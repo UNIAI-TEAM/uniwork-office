@@ -32,6 +32,7 @@
     "dev:docs": "npm run dev -w @genoffice/docs",
     "build": "npm run build -w @genoffice/docs",
     "build:all": "npm run build -w @genoffice/docs && npm run build -w @genoffice/sheets && npm run build -w @genoffice/slides && npm run build -w @genoffice/pdf && npm run build -w @genoffice/markdown && npm run build -w @genoffice/html && npm run build -w @genoffice/cli && npm run build -w @genoffice/shell",
+    "build:web": "vite build --config web/docs/vite.config.ts",
     "shell": "npm run build:all && electron apps/shell",
     "test:e2e": "playwright test --config e2e/playwright.config.ts",
     "notices": "node tools/gen-third-party-notices.mjs",

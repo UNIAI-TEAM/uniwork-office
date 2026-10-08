@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <!--
+      Desktop CSP (apps/docs/src/renderer/index.html), kept for comparison:
+        default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';
+        img-src 'self' data: blob:; font-src 'self' data: blob:; worker-src 'self' blob:;
+        connect-src 'self' ws://localhost:*
+      Web spike: connect-src additionally allows http://localhost:* (local AI / API stubs).
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data: blob:; worker-src 'self' blob:; connect-src 'self' http://localhost:* ws://localhost:*"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>UniWork Docs (web)</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <!-- bridge must run first: it installs window.desktop / window.projectApi -->
+    <script type="module" src="./bridge/install.ts"></script>
+    <script type="module" src="../../apps/docs/src/renderer/main.tsx"></script>
+  </body>
+</html>
