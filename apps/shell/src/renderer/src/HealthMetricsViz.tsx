@@ -255,7 +255,11 @@ export function HealthMetricsViz({ vi }: { vi: boolean }): ReactElement {
                 {meta.unit ? ` ${meta.unit}` : ''}
               </span>
             </header>
-            <BarTrend values={trend} color={meta.color} empty={label('Chưa đủ dữ liệu', 'Not enough data')} />
+            <BarTrend
+              values={trend}
+              color={meta.color}
+              empty={label('Chưa đủ dữ liệu', 'Not enough data')}
+            />
           </section>
           <section className="wb-hdash-card">
             <header>
@@ -435,7 +439,12 @@ function AreaWave({
   const line = pts.join(' ')
   const area = `0,${h} ${line} ${w},${h}`
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="wb-hdash-chart-svg" role="img" opacity={muted ? 0.45 : 1}>
+    <svg
+      viewBox={`0 0 ${w} ${h}`}
+      className="wb-hdash-chart-svg"
+      role="img"
+      opacity={muted ? 0.45 : 1}
+    >
       <polygon points={area} fill={color} opacity="0.22" />
       <polyline points={line} fill="none" stroke={color} strokeWidth="2.5" strokeLinejoin="round" />
     </svg>
@@ -604,7 +613,12 @@ function DashboardBody({
           {label('📁 Tải ảnh lên', '📁 Upload')}
         </button>
         {bodySource !== 'default' ? (
-          <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => void resetDefault()}>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            disabled={busy}
+            onClick={() => void resetDefault()}
+          >
             {label('Mô hình mặc định', 'Default model')}
           </button>
         ) : null}

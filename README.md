@@ -6,15 +6,15 @@ UniWork Office is an independently branded fork of [GenOffice](https://github.co
 
 ## Supported applications
 
-| App | Package | Formats |
-| --- | --- | --- |
-| UniWork Docs | `@genoffice/docs` | `.docx` open / edit / save |
-| UniWork Sheets | `@genoffice/sheets` | `.xlsx` (and `.xlsm`, `.xls`, `.csv` associations) |
-| UniWork Slides | `@genoffice/slides` | `.pptx` open / edit / save |
-| UniWork PDF | `@genoffice/pdf` | `.pdf` view / edit (content-stream rewrite where supported) |
-| Markdown | `@genoffice/markdown` | `.md` |
-| HTML | `@genoffice/html` | `.html` |
-| UniWork Office Desktop | `@genoffice/shell` | suite shell hosting the editors |
+| App                    | Package               | Formats                                                     |
+| ---------------------- | --------------------- | ----------------------------------------------------------- |
+| UniWork Docs           | `@genoffice/docs`     | `.docx` open / edit / save                                  |
+| UniWork Sheets         | `@genoffice/sheets`   | `.xlsx` (and `.xlsm`, `.xls`, `.csv` associations)          |
+| UniWork Slides         | `@genoffice/slides`   | `.pptx` open / edit / save                                  |
+| UniWork PDF            | `@genoffice/pdf`      | `.pdf` view / edit (content-stream rewrite where supported) |
+| Markdown               | `@genoffice/markdown` | `.md`                                                       |
+| HTML                   | `@genoffice/html`     | `.html`                                                     |
+| UniWork Office Desktop | `@genoffice/shell`    | suite shell hosting the editors                             |
 
 Internal npm workspace names remain `@genoffice/*` so upstream merges stay possible.
 
