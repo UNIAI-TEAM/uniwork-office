@@ -76,6 +76,7 @@ const GITHUB_URL_FILES = [
   'apps/shell/src/renderer/src/SettingsModal.tsx',
   'apps/docs/src/renderer/App.tsx',
   'packages/electron-utils/src/github-menu.ts',
+  'apps/uniai-pwa/app.js',
 ]
 
 const aiBadgeSvg = (classLine) => `    <svg
@@ -361,13 +362,16 @@ export const rules = [
   },
   {
     id: 'origin-repo-urls',
-    why: 'Homepage / repository / releases / issues / stars links point at the UniWork origin repo (limited to the files the hand rebrand touched; other upstream URLs are tracked by the brand scan allowlist)',
+    why: 'Homepage / repository / releases / issues / stars links point at the UniWork team repo UNIAI-TEAM/uniwork-office. The earlier fork truongnt7/uniwork-office is rewritten too (limited to the files the hand rebrand touched plus the PWA download links; other upstream URLs are tracked by the brand scan allowlist)',
     files: GITHUB_URL_FILES,
     replace: [
-      [/github\.com\/genspark-ai\/genoffice/g, 'github.com/truongnt7/uniwork-office'],
       [
-        /https:\/\/api\.github\.com\/repos\/genspark-ai\/genoffice/g,
-        'https://api.github.com/repos/truongnt7/uniwork-office',
+        /github\.com\/(?:genspark-ai\/genoffice|truongnt7\/uniwork-office)/g,
+        'github.com/UNIAI-TEAM/uniwork-office',
+      ],
+      [
+        /https:\/\/api\.github\.com\/repos\/(?:genspark-ai\/genoffice|truongnt7\/uniwork-office)/g,
+        'https://api.github.com/repos/UNIAI-TEAM/uniwork-office',
       ],
     ],
   },
@@ -376,7 +380,7 @@ export const rules = [
     why: 'GenTeam community link and the onboarding offer slide are disabled (no genoffice.ai link)',
     files: ['apps/shell/src/main/index.ts', 'apps/shell/src/renderer/src/Onboarding.tsx'],
     replace: [
-      [/'https:\/\/genoffice\.ai\/join'/g, "'https://github.com/truongnt7/uniwork-office'"],
+      [/'https:\/\/genoffice\.ai\/join'/g, "'https://github.com/UNIAI-TEAM/uniwork-office'"],
       [/(titleKey: 'onbTitle2', subtitleKey: 'onbBody2', showOffer: )true/g, '$1false'],
     ],
   },

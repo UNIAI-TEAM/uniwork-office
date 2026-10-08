@@ -922,7 +922,7 @@ function renderOfficeDocDetail(doc) {
   fallback.hidden = true
   fallback.innerHTML = `
     <p>Chưa mở được? Cần UniWork Office desktop đã đăng ký protocol <code>uniwork://</code> (bản mới có <code>office/app</code>). Rebuild/cài lại shell rồi thử.</p>
-    <a href="https://github.com/truongnt7/uniwork-office/releases/latest" target="_blank" rel="noopener">Tải UniWork Office</a>
+    <a href="https://github.com/UNIAI-TEAM/uniwork-office/releases/latest" target="_blank" rel="noopener">Tải UniWork Office</a>
   `
   const retry = document.createElement('button')
   retry.type = 'button'
@@ -1442,7 +1442,7 @@ function renderSettings() {
       </div>
       <div class="settings-row">
         <div><span class="settings-label">Cài UniWork Office</span><small>Desktop để mở Workbench &amp; file Office</small></div>
-        <a class="settings-link" href="https://github.com/truongnt7/uniwork-office/releases/latest" target="_blank" rel="noopener">Tải</a>
+        <a class="settings-link" href="https://github.com/UNIAI-TEAM/uniwork-office/releases/latest" target="_blank" rel="noopener">Tải</a>
       </div>
       <div class="settings-row">
         <div><span class="settings-label">Phản hồi</span><small>Góp ý sản phẩm</small></div>

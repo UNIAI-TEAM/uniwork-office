@@ -176,3 +176,26 @@ test('vi errNoApiKey keeps the UniWork wording after an upstream merge', () => {
     )
   })
 })
+
+test('origin links point at the UNIAI-TEAM repo, from upstream and from the old fork', () => {
+  withFiles(
+    {
+      'package.json': '{ "homepage": "https://github.com/truongnt7/uniwork-office" }\n',
+      'apps/shell/src/main/updater.ts':
+        "const A = 'https://github.com/genspark-ai/genoffice/releases/latest'\nconst B = 'https://github.com/truongnt7/uniwork-office/releases/latest'\n",
+      'apps/shell/src/main/index.ts':
+        "const S = 'https://api.github.com/repos/truongnt7/uniwork-office'\nconst J = 'https://genoffice.ai/join'\n",
+    },
+    (get) => {
+      assert.match(get('package.json'), /github\.com\/UNIAI-TEAM\/uniwork-office"/)
+      assert.equal(
+        get('apps/shell/src/main/updater.ts'),
+        "const A = 'https://github.com/UNIAI-TEAM/uniwork-office/releases/latest'\nconst B = 'https://github.com/UNIAI-TEAM/uniwork-office/releases/latest'\n",
+      )
+      assert.equal(
+        get('apps/shell/src/main/index.ts'),
+        "const S = 'https://api.github.com/repos/UNIAI-TEAM/uniwork-office'\nconst J = 'https://github.com/UNIAI-TEAM/uniwork-office'\n",
+      )
+    },
+  )
+})

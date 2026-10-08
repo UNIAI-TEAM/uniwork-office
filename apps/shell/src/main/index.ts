@@ -660,7 +660,7 @@ function initAnalytics(): void {
 // ---- first-run onboarding ----
 // Onboarding offer CTA (disabled in GO-1). Points at the UniWork origin repo,
 // not genoffice.ai.
-const GENTEAM_URL = 'https://github.com/truongnt7/uniwork-office'
+const GENTEAM_URL = 'https://github.com/UNIAI-TEAM/uniwork-office'
 
 // Genspark credit-usage page opened from the account menu's credits row.
 // Kept main-side so the renderer never supplies the URL.
@@ -701,7 +701,7 @@ let cachedGithubStars: number | null = null
 async function fetchGithubStars(): Promise<number | null> {
   if (cachedGithubStars !== null) return cachedGithubStars
   try {
-    const response = await fetch('https://api.github.com/repos/truongnt7/uniwork-office', {
+    const response = await fetch('https://api.github.com/repos/UNIAI-TEAM/uniwork-office', {
       headers: { Accept: 'application/vnd.github+json' },
       signal: AbortSignal.timeout(5000),
     })

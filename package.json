@@ -10,7 +10,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/truongnt7/uniwork-office.git"
+    "url": "git+https://github.com/UNIAI-TEAM/uniwork-office.git"
   },
   "workspaces": [
     "apps/*",

@@ -2022,8 +2022,8 @@ export function SettingsModal({
                   label={t('setGithub')}
                   value={
                     githubStars === null
-                      ? 'github.com/truongnt7/uniwork-office'
-                      : `github.com/truongnt7/uniwork-office · ★ ${formatStars(githubStars)}`
+                      ? 'github.com/UNIAI-TEAM/uniwork-office'
+                      : `github.com/UNIAI-TEAM/uniwork-office · ★ ${formatStars(githubStars)}`
                   }
                   action={
                     <button
