@@ -12,6 +12,7 @@ import {
   type ProtocolErrorCode,
   type ProtocolErrorShape,
   type SavedPayload,
+  type Theme,
 } from '../protocol/types'
 
 export interface PortRequestOptions {
@@ -24,6 +25,9 @@ export interface PortRequestOptions {
 export interface PortSession {
   documentId: string
   open?: HostRequests['open']['payload']
+  /** the host's UI theme / locale from `init` (absent in unit-test sessions) */
+  theme?: Theme
+  locale?: string
 }
 
 type HostHandler<K extends keyof HostRequests> = (
@@ -44,6 +48,9 @@ export interface FramePort {
   handlePrint(handler: HostHandler<'print'>): () => void
   handleCloseCheck(handler: HostHandler<'doc.closeCheck'>): () => void
   onFileRenamed(listener: (file: FileMeta) => void): () => void
+  /** host `theme` / `language` events (the host is authoritative for both) */
+  onTheme(listener: (theme: Theme) => void): () => void
+  onLanguage(listener: (locale: string) => void): () => void
   setDirty(dirty: boolean): void
   setTitle(title: string): void
   reportSaved(payload: SavedPayload): void

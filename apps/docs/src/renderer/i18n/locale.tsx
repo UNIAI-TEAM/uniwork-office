@@ -68,7 +68,7 @@ export const DATE_LOCALES: Record<Lang, string> = {
   ms: 'ms-MY',
   he: 'he-IL',
   hi: 'hi-IN',
-  vi: "\n\nTrả lời bằng cùng ngôn ngữ với tin nhắn của người dùng; nếu không xác định được, hãy trả lời bằng tiếng Việt.",
+  vi: 'vi-VN',
   'zh-TW': 'zh-TW',
 }
 

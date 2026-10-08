@@ -30,7 +30,10 @@ beforeEach(() => {
   vi.spyOn(console, 'warn').mockImplementation(() => {})
   URL.createObjectURL = vi.fn(() => 'blob:fake')
   URL.revokeObjectURL = vi.fn()
-  window.print = vi.fn()
+  // the browser print path settles on afterprint, like a real print dialog closing
+  window.print = vi.fn(() => {
+    window.dispatchEvent(new Event('afterprint'))
+  })
   click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
   setup()
 })
@@ -402,6 +405,39 @@ describe('exportPdf / print', () => {
     expect(mock.calls.at(-1)!.type).toBe('api.export')
     expect(await mock.host.print({})).toEqual({ printed: true })
     expect(window.print).toHaveBeenCalledTimes(1)
+  })
+
+  it('host print request goes through the browser print path and answers after it settles', async () => {
+    await bootWith()
+    let during: { theme: string | null; sheet: boolean } | null = null
+    document.documentElement.setAttribute('data-theme', 'dark')
+    window.print = vi.fn(() => {
+      during = {
+        theme: document.documentElement.getAttribute('data-theme'),
+        sheet: !!document.getElementById('web-bridge-print-page'),
+      }
+      // the dialog stays open: afterprint comes later
+      setTimeout(() => window.dispatchEvent(new Event('afterprint')), 20)
+    })
+    let answered = false
+    const pending = (mock.host.print({ mode: 'dialog' }) as Promise<unknown>).then((r) => {
+      answered = true
+      return r
+    })
+    await new Promise((r) => setTimeout(r, 5))
+    expect(during).toEqual({ theme: 'light', sheet: true })
+    expect(answered).toBe(false)
+    expect(await pending).toEqual({ printed: true })
+    expect(document.getElementById('web-bridge-print-page')).toBeNull()
+    document.documentElement.removeAttribute('data-theme')
+  })
+
+  it('host print request reports printed:false when the browser refuses to print', async () => {
+    await bootWith()
+    window.print = vi.fn(() => {
+      throw new Error('blocked')
+    })
+    expect(await mock.host.print({})).toEqual({ printed: false })
   })
 
   it('exportHtml downloads locally', async () => {

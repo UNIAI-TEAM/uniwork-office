@@ -44,6 +44,7 @@ import type {
   SaveResult,
 } from '../protocol/types'
 import { TIMEOUTS, errorCode, type FramePort } from './frame-port'
+import { printFrame } from './browser'
 import { createSession, type SessionOptions } from './session'
 import { projectApi } from './project-memory'
 
@@ -146,6 +147,8 @@ export const WEB_PRINT_PART = 'web-print-deferred'
 
 export interface WebApiOptions {
   session?: SessionOptions
+  /** the in-frame print (default: browser.ts printFrame); injectable for tests */
+  print?: (scale?: number) => Promise<{ ok: boolean; error?: string }>
 }
 
 // ---------------------------------------------------------------- factory
@@ -279,9 +282,17 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
 
   // ------------------------------------------------------------ export / print
 
-  function printViaBrowser(defaultName: string): { ok: boolean; path?: string } {
-    window.print()
-    return { ok: true, path: `${withExt(defaultName, '.pdf')} (browser print dialog)` }
+  /**
+   * The in-frame print dialog through the BROWSER print path (browser.ts printFrame: print
+   * sheet, print-color-adjust, light theme pin, settles on `afterprint`).
+   */
+  async function printViaBrowser(
+    defaultName: string,
+  ): Promise<{ ok: boolean; path?: string; error?: string }> {
+    const r = await (opts.print ?? printFrame)()
+    return r.ok
+      ? { ok: true, path: `${withExt(defaultName, '.pdf')} (browser print dialog)` }
+      : { ok: false, ...(r.error ? { error: r.error } : {}) }
   }
 
   /** the renderer's live-document serializer (App.tsx registers it via provideDocBytes) */
@@ -344,8 +355,9 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
       const r = await exportCurrentPdf(name, 0, 0)
       return { printed: r.ok }
     }
-    window.print()
-    return { printed: true }
+    // answered after the print settles (afterprint), so the host knows the job is over
+    const r = await (opts.print ?? printFrame)()
+    return { printed: r.ok }
   })
 
   // ------------------------------------------------------------ DesktopApi part
