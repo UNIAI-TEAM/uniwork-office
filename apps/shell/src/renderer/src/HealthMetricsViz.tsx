@@ -186,8 +186,8 @@ export function HealthMetricsViz({ vi }: { vi: boolean }): ReactElement {
       <div className="wb-hdash-top">
         <p className="teacher-hint">
           {label(
-            'Bảng chỉ số sức khoẻ — hiện bạn nhập số liệu bằng tay. Kết nối Apple Watch / đồng hồ sức khoẻ dùng được khi có mạng.',
-            'Health metrics dashboard — you enter readings by hand for now. Apple Watch / wearable sync works once you are online.',
+            'Bảng chỉ số sức khoẻ — hiện bạn nhập số liệu bằng tay.',
+            'Health metrics dashboard — you enter readings by hand.',
           )}
         </p>
         <DeviceConnectStrip vi={vi} />
