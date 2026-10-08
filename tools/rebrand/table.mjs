@@ -308,14 +308,41 @@ export const rules = [
   },
   {
     id: 'cli-gui-binary-paths',
-    why: 'CLI looks for the renamed app executable (executableName uniwork-office) on linux',
+    why: "CLI looks for the renamed app executable (executableName uniwork-office) on linux. The deb/rpm post-install only links the launcher at /usr/bin/genoffice, so upstream's second candidate (/usr/bin/<app>) is dropped, not renamed",
     files: ['packages/cli/src/resources.ts'],
     replace: [
       [
-        /\['\/opt\/UniWork Office\/genoffice', '\/usr\/bin\/genoffice'\]/g,
-        "['/opt/UniWork Office/uniwork-office', '/usr/bin/uniwork-office']",
+        /'\/opt\/UniWork Office\/genoffice',\s*'\/usr\/bin\/genoffice'/g,
+        "'/opt/UniWork Office/uniwork-office'",
       ],
+      [/join\(install, 'genoffice'\)/g, "join(install, 'uniwork-office')"],
     ],
+  },
+  {
+    id: 'cli-launchers',
+    why: 'Shipped CLI launchers start the renamed app binary: MacOS/UniWork Office, UniWork Office.exe and the linux executableName uniwork-office (must match productName / executableName in apps/shell/electron-builder.cjs; asserted by packages/cli/tests/launcher-names.test.ts)',
+    files: ['packages/cli/bin/genoffice', 'packages/cli/bin/genoffice.cmd'],
+    replace: [
+      [PRODUCT_NAME, 'UniWork Office'],
+      [/(app="\$here\/\.\.\/\.\.\/)genoffice"/g, '$1uniwork-office"'],
+    ],
+  },
+  {
+    id: 'cli-readme-names',
+    why: 'npm-published CLI README: product name in prose and paths, vendor account wording (the README is in the brand-scan scope)',
+    files: ['packages/cli/README.md'],
+    ignoreGlobalExclude: true,
+    replace: [
+      [PRODUCT_NAME, 'UniWork Office'],
+      [/(?<![A-Za-z0-9_])Genspark(?![A-Z0-9_])/g, 'UniWork'],
+    ],
+  },
+  {
+    id: 'mcp-bridge-log',
+    why: "MCP stdio bridge log lines show up in the MCP client's server log (comment lines are left alone)",
+    files: ['scripts/mcp-stdio-bridge.js'],
+    skipComments: true,
+    replace: [[PRODUCT_NAME, 'UniWork Office']],
   },
   {
     id: 'origin-repo-urls',

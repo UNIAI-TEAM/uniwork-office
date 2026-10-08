@@ -134,11 +134,8 @@ function installedAppBinaries(
         env.ProgramFiles ? join(env.ProgramFiles, 'UniWork Office', 'UniWork Office.exe') : '',
       ].filter(Boolean)
     default:
-      return [
-        ...(shipped ? [shipped] : []),
-        '/opt/UniWork Office/uniwork-office',
-        '/usr/bin/uniwork-office',
-      ]
+      // no /usr/bin candidate: the deb/rpm post-install links only the CLI launcher there
+      return [...(shipped ? [shipped] : []), '/opt/UniWork Office/uniwork-office']
   }
 }
 
@@ -146,7 +143,7 @@ export function appBinaryForResources(resources: string, platform: NodeJS.Platfo
   const install = dirname(resources)
   if (platform === 'darwin') return join(install, 'MacOS', 'UniWork Office')
   if (platform === 'win32') return join(install, 'UniWork Office.exe')
-  return join(install, 'genoffice')
+  return join(install, 'uniwork-office')
 }
 
 /**

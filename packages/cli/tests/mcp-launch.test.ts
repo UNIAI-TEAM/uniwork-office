@@ -7,7 +7,7 @@ import { tempDir } from './helpers'
 
 const WIN_DIR = 'C:\\Users\\Jane Doe\\AppData\\Local\\Programs\\GenOffice\\resources\\cli'
 const WIN_APP: McpLaunch = {
-  command: `${WIN_DIR}\\..\\..\\GenOffice.exe`,
+  command: `${WIN_DIR}\\..\\..\\UniWork Office.exe`,
   args: [`${WIN_DIR}\\genoffice.cjs`, 'mcp'],
   env: { ELECTRON_RUN_AS_NODE: '1' },
 }
@@ -38,7 +38,7 @@ describe('mcp launch entry', () => {
   })
 
   it('runs the packaged Windows app as Node on the bundle, exactly as the app snippet does', () => {
-    const exists = (p: string) => p === `${WIN_DIR}\\..\\..\\GenOffice.exe`
+    const exists = (p: string) => p === `${WIN_DIR}\\..\\..\\UniWork Office.exe`
     const fromCli = mcpLaunchFromLauncher(`${WIN_DIR}\\genoffice.cmd`, { exists })
     expect(fromCli).toEqual(WIN_APP)
     expect(fromCli).toEqual(mcpLaunch({ status: 'missing', launcherDir: WIN_DIR }))

@@ -14,7 +14,9 @@
 //              repository, build.*; not the npm name or dependency maps)
 //   installer  electron-builder config and installer scripts under */build/ (comments too)
 //   source     string literals / markup in apps/*/src and packages/*/src (comment lines skipped)
-//   shipped    skills/** copied into users' agent directories
+//   installer  also packages/cli/bin/** (the shipped launchers) and packaging/** (flatpak, nix, docker)
+//   shipped    skills/** copied into users' agent directories, and the npm-published packages/cli/README.md
+//   source     also scripts/mcp-stdio-bridge.js (its log lines reach the MCP client)
 //
 // Exemptions live in brand-allowlist.json, one reason per entry. Code
 // identifiers (@genoffice/*, GENOFFICE_* env vars, font aliases, ...) are
@@ -77,7 +79,11 @@ export function scopeOf(file) {
   if (matchesAny(file, ['apps/*/electron-builder.*', 'apps/*/build/**'])) {
     return TEXT_EXT.test(file) ? 'installer' : null
   }
-  if (matchesAny(file, ['skills/**/*.md'])) return 'shipped'
+  // launchers and package recipes ship with or beside the installers; any text file counts
+  // (extension-less launchers included), binaries are skipped by the NUL check in scan()
+  if (matchesAny(file, ['packages/cli/bin/**', 'packaging/**'])) return 'installer'
+  if (matchesAny(file, ['skills/**/*.md', 'packages/cli/README.md'])) return 'shipped'
+  if (file === 'scripts/mcp-stdio-bridge.js') return 'source'
   if (matchesAny(file, CATALOG_PATHS)) return 'catalog'
   if (matchesAny(file, ['apps/*/src/**', 'packages/*/src/**'])) {
     return TEXT_EXT.test(file) && !matchesAny(file, ['**/fonts/**']) ? 'source' : null

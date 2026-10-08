@@ -147,3 +147,16 @@ test('the shipped allowlist file is well formed', () => {
   assert.ok(entries.length > 0)
   for (const e of entries) assert.ok(e.reason.length > 20, `reason too thin: ${e.path}`)
 })
+
+test('scope covers the shipped CLI launchers, packaging recipes, CLI README and MCP bridge', () => {
+  assert.equal(scopeOf('packages/cli/bin/genoffice'), 'installer')
+  assert.equal(scopeOf('packages/cli/bin/genoffice.cmd'), 'installer')
+  assert.equal(scopeOf('packaging/flatpak/com.genoffice.app.json'), 'installer')
+  assert.equal(scopeOf('packaging/docker/batch-convert'), 'installer')
+  assert.equal(scopeOf('packages/cli/README.md'), 'shipped')
+  assert.equal(scopeOf('scripts/mcp-stdio-bridge.js'), 'source')
+  const { violations } = run({
+    'packages/cli/bin/genoffice': 'app="$here/../../MacOS/GenOffice"',
+  })
+  assert.equal(violations.length, 1)
+})
