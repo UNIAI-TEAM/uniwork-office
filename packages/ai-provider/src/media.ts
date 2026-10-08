@@ -5,6 +5,7 @@ import type {
   AiMediaSettings,
   AiSettings,
 } from './types'
+import { uniworkCloudEnabled } from './uniwork-cloud'
 
 export const OPENAI_IMAGES_BASE_URL = 'https://api.openai.com/v1'
 export const GEMINI_MEDIA_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta'
@@ -18,12 +19,14 @@ export const MINIMAX_BASE_URL = 'https://api.minimax.io/v1'
 export const DEEPSEEK_MEDIA_BASE_URL = 'https://api.deepseek.com/v1'
 
 // Model ids verified against vendor docs 2026-09; keep chat-capable analysis
-// models in step with the chat catalog in providers.ts.
+// models in step with the chat catalog in providers.ts. The `genspark` entry
+// is the UniWork cloud route, kept so stored settings still resolve; pickers
+// list visibleMediaProviders() instead.
 export const AI_MEDIA_PROVIDERS: AiMediaProviderMeta[] = [
   {
     id: 'genspark',
     label: 'UniWork',
-    description: 'Image generation, media analysis and search through your UniWork sign-in',
+    description: 'Image generation and media analysis through your UniWork sign-in',
     keyPlaceholder: 'Not required - sign in to UniWork',
     defaultBaseUrl: '',
     imageProtocol: 'openai-images',
@@ -308,7 +311,7 @@ export function activeMediaProvider(
   return id
 }
 
-/** the active BYOK config for one capability, or null when it runs through Genspark */
+/** the active BYOK config for one capability, or null when it falls back to the UniWork cloud route */
 export function activeMediaConfig(
   settings: Pick<AiSettings, 'media'>,
   capability: MediaCapability,
@@ -330,18 +333,30 @@ function byokModel(
     : active.config.analysisModel || meta.defaultAnalysisModel
 }
 
+/**
+ * Media providers a picker may offer: the UniWork cloud entry only while the
+ * cloud seam is on, so a stored `genspark` choice stays readable but hidden.
+ */
+export function visibleMediaProviders(): AiMediaProviderMeta[] {
+  return uniworkCloudEnabled()
+    ? AI_MEDIA_PROVIDERS
+    : AI_MEDIA_PROVIDERS.filter((m) => m.id !== 'genspark')
+}
+
+/** BYOK-only while the cloud seam is off; the cloud fallback also needs a sign-in and the cloud toggle */
 function capabilityAvailable(
   settings: Pick<AiSettings, 'media' | 'gskToolsEnabled'> | null | undefined,
   gskLoggedIn: boolean,
   capability: MediaCapability,
 ): boolean {
-  if (!settings) return gskLoggedIn
+  const cloud = uniworkCloudEnabled() && gskLoggedIn
+  if (!settings) return cloud
   const model = byokModel(settings, capability)
   if (model !== null) return model !== ''
-  return gskLoggedIn && settings.gskToolsEnabled !== false
+  return cloud && settings.gskToolsEnabled !== false
 }
 
-/** live predicate for the generate_image tool: BYOK image model configured, or gsk login + cloud tools on */
+/** live predicate for the generate_image tool: BYOK image model configured, or cloud sign-in + cloud tools on */
 export function imageGenerationAvailable(
   settings: Pick<AiSettings, 'media' | 'gskToolsEnabled'> | null | undefined,
   gskLoggedIn: boolean,

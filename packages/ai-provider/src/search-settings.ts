@@ -6,12 +6,8 @@ import type {
 } from './types'
 
 export const AI_SEARCH_PROVIDERS: AiSearchProviderMeta[] = [
-  {
-    id: 'genspark',
-    label: 'UniWork',
-    keyPlaceholder: 'Not required - sign in to UniWork',
-    imageSearch: true,
-  },
+  // keyless default: Parallel's free search, then DuckDuckGo
+  { id: 'auto', label: 'Auto', keyPlaceholder: 'Not required', imageSearch: true },
   { id: 'serper', label: 'Serper', keyPlaceholder: 'Serper API key', imageSearch: true },
   { id: 'serply', label: 'Serply', keyPlaceholder: 'Serply API key', imageSearch: true },
   { id: 'tavily', label: 'Tavily', keyPlaceholder: 'tvly-...', imageSearch: false },
@@ -23,7 +19,7 @@ export const AI_SEARCH_PROVIDERS: AiSearchProviderMeta[] = [
 
 export function defaultAiSearchSettings(): AiSearchSettings {
   return {
-    provider: 'genspark',
+    provider: 'auto',
     providers: {
       serper: { apiKey: '' },
       serply: { apiKey: '' },
@@ -45,16 +41,22 @@ export function resolveAiSearchSettings(
     const key = stored.providers?.[id]?.apiKey
     if (typeof key === 'string') providers[id] = { apiKey: key.trim() }
   }
-  return { provider: stored.provider ?? defaults.provider, providers }
+  return { provider: migrateSearchProvider(stored.provider) ?? defaults.provider, providers }
 }
 
-/** Parallel can run keylessly; other custom providers require a key or fall back to Genspark. */
+/** the retired `genspark` search backend reads back as the keyless `auto` chain */
+function migrateSearchProvider(provider: unknown): AiSearchProviderId | undefined {
+  if (provider === 'genspark') return 'auto'
+  return provider as AiSearchProviderId | undefined
+}
+
+/** Parallel can run keylessly; other custom providers require a key or fall back to the keyless auto chain. */
 export function activeSearchProvider(settings: Pick<AiSettings, 'search'>): AiSearchProviderId {
   const search = settings.search
-  if (!search || search.provider === 'genspark') return 'genspark'
-  if (!AI_SEARCH_PROVIDERS.some((m) => m.id === search.provider)) return 'genspark'
+  if (!search || search.provider === 'auto') return 'auto'
+  if (!AI_SEARCH_PROVIDERS.some((m) => m.id === search.provider)) return 'auto'
   if (search.provider === 'parallel') return 'parallel'
   // Trim-aware: a whitespace-only key from in-memory settings falls back
   // instead of sending `Bearer    ` to the search backend.
-  return search.providers?.[search.provider]?.apiKey?.trim() ? search.provider : 'genspark'
+  return search.providers?.[search.provider]?.apiKey?.trim() ? search.provider : 'auto'
 }

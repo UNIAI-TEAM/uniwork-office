@@ -7,6 +7,7 @@ import {
   imageGenerationAvailable,
   mediaAnalysisAvailable,
   resolveAiMediaSettings,
+  visibleMediaProviders,
 } from '../src/media'
 import {
   analyzeMediaWithProvider,
@@ -142,9 +143,11 @@ describe('media settings', () => {
     ).toBe('genspark')
   })
 
-  it('gates the tools on gsk login + toggle without BYOK, and on the BYOK model with it', () => {
+  it('is BYOK-only while the UniWork cloud seam is off, and gated on the BYOK model', () => {
     const genspark = defaultAiSettings()
-    expect(imageGenerationAvailable(genspark, true)).toBe(true)
+    // no cloud route: a signed-in flag alone never enables the tools
+    expect(imageGenerationAvailable(genspark, true)).toBe(false)
+    expect(mediaAnalysisAvailable(genspark, true)).toBe(false)
     expect(imageGenerationAvailable(genspark, false)).toBe(false)
     expect(imageGenerationAvailable({ ...genspark, gskToolsEnabled: false }, true)).toBe(false)
     expect(mediaAnalysisAvailable({ ...genspark, gskToolsEnabled: false }, true)).toBe(false)
@@ -169,7 +172,13 @@ describe('media settings', () => {
     }
     expect(mediaAnalysisAvailable(withMedia(custom), false)).toBe(false)
     expect(imageGenerationAvailable(withMedia(custom), false)).toBe(true)
-    expect(imageGenerationAvailable(null, true)).toBe(true)
+    expect(imageGenerationAvailable(null, true)).toBe(false)
+  })
+
+  it('hides the UniWork cloud entry from pickers while keeping it for stored settings', () => {
+    expect(AI_MEDIA_PROVIDERS.some((m) => m.id === 'genspark')).toBe(true)
+    expect(visibleMediaProviders().map((m) => m.id)).not.toContain('genspark')
+    expect(visibleMediaProviders()).toHaveLength(AI_MEDIA_PROVIDERS.length - 1)
   })
 })
 

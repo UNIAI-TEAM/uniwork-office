@@ -23,7 +23,6 @@ export type {
 export {
   AI_PROVIDERS,
   DEFAULT_MAX_OUTPUT_TOKENS,
-  GENSPARK_LLM_BASE_URLS,
   MAX_MAX_OUTPUT_TOKENS,
   MIN_MAX_OUTPUT_TOKENS,
   activeProvider,
@@ -49,8 +48,10 @@ export {
   providerHasCapability,
   resolveAiMediaSettings,
   videoAnalysisAvailable,
+  visibleMediaProviders,
 } from './media'
 export type { MediaCapability } from './media'
+export { UNIWORK_CLOUD_ENABLED, uniworkCloudEnabled } from './uniwork-cloud'
 export {
   AI_SEARCH_PROVIDERS,
   activeSearchProvider,
