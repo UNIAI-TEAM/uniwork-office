@@ -110,7 +110,7 @@ export const imageCommand: CommandDef = {
     if (!r.url)
       throw new CliError(EXIT.app, r.error ?? 'image generation failed', undefined, {
         suggestion:
-          'retry once later; if it persists, check the UniWork login in the UniWork Office app, configure a BYOK image provider under Settings (AI Media), or continue without generated images',
+          'configure an image provider under Settings (AI Media) in the UniWork Office app, or continue without generated images',
       })
     const image = await loadImage(r.url)
     const ext = EXTS_BY_MIME[image.mime]?.[0] ?? 'png'
@@ -154,7 +154,7 @@ export function siblingExtensions(outExt: string): string[] {
     .map(([, exts]) => exts[0]!)
 }
 
-/** Genspark returns an https URL, BYOK providers a file:// in the app's generated-image store; fetchRemoteImage serves both. */
+/** a provider may return an https URL or a file:// in the app's generated-image store; fetchRemoteImage serves both. */
 async function loadImage(url: string): Promise<{ bytes: Uint8Array; mime: string }> {
   const response = await fetchRemoteImage(url)
   if (!response?.ok) throw new CliError(EXIT.app, `could not download the generated image: ${url}`)
