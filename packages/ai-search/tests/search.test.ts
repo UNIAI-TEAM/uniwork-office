@@ -1,12 +1,7 @@
-import { describe, it, expect, vi, afterEach, beforeAll } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { webSearch, imageSearch } from '../src/index'
 import { searchOptionsFromSettings, testSearchProvider } from '../src/search-tools'
 import { defaultAiSettings } from '@genoffice/ai-provider'
-
-// These cases only test the Serper/DuckDuckGo paths; a local gsk login would take priority, so disable it explicitly
-beforeAll(() => {
-  process.env.AI_SEARCH_DISABLE_GSK = '1'
-})
 
 const realFetch = globalThis.fetch
 afterEach(() => {
@@ -481,7 +476,8 @@ describe('webSearch (Firecrawl)', () => {
 describe('search-tools', () => {
   it('maps the settings block onto SearchOptions', () => {
     const base = defaultAiSettings()
-    expect(searchOptionsFromSettings(base)).toEqual({ useGsk: true })
+    // the default `auto` provider is the keyless chain; the cloud backend is never asked
+    expect(searchOptionsFromSettings(base)).toEqual({ useGsk: false })
     expect(searchOptionsFromSettings({ ...base, gskToolsEnabled: false })).toEqual({
       useGsk: false,
     })
@@ -553,7 +549,7 @@ describe('search-tools', () => {
       firecrawlKey: 'fc-1',
       prefer: 'firecrawl',
     })
-    // no key → genspark chain
+    // no key → the keyless auto chain
     const empty = {
       ...base,
       search: {
@@ -568,7 +564,7 @@ describe('search-tools', () => {
         },
       },
     }
-    expect(searchOptionsFromSettings(empty)).toEqual({ useGsk: true })
+    expect(searchOptionsFromSettings(empty)).toEqual({ useGsk: false })
   })
 
   it('reports a rejected key as a failure instead of the silent free fallback', async () => {

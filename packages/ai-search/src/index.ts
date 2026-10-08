@@ -1,11 +1,11 @@
 /**
- * Search utilities (main process) — gsk (Genspark CLI) first, then Serper Google API,
+ * Search utilities (main process) — the UniWork cloud (off until it is wired, see ./gsk.ts),
+ * then Serper Google API,
  * then Serply, Tavily, Parallel (whose free Search MCP answers keyless), Exa and Firecrawl,
  * before the DuckDuckGo last resort. Runs in the main process
- * (Node fetch / child process) to avoid renderer CORS; the Serper key reuses SERPER_API_KEY,
+ * (Node fetch) to avoid renderer CORS; the Serper key reuses SERPER_API_KEY,
  * the Serply key reuses SERPLY_API_KEY, the Tavily key reuses TAVILY_API_KEY, Parallel uses
  * PARALLEL_API_KEY, Exa uses EXA_API_KEY and Firecrawl uses FIRECRAWL_API_KEY.
- * For gsk auth see ./gsk.ts (`gsk login` or GSK_API_KEY).
  */
 
 import {
@@ -20,7 +20,6 @@ import { parallelMcpSearch } from './parallel-mcp'
 
 export type { ImageSearchResult, WebSearchResult } from './shared'
 export * from './gsk'
-export * from './genoffice-auth'
 export * from './media-tools'
 export * from './search-tools'
 
@@ -37,7 +36,7 @@ const FIRECRAWL_KEY = () => process.env.FIRECRAWL_API_KEY ?? ''
  * user's key and turn gsk off so the chosen backend runs first.
  */
 export interface SearchOptions {
-  /** false = skip the Genspark backend (cloud tools off, or a BYOK search provider is active) */
+  /** false = skip the UniWork cloud backend (cloud tools off, or a BYOK search provider is active) */
   useGsk?: boolean
   serperKey?: string
   serplyKey?: string
@@ -388,7 +387,7 @@ export async function webSearch(
 ): Promise<WebSearchResponse> {
   const o = normalizeOptions(options)
   const { query: q, max } = normalizeSearchArgs(query, maxResults, 6)
-  // useGsk=false: the user turned Genspark cloud tools off or picked their own
+  // useGsk=false: the user turned UniWork cloud tools off or picked their own
   // search key — skip straight to the keyed/free backends
   if (o.useGsk && hasGskAuth()) {
     try {
