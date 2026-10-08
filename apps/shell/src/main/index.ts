@@ -3837,7 +3837,6 @@ function surfaceNewTabError(err: unknown): void {
 function newDocTab(): void {
   try {
     bindPendingDir('doc', () => tabManager?.openDocsTab(undefined, { newBlank: true }))
-    // creating a document is as much a value moment as opening one
   } catch (err) {
     surfaceNewTabError(err)
   }
