@@ -1,0 +1,711 @@
+{
+  "generatedAt": "2026-10-08T13:31:17.182829+00:00",
+  "scope": "M-Z+projectApi",
+  "methods": [
+    {
+      "name": "onAiPanelPrefsChanged",
+      "signature": "onAiPanelPrefsChanged(handler: (prefs: AiPanelPrefs) => void): () => void",
+      "call_sites": [
+        "apps/docs/src/renderer/main.tsx:50"
+      ],
+      "call_count": 1,
+      "preload_channel": "app:ai-panel-prefs-changed",
+      "preload_kind": "push",
+      "preload": "apps/docs/src/preload/index.ts",
+      "main_handler": "apps/shell/src/main/index.ts:3986 (wc.send broadcast)",
+      "args_returns": "in: handler(prefs: AiPanelPrefs); out: unsubscribe fn. Shell broadcasts to all webContents when Settings changes AI panel text size / spellcheck",
+      "class": "BROWSER",
+      "reason": "Pure UI preference; web build reads it from localStorage / a server user-prefs value and never needs a push channel."
+    },
+    {
+      "name": "onAiPreset",
+      "signature": "onAiPreset(handler: (preset: AiPresetPayload) => void): () => void",
+      "call_sites": [
+        "apps/docs/src/renderer/App.tsx:1771"
+      ],
+      "call_count": 1,
+      "preload_channel": "my-ai:ai-preset",
+      "preload_kind": "push",
+      "preload": "apps/docs/src/preload/index.ts",
+      "main_handler": "apps/shell/src/main/tab-manager.ts:298 (tab.view.webContents.send)",
+      "args_returns": "in: handler(preset {text, autoRun?, displayText?}); out: unsubscribe. Shell Home/Teacher mode queues an AI prompt into a live docs tab",
+      "class": "HIDE",
+      "reason": "Shell Home/Teacher-mode handoff into a tab; web has no shell tabs (initial preset can arrive via URL params instead)."
+    },
+    {
+      "name": "onAiStream",
+      "signature": "onAiStream(handler: (chunk: AiStreamChunk) => void): () => void",
+      "call_sites": [
+        "apps/docs/src/renderer/ai/transport.ts:8"
+      ],
+      "call_count": 1,
+      "preload_channel": "ai:stream-chunk",
+      "preload_kind": "push",
+      "preload": "apps/docs/src/preload/index.ts",
+      "main_handler": "apps/docs/src/main/docs-main.ts:2948 (event.sender.send inside ai:stream)",
+      "args_returns": "in: handler(chunk: AiStreamChunk); out: unsubscribe. Streams AI deltas keyed by requestId",
+      "class": "WEB-API",
+      "reason": "AI streaming must be re-served by a UniWork server SSE/WebSocket endpoint paired with aiStream/aiStreamCancel."
+    },
+    {
+      "name": "onAutoSaveDefaultChanged",
+      "signature": "onAutoSaveDefaultChanged(handler: (value: AutoSaveDefault) => void): () => void",
+      "call_sites": [
+        "packages/ui/src/auto-save-pref.ts:83 (via alias: App.tsx:872 passes window.desktop to useAutoSavePref)"
+      ],
+      "call_count": 1,
+      "preload_channel": "app:auto-save-default-changed",
+      "preload_kind": "push",
+      "preload": "apps/docs/src/preload/index.ts",
+      "main_handler": "apps/shell/src/main/index.ts:3956 (wc.send broadcast)",
+      "args_returns": "in: handler(AutoSaveDefault {on, updatedAt}); out: unsubscribe. Shell-wide AutoSave default changed in Settings",
+      "class": "BROWSER",
+      "reason": "User preference with localStorage fallback already built into useAutoSavePref (api optional); no server push needed."
+    },
+    {
+      "name": "onChromePressed",
+      "signature": "onChromePressed(handler: () => void): () => void",
+      "call_sites": [
+        "apps/docs/src/renderer/components/ContextMenu.tsx:120",
+        "packages/ui/src/popover-dismiss.ts:33 (dynamic: w['desktop']?.onChromePressed probe, used by installPopoverDismiss/ribbon-collapse)"
+      ],
+      "call_count": 2,
+      "preload_channel": "app:chrome-pressed",
+      "preload_kind": "push",
+      "preload": "apps/docs/src/preload/index.ts",
+      "main_handler": "apps/shell/src/main/index.ts:4133 (wc.send to every other webContents)",
+      "args_returns": "in: handler(); out: unsubscribe. Fires when the native shell tab strip is pressed so popovers close",
+      "class": "HIDE",
+      "reason": "Exists only because the shell tab strip is a sibling WebContentsView; in a web page ordinary DOM pointerdown covers it (already optional via ?.)."
+    },
+    {
+      "name": "onCloseCheck",
+      "signature": "onCloseCheck(handler: () => void): () => void",
+      "call_sites": [
+        "apps/docs/src/renderer/App.tsx:4209"
+      ],
+      "call_count": 1,
+      "preload_channel": "docs:close-check",
+      "preload_kind": "push",
+      "preload": "apps/docs/src/preload/index.ts",
+      "main_handler": "apps/docs/src/main/docs-main.ts:4724 (contents.send)",
+      "args_returns": "in: handler(); out: unsubscribe. Main asks renderer for dirty/autosave state before closing a tab",
+      "class": "BROWSER",
+      "reason": "Maps to window `beforeunload`/visibilitychange guard in the browser."
+    },
+    {
+      "name": "onCloseSaveRequest",
+      "signature": "onCloseSaveRequest(handler: () => void): () => void",
+      "call_sites": [
+        "apps/docs/src/renderer/App.tsx:4216"
+      ],
+      "call_count": 1,
+      "preload_channel": "docs:close-save-request",
+      "preload_kind": "push",
+      "preload": "apps/docs/src/preload/index.ts",
+      "main_handler": "apps/docs/src/main/docs-main.ts:4745 (contents.send)",
+      "args_returns": "in: handler(); out: unsubscribe. Close guard chose \"Save\": renderer runs full save flow then reportCloseSaveResult",
+      "class": "BROWSER",
+      "reason": "Close-prompt flow disappears on web; autosave + beforeunload warning replace it."
+    },
+    {
+      "name": "onLanguageChanged",
+      "signature": "onLanguageChanged( handler: ( lang: 'zh' | 'en' | 'ja' | 'ko' | 'fr' | 'de' | 'es' | 'th' | 'id' | 'ru' | 'ar', ) => void, ): () => void",
+      "call_sites": [
+        "apps/docs/src/renderer/i18n/locale.tsx:81"
+      ],
+      "call_count": 1,
+      "preload_channel": "app:language-changed",
+      "preload_kind": "push",
+      "preload": "apps/docs/src/preload/index.ts",
+      "main_handler": "apps/shell/src/main/index.ts:3904 (wc.send broadcast)",
+      "args_returns": "in: handler(lang); out: unsubscribe. Shell Home language switch broadcast",
+      "class": "BROWSER",
+      "reason": "Language is a per-user preference; web uses localStorage/user setting and re-renders itself (getLanguage is the A-L counterpart)."
+    },
+    {
+      "name": "onMenuCommand",
+      "signature": "onMenuCommand(handler: (command: MenuCommand, payload?: string) => void): () => void",
+      "call_sites": [
+        "apps/docs/src/renderer/App.tsx:4521"
+      ],
+      "call_count": 1,
+      "preload_channel": "menu:command",
+      "preload_kind": "push",
+      "preload": "apps/docs/src/preload/index.ts",
+      "main_handler": "apps/docs/src/main/docs-main.ts:4245 (activeDocsWebContents().send); also apps/shell/src/main/index.ts:3123,3126 for save",
+      "args_returns": "in: handler(command: MenuCommand, payload?); out: unsubscribe. Native app-menu commands (new/open/save/zoom/print/export/...) forwarded to renderer",
+      "class": "HIDE",
+      "reason": "Native application menu does not exist on the web; the same actions are reachable from the ribbon/keyboard, so the subscription is a no-op stub."
+    },
+    {
+      "name": "onOpenDocx",
+      "signature": "onOpenDocx(handler: (result: Exclude<OpenDocxResult, null>) => void): () => void",
+      "call_sites": [
+        "apps/docs/src/renderer/App.tsx:1722"
+      ],
+      "call_count": 1,
+      "preload_channel": "docs:opened",
+      "preload_kind": "push",
+      "preload": "apps/docs/src/preload/index.ts",
+      "main_handler": "apps/docs/src/main/docs-main.ts:2322 (win.webContents.send)",
+      "args_returns": "in: handler(OpenFileResult | needsPassword); out: unsubscribe. A file opened from Finder/Explorer while the app runs",
+      "class": "HIDE",
+      "reason": "OS file association / second-instance open has no web equivalent (web opens via URL or picker)."
+    },
+    {
+      "name": "onRenamedDocx",
+      "signature": "onRenamedDocx(handler: (paths: { oldPath: string; newPath: string }) => void): () => void",
+      "call_sites": [
+        "apps/docs/src/renderer/App.tsx:1706"
+      ],
+      "call_count": 1,
+      "preload_channel": "docs:renamed",
+      "preload_kind": "push",
+      "preload": "apps/docs/src/preload/index.ts",
+      "main_handler": "apps/docs/src/main/docs-main.ts:2399 (wc.send {oldPath,newPath})",
+      "args_returns": "in: handler({oldPath,newPath}); out: unsubscribe. Shell Home list renamed the file on disk",
+      "class": "WEB-API",
+      "reason": "File rename is a server-side document-store operation; the web client needs the rename event (or refetches metadata) from UniWork."
+    },
+    {
+      "name": "onTeardown",
+      "signature": "onTeardown(handler: () => void): () => void",
+      "call_sites": [
+        "apps/docs/src/renderer/App.tsx:1492"
+      ],
+      "call_count": 1,
+      "preload_channel": "docs:teardown",
+      "preload_kind": "push",
+      "preload": "apps/docs/src/preload/index.ts",
+      "main_handler": "apps/docs/src/main/docs-main.ts:2587 (contents.send)",
+      "args_returns": "in: handler(); out: unsubscribe. Tab closed but webContents kept alive (shell freeze workaround) so renderer stops timers",
+      "class": "HIDE",
+      "reason": "Workaround for the shell keeping closed tabs alive; browser tab close/unmount handles it."
+    },
+    {
+      "name": "onThemeChanged",
+      "signature": "onThemeChanged(handler: (theme: UiTheme) => void): () => void",
+      "call_sites": [
+        "apps/docs/src/renderer/ui-theme.ts:21",
+        "apps/docs/src/renderer/main.tsx:45"
+      ],
+      "call_count": 2,
+      "preload_channel": "app:theme-changed",
+      "preload_kind": "push",
+      "preload": "apps/docs/src/preload/index.ts",
+      "main_handler": "apps/shell/src/main/index.ts:3941 (wc.send broadcast)",
+      "args_returns": "in: handler(theme: UiTheme); out: unsubscribe. Shell theme switch broadcast",
+      "class": "BROWSER",
+      "reason": "Theme is data-theme + prefers-color-scheme + localStorage in the browser; no host push needed."
+    },
+    {
+      "name": "onZoteroRequest",
+      "signature": "onZoteroRequest(handler: (request: ZoteroRendererRequest) => void): () => void",
+      "call_sites": [
+        "apps/docs/src/renderer/App.tsx:2061"
+      ],
+      "call_count": 1,
+      "preload_channel": "zotero:request",
+      "preload_kind": "push",
+      "preload": "apps/docs/src/preload/index.ts",
+      "main_handler": "apps/docs/src/main/zotero-ipc.ts:32 (contents.send)",
+      "args_returns": "in: handler(ZoteroRendererRequest {requestId, command, args}); out: unsubscribe. Main services Zotero word-processor callbacks via renderer document ops",
+      "class": "HIDE",
+      "reason": "Zotero word-processor integration is a local TCP wire to the desktop Zotero app; no web equivalent."
+    },
+    {
+      "name": "openDocx",
+      "signature": "openDocx(): Promise<OpenDocxResult>",
+      "call_sites": [
+        "apps/docs/src/renderer/review-actions.ts:252",
+        "apps/docs/src/renderer/App.tsx:1792"
+      ],
+      "call_count": 2,
+      "preload_channel": "docs:open",
+      "preload_kind": "invoke",
+      "preload": "apps/docs/src/preload/index.ts",
+      "main_handler": "apps/docs/src/main/docs-main.ts:3475",
+      "args_returns": "in: none; out: OpenDocxResult = {path,name,data:ArrayBuffer,hash,encrypted?,recovered?} | {needsPassword,path,name} | null. Native open dialog (docx filter) then loadDocx reads bytes + archives original by sha256",
+      "class": "WEB-API",
+      "reason": "Open flow becomes a UniWork document list/fetch endpoint (returning bytes + hash); a plain <input type=file> can supplement it for local import."
+    },
+    {
+      "name": "openDocxDecrypt",
+      "signature": "openDocxDecrypt(path: string, password: string): Promise<DecryptOpenResult>",
+      "call_sites": [
+        "apps/docs/src/renderer/App.tsx:1809"
+      ],
+      "call_count": 1,
+      "preload_channel": "docs:open-decrypt",
+      "preload_kind": "invoke",
+      "preload": "apps/docs/src/preload/index.ts",
+      "main_handler": "apps/docs/src/main/docs-main.ts:3553",
+      "args_returns": "in: (path, password); out: DecryptOpenResult {ok:true,result:OpenFileResult} | {ok:false,reason:wrong-password|unsupported|error,error?}. Decrypts ECMA-376 encrypted docx on disk",
+      "class": "HIDE",
+      "reason": "Document-password (encrypted docx) support is desktop-only per the lane scope; server would need ms-offcrypto, so hide for the spike."
+    },
+    {
+      "name": "openDocxPath",
+      "signature": "openDocxPath(path: string): Promise<OpenDocxResult>",
+      "call_sites": [
+        "apps/docs/src/renderer/App.tsx:1800"
+      ],
+      "call_count": 1,
+      "preload_channel": "docs:open-path",
+      "preload_kind": "invoke",
+      "preload": "apps/docs/src/preload/index.ts",
+      "main_handler": "apps/docs/src/main/docs-main.ts:3485",
+      "args_returns": "in: path:string; out: OpenDocxResult (loadDocx; null if missing; needsPassword if encrypted). Used for recents, drag-open and tab restore",
+      "class": "WEB-API",
+      "reason": "Open-by-id/path from recents becomes a UniWork document fetch endpoint keyed by document id."
+    },
+    {
+      "name": "openNewTab",
+      "signature": "openNewTab(openPath?: string | null): Promise<void>",
+      "call_sites": [
+        "apps/docs/src/renderer/components/ribbon-tabs.tsx:1335"
+      ],
+      "call_count": 1,
+      "preload_channel": "win:new",
+      "preload_kind": "invoke",
+      "preload": "apps/docs/src/preload/index.ts",
+      "main_handler": "apps/docs/src/main/docs-main.ts:4115",
+      "args_returns": "in: openPath?: string|null; out: void. Creates a shell tab (or BrowserWindow) optionally loading the same document",
+      "class": "HIDE",
+      "reason": "Shell tab/window management; web equivalent is window.open(url) and not a bridge call."
+    },
+    {
+      "name": "pickAttachments",
+      "signature": "pickAttachments(): Promise<AttachmentAddResult | null>",
+      "call_sites": [
+        "apps/docs/src/renderer/ai/AiPanel.tsx:1132"
+      ],
+      "call_count": 1,
+      "preload_channel": "files:pick",
+      "preload_kind": "invoke",
+      "preload": "apps/docs/src/preload/index.ts",
+      "main_handler": "apps/docs/src/main/docs-main.ts:3851",
+      "args_returns": "in: none; out: AttachmentAddResult | null = {accepted:[{path,name,ext,sizeBytes}],rejected:string[]}. Native multi-select dialog returns absolute local paths",
+      "class": "BROWSER",
+      "reason": "Browser file picker (<input type=file multiple>); but attachment text extraction (readAttachment) then needs an upload endpoint because paths do not exist on web."
+    },
+    {
+      "name": "pickImage",
+      "signature": "pickImage(): Promise<PickImageResult | null>",
+      "call_sites": [
+        "apps/docs/src/renderer/components/ribbon-tabs.tsx:320",
+        "apps/docs/src/renderer/components/Ribbon.tsx:978"
+      ],
+      "call_count": 2,
+      "preload_channel": "docs:pick-image",
+      "preload_kind": "invoke",
+      "preload": "apps/docs/src/preload/index.ts",
+      "main_handler": "apps/docs/src/main/docs-main.ts:3833",
+      "args_returns": "in: none; out: PickImageResult {base64,mime,name} | null (png/jpg/jpeg/gif, read synchronously from disk)",
+      "class": "BROWSER",
+      "reason": "Plain <input type=file accept=image/*> + FileReader gives the same base64/mime/name."
+    },
+    {
+      "name": "print",
+      "signature": "print(scale?: number): Promise<{ ok: boolean; error?: string }>",
+      "call_sites": [
+        "apps/docs/src/renderer/components/PrintDialog.tsx:123"
+      ],
+      "call_count": 1,
+      "preload_channel": "docs:print",
+      "preload_kind": "invoke",
+      "preload": "apps/docs/src/preload/index.ts",
+      "main_handler": "apps/docs/src/main/docs-main.ts:3968",
+      "args_returns": "in: scale?: number; out: {ok:boolean,error?}. event.sender.print system dialog with margins none and scale",
+      "class": "BROWSER",
+      "reason": "window.print() with the same print stylesheet (scale handled via CSS); result is unobservable so resolve ok:true."
+    },
+    {
+      "name": "printPdfBuffer",
+      "signature": "printPdfBuffer( pageWidthTwips: number, pageHeightTwips: number, scale?: number, ): Promise<{ ok: boolean; base64?: string; error?: string }>",
+      "call_sites": [
+        "apps/docs/src/renderer/file-actions.ts:1091"
+      ],
+      "call_count": 1,
+      "preload_channel": "docs:print-pdf-buffer",
+      "preload_kind": "invoke",
+      "preload": "apps/docs/src/preload/index.ts",
+      "main_handler": "apps/docs/src/main/docs-main.ts:4061",
+      "args_returns": "in: (pageWidthTwips,pageHeightTwips,scale?); out: {ok,base64?,error?}. webContents.printToPDF of the calling tab for one page-size group",
+      "class": "WEB-API",
+      "reason": "Chromium printToPDF has no browser API; mixed-size PDF export needs a server-side render (headless Chromium) endpoint or a client PDF lib."
+    },
+    {
+      "name": "readAttachment",
+      "signature": "readAttachment(path: string, offset: number, maxChars: number): Promise<AttachmentReadResult>",
+      "call_sites": [
+        "apps/docs/src/renderer/ai/files-skill.ts:78"
+      ],
+      "call_count": 1,
+      "preload_channel": "files:read",
+      "preload_kind": "invoke",
+      "preload": "apps/docs/src/preload/index.ts",
+      "main_handler": "apps/docs/src/main/docs-main.ts:3867",
+      "args_returns": "in: (path, offset, maxChars<=48000); out: AttachmentReadResult {ok,error?,name?,totalChars?,text?,offset?}. Extracts text from a local file path via extractAttachmentText",
+      "class": "WEB-API",
+      "reason": "Text extraction (pdf/docx/xlsx/...) must run server-side on an uploaded attachment id (file-parse package), not on a local path."
+    },
+    {
+      "name": "readAttachmentImage",
+      "signature": "readAttachmentImage(path: string): Promise<AttachmentImageResult>",
+      "call_sites": [
+        "apps/docs/src/renderer/ai/AiPanel.tsx:384",
+        "apps/docs/src/renderer/ai/AiPanel.tsx:960"
+      ],
+      "call_count": 2,
+      "preload_channel": "files:read-image",
+      "preload_kind": "invoke",
+      "preload": "apps/docs/src/preload/index.ts",
+      "main_handler": "apps/docs/src/main/docs-main.ts:3898",
+      "args_returns": "in: path; out: AttachmentImageResult {ok,base64?,mime?,error?}; rejects non-images and files >5MB",
+      "class": "BROWSER",
+      "reason": "Once the attachment is a browser File, FileReader.readAsDataURL yields the same base64+mime locally."
+    },
+    {
+      "name": "reportCloseCheck",
+      "signature": "reportCloseCheck(state: { dirty: boolean; autoSave: boolean; filePath?: string | null }): void",
+      "call_sites": [
+        "apps/docs/src/renderer/App.tsx:4210"
+      ],
+      "call_count": 1,
+      "preload_channel": "docs:close-check-result",
+      "preload_kind": "send",
+      "preload": "apps/docs/src/preload/index.ts",
+      "main_handler": "apps/docs/src/main/docs-main.ts:4682 (ipcMain.on)",
+      "args_returns": "in: {dirty,autoSave,filePath?}; out: void. Answers the onCloseCheck query within 2s",
+      "class": "BROWSER",
+      "reason": "Replaced by an in-page beforeunload handler reading the same dirty flag."
+    },
+    {
+      "name": "reportCloseSaveResult",
+      "signature": "reportCloseSaveResult(ok: boolean): void",
+      "call_sites": [
+        "apps/docs/src/renderer/App.tsx:4227",
+        "apps/docs/src/renderer/App.tsx:4228"
+      ],
+      "call_count": 2,
+      "preload_channel": "docs:close-save-result",
+      "preload_kind": "send",
+      "preload": "apps/docs/src/preload/index.ts",
+      "main_handler": "apps/docs/src/main/docs-main.ts:4698 (ipcMain.on)",
+      "args_returns": "in: ok:boolean; out: void. Reports result of the close-guard save flow",
+      "class": "BROWSER",
+      "reason": "Part of the close-guard handshake; beforeunload replaces it."
+    },
+    {
+      "name": "reportViewMenuState",
+      "signature": "reportViewMenuState(state: { aiSidebar: boolean; darkCanvas: boolean }): void }",
+      "call_sites": [
+        "apps/docs/src/renderer/App.tsx:1497"
+      ],
+      "call_count": 1,
+      "preload_channel": "docs:view-menu-state",
+      "preload_kind": "send",
+      "preload": "apps/docs/src/preload/index.ts",
+      "main_handler": "apps/docs/src/main/docs-main.ts:4664 (ipcMain.on)",
+      "args_returns": "in: {aiSidebar,darkCanvas}; out: void. Syncs native View menu checkboxes",
+      "class": "HIDE",
+      "reason": "Only syncs the native View menu, which does not exist on the web."
+    },
+    {
+      "name": "respellKick",
+      "signature": "respellKick(): Promise<void>",
+      "call_sites": [
+        "apps/docs/src/renderer/App.tsx:1337"
+      ],
+      "call_count": 1,
+      "preload_channel": "docs:respell-kick",
+      "preload_kind": "invoke",
+      "preload": "apps/docs/src/preload/index.ts",
+      "main_handler": "apps/docs/src/main/docs-main.ts:3737",
+      "args_returns": "in: none; out: void. wc.focus + sendInputEvent trusted space keystroke + 120ms wait so Blink respells text",
+      "class": "HIDE",
+      "reason": "Electron sendInputEvent hack for spellcheck re-scan (r168); no equivalent and not needed in a normal browser (App.tsx guards with ?.)."
+    },
+    {
+      "name": "respondToZotero",
+      "signature": "respondToZotero(response: ZoteroRendererResponse): void",
+      "call_sites": [
+        "apps/docs/src/renderer/App.tsx:2076",
+        "apps/docs/src/renderer/App.tsx:2078"
+      ],
+      "call_count": 2,
+      "preload_channel": "zotero:response",
+      "preload_kind": "send",
+      "preload": "apps/docs/src/preload/index.ts",
+      "main_handler": "apps/docs/src/main/zotero-ipc.ts:62 (ipcMain.on)",
+      "args_returns": "in: ZoteroRendererResponse {requestId,ok,result?,error?}; out: void",
+      "class": "HIDE",
+      "reason": "Reply half of the Zotero document-callback loop; desktop-only."
+    },
+    {
+      "name": "saveDocx",
+      "signature": "saveDocx( path: string, data: ArrayBuffer, auto?: boolean, ): Promise<{ ok: boolean error?: string reason?: 'external-modified' /** a newer password choice arrived after this save's snapshot */ passwordIntentPending?: boolean }>",
+      "call_sites": [
+        "apps/docs/src/renderer/file-actions.ts:892"
+      ],
+      "call_count": 1,
+      "preload_channel": "docs:save",
+      "preload_kind": "invoke",
+      "preload": "apps/docs/src/preload/index.ts",
+      "main_handler": "apps/docs/src/main/docs-main.ts:3629",
+      "args_returns": "in: (path, data:ArrayBuffer, auto?:boolean); out: {ok,error?,reason?:external-modified,passwordIntentPending?}. canDocWrite grant, external-modification check (dialog on manual), optional encrypt, atomic write, clears recovery copy, pushes recent",
+      "class": "WEB-API",
+      "reason": "Core save: becomes PUT of document bytes to the UniWork document store; the external-modified conflict maps to an ETag/version-conflict response."
+    },
+    {
+      "name": "saveDocxAs",
+      "signature": "saveDocxAs( defaultName: string, data: ArrayBuffer, sourcePath?: string | null, ): Promise<{ ok: boolean; path?: string; error?: string; passwordIntentPending?: boolean }>",
+      "call_sites": [
+        "apps/docs/src/renderer/file-actions.ts:879"
+      ],
+      "call_count": 1,
+      "preload_channel": "docs:save-as",
+      "preload_kind": "invoke",
+      "preload": "apps/docs/src/preload/index.ts",
+      "main_handler": "apps/docs/src/main/docs-main.ts:3748",
+      "args_returns": "in: (defaultName, data, sourcePath?); out: {ok,path?,error?,passwordIntentPending?}. Native save dialog then atomic write, grants write, pushes recent",
+      "class": "WEB-API",
+      "reason": "Save-As becomes \"save a copy\" to a new UniWork document id (server returns the new id); optional browser download for a local copy."
+    },
+    {
+      "name": "saveDocxNew",
+      "signature": "saveDocxNew( defaultName: string, data: ArrayBuffer, ): Promise<{ ok: boolean; path?: string; error?: string; passwordIntentPending?: boolean }>",
+      "call_sites": [
+        "apps/docs/src/renderer/file-actions.ts:880"
+      ],
+      "call_count": 1,
+      "preload_channel": "docs:save-new",
+      "preload_kind": "invoke",
+      "preload": "apps/docs/src/preload/index.ts",
+      "main_handler": "apps/docs/src/main/docs-main.ts:3791",
+      "args_returns": "in: (defaultName, data); out: {ok,path?,error?,passwordIntentPending?}. First save of a new doc: unique path in default folder, no dialog",
+      "class": "WEB-API",
+      "reason": "First save creates a document record via a UniWork create endpoint (POST) and returns its id."
+    },
+    {
+      "name": "saveMergedPdf",
+      "signature": "saveMergedPdf( defaultName: string, base64Parts: string[], outPath?: string, ): Promise<{ ok: boolean; path?: string; error?: string }>",
+      "call_sites": [
+        "apps/docs/src/renderer/file-actions.ts:1110"
+      ],
+      "call_count": 1,
+      "preload_channel": "docs:save-merged-pdf",
+      "preload_kind": "invoke",
+      "preload": "apps/docs/src/preload/index.ts",
+      "main_handler": "apps/docs/src/main/docs-main.ts:4082",
+      "args_returns": "in: (defaultName, base64Parts:string[], outPath?); out: {ok,path?,error?}. pdf-lib merges parts, save dialog (or authorized outPath), writes, opens file",
+      "class": "BROWSER",
+      "reason": "Merging with pdf-lib can run in-browser and be delivered as a Blob download; only the parts (printPdfBuffer) need the server."
+    },
+    {
+      "name": "setAiSettings",
+      "signature": "setAiSettings(settings: AiSettings): Promise<void>",
+      "call_sites": [],
+      "call_count": 0,
+      "preload_channel": "ai:set-settings",
+      "preload_kind": "invoke",
+      "preload": "apps/docs/src/preload/index.ts",
+      "main_handler": "apps/docs/src/main/docs-main.ts:2929",
+      "args_returns": "in: settings: AiSettings; out: void. writeJson(SETTINGS_PATH, settings). No Docs renderer call sites (only the shell preload and docs/slides main register it)",
+      "class": "WEB-API",
+      "reason": "Provider keys/config must live in a UniWork server-side per-user AI settings store (keys must not sit in the browser); unused by Docs renderer today."
+    },
+    {
+      "name": "setDocPassword",
+      "signature": "setDocPassword(filePath: string | null, password: string | null): Promise<{ ok: boolean }>",
+      "call_sites": [
+        "apps/docs/src/renderer/App.tsx:1835"
+      ],
+      "call_count": 1,
+      "preload_channel": "docs:set-password",
+      "preload_kind": "invoke",
+      "preload": "apps/docs/src/preload/index.ts",
+      "main_handler": "apps/docs/src/main/docs-main.ts:3516",
+      "args_returns": "in: (filePath|null, password|null); out: {ok}. Records desired next-save password; encryption applied at save",
+      "class": "HIDE",
+      "reason": "Password-protected (ECMA-376) docx is desktop-only for the spike."
+    },
+    {
+      "name": "webSearch",
+      "signature": "webSearch( query: string, maxResults?: number, ): Promise<{ results: Array<{ title: string; url: string; snippet: string }> answer?: string method: string /** failure reason when method === 'error' */ error?: string }>",
+      "call_sites": [
+        "apps/docs/src/renderer/ai/tools.ts:562"
+      ],
+      "call_count": 1,
+      "preload_channel": "ai:web-search",
+      "preload_kind": "invoke",
+      "preload": "apps/docs/src/preload/index.ts",
+      "main_handler": "apps/docs/src/main/docs-main.ts:3015",
+      "args_returns": "in: (query, maxResults=6); out: {results:[{title,url,snippet}],answer?,method,error?}. Serper with DuckDuckGo fallback using SETTINGS_PATH keys",
+      "class": "WEB-API",
+      "reason": "Needs a server-side search proxy so API keys stay off the client and CORS is avoided."
+    },
+    {
+      "name": "writeRecoveryCopy",
+      "signature": "writeRecoveryCopy(path: string, data: ArrayBuffer): Promise<{ ok: boolean }>",
+      "call_sites": [
+        "apps/docs/src/renderer/file-actions.ts:718"
+      ],
+      "call_count": 1,
+      "preload_channel": "docs:write-recovery",
+      "preload_kind": "invoke",
+      "preload": "apps/docs/src/preload/index.ts",
+      "main_handler": "apps/docs/src/main/docs-main.ts:3695",
+      "args_returns": "in: (path, data:ArrayBuffer); out: {ok}. Best-effort atomic crash-recovery copy under userData with teardown/epoch race guards",
+      "class": "HIDE",
+      "reason": "Local crash-recovery file under userData; web equivalent is IndexedDB/autosave draft, not a bridge call."
+    },
+    {
+      "name": "zoteroCommand",
+      "signature": "zoteroCommand(command: ZoteroCommand): Promise<ZoteroCommandResult>",
+      "call_sites": [
+        "apps/docs/src/renderer/components/ribbon-references-tab.tsx:378"
+      ],
+      "call_count": 1,
+      "preload_channel": "zotero:command",
+      "preload_kind": "invoke",
+      "preload": "apps/docs/src/preload/index.ts",
+      "main_handler": "apps/docs/src/main/zotero-ipc.ts:40",
+      "args_returns": "in: command: addEditCitation|addEditBibliography|refresh|setDocPrefs|removeCodes; out: ZoteroCommandResult {ok,errorCode?,error?}",
+      "class": "HIDE",
+      "reason": "Drives the desktop Zotero app over its local wire protocol; no web equivalent."
+    }
+  ],
+  "projectApi": [
+    {
+      "name": "resolveChat",
+      "signature": "resolveChat(args: ResolveChatArgs): Promise<ResolveChatResult>",
+      "call_sites": [
+        "apps/docs/src/renderer/ai/AiPanel.tsx:540 (via alias: const api = window.projectApi at AiPanel.tsx:536)"
+      ],
+      "call_count": 1,
+      "preload_channel": "project:resolveChat",
+      "preload": "apps/docs/src/preload/index.ts:204",
+      "main_handler": "apps/docs/src/main/docs-main.ts:3190 (registerProjectIpc; same channel also in slides-main/sheets-main for 4 chat methods)",
+      "args_returns": "in: {filePath|null,tempChatId?,sessionId?}; out: {projectId,chatId}. Null path => {projectId:\"default\",chatId:tempChatId}; else store.resolveChatForFile(path) (fileMap keyed by local path)",
+      "class": "WEB-API",
+      "reason": "Chat persistence keyed by local file path; web needs a project-store endpoint keyed by document id."
+    },
+    {
+      "name": "appendChat",
+      "signature": "appendChat(args: AppendChatArgs): Promise<void>",
+      "call_sites": [
+        "apps/docs/src/renderer/ai/AiPanel.tsx:610 (via alias: const api = window.projectApi at AiPanel.tsx:607)"
+      ],
+      "call_count": 1,
+      "preload_channel": "project:appendChat",
+      "preload": "apps/docs/src/preload/index.ts:205",
+      "main_handler": "apps/docs/src/main/docs-main.ts:3210 (registerProjectIpc; same channel also in slides-main/sheets-main for 4 chat methods)",
+      "args_returns": "in: {projectId,chatId,role,text,tools?,attachments?,scope?}; out: void. store.appendChatMessage (JSONL append)",
+      "class": "WEB-API",
+      "reason": "Chat message persistence needs a UniWork project store append endpoint (append-only per chat)."
+    },
+    {
+      "name": "loadChat",
+      "signature": "loadChat(args: LoadChatArgs): Promise<ChatMessage[]>",
+      "call_sites": [
+        "apps/docs/src/renderer/ai/AiPanel.tsx:543 (via alias: const api = window.projectApi at AiPanel.tsx:536)"
+      ],
+      "call_count": 1,
+      "preload_channel": "project:loadChat",
+      "preload": "apps/docs/src/preload/index.ts:206",
+      "main_handler": "apps/docs/src/main/docs-main.ts:3244 (registerProjectIpc; same channel also in slides-main/sheets-main for 4 chat methods)",
+      "args_returns": "in: {projectId,chatId,limit=200}; out: ChatMessage[] (most recent `limit`)",
+      "class": "WEB-API",
+      "reason": "Chat history read needs a UniWork project store endpoint (paged)."
+    },
+    {
+      "name": "rebindChat",
+      "signature": "rebindChat(args: RebindChatArgs): Promise<ResolveChatResult>",
+      "call_sites": [
+        "apps/docs/src/renderer/ai/AiPanel.tsx:584 (via alias: const api = window.projectApi at AiPanel.tsx:581)"
+      ],
+      "call_count": 1,
+      "preload_channel": "project:rebindChat",
+      "preload": "apps/docs/src/preload/index.ts:207",
+      "main_handler": "apps/docs/src/main/docs-main.ts:3260 (registerProjectIpc; same channel also in slides-main/sheets-main for 4 chat methods)",
+      "args_returns": "in: {projectId,tempChatId,newChatId?|newFilePath?|sessionId?}; out: {projectId,chatId}. Renames unsaved-* JSONL to file-derived chatId and registers fileMap",
+      "class": "WEB-API",
+      "reason": "Temp-chat rebind after first save; with server document ids from saveDocxNew the chat can be keyed by id from creation, but the endpoint/semantics still need defining."
+    },
+    {
+      "name": "listProjects",
+      "signature": "listProjects(): Promise<ProjectSummary[]>",
+      "call_sites": [],
+      "call_count": 0,
+      "preload_channel": "project:list",
+      "preload": "apps/docs/src/preload/index.ts:209",
+      "main_handler": "apps/docs/src/main/docs-main.ts:3287 (registerProjectIpc; same channel also in slides-main/sheets-main for 4 chat methods)",
+      "args_returns": "in: none; out: ProjectSummary[] (file count + last active)",
+      "class": "WEB-API",
+      "reason": "Project listing is the UniWork project store; no Docs renderer call site today."
+    },
+    {
+      "name": "createProject",
+      "signature": "createProject(args: CreateProjectArgs): Promise<ProjectSummary>",
+      "call_sites": [],
+      "call_count": 0,
+      "preload_channel": "project:create",
+      "preload": "apps/docs/src/preload/index.ts:210",
+      "main_handler": "apps/docs/src/main/docs-main.ts:3297 (registerProjectIpc; same channel also in slides-main/sheets-main for 4 chat methods)",
+      "args_returns": "in: {name}; out: ProjectSummary",
+      "class": "WEB-API",
+      "reason": "Project CRUD belongs on the UniWork project store; no Docs renderer call site today."
+    },
+    {
+      "name": "renameProject",
+      "signature": "renameProject(args: RenameProjectArgs): Promise<void>",
+      "call_sites": [],
+      "call_count": 0,
+      "preload_channel": "project:rename",
+      "preload": "apps/docs/src/preload/index.ts:211",
+      "main_handler": "apps/docs/src/main/docs-main.ts:3435 (registerProjectIpc; same channel also in slides-main/sheets-main for 4 chat methods)",
+      "args_returns": "in: {id,name}; out: void",
+      "class": "WEB-API",
+      "reason": "Project CRUD belongs on the UniWork project store; no Docs renderer call site today."
+    },
+    {
+      "name": "deleteProject",
+      "signature": "deleteProject(args: DeleteProjectArgs): Promise<void>",
+      "call_sites": [],
+      "call_count": 0,
+      "preload_channel": "project:delete",
+      "preload": "apps/docs/src/preload/index.ts:212",
+      "main_handler": "apps/docs/src/main/docs-main.ts:3440 (registerProjectIpc; same channel also in slides-main/sheets-main for 4 chat methods)",
+      "args_returns": "in: {id}; out: void (soft-delete to .trash)",
+      "class": "WEB-API",
+      "reason": "Project CRUD belongs on the UniWork project store; no Docs renderer call site today."
+    },
+    {
+      "name": "moveFile",
+      "signature": "moveFile(args: MoveFileArgs): Promise<void>",
+      "call_sites": [],
+      "call_count": 0,
+      "preload_channel": "project:moveFile",
+      "preload": "apps/docs/src/preload/index.ts:213",
+      "main_handler": "apps/docs/src/main/docs-main.ts:3445 (registerProjectIpc; same channel also in slides-main/sheets-main for 4 chat methods)",
+      "args_returns": "in: {filePath,projectId}; out: void",
+      "class": "WEB-API",
+      "reason": "File-to-project assignment belongs on the UniWork project store; no Docs renderer call site today."
+    },
+    {
+      "name": "getTimeline",
+      "signature": "getTimeline(args: GetTimelineArgs): Promise<TimelineEntry[]>",
+      "call_sites": [],
+      "call_count": 0,
+      "preload_channel": "project:timeline",
+      "preload": "apps/docs/src/preload/index.ts:214",
+      "main_handler": "apps/docs/src/main/docs-main.ts:3450 (registerProjectIpc; same channel also in slides-main/sheets-main for 4 chat methods)",
+      "args_returns": "in: {projectId,limit=20}; out: TimelineEntry[]",
+      "class": "WEB-API",
+      "reason": "Project timeline read belongs on the UniWork project store; no Docs renderer call site today."
+    }
+  ]
+}
