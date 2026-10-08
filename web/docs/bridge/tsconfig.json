@@ -1,0 +1,23 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "types": [
+      "node"
+    ],
+    "noEmit": true,
+    "jsx": "react-jsx"
+  },
+  "include": [
+    "webapi.ts",
+    "session.ts",
+    "frame-port.ts",
+    "project-memory.ts",
+    "webapi.test.ts",
+    "testing/*.ts"
+  ]
+}

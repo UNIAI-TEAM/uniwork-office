@@ -1,0 +1,62 @@
+/**
+ * The slice of the frame protocol client (web/docs/protocol/client.ts,
+ * `DocsFrameClient`) the bridge uses. Kept structural so unit tests can hand
+ * the bridge a mocked transport and the real client satisfies it unchanged.
+ */
+import {
+  toProtocolError,
+  type FrameRequestType,
+  type FrameRequests,
+  type HostRequests,
+  type ProtocolErrorCode,
+  type ProtocolErrorShape,
+  type SavedPayload,
+} from '../protocol/types'
+
+export interface PortRequestOptions {
+  timeoutMs?: number
+  signal?: AbortSignal
+  transfer?: Transferable[]
+}
+
+/** what the bridge needs from `init` (the token never leaves the client) */
+export interface PortSession {
+  documentId: string
+  open?: HostRequests['open']['payload']
+}
+
+type HostHandler<K extends keyof HostRequests> = (
+  payload: HostRequests[K]['payload'],
+  ctx: { signal: AbortSignal },
+) => HostRequests[K]['result'] | Promise<HostRequests[K]['result']>
+
+export interface FramePort {
+  whenInitialized(): Promise<PortSession>
+  request<K extends FrameRequestType>(
+    type: K,
+    payload: FrameRequests[K]['payload'],
+    options?: PortRequestOptions,
+  ): Promise<FrameRequests[K]['result']>
+  handleOpen(handler: HostHandler<'open'>): () => void
+  handleSave(handler: HostHandler<'save'>): () => void
+  handleSaveAs(handler: HostHandler<'saveAs'>): () => void
+  handlePrint(handler: HostHandler<'print'>): () => void
+  setDirty(dirty: boolean): void
+  setTitle(title: string): void
+  reportSaved(payload: SavedPayload): void
+  reportError(error: ProtocolErrorShape | unknown, fatal?: boolean): void
+}
+
+export function errorCode(err: unknown): ProtocolErrorCode {
+  return toProtocolError(err).code
+}
+
+/** request timeouts per call class (ms) */
+export const TIMEOUTS = {
+  /** metadata */
+  short: 30_000,
+  /** document bytes up or down, server-side render */
+  transfer: 120_000,
+  /** waits on a host dialog (save-as name/folder): generous, not unbounded */
+  dialog: 600_000,
+} as const
