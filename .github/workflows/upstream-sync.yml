@@ -4,6 +4,15 @@ name: Upstream sync
 # tools/rebrand/sync-upstream.mjs (patch + UniWork rebrand + UPSTREAM_BASE bump)
 # and opens a pull request for a human to review. Nothing is merged
 # automatically. See tools/rebrand/README.md ("Sync with upstream").
+#
+# Two jobs, so code arriving with the upstream patch never runs next to a write token:
+#   prepare  read-only token, no persisted credentials. Runs the sync script from the
+#            default branch checkout; the script runs its checks from a copy of that
+#            (pre-sync) tooling, never from the patched tree. Uploads a git bundle of
+#            the sync branch plus the report as the upstream-sync-report artifact.
+#   publish  write token. Executes nothing from the tree: it fetches the bundle,
+#            pushes the branch, opens the pull request, closes superseded sync pull
+#            requests and dispatches CI.
 
 on:
   schedule:
@@ -11,7 +20,7 @@ on:
   workflow_dispatch:
     inputs:
       upstream_ref:
-        description: 'Upstream commit or ref to sync to (empty = upstream default branch head)'
+        description: 'Upstream full commit SHA or ref name to sync to (empty = upstream default branch head)'
         required: false
         default: ''
 
@@ -20,16 +29,20 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: write # push the sync branch
-  pull-requests: write # open the pull request
-  actions: write # dispatch ci.yml on the sync branch (see below)
+  contents: read
 
 jobs:
-  sync:
+  prepare:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    env:
-      GH_TOKEN: ${{ github.token }}
+    permissions:
+      contents: read
+    outputs:
+      status: ${{ steps.sync.outputs.status }}
+      exit_code: ${{ steps.sync.outputs.exit_code }}
+      branch: ${{ steps.sync.outputs.branch }}
+      range: ${{ steps.sync.outputs.range }}
+      base_sha: ${{ steps.sync.outputs.base_sha }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -38,16 +51,17 @@ jobs:
           # full history and every origin branch so an existing sync branch is seen
           ref: ${{ github.event.repository.default_branch }}
           fetch-depth: 0
+          persist-credentials: false
 
-      # No `npm ci`: the sync, the rebrand, the brand scan and the rebrand tests
-      # are plain Node with no dependencies (only `rebrand.mjs --icons` needs one).
+      # No `npm ci`: the sync, the rebrand, the brand scan, the egress check and the
+      # rebrand tests are plain Node with no dependencies.
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
 
-      # Only Prettier, at the lockfile's version and outside the workspace, so the
-      # files the rebrand rewrites are formatted the way CI's format check expects.
+      # Only Prettier, at the lockfile's version and outside the workspace. The script
+      # runs it with the pre-sync tree's config and ignore file (copied aside).
       - name: Install Prettier
         run: |
           version=$(node -p "require('./package-lock.json').packages['node_modules/prettier'].version")
@@ -59,64 +73,113 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
 
       # Exit 0 = up to date / already prepared / clean, 2 = needs a human (the PR is
-      # opened as a draft), 1 = error (the job fails). Upstream workflow files are
-      # left out: GITHUB_TOKEN may not push changes under .github/workflows, and
-      # ours differ from upstream's anyway; the report lists them for a human.
+      # opened as a draft), 1 = error (the job fails; also when origin already has the
+      # sync branch without this sync). --ci commits conflicts with their markers and
+      # fails on a missing Prettier. Upstream workflow files are left out: GITHUB_TOKEN
+      # may not push changes under .github/workflows, and ours differ from upstream's
+      # anyway; the report lists them for a human.
       - name: Prepare sync branch
         id: sync
         env:
           UPSTREAM_REF: ${{ inputs.upstream_ref }}
         run: |
-          args=(--commit-conflicts --json --report "$RUNNER_TEMP/upstream-sync.md"
+          out="$RUNNER_TEMP/upstream-sync-report"
+          mkdir -p "$out"
+          base_sha=$(git rev-parse HEAD)
+          args=(--ci --json --report "$out/upstream-sync.md" --pr-body "$out/pr-body.md"
                 --exclude '.github/workflows/**'
                 --prettier "$RUNNER_TEMP/prettier/node_modules/prettier/bin/prettier.cjs")
           if [ -n "$UPSTREAM_REF" ]; then args+=(--to "$UPSTREAM_REF"); fi
           set +e
-          node tools/rebrand/sync-upstream.mjs "${args[@]}" > "$RUNNER_TEMP/summary.json"
+          node tools/rebrand/sync-upstream.mjs "${args[@]}" > "$out/summary.json"
           code=$?
           set -e
           if [ "$code" -eq 1 ]; then exit 1; fi
+          status=$(jq -r .status "$out/summary.json")
+          branch=$(jq -r .branch "$out/summary.json")
+          if [ "$status" != "up-to-date" ] && [ "$status" != "already-prepared" ]; then
+            git bundle create "$out/sync.bundle" "refs/heads/$branch" "^$base_sha"
+          fi
           {
             echo "exit_code=$code"
-            echo "status=$(jq -r .status "$RUNNER_TEMP/summary.json")"
-            echo "branch=$(jq -r .branch "$RUNNER_TEMP/summary.json")"
-            echo "range=$(jq -r '"\(.base[0:7])..\(.target[0:7])"' "$RUNNER_TEMP/summary.json")"
+            echo "status=$status"
+            echo "branch=$branch"
+            echo "range=$(jq -r '"\(.base[0:7])..\(.target[0:7])"' "$out/summary.json")"
+            echo "base_sha=$base_sha"
           } >> "$GITHUB_OUTPUT"
-          cat "$RUNNER_TEMP/upstream-sync.md" >> "$GITHUB_STEP_SUMMARY"
+          cat "$out/upstream-sync.md" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Open pull request
-        if: steps.sync.outputs.status != 'up-to-date' && steps.sync.outputs.status != 'already-prepared'
+      - name: Upload report and bundle
+        if: steps.sync.outputs.status != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: upstream-sync-report
+          path: ${{ runner.temp }}/upstream-sync-report
+          if-no-files-found: ignore
+          retention-days: 30
+
+  publish:
+    needs: prepare
+    if: needs.prepare.outputs.status != 'up-to-date' && needs.prepare.outputs.status != 'already-prepared'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write # push the sync branch
+      pull-requests: write # open the pull request, close superseded ones
+      actions: write # download the artifact, dispatch ci.yml on the sync branch
+    steps:
+      # Only for the git objects the bundle builds on; nothing from it is executed.
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.prepare.outputs.base_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      # gh instead of a download action: the same token, no extra third-party pin.
+      - name: Fetch the prepared branch
         env:
-          BRANCH: ${{ steps.sync.outputs.branch }}
-          RANGE: ${{ steps.sync.outputs.range }}
-          EXIT_CODE: ${{ steps.sync.outputs.exit_code }}
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ needs.prepare.outputs.branch }}
+        run: |
+          gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+            --name upstream-sync-report --dir "$RUNNER_TEMP/report"
+          git bundle verify "$RUNNER_TEMP/report/sync.bundle"
+          git fetch --no-tags "$RUNNER_TEMP/report/sync.bundle" "refs/heads/$BRANCH:refs/heads/$BRANCH"
+
+      - name: Push branch and open pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ needs.prepare.outputs.branch }}
+          RANGE: ${{ needs.prepare.outputs.range }}
+          EXIT_CODE: ${{ needs.prepare.outputs.exit_code }}
           BASE_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
-          if [ "$(gh pr list --head "$BRANCH" --state open --json number --jq length)" != "0" ]; then
+          if [ "$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$BRANCH" --state open --json number --jq length)" != "0" ]; then
             echo "An open pull request for $BRANCH already exists; nothing to do." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
+          # credentials for this one push only; never a force push (prepare already
+          # failed if origin had this branch without this sync)
+          gh auth setup-git
           git push origin "refs/heads/$BRANCH:refs/heads/$BRANCH"
           draft=()
           if [ "$EXIT_CODE" = "2" ]; then draft=(--draft); fi
-          gh pr create --base "$BASE_BRANCH" --head "$BRANCH" "${draft[@]}" \
-            --title "chore(upstream): sync genoffice $RANGE" --body-file "$RUNNER_TEMP/upstream-sync.md"
+          url=$(gh pr create --repo "$GITHUB_REPOSITORY" --base "$BASE_BRANCH" --head "$BRANCH" "${draft[@]}" \
+            --title "chore(upstream): sync genoffice $RANGE" --body-file "$RUNNER_TEMP/report/pr-body.md")
+          number=${url##*/}
+          # Older sync pull requests are superseded by this one (it contains their
+          # upstream range too); close them with a pointer and keep their branches.
+          for old in $(gh pr list --repo "$GITHUB_REPOSITORY" --state open --limit 100 \
+              --json number,headRefName \
+              --jq '.[] | select(.headRefName | startswith("upstream-sync/")) | select(.headRefName != env.BRANCH) | .number'); do
+            gh pr close "$old" --repo "$GITHUB_REPOSITORY" \
+              --comment "Superseded by #$number, which syncs a newer upstream. The branch is kept."
+          done
           # Pushes and pull requests made with GITHUB_TOKEN do not trigger other
           # workflows (only workflow_dispatch / repository_dispatch do), so the
           # pull_request run of ci.yml never starts for this PR. Dispatch ci.yml on
           # the branch instead: its checks attach to the PR head commit. Any later
           # push by a person to the branch triggers the normal pull_request run.
-          gh workflow run ci.yml --ref "$BRANCH"
-          echo "Opened a pull request for $BRANCH and dispatched CI on it." >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Nothing to open
-        if: steps.sync.outputs.status == 'up-to-date' || steps.sync.outputs.status == 'already-prepared'
-        env:
-          STATUS: ${{ steps.sync.outputs.status }}
-          BRANCH: ${{ steps.sync.outputs.branch }}
-        run: |
-          if [ "$STATUS" = "up-to-date" ]; then
-            echo "Upstream has nothing new: UPSTREAM_BASE already equals the upstream head." >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "$BRANCH already carries this sync (open or closed PR); delete the branch to prepare it again." >> "$GITHUB_STEP_SUMMARY"
-          fi
+          gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" --ref "$BRANCH"
+          echo "Opened $url for $BRANCH and dispatched CI on it." >> "$GITHUB_STEP_SUMMARY"

@@ -113,6 +113,28 @@ jobs:
       - name: Check legal notices
         run: npm run legal:check && npm run test:legal
 
+      # No shipped code may name a blocked cloud / analytics host; --if-present
+      # keeps this step green on a checkout without the gate.
+      - name: Check egress
+        run: npm run --if-present check:egress
+
+      # An upstream sync PR carries merge-conflict markers until a person resolves
+      # them. A file fails only when it holds all three of git's marker lines
+      # (<<<<<<< x, =======, >>>>>>> y), so a lone ======= underline does not;
+      # binary files are skipped.
+      - name: Check for conflict markers
+        run: |
+          set +e
+          files=$(git grep -I -l --all-match -e '^<<<<<<< ' -e '^=======$' -e '^>>>>>>> ')
+          rc=$?
+          set -e
+          if [ "$rc" -eq 0 ]; then
+            echo "Unresolved merge-conflict markers committed in:"
+            echo "$files"
+            exit 1
+          fi
+          if [ "$rc" -gt 1 ]; then exit "$rc"; fi
+
       # skills/*/SKILL.md ship to users' agent directories; a body change
       # without a metadata.version bump would never be offered as an update.
       - name: Check skill versions
