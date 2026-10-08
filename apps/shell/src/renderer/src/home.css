@@ -616,7 +616,7 @@ body.vib .home {
   border: 1px solid var(--border-subtle);
   border-radius: 10px;
   background: var(--surface);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-menu);
   z-index: 30;
 }
 
