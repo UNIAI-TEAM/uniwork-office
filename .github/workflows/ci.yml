@@ -93,6 +93,15 @@ jobs:
           fi
           npm run check:theme-colors
 
+      # UniWork brand gate: no GenOffice / Genspark / genspark.ai in user-visible
+      # strings, i18n catalogs, package metadata or installer config except the
+      # reasoned entries in tools/rebrand/brand-allowlist.json (see tools/rebrand/README.md).
+      - name: Check brand
+        run: npm run check:brand
+
+      - name: Test rebrand tooling
+        run: npm run test:rebrand
+
       # skills/*/SKILL.md ship to users' agent directories; a body change
       # without a metadata.version bump would never be offered as an update.
       - name: Check skill versions

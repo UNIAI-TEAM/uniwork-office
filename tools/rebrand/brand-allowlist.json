@@ -1,0 +1,112 @@
+{
+  "_doc": "Exemptions for tools/rebrand/brand-scan.mjs. Every entry needs path (glob), kind and reason. kind=permanent: the upstream name is legitimately there (attribution, vendored text, code identifiers). kind=debt: a real remaining brand string that is fixed by a known follow-up; the scan warns when a debt entry stops matching so it gets deleted. pattern (optional) is a regex tested against the raw source line. Code identifiers (@genoffice/*, GENOFFICE_* env vars, genofficeAuthPath-style names, font aliases, the lowercase `genoffice` CLI command) are masked in table.mjs and need no entry. Out of scope by construction, not scanned at all: LICENSE*, NOTICE, ee/, docs/, README*/CONTRIBUTING/PRIVACY, tests, e2e, fixtures, .github.",
+  "entries": [
+    {
+      "path": "**",
+      "pattern": "genspark-ai/genoffice#\\d+",
+      "kind": "permanent",
+      "reason": "Reference to an upstream issue/PR number inside a comment; attribution to where the behaviour was designed."
+    },
+    {
+      "path": "apps/shell/electron-builder.cjs",
+      "pattern": "@genofficeshell",
+      "kind": "permanent",
+      "reason": "Comment quoting the invalid npm-scope-derived desktop name that syncDesktopName avoids; describes upstream behaviour, not product branding."
+    },
+    {
+      "path": "apps/shell/src/renderer/src/assets/UNIWORK_BRAND_ASSET_REQUIRED.md",
+      "kind": "permanent",
+      "reason": "Internal note that names the removed upstream lockup to explain why placeholder artwork is in place (trademark attribution)."
+    },
+    {
+      "path": "packages/docx-engine/src/vendor/**",
+      "kind": "permanent",
+      "reason": "Vendored third-party library notes that record who made local modifications; attribution text, never rendered in the UI."
+    },
+
+    {
+      "path": "apps/html/src/renderer/ai/{brief-writer,page-writer}.ts",
+      "pattern": "GenOffice HTML",
+      "kind": "debt",
+      "reason": "AI system prompt missed by the hand rebrand; rewritten to 'UniWork HTML' by the first `node tools/rebrand/rebrand.mjs` run (module-names rule).",
+      "tracker": "UNI-1002 / GO-A1 re-run after upstream merge"
+    },
+    {
+      "path": "apps/markdown/src/renderer/ai/doc-writer.ts",
+      "pattern": "GenOffice Markdown",
+      "kind": "debt",
+      "reason": "AI system prompt missed by the hand rebrand; rewritten to 'UniWork Markdown' by the first rebrand run (module-names rule).",
+      "tracker": "UNI-1002 / GO-A1 re-run after upstream merge"
+    },
+    {
+      "path": "packages/ai-provider/src/codex-app-server.ts",
+      "pattern": "GenOffice",
+      "kind": "debt",
+      "reason": "Codex backend prompt text missed by the hand rebrand; rewritten to 'UniWork Office' by the first rebrand run (product-name rule).",
+      "tracker": "UNI-1002 / GO-A1 re-run after upstream merge"
+    },
+    {
+      "path": "packages/cli/src/{commands/image,commands/search,commands/sheet,formats/app-export}.ts",
+      "pattern": "Genspark|GenOffice",
+      "kind": "debt",
+      "reason": "CLI help and error strings missed by the hand rebrand; rewritten by the first rebrand run (genspark-account / product-name rules).",
+      "tracker": "UNI-1002 / GO-A1 re-run after upstream merge"
+    },
+    {
+      "path": "apps/sheets/src/preload/index.ts",
+      "pattern": "Invalid Genspark account",
+      "kind": "debt",
+      "reason": "Error message missed by the hand rebrand; rewritten to 'UniWork' by the first rebrand run (genspark-account rule).",
+      "tracker": "UNI-1002 / GO-A1 re-run after upstream merge"
+    },
+
+    {
+      "path": "{apps/sheets/src/main/sheets-main.ts,apps/slides/src/main/slides-main.ts,apps/shell/src/main/index.ts}",
+      "pattern": "genspark\\.ai",
+      "kind": "debt",
+      "reason": "Proxy-resolution probe against www.genspark.ai; the Genspark endpoints are removed under the telemetry/login/URL clean-up.",
+      "tracker": "GO-A4 UNI-1005"
+    },
+    {
+      "path": "apps/shell/src/main/cloud-projects.ts",
+      "pattern": "genspark\\.ai",
+      "kind": "debt",
+      "reason": "GENSPARK_ORIGIN cloud-projects endpoint; removed with the Genspark cloud integration.",
+      "tracker": "GO-A4 UNI-1005"
+    },
+    {
+      "path": "packages/ai-provider/src/{providers,protocols/shared}.ts",
+      "pattern": "genspark\\.ai",
+      "kind": "debt",
+      "reason": "Genspark LLM proxy base URLs and pricing-URL matcher kept for the legacy provider id until the provider is removed.",
+      "tracker": "GO-A4 UNI-1005"
+    },
+    {
+      "path": "packages/ai-search/src/{genoffice-auth,gsk}.ts",
+      "pattern": "genspark\\.ai",
+      "kind": "debt",
+      "reason": "Genspark device-login and gsk tool CLI base URLs; removed with the Genspark login (GO-A4) and replaced by UniWork sign-in (GO-A5).",
+      "tracker": "GO-A4 UNI-1005 / GO-A5"
+    },
+    {
+      "path": "packages/electron-utils/src/remote-image.ts",
+      "pattern": "genspark\\.ai",
+      "kind": "debt",
+      "reason": "Referer header rule for genspark.ai-hosted images; removed with the Genspark integration.",
+      "tracker": "GO-A4 UNI-1005"
+    },
+    {
+      "path": "apps/shell/src/renderer/src/IntegrationsPane.tsx",
+      "pattern": "genspark-ai/genoffice",
+      "kind": "debt",
+      "reason": "User-visible `npx skills add genspark-ai/genoffice` install command; needs a UniWork skills repository before it can change.",
+      "tracker": "GO-A4 UNI-1005 (skills distribution)"
+    },
+    {
+      "path": "{skills/**,packages/pipelines/src/slides/guides/*.md}",
+      "kind": "debt",
+      "reason": "Agent-facing skill and guide text ships to users' agent directories and still names GenOffice. Rewriting skills/*/SKILL.md requires a metadata.version bump (tools/check-skill-version.mjs) and a decision on the CLI command name, so it is a separate change.",
+      "tracker": "UNI-1002 follow-up (skill rebrand + version bump)"
+    }
+  ]
+}
