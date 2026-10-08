@@ -5,7 +5,6 @@ export const es = {
   aiEmptyBuildTitle: 'Deja que la IA construya este libro por ti',
   aiEmptyBuildBody:
     'Describe la tabla, los datos o el gráfico que necesitas: la IA los crea directamente.',
-  aiGskLoginBtn: 'Iniciar sesión en UniWork',
   aiUndelivered: 'No enviado',
   aiRetry: 'Reintentar',
   aiOpenAssistant: 'Abrir el asistente de IA',
@@ -50,13 +49,6 @@ export const es = {
   aiFileTooltip:
     'SHA-256 {sha}\nAl guardar solo se reescriben las entradas editadas; todo lo demás se conserva.',
   aiFileMeta: '{sheets} hojas · {entries} entradas',
-  aiGensparkAccount: 'Cuenta de UniWork',
-  aiAccountChecking: 'Comprobando…',
-  aiLoggedIn: 'Sesión iniciada',
-  aiLoggedInAs: 'Sesión iniciada: {email}',
-  aiNotLoggedIn: 'Sin sesión iniciada (las funciones de IA requieren una cuenta de UniWork)',
-  aiWaitingBrowserLogin: 'Esperando el inicio de sesión en el navegador…',
-  aiLoginGenspark: 'Iniciar sesión en UniWork',
   aiModel: 'Modelo',
   aiCancel: 'Cancelar',
   aiSave: 'Guardar',
