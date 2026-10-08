@@ -27,7 +27,13 @@ let reqSeq = 0
 function put(name, bytes, fileId = `f${++seq}`) {
   const prev = files.get(fileId)
   const n = prev ? Number(prev.meta.versionId.slice(1)) + 1 : 1
-  const meta = { fileId, name, versionId: `v${n}`, etag: `"${fileId}-v${n}"`, sizeBytes: bytes.byteLength }
+  const meta = {
+    fileId,
+    name,
+    versionId: `v${n}`,
+    etag: `"${fileId}-v${n}"`,
+    sizeBytes: bytes.byteLength,
+  }
   files.set(fileId, { meta, bytes: bytes.slice() })
   return meta
 }
@@ -68,7 +74,12 @@ const handlers = {
     lastSaved = { ...meta, bytes: new Uint8Array(data) }
     return { ok: true, file: meta, versionId: meta.versionId }
   },
-  'api.recents': ({ limit }) => ({ files: [...files.values()].map((f) => f.meta).reverse().slice(0, limit ?? 20) }),
+  'api.recents': ({ limit }) => ({
+    files: [...files.values()]
+      .map((f) => f.meta)
+      .reverse()
+      .slice(0, limit ?? 20),
+  }),
   // no server PDF render in the harness: the frame falls back to its print dialog
   'api.export': () => {
     throw apiError('unsupported', 'export is not available in the test host')
@@ -123,7 +134,14 @@ const initPayload = {
   apiMode: 'host-proxy',
   locale: params.get('lang') || 'zh',
   theme: params.get('theme') === 'dark' ? 'dark' : 'light',
-  capabilities: { save: true, saveAs: true, recents: true, print: true, exportPdf: true, exportHtml: true },
+  capabilities: {
+    save: true,
+    saveAs: true,
+    recents: true,
+    print: true,
+    exportPdf: true,
+    exportHtml: true,
+  },
 }
 
 async function boot() {
@@ -131,7 +149,9 @@ async function boot() {
   if (url) {
     const res = await fetch(url)
     if (!res.ok) throw new Error(`GET ${url} -> ${res.status}`)
-    const name = decodeURIComponent(new URL(url, location.href).pathname.split('/').pop() || 'document.docx')
+    const name = decodeURIComponent(
+      new URL(url, location.href).pathname.split('/').pop() || 'document.docx',
+    )
     initPayload.documentId = put(name, new Uint8Array(await res.arrayBuffer())).fileId
   } else {
     initPayload.documentId = put('Untitled.docx', new Uint8Array()).fileId

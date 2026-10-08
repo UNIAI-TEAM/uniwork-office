@@ -37,7 +37,14 @@ function fallbackFor(key: string): unknown {
 const webapi = createWebApi(
   createDocsFrameClient({
     allowedOrigins: [location.origin],
-    capabilities: { save: true, saveAs: true, recents: true, print: true, exportPdf: true, exportHtml: true },
+    capabilities: {
+      save: true,
+      saveAs: true,
+      recents: true,
+      print: true,
+      exportPdf: true,
+      exportHtml: true,
+    },
   }),
 )
 

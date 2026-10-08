@@ -74,11 +74,17 @@ describe('boot open (consumePendingOpenDocx)', () => {
     vi.stubGlobal('fetch', fetchMock)
     mock.init({
       documentId: 'u1',
-      open: { file: { fileId: 'u1', name: 'Url.docx' }, source: { kind: 'url', url: 'https://s3/signed' } },
+      open: {
+        file: { fileId: 'u1', name: 'Url.docx' },
+        source: { kind: 'url', url: 'https://s3/signed' },
+      },
     })
     const r = (await api.consumePendingOpenDocx()) as OpenFileResult
     expect(new Uint8Array(r.data)).toEqual(DOCX)
-    expect(fetchMock).toHaveBeenCalledWith('https://s3/signed', { credentials: 'omit', headers: undefined })
+    expect(fetchMock).toHaveBeenCalledWith('https://s3/signed', {
+      credentials: 'omit',
+      headers: undefined,
+    })
     vi.unstubAllGlobals()
   })
 
@@ -138,7 +144,10 @@ describe('openDocxPath / openDocx', () => {
     mock.seed('Picked.docx', DOCX)
     const r = (await api.openDocx()) as OpenFileResult
     expect(r.name).toBe('Picked.docx')
-    expect(mock.calls[0]).toMatchObject({ type: 'file.pick', payload: { purpose: 'open', accept: ['docx'] } })
+    expect(mock.calls[0]).toMatchObject({
+      type: 'file.pick',
+      payload: { purpose: 'open', accept: ['docx'] },
+    })
     expect(mock.calls[0].opts?.timeoutMs).toBe(600_000)
   })
 
@@ -164,7 +173,10 @@ describe('saveDocx', () => {
     expect(call.payload).toMatchObject({ fileId: 'f1', etag: '"f1-v1"', auto: false })
     expect(call.opts?.transfer).toHaveLength(1)
     expect(mock.bytesOf('f1')).toEqual(new Uint8Array([9, 9, 9]))
-    expect(mock.saved.at(-1)).toMatchObject({ file: { fileId: 'f1', versionId: 'v2' }, initiatedByFrame: true })
+    expect(mock.saved.at(-1)).toMatchObject({
+      file: { fileId: 'f1', versionId: 'v2' },
+      initiatedByFrame: true,
+    })
     // next save is based on the version this one created
     expect(await api.saveDocx(doc.path, buf([1]), true)).toEqual({ ok: true })
     expect(mock.calls.at(-1)!.payload).toMatchObject({ etag: '"f1-v2"', auto: true })
@@ -181,12 +193,18 @@ describe('saveDocx', () => {
   it('conflict as a rejected request maps the same way', async () => {
     const doc = await bootWith()
     mock.override('api.save', () => Promise.reject(protocolError('conflict', 'HTTP 409')))
-    expect(await api.saveDocx(doc.path, buf([5]))).toMatchObject({ ok: false, reason: 'external-modified' })
+    expect(await api.saveDocx(doc.path, buf([5]))).toMatchObject({
+      ok: false,
+      reason: 'external-modified',
+    })
   })
 
   it('error: surfaces the message', async () => {
     const doc = await bootWith()
-    mock.override('api.save', () => ({ ok: false, error: { code: 'forbidden', message: 'read-only' } }))
+    mock.override('api.save', () => ({
+      ok: false,
+      error: { code: 'forbidden', message: 'read-only' },
+    }))
     expect(await api.saveDocx(doc.path, buf([5]))).toEqual({ ok: false, error: 'read-only' })
     mock.override('api.save', () => Promise.reject(protocolError('internal', 'HTTP 500')))
     expect(await api.saveDocx(doc.path, buf([5]))).toEqual({ ok: false, error: 'HTTP 500' })
@@ -220,7 +238,10 @@ describe('saveDocxAs / saveDocxNew', () => {
   })
 
   it('saveDocxAs cancelled -> {ok:false} without an error', async () => {
-    mock.override('api.saveAs', () => ({ ok: false, error: { code: 'cancelled', message: 'user closed' } }))
+    mock.override('api.saveAs', () => ({
+      ok: false,
+      error: { code: 'cancelled', message: 'user closed' },
+    }))
     expect(await api.saveDocxAs('Copy', buf([7]))).toEqual({ ok: false })
   })
 
@@ -244,7 +265,10 @@ describe('getRecentFiles', () => {
   it('success: maps files to bridge paths', async () => {
     mock.seed('A.docx', DOCX)
     mock.seed('B.docx', DOCX)
-    expect(await api.getRecentFiles()).toEqual(['uniwork://files/f2/B.docx', 'uniwork://files/f1/A.docx'])
+    expect(await api.getRecentFiles()).toEqual([
+      'uniwork://files/f2/B.docx',
+      'uniwork://files/f1/A.docx',
+    ])
     expect(mock.calls[0].payload).toEqual({ limit: 20 })
   })
 
@@ -313,7 +337,10 @@ describe('exportPdf / print', () => {
   })
 
   it('exportHtml downloads locally', async () => {
-    expect(await api.exportHtml('Report.docx', '<p>x</p>')).toEqual({ ok: true, path: 'Report.html' })
+    expect(await api.exportHtml('Report.docx', '<p>x</p>')).toEqual({
+      ok: true,
+      path: 'Report.html',
+    })
     expect((await api.exportHtml('Report.docx', '')).ok).toBe(false)
   })
 })
@@ -342,14 +369,23 @@ describe('onRenamedDocx', () => {
 
 describe('fetchImage / convertAltChunkHtml', () => {
   it('fetchImage: data: URLs locally, http(s) through image.fetch', async () => {
-    expect(await api.fetchImage('data:image/png;base64,AAAA')).toEqual({ base64: 'AAAA', mime: 'image/png' })
+    expect(await api.fetchImage('data:image/png;base64,AAAA')).toEqual({
+      base64: 'AAAA',
+      mime: 'image/png',
+    })
     expect(await api.fetchImage('data:image/svg+xml,%3Csvg%2F%3E')).toEqual({
       base64: btoa('<svg/>'),
       mime: 'image/svg+xml',
     })
     expect(mock.calls).toHaveLength(0)
-    expect(await api.fetchImage('https://cdn/x.png')).toEqual({ base64: 'iVBORw0KGgo=', mime: 'image/png' })
-    expect(mock.calls[0]).toMatchObject({ type: 'image.fetch', payload: { url: 'https://cdn/x.png' } })
+    expect(await api.fetchImage('https://cdn/x.png')).toEqual({
+      base64: 'iVBORw0KGgo=',
+      mime: 'image/png',
+    })
+    expect(mock.calls[0]).toMatchObject({
+      type: 'image.fetch',
+      payload: { url: 'https://cdn/x.png' },
+    })
     expect(await api.fetchImage('file:///etc/passwd')).toBeNull()
   })
 
@@ -389,7 +425,11 @@ describe('host save / saveAs requests (editor flows)', () => {
     const doc = await bootWith()
     wireRenderer(() => doc.path)
     const res = await mock.host.save({ reason: 'user' })
-    expect(res).toMatchObject({ ok: true, file: { fileId: 'f1', versionId: 'v2' }, versionId: 'v2' })
+    expect(res).toMatchObject({
+      ok: true,
+      file: { fileId: 'f1', versionId: 'v2' },
+      versionId: 'v2',
+    })
     expect(mock.saved.at(-1)!.initiatedByFrame).toBe(false)
   })
 
@@ -402,11 +442,17 @@ describe('host save / saveAs requests (editor flows)', () => {
   })
 
   it('save timeout / no document', async () => {
-    expect(await mock.host.save({ reason: 'user' })).toMatchObject({ ok: false, error: { code: 'not_ready' } })
+    expect(await mock.host.save({ reason: 'user' })).toMatchObject({
+      ok: false,
+      error: { code: 'not_ready' },
+    })
     const doc = await bootWith()
     wireRenderer(() => doc.path)
     mock.override('api.save', timeoutAfter)
-    expect(await mock.host.save({ reason: 'autosave' })).toMatchObject({ ok: false, error: { code: 'timeout' } })
+    expect(await mock.host.save({ reason: 'autosave' })).toMatchObject({
+      ok: false,
+      error: { code: 'timeout' },
+    })
   })
 
   it('saveAs: drives the editor Save As with the host name', async () => {

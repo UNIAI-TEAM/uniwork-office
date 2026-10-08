@@ -47,13 +47,23 @@ export function createMockPort(session: Partial<PortSession> = {}) {
   const renameListeners: Array<(file: FileMeta) => void> = []
 
   function put(name: string, bytes: Uint8Array, fileId = `f${++seq}`): FileMeta {
-    const version = (store.get(fileId)?.meta.versionId ?? 'v0').replace(/\d+$/, (n) => String(+n + 1))
-    const meta: FileMeta = { fileId, name, versionId: version, etag: `"${fileId}-${version}"`, sizeBytes: bytes.byteLength }
+    const version = (store.get(fileId)?.meta.versionId ?? 'v0').replace(/\d+$/, (n) =>
+      String(+n + 1),
+    )
+    const meta: FileMeta = {
+      fileId,
+      name,
+      versionId: version,
+      etag: `"${fileId}-${version}"`,
+      sizeBytes: bytes.byteLength,
+    }
     store.set(fileId, { meta, bytes: bytes.slice() })
     return meta
   }
 
-  const api: { [K in FrameRequestType]: (p: FrameRequests[K]['payload']) => FrameRequests[K]['result'] } = {
+  const api: {
+    [K in FrameRequestType]: (p: FrameRequests[K]['payload']) => FrameRequests[K]['result']
+  } = {
     'token.refresh': () => ({ token: 't2', tokenExpiresAt: Date.now() + 60_000 }),
     'api.open': ({ fileId }) => {
       const f = store.get(fileId)
@@ -75,7 +85,10 @@ export function createMockPort(session: Partial<PortSession> = {}) {
       return { ok: true, file: meta, versionId: meta.versionId }
     },
     'api.recents': ({ limit }) => ({
-      files: [...store.values()].map((f) => f.meta).reverse().slice(0, limit ?? 20),
+      files: [...store.values()]
+        .map((f) => f.meta)
+        .reverse()
+        .slice(0, limit ?? 20),
     }),
     'api.export': ({ name }) => ({
       data: new TextEncoder().encode('%PDF-1.7 mock').buffer,

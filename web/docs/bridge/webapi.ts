@@ -34,11 +34,7 @@
  * hidden), attachments (./browser.ts keeps them in the browser; AI-panel only),
  * doc passwords (./hide.ts). Encrypted (CFB) docx is passed through as-is.
  */
-import type {
-  DesktopApi,
-  OpenDocxResult,
-  OpenFileResult,
-} from '../../../apps/docs/src/shared/ipc'
+import type { DesktopApi, OpenDocxResult, OpenFileResult } from '../../../apps/docs/src/shared/ipc'
 import type {
   FileMeta,
   FileSource,
@@ -123,7 +119,8 @@ function decodeDataUrl(url: string): { base64: string; mime: string } | null {
   if (m[3]) return { base64: m[4], mime }
   try {
     let bin = ''
-    for (const b of new TextEncoder().encode(decodeURIComponent(m[4]))) bin += String.fromCharCode(b)
+    for (const b of new TextEncoder().encode(decodeURIComponent(m[4])))
+      bin += String.fromCharCode(b)
     return { base64: btoa(bin), mime }
   } catch {
     return null
@@ -243,7 +240,10 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
       if (ok && file) {
         return { ok: true, file, ...(file.versionId ? { versionId: file.versionId } : {}) }
       }
-      return { ok: false, error: hostSave.error ?? { code: 'internal', message: 'save did not complete' } }
+      return {
+        ok: false,
+        error: hostSave.error ?? { code: 'internal', message: 'save did not complete' },
+      }
     } finally {
       hostSave = null
     }
@@ -309,7 +309,10 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
         },
         { timeoutMs: TIMEOUTS.transfer },
       )
-      downloadBlob(out.name || name, new Blob([out.data], { type: out.mimeType || 'application/pdf' }))
+      downloadBlob(
+        out.name || name,
+        new Blob([out.data], { type: out.mimeType || 'application/pdf' }),
+      )
       return { ok: true, path: out.name || name }
     } catch (err) {
       if (errorCode(err) === 'cancelled') return { ok: false }
@@ -387,9 +390,17 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
       const fileId = idFromPath(path)
       if (!fileId) return { ok: false, error: `not a UniWork document: ${basename(String(path))}` }
       const etag = files.get(fileId)?.etag
-      const payload = { fileId, data: copyBuffer(data), ...(etag ? { etag } : {}), auto: auto === true }
+      const payload = {
+        fileId,
+        data: copyBuffer(data),
+        ...(etag ? { etag } : {}),
+        auto: auto === true,
+      }
       const res = await sendSave('api.save', () =>
-        port.request('api.save', payload, { timeoutMs: TIMEOUTS.transfer, transfer: [payload.data] }),
+        port.request('api.save', payload, {
+          timeoutMs: TIMEOUTS.transfer,
+          transfer: [payload.data],
+        }),
       )
       if (res.ok) {
         landed(res)
@@ -400,7 +411,10 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
       if (res.error.code === 'conflict') {
         return { ok: false, reason: 'external-modified', error: res.error.message }
       }
-      return { ok: false, error: res.error.code === 'timeout' ? 'save timed out' : res.error.message }
+      return {
+        ok: false,
+        error: res.error.code === 'timeout' ? 'save timed out' : res.error.message,
+      }
     },
 
     async saveDocxAs(defaultName: string, data: ArrayBuffer, sourcePath?: string | null) {
@@ -412,7 +426,10 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
         ...(sourceFileId ? { sourceFileId } : {}),
       }
       const res = await sendSave('api.saveAs', () =>
-        port.request('api.saveAs', payload, { timeoutMs: TIMEOUTS.dialog, transfer: [payload.data] }),
+        port.request('api.saveAs', payload, {
+          timeoutMs: TIMEOUTS.dialog,
+          transfer: [payload.data],
+        }),
       )
       if (res.ok) {
         const file = landed(res)
@@ -426,9 +443,16 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
     },
 
     async saveDocxNew(defaultName: string, data: ArrayBuffer) {
-      const payload = { name: withExt(defaultName || 'Untitled', '.docx'), data: copyBuffer(data), silent: true }
+      const payload = {
+        name: withExt(defaultName || 'Untitled', '.docx'),
+        data: copyBuffer(data),
+        silent: true,
+      }
       const res = await sendSave('api.saveAs', () =>
-        port.request('api.saveAs', payload, { timeoutMs: TIMEOUTS.transfer, transfer: [payload.data] }),
+        port.request('api.saveAs', payload, {
+          timeoutMs: TIMEOUTS.transfer,
+          transfer: [payload.data],
+        }),
       )
       if (!res.ok) {
         if (hostSave) hostSave.error = res.error
@@ -441,7 +465,9 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
       try {
         const res = await port.request('api.recents', { limit: 20 }, { timeoutMs: TIMEOUTS.short })
         return Array.isArray(res?.files)
-          ? res.files.filter((f) => typeof f?.fileId === 'string' && typeof f.name === 'string').map(pathFor)
+          ? res.files
+              .filter((f) => typeof f?.fileId === 'string' && typeof f.name === 'string')
+              .map(pathFor)
           : []
       } catch (err) {
         console.warn('[docs-web] api.recents failed:', err)
@@ -490,7 +516,11 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
     async convertAltChunkHtml(html: string): Promise<Uint8Array | null> {
       if (typeof html !== 'string' || !html) return null
       try {
-        const res = await port.request('convert.altChunkHtml', { html }, { timeoutMs: TIMEOUTS.transfer })
+        const res = await port.request(
+          'convert.altChunkHtml',
+          { html },
+          { timeoutMs: TIMEOUTS.transfer },
+        )
         return res?.data ? new Uint8Array(copyBuffer(res.data)) : null
       } catch {
         return null
