@@ -317,6 +317,8 @@ const tMain = createI18n({
     menuShortcuts: '键盘快捷键',
     menuDocsHelp: 'UniWork Docs 帮助',
   },
+  // en and vi are ours (UniWork wording, e.g. errNoApiKey: no active AI plan); the other locales keep
+  // upstream's wording. tools/rebrand re-applies the vi errNoApiKey (rule vi-no-api-key).
   en: {
     dlgOpenDoc: 'Open Document',
     filterWord: 'Word Documents',
@@ -488,7 +490,7 @@ const tMain = createI18n({
     errNotImage: 'loại hình ảnh không được hỗ trợ',
     errGskNotLoggedIn:
       'Chưa đăng nhập UniWork: nhấp “Đăng nhập UniWork” bên dưới, đăng nhập, rồi thử lại',
-    errNoApiKey: 'Chưa cấu hình khóa API cho {provider}',
+    errNoApiKey: 'Chưa kích hoạt / mua gói AI. Hãy mua gói để dùng Trợ lý AI.',
     errAiBusy: 'Dịch vụ AI hiện đang bận — vui lòng thử lại sau giây lát',
     errNoModel: 'Chưa cấu hình tên mô hình',
     menuFile: 'Tệp',

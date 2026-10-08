@@ -115,3 +115,64 @@ test('glob matching', () => {
   assert.ok(globToRegExp('apps/*/src/**/*.{ts,tsx}').test('apps/a/src/b/c/d.tsx'))
   assert.ok(globToRegExp('{a,b/c}/x').test('b/c/x'))
 })
+
+/** Runs a rebrand over an ad-hoc file map (in addition to FIXTURE) and returns the result reader. */
+function withFiles(files, fn) {
+  const root = mkdtempSync(join(tmpdir(), 'rebrand-test-'))
+  try {
+    for (const [file, text] of Object.entries(files)) {
+      mkdirSync(dirname(join(root, file)), { recursive: true })
+      writeFileSync(join(root, file), text)
+    }
+    rebrand(root, { write: true })
+    fn((f) => read(root, f), root)
+    assert.equal(rebrand(root, { write: true }).changed.length, 0, 'second run changes nothing')
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+}
+
+test('CLI launchers start the renamed app binaries', () => {
+  withFiles(
+    {
+      'packages/cli/bin/genoffice': [
+        '  */Contents/Resources/cli) app="$here/../../MacOS/GenOffice" ;;',
+        '    if [ -x "$here/../../GenOffice.exe" ]; then app="$here/../../GenOffice.exe"; else app="$here/../../genoffice"; fi',
+        '',
+      ].join('\n'),
+      'packages/cli/bin/genoffice.cmd': '"%~dp0..\..\GenOffice.exe" "%~dp0genoffice.cjs" %*\n',
+      'packages/cli/src/resources.ts': [
+        "      return [...(shipped ? [shipped] : []), '/opt/GenOffice/genoffice', '/usr/bin/genoffice']",
+        "  return join(install, 'genoffice')",
+        '',
+      ].join('\n'),
+    },
+    (get) => {
+      const sh = get('packages/cli/bin/genoffice')
+      assert.match(sh, /MacOS\/UniWork Office" ;;/)
+      assert.match(sh, /-x "\$here\/\.\.\/\.\.\/UniWork Office\.exe"/)
+      assert.match(sh, /app="\$here\/\.\.\/\.\.\/uniwork-office"/)
+      assert.match(
+        get('packages/cli/bin/genoffice.cmd'),
+        /\.\.\UniWork Office\.exe" "%~dp0genoffice\.cjs"/,
+      )
+      const res = get('packages/cli/src/resources.ts')
+      assert.match(
+        res,
+        /\[\.\.\.\(shipped \? \[shipped\] : \[\]\), '\/opt\/UniWork Office\/uniwork-office'\]/,
+      )
+      assert.ok(!res.includes('/usr/bin/'), 'no dead /usr/bin candidate')
+      assert.match(res, /join\(install, 'uniwork-office'\)/)
+    },
+  )
+})
+
+test('vi errNoApiKey keeps the UniWork wording after an upstream merge', () => {
+  const upstreamVi = "    errNoApiKey: 'Chưa cấu hình khóa API cho {provider}',\n"
+  withFiles({ 'apps/docs/src/main/docs-main.ts': upstreamVi }, (get) => {
+    assert.equal(
+      get('apps/docs/src/main/docs-main.ts'),
+      "    errNoApiKey: 'Chưa kích hoạt / mua gói AI. Hãy mua gói để dùng Trợ lý AI.',\n",
+    )
+  })
+})

@@ -233,6 +233,8 @@ const tMain = createI18n({
     csvKeepFormatDetail:
       'CSV 只保留单张工作表的纯文本值——公式、格式和其他工作表不会存入 .csv 文件。',
   },
+  // en and vi are ours (UniWork wording, e.g. errNoApiKey: no active AI plan); the other locales keep
+  // upstream's wording. tools/rebrand re-applies the vi errNoApiKey (rule vi-no-api-key).
   en: {
     filterSpreadsheets: 'Spreadsheets',
     filterXlsx: 'Excel Workbooks',
@@ -312,7 +314,7 @@ const tMain = createI18n({
     errNotImage: 'loại hình ảnh không được hỗ trợ',
     errGskNotLoggedIn:
       'Chưa đăng nhập UniWork: nhấp “Đăng nhập UniWork” bên dưới, đăng nhập, rồi thử lại',
-    errNoApiKey: 'Chưa cấu hình khóa API cho {provider}',
+    errNoApiKey: 'Chưa kích hoạt / mua gói AI. Hãy mua gói để dùng Trợ lý AI.',
     errAiBusy: 'Dịch vụ AI hiện đang bận — vui lòng thử lại sau giây lát',
     errNoModel: 'Chưa cấu hình tên mô hình',
     errImgAbsPath: 'Đường dẫn hình ảnh phải là đường dẫn tuyệt đối.',

@@ -111,6 +111,8 @@ export const tMain = createI18n({
     menuZoomOut: '缩小',
     menuActualSize: '实际大小',
   },
+  // en and vi are ours (UniWork wording, e.g. errNoApiKey: no active AI plan); the other locales keep
+  // upstream's wording. tools/rebrand re-applies the vi errNoApiKey (rule vi-no-api-key).
   en: {
     dlgInsertImage: 'Insert Image',
     dlgReplacePicture: 'Replace Picture',
@@ -294,7 +296,7 @@ export const tMain = createI18n({
     errNotImage: 'loại hình ảnh không được hỗ trợ',
     errGskNotLoggedIn:
       'Chưa đăng nhập UniWork: nhấp “Đăng nhập UniWork” bên dưới, đăng nhập, rồi thử lại',
-    errNoApiKey: 'Chưa cấu hình khóa API cho {provider}',
+    errNoApiKey: 'Chưa kích hoạt / mua gói AI. Hãy mua gói để dùng Trợ lý AI.',
     errNoModel: 'Chưa cấu hình tên mô hình',
     errGskCli: 'gsk chưa đăng nhập: chạy gsk login để đăng nhập tài khoản UniWork trước',
     errNoDeckAppend:

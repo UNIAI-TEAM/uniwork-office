@@ -238,6 +238,21 @@ export const rules = [
     replace: [[/GenOffice-venster/g, 'UniWork Office-venster']],
   },
   {
+    id: 'vi-no-api-key',
+    why: 'Main-process vi errNoApiKey keeps the UniWork wording (no active AI plan), matching the en entry; the upstream "no API key configured for {provider}" text comes back with every merge of these three dictionaries',
+    files: [
+      'apps/docs/src/main/docs-main.ts',
+      'apps/sheets/src/main/sheets-main.ts',
+      'apps/slides/src/main/i18n-main.ts',
+    ],
+    replace: [
+      [
+        /errNoApiKey: 'Chưa cấu hình khóa API cho \{provider\}'/g,
+        "errNoApiKey: 'Chưa kích hoạt / mua gói AI. Hãy mua gói để dùng Trợ lý AI.'",
+      ],
+    ],
+  },
+  {
     id: 'ai-search-description',
     why: 'ai-search package description lists the search providers; "Genspark" -> "UniWork" like every other vendor mention',
     files: ['packages/ai-search/package.json'],
