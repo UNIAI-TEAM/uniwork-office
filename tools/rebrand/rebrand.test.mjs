@@ -241,3 +241,85 @@ test('first-run welcome copy is re-applied per locale and survives a merge', () 
     assert.ok(!/GO-1|Work Graph|this phase|runtime/.test(text))
   })
 })
+
+test('the Linux default-app desktop id follows desktopName', () => {
+  withFiles(
+    {
+      'apps/shell/src/main/default-app.ts': [
+        "const LINUX_DESKTOP_ID = 'genoffice.desktop'",
+        "const WINDOWS_DEFAULT_APPS_URL = 'ms-settings:defaultapps'",
+        '',
+      ].join('\n'),
+    },
+    (get) => {
+      const src = get('apps/shell/src/main/default-app.ts')
+      assert.match(src, /LINUX_DESKTOP_ID = 'uniwork-office\.desktop'/)
+      assert.ok(!src.includes('genoffice.desktop'))
+    },
+  )
+})
+
+// verbatim from `git show b08e2ebf:packages/cli/src/resources.ts` (the linux branch is one line there)
+const UPSTREAM_RESOURCES_TAIL = [
+  '    default:',
+  "      return [...(shipped ? [shipped] : []), '/opt/GenOffice/genoffice', '/usr/bin/genoffice']",
+  '  }',
+  '}',
+  '',
+  'export function appBinaryForResources(resources: string, platform: NodeJS.Platform): string {',
+  '  const install = dirname(resources)',
+  "  if (platform === 'darwin') return join(install, 'MacOS', 'GenOffice')",
+  "  if (platform === 'win32') return join(install, 'GenOffice.exe')",
+  "  return join(install, 'genoffice')",
+  '}',
+  '',
+].join('\n')
+
+test('cli-gui-binary-paths matches the real upstream shape of resources.ts', () => {
+  withFiles({ 'packages/cli/src/resources.ts': UPSTREAM_RESOURCES_TAIL }, (get) => {
+    const res = get('packages/cli/src/resources.ts')
+    assert.match(
+      res,
+      /return \[\.\.\.\(shipped \? \[shipped\] : \[\]\), '\/opt\/UniWork Office\/uniwork-office'\]/,
+    )
+    assert.match(res, /join\(install, 'MacOS', 'UniWork Office'\)/)
+    assert.match(res, /join\(install, 'UniWork Office\.exe'\)/)
+    assert.match(res, /return join\(install, 'uniwork-office'\)/)
+    assert.ok(!/\/usr\/bin|genoffice'/.test(res), 'no stale upstream linux names left')
+  })
+})
+
+test('"Genspark AI" becomes "AI" only as a label, not inside a sentence', () => {
+  withFiles(
+    {
+      'apps/html/src/renderer/components/Ribbon.tsx':
+        '<span>Genspark AI</span>\n<Group label="Genspark AI">\n<strong>Genspark AI</strong>\n',
+      'apps/shell/src/renderer/src/strings.ts':
+        "  cloudSubtitle: 'Projects created on the web with Genspark AI. Editing continues in your browser.',\n  cloudPt: 'Projetos criados na web com o Genspark AI.',\n",
+    },
+    (get) => {
+      assert.equal(
+        get('apps/html/src/renderer/components/Ribbon.tsx'),
+        '<span>AI</span>\n<Group label="AI">\n<strong>AI</strong>\n',
+      )
+      const s = get('apps/shell/src/renderer/src/strings.ts')
+      assert.match(s, /with UniWork AI\. Editing continues/)
+      assert.match(s, /com o UniWork AI\./)
+    },
+  )
+})
+
+test('the post-install ln -s hint quotes the spaced install dir', () => {
+  withFiles(
+    {
+      'apps/shell/build/linux-after-install.sh':
+        'echo "genoffice: $link is another program; run: ln -s $launcher $link" >&2\n',
+    },
+    (get) => {
+      assert.equal(
+        get('apps/shell/build/linux-after-install.sh'),
+        'echo "genoffice: $link is another program; run: ln -s \\"$launcher\\" \\"$link\\"" >&2\n',
+      )
+    },
+  )
+})

@@ -215,10 +215,10 @@ export const rules = [
   },
   {
     id: 'ai-label',
-    why: 'Ribbon / group labels "Genspark AI" -> "AI"',
+    why: 'Ribbon / group labels "Genspark AI" -> "AI". Only label contexts (element text `<span>Genspark AI</span>`, `label="..."`, `title="..."`, `aria-label="..."`): in a sentence (the 20-locale cloudSubtitle) "Genspark AI" is a vendor name and falls through to genspark-account ("UniWork AI"), not "com o AI" / "Mit AI"',
     files: SRC,
     skipComments: true,
-    replace: [[/(?<![A-Za-z0-9_])Genspark AI(?![A-Za-z])/g, 'AI']],
+    replace: [[/(?<=>|\blabel="|\btitle="|\baria-label=")Genspark AI(?=<|")/g, 'AI']],
   },
   {
     id: 'ai-panel-brand',
@@ -368,12 +368,25 @@ export const rules = [
     replace: [[/"desktopName": "genoffice\.desktop"/g, '"desktopName": "uniwork-office.desktop"']],
   },
   {
+    id: 'linux-default-app-desktop-id',
+    why: "Settings > General 'Open .docx/.xlsx/.pptx in UniWork Office' writes this desktop id into mimeapps.list (xdg-mime default); it must be the .desktop file the package ships, i.e. desktopName in apps/shell/package.json (asserted by apps/shell/tests/default-app.test.ts)",
+    files: ['apps/shell/src/main/default-app.ts'],
+    skipComments: true,
+    replace: [[/'genoffice\.desktop'/g, "'uniwork-office.desktop'"]],
+  },
+  {
+    id: 'linux-ln-hint-quotes',
+    why: 'The post-install hint `run: ln -s $launcher $link` is copied by users; the install dir is /opt/UniWork Office (a space), so both variables are quoted',
+    files: ['apps/shell/build/linux-after-install.sh'],
+    replace: [[/run: ln -s \$launcher \$link/g, 'run: ln -s \\"$launcher\\" \\"$link\\"']],
+  },
+  {
     id: 'cli-gui-binary-paths',
-    why: "CLI looks for the renamed app executable (executableName uniwork-office) on linux. The deb/rpm post-install only links the launcher at /usr/bin/genoffice, so upstream's second candidate (/usr/bin/<app>) is dropped, not renamed",
+    why: "Matches upstream's real shape (`git show b08e2ebf:packages/cli/src/resources.ts`: `'/opt/GenOffice/genoffice', '/usr/bin/genoffice'` on one line; asserted by rebrand.test.mjs), whether or not product-name already ran. CLI looks for the renamed app executable (executableName uniwork-office) on linux. The deb/rpm post-install only links the launcher at /usr/bin/genoffice, so upstream's second candidate (/usr/bin/<app>) is dropped, not renamed",
     files: ['packages/cli/src/resources.ts'],
     replace: [
       [
-        /'\/opt\/UniWork Office\/genoffice',\s*'\/usr\/bin\/genoffice'/g,
+        /'\/opt\/(?:GenOffice|UniWork Office)\/genoffice',\s*'\/usr\/bin\/genoffice'/g,
         "'/opt/UniWork Office/uniwork-office'",
       ],
       [/join\(install, 'genoffice'\)/g, "join(install, 'uniwork-office')"],
@@ -409,6 +422,9 @@ export const rules = [
     id: 'origin-repo-urls',
     why: 'Homepage / repository / releases / issues / stars links point at the UniWork team repo UNIAI-TEAM/uniwork-office. The earlier fork truongnt7/uniwork-office is rewritten too (limited to the files the hand rebrand touched plus the PWA download links; other upstream URLs are tracked by the brand scan allowlist)',
     files: GITHUB_URL_FILES,
+    // comments cite upstream issues (github.com/genspark-ai/genoffice/issues/15): those stay upstream's
+    skipComments: true,
+    skipLines: [/github\.com\/[\w.-]+\/[\w.-]+\/(?:issues|pull)\//],
     replace: [
       [
         /github\.com\/(?:genspark-ai\/genoffice|truongnt7\/uniwork-office)/g,

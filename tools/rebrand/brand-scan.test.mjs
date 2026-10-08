@@ -221,3 +221,33 @@ test('internal planning vocabulary in user-visible strings is a violation', () =
     assert.equal(hits(`  key: '${text}',`), 0, text)
   }
 })
+
+test('source: the upstream .desktop id is flagged, the UniWork one and comments are not', () => {
+  const hit = run({
+    'apps/shell/src/main/default-app.ts': "const LINUX_DESKTOP_ID = 'genoffice.desktop'",
+  })
+  assert.deepEqual(
+    hit.violations.map((v) => v.match),
+    ['genoffice.desktop'],
+  )
+  const ok = run({
+    'apps/shell/src/main/default-app.ts': [
+      "const LINUX_DESKTOP_ID = 'uniwork-office.desktop'",
+      '// upstream used genoffice.desktop',
+    ].join('\n'),
+  })
+  assert.equal(ok.violations.length, 0)
+})
+
+test('a permanent entry that matches nothing is reported separately from debt', () => {
+  const { unused, unusedPermanent } = run({ 'apps/shell/src/main/a.ts': "const n = 'UniWork'" }, [
+    {
+      path: 'apps/shell/src/main/a.ts',
+      pattern: 'GenOffice',
+      kind: 'permanent',
+      reason: 'stale: nothing matches this any more',
+    },
+  ])
+  assert.equal(unused.length, 0)
+  assert.equal(unusedPermanent.length, 1)
+})

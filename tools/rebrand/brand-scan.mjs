@@ -147,6 +147,14 @@ function mask(text) {
 const PACKAGING_IDENTITY =
   /com\.(?:genoffice|genspark)\b|(?:executableName|packageName|desktopName|artifactName|appId|productName)\W+[^,\n]*?(?:genoffice|genspark)/gi
 
+/**
+ * The upstream .desktop id is a packaging identity even when it sits in source: apps/shell
+ * `default-app.ts` hands it to `xdg-mime default`, so a stale id silently breaks the Linux
+ * "set as default app" feature (review-r2 R2-1). Lowercase `genoffice` is otherwise masked as
+ * the CLI command, hence the explicit check.
+ */
+const DESKTOP_ID = /\bgenoffice\.desktop\b/gi
+
 /** All brand matches in one line of text: org/domain forms first, then masked brand words. */
 export function brandMatches(text, scope = 'source') {
   const hits = []
@@ -154,6 +162,7 @@ export function brandMatches(text, scope = 'source') {
   if (scope === 'package' || scope === 'installer') {
     for (const m of text.matchAll(PACKAGING_IDENTITY)) hits.push(m[0])
   }
+  if (scope === 'source') for (const m of text.matchAll(DESKTOP_ID)) hits.push(m[0])
   if (scope === 'catalog' || scope === 'source') {
     for (const re of INTERNAL_COPY) for (const m of text.matchAll(re)) hits.push(m[0])
   }
@@ -273,7 +282,7 @@ function allowedBy(allow, file, line, scope) {
 
 /**
  * Scans `files` (or every tracked file under root). `read(file)` may be
- * injected by tests. Returns { violations, allowed, unused }.
+ * injected by tests. Returns { violations, allowed, unused (debt), unusedPermanent }.
  */
 export function scan({ root, files, allow, read } = {}) {
   const allowlist = allow ?? loadAllowlist()
@@ -302,8 +311,11 @@ export function scan({ root, files, allow, read } = {}) {
       } else violations.push(record)
     }
   }
+  // debt entries must go once fixed; a permanent entry that matches nothing is a stale exemption
+  // that could hide a future hit, so it is reported as well (as a warning)
   const unused = allowlist.filter((e) => e.kind === 'debt' && e.used === 0)
-  return { violations, allowed, unused }
+  const unusedPermanent = allowlist.filter((e) => e.kind === 'permanent' && e.used === 0)
+  return { violations, allowed, unused, unusedPermanent }
 }
 
 function main(argv) {
@@ -313,9 +325,20 @@ function main(argv) {
       ? argv[rootArg + 1]
       : execFileSync('git', ['rev-parse', '--show-toplevel']).toString().trim(),
   )
-  const { violations, allowed, unused } = scan({ root })
+  const { violations, allowed, unused, unusedPermanent } = scan({ root })
   if (argv.includes('--json')) {
-    console.log(JSON.stringify({ violations, allowed, unused: unused.map((e) => e.path) }, null, 2))
+    console.log(
+      JSON.stringify(
+        {
+          violations,
+          allowed,
+          unused: unused.map((e) => e.path),
+          unusedPermanent: unusedPermanent.map((e) => e.path),
+        },
+        null,
+        2,
+      ),
+    )
   } else {
     if (argv.includes('--list')) {
       for (const a of allowed) {
@@ -331,6 +354,11 @@ function main(argv) {
     for (const e of unused) {
       console.log(
         `warning: debt entry no longer matches anything, remove it: ${e.path} ${e.pattern ?? ''}`,
+      )
+    }
+    for (const e of unusedPermanent) {
+      console.log(
+        `warning: permanent entry matches nothing, check it is still needed: ${e.path} ${e.pattern ?? ''}`,
       )
     }
     if (violations.length > 0) {

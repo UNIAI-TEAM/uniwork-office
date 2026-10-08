@@ -9,10 +9,10 @@ link="/usr/bin/genoffice"
 if [ -L "$link" ]; then
   case "$(readlink "$link")" in
     "/opt/UniWork Office/"*) ;;
-    *) [ -e "$link" ] && { echo "genoffice: $link is another program, left as is; run: ln -s $launcher $link" >&2; exit 0; } ;;
+    *) [ -e "$link" ] && { echo "genoffice: $link is another program, left as is; run: ln -s \"$launcher\" \"$link\"" >&2; exit 0; } ;;
   esac
 elif [ -e "$link" ]; then
-  echo "genoffice: $link is another program, left as is; run: ln -s $launcher $link" >&2
+  echo "genoffice: $link is another program, left as is; run: ln -s \"$launcher\" \"$link\"" >&2
   exit 0
 fi
 ln -sfn "$launcher" "$link"
