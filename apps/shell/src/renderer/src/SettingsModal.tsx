@@ -9,7 +9,12 @@ import {
   clampAiCustomFontSize,
 } from '@genoffice/ui'
 import type { AiFontSize, AiPanelPrefs, AiPanelSide } from '@genoffice/ui'
-import type { DecisionEndpoint, DefaultAppStatus, FileSearchSettings } from '../../shared/home-api'
+import type {
+  DecisionEndpoint,
+  DefaultAppStatus,
+  FileSearchSettings,
+  LegalDoc,
+} from '../../shared/home-api'
 import type { UpdateUiState } from '../../shared/update-api'
 import {
   DEFAULT_MAX_OUTPUT_TOKENS,
@@ -29,6 +34,7 @@ import { useI18n } from './locale'
 import type { StringKey, TFunc } from './locale'
 import type { AccountStatus, AiCatalogEntry, DocTheme, UiTheme } from '../../shared/home-api'
 import appIcon from './assets/app-icon.png'
+import legal from '../../shared/legal.json'
 import { ProviderLogo } from './provider-logos'
 import { BackupStoragePane } from './BackupStoragePane'
 import { BillingPaymentPane } from './BillingPaymentPane'
@@ -1534,6 +1540,23 @@ export function SettingsModal({
   const [channel, setChannel] = useState<'stable' | 'beta'>('stable')
   const [appVersion, setAppVersion] = useState('')
   const [updateState, setUpdateState] = useState<UpdateUiState | null>(null)
+  const [legalOpenFailed, setLegalOpenFailed] = useState(false)
+
+  // About: open a shipped legal file; a missing file or a refused viewer shows an inline note
+  const openLegal = (doc: LegalDoc): void => {
+    setLegalOpenFailed(false)
+    const open = window.aiOffice.openLegalDoc
+    if (!open) {
+      setLegalOpenFailed(true)
+      return
+    }
+    void open(doc).then(
+      (ok) => {
+        if (!ok) setLegalOpenFailed(true)
+      },
+      () => setLegalOpenFailed(true),
+    )
+  }
 
   useEffect(() => {
     let alive = true
@@ -1983,9 +2006,50 @@ export function SettingsModal({
                     }}
                   />
                 </div>
-                <p className="set-about-copyright">
-                  {t('setAboutCopyright', { year: new Date().getFullYear() })}
-                </p>
+                <div className="set-about-legal">
+                  <p className="set-about-copyright">
+                    {t('setAboutCopyright', {
+                      year: legal.copyrightYear,
+                      company: legal.company,
+                    })}
+                  </p>
+                  <p className="set-about-attribution">
+                    {t('setAboutAttribution', {
+                      product: legal.product,
+                      upstream: legal.upstream.name,
+                      upstreamCopyright: legal.upstream.copyright,
+                      license: legal.upstream.license,
+                    })}
+                  </p>
+                  <div className="set-about-legal-links">
+                    <button
+                      type="button"
+                      className="set-about-legal-btn"
+                      onClick={() => openLegal('license')}
+                    >
+                      {t('setAboutLicense')}
+                    </button>
+                    <button
+                      type="button"
+                      className="set-about-legal-btn"
+                      onClick={() => openLegal('notice')}
+                    >
+                      {t('setAboutLegalNotices')}
+                    </button>
+                    <button
+                      type="button"
+                      className="set-about-legal-btn"
+                      onClick={() => openLegal('thirdParty')}
+                    >
+                      {t('setAboutThirdPartyLicenses')}
+                    </button>
+                  </div>
+                  {legalOpenFailed && (
+                    <p className="set-about-legal-error" role="alert">
+                      {t('setAboutLegalOpenFailed')}
+                    </p>
+                  )}
+                </div>
               </>
             )}
           </div>

@@ -537,3 +537,27 @@ test('the fork banner loses the internal ticket sentence but keeps the attributi
     assert.match(de, /^> \*\*UniWork Office fork\.\*\*.*\n\n# GenOffice/s)
   })
 })
+
+test('shell maintainer / vendor map onto legal.json, and legal.json keeps its attribution', () => {
+  const legal =
+    '{ "upstream": { "name": "GenOffice", "copyright": "Copyright 2026 Mainfunc, Inc." } }\n'
+  withFiles(
+    {
+      'apps/shell/electron-builder.cjs': [
+        'const config = {',
+        "  linux: { maintainer: 'Mainfunc, Inc. <team@genspark.ai>', vendor: 'Mainfunc, Inc.' },",
+        "  deb: { maintainer: 'UniWork Office', vendor: 'UniWork Office' },",
+        '}',
+        '',
+      ].join('\n'),
+      'apps/shell/src/shared/legal.json': legal,
+    },
+    (get) => {
+      const builder = get('apps/shell/electron-builder.cjs')
+      assert.ok(!builder.includes('Mainfunc'), builder)
+      assert.equal(builder.split('maintainer: `${legal.company} <${legal.email}>`').length, 3)
+      assert.equal(builder.split('vendor: legal.company').length, 3)
+      assert.equal(get('apps/shell/src/shared/legal.json'), legal, 'attribution is never rebranded')
+    },
+  )
+})

@@ -28,6 +28,7 @@ import {
 import type { MenuItemConstructorOptions, NativeImage, WebContents } from 'electron'
 import { atomicCopyFile, atomicWriteFile } from './atomic-write'
 import { tabStripOverlay } from './title-bar-overlay'
+import { legalDocPath, openLegalDoc, type LegalDocEnv } from './legal-docs'
 import menuDocxIcon1x from './assets/menu-docx.png?asset'
 import menuDocxIcon2x from './assets/menu-docx@2x.png?asset'
 import menuXlsxIcon1x from './assets/menu-xlsx.png?asset'
@@ -4094,6 +4095,11 @@ function registerHomeIpc(): void {
 
   ipcMain.handle(HOME_CHANNELS.getAppVersion, (): string => app.getVersion())
 
+  // Settings > About: the shipped legal files, opened locally (never a URL)
+  ipcMain.handle(HOME_CHANNELS.openLegalDoc, (_event, doc: unknown): Promise<boolean> =>
+    openLegalDoc(doc, legalDocEnv(), { openPath: (path) => shell.openPath(path) }),
+  )
+
   ipcMain.handle(HOME_CHANNELS.recents, (_event, query: unknown): RecentPage =>
     pageRecentPaths(readRecentFiles(), query, new Set(readStarredFiles())),
   )
@@ -5884,11 +5890,16 @@ ipcMain.handle(PDF_CHANNELS.convertOffice, async (e, format: unknown) => {
   else if (format === 'pptx') await exportPdfAsPptxLocal()
 })
 
+function legalDocEnv(): LegalDocEnv {
+  return {
+    packaged: app.isPackaged,
+    resourcesPath: process.resourcesPath,
+    appPath: app.getAppPath(),
+  }
+}
+
 function openThirdPartyNotices(): Promise<string> {
-  const path = app.isPackaged
-    ? join(process.resourcesPath, 'THIRD-PARTY-NOTICES.txt')
-    : join(app.getAppPath(), 'build', 'THIRD-PARTY-NOTICES.txt')
-  return shell.openPath(path)
+  return shell.openPath(legalDocPath('thirdParty', legalDocEnv())!)
 }
 
 /** every module's File menu gets a way back to the launcher */

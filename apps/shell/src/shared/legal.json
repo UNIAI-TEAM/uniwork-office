@@ -1,0 +1,16 @@
+{
+  "_doc": "Single source of the product's legal identity. Read by apps/shell/electron-builder.cjs (copyright, linux maintainer / vendor, packaged author / homepage), Settings > About, tools/gen-third-party-notices.mjs and tools/legal/sync-legal.mjs (NOTICE, MODIFICATIONS, package.json author / homepage; run `npm run legal` after editing). The upstream block is Apache-2.0 attribution and is never rebranded.",
+  "_todo": "company, email and homepage are placeholders until the legal entity is registered; change them here and run `npm run legal`.",
+  "product": "UniWork Office",
+  "company": "UniWork",
+  "email": "hello@uniwork.app",
+  "homepage": "https://uniwork.app",
+  "copyrightYear": 2026,
+  "upstream": {
+    "name": "GenOffice",
+    "copyright": "Copyright 2026 Mainfunc, Inc.",
+    "license": "Apache License, Version 2.0",
+    "notice": "GenOffice\nCopyright 2026 Mainfunc, Inc.\n\nThis product includes software developed at Mainfunc, Inc.",
+    "trademarks": "The GenOffice and Genspark names and logos remain trademarks of Mainfunc, Inc. and are not used as UniWork product branding."
+  }
+}

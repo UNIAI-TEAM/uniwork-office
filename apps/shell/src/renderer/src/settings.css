@@ -1439,3 +1439,46 @@
   line-height: 1.45;
   color: var(--text-secondary);
 }
+
+/* Settings → About: upstream attribution and the shipped legal files */
+.set-about-attribution {
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.set-about-legal-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.set-about-legal-btn {
+  height: 26px;
+  padding: 0 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.set-about-legal-btn:hover {
+  background: var(--hover);
+}
+
+.set-about-legal-error {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--danger);
+}
+
+.set-about-legal-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}

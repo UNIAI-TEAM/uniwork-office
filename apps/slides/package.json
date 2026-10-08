@@ -46,7 +46,10 @@
     "vite": "^7.3.1",
     "vitest": "^4.1.11"
   },
-  "author": "UniWork Office",
+  "author": {
+    "name": "UniWork",
+    "email": "hello@uniwork.app"
+  },
   "build": {
     "appId": "com.uniwork.slides",
     "productName": "UniWork Slides",

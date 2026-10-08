@@ -23,6 +23,11 @@ const { execFileSync } = require('node:child_process')
 const { existsSync, readFileSync, rmSync } = require('node:fs')
 const { join } = require('node:path')
 
+// Legal identity (company, contact, homepage, copyright year): one file shared
+// with Settings > About, the NOTICE / MODIFICATIONS sync (tools/legal) and the
+// third-party notice header. Absolute path so vm-based tests can load it too.
+const legal = require(join(__dirname, 'src/shared/legal.json'))
+
 function normalizeHttpsBaseUrl(name, value) {
   if (!value || !value.trim()) return null
   try {
@@ -68,6 +73,9 @@ const winArch = winArm64 ? 'arm64' : 'x64'
 const winSidecarTarget = winArm64 ? 'aarch64-pc-windows-msvc' : 'x86_64-pc-windows-gnu'
 const WIN_SIDECAR = `../sheets/native/xlsx-engine/target/${winSidecarTarget}/release/xlsx-sidecar.exe`
 
+// Shipped next to THIRD-PARTY-NOTICES.txt (see extraResources)
+const LEGAL_FILES = ['LICENSE', 'NOTICE', 'MODIFICATIONS', 'LICENSE-UNICODE.txt']
+
 function assertExtraResourceSources() {
   for (const rel of [
     '../../node_modules/@genspark/cli',
@@ -76,6 +84,7 @@ function assertExtraResourceSources() {
     '../../node_modules/electron/dist/LICENSES.chromium.html',
     '../../node_modules/@embedpdf/pdfium/dist/pdfium.wasm',
     '../pdf/node_modules/harfbuzzjs/hb-subset.wasm',
+    ...LEGAL_FILES.map((name) => `../../${name}`),
   ]) {
     if (!existsSync(join(__dirname, rel))) {
       throw new Error(
@@ -290,6 +299,9 @@ const config = {
   appId: 'com.uniwork.office',
   productName: 'UniWork Office',
   artifactName: 'UniWork-Office-${version}-${arch}.${ext}',
+  // binary metadata names the distributor only; the upstream attribution
+  // lives in the shipped NOTICE
+  copyright: `Copyright © ${legal.copyrightYear} ${legal.company}`,
   // Resolved from the installed electron package so dependency bumps can
   // never leave a stale hard-coded pin behind (packaging would silently ship
   // the old runtime).
@@ -302,6 +314,28 @@ const config = {
     {
       from: 'build/THIRD-PARTY-NOTICES.txt',
       to: 'THIRD-PARTY-NOTICES.txt',
+    },
+    // Apache-2.0 section 4: the license, the upstream NOTICE (with the fork's
+    // header) and the statement of changes travel with every copy. Settings >
+    // About opens them from Resources/ (apps/shell/src/main/legal-docs.ts).
+    // Shipped as .txt so the system viewer opens them without an "Open with"
+    // prompt; the text is byte-identical to the repo-root originals.
+    {
+      from: '../../LICENSE',
+      to: 'LICENSE.txt',
+    },
+    {
+      from: '../../NOTICE',
+      to: 'NOTICE.txt',
+    },
+    {
+      from: '../../MODIFICATIONS',
+      to: 'MODIFICATIONS.txt',
+    },
+    // NOTICE points at it for the Unicode data in the PDF module
+    {
+      from: '../../LICENSE-UNICODE.txt',
+      to: 'LICENSE-UNICODE.txt',
     },
     {
       from: '../../node_modules/electron/dist/LICENSES.chromium.html',
@@ -561,12 +595,12 @@ const config = {
       { target: 'deb', arch: ['x64'] },
       { target: 'rpm', arch: ['x64'] },
     ],
-    // deb control metadata; values match the manually published 0.5.149 deb
-    // so apt sees the new packages as the same lineage. Homepage comes from
-    // package.json "homepage"; the Package field is pinned in the deb block
-    // below (packageName is a per-target option, rejected here by the schema).
-    maintainer: 'UniWork Office',
-    vendor: 'UniWork Office',
+    // deb / rpm control metadata from legal.json: Maintainer is "<company>
+    // <email>", Vendor the company. Homepage comes from extraMetadata.homepage
+    // (legal.json as well); the Package field is pinned in the deb block below
+    // (packageName is a per-target option, rejected here by the schema).
+    maintainer: `${legal.company} <${legal.email}>`,
+    vendor: legal.company,
     category: 'Office',
     // Icon SET directory, not the single 1024px png: electron-builder does
     // not resize a lone png, so deb/rpm would install only
@@ -705,9 +739,14 @@ if (updateUrl) {
 }
 
 // CI's "-c.extraMetadata.version=..." CLI override deep-merges with this block,
-// so the version and all injected feature settings survive together.
-const extraMetadata = {}
+// so the version and all injected feature settings survive together. author /
+// homepage restate legal.json so the packaged package.json (and the deb / rpm
+// fields electron-builder derives from it) never depend on a stale workspace copy.
+const extraMetadata = {
+  author: { name: legal.company, email: legal.email },
+  homepage: legal.homepage,
+}
 if (fontCdnUrl) extraMetadata.genofficeFontCdn = { baseUrl: fontCdnUrl }
-if (Object.keys(extraMetadata).length) config.extraMetadata = extraMetadata
+config.extraMetadata = extraMetadata
 
 module.exports = config

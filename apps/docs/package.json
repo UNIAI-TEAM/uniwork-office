@@ -47,7 +47,10 @@
     "vite": "^7.3.1",
     "vitest": "^4.1.11"
   },
-  "author": "UniWork Office",
+  "author": {
+    "name": "UniWork",
+    "email": "hello@uniwork.app"
+  },
   "build": {
     "appId": "com.uniwork.docs",
     "productName": "UniWork Docs",
@@ -58,6 +61,24 @@
     },
     "files": [
       "out/**"
+    ],
+    "extraResources": [
+      {
+        "from": "../../LICENSE",
+        "to": "LICENSE.txt"
+      },
+      {
+        "from": "../../NOTICE",
+        "to": "NOTICE.txt"
+      },
+      {
+        "from": "../../MODIFICATIONS",
+        "to": "MODIFICATIONS.txt"
+      },
+      {
+        "from": "../../LICENSE-UNICODE.txt",
+        "to": "LICENSE-UNICODE.txt"
+      }
     ],
     "fileAssociations": [
       {
@@ -88,7 +109,8 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
-    }
+    },
+    "copyright": "Copyright © 2026 UniWork"
   },
   "dependencies": {
     "@genoffice/electron-utils": "*",

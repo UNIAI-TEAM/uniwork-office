@@ -28,7 +28,11 @@ node tools/rebrand/rebrand.mjs        # re-apply the brand to whatever upstream 
 npm run format                        # rebrand.mjs does not run prettier; CI checks every changed file as a whole
 npm run check:brand                   # must be clean; fix copy the table cannot, or allowlist with a reason
 git rev-parse <new-upstream-sha> > tools/rebrand/UPSTREAM_BASE
+npm run legal                         # NOTICE / MODIFICATIONS header (new upstream commit), package author + homepage
 ```
+
+If upstream changed its own NOTICE header (year, wording), copy the new text into `upstream.notice` in
+`apps/shell/src/shared/legal.json` before `npm run legal`: that field is the upstream NOTICE kept verbatim.
 
 Commit the patch, the rebrand run (`chore(rebrand): re-apply UniWork brand after upstream sync`)
 and the new `UPSTREAM_BASE` so the history shows what upstream changed versus what the script changed.
@@ -100,7 +104,7 @@ scopes is in `office-g3g4/reports/go-a1/rebrand-table.md`; in short:
 - **Docs**: the fork banner on every `docs/i18n/README.<lang>.md`.
 - **Artwork**: everything under `assets/` (shell icons incl. `icons/<size>/apps/uniwork-office.png`, `app-icon.png`, home lockup).
 
-Never touched: `LICENSE*`, `NOTICE`, `ee/`, `docs/` (except the banner), the rest of `skills/`, tests and fixtures, `e2e/`,
+Never touched: `LICENSE*`, `NOTICE`, `apps/shell/src/shared/legal.json` (upstream attribution), `ee/`, `docs/` (except the banner), the rest of `skills/`, tests and fixtures, `e2e/`,
 font families, document-engine packages and every stored-document marker (CLAUDE.md rule 4: document content is not
 re-authored by branding). Whole-line comments are left alone, except in `electron-builder.cjs`, which is scanned in full.
 
@@ -120,6 +124,18 @@ credentials in source or packaging config (`REPO_LINKS`, `TELEMETRY` in `brand-s
 identifiers of the Markdown image host (provider id, API endpoint; never rendered), the name GitHub Copilot, vendored-library attribution and the updater's download URL, each with a reason.
 
 `debt` allowlist entries mark real leftovers with a tracker; the scan warns when one stops matching so it gets deleted.
+
+## Legal identity and attribution
+
+`apps/shell/src/shared/legal.json` is the one place for the product's legal identity (company, contact email, homepage,
+copyright year) and the upstream attribution (name, copyright, license, the upstream NOTICE verbatim, the trademark sentence).
+Company, email and homepage are placeholders until the legal entity exists; change them there and run `npm run legal`.
+Readers: `electron-builder.cjs` (copyright, linux maintainer / vendor, packaged author / homepage), Settings > About
+(copyright and attribution line, buttons that open the shipped LICENSE, NOTICE and THIRD-PARTY-NOTICES.txt locally, inline error if one fails),
+`tools/gen-third-party-notices.mjs` (header) and `tools/legal/sync-legal.mjs` (`npm run legal`, `legal:check` in CI), which
+rewrites the NOTICE header, the MODIFICATIONS header (Apache-2.0 4(b) statement with the `UPSTREAM_BASE` commit) and the
+`apps/*/package.json` author / homepage / Docs `build.copyright`. LICENSE, NOTICE and MODIFICATIONS ship as `.txt` copies (with LICENSE-UNICODE.txt)
+in Resources/ of the shell and the standalone Docs package. Upstream names may appear in the UI only in that About attribution.
 
 ## Known gaps (also in the GO-A1 report)
 

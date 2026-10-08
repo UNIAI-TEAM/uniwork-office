@@ -19,6 +19,12 @@
       "reason": "Internal note that names the removed upstream lockup to explain why placeholder artwork is in place (trademark attribution)."
     },
     {
+      "path": "apps/shell/src/shared/legal.json",
+      "pattern": "^\\s*\"(?:name|copyright|notice|trademarks)\": \"[^\"]*(?:GenOffice|Genspark|Mainfunc)",
+      "kind": "permanent",
+      "reason": "Apache-2.0 attribution: the upstream name, copyright line, NOTICE (retained verbatim per section 4(d)) and trademark sentence. Shown only in Settings > About's attribution line and the legal files; excluded from rebranding (GLOBAL_EXCLUDE)."
+    },
+    {
       "path": "packages/docx-engine/src/vendor/**",
       "kind": "permanent",
       "reason": "Vendored third-party library notes that record who made local modifications; attribution text, never rendered in the UI."
