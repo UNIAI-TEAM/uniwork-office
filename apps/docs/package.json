@@ -65,15 +65,15 @@
     "extraResources": [
       {
         "from": "../../LICENSE",
-        "to": "LICENSE"
+        "to": "LICENSE.txt"
       },
       {
         "from": "../../NOTICE",
-        "to": "NOTICE"
+        "to": "NOTICE.txt"
       },
       {
         "from": "../../MODIFICATIONS",
-        "to": "MODIFICATIONS"
+        "to": "MODIFICATIONS.txt"
       },
       {
         "from": "../../LICENSE-UNICODE.txt",

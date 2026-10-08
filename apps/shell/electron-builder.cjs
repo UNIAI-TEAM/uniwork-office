@@ -318,17 +318,19 @@ const config = {
     // Apache-2.0 section 4: the license, the upstream NOTICE (with the fork's
     // header) and the statement of changes travel with every copy. Settings >
     // About opens them from Resources/ (apps/shell/src/main/legal-docs.ts).
+    // Shipped as .txt so the system viewer opens them without an "Open with"
+    // prompt; the text is byte-identical to the repo-root originals.
     {
       from: '../../LICENSE',
-      to: 'LICENSE',
+      to: 'LICENSE.txt',
     },
     {
       from: '../../NOTICE',
-      to: 'NOTICE',
+      to: 'NOTICE.txt',
     },
     {
       from: '../../MODIFICATIONS',
-      to: 'MODIFICATIONS',
+      to: 'MODIFICATIONS.txt',
     },
     // NOTICE points at it for the Unicode data in the PDF module
     {

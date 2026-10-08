@@ -9,7 +9,12 @@ import {
   clampAiCustomFontSize,
 } from '@genoffice/ui'
 import type { AiFontSize, AiPanelPrefs, AiPanelSide } from '@genoffice/ui'
-import type { DecisionEndpoint, DefaultAppStatus, FileSearchSettings } from '../../shared/home-api'
+import type {
+  DecisionEndpoint,
+  DefaultAppStatus,
+  FileSearchSettings,
+  LegalDoc,
+} from '../../shared/home-api'
 import type { UpdateUiState } from '../../shared/update-api'
 import {
   DEFAULT_MAX_OUTPUT_TOKENS,
@@ -1535,6 +1540,23 @@ export function SettingsModal({
   const [channel, setChannel] = useState<'stable' | 'beta'>('stable')
   const [appVersion, setAppVersion] = useState('')
   const [updateState, setUpdateState] = useState<UpdateUiState | null>(null)
+  const [legalOpenFailed, setLegalOpenFailed] = useState(false)
+
+  // About: open a shipped legal file; a missing file or a refused viewer shows an inline note
+  const openLegal = (doc: LegalDoc): void => {
+    setLegalOpenFailed(false)
+    const open = window.aiOffice.openLegalDoc
+    if (!open) {
+      setLegalOpenFailed(true)
+      return
+    }
+    void open(doc).then(
+      (ok) => {
+        if (!ok) setLegalOpenFailed(true)
+      },
+      () => setLegalOpenFailed(true),
+    )
+  }
 
   useEffect(() => {
     let alive = true
@@ -2003,18 +2025,30 @@ export function SettingsModal({
                     <button
                       type="button"
                       className="set-about-legal-btn"
-                      onClick={() => void window.aiOffice.openLegalDoc?.('notice')}
+                      onClick={() => openLegal('license')}
+                    >
+                      {t('setAboutLicense')}
+                    </button>
+                    <button
+                      type="button"
+                      className="set-about-legal-btn"
+                      onClick={() => openLegal('notice')}
                     >
                       {t('setAboutLegalNotices')}
                     </button>
                     <button
                       type="button"
                       className="set-about-legal-btn"
-                      onClick={() => void window.aiOffice.openLegalDoc?.('thirdParty')}
+                      onClick={() => openLegal('thirdParty')}
                     >
                       {t('setAboutThirdPartyLicenses')}
                     </button>
                   </div>
+                  {legalOpenFailed && (
+                    <p className="set-about-legal-error" role="alert">
+                      {t('setAboutLegalOpenFailed')}
+                    </p>
+                  )}
                 </div>
               </>
             )}

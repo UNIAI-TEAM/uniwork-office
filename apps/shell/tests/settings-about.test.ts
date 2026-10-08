@@ -31,7 +31,7 @@ afterEach(() => {
   host.remove()
 })
 
-const openLegalDoc = vi.fn(async () => true)
+const openLegalDoc = vi.fn(async (_doc: string) => true)
 
 async function openAbout(lang: Lang, aboutLabel: string): Promise<void> {
   openLegalDoc.mockClear()
@@ -98,14 +98,32 @@ describe('Settings > About', () => {
       `UniWork Office is a modified version of GenOffice (Copyright 2026 Mainfunc, Inc.), used under the Apache License, Version 2.0.`,
     )
     const buttons = Array.from(pane.querySelectorAll<HTMLButtonElement>('.set-about-legal-btn'))
-    expect(buttons.map((b) => b.textContent)).toEqual(['Legal notices', 'Third-party licenses'])
+    expect(buttons.map((b) => b.textContent)).toEqual([
+      'License',
+      'Legal notices',
+      'Third-party licenses',
+    ])
     await act(async () => {
-      buttons[0].click()
-      buttons[1].click()
+      for (const button of buttons) button.click()
       await Promise.resolve()
     })
-    expect(openLegalDoc.mock.calls).toEqual([['notice'], ['thirdParty']])
+    expect(openLegalDoc.mock.calls).toEqual([['license'], ['notice'], ['thirdParty']])
     expect(pane.querySelector('a[href]')).toBeNull()
+    expect(pane.querySelector('.set-about-legal-error')).toBeNull()
+  })
+
+  it('says so inline when a legal file cannot be opened', async () => {
+    await openAbout('en', 'About')
+    openLegalDoc.mockResolvedValueOnce(false)
+    const pane = host.querySelector('.set-pane')!
+    await act(async () => {
+      pane.querySelector<HTMLButtonElement>('.set-about-legal-btn')!.click()
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+    expect(pane.querySelector('.set-about-legal-error')?.textContent).toBe(
+      'Could not open this file.',
+    )
   })
 
   it('keeps brand words out of the catalog: the attribution is placeholders only', () => {
@@ -115,6 +133,8 @@ describe('Settings > About', () => {
         'setAboutAttribution',
         'setAboutLegalNotices',
         'setAboutThirdPartyLicenses',
+        'setAboutLicense',
+        'setAboutLegalOpenFailed',
       ] as const) {
         expect(table[key], `${lang}.${key}`).not.toMatch(/GenOffice|Genspark|Mainfunc|Apache|github/i)
       }

@@ -3,12 +3,13 @@ import { join, resolve } from 'node:path'
 import { runInNewContext } from 'node:vm'
 import { createRequire } from 'node:module'
 import { describe, expect, it } from 'vitest'
-import { LEGAL_DOC_FILES, isLegalDoc, legalDocPath } from '../src/main/legal-docs'
+import { LEGAL_DOC_FILES, isLegalDoc, legalDocPath, openLegalDoc } from '../src/main/legal-docs'
 import legal from '../src/shared/legal.json'
 
 const require = createRequire(import.meta.url)
 const shellRoot = resolve(import.meta.dirname, '..')
 const repoRoot = resolve(shellRoot, '../..')
+const DOCS = Object.keys(LEGAL_DOC_FILES) as Array<keyof typeof LEGAL_DOC_FILES>
 
 function loadBuilderConfig(): {
   copyright: string
@@ -28,15 +29,21 @@ function loadBuilderConfig(): {
 }
 
 describe('legal documents', () => {
-  it('resolves under Resources/ when packaged and in the checkout in dev', () => {
+  it('resolves the .txt copies under Resources/ when packaged', () => {
     const packaged = { packaged: true, resourcesPath: '/r', appPath: '/x/app.asar' }
-    expect(legalDocPath('notice', packaged)).toBe(join('/r', 'NOTICE'))
+    expect(legalDocPath('license', packaged)).toBe(join('/r', 'LICENSE.txt'))
+    expect(legalDocPath('notice', packaged)).toBe(join('/r', 'NOTICE.txt'))
+    expect(legalDocPath('modifications', packaged)).toBe(join('/r', 'MODIFICATIONS.txt'))
     expect(legalDocPath('thirdParty', packaged)).toBe(join('/r', 'THIRD-PARTY-NOTICES.txt'))
+    for (const doc of DOCS) expect(LEGAL_DOC_FILES[doc].shipped, doc).toMatch(/\.txt$/)
+  })
+
+  it('resolves the repo-root originals in dev', () => {
     const dev = { packaged: false, resourcesPath: '/r', appPath: shellRoot }
-    for (const doc of Object.keys(LEGAL_DOC_FILES)) {
+    for (const doc of DOCS) {
       if (doc === 'thirdParty') continue
       const path = legalDocPath(doc, dev)!
-      expect(path, doc).toBe(join(repoRoot, LEGAL_DOC_FILES[doc as keyof typeof LEGAL_DOC_FILES]))
+      expect(path, doc).toBe(join(repoRoot, LEGAL_DOC_FILES[doc].source))
       expect(existsSync(path), doc).toBe(true)
     }
     expect(legalDocPath('thirdParty', dev)).toBe(
@@ -52,12 +59,44 @@ describe('legal documents', () => {
     }
   })
 
-  it('ships every legal document and takes the package identity from legal.json', () => {
+  it('falls back to a temp .txt copy only for an extension-less original', async () => {
+    const dev = { packaged: false, resourcesPath: '/r', appPath: '/repo/apps/shell' }
+    const opened: string[] = []
+    const copies: Array<[string, string]> = []
+    const io = (results: string[]) => ({
+      openPath: async (path: string) => {
+        opened.push(path)
+        return results.shift() ?? ''
+      },
+      exists: () => true,
+      copyFile: (from: string, to: string) => void copies.push([from, to]),
+      tempDir: () => '/tmp/legal',
+    })
+
+    expect(await openLegalDoc('notice', dev, io(['']))).toBe(true)
+    expect(copies).toEqual([])
+
+    opened.length = 0
+    expect(await openLegalDoc('notice', dev, io(['no app', '']))).toBe(true)
+    expect(opened).toEqual([join('/repo', 'NOTICE'), join('/tmp/legal', 'NOTICE.txt')])
+    expect(copies).toEqual([[join('/repo', 'NOTICE'), join('/tmp/legal', 'NOTICE.txt')]])
+
+    copies.length = 0
+    expect(await openLegalDoc('thirdParty', dev, io(['no app']))).toBe(false)
+    expect(copies).toEqual([]) // a .txt that fails is not copied
+
+    expect(await openLegalDoc('notice', dev, { ...io([]), exists: () => false })).toBe(false)
+    expect(await openLegalDoc('../NOTICE', dev, io([]))).toBe(false)
+  })
+
+  it('ships every legal document as .txt and takes the package identity from legal.json', () => {
     const config = loadBuilderConfig()
     const shipped = new Map(config.extraResources.map((e) => [e.to, e.from]))
-    for (const name of Object.values(LEGAL_DOC_FILES)) {
+    for (const doc of DOCS) {
+      const { source, shipped: name } = LEGAL_DOC_FILES[doc]
       expect(shipped.has(name), name).toBe(true)
-      if (name !== 'THIRD-PARTY-NOTICES.txt') {
+      if (doc !== 'thirdParty') {
+        expect(shipped.get(name)).toBe(`../../${source}`)
         expect(existsSync(join(shellRoot, shipped.get(name)!)), name).toBe(true)
       }
     }
@@ -68,5 +107,15 @@ describe('legal documents', () => {
     expect(config.extraMetadata.author).toEqual({ name: legal.company, email: legal.email })
     expect(config.extraMetadata.homepage).toBe(legal.homepage)
     expect(legal.homepage).not.toMatch(/github/i)
+  })
+
+  it('the standalone Docs package ships the same .txt legal files', () => {
+    const docs = JSON.parse(readFileSync(join(repoRoot, 'apps/docs/package.json'), 'utf8')) as {
+      build: { extraResources: Array<{ from: string; to: string }> }
+    }
+    const to = docs.build.extraResources.map((e) => e.to)
+    for (const doc of ['license', 'notice', 'modifications'] as const) {
+      expect(to).toContain(LEGAL_DOC_FILES[doc].shipped)
+    }
   })
 })

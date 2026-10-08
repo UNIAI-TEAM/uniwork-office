@@ -131,10 +131,10 @@ identifiers of the Markdown image host (provider id, API endpoint; never rendere
 copyright year) and the upstream attribution (name, copyright, license, the upstream NOTICE verbatim, the trademark sentence).
 Company, email and homepage are placeholders until the legal entity exists; change them there and run `npm run legal`.
 Readers: `electron-builder.cjs` (copyright, linux maintainer / vendor, packaged author / homepage), Settings > About
-(copyright and attribution line, buttons that open the shipped NOTICE and THIRD-PARTY-NOTICES.txt locally),
+(copyright and attribution line, buttons that open the shipped LICENSE, NOTICE and THIRD-PARTY-NOTICES.txt locally, inline error if one fails),
 `tools/gen-third-party-notices.mjs` (header) and `tools/legal/sync-legal.mjs` (`npm run legal`, `legal:check` in CI), which
 rewrites the NOTICE header, the MODIFICATIONS header (Apache-2.0 4(b) statement with the `UPSTREAM_BASE` commit) and the
-`apps/*/package.json` author / homepage / Docs `build.copyright`. LICENSE, NOTICE, MODIFICATIONS and LICENSE-UNICODE.txt ship
+`apps/*/package.json` author / homepage / Docs `build.copyright`. LICENSE, NOTICE and MODIFICATIONS ship as `.txt` copies (with LICENSE-UNICODE.txt)
 in Resources/ of the shell and the standalone Docs package. Upstream names may appear in the UI only in that About attribution.
 
 ## Known gaps (also in the GO-A1 report)

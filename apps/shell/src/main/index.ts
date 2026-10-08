@@ -28,7 +28,7 @@ import {
 import type { MenuItemConstructorOptions, NativeImage, WebContents } from 'electron'
 import { atomicCopyFile, atomicWriteFile } from './atomic-write'
 import { tabStripOverlay } from './title-bar-overlay'
-import { legalDocPath, type LegalDocEnv } from './legal-docs'
+import { legalDocPath, openLegalDoc, type LegalDocEnv } from './legal-docs'
 import menuDocxIcon1x from './assets/menu-docx.png?asset'
 import menuDocxIcon2x from './assets/menu-docx@2x.png?asset'
 import menuXlsxIcon1x from './assets/menu-xlsx.png?asset'
@@ -4096,11 +4096,11 @@ function registerHomeIpc(): void {
   ipcMain.handle(HOME_CHANNELS.getAppVersion, (): string => app.getVersion())
 
   // Settings > About: the shipped legal files, opened locally (never a URL)
-  ipcMain.handle(HOME_CHANNELS.openLegalDoc, async (_event, doc: unknown): Promise<boolean> => {
-    const path = legalDocPath(doc, legalDocEnv())
-    if (!path || !existsSync(path)) return false
-    return (await shell.openPath(path)) === ''
-  })
+  ipcMain.handle(
+    HOME_CHANNELS.openLegalDoc,
+    (_event, doc: unknown): Promise<boolean> =>
+      openLegalDoc(doc, legalDocEnv(), { openPath: (path) => shell.openPath(path) }),
+  )
 
   ipcMain.handle(HOME_CHANNELS.recents, (_event, query: unknown): RecentPage =>
     pageRecentPaths(readRecentFiles(), query, new Set(readStarredFiles())),
