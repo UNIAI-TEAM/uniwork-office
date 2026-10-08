@@ -289,8 +289,9 @@ export function mediaConfigUsable(
 
 /**
  * The stored provider for one capability, honored only when it exists, has
- * that capability and is usable; anything else falls back to genspark so a
- * half-filled setup degrades to the signed-in default.
+ * that capability and is usable; anything else resolves to `genspark` (no BYOK
+ * route). While the cloud seam is off, a stored `genspark` (the default) yields
+ * to the first visible BYOK provider with a usable config for the capability.
  */
 export function activeMediaProvider(
   settings: Pick<AiSettings, 'media'>,
@@ -304,7 +305,16 @@ export function activeMediaProvider(
       : capability === 'video'
         ? media.videoAnalysisProvider
         : media.analysisProvider
-  if (!id || id === 'genspark') return 'genspark'
+  if (!id || id === 'genspark') {
+    if (uniworkCloudEnabled()) return 'genspark'
+    const fallback = AI_MEDIA_PROVIDERS.find(
+      (m) =>
+        m.id !== 'genspark' &&
+        providerHasCapability(m, capability) &&
+        mediaConfigUsable(m, media.providers?.[m.id]),
+    )
+    return fallback?.id ?? 'genspark'
+  }
   const meta = getMediaProviderMeta(id)
   if (!meta || !providerHasCapability(meta, capability)) return 'genspark'
   if (!mediaConfigUsable(meta, media.providers?.[id])) return 'genspark'

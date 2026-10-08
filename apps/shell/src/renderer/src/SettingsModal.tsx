@@ -942,14 +942,25 @@ function AiMediaPane({
       }
     )
   }
+  /** editing the shown vendor also stores it when the stored choice is hidden (the picker shows options[0]) */
   const updateMediaConfig = (
+    cap: Exclude<Capability, 'search'>,
     id: AiMediaProviderId,
     patch: Partial<AiMediaSettings['providers'][AiMediaProviderId]>,
-  ) =>
+  ) => {
+    const field =
+      cap === 'image'
+        ? 'imageProvider'
+        : cap === 'video'
+          ? 'videoAnalysisProvider'
+          : 'analysisProvider'
+    const shown = mediaOptions(cap).some((m) => m.id === media[field])
     setMedia({
       ...media,
+      ...(shown ? {} : { [field]: id }),
       providers: { ...media.providers, [id]: { ...mediaConfigOf(id), ...patch } },
     })
+  }
 
   const save = () => {
     Promise.all([
@@ -1251,13 +1262,13 @@ function AiMediaPane({
           cap === 'image' ? meta.imageModels : meta.analysisModels,
           cap === 'image' ? meta.defaultImageModel : meta.defaultAnalysisModel,
           config[modelField],
-          (m) => updateMediaConfig(id, { [modelField]: m }),
+          (m) => updateMediaConfig(cap, id, { [modelField]: m }),
         )}
         {keyRow(`set-ai-${cap}-key`, config.apiKey, meta.keyPlaceholder, (v) =>
-          updateMediaConfig(id, { apiKey: v }),
+          updateMediaConfig(cap, id, { apiKey: v }),
         )}
         {baseUrlRow(`set-ai-${cap}-base-url`, meta, config.baseUrl ?? '', (v) =>
-          updateMediaConfig(id, { baseUrl: v }),
+          updateMediaConfig(cap, id, { baseUrl: v }),
         )}
       </section>
     )

@@ -39,11 +39,12 @@ function openaiSettings(apiKey = 'sk-test', imageModel = 'gpt-image-2'): AiSetti
 }
 
 describe('media settings', () => {
-  it('defaults every provider to its default models and genspark as the active one', () => {
+  it('defaults every provider to its default models with no active BYOK route', () => {
     const media = defaultAiMediaSettings()
-    expect(media.imageProvider).toBe('genspark')
-    expect(media.analysisProvider).toBe('genspark')
-    expect(media.videoAnalysisProvider).toBe('genspark')
+    const settings = withMedia(media)
+    expect(activeMediaConfig(settings, 'image')).toBeNull()
+    expect(activeMediaConfig(settings, 'analysis')).toBeNull()
+    expect(activeMediaConfig(settings, 'video')).toBeNull()
     for (const meta of AI_MEDIA_PROVIDERS) {
       expect(media.providers[meta.id].imageModel).toBe(meta.defaultImageModel)
       expect(media.providers[meta.id].apiKey).toBe('')
@@ -54,7 +55,7 @@ describe('media settings', () => {
 
   it('is carried by defaultAiSettings and healed in from a pre-media settings file', () => {
     const defaults = defaultAiSettings()
-    expect(defaults.media?.imageProvider).toBe('genspark')
+    expect(defaults.media).toEqual(defaultAiMediaSettings())
     const resolved = resolveAiSettings(
       { provider: 'genspark', providers: defaults.providers },
       defaultAiSettings(),
@@ -114,7 +115,8 @@ describe('media settings', () => {
     expect(activeMediaProvider(withMedia(custom), 'image')).toBe('genspark')
     custom.providers.custom.baseUrl = 'http://localhost:1234/v1'
     expect(activeMediaProvider(withMedia(custom), 'image')).toBe('custom')
-    expect(activeMediaProvider(withMedia(custom), 'analysis')).toBe('genspark')
+    // the default (hidden cloud) analysis choice yields to the usable endpoint
+    expect(activeMediaProvider(withMedia(custom), 'analysis')).toBe('custom')
     expect(activeMediaConfig(withMedia(custom), 'image')?.provider).toBe('custom')
     // MiniMax-M3 supports both image and video analysis
     const mm = defaultAiMediaSettings()
@@ -141,6 +143,24 @@ describe('media settings', () => {
     expect(
       activeMediaProvider({ media: { imageProvider: 'nope', providers: {} } as never }, 'image'),
     ).toBe('genspark')
+  })
+
+  it('lets a key for the first visible provider work from fresh defaults', () => {
+    const settings = defaultAiSettings()
+    const first = visibleMediaProviders().find((m) => !!m.imageProtocol)!
+    settings.media!.providers[first.id].apiKey = 'sk-test'
+    expect(activeMediaProvider(settings, 'image')).toBe(first.id)
+    expect(imageGenerationAvailable(settings, false)).toBe(true)
+    // the stored cloud choice yields to whichever BYOK vendor is usable
+    const gemini = defaultAiSettings()
+    gemini.media!.providers.gemini.apiKey = 'AIza'
+    expect(activeMediaProvider(gemini, 'image')).toBe('gemini')
+    expect(activeMediaProvider(gemini, 'video')).toBe('gemini')
+    expect(mediaAnalysisAvailable(gemini, false)).toBe(true)
+    // an explicit BYOK choice is never swapped for another vendor
+    const explicit = openaiSettings('')
+    explicit.media!.providers.gemini.apiKey = 'AIza'
+    expect(activeMediaProvider(explicit, 'image')).toBe('genspark')
   })
 
   it('is BYOK-only while the UniWork cloud seam is off, and gated on the BYOK model', () => {
