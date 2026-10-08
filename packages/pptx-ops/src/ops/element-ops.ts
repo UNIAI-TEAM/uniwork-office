@@ -25,6 +25,10 @@ import {
   setShapePresetGeometry,
   setGroupChildShapePresetGeometry,
   setShapeAdjustValues,
+  setShapeCustomGeometry,
+  setGroupChildShapeCustomGeometry,
+  validCustGeomPath,
+  type CustGeomPath,
   setGroupChildShapeAdjustValues,
   ungroupElement,
   updateConnectorsForMoved,
@@ -40,6 +44,7 @@ import {
   matchesElementRef,
   register,
   requireFinite,
+  requireLinkTarget,
   resolveElement,
   resolveGroup,
   resolveGroupChildId,
@@ -254,26 +259,8 @@ register({
     }
     for (const el of targets) {
       const t = el.transform
-      // Rotation pivots on the flip-adjusted box origin, so toggling a flip on a
-      // rotated element would move its visual center: origin + R(rot)·(flip-signed
-      // half-extent) must stay put — shift the offset by the orbit difference.
-      const orbit = () => {
-        const rad = (((t.rot ?? 0) / 60000) * Math.PI) / 180
-        const bx = t.flipH ? t.offset.cx : 0
-        const by = t.flipV ? t.offset.cy : 0
-        const vx = ((t.flipH ? -1 : 1) * t.offset.cx) / 2
-        const vy = ((t.flipV ? -1 : 1) * t.offset.cy) / 2
-        return {
-          x: bx + vx * Math.cos(rad) - vy * Math.sin(rad),
-          y: by + vx * Math.sin(rad) + vy * Math.cos(rad),
-        }
-      }
-      const before = orbit()
       if (op.axis === 'h') t.flipH = !t.flipH
       else t.flipV = !t.flipV
-      const after = orbit()
-      t.offset.x += Math.round(before.x - after.x)
-      t.offset.y += Math.round(before.y - after.y)
       el.dirtyTransform = true
     }
     updateConnectorsForMoved(
@@ -483,6 +470,42 @@ register({
 })
 
 register({
+  name: 'setShapeCustomGeometry',
+  validate(op, ctx) {
+    if (!validCustGeomPath(op.path)) {
+      throw new GuidedError(
+        'op "setShapeCustomGeometry" needs "path": { w, h, cmds:[{op:"M"|"L"|"C"|"Q"|"Z", pts:number[]}] } starting with "M" (pts: M/L 2, Q 4, C 6, Z 0).',
+      )
+    }
+    if (op.group) {
+      const { index, slide } = resolveSlide(ctx, op)
+      resolveGroup(op, index, slide.elements)
+      return
+    }
+    resolveElement(ctx, op, { types: ['text', 'shape'] })
+  },
+  apply(op, ctx): OpRecord {
+    const path = op.path as CustGeomPath
+    if (op.group) {
+      const { index, slide } = resolveSlide(ctx, op)
+      const groupId = resolveGroup(op, index, slide.elements)
+      const id = resolveGroupChildId(slide, groupId, String(op.target?.el ?? ''))
+      if (!setGroupChildShapeCustomGeometry(slide, groupId, id, path)) {
+        throw new GuidedError(
+          `op "setShapeCustomGeometry": no shape child "${id}" in group "${groupId}".`,
+        )
+      }
+      return { op, after: path }
+    }
+    const { slide, el } = resolveElement(ctx, op, { types: ['text', 'shape'] })
+    if (!setShapeCustomGeometry(slide, el.id, path)) {
+      throw new GuidedError(`op "setShapeCustomGeometry": element "${el.id}" has no geometry.`)
+    }
+    return { op, after: path }
+  },
+})
+
+register({
   name: 'setTextAnchor',
   validate(op, ctx) {
     resolveElement(ctx, op)
@@ -556,6 +579,7 @@ register({
 register({
   name: 'setLink',
   validate(op, ctx) {
+    requireLinkTarget('setLink', op.link)
     resolveElement(ctx, op)
   },
   apply(op, ctx): OpRecord {

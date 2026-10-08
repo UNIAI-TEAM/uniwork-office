@@ -1,0 +1,120 @@
+{
+  "_doc": "Exemptions for tools/rebrand/brand-scan.mjs. Every entry needs path (glob), kind and reason. kind=permanent: the upstream name is legitimately there (attribution, vendored text, code identifiers). kind=debt: a real remaining brand string that is fixed by a known follow-up; the scan warns when a debt entry stops matching so it gets deleted. pattern (optional) is a regex tested against the raw source line. Code identifiers (@genoffice/*, GENOFFICE_* env vars, genofficeAuthPath-style names, font aliases, the lowercase `genoffice` CLI command) are masked in table.mjs and need no entry. Out of scope by construction, not scanned at all: LICENSE*, NOTICE, ee/, docs/, README*/CONTRIBUTING/PRIVACY except packages/cli/README.md (npm-published, scanned), tests, e2e, fixtures, .github.",
+  "entries": [
+    {
+      "path": "**",
+      "pattern": "genspark-ai/genoffice#\\d+",
+      "kind": "permanent",
+      "reason": "Reference to an upstream issue/PR number inside a comment; attribution to where the behaviour was designed."
+    },
+    {
+      "path": "apps/shell/electron-builder.cjs",
+      "pattern": "@genofficeshell",
+      "kind": "permanent",
+      "reason": "Comment quoting the invalid npm-scope-derived desktop name that syncDesktopName avoids; describes upstream behaviour, not product branding."
+    },
+    {
+      "path": "apps/shell/src/renderer/src/assets/UNIWORK_BRAND_ASSET_REQUIRED.md",
+      "kind": "permanent",
+      "reason": "Internal note that names the removed upstream lockup to explain why placeholder artwork is in place (trademark attribution)."
+    },
+    {
+      "path": "packages/docx-engine/src/vendor/**",
+      "kind": "permanent",
+      "reason": "Vendored third-party library notes that record who made local modifications; attribution text, never rendered in the UI."
+    },
+    {
+      "path": "{packages/cli/src/mcp/server.ts,packages/cli/src/mcp/tools.ts,packages/cli/README.md,skills/genoffice/SKILL.md}",
+      "pattern": "genoffice://",
+      "kind": "permanent",
+      "reason": "MCP resource URI scheme (genoffice://guide/*) is a protocol identifier agents address by name (skills/genoffice/SKILL.md, the CLI README), like the kept `genoffice` CLI command; renaming it breaks existing agent configs."
+    },
+    {
+      "path": "packages/docx-engine/src/lazy-media.ts",
+      "pattern": "GENOFFICE-LAZY-MEDIA",
+      "kind": "permanent",
+      "reason": "On-disk magic header of lazy-media stub files; changing it would orphan stubs already written by earlier versions. Never user visible."
+    },
+    {
+      "path": "{apps/sheets/src/main/sheets-main.ts,apps/slides/src/main/slides-main.ts,apps/shell/src/main/index.ts}",
+      "pattern": "genspark\\.ai",
+      "kind": "debt",
+      "reason": "Proxy-resolution probe against www.genspark.ai; the Genspark endpoints are removed under the telemetry/login/URL clean-up.",
+      "tracker": "GO-A4 UNI-1005"
+    },
+    {
+      "path": "apps/shell/src/main/cloud-projects.ts",
+      "pattern": "genspark\\.ai",
+      "kind": "debt",
+      "reason": "GENSPARK_ORIGIN cloud-projects endpoint; removed with the Genspark cloud integration.",
+      "tracker": "GO-A4 UNI-1005"
+    },
+    {
+      "path": "packages/ai-provider/src/{providers,protocols/shared}.ts",
+      "pattern": "genspark\\.ai",
+      "kind": "debt",
+      "reason": "Genspark LLM proxy base URLs and pricing-URL matcher kept for the legacy provider id until the provider is removed.",
+      "tracker": "GO-A4 UNI-1005"
+    },
+    {
+      "path": "packages/ai-search/src/{genoffice-auth,gsk}.ts",
+      "pattern": "genspark\\.ai",
+      "kind": "debt",
+      "reason": "Genspark device-login and gsk tool CLI base URLs; removed with the Genspark login (GO-A4) and replaced by UniWork sign-in (GO-A5).",
+      "tracker": "GO-A4 UNI-1005 / GO-A5"
+    },
+    {
+      "path": "packages/electron-utils/src/remote-image.ts",
+      "pattern": "genspark\\.ai",
+      "kind": "debt",
+      "reason": "Referer header rule for genspark.ai-hosted images; removed with the Genspark integration.",
+      "tracker": "GO-A4 UNI-1005"
+    },
+    {
+      "path": "packaging/**",
+      "pattern": "genspark-ai/",
+      "kind": "debt",
+      "reason": "Release / issue / homepage URLs of the flatpak, nix and docker recipes point at github.com/genspark-ai/genoffice releases, because these recipes still fetch the upstream deb / AppImage. They are repointed when the UniWork release feed exists; do not redesign the packaging before that.",
+      "tracker": "GO-A8 (packaging/release) + GO-A4 UNI-1005 (release URLs)"
+    },
+    {
+      "path": "packaging/**",
+      "pattern": "com.genoffice",
+      "kind": "debt",
+      "reason": "Flatpak application id com.genoffice.app (manifest, .desktop, metainfo, install paths, docs) and its file names; the id moves to a UniWork reverse-DNS id together with the developer id (ai.genspark in the metainfo) and the Flathub / flatpak-builder setup.",
+      "tracker": "GO-A8 (packaging/release)"
+    },
+    {
+      "path": "packaging/**",
+      "pattern": "GenOffice|Mainfunc",
+      "kind": "debt",
+      "reason": "Packaging recipes name the upstream product and vendor (Name=, descriptions, <name>, developer Mainfunc, /opt/GenOffice/genoffice) because they unpack the upstream-built deb / AppImage, which still installs under /opt/GenOffice. Rebrand with the recipes once they consume the UniWork Office artifacts (install dir /opt/UniWork Office, binary uniwork-office).",
+      "tracker": "GO-A8 (packaging/release)"
+    },
+    {
+      "path": "packages/{docx-engine,pptx-engine}/src/vendor/**",
+      "pattern": "github\\.com",
+      "kind": "permanent",
+      "reason": "Attribution link to the upstream project of a vendored third-party library (licence / provenance notes in a vendor README); never rendered in the UI."
+    },
+    {
+      "path": "apps/markdown/src/{main/image-host.ts,renderer/components/ImageHostDialog.tsx,shared/ipc.ts}",
+      "pattern": "[Gg]it[Hh]ub",
+      "kind": "permanent",
+      "reason": "Functional identifiers of the Markdown image host's repository adapter only: the persisted provider id 'github' (settings files, ImageHostKind, the dialog option value) and the REST API endpoint / headers it must send (api.github.com, vnd.github+json, X-GitHub-Api-Version). Never rendered: every label, placeholder and upload error says 'repository' / 'access token' (apps/markdown/tests/image-host-wording.test.ts pins the dialog strings in all 21 locales and the error text)."
+    },
+    {
+      "path": "apps/shell/src/main/updater.ts",
+      "pattern": "github\\.com/UNIAI-TEAM/uniwork-office/releases/latest",
+      "kind": "debt",
+      "reason": "DOWNLOAD_PAGE_URL, the manual-download target of the update dialog when a build has no self-update feed. Functional URL, never displayed as text (the dialog says 'Download'); moves to a UniWork download page once one exists.",
+      "tracker": "GO-A8 (release / download page) + GO-A4 UNI-1005 (release URLs)"
+    },
+    {
+      "path": "packages/cli/src/agent-skills.ts",
+      "pattern": "GitHub Copilot",
+      "kind": "permanent",
+      "reason": "Name of a third-party AI coding agent (GitHub Copilot) in the list of agents the skill installer can target; a product name, not a repository link."
+    }
+  ]
+}

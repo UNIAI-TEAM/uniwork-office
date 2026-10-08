@@ -10,6 +10,7 @@
     "./custgeom": "./src/custgeom.ts",
     "./table-grid": "./src/table-grid.ts",
     "./identity": "./src/identity.ts",
+    "./named-action": "./src/named-action.ts",
     "./background-promote": "./src/background-promote.ts"
   },
   "scripts": {
@@ -18,6 +19,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@genoffice/zip-gate": "*",
     "fast-xml-parser": "^5.3.4",
     "jszip": "^3.10.1"
   },

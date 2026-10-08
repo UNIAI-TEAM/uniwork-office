@@ -18,6 +18,8 @@ export const HTML_CHANNELS = {
   save: 'html:save',
   saveRequest: 'html:save-request',
   saveRequestAck: 'html:save-request-ack',
+  readTextRequest: 'html:read-text-request',
+  readTextResult: 'html:read-text-result',
   dirtyChanged: 'html:dirty-changed',
   closeSaveRequest: 'html:close-save-request',
   closeSaveResult: 'html:close-save-result',
@@ -34,6 +36,7 @@ export const HTML_CHANNELS = {
   consumeHeadlessExport: 'html:consume-headless-export',
   headlessExportDone: 'html:headless-export-done',
   printRequest: 'html:print-request',
+  printHtml: 'html:print-html',
   aiGenerateImage: 'html:ai-generate-image',
   filesPick: 'html:files-pick',
   filesAdd: 'html:files-add',
@@ -123,6 +126,9 @@ export type SaveHtmlResult =
 /** AI channels are app-wide shared ipcMain handlers (shell registers via docs-main registerAiIpc); pass-through only */
 export const AI_CHANNELS = {
   getSettings: 'ai:get-settings',
+  setSettings: 'ai:set-settings',
+  settingsChanged: 'ai:settings-changed',
+  openModelSettings: 'ai:open-model-settings',
   gskStatus: 'ai:gsk-status',
   stream: 'ai:stream',
   streamChunk: 'ai:stream-chunk',
@@ -176,7 +182,19 @@ export interface ExportHtmlRequest {
 }
 
 export type ExportResult =
-  { ok: true; path: string } | { ok: true; canceled: true } | { ok: false; error: string }
+  | { ok: true; path: string; skipped?: string[] }
+  | { ok: true; canceled: true }
+  | { ok: false; error: string }
+
+/** Shell menu Print: the renderer hands over the document text, main opens the system dialog */
+export interface PrintHtmlRequest {
+  /** the document text */
+  html: string
+}
+
+/** A cancelled job is the user closing the system dialog: an outcome, not a failure,
+ * so it must stay silent. Mirrors the `canceled` variant ExportResult already uses. */
+export type PrintResult = { ok: true } | { ok: true; canceled: true } | { ok: false; error: string }
 
 export interface ImageData {
   base64: string
@@ -213,6 +231,12 @@ export interface HtmlApi {
   onSaveRequest(handler: (mode: SaveMode) => void): () => void
   /** Resolves a menu-save waiter when doSave exits without ever invoking save() (busy/loading) */
   sendSaveRequestAck(ok: boolean): void
+  /**
+   * Main process asks for the live document source — the MCP read of an open
+   * document, unsaved edits included; reply through sendReadTextResult.
+   */
+  onReadTextRequest(handler: () => void): () => void
+  sendReadTextResult(result: { text: string } | { error: string }): void
   /** Main process picked "Save" in the close prompt → renderer saves and replies via sendCloseSaveResult */
   onCloseSaveRequest(handler: () => void): () => void
   sendCloseSaveResult(ok: boolean): void
@@ -255,6 +279,8 @@ export interface HtmlApi {
   exportDocx(request: ExportDocxRequest): Promise<ExportResult>
   exportPdf(request: ExportPdfRequest): Promise<ExportResult>
   exportHtml(request: ExportHtmlRequest): Promise<ExportResult>
+  /** Shell menu Print → main renders the document and opens the system print dialog */
+  printHtml(request: PrintHtmlRequest): Promise<PrintResult>
   getLanguage(): Promise<Lang>
   onLanguageChanged(handler: (lang: Lang) => void): () => void
   getTheme(): Promise<UiTheme>
@@ -263,11 +289,17 @@ export interface HtmlApi {
   onAutoSaveDefaultChanged(handler: (value: AutoSaveDefault) => void): () => void
   /** AI panel text size + chat-input spellcheck (Settings → General in the shell) */
   getAiPanelPrefs(): Promise<AiPanelPrefs>
+  setAiPanelPrefs(patch: Partial<AiPanelPrefs>): Promise<AiPanelPrefs>
   onAiPanelPrefsChanged(handler: (prefs: AiPanelPrefs) => void): () => void
   /** press on the shell chrome (tab strip is a sibling WebContentsView whose
    *  clicks produce no DOM event here) — dismiss open popovers */
   onChromePressed(handler: () => void): () => void
   getAiSettings(): Promise<AiSettings>
+  setAiSettings(settings: AiSettings): Promise<void>
+  /** ai-settings.json was rewritten by any renderer; re-read it */
+  onAiSettingsChanged(handler: () => void): () => void
+  /** shell only: switch to Home and open Settings › AI Model (rejects in standalone) */
+  openAiModelSettings(): Promise<void>
   /** Genspark login state (shell-registered ai:gsk-status) — gates generate_image with the cloud-tools toggle */
   aiGskStatus(): Promise<GenSparkAccountStatus>
   aiStream(request: AiStreamRequest): Promise<void>

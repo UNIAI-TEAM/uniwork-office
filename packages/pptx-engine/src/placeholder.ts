@@ -19,16 +19,27 @@ import { XMLParser } from 'fast-xml-parser'
 import type { Transform, TextAlign } from './types'
 import { type EaScript, type Theme, eaScriptOfLang, resolveFontRef } from './theme'
 import { resolveColorNode } from './color'
-import { asXmlNode, xmlArray, type XmlNode } from './xml-utils'
+import { asXmlNode, decodeNumericCharRefs, xmlArray, type XmlNode } from './xml-utils'
+
+/** Spec (and PowerPoint UI) ceiling for <a:buAutoNum startAt>. */
+export const MAX_AUTO_NUM_START = 32767
 
 const phParser = new XMLParser({
   ignoreAttributes: false,
   attributeNamePrefix: '@_',
-  isArray: (name) => ['p:sp'].includes(name),
+  isArray: (name) => ['p:sp', 'p:graphicFrame', 'p:pic'].includes(name),
 })
 
 /** Default run/paragraph style for one indent level (from lstStyle's lvlNpPr/defRPr). */
+/** Fields whose inheritance source a level records (see mergeTextStyleChain). */
+export type StyleSourceField =
+  'fontSize' | 'bold' | 'italic' | 'color' | 'latinFont' | 'eaFont' | 'csFont' | 'align'
+
 export interface LevelTextStyle {
+  /** Which chain layer supplied each field (only set by mergeTextStyleChain) */
+  src?: Partial<Record<StyleSourceField, string>>
+  /** The level's unresolved latin theme ref (+mj-lt / +mn-lt), kept beside the resolved name */
+  latinFontRef?: string
   /** Font size (pt) */
   fontSize?: number
   bold?: boolean
@@ -82,6 +93,8 @@ export interface LevelTextStyle {
 /** Default styles for the 9 levels (index = level, 0-based). */
 export interface TextStyleLevels {
   levels: Array<LevelTextStyle | undefined>
+  /** where this layer sits in the inheritance chain, for style provenance */
+  src?: string
 }
 
 /** master <p:txStyles>: the title/body/other families. */
@@ -116,6 +129,23 @@ export interface PlaceholderMap {
 
 const TITLE_TYPES = new Set(['title', 'ctrTitle'])
 const BODY_TYPES = new Set(['body', 'subTitle', 'obj', ''])
+/** Placeholders a slide never renders text into. They can still carry a lstStyle, so the
+ *  idx-only step below must skip them — a master's `dt idx="2"` must not hand its date
+ *  style to a body placeholder that merely shares idx="2". */
+const FUNCTION_TYPES = new Set([
+  'dt',
+  'ftr',
+  'sldNum',
+  'sldImg',
+  'hdr',
+  'clipArt',
+  'dgm',
+  'media',
+  'oleObj',
+  'chart',
+  'tbl',
+  'pic',
+])
 
 const ANCHOR_MAP: Record<string, PlaceholderGeom['anchor']> = {
   t: 'top',
@@ -164,19 +194,36 @@ export function parsePlaceholderMap(
   } catch {
     return { entries }
   }
-  // Path: p:sldLayout / p:sldMaster → p:cSld → p:spTree → p:sp[]
+  // Path: p:sldLayout / p:sldMaster → p:cSld → p:spTree → p:sp[] + p:graphicFrame[] + p:pic[]
   const root = asXmlNode(doc['p:sldLayout'] ?? doc['p:sldMaster'])
   const spTreeRaw = asXmlNode(root['p:cSld'])['p:spTree']
   if (!spTreeRaw) return { entries }
   const spTree = asXmlNode(spTreeRaw)
-  for (const sp of xmlArray(spTree['p:sp'])) {
-    const phRaw = asXmlNode(asXmlNode(sp['p:nvSpPr'])['p:nvPr'])['p:ph']
+  const shapes: Array<{ node: XmlNode; nvKey: string; frame: boolean }> = [
+    ...xmlArray(spTree['p:sp']).map((node) => ({
+      node: asXmlNode(node),
+      nvKey: 'p:nvSpPr',
+      frame: false,
+    })),
+    ...xmlArray(spTree['p:graphicFrame']).map((node) => ({
+      node: asXmlNode(node),
+      nvKey: 'p:nvGraphicFramePr',
+      frame: true,
+    })),
+    ...xmlArray(spTree['p:pic']).map((node) => ({
+      node: asXmlNode(node),
+      nvKey: 'p:nvPicPr',
+      frame: false,
+    })),
+  ]
+  for (const { node: sp, nvKey, frame } of shapes) {
+    const phRaw = asXmlNode(asXmlNode(sp[nvKey])['p:nvPr'])['p:ph']
     if (!phRaw) continue
     const ph = asXmlNode(phRaw)
     const type = String(ph['@_type'] ?? 'body')
     const idx = ph['@_idx'] != null ? String(ph['@_idx']) : ''
     const spPr = asXmlNode(sp['p:spPr'])
-    const transform = parseXfrmNode(spPr['a:xfrm'])
+    const transform = frame ? parseXfrmNode(sp['p:xfrm']) : parseXfrmNode(spPr['a:xfrm'])
     const textStyle = parseLstStyleLevels(asXmlNode(sp['p:txBody'])['a:lstStyle'], theme, src)
     const bodyPrNode = asXmlNode(asXmlNode(sp['p:txBody'])['a:bodyPr'])
     const anchor = ANCHOR_MAP[String(bodyPrNode['@_anchor'] ?? '')]
@@ -226,13 +273,6 @@ const ALIGN_MAP: Record<string, TextAlign> = {
   ctr: 'center',
   r: 'right',
   just: 'justify',
-}
-
-/** fast-xml-parser does not decode numeric character references in attributes (&#x2022; etc.); done here. */
-function decodeAttrCharRefs(s: string): string {
-  return s
-    .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => String.fromCodePoint(parseInt(h, 16)))
-    .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(parseInt(d, 10)))
 }
 
 /** <a:spcPct val="150000"/> → 150 (%). */
@@ -285,13 +325,14 @@ function parseLvlPPr(
   const buChar = asXmlNode(pPr['a:buChar'])['@_char']
   if (pPr['a:buNone'] !== undefined) out.bullet = { type: 'none' }
   else if (buChar != null) {
-    out.bullet = { type: 'char', char: decodeAttrCharRefs(String(buChar)) }
+    out.bullet = { type: 'char', char: decodeNumericCharRefs(String(buChar)) }
   } else if (pPr['a:buAutoNum']) {
     out.bullet = { type: 'number' }
     const an = asXmlNode(pPr['a:buAutoNum'])
     if (an['@_type'] != null) out.bullet.numType = String(an['@_type'])
     const startAt = parseInt(String(an['@_startAt']), 10)
-    if (Number.isFinite(startAt) && startAt > 1) out.bullet.startAt = startAt
+    if (Number.isFinite(startAt) && startAt > 1)
+      out.bullet.startAt = Math.min(startAt, MAX_AUTO_NUM_START)
   } else if (pPr['a:buBlip'] !== undefined) {
     out.bullet = { type: 'blip' }
     const embed = asXmlNode(asXmlNode(pPr['a:buBlip'])['a:blip'])['@_r:embed']
@@ -358,8 +399,10 @@ export function parseDefRPrStyle(
   }
   const eaScript = eaScriptOfLang(defRPr['@_altLang']) ?? eaScriptOfLang(defRPr['@_lang'])
   if (eaScript) out.eaScript = eaScript
-  const latin = resolveFontRef(typefaceAttr(defRPr['a:latin']), theme, eaScript)
+  const latinAttr = typefaceAttr(defRPr['a:latin'])
+  const latin = resolveFontRef(latinAttr, theme, eaScript)
   if (latin) out.latinFont = latin
+  if (latinAttr?.startsWith('+')) out.latinFontRef = latinAttr
   const eaAttr = typefaceAttr(defRPr['a:ea'])
   const ea = resolveFontRef(eaAttr, theme, eaScript)
   if (ea) out.eaFont = ea
@@ -425,7 +468,12 @@ export function parseMasterTextStyles(
   }
 }
 
-/** Find the lstStyle in a layer's map by placeholder (type, idx). Same match order as geometry inheritance. */
+/** Find the lstStyle in a layer's map by placeholder (type, idx). The idx-only step is
+ *  what ECMA's idx matching needs for legacy decks (slide `<p:ph idx="1"/>` vs layout
+ *  `<p:ph type="obj" idx="1"/>`), so it stays — but it skips FUNCTION_TYPES, since those
+ *  never render slide text and would otherwise donate their style by index collision.
+ *  findInMap's geometry step applies the same skip, so style and geometry resolve to the
+ *  same placeholder. */
 function findStyleInMap(
   map: PlaceholderMap | undefined,
   type: string | undefined,
@@ -436,16 +484,16 @@ function findStyleInMap(
   const i = idx ?? ''
   const styled = map.entries.filter((e) => e.textStyle)
   let hit = styled.find((e) => e.type === t && e.idx === i)
-  if (!hit && i !== '') hit = styled.find((e) => e.idx === i)
+  if (!hit && i !== '') hit = styled.find((e) => e.idx === i && !FUNCTION_TYPES.has(e.type))
   if (!hit) hit = styled.find((e) => e.type === t)
   if (!hit && TITLE_TYPES.has(t)) hit = styled.find((e) => TITLE_TYPES.has(e.type))
   if (!hit && BODY_TYPES.has(t)) hit = styled.find((e) => BODY_TYPES.has(e.type))
   return hit?.textStyle
 }
 
-/** Find the bodyPr anchor in a layer's map by placeholder (type, idx). Unlike
- *  findStyleInMap there is no idx-only step: master placeholders reuse idx values
- *  across types (a dt idx="2" must not anchor a body idx="2" to the bottom). */
+/** Find the bodyPr anchor in a layer's map by placeholder (type, idx). No idx-only
+ *  step: master placeholders reuse idx values across types (a dt idx="2" must not
+ *  anchor a body idx="2" to the bottom). */
 function findAnchorInMap(
   map: PlaceholderMap | undefined,
   type: string | undefined,
@@ -547,16 +595,16 @@ export function placeholderStyleChain(
 ): TextStyleLevels[] {
   const chain: TextStyleLevels[] = []
   const fromLayout = findStyleInMap(layout, type, idx)
-  if (fromLayout) chain.push(fromLayout)
+  if (fromLayout) chain.push({ ...fromLayout, src: 'layout placeholder' })
   const fromMaster = findStyleInMap(master, type, idx)
-  if (fromMaster) chain.push(fromMaster)
+  if (fromMaster) chain.push({ ...fromMaster, src: 'master placeholder' })
   const t = type ?? 'body'
-  const family = TITLE_TYPES.has(t)
-    ? masterTx?.title
+  const [family, familySrc] = TITLE_TYPES.has(t)
+    ? [masterTx?.title, 'master titleStyle']
     : BODY_TYPES.has(t)
-      ? masterTx?.body
-      : masterTx?.other
-  if (family) chain.push(family)
+      ? [masterTx?.body, 'master bodyStyle']
+      : [masterTx?.other, 'master otherStyle']
+  if (family) chain.push({ ...family, src: familySrc })
   return chain
 }
 
@@ -570,26 +618,51 @@ export function mergeTextStyleChain(
   level: number,
 ): LevelTextStyle | undefined {
   const out: LevelTextStyle = {}
+  const src: NonNullable<LevelTextStyle['src']> = {}
   let any = false
   for (const layer of chain) {
     if (!layer) continue
     const lvl = layer.levels[level] ?? layer.levels[0]
     if (!lvl) continue
     any = true
-    if (out.fontSize == null && lvl.fontSize != null) out.fontSize = lvl.fontSize
-    if (out.bold == null && lvl.bold != null) out.bold = lvl.bold
-    if (out.italic == null && lvl.italic != null) out.italic = lvl.italic
+    const from = layer.src ?? 'inherited'
+    if (out.fontSize == null && lvl.fontSize != null) {
+      out.fontSize = lvl.fontSize
+      src.fontSize = from
+    }
+    if (out.bold == null && lvl.bold != null) {
+      out.bold = lvl.bold
+      src.bold = from
+    }
+    if (out.italic == null && lvl.italic != null) {
+      out.italic = lvl.italic
+      src.italic = from
+    }
     if (out.cap == null && lvl.cap != null) out.cap = lvl.cap
-    if (out.color == null && lvl.color != null) out.color = lvl.color
+    if (out.color == null && lvl.color != null) {
+      out.color = lvl.color
+      src.color = from
+    }
     if (out.shadow == null && lvl.shadow != null) out.shadow = lvl.shadow
-    if (out.latinFont == null && lvl.latinFont != null) out.latinFont = lvl.latinFont
+    if (out.latinFont == null && lvl.latinFont != null) {
+      out.latinFont = lvl.latinFont
+      if (lvl.latinFontRef != null) out.latinFontRef = lvl.latinFontRef
+      src.latinFont = from
+    }
     if (out.eaFont == null && lvl.eaFont != null) {
       out.eaFont = lvl.eaFont
       if (lvl.eaFontRef != null) out.eaFontRef = lvl.eaFontRef
+      src.eaFont = from
     }
-    if (out.csFont == null && lvl.csFont != null) out.csFont = lvl.csFont
+    if (out.csFont == null && lvl.csFont != null) {
+      out.csFont = lvl.csFont
+      src.csFont = from
+    }
     if (out.eaScript == null && lvl.eaScript != null) out.eaScript = lvl.eaScript
-    if (out.align == null && lvl.align != null) out.align = lvl.align
+    if (out.align == null && lvl.align != null) {
+      out.align = lvl.align
+      src.align = from
+    }
     if (out.bullet == null && lvl.bullet != null) out.bullet = lvl.bullet
     if (out.marL == null && lvl.marL != null) out.marL = lvl.marL
     if (out.indent == null && lvl.indent != null) out.indent = lvl.indent
@@ -619,6 +692,7 @@ export function mergeTextStyleChain(
       if (lvl.spaceAfterPct != null) out.spaceAfterPct = lvl.spaceAfterPct
     }
   }
+  if (Object.keys(src).length) out.src = src
   return any ? out : undefined
 }
 
@@ -636,9 +710,10 @@ function findInMap(
   // 1. Exact (type, idx)
   let hit = geo.find((e) => e.type === t && e.idx === i)
   if (hit) return hit.transform!
-  // 2. By idx (when idx is non-empty)
+  // 2. By idx (when idx is non-empty), skipping function placeholders so style and
+  //    geometry agree — see findStyleInMap
   if (i !== '') {
-    hit = geo.find((e) => e.idx === i)
+    hit = geo.find((e) => e.idx === i && !FUNCTION_TYPES.has(e.type))
     if (hit) return hit.transform!
   }
   // 3. By type

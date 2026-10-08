@@ -22,10 +22,47 @@ import {
   type TableStructureOp,
   type TableStyleEdit,
 } from '@genoffice/pptx-engine'
-import { editTableStyle } from '@genoffice/pptx-engine'
+import {
+  BUILTIN_TABLE_STYLES,
+  editTableStyle,
+  resolveBuiltinTableStyleId,
+} from '@genoffice/pptx-engine'
 import type { EditParagraph } from '../types'
 import { applyEditParagraphs, collectParagraphFormatPatches } from '../edit-text'
 import { GuidedError, register, resolveElement, type Op, type OpRecord } from './registry'
+
+/** PowerPoint's line weight ceiling. */
+const MAX_BORDER_WIDTH_PT = 1584
+
+/** Per-edit cell targets accepted by setTableStyle (a table is at most 50x50). */
+const MAX_TABLE_STYLE_CELLS = 4096
+
+function resolveStyleCells(raw: unknown): TableStyleEdit['cells'] | undefined {
+  if (raw == null) return undefined
+  if (!Array.isArray(raw)) {
+    throw new GuidedError(
+      'op "setTableStyle": cells must be an array of { "row": number, "col": number } pairs.',
+    )
+  }
+  if (raw.length > MAX_TABLE_STYLE_CELLS) {
+    throw new GuidedError(
+      `op "setTableStyle": cells takes at most ${MAX_TABLE_STYLE_CELLS} entries, got ${raw.length}.`,
+    )
+  }
+  return raw.map((entry, i) => {
+    if (typeof entry !== 'object' || entry === null) {
+      throw new GuidedError(`op "setTableStyle": cells[${i}] must be a { row, col } object.`)
+    }
+    const { row, col } = entry as { row?: unknown; col?: unknown }
+    if (!Number.isInteger(row) || !Number.isInteger(col)) {
+      throw new GuidedError(`op "setTableStyle": cells[${i}] row and col must be integers.`)
+    }
+    if ((row as number) < 0 || (col as number) < 0) {
+      throw new GuidedError(`op "setTableStyle": cells[${i}] row and col must be >= 0.`)
+    }
+    return { row: row as number, col: col as number }
+  })
+}
 
 register({
   name: 'setTableCell',
@@ -186,8 +223,13 @@ register({
 // preset clears direct cell formatting like PowerPoint's style gallery does.
 const HEX_RE = /^#[0-9A-Fa-f]{6}$/
 const STYLE_FIELDS = [
+  'styleId',
   'firstRow',
+  'lastRow',
+  'firstCol',
+  'lastCol',
   'bandRow',
+  'bandCol',
   'rtl',
   'shadingColor',
   'borderColor',
@@ -229,8 +271,20 @@ function resolveTableStyle(op: Op): ResolvedTableStyle {
   }
   if (!STYLE_FIELDS.some((f) => op[f] != null)) {
     throw new GuidedError(
-      'op "setTableStyle" needs "styleName" or at least one of firstRow, bandRow, shadingColor, borderColor, borderWidthPt, borderPreset.',
+      'op "setTableStyle" needs "styleName", "styleId" (a built-in style name or GUID) or at least one of firstRow, lastRow, firstCol, lastCol, bandRow, bandCol, shadingColor, borderColor, borderWidthPt, borderPreset.',
     )
+  }
+  let styleId: string | undefined
+  if (op.styleId != null) {
+    if (typeof op.styleId !== 'string' || !op.styleId.trim()) {
+      throw new GuidedError('op "setTableStyle": "styleId" must be a built-in style name or GUID.')
+    }
+    styleId = resolveBuiltinTableStyleId(op.styleId)
+    if (!styleId) {
+      throw new GuidedError(
+        `op "setTableStyle": unknown styleId "${op.styleId}". Built-in styles: ${BUILTIN_TABLE_STYLES.map((s) => s.name).join(', ')}.`,
+      )
+    }
   }
   if (
     op.shadingColor != null &&
@@ -242,15 +296,27 @@ function resolveTableStyle(op: Op): ResolvedTableStyle {
   if (op.borderColor != null && !HEX_RE.test(String(op.borderColor))) {
     throw new GuidedError('op "setTableStyle": borderColor must be #RRGGBB.')
   }
-  if (op.borderWidthPt != null && !(Number(op.borderWidthPt) > 0)) {
-    throw new GuidedError('op "setTableStyle": borderWidthPt must be a positive number.')
+  if (op.borderWidthPt != null) {
+    const w = Number(op.borderWidthPt)
+    if (!Number.isFinite(w) || w <= 0 || w > MAX_BORDER_WIDTH_PT) {
+      throw new GuidedError(
+        'op "setTableStyle": borderWidthPt must be a finite number > 0 and <= 1584.',
+      )
+    }
   }
   if (op.borderPreset != null && op.borderPreset !== 'all' && op.borderPreset !== 'none') {
     throw new GuidedError('op "setTableStyle": borderPreset must be "all" or "none".')
   }
   return {
     edit: {
+      ...(styleId ? { styleId } : {}),
+      // a gallery pick clears direct cell fills so the style shows, like the preset path
+      ...(styleId && op.keepFormatting !== true ? { clearDirectFormatting: true } : {}),
       ...(op.firstRow != null ? { firstRow: Boolean(op.firstRow) } : {}),
+      ...(op.lastRow != null ? { lastRow: Boolean(op.lastRow) } : {}),
+      ...(op.firstCol != null ? { firstCol: Boolean(op.firstCol) } : {}),
+      ...(op.lastCol != null ? { lastCol: Boolean(op.lastCol) } : {}),
+      ...(op.bandCol != null ? { bandCol: Boolean(op.bandCol) } : {}),
       ...(op.bandRow != null ? { bandRow: Boolean(op.bandRow) } : {}),
       ...(op.rtl != null ? { rtl: Boolean(op.rtl) } : {}),
       ...(op.shadingColor != null ? { shadingColor: String(op.shadingColor) } : {}),
@@ -259,7 +325,7 @@ function resolveTableStyle(op: Op): ResolvedTableStyle {
         ? { borderWidthEmu: Math.round(Number(op.borderWidthPt) * EMU_PER_PT) }
         : {}),
       ...(op.borderPreset != null ? { borderPreset: op.borderPreset as 'all' | 'none' } : {}),
-      ...(op.cells != null ? { cells: op.cells as TableStyleEdit['cells'] } : {}),
+      ...(op.cells != null ? { cells: resolveStyleCells(op.cells) } : {}),
     },
   }
 }

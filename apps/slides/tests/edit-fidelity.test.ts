@@ -83,8 +83,33 @@ describe('run fragmentation: layout fragments merge back into original runs by s
     expect(fragments.some((fragment) => fragment.style.width !== '')).toBe(true)
     releaseEditorLayoutConstraints(div)
     expect(
-      fragments.every((fragment) => fragment.style.width === '' && fragment.style.display === ''),
+      fragments.every(
+        (fragment) =>
+          fragment.style.width === '' &&
+          fragment.style.display === '' &&
+          fragment.style.whiteSpace === '',
+      ),
     ).toBe(true)
+  })
+
+  it('fixed-width cells never wrap inside themselves (contentEditable defaults to break-word)', () => {
+    const div = document.createElement('div')
+    populateEditorDom(
+      div,
+      layout([{ runs: [{ text: 'AI \u539f\u751f APP \u65ad\u5c42\u7b2c\u4e00', bold: true }] }])
+        .lines,
+    )
+    const cells = [...div.querySelectorAll<HTMLElement>('[data-layout-fragment]')].filter(
+      (f) => f.style.width !== '',
+    )
+    expect(cells.map((f) => f.textContent)).toContain('APP')
+    expect(cells.every((f) => f.style.whiteSpace === 'pre')).toBe(true)
+    const caret = document.createRange()
+    const app = cells.find((f) => f.textContent === 'APP')!
+    caret.setStart(app.firstChild!, 1)
+    caret.collapse(true)
+    releaseFragmentsAtEdit(div, [caret])
+    expect(app.style.whiteSpace).toBe('')
   })
 
   it('a collapsed-caret edit releases only the touched fragment and its neighbors', () => {
@@ -147,6 +172,28 @@ describe('run fragmentation: layout fragments merge back into original runs by s
     const out = roundTrip(paras, 90) // narrow box forces wrapping
     expect(out[0]!.runs).toHaveLength(1)
     expect(out[0]!.runs[0]!.text).toBe('Hello World Again')
+  })
+
+  it('restored wrap-swallowed spaces flow naturally, never inside a fixed-width fragment (words glued after reflow)', () => {
+    // The engine strips the space at each wrap point before measuring, so no fixed fragment
+    // advance accounts for it. A restored space baked into a fixed-width fragment renders
+    // zero-width once an edit reflows it mid-line ("scriptautant", "quevous").
+    const div = document.createElement('div')
+    document.body.appendChild(div)
+    populateEditorDom(
+      div,
+      layout([{ runs: [{ text: 'Hello World Again', fontSize: 18 }] }], 90).lines,
+    )
+    const fragments = [...div.querySelectorAll<HTMLElement>('[data-layout-fragment]')]
+    const restored = fragments.filter((f) => /^\s+$/.test(f.textContent ?? ''))
+    expect(restored.length).toBeGreaterThan(0) // the narrow box wrapped at least once
+    for (const f of restored) {
+      expect(f.style.width).toBe('')
+      expect(f.style.display).toBe('')
+    }
+    // and the text still round-trips losslessly through extraction
+    expect(extractParagraphs(div, 1)[0]!.runs[0]!.text).toBe('Hello World Again')
+    div.remove()
   })
 
   it('hard-wrapped long URL no longer gets spaces injected (historical bug: URL rewritten after one edit round-trip)', () => {
@@ -404,6 +451,60 @@ describe('applyEditParagraphs: srcPara/srcRun tracing + unedited fields preserve
     )
     expect(out3[0]!.runs[0]!.underline).toBe(false)
     expect(out3[0]!.runs[0]!.underlineExplicitNone).toBeUndefined()
+    // un-underlining a run that KEEPS its link must bake the explicit none in,
+    // or the reparse re-derives the link underline and the removal never sticks
+    const out4 = applyEditParagraphs(
+      [
+        {
+          runs: [
+            { text: 'l', underline: true, underlineImplicit: true, hyperlink: 'https://a.com' },
+          ],
+        },
+      ],
+      [
+        {
+          runs: [{ text: 'l', srcRun: 0, bold: false, italic: false, underline: false }],
+          srcPara: 0,
+        },
+      ],
+    )
+    expect(out4[0]!.runs[0]!.underline).toBe(false)
+    expect(out4[0]!.runs[0]!.underlineExplicitNone).toBe(true)
+    expect(out4[0]!.runs[0]!.underlineImplicit).toBeUndefined()
+    expect(out4[0]!.runs[0]!.hyperlink).toBe('https://a.com')
+    // same when the edit re-states the link explicitly (link kept, not removed)
+    const out5 = applyEditParagraphs(
+      [
+        {
+          runs: [
+            {
+              text: 'l',
+              underline: true,
+              underlineImplicit: true,
+              hyperlink: 'https://a.com',
+              hyperlinkRId: 'rId3',
+            },
+          ],
+        },
+      ],
+      [
+        {
+          runs: [
+            {
+              text: 'l',
+              srcRun: 0,
+              bold: false,
+              italic: false,
+              underline: false,
+              link: { kind: 'url', url: 'https://a.com' },
+            },
+          ],
+          srcPara: 0,
+        },
+      ],
+    )
+    expect(out5[0]!.runs[0]!.underline).toBe(false)
+    expect(out5[0]!.runs[0]!.underlineExplicitNone).toBe(true)
   })
 
   it('no srcPara/srcRun (newly typed paragraph) falls back to position without crashing', () => {

@@ -54,7 +54,9 @@ async function describe(path: string, ext: string, password?: string): Promise<D
     case 'txt':
       return describeText(path, ext)
     default:
-      throw new CliError(EXIT.usage, `unsupported file type: .${ext}`)
+      throw new CliError(EXIT.usage, `unsupported file type: .${ext}`, undefined, {
+        reason: 'unsupported',
+      })
   }
 }
 
@@ -114,12 +116,7 @@ async function describePdf(path: string, password?: string): Promise<Description
   const info = await pdfInfo(readInput(path), password)
   return {
     headline: info.pages === null ? 'encrypted (password required)' : `${info.pages} pages`,
-    fields: {
-      pages: info.pages,
-      encrypted: info.encrypted,
-      ...(info.producer ? { producer: info.producer } : {}),
-      ...(info.creator ? { creator: info.creator } : {}),
-    },
+    fields: { ...info },
   }
 }
 

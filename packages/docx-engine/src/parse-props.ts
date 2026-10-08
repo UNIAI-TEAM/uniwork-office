@@ -34,11 +34,13 @@ import type {
   ThemeFonts,
 } from './types'
 import { resolveThemeColor } from './theme'
+import { isOn } from './checkbox-control'
 
 /** No run un-hides itself and nothing anchors here (bookmarks, comments, sectPr,
  *  drawings, numbering): safe to collapse a style-vanished paragraph entirely */
 export function staysVanished(xml: string): boolean {
-  if (/<w:vanish\s[^>]*w:val="(?:0|false|off)"/.test(xml)) return false
+  if (/<w:vanish\s[^>]*w:val=(?:"(?:0|false|none|off)"|'(?:0|false|none|off)')/i.test(xml))
+    return false
   return !/<w:(?:drawing|pict|object|sectPr|bookmarkStart|commentRangeStart|commentRangeEnd|numPr)[\s/>]/.test(
     xml,
   )
@@ -49,15 +51,19 @@ export function staysVanished(xml: string): boolean {
  *  w:pPr is skipped so tab-stop definitions (w:tabs > w:tab) don't count. */
 const LAYOUT_RUN_CONTENT = /^w:(?:br|cr|tab|sym|footnoteReference|endnoteReference)$/
 
-export function hasLayoutRunContent(node: XNode): boolean {
+export function hasLayoutRunContent(node: XNode, pattern = LAYOUT_RUN_CONTENT): boolean {
   for (const child of childrenOf(node)) {
     const name = nameOf(child)
     if (name === 'w:pPr' || name === 'w:rPr') continue
-    if (name !== undefined && LAYOUT_RUN_CONTENT.test(name)) return true
-    if (hasLayoutRunContent(child)) return true
+    if (name !== undefined && pattern.test(name)) return true
+    if (hasLayoutRunContent(child, pattern)) return true
   }
   return false
 }
+
+/** layout run content other than line/page/column breaks */
+export const LAYOUT_RUN_CONTENT_BESIDES_BREAKS =
+  /^w:(?:cr|tab|sym|footnoteReference|endnoteReference)$/
 
 /**
  * Cross-paragraph comment range endpoints: comment ids where only one end falls in this
@@ -70,8 +76,8 @@ export function crossParaCommentMarkers(xml: string): {
   commentEnds: string[] | undefined
 } {
   const ids = (re: RegExp) => [...xml.matchAll(re)].map((m) => m[1])
-  const starts = ids(/<w:commentRangeStart [^>]*w:id="([^"]+)"/g)
-  const ends = ids(/<w:commentRangeEnd [^>]*w:id="([^"]+)"/g)
+  const starts = ids(/<w:commentRangeStart\b[^>]*\bw:id\s*=\s*["']([^"']+)["']/g)
+  const ends = ids(/<w:commentRangeEnd\b[^>]*\bw:id\s*=\s*["']([^"']+)["']/g)
   const onlyStarts = starts.filter((id) => !ends.includes(id))
   const onlyEnds = ends.filter((id) => !starts.includes(id))
   return {
@@ -87,8 +93,8 @@ export function bookmarkNamesOf(xml: string): {
 } {
   const names: string[] = []
   const hidden: string[] = []
-  for (const m of xml.matchAll(/<w:bookmarkStart [^>]*w:name="([^"]+)"/g)) {
-    const name = decodeEntities(m[1])
+  for (const m of xml.matchAll(/<w:bookmarkStart [^>]*w:name=(?:"([^"]+)"|'([^']+)')/g)) {
+    const name = decodeEntities(m[1] ?? m[2] ?? '')
     // A _ prefix marks Word internal bookmarks (_Ref/_Toc/_Hlk): hidden from the UI, but
     // they must be re-emitted when the paragraph rebuilds, otherwise REF cross-references
     // and TOC anchors pointing at them break
@@ -264,6 +270,11 @@ export const JC_ALIGN: Record<string, ParaFormat['align']> = {
   right: 'right',
   end: 'right',
   both: 'justify',
+  // kashida/Thai justification variants: plain justify for non-Arabic/Thai text
+  lowKashida: 'justify',
+  mediumKashida: 'justify',
+  highKashida: 'justify',
+  thaiDistribute: 'justify',
   distribute: 'distribute',
 }
 
@@ -345,7 +356,20 @@ export function ptabDisplayStops(pNode: XNode): import('./types').TabStop[] {
 /** paragraphs whose only fields are XE / REF stay editable (extractRuns round-trips them) */
 /** Simple instructions foldable into an editable inline-field run (the cached result is the display text) */
 export const SIMPLE_INLINE_FIELD_RE =
-  /^\s*(DATE|TIME|CREATEDATE|SAVEDATE|NUMPAGES|FILENAME|AUTHOR|PAGE)\b/
+  /^\s*(DATE|TIME|CREATEDATE|SAVEDATE|NUMPAGES|FILENAME|AUTHOR|PAGEREF|PAGE)\b/
+
+/** every fldChar closes inside the paragraph: a stray end (the last TOC entry
+ *  carries the TOC field's end) or an unclosed begin must stay byte-preserved */
+export function fieldCharsBalanced(xml: string): boolean {
+  let depth = 0
+  const re = /<w:fldChar\b[^>]*\bw:fldCharType=(?:"(begin|end)"|'(begin|end)')/g
+  let m: RegExpExecArray | null
+  while ((m = re.exec(xml)) !== null) {
+    if ((m[1] ?? m[2]) === 'begin') depth++
+    else if (--depth < 0) return false
+  }
+  return depth === 0
+}
 
 /** Zotero Word fields. Their cached result is the visible citation/bibliography text. */
 export const ZOTERO_INLINE_FIELD_RE = /^\s*(?:ADDIN\s+)?(?:ZOTERO_|CSL_)(?:ITEM|BIBL|TEMP)\b/i
@@ -379,6 +403,7 @@ export function onlyXeFields(xml: string): boolean {
   if (simple.some((instr) => instr === undefined)) return false
   const instrs = xml.match(/<w:instrText[^>]*>[\s\S]*?<\/w:instrText>/g) ?? []
   if (instrs.length === 0 && simple.length === 0) return false
+  if (!fieldCharsBalanced(xml)) return false
   const simpleOk = simple.every((raw) => {
     const text = decodeEntities(raw!)
     return /^\s*XE[\s"]/.test(text) || /^\s*REF\s/.test(text) || SIMPLE_INLINE_FIELD_RE.test(text)
@@ -417,7 +442,7 @@ export function checkboxStateOf(beginRun: XNode | null): { checked: boolean } | 
   const state = findChild(box, 'w:checked') ?? findChild(box, 'w:default')
   if (!state) return { checked: false }
   const val = attrsOf(state)['w:val']
-  return { checked: val === undefined || val === '1' || val === 'true' || val === 'on' }
+  return { checked: isOn(val) }
 }
 
 /**
@@ -623,6 +648,13 @@ export function spaceOnlyRuns(runs: ReadonlyArray<{ text: string }>): boolean {
   return runs.length > 0 && runs.every((r) => SPACE_ONLY_RE.test(r.text))
 }
 
+const BREAK_ONLY_RE = /^[\f\v \u00a0\u3000]*$/
+
+/** every run is page/column breaks (\f / \v) or spaces, at least one break */
+export function breakOnlyRuns(runs: ReadonlyArray<{ text: string }>): boolean {
+  return runs.every((r) => BREAK_ONLY_RE.test(r.text)) && runs.some((r) => /[\f\v]/.test(r.text))
+}
+
 export const IMAGE_RUN_CHILDREN = new Set([
   'w:drawing',
   'w:pict',
@@ -820,21 +852,23 @@ export function themedRFonts(
   const themedEa = themeVal(eaRef)
   const eaSlotEmpty =
     !themedEa && !!fonts && (eaRef === 'majorEastAsia' || eaRef === 'minorEastAsia')
-  // an empty cs slot likewise keeps the theme's authority over the literal
-  const themedOrEmptyCs = (ref: string | undefined): string | undefined => {
+  // an empty cs or EA slot likewise keeps the theme's authority over the
+  // literal: a Latin slot pointing at minorEastAsia renders the language
+  // default EA face (Word probe 2026-09-17: MS Mincho digits under ja-JP)
+  const themedOrEmptySlot = (ref: string | undefined): string | undefined => {
     const themed = themeVal(ref)
-    if (themed) return themed
-    return fonts && (ref === 'majorBidi' || ref === 'minorBidi')
-      ? emptyCsSlotFont(fonts, ref)
-      : undefined
+    if (themed || !fonts) return themed
+    if (ref === 'majorBidi' || ref === 'minorBidi') return emptyCsSlotFont(fonts, ref)
+    if (ref === 'majorEastAsia' || ref === 'minorEastAsia') return emptyEaSlotFont(fonts, ref)
+    return undefined
   }
-  const themedAscii = themedOrEmptyCs(attrs['w:asciiTheme'])
-  const themedHAnsi = themedOrEmptyCs(attrs['w:hAnsiTheme'])
+  const themedAscii = themedOrEmptySlot(attrs['w:asciiTheme'])
+  const themedHAnsi = themedOrEmptySlot(attrs['w:hAnsiTheme'])
   return {
     ascii: themedAscii ?? attrs['w:ascii'],
     hAnsi: themedHAnsi ?? attrs['w:hAnsi'],
     eastAsia: themedEa ?? (eaSlotEmpty ? emptyEaSlotFont(fonts!, eaRef) : attrs['w:eastAsia']),
-    cs: themedOrEmptyCs(attrs['w:cstheme']) ?? attrs['w:cs'],
+    cs: themedOrEmptySlot(attrs['w:cstheme']) ?? attrs['w:cs'],
     ...(eaSlotEmpty ? { eaSlotEmpty } : {}),
     themed: {
       ascii: themedAscii !== undefined,
@@ -849,7 +883,7 @@ export function themedRFonts(
  *  w:document/w:hdr instead of per element; Word honors the inheritance) */
 export function partXmlSpacePreserve(partXml: string, rootTag: string): boolean {
   const open = new RegExp(`<${rootTag}(\\s[^>]*)?>`).exec(partXml)?.[1] ?? ''
-  return /\sxml:space="preserve"/.test(open)
+  return /\sxml:space=(?:"preserve"|'preserve')/.test(open)
 }
 
 export function mergeRuns(runs: Run[]): Run[] {
@@ -889,6 +923,7 @@ function sameStyle(a: Run, b: Run): boolean {
     a.vertAlign === b.vertAlign &&
     (a.link?.href ?? '') === (b.link?.href ?? '') &&
     (a.link?.rId ?? '') === (b.link?.rId ?? '') &&
+    (a.link?.plain ?? false) === (b.link?.plain ?? false) &&
     (a.commentIds ?? []).join(',') === (b.commentIds ?? []).join(',') &&
     sameRevision(a.ins, b.ins) &&
     sameRevision(a.del, b.del)
@@ -993,7 +1028,10 @@ function borderLinesOf(node: XNode | undefined, withInside: boolean): TableBorde
     'w:right': 'right',
     'w:start': 'left',
     'w:end': 'right',
-    ...(withInside ? { 'w:insideH': 'insideH', 'w:insideV': 'insideV' } : {}),
+    // the diagonals are cell-level only (CT_TblBorders has no tl2br/tr2bl child)
+    ...(withInside
+      ? { 'w:insideH': 'insideH', 'w:insideV': 'insideV' }
+      : { 'w:tl2br': 'tl2br', 'w:tr2bl': 'tr2bl' }),
   }
   const borders: TableBorders = {}
   for (const [tag, side] of Object.entries(ALIAS)) {
@@ -1034,11 +1072,12 @@ export function paraBorderSidesOf(
     if (!el) continue
     const a = attrsOf(el)
     const val = a['w:val']
+    const line: ParaBorderLine = {}
     if (val === 'none' || val === 'nil') {
-      sides[ch] = null
+      const space = parseInt(a['w:space'] ?? '', 10)
+      sides[ch] = Number.isFinite(space) && space > 0 ? { none: true, spacePt: space } : null
       continue
     }
-    const line: ParaBorderLine = {}
     const themed =
       theme && a['w:themeColor']
         ? resolveThemeColor(a['w:themeColor'], theme, a['w:themeTint'], a['w:themeShade'])
@@ -1055,18 +1094,18 @@ export function paraBorderSidesOf(
 }
 
 /** model form of the sides: drawn "tblr" subset + declared look, reset sides apart */
-export function paraBordersOf(
-  sides: ParaBorderSides,
-): Pick<ParaFormat, 'borders' | 'borderLines' | 'borderReset'> {
-  const out: Pick<ParaFormat, 'borders' | 'borderLines' | 'borderReset'> = {}
+export function paraBordersOf(sides: ParaBorderSides): ParaBorderModel {
+  const out: ParaBorderModel = {}
   let borders = ''
   let reset = ''
   const lines: NonNullable<ParaFormat['borderLines']> = {}
+  const pad: NonNullable<ParaFormat['borderPad']> = {}
   for (const ch of ['t', 'b', 'l', 'r'] as const) {
     const line = sides[ch]
     if (line === undefined) continue
-    if (line === null) {
+    if (line === null || line.none) {
       reset += ch
+      if (line?.spacePt) pad[ch] = line.spacePt
       continue
     }
     borders += ch
@@ -1076,8 +1115,14 @@ export function paraBordersOf(
   if (borders) out.borders = borders
   if (borders && Object.keys(lines).length > 0) out.borderLines = lines
   if (reset) out.borderReset = reset
+  if (Object.keys(pad).length > 0) out.borderPad = pad
   return out
 }
+
+export type ParaBorderModel = Pick<
+  ParaFormat,
+  'borders' | 'borderLines' | 'borderReset' | 'borderPad'
+>
 
 /**
  * Word merges pBdr per side: every side the direct pPr declares (drawn or reset)
@@ -1086,16 +1131,21 @@ export function paraBordersOf(
  */
 export function mergeStyleBorders(
   sides: ParaBorderSides,
-  direct: Pick<ParaFormat, 'borders' | 'borderLines' | 'borderReset'> | undefined,
-): Pick<ParaFormat, 'borders' | 'borderLines'> {
+  direct: ParaBorderModel | undefined,
+): Pick<ParaFormat, 'borders' | 'borderLines' | 'borderPad'> {
   const declared = `${direct?.borders ?? ''}${direct?.borderReset ?? ''}`
   const merged: ParaBorderSides = {}
   for (const ch of ['t', 'b', 'l', 'r'] as const) {
     if (direct?.borders?.includes(ch)) merged[ch] = direct.borderLines?.[ch] ?? {}
+    else if (direct?.borderPad?.[ch]) merged[ch] = { none: true, spacePt: direct.borderPad[ch] }
     else if (sides[ch] && !declared.includes(ch)) merged[ch] = sides[ch]
   }
-  const { borders, borderLines } = paraBordersOf(merged)
-  return { ...(borders ? { borders } : {}), ...(borderLines ? { borderLines } : {}) }
+  const { borders, borderLines, borderPad } = paraBordersOf(merged)
+  return {
+    ...(borders ? { borders } : {}),
+    ...(borderLines ? { borderLines } : {}),
+    ...(borderPad ? { borderPad } : {}),
+  }
 }
 
 /** Duplicated border containers (two w:tcBorders in one tcPr etc.): Word merges per side, later wins */

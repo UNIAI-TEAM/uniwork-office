@@ -6,6 +6,7 @@ import {
   coverageGaps,
   groupRowRuns,
   measureWrapAutoFitRows,
+  measureWrapRowsFromCells,
   numericWrapOverride,
   resetStaleWrapAutoHeights,
   takeContaminatedRows,
@@ -525,8 +526,19 @@ describe('merged wrap cells and stale auto heights (prod_100 shape)', () => {
       }),
     } as never
     // Queued pre-Rendered measure must lose the reset rows or the lifecycle
-    // flush re-poisons them (bugbot).
+    // flush re-poisons them.
     wrapMeasureGate.pending.push({ worksheet, rows: [0, 1, 3], keepTaller: true })
+    // A chunk-payload measure waiting on the gate purges the same way.
+    wrapMeasureGate.ready = false
+    const fromCells = {
+      cells: [],
+      styles: [],
+      merges: undefined,
+      inheritedWrap: () => false,
+      defaultRowHeightPx: 20,
+    }
+    measureWrapRowsFromCells(worksheet, [1, 4], fromCells)
+    wrapMeasureGate.ready = true
     resetStaleWrapAutoHeights(
       runtime,
       'file-x',
@@ -535,7 +547,7 @@ describe('merged wrap cells and stale auto heights (prod_100 shape)', () => {
       [
         { row: 5, height: 22, customHeight: true },
         // Cached ht without customHeight stays auto mode: a poisoned merged
-        // measure on such a row must reset too (bugbot).
+        // measure on such a row must reset too.
         { row: 6, height: 30, customHeight: false },
         // Sub-default spacer rows keep their stored height verbatim.
         { row: 7, height: 8, customHeight: false },
@@ -556,6 +568,9 @@ describe('merged wrap cells and stale auto heights (prod_100 shape)', () => {
         },
       ],
     ])
+    const queuedFromCells = wrapMeasureGate.pending.pop()
+    expect(queuedFromCells?.rows).toEqual([4])
+    expect(queuedFromCells?.fromCells).toBe(fromCells)
     expect(wrapMeasureGate.pending.pop()?.rows).toEqual([3])
   })
 

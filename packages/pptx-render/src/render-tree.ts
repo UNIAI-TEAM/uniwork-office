@@ -12,7 +12,7 @@
  */
 import type { Fill, Stroke } from '@genoffice/pptx-engine'
 import type { PlacedBox } from './coords'
-import type { ExtrusionFaceRender } from './scene3d'
+import type { ExtrusionRender } from './scene3d'
 
 export type RenderNodeType =
   | 'shape' // vector shape (may contain text)
@@ -328,7 +328,7 @@ export interface ShapeRenderNode extends RenderNodeBase {
   glow?: RenderGlow
   reflection?: RenderReflection
   /** scene3d+sp3d extrusion: pre-projected shaded faces (painter order) replacing the flat geometry */
-  extrusion?: { faces: ExtrusionFaceRender[]; wireframe?: boolean }
+  extrusion?: ExtrusionRender
   text?: RenderTextLayout
 }
 
@@ -401,6 +401,8 @@ export interface TableCellRender {
   fill: RenderFill
   /** Border lines on the four sides (default none) */
   borders?: { l?: RenderStroke; r?: RenderStroke; t?: RenderStroke; b?: RenderStroke }
+  /** <a:cell3D> bevel bands drawn over the (already darkened) fill */
+  bevel?: import('./cell-bevel').CellBevelRender
   text?: RenderTextLayout
 }
 
@@ -430,8 +432,14 @@ export interface ChartLabel {
   color: string
   bold?: boolean
   italic?: boolean
+  /** Chart text typeface (ChartModel.fontFamily); unset = the renderer's Calibri stack */
+  fontFamily?: string
   /** Rotation angle (e.g. -90 for a value-axis title) */
   rotationDeg?: number
+  /** Data-label box (c:dLbls/c:spPr): fill / outline color and the measured text width it wraps */
+  fill?: string
+  stroke?: string
+  w?: number
 }
 
 /** Current chart style (for the Ribbon "Chart Design" display; kind aligns with EditChartOp.kind). */
@@ -498,7 +506,7 @@ export interface ChartRenderNode extends RenderNodeBase {
   /** Tick / category / legend / axis-title text */
   labels: ChartLabel[]
   /** Bars */
-  bars: Array<{ x: number; y: number; w: number; h: number; color: string }>
+  bars: Array<{ x: number; y: number; w: number; h: number; color: string; fill?: RenderFill }>
   /** Polylines (points is flat [x0,y0,x1,y1,...]); closed+fill for filled radar charts etc. */
   polylines: Array<{
     points: number[]
@@ -553,6 +561,8 @@ export interface RenderSlide {
   nodes: RenderNode[]
   /** Hidden slide (<p:sld show="0">): thumbnails get a badge, skipped during presentation */
   hidden?: boolean
+  /** Slide part path (ppt/slides/slideN.xml): stable identity across insert/delete/reorder */
+  partPath?: string
 }
 
 // Convenience type re-exports (for internal render logic)

@@ -142,6 +142,7 @@ export const es = {
   aiClarifyOther: 'Otro (escríbelo)',
   aiClarifySkip: 'Omitir encuesta',
   aiClarifyNext: 'Siguiente',
+  aiClarifyPrev: 'Anterior',
   aiClarifySubmit: 'Generar',
   aiSumReadAttachment: 'Leer datos adjuntos',
   aiSumReadAttachmentName: 'Leer archivo adjunto {name}',
@@ -230,4 +231,5 @@ export const es = {
   aiSumSaveTemplate: 'Plantilla de estilo "{name}" guardada',
   aiSumTemplatesEmpty: 'Plantillas de estilo (vacío)',
   aiSumListTemplates: 'Se enumeraron {count} plantillas de estilo',
+  aiPageCloudToLocal: 'Nube no disponible — generado localmente',
 } satisfies Record<keyof typeof zh, string>

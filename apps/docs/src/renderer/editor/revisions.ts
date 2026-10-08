@@ -47,7 +47,7 @@ export const TRACK_IGNORE = 'trackIgnore'
 
 const TRACKED_FORMAT_MARKS = new Set(['bold', 'italic', 'underline', 'strike', 'docTextStyle'])
 
-const TEXT_STYLE_FIELDS = [
+export const TEXT_STYLE_FIELDS = [
   'color',
   'sizeHalfPoints',
   'font',
@@ -60,7 +60,7 @@ const TEXT_STYLE_FIELDS = [
 ] as const
 
 const PARAGRAPH_NODE_TYPES = new Set(['docParagraph', 'docHeading', 'docListItem'])
-const PARAGRAPH_FORMAT_FIELDS = [
+export const PARAGRAPH_FORMAT_FIELDS = [
   'align',
   'lineSpacing',
   'lineRule',
@@ -266,7 +266,11 @@ function stripTrackMarker(raw: string | null, tag: string, container: string): s
   return out
 }
 
-function applyRevisions(editor: Editor, ranges: RevisionRange[], mode: 'accept' | 'reject'): void {
+export function applyRevisions(
+  editor: Editor,
+  ranges: RevisionRange[],
+  mode: 'accept' | 'reject',
+): void {
   if (ranges.length === 0) return
   const { state } = editor
   const tr = state.tr
@@ -531,23 +535,31 @@ export function rejectCurrentRevision(editor: Editor): boolean {
   return true
 }
 
-/** move the selection to the next / previous revision (wraps around) */
-export function gotoRevision(editor: Editor, dir: 1 | -1): boolean {
+/** the next / previous revision after the selection (wraps around) */
+export function nextRevision(editor: Editor, dir: 1 | -1): RevisionRange | null {
   const ranges = collectRevisions(editor.state.doc)
-  if (ranges.length === 0) return false
+  if (ranges.length === 0) return null
   // compare range starts so adjacent revisions (shared boundary) still advance
   const anchor = editor.state.selection.from
-  const target =
-    dir === 1
-      ? (ranges.find((r) => r.from > anchor) ?? ranges[0])
-      : ([...ranges].reverse().find((r) => r.from < anchor) ?? ranges[ranges.length - 1])
+  return dir === 1
+    ? (ranges.find((r) => r.from > anchor) ?? ranges[0])
+    : ([...ranges].reverse().find((r) => r.from < anchor) ?? ranges[ranges.length - 1])
+}
+
+export function selectRevision(editor: Editor, target: RevisionRange): void {
   const tr = editor.state.tr
   // between: row/cell-level revision range endpoints are not text positions; snap to the nearest selectable text position
   tr.setSelection(TextSelection.between(tr.doc.resolve(target.from), tr.doc.resolve(target.to)))
   tr.scrollIntoView()
   tr.setMeta(TRACK_IGNORE, true)
   editor.view.dispatch(tr)
-  return true
+}
+
+/** move the selection to the next / previous revision (wraps around) */
+export function gotoRevision(editor: Editor, dir: 1 | -1): RevisionRange | null {
+  const target = nextRevision(editor, dir)
+  if (target) selectRevision(editor, target)
+  return target
 }
 
 export interface TrackChangesStorage {

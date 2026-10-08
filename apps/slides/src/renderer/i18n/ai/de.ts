@@ -143,6 +143,7 @@ export const de = {
   aiClarifyOther: 'Sonstiges (eingeben)',
   aiClarifySkip: 'Umfrage überspringen',
   aiClarifyNext: 'Weiter',
+  aiClarifyPrev: 'Zurück',
   aiClarifySubmit: 'Generieren',
   aiSumReadAttachment: 'Anlage gelesen',
   aiSumReadAttachmentName: 'Anlage {name} gelesen',
@@ -231,4 +232,5 @@ export const de = {
   aiSumSaveTemplate: 'Stilvorlage „{name}“ gespeichert',
   aiSumTemplatesEmpty: 'Stilvorlagen (leer)',
   aiSumListTemplates: '{count} Stilvorlagen aufgelistet',
+  aiPageCloudToLocal: 'Cloud nicht verfügbar — lokal generiert',
 } satisfies Record<keyof typeof zh, string>

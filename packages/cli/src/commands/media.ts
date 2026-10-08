@@ -1,5 +1,6 @@
+import { dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { analyzeMediaTool } from '@genoffice/ai-search'
+import { analyzeMediaTool, localMediaRoots } from '@genoffice/ai-search'
 import { flagString } from '../args'
 import { aiSettingsPath, prepareCloud } from '../cloud'
 import { resolveInput } from '../fs'
@@ -18,16 +19,30 @@ export const mediaCommand: CommandDef = {
   ],
   async run(args, ctx) {
     const ref = args.positionals[0]
-    if (!ref) throw new CliError(EXIT.usage, 'missing <file|url>')
+    if (!ref)
+      throw new CliError(EXIT.usage, 'missing <file|url>', undefined, {
+        reason: 'missing_argument',
+      })
     const target = /^https?:\/\//i.test(ref)
       ? ref
       : resolveInput(ref.startsWith('file:') ? fileURLToPath(ref) : ref, ctx)
     await prepareCloud(ctx.env)
-    const r = await analyzeMediaTool(aiSettingsPath(ctx.env), {
-      mediaUrls: [target],
-      requirements: flagString(args, 'ask') ?? DEFAULT_ASK,
-    })
-    if (r.text === undefined) throw new CliError(EXIT.app, r.error ?? 'media analysis failed')
+    // the user named this file on the command line, so its own directory is the
+    // allowlist: an http(s) target is fetched remotely and has no local root
+    const mediaRoots = localMediaRoots(/^https?:\/\//i.test(target) ? undefined : dirname(target))
+    const r = await analyzeMediaTool(
+      aiSettingsPath(ctx.env),
+      {
+        mediaUrls: [target],
+        requirements: flagString(args, 'ask') ?? DEFAULT_ASK,
+      },
+      { mediaRoots },
+    )
+    if (r.text === undefined)
+      throw new CliError(EXIT.app, r.error ?? 'media analysis failed', undefined, {
+        suggestion:
+          'retry once later; if it persists, check the UniWork login in the UniWork Office app or configure a BYOK analysis provider under Settings (AI Media)',
+      })
     const failure = providerFailure(r.text)
     if (failure) throw new CliError(EXIT.conversion, `media analysis failed: ${failure}`)
     const text = analysisText(r.text)

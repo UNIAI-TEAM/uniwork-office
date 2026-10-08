@@ -1,7 +1,7 @@
 import { OPENROUTER_API_BASE } from './openrouter'
 import { ANTHROPIC_BASE_URL } from './protocols/anthropic'
 import { GEMINI_BASE_URL } from './protocols/gemini'
-import { AI_PROVIDERS } from './providers'
+import { AI_PROVIDERS, DEEPSEEK_V41_FLASH } from './providers'
 import type { AiProviderConfig, AiProviderId, AiProviderMeta } from './types'
 
 /** Wire protocols every provider maps onto, including the official Codex app-server bridge. */
@@ -23,6 +23,8 @@ export interface ResolvedEndpoint {
   useMaxCompletionTokens?: boolean
   /** vendor-specific request fields merged into the chat-completions body */
   bodyExtras?: Record<string, unknown>
+  /** id to put on the wire when the vendor spells the configured model differently */
+  model?: string
 }
 
 export interface ProviderAdapter {
@@ -40,45 +42,55 @@ function metaOf(id: AiProviderId): AiProviderMeta {
  * Model families that fix sampling and reject a temperature field, on any
  * route — vendor API, the Genspark proxy, OpenRouter's vendor-prefixed ids,
  * or a mirror behind a custom base URL. Kimi K3 answers "only 1 is allowed";
- * OpenAI's GPT-5 reasoning family rejects any temperature other than the
- * default outright, and the o-series reasoning models (o1/o3/o4) likewise
+ * OpenAI's GPT-5 and GPT-6 reasoning families reject any temperature other
+ * than the default outright, and the o-series reasoning models (o1/o3/o4) likewise
  * only accept the default. Google's Gemini 3 docs strongly recommend keeping
  * the default temperature of 1.0 for the whole Gemini 3 family, since lower
  * values may cause looping or degraded reasoning, so our hard-coded 0.3
  * must not be sent there either.
  */
 export function modelHasFixedSampling(model: string): boolean {
-  return /(^|\/)(kimi-k3|gpt-5|gemini-3|o1(-mini|-preview)?|o3(-mini)?|o4-mini)/i.test(model)
+  return /(^|\/)(kimi-k3([^\w]|$)|gpt-[5-9]([^\w]|$)|gemini-3([^\w]|$)|o1(-mini|-preview)?([^\w]|$)|o3(-mini)?([^\w]|$)|o4-mini([^\w]|$))/i.test(
+    model,
+  )
 }
 
 /**
  * Model ids that reject image input even under a vision-capable provider.
- * DeepSeek V4 Pro and Flash are text-only; their -vision* branches are
- * excluded so the direct Vision Exp model can receive screenshots.
+ * DeepSeek V4 Pro and V4 Flash are text-only; V4.1 Flash and the -vision*
+ * branches take images, so they fall through and receive screenshots.
+ * Ling and LongCat are the same shape: only `Ling-3.0-flash-VL` and
+ * `LongCat-2.5-Preview` take images; a text-only id added to either provider
+ * must be added here too.
  */
 export function modelLacksVision(model: string): boolean {
-  return /(^|\/)deep-?seek-v4-(?:pro(?:$|-)|flash(?!-vision))/.test(model)
+  // MiniMax-M2.7 remains text-only when MiniMax-M3 enables provider vision.
+  if (/(^|\/)minimax-m2\.7($|-)/i.test(model)) return true
+  return (
+    /(^|\/)deep-?seek-v4-(?:pro(?:$|-)|flash(?!-vision))/i.test(model) ||
+    /(^|\/)(?:ling-(?:3\.0-flash(?!-vl)|3\.0-tiny|2\.6-1t|2\.6-flash)|ring-2\.6-1t|longcat-2\.0(?:$|-))/i.test(
+      model,
+    )
+  )
 }
 
 /**
  * Interleaved-thinking families whose vendors want the reasoning echoed back
  * on assistant messages: MiniMax documents that stripping it degrades
  * multi-turn tool use, and DeepSeek V4 rejects tool turns without it. Gated
- * per model because other vendors may reject the unknown field.
+ * per model because other vendors may reject the unknown field. Hunyuan joins
+ * them because hy4-preview ships deep thinking on by default, so its first
+ * turn already carries `reasoning_content`.
  */
 export function modelEchoesReasoning(model: string): boolean {
-  return /(^|\/)(minimax-m|deep-?seek-v4)/i.test(model)
+  return /(^|\/)(minimax-m|deep-?seek-(v4|flash)|hy-?[34]([^\w]|$))/i.test(model)
 }
 
 /**
- * DeepSeek V4 thinks by default, and once a request carries `tools` the API
- * rejects (400) every later turn whose assistant messages don't echo back the
- * `reasoning_content` it produced. Our OpenAI-compatible transcript has no
- * field to carry that, so the agent loop would die right after its first tool
- * call. Pin the models to non-thinking mode — what the retired deepseek-chat
- * alias did — until the transcript can round-trip reasoning.
+ * The direct API 400s on the versioned pool spelling we list (verified
+ * 2026-09-21: GET /v1/models serves only `deepseek-flash` and `deepseek-v4-pro`).
  */
-const DEEPSEEK_NON_THINKING = { thinking: { type: 'disabled' } }
+const DEEPSEEK_WIRE_IDS: Record<string, string> = { [DEEPSEEK_V41_FLASH]: 'deepseek-flash' }
 
 /**
  * OpenCode Zen / Go (opencode.ai) are protocol passthrough gateways: each
@@ -94,22 +106,68 @@ const OPENCODE_GATEWAY_ROOTS = {
   go: 'https://opencode.ai/zen/go',
 } as const
 
+/**
+ * Stored provider settings are user data: a custom base URL must be a
+ * bounded http(s) URL. Anything else (file:/javascript: schemes, megabyte
+ * strings) would misroute gateway traffic or overflow request builders.
+ *
+ * A query string is kept — Azure-style bases pin `?api-version=…` and
+ * gateways pin a version there — while the fragment is dropped (it is never
+ * sent to the server, and leaving it on would truncate every composed
+ * endpoint path). Embedded credentials are refused outright: they would end
+ * up in request logs and error messages, and the api key field is the
+ * supported place for them.
+ */
+export function normalizeBaseUrl(raw: string | undefined, fallback: string): string {
+  const candidate = (raw ?? fallback).trim()
+  if (candidate === '' || candidate.length > 2048) {
+    throw new Error('Base URL must be a non-empty http(s) URL under 2048 characters')
+  }
+  let parsed: URL
+  try {
+    parsed = new URL(candidate)
+  } catch {
+    throw new Error('Base URL must be a valid http(s) URL')
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error('Base URL must use http or https')
+  }
+  if (parsed.username || parsed.password) {
+    throw new Error('Base URL must not embed credentials; put the key in the API key field')
+  }
+  parsed.hash = ''
+  return parsed.toString()
+}
+
+/** Strip trailing slashes and a trailing /v1 from the path (before any query) */
+function stripTrailingV1(base: string): string {
+  const q = base.indexOf('?')
+  const path = (q === -1 ? base : base.slice(0, q)).replace(/\/+$/, '').replace(/\/v1$/, '')
+  return q === -1 ? path : `${path}${base.slice(q)}`
+}
+
+/** Append a path segment before any query string so `?api-version=…` stays last */
+function appendPath(base: string, path: string): string {
+  const q = base.indexOf('?')
+  return q === -1 ? `${base}${path}` : `${base.slice(0, q)}${path}${base.slice(q)}`
+}
+
 function opencodeEndpoint(
   root: string,
   routes: { anthropic: RegExp; gemini?: RegExp },
 ): (config: AiProviderConfig) => ResolvedEndpoint {
   return (config) => {
     // a stored base URL replaces the gateway root; the documented `/v1` API base is tolerated
-    const base = (config.baseUrl || root).replace(/\/+$/, '').replace(/\/v1$/, '')
+    const base = stripTrailingV1(normalizeBaseUrl(config.baseUrl, root))
+    const model = config.model ?? ''
     const omit =
-      modelHasFixedSampling(config.model) || config.model.toLowerCase().startsWith('kimi-')
+      model !== '' && (modelHasFixedSampling(model) || model.toLowerCase().startsWith('kimi-'))
     const sampling = omit ? { omitTemperature: true as const } : {}
-    if (routes.anthropic.test(config.model))
-      return { protocol: 'anthropic', baseUrl: base, ...sampling }
-    if (routes.gemini?.test(config.model)) {
-      return { protocol: 'gemini', baseUrl: `${base}/v1`, ...sampling }
+    if (routes.anthropic.test(model)) return { protocol: 'anthropic', baseUrl: base, ...sampling }
+    if (routes.gemini?.test(model)) {
+      return { protocol: 'gemini', baseUrl: appendPath(base, '/v1'), ...sampling }
     }
-    return { protocol: 'openai-compatible', baseUrl: `${base}/v1`, ...sampling }
+    return { protocol: 'openai-compatible', baseUrl: appendPath(base, '/v1'), ...sampling }
   }
 }
 
@@ -127,7 +185,7 @@ function fixedEndpoint(
     const omit = extras?.omitTemperature || modelHasFixedSampling(config.model)
     return {
       protocol,
-      baseUrl: config.baseUrl || baseUrl,
+      baseUrl: config.baseUrl ? normalizeBaseUrl(config.baseUrl, baseUrl) : baseUrl,
       ...(omit ? { omitTemperature: true } : {}),
       ...(extras?.useMaxCompletionTokens ? { useMaxCompletionTokens: true } : {}),
       ...(extras?.bodyExtras ? { bodyExtras: extras.bodyExtras } : {}),
@@ -162,9 +220,14 @@ export const AI_PROVIDER_ADAPTERS: Record<AiProviderId, ProviderAdapter> = {
   deepseek: {
     meta: metaOf('deepseek'),
     capabilities: { auth: 'api-key', vision: true },
-    resolveEndpoint: fixedEndpoint('openai-compatible', 'https://api.deepseek.com/v1', {
-      bodyExtras: DEEPSEEK_NON_THINKING,
-    }),
+    resolveEndpoint(config) {
+      const wire = DEEPSEEK_WIRE_IDS[config.model]
+      // thinking stays on (vendor default); the transcript echoes reasoning_content for tool turns
+      return {
+        ...fixedEndpoint('openai-compatible', 'https://api.deepseek.com/v1')(config),
+        ...(wire ? { model: wire } : {}),
+      }
+    },
   },
   openai: {
     meta: metaOf('openai'),
@@ -200,9 +263,43 @@ export const AI_PROVIDER_ADAPTERS: Record<AiProviderId, ProviderAdapter> = {
     capabilities: { auth: 'api-key', vision: true },
     resolveEndpoint: fixedEndpoint('openai-compatible', 'https://ark.cn-beijing.volces.com/api/v3'),
   },
+  mimo: {
+    meta: metaOf('mimo'),
+    // the V2.6 series is omni-modal: text, image, video and audio in, text out
+    capabilities: { auth: 'api-key', vision: true },
+    resolveEndpoint: fixedEndpoint('openai-compatible', 'https://api.xiaomimimo.com/v1'),
+  },
+  hunyuan: {
+    meta: metaOf('hunyuan'),
+    // conservative: the chat models are documented for text first, so we do not
+    // hand them screenshots until a model card says otherwise
+    capabilities: { auth: 'api-key', vision: false },
+    // mainland TokenHub host; the intl one (tokenhub-intl.tencentcloudmaas.com)
+    // is reachable by storing a base URL on this provider
+    resolveEndpoint: fixedEndpoint('openai-compatible', 'https://tokenhub.tencentcloudmaas.com/v1'),
+  },
+  ling: {
+    meta: metaOf('ling'),
+    capabilities: { auth: 'api-key', vision: true },
+    resolveEndpoint: fixedEndpoint('openai-compatible', 'https://api.ant-ling.com/v1'),
+  },
+  spark: {
+    meta: metaOf('spark'),
+    capabilities: { auth: 'api-key', vision: false },
+    // endpointUrl() appends chat/completions to this documented /v2 base
+    resolveEndpoint: fixedEndpoint(
+      'openai-compatible',
+      'https://maas-api.cn-huabei-1.xf-yun.com/v2',
+    ),
+  },
+  longcat: {
+    meta: metaOf('longcat'),
+    capabilities: { auth: 'api-key', vision: true },
+    resolveEndpoint: fixedEndpoint('openai-compatible', 'https://api.longcat.chat/openai/v1'),
+  },
   minimax: {
     meta: metaOf('minimax'),
-    capabilities: { auth: 'api-key', vision: false },
+    capabilities: { auth: 'api-key', vision: true },
     resolveEndpoint: fixedEndpoint('openai-compatible', 'https://api.minimax.io/v1'),
   },
   xai: {
@@ -225,6 +322,18 @@ export const AI_PROVIDER_ADAPTERS: Record<AiProviderId, ProviderAdapter> = {
     capabilities: { auth: 'api-key', vision: true },
     // a stored base URL selects a regional router (https://router.eu.requesty.ai/v1 for the EU)
     resolveEndpoint: fixedEndpoint('openai-compatible', 'https://router.requesty.ai/v1'),
+  },
+  opper: {
+    meta: metaOf('opper'),
+    capabilities: { auth: 'api-key', vision: true },
+    // one chat-completions endpoint for every pool and vendor route; the model id picks it
+    resolveEndpoint: fixedEndpoint('openai-compatible', 'https://api.opper.ai/v3/compat'),
+  },
+  cheaperinference: {
+    meta: metaOf('cheaperinference'),
+    capabilities: { auth: 'api-key', vision: true },
+    // one chat-completions endpoint for every model; the model id picks the lab
+    resolveEndpoint: fixedEndpoint('openai-compatible', 'https://api.cheaperinference.com/v1'),
   },
   'opencode-zen': {
     meta: metaOf('opencode-zen'),
@@ -252,7 +361,7 @@ export const AI_PROVIDER_ADAPTERS: Record<AiProviderId, ProviderAdapter> = {
       if (!config.baseUrl) throw new Error('A custom provider requires a Base URL')
       return {
         protocol: 'openai-compatible',
-        baseUrl: config.baseUrl,
+        baseUrl: normalizeBaseUrl(config.baseUrl, ''),
         ...(modelHasFixedSampling(config.model) ? { omitTemperature: true } : {}),
       }
     },

@@ -18,8 +18,8 @@ import { nl } from './panes/nl'
 import { ms } from './panes/ms'
 import { he } from './panes/he'
 import { hi } from './panes/hi'
-import { vi } from './panes/vi'
 import { zhTW } from './panes/zh-TW'
+import { vi } from './panes/vi'
 
 /** Copy for the panes/show views (animation, presenter, slide show, comments, format, ...) */
 export const paneStrings = defineStrings({
@@ -42,6 +42,6 @@ export const paneStrings = defineStrings({
   ms,
   he,
   hi,
-  vi,
   'zh-TW': zhTW,
+  vi,
 })

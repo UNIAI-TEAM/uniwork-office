@@ -9,6 +9,7 @@ import {
 import type { AiSettings, CodexModelCatalog } from '@genoffice/ai-provider/browser'
 import type { AiStreamChunk, AiStreamRequest } from '@genoffice/ai-provider'
 import { installDropOpenBridge } from '@genoffice/electron-utils/drop-open'
+import type { UpdateUiState } from '../shared/update-api'
 import { normalizeAiPanelPrefs } from '@genoffice/ui/ai-panel-prefs'
 import type {
   AccountLoginEvent,
@@ -17,14 +18,21 @@ import type {
   AttachmentImageResult,
   AttachmentReadResult,
   CloudProjectsSnapshot,
+  DefaultAppStatus,
+  FolderListing,
+  FolderRoot,
+  MoveResult,
+  ProjectHomeApi,
+  ProjectSummaryEntry,
+  TimelineEntryItem,
   HomeApi,
   RecentEntry,
   RecentPage,
   RenameResult,
-  ProjectHomeApi,
-  ProjectSummaryEntry,
-  TimelineEntryItem,
   UiLanguage,
+  FileSearchPage,
+  FileSearchRerank,
+  FileSearchSettings,
 } from '../shared/home-api'
 import { HOME_CHANNELS, PROJECT_CHANNELS } from '../shared/home-api'
 import { INTEGRATIONS_CHANNELS } from '../shared/integrations-api'
@@ -56,8 +64,8 @@ const UI_LANGUAGES: readonly UiLanguage[] = [
   'ms',
   'he',
   'hi',
-  'vi',
   'zh-TW',
+  'vi',
 ]
 
 function isUiLanguage(value: unknown): value is UiLanguage {
@@ -73,9 +81,59 @@ function asRecentPage(result: unknown): RecentPage {
   return EMPTY_PAGE
 }
 
+const EMPTY_SEARCH: FileSearchPage = {
+  hits: [],
+  total: 0,
+  index: { indexed: 0, pending: 0, scanning: false },
+}
+
+function asSearchPage(result: unknown): FileSearchPage {
+  if (result && typeof result === 'object' && Array.isArray((result as FileSearchPage).hits)) {
+    return result as FileSearchPage
+  }
+  return EMPTY_SEARCH
+}
+
+function normalizeDefaultAppStatus(result: unknown): DefaultAppStatus {
+  const r = (result ?? {}) as Partial<DefaultAppStatus>
+  const state = r.state
+  return {
+    state: state === 'default' || state === 'other' || state === 'unknown' ? state : 'unsupported',
+    others: Array.isArray(r.others) ? r.others.filter((x) => typeof x === 'string') : [],
+    manualOnly: r.manualOnly === true,
+  }
+}
+
 const homeApi: HomeApi = {
   async recents(query) {
     return asRecentPage(await ipcRenderer.invoke(HOME_CHANNELS.recents, query))
+  },
+  async searchFiles(query) {
+    return asSearchPage(await ipcRenderer.invoke(HOME_CHANNELS.searchFiles, query))
+  },
+  async rerankSearch(query) {
+    const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.rerankSearch, query)
+    return result && typeof result === 'object' && Array.isArray((result as FileSearchRerank).order)
+      ? (result as FileSearchRerank)
+      : null
+  },
+  async getFileSearchSettings() {
+    return (await ipcRenderer.invoke(HOME_CHANNELS.getFileSearchSettings)) as FileSearchSettings
+  },
+  async setFileSearchSettings(patch) {
+    return (await ipcRenderer.invoke(
+      HOME_CHANNELS.setFileSearchSettings,
+      patch,
+    )) as FileSearchSettings
+  },
+  async testFileSearchRerank(input) {
+    const raw = ((await ipcRenderer.invoke(HOME_CHANNELS.testFileSearchRerank, input)) ?? {}) as {
+      ok?: unknown
+      error?: unknown
+    }
+    return raw.ok === true
+      ? { ok: true }
+      : { ok: false, error: typeof raw.error === 'string' ? raw.error : 'Connection failed' }
   },
   async starred(query) {
     return asRecentPage(await ipcRenderer.invoke(HOME_CHANNELS.starred, query))
@@ -101,7 +159,11 @@ const homeApi: HomeApi = {
     const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.activeOfficeTab)
     if (!result || typeof result !== 'object') return null
     const tab = result as { id?: unknown; kind?: unknown; title?: unknown; path?: unknown }
-    if (typeof tab.id !== 'string' || typeof tab.kind !== 'string' || typeof tab.title !== 'string') {
+    if (
+      typeof tab.id !== 'string' ||
+      typeof tab.kind !== 'string' ||
+      typeof tab.title !== 'string'
+    ) {
       return null
     }
     return {
@@ -196,6 +258,48 @@ const homeApi: HomeApi = {
   async deleteFiles(paths) {
     await ipcRenderer.invoke(HOME_CHANNELS.deleteFiles, paths)
   },
+  async folderRoots() {
+    return (await ipcRenderer.invoke(HOME_CHANNELS.folderRoots)) as FolderRoot[]
+  },
+  async addFolderRoot() {
+    return (await ipcRenderer.invoke(HOME_CHANNELS.addFolderRoot)) as FolderRoot | null
+  },
+  async dropFolderRoots(paths) {
+    return (await ipcRenderer.invoke(HOME_CHANNELS.dropFolderRoots, paths)) as FolderRoot[]
+  },
+  async removeFolderRoot(path) {
+    await ipcRenderer.invoke(HOME_CHANNELS.removeFolderRoot, path)
+  },
+  pathForFile(file) {
+    return webUtils.getPathForFile(file)
+  },
+  async listFolder(dir) {
+    return (await ipcRenderer.invoke(HOME_CHANNELS.listFolder, dir)) as FolderListing
+  },
+  async createFolder(parent, name) {
+    return (await ipcRenderer.invoke(HOME_CHANNELS.createFolder, parent, name)) as RenameResult
+  },
+  async renameFolder(dir, newName) {
+    return (await ipcRenderer.invoke(HOME_CHANNELS.renameFolder, dir, newName)) as RenameResult
+  },
+  async movePaths(paths, targetDir, onConflict) {
+    return (await ipcRenderer.invoke(
+      HOME_CHANNELS.movePaths,
+      paths,
+      targetDir,
+      onConflict,
+    )) as MoveResult
+  },
+  async deleteFolder(dir) {
+    await ipcRenderer.invoke(HOME_CHANNELS.deleteFolder, dir)
+  },
+  onFolderChanged(handler) {
+    const listener = (_event: IpcRendererEvent, dirs: unknown) => {
+      if (Array.isArray(dirs)) handler(dirs.filter((d): d is string => typeof d === 'string'))
+    }
+    ipcRenderer.on(HOME_CHANNELS.folderChanged, listener)
+    return () => ipcRenderer.removeListener(HOME_CHANNELS.folderChanged, listener)
+  },
   async openTrash() {
     await ipcRenderer.invoke(HOME_CHANNELS.openTrash)
   },
@@ -227,6 +331,11 @@ const homeApi: HomeApi = {
     const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.accountLogin)
     return result === true
   },
+  onOpenSettings(handler) {
+    const listener = (_event: IpcRendererEvent, target: { section: string }) => handler(target)
+    ipcRenderer.on(HOME_CHANNELS.openSettings, listener)
+    return () => ipcRenderer.removeListener(HOME_CHANNELS.openSettings, listener)
+  },
   onAccountLogin(handler) {
     const listener = (_event: IpcRendererEvent, ev: AccountLoginEvent) => handler(ev)
     ipcRenderer.on(HOME_CHANNELS.accountLoginEvent, listener)
@@ -249,6 +358,19 @@ const homeApi: HomeApi = {
     const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.getAppVersion)
     return typeof result === 'string' ? result : ''
   },
+  async getUpdateState() {
+    const result: unknown = await ipcRenderer.invoke('update:get-state')
+    return (result as UpdateUiState | null) ?? null
+  },
+  async openUpdateDialog() {
+    const result: unknown = await ipcRenderer.invoke('update:open-for-update')
+    return result === true
+  },
+  onUpdateStateChanged(handler: (state: UpdateUiState) => void) {
+    const listener = (_e: IpcRendererEvent, state: UpdateUiState) => handler(state)
+    ipcRenderer.on('update:state-changed', listener)
+    return () => ipcRenderer.removeListener('update:state-changed', listener)
+  },
   async onboardingSeen() {
     const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.onboardingSeen)
     return result === true
@@ -266,6 +388,15 @@ const homeApi: HomeApi = {
       throw new Error('Invalid theme.')
     await ipcRenderer.invoke(HOME_CHANNELS.setTheme, theme)
   },
+  async getDocumentTheme() {
+    const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.getDocumentTheme)
+    return result === 'dark' || result === 'light' ? result : 'follow'
+  },
+  async setDocumentTheme(theme) {
+    if (theme !== 'light' && theme !== 'dark' && theme !== 'follow')
+      throw new Error('Invalid document theme.')
+    await ipcRenderer.invoke(HOME_CHANNELS.setDocumentTheme, theme)
+  },
   async getAutoSaveDefault() {
     const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.getAutoSaveDefault)
     const r = result as { on?: unknown; updatedAt?: unknown } | null
@@ -278,14 +409,70 @@ const homeApi: HomeApi = {
     if (typeof on !== 'boolean') throw new Error('Invalid AutoSave default.')
     await ipcRenderer.invoke(HOME_CHANNELS.setAutoSaveDefault, on)
   },
-  async getAnalyticsEnabled() {
-    const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.getAnalyticsEnabled)
-    return result !== false
+  async getMcpStatus() {
+    const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.getMcpStatus)
+    const r = result as {
+      running?: unknown
+      enabled?: unknown
+      port?: unknown
+      background?: unknown
+      logging?: unknown
+      url?: unknown
+      capabilities?: unknown
+      error?: unknown
+    } | null
+    return {
+      running: r?.running === true,
+      enabled: r?.enabled === true,
+      port: typeof r?.port === 'number' ? r.port : 3093,
+      background: r?.background === true,
+      logging: r?.logging === true,
+      url: typeof r?.url === 'string' ? r.url : null,
+      capabilities: Array.isArray(r?.capabilities)
+        ? r.capabilities.filter((c): c is string => typeof c === 'string')
+        : ['docs'],
+      ...(typeof r?.error === 'string' ? { error: r.error } : {}),
+    }
   },
-  async setAnalyticsEnabled(enabled) {
-    if (typeof enabled !== 'boolean') throw new Error('Invalid analytics consent.')
-    const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.setAnalyticsEnabled, enabled)
-    return result === true
+  async setMcpSettings(patch: {
+    enabled?: boolean
+    port?: number
+    background?: boolean
+    logging?: boolean
+  }) {
+    const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.setMcpSettings, patch)
+    const r = result as {
+      running?: unknown
+      enabled?: unknown
+      port?: unknown
+      background?: unknown
+      logging?: unknown
+      url?: unknown
+      capabilities?: unknown
+      error?: unknown
+    } | null
+    return {
+      running: r?.running === true,
+      enabled: r?.enabled === true,
+      port: typeof r?.port === 'number' ? r.port : 3093,
+      background: r?.background === true,
+      logging: r?.logging === true,
+      url: typeof r?.url === 'string' ? r.url : null,
+      capabilities: Array.isArray(r?.capabilities)
+        ? r.capabilities.filter((c): c is string => typeof c === 'string')
+        : ['docs'],
+      ...(typeof r?.error === 'string' ? { error: r.error } : {}),
+    }
+  },
+  async getMcpLogs() {
+    const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.getMcpLogs)
+    return Array.isArray(result) ? result.filter((l): l is string => typeof l === 'string') : []
+  },
+  async clearMcpLogs() {
+    await ipcRenderer.invoke(HOME_CHANNELS.clearMcpLogs)
+  },
+  async openMcpLogFile() {
+    await ipcRenderer.invoke(HOME_CHANNELS.openMcpLogFile)
   },
   async getAiPanelPrefs() {
     return normalizeAiPanelPrefs(await ipcRenderer.invoke(HOME_CHANNELS.getAiPanelPrefs))
@@ -296,6 +483,12 @@ const homeApi: HomeApi = {
   async getDefaultSaveDir() {
     const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.getDefaultSaveDir)
     return typeof result === 'string' ? result : ''
+  },
+  async getDefaultAppStatus() {
+    return normalizeDefaultAppStatus(await ipcRenderer.invoke(HOME_CHANNELS.getDefaultAppStatus))
+  },
+  async setDefaultApp() {
+    return normalizeDefaultAppStatus(await ipcRenderer.invoke(HOME_CHANNELS.setDefaultApp))
   },
   async pickDefaultSaveDir() {
     const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.pickDefaultSaveDir)
@@ -308,31 +501,15 @@ const homeApi: HomeApi = {
     ipcRenderer.on('app:theme-changed', listener)
     return () => ipcRenderer.removeListener('app:theme-changed', listener)
   },
-  async openGenTeam() {
-    await ipcRenderer.invoke(HOME_CHANNELS.openGenTeam)
+  onDocumentThemeChanged(handler) {
+    const listener = (_event: Electron.IpcRendererEvent, theme: unknown) => {
+      if (theme === 'light' || theme === 'dark' || theme === 'follow') handler(theme)
+    }
+    ipcRenderer.on('app:document-theme-changed', listener)
+    return () => ipcRenderer.removeListener('app:document-theme-changed', listener)
   },
   async openCreditUsage() {
     await ipcRenderer.invoke(HOME_CHANNELS.openCreditUsage)
-  },
-  async openGitHubRepo() {
-    await ipcRenderer.invoke(HOME_CHANNELS.openGitHubRepo)
-  },
-  async githubStars() {
-    const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.githubStars)
-    return typeof result === 'number' && Number.isFinite(result) ? result : null
-  },
-  async starPromptShouldShow() {
-    const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.starPromptShouldShow)
-    const raw = (result ?? {}) as { show?: unknown; docOpens?: unknown }
-    return {
-      show: raw.show === true,
-      docOpens:
-        typeof raw.docOpens === 'number' && Number.isFinite(raw.docOpens) ? raw.docOpens : 0,
-    }
-  },
-  async starPromptAction(action) {
-    if (action !== 'starred' && action !== 'later') throw new Error('Invalid star prompt action.')
-    await ipcRenderer.invoke(HOME_CHANNELS.starPromptAction, action)
   },
   async cloudProjectsCached() {
     const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.cloudProjectsCached)
@@ -352,6 +529,11 @@ const homeApi: HomeApi = {
     await ipcRenderer.invoke(HOME_CHANNELS.openCloudProject, projectUrl)
   },
   // AI settings channels are registered once by the shell's aggregated docs handlers
+  onAiSettingsChanged(handler) {
+    const listener = () => handler()
+    ipcRenderer.on('ai:settings-changed', listener)
+    return () => ipcRenderer.removeListener('ai:settings-changed', listener)
+  },
   async getAiSettings() {
     return (await ipcRenderer.invoke('ai:get-settings')) as AiSettings
   },
@@ -374,6 +556,9 @@ const homeApi: HomeApi = {
   async getCodexModels(cliPath) {
     return (await ipcRenderer.invoke('ai:codex-models', cliPath)) as CodexModelCatalog
   },
+  async getCustomModels(baseUrl, apiKey) {
+    return (await ipcRenderer.invoke('ai:custom-models', { baseUrl, apiKey })) as CodexModelCatalog
+  },
   async testAiSettings(settings) {
     const result: unknown = await ipcRenderer.invoke('ai:chat', {
       settings,
@@ -386,11 +571,13 @@ const homeApi: HomeApi = {
       : { ok: false, error: typeof raw.error === 'string' ? raw.error : 'Connection failed' }
   },
   async probeOpenRouterKey(apiKey) {
-    return (await ipcRenderer.invoke('ai:openrouter-key-status', apiKey)) as import('@genoffice/ai-provider').OpenRouterKeyStatus
+    return (await ipcRenderer.invoke(
+      'ai:openrouter-key-status',
+      apiKey,
+    )) as import('@genoffice/ai-provider').OpenRouterKeyStatus
   },
   async aiChat(input) {
-    const settings =
-      input.settings ?? ((await ipcRenderer.invoke('ai:get-settings')) as AiSettings)
+    const settings = input.settings ?? ((await ipcRenderer.invoke('ai:get-settings')) as AiSettings)
     const result: unknown = await ipcRenderer.invoke('ai:chat', {
       settings,
       system: input.system,
@@ -490,7 +677,9 @@ const homeApi: HomeApi = {
     async importKeys(keys) {
       const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.wbImportKeys, keys)
       const imported =
-        result && typeof result === 'object' && typeof (result as { imported?: unknown }).imported === 'number'
+        result &&
+        typeof result === 'object' &&
+        typeof (result as { imported?: unknown }).imported === 'number'
           ? (result as { imported: number }).imported
           : 0
       return { imported }
@@ -508,7 +697,7 @@ const homeApi: HomeApi = {
         ok: boolean
         keyCount?: number
         keys?: Record<string, string>
-        media?: import('../../shared/home-api').WorkbenchIdbMediaDump
+        media?: import('../shared/home-api').WorkbenchIdbMediaDump
         error?: string
         canceled?: boolean
       }
@@ -562,7 +751,9 @@ const projectApi: ProjectHomeApi = {
     return result as ProjectSummaryEntry
   },
   async getPracticeMeta(projectId) {
-    const result: unknown = await ipcRenderer.invoke(PROJECT_CHANNELS.getPracticeMeta, { projectId })
+    const result: unknown = await ipcRenderer.invoke(PROJECT_CHANNELS.getPracticeMeta, {
+      projectId,
+    })
     if (!result || typeof result !== 'object') return null
     return result as NonNullable<ProjectSummaryEntry['practice']>
   },
@@ -636,6 +827,34 @@ const tabsApi: TabsApi = {
   },
   async showNewMenu(x, y) {
     await ipcRenderer.invoke(TABS_CHANNELS.showNewMenu, x, y)
+  },
+  async showTabMenu(id, x, y) {
+    await ipcRenderer.invoke(TABS_CHANNELS.showTabMenu, id, x, y)
+  },
+  async detach(id) {
+    await ipcRenderer.invoke(TABS_CHANNELS.detach, id)
+  },
+  async tearOff(id, screenX, screenY) {
+    const result: unknown = await ipcRenderer.invoke(TABS_CHANNELS.tearOff, id, screenX, screenY)
+    return result === true
+  },
+  dragTornWindow(screenX, screenY) {
+    ipcRenderer.send(TABS_CHANNELS.dragTornWindow, screenX, screenY)
+  },
+  async dockTornWindow(index) {
+    await ipcRenderer.invoke(TABS_CHANNELS.dockTornWindow, index)
+  },
+  async endTornDrag() {
+    await ipcRenderer.invoke(TABS_CHANNELS.endTornDrag)
+  },
+  onDockPreview(handler) {
+    const listener = (_event: IpcRendererEvent, preview: { x: number } | null) =>
+      handler(preview && typeof preview.x === 'number' ? { x: preview.x } : null)
+    ipcRenderer.on(TABS_CHANNELS.dockPreview, listener)
+    return () => ipcRenderer.removeListener(TABS_CHANNELS.dockPreview, listener)
+  },
+  reportDockIndex(index) {
+    ipcRenderer.send(TABS_CHANNELS.dockIndex, index)
   },
   async showAppMenu(x, y) {
     await ipcRenderer.invoke(TABS_CHANNELS.showAppMenu, x, y)

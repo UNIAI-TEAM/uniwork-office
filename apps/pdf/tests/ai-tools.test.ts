@@ -174,6 +174,15 @@ describe('AGENT_TOOLS definitions', () => {
 })
 
 describe('read_pages', () => {
+  it('rejects a non-numeric end instead of reporting no text on valid pages', async () => {
+    // Number('all') is NaN; the old `end < start` test is false for NaN, so
+    // the range slipped past validation and the loop never ran — the model
+    // got "(No extractable text...)" for pages that do have text.
+    const result = await executePdfTool(makeDeps(), call('read_pages', { start: 1, end: 'all' }))
+    expect(result.isError).toBe(true)
+    expect(result.output).toContain('Invalid page range')
+  })
+
   it('reads a page range with [Page N] markers', async () => {
     const result = await executePdfTool(makeDeps(), call('read_pages', { start: 1, end: 2 }))
     expect(result.isError).toBeUndefined()
@@ -307,6 +316,29 @@ describe('edit_text', () => {
       newColor: undefined,
     })
     expect(deps.gotoPage).toHaveBeenCalledWith(2)
+  })
+
+  it('locates dotted-capital text with the same fold as the search index', async () => {
+    // 'İ'.toLowerCase() grows to two chars ('i̇'), so a toLowerCase query
+    // never matches the length-preserving foldCase index; the helpers must
+    // fold the query the same way the index was built.
+    const dotted: SearchIndex = [
+      {
+        text: 'İzmir report',
+        lower: 'İzmir report',
+        items: [{ start: 0, end: 12, x: 0, y: 700, w: 120, h: 12 }],
+      },
+    ]
+    const deps = makeDeps({ searchIndex: () => Promise.resolve(dotted), pageCount: () => 1 })
+    const result = await executePdfTool(
+      deps,
+      call('edit_text', { page: 1, old_text: 'İzmir', new_text: 'Ankara' }),
+    )
+    expect(result.isError).toBeUndefined()
+    expect(result.mutated).toBe(true)
+    expect(deps.editText).toHaveBeenCalledWith(
+      expect.objectContaining({ oldText: 'İzmir', newText: 'Ankara' }),
+    )
   })
 
   it('targets the nth occurrence and passes style overrides through', async () => {

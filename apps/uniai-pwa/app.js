@@ -385,11 +385,12 @@ function paintAvatar(node, size = 'md') {
 }
 
 function applyPrefs() {
-  const theme = prefs.theme === 'system'
-    ? window.matchMedia('(prefers-color-scheme: light)').matches
-      ? 'light'
-      : 'dark'
-    : prefs.theme
+  const theme =
+    prefs.theme === 'system'
+      ? window.matchMedia('(prefers-color-scheme: light)').matches
+        ? 'light'
+        : 'dark'
+      : prefs.theme
   document.documentElement.dataset.theme = theme
   const lang = prefs.lang === 'en' ? 'en' : 'vi'
   document.documentElement.lang = lang
@@ -478,18 +479,14 @@ function openDeepLink(url) {
 }
 
 function officeAppDeepLink(kind) {
-  const k = ['docs', 'sheets', 'slides', 'pdf', 'markdown', 'html'].includes(kind)
-    ? kind
-    : 'docs'
+  const k = ['docs', 'sheets', 'slides', 'pdf', 'markdown', 'html'].includes(kind) ? kind : 'docs'
   // Prefer office/app; agent/intent?tab=<kind> is also accepted by updated shell.
   return Office()?.officeAppUrl?.(k) || `uniwork://office/app?kind=${k}`
 }
 
 /** Fire both protocol forms so slightly older handlers still have a chance. */
 function launchOfficeApp(kind) {
-  const k = ['docs', 'sheets', 'slides', 'pdf', 'markdown', 'html'].includes(kind)
-    ? kind
-    : 'docs'
+  const k = ['docs', 'sheets', 'slides', 'pdf', 'markdown', 'html'].includes(kind) ? kind : 'docs'
   openDeepLink(`uniwork://office/app?kind=${k}`)
   window.setTimeout(() => {
     openDeepLink(
@@ -622,9 +619,7 @@ function renderPluginPanel() {
         <span class="plugin-suite-app-label">${escapeHtml(app.label)}</span>
         <span class="plugin-suite-app-check" aria-hidden="true">${on ? '✓' : '+'}</span>
       `
-      item.addEventListener('click', () =>
-        togglePlugin('office', app.id, app.label, app.hint),
-      )
+      item.addEventListener('click', () => togglePlugin('office', app.id, app.label, app.hint))
       item.addEventListener('dblclick', () => {
         launchOfficeApp(app.id)
       })
@@ -659,9 +654,7 @@ function renderPluginPanel() {
           <span>${escapeHtml(t.hint)}</span>
         </div>
       `
-      row.appendChild(
-        makeAddButton(on, () => togglePlugin('workbench', t.id, t.label, t.hint)),
-      )
+      row.appendChild(makeAddButton(on, () => togglePlugin('workbench', t.id, t.label, t.hint)))
       // Long-press style: double-click / alt-click opens deep link
       row.addEventListener('dblclick', () => {
         if (!on) togglePlugin('workbench', t.id, t.label, t.hint)
@@ -715,7 +708,8 @@ function renderOfficeDocs() {
     const li = document.createElement('li')
     const btn = document.createElement('button')
     btn.type = 'button'
-    btn.className = doc.id === activeDocId && (navView === 'office' || navView === 'documents') ? 'active' : ''
+    btn.className =
+      doc.id === activeDocId && (navView === 'office' || navView === 'documents') ? 'active' : ''
     btn.innerHTML = `<span class="office-dot" style="background:${doc.color}"></span><span>${escapeHtml(doc.name)}</span>`
     btn.addEventListener('click', () => {
       activeDocId = doc.id
@@ -733,10 +727,7 @@ let officePreviewCleanup = null
 function renderLibrary() {
   const titles = {
     knowledge: ['Tri thức', 'Kho kiến thức, skill và ghi chú dùng lại trong uniAI.'],
-    documents: [
-      'Tài liệu',
-      'Xem trên PWA (local) hoặc mở bằng UniWork Office trên máy.',
-    ],
+    documents: ['Tài liệu', 'Xem trên PWA (local) hoặc mở bằng UniWork Office trên máy.'],
     tasks: ['Công việc', 'Việc cần làm — lưu trên thiết bị này.'],
     projects: ['Dự án', 'Theo dõi dự án đang chạy — lưu trên thiết bị này.'],
     office: [
@@ -922,7 +913,7 @@ function renderOfficeDocDetail(doc) {
   fallback.hidden = true
   fallback.innerHTML = `
     <p>Chưa mở được? Cần UniWork Office desktop đã đăng ký protocol <code>uniwork://</code> (bản mới có <code>office/app</code>). Rebuild/cài lại shell rồi thử.</p>
-    <a href="https://github.com/truongnt7/uniwork-office/releases/latest" target="_blank" rel="noopener">Tải UniWork Office</a>
+    <a href="https://github.com/UNIAI-TEAM/uniwork-office/releases/latest" target="_blank" rel="noopener">Tải UniWork Office</a>
   `
   const retry = document.createElement('button')
   retry.type = 'button'
@@ -1079,8 +1070,7 @@ async function ingestOfficeFiles(fileList) {
 function addCloudWorkProduct() {
   const id = window.prompt('Work Product / documentId trên UniWork (UUID):', '')?.trim()
   if (!id) return
-  const name =
-    window.prompt('Tên hiển thị:', 'Tài liệu UniWork')?.trim() || 'Tài liệu UniWork'
+  const name = window.prompt('Tên hiển thị:', 'Tài liệu UniWork')?.trim() || 'Tài liệu UniWork'
   const kindGuess =
     Office()?.kindFromFileName?.(name) ||
     (/\.xlsx$/i.test(name) ? 'sheets' : /\.pptx$/i.test(name) ? 'slides' : 'docs')
@@ -1114,7 +1104,6 @@ async function removeOfficeDoc(id) {
   renderOfficeDocs()
 }
 
-
 /** @returns {HTMLElement} */
 function renderTasksHub() {
   const wrap = document.createElement('div')
@@ -1135,7 +1124,10 @@ function renderTasksHub() {
   const add = () => {
     const t = input.value.trim()
     if (!t) return
-    hubTasks = [{ id: uid(), title: t, done: false, createdAt: new Date().toISOString() }, ...hubTasks]
+    hubTasks = [
+      { id: uid(), title: t, done: false, createdAt: new Date().toISOString() },
+      ...hubTasks,
+    ]
     saveTasks(hubTasks)
     input.value = ''
     renderLibrary()
@@ -1442,7 +1434,7 @@ function renderSettings() {
       </div>
       <div class="settings-row">
         <div><span class="settings-label">Cài UniWork Office</span><small>Desktop để mở Workbench &amp; file Office</small></div>
-        <a class="settings-link" href="https://github.com/truongnt7/uniwork-office/releases/latest" target="_blank" rel="noopener">Tải</a>
+        <a class="settings-link" href="https://github.com/UNIAI-TEAM/uniwork-office/releases/latest" target="_blank" rel="noopener">Tải</a>
       </div>
       <div class="settings-row">
         <div><span class="settings-label">Phản hồi</span><small>Góp ý sản phẩm</small></div>
@@ -1500,7 +1492,8 @@ function renderSettings() {
     persistPrefs()
   })
   el.settingsBody.querySelector('#setName')?.addEventListener('change', (e) => {
-    prefs.accountName = /** @type {HTMLInputElement} */ (e.target).value.trim() || DEFAULT_PREFS.accountName
+    prefs.accountName =
+      /** @type {HTMLInputElement} */ (e.target).value.trim() || DEFAULT_PREFS.accountName
     persistPrefs()
   })
   el.settingsBody.querySelector('#setEmail')?.addEventListener('change', (e) => {
@@ -1730,9 +1723,7 @@ function send(text) {
   const atts = [...attachments]
   if (!trimmed && atts.length === 0) return
   const chat = activeChat()
-  const composed =
-    trimmed ||
-    atts.map((a) => a.label).join(', ')
+  const composed = trimmed || atts.map((a) => a.label).join(', ')
   if (chat.messages.length === 0) {
     chat.title = composed.slice(0, 48)
   }

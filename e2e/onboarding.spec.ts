@@ -10,16 +10,20 @@ test.describe('first-run onboarding', () => {
     try {
       const overlay = page.locator('.onb-overlay')
       await expect(overlay).toBeVisible()
-      await expect(page.locator('.onb-slide.active .onb-title')).toHaveText('Welcome to UniWork Office')
+      await expect(page.locator('.onb-slide.active .onb-title')).toHaveText(
+        'Welcome to UniWork Office',
+      )
       await page.screenshot({ path: screenshotPath('onboarding-slide-1') })
 
       await page.locator('.onb-next').click()
-      await expect(page.locator('.onb-slide.active .onb-title')).toHaveText('This is just the beginning')
+      await expect(page.locator('.onb-slide.active .onb-title')).toHaveText('AI at every step')
       await expect(page.locator('.onb-slide.active .onb-offer')).toHaveCount(0)
       await page.screenshot({ path: screenshotPath('onboarding-slide-2') })
 
       await page.locator('.onb-next').click()
-      await expect(page.locator('.onb-slide.active .onb-title')).toHaveText('Free for everyone')
+      await expect(page.locator('.onb-slide.active .onb-title')).toHaveText('You’re all set')
+      // no repo, star or usage-statistics call to action on the last step
+      await expect(page.locator('.onb-card')).not.toContainText(/github|star on|analytics/i)
       await page.screenshot({ path: screenshotPath('onboarding-slide-3') })
 
       // last slide's primary button finishes the onboarding
