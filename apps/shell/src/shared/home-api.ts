@@ -400,21 +400,15 @@ export interface HomeApi {
   onThemeChanged(handler: (theme: UiTheme) => void): () => void
   /** document page theme switched anywhere (broadcast from the main process) */
   onDocumentThemeChanged(handler: (theme: DocTheme) => void): () => void
-  /** open the Genspark credit-usage page in the default browser */
+  /** open the Token Hub (OpenRouter) credits page in the default browser */
   openCreditUsage(): Promise<void>
-  /** locally stored full cloud project list (instant; null when no store or logged out) */
-  cloudProjectsCached(): Promise<CloudProjectsSnapshot | null>
-  /** sync the full list from Genspark and return it (1 request when nothing changed); null when the sync failed */
-  cloudProjectsSync(): Promise<CloudProjectsSnapshot | null>
-  /** open a cloud project (relative '/agents?id=...' URL) in the default browser */
-  openCloudProject(projectUrl: string): Promise<void>
-  /** AI settings (userData/ai-settings.json, shared by every editor); the genspark key never appears here */
+  /** AI settings (userData/ai-settings.json, shared by every editor) */
   getAiSettings(): Promise<AiSettings>
   /** persist AI settings; every renderer gets ai:settings-changed and re-reads */
   setAiSettings(settings: AiSettings): Promise<void>
   /** ai-settings.json was rewritten by any renderer (composer model chip, another window) */
   onAiSettingsChanged(handler: () => void): () => void
-  /** provider catalog with each fixed endpoint's default base URL (empty for genspark/custom) */
+  /** provider catalog with each fixed endpoint's default base URL (empty for uniAI/custom) */
   getAiProviders(): AiCatalogEntry[]
   /** live Codex model catalog discovered through the current or overridden app-server */
   getCodexModels(cliPath?: string): Promise<CodexModelCatalog>
@@ -437,16 +431,16 @@ export interface HomeApi {
   readAttachment(path: string, offset: number, maxChars: number): Promise<AttachmentReadResult>
   readAttachmentImage(path: string): Promise<AttachmentImageResult>
   getPathForFile(file: File): string
-  /** image generation / media analysis provider catalog */
+  /** image generation / media analysis providers a picker may offer */
   getAiMediaProviders(): AiMediaProviderMeta[]
-  /** credential check for a (possibly unsaved) media provider; genspark reports the gsk login state */
+  /** credential check for a (possibly unsaved) media provider */
   testAiMediaSettings(input: {
     provider: AiMediaProviderId
     config: AiMediaProviderConfig
   }): Promise<{ ok: boolean; error?: string }>
   /** web search provider catalog */
   getAiSearchProviders(): AiSearchProviderMeta[]
-  /** one minimal query against the given key (genspark reports the gsk login state) */
+  /** one minimal query against the given key (the keyless auto entry needs none) */
   testAiSearchSettings(input: {
     provider: AiSearchProviderId
     apiKey: string
@@ -491,36 +485,10 @@ export interface AiCatalogEntry extends AiProviderMeta {
   defaultBaseUrl: string
 }
 
-export type CloudProjectKind = 'docs' | 'sheets' | 'slides'
-
-/** a Genspark web project shown in the home cloud section */
-export interface CloudProjectEntry {
-  projectId: string
-  title: string
-  /** module kind derived from the API project type ('docs_agent' → 'docs') */
-  kind: CloudProjectKind | 'other'
-  /** creation time, ms since epoch (0 when unparsable) */
-  ctimeMs: number
-  /** relative genspark.ai URL ('/agents?id=...') */
-  projectUrl: string
-}
-
-/** full local copy of the cloud project list; filtering/paging are client-side */
-export interface CloudProjectsSnapshot {
-  /** false when gsk is unavailable (CLI missing or not logged in) */
-  available: boolean
-  /** all projects, newest first */
-  projects: CloudProjectEntry[]
-  /** ms epoch of the last successful sync (0 when never synced) */
-  syncedAt: number
-}
-
 export interface AccountStatus {
   /** UniWork desktop session present (web Sign-in link used until sync lands) */
   loggedIn: boolean
   email?: string
-  /** remaining account credits when the balance query succeeds */
-  creditBalance?: number
 }
 
 /** login flow progress pushed from main (UniWork Sign-in URL open) */
@@ -891,9 +859,6 @@ export const HOME_CHANNELS = {
   setDefaultApp: 'home:set-default-app',
   pickDefaultSaveDir: 'home:pick-default-save-dir',
   openCreditUsage: 'home:open-credit-usage',
-  cloudProjects: 'home:cloud-projects',
-  cloudProjectsCached: 'home:cloud-projects-cached',
-  openCloudProject: 'home:open-cloud-project',
   probeAiHub: 'home:probe-ai-hub',
   exportLessonPack: 'home:export-lesson-pack',
   agentIntentEvent: 'home:agent-intent-event',

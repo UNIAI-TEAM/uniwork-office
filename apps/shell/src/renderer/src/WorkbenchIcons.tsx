@@ -4,7 +4,7 @@ import type { PracticePillarId, WorkbenchModuleId } from '@uniwork/practice-core
 type IconId = PracticePillarId | WorkbenchModuleId | 'add'
 
 /**
- * Genspark / Office-style app badges: rounded square + solid brand color + white glyph.
+ * Office-style app badges: rounded square + solid brand color + white glyph.
  * Same visual language as Home file icons (docx blue, xlsx green, pptx red).
  */
 const BADGE: Record<IconId, { bg: string; glyph: ReactElement }> = {

@@ -1,10 +1,10 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type { IpcRendererEvent } from 'electron'
 import {
-  AI_MEDIA_PROVIDERS,
   AI_PROVIDERS,
   AI_SEARCH_PROVIDERS,
   getProviderAdapter,
+  visibleMediaProviders,
 } from '@genoffice/ai-provider/browser'
 import type { AiSettings, CodexModelCatalog } from '@genoffice/ai-provider/browser'
 import type { AiStreamChunk, AiStreamRequest } from '@genoffice/ai-provider'
@@ -17,7 +17,6 @@ import type {
   AttachmentAddResult,
   AttachmentImageResult,
   AttachmentReadResult,
-  CloudProjectsSnapshot,
   DefaultAppStatus,
   FolderListing,
   FolderRoot,
@@ -515,23 +514,6 @@ const homeApi: HomeApi = {
   async openCreditUsage() {
     await ipcRenderer.invoke(HOME_CHANNELS.openCreditUsage)
   },
-  async cloudProjectsCached() {
-    const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.cloudProjectsCached)
-    return asCloudProjectsSnapshot(result)
-  },
-  async cloudProjectsSync() {
-    // failures (network / CLI) resolve to null so the renderer keeps whatever it has
-    try {
-      const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.cloudProjects)
-      return asCloudProjectsSnapshot(result)
-    } catch {
-      return null
-    }
-  },
-  async openCloudProject(projectUrl) {
-    if (typeof projectUrl !== 'string' || !projectUrl) throw new Error('Invalid project URL.')
-    await ipcRenderer.invoke(HOME_CHANNELS.openCloudProject, projectUrl)
-  },
   // AI settings channels are registered once by the shell's aggregated docs handlers
   onAiSettingsChanged(handler) {
     const listener = () => handler()
@@ -629,7 +611,7 @@ const homeApi: HomeApi = {
     return webUtils.getPathForFile(file)
   },
   getAiMediaProviders() {
-    return AI_MEDIA_PROVIDERS
+    return visibleMediaProviders()
   },
   getAiSearchProviders() {
     return AI_SEARCH_PROVIDERS
@@ -707,17 +689,6 @@ const homeApi: HomeApi = {
       }
     },
   },
-}
-
-function asCloudProjectsSnapshot(result: unknown): CloudProjectsSnapshot | null {
-  if (
-    result &&
-    typeof result === 'object' &&
-    Array.isArray((result as CloudProjectsSnapshot).projects)
-  ) {
-    return result as CloudProjectsSnapshot
-  }
-  return null
 }
 
 contextBridge.exposeInMainWorld('aiOffice', homeApi)
