@@ -4,7 +4,7 @@
 // Usage: node web/measure/font-picker.mjs [--dist <dir>] [--compress] [--out file.json] [--doc simple|kitchen-sink|long]
 // Spawns web/server/server.mjs itself (PORT=4183). HTTP cache disabled, fresh context.
 import { spawn } from 'node:child_process'
-import { writeFileSync } from 'node:fs'
+import { readFileSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright'
@@ -60,6 +60,16 @@ try {
         wire: e.encodedDataLength,
       })
   })
+  // long.docx is not in fixtures/generated: serve it from web/fixtures (same as load.mjs)
+  if (DOC === 'long') {
+    await page.route('**/fixtures/long.docx', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        body: readFileSync(resolve(repoRoot, 'web/fixtures/long.docx')),
+      }),
+    )
+  }
   await page.goto(`${ORIGIN}/?open=${encodeURIComponent(`/fixtures/${DOC}.docx`)}`)
   await page.waitForSelector('.ProseMirror[contenteditable="true"]', { timeout: 30000 })
   await page.waitForLoadState('networkidle')

@@ -59,26 +59,66 @@ function run(script, args) {
 }
 const readJson = (f) => JSON.parse(readFileSync(f, 'utf8'))
 
-function measure(label, dist) {
+const median = (xs) => {
+  const v = [...xs].sort((x, y) => x - y)
+  const m = v.length >> 1
+  return v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2
+}
+const stat = (xs) => ({
+  median: median(xs),
+  min: Math.min(...xs),
+  max: Math.max(...xs),
+  n: xs.length,
+})
+
+// Cold loads are timing-sensitive and this host is shared: run before/after alternately, one run per
+// invocation, so both builds see the same background load; aggregate the per-run records afterwards.
+function loadInterleaved(builds, mode) {
+  const runs = Object.fromEntries(builds.map((b) => [b.label, {}]))
+  const meta = {}
+  for (let round = 0; round < RUNS; round++) {
+    for (const b of builds) {
+      const f = join(tmp, `${b.label}-load-${mode}-${round}.json`)
+      run('load.mjs', [
+        '--runs',
+        '1',
+        '--dist',
+        b.dist,
+        '--out',
+        f,
+        ...(mode === 'gzip' ? ['--compress'] : []),
+      ])
+      const res = readJson(f)
+      meta.chromium = res.chromium
+      for (const [doc, d] of Object.entries(res.docs)) (runs[b.label][doc] ??= []).push(...d.raw)
+    }
+  }
+  const out = {}
+  for (const b of builds) {
+    out[b.label] = { docs: {} }
+    for (const [doc, rs] of Object.entries(runs[b.label])) {
+      const good = rs.filter((r) => r.ok)
+      const col = (k) => good.map((r) => r[k]).filter((v) => v != null)
+      out[b.label].docs[doc] = {
+        okRuns: good.length,
+        timeToEditableMs: stat(col('tte')),
+        transferredAtEditableBytes: stat(col('transferredAtEditable')),
+        transferredBytes: stat(col('transferred')),
+        requests: stat(col('requests')),
+        failedRequests: rs.reduce((n, r) => n + r.failed.length, 0),
+        firstRunRequests: rs[0].reqLog,
+      }
+    }
+  }
+  return { out, chromium: meta.chromium }
+}
+
+function measureStatic(label, dist) {
   console.log(`== ${label}: ${dist}`)
   const out = { label, dist: relative(repoRoot, dist) || dist }
   const bs = join(tmp, `${label}-bundle.json`)
   run('bundle-size.mjs', [bs, '--dist', dist])
   out.bundle = readJson(bs)
-  out.load = {}
-  for (const mode of ['gzip', 'raw']) {
-    const f = join(tmp, `${label}-load-${mode}.json`)
-    run('load.mjs', [
-      '--runs',
-      String(RUNS),
-      '--dist',
-      dist,
-      '--out',
-      f,
-      ...(mode === 'gzip' ? ['--compress'] : []),
-    ])
-    out.load[mode] = readJson(f)
-  }
   out.picker = {}
   for (const doc of ['simple', 'long']) {
     const f = join(tmp, `${label}-picker-${doc}.json`)
@@ -102,8 +142,20 @@ function measure(label, dist) {
   return out
 }
 
-const before = measure('before', resolve(beforeDist))
-const after = measure('after', afterDist)
+const before = measureStatic('before', resolve(beforeDist))
+const after = measureStatic('after', afterDist)
+const loadAvgStart = os.loadavg()
+const builds = [
+  { label: 'before', dist: resolve(beforeDist) },
+  { label: 'after', dist: afterDist },
+]
+let chromium = ''
+for (const mode of ['gzip', 'raw']) {
+  const { out, chromium: c } = loadInterleaved(builds, mode)
+  chromium = c
+  before.load = { ...before.load, [mode]: out.before }
+  after.load = { ...after.load, [mode]: out.after }
+}
 
 // the build must also work under a sub-path (host serves /office-frame/docs/<version>/): one cold load there
 const mount = `/office-frame/docs/${after.manifest?.version ?? 'v'}/`
@@ -141,6 +193,9 @@ const result = {
     cpus: os.cpus().length,
     node: process.version,
     platform: `${os.platform()} ${os.arch()}`,
+    chromium,
+    loadAvgBefore: loadAvgStart,
+    loadAvgAfter: os.loadavg(),
   },
   runsPerDoc: RUNS,
   before,
@@ -156,19 +211,26 @@ writeFileSync(
 const MiB = (n) => `${(n / 1024 / 1024).toFixed(2)} MiB`
 const KiB = (n) => `${(n / 1024).toFixed(0)} KiB`
 const ms = (n) => `${Math.round(n)} ms`
-const pct = (a, b) => `${a <= b ? '−' : '+'}${Math.abs(Math.round((1 - b / a) * 100))}%`
+const pct = (a, b) => {
+  const d = Math.round((1 - b / a) * 100)
+  return d === 0 ? 'same' : d > 0 ? `−${d}%` : `+${-d}%`
+}
 const cmp = (fmt, a, b) => `${fmt(a)} → ${fmt(b)} (${pct(a, b)})`
+const fileName = (url) => {
+  const n = url.split('?')[0].split('/').pop()
+  return n || 'index.html'
+}
 const byType = (b, t) => b.byType[t] ?? { files: 0, raw: 0, gzip: 0, brotli: 0 }
 const docs = Object.keys(after.load.gzip.docs)
 
 const md = []
 md.push('# Web bundle measurements (UNI-1013 B3)', '')
 md.push(
-  `Generated ${result.generatedAt} on ${result.host.platform}, ${result.host.cpus} CPUs, node ${result.host.node}, chromium ${after.load.gzip.chromium} (headless). Raw data: \`measurements-b3.json\`. Reproduce: \`node web/measure/measure-b3.mjs --before-dist <spike build>\` (before = \`npm run build:web\` at 4a70857, i.e. \`web/docs/dist\`).`,
+  `Generated ${result.generatedAt} on ${result.host.platform}, ${result.host.cpus} CPUs, node ${result.host.node}, chromium ${result.host.chromium} (headless), 1-min load average ${result.host.loadAvgBefore[0].toFixed(1)} → ${result.host.loadAvgAfter[0].toFixed(1)} (the host is shared with other workers: before/after runs are interleaved, absolute times still carry noise). Raw data: \`measurements-b3.json\`. Reproduce: \`node web/measure/measure-b3.mjs --before-dist <spike build>\` (before = \`npm run build:web\` at 4a70857, i.e. \`web/docs/dist\`).`,
   '',
   `- **before**: UNI-1011 spike build (single-directory output, TTF faces, meta CSP).`,
   `- **after**: \`${after.manifest?.version ?? after.dist}\` (${after.manifest?.files ?? '?'} files; versioned dir, manifest + csp.json + headers.json, WOFF2 Latin faces, fonts under \`fonts/\` never inlined, no sourcemaps).`,
-  `- Both are served by the same \`web/server/server.mjs\`; "gzip" = server compresses text/font responses level 9 (what a host sends), "raw" = no compression (the spike's original measurement setup). Cold load, HTTP cache disabled, ${RUNS} runs per document, median shown.`,
+  `- Both are served by the same \`web/server/server.mjs\`; "gzip" = server compresses text/font responses level 9 (what a host sends), "raw" = no compression (the spike's original measurement setup). Cold load, HTTP cache disabled, ${RUNS} rounds of (before, after) per document, median shown.`,
   '',
 )
 
@@ -235,11 +297,11 @@ for (const mode of ['gzip', 'raw']) {
 
 md.push('### What was fetched (gzip run 1, after build)', '')
 for (const d of docs) {
-  const r = after.load.gzip.docs[d].raw[0]
-  const fonts = r.reqLog.filter((q) => q.type === 'Font')
-  const code = r.reqLog.filter((q) => q.type !== 'Font' && !q.url.startsWith('data:'))
+  const reqs = after.load.gzip.docs[d].firstRunRequests
+  const fonts = reqs.filter((q) => q.type === 'Font')
+  const code = reqs.filter((q) => q.type !== 'Font' && !q.url.startsWith('data:'))
   md.push(
-    `- **${d}**: ${code.map((q) => `\`${q.url.split('/').pop().split('?')[0]}\` ${KiB(q.wire)}`).join(', ')}; fonts: ${fonts.length ? fonts.map((q) => `\`${q.url.split('/').pop()}\` ${KiB(q.wire)}${q.afterEditable ? ' (after editable)' : ''}`).join(', ') : 'none'}`,
+    `- **${d}**: ${code.map((q) => `\`${fileName(q.url)}\` ${KiB(q.wire)}`).join(', ')}; fonts: ${fonts.length ? fonts.map((q) => `\`${fileName(q.url)}\` ${KiB(q.wire)}${q.afterEditable ? ' (after editable)' : ''}`).join(', ') : 'none'}`,
   )
 }
 md.push('')
