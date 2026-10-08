@@ -25,7 +25,7 @@
     "check:egress": "node tools/check-egress.mjs && node --test tools/check-egress.test.mjs",
     "rebrand": "node tools/rebrand/rebrand.mjs",
     "rebrand:check": "node tools/rebrand/rebrand.mjs --check",
-    "test:rebrand": "node --test tools/rebrand/brand-scan.test.mjs tools/rebrand/rebrand.test.mjs",
+    "test:rebrand": "node --test tools/rebrand/brand-scan.test.mjs tools/rebrand/rebrand.test.mjs tools/rebrand/sync-upstream.test.mjs",
     "legal": "node tools/legal/sync-legal.mjs",
     "legal:check": "node tools/legal/sync-legal.mjs --check",
     "test:legal": "node --test tools/legal/sync-legal.test.mjs",
