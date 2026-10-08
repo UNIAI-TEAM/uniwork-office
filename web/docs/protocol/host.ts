@@ -15,6 +15,7 @@
  */
 import {
   Endpoint,
+  armTimeout,
   err,
   type MessageSource,
   type PostTarget,
@@ -210,13 +211,12 @@ export function createDocsFrameHost(options: DocsFrameHostOptions): DocsFrameHos
           reject(e)
         },
       }
-      const timer = setTimeout(
-        () => w.reject(err('timeout', `frame not ready after ${timeoutMs} ms`)),
-        timeoutMs,
+      const clearTimer = armTimeout(timeoutMs, () =>
+        w.reject(err('timeout', `frame not ready after ${timeoutMs} ms`)),
       )
       const onAbort = (): void => w.reject(err('cancelled', 'whenReady aborted'))
       const done = (): void => {
-        clearTimeout(timer)
+        clearTimer()
         o.signal?.removeEventListener('abort', onAbort)
         waiters.delete(w)
       }

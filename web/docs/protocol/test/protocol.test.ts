@@ -492,6 +492,39 @@ describe('timeouts and cancellation', () => {
     await settled
   })
 
+  it('timeoutMs 0 means no timeout (a request may wait on a user dialog)', async () => {
+    vi.useFakeTimers()
+    let answer!: (v: { files: [] }) => void
+    const { host, client } = setup({
+      api: { 'api.recents': () => new Promise((r) => (answer = r)) },
+    })
+    await vi.advanceTimersByTimeAsync(0)
+    await host.whenReady()
+    let outcome = 'pending'
+    const p = client.request('api.recents', {}, { timeoutMs: 0 }).then(
+      () => (outcome = 'resolved'),
+      (e: DocsProtocolError) => (outcome = e.code),
+    )
+    await vi.advanceTimersByTimeAsync(60 * 60_000)
+    expect(outcome).toBe('pending')
+    answer({ files: [] })
+    await vi.advanceTimersByTimeAsync(0)
+    await p
+    expect(outcome).toBe('resolved')
+  })
+
+  it('host.whenReady with timeoutMs 0 waits for the frame', async () => {
+    vi.useFakeTimers()
+    const { host } = setup({ getInit: vi.fn(() => new Promise<never>(() => {})) })
+    let outcome = 'pending'
+    void host.whenReady({ timeoutMs: 0 }).then(
+      () => (outcome = 'ready'),
+      (e: DocsProtocolError) => (outcome = e.code),
+    )
+    await vi.advanceTimersByTimeAsync(60 * 60_000)
+    expect(outcome).toBe('pending')
+  })
+
   it('AbortSignal cancels the request and aborts the peer handler', async () => {
     let handlerSignal: AbortSignal | undefined
     const { host, client } = setup({

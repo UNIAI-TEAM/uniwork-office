@@ -51,26 +51,26 @@ handshake again.
 
 ### Frame → host
 
-| type                   | kind    | payload → result                                                                               |
-| ---------------------- | ------- | ---------------------------------------------------------------------------------------------- |
-| `ready`                | event   | {protocolVersion, frameVersion?, capabilities}                                                 |
-| `token.refresh`        | request | {reason: 'expiring' \| 'unauthorized'} → {token, tokenExpiresAt}                               |
-| `api.open`             | request | {fileId} → `OpenPayload`                                                                       |
-| `api.save`             | request | {fileId, data, etag?, auto?} → `SaveResult` (etag mismatch → `conflict`)                       |
-| `api.saveAs`           | request | {name, data, sourceFileId?, folderId?, silent?} → `SaveResult`                                 |
-| `api.recents`          | request | {limit?} → {files: FileMeta[]}                                                                 |
-| `api.export`           | request | {format: 'pdf' \| 'html', fileId? \| data? \| html?, page geometry?} → {data, mimeType, name?} |
-| `api.attachments.add`  | request | {files: UploadItem[]} → {accepted, rejected}                                                   |
-| `api.images.upload`    | request | UploadItem + {fileId?} → {imageId, url}                                                        |
-| `file.pick`            | request | {purpose: 'open' \| 'insert', accept?} → {file: OpenPayload \| null}                           |
-| `image.fetch`          | request | {url (http/s)} → {image: {base64, mime} \| null}                                               |
-| `convert.altChunkHtml` | request | {html} → {data: ArrayBuffer \| null}                                                           |
-| `dirty`                | event   | {dirty} (client de-duplicates)                                                                 |
-| `title`                | event   | {title}                                                                                        |
-| `resize`               | event   | {height} (CSS px, content height)                                                              |
-| `saved`                | event   | {file, versionId?, initiatedByFrame}                                                           |
-| `error`                | event   | {error: ProtocolErrorShape, fatal}                                                             |
-| `cancel`               | event   | {id} — abort a frame→host request                                                              |
+| type                   | kind    | payload → result                                                                      |
+| ---------------------- | ------- | ------------------------------------------------------------------------------------- |
+| `ready`                | event   | {protocolVersion, frameVersion?, capabilities}                                        |
+| `token.refresh`        | request | {reason: 'expiring' \| 'unauthorized'} → {token, tokenExpiresAt}                      |
+| `api.open`             | request | {fileId} → `OpenPayload`                                                              |
+| `api.save`             | request | {fileId, data, etag?, auto?} → `SaveResult` (etag mismatch → `conflict`)              |
+| `api.saveAs`           | request | {name, data, sourceFileId?, folderId?, silent?} → `SaveResult`                        |
+| `api.recents`          | request | {limit?} → {files: FileMeta[]}                                                        |
+| `api.export`           | request | {format: 'pdf' \| 'html', fileId?, data?, html?, geometry?} → {data, mimeType, name?} |
+| `api.attachments.add`  | request | {files: UploadItem[]} → {accepted, rejected}                                          |
+| `api.images.upload`    | request | UploadItem + {fileId?} → {imageId, url}                                               |
+| `file.pick`            | request | {purpose: 'open' \| 'insert', accept?} → {file: OpenPayload \| null}                  |
+| `image.fetch`          | request | {url (http/s)} → {image: {base64, mime} \| null}                                      |
+| `convert.altChunkHtml` | request | {html} → {data: ArrayBuffer \| null}                                                  |
+| `dirty`                | event   | {dirty} (client de-duplicates)                                                        |
+| `title`                | event   | {title}                                                                               |
+| `resize`               | event   | {height} (CSS px, content height)                                                     |
+| `saved`                | event   | {file, versionId?, initiatedByFrame}                                                  |
+| `error`                | event   | {error: ProtocolErrorShape, fatal}                                                    |
+| `cancel`               | event   | {id} — abort a frame→host request                                                     |
 
 `api.*`, `file.pick`, `image.fetch` and `convert.altChunkHtml` are proxied by the host's `api` handlers; a type
 without a handler answers `unsupported` (e.g. AI-adjacent calls stay unavailable on the web).
@@ -106,9 +106,19 @@ without a handler answers `unsupported` (e.g. AI-adjacent calls stay unavailable
   `Authorization: Bearer`, `credentials: 'omit'`, retries once after a 401 with a refreshed token, and refuses any
   URL outside `apiBase`.
 
+### Exporting unsaved edits (`api.export.data`)
+
+`fileId` alone means "export the last saved version". When the editor has unsaved edits (or the
+document was never saved) the frame also sends the current docx bytes as `data` (an `ArrayBuffer`,
+transferred, not copied), and `fileId` then only identifies the document. A host that can render
+bytes must prefer `data` over the stored version. A host without byte support ignores `data` and
+exports `fileId`'s stored version (unsaved edits are then missing, as before); a host that can do
+neither answers `unsupported`, and the frame falls back to its in-frame print dialog.
+
 ## Correlation, timeouts, cancellation
 
-Ids are `<h|f><seq>-<random>` per sender. Every request has a timeout (default 30 s, per call `timeoutMs`) and an
+Ids are `<h|f><seq>-<random>` per sender. Every request has a timeout (default 30 s, per call `timeoutMs`;
+`timeoutMs: 0` = no timeout, for requests that wait on a user dialog such as `file.pick` / `api.saveAs`) and an
 optional `AbortSignal`; aborting rejects with `cancelled` and sends a `cancel` event so the peer handler's
 `ctx.signal` aborts. Host calls made before the handshake wait for it (bounded by the same timeout); frame `api.*`
 calls wait for `init`. `dispose()` rejects everything in flight with `cancelled` and removes the listener.
