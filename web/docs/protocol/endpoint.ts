@@ -84,8 +84,10 @@ export function armTimeout(timeoutMs: number, onTimeout: () => void): () => void
   return () => clearTimeout(timer)
 }
 
-export function validateOrigins(origins: readonly string[]): void {
-  if (origins.length === 0) throw new Error('allowedOrigins must not be empty')
+/** Throws on an empty list or a non-exact origin; returns the first one (the postMessage targetOrigin). */
+export function validateOrigins(origins: readonly string[]): string {
+  const first = origins[0]
+  if (first === undefined) throw new Error('allowedOrigins must not be empty')
   for (const o of origins) {
     if (o === '*' || o === 'null' || !/^https?:\/\/[^/?#\s]+$/.test(o)) {
       throw new Error(
@@ -93,11 +95,14 @@ export function validateOrigins(origins: readonly string[]): void {
       )
     }
   }
+  return first
 }
 
 export class Endpoint {
   private readonly opts: EndpointOptions
   private readonly allowed: ReadonlySet<string>
+  /** first allowed origin, captured at construction (later edits to the caller's array do not apply) */
+  private readonly targetOrigin: string
   private readonly pending = new Map<string, Pending>()
   private readonly handlers = new Map<string, Handler>()
   private readonly listeners = new Map<string, Set<Listener>>()
@@ -108,7 +113,7 @@ export class Endpoint {
   private readonly onMessage = (ev: MessageEvent): void => this.receive(ev)
 
   constructor(opts: EndpointOptions) {
-    validateOrigins(opts.allowedOrigins)
+    this.targetOrigin = validateOrigins(opts.allowedOrigins)
     this.opts = opts
     this.allowed = new Set(opts.allowedOrigins)
     opts.self.addEventListener('message', this.onMessage)
@@ -214,7 +219,7 @@ export class Endpoint {
     if (this.disposed) return
     const peer = this.opts.peer()
     if (!peer) throw err('not_ready', 'peer window not available')
-    peer.postMessage(msg, this.opts.allowedOrigins[0], transfer)
+    peer.postMessage(msg, this.targetOrigin, transfer)
   }
 
   private reply(req: Envelope, body: { payload?: unknown; error?: ProtocolErrorShape }): void {

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createDocsFrameClient, type DocsFrameClient, type DocsFrameClientOptions } from '../client'
 import { createDocsFrameHost, type DocsFrameHost, type DocsFrameHostOptions } from '../host'
-import type { RejectInfo } from '../endpoint'
+import { Endpoint, validateOrigins, type RejectInfo } from '../endpoint'
 import {
   DocsProtocolError,
   PROTOCOL_NS,
@@ -194,6 +194,26 @@ describe('origin and source checks', () => {
     expect(mk(['null'])).toThrow(/invalid allowed origin/)
     expect(mk([`${ORIGIN}/path`])).toThrow(/invalid allowed origin/)
     expect(mk([])).toThrow(/must not be empty/)
+  })
+
+  it('validateOrigins returns the first origin, the postMessage targetOrigin', () => {
+    expect(validateOrigins([ORIGIN, 'https://other.test'])).toBe(ORIGIN)
+  })
+
+  it('targets the first allowed origin captured at construction', () => {
+    const { host: hostWin } = wirePair()
+    const origins = [ORIGIN]
+    const posted: string[] = []
+    const ep = new Endpoint({
+      self: hostWin,
+      peer: () => ({ postMessage: (_m, targetOrigin) => posted.push(targetOrigin) }),
+      allowedOrigins: origins,
+      idPrefix: 'h',
+    })
+    origins.length = 0 // a later edit to the caller's array must not change the target
+    ep.emit('dirty', { dirty: true })
+    expect(posted).toEqual([ORIGIN])
+    ep.dispose()
   })
 
   it('drops messages from another origin even when the source is the peer', async () => {
