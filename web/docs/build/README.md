@@ -68,5 +68,5 @@ font picker and saves under this exact header and fails on any `securitypolicyvi
 ## Tests
 
 `npx vitest run --root web/docs/build` (manifest, CSP, version, font rewrite + woff2 freshness),
-`npx playwright test -c web/e2e` (spike e2e + CSP header spec; builds with `npm run build:web` first),
-`node web/measure/measure-b3.mjs --before-dist <spike build>` (writes `web/measure/measurements-b3.{md,json}`).
+`npx playwright test -c web/e2e` (needs `npm run build:web` first; the specs open documents through the protocol test host at `/test-host/`, `csp-header.spec.ts` fails on any CSP violation),
+`node web/measure/measure-b3.mjs --before-dist <old-pipeline build> --before-desc "..."` (writes `web/measure/measurements-b3.{md,json}`; `measurements-b3-vs-spike.*` is the earlier run against the UNI-1011 spike build).

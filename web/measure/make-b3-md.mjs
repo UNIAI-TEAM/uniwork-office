@@ -34,7 +34,7 @@ const docs = Object.keys(after.load.gzip.docs)
 const md = []
 md.push('# Web bundle measurements (UNI-1013 B3)', '')
 md.push(
-  `Generated ${result.generatedAt} on ${result.host.platform}, ${result.host.cpus} CPUs, node ${result.host.node}, chromium ${result.host.chromium} (headless), 1-min load average ${result.host.loadAvgBefore[0].toFixed(1)} → ${result.host.loadAvgAfter[0].toFixed(1)} (the host is shared with other workers: before/after runs are interleaved, absolute times still carry noise). Raw data: \`measurements-b3.json\`. Reproduce: \`node web/measure/measure-b3.mjs --before-dist <old-pipeline build> --before-desc \"...\"\`.`,
+  `Generated ${result.generatedAt} on ${result.host.platform}, ${result.host.cpus} CPUs, node ${result.host.node}, chromium ${result.host.chromium} (headless), 1-min load average ${result.host.loadAvgBefore[0].toFixed(1)} → ${result.host.loadAvgAfter[0].toFixed(1)} (the host is shared with other workers: before/after runs are interleaved, absolute times still carry noise). Raw data: \`measurements-b3.json\`. Reproduce: \`node web/measure/measure-b3.mjs --before-dist <old-pipeline build> --before-desc "..."\`.`,
   '',
   `- **before**: ${result.beforeDescription}.`,
   `- **after**: \`${after.manifest?.version ?? after.dist}\` (${after.manifest?.files ?? '?'} files; versioned dir, manifest + csp.json + headers.json, WOFF2 Latin faces, fonts under \`fonts/\` never inlined, no sourcemaps).`,
