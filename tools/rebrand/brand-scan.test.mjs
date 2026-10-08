@@ -160,3 +160,22 @@ test('scope covers the shipped CLI launchers, packaging recipes, CLI README and 
   })
   assert.equal(violations.length, 1)
 })
+
+test('catalog: internal tracker ids are violations, code and other scopes are not affected', () => {
+  const { violations } = run({
+    'apps/shell/src/renderer/src/strings.ts': [
+      "  onbBody1: 'A desktop runtime; platform integration is not part of GO-1.',",
+      "  onbBody2: 'See UNI-1002 and GO-A8.',",
+      "  onbBody3: 'Your ego-1 and a GOAL-100 stay.',",
+      '',
+    ].join('\n'),
+    'apps/shell/src/main/index.ts': "// disabled in GO-1\nconst x = 'GO-1'\n",
+  })
+  assert.deepEqual(
+    violations.map((v) => [v.file, v.line]),
+    [
+      ['apps/shell/src/renderer/src/strings.ts', 1],
+      ['apps/shell/src/renderer/src/strings.ts', 2],
+    ],
+  )
+})

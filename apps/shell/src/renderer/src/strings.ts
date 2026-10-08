@@ -809,8 +809,7 @@ export const strings = {
     // First-run onboarding
     onbTitle1: 'Welcome to UniWork Office',
     onbSubtitle1: 'Open document productivity runtime for the UniWork ecosystem',
-    onbBody1:
-      'Create docs, build sheets, make slides, and review PDFs. This is a desktop office runtime; UniWork platform integration is not part of GO-1.',
+    onbBody1: 'Create docs, build sheets, make slides, and review PDFs, all on your own computer.',
     onbTitle2: 'This is just the beginning',
     onbBody2:
       'UniWork Office currently ships the desktop editors only. UniWork authentication, Work Graph and cloud sync are not part of this phase.',
@@ -8507,8 +8506,7 @@ export const strings = {
     newTab: 'Tab mới',
     onbTitle1: 'Chào mừng đến UniWork Office',
     onbSubtitle1: 'Môi trường năng suất tài liệu mở cho hệ sinh thái UniWork',
-    onbBody1:
-      'Tạo tài liệu, lập bảng tính, làm trình chiếu và xem PDF. Đây là môi trường office trên máy tính; tích hợp nền tảng UniWork chưa thuộc GO-1.',
+    onbBody1: 'Tạo tài liệu, lập bảng tính, làm trình chiếu và xem PDF ngay trên máy tính của bạn.',
     onbTitle2: 'Đây mới chỉ là khởi đầu',
     onbBody2:
       'UniWork Office hiện chỉ cung cấp các trình soạn thảo trên máy tính. Xác thực UniWork, Work Graph và đồng bộ đám mây chưa thuộc giai đoạn này.',

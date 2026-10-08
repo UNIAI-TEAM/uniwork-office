@@ -9,7 +9,8 @@
 //
 // Scanned surfaces (everything else, e.g. LICENSE, NOTICE, docs/, tests, is
 // out of scope by construction; see README.md):
-//   catalog    i18n catalogs / string tables (all locales): values only, keys are code
+//   catalog    i18n catalogs / string tables (all locales): values only, keys are code;
+//              internal tracker ids (GO-1, UNI-1002) are violations too
 //   package    package.json metadata (productName, description, author, homepage,
 //              repository, build.*; not the npm name or dependency maps)
 //   installer  electron-builder config and installer scripts under */build/ (comments too)
@@ -32,6 +33,8 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 
 /** The upstream brand, matched case-insensitively. */
 export const BRAND = /genoffice|genspark|genteam|mainfunc/gi
+/** Internal tracker ids (GO-1, GO-A8, UNI-1002) have no place in text users read. */
+const INTERNAL_TICKET = /\b(?:GO-A?\d+|UNI-\d{3,})\b/g
 /** Org / domain forms that are never code identifiers, even though they embed the lowercase brand. */
 const BRAND_LOCATOR = /genoffice\.ai|genspark\.ai|genspark-ai\/|genoffice:\/\//gi
 
@@ -134,6 +137,7 @@ export function brandMatches(text, scope = 'source') {
   if (scope === 'package' || scope === 'installer') {
     for (const m of text.matchAll(PACKAGING_IDENTITY)) hits.push(m[0])
   }
+  if (scope === 'catalog') for (const m of text.matchAll(INTERNAL_TICKET)) hits.push(m[0])
   const masked = mask(text).replace(BRAND_LOCATOR, (m) => ' '.repeat(m.length))
   for (const m of masked.matchAll(BRAND)) hits.push(m[0])
   return hits

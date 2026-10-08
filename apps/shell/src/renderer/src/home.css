@@ -1234,8 +1234,9 @@ body.vib .home {
   max-width: 100%;
   min-width: 0;
   display: flex;
+  flex-wrap: wrap; /* the AI chip drops below a long title instead of truncating it ("AI Markd…") */
   align-items: center;
-  gap: 6px;
+  gap: 2px 6px;
 }
 
 .quick-title {

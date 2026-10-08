@@ -1558,9 +1558,10 @@ export function AiPanel({
 
   // `open` dep: re-expanding lands on messages streamed while collapsed
   useEffect(() => {
-    if (stickToBottomRef.current) {
-      logRef.current?.scrollTo({ top: logRef.current.scrollHeight })
-    }
+    const el = logRef.current
+    // the empty state (intro and examples) reads from its top; only a conversation sticks to the bottom
+    if (el?.querySelector('.ai-chat-empty')) el.scrollTo({ top: 0 })
+    else if (stickToBottomRef.current) el?.scrollTo({ top: el.scrollHeight })
   }, [chat, open])
 
   const onLogScroll = () => {
