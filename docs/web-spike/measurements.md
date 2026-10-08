@@ -2,7 +2,7 @@
 
 Raw data: `measurements.json`. Produced by `web/measure/{bundle-size,load,css-evidence,make-tables}.mjs`.
 
-## Bundle size (web/docs/dist, generated 2026-10-08T13:34:09.271Z)
+## Bundle size (web/docs/dist, generated 2026-10-08T13:47:04.227Z)
 
 gzip = zlib level 9, brotli = quality 11, both computed per file. `.map` files excluded (sourcemaps: 11.67 MiB).
 
@@ -70,9 +70,9 @@ time-to-editable = first moment a visible `.ProseMirror[contenteditable=true]` c
 
 | doc | ok runs | DOMContentLoaded | load | time-to-editable | JS heap | JS heap after GC | transferred by editable | transferred settled | requests |
 |---|---|---|---|---|---|---|---|---|---|
-| simple.docx | 5/5 | 331 ms (322 ms – 343 ms) | 331 ms (322 ms – 343 ms) | 590 ms (574 ms – 676 ms) | 10.59 MiB (10.58 MiB – 10.62 MiB) | 8.23 MiB (8.23 MiB – 8.23 MiB) | 5.10 MiB (5.10 MiB – 5.10 MiB) | 7.51 MiB (7.51 MiB – 7.51 MiB) | 9 |
-| kitchen-sink.docx | 5/5 | 316 ms (311 ms – 350 ms) | 316 ms (312 ms – 350 ms) | 667 ms (641 ms – 755 ms) | 11.57 MiB (11.57 MiB – 11.58 MiB) | 9.17 MiB (9.17 MiB – 9.17 MiB) | 5.69 MiB (5.69 MiB – 5.69 MiB) | 8.11 MiB (8.11 MiB – 8.11 MiB) | 11 |
-| long.docx | 5/5 | 315 ms (306 ms – 338 ms) | 315 ms (306 ms – 338 ms) | 1006 ms (988 ms – 1019 ms) | 21.05 MiB (20.06 MiB – 21.06 MiB) | 11.93 MiB (11.93 MiB – 11.93 MiB) | 5.10 MiB (5.10 MiB – 5.10 MiB) | 5.10 MiB (5.10 MiB – 5.10 MiB) | 8 |
+| simple.docx | 5/5 | 313 ms (307 ms – 317 ms) | 313 ms (308 ms – 318 ms) | 567 ms (553 ms – 592 ms) | 10.62 MiB (10.58 MiB – 10.63 MiB) | 8.23 MiB (8.23 MiB – 8.23 MiB) | 5.10 MiB (5.10 MiB – 5.10 MiB) | 7.51 MiB (7.51 MiB – 7.51 MiB) | 9 |
+| kitchen-sink.docx | 5/5 | 310 ms (306 ms – 318 ms) | 311 ms (306 ms – 318 ms) | 641 ms (627 ms – 649 ms) | 11.58 MiB (11.54 MiB – 11.58 MiB) | 9.17 MiB (9.17 MiB – 9.17 MiB) | 5.69 MiB (5.69 MiB – 5.69 MiB) | 8.11 MiB (8.11 MiB – 8.11 MiB) | 11 |
+| long.docx | 5/5 | 311 ms (307 ms – 312 ms) | 311 ms (307 ms – 312 ms) | 987 ms (972 ms – 1008 ms) | 21.05 MiB (19.94 MiB – 21.06 MiB) | 11.93 MiB (11.93 MiB – 11.93 MiB) | 5.10 MiB (5.10 MiB – 5.10 MiB) | 5.10 MiB (5.10 MiB – 5.10 MiB) | 8 |
 
 - long.docx: fixture served by playwright route (server 404)
 
