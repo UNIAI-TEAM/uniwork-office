@@ -12,8 +12,9 @@
  * result is destructured / branched on (zoteroCommand().ok, openDocxDecrypt().ok,
  * setDocPassword().ok, getAutoSaveDefault validation).
  *
- * Which UI entry points exist for each method, and whether the renderer has a flag
- * to hide them, is documented in docs/web-spike/hide-flags.md.
+ * Which UI entry points exist for each method is documented in
+ * docs/web-spike/hide-flags.md; the entries are hidden by `webCapabilities` below
+ * (UNI-1013 W4), so these no-ops are the safety net behind a hidden entry.
  *
  * | group               | methods                                                                                      | value returned                      |
  * |---------------------|----------------------------------------------------------------------------------------------|-------------------------------------|
@@ -31,12 +32,50 @@
  * Merge order in install.ts is hide, webapi, ai, browser: a later module that
  * defines the same key silently replaces these.
  */
-import type { DesktopApi } from '../../../apps/docs/src/shared/ipc'
+import type { DesktopApi, DesktopCapabilities } from '../../../apps/docs/src/shared/ipc'
+
+/**
+ * THE web capability source. The renderer reads `window.desktop.capabilities`
+ * once (apps/docs/src/renderer/capabilities.ts `cap()`) and every hidden entry
+ * is declared against one of these keys; there is no `isWeb` check anywhere
+ * else. Electron never sets the object, so on desktop every entry stays on.
+ *
+ * | capability      | hides (renderer entry)                                              |
+ * |-----------------|---------------------------------------------------------------------|
+ * | zotero          | References tab > Zotero group (4 buttons)                           |
+ * | docPassword     | Protect dialog > open-password + confirm fields                     |
+ * | tabs            | View > Window > New Tab, Switch Tabs                                |
+ * | autoSaveToDisk  | quick-access AutoSave toggle, 30 s crash-recovery copy timer        |
+ * | ai              | Home > AI group, Review > Editor/Translate/AI comments/AI revisions,|
+ * |                 | View > AI panel, AI dock, ask-AI popover, context-menu Synonyms +   |
+ * |                 | Translate, F7 / menu proofread                                      |
+ * | webSearch       | AI tool web_search                                                  |
+ * | imageSearch     | AI tool image_search                                                |
+ * | imageGeneration | AI tool generate_image                                              |
+ * | createDocument  | AI tool create_document                                             |
+ * | billing         | AI panel "Buy plan" button                                          |
+ */
+export const webCapabilities: Readonly<Required<DesktopCapabilities>> = Object.freeze({
+  platform: 'web',
+  zotero: false,
+  docPassword: false,
+  tabs: false,
+  autoSaveToDisk: false,
+  ai: false,
+  webSearch: false,
+  imageSearch: false,
+  imageGeneration: false,
+  createDocument: false,
+  billing: false,
+})
 
 const noopDisposer = () => () => {}
 const NOT_AVAILABLE = 'Not available in the web build'
 
 export default {
+  // ---- capability flags (read once by the renderer; see webCapabilities) ----
+  capabilities: webCapabilities,
+
   // ---- Zotero (local desktop app over its connector port) ------------------
   zoteroCommand: async () => ({
     ok: false,
