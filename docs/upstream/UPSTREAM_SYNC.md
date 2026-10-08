@@ -4,16 +4,16 @@ UniWork Office is a long-lived fork of GenOffice. Do not automate blind upstream
 
 ## Remotes
 
-| Remote | URL | Role |
-| --- | --- | --- |
-| `upstream` | https://github.com/genspark-ai/genoffice.git | Official GenOffice repository |
-| `origin` | https://github.com/truongnt7/uniwork-office.git | UniWork-controlled fork |
-| Default branch | `main` | Both remotes |
+| Remote         | URL                                              | Role                          |
+| -------------- | ------------------------------------------------ | ----------------------------- |
+| `upstream`     | https://github.com/genspark-ai/genoffice.git     | Official GenOffice repository |
+| `origin`       | https://github.com/UNIAI-TEAM/uniwork-office.git | UniWork-controlled fork       |
+| Default branch | `main`                                           | Both remotes                  |
 
 ## One-time setup
 
 ```bash
-git clone https://github.com/truongnt7/uniwork-office.git
+git clone https://github.com/UNIAI-TEAM/uniwork-office.git
 cd uniwork-office
 git remote add upstream https://github.com/genspark-ai/genoffice.git   # already present on this clone
 git fetch upstream
