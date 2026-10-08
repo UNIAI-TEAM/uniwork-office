@@ -1,5 +1,5 @@
-import { Extension } from '@tiptap/core'
-import { Plugin, PluginKey, type EditorState } from '@tiptap/pm/state'
+import { Extension, type Editor } from '@tiptap/core'
+import { Plugin, PluginKey, type EditorState, type Transaction } from '@tiptap/pm/state'
 import { Decoration, DecorationSet, type EditorView } from '@tiptap/pm/view'
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model'
 import { isInTable } from '@tiptap/pm/tables'
@@ -12,10 +12,19 @@ import { type TabStop } from '@genoffice/docx-engine'
  * `aiChanged` (diff highlighting for AI edits).
  */
 
-import { SearchHighlight } from './extensions'
+import { SearchHighlight, type ListNumberingStorage } from './extensions'
 import { revisionDisplayState } from './marks'
-import { borderMergeFlags, type ParaBorderAttrs } from './para-border-merge'
+import {
+  affectsBorderGroup,
+  borderGroupKey,
+  borderMergeFlags,
+  type ParaBorderAttrs,
+  type StyleBorderLookup,
+} from './para-border-merge'
 import { rangeSlot } from '../dom-range'
+import { PHASED_CONTENT_SETTLED_EVENT, isPhasedContentPending } from '../phased-content'
+import { appendsAtEnd, touchedTopLevelBlocks } from './touched-blocks'
+import { blockDecorationPlugin } from './local-edit'
 
 const alignRange = rangeSlot()
 
@@ -136,6 +145,54 @@ export const ResolvedCommentsExtension = Extension.create({
   },
 })
 
+/**
+ * Plugin state for inline decorations that are a pure function of each text
+ * node: a full scan at init, then only the top-level blocks a transaction
+ * touched recompute (a `decorations` prop rescanned the whole document on
+ * every view update — tens of ms per keystroke on a 10k-paragraph file).
+ */
+function textDecorationState(
+  key: PluginKey<DecorationSet>,
+  decosOf: (node: ProseMirrorNode, pos: number, out: Decoration[]) => void,
+) {
+  const scan = (root: ProseMirrorNode, base: number, out: Decoration[]) =>
+    root.descendants((node, pos) => {
+      if (node.isText) decosOf(node, base + pos, out)
+    })
+  const full = (doc: ProseMirrorNode) => {
+    const decos: Decoration[] = []
+    scan(doc, 0, decos)
+    return decos.length > 0 ? DecorationSet.create(doc, decos) : DecorationSet.empty
+  }
+  return {
+    key,
+    state: {
+      init: (_config: unknown, state: EditorState) => full(state.doc),
+      apply(tr: Transaction, old: DecorationSet) {
+        if (!tr.docChanged) return old
+        const touched = touchedTopLevelBlocks(tr)
+        if (!touched) return full(tr.doc)
+        let set = appendsAtEnd(tr) ? old : old.map(tr.mapping, tr.doc)
+        const decos: Decoration[] = []
+        for (const offset of touched) {
+          const node = tr.doc.nodeAt(offset)
+          if (!node) continue
+          const end = offset + node.nodeSize
+          const stale = set.find(offset, end).filter((d) => d.from >= offset && d.to <= end)
+          if (stale.length) set = set.remove(stale)
+          scan(node, offset + 1, decos)
+        }
+        return decos.length ? set.add(tr.doc, decos) : set
+      },
+    },
+    props: {
+      decorations(state: EditorState) {
+        return key.getState(state)
+      },
+    },
+  }
+}
+
 // ---- tab stop rendering extension ----
 
 const tabStopPluginKey = new PluginKey<DecorationSet>('tabStops')
@@ -189,6 +246,9 @@ export interface TabTargetInput {
   /** left indent (tab-origin px) of a paragraph whose first line starts before
    *  it (w:hanging); only passed for tabs on that first line */
   hangingX?: number
+  /** the segment can wrap on its own (spaces / CJK): Word keeps the stop and
+   *  wraps a segment overflowing the edge by more than a space (probe 2026-09-17) */
+  segBreakable?: boolean
 }
 
 export interface TabTarget {
@@ -252,9 +312,12 @@ export function resolveTabTarget(input: TabTargetInput): TabTarget {
   else if (val === 'center') target -= segWidth / 2
   // no flush-right pin inside the hanging area: Word wraps the first-line
   // text on to the left indent rather than stranding the label
+  const overflow = target + segWidth - (paraW - 1)
   if (
-    target + segWidth > paraW - 1 &&
-    (val !== 'left' || target > paraW - 1 || (!inHang && paraW - segWidth - 1 > x))
+    overflow > 0 &&
+    (val !== 'left' ||
+      target > paraW - 1 ||
+      (!inHang && paraW - segWidth - 1 > x && !(input.segBreakable && overflow > minAdv)))
   )
     target = paraW - 1 - restWidth
   let collapsed = false
@@ -310,9 +373,23 @@ export function tabSegmentWidth(
   paraW: number,
   zoom: number,
 ): number {
-  const sameLine = end.top < start.bottom && end.bottom > start.top
-  if (!sameLine) return paraW
+  if (!sameVisualLine(start, end)) return paraW
   return Math.max(0, (end.left - start.left) / zoom)
+}
+
+/**
+ * Two caret rects sit on one line when either's vertical middle falls inside
+ * the other: a plain overlap test also matched consecutive lines whose boxes
+ * overlap under a tight line rule (line=177 auto: 20px boxes 15px apart), which
+ * read the next line's tab as a same-line continuation.
+ */
+export function sameVisualLine(
+  a: { top: number; bottom: number },
+  b: { top: number; bottom: number },
+): boolean {
+  const midA = (a.top + a.bottom) / 2
+  const midB = (b.top + b.bottom) / 2
+  return (midA > b.top && midA < b.bottom) || (midB > a.top && midB < a.bottom)
 }
 
 function spaceWidthPx(cs: CSSStyleDeclaration): number {
@@ -334,6 +411,9 @@ function tabGlyphLeft(view: EditorView, pos: number): number | null {
   const rect = range.getClientRects()[0]
   return rect ? rect.left : null
 }
+
+/** inner whitespace or CJK text: a wrap opportunity inside the tab segment */
+const SEG_BREAKABLE_RE = /\s|[\u2E80-\u9FFF\uAC00-\uD7AF\uF900-\uFAFF\uFF00-\uFFEF]/
 
 const MEASURE_RETRY_MAX = 10
 /**
@@ -360,6 +440,10 @@ class TabLayoutView {
     this.invalidate()
     this.measure()
   }
+  private onPhasedSettled = () => {
+    this.invalidate()
+    this.measure()
+  }
 
   constructor(
     private view: EditorView,
@@ -367,6 +451,7 @@ class TabLayoutView {
   ) {
     this.measure()
     document.fonts?.addEventListener('loadingdone', this.onFontsLoaded)
+    document.addEventListener(PHASED_CONTENT_SETTLED_EVENT, this.onPhasedSettled)
     if (typeof ResizeObserver !== 'undefined') {
       // width-only trigger: height changes on every keystroke
       this.resizeObserver = new ResizeObserver(() => {
@@ -401,6 +486,7 @@ class TabLayoutView {
 
   destroy() {
     document.fonts?.removeEventListener('loadingdone', this.onFontsLoaded)
+    document.removeEventListener(PHASED_CONTENT_SETTLED_EVENT, this.onPhasedSettled)
     this.resizeObserver?.disconnect()
     if (this.retryRaf) cancelAnimationFrame(this.retryRaf)
   }
@@ -421,6 +507,8 @@ class TabLayoutView {
       this.retryRaf = 0
     }
     const { view } = this
+    // a streamed tail is still landing: measured once, when it has (settled event)
+    if (isPhasedContentPending()) return
     if (!view.dom.isConnected) {
       this.scheduleRetry()
       return
@@ -614,6 +702,7 @@ class TabLayoutView {
     // otherwise the computed target depends on the layout being measured and
     // re-measure never reaches a fixed point.
     const endsAtBreak: boolean[] = []
+    const segBreakable: boolean[] = []
     const segWidths = tabPositions.map((tabPos, i) => {
       const segStart = tabPos + 1
       const nextTab = i + 1 < tabPositions.length ? tabPositions[i + 1] : paraEnd
@@ -622,6 +711,9 @@ class TabLayoutView {
       endsAtBreak[i] = nextBreak !== undefined
       const segEnd = nextBreak ?? nextTab
       if (segEnd <= segStart) return 0
+      segBreakable[i] = SEG_BREAKABLE_RE.test(
+        node.textBetween(segStart - pos - 1, segEnd - pos - 1).trim(),
+      )
       try {
         return tabSegmentWidth(
           view.coordsAtPos(segStart, 1),
@@ -661,8 +753,7 @@ class TabLayoutView {
         continue
       }
       const measuredX = (coords.left - alignShiftAt(coords) - originX) / zoom
-      const sameLine =
-        prevLine != null && coords.top < prevLine.bottom && coords.bottom > prevLine.top
+      const sameLine = prevLine != null && sameVisualLine(coords, prevLine)
       const x = sameLine ? prevEnd : measuredX
       prevLine = { top: coords.top, bottom: coords.bottom }
 
@@ -679,6 +770,7 @@ class TabLayoutView {
         stops: stopsPx,
         gridPx: gridTwips > 0 ? gridTwips / TWIPS_PER_PX : 0,
         hangingX: inHang ? contentEdge : undefined,
+        segBreakable: segBreakable[i],
       })
       // convert the Word-space target to a CSS tab-size: the next multiple of
       // it past the tab's position must be the target itself, so it needs to
@@ -827,26 +919,17 @@ export const WsRunLineHeightExtension = Extension.create({
   name: 'wsRunLineHeight',
   addProseMirrorPlugins() {
     return [
-      new Plugin({
-        key: wsRunPluginKey,
-        props: {
-          decorations(state) {
-            const decos: Decoration[] = []
-            state.doc.descendants((node, pos) => {
-              if (!node.isText || !node.text) return
-              if (!/^[ \t]+$/.test(node.text)) return
-              // only runs with a font-size source can inflate the line
-              const styled = node.marks.some(
-                (m) =>
-                  m.type.name === 'docTextStyle' && (m.attrs.sizeHalfPoints || m.attrs.styleId),
-              )
-              if (!styled) return
-              decos.push(Decoration.inline(pos, pos + node.nodeSize, { class: 'doc-ws-run' }))
-            })
-            return decos.length > 0 ? DecorationSet.create(state.doc, decos) : DecorationSet.empty
-          },
-        },
-      }),
+      new Plugin(
+        textDecorationState(wsRunPluginKey, (node, pos, decos) => {
+          if (!node.text || !/^[ \t]+$/.test(node.text)) return
+          // only runs with a font-size source can inflate the line
+          const styled = node.marks.some(
+            (m) => m.type.name === 'docTextStyle' && (m.attrs.sizeHalfPoints || m.attrs.styleId),
+          )
+          if (!styled) return
+          decos.push(Decoration.inline(pos, pos + node.nodeSize, { class: 'doc-ws-run' }))
+        }),
+      ),
     ]
   },
 })
@@ -886,65 +969,96 @@ export const EaHintQuotesExtension = Extension.create({
   name: 'eaHintQuotes',
   addProseMirrorPlugins() {
     return [
-      new Plugin({
-        key: eaHintQuotesPluginKey,
-        props: {
-          decorations(state) {
-            const decos: Decoration[] = []
-            state.doc.descendants((node, pos) => {
-              if (!node.isText || !node.text) return
-              const style = node.marks.find((m) => m.type.name === 'docTextStyle')
-              const raw = style?.attrs.rawRPr as string | null | undefined
-              for (const r of eaHintQuoteRanges(raw, node.text)) {
-                decos.push(Decoration.inline(pos + r.from, pos + r.to, { class: 'doc-ea-quotes' }))
-              }
-            })
-            return decos.length > 0 ? DecorationSet.create(state.doc, decos) : DecorationSet.empty
-          },
-        },
-      }),
+      new Plugin(
+        textDecorationState(eaHintQuotesPluginKey, (node, pos, decos) => {
+          if (!node.text) return
+          const style = node.marks.find((m) => m.type.name === 'docTextStyle')
+          const raw = style?.attrs.rawRPr as string | null | undefined
+          for (const r of eaHintQuoteRanges(raw, node.text)) {
+            decos.push(Decoration.inline(pos + r.from, pos + r.to, { class: 'doc-ea-quotes' }))
+          }
+        }),
+      ),
     ]
   },
 })
 
 // ---- adjacent-paragraph border merging (Word border groups) ----
 
-const paraBorderMergePluginKey = new PluginKey<DecorationSet>('paraBorderMerge')
+export const paraBorderMergePluginKey = new PluginKey('paraBorderMerge')
 
 /**
  * Word border groups (ECMA-376 §17.3.1.24): adjacent top-level paragraphs with
  * identical borders/shading draw top/bottom lines only at the group edges.
  * Display-only classes; the borders attrs still serialize unchanged on save.
  */
+/** style-level w:pBdr/w:shd the body merge compares (the strips resolve theirs in the engine) */
+const styleTableIds = new WeakMap<object, number>()
+let nextStyleTableId = 0
+function styleBorderLookup(editor: Editor): {
+  lookup: StyleBorderLookup | undefined
+  sig: string
+} {
+  const styles = (editor.storage.listNumbering as ListNumberingStorage | undefined)?.styles
+  if (!styles) return { lookup: undefined, sig: '' }
+  let id = styleTableIds.get(styles)
+  if (id == null) styleTableIds.set(styles, (id = ++nextStyleTableId))
+  let defaultId: string | null = null
+  for (const info of styles.values()) {
+    if (info.isDefault && info.type === 'paragraph') defaultId = info.styleId
+  }
+  return {
+    lookup: (styleId) => {
+      const d = styles.get(styleId ?? defaultId ?? '')?.display
+      return d ? { borderSides: d.borderSides, shadingFill: d.shadingFill } : undefined
+    },
+    sig: String(id),
+  }
+}
+
 export const ParaBorderMergeExtension = Extension.create({
   name: 'paraBorderMerge',
   addProseMirrorPlugins() {
+    const styleTable = () => styleBorderLookup(this.editor)
     return [
-      new Plugin({
+      blockDecorationPlugin({
         key: paraBorderMergePluginKey,
-        props: {
-          decorations(state) {
-            const items: ParaBorderAttrs[] = []
-            const spans: Array<{ from: number; to: number }> = []
-            state.doc.forEach((node, offset) => {
-              // non-paragraph blocks (tables...) enter as border-less entries: they break adjacency
-              items.push(node.isTextblock ? (node.attrs as ParaBorderAttrs) : {})
-              spans.push({ from: offset, to: offset + node.nodeSize })
-            })
-            const decos: Decoration[] = []
-            borderMergeFlags(items).forEach((f, i) => {
-              if (!f.suppressTop && !f.suppressBottom) return
-              const cls = [
-                f.suppressTop ? 'pbdr-suppress-top' : '',
-                f.suppressBottom ? 'pbdr-suppress-bottom' : '',
-              ]
-                .filter(Boolean)
-                .join(' ')
-              decos.push(Decoration.node(spans[i].from, spans[i].to, { class: cls }))
-            })
-            return decos.length > 0 ? DecorationSet.create(state.doc, decos) : DecorationSet.empty
-          },
+        build(doc) {
+          const { lookup } = styleTable()
+          const items: ParaBorderAttrs[] = []
+          const spans: Array<{ from: number; to: number }> = []
+          doc.forEach((node, offset) => {
+            // non-paragraph blocks (tables...) enter as border-less entries: they break adjacency
+            items.push(node.isTextblock ? (node.attrs as ParaBorderAttrs) : { break: true })
+            spans.push({ from: offset, to: offset + node.nodeSize })
+          })
+          const decos: Decoration[] = []
+          borderMergeFlags(items, lookup).forEach((f, i) => {
+            if (!f.suppressTop && !f.suppressBottom) return
+            const cls = [
+              f.suppressTop ? 'pbdr-suppress-top' : '',
+              f.suppressBottom ? 'pbdr-suppress-bottom' : '',
+            ]
+              .filter(Boolean)
+              .join(' ')
+            decos.push(Decoration.node(spans[i].from, spans[i].to, { class: cls }))
+          })
+          return decos
         },
+        // a bordered block can join or leave a group; a border-less one only
+        // matters when it was grouped before (then it carried a decoration)
+        needsRecompute: (node) =>
+          node.isTextblock &&
+          affectsBorderGroup(node.attrs as ParaBorderAttrs, styleTable().lookup),
+        // a text edit inside a style-bordered paragraph keeps its group key: no rebuild
+        changed: (before, after) => {
+          const { lookup } = styleTable()
+          const key = (n: ProseMirrorNode) =>
+            n.isTextblock ? borderGroupKey(n.attrs as ParaBorderAttrs, lookup) : ''
+          return key(before) !== key(after)
+        },
+        // a reloaded style table changes which styles carry borders
+        signature: () => styleTable().sig,
       }),
     ]
   },
@@ -1048,30 +1162,29 @@ export const SdtExtension = Extension.create({
 
 // ---- move revision rendering extension ----
 
-const moveRevisionPluginKey = new PluginKey<DecorationSet>('moveRevision')
+const moveRevisionPluginKey = new PluginKey('moveRevision')
 
 export const MoveRevisionExtension = Extension.create({
   name: 'moveRevision',
   addProseMirrorPlugins() {
     return [
-      new Plugin({
+      blockDecorationPlugin({
         key: moveRevisionPluginKey,
-        props: {
-          decorations(state) {
-            const decos: Decoration[] = []
-            state.doc.forEach((node, offset) => {
-              const rev = node.attrs?.moveRevision as string | null
-              if (!rev) return
-              decos.push(
-                Decoration.node(offset, offset + node.nodeSize, {
-                  'data-move-revision': rev,
-                  class: rev === 'from' ? 'has-move-from' : 'has-move-to',
-                }),
-              )
-            })
-            return decos.length > 0 ? DecorationSet.create(state.doc, decos) : DecorationSet.empty
-          },
+        build(doc) {
+          const decos: Decoration[] = []
+          doc.forEach((node, offset) => {
+            const rev = node.attrs?.moveRevision as string | null
+            if (!rev) return
+            decos.push(
+              Decoration.node(offset, offset + node.nodeSize, {
+                'data-move-revision': rev,
+                class: rev === 'from' ? 'has-move-from' : 'has-move-to',
+              }),
+            )
+          })
+          return decos
         },
+        needsRecompute: (node) => !!node.attrs?.moveRevision,
       }),
     ]
   },
@@ -1079,7 +1192,7 @@ export const MoveRevisionExtension = Extension.create({
 
 // ---- deleted paragraph mark (w:pPr/w:rPr/w:del) collapse extension ----
 
-const paraMarkDelPluginKey = new PluginKey<DecorationSet>('paraMarkDel')
+const paraMarkDelPluginKey = new PluginKey('paraMarkDel')
 
 /**
  * A paragraph whose mark is a tracked deletion and whose inline content is all
@@ -1088,30 +1201,45 @@ const paraMarkDelPluginKey = new PluginKey<DecorationSet>('paraMarkDel')
  * (Word joins them into the next one) keep their height — approximate, but the
  * remaining text still occupies a line either way.
  */
+/**
+ * Deletion class of a paragraph: mark deleted with nothing else live →
+ * collapse; mark live but every inline child deleted → Word keeps one empty
+ * line (`doc-para-content-del` gives the paragraph a strut once the deleted
+ * runs are hidden); null when nothing applies.
+ */
+export function paraDeletionClass(node: {
+  attrs?: Record<string, unknown>
+  childCount: number
+  forEach: (f: (child: { marks: readonly { type: { name: string } }[] }) => void) => void
+}): string | null {
+  let visible = false
+  node.forEach((child) => {
+    if (!child.marks.some((m) => m.type.name === 'del')) visible = true
+  })
+  if (node.attrs?.paraMarkDel) {
+    return visible ? 'doc-para-mark-del' : 'doc-para-mark-del doc-para-del-collapse'
+  }
+  return !visible && node.childCount > 0 ? 'doc-para-content-del' : null
+}
+
 export const ParaMarkDelExtension = Extension.create({
   name: 'paraMarkDel',
   addProseMirrorPlugins() {
     return [
-      new Plugin({
+      blockDecorationPlugin({
         key: paraMarkDelPluginKey,
-        props: {
-          decorations(state) {
-            const decos: Decoration[] = []
-            state.doc.forEach((node, offset) => {
-              if (!node.attrs?.paraMarkDel) return
-              let visible = false
-              node.forEach((child) => {
-                if (!child.marks.some((m) => m.type.name === 'del')) visible = true
-              })
-              decos.push(
-                Decoration.node(offset, offset + node.nodeSize, {
-                  class: visible ? 'doc-para-mark-del' : 'doc-para-mark-del doc-para-del-collapse',
-                }),
-              )
-            })
-            return decos.length > 0 ? DecorationSet.create(state.doc, decos) : DecorationSet.empty
-          },
+        build(doc) {
+          const decos: Decoration[] = []
+          doc.forEach((node, offset) => {
+            if (!node.isTextblock && !node.attrs?.paraMarkDel) return
+            const cls = paraDeletionClass(node)
+            if (cls) decos.push(Decoration.node(offset, offset + node.nodeSize, { class: cls }))
+          })
+          return decos
         },
+        needsRecompute: (node) =>
+          !!node.attrs?.paraMarkDel ||
+          (node.isTextblock && node.childCount > 0 && paraDeletionClass(node) !== null),
       }),
     ]
   },
@@ -1119,62 +1247,63 @@ export const ParaMarkDelExtension = Extension.create({
 
 // ---- pPrChange (tracked paragraph format) rendering extension ----
 
-const pPrChangePluginKey = new PluginKey<DecorationSet>('pPrChange')
+const pPrChangePluginKey = new PluginKey('pPrChange')
 
 export const PPrChangeExtension = Extension.create({
   name: 'pPrChange',
   addProseMirrorPlugins() {
     return [
-      new Plugin({
+      blockDecorationPlugin({
         key: pPrChangePluginKey,
-        props: {
-          decorations(state) {
-            const decos: Decoration[] = []
-            state.doc.forEach((node, offset) => {
-              const raw = node.attrs?.pPrChange as string | null
-              if (!raw) return
-              let author = ''
-              let old: Record<string, unknown> = {}
-              try {
-                const parsed = JSON.parse(raw)
-                author = parsed?.author || ''
-                old = (parsed?.old ?? {}) as Record<string, unknown>
-              } catch {
-                /* ignore */
+        build(doc) {
+          const decos: Decoration[] = []
+          doc.forEach((node, offset) => {
+            const raw = node.attrs?.pPrChange as string | null
+            if (!raw) return
+            let author = ''
+            let old: Record<string, unknown> = {}
+            try {
+              const parsed = JSON.parse(raw)
+              author = parsed?.author || ''
+              old = (parsed?.old ?? {}) as Record<string, unknown>
+            } catch {
+              /* ignore */
+            }
+            // original view: override with the pre-revision paragraph format (mirroring the restore subset of revisions.ts reject)
+            let style = ''
+            if (revisionDisplayState.mode === 'original') {
+              const styles = [
+                `text-align:${(old.align as string) ?? 'start'}`,
+                `margin-left:${old.indentLeft ? Number(old.indentLeft) / 20 : 0}pt`,
+                `margin-right:${old.indentRight ? Number(old.indentRight) / 20 : 0}pt`,
+                `text-indent:${old.indentFirstLine ? Number(old.indentFirstLine) / 20 : 0}pt`,
+                `margin-top:${old.spaceBefore ? Number(old.spaceBefore) / 20 : 0}pt`,
+                `margin-bottom:${old.spaceAfter ? Number(old.spaceAfter) / 20 : 0}pt`,
+                `background:${old.shadingFill ? `#${old.shadingFill}` : 'transparent'}`,
+              ]
+              if (old.lineRule === 'exact' || old.lineRule === 'atLeast') {
+                styles.push(`line-height:${Number(old.lineRawTwips || 240) / 20}pt`)
+              } else if (old.lineSpacing) {
+                styles.push(`line-height:${Number(old.lineSpacing) * 1.2}`)
+              } else {
+                styles.push('line-height:inherit')
               }
-              // original view: override with the pre-revision paragraph format (mirroring the restore subset of revisions.ts reject)
-              let style = ''
-              if (revisionDisplayState.mode === 'original') {
-                const styles = [
-                  `text-align:${(old.align as string) ?? 'start'}`,
-                  `margin-left:${old.indentLeft ? Number(old.indentLeft) / 20 : 0}pt`,
-                  `margin-right:${old.indentRight ? Number(old.indentRight) / 20 : 0}pt`,
-                  `text-indent:${old.indentFirstLine ? Number(old.indentFirstLine) / 20 : 0}pt`,
-                  `margin-top:${old.spaceBefore ? Number(old.spaceBefore) / 20 : 0}pt`,
-                  `margin-bottom:${old.spaceAfter ? Number(old.spaceAfter) / 20 : 0}pt`,
-                  `background:${old.shadingFill ? `#${old.shadingFill}` : 'transparent'}`,
-                ]
-                if (old.lineRule === 'exact' || old.lineRule === 'atLeast') {
-                  styles.push(`line-height:${Number(old.lineRawTwips || 240) / 20}pt`)
-                } else if (old.lineSpacing) {
-                  styles.push(`line-height:${Number(old.lineSpacing) * 1.2}`)
-                } else {
-                  styles.push('line-height:inherit')
-                }
-                style = styles.join(';')
-              }
-              decos.push(
-                Decoration.node(offset, offset + node.nodeSize, {
-                  'data-ppr-change-author': author,
-                  'data-ppr-change-label': t('editorFormatRevision'),
-                  class: 'has-ppr-change',
-                  ...(style ? { style } : {}),
-                }),
-              )
-            })
-            return decos.length > 0 ? DecorationSet.create(state.doc, decos) : DecorationSet.empty
-          },
+              style = styles.join(';')
+            }
+            decos.push(
+              Decoration.node(offset, offset + node.nodeSize, {
+                'data-ppr-change-author': author,
+                'data-ppr-change-label': t('editorFormatRevision'),
+                class: 'has-ppr-change',
+                ...(style ? { style } : {}),
+              }),
+            )
+          })
+          return decos
         },
+        needsRecompute: (node) => !!node.attrs?.pPrChange,
+        // the original view restores the pre-revision format through these decorations
+        signature: () => revisionDisplayState.mode,
       }),
     ]
   },

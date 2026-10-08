@@ -31,10 +31,37 @@ export async function resolveMainDocumentPath(zip: JSZip): Promise<string | null
   const rels = await parseRels(zip, '_rels/.rels')
   for (const rel of rels.values()) {
     if (!/\/officeDocument$/.test(rel.type) || rel.targetMode === 'External') continue
-    const target = rel.target.replace(/^\//, '')
-    if (zip.file(target)) return target
+    const target = resolveRelationshipTargetPath('', rel.target)
+    if (target && zip.file(target)) return target
   }
   return null
+}
+
+export function resolveRelationshipTargetPath(sourcePath: string, target: string): string | null {
+  const withoutFragment = target.split('#', 1)[0]
+  if (!withoutFragment || /^[A-Za-z][A-Za-z0-9+.-]*:/.test(withoutFragment)) return null
+  let decoded: string
+  try {
+    decoded = decodeURIComponent(withoutFragment)
+  } catch {
+    return null
+  }
+  const sourceSlash = sourcePath.lastIndexOf('/')
+  const base = sourceSlash >= 0 ? sourcePath.slice(0, sourceSlash + 1) : ''
+  // Test the root anchor after normalizing: a backslash-led target is rooted too.
+  const normalized = decoded.replace(/\\/g, '/')
+  const path = normalized.startsWith('/') ? normalized.slice(1) : `${base}${normalized}`
+  const parts: string[] = []
+  for (const segment of path.split('/')) {
+    if (!segment || segment === '.') continue
+    if (segment === '..') {
+      if (parts.length === 0) return null
+      parts.pop()
+    } else {
+      parts.push(segment)
+    }
+  }
+  return parts.join('/') || null
 }
 
 export async function parseRels(zip: JSZip, path: string): Promise<Map<string, RelInfo>> {
@@ -44,7 +71,10 @@ export async function parseRels(zip: JSZip, path: string): Promise<Map<string, R
   // fast-xml-parser rejects a DOCTYPE declaring external entities; drop the
   // prologue instead of failing the whole document (entities never resolve —
   // XXE-safe — and Relationship elements carry everything in attributes)
-  const relsXml = (await file.async('string')).replace(/<!DOCTYPE(?:[^>[]|\[[\s\S]*?\])*>/i, '')
+  const relsXml = (await file.async('string')).replace(
+    /<!DOCTYPE(?:[^>"'\x5B\x5D]|\[[\s\S]*?\]|"[^"]*"|'[^']*')*>/i,
+    '',
+  )
   const parsed = xmlParser.parse(relsXml) as XNode[]
   const root = parsed.find((n) => nameOf(n) === 'Relationships')
   if (!root) return rels
@@ -128,10 +158,14 @@ export async function parseProtection(zip: JSZip): Promise<DocProtection | null>
   if (!edit || edit === 'none') return null
   const enforcementMatch = /w:enforcement=(?:"([^"]+)"|'([^']+)')/.exec(tag)
   const enforcement = enforcementMatch?.[1] ?? enforcementMatch?.[2]
-  const hash = /w:hash="([^"]+)"/.exec(tag)?.[1]
-  const salt = /w:salt="([^"]+)"/.exec(tag)?.[1]
-  const spin = /w:cryptSpinCount="(\d+)"/.exec(tag)?.[1]
-  const sid = /w:cryptAlgorithmSid="(\d+)"/.exec(tag)?.[1]
+  const hashMatch = /w:hash=(?:"([^"]+)"|'([^']+)')/.exec(tag)
+  const hash = hashMatch?.[1] ?? hashMatch?.[2]
+  const saltMatch = /w:salt=(?:"([^"]+)"|'([^']+)')/.exec(tag)
+  const salt = saltMatch?.[1] ?? saltMatch?.[2]
+  const spinMatch = /w:cryptSpinCount=(?:"(\d+)"|'(\d+)')/.exec(tag)
+  const spin = spinMatch?.[1] ?? spinMatch?.[2]
+  const sidMatch = /w:cryptAlgorithmSid=(?:"(\d+)"|'(\d+)')/.exec(tag)
+  const sid = sidMatch?.[1] ?? sidMatch?.[2]
   return {
     edit,
     enforced: enforcement === '1' || enforcement === 'true' || enforcement === 'on',
@@ -148,11 +182,15 @@ export async function parseWriteProtection(zip: JSZip): Promise<WriteProtection 
   if (!file) return null
   const tag = /<w:writeProtection\b[^>]*?(?:\/>|>)/.exec(await file.async('string'))?.[0]
   if (!tag) return null
-  const recommended = /w:recommended="(?:1|true|on)"/.test(tag)
-  const hash = /w:hash="([^"]+)"/.exec(tag)?.[1]
-  const salt = /w:salt="([^"]+)"/.exec(tag)?.[1]
-  const spin = /w:cryptSpinCount="(\d+)"/.exec(tag)?.[1]
-  const sid = /w:cryptAlgorithmSid="(\d+)"/.exec(tag)?.[1]
+  const recommended = /w:recommended=(?:"(?:1|true|on)"|'(?:1|true|on)')/.test(tag)
+  const hashMatch = /w:hash=(?:"([^"]+)"|'([^']+)')/.exec(tag)
+  const hash = hashMatch?.[1] ?? hashMatch?.[2]
+  const saltMatch = /w:salt=(?:"([^"]+)"|'([^']+)')/.exec(tag)
+  const salt = saltMatch?.[1] ?? saltMatch?.[2]
+  const spinMatch = /w:cryptSpinCount=(?:"(\d+)"|'(\d+)')/.exec(tag)
+  const spin = spinMatch?.[1] ?? spinMatch?.[2]
+  const sidMatch = /w:cryptAlgorithmSid=(?:"(\d+)"|'(\d+)')/.exec(tag)
+  const sid = sidMatch?.[1] ?? sidMatch?.[2]
   if (!recommended && !hash) return null
   return {
     ...(recommended ? { recommended } : {}),
@@ -229,7 +267,14 @@ function parseNumberingLevel(lvlNode: XNode): NumberingLevel {
   const lvlJc = attrsOf(findChild(lvlNode, 'w:lvlJc') ?? {})['w:val']
   if (lvlJc === 'right' || lvlJc === 'end') level.lvlJc = 'right'
   else if (lvlJc === 'center') level.lvlJc = 'center'
+  const pStyle = attrsOf(findChild(lvlNode, 'w:pStyle') ?? {})['w:val']
+  if (pStyle) level.pStyle = pStyle
+  const lvlRestart = parseInt(attrsOf(findChild(lvlNode, 'w:lvlRestart') ?? {})['w:val'] ?? '', 10)
+  if (Number.isFinite(lvlRestart)) level.lvlRestart = lvlRestart
   const lvlPPr = findChild(lvlNode, 'w:pPr')
+  const tabs = lvlPPr ? findChild(lvlPPr, 'w:tabs') : undefined
+  const tabPos = tabs ? parseInt(attrsOf(findChild(tabs, 'w:tab') ?? {})['w:pos'] ?? '', 10) : NaN
+  if (Number.isFinite(tabPos)) level.tabStop = tabPos
   const ind = lvlPPr ? findChild(lvlPPr, 'w:ind') : undefined
   if (ind) {
     const attrs = attrsOf(ind)
@@ -247,6 +292,12 @@ function parseNumberingLevel(lvlNode: XNode): NumberingLevel {
   if (sz > 0) level.szHalfPoints = sz
   const color = lvlRPr ? attrsOf(findChild(lvlRPr, 'w:color') ?? {})['w:val'] : undefined
   if (color && /^[0-9a-f]{6}$/i.test(color)) level.color = color.toUpperCase()
+  const flag = (name: string) => {
+    const el = lvlRPr ? findChild(lvlRPr, name) : undefined
+    return !!el && !['0', 'false', 'off'].includes(attrsOf(el)['w:val'] ?? '')
+  }
+  if (flag('w:b')) level.bold = true
+  if (flag('w:i')) level.italic = true
   const fonts = lvlRPr ? attrsOf(findChild(lvlRPr, 'w:rFonts') ?? {}) : {}
   const font = fonts['w:ascii'] ?? fonts['w:hAnsi'] ?? fonts['w:eastAsia']
   if (font) level.font = font

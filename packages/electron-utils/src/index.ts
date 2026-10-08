@@ -2,16 +2,31 @@ export {
   buildContextMenuItems,
   contextMenuLabels,
   installContextMenu,
+  setContextMenuInterceptor,
+  VIEW_IMAGE_CHANNEL,
+  type ContextMenuInterceptor,
   type ContextMenuItem,
   type ContextMenuLabels,
 } from './context-menu'
 export {
+  decodeDataUrl,
+  isSavableImageUrl,
+  saveImageFromUrl,
+  suggestImageFileName,
+  type SaveImageResult,
+} from './save-image'
+export {
+  aboutMenuItem,
   appMenuLabels,
+  checkUpdatesMenuItem,
   editMenuTemplate,
+  helpMenuTemplate,
+  setUpdateCheckInvoker,
   toggleDevToolsItem,
   viewMenuTemplate,
   windowMenuTemplate,
   type AppMenuLabels,
+  type ViewMenuOptions,
 } from './app-menu'
 export { GITHUB_REPO_URL } from './github-menu'
 export {
@@ -43,7 +58,13 @@ export {
   isSafeRemoteUrl,
   type FetchWithSsrfGuardOptions,
 } from './safe-remote-url'
-export { fetchRemoteImage, remoteImageHeaders } from './remote-image'
+export {
+  MAX_REMOTE_IMAGE_BYTES,
+  ResponseTooLargeError,
+  fetchRemoteImage,
+  readBodyCapped,
+  remoteImageHeaders,
+} from './remote-image'
 export { GENERATED_IMAGE_DIR, readGeneratedImage, storeGeneratedImage } from './generated-images'
 export {
   buildPrintableHtml,
@@ -73,9 +94,19 @@ export {
 } from './headless-export'
 export {
   RENDERER_SCHEME,
+  DOCX_MEDIA_SCHEME_PRIVILEGE,
   RENDERER_SCHEME_PRIVILEGE,
   rendererUrl,
   resolveRendererFile,
   type RendererHost,
 } from './renderer-scheme'
 export { installRendererProtocol, registerRendererScheme } from './renderer-protocol'
+export { atomicWriteFile, writeJsonAtomic } from './atomic-write'
+export {
+  PRINT_READY_SCRIPT,
+  printHtmlDocument,
+  type PrintDialogOutcome,
+  type PrintDialogWindow,
+  type PrintDocumentOptions,
+} from './print-window'
+export { abortOnDestroyed, type DestroyableSender } from './abort-on-destroyed'

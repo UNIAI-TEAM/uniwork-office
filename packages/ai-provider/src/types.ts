@@ -11,11 +11,18 @@ export type AiProviderId =
   | 'glm'
   | 'qwen'
   | 'doubao'
+  | 'mimo'
+  | 'hunyuan'
+  | 'ling'
+  | 'spark'
+  | 'longcat'
   | 'minimax'
   | 'xai'
   | 'mistral'
   | 'openrouter'
   | 'requesty'
+  | 'opper'
+  | 'cheaperinference'
   | 'opencode-zen'
   | 'opencode-go'
   | 'custom'
@@ -53,7 +60,16 @@ export interface AiProviderMeta {
 
 /** Image generation / media analysis backends (separate from the chat provider) */
 export type AiMediaProviderId =
-  'genspark' | 'openai' | 'gemini' | 'doubao' | 'glm' | 'xai' | 'qwen' | 'minimax' | 'custom'
+  | 'genspark'
+  | 'openai'
+  | 'gemini'
+  | 'doubao'
+  | 'glm'
+  | 'xai'
+  | 'qwen'
+  | 'minimax'
+  | 'deepseek'
+  | 'custom'
 
 /** wire shape of the image endpoint */
 export type AiImageProtocol = 'openai-images' | 'gemini' | 'dashscope' | 'minimax'
@@ -103,8 +119,9 @@ export interface AiMediaSettings {
   provider?: AiMediaProviderId | undefined
 }
 
-/** web/image search backends: Genspark (gsk) or a user key for Serper / Tavily */
-export type AiSearchProviderId = 'genspark' | 'serper' | 'tavily'
+/** web/image search backends; Parallel supports both a user key and free keyless search */
+export type AiSearchProviderId =
+  'genspark' | 'serper' | 'serply' | 'tavily' | 'parallel' | 'exa' | 'firecrawl'
 
 export interface AiSearchProviderMeta {
   id: AiSearchProviderId

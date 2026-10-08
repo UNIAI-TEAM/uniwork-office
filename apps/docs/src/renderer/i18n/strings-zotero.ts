@@ -337,23 +337,6 @@ export const zoteroStrings = defineStrings({
       'इस दस्तावेज़ के फ़ुटनोट या एंडनोट में Zotero उद्धरण हैं, जिन्हें UniWork Office अभी अपडेट नहीं कर सकता। ग्रंथसूची को सुरक्षित रखने के लिए यहाँ Zotero कमांड बंद हैं।',
     zoteroGroup: 'Zotero',
   },
-  vi: {
-    zoteroCitation: 'Trích dẫn Zotero',
-    zoteroCitationTip: 'Thêm trích dẫn bằng Zotero; đặt con trỏ trong trích dẫn hiện có để sửa',
-    zoteroBibliography: 'Thư mục Zotero',
-    zoteroBibliographyTip: 'Thêm hoặc sửa thư mục tài liệu tham khảo bằng Zotero',
-    zoteroRefresh: 'Làm mới',
-    zoteroRefreshTip: 'Làm mới tất cả trích dẫn và thư mục Zotero',
-    zoteroDocumentSettings: 'Cài đặt tài liệu',
-    zoteroDocumentSettingsTip: 'Cài đặt tài liệu Zotero',
-    zoteroDocumentPreferences: 'Tùy chọn tài liệu',
-    zoteroRemoveCodes: 'Gỡ mã trường',
-    zoteroConnectionError: 'Không kết nối được Zotero. Hãy khởi động Zotero và giữ chương trình chạy.',
-    zoteroOperationError: 'Thao tác Zotero thất bại.',
-    zoteroNoteFieldsUnsupported:
-      'Tài liệu này có trích dẫn Zotero trong chú thích cuối trang hoặc cuối tài liệu mà UniWork Office chưa cập nhật được. Các lệnh Zotero bị tắt ở đây để giữ thư mục tham khảo nguyên vẹn.',
-    zoteroGroup: 'Zotero',
-  },
   'zh-TW': {
     zoteroCitation: 'Zotero 引文',
     zoteroCitationTip: '使用 Zotero 新增引文；游標位於現有引文中時可編輯',
@@ -369,6 +352,24 @@ export const zoteroStrings = defineStrings({
     zoteroOperationError: 'Zotero 操作失敗。',
     zoteroNoteFieldsUnsupported:
       '此文件的註腳或章節附註中含有 Zotero 引文，UniWork Office 目前還無法更新它們。為保持參考文獻完整，已停用此文件的 Zotero 命令。',
+    zoteroGroup: 'Zotero',
+  },
+  vi: {
+    zoteroCitation: 'Trích dẫn Zotero',
+    zoteroCitationTip: 'Thêm trích dẫn bằng Zotero; đặt con trỏ vào trích dẫn để chỉnh sửa',
+    zoteroBibliography: 'Danh mục tài liệu tham khảo Zotero',
+    zoteroBibliographyTip: 'Thêm hoặc chỉnh sửa danh mục tài liệu tham khảo bằng Zotero',
+    zoteroRefresh: 'Làm mới',
+    zoteroRefreshTip: 'Làm mới tất cả trích dẫn và danh mục tài liệu tham khảo Zotero',
+    zoteroDocumentSettings: 'Cài đặt tài liệu',
+    zoteroDocumentSettingsTip: 'Cài đặt tài liệu Zotero',
+    zoteroDocumentPreferences: 'Tùy chọn tài liệu',
+    zoteroRemoveCodes: 'Xóa mã trường',
+    zoteroConnectionError:
+      'Không thể kết nối với Zotero. Hãy khởi động Zotero và giữ ứng dụng luôn chạy.',
+    zoteroOperationError: 'Thao tác Zotero thất bại.',
+    zoteroNoteFieldsUnsupported:
+      'Tài liệu này có trích dẫn Zotero trong chú thích cuối trang hoặc cuối tài liệu mà UniWork Office chưa cập nhật được. Các lệnh Zotero bị tắt ở đây để giữ thư mục tham khảo nguyên vẹn.',
     zoteroGroup: 'Zotero',
   },
 })

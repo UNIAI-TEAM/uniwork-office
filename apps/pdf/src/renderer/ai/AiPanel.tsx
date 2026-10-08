@@ -1,3 +1,9 @@
+import {
+  aiPanelWidthAtPointer,
+  AiPanelSideButton,
+  AiModelPicker,
+  type AiModelPickerBridge,
+} from '@genoffice/ui'
 import { useEffect, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent, ReactElement } from 'react'
 import { AgentLoop } from '@genoffice/agent-core'
@@ -69,6 +75,14 @@ type Phase = 'thinking' | 'replying' | 'working'
 interface PendingConfirm {
   req: FileOpConfirm
   settle: (ok: boolean) => void
+}
+
+const MODEL_BRIDGE: AiModelPickerBridge = {
+  getSettings: () => window.pdfApi.getAiSettings(),
+  setSettings: (settings) => window.pdfApi.setAiSettings(settings),
+  onSettingsChanged: (handler) => window.pdfApi.onAiSettingsChanged(handler),
+  gskLoggedIn: () => window.pdfApi.gskStatus().then((s) => !!s?.loggedIn),
+  openModelSettings: () => window.pdfApi.openAiModelSettings().catch(() => {}),
 }
 
 export function AiPanel({
@@ -538,7 +552,7 @@ export function AiPanel({
   const resizeCleanupRef = useRef<(() => void) | null>(null)
   useEffect(() => () => resizeCleanupRef.current?.(), [])
 
-  /** Drag the right edge to resize: the panel is flush with the window's left edge, so width = clientX */
+  /** Drag the inner panel edge to resize from the selected window side. */
   const startResize = (e: ReactPointerEvent<HTMLDivElement>): void => {
     e.preventDefault()
     const resizer = e.currentTarget
@@ -546,7 +560,7 @@ export function AiPanel({
     document.body.style.cursor = 'col-resize'
     document.body.style.userSelect = 'none'
     const onMove = (ev: PointerEvent): void => {
-      const w = clampPanelWidth(ev.clientX)
+      const w = clampPanelWidth(aiPanelWidthAtPointer(ev.clientX))
       preferredWidthRef.current = w
       setPanelWidth(w)
     }
@@ -631,6 +645,10 @@ export function AiPanel({
           uniAI
         </span>
         <div className="ai-panel-header-actions">
+          <AiPanelSideButton
+            lang={lang}
+            onMove={(side) => window.pdfApi.setAiPanelPrefs({ side })}
+          />
           {chat.length > 0 && (
             <button
               className="ai-header-btn"
@@ -647,7 +665,7 @@ export function AiPanel({
             </button>
           )}
           <button
-            className="ai-header-btn"
+            className="ai-header-btn ai-panel-collapse"
             onClick={onCollapse}
             data-tip={t('aiCollapsePanel')}
             aria-label={t('aiCollapsePanel')}
@@ -810,6 +828,7 @@ export function AiPanel({
           sendLabel={t('aiSend')}
           stopLabel={t('aiStop')}
           iconOnly
+          footerStart={<AiModelPicker bridge={MODEL_BRIDGE} lang={lang} />}
           sendIconEnabled={<img src={sendEnterOn} alt="" aria-hidden />}
           sendIconDisabled={<img src={sendEnterOff} alt="" aria-hidden />}
           stopIcon={<img src={sendStop} alt="" aria-hidden />}

@@ -1,15 +1,28 @@
+import {
+  aiPanelWidthAtPointer,
+  AiPanelSideButton,
+  AiModelPicker,
+  type AiModelPickerBridge,
+} from '@genoffice/ui'
 import { useEffect, useRef, useState } from 'react'
 import type { Editor } from '@tiptap/core'
 import type { Block } from '@genoffice/docx-engine'
 import { AgentLoop, composeSkills, streamText, type AgentImage } from '@genoffice/agent-core'
-import { imageGenerationAvailable } from '@genoffice/ai-provider/browser'
+import { imageGenerationAvailable, mediaAnalysisAvailable } from '@genoffice/ai-provider/browser'
 import type { AiSettings, AttachmentAddResult, AttachmentMeta } from '../../shared/ipc'
 import { ATTACHMENT_IMAGE_EXTS } from '../../shared/ipc'
 import type { PmNode } from '../editor/convert'
 import { TABLE_TRAILING_SKIP } from '../editor/extensions'
 import { countWords, findNumId, type NumIds } from './protocol'
 import { DOC_NAV_SCHEME, navigateToBlock, parseDocNavHref } from './doc-nav'
-import { markDocSeen, type AiCommentsAccess, type AiHeaderFooterAccess } from './tools'
+import {
+  markDocSeen,
+  type AiCommentsAccess,
+  type AiDocExtras,
+  type AiHeaderFooterAccess,
+} from './tools'
+import type { AiPageSetupAccess } from './page-setup'
+import type { AiNotesAccess } from './note-ops'
 import { createDocsSkill } from './docs-skill'
 import {
   buildDocWriterRequest,
@@ -33,6 +46,7 @@ import { DOCS_CONTINUE_INSTRUCTION } from './continuation'
 import { waitForFullContent } from '../phased-content'
 import { currentDocGeneration } from '../file-actions'
 import { createFilesSkill } from './files-skill'
+import { boundChatHistory } from './chat-retention'
 import { createElectronTransport } from './transport'
 import { useI18n, t as tModule, aiLangDirective, type StringKey } from '../i18n/locale'
 import { Markdown } from '@genoffice/ui'
@@ -304,6 +318,20 @@ interface AiPanelProps {
   commentsAccess?: AiCommentsAccess
   /** header/footer state for the set_header_footer tool and per-turn context */
   hfAccess?: AiHeaderFooterAccess
+  /** section store for set_page_setup / insert_section_break and the page-setup context line */
+  pageSetupAccess?: AiPageSetupAccess
+  /** style catalog and watermark stores for define_style / applyStyle / set_watermark */
+  docExtras?: AiDocExtras
+  /** footnote / endnote lists for insert_footnote, insert_endnote, delete_note, read_notes */
+  notesAccess?: AiNotesAccess
+}
+
+const MODEL_BRIDGE: AiModelPickerBridge = {
+  getSettings: () => window.desktop.getAiSettings(),
+  setSettings: (settings) => window.desktop.setAiSettings(settings),
+  onSettingsChanged: (handler) => window.desktop.onAiSettingsChanged(handler),
+  gskLoggedIn: () => window.desktop.aiGskStatus().then((s) => !!s?.loggedIn),
+  openModelSettings: () => window.desktop.openAiModelSettings().catch(() => {}),
 }
 
 export function AiPanel({
@@ -325,6 +353,9 @@ export function AiPanel({
   onQueueConsume,
   commentsAccess,
   hfAccess,
+  pageSetupAccess,
+  docExtras,
+  notesAccess,
 }: AiPanelProps) {
   const { t, lang } = useI18n()
   // Panel chrome follows the UI language; message text follows its own content (dir=auto below)
@@ -499,6 +530,12 @@ export function AiPanel({
   commentsAccessRef.current = commentsAccess
   const hfAccessRef = useRef(hfAccess)
   hfAccessRef.current = hfAccess
+  const pageSetupAccessRef = useRef(pageSetupAccess)
+  pageSetupAccessRef.current = pageSetupAccess
+  const docExtrasRef = useRef(docExtras)
+  docExtrasRef.current = docExtras
+  const notesAccessRef = useRef(notesAccess)
+  notesAccessRef.current = notesAccess
 
   /** drop every aiChanged flag; silent = skip undo history (auto-accept path) */
   const clearAiHighlights = (silent = false) => {
@@ -638,7 +675,8 @@ export function AiPanel({
       const last = next[next.length - 1]
       if (!last || last.role !== 'assistant') return prev
       next[next.length - 1] = { ...last, ...(typeof patch === 'function' ? patch(last) : patch) }
-      return next
+      // bounded: this is where a finished run's full-document snapshot lands
+      return boundChatHistory(next)
     })
   }
 
@@ -739,6 +777,10 @@ export function AiPanel({
           () => ({
             write: (spec, onProgress, signal) => runDocWriterRef.current(spec, onProgress, signal),
           }),
+          () => pageSetupAccessRef.current,
+          () => docExtrasRef.current,
+          () => notesAccessRef.current,
+          () => mediaAnalysisAvailable(settingsRef.current, gskLoggedInRef.current),
         ),
         createFilesSkill(availableAttachments),
       ]),
@@ -792,7 +834,9 @@ export function AiPanel({
         },
         onTurnEnd: () => {
           patchLastAssistant({ streaming: false })
-          setChat((prev) => [...prev, { role: 'assistant', text: '', streaming: true }])
+          setChat((prev) =>
+            boundChatHistory([...prev, { role: 'assistant', text: '', streaming: true }]),
+          )
         },
         onDone: ({ text, cancelled, turnLimit, truncated }) => {
           // module-level t: the loop instance is created only once; the component's t goes stale with the first-render closure
@@ -833,7 +877,7 @@ export function AiPanel({
                 snapshot: runSnapshotRef.current ?? undefined,
               }
             }
-            return next
+            return boundChatHistory(next)
           })
           // Signed-out failures get an inline sign-in button; detected via
           // gsk status rather than matching the localized error text
@@ -1011,16 +1055,18 @@ export function AiPanel({
     runToolsRef.current = []
     runSnapshotRef.current = null
     stickToBottomRef.current = true
-    setChat((prev) => [
-      ...prev,
-      {
-        role: 'user',
-        text: displayInstruction,
-        ...(sentAtts.length > 0 ? { attachments: sentAtts } : {}),
-        ...(scope ? { scope } : {}),
-      },
-      { role: 'assistant', text: '', streaming: true },
-    ])
+    setChat((prev) =>
+      boundChatHistory([
+        ...prev,
+        {
+          role: 'user',
+          text: displayInstruction,
+          ...(sentAtts.length > 0 ? { attachments: sentAtts } : {}),
+          ...(scope ? { scope } : {}),
+        },
+        { role: 'assistant', text: '', streaming: true },
+      ]),
+    )
     runStartedAtRef.current = Date.now()
     setBusy(true)
     // claimed before the async image read so Stop / New chat can flag this send at any point
@@ -1188,7 +1234,7 @@ export function AiPanel({
   const resizeCleanupRef = useRef<(() => void) | null>(null)
   useEffect(() => () => resizeCleanupRef.current?.(), [])
 
-  /** drag the panel's right edge to resize; panel is flush with the window's left edge */
+  /** Drag the inner panel edge to resize from the selected window side. */
   const startResize = (e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault()
     const resizer = e.currentTarget
@@ -1196,7 +1242,7 @@ export function AiPanel({
     document.body.style.cursor = 'col-resize'
     document.body.style.userSelect = 'none'
     const onMove = (ev: PointerEvent) => {
-      const w = clampPanelWidth(ev.clientX)
+      const w = clampPanelWidth(aiPanelWidthAtPointer(ev.clientX))
       preferredWidthRef.current = w
       setPanelWidth(w)
     }
@@ -1268,6 +1314,10 @@ export function AiPanel({
           {t('aiPanelTitle')}
         </span>
         <div className="ai-panel-header-actions">
+          <AiPanelSideButton
+            lang={lang}
+            onMove={(side) => window.desktop.setAiPanelPrefs({ side })}
+          />
           {(chat.length > 0 || historicChat.length > 0) && (
             <button
               className="ai-header-btn"
@@ -1280,7 +1330,7 @@ export function AiPanel({
           )}
           {onCollapse && (
             <button
-              className="ai-header-btn"
+              className="ai-header-btn ai-panel-collapse"
               onClick={onCollapse}
               data-tip={t('aiCollapseTitle')}
               aria-label={t('aiCollapseTitle')}
@@ -1642,6 +1692,7 @@ export function AiPanel({
           onPasteFiles={(files) => void onPasteFiles(files)}
           footerStart={
             <>
+              <AiModelPicker bridge={MODEL_BRIDGE} lang={lang} />
               <button
                 className="ai-attach-btn"
                 onClick={pickAttachments}

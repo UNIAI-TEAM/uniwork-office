@@ -92,6 +92,14 @@ describe('EQ field instructions', () => {
       `<w:p><w:r>${SZ36}<w:t xml:space="preserve">1/2</w:t></w:r></w:p>`,
     )
   })
+
+  it('inlineEqFieldResults handles single-quoted fldCharType', () => {
+    const xml =
+      `<w:p><w:r><w:fldChar w:fldCharType='begin'/></w:r>` +
+      `<w:r><w:instrText xml:space="preserve"> EQ \\f(a,b) </w:instrText></w:r>` +
+      `<w:r><w:fldChar w:fldCharType='end'/></w:r></w:p>`
+    expect(inlineEqFieldResults(xml)).toContain('a/b')
+  })
 })
 
 describe('EQ field paragraphs', () => {
@@ -193,5 +201,13 @@ describe('inline field result formatting', () => {
     const runs = doc.blocks[0].table!.rows[0][0].richParas?.[0]?.runs ?? []
     expect(runs).toHaveLength(1)
     expect(runs[0]).toMatchObject({ text: 'Erika', italic: true })
+  })
+
+  it('clamps a hostile array column count instead of hanging', () => {
+    const start = Date.now()
+    const eq = eqFieldToOmml('EQ \\a \\co9999999999 (a,b)')!
+    expect(Date.now() - start).toBeLessThan(5000)
+    expect(eq.omml).toContain('m:val="64"')
+    expect(eq.omml.match(/<m:mr>/g)).toHaveLength(1)
   })
 })

@@ -140,6 +140,7 @@ export const id = {
   aiClarifyOther: 'Lainnya (isi sendiri)',
   aiClarifySkip: 'Lewati survei',
   aiClarifyNext: 'Berikutnya',
+  aiClarifyPrev: 'Sebelumnya',
   aiClarifySubmit: 'Buat',
   aiSumReadAttachment: 'Baca lampiran',
   aiSumReadAttachmentName: 'Baca lampiran {name}',
@@ -228,4 +229,5 @@ export const id = {
   aiSumSaveTemplate: 'Menyimpan templat gaya "{name}"',
   aiSumTemplatesEmpty: 'Daftar templat gaya (kosong)',
   aiSumListTemplates: 'Menampilkan {count} templat gaya',
+  aiPageCloudToLocal: 'Awan tidak tersedia — dibuat secara lokal',
 } satisfies Record<keyof typeof zh, string>

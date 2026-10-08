@@ -36,6 +36,14 @@ const tUpd = createI18n({
     updInstall: 'Restart & Install',
     updLater: 'Remind me later',
   },
+  vi: {
+    updTitle: 'Cập nhật phần mềm',
+    updHeadline: 'Đã có phiên bản mới',
+    updDesc:
+      'Bản cập nhật này bao gồm các cải tiến hiệu suất và sửa lỗi. Chúng tôi khuyên bạn nên cập nhật ngay bây giờ.',
+    updInstall: 'Khởi động lại & Cài đặt',
+    updLater: 'Nhắc tôi sau',
+  },
   ja: {
     updTitle: 'ソフトウェアアップデート',
     updHeadline: '新しいバージョンがあります',
@@ -168,14 +176,6 @@ const tUpd = createI18n({
       'इस अपडेट में प्रदर्शन सुधार और बग फ़िक्स शामिल हैं। हम अभी अपडेट करने की सलाह देते हैं।',
     updInstall: 'पुनरारंभ करें और इंस्टॉल करें',
     updLater: 'बाद में याद दिलाएँ',
-  },
-  vi: {
-    updTitle: 'Cập nhật phần mềm',
-    updHeadline: 'Có phiên bản mới',
-    updDesc:
-      'Bản cập nhật này gồm cải thiện hiệu năng và sửa lỗi. Chúng tôi khuyên bạn cập nhật ngay.',
-    updInstall: 'Khởi động lại và cài đặt',
-    updLater: 'Nhắc tôi sau',
   },
   'zh-TW': {
     updTitle: '軟體更新',

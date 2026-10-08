@@ -5,12 +5,14 @@ import {
   blankXlsxBuffer,
   buildWorksheetXml,
   csvToXlsxBuffer,
+  csvToXlsxBufferForOpen,
   sheetCsvToXlsxBuffer,
   decodeCsvBuffer,
   isNumericCell,
   parseCsv,
   resolveImportDelimiter,
   sniffDelimiter,
+  splitSepDeclaration,
 } from '@genoffice/xlsx-gateway/gateway/csv-import'
 
 describe('decodeCsvBuffer', () => {
@@ -28,6 +30,16 @@ describe('decodeCsvBuffer', () => {
     expect(decodeCsvBuffer(Buffer.from(`\uFEFF${rows}`, 'utf16le'))).toBe(rows)
     const be = Buffer.from(`\uFEFF${rows}`, 'utf16le').swap16()
     expect(decodeCsvBuffer(be)).toBe(rows)
+  })
+
+  it('reads BOM-less UTF-16 instead of keeping NUL garbage', () => {
+    const ascii = 'a,b\n1,2\n'
+    const le = Buffer.from(ascii, 'utf16le')
+    expect(decodeCsvBuffer(le)).toBe(ascii)
+    const be = Buffer.from(ascii, 'utf16le').swap16()
+    expect(decodeCsvBuffer(be)).toBe(ascii)
+    const leRows = Buffer.from(rows, 'utf16le')
+    expect(decodeCsvBuffer(leRows)).toBe(rows)
   })
 
   it('falls back to the legacy charset Excel actually writes', () => {
@@ -73,6 +85,33 @@ function encodeWith(text: string, charset: string): Buffer {
 
 const gbkBytes = (text: string): Buffer => encodeWith(text, 'gb18030')
 const shiftJisBytes = (text: string): Buffer => encodeWith(text, 'shift_jis')
+
+describe('sep= declaration', () => {
+  it('names the delimiter and is never a data row', () => {
+    const text = 'sep=;\nname;qty\nApple;3\n'
+    expect(splitSepDeclaration(text)).toEqual({ text: 'name;qty\nApple;3\n', delimiter: ';' })
+    expect(sniffDelimiter(text)).toBe(';')
+    expect(parseCsv(text)).toEqual([
+      ['name', 'qty'],
+      ['Apple', '3'],
+    ])
+    expect(sniffDelimiter('\ufeffsep=\t\na\tb\n')).toBe('\t')
+    expect(splitSepDeclaration('separator,x\n1,2\n').delimiter).toBeUndefined()
+  })
+
+  it('overrides the prose guard on the import path', () => {
+    const prose = 'sep=;\nnotes\nhello; world\nplain text\n'
+    expect(resolveImportDelimiter(prose)).toBe(';')
+    expect(resolveImportDelimiter(prose.slice('sep=;\n'.length))).toBe(',')
+  })
+
+  it('is stripped by the workbook import too', async () => {
+    const zip = await JSZip.loadAsync(await csvToXlsxBuffer('sep=;\na;b\n1;2\n'))
+    const sheet = await zip.file('xl/worksheets/sheet1.xml')!.async('string')
+    expect(sheet).not.toContain('sep=')
+    expect(sheet).toContain('<c r="B2"><v>2</v></c>')
+  })
+})
 
 describe('parseCsv', () => {
   it('handles quotes, embedded delimiters, escaped quotes, and CRLF', () => {
@@ -159,7 +198,7 @@ describe('resolveImportDelimiter', () => {
 
 describe('isNumericCell', () => {
   it('accepts plain decimals and scientific notation', () => {
-    for (const value of ['0', '42', '-3.5', '1e3', '0.5']) {
+    for (const value of ['0', '42', '-3.5', '1e3', '0.5', '.5', '1.', '-.5']) {
       expect(isNumericCell(value), value).toBe(true)
     }
   })
@@ -203,6 +242,70 @@ describe('csvToXlsxBuffer', () => {
     await expect(csvToXlsxBuffer('')).rejects.toThrow('no data rows')
     expect(buildWorksheetXml([['<b>&"']])).toContain('&lt;b&gt;&amp;&quot;')
     expect(buildWorksheetXml([['a\rb_x000D_']])).toContain('>a_x000D_b_x005F_x000D_<')
+  })
+
+  it('rejects worksheet names that Excel forbids', async () => {
+    for (const name of ['data[final]', 'bad/name', "'quoted", "trailing'"]) {
+      await expect(csvToXlsxBuffer('A\n1', name), name).rejects.toThrow(/sheet name/i)
+      await expect(blankXlsxBuffer(name), name).rejects.toThrow(/sheet name/i)
+    }
+  })
+})
+
+describe('csvToXlsxBufferForOpen', () => {
+  it('opens a blank-lines-only CSV as an empty workbook and reports the empty source', async () => {
+    const { buffer, empty } = await csvToXlsxBufferForOpen('\r\n'.repeat(5_927))
+    const zip = await JSZip.loadAsync(buffer)
+    const sheet = await zip.file('xl/worksheets/sheet1.xml')?.async('text')
+
+    expect(empty).toBe(true)
+    expect(sheet).toContain('<sheetData></sheetData>')
+  })
+
+  it('keeps normal CSV rows unchanged', async () => {
+    const { buffer, empty } = await csvToXlsxBufferForOpen('name,amount\r\nalpha,10\r\n')
+    const zip = await JSZip.loadAsync(buffer)
+    const sheet = await zip.file('xl/worksheets/sheet1.xml')?.async('text')
+
+    expect(empty).toBe(false)
+    expect(sheet).toContain('<t xml:space="preserve">alpha</t>')
+    expect(sheet).toContain('<v>10</v>')
+  })
+
+  it('honors a pinned delimiter so a comma-heavy .tsv keeps its columns', async () => {
+    // A UniProt-style export (issue #1140): few columns, and each annotation
+    // field is itself a comma-separated list, so the sniffer counts more
+    // commas than tabs and shatters every row. The .tsv extension already
+    // declares the delimiter — pin it.
+    const tsv =
+      'Entry\tProtein names\tGene names\r\n' +
+      'P38398\tBreast cancer protein 1, RING finger E3 ubiquitin protein ligase, BRC1, BRCA1, PARSUM1, PPP2R5S\tBRCA1, RNF3, c.1125dupT, 1253del7TTGGTCTAA\r\n' +
+      'Q92766\tSentrin/SUMO-specific protease 6, GCP-2, SUMO-1/sentrin-specific peptidase activity, PIASY, SENP6\tSENP6, SENP7, GCP2, CA1H5\r\n'
+    expect(sniffDelimiter(tsv)).toBe(',')
+    const lastColumn = async (buffer: Buffer): Promise<string> => {
+      const zip = await JSZip.loadAsync(buffer)
+      const sheet = await zip.file('xl/worksheets/sheet1.xml')?.async('text')
+      return /<dimension ref="A1:([A-Z]+)/.exec(sheet ?? '')?.[1] ?? ''
+    }
+
+    const pinned = await csvToXlsxBufferForOpen(tsv, 'Sheet1', '\t')
+    const sniffed = await csvToXlsxBufferForOpen(tsv)
+
+    // three tab columns instead of nine comma fragments, each field whole
+    expect(pinned.empty).toBe(false)
+    expect(await lastColumn(pinned.buffer)).toBe('C')
+    expect(await lastColumn(sniffed.buffer)).toBe('I')
+    const sheet = await (
+      await JSZip.loadAsync(pinned.buffer)
+    )
+      .file('xl/worksheets/sheet1.xml')
+      ?.async('text')
+    expect(sheet).toContain(
+      '<t xml:space="preserve">BRCA1, RNF3, c.1125dupT, 1253del7TTGGTCTAA</t>',
+    )
+    expect(sheet).toContain('<t xml:space="preserve">P38398</t>')
+    // a blank .tsv still opens as an empty workbook instead of throwing
+    expect((await csvToXlsxBufferForOpen('\r\n\r\n', 'Sheet1', '\t')).empty).toBe(true)
   })
 })
 

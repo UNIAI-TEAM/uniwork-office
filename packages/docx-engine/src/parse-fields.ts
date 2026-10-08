@@ -1,7 +1,7 @@
 // Field-code display (PAGE, TOC, REF, ...) and TOC entry numbering.
 import { inlineEqFieldResults } from './eq-field'
 import { computeListMarkers, type ListItemRef } from './list-markers'
-import { decodeEntities, lineTwipsOf, plainText } from './parse-xml-text'
+import { decodeEntities, lineTwipsOf, onOffTagIn, plainText } from './parse-xml-text'
 import type { Block, FieldDisplay, NumberingDef, StyleInfo, TabStop } from './types'
 
 /**
@@ -33,11 +33,11 @@ function tocLeaderOf(pPr: string, style?: StyleInfo): TabStop['leader'] | undefi
   const tabsXml = /<w:tabs>[\s\S]*?<\/w:tabs>/.exec(pPr)?.[0]
   if (tabsXml) {
     const rights = Array.from(tabsXml.matchAll(/<w:tab\s[^>]*\/>/g), (m) => m[0]).filter((t) =>
-      /\sw:val="right"/.test(t),
+      /\sw:val=(?:"right"|'right')/.test(t),
     )
     const last = rights[rights.length - 1]
     if (last) {
-      const v = /\sw:leader="([^"]+)"/.exec(last)?.[1] ?? 'none'
+      const v = /\sw:leader=(?:"([^"]+)"|'([^']+)')/.exec(last)?.slice(1, 3).find(Boolean) ?? 'none'
       return (TAB_LEADERS as readonly string[]).includes(v) ? (v as TabStop['leader']) : 'none'
     }
   }
@@ -58,12 +58,59 @@ function leadingRunFont(rPr: string, text: string): string | undefined {
 /** a w:del run wrapper with its content (not the self-closing paragraph-mark w:del in pPr/rPr) */
 const DEL_WRAPPER_RE = /<w:del(?:\s[^>]*)?(?<!\/)>[\s\S]*?<\/w:del>/g
 
+/**
+ * Attribute value of the first w: element that declares it. XML allows either
+ * quote delimiter, so a double-quote-only pattern read a producer that wrote '
+ * as if the attribute were absent.
+ */
+export function tagAttr(xml: string, tag: string, name: string): string | undefined {
+  return new RegExp(`<${tag}\\b[^>]*\\s${name}=(["'])([^"']*)\\1`).exec(xml)?.[2]
+}
+
+/** direct paragraph geometry Word applies over the style: before/after spacing and left indent */
+export function directParaGeometry(
+  pPr: string,
+): Pick<FieldDisplay, 'spaceBeforeTwips' | 'spaceAfterTwips' | 'indentLeftTwips'> {
+  const twips = (tag: string, name: string): number | undefined => {
+    const v = parseInt(tagAttr(pPr, tag, name) ?? '', 10)
+    return Number.isNaN(v) ? undefined : v
+  }
+  const before = twips('w:spacing', 'w:before')
+  const after = twips('w:spacing', 'w:after')
+  // w:start is the strict-transitional spelling of w:left
+  const left = twips('w:ind', 'w:(?:left|start)')
+  return {
+    ...(before !== undefined ? { spaceBeforeTwips: before } : {}),
+    ...(after !== undefined ? { spaceAfterTwips: after } : {}),
+    ...(left !== undefined ? { indentLeftTwips: left } : {}),
+  }
+}
+
+/** ST_LineSpacingRule of a paragraph, defaulting to auto as OOXML does */
+function lineRuleOf(pPr: string): 'auto' | 'atLeast' | 'exact' {
+  const v = tagAttr(pPr, 'w:spacing', 'w:lineRule')
+  return v === 'atLeast' || v === 'exact' ? v : 'auto'
+}
+
+/** a TOC entry Word wrote without TOC styles: PAGEREF page number behind a right tab stop */
+function unstyledTocEntry(xml: string, pPr: string): boolean {
+  return (
+    /<w:instrText[^>]*>\s*PAGEREF\s/.test(xml) &&
+    /<w:tabs>[\s\S]*?<w:tab\s[^>]*w:val=(?:"right"|'right')/.test(pPr)
+  )
+}
+
 export function fieldDisplayOf(
   xml: string,
   styles?: Map<string, StyleInfo>,
 ): FieldDisplay | undefined {
-  const styleId = /<w:pStyle w:val="([^"]+)"/.exec(xml)?.[1] ?? ''
-  const tocLevel = tocLevelOf(styleId, styles)
+  const styleId = tagAttr(xml, 'w:pStyle', 'w:val') ?? ''
+  const pPr = /<w:pPr>[\s\S]*?<\/w:pPr>/.exec(xml)?.[0] ?? ''
+  const geometry = directParaGeometry(pPr)
+  const styledLevel = tocLevelOf(styleId, styles)
+  // unstyled entries indent through their own w:ind, styled ones through the level ladder
+  const tocLevel = styledLevel ?? (unstyledTocEntry(xml, pPr) ? 1 : null)
+  if (styledLevel !== null) delete geometry.indentLeftTwips
   if (tocLevel !== null) {
     // TOC entry: title <tab with dot leader> page number. The page number
     // follows the LAST tab — entries like "1.1.<tab>Title<tab>7" put a leading
@@ -102,13 +149,10 @@ export function fieldDisplayOf(
     const anchor = /<w:hyperlink [^>]*w:anchor="([^"]+)"/.exec(xml)?.[1]
     // direct pPr/run metrics: Word sizes TOC lines by them while the style
     // (html2docx exports) often carries nothing
-    const pPr = /<w:pPr>[\s\S]*?<\/w:pPr>/.exec(xml)?.[0] ?? ''
     const leader = tocLeaderOf(pPr, styles?.get(styleId))
-    const spacingAttrs = /<w:spacing ([^/>]*)\/>/.exec(pPr)?.[1] ?? ''
-    const line = lineTwipsOf(/w:line="([^"]+)"/.exec(spacingAttrs)?.[1])
+    const line = lineTwipsOf(tagAttr(pPr, 'w:spacing', 'w:line'))
     // OOXML defaults w:lineRule to auto when omitted
-    const lineRule = (/w:lineRule="(auto|atLeast|exact)"/.exec(spacingAttrs)?.[1] ?? 'auto') as
-      'auto' | 'atLeast' | 'exact'
+    const lineRule = lineRuleOf(pPr)
     // font size from visible result runs only: field-machinery runs
     // (fldChar/instrText) often carry the target heading's size and would
     // inflate the whole line
@@ -123,7 +167,7 @@ export function fieldDisplayOf(
     let run: RegExpExecArray | null
     while ((run = runRe.exec(xml)) !== null) {
       if (!/<w:(?:t|delText)(?:\s|>)/.test(run[1]) || run[1].includes('<w:instrText')) continue
-      const v = parseInt(/<w:sz w:val="(\d+)"/.exec(run[1])?.[1] ?? '', 10)
+      const v = parseInt(tagAttr(run[1], 'w:sz', 'w:val') ?? '', 10)
       if (v > sz) sz = v
       if (font === undefined) {
         const rPr = /<w:rPr>[\s\S]*?<\/w:rPr>/.exec(run[1])?.[0] ?? ''
@@ -133,7 +177,7 @@ export function fieldDisplayOf(
           (m) => m[1],
         ).join('')
         font = leadingRunFont(rPr, text) ?? ''
-        bold = /<w:b(?:\s*\/>|\s(?![^>]*w:val="(?:0|false|none|off)")[^>]*\/>)/i.test(rPr)
+        bold = onOffTagIn(rPr, 'w:b') === true
       }
     }
     return {
@@ -157,6 +201,7 @@ export function fieldDisplayOf(
             ...(lineRule === 'auto' ? { lineSpacing: Math.round((line / 240) * 100) / 100 } : {}),
           }
         : {}),
+      ...geometry,
     }
   }
   xml = inlineEqFieldResults(xml)
@@ -180,7 +225,7 @@ export function fieldDisplayOf(
       const text = decodeEntities(
         Array.from(run[1].matchAll(/<w:t[^>]*>([\s\S]*?)<\/w:t>/g), (m) => m[1]).join(''),
       )
-      const v = parseInt(/<w:sz w:val="(\d+)"/.exec(run[1])?.[1] ?? '', 10)
+      const v = parseInt(tagAttr(run[1], 'w:sz', 'w:val') ?? '', 10)
       // unsized runs vote for the inherited default (key 0): one explicit
       // drop-cap letter must not out-vote a body of default-sized text
       const key = v > 0 ? v : 0
@@ -200,7 +245,6 @@ export function fieldDisplayOf(
     }
     // explicit paragraph alignment: the passthrough div would inherit the
     // document default (justify in CJK docs) and stretch short lines
-    const pPr = /<w:pPr>[\s\S]*?<\/w:pPr>/.exec(xml)?.[0] ?? ''
     const jc = /<w:jc w:val="([^"]+)"/.exec(pPr)?.[1]
     const align =
       jc === 'left' || jc === 'start'
@@ -209,15 +253,13 @@ export function fieldDisplayOf(
           ? 'right'
           : jc === 'center'
             ? 'center'
-            : jc === 'both' || jc === 'distribute'
+            : jc === 'both' || jc === 'distribute' || /kashida$|^thaiDistribute$/i.test(jc ?? '')
               ? 'justify'
               : undefined
     // explicit line spacing (same extraction as tocLine): the renderer must
     // not collapse a 1.5x field paragraph to single-spacing
-    const spacingAttrs = /<w:spacing ([^/>]*)\/>/.exec(pPr)?.[1] ?? ''
-    const line = lineTwipsOf(/w:line="([^"]+)"/.exec(spacingAttrs)?.[1])
-    const lineRule = (/w:lineRule="(auto|atLeast|exact)"/.exec(spacingAttrs)?.[1] ?? 'auto') as
-      'auto' | 'atLeast' | 'exact'
+    const line = lineTwipsOf(tagAttr(pPr, 'w:spacing', 'w:line'))
+    const lineRule = lineRuleOf(pPr)
     return {
       kind: 'text',
       left: visible,
@@ -231,6 +273,7 @@ export function fieldDisplayOf(
             ...(lineRule === 'auto' ? { lineSpacing: Math.round((line / 240) * 100) / 100 } : {}),
           }
         : {}),
+      ...geometry,
     }
   }
   return undefined
@@ -274,11 +317,12 @@ export function applyTocEntryNumbers(blocks: Block[], numbering: Map<string, Num
 /** Open fields after a paragraph's fldChars; an entry turns true past its separator. */
 export function fieldStackAfter(xml: string, stack: readonly boolean[]): boolean[] {
   const next = [...stack]
-  const re = /<w:fldChar[^>]*w:fldCharType="(begin|separate|end)"/g
+  const re = /<w:fldChar\b[^>]*\bw:fldCharType=(?:"(begin|separate|end)"|'(begin|separate|end)')/g
   let m: RegExpExecArray | null
   while ((m = re.exec(xml)) !== null) {
-    if (m[1] === 'begin') next.push(false)
-    else if (m[1] === 'separate') {
+    const kind = m[1] ?? m[2]
+    if (kind === 'begin') next.push(false)
+    else if (kind === 'separate') {
       if (next.length > 0) next[next.length - 1] = true
     } else next.pop()
   }
@@ -315,7 +359,9 @@ export function fieldLabel(xml: string): string {
   if (keyword) return `Field (${keyword})`
   // No field code in this paragraph: it only closes a field started earlier
   // (e.g. the paragraph holding the TOC's fldChar end + page break).
-  if (xml.includes('fldCharType="end"') && !xml.includes('fldCharType="begin"')) {
+  const hasEnd = xml.includes('fldCharType="end"') || xml.includes("fldCharType='end'")
+  const hasBegin = xml.includes('fldCharType="begin"') || xml.includes("fldCharType='begin'")
+  if (hasEnd && !hasBegin) {
     return xml.includes('w:type="page"') ? 'Field end marker + page break' : 'Field end marker'
   }
   return 'Field (TOC/page number/etc.)'

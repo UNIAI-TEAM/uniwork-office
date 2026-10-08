@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import { createI18n, htmlLang, type Lang, type Params } from '@genoffice/i18n'
+import { createI18n, htmlDir, htmlLang, type Lang, type Params } from '@genoffice/i18n'
 import { strings } from './strings'
 
 const translate = createI18n(strings)
@@ -38,8 +38,8 @@ const AI_LANG_DIRECTIVES: Record<Lang, string> = {
   ms: '\n\nBalas dalam bahasa yang sama dengan mesej pengguna; jika tidak dapat ditentukan, balas dalam bahasa Melayu.',
   he: '\n\nהשב באותה שפה של הודעת המשתמש; אם לא ניתן לקבוע אותה, השב בעברית.',
   hi: '\n\nउपयोगकर्ता के संदेश की भाषा में ही उत्तर दें; यदि भाषा निर्धारित न हो सके, तो हिंदी में उत्तर दें।',
-  vi: '\n\nTrả lời bằng cùng ngôn ngữ với tin nhắn của người dùng; nếu không xác định được, hãy trả lời bằng tiếng Việt.',
   'zh-TW': '\n\n用與使用者訊息相同的語言回覆；無法判斷使用者訊息的語言時，用繁體中文回覆。',
+  vi: '\n\nTrả lời bằng ngôn ngữ của tin nhắn người dùng; nếu không xác định được, hãy trả lời bằng tiếng Việt.',
 }
 
 /** appended to the agent system prompt: replies follow the user's message language, falling back to the UI language */
@@ -68,8 +68,8 @@ export const DATE_LOCALES: Record<Lang, string> = {
   ms: 'ms-MY',
   he: 'he-IL',
   hi: 'hi-IN',
-  vi: "\n\nTrả lời bằng cùng ngôn ngữ với tin nhắn của người dùng; nếu không xác định được, hãy trả lời bằng tiếng Việt.",
   'zh-TW': 'zh-TW',
+  vi: 'vi-VN',
 }
 
 const LocaleContext = createContext<Lang>('zh')
@@ -81,6 +81,7 @@ export function LocaleProvider({ initial, children }: { initial: Lang; children:
       window.slidesApi.onLanguageChanged((next) => {
         setModuleLang(next)
         document.documentElement.lang = htmlLang(next)
+        document.documentElement.dir = htmlDir(next)
         setLang(next)
       }),
     [],

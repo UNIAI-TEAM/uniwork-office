@@ -63,6 +63,7 @@ interface Props {
   disabled: boolean
   dirty: boolean
   onSave: () => void
+  onSaveAs: () => void
   onFind: () => void
   canUndo: boolean
   canRedo: boolean
@@ -77,6 +78,10 @@ interface Props {
   canInsert: boolean
   /** images come from a picked file by default; `url` places a remote image instead; tables take the picker's rows × cols */
   onInsert: (kind: InsertKind, opts?: InsertOptions) => void
+  /** replace a still-blank page with the document skeleton, in the UI language */
+  onInsertSkeleton: () => void
+  /** false once the page has content: a skeleton would only duplicate the document */
+  canInsertSkeleton: boolean
   /** page-wide AI actions: send this instruction to the assistant right away */
   onAiPreset: (text: string) => void
   canvasMode: CanvasMode
@@ -128,7 +133,10 @@ const ICON = 20
 
 export function Ribbon(p: Props) {
   const { t } = useI18n()
-  const collapse = useRibbonCollapse('htmlapp.ribbonCollapsed')
+  const collapse = useRibbonCollapse('htmlapp.ribbonCollapsed', {
+    collapse: t('ribbonCollapse'),
+    expand: t('ribbonExpand'),
+  })
   const [themeOpen, setThemeOpen] = useState(false)
   const themeRef = useRef<HTMLDivElement>(null)
   useDismissablePopover(themeOpen, () => setThemeOpen(false), {
@@ -208,6 +216,17 @@ export function Ribbon(p: Props) {
           onClick={p.onSave}
         >
           <IconSave size={16} />
+        </button>
+        <button
+          type="button"
+          className="qa-btn qa-save-as"
+          data-tip={t('saveAs')}
+          aria-label={t('saveAs')}
+          disabled={off}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={p.onSaveAs}
+        >
+          {t('saveAs')}
         </button>
         <button
           type="button"
@@ -491,6 +510,19 @@ export function Ribbon(p: Props) {
                       {t(INSERT_LABEL[kind])}
                     </button>
                   ))}
+                  <button
+                    type="button"
+                    role="menuitem"
+                    disabled={!p.canInsertSkeleton}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      closeInsert()
+                      p.onInsertSkeleton()
+                    }}
+                  >
+                    <IconCode size={16} />
+                    {t('insertSkeleton')}
+                  </button>
                 </div>
               )}
             </div>
@@ -564,10 +596,7 @@ export function Ribbon(p: Props) {
           </div>
         </div>
       </div>
-      <RibbonCollapseButton
-        state={collapse}
-        labels={{ collapse: t('ribbonCollapse'), pin: t('ribbonPin') }}
-      />
+      <RibbonCollapseButton state={collapse} label={t('ribbonCollapse')} />
     </div>
   )
 }

@@ -7,6 +7,8 @@ import {
   useAutoSavePref,
   type FindPanelStrings,
   type FindTarget,
+  aiPanelInitiallyOpen,
+  rememberAiPanelOpen,
 } from '@genoffice/ui'
 import {
   pollUntilReady,
@@ -45,6 +47,8 @@ import {
   TEXT_INSERT_KINDS,
   type InsertKind,
 } from './document/insert-presets'
+import { isDocEmpty } from './document/blank'
+import { documentSkeleton } from './document/skeleton'
 import { moveTarget } from './document/move-target'
 import { StylePanel } from './components/StylePanel'
 import { floatPosition, parseDeclarations } from './document/float-position'
@@ -58,7 +62,9 @@ import {
 import { compileOps, type HtmlOp, type OpError } from './document/ops'
 import { injectBrief, parseBrief, type Brief } from './document/brief'
 import { applyPatches } from './document/patch'
+import { adoptImageRewrites } from './document/image-rewrites'
 import { deriveAutoFileName, deriveNameFromPrompt, derivePageTitleName } from './document/auto-name'
+import { runGuardedPrint } from './print-guard'
 import type { ExportFormat, SaveMode } from '../shared/ipc'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
@@ -113,7 +119,7 @@ async function loadImageDataUrl(src: string): Promise<string | null> {
 }
 
 export default function App() {
-  const { t } = useI18n()
+  const { lang, t } = useI18n()
   const [status, setStatus] = useState<LoadStatus>('loading')
   const [path, setPath] = useState<string | null>(null)
   const [text, setText] = useState('')
@@ -132,7 +138,7 @@ export default function App() {
   const [previewNonce, setPreviewNonce] = useState(0)
   const [draftHtml, setDraftHtml] = useState<string | null>(null)
   const [historyState, setHistoryState] = useState({ undo: false, redo: false })
-  const [aiOpen, setAiOpen] = useState(() => localStorage.getItem('htmlapp.showAi') !== '0')
+  const [aiOpen, setAiOpen] = useState(() => aiPanelInitiallyOpen('htmlapp.showAi'))
   const [aiPreset, setAiPreset] = useState<AiPreset | null>(null)
   const [editQueue, setEditQueue] = useState<EditQueueItem[]>([])
   const [askMode, setAskMode] = useState<AskMode | null>(null)
@@ -199,6 +205,7 @@ export default function App() {
   const savingRef = useRef(false)
   const statusRef = useRef<LoadStatus>('loading')
   const pushedTextRef = useRef<string | null>(null)
+  const previewTimerRef = useRef<number | null>(null)
   /** parse-map version of the copy currently served to the preview; messages from older copies are ignored */
   const pushedVersionRef = useRef(-1)
   /** versions whose sids the running frame still describes: the loaded copy plus every in-place commit since
@@ -294,6 +301,10 @@ export default function App() {
    */
   const pushPreview = useCallback(
     (nextText: string, reload = true) => {
+      if (previewTimerRef.current !== null) {
+        window.clearTimeout(previewTimerRef.current)
+        previewTimerRef.current = null
+      }
       if (pushedTextRef.current === nextText) return
       const map = getMap()
       window.htmlApi.updatePreview(instrumentForPreview(nextText, map, inspectorSource))
@@ -309,8 +320,17 @@ export default function App() {
   // push the instrumented buffer to html-preview:// and reload the frame, debounced per keystroke
   useEffect(() => {
     if (status !== 'ready' || pushedTextRef.current === text) return
-    const id = window.setTimeout(() => pushPreview(text), PREVIEW_DEBOUNCE_MS)
-    return () => window.clearTimeout(id)
+    if (previewTimerRef.current !== null) window.clearTimeout(previewTimerRef.current)
+    previewTimerRef.current = window.setTimeout(() => {
+      previewTimerRef.current = null
+      pushPreview(text)
+    }, PREVIEW_DEBOUNCE_MS)
+    return () => {
+      if (previewTimerRef.current !== null) {
+        window.clearTimeout(previewTimerRef.current)
+        previewTimerRef.current = null
+      }
+    }
   }, [text, status, pushPreview])
 
   useEffect(() => {
@@ -327,7 +347,7 @@ export default function App() {
   }, [canvasMode])
 
   useEffect(() => {
-    localStorage.setItem('htmlapp.showAi', aiOpen ? '1' : '0')
+    rememberAiPanelOpen('htmlapp.showAi', aiOpen)
   }, [aiOpen])
 
   useEffect(() => {
@@ -368,7 +388,7 @@ export default function App() {
 
   /** every text change goes through here so the version counter and the map cache stay coherent */
   const commitText = useCallback(
-    (next: string, manual: boolean) => {
+    (next: string, manual: boolean, preservePending = false) => {
       textRef.current = next
       versionRef.current += 1
       if (manual) lastManualVersionRef.current = versionRef.current
@@ -376,7 +396,7 @@ export default function App() {
       setTextSel(null)
       // any other document change reloads the preview and drops the live pokes; forget them too rather than
       // committing them later against sids the rebuilt parse map may have reassigned
-      if (!flushingStylesRef.current) {
+      if (!flushingStylesRef.current && !preservePending) {
         if (styleTimerRef.current !== null) window.clearTimeout(styleTimerRef.current)
         styleTimerRef.current = null
         pendingStylesRef.current = {}
@@ -415,8 +435,17 @@ export default function App() {
     [commitText, getMap],
   )
 
+  const flushStylesRef = useRef<(() => void) | null>(null)
+  const flushDraftsRef = useRef<(() => void) | null>(null)
+  /** land live style pokes and open panel drafts in the source before anything reads, saves or edits it */
+  const flushPending = useCallback(() => {
+    flushDraftsRef.current?.()
+    flushStylesRef.current?.()
+  }, [])
+
   const replaceAll = useCallback(
     (html: string, highlight: boolean) => {
+      flushPending()
       // a generated document carries the confirmed brief so later turns (and re-opens) stay anchored to it
       const pinned =
         highlight && briefRef.current && !parseBrief(html)
@@ -427,16 +456,8 @@ export default function App() {
       frameScrollRef.current = null
       commitText(pinned, false)
     },
-    [commitText],
+    [commitText, flushPending],
   )
-
-  const flushStylesRef = useRef<(() => void) | null>(null)
-  const flushDraftsRef = useRef<(() => void) | null>(null)
-  /** land live style pokes and open panel drafts in the source before anything reads, saves or edits it */
-  const flushPending = useCallback(() => {
-    flushStylesRef.current?.()
-    flushDraftsRef.current?.()
-  }, [])
 
   /** apply a toolbar/inspector batch; the selection follows the edited element (or clears when it is gone) */
   const runManual = useCallback(
@@ -778,6 +799,14 @@ export default function App() {
     if (rel && selectedSidRef.current === sid)
       runManual([{ op: 'set_attr', sid, name: 'src', value: rel }])
   }
+  /** ribbon Insert > Insert skeleton: a standards-mode page in the UI language, for a still-blank document */
+  const insertSkeleton = useCallback(() => {
+    // the menu is disabled once the page has content, and re-checked here so
+    // the action cannot fire from a stale render (a keyboard path, a queued click)
+    if (!isDocEmpty(textRef.current)) return
+    replaceAll(documentSkeleton(lang), false)
+  }, [lang, replaceAll])
+
   /** ribbon Insert menu: a starter element after the selection (or at the end of the body), then straight into editing */
   const insertElement = async (kind: InsertKind, opts: InsertOptions = {}) => {
     let imageSrc: string | undefined
@@ -1088,15 +1117,21 @@ export default function App() {
           defaultName: provisionalNameRef.current ?? undefined,
         })
         if (result.ok && 'path' in result) {
+          const adopted = adoptImageRewrites(textAtSave, textRef.current, result.imageRewrites)
+          if (adopted.liveText !== textRef.current) {
+            editorRef.current?.setDoc(adopted.liveText)
+            commitText(adopted.liveText, false, true)
+          }
           setPath((previous) => {
-            // a new path changes the preview's <base>; relative assets only resolve after a reload
             if (previous !== result.path) setPreviewNonce((n) => n + 1)
             return result.path
           })
-          setSavedText(textAtSave)
-          // edits that landed during the write keep the document dirty
-          setSaveState(textRef.current === textAtSave ? 'saved' : 'idle')
-          if (textRef.current !== textAtSave) window.htmlApi.setDirty(true)
+          savedTextRef.current = adopted.savedText
+          setSavedText(adopted.savedText)
+          const saved = adopted.liveText === adopted.savedText
+          setSaveState(saved ? 'saved' : 'idle')
+          if (!saved) window.htmlApi.setDirty(true)
+          pushPreview(adopted.liveText)
           return true
         }
         setSaveState(result.ok ? 'idle' : 'failed')
@@ -1109,7 +1144,7 @@ export default function App() {
         savingRef.current = false
       }
     },
-    [flushPending],
+    [commitText, flushPending, pushPreview],
   )
 
   const zoomIn = useCallback(() => setZoom((z) => clampZoom(Math.round(z) + ZOOM_STEP)), [])
@@ -1157,10 +1192,35 @@ export default function App() {
         setNotice(t('exportFailed'))
         return false
       }
+      if ('skipped' in result && result.skipped?.length) {
+        setNotice(
+          t('exportHtmlSkipped', { count: result.skipped.length, first: result.skipped[0]! }),
+        )
+      }
       return !('canceled' in result)
     } finally {
       exportingRef.current = false
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- t is not referentially stable
+  }, [])
+
+  const printingRef = useRef(false)
+  const runPrint = useCallback(async () => {
+    if (statusRef.current !== 'ready') return false
+    return runGuardedPrint(
+      printingRef,
+      async () => {
+        // serialize inside the gate so a throw still releases the flag
+        flushPending()
+        return window.htmlApi.printHtml({
+          html: serializeDocText({ text: textRef.current, envelope: envelopeRef.current }),
+        })
+      },
+      (error) => {
+        console.error('[html] print failed:', error)
+        setNotice(t('printFailed', { error }))
+      },
+    )
     // eslint-disable-next-line react-hooks/exhaustive-deps -- t is not referentially stable
   }, [])
 
@@ -1195,6 +1255,25 @@ export default function App() {
       }
       void doSave(mode)
     })
+    // MCP read of this open document: hand back the same serialization a save
+    // would write, so uncommitted edits are included. Staying silent while the
+    // editor is still loading keeps the main process retrying its request
+    // instead of failing on a document that is merely not ready yet.
+    const offReadText = window.htmlApi.onReadTextRequest(() => {
+      if (statusRef.current !== 'ready') return
+      try {
+        flushPending()
+        const serialized = serializeDocText({
+          text: textRef.current,
+          envelope: envelopeRef.current,
+        })
+        window.htmlApi.sendReadTextResult({ text: serialized })
+      } catch (err) {
+        window.htmlApi.sendReadTextResult({
+          error: err instanceof Error ? err.message : String(err),
+        })
+      }
+    })
     const offClose = window.htmlApi.onCloseSaveRequest(() => {
       void (async () => {
         while (savingRef.current) await new Promise((r) => setTimeout(r, 50))
@@ -1208,6 +1287,9 @@ export default function App() {
     })
     const offRenamed = window.htmlApi.onFileRenamed((next) => setPath(next))
     const offExport = window.htmlApi.onExportRequest((format) => void runExport(format))
+    // Shell menu Print / ⌘P. The menu owns the accelerator, so this subscription
+    // is the only route the keystroke takes; without it ⌘P did nothing at all.
+    const offPrint = window.htmlApi.onPrintRequest(() => void runPrint())
     const offTheme = window.htmlApi.onThemeChanged(() => {
       // let main.tsx flip data-theme first
       window.setTimeout(
@@ -1255,13 +1337,15 @@ export default function App() {
     window.addEventListener('keydown', onKeyDown, true)
     return () => {
       offSave()
+      offReadText()
       offClose()
       offRenamed()
       offExport()
+      offPrint()
       offTheme()
       window.removeEventListener('keydown', onKeyDown, true)
     }
-  }, [doSave, runExport, cycleView, zoomIn, zoomOut, flushPending, openFind])
+  }, [doSave, runExport, runPrint, cycleView, zoomIn, zoomOut, flushPending, openFind])
 
   // pinch / ctrl+wheel over the stage chrome around the frame; wheel inside the frame arrives as gx:zoom
   useEffect(() => {
@@ -1390,6 +1474,7 @@ export default function App() {
         disabled={status !== 'ready'}
         dirty={dirty}
         onSave={() => void doSave('save')}
+        onSaveAs={() => void doSave('saveAs')}
         onFind={() => openFind(false)}
         canUndo={historyState.undo}
         canRedo={historyState.redo}
@@ -1409,6 +1494,8 @@ export default function App() {
         onToggleAi={() => setAiOpen((v) => !v)}
         canInsert={canvasMode === 'edit'}
         onInsert={(kind, opts) => void insertElement(kind, opts)}
+        onInsertSkeleton={insertSkeleton}
+        canInsertSkeleton={canvasMode === 'edit' && isDocEmpty(textRef.current)}
         onAiPreset={(text) => {
           flushPending()
           setAiOpen(true)
@@ -1562,6 +1649,7 @@ export default function App() {
                 initialText={text}
                 onChange={onEditorChange}
                 onCursor={onCursor}
+                onBeforeReplace={flushPending}
               />
             </div>
           </div>
@@ -1661,6 +1749,7 @@ export default function App() {
       {pictureDialog?.kind === 'crop' && (
         <CropDialog
           labels={imageDialogLabels}
+          lang={lang}
           image={pictureDialog.image}
           onApply={(png) => void applyPictureBytes(pictureDialog.sid, pictureDialog.src, png)}
           onCancel={() => setPictureDialog(null)}

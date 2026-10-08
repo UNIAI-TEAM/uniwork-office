@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { Editor } from '@tiptap/core'
+import { mergePPrFormat } from '@genoffice/docx-engine'
 import { editorExtensions } from '../src/renderer/editor/extensions'
+import { paraBorderPadding } from '../src/renderer/editor/hf-dom'
 
 function paraStyle(attrs: Record<string, unknown>): CSSStyleDeclaration {
   const editor = new Editor({
@@ -41,6 +43,16 @@ function listItemStyle(attrs: Record<string, unknown>): CSSStyleDeclaration {
   editor.destroy()
   return style
 }
+
+describe('drawn borders on a list item', () => {
+  it('keep the list indent: no inline padding-left/right', () => {
+    const style = listItemStyle({ borders: 'tblr', indentLeft: 300, indentFirstLine: -360 })
+    expect(style.borderLeftStyle).toBe('solid')
+    expect(style.paddingLeft).toBe('')
+    expect(style.paddingRight).toBe('')
+    expect(style.getPropertyValue('--li-left')).toBe('15pt')
+  })
+})
 
 describe('direct w:pBdr none over a style border', () => {
   it('emits an inline border-none for the reset sides only', () => {
@@ -85,5 +97,15 @@ describe('direct w:pBdr none over a style border', () => {
     expect(style.paddingBottom).toBe('4pt')
     expect(style.paddingLeft).toBe('4px')
     expect(style.paddingRight).toBe('')
+  })
+
+  it('a side with no declared w:space displays the same gap the save writes', () => {
+    const xml = mergePPrFormat('<w:pPr></w:pPr>', { borders: 'tb' })
+    const saved = [...xml.matchAll(/w:space="(\d+)"/g)].map((m) => Number(m[1]))
+    expect(saved).toEqual([0, 0])
+    const padding = paraBorderPadding('tb')
+    expect(parseFloat(padding.paddingTop!)).toBe(saved[0])
+    expect(parseFloat(padding.paddingBottom!)).toBe(saved[1])
+    expect(paraStyle({ borders: 'tb' }).paddingBottom).toBe('0px')
   })
 })

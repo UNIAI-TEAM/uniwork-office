@@ -12,6 +12,7 @@ import {
   addPicture,
   addSmartArt,
   addTable,
+  MAX_INSERT_TABLE_DIM,
   pasteElements,
   replacePictureBytes,
   type NewChartKind,
@@ -43,6 +44,11 @@ function reqRect(op: Op): { x: number; y: number; cx: number; cy: number } {
     typeof b.cy !== 'number'
   ) {
     throw new GuidedError(`op "${op.op}" needs "offset": an EMU rect {x, y, cx, cy}.`)
+  }
+  for (const k of ['x', 'y', 'cx', 'cy'] as const)
+    requireFinite(b[k], op.op as string, `offset.${k}`)
+  if (b.cx < 0 || b.cy < 0) {
+    throw new GuidedError(`op "${op.op}": "offset.cx/cy" must be >= 0 (EMU).`)
   }
   return { x: b.x, y: b.y, cx: b.cx, cy: b.cy }
 }
@@ -175,8 +181,12 @@ register({
   validate(op, ctx) {
     resolveSlide(ctx, op)
     reqRect(op)
-    if (typeof op.rows !== 'number' || typeof op.cols !== 'number' || op.rows < 1 || op.cols < 1) {
-      throw new GuidedError('op "addTable" needs "rows" and "cols" (>= 1).')
+    const dimOk = (n: unknown): n is number =>
+      Number.isInteger(n) && (n as number) >= 1 && (n as number) <= MAX_INSERT_TABLE_DIM
+    if (!dimOk(op.rows) || !dimOk(op.cols)) {
+      throw new GuidedError(
+        `op "addTable" needs integer "rows" and "cols" (1..${MAX_INSERT_TABLE_DIM}).`,
+      )
     }
     const reqEmuList = (key: 'colWidthsEmu' | 'rowHeightsEmu', count: number, dim: string) => {
       const v = op[key]

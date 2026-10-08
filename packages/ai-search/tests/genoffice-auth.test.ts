@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
@@ -13,7 +13,7 @@ import {
   startGenofficeLogin,
   type GskLoginProgress,
 } from '../src/genoffice-auth'
-import { gskApiKey, setGskProxyUrl } from '../src/gsk'
+import { gskApiKey, setGskProxyUrl, watchGskApiKey } from '../src/gsk'
 
 const CODE = 'a'.repeat(64)
 const AUTH_URL = `https://www.genspark.ai/api/office_addin_auth/verify?code=${CODE}`
@@ -47,23 +47,36 @@ function jsonResponse(json: unknown, opts: { status?: number; setCookie?: string
   } as unknown as Response
 }
 
+const deviceCodeOk = {
+  device_code: CODE,
+  auth_url: AUTH_URL,
+  expires_in: 600,
+  poll_interval: 0.001,
+}
+
 /** fetch stub for the full flow; token polls: pending × (pendingPolls) then approved */
-function stubFlow(opts: { pendingPolls?: number; createResponse?: unknown } = {}) {
+function stubFlow(
+  opts: {
+    pendingPolls?: number
+    createResponse?: unknown
+    /** overrides fields of the device_code response (poll_interval, expires_in, …) */
+    deviceCode?: Record<string, unknown>
+    /** keep answering "pending", so only the expiry can end the flow */
+    alwaysPending?: boolean
+  } = {},
+) {
   let tokenPolls = 0
   const fetchMock = vi.fn(async (input: string | URL, _init?: RequestInit) => {
     const url = String(input)
     if (url.includes('/office_addin_auth/device_code')) {
-      return jsonResponse({
-        device_code: CODE,
-        auth_url: AUTH_URL,
-        expires_in: 600,
-        poll_interval: 0.001,
-      })
+      return jsonResponse({ ...deviceCodeOk, ...opts.deviceCode })
     }
     if (url.includes('/office_addin_auth/token')) {
       tokenPolls++
-      if (tokenPolls <= (opts.pendingPolls ?? 1)) return jsonResponse({ status: 'pending' })
-      return jsonResponse({ status: 'approved', access_token: 'bearer-token' })
+      if (!opts.alwaysPending && tokenPolls > (opts.pendingPolls ?? 1)) {
+        return jsonResponse({ status: 'approved', access_token: 'bearer-token' })
+      }
+      return jsonResponse({ status: 'pending' })
     }
     if (url.includes('/office_addin_auth/session')) {
       return jsonResponse(
@@ -221,6 +234,70 @@ describe('startGenofficeLogin', () => {
     expect(loadGenofficeAuth()).toBeNull()
   })
 
+  // The device-code endpoint chooses the poll interval and the expiry, so one odd
+  // response could stretch a login for hours or leave it polling at a crawl.
+  // Both are clamped; the ceiling is MAX_LOGIN_SEC / MAX_POLL_INTERVAL_MS.
+  it('clamps a server poll interval far above the ceiling', async () => {
+    vi.useFakeTimers()
+    try {
+      stubFlow({ pendingPolls: 0, deviceCode: { ...deviceCodeOk, poll_interval: 2_000_000 } })
+      const events: GskLoginProgress[] = []
+      startGenofficeLogin((progress) => events.push(progress))
+      // 10s is the clamped ceiling; the ~23 days the server asked for never elapse
+      await vi.advanceTimersByTimeAsync(0) // let the device_code reply land and arm the sleep
+      await vi.advanceTimersByTimeAsync(10_000)
+      await vi.waitFor(() => {
+        expect(['success', 'error']).toContain(events.at(-1)?.phase)
+      })
+      expect(events.at(-1)).toEqual({ phase: 'success' })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('stops waiting for a device code at the clamped expiry', async () => {
+    vi.useFakeTimers()
+    try {
+      stubFlow({
+        alwaysPending: true,
+        deviceCode: { ...deviceCodeOk, expires_in: 1e9, poll_interval: 2_000_000 },
+      })
+      const events: GskLoginProgress[] = []
+      startGenofficeLogin((progress) => events.push(progress))
+      // 1h is the clamped ceiling: still waiting one second before it
+      await vi.advanceTimersByTimeAsync(3_599_000)
+      expect(events.some((e) => e.phase === 'error')).toBe(false)
+      await vi.advanceTimersByTimeAsync(2_000)
+      await vi.waitFor(() => {
+        expect(events.at(-1)).toEqual({ phase: 'error', error: 'expired' })
+      })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('honors a provider lifetime longer than the old 15 min ceiling', async () => {
+    // A clamp must never truncate a code the server still considers valid:
+    // Google's device_code answers 1800s, which the previous 900s ceiling cut
+    // in half and logged out a user who could still approve.
+    vi.useFakeTimers()
+    try {
+      stubFlow({
+        alwaysPending: true,
+        deviceCode: { ...deviceCodeOk, expires_in: 1800, poll_interval: 2_000 },
+      })
+      const events: GskLoginProgress[] = []
+      startGenofficeLogin((progress) => events.push(progress))
+      await vi.advanceTimersByTimeAsync(0)
+      expect(events.at(-1)).toEqual({ phase: 'url', url: AUTH_URL, expiresInSec: 1800 })
+      // still alive well past the old 900s ceiling
+      await vi.advanceTimersByTimeAsync(1_500_000)
+      expect(events.some((e) => e.phase === 'error')).toBe(false)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('re-login revokes the superseded key (best-effort)', async () => {
     stubFlow()
     await loginAndCollect()
@@ -294,5 +371,25 @@ describe('genofficeLogout', () => {
     vi.stubGlobal('fetch', fetchMock)
     await genofficeLogout()
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('watchGskApiKey', () => {
+  it('drops the cached key and reports the new one when another process rewrites auth.json', async () => {
+    const write = (key: string) =>
+      writeFileSync(join(dir, 'auth.json'), JSON.stringify({ api_key: key, key_id: key }))
+    write('gsk-old')
+    expect(gskApiKey()).toBe('gsk-old')
+    const seen: string[] = []
+    const stop = watchGskApiKey((key) => seen.push(key), 20)
+    try {
+      // the first stat runs off-thread; a write that lands before it becomes the baseline
+      await new Promise((r) => setTimeout(r, 100))
+      write('gsk-new')
+      await vi.waitFor(() => expect(seen).toEqual(['gsk-new']), { timeout: 3000 })
+      expect(genofficeApiKey()).toBe('gsk-new')
+    } finally {
+      stop()
+    }
   })
 })

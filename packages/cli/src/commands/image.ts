@@ -1,12 +1,15 @@
 import { randomBytes } from 'node:crypto'
-import { writeFileSync } from 'node:fs'
-import { extname } from 'node:path'
+import { dirname, extname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { generateImageTool } from '@genoffice/ai-search'
-import { fetchRemoteImage } from '@genoffice/electron-utils/remote-image'
+import { generateImageTool, localMediaRoots } from '@genoffice/ai-search'
+import {
+  MAX_REMOTE_IMAGE_BYTES,
+  fetchRemoteImage,
+  readBodyCapped,
+} from '@genoffice/electron-utils/remote-image'
 import { flagBool, flagString } from '../args'
 import { aiSettingsPath, prepareCloud } from '../cloud'
-import { resolveInput, resolveOutput } from '../fs'
+import { resolveInput, resolveOutput, writeOutput } from '../fs'
 import type { CommandDef } from '../registry'
 import { CliError, EXIT } from '../result'
 
@@ -47,14 +50,19 @@ export const imageCommand: CommandDef = {
   ],
   async run(args, ctx) {
     const prompt = args.positionals.join(' ').trim()
-    if (!prompt) throw new CliError(EXIT.usage, 'missing <prompt>')
+    if (!prompt)
+      throw new CliError(EXIT.usage, 'missing <prompt>', undefined, { reason: 'missing_argument' })
     const aspect = flagString(args, 'aspect')
     if (aspect && !ASPECTS.includes(aspect)) {
-      throw new CliError(EXIT.usage, `--aspect must be one of ${ASPECTS.join(', ')}`)
+      throw new CliError(EXIT.usage, `--aspect must be one of ${ASPECTS.join(', ')}`, undefined, {
+        reason: 'invalid_argument',
+      })
     }
     const size = flagString(args, 'size')
     if (size && !SIZES.includes(size)) {
-      throw new CliError(EXIT.usage, `--size must be one of ${SIZES.join(', ')}`)
+      throw new CliError(EXIT.usage, `--size must be one of ${SIZES.join(', ')}`, undefined, {
+        reason: 'invalid_argument',
+      })
     }
     const refs = (flagString(args, 'ref') ?? '')
       .split(',')
@@ -82,14 +90,28 @@ export const imageCommand: CommandDef = {
       resolveOutput(`${base}${ext}`, ctx, { force, fresh: true })
     }
     await prepareCloud(ctx.env)
-    const r = await generateImageTool(aiSettingsPath(ctx.env), {
-      prompt,
-      aspectRatio: aspect,
-      imageSize: size,
-      model: flagString(args, 'model'),
-      ...(refs.length ? { referenceImageUrls: refs } : {}),
-    })
-    if (!r.url) throw new CliError(EXIT.app, r.error ?? 'image generation failed')
+    // every --ref is a file the user named on the command line, so each one
+    // contributes its own directory; an http(s) ref is fetched remotely and
+    // contributes no local root
+    const mediaRoots = localMediaRoots(
+      ...refs.filter((r) => !/^https?:\/\//i.test(r)).map((r) => dirname(r)),
+    )
+    const r = await generateImageTool(
+      aiSettingsPath(ctx.env),
+      {
+        prompt,
+        aspectRatio: aspect,
+        imageSize: size,
+        model: flagString(args, 'model'),
+        ...(refs.length ? { referenceImageUrls: refs } : {}),
+      },
+      { mediaRoots },
+    )
+    if (!r.url)
+      throw new CliError(EXIT.app, r.error ?? 'image generation failed', undefined, {
+        suggestion:
+          'retry once later; if it persists, check the Genspark login in the GenOffice app, configure a BYOK image provider under Settings (AI Media), or continue without generated images',
+      })
     const image = await loadImage(r.url)
     const ext = EXTS_BY_MIME[image.mime]?.[0] ?? 'png'
     // the provider picks the encoding; a .png name holding JPEG bytes would mislead every reader,
@@ -100,7 +122,7 @@ export const imageCommand: CommandDef = {
       : (out && outExt) || ext === 'png'
         ? chosen
         : resolveOutput(`${stem}.${ext}`, ctx, { force, fresh: true })
-    writeFileSync(output, image.bytes)
+    writeOutput(output, image.bytes)
     return {
       summary: `saved ${image.bytes.byteLength} bytes (${image.mime}) to ${output}`,
       outputPath: output,
@@ -108,10 +130,18 @@ export const imageCommand: CommandDef = {
         mime: image.mime,
         bytes: image.bytes.byteLength,
         source_url: r.url,
-        ...(renamed
-          ? { note: `provider returned ${image.mime}; saved with .${ext} instead of .${outExt}` }
-          : {}),
       },
+      ...(renamed
+        ? {
+            warnings: [
+              {
+                code: 'output_renamed',
+                message: `provider returned ${image.mime}; saved with .${ext} instead of .${outExt}`,
+                suggestion: 'read output_path for the real file name',
+              },
+            ],
+          }
+        : {}),
     }
   },
 }
@@ -129,7 +159,7 @@ async function loadImage(url: string): Promise<{ bytes: Uint8Array; mime: string
   const response = await fetchRemoteImage(url)
   if (!response?.ok) throw new CliError(EXIT.app, `could not download the generated image: ${url}`)
   const mime = response.headers.get('content-type')?.split(';')[0]?.trim() || 'image/png'
-  return { bytes: new Uint8Array(await response.arrayBuffer()), mime }
+  return { bytes: await readBodyCapped(response, MAX_REMOTE_IMAGE_BYTES), mime }
 }
 
 /** yyyymmdd-hhmmssmmm plus a random tail, so two runs in the same instant do not collide */
