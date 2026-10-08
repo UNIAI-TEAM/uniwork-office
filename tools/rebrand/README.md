@@ -116,8 +116,8 @@ The patterns are narrow (UNIAI, uniAI, Unicode, the Family `milestones` feature 
 Not scanned: LICENSE, NOTICE, `docs/`, the other READMEs, tests, `e2e/`, fixtures, `package-lock.json`.
 
 GitHub (the word, `github.com`) in catalog values and string literals is a violation too, as are analytics endpoints and GA4
-credentials in source or packaging config (`REPO_LINKS`, `TELEMETRY` in `brand-scan.mjs`); the allowlist carries only the Markdown
-image-host feature, the name GitHub Copilot, vendored-library attribution and the updater's download URL, each with a reason.
+credentials in source or packaging config (`REPO_LINKS`, `TELEMETRY` in `brand-scan.mjs`); the allowlist carries only the functional
+identifiers of the Markdown image host (provider id, API endpoint; never rendered), the name GitHub Copilot, vendored-library attribution and the updater's download URL, each with a reason.
 
 `debt` allowlist entries mark real leftovers with a tracker; the scan warns when one stops matching so it gets deleted.
 
