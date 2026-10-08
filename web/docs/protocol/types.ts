@@ -84,6 +84,8 @@ export type ProtocolErrorCode =
   | 'network'
   /** capability not available in this deployment (e.g. AI on the web) */
   | 'unsupported'
+  /** the same operation is already running (e.g. a second save while one is in flight); retry later */
+  | 'busy'
   /** anything else (HTTP 5xx, thrown exceptions) */
   | 'internal'
 
@@ -102,6 +104,7 @@ export const PROTOCOL_ERROR_CODES: readonly ProtocolErrorCode[] = [
   'rate_limited',
   'network',
   'unsupported',
+  'busy',
   'internal',
 ]
 
@@ -191,6 +194,8 @@ export type Capability =
   | 'save'
   | 'saveAs'
   | 'recents'
+  /** `file.pick` (File > Open / Ctrl+O): the host has a document picker */
+  | 'filePick'
   | 'print'
   | 'exportPdf'
   | 'exportHtml'
@@ -205,6 +210,7 @@ export const CAPABILITY_KEYS: readonly Capability[] = [
   'save',
   'saveAs',
   'recents',
+  'filePick',
   'print',
   'exportPdf',
   'exportHtml',
@@ -263,6 +269,12 @@ export interface ReadyPayload {
   frameVersion?: string
   /** what the frame can do, before the host grants anything */
   capabilities: Capabilities
+  /**
+   * random per frame-document id (additive). Every `ready` of one page load carries the
+   * same value; a different value while a handshake is in flight means the frame reloaded
+   * and the host restarts the handshake.
+   */
+  instanceId?: string
 }
 
 export interface InitPayload extends TokenPayload {
@@ -722,7 +734,8 @@ export function isReadyPayload(x: unknown): x is ReadyPayload {
     isObj(x) &&
     isFiniteNum(x.protocolVersion) &&
     isOpt(x.frameVersion, isStr) &&
-    isCapabilities(x.capabilities)
+    isCapabilities(x.capabilities) &&
+    isOpt(x.instanceId, isStr)
   )
 }
 

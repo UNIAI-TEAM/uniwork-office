@@ -31,7 +31,11 @@ Every message is one envelope:
 
 Handshake: frame boots → emits `ready` (re-sent every 500 ms until answered) → host checks the version, calls
 `getInit()` (mints a token) → sends `init` → frame answers with `InitAck`. A later `ready` (frame reload) runs the
-handshake again.
+handshake again. `ready.instanceId` (random per page load) lets the host tell a retry from a reload: while a
+handshake is in flight, `ready` with the same id is ignored and a new id aborts the pending `init` and restarts
+(frames that send no `instanceId` keep the old behaviour: retries during a handshake are ignored). When the frame
+gets no `init` within its retry budget (40 × 500 ms), or is opened top-level (`window.parent === window`),
+`whenInitialized()` rejects (`timeout` / `not_ready`) and the editor shows an error instead of "Opening…".
 
 ### Host → frame
 
@@ -53,7 +57,7 @@ handshake again.
 
 | type                   | kind    | payload → result                                                                      |
 | ---------------------- | ------- | ------------------------------------------------------------------------------------- |
-| `ready`                | event   | {protocolVersion, frameVersion?, capabilities}                                        |
+| `ready`                | event   | {protocolVersion, frameVersion?, capabilities, instanceId?}                           |
 | `token.refresh`        | request | {reason: 'expiring' \| 'unauthorized'} → {token, tokenExpiresAt}                      |
 | `api.open`             | request | {fileId} → `OpenPayload`                                                              |
 | `api.save`             | request | {fileId, data, etag?, auto?} → `SaveResult` (etag mismatch → `conflict`)              |
@@ -75,12 +79,23 @@ handshake again.
 `api.*`, `file.pick`, `image.fetch` and `convert.altChunkHtml` are proxied by the host's `api` handlers; a type
 without a handler answers `unsupported` (e.g. AI-adjacent calls stay unavailable on the web).
 
+Capabilities: `save`, `saveAs`, `recents`, `filePick`, `print`, `exportPdf`, `exportHtml`, `attachments`, `images`,
+`ai`. The effective set is the frame's ∩ the host's grant. The frame hides File > Open / Ctrl+O unless `filePick`
+is granted (grant it only with an `api` handler for `file.pick`) and stops asking for recents without `recents`.
+
+`FileSource {kind:'url'}` (in `init.open`, `open`, `api.open`, `file.pick`) must be **same-origin** with the frame,
+or the host must send `{kind:'bytes'}`: the frame bundle's CSP is `connect-src 'self'` (baked in at build time,
+`web/docs/build/csp.ts`), so a presigned URL on another origin (S3/MinIO) is blocked. A host that needs a foreign
+URL must widen `connect-src` in the CSP it serves (`csp.json`) for that origin.
+
 ### Errors
 
 `ProtocolErrorShape = {code, message, retryable?, status?, details?}`; host/client reject with
 `DocsProtocolError` (same fields, `instanceof`-checkable). Codes: `timeout`, `cancelled`, `version_mismatch`,
 `malformed`, `unknown_type`, `not_ready`, `unauthorized`, `forbidden`, `not_found`, `conflict`, `too_large`,
-`rate_limited`, `network`, `unsupported`, `internal`. `errorFromHttpStatus()` maps UniWork API statuses
+`rate_limited`, `network`, `unsupported`, `busy`, `internal`. `conflict` only means "the document changed on the
+server"; `busy` means the same operation is already running (e.g. a host `save` while a save is in flight) and the
+host should retry later rather than open its conflict UI. `errorFromHttpStatus()` maps UniWork API statuses
 (401/403/404/409+412/413/429/5xx); anything else thrown by a handler becomes `internal` (or `network` /
 `cancelled` for fetch failures / aborts). UIs translate `code`, never `message`.
 
@@ -119,8 +134,9 @@ neither answers `unsupported`, and the frame falls back to its in-frame print di
 
 Ids are `<h|f><seq>-<random>` per sender. Every request has a timeout (default 30 s, per call `timeoutMs`;
 `timeoutMs: 0` = no timeout, for requests that wait on a user dialog such as `file.pick` / `api.saveAs`) and an
-optional `AbortSignal`; aborting rejects with `cancelled` and sends a `cancel` event so the peer handler's
-`ctx.signal` aborts. Host calls made before the handshake wait for it (bounded by the same timeout); frame `api.*`
+optional `AbortSignal`; aborting rejects with `cancelled` and a timeout rejects with `timeout`, and both send a
+`cancel` event so the peer handler's `ctx.signal` aborts (a host should abort its upload/fetch on it; a save that
+committed anyway is reconciled by the frame, which re-reads the file metadata after a timed-out save). Host calls made before the handshake wait for it (bounded by the same timeout); frame `api.*`
 calls wait for `init`. `dispose()` rejects everything in flight with `cancelled` and removes the listener.
 
 ## Usage
@@ -154,9 +170,19 @@ const session = await client.whenInitialized()
 const saved = await client.request('api.save', { fileId, data: bytes, etag })
 ```
 
+## Frame-side save conflicts
+
+A frame-initiated save (Ctrl+S / File > Save) that the host answers with `conflict` is reported to the host as an
+`error` event `{error: {code: 'conflict'}, fatal: false}` and the frame asks the user: **Overwrite** (the frame
+re-reads the file metadata with `api.open` and saves again with the current etag), **Reload latest** (`api.open`
+replaces the document, discarding the local edits) or **Cancel** (stays dirty; the next save asks again). A
+host-initiated `save` request gets the conflict in its `SaveResult` instead and owns the UI.
+
 ## Tests
 
 ```sh
+npm run test:web        # protocol + bridge (jsdom) + build vitest suites
+npm run typecheck:web   # tsc for web/docs/protocol and web/docs/bridge
 npx vitest run --root web/docs/protocol      # unit + host<->client tests over fake windows
 npx tsc -p web/docs/protocol/tsconfig.json   # typecheck incl. tests
 ```

@@ -7,7 +7,9 @@
  *   through a single-flight `token.refresh` request when it is about to
  *   expire or an API call returns 401.
  * - Handshake: emits `ready` (retried until the host answers) -> host sends
- *   `init` -> this client answers with an InitAck.
+ *   `init` -> this client answers with an InitAck. When the retry budget runs
+ *   out (or the frame is not embedded at all) `whenInitialized()` rejects, so
+ *   the editor can show an error instead of waiting forever.
  */
 import {
   Endpoint,
@@ -53,7 +55,7 @@ export interface DocsFrameClientOptions {
   timeoutMs?: number
   /** refresh the token when it expires within this window (ms, default 60 s) */
   refreshLeadMs?: number
-  /** `ready` is re-sent every readyRetryMs until `init` arrives (default 500 ms, 40 tries) */
+  /** `ready` is re-sent every readyRetryMs until `init` arrives (default 500 ms, 40 tries); then `whenInitialized()` rejects with `timeout` */
   readyRetryMs?: number
   readyMaxAttempts?: number
   /** injectable clock + fetch for tests */
@@ -82,7 +84,11 @@ type HostRequestHandler<K extends keyof HostRequests> = (
 ) => HostRequests[K]['result'] | Promise<HostRequests[K]['result']>
 
 export interface DocsFrameClient {
-  /** resolves on the first valid `init`; rejects with `version_mismatch` if the host speaks another version */
+  /**
+   * resolves on the first valid `init`; rejects with `version_mismatch` if the host speaks
+   * another version, `timeout` when no host answered `ready`, `not_ready` when the frame is
+   * not embedded (window.parent is the frame itself)
+   */
   whenInitialized(): Promise<FrameSession>
   readonly session: FrameSession | null
   /** a token valid for at least `refreshLeadMs` (refreshes first if needed) */
@@ -144,6 +150,8 @@ export function createDocsFrameClient(options: DocsFrameClientOptions): DocsFram
   initialized.catch(() => {}) // observed via whenInitialized()
 
   // ---- handshake
+  /** one id per page load: a host mid-handshake sees a new one when the frame reloads */
+  const instanceId = Math.random().toString(36).slice(2, 12) + now().toString(36)
   let readyTimer: ReturnType<typeof setInterval> | null = null
   const stopReady = (): void => {
     if (readyTimer !== null) clearInterval(readyTimer)
@@ -155,6 +163,7 @@ export function createDocsFrameClient(options: DocsFrameClientOptions): DocsFram
         protocolVersion: PROTOCOL_VERSION,
         frameVersion: options.frameVersion,
         capabilities: options.capabilities,
+        instanceId,
       })
     } catch {
       // not framed / parent gone: keep retrying until the budget runs out
@@ -217,15 +226,24 @@ export function createDocsFrameClient(options: DocsFrameClientOptions): DocsFram
     if (session) session.locale = (raw as HostEvents['language']).locale
   })
 
-  sendReady()
-  {
+  if ((parent as unknown) === (self as unknown)) {
+    // opened top-level (e.g. the frame URL visited directly): `ready` would go to ourselves
+    rejectInit(err('not_ready', 'the editor is not embedded in a host page'))
+  } else {
+    sendReady()
     let attempts = 1
     const max = options.readyMaxAttempts ?? 40
+    const retryMs = options.readyRetryMs ?? 500
     readyTimer = setInterval(() => {
-      if (session || attempts >= max) return stopReady()
+      if (session) return stopReady()
+      if (attempts >= max) {
+        stopReady()
+        rejectInit(err('timeout', `host did not answer ready after ${attempts * retryMs} ms`))
+        return
+      }
       attempts += 1
       sendReady()
-    }, options.readyRetryMs ?? 500)
+    }, retryMs)
   }
 
   // ---- auth

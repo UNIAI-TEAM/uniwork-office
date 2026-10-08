@@ -150,8 +150,30 @@ describe('error mapping', () => {
       'cancelled',
     )
     expect(toProtocolError({ code: 'conflict', message: 'm' }).code).toBe('conflict')
+    expect(toProtocolError({ code: 'busy', message: 'save running' }).code).toBe('busy')
     expect(toProtocolError('str').message).toBe('str')
     const pe = new DocsProtocolError({ code: 'timeout', message: 't' })
     expect(toProtocolError(pe)).toBe(pe)
+  })
+})
+
+describe('additive fields (PROTOCOL_VERSION stays 1)', () => {
+  const ready = (payload: Record<string, unknown>) =>
+    parseEnvelope(
+      env({ type: 'ready', payload: { protocolVersion: 1, capabilities: {}, ...payload } }),
+    )
+
+  it('ready.instanceId is optional and must be a string', () => {
+    expect(ready({}).ok).toBe(true)
+    expect(ready({ instanceId: 'abc123' }).ok).toBe(true)
+    expect(ready({ instanceId: 42 })).toMatchObject({ ok: false, reason: 'malformed' })
+  })
+
+  it('a busy error and a filePick capability are valid on the wire', () => {
+    const busy = parseEnvelope(
+      env({ kind: 'response', type: 'save', error: { code: 'busy', message: 'save running' } }),
+    )
+    expect(busy).toMatchObject({ ok: true, message: { error: { code: 'busy' } } })
+    expect(ready({ capabilities: { filePick: true, recents: false } }).ok).toBe(true)
   })
 })

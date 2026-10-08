@@ -7,7 +7,9 @@
  *   allowed frame origins; posts only to the first allowed origin.
  * - Handshake: waits for the frame's `ready`, checks the protocol version,
  *   asks `getInit` for a fresh server-minted token + session data and sends
- *   `init`. A later `ready` (frame reload) re-runs the handshake.
+ *   `init`. A later `ready` (frame reload) re-runs the handshake; a `ready`
+ *   with a new `instanceId` while a handshake is in flight (the frame reloaded
+ *   mid-handshake) aborts it and starts over.
  * - Token refresh: answers the frame's `token.refresh` via `refreshToken`,
  *   or pushes one proactively with `pushToken`.
  * - `api.*` requests from the frame are proxied by the `api` handlers the
@@ -120,7 +122,11 @@ export function createDocsFrameHost(options: DocsFrameHostOptions): DocsFrameHos
   })
 
   let ack: InitAck | null = null
-  let handshaking = false
+  /** the handshake in flight: which frame instance it targets + how to abort its `init` */
+  let handshake: { instanceId?: string; abort: AbortController } | null = null
+  /** instance whose handshake completed (its late `ready` retries are ignored) */
+  let ackedInstance: string | undefined
+  let generation = 0
   let disposed = false
   const waiters = new Set<{
     resolve: (a: InitAck) => void
@@ -134,8 +140,19 @@ export function createDocsFrameHost(options: DocsFrameHostOptions): DocsFrameHos
 
   ep.on('ready', async (raw) => {
     const ready = raw as ReadyPayload
-    if (handshaking || disposed) return // the frame re-sends `ready` until it gets `init`
+    if (disposed) return
+    const { instanceId } = ready
+    if (handshake) {
+      // the frame re-sends `ready` until it gets `init`; only a new instance (reload) restarts
+      if (instanceId === undefined || instanceId === handshake.instanceId) return
+      handshake.abort.abort()
+      handshake = null
+    } else if (ack && instanceId !== undefined && instanceId === ackedInstance) {
+      return // a retry that crossed our `init`
+    }
+    const gen = ++generation
     ack = null
+    ackedInstance = undefined
     if (ready.protocolVersion !== PROTOCOL_VERSION) {
       failHandshake(
         err(
@@ -148,21 +165,26 @@ export function createDocsFrameHost(options: DocsFrameHostOptions): DocsFrameHos
       )
       return
     }
-    handshaking = true
+    const abort = new AbortController()
+    handshake = { abort, ...(instanceId !== undefined ? { instanceId } : {}) }
+    const current = (): boolean => !disposed && gen === generation
     try {
       const init = await options.getInit(ready)
-      if (disposed) return
-      const result = (await ep.request('init', {
-        ...init,
-        protocolVersion: PROTOCOL_VERSION,
-      })) as InitAck
+      if (!current()) return
+      const result = (await ep.request(
+        'init',
+        { ...init, protocolVersion: PROTOCOL_VERSION },
+        { signal: abort.signal },
+      )) as InitAck
+      if (!current()) return
       ack = result
+      ackedInstance = instanceId
       options.onInitialized?.(result, ready)
       for (const w of [...waiters]) w.resolve(result)
     } catch (e) {
-      if (!disposed) failHandshake(toProtocolError(e))
+      if (current()) failHandshake(toProtocolError(e))
     } finally {
-      handshaking = false
+      if (gen === generation) handshake = null
     }
   })
 
@@ -187,7 +209,7 @@ export function createDocsFrameHost(options: DocsFrameHostOptions): DocsFrameHos
   for (const type of apiTypes) {
     ep.handle(type, async (payload, ctx) => {
       // the frame may act on `init` before its ack reached us: wait for it
-      if (!ack && !handshaking) throw err('not_ready', `${type} before init`)
+      if (!ack && !handshake) throw err('not_ready', `${type} before init`)
       if (!ack) await whenReady({ signal: ctx.signal })
       const h = options.api?.[type] as
         ((p: unknown, c: { signal: AbortSignal }) => unknown) | undefined

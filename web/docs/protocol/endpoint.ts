@@ -151,14 +151,16 @@ export class Endpoint {
 
     return new Promise<unknown>((resolve, reject) => {
       const clearTimer = armTimeout(timeoutMs, () => {
-        this.settle(id)?.reject(
-          err('timeout', `${type} timed out after ${timeoutMs} ms`, { retryable: true }),
-        )
+        const p = this.settle(id)
+        if (!p) return
+        // tell the peer we gave up, so it can abort the work (e.g. the host's upload)
+        this.cancelRemote(id)
+        p.reject(err('timeout', `${type} timed out after ${timeoutMs} ms`, { retryable: true }))
       })
       const onAbort = (): void => {
         const p = this.settle(id)
         if (!p) return
-        this.emit('cancel', { id })
+        this.cancelRemote(id)
         p.reject(err('cancelled', `${type} aborted`))
       }
       signal?.addEventListener('abort', onAbort, { once: true })
@@ -205,6 +207,14 @@ export class Endpoint {
   private nextId(): string {
     this.seq += 1
     return `${this.opts.idPrefix}${this.seq}-${Math.random().toString(36).slice(2, 10)}`
+  }
+
+  private cancelRemote(id: string): void {
+    try {
+      this.emit('cancel', { id })
+    } catch {
+      // peer gone: nothing left to cancel
+    }
   }
 
   private settle(id: string): Pending | undefined {

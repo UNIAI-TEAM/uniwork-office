@@ -91,6 +91,7 @@ describe('handshake', () => {
         save: true,
         saveAs: true,
         recents: false,
+        filePick: false,
         print: false, // granted by host, not supported by frame
         exportPdf: false, // supported by frame, not granted by host
         exportHtml: false,
@@ -111,6 +112,7 @@ describe('handshake', () => {
       protocolVersion: PROTOCOL_VERSION,
       frameVersion: 'test-build',
       capabilities: { save: true, saveAs: true, print: false, exportPdf: true },
+      instanceId: expect.stringMatching(/^[0-9a-z]+$/),
     })
     expect(host.isReady).toBe(true)
   })
@@ -137,6 +139,97 @@ describe('handshake', () => {
     }).whenInitialized()
     await flush(60)
     expect(hostOpts.getInit).toHaveBeenCalledTimes(2)
+  })
+
+  it('a frame reload in the middle of a handshake restarts it for the new frame', async () => {
+    let releaseFirst!: () => void
+    let calls = 0
+    const getInit = vi.fn(async () => {
+      calls += 1
+      // the first getInit is slow; the frame reloads meanwhile
+      if (calls === 1) await new Promise<void>((r) => (releaseFirst = r))
+      return baseInit({ documentId: `doc-${calls}` })
+    })
+    const onHandshakeError = vi.fn()
+    const { host, client, hostWin, frameWin } = setup(
+      { getInit, onHandshakeError },
+      { readyRetryMs: 10_000 },
+    )
+    await flush()
+    expect(getInit).toHaveBeenCalledTimes(1)
+    // the reloaded frame: a new client (new instanceId) on the same window
+    client.dispose()
+    const reloaded = createDocsFrameClient({
+      self: frameWin,
+      parent: hostWin,
+      allowedOrigins: [ORIGIN],
+      capabilities: { save: true },
+      readyRetryMs: 10_000,
+    })
+    live.push(reloaded)
+    await expect(reloaded.whenInitialized()).resolves.toMatchObject({ documentId: 'doc-2' })
+    expect(getInit).toHaveBeenCalledTimes(2)
+    // the stale handshake finishing late changes nothing
+    releaseFirst()
+    await flush(60)
+    expect(host.isReady).toBe(true)
+    expect(onHandshakeError).not.toHaveBeenCalled()
+    expect(getInit).toHaveBeenCalledTimes(2)
+  })
+
+  it('ready retries of the same frame do not restart a handshake in flight', async () => {
+    vi.useFakeTimers()
+    let release!: () => void
+    const getInit = vi.fn(async () => {
+      await new Promise<void>((r) => (release = r))
+      return baseInit()
+    })
+    const { host } = setup({ getInit }, { readyRetryMs: 100 })
+    await vi.advanceTimersByTimeAsync(1_000) // ~10 ready retries while getInit waits
+    expect(getInit).toHaveBeenCalledTimes(1)
+    release()
+    await vi.advanceTimersByTimeAsync(0)
+    await expect(host.whenReady()).resolves.toMatchObject({ protocolVersion: PROTOCOL_VERSION })
+    expect(getInit).toHaveBeenCalledTimes(1)
+  })
+
+  it('whenInitialized rejects with timeout when no host ever answers ready', async () => {
+    vi.useFakeTimers()
+    const { host: hostWin, frame: frameWin } = wirePair()
+    const client = createDocsFrameClient({
+      self: frameWin,
+      parent: hostWin,
+      allowedOrigins: [ORIGIN],
+      capabilities: {},
+      readyRetryMs: 100,
+      readyMaxAttempts: 5,
+    })
+    live.push(client)
+    let outcome = 'pending'
+    void client.whenInitialized().then(
+      () => (outcome = 'ok'),
+      (e: DocsProtocolError) => (outcome = e.code),
+    )
+    await vi.advanceTimersByTimeAsync(400)
+    expect(outcome).toBe('pending')
+    await vi.advanceTimersByTimeAsync(100)
+    expect(outcome).toBe('timeout')
+    const readies = frameWin.sent.filter((m) => (m as { type: string }).type === 'ready').length
+    expect(readies).toBe(5)
+  })
+
+  it('whenInitialized rejects at once when the frame is not embedded (parent is itself)', async () => {
+    const win = new FakeWindow(ORIGIN)
+    win.peer = win
+    const client = createDocsFrameClient({
+      self: win,
+      parent: win,
+      allowedOrigins: [ORIGIN],
+      capabilities: {},
+    })
+    live.push(client)
+    await expect(client.whenInitialized()).rejects.toMatchObject({ code: 'not_ready' })
+    expect(win.sent).toHaveLength(0)
   })
 
   it('getInit failure surfaces as a handshake error', async () => {
@@ -543,6 +636,34 @@ describe('timeouts and cancellation', () => {
     )
     await vi.advanceTimersByTimeAsync(60 * 60_000)
     expect(outcome).toBe('pending')
+  })
+
+  it('a timeout also cancels the peer handler (the host can abort its upload)', async () => {
+    vi.useFakeTimers()
+    let handlerSignal: AbortSignal | undefined
+    const { host, client, frameWin } = setup({
+      api: {
+        'api.save': (_p, ctx) => {
+          handlerSignal = ctx.signal
+          return new Promise(() => {})
+        },
+      },
+    })
+    await vi.advanceTimersByTimeAsync(0)
+    await host.whenReady()
+    const p = client.request(
+      'api.save',
+      { fileId: 'f1', data: new ArrayBuffer(1) },
+      { timeoutMs: 250 },
+    )
+    const settled = expect(p).rejects.toMatchObject({ code: 'timeout' })
+    await vi.advanceTimersByTimeAsync(0)
+    expect(handlerSignal?.aborted).toBe(false)
+    await vi.advanceTimersByTimeAsync(250)
+    await settled
+    expect(frameWin.sent.at(-1)).toMatchObject({ kind: 'event', type: 'cancel' })
+    await vi.advanceTimersByTimeAsync(0)
+    expect(handlerSignal?.aborted).toBe(true)
   })
 
   it('AbortSignal cancels the request and aborts the peer handler', async () => {
