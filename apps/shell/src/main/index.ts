@@ -325,6 +325,7 @@ import {
   uniqueNameIn,
   type FolderErrors,
 } from './folder-tree'
+import { PendingProjects, type PendingProject, type PendingProjectKind } from './pending-project'
 import {
   FOLDER_ROOTS_KEY,
   describeExtraRoot,
@@ -3022,38 +3023,17 @@ let shellWindow: BrowserWindow | null = null
 let tabManager: TabManager | null = null
 
 /**
- * When the user creates a file from a specific project view, remember which
- * project the next save should belong to. key: 'doc' | 'sheet' | 'slide' | 'markdown' | 'html' | 'pdf',
- * value: projectId. Consumed by each app's saveHook once the file first hits disk.
+ * When the user creates a file from a specific project view, the project waits
+ * (per kind) until the new editor tab exists, is bound to that tab, and the
+ * tab's first save moves the fresh file into the project. See pending-project.ts.
  */
-const pendingNewFileProject = new Map<string, string>()
+const pendingProjects = new PendingProjects()
 
-function rememberPendingProject(kind: string, opts?: { projectId?: string }): void {
-  if (opts?.projectId && opts.projectId !== 'default') {
-    pendingNewFileProject.set(kind, opts.projectId)
-  }
+function rememberPendingProject(kind: PendingProjectKind, opts?: { projectId?: string }): void {
+  pendingProjects.remember(kind, opts?.projectId)
 }
 
-/**
- * After a file first hits disk, if a pending project was set earlier via
- * "create from project view", move the new file into that project automatically.
- * Called from createShellWindow's opened/saved hooks.
- */
-function applyPendingProject(filePath: string): void {
-  // the unsaved-new workbook's temp backing file is not a user file yet; wait for its Save As
-  if (filePath.includes('genoffice-imports')) return
-  const ext = extname(filePath).slice(1).toLowerCase()
-  let key: string | undefined
-  if (ext === 'docx') key = 'doc'
-  else if (ext === 'xlsx' || ext === 'xlsm' || ext === 'xls' || ext === 'csv') key = 'sheet'
-  else if (ext === 'pptx') key = 'slide'
-  else if (ext === 'md' || ext === 'markdown') key = 'markdown'
-  else if (ext === 'html' || ext === 'htm') key = 'html'
-  else if (ext === 'pdf') key = 'pdf'
-  if (!key) return
-  const projectId = pendingNewFileProject.get(key)
-  if (!projectId) return
-  pendingNewFileProject.delete(key)
+function assignToProject(filePath: string, projectId: string): void {
   try {
     const store = new ProjectStore(app.getPath('userData'))
     store.ensureDefaultProject()
@@ -3062,6 +3042,28 @@ function applyPendingProject(filePath: string): void {
   } catch (err) {
     console.warn('[shell] applyPendingProject failed:', err)
   }
+}
+
+/** a file the tab just created: born after the click that asked for it (a file opened into the tab never qualifies) */
+function isFreshSince(filePath: string, setAt: number): boolean {
+  try {
+    const stat = statSync(filePath)
+    return (stat.birthtimeMs || stat.mtimeMs) >= setAt - 2000
+  } catch {
+    return false
+  }
+}
+
+/**
+ * After a tab's file first hits disk, if a project is bound to that tab (created
+ * from a project view), move the new file into that project automatically.
+ * Called from createShellWindow's opened/saved hooks.
+ */
+function applyPendingProject(wcId: number, filePath: string): void {
+  // the unsaved-new workbook's temp backing file is not a user file yet; wait for its Save As
+  if (filePath.includes('genoffice-imports')) return
+  const pending = pendingProjects.takeForTab(wcId, filePath, (p) => isFreshSince(filePath, p.setAt))
+  if (pending) assignToProject(filePath, pending.projectId)
 }
 
 type AiPresetInput = { text: string; autoRun?: boolean; displayText?: string }
@@ -3140,10 +3142,16 @@ function newFileDir(kind: string): string {
 }
 
 /** hand the remembered folder to the tab that was just opened for it */
-function bindPendingDir(kind: string, tabId: string | undefined): void {
+function bindPendingDir(kind: PendingProjectKind, tabId: string | undefined): void {
   const pending = takePendingDir(kind)
   const wc = tabId ? tabManager?.webContentsForTab(tabId) : undefined
   if (pending && wc) pendingDirByWc.set(wc.id, pending)
+  bindPendingProject(pendingProjects.take(kind), tabId)
+}
+
+/** hand the project remembered for a new file to the tab that was just opened for it */
+function bindPendingProject(pending: PendingProject | null, tabId: string | undefined): void {
+  pendingProjects.bind(pending, tabId ? tabManager?.webContentsForTab(tabId)?.id : undefined)
 }
 
 /**
@@ -3480,13 +3488,13 @@ function createShellWindow(): void {
     manager.setTabFileFor(wc.id, path)
     detachedSetFileFor(wc.id, path)
     recordRecentFile(path)
-    applyPendingProject(path)
+    applyPendingProject(wc.id, path)
   })
   setSlidesOpenedHook((wc, path) => {
     manager.setTabFileFor(wc.id, path)
     detachedSetFileFor(wc.id, path)
     recordRecentFile(path)
-    applyPendingProject(applyPendingDir(wc.id, path))
+    applyPendingProject(wc.id, applyPendingDir(wc.id, path))
   })
   // docs' save-as / silent first save lands on a new path → sync the tab title too
   setDocsFileSavedHook((wc, path) => {
@@ -3494,7 +3502,7 @@ function createShellWindow(): void {
     detachedSetFileFor(wc.id, path)
     recordRecentFile(path)
     const moved = applyPendingDir(wc.id, path)
-    applyPendingProject(moved)
+    applyPendingProject(wc.id, moved)
     return moved
   })
   // ⌘O / open-path inside a docs tab: sync the tab title immediately, same
@@ -3504,20 +3512,20 @@ function createShellWindow(): void {
     manager.setTabFileFor(wcId, path)
     detachedSetFileFor(wcId, path)
     recordRecentFile(path)
-    applyPendingProject(applyPendingDir(wcId, path))
+    applyPendingProject(wcId, applyPendingDir(wcId, path))
   })
   // markdown untitled first save / Save As lands on a new path
   setMarkdownFileSavedHook((wc, path) => {
     manager.setTabFileFor(wc.id, path)
     detachedSetFileFor(wc.id, path)
     recordRecentFile(path)
-    applyPendingProject(applyPendingDir(wc.id, path))
+    applyPendingProject(wc.id, applyPendingDir(wc.id, path))
   })
   setHtmlFileSavedHook((wc, path) => {
     manager.setTabFileFor(wc.id, path)
     detachedSetFileFor(wc.id, path)
     recordRecentFile(path)
-    applyPendingProject(applyPendingDir(wc.id, path))
+    applyPendingProject(wc.id, applyPendingDir(wc.id, path))
   })
   setHtmlProvisionalTitleHook((wc, title) => {
     manager.setTabTitleFor(wc.id, title)
@@ -3528,7 +3536,7 @@ function createShellWindow(): void {
     manager.setTabFileFor(wc.id, path)
     detachedSetFileFor(wc.id, path)
     recordRecentFile(path)
-    applyPendingProject(applyPendingDir(wc.id, path))
+    applyPendingProject(wc.id, applyPendingDir(wc.id, path))
   })
   // pdf content-derived auto-rename: the file moved on disk, follow it everywhere
   setPdfRenamedHook((wc, oldPath, newPath) => {
@@ -3876,6 +3884,8 @@ function routeDocumentPath(filePath: string): boolean {
  */
 async function newSheetTab(recoverAs?: string, opts?: { aiPreset?: AiPresetInput }): Promise<void> {
   const preset = normalizeAiPreset(opts?.aiPreset)
+  // taken up front: the awaits below must not let a later click swap it
+  const pendingProject = pendingProjects.take('sheet')
   // recoverAs: the would-be path of a new workbook whose recovery copy
   // survived a crash; the sheets module offers it under that name
   const dir = newFileDir('sheet')
@@ -3899,7 +3909,10 @@ async function newSheetTab(recoverAs?: string, opts?: { aiPreset?: AiPresetInput
     }
     // eligible for content-derived auto-rename after the first AI generation
     markSheetsUntitledPath(backingPath)
-    tabManager?.openSheetsTab(backingPath, preset ? { aiPreset: preset } : undefined)
+    bindPendingProject(
+      pendingProject,
+      tabManager?.openSheetsTab(backingPath, preset ? { aiPreset: preset } : undefined),
+    )
     startQueuedWorkbookNudge()
     // no recent-file entry yet: there is no user-visible file until it is saved
     recordStarPromptDocOpen()
@@ -3912,7 +3925,10 @@ async function newSheetTab(recoverAs?: string, opts?: { aiPreset?: AiPresetInput
       // route directly (not via openDocumentPath) so creating a sheet emits
       // only file_new — the file_open event is reserved for opening existing files
       if (preset && tabManager) {
-        tabManager.openSheetsTab(suggestedPath, { aiPreset: preset })
+        bindPendingProject(
+          pendingProject,
+          tabManager.openSheetsTab(suggestedPath, { aiPreset: preset }),
+        )
         recordStarPromptDocOpen()
       } else if (routeDocumentPath(suggestedPath)) recordStarPromptDocOpen()
       analytics.track('file_new', { kind: 'xlsx' })
@@ -4095,7 +4111,8 @@ async function newPdfTab(opts?: {
     // Opt the file into content-derived auto-naming on its first save
     markPdfUntitledPath(filePath)
     // PDF has no opened/saved shell hook — assign the pending project right here
-    applyPendingProject(filePath)
+    const pendingProject = pendingProjects.take('pdf')
+    if (pendingProject) assignToProject(filePath, pendingProject.projectId)
     const preset = normalizeAiPreset(opts?.aiPreset)
     if (preset && tabManager) {
       tabManager.openPdfTab(filePath, { aiPreset: preset })
