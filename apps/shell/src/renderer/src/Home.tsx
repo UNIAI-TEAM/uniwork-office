@@ -2218,6 +2218,61 @@ export function Home() {
       active = false
     }
   }, [projectMode, selectedProjectId, projectTick])
+  // "Move to project": the row menu expands the project list in place (the row menu
+  // scrolls, so a flyout submenu would be clipped); the selection bar has its own dropdown
+  const [moveFileMenu, setMoveFileMenu] = useState<string | null>(null)
+  const [bulkMoveMenu, setBulkMoveMenu] = useState(false)
+  const bulkMoveWrapRef = useRef<HTMLSpanElement>(null)
+  useEffect(() => {
+    if (rowMenu === null) setMoveFileMenu(null)
+  }, [rowMenu])
+  useDismissablePopover(bulkMoveMenu, () => setBulkMoveMenu(false), {
+    inside: () => [bulkMoveWrapRef.current],
+  })
+  useEffect(() => {
+    if (!bulkMoveMenu) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setBulkMoveMenu(false)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [bulkMoveMenu])
+
+  const moveFileTo = async (filePath: string, targetProjectId: string) => {
+    setMoveFileMenu(null)
+    setRowMenu(null)
+    try {
+      await window.aiOfficeProject?.moveFile(filePath, targetProjectId)
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : String(error))
+      return
+    }
+    refresh()
+    if (selectedProjectId) {
+      setProjectFileEntries((prev) => prev.filter((e) => e.path !== filePath))
+    }
+  }
+
+  const moveFilesTo = async (paths: string[], targetProjectId: string) => {
+    setBulkMoveMenu(false)
+    setSelected(new Set())
+    // drop moved rows immediately so they cannot be re-selected or re-moved
+    // while the sequential IPC loop is in flight
+    const moved = new Set(paths)
+    setProjectFileEntries((prev) => prev.filter((e) => !moved.has(e.path)))
+    try {
+      for (const path of paths) {
+        await window.aiOfficeProject?.moveFile(path, targetProjectId)
+      }
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : String(error))
+    } finally {
+      // a bulk move can fail after earlier paths succeeded: reload to restore the
+      // unmoved rows while the moved ones stay out of this project
+      refresh()
+    }
+  }
+
   const projSelectedPaths = projectFileEntries
     .filter((e) => selected.has(e.path))
     .map((e) => e.path)
@@ -2903,6 +2958,10 @@ export function Home() {
     const editable = editableAt(entry.path)
     const canDelete =
       context === 'folder' ? folderSelectedPaths.length === 0 : selectedPaths.length === 0
+    // inside a project the file's own project is not a target; elsewhere its project is unknown
+    const otherProjects = projectMode
+      ? projects.filter((p) => p.id !== (selectedProjectId ?? undefined))
+      : []
     return (
       <li className="recent-row" key={entry.path}>
         <div
@@ -3031,6 +3090,51 @@ export function Home() {
                     <button role="menuitem" onClick={() => startMove([entry.path])}>
                       {t('moveToFolder')}
                     </button>
+                  </>
+                )}
+                {otherProjects.length > 0 && (
+                  <>
+                    {!(canMove && editable && !entry.missing) && (
+                      <div className="row-menu-divider" />
+                    )}
+                    <button
+                      role="menuitem"
+                      className="submenu-trigger"
+                      aria-expanded={moveFileMenu === entry.path}
+                      onClick={() =>
+                        setMoveFileMenu(moveFileMenu === entry.path ? null : entry.path)
+                      }
+                    >
+                      {t('moveToProject')}
+                      <svg
+                        className="submenu-chevron"
+                        width="11"
+                        height="11"
+                        viewBox="0 0 12 12"
+                        aria-hidden="true"
+                      >
+                        <path
+                          d="M2.5 4.5l3.5 4 3.5-4"
+                          stroke="currentColor"
+                          strokeWidth="1.3"
+                          strokeLinecap="round"
+                          fill="none"
+                        />
+                      </svg>
+                    </button>
+                    {moveFileMenu === entry.path && (
+                      <div className="submenu" role="menu">
+                        {otherProjects.map((p) => (
+                          <button
+                            key={p.id}
+                            role="menuitem"
+                            onClick={() => void moveFileTo(entry.path, p.id)}
+                          >
+                            {p.isDefault ? t('defaultProject') : p.name}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </>
                 )}
                 {editable && (
@@ -3638,6 +3742,7 @@ export function Home() {
   function renderProjectContent() {
     const proj = projects.find((p) => p.id === selectedProjectId)
     if (!proj) return null
+    const otherProjects = projects.filter((p) => p.id !== proj.id)
 
     return (
       <main className="content">
@@ -3661,6 +3766,30 @@ export function Home() {
                 <span className="selection-count">
                   {t('selectedCount', { n: projSelectedPaths.length })}
                 </span>
+                {otherProjects.length > 0 && (
+                  <span className="selection-move-wrap" ref={bulkMoveWrapRef}>
+                    <button
+                      className="selection-action"
+                      aria-expanded={bulkMoveMenu}
+                      onClick={() => setBulkMoveMenu((open) => !open)}
+                    >
+                      {t('moveToProject')}
+                    </button>
+                    {bulkMoveMenu && (
+                      <div className="selection-move-menu" role="menu">
+                        {otherProjects.map((p) => (
+                          <button
+                            key={p.id}
+                            role="menuitem"
+                            onClick={() => void moveFilesTo(projSelectedPaths, p.id)}
+                          >
+                            {p.isDefault ? t('defaultProject') : p.name}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </span>
+                )}
                 <button
                   className="selection-action danger"
                   onClick={() => deleteFiles(projSelectedPaths)}
