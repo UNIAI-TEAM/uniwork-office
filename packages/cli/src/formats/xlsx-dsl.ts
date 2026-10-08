@@ -704,7 +704,7 @@ function normalizeOp(
   if (!(SUPPORTED_DSL_OPS as readonly string[]).includes(op.op)) {
     const reason = Object.hasOwn(REFUSED_DSL_OPS, op.op) ? REFUSED_DSL_OPS[op.op] : undefined
     const message = reason
-      ? `"${op.op}" is not available headless (${reason}); use the GenOffice app`
+      ? `"${op.op}" is not available headless (${reason}); use the UniWork Office app`
       : `unknown op "${op.op}"`
     throw new CliError(
       EXIT.usage,

@@ -23,43 +23,18 @@
       "kind": "permanent",
       "reason": "Vendored third-party library notes that record who made local modifications; attribution text, never rendered in the UI."
     },
-
     {
-      "path": "apps/html/src/renderer/ai/{brief-writer,page-writer}.ts",
-      "pattern": "GenOffice HTML",
-      "kind": "debt",
-      "reason": "AI system prompt missed by the hand rebrand; rewritten to 'UniWork HTML' by the first `node tools/rebrand/rebrand.mjs` run (module-names rule).",
-      "tracker": "UNI-1002 / GO-A1 re-run after upstream merge"
+      "path": "{packages/cli/src/mcp/server.ts,packages/cli/src/mcp/tools.ts}",
+      "pattern": "genoffice://",
+      "kind": "permanent",
+      "reason": "MCP resource URI scheme (genoffice://guide/*) is a protocol identifier agents and skills/genoffice/SKILL.md address by name, like the kept `genoffice` CLI command; renaming it breaks existing agent configs."
     },
     {
-      "path": "apps/markdown/src/renderer/ai/doc-writer.ts",
-      "pattern": "GenOffice Markdown",
-      "kind": "debt",
-      "reason": "AI system prompt missed by the hand rebrand; rewritten to 'UniWork Markdown' by the first rebrand run (module-names rule).",
-      "tracker": "UNI-1002 / GO-A1 re-run after upstream merge"
+      "path": "packages/docx-engine/src/lazy-media.ts",
+      "pattern": "GENOFFICE-LAZY-MEDIA",
+      "kind": "permanent",
+      "reason": "On-disk magic header of lazy-media stub files; changing it would orphan stubs already written by earlier versions. Never user visible."
     },
-    {
-      "path": "packages/ai-provider/src/codex-app-server.ts",
-      "pattern": "GenOffice",
-      "kind": "debt",
-      "reason": "Codex backend prompt text missed by the hand rebrand; rewritten to 'UniWork Office' by the first rebrand run (product-name rule).",
-      "tracker": "UNI-1002 / GO-A1 re-run after upstream merge"
-    },
-    {
-      "path": "packages/cli/src/{commands/image,commands/search,commands/sheet,formats/app-export}.ts",
-      "pattern": "Genspark|GenOffice",
-      "kind": "debt",
-      "reason": "CLI help and error strings missed by the hand rebrand; rewritten by the first rebrand run (genspark-account / product-name rules).",
-      "tracker": "UNI-1002 / GO-A1 re-run after upstream merge"
-    },
-    {
-      "path": "apps/sheets/src/preload/index.ts",
-      "pattern": "Invalid Genspark account",
-      "kind": "debt",
-      "reason": "Error message missed by the hand rebrand; rewritten to 'UniWork' by the first rebrand run (genspark-account rule).",
-      "tracker": "UNI-1002 / GO-A1 re-run after upstream merge"
-    },
-
     {
       "path": "{apps/sheets/src/main/sheets-main.ts,apps/slides/src/main/slides-main.ts,apps/shell/src/main/index.ts}",
       "pattern": "genspark\\.ai",

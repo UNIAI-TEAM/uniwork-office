@@ -27,7 +27,7 @@ export function mcpLaunch(cli: {
 
 function windowsAppLaunch(dir: string): McpLaunch {
   return {
-    command: `${dir}\\..\\..\\GenOffice.exe`,
+    command: `${dir}\\..\\..\\UniWork Office.exe`,
     args: [`${dir}\\genoffice.cjs`, 'mcp'],
     env: { ELECTRON_RUN_AS_NODE: '1' },
   }
@@ -54,7 +54,7 @@ export function mcpLaunchFromLauncher(
   const sep = isWindowsPath(launcher) ? '\\' : '/'
   const dir = launcher.slice(0, Math.max(launcher.lastIndexOf('\\'), launcher.lastIndexOf('/')))
   const exists = opts.exists ?? (() => false)
-  if (exists(`${dir}${sep}..${sep}..${sep}GenOffice.exe`)) return windowsAppLaunch(dir)
+  if (exists(`${dir}${sep}..${sep}..${sep}UniWork Office.exe`)) return windowsAppLaunch(dir)
   const bundle = exists(`${dir}${sep}genoffice.cjs`)
     ? `${dir}${sep}genoffice.cjs`
     : `${dir}${sep}..${sep}dist${sep}genoffice.cjs`

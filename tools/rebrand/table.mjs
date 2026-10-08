@@ -47,7 +47,7 @@ export const GLOBAL_EXCLUDE = [
 // stored-document markers. `GenOffice` followed by one of these is not the
 // product name.
 const FONT_ALIAS =
-  'PUA|Grid|Sans|Serif|Gothic|Che|Poppins|Tamil|Fullwidth|Songti|Hiragino|MS|Batang|Myungjo|Heiti|MingLiU|Ethiopic|Box|UI'
+  'PUA|Grid|Sans|Serif|Gothic|Che|Poppins|Tamil|Fullwidth|Songti|Hiragino|MS|Batang|Myungjo|Heiti|MingLiU|Ethiopic|Box|UI|Hangul|DM|SimSun|YaHei'
 const DATA_MARKER = 'visual'
 
 export const NON_BRAND_TOKENS = [
@@ -230,6 +230,25 @@ export const rules = [
     skipComments: true,
     skipLines: [/webSearch\('GenOffice'/, /GenOffice\s+\[A-Za-z/],
     replace: [[PRODUCT_NAME, 'UniWork Office']],
+  },
+  {
+    id: 'product-name-compound',
+    why: 'Dutch compound "GenOffice-venster" (the hyphenated-compound guard in product-name keeps code names like GenOffice-Docs out, but this one is prose)',
+    files: ['apps/shell/src/renderer/src/strings.ts'],
+    replace: [[/GenOffice-venster/g, 'UniWork Office-venster']],
+  },
+  {
+    id: 'ai-search-description',
+    why: 'ai-search package description lists the search providers; "Genspark" -> "UniWork" like every other vendor mention',
+    files: ['packages/ai-search/package.json'],
+    replace: [[/\(Genspark, Serper/g, '(UniWork, Serper']],
+  },
+  {
+    id: 'pptx-ops-prompt-preview',
+    why: 'Slide op prompt tells the model what the app preview shows; the engine package is excluded from rewrites, this single prose line is not engine data',
+    files: ['packages/pptx-ops/src/prompts/ops/text.md'],
+    ignoreGlobalExclude: true,
+    replace: [[/the GenOffice preview/g, 'the UniWork Office preview']],
   },
   {
     id: 'builder-config-names',

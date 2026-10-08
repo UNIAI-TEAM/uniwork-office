@@ -5,7 +5,7 @@ import { appBinaryForResources } from '../src/resources'
 describe('appBinaryForResources', () => {
   it('finds the app in a custom Windows install directory', () => {
     expect(appBinaryForResources(join('D:\\Apps\\GenOffice', 'resources'), 'win32')).toBe(
-      join('D:\\Apps\\GenOffice', 'GenOffice.exe'),
+      join('D:\\Apps\\GenOffice', 'UniWork Office.exe'),
     )
   })
 
@@ -13,14 +13,14 @@ describe('appBinaryForResources', () => {
     const localAppData = 'C:\\Users\\test\\AppData\\Local'
     const resources = join(localAppData, 'Programs', 'GenOffice', 'resources')
     expect(appBinaryForResources(resources, 'win32')).toBe(
-      join(localAppData, 'Programs', 'GenOffice', 'GenOffice.exe'),
+      join(localAppData, 'Programs', 'GenOffice', 'UniWork Office.exe'),
     )
   })
 
   it('finds the app in a custom macOS bundle location', () => {
     expect(
       appBinaryForResources(join('/Volumes/Work/GenOffice.app/Contents/Resources'), 'darwin'),
-    ).toBe(join('/Volumes/Work/GenOffice.app/Contents/MacOS/GenOffice'))
+    ).toBe(join('/Volumes/Work/GenOffice.app/Contents/MacOS/UniWork Office'))
   })
 
   it('finds the app in a custom Linux prefix', () => {

@@ -144,8 +144,8 @@ function installedAppBinaries(
 
 export function appBinaryForResources(resources: string, platform: NodeJS.Platform): string {
   const install = dirname(resources)
-  if (platform === 'darwin') return join(install, 'MacOS', 'GenOffice')
-  if (platform === 'win32') return join(install, 'GenOffice.exe')
+  if (platform === 'darwin') return join(install, 'MacOS', 'UniWork Office')
+  if (platform === 'win32') return join(install, 'UniWork Office.exe')
   return join(install, 'genoffice')
 }
 
