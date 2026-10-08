@@ -1182,7 +1182,7 @@ function AccountEntry({
   }
 
   const startLogin = () => {
-    // Open UniWork Sign-in in the system browser.
+    // Open UniWork Sign-in in the system browser (no Genspark device-code).
     setLoginError(null)
     setWaiting(true)
     setAuthUrl(null)

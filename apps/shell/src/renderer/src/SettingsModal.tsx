@@ -50,7 +50,7 @@ import { IntegrationsPane, skillUpdateDue } from './IntegrationsPane'
 import './settings.css'
 
 // ── Settings modal (opened from the sidebar Settings entry) ─
-// Two-pane dialog: section nav on the left, fields on the right.
+// Genspark-style two-pane dialog: section nav on the left, fields on the right.
 // All values go through the existing home IPC; nothing is stored locally.
 
 // sorted by ISO 639 language code — native-script labels have no natural
@@ -425,7 +425,7 @@ function AiModelPane({ t }: { t: TFunc }) {
   // endpoint itself. Keyed on the catalog's `needsBaseUrl` flag rather than on
   // the literal 'custom' id, so it follows the slot rather than the name, and
   // stays a no-op while any other provider is selected — a local server saved
-  // months ago is never contacted while uniAI is in use.
+  // months ago is never contacted while Genspark is in use.
   const endpointProvider = catalog.find(
     (entry) => entry.id === settings?.provider && entry.needsBaseUrl,
   )?.id
