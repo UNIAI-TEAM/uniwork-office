@@ -136,6 +136,8 @@ export const de = {
   appProtectSecurity: 'Sicherheit',
   appProtectDesc:
     'Kennwörter zum Öffnen und Ändern, Bearbeitungseinschränkungen und Datenschutzoptionen festlegen; wird beim Speichern angewendet',
+  appProtectDescWeb:
+    'Kennwort zum Ändern, Bearbeitungseinschränkungen und Datenschutzoptionen festlegen; wird beim Speichern angewendet',
   appOptional: '(optional)',
   appOptionalBlank: '(optional)',
   appProtectOpenPwd: 'Kennwort zum Öffnen dieses Dokuments',

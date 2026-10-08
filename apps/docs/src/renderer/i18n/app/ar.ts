@@ -130,6 +130,7 @@ export const ar = {
   appProtectSecurity: 'الأمان',
   appProtectDesc:
     'عيّن كلمات مرور الفتح والتعديل وقيود التحرير وخيارات الخصوصية؛ يُطبَّق عند الحفظ',
+  appProtectDescWeb: 'عيّن كلمة مرور التعديل وقيود التحرير وخيارات الخصوصية؛ يُطبَّق عند الحفظ',
   appOptional: '(اختيارية)',
   appOptionalBlank: '(اختيارية)',
   appProtectOpenPwd: 'كلمة مرور لفتح هذا المستند',

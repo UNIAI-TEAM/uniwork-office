@@ -133,6 +133,8 @@ export const id = {
   appProtectSecurity: 'Keamanan',
   appProtectDesc:
     'Atur kata sandi buka/ubah, pembatasan pengeditan, dan opsi privasi; berlaku saat disimpan',
+  appProtectDescWeb:
+    'Atur kata sandi ubah, pembatasan pengeditan, dan opsi privasi; berlaku saat disimpan',
   appOptional: '(opsional)',
   appOptionalBlank: '(opsional)',
   appProtectOpenPwd: 'Kata sandi untuk membuka dokumen ini',

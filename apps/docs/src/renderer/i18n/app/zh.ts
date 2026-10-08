@@ -134,6 +134,7 @@ export const zh = {
   appProtectTitle: '保护文档',
   appProtectSecurity: '安全性',
   appProtectDesc: '设置打开/修改密码、编辑限制与隐私选项,保存后生效',
+  appProtectDescWeb: '设置修改密码、编辑限制与隐私选项,保存后生效',
   appOptional: '(可选)',
   appOptionalBlank: '(可留空)',
   appProtectOpenPwd: '打开此文档的密码',

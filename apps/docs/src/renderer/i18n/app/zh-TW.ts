@@ -126,6 +126,7 @@ export const zhTW = {
   appProtectTitle: '保護文件',
   appProtectSecurity: '安全性',
   appProtectDesc: '設定開啟/修改密碼、編輯限制與隱私選項,儲存後生效',
+  appProtectDescWeb: '設定修改密碼、編輯限制與隱私選項,儲存後生效',
   appOptional: '(可選)',
   appOptionalBlank: '(可留空)',
   appProtectOpenPwd: '開啟此文件的密碼',

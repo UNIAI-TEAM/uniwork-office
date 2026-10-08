@@ -136,6 +136,8 @@ export const nl = {
   appProtectSecurity: 'Beveiliging',
   appProtectDesc:
     'Stel wachtwoorden voor openen en wijzigen, bewerkingsbeperkingen en privacyopties in; toegepast bij opslaan',
+  appProtectDescWeb:
+    'Stel een wachtwoord voor wijzigen, bewerkingsbeperkingen en privacyopties in; toegepast bij opslaan',
   appOptional: '(optioneel)',
   appOptionalBlank: '(optioneel)',
   appProtectOpenPwd: 'Wachtwoord om dit document te openen',

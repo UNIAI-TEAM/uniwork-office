@@ -134,6 +134,8 @@ export const pl = {
   appProtectSecurity: 'Zabezpieczenia',
   appProtectDesc:
     'Ustaw hasła otwierania i modyfikacji, ograniczenia edycji oraz opcje prywatności; zastosowane przy zapisie',
+  appProtectDescWeb:
+    'Ustaw hasło modyfikacji, ograniczenia edycji oraz opcje prywatności; zastosowane przy zapisie',
   appOptional: '(opcjonalne)',
   appOptionalBlank: '(opcjonalne)',
   appProtectOpenPwd: 'Hasło do otwarcia tego dokumentu',
