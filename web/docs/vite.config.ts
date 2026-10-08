@@ -3,6 +3,7 @@ import { dirname, resolve } from 'node:path'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import { cspOptionsFromEnv } from './build/csp'
+import { woff2FontsPlugin } from './build/fonts-woff2'
 import { fontBuildOptions, webDocsManifestPlugin } from './build/plugin'
 import { resolveVersion } from './build/version'
 
@@ -21,7 +22,11 @@ const version = resolveVersion(repoRoot)
 export default defineConfig({
   root: here,
   base: './',
-  plugins: [react(), webDocsManifestPlugin({ version, csp: cspOptionsFromEnv() })],
+  plugins: [
+    woff2FontsPlugin(),
+    react(),
+    webDocsManifestPlugin({ version, csp: cspOptionsFromEnv() }),
+  ],
   server: {
     fs: { allow: [repoRoot] },
   },

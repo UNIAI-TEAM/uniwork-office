@@ -1,0 +1,122 @@
+{
+  "Caladea-Bold.woff2": {
+    "source": "apps/docs/src/renderer/fonts/Caladea-Bold.ttf",
+    "sourceSha256": "74eda4fc5ffba0d8dc4aa76d41499f5ab76168d9ed6141c6417064c6244db9b6",
+    "ttfBytes": 58892,
+    "woff2Bytes": 18428
+  },
+  "Caladea-BoldItalic.woff2": {
+    "source": "apps/docs/src/renderer/fonts/Caladea-BoldItalic.ttf",
+    "sourceSha256": "f47a35ad6cd0efa9914d93f9d03c93e30c55da43674bccfabac73b3c0d522c01",
+    "ttfBytes": 61828,
+    "woff2Bytes": 19328
+  },
+  "Caladea-Italic.woff2": {
+    "source": "apps/docs/src/renderer/fonts/Caladea-Italic.ttf",
+    "sourceSha256": "9c968bf60ba1e851cdfea77c71e3540c57792f77482dd241acc29d1425569c4e",
+    "ttfBytes": 61860,
+    "woff2Bytes": 19616
+  },
+  "Caladea-Regular.woff2": {
+    "source": "apps/docs/src/renderer/fonts/Caladea-Regular.ttf",
+    "sourceSha256": "d2f6cad33f191e65b68bd74e6d4f7708080a41b32db635866109df3090265d91",
+    "ttfBytes": 58964,
+    "woff2Bytes": 18848
+  },
+  "Carlito-Bold.woff2": {
+    "source": "packages/ui/src/fonts/Carlito-Bold.ttf",
+    "sourceSha256": "ed778b78ce652f5b17647344fb9a4c4dcb2e6f8bafe75a0366300da7f8c199ac",
+    "ttfBytes": 686240,
+    "woff2Bytes": 198468
+  },
+  "Carlito-BoldItalic.woff2": {
+    "source": "packages/ui/src/fonts/Carlito-BoldItalic.ttf",
+    "sourceSha256": "0468067dde1d54111862f20f3fc4a5e8dcbc0ad4549e318c601b8ff7bdec935d",
+    "ttfBytes": 812344,
+    "woff2Bytes": 207116
+  },
+  "Carlito-Italic.woff2": {
+    "source": "packages/ui/src/fonts/Carlito-Italic.ttf",
+    "sourceSha256": "de59348ac812a347537b90a3d70796cfd5369048ecf9c78f5bca79ab55dd28a7",
+    "ttfBytes": 619052,
+    "woff2Bytes": 202000
+  },
+  "Carlito-Regular.woff2": {
+    "source": "packages/ui/src/fonts/Carlito-Regular.ttf",
+    "sourceSha256": "cca497a63f1cf8111d2189424ec38b95002e43799efe4f1486ec7f8063bb93c1",
+    "ttfBytes": 631712,
+    "woff2Bytes": 190604
+  },
+  "LiberationMono-Bold.woff2": {
+    "source": "apps/docs/src/renderer/fonts/LiberationMono-Bold.ttf",
+    "sourceSha256": "bd62a0672d0b9b6710b01df434c80ad54fa5f0835207eb7b17b7a761463067bb",
+    "ttfBytes": 307996,
+    "woff2Bytes": 122928
+  },
+  "LiberationMono-BoldItalic.woff2": {
+    "source": "apps/docs/src/renderer/fonts/LiberationMono-BoldItalic.ttf",
+    "sourceSha256": "79451f3c09fe25116098853b7a2ca6e2436220ccc11af022979adbcf195be130",
+    "ttfBytes": 284068,
+    "woff2Bytes": 117028
+  },
+  "LiberationMono-Italic.woff2": {
+    "source": "apps/docs/src/renderer/fonts/LiberationMono-Italic.ttf",
+    "sourceSha256": "605c01c711b44480a7508d349dfbf3264e81fa43d69e61cfa7d10b86e764c4d1",
+    "ttfBytes": 281536,
+    "woff2Bytes": 114728
+  },
+  "LiberationMono-Regular.woff2": {
+    "source": "apps/docs/src/renderer/fonts/LiberationMono-Regular.ttf",
+    "sourceSha256": "f2b83c763e8afd21709333370bed4774337fae82267937e2b5aea7e2fbd922c1",
+    "ttfBytes": 319508,
+    "woff2Bytes": 125996
+  },
+  "LiberationSans-Bold.woff2": {
+    "source": "apps/docs/src/renderer/fonts/LiberationSans-Bold.ttf",
+    "sourceSha256": "788abee4c806d660e8aee46689dd8540cd4bb98da03dcc9d171ce3efd99a9173",
+    "ttfBytes": 414456,
+    "woff2Bytes": 148756
+  },
+  "LiberationSans-BoldItalic.woff2": {
+    "source": "apps/docs/src/renderer/fonts/LiberationSans-BoldItalic.ttf",
+    "sourceSha256": "698da70fc191cc5f33ad4d6d3fe830fe4624b898ea2e3169955928b7c491f1ee",
+    "ttfBytes": 408996,
+    "woff2Bytes": 150908
+  },
+  "LiberationSans-Italic.woff2": {
+    "source": "apps/docs/src/renderer/fonts/LiberationSans-Italic.ttf",
+    "sourceSha256": "e5bae5c4cde31f22142753855f4f8fb86da6ff39955ed3c0a11248b0d16948b0",
+    "ttfBytes": 415816,
+    "woff2Bytes": 153144
+  },
+  "LiberationSans-Regular.woff2": {
+    "source": "apps/docs/src/renderer/fonts/LiberationSans-Regular.ttf",
+    "sourceSha256": "76d04c18ea243f426b7de1f3ad208e927008f961dc5945e5aad352d0dfde8ee8",
+    "ttfBytes": 410712,
+    "woff2Bytes": 147108
+  },
+  "LiberationSerif-Bold.woff2": {
+    "source": "apps/docs/src/renderer/fonts/LiberationSerif-Bold.ttf",
+    "sourceSha256": "d754ba427cfe0bca54ae052384baa8f842da5bd6550ad4da024ac441e7a7d5ce",
+    "ttfBytes": 370096,
+    "woff2Bytes": 141068
+  },
+  "LiberationSerif-BoldItalic.woff2": {
+    "source": "apps/docs/src/renderer/fonts/LiberationSerif-BoldItalic.ttf",
+    "sourceSha256": "f17db8af71e24d2066b587546021d4f0b296be389512b658dec3c09affeb11a7",
+    "ttfBytes": 376772,
+    "woff2Bytes": 147132
+  },
+  "LiberationSerif-Italic.woff2": {
+    "source": "apps/docs/src/renderer/fonts/LiberationSerif-Italic.ttf",
+    "sourceSha256": "0e3dea9f8d613e006ccfa62201f33e265d19167bd0907725c3e145368b04fc2e",
+    "ttfBytes": 375632,
+    "woff2Bytes": 147536
+  },
+  "LiberationSerif-Regular.woff2": {
+    "source": "apps/docs/src/renderer/fonts/LiberationSerif-Regular.ttf",
+    "sourceSha256": "058ea80864aef09a23f45cbec2bb5400bc3dfbdea01c3f10538a21fcb497fb74",
+    "ttfBytes": 393576,
+    "woff2Bytes": 146880
+  }
+}
