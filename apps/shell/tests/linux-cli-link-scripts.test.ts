@@ -17,10 +17,13 @@ import { describe, expect, it } from 'vitest'
 
 const BUILD = join(__dirname, '..', 'build')
 
-/** The scripts hardcode the package paths; a copy with the two roots swapped runs against a temp tree. */
+/**
+ * The scripts hardcode the package paths (/opt/UniWork Office, /usr/bin); a copy with the two roots
+ * swapped runs against a temp tree. The install dir has a space, so every use must stay quoted.
+ */
 function makeRoot() {
   const root = mkdtempSync(join(tmpdir(), 'genoffice-postinst-'))
-  const opt = join(root, 'opt', 'GenOffice')
+  const opt = join(root, 'opt', 'UniWork Office')
   const bin = join(root, 'usr', 'bin')
   mkdirSync(join(opt, 'resources', 'cli'), { recursive: true })
   mkdirSync(bin, { recursive: true })
@@ -30,7 +33,7 @@ function makeRoot() {
   const script = (name: string) => {
     const file = join(root, name)
     const body = readFileSync(join(BUILD, name), 'utf-8')
-      .replaceAll('/opt/GenOffice', opt)
+      .replaceAll('/opt/UniWork Office', opt)
       .replaceAll('/usr/bin/', `${bin}/`)
     writeFileSync(file, body)
     return (arg = '') => {

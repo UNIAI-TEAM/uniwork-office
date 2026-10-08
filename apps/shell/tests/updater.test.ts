@@ -468,7 +468,9 @@ describe('manual download fallback', () => {
     try {
       const actions = await failTwiceIntoManual(macFiles)
       actions.onOpenDownload()
-      expect(openExternal).toHaveBeenCalledWith('https://cdn.example.com/mac/UniWork-Office-0.2.0.dmg')
+      expect(openExternal).toHaveBeenCalledWith(
+        'https://cdn.example.com/mac/UniWork-Office-0.2.0.dmg',
+      )
     } finally {
       restoreArch()
     }
@@ -554,9 +556,7 @@ describe('manual download fallback', () => {
     readFileSyncMock.mockReturnValue('url: http://cdn.example.com/mac\n')
     const actions = await failTwiceIntoManual(macFiles)
     actions.onOpenDownload()
-    expect(openExternal).toHaveBeenCalledWith(
-      'https://github.com/UNIAI-TEAM/uniwork-office/releases/latest',
-    )
+    expect(openExternal).toHaveBeenCalledWith((await loadUpdater()).DOWNLOAD_PAGE_URL)
   })
 
   it('falls back to the generic download page when the feed base cannot be read', async () => {
@@ -565,9 +565,7 @@ describe('manual download fallback', () => {
       { url: 'https://attacker.example/UniWork-Office-0.2.0-arm64.dmg' },
     ])
     actions.onOpenDownload()
-    expect(openExternal).toHaveBeenCalledWith(
-      'https://github.com/UNIAI-TEAM/uniwork-office/releases/latest',
-    )
+    expect(openExternal).toHaveBeenCalledWith((await loadUpdater()).DOWNLOAD_PAGE_URL)
   })
 })
 
@@ -623,9 +621,7 @@ describe('checkForUpdatesNow (r148 manual check)', () => {
 
     expect(showMessageBox).toHaveBeenCalledTimes(1)
     expect(lastDialogOpts().buttons.length).toBe(2)
-    expect(openExternal).toHaveBeenCalledWith(
-      'https://github.com/UNIAI-TEAM/uniwork-office/releases/latest',
-    )
+    expect(openExternal).toHaveBeenCalledWith((await loadUpdater()).DOWNLOAD_PAGE_URL)
     expect(checkForUpdates).not.toHaveBeenCalled()
   })
 
