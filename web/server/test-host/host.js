@@ -10,6 +10,7 @@
 //   files()          -> [{fileId, name, versionId, size}]
 //   request(type, p) -> send a host->frame request (open/save/saveAs/print), resolves with the response
 //   bumpRemote(id)   -> simulate a concurrent server-side save (next frame save conflicts)
+//   lastExport()     -> {fileId, name, dataBytes: number[] | null} of the last api.export | null
 
 const NS = 'uniwork.office.docs'
 const V = 1
@@ -20,6 +21,7 @@ const statusEl = document.getElementById('status')
 const files = new Map() // fileId -> {meta, bytes: Uint8Array}
 let seq = 0
 let lastSaved = null
+let lastExport = null
 const events = []
 const pending = new Map() // id -> {resolve, reject}
 let reqSeq = 0
@@ -80,9 +82,18 @@ const handlers = {
       .reverse()
       .slice(0, limit ?? 20),
   }),
-  // no server PDF render in the harness: the frame falls back to its print dialog
-  'api.export': () => {
-    throw apiError('unsupported', 'export is not available in the test host')
+  // no server render in the harness: record what the frame sent, answer a stub PDF
+  'api.export': ({ fileId, name, data }) => {
+    lastExport = {
+      fileId: fileId ?? null,
+      name,
+      dataBytes: data ? Array.from(new Uint8Array(data)) : null,
+    }
+    return {
+      data: new TextEncoder().encode('%PDF-1.4 test-host stub').buffer,
+      mimeType: 'application/pdf',
+      name,
+    }
   },
 }
 
@@ -158,6 +169,7 @@ async function boot() {
   }
   window.__host = {
     lastSaved: () => (lastSaved ? { ...lastSaved, bytes: Array.from(lastSaved.bytes) } : null),
+    lastExport: () => lastExport,
     events,
     files: () => [...files.values()].map((f) => ({ ...f.meta, size: f.bytes.byteLength })),
     request,

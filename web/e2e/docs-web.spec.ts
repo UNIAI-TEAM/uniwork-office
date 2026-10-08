@@ -376,6 +376,34 @@ for (const d of DOCS) {
       return 'stale etag refused (412 conflict), editor stays dirty'
     })
 
+    await step('export-unsaved', ['save-conflict'], async () => {
+      // the document is dirty here: api.export must carry the live docx bytes, not just the file id
+      const unsaved = `UNSAVED${Date.now().toString(36).toUpperCase()}`
+      await ed.locator(EDITOR).first().click()
+      await page.keyboard.press('Control+End')
+      await page.keyboard.type(` ${unsaved}`, { delay: 10 })
+      await expect(ed.locator(EDITOR).first()).toContainText(unsaved)
+      const dl = page.waitForEvent('download', { timeout: 30_000 }).catch(() => null)
+      await ed.evaluate(() => void (window as any).__exportPdf())
+      let exp: { fileId: string | null; dataBytes: number[] | null } | null = null
+      await expect
+        .poll(
+          async () => (exp = await page.evaluate(() => (window as any).__host.lastExport())),
+          { timeout: 30_000, message: 'host received api.export' },
+        )
+        .not.toBeNull()
+      const got = exp as unknown as { fileId: string | null; dataBytes: number[] | null }
+      expect(got.dataBytes, 'live docx bytes sent with the export').not.toBeNull()
+      const zip = await JSZip.loadAsync(Buffer.from(got.dataBytes!))
+      const xml = await zip.file('word/document.xml')!.async('string')
+      expect(xml, 'live bytes hold the unsaved edit').toContain(unsaved)
+      const stored = await JSZip.loadAsync(Buffer.from((await lastHostSave(page))!.bytes))
+      const storedXml = await stored.file('word/document.xml')!.async('string')
+      expect(storedXml, 'the edit is not in the stored version').not.toContain(unsaved)
+      const d0 = await dl
+      return `api.export fileId=${got.fileId} data=${got.dataBytes!.length}B (unsaved edit present); download=${d0?.suggestedFilename() ?? 'none'}`
+    })
+
     writeFileSync(resolve(SHOTS, `console-${d.name}.txt`), consoleLines.join('\n') + (consoleLines.length ? '\n' : '(no console errors/warnings, pageerrors, failed or >=400 requests)\n'))
     writeFileSync(resolve(SHOTS, `results-${d.name}.json`), JSON.stringify(results.filter((r) => r.doc === d.name), null, 2))
     const bad = results.filter((r) => r.doc === d.name && !r.ok)
