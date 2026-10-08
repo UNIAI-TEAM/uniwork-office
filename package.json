@@ -22,6 +22,7 @@
     "format:check": "node tools/format-changed.mjs --check",
     "check:theme-colors": "node tools/check-theme-colors.mjs",
     "check:brand": "node tools/rebrand/brand-scan.mjs",
+    "check:egress": "node tools/check-egress.mjs && node --test tools/check-egress.test.mjs",
     "rebrand": "node tools/rebrand/rebrand.mjs",
     "rebrand:check": "node tools/rebrand/rebrand.mjs --check",
     "test:rebrand": "node --test tools/rebrand/brand-scan.test.mjs tools/rebrand/rebrand.test.mjs",

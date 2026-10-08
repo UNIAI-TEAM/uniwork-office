@@ -17,5 +17,12 @@ export {
   uniAiOpenRouterKey,
 } from './providers'
 export { getProviderAdapter, modelLacksVision } from './registry'
-export { AI_MEDIA_PROVIDERS, imageGenerationAvailable, mediaAnalysisAvailable } from './media'
+export {
+  AI_MEDIA_PROVIDERS,
+  imageGenerationAvailable,
+  mediaAnalysisAvailable,
+  updateMediaProviderConfig,
+  visibleMediaProviders,
+} from './media'
+export { UNIWORK_CLOUD_ENABLED, uniworkCloudEnabled } from './uniwork-cloud'
 export { AI_SEARCH_PROVIDERS } from './search-settings'

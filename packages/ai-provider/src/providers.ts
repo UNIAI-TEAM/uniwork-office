@@ -1,6 +1,7 @@
 import { defaultAiMediaSettings, resolveAiMediaSettings } from './media'
 import { OPENROUTER_CHAT_MODELS, OPENROUTER_DEFAULT_MODEL } from './openrouter'
 import { defaultAiSearchSettings, resolveAiSearchSettings } from './search-settings'
+import { uniworkCloudEnabled } from './uniwork-cloud'
 import type {
   AiProviderConfig,
   AiProviderId,
@@ -8,28 +9,6 @@ import type {
   AiSettings,
   LegacyAiSettings,
 } from './types'
-
-/**
- * Legacy Genspark LLM proxy endpoints — kept for media/search tooling that
- * still rides the gsk login. UniAI chat itself now routes through OpenRouter.
- */
-export const GENSPARK_LLM_BASE_URLS = {
-  anthropic: 'https://www.genspark.ai/api/anthropic',
-  openai: 'https://www.genspark.ai/api/llm_proxy/v1',
-} as const
-
-/**
- * Splits GenOffice usage out of the proxy's default "Claw" billing bucket
- * (the backend attributes gsk-key traffic by X-Agent-Type). Only sent to the
- * Genspark proxy — never to direct vendor APIs or OpenRouter.
- */
-export const GENSPARK_AGENT_TYPE = 'genoffice'
-
-export function gensparkAttributionHeaders(baseUrl?: string): Record<string, string> {
-  return baseUrl?.startsWith('https://www.genspark.ai')
-    ? { 'X-Agent-Type': GENSPARK_AGENT_TYPE }
-    : {}
-}
 
 /**
  * OpenCode Zen / Go route and cache per conversation and answer 400
@@ -410,9 +389,12 @@ export function defaultAiSettings(
   }
 }
 
-/** false only on an explicit opt-out; absent (pre-toggle settings files) means on */
+/**
+ * UniWork cloud tools are reachable only while the cloud seam is on; then
+ * false only on an explicit opt-out (absent, from pre-toggle settings files, means on).
+ */
 export function cloudToolsEnabled(settings: Pick<AiSettings, 'gskToolsEnabled'>): boolean {
-  return settings.gskToolsEnabled !== false
+  return uniworkCloudEnabled() && settings.gskToolsEnabled !== false
 }
 
 /**

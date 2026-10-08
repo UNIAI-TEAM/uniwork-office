@@ -80,12 +80,6 @@ import { installCliLinkBestEffort } from './cli-link'
 import { createDefaultAppService, execFileRunner } from './default-app'
 import { registerIntegrationsIpc } from './integrations-ipc'
 import { exportLessonPackZip, probeAiHub } from './edu-commercial'
-import {
-  clearCloudProjectsStore,
-  cloudProjectExternalUrl,
-  readCloudProjectsStore,
-  syncCloudProjects,
-} from './cloud-projects'
 import { handleDroppedFiles } from './dropped-files'
 import {
   handleOfficeLaunchUrl,
@@ -104,7 +98,6 @@ import {
 } from '@uniwork/practice-core'
 import { ProjectStore } from '@genoffice/project-store'
 import { collectLaunchPaths } from './launch-paths'
-import { genofficeLogout, setGskProxyUrl } from '@genoffice/ai-search'
 
 import {
   buildDocsMenu,
@@ -569,7 +562,7 @@ function currentAiPanelPrefs(): AiPanelPrefs {
 }
 
 // ---- first-run onboarding ----
-// Genspark credit-usage page opened from the account menu's credits row.
+// Token Hub (OpenRouter) credits page opened from the Home credit wallet.
 // Kept main-side so the renderer never supplies the URL.
 const CREDIT_USAGE_URL = 'https://openrouter.ai/settings/credits'
 
@@ -4026,7 +4019,6 @@ function statEntries(paths: string[]): RecentEntry[] {
 
 function registerHomeIpc(): void {
   // Desktop UniWork session sync is not wired yet — Sign-in opens the UniWork web link.
-  // Do not treat legacy Genspark / gsk CLI auth as the UniWork account state.
   ipcMain.handle(HOME_CHANNELS.accountStatus, async () => {
     return { loggedIn: false }
   })
@@ -4056,11 +4048,9 @@ function registerHomeIpc(): void {
     if (pendingLoginUrl) void shell.openExternal(pendingLoginUrl)
   })
 
-  ipcMain.handle(HOME_CHANNELS.accountLogout, async () => {
-    // Clear any leftover local auth material from the former Genspark login path.
-    await genofficeLogout()
-    clearCloudProjectsStore(cloudProjectsStorePath())
-  })
+  // No desktop UniWork session exists yet, so there is nothing to clear; the
+  // channel stays as the seam the UniWork session sync will fill in.
+  ipcMain.handle(HOME_CHANNELS.accountLogout, async () => undefined)
 
   // Reserved for the Hub result channel; the ack is not reported anywhere today.
   ipcMain.handle(HOME_CHANNELS.agentIntentAck, () => undefined)
@@ -4854,19 +4844,6 @@ function registerHomeIpc(): void {
     shell.openExternal(CREDIT_USAGE_URL).catch(() => {
       // no browser handler available; nothing actionable for the user here
     })
-  })
-
-  const cloudProjectsStorePath = () => join(app.getPath('userData'), 'cloud-projects.json')
-
-  ipcMain.handle(HOME_CHANNELS.cloudProjectsCached, () =>
-    readCloudProjectsStore(cloudProjectsStorePath()),
-  )
-
-  ipcMain.handle(HOME_CHANNELS.cloudProjects, () => syncCloudProjects(cloudProjectsStorePath()))
-
-  ipcMain.handle(HOME_CHANNELS.openCloudProject, (_event, projectUrl: unknown) => {
-    const url = cloudProjectExternalUrl(projectUrl)
-    if (url) void shell.openExternal(url)
   })
 }
 
@@ -5945,8 +5922,6 @@ function installDockMenu(): void {
 // Prefer proxy env vars (terminal launch); a packaged app launched from Finder inherits no shell
 // env vars, so fall back to the system HTTP proxy. The renderer uses Chromium's system proxy and
 // is unaffected. Same bootstrap as slides-main startSlidesStandalone.
-// awaited by login IPC so the first status probe / login click cannot race the proxy resolution
-let proxyBootstrap: Promise<void> = Promise.resolve()
 
 async function installMainProcessProxy(): Promise<void> {
   let proxyUrl = [
@@ -5959,9 +5934,9 @@ async function installMainProcessProxy(): Promise<void> {
   ].find((v) => v && /^https?:\/\//.test(v))
   if (!proxyUrl) {
     try {
-      // PAC/rule proxies answer per-host: probe the host the login flow, the
-      // Genspark LLM proxy and the gsk CLI actually target
-      const resolved = await session.defaultSession.resolveProxy('https://www.genspark.ai/')
+      // PAC/rule proxies answer per-host: probe the Token Hub host the
+      // default chat route targets
+      const resolved = await session.defaultSession.resolveProxy('https://openrouter.ai/')
       const m = /PROXY\s+([^;\s]+)/.exec(resolved)
       if (m) proxyUrl = `http://${m[1]}`
     } catch {
@@ -5969,9 +5944,6 @@ async function installMainProcessProxy(): Promise<void> {
     }
   }
   if (!proxyUrl) return
-  // spawned gsk CLI children (login/search/…) do their own fetch and never see
-  // the dispatcher below — forward the proxy to them via env
-  setGskProxyUrl(proxyUrl)
   try {
     const { ProxyAgent, setGlobalDispatcher } = await import('undici')
     setGlobalDispatcher(new ProxyAgent(proxyUrl))
@@ -6180,7 +6152,13 @@ app.whenReady().then(async () => {
     }
   }
 
-  proxyBootstrap = installMainProcessProxy()
+  void installMainProcessProxy()
+  // the removed cloud projects page cached project titles here; clear our leftover copy
+  try {
+    rmSync(join(app.getPath('userData'), 'cloud-projects.json'), { force: true })
+  } catch {
+    // best-effort: a locked file is retried on the next launch
+  }
   app.setAccessibilitySupportEnabled(true)
   // Settle the shared uiLang from saved settings BEFORE any tab renderer can
   // ask 'app:get-language': the editor handlers return the i18n module's

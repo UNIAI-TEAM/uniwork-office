@@ -353,7 +353,6 @@ function creditsNoticeText(value: unknown): string | null {
   if (typeof value === 'string') {
     const t = value.toLowerCase()
     const credits =
-      t.includes('genspark.ai/pricing') ||
       t.includes('uniwork.app/pricing') ||
       t.includes('openrouter.ai') ||
       t.includes('openrouter_credits') ||

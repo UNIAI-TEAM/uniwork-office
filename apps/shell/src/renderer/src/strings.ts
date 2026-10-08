@@ -7,23 +7,9 @@ export const strings = {
     // Sidebar navigation
     navRecent: '最近',
     navStarred: '收藏',
-    navCloud: 'UniWork Projects',
     navTeacher: '专业工作台',
-    cloudSubtitle: '在网页端用 UniWork AI 创建的项目。编辑在浏览器中继续——点击任意项目即可打开。',
-    cloudSearchPlaceholder: '搜索 {n} 个项目…',
-    cloudNoResults: '没有匹配的项目。',
-    cloudGroupThisWeek: '本周',
-    cloudGroupThisMonth: '本月',
-    cloudSortLabel: '排序：{v}',
     cloudSortRecent: '最近',
     cloudSortOldest: '最早',
-    cloudRefresh: '刷新',
-    cloudLoginHint: '登录 UniWork 账号，查看你在网页端创建的项目。',
-    cloudEmpty: '还没有网页端项目。',
-    cloudError: '加载失败，请稍后重试。',
-    cloudRetry: '重试',
-    cloudLoadMore: '加载更多',
-    cloudOpenInBrowser: '在浏览器中打开',
     navTrash: '回收站',
     navTrashTip: '删除的文件在系统废纸篓中，可从那里还原',
     secQuickStart: '快速开始',
@@ -129,7 +115,6 @@ export const strings = {
     untitled: '未命名',
     noContent: '（无内容）',
     // Account
-    accountGenspark: 'UniWork 账号',
     account: '账号',
     login: '登录',
     loginGenspark: '登录 UniWork 账号',
@@ -148,8 +133,6 @@ export const strings = {
     loginFailed: '登录失败,点击重试',
     loggingOut: '正在退出…',
     logout: '退出登录',
-    credits: '积分',
-    creditsTip: '查看积分用量详情',
     appVersion: '版本 {v}',
     versionLabel: '版本',
     setUpdateAvailableLabel: '可用更新',
@@ -327,8 +310,7 @@ export const strings = {
     setAiCodexAutoPlaceholder: '留空自动检测（推荐）',
     setAiCodexHint:
       '自动查找并使用当前 Codex CLI，更新后无需重新选择；也可填写自定义路径。无需 API Key。',
-    setAiByokNote:
-      '对话使用你自己的 key；生图与媒体解析按「生图与媒体」设置；网页搜索仍走 UniWork 登录或免费来源。',
+    setAiByokNote: '对话使用你自己的 key；生图、媒体解析与网页搜索按「生图、媒体与搜索」设置。',
     setAiSave: '保存',
     setAiSaved: '已保存',
     setAiTest: '测试连接',
@@ -345,11 +327,11 @@ export const strings = {
     setAiMaxTokensDesc:
       '一次回合的输出预算。推理模型会先消耗预算用于思考，预算用完时回复可能变成空白，遇到这种情况请调大此项。',
     setSecAiMedia: '生图、媒体与搜索',
-    setAiMediaGensparkHint: '生图与图片/视频解析使用 UniWork 账号登录。',
     setAiImageModel: '生图模型',
     setAiAnalysisModel: '解析模型',
-    setAiSearchGensparkHint:
-      '网页与图片搜索使用 UniWork 账号登录；未登录或关闭云工具时改用免费来源。',
+    setAiSearchAutoHint:
+      '无需 key：网页与图片搜索使用免费来源（用量有限）。如需更高配额，可改选其他服务商并填写自己的 key。',
+    setAiSearchAuto: '自动（免费）',
     setAiSearchSerperHint: 'Serper 用你的 key 同时提供网页与图片搜索。',
     setAiSearchSerplyHint: 'Serply 用你的 key 同时提供网页与图片搜索。',
     setAiSearchTavilyHint: 'Tavily 用你的 key 提供网页搜索；图片搜索改用免费来源。',
@@ -361,12 +343,8 @@ export const strings = {
     setAiCapSearch: '网络搜索',
     setAiCapFileSearch: '本机文件搜索',
     setAiSharedKeyHint: '同一服务商的 key 与 Base URL 在各项能力间共用，只需填一次。',
-    setAiGskTools: 'UniWork 云工具',
-    setAiGskToolsDesc:
-      '服务商选择 UniWork 时，网页搜索、生图与媒体解析经 UniWork 云端并消耗积分；关闭后搜索改用免费来源，UniWork 生图工具不可用。',
     setEmail: '邮箱',
     setNotLoggedIn: '未登录',
-    setViewUsage: '查看用量',
     setChange: '更改',
     // Dates
     today: '今天',
@@ -412,24 +390,9 @@ export const strings = {
     rootUnavailable: 'Not available',
     navRecent: 'Recent',
     navStarred: 'Starred',
-    navCloud: 'UniWork Projects',
     navTeacher: 'Workbench',
-    cloudSubtitle:
-      'Projects created on the web with UniWork AI. Editing continues in your browser — click any project to open it.',
-    cloudSearchPlaceholder: 'Search {n} projects…',
-    cloudNoResults: 'No matching projects.',
-    cloudGroupThisWeek: 'This week',
-    cloudGroupThisMonth: 'Earlier this month',
-    cloudSortLabel: 'Sort: {v}',
     cloudSortRecent: 'Recent',
     cloudSortOldest: 'Oldest',
-    cloudRefresh: 'Refresh',
-    cloudLoginHint: 'Sign in to your UniWork account to see projects you created on the web.',
-    cloudEmpty: 'No web projects yet.',
-    cloudError: 'Failed to load. Try again later.',
-    cloudRetry: 'Retry',
-    cloudLoadMore: 'Load more',
-    cloudOpenInBrowser: 'Open in browser',
     navTrash: 'Trash',
     navTrashTip: 'Deleted files go to the system Trash and can be restored there',
     secQuickStart: 'Quick start',
@@ -531,7 +494,6 @@ export const strings = {
     timelineUserAria: 'User',
     untitled: 'Untitled',
     noContent: '(empty)',
-    accountGenspark: 'UniWork Account',
     account: 'Account',
     login: 'Sign in',
     loginGenspark: 'Sign in with UniWork',
@@ -550,8 +512,6 @@ export const strings = {
     waitingShort: 'Waiting…',
     loggingOut: 'Signing out…',
     logout: 'Sign out',
-    credits: 'Credits',
-    creditsTip: 'View credit usage details',
     appVersion: 'Version {v}',
     versionLabel: 'Version',
     setUpdateAvailableLabel: 'Update available',
@@ -741,7 +701,7 @@ export const strings = {
     setAiCodexHint:
       'Automatically finds the current signed-in Codex CLI after updates; a custom path is optional. No API key is needed.',
     setAiByokNote:
-      'Chats use your own key. Image generation and media analysis follow the AI Media section; web search still uses the UniWork sign-in or free sources.',
+      'Chats use your own key. Image generation, media analysis and web search follow the AI Media section.',
     setAiSave: 'Save',
     setAiSaved: 'Saved',
     setAiTest: 'Test connection',
@@ -758,11 +718,11 @@ export const strings = {
     setAiMaxTokensDesc:
       'Output budget for one turn. Reasoning models spend part of it thinking, so an answer can come back empty once the budget runs out; raise this value if that happens.',
     setSecAiMedia: 'AI Media & Search',
-    setAiMediaGensparkHint: 'Image generation and image/video analysis use your UniWork sign-in.',
     setAiImageModel: 'Image model',
     setAiAnalysisModel: 'Analysis model',
-    setAiSearchGensparkHint:
-      'Web and image search use your UniWork sign-in; signed out or with cloud tools off they fall back to free sources.',
+    setAiSearchAutoHint:
+      'No key needed: web and image search use free sources (limited usage). Pick another provider and add your own key for higher limits.',
+    setAiSearchAuto: 'Auto (free)',
     setAiSearchSerperHint: 'Serper serves both web and image search with your key.',
     setAiSearchSerplyHint: 'Serply serves both web and image search with your key.',
     setAiSearchTavilyHint:
@@ -776,12 +736,8 @@ export const strings = {
     setAiCapFileSearch: 'Local file search',
     setAiSharedKeyHint:
       "A vendor's key and base URL are shared across capabilities; enter them once.",
-    setAiGskTools: 'UniWork cloud tools',
-    setAiGskToolsDesc:
-      'Web search, image generation and media analysis run through UniWork and use credits while their provider is set to UniWork; when off, search uses free sources and the UniWork image tools are unavailable.',
     setEmail: 'Email',
     setNotLoggedIn: 'Not signed in',
-    setViewUsage: 'View usage',
     setChange: 'Change',
     today: 'Today',
     yesterday: 'Yesterday',
@@ -829,25 +785,9 @@ export const strings = {
     // Sidebar navigation
     navRecent: '最近使用',
     navStarred: 'お気に入り',
-    navCloud: 'UniWork Projects',
     navTeacher: '教師',
-    cloudSubtitle:
-      'Web で UniWork AI を使って作成したプロジェクト。編集はブラウザで続行します。クリックで開きます。',
-    cloudSearchPlaceholder: '{n} 件のプロジェクトを検索…',
-    cloudNoResults: '一致するプロジェクトはありません。',
-    cloudGroupThisWeek: '今週',
-    cloudGroupThisMonth: '今月',
-    cloudSortLabel: '並び替え: {v}',
     cloudSortRecent: '新しい順',
     cloudSortOldest: '古い順',
-    cloudRefresh: '更新',
-    cloudLoginHint:
-      'UniWork アカウントにサインインすると、Web で作成したプロジェクトを表示できます。',
-    cloudEmpty: 'Web のプロジェクトはまだありません。',
-    cloudError: '読み込みに失敗しました。後でもう一度お試しください。',
-    cloudRetry: '再試行',
-    cloudLoadMore: 'もっと見る',
-    cloudOpenInBrowser: 'ブラウザで開く',
     navTrash: 'ゴミ箱',
     navTrashTip: '削除したファイルはシステムのゴミ箱に移動され、そこから復元できます',
     // Section headings
@@ -955,7 +895,6 @@ export const strings = {
     untitled: '無題',
     noContent: '（内容なし）',
     // Account
-    accountGenspark: 'UniWork アカウント',
     account: 'アカウント',
     login: 'サインイン',
     loginGenspark: 'UniWork アカウントでサインイン',
@@ -975,8 +914,6 @@ export const strings = {
     loginFailed: 'サインインに失敗しました。クリックして再試行',
     loggingOut: 'サインアウトしています…',
     logout: 'サインアウト',
-    credits: 'クレジット',
-    creditsTip: 'クレジット使用状況を確認',
     appVersion: 'バージョン {v}',
     versionLabel: 'バージョン',
     setUpdateAvailableLabel: '更新があります',
@@ -1170,7 +1107,7 @@ export const strings = {
     setAiCodexAutoPlaceholder: '自動検出（推奨）',
     setAiCodexHint: 'ローカルでサインイン済みの Codex CLI を使用します。API キーは不要です。',
     setAiByokNote:
-      'チャットは自分のキーを使用します。画像生成とメディア解析は「AI メディア」の設定に従い、Web 検索は引き続き UniWork のサインインまたは無料ソースを使用します。',
+      'チャットは自分のキーを使用します。画像生成、メディア解析、Web 検索は「AI メディア」の設定に従います。',
     setAiSave: '保存',
     setAiSaved: '保存しました',
     setAiTest: '接続テスト',
@@ -1187,11 +1124,11 @@ export const strings = {
     setAiMaxTokensDesc:
       '1 ターンの出力予算です。推論モデルは思考にも消費するため、使い切ると返信が空になることがあります。その場合は値を大きくしてください。',
     setSecAiMedia: 'AI メディアと検索',
-    setAiMediaGensparkHint: '画像生成と画像/動画解析は UniWork のサインインを使用します。',
     setAiImageModel: '画像モデル',
     setAiAnalysisModel: '解析モデル',
-    setAiSearchGensparkHint:
-      'Web 検索と画像検索は UniWork のサインインを使用します。サインアウト時やクラウドツールがオフのときは無料ソースにフォールバックします。',
+    setAiSearchAutoHint:
+      'キー不要：Web 検索と画像検索は無料ソースを使用します（利用量に制限あり）。上限を上げるには、プロバイダーを選んで自分のキーを入力してください。',
+    setAiSearchAuto: '自動（無料）',
     setAiSearchSerperHint: 'Serper はあなたのキーで Web 検索と画像検索の両方を提供します。',
     setAiSearchSerplyHint: 'Serply はあなたのキーで Web 検索と画像検索の両方を提供します。',
     setAiSearchTavilyHint:
@@ -1205,12 +1142,8 @@ export const strings = {
     setAiCapFileSearch: 'ローカルファイル検索',
     setAiSharedKeyHint:
       '同じプロバイダーのキーと Base URL は各機能で共有されます。一度入力すれば済みます。',
-    setAiGskTools: 'UniWork クラウドツール',
-    setAiGskToolsDesc:
-      'プロバイダーが UniWork のとき、Web 検索・画像生成・メディア解析は UniWork 経由でクレジットを消費します。オフにすると検索は無料ソースを使い、UniWork の画像ツールは利用できません。',
     setEmail: 'メール',
     setNotLoggedIn: '未ログイン',
-    setViewUsage: '使用状況を見る',
     setChange: '変更',
     // Dates
     today: '今日',
@@ -1263,24 +1196,9 @@ export const strings = {
     // Sidebar navigation
     navRecent: '최근 사용',
     navStarred: '즐겨찾기',
-    navCloud: 'UniWork Projects',
     navTeacher: '교사',
-    cloudSubtitle:
-      'UniWork AI로 웹에서 만든 프로젝트입니다. 편집은 브라우저에서 계속됩니다. 프로젝트를 클릭하면 열립니다.',
-    cloudSearchPlaceholder: '프로젝트 {n}개 검색…',
-    cloudNoResults: '일치하는 프로젝트가 없습니다.',
-    cloudGroupThisWeek: '이번 주',
-    cloudGroupThisMonth: '이번 달',
-    cloudSortLabel: '정렬: {v}',
     cloudSortRecent: '최신순',
     cloudSortOldest: '오래된순',
-    cloudRefresh: '새로고침',
-    cloudLoginHint: 'UniWork 계정에 로그인하면 웹에서 만든 프로젝트를 볼 수 있습니다.',
-    cloudEmpty: '아직 웹 프로젝트가 없습니다.',
-    cloudError: '불러오지 못했습니다. 나중에 다시 시도해 주세요.',
-    cloudRetry: '다시 시도',
-    cloudLoadMore: '더 보기',
-    cloudOpenInBrowser: '브라우저에서 열기',
     navTrash: '휴지통',
     navTrashTip: '삭제된 파일은 시스템 휴지통으로 이동되며 그곳에서 복원할 수 있습니다',
     // Section headings
@@ -1387,7 +1305,6 @@ export const strings = {
     untitled: '제목 없음',
     noContent: '(내용 없음)',
     // Account
-    accountGenspark: 'UniWork 계정',
     account: '계정',
     login: '로그인',
     loginGenspark: 'UniWork 계정으로 로그인',
@@ -1406,8 +1323,6 @@ export const strings = {
     loginFailed: '로그인에 실패했습니다. 클릭하여 다시 시도',
     loggingOut: '로그아웃 중…',
     logout: '로그아웃',
-    credits: '크레딧',
-    creditsTip: '크레딧 사용 내역 보기',
     appVersion: '버전 {v}',
     versionLabel: '버전',
     setUpdateAvailableLabel: '업데이트 가능',
@@ -1594,7 +1509,7 @@ export const strings = {
     setAiCodexAutoPlaceholder: '자동 감지(권장)',
     setAiCodexHint: '로컬에서 로그인된 Codex CLI를 사용하므로 API 키가 필요 없습니다.',
     setAiByokNote:
-      '채팅은 내 키를 사용합니다. 이미지 생성과 미디어 분석은 「AI 미디어」 설정을 따르며, 웹 검색은 여전히 UniWork 로그인 또는 무료 소스를 사용합니다.',
+      '채팅은 내 키를 사용합니다. 이미지 생성, 미디어 분석, 웹 검색은 「AI 미디어」 설정을 따릅니다.',
     setAiSave: '저장',
     setAiSaved: '저장됨',
     setAiTest: '연결 테스트',
@@ -1611,11 +1526,11 @@ export const strings = {
     setAiMaxTokensDesc:
       '한 턴의 출력 예산입니다. 추론 모델은 생각하는 데 소모하므로 예산이 떨어지면 응답이 비어 올 수 있습니다. 그럴 때 값을 키우세요.',
     setSecAiMedia: 'AI 미디어 및 검색',
-    setAiMediaGensparkHint: '이미지 생성과 이미지/동영상 분석은 UniWork 로그인을 사용합니다.',
     setAiImageModel: '이미지 모델',
     setAiAnalysisModel: '분석 모델',
-    setAiSearchGensparkHint:
-      '웹 검색과 이미지 검색은 UniWork 로그인을 사용합니다. 로그아웃 상태거나 클라우드 도구가 꺼져 있으면 무료 소스로 대체됩니다.',
+    setAiSearchAutoHint:
+      '키가 필요 없습니다. 웹 검색과 이미지 검색은 무료 소스를 사용합니다(사용량 제한). 한도를 늘리려면 제공업체를 선택하고 내 키를 입력하세요.',
+    setAiSearchAuto: '자동(무료)',
     setAiSearchSerperHint: 'Serper는 내 키로 웹 검색과 이미지 검색을 모두 제공합니다.',
     setAiSearchSerplyHint: 'Serply는 내 키로 웹 검색과 이미지 검색을 모두 제공합니다.',
     setAiSearchTavilyHint:
@@ -1629,12 +1544,8 @@ export const strings = {
     setAiCapFileSearch: '로컬 파일 검색',
     setAiSharedKeyHint:
       '같은 제공자의 키와 Base URL은 모든 기능에서 공유되므로 한 번만 입력하면 됩니다.',
-    setAiGskTools: 'UniWork 클라우드 도구',
-    setAiGskToolsDesc:
-      '제공자가 UniWork일 때 웹 검색, 이미지 생성, 미디어 분석은 UniWork를 거쳐 크레딧을 사용합니다. 끄면 검색은 무료 소스를 사용하고 UniWork 이미지 도구는 사용할 수 없습니다.',
     setEmail: '이메일',
     setNotLoggedIn: '로그인되지 않음',
-    setViewUsage: '사용량 보기',
     setChange: '변경',
     // Dates
     today: '오늘',
@@ -1686,24 +1597,9 @@ export const strings = {
     // Sidebar navigation
     navRecent: 'Récents',
     navStarred: 'Favoris',
-    navCloud: 'UniWork Projects',
     navTeacher: 'Enseignant',
-    cloudSubtitle:
-      "Projets créés sur le web avec UniWork AI. L'édition continue dans votre navigateur — cliquez sur un projet pour l'ouvrir.",
-    cloudSearchPlaceholder: 'Rechercher parmi {n} projets…',
-    cloudNoResults: 'Aucun projet correspondant.',
-    cloudGroupThisWeek: 'Cette semaine',
-    cloudGroupThisMonth: 'Plus tôt ce mois-ci',
-    cloudSortLabel: 'Tri : {v}',
     cloudSortRecent: 'Récents',
     cloudSortOldest: 'Plus anciens',
-    cloudRefresh: 'Actualiser',
-    cloudLoginHint: 'Connectez-vous à votre compte UniWork pour voir les projets créés sur le web.',
-    cloudEmpty: 'Aucun projet web pour le moment.',
-    cloudError: 'Échec du chargement. Réessayez plus tard.',
-    cloudRetry: 'Réessayer',
-    cloudLoadMore: 'Charger plus',
-    cloudOpenInBrowser: 'Ouvrir dans le navigateur',
     navTrash: 'Corbeille',
     navTrashTip:
       'Les fichiers supprimés sont placés dans la corbeille du système et peuvent y être restaurés',
@@ -1813,7 +1709,6 @@ export const strings = {
     untitled: 'Sans titre',
     noContent: '(vide)',
     // Account
-    accountGenspark: 'Compte UniWork',
     account: 'Compte',
     login: 'Se connecter',
     loginGenspark: 'Se connecter avec UniWork',
@@ -1834,8 +1729,6 @@ export const strings = {
     loginFailed: 'Échec de la connexion — cliquez pour réessayer',
     loggingOut: 'Déconnexion…',
     logout: 'Se déconnecter',
-    credits: 'Crédits',
-    creditsTip: 'Voir le détail de la consommation de crédits',
     appVersion: 'Version {v}',
     versionLabel: 'Version',
     setUpdateAvailableLabel: 'Mise à jour disponible',
@@ -2031,7 +1924,7 @@ export const strings = {
     setAiCodexAutoPlaceholder: 'Détection auto (recommandé)',
     setAiCodexHint: 'Utilise le CLI Codex connecté localement ; aucune clé API requise.',
     setAiByokNote:
-      "Les conversations utilisent votre propre clé. La génération d'images et l'analyse de médias suivent la section « Médias IA » ; la recherche web utilise toujours la connexion UniWork ou des sources gratuites.",
+      "Les conversations utilisent votre propre clé. La génération d'images, l'analyse de médias et la recherche web suivent la section « Médias IA ».",
     setAiSave: 'Enregistrer',
     setAiSaved: 'Enregistré',
     setAiTest: 'Tester la connexion',
@@ -2048,12 +1941,11 @@ export const strings = {
     setAiMaxTokensDesc:
       'Budget de sortie pour un tour. Les modèles à raisonnement le dépensent en réflexion ; quand il est épuisé, la réponse arrive vide : augmentez cette valeur.',
     setSecAiMedia: 'Médias IA et recherche',
-    setAiMediaGensparkHint:
-      "La génération d'images et l'analyse d'images/vidéos utilisent votre connexion UniWork.",
     setAiImageModel: "Modèle d'image",
     setAiAnalysisModel: "Modèle d'analyse",
-    setAiSearchGensparkHint:
-      "La recherche web et d'images utilise votre connexion UniWork ; déconnecté ou avec les outils cloud désactivés, elle se rabat sur des sources gratuites.",
+    setAiSearchAutoHint:
+      "Aucune clé requise : la recherche web et d'images utilise des sources gratuites (usage limité). Choisissez un fournisseur et ajoutez votre clé pour des limites plus élevées.",
+    setAiSearchAuto: 'Auto (gratuit)',
     setAiSearchSerperHint:
       "Serper assure la recherche web et la recherche d'images avec votre clé.",
     setAiSearchSerplyHint:
@@ -2069,12 +1961,8 @@ export const strings = {
     setAiCapFileSearch: 'Recherche de fichiers locaux',
     setAiSharedKeyHint:
       "La clé et l'URL de base d'un fournisseur sont partagées entre les capacités ; saisissez-les une seule fois.",
-    setAiGskTools: 'Outils cloud UniWork',
-    setAiGskToolsDesc:
-      "Lorsque leur fournisseur est UniWork, la recherche web, la génération d'images et l'analyse de médias passent par UniWork et consomment des crédits ; désactivé, la recherche utilise des sources gratuites et les outils d'image UniWork sont indisponibles.",
     setEmail: 'E-mail',
     setNotLoggedIn: 'Non connecté',
-    setViewUsage: "Voir l'utilisation",
     setChange: 'Modifier',
     // Dates
     today: "Aujourd'hui",
@@ -2127,25 +2015,9 @@ export const strings = {
     // Sidebar navigation
     navRecent: 'Zuletzt verwendet',
     navStarred: 'Favoriten',
-    navCloud: 'UniWork Projects',
     navTeacher: 'Lehrer',
-    cloudSubtitle:
-      'Mit UniWork AI im Web erstellte Projekte. Die Bearbeitung läuft im Browser weiter – klicken Sie auf ein Projekt, um es zu öffnen.',
-    cloudSearchPlaceholder: '{n} Projekte durchsuchen…',
-    cloudNoResults: 'Keine passenden Projekte.',
-    cloudGroupThisWeek: 'Diese Woche',
-    cloudGroupThisMonth: 'Früher in diesem Monat',
-    cloudSortLabel: 'Sortierung: {v}',
     cloudSortRecent: 'Neueste',
     cloudSortOldest: 'Älteste',
-    cloudRefresh: 'Aktualisieren',
-    cloudLoginHint:
-      'Melden Sie sich bei Ihrem UniWork-Konto an, um Ihre im Web erstellten Projekte zu sehen.',
-    cloudEmpty: 'Noch keine Web-Projekte.',
-    cloudError: 'Laden fehlgeschlagen. Bitte später erneut versuchen.',
-    cloudRetry: 'Erneut versuchen',
-    cloudLoadMore: 'Mehr laden',
-    cloudOpenInBrowser: 'Im Browser öffnen',
     navTrash: 'Papierkorb',
     navTrashTip:
       'Gelöschte Dateien werden in den System-Papierkorb verschoben und können dort wiederhergestellt werden',
@@ -2258,7 +2130,6 @@ export const strings = {
     untitled: 'Unbenannt',
     noContent: '(leer)',
     // Account
-    accountGenspark: 'UniWork-Konto',
     account: 'Konto',
     login: 'Anmelden',
     loginGenspark: 'Mit UniWork anmelden',
@@ -2279,8 +2150,6 @@ export const strings = {
     loginFailed: 'Anmeldung fehlgeschlagen — klicken Sie zum Wiederholen',
     loggingOut: 'Abmelden…',
     logout: 'Abmelden',
-    credits: 'Credits',
-    creditsTip: 'Credit-Verbrauch ansehen',
     appVersion: 'Version {v}',
     versionLabel: 'Version',
     setUpdateAvailableLabel: 'Update verfügbar',
@@ -2475,7 +2344,7 @@ export const strings = {
     setAiCodexAutoPlaceholder: 'Automatisch erkennen (empfohlen)',
     setAiCodexHint: 'Verwendet die lokal angemeldete Codex CLI; kein API-Schlüssel nötig.',
     setAiByokNote:
-      'Chats nutzen deinen eigenen Schlüssel. Bildgenerierung und Medienanalyse folgen dem Abschnitt „KI-Medien“; die Websuche nutzt weiterhin die UniWork-Anmeldung oder kostenlose Quellen.',
+      'Chats nutzen deinen eigenen Schlüssel. Bildgenerierung, Medienanalyse und Websuche folgen dem Abschnitt „KI-Medien“.',
     setAiSave: 'Speichern',
     setAiSaved: 'Gespeichert',
     setAiTest: 'Verbindung testen',
@@ -2492,12 +2361,11 @@ export const strings = {
     setAiMaxTokensDesc:
       'Ausgabe-Budget pro Durchlauf. Denk-Modelle verbrauchen es beim Reasoning; ist es erschöpft, kommt eine leere Antwort zurück — dann diesen Wert erhöhen.',
     setSecAiMedia: 'KI-Medien & Suche',
-    setAiMediaGensparkHint:
-      'Bildgenerierung und Bild-/Videoanalyse nutzen deine UniWork-Anmeldung.',
     setAiImageModel: 'Bildmodell',
     setAiAnalysisModel: 'Analysemodell',
-    setAiSearchGensparkHint:
-      'Web- und Bildsuche nutzen deine UniWork-Anmeldung; abgemeldet oder mit ausgeschalteten Cloud-Tools greifen sie auf kostenlose Quellen zurück.',
+    setAiSearchAutoHint:
+      'Kein Schlüssel nötig: Web- und Bildsuche nutzen kostenlose Quellen (begrenzte Nutzung). Für höhere Limits einen Anbieter wählen und den eigenen Schlüssel eintragen.',
+    setAiSearchAuto: 'Automatisch (kostenlos)',
     setAiSearchSerperHint: 'Serper liefert mit deinem Schlüssel Web- und Bildsuche.',
     setAiSearchSerplyHint: 'Serply liefert mit deinem Schlüssel Web- und Bildsuche.',
     setAiSearchTavilyHint:
@@ -2511,12 +2379,8 @@ export const strings = {
     setAiCapFileSearch: 'Lokale Dateisuche',
     setAiSharedKeyHint:
       'Schlüssel und Base URL eines Anbieters gelten für alle Fähigkeiten; einmal eintragen genügt.',
-    setAiGskTools: 'UniWork-Cloud-Tools',
-    setAiGskToolsDesc:
-      'Steht ihr Anbieter auf UniWork, laufen Websuche, Bildgenerierung und Medienanalyse über UniWork und verbrauchen Credits; ausgeschaltet nutzt die Suche kostenlose Quellen und die UniWork-Bildwerkzeuge sind nicht verfügbar.',
     setEmail: 'E-Mail',
     setNotLoggedIn: 'Nicht angemeldet',
-    setViewUsage: 'Verbrauch anzeigen',
     setChange: 'Ändern',
     // Dates
     today: 'Heute',
@@ -2569,25 +2433,9 @@ export const strings = {
     // Sidebar navigation
     navRecent: 'Recientes',
     navStarred: 'Destacados',
-    navCloud: 'UniWork Projects',
     navTeacher: 'Docente',
-    cloudSubtitle:
-      'Proyectos creados en la web con UniWork AI. La edición continúa en tu navegador: haz clic en un proyecto para abrirlo.',
-    cloudSearchPlaceholder: 'Buscar entre {n} proyectos…',
-    cloudNoResults: 'No hay proyectos coincidentes.',
-    cloudGroupThisWeek: 'Esta semana',
-    cloudGroupThisMonth: 'Este mes',
-    cloudSortLabel: 'Orden: {v}',
     cloudSortRecent: 'Recientes',
     cloudSortOldest: 'Más antiguos',
-    cloudRefresh: 'Actualizar',
-    cloudLoginHint:
-      'Inicia sesión en tu cuenta de UniWork para ver los proyectos creados en la web.',
-    cloudEmpty: 'Aún no hay proyectos en la web.',
-    cloudError: 'Error al cargar. Inténtalo más tarde.',
-    cloudRetry: 'Reintentar',
-    cloudLoadMore: 'Cargar más',
-    cloudOpenInBrowser: 'Abrir en el navegador',
     navTrash: 'Papelera',
     navTrashTip:
       'Los archivos eliminados van a la papelera del sistema y pueden restaurarse desde allí',
@@ -2698,7 +2546,6 @@ export const strings = {
     untitled: 'Sin título',
     noContent: '(vacío)',
     // Account
-    accountGenspark: 'Cuenta de UniWork',
     account: 'Cuenta',
     login: 'Iniciar sesión',
     loginGenspark: 'Iniciar sesión con UniWork',
@@ -2719,8 +2566,6 @@ export const strings = {
     loginFailed: 'Error al iniciar sesión — haga clic para reintentar',
     loggingOut: 'Cerrando sesión…',
     logout: 'Cerrar sesión',
-    credits: 'Créditos',
-    creditsTip: 'Ver el detalle del uso de créditos',
     appVersion: 'Versión {v}',
     versionLabel: 'Versión',
     setUpdateAvailableLabel: 'Actualización disponible',
@@ -2915,7 +2760,7 @@ export const strings = {
     setAiCodexAutoPlaceholder: 'Detección automática (recomendado)',
     setAiCodexHint: 'Usa la CLI de Codex con sesión local; no se necesita clave de API.',
     setAiByokNote:
-      'Los chats usan tu propia clave. La generación de imágenes y el análisis de medios siguen la sección «Medios de IA»; la búsqueda web sigue usando el inicio de sesión de UniWork o fuentes gratuitas.',
+      'Los chats usan tu propia clave. La generación de imágenes, el análisis de medios y la búsqueda web siguen la sección «Medios de IA».',
     setAiSave: 'Guardar',
     setAiSaved: 'Guardado',
     setAiTest: 'Probar conexión',
@@ -2932,12 +2777,11 @@ export const strings = {
     setAiMaxTokensDesc:
       'Presupuesto de salida por turno. Los modelos de razonamiento lo gastan en pensar; si se agota, la respuesta llega vacía: suba este valor.',
     setSecAiMedia: 'Medios de IA y búsqueda',
-    setAiMediaGensparkHint:
-      'La generación de imágenes y el análisis de imágenes/vídeos usan tu inicio de sesión de UniWork.',
     setAiImageModel: 'Modelo de imagen',
     setAiAnalysisModel: 'Modelo de análisis',
-    setAiSearchGensparkHint:
-      'La búsqueda web y de imágenes usa tu inicio de sesión de UniWork; sin sesión o con las herramientas en la nube desactivadas recurre a fuentes gratuitas.',
+    setAiSearchAutoHint:
+      'No necesita clave: la búsqueda web y de imágenes usa fuentes gratuitas (uso limitado). Elige un proveedor y añade tu clave para límites más altos.',
+    setAiSearchAuto: 'Automático (gratis)',
     setAiSearchSerperHint: 'Serper ofrece búsqueda web y de imágenes con tu clave.',
     setAiSearchSerplyHint: 'Serply ofrece búsqueda web y de imágenes con tu clave.',
     setAiSearchTavilyHint:
@@ -2951,12 +2795,8 @@ export const strings = {
     setAiCapFileSearch: 'Búsqueda de archivos locales',
     setAiSharedKeyHint:
       'La clave y la URL base de un proveedor se comparten entre capacidades; introdúcelas una sola vez.',
-    setAiGskTools: 'Herramientas en la nube de UniWork',
-    setAiGskToolsDesc:
-      'Cuando su proveedor es UniWork, la búsqueda web, la generación de imágenes y el análisis de medios pasan por UniWork y consumen créditos; desactivado, la búsqueda usa fuentes gratuitas y las herramientas de imagen de UniWork no están disponibles.',
     setEmail: 'Correo electrónico',
     setNotLoggedIn: 'Sesión no iniciada',
-    setViewUsage: 'Ver uso',
     setChange: 'Cambiar',
     // Dates
     today: 'Hoy',
@@ -3009,24 +2849,9 @@ export const strings = {
     // Sidebar navigation
     navRecent: 'ล่าสุด',
     navStarred: 'รายการโปรด',
-    navCloud: 'UniWork Projects',
     navTeacher: 'ครู',
-    cloudSubtitle:
-      'โปรเจกต์ที่สร้างบนเว็บด้วย UniWork AI แก้ไขต่อได้ในเบราว์เซอร์ — คลิกโปรเจกต์เพื่อเปิด',
-    cloudSearchPlaceholder: 'ค้นหา {n} โปรเจกต์…',
-    cloudNoResults: 'ไม่มีโปรเจกต์ที่ตรงกัน',
-    cloudGroupThisWeek: 'สัปดาห์นี้',
-    cloudGroupThisMonth: 'เดือนนี้',
-    cloudSortLabel: 'เรียง: {v}',
     cloudSortRecent: 'ล่าสุด',
     cloudSortOldest: 'เก่าสุด',
-    cloudRefresh: 'รีเฟรช',
-    cloudLoginHint: 'ลงชื่อเข้าใช้บัญชี UniWork เพื่อดูโปรเจกต์ที่คุณสร้างบนเว็บ',
-    cloudEmpty: 'ยังไม่มีโปรเจกต์บนเว็บ',
-    cloudError: 'โหลดไม่สำเร็จ โปรดลองอีกครั้งภายหลัง',
-    cloudRetry: 'ลองอีกครั้ง',
-    cloudLoadMore: 'โหลดเพิ่มเติม',
-    cloudOpenInBrowser: 'เปิดในเบราว์เซอร์',
     navTrash: 'ถังขยะ',
     navTrashTip: 'ไฟล์ที่ถูกลบจะถูกย้ายไปยังถังขยะของระบบ และสามารถกู้คืนได้จากที่นั่น',
     // Section headings
@@ -3133,7 +2958,6 @@ export const strings = {
     untitled: 'ไม่มีชื่อ',
     noContent: '(ไม่มีเนื้อหา)',
     // Account
-    accountGenspark: 'บัญชี UniWork',
     account: 'บัญชี',
     login: 'ลงชื่อเข้าใช้',
     loginGenspark: 'ลงชื่อเข้าใช้ด้วย UniWork',
@@ -3152,8 +2976,6 @@ export const strings = {
     loginFailed: 'การลงชื่อเข้าใช้ล้มเหลว — คลิกเพื่อลองอีกครั้ง',
     loggingOut: 'กำลังออกจากระบบ…',
     logout: 'ออกจากระบบ',
-    credits: 'เครดิต',
-    creditsTip: 'ดูรายละเอียดการใช้เครดิต',
     appVersion: 'เวอร์ชัน {v}',
     versionLabel: 'เวอร์ชัน',
     setUpdateAvailableLabel: 'มีอัปเดต',
@@ -3337,7 +3159,7 @@ export const strings = {
     setAiCodexAutoPlaceholder: 'ค้นหาอัตโนมัติ (แนะนำ)',
     setAiCodexHint: 'ใช้ Codex CLI ที่เข้าสู่ระบบไว้ในเครื่อง โดยไม่ต้องใช้คีย์ API',
     setAiByokNote:
-      'การแชทใช้คีย์ของคุณเอง การสร้างภาพและการวิเคราะห์สื่อเป็นไปตามส่วน "สื่อ AI" ส่วนการค้นหาเว็บยังใช้การลงชื่อเข้าใช้ UniWork หรือแหล่งข้อมูลฟรี',
+      'การแชทใช้คีย์ของคุณเอง การสร้างภาพ การวิเคราะห์สื่อ และการค้นหาเว็บเป็นไปตามส่วน "สื่อ AI"',
     setAiSave: 'บันทึก',
     setAiSaved: 'บันทึกแล้ว',
     setAiTest: 'ทดสอบการเชื่อมต่อ',
@@ -3354,12 +3176,11 @@ export const strings = {
     setAiMaxTokensDesc:
       'งบผลลัพธ์ต่อหนึ่งรอบ โมเดลแบบใช้เหตุผลจะใช้ส่วนหนึ่งไปกับการคิด หากงบหมด คำตอบอาจกลับมาว่างเปล่า ให้เพิ่มค่านี้',
     setSecAiMedia: 'สื่อ AI และการค้นหา',
-    setAiMediaGensparkHint:
-      'การสร้างภาพและการวิเคราะห์ภาพ/วิดีโอใช้การลงชื่อเข้าใช้ UniWork ของคุณ',
     setAiImageModel: 'โมเดลสร้างภาพ',
     setAiAnalysisModel: 'โมเดลวิเคราะห์',
-    setAiSearchGensparkHint:
-      'การค้นหาเว็บและภาพใช้การลงชื่อเข้าใช้ UniWork หากไม่ได้ลงชื่อเข้าใช้หรือปิดเครื่องมือคลาวด์ จะใช้แหล่งข้อมูลฟรีแทน',
+    setAiSearchAutoHint:
+      'ไม่ต้องใช้คีย์: การค้นหาเว็บและภาพใช้แหล่งข้อมูลฟรี (จำกัดการใช้งาน) เลือกผู้ให้บริการและใส่คีย์ของคุณเองเพื่อเพิ่มขีดจำกัด',
+    setAiSearchAuto: 'อัตโนมัติ (ฟรี)',
     setAiSearchSerperHint: 'Serper ให้บริการค้นหาเว็บและภาพด้วยคีย์ของคุณ',
     setAiSearchSerplyHint: 'Serply ให้บริการค้นหาเว็บและภาพด้วยคีย์ของคุณ',
     setAiSearchTavilyHint:
@@ -3373,12 +3194,8 @@ export const strings = {
     setAiCapFileSearch: 'ค้นหาไฟล์ในเครื่อง',
     setAiSharedKeyHint:
       'คีย์และ Base URL ของผู้ให้บริการเดียวกันใช้ร่วมกันทุกความสามารถ กรอกครั้งเดียวพอ',
-    setAiGskTools: 'เครื่องมือคลาวด์ UniWork',
-    setAiGskToolsDesc:
-      'เมื่อผู้ให้บริการตั้งเป็น UniWork การค้นหาเว็บ การสร้างภาพ และการวิเคราะห์สื่อจะผ่าน UniWork และใช้เครดิต เมื่อปิด การค้นหาจะใช้แหล่งข้อมูลฟรีและเครื่องมือภาพของ UniWork จะใช้ไม่ได้',
     setEmail: 'อีเมล',
     setNotLoggedIn: 'ยังไม่ได้เข้าสู่ระบบ',
-    setViewUsage: 'ดูการใช้งาน',
     setChange: 'เปลี่ยน',
     // Dates
     today: 'วันนี้',
@@ -3430,24 +3247,9 @@ export const strings = {
     // Sidebar navigation
     navRecent: 'Terbaru',
     navStarred: 'Berbintang',
-    navCloud: 'UniWork Projects',
     navTeacher: 'Guru',
-    cloudSubtitle:
-      'Proyek yang dibuat di web dengan UniWork AI. Pengeditan berlanjut di browser — klik proyek untuk membukanya.',
-    cloudSearchPlaceholder: 'Cari {n} proyek…',
-    cloudNoResults: 'Tidak ada proyek yang cocok.',
-    cloudGroupThisWeek: 'Minggu ini',
-    cloudGroupThisMonth: 'Bulan ini',
-    cloudSortLabel: 'Urutkan: {v}',
     cloudSortRecent: 'Terbaru',
     cloudSortOldest: 'Terlama',
-    cloudRefresh: 'Segarkan',
-    cloudLoginHint: 'Masuk ke akun UniWork untuk melihat proyek yang Anda buat di web.',
-    cloudEmpty: 'Belum ada proyek web.',
-    cloudError: 'Gagal memuat. Coba lagi nanti.',
-    cloudRetry: 'Coba lagi',
-    cloudLoadMore: 'Muat lebih banyak',
-    cloudOpenInBrowser: 'Buka di browser',
     navTrash: 'Sampah',
     navTrashTip:
       'File yang dihapus akan dipindahkan ke tempat sampah sistem dan dapat dipulihkan dari sana',
@@ -3557,7 +3359,6 @@ export const strings = {
     untitled: 'Tanpa judul',
     noContent: '(kosong)',
     // Account
-    accountGenspark: 'Akun UniWork',
     account: 'Akun',
     login: 'Masuk',
     loginGenspark: 'Masuk dengan UniWork',
@@ -3577,8 +3378,6 @@ export const strings = {
     loginFailed: 'Login gagal — klik untuk mencoba lagi',
     loggingOut: 'Keluar…',
     logout: 'Keluar',
-    credits: 'Kredit',
-    creditsTip: 'Lihat detail penggunaan kredit',
     appVersion: 'Versi {v}',
     versionLabel: 'Versi',
     setUpdateAvailableLabel: 'Pembaruan tersedia',
@@ -3769,7 +3568,7 @@ export const strings = {
     setAiCodexAutoPlaceholder: 'Deteksi otomatis (disarankan)',
     setAiCodexHint: 'Menggunakan Codex CLI yang sudah login secara lokal; tanpa kunci API.',
     setAiByokNote:
-      'Chat memakai kunci Anda sendiri. Pembuatan gambar dan analisis media mengikuti bagian "Media AI"; pencarian web tetap memakai login UniWork atau sumber gratis.',
+      'Chat memakai kunci Anda sendiri. Pembuatan gambar, analisis media, dan pencarian web mengikuti bagian "Media AI".',
     setAiSave: 'Simpan',
     setAiSaved: 'Tersimpan',
     setAiTest: 'Uji koneksi',
@@ -3786,12 +3585,11 @@ export const strings = {
     setAiMaxTokensDesc:
       'Anggaran keluaran untuk satu giliran. Model penalaran memakainya untuk berpikir; jika habis, balasan datang kosong — naikkan nilai ini.',
     setSecAiMedia: 'Media & Pencarian AI',
-    setAiMediaGensparkHint:
-      'Pembuatan gambar dan analisis gambar/video menggunakan login UniWork Anda.',
     setAiImageModel: 'Model gambar',
     setAiAnalysisModel: 'Model analisis',
-    setAiSearchGensparkHint:
-      'Pencarian web dan gambar memakai login UniWork Anda; saat keluar atau alat cloud dimatikan, keduanya memakai sumber gratis.',
+    setAiSearchAutoHint:
+      'Tanpa kunci: pencarian web dan gambar memakai sumber gratis (penggunaan terbatas). Pilih penyedia dan masukkan kunci Anda sendiri untuk batas lebih tinggi.',
+    setAiSearchAuto: 'Otomatis (gratis)',
     setAiSearchSerperHint: 'Serper menyediakan pencarian web dan gambar dengan kunci Anda.',
     setAiSearchSerplyHint: 'Serply menyediakan pencarian web dan gambar dengan kunci Anda.',
     setAiSearchTavilyHint:
@@ -3805,12 +3603,8 @@ export const strings = {
     setAiCapFileSearch: 'Pencarian file lokal',
     setAiSharedKeyHint:
       'Kunci dan Base URL satu penyedia dipakai bersama oleh semua kemampuan; cukup isi sekali.',
-    setAiGskTools: 'Alat cloud UniWork',
-    setAiGskToolsDesc:
-      'Saat penyedianya disetel ke UniWork, pencarian web, pembuatan gambar, dan analisis media berjalan lewat UniWork dan memakai kredit; jika dimatikan, pencarian memakai sumber gratis dan alat gambar UniWork tidak tersedia.',
     setEmail: 'Email',
     setNotLoggedIn: 'Belum masuk',
-    setViewUsage: 'Lihat penggunaan',
     setChange: 'Ubah',
     // Dates
     today: 'Hari ini',
@@ -3862,24 +3656,9 @@ export const strings = {
     // Sidebar navigation
     navRecent: 'Недавние',
     navStarred: 'Избранное',
-    navCloud: 'UniWork Projects',
     navTeacher: 'Учитель',
-    cloudSubtitle:
-      'Проекты, созданные в вебе с UniWork AI. Редактирование продолжается в браузере — нажмите на проект, чтобы открыть его.',
-    cloudSearchPlaceholder: 'Поиск среди {n} проектов…',
-    cloudNoResults: 'Нет подходящих проектов.',
-    cloudGroupThisWeek: 'На этой неделе',
-    cloudGroupThisMonth: 'Ранее в этом месяце',
-    cloudSortLabel: 'Сортировка: {v}',
     cloudSortRecent: 'Сначала новые',
     cloudSortOldest: 'Сначала старые',
-    cloudRefresh: 'Обновить',
-    cloudLoginHint: 'Войдите в аккаунт UniWork, чтобы увидеть проекты, созданные в вебе.',
-    cloudEmpty: 'Пока нет веб-проектов.',
-    cloudError: 'Не удалось загрузить. Повторите попытку позже.',
-    cloudRetry: 'Повторить',
-    cloudLoadMore: 'Загрузить ещё',
-    cloudOpenInBrowser: 'Открыть в браузере',
     navTrash: 'Корзина',
     navTrashTip: 'Удалённые файлы перемещаются в системную корзину, откуда их можно восстановить',
     // Section headings
@@ -3987,7 +3766,6 @@ export const strings = {
     untitled: 'Без названия',
     noContent: '(пусто)',
     // Account
-    accountGenspark: 'Учётная запись UniWork',
     account: 'Учётная запись',
     login: 'Войти',
     loginGenspark: 'Войти через UniWork',
@@ -4006,8 +3784,6 @@ export const strings = {
     loginFailed: 'Не удалось войти — нажмите, чтобы повторить',
     loggingOut: 'Выход…',
     logout: 'Выйти',
-    credits: 'Кредиты',
-    creditsTip: 'Посмотреть расход кредитов',
     appVersion: 'Версия {v}',
     versionLabel: 'Версия',
     setUpdateAvailableLabel: 'Доступно обновление',
@@ -4200,7 +3976,7 @@ export const strings = {
     setAiCodexAutoPlaceholder: 'Автоопределение (рекомендуется)',
     setAiCodexHint: 'Использует локально авторизованный Codex CLI; ключ API не нужен.',
     setAiByokNote:
-      'Чаты используют ваш собственный ключ. Генерация изображений и анализ медиа настраиваются в разделе «Медиа ИИ»; веб-поиск по-прежнему использует вход в UniWork или бесплатные источники.',
+      'Чаты используют ваш собственный ключ. Генерация изображений, анализ медиа и веб-поиск настраиваются в разделе «Медиа ИИ».',
     setAiSave: 'Сохранить',
     setAiSaved: 'Сохранено',
     setAiTest: 'Проверить подключение',
@@ -4217,12 +3993,11 @@ export const strings = {
     setAiMaxTokensDesc:
       'Бюджет вывода за один ход. Модели рассуждений тратят его на размышления: если бюджет иссякнет, ответ придёт пустым — увеличьте значение.',
     setSecAiMedia: 'Медиа и поиск ИИ',
-    setAiMediaGensparkHint:
-      'Генерация изображений и анализ изображений/видео используют ваш вход в UniWork.',
     setAiImageModel: 'Модель изображений',
     setAiAnalysisModel: 'Модель анализа',
-    setAiSearchGensparkHint:
-      'Веб-поиск и поиск изображений используют ваш вход в UniWork; без входа или при выключенных облачных инструментах используются бесплатные источники.',
+    setAiSearchAutoHint:
+      'Ключ не нужен: веб-поиск и поиск изображений используют бесплатные источники (с ограничениями). Для более высоких лимитов выберите провайдера и укажите свой ключ.',
+    setAiSearchAuto: 'Авто (бесплатно)',
     setAiSearchSerperHint: 'Serper обеспечивает веб-поиск и поиск изображений с вашим ключом.',
     setAiSearchSerplyHint: 'Serply обеспечивает веб-поиск и поиск изображений с вашим ключом.',
     setAiSearchTavilyHint:
@@ -4236,12 +4011,8 @@ export const strings = {
     setAiCapFileSearch: 'Поиск локальных файлов',
     setAiSharedKeyHint:
       'Ключ и базовый URL провайдера общие для всех функций; введите их один раз.',
-    setAiGskTools: 'Облачные инструменты UniWork',
-    setAiGskToolsDesc:
-      'Когда провайдером выбран UniWork, веб-поиск, генерация изображений и анализ медиа идут через UniWork и расходуют кредиты; при выключении поиск использует бесплатные источники, а инструменты изображений UniWork недоступны.',
     setEmail: 'Эл. почта',
     setNotLoggedIn: 'Вы не вошли',
-    setViewUsage: 'Посмотреть расход',
     setChange: 'Изменить',
     // Dates
     today: 'Сегодня',
@@ -4294,24 +4065,9 @@ export const strings = {
     // Sidebar navigation
     navRecent: 'الأخيرة',
     navStarred: 'المفضلة',
-    navCloud: 'UniWork Projects',
     navTeacher: 'المعلم',
-    cloudSubtitle:
-      'مشاريع أُنشئت على الويب باستخدام UniWork AI. يستمر التحرير في المتصفح — انقر على أي مشروع لفتحه.',
-    cloudSearchPlaceholder: 'ابحث في {n} مشروعًا…',
-    cloudNoResults: 'لا توجد مشاريع مطابقة.',
-    cloudGroupThisWeek: 'هذا الأسبوع',
-    cloudGroupThisMonth: 'في وقت سابق من هذا الشهر',
-    cloudSortLabel: 'الترتيب: {v}',
     cloudSortRecent: 'الأحدث',
     cloudSortOldest: 'الأقدم',
-    cloudRefresh: 'تحديث',
-    cloudLoginHint: 'سجّل الدخول إلى حساب UniWork لعرض المشاريع التي أنشأتها على الويب.',
-    cloudEmpty: 'لا توجد مشاريع على الويب بعد.',
-    cloudError: 'فشل التحميل. حاول مرة أخرى لاحقًا.',
-    cloudRetry: 'إعادة المحاولة',
-    cloudLoadMore: 'تحميل المزيد',
-    cloudOpenInBrowser: 'فتح في المتصفح',
     navTrash: 'سلة المهملات',
     navTrashTip: 'تُنقل الملفات المحذوفة إلى سلة مهملات النظام ويمكن استعادتها من هناك',
     // Section headings
@@ -4418,7 +4174,6 @@ export const strings = {
     untitled: 'بدون عنوان',
     noContent: '(فارغ)',
     // Account
-    accountGenspark: 'حساب UniWork',
     account: 'الحساب',
     login: 'تسجيل الدخول',
     loginGenspark: 'تسجيل الدخول باستخدام UniWork',
@@ -4437,8 +4192,6 @@ export const strings = {
     loginFailed: 'فشل تسجيل الدخول — انقر لإعادة المحاولة',
     loggingOut: 'جارٍ تسجيل الخروج…',
     logout: 'تسجيل الخروج',
-    credits: 'الأرصدة',
-    creditsTip: 'عرض تفاصيل استخدام الأرصدة',
     appVersion: 'الإصدار {v}',
     versionLabel: 'الإصدار',
     setUpdateAvailableLabel: 'يتوفر تحديث',
@@ -4626,7 +4379,7 @@ export const strings = {
     setAiCodexAutoPlaceholder: 'اكتشاف تلقائي (موصى به)',
     setAiCodexHint: 'يستخدم Codex CLI المسجل محليًا؛ لا حاجة إلى مفتاح API.',
     setAiByokNote:
-      'تستخدم المحادثات مفتاحك الخاص. يتبع توليد الصور وتحليل الوسائط قسم «وسائط الذكاء الاصطناعي»؛ ولا يزال البحث في الويب يستخدم تسجيل دخول UniWork أو مصادر مجانية.',
+      'تستخدم المحادثات مفتاحك الخاص. يتبع توليد الصور وتحليل الوسائط والبحث في الويب قسم «وسائط الذكاء الاصطناعي».',
     setAiSave: 'حفظ',
     setAiSaved: 'تم الحفظ',
     setAiTest: 'اختبار الاتصال',
@@ -4643,11 +4396,11 @@ export const strings = {
     setAiMaxTokensDesc:
       'ميزانية الإخراج في الدورة الواحدة. نماذج الاستدلال تصرفها على التفكير، فإذا نفدت جاء الرد فارغًا؛ ارفع هذه القيمة عندئذ.',
     setSecAiMedia: 'وسائط الذكاء الاصطناعي والبحث',
-    setAiMediaGensparkHint: 'يستخدم توليد الصور وتحليل الصور/الفيديو تسجيل دخولك إلى UniWork.',
     setAiImageModel: 'نموذج الصور',
     setAiAnalysisModel: 'نموذج التحليل',
-    setAiSearchGensparkHint:
-      'يستخدم البحث في الويب والصور تسجيل دخولك إلى UniWork؛ وعند الخروج أو إيقاف الأدوات السحابية يعود إلى مصادر مجانية.',
+    setAiSearchAutoHint:
+      'لا حاجة إلى مفتاح: يستخدم البحث في الويب والصور مصادر مجانية (استخدام محدود). اختر مزوّدًا وأضف مفتاحك الخاص للحصول على حدود أعلى.',
+    setAiSearchAuto: 'تلقائي (مجاني)',
     setAiSearchSerperHint: 'يوفّر Serper البحث في الويب والصور بمفتاحك.',
     setAiSearchSerplyHint: 'يوفّر Serply البحث في الويب والصور بمفتاحك.',
     setAiSearchTavilyHint:
@@ -4661,12 +4414,8 @@ export const strings = {
     setAiCapFileSearch: 'البحث في الملفات المحلية',
     setAiSharedKeyHint:
       'مفتاح المزوّد وعنوان Base URL مشتركان بين جميع القدرات؛ أدخلهما مرة واحدة فقط.',
-    setAiGskTools: 'أدوات UniWork السحابية',
-    setAiGskToolsDesc:
-      'عندما يكون المزوّد UniWork، يمر البحث في الويب وتوليد الصور وتحليل الوسائط عبر UniWork ويستهلك الرصيد؛ عند الإيقاف يستخدم البحث مصادر مجانية وتصبح أدوات صور UniWork غير متاحة.',
     setEmail: 'البريد الإلكتروني',
     setNotLoggedIn: 'لم يتم تسجيل الدخول',
-    setViewUsage: 'عرض الاستخدام',
     setChange: 'تغيير',
     // Dates
     today: 'اليوم',
@@ -4717,24 +4466,9 @@ export const strings = {
     rootUnavailable: 'Indisponível',
     navRecent: 'Recentes',
     navStarred: 'Favoritos',
-    navCloud: 'UniWork Projects',
     navTeacher: 'Professor',
-    cloudSubtitle:
-      'Projetos criados na web com o UniWork AI. A edição continua no navegador — clique em um projeto para abri-lo.',
-    cloudSearchPlaceholder: 'Pesquisar {n} projetos…',
-    cloudNoResults: 'Nenhum projeto correspondente.',
-    cloudGroupThisWeek: 'Esta semana',
-    cloudGroupThisMonth: 'Este mês',
-    cloudSortLabel: 'Ordenar: {v}',
     cloudSortRecent: 'Recentes',
     cloudSortOldest: 'Mais antigos',
-    cloudRefresh: 'Atualizar',
-    cloudLoginHint: 'Entre na sua conta UniWork para ver os projetos criados na web.',
-    cloudEmpty: 'Ainda não há projetos na web.',
-    cloudError: 'Falha ao carregar. Tente novamente mais tarde.',
-    cloudRetry: 'Tentar novamente',
-    cloudLoadMore: 'Carregar mais',
-    cloudOpenInBrowser: 'Abrir no navegador',
     navTrash: 'Lixeira',
     navTrashTip:
       'Os arquivos excluídos vão para a lixeira do sistema e podem ser restaurados de lá',
@@ -4838,7 +4572,6 @@ export const strings = {
     timelineUserAria: 'Usuário',
     untitled: 'Sem título',
     noContent: '(vazio)',
-    accountGenspark: 'Conta UniWork',
     account: 'Conta',
     login: 'Entrar',
     loginGenspark: 'Entrar com a UniWork',
@@ -4858,8 +4591,6 @@ export const strings = {
     loginFailed: 'Falha no login — clique para tentar novamente',
     loggingOut: 'Saindo…',
     logout: 'Sair',
-    credits: 'Créditos',
-    creditsTip: 'Ver detalhes do uso de créditos',
     appVersion: 'Versão {v}',
     versionLabel: 'Versão',
     setUpdateAvailableLabel: 'Atualização disponível',
@@ -5054,7 +4785,7 @@ export const strings = {
     setAiCodexAutoPlaceholder: 'Detectar automaticamente (recomendado)',
     setAiCodexHint: 'Usa o Codex CLI conectado localmente; nenhuma chave de API é necessária.',
     setAiByokNote:
-      'Os chats usam a sua própria chave. A geração de imagens e a análise de mídia seguem a seção «Mídia de IA»; a busca na web continua usando o login do UniWork ou fontes gratuitas.',
+      'Os chats usam a sua própria chave. A geração de imagens, a análise de mídia e a busca na web seguem a seção «Mídia de IA».',
     setAiSave: 'Salvar',
     setAiSaved: 'Salvo',
     setAiTest: 'Testar conexão',
@@ -5071,12 +4802,11 @@ export const strings = {
     setAiMaxTokensDesc:
       'Orçamento de saída por turno. Modelos de raciocínio gastam-no pensando; se esgotar, a resposta vem vazia — aumente este valor.',
     setSecAiMedia: 'Mídia e busca de IA',
-    setAiMediaGensparkHint:
-      'A geração de imagens e a análise de imagens/vídeos usam o seu login do UniWork.',
     setAiImageModel: 'Modelo de imagem',
     setAiAnalysisModel: 'Modelo de análise',
-    setAiSearchGensparkHint:
-      'A busca na web e de imagens usa o seu login do UniWork; desconectado ou com as ferramentas na nuvem desativadas, recorre a fontes gratuitas.',
+    setAiSearchAutoHint:
+      'Não precisa de chave: a busca na web e de imagens usa fontes gratuitas (uso limitado). Escolha um provedor e adicione a sua chave para limites maiores.',
+    setAiSearchAuto: 'Automático (grátis)',
     setAiSearchSerperHint: 'O Serper oferece busca na web e de imagens com a sua chave.',
     setAiSearchSerplyHint: 'O Serply oferece busca na web e de imagens com a sua chave.',
     setAiSearchTavilyHint:
@@ -5090,12 +4820,8 @@ export const strings = {
     setAiCapFileSearch: 'Pesquisa de arquivos locais',
     setAiSharedKeyHint:
       'A chave e a URL base de um provedor são compartilhadas entre as capacidades; insira-as uma só vez.',
-    setAiGskTools: 'Ferramentas na nuvem UniWork',
-    setAiGskToolsDesc:
-      'Quando o provedor é o UniWork, a busca na web, a geração de imagens e a análise de mídia passam pelo UniWork e consomem créditos; desativado, a busca usa fontes gratuitas e as ferramentas de imagem do UniWork ficam indisponíveis.',
     setEmail: 'E-mail',
     setNotLoggedIn: 'Não conectado',
-    setViewUsage: 'Ver uso',
     setChange: 'Alterar',
     today: 'Hoje',
     yesterday: 'Ontem',
@@ -5145,24 +4871,9 @@ export const strings = {
     rootUnavailable: 'Non disponibile',
     navRecent: 'Recenti',
     navStarred: 'Preferiti',
-    navCloud: 'UniWork Projects',
     navTeacher: 'Docente',
-    cloudSubtitle:
-      'Progetti creati sul web con UniWork AI. La modifica continua nel browser: fai clic su un progetto per aprirlo.',
-    cloudSearchPlaceholder: 'Cerca tra {n} progetti…',
-    cloudNoResults: 'Nessun progetto corrispondente.',
-    cloudGroupThisWeek: 'Questa settimana',
-    cloudGroupThisMonth: 'Questo mese',
-    cloudSortLabel: 'Ordina: {v}',
     cloudSortRecent: 'Recenti',
     cloudSortOldest: 'Meno recenti',
-    cloudRefresh: 'Aggiorna',
-    cloudLoginHint: 'Accedi al tuo account UniWork per vedere i progetti creati sul web.',
-    cloudEmpty: 'Ancora nessun progetto web.',
-    cloudError: 'Caricamento non riuscito. Riprova più tardi.',
-    cloudRetry: 'Riprova',
-    cloudLoadMore: 'Carica altri',
-    cloudOpenInBrowser: 'Apri nel browser',
     navTrash: 'Cestino',
     navTrashTip:
       'I file eliminati vengono spostati nel cestino di sistema e possono essere ripristinati da lì',
@@ -5266,7 +4977,6 @@ export const strings = {
     timelineUserAria: 'Utente',
     untitled: 'Senza titolo',
     noContent: '(vuoto)',
-    accountGenspark: 'Account UniWork',
     account: 'Account',
     login: 'Accedi',
     loginGenspark: 'Accedi con UniWork',
@@ -5286,8 +4996,6 @@ export const strings = {
     loginFailed: 'Accesso non riuscito — fai clic per riprovare',
     loggingOut: 'Disconnessione…',
     logout: 'Esci',
-    credits: 'Crediti',
-    creditsTip: 'Vedi i dettagli sull’uso dei crediti',
     appVersion: 'Versione {v}',
     versionLabel: 'Versione',
     setUpdateAvailableLabel: 'Aggiornamento disponibile',
@@ -5480,7 +5188,7 @@ export const strings = {
     setAiCodexAutoPlaceholder: 'Rilevamento automatico (consigliato)',
     setAiCodexHint: 'Usa Codex CLI con accesso locale; non è richiesta alcuna chiave API.',
     setAiByokNote:
-      "Le chat usano la tua chiave. La generazione di immagini e l'analisi dei media seguono la sezione «Media IA»; la ricerca web usa ancora l'accesso UniWork o fonti gratuite.",
+      "Le chat usano la tua chiave. La generazione di immagini, l'analisi dei media e la ricerca web seguono la sezione «Media IA».",
     setAiSave: 'Salva',
     setAiSaved: 'Salvato',
     setAiTest: 'Prova connessione',
@@ -5497,12 +5205,11 @@ export const strings = {
     setAiMaxTokensDesc:
       'Budget di uscita per singolo turno. I modelli di ragionamento lo consumano pensando: se si esaurisce, la risposta arriva vuota; aumentalo.',
     setSecAiMedia: 'Media e ricerca IA',
-    setAiMediaGensparkHint:
-      "La generazione di immagini e l'analisi di immagini/video usano il tuo accesso UniWork.",
     setAiImageModel: 'Modello immagini',
     setAiAnalysisModel: 'Modello di analisi',
-    setAiSearchGensparkHint:
-      'La ricerca web e di immagini usa il tuo accesso UniWork; disconnesso o con gli strumenti cloud disattivati ricorre a fonti gratuite.',
+    setAiSearchAutoHint:
+      'Nessuna chiave richiesta: la ricerca web e di immagini usa fonti gratuite (uso limitato). Scegli un fornitore e aggiungi la tua chiave per limiti più alti.',
+    setAiSearchAuto: 'Automatico (gratuito)',
     setAiSearchSerperHint: 'Serper offre ricerca web e di immagini con la tua chiave.',
     setAiSearchSerplyHint: 'Serply offre ricerca web e di immagini con la tua chiave.',
     setAiSearchTavilyHint:
@@ -5516,12 +5223,8 @@ export const strings = {
     setAiCapFileSearch: 'Ricerca file locali',
     setAiSharedKeyHint:
       "La chiave e l'URL base di un provider sono condivisi tra le capacità; inseriscili una volta sola.",
-    setAiGskTools: 'Strumenti cloud UniWork',
-    setAiGskToolsDesc:
-      "Quando il provider è UniWork, la ricerca web, la generazione di immagini e l'analisi dei media passano da UniWork e consumano crediti; se disattivato, la ricerca usa fonti gratuite e gli strumenti immagine di UniWork non sono disponibili.",
     setEmail: 'Email',
     setNotLoggedIn: 'Non connesso',
-    setViewUsage: 'Vedi utilizzo',
     setChange: 'Cambia',
     today: 'Oggi',
     yesterday: 'Ieri',
@@ -5571,24 +5274,9 @@ export const strings = {
     rootUnavailable: 'Niedostępny',
     navRecent: 'Ostatnie',
     navStarred: 'Ulubione',
-    navCloud: 'UniWork Projects',
     navTeacher: 'Nauczyciel',
-    cloudSubtitle:
-      'Projekty utworzone w sieci za pomocą UniWork AI. Edycja jest kontynuowana w przeglądarce — kliknij projekt, aby go otworzyć.',
-    cloudSearchPlaceholder: 'Szukaj wśród {n} projektów…',
-    cloudNoResults: 'Brak pasujących projektów.',
-    cloudGroupThisWeek: 'W tym tygodniu',
-    cloudGroupThisMonth: 'Wcześniej w tym miesiącu',
-    cloudSortLabel: 'Sortuj: {v}',
     cloudSortRecent: 'Najnowsze',
     cloudSortOldest: 'Najstarsze',
-    cloudRefresh: 'Odśwież',
-    cloudLoginHint: 'Zaloguj się na konto UniWork, aby zobaczyć projekty utworzone w sieci.',
-    cloudEmpty: 'Brak projektów w sieci.',
-    cloudError: 'Nie udało się wczytać. Spróbuj ponownie później.',
-    cloudRetry: 'Spróbuj ponownie',
-    cloudLoadMore: 'Wczytaj więcej',
-    cloudOpenInBrowser: 'Otwórz w przeglądarce',
     navTrash: 'Kosz',
     navTrashTip: 'Usunięte pliki trafiają do systemowego kosza i można je stamtąd przywrócić',
     secQuickStart: 'Szybki start',
@@ -5691,7 +5379,6 @@ export const strings = {
     timelineUserAria: 'Użytkownik',
     untitled: 'Bez tytułu',
     noContent: '(pusto)',
-    accountGenspark: 'Konto UniWork',
     account: 'Konto',
     login: 'Zaloguj się',
     loginGenspark: 'Zaloguj się przez UniWork',
@@ -5711,8 +5398,6 @@ export const strings = {
     loginFailed: 'Logowanie nie powiodło się — kliknij, aby spróbować ponownie',
     loggingOut: 'Wylogowywanie…',
     logout: 'Wyloguj się',
-    credits: 'Kredyty',
-    creditsTip: 'Zobacz szczegóły zużycia kredytów',
     appVersion: 'Wersja {v}',
     versionLabel: 'Wersja',
     setUpdateAvailableLabel: 'Dostępna aktualizacja',
@@ -5904,7 +5589,7 @@ export const strings = {
     setAiCodexAutoPlaceholder: 'Wykryj automatycznie (zalecane)',
     setAiCodexHint: 'Używa lokalnie zalogowanego Codex CLI; klucz API nie jest potrzebny.',
     setAiByokNote:
-      'Czaty używają Twojego klucza. Generowanie obrazów i analiza mediów zależą od sekcji „Media AI”; wyszukiwanie w sieci nadal korzysta z logowania UniWork lub darmowych źródeł.',
+      'Czaty używają Twojego klucza. Generowanie obrazów, analiza mediów i wyszukiwanie w sieci zależą od sekcji „Media AI”.',
     setAiSave: 'Zapisz',
     setAiSaved: 'Zapisano',
     setAiTest: 'Testuj połączenie',
@@ -5921,12 +5606,11 @@ export const strings = {
     setAiMaxTokensDesc:
       'Budżet wyjścia na jedną turę. Modele rozumowania zużywają go na myślenie; gdy się wyczerpie, odpowiedź przychodzi pusta — zwiększ tę wartość.',
     setSecAiMedia: 'Media i wyszukiwanie AI',
-    setAiMediaGensparkHint:
-      'Generowanie obrazów i analiza obrazów/wideo korzystają z logowania UniWork.',
     setAiImageModel: 'Model obrazów',
     setAiAnalysisModel: 'Model analizy',
-    setAiSearchGensparkHint:
-      'Wyszukiwanie w sieci i obrazów korzysta z logowania UniWork; po wylogowaniu lub przy wyłączonych narzędziach chmurowych używa darmowych źródeł.',
+    setAiSearchAutoHint:
+      'Klucz nie jest potrzebny: wyszukiwanie w sieci i obrazów korzysta z darmowych źródeł (ograniczone użycie). Wybierz dostawcę i dodaj własny klucz, aby zwiększyć limity.',
+    setAiSearchAuto: 'Automatycznie (za darmo)',
     setAiSearchSerperHint: 'Serper zapewnia wyszukiwanie w sieci i obrazów z Twoim kluczem.',
     setAiSearchSerplyHint: 'Serply zapewnia wyszukiwanie w sieci i obrazów z Twoim kluczem.',
     setAiSearchTavilyHint:
@@ -5940,12 +5624,8 @@ export const strings = {
     setAiCapFileSearch: 'Wyszukiwanie plików lokalnych',
     setAiSharedKeyHint:
       'Klucz i bazowy URL dostawcy są wspólne dla wszystkich funkcji; wpisz je raz.',
-    setAiGskTools: 'Narzędzia chmurowe UniWork',
-    setAiGskToolsDesc:
-      'Gdy dostawcą jest UniWork, wyszukiwanie w sieci, generowanie obrazów i analiza mediów przechodzą przez UniWork i zużywają kredyty; po wyłączeniu wyszukiwanie używa darmowych źródeł, a narzędzia obrazów UniWork są niedostępne.',
     setEmail: 'E-mail',
     setNotLoggedIn: 'Nie zalogowano',
-    setViewUsage: 'Zobacz zużycie',
     setChange: 'Zmień',
     today: 'Dzisiaj',
     yesterday: 'Wczoraj',
@@ -5995,25 +5675,9 @@ export const strings = {
     rootUnavailable: 'Nedostupné',
     navRecent: 'Nedávné',
     navStarred: 'Oblíbené',
-    navCloud: 'UniWork Projects',
     navTeacher: 'Učitel',
-    cloudSubtitle:
-      'Projekty vytvořené na webu pomocí UniWork AI. Úpravy pokračují v prohlížeči — klikněte na projekt a otevřete ho.',
-    cloudSearchPlaceholder: 'Hledat mezi {n} projekty…',
-    cloudNoResults: 'Žádné odpovídající projekty.',
-    cloudGroupThisWeek: 'Tento týden',
-    cloudGroupThisMonth: 'Dříve tento měsíc',
-    cloudSortLabel: 'Řazení: {v}',
     cloudSortRecent: 'Nejnovější',
     cloudSortOldest: 'Nejstarší',
-    cloudRefresh: 'Obnovit',
-    cloudLoginHint:
-      'Přihlaste se ke svému účtu UniWork a zobrazte projekty, které jste vytvořili na webu.',
-    cloudEmpty: 'Zatím žádné webové projekty.',
-    cloudError: 'Načtení se nezdařilo. Zkuste to později.',
-    cloudRetry: 'Zkusit znovu',
-    cloudLoadMore: 'Načíst další',
-    cloudOpenInBrowser: 'Otevřít v prohlížeči',
     navTrash: 'Koš',
     navTrashTip: 'Odstraněné soubory se přesunou do systémového koše, odkud je lze obnovit',
     secQuickStart: 'Rychlý start',
@@ -6114,7 +5778,6 @@ export const strings = {
     timelineUserAria: 'Uživatel',
     untitled: 'Bez názvu',
     noContent: '(prázdné)',
-    accountGenspark: 'Účet UniWork',
     account: 'Účet',
     login: 'Přihlásit se',
     loginGenspark: 'Přihlásit se přes UniWork',
@@ -6134,8 +5797,6 @@ export const strings = {
     waitingShort: 'Čekejte…',
     loggingOut: 'Odhlašování…',
     logout: 'Odhlásit se',
-    credits: 'Kredity',
-    creditsTip: 'Zobrazit podrobnosti o využití kreditů',
     appVersion: 'Verze {v}',
     versionLabel: 'Verze',
     setUpdateAvailableLabel: 'K dispozici je aktualizace',
@@ -6295,7 +5956,7 @@ export const strings = {
     setAiCodexHint:
       'Automaticky najde a použije aktuální Codex CLI, po aktualizaci není třeba nic měnit; lze zadat i vlastní cestu. API klíč není potřeba.',
     setAiByokNote:
-      'Chaty používají váš vlastní klíč. Generování obrázků a analýza médií se řídí sekcí AI média; webové vyhledávání dál používá přihlášení ke UniWork nebo bezplatné zdroje.',
+      'Chaty používají váš vlastní klíč. Generování obrázků, analýza médií a webové vyhledávání se řídí sekcí AI média.',
     setAiSave: 'Uložit',
     setAiSaved: 'Uloženo',
     setAiTest: 'Otestovat připojení',
@@ -6312,12 +5973,11 @@ export const strings = {
     setAiMaxTokensDesc:
       'Rozpočet výstupu na jeden tah. Modely s uvažováním jeho část spotřebují na přemýšlení, takže po vyčerpání rozpočtu může být odpověď prázdná; v takovém případě hodnotu zvyšte.',
     setSecAiMedia: 'AI média a vyhledávání',
-    setAiMediaGensparkHint:
-      'Generování obrázků a analýza obrázků/videí používají vaše přihlášení ke UniWork.',
     setAiImageModel: 'Model pro obrázky',
     setAiAnalysisModel: 'Model pro analýzu',
-    setAiSearchGensparkHint:
-      'Webové a obrázkové vyhledávání používá vaše přihlášení ke UniWork; při odhlášení nebo vypnutých cloudových nástrojích se použijí bezplatné zdroje.',
+    setAiSearchAutoHint:
+      'Klíč není potřeba: webové a obrázkové vyhledávání používá bezplatné zdroje (omezené využití). Pro vyšší limity vyberte poskytovatele a zadejte vlastní klíč.',
+    setAiSearchAuto: 'Automaticky (zdarma)',
     setAiSearchSerperHint: 'Serper zajišťuje webové i obrázkové vyhledávání s vaším klíčem.',
     setAiSearchSerplyHint: 'Serply zajišťuje webové i obrázkové vyhledávání s vaším klíčem.',
     setAiSearchTavilyHint:
@@ -6331,12 +5991,8 @@ export const strings = {
     setAiCapFileSearch: 'Hledání místních souborů',
     setAiSharedKeyHint:
       'Klíč a základní URL jednoho poskytovatele se sdílejí mezi funkcemi; zadejte je jen jednou.',
-    setAiGskTools: 'Cloudové nástroje UniWork',
-    setAiGskToolsDesc:
-      'Webové vyhledávání, generování obrázků a analýza médií běží přes UniWork a čerpají kredity, pokud je jejich poskytovatel nastaven na UniWork; při vypnutí vyhledávání používá bezplatné zdroje a obrázkové nástroje UniWork nejsou dostupné.',
     setEmail: 'E-mail',
     setNotLoggedIn: 'Nepřihlášeno',
-    setViewUsage: 'Zobrazit využití',
     setChange: 'Změnit',
     today: 'Dnes',
     yesterday: 'Včera',
@@ -6418,25 +6074,9 @@ export const strings = {
     rootUnavailable: 'Niet beschikbaar',
     navRecent: 'Recent',
     navStarred: 'Favorieten',
-    navCloud: 'UniWork Projects',
     navTeacher: 'Docent',
-    cloudSubtitle:
-      'Projecten gemaakt op het web met UniWork AI. Bewerken gaat verder in je browser — klik op een project om het te openen.',
-    cloudSearchPlaceholder: 'Zoek in {n} projecten…',
-    cloudNoResults: 'Geen overeenkomende projecten.',
-    cloudGroupThisWeek: 'Deze week',
-    cloudGroupThisMonth: 'Eerder deze maand',
-    cloudSortLabel: 'Sorteren: {v}',
     cloudSortRecent: 'Recent',
     cloudSortOldest: 'Oudste',
-    cloudRefresh: 'Vernieuwen',
-    cloudLoginHint:
-      'Log in op je UniWork-account om projecten te zien die je op het web hebt gemaakt.',
-    cloudEmpty: 'Nog geen webprojecten.',
-    cloudError: 'Laden mislukt. Probeer het later opnieuw.',
-    cloudRetry: 'Opnieuw proberen',
-    cloudLoadMore: 'Meer laden',
-    cloudOpenInBrowser: 'Openen in browser',
     navTrash: 'Prullenbak',
     navTrashTip:
       'Verwijderde bestanden gaan naar de systeemprullenbak en kunnen daar worden hersteld',
@@ -6539,7 +6179,6 @@ export const strings = {
     timelineUserAria: 'Gebruiker',
     untitled: 'Naamloos',
     noContent: '(leeg)',
-    accountGenspark: 'UniWork-account',
     account: 'Account',
     login: 'Inloggen',
     loginGenspark: 'Inloggen met UniWork',
@@ -6558,8 +6197,6 @@ export const strings = {
     loginFailed: 'Inloggen mislukt — klik om het opnieuw te proberen',
     loggingOut: 'Uitloggen…',
     logout: 'Uitloggen',
-    credits: 'Credits',
-    creditsTip: 'Bekijk het creditverbruik',
     appVersion: 'Versie {v}',
     versionLabel: 'Versie',
     setUpdateAvailableLabel: 'Update beschikbaar',
@@ -6753,7 +6390,7 @@ export const strings = {
     setAiCodexAutoPlaceholder: 'Automatisch detecteren (aanbevolen)',
     setAiCodexHint: 'Gebruikt de lokaal aangemelde Codex CLI; geen API-sleutel nodig.',
     setAiByokNote:
-      'Chats gebruiken je eigen sleutel. Afbeeldingen genereren en media-analyse volgen de sectie "AI-media"; zoeken op het web gebruikt nog steeds de UniWork-aanmelding of gratis bronnen.',
+      'Chats gebruiken je eigen sleutel. Afbeeldingen genereren, media-analyse en zoeken op het web volgen de sectie "AI-media".',
     setAiSave: 'Opslaan',
     setAiSaved: 'Opgeslagen',
     setAiTest: 'Verbinding testen',
@@ -6770,12 +6407,11 @@ export const strings = {
     setAiMaxTokensDesc:
       'Uitvoerbudget voor één beurt. Redeneermodellen geven dit uit aan denken; is het op, dan komt een leeg antwoord terug — verhoog deze waarde.',
     setSecAiMedia: 'AI-media en zoeken',
-    setAiMediaGensparkHint:
-      'Afbeeldingen genereren en afbeelding-/video-analyse gebruiken je UniWork-aanmelding.',
     setAiImageModel: 'Afbeeldingsmodel',
     setAiAnalysisModel: 'Analysemodel',
-    setAiSearchGensparkHint:
-      'Web- en afbeeldingszoeken gebruiken je UniWork-aanmelding; afgemeld of met cloudtools uit vallen ze terug op gratis bronnen.',
+    setAiSearchAutoHint:
+      'Geen sleutel nodig: web- en afbeeldingszoeken gebruiken gratis bronnen (beperkt gebruik). Kies een aanbieder en voeg je eigen sleutel toe voor hogere limieten.',
+    setAiSearchAuto: 'Automatisch (gratis)',
     setAiSearchSerperHint: 'Serper levert web- en afbeeldingszoeken met je sleutel.',
     setAiSearchSerplyHint: 'Serply levert web- en afbeeldingszoeken met je sleutel.',
     setAiSearchTavilyHint:
@@ -6789,12 +6425,8 @@ export const strings = {
     setAiCapFileSearch: 'Lokale bestanden zoeken',
     setAiSharedKeyHint:
       'De sleutel en basis-URL van een provider gelden voor alle functies; één keer invoeren volstaat.',
-    setAiGskTools: 'UniWork-cloudtools',
-    setAiGskToolsDesc:
-      'Staat de provider op UniWork, dan lopen zoeken op het web, afbeeldingen genereren en media-analyse via UniWork en kosten ze credits; uitgeschakeld gebruikt zoeken gratis bronnen en zijn de UniWork-afbeeldingstools niet beschikbaar.',
     setEmail: 'E-mail',
     setNotLoggedIn: 'Niet ingelogd',
-    setViewUsage: 'Verbruik bekijken',
     setChange: 'Wijzigen',
     today: 'Vandaag',
     yesterday: 'Gisteren',
@@ -6844,24 +6476,9 @@ export const strings = {
     rootUnavailable: 'Tidak tersedia',
     navRecent: 'Terkini',
     navStarred: 'Berbintang',
-    navCloud: 'UniWork Projects',
     navTeacher: 'Guru',
-    cloudSubtitle:
-      'Projek yang dicipta di web dengan UniWork AI. Penyuntingan diteruskan dalam pelayar — klik projek untuk membukanya.',
-    cloudSearchPlaceholder: 'Cari {n} projek…',
-    cloudNoResults: 'Tiada projek sepadan.',
-    cloudGroupThisWeek: 'Minggu ini',
-    cloudGroupThisMonth: 'Bulan ini',
-    cloudSortLabel: 'Isih: {v}',
     cloudSortRecent: 'Terbaru',
     cloudSortOldest: 'Terlama',
-    cloudRefresh: 'Muat semula',
-    cloudLoginHint: 'Log masuk ke akaun UniWork untuk melihat projek yang anda cipta di web.',
-    cloudEmpty: 'Belum ada projek web.',
-    cloudError: 'Gagal memuatkan. Cuba lagi kemudian.',
-    cloudRetry: 'Cuba lagi',
-    cloudLoadMore: 'Muat lagi',
-    cloudOpenInBrowser: 'Buka dalam pelayar',
     navTrash: 'Tong sampah',
     navTrashTip:
       'Fail yang dipadamkan akan dipindahkan ke tong sampah sistem dan boleh dipulihkan dari sana',
@@ -6964,7 +6581,6 @@ export const strings = {
     timelineUserAria: 'Pengguna',
     untitled: 'Tanpa tajuk',
     noContent: '(kosong)',
-    accountGenspark: 'Akaun UniWork',
     account: 'Akaun',
     login: 'Log masuk',
     loginGenspark: 'Log masuk dengan UniWork',
@@ -6984,8 +6600,6 @@ export const strings = {
     loginFailed: 'Log masuk gagal — klik untuk cuba lagi',
     loggingOut: 'Sedang log keluar…',
     logout: 'Log keluar',
-    credits: 'Kredit',
-    creditsTip: 'Lihat butiran penggunaan kredit',
     appVersion: 'Versi {v}',
     versionLabel: 'Versi',
     setUpdateAvailableLabel: 'Kemas kini tersedia',
@@ -7182,7 +6796,7 @@ export const strings = {
     setAiCodexHint:
       'Menggunakan Codex CLI yang telah log masuk secara setempat; tiada kunci API diperlukan.',
     setAiByokNote:
-      'Sembang menggunakan kunci anda sendiri. Penjanaan imej dan analisis media mengikut bahagian "Media AI"; carian web masih menggunakan log masuk UniWork atau sumber percuma.',
+      'Sembang menggunakan kunci anda sendiri. Penjanaan imej, analisis media dan carian web mengikut bahagian "Media AI".',
     setAiSave: 'Simpan',
     setAiSaved: 'Disimpan',
     setAiTest: 'Uji sambungan',
@@ -7199,12 +6813,11 @@ export const strings = {
     setAiMaxTokensDesc:
       'Belanjawan output untuk satu pusingan. Model penaakulan menghabiskannya untuk berfikir; jika habis, balasan datang kosong — tingkatkan nilai ini.',
     setSecAiMedia: 'Media & Carian AI',
-    setAiMediaGensparkHint:
-      'Penjanaan imej dan analisis imej/video menggunakan log masuk UniWork anda.',
     setAiImageModel: 'Model imej',
     setAiAnalysisModel: 'Model analisis',
-    setAiSearchGensparkHint:
-      'Carian web dan imej menggunakan log masuk UniWork anda; apabila log keluar atau alat awan dimatikan, ia menggunakan sumber percuma.',
+    setAiSearchAutoHint:
+      'Tiada kunci diperlukan: carian web dan imej menggunakan sumber percuma (penggunaan terhad). Pilih pembekal dan masukkan kunci anda sendiri untuk had yang lebih tinggi.',
+    setAiSearchAuto: 'Automatik (percuma)',
     setAiSearchSerperHint: 'Serper menyediakan carian web dan imej dengan kunci anda.',
     setAiSearchSerplyHint: 'Serply menyediakan carian web dan imej dengan kunci anda.',
     setAiSearchTavilyHint:
@@ -7218,12 +6831,8 @@ export const strings = {
     setAiCapFileSearch: 'Carian fail tempatan',
     setAiSharedKeyHint:
       'Kunci dan Base URL pembekal dikongsi oleh semua keupayaan; isi sekali sahaja.',
-    setAiGskTools: 'Alat awan UniWork',
-    setAiGskToolsDesc:
-      'Apabila pembekalnya ditetapkan kepada UniWork, carian web, penjanaan imej dan analisis media melalui UniWork dan menggunakan kredit; apabila dimatikan, carian menggunakan sumber percuma dan alat imej UniWork tidak tersedia.',
     setEmail: 'E-mel',
     setNotLoggedIn: 'Belum log masuk',
-    setViewUsage: 'Lihat penggunaan',
     setChange: 'Tukar',
     today: 'Hari ini',
     yesterday: 'Semalam',
@@ -7272,24 +6881,9 @@ export const strings = {
     rootUnavailable: 'לא זמין',
     navRecent: 'אחרונים',
     navStarred: 'מועדפים',
-    navCloud: 'UniWork Projects',
     navTeacher: 'מורה',
-    cloudSubtitle:
-      'פרויקטים שנוצרו באינטרנט עם UniWork AI. העריכה נמשכת בדפדפן — לחצו על פרויקט כדי לפתוח אותו.',
-    cloudSearchPlaceholder: 'חיפוש בין {n} פרויקטים…',
-    cloudNoResults: 'אין פרויקטים תואמים.',
-    cloudGroupThisWeek: 'השבוע',
-    cloudGroupThisMonth: 'מוקדם יותר החודש',
-    cloudSortLabel: 'מיון: {v}',
     cloudSortRecent: 'החדשים ביותר',
     cloudSortOldest: 'הישנים ביותר',
-    cloudRefresh: 'רענון',
-    cloudLoginHint: 'התחברו לחשבון UniWork כדי לראות פרויקטים שיצרתם באתר.',
-    cloudEmpty: 'אין עדיין פרויקטים מהאתר.',
-    cloudError: 'הטעינה נכשלה. נסו שוב מאוחר יותר.',
-    cloudRetry: 'נסו שוב',
-    cloudLoadMore: 'טענו עוד',
-    cloudOpenInBrowser: 'פתיחה בדפדפן',
     navTrash: 'אשפה',
     navTrashTip: 'קבצים שנמחקו עוברים לאשפה של המערכת וניתן לשחזר אותם משם',
     secQuickStart: 'התחלה מהירה',
@@ -7390,7 +6984,6 @@ export const strings = {
     timelineUserAria: 'משתמש',
     untitled: 'ללא שם',
     noContent: '(ריק)',
-    accountGenspark: 'חשבון UniWork',
     account: 'חשבון',
     login: 'התחברות',
     loginGenspark: 'התחברות עם UniWork',
@@ -7409,8 +7002,6 @@ export const strings = {
     loginFailed: 'ההתחברות נכשלה — לחצו כדי לנסות שוב',
     loggingOut: 'מתנתק…',
     logout: 'התנתקות',
-    credits: 'קרדיטים',
-    creditsTip: 'הצגת פרטי השימוש בקרדיטים',
     appVersion: 'גרסה {v}',
     versionLabel: 'גרסה',
     setUpdateAvailableLabel: 'עדכון זמין',
@@ -7595,7 +7186,7 @@ export const strings = {
     setAiCodexAutoPlaceholder: 'זיהוי אוטומטי (מומלץ)',
     setAiCodexHint: 'משתמש ב-Codex CLI המחובר מקומית; אין צורך במפתח API.',
     setAiByokNote:
-      'הצ׳אטים משתמשים במפתח שלך. יצירת תמונות וניתוח מדיה נקבעים בקטע "מדיה AI"; חיפוש באינטרנט עדיין משתמש בהתחברות UniWork או במקורות חינמיים.',
+      'הצ׳אטים משתמשים במפתח שלך. יצירת תמונות, ניתוח מדיה וחיפוש באינטרנט נקבעים בקטע "מדיה AI".',
     setAiSave: 'שמירה',
     setAiSaved: 'נשמר',
     setAiTest: 'בדיקת חיבור',
@@ -7612,11 +7203,11 @@ export const strings = {
     setAiMaxTokensDesc:
       'תקציב פלט לסיבוב אחד. מודלי היסק מנצלים חלק ממנו לחשיבה, ואם הוא נגמר התשובה עלולה לחזור ריקה — במקרה כזה העלו את הערך.',
     setSecAiMedia: 'מדיה וחיפוש AI',
-    setAiMediaGensparkHint: 'יצירת תמונות וניתוח תמונות/וידאו משתמשים בהתחברות UniWork שלך.',
     setAiImageModel: 'מודל תמונות',
     setAiAnalysisModel: 'מודל ניתוח',
-    setAiSearchGensparkHint:
-      'חיפוש באינטרנט ובתמונות משתמש בהתחברות UniWork שלך; כשלא מחוברים או כשכלי הענן כבויים הוא חוזר למקורות חינמיים.',
+    setAiSearchAutoHint:
+      'אין צורך במפתח: חיפוש באינטרנט ובתמונות משתמש במקורות חינמיים (שימוש מוגבל). בחרו ספק והוסיפו מפתח משלכם למגבלות גבוהות יותר.',
+    setAiSearchAuto: 'אוטומטי (חינם)',
     setAiSearchSerperHint: 'Serper מספק חיפוש באינטרנט ובתמונות עם המפתח שלך.',
     setAiSearchSerplyHint: 'Serply מספק חיפוש באינטרנט ובתמונות עם המפתח שלך.',
     setAiSearchTavilyHint:
@@ -7630,12 +7221,8 @@ export const strings = {
     setAiCapFileSearch: 'חיפוש קבצים מקומיים',
     setAiSharedKeyHint:
       'המפתח וכתובת ה-Base URL של ספק משותפים לכל היכולות; יש להזין אותם פעם אחת בלבד.',
-    setAiGskTools: 'כלי הענן של UniWork',
-    setAiGskToolsDesc:
-      'כשהספק מוגדר ל-UniWork, חיפוש באינטרנט, יצירת תמונות וניתוח מדיה עוברים דרך UniWork וצורכים קרדיטים; כשהוא כבוי החיפוש משתמש במקורות חינמיים וכלי התמונות של UniWork אינם זמינים.',
     setEmail: 'אימייל',
     setNotLoggedIn: 'לא מחובר',
-    setViewUsage: 'הצגת שימוש',
     setChange: 'שינוי',
     today: 'היום',
     yesterday: 'אתמול',
@@ -7682,24 +7269,9 @@ export const strings = {
     rootUnavailable: 'उपलब्ध नहीं',
     navRecent: 'हाल के',
     navStarred: 'तारांकित',
-    navCloud: 'UniWork Projects',
     navTeacher: 'शिक्षक',
-    cloudSubtitle:
-      'UniWork AI के साथ वेब पर बनाए गए प्रोजेक्ट। संपादन ब्राउज़र में जारी रहता है — खोलने के लिए किसी प्रोजेक्ट पर क्लिक करें।',
-    cloudSearchPlaceholder: '{n} प्रोजेक्ट खोजें…',
-    cloudNoResults: 'कोई मिलान वाला प्रोजेक्ट नहीं।',
-    cloudGroupThisWeek: 'इस सप्ताह',
-    cloudGroupThisMonth: 'इस महीने',
-    cloudSortLabel: 'क्रम: {v}',
     cloudSortRecent: 'हाल के',
     cloudSortOldest: 'सबसे पुराने',
-    cloudRefresh: 'रीफ़्रेश',
-    cloudLoginHint: 'वेब पर बनाए गए प्रोजेक्ट देखने के लिए अपने UniWork खाते में साइन इन करें।',
-    cloudEmpty: 'अभी तक कोई वेब प्रोजेक्ट नहीं है।',
-    cloudError: 'लोड नहीं हो सका। बाद में फिर से कोशिश करें।',
-    cloudRetry: 'फिर से कोशिश करें',
-    cloudLoadMore: 'और लोड करें',
-    cloudOpenInBrowser: 'ब्राउज़र में खोलें',
     navTrash: 'ट्रैश',
     navTrashTip: 'हटाई गई फ़ाइलें सिस्टम ट्रैश में जाती हैं और वहाँ से पुनर्स्थापित की जा सकती हैं',
     secQuickStart: 'त्वरित प्रारंभ',
@@ -7802,7 +7374,6 @@ export const strings = {
     timelineUserAria: 'उपयोगकर्ता',
     untitled: 'बिना शीर्षक',
     noContent: '(खाली)',
-    accountGenspark: 'UniWork खाता',
     account: 'खाता',
     login: 'साइन इन करें',
     loginGenspark: 'UniWork से साइन इन करें',
@@ -7822,8 +7393,6 @@ export const strings = {
     loginFailed: 'साइन इन विफल — पुनः प्रयास के लिए क्लिक करें',
     loggingOut: 'साइन आउट हो रहा है…',
     logout: 'साइन आउट करें',
-    credits: 'क्रेडिट',
-    creditsTip: 'क्रेडिट उपयोग का विवरण देखें',
     appVersion: 'संस्करण {v}',
     versionLabel: 'संस्करण',
     setUpdateAvailableLabel: 'अपडेट उपलब्ध',
@@ -8014,7 +7583,7 @@ export const strings = {
     setAiCodexHint:
       'स्थानीय रूप से साइन-इन किए गए Codex CLI का उपयोग करता है; API कुंजी की आवश्यकता नहीं।',
     setAiByokNote:
-      'चैट आपकी अपनी कुंजी का उपयोग करती हैं। इमेज जनरेशन और मीडिया विश्लेषण "AI मीडिया" अनुभाग के अनुसार होते हैं; वेब खोज अभी भी UniWork साइन-इन या मुफ़्त स्रोतों का उपयोग करती है।',
+      'चैट आपकी अपनी कुंजी का उपयोग करती हैं। इमेज जनरेशन, मीडिया विश्लेषण और वेब खोज "AI मीडिया" अनुभाग के अनुसार होते हैं।',
     setAiSave: 'सहेजें',
     setAiSaved: 'सहेजा गया',
     setAiTest: 'कनेक्शन परखें',
@@ -8031,12 +7600,11 @@ export const strings = {
     setAiMaxTokensDesc:
       'एक टर्न का आउटपुट बजट। रीज़निंग मॉडल इसका कुछ हिस्सा सोचने में खर्च करते हैं; बजट खत्म होने पर उत्तर खाली आ सकता है — ऐसा हो तो इसे बढ़ाएँ।',
     setSecAiMedia: 'AI मीडिया और खोज',
-    setAiMediaGensparkHint:
-      'इमेज जनरेशन और इमेज/वीडियो विश्लेषण आपके UniWork साइन-इन का उपयोग करते हैं।',
     setAiImageModel: 'इमेज मॉडल',
     setAiAnalysisModel: 'विश्लेषण मॉडल',
-    setAiSearchGensparkHint:
-      'वेब और इमेज खोज आपके UniWork साइन-इन का उपयोग करती हैं; साइन-आउट होने पर या क्लाउड टूल बंद होने पर वे मुफ़्त स्रोतों पर लौट जाती हैं।',
+    setAiSearchAutoHint:
+      'कुंजी की ज़रूरत नहीं: वेब और इमेज खोज मुफ़्त स्रोतों का उपयोग करती हैं (सीमित उपयोग)। अधिक सीमा के लिए कोई प्रदाता चुनें और अपनी कुंजी जोड़ें।',
+    setAiSearchAuto: 'स्वचालित (मुफ़्त)',
     setAiSearchSerperHint: 'Serper आपकी कुंजी से वेब और इमेज खोज दोनों देता है।',
     setAiSearchSerplyHint: 'Serply आपकी कुंजी से वेब और इमेज खोज दोनों देता है।',
     setAiSearchTavilyHint:
@@ -8050,12 +7618,8 @@ export const strings = {
     setAiCapFileSearch: 'स्थानीय फ़ाइल खोज',
     setAiSharedKeyHint:
       'एक प्रदाता की कुंजी और Base URL सभी क्षमताओं में साझा होते हैं; एक बार ही दर्ज करें।',
-    setAiGskTools: 'UniWork क्लाउड टूल',
-    setAiGskToolsDesc:
-      'जब प्रदाता UniWork हो, वेब खोज, इमेज जनरेशन और मीडिया विश्लेषण UniWork से होकर चलते हैं और क्रेडिट खर्च करते हैं; बंद होने पर खोज मुफ़्त स्रोत उपयोग करती है और UniWork इमेज टूल उपलब्ध नहीं रहते।',
     setEmail: 'ईमेल',
     setNotLoggedIn: 'साइन इन नहीं किया गया',
-    setViewUsage: 'उपयोग देखें',
     setChange: 'बदलें',
     today: 'आज',
     yesterday: 'कल',
@@ -8102,24 +7666,9 @@ export const strings = {
   vi: {
     navRecent: 'Gần đây',
     navStarred: 'Đã gắn sao',
-    navCloud: 'UniWork Projects',
     navTeacher: 'Bàn làm việc',
-    cloudSubtitle:
-      'Các dự án tạo trên web bằng UniWork AI. Tiếp tục chỉnh sửa trong trình duyệt — nhấp vào dự án bất kỳ để mở.',
-    cloudSearchPlaceholder: 'Tìm trong {n} dự án…',
-    cloudNoResults: 'Không có dự án khớp.',
-    cloudGroupThisWeek: 'Tuần này',
-    cloudGroupThisMonth: 'Sớm hơn trong tháng',
-    cloudSortLabel: 'Sắp xếp: {v}',
     cloudSortRecent: 'Gần đây',
     cloudSortOldest: 'Cũ nhất',
-    cloudRefresh: 'Làm mới',
-    cloudLoginHint: 'Đăng nhập tài khoản UniWork để xem các dự án bạn đã tạo trên web.',
-    cloudEmpty: 'Chưa có dự án web.',
-    cloudError: 'Không tải được. Thử lại sau.',
-    cloudRetry: 'Thử lại',
-    cloudLoadMore: 'Tải thêm',
-    cloudOpenInBrowser: 'Mở trong trình duyệt',
     navTrash: 'Thùng rác',
     navTrashTip: 'Tệp đã xóa được chuyển vào Thùng rác hệ thống và có thể khôi phục từ đó',
     secQuickStart: 'Bắt đầu nhanh',
@@ -8202,7 +7751,6 @@ export const strings = {
     timelineUserAria: 'Người dùng',
     untitled: 'Chưa đặt tên',
     noContent: '(trống)',
-    accountGenspark: 'Tài khoản UniWork',
     account: 'Tài khoản',
     login: 'Đăng nhập',
     loginGenspark: 'Đăng nhập UniWork',
@@ -8221,8 +7769,6 @@ export const strings = {
     waitingShort: 'Đang chờ…',
     loggingOut: 'Đang đăng xuất…',
     logout: 'Đăng xuất',
-    credits: 'Tín dụng',
-    creditsTip: 'Xem chi tiết sử dụng tín dụng',
     appVersion: 'Phiên bản {v}',
     versionLabel: 'Phiên bản',
     updateChannel: 'Kênh cập nhật',
@@ -8334,7 +7880,7 @@ export const strings = {
     setAiCodexHint:
       'Tự tìm Codex CLI đang đăng nhập sau mỗi lần cập nhật; đường dẫn tùy chỉnh là tùy chọn. Không cần API key.',
     setAiByokNote:
-      'Chat dùng key của bạn. Tạo ảnh và phân tích media theo mục AI Media; tìm kiếm web vẫn dùng đăng nhập UniWork hoặc nguồn miễn phí.',
+      'Chat dùng key của bạn. Tạo ảnh, phân tích media và tìm kiếm web theo mục AI Media.',
     setAiSave: 'Lưu',
     setAiSaved: 'Đã lưu',
     setAiTest: 'Kiểm tra kết nối',
@@ -8351,11 +7897,11 @@ export const strings = {
     setAiMaxTokensDesc:
       'Ngân sách đầu ra cho một lượt. Mô hình suy luận dùng một phần để suy nghĩ, nên câu trả lời có thể trống khi hết ngân sách; hãy tăng giá trị này nếu gặp trường hợp đó.',
     setSecAiMedia: 'AI Media & Tìm kiếm',
-    setAiMediaGensparkHint: 'Tạo ảnh và phân tích ảnh/video dùng phiên đăng nhập UniWork.',
     setAiImageModel: 'Mô hình tạo ảnh',
     setAiAnalysisModel: 'Mô hình phân tích',
-    setAiSearchGensparkHint:
-      'Tìm kiếm web và ảnh dùng phiên đăng nhập UniWork; khi đăng xuất hoặc tắt công cụ đám mây sẽ chuyển sang nguồn miễn phí.',
+    setAiSearchAutoHint:
+      'Không cần key: tìm kiếm web và ảnh dùng nguồn miễn phí (có giới hạn lượt dùng). Muốn hạn mức cao hơn, hãy chọn nhà cung cấp khác và nhập key của bạn.',
+    setAiSearchAuto: 'Tự động (miễn phí)',
     setAiSearchSerperHint: 'Serper cung cấp tìm kiếm web và ảnh bằng key của bạn.',
     setAiSearchTavilyHint:
       'Tavily cung cấp tìm kiếm web bằng key của bạn; tìm ảnh chuyển sang nguồn miễn phí.',
@@ -8365,12 +7911,8 @@ export const strings = {
     setAiCapSearch: 'Tìm kiếm web',
     setAiSharedKeyHint:
       'Key và Base URL của cùng nhà cung cấp được dùng chung giữa các khả năng; chỉ cần nhập một lần.',
-    setAiGskTools: 'Công cụ đám mây UniWork',
-    setAiGskToolsDesc:
-      'Tìm kiếm web, tạo ảnh và phân tích media chạy qua UniWork và dùng tín dụng khi nhà cung cấp đặt là UniWork; khi tắt, tìm kiếm dùng nguồn miễn phí và công cụ tạo ảnh UniWork không khả dụng.',
     setEmail: 'Email',
     setNotLoggedIn: 'Chưa đăng nhập',
-    setViewUsage: 'Xem mức sử dụng',
     setChange: 'Thay đổi',
     today: 'Hôm nay',
     yesterday: 'Hôm qua',
@@ -8514,23 +8056,9 @@ export const strings = {
     rootUnavailable: '無法使用',
     navRecent: '最近',
     navStarred: '收藏',
-    navCloud: 'UniWork Projects',
     navTeacher: '教師',
-    cloudSubtitle: '在網頁端用 UniWork AI 建立的專案。編輯在瀏覽器中繼續——點擊任意專案即可開啟。',
-    cloudSearchPlaceholder: '搜尋 {n} 個專案…',
-    cloudNoResults: '沒有符合的專案。',
-    cloudGroupThisWeek: '本週',
-    cloudGroupThisMonth: '本月',
-    cloudSortLabel: '排序：{v}',
     cloudSortRecent: '最近',
     cloudSortOldest: '最早',
-    cloudRefresh: '重新整理',
-    cloudLoginHint: '登入 UniWork 帳號，查看你在網頁端建立的專案。',
-    cloudEmpty: '還沒有網頁端專案。',
-    cloudError: '載入失敗，請稍後再試。',
-    cloudRetry: '重試',
-    cloudLoadMore: '載入更多',
-    cloudOpenInBrowser: '在瀏覽器中開啟',
     navTrash: '垃圾桶',
     navTrashTip: '刪除的檔案會移至系統垃圾桶，可從那裡還原',
     secQuickStart: '快速開始',
@@ -8631,7 +8159,6 @@ export const strings = {
     timelineUserAria: '使用者',
     untitled: '未命名',
     noContent: '（無內容）',
-    accountGenspark: 'UniWork 帳號',
     account: '帳號',
     login: '登入',
     loginGenspark: '登入 UniWork 帳號',
@@ -8650,8 +8177,6 @@ export const strings = {
     loginFailed: '登入失敗，點按重試',
     loggingOut: '正在登出…',
     logout: '登出',
-    credits: '點數',
-    creditsTip: '查看點數用量詳情',
     appVersion: '版本 {v}',
     versionLabel: '版本',
     setUpdateAvailableLabel: '可用更新',
@@ -8829,8 +8354,7 @@ export const strings = {
     setAiCodexAutoPlaceholder: '留空自動偵測（建議）',
     setAiCodexHint:
       '自動尋找目前的 Codex CLI，更新後無需重新選擇；也可填寫自訂路徑。無需 API Key。',
-    setAiByokNote:
-      '對話使用你自己的 key；生圖與媒體解析依「生圖與媒體」設定；網頁搜尋仍走 UniWork 登入或免費來源。',
+    setAiByokNote: '對話使用你自己的 key；生圖、媒體解析與網頁搜尋依「生圖、媒體與搜尋」設定。',
     setAiSave: '儲存',
     setAiSaved: '已儲存',
     setAiTest: '測試連線',
@@ -8847,11 +8371,11 @@ export const strings = {
     setAiMaxTokensDesc:
       '一次回合的輸出預算。推理模型會先消耗預算用於思考，預算用畢時回覆可能變成空白，遇到此情況請調高本項。',
     setSecAiMedia: '生圖、媒體與搜尋',
-    setAiMediaGensparkHint: '生圖與圖片/影片解析使用 UniWork 帳號登入。',
     setAiImageModel: '生圖模型',
     setAiAnalysisModel: '解析模型',
-    setAiSearchGensparkHint:
-      '網頁與圖片搜尋使用 UniWork 帳號登入；未登入或關閉雲端工具時改用免費來源。',
+    setAiSearchAutoHint:
+      '無需 key：網頁與圖片搜尋使用免費來源（用量有限）。如需更高配額，可改選其他服務商並填寫自己的 key。',
+    setAiSearchAuto: '自動（免費）',
     setAiSearchSerperHint: 'Serper 用你的 key 同時提供網頁與圖片搜尋。',
     setAiSearchSerplyHint: 'Serply 用你的 key 同時提供網頁與圖片搜尋。',
     setAiSearchTavilyHint: 'Tavily 用你的 key 提供網頁搜尋；圖片搜尋改用免費來源。',
@@ -8863,12 +8387,8 @@ export const strings = {
     setAiCapSearch: '網路搜尋',
     setAiCapFileSearch: '本機檔案搜尋',
     setAiSharedKeyHint: '同一服務商的 key 與 Base URL 在各項能力間共用，只需填一次。',
-    setAiGskTools: 'UniWork 雲端工具',
-    setAiGskToolsDesc:
-      '服務商選擇 UniWork 時，網頁搜尋、生圖與媒體解析經 UniWork 雲端並消耗點數；關閉後搜尋改用免費來源，UniWork 生圖工具不可用。',
     setEmail: '電子郵件',
     setNotLoggedIn: '未登入',
-    setViewUsage: '查看用量',
     setChange: '變更',
     today: '今天',
     yesterday: '昨天',

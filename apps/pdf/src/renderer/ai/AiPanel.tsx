@@ -266,7 +266,7 @@ export function AiPanel({
   }, [panelWidth])
   const settingsRef = useRef<AiSettings | null>(null)
 
-  /** gsk login state for the cloud-tools gate (refreshed on mount and window focus) */
+  /** UniWork cloud sign-in state (stub, signed out while the seam is off) for the media tool gates */
   const gskLoggedInRef = useRef(false)
   useEffect(() => {
     let alive = true

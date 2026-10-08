@@ -74,7 +74,7 @@ describe('generate_image', () => {
     expect(called).toBe(false)
   })
 
-  it('surfaces the channel error (not logged in / cloud tools off / generation failure)', async () => {
+  it('surfaces the channel error (no media model / generation failure)', async () => {
     const { exec, editor } = await runWithDesktop(
       { aiGenerateImage: () => Promise.resolve({ error: 'UniWork account is not logged in' }) },
       { prompt: 'a watercolor fox' },

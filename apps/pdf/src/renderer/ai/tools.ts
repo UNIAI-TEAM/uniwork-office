@@ -167,7 +167,7 @@ export interface PdfAiDeps {
   /** Queue a pending delete of an existing image */
   deleteImage(ref: PageImageRef): void
   searchImages(query: string, maxResults: number): Promise<ImageSearchResponse>
-  /** live predicate (gsk login && cloud-tools toggle, or a BYOK media key); false hides generate_image */
+  /** live predicate (a BYOK media model is configured; the UniWork cloud route while its seam is on); false hides generate_image */
   imageGenAvailable?(): boolean
   generateImage(op: { prompt: string; aspectRatio?: string }): Promise<{
     url?: string

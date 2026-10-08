@@ -183,7 +183,7 @@ file store.
 
 `genoffice install-cli` repeats the attempt and prints the manual command when it cannot finish. jsdom (for Word/Markdown) ships beside the bundle as `Resources/cli/node_modules`, collected by `collect-deps.mjs` at build time.
 
-Independently of the PATH, every launch of the packaged app writes the launcher directory to `~/.genoffice/launcher` (`GENOFFICE_AUTH_DIR` overrides the directory, as for `auth.json`). The `genoffice` agent skill (`skills/genoffice/SKILL.md`) reads it when `genoffice` is not on the PATH. `genoffice --version` prints this package's version, inlined by `build.mjs`.
+Independently of the PATH, every launch of the packaged app writes the launcher directory to `~/.genoffice/launcher` (`GENOFFICE_AUTH_DIR` overrides the directory). The `genoffice` agent skill (`skills/genoffice/SKILL.md`) reads it when `genoffice` is not on the PATH. `genoffice --version` prints this package's version, inlined by `build.mjs`.
 
 ## Layout
 
@@ -222,9 +222,8 @@ Independently of the PATH, every launch of the packaged app writes the launcher 
 
 `search`, `image` and `media` reuse the editors' provider routing. Search uses
 the selected Serper / Serply / Tavily / Parallel provider when its key is configured;
-otherwise UniWork is the default when signed in (`~/.genoffice/auth.json`)
-and cloud tools are on, then Parallel's free, rate-limited Search MCP, then
-DuckDuckGo. Parallel
+otherwise the keyless `auto` default runs Parallel's free, rate-limited Search MCP,
+then DuckDuckGo. Parallel
 and Tavily provide web search only. Image generation and media analysis use
 the corresponding provider chosen in the app's AI settings
 (`UniWork Office/ai-settings.json` in the platform config directory, override with

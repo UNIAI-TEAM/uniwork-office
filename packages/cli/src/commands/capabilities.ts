@@ -1,7 +1,6 @@
 import {
   activeMediaProvider,
   activeSearchProvider,
-  cloudToolsEnabled,
   imageGenerationAvailable,
   mediaAnalysisAvailable,
 } from '@genoffice/ai-provider'
@@ -11,10 +10,10 @@ import type { CommandDef } from '../registry'
 import { appLaunch } from '../resources'
 
 /**
- * What the cloud commands can do on this machine, decided from GenOffice's
- * own settings without a network call: a Genspark login with cloud tools on,
- * a BYOK key, or explicitly selected free Parallel search. Unkeyed fallbacks in the
- * default chain (free Parallel MCP, DuckDuckGo) do not count as configured. Agents
+ * What the cloud commands can do on this machine, decided from UniWork Office's
+ * own settings without a network call: a BYOK key, or explicitly selected free
+ * Parallel search. The UniWork cloud is off, and unkeyed fallbacks in the default
+ * `auto` chain (free Parallel MCP, DuckDuckGo) do not count as configured. Agents
  * check this once before planning work that needs photos or web facts.
  */
 export const capabilitiesCommand: CommandDef = {
@@ -25,24 +24,21 @@ export const capabilitiesCommand: CommandDef = {
   async run(_args, ctx) {
     await prepareCloud(ctx.env)
     const settings = readAiSettingsFile(aiSettingsPath(ctx.env))
-    const gsk = hasGskAuth() && cloudToolsEnabled(settings)
     const searchProvider = activeSearchProvider(settings)
-    const gskSearch = gsk && searchProvider === 'genspark'
-    const customSearch = searchProvider !== 'genspark'
-    const search = gskSearch || customSearch
-    const keyedImageSearch = searchProvider === 'serper' || searchProvider === 'serply'
-    const imageSearch = gskSearch || keyedImageSearch
+    const search = searchProvider !== 'auto'
+    const imageSearch = searchProvider === 'serper' || searchProvider === 'serply'
     const imageGeneration = imageGenerationAvailable(settings, hasGskAuth())
     const mediaAnalysis = mediaAnalysisAvailable(settings, hasGskAuth())
-    const via = (byok: string | null | undefined) => (byok ? byok : gsk ? 'genspark' : null)
+    // only BYOK providers are reported; the UniWork cloud route is off
+    const via = (provider: string) => (provider === 'genspark' ? null : provider)
     const detail = {
       search: {
         available: search,
-        via: customSearch ? searchProvider : gskSearch ? 'genspark' : null,
+        via: search ? searchProvider : null,
       },
       image_search: {
         available: imageSearch,
-        via: keyedImageSearch ? searchProvider : gskSearch ? 'genspark' : null,
+        via: imageSearch ? searchProvider : null,
       },
       image_generation: {
         available: imageGeneration,

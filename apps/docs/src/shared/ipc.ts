@@ -505,10 +505,8 @@ export interface DesktopApi {
   /** start a streaming AI call; deltas arrive via onAiStream with the same requestId */
   aiStream(request: AiStreamRequest): Promise<void>
   aiStreamCancel(requestId: string): Promise<void>
-  /** Genspark account status (gsk login state); withEmail also returns the email (needs a network request, slower) */
+  /** UniWork cloud account status (internal gsk name); always signed out while the cloud seam is off */
   aiGskStatus(withEmail?: boolean): Promise<GenSparkAccountStatus>
-  /** Open the browser to log in to Genspark (fire-and-forget; aiGskStatus flips to logged-in when done) */
-  aiGskLogin(): Promise<void>
   /** Focus Home → Settings → Account (AI plan purchase UI) */
   aiOpenBilling(): Promise<void>
   webSearch(
@@ -543,7 +541,7 @@ export interface DesktopApi {
     requirements: string
   }): Promise<{ text?: string; error?: string }>
   fetchImage(url: string): Promise<{ base64: string; mime: string } | null>
-  /** AI image generation via the Genspark cloud channel (requires login + cloud tools) */
+  /** AI image generation via the configured media provider */
   aiGenerateImage(op: {
     prompt: string
     aspectRatio?: string

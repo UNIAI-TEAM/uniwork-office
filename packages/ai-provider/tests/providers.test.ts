@@ -428,11 +428,13 @@ describe('uniAi OpenRouter Token Hub key', () => {
 })
 
 describe('gskToolsEnabled', () => {
-  it('defaults on, survives resolveAiSettings, and only an explicit false turns it off', () => {
-    expect(cloudToolsEnabled(defaultAiSettings())).toBe(true)
-    // pre-toggle settings file (field absent) stays on
+  it('keeps the stored toggle but stays off while the UniWork cloud seam is off', () => {
+    expect(defaultAiSettings().gskToolsEnabled).toBe(true)
+    expect(cloudToolsEnabled(defaultAiSettings())).toBe(false)
+    // pre-toggle settings file (field absent) keeps the default on
     const legacy = resolveAiSettings({ providers: {} as never }, defaultAiSettings())
-    expect(cloudToolsEnabled(legacy)).toBe(true)
+    expect(legacy.gskToolsEnabled).toBe(true)
+    expect(cloudToolsEnabled(legacy)).toBe(false)
     const off = resolveAiSettings(
       { providers: {} as never, gskToolsEnabled: false },
       defaultAiSettings(),

@@ -5,7 +5,6 @@ export const nl = {
   aiEmptyBuildTitle: 'Laat AI deze werkmap voor je opbouwen',
   aiEmptyBuildBody:
     'Beschrijf de tabel, gegevens of grafiek die je nodig hebt — AI maakt het direct.',
-  aiGskLoginBtn: 'Aanmelden bij UniWork',
   aiUndelivered: 'Niet verzonden',
   aiRetry: 'Opnieuw proberen',
   aiOpenAssistant: 'AI-assistent openen',
@@ -50,13 +49,6 @@ export const nl = {
   aiFileTooltip:
     'SHA-256 {sha}\nBij het opslaan worden alleen de bewerkte items herschreven; al het andere blijft behouden.',
   aiFileMeta: '{sheets} bladen · {entries} items',
-  aiGensparkAccount: 'UniWork-account',
-  aiAccountChecking: 'Controleren…',
-  aiLoggedIn: 'Aangemeld',
-  aiLoggedInAs: 'Aangemeld: {email}',
-  aiNotLoggedIn: 'Niet aangemeld (AI-functies vereisen een UniWork-account)',
-  aiWaitingBrowserLogin: 'Wachten op aanmelding in de browser…',
-  aiLoginGenspark: 'Aanmelden bij UniWork',
   aiModel: 'Model',
   aiCancel: 'Annuleren',
   aiSave: 'Opslaan',

@@ -1,14 +1,12 @@
 /**
  * ai:web-search / ai:image-search for the editors' main processes: reads
  * ai-settings.json live and turns the search provider choice into
- * SearchOptions — Genspark keeps the historic chain (gsk when signed in and
- * cloud tools are on, then env keys, then free Parallel MCP, then DuckDuckGo); a
- * selected custom provider runs first and skips gsk.
+ * SearchOptions — `auto` keeps the keyless chain (env keys, then free Parallel
+ * MCP, then DuckDuckGo); a selected custom provider runs first.
  */
 
 import {
   activeSearchProvider,
-  cloudToolsEnabled,
   type AiSearchProviderId,
   type AiSettings,
 } from '@genoffice/ai-provider'
@@ -17,7 +15,7 @@ import { readAiSettingsFile } from './media-tools'
 
 export function searchOptionsFromSettings(settings: AiSettings): SearchOptions {
   const provider = activeSearchProvider(settings)
-  if (provider === 'genspark') return { useGsk: cloudToolsEnabled(settings) }
+  if (provider === 'auto') return { useGsk: false }
   const key = settings.search!.providers?.[provider]?.apiKey?.trim() ?? ''
   if (provider === 'parallel') return { useGsk: false, parallelKey: key, prefer: 'parallel' }
   if (provider === 'serply') return { useGsk: false, serplyKey: key, prefer: 'serply' }
@@ -41,7 +39,7 @@ export async function testSearchProvider(
   provider: AiSearchProviderId,
   apiKey: string,
 ): Promise<{ ok: boolean; error?: string }> {
-  if (provider === 'genspark') return { ok: true }
+  if (provider === 'auto') return { ok: true }
   apiKey = apiKey.trim()
   if (!apiKey && provider !== 'parallel') return { ok: false, error: 'API key is empty' }
   const options: SearchOptions = {
@@ -54,7 +52,7 @@ export async function testSearchProvider(
     firecrawlKey: provider === 'firecrawl' ? apiKey : '',
     prefer: provider,
   }
-  const r = await webSearch('GenOffice', 1, options)
+  const r = await webSearch('UniWork Office', 1, options)
   if (r.method === provider) return { ok: true }
   return {
     ok: false,

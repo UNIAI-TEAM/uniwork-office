@@ -318,15 +318,6 @@ export const ja = {
   appTabBar: '縦棒',
   appTabClear: 'クリア',
   // AI settings
-  appAiSettings: 'AI 設定',
-  appGensparkAccount: 'UniWork アカウント',
-  appChecking: '確認中…',
-  appLoggedIn: 'サインイン済み',
-  appLoggedInEmail: 'サインイン済み:{email}',
-  appNotLoggedIn: '未サインイン(AI 機能には UniWork アカウントが必要です)',
-  appWaitingBrowserLogin: 'ブラウザーでのサインインを待っています…',
-  appLoginGenspark: 'UniWork にサインイン',
-  appModel: 'モデル',
   // Context menu
   appCut: '切り取り',
   appCopy: 'コピー',

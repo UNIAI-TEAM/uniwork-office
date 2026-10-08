@@ -233,8 +233,6 @@ interface ChatEntry {
   text: string
   error?: string
   streaming?: boolean
-  /** the run failed because Genspark is signed out — render an inline sign-in button */
-  loginRequired?: boolean
   tools?: ToolActivity[]
   /** Generation progress card (only one per turn, replaced in real time) */
   deckProgress?: DeckProgressSnapshot
@@ -1030,12 +1028,10 @@ export function AiPanel({
         })
       },
       isCloudPageGenEnabled: async () => {
-        // Cloud page generation runs on Genspark's own slide model and spends
-        // Genspark credits, so it is gated by the "Genspark cloud tools" toggle
-        // plus the main-process account status only — the chat provider does not
-        // gate it (search/media gate per capability, not per chat provider). A
-        // free-plan or credits-exhausted account is covered by the mid-run
-        // fallback to the local pipeline instead of disabling cloud up front.
+        // Cloud page generation runs on the UniWork cloud slide model, so it is
+        // gated by the cloud-tools setting plus the main-process status (off
+        // while the UniWork cloud seam is disabled) — the chat provider does not
+        // gate it. A failing cloud run falls back to the local pipeline mid-run.
         const cur = settingsRef.current
         if (!cloudToolsEnabled(cur)) return false
         try {
@@ -1044,7 +1040,7 @@ export function AiPanel({
           return false
         }
       },
-      // Local single-page generation (no gsk needed, e.g. BYOK): one LLM request through the
+      // Local single-page generation (no cloud needed, e.g. BYOK): one LLM request through the
       // app's own AI transport writes a structured JSON slide spec, and the main process builds
       // it directly into a one-slide pptx with pptx-engine primitives — no HTML intermediate.
       generatePageLocal: async (args) => {
@@ -1504,22 +1500,6 @@ export function AiPanel({
             }
             return next
           })
-          // Signed-out failures get an inline sign-in button; detected via
-          // gsk status rather than matching the localized error text
-          void window.slidesApi
-            .aiGskStatus()
-            .then((status) => {
-              if (status.loggedIn) return
-              setChat((prev) => {
-                const next = [...prev]
-                const last = next.at(-1)
-                if (last?.role === 'assistant' && last.error) {
-                  next[next.length - 1] = { ...last, loginRequired: true }
-                }
-                return next
-              })
-            })
-            .catch(() => {})
           void finishHistoryBatch().finally(() => {
             setBusy(false)
             const resolveQueueRun = queueRunResolverRef.current
@@ -2274,11 +2254,6 @@ export function AiPanel({
               {entry.tools && entry.tools.length > 0 && <ToolChipList tools={entry.tools} />}
               {entry.error && (
                 <div className="ai-msg-error">{t('aiMsgError', { error: entry.error })}</div>
-              )}
-              {entry.loginRequired && (
-                <button className="ai-login-btn" onClick={() => void window.slidesApi.aiGskLogin()}>
-                  {t('aiGskLoginBtn')}
-                </button>
               )}
               {entry.deckProgress && <DeckProgressCard progress={entry.deckProgress} />}
               {showToolbar && (

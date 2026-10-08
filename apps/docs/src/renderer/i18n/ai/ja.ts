@@ -8,7 +8,6 @@ export const ja = {
   aiStarterPolishAll: '全文を推敲してよりプロフェッショナルな文体に',
   aiStarterContinue: '今の内容の続きを書いて',
   aiStarterFillTemplate: '文書内のプレースホルダーを見つけて埋めて',
-  aiGskLoginBtn: 'UniWork にサインイン',
   aiBuyPlanBtn: 'AIプランを購入',
   aiPanelTitle: 'uniAI',
   aiOpenAssistant: 'AI アシスタントを開く',

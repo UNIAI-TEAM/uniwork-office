@@ -102,8 +102,6 @@ interface ChatEntry {
   error?: string
   streaming?: boolean
   turnLimit?: boolean
-  /** the run failed because Genspark is signed out — render an inline sign-in button */
-  loginRequired?: boolean
   /** tool executions performed during this assistant turn */
   tools?: ToolActivity[]
   /** document state before this turn's first edit — rendered as an inline roll-back action */
@@ -487,7 +485,7 @@ export function AiPanel({
   editorRef.current = editor
   const settingsRef = useRef(settings)
   settingsRef.current = settings
-  /** gsk login state for the generate_image gate (refreshed on mount and window focus) */
+  /** UniWork cloud sign-in state (stub, signed out while the seam is off) for the media tool gates */
   const gskLoggedInRef = useRef(false)
   useEffect(() => {
     let alive = true
@@ -879,22 +877,6 @@ export function AiPanel({
             }
             return boundChatHistory(next)
           })
-          // Signed-out failures get an inline sign-in button; detected via
-          // gsk status rather than matching the localized error text
-          void window.desktop
-            .aiGskStatus()
-            .then((status) => {
-              if (status.loggedIn) return
-              setChat((prev) => {
-                const next = [...prev]
-                const last = next.at(-1)
-                if (last?.role === 'assistant' && last.error) {
-                  next[next.length - 1] = { ...last, loginRequired: true }
-                }
-                return next
-              })
-            })
-            .catch(() => {})
           setBusy(false)
         },
       },
@@ -1435,17 +1417,11 @@ export function AiPanel({
               {entry.error && (
                 <div className="ai-msg-error">{t('aiErrorPrefix', { error: entry.error })}</div>
               )}
-              {(entry.loginRequired ||
-                (entry.error &&
-                  /API\s*[Kk]ey|api key|khóa API|kích hoạt|mua gói AI|not activated|purchase an AI|未配置|未設定/i.test(
-                    entry.error,
-                  ))) && (
+              {entry.error &&
+                /API\s*[Kk]ey|api key|khóa API|kích hoạt|mua gói AI|not activated|purchase an AI|未配置|未設定/i.test(
+                  entry.error,
+                ) && (
                 <div className="ai-msg-actions">
-                  {entry.loginRequired && (
-                    <button className="ai-login-btn" onClick={() => void window.desktop.aiGskLogin()}>
-                      {t('aiGskLoginBtn')}
-                    </button>
-                  )}
                   <button
                     className="ai-login-btn"
                     onClick={() => void window.desktop.aiOpenBilling?.()}

@@ -5,7 +5,6 @@ export const fr = {
   aiEmptyBuildTitle: "Laissez l'IA construire ce classeur pour vous",
   aiEmptyBuildBody:
     "Décrivez le tableau, les données ou le graphique voulu — l'IA les crée directement.",
-  aiGskLoginBtn: 'Se connecter à UniWork',
   aiUndelivered: 'Non envoyé',
   aiRetry: 'Réessayer',
   aiOpenAssistant: "Ouvrir l'assistant IA",
@@ -50,13 +49,6 @@ export const fr = {
   aiFileTooltip:
     "SHA-256 {sha}\nL'enregistrement ne réécrit que les entrées modifiées ; tout le reste est conservé.",
   aiFileMeta: '{sheets} feuilles · {entries} entrées',
-  aiGensparkAccount: 'Compte UniWork',
-  aiAccountChecking: 'Vérification…',
-  aiLoggedIn: 'Connecté',
-  aiLoggedInAs: 'Connecté : {email}',
-  aiNotLoggedIn: 'Non connecté (les fonctions IA nécessitent un compte UniWork)',
-  aiWaitingBrowserLogin: 'En attente de la connexion dans le navigateur…',
-  aiLoginGenspark: 'Se connecter à UniWork',
   aiModel: 'Modèle',
   aiCancel: 'Annuler',
   aiSave: 'Enregistrer',

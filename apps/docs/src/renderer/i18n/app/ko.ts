@@ -318,15 +318,6 @@ export const ko = {
   appTabBar: '세로 막대',
   appTabClear: '지우기',
   // AI settings
-  appAiSettings: 'AI 설정',
-  appGensparkAccount: 'UniWork 계정',
-  appChecking: '확인 중…',
-  appLoggedIn: '로그인됨',
-  appLoggedInEmail: '로그인됨: {email}',
-  appNotLoggedIn: '로그인되지 않음(AI 기능을 사용하려면 UniWork 계정 로그인이 필요합니다)',
-  appWaitingBrowserLogin: '브라우저 로그인 대기 중…',
-  appLoginGenspark: 'UniWork 로그인',
-  appModel: '모델',
   // Context menu
   appCut: '잘라내기',
   appCopy: '복사',
