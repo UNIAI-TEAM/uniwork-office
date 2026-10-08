@@ -441,3 +441,51 @@ test('the standalone Docs app ships the same icons as the shell', () => {
     assert.deepEqual(asset(`apps/docs/build/${f}`), asset(`apps/shell/build/${f}`), f)
   }
 })
+
+test('Integrations prose names the product and keeps the command in parentheses, idempotently', () => {
+  const upstream = [
+    'export const strings = {',
+    '  en: {',
+    "    intgStep2Note: 'The assistant runs the genoffice command line itself; you never type it.',",
+    "    intgCliTitle: 'Advanced: genoffice command line',",
+    "    intgCliReady: 'genoffice {v} · ready in your terminal ({path})',",
+    '    intgCliNotOnPath:',
+    "      'genoffice {v} · not on PATH; found via ~/.genoffice/launcher. To type genoffice yourself, run this once:',",
+    "    intgMcpStdioDesc: 'The assistant launches genoffice mcp itself.',",
+    "    intgCopy: 'Copy genoffice',",
+    '  },',
+    '}',
+    '',
+  ].join('\n')
+  withFiles({ 'apps/shell/src/renderer/src/strings.ts': upstream }, (get) => {
+    const text = get('apps/shell/src/renderer/src/strings.ts')
+    assert.match(text, /runs the UniWork Office \(genoffice\) command line itself/)
+    assert.match(text, /intgCliTitle: 'Advanced: UniWork Office command line'/)
+    assert.match(text, /intgCliReady: 'UniWork Office \(genoffice\) \{v\} · ready/)
+    assert.match(
+      text,
+      /'UniWork Office \(genoffice\) \{v\} · not on PATH; found via ~\/\.genoffice\/launcher\. To type genoffice yourself/,
+    )
+    assert.match(text, /launches UniWork Office \(genoffice mcp\) itself/)
+    assert.match(text, /intgCopy: 'Copy genoffice'/, 'other keys are untouched')
+  })
+})
+
+test('the fork banner loses the internal ticket sentence but keeps the attribution line', () => {
+  const old = [
+    '> **UniWork Office fork.** The canonical product README is [`README.md`](../../README.md).',
+    '>',
+    '> This repository is currently a desktop office runtime. UniWork platform integration is not part of GO-1.',
+    '',
+    '# GenOffice',
+    '',
+  ].join('\n')
+  withFiles({ 'docs/i18n/README.fr.md': old, 'docs/i18n/README.de.md': '# GenOffice\n' }, (get) => {
+    const fr = get('docs/i18n/README.fr.md')
+    assert.ok(!/GO-1|desktop office runtime/.test(fr))
+    assert.match(fr, /^> \*\*UniWork Office fork\.\*\*/)
+    assert.equal((fr.match(/UniWork Office fork/g) ?? []).length, 1)
+    const de = get('docs/i18n/README.de.md')
+    assert.match(de, /^> \*\*UniWork Office fork\.\*\*.*\n\n# GenOffice/s)
+  })
+})

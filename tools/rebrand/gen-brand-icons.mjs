@@ -4,6 +4,7 @@
 // sizes), the macOS grid-margin variant and the in-app logo.
 //
 //   node tools/rebrand/gen-brand-icons.mjs <master-dir>
+//   node tools/rebrand/rebrand.mjs --icons <master-dir>    same, then applies the overlay in one step
 //
 // <master-dir> holds icon.png (1024 px), icon.ico (16..256 px) and icons/<n>x<n>.png
 // (16, 32, 48, 64, 128, 256, 512). Outputs are committed; `node tools/rebrand/rebrand.mjs`
@@ -19,12 +20,6 @@ import { fileURLToPath } from 'node:url'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ASSETS = join(HERE, 'assets')
-const master = process.argv[2] ? resolve(process.argv[2]) : null
-if (!master) {
-  console.error('usage: node tools/rebrand/gen-brand-icons.mjs <master-dir>')
-  process.exit(2)
-}
-
 const SIZES = [16, 32, 48, 64, 128, 256, 512]
 const MAC_CONTENT_RATIO = 824 / 1024
 
@@ -75,32 +70,44 @@ function icns(pngBySize) {
   return Buffer.concat([head, body])
 }
 
-const masterPng = join(master, 'icon.png')
-const sourceImg = await loadImage(readFileSync(masterPng))
-const macImg = await loadImage(render(sourceImg, 1024, MAC_CONTENT_RATIO))
-const macPng = render(macImg, 1024)
-const macBySize = new Map([16, 32, 64, 128, 256, 512, 1024].map((s) => [s, render(macImg, s)]))
-const icnsBytes = icns(macBySize)
+/** Writes every icon slot of the overlay from the master set in `masterDir`. */
+export async function generateBrandIcons(masterDir) {
+  const master = resolve(masterDir)
+  const masterPng = join(master, 'icon.png')
+  const sourceImg = await loadImage(readFileSync(masterPng))
+  const macImg = await loadImage(render(sourceImg, 1024, MAC_CONTENT_RATIO))
+  const macPng = render(macImg, 1024)
+  const macBySize = new Map([16, 32, 64, 128, 256, 512, 1024].map((s) => [s, render(macImg, s)]))
+  const icnsBytes = icns(macBySize)
 
-// packager icons: the shell app, and the standalone Docs app that builds from its own build/ dir
-for (const app of ['shell', 'docs']) {
-  put(`apps/${app}/build/icon.png`, masterPng)
-  put(`apps/${app}/build/icon.ico`, join(master, 'icon.ico'))
-  put(`apps/${app}/build/icon-mac.png`, macPng)
-  put(`apps/${app}/build/icon.icns`, icnsBytes)
+  // packager icons: the shell app, and the standalone Docs app that builds from its own build/ dir
+  for (const app of ['shell', 'docs']) {
+    put(`apps/${app}/build/icon.png`, masterPng)
+    put(`apps/${app}/build/icon.ico`, join(master, 'icon.ico'))
+    put(`apps/${app}/build/icon-mac.png`, macPng)
+    put(`apps/${app}/build/icon.icns`, icnsBytes)
+  }
+
+  // Linux icon SET (electron-builder `linux.icon: 'build/icons'`): <n>x<n>.png and the hicolor
+  // layout <n>x<n>/apps/<executableName>.png, 16..1024
+  for (const size of [...SIZES, 1024]) {
+    const src = size === 1024 ? masterPng : join(master, 'icons', `${size}x${size}.png`)
+    put(`apps/shell/build/icons/${size}x${size}.png`, src)
+    put(`apps/shell/build/icons/${size}x${size}/apps/uniwork-office.png`, src)
+  }
+
+  // in-app logo: onboarding / About / update window read the shell's app-icon.png
+  put('apps/shell/src/renderer/src/assets/app-icon.png', join(master, 'icons', '512x512.png'))
+  // upstream's per-module app-icon.png is referenced by no source file; keep it off the old mark
+  for (const app of ['docs', 'sheets', 'slides']) {
+    put(`apps/${app}/src/renderer/assets/app-icon.png`, join(master, 'icons', '256x256.png'))
+  }
 }
 
-// Linux icon SET (electron-builder `linux.icon: 'build/icons'`): <n>x<n>.png and the hicolor
-// layout <n>x<n>/apps/<executableName>.png, 16..1024
-for (const size of [...SIZES, 1024]) {
-  const src = size === 1024 ? masterPng : join(master, 'icons', `${size}x${size}.png`)
-  put(`apps/shell/build/icons/${size}x${size}.png`, src)
-  put(`apps/shell/build/icons/${size}x${size}/apps/uniwork-office.png`, src)
-}
-
-// in-app logo: onboarding / About / update window read the shell's app-icon.png
-put('apps/shell/src/renderer/src/assets/app-icon.png', join(master, 'icons', '512x512.png'))
-// upstream's per-module app-icon.png is referenced by no source file; keep it off the old mark
-for (const app of ['docs', 'sheets', 'slides']) {
-  put(`apps/${app}/src/renderer/assets/app-icon.png`, join(master, 'icons', '256x256.png'))
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  if (!process.argv[2]) {
+    console.error('usage: node tools/rebrand/gen-brand-icons.mjs <master-dir>')
+    process.exit(2)
+  }
+  await generateBrandIcons(process.argv[2])
 }

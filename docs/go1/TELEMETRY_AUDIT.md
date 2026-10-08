@@ -1,5 +1,7 @@
 # GO-1 telemetry audit
 
+> **Superseded (UNI-1002 follow-up):** the GA4 tracker described below (`apps/shell/src/main/analytics.ts`, the Settings switch, the `GENOFFICE_GA4_*` packaging variables) was removed from the product. The brand scan fails on `google-analytics.com` and GA4 credentials in source or packaging config. This table is the historical GO-1 state.
+
 | Channel | Class | Notes |
 | --- | --- | --- |
 | GA4 Measurement Protocol | `THIRD_PARTY` when packaged **with injected keys**; `DISABLED` in source/dev and UniWork GO-1 packs | `apps/shell/src/main/analytics.ts`. Keys come from `GENOFFICE_GA4_*` at electron-builder time. Not in the repo. `extractPackagedAnalyticsKeys` returns null unless `app.isPackaged`. |

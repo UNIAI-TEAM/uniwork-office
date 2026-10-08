@@ -4,6 +4,8 @@
 //   node tools/rebrand/rebrand.mjs            apply the table + asset overlay
 //   node tools/rebrand/rebrand.mjs --check    change nothing, exit 1 if a run would
 //   node tools/rebrand/rebrand.mjs --root <dir>   operate on another checkout
+//   node tools/rebrand/rebrand.mjs --icons <dir>  first rebuild every icon in assets/ from a master
+//                                                 icon set (gen-brand-icons.mjs), then apply
 //
 // The replacement table lives in table.mjs, the artwork overlay in assets/
 // (same relative paths as the repo). See README.md for the upstream sync flow.
@@ -148,8 +150,14 @@ export function rebrand(root, { write = false } = {}) {
   return { changed, overlays }
 }
 
-function main(argv) {
+async function main(argv) {
   const check = argv.includes('--check')
+  const iconsArg = argv.indexOf('--icons')
+  if (iconsArg >= 0) {
+    if (check) throw new Error('--icons rewrites assets/ and cannot be combined with --check')
+    const { generateBrandIcons } = await import('./gen-brand-icons.mjs')
+    await generateBrandIcons(argv[iconsArg + 1])
+  }
   const rootArg = argv.indexOf('--root')
   const root = resolve(
     rootArg >= 0
@@ -175,5 +183,5 @@ function main(argv) {
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  main(process.argv.slice(2))
+  await main(process.argv.slice(2))
 }

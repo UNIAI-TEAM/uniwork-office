@@ -447,7 +447,8 @@ import {
   shiftVisualForStructuralOp,
 } from './edit-journal'
 import { shiftPinnedCells } from './formula-closure'
-import { getLang, t, aiLangDirective } from './i18n/locale'
+import { getLang, t, aiLangDirective, useI18n } from './i18n/locale'
+import { retranslateStatus } from './status-message'
 import { planStillMatches } from './lazy-plan'
 import { lastSurvivingScreenLine, netAxisDelta, screenToFile } from './view-transform'
 import { selectionFormatEquals, toSelectionFormat, type SelectionFormat } from './selection-format'
@@ -699,6 +700,9 @@ export function App({
   const [fullLoadPrompt, setFullLoadPrompt] = useState<'ask' | 'tooLarge' | null>(null)
   const fullLoadRunning = useRef(false)
   const [message, setMessage] = useState(t('appReadyInitial'))
+  // a language switch re-renders the static status texts ("Workbook fully loaded ...")
+  const { lang: uiLang } = useI18n()
+  useEffect(() => setMessage((prev) => retranslateStatus(prev, uiLang)), [uiLang])
   const sheetTabActions = useMemo(
     () => createSheetTabActions({ univerRef, lazyWorkbookRef, notify: setMessage }),
     [],

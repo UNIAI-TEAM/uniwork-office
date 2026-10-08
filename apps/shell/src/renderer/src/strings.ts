@@ -255,16 +255,16 @@ export const strings = {
     intgExample1: '把 ~/Downloads/report.md 转成 Word 文档',
     intgExample2: '做一份 6 页的幻灯片，介绍我们第三季度的业绩',
     intgExample3: '把 budget.xlsx 转成 PDF，并在 UniWork Office 里打开',
-    intgStep2Note: '助手会自己调用 genoffice 命令行，你不需要输入任何命令。',
+    intgStep2Note: '助手会自己调用 UniWork Office (genoffice) 命令行，你不需要输入任何命令。',
     intgCliPartTitle: 'CLI · 命令行 + skill',
     intgCliPartDesc:
-      '适合能运行终端命令的助手（Claude Code、Codex、Cursor 等）。安装 skill 后，助手会自己调用 genoffice 命令行创建、转换、读取和编辑文件，你不需要输入任何命令。',
+      '适合能运行终端命令的助手（Claude Code、Codex、Cursor 等）。安装 skill 后，助手会自己调用 UniWork Office (genoffice) 命令行创建、转换、读取和编辑文件，你不需要输入任何命令。',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP 是 AI 助手调用外部工具的通用协议。助手不能运行命令（如 Claude Desktop），或你想让它直接操作 UniWork Office 窗口时用这条路。下面两种接法任选一种。',
     intgMcpStdioTitle: '由助手启动（推荐）',
     intgMcpStdioDesc:
-      '助手自己拉起 genoffice mcp，不需要在这里开任何开关，UniWork Office 也不用开着。功能与 CLI 完全相同。',
+      '助手自己拉起 UniWork Office (genoffice mcp)，不需要在这里开任何开关，UniWork Office 也不用开着。功能与 CLI 完全相同。',
     intgMcpHttpTitle: '本地 HTTP 服务',
     intgMcpHttpDesc:
       '在 UniWork Office 内运行，助手通过网址连接，可以看着它在 Word 编辑器里逐步生成。需要 UniWork Office 保持打开；目前只支持 Word。',
@@ -276,10 +276,10 @@ export const strings = {
     intgMcpOtherDesc:
       '把这段加进它的 MCP 服务器配置（一个 JSON 文件，或设置里的「添加 MCP 服务器」）：',
     intgMcpNote: 'skill 和 MCP 可以同时存在，助手会自己选用；两者做的事完全一样。',
-    intgCliTitle: '高级：命令行 genoffice',
-    intgCliReady: 'genoffice {v} · 已可在终端直接使用（{path}）',
+    intgCliTitle: '高级：命令行 UniWork Office',
+    intgCliReady: 'UniWork Office (genoffice) {v} · 已可在终端直接使用（{path}）',
     intgCliNotOnPath:
-      'genoffice {v} · 尚未加入终端 PATH。助手仍能通过 ~/.genoffice/launcher 找到它，skill 不受影响。若想自己在终端输入 genoffice，运行一次：',
+      'UniWork Office (genoffice) {v} · 尚未加入终端 PATH。助手仍能通过 ~/.genoffice/launcher 找到它，skill 不受影响。若想自己在终端输入 genoffice，运行一次：',
     intgCliLauncher: '启动器目录',
     intgStateOutdated: '已安装 {v}，可更新到 {next}',
     intgStateModified: '已安装 {v}（已被修改）',
@@ -330,7 +330,7 @@ export const strings = {
     setAiTestOk: '连接成功',
     setAiTestFail: '连接失败',
     setAiOpenRouterHub: 'OpenRouter Token Hub',
-    setAiOpenRouterHubHint: '查看当前 key 的剩余额度与用量（GET /api/v1/key）。',
+    setAiOpenRouterHubHint: '查看当前 key 的剩余额度与用量。',
     setAiOpenRouterHubCheck: '查询额度',
     setAiOpenRouterHubChecking: '查询中…',
     setAiOpenRouterHubFail: '无法读取 OpenRouter 额度',
@@ -660,16 +660,16 @@ export const strings = {
     intgExample2: 'Make a 6-slide deck about our Q3 results',
     intgExample3: 'Convert budget.xlsx to PDF and open it in UniWork Office',
     intgStep2Note:
-      'The assistant runs the genoffice command line itself; you never have to type it.',
+      'The assistant runs the UniWork Office (genoffice) command line itself; you never have to type it.',
     intgCliPartTitle: 'CLI · command line + skill',
     intgCliPartDesc:
-      'For assistants that can run terminal commands (Claude Code, Codex, Cursor and others). Once the skill is installed, the assistant calls the genoffice command line itself to create, convert, read and edit files; you never type a command.',
+      'For assistants that can run terminal commands (Claude Code, Codex, Cursor and others). Once the skill is installed, the assistant calls the UniWork Office (genoffice) command line itself to create, convert, read and edit files; you never type a command.',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP is the common protocol AI assistants use to call external tools. Use it when your assistant cannot run commands (Claude Desktop, for example) or when you want it to drive the UniWork Office window directly. Pick either of the two ways below.',
     intgMcpStdioTitle: 'Started by the assistant (recommended)',
     intgMcpStdioDesc:
-      'The assistant launches genoffice mcp itself: nothing to switch on here, and UniWork Office does not need to be open. Same features as the CLI.',
+      'The assistant launches UniWork Office (genoffice mcp) itself: nothing to switch on here, and UniWork Office does not need to be open. Same features as the CLI.',
     intgMcpHttpTitle: 'Local HTTP server',
     intgMcpHttpDesc:
       'Runs inside UniWork Office; the assistant connects to a URL and you can watch it build the document step by step in the Word editor. UniWork Office must stay open; Word documents only for now.',
@@ -682,10 +682,10 @@ export const strings = {
       'Add this to its MCP server settings (a JSON file, or "Add MCP server" in its settings):',
     intgMcpNote:
       'The skill and MCP can be set up side by side; the assistant picks one. They do exactly the same things.',
-    intgCliTitle: 'Advanced: genoffice command line',
-    intgCliReady: 'genoffice {v} · ready in your terminal ({path})',
+    intgCliTitle: 'Advanced: UniWork Office command line',
+    intgCliReady: 'UniWork Office (genoffice) {v} · ready in your terminal ({path})',
     intgCliNotOnPath:
-      "genoffice {v} · not on your terminal's PATH. Assistants still find it through ~/.genoffice/launcher, so the skill works. To type genoffice yourself, run this once:",
+      "UniWork Office (genoffice) {v} · not on your terminal's PATH. Assistants still find it through ~/.genoffice/launcher, so the skill works. To type genoffice yourself, run this once:",
     intgCliLauncher: 'Launcher folder',
     intgStateOutdated: 'Installed {v}, update to {next} available',
     intgStateModified: 'Installed {v} (modified)',
@@ -737,7 +737,7 @@ export const strings = {
     setAiTestOk: 'Connection OK',
     setAiTestFail: 'Connection failed',
     setAiOpenRouterHub: 'OpenRouter Token Hub',
-    setAiOpenRouterHubHint: 'Check remaining limit and usage for this key (GET /api/v1/key).',
+    setAiOpenRouterHubHint: 'Check the remaining limit and usage for this key.',
     setAiOpenRouterHubCheck: 'Check credits',
     setAiOpenRouterHubChecking: 'Checking…',
     setAiOpenRouterHubFail: 'Could not read OpenRouter credits',
@@ -1081,16 +1081,16 @@ export const strings = {
     intgExample2: '第 3 四半期の業績について 6 枚のスライドを作って',
     intgExample3: 'budget.xlsx を PDF に変換して UniWork Office で開いて',
     intgStep2Note:
-      'genoffice コマンドラインはアシスタントが自分で実行します。あなたが入力する必要はありません。',
+      'UniWork Office (genoffice) コマンドラインはアシスタントが自分で実行します。あなたが入力する必要はありません。',
     intgCliPartTitle: 'CLI · コマンドライン + skill',
     intgCliPartDesc:
-      'ターミナルコマンドを実行できるアシスタント（Claude Code、Codex、Cursor など）向け。skill をインストールすると、アシスタントが自分で genoffice コマンドラインを呼び出してファイルを作成・変換・読み取り・編集します。コマンドを入力する必要はありません。',
+      'ターミナルコマンドを実行できるアシスタント（Claude Code、Codex、Cursor など）向け。skill をインストールすると、アシスタントが自分で UniWork Office (genoffice) コマンドラインを呼び出してファイルを作成・変換・読み取り・編集します。コマンドを入力する必要はありません。',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP は AI アシスタントが外部ツールを呼び出すための共通プロトコルです。アシスタントがコマンドを実行できない場合（Claude Desktop など）や、UniWork Office のウィンドウを直接操作させたい場合に使います。下の 2 つの方法からどちらか 1 つを選んでください。',
     intgMcpStdioTitle: 'アシスタントが起動する（推奨）',
     intgMcpStdioDesc:
-      'アシスタントが genoffice mcp を自分で起動します。ここで何かをオンにする必要はなく、UniWork Office を開いておく必要もありません。機能は CLI と同じです。',
+      'アシスタントが UniWork Office (genoffice mcp) を自分で起動します。ここで何かをオンにする必要はなく、UniWork Office を開いておく必要もありません。機能は CLI と同じです。',
     intgMcpHttpTitle: 'ローカル HTTP サーバー',
     intgMcpHttpDesc:
       'UniWork Office 内で動作し、アシスタントは URL で接続します。Word エディター上で文書が段階的に生成される様子を見られます。UniWork Office を開いたままにする必要があり、現時点では Word のみ対応です。',
@@ -1104,10 +1104,10 @@ export const strings = {
       'これを MCP サーバー設定（JSON ファイル、または設定の「MCP サーバーを追加」）に追加します：',
     intgMcpNote:
       'スキルと MCP は併用できます。アシスタントがどちらかを選びます。両者の機能はまったく同じです。',
-    intgCliTitle: '上級：コマンドライン genoffice',
-    intgCliReady: 'genoffice {v} · ターミナルで使えます（{path}）',
+    intgCliTitle: '上級：コマンドライン UniWork Office',
+    intgCliReady: 'UniWork Office (genoffice) {v} · ターミナルで使えます（{path}）',
     intgCliNotOnPath:
-      'genoffice {v} · ターミナルの PATH にありません。アシスタントは ~/.genoffice/launcher 経由で見つけられるため、スキルは動作します。自分で genoffice を入力したい場合は一度だけ次を実行：',
+      'UniWork Office (genoffice) {v} · ターミナルの PATH にありません。アシスタントは ~/.genoffice/launcher 経由で見つけられるため、スキルは動作します。自分で genoffice を入力したい場合は一度だけ次を実行：',
     intgCliLauncher: 'ランチャーフォルダー',
     intgStateOutdated: 'インストール済み {v}、{next} に更新できます',
     intgStateModified: 'インストール済み {v}（変更されています）',
@@ -1160,11 +1160,11 @@ export const strings = {
     setAiTestOk: '接続に成功しました',
     setAiTestFail: '接続に失敗しました',
     setAiOpenRouterHub: 'OpenRouter Token Hub',
-    setAiOpenRouterHubHint: 'Check remaining limit and usage for this key (GET /api/v1/key).',
-    setAiOpenRouterHubCheck: 'Check credits',
-    setAiOpenRouterHubChecking: 'Checking…',
-    setAiOpenRouterHubFail: 'Could not read OpenRouter credits',
-    setAiOpenRouterCredits: 'Top up / manage',
+    setAiOpenRouterHubHint: 'このキーの残り上限と使用量を確認します。',
+    setAiOpenRouterHubCheck: 'クレジットを確認',
+    setAiOpenRouterHubChecking: '確認中…',
+    setAiOpenRouterHubFail: 'OpenRouter のクレジットを読み取れませんでした',
+    setAiOpenRouterCredits: 'チャージ / 管理',
     setAiMaxTokens: '1 回あたりの出力トークン上限',
     setAiMaxTokensDesc:
       '1 ターンの出力予算です。推論モデルは思考にも消費するため、使い切ると返信が空になることがあります。その場合は値を大きくしてください。',
@@ -1500,16 +1500,16 @@ export const strings = {
     intgExample2: '3분기 실적을 소개하는 6장짜리 슬라이드를 만들어 줘',
     intgExample3: 'budget.xlsx를 PDF로 변환해서 UniWork Office에서 열어 줘',
     intgStep2Note:
-      'genoffice 명령줄은 어시스턴트가 직접 실행하므로 여러분이 입력할 필요가 없습니다.',
+      'UniWork Office (genoffice) 명령줄은 어시스턴트가 직접 실행하므로 여러분이 입력할 필요가 없습니다.',
     intgCliPartTitle: 'CLI · 명령줄 + skill',
     intgCliPartDesc:
-      '터미널 명령을 실행할 수 있는 어시스턴트(Claude Code, Codex, Cursor 등)용입니다. skill을 설치하면 어시스턴트가 스스로 genoffice 명령줄을 호출해 파일을 만들고 변환하고 읽고 편집합니다. 명령을 직접 입력할 필요가 없습니다.',
+      '터미널 명령을 실행할 수 있는 어시스턴트(Claude Code, Codex, Cursor 등)용입니다. skill을 설치하면 어시스턴트가 스스로 UniWork Office (genoffice) 명령줄을 호출해 파일을 만들고 변환하고 읽고 편집합니다. 명령을 직접 입력할 필요가 없습니다.',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP는 AI 어시스턴트가 외부 도구를 호출하는 공통 프로토콜입니다. 어시스턴트가 명령을 실행할 수 없거나(예: Claude Desktop) UniWork Office 창을 직접 조작하게 하려면 이 방식을 사용하세요. 아래 두 방법 중 하나를 선택하면 됩니다.',
     intgMcpStdioTitle: '어시스턴트가 실행(권장)',
     intgMcpStdioDesc:
-      '어시스턴트가 genoffice mcp를 직접 실행합니다. 여기서 켤 것이 없고 UniWork Office가 열려 있을 필요도 없습니다. 기능은 CLI와 같습니다.',
+      '어시스턴트가 UniWork Office (genoffice mcp)를 직접 실행합니다. 여기서 켤 것이 없고 UniWork Office가 열려 있을 필요도 없습니다. 기능은 CLI와 같습니다.',
     intgMcpHttpTitle: '로컬 HTTP 서버',
     intgMcpHttpDesc:
       'UniWork Office 안에서 실행되며 어시스턴트가 URL로 연결합니다. Word 편집기에서 문서가 단계별로 만들어지는 과정을 볼 수 있습니다. UniWork Office를 열어 두어야 하며 현재는 Word만 지원합니다.',
@@ -1523,10 +1523,10 @@ export const strings = {
       '이 내용을 해당 어시스턴트의 MCP 서버 설정(JSON 파일 또는 설정의 "MCP 서버 추가")에 추가하세요:',
     intgMcpNote:
       '스킬과 MCP는 함께 설정할 수 있으며 어시스턴트가 하나를 선택합니다. 두 방식이 하는 일은 완전히 같습니다.',
-    intgCliTitle: '고급: 명령줄 genoffice',
-    intgCliReady: 'genoffice {v} · 터미널에서 바로 사용 가능({path})',
+    intgCliTitle: '고급: 명령줄 UniWork Office',
+    intgCliReady: 'UniWork Office (genoffice) {v} · 터미널에서 바로 사용 가능({path})',
     intgCliNotOnPath:
-      'genoffice {v} · 터미널 PATH에 없습니다. 어시스턴트는 ~/.genoffice/launcher로 찾을 수 있어 스킬은 정상 작동합니다. 직접 genoffice를 입력하려면 한 번만 실행:',
+      'UniWork Office (genoffice) {v} · 터미널 PATH에 없습니다. 어시스턴트는 ~/.genoffice/launcher로 찾을 수 있어 스킬은 정상 작동합니다. 직접 genoffice를 입력하려면 한 번만 실행:',
     intgCliLauncher: '런처 폴더',
     intgStateOutdated: '설치됨 {v}, {next}(으)로 업데이트 가능',
     intgStateModified: '설치됨 {v} (수정됨)',
@@ -1577,11 +1577,11 @@ export const strings = {
     setAiTestOk: '연결 성공',
     setAiTestFail: '연결 실패',
     setAiOpenRouterHub: 'OpenRouter Token Hub',
-    setAiOpenRouterHubHint: 'Check remaining limit and usage for this key (GET /api/v1/key).',
-    setAiOpenRouterHubCheck: 'Check credits',
-    setAiOpenRouterHubChecking: 'Checking…',
-    setAiOpenRouterHubFail: 'Could not read OpenRouter credits',
-    setAiOpenRouterCredits: 'Top up / manage',
+    setAiOpenRouterHubHint: '이 키의 남은 한도와 사용량을 확인합니다.',
+    setAiOpenRouterHubCheck: '크레딧 확인',
+    setAiOpenRouterHubChecking: '확인 중…',
+    setAiOpenRouterHubFail: 'OpenRouter 크레딧을 읽지 못했습니다',
+    setAiOpenRouterCredits: '충전 / 관리',
     setAiMaxTokens: '턴당 출력 토큰 상한',
     setAiMaxTokensDesc:
       '한 턴의 출력 예산입니다. 추론 모델은 생각하는 데 소모하므로 예산이 떨어지면 응답이 비어 올 수 있습니다. 그럴 때 값을 키우세요.',
@@ -1927,16 +1927,16 @@ export const strings = {
     intgExample2: 'Prépare une présentation de 6 diapositives sur nos résultats du T3',
     intgExample3: 'Convertis budget.xlsx en PDF et ouvre-le dans UniWork Office',
     intgStep2Note:
-      "L'assistant lance lui-même la ligne de commande genoffice ; vous n'avez jamais à la saisir.",
+      "L'assistant lance lui-même la ligne de commande UniWork Office (genoffice) ; vous n'avez jamais à la saisir.",
     intgCliPartTitle: 'CLI · ligne de commande + skill',
     intgCliPartDesc:
-      'Pour les assistants capables de lancer des commandes dans le terminal (Claude Code, Codex, Cursor, etc.). Une fois le skill installé, l’assistant appelle lui-même la ligne de commande genoffice pour créer, convertir, lire et modifier les fichiers ; vous ne tapez jamais de commande.',
+      'Pour les assistants capables de lancer des commandes dans le terminal (Claude Code, Codex, Cursor, etc.). Une fois le skill installé, l’assistant appelle lui-même la ligne de commande UniWork Office (genoffice) pour créer, convertir, lire et modifier les fichiers ; vous ne tapez jamais de commande.',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP est le protocole commun que les assistants IA utilisent pour appeler des outils externes. Utilisez-le si votre assistant ne peut pas lancer de commandes (Claude Desktop, par exemple) ou si vous voulez qu’il pilote directement la fenêtre UniWork Office. Choisissez l’une des deux méthodes ci-dessous.',
     intgMcpStdioTitle: 'Lancé par l’assistant (recommandé)',
     intgMcpStdioDesc:
-      'L’assistant lance lui-même genoffice mcp : rien à activer ici, et UniWork Office n’a pas besoin d’être ouvert. Mêmes fonctions que la CLI.',
+      'L’assistant lance lui-même UniWork Office (genoffice mcp) : rien à activer ici, et UniWork Office n’a pas besoin d’être ouvert. Mêmes fonctions que la CLI.',
     intgMcpHttpTitle: 'Serveur HTTP local',
     intgMcpHttpDesc:
       'Tourne dans UniWork Office ; l’assistant se connecte à une URL et vous voyez le document se construire pas à pas dans l’éditeur Word. UniWork Office doit rester ouvert ; documents Word uniquement pour l’instant.',
@@ -1950,10 +1950,10 @@ export const strings = {
       'Ajoutez ceci à sa configuration de serveurs MCP (un fichier JSON, ou « Ajouter un serveur MCP » dans ses réglages) :',
     intgMcpNote:
       "Le skill et MCP peuvent coexister ; l'assistant choisit l'un des deux. Ils font exactement la même chose.",
-    intgCliTitle: 'Avancé : ligne de commande genoffice',
-    intgCliReady: 'genoffice {v} · prêt dans votre terminal ({path})',
+    intgCliTitle: 'Avancé : ligne de commande UniWork Office',
+    intgCliReady: 'UniWork Office (genoffice) {v} · prêt dans votre terminal ({path})',
     intgCliNotOnPath:
-      'genoffice {v} · absent du PATH de votre terminal. Les assistants le trouvent quand même via ~/.genoffice/launcher, le skill fonctionne donc. Pour taper genoffice vous-même, exécutez ceci une fois :',
+      'UniWork Office (genoffice) {v} · absent du PATH de votre terminal. Les assistants le trouvent quand même via ~/.genoffice/launcher, le skill fonctionne donc. Pour taper genoffice vous-même, exécutez ceci une fois :',
     intgCliLauncher: 'Dossier du lanceur',
     intgStateOutdated: 'Installé {v}, mise à jour {next} disponible',
     intgStateModified: 'Installé {v} (modifié)',
@@ -2007,11 +2007,11 @@ export const strings = {
     setAiTestOk: 'Connexion réussie',
     setAiTestFail: 'Échec de la connexion',
     setAiOpenRouterHub: 'OpenRouter Token Hub',
-    setAiOpenRouterHubHint: 'Check remaining limit and usage for this key (GET /api/v1/key).',
-    setAiOpenRouterHubCheck: 'Check credits',
-    setAiOpenRouterHubChecking: 'Checking…',
-    setAiOpenRouterHubFail: 'Could not read OpenRouter credits',
-    setAiOpenRouterCredits: 'Top up / manage',
+    setAiOpenRouterHubHint: 'Vérifiez la limite restante et l’utilisation de cette clé.',
+    setAiOpenRouterHubCheck: 'Vérifier les crédits',
+    setAiOpenRouterHubChecking: 'Vérification…',
+    setAiOpenRouterHubFail: 'Impossible de lire les crédits OpenRouter',
+    setAiOpenRouterCredits: 'Recharger / gérer',
     setAiMaxTokens: 'Jetons de sortie max.',
     setAiMaxTokensDesc:
       'Budget de sortie pour un tour. Les modèles à raisonnement le dépensent en réflexion ; quand il est épuisé, la réponse arrive vide : augmentez cette valeur.',
@@ -2365,16 +2365,16 @@ export const strings = {
     intgExample2: 'Erstelle eine Präsentation mit 6 Folien zu unseren Q3-Ergebnissen',
     intgExample3: 'Wandle budget.xlsx in PDF um und öffne es in UniWork Office',
     intgStep2Note:
-      'Der Assistent ruft die genoffice-Befehlszeile selbst auf; Sie müssen sie nie eintippen.',
+      'Der Assistent ruft die UniWork Office-Befehlszeile selbst auf; Sie müssen sie nie eintippen.',
     intgCliPartTitle: 'CLI · Kommandozeile + Skill',
     intgCliPartDesc:
-      'Für Assistenten, die Terminalbefehle ausführen können (Claude Code, Codex, Cursor u. a.). Nach der Installation des Skills ruft der Assistent die genoffice-Kommandozeile selbst auf, um Dateien zu erstellen, zu konvertieren, zu lesen und zu bearbeiten; Sie tippen nie einen Befehl.',
+      'Für Assistenten, die Terminalbefehle ausführen können (Claude Code, Codex, Cursor u. a.). Nach der Installation des Skills ruft der Assistent die UniWork Office-Kommandozeile selbst auf, um Dateien zu erstellen, zu konvertieren, zu lesen und zu bearbeiten; Sie tippen nie einen Befehl.',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP ist das gemeinsame Protokoll, über das KI-Assistenten externe Werkzeuge aufrufen. Nutzen Sie es, wenn der Assistent keine Befehle ausführen kann (z. B. Claude Desktop) oder wenn er das UniWork Office-Fenster direkt steuern soll. Wählen Sie einen der beiden Wege unten.',
     intgMcpStdioTitle: 'Vom Assistenten gestartet (empfohlen)',
     intgMcpStdioDesc:
-      'Der Assistent startet genoffice mcp selbst: hier ist nichts einzuschalten, und UniWork Office muss nicht geöffnet sein. Gleicher Funktionsumfang wie die CLI.',
+      'Der Assistent startet UniWork Office (genoffice mcp) selbst: hier ist nichts einzuschalten, und UniWork Office muss nicht geöffnet sein. Gleicher Funktionsumfang wie die CLI.',
     intgMcpHttpTitle: 'Lokaler HTTP-Server',
     intgMcpHttpDesc:
       'Läuft in UniWork Office; der Assistent verbindet sich über eine URL, und Sie sehen im Word-Editor zu, wie das Dokument Schritt für Schritt entsteht. UniWork Office muss geöffnet bleiben; derzeit nur Word-Dokumente.',
@@ -2387,10 +2387,10 @@ export const strings = {
       'Fügen Sie dies in seine MCP-Server-Konfiguration ein (eine JSON-Datei oder „MCP-Server hinzufügen“ in den Einstellungen):',
     intgMcpNote:
       'Skill und MCP können nebeneinander eingerichtet sein; der Assistent wählt eines. Beide tun genau dasselbe.',
-    intgCliTitle: 'Erweitert: Befehlszeile genoffice',
-    intgCliReady: 'genoffice {v} · im Terminal verfügbar ({path})',
+    intgCliTitle: 'Erweitert: Befehlszeile UniWork Office',
+    intgCliReady: 'UniWork Office (genoffice) {v} · im Terminal verfügbar ({path})',
     intgCliNotOnPath:
-      'genoffice {v} · nicht im PATH Ihres Terminals. Assistenten finden es trotzdem über ~/.genoffice/launcher, der Skill funktioniert also. Um genoffice selbst einzugeben, führen Sie dies einmal aus:',
+      'UniWork Office (genoffice) {v} · nicht im PATH Ihres Terminals. Assistenten finden es trotzdem über ~/.genoffice/launcher, der Skill funktioniert also. Um genoffice selbst einzugeben, führen Sie dies einmal aus:',
     intgCliLauncher: 'Launcher-Ordner',
     intgStateOutdated: 'Installiert {v}, Update auf {next} verfügbar',
     intgStateModified: 'Installiert {v} (geändert)',
@@ -2444,11 +2444,11 @@ export const strings = {
     setAiTestOk: 'Verbindung erfolgreich',
     setAiTestFail: 'Verbindung fehlgeschlagen',
     setAiOpenRouterHub: 'OpenRouter Token Hub',
-    setAiOpenRouterHubHint: 'Check remaining limit and usage for this key (GET /api/v1/key).',
-    setAiOpenRouterHubCheck: 'Check credits',
-    setAiOpenRouterHubChecking: 'Checking…',
-    setAiOpenRouterHubFail: 'Could not read OpenRouter credits',
-    setAiOpenRouterCredits: 'Top up / manage',
+    setAiOpenRouterHubHint: 'Verbleibendes Limit und Nutzung dieses Schlüssels prüfen.',
+    setAiOpenRouterHubCheck: 'Guthaben prüfen',
+    setAiOpenRouterHubChecking: 'Wird geprüft…',
+    setAiOpenRouterHubFail: 'OpenRouter-Guthaben konnte nicht gelesen werden',
+    setAiOpenRouterCredits: 'Aufladen / verwalten',
     setAiMaxTokens: 'Max. Ausgabe-Tokens',
     setAiMaxTokensDesc:
       'Ausgabe-Budget pro Durchlauf. Denk-Modelle verbrauchen es beim Reasoning; ist es erschöpft, kommt eine leere Antwort zurück — dann diesen Wert erhöhen.',
@@ -2797,16 +2797,16 @@ export const strings = {
     intgExample2: 'Haz una presentación de 6 diapositivas sobre nuestros resultados del T3',
     intgExample3: 'Convierte budget.xlsx a PDF y ábrelo en UniWork Office',
     intgStep2Note:
-      'El asistente ejecuta la línea de comandos genoffice por sí mismo; nunca tienes que escribirla.',
+      'El asistente ejecuta la línea de comandos UniWork Office (genoffice) por sí mismo; nunca tienes que escribirla.',
     intgCliPartTitle: 'CLI · línea de comandos + skill',
     intgCliPartDesc:
-      'Para asistentes que pueden ejecutar comandos de terminal (Claude Code, Codex, Cursor y otros). Con el skill instalado, el asistente llama por sí mismo a la línea de comandos genoffice para crear, convertir, leer y editar archivos; nunca escribes un comando.',
+      'Para asistentes que pueden ejecutar comandos de terminal (Claude Code, Codex, Cursor y otros). Con el skill instalado, el asistente llama por sí mismo a la línea de comandos UniWork Office (genoffice) para crear, convertir, leer y editar archivos; nunca escribes un comando.',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP es el protocolo común con el que los asistentes de IA llaman a herramientas externas. Úsalo cuando tu asistente no pueda ejecutar comandos (Claude Desktop, por ejemplo) o cuando quieras que controle directamente la ventana de UniWork Office. Elige una de las dos formas de abajo.',
     intgMcpStdioTitle: 'Iniciado por el asistente (recomendado)',
     intgMcpStdioDesc:
-      'El asistente lanza genoffice mcp por sí mismo: nada que activar aquí, y UniWork Office no necesita estar abierto. Mismas funciones que la CLI.',
+      'El asistente lanza UniWork Office (genoffice mcp) por sí mismo: nada que activar aquí, y UniWork Office no necesita estar abierto. Mismas funciones que la CLI.',
     intgMcpHttpTitle: 'Servidor HTTP local',
     intgMcpHttpDesc:
       'Se ejecuta dentro de UniWork Office; el asistente se conecta a una URL y puedes ver cómo construye el documento paso a paso en el editor de Word. UniWork Office debe permanecer abierto; por ahora solo documentos Word.',
@@ -2820,10 +2820,10 @@ export const strings = {
       'Añade esto a su configuración de servidores MCP (un archivo JSON, o «Añadir servidor MCP» en sus ajustes):',
     intgMcpNote:
       'El skill y MCP pueden convivir; el asistente elige uno. Ambos hacen exactamente lo mismo.',
-    intgCliTitle: 'Avanzado: línea de comandos genoffice',
-    intgCliReady: 'genoffice {v} · listo en tu terminal ({path})',
+    intgCliTitle: 'Avanzado: línea de comandos UniWork Office',
+    intgCliReady: 'UniWork Office (genoffice) {v} · listo en tu terminal ({path})',
     intgCliNotOnPath:
-      'genoffice {v} · no está en el PATH de tu terminal. Los asistentes lo encuentran igualmente mediante ~/.genoffice/launcher, así que el skill funciona. Para escribir genoffice tú mismo, ejecuta esto una vez:',
+      'UniWork Office (genoffice) {v} · no está en el PATH de tu terminal. Los asistentes lo encuentran igualmente mediante ~/.genoffice/launcher, así que el skill funciona. Para escribir genoffice tú mismo, ejecuta esto una vez:',
     intgCliLauncher: 'Carpeta del lanzador',
     intgStateOutdated: 'Instalado {v}, actualización a {next} disponible',
     intgStateModified: 'Instalado {v} (modificado)',
@@ -2877,11 +2877,11 @@ export const strings = {
     setAiTestOk: 'Conexión correcta',
     setAiTestFail: 'Error de conexión',
     setAiOpenRouterHub: 'OpenRouter Token Hub',
-    setAiOpenRouterHubHint: 'Check remaining limit and usage for this key (GET /api/v1/key).',
-    setAiOpenRouterHubCheck: 'Check credits',
-    setAiOpenRouterHubChecking: 'Checking…',
-    setAiOpenRouterHubFail: 'Could not read OpenRouter credits',
-    setAiOpenRouterCredits: 'Top up / manage',
+    setAiOpenRouterHubHint: 'Consulta el límite restante y el uso de esta clave.',
+    setAiOpenRouterHubCheck: 'Consultar créditos',
+    setAiOpenRouterHubChecking: 'Consultando…',
+    setAiOpenRouterHubFail: 'No se pudieron leer los créditos de OpenRouter',
+    setAiOpenRouterCredits: 'Recargar / administrar',
     setAiMaxTokens: 'Tokens de salida máx.',
     setAiMaxTokensDesc:
       'Presupuesto de salida por turno. Los modelos de razonamiento lo gastan en pensar; si se agota, la respuesta llega vacía: suba este valor.',
@@ -3216,16 +3216,16 @@ export const strings = {
     intgExample1: 'แปลง ~/Downloads/report.md เป็นเอกสาร Word',
     intgExample2: 'ทำสไลด์ 6 หน้าเกี่ยวกับผลประกอบการไตรมาส 3 ของเรา',
     intgExample3: 'แปลง budget.xlsx เป็น PDF แล้วเปิดใน UniWork Office',
-    intgStep2Note: 'ผู้ช่วยจะเรียกใช้บรรทัดคำสั่ง genoffice เอง คุณไม่ต้องพิมพ์คำสั่งใด ๆ',
+    intgStep2Note: 'ผู้ช่วยจะเรียกใช้บรรทัดคำสั่ง UniWork Office (genoffice) เอง คุณไม่ต้องพิมพ์คำสั่งใด ๆ',
     intgCliPartTitle: 'CLI · บรรทัดคำสั่ง + skill',
     intgCliPartDesc:
-      'สำหรับผู้ช่วยที่รันคำสั่งเทอร์มินัลได้ (Claude Code, Codex, Cursor และอื่น ๆ) เมื่อติดตั้ง skill แล้ว ผู้ช่วยจะเรียกบรรทัดคำสั่ง genoffice เองเพื่อสร้าง แปลง อ่าน และแก้ไขไฟล์ คุณไม่ต้องพิมพ์คำสั่งใด ๆ',
+      'สำหรับผู้ช่วยที่รันคำสั่งเทอร์มินัลได้ (Claude Code, Codex, Cursor และอื่น ๆ) เมื่อติดตั้ง skill แล้ว ผู้ช่วยจะเรียกบรรทัดคำสั่ง UniWork Office (genoffice) เองเพื่อสร้าง แปลง อ่าน และแก้ไขไฟล์ คุณไม่ต้องพิมพ์คำสั่งใด ๆ',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP คือโปรโตคอลกลางที่ผู้ช่วย AI ใช้เรียกเครื่องมือภายนอก ใช้เมื่อผู้ช่วยรันคำสั่งไม่ได้ (เช่น Claude Desktop) หรือเมื่อต้องการให้มันควบคุมหน้าต่าง UniWork Office โดยตรง เลือกวิธีใดวิธีหนึ่งจากสองวิธีด้านล่าง',
     intgMcpStdioTitle: 'ให้ผู้ช่วยเป็นผู้เริ่ม (แนะนำ)',
     intgMcpStdioDesc:
-      'ผู้ช่วยจะเรียก genoffice mcp ขึ้นมาเอง ไม่ต้องเปิดสวิตช์ใดที่นี่ และไม่ต้องเปิด UniWork Office ไว้ ความสามารถเหมือน CLI ทุกประการ',
+      'ผู้ช่วยจะเรียก UniWork Office (genoffice mcp) ขึ้นมาเอง ไม่ต้องเปิดสวิตช์ใดที่นี่ และไม่ต้องเปิด UniWork Office ไว้ ความสามารถเหมือน CLI ทุกประการ',
     intgMcpHttpTitle: 'เซิร์ฟเวอร์ HTTP ในเครื่อง',
     intgMcpHttpDesc:
       'ทำงานอยู่ใน UniWork Office ผู้ช่วยเชื่อมต่อผ่าน URL และคุณจะเห็นเอกสารค่อย ๆ ถูกสร้างขึ้นในตัวแก้ไข Word ต้องเปิด UniWork Office ไว้ตลอด ปัจจุบันรองรับเฉพาะ Word',
@@ -3238,10 +3238,10 @@ export const strings = {
       'เพิ่มส่วนนี้ลงในการตั้งค่าเซิร์ฟเวอร์ MCP ของผู้ช่วย (ไฟล์ JSON หรือ "เพิ่มเซิร์ฟเวอร์ MCP" ในการตั้งค่า):',
     intgMcpNote:
       'สกิลและ MCP ตั้งค่าไว้พร้อมกันได้ ผู้ช่วยจะเลือกใช้เอง ทั้งสองทำงานเหมือนกันทุกอย่าง',
-    intgCliTitle: 'ขั้นสูง: บรรทัดคำสั่ง genoffice',
-    intgCliReady: 'genoffice {v} · พร้อมใช้ในเทอร์มินัล ({path})',
+    intgCliTitle: 'ขั้นสูง: บรรทัดคำสั่ง UniWork Office',
+    intgCliReady: 'UniWork Office (genoffice) {v} · พร้อมใช้ในเทอร์มินัล ({path})',
     intgCliNotOnPath:
-      'genoffice {v} · ยังไม่อยู่ใน PATH ของเทอร์มินัล ผู้ช่วยยังหาเจอผ่าน ~/.genoffice/launcher สกิลจึงใช้งานได้ตามปกติ หากต้องการพิมพ์ genoffice เอง ให้รันคำสั่งนี้ครั้งเดียว:',
+      'UniWork Office (genoffice) {v} · ยังไม่อยู่ใน PATH ของเทอร์มินัล ผู้ช่วยยังหาเจอผ่าน ~/.genoffice/launcher สกิลจึงใช้งานได้ตามปกติ หากต้องการพิมพ์ genoffice เอง ให้รันคำสั่งนี้ครั้งเดียว:',
     intgCliLauncher: 'โฟลเดอร์ตัวเรียกใช้',
     intgStateOutdated: 'ติดตั้งแล้ว {v} อัปเดตเป็น {next} ได้',
     intgStateModified: 'ติดตั้งแล้ว {v} (ถูกแก้ไข)',
@@ -3291,11 +3291,11 @@ export const strings = {
     setAiTestOk: 'เชื่อมต่อสำเร็จ',
     setAiTestFail: 'การเชื่อมต่อล้มเหลว',
     setAiOpenRouterHub: 'OpenRouter Token Hub',
-    setAiOpenRouterHubHint: 'Check remaining limit and usage for this key (GET /api/v1/key).',
-    setAiOpenRouterHubCheck: 'Check credits',
-    setAiOpenRouterHubChecking: 'Checking…',
-    setAiOpenRouterHubFail: 'Could not read OpenRouter credits',
-    setAiOpenRouterCredits: 'Top up / manage',
+    setAiOpenRouterHubHint: 'ตรวจสอบวงเงินคงเหลือและการใช้งานของคีย์นี้',
+    setAiOpenRouterHubCheck: 'ตรวจสอบเครดิต',
+    setAiOpenRouterHubChecking: 'กำลังตรวจสอบ…',
+    setAiOpenRouterHubFail: 'อ่านเครดิต OpenRouter ไม่ได้',
+    setAiOpenRouterCredits: 'เติมเงิน / จัดการ',
     setAiMaxTokens: 'จำนวนโทเคนขาออกสูงสุด',
     setAiMaxTokensDesc:
       'งบผลลัพธ์ต่อหนึ่งรอบ โมเดลแบบใช้เหตุผลจะใช้ส่วนหนึ่งไปกับการคิด หากงบหมด คำตอบอาจกลับมาว่างเปล่า ให้เพิ่มค่านี้',
@@ -3637,16 +3637,16 @@ export const strings = {
     intgExample2: 'Buat presentasi 6 slide tentang hasil Q3 kami',
     intgExample3: 'Konversi budget.xlsx ke PDF dan buka di UniWork Office',
     intgStep2Note:
-      'Asisten menjalankan baris perintah genoffice sendiri; Anda tidak perlu mengetiknya.',
+      'Asisten menjalankan baris perintah UniWork Office (genoffice) sendiri; Anda tidak perlu mengetiknya.',
     intgCliPartTitle: 'CLI · baris perintah + skill',
     intgCliPartDesc:
-      'Untuk asisten yang bisa menjalankan perintah terminal (Claude Code, Codex, Cursor, dan lainnya). Setelah skill terpasang, asisten memanggil baris perintah genoffice sendiri untuk membuat, mengonversi, membaca, dan mengedit file; Anda tidak pernah mengetik perintah.',
+      'Untuk asisten yang bisa menjalankan perintah terminal (Claude Code, Codex, Cursor, dan lainnya). Setelah skill terpasang, asisten memanggil baris perintah UniWork Office (genoffice) sendiri untuk membuat, mengonversi, membaca, dan mengedit file; Anda tidak pernah mengetik perintah.',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP adalah protokol umum yang dipakai asisten AI untuk memanggil alat eksternal. Gunakan saat asisten Anda tidak bisa menjalankan perintah (misalnya Claude Desktop) atau saat Anda ingin ia mengendalikan jendela UniWork Office secara langsung. Pilih salah satu dari dua cara di bawah.',
     intgMcpStdioTitle: 'Dijalankan oleh asisten (disarankan)',
     intgMcpStdioDesc:
-      'Asisten menjalankan genoffice mcp sendiri: tidak ada yang perlu dinyalakan di sini, dan UniWork Office tidak perlu terbuka. Fitur sama dengan CLI.',
+      'Asisten menjalankan UniWork Office (genoffice mcp) sendiri: tidak ada yang perlu dinyalakan di sini, dan UniWork Office tidak perlu terbuka. Fitur sama dengan CLI.',
     intgMcpHttpTitle: 'Server HTTP lokal',
     intgMcpHttpDesc:
       'Berjalan di dalam UniWork Office; asisten terhubung lewat URL dan Anda bisa melihat dokumen dibangun langkah demi langkah di editor Word. UniWork Office harus tetap terbuka; untuk saat ini hanya dokumen Word.',
@@ -3660,10 +3660,10 @@ export const strings = {
       'Tambahkan ini ke pengaturan server MCP miliknya (berkas JSON, atau "Tambah server MCP" di pengaturannya):',
     intgMcpNote:
       'Skill dan MCP bisa dipasang bersamaan; asisten akan memilih salah satu. Keduanya melakukan hal yang sama persis.',
-    intgCliTitle: 'Lanjutan: baris perintah genoffice',
-    intgCliReady: 'genoffice {v} · siap di terminal Anda ({path})',
+    intgCliTitle: 'Lanjutan: baris perintah UniWork Office',
+    intgCliReady: 'UniWork Office (genoffice) {v} · siap di terminal Anda ({path})',
     intgCliNotOnPath:
-      'genoffice {v} · belum ada di PATH terminal Anda. Asisten tetap menemukannya lewat ~/.genoffice/launcher, jadi skill tetap berfungsi. Untuk mengetik genoffice sendiri, jalankan ini sekali:',
+      'UniWork Office (genoffice) {v} · belum ada di PATH terminal Anda. Asisten tetap menemukannya lewat ~/.genoffice/launcher, jadi skill tetap berfungsi. Untuk mengetik genoffice sendiri, jalankan ini sekali:',
     intgCliLauncher: 'Folder peluncur',
     intgStateOutdated: 'Terpasang {v}, pembaruan ke {next} tersedia',
     intgStateModified: 'Terpasang {v} (dimodifikasi)',
@@ -3715,11 +3715,11 @@ export const strings = {
     setAiTestOk: 'Koneksi berhasil',
     setAiTestFail: 'Koneksi gagal',
     setAiOpenRouterHub: 'OpenRouter Token Hub',
-    setAiOpenRouterHubHint: 'Check remaining limit and usage for this key (GET /api/v1/key).',
-    setAiOpenRouterHubCheck: 'Check credits',
-    setAiOpenRouterHubChecking: 'Checking…',
-    setAiOpenRouterHubFail: 'Could not read OpenRouter credits',
-    setAiOpenRouterCredits: 'Top up / manage',
+    setAiOpenRouterHubHint: 'Periksa sisa batas dan penggunaan kunci ini.',
+    setAiOpenRouterHubCheck: 'Periksa kredit',
+    setAiOpenRouterHubChecking: 'Memeriksa…',
+    setAiOpenRouterHubFail: 'Tidak dapat membaca kredit OpenRouter',
+    setAiOpenRouterCredits: 'Isi ulang / kelola',
     setAiMaxTokens: 'Token keluaran maks.',
     setAiMaxTokensDesc:
       'Anggaran keluaran untuk satu giliran. Model penalaran memakainya untuk berpikir; jika habis, balasan datang kosong — naikkan nilai ini.',
@@ -4059,16 +4059,16 @@ export const strings = {
     intgExample2: 'Сделай презентацию из 6 слайдов о наших результатах за 3-й квартал',
     intgExample3: 'Конвертируй budget.xlsx в PDF и открой в UniWork Office',
     intgStep2Note:
-      'Ассистент сам запускает командную строку genoffice; вводить её вам не придётся.',
+      'Ассистент сам запускает командную строку UniWork Office (genoffice); вводить её вам не придётся.',
     intgCliPartTitle: 'CLI · командная строка + skill',
     intgCliPartDesc:
-      'Для ассистентов, умеющих выполнять команды терминала (Claude Code, Codex, Cursor и другие). После установки skill ассистент сам вызывает командную строку genoffice, чтобы создавать, конвертировать, читать и редактировать файлы; вам не нужно вводить команды.',
+      'Для ассистентов, умеющих выполнять команды терминала (Claude Code, Codex, Cursor и другие). После установки skill ассистент сам вызывает командную строку UniWork Office (genoffice), чтобы создавать, конвертировать, читать и редактировать файлы; вам не нужно вводить команды.',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP — общий протокол, через который ИИ-ассистенты вызывают внешние инструменты. Используйте его, если ассистент не умеет выполнять команды (например, Claude Desktop) или если хотите, чтобы он напрямую управлял окном UniWork Office. Выберите один из двух способов ниже.',
     intgMcpStdioTitle: 'Запускает ассистент (рекомендуется)',
     intgMcpStdioDesc:
-      'Ассистент сам запускает genoffice mcp: здесь ничего включать не нужно, и UniWork Office не обязан быть открыт. Те же возможности, что у CLI.',
+      'Ассистент сам запускает UniWork Office (genoffice mcp): здесь ничего включать не нужно, и UniWork Office не обязан быть открыт. Те же возможности, что у CLI.',
     intgMcpHttpTitle: 'Локальный HTTP-сервер',
     intgMcpHttpDesc:
       'Работает внутри UniWork Office; ассистент подключается по URL, и вы видите, как документ шаг за шагом собирается в редакторе Word. UniWork Office должен оставаться открытым; пока только документы Word.',
@@ -4082,10 +4082,10 @@ export const strings = {
       'Добавьте это в его настройки MCP-серверов (JSON-файл или «Добавить MCP-сервер» в настройках):',
     intgMcpNote:
       'Скилл и MCP могут быть настроены одновременно; ассистент выберет один из них. Они делают одно и то же.',
-    intgCliTitle: 'Дополнительно: командная строка genoffice',
-    intgCliReady: 'genoffice {v} · доступен в терминале ({path})',
+    intgCliTitle: 'Дополнительно: командная строка UniWork Office',
+    intgCliReady: 'UniWork Office (genoffice) {v} · доступен в терминале ({path})',
     intgCliNotOnPath:
-      'genoffice {v} · отсутствует в PATH терминала. Ассистенты всё равно находят его через ~/.genoffice/launcher, так что скилл работает. Чтобы вводить genoffice самостоятельно, выполните один раз:',
+      'UniWork Office (genoffice) {v} · отсутствует в PATH терминала. Ассистенты всё равно находят его через ~/.genoffice/launcher, так что скилл работает. Чтобы вводить genoffice самостоятельно, выполните один раз:',
     intgCliLauncher: 'Папка лаунчера',
     intgStateOutdated: 'Установлен {v}, доступно обновление до {next}',
     intgStateModified: 'Установлен {v} (изменён)',
@@ -4139,11 +4139,11 @@ export const strings = {
     setAiTestOk: 'Подключение успешно',
     setAiTestFail: 'Ошибка подключения',
     setAiOpenRouterHub: 'OpenRouter Token Hub',
-    setAiOpenRouterHubHint: 'Check remaining limit and usage for this key (GET /api/v1/key).',
-    setAiOpenRouterHubCheck: 'Check credits',
-    setAiOpenRouterHubChecking: 'Checking…',
-    setAiOpenRouterHubFail: 'Could not read OpenRouter credits',
-    setAiOpenRouterCredits: 'Top up / manage',
+    setAiOpenRouterHubHint: 'Проверьте остаток лимита и использование этого ключа.',
+    setAiOpenRouterHubCheck: 'Проверить кредиты',
+    setAiOpenRouterHubChecking: 'Проверка…',
+    setAiOpenRouterHubFail: 'Не удалось получить кредиты OpenRouter',
+    setAiOpenRouterCredits: 'Пополнить / управлять',
     setAiMaxTokens: 'Макс. токенов на ответ',
     setAiMaxTokensDesc:
       'Бюджет вывода за один ход. Модели рассуждений тратят его на размышления: если бюджет иссякнет, ответ придёт пустым — увеличьте значение.',
@@ -4481,16 +4481,16 @@ export const strings = {
     intgExample1: 'حوّل ~/Downloads/report.md إلى مستند Word',
     intgExample2: 'أنشئ عرضاً من 6 شرائح عن نتائج الربع الثالث',
     intgExample3: 'حوّل budget.xlsx إلى PDF وافتحه في UniWork Office',
-    intgStep2Note: 'المساعد يشغّل سطر أوامر genoffice بنفسه؛ لن تحتاج إلى كتابته أبداً.',
+    intgStep2Note: 'المساعد يشغّل سطر أوامر UniWork Office (genoffice) بنفسه؛ لن تحتاج إلى كتابته أبداً.',
     intgCliPartTitle: 'CLI · سطر الأوامر + skill',
     intgCliPartDesc:
-      'للمساعدين الذين يستطيعون تنفيذ أوامر الطرفية (Claude Code وCodex وCursor وغيرها). بعد تثبيت skill، يستدعي المساعد سطر أوامر genoffice بنفسه لإنشاء الملفات وتحويلها وقراءتها وتحريرها؛ لن تكتب أي أمر.',
+      'للمساعدين الذين يستطيعون تنفيذ أوامر الطرفية (Claude Code وCodex وCursor وغيرها). بعد تثبيت skill، يستدعي المساعد سطر أوامر UniWork Office (genoffice) بنفسه لإنشاء الملفات وتحويلها وقراءتها وتحريرها؛ لن تكتب أي أمر.',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP هو البروتوكول المشترك الذي يستخدمه مساعدو الذكاء الاصطناعي لاستدعاء أدوات خارجية. استخدمه إذا كان مساعدك لا يستطيع تنفيذ الأوامر (مثل Claude Desktop) أو إذا أردت أن يتحكم في نافذة UniWork Office مباشرة. اختر إحدى الطريقتين أدناه.',
     intgMcpStdioTitle: 'يشغّله المساعد (موصى به)',
     intgMcpStdioDesc:
-      'يشغّل المساعد genoffice mcp بنفسه: لا شيء لتفعيله هنا، ولا يلزم أن يكون UniWork Office مفتوحًا. نفس إمكانات CLI.',
+      'يشغّل المساعد UniWork Office (genoffice mcp) بنفسه: لا شيء لتفعيله هنا، ولا يلزم أن يكون UniWork Office مفتوحًا. نفس إمكانات CLI.',
     intgMcpHttpTitle: 'خادم HTTP محلي',
     intgMcpHttpDesc:
       'يعمل داخل UniWork Office؛ يتصل المساعد عبر عنوان URL ويمكنك مشاهدة المستند يُبنى خطوة بخطوة في محرر Word. يجب أن يبقى UniWork Office مفتوحًا؛ مستندات Word فقط حاليًا.',
@@ -4503,10 +4503,10 @@ export const strings = {
       'أضف هذا إلى إعدادات خوادم MCP لديه (ملف JSON، أو «إضافة خادم MCP» في إعداداته):',
     intgMcpNote:
       'يمكن إعداد المهارة و MCP معاً؛ يختار المساعد أحدهما. كلاهما يقوم بالأشياء نفسها تماماً.',
-    intgCliTitle: 'متقدم: سطر أوامر genoffice',
-    intgCliReady: 'genoffice {v} · جاهز في الطرفية ({path})',
+    intgCliTitle: 'متقدم: سطر أوامر UniWork Office',
+    intgCliReady: 'UniWork Office (genoffice) {v} · جاهز في الطرفية ({path})',
     intgCliNotOnPath:
-      'genoffice {v} · غير موجود في PATH الطرفية. ما زال المساعدون يجدونه عبر ~/.genoffice/launcher، فالمهارة تعمل. لكتابة genoffice بنفسك، شغّل هذا مرة واحدة:',
+      'UniWork Office (genoffice) {v} · غير موجود في PATH الطرفية. ما زال المساعدون يجدونه عبر ~/.genoffice/launcher، فالمهارة تعمل. لكتابة genoffice بنفسك، شغّل هذا مرة واحدة:',
     intgCliLauncher: 'مجلد المشغّل',
     intgStateOutdated: 'مثبّت {v}، يتوفر تحديث إلى {next}',
     intgStateModified: 'مثبّت {v} (تم تعديله)',
@@ -4557,11 +4557,11 @@ export const strings = {
     setAiTestOk: 'نجح الاتصال',
     setAiTestFail: 'فشل الاتصال',
     setAiOpenRouterHub: 'OpenRouter Token Hub',
-    setAiOpenRouterHubHint: 'Check remaining limit and usage for this key (GET /api/v1/key).',
-    setAiOpenRouterHubCheck: 'Check credits',
-    setAiOpenRouterHubChecking: 'Checking…',
-    setAiOpenRouterHubFail: 'Could not read OpenRouter credits',
-    setAiOpenRouterCredits: 'Top up / manage',
+    setAiOpenRouterHubHint: 'تحقق من الحد المتبقي والاستخدام لهذا المفتاح.',
+    setAiOpenRouterHubCheck: 'التحقق من الرصيد',
+    setAiOpenRouterHubChecking: 'جارٍ التحقق…',
+    setAiOpenRouterHubFail: 'تعذّرت قراءة رصيد OpenRouter',
+    setAiOpenRouterCredits: 'شحن / إدارة',
     setAiMaxTokens: 'الحد الأقصى لرموز المخرجات',
     setAiMaxTokensDesc:
       'ميزانية الإخراج في الدورة الواحدة. نماذج الاستدلال تصرفها على التفكير، فإذا نفدت جاء الرد فارغًا؛ ارفع هذه القيمة عندئذ.',
@@ -4899,16 +4899,16 @@ export const strings = {
     intgExample2: 'Monte uma apresentação de 6 slides sobre nossos resultados do 3º trimestre',
     intgExample3: 'Converta budget.xlsx para PDF e abra no UniWork Office',
     intgStep2Note:
-      'O assistente executa a linha de comando genoffice sozinho; você nunca precisa digitá-la.',
+      'O assistente executa a linha de comando UniWork Office (genoffice) sozinho; você nunca precisa digitá-la.',
     intgCliPartTitle: 'CLI · linha de comando + skill',
     intgCliPartDesc:
-      'Para assistentes que executam comandos de terminal (Claude Code, Codex, Cursor e outros). Com o skill instalado, o assistente chama a linha de comando genoffice sozinho para criar, converter, ler e editar arquivos; você nunca digita um comando.',
+      'Para assistentes que executam comandos de terminal (Claude Code, Codex, Cursor e outros). Com o skill instalado, o assistente chama a linha de comando UniWork Office (genoffice) sozinho para criar, converter, ler e editar arquivos; você nunca digita um comando.',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP é o protocolo comum que assistentes de IA usam para chamar ferramentas externas. Use-o quando o assistente não puder executar comandos (Claude Desktop, por exemplo) ou quando quiser que ele controle a janela do UniWork Office diretamente. Escolha uma das duas formas abaixo.',
     intgMcpStdioTitle: 'Iniciado pelo assistente (recomendado)',
     intgMcpStdioDesc:
-      'O assistente inicia o genoffice mcp sozinho: nada para ligar aqui, e o UniWork Office não precisa estar aberto. Mesmos recursos da CLI.',
+      'O assistente inicia o UniWork Office (genoffice mcp) sozinho: nada para ligar aqui, e o UniWork Office não precisa estar aberto. Mesmos recursos da CLI.',
     intgMcpHttpTitle: 'Servidor HTTP local',
     intgMcpHttpDesc:
       'Roda dentro do UniWork Office; o assistente conecta por URL e você acompanha o documento sendo montado passo a passo no editor Word. O UniWork Office precisa ficar aberto; por enquanto só documentos Word.',
@@ -4921,10 +4921,10 @@ export const strings = {
       'Adicione isto à configuração de servidores MCP dele (um arquivo JSON, ou "Adicionar servidor MCP" nas configurações):',
     intgMcpNote:
       'O skill e o MCP podem coexistir; o assistente escolhe um deles. Ambos fazem exatamente as mesmas coisas.',
-    intgCliTitle: 'Avançado: linha de comando genoffice',
-    intgCliReady: 'genoffice {v} · pronto no seu terminal ({path})',
+    intgCliTitle: 'Avançado: linha de comando UniWork Office',
+    intgCliReady: 'UniWork Office (genoffice) {v} · pronto no seu terminal ({path})',
     intgCliNotOnPath:
-      'genoffice {v} · não está no PATH do seu terminal. Os assistentes ainda o encontram por ~/.genoffice/launcher, então o skill funciona. Para digitar genoffice você mesmo, execute isto uma vez:',
+      'UniWork Office (genoffice) {v} · não está no PATH do seu terminal. Os assistentes ainda o encontram por ~/.genoffice/launcher, então o skill funciona. Para digitar genoffice você mesmo, execute isto uma vez:',
     intgCliLauncher: 'Pasta do inicializador',
     intgStateOutdated: 'Instalado {v}, atualização para {next} disponível',
     intgStateModified: 'Instalado {v} (modificado)',
@@ -4978,11 +4978,11 @@ export const strings = {
     setAiTestOk: 'Conexão bem-sucedida',
     setAiTestFail: 'Falha na conexão',
     setAiOpenRouterHub: 'OpenRouter Token Hub',
-    setAiOpenRouterHubHint: 'Check remaining limit and usage for this key (GET /api/v1/key).',
-    setAiOpenRouterHubCheck: 'Check credits',
-    setAiOpenRouterHubChecking: 'Checking…',
-    setAiOpenRouterHubFail: 'Could not read OpenRouter credits',
-    setAiOpenRouterCredits: 'Top up / manage',
+    setAiOpenRouterHubHint: 'Veja o limite restante e o uso desta chave.',
+    setAiOpenRouterHubCheck: 'Verificar créditos',
+    setAiOpenRouterHubChecking: 'Verificando…',
+    setAiOpenRouterHubFail: 'Não foi possível ler os créditos do OpenRouter',
+    setAiOpenRouterCredits: 'Recarregar / gerenciar',
     setAiMaxTokens: 'Máx. de tokens de saída',
     setAiMaxTokensDesc:
       'Orçamento de saída por turno. Modelos de raciocínio gastam-no pensando; se esgotar, a resposta vem vazia — aumente este valor.',
@@ -5319,16 +5319,16 @@ export const strings = {
     intgExample2: 'Prepara una presentazione di 6 slide sui nostri risultati del terzo trimestre',
     intgExample3: 'Converti budget.xlsx in PDF e aprilo in UniWork Office',
     intgStep2Note:
-      "L'assistente esegue da solo la riga di comando genoffice; non dovrai mai digitarla.",
+      "L'assistente esegue da solo la riga di comando UniWork Office (genoffice); non dovrai mai digitarla.",
     intgCliPartTitle: 'CLI · riga di comando + skill',
     intgCliPartDesc:
-      'Per assistenti che possono eseguire comandi da terminale (Claude Code, Codex, Cursor e altri). Installato lo skill, l’assistente richiama da sé la riga di comando genoffice per creare, convertire, leggere e modificare file; non digiti mai un comando.',
+      'Per assistenti che possono eseguire comandi da terminale (Claude Code, Codex, Cursor e altri). Installato lo skill, l’assistente richiama da sé la riga di comando UniWork Office (genoffice) per creare, convertire, leggere e modificare file; non digiti mai un comando.',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP è il protocollo comune con cui gli assistenti IA richiamano strumenti esterni. Usalo quando l’assistente non può eseguire comandi (Claude Desktop, ad esempio) o quando vuoi che controlli direttamente la finestra di UniWork Office. Scegli uno dei due modi qui sotto.',
     intgMcpStdioTitle: 'Avviato dall’assistente (consigliato)',
     intgMcpStdioDesc:
-      'L’assistente avvia genoffice mcp da sé: niente da attivare qui, e UniWork Office non deve essere aperto. Stesse funzioni della CLI.',
+      'L’assistente avvia UniWork Office (genoffice mcp) da sé: niente da attivare qui, e UniWork Office non deve essere aperto. Stesse funzioni della CLI.',
     intgMcpHttpTitle: 'Server HTTP locale',
     intgMcpHttpDesc:
       'Gira dentro UniWork Office; l’assistente si collega a un URL e puoi vedere il documento prendere forma passo dopo passo nell’editor Word. UniWork Office deve restare aperto; per ora solo documenti Word.',
@@ -5341,10 +5341,10 @@ export const strings = {
       'Aggiungi questo alla sua configurazione dei server MCP (un file JSON, oppure «Aggiungi server MCP» nelle impostazioni):',
     intgMcpNote:
       "Skill e MCP possono convivere; l'assistente ne sceglie uno. Fanno esattamente le stesse cose.",
-    intgCliTitle: 'Avanzato: riga di comando genoffice',
-    intgCliReady: 'genoffice {v} · pronto nel terminale ({path})',
+    intgCliTitle: 'Avanzato: riga di comando UniWork Office',
+    intgCliReady: 'UniWork Office (genoffice) {v} · pronto nel terminale ({path})',
     intgCliNotOnPath:
-      'genoffice {v} · non è nel PATH del terminale. Gli assistenti lo trovano comunque tramite ~/.genoffice/launcher, quindi lo skill funziona. Per digitare genoffice tu stesso, esegui questo una volta:',
+      'UniWork Office (genoffice) {v} · non è nel PATH del terminale. Gli assistenti lo trovano comunque tramite ~/.genoffice/launcher, quindi lo skill funziona. Per digitare genoffice tu stesso, esegui questo una volta:',
     intgCliLauncher: 'Cartella del launcher',
     intgStateOutdated: 'Installato {v}, aggiornamento a {next} disponibile',
     intgStateModified: 'Installato {v} (modificato)',
@@ -5397,11 +5397,11 @@ export const strings = {
     setAiTestOk: 'Connessione riuscita',
     setAiTestFail: 'Connessione non riuscita',
     setAiOpenRouterHub: 'OpenRouter Token Hub',
-    setAiOpenRouterHubHint: 'Check remaining limit and usage for this key (GET /api/v1/key).',
-    setAiOpenRouterHubCheck: 'Check credits',
-    setAiOpenRouterHubChecking: 'Checking…',
-    setAiOpenRouterHubFail: 'Could not read OpenRouter credits',
-    setAiOpenRouterCredits: 'Top up / manage',
+    setAiOpenRouterHubHint: 'Controlla il limite residuo e l’utilizzo di questa chiave.',
+    setAiOpenRouterHubCheck: 'Controlla i crediti',
+    setAiOpenRouterHubChecking: 'Controllo in corso…',
+    setAiOpenRouterHubFail: 'Impossibile leggere i crediti OpenRouter',
+    setAiOpenRouterCredits: 'Ricarica / gestisci',
     setAiMaxTokens: 'Token di output massimi',
     setAiMaxTokensDesc:
       'Budget di uscita per singolo turno. I modelli di ragionamento lo consumano pensando: se si esaurisce, la risposta arriva vuota; aumentalo.',
@@ -5735,16 +5735,16 @@ export const strings = {
     intgExample1: 'Zamień ~/Downloads/report.md na dokument Word',
     intgExample2: 'Zrób prezentację z 6 slajdów o naszych wynikach za III kwartał',
     intgExample3: 'Przekonwertuj budget.xlsx do PDF i otwórz w UniWork Office',
-    intgStep2Note: 'Asystent sam uruchamia wiersz poleceń genoffice; nigdy nie musisz go wpisywać.',
+    intgStep2Note: 'Asystent sam uruchamia wiersz poleceń UniWork Office (genoffice); nigdy nie musisz go wpisywać.',
     intgCliPartTitle: 'CLI · wiersz poleceń + skill',
     intgCliPartDesc:
-      'Dla asystentów, które potrafią uruchamiać polecenia terminala (Claude Code, Codex, Cursor i inne). Po zainstalowaniu skilla asystent sam wywołuje wiersz poleceń genoffice, aby tworzyć, konwertować, czytać i edytować pliki; nigdy nie wpisujesz polecenia.',
+      'Dla asystentów, które potrafią uruchamiać polecenia terminala (Claude Code, Codex, Cursor i inne). Po zainstalowaniu skilla asystent sam wywołuje wiersz poleceń UniWork Office (genoffice), aby tworzyć, konwertować, czytać i edytować pliki; nigdy nie wpisujesz polecenia.',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP to wspólny protokół, którym asystenci AI wywołują zewnętrzne narzędzia. Użyj go, gdy asystent nie potrafi uruchamiać poleceń (np. Claude Desktop) lub gdy chcesz, aby bezpośrednio sterował oknem UniWork Office. Wybierz jeden z dwóch sposobów poniżej.',
     intgMcpStdioTitle: 'Uruchamiany przez asystenta (zalecane)',
     intgMcpStdioDesc:
-      'Asystent sam uruchamia genoffice mcp: nic tu nie trzeba włączać, a UniWork Office nie musi być otwarty. Te same funkcje co CLI.',
+      'Asystent sam uruchamia UniWork Office (genoffice mcp): nic tu nie trzeba włączać, a UniWork Office nie musi być otwarty. Te same funkcje co CLI.',
     intgMcpHttpTitle: 'Lokalny serwer HTTP',
     intgMcpHttpDesc:
       'Działa wewnątrz UniWork Office; asystent łączy się przez URL, a Ty widzisz, jak dokument powstaje krok po kroku w edytorze Word. UniWork Office musi pozostać otwarty; na razie tylko dokumenty Word.',
@@ -5757,10 +5757,10 @@ export const strings = {
       'Dodaj to do jego konfiguracji serwerów MCP (plik JSON lub „Dodaj serwer MCP” w ustawieniach):',
     intgMcpNote:
       'Skill i MCP mogą działać obok siebie; asystent wybiera jedno z nich. Oba robią dokładnie to samo.',
-    intgCliTitle: 'Zaawansowane: wiersz poleceń genoffice',
-    intgCliReady: 'genoffice {v} · gotowy w terminalu ({path})',
+    intgCliTitle: 'Zaawansowane: wiersz poleceń UniWork Office',
+    intgCliReady: 'UniWork Office (genoffice) {v} · gotowy w terminalu ({path})',
     intgCliNotOnPath:
-      'genoffice {v} · nie ma go w PATH terminala. Asystenty i tak znajdą go przez ~/.genoffice/launcher, więc skill działa. Aby samodzielnie wpisywać genoffice, uruchom to raz:',
+      'UniWork Office (genoffice) {v} · nie ma go w PATH terminala. Asystenty i tak znajdą go przez ~/.genoffice/launcher, więc skill działa. Aby samodzielnie wpisywać genoffice, uruchom to raz:',
     intgCliLauncher: 'Folder programu uruchamiającego',
     intgStateOutdated: 'Zainstalowano {v}, dostępna aktualizacja do {next}',
     intgStateModified: 'Zainstalowano {v} (zmodyfikowano)',
@@ -5813,11 +5813,11 @@ export const strings = {
     setAiTestOk: 'Połączenie działa',
     setAiTestFail: 'Połączenie nie powiodło się',
     setAiOpenRouterHub: 'OpenRouter Token Hub',
-    setAiOpenRouterHubHint: 'Check remaining limit and usage for this key (GET /api/v1/key).',
-    setAiOpenRouterHubCheck: 'Check credits',
-    setAiOpenRouterHubChecking: 'Checking…',
-    setAiOpenRouterHubFail: 'Could not read OpenRouter credits',
-    setAiOpenRouterCredits: 'Top up / manage',
+    setAiOpenRouterHubHint: 'Sprawdź pozostały limit i użycie tego klucza.',
+    setAiOpenRouterHubCheck: 'Sprawdź kredyty',
+    setAiOpenRouterHubChecking: 'Sprawdzanie…',
+    setAiOpenRouterHubFail: 'Nie udało się odczytać kredytów OpenRouter',
+    setAiOpenRouterCredits: 'Doładuj / zarządzaj',
     setAiMaxTokens: 'Maks. tokeny wyjścia',
     setAiMaxTokensDesc:
       'Budżet wyjścia na jedną turę. Modele rozumowania zużywają go na myślenie; gdy się wyczerpie, odpowiedź przychodzi pusta — zwiększ tę wartość.',
@@ -6116,16 +6116,16 @@ export const strings = {
     intgExample1: 'Převeď ~/Downloads/report.md na dokument Word',
     intgExample2: 'Udělej prezentaci o 6 snímcích o našich výsledcích za 3. čtvrtletí',
     intgExample3: 'Převeď budget.xlsx do PDF a otevři ho v UniWork Office',
-    intgStep2Note: 'Asistent spouští příkazový řádek genoffice sám; nikdy ho nemusíte psát.',
+    intgStep2Note: 'Asistent spouští příkazový řádek UniWork Office (genoffice) sám; nikdy ho nemusíte psát.',
     intgCliPartTitle: 'CLI · příkazový řádek + skill',
     intgCliPartDesc:
-      'Pro asistenty, kteří umí spouštět příkazy terminálu (Claude Code, Codex, Cursor a další). Po instalaci skillu asistent sám volá příkazový řádek genoffice k vytváření, převodu, čtení a úpravám souborů; žádný příkaz nepíšete.',
+      'Pro asistenty, kteří umí spouštět příkazy terminálu (Claude Code, Codex, Cursor a další). Po instalaci skillu asistent sám volá příkazový řádek UniWork Office (genoffice) k vytváření, převodu, čtení a úpravám souborů; žádný příkaz nepíšete.',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP je společný protokol, kterým AI asistenti volají externí nástroje. Použijte ho, když asistent neumí spouštět příkazy (např. Claude Desktop) nebo když chcete, aby přímo ovládal okno UniWork Office. Vyberte jeden ze dvou způsobů níže.',
     intgMcpStdioTitle: 'Spouští asistent (doporučeno)',
     intgMcpStdioDesc:
-      'Asistent spustí genoffice mcp sám: tady není co zapínat a UniWork Office nemusí být otevřený. Stejné funkce jako CLI.',
+      'Asistent spustí UniWork Office (genoffice mcp) sám: tady není co zapínat a UniWork Office nemusí být otevřený. Stejné funkce jako CLI.',
     intgMcpHttpTitle: 'Místní HTTP server',
     intgMcpHttpDesc:
       'Běží uvnitř UniWork Office; asistent se připojí přes URL a v editoru Word sledujete, jak dokument krok za krokem vzniká. UniWork Office musí zůstat otevřený; zatím jen dokumenty Word.',
@@ -6138,10 +6138,10 @@ export const strings = {
       'Přidejte toto do jeho nastavení MCP serverů (soubor JSON nebo „Přidat MCP server“ v nastavení):',
     intgMcpNote:
       'Skill a MCP mohou být nastaveny současně; asistent si jeden vybere. Oba dělají přesně to samé.',
-    intgCliTitle: 'Pokročilé: příkazový řádek genoffice',
-    intgCliReady: 'genoffice {v} · připraven v terminálu ({path})',
+    intgCliTitle: 'Pokročilé: příkazový řádek UniWork Office',
+    intgCliReady: 'UniWork Office (genoffice) {v} · připraven v terminálu ({path})',
     intgCliNotOnPath:
-      'genoffice {v} · není v PATH terminálu. Asistenti ho i tak najdou přes ~/.genoffice/launcher, skill tedy funguje. Chcete-li genoffice psát sami, spusťte jednou:',
+      'UniWork Office (genoffice) {v} · není v PATH terminálu. Asistenti ho i tak najdou přes ~/.genoffice/launcher, skill tedy funguje. Chcete-li genoffice psát sami, spusťte jednou:',
     intgCliLauncher: 'Složka spouštěče',
     intgStateOutdated: 'Nainstalováno {v}, k dispozici aktualizace na {next}',
     intgStateModified: 'Nainstalováno {v} (upraveno)',
@@ -6196,11 +6196,11 @@ export const strings = {
     setAiTestOk: 'Připojení funguje',
     setAiTestFail: 'Připojení se nezdařilo',
     setAiOpenRouterHub: 'OpenRouter Token Hub',
-    setAiOpenRouterHubHint: 'Check remaining limit and usage for this key (GET /api/v1/key).',
-    setAiOpenRouterHubCheck: 'Check credits',
-    setAiOpenRouterHubChecking: 'Checking…',
-    setAiOpenRouterHubFail: 'Could not read OpenRouter credits',
-    setAiOpenRouterCredits: 'Top up / manage',
+    setAiOpenRouterHubHint: 'Zkontrolujte zbývající limit a využití tohoto klíče.',
+    setAiOpenRouterHubCheck: 'Zkontrolovat kredity',
+    setAiOpenRouterHubChecking: 'Kontroluje se…',
+    setAiOpenRouterHubFail: 'Nepodařilo se načíst kredity OpenRouter',
+    setAiOpenRouterCredits: 'Dobít / spravovat',
     setAiMaxTokens: 'Max. počet výstupních tokenů',
     setAiMaxTokensDesc:
       'Rozpočet výstupu na jeden tah. Modely s uvažováním jeho část spotřebují na přemýšlení, takže po vyčerpání rozpočtu může být odpověď prázdná; v takovém případě hodnotu zvyšte.',
@@ -6569,16 +6569,16 @@ export const strings = {
     intgExample2: 'Maak een presentatie van 6 dia’s over onze Q3-resultaten',
     intgExample3: 'Zet budget.xlsx om naar PDF en open het in UniWork Office',
     intgStep2Note:
-      'De assistent voert de genoffice-opdrachtregel zelf uit; u hoeft die nooit te typen.',
+      'De assistent voert de UniWork Office-opdrachtregel zelf uit; u hoeft die nooit te typen.',
     intgCliPartTitle: 'CLI · opdrachtregel + skill',
     intgCliPartDesc:
-      'Voor assistenten die terminalopdrachten kunnen uitvoeren (Claude Code, Codex, Cursor en andere). Na installatie van de skill roept de assistent zelf de genoffice-opdrachtregel aan om bestanden te maken, converteren, lezen en bewerken; je typt nooit een opdracht.',
+      'Voor assistenten die terminalopdrachten kunnen uitvoeren (Claude Code, Codex, Cursor en andere). Na installatie van de skill roept de assistent zelf de UniWork Office-opdrachtregel aan om bestanden te maken, converteren, lezen en bewerken; je typt nooit een opdracht.',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP is het gemeenschappelijke protocol waarmee AI-assistenten externe tools aanroepen. Gebruik het als je assistent geen opdrachten kan uitvoeren (bijvoorbeeld Claude Desktop) of als je wilt dat hij het UniWork Office-venster rechtstreeks bestuurt. Kies een van de twee manieren hieronder.',
     intgMcpStdioTitle: 'Gestart door de assistent (aanbevolen)',
     intgMcpStdioDesc:
-      'De assistent start genoffice mcp zelf: hier hoeft niets aan, en UniWork Office hoeft niet open te staan. Dezelfde functies als de CLI.',
+      'De assistent start UniWork Office (genoffice mcp) zelf: hier hoeft niets aan, en UniWork Office hoeft niet open te staan. Dezelfde functies als de CLI.',
     intgMcpHttpTitle: 'Lokale HTTP-server',
     intgMcpHttpDesc:
       'Draait in UniWork Office; de assistent verbindt via een URL en je ziet het document stap voor stap ontstaan in de Word-editor. UniWork Office moet open blijven; voorlopig alleen Word-documenten.',
@@ -6591,10 +6591,10 @@ export const strings = {
       'Voeg dit toe aan de MCP-serverinstellingen (een JSON-bestand, of "MCP-server toevoegen" in de instellingen):',
     intgMcpNote:
       'De skill en MCP kunnen naast elkaar bestaan; de assistent kiest er een. Ze doen precies hetzelfde.',
-    intgCliTitle: 'Geavanceerd: genoffice-opdrachtregel',
-    intgCliReady: 'genoffice {v} · klaar in uw terminal ({path})',
+    intgCliTitle: 'Geavanceerd: UniWork Office-opdrachtregel',
+    intgCliReady: 'UniWork Office (genoffice) {v} · klaar in uw terminal ({path})',
     intgCliNotOnPath:
-      'genoffice {v} · staat niet in het PATH van uw terminal. Assistenten vinden het toch via ~/.genoffice/launcher, dus de skill werkt. Om zelf genoffice te typen, voert u dit één keer uit:',
+      'UniWork Office (genoffice) {v} · staat niet in het PATH van uw terminal. Assistenten vinden het toch via ~/.genoffice/launcher, dus de skill werkt. Om zelf genoffice te typen, voert u dit één keer uit:',
     intgCliLauncher: 'Launcher-map',
     intgStateOutdated: 'Geïnstalleerd {v}, update naar {next} beschikbaar',
     intgStateModified: 'Geïnstalleerd {v} (gewijzigd)',
@@ -6647,11 +6647,11 @@ export const strings = {
     setAiTestOk: 'Verbinding geslaagd',
     setAiTestFail: 'Verbinding mislukt',
     setAiOpenRouterHub: 'OpenRouter Token Hub',
-    setAiOpenRouterHubHint: 'Check remaining limit and usage for this key (GET /api/v1/key).',
-    setAiOpenRouterHubCheck: 'Check credits',
-    setAiOpenRouterHubChecking: 'Checking…',
-    setAiOpenRouterHubFail: 'Could not read OpenRouter credits',
-    setAiOpenRouterCredits: 'Top up / manage',
+    setAiOpenRouterHubHint: 'Bekijk het resterende limiet en het gebruik van deze sleutel.',
+    setAiOpenRouterHubCheck: 'Tegoed controleren',
+    setAiOpenRouterHubChecking: 'Controleren…',
+    setAiOpenRouterHubFail: 'OpenRouter-tegoed kon niet worden gelezen',
+    setAiOpenRouterCredits: 'Opwaarderen / beheren',
     setAiMaxTokens: 'Max. outputtokens',
     setAiMaxTokensDesc:
       'Uitvoerbudget voor één beurt. Redeneermodellen geven dit uit aan denken; is het op, dan komt een leeg antwoord terug — verhoog deze waarde.',
@@ -6989,16 +6989,16 @@ export const strings = {
     intgExample2: 'Buat pembentangan 6 slaid tentang hasil S3 kami',
     intgExample3: 'Tukar budget.xlsx kepada PDF dan buka dalam UniWork Office',
     intgStep2Note:
-      'Pembantu menjalankan baris arahan genoffice sendiri; anda tidak perlu menaipnya.',
+      'Pembantu menjalankan baris arahan UniWork Office (genoffice) sendiri; anda tidak perlu menaipnya.',
     intgCliPartTitle: 'CLI · baris arahan + skill',
     intgCliPartDesc:
-      'Untuk pembantu yang boleh menjalankan arahan terminal (Claude Code, Codex, Cursor dan lain-lain). Setelah skill dipasang, pembantu memanggil baris arahan genoffice sendiri untuk mencipta, menukar, membaca dan mengedit fail; anda tidak perlu menaip sebarang arahan.',
+      'Untuk pembantu yang boleh menjalankan arahan terminal (Claude Code, Codex, Cursor dan lain-lain). Setelah skill dipasang, pembantu memanggil baris arahan UniWork Office (genoffice) sendiri untuk mencipta, menukar, membaca dan mengedit fail; anda tidak perlu menaip sebarang arahan.',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP ialah protokol umum yang digunakan pembantu AI untuk memanggil alat luaran. Gunakannya apabila pembantu anda tidak boleh menjalankan arahan (contohnya Claude Desktop) atau apabila anda mahu ia mengawal tetingkap UniWork Office secara langsung. Pilih salah satu daripada dua cara di bawah.',
     intgMcpStdioTitle: 'Dimulakan oleh pembantu (disyorkan)',
     intgMcpStdioDesc:
-      'Pembantu melancarkan genoffice mcp sendiri: tiada apa yang perlu dihidupkan di sini, dan UniWork Office tidak perlu dibuka. Ciri sama seperti CLI.',
+      'Pembantu melancarkan UniWork Office (genoffice mcp) sendiri: tiada apa yang perlu dihidupkan di sini, dan UniWork Office tidak perlu dibuka. Ciri sama seperti CLI.',
     intgMcpHttpTitle: 'Pelayan HTTP tempatan',
     intgMcpHttpDesc:
       'Berjalan di dalam UniWork Office; pembantu menyambung melalui URL dan anda boleh melihat dokumen dibina langkah demi langkah dalam editor Word. UniWork Office mesti kekal dibuka; buat masa ini dokumen Word sahaja.',
@@ -7012,10 +7012,10 @@ export const strings = {
       'Tambahkan ini pada tetapan pelayan MCP pembantu tersebut (fail JSON, atau "Tambah pelayan MCP" dalam tetapannya):',
     intgMcpNote:
       'Skill dan MCP boleh dipasang serentak; pembantu akan memilih satu. Kedua-duanya melakukan perkara yang sama.',
-    intgCliTitle: 'Lanjutan: baris arahan genoffice',
-    intgCliReady: 'genoffice {v} · sedia dalam terminal anda ({path})',
+    intgCliTitle: 'Lanjutan: baris arahan UniWork Office',
+    intgCliReady: 'UniWork Office (genoffice) {v} · sedia dalam terminal anda ({path})',
     intgCliNotOnPath:
-      'genoffice {v} · tiada dalam PATH terminal anda. Pembantu masih menemuinya melalui ~/.genoffice/launcher, jadi skill berfungsi. Untuk menaip genoffice sendiri, jalankan ini sekali:',
+      'UniWork Office (genoffice) {v} · tiada dalam PATH terminal anda. Pembantu masih menemuinya melalui ~/.genoffice/launcher, jadi skill berfungsi. Untuk menaip genoffice sendiri, jalankan ini sekali:',
     intgCliLauncher: 'Folder pelancar',
     intgStateOutdated: 'Dipasang {v}, kemas kini ke {next} tersedia',
     intgStateModified: 'Dipasang {v} (diubah suai)',
@@ -7069,11 +7069,11 @@ export const strings = {
     setAiTestOk: 'Sambungan berjaya',
     setAiTestFail: 'Sambungan gagal',
     setAiOpenRouterHub: 'OpenRouter Token Hub',
-    setAiOpenRouterHubHint: 'Check remaining limit and usage for this key (GET /api/v1/key).',
-    setAiOpenRouterHubCheck: 'Check credits',
-    setAiOpenRouterHubChecking: 'Checking…',
-    setAiOpenRouterHubFail: 'Could not read OpenRouter credits',
-    setAiOpenRouterCredits: 'Top up / manage',
+    setAiOpenRouterHubHint: 'Semak baki had dan penggunaan kunci ini.',
+    setAiOpenRouterHubCheck: 'Semak kredit',
+    setAiOpenRouterHubChecking: 'Menyemak…',
+    setAiOpenRouterHubFail: 'Tidak dapat membaca kredit OpenRouter',
+    setAiOpenRouterCredits: 'Tambah nilai / urus',
     setAiMaxTokens: 'Token output maks.',
     setAiMaxTokensDesc:
       'Belanjawan output untuk satu pusingan. Model penaakulan menghabiskannya untuk berfikir; jika habis, balasan datang kosong — tingkatkan nilai ini.',
@@ -7399,16 +7399,16 @@ export const strings = {
     intgExample1: 'הפוך את ~/Downloads/report.md למסמך Word',
     intgExample2: 'הכן מצגת של 6 שקופיות על תוצאות הרבעון השלישי שלנו',
     intgExample3: 'המר את budget.xlsx ל-PDF ופתח אותו ב-UniWork Office',
-    intgStep2Note: 'העוזר מריץ בעצמו את שורת הפקודה genoffice; לעולם לא תצטרכו להקליד אותה.',
+    intgStep2Note: 'העוזר מריץ בעצמו את שורת הפקודה UniWork Office (genoffice); לעולם לא תצטרכו להקליד אותה.',
     intgCliPartTitle: 'CLI · שורת פקודה + skill',
     intgCliPartDesc:
-      'לעוזרים שיכולים להריץ פקודות טרמינל (Claude Code‏, Codex‏, Cursor ואחרים). לאחר התקנת ה‑skill העוזר קורא בעצמו לשורת הפקודה genoffice כדי ליצור, להמיר, לקרוא ולערוך קבצים; אתם לא מקלידים שום פקודה.',
+      'לעוזרים שיכולים להריץ פקודות טרמינל (Claude Code‏, Codex‏, Cursor ואחרים). לאחר התקנת ה‑skill העוזר קורא בעצמו לשורת הפקודה UniWork Office (genoffice) כדי ליצור, להמיר, לקרוא ולערוך קבצים; אתם לא מקלידים שום פקודה.',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP הוא הפרוטוקול המשותף שבו עוזרי AI קוראים לכלים חיצוניים. השתמשו בו כשהעוזר אינו יכול להריץ פקודות (למשל Claude Desktop) או כשאתם רוצים שהוא ישלוט ישירות בחלון UniWork Office. בחרו אחת משתי הדרכים למטה.',
     intgMcpStdioTitle: 'מופעל על ידי העוזר (מומלץ)',
     intgMcpStdioDesc:
-      'העוזר מפעיל את genoffice mcp בעצמו: אין מה להפעיל כאן, ו‑UniWork Office לא חייב להיות פתוח. אותן יכולות כמו ב‑CLI.',
+      'העוזר מפעיל את UniWork Office (genoffice mcp) בעצמו: אין מה להפעיל כאן, ו‑UniWork Office לא חייב להיות פתוח. אותן יכולות כמו ב‑CLI.',
     intgMcpHttpTitle: 'שרת HTTP מקומי',
     intgMcpHttpDesc:
       'פועל בתוך UniWork Office; העוזר מתחבר דרך כתובת URL ואפשר לראות את המסמך נבנה צעד אחר צעד בעורך Word. UniWork Office חייב להישאר פתוח; בשלב זה מסמכי Word בלבד.',
@@ -7420,10 +7420,10 @@ export const strings = {
     intgMcpOtherDesc: 'הוסיפו זאת להגדרות שרתי ה-MCP שלו (קובץ JSON, או "הוספת שרת MCP" בהגדרות):',
     intgMcpNote:
       'הסקיל ו-MCP יכולים להיות מוגדרים יחד; העוזר יבחר אחד מהם. שניהם עושים בדיוק את אותם הדברים.',
-    intgCliTitle: 'מתקדם: שורת הפקודה genoffice',
-    intgCliReady: 'genoffice {v} · מוכן בטרמינל ({path})',
+    intgCliTitle: 'מתקדם: שורת הפקודה UniWork Office',
+    intgCliReady: 'UniWork Office (genoffice) {v} · מוכן בטרמינל ({path})',
     intgCliNotOnPath:
-      'genoffice {v} · לא נמצא ב-PATH של הטרמינל. העוזרים עדיין מוצאים אותו דרך ~/.genoffice/launcher, ולכן ה-skill עובד. כדי להקליד genoffice בעצמכם, הריצו זאת פעם אחת:',
+      'UniWork Office (genoffice) {v} · לא נמצא ב-PATH של הטרמינל. העוזרים עדיין מוצאים אותו דרך ~/.genoffice/launcher, ולכן ה-skill עובד. כדי להקליד genoffice בעצמכם, הריצו זאת פעם אחת:',
     intgCliLauncher: 'תיקיית המשגר',
     intgStateOutdated: 'מותקן {v}, זמין עדכון ל-{next}',
     intgStateModified: 'מותקן {v} (שונה)',
@@ -7474,11 +7474,11 @@ export const strings = {
     setAiTestOk: 'החיבור תקין',
     setAiTestFail: 'החיבור נכשל',
     setAiOpenRouterHub: 'OpenRouter Token Hub',
-    setAiOpenRouterHubHint: 'Check remaining limit and usage for this key (GET /api/v1/key).',
-    setAiOpenRouterHubCheck: 'Check credits',
-    setAiOpenRouterHubChecking: 'Checking…',
-    setAiOpenRouterHubFail: 'Could not read OpenRouter credits',
-    setAiOpenRouterCredits: 'Top up / manage',
+    setAiOpenRouterHubHint: 'בדקו את המכסה שנותרה ואת השימוש במפתח זה.',
+    setAiOpenRouterHubCheck: 'בדיקת קרדיטים',
+    setAiOpenRouterHubChecking: 'בודק…',
+    setAiOpenRouterHubFail: 'לא ניתן לקרוא את הקרדיטים של OpenRouter',
+    setAiOpenRouterCredits: 'טעינה / ניהול',
     setAiMaxTokens: 'מקסימום טוקנים לתשובה',
     setAiMaxTokensDesc:
       'תקציב פלט לסיבוב אחד. מודלי היסק מנצלים חלק ממנו לחשיבה, ואם הוא נגמר התשובה עלולה לחזור ריקה — במקרה כזה העלו את הערך.',
@@ -7806,16 +7806,16 @@ export const strings = {
     intgExample1: '~/Downloads/report.md को Word दस्तावेज़ बना दो',
     intgExample2: 'हमारे Q3 नतीजों पर 6 स्लाइड का प्रेज़ेंटेशन बनाओ',
     intgExample3: 'budget.xlsx को PDF में बदलो और UniWork Office में खोलो',
-    intgStep2Note: 'genoffice कमांड लाइन असिस्टेंट खुद चलाता है; आपको कभी टाइप नहीं करना पड़ता।',
+    intgStep2Note: 'UniWork Office (genoffice) कमांड लाइन असिस्टेंट खुद चलाता है; आपको कभी टाइप नहीं करना पड़ता।',
     intgCliPartTitle: 'CLI · कमांड लाइन + skill',
     intgCliPartDesc:
-      'उन सहायकों के लिए जो टर्मिनल कमांड चला सकते हैं (Claude Code, Codex, Cursor आदि)। skill इंस्टॉल होने के बाद सहायक फ़ाइलें बनाने, बदलने, पढ़ने और संपादित करने के लिए खुद genoffice कमांड लाइन चलाता है; आपको कोई कमांड टाइप नहीं करना पड़ता।',
+      'उन सहायकों के लिए जो टर्मिनल कमांड चला सकते हैं (Claude Code, Codex, Cursor आदि)। skill इंस्टॉल होने के बाद सहायक फ़ाइलें बनाने, बदलने, पढ़ने और संपादित करने के लिए खुद UniWork Office (genoffice) कमांड लाइन चलाता है; आपको कोई कमांड टाइप नहीं करना पड़ता।',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP वह साझा प्रोटोकॉल है जिससे AI सहायक बाहरी टूल बुलाते हैं। इसे तब चुनें जब सहायक कमांड न चला सके (जैसे Claude Desktop) या आप चाहें कि वह UniWork Office की विंडो को सीधे चलाए। नीचे दिए दो तरीकों में से कोई एक चुनें।',
     intgMcpStdioTitle: 'सहायक द्वारा शुरू (अनुशंसित)',
     intgMcpStdioDesc:
-      'सहायक खुद genoffice mcp चलाता है: यहाँ कुछ चालू करने की ज़रूरत नहीं, और UniWork Office खुला होना भी ज़रूरी नहीं। सुविधाएँ CLI जैसी ही।',
+      'सहायक खुद UniWork Office (genoffice mcp) चलाता है: यहाँ कुछ चालू करने की ज़रूरत नहीं, और UniWork Office खुला होना भी ज़रूरी नहीं। सुविधाएँ CLI जैसी ही।',
     intgMcpHttpTitle: 'स्थानीय HTTP सर्वर',
     intgMcpHttpDesc:
       'UniWork Office के अंदर चलता है; सहायक URL से जुड़ता है और आप Word संपादक में दस्तावेज़ को चरण-दर-चरण बनते देख सकते हैं। UniWork Office खुला रहना चाहिए; अभी केवल Word दस्तावेज़।',
@@ -7829,10 +7829,10 @@ export const strings = {
       'इसे उसकी MCP सर्वर सेटिंग्स में जोड़ें (एक JSON फ़ाइल, या सेटिंग्स में "MCP सर्वर जोड़ें"):',
     intgMcpNote:
       'स्किल और MCP एक साथ सेट किए जा सकते हैं; असिस्टेंट एक को चुन लेता है। दोनों बिल्कुल एक जैसे काम करते हैं।',
-    intgCliTitle: 'उन्नत: genoffice कमांड लाइन',
-    intgCliReady: 'genoffice {v} · टर्मिनल में तैयार ({path})',
+    intgCliTitle: 'उन्नत: UniWork Office कमांड लाइन',
+    intgCliReady: 'UniWork Office (genoffice) {v} · टर्मिनल में तैयार ({path})',
     intgCliNotOnPath:
-      'genoffice {v} · टर्मिनल के PATH में नहीं है। असिस्टेंट इसे ~/.genoffice/launcher से फिर भी ढूँढ लेते हैं, इसलिए skill काम करता है। खुद genoffice टाइप करने के लिए यह एक बार चलाएँ:',
+      'UniWork Office (genoffice) {v} · टर्मिनल के PATH में नहीं है। असिस्टेंट इसे ~/.genoffice/launcher से फिर भी ढूँढ लेते हैं, इसलिए skill काम करता है। खुद genoffice टाइप करने के लिए यह एक बार चलाएँ:',
     intgCliLauncher: 'लॉन्चर फ़ोल्डर',
     intgStateOutdated: 'इंस्टॉल {v}, {next} पर अपडेट उपलब्ध',
     intgStateModified: 'इंस्टॉल {v} (बदला गया)',
@@ -7885,11 +7885,11 @@ export const strings = {
     setAiTestOk: 'कनेक्शन सफल',
     setAiTestFail: 'कनेक्शन विफल',
     setAiOpenRouterHub: 'OpenRouter Token Hub',
-    setAiOpenRouterHubHint: 'Check remaining limit and usage for this key (GET /api/v1/key).',
-    setAiOpenRouterHubCheck: 'Check credits',
-    setAiOpenRouterHubChecking: 'Checking…',
-    setAiOpenRouterHubFail: 'Could not read OpenRouter credits',
-    setAiOpenRouterCredits: 'Top up / manage',
+    setAiOpenRouterHubHint: 'इस कुंजी की शेष सीमा और उपयोग देखें।',
+    setAiOpenRouterHubCheck: 'क्रेडिट जाँचें',
+    setAiOpenRouterHubChecking: 'जाँच हो रही है…',
+    setAiOpenRouterHubFail: 'OpenRouter क्रेडिट नहीं पढ़ सके',
+    setAiOpenRouterCredits: 'टॉप अप / प्रबंधित करें',
     setAiMaxTokens: 'अधिकतम आउटपुट टोकन',
     setAiMaxTokensDesc:
       'एक टर्न का आउटपुट बजट। रीज़निंग मॉडल इसका कुछ हिस्सा सोचने में खर्च करते हैं; बजट खत्म होने पर उत्तर खाली आ सकता है — ऐसा हो तो इसे बढ़ाएँ।',
@@ -8143,11 +8143,11 @@ export const strings = {
     intgExample1: 'Chuyển ~/Downloads/report.md thành tài liệu Word',
     intgExample2: 'Tạo bài trình chiếu 6 slide về kết quả Q3 của chúng ta',
     intgExample3: 'Chuyển budget.xlsx sang PDF và mở trong UniWork Office',
-    intgStep2Note: 'Trợ lý tự chạy dòng lệnh genoffice; bạn không cần gõ gì.',
-    intgCliTitle: 'Nâng cao: dòng lệnh genoffice',
-    intgCliReady: 'genoffice {v} · sẵn sàng trong terminal ({path})',
+    intgStep2Note: 'Trợ lý tự chạy dòng lệnh UniWork Office (genoffice); bạn không cần gõ gì.',
+    intgCliTitle: 'Nâng cao: dòng lệnh UniWork Office',
+    intgCliReady: 'UniWork Office (genoffice) {v} · sẵn sàng trong terminal ({path})',
     intgCliNotOnPath:
-      'genoffice {v} · chưa có trong PATH của terminal. Trợ lý vẫn tìm được qua ~/.genoffice/launcher nên skill vẫn hoạt động. Để tự gõ genoffice, chạy một lần:',
+      'UniWork Office (genoffice) {v} · chưa có trong PATH của terminal. Trợ lý vẫn tìm được qua ~/.genoffice/launcher nên skill vẫn hoạt động. Để tự gõ genoffice, chạy một lần:',
     intgCliLauncher: 'Thư mục launcher',
     intgStateOutdated: 'Đã cài {v}, có bản cập nhật {next}',
     intgStateModified: 'Đã cài {v} (đã chỉnh sửa)',
@@ -8197,12 +8197,12 @@ export const strings = {
     setAiTesting: 'Đang kiểm tra…',
     setAiTestOk: 'Kết nối OK',
     setAiTestFail: 'Kết nối thất bại',
-    setAiOpenRouterHub: 'OpenRouter Token Hub',
-    setAiOpenRouterHubHint: 'Check remaining limit and usage for this key (GET /api/v1/key).',
-    setAiOpenRouterHubCheck: 'Check credits',
-    setAiOpenRouterHubChecking: 'Checking…',
-    setAiOpenRouterHubFail: 'Could not read OpenRouter credits',
-    setAiOpenRouterCredits: 'Top up / manage',
+    setAiOpenRouterHub: 'Token Hub OpenRouter',
+    setAiOpenRouterHubHint: 'Xem hạn mức còn lại và mức sử dụng của key này.',
+    setAiOpenRouterHubCheck: 'Kiểm tra tín dụng',
+    setAiOpenRouterHubChecking: 'Đang kiểm tra…',
+    setAiOpenRouterHubFail: 'Không đọc được tín dụng OpenRouter',
+    setAiOpenRouterCredits: 'Nạp thêm / quản lý',
     setAiMaxTokens: 'Số token đầu ra tối đa',
     setAiMaxTokensDesc:
       'Ngân sách đầu ra cho một lượt. Mô hình suy luận dùng một phần để suy nghĩ, nên câu trả lời có thể trống khi hết ngân sách; hãy tăng giá trị này nếu gặp trường hợp đó.',
@@ -8340,13 +8340,13 @@ export const strings = {
     setMcpLogEmpty: 'Chưa có mục nhật ký nào',
     intgCliPartTitle: 'CLI · dòng lệnh + kỹ năng',
     intgCliPartDesc:
-      'Dành cho các trợ lý có thể chạy lệnh terminal (Claude Code, Codex, Cursor và các trợ lý khác). Khi kỹ năng đã được cài đặt, trợ lý sẽ tự gọi dòng lệnh genoffice để tạo, chuyển đổi, đọc và chỉnh sửa tệp; bạn không cần nhập lệnh.',
+      'Dành cho các trợ lý có thể chạy lệnh terminal (Claude Code, Codex, Cursor và các trợ lý khác). Khi kỹ năng đã được cài đặt, trợ lý sẽ tự gọi dòng lệnh UniWork Office (genoffice) để tạo, chuyển đổi, đọc và chỉnh sửa tệp; bạn không cần nhập lệnh.',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP là giao thức tiêu chuẩn mà các trợ lý AI dùng để gọi công cụ bên ngoài. Sử dụng khi trợ lý của bạn không thể chạy lệnh (ví dụ Claude Desktop) hoặc khi bạn muốn trợ lý điều khiển trực tiếp cửa sổ UniWork Office. Chọn một trong hai cách bên dưới.',
     intgMcpStdioTitle: 'Được khởi động bởi trợ lý (khuyến nghị)',
     intgMcpStdioDesc:
-      'Trợ lý sẽ tự khởi chạy genoffice mcp: không cần bật gì ở đây và UniWork Office không cần phải mở. Có đầy đủ tính năng tương tự CLI.',
+      'Trợ lý sẽ tự khởi chạy UniWork Office (genoffice mcp): không cần bật gì ở đây và UniWork Office không cần phải mở. Có đầy đủ tính năng tương tự CLI.',
     intgMcpHttpTitle: 'Máy chủ HTTP cục bộ',
     intgMcpHttpDesc:
       'Chạy bên trong UniWork Office; trợ lý kết nối với một URL và bạn có thể theo dõi nó tạo tài liệu từng bước trong trình chỉnh sửa Word. UniWork Office phải luôn mở; hiện tại chỉ hỗ trợ tài liệu Word.',
@@ -8613,16 +8613,16 @@ export const strings = {
     intgExample1: '把 ~/Downloads/report.md 轉成 Word 文件',
     intgExample2: '做一份 6 頁的簡報，介紹我們第三季的業績',
     intgExample3: '把 budget.xlsx 轉成 PDF，並在 UniWork Office 中開啟',
-    intgStep2Note: '助理會自行呼叫 genoffice 命令列，你不需要輸入任何指令。',
+    intgStep2Note: '助理會自行呼叫 UniWork Office (genoffice) 命令列，你不需要輸入任何指令。',
     intgCliPartTitle: 'CLI · 命令列 + skill',
     intgCliPartDesc:
-      '適合能執行終端機指令的助理（Claude Code、Codex、Cursor 等）。安裝 skill 後，助理會自己呼叫 genoffice 命令列建立、轉換、讀取和編輯檔案，你不需要輸入任何指令。',
+      '適合能執行終端機指令的助理（Claude Code、Codex、Cursor 等）。安裝 skill 後，助理會自己呼叫 UniWork Office (genoffice) 命令列建立、轉換、讀取和編輯檔案，你不需要輸入任何指令。',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP 是 AI 助理呼叫外部工具的通用協定。助理不能執行指令（如 Claude Desktop），或你想讓它直接操作 UniWork Office 視窗時用這條路。下面兩種接法任選一種。',
     intgMcpStdioTitle: '由助理啟動（建議）',
     intgMcpStdioDesc:
-      '助理自己啟動 genoffice mcp，不需要在這裡開任何開關，UniWork Office 也不用開著。功能與 CLI 完全相同。',
+      '助理自己啟動 UniWork Office (genoffice mcp)，不需要在這裡開任何開關，UniWork Office 也不用開著。功能與 CLI 完全相同。',
     intgMcpHttpTitle: '本機 HTTP 服務',
     intgMcpHttpDesc:
       '在 UniWork Office 內執行，助理透過網址連線，可以看著它在 Word 編輯器裡逐步產生。需要 UniWork Office 保持開啟；目前只支援 Word。',
@@ -8634,10 +8634,10 @@ export const strings = {
     intgMcpOtherDesc:
       '把這段加進它的 MCP 伺服器設定（一個 JSON 檔，或設定裡的「新增 MCP 伺服器」）：',
     intgMcpNote: 'skill 和 MCP 可以同時存在，助理會自行選用；兩者做的事完全相同。',
-    intgCliTitle: '進階：命令列 genoffice',
-    intgCliReady: 'genoffice {v} · 已可在終端機直接使用（{path}）',
+    intgCliTitle: '進階：命令列 UniWork Office',
+    intgCliReady: 'UniWork Office (genoffice) {v} · 已可在終端機直接使用（{path}）',
     intgCliNotOnPath:
-      'genoffice {v} · 尚未加入終端機 PATH。助理仍能透過 ~/.genoffice/launcher 找到它，skill 不受影響。若想自己在終端機輸入 genoffice，執行一次：',
+      'UniWork Office (genoffice) {v} · 尚未加入終端機 PATH。助理仍能透過 ~/.genoffice/launcher 找到它，skill 不受影響。若想自己在終端機輸入 genoffice，執行一次：',
     intgCliLauncher: '啟動器資料夾',
     intgStateOutdated: '已安裝 {v}，可更新至 {next}',
     intgStateModified: '已安裝 {v}（已被修改）',
@@ -8688,11 +8688,11 @@ export const strings = {
     setAiTestOk: '連線成功',
     setAiTestFail: '連線失敗',
     setAiOpenRouterHub: 'OpenRouter Token Hub',
-    setAiOpenRouterHubHint: 'Check remaining limit and usage for this key (GET /api/v1/key).',
-    setAiOpenRouterHubCheck: 'Check credits',
-    setAiOpenRouterHubChecking: 'Checking…',
-    setAiOpenRouterHubFail: 'Could not read OpenRouter credits',
-    setAiOpenRouterCredits: 'Top up / manage',
+    setAiOpenRouterHubHint: '查看這組金鑰的剩餘額度與用量。',
+    setAiOpenRouterHubCheck: '查詢額度',
+    setAiOpenRouterHubChecking: '查詢中…',
+    setAiOpenRouterHubFail: '無法讀取 OpenRouter 額度',
+    setAiOpenRouterCredits: '儲值 / 管理',
     setAiMaxTokens: '單次輸出上限（tokens）',
     setAiMaxTokensDesc:
       '一次回合的輸出預算。推理模型會先消耗預算用於思考，預算用畢時回覆可能變成空白，遇到此情況請調高本項。',

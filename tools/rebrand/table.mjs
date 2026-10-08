@@ -190,6 +190,56 @@ export const DROPPED_SHELL_STRING_KEYS = [
 ]
 
 /**
+ * Settings > Integrations names the tool in prose: "the genoffice command line", "Advanced:
+ * genoffice command line". The command (`genoffice`), the MCP server keys and the paths
+ * (~/.genoffice/launcher) are functional ids and stay; only the words around them become the
+ * product name, with the command in parentheses so a user can still find it in a terminal.
+ * Each entry rewrites one string key in every locale block of the shell string table.
+ */
+// not part of a path / id, and not already wrapped by an earlier run
+const BARE_COMMAND = /(?<![\w~./-]|UniWork Office \()genoffice(?![\w./-])/
+const BARE_MCP = /(?<![\w~./-]|UniWork Office \()genoffice mcp/
+const BARE_WITH_VERSION = /(?<![\w~./-]|UniWork Office \()genoffice(?= \{v\})/
+// German / Dutch compounds: "genoffice-Befehlszeile", "genoffice-opdrachtregel"
+const COMPOUND = /(?<![\w~./-])genoffice-(?=[A-Za-z])/
+const named = (v) =>
+  v.replace(COMPOUND, 'UniWork Office-').replace(BARE_COMMAND, 'UniWork Office (genoffice)')
+export const INTEGRATIONS_PROSE = {
+  intgStep2Note: named,
+  intgCliPartDesc: named,
+  intgMcpStdioDesc: (v) => v.replace(BARE_MCP, 'UniWork Office (genoffice mcp)'),
+  intgCliTitle: (v) =>
+    v.replace(COMPOUND, 'UniWork Office-').replace(BARE_COMMAND, 'UniWork Office'),
+  intgCliReady: (v) => v.replace(BARE_WITH_VERSION, 'UniWork Office (genoffice)'),
+  intgCliNotOnPath: (v) => v.replace(BARE_WITH_VERSION, 'UniWork Office (genoffice)'),
+}
+
+/**
+ * Rewrites `key: value,` properties (value on the key line or on deeper-indented continuation
+ * lines) of a string table with `fns[key](value)`; the quotes and the layout stay.
+ */
+export function mapStringValues(fns) {
+  const keys = Object.keys(fns)
+  const keyLine = new RegExp(`^( {4}(${keys.join('|')}):[ \\t]*)(.*)$`)
+  return (text) => {
+    const lines = text.split(/(?<=\n)/)
+    for (let i = 0; i < lines.length; i++) {
+      const head = keyLine.exec(lines[i].replace(/\n$/, ''))
+      if (!head) continue
+      let end = i
+      while (/^ {6,}\S/.test(lines[end + 1] ?? '')) end++
+      for (let j = i; j <= end; j++) {
+        const nl = lines[j].endsWith('\n') ? '\n' : ''
+        const body = lines[j].replace(/\n$/, '')
+        lines[j] = (j === i ? head[1] + fns[head[2]](head[3]) : fns[head[2]](body)) + nl
+      }
+      i = end
+    }
+    return lines.join('')
+  }
+}
+
+/**
  * Removes whole `key: value,` properties (value on the key line, or on the continuation lines
  * indented deeper) from every locale block of a string table.
  */
@@ -492,6 +542,12 @@ export const rules = [
     transform: dropStringKeys(DROPPED_SHELL_STRING_KEYS),
   },
   {
+    id: 'integrations-prose',
+    why: 'Settings > Integrations prose says "the genoffice command line" / "Advanced: genoffice command line": the product name replaces the command word in the sentence (command in parentheses); the command itself, the MCP server keys, ~/.genoffice paths and the paste-able snippets stay (functional ids)',
+    files: ['apps/shell/src/renderer/src/strings.ts'],
+    transform: mapStringValues(INTEGRATIONS_PROSE),
+  },
+  {
     id: 'skills-install-source',
     why: 'Settings > Integrations shows `npx skills add <owner/repo>`; the skills CLI installs skills/genoffice from the team repo (public, ships the same skill), not from the upstream repo',
     files: ['apps/shell/src/renderer/src/IntegrationsPane.tsx'],
@@ -517,18 +573,21 @@ export const rules = [
     files: ['docs/i18n/README.*.md'],
     ignoreGlobalExclude: true,
     transform: (text) => {
-      if (text.includes('> **UniWork Office fork.**')) return text
-      return `${FORK_BANNER}\n${text}`
+      // the first banner carried an internal ticket sentence ("... not part of GO-1."): drop it
+      const clean = text.replace(LEGACY_BANNER_TAIL, '')
+      if (clean.includes('> **UniWork Office fork.**')) return clean
+      return `${FORK_BANNER}\n${clean}`
     },
   },
 ]
 
 export const FORK_BANNER = [
   '> **UniWork Office fork.** The canonical product README is [`README.md`](../../README.md). This file is the upstream GenOffice translation, kept for attribution. It is not a UniWork localized product guide.',
-  '>',
-  '> This repository is currently a desktop office runtime. UniWork platform integration is not part of GO-1.',
   '',
 ].join('\n')
+
+const LEGACY_BANNER_TAIL =
+  />\n> This repository is currently a desktop office runtime\. UniWork platform integration is not part of GO-1\.\n/
 
 /**
  * Files copied verbatim over their target (path under tools/rebrand/assets/
