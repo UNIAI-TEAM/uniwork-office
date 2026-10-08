@@ -62,7 +62,9 @@ export function validateLegal(legal) {
     throw new Error(`${LEGAL_JSON}: "copyrightYear" must be an integer`)
   }
   if (!/^https:\/\//.test(legal.homepage) || /github\.com/i.test(legal.homepage)) {
-    throw new Error(`${LEGAL_JSON}: "homepage" must be an https URL that is not a code-hosting page`)
+    throw new Error(
+      `${LEGAL_JSON}: "homepage" must be an https URL that is not a code-hosting page`,
+    )
   }
   const up = legal.upstream ?? {}
   for (const key of ['name', 'copyright', 'license', 'notice', 'trademarks']) {

@@ -136,7 +136,9 @@ describe('Settings > About', () => {
         'setAboutLicense',
         'setAboutLegalOpenFailed',
       ] as const) {
-        expect(table[key], `${lang}.${key}`).not.toMatch(/GenOffice|Genspark|Mainfunc|Apache|github/i)
+        expect(table[key], `${lang}.${key}`).not.toMatch(
+          /GenOffice|Genspark|Mainfunc|Apache|github/i,
+        )
       }
       for (const p of ['{product}', '{upstream}', '{upstreamCopyright}', '{license}']) {
         expect(table.setAboutAttribution, lang).toContain(p)

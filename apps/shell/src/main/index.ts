@@ -4096,10 +4096,8 @@ function registerHomeIpc(): void {
   ipcMain.handle(HOME_CHANNELS.getAppVersion, (): string => app.getVersion())
 
   // Settings > About: the shipped legal files, opened locally (never a URL)
-  ipcMain.handle(
-    HOME_CHANNELS.openLegalDoc,
-    (_event, doc: unknown): Promise<boolean> =>
-      openLegalDoc(doc, legalDocEnv(), { openPath: (path) => shell.openPath(path) }),
+  ipcMain.handle(HOME_CHANNELS.openLegalDoc, (_event, doc: unknown): Promise<boolean> =>
+    openLegalDoc(doc, legalDocEnv(), { openPath: (path) => shell.openPath(path) }),
   )
 
   ipcMain.handle(HOME_CHANNELS.recents, (_event, query: unknown): RecentPage =>

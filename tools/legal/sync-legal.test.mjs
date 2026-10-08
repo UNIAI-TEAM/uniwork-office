@@ -32,7 +32,9 @@ test('legal.json carries the upstream NOTICE verbatim and a non-repository homep
 test('NOTICE header: fork first, upstream NOTICE verbatim, body untouched', () => {
   const upstreamOnly = `${UPSTREAM_NOTICE}\n\n${BODY}`
   const out = syncNotice(upstreamOnly, LEGAL)
-  assert.ok(out.startsWith(`${LEGAL.product}\nCopyright ${LEGAL.copyrightYear} ${LEGAL.company}\n\n`))
+  assert.ok(
+    out.startsWith(`${LEGAL.product}\nCopyright ${LEGAL.copyrightYear} ${LEGAL.company}\n\n`),
+  )
   assert.ok(out.includes(`\n${UPSTREAM_NOTICE}\n`), 'upstream NOTICE kept byte for byte')
   assert.match(out, /modified version of GenOffice/)
   assert.match(out, /described in MODIFICATIONS\.\n\nBundled third-party/)
