@@ -183,18 +183,12 @@ test('origin links point at the UNIAI-TEAM repo, from upstream and from the old 
       'package.json': '{ "homepage": "https://github.com/truongnt7/uniwork-office" }\n',
       'apps/shell/src/main/updater.ts':
         "const A = 'https://github.com/genspark-ai/genoffice/releases/latest'\nconst B = 'https://github.com/truongnt7/uniwork-office/releases/latest'\n",
-      'apps/shell/src/main/index.ts':
-        "const S = 'https://api.github.com/repos/truongnt7/uniwork-office'\nconst J = 'https://genoffice.ai/join'\n",
     },
     (get) => {
       assert.match(get('package.json'), /github\.com\/UNIAI-TEAM\/uniwork-office"/)
       assert.equal(
         get('apps/shell/src/main/updater.ts'),
         "const A = 'https://github.com/UNIAI-TEAM/uniwork-office/releases/latest'\nconst B = 'https://github.com/UNIAI-TEAM/uniwork-office/releases/latest'\n",
-      )
-      assert.equal(
-        get('apps/shell/src/main/index.ts'),
-        "const S = 'https://api.github.com/repos/UNIAI-TEAM/uniwork-office'\nconst J = 'https://github.com/UNIAI-TEAM/uniwork-office'\n",
       )
     },
   )
@@ -322,4 +316,128 @@ test('the post-install ln -s hint quotes the spaced install dir', () => {
       )
     },
   )
+})
+
+test('GitHub, GenTeam and usage-statistics strings are dropped from every locale and stay dropped', () => {
+  const upstream = [
+    'export const strings = {',
+    '  en: {',
+    "    setGithub: 'Open Source',",
+    "    starOnGitHub: 'Star on GitHub',",
+    '    starPromptTitleN: "You\'ve opened {n} documents",',
+    '    starPromptBody:',
+    "      'UniWork Office is free and open source. A star on GitHub is the best way to support the team.',",
+    "    setAnalytics: 'Send anonymous usage statistics',",
+    '    setAnalyticsDesc:',
+    "      'Uses Google Analytics 4; Google receives your public IP address.',",
+    "    setAnalyticsOther: 'a different key that merely starts the same',",
+    "    onbCredits: 'Active contributors get **1,000+ credits**',",
+    "    onbJoinGenTeam: 'Join GenTeam',",
+    "    onbSkip: 'Skip',",
+    '  },',
+    '  vi: {',
+    "    starPromptGo: 'Gắn sao trên GitHub',",
+    "    onbStarHint: 'Nếu bạn thích UniWork Office, hãy gắn sao.',",
+    "    onbSkip: 'Bỏ qua',",
+    '  },',
+    '}',
+    '',
+  ].join('\n')
+  withFiles({ 'apps/shell/src/renderer/src/strings.ts': upstream }, (get) => {
+    const text = get('apps/shell/src/renderer/src/strings.ts')
+    assert.ok(
+      !/GitHub|Analytics|starPrompt|onbStarHint|onbCredits|onbJoinGenTeam|setGithub/.test(
+        text.replace('setAnalyticsOther', ''),
+      ),
+    )
+    assert.match(text, /setAnalyticsOther: 'a different key that merely starts the same'/)
+    assert.equal((text.match(/onbSkip/g) ?? []).length, 2)
+    assert.match(text, /^ {4}onbSkip: 'Bỏ qua',$/m)
+  })
+})
+
+test('step 3 of the welcome dialog is rewritten in every locale, double-quoted upstream values included', () => {
+  const upstream = [
+    'export const strings = {',
+    '  pt: {',
+    "    onbTitle3: 'Grátis para todos',",
+    '    onbBody3: "Sem licenças. Sem anúncios. Sem marcas d\'água.",',
+    '  },',
+    '  vi: {',
+    "    onbTitle3: 'Miễn phí cho mọi người',",
+    "    onbBody3: 'Không phí bản quyền. Không quảng cáo. Không watermark.',",
+    '  },',
+    '}',
+    '',
+  ].join('\n')
+  withFiles({ 'apps/shell/src/renderer/src/strings.ts': upstream }, (get) => {
+    const text = get('apps/shell/src/renderer/src/strings.ts')
+    assert.match(text, /^ {4}onbTitle3: 'Tudo pronto',$/m)
+    assert.match(
+      text,
+      /^ {4}onbBody3: 'Abra um arquivo ou crie um novo documento para começar\.',$/m,
+    )
+    assert.match(text, /^ {4}onbTitle3: 'Bạn đã sẵn sàng',$/m)
+    assert.ok(!/Miễn phí|licenças|watermark/i.test(text))
+  })
+})
+
+// ---- app icon overlay: the blue "W" icon, every size the packagers and the app read ----
+
+const ASSETS = new URL('./assets/', import.meta.url)
+const asset = (rel) => readFileSync(new URL(rel, ASSETS))
+const pngSize = (buf) => {
+  assert.equal(buf.subarray(1, 4).toString(), 'PNG')
+  return [buf.readUInt32BE(16), buf.readUInt32BE(20)]
+}
+
+test('the icon overlay carries every Linux hicolor size at its real dimensions', () => {
+  for (const n of [16, 32, 48, 64, 128, 256, 512, 1024]) {
+    assert.deepEqual(pngSize(asset(`apps/shell/build/icons/${n}x${n}.png`)), [n, n], `${n}`)
+    assert.deepEqual(
+      asset(`apps/shell/build/icons/${n}x${n}/apps/uniwork-office.png`),
+      asset(`apps/shell/build/icons/${n}x${n}.png`),
+      `${n} hicolor copy`,
+    )
+  }
+  assert.deepEqual(pngSize(asset('apps/shell/build/icon.png')), [1024, 1024])
+  assert.deepEqual(pngSize(asset('apps/shell/build/icon-mac.png')), [1024, 1024])
+  assert.deepEqual(pngSize(asset('apps/shell/src/renderer/src/assets/app-icon.png')), [512, 512])
+})
+
+test('icon.ico holds 16..256 px entries and icon.icns the PNG slots macOS reads', () => {
+  const ico = asset('apps/shell/build/icon.ico')
+  assert.equal(ico.readUInt16LE(2), 1, 'icon resource type')
+  const sizes = Array.from({ length: ico.readUInt16LE(4) }, (_, i) => ico[6 + i * 16] || 256)
+  assert.deepEqual(sizes, [16, 24, 32, 48, 64, 128, 256])
+
+  const icns = asset('apps/shell/build/icon.icns')
+  assert.equal(icns.subarray(0, 4).toString('ascii'), 'icns')
+  assert.equal(icns.readUInt32BE(4), icns.length)
+  const slots = {}
+  for (let at = 8; at < icns.length;) {
+    const type = icns.subarray(at, at + 4).toString('ascii')
+    const len = icns.readUInt32BE(at + 4)
+    slots[type] = pngSize(icns.subarray(at + 8, at + len))[0]
+    at += len
+  }
+  assert.deepEqual(slots, {
+    icp4: 16,
+    icp5: 32,
+    icp6: 64,
+    ic07: 128,
+    ic08: 256,
+    ic09: 512,
+    ic10: 1024,
+    ic11: 32,
+    ic12: 64,
+    ic13: 256,
+    ic14: 512,
+  })
+})
+
+test('the standalone Docs app ships the same icons as the shell', () => {
+  for (const f of ['icon.png', 'icon-mac.png', 'icon.ico', 'icon.icns']) {
+    assert.deepEqual(asset(`apps/docs/build/${f}`), asset(`apps/shell/build/${f}`), f)
+  }
 })

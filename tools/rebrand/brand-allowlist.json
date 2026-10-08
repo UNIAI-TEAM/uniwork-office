@@ -90,6 +90,31 @@
       "kind": "debt",
       "reason": "Packaging recipes name the upstream product and vendor (Name=, descriptions, <name>, developer Mainfunc, /opt/GenOffice/genoffice) because they unpack the upstream-built deb / AppImage, which still installs under /opt/GenOffice. Rebrand with the recipes once they consume the UniWork Office artifacts (install dir /opt/UniWork Office, binary uniwork-office).",
       "tracker": "GO-A8 (packaging/release)"
+    },
+    {
+      "path": "packages/{docx-engine,pptx-engine}/src/vendor/**",
+      "pattern": "github\\.com",
+      "kind": "permanent",
+      "reason": "Attribution link to the upstream project of a vendored third-party library (licence / provenance notes in a vendor README); never rendered in the UI."
+    },
+    {
+      "path": "apps/markdown/src/{main/image-host.ts,renderer/components/ImageHostDialog.tsx,shared/ipc.ts}",
+      "pattern": "[Gg]it[Hh]ub",
+      "kind": "permanent",
+      "reason": "The Markdown editor's image-host feature lets the user upload pictures to a GitHub repository they configure (owner, repo, token): the service is named as an upload target, its API endpoint and error messages carry its name. A third-party product, not a link to the UniWork repository and not a call to action."
+    },
+    {
+      "path": "apps/shell/src/main/updater.ts",
+      "pattern": "github\\.com/UNIAI-TEAM/uniwork-office/releases/latest",
+      "kind": "debt",
+      "reason": "DOWNLOAD_PAGE_URL, the manual-download target of the update dialog when a build has no self-update feed. Functional URL, never displayed as text (the dialog says 'Download'); moves to a UniWork download page once one exists.",
+      "tracker": "GO-A8 (release / download page) + GO-A4 UNI-1005 (release URLs)"
+    },
+    {
+      "path": "packages/cli/src/agent-skills.ts",
+      "pattern": "GitHub Copilot",
+      "kind": "permanent",
+      "reason": "Name of a third-party AI coding agent (GitHub Copilot) in the list of agents the skill installer can target; a product name, not a repository link."
     }
   ]
 }

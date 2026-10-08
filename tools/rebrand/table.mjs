@@ -69,15 +69,12 @@ export const NON_BRAND_TOKENS = [
   /[A-Za-z0-9_.:-]+[._:-](?:genoffice|genspark|genteam)\b/g,
 ]
 
+// Functional repo URLs that stay (never shown as text): package metadata, the updater's manual
+// download page and the PWA's download links. The product UI itself links no repository.
 const GITHUB_URL_FILES = [
   'package.json',
   'apps/shell/package.json',
-  'apps/shell/src/main/index.ts',
-  'apps/shell/src/main/tab-manager.ts',
   'apps/shell/src/main/updater.ts',
-  'apps/shell/src/renderer/src/SettingsModal.tsx',
-  'apps/docs/src/renderer/App.tsx',
-  'packages/electron-utils/src/github-menu.ts',
   'apps/uniai-pwa/app.js',
 ]
 
@@ -158,12 +155,58 @@ function onboardingCopy(text) {
     for (const [key, value] of Object.entries(copy)) {
       const line = `    ${key}: '${value}',`
       const next = columns(line) <= 100 ? line : `    ${key}:\n      '${value}',`
-      const prop = new RegExp(`^    ${key}:[ \\t]*(?:\\n[ \\t]*)?'(?:[^'\\\\\\n]|\\\\.)*',$`, 'm')
+      // upstream writes a value with an apostrophe in double quotes ("Sem marcas d'água.")
+      const prop = new RegExp(
+        `^    ${key}:[ \\t]*(?:\\n[ \\t]*)?(['"])(?:(?!\\1)[^\\\\\\n]|\\\\.)*\\1,$`,
+        'm',
+      )
       block = prop.test(block) ? block.replace(prop, () => next) : block
     }
     out = out.slice(0, start) + block + out.slice(end)
   }
   return out
+}
+
+/**
+ * Shell string keys of features UniWork Office does not ship: the GitHub star prompt / About row /
+ * welcome card, the GenTeam credits offer and the Google Analytics usage-statistics consent.
+ * No UI references them any more; an upstream sync brings them back in every locale block, and
+ * the brand scan (which flags "GitHub" in user-visible strings) would fail on them.
+ */
+export const DROPPED_SHELL_STRING_KEYS = [
+  'setGithub',
+  'starOnGitHub',
+  'starPromptTitle',
+  'starPromptTitleN',
+  'starPromptBody',
+  'starPromptGo',
+  'starPromptDone',
+  'starPromptLater',
+  'onbStarHint',
+  'setAnalytics',
+  'setAnalyticsDesc',
+  'onbCredits',
+  'onbJoinGenTeam',
+]
+
+/**
+ * Removes whole `key: value,` properties (value on the key line, or on the continuation lines
+ * indented deeper) from every locale block of a string table.
+ */
+export function dropStringKeys(keys) {
+  const keyLine = new RegExp(`^ {4}(?:${keys.join('|')}):`)
+  return (text) => {
+    const lines = text.split(/(?<=\n)/)
+    const out = []
+    for (let i = 0; i < lines.length; i++) {
+      if (!keyLine.test(lines[i])) {
+        out.push(lines[i])
+        continue
+      }
+      while (/^ {6,}\S/.test(lines[i + 1] ?? '')) i++
+    }
+    return out.join('')
+  }
 }
 
 const PRODUCT_NAME = new RegExp(
@@ -420,7 +463,7 @@ export const rules = [
   },
   {
     id: 'origin-repo-urls',
-    why: 'Homepage / repository / releases / issues / stars links point at the UniWork team repo UNIAI-TEAM/uniwork-office. The earlier fork truongnt7/uniwork-office is rewritten too (limited to the files the hand rebrand touched plus the PWA download links; other upstream URLs are tracked by the brand scan allowlist)',
+    why: 'Functional repo URLs (package homepage / repository, the updater download page, the PWA download links) point at the UniWork team repo UNIAI-TEAM/uniwork-office, never shown as text. The earlier fork truongnt7/uniwork-office is rewritten too. The product UI shows no repo link (the brand scan flags GitHub wording and github.com in user-visible strings)',
     files: GITHUB_URL_FILES,
     // comments cite upstream issues (github.com/genspark-ai/genoffice/issues/15): those stay upstream's
     skipComments: true,
@@ -443,6 +486,12 @@ export const rules = [
     transform: onboardingCopy,
   },
   {
+    id: 'drop-github-and-usage-strings',
+    why: 'GitHub star prompt / About row / welcome card, GenTeam credits offer and the Google Analytics consent are not shipped (no GitHub or repo call to action, no usage statistics in the product UI); their string keys are dropped from every locale after a sync',
+    files: ['apps/shell/src/renderer/src/strings.ts'],
+    transform: dropStringKeys(DROPPED_SHELL_STRING_KEYS),
+  },
+  {
     id: 'skills-install-source',
     why: 'Settings > Integrations shows `npx skills add <owner/repo>`; the skills CLI installs skills/genoffice from the team repo (public, ships the same skill), not from the upstream repo',
     files: ['apps/shell/src/renderer/src/IntegrationsPane.tsx'],
@@ -458,15 +507,6 @@ export const rules = [
     replace: [
       [PRODUCT_NAME, 'UniWork Office'],
       [/(?<![A-Za-z0-9_])Genspark(?![A-Z0-9_])/g, 'UniWork'],
-    ],
-  },
-  {
-    id: 'onboarding-community-cta',
-    why: 'GenTeam community link and the onboarding offer slide are disabled (no genoffice.ai link)',
-    files: ['apps/shell/src/main/index.ts', 'apps/shell/src/renderer/src/Onboarding.tsx'],
-    replace: [
-      [/'https:\/\/genoffice\.ai\/join'/g, "'https://github.com/UNIAI-TEAM/uniwork-office'"],
-      [/(titleKey: 'onbTitle2', subtitleKey: 'onbBody2', showOffer: )true/g, '$1false'],
     ],
   },
 

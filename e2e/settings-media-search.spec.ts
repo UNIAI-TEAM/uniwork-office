@@ -4,10 +4,8 @@ import { join } from 'node:path'
 import { launchShell, closeAndSaveVideo, screenshotPath } from './helpers'
 
 test('Jev reranking lives in the AI Media & Search pane, saves with it, and reports its own test verdict', async () => {
-  // the star prompt card sits over the pane footer on a small window
   const launched = await launchShell({
     onboardingSeen: true,
-    settings: { starPrompt: { resolved: true } },
     videoDir: 'settings-media-search',
   })
   const { page, userDataDir } = launched

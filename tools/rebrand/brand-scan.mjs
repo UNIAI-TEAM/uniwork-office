@@ -19,6 +19,9 @@
 //   shipped    skills/** copied into users' agent directories, and the npm-published packages/cli/README.md
 //   source     also scripts/mcp-stdio-bridge.js (its log lines reach the MCP client)
 //
+// Also flagged in the catalog / source scopes: GitHub (the word, github.com) and analytics-service
+// endpoints (google-analytics.com, GA4 credentials; also in installer scope), see REPO_LINKS / TELEMETRY.
+//
 // Exemptions live in brand-allowlist.json, one reason per entry. Code
 // identifiers (@genoffice/*, GENOFFICE_* env vars, font aliases, ...) are
 // masked via NON_BRAND_TOKENS from table.mjs, the same list the rebrand uses.
@@ -51,6 +54,23 @@ const INTERNAL_COPY = [
   /\b(?:office|productivity)\s+runtime\b/gi,
   /\bplatform integration\b/gi,
   /giai đoạn\s+(?:này|\d+)/gi,
+]
+/**
+ * Repo and open-source calls to action are not product copy: the user-visible UI names no
+ * GitHub, links no repository and asks for no star. Matches the word (any case) and the hosts;
+ * camel-case identifiers (openGitHubRepo) are not hits. Applied to catalog values and
+ * string-literal lines of apps/*\/src and packages/*\/src (comment lines skipped); allowlist only
+ * licence / attribution text, third-party product names and functional URLs, each with a reason.
+ */
+const REPO_LINKS = [/\bgithub\b/gi, /github(?:usercontent)?\.com/gi]
+/**
+ * The product reports nothing to analytics services (PRIVACY.md): a Google Analytics /
+ * Tag Manager endpoint, a GA4 measurement id or the old injected credentials in product code
+ * or packaging config is a violation, whatever the surrounding copy says.
+ */
+const TELEMETRY = [
+  /google-analytics\.com|googletagmanager\.com/gi,
+  /\bmeasurement_id\b|GA4_(?:API_SECRET|MEASUREMENT_ID)|genofficeAnalytics/g,
 ]
 /** Org / domain forms that are never code identifiers, even though they embed the lowercase brand. */
 const BRAND_LOCATOR = /genoffice\.ai|genspark\.ai|genspark-ai\/|genoffice:\/\//gi
@@ -163,6 +183,12 @@ export function brandMatches(text, scope = 'source') {
     for (const m of text.matchAll(PACKAGING_IDENTITY)) hits.push(m[0])
   }
   if (scope === 'source') for (const m of text.matchAll(DESKTOP_ID)) hits.push(m[0])
+  if (scope === 'catalog' || scope === 'source') {
+    for (const re of REPO_LINKS) for (const m of text.matchAll(re)) hits.push(m[0])
+  }
+  if (scope === 'source' || scope === 'installer') {
+    for (const re of TELEMETRY) for (const m of text.matchAll(re)) hits.push(m[0])
+  }
   if (scope === 'catalog' || scope === 'source') {
     for (const re of INTERNAL_COPY) for (const m of text.matchAll(re)) hits.push(m[0])
   }

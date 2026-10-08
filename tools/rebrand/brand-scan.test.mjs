@@ -251,3 +251,71 @@ test('a permanent entry that matches nothing is reported separately from debt', 
   assert.equal(unused.length, 0)
   assert.equal(unusedPermanent.length, 1)
 })
+
+test('user-visible GitHub wording and repo links are violations, camel-case identifiers and comments are not', () => {
+  const hits = (line, file = 'apps/shell/src/renderer/src/strings.ts') =>
+    run({ [file]: line }).violations.length
+  // hits: the word in any case, repo / API hosts, in catalogs and in string literals
+  for (const text of [
+    'Star on GitHub',
+    'Gắn sao trên GitHub',
+    'Open the repo on github',
+    'see https://github.com/UNIAI-TEAM/uniwork-office',
+    'api.github.com/repos/a/b',
+    'raw.githubusercontent.com/a/b',
+  ]) {
+    assert.equal(hits(`  key: '${text}',`), 1, text)
+  }
+  assert.equal(hits("const URL = 'https://github.com/x/y'", 'apps/shell/src/main/a.ts'), 1)
+  // non-hits: code identifiers, comments, out-of-scope files
+  for (const line of [
+    'window.aiOffice.openGitHubRepo()',
+    'export const GITHUB_REPO_URL = u',
+    'const githubStars = 0',
+  ]) {
+    assert.equal(hits(line, 'apps/shell/src/main/a.ts'), 0, line)
+  }
+  assert.equal(hits('// see github.com/foo/bar#12', 'apps/shell/src/main/a.ts'), 0)
+  assert.equal(hits('Star on GitHub', 'LICENSE'), 0)
+  assert.equal(hits('Star on GitHub', 'NOTICE'), 0)
+  assert.equal(
+    hits('"homepage": "https://github.com/UNIAI-TEAM/uniwork-office"', 'package.json'),
+    0,
+  )
+})
+
+test('GitHub allowlist entries are reasoned and suppress only their file', () => {
+  const files = {
+    'apps/markdown/src/main/image-host.ts': 'const u = `https://api.github.com/repos/${o}/${r}`',
+    'apps/shell/src/main/a.ts': "const u = 'https://api.github.com/repos/${o}'",
+  }
+  const { violations, allowed } = run(files, [
+    {
+      path: 'apps/markdown/src/main/image-host.ts',
+      pattern: 'api\.github\.com',
+      kind: 'permanent',
+      reason: 'third-party image host API endpoint the user configures',
+    },
+  ])
+  assert.deepEqual(
+    violations.map((v) => v.file),
+    ['apps/shell/src/main/a.ts'],
+  )
+  assert.equal(allowed.length, 1)
+})
+
+test('analytics endpoints and GA4 credentials in product code or packaging config are violations', () => {
+  const hits = (line, file) => run({ [file]: line }).violations.length
+  for (const [line, file] of [
+    ["const E = 'https://www.google-analytics.com/mp/collect'", 'apps/shell/src/main/a.ts'],
+    ["const T = 'https://www.googletagmanager.com/gtag/js'", 'apps/docs/src/renderer/a.ts'],
+    ['const q = `?measurement_id=${id}`', 'apps/shell/src/main/a.ts'],
+    ['extraMetadata.genofficeAnalytics = { apiSecret }', 'apps/shell/electron-builder.cjs'],
+    ['const id = process.env.GENOFFICE_GA4_API_SECRET', 'apps/shell/electron-builder.cjs'],
+  ]) {
+    assert.equal(hits(line, file), 1, line)
+  }
+  // a settings key that merely says "analytics" is fine
+  assert.equal(hits("const k = 'analytics'", 'apps/shell/src/main/a.ts'), 0)
+  assert.equal(hits('// google-analytics.com was removed', 'apps/shell/src/main/a.ts'), 0)
+})
