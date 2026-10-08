@@ -1,0 +1,71 @@
+[
+  {
+    "doc": "long",
+    "step": "open",
+    "ok": true,
+    "ms": 2641,
+    "detail": "text visible in 2641ms; fully loaded (460 blocks, editable) after 1224ms; tables=5"
+  },
+  {
+    "doc": "long",
+    "step": "editable",
+    "ok": true,
+    "ms": 139
+  },
+  {
+    "doc": "long",
+    "step": "type-marker",
+    "ok": true,
+    "ms": 1183,
+    "detail": "461 blocks; last: docParagraph:\"Lorem ipsum dolor sit amet, co\" / docTable:\"T5 R1C1T5 R1C2T5 R1C3T5 R2C1T5\" / docParagraph:\"\" / docParagraph:\"E2EMARKLONGMUZOECNV\" sel=139259-139259 hasMarker=true"
+  },
+  {
+    "doc": "long",
+    "step": "bold",
+    "ok": true,
+    "ms": 207,
+    "detail": "Ctrl+B: {\"inStrong\":true,\"weight\":\"700\",\"tag\":\"STRONG\"}"
+  },
+  {
+    "doc": "long",
+    "step": "insert-table",
+    "ok": true,
+    "ms": 1013,
+    "detail": "tables 5 -> 6"
+  },
+  {
+    "doc": "long",
+    "step": "save",
+    "ok": true,
+    "ms": 629,
+    "detail": "4843 bytes"
+  },
+  {
+    "doc": "long",
+    "step": "saved-xml",
+    "ok": true,
+    "ms": 13,
+    "detail": "run=<w:r><w:rPr><w:b/><w:bCs/></w:rPr><w:t xml:space=\"preserve\">E2EMARKLONGMUZOECNV</w:t></w:r> | w:tbl=6"
+  },
+  {
+    "doc": "long",
+    "step": "reopen",
+    "ok": true,
+    "ms": 2096,
+    "detail": "marker bold={\"inStrong\":true,\"weight\":\"700\"}; tables 5 -> 6"
+  },
+  {
+    "doc": "long",
+    "step": "host-events",
+    "ok": true,
+    "ms": 37,
+    "detail": "events: ready,title,dirty,saved; dirty true>false; saved {\"fileId\":\"f1\",\"name\":\"long.docx\",\"versionId\":\"v2\",\"etag\":\"\\\"f1-v2\\\"\",\"sizeBytes\":4843}"
+  },
+  {
+    "doc": "long",
+    "step": "save-conflict",
+    "ok": true,
+    "ms": 2334,
+    "detail": "stale etag refused (412 conflict), editor stays dirty"
+  }
+]

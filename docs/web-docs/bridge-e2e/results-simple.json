@@ -1,0 +1,71 @@
+[
+  {
+    "doc": "simple",
+    "step": "open",
+    "ok": true,
+    "ms": 2600,
+    "detail": "text visible in 2600ms; fully loaded (3 blocks, editable) after 1356ms; tables=0"
+  },
+  {
+    "doc": "simple",
+    "step": "editable",
+    "ok": true,
+    "ms": 132
+  },
+  {
+    "doc": "simple",
+    "step": "type-marker",
+    "ok": true,
+    "ms": 1182,
+    "detail": "4 blocks; last: docHeading:\"标题\" / docParagraph:\"第一段。\" / docParagraph:\"第二段。\" / docParagraph:\"E2EMARKSIMPLEMUZODYLV\" sel=38-38 hasMarker=true"
+  },
+  {
+    "doc": "simple",
+    "step": "bold",
+    "ok": true,
+    "ms": 246,
+    "detail": "Ctrl+B: {\"inStrong\":true,\"weight\":\"700\",\"tag\":\"STRONG\"}"
+  },
+  {
+    "doc": "simple",
+    "step": "insert-table",
+    "ok": true,
+    "ms": 1046,
+    "detail": "tables 0 -> 1"
+  },
+  {
+    "doc": "simple",
+    "step": "save",
+    "ok": true,
+    "ms": 403,
+    "detail": "2373 bytes"
+  },
+  {
+    "doc": "simple",
+    "step": "saved-xml",
+    "ok": true,
+    "ms": 11,
+    "detail": "run=<w:r><w:rPr><w:b/><w:bCs/></w:rPr><w:t xml:space=\"preserve\">E2EMARKSIMPLEMUZODYLV</w:t></w:r> | w:tbl=1"
+  },
+  {
+    "doc": "simple",
+    "step": "reopen",
+    "ok": true,
+    "ms": 1372,
+    "detail": "marker bold={\"inStrong\":true,\"weight\":\"700\"}; tables 0 -> 1"
+  },
+  {
+    "doc": "simple",
+    "step": "host-events",
+    "ok": true,
+    "ms": 28,
+    "detail": "events: ready,title,dirty,saved; dirty false>true>false; saved {\"fileId\":\"f1\",\"name\":\"simple.docx\",\"versionId\":\"v2\",\"etag\":\"\\\"f1-v2\\\"\",\"sizeBytes\":2373}"
+  },
+  {
+    "doc": "simple",
+    "step": "save-conflict",
+    "ok": true,
+    "ms": 2243,
+    "detail": "stale etag refused (412 conflict), editor stays dirty"
+  }
+]

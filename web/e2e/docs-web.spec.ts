@@ -1,14 +1,17 @@
 // UNI-1011 W7: for each of 3 docx fixtures, in the web build of the Docs renderer:
 // open -> editable -> type marker -> bold -> insert table -> save -> reopen saved bytes -> assert.
-// Every step is recorded (pass/fail + error) to docs/web-spike/screenshots/results.json and the
+// GO-B3 (UNI-1013): the editor runs in an iframe inside the protocol test host
+// (web/server/test-host); open/save go through the frame protocol to the host's
+// in-memory store, plus host-event and save-conflict checks.
+// Every step is recorded (pass/fail + error) to <SHOTS>/results-<doc>.json and the
 // test fails at the end if any step failed; a failed step does not stop independent later steps.
-import { test, expect, type Page, type BrowserContext } from '@playwright/test'
+import { test, expect, type Page, type BrowserContext, type Frame } from '@playwright/test'
 import JSZip from 'jszip'
-import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 const repoRoot = resolve(__dirname, '../..')
-const SHOTS = resolve(repoRoot, 'docs/web-spike/screenshots')
+const SHOTS = resolve(repoRoot, process.env.E2E_SHOTS || 'docs/web-spike/screenshots')
 mkdirSync(SHOTS, { recursive: true })
 
 interface DocCase {
@@ -74,30 +77,22 @@ async function serveBytes(ctx: BrowserContext, urlPath: string, body: Buffer): P
   )
 }
 
-async function openDoc(page: Page, urlPath: string, expectText: string): Promise<void> {
-  await page.goto(`/?open=${encodeURIComponent(urlPath)}`)
-  const loaded = () =>
-    page
-      .locator(EDITOR)
-      .first()
-      .getByText(expectText, { exact: false })
-      .first()
-      .waitFor({ state: 'visible', timeout: 30_000 })
-  try {
-    await loaded()
-  } catch (err) {
-    // no ?open support (or it failed): fall back to the startup hook W5 exposes
-    const hasHook = await page.evaluate(
-      () => typeof (window as any).__docsWeb?.openUrl === 'function',
-    )
-    if (!hasHook) throw err
-    await page.evaluate((u) => (window as any).__docsWeb.openUrl(u), urlPath)
-    await loaded()
-  }
+/** open `urlPath` through the test host; returns the editor iframe */
+async function openDoc(page: Page, urlPath: string, expectText: string): Promise<Frame> {
+  await page.goto(`/test-host/?open=${encodeURIComponent(urlPath)}`)
+  await page.waitForFunction(() => /index\.html/.test((document.getElementById('frame') as HTMLIFrameElement)?.src ?? ''))
+  const ed = (await (await page.waitForSelector('#frame')).contentFrame())!
+  await ed
+    .locator(EDITOR)
+    .first()
+    .getByText(expectText, { exact: false })
+    .first()
+    .waitFor({ state: 'visible', timeout: 30_000 })
+  return ed
 }
 
 /** ProseMirror model summary (tiptap exposes the editor on the .ProseMirror element) */
-async function model(page: Page, marker = ''): Promise<string> {
+async function model(page: Frame, marker = ''): Promise<string> {
   return page.evaluate((marker) => {
     const e = (document.querySelector('.ProseMirror') as any)?.editor
     if (!e) return 'no editor handle'
@@ -107,7 +102,7 @@ async function model(page: Page, marker = ''): Promise<string> {
 }
 
 /** Large docs open progressively (phased-content.ts): read-only while the tail streams. Wait for it to settle. */
-async function waitForFullLoad(page: Page): Promise<string> {
+async function waitForFullLoad(page: Frame): Promise<string> {
   const t0 = Date.now()
   let last = -1
   let stableFor = 0
@@ -130,7 +125,7 @@ async function waitForFullLoad(page: Page): Promise<string> {
 }
 
 /** PM syncs the DOM selection asynchronously after Ctrl+End etc.: wait until the model caret stops moving. */
-async function settleCaret(page: Page): Promise<number> {
+async function settleCaret(page: Frame): Promise<number> {
   let prev = -2
   let same = 0
   await expect
@@ -147,40 +142,32 @@ async function settleCaret(page: Page): Promise<number> {
   return prev
 }
 
-async function tableCount(page: Page): Promise<number> {
+async function tableCount(page: Frame): Promise<number> {
   return page.locator(`${EDITOR} table`).count()
 }
 
-/** Capture the saved docx: download event (preferred) or window.__docsWeb.lastSaved(). */
-async function saveAndCapture(page: Page): Promise<Buffer> {
-  await page.locator(EDITOR).first().click({ position: { x: 5, y: 5 }, force: true }).catch(() => {})
-  const dl = page.waitForEvent('download', { timeout: 20_000 }).then(async (d) => {
-    const path = await d.path()
-    return { how: 'download', bytes: readFileSync(path!), name: d.suggestedFilename() }
-  })
-  const hook = (async () => {
-    // poll lastSaved(); only counts if the shim exposes it
-    for (let i = 0; i < 40; i++) {
-      await page.waitForTimeout(500)
-      const v = await page.evaluate(async () => {
-        const f = (window as any).__docsWeb?.lastSaved
-        if (typeof f !== 'function') return null
-        const r = await f()
-        if (!r) return null
-        const b: any = r.bytes ?? r.data ?? r
-        return Array.from(new Uint8Array(b.buffer ? b.buffer : b))
-      })
-      if (v && v.length > 100) return { how: 'lastSaved', bytes: Buffer.from(v), name: '' }
-    }
-    throw new Error('no lastSaved()')
-  })()
+type HostSave = { fileId: string; versionId: string; bytes: number[] } | null
+const lastHostSave = (page: Page): Promise<HostSave> => page.evaluate(() => (window as any).__host.lastSaved())
+
+/** Ctrl+S in the editor; the bytes arrive at the test host through api.save. */
+async function saveAndCapture(page: Page, ed: Frame): Promise<Buffer> {
+  await ed.locator(EDITOR).first().click({ position: { x: 5, y: 5 }, force: true }).catch(() => {})
+  const before = (await lastHostSave(page))?.versionId ?? null
   await page.keyboard.press('Control+s')
-  const winner = await Promise.any([dl, hook]).catch((e: AggregateError) => {
-    throw new Error(`save produced neither a download nor lastSaved(): ${e.errors.map((x) => x.message).join(' | ')}`)
-  })
-  test.info().annotations.push({ type: 'save', description: `${winner.how} ${winner.name} ${winner.bytes.length}B` })
-  return winner.bytes
+  let got: HostSave = null
+  await expect
+    .poll(async () => {
+      got = await lastHostSave(page)
+      return !!got && got.versionId !== before && got.bytes.length > 100
+    }, { intervals: [250], timeout: 20_000, message: 'host received a new version via api.save' })
+    .toBe(true)
+  const s = got as unknown as NonNullable<HostSave>
+  test.info().annotations.push({ type: 'save', description: `api.save ${s.fileId}@${s.versionId} ${s.bytes.length}B` })
+  return Buffer.from(s.bytes)
 }
+
+const hostEvents = (page: Page): Promise<Array<{ type: string; payload: any }>> =>
+  page.evaluate(() => (window as any).__host.events)
 
 for (const d of DOCS) {
   test(`docs-web: ${d.name}`, async ({ page, context }) => {
@@ -212,31 +199,32 @@ for (const d of DOCS) {
     if (d.local) await serveBytes(context, d.url, readFileSync(d.local))
 
     let tablesBefore = 0
+    let ed!: Frame
     let saved: Buffer | null = null
 
     await step('open', [], async () => {
       const t0 = Date.now()
-      await openDoc(page, d.url, d.expectText)
-      const loaded = await waitForFullLoad(page)
-      tablesBefore = await tableCount(page)
+      ed = await openDoc(page, d.url, d.expectText)
+      const loaded = await waitForFullLoad(ed)
+      tablesBefore = await tableCount(ed)
       await shot('open')
       return `text visible in ${Date.now() - t0}ms; ${loaded}; tables=${tablesBefore}`
     })
 
     await step('editable', ['open'], async () => {
-      await expect(page.locator(EDITOR).first()).toBeVisible()
-      await page.locator(EDITOR).first().click()
-      const focused = await page.evaluate(() => !!document.activeElement?.closest('.ProseMirror'))
+      await expect(ed.locator(EDITOR).first()).toBeVisible()
+      await ed.locator(EDITOR).first().click()
+      const focused = await ed.evaluate(() => !!document.activeElement?.closest('.ProseMirror'))
       expect(focused, 'focus is inside .ProseMirror').toBe(true)
     })
 
     await step('type-marker', ['editable'], async () => {
       await page.keyboard.press('Control+End')
-      await settleCaret(page)
+      await settleCaret(ed)
       await page.keyboard.press('Enter')
       await page.keyboard.type(marker, { delay: 15 })
-      await expect(page.locator(EDITOR).first()).toContainText(marker)
-      const m = await model(page, marker)
+      await expect(ed.locator(EDITOR).first()).toContainText(marker)
+      const m = await model(ed, marker)
       expect(m, 'marker in the PM model, not just the DOM').toContain('hasMarker=true')
       await shot('typed')
       return m
@@ -244,16 +232,16 @@ for (const d of DOCS) {
 
     await step('bold', ['type-marker'], async () => {
       await page.keyboard.press('Shift+Home')
-      const sel = await page.evaluate(() => window.getSelection()?.toString() ?? '')
+      const sel = await ed.evaluate(() => window.getSelection()?.toString() ?? '')
       expect(sel, 'selection covers marker').toContain(marker)
       // PM learns of a DOM selection change asynchronously (selectionchange); wait until its model selection
       // is a real range, otherwise Ctrl+B races and only toggles a stored mark at the caret
       await expect
-        .poll(() => page.evaluate(() => { const e = (document.querySelector('.ProseMirror') as any).editor; return e.state.selection.to - e.state.selection.from }))
+        .poll(() => ed.evaluate(() => { const e = (document.querySelector('.ProseMirror') as any).editor; return e.state.selection.to - e.state.selection.from }))
         .toBeGreaterThanOrEqual(marker.length)
       await page.keyboard.press('Control+b')
       const readBold = () =>
-        page.evaluate((m) => {
+        ed.evaluate((m) => {
           const walker = document.createTreeWalker(document.querySelector('.ProseMirror')!, NodeFilter.SHOW_TEXT)
           let n: Node | null
           while ((n = walker.nextNode())) {
@@ -271,9 +259,9 @@ for (const d of DOCS) {
         await expect.poll(async () => isB(await readBold()), { timeout: 3_000 }).toBe(true)
       } catch {
         // Ctrl+B did not take: try the ribbon button (Home tab, "Bold" tip) before declaring failure
-        via = `ribbon button (Ctrl+B had no effect; DOM after Ctrl+B: ${JSON.stringify(await readBold())}; model: ${await model(page, marker)})`
-        await page.locator('.ribbon-tab:not(.ribbon-tab-file)').nth(0).click()
-        await page.locator('button[data-tip^="Bold"], button[data-tip^="加粗"]').first().click()
+        via = `ribbon button (Ctrl+B had no effect; DOM after Ctrl+B: ${JSON.stringify(await readBold())}; model: ${await model(ed, marker)})`
+        await ed.locator('.ribbon-tab:not(.ribbon-tab-file)').nth(0).click()
+        await ed.locator('button[data-tip^="Bold"], button[data-tip^="加粗"]').first().click()
       }
       const bold = await readBold()
       expect(bold, 'marker text node found').not.toBeNull()
@@ -287,24 +275,24 @@ for (const d of DOCS) {
       // Collapse caret out of the marker run first: press End to deselect, then new paragraph for the table.
       // collapse the marker selection (a still-selected marker would be replaced by Enter): click into the
       // doc, then Ctrl+End = end of the last paragraph (the marker paragraph), then a new empty paragraph
-      await page.locator(EDITOR).first().getByText(marker).first().click()
+      await ed.locator(EDITOR).first().getByText(marker).first().click()
       await page.keyboard.press('Control+End')
-      await settleCaret(page)
+      await settleCaret(ed)
       await expect
-        .poll(() => page.evaluate(() => { const e = (document.querySelector('.ProseMirror') as any).editor; return e.state.selection.empty }))
+        .poll(() => ed.evaluate(() => { const e = (document.querySelector('.ProseMirror') as any).editor; return e.state.selection.empty }))
         .toBe(true)
       await page.keyboard.press('Enter')
-      expect(await model(page, marker), 'marker survived the paragraph split').toContain('hasMarker=true')
-      await page.locator('.ribbon-tab:not(.ribbon-tab-file)').nth(1).click()
-      await page.locator('button.rb-big', { hasText: /^(表格|Table)$/ }).first().click()
-      await page.locator('.table-picker-grid button.table-cell').nth(11).click() // 2x2 grid cell: index = row*10+col = 11
-      await expect.poll(() => tableCount(page), { message: 'table count increased' }).toBeGreaterThan(tablesBefore)
+      expect(await model(ed, marker), 'marker survived the paragraph split').toContain('hasMarker=true')
+      await ed.locator('.ribbon-tab:not(.ribbon-tab-file)').nth(1).click()
+      await ed.locator('button.rb-big', { hasText: /^(表格|Table)$/ }).first().click()
+      await ed.locator('.table-picker-grid button.table-cell').nth(11).click() // 2x2 grid cell: index = row*10+col = 11
+      await expect.poll(() => tableCount(ed), { message: 'table count increased' }).toBeGreaterThan(tablesBefore)
       await shot('table')
-      return `tables ${tablesBefore} -> ${await tableCount(page)}`
+      return `tables ${tablesBefore} -> ${await tableCount(ed)}`
     })
 
     await step('save', ['open'], async () => {
-      saved = await saveAndCapture(page)
+      saved = await saveAndCapture(page, ed)
       const zip = await JSZip.loadAsync(saved)
       expect(zip.file('word/document.xml'), 'saved bytes are a docx').toBeTruthy()
       writeFileSync(resolve(SHOTS, `${d.name}-saved.docx`), saved)
@@ -331,9 +319,9 @@ for (const d of DOCS) {
       attachConsole(page2, consoleLines)
       const savedUrl = `/fixtures/${d.name}-saved-${Date.now()}.docx`
       await serveBytes(context, savedUrl, saved!)
-      await openDoc(page2, savedUrl, marker)
+      const ed2 = await openDoc(page2, savedUrl, marker)
       await shot('reopened', page2)
-      const bold = await page2.evaluate((m) => {
+      const bold = await ed2.evaluate((m) => {
         const walker = document.createTreeWalker(document.querySelector('.ProseMirror')!, NodeFilter.SHOW_TEXT)
         let n: Node | null
         while ((n = walker.nextNode())) {
@@ -344,12 +332,48 @@ for (const d of DOCS) {
         }
         return null
       }, marker)
-      const tablesAfter = await page2.locator(`${EDITOR} table`).count()
+      const tablesAfter = await ed2.locator(`${EDITOR} table`).count()
       await page2.close()
       expect(bold, 'marker found after reopen').not.toBeNull()
       expect(bold!.inStrong || Number(bold!.weight) >= 600, `marker bold after reopen ${JSON.stringify(bold)}`).toBe(true)
       expect(tablesAfter, 'table count after reopen > before').toBeGreaterThan(tablesBefore)
       return `marker bold=${JSON.stringify(bold)}; tables ${tablesBefore} -> ${tablesAfter}`
+    })
+
+    await step('host-events', ['save', 'type-marker'], async () => {
+      const ev = await hostEvents(page)
+      const types = ev.map((e) => e.type)
+      expect(types, 'handshake ready').toContain('ready')
+      const dirty = ev.filter((e) => e.type === 'dirty').map((e) => e.payload.dirty)
+      expect(dirty, 'dirty went true while editing').toContain(true)
+      await expect
+        .poll(async () => (await hostEvents(page)).filter((e) => e.type === 'dirty').at(-1)?.payload.dirty, {
+          message: 'dirty false after the save',
+        })
+        .toBe(false)
+      const savedEv = ev.filter((e) => e.type === 'saved')
+      expect(savedEv.length, 'saved event').toBeGreaterThan(0)
+      expect(savedEv.at(-1)!.payload).toMatchObject({ initiatedByFrame: true, file: { versionId: expect.stringMatching(/^v[2-9]/) } })
+      const titles = ev.filter((e) => e.type === 'title').map((e) => e.payload.title)
+      expect(titles, 'title event with the file name').toContain(d.url.split('/').pop())
+      return `events: ${[...new Set(types)].join(',')}; dirty ${dirty.join('>')}; saved ${JSON.stringify(savedEv.at(-1)!.payload.file)}`
+    })
+
+    await step('save-conflict', ['save'], async () => {
+      // another writer bumps the server version: the next save must be refused and stay dirty
+      const before = await lastHostSave(page)
+      await page.evaluate((id) => (window as any).__host.bumpRemote(id), before!.fileId)
+      await ed.locator(EDITOR).first().click()
+      await page.keyboard.press('Control+End')
+      await page.keyboard.type('x')
+      await page.keyboard.press('Control+s')
+      await page.waitForTimeout(2_000)
+      expect((await lastHostSave(page))?.versionId, 'no new version was written').toBe(before!.versionId)
+      await expect
+        .poll(async () => (await hostEvents(page)).filter((e) => e.type === 'dirty').at(-1)?.payload.dirty)
+        .toBe(true)
+      await shot('conflict')
+      return 'stale etag refused (412 conflict), editor stays dirty'
     })
 
     writeFileSync(resolve(SHOTS, `console-${d.name}.txt`), consoleLines.join('\n') + (consoleLines.length ? '\n' : '(no console errors/warnings, pageerrors, failed or >=400 requests)\n'))
