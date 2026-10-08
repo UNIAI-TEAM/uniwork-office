@@ -364,9 +364,15 @@ export interface ApiRecentsResult {
 
 export interface ApiExportPayload {
   format: 'pdf' | 'html'
-  /** export a stored file server-side ... */
+  /** the stored file to export (its last saved version) ... */
   fileId?: string
-  /** ... or the current in-editor bytes / renderer HTML */
+  /**
+   * ... or the current in-editor docx bytes (transferred). The frame sends them
+   * when the document has unsaved edits (or was never saved). When present they
+   * take precedence over `fileId` (which then only identifies the document for
+   * naming / authorisation). Hosts without byte support ignore `data` and export
+   * `fileId`'s stored version.
+   */
   data?: ArrayBuffer
   html?: string
   /** page geometry for server PDF rendering */

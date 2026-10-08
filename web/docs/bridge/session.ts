@@ -75,6 +75,8 @@ export function createSession(
   }
 
   return {
+    /** the editor's dirty flag right now (false before the editor listens) */
+    isDirty: () => query()?.dirty ?? false,
     pushDirty,
     pushTitle,
     /** the renderer's full save flow (close-guard "Save"); false when no editor listens */

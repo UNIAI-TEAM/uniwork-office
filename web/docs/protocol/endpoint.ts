@@ -52,6 +52,7 @@ export interface EndpointOptions {
 }
 
 export interface RequestOptions {
+  /** ms; 0 (or any non-positive / non-finite value) = no timeout, e.g. a request waiting on a user dialog */
   timeoutMs?: number
   signal?: AbortSignal
   /** ArrayBuffers to transfer instead of copy */
@@ -75,6 +76,13 @@ interface Pending {
 }
 
 export const DEFAULT_TIMEOUT_MS = 30_000
+
+/** `timeoutMs` 0 means "wait forever"; setTimeout(fn, 0) would time out at once */
+export function armTimeout(timeoutMs: number, onTimeout: () => void): () => void {
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) return () => {}
+  const timer = setTimeout(onTimeout, timeoutMs)
+  return () => clearTimeout(timer)
+}
 
 export function validateOrigins(origins: readonly string[]): void {
   if (origins.length === 0) throw new Error('allowedOrigins must not be empty')
@@ -137,11 +145,11 @@ export class Endpoint {
     const timeoutMs = options.timeoutMs ?? this.opts.timeoutMs ?? DEFAULT_TIMEOUT_MS
 
     return new Promise<unknown>((resolve, reject) => {
-      const timer = setTimeout(() => {
+      const clearTimer = armTimeout(timeoutMs, () => {
         this.settle(id)?.reject(
           err('timeout', `${type} timed out after ${timeoutMs} ms`, { retryable: true }),
         )
-      }, timeoutMs)
+      })
       const onAbort = (): void => {
         const p = this.settle(id)
         if (!p) return
@@ -154,7 +162,7 @@ export class Endpoint {
         resolve,
         reject,
         cleanup: () => {
-          clearTimeout(timer)
+          clearTimer()
           signal?.removeEventListener('abort', onAbort)
         },
       })

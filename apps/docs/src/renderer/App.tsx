@@ -261,6 +261,7 @@ import {
 } from './doc-state'
 import {
   applyAiDocContent as applyAiDocContentImpl,
+  buildDocBytes as buildDocBytesImpl,
   exportPdf as exportPdfImpl,
   exportHtml as exportHtmlImpl,
   loadFile as loadFileImpl,
@@ -1516,6 +1517,16 @@ export function App() {
     }, 30_000)
     return () => window.clearInterval(timer)
   }, [tornDown])
+
+  // web bridge: serialize the live document on demand (server PDF export of unsaved edits)
+  useEffect(
+    () =>
+      window.desktop.provideDocBytes?.(async () => {
+        const bytes = await buildDocBytesImpl(fileCtxRef.current)
+        return bytes ? (bytes.slice().buffer as ArrayBuffer) : null
+      }),
+    [],
+  )
 
   // Recompute the document-level line-height factor while editing:
   // docStyleCss decides it once at parse time, so typing CJK into a blank document

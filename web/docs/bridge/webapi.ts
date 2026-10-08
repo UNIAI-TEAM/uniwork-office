@@ -16,7 +16,8 @@
  * | saveDocxAs                | api.saveAs {name, data, sourceFileId} (host dialog); 'cancelled' -> {ok:false}   |
  * | saveDocxNew               | api.saveAs {name, data, silent: true} (first save of an untitled document)       |
  * | getRecentFiles            | api.recents {limit} -> `uniwork://files/<id>/<name>` paths                        |
- * | exportPdf                 | api.export {format:'pdf', fileId, page size} -> download; failure -> window.print |
+ * | exportPdf                 | api.export {format:'pdf', fileId, data (live bytes when dirty)} -> download; failure -> window.print |
+ * | provideDocBytes           | App.tsx registers the live-document serializer exportPdf uses when dirty        |
  * | printPdfBuffer / saveMergedPdf | deferred marker parts -> one exportPdf of the current file                  |
  * | exportHtml                | renderer-built HTML -> browser download (no server needed)                       |
  * | onRenamedDocx             | host event file.renamed {file}                                                   |
@@ -283,9 +284,23 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
     return { ok: true, path: `${withExt(defaultName, '.pdf')} (browser print dialog)` }
   }
 
+  /** the renderer's live-document serializer (App.tsx registers it via provideDocBytes) */
+  let docBytesProvider: (() => Promise<ArrayBuffer | null>) | null = null
+
+  async function liveDocBytes(): Promise<ArrayBuffer | null> {
+    try {
+      return (await docBytesProvider?.()) ?? null
+    } catch (err) {
+      console.warn('[docs-web] serializing the live document failed:', err)
+      return null
+    }
+  }
+
   /**
-   * Server-rendered PDF of the current file's stored version (unsaved edits
-   * are not in it); no file yet or any failure -> the in-frame print dialog.
+   * Server-rendered PDF. A clean document exports its stored version by
+   * `fileId`; unsaved edits (or a never-saved document) also send the live
+   * docx bytes as `data` (hosts without byte support ignore them). Nothing to
+   * export or any failure -> the in-frame print dialog.
    */
   async function exportCurrentPdf(
     defaultName: string,
@@ -294,20 +309,22 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
     scale?: number,
   ): Promise<{ ok: boolean; path?: string; error?: string }> {
     const fileId = current
-    if (!fileId) return printViaBrowser(defaultName)
-    const name = withExt(defaultName || files.get(fileId)?.name || 'document', '.pdf')
+    const data = !fileId || session.isDirty() ? await liveDocBytes() : null
+    if (!fileId && !data) return printViaBrowser(defaultName)
+    const name = withExt(defaultName || (fileId && files.get(fileId)?.name) || 'document', '.pdf')
     try {
       const out = await port.request(
         'api.export',
         {
           format: 'pdf',
-          fileId,
+          ...(fileId ? { fileId } : {}),
+          ...(data ? { data } : {}),
           name,
           ...(pageWidthTwips > 0 ? { pageWidthTwips } : {}),
           ...(pageHeightTwips > 0 ? { pageHeightTwips } : {}),
           scale: scale ?? 1,
         },
-        { timeoutMs: TIMEOUTS.transfer },
+        { timeoutMs: TIMEOUTS.transfer, ...(data ? { transfer: [data] } : {}) },
       )
       downloadBlob(
         out.name || name,
@@ -347,6 +364,13 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
       openListeners.add(handler)
       return () => {
         openListeners.delete(handler)
+      }
+    },
+
+    provideDocBytes(provider: () => Promise<ArrayBuffer | null>): () => void {
+      docBytesProvider = provider
+      return () => {
+        if (docBytesProvider === provider) docBytesProvider = null
       }
     },
 
