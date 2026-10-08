@@ -128,6 +128,8 @@ export const vi = {
   appProtectSecurity: 'Bảo mật',
   appProtectDesc:
     'Đặt mật khẩu mở và sửa, hạn chế chỉnh sửa và tùy chọn riêng tư; các thay đổi có hiệu lực khi lưu tài liệu',
+  appProtectDescWeb:
+    'Đặt mật khẩu sửa, hạn chế chỉnh sửa và tùy chọn riêng tư; các thay đổi có hiệu lực khi lưu tài liệu',
   appOptional: '(tùy chọn)',
   appOptionalBlank: '(tùy chọn)',
   appProtectOpenPwd: 'Mật khẩu để mở tài liệu này',

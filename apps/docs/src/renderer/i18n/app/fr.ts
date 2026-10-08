@@ -135,6 +135,8 @@ export const fr = {
   appProtectSecurity: 'Sécurité',
   appProtectDesc:
     'Définissez les mots de passe d’ouverture et de modification, les restrictions de modification et les options de confidentialité ; appliqué à l’enregistrement',
+  appProtectDescWeb:
+    'Définissez le mot de passe de modification, les restrictions de modification et les options de confidentialité ; appliqué à l’enregistrement',
   appOptional: '(facultatif)',
   appOptionalBlank: '(facultatif)',
   appProtectOpenPwd: 'Mot de passe pour ouvrir ce document',

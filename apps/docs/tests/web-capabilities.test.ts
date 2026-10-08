@@ -271,6 +271,39 @@ describe('ProtectDialog', () => {
     return out
   }
 
+  it('describes only what the web dialog offers (no open password)', () => {
+    const desc = () => {
+      const el = document.createElement('div')
+      document.body.appendChild(el)
+      const root = createRoot(el)
+      const noop = () => {}
+      act(() =>
+        root.render(
+          createElement(LocaleProvider, {
+            initial: 'en',
+            children: createElement(ProtectDialog, {
+              encrypted: false,
+              writeProtection: null,
+              protection: null,
+              removePersonalInfo: false,
+              onCancel: noop,
+              onApply: noop,
+            }),
+          }),
+        ),
+      )
+      const text = el.querySelector('.modal-desc')?.textContent ?? ''
+      act(() => root.unmount())
+      el.remove()
+      return text
+    }
+    useCapabilities(undefined)
+    expect(desc()).toContain('open and modify passwords')
+    useCapabilities(WEB)
+    expect(desc()).toBe(t('appProtectDescWeb'))
+    expect(desc()).not.toMatch(/open/i)
+  })
+
   it('drops the open-password fields on the web but keeps modify-password', () => {
     useCapabilities(undefined)
     const desktop = passwordLabels().join('|')

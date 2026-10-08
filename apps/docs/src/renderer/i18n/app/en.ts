@@ -128,6 +128,8 @@ export const en = {
   appProtectSecurity: 'Security',
   appProtectDesc:
     'Set open and modify passwords, editing restrictions, and privacy options; changes apply when the document is saved',
+  appProtectDescWeb:
+    'Set a modify password, editing restrictions, and privacy options; changes apply when the document is saved',
   appOptional: '(optional)',
   appOptionalBlank: '(optional)',
   appProtectOpenPwd: 'Password to open this document',

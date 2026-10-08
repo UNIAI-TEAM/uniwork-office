@@ -161,7 +161,9 @@ export function ProtectDialog({
     <div className="modal-backdrop">
       <div className="modal protect-dialog gs-form">
         <h2>{t('appProtectTitle')}</h2>
-        <p className="modal-desc">{t('appProtectDesc')}</p>
+        <p className="modal-desc">
+          {t(openPasswordAvailable ? 'appProtectDesc' : 'appProtectDescWeb')}
+        </p>
 
         <h3 className="protect-section-title">{t('appProtectSecurity')}</h3>
         {openPasswordAvailable && (

@@ -134,6 +134,8 @@ export const ms = {
   appProtectSecurity: 'Keselamatan',
   appProtectDesc:
     'Tetapkan kata laluan buka/ubah suai, sekatan pengeditan dan pilihan privasi; berkuat kuasa semasa menyimpan',
+  appProtectDescWeb:
+    'Tetapkan kata laluan ubah suai, sekatan pengeditan dan pilihan privasi; berkuat kuasa semasa menyimpan',
   appOptional: '(pilihan)',
   appOptionalBlank: '(pilihan)',
   appProtectOpenPwd: 'Kata laluan untuk membuka dokumen ini',
