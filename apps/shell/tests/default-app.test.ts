@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
+import { readFileSync } from 'node:fs'
 import {
+  LINUX_DESKTOP_ID,
   OFFICE_TYPES,
   createDefaultAppService,
   macAppBundlePath,
@@ -23,6 +25,16 @@ function macStatusJson(
     }),
   })
 }
+
+describe('LINUX_DESKTOP_ID', () => {
+  it('is the desktop file the package ships (desktopName in apps/shell/package.json)', () => {
+    const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as {
+      desktopName: string
+    }
+    expect(LINUX_DESKTOP_ID).toBe(pkg.desktopName)
+    expect(LINUX_DESKTOP_ID).toBe('uniwork-office.desktop')
+  })
+})
 
 describe('macAppBundlePath', () => {
   it('walks up from the executable to the .app bundle', () => {
@@ -126,7 +138,9 @@ describe('createDefaultAppService', () => {
     const run = vi.fn<RunCommand>(async (cmd, args) => {
       calls.push([cmd, ...args])
       if (args[0] === 'query')
-        return args[2].includes('spreadsheetml') ? 'wps-office-et.desktop\n' : 'genoffice.desktop\n'
+        return args[2].includes('spreadsheetml')
+          ? 'wps-office-et.desktop\n'
+          : `${LINUX_DESKTOP_ID}\n`
       return ''
     })
     const svc = createDefaultAppService({
@@ -134,7 +148,7 @@ describe('createDefaultAppService', () => {
       platform: 'linux',
       run,
       readFile: (p) => {
-        if (p.endsWith('/usr/share/applications/wps-office-et.desktop'))
+        if (p.replaceAll('\\', '/').endsWith('/usr/share/applications/wps-office-et.desktop'))
           return '[Desktop Entry]\nName=WPS Spreadsheets\n'
         throw new Error('ENOENT')
       },
@@ -148,7 +162,7 @@ describe('createDefaultAppService', () => {
     expect(calls.find((c) => c[1] === 'default')).toEqual([
       'xdg-mime',
       'default',
-      'genoffice.desktop',
+      LINUX_DESKTOP_ID,
       ...OFFICE_TYPES.map((t) => t.mime),
     ])
   })

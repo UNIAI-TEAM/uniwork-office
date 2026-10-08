@@ -48,7 +48,8 @@ export const OFFICE_TYPES: readonly OfficeType[] = [
   },
 ]
 
-const LINUX_DESKTOP_ID = 'genoffice.desktop'
+/** Must equal `desktopName` in apps/shell/package.json (the .desktop file the deb/rpm/AppImage ships). */
+export const LINUX_DESKTOP_ID = 'uniwork-office.desktop'
 const WINDOWS_DEFAULT_APPS_URL = 'ms-settings:defaultapps'
 
 export type RunCommand = (cmd: string, args: string[]) => Promise<string>
