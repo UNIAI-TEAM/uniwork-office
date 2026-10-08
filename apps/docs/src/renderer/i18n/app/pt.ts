@@ -132,6 +132,8 @@ export const pt = {
   appProtectSecurity: 'Segurança',
   appProtectDesc:
     'Defina senhas de abertura e modificação, restrições de edição e opções de privacidade; aplica-se ao salvar',
+  appProtectDescWeb:
+    'Defina a senha de modificação, restrições de edição e opções de privacidade; aplica-se ao salvar',
   appOptional: '(opcional)',
   appOptionalBlank: '(opcional)',
   appProtectOpenPwd: 'Senha para abrir este documento',

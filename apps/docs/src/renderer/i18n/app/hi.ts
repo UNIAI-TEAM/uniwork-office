@@ -131,6 +131,8 @@ export const hi = {
   appProtectSecurity: 'सुरक्षा',
   appProtectDesc:
     'खोलने/संशोधित करने के पासवर्ड, संपादन प्रतिबंध और गोपनीयता विकल्प सेट करें; सहेजने पर लागू',
+  appProtectDescWeb:
+    'संशोधित करने का पासवर्ड, संपादन प्रतिबंध और गोपनीयता विकल्प सेट करें; सहेजने पर लागू',
   appOptional: '(वैकल्पिक)',
   appOptionalBlank: '(वैकल्पिक)',
   appProtectOpenPwd: 'इस दस्तावेज़ को खोलने का पासवर्ड',

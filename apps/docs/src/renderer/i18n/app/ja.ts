@@ -140,6 +140,7 @@ export const ja = {
   appProtectTitle: '文書の保護',
   appProtectSecurity: 'セキュリティ',
   appProtectDesc: '開く/変更のパスワード、編集制限、プライバシーを設定します(保存時に適用)',
+  appProtectDescWeb: '変更のパスワード、編集制限、プライバシーを設定します(保存時に適用)',
   appOptional: '(省略可)',
   appOptionalBlank: '(省略可)',
   appProtectOpenPwd: 'この文書を開くパスワード',

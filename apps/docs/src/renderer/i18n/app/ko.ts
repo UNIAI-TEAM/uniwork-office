@@ -141,6 +141,7 @@ export const ko = {
   appProtectTitle: '문서 보호',
   appProtectSecurity: '보안',
   appProtectDesc: '열기/수정 암호, 편집 제한, 개인 정보 옵션을 설정합니다(저장 시 적용)',
+  appProtectDescWeb: '수정 암호, 편집 제한, 개인 정보 옵션을 설정합니다(저장 시 적용)',
   appOptional: '(선택)',
   appOptionalBlank: '(생략 가능)',
   appProtectOpenPwd: '이 문서를 열 암호',

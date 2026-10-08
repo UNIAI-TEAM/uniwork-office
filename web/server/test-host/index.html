@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Docs frame test host</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+      }
+      body {
+        display: flex;
+        flex-direction: column;
+        font:
+          13px system-ui,
+          sans-serif;
+      }
+      #bar {
+        padding: 4px 8px;
+        border-bottom: 1px solid;
+      }
+      #frame {
+        flex: 1;
+        border: 0;
+        width: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Test-only stand-in for the UniWork host page (W5): an in-memory file
+         store behind the W2 frame protocol. Usage: /test-host/?open=<url> -->
+    <div id="bar">test host: <span id="status">booting</span></div>
+    <iframe id="frame" title="Docs"></iframe>
+    <script type="module" src="./host.js"></script>
+  </body>
+</html>

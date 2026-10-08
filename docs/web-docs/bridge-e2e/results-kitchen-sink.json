@@ -1,0 +1,78 @@
+[
+  {
+    "doc": "kitchen-sink",
+    "step": "open",
+    "ok": true,
+    "ms": 3017,
+    "detail": "text visible in 3017ms; fully loaded (11 blocks, editable) after 1256ms; tables=1"
+  },
+  {
+    "doc": "kitchen-sink",
+    "step": "editable",
+    "ok": true,
+    "ms": 147
+  },
+  {
+    "doc": "kitchen-sink",
+    "step": "type-marker",
+    "ok": true,
+    "ms": 1393,
+    "detail": "12 blocks; last: docProtected:\"\" / docProtected:\"\" / docParagraph:\"尾段。\" / docParagraph:\"E2EMARKKITCHENSINKMUZP3Q4X\" sel=148-148 hasMarker=true"
+  },
+  {
+    "doc": "kitchen-sink",
+    "step": "bold",
+    "ok": true,
+    "ms": 239,
+    "detail": "Ctrl+B: {\"inStrong\":true,\"weight\":\"700\",\"tag\":\"STRONG\"}"
+  },
+  {
+    "doc": "kitchen-sink",
+    "step": "insert-table",
+    "ok": true,
+    "ms": 1130,
+    "detail": "tables 1 -> 2"
+  },
+  {
+    "doc": "kitchen-sink",
+    "step": "save",
+    "ok": true,
+    "ms": 513,
+    "detail": "3611 bytes"
+  },
+  {
+    "doc": "kitchen-sink",
+    "step": "saved-xml",
+    "ok": true,
+    "ms": 10,
+    "detail": "run=<w:r><w:rPr><w:b/><w:bCs/></w:rPr><w:t xml:space=\"preserve\">E2EMARKKITCHENSINKMUZP3Q4X</w:t></w:r> | w:tbl=2"
+  },
+  {
+    "doc": "kitchen-sink",
+    "step": "reopen",
+    "ok": true,
+    "ms": 1906,
+    "detail": "marker bold={\"inStrong\":true,\"weight\":\"700\"}; tables 1 -> 2"
+  },
+  {
+    "doc": "kitchen-sink",
+    "step": "host-events",
+    "ok": true,
+    "ms": 32,
+    "detail": "events: ready,title,dirty,saved; dirty false>true>false; saved {\"fileId\":\"f1\",\"name\":\"kitchen-sink.docx\",\"versionId\":\"v2\",\"etag\":\"\\\"f1-v2\\\"\",\"sizeBytes\":3611}"
+  },
+  {
+    "doc": "kitchen-sink",
+    "step": "save-conflict",
+    "ok": true,
+    "ms": 2366,
+    "detail": "stale etag refused (412 conflict), editor stays dirty"
+  },
+  {
+    "doc": "kitchen-sink",
+    "step": "export-unsaved",
+    "ok": true,
+    "ms": 693,
+    "detail": "api.export fileId=f1 data=3630B (unsaved edit present); download=kitchen-sink.pdf"
+  }
+]

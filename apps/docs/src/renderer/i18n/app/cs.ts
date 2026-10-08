@@ -131,6 +131,8 @@ export const cs = {
   appProtectSecurity: 'Zabezpečení',
   appProtectDesc:
     'Nastavte hesla pro otevření a úpravy, omezení úprav a možnosti ochrany osobních údajů; změny se použijí při uložení dokumentu',
+  appProtectDescWeb:
+    'Nastavte heslo pro úpravy, omezení úprav a možnosti ochrany osobních údajů; změny se použijí při uložení dokumentu',
   appOptional: '(nepovinné)',
   appOptionalBlank: '(nepovinné)',
   appProtectOpenPwd: 'Heslo pro otevření tohoto dokumentu',

@@ -40,6 +40,8 @@ const headerRules = existsSync(join(distDir, 'headers.json'))
   ? JSON.parse(readFileSync(join(distDir, 'headers.json'), 'utf8')).rules
   : []
 const fixturesDir = resolve(repoRoot, 'fixtures/generated')
+// GO-B3: test-only host page that embeds the frame and speaks the protocol (web/e2e)
+const testHostDir = resolve(here, 'test-host')
 const port = Number(process.env.PORT) || 4180
 
 const MIME = {
@@ -156,6 +158,12 @@ const server = createServer(async (req, res) => {
       const file = safeJoin(fixturesDir, fx[1])
       if (file && (await isFile(file))) return sendFile(req, res, file)
       return send(res, 404, 'fixture not found')
+    }
+    const th = /^\/test-host\/(.*)$/.exec(pathname)
+    if (th) {
+      const file = safeJoin(testHostDir, th[1] || 'index.html')
+      if (file && (await isFile(file))) return sendFile(req, res, file)
+      return send(res, 404, 'not found')
     }
 
     // MOUNT: only the prefixed URL space serves the build (proves the build has no root-absolute URLs)

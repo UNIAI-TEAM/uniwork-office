@@ -127,6 +127,7 @@ export const he = {
   appProtectTitle: 'הגנה על המסמך',
   appProtectSecurity: 'אבטחה',
   appProtectDesc: 'הגדירו סיסמאות פתיחה ושינוי, הגבלות עריכה ואפשרויות פרטיות; חל בשמירה',
+  appProtectDescWeb: 'הגדירו סיסמת שינוי, הגבלות עריכה ואפשרויות פרטיות; חל בשמירה',
   appOptional: '(לא חובה)',
   appOptionalBlank: '(לא חובה)',
   appProtectOpenPwd: 'סיסמה לפתיחת מסמך זה',

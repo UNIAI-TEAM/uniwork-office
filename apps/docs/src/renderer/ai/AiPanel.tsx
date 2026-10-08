@@ -52,6 +52,7 @@ import fileVoiceIcon from '../assets/file-voice.png'
 import fileDocumentIcon from '../assets/file-document.png'
 import fileGeneralIcon from '../assets/file-general.png'
 import { IconNewChat, IconSidebarCollapse } from '../components/icons'
+import { cap } from '../capabilities'
 
 interface ToolActivity {
   name: string
@@ -1392,16 +1393,21 @@ export function AiPanel({
                   ))) && (
                 <div className="ai-msg-actions">
                   {entry.loginRequired && (
-                    <button className="ai-login-btn" onClick={() => void window.desktop.aiGskLogin()}>
+                    <button
+                      className="ai-login-btn"
+                      onClick={() => void window.desktop.aiGskLogin()}
+                    >
                       {t('aiGskLoginBtn')}
                     </button>
                   )}
-                  <button
-                    className="ai-login-btn"
-                    onClick={() => void window.desktop.aiOpenBilling?.()}
-                  >
-                    {t('aiBuyPlanBtn')}
-                  </button>
+                  {cap('billing') && (
+                    <button
+                      className="ai-login-btn"
+                      onClick={() => void window.desktop.aiOpenBilling?.()}
+                    >
+                      {t('aiBuyPlanBtn')}
+                    </button>
+                  )}
                 </div>
               )}
               {showToolbar && (

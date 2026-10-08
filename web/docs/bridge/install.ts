@@ -8,8 +8,8 @@
  * Module ownership (each default-exports a partial DesktopApi):
  *   ./browser  W4  BROWSER class: print, download, file picker, clipboard,
  *                  theme, language.
- *   ./webapi   W5  WEB-API class: open/save/recents/export + projectApi, backed
- *                  by a fake in-memory backend.
+ *   ./webapi   W3  WEB-API class: open/save/recents/export over the host
+ *                  protocol (../protocol/client.ts) + in-memory projectApi.
  *   ./ai       W6  aiStream / webSearch / imageSearch / aiGenerateImage /
  *                  getAiSettings / aiChat / fetchImage stubs.
  *   ./hide     W6  HIDE class no-ops (Zotero, doc passwords, recovery copy,
@@ -21,7 +21,8 @@
  * used as an unsubscribe function), everything else gets an async no-op.
  */
 import browser from './browser'
-import webapi from './webapi'
+import { createDocsFrameClient } from '../protocol/client'
+import { createWebApi } from './webapi'
 import ai from './ai'
 import hide from './hide'
 
@@ -32,8 +33,25 @@ function fallbackFor(key: string): unknown {
   return () => Promise.resolve(undefined)
 }
 
+/** same-origin iframe (lane decision): the only host the frame talks to */
+const webapi = createWebApi(
+  createDocsFrameClient({
+    allowedOrigins: [location.origin],
+    capabilities: {
+      save: true,
+      saveAs: true,
+      recents: true,
+      print: true,
+      exportPdf: true,
+      exportHtml: true,
+    },
+  }),
+)
+
 export function installBridge(): void {
-  const modules: Bridge[] = [hide, webapi, ai, browser]
+  // later modules win: webapi's real fetchImage / convertAltChunkHtml / close
+  // guard replace the ai.ts and hide.ts stubs
+  const modules: Bridge[] = [hide, ai, webapi, browser]
   const desktop: Bridge = {}
   for (const mod of modules) for (const key of Object.keys(mod ?? {})) desktop[key] = mod[key]
 

@@ -14,9 +14,10 @@
  *                      | `genoffice.web.lang` > navigator.languages,    | full 21-locale Lang like getUiLang() does — the
  *                      | via @genoffice/i18n normalizeLang              | DesktopApi type only lists 11 (stale type).
  * onLanguageChanged    | in-tab setWebLanguage() + `storage` event      | same as onThemeChanged.
- * print                | window.print() with a temporary                | no scale (scaleFactor) support: the print-zoom
- *                      | `@page { margin: 0 }` sheet                    | arg is ignored. window.print() gives no
- *                      |                                                | cancel/failure signal → always { ok: true }.
+ * print                | window.print() of THIS frame (an iframe prints   | no scaleFactor: the print-zoom is neutralised
+ *                      | only its own document) with a temporary         | in CSS instead. Paper size comes from the
+ *                      | print sheet + data-theme pinned to light; resolves | print dialog. No cancel/failure signal →
+ *                      | on `afterprint`                                 | always { ok: true }.
  * pickImage            | <input type=file accept=png/jpeg/gif>          | same shape ({ base64, mime, name }); cancel is
  *                      |                                                | detected via the `cancel` event (+ focus fallback).
  * pickAttachments      | <input type=file multiple>                     | paths are in-memory ids `web-file://<n>/<name>`
@@ -36,6 +37,14 @@
  * fontMetrics          | null                                           | desktop parses installed font files; the web
  *                      |                                                | cannot read font tables → callers use their
  *                      |                                                | documented "family missing" fallback.
+ *
+ * Also exported for the other bridge modules (W3 export / save-copy):
+ *   downloadBlob / downloadBytes  Blob + <a download> "save to disk"
+ *   openExternal                  window.open(url, '_blank', 'noopener,noreferrer'), http(s) only
+ *   pickFiles                     <input type=file>, [] on cancel
+ * and installed at load: a `window.open` guard (see `guardedOpen`) so the renderer's
+ * Ctrl/Cmd-click on a document hyperlink (`window.open(href)`, App.tsx) can never
+ * hand the new tab a `window.opener` to the host page or open a javascript:/data: URL.
  *
  * Not here (decided from the main handlers):
  * - exportPdf / printPdfBuffer / saveMergedPdf use webContents.printToPDF (page
@@ -137,12 +146,21 @@ export function setWebLanguage(lang: Lang | null): void {
 
 // ---- downloads ----
 
+// eslint-disable-next-line no-control-regex
+const RESERVED_FILE_CHARS = /[\\/:*?"<>|\u0000-\u001f]/g
+
+/** a file name the browser will not mangle: no path separators / reserved characters */
+export function safeFileName(name: string, fallback = 'document'): string {
+  const cleaned = name.replace(RESERVED_FILE_CHARS, '_').trim().replace(/^\.+$/, '')
+  return cleaned || fallback
+}
+
 /** save a Blob through <a download> (pure browser "save to disk") */
 export function downloadBlob(name: string, data: Blob): void {
   const url = URL.createObjectURL(data)
   const a = document.createElement('a')
   a.href = url
-  a.download = name
+  a.download = safeFileName(name)
   a.style.display = 'none'
   document.body.appendChild(a)
   a.click()
@@ -151,10 +169,58 @@ export function downloadBlob(name: string, data: Blob): void {
   window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
 }
 
+/** save raw bytes (docx / pdf / html export, save-a-copy) through <a download> */
+export function downloadBytes(name: string, bytes: BlobPart, mime: string): void {
+  downloadBlob(name, new Blob([bytes], { type: mime }))
+}
+
+// ---- external links ----
+
+/** http(s) only, same allowlist as the desktop shell's safeExternalUrl */
+function safeHttpUrl(url: unknown): string | null {
+  const text = url instanceof URL ? url.href : typeof url === 'string' ? url.trim() : ''
+  try {
+    const { protocol } = new URL(text)
+    return protocol === 'http:' || protocol === 'https:' ? text : null
+  } catch {
+    return null
+  }
+}
+
+type WindowOpen = typeof window.open
+
+/**
+ * `window.open` for untrusted (document-authored) URLs: http(s) only, always a new
+ * tab, never with an opener (the frame is same-origin with the UniWork page, so an
+ * opener would hand the target page a handle to it). Blocked URLs return null, like
+ * a popup blocker.
+ */
+export function guardedOpen(nativeOpen: WindowOpen): WindowOpen {
+  return (url, _target, _features) => {
+    const safe = safeHttpUrl(url)
+    return safe ? nativeOpen(safe, '_blank', 'noopener,noreferrer') : null
+  }
+}
+
+/** open a link outside the frame; false when the URL is not an allowed http(s) URL */
+export function openExternal(url: unknown): boolean {
+  if (!safeHttpUrl(url)) return false
+  window.open(String(url), '_blank', 'noopener,noreferrer')
+  return true
+}
+
+let externalGuardInstalled = false
+
+function installExternalLinkGuard(): void {
+  if (externalGuardInstalled) return
+  externalGuardInstalled = true
+  window.open = guardedOpen(window.open.bind(window))
+}
+
 // ---- file pickers ----
 
 /** <input type=file>; resolves [] on cancel */
-function pickFiles(accept: string, multiple: boolean): Promise<File[]> {
+export function pickFiles(accept: string, multiple: boolean): Promise<File[]> {
   return new Promise((resolve) => {
     const input = document.createElement('input')
     input.type = 'file'
@@ -208,8 +274,33 @@ const IMAGE_MIME: Record<string, PickImageResult['mime']> = {
 const ATTACHMENT_MAX_BYTES = 50 * 1024 * 1024
 const ATTACHMENT_IMAGE_MAX_BYTES = 5 * 1024 * 1024
 const TEXT_EXTS = new Set([
-  'txt', 'md', 'markdown', 'csv', 'tsv', 'json', 'yaml', 'yml', 'xml', 'html', 'htm', 'log',
-  'js', 'ts', 'tsx', 'jsx', 'py', 'java', 'c', 'h', 'cpp', 'go', 'rs', 'rb', 'sh', 'sql', 'css',
+  'txt',
+  'md',
+  'markdown',
+  'csv',
+  'tsv',
+  'json',
+  'yaml',
+  'yml',
+  'xml',
+  'html',
+  'htm',
+  'log',
+  'js',
+  'ts',
+  'tsx',
+  'jsx',
+  'py',
+  'java',
+  'c',
+  'h',
+  'cpp',
+  'go',
+  'rs',
+  'rb',
+  'sh',
+  'sql',
+  'css',
 ])
 const ATTACHMENT_IMAGE_MIME: Record<string, string> = {
   png: 'image/png',
@@ -220,7 +311,14 @@ const ATTACHMENT_IMAGE_MIME: Record<string, string> = {
 }
 const ATTACHMENT_EXTS = new Set([
   ...TEXT_EXTS,
-  'doc', 'docx', 'pdf', 'pptx', 'ppt', 'xlsx', 'xlsm', 'xls',
+  'doc',
+  'docx',
+  'pdf',
+  'pptx',
+  'ppt',
+  'xlsx',
+  'xlsm',
+  'xls',
   ...Object.keys(ATTACHMENT_IMAGE_MIME),
 ])
 const READ_MAX_CHARS = 48_000
@@ -279,7 +377,9 @@ function dataUrlToBlob(dataUrl: string): Blob {
 }
 
 async function toPngBlob(dataUrl: string): Promise<Blob | null> {
-  const blob = dataUrl.startsWith('data:') ? dataUrlToBlob(dataUrl) : await (await fetch(dataUrl)).blob()
+  const blob = dataUrl.startsWith('data:')
+    ? dataUrlToBlob(dataUrl)
+    : await (await fetch(dataUrl)).blob()
   if (blob.type === 'image/png') return blob
   const bitmap = await createImageBitmap(blob)
   const canvas = document.createElement('canvas')
@@ -296,7 +396,32 @@ function escapeAttr(value: string): string {
 
 // ---- print ----
 
-const PRINT_PAGE_STYLE_ID = 'web-bridge-print-page'
+const PRINT_STYLE_ID = 'web-bridge-print-page'
+/** a print dialog can stay open for a long time; this only bounds a missing `afterprint` */
+const PRINT_TIMEOUT_MS = 10 * 60_000
+
+/**
+ * Print-only sheet (document data, see CLAUDE.md rule 4: never theme tokens).
+ * The renderer's own `@media print` block already hides the chrome and unwraps
+ * the page; this adds what a browser needs on top of Electron's
+ * `webContents.print({ printBackground: true, margins: none })`.
+ */
+function printCss(scale?: number): string {
+  const rules = [
+    // the docx page padding provides the margins
+    '@page { margin: 0; }',
+    'html, body { background: none !important; }',
+    // cell fills, highlights, shading: Electron prints backgrounds, browsers do not by default
+    '.doc-page, .doc-page *, .pv-page, .pv-page * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }',
+  ]
+  // The renderer zooms the preview sheets by the screen scale and asks the host to
+  // print at the inverse (print-zoom.ts). A browser cannot set a print scale, so a
+  // non-1 zoom would print the sheets oversized: print them unzoomed instead.
+  if (scale !== undefined && scale > 0 && Math.abs(scale - 1) > 1e-3) {
+    rules.push('.pagination-preview { zoom: 1 !important; }')
+  }
+  return `@media print { ${rules.join(' ')} }`
+}
 
 const browser = {
   getTheme: () => Promise.resolve(currentTheme()),
@@ -306,27 +431,39 @@ const browser = {
   onLanguageChanged: (handler) =>
     subscribe(LANG_KEY, currentLanguage, (lang) => handler(lang as DesktopLang)),
 
-  // scale (print-zoom inverse) has no window.print() equivalent and is ignored
-  print: async (_scale?: number) => {
-    // desktop prints with marginType 'none' — the docx page padding provides margins
-    let style = document.getElementById(PRINT_PAGE_STYLE_ID)
-    if (!style) {
-      style = document.createElement('style')
-      style.id = PRINT_PAGE_STYLE_ID
-      style.textContent = '@media print { @page { margin: 0; } }'
+  // An iframe's own window.print() prints only that frame's document, which is what
+  // we want. The UI theme is pinned to light for the job so the output is the same
+  // in both themes (the dark page is screen-only in styles.css; this also covers any
+  // chrome token that could leak into print). Resolves on `afterprint`: Chromium blocks
+  // inside print(), Firefox/Safari return at once, and the renderer clears its
+  // print-only state (selected pages, zoom) when this promise settles.
+  print: (scale?: number) =>
+    new Promise<{ ok: boolean; error?: string }>((resolve) => {
+      document.getElementById(PRINT_STYLE_ID)?.remove()
+      const style = document.createElement('style')
+      style.id = PRINT_STYLE_ID
+      style.textContent = printCss(scale)
       document.head.appendChild(style)
-    }
-    // Chromium blocks inside print(), Firefox does not: drop the sheet on afterprint
-    const sheet = style
-    window.addEventListener('afterprint', () => sheet.remove(), { once: true })
-    try {
-      window.print()
-      return { ok: true }
-    } catch (err) {
-      sheet.remove()
-      return { ok: false, error: String(err) }
-    }
-  },
+      document.documentElement.setAttribute('data-theme', 'light')
+
+      let timer = 0
+      const finish = (result: { ok: boolean; error?: string }) => {
+        window.clearTimeout(timer)
+        window.removeEventListener('afterprint', onAfterPrint)
+        style.remove()
+        applyTheme(currentTheme())
+        resolve(result)
+      }
+      const onAfterPrint = () => finish({ ok: true })
+      window.addEventListener('afterprint', onAfterPrint)
+      timer = window.setTimeout(() => finish({ ok: true }), PRINT_TIMEOUT_MS)
+      try {
+        window.focus()
+        window.print()
+      } catch (err) {
+        finish({ ok: false, error: String(err) })
+      }
+    }),
 
   pickImage: async () => {
     const [file] = await pickFiles('image/png,image/jpeg,image/gif,.png,.jpg,.jpeg,.gif', false)
@@ -440,5 +577,6 @@ const browser = {
 
 // apply the stored theme before the renderer mounts (main.tsx re-applies it identically)
 applyTheme(currentTheme())
+installExternalLinkGuard()
 
 export default browser
