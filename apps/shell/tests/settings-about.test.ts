@@ -1,0 +1,107 @@
+/**
+ * @vitest-environment jsdom
+ */
+import { act, createElement } from 'react'
+import { createRoot } from 'react-dom/client'
+import type { Root } from 'react-dom/client'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { HomeApi } from '../src/shared/home-api'
+import { LocaleProvider } from '../src/renderer/src/locale'
+import type { Lang } from '../src/renderer/src/locale'
+import { SettingsModal } from '../src/renderer/src/SettingsModal'
+import { strings } from '../src/renderer/src/strings'
+
+const actEnvironment = globalThis as typeof globalThis & {
+  IS_REACT_ACT_ENVIRONMENT?: boolean
+}
+actEnvironment.IS_REACT_ACT_ENVIRONMENT = true
+
+let host: HTMLDivElement
+let root: Root
+
+beforeEach(() => {
+  host = document.createElement('div')
+  document.body.append(host)
+  root = createRoot(host)
+})
+
+afterEach(() => {
+  act(() => root.unmount())
+  host.remove()
+})
+
+async function openAbout(lang: Lang, aboutLabel: string): Promise<void> {
+  window.aiOffice = {
+    getTheme: async () => 'system',
+    getDefaultSaveDir: async () => '',
+    getAiPanelPrefs: async () => ({ fontSize: 'default', spellcheck: true }),
+    getUpdateChannel: async () => 'beta',
+    getAppVersion: async () => '1.2.3',
+    getUpdateState: async () => null,
+  } as unknown as HomeApi
+
+  await act(async () => {
+    root.render(
+      createElement(
+        LocaleProvider,
+        { initial: lang },
+        createElement(SettingsModal, {
+          status: null,
+          loggingOut: false,
+          loginWaiting: false,
+          loginUrl: null,
+          urlCopied: false,
+          onOpenLoginUrl: vi.fn(),
+          onCopyLoginUrl: vi.fn(),
+          onClose: vi.fn(),
+          onLogin: vi.fn(),
+          onLogout: vi.fn(),
+        }),
+      ),
+    )
+    await Promise.resolve()
+  })
+  const about = Array.from(host.querySelectorAll<HTMLButtonElement>('.set-nav-item')).find(
+    (button) => button.textContent?.includes(aboutLabel),
+  )
+  expect(about, `About nav item (${lang})`).toBeDefined()
+  await act(async () => {
+    about!.click()
+    await Promise.resolve()
+  })
+}
+
+describe('Settings > About', () => {
+  it('shows the product name, logo, version, channel and a copyright line, in English', async () => {
+    await openAbout('en', 'About')
+    const pane = host.querySelector('.set-pane')!
+    expect(pane.querySelector('.set-about-name')?.textContent).toBe('UniWork Office')
+    expect(pane.querySelector<HTMLImageElement>('img.set-about-logo')?.getAttribute('src')).toMatch(
+      /app-icon/,
+    )
+    expect(pane.textContent).toContain('1.2.3')
+    expect(pane.textContent).toContain('Update Channel')
+    expect(pane.querySelector('.set-about-copyright')?.textContent).toBe(
+      `© ${new Date().getFullYear()} UniWork`,
+    )
+  })
+
+  it('has no GitHub or star row, in English and Vietnamese', async () => {
+    await openAbout('en', 'About')
+    expect(host.querySelector('.set-pane')!.textContent).not.toMatch(/github|star|open source/i)
+    act(() => root.unmount())
+    root = createRoot(host)
+    await openAbout('vi', strings.vi.setSecAbout)
+    const pane = host.querySelector('.set-pane')!
+    expect(pane.querySelector('.set-about-name')?.textContent).toBe('UniWork Office')
+    expect(pane.textContent).not.toMatch(/github|gắn sao|mã nguồn mở/i)
+    expect(pane.textContent).toContain('Phiên bản')
+  })
+
+  it('has a copyright line in every locale', () => {
+    for (const [lang, table] of Object.entries(strings)) {
+      expect(table.setAboutCopyright, lang).toContain('{year}')
+      expect(table.setAboutCopyright, lang).toContain('UniWork')
+    }
+  })
+})

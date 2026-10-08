@@ -24,12 +24,10 @@ beforeEach(() => {
   window.aiOffice = {
     getTheme: async () => 'system',
     getDefaultSaveDir: async () => '',
-    getAnalyticsEnabled: async () => true,
     getAutoSaveDefault: async () => ({ on: false, updatedAt: 0 }),
     getAiPanelPrefs: async () => ({ fontSize: 'default', spellcheck: true }),
     getUpdateChannel: async () => 'stable',
     getAppVersion: async () => '1.0.0',
-    githubStars: async () => null,
   } as unknown as HomeApi
 })
 

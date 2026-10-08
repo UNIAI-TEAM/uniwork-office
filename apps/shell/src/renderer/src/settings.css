@@ -1403,3 +1403,39 @@
 .set-update-btn:hover {
   background: var(--hover);
 }
+
+/* Settings → About: product identity above the version rows */
+.set-about-hero {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 4px 0 18px;
+}
+
+.set-about-logo {
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+  border-radius: 14px;
+}
+
+.set-about-name {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+}
+
+.set-about-tagline {
+  margin-top: 2px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.set-about-copyright {
+  margin: 18px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}

@@ -28,7 +28,6 @@ export {
   type AppMenuLabels,
   type ViewMenuOptions,
 } from './app-menu'
-export { GITHUB_REPO_URL } from './github-menu'
 export {
   saveAsSuggestion,
   showOpenDialogWithMemory,

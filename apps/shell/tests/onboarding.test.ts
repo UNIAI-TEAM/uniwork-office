@@ -7,6 +7,9 @@ import type { Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Onboarding } from '../src/renderer/src/Onboarding'
 import { LocaleProvider } from '../src/renderer/src/locale'
+import { strings } from '../src/renderer/src/strings'
+// @ts-expect-error plain .mjs module without type declarations
+import { ONBOARDING_COPY } from '../../../tools/rebrand/onboarding-copy.mjs'
 
 const actEnvironment = globalThis as typeof globalThis & {
   IS_REACT_ACT_ENVIRONMENT?: boolean
@@ -44,15 +47,37 @@ async function click(selector: string): Promise<void> {
   })
 }
 
-describe('analytics consent in onboarding', () => {
-  it('explains default-on analytics without an onboarding control', () => {
+describe('first-run welcome dialog', () => {
+  it('has no GitHub, star, usage-statistics or pricing call to action on any step', () => {
     renderOnboarding(vi.fn(async () => true))
     expect(host.querySelector('[role="switch"]')).toBeNull()
-    expect(host.textContent).toContain('Enabled by default')
-    expect(host.textContent).toContain('Settings → General')
+    // every slide stays mounted (inert) so one read covers all three steps
+    const text = host.textContent ?? ''
+    expect(text).toContain('Documents, spreadsheets, slides and PDFs in one app')
+    expect(text).not.toMatch(/github|star on|open source|google analytics|usage statistics/i)
+    expect(text).not.toMatch(/free for everyone|no license|no ads|no watermark/i)
+    expect(host.querySelectorAll('a, .onb-star, .onb-offer')).toHaveLength(0)
   })
 
-  it('lets Skip and Escape finish without changing analytics', async () => {
+  it('shows the app logo on step 1 and an AI mark on step 2', () => {
+    renderOnboarding(vi.fn(async () => true))
+    const slides = host.querySelectorAll('.onb-slide')
+    expect(slides).toHaveLength(3)
+    expect(slides[0].querySelector('img.onb-art-logo')).not.toBeNull()
+    expect(slides[1].querySelector('.onb-art-ai svg')).not.toBeNull()
+    expect(host.querySelector('.onb-art-gift')).toBeNull()
+  })
+
+  it('carries the neutral step-3 copy in every locale', () => {
+    for (const [lang, table] of Object.entries(strings)) {
+      const copy = ONBOARDING_COPY[lang as keyof typeof ONBOARDING_COPY]
+      expect(copy, lang).toBeDefined()
+      expect(table.onbTitle3, lang).toBe(copy.onbTitle3)
+      expect(table.onbBody3, lang).toBe(copy.onbBody3)
+    }
+  })
+
+  it('lets Skip and Escape finish', async () => {
     const onDone = vi.fn(async () => true)
     renderOnboarding(onDone)
 
@@ -67,7 +92,7 @@ describe('analytics consent in onboarding', () => {
     expect(onDone).toHaveBeenLastCalledWith()
   })
 
-  it('finishes the final slide without an analytics choice', async () => {
+  it('finishes on the final slide', async () => {
     const onDone = vi.fn(async () => true)
     renderOnboarding(onDone)
 

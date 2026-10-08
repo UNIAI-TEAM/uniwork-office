@@ -75,7 +75,7 @@ npm run dist:win      # Windows NSIS (from Windows or with a Windows sidecar)
 npm run dist:linux    # AppImage / deb / rpm
 ```
 
-Do not set `GENOFFICE_GA4_*` or `GENOFFICE_UPDATE_URL` for UniWork GO-1 packaging. Without those values, analytics and in-app updates stay disabled.
+Do not set `GENOFFICE_UPDATE_URL` until a UniWork update feed exists; without it in-app auto-update stays disabled. The app has no usage-statistics component (see [PRIVACY.md](PRIVACY.md)).
 
 ## GO-1 limitations
 

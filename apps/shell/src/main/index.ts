@@ -46,7 +46,6 @@ import { createI18n, isLang, normalizeLang, setUiLang, type Lang } from '@genoff
 import {
   DEFAULT_SAVE_DIR_KEY,
   DROP_OPEN_CHANNEL,
-  GITHUB_REPO_URL,
   appMenuLabels,
   contextMenuLabels,
   editMenuTemplate,
@@ -80,27 +79,6 @@ import { installCliLinkBestEffort } from './cli-link'
 import { createDefaultAppService, execFileRunner } from './default-app'
 import { registerIntegrationsIpc } from './integrations-ipc'
 import { exportLessonPackZip, probeAiHub } from './edu-commercial'
-import {
-  ANALYTICS_ENABLED_KEY,
-  analyticsEnabledFrom,
-  createAnalytics,
-  ensureAnalyticsClientState,
-  extractPackagedAnalyticsKeys,
-  markAnalyticsFirstLaunchSent,
-} from './analytics'
-import type { Analytics, AnalyticsKeys } from './analytics'
-import {
-  LAST_RUN_VERSION_KEY,
-  STAR_PROMPT_KEY,
-  asStarPromptState,
-  isUpgradeLaunch,
-  shouldShowStarPrompt,
-  shouldShowUpgradeStarPrompt,
-  withDocOpen,
-  withFirstRun,
-  withResolved,
-  withShown,
-} from './star-prompt'
 import {
   clearCloudProjectsStore,
   cloudProjectExternalUrl,
@@ -274,7 +252,6 @@ import type {
   RecentPage,
   RenameResult,
   DocTheme,
-  StarPromptShow,
   UiTheme,
   FileSearchPage,
   FileSearchQuery,
@@ -590,131 +567,10 @@ function currentAiPanelPrefs(): AiPanelPrefs {
   return cachedAiPanelPrefs
 }
 
-// ---- anonymous usage analytics (see src/main/analytics.ts) ----
-// Stays a no-op until initAnalytics() runs at startup; keyless builds
-// (source/forks) keep the no-op forever, so every track() call is safe.
-
-let analytics: Analytics = { active: false, track: () => {} }
-
-let cachedAnalyticsEnabled: boolean | null = null
-
-function analyticsEnabled(): boolean {
-  cachedAnalyticsEnabled ??= analyticsEnabledFrom(readAppSettings(APP_SETTINGS_PATH()))
-  return cachedAnalyticsEnabled
-}
-
-function resolveAnalyticsKeys(): AnalyticsKeys | null {
-  // Only packaged extraMetadata is authoritative. Source/dev runs never read
-  // runtime credentials and therefore remain a strict no-op.
-  if (!app.isPackaged) return null
-  try {
-    return extractPackagedAnalyticsKeys(
-      JSON.parse(readFileSync(join(app.getAppPath(), 'package.json'), 'utf8')),
-      app.isPackaged,
-    )
-  } catch {
-    return null
-  }
-}
-
-function persistAnalyticsPreference(enabled: boolean): boolean {
-  const previous = cachedAnalyticsEnabled
-  // Change the in-memory gate before touching disk. The synchronous atomic
-  // write prevents another event from being handled in between.
-  cachedAnalyticsEnabled = enabled
-  try {
-    writeAppSettings(APP_SETTINGS_PATH(), { [ANALYTICS_ENABLED_KEY]: enabled })
-    return true
-  } catch (error) {
-    cachedAnalyticsEnabled = previous
-    throw error
-  }
-}
-
-function initAnalytics(): void {
-  try {
-    let clientState: ReturnType<typeof ensureAnalyticsClientState> | null = null
-    const getClientState = () => (clientState ??= ensureAnalyticsClientState(APP_SETTINGS_PATH()))
-    analytics = createAnalytics({
-      keys: resolveAnalyticsKeys(),
-      getClientId: () => getClientState().clientId,
-      isEnabled: analyticsEnabled,
-      shouldTrackFirstLaunch: () => getClientState().firstLaunchPending,
-      onFirstLaunchSent: () => markAnalyticsFirstLaunchSent(APP_SETTINGS_PATH()),
-      // Country-only approximation from OS regional settings. This avoids an
-      // IP lookup while populating GA4's built-in Country dimension.
-      getCountryCode: () => app.getLocaleCountryCode(),
-      // evaluated per event: ui_lang follows live language switches
-      baseParams: () => ({
-        app_version: app.getVersion(),
-        platform: process.platform,
-        os_version: process.getSystemVersion(),
-        ui_lang: currentLang(),
-      }),
-    })
-  } catch {
-    // analytics must never block startup
-  }
-}
-
 // ---- first-run onboarding ----
-// Onboarding offer CTA (disabled in GO-1). Points at the UniWork origin repo,
-// not genoffice.ai.
-const GENTEAM_URL = 'https://github.com/UNIAI-TEAM/uniwork-office'
-
 // Genspark credit-usage page opened from the account menu's credits row.
 // Kept main-side so the renderer never supplies the URL.
 const CREDIT_USAGE_URL = 'https://openrouter.ai/settings/credits'
-
-// ---- "star us on GitHub" prompt (see star-prompt.ts for the rules) ----
-
-const readStarPrompt = () =>
-  asStarPromptState(readAppSettings(APP_SETTINGS_PATH())[STAR_PROMPT_KEY])
-const writeStarPrompt = (state: ReturnType<typeof readStarPrompt>) =>
-  writeAppSetting(APP_SETTINGS_PATH(), STAR_PROMPT_KEY, state)
-
-/** set at startup when this is the first launch after an upgrade; consumed by
- * the first starPromptShouldShow query of the session */
-let upgradeStarPromptPending = false
-
-/** a granted show, cached for the session: repeated queries (React StrictMode
- * double-effects, AppFrame remounts) must return the same answer instead of
- * burning another lifetime show or flipping to a snoozed "false" */
-let starPromptSessionGrant: StarPromptShow | null = null
-
-/** every successful document open counts toward the prompt's value threshold */
-function recordStarPromptDocOpen(): void {
-  try {
-    const state = readStarPrompt()
-    const next = withDocOpen(state)
-    if (next !== state) writeStarPrompt(next)
-  } catch {
-    // settings write failures must never break opening a document
-  }
-}
-
-// Stargazer count for the settings About pane; fetched main-side (the
-// renderer CSP has no api.github.com) and cached per session — the exact
-// number is decoration, staleness is fine.
-let cachedGithubStars: number | null = null
-
-async function fetchGithubStars(): Promise<number | null> {
-  if (cachedGithubStars !== null) return cachedGithubStars
-  try {
-    const response = await fetch('https://api.github.com/repos/UNIAI-TEAM/uniwork-office', {
-      headers: { Accept: 'application/vnd.github+json' },
-      signal: AbortSignal.timeout(5000),
-    })
-    if (!response.ok) return null
-    const body: unknown = await response.json()
-    const count = (body as { stargazers_count?: unknown }).stargazers_count
-    if (typeof count !== 'number' || !Number.isFinite(count)) return null
-    cachedGithubStars = count
-    return count
-  } catch {
-    return null
-  }
-}
 
 const tMain = createI18n({
   zh: {
@@ -3333,13 +3189,28 @@ function refreshTitleBarOverlay(): void {
   shellWindow.setTitleBarOverlay(tabStripOverlay(nativeTheme.shouldUseDarkColors))
 }
 
+/**
+ * Window icon for runs that do not carry the packager icon: a dev run (`electron apps/shell`) on
+ * Windows / Linux, and Linux window managers that read the window rather than the .desktop file.
+ * Packaged Windows builds embed build/icon.ico in the exe and macOS takes the bundle's icns.
+ */
+function windowIconPath(): string | undefined {
+  if (process.platform === 'darwin' || (app.isPackaged && process.platform === 'win32')) {
+    return undefined
+  }
+  const icon = join(app.getAppPath(), 'build', 'icon.png')
+  return existsSync(icon) ? icon : undefined
+}
+
 function createShellWindow(): void {
+  const icon = windowIconPath()
   const win = new BrowserWindow({
     width: 1360,
     height: 900,
     minWidth: 720,
     minHeight: 550,
     title: 'UniWork Office',
+    ...(icon ? { icon } : {}),
     // vibrancy: editor modules punch translucent regions (e.g. the slides
     // thumbnail pane) through to the desktop
     ...(process.platform === 'darwin'
@@ -3786,13 +3657,7 @@ function registerDroppedFilesIpc(): void {
 
 /** the single router: extension decides which module owns the file; false = nothing opened */
 function openDocumentPath(filePath: string): boolean {
-  const opened = routeDocumentPath(filePath)
-  if (opened) {
-    recordStarPromptDocOpen()
-    // extension only — never the file name or path
-    analytics.track('file_open', { ext: extname(filePath).slice(1).toLowerCase() })
-  }
-  return opened
+  return routeDocumentPath(filePath)
 }
 
 /**
@@ -3915,23 +3780,18 @@ async function newSheetTab(recoverAs?: string, opts?: { aiPreset?: AiPresetInput
     )
     startQueuedWorkbookNudge()
     // no recent-file entry yet: there is no user-visible file until it is saved
-    recordStarPromptDocOpen()
-    analytics.track('file_new', { kind: 'xlsx' })
   } catch (err) {
     console.warn('[shell] temp workbook create failed, writing to the default folder:', err)
     try {
       await atomicWriteFile(suggestedPath, await blankXlsxBuffer())
       markSheetsUntitledPath(suggestedPath)
-      // route directly (not via openDocumentPath) so creating a sheet emits
-      // only file_new — the file_open event is reserved for opening existing files
+      // route directly (not via openDocumentPath): creating a sheet is not opening a file
       if (preset && tabManager) {
         bindPendingProject(
           pendingProject,
           tabManager.openSheetsTab(suggestedPath, { aiPreset: preset }),
         )
-        recordStarPromptDocOpen()
-      } else if (routeDocumentPath(suggestedPath)) recordStarPromptDocOpen()
-      analytics.track('file_new', { kind: 'xlsx' })
+      } else routeDocumentPath(suggestedPath)
     } catch (fallbackErr) {
       console.warn(
         '[shell] blank workbook create failed, opening in-memory blank tab:',
@@ -3961,8 +3821,6 @@ function newDocTab(): void {
   try {
     bindPendingDir('doc', tabManager?.openDocsTab(undefined, { newBlank: true }))
     // creating a document is as much a value moment as opening one
-    recordStarPromptDocOpen()
-    analytics.track('file_new', { kind: 'docx' })
   } catch (err) {
     surfaceNewTabError(err)
   }
@@ -3974,8 +3832,6 @@ function openBlankDocsTabForMcp(): number {
   const tabId = tabManager.openDocsTab(undefined, { newBlank: true })
   const view = tabManager.docsTabs().find((t) => t.id === tabId)
   if (!view) throw new Error('the new document tab could not be opened')
-  recordStarPromptDocOpen()
-  analytics.track('file_new', { kind: 'docx' })
   return view.webContents.id
 }
 
@@ -4008,8 +3864,6 @@ async function openBlankSheetsTabForMcp(): Promise<number> {
   // action only after Univer mounts, so a single push can land in the void on a
   // cold start and leave the tab sitting on a blank in-memory workbook.
   startQueuedWorkbookNudge()
-  recordStarPromptDocOpen()
-  analytics.track('file_new', { kind: 'xlsx' })
   return view.webContents.id
 }
 
@@ -4062,16 +3916,12 @@ function openBlankSlidesTabForMcp(): number {
   const tabId = tabManager.openSlidesTab()
   const view = tabManager.slidesTabs().find((t) => t.id === tabId)
   if (!view) throw new Error('the new presentation tab could not be opened')
-  recordStarPromptDocOpen()
-  analytics.track('file_new', { kind: 'pptx' })
   return view.webContents.id
 }
 
 function newSlideTab(): void {
   try {
     bindPendingDir('slide', tabManager?.openSlidesTab())
-    recordStarPromptDocOpen()
-    analytics.track('file_new', { kind: 'pptx' })
   } catch (err) {
     surfaceNewTabError(err)
   }
@@ -4080,8 +3930,6 @@ function newSlideTab(): void {
 function newMarkdownTab(): void {
   try {
     bindPendingDir('markdown', tabManager?.openMarkdownTab())
-    recordStarPromptDocOpen()
-    analytics.track('file_new', { kind: 'md' })
   } catch (err) {
     surfaceNewTabError(err)
   }
@@ -4090,8 +3938,6 @@ function newMarkdownTab(): void {
 function newHtmlTab(): void {
   try {
     bindPendingDir('html', tabManager?.openHtmlTab())
-    recordStarPromptDocOpen()
-    analytics.track('file_new', { kind: 'html' })
   } catch (err) {
     surfaceNewTabError(err)
   }
@@ -4116,14 +3962,10 @@ async function newPdfTab(opts?: {
     const preset = normalizeAiPreset(opts?.aiPreset)
     if (preset && tabManager) {
       tabManager.openPdfTab(filePath, { aiPreset: preset })
-      recordStarPromptDocOpen()
-      analytics.track('file_new', { kind: 'pdf' })
       return
     }
-    // route directly (not via openDocumentPath) so creating a pdf emits only
-    // file_new and counts one doc-open — same as the blank workbook above
-    if (routeDocumentPath(filePath)) recordStarPromptDocOpen()
-    analytics.track('file_new', { kind: 'pdf' })
+    // route directly (not via openDocumentPath), same as the blank workbook above
+    routeDocumentPath(filePath)
   } catch (err) {
     surfaceNewTabError(err)
   }
@@ -4175,7 +4017,6 @@ function registerHomeIpc(): void {
   // kept main-side so the "open manually" rescue never opens a renderer-supplied URL.
   let pendingLoginUrl = ''
   ipcMain.handle(HOME_CHANNELS.accountLogin, async (event) => {
-    analytics.track('login_click')
     const sender = event.sender
     const send = (payload: AccountLoginEvent) => {
       if (!sender.isDestroyed()) sender.send(HOME_CHANNELS.accountLoginEvent, payload)
@@ -4203,11 +4044,8 @@ function registerHomeIpc(): void {
     clearCloudProjectsStore(cloudProjectsStorePath())
   })
 
-  ipcMain.handle(HOME_CHANNELS.agentIntentAck, (_event, intentId: unknown, status: unknown) => {
-    if (typeof intentId === 'string' && typeof status === 'string') {
-      analytics.track('agent_intent_ack', { intentId, status })
-    }
-  })
+  // Reserved for the Hub result channel; the ack is not reported anywhere today.
+  ipcMain.handle(HOME_CHANNELS.agentIntentAck, () => undefined)
 
   ipcMain.handle(HOME_CHANNELS.resolveAgentIntent, (_event, text: unknown) => {
     if (typeof text !== 'string') return null
@@ -4766,13 +4604,6 @@ function registerHomeIpc(): void {
     if (logPath) shell.showItemInFolder(logPath)
   })
 
-  ipcMain.handle(HOME_CHANNELS.getAnalyticsEnabled, (): boolean => analyticsEnabled())
-
-  ipcMain.handle(HOME_CHANNELS.setAnalyticsEnabled, (_event, enabled: unknown): boolean => {
-    if (typeof enabled !== 'boolean') return false
-    return persistAnalyticsPreference(enabled)
-  })
-
   ipcMain.handle(HOME_CHANNELS.getAiPanelPrefs, (): AiPanelPrefs => currentAiPanelPrefs())
   ipcMain.handle('app:get-ai-panel-prefs', (): AiPanelPrefs => currentAiPanelPrefs())
 
@@ -4997,58 +4828,10 @@ function registerHomeIpc(): void {
     return picked
   })
 
-  ipcMain.handle(HOME_CHANNELS.openGenTeam, () => {
-    shell.openExternal(GENTEAM_URL).catch(() => {
-      // no browser handler available; nothing actionable for the user here
-    })
-  })
-
   ipcMain.handle(HOME_CHANNELS.openCreditUsage, () => {
     shell.openExternal(CREDIT_USAGE_URL).catch(() => {
       // no browser handler available; nothing actionable for the user here
     })
-  })
-
-  ipcMain.handle(HOME_CHANNELS.openGitHubRepo, () => {
-    shell.openExternal(GITHUB_REPO_URL).catch(() => {
-      // no browser handler available; nothing actionable for the user here
-    })
-  })
-
-  ipcMain.handle(HOME_CHANNELS.githubStars, () => fetchGithubStars())
-
-  // returning true also counts as "shown": the renderer displays it
-  // unconditionally, so no separate mark-shown round-trip is needed
-  ipcMain.handle(HOME_CHANNELS.starPromptShouldShow, (): StarPromptShow => {
-    if (starPromptSessionGrant) return starPromptSessionGrant
-    const now = Date.now()
-    const state = readStarPrompt()
-    const docOpens = state.docOpens ?? 0
-    // dev preview of the card without waiting out the value thresholds
-    // (same pattern as GENOFFICE_FAKE_UPDATE); nothing is recorded
-    if (!app.isPackaged && process.env.GENOFFICE_FORCE_STAR_PROMPT) return { show: true, docOpens }
-    const grant = (): StarPromptShow => {
-      writeStarPrompt(withShown(state, now))
-      starPromptSessionGrant = { show: true, docOpens }
-      return starPromptSessionGrant
-    }
-    // first launch after an upgrade: skip the value gates once for a
-    // never-prompted user (they are a proven repeat user already)
-    if (upgradeStarPromptPending) {
-      upgradeStarPromptPending = false
-      if (shouldShowUpgradeStarPrompt(state)) return grant()
-    }
-    if (!shouldShowStarPrompt(state, now)) return { show: false, docOpens }
-    return grant()
-  })
-
-  ipcMain.handle(HOME_CHANNELS.starPromptAction, (_event, action: unknown) => {
-    if (action !== 'starred' && action !== 'later') return
-    // the card was reacted to — drop the session grant so a later query (new
-    // shell window on macOS) re-evaluates the real rules (snooze / resolved)
-    starPromptSessionGrant = null
-    // 'later' needs no write: the display was already counted by the query
-    if (action === 'starred') writeStarPrompt(withResolved(readStarPrompt()))
   })
 
   const cloudProjectsStorePath = () => join(app.getPath('userData'), 'cloud-projects.json')
@@ -6306,6 +6089,11 @@ async function runHeadlessExportEntry(
 }
 
 app.whenReady().then(async () => {
+  // a dev run has no bundle icns; packaged macOS builds take the Dock icon from the bundle
+  if (!app.isPackaged && process.platform === 'darwin') {
+    const dockIcon = join(app.getAppPath(), 'build', 'icon-mac.png')
+    if (existsSync(dockIcon)) app.dock?.setIcon(dockIcon)
+  }
   // first scan waits for the windows to come up; later ones follow folder changes
   setTimeout(() => ensureFileIndexer()?.refresh(), 4000)
   installRendererProtocol({
@@ -6374,33 +6162,8 @@ app.whenReady().then(async () => {
   currentLang()
   // native menus/dialogs/scrollbars follow the persisted theme from first paint
   nativeTheme.themeSource = currentTheme()
-  // stamp the star-prompt install-age clock on the first launch carrying the feature,
-  // and detect upgrade launches (version changed since the previous run)
-  try {
-    const settings = readAppSettings(APP_SETTINGS_PATH())
-    const starState = readStarPrompt()
-    const stamped = withFirstRun(starState, Date.now())
-    if (stamped !== starState) writeStarPrompt(stamped)
-
-    const prevVersion =
-      typeof settings[LAST_RUN_VERSION_KEY] === 'string'
-        ? (settings[LAST_RUN_VERSION_KEY] as string)
-        : null
-    const currentVersion = app.getVersion()
-    upgradeStarPromptPending = isUpgradeLaunch(
-      prevVersion,
-      currentVersion,
-      settings.onboardingSeen === true,
-    )
-    if (prevVersion !== currentVersion)
-      writeAppSetting(APP_SETTINGS_PATH(), LAST_RUN_VERSION_KEY, currentVersion)
-  } catch {
-    // settings write failures must never block startup
-  }
   // off the startup path: a symlink / registry write nobody is waiting for
   setTimeout(() => installCliLinkBestEffort(APP_SETTINGS_PATH()), 3000)
-  initAnalytics()
-  analytics.track('app_launch')
   startSheetsCaptureServer()
   // Register the docs renderer bridge listeners before the MCP server can take
   // a visible-editing request.

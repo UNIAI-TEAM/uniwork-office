@@ -28,6 +28,7 @@ import type {
 import { useI18n } from './locale'
 import type { StringKey, TFunc } from './locale'
 import type { AccountStatus, AiCatalogEntry, DocTheme, UiTheme } from '../../shared/home-api'
+import appIcon from './assets/app-icon.png'
 import { ProviderLogo } from './provider-logos'
 import { BackupStoragePane } from './BackupStoragePane'
 import { BillingPaymentPane } from './BillingPaymentPane'
@@ -98,14 +99,6 @@ const CHANNEL_OPTIONS = [
   { value: 'stable', labelKey: 'channelStable' },
   { value: 'beta', labelKey: 'channelBeta' },
 ] as const satisfies readonly { value: 'stable' | 'beta'; labelKey: StringKey }[]
-
-/** GitHub-style abbreviated stargazer count (2591 → "2.6k") — the number is
- * social proof, not a metric; the cached/exact value would only look stale */
-function formatStars(n: number): string {
-  if (n < 1000) return String(n)
-  const k = n / 1000
-  return `${k >= 100 ? Math.round(k) : (Math.round(k * 10) / 10).toString().replace(/\.0$/, '')}k`
-}
 
 /** px stepper for the custom AI panel text size; in-range values apply live,
  * out-of-range or partial input is clamped on blur */
@@ -1533,8 +1526,6 @@ export function SettingsModal({
   const [theme, setTheme] = useState<UiTheme>('system')
   const [docTheme, setDocTheme] = useState<DocTheme>('follow')
   const [saveDir, setSaveDir] = useState('')
-  const [analyticsOn, setAnalyticsOn] = useState(true)
-  const [analyticsSaving, setAnalyticsSaving] = useState(false)
   const [autoSaveOn, setAutoSaveOn] = useState(false)
   const [defaultApp, setDefaultApp] = useState<DefaultAppStatus | null>(null)
   const [defaultAppBusy, setDefaultAppBusy] = useState(false)
@@ -1542,7 +1533,6 @@ export function SettingsModal({
   const [aiPrefs, setAiPrefs] = useState<AiPanelPrefs>(DEFAULT_AI_PANEL_PREFS)
   const [channel, setChannel] = useState<'stable' | 'beta'>('stable')
   const [appVersion, setAppVersion] = useState('')
-  const [githubStars, setGithubStars] = useState<number | null>(null)
   const [updateState, setUpdateState] = useState<UpdateUiState | null>(null)
 
   useEffect(() => {
@@ -1555,9 +1545,6 @@ export function SettingsModal({
     })
     void window.aiOffice.getDefaultSaveDir?.().then((dir) => {
       if (alive && dir) setSaveDir(dir)
-    })
-    void window.aiOffice.getAnalyticsEnabled?.().then((on) => {
-      if (alive) setAnalyticsOn(on !== false)
     })
     void window.aiOffice.getAutoSaveDefault?.().then((v) => {
       if (alive) setAutoSaveOn(v.on)
@@ -1583,9 +1570,6 @@ export function SettingsModal({
         if (alive) setUpdateState(s)
       })
       .catch(() => undefined)
-    void window.aiOffice.githubStars?.().then((n) => {
-      if (alive && n !== null) setGithubStars(n)
-    })
     return () => {
       alive = false
     }
@@ -1944,32 +1928,6 @@ export function SettingsModal({
                     }}
                   />
                 </div>
-                <div className="set-field">
-                  <div className="set-field-text">
-                    <div className="set-field-stack">
-                      <div className="set-field-label">{t('setAnalytics')}</div>
-                      <div className="set-field-desc">{t('setAnalyticsDesc')}</div>
-                    </div>
-                  </div>
-                  <button
-                    className="set-switch"
-                    role="switch"
-                    aria-checked={analyticsOn}
-                    aria-label={t('setAnalytics')}
-                    disabled={analyticsSaving}
-                    onClick={() => {
-                      const next = !analyticsOn
-                      setAnalyticsSaving(true)
-                      void window.aiOffice
-                        .setAnalyticsEnabled(next)
-                        .then((persisted) => {
-                          if (persisted) setAnalyticsOn(next)
-                        })
-                        .catch(() => {})
-                        .finally(() => setAnalyticsSaving(false))
-                    }}
-                  />
-                </div>
               </>
             )}
             {section === 'integrations' && (
@@ -1978,6 +1936,13 @@ export function SettingsModal({
             {section === 'about' && (
               <>
                 <h3 className="set-pane-title">{t('setSecAbout')}</h3>
+                <div className="set-about-hero">
+                  <img className="set-about-logo" src={appIcon} alt="" />
+                  <div className="set-about-id">
+                    <div className="set-about-name">UniWork Office</div>
+                    <div className="set-about-tagline">{t('onbSubtitle1')}</div>
+                  </div>
+                </div>
                 <Field label={t('versionLabel')} value={appVersion || '—'} />
                 {updateState && (
                   <div className="set-field">
@@ -2018,22 +1983,9 @@ export function SettingsModal({
                     }}
                   />
                 </div>
-                <Field
-                  label={t('setGithub')}
-                  value={
-                    githubStars === null
-                      ? 'github.com/UNIAI-TEAM/uniwork-office'
-                      : `github.com/UNIAI-TEAM/uniwork-office · ★ ${formatStars(githubStars)}`
-                  }
-                  action={
-                    <button
-                      className="set-btn"
-                      onClick={() => void window.aiOffice.openGitHubRepo?.()}
-                    >
-                      {t('starOnGitHub')}
-                    </button>
-                  }
-                />
+                <p className="set-about-copyright">
+                  {t('setAboutCopyright', { year: new Date().getFullYear() })}
+                </p>
               </>
             )}
           </div>
