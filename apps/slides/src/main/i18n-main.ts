@@ -293,7 +293,7 @@ export const tMain = createI18n({
     errNotImage: 'loại hình ảnh không được hỗ trợ',
     errNoApiKey: 'Chưa kích hoạt / mua gói AI. Hãy mua gói để dùng Trợ lý AI.',
     errNoModel: 'Chưa cấu hình tên mô hình',
-    errMediaNotConfigured: 'Chưa cấu hình mô hình hình ảnh/đa phương tiện: hãy thiết lập trong Cài đặt → AI đa phương tiện rồi thử lại',
+    errMediaNotConfigured: 'Chưa cấu hình mô hình hình ảnh/đa phương tiện: hãy thiết lập trong Cài đặt → AI Media & Tìm kiếm rồi thử lại',
     errNoDeckAppend:
       'Không có bản trình bày để nối thêm vào (thiếu phiên làm việc). Hãy tạo trang đầu tiên với mode:"replace" hoặc thêm trang bằng các công cụ gốc.',
     errAppendFailed: 'Nối thêm thất bại: {reason}',
