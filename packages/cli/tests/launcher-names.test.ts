@@ -53,8 +53,11 @@ describe('CLI launcher binary names', () => {
     expect(slash(appBinaryForResources('/Apps/X.app/Contents/Resources', 'darwin'))).toMatch(
       new RegExp(`/MacOS/${productName}$`),
     )
-    expect(slash(appBinaryForResources('C:\\X\\resources', 'win32'))).toMatch(
-      new RegExp(`/${productName}\\.exe$`),
+    // join() keeps the input's dirname correct on a POSIX host too (a bare 'C:\\X\\resources'
+    // has no separator there), and the expectation is built with the same join
+    const winInstall = 'D:\\Apps\\X'
+    expect(appBinaryForResources(join(winInstall, 'resources'), 'win32')).toBe(
+      join(winInstall, `${productName}.exe`),
     )
     expect(slash(appBinaryForResources('/opt/X/resources', 'linux'))).toMatch(
       new RegExp(`/${executableName}$`),
