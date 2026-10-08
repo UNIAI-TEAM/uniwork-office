@@ -17,6 +17,12 @@
  * `capabilities` is then replaced by a copy of hide's that receives the host
  * grants from `init` (File > Open, recents).
  *
+ * Headless entry (./headless.ts): a TOP-LEVEL page loaded with
+ * `?headless=1&open=<same-origin path>` gets no frame client at all; a
+ * synthesized port opens that one document read-only, light theme, and its
+ * overrides (headless export target, readiness signal, no saves) win last.
+ * A framed page never takes this path, whatever its URL says.
+ *
  * Every key of DesktopApi that no module implements is filled with a safe
  * fallback so the renderer never throws on a missing method: `on*` subscribers
  * get a no-op disposer (they are called synchronously and their return value is
@@ -28,6 +34,7 @@ import { createWebApi } from './webapi'
 import { bindHostAppearance } from './host-appearance'
 import ai from './ai'
 import hide, { hostGrants, webCapabilities } from './hide'
+import { createHeadless, isTopLevel, parseHeadlessEntry } from './headless'
 import type { DesktopCapabilities } from '../../../apps/docs/src/shared/ipc'
 
 type Bridge = Record<string, unknown>
@@ -37,19 +44,24 @@ function fallbackFor(key: string): unknown {
   return () => Promise.resolve(undefined)
 }
 
+const headlessEntry = parseHeadlessEntry(location.href, isTopLevel(window))
+const headless = headlessEntry ? createHeadless(headlessEntry) : null
+
 /** same-origin iframe (lane decision): the only host the frame talks to */
-const client = createDocsFrameClient({
-  allowedOrigins: [location.origin],
-  capabilities: {
-    save: true,
-    saveAs: true,
-    recents: true,
-    print: true,
-    exportPdf: true,
-    exportHtml: true,
-    filePick: true,
-  },
-})
+const client =
+  headless?.port ??
+  createDocsFrameClient({
+    allowedOrigins: [location.origin],
+    capabilities: {
+      save: true,
+      saveAs: true,
+      recents: true,
+      print: true,
+      exportPdf: true,
+      exportHtml: true,
+      filePick: true,
+    },
+  })
 /** read by the renderer's cap(); boot waits (bounded) for init, so the grants land before the first render */
 const capabilities: DesktopCapabilities = { ...webCapabilities }
 client
@@ -64,6 +76,7 @@ export function installBridge(): void {
   // later modules win: webapi's real fetchImage / convertAltChunkHtml / close
   // guard replace the ai.ts and hide.ts stubs
   const modules: Bridge[] = [hide, ai, webapi, browser]
+  if (headless) modules.push(headless.desktopFor(webapi))
   const desktop: Bridge = {}
   for (const mod of modules) for (const key of Object.keys(mod ?? {})) desktop[key] = mod[key]
   desktop.capabilities = capabilities

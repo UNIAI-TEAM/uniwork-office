@@ -14,6 +14,8 @@
     "host-appearance.ts",
     "browser.ts",
     "hide.ts",
+    "headless.ts",
+    "headless.test.ts",
     "ai.ts",
     "host-appearance.test.ts",
     "project-memory.ts",

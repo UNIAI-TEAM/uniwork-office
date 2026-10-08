@@ -178,6 +178,60 @@ re-reads the file metadata with `api.open` and saves again with the current etag
 replaces the document, discarding the local edits) or **Cancel** (stays dirty; the next save asks again). A
 host-initiated `save` request gets the conflict in its `SaveResult` instead and owns the UI.
 
+## Headless entry (server-side PDF export)
+
+Not part of the postMessage protocol (no message types, `PROTOCOL_VERSION` stays 1): a second way to load the
+bundle, for dev-uniwork's office-engine (`apps/office-engine/src/worker/docs-pdf.ts`), which renders a document
+in headless Chromium and prints the **top-level** page with `Page.printToPDF`. Implementation:
+`web/docs/bridge/headless.ts`; proof: `web/e2e/headless.spec.ts`.
+
+**URL**
+
+```
+<bundle>/index.html?headless=1&open=<same-origin URL of the .docx>
+e.g. http://127.0.0.1:<port>/index.html?headless=1&open=/__input.docx
+```
+
+The entry is active only when **all** of these hold; otherwise the page is the normal framed editor and `open` is
+ignored:
+
+- the page is top-level (`window.parent === window`); in an iframe (normal UniWork use) it is inert, whatever the URL;
+- `headless=1` exactly (explicit opt-in; `?open=` alone does nothing);
+- `open` (absolute, or relative to the page) resolves to `http(s)` on the page's own origin. Rejected: other
+  origins/ports/schemes, protocol-relative (`//host`, `/\host`), `data:`, `blob:`, `javascript:`, URLs with
+  credentials.
+
+**Behaviour.** No handshake and no `ready` messages: `init` is synthesized at once (the 3 s host-appearance wait
+does not apply). The document is fetched with `credentials: 'omit'` (CSP `connect-src 'self'` covers it; the CSP
+is unchanged) and opened as `uniwork://files/headless/<name>`. Theme is forced light; capabilities are print /
+PDF export only. The page is read-only: every `api.*` request answers `unsupported`, saves are refused, no
+recents / picker / AI.
+
+**Driving the export (what the engine does).** The renderer runs its desktop headless-export path
+(`App.tsx` → `consumeHeadlessExport` → `runHeadlessDocumentExport`): it waits until the opened document is mounted,
+fonts settled and pagination stable, then calls the same PDF export as File > Export, then `headlessExportDone`.
+An init script that defines a `window.desktop` setter (docs-pdf.ts `PAGE_SHIM`) sees the bridge object assigned
+once, before the renderer boots, and may replace these methods on it:
+
+| method                                             | when the renderer calls it                                                   | engine answers                                                                                            |
+| -------------------------------------------------- | ---------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `consumeHeadlessExport()`                          | once at boot                                                                 | `{outPath, format: 'pdf'}` (the bridge's default returns the same, so the shim is optional)               |
+| `exportPdf(name, wTwips, hTwips, outPath, scale?)` | document ready, uniform paper: print **now**                                 | `printToPDF` (paper w/h in inches = twips/1440, zero margins, printBackground, scale) → `{ok:true, path}` |
+| `printPdfBuffer(wTwips, hTwips, scale?)`           | ready, mixed paper or > 10 pages: one call per chunk, the other pages hidden | `printToPDF` → `{ok:true, base64:<marker>}`                                                               |
+| `saveMergedPdf(name, parts, outPath)`              | after the chunks                                                             | merge the parts in order → `{ok:true, path}`                                                              |
+| `headlessExportDone({ok, error?})`                 | last                                                                         | **the completion signal**: `ok:false` = not opened / no pages / print failed                              |
+
+**Readiness signal (bridge side, with or without a shim).** `window.__docsWebHeadless = {state, error?, prints}`,
+mirrored to `<html data-docs-headless="<state>">` and a `docs-web:headless` window event (detail = same object):
+`opening` → `opened` (bytes handed to the renderer) → `done` (`headlessExportDone` ok) or `failed` (+ `error`: the
+fetch failed, e.g. HTTP 404, or the renderer's report). When a shim replaces `headlessExportDone`, the shim's own
+callback is the completion signal and the state stays `opened`. Without a shim the print calls print nothing (they
+are recorded in `prints`) and report ok.
+
+**Limits.** One document per page load; no editing, saving or host events; the input must be served from the
+bundle's origin (the engine's job-local loopback server does this); a document that fails to open lands on the
+renderer's blank fallback and is reported as `failed`, never exported as a blank PDF.
+
 ## Tests
 
 ```sh
@@ -185,4 +239,5 @@ npm run test:web        # protocol + bridge (jsdom) + build vitest suites
 npm run typecheck:web   # tsc for web/docs/protocol and web/docs/bridge
 npx vitest run --root web/docs/protocol      # unit + host<->client tests over fake windows
 npx tsc -p web/docs/protocol/tsconfig.json   # typecheck incl. tests
+npx playwright test -c web/e2e headless.spec   # headless entry (after npm run build:web)
 ```
