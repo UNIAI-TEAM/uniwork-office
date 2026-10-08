@@ -1,0 +1,122 @@
+name: Upstream sync
+
+# Weekly: brings genoffice (upstream) changes into a branch with
+# tools/rebrand/sync-upstream.mjs (patch + UniWork rebrand + UPSTREAM_BASE bump)
+# and opens a pull request for a human to review. Nothing is merged
+# automatically. See tools/rebrand/README.md ("Sync with upstream").
+
+on:
+  schedule:
+    - cron: '17 3 * * 1' # Mondays 03:17 UTC
+  workflow_dispatch:
+    inputs:
+      upstream_ref:
+        description: 'Upstream commit or ref to sync to (empty = upstream default branch head)'
+        required: false
+        default: ''
+
+concurrency:
+  group: upstream-sync
+  cancel-in-progress: false
+
+permissions:
+  contents: write # push the sync branch
+  pull-requests: write # open the pull request
+  actions: write # dispatch ci.yml on the sync branch (see below)
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # always branch off the default branch, whatever ref dispatched the run;
+          # full history and every origin branch so an existing sync branch is seen
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+
+      # No `npm ci`: the sync, the rebrand, the brand scan and the rebrand tests
+      # are plain Node with no dependencies (only `rebrand.mjs --icons` needs one).
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+
+      # Only Prettier, at the lockfile's version and outside the workspace, so the
+      # files the rebrand rewrites are formatted the way CI's format check expects.
+      - name: Install Prettier
+        run: |
+          version=$(node -p "require('./package-lock.json').packages['node_modules/prettier'].version")
+          npm install --prefix "$RUNNER_TEMP/prettier" --no-save --no-audit --no-fund "prettier@$version"
+
+      - name: Configure git identity
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+      # Exit 0 = up to date / already prepared / clean, 2 = needs a human (the PR is
+      # opened as a draft), 1 = error (the job fails). Upstream workflow files are
+      # left out: GITHUB_TOKEN may not push changes under .github/workflows, and
+      # ours differ from upstream's anyway; the report lists them for a human.
+      - name: Prepare sync branch
+        id: sync
+        env:
+          UPSTREAM_REF: ${{ inputs.upstream_ref }}
+        run: |
+          args=(--commit-conflicts --json --report "$RUNNER_TEMP/upstream-sync.md"
+                --exclude '.github/workflows/**'
+                --prettier "$RUNNER_TEMP/prettier/node_modules/prettier/bin/prettier.cjs")
+          if [ -n "$UPSTREAM_REF" ]; then args+=(--to "$UPSTREAM_REF"); fi
+          set +e
+          node tools/rebrand/sync-upstream.mjs "${args[@]}" > "$RUNNER_TEMP/summary.json"
+          code=$?
+          set -e
+          if [ "$code" -eq 1 ]; then exit 1; fi
+          {
+            echo "exit_code=$code"
+            echo "status=$(jq -r .status "$RUNNER_TEMP/summary.json")"
+            echo "branch=$(jq -r .branch "$RUNNER_TEMP/summary.json")"
+            echo "range=$(jq -r '"\(.base[0:7])..\(.target[0:7])"' "$RUNNER_TEMP/summary.json")"
+          } >> "$GITHUB_OUTPUT"
+          cat "$RUNNER_TEMP/upstream-sync.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Open pull request
+        if: steps.sync.outputs.status != 'up-to-date' && steps.sync.outputs.status != 'already-prepared'
+        env:
+          BRANCH: ${{ steps.sync.outputs.branch }}
+          RANGE: ${{ steps.sync.outputs.range }}
+          EXIT_CODE: ${{ steps.sync.outputs.exit_code }}
+          BASE_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          if [ "$(gh pr list --head "$BRANCH" --state open --json number --jq length)" != "0" ]; then
+            echo "An open pull request for $BRANCH already exists; nothing to do." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          git push origin "refs/heads/$BRANCH:refs/heads/$BRANCH"
+          draft=()
+          if [ "$EXIT_CODE" = "2" ]; then draft=(--draft); fi
+          gh pr create --base "$BASE_BRANCH" --head "$BRANCH" "${draft[@]}" \
+            --title "chore(upstream): sync genoffice $RANGE" --body-file "$RUNNER_TEMP/upstream-sync.md"
+          # Pushes and pull requests made with GITHUB_TOKEN do not trigger other
+          # workflows (only workflow_dispatch / repository_dispatch do), so the
+          # pull_request run of ci.yml never starts for this PR. Dispatch ci.yml on
+          # the branch instead: its checks attach to the PR head commit. Any later
+          # push by a person to the branch triggers the normal pull_request run.
+          gh workflow run ci.yml --ref "$BRANCH"
+          echo "Opened a pull request for $BRANCH and dispatched CI on it." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Nothing to open
+        if: steps.sync.outputs.status == 'up-to-date' || steps.sync.outputs.status == 'already-prepared'
+        env:
+          STATUS: ${{ steps.sync.outputs.status }}
+          BRANCH: ${{ steps.sync.outputs.branch }}
+        run: |
+          if [ "$STATUS" = "up-to-date" ]; then
+            echo "Upstream has nothing new: UPSTREAM_BASE already equals the upstream head." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "$BRANCH already carries this sync (open or closed PR); delete the branch to prepare it again." >> "$GITHUB_STEP_SUMMARY"
+          fi

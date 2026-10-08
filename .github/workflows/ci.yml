@@ -78,9 +78,13 @@ jobs:
         # exact main revision the merge was built against. The event's base.sha can
         # lag behind a fast-moving main, which pulls unrelated main-side files into
         # the changed-file set and fails the check on files the PR never touched.
+        # A workflow_dispatch run (e.g. the one upstream-sync.yml starts on its
+        # branch) has no event base, so it diffs against the default branch.
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             FORMAT_BASE_REF=$(git rev-parse HEAD^1)
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            FORMAT_BASE_REF=$(git merge-base HEAD "origin/${{ github.event.repository.default_branch }}")
           fi
           npm run format:check
 
@@ -90,6 +94,8 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             FORMAT_BASE_REF=$(git rev-parse HEAD^1)
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            FORMAT_BASE_REF=$(git merge-base HEAD "origin/${{ github.event.repository.default_branch }}")
           fi
           npm run check:theme-colors
 
@@ -115,6 +121,8 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             FORMAT_BASE_REF=$(git rev-parse HEAD^1)
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            FORMAT_BASE_REF=$(git merge-base HEAD "origin/${{ github.event.repository.default_branch }}")
           fi
           npm run check:skill-version
 
@@ -127,6 +135,8 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             FORMAT_BASE_REF=$(git rev-parse HEAD^1)
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            FORMAT_BASE_REF=$(git merge-base HEAD "origin/${{ github.event.repository.default_branch }}")
           fi
           if [ -f tools/check-public-hygiene.mjs ]; then
             node tools/check-public-hygiene.mjs
