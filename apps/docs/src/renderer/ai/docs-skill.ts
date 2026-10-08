@@ -8,6 +8,7 @@ import {
   type NumIds,
 } from './protocol'
 import type { AiDocWriter } from './doc-writer'
+import { cap, type Capability } from '../capabilities'
 import {
   AGENT_TOOLS,
   executeTool,
@@ -16,6 +17,14 @@ import {
   type AiHeaderFooterAccess,
   type FrozenSelection,
 } from './tools'
+
+/** tools that only exist while their platform capability does (hidden on the web build) */
+const CAPABILITY_TOOLS: ReadonlyArray<readonly [tool: string, capability: Capability]> = [
+  ['web_search', 'webSearch'],
+  ['image_search', 'imageSearch'],
+  ['generate_image', 'imageGeneration'],
+  ['create_document', 'createDocument'],
+]
 
 const IMAGE_GEN_OFF_NOTE =
   '\n\nNote: generate_image is currently unavailable (no image provider: signed out of UniWork or cloud tools off, and no media API key in Settings). Do not call or promise it; use image_search for imagery.'
@@ -49,9 +58,9 @@ export function createDocsSkill(
         : AGENT_SYSTEM_PROMPT
     },
     get tools() {
-      return imageGenAvailable?.() === false
-        ? AGENT_TOOLS.filter((t) => t.name !== 'generate_image')
-        : AGENT_TOOLS
+      const off = new Set(CAPABILITY_TOOLS.filter(([, c]) => !cap(c)).map(([tool]) => tool))
+      if (imageGenAvailable?.() === false) off.add('generate_image')
+      return off.size === 0 ? AGENT_TOOLS : AGENT_TOOLS.filter((t) => !off.has(t.name))
     },
     buildContext: () => {
       const editor = getEditor()

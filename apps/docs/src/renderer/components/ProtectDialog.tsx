@@ -20,6 +20,7 @@ import {
 } from '@genoffice/docx-engine'
 import { useI18n } from '../i18n/locale'
 import { FieldError, PasswordInput } from './PasswordInput'
+import { cap } from '../capabilities'
 
 /** every field: undefined = unchanged; null = remove; value = set */
 export interface ProtectDialogResult {
@@ -65,6 +66,8 @@ export function ProtectDialog({
   onApply: (result: ProtectDialogResult) => void
 }) {
   const { t } = useI18n()
+  // the open password needs main-process crypto: the web build does not offer it
+  const openPasswordAvailable = cap('docPassword')
   const hadModifyPwd = !!writeProtection?.hash
   const wasEnforced = !!protection?.enforced
   /** changing/removing an enforced password-protected restriction needs the password */
@@ -161,40 +164,43 @@ export function ProtectDialog({
         <p className="modal-desc">{t('appProtectDesc')}</p>
 
         <h3 className="protect-section-title">{t('appProtectSecurity')}</h3>
-        <div className="fld-row">
-          <label className="fld">
-            {t('appProtectOpenPwd')} <span className="fld-opt">{t('appOptional')}</span>
-            <PasswordInput
-              autoFocus
-              maxLength={255}
-              value={openPwd}
-              hideReveal={openPwd === KEEP}
-              onChange={(v) => {
-                setOpenPwd(v)
-                clearError()
-              }}
-              onKeyDown={onEnter}
-            />
-          </label>
-          <label className="fld">
-            {t('appEncConfirmLabel')}
-            <PasswordInput
-              maxLength={255}
-              value={openPwd2}
-              invalid={mismatch}
-              hideReveal={openPwd2 === KEEP}
-              onChange={(v) => {
-                setOpenPwd2(v)
-                clearError()
-              }}
-              onKeyDown={onEnter}
-            />
-          </label>
-        </div>
+        {openPasswordAvailable && (
+          <div className="fld-row">
+            <label className="fld">
+              {t('appProtectOpenPwd')} <span className="fld-opt">{t('appOptional')}</span>
+              <PasswordInput
+                autoFocus
+                maxLength={255}
+                value={openPwd}
+                hideReveal={openPwd === KEEP}
+                onChange={(v) => {
+                  setOpenPwd(v)
+                  clearError()
+                }}
+                onKeyDown={onEnter}
+              />
+            </label>
+            <label className="fld">
+              {t('appEncConfirmLabel')}
+              <PasswordInput
+                maxLength={255}
+                value={openPwd2}
+                invalid={mismatch}
+                hideReveal={openPwd2 === KEEP}
+                onChange={(v) => {
+                  setOpenPwd2(v)
+                  clearError()
+                }}
+                onKeyDown={onEnter}
+              />
+            </label>
+          </div>
+        )}
         <div className="fld-row">
           <label className="fld">
             {t('appProtectModifyPwd')} <span className="fld-opt">{t('appOptional')}</span>
             <PasswordInput
+              autoFocus={!openPasswordAvailable}
               maxLength={255}
               value={modifyPwd}
               hideReveal={modifyPwd === KEEP}
