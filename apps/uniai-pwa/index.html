@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="description" content="uniAI — UniWork assistant. Chat, Token Hub, natural-language commands." />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="uniAI" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icons/icon-192.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="icons/icon-192.svg" />
+    <title>uniAI</title>
+    <link rel="stylesheet" href="fonts.css" />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="plans.js" defer></script>
+    <script src="office-hub.js" defer></script>
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <div class="app">
+      <aside class="sidebar" id="sidebar" aria-label="Menu chính">
+        <div class="sidebar-top">
+          <button type="button" class="btn-new" id="btnNew" title="New chat">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+            </svg>
+            <span>New chat</span>
+          </button>
+        </div>
+
+        <nav class="sidebar-nav" aria-label="Chính">
+          <button type="button" class="nav-item" data-nav="knowledge" id="navKnowledge">
+            <span class="nav-ico" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z" stroke="currentColor" stroke-width="1.6"/>
+              </svg>
+            </span>
+            <span>Tri thức</span>
+          </button>
+          <button type="button" class="nav-item" data-nav="documents" id="navDocuments">
+            <span class="nav-ico" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9l-5-6Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+                <path d="M14 3v6h6M9 13h6M9 17h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+              </svg>
+            </span>
+            <span>Tài liệu</span>
+          </button>
+          <button type="button" class="nav-item" data-nav="tasks" id="navTasks">
+            <span class="nav-ico" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <path d="M5 7h14M5 12h10M5 17h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                <path d="m14.5 10.5 2 2 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </span>
+            <span>Công việc</span>
+          </button>
+          <button type="button" class="nav-item" data-nav="projects" id="navProjects">
+            <span class="nav-ico" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <path d="M4 7.5A1.5 1.5 0 0 1 5.5 6H10l2 2h6.5A1.5 1.5 0 0 1 20 9.5v7A1.5 1.5 0 0 1 18.5 18h-13A1.5 1.5 0 0 1 4 16.5v-9Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+              </svg>
+            </span>
+            <span>Dự án</span>
+          </button>
+
+          <div class="nav-office">
+            <button type="button" class="nav-item" data-nav="office" id="navOffice" aria-expanded="true">
+              <span class="nav-ico" aria-hidden="true">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                  <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/>
+                  <path d="M3 9h18M9 9v11" stroke="currentColor" stroke-width="1.6"/>
+                </svg>
+              </span>
+              <span>UniOffice</span>
+              <span class="nav-chev" aria-hidden="true">▾</span>
+            </button>
+            <ul class="office-docs" id="officeDocs"></ul>
+          </div>
+        </nav>
+
+        <div class="sidebar-scroll">
+          <p class="sidebar-label">Gần đây</p>
+          <ul class="chat-list" id="chatList"></ul>
+        </div>
+
+        <div class="sidebar-foot">
+          <button type="button" class="account-btn" id="btnSettings" aria-label="Cài đặt">
+            <span class="brand-mark" aria-hidden="true">AI</span>
+            <div class="account-meta">
+              <strong id="accountName">uniAI</strong>
+              <small id="accountEmail">Cá nhân hoá &amp; tài khoản</small>
+            </div>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.6"/>
+              <path d="M12 3.5v2.2M12 18.3v2.2M3.5 12h2.2M18.3 12h2.2M6.2 6.2l1.6 1.6M16.2 16.2l1.6 1.6M17.8 6.2l-1.6 1.6M7.8 16.2l-1.6 1.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </button>
+          <button type="button" class="linkish" id="btnInstall" hidden>Install app</button>
+        </div>
+      </aside>
+
+      <main class="main">
+        <header class="top">
+          <button type="button" class="btn-menu" id="btnMenu" aria-label="Open menu" hidden>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
+            </svg>
+          </button>
+          <button type="button" class="model-chip" id="modelChip" aria-label="Model">
+            <span id="threadTitle">uniAI</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M7 10l5 5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </button>
+        </header>
+
+        <section class="library" id="libraryView" hidden></section>
+        <section class="thread" id="thread" aria-live="polite"></section>
+
+        <footer class="composer-dock" id="composerDock">
+          <div class="composer-inner">
+            <div class="suggestions" id="suggestions" hidden></div>
+            <div class="attach-shell">
+              <div class="attach-menu" id="attachMenu" hidden role="menu" aria-label="Đính kèm">
+                <button type="button" class="attach-item" data-attach="camera" role="menuitem">
+                  <span class="attach-ico" aria-hidden="true">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                      <path d="M4 8h3l1.5-2h7L17 8h3a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+                      <circle cx="12" cy="13" r="3.2" stroke="currentColor" stroke-width="1.6"/>
+                    </svg>
+                  </span>
+                  <span>Camera</span>
+                </button>
+                <button type="button" class="attach-item" data-attach="photo" role="menuitem">
+                  <span class="attach-ico" aria-hidden="true">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                      <rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" stroke-width="1.6"/>
+                      <path d="M3 15l5-4 4 3 3-2 6 5" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+                      <circle cx="9" cy="9" r="1.4" fill="currentColor"/>
+                    </svg>
+                  </span>
+                  <span>Ảnh</span>
+                </button>
+                <button type="button" class="attach-item" data-attach="file" role="menuitem">
+                  <span class="attach-ico" aria-hidden="true">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                      <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9l-5-6Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+                      <path d="M14 3v6h6" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+                    </svg>
+                  </span>
+                  <span>Tệp</span>
+                </button>
+                <button type="button" class="attach-item" data-attach="plugin" role="menuitem">
+                  <span class="attach-ico" aria-hidden="true">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                      <path d="M8 4v3M16 4v3M7 7h10v2.2a5 5 0 0 1-10 0V7ZM12 14.2V20" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                  </span>
+                  <span>Plugin</span>
+                  <span class="attach-chev" aria-hidden="true">›</span>
+                </button>
+              </div>
+
+              <form class="composer" id="composer" data-composer-surface="true">
+                <div class="composer-stack">
+                  <div class="attach-chips" id="attachChips" hidden></div>
+                  <div class="composer-row">
+                    <button type="button" class="composer-icon" id="btnAttach" aria-label="Đính kèm" title="Đính kèm" aria-haspopup="menu" aria-expanded="false">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path
+                          d="M12 5v14M5 12h14"
+                          stroke="currentColor"
+                          stroke-width="1.8"
+                          stroke-linecap="round"
+                        />
+                      </svg>
+                    </button>
+                    <textarea
+                      id="input"
+                      rows="1"
+                      placeholder="Ask anything"
+                      autocomplete="off"
+                      enterkeyhint="send"
+                    ></textarea>
+                    <div class="composer-actions">
+                      <button type="button" class="composer-icon" id="btnMic" aria-label="Dictate" title="Dictate">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                          <rect x="9" y="3" width="6" height="11" rx="3" stroke="currentColor" stroke-width="1.7" />
+                          <path
+                            d="M5 11a7 7 0 0 0 14 0M12 18v3"
+                            stroke="currentColor"
+                            stroke-width="1.7"
+                            stroke-linecap="round"
+                          />
+                        </svg>
+                      </button>
+                      <button type="submit" class="btn-send" id="btnSend" aria-label="Send message" disabled>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                          <path
+                            d="M12 19V5M6.5 10.5 12 5l5.5 5.5"
+                            stroke="currentColor"
+                            stroke-width="2.2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </form>
+            </div>
+            <p class="fineprint">
+              uniAI can make mistakes. Check important info. Optional: open Workbench intents in UniWork Office.
+            </p>
+          </div>
+        </footer>
+      </main>
+    </div>
+
+    <input id="inputCamera" type="file" accept="image/*" capture="environment" hidden />
+    <input id="inputPhoto" type="file" accept="image/*" multiple hidden />
+    <input id="inputFile" type="file" multiple hidden />
+
+    <div class="plugin-scrim" id="pluginScrim" hidden></div>
+    <aside class="plugin-panel" id="pluginPanel" hidden aria-label="Plugin">
+      <header class="plugin-head">
+        <h2>Plugin</h2>
+        <button type="button" class="composer-icon" id="btnPluginClose" aria-label="Đóng">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </header>
+      <div class="plugin-search-wrap">
+        <svg class="plugin-search-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle cx="11" cy="11" r="6.5" stroke="currentColor" stroke-width="1.7"/>
+          <path d="M16.5 16.5 21 21" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+        </svg>
+        <input
+          id="pluginSearch"
+          class="plugin-search"
+          type="search"
+          placeholder="Tìm plugin"
+          autocomplete="off"
+        />
+      </div>
+      <div class="plugin-body" id="pluginBody"></div>
+    </aside>
+
+    <div class="scrim" id="scrim" hidden></div>
+
+    <div class="settings-scrim" id="settingsScrim" hidden></div>
+    <div class="settings-modal" id="settingsModal" hidden role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+      <header class="settings-head">
+        <h2 id="settingsTitle">Cài đặt</h2>
+        <button type="button" class="composer-icon" id="btnSettingsClose" aria-label="Đóng">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </header>
+      <div class="settings-body" id="settingsBody"></div>
+    </div>
+  </body>
+</html>

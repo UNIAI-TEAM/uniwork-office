@@ -1,0 +1,11 @@
+{
+  "name": "@uniwork/uniai-pwa",
+  "version": "0.1.0",
+  "private": true,
+  "description": "uniAI — standalone ChatGPT-style PWA for UniWork (Token Hub + NL commands)",
+  "license": "Apache-2.0",
+  "scripts": {
+    "dev": "npx --yes serve@14 -l 5188 .",
+    "start": "npm run dev"
+  }
+}

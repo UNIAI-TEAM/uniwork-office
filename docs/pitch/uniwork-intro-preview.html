@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>UniWork Office — Slide preview</title>
+    <style>
+      :root {
+        --ink: #0b1220;
+        --ink2: #0f172a;
+        --ink-soft: #334155;
+        --mute: #64748b;
+        --paper: #f4f7fb;
+        --white: #ffffff;
+        --accent: #0d9488;
+        --accent-soft: #ccfbf1;
+        --accent-dark: #0f766e;
+        --warm: #ea580c;
+        --line: #e2e8f0;
+        --slate: #1e293b;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: "Calibri", "Segoe UI", system-ui, sans-serif;
+        background: #070b14;
+        color: var(--ink2);
+      }
+      .toolbar {
+        position: sticky; top: 0; z-index: 5;
+        display: flex; gap: 12px; align-items: center; justify-content: space-between;
+        padding: 12px 20px;
+        background: rgba(11, 18, 32, 0.94);
+        color: #e2e8f0;
+        border-bottom: 1px solid #1e293b;
+        backdrop-filter: blur(10px);
+      }
+      .toolbar strong { color: var(--accent-soft); }
+      .toolbar button {
+        border: 1px solid #334155; background: #1e293b; color: #f8fafc;
+        border-radius: 8px; padding: 8px 12px; cursor: pointer; font: inherit;
+      }
+      .stage {
+        padding: 28px 16px 64px;
+        display: flex; flex-direction: column; align-items: center; gap: 32px;
+      }
+      .slide {
+        width: min(1120px, 96vw);
+        aspect-ratio: 16 / 9;
+        background: var(--paper);
+        border-radius: 16px;
+        overflow: hidden;
+        position: relative;
+        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+      }
+      .slide.dark { background: var(--ink); color: #fff; }
+      .pad { padding: 28px 36px 22px; height: 100%; position: relative; z-index: 1; }
+      .kicker {
+        font-size: 11px; letter-spacing: 0.18em; font-weight: 700;
+        color: var(--accent-dark); margin: 0 0 8px;
+      }
+      .dark .kicker { color: var(--accent-soft); }
+      h1 {
+        margin: 0; font-size: clamp(24px, 2.8vw, 34px);
+        line-height: 1.15; color: inherit;
+      }
+      .lead { margin: 10px 0 0; font-size: 14px; color: var(--ink-soft); max-width: 92%; }
+      .dark .lead { color: #94a3b8; }
+      .foot {
+        position: absolute; left: 36px; right: 36px; bottom: 16px;
+        display: flex; justify-content: space-between;
+        font-size: 11px; color: var(--mute); z-index: 2;
+      }
+      .dark .foot { color: #94a3b8; }
+      .pill {
+        display: inline-flex; align-items: center; justify-content: center;
+        padding: 6px 12px; border-radius: 999px;
+        background: var(--accent-soft); color: var(--accent-dark);
+        font-size: 11px; font-weight: 700;
+      }
+      .pills { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 18px; }
+      .shot {
+        border-radius: 12px; overflow: hidden;
+        box-shadow: 0 16px 40px rgba(15, 23, 42, 0.22);
+        border: 1px solid rgba(255,255,255,0.08);
+        background: #fff;
+      }
+      .shot img { width: 100%; height: 100%; object-fit: cover; display: block; }
+      .split { display: grid; grid-template-columns: 1.05fr 1fr; gap: 28px; height: calc(100% - 8px); }
+      .split > div:first-child { display: flex; flex-direction: column; }
+      .list { margin-top: 18px; display: grid; gap: 10px; }
+      .row {
+        display: grid; grid-template-columns: 28px 1fr; gap: 10px; align-items: start;
+        background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px;
+      }
+      .row .n { color: var(--accent); font-weight: 800; font-size: 15px; }
+      .row b { display: block; font-size: 14px; margin-bottom: 2px; }
+      .row span { font-size: 12px; color: var(--ink-soft); }
+      .dark-card {
+        background: var(--slate); border: 1px solid #334155; border-radius: 12px;
+        padding: 12px 14px;
+      }
+      .dark-card b { color: var(--accent-soft); font-size: 13px; display: block; margin-bottom: 4px; }
+      .dark-card span { color: #cbd5e1; font-size: 12px; }
+      .gallery {
+        display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px;
+        height: calc(100% - 78px);
+      }
+      .gcard {
+        background: var(--slate); border: 1px solid #334155; border-radius: 12px;
+        overflow: hidden; display: flex; flex-direction: column;
+      }
+      .gcard .thumb { flex: 1; min-height: 0; }
+      .gcard .thumb img { width: 100%; height: 100%; object-fit: cover; }
+      .gcard .meta { padding: 8px 12px 10px; }
+      .gcard .meta b { color: #fff; font-size: 13px; display: block; }
+      .gcard .meta span { color: #94a3b8; font-size: 11px; }
+      .mods {
+        display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 14px;
+      }
+      .mod {
+        background: #fff; border: 1px solid var(--line); border-radius: 10px;
+        padding: 10px 8px; text-align: center; font-size: 12px; font-weight: 700;
+        color: var(--accent-dark);
+      }
+      .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 14px; height: calc(100% - 110px); }
+      .panel {
+        border-radius: 14px; padding: 18px; border: 1px solid var(--line); background: #fff;
+        display: flex; flex-direction: column; gap: 10px;
+      }
+      .panel.good { background: var(--accent-soft); border-color: var(--accent); }
+      .panel h3 { margin: 0; font-size: 15px; }
+      .panel.bad h3 { color: var(--warm); }
+      .panel.good h3 { color: var(--accent-dark); }
+      .panel ul { margin: 0; padding-left: 18px; color: var(--ink-soft); font-size: 13px; line-height: 1.55; }
+      .panel .mini { border-radius: 10px; overflow: hidden; flex: 1; min-height: 120px; }
+      .panel .mini img { width: 100%; height: 100%; object-fit: cover; }
+      .audiences {
+        display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 14px;
+      }
+      .aud {
+        background: var(--paper); border: 1px solid var(--line); border-radius: 12px;
+        padding: 16px; min-height: 110px;
+        box-shadow: 0 8px 20px rgba(15,23,42,0.06);
+      }
+      .aud b { display: block; margin-bottom: 8px; font-size: 14px; }
+      .aud span { font-size: 12px; color: var(--ink-soft); }
+      .hero-strip {
+        position: absolute; inset: 0 0 auto 0; height: 38%;
+        background: center/cover no-repeat;
+      }
+      .hero-strip::after {
+        content: ""; position: absolute; inset: 0;
+        background: linear-gradient(180deg, rgba(11,18,32,0.55), rgba(11,18,32,0.85));
+      }
+      .flex-rows { margin-top: 16px; display: grid; gap: 12px; }
+      .flex-row { display: grid; grid-template-columns: 28px 1fr; gap: 12px; align-items: start; }
+      .dot {
+        width: 28px; height: 28px; border-radius: 999px; background: var(--accent);
+        color: #fff; font-size: 12px; font-weight: 800;
+        display: grid; place-items: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="toolbar">
+      <div><strong>UniWork Office</strong> · Preview 10 slides · ảnh thật sản phẩm</div>
+      <button type="button" onclick="window.scrollTo({ top: 0, behavior: 'smooth' })">Lên đầu</button>
+    </div>
+    <div class="stage">
+
+      <!-- 1 -->
+      <section class="slide dark" id="s1">
+        <div style="position:absolute;inset:0 0 0 46%;background:url('assets/hero.png') center/cover no-repeat;"></div>
+        <div style="position:absolute;inset:0 48% 0 0;background:var(--ink);"></div>
+        <div style="position:absolute;left:0;top:0;bottom:0;width:6px;background:var(--accent);"></div>
+        <div class="pad" style="max-width:48%;">
+          <p class="kicker">UNIWORK OFFICE</p>
+          <h1>Hệ điều hành công việc<br/>và quản trị cuộc sống</h1>
+          <p class="lead">
+            Cài trực tiếp trên máy · Dữ liệu ở lại với bạn<br/>
+            Office đủ dùng + Workbench + My AI có kiểm soát<br/>
+            Giảm phụ thuộc bản quyền Microsoft Office
+          </p>
+          <div class="pills">
+            <span class="pill">Desktop-native</span>
+            <span class="pill">Local-first</span>
+            <span class="pill">OOXML chuẩn</span>
+          </div>
+        </div>
+        <div class="foot"><span></span><span>1 / 10</span></div>
+      </section>
+
+      <!-- 2 -->
+      <section class="slide" id="s2">
+        <div style="position:absolute;right:0;top:18%;width:42%;height:70%;background:url('assets/hero-dark.png') center/cover no-repeat;opacity:.18;"></div>
+        <div class="pad">
+          <p class="kicker">BÀI TOÁN</p>
+          <h1>Người làm việc cá nhân<br/>bị kẹt giữa suite doanh nghiệp<br/>và hàng tá app rời</h1>
+          <div class="list" style="max-width:58%; margin-top:22px;">
+            <div class="row"><div class="n">•</div><div><b>Bản quyền đắt</b><span>MS 365 theo năm, nhân theo máy — dù chỉ cần Word–Excel–Slide.</span></div></div>
+            <div class="row"><div class="n">•</div><div><b>Data lên mây mặc định</b><span>Tài liệu & đời sống dễ bị kéo vào cloud nhà cung cấp.</span></div></div>
+            <div class="row"><div class="n">•</div><div><b>Công cụ mảnh vụn</b><span>Soạn thảo một nơi, việc–sức khỏe–tài chính chỗ khác.</span></div></div>
+            <div class="row"><div class="n">•</div><div><b>Phụ thuộc online</b><span>Mất mạng là đứt nhịp; cá nhân cần chủ động trên máy mình.</span></div></div>
+          </div>
+        </div>
+        <div class="foot"><span>UniWork Office · Cài trên máy · Dữ liệu của bạn</span><span>2 / 10</span></div>
+      </section>
+
+      <!-- 3 -->
+      <section class="slide" id="s3" style="background:#fff;">
+        <div class="pad">
+          <div class="split">
+            <div>
+              <p class="kicker">GIẢI PHÁP</p>
+              <h1>UniWork Office là gì?</h1>
+              <p class="lead">Desktop cài trên máy bạn — bộ Office chuẩn + Workbench quản trị công việc & cuộc sống + My AI điều phối.</p>
+              <div class="list">
+                <div class="row"><div class="n">01</div><div><b>Office trên máy</b><span>Word · Excel · PPT · PDF — file chuẩn, offline.</span></div></div>
+                <div class="row"><div class="n">02</div><div><b>Workbench theo vai</b><span>Sales, Teacher, Legal, IT… tri thức & việc.</span></div></div>
+                <div class="row"><div class="n">03</div><div><b>My AI điều phối</b><span>Tạo file, mở Recent, playbook — có xác nhận Token.</span></div></div>
+                <div class="row"><div class="n">04</div><div><b>Đời sống cá nhân</b><span>Tài chính, sức khỏe, gia đình — cùng một không gian.</span></div></div>
+              </div>
+            </div>
+            <div class="shot"><img src="assets/docs-ai.png" alt="UniWork Docs AI" /></div>
+          </div>
+        </div>
+        <div class="foot"><span>UniWork Office · Cài trên máy · Dữ liệu của bạn</span><span>3 / 10</span></div>
+      </section>
+
+      <!-- 4 -->
+      <section class="slide dark" id="s4">
+        <div class="pad">
+          <div class="split">
+            <div>
+              <p class="kicker">LOCAL-FIRST</p>
+              <h1>Cài trên máy —<br/>dữ liệu thuộc về bạn</h1>
+              <p class="lead">Không bắt buộc đưa cuộc sống lên đám mây bên thứ ba để “được dùng app”.</p>
+              <div class="list">
+                <div class="dark-card"><b>Desktop-native</b><span>Electron trên macOS / Windows / Linux. File chuẩn trên ổ đĩa bạn.</span></div>
+                <div class="dark-card"><b>Workbench local</b><span>Việc, lịch, email nháp, khách, tài chính, sức khỏe trên thiết bị.</span></div>
+                <div class="dark-card"><b>AI có kiểm soát</b><span>Token / Hub chỉ khi bạn xác nhận. Đọc excerpt có consent.</span></div>
+                <div class="dark-card"><b>Backup do bạn chọn</b><span>Xuất / nhập trên máy. Cloud sync là lựa chọn — không bắt buộc.</span></div>
+              </div>
+            </div>
+            <div class="shot"><img src="assets/sheets-qa.png" alt="UniWork Sheets" /></div>
+          </div>
+        </div>
+        <div class="foot"><span>UniWork Office · Cài trên máy · Dữ liệu của bạn</span><span>4 / 10</span></div>
+      </section>
+
+      <!-- 5 -->
+      <section class="slide" id="s5">
+        <div class="pad">
+          <p class="kicker">GIÁ TRỊ</p>
+          <h1>Giảm chi phí bản quyền Microsoft Office</h1>
+          <p class="lead">Một bộ Office đủ dùng hàng ngày — không khóa bạn vào thuê bao theo ghế ngồi.</p>
+          <div class="compare">
+            <div class="panel bad">
+              <h3>Trước đây</h3>
+              <ul>
+                <li>Thuê bao Microsoft 365 / Office theo năm</li>
+                <li>Phụ thuộc OneDrive & tài khoản Microsoft</li>
+                <li>Chi phí nhân theo máy & người dùng</li>
+                <li>“Đời sống” phải mua thêm app khác</li>
+              </ul>
+            </div>
+            <div class="panel good">
+              <h3>Với UniWork Office</h3>
+              <div class="mini"><img src="assets/slides-cover.png" alt="Slides" /></div>
+              <ul>
+                <li>Docs · Sheets · Slides · PDF trên máy</li>
+                <li>File OOXML — trao đổi bình thường</li>
+                <li>AI khi cần, có xác nhận Token</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+        <div class="foot"><span>UniWork Office · Cài trên máy · Dữ liệu của bạn</span><span>5 / 10</span></div>
+      </section>
+
+      <!-- 6 -->
+      <section class="slide dark" id="s6">
+        <div class="pad">
+          <p class="kicker">OFFICE & MY AI</p>
+          <h1>Làm việc đủ nhịp — bằng ảnh thật sản phẩm</h1>
+          <div class="gallery">
+            <div class="gcard"><div class="thumb"><img src="assets/docs-ai.png" alt="Docs" /></div><div class="meta"><b>UniWork Docs</b><span>Soạn thảo Word + panel AI</span></div></div>
+            <div class="gcard"><div class="thumb"><img src="assets/sheets-qa.png" alt="Sheets" /></div><div class="meta"><b>UniWork Sheets</b><span>Excel + phân tích có trích dẫn ô</span></div></div>
+            <div class="gcard"><div class="thumb"><img src="assets/slides-ai.png" alt="Slides" /></div><div class="meta"><b>UniWork Slides</b><span>PPTX · pitch · giáo án</span></div></div>
+            <div class="gcard"><div class="thumb"><img src="assets/pdf-edit.png" alt="PDF" /></div><div class="meta"><b>UniWork PDF</b><span>Xem / chỉnh PDF trên máy</span></div></div>
+          </div>
+        </div>
+        <div class="foot"><span>UniWork Office · Cài trên máy · Dữ liệu của bạn</span><span>6 / 10</span></div>
+      </section>
+
+      <!-- 7 -->
+      <section class="slide" id="s7">
+        <div class="pad">
+          <div class="split">
+            <div>
+              <p class="kicker">WORKBENCH</p>
+              <h1>Hệ điều hành hàng ngày</h1>
+              <p class="lead">Một “My Space” gom việc làm và đời sống — không bắt bạn sống trong mười ứng dụng.</p>
+              <div class="mods">
+                <div class="mod">Desk</div><div class="mod">Tasks / Notes</div><div class="mod">Calendar</div>
+                <div class="mod">Email local</div><div class="mod">Clients</div><div class="mod">Finance</div>
+                <div class="mod">Health</div><div class="mod">Family / Pets</div><div class="mod">Travel / Growth</div>
+              </div>
+              <p class="lead" style="margin-top:16px;">My AI trên Home điều phối: tạo file · mở Recent · thêm việc · playbook nhiều bước.</p>
+              <div class="pills">
+                <span class="pill">Local storage</span>
+                <span class="pill">Theo Practice</span>
+                <span class="pill">Có consent</span>
+              </div>
+            </div>
+            <div class="shot"><img src="assets/html-dashboard.png" alt="Dashboard" /></div>
+          </div>
+        </div>
+        <div class="foot"><span>UniWork Office · Cài trên máy · Dữ liệu của bạn</span><span>7 / 10</span></div>
+      </section>
+
+      <!-- 8 -->
+      <section class="slide" id="s8" style="background:#fff;">
+        <div class="hero-strip" style="background-image:url('assets/cli-slides-grid.png');"></div>
+        <div class="pad" style="padding-top: 12%;">
+          <p class="kicker" style="color:var(--accent-soft); position:relative; z-index:1; margin-top:-8%;">ĐỐI TƯỢNG</p>
+          <h1 style="color:#fff; position:relative; z-index:1; max-width:90%;">Cá nhân & nhóm nhỏ — vừa làm nghề, vừa quản trị đời sống</h1>
+          <div class="audiences" style="margin-top: 18%;">
+            <div class="aud"><b>Freelancer & doanh nhân</b><span>Báo giá, pitch, hóa đơn, follow-up khách.</span></div>
+            <div class="aud"><b>Giáo viên & nhà trường</b><span>Giáo án, slide, skill sư phạm, Hub khi cần.</span></div>
+            <div class="aud"><b>Sales · CSKH · Marketing</b><span>Playbook quote / campaign / Clients.</span></div>
+            <div class="aud"><b>Legal · Procurement · BĐS</b><span>Hợp đồng, RFP, listing trên máy.</span></div>
+            <div class="aud"><b>HR · Kế toán · IT</b><span>Offer, onboarding, hóa đơn, runbook.</span></div>
+            <div class="aud"><b>Cá nhân có hệ thống</b><span>Việc + sức khỏe + gia đình + tài chính.</span></div>
+          </div>
+        </div>
+        <div class="foot"><span>UniWork Office · Cài trên máy · Dữ liệu của bạn</span><span>8 / 10</span></div>
+      </section>
+
+      <!-- 9 -->
+      <section class="slide" id="s9">
+        <div class="pad">
+          <div class="split">
+            <div>
+              <p class="kicker">LINH HOẠT</p>
+              <h1>Dùng theo nhịp<br/>của bạn</h1>
+              <p class="lead">Không ép quy trình doanh nghiệp. Bạn chọn độ sâu.</p>
+              <div class="flex-rows">
+                <div class="flex-row"><div class="dot">1</div><div><b>Theo vai (Practice)</b><div style="font-size:12px;color:var(--ink-soft);margin-top:2px;">Sales → Teacher → IT: Workbench & playbook đổi theo nghề.</div></div></div>
+                <div class="flex-row"><div class="dot">2</div><div><b>Theo gói Tri thức</b><div style="font-size:12px;color:var(--ink-soft);margin-top:2px;">Mỗi dự án / lớp / vụ việc là một pack tài liệu & skill.</div></div></div>
+                <div class="flex-row"><div class="dot">3</div><div><b>Theo mức AI</b><div style="font-size:12px;color:var(--ink-soft);margin-top:2px;">Soạn tay miễn phí; AI chỉ khi Cho phép / dùng Token.</div></div></div>
+                <div class="flex-row"><div class="dot">4</div><div><b>Theo nhịp online</b><div style="font-size:12px;color:var(--ink-soft);margin-top:2px;">Offline đầy đủ; Hub / cloud là lớp bổ sung khi sẵn sàng.</div></div></div>
+              </div>
+            </div>
+            <div class="shot"><img src="assets/slides-generate.png" alt="AI generate" /></div>
+          </div>
+        </div>
+        <div class="foot"><span>UniWork Office · Cài trên máy · Dữ liệu của bạn</span><span>9 / 10</span></div>
+      </section>
+
+      <!-- 10 -->
+      <section class="slide dark" id="s10">
+        <div style="position:absolute;inset:0;background:url('assets/hero-dark.png') center/cover no-repeat;"></div>
+        <div style="position:absolute;inset:0;background:rgba(11,18,32,0.82);"></div>
+        <div style="position:absolute;left:0;top:0;bottom:0;width:6px;background:var(--accent);"></div>
+        <div class="pad" style="max-width:78%;">
+          <p class="kicker">KẾT LẠI</p>
+          <h1>Một hệ điều hành cho<br/>công việc và cuộc sống</h1>
+          <div style="margin-top:28px;display:grid;gap:12px;font-size:15px;color:#e2e8f0;">
+            <div>▸ &nbsp; Cài trên máy — không bị cầm tù bởi trình duyệt</div>
+            <div>▸ &nbsp; Dữ liệu cá nhân ưu tiên ở lại thiết bị của bạn</div>
+            <div>▸ &nbsp; Office đủ dùng + Workbench đời sống + My AI có kiểm soát</div>
+            <div>▸ &nbsp; Giảm phụ thuộc thuê bao Microsoft Office cho cá nhân & nhóm nhỏ</div>
+          </div>
+        </div>
+        <div class="foot"><span>UniWork Office</span><span>10 / 10</span></div>
+      </section>
+
+    </div>
+  </body>
+</html>

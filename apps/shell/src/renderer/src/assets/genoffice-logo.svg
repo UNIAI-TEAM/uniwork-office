@@ -1,0 +1,8 @@
+<svg width="1091" height="240" viewBox="0 0 1091 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- UNIWORK_BRAND_ASSET_REQUIRED: temporary placeholder. Do not treat as the official UniWork logo. -->
+  <rect width="240" height="240" rx="48" fill="#0F172A"/>
+  <rect x="28" y="196" width="184" height="16" rx="8" fill="#38BDF8"/>
+  <text x="120" y="132" text-anchor="middle" font-family="ui-sans-serif, system-ui, -apple-system, sans-serif" font-size="72" font-weight="700" fill="#F8FAFC">UW</text>
+  <text x="280" y="128" font-family="ui-sans-serif, system-ui, -apple-system, sans-serif" font-size="72" font-weight="650" fill="#0F172A">UniWork Office</text>
+  <text x="284" y="176" font-family="ui-sans-serif, system-ui, -apple-system, sans-serif" font-size="18" font-weight="500" fill="#64748B">UNIWORK_BRAND_ASSET_REQUIRED</text>
+</svg>

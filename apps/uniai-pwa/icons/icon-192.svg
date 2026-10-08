@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" role="img" aria-label="uniAI">
+  <rect width="192" height="192" rx="40" fill="#0f172a"/>
+  <rect x="28" y="140" width="136" height="18" rx="4" fill="#38bdf8"/>
+  <text x="96" y="108" text-anchor="middle" font-family="system-ui,sans-serif" font-size="56" font-weight="700" fill="#f8fafc">AI</text>
+</svg>

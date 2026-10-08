@@ -1,0 +1,25 @@
+{
+  "name": "@uniwork/office-bridge-adapter",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "description": "Portable UniWork Office Bridge HTTP adapter. In-memory store is a GO-2 verification double, not a second production Work Product database. UniWork hosts this contract against its real tables.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./pwa": "./src/pwa.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@uniwork/office-bridge-contracts": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.11"
+  }
+}
