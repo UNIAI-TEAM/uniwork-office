@@ -43,7 +43,6 @@ function writeSettings(mediaProvider: string): string {
   return path
 }
 
-
 describe('loadMediaReferences budget', () => {
   it('pins the production ceilings', () => {
     expect(MEDIA_BUDGET).toEqual({
