@@ -14,6 +14,9 @@ import type {
 } from '@genoffice/ai-provider'
 import type { UpdateChannel, UpdateUiState } from './update-api'
 
+/** Legal files shipped beside the app and opened from Settings > About. */
+export type LegalDoc = 'license' | 'notice' | 'modifications' | 'thirdParty'
+
 /** Image attachment extensions — multimodal base64 on send (mirrors docs). */
 export const ATTACHMENT_IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp'])
 
@@ -347,6 +350,8 @@ export interface HomeApi {
   getUpdateState(): Promise<UpdateUiState | null>
   /** re-open the (minimized) update dialog; a not-yet-started download also starts */
   openUpdateDialog(): Promise<boolean>
+  /** open a shipped legal file (NOTICE, LICENSE, ...) in the system viewer; false when it is missing */
+  openLegalDoc?(doc: LegalDoc): Promise<boolean>
   onUpdateStateChanged(handler: (state: UpdateUiState) => void): () => void
   /** whether the first-run onboarding has been completed or skipped (persisted in userData/app-settings.json) */
   onboardingSeen(): Promise<boolean>
@@ -865,6 +870,7 @@ export const HOME_CHANNELS = {
   /** Main → shell renderer: open Settings to a section (from editor AI billing CTA). */
   openSettingsEvent: 'home:open-settings-event',
   getAppVersion: 'home:get-app-version',
+  openLegalDoc: 'home:open-legal-doc',
   onboardingSeen: 'home:onboarding-seen',
   setOnboardingSeen: 'home:set-onboarding-seen',
   getTheme: 'home:get-theme',

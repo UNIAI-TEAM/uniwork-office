@@ -29,6 +29,7 @@ import { useI18n } from './locale'
 import type { StringKey, TFunc } from './locale'
 import type { AccountStatus, AiCatalogEntry, DocTheme, UiTheme } from '../../shared/home-api'
 import appIcon from './assets/app-icon.png'
+import legal from '../../shared/legal.json'
 import { ProviderLogo } from './provider-logos'
 import { BackupStoragePane } from './BackupStoragePane'
 import { BillingPaymentPane } from './BillingPaymentPane'
@@ -1983,9 +1984,38 @@ export function SettingsModal({
                     }}
                   />
                 </div>
-                <p className="set-about-copyright">
-                  {t('setAboutCopyright', { year: new Date().getFullYear() })}
-                </p>
+                <div className="set-about-legal">
+                  <p className="set-about-copyright">
+                    {t('setAboutCopyright', {
+                      year: legal.copyrightYear,
+                      company: legal.company,
+                    })}
+                  </p>
+                  <p className="set-about-attribution">
+                    {t('setAboutAttribution', {
+                      product: legal.product,
+                      upstream: legal.upstream.name,
+                      upstreamCopyright: legal.upstream.copyright,
+                      license: legal.upstream.license,
+                    })}
+                  </p>
+                  <div className="set-about-legal-links">
+                    <button
+                      type="button"
+                      className="set-about-legal-btn"
+                      onClick={() => void window.aiOffice.openLegalDoc?.('notice')}
+                    >
+                      {t('setAboutLegalNotices')}
+                    </button>
+                    <button
+                      type="button"
+                      className="set-about-legal-btn"
+                      onClick={() => void window.aiOffice.openLegalDoc?.('thirdParty')}
+                    >
+                      {t('setAboutThirdPartyLicenses')}
+                    </button>
+                  </div>
+                </div>
               </>
             )}
           </div>
