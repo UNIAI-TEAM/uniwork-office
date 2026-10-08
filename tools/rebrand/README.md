@@ -53,7 +53,7 @@ The app logo is the UniWork Office "Page" mark (two people forming a W on a blue
 folded corner). Its source of truth is the vector `assets/_source/uniwork-office-logo.svg`; every icon slot below is rendered
 from it at its real size (no bitmap scaling) by `gen-brand-icons.mjs`. Each slot is a file under `assets/` that `rebrand.mjs`
 copies to the same repo-relative path (the `_source` folder is the one exception: it is never copied), so changing the logo
-later is asset-only: replace the SVG (a `viewBox`, no fixed width / height; needs `@napi-rs/canvas`, already a dev dependency)
+later is asset-only: replace the SVG (a `viewBox`, no fixed width / height; needs the transitive, optional `@napi-rs/canvas`; it is not a declared dependency, so the generator stops with a clear message when it is missing, and the generated icons are committed, so it is only needed when the logo changes)
 and run `node tools/rebrand/rebrand.mjs --icons` (or `--icons <other.svg>`). That rebuilds the files below (the macOS icns /
 `icon-mac.png` with Apple's 824/1024 grid margin, the Linux hicolor copies, the Docs copies) and applies them.
 `--check` stays green afterwards.

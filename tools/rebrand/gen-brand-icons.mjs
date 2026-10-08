@@ -10,12 +10,13 @@
 // two people forming a W on a blue-cyan gradient, document-page tile with a folded corner). The
 // `_source` folder is not an overlay: rebrand.mjs never copies it into the repo. Outputs are
 // committed; `node tools/rebrand/rebrand.mjs` copies them over upstream's icons after a sync, so
-// the build never runs this script. Needs @napi-rs/canvas (a dev dependency of the repo).
+// the build never runs this script: it is only needed when the logo changes. It relies on the
+// transitive, optional @napi-rs/canvas (not a declared dependency of the repo, so nothing is added
+// to package.json); when that package is missing the script stops with a clear message.
 //
 // The macOS icon follows Apple's grid (824 / 1024 content, transparent margin, same treatment as
 // upstream's icon-mac.png); the icns packs PNG entries (types icp4..ic14), no iconutil needed.
 // The ico packs PNG entries too (16, 24, 32, 48, 64, 128, 256), which Windows reads since Vista.
-import { createCanvas, loadImage } from '@napi-rs/canvas'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -26,6 +27,24 @@ export const DEFAULT_LOGO = join(ASSETS, '_source', 'uniwork-office-logo.svg')
 const HICOLOR_SIZES = [16, 32, 48, 64, 128, 256, 512, 1024]
 const ICO_SIZES = [16, 24, 32, 48, 64, 128, 256]
 const MAC_CONTENT_RATIO = 824 / 1024
+
+let canvasModule
+/** @napi-rs/canvas arrives only transitively, so it is loaded when first drawn, with a readable failure */
+async function loadCanvas() {
+  if (canvasModule) return canvasModule
+  try {
+    canvasModule = await import('@napi-rs/canvas')
+  } catch (error) {
+    throw new Error(
+      'gen-brand-icons needs @napi-rs/canvas, which is not installed here (it is only a transitive, ' +
+        'optional dependency). Run npm install (or install it ad hoc without saving it: ' +
+        'npm i --no-save @napi-rs/canvas) and try again. The generated icons are committed, so this ' +
+        'is only needed when the logo changes.',
+      { cause: error },
+    )
+  }
+  return canvasModule
+}
 
 function put(rel, data) {
   const target = join(ASSETS, rel)
@@ -40,6 +59,7 @@ function put(rel, data) {
  * it is drawn at, which keeps every size crisp.
  */
 async function rasterize(svg, size, ratio = 1) {
+  const { createCanvas, loadImage } = await loadCanvas()
   const side = Math.round(size * ratio)
   const img = await loadImage(
     Buffer.from(svg.replace('<svg ', `<svg width="${side}" height="${side}" `)),
