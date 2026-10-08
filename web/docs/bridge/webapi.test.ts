@@ -148,7 +148,7 @@ describe('openDocxPath / openDocx', () => {
       type: 'file.pick',
       payload: { purpose: 'open', accept: ['docx'] },
     })
-    expect(mock.calls[0].opts?.timeoutMs).toBe(600_000)
+    expect(mock.calls[0].opts?.timeoutMs).toBe(0) // host dialog: no timeout
   })
 
   it('openDocx: cancelled / error / timeout -> null', async () => {
@@ -295,6 +295,74 @@ describe('exportPdf / print', () => {
     })
     expect(click).toHaveBeenCalledTimes(1)
     expect(window.print).not.toHaveBeenCalled()
+  })
+
+  /** App.tsx's provideDocBytes + close-guard wiring */
+  function wireLiveDoc(dirty: () => boolean, bytes: () => Promise<ArrayBuffer | null>) {
+    api.onCloseCheck(() => api.reportCloseCheck({ dirty: dirty(), autoSave: false }))
+    api.provideDocBytes(bytes)
+  }
+
+  it('dirty: sends the live docx bytes (transferred) with the file id', async () => {
+    await bootWith()
+    const live = buf([7, 7, 7])
+    wireLiveDoc(
+      () => true,
+      async () => live,
+    )
+    expect((await api.exportPdf('Report', 12240, 15840)).ok).toBe(true)
+    const call = mock.calls.at(-1)!
+    expect(call.payload).toMatchObject({ format: 'pdf', fileId: 'f1' })
+    expect(new Uint8Array((call.payload as { data: ArrayBuffer }).data)).toEqual(
+      new Uint8Array([7, 7, 7]),
+    )
+    expect(call.opts?.transfer).toEqual([live])
+  })
+
+  it('clean: exports the stored version only, without serializing', async () => {
+    await bootWith()
+    const provider = vi.fn(async () => buf([1]))
+    wireLiveDoc(() => false, provider)
+    await api.exportPdf('Report', 1, 1)
+    expect(mock.calls.at(-1)!.payload).not.toHaveProperty('data')
+    expect(mock.calls.at(-1)!.opts?.transfer).toBeUndefined()
+    expect(provider).not.toHaveBeenCalled()
+  })
+
+  it('never-saved document: exports the live bytes without a file id', async () => {
+    wireLiveDoc(
+      () => true,
+      async () => buf([3]),
+    )
+    expect(await api.exportPdf('New', 1, 1)).toEqual({ ok: true, path: 'New.pdf' })
+    expect(mock.calls[0].payload).not.toHaveProperty('fileId')
+    expect(mock.calls[0].payload).toHaveProperty('data')
+    expect(window.print).not.toHaveBeenCalled()
+  })
+
+  it('serializer failure: falls back to the stored version; unregister stops it', async () => {
+    await bootWith()
+    api.onCloseCheck(() => api.reportCloseCheck({ dirty: true, autoSave: false }))
+    const off = api.provideDocBytes(async () => {
+      throw new Error('boom')
+    })
+    expect((await api.exportPdf('Report', 1, 1)).ok).toBe(true)
+    expect(mock.calls.at(-1)!.payload).toMatchObject({ fileId: 'f1' })
+    expect(mock.calls.at(-1)!.payload).not.toHaveProperty('data')
+    off()
+    await api.exportPdf('Report', 1, 1)
+    expect(mock.calls.at(-1)!.payload).not.toHaveProperty('data')
+  })
+
+  it('dirty + export error: still falls back to print', async () => {
+    await bootWith()
+    wireLiveDoc(
+      () => true,
+      async () => buf([7]),
+    )
+    mock.override('api.export', () => Promise.reject(protocolError('unsupported')))
+    expect((await api.exportPdf('Report', 1, 1)).ok).toBe(true)
+    expect(window.print).toHaveBeenCalledTimes(1)
   })
 
   it('unsaved document: in-frame print, no request', async () => {

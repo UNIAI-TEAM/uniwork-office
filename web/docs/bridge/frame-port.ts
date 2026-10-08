@@ -60,6 +60,6 @@ export const TIMEOUTS = {
   short: 30_000,
   /** document bytes up or down, server-side render */
   transfer: 120_000,
-  /** waits on a host dialog (save-as name/folder): generous, not unbounded */
-  dialog: 600_000,
+  /** waits on a host dialog (picker, save-as name/folder): no timeout */
+  dialog: 0,
 } as const

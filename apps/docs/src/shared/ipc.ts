@@ -297,6 +297,9 @@ export interface DesktopApi {
   }>
   /** crash-recovery copy of a dirty document, stored under userData */
   writeRecoveryCopy(path: string, data: ArrayBuffer): Promise<{ ok: boolean }>
+  /** web bridge only (absent on desktop): the renderer registers a serializer of the
+   *  live document so a server-side PDF export includes unsaved edits; returns an unregister */
+  provideDocBytes?(provider: () => Promise<ArrayBuffer | null>): () => void
   /** tab closed but webContents kept alive (shell freeze workaround) — stop background timers */
   onTeardown(handler: () => void): () => void
   /** one trusted space keystroke into this webContents — the only thing that
