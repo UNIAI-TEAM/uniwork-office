@@ -1,44 +1,75 @@
 #!/usr/bin/env node
 // Builds every app-icon file of the artwork overlay (tools/rebrand/assets/) from the UniWork Office
-// master icon set (the blue "W" rounded square): the packager icons (png / ico / icns / hicolor
-// sizes), the macOS grid-margin variant and the in-app logo.
+// logo, a single SVG: the packager icons (png / ico / icns / hicolor sizes), the macOS grid-margin
+// variant and the in-app logo. Each size is rasterized from the vector, not scaled from a bitmap.
 //
-//   node tools/rebrand/gen-brand-icons.mjs <master-dir>
-//   node tools/rebrand/rebrand.mjs --icons <master-dir>    same, then applies the overlay in one step
+//   node tools/rebrand/gen-brand-icons.mjs [logo.svg]
+//   node tools/rebrand/rebrand.mjs --icons [logo.svg]    same, then applies the overlay in one step
 //
-// <master-dir> holds icon.png (1024 px), icon.ico (16..256 px) and icons/<n>x<n>.png
-// (16, 32, 48, 64, 128, 256, 512). Outputs are committed; `node tools/rebrand/rebrand.mjs`
-// copies them over upstream's icons after a sync, so the build never runs this script.
-// Needs @napi-rs/canvas (a dev dependency of the repo) only for the macOS variant and the icns sizes.
+// The logo defaults to assets/_source/uniwork-office-logo.svg (the source of truth, the "Page" mark:
+// two people forming a W on a blue-cyan gradient, document-page tile with a folded corner). The
+// `_source` folder is not an overlay: rebrand.mjs never copies it into the repo. Outputs are
+// committed; `node tools/rebrand/rebrand.mjs` copies them over upstream's icons after a sync, so
+// the build never runs this script. Needs @napi-rs/canvas (a dev dependency of the repo).
 //
 // The macOS icon follows Apple's grid (824 / 1024 content, transparent margin, same treatment as
 // upstream's icon-mac.png); the icns packs PNG entries (types icp4..ic14), no iconutil needed.
+// The ico packs PNG entries too (16, 24, 32, 48, 64, 128, 256), which Windows reads since Vista.
 import { createCanvas, loadImage } from '@napi-rs/canvas'
-import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ASSETS = join(HERE, 'assets')
-const SIZES = [16, 32, 48, 64, 128, 256, 512]
+export const DEFAULT_LOGO = join(ASSETS, '_source', 'uniwork-office-logo.svg')
+const HICOLOR_SIZES = [16, 32, 48, 64, 128, 256, 512, 1024]
+const ICO_SIZES = [16, 24, 32, 48, 64, 128, 256]
 const MAC_CONTENT_RATIO = 824 / 1024
 
 function put(rel, data) {
   const target = join(ASSETS, rel)
   mkdirSync(dirname(target), { recursive: true })
-  if (typeof data === 'string') copyFileSync(data, target)
-  else writeFileSync(target, data)
+  writeFileSync(target, data)
   console.log(`wrote ${rel}`)
 }
 
-/** Draws `img` into a size x size canvas, scaled to `ratio` of the canvas and centred. */
-function render(img, size, ratio = 1) {
+/**
+ * Rasterizes the SVG into a size x size PNG, the artwork scaled to `ratio` of the canvas and
+ * centred (the rest stays transparent). The logo only has a viewBox, so it is given the pixel size
+ * it is drawn at, which keeps every size crisp.
+ */
+async function rasterize(svg, size, ratio = 1) {
+  const side = Math.round(size * ratio)
+  const img = await loadImage(
+    Buffer.from(svg.replace('<svg ', `<svg width="${side}" height="${side}" `)),
+  )
   const canvas = createCanvas(size, size)
   const ctx = canvas.getContext('2d')
-  ctx.imageSmoothingQuality = 'high'
-  const side = size * ratio
   ctx.drawImage(img, (size - side) / 2, (size - side) / 2, side, side)
   return canvas.toBuffer('image/png')
+}
+
+/** .ico container with PNG entries, one per size. */
+function ico(pngBySize) {
+  const sizes = [...pngBySize.keys()]
+  const head = Buffer.alloc(6)
+  head.writeUInt16LE(1, 2) // resource type: icon
+  head.writeUInt16LE(sizes.length, 4)
+  let offset = head.length + sizes.length * 16
+  const dir = sizes.map((size) => {
+    const png = pngBySize.get(size)
+    const entry = Buffer.alloc(16)
+    entry[0] = size >= 256 ? 0 : size // 0 means 256
+    entry[1] = size >= 256 ? 0 : size
+    entry.writeUInt16LE(1, 4) // planes
+    entry.writeUInt16LE(32, 6) // bits per pixel
+    entry.writeUInt32LE(png.length, 8)
+    entry.writeUInt32LE(offset, 12)
+    offset += png.length
+    return entry
+  })
+  return Buffer.concat([head, ...dir, ...sizes.map((size) => pngBySize.get(size))])
 }
 
 /** .icns container with PNG entries (the format macOS reads since 10.7). */
@@ -70,44 +101,45 @@ function icns(pngBySize) {
   return Buffer.concat([head, body])
 }
 
-/** Writes every icon slot of the overlay from the master set in `masterDir`. */
-export async function generateBrandIcons(masterDir) {
-  const master = resolve(masterDir)
-  const masterPng = join(master, 'icon.png')
-  const sourceImg = await loadImage(readFileSync(masterPng))
-  const macImg = await loadImage(render(sourceImg, 1024, MAC_CONTENT_RATIO))
-  const macPng = render(macImg, 1024)
-  const macBySize = new Map([16, 32, 64, 128, 256, 512, 1024].map((s) => [s, render(macImg, s)]))
-  const icnsBytes = icns(macBySize)
+/** Maps every size to its PNG. */
+async function rasterizeAll(svg, sizes, ratio = 1) {
+  return new Map(await Promise.all(sizes.map(async (s) => [s, await rasterize(svg, s, ratio)])))
+}
+
+/** Writes every icon slot of the overlay from the logo SVG at `logoPath`. */
+export async function generateBrandIcons(logoPath = DEFAULT_LOGO) {
+  const svg = readFileSync(resolve(logoPath), 'utf8')
+  if (!/<svg\s[^>]*viewBox=/.test(svg) || /<svg\s[^>]*\swidth=/.test(svg)) {
+    throw new Error(`${logoPath}: expected an <svg> with a viewBox and no fixed width / height`)
+  }
+  const flat = await rasterizeAll(svg, [...new Set([...HICOLOR_SIZES, ...ICO_SIZES])])
+  const mac = await rasterizeAll(svg, [16, 32, 64, 128, 256, 512, 1024], MAC_CONTENT_RATIO)
+  const icoBytes = ico(new Map(ICO_SIZES.map((s) => [s, flat.get(s)])))
+  const icnsBytes = icns(mac)
 
   // packager icons: the shell app, and the standalone Docs app that builds from its own build/ dir
   for (const app of ['shell', 'docs']) {
-    put(`apps/${app}/build/icon.png`, masterPng)
-    put(`apps/${app}/build/icon.ico`, join(master, 'icon.ico'))
-    put(`apps/${app}/build/icon-mac.png`, macPng)
+    put(`apps/${app}/build/icon.png`, flat.get(1024))
+    put(`apps/${app}/build/icon.ico`, icoBytes)
+    put(`apps/${app}/build/icon-mac.png`, mac.get(1024))
     put(`apps/${app}/build/icon.icns`, icnsBytes)
   }
 
   // Linux icon SET (electron-builder `linux.icon: 'build/icons'`): <n>x<n>.png and the hicolor
   // layout <n>x<n>/apps/<executableName>.png, 16..1024
-  for (const size of [...SIZES, 1024]) {
-    const src = size === 1024 ? masterPng : join(master, 'icons', `${size}x${size}.png`)
-    put(`apps/shell/build/icons/${size}x${size}.png`, src)
-    put(`apps/shell/build/icons/${size}x${size}/apps/uniwork-office.png`, src)
+  for (const size of HICOLOR_SIZES) {
+    put(`apps/shell/build/icons/${size}x${size}.png`, flat.get(size))
+    put(`apps/shell/build/icons/${size}x${size}/apps/uniwork-office.png`, flat.get(size))
   }
 
-  // in-app logo: onboarding / About / update window read the shell's app-icon.png
-  put('apps/shell/src/renderer/src/assets/app-icon.png', join(master, 'icons', '512x512.png'))
+  // in-app logo: onboarding / About / home sidebar / update window read the shell's app-icon.png
+  put('apps/shell/src/renderer/src/assets/app-icon.png', flat.get(512))
   // upstream's per-module app-icon.png is referenced by no source file; keep it off the old mark
   for (const app of ['docs', 'sheets', 'slides']) {
-    put(`apps/${app}/src/renderer/assets/app-icon.png`, join(master, 'icons', '256x256.png'))
+    put(`apps/${app}/src/renderer/assets/app-icon.png`, flat.get(256))
   }
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  if (!process.argv[2]) {
-    console.error('usage: node tools/rebrand/gen-brand-icons.mjs <master-dir>')
-    process.exit(2)
-  }
   await generateBrandIcons(process.argv[2])
 }

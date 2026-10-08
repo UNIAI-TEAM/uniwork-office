@@ -49,16 +49,19 @@ npm run test:rebrand                         # unit tests for both tools (node:t
 
 ## App icons
 
-The app logo is the blue "W" icon. Every icon slot is a file under `assets/` that `rebrand.mjs` copies to the same
-repo-relative path, so changing the logo later is asset-only: put the new master set in a folder
-(`icon.png` 1024 px, `icon.ico` 16..256 px, `icons/<n>x<n>.png` for 16, 32, 48, 64, 128, 256, 512) and run
-`node tools/rebrand/rebrand.mjs --icons <folder>`. That rebuilds the files below (the macOS icns / `icon-mac.png` with
-Apple's 824/1024 grid margin, the Linux hicolor copies, the Docs copies) and applies them. `--check` stays green afterwards.
+The app logo is the UniWork Office "Page" mark (two people forming a W on a blue-cyan gradient, a document-page tile with a
+folded corner). Its source of truth is the vector `assets/_source/uniwork-office-logo.svg`; every icon slot below is rendered
+from it at its real size (no bitmap scaling) by `gen-brand-icons.mjs`. Each slot is a file under `assets/` that `rebrand.mjs`
+copies to the same repo-relative path (the `_source` folder is the one exception: it is never copied), so changing the logo
+later is asset-only: replace the SVG (a `viewBox`, no fixed width / height; needs `@napi-rs/canvas`, already a dev dependency)
+and run `node tools/rebrand/rebrand.mjs --icons` (or `--icons <other.svg>`). That rebuilds the files below (the macOS icns /
+`icon-mac.png` with Apple's 824/1024 grid margin, the Linux hicolor copies, the Docs copies) and applies them.
+`--check` stays green afterwards.
 
 | Asset (under `tools/rebrand/assets/`)                                                    | Target slot                                                                                           |
 | ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | `apps/shell/build/icon.png` (1024)                                                       | electron-builder app icon source; Linux fallback; dev window icon (`windowIconPath()` in `index.ts`)  |
-| `apps/shell/build/icon.ico` (16..256)                                                    | Windows exe icon, NSIS installer and uninstaller icon (electron-builder defaults to `build/icon.ico`) |
+| `apps/shell/build/icon.ico` (16, 24, 32, 48, 64, 128, 256)                               | Windows exe icon, NSIS installer and uninstaller icon (electron-builder defaults to `build/icon.ico`) |
 | `apps/shell/build/icon.icns`                                                             | macOS app bundle icon (Dock, Finder, dmg)                                                             |
 | `apps/shell/build/icon-mac.png` (1024, grid margin)                                      | macOS dev Dock icon (`app.dock.setIcon`)                                                              |
 | `apps/shell/build/icons/<n>x<n>.png` and `<n>x<n>/apps/uniwork-office.png`, n = 16..1024 | Linux deb / rpm / AppImage icon set (`linux.icon: 'build/icons'`, hicolor theme names)                |
@@ -134,8 +137,9 @@ image-host feature, the name GitHub Copilot, vendored-library attribution and th
 - `packaging/**` (flatpak, nix, docker) is in the scan scope but still names GenOffice, `com.genoffice.app` and fetches
   upstream release artifacts; the hits are `debt` entries (GO-A8 / GO-A4). The recipes are not rebranded because they unpack
   upstream-built packages (`/opt/GenOffice/genoffice`); redo them together with the first UniWork release feed.
-- The W icon is the old UniWork Office artwork (user decision); the per-type document icons are upstream's tile design in blue /
-  green / orange, kept. Replace the master set via `--icons` if a new logo is issued (GO-A8).
+- The app icon is the "Page" logo (user decision, variant v1); the per-type document icons are upstream's tile design in blue /
+  green / orange, kept. The `apps/uniai-pwa/icons/icon-*.svg` PWA icons are a separate product surface and not part of this set.
+  Replace `assets/_source/uniwork-office-logo.svg` and run `--icons` if a new logo is issued (GO-A8).
 - The CLI command `genoffice`, the MCP server keys `genoffice` / `genoffice-editor` and the `~/.genoffice` paths keep upstream's name
   (functional ids that agent configs address); renaming them is a GO-A8 decision.
 - Origin URLs point at `github.com/UNIAI-TEAM/uniwork-office`; switch the single regex in `table.mjs` (`origin-repo-urls`)

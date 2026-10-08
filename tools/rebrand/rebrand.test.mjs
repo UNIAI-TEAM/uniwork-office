@@ -420,7 +420,7 @@ test('step 3 of the welcome dialog is rewritten in every locale, double-quoted u
   })
 })
 
-// ---- app icon overlay: the blue "W" icon, every size the packagers and the app read ----
+// ---- app icon overlay: the UniWork Office "Page" logo, every size the packagers and the app read ----
 
 const ASSETS = new URL('./assets/', import.meta.url)
 const asset = (rel) => readFileSync(new URL(rel, ASSETS))
@@ -471,6 +471,16 @@ test('icon.ico holds 16..256 px entries and icon.icns the PNG slots macOS reads'
     ic12: 64,
     ic13: 256,
     ic14: 512,
+  })
+})
+
+test('the logo SVG is the icon source of truth and is never copied into the repo', () => {
+  const svg = asset('_source/uniwork-office-logo.svg').toString('utf8')
+  assert.match(svg, /<svg\s[^>]*viewBox="0 0 512 512"/)
+  assert.doesNotMatch(svg, /<svg\s[^>]*\swidth=/, 'sized by the generator at each render')
+  withTree((root) => {
+    const { overlays } = rebrand(root)
+    assert.ok(!overlays.some((f) => f.startsWith('_source/')), 'overlays: ' + overlays.join(', '))
   })
 })
 

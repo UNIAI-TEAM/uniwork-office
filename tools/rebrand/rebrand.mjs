@@ -4,11 +4,13 @@
 //   node tools/rebrand/rebrand.mjs            apply the table + asset overlay
 //   node tools/rebrand/rebrand.mjs --check    change nothing, exit 1 if a run would
 //   node tools/rebrand/rebrand.mjs --root <dir>   operate on another checkout
-//   node tools/rebrand/rebrand.mjs --icons <dir>  first rebuild every icon in assets/ from a master
-//                                                 icon set (gen-brand-icons.mjs), then apply
+//   node tools/rebrand/rebrand.mjs --icons [svg]  first rebuild every icon in assets/ from the logo SVG
+//                                                 (default assets/_source/uniwork-office-logo.svg,
+//                                                 see gen-brand-icons.mjs), then apply
 //
 // The replacement table lives in table.mjs, the artwork overlay in assets/
-// (same relative paths as the repo). See README.md for the upstream sync flow.
+// (same relative paths as the repo; the `_source` folder holds sources, not overlay files).
+// See README.md for the upstream sync flow.
 import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative, resolve, sep } from 'node:path'
@@ -97,6 +99,7 @@ function walk(root, dir, acc = []) {
 function listAssets(dir = ASSETS, acc = []) {
   if (!existsSync(dir)) return acc
   for (const name of readdirSync(dir)) {
+    if (dir === ASSETS && name === '_source') continue
     const p = join(dir, name)
     if (statSync(p).isDirectory()) listAssets(p, acc)
     else acc.push(relative(ASSETS, p).split(sep).join('/'))
@@ -156,7 +159,8 @@ async function main(argv) {
   if (iconsArg >= 0) {
     if (check) throw new Error('--icons rewrites assets/ and cannot be combined with --check')
     const { generateBrandIcons } = await import('./gen-brand-icons.mjs')
-    await generateBrandIcons(argv[iconsArg + 1])
+    const logo = argv[iconsArg + 1]
+    await generateBrandIcons(logo && !logo.startsWith('--') ? logo : undefined)
   }
   const rootArg = argv.indexOf('--root')
   const root = resolve(
