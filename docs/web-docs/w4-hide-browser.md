@@ -95,13 +95,20 @@ fits its `DesktopApi` return type (`isAiUnavailable(error)` matches the prefix):
 
 `web/e2e/w4-hide.spec.ts` runs through `/test-host/` (editor inside `iframe#frame`) together with
 `docs-web.spec.ts` against one `npm run build:web`; screenshots are taken of the host page.
-Two expected-failure tests (`test.fail`) record gaps in W3-owned files, to be fixed there:
+Both gaps found in this integration pass are fixed:
 
-1. **Host print request bypasses the BROWSER print.** `webapi.ts` `handlePrint` calls
-   `window.print()` directly, so a host-initiated print has no print sheet, no light pin and no
-   `afterprint`. It should call `window.desktop.print()`.
-2. **Host `init.theme` / `init.locale` (and `theme` / `language` events) are not applied.**
-   Nothing consumes them; `browser.ts` already exports `setWebTheme` / `setWebLanguage` for the
-   frame wiring (session / frame-port) to call.
+1. **Host print** (`print` request, mode `dialog`) and the `exportPdf` print fallback go through
+   `browser.ts` `printFrame` (print sheet, `print-color-adjust`, light pin, settles on
+   `afterprint`); the host's answer is sent only after the job settles. Mode `pdf` keeps the
+   server export.
+2. **Host theme and language** are authoritative inside the frame. `host-appearance.ts` applies
+   `init.theme` / `init.locale` and the `theme` / `language` events through
+   `setWebTheme` / `setWebLanguage` with `{ host: true }`: memory only (the frame's localStorage
+   is the UniWork page's, so the host's value is never written there and a stale stored value
+   never overrides it). In a hosted frame the stored theme/language are ignored; standalone
+   keeps localStorage. `getTheme` / `getLanguage` wait (max 3 s) for `init`, so boot has the
+   right theme and language. The switch is live without a reload (`main.tsx` follows
+   `onThemeChanged`, `LocaleProvider` follows `onLanguageChanged`).
 
-When either is fixed the matching `test.fail` starts failing: delete the `test.fail` marker.
+Also fixed: `DATE_LOCALES.vi` held the AI language directive instead of `vi-VN`.
+Test host: `window.__host.send(type, payload)` sends host events (`theme`, `language`).

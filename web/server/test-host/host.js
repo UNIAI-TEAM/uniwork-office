@@ -9,6 +9,7 @@
 //   events           -> frame events received ({type, payload})
 //   files()          -> [{fileId, name, versionId, size}]
 //   request(type, p) -> send a host->frame request (open/save/saveAs/print), resolves with the response
+//   send(type, p)    -> send a host->frame event (theme / language / ...)
 //   bumpRemote(id)   -> simulate a concurrent server-side save (next frame save conflicts)
 //   lastExport()     -> {fileId, name, dataBytes: number[] | null} of the last api.export | null
 
@@ -173,6 +174,8 @@ async function boot() {
     events,
     files: () => [...files.values()].map((f) => ({ ...f.meta, size: f.bytes.byteLength })),
     request,
+    // host -> frame event, e.g. send('theme', {theme: 'dark'}), send('language', {locale: 'vi'})
+    send: (type, payload) => post({ id: `h${++reqSeq}`, kind: 'event', type, payload }),
     bumpRemote: (fileId) => {
       const f = files.get(fileId)
       return f ? put(f.meta.name, f.bytes, fileId) : null

@@ -18,16 +18,16 @@ const EDITOR = '.ProseMirror[contenteditable="true"]'
 const consoleErrors: string[] = []
 
 /** open the docx through the test host and return the editor iframe */
-async function openDoc(page: Page, theme?: 'light' | 'dark'): Promise<Frame> {
+async function openDoc(page: Page, theme?: 'light' | 'dark', lang: string = 'en'): Promise<Frame> {
   page.on('console', (m) => {
     if (m.type() === 'error') consoleErrors.push(`console.error: ${m.text()} @ ${m.location().url}`)
   })
   page.on('pageerror', (e) => consoleErrors.push(`pageerror: ${e.message}`))
-  if (theme) {
-    // same-origin frame: the bridge reads the stored UI theme at load
-    await page.addInitScript((t) => localStorage.setItem('genoffice.web.theme', t), theme)
-  }
-  await page.goto(`/test-host/?open=${encodeURIComponent('/fixtures/kitchen-sink.docx')}`)
+  // the host is authoritative for the theme and language (init.theme / init.locale)
+  const themeParam = theme ? `theme=${theme}&` : ''
+  await page.goto(
+    `/test-host/?${themeParam}lang=${lang}&open=${encodeURIComponent('/fixtures/kitchen-sink.docx')}`,
+  )
   await page.waitForFunction(() =>
     /index\.html/.test((document.getElementById('frame') as HTMLIFrameElement)?.src ?? ''),
   )
@@ -191,11 +191,9 @@ test.describe('BROWSER class', () => {
     expect(fromDark).toBe(fromLight)
   })
 
-  // The host's print request (W2 `print`, mode 'print') is answered by webapi.ts. It must go
-  // through the BROWSER print (window.desktop.print: light pin, print sheet, afterprint) and not
-  // call window.print() directly. Known integration gap reported to the lane lead: this is
-  // expected to fail until webapi.ts handlePrint delegates to window.desktop.print().
-  test.fail('a host print request runs the BROWSER print path', async ({ page }) => {
+  test('a host print request runs the BROWSER print path and answers after it settles', async ({
+    page,
+  }) => {
     const ed = await openDoc(page, 'dark')
     await ed.evaluate(() => {
       ;(window as any).__printed = []
@@ -204,27 +202,54 @@ test.describe('BROWSER class', () => {
           theme: document.documentElement.getAttribute('data-theme'),
           sheet: !!document.getElementById('web-bridge-print-page'),
         })
-        window.dispatchEvent(new Event('afterprint'))
+        // the dialog is still open: afterprint comes later
+        setTimeout(() => window.dispatchEvent(new Event('afterprint')), 300)
       }
     })
-    await page.evaluate(() => (window as any).__host.request('print', { mode: 'print' }))
-    const printed = await ed.evaluate(() => (window as any).__printed)
-    expect(printed).toEqual([{ theme: 'light', sheet: true }])
+    const t0 = Date.now()
+    const res = await page.evaluate(() =>
+      (window as any).__host.request('print', { mode: 'dialog' }),
+    )
+    expect(Date.now() - t0).toBeGreaterThanOrEqual(250)
+    expect(res).toEqual({ printed: true })
+    expect(await ed.evaluate(() => (window as any).__printed)).toEqual([
+      { theme: 'light', sheet: true },
+    ])
+    // the host's dark theme is back after the job
+    await expect(ed.locator('html')).toHaveAttribute('data-theme', 'dark')
+    await expect(ed.locator('#web-bridge-print-page')).toHaveCount(0)
   })
 
-  // The host passes theme + locale in `init` (W2). The frame side must apply them through
-  // setWebTheme / setWebLanguage (browser.ts). Known integration gap reported to the lane lead:
-  // nothing consumes init.theme yet, so this is expected to fail until session/frame wiring lands.
-  test.fail('the host init theme is applied to the frame', async ({ page }) => {
-    await page.goto(
-      `/test-host/?theme=dark&open=${encodeURIComponent('/fixtures/kitchen-sink.docx')}`,
-    )
-    await page.waitForFunction(() =>
-      /index\.html/.test((document.getElementById('frame') as HTMLIFrameElement)?.src ?? ''),
-    )
-    const ed = (await (await page.waitForSelector('#frame')).contentFrame())!
-    await ed.locator(EDITOR).first().waitFor({ timeout: 30_000 })
-    await expect(ed.locator('html')).toHaveAttribute('data-theme', 'dark', { timeout: 3_000 })
+  test('the host theme wins over localStorage, follows host events, never writes storage', async ({
+    page,
+  }) => {
+    // a stale stored theme from a standalone run must not override init.theme
+    await page.addInitScript(() => localStorage.setItem('genoffice.web.theme', 'light'))
+    const ed = await openDoc(page, 'dark')
+    await expect(ed.locator('html')).toHaveAttribute('data-theme', 'dark')
+    await page.evaluate(() => (window as any).__host.send('theme', { theme: 'light' }))
+    await expect(ed.locator('html')).toHaveAttribute('data-theme', 'light')
+    await page.evaluate(() => (window as any).__host.send('theme', { theme: 'dark' }))
+    await expect(ed.locator('html')).toHaveAttribute('data-theme', 'dark')
+    // the dark UI follows through to the document page (screen dark page)
+    await shot(page, '09-host-theme-dark-event')
+    expect(await page.evaluate(() => localStorage.getItem('genoffice.web.theme'))).toBe('light')
+  })
+
+  test('the host language is applied at init and switches live on a language event', async ({
+    page,
+  }) => {
+    const ed = await openDoc(page, undefined, 'vi')
+    await expect(tab(ed, 'Trang đầu')).toBeVisible()
+    await expect(ed.locator('html')).toHaveAttribute('lang', /vi/)
+    await shot(page, '10-host-language-vi')
+    await page.evaluate(() => (window as any).__host.send('language', { locale: 'en' }))
+    await expect(tab(ed, 'Home')).toBeVisible()
+    await expect(tab(ed, 'Trang đầu')).toHaveCount(0)
+    await page.evaluate(() => (window as any).__host.send('language', { locale: 'vi' }))
+    await expect(tab(ed, 'Trang đầu')).toBeVisible()
+    // still hidden in Vietnamese: no AI group, same capability set
+    await expect(ed.locator('.ai-entry')).toHaveCount(0)
   })
 
   test('document hyperlinks open without an opener and javascript: is blocked', async ({
