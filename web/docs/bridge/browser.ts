@@ -265,8 +265,21 @@ function collectAttachments(paths: string[]): AttachmentAddResult {
 
 // ---- clipboard ----
 
+// Decoded by hand: the page CSP's connect-src has no `data:`, so fetch(dataUrl) is refused.
+function dataUrlToBlob(dataUrl: string): Blob {
+  const comma = dataUrl.indexOf(',')
+  const header = dataUrl.slice(5, comma)
+  const body = dataUrl.slice(comma + 1)
+  const type = header.split(';')[0] || 'application/octet-stream'
+  if (!header.endsWith(';base64')) return new Blob([decodeURIComponent(body)], { type })
+  const bin = atob(body)
+  const bytes = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+  return new Blob([bytes], { type })
+}
+
 async function toPngBlob(dataUrl: string): Promise<Blob | null> {
-  const blob = await (await fetch(dataUrl)).blob()
+  const blob = dataUrl.startsWith('data:') ? dataUrlToBlob(dataUrl) : await (await fetch(dataUrl)).blob()
   if (blob.type === 'image/png') return blob
   const bitmap = await createImageBitmap(blob)
   const canvas = document.createElement('canvas')

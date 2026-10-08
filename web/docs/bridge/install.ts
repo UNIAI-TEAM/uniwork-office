@@ -38,7 +38,9 @@ export function installBridge(): void {
   for (const mod of modules) for (const key of Object.keys(mod ?? {})) desktop[key] = mod[key]
 
   const proxied = new Proxy(desktop, {
-    get(target, prop: string) {
+    get(target, prop: string | symbol) {
+      // symbols (String(desktop), devtools) and `then` (await desktop) must not get a fallback
+      if (typeof prop !== 'string' || prop === 'then') return Reflect.get(target, prop)
       if (prop in target) return target[prop]
       const fallback = fallbackFor(prop)
       target[prop] = fallback

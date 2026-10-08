@@ -12,7 +12,7 @@ ratios, not as SLAs).
 ## 1. Summary
 
 - The unmodified Docs renderer (`apps/docs/src/renderer`, ~65 files importing docx-engine) builds with plain Vite as a
-  static web app and boots in a browser once a ~1k-line bridge (`web/docs/bridge/*`) provides `window.desktop` /
+  static web app and boots in a browser once a ~1.5k-line bridge (1,539 non-test lines) (`web/docs/bridge/*`) provides `window.desktop` /
   `window.projectApi`. No renderer source was changed.
 - Cold load on this box: **editable doc in 0.57 s (simple), 0.64 s (kitchen-sink), 0.99 s (long doc, ~41 pages)**, median of 5
   cache-disabled runs each, 0 page errors, 0 failed requests.
@@ -42,8 +42,8 @@ the 3 saved docx files in `screenshots/`.
 | doc | open | editable | type | bold | insert table | save | saved XML | reopen |
 |---|---|---|---|---|---|---|---|---|
 | simple | PASS | PASS | PASS | PASS | PASS (0→1) | PASS (2,373 B) | PASS | PASS |
-| kitchen-sink | PASS | PASS | PASS | PASS | PASS (1→2) | PASS (3,611 B) | PASS | PASS |
-| long | PASS | PASS | PASS | PASS | PASS (5→6) | PASS (4,846 B) | PASS | PASS |
+| kitchen-sink | PASS | PASS | PASS | PASS | PASS (1→2) | PASS (3,610 B) | PASS | PASS |
+| long | PASS | PASS | PASS | PASS | PASS (5→6) | PASS (4,845 B) | PASS | PASS |
 
 **Shim behaviour (`web/docs/bridge/`, headers of each file carry the per-method table):**
 
@@ -59,7 +59,7 @@ the 3 saved docx files in `screenshots/`.
 - `ai.ts` (W6, 14 stubs): `aiStream` reproduces the desktop chunk protocol (10 chunks × 50 ms, cancel → `done`),
   fixed web/image search results, SVG image generation, `getAiSettings`/`aiGskStatus` report "configured" so the AI
   panel paths are exercisable.
-- `hide.ts` (W6, 31 typed no-ops) + `install.ts` (catch-all Proxy so any unmapped method is a safe async no-op /
+- `hide.ts` (W6, 34 typed no-ops: 31 HIDE members + 3 open-flow defaults that `webapi.ts` overrides) + `install.ts` (catch-all Proxy so any unmapped method is a safe async no-op /
   no-op disposer).
 
 Cold-load runs (`web/measure/load.mjs`, 15 runs, 3 docs, all 15 reached "editable"):
@@ -120,6 +120,19 @@ openDocxPath printPdfBuffer readAttachment saveDocx saveDocxAs saveDocxNew setAi
 
 Counts re-checked by the lead against the final merged `bridge-inventory.json`: 72 DesktopApi (26/20/26) + 10 projectApi.
 
+**Inventory class vs what the spike shim actually ships.** The class above is the *target* (what GO-B3 must provide). For the
+spike, some members were shipped differently, so the shim files do not split 26/20/26:
+
+| member(s) | inventory class | spike shim | why |
+|---|---|---|---|
+| `createDocument`, `convertAltChunkHtml`, `onRenamedDocx` | WEB-API | no-op in `hide.ts` | no fake needed for the proof; GO-B3 must implement |
+| `getAutoSaveDefault`, `onAutoSaveDefaultChanged`, `onCloseCheck`, `onCloseSaveRequest`, `reportCloseCheck`, `reportCloseSaveResult` | BROWSER | no-op in `hide.ts` | autosave pref / window-close handshake not wired to `localStorage` / `beforeunload` in the spike |
+| `aiGskLogin` | HIDE | stub in `ai.ts` | keeps the AI login path exercisable |
+| `getPathForFile`, `fontMetrics` | HIDE | implemented in `browser.ts` | `web-file://` registry; `fontMetrics` → `null` |
+
+The only key no module implements is `onAiPanelPrefsChanged` (Proxy no-op disposer). Merge collisions (later module wins):
+`onOpenDocx`, `consumePendingOpenDocx` (webapi over hide), `getPathForFile` (browser over hide) — all intended.
+
 ## 5. Size / time numbers
 
 Full tables: `measurements.md`. Headlines:
@@ -173,9 +186,9 @@ The CJK docs download Noto Sans CJK on demand, which is why their settled transf
 2. **Window / document globals.** The renderer writes `window.__exportPdf`, `__openPagePreview`, `__pageDebug`, `__aidocs`, reads
    `window.desktop` (81×) and `window.projectApi`, sets `documentElement.lang`, `documentElement` classes and `data-theme`, and toggles
    `document.body` classes/styles (`docs-crop-active`, `cursor`/`userSelect` while resizing the AI panel). The bundle registers
-   60 `window.addEventListener` and 8 `document.addEventListener` handlers and touches `document.body`/`documentElement` 26×.
+   64 `window.addEventListener` and 8 `document.addEventListener` handlers and touches `document.body`/`documentElement` 31× (18 + 13).
    `window.desktop` itself would have to be a host-global in the mount model.
-3. **Storage.** 23 `localStorage` reads/writes under unscoped keys (`aidocs.showAi`, `aidocs.spellcheck`, `aidocs.pasteFromOtherApps`,
+3. **Storage.** 28 `localStorage` reads/writes under unscoped keys (`aidocs.showAi`, `aidocs.spellcheck`, `aidocs.pasteFromOtherApps`,
    `aidocs.marginLastCustom`, `docs-ai-panel-width`, `docs-ai-rewrite-ack`, track-changes key). A same-origin iframe still shares
    `localStorage` with the host, so serve the iframe from its own origin/subdomain if isolation matters (then the `postMessage`
    channel is the *only* coupling — preferable for GO-D2).
@@ -185,7 +198,7 @@ The CJK docs download Noto Sans CJK on demand, which is why their settled transf
    have to be loosened to `style-src 'unsafe-inline'` + `blob:`/`data:` for fonts/images, and the spike's `http://localhost:*`
    in `connect-src` must be replaced by the real API origin. In an iframe the renderer keeps its own tight CSP (deliver it as an HTTP
    header, with `sandbox="allow-same-origin allow-scripts allow-downloads allow-modals"` if the host wants more).
-5. **Fonts.** 144 `@font-face` rules over 54 families. Generic names that can collide with a host page or with locally-installed
+5. **Fonts.** 144 `@font-face` rules over 52 families. Generic names that can collide with a host page or with locally-installed
    fonts: `Caladea`, `Liberation Serif/Sans/Mono`, `Noto Sans CJK SC`, `Noto Serif CJK SC`, `Noto Naskh Arabic`, `Noto Sans Arabic`
    (the rest are suffixed — `… GO`, `GenOffice …`). `document.fonts` is used 16×; mounted, all of this lands on the host's `document.fonts`
    and bundles 14 MiB of faces into the host's font namespace.
@@ -268,6 +281,11 @@ node web/measure/css-evidence.mjs     # -> web/measure/css-evidence.json
 node web/measure/load.mjs             # spawns web/server/server.mjs on PORT=4182 -> web/measure/load.json
 node web/measure/make-tables.mjs      # -> docs/web-spike/measurements.{json,md}
 ```
+
+E2E: `npx playwright test -c web/e2e && node web/e2e/make-results-md.mjs` (writes screenshots, `results-<doc>.json`,
+saved docx and `results.md` into `docs/web-spike/screenshots/`, i.e. it rewrites committed evidence; the marker is random
+per run, so saved sizes differ by a few bytes). Bridge unit tests: `npx vitest run --root web/docs/bridge --environment jsdom`
+(10 tests; not part of root `npm test`).
 
 Caveats: loopback network (no latency/bandwidth), headless Chromium on a shared 4-CPU box while other workers were running
 (timings are upper-biased, spread shown as min–max), single-chunk bundle measured as built (no compression), heap =

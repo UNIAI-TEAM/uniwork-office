@@ -3,55 +3,55 @@
     "doc": "kitchen-sink",
     "step": "open",
     "ok": true,
-    "ms": 1984,
-    "detail": "text visible in 1984ms; fully loaded (11 blocks, editable) after 1225ms; tables=1"
+    "ms": 2047,
+    "detail": "text visible in 2047ms; fully loaded (11 blocks, editable) after 1238ms; tables=1"
   },
   {
     "doc": "kitchen-sink",
     "step": "editable",
     "ok": true,
-    "ms": 79
+    "ms": 86
   },
   {
     "doc": "kitchen-sink",
     "step": "type-marker",
     "ok": true,
-    "ms": 1275,
-    "detail": "12 blocks; last: docProtected:\"\" / docProtected:\"\" / docParagraph:\"尾段。\" / docParagraph:\"E2EMARKKITCHENSINKMUZLAGP9\" sel=148-148 hasMarker=true"
+    "ms": 1114,
+    "detail": "12 blocks; last: docProtected:\"\" / docProtected:\"\" / docParagraph:\"尾段。\" / docParagraph:\"E2EMARKKITCHENSINKMUZLKA4H\" sel=148-148 hasMarker=true"
   },
   {
     "doc": "kitchen-sink",
     "step": "bold",
     "ok": true,
-    "ms": 115,
+    "ms": 119,
     "detail": "Ctrl+B: {\"inStrong\":true,\"weight\":\"700\",\"tag\":\"STRONG\"}"
   },
   {
     "doc": "kitchen-sink",
     "step": "insert-table",
     "ok": true,
-    "ms": 915,
+    "ms": 904,
     "detail": "tables 1 -> 2"
   },
   {
     "doc": "kitchen-sink",
     "step": "save",
     "ok": true,
-    "ms": 220,
+    "ms": 217,
     "detail": "3610 bytes"
   },
   {
     "doc": "kitchen-sink",
     "step": "saved-xml",
     "ok": true,
-    "ms": 4,
-    "detail": "run=<w:r><w:rPr><w:b/><w:bCs/></w:rPr><w:t xml:space=\"preserve\">E2EMARKKITCHENSINKMUZLAGP9</w:t></w:r> | w:tbl=2"
+    "ms": 5,
+    "detail": "run=<w:r><w:rPr><w:b/><w:bCs/></w:rPr><w:t xml:space=\"preserve\">E2EMARKKITCHENSINKMUZLKA4H</w:t></w:r> | w:tbl=2"
   },
   {
     "doc": "kitchen-sink",
     "step": "reopen",
     "ok": true,
-    "ms": 943,
+    "ms": 934,
     "detail": "marker bold={\"inStrong\":true,\"weight\":\"700\"}; tables 1 -> 2"
   }
 ]
