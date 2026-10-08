@@ -1225,7 +1225,7 @@ export function App() {
   }, [editor])
 
   useEffect(() => {
-    void window.desktop.getRecentFiles().then(setRecent)
+    if (cap('recents')) void window.desktop.getRecentFiles().then(setRecent)
     void window.desktop.getAiSettings().then(setSettings)
   }, [])
 
@@ -4304,7 +4304,7 @@ export function App() {
       }
       if ((e.metaKey || e.ctrlKey) && e.key === 'o') {
         e.preventDefault()
-        void openFile()
+        if (cap('open')) void openFile()
       }
       if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
         e.preventDefault()

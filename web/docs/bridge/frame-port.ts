@@ -5,6 +5,7 @@
  */
 import {
   toProtocolError,
+  type Capabilities,
   type FileMeta,
   type FrameRequestType,
   type FrameRequests,
@@ -28,6 +29,8 @@ export interface PortSession {
   /** the host's UI theme / locale from `init` (absent in unit-test sessions) */
   theme?: Theme
   locale?: string
+  /** effective capabilities (frame ∩ host grant); absent in unit-test sessions */
+  capabilities?: Capabilities
 }
 
 type HostHandler<K extends keyof HostRequests> = (
@@ -67,6 +70,9 @@ export const TIMEOUTS = {
   short: 30_000,
   /** document bytes up or down, server-side render */
   transfer: 120_000,
-  /** waits on a host dialog (picker, save-as name/folder): no timeout */
+  /** the editor must START a host-requested flow (e.g. Save As serializes first); a real timer */
+  editorStart: 30_000,
+  /** waits on a host dialog (picker, save-as name/folder): no timeout. A request option only:
+   *  never pass it to setTimeout (0 there fires at once) */
   dialog: 0,
 } as const

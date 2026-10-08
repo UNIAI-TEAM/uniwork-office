@@ -251,6 +251,10 @@ export interface DesktopCapabilities {
   createDocument?: boolean
   /** AI panel "Buy plan" button */
   billing?: boolean
+  /** File > Open / Ctrl+O (web: only when the host grants its document picker, `filePick`) */
+  open?: boolean
+  /** recent-files lookups (web: only when the host grants `recents`) */
+  recents?: boolean
 }
 
 export interface DesktopApi {

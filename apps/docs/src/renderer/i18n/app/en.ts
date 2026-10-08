@@ -358,4 +358,18 @@ export const en = {
   appUpdateStyleTip: 'Update this style from the current selection (written back to styles.xml)',
   appNewStyleFromSelection: 'New style from the current selection',
   appStyleNamePlaceholder: 'Style name',
+  appWebConflictTitle: 'This document was changed elsewhere',
+  appWebConflictBody:
+    'A newer version was saved while you were editing. Overwrite it with your version, or reload the latest version and discard your changes?',
+  appWebConflictOverwrite: 'Overwrite',
+  appWebConflictReload: 'Reload latest',
+  appWebConflictNotSaved: 'the document was changed elsewhere',
+  appWebDiscardTitle: 'Discard unsaved changes?',
+  appWebDiscardBody:
+    'Opening another document replaces this one, and your unsaved changes will be lost.',
+  appWebDiscard: 'Discard and open',
+  appWebFatalTitle: 'The document could not be opened',
+  appWebFatalBody:
+    'Editing and saving are disabled. Reload the page or open the document again from UniWork.',
+  appWebNoHost: 'This editor runs inside UniWork. Open the document from UniWork.',
 } satisfies Record<keyof typeof zh, string>

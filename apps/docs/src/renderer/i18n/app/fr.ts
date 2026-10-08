@@ -373,4 +373,18 @@ export const fr = {
     'Mettre à jour ce style à partir de la sélection actuelle (réécrit dans styles.xml)',
   appNewStyleFromSelection: 'Nouveau style à partir de la sélection actuelle',
   appStyleNamePlaceholder: 'Nom du style',
+  appWebConflictTitle: 'Ce document a été modifié ailleurs',
+  appWebConflictBody:
+    'Une version plus récente a été enregistrée pendant que vous modifiiez. Voulez-vous l’écraser avec votre version, ou recharger la dernière version et abandonner vos modifications ?',
+  appWebConflictOverwrite: 'Écraser',
+  appWebConflictReload: 'Recharger la dernière version',
+  appWebConflictNotSaved: 'le document a été modifié ailleurs',
+  appWebDiscardTitle: 'Abandonner les modifications non enregistrées ?',
+  appWebDiscardBody:
+    'Ouvrir un autre document remplace celui-ci, et vos modifications non enregistrées seront perdues.',
+  appWebDiscard: 'Abandonner et ouvrir',
+  appWebFatalTitle: 'Impossible d’ouvrir le document',
+  appWebFatalBody:
+    'La modification et l’enregistrement sont désactivés. Rechargez la page ou rouvrez le document depuis UniWork.',
+  appWebNoHost: 'Cet éditeur fonctionne dans UniWork. Ouvrez le document depuis UniWork.',
 } satisfies Record<keyof typeof zh, string>

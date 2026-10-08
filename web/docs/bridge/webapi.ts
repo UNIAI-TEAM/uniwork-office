@@ -12,7 +12,7 @@
  * | onOpenDocx                | host request `open` {file, source} -> listeners -> {opened, title}                |
  * | openDocxPath(path)        | `uniwork://files/<id>/<name>` -> api.open {fileId}                                |
  * | openDocx                  | file.pick {purpose:'open'} (UniWork picker in the host); null = cancelled        |
- * | saveDocx(path,data,auto)  | api.save {fileId, data, etag, auto}; 'conflict' -> reason 'external-modified'    |
+ * | saveDocx(path,data,auto)  | api.save {fileId, data, etag, auto}; 'conflict' -> see "Save conflicts" below    |
  * | saveDocxAs                | api.saveAs {name, data, sourceFileId} (host dialog); 'cancelled' -> {ok:false}   |
  * | saveDocxNew               | api.saveAs {name, data, silent: true} (first save of an untitled document)       |
  * | getRecentFiles            | api.recents {limit} -> `uniwork://files/<id>/<name>` paths                        |
@@ -27,6 +27,19 @@
  * | projectApi.*              | ./project-memory.ts (AI-only; AI is hidden on the web)                           |
  * Every successful save emits `saved` {file, versionId, initiatedByFrame}.
  *
+ * Save conflicts (the host answers `conflict`: someone saved a newer version). A host `save`
+ * request gets it in its SaveResult and owns the UI. Otherwise the host gets an `error` event
+ * {code:'conflict', fatal:false} and, for a manual save, the frame asks like the desktop's
+ * "modified by another program" box (./notice.ts): Overwrite (re-read the head etag with
+ * api.open, save again), Reload latest (api.open replaces the document) or Cancel (stays dirty,
+ * "Save failed" with the reason; the next save asks again). An autosave never prompts.
+ * A timed-out / network-failed save may still have landed: the bridge re-reads the head and
+ * adopts its etag when it looks like our own write (see reconcileAfterUnknown).
+ *
+ * Opening another document (File > Open, recents) over unsaved edits asks first. A fatal open
+ * failure (no host, init timeout, api.open error) shows a blocking notice and every save is
+ * refused until the host opens a document again.
+ *
  * Host -> frame requests handled here: `open`, `save` (runs the editor's full
  * save flow), `saveAs` (runs the editor's Save As with the host's name),
  * `print` ({mode:'pdf'} = server export, else the in-frame print dialog).
@@ -36,15 +49,17 @@
  * doc passwords (./hide.ts). Encrypted (CFB) docx is passed through as-is.
  */
 import type { DesktopApi, OpenDocxResult, OpenFileResult } from '../../../apps/docs/src/shared/ipc'
-import type {
-  FileMeta,
-  FileSource,
-  OpenPayload,
-  ProtocolErrorShape,
-  SaveResult,
+import {
+  toProtocolError,
+  type FileMeta,
+  type FileSource,
+  type OpenPayload,
+  type ProtocolErrorShape,
+  type SaveResult,
 } from '../protocol/types'
 import { TIMEOUTS, errorCode, type FramePort } from './frame-port'
-import { printFrame } from './browser'
+import { downloadBlob, printFrame } from './browser'
+import { ask, hideFatal, showFatal, text } from './notice'
 import { createSession, type SessionOptions } from './session'
 import { projectApi } from './project-memory'
 
@@ -100,18 +115,6 @@ async function readSource(source: FileSource): Promise<ArrayBuffer> {
   const res = await fetch(source.url, { credentials: 'omit', headers: source.headers })
   if (!res.ok) throw new Error(`download failed: HTTP ${res.status}`)
   return res.arrayBuffer()
-}
-
-function downloadBlob(name: string, blob: Blob): void {
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = name
-  a.style.display = 'none'
-  document.body.appendChild(a)
-  a.click()
-  a.remove()
-  setTimeout(() => URL.revokeObjectURL(url), 30_000)
 }
 
 function decodeDataUrl(url: string): { base64: string; mime: string } | null {
@@ -176,12 +179,34 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
     return toOpenResult(open)
   }
 
+  // ------------------------------------------------------------ fatal state
+
+  /** set when the document could not be opened: saves are refused until a host `open` succeeds */
+  let fatal: ProtocolErrorShape | null = null
+
+  function setFatal(err: unknown): void {
+    fatal = toProtocolError(err).toShape()
+    // not embedded at all vs. a host that did not (or could not) open the document
+    showFatal(
+      fatal.code === 'not_ready' && window.parent === window ? 'appWebNoHost' : 'appWebFatalBody',
+    )
+  }
+
+  function fatalSave(): { ok: boolean; path?: string; error?: string } {
+    return { ok: false, error: text('appWebFatalTitle') }
+  }
+
   // ------------------------------------------------------------ save bookkeeping
 
   /** set while the host's `save` request runs the editor's save flow */
   let hostSave: { error: ProtocolErrorShape | null } | null = null
   /** set while the host's `saveAs` request waits for the editor's saveDocxAs */
-  let hostSaveAs: { name?: string; settle: (r: SaveResult) => void } | null = null
+  let hostSaveAs: {
+    name?: string
+    settle: (r: SaveResult) => void
+    /** the editor reached saveDocxAs: stop the "did not start" timer */
+    started: () => void
+  } | null = null
 
   function landed(result: Extract<SaveResult, { ok: true }>): FileMeta {
     const file = { ...result.file }
@@ -220,6 +245,7 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
     .catch((err: unknown) => {
       console.error('[docs-web] initial open failed:', err)
       port.reportError(err, true)
+      setFatal(err)
       return null
     })
 
@@ -230,13 +256,16 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
 
   port.handleOpen(async (payload) => {
     const result = await toOpenResult(payload)
+    fatal = null
+    hideFatal()
     deliver(result)
     return { opened: true, title: result.name }
   })
 
   port.handleSave(async () => {
+    if (fatal) return { ok: false, error: fatal }
     if (!current) return failure('not_ready', 'no document is open')
-    if (hostSave) return failure('conflict', 'a save is already running')
+    if (hostSave) return failure('busy', 'a save is already running')
     hostSave = { error: null }
     try {
       const ok = await session.runSave()
@@ -254,21 +283,105 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
   })
 
   port.handleSaveAs(async (payload) => {
-    if (hostSaveAs) return failure('conflict', 'a save-as is already running')
+    if (fatal) return { ok: false, error: fatal }
+    if (hostSaveAs) return failure('busy', 'a save-as is already running')
     return new Promise<SaveResult>((resolve) => {
+      // bounded wait for the editor to reach saveDocxAs (it serializes the document first);
+      // the host's name/folder dialog after that has no timeout (TIMEOUTS.dialog)
       const timer = setTimeout(
         () => settle(failure('timeout', 'the editor did not start Save As')),
-        TIMEOUTS.dialog,
+        TIMEOUTS.editorStart,
       )
       const settle = (r: SaveResult) => {
         clearTimeout(timer)
         hostSaveAs = null
         resolve(r)
       }
-      hostSaveAs = { ...(payload?.name ? { name: payload.name } : {}), settle }
+      hostSaveAs = {
+        ...(payload?.name ? { name: payload.name } : {}),
+        settle,
+        started: () => clearTimeout(timer),
+      }
       if (!session.runMenuCommand('save-as')) settle(failure('not_ready', 'no editor is listening'))
     })
   })
+
+  // ------------------------------------------------------------ conflicts / unknown outcomes
+
+  /** api.open for the metadata only (the head etag); the source is not downloaded */
+  async function headMeta(fileId: string): Promise<FileMeta | null> {
+    try {
+      const open = await port.request('api.open', { fileId }, { timeoutMs: TIMEOUTS.short })
+      return open?.file?.fileId === fileId ? open.file : null
+    } catch (err) {
+      console.warn('[docs-web] reading the head version failed:', err)
+      return null
+    }
+  }
+
+  /**
+   * After a save whose outcome is unknown (timeout / network; the request was cancelled but
+   * the host may have committed it): when the head moved on and has exactly the size we sent,
+   * it is taken to be our own write and its etag becomes the base of the next save. Anything
+   * else keeps the old etag, so a real concurrent edit still surfaces as a conflict prompt.
+   */
+  async function reconcileAfterUnknown(fileId: string, sentBytes: number): Promise<void> {
+    const before = files.get(fileId)
+    const head = await headMeta(fileId)
+    if (!head || !before?.etag || head.etag === before.etag) return
+    if (head.sizeBytes === sentBytes) remember(head)
+  }
+
+  /** the user chose for a frame-initiated save that hit `conflict` */
+  async function resolveConflict(
+    path: string,
+    fileId: string,
+    data: ArrayBuffer,
+  ): Promise<{ ok: boolean; error?: string; reason?: 'external-modified' }> {
+    const choice = await ask({
+      title: 'appWebConflictTitle',
+      body: 'appWebConflictBody',
+      choices: [
+        { id: 'cancel', label: 'appCancel' },
+        { id: 'reload', label: 'appWebConflictReload' },
+        { id: 'overwrite', label: 'appWebConflictOverwrite', primary: true },
+      ],
+      cancelId: 'cancel',
+      marker: 'conflict',
+    })
+    if (choice === 'overwrite') {
+      const head = await headMeta(fileId)
+      if (!head) return { ok: false, error: text('appWebConflictNotSaved') }
+      remember(head)
+      return desktopPart.saveDocx(path, data, false)
+    }
+    if (choice === 'reload') {
+      try {
+        deliver(await openById(fileId))
+        // the document is being replaced by the latest version: no error banner
+        return { ok: false, reason: 'external-modified' }
+      } catch (err) {
+        console.error('[docs-web] reloading the latest version failed:', err)
+      }
+    }
+    return { ok: false, error: text('appWebConflictNotSaved') }
+  }
+
+  /** before another document replaces this one: unsaved edits need an explicit discard */
+  async function mayReplace(): Promise<boolean> {
+    if (!session.isDirty()) return true
+    const choice = await ask({
+      title: 'appWebDiscardTitle',
+      body: 'appWebDiscardBody',
+      choices: [
+        { id: 'cancel', label: 'appCancel', primary: true },
+        { id: 'discard', label: 'appWebDiscard' },
+      ],
+      cancelId: 'cancel',
+      marker: 'discard',
+    })
+    return choice === 'discard'
+  }
 
   type RenameHandler = (paths: { oldPath: string; newPath: string }) => void
   const renameListeners = new Set<RenameHandler>()
@@ -400,7 +513,8 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
           { purpose: 'open', accept: ['docx'] },
           { timeoutMs: TIMEOUTS.dialog },
         )
-        return res?.file ? await toOpenResult(res.file) : null
+        if (!res?.file || !(await mayReplace())) return null
+        return await toOpenResult(res.file)
       } catch (err) {
         if (errorCode(err) !== 'cancelled') console.error('[docs-web] file.pick failed:', err)
         return null
@@ -409,7 +523,7 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
 
     async openDocxPath(path: string): Promise<OpenDocxResult> {
       const fileId = idFromPath(path)
-      if (!fileId) return null
+      if (!fileId || !(await mayReplace())) return null
       try {
         return await openById(fileId)
       } catch (err) {
@@ -423,6 +537,10 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
       data: ArrayBuffer,
       auto?: boolean,
     ): Promise<{ ok: boolean; error?: string; reason?: 'external-modified' }> {
+      if (fatal) {
+        if (hostSave) hostSave.error = fatal
+        return fatalSave()
+      }
       const fileId = idFromPath(path)
       if (!fileId) return { ok: false, error: `not a UniWork document: ${basename(String(path))}` }
       const etag = files.get(fileId)?.etag
@@ -443,9 +561,17 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
         return { ok: true }
       }
       if (hostSave) hostSave.error = res.error
-      // the host owns the conflict UI (reload / keep mine); the editor stays dirty
-      if (res.error.code === 'conflict') {
-        return { ok: false, reason: 'external-modified', error: res.error.message }
+      const code = res.error.code
+      if (code === 'conflict') {
+        // a host `save` request gets the conflict in its result and owns the UI
+        if (hostSave) return { ok: false, reason: 'external-modified', error: res.error.message }
+        port.reportError(res.error, false)
+        // an autosave never prompts: it stays dirty and the next manual save asks
+        if (auto === true) return { ok: false, reason: 'external-modified' }
+        return resolveConflict(path, fileId, data)
+      }
+      if (code === 'timeout' || code === 'network') {
+        await reconcileAfterUnknown(fileId, data.byteLength)
       }
       return {
         ok: false,
@@ -455,6 +581,11 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
 
     async saveDocxAs(defaultName: string, data: ArrayBuffer, sourcePath?: string | null) {
       const pending = hostSaveAs
+      pending?.started()
+      if (fatal) {
+        pending?.settle({ ok: false, error: fatal })
+        return fatalSave()
+      }
       const sourceFileId = idFromPath(sourcePath)
       const payload = {
         name: withExt(pending?.name || defaultName || 'Untitled', '.docx'),
@@ -479,6 +610,11 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
     },
 
     async saveDocxNew(defaultName: string, data: ArrayBuffer) {
+      // after a failed open the blank fallback document must not become a new workspace file
+      if (fatal) {
+        if (hostSave) hostSave.error = fatal
+        return fatalSave()
+      }
       const payload = {
         name: withExt(defaultName || 'Untitled', '.docx'),
         data: copyBuffer(data),

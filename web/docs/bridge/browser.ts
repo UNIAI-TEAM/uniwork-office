@@ -182,6 +182,11 @@ function currentLanguage(): Lang {
   return 'en'
 }
 
+/** the UI language in force (host > ?lang= > stored > browser), for bridge-owned strings */
+export function webLanguage(): Lang {
+  return currentLanguage()
+}
+
 /**
  * Switch the UI language (the renderer's LocaleProvider re-renders live). `{ host: true }`
  * takes a host locale such as 'vi' or 'vi-VN' (memory only, authoritative); without it the

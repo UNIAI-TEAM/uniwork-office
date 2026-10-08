@@ -362,4 +362,17 @@ export const cs = {
   appUpdateStyleTip: 'Aktualizovat tento styl podle aktuálního výběru (zapíše se do styles.xml)',
   appNewStyleFromSelection: 'Nový styl z aktuálního výběru',
   appStyleNamePlaceholder: 'Název stylu',
+  appWebConflictTitle: 'Tento dokument byl změněn jinde',
+  appWebConflictBody:
+    'Během úprav byla uložena novější verze. Chcete ji přepsat svou verzí, nebo načíst nejnovější verzi a zahodit své změny?',
+  appWebConflictOverwrite: 'Přepsat',
+  appWebConflictReload: 'Načíst nejnovější verzi',
+  appWebConflictNotSaved: 'dokument byl změněn jinde',
+  appWebDiscardTitle: 'Zahodit neuložené změny?',
+  appWebDiscardBody: 'Otevřením jiného dokumentu nahradíte tento a neuložené změny budou ztraceny.',
+  appWebDiscard: 'Zahodit a otevřít',
+  appWebFatalTitle: 'Dokument nelze otevřít',
+  appWebFatalBody:
+    'Úpravy a ukládání jsou vypnuté. Obnovte stránku nebo dokument znovu otevřete z UniWork.',
+  appWebNoHost: 'Tento editor běží v UniWork. Otevřete dokument z UniWork.',
 } satisfies Record<keyof typeof zh, string>

@@ -366,4 +366,18 @@ export const ru = {
     'Обновить этот стиль по формату текущего выделения (записывается обратно в styles.xml)',
   appNewStyleFromSelection: 'Создать стиль из текущего выделения',
   appStyleNamePlaceholder: 'Имя стиля',
+  appWebConflictTitle: 'Этот документ был изменён в другом месте',
+  appWebConflictBody:
+    'Пока вы редактировали, была сохранена более новая версия. Перезаписать её вашей версией или загрузить последнюю версию и отменить ваши изменения?',
+  appWebConflictOverwrite: 'Перезаписать',
+  appWebConflictReload: 'Загрузить последнюю версию',
+  appWebConflictNotSaved: 'документ был изменён в другом месте',
+  appWebDiscardTitle: 'Отменить несохранённые изменения?',
+  appWebDiscardBody:
+    'Открытие другого документа заменит текущий, и несохранённые изменения будут потеряны.',
+  appWebDiscard: 'Отменить и открыть',
+  appWebFatalTitle: 'Не удалось открыть документ',
+  appWebFatalBody:
+    'Редактирование и сохранение отключены. Обновите страницу или снова откройте документ из UniWork.',
+  appWebNoHost: 'Этот редактор работает внутри UniWork. Откройте документ из UniWork.',
 } satisfies Record<keyof typeof zh, string>

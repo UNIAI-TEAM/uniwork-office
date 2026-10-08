@@ -368,4 +368,18 @@ export const pl = {
     'Zaktualizuj ten styl formatem bieżącego zaznaczenia (zapisywane z powrotem do styles.xml)',
   appNewStyleFromSelection: 'Nowy styl z bieżącego zaznaczenia',
   appStyleNamePlaceholder: 'Nazwa stylu',
+  appWebConflictTitle: 'Ten dokument został zmieniony w innym miejscu',
+  appWebConflictBody:
+    'Podczas edycji zapisano nowszą wersję. Czy zastąpić ją swoją wersją, czy wczytać najnowszą wersję i odrzucić swoje zmiany?',
+  appWebConflictOverwrite: 'Zastąp',
+  appWebConflictReload: 'Wczytaj najnowszą wersję',
+  appWebConflictNotSaved: 'dokument został zmieniony w innym miejscu',
+  appWebDiscardTitle: 'Odrzucić niezapisane zmiany?',
+  appWebDiscardBody:
+    'Otwarcie innego dokumentu zastąpi ten, a niezapisane zmiany zostaną utracone.',
+  appWebDiscard: 'Odrzuć i otwórz',
+  appWebFatalTitle: 'Nie można otworzyć dokumentu',
+  appWebFatalBody:
+    'Edycja i zapisywanie są wyłączone. Odśwież stronę lub otwórz dokument ponownie z UniWork.',
+  appWebNoHost: 'Ten edytor działa w UniWork. Otwórz dokument z UniWork.',
 } satisfies Record<keyof typeof zh, string>

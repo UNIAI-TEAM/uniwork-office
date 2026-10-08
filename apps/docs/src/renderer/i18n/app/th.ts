@@ -361,4 +361,17 @@ export const th = {
   appUpdateStyleTip: 'อัปเดตสไตล์นี้ด้วยรูปแบบของส่วนที่เลือกปัจจุบัน (เขียนกลับไปยัง styles.xml)',
   appNewStyleFromSelection: 'สร้างสไตล์ใหม่จากส่วนที่เลือกปัจจุบัน',
   appStyleNamePlaceholder: 'ชื่อสไตล์',
+  appWebConflictTitle: 'เอกสารนี้ถูกแก้ไขจากที่อื่น',
+  appWebConflictBody:
+    'มีการบันทึกเวอร์ชันใหม่กว่าระหว่างที่คุณแก้ไข ต้องการเขียนทับด้วยเวอร์ชันของคุณ หรือโหลดเวอร์ชันล่าสุดใหม่และละทิ้งการเปลี่ยนแปลงของคุณ?',
+  appWebConflictOverwrite: 'เขียนทับ',
+  appWebConflictReload: 'โหลดเวอร์ชันล่าสุด',
+  appWebConflictNotSaved: 'เอกสารถูกแก้ไขจากที่อื่น',
+  appWebDiscardTitle: 'ละทิ้งการเปลี่ยนแปลงที่ยังไม่ได้บันทึก?',
+  appWebDiscardBody:
+    'การเปิดเอกสารอื่นจะแทนที่เอกสารนี้ และการเปลี่ยนแปลงที่ยังไม่ได้บันทึกจะสูญหาย',
+  appWebDiscard: 'ละทิ้งและเปิด',
+  appWebFatalTitle: 'ไม่สามารถเปิดเอกสารได้',
+  appWebFatalBody: 'ปิดการแก้ไขและการบันทึกแล้ว โปรดโหลดหน้าใหม่หรือเปิดเอกสารอีกครั้งจาก UniWork',
+  appWebNoHost: 'ตัวแก้ไขนี้ทำงานภายใน UniWork โปรดเปิดเอกสารจาก UniWork',
 } satisfies Record<keyof typeof zh, string>

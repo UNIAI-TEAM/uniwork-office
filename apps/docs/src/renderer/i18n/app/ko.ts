@@ -388,4 +388,17 @@ export const ko = {
   appUpdateStyleTip: '현재 선택 영역의 서식으로 이 스타일을 업데이트합니다(styles.xml에 기록)',
   appNewStyleFromSelection: '선택 영역에서 새 스타일 만들기',
   appStyleNamePlaceholder: '스타일 이름',
+  appWebConflictTitle: '이 문서는 다른 곳에서 변경되었습니다',
+  appWebConflictBody:
+    '편집하는 동안 새 버전이 저장되었습니다. 내 버전으로 덮어쓰시겠습니까, 아니면 최신 버전을 다시 불러오고 변경 내용을 버리시겠습니까?',
+  appWebConflictOverwrite: '덮어쓰기',
+  appWebConflictReload: '최신 버전 다시 불러오기',
+  appWebConflictNotSaved: '문서가 다른 곳에서 변경되었습니다',
+  appWebDiscardTitle: '저장하지 않은 변경 내용을 버리시겠습니까?',
+  appWebDiscardBody: '다른 문서를 열면 현재 문서가 바뀌며 저장하지 않은 변경 내용이 손실됩니다.',
+  appWebDiscard: '버리고 열기',
+  appWebFatalTitle: '문서를 열 수 없습니다',
+  appWebFatalBody:
+    '편집과 저장이 비활성화되었습니다. 페이지를 새로 고치거나 UniWork에서 문서를 다시 여세요.',
+  appWebNoHost: '이 편집기는 UniWork 안에서 실행됩니다. UniWork에서 문서를 여세요.',
 } satisfies Record<keyof typeof zh, string>

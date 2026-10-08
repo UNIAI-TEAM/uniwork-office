@@ -358,4 +358,16 @@ export const ar = {
   appUpdateStyleTip: 'تحديث هذا النمط بتنسيق التحديد الحالي (يُكتب مرة أخرى في styles.xml)',
   appNewStyleFromSelection: 'نمط جديد من التحديد الحالي',
   appStyleNamePlaceholder: 'اسم النمط',
+  appWebConflictTitle: 'تم تعديل هذا المستند في مكان آخر',
+  appWebConflictBody:
+    'تم حفظ إصدار أحدث أثناء تحريرك. هل تريد استبداله بإصدارك، أم إعادة تحميل أحدث إصدار وتجاهل تغييراتك؟',
+  appWebConflictOverwrite: 'استبدال',
+  appWebConflictReload: 'إعادة تحميل أحدث إصدار',
+  appWebConflictNotSaved: 'تم تعديل المستند في مكان آخر',
+  appWebDiscardTitle: 'تجاهل التغييرات غير المحفوظة؟',
+  appWebDiscardBody: 'فتح مستند آخر يستبدل هذا المستند، وستفقد التغييرات غير المحفوظة.',
+  appWebDiscard: 'تجاهل وفتح',
+  appWebFatalTitle: 'تعذر فتح المستند',
+  appWebFatalBody: 'تم تعطيل التحرير والحفظ. أعد تحميل الصفحة أو افتح المستند مرة أخرى من UniWork.',
+  appWebNoHost: 'يعمل هذا المحرر داخل UniWork. افتح المستند من UniWork.',
 } satisfies Record<keyof typeof zh, string>

@@ -1,14 +1,8 @@
 {
   "extends": "../../../tsconfig.base.json",
   "compilerOptions": {
-    "lib": [
-      "ES2022",
-      "DOM",
-      "DOM.Iterable"
-    ],
-    "types": [
-      "node"
-    ],
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["node"],
     "noEmit": true,
     "jsx": "react-jsx"
   },
@@ -24,6 +18,7 @@
     "host-appearance.test.ts",
     "project-memory.ts",
     "webapi.test.ts",
+    "notice.ts",
     "testing/*.ts"
   ]
 }

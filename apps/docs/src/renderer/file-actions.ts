@@ -80,6 +80,7 @@ import { defaultEastAsiaFontFor } from './font-list'
 import { hasPrintableHeaderFooter } from './pagination'
 import { clearPrintZoom, setPrintZoom } from './print-zoom'
 import { showToast } from './components/toast-bus'
+import { cap } from './capabilities'
 import { buildStandaloneHtml } from './html-export'
 
 /** An export waiting for the pagination preview to mount; resolve settles the caller's exportPdf promise. */
@@ -435,7 +436,7 @@ export async function loadFile(
     } else {
       ctx.setStatus(t('appOpenedFile', { name: result.name }))
     }
-    void window.desktop.getRecentFiles().then(ctx.setRecent)
+    if (cap('recents')) void window.desktop.getRecentFiles().then(ctx.setRecent)
     return 'ok'
   } catch (err) {
     if (generation !== openGeneration) return 'superseded'

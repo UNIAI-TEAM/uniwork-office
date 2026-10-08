@@ -151,6 +151,10 @@ export function createMockPort(session: Partial<PortSession> = {}) {
       const f = store.get(fileId)!
       return put(f.meta.name, f.bytes, fileId)
     },
+    /** write new bytes as the next version (a save that landed on the server) */
+    commit(fileId: string, bytes: Uint8Array): FileMeta {
+      return put(store.get(fileId)!.meta.name, bytes, fileId)
+    },
     bytesOf: (fileId: string) => store.get(fileId)?.bytes,
     openPayload(fileId: string): OpenPayload {
       return api['api.open']({ fileId })

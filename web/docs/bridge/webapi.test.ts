@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { OpenFileResult } from '../../../apps/docs/src/shared/ipc'
 import { createWebApi, idFromPath, pathFor, WEB_PRINT_PART, type WebApi } from './webapi'
 import { createMockPort, protocolError, timeoutAfter, type MockPort } from './testing/mock-port'
+import { text } from './notice'
 
 const DOCX = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 1, 2, 3])
 const flush = () => new Promise((r) => setTimeout(r, 0))
@@ -25,6 +26,26 @@ async function bootWith(name = 'Report.docx'): Promise<OpenFileResult> {
 
 const buf = (bytes: number[]) => new Uint8Array(bytes).buffer
 
+/** the bridge's in-frame dialog (./notice.ts), once it is on screen */
+async function dialogShown(marker: string): Promise<HTMLElement> {
+  for (let i = 0; i < 50; i++) {
+    const el = document.querySelector<HTMLElement>(`[data-docs-web="${marker}"]`)
+    if (el) return el
+    await flush()
+  }
+  throw new Error(`no ${marker} dialog`)
+}
+
+async function choose(marker: string, choice: string): Promise<void> {
+  const el = await dialogShown(marker)
+  el.querySelector<HTMLButtonElement>(`[data-choice="${choice}"]`)!.click()
+}
+
+/** the renderer's close guard reporting a dirty / clean document */
+function guardDirty(dirty: boolean): void {
+  api.onCloseCheck(() => api.reportCloseCheck({ dirty, autoSave: false }))
+}
+
 beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => {})
   vi.spyOn(console, 'warn').mockImplementation(() => {})
@@ -41,6 +62,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.restoreAllMocks()
   vi.useRealTimers()
+  document.body.replaceChildren()
 })
 
 describe('paths', () => {
@@ -185,21 +207,68 @@ describe('saveDocx', () => {
     expect(mock.calls.at(-1)!.payload).toMatchObject({ etag: '"f1-v2"', auto: true })
   })
 
-  it('conflict: stale etag -> external-modified, stays unsaved', async () => {
+  it('conflict: tells the host, asks the user; Cancel stays unsaved with a visible reason', async () => {
     const doc = await bootWith()
     mock.bumpRemote('f1')
-    const r = await api.saveDocx(doc.path, buf([5]))
-    expect(r).toMatchObject({ ok: false, reason: 'external-modified' })
+    const pending = api.saveDocx(doc.path, buf([5]))
+    const dlg = await dialogShown('conflict')
+    expect(dlg.textContent).toContain(text('appWebConflictTitle'))
+    expect(mock.errors).toEqual([
+      { error: expect.objectContaining({ code: 'conflict' }), fatal: false },
+    ])
+    await choose('conflict', 'cancel')
+    // no `reason`: the renderer shows its "Save failed: <error>" toast + status line
+    expect(await pending).toEqual({ ok: false, error: text('appWebConflictNotSaved') })
     expect(mock.saved).toHaveLength(0)
+    expect(document.querySelector('[data-docs-web="conflict"]')).toBeNull()
+    // the etag is still stale: the next save asks again instead of failing silently
+    const again = api.saveDocx(doc.path, buf([5]))
+    await choose('conflict', 'cancel')
+    expect((await again).ok).toBe(false)
+    expect(mock.errors).toHaveLength(2)
   })
 
-  it('conflict as a rejected request maps the same way', async () => {
+  it('conflict -> Overwrite: re-reads the head etag and saves over the newer version', async () => {
+    const doc = await bootWith()
+    const remote = mock.bumpRemote('f1') // v2 by someone else
+    const pending = api.saveDocx(doc.path, buf([7, 7]))
+    await choose('conflict', 'overwrite')
+    expect(await pending).toEqual({ ok: true })
+    const saves = mock.calls.filter((c) => c.type === 'api.save')
+    expect(saves.map((c) => (c.payload as { etag?: string }).etag)).toEqual([
+      '"f1-v1"',
+      remote.etag,
+    ])
+    expect(mock.bytesOf('f1')).toEqual(new Uint8Array([7, 7]))
+    expect(mock.saved.at(-1)).toMatchObject({ file: { versionId: 'v3' }, initiatedByFrame: true })
+    // and the following save is based on the version it wrote
+    expect(await api.saveDocx(doc.path, buf([8]))).toEqual({ ok: true })
+  })
+
+  it('conflict -> Reload latest: the latest version replaces the document, no error banner', async () => {
+    const doc = await bootWith()
+    const seen: string[] = []
+    api.onOpenDocx((r) =>
+      seen.push(`${r.name}:${new Uint8Array((r as OpenFileResult).data).length}`),
+    )
+    mock.bumpRemote('f1')
+    const pending = api.saveDocx(doc.path, buf([5]))
+    await choose('conflict', 'reload')
+    expect(await pending).toEqual({ ok: false, reason: 'external-modified' })
+    expect(seen).toEqual([`Report.docx:${DOCX.length}`])
+    // reopened at the head: the next save is not a conflict
+    expect(await api.saveDocx(doc.path, buf([6]))).toEqual({ ok: true })
+  })
+
+  it('conflict on an autosave: reported to the host, no prompt', async () => {
     const doc = await bootWith()
     mock.override('api.save', () => Promise.reject(protocolError('conflict', 'HTTP 409')))
-    expect(await api.saveDocx(doc.path, buf([5]))).toMatchObject({
+    expect(await api.saveDocx(doc.path, buf([5]), true)).toEqual({
       ok: false,
       reason: 'external-modified',
     })
+    expect(document.querySelector('[data-docs-web="conflict"]')).toBeNull()
+    expect(mock.errors[0]).toMatchObject({ error: { code: 'conflict' }, fatal: false })
   })
 
   it('error: surfaces the message', async () => {
@@ -219,7 +288,37 @@ describe('saveDocx', () => {
     const doc = await bootWith()
     mock.override('api.save', timeoutAfter)
     expect(await api.saveDocx(doc.path, buf([5]))).toEqual({ ok: false, error: 'save timed out' })
-    expect(mock.calls.at(-1)!.opts?.timeoutMs).toBe(120_000)
+    expect(mock.calls.find((c) => c.type === 'api.save')!.opts?.timeoutMs).toBe(120_000)
+  })
+
+  it('timeout after the host committed: the next save is based on that version, no conflict', async () => {
+    const doc = await bootWith()
+    // the host wrote the bytes but the answer never came back
+    mock.override('api.save', (payload) => {
+      const { fileId, data } = payload as { fileId: string; data: ArrayBuffer }
+      mock.commit(fileId, new Uint8Array(data))
+      return timeoutAfter(payload, { timeoutMs: 120_000 })
+    })
+    expect(await api.saveDocx(doc.path, buf([5, 5]))).toEqual({
+      ok: false,
+      error: 'save timed out',
+    })
+    mock.clearOverrides()
+    expect(await api.saveDocx(doc.path, buf([5, 5, 5]))).toEqual({ ok: true })
+    expect(document.querySelector('[data-docs-web="conflict"]')).toBeNull()
+  })
+
+  it('timeout while someone else saved (other size): keeps the old etag, so the conflict is asked', async () => {
+    const doc = await bootWith()
+    mock.override('api.save', (payload) => {
+      mock.bumpRemote('f1') // concurrent writer, original size
+      return timeoutAfter(payload, { timeoutMs: 120_000 })
+    })
+    await api.saveDocx(doc.path, buf([5, 5]))
+    mock.clearOverrides()
+    const pending = api.saveDocx(doc.path, buf([5, 5, 5]))
+    await choose('conflict', 'cancel')
+    expect((await pending).ok).toBe(false)
   })
 
   it('rejects a path that is not a UniWork document', async () => {
@@ -516,12 +615,20 @@ describe('fetchImage / convertAltChunkHtml', () => {
 
 describe('host save / saveAs requests (editor flows)', () => {
   /** stand-in for App.tsx's close-guard + menu wiring */
-  function wireRenderer(path: () => string, save = () => api.saveDocx(path(), buf([4]))) {
+  function wireRenderer(
+    path: () => string,
+    save = () => api.saveDocx(path(), buf([4])),
+    /** ms the renderer's Save As flow spends serializing before it calls saveDocxAs */
+    saveAsDelayMs = 0,
+  ) {
     api.onCloseSaveRequest(() => {
       void save().then((r) => api.reportCloseSaveResult(r.ok))
     })
     api.onMenuCommand((cmd) => {
-      if (cmd === 'save-as') void api.saveDocxAs('Report', buf([6]), path())
+      if (cmd !== 'save-as') return
+      const run = () => void api.saveDocxAs('Report', buf([6]), path())
+      if (saveAsDelayMs > 0) setTimeout(run, saveAsDelayMs)
+      else run()
     })
   }
 
@@ -537,12 +644,30 @@ describe('host save / saveAs requests (editor flows)', () => {
     expect(mock.saved.at(-1)!.initiatedByFrame).toBe(false)
   })
 
-  it('save conflict: answers ok:false with the conflict error', async () => {
+  it('save conflict: answers ok:false with the conflict error (the host owns the UI)', async () => {
     const doc = await bootWith()
     wireRenderer(() => doc.path)
     mock.bumpRemote('f1')
     const res = await mock.host.save({ reason: 'navigate' })
     expect(res).toMatchObject({ ok: false, error: { code: 'conflict' } })
+    expect(document.querySelector('[data-docs-web="conflict"]')).toBeNull()
+    expect(mock.errors).toHaveLength(0)
+  })
+
+  it('save while a save runs: busy, not conflict', async () => {
+    const doc = await bootWith()
+    let release!: () => void
+    wireRenderer(
+      () => doc.path,
+      () => new Promise<void>((r) => (release = r)).then(() => api.saveDocx(doc.path, buf([4]))),
+    )
+    const first = mock.host.save({ reason: 'user' })
+    expect(await mock.host.save({ reason: 'user' })).toMatchObject({
+      ok: false,
+      error: { code: 'busy' },
+    })
+    release()
+    expect(await first).toMatchObject({ ok: true })
   })
 
   it('save timeout / no document', async () => {
@@ -567,12 +692,103 @@ describe('host save / saveAs requests (editor flows)', () => {
     expect(mock.calls.at(-1)!.payload).toMatchObject({ name: 'Final.docx', sourceFileId: 'f1' })
   })
 
+  it('saveAs: a renderer that serializes first (real delay) still gets the host name', async () => {
+    const doc = await bootWith()
+    wireRenderer(() => doc.path, undefined, 20)
+    const res = await mock.host.saveAs({ name: 'Final' })
+    expect(res).toMatchObject({ ok: true, file: { name: 'Final.docx' } })
+    const saveAs = mock.calls.filter((c) => c.type === 'api.saveAs')
+    expect(saveAs.map((c) => (c.payload as { name: string }).name)).toEqual(['Final.docx'])
+    expect(mock.saved.at(-1)!.initiatedByFrame).toBe(false)
+  })
+
+  it('saveAs: times out only when the editor never starts Save As', async () => {
+    const doc = await bootWith()
+    vi.useFakeTimers()
+    api.onMenuCommand(() => {}) // listens, never calls saveDocxAs
+    let outcome: unknown = 'pending'
+    void (mock.host.saveAs({ name: 'Final' }) as Promise<unknown>).then((r) => (outcome = r))
+    await vi.advanceTimersByTimeAsync(29_000)
+    expect(outcome).toBe('pending')
+    await vi.advanceTimersByTimeAsync(1_000)
+    expect(outcome).toMatchObject({ ok: false, error: { code: 'timeout' } })
+    expect(doc.name).toBe('Report.docx')
+  })
+
   it('saveAs cancelled / no editor', async () => {
     expect(await mock.host.saveAs({})).toMatchObject({ ok: false, error: { code: 'not_ready' } })
     const doc = await bootWith()
     wireRenderer(() => doc.path)
     mock.override('api.saveAs', () => Promise.reject(protocolError('cancelled')))
     expect(await mock.host.saveAs({})).toMatchObject({ ok: false, error: { code: 'cancelled' } })
+  })
+})
+
+describe('replacing a dirty document', () => {
+  it('openDocxPath asks first; Cancel keeps the document, Discard opens', async () => {
+    const doc = await bootWith()
+    guardDirty(true)
+    const cancelled = api.openDocxPath(doc.path)
+    await choose('discard', 'cancel')
+    expect(await cancelled).toBeNull()
+    expect(mock.calls.filter((c) => c.type === 'api.open')).toHaveLength(1) // boot only
+    const opened = api.openDocxPath(doc.path)
+    await choose('discard', 'discard')
+    expect((await opened)?.name).toBe('Report.docx')
+  })
+
+  it('openDocx asks after the pick, and not at all when clean', async () => {
+    await bootWith()
+    guardDirty(true)
+    const p = api.openDocx()
+    await choose('discard', 'cancel')
+    expect(await p).toBeNull()
+    expect(mock.calls.at(-1)!.type).toBe('file.pick')
+    document.body.replaceChildren()
+    const clean = createMockPort()
+    const cleanApi = createWebApi(clean.port, { session: { pollMs: 0 } })
+    clean.seed('Picked.docx', DOCX)
+    cleanApi.onCloseCheck(() => cleanApi.reportCloseCheck({ dirty: false, autoSave: false }))
+    expect((await cleanApi.openDocx())?.name).toBe('Picked.docx')
+    expect(document.querySelector('[data-docs-web="discard"]')).toBeNull()
+  })
+})
+
+describe('fatal open failure', () => {
+  it('shows a blocking notice and refuses every save until the host opens a document', async () => {
+    mock.init({ documentId: 'nope' })
+    expect(await api.consumePendingOpenDocx()).toBeNull()
+    const notice = await dialogShown('fatal')
+    expect(notice.textContent).toContain(text('appWebFatalTitle'))
+    mock.calls.length = 0
+    expect(await api.saveDocxNew('Untitled', buf([1]))).toEqual({
+      ok: false,
+      error: text('appWebFatalTitle'),
+    })
+    expect(await api.saveDocx('uniwork://files/nope/x.docx', buf([1]))).toMatchObject({
+      ok: false,
+    })
+    expect((await api.saveDocxAs('x', buf([1]))).ok).toBe(false)
+    expect(await mock.host.save({ reason: 'user' })).toMatchObject({ ok: false, error: {} })
+    expect(mock.calls).toHaveLength(0) // nothing reached the host: no silent Untitled document
+
+    const meta = mock.seed('Later.docx', DOCX)
+    expect(await mock.host.open(mock.openPayload(meta.fileId))).toMatchObject({ opened: true })
+    expect(document.querySelector('[data-docs-web="fatal"]')).toBeNull()
+    expect(await api.saveDocx(pathFor(meta), buf([2]))).toEqual({ ok: true })
+  })
+
+  it('init timeout (no host answered) lands in the same fatal state', async () => {
+    const port = createMockPort()
+    const failing = createWebApi(
+      { ...port.port, whenInitialized: () => Promise.reject(protocolError('timeout')) },
+      { session: { pollMs: 0 } },
+    )
+    expect(await failing.consumePendingOpenDocx()).toBeNull()
+    await dialogShown('fatal')
+    expect(port.errors[0]).toMatchObject({ fatal: true })
+    expect((await failing.saveDocxNew('Untitled', buf([1]))).ok).toBe(false)
+    expect(port.calls).toHaveLength(0)
   })
 })
 

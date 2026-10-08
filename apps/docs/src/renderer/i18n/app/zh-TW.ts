@@ -350,4 +350,16 @@ export const zhTW = {
   appUpdateStyleTip: '用目前選取範圍的格式更新此樣式(寫回 styles.xml)',
   appNewStyleFromSelection: '從目前選取範圍建立新樣式',
   appStyleNamePlaceholder: '樣式名稱',
+  appWebConflictTitle: '此文件已在其他地方被修改',
+  appWebConflictBody:
+    '在你編輯期間已儲存了較新的版本。要用你的版本覆寫它,還是重新載入最新版本並捨棄你的變更?',
+  appWebConflictOverwrite: '覆寫',
+  appWebConflictReload: '重新載入最新版本',
+  appWebConflictNotSaved: '文件已在其他地方被修改',
+  appWebDiscardTitle: '要捨棄未儲存的變更嗎?',
+  appWebDiscardBody: '開啟其他文件會取代目前的文件,未儲存的變更將會遺失。',
+  appWebDiscard: '捨棄並開啟',
+  appWebFatalTitle: '無法開啟文件',
+  appWebFatalBody: '編輯與儲存已停用。請重新整理頁面,或從 UniWork 重新開啟文件。',
+  appWebNoHost: '此編輯器需在 UniWork 中執行。請從 UniWork 開啟文件。',
 } satisfies Record<keyof typeof zh, string>

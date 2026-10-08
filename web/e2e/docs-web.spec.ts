@@ -2,7 +2,7 @@
 // open -> editable -> type marker -> bold -> insert table -> save -> reopen saved bytes -> assert.
 // GO-B3 (UNI-1013): the editor runs in an iframe inside the protocol test host
 // (web/server/test-host); open/save go through the frame protocol to the host's
-// in-memory store, plus host-event and save-conflict checks.
+// in-memory store, plus host-event and save-conflict (dialog, host error event, cancel + overwrite) checks.
 // Every step is recorded (pass/fail + error) to <SHOTS>/results-<doc>.json and the
 // test fails at the end if any step failed; a failed step does not stop independent later steps.
 import { test, expect, type Page, type BrowserContext, type Frame } from '@playwright/test'
@@ -360,20 +360,48 @@ for (const d of DOCS) {
     })
 
     await step('save-conflict', ['save'], async () => {
-      // another writer bumps the server version: the next save must be refused and stay dirty
+      // another writer bumps the server version: the next Ctrl+S must not write, must say so in the
+      // frame and to the host, and must offer a way out (Cancel / Reload latest / Overwrite)
       const before = await lastHostSave(page)
-      await page.evaluate((id) => (window as any).__host.bumpRemote(id), before!.fileId)
+      const remote = await page.evaluate((id) => (window as any).__host.bumpRemote(id), before!.fileId)
+      const errorsBefore = (await hostEvents(page)).filter((e) => e.type === 'error').length
       await ed.locator(EDITOR).first().click()
       await page.keyboard.press('Control+End')
       await page.keyboard.type('x')
       await page.keyboard.press('Control+s')
-      await page.waitForTimeout(2_000)
+      const dialog = ed.locator('[data-docs-web="conflict"]')
+      await expect(dialog, 'conflict dialog in the frame').toBeVisible({ timeout: 15_000 })
+      await expect
+        .poll(async () => (await hostEvents(page)).filter((e) => e.type === 'error').slice(errorsBefore), {
+          message: 'host got a non-fatal conflict error event',
+        })
+        .toEqual([{ type: 'error', payload: { error: expect.objectContaining({ code: 'conflict' }), fatal: false } }])
+      await shot('conflict')
+      // Cancel: nothing written, stays dirty, and the frame says why (status line + toast)
+      await dialog.locator('[data-choice="cancel"]').click()
+      await expect(dialog).toHaveCount(0)
+      await expect(ed.locator('body'), 'visible "not saved" message').toContainText('文档已在其他地方被修改')
       expect((await lastHostSave(page))?.versionId, 'no new version was written').toBe(before!.versionId)
       await expect
         .poll(async () => (await hostEvents(page)).filter((e) => e.type === 'dirty').at(-1)?.payload.dirty)
         .toBe(true)
-      await shot('conflict')
-      return 'stale etag refused (412 conflict), editor stays dirty'
+      // the etag is not stuck: Ctrl+S asks again, and Overwrite lands on top of the remote version
+      await ed.locator(EDITOR).first().click()
+      await page.keyboard.press('Control+s')
+      await expect(dialog).toBeVisible({ timeout: 15_000 })
+      await dialog.locator('[data-choice="overwrite"]').click()
+      let after: HostSave = null
+      await expect
+        .poll(async () => (after = await lastHostSave(page))?.versionId, { timeout: 20_000, message: 'overwrite saved a new version' })
+        .not.toBe(before!.versionId)
+      const v = (after as unknown as NonNullable<HostSave>).versionId
+      expect(Number(v.slice(1)), 'overwrite is newer than the remote bump').toBeGreaterThan(Number(remote.versionId.slice(1)))
+      await expect
+        .poll(async () => (await hostEvents(page)).filter((e) => e.type === 'dirty').at(-1)?.payload.dirty, {
+          message: 'dirty false after the overwrite',
+        })
+        .toBe(false)
+      return `conflict -> host error event + in-frame dialog; cancel kept ${before!.versionId} dirty with a visible message; overwrite -> ${v} over remote ${remote.versionId}`
     })
 
     await step('export-unsaved', ['save-conflict'], async () => {

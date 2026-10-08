@@ -147,7 +147,8 @@ export const vi = {
   appProtectRemovePersonal: 'Xóa siêu dữ liệu tác giả và tổ chức khỏi tệp này khi lưu',
   appProtectUpdated: 'Đã cập nhật cài đặt bảo vệ; có hiệu lực khi lưu tài liệu',
   appModifyPwdTitle: 'Được bảo vệ ghi',
-  appModifyPwdBody: '"{name}" có mật khẩu để sửa. Nhập mật khẩu để chỉnh sửa, hoặc mở ở chế độ chỉ đọc.',
+  appModifyPwdBody:
+    '"{name}" có mật khẩu để sửa. Nhập mật khẩu để chỉnh sửa, hoặc mở ở chế độ chỉ đọc.',
   appOpenReadOnly: 'Mở chỉ đọc',
   appProtectPwdOptional: 'Mật khẩu bảo vệ',
   appWrongPassword: 'Sai mật khẩu',
@@ -165,8 +166,7 @@ export const vi = {
     'Đã đổi phông chữ chủ đề; ghi vào tài liệu khi lưu (các kiểu tham chiếu phông chủ đề có hiệu lực trong Word)',
   appThemeColorsApplied: 'Đã áp dụng màu chủ đề "{name}"; ghi vào tài liệu khi lưu',
   appSourceAdded: 'Đã thêm nguồn "{title}"; trích dẫn qua Chèn trích dẫn',
-  appTitlePgOn:
-    'Đã bật "Trang đầu khác"; chuyển ở đầu trang để chỉnh đầu/chân trang của trang đầu',
+  appTitlePgOn: 'Đã bật "Trang đầu khác"; chuyển ở đầu trang để chỉnh đầu/chân trang của trang đầu',
   appTitlePgOff: 'Đã tắt "Trang đầu khác"',
   appEvenOddOn:
     'Đã bật "Trang lẻ & chẵn khác nhau"; chuyển ở đầu trang để chỉnh đầu/chân trang chẵn',
@@ -358,4 +358,17 @@ export const vi = {
   appUpdateStyleTip: 'Cập nhật kiểu này từ vùng chọn hiện tại (ghi lại vào styles.xml)',
   appNewStyleFromSelection: 'Kiểu mới từ vùng chọn hiện tại',
   appStyleNamePlaceholder: 'Tên kiểu',
+  appWebConflictTitle: 'Tài liệu này đã được thay đổi ở nơi khác',
+  appWebConflictBody:
+    'Một phiên bản mới hơn đã được lưu trong khi bạn chỉnh sửa. Ghi đè bằng phiên bản của bạn, hay tải lại phiên bản mới nhất và bỏ các thay đổi của bạn?',
+  appWebConflictOverwrite: 'Ghi đè',
+  appWebConflictReload: 'Tải lại bản mới nhất',
+  appWebConflictNotSaved: 'tài liệu đã được thay đổi ở nơi khác',
+  appWebDiscardTitle: 'Bỏ các thay đổi chưa lưu?',
+  appWebDiscardBody:
+    'Mở tài liệu khác sẽ thay thế tài liệu này và các thay đổi chưa lưu sẽ bị mất.',
+  appWebDiscard: 'Bỏ và mở',
+  appWebFatalTitle: 'Không thể mở tài liệu',
+  appWebFatalBody: 'Đã tắt chỉnh sửa và lưu. Hãy tải lại trang hoặc mở lại tài liệu từ UniWork.',
+  appWebNoHost: 'Trình soạn thảo này chạy bên trong UniWork. Hãy mở tài liệu từ UniWork.',
 } satisfies Record<keyof typeof zh, string>

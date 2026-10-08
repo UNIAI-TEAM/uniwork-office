@@ -1,5 +1,5 @@
 /**
- * HIDE class no-ops (W6 - UNI-1011 spike).
+ * HIDE class no-ops + the web capability source (UNI-1013).
  *
  * HIDE = desktop-only capability with no web equivalent. Every method is a typed
  * no-op returning the sensible "nothing / not supported" value and NEVER throws or
@@ -13,8 +13,8 @@
  * setDocPassword().ok, getAutoSaveDefault validation).
  *
  * Which UI entry points exist for each method is documented in
- * docs/web-spike/hide-flags.md; the entries are hidden by `webCapabilities` below
- * (UNI-1013 W4), so these no-ops are the safety net behind a hidden entry.
+ * docs/web-spike/hide-flags.md; the entries are hidden by `webCapabilities` below,
+ * so these no-ops are the safety net behind a hidden entry.
  *
  * | group               | methods                                                                                      | value returned                      |
  * |---------------------|----------------------------------------------------------------------------------------------|-------------------------------------|
@@ -27,12 +27,14 @@
  * | Launch / headless   | consumeNewBlankDoc, consumeAiDocContent, consumeAiPreset, onAiPreset, consumeHeadlessExport, | false / null / disposer / void      |
  * |                     | headlessExportDone, createDocument, convertAltChunkHtml                                      |                                     |
  * | Shell drag-drop     | getPathForFile                                                                               | '' (no OS path in a browser)        |
- * | Overridable default | consumePendingOpenDocx, onOpenDocx, onRenamedDocx (open flow is W5's webapi.ts, which wins)  | null / disposer                     |
+ * | Overridable default | consumePendingOpenDocx, onOpenDocx, onRenamedDocx (the open flow is webapi.ts, which wins)   | null / disposer                     |
  *
- * Merge order in install.ts is hide, webapi, ai, browser: a later module that
- * defines the same key silently replaces these.
+ * Merge order in install.ts is hide, ai, webapi, browser: a later module that
+ * defines the same key silently replaces these (install.ts also replaces
+ * `capabilities` with a copy that gets the host grants, see `hostGrants`).
  */
 import type { DesktopApi, DesktopCapabilities } from '../../../apps/docs/src/shared/ipc'
+import type { Capabilities } from '../protocol/types'
 
 /**
  * THE web capability source. The renderer reads `window.desktop.capabilities`
@@ -54,6 +56,8 @@ import type { DesktopApi, DesktopCapabilities } from '../../../apps/docs/src/sha
  * | imageGeneration | AI tool generate_image                                              |
  * | createDocument  | AI tool create_document                                             |
  * | billing         | AI panel "Buy plan" button                                          |
+ * | open            | File > Open, Ctrl+O (on only with the host's `filePick` grant)      |
+ * | recents         | recent-files lookups (on only with the host's `recents` grant)      |
  */
 export const webCapabilities: Readonly<Required<DesktopCapabilities>> = Object.freeze({
   platform: 'web',
@@ -67,7 +71,20 @@ export const webCapabilities: Readonly<Required<DesktopCapabilities>> = Object.f
   imageGeneration: false,
   createDocument: false,
   billing: false,
+  open: false,
+  recents: false,
 })
+
+/**
+ * The entries a host can turn on, from the effective (frame ∩ host) capabilities of `init`.
+ * A host that cannot pick documents (`file.pick` answers `unsupported`) does not grant
+ * `filePick`, so File > Open stays hidden instead of being a silent no-op.
+ */
+export function hostGrants(
+  granted: Capabilities | undefined,
+): Required<Pick<DesktopCapabilities, 'open' | 'recents'>> {
+  return { open: granted?.filePick === true, recents: granted?.recents === true }
+}
 
 const noopDisposer = () => () => {}
 const NOT_AVAILABLE = 'Not available in the web build'

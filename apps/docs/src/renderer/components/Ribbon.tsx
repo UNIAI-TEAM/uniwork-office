@@ -1942,14 +1942,16 @@ function RibbonInner({
             </button>
             {dropdown === 'file' && (
               <div data-rb-panel="" className="file-menu">
-                <button
-                  onClick={() => {
-                    setDropdown(null)
-                    onOpen()
-                  }}
-                >
-                  {t('ribbonOpen')} <span className="file-menu-key">Ctrl+O</span>
-                </button>
+                {cap('open') && (
+                  <button
+                    onClick={() => {
+                      setDropdown(null)
+                      onOpen()
+                    }}
+                  >
+                    {t('ribbonOpen')} <span className="file-menu-key">Ctrl+O</span>
+                  </button>
+                )}
                 <button
                   disabled={!hasDoc}
                   onClick={() => {

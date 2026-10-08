@@ -356,4 +356,16 @@ export const he = {
   appUpdateStyleTip: 'עדכון סגנון זה לפי הקטע המסומן הנוכחי (נכתב חזרה אל styles.xml)',
   appNewStyleFromSelection: 'סגנון חדש מהקטע המסומן הנוכחי',
   appStyleNamePlaceholder: 'שם הסגנון',
+  appWebConflictTitle: 'מסמך זה שונה במקום אחר',
+  appWebConflictBody:
+    'גרסה חדשה יותר נשמרה בזמן שערכת. לדרוס אותה בגרסה שלך, או לטעון מחדש את הגרסה העדכנית ולבטל את השינויים שלך?',
+  appWebConflictOverwrite: 'דריסה',
+  appWebConflictReload: 'טעינת הגרסה העדכנית',
+  appWebConflictNotSaved: 'המסמך שונה במקום אחר',
+  appWebDiscardTitle: 'לבטל את השינויים שלא נשמרו?',
+  appWebDiscardBody: 'פתיחת מסמך אחר מחליפה את המסמך הזה, והשינויים שלא נשמרו יאבדו.',
+  appWebDiscard: 'ביטול ופתיחה',
+  appWebFatalTitle: 'לא ניתן לפתוח את המסמך',
+  appWebFatalBody: 'העריכה והשמירה מושבתות. טען מחדש את הדף או פתח את המסמך שוב מ-UniWork.',
+  appWebNoHost: 'עורך זה פועל בתוך UniWork. פתח את המסמך מ-UniWork.',
 } satisfies Record<keyof typeof zh, string>

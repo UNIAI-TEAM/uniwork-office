@@ -362,4 +362,18 @@ export const hi = {
   appUpdateStyleTip: 'वर्तमान चयन से इस शैली को अपडेट करें (styles.xml में वापस लिखा जाता है)',
   appNewStyleFromSelection: 'वर्तमान चयन से नई शैली',
   appStyleNamePlaceholder: 'शैली का नाम',
+  appWebConflictTitle: 'यह दस्तावेज़ कहीं और बदला गया है',
+  appWebConflictBody:
+    'आपके संपादन के दौरान एक नया संस्करण सहेजा गया। क्या आप इसे अपने संस्करण से अधिलेखित करना चाहते हैं, या नवीनतम संस्करण फिर से लोड करके अपने बदलाव छोड़ना चाहते हैं?',
+  appWebConflictOverwrite: 'अधिलेखित करें',
+  appWebConflictReload: 'नवीनतम संस्करण लोड करें',
+  appWebConflictNotSaved: 'दस्तावेज़ कहीं और बदला गया है',
+  appWebDiscardTitle: 'सहेजे न गए बदलाव छोड़ें?',
+  appWebDiscardBody:
+    'दूसरा दस्तावेज़ खोलने से यह दस्तावेज़ बदल जाएगा और सहेजे न गए बदलाव खो जाएँगे।',
+  appWebDiscard: 'छोड़ें और खोलें',
+  appWebFatalTitle: 'दस्तावेज़ नहीं खोला जा सका',
+  appWebFatalBody:
+    'संपादन और सहेजना बंद हैं। पेज फिर से लोड करें या UniWork से दस्तावेज़ दोबारा खोलें।',
+  appWebNoHost: 'यह संपादक UniWork के अंदर चलता है। UniWork से दस्तावेज़ खोलें।',
 } satisfies Record<keyof typeof zh, string>

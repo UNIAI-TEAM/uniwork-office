@@ -376,4 +376,16 @@ export const zh = {
   appUpdateStyleTip: '用当前选区的格式更新此样式(写回 styles.xml)',
   appNewStyleFromSelection: '从当前选区新建样式',
   appStyleNamePlaceholder: '样式名称',
+  appWebConflictTitle: '此文档已在其他地方被修改',
+  appWebConflictBody:
+    '在你编辑期间已保存了更新的版本。要用你的版本覆盖它,还是重新加载最新版本并放弃你的更改?',
+  appWebConflictOverwrite: '覆盖',
+  appWebConflictReload: '重新加载最新版本',
+  appWebConflictNotSaved: '文档已在其他地方被修改',
+  appWebDiscardTitle: '放弃未保存的更改?',
+  appWebDiscardBody: '打开其他文档会替换当前文档,未保存的更改将丢失。',
+  appWebDiscard: '放弃并打开',
+  appWebFatalTitle: '无法打开文档',
+  appWebFatalBody: '编辑和保存已停用。请刷新页面或从 UniWork 重新打开文档。',
+  appWebNoHost: '此编辑器需在 UniWork 中运行。请从 UniWork 打开文档。',
 }

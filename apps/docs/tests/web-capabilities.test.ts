@@ -30,6 +30,8 @@ const WEB: DesktopCapabilities = {
   imageGeneration: false,
   createDocument: false,
   billing: false,
+  open: false,
+  recents: false,
 }
 
 function useCapabilities(capabilities: DesktopCapabilities | undefined): void {
@@ -138,6 +140,28 @@ describe('Ribbon entries', () => {
     expect(container.querySelectorAll('.ai-entry')).toHaveLength(0)
     // the rest of Home is untouched
     expect(container.textContent).toContain(t('ribbonPaste'))
+  })
+
+  it('File: Open is listed on desktop, hidden on the web until the host grants its picker', () => {
+    const fileMenu = (): string[] => {
+      openTab(t('ribbonTabFile'))
+      return [...container.querySelectorAll('.file-menu button')].map((b) => b.textContent ?? '')
+    }
+    const hasOpen = (labels: string[]) => labels.some((l) => l.startsWith(t('ribbonOpen')))
+    useCapabilities(undefined)
+    expect(hasOpen(fileMenu())).toBe(true)
+    act(() => root.unmount())
+    root = createRoot(container)
+
+    useCapabilities(WEB)
+    const web = fileMenu()
+    expect(hasOpen(web)).toBe(false)
+    expect(web.some((l) => l.startsWith(t('ribbonSave')))).toBe(true)
+    act(() => root.unmount())
+    root = createRoot(container)
+
+    useCapabilities({ ...WEB, open: true })
+    expect(hasOpen(fileMenu())).toBe(true)
   })
 
   it('References: the Zotero group is hidden on the web', () => {

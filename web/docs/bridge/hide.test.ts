@@ -2,7 +2,7 @@
 // Capability source + safety-net stubs of the web bridge (UNI-1013 W4).
 import { describe, expect, it, vi } from 'vitest'
 import ai, { AI_UNAVAILABLE_CODE, aiUnavailableMessage, isAiUnavailable } from './ai'
-import hide, { webCapabilities } from './hide'
+import hide, { hostGrants, webCapabilities } from './hide'
 
 describe('webCapabilities (the single web capability source)', () => {
   it('turns every capability off, and says it is the web platform', () => {
@@ -20,6 +20,8 @@ describe('webCapabilities (the single web capability source)', () => {
         'tabs',
         'webSearch',
         'zotero',
+        'open',
+        'recents',
       ].sort(),
     )
     for (const [, value] of flags) expect(value).toBe(false)
@@ -35,6 +37,16 @@ describe('webCapabilities (the single web capability source)', () => {
 
   it('is exported by the hide module so install.ts merges it into window.desktop', () => {
     expect(hide.capabilities).toBe(webCapabilities)
+  })
+
+  it('File > Open and recents turn on only with the negotiated host grants', () => {
+    expect(hostGrants(undefined)).toEqual({ open: false, recents: false })
+    // the dev-uniwork host: no document picker (file.pick answers unsupported)
+    expect(hostGrants({ save: true, recents: true, filePick: false })).toEqual({
+      open: false,
+      recents: true,
+    })
+    expect(hostGrants({ filePick: true, recents: false })).toEqual({ open: true, recents: false })
   })
 })
 

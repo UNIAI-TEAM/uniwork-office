@@ -1,19 +1,21 @@
 /**
- * Web bridge entry point (UNI-1011 spike).
+ * Web bridge entry point (UNI-1013).
  *
  * Imported from web/docs/index.html BEFORE the renderer entry so
  * `window.desktop` / `window.projectApi` exist by the time the renderer's
  * main.tsx reads them.
  *
- * Module ownership (each default-exports a partial DesktopApi):
- *   ./browser  W4  BROWSER class: print, download, file picker, clipboard,
- *                  theme, language.
- *   ./webapi   W3  WEB-API class: open/save/recents/export over the host
- *                  protocol (../protocol/client.ts) + in-memory projectApi.
- *   ./ai       W6  aiStream / webSearch / imageSearch / aiGenerateImage /
- *                  getAiSettings / aiChat / fetchImage stubs.
- *   ./hide     W6  HIDE class no-ops (Zotero, doc passwords, recovery copy,
- *                  tabs/menu, window chrome).
+ * Modules (each provides a partial DesktopApi), merged in this order, later wins:
+ *   ./hide     HIDE class no-ops (Zotero, doc passwords, recovery copy,
+ *              tabs/menu, window chrome) + the capability source.
+ *   ./ai       aiStream / webSearch / imageSearch / aiGenerateImage /
+ *              getAiSettings / aiChat / fetchImage stubs (AI is hidden).
+ *   ./webapi   WEB-API class: open/save/recents/export over the host
+ *              protocol (../protocol/client.ts) + in-memory projectApi.
+ *   ./browser  BROWSER class: print, download, file picker, clipboard,
+ *              theme, language.
+ * `capabilities` is then replaced by a copy of hide's that receives the host
+ * grants from `init` (File > Open, recents).
  *
  * Every key of DesktopApi that no module implements is filled with a safe
  * fallback so the renderer never throws on a missing method: `on*` subscribers
@@ -25,7 +27,8 @@ import { createDocsFrameClient } from '../protocol/client'
 import { createWebApi } from './webapi'
 import { bindHostAppearance } from './host-appearance'
 import ai from './ai'
-import hide from './hide'
+import hide, { hostGrants, webCapabilities } from './hide'
+import type { DesktopCapabilities } from '../../../apps/docs/src/shared/ipc'
 
 type Bridge = Record<string, unknown>
 
@@ -44,8 +47,15 @@ const client = createDocsFrameClient({
     print: true,
     exportPdf: true,
     exportHtml: true,
+    filePick: true,
   },
 })
+/** read by the renderer's cap(); boot waits (bounded) for init, so the grants land before the first render */
+const capabilities: DesktopCapabilities = { ...webCapabilities }
+client
+  .whenInitialized()
+  .then((session) => Object.assign(capabilities, hostGrants(session.capabilities)))
+  .catch(() => {}) // a failed handshake is reported by webapi.ts
 // theme + language come from the host (never localStorage) and must be in place before boot
 bindHostAppearance(client)
 const webapi = createWebApi(client)
@@ -56,6 +66,7 @@ export function installBridge(): void {
   const modules: Bridge[] = [hide, ai, webapi, browser]
   const desktop: Bridge = {}
   for (const mod of modules) for (const key of Object.keys(mod ?? {})) desktop[key] = mod[key]
+  desktop.capabilities = capabilities
 
   const proxied = new Proxy(desktop, {
     get(target, prop: string | symbol) {
