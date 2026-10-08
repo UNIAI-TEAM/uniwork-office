@@ -79,8 +79,8 @@ fits its `DesktopApi` return type (`isAiUnavailable(error)` matches the prefix):
 
 ## Open items / notes for the lead
 
-- The Protect dialog description (`appProtectDesc`, 19 locales) still says "open and modify
-  passwords" on the web. Not changed: it needs a string variant in every shard.
+- The Protect dialog description is now `appProtectDescWeb` (all 21 `i18n/app` shards) when
+  `docPassword` is off.
 - `autoSaveToDisk` is `false` on the web. If W3 wants a server-backed autosave later, flip the
   capability (or add a new key) rather than reviving the toggle.
 - Paper size for print comes from the browser's print dialog (desktop does the same via
@@ -90,3 +90,18 @@ fits its `DesktopApi` return type (`isAiUnavailable(error)` matches the prefix):
 - Tests: `apps/docs/tests/web-capabilities.test.ts` (renderer gating, mounts the real Ribbon /
   ContextMenu / ProtectDialog), `web/docs/bridge/hide.test.ts`, `web/docs/bridge/browser.test.ts`,
   Playwright `web/e2e/w4-hide.spec.ts`; screenshots in `docs/web-docs/screenshots/w4/`.
+
+## Integration through the test host (after the W3 merge)
+
+`web/e2e/w4-hide.spec.ts` runs through `/test-host/` (editor inside `iframe#frame`) together with
+`docs-web.spec.ts` against one `npm run build:web`; screenshots are taken of the host page.
+Two expected-failure tests (`test.fail`) record gaps in W3-owned files, to be fixed there:
+
+1. **Host print request bypasses the BROWSER print.** `webapi.ts` `handlePrint` calls
+   `window.print()` directly, so a host-initiated print has no print sheet, no light pin and no
+   `afterprint`. It should call `window.desktop.print()`.
+2. **Host `init.theme` / `init.locale` (and `theme` / `language` events) are not applied.**
+   Nothing consumes them; `browser.ts` already exports `setWebTheme` / `setWebLanguage` for the
+   frame wiring (session / frame-port) to call.
+
+When either is fixed the matching `test.fail` starts failing: delete the `test.fail` marker.
