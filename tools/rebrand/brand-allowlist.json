@@ -101,7 +101,7 @@
       "path": "apps/markdown/src/{main/image-host.ts,renderer/components/ImageHostDialog.tsx,shared/ipc.ts}",
       "pattern": "[Gg]it[Hh]ub",
       "kind": "permanent",
-      "reason": "The Markdown editor's image-host feature lets the user upload pictures to a GitHub repository they configure (owner, repo, token): the service is named as an upload target, its API endpoint and error messages carry its name. A third-party product, not a link to the UniWork repository and not a call to action."
+      "reason": "Functional identifiers of the Markdown image host's repository adapter only: the persisted provider id 'github' (settings files, ImageHostKind, the dialog option value) and the REST API endpoint / headers it must send (api.github.com, vnd.github+json, X-GitHub-Api-Version). Never rendered: every label, placeholder and upload error says 'repository' / 'access token' (apps/markdown/tests/image-host-wording.test.ts pins the dialog strings in all 21 locales and the error text)."
     },
     {
       "path": "apps/shell/src/main/updater.ts",

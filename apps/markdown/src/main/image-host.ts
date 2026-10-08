@@ -268,15 +268,15 @@ async function uploadGithub(
   try {
     json = JSON.parse(text)
   } catch {
-    return { ok: false, error: `GitHub ${response.status}: unparseable response` }
+    return { ok: false, error: `Repository ${response.status}: unparseable response` }
   }
   if (!response.ok)
     return {
       ok: false,
-      error: `GitHub ${response.status}: ${String(jsonPath(json, 'message') ?? 'upload rejected').slice(0, 200)}`,
+      error: `Repository ${response.status}: ${String(jsonPath(json, 'message') ?? 'upload rejected').slice(0, 200)}`,
     }
   const download = jsonPath(json, 'content.download_url')
-  if (!download) return { ok: false, error: 'GitHub: no download_url in response' }
+  if (!download) return { ok: false, error: 'Repository: no download_url in response' }
   // a configured CDN base (jsDelivr etc.) replaces the API's raw URL; the
   // repo-relative path is identical
   const url2 = config.urlPrefix ? `${trimSlash(config.urlPrefix)}/${path}` : download

@@ -130,7 +130,7 @@ export function ImageHostDialog({
               >
                 <option value="s3">{t('imageHostKindS3')}</option>
                 <option value="smms">SM.MS</option>
-                <option value="github">GitHub</option>
+                <option value="github">{t('imageHostKindRepo')}</option>
               </select>
             </label>
             {kind === 's3' && (
