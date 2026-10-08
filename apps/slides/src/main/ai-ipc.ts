@@ -4,7 +4,7 @@
  * to avoid renderer CORS), search tools, and the slides-only ai:* channels
  * (image generation, media analysis, style templates).
  */
-import { app, ipcMain, nativeImage, net, shell, webContents } from 'electron'
+import { app, ipcMain, nativeImage, net, webContents } from 'electron'
 import {
   appendFileSync,
   existsSync,
@@ -46,7 +46,6 @@ import {
 import {
   webSearchTool,
   imageSearchTool,
-  ensureGenofficeLogin,
   generateImageTool,
   analyzeMediaTool,
   documentMediaRoots,
@@ -128,7 +127,7 @@ export function registerAiIpc(): void {
     return settings
   })
 
-  // Genspark account (gsk login state): the auth source for AI features; when logged out the frontend uses this to guide login
+  // UniWork cloud account state (internal gsk name; stub-backed, signed out while the cloud seam is off)
   ipcMain.handle(
     'ai:gsk-status',
     async (_event, withEmail?: boolean): Promise<GenSparkAccountStatus> => {
@@ -139,13 +138,9 @@ export function registerAiIpc(): void {
     },
   )
 
-  ipcMain.handle('ai:gsk-login', () => {
-    ensureGenofficeLogin((url) => void shell.openExternal(url))
-  })
-
   ipcMain.handle('ai:set-settings', (_event, settings: AiSettings) => {
     // SECURITY.md: payloads are schema-checked in the main process. The settings
-    // file feeds cliPath into spawn() and baseUrl receives the gsk bearer token,
+    // file feeds cliPath into spawn() and baseUrl receives provider credentials,
     // so the renderer's copy is sanitized before it touches disk.
     const sanitized = sanitizeAiSettings(settings)
     if (!sanitized) {
@@ -286,7 +281,7 @@ export function registerAiIpc(): void {
 // never called; docs does not have these channels, so putting them in the wrong place raises
 // "No handler registered".
 export function registerSlidesOnlyAiIpc(): void {
-  // gsk (Genspark CLI) capabilities: AI image generation / media analysis. Returns an error prompt when not logged in.
+  // AI image generation / media analysis through the configured media provider; errors when none is set up.
   ipcMain.handle(
     'ai:generate-image',
     async (
@@ -313,7 +308,7 @@ export function registerSlidesOnlyAiIpc(): void {
           transparentBackground: op.transparentBackground === true,
         },
         {
-          notLoggedInError: tm('errGskCli'),
+          notLoggedInError: tm('errMediaNotConfigured'),
           mediaRoots: slidesMediaRoots(event.sender.id),
         },
       )
@@ -330,7 +325,7 @@ export function registerSlidesOnlyAiIpc(): void {
           requirements: String(op.requirements ?? ''),
         },
         {
-          notLoggedInError: tm('errGskCli'),
+          notLoggedInError: tm('errMediaNotConfigured'),
           mediaRoots: slidesMediaRoots(event.sender.id),
         },
       )

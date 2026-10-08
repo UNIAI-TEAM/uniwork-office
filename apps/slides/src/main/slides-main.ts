@@ -28,7 +28,8 @@ import { basename, dirname, join, resolve } from 'node:path'
 import { cleanupExpiredGeneratedPages } from './generated-page-temp'
 import { exportSlidesPdf } from './pdf-export'
 import { printSlidesHtml } from './print-window'
-import { gskApiKey, gskSlideGenerate, setGskProxyUrl } from '@genoffice/ai-search'
+import { gskSlideGenerate, hasGskAuth } from '@genoffice/ai-search'
+import { uniworkCloudEnabled } from '@genoffice/ai-provider'
 import {
   appMenuLabels,
   configuredDefaultSaveDir,
@@ -1768,10 +1769,11 @@ export function registerSlidesIpc(): void {
     }
     return rendered ? { slide: rendered } : null
   })
-  // ── Cloud single-page generation (gsk slide_generate): brief → cloud HTML+conversion → one-slide
-  // pptx saved to a temp file. Returns a marker string that slides:land-generated-pages redeems for
-  // the bytes. Enabled when gsk is logged in; GENOFFICE_CLOUD_SLIDE=0 is the kill switch.
-  const cloudSlideEnabled = () => process.env.GENOFFICE_CLOUD_SLIDE !== '0' && !!gskApiKey()
+  // ── Cloud single-page generation: brief → cloud HTML+conversion → one-slide pptx saved to a
+  // temp file. Returns a marker string that slides:land-generated-pages redeems for the bytes.
+  // Off until the UniWork cloud seam is enabled and signed in; GENOFFICE_CLOUD_SLIDE=0 is the kill switch.
+  const cloudSlideEnabled = () =>
+    process.env.GENOFFICE_CLOUD_SLIDE !== '0' && uniworkCloudEnabled() && hasGskAuth()
 
   ipcMain.handle('slides:cloud-gen-status', () => ({ enabled: cloudSlideEnabled() }))
 
@@ -1847,7 +1849,7 @@ export function registerSlidesIpc(): void {
     },
   )
 
-  // ── Local single-page generation (no gsk needed, e.g. BYOK): a JSON slide spec written by
+  // ── Local single-page generation (no cloud needed, e.g. BYOK): a JSON slide spec written by
   // the renderer's LLM call is built directly into a one-slide pptx with pptx-engine
   // primitives — no HTML intermediate. Returns the same marker kind as the cloud path, so
   // landing (slides:land-generated-pages) is shared.
@@ -5046,9 +5048,6 @@ export function installSlidesMenu(): void {
  */
 async function applyMainProcessProxy(): Promise<void> {
   const setDispatcher = async (proxyUrl: string) => {
-    // spawned gsk CLI children do their own fetch and never see the
-    // dispatcher below — forward the proxy to them via env
-    setGskProxyUrl(proxyUrl)
     try {
       const { ProxyAgent, setGlobalDispatcher } = await import('undici')
       setGlobalDispatcher(new ProxyAgent(proxyUrl))
@@ -5072,9 +5071,8 @@ async function applyMainProcessProxy(): Promise<void> {
   // No environment variables: read the system proxy (requires app ready)
   try {
     await app.whenReady()
-    // PAC/rule proxies answer per-host: probe the host the login flow, the
-    // UniWork LLM proxy and the gsk CLI actually target
-    const resolved = await electronSession.defaultSession.resolveProxy('https://www.genspark.ai/')
+    // PAC/rule proxies answer per-host: probe the host the default uniAI chat route targets
+    const resolved = await electronSession.defaultSession.resolveProxy('https://openrouter.ai/')
     // resolveProxy returns strings like "PROXY 127.0.0.1:1087" or "DIRECT"
     const m = /PROXY\s+([^;]+)/i.exec(resolved || '')
     if (m) {

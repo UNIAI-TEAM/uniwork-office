@@ -248,18 +248,7 @@ export const it = {
     "Il tempo totale della presentazione è stato {duration}. Vuoi salvare gli intervalli delle diapositive per l'avanzamento automatico?",
   appRehearseDiscard: 'Non salvare',
   appRehearseSave: 'Salva',
-  appSettingsTitle: 'Impostazioni IA',
-  appSettingsAccount: 'Account UniWork',
-  appSettingsChecking: 'Verifica in corso…',
-  appSettingsLoggedIn: 'Accesso effettuato',
-  appSettingsLoggedInEmail: 'Accesso effettuato: {email}',
-  appSettingsLoggedOut:
-    'Accesso non effettuato (le funzionalità IA richiedono un account UniWork)',
-  appSettingsLoginPending: "In attesa dell'accesso dal browser…",
-  appSettingsLogin: 'Accedi a UniWork',
-  appSettingsModel: 'Modello',
   appSettingsCancel: 'Annulla',
-  appSettingsSave: 'Salva',
   appCropHint: "Invio per confermare · Esc per annullare · Fai clic all'esterno per confermare",
   appStatusZoomsInserted:
     '{count} zoom inseriti: fai clic durante la presentazione per passare alle diapositive',

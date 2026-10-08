@@ -70,10 +70,9 @@ export const tMain = createI18n({
     errParseFailed: '文件解析失败',
     errImageNoText: '图片附件不提供文本,已作为图像随用户消息发送,直接看图即可',
     errNotImage: '不是支持的图片类型',
-    errGskNotLoggedIn: '未登录 UniWork:请点击下方「登录 UniWork」完成登录后重试',
     errNoApiKey: '未配置 {provider} 的 API Key',
     errNoModel: '未配置模型名称',
-    errGskCli: 'gsk 未登录:请先运行 gsk login 登录 UniWork 账号',
+    errMediaNotConfigured: '未配置图像/媒体模型:请在「设置 → AI 媒体」中配置后重试',
     errNoDeckAppend:
       '当前没有可追加的文稿（会话不存在）。请先用 mode:"replace" 生成首页，或改用原生工具新增页面。',
     errAppendFailed: '追加失败：{reason}',
@@ -182,11 +181,9 @@ export const tMain = createI18n({
     errParseFailed: 'Failed to parse file',
     errImageNoText: 'Image attachments have no text; the image is sent along with the user message',
     errNotImage: 'not a supported image type',
-    errGskNotLoggedIn:
-      'Not signed in to UniWork: click “Sign in to UniWork” below, sign in, then retry',
     errNoApiKey: 'AI is not activated. Purchase a plan to use the AI assistant.',
     errNoModel: 'No model name configured',
-    errGskCli: 'gsk not signed in: run gsk login to sign in to your UniWork account first',
+    errMediaNotConfigured: 'No image/media model configured: set one up in Settings → AI media, then retry',
     errNoDeckAppend:
       'No deck to append to (session missing). Generate the first page with mode:"replace" or add pages with the native tools.',
     errAppendFailed: 'Append failed: {reason}',
@@ -294,11 +291,9 @@ export const tMain = createI18n({
     errImageNoText:
       'Tệp đính kèm hình ảnh không có văn bản; hình ảnh được gửi cùng với tin nhắn của người dùng',
     errNotImage: 'loại hình ảnh không được hỗ trợ',
-    errGskNotLoggedIn:
-      'Chưa đăng nhập UniWork: nhấp “Đăng nhập UniWork” bên dưới, đăng nhập, rồi thử lại',
     errNoApiKey: 'Chưa kích hoạt / mua gói AI. Hãy mua gói để dùng Trợ lý AI.',
     errNoModel: 'Chưa cấu hình tên mô hình',
-    errGskCli: 'gsk chưa đăng nhập: chạy gsk login để đăng nhập tài khoản UniWork trước',
+    errMediaNotConfigured: 'Chưa cấu hình mô hình hình ảnh/đa phương tiện: hãy thiết lập trong Cài đặt → AI đa phương tiện rồi thử lại',
     errNoDeckAppend:
       'Không có bản trình bày để nối thêm vào (thiếu phiên làm việc). Hãy tạo trang đầu tiên với mode:"replace" hoặc thêm trang bằng các công cụ gốc.',
     errAppendFailed: 'Nối thêm thất bại: {reason}',
@@ -408,12 +403,9 @@ export const tMain = createI18n({
     errImageNoText:
       '画像添付はテキストを提供しません。画像としてユーザー メッセージと一緒に送信済みのため、そのまま画像をご覧ください',
     errNotImage: 'サポートされていない画像形式です',
-    errGskNotLoggedIn:
-      'UniWork にサインインしていません。下の「UniWork にサインイン」からサインインして再試行してください',
     errNoApiKey: '{provider} の API キーが設定されていません',
     errNoModel: 'モデル名が設定されていません',
-    errGskCli:
-      'gsk が未サインインです。先に gsk login を実行して UniWork アカウントにサインインしてください',
+    errMediaNotConfigured: '画像/メディアモデルが設定されていません。設定 → AI メディアで設定してから再試行してください',
     errNoDeckAppend:
       '追加先のプレゼンテーションがありません（セッションが存在しません）。まず mode:"replace" で最初のページを生成するか、ネイティブ ツールでページを追加してください。',
     errAppendFailed: '追加に失敗しました: {reason}',
@@ -524,12 +516,9 @@ export const tMain = createI18n({
     errImageNoText:
       '이미지 첨부는 텍스트를 제공하지 않으며, 이미지로 사용자 메시지와 함께 전송되었으니 이미지를 직접 확인하세요',
     errNotImage: '지원되는 이미지 형식이 아님',
-    errGskNotLoggedIn:
-      'UniWork에 로그인되어 있지 않습니다. 아래 "UniWork 로그인"을 눌러 로그인한 뒤 다시 시도하세요',
     errNoApiKey: '{provider}의 API 키가 설정되지 않았습니다',
     errNoModel: '모델 이름이 설정되지 않았습니다',
-    errGskCli:
-      'gsk가 로그인되어 있지 않습니다. 먼저 gsk login을 실행해 UniWork 계정에 로그인하세요',
+    errMediaNotConfigured: '이미지/미디어 모델이 설정되지 않았습니다. 설정 → AI 미디어에서 설정한 뒤 다시 시도하세요',
     errNoDeckAppend:
       '추가할 수 있는 문서가 없습니다(세션 없음). 먼저 mode:"replace"로 첫 페이지를 생성하거나 네이티브 도구로 페이지를 추가하세요.',
     errAppendFailed: '추가 실패: {reason}',
@@ -637,12 +626,9 @@ export const tMain = createI18n({
     errImageNoText:
       "Les pièces jointes image ne fournissent pas de texte ; l'image a été envoyée avec le message de l'utilisateur, consultez-la directement",
     errNotImage: "n'est pas un type d'image pris en charge",
-    errGskNotLoggedIn:
-      'Non connecté à UniWork : cliquez sur « Se connecter à UniWork » ci-dessous, connectez-vous puis réessayez',
     errNoApiKey: 'Aucune clé API configurée pour {provider}',
     errNoModel: 'Aucun nom de modèle configuré',
-    errGskCli:
-      "gsk non connecté : exécutez d'abord gsk login pour vous connecter à votre compte UniWork",
+    errMediaNotConfigured: 'Aucun modèle image/média configuré : configurez-en un dans Paramètres → Médias IA, puis réessayez',
     errNoDeckAppend:
       'Aucune présentation à compléter (session inexistante). Générez d\'abord la première page avec mode:"replace" ou ajoutez des pages avec les outils natifs.',
     errAppendFailed: "Échec de l'ajout : {reason}",
@@ -755,12 +741,9 @@ export const tMain = createI18n({
     errImageNoText:
       'Bildanlagen liefern keinen Text; das Bild wurde mit der Benutzernachricht gesendet, bitte direkt ansehen',
     errNotImage: 'kein unterstütztes Bildformat',
-    errGskNotLoggedIn:
-      'Nicht bei UniWork angemeldet: Klicken Sie unten auf „Bei UniWork anmelden“, melden Sie sich an und versuchen Sie es erneut',
     errNoApiKey: 'Kein API-Schlüssel für {provider} konfiguriert',
     errNoModel: 'Kein Modellname konfiguriert',
-    errGskCli:
-      'gsk nicht angemeldet: Führen Sie zuerst gsk login aus, um sich bei Ihrem UniWork-Konto anzumelden',
+    errMediaNotConfigured: 'Kein Bild-/Medienmodell konfiguriert: Richten Sie eines unter Einstellungen → KI-Medien ein und versuchen Sie es erneut',
     errNoDeckAppend:
       'Keine Präsentation zum Anfügen vorhanden (Sitzung fehlt). Generieren Sie zuerst die erste Seite mit mode:"replace" oder fügen Sie Seiten mit den nativen Tools hinzu.',
     errAppendFailed: 'Anfügen fehlgeschlagen: {reason}',
@@ -872,12 +855,9 @@ export const tMain = createI18n({
     errImageNoText:
       'Las imágenes adjuntas no proporcionan texto; la imagen se envió junto con el mensaje del usuario, consúltala directamente',
     errNotImage: 'no es un tipo de imagen compatible',
-    errGskNotLoggedIn:
-      'No has iniciado sesión en UniWork: pulsa «Iniciar sesión en UniWork» abajo, inicia sesión y vuelve a intentarlo',
     errNoApiKey: 'No hay clave de API configurada para {provider}',
     errNoModel: 'No hay nombre de modelo configurado',
-    errGskCli:
-      'gsk sin sesión iniciada: ejecuta primero gsk login para iniciar sesión en tu cuenta de UniWork',
+    errMediaNotConfigured: 'No hay ningún modelo de imagen/medios configurado: configúralo en Ajustes → Medios de IA y vuelve a intentarlo',
     errNoDeckAppend:
       'No hay ninguna presentación a la que anexar (no existe la sesión). Genera primero la primera página con mode:"replace" o añade páginas con las herramientas nativas.',
     errAppendFailed: 'Error al anexar: {reason}',
@@ -988,11 +968,9 @@ export const tMain = createI18n({
     errImageNoText:
       'สิ่งที่แนบเป็นรูปภาพไม่มีข้อความ รูปถูกส่งไปพร้อมข้อความของผู้ใช้แล้ว โปรดดูรูปโดยตรง',
     errNotImage: 'ไม่ใช่ชนิดรูปภาพที่รองรับ',
-    errGskNotLoggedIn:
-      'ยังไม่ได้ลงชื่อเข้าใช้ UniWork: แตะ “ลงชื่อเข้าใช้ UniWork” ด้านล่าง แล้วลองอีกครั้ง',
     errNoApiKey: 'ยังไม่ได้ตั้งค่า API Key ของ {provider}',
     errNoModel: 'ยังไม่ได้ตั้งค่าชื่อโมเดล',
-    errGskCli: 'gsk ยังไม่ได้เข้าสู่ระบบ: โปรดรัน gsk login เพื่อเข้าสู่ระบบบัญชี UniWork ก่อน',
+    errMediaNotConfigured: 'ยังไม่ได้ตั้งค่าโมเดลรูปภาพ/สื่อ: ตั้งค่าใน การตั้งค่า → สื่อ AI แล้วลองอีกครั้ง',
     errNoDeckAppend:
       'ไม่มีเอกสารให้เพิ่มต่อท้าย (ไม่มีเซสชัน) โปรดสร้างหน้าแรกด้วย mode:"replace" ก่อน หรือใช้เครื่องมือเนทีฟเพิ่มหน้าแทน',
     errAppendFailed: 'เพิ่มต่อท้ายไม่สำเร็จ: {reason}',
@@ -1100,10 +1078,9 @@ export const tMain = createI18n({
     errImageNoText:
       'Lampiran gambar tidak menyediakan teks; gambar telah dikirim bersama pesan pengguna, silakan lihat gambarnya langsung',
     errNotImage: 'bukan jenis gambar yang didukung',
-    errGskNotLoggedIn: 'Belum masuk ke UniWork: klik “Masuk ke UniWork” di bawah, lalu coba lagi',
     errNoApiKey: 'API Key untuk {provider} belum dikonfigurasi',
     errNoModel: 'Nama model belum dikonfigurasi',
-    errGskCli: 'gsk belum masuk: jalankan gsk login dulu untuk masuk ke akun UniWork',
+    errMediaNotConfigured: 'Model gambar/media belum dikonfigurasi: atur di Pengaturan → Media AI, lalu coba lagi',
     errNoDeckAppend:
       'Tidak ada dokumen yang bisa ditambahi (sesi tidak ada). Buat halaman pertama dengan mode:"replace" dulu, atau tambahkan halaman dengan alat bawaan.',
     errAppendFailed: 'Gagal menambahkan: {reason}',
@@ -1215,12 +1192,9 @@ export const tMain = createI18n({
     errImageNoText:
       'Вложения-изображения не содержат текста; изображение отправлено вместе с сообщением пользователя, просто посмотрите на него',
     errNotImage: 'неподдерживаемый тип изображения',
-    errGskNotLoggedIn:
-      'Вы не вошли в UniWork: нажмите «Войти в UniWork» ниже, войдите и повторите попытку',
     errNoApiKey: 'API-ключ для {provider} не настроен',
     errNoModel: 'Не указано имя модели',
-    errGskCli:
-      'gsk не авторизован: сначала выполните gsk login, чтобы войти в учётную запись UniWork',
+    errMediaNotConfigured: 'Модель изображений/медиа не настроена: настройте её в разделе «Настройки → ИИ-медиа» и повторите попытку',
     errNoDeckAppend:
       'Нет презентации для добавления страниц (сессия отсутствует). Сначала создайте первую страницу с mode:"replace" или добавьте страницы нативными инструментами.',
     errAppendFailed: 'Сбой добавления: {reason}',
@@ -1331,11 +1305,9 @@ export const tMain = createI18n({
     errImageNoText:
       'المرفقات من نوع الصور لا توفر نصًا؛ وقد أُرسلت الصورة مع رسالة المستخدم، يكفي النظر إليها مباشرة',
     errNotImage: 'ليس نوع صورة مدعومًا',
-    errGskNotLoggedIn:
-      'لم تسجّل الدخول إلى UniWork: انقر على «تسجيل الدخول إلى UniWork» أدناه ثم أعد المحاولة',
     errNoApiKey: 'لم يتم تكوين مفتاح API لـ {provider}',
     errNoModel: 'لم يتم تكوين اسم النموذج',
-    errGskCli: 'gsk غير مسجَّل الدخول: شغّل gsk login أولًا لتسجيل الدخول إلى حساب UniWork',
+    errMediaNotConfigured: 'لم يتم تكوين نموذج للصور/الوسائط: قم بإعداده من الإعدادات ← وسائط الذكاء الاصطناعي ثم أعد المحاولة',
     errNoDeckAppend:
       'لا يوجد مستند يمكن الإلحاق به (الجلسة غير موجودة). أنشئ الصفحة الأولى باستخدام mode:"replace" أولًا، أو أضف صفحات بالأدوات الأصلية.',
     errAppendFailed: 'فشل الإلحاق: {reason}',
@@ -1443,11 +1415,9 @@ export const tMain = createI18n({
     errImageNoText:
       'Anexos de imagem não têm texto; a imagem é enviada junto com a mensagem do usuário',
     errNotImage: 'não é um tipo de imagem suportado',
-    errGskNotLoggedIn:
-      'Não conectado ao UniWork: clique em “Entrar no UniWork” abaixo, entre e tente novamente',
     errNoApiKey: 'Nenhuma chave de API configurada para {provider}',
     errNoModel: 'Nenhum nome de modelo configurado',
-    errGskCli: 'gsk não conectado: execute gsk login primeiro para entrar na sua conta UniWork',
+    errMediaNotConfigured: 'Nenhum modelo de imagem/mídia configurado: configure um em Configurações → Mídia de IA e tente novamente',
     errNoDeckAppend:
       'Não há apresentação para anexar (sessão inexistente). Gere a primeira página com mode:"replace" ou adicione páginas com as ferramentas nativas.',
     errAppendFailed: 'Falha ao anexar: {reason}',
@@ -1559,12 +1529,9 @@ export const tMain = createI18n({
     errImageNoText:
       "Gli allegati immagine non hanno testo; l'immagine viene inviata insieme al messaggio dell'utente",
     errNotImage: 'tipo di immagine non supportato',
-    errGskNotLoggedIn:
-      'Accesso a UniWork non effettuato: fai clic su “Accedi a UniWork” qui sotto, accedi e riprova',
     errNoApiKey: 'Nessuna chiave API configurata per {provider}',
     errNoModel: 'Nessun nome di modello configurato',
-    errGskCli:
-      "gsk non ha effettuato l'accesso: esegui prima gsk login per accedere al tuo account UniWork",
+    errMediaNotConfigured: 'Nessun modello immagine/media configurato: configuralo in Impostazioni → Media IA, quindi riprova',
     errNoDeckAppend:
       'Nessuna presentazione a cui aggiungere pagine (sessione mancante). Genera la prima pagina con mode:"replace" o aggiungi pagine con gli strumenti nativi.',
     errAppendFailed: 'Aggiunta non riuscita: {reason}',
@@ -1677,12 +1644,9 @@ export const tMain = createI18n({
     errImageNoText:
       'Załączniki graficzne nie zawierają tekstu; obraz jest wysyłany razem z wiadomością użytkownika',
     errNotImage: 'nieobsługiwany typ obrazu',
-    errGskNotLoggedIn:
-      'Nie zalogowano do UniWork: kliknij „Zaloguj się do UniWork” poniżej, zaloguj się i spróbuj ponownie',
     errNoApiKey: 'Nie skonfigurowano klucza API dla {provider}',
     errNoModel: 'Nie skonfigurowano nazwy modelu',
-    errGskCli:
-      'gsk nie jest zalogowany: najpierw uruchom gsk login, aby zalogować się na konto UniWork',
+    errMediaNotConfigured: 'Nie skonfigurowano modelu obrazów/multimediów: skonfiguruj go w Ustawienia → Multimedia AI i spróbuj ponownie',
     errNoDeckAppend:
       'Brak prezentacji do rozszerzenia (brak sesji). Najpierw wygeneruj pierwszą stronę z mode:"replace" albo dodaj strony narzędziami natywnymi.',
     errAppendFailed: 'Dołączanie nie powiodło się: {reason}',
@@ -1793,11 +1757,9 @@ export const tMain = createI18n({
     errImageNoText:
       'Obrázkové přílohy neobsahují text; obrázek je odeslán spolu se zprávou uživatele',
     errNotImage: 'nepodporovaný typ obrázku',
-    errGskNotLoggedIn:
-      'Nejste přihlášeni ke UniWork: klikněte níže na „Přihlásit se ke UniWork“, přihlaste se a zkuste to znovu',
     errNoApiKey: 'Pro {provider} není nakonfigurován žádný klíč API',
     errNoModel: 'Není nakonfigurován název modelu',
-    errGskCli: 'gsk není přihlášen: nejprve spusťte gsk login a přihlaste se k účtu UniWork',
+    errMediaNotConfigured: 'Není nakonfigurován model pro obrázky/média: nastavte jej v Nastavení → AI média a zkuste to znovu',
     errNoDeckAppend:
       'Není k čemu přidávat (chybí relace). Vygenerujte první stránku s mode:"replace" nebo přidejte stránky nativními nástroji.',
     errAppendFailed: 'Přidání se nezdařilo: {reason}',
@@ -1907,12 +1869,9 @@ export const tMain = createI18n({
     errImageNoText:
       'Afbeeldingsbijlagen bevatten geen tekst; de afbeelding wordt samen met het gebruikersbericht verzonden',
     errNotImage: 'geen ondersteund afbeeldingstype',
-    errGskNotLoggedIn:
-      'Niet aangemeld bij UniWork: klik hieronder op “Aanmelden bij UniWork”, meld u aan en probeer het opnieuw',
     errNoApiKey: 'Geen API-sleutel geconfigureerd voor {provider}',
     errNoModel: 'Geen modelnaam geconfigureerd',
-    errGskCli:
-      'gsk is niet aangemeld: voer eerst gsk login uit om u aan te melden bij uw UniWork-account',
+    errMediaNotConfigured: 'Geen beeld-/mediamodel geconfigureerd: stel er een in via Instellingen → AI-media en probeer het opnieuw',
     errNoDeckAppend:
       'Geen presentatie om aan toe te voegen (sessie ontbreekt). Genereer eerst de eerste pagina met mode:"replace" of voeg pagina\'s toe met de native tools.',
     errAppendFailed: 'Toevoegen mislukt: {reason}',
@@ -2022,12 +1981,9 @@ export const tMain = createI18n({
     errParseFailed: 'Gagal menghurai fail',
     errImageNoText: 'Lampiran imej tiada teks; imej dihantar bersama mesej pengguna',
     errNotImage: 'bukan jenis imej yang disokong',
-    errGskNotLoggedIn:
-      'Belum log masuk ke UniWork: klik “Log masuk ke UniWork” di bawah, kemudian cuba lagi',
     errNoApiKey: 'Kunci API untuk {provider} belum dikonfigurasikan',
     errNoModel: 'Nama model belum dikonfigurasikan',
-    errGskCli:
-      'gsk belum log masuk: jalankan gsk login dahulu untuk log masuk ke akaun UniWork anda',
+    errMediaNotConfigured: 'Model imej/media belum dikonfigurasikan: tetapkan dalam Tetapan → Media AI, kemudian cuba lagi',
     errNoDeckAppend:
       'Tiada persembahan untuk ditambah (sesi tidak wujud). Jana halaman pertama dengan mode:"replace" dahulu, atau tambah halaman dengan alat asli.',
     errAppendFailed: 'Gagal menambah: {reason}',
@@ -2136,10 +2092,9 @@ export const tMain = createI18n({
     errParseFailed: 'ניתוח הקובץ נכשל',
     errImageNoText: 'קבצים מצורפים מסוג תמונה אינם מכילים טקסט; התמונה נשלחת יחד עם הודעת המשתמש',
     errNotImage: 'סוג תמונה שאינו נתמך',
-    errGskNotLoggedIn: 'לא מחובר ל-UniWork: לחץ על "התחבר ל-UniWork" למטה, התחבר ונסה שוב',
     errNoApiKey: 'לא הוגדר מפתח API עבור {provider}',
     errNoModel: 'לא הוגדר שם מודל',
-    errGskCli: 'gsk אינו מחובר: הרץ תחילה gsk login כדי להיכנס לחשבון UniWork שלך',
+    errMediaNotConfigured: 'לא הוגדר מודל תמונה/מדיה: הגדר אחד בהגדרות ← מדיה של AI ונסה שוב',
     errNoDeckAppend:
       'אין מצגת להוסיף אליה (הפעלה חסרה). צור תחילה את העמוד הראשון עם mode:"replace" או הוסף עמודים בכלים המקוריים.',
     errAppendFailed: 'ההוספה נכשלה: {reason}',
@@ -2246,11 +2201,9 @@ export const tMain = createI18n({
     errParseFailed: 'फ़ाइल पार्स करने में विफल',
     errImageNoText: 'छवि अनुलग्नक में टेक्स्ट नहीं होता; छवि उपयोगकर्ता संदेश के साथ भेजी जाती है',
     errNotImage: 'समर्थित छवि प्रकार नहीं है',
-    errGskNotLoggedIn:
-      'UniWork में साइन इन नहीं है: नीचे “UniWork में साइन इन करें” पर क्लिक करें, साइन इन करें और फिर से कोशिश करें',
     errNoApiKey: '{provider} के लिए कोई API कुंजी कॉन्फ़िगर नहीं है',
     errNoModel: 'कोई मॉडल नाम कॉन्फ़िगर नहीं है',
-    errGskCli: 'gsk साइन इन नहीं है: पहले gsk login चलाकर अपने UniWork खाते में साइन इन करें',
+    errMediaNotConfigured: 'कोई इमेज/मीडिया मॉडल कॉन्फ़िगर नहीं है: सेटिंग्स → AI मीडिया में सेट करें, फिर पुनः प्रयास करें',
     errNoDeckAppend:
       'जोड़ने के लिए कोई प्रस्तुति नहीं है (सत्र मौजूद नहीं)। पहले mode:"replace" से पहला पृष्ठ बनाएँ, या नेटिव टूल से पृष्ठ जोड़ें।',
     errAppendFailed: 'जोड़ना विफल: {reason}',
@@ -2359,10 +2312,9 @@ export const tMain = createI18n({
     errParseFailed: '檔案解析失敗',
     errImageNoText: '圖片附件不提供文字,已作為影像隨使用者訊息傳送,直接看圖即可',
     errNotImage: '不是支援的圖片類型',
-    errGskNotLoggedIn: '未登入 UniWork:請點擊下方「登入 UniWork」完成登入後重試',
     errNoApiKey: '未設定 {provider} 的 API Key',
     errNoModel: '未設定模型名稱',
-    errGskCli: 'gsk 未登入:請先執行 gsk login 登入 UniWork 帳號',
+    errMediaNotConfigured: '未設定圖像/媒體模型:請在「設定 → AI 媒體」中設定後重試',
     errNoDeckAppend:
       '目前沒有可附加的簡報（工作階段不存在）。請先用 mode:"replace" 產生首頁，或改用原生工具新增頁面。',
     errAppendFailed: '附加失敗：{reason}',
