@@ -24,16 +24,10 @@
       "reason": "Vendored third-party library notes that record who made local modifications; attribution text, never rendered in the UI."
     },
     {
-      "path": "packages/cli/README.md",
+      "path": "{packages/cli/src/mcp/server.ts,packages/cli/src/mcp/tools.ts,packages/cli/README.md,skills/genoffice/SKILL.md}",
       "pattern": "genoffice://",
       "kind": "permanent",
-      "reason": "MCP resource URI scheme (genoffice://guide/*) documented for agent authors; a protocol identifier kept like the `genoffice` CLI command (see the packages/cli/src/mcp entry above)."
-    },
-    {
-      "path": "{packages/cli/src/mcp/server.ts,packages/cli/src/mcp/tools.ts}",
-      "pattern": "genoffice://",
-      "kind": "permanent",
-      "reason": "MCP resource URI scheme (genoffice://guide/*) is a protocol identifier agents and skills/genoffice/SKILL.md address by name, like the kept `genoffice` CLI command; renaming it breaks existing agent configs."
+      "reason": "MCP resource URI scheme (genoffice://guide/*) is a protocol identifier agents address by name (skills/genoffice/SKILL.md, the CLI README), like the kept `genoffice` CLI command; renaming it breaks existing agent configs."
     },
     {
       "path": "packages/docx-engine/src/lazy-media.ts",
@@ -75,19 +69,6 @@
       "kind": "debt",
       "reason": "Referer header rule for genspark.ai-hosted images; removed with the Genspark integration.",
       "tracker": "GO-A4 UNI-1005"
-    },
-    {
-      "path": "apps/shell/src/renderer/src/IntegrationsPane.tsx",
-      "pattern": "genspark-ai/genoffice",
-      "kind": "debt",
-      "reason": "User-visible `npx skills add genspark-ai/genoffice` install command; needs a UniWork skills repository before it can change.",
-      "tracker": "GO-A4 UNI-1005 (skills distribution)"
-    },
-    {
-      "path": "{skills/**,packages/pipelines/src/slides/guides/*.md}",
-      "kind": "debt",
-      "reason": "Agent-facing skill and guide text ships to users' agent directories and still names GenOffice. Rewriting skills/*/SKILL.md requires a metadata.version bump (tools/check-skill-version.mjs) and a decision on the CLI command name, so it is a separate change.",
-      "tracker": "UNI-1002 follow-up (skill rebrand + version bump)"
     },
     {
       "path": "packaging/**",

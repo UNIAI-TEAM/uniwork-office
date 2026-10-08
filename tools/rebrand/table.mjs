@@ -376,6 +376,24 @@ export const rules = [
     ],
   },
   {
+    id: 'skills-install-source',
+    why: 'Settings > Integrations shows `npx skills add <owner/repo>`; the skills CLI installs skills/genoffice from the team repo (public, ships the same skill), not from the upstream repo',
+    files: ['apps/shell/src/renderer/src/IntegrationsPane.tsx'],
+    replace: [
+      [/npx skills add genspark-ai\/genoffice/g, 'npx skills add UNIAI-TEAM/uniwork-office'],
+    ],
+  },
+  {
+    id: 'skills-product-name',
+    why: 'Skill and slide-guide text ships into users\' agent directories and the CLI guide command: the product word "GenOffice" becomes "UniWork Office" and the vendor account word "Genspark" becomes "UniWork"; the skill name, the `genoffice` command, genoffice:// URIs and GENOFFICE_* variables stay. Bump metadata.version in skills/genoffice/SKILL.md after a change (tools/check-skill-version.mjs)',
+    files: ['skills/genoffice/SKILL.md', 'packages/pipelines/src/slides/guides/*.md'],
+    ignoreGlobalExclude: true,
+    replace: [
+      [PRODUCT_NAME, 'UniWork Office'],
+      [/(?<![A-Za-z0-9_])Genspark(?![A-Z0-9_])/g, 'UniWork'],
+    ],
+  },
+  {
     id: 'onboarding-community-cta',
     why: 'GenTeam community link and the onboarding offer slide are disabled (no genoffice.ai link)',
     files: ['apps/shell/src/main/index.ts', 'apps/shell/src/renderer/src/Onboarding.tsx'],
