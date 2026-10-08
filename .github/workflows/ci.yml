@@ -113,10 +113,10 @@ jobs:
       - name: Check legal notices
         run: npm run legal:check && npm run test:legal
 
-      # No shipped code may name a blocked cloud / analytics host; --if-present
-      # keeps this step green on a checkout without the gate.
+      # No shipped code may name a blocked cloud / analytics host
+      # (tools/check-egress.mjs and its tests).
       - name: Check egress
-        run: npm run --if-present check:egress
+        run: npm run check:egress
 
       # An upstream sync PR carries merge-conflict markers until a person resolves
       # them. A file fails only when it holds all three of git's marker lines
