@@ -375,7 +375,7 @@ export const strings = {
     // First-run onboarding
     onbTitle1: '欢迎使用 UniWork Office',
     onbSubtitle1: '文档、表格、演示和 PDF，尽在一个应用',
-    onbBody1: '创建文档、制作表格、生成演示、审阅 PDF。AI 深度融入每个环节。',
+    onbBody1: '创建文档、制作表格、生成演示、审阅 PDF，一切都在你自己的电脑上完成。',
     onbTitle2: 'AI 贯穿每一步',
     onbBody2: '在文档中直接起草、改写和解释。使用你的 UniWork 账号，或自带 AI 服务商密钥。',
     onbSkip: '跳过',
@@ -384,7 +384,7 @@ export const strings = {
     onbStepAria: '第 {n} 页，共 {total} 页',
     onbTitle3: '一切就绪',
     onbBody3: '打开文件，或新建一个文档即可开始。',
-    onbNote3: 'AI 功能可能消耗 UniWork 积分。',
+    onbNote3: 'AI 为可选功能。文档在你的电脑上编辑；打开或保存文件无需账号或密钥。',
     onbBack: '上一步',
     defaultProject: '默认项目',
     deleteProject: '删除项目…',
@@ -1208,7 +1208,7 @@ export const strings = {
     onbTitle1: 'UniWork Office へようこそ',
     onbSubtitle1: 'ドキュメント、スプレッドシート、スライド、PDF をひとつのアプリで',
     onbBody1:
-      '文書の作成、表計算、プレゼン作成、PDF のレビュー。あらゆるステップに AI が組み込まれています。',
+      'ドキュメントの作成、表計算、スライド作成、PDF のレビューを、すべてご自身のコンピューター上で行えます。',
     onbTitle2: 'すべての作業に AI を',
     onbBody2:
       '文書の中でそのまま下書き・書き直し・説明ができます。UniWork アカウント、またはご自身の AI プロバイダーキーを使えます。',
@@ -1218,7 +1218,8 @@ export const strings = {
     onbStepAria: '{total} ページ中 {n} ページ目',
     onbTitle3: '準備完了です',
     onbBody3: 'ファイルを開くか、新しいドキュメントを作成して始めましょう。',
-    onbNote3: 'AI 機能は UniWork クレジットを消費する場合があります。',
+    onbNote3:
+      'AI の利用は任意です。ドキュメントはお使いのコンピューター上で編集され、ファイルを開いたり保存したりするのにアカウントやキーは必要ありません。',
     onbBack: '戻る',
     defaultProject: '既定のプロジェクト',
     deleteProject: 'プロジェクトを削除…',
@@ -1625,7 +1626,7 @@ export const strings = {
     onbTitle1: 'UniWork Office에 오신 것을 환영합니다',
     onbSubtitle1: '문서, 스프레드시트, 슬라이드, PDF를 하나의 앱에서',
     onbBody1:
-      '문서 작성, 스프레드시트 제작, 프레젠테이션 생성, PDF 검토. 모든 단계에 AI가 녹아 있습니다.',
+      '문서 작성, 스프레드시트 제작, 프레젠테이션 생성, PDF 검토를 모두 내 컴퓨터에서 할 수 있습니다.',
     onbTitle2: '모든 단계에 AI를',
     onbBody2:
       '문서 안에서 바로 초안 작성, 다시 쓰기, 설명을 할 수 있습니다. UniWork 계정이나 직접 마련한 AI 제공업체 키를 사용하세요.',
@@ -1635,7 +1636,8 @@ export const strings = {
     onbStepAria: '총 {total}페이지 중 {n}페이지',
     onbTitle3: '준비가 끝났습니다',
     onbBody3: '파일을 열거나 새 문서를 만들어 시작하세요.',
-    onbNote3: 'AI 기능은 UniWork 크레딧을 소모할 수 있습니다.',
+    onbNote3:
+      'AI는 선택 사항입니다. 문서는 내 컴퓨터에서 편집되며, 파일을 열거나 저장하는 데 계정이나 키가 필요하지 않습니다.',
     onbBack: '이전',
     defaultProject: '기본 프로젝트',
     deleteProject: '프로젝트 삭제…',
@@ -2058,7 +2060,7 @@ export const strings = {
     onbTitle1: 'Bienvenue dans UniWork Office',
     onbSubtitle1: 'Documents, tableurs, présentations et PDF dans une seule application',
     onbBody1:
-      'Créez des documents, des feuilles de calcul et des présentations, et relisez des PDF. L’IA est intégrée à chaque étape.',
+      'Créez des documents, des feuilles de calcul et des présentations, et relisez des PDF, le tout sur votre propre ordinateur.',
     onbTitle2: 'L’IA à chaque étape',
     onbBody2:
       'Rédigez, reformulez et expliquez directement dans vos documents. Utilisez votre compte UniWork ou votre propre clé de fournisseur d’IA.',
@@ -2068,7 +2070,8 @@ export const strings = {
     onbStepAria: 'Page {n} sur {total}',
     onbTitle3: 'Tout est prêt',
     onbBody3: 'Ouvrez un fichier ou créez un nouveau document pour commencer.',
-    onbNote3: 'Les fonctions IA peuvent consommer des crédits UniWork.',
+    onbNote3:
+      'L’IA est facultative. Vos documents sont modifiés sur votre ordinateur ; aucun compte ni clé n’est nécessaire pour ouvrir ou enregistrer des fichiers.',
     onbBack: 'Retour',
     defaultProject: 'Projet par défaut',
     deleteProject: 'Supprimer le projet…',
@@ -2493,7 +2496,7 @@ export const strings = {
     onbTitle1: 'Willkommen bei UniWork Office',
     onbSubtitle1: 'Dokumente, Tabellen, Präsentationen und PDFs in einer App',
     onbBody1:
-      'Dokumente erstellen, Tabellen bauen, Präsentationen gestalten und PDFs prüfen. KI ist in jedem Schritt integriert.',
+      'Dokumente erstellen, Tabellen bauen, Präsentationen gestalten und PDFs prüfen – alles auf Ihrem eigenen Computer.',
     onbTitle2: 'KI bei jedem Schritt',
     onbBody2:
       'Entwerfen, umformulieren und erklären – direkt in Ihren Dokumenten. Nutzen Sie Ihr UniWork-Konto oder Ihren eigenen KI-Anbieter-Schlüssel.',
@@ -2503,7 +2506,8 @@ export const strings = {
     onbStepAria: 'Seite {n} von {total}',
     onbTitle3: 'Alles bereit',
     onbBody3: 'Öffnen Sie eine Datei oder erstellen Sie ein neues Dokument, um loszulegen.',
-    onbNote3: 'KI-Funktionen können UniWork-Credits verbrauchen.',
+    onbNote3:
+      'KI ist optional. Ihre Dokumente werden auf Ihrem Computer bearbeitet; zum Öffnen oder Speichern von Dateien sind weder ein Konto noch ein Schlüssel nötig.',
     onbBack: 'Zurück',
     defaultProject: 'Standardprojekt',
     deleteProject: 'Projekt löschen…',
@@ -2926,7 +2930,7 @@ export const strings = {
     onbTitle1: 'Bienvenido a UniWork Office',
     onbSubtitle1: 'Documentos, hojas de cálculo, presentaciones y PDF en una sola aplicación',
     onbBody1:
-      'Crea documentos, hojas de cálculo y presentaciones, y revisa PDF. La IA está integrada en cada paso.',
+      'Crea documentos, hojas de cálculo y presentaciones, y revisa PDF, todo en tu propio equipo.',
     onbTitle2: 'IA en cada paso',
     onbBody2:
       'Redacta, reescribe y explica directamente en tus documentos. Usa tu cuenta de UniWork o tu propia clave de proveedor de IA.',
@@ -2936,7 +2940,8 @@ export const strings = {
     onbStepAria: 'Página {n} de {total}',
     onbTitle3: 'Todo listo',
     onbBody3: 'Abre un archivo o crea un documento nuevo para empezar.',
-    onbNote3: 'Las funciones de IA pueden consumir créditos de UniWork.',
+    onbNote3:
+      'La IA es opcional. Tus documentos se editan en tu equipo; no hace falta una cuenta ni una clave para abrir o guardar archivos.',
     onbBack: 'Atrás',
     defaultProject: 'Proyecto predeterminado',
     deleteProject: 'Eliminar proyecto…',
@@ -3340,7 +3345,8 @@ export const strings = {
     // First-run onboarding
     onbTitle1: 'ยินดีต้อนรับสู่ UniWork Office',
     onbSubtitle1: 'เอกสาร สเปรดชีต งานนำเสนอ และ PDF ในแอปเดียว',
-    onbBody1: 'สร้างเอกสาร ทำสเปรดชีต สร้างงานนำเสนอ และตรวจทาน PDF ทุกขั้นตอนมี AI ในตัว',
+    onbBody1:
+      'สร้างเอกสาร ทำสเปรดชีต สร้างงานนำเสนอ และตรวจทาน PDF ได้ทั้งหมดบนคอมพิวเตอร์ของคุณเอง',
     onbTitle2: 'AI ช่วยในทุกขั้นตอน',
     onbBody2:
       'ร่าง เขียนใหม่ และอธิบายได้ในเอกสารของคุณโดยตรง ใช้บัญชี UniWork หรือคีย์ผู้ให้บริการ AI ของคุณเอง',
@@ -3350,7 +3356,8 @@ export const strings = {
     onbStepAria: 'หน้า {n} จาก {total}',
     onbTitle3: 'พร้อมแล้ว',
     onbBody3: 'เปิดไฟล์หรือสร้างเอกสารใหม่เพื่อเริ่มต้น',
-    onbNote3: 'ฟีเจอร์ AI อาจใช้เครดิต UniWork',
+    onbNote3:
+      'AI เป็นตัวเลือก เอกสารของคุณถูกแก้ไขบนคอมพิวเตอร์ของคุณ ไม่ต้องใช้บัญชีหรือคีย์เพื่อเปิดหรือบันทึกไฟล์',
     onbBack: 'ย้อนกลับ',
     defaultProject: 'โปรเจ็กต์เริ่มต้น',
     deleteProject: 'ลบโปรเจ็กต์…',
@@ -3765,7 +3772,7 @@ export const strings = {
     onbTitle1: 'Selamat datang di UniWork Office',
     onbSubtitle1: 'Dokumen, spreadsheet, slide, dan PDF dalam satu aplikasi',
     onbBody1:
-      'Buat dokumen, susun spreadsheet, rancang presentasi, dan tinjau PDF. AI hadir di setiap langkah.',
+      'Buat dokumen, susun spreadsheet, rancang presentasi, dan tinjau PDF, semuanya di komputer Anda sendiri.',
     onbTitle2: 'AI di setiap langkah',
     onbBody2:
       'Susun draf, tulis ulang, dan jelaskan langsung di dalam dokumen Anda. Gunakan akun UniWork atau kunci penyedia AI Anda sendiri.',
@@ -3775,7 +3782,8 @@ export const strings = {
     onbStepAria: 'Halaman {n} dari {total}',
     onbTitle3: 'Semua siap',
     onbBody3: 'Buka berkas atau buat dokumen baru untuk memulai.',
-    onbNote3: 'Fitur AI dapat menggunakan kredit UniWork.',
+    onbNote3:
+      'AI bersifat opsional. Dokumen Anda diedit di komputer Anda; tidak perlu akun atau kunci untuk membuka atau menyimpan file.',
     onbBack: 'Kembali',
     defaultProject: 'Proyek default',
     deleteProject: 'Hapus proyek…',
@@ -4189,7 +4197,7 @@ export const strings = {
     onbTitle1: 'Добро пожаловать в UniWork Office',
     onbSubtitle1: 'Документы, таблицы, презентации и PDF в одном приложении',
     onbBody1:
-      'Создавайте документы, таблицы и презентации, работайте с PDF. ИИ встроен в каждый шаг.',
+      'Создавайте документы, таблицы и презентации, работайте с PDF — всё на вашем компьютере.',
     onbTitle2: 'ИИ на каждом шаге',
     onbBody2:
       'Составляйте черновики, переписывайте и объясняйте прямо в документах. Используйте аккаунт UniWork или собственный ключ поставщика ИИ.',
@@ -4199,7 +4207,8 @@ export const strings = {
     onbStepAria: 'Страница {n} из {total}',
     onbTitle3: 'Всё готово',
     onbBody3: 'Откройте файл или создайте новый документ, чтобы начать.',
-    onbNote3: 'Функции ИИ могут расходовать кредиты UniWork.',
+    onbNote3:
+      'ИИ необязателен. Документы редактируются на вашем компьютере; для открытия и сохранения файлов не нужны ни аккаунт, ни ключ.',
     onbBack: 'Назад',
     defaultProject: 'Проект по умолчанию',
     deleteProject: 'Удалить проект…',
@@ -4607,7 +4616,7 @@ export const strings = {
     onbTitle1: 'مرحبًا بك في UniWork Office',
     onbSubtitle1: 'المستندات والجداول والعروض وملفات PDF في تطبيق واحد',
     onbBody1:
-      'أنشئ المستندات وجداول البيانات والعروض التقديمية وراجع ملفات PDF. الذكاء الاصطناعي مدمج في كل خطوة.',
+      'أنشئ المستندات وجداول البيانات والعروض التقديمية وراجع ملفات PDF، كل ذلك على جهاز الكمبيوتر الخاص بك.',
     onbTitle2: 'الذكاء الاصطناعي في كل خطوة',
     onbBody2:
       'اكتب المسودات وأعد الصياغة واشرح مباشرة داخل مستنداتك. استخدم حساب UniWork أو مفتاح مزوّد الذكاء الاصطناعي الخاص بك.',
@@ -4617,7 +4626,8 @@ export const strings = {
     onbStepAria: 'الصفحة {n} من {total}',
     onbTitle3: 'كل شيء جاهز',
     onbBody3: 'افتح ملفًا أو أنشئ مستندًا جديدًا للبدء.',
-    onbNote3: 'قد تستهلك ميزات الذكاء الاصطناعي أرصدة UniWork.',
+    onbNote3:
+      'الذكاء الاصطناعي اختياري. تُحرَّر مستنداتك على جهاز الكمبيوتر الخاص بك، ولا حاجة إلى حساب أو مفتاح لفتح الملفات أو حفظها.',
     onbBack: 'رجوع',
     defaultProject: 'المشروع الافتراضي',
     deleteProject: 'حذف المشروع…',
@@ -5027,7 +5037,7 @@ export const strings = {
     onbTitle1: 'Bem-vindo ao UniWork Office',
     onbSubtitle1: 'Documentos, planilhas, apresentações e PDFs em um só app',
     onbBody1:
-      'Crie documentos, planilhas e apresentações e revise PDFs. A IA está integrada em cada etapa.',
+      'Crie documentos, planilhas e apresentações e revise PDFs, tudo no seu próprio computador.',
     onbTitle2: 'IA em cada etapa',
     onbBody2:
       'Redija, reescreva e explique direto nos seus documentos. Use sua conta UniWork ou sua própria chave de provedor de IA.',
@@ -5037,7 +5047,8 @@ export const strings = {
     onbStepAria: 'Página {n} de {total}',
     onbTitle3: 'Tudo pronto',
     onbBody3: 'Abra um arquivo ou crie um novo documento para começar.',
-    onbNote3: 'Os recursos de IA podem consumir créditos UniWork.',
+    onbNote3:
+      'A IA é opcional. Seus documentos são editados no seu computador; não é preciso conta nem chave para abrir ou salvar arquivos.',
     onbBack: 'Voltar',
     defaultProject: 'Projeto padrão',
     deleteProject: 'Excluir projeto…',
@@ -5446,7 +5457,7 @@ export const strings = {
     onbTitle1: 'Benvenuto in UniWork Office',
     onbSubtitle1: 'Documenti, fogli di calcolo, presentazioni e PDF in una sola app',
     onbBody1:
-      'Crea documenti, fogli di calcolo e presentazioni e rivedi i PDF. L’IA è integrata in ogni passaggio.',
+      'Crea documenti, fogli di calcolo e presentazioni e rivedi i PDF, tutto sul tuo computer.',
     onbTitle2: 'L’IA in ogni passaggio',
     onbBody2:
       'Scrivi bozze, riformula e spiega direttamente nei tuoi documenti. Usa il tuo account UniWork o la tua chiave di un provider IA.',
@@ -5456,7 +5467,8 @@ export const strings = {
     onbStepAria: 'Pagina {n} di {total}',
     onbTitle3: 'Tutto pronto',
     onbBody3: 'Apri un file o crea un nuovo documento per iniziare.',
-    onbNote3: 'Le funzioni IA possono consumare crediti UniWork.',
+    onbNote3:
+      'L’IA è facoltativa. I tuoi documenti vengono modificati sul tuo computer; per aprire o salvare i file non servono né un account né una chiave.',
     onbBack: 'Indietro',
     defaultProject: 'Progetto predefinito',
     deleteProject: 'Elimina progetto…',
@@ -5863,7 +5875,7 @@ export const strings = {
     onbTitle1: 'Witamy w UniWork Office',
     onbSubtitle1: 'Dokumenty, arkusze, prezentacje i PDF w jednej aplikacji',
     onbBody1:
-      'Twórz dokumenty, arkusze i prezentacje oraz przeglądaj pliki PDF. AI jest wbudowana w każdy etap.',
+      'Twórz dokumenty, arkusze i prezentacje oraz przeglądaj pliki PDF, a wszystko to na własnym komputerze.',
     onbTitle2: 'AI na każdym kroku',
     onbBody2:
       'Twórz szkice, przepisuj i wyjaśniaj bezpośrednio w dokumentach. Użyj konta UniWork lub własnego klucza dostawcy AI.',
@@ -5873,7 +5885,8 @@ export const strings = {
     onbStepAria: 'Strona {n} z {total}',
     onbTitle3: 'Wszystko gotowe',
     onbBody3: 'Otwórz plik lub utwórz nowy dokument, aby zacząć.',
-    onbNote3: 'Funkcje AI mogą zużywać kredyty UniWork.',
+    onbNote3:
+      'AI jest opcjonalna. Dokumenty są edytowane na Twoim komputerze; do otwierania i zapisywania plików nie potrzeba konta ani klucza.',
     onbBack: 'Wstecz',
     defaultProject: 'Projekt domyślny',
     deleteProject: 'Usuń projekt…',
@@ -6247,7 +6260,7 @@ export const strings = {
     onbTitle1: 'Vítejte v UniWork Office',
     onbSubtitle1: 'Dokumenty, tabulky, prezentace a PDF v jedné aplikaci',
     onbBody1:
-      'Vytvářejte dokumenty, tabulky a prezentace a kontrolujte PDF. AI je součástí každého kroku.',
+      'Vytvářejte dokumenty, tabulky a prezentace a kontrolujte PDF, a to vše na vlastním počítači.',
     onbTitle2: 'AI v každém kroku',
     onbBody2:
       'Pište návrhy, přeformulovávejte a vysvětlujte přímo ve svých dokumentech. Použijte účet UniWork nebo vlastní klíč poskytovatele AI.',
@@ -6257,7 +6270,8 @@ export const strings = {
     onbStepAria: 'Stránka {n} z {total}',
     onbTitle3: 'Vše je připraveno',
     onbBody3: 'Otevřete soubor nebo vytvořte nový dokument a začněte.',
-    onbNote3: 'Funkce AI mohou čerpat kredity UniWork.',
+    onbNote3:
+      'AI je volitelná. Dokumenty se upravují ve vašem počítači; k otevření nebo uložení souborů není potřeba účet ani klíč.',
     onbBack: 'Zpět',
     setAutoSave: 'Automaticky ukládat všechny dokumenty',
     setAutoSaveDesc:
@@ -6698,7 +6712,7 @@ export const strings = {
     onbTitle1: 'Welkom bij UniWork Office',
     onbSubtitle1: 'Documenten, spreadsheets, presentaties en pdf’s in één app',
     onbBody1:
-      'Maak documenten, bouw spreadsheets, maak presentaties en beoordeel PDF-bestanden. AI zit in elke stap ingebouwd.',
+      'Maak documenten, bouw spreadsheets, maak presentaties en beoordeel pdf’s, alles op je eigen computer.',
     onbTitle2: 'AI bij elke stap',
     onbBody2:
       'Schrijf concepten, herformuleer en leg uit, direct in je documenten. Gebruik je UniWork-account of je eigen sleutel van een AI-aanbieder.',
@@ -6708,7 +6722,8 @@ export const strings = {
     onbStepAria: 'Pagina {n} van {total}',
     onbTitle3: 'Alles staat klaar',
     onbBody3: 'Open een bestand of maak een nieuw document om te beginnen.',
-    onbNote3: 'AI-functies kunnen UniWork-credits verbruiken.',
+    onbNote3:
+      'AI is optioneel. Je documenten worden op je computer bewerkt; om bestanden te openen of op te slaan heb je geen account of sleutel nodig.',
     onbBack: 'Terug',
     defaultProject: 'Standaardproject',
     deleteProject: 'Project verwijderen…',
@@ -7120,7 +7135,7 @@ export const strings = {
     onbTitle1: 'Selamat datang ke UniWork Office',
     onbSubtitle1: 'Dokumen, hamparan, slaid dan PDF dalam satu aplikasi',
     onbBody1:
-      'Cipta dokumen, bina hamparan, hasilkan persembahan dan semak PDF. AI tersedia pada setiap langkah.',
+      'Cipta dokumen, bina hamparan, hasilkan persembahan dan semak PDF, semuanya pada komputer anda sendiri.',
     onbTitle2: 'AI pada setiap langkah',
     onbBody2:
       'Susun draf, tulis semula dan terangkan terus dalam dokumen anda. Gunakan akaun UniWork atau kunci pembekal AI anda sendiri.',
@@ -7130,7 +7145,8 @@ export const strings = {
     onbStepAria: 'Halaman {n} daripada {total}',
     onbTitle3: 'Semuanya sedia',
     onbBody3: 'Buka fail atau cipta dokumen baharu untuk bermula.',
-    onbNote3: 'Ciri AI mungkin menggunakan kredit UniWork.',
+    onbNote3:
+      'AI adalah pilihan. Dokumen anda diedit pada komputer anda; tiada akaun atau kunci diperlukan untuk membuka atau menyimpan fail.',
     onbBack: 'Kembali',
     defaultProject: 'Projek lalai',
     deleteProject: 'Padam projek…',
@@ -7524,7 +7540,7 @@ export const strings = {
     // First-run onboarding
     onbTitle1: 'ברוכים הבאים ל-UniWork Office',
     onbSubtitle1: 'מסמכים, גיליונות, מצגות וקובצי PDF באפליקציה אחת',
-    onbBody1: 'צרו מסמכים, בנו גיליונות, הכינו מצגות ובדקו קובצי PDF. ה-AI מובנה בכל שלב.',
+    onbBody1: 'צרו מסמכים, בנו גיליונות, הכינו מצגות ובדקו קובצי PDF, הכול במחשב שלכם.',
     onbTitle2: 'AI בכל שלב',
     onbBody2:
       'אפשר לנסח, לכתוב מחדש ולהסביר ישירות בתוך המסמכים. השתמשו בחשבון UniWork או במפתח ספק AI משלכם.',
@@ -7534,7 +7550,8 @@ export const strings = {
     onbStepAria: 'עמוד {n} מתוך {total}',
     onbTitle3: 'הכול מוכן',
     onbBody3: 'פתחו קובץ או צרו מסמך חדש כדי להתחיל.',
-    onbNote3: 'תכונות AI עשויות לצרוך קרדיטים של UniWork.',
+    onbNote3:
+      'ה-AI הוא אופציונלי. המסמכים שלכם נערכים במחשב שלכם; אין צורך בחשבון או במפתח כדי לפתוח או לשמור קבצים.',
     onbBack: 'חזרה',
     defaultProject: 'פרויקט ברירת מחדל',
     deleteProject: 'מחיקת פרויקט…',
@@ -7938,7 +7955,7 @@ export const strings = {
     onbTitle1: 'UniWork Office में आपका स्वागत है',
     onbSubtitle1: 'दस्तावेज़, स्प्रेडशीट, स्लाइड और PDF — एक ही ऐप में',
     onbBody1:
-      'दस्तावेज़ बनाएँ, स्प्रेडशीट तैयार करें, प्रस्तुतियाँ बनाएँ और PDF की समीक्षा करें। AI हर चरण में शामिल है।',
+      'दस्तावेज़ बनाएँ, स्प्रेडशीट तैयार करें, स्लाइड बनाएँ और PDF की समीक्षा करें, यह सब आपके अपने कंप्यूटर पर।',
     onbTitle2: 'हर कदम पर AI',
     onbBody2:
       'अपने दस्तावेज़ों में ही ड्राफ़्ट बनाएँ, दोबारा लिखें और समझाएँ। अपना UniWork खाता या अपनी AI प्रदाता कुंजी इस्तेमाल करें।',
@@ -7948,7 +7965,8 @@ export const strings = {
     onbStepAria: 'कुल {total} में से पृष्ठ {n}',
     onbTitle3: 'सब तैयार है',
     onbBody3: 'शुरू करने के लिए कोई फ़ाइल खोलें या नया दस्तावेज़ बनाएँ।',
-    onbNote3: 'AI सुविधाएँ UniWork क्रेडिट खर्च कर सकती हैं।',
+    onbNote3:
+      'AI वैकल्पिक है। आपके दस्तावेज़ आपके कंप्यूटर पर ही संपादित होते हैं; फ़ाइलें खोलने या सहेजने के लिए खाता या कुंजी की ज़रूरत नहीं है।',
     onbBack: 'वापस',
     defaultProject: 'डिफ़ॉल्ट प्रोजेक्ट',
     deleteProject: 'प्रोजेक्ट हटाएँ…',
@@ -8737,7 +8755,7 @@ export const strings = {
     // First-run onboarding
     onbTitle1: '歡迎使用 UniWork Office',
     onbSubtitle1: '文件、試算表、簡報與 PDF，盡在一個應用程式',
-    onbBody1: '建立文件、製作試算表、產生簡報、審閱 PDF。AI 深度融入每個環節。',
+    onbBody1: '建立文件、製作試算表、產生簡報、審閱 PDF，一切都在你自己的電腦上完成。',
     onbTitle2: 'AI 貫穿每一步',
     onbBody2: '直接在文件中撰寫草稿、改寫與說明。使用你的 UniWork 帳號，或自備 AI 服務商金鑰。',
     onbSkip: '略過',
@@ -8746,7 +8764,7 @@ export const strings = {
     onbStepAria: '第 {n} 頁，共 {total} 頁',
     onbTitle3: '一切就緒',
     onbBody3: '開啟檔案，或建立新文件即可開始。',
-    onbNote3: 'AI 功能可能消耗 UniWork 點數。',
+    onbNote3: 'AI 為選用功能。文件在你的電腦上編輯；開啟或儲存檔案無需帳號或金鑰。',
     onbBack: '上一步',
     defaultProject: '預設專案',
     deleteProject: '刪除專案…',
