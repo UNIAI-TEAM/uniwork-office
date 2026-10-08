@@ -13,6 +13,8 @@
 // whole-line comments alone (the brand word in a comment is not user-visible
 // and rewriting it would only make upstream merges noisier).
 
+import { ONBOARDING_COPY } from './onboarding-copy.mjs'
+
 const SRC_EXT = '{ts,tsx,mts,cts,js,mjs,cjs,html,md,json}'
 
 /** Product source that can carry user-visible strings. */
@@ -118,6 +120,49 @@ function genericAiBadge(text) {
     /\/\*\*(?:(?!\*\/)[^])*\*\/(\s*\nexport function GensparkMark\()/,
     (_m, tail) => `${AI_BADGE_DOC}${tail}`,
   )
+  return out
+}
+
+/** Terminal columns of a string the way prettier counts them (wide CJK = 2, U+0300-036F = 0). */
+function columns(text) {
+  let n = 0
+  for (const ch of text) {
+    const c = ch.codePointAt(0)
+    if (c >= 0x300 && c <= 0x36f) continue // prettier skips only these combining marks
+    const wide =
+      (c >= 0x1100 && c <= 0x115f) ||
+      (c >= 0x2e80 && c <= 0xa4cf) ||
+      (c >= 0xac00 && c <= 0xd7a3) ||
+      (c >= 0xf900 && c <= 0xfaff) ||
+      (c >= 0xfe30 && c <= 0xfe6f) ||
+      (c >= 0xff00 && c <= 0xff60) ||
+      (c >= 0xffe0 && c <= 0xffe6)
+    n += wide ? 2 : 1
+  }
+  return n
+}
+
+/**
+ * Sets the first-run welcome keys (onboarding-copy.mjs) inside each locale block of the shell
+ * string table, written the way prettier lays out a long property (value on its own line).
+ */
+function onboardingCopy(text) {
+  let out = text
+  for (const [locale, copy] of Object.entries(ONBOARDING_COPY)) {
+    const header = new RegExp(`^  (?:${locale}|'${locale}'): \\{\\n`, 'm').exec(out)
+    if (!header) continue
+    const start = header.index + header[0].length
+    const end = out.indexOf('\n  },\n', start)
+    if (end < 0) continue
+    let block = out.slice(start, end)
+    for (const [key, value] of Object.entries(copy)) {
+      const line = `    ${key}: '${value}',`
+      const next = columns(line) <= 100 ? line : `    ${key}:\n      '${value}',`
+      const prop = new RegExp(`^    ${key}:[ \\t]*(?:\\n[ \\t]*)?'(?:[^'\\\\\\n]|\\\\.)*',$`, 'm')
+      block = prop.test(block) ? block.replace(prop, () => next) : block
+    }
+    out = out.slice(0, start) + block + out.slice(end)
+  }
   return out
 }
 
@@ -374,6 +419,12 @@ export const rules = [
         'https://api.github.com/repos/UNIAI-TEAM/uniwork-office',
       ],
     ],
+  },
+  {
+    id: 'onboarding-copy',
+    why: "First-run welcome copy (subtitle, slide 2, footnote; onbBody1 for en / vi) is UniWork product copy, not upstream's and not planning vocabulary: the values live in tools/rebrand/onboarding-copy.mjs and are re-applied in every locale after a sync",
+    files: ['apps/shell/src/renderer/src/strings.ts'],
+    transform: onboardingCopy,
   },
   {
     id: 'skills-install-source',

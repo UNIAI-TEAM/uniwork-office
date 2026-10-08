@@ -186,8 +186,8 @@ export function HealthMetricsViz({ vi }: { vi: boolean }): ReactElement {
       <div className="wb-hdash-top">
         <p className="teacher-hint">
           {label(
-            'Dashboard chỉ số — giai đoạn này nhập thủ công. Giao diện kết nối Apple Watch / đồng hồ sức khoẻ đã sẵn, bật khi có mạng.',
-            'Metrics dashboard — manual entry for now. Apple Watch / wearables UI is ready for when network sync is available.',
+            'Bảng chỉ số sức khoẻ — hiện bạn nhập số liệu bằng tay. Kết nối Apple Watch / đồng hồ sức khoẻ dùng được khi có mạng.',
+            'Health metrics dashboard — you enter readings by hand for now. Apple Watch / wearable sync works once you are online.',
           )}
         </p>
         <DeviceConnectStrip vi={vi} />
@@ -270,7 +270,6 @@ export function HealthMetricsViz({ vi }: { vi: boolean }): ReactElement {
           <section className="wb-hdash-card wb-hdash-entry">
             <header>
               <h3>{label('Nhập thủ công', 'Manual entry')}</h3>
-              <span className="wb-hdash-badge">{label('Giai đoạn 1', 'Phase 1')}</span>
             </header>
             <div className="wb-module-form wb-hm-form">
               <label>

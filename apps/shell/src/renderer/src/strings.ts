@@ -386,11 +386,10 @@ export const strings = {
     newTab: '新建标签页',
     // First-run onboarding
     onbTitle1: '欢迎使用 UniWork Office',
-    onbSubtitle1: '第一个开源的 AI 原生 Office 套件',
+    onbSubtitle1: '文档、表格、演示和 PDF，尽在一个应用',
     onbBody1: '创建文档、制作表格、生成演示、审阅 PDF。AI 深度融入每个环节。',
-    onbTitle2: '这只是一个开始',
-    onbBody2:
-      'UniWork Office 当前仅提供桌面编辑器。UniWork 身份认证、Work Graph 和云同步不在本阶段范围内。',
+    onbTitle2: 'AI 贯穿每一步',
+    onbBody2: '在文档中直接起草、改写和解释。使用你的 UniWork 账号，或自带 AI 服务商密钥。',
     onbCredits: '活跃贡献者可获得 **1,000+ UniWork 积分**',
     onbJoinGenTeam: '了解更多',
     onbSkip: '跳过',
@@ -808,11 +807,11 @@ export const strings = {
     newTab: 'New tab',
     // First-run onboarding
     onbTitle1: 'Welcome to UniWork Office',
-    onbSubtitle1: 'Open document productivity runtime for the UniWork ecosystem',
+    onbSubtitle1: 'Documents, spreadsheets, slides and PDFs in one app',
     onbBody1: 'Create docs, build sheets, make slides, and review PDFs, all on your own computer.',
-    onbTitle2: 'This is just the beginning',
+    onbTitle2: 'AI at every step',
     onbBody2:
-      'UniWork Office currently ships the desktop editors only. UniWork authentication, Work Graph and cloud sync are not part of this phase.',
+      'Draft, rewrite and explain right inside your documents. Use your UniWork account or your own AI provider key.',
     onbCredits: 'Existing AI features may use a UniWork account or your own provider keys.',
     onbJoinGenTeam: 'Learn more',
     onbSkip: 'Skip',
@@ -822,7 +821,7 @@ export const strings = {
     onbTitle3: 'Free for everyone',
     onbBody3: 'No license fees. No ads. No watermarks.',
     onbNote3:
-      'AI is optional. Document editing is local. Provider keys are never required to open or save files.',
+      'AI is optional. Your documents are edited on your computer; no account or key is needed to open or save files.',
     onbBack: 'Back',
     defaultProject: 'Default project',
     deleteProject: 'Delete project…',
@@ -1247,12 +1246,12 @@ export const strings = {
     newTab: '新しいタブ',
     // First-run onboarding
     onbTitle1: 'UniWork Office へようこそ',
-    onbSubtitle1: '初のオープンソース AI ネイティブ Office スイート',
+    onbSubtitle1: 'ドキュメント、スプレッドシート、スライド、PDF をひとつのアプリで',
     onbBody1:
       '文書の作成、表計算、プレゼン作成、PDF のレビュー。あらゆるステップに AI が組み込まれています。',
-    onbTitle2: 'これはまだ始まりにすぎません',
+    onbTitle2: 'すべての作業に AI を',
     onbBody2:
-      'UniWork Office は現時点ではデスクトップ編集アプリのみです。UniWork 認証、Work Graph、クラウド同期はこの段階には含まれません。',
+      '文書の中でそのまま下書き・書き直し・説明ができます。UniWork アカウント、またはご自身の AI プロバイダーキーを使えます。',
     onbCredits: 'アクティブな貢献者への特典 **1,000+ UniWork クレジット**',
     onbJoinGenTeam: '詳しく見る',
     onbSkip: 'スキップ',
@@ -1678,12 +1677,12 @@ export const strings = {
     newTab: '새 탭',
     // First-run onboarding
     onbTitle1: 'UniWork Office에 오신 것을 환영합니다',
-    onbSubtitle1: '최초의 오픈소스 AI 네이티브 오피스 제품군',
+    onbSubtitle1: '문서, 스프레드시트, 슬라이드, PDF를 하나의 앱에서',
     onbBody1:
       '문서 작성, 스프레드시트 제작, 프레젠테이션 생성, PDF 검토. 모든 단계에 AI가 녹아 있습니다.',
-    onbTitle2: '이제 시작일 뿐입니다',
+    onbTitle2: '모든 단계에 AI를',
     onbBody2:
-      'UniWork Office는 현재 데스크톱 편집기만 제공합니다. UniWork 인증, Work Graph, 클라우드 동기화는 이 단계에 포함되지 않습니다.',
+      '문서 안에서 바로 초안 작성, 다시 쓰기, 설명을 할 수 있습니다. UniWork 계정이나 직접 마련한 AI 제공업체 키를 사용하세요.',
     onbCredits: '활발한 기여자를 위한 혜택 **1,000+ UniWork 크레딧**',
     onbJoinGenTeam: '자세히 알아보기',
     onbSkip: '건너뛰기',
@@ -2123,12 +2122,12 @@ export const strings = {
     newTab: 'Nouvel onglet',
     // First-run onboarding
     onbTitle1: 'Bienvenue dans UniWork Office',
-    onbSubtitle1: 'La première suite bureautique open source et native IA',
+    onbSubtitle1: 'Documents, tableurs, présentations et PDF dans une seule application',
     onbBody1:
       'Créez des documents, des feuilles de calcul et des présentations, et relisez des PDF. L’IA est intégrée à chaque étape.',
-    onbTitle2: 'Ce n’est qu’un début',
+    onbTitle2: 'L’IA à chaque étape',
     onbBody2:
-      'UniWork Office propose actuellement uniquement les éditeurs de bureau. L’authentification UniWork, Work Graph et la synchronisation cloud ne font pas partie de cette phase.',
+      'Rédigez, reformulez et expliquez directement dans vos documents. Utilisez votre compte UniWork ou votre propre clé de fournisseur d’IA.',
     onbCredits: 'Les contributeurs actifs reçoivent **1 000+ crédits UniWork**',
     onbJoinGenTeam: 'En savoir plus',
     onbSkip: 'Passer',
@@ -2572,12 +2571,12 @@ export const strings = {
     newTab: 'Neuer Tab',
     // First-run onboarding
     onbTitle1: 'Willkommen bei UniWork Office',
-    onbSubtitle1: 'Die erste quelloffene, KI-native Office-Suite',
+    onbSubtitle1: 'Dokumente, Tabellen, Präsentationen und PDFs in einer App',
     onbBody1:
       'Dokumente erstellen, Tabellen bauen, Präsentationen gestalten und PDFs prüfen. KI ist in jedem Schritt integriert.',
-    onbTitle2: 'Das ist erst der Anfang',
+    onbTitle2: 'KI bei jedem Schritt',
     onbBody2:
-      'UniWork Office liefert derzeit nur die Desktop-Editoren. UniWork-Anmeldung, Work Graph und Cloud-Sync gehören nicht zu dieser Phase.',
+      'Entwerfen, umformulieren und erklären – direkt in Ihren Dokumenten. Nutzen Sie Ihr UniWork-Konto oder Ihren eigenen KI-Anbieter-Schlüssel.',
     onbCredits: 'Aktive Mitwirkende erhalten **1.000+ UniWork-Guthaben**',
     onbJoinGenTeam: 'Mehr erfahren',
     onbSkip: 'Überspringen',
@@ -3018,12 +3017,12 @@ export const strings = {
     newTab: 'Nueva pestaña',
     // First-run onboarding
     onbTitle1: 'Bienvenido a UniWork Office',
-    onbSubtitle1: 'La primera suite ofimática de código abierto y nativa de IA',
+    onbSubtitle1: 'Documentos, hojas de cálculo, presentaciones y PDF en una sola aplicación',
     onbBody1:
       'Crea documentos, hojas de cálculo y presentaciones, y revisa PDF. La IA está integrada en cada paso.',
-    onbTitle2: 'Esto es solo el comienzo',
+    onbTitle2: 'IA en cada paso',
     onbBody2:
-      'UniWork Office actualmente solo incluye los editores de escritorio. La autenticación UniWork, Work Graph y la sincronización en la nube no forman parte de esta fase.',
+      'Redacta, reescribe y explica directamente en tus documentos. Usa tu cuenta de UniWork o tu propia clave de proveedor de IA.',
     onbCredits: 'Los colaboradores activos reciben **1.000+ créditos de UniWork**',
     onbJoinGenTeam: 'Más información',
     onbSkip: 'Omitir',
@@ -3446,11 +3445,11 @@ export const strings = {
     newTab: 'แท็บใหม่',
     // First-run onboarding
     onbTitle1: 'ยินดีต้อนรับสู่ UniWork Office',
-    onbSubtitle1: 'ชุดโปรแกรมออฟฟิศ AI-native โอเพนซอร์สตัวแรก',
+    onbSubtitle1: 'เอกสาร สเปรดชีต งานนำเสนอ และ PDF ในแอปเดียว',
     onbBody1: 'สร้างเอกสาร ทำสเปรดชีต สร้างงานนำเสนอ และตรวจทาน PDF ทุกขั้นตอนมี AI ในตัว',
-    onbTitle2: 'นี่เป็นเพียงจุดเริ่มต้น',
+    onbTitle2: 'AI ช่วยในทุกขั้นตอน',
     onbBody2:
-      'UniWork Office ปัจจุบันมีเฉพาะโปรแกรมแก้ไขบนเดสก์ท็อป การยืนยันตัวตน UniWork, Work Graph และการซิงค์คลาวด์ไม่รวมในระยะนี้',
+      'ร่าง เขียนใหม่ และอธิบายได้ในเอกสารของคุณโดยตรง ใช้บัญชี UniWork หรือคีย์ผู้ให้บริการ AI ของคุณเอง',
     onbCredits: 'ผู้มีส่วนร่วมอย่างต่อเนื่องจะได้รับ **เครดิต UniWork กว่า 1,000**',
     onbJoinGenTeam: 'เรียนรู้เพิ่มเติม',
     onbSkip: 'ข้าม',
@@ -3883,12 +3882,12 @@ export const strings = {
     newTab: 'Tab baru',
     // First-run onboarding
     onbTitle1: 'Selamat datang di UniWork Office',
-    onbSubtitle1: 'Suite office open source AI-native pertama',
+    onbSubtitle1: 'Dokumen, spreadsheet, slide, dan PDF dalam satu aplikasi',
     onbBody1:
       'Buat dokumen, susun spreadsheet, rancang presentasi, dan tinjau PDF. AI hadir di setiap langkah.',
-    onbTitle2: 'Ini baru permulaan',
+    onbTitle2: 'AI di setiap langkah',
     onbBody2:
-      'UniWork Office saat ini hanya menghadirkan editor desktop. Autentikasi UniWork, Work Graph, dan sinkronisasi cloud bukan bagian dari tahap ini.',
+      'Susun draf, tulis ulang, dan jelaskan langsung di dalam dokumen Anda. Gunakan akun UniWork atau kunci penyedia AI Anda sendiri.',
     onbCredits: 'Kontributor aktif mendapat **1.000+ kredit UniWork**',
     onbJoinGenTeam: 'Pelajari selengkapnya',
     onbSkip: 'Lewati',
@@ -4320,12 +4319,12 @@ export const strings = {
     newTab: 'Новая вкладка',
     // First-run onboarding
     onbTitle1: 'Добро пожаловать в UniWork Office',
-    onbSubtitle1: 'Первый открытый AI-нативный офисный пакет',
+    onbSubtitle1: 'Документы, таблицы, презентации и PDF в одном приложении',
     onbBody1:
       'Создавайте документы, таблицы и презентации, работайте с PDF. ИИ встроен в каждый шаг.',
-    onbTitle2: 'Это только начало',
+    onbTitle2: 'ИИ на каждом шаге',
     onbBody2:
-      'UniWork Office сейчас включает только настольные редакторы. Аутентификация UniWork, Work Graph и облачная синхронизация не входят в этот этап.',
+      'Составляйте черновики, переписывайте и объясняйте прямо в документах. Используйте аккаунт UniWork или собственный ключ поставщика ИИ.',
     onbCredits: 'Активные участники получают **1000+ кредитов UniWork**',
     onbJoinGenTeam: 'Подробнее',
     onbSkip: 'Пропустить',
@@ -4750,12 +4749,12 @@ export const strings = {
     newTab: 'علامة تبويب جديدة',
     // First-run onboarding
     onbTitle1: 'مرحبًا بك في UniWork Office',
-    onbSubtitle1: 'أول حزمة مكتبية مفتوحة المصدر وأصيلة في الذكاء الاصطناعي',
+    onbSubtitle1: 'المستندات والجداول والعروض وملفات PDF في تطبيق واحد',
     onbBody1:
       'أنشئ المستندات وجداول البيانات والعروض التقديمية وراجع ملفات PDF. الذكاء الاصطناعي مدمج في كل خطوة.',
-    onbTitle2: 'هذه مجرد البداية',
+    onbTitle2: 'الذكاء الاصطناعي في كل خطوة',
     onbBody2:
-      'يوفّر UniWork Office حالياً محررات سطح المكتب فقط. مصادقة UniWork وWork Graph والمزامنة السحابية ليست جزءاً من هذه المرحلة.',
+      'اكتب المسودات وأعد الصياغة واشرح مباشرة داخل مستنداتك. استخدم حساب UniWork أو مفتاح مزوّد الذكاء الاصطناعي الخاص بك.',
     onbCredits: 'يحصل المساهمون النشطون على **+1,000 من أرصدة UniWork**',
     onbJoinGenTeam: 'معرفة المزيد',
     onbSkip: 'تخطي',
@@ -5183,12 +5182,12 @@ export const strings = {
     newTab: 'Nova guia',
     // First-run onboarding
     onbTitle1: 'Bem-vindo ao UniWork Office',
-    onbSubtitle1: 'A primeira suíte de escritório open source e nativa de IA',
+    onbSubtitle1: 'Documentos, planilhas, apresentações e PDFs em um só app',
     onbBody1:
       'Crie documentos, planilhas e apresentações e revise PDFs. A IA está integrada em cada etapa.',
-    onbTitle2: 'Isto é só o começo',
+    onbTitle2: 'IA em cada etapa',
     onbBody2:
-      'O UniWork Office atualmente inclui apenas os editores para desktop. Autenticação UniWork, Work Graph e sincronização na nuvem não fazem parte desta fase.',
+      'Redija, reescreva e explique direto nos seus documentos. Use sua conta UniWork ou sua própria chave de provedor de IA.',
     onbCredits: 'Contribuidores ativos recebem **1.000+ créditos UniWork**',
     onbJoinGenTeam: 'Saiba mais',
     onbSkip: 'Pular',
@@ -5616,12 +5615,12 @@ export const strings = {
     newTab: 'Nuova scheda',
     // First-run onboarding
     onbTitle1: 'Benvenuto in UniWork Office',
-    onbSubtitle1: 'La prima suite per ufficio open source e nativa per l’IA',
+    onbSubtitle1: 'Documenti, fogli di calcolo, presentazioni e PDF in una sola app',
     onbBody1:
       'Crea documenti, fogli di calcolo e presentazioni e rivedi i PDF. L’IA è integrata in ogni passaggio.',
-    onbTitle2: 'Questo è solo l’inizio',
+    onbTitle2: 'L’IA in ogni passaggio',
     onbBody2:
-      'UniWork Office al momento include solo gli editor desktop. Autenticazione UniWork, Work Graph e sincronizzazione cloud non fanno parte di questa fase.',
+      'Scrivi bozze, riformula e spiega direttamente nei tuoi documenti. Usa il tuo account UniWork o la tua chiave di un provider IA.',
     onbCredits: 'I collaboratori attivi ricevono **1.000+ crediti UniWork**',
     onbJoinGenTeam: 'Scopri di più',
     onbSkip: 'Salta',
@@ -6045,12 +6044,12 @@ export const strings = {
     newTab: 'Nowa karta',
     // First-run onboarding
     onbTitle1: 'Witamy w UniWork Office',
-    onbSubtitle1: 'Pierwszy otwartoźródłowy, natywnie oparty na AI pakiet biurowy',
+    onbSubtitle1: 'Dokumenty, arkusze, prezentacje i PDF w jednej aplikacji',
     onbBody1:
       'Twórz dokumenty, arkusze i prezentacje oraz przeglądaj pliki PDF. AI jest wbudowana w każdy etap.',
-    onbTitle2: 'To dopiero początek',
+    onbTitle2: 'AI na każdym kroku',
     onbBody2:
-      'UniWork Office obecnie zawiera tylko edytory desktopowe. Uwierzytelnianie UniWork, Work Graph i synchronizacja w chmurze nie wchodzą w ten etap.',
+      'Twórz szkice, przepisuj i wyjaśniaj bezpośrednio w dokumentach. Użyj konta UniWork lub własnego klucza dostawcy AI.',
     onbCredits: 'Aktywni współtwórcy otrzymują **1000+ kredytów UniWork**',
     onbJoinGenTeam: 'Dowiedz się więcej',
     onbSkip: 'Pomiń',
@@ -6442,12 +6441,12 @@ export const strings = {
     newTab: 'Nová karta',
     // First-run onboarding
     onbTitle1: 'Vítejte v UniWork Office',
-    onbSubtitle1: 'První open-source kancelářský balík s nativní AI',
+    onbSubtitle1: 'Dokumenty, tabulky, prezentace a PDF v jedné aplikaci',
     onbBody1:
       'Vytvářejte dokumenty, tabulky a prezentace a kontrolujte PDF. AI je součástí každého kroku.',
-    onbTitle2: 'Toto je jen začátek',
+    onbTitle2: 'AI v každém kroku',
     onbBody2:
-      'UniWork Office aktuálně nabízí jen desktopové editory. UniWork přihlášení, Work Graph a cloudová synchronizace v této fázi nejsou.',
+      'Pište návrhy, přeformulovávejte a vysvětlujte přímo ve svých dokumentech. Použijte účet UniWork nebo vlastní klíč poskytovatele AI.',
     onbCredits: 'Aktivní přispěvatelé získají **1 000+ kreditů UniWork**',
     onbJoinGenTeam: 'Zjistit více',
     onbSkip: 'Přeskočit',
@@ -6906,12 +6905,12 @@ export const strings = {
     newTab: 'Nieuw tabblad',
     // First-run onboarding
     onbTitle1: 'Welkom bij UniWork Office',
-    onbSubtitle1: 'De eerste open source, AI-native officesuite',
+    onbSubtitle1: 'Documenten, spreadsheets, presentaties en pdf’s in één app',
     onbBody1:
       'Maak documenten, bouw spreadsheets, maak presentaties en beoordeel PDF-bestanden. AI zit in elke stap ingebouwd.',
-    onbTitle2: 'Dit is nog maar het begin',
+    onbTitle2: 'AI bij elke stap',
     onbBody2:
-      'UniWork Office levert momenteel alleen de desktop-editors. UniWork-authenticatie, Work Graph en cloudsynchronisatie horen niet bij deze fase.',
+      'Schrijf concepten, herformuleer en leg uit, direct in je documenten. Gebruik je UniWork-account of je eigen sleutel van een AI-aanbieder.',
     onbCredits: 'Actieve bijdragers krijgen **1.000+ UniWork-credits**',
     onbJoinGenTeam: 'Meer informatie',
     onbSkip: 'Overslaan',
@@ -7341,12 +7340,12 @@ export const strings = {
     newTab: 'Tab baharu',
     // First-run onboarding
     onbTitle1: 'Selamat datang ke UniWork Office',
-    onbSubtitle1: 'Suite pejabat sumber terbuka natif AI yang pertama',
+    onbSubtitle1: 'Dokumen, hamparan, slaid dan PDF dalam satu aplikasi',
     onbBody1:
       'Cipta dokumen, bina hamparan, hasilkan persembahan dan semak PDF. AI tersedia pada setiap langkah.',
-    onbTitle2: 'Ini baru permulaan',
+    onbTitle2: 'AI pada setiap langkah',
     onbBody2:
-      'UniWork Office pada masa ini hanya menyediakan editor desktop. Pengesahan UniWork, Work Graph dan segerak awan bukan sebahagian daripada fasa ini.',
+      'Susun draf, tulis semula dan terangkan terus dalam dokumen anda. Gunakan akaun UniWork atau kunci pembekal AI anda sendiri.',
     onbCredits: 'Penyumbang aktif menerima **1,000+ kredit UniWork**',
     onbJoinGenTeam: 'Ketahui selanjutnya',
     onbSkip: 'Langkau',
@@ -7758,11 +7757,11 @@ export const strings = {
     newTab: 'כרטיסייה חדשה',
     // First-run onboarding
     onbTitle1: 'ברוכים הבאים ל-UniWork Office',
-    onbSubtitle1: 'חבילת המשרד הראשונה בקוד פתוח שהיא AI-נייטיב',
+    onbSubtitle1: 'מסמכים, גיליונות, מצגות וקובצי PDF באפליקציה אחת',
     onbBody1: 'צרו מסמכים, בנו גיליונות, הכינו מצגות ובדקו קובצי PDF. ה-AI מובנה בכל שלב.',
-    onbTitle2: 'זו רק ההתחלה',
+    onbTitle2: 'AI בכל שלב',
     onbBody2:
-      'UniWork Office כולל כרגע רק את עורכי שולחן העבודה. אימות UniWork, Work Graph וסנכרון ענן אינם חלק משלב זה.',
+      'אפשר לנסח, לכתוב מחדש ולהסביר ישירות בתוך המסמכים. השתמשו בחשבון UniWork או במפתח ספק AI משלכם.',
     onbCredits: 'תורמים פעילים מקבלים **1,000+ נקודות UniWork**',
     onbJoinGenTeam: 'מידע נוסף',
     onbSkip: 'דילוג',
@@ -8184,12 +8183,12 @@ export const strings = {
     newTab: 'नया टैब',
     // First-run onboarding
     onbTitle1: 'UniWork Office में आपका स्वागत है',
-    onbSubtitle1: 'पहला ओपन-सोर्स, AI-नेटिव ऑफ़िस सुइट',
+    onbSubtitle1: 'दस्तावेज़, स्प्रेडशीट, स्लाइड और PDF — एक ही ऐप में',
     onbBody1:
       'दस्तावेज़ बनाएँ, स्प्रेडशीट तैयार करें, प्रस्तुतियाँ बनाएँ और PDF की समीक्षा करें। AI हर चरण में शामिल है।',
-    onbTitle2: 'यह तो बस शुरुआत है',
+    onbTitle2: 'हर कदम पर AI',
     onbBody2:
-      'UniWork Office अभी केवल डेस्कटॉप संपादक देता है। UniWork प्रमाणीकरण, Work Graph और क्लाउड सिंक इस चरण में शामिल नहीं हैं।',
+      'अपने दस्तावेज़ों में ही ड्राफ़्ट बनाएँ, दोबारा लिखें और समझाएँ। अपना UniWork खाता या अपनी AI प्रदाता कुंजी इस्तेमाल करें।',
     onbCredits: 'सक्रिय योगदानकर्ताओं के लिए **1,000+ UniWork क्रेडिट**',
     onbJoinGenTeam: 'और जानें',
     onbSkip: 'छोड़ें',
@@ -8505,11 +8504,11 @@ export const strings = {
     appMenu: 'Menu',
     newTab: 'Tab mới',
     onbTitle1: 'Chào mừng đến UniWork Office',
-    onbSubtitle1: 'Môi trường năng suất tài liệu mở cho hệ sinh thái UniWork',
+    onbSubtitle1: 'Tài liệu, bảng tính, trình chiếu và PDF trong một ứng dụng',
     onbBody1: 'Tạo tài liệu, lập bảng tính, làm trình chiếu và xem PDF ngay trên máy tính của bạn.',
-    onbTitle2: 'Đây mới chỉ là khởi đầu',
+    onbTitle2: 'AI hỗ trợ từng bước',
     onbBody2:
-      'UniWork Office hiện chỉ cung cấp các trình soạn thảo trên máy tính. Xác thực UniWork, Work Graph và đồng bộ đám mây chưa thuộc giai đoạn này.',
+      'Soạn thảo, viết lại và giải thích ngay trong tài liệu của bạn. Dùng tài khoản UniWork hoặc khóa AI của riêng bạn.',
     onbCredits:
       'Các tính năng AI hiện có có thể dùng tài khoản UniWork hoặc key nhà cung cấp của bạn.',
     onbJoinGenTeam: 'Tìm hiểu thêm',
@@ -8520,7 +8519,7 @@ export const strings = {
     onbTitle3: 'Miễn phí cho mọi người',
     onbBody3: 'Không phí bản quyền. Không quảng cáo. Không watermark.',
     onbNote3:
-      'AI là tùy chọn. Chỉnh sửa tài liệu diễn ra cục bộ. Không bao giờ bắt buộc phải có key nhà cung cấp để mở hoặc lưu tệp.',
+      'AI là tùy chọn. Tài liệu được chỉnh sửa ngay trên máy tính của bạn; mở và lưu tệp không cần tài khoản hay khóa.',
     onbBack: 'Quay lại',
     addFolderRoot: 'Thêm thư mục…',
     removeFolderRoot: 'Xóa khỏi danh sách',
@@ -9012,11 +9011,10 @@ export const strings = {
     newTab: '新分頁',
     // First-run onboarding
     onbTitle1: '歡迎使用 UniWork Office',
-    onbSubtitle1: '第一個開源的 AI 原生 Office 套件',
+    onbSubtitle1: '文件、試算表、簡報與 PDF，盡在一個應用程式',
     onbBody1: '建立文件、製作試算表、產生簡報、審閱 PDF。AI 深度融入每個環節。',
-    onbTitle2: '這只是一個開始',
-    onbBody2:
-      'UniWork Office 目前僅提供桌面編輯器。UniWork 身分驗證、Work Graph 與雲端同步不在本階段範圍內。',
+    onbTitle2: 'AI 貫穿每一步',
+    onbBody2: '直接在文件中撰寫草稿、改寫與說明。使用你的 UniWork 帳號，或自備 AI 服務商金鑰。',
     onbCredits: '活躍貢獻者可獲得 **1,000+ UniWork 點數**',
     onbJoinGenTeam: '了解更多',
     onbSkip: '略過',

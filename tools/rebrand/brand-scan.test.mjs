@@ -161,7 +161,7 @@ test('scope covers the shipped CLI launchers, packaging recipes, CLI README and 
   assert.equal(violations.length, 1)
 })
 
-test('catalog: internal tracker ids are violations, code and other scopes are not affected', () => {
+test('catalog and source: internal tracker ids are violations, comments are not', () => {
   const { violations } = run({
     'apps/shell/src/renderer/src/strings.ts': [
       "  onbBody1: 'A desktop runtime; platform integration is not part of GO-1.',",
@@ -176,6 +176,48 @@ test('catalog: internal tracker ids are violations, code and other scopes are no
     [
       ['apps/shell/src/renderer/src/strings.ts', 1],
       ['apps/shell/src/renderer/src/strings.ts', 2],
+      ['apps/shell/src/main/index.ts', 2],
     ],
   )
+})
+
+test('internal planning vocabulary in user-visible strings is a violation', () => {
+  const hits = (line, file = 'apps/shell/src/renderer/src/strings.ts') =>
+    run({ [file]: line }).violations.length
+  // hits: tracker ids, phase talk, unreleased platform names, spec-speak (en and vi)
+  for (const text of [
+    'platform integration is not part of GO-1.',
+    'Tracked in GO-A8 and GO-B2.',
+    'See UNI-1002.',
+    'Cloud sync is not part of this phase.',
+    'The next milestone adds sync.',
+    'Phase 1',
+    'plan v2 only',
+    'Work Graph and cloud sync',
+    'A desktop office runtime',
+    'Open document productivity runtime',
+    'Dashboard chỉ số — giai đoạn này nhập thủ công',
+    'Giai đoạn 1',
+  ]) {
+    assert.equal(hits(`  key: '${text}',`), 1, text)
+  }
+  // string literals in renderer source count too, comment lines do not
+  assert.equal(hits("const a = 'Phase 1'", 'apps/shell/src/renderer/src/Wb.tsx'), 1)
+  assert.equal(hits('// GO-1 is the first phase 1', 'apps/shell/src/renderer/src/Wb.tsx'), 0)
+  // non-hits: lookalikes and legitimate product words
+  for (const text of [
+    'UniAI and uniAI stay',
+    'Unicode and UNIAI-TEAM',
+    'Press GO-TO to jump',
+    'go-to-next-match',
+    'Family milestones: birthdays and weddings',
+    'A new moon phase calendar',
+    'Add milestone',
+    'PHASE1_BLOCKS',
+    'giai đoạn ôn tập',
+    'Plan your week',
+    'Run time: 5 min',
+  ]) {
+    assert.equal(hits(`  key: '${text}',`), 0, text)
+  }
 })

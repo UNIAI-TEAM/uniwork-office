@@ -10,7 +10,7 @@
 // Scanned surfaces (everything else, e.g. LICENSE, NOTICE, docs/, tests, is
 // out of scope by construction; see README.md):
 //   catalog    i18n catalogs / string tables (all locales): values only, keys are code;
-//              internal tracker ids (GO-1, UNI-1002) are violations too
+//              internal planning vocabulary (GO-1, UNI-1002, "this phase", Work Graph) is a violation too
 //   package    package.json metadata (productName, description, author, homepage,
 //              repository, build.*; not the npm name or dependency maps)
 //   installer  electron-builder config and installer scripts under */build/ (comments too)
@@ -33,8 +33,25 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 
 /** The upstream brand, matched case-insensitively. */
 export const BRAND = /genoffice|genspark|genteam|mainfunc/gi
-/** Internal tracker ids (GO-1, GO-A8, UNI-1002) have no place in text users read. */
-const INTERNAL_TICKET = /\b(?:GO-A?\d+|UNI-\d{3,})\b/g
+/**
+ * Internal planning vocabulary that must not reach text users read: tracker ids (GO-1, GO-A8,
+ * UNI-1002), the name of an unreleased platform piece (Work Graph), phase talk ("this phase",
+ * "Phase 1", "plan v2", "not part of this phase") and spec-speak ("office runtime", "platform
+ * integration"). Each pattern is narrow on purpose: UNIAI, uniAI, Unicode, "GO-TO", the Family
+ * "milestones" feature and bare "phase" (moon phase, "phase" in lesson content) are not hits.
+ * The vi pattern covers the Vietnamese catalogs, the primary locale.
+ */
+const INTERNAL_COPY = [
+  /\bGO-(?:\d+|[A-Z]\d*)\b/g,
+  /\bUNI-\d{3,}\b/g,
+  /\bWork Graph\b/g,
+  /\b(?:this|current|next|later|future|upcoming)\s+(?:phase|milestone)\b/gi,
+  /\bphase\s*\d+\b/gi,
+  /\bplan\s+v\d/gi,
+  /\b(?:office|productivity)\s+runtime\b/gi,
+  /\bplatform integration\b/gi,
+  /giai đoạn\s+(?:này|\d+)/gi,
+]
 /** Org / domain forms that are never code identifiers, even though they embed the lowercase brand. */
 const BRAND_LOCATOR = /genoffice\.ai|genspark\.ai|genspark-ai\/|genoffice:\/\//gi
 
@@ -137,7 +154,9 @@ export function brandMatches(text, scope = 'source') {
   if (scope === 'package' || scope === 'installer') {
     for (const m of text.matchAll(PACKAGING_IDENTITY)) hits.push(m[0])
   }
-  if (scope === 'catalog') for (const m of text.matchAll(INTERNAL_TICKET)) hits.push(m[0])
+  if (scope === 'catalog' || scope === 'source') {
+    for (const re of INTERNAL_COPY) for (const m of text.matchAll(re)) hits.push(m[0])
+  }
   const masked = mask(text).replace(BRAND_LOCATOR, (m) => ' '.repeat(m.length))
   for (const m of masked.matchAll(BRAND)) hits.push(m[0])
   return hits

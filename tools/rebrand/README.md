@@ -7,14 +7,16 @@ Internal names stay upstream's on purpose (`@genoffice/*` packages, import
 paths, code identifiers, `GENOFFICE_*` env vars, the `genoffice` CLI command,
 font aliases) so patches keep applying.
 
-| File                   | Role                                                                                |
-| ---------------------- | ----------------------------------------------------------------------------------- |
-| `UPSTREAM_BASE`        | Full SHA of the upstream commit this tree has absorbed (`b08e2ebf…`)                |
-| `table.mjs`            | Replacement table: rule id, why, file globs, regex pairs; shared identifier masks   |
-| `rebrand.mjs`          | Idempotent runner: applies the table, then copies `assets/` over their targets      |
-| `assets/`              | Artwork overlay, same repo-relative paths as the targets (shell icons, home lockup) |
-| `brand-scan.mjs`       | Gate: fails on GenOffice / Genspark / genspark.ai in user-visible surfaces          |
-| `brand-allowlist.json` | Reasoned exemptions for the scan (`permanent` or `debt` with a tracker)             |
+| File                   | Role                                                                                              |
+| ---------------------- | ------------------------------------------------------------------------------------------------- |
+| `UPSTREAM_BASE`        | Full SHA of the upstream commit this tree has absorbed (`b08e2ebf…`)                              |
+| `table.mjs`            | Replacement table: rule id, why, file globs, regex pairs; shared identifier masks                 |
+| `rebrand.mjs`          | Idempotent runner: applies the table, then copies `assets/` over their targets                    |
+| `assets/`              | Artwork overlay, same repo-relative paths as the targets (shell icons, home lockup)               |
+| `onboarding-copy.mjs`  | First-run welcome copy (shell `onb*` keys) for every locale; the table re-applies it after a sync |
+| `gen-app-icon.mjs`     | Renders the UW mark to `assets/.../app-icon.png` (onboarding / About icon); the PNG is committed  |
+| `brand-scan.mjs`       | Gate: fails on GenOffice / Genspark / genspark.ai in user-visible surfaces                        |
+| `brand-allowlist.json` | Reasoned exemptions for the scan (`permanent` or `debt` with a tracker)                           |
 
 ## Sync with upstream
 
@@ -61,6 +63,8 @@ scopes is in `office-g3g4/reports/go-a1/rebrand-table.md`; in short:
 - **Shipped launchers and text**: `packages/cli/bin/genoffice[.cmd]` start `MacOS/UniWork Office`, `UniWork Office.exe` and the linux `uniwork-office`
   (kept in line with `productName` / `executableName` by `packages/cli/tests/launcher-names.test.ts`); the CLI README, the MCP stdio bridge log lines,
   `skills/genoffice/SKILL.md`, the slide guides and the `npx skills add` command in Settings > Integrations.
+- **First-run copy**: the welcome dialog (subtitle, slide 2, footnote, all locales) comes from `onboarding-copy.mjs`; upstream's wording
+  describes upstream's product, and nothing in it may talk about internal phases or tickets.
 - **Docs**: the fork banner on every `docs/i18n/README.<lang>.md`.
 - **Artwork**: everything under `assets/` (shell icons incl. `icons/<size>/apps/uniwork-office.png`, `app-icon.png`, home lockup).
 
@@ -74,7 +78,9 @@ Scanned: i18n catalogs and string tables (values only, all locales), `package.js
 `author`, `homepage`, `repository`, `build.*`; not `name` or dependency maps), `electron-builder` config and `*/build/` installer
 scripts, string literals in `apps/*/src` and `packages/*/src` (comment lines skipped), `skills/**` (ships to users), the shipped CLI launchers
 (`packages/cli/bin/**`), the package recipes in `packaging/**`, `packages/cli/README.md` (published to npm) and `scripts/mcp-stdio-bridge.js`.
-Catalog values are also checked for internal tracker ids (`GO-1`, `GO-A8`, `UNI-1002`).
+Catalog values and source string literals are also checked for internal planning vocabulary: tracker ids (`GO-1`, `GO-A8`, `UNI-1002`),
+`Work Graph`, phase talk (`this phase`, `Phase 1`, `plan v2`) and spec-speak (`office runtime`, `platform integration`, vi `giai đoạn này`).
+The patterns are narrow (UNIAI, uniAI, Unicode, the Family `milestones` feature and a bare `phase` are fine); see `INTERNAL_COPY` in `brand-scan.mjs`.
 Not scanned: LICENSE, NOTICE, `docs/`, the other READMEs, tests, `e2e/`, fixtures, `package-lock.json`.
 
 `debt` allowlist entries mark real leftovers with a tracker; the scan warns when one stops matching so it gets deleted.
@@ -83,8 +89,12 @@ Not scanned: LICENSE, NOTICE, `docs/`, the other READMEs, tests, `e2e/`, fixture
 
 - `rebrand:check` is not in CI yet; run it after every upstream sync. The strings the hand rebrand had missed (AI prompts,
   CLI help) were fixed by the first post-merge run and their allowlist entries are gone.
-- `strings.ts` onboarding copy (`GenTeam`, alpha / credits wording, the welcome page) was rewritten by hand; upstream copy for
-  those keys must be re-resolved manually after a sync, and the scan will flag it (it also flags internal ticket ids such as `GO-1`).
+- `strings.ts` onboarding copy: the welcome keys are re-applied from `onboarding-copy.mjs`; the other `onb*` keys (`GenTeam`, the
+  hidden offer / credits slide) were rewritten by hand, must be re-resolved manually after a sync, and the scan will flag them.
+  `onbCredits` / `onbJoinGenTeam` belong to the disabled offer panel and still carry upstream's "1,000+ credits" promise in 19 locales;
+  they are never shown (`showOffer: false`), delete them with the panel.
+- `app-icon.png` is a placeholder UW mark (`gen-app-icon.mjs`), like the rest of `UNIWORK_BRAND_ASSET_REQUIRED.md`; the unused
+  `apps/{docs,sheets,slides}/src/renderer/assets/app-icon.png` still carry upstream's artwork (GO-A8).
 - Main-process `errNoApiKey` in `docs-main.ts`, `sheets-main.ts` and `slides/i18n-main.ts`: `en` and `vi` are ours (UniWork wording),
   the other locales keep upstream's text; the rule `vi-no-api-key` re-applies the `vi` value after a merge.
 - `skills/genoffice/SKILL.md` is rebranded by `skills-product-name`; after a sync bump its `metadata.version` once more

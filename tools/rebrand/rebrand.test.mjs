@@ -199,3 +199,45 @@ test('origin links point at the UNIAI-TEAM repo, from upstream and from the old 
     },
   )
 })
+
+test('first-run welcome copy is re-applied per locale and survives a merge', () => {
+  const upstream = [
+    'export const strings = {',
+    '  zh: {',
+    "    onbSubtitle1: '第一个开源的 AI 原生 Office 套件',",
+    "    onbTitle2: '这只是一个开始',",
+    '    onbBody2:',
+    "      'UniWork Office 当前仅提供桌面编辑器。UniWork 身份认证、Work Graph 和云同步不在本阶段范围内。',",
+    "    onbSkip: '跳过',",
+    '  },',
+    '  en: {',
+    "    onbSubtitle1: 'Open document productivity runtime for the UniWork ecosystem',",
+    "    onbBody1: 'Create docs. This is a desktop office runtime; platform integration is not part of GO-1.',",
+    "    onbTitle2: 'This is just the beginning',",
+    "    onbBody2: 'Not part of this phase.',",
+    "    onbSkip: 'Skip',",
+    '  },',
+    "  'xx-XX': {",
+    "    onbSubtitle1: 'Upstream wording of a locale without a copy',",
+    '  },',
+    '}',
+    '',
+  ].join('\n')
+  withFiles({ 'apps/shell/src/renderer/src/strings.ts': upstream }, (get) => {
+    const text = get('apps/shell/src/renderer/src/strings.ts')
+    assert.match(text, /^ {4}onbSubtitle1: '文档、表格、演示和 PDF，尽在一个应用',$/m)
+    assert.match(text, /^ {4}onbTitle2: 'AI at every step',$/m)
+    // a value longer than the print width moves to its own line, like prettier lays it out
+    assert.match(
+      text,
+      /^ {4}onbBody2:\n {6}'Draft, rewrite and explain right inside your documents\./m,
+    )
+    assert.match(
+      text,
+      /^ {4}onbSubtitle1: 'Upstream wording of a locale without a copy',$/m,
+      'locales without a copy are untouched',
+    )
+    assert.match(text, /^ {4}onbSkip: 'Skip',$/m)
+    assert.ok(!/GO-1|Work Graph|this phase|runtime/.test(text))
+  })
+})
