@@ -7,25 +7,35 @@
 //   node tools/rebrand/sync-upstream.mjs --continue        after resolving conflicts by hand: commit, rebrand, bump, check
 //
 // Options:
-//   --to <sha|ref>        upstream commit or ref to sync to (default: the remote's HEAD after fetch)
+//   --to <sha|ref>        upstream commit (full 40-hex SHA) or ref name to sync to
+//                         (default: the remote's HEAD after fetch; abbreviated SHAs are refused)
 //   --base <sha>          override the absorbed base (default: tools/rebrand/UPSTREAM_BASE)
 //   --remote <url|name>   upstream remote (default https://github.com/genspark-ai/genoffice.git)
 //   --root <dir>          repo to operate on (default: the current checkout)
 //   --branch <name>       sync branch (default upstream-sync/<target7>)
 //   --report <file.md>    write the markdown report there, plus a .json sibling
+//   --pr-body <file.md>   write the report cut below 60000 characters (a pull request body limit)
 //   --exclude <glob>      leave matching upstream paths out of the patch (repeatable; listed in the report)
 //   --prettier <path>     prettier.cjs used to format the files the rebrand touched
 //                         (default: node_modules/prettier of the repo or its main checkout; skipped if absent)
-//   --commit-conflicts    CI mode: commit conflicted files with their markers and finish the remaining steps
+//   --commit-conflicts    commit conflicted files with their markers and finish the remaining steps
+//   --ci                  CI mode: --commit-conflicts, and a missing Prettier fails the run
+//   --force               allow a target that does not descend from the base
 //   --no-fetch            use refs already present locally (refs/upstream-sync/target by default)
-//   --skip-checks         skip rebrand, formatting, brand scan and rebrand tests (for toy repos)
+//   --skip-checks         skip rebrand, formatting, brand scan, egress check and rebrand tests (toy repos)
 //   --json                print the summary as JSON on stdout (logs always go to stderr)
 //
 // Exit codes:
 //   0  up to date, already prepared, or synced cleanly with every check green
-//   1  usage or runtime error (bad arguments, dirty tree, fetch failure, ...)
-//   2  needs a human: conflicts, patches that could not be applied, brand-scan
-//      violations or failing rebrand tests (the report says which)
+//   1  usage or runtime error (bad arguments, dirty tree, fetch failure, a target that does
+//      not descend from the base, an unfinished sync branch, ...); a real run rolls back its branch
+//   2  needs a human: conflicts, patches that could not be applied, a failing check (rebrand,
+//      formatting, brand scan, egress check, rebrand tests); the report says which
+//
+// The checks never execute code from the patched tree: before applying, the script copies
+// tools/ and the Prettier config of the checkout it runs from to a temp dir and runs the
+// rebrand, brand scan, egress check (when package.json defines check:egress) and the
+// rebrand tests from that copy with --root.
 //
 // Commits made in real mode (on the new branch, in this order, each only if it changes something):
 //   chore(upstream): apply genoffice <base7>..<target7>
@@ -33,7 +43,15 @@
 //   chore(rebrand): bump UPSTREAM_BASE to <target7>
 // See README.md ("Sync with upstream") for the human side of the flow.
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -42,6 +60,10 @@ export const DEFAULT_REMOTE = 'https://github.com/genspark-ai/genoffice.git'
 export const BASE_FILE = 'tools/rebrand/UPSTREAM_BASE'
 export const FETCH_REF_PREFIX = 'refs/upstream-sync'
 const LIST_CAP = 200
+export const PR_BODY_LIMIT = 60000
+const HERE = dirname(fileURLToPath(import.meta.url))
+/** Test files of the rebrand tooling, run from the trusted copy (never read from the patched tree). */
+export const REBRAND_TESTS = ['brand-scan.test.mjs', 'rebrand.test.mjs', 'sync-upstream.test.mjs']
 
 /**
  * Upstream paths that bring back things the fork removed or must adjust by hand
@@ -84,11 +106,14 @@ export function parseArgs(argv) {
     root: undefined,
     branch: undefined,
     report: undefined,
+    prBody: undefined,
     exclude: [],
     prettier: undefined,
     dryRun: false,
     fetch: true,
     commitConflicts: false,
+    ci: false,
+    force: false,
     skipChecks: false,
     json: false,
     continue: false,
@@ -120,6 +145,9 @@ export function parseArgs(argv) {
       case '--report':
         opts.report = value(i++, a)
         break
+      case '--pr-body':
+        opts.prBody = value(i++, a)
+        break
       case '--exclude':
         opts.exclude.push(value(i++, a))
         break
@@ -134,6 +162,13 @@ export function parseArgs(argv) {
         break
       case '--commit-conflicts':
         opts.commitConflicts = true
+        break
+      case '--ci':
+        opts.ci = true
+        opts.commitConflicts = true
+        break
+      case '--force':
+        opts.force = true
         break
       case '--skip-checks':
         opts.skipChecks = true
@@ -154,6 +189,11 @@ export function parseArgs(argv) {
   }
   if (opts.continue && opts.dryRun)
     throw new UsageError('--continue cannot be combined with --dry-run')
+  if (opts.to !== undefined && SHORT_SHA.test(opts.to)) {
+    throw new UsageError(
+      `--to ${opts.to}: pass a full 40-hex SHA or a ref name, not an abbreviated SHA`,
+    )
+  }
   return opts
 }
 
@@ -191,6 +231,7 @@ export function createGit(cwd, { env = process.env } = {}) {
 
 const short = (sha) => sha.slice(0, 7)
 const FULL_SHA = /^[0-9a-f]{40}$/i
+const SHORT_SHA = /^[0-9a-f]{4,39}$/i
 
 function revParse(git, rev) {
   const r = git(['rev-parse', '--verify', '--quiet', `${rev}^{commit}`], { allowFailure: true })
@@ -214,8 +255,10 @@ export function readBase(root) {
 export function resolveRange(git, { to, base, remote, fetch }) {
   const targetRef = `${FETCH_REF_PREFIX}/target`
   const baseRef = `${FETCH_REF_PREFIX}/base`
-  // an abbreviated SHA cannot be fetched; it must already be known locally
-  const localTarget = !fetch || (to && /^[0-9a-f]{4,39}$/i.test(to) && revParse(git, to))
+  if (to !== undefined && SHORT_SHA.test(to)) {
+    throw new UsageError(`--to ${to}: pass a full 40-hex SHA or a ref name, not an abbreviated SHA`)
+  }
+  const localTarget = !fetch
   const localBase = revParse(git, base)
   const specs = []
   if (!localTarget) specs.push(`+${to ?? 'HEAD'}:${targetRef}`)
@@ -324,10 +367,13 @@ export function applyUpstreamPatch(git, base, target, files, { exclude = [] } = 
   ]).stdout
   const paths = files.map((f) => f.path)
   if (patch.length === 0) return { clean: [], conflicted: [], failed: [], mode: 'empty' }
-  const whole = git(['apply', '-3', '--index', '--whitespace=nowarn', '-'], {
-    input: patch,
-    allowFailure: true,
-  })
+  const whole = git(
+    ['-c', 'core.autocrlf=false', 'apply', '-3', '--index', '--whitespace=nowarn', '-'],
+    {
+      input: patch,
+      allowFailure: true,
+    },
+  )
   let mode = 'whole'
   const failed = []
   if (whole.status !== 0 && unmergedPaths(git).length === 0 && !hasStagedChanges(git)) {
@@ -342,10 +388,13 @@ export function applyUpstreamPatch(git, base, target, files, { exclude = [] } = 
         '--',
         `:(literal)${path}`,
       ]).stdout
-      const r = git(['apply', '-3', '--index', '--whitespace=nowarn', '-'], {
-        input: one,
-        allowFailure: true,
-      })
+      const r = git(
+        ['-c', 'core.autocrlf=false', 'apply', '-3', '--index', '--whitespace=nowarn', '-'],
+        {
+          input: one,
+          allowFailure: true,
+        },
+      )
       if (r.status !== 0 && !unmergedPaths(git).includes(path)) {
         failed.push({ path, error: firstError(r.stderr) })
       }
@@ -369,10 +418,26 @@ function commit(git, message) {
   return git(['rev-parse', 'HEAD']).text
 }
 
-/** Files changed in the working tree (modified, added, deleted) relative to HEAD. */
+/**
+ * Parses `git status --porcelain -z`: "XY path", where a rename or copy entry ("R" / "C"
+ * in either column) is followed by a second NUL-terminated field holding the source path.
+ * Returns every path involved (both sides of a rename), sorted.
+ */
+export function parsePorcelainZ(buf) {
+  const fields = splitZ(buf)
+  const paths = []
+  for (let i = 0; i < fields.length; i++) {
+    const entry = fields[i]
+    const xy = entry.slice(0, 2)
+    paths.push(entry.slice(3))
+    if (/[RC]/.test(xy) && i + 1 < fields.length) paths.push(fields[++i])
+  }
+  return [...new Set(paths)].sort()
+}
+
+/** Files changed in the working tree (modified, added, deleted, renamed) relative to HEAD. */
 function worktreeChanges(git) {
-  const entries = splitZ(git(['status', '--porcelain', '-z', '--untracked-files=all']).stdout)
-  return entries.map((e) => e.slice(3)).sort()
+  return parsePorcelainZ(git(['status', '--porcelain', '-z', '--untracked-files=all']).stdout)
 }
 
 // ---------------------------------------------------------------- default checks
@@ -396,30 +461,71 @@ function findPrettier(git, root, explicit) {
   return candidates.find((c) => existsSync(c)) ?? null
 }
 
-/** The real rebrand / format / scan / test steps; tests replace them through `checks`. */
-export function defaultChecks({ prettier, repoGit } = {}) {
+/**
+ * Copies the tooling the checks run (tools/, the Prettier config and ignore file) from
+ * `sourceRepo` (default: the checkout this script runs from, i.e. the pre-sync tree) to a
+ * temp dir, so nothing the upstream patch brings in is ever executed. `egress` is true when
+ * the source package.json defines check:egress and tools/check-egress.mjs exists.
+ */
+export function trustedSnapshot({ sourceRepo = dirname(dirname(HERE)) } = {}) {
+  const dir = mkdtempSync(join(tmpdir(), 'uniwork-sync-tools-'))
+  cpSync(join(sourceRepo, 'tools'), join(dir, 'tools'), { recursive: true })
+  const copy = (name) => {
+    if (!existsSync(join(sourceRepo, name))) return null
+    cpSync(join(sourceRepo, name), join(dir, name))
+    return join(dir, name)
+  }
+  const prettierConfig = copy('.prettierrc.json') ?? copy('.prettierrc')
+  const prettierIgnore = copy('.prettierignore') ?? join(dir, '.prettierignore-empty')
+  if (!existsSync(prettierIgnore)) writeFileSync(prettierIgnore, '')
+  let scripts = {}
+  try {
+    scripts = JSON.parse(readFileSync(join(sourceRepo, 'package.json'), 'utf8')).scripts ?? {}
+  } catch {}
+  const egress =
+    Boolean(scripts['check:egress']) && existsSync(join(dir, 'tools', 'check-egress.mjs'))
+  return {
+    dir,
+    tools: join(dir, 'tools'),
+    prettierConfig,
+    prettierIgnore,
+    egress,
+    cleanup: () => rmSync(dir, { recursive: true, force: true }),
+  }
+}
+
+/**
+ * The real rebrand / format / scan / egress / test steps, run from a trustedSnapshot().
+ * Tests replace them through `checks`. `strictFormat` (--ci) turns a missing Prettier into a failure.
+ */
+export function defaultChecks({ trusted, prettier, strictFormat = false, repoGit } = {}) {
+  const rebrandDir = join(trusted.tools, 'rebrand')
   return {
     rebrand(root) {
-      const script = join(root, 'tools', 'rebrand', 'rebrand.mjs')
+      const script = join(rebrandDir, 'rebrand.mjs')
       if (!existsSync(script)) return { ran: false, note: 'rebrand.mjs not found' }
-      const r = runNode([script, '--root', root], root)
+      const r = runNode([script, '--root', root], trusted.dir)
       return { ran: true, ok: r.status === 0, note: r.status === 0 ? '' : firstLine(r.stderr) }
     },
     format(root, files) {
       if (files.length === 0) return { ran: true, ok: true, note: 'nothing to format' }
       const bin = findPrettier(repoGit ?? createGit(root), root, prettier)
-      if (!bin)
-        return { ran: false, note: 'prettier not found; run `npm run format` before merging' }
-      const r = runNode(
-        [bin, '--write', '--ignore-unknown', '--log-level', 'warn', '--', ...files],
-        root,
-      )
+      if (!bin) {
+        return strictFormat
+          ? { ran: true, ok: false, note: 'prettier not found (required with --ci)' }
+          : { ran: false, note: 'prettier not found; run `npm run format` before merging' }
+      }
+      // the base tree's config and ignore file, never the patched tree's
+      const config = trusted.prettierConfig ? ['--config', trusted.prettierConfig] : ['--no-config']
+      const args = [bin, '--write', '--ignore-unknown', '--no-editorconfig', ...config]
+      args.push('--ignore-path', trusted.prettierIgnore, '--log-level', 'warn', '--', ...files)
+      const r = runNode(args, root)
       return { ran: true, ok: r.status === 0, note: r.status === 0 ? '' : firstLine(r.stderr) }
     },
     brandScan(root) {
-      const script = join(root, 'tools', 'rebrand', 'brand-scan.mjs')
+      const script = join(rebrandDir, 'brand-scan.mjs')
       if (!existsSync(script)) return { ran: false, note: 'brand-scan.mjs not found' }
-      const r = runNode([script, '--root', root, '--json'], root)
+      const r = runNode([script, '--root', root, '--json'], trusted.dir)
       try {
         const data = JSON.parse(r.stdout)
         return {
@@ -438,17 +544,24 @@ export function defaultChecks({ prettier, repoGit } = {}) {
         }
       }
     },
-    tests(root) {
-      const pkg = join(root, 'package.json')
-      const script = existsSync(pkg)
-        ? JSON.parse(readFileSync(pkg, 'utf8')).scripts?.['test:rebrand']
-        : null
-      if (!script || !/^node\s+--test\s/.test(script)) {
-        return { ran: false, note: 'no `node --test` test:rebrand script' }
+    egress(root) {
+      if (!trusted.egress) return { ran: false, note: 'not present: no check:egress script' }
+      const r = runNode(
+        [join(trusted.tools, 'check-egress.mjs'), '--root', root, '--json'],
+        trusted.dir,
+      )
+      let violations = []
+      try {
+        violations = JSON.parse(r.stdout).map((v) => `${v.path}:${v.line} [${v.pattern}]`)
+      } catch {
+        if (r.status !== 0) return { ran: true, ok: false, violations, note: firstLine(r.stderr) }
       }
-      const args = script.split(/\s+/).slice(1)
-      args.splice(1, 0, '--test-reporter=tap')
-      const r = runNode(args, root)
+      return { ran: true, ok: r.status === 0, violations }
+    },
+    tests() {
+      const files = REBRAND_TESTS.map((t) => join(rebrandDir, t)).filter((p) => existsSync(p))
+      if (files.length === 0) return { ran: false, note: 'no rebrand test files' }
+      const r = runNode(['--test', '--test-reporter=tap', ...files], trusted.dir)
       const count = (k) => Number(r.stdout.match(new RegExp(`^# ${k} (\\d+)`, 'm'))?.[1] ?? 0)
       return { ran: true, ok: r.status === 0, pass: count('pass'), fail: count('fail') }
     },
@@ -466,7 +579,13 @@ function firstLine(s) {
 
 function noopChecks() {
   const skip = { ran: false, note: 'skipped (--skip-checks)' }
-  return { rebrand: () => skip, format: () => skip, brandScan: () => skip, tests: () => skip }
+  return {
+    rebrand: () => skip,
+    format: () => skip,
+    brandScan: () => skip,
+    egress: () => skip,
+    tests: () => skip,
+  }
 }
 
 function stateFile(git) {
@@ -482,7 +601,7 @@ function guarded(fn) {
   }
 }
 
-/** Steps after the patch commit: rebrand (+format), bump UPSTREAM_BASE, scan, test. */
+/** Steps after the patch commit: rebrand (+format), bump UPSTREAM_BASE, scan, egress, test. */
 function finish(git, root, summary, checks) {
   const reb = guarded(() => checks.rebrand(root))
   summary.rebrand = { ...reb, changed: [] }
@@ -517,27 +636,27 @@ function finish(git, root, summary, checks) {
     )
   }
   summary.brandScan = guarded(() => checks.brandScan(root))
+  summary.egress = checks.egress
+    ? guarded(() => checks.egress(root))
+    : { ran: false, note: 'not present' }
   summary.tests = guarded(() => checks.tests(root))
 }
 
 function exitCodeOf(s) {
   if (s.status === 'up-to-date' || s.status === 'already-prepared') return 0
-  const human =
-    s.apply.conflicted.length > 0 ||
-    s.apply.failed.length > 0 ||
-    (s.rebrand?.ran && s.rebrand.ok === false) ||
-    (s.brandScan?.ran && s.brandScan.ok === false) ||
-    (s.tests?.ran && s.tests.ok === false)
+  const human = s.apply.conflicted.length > 0 || s.apply.failed.length > 0 || !checksOk(s)
   return human ? 2 : 0
 }
 
+/** The local or origin sync branch, if any, and whether its UPSTREAM_BASE already is the target. */
 function existingPrepared(git, branch, target) {
+  const found = []
   for (const ref of [`refs/heads/${branch}`, `refs/remotes/origin/${branch}`]) {
     if (!revParse(git, ref)) continue
     const r = git(['show', `${ref}:${BASE_FILE}`], { allowFailure: true })
-    return { ref, prepared: r.status === 0 && r.text === target }
+    found.push({ ref, prepared: r.status === 0 && r.text === target })
   }
-  return null
+  return found.find((f) => f.prepared) ?? found[0] ?? null
 }
 
 /**
@@ -553,12 +672,28 @@ export function syncUpstream(options) {
     options.root ?? createGit(process.cwd())(['rev-parse', '--show-toplevel']).text,
   )
   const git = createGit(root)
-  const checks =
-    options.checks === false || options.skipChecks
-      ? noopChecks()
-      : (options.checks ?? defaultChecks({ prettier: options.prettier, repoGit: git }))
-  const exclude = options.exclude ?? []
+  let trusted = null
+  let checks
+  if (options.checks === false || options.skipChecks) checks = noopChecks()
+  else if (options.checks) checks = options.checks
+  else {
+    trusted = trustedSnapshot()
+    checks = defaultChecks({
+      trusted,
+      prettier: options.prettier,
+      strictFormat: Boolean(options.ci),
+      repoGit: git,
+    })
+  }
+  try {
+    return runSync({ options, root, git, checks, log, started })
+  } finally {
+    trusted?.cleanup()
+  }
+}
 
+function runSync({ options, root, git, checks, log, started }) {
+  const exclude = options.exclude ?? []
   if (options.continue) return continueSync({ git, root, checks, log, started })
 
   const base = options.base ?? readBase(root)
@@ -590,6 +725,7 @@ export function syncUpstream(options) {
     rebrand: null,
     format: null,
     brandScan: null,
+    egress: null,
     tests: null,
     watch: [],
     stoppedForConflicts: false,
@@ -610,22 +746,49 @@ export function syncUpstream(options) {
     log(`already prepared: ${prior.ref} already absorbs ${short(range.target)}`)
     return done('already-prepared')
   }
-  if (prior && prior.ref.startsWith('refs/heads/') && !options.dryRun) {
+  if (prior && !options.dryRun) {
     throw new Error(
-      `branch ${branch} exists but is not finished; resolve it and run --continue, or delete it`,
+      prior.ref.startsWith('refs/heads/')
+        ? `branch ${branch} exists but is not finished; resolve it and run --continue, or delete it`
+        : `origin/${branch} exists but does not absorb ${short(range.target)}; delete it or pass --branch (never force-pushed)`,
     )
   }
 
   Object.assign(summary, rangeStats(git, range.base, range.target, { exclude }))
+  if (!summary.ancestor && !options.force) {
+    throw new Error(
+      `upstream base ${short(range.base)} is not an ancestor of ${short(range.target)} (rewritten or unrelated history); pass --force to sync anyway`,
+    )
+  }
   summary.watch = watchHits(git, range, summary.files)
   log(`${summary.behind} upstream commit(s), ${summary.files.length} file(s) changed`)
 
   if (options.dryRun) return dryRun({ git, summary, checks, exclude, log, done })
 
   if (isDirty(git)) throw new Error('working tree is not clean; commit or stash first')
+  const original =
+    git(['symbolic-ref', '--quiet', '--short', 'HEAD'], { allowFailure: true }).text ||
+    git(['rev-parse', 'HEAD']).text
   git(['switch', '--quiet', '-c', branch])
   log(`created branch ${branch}`)
-  return applyAndFinish({ git, root, summary, checks, exclude, log, done, options })
+  try {
+    return applyAndFinish({ git, root, summary, checks, exclude, log, done, options })
+  } catch (e) {
+    rollback(git, original, branch, log)
+    throw e
+  }
+}
+
+/** Undoes a failed real run: back to the original ref, the new branch deleted. */
+function rollback(git, original, branch, log) {
+  git(['reset', '--quiet', '--hard', 'HEAD'], { allowFailure: true })
+  // the tree was clean (untracked files included) before the run, so this only drops its leftovers
+  git(['clean', '-fdq'], { allowFailure: true })
+  const back = FULL_SHA.test(original)
+    ? git(['switch', '--quiet', '--detach', original], { allowFailure: true })
+    : git(['switch', '--quiet', original], { allowFailure: true })
+  if (back.status === 0) git(['branch', '-D', branch], { allowFailure: true })
+  log(`rolled back: back on ${original}${back.status === 0 ? `, ${branch} deleted` : ''}`)
 }
 
 function applyAndFinish({
@@ -663,7 +826,9 @@ function applyAndFinish({
 }
 
 function checksOk(s) {
-  return ![s.rebrand, s.brandScan, s.tests].some((c) => c?.ran && c.ok === false)
+  return ![s.rebrand, s.format, s.brandScan, s.egress, s.tests].some(
+    (c) => c?.ran && c.ok === false,
+  )
 }
 
 function applyMessage(s) {
@@ -690,6 +855,7 @@ function stateOf(s) {
     target,
     branch,
     behind,
+    ancestor,
     commits,
     files,
     insertions,
@@ -705,6 +871,7 @@ function stateOf(s) {
     target,
     branch,
     behind,
+    ancestor,
     commits,
     files,
     insertions,
@@ -757,6 +924,7 @@ function continueSync({ git, root, checks, log, started }) {
     rebrand: null,
     format: null,
     brandScan: null,
+    egress: null,
     tests: null,
     stoppedForConflicts: false,
   }
@@ -827,6 +995,19 @@ function displayRemote(remote) {
 
 // ---------------------------------------------------------------- report
 
+/**
+ * Wraps untrusted text (upstream commit subjects, git errors, scan hits) in a code span, so
+ * GitHub renders no @mentions, #references or markup from it. The fence is one backtick
+ * longer than the longest backtick run inside.
+ */
+export function codeSpan(text) {
+  const t = String(text).replace(/\r?\n/g, ' ')
+  const longest = Math.max(0, ...(t.match(/`+/g) ?? []).map((m) => m.length))
+  const fence = '`'.repeat(longest + 1)
+  const pad = longest > 0 ? ' ' : ''
+  return `${fence}${pad}${t}${pad}${fence}`
+}
+
 function capped(list, fmt = (x) => x) {
   const out = list.slice(0, LIST_CAP).map((x) => `- ${fmt(x)}`)
   if (list.length > LIST_CAP) out.push(`- ... and ${list.length - LIST_CAP} more`)
@@ -836,11 +1017,29 @@ function capped(list, fmt = (x) => x) {
 function checkLine(c, detail = '') {
   if (!c) return 'not run'
   if (!c.ran) return `skipped (${c.note})`
-  return `${c.ok ? 'pass' : 'FAIL'}${detail}${c.note ? ` (${c.note})` : ''}`
+  return `${c.ok ? 'pass' : 'FAIL'}${detail}${c.note ? ` (${codeSpan(c.note)})` : ''}`
 }
 
-/** Markdown report; repo-relative paths only, so it can be a PR body as is. */
-export function renderReport(s) {
+const TRUNCATED_NOTE =
+  '> Report truncated to fit a pull request body; the full report (markdown and JSON) is in the ' +
+  "workflow run's `upstream-sync-report` artifact."
+
+/**
+ * Markdown report; repo-relative paths only, so it can be a PR body as is. With `maxLength`
+ * it is cut at a line boundary below that size and ends with a pointer to the full report.
+ */
+export function renderReport(s, { maxLength } = {}) {
+  const full = reportLines(s).join('\n')
+  if (!maxLength || full.length <= maxLength) return full
+  const budget = maxLength - TRUNCATED_NOTE.length - 32
+  let cutText = full.slice(0, full.lastIndexOf('\n', budget))
+  const open = (cutText.match(/<details>/g) ?? []).length
+  const closed = (cutText.match(/<\/details>/g) ?? []).length
+  if (open > closed) cutText += '\n\n</details>'
+  return `${cutText}\n\n${TRUNCATED_NOTE}\n`
+}
+
+function reportLines(s) {
   const r = []
   const range = `${short(s.base)}..${short(s.target)}`
   const title = {
@@ -851,12 +1050,41 @@ export function renderReport(s) {
     'checks-failed': 'checks failed',
   }[s.status]
   r.push(`# Upstream sync ${range}: ${title}${s.dryRun ? ' (dry run)' : ''}`, '')
+  const a = s.apply
+  // the loud part first, so it survives truncation of a long report
+  if (a.failed.length > 0) {
+    r.push(
+      '> [!CAUTION]',
+      `> **${a.failed.length} upstream file(s) were NOT applied** (no 3-way merge possible).`,
+      '> UPSTREAM_BASE is bumped anyway, so their upstream changes would be lost:',
+      '> **do not merge this until every file listed under "Not applied" is ported by hand.**',
+      '',
+    )
+  }
+  if (a.conflicted.length > 0 && !s.stoppedForConflicts) {
+    r.push(
+      '> [!WARNING]',
+      `> ${a.conflicted.length} file(s) are committed WITH conflict markers; resolve them before merging`,
+      "> (CI's conflict-marker check fails until then).",
+      '',
+    )
+  }
+  const failedChecks = [
+    ['rebrand', s.rebrand],
+    ['formatting', s.format],
+    ['brand scan', s.brandScan],
+    ['egress check', s.egress],
+    ['rebrand tests', s.tests],
+  ].filter(([, c]) => c?.ran && c.ok === false)
+  if (failedChecks.length > 0) {
+    r.push('> [!WARNING]', `> Failed checks: ${failedChecks.map(([n]) => n).join(', ')}.`, '')
+  }
   r.push(`| | |`, `| --- | --- |`)
   r.push(`| Upstream | ${s.remote} |`)
   r.push(`| Base (UPSTREAM_BASE) | \`${s.base}\` |`)
   r.push(`| Target | \`${s.target}\` |`)
   r.push(
-    `| Commits behind | ${s.behind}${s.ancestor ? '' : ' (base is NOT an ancestor of the target)'} |`,
+    `| Commits behind | ${s.behind}${s.ancestor === false ? ' (base is NOT an ancestor of the target)' : ''} |`,
   )
   r.push(`| Branch | \`${s.branch}\` |`)
   if (s.dryRun && s.dryRunCommits !== undefined)
@@ -866,76 +1094,57 @@ export function renderReport(s) {
   r.push(`| Wall time | ${(s.durationMs / 1000).toFixed(1)} s |`, '')
   if (s.status === 'up-to-date') {
     r.push('Nothing to do: the tree already absorbs the upstream target.', '')
-    return r.join('\n')
+    return r
   }
   if (s.status === 'already-prepared') {
     r.push(
       `Nothing to do: \`${s.branch}\` already carries this sync. Delete that branch to prepare it again.`,
       '',
     )
-    return r.join('\n')
+    return r
   }
-  r.push(
-    `## Upstream commits (${s.behind})`,
-    '',
-    ...capped(s.commits, (c) => `\`${c.slice(0, 7)}\`${c.slice(7)}`),
-    '',
-  )
-  r.push(
-    `## Files changed upstream: ${s.files.length} (+${s.insertions} / -${s.deletions}, ${s.binary.length} binary)`,
-    '',
-  )
-  r.push(
-    `<details><summary>File list</summary>`,
-    '',
-    ...capped(s.files, (f) => `${f.status} \`${f.path}\``),
-    '',
-    '</details>',
-    '',
-  )
-  if (s.excluded.length > 0) {
+  if (a.failed.length > 0) {
     r.push(
-      `### Left out by --exclude (${s.excluded.length}, port by hand)`,
+      `## Not applied: ${a.failed.length} file(s), port by hand`,
       '',
-      ...capped(s.excluded, (p) => `\`${p}\``),
+      ...capped(a.failed, (f) => `\`${f.path}\`: ${codeSpan(f.error)}`),
       '',
     )
   }
-  const a = s.apply
-  r.push(
-    `## Patch result: ${a.clean.length} clean, ${a.conflicted.length + (a.resolvedByHand?.length ?? 0)} conflicted, ${a.failed.length} failed`,
-    '',
-  )
   if (a.conflicted.length > 0) {
     r.push(
       s.stoppedForConflicts
-        ? '### Conflicted (left in the working tree)'
-        : '### Conflicted (committed with markers)',
+        ? `## Conflicted: ${a.conflicted.length} file(s), left in the working tree`
+        : `## Conflicted: ${a.conflicted.length} file(s), committed with markers`,
       '',
       ...capped(a.conflicted, (p) => `\`${p}\``),
       '',
     )
   }
   if (a.resolvedByHand?.length > 0)
-    r.push('### Conflicts resolved by hand', '', ...capped(a.resolvedByHand, (p) => `\`${p}\``), '')
-  if (a.failed.length > 0) {
-    r.push(
-      '### Not applied (no 3-way merge possible)',
-      '',
-      ...capped(a.failed, (f) => `\`${f.path}\`: ${f.error}`),
-      '',
-    )
-  }
+    r.push('## Conflicts resolved by hand', '', ...capped(a.resolvedByHand, (p) => `\`${p}\``), '')
+  r.push(
+    `## Patch result: ${a.clean.length} clean, ${a.conflicted.length + (a.resolvedByHand?.length ?? 0)} conflicted, ${a.failed.length} failed`,
+    '',
+  )
   if (!s.stoppedForConflicts) {
     const rb = s.rebrand
-    r.push(`## Rebrand: ${rb?.ran ? `${rb.changed.length} file(s) changed` : checkLine(rb)}`, '')
-    if (rb?.ran && rb.changed.length > 0) r.push(...capped(rb.changed, (p) => `\`${p}\``), '')
+    r.push(`## Checks`, '')
+    r.push(
+      `- Rebrand: ${rb?.ran ? `${checkLine(rb)}, ${rb.changed.length} file(s) changed` : checkLine(rb)}`,
+    )
+    for (const p of (rb?.changed ?? []).slice(0, LIST_CAP)) r.push(`  - \`${p}\``)
     r.push(`- Formatting of rebranded files: ${checkLine(s.format)}`)
     const bs = s.brandScan
     r.push(
       `- Brand scan: ${checkLine(bs, bs?.ran ? `, ${bs.violations?.length ?? 0} violation(s), ${bs.allowed ?? 0} allowlisted hit(s)` : '')}`,
     )
-    for (const v of (bs?.violations ?? []).slice(0, 50)) r.push(`  - \`${v}\``)
+    for (const v of (bs?.violations ?? []).slice(0, 50)) r.push(`  - ${codeSpan(v)}`)
+    const eg = s.egress
+    r.push(
+      `- Egress check: ${checkLine(eg, eg?.ran && eg.violations ? `, ${eg.violations.length} hit(s)` : '')}`,
+    )
+    for (const v of (eg?.violations ?? []).slice(0, 50)) r.push(`  - ${codeSpan(v)}`)
     const t = s.tests
     r.push(
       `- Rebrand tests: ${checkLine(t, t?.ran && t.pass !== undefined ? `, ${t.pass} passed, ${t.fail} failed` : '')}`,
@@ -957,14 +1166,14 @@ export function renderReport(s) {
       '2. `git add` the resolved files, then run `node tools/rebrand/sync-upstream.mjs --continue`.',
     )
   } else {
+    if (a.failed.length > 0) {
+      r.push(
+        `1. Port the files that did not apply by hand: \`git diff ${short(s.base)} ${short(s.target)} -- <file>\`. Do not merge before.`,
+      )
+    }
     if (a.conflicted.length > 0) {
       r.push(
         '1. Check out the branch and resolve the conflict markers in the files above; commit the result.',
-      )
-    }
-    if (a.failed.length > 0) {
-      r.push(
-        `1. Port the files that did not apply by hand: \`git diff ${short(s.base)} ${short(s.target)} -- <file>\`.`,
       )
     }
     if (s.excluded.length > 0)
@@ -976,7 +1185,27 @@ export function renderReport(s) {
     )
   }
   r.push('')
-  return r.join('\n')
+  r.push(`## Upstream commits (${s.behind})`, '')
+  r.push(...capped(s.commits, (c) => `\`${c.slice(0, 7)}\` ${codeSpan(c.slice(8))}`), '')
+  if (s.excluded.length > 0) {
+    r.push(
+      `## Left out by --exclude (${s.excluded.length}, port by hand)`,
+      '',
+      ...capped(s.excluded, (p) => `\`${p}\``),
+      '',
+    )
+  }
+  r.push(
+    `## Files changed upstream: ${s.files.length} (+${s.insertions} / -${s.deletions}, ${s.binary.length} binary)`,
+    '',
+    `<details><summary>File list</summary>`,
+    '',
+    ...capped(s.files, (f) => `${f.status} \`${f.path}\``),
+    '',
+    '</details>',
+    '',
+  )
+  return r
 }
 
 export function writeReport(file, summary) {
@@ -986,6 +1215,14 @@ export function writeReport(file, summary) {
   const json = /\.md$/i.test(md) ? md.replace(/\.md$/i, '.json') : `${md}.json`
   writeFileSync(json, `${JSON.stringify(summary, null, 2)}\n`)
   return { md, json }
+}
+
+/** The report cut below PR_BODY_LIMIT characters, for `gh pr create --body-file`. */
+export function writePrBody(file, summary) {
+  const out = resolve(file)
+  mkdirSync(dirname(out), { recursive: true })
+  writeFileSync(out, renderReport(summary, { maxLength: PR_BODY_LIMIT }))
+  return out
 }
 
 // ---------------------------------------------------------------- CLI
@@ -1013,6 +1250,7 @@ async function main(argv) {
   try {
     const summary = syncUpstream(opts)
     if (opts.report) writeReport(opts.report, summary)
+    if (opts.prBody) writePrBody(opts.prBody, summary)
     if (opts.json) process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`)
     else {
       process.stdout.write(renderReport(summary))

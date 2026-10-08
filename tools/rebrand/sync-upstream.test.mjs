@@ -7,7 +7,16 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { after, test } from 'node:test'
-import { BASE_FILE, parseArgs, renderReport, syncUpstream } from './sync-upstream.mjs'
+import {
+  BASE_FILE,
+  codeSpan,
+  defaultChecks,
+  parsePorcelainZ,
+  parseArgs,
+  renderReport,
+  syncUpstream,
+  trustedSnapshot,
+} from './sync-upstream.mjs'
 
 // Same identity and line-ending behaviour on every platform, for the helpers below
 // and for the git processes the script spawns (they inherit process.env).
@@ -80,7 +89,7 @@ function upstreamFor(upstreamChanges) {
   let target = base
   if (upstreamChanges) {
     write(upstream, upstreamChanges)
-    commitAll(upstream, 'upstream: first change')
+    commitAll(upstream, 'upstream: first change, thanks @someone, fixes #12')
     write(upstream, { 'later.txt': 'second upstream commit\n' })
     target = commitAll(upstream, 'upstream: second change')
   }
@@ -157,13 +166,18 @@ const CONFLICT_CHANGES = {
 }
 
 test('parseArgs reads flags and rejects unknown ones', () => {
-  const o = parseArgs(['--to', 'abc123', '--dry-run', '--exclude', '.github/**', '--json'])
-  assert.equal(o.to, 'abc123')
+  const o = parseArgs(['--to', 'main', '--dry-run', '--exclude', '.github/**', '--json'])
+  assert.equal(o.to, 'main')
   assert.equal(o.dryRun, true)
   assert.deepEqual(o.exclude, ['.github/**'])
   assert.equal(o.json, true)
   assert.throws(() => parseArgs(['--bogus']), /unknown argument/)
   assert.throws(() => parseArgs(['--to']), /needs a value/)
+  assert.throws(() => parseArgs(['--to', 'b08e2eb']), /full 40-hex SHA/)
+  assert.equal(parseArgs(['--to', 'a'.repeat(40)]).to, 'a'.repeat(40))
+  const ci = parseArgs(['--ci'])
+  assert.equal(ci.ci, true)
+  assert.equal(ci.commitConflicts, true)
 })
 
 test('up to date: no branch, no commit, exit 0', () => {
@@ -350,4 +364,157 @@ test('a failing or crashing check makes the run exit 2 instead of aborting', () 
   assert.match(s.tests.note, /crashed/)
   assert.equal(readFileSync(join(fork, BASE_FILE), 'utf8'), `${s.target}\n`)
   assert.match(renderReport(s), /Brand scan: FAIL[\s\S]*c\.txt:1/)
+})
+
+test('parsePorcelainZ keeps both paths of a rename entry', () => {
+  const buf = Buffer.from('R  new name.txt\0old name.txt\0 M a.txt\0?? u.txt\0 D gone.txt\0')
+  assert.deepEqual(parsePorcelainZ(buf), [
+    'a.txt',
+    'gone.txt',
+    'new name.txt',
+    'old name.txt',
+    'u.txt',
+  ])
+})
+
+test('refuses a target that does not descend from the base unless --force', () => {
+  const upstream = join(TMP, `side-upstream-${++counter}`)
+  mkdirSync(upstream, { recursive: true })
+  git(upstream, 'init', '-q')
+  write(upstream, { 'a.txt': lines(3) })
+  const root = commitAll(upstream, 'root')
+  write(upstream, BASE_TREE)
+  const base = commitAll(upstream, 'base')
+  git(upstream, 'switch', '-q', '-c', 'side', root)
+  write(upstream, { ...BASE_TREE, 'side.txt': 'side\n' })
+  commitAll(upstream, 'side')
+  const fork = join(TMP, `fork-${++counter}`)
+  mkdirSync(fork, { recursive: true })
+  git(fork, 'init', '-q')
+  write(fork, { ...BASE_TREE, [BASE_FILE]: `${base}\n` })
+  commitAll(fork, 'fork')
+  const before = snapshot(fork)
+  assert.throws(() => run(fork, upstream, { to: 'side' }), /not an ancestor.*--force/)
+  assert.deepEqual(snapshot(fork), before)
+  const forced = run(fork, upstream, { to: 'side', force: true })
+  assert.equal(forced.ancestor, false)
+  assert.match(renderReport(forced), /NOT an ancestor/)
+})
+
+test('an existing origin sync branch that is not prepared fails early, nothing created', () => {
+  const { fork, upstream, target } = setup({ upstreamChanges: CLEAN_CHANGES })
+  git(fork, 'update-ref', `refs/remotes/origin/upstream-sync/${target.slice(0, 7)}`, 'HEAD')
+  const before = snapshot(fork)
+  assert.throws(() => run(fork, upstream), /origin\/upstream-sync\/\w+ exists but does not absorb/)
+  assert.deepEqual(snapshot(fork), before)
+})
+
+test('a runtime error after the branch was created rolls back to the original branch', () => {
+  const { fork, upstream } = setup({ upstreamChanges: CLEAN_CHANGES, forkChanges: FORK_EDITS })
+  const before = snapshot(fork)
+  const checks = {
+    ...fakeChecks(),
+    // turns tools/rebrand into a file, so writing UPSTREAM_BASE throws (not a guarded check)
+    rebrand(root) {
+      rmSync(join(root, 'tools', 'rebrand'), { recursive: true, force: true })
+      writeFileSync(join(root, 'tools', 'rebrand'), 'not a directory\n')
+      return { ran: true, ok: true }
+    },
+  }
+  assert.throws(() => run(fork, upstream, { checks }))
+  assert.deepEqual(snapshot(fork), before)
+})
+
+test('a formatting failure counts as exit 2; --ci makes a missing Prettier a failure', () => {
+  const { fork, upstream } = setup({ upstreamChanges: CLEAN_CHANGES })
+  const checks = { ...fakeChecks(), format: () => ({ ran: true, ok: false, note: 'boom' }) }
+  const s = run(fork, upstream, { checks })
+  assert.equal(s.status, 'checks-failed')
+  assert.equal(s.exitCode, 2)
+
+  const trusted = trustedSnapshot({ sourceRepo: fakeSourceRepo({}) })
+  try {
+    const missing = join(TMP, 'no-such-prettier.cjs')
+    const strict = defaultChecks({ trusted, prettier: missing, strictFormat: true })
+    assert.equal(strict.format(fork, ['a.txt']).ok, false)
+    const lax = defaultChecks({ trusted, prettier: missing })
+    assert.equal(lax.format(fork, ['a.txt']).ran, false)
+  } finally {
+    trusted.cleanup()
+  }
+})
+
+/** A stand-in for the checkout the script runs from: tools/check-egress.mjs and package.json. */
+function fakeSourceRepo({ egressScript = false }) {
+  const dir = join(TMP, `source-${++counter}`)
+  write(dir, {
+    'package.json': JSON.stringify({
+      scripts: egressScript ? { 'check:egress': 'node tools/check-egress.mjs' } : {},
+    }),
+    '.prettierrc.json': '{ "semi": false }\n',
+    // mimics the real gate's CLI: --root <dir> --json, a JSON array of hits, exit 1 on a hit
+    'tools/check-egress.mjs': [
+      "import { readdirSync, readFileSync } from 'node:fs'",
+      "import { join } from 'node:path'",
+      "const root = process.argv[process.argv.indexOf('--root') + 1]",
+      'const hits = []',
+      'for (const f of readdirSync(root)) {',
+      "  if (!f.endsWith('.txt')) continue",
+      "  const lines = readFileSync(join(root, f), 'utf8').split('\\n')",
+      "  lines.forEach((t, i) => t.includes('tracker.example') && hits.push({ path: f, line: i + 1, pattern: 'tracker.example', text: t }))",
+      '}',
+      'console.log(JSON.stringify(hits))',
+      'process.exitCode = hits.length ? 1 : 0',
+      '',
+    ].join('\n'),
+  })
+  return dir
+}
+
+test('egress check runs from the trusted copy when check:egress exists, and a hit is exit 2', () => {
+  const upstreamChanges = { 'beacon.txt': 'send to tracker.example\n' }
+  const { fork, upstream } = setup({ upstreamChanges })
+  const trusted = trustedSnapshot({ sourceRepo: fakeSourceRepo({ egressScript: true }) })
+  try {
+    assert.equal(trusted.egress, true)
+    const s = run(fork, upstream, { checks: defaultChecks({ trusted }) })
+    assert.equal(s.egress.ran, true)
+    assert.equal(s.egress.ok, false)
+    assert.deepEqual(s.egress.violations, ['beacon.txt:1 [tracker.example]'])
+    assert.equal(s.exitCode, 2)
+    assert.match(renderReport(s), /Egress check: FAIL, 1 hit/)
+  } finally {
+    trusted.cleanup()
+  }
+
+  const { fork: fork2, upstream: upstream2 } = setup({ upstreamChanges: CLEAN_CHANGES })
+  const absent = trustedSnapshot({ sourceRepo: fakeSourceRepo({ egressScript: false }) })
+  try {
+    assert.equal(absent.egress, false)
+    const s = run(fork2, upstream2, { checks: defaultChecks({ trusted: absent }) })
+    assert.equal(s.egress.ran, false)
+    assert.match(s.egress.note, /not present/)
+    assert.equal(s.exitCode, 0)
+  } finally {
+    absent.cleanup()
+  }
+})
+
+test('report: upstream text in code spans, failed files flagged loudly, PR body truncated', () => {
+  const { fork, upstream } = setup({
+    upstreamChanges: CLEAN_CHANGES,
+    forkChanges: { 'a.txt': null },
+  })
+  const s = run(fork, upstream, { commitConflicts: true })
+  const report = renderReport(s)
+  assert.match(report, /`upstream: first change, thanks @someone, fixes #12`/)
+  assert.match(
+    report,
+    /\[!CAUTION\][\s\S]*1 upstream file\(s\) were NOT applied[\s\S]*do not merge/,
+  )
+  assert.equal(codeSpan('a `b`'), '`` a `b` ``')
+  const body = renderReport(s, { maxLength: 1500 })
+  assert.ok(body.length < 1500, `body is ${body.length} chars`)
+  assert.match(body, /Report truncated/)
+  assert.match(body, /NOT applied/)
 })
