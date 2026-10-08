@@ -1,10 +1,15 @@
 // UNI-1011 W7: headless-Chromium proof for Docs-on-the-web.
 // Run from repo root:  npx playwright test -c web/e2e
 import { defineConfig } from '@playwright/test'
+import { createHash } from 'node:crypto'
 import { resolve } from 'node:path'
 
 const repoRoot = resolve(__dirname, '../..')
-const PORT = Number(process.env.E2E_PORT) || 4181
+// Default port is derived from the checkout path: several worktrees run this suite on one host and a
+// fixed port silently tested another checkout's build (a stale server on :4181 answered). Override: E2E_PORT.
+const PORT =
+  Number(process.env.E2E_PORT) ||
+  4300 + (createHash('sha1').update(repoRoot).digest().readUInt16BE(0) % 600)
 
 export default defineConfig({
   testDir: __dirname,
@@ -16,13 +21,13 @@ export default defineConfig({
   fullyParallel: false,
   retries: 0,
   reporter: [['list']],
-  // never assume the server is running: start our own on PORT (reuse only if already healthy)
+  // always start our own server: reusing whatever answers on PORT would test an unknown build
   webServer: {
     command: 'node web/server/server.mjs',
     cwd: repoRoot,
     env: { PORT: String(PORT) },
     url: `http://localhost:${PORT}/healthz`,
-    reuseExistingServer: true,
+    reuseExistingServer: false,
     timeout: 30_000,
   },
   use: {
