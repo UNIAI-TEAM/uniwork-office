@@ -1,6 +1,7 @@
 # Upstream sync
 
-UniWork Office is a long-lived fork of GenOffice. Do not automate blind upstream merges.
+UniWork Office is a long-lived fork of GenOffice with no shared git history: upstream changes arrive as a patch and the
+UniWork brand is re-applied by script. Nothing is merged automatically; the weekly sync workflow only opens a pull request.
 
 ## Remotes
 
@@ -22,27 +23,19 @@ git branch -vv
 
 ## Sync procedure
 
-1. `git fetch upstream`
-2. `git checkout main`
-3. Review `git log --oneline HEAD..upstream/main`
-4. Merge or rebase the **reviewed** upstream commits onto a working branch — never onto origin/main blindly
-5. Resolve branding conflicts explicitly (product names, `appId`, README, icons, About URLs)
-6. Run validation: `npm run typecheck`, `npm run lint`, `npm test`, `npm run build:all`
-7. Merge to `origin` only after PASS
-
-Recommended:
+Use `tools/rebrand/sync-upstream.mjs`; [`tools/rebrand/README.md`](../../tools/rebrand/README.md) ("Sync with upstream")
+documents the commands, the dry run, the exit codes, the report and the weekly workflow.
 
 ```bash
-git fetch upstream
-git checkout main
-git checkout -b sync/upstream-$(date +%Y%m%d)
-git merge upstream/main
-# resolve conflicts, especially branding files listed below
+node tools/rebrand/sync-upstream.mjs --dry-run   # preview against the upstream head
+node tools/rebrand/sync-upstream.mjs             # branch upstream-sync/<sha>: patch, rebrand, UPSTREAM_BASE bump, checks
+# resolve conflicts if it stops (exit 2), `git add`, then:
+node tools/rebrand/sync-upstream.mjs --continue
 npm run typecheck && npm run lint && npm test && npm run build:all
-git checkout main
-git merge --ff-only sync/upstream-YYYYMMDD
-git push origin main
 ```
+
+`git merge upstream/main` and `git cherry-pick` do not work here: the histories are unrelated. To absorb upstream only up to
+a given commit (for example a release tag), run the script with `--to <sha|tag>`; the next sync starts from there.
 
 ## Conflict handling
 
@@ -56,28 +49,9 @@ Treat these as **expected conflict areas**. Prefer UniWork display strings and i
 - `packages/electron-utils/src/github-menu.ts`
 - `docs/go1/**` (ours; keep)
 
-## Cherry-pick upstream fixes
-
-```bash
-git fetch upstream
-git log upstream/main --oneline
-git cherry-pick <sha>
-# run the same validation gates
-```
-
-Cherry-pick engine/package commits first. Avoid cherry-picking upstream README/icon/productName commits unless you re-apply UniWork branding afterwards.
-
-## Merge upstream releases
-
-1. Identify the upstream tag (`git tag -l 'v*' --sort=-v:refname`)
-2. `git merge <tag>` on a review branch
-3. Re-apply UniWork branding if the tag rewrote product names
-4. Run full test/build gates
-5. Tag the UniWork build separately if you ship artifacts (`UniWork-Office-…`)
-
 ## How to avoid overwriting UniWork branding
 
 - Do not `git merge -X theirs upstream/main`
-- After every sync, grep `GenOffice` in user-visible files (`apps/shell/src/renderer`, `apps/*/package.json` `productName`, `electron-builder.cjs`)
+- After every sync, `npm run check:brand` must be clean (the script runs it and lists violations in its report)
 - Keep `@genoffice/*` package names and `GENOFFICE_*` env vars unless a future phase has a migration plan
 - Keep `docs/go1/` and `docs/upstream/` as UniWork-owned documentation

@@ -17,25 +17,76 @@ font aliases) so patches keep applying.
 | `gen-brand-icons.mjs`  | Rebuilds every icon file in `assets/` from a master icon set (`rebrand.mjs --icons <dir>`)        |
 | `brand-scan.mjs`       | Gate: GenOffice / Genspark, GitHub wording, analytics endpoints, internal codes in visible text   |
 | `brand-allowlist.json` | Reasoned exemptions for the scan (`permanent` or `debt` with a tracker)                           |
+| `sync-upstream.mjs`    | Upstream sync: patch on a new branch, rebrand, `UPSTREAM_BASE` bump, scan and tests, report       |
 
 ## Sync with upstream
 
+`sync-upstream.mjs` does the whole flow; the weekly workflow runs it and opens a pull request.
+
 ```sh
-git fetch upstream
-git diff --binary $(cat tools/rebrand/UPSTREAM_BASE) <new-upstream-sha> | git apply -3
-# resolve conflicts: keep the UniWork brand and teacher-edu work, upstream wins elsewhere
-node tools/rebrand/rebrand.mjs        # re-apply the brand to whatever upstream brought in
-npm run format                        # rebrand.mjs does not run prettier; CI checks every changed file as a whole
-npm run check:brand                   # must be clean; fix copy the table cannot, or allowlist with a reason
-git rev-parse <new-upstream-sha> > tools/rebrand/UPSTREAM_BASE
-npm run legal                         # NOTICE / MODIFICATIONS header (new upstream commit), package author + homepage
+node tools/rebrand/sync-upstream.mjs --dry-run --report sync.md   # preview: changes nothing, writes sync.md + sync.json
+node tools/rebrand/sync-upstream.mjs                              # real run on a new branch upstream-sync/<target7>
+node tools/rebrand/sync-upstream.mjs --to <sha|ref>               # a specific upstream commit, branch, tag or refs/pull/<n>/head
+node tools/rebrand/sync-upstream.mjs --continue                   # after resolving conflicts by hand
 ```
 
-If upstream changed its own NOTICE header (year, wording), copy the new text into `upstream.notice` in
-`apps/shell/src/shared/legal.json` before `npm run legal`: that field is the upstream NOTICE kept verbatim.
+What a real run does (it refuses a dirty working tree):
 
-Commit the patch, the rebrand run (`chore(rebrand): re-apply UniWork brand after upstream sync`)
-and the new `UPSTREAM_BASE` so the history shows what upstream changed versus what the script changed.
+1. Fetches the target (default: the upstream default branch head) and the base from `UPSTREAM_BASE` into
+   `refs/upstream-sync/*` (the only refs a dry run touches), and stops with "up to date" when they are equal.
+2. Creates `upstream-sync/<target7>` off the current `HEAD` and applies `git diff --binary <base> <target>` with
+   `git apply -3 --index` (bytes over stdin, so line endings and binaries survive). If git rejects the patch as a
+   whole, it applies file by file and lists the files no 3-way merge could take as "failed".
+3. Commits `chore(upstream): apply genoffice <base7>..<target7>`, runs `rebrand.mjs`, formats the files it touched
+   with Prettier (when installed) and commits `chore(rebrand): re-apply UniWork brand after upstream sync`, then writes
+   the target to `UPSTREAM_BASE` and commits `chore(rebrand): bump UPSTREAM_BASE to <target7>`.
+4. Runs the brand scan and the `test:rebrand` suite and records both in the report.
+
+On conflicts it stops after step 2 (exit 2) with the conflicted files in the working tree. Resolve them (keep the
+UniWork brand and teacher-edu work, upstream wins elsewhere), `git add` them and run `--continue`, which commits the
+patch and finishes steps 3 and 4. `--commit-conflicts` (the workflow's mode) instead commits the files with their
+markers so a pull request shows them, and still finishes the remaining steps.
+
+| Exit code | Meaning                                                                                                  |
+| --------- | -------------------------------------------------------------------------------------------------------- |
+| 0         | up to date, already prepared (the branch exists and absorbs the target), or clean with every check green |
+| 1         | usage or runtime error: bad arguments, dirty tree, fetch failure, unfinished sync branch                 |
+| 2         | needs a human: conflicts, files that did not apply, brand-scan violations or failing rebrand tests       |
+
+Re-running is safe: a dry run leaves branches, `HEAD`, the index and the worktree list as they were (it works in a
+throwaway `git worktree` under the OS temp dir), and a second real run for the same target reports "already prepared"
+and changes nothing. Delete the `upstream-sync/<target7>` branch to prepare a sync again.
+
+The report (`--report <file.md>`, plus a `.json` sibling; the markdown is also printed without `--json`) lists base,
+target, commits behind, the upstream commits, the files changed, clean / conflicted / failed files, the files the
+rebrand changed, the brand-scan and test results, a watch list and the next steps. It holds no local paths, so it can be
+a pull request body as is. Other flags: `--remote`, `--root`, `--branch`, `--base`, `--exclude <glob>`,
+`--prettier <prettier.cjs>`, `--no-fetch`, `--skip-checks`, `--json` (see the header of `sync-upstream.mjs`).
+
+### Weekly workflow
+
+`.github/workflows/upstream-sync.yml` runs every Monday (03:17 UTC) and on demand (`workflow_dispatch`, optional
+`upstream_ref`). It runs the script with `--commit-conflicts`, pushes the branch and opens a pull request against the
+default branch with the report as its body: a draft when the exit code is 2. It does nothing when upstream has nothing
+new, when the branch for that target already exists, or when an open pull request for it exists. Nothing is merged
+automatically. It needs no `npm ci` (the tools are dependency-free Node); it installs only Prettier at the lockfile version.
+
+- It uses `GITHUB_TOKEN` only. Pushes and pull requests made with that token do not trigger other workflows, so the
+  `pull_request` run of `ci.yml` never starts for the sync PR. The workflow therefore dispatches `ci.yml` on the branch
+  (`gh workflow run`); those checks attach to the PR head commit. Any later push by a person triggers the normal run.
+- `GITHUB_TOKEN` may not push changes under `.github/workflows/`, so upstream workflow files are left out of the patch
+  (`--exclude`); the report lists them for a human to port.
+
+### What a human still checks
+
+- Every conflicted or failed file, and the commits in order (patch, rebrand, base bump).
+- The watch list and "Known gaps" below: upstream brings back analytics / star prompt / offer panel code that the fork
+  removed, a changed `skills/*/SKILL.md` needs its `metadata.version` bumped, packaging recipes stay upstream-branded.
+- `npm run legal` after the base bump: it refreshes the NOTICE / MODIFICATIONS header (new upstream commit) and the
+  package author / homepage. If upstream changed its own NOTICE header (year, wording), first copy the new text into
+  `upstream.notice` in `apps/shell/src/shared/legal.json` (the upstream NOTICE kept verbatim).
+- `npm run format` when the run had no Prettier (CI checks every changed file as a whole), then `npm run check:brand`,
+  `npm run rebrand:check` and the app tests. Fix copy the table cannot, or allowlist it with a reason.
 
 ## Commands
 
@@ -45,7 +96,8 @@ node tools/rebrand/rebrand.mjs --check       # exit 1 if a run would change anyt
 node tools/rebrand/rebrand.mjs --root <dir>  # operate on another checkout, e.g. a scratch worktree
 node tools/rebrand/rebrand.mjs --icons <dir> # rebuild assets/ icons from a master icon set, then apply (see App icons)
 npm run check:brand                          # brand scan; --list shows allowlisted hits, --json for tooling
-npm run test:rebrand                         # unit tests for both tools (node:test, no extra deps)
+npm run test:rebrand                         # unit tests for the rebrand, scan and sync tools (node:test, no extra deps)
+node tools/rebrand/sync-upstream.mjs --dry-run   # preview the next upstream sync (see Sync with upstream)
 ```
 
 `check:brand` and `test:rebrand` run in CI next to `check:theme-colors`.
