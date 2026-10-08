@@ -12,10 +12,10 @@ font aliases) so patches keep applying.
 | `UPSTREAM_BASE`        | Full SHA of the upstream commit this tree has absorbed (`b08e2ebf…`)                              |
 | `table.mjs`            | Replacement table: rule id, why, file globs, regex pairs; shared identifier masks                 |
 | `rebrand.mjs`          | Idempotent runner: applies the table, then copies `assets/` over their targets                    |
-| `assets/`              | Artwork overlay, same repo-relative paths as the targets (shell icons, home lockup)               |
+| `assets/`              | Artwork overlay, same repo-relative paths as the targets (every app icon, see "App icons")        |
 | `onboarding-copy.mjs`  | First-run welcome copy (shell `onb*` keys) for every locale; the table re-applies it after a sync |
-| `gen-app-icon.mjs`     | Renders the UW mark to `assets/.../app-icon.png` (onboarding / About icon); the PNG is committed  |
-| `brand-scan.mjs`       | Gate: fails on GenOffice / Genspark / genspark.ai in user-visible surfaces                        |
+| `gen-brand-icons.mjs`  | Rebuilds every icon file in `assets/` from a master icon set (`rebrand.mjs --icons <dir>`)        |
+| `brand-scan.mjs`       | Gate: GenOffice / Genspark, GitHub wording, analytics endpoints, internal codes in visible text   |
 | `brand-allowlist.json` | Reasoned exemptions for the scan (`permanent` or `debt` with a tracker)                           |
 
 ## Sync with upstream
@@ -38,12 +38,36 @@ and the new `UPSTREAM_BASE` so the history shows what upstream changed versus wh
 node tools/rebrand/rebrand.mjs               # apply (npm run rebrand)
 node tools/rebrand/rebrand.mjs --check       # exit 1 if a run would change anything (npm run rebrand:check)
 node tools/rebrand/rebrand.mjs --root <dir>  # operate on another checkout, e.g. a scratch worktree
+node tools/rebrand/rebrand.mjs --icons <dir> # rebuild assets/ icons from a master icon set, then apply (see App icons)
 npm run check:brand                          # brand scan; --list shows allowlisted hits, --json for tooling
 npm run test:rebrand                         # unit tests for both tools (node:test, no extra deps)
 ```
 
 `check:brand` and `test:rebrand` run in CI next to `check:theme-colors`.
 `rebrand:check` is intentionally not in CI yet (see "Known gaps").
+
+## App icons
+
+The app logo is the blue "W" icon. Every icon slot is a file under `assets/` that `rebrand.mjs` copies to the same
+repo-relative path, so changing the logo later is asset-only: put the new master set in a folder
+(`icon.png` 1024 px, `icon.ico` 16..256 px, `icons/<n>x<n>.png` for 16, 32, 48, 64, 128, 256, 512) and run
+`node tools/rebrand/rebrand.mjs --icons <folder>`. That rebuilds the files below (the macOS icns / `icon-mac.png` with
+Apple's 824/1024 grid margin, the Linux hicolor copies, the Docs copies) and applies them. `--check` stays green afterwards.
+
+| Asset (under `tools/rebrand/assets/`)                                                    | Target slot                                                                                           |
+| ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `apps/shell/build/icon.png` (1024)                                                       | electron-builder app icon source; Linux fallback; dev window icon (`windowIconPath()` in `index.ts`)  |
+| `apps/shell/build/icon.ico` (16..256)                                                    | Windows exe icon, NSIS installer and uninstaller icon (electron-builder defaults to `build/icon.ico`) |
+| `apps/shell/build/icon.icns`                                                             | macOS app bundle icon (Dock, Finder, dmg)                                                             |
+| `apps/shell/build/icon-mac.png` (1024, grid margin)                                      | macOS dev Dock icon (`app.dock.setIcon`)                                                              |
+| `apps/shell/build/icons/<n>x<n>.png` and `<n>x<n>/apps/uniwork-office.png`, n = 16..1024 | Linux deb / rpm / AppImage icon set (`linux.icon: 'build/icons'`, hicolor theme names)                |
+| `apps/shell/src/renderer/src/assets/app-icon.png` (512)                                  | welcome dialog, Settings > About, home sidebar mark, update window (`update.html`)                    |
+| `apps/docs/build/icon.{png,ico,icns}`, `icon-mac.png`                                    | standalone UniWork Docs package (same files as the shell's)                                           |
+| `apps/{docs,sheets,slides}/src/renderer/assets/app-icon.png` (256)                       | referenced by no source file; kept off upstream's mark                                                |
+
+There is no tray icon and no favicon in the product (no `<link rel="icon">`, no `Tray`). The per-type document icons
+(`apps/shell/build/{docx,xlsx,pptx,pdf,md,html}.{ico,icns}`) are file-type tiles, not the app mark, and stay as they are.
+`tests` in `rebrand.test.mjs` assert the sizes, the ico entries and the icns slots.
 
 ## What the table covers
 
@@ -59,7 +83,11 @@ scopes is in `office-g3g4/reports/go-a1/rebrand-table.md`; in short:
   User-Agent token (`UniWorkOffice`).
 - **Vendor wording**: `Genspark` to `UniWork` in every locale (including `vi`), `Genspark AI` to `AI`, AI panel title `uniAI`,
   credits top-up links to `uniwork.app`, generic AI badge instead of the Genspark sparkle (`GensparkMark` name kept for call sites).
-- **Links**: homepage, repository, releases, issues and stars API to `github.com/UNIAI-TEAM/uniwork-office` (upstream and the old `truongnt7` fork both map there; only the files the hand rebrand touched plus the PWA download links).
+- **Links**: only functional URLs remain (package homepage / repository, the updater download page, the PWA download links), all on
+  `github.com/UNIAI-TEAM/uniwork-office`; the product UI shows no GitHub wording, repo link or star prompt. `drop-github-and-usage-strings`
+  removes those string keys again after a sync, and the scan fails if they come back.
+- **Settings > Integrations prose** (`integrations-prose`): the sentences name UniWork Office with the `genoffice` command in parentheses;
+  the command, MCP keys and paths stay.
 - **Shipped launchers and text**: `packages/cli/bin/genoffice[.cmd]` start `MacOS/UniWork Office`, `UniWork Office.exe` and the linux `uniwork-office`
   (kept in line with `productName` / `executableName` by `packages/cli/tests/launcher-names.test.ts`); the CLI README, the MCP stdio bridge log lines,
   `skills/genoffice/SKILL.md`, the slide guides and the `npx skills add` command in Settings > Integrations.
@@ -83,18 +111,21 @@ Catalog values and source string literals are also checked for internal planning
 The patterns are narrow (UNIAI, uniAI, Unicode, the Family `milestones` feature and a bare `phase` are fine); see `INTERNAL_COPY` in `brand-scan.mjs`.
 Not scanned: LICENSE, NOTICE, `docs/`, the other READMEs, tests, `e2e/`, fixtures, `package-lock.json`.
 
+GitHub (the word, `github.com`) in catalog values and string literals is a violation too, as are analytics endpoints and GA4
+credentials in source or packaging config (`REPO_LINKS`, `TELEMETRY` in `brand-scan.mjs`); the allowlist carries only the Markdown
+image-host feature, the name GitHub Copilot, vendored-library attribution and the updater's download URL, each with a reason.
+
 `debt` allowlist entries mark real leftovers with a tracker; the scan warns when one stops matching so it gets deleted.
 
 ## Known gaps (also in the GO-A1 report)
 
 - `rebrand:check` is not in CI yet; run it after every upstream sync. The strings the hand rebrand had missed (AI prompts,
   CLI help) were fixed by the first post-merge run and their allowlist entries are gone.
-- `strings.ts` onboarding copy: the welcome keys are re-applied from `onboarding-copy.mjs`; the other `onb*` keys (`GenTeam`, the
-  hidden offer / credits slide) were rewritten by hand, must be re-resolved manually after a sync, and the scan will flag them.
-  `onbCredits` / `onbJoinGenTeam` belong to the disabled offer panel and still carry upstream's "1,000+ credits" promise in 19 locales;
-  they are never shown (`showOffer: false`), delete them with the panel.
-- `app-icon.png` is a placeholder UW mark (`gen-app-icon.mjs`), like the rest of `UNIWORK_BRAND_ASSET_REQUIRED.md`; the unused
-  `apps/{docs,sheets,slides}/src/renderer/assets/app-icon.png` still carry upstream's artwork (GO-A8).
+- `strings.ts` onboarding copy: the welcome keys (steps 1-3) are re-applied from `onboarding-copy.mjs`; the GenTeam, star and
+  analytics-consent keys are dropped by `drop-github-and-usage-strings`. After a sync the code that used them (offer panel, star
+  prompt, analytics tracker) comes back with upstream's files and must be removed again by hand (git conflict resolution).
+- The tracker `apps/shell/src/main/analytics.ts` and every `analytics.track(...)` call were deleted, not guarded; the scan and
+  `apps/shell/tests/privacy-doc.test.ts` fail if an analytics endpoint or credential reappears.
 - Main-process `errNoApiKey` in `docs-main.ts`, `sheets-main.ts` and `slides/i18n-main.ts`: `en` and `vi` are ours (UniWork wording),
   the other locales keep upstream's text; the rule `vi-no-api-key` re-applies the `vi` value after a merge.
 - `skills/genoffice/SKILL.md` is rebranded by `skills-product-name`; after a sync bump its `metadata.version` once more
@@ -102,7 +133,9 @@ Not scanned: LICENSE, NOTICE, `docs/`, the other READMEs, tests, `e2e/`, fixture
 - `packaging/**` (flatpak, nix, docker) is in the scan scope but still names GenOffice, `com.genoffice.app` and fetches
   upstream release artifacts; the hits are `debt` entries (GO-A8 / GO-A4). The recipes are not rebranded because they unpack
   upstream-built packages (`/opt/GenOffice/genoffice`); redo them together with the first UniWork release feed.
-- `apps/shell/build/icon.icns`, `icon.ico`, `icon-mac.png` and the per-type document icons are still upstream artwork
-  (the hand rebrand only replaced PNGs). Replace them with official UniWork artwork before release (GO-A8).
+- The W icon is the old UniWork Office artwork (user decision); the per-type document icons are upstream's tile design in blue /
+  green / orange, kept. Replace the master set via `--icons` if a new logo is issued (GO-A8).
+- The CLI command `genoffice`, the MCP server keys `genoffice` / `genoffice-editor` and the `~/.genoffice` paths keep upstream's name
+  (functional ids that agent configs address); renaming them is a GO-A8 decision.
 - Origin URLs point at `github.com/UNIAI-TEAM/uniwork-office`; switch the single regex in `table.mjs` (`origin-repo-urls`)
   when the canonical repo changes.

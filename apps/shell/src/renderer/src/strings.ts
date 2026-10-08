@@ -3216,7 +3216,8 @@ export const strings = {
     intgExample1: 'แปลง ~/Downloads/report.md เป็นเอกสาร Word',
     intgExample2: 'ทำสไลด์ 6 หน้าเกี่ยวกับผลประกอบการไตรมาส 3 ของเรา',
     intgExample3: 'แปลง budget.xlsx เป็น PDF แล้วเปิดใน UniWork Office',
-    intgStep2Note: 'ผู้ช่วยจะเรียกใช้บรรทัดคำสั่ง UniWork Office (genoffice) เอง คุณไม่ต้องพิมพ์คำสั่งใด ๆ',
+    intgStep2Note:
+      'ผู้ช่วยจะเรียกใช้บรรทัดคำสั่ง UniWork Office (genoffice) เอง คุณไม่ต้องพิมพ์คำสั่งใด ๆ',
     intgCliPartTitle: 'CLI · บรรทัดคำสั่ง + skill',
     intgCliPartDesc:
       'สำหรับผู้ช่วยที่รันคำสั่งเทอร์มินัลได้ (Claude Code, Codex, Cursor และอื่น ๆ) เมื่อติดตั้ง skill แล้ว ผู้ช่วยจะเรียกบรรทัดคำสั่ง UniWork Office (genoffice) เองเพื่อสร้าง แปลง อ่าน และแก้ไขไฟล์ คุณไม่ต้องพิมพ์คำสั่งใด ๆ',
@@ -4481,7 +4482,8 @@ export const strings = {
     intgExample1: 'حوّل ~/Downloads/report.md إلى مستند Word',
     intgExample2: 'أنشئ عرضاً من 6 شرائح عن نتائج الربع الثالث',
     intgExample3: 'حوّل budget.xlsx إلى PDF وافتحه في UniWork Office',
-    intgStep2Note: 'المساعد يشغّل سطر أوامر UniWork Office (genoffice) بنفسه؛ لن تحتاج إلى كتابته أبداً.',
+    intgStep2Note:
+      'المساعد يشغّل سطر أوامر UniWork Office (genoffice) بنفسه؛ لن تحتاج إلى كتابته أبداً.',
     intgCliPartTitle: 'CLI · سطر الأوامر + skill',
     intgCliPartDesc:
       'للمساعدين الذين يستطيعون تنفيذ أوامر الطرفية (Claude Code وCodex وCursor وغيرها). بعد تثبيت skill، يستدعي المساعد سطر أوامر UniWork Office (genoffice) بنفسه لإنشاء الملفات وتحويلها وقراءتها وتحريرها؛ لن تكتب أي أمر.',
@@ -5735,7 +5737,8 @@ export const strings = {
     intgExample1: 'Zamień ~/Downloads/report.md na dokument Word',
     intgExample2: 'Zrób prezentację z 6 slajdów o naszych wynikach za III kwartał',
     intgExample3: 'Przekonwertuj budget.xlsx do PDF i otwórz w UniWork Office',
-    intgStep2Note: 'Asystent sam uruchamia wiersz poleceń UniWork Office (genoffice); nigdy nie musisz go wpisywać.',
+    intgStep2Note:
+      'Asystent sam uruchamia wiersz poleceń UniWork Office (genoffice); nigdy nie musisz go wpisywać.',
     intgCliPartTitle: 'CLI · wiersz poleceń + skill',
     intgCliPartDesc:
       'Dla asystentów, które potrafią uruchamiać polecenia terminala (Claude Code, Codex, Cursor i inne). Po zainstalowaniu skilla asystent sam wywołuje wiersz poleceń UniWork Office (genoffice), aby tworzyć, konwertować, czytać i edytować pliki; nigdy nie wpisujesz polecenia.',
@@ -6116,7 +6119,8 @@ export const strings = {
     intgExample1: 'Převeď ~/Downloads/report.md na dokument Word',
     intgExample2: 'Udělej prezentaci o 6 snímcích o našich výsledcích za 3. čtvrtletí',
     intgExample3: 'Převeď budget.xlsx do PDF a otevři ho v UniWork Office',
-    intgStep2Note: 'Asistent spouští příkazový řádek UniWork Office (genoffice) sám; nikdy ho nemusíte psát.',
+    intgStep2Note:
+      'Asistent spouští příkazový řádek UniWork Office (genoffice) sám; nikdy ho nemusíte psát.',
     intgCliPartTitle: 'CLI · příkazový řádek + skill',
     intgCliPartDesc:
       'Pro asistenty, kteří umí spouštět příkazy terminálu (Claude Code, Codex, Cursor a další). Po instalaci skillu asistent sám volá příkazový řádek UniWork Office (genoffice) k vytváření, převodu, čtení a úpravám souborů; žádný příkaz nepíšete.',
@@ -7399,7 +7403,8 @@ export const strings = {
     intgExample1: 'הפוך את ~/Downloads/report.md למסמך Word',
     intgExample2: 'הכן מצגת של 6 שקופיות על תוצאות הרבעון השלישי שלנו',
     intgExample3: 'המר את budget.xlsx ל-PDF ופתח אותו ב-UniWork Office',
-    intgStep2Note: 'העוזר מריץ בעצמו את שורת הפקודה UniWork Office (genoffice); לעולם לא תצטרכו להקליד אותה.',
+    intgStep2Note:
+      'העוזר מריץ בעצמו את שורת הפקודה UniWork Office (genoffice); לעולם לא תצטרכו להקליד אותה.',
     intgCliPartTitle: 'CLI · שורת פקודה + skill',
     intgCliPartDesc:
       'לעוזרים שיכולים להריץ פקודות טרמינל (Claude Code‏, Codex‏, Cursor ואחרים). לאחר התקנת ה‑skill העוזר קורא בעצמו לשורת הפקודה UniWork Office (genoffice) כדי ליצור, להמיר, לקרוא ולערוך קבצים; אתם לא מקלידים שום פקודה.',
@@ -7806,7 +7811,8 @@ export const strings = {
     intgExample1: '~/Downloads/report.md को Word दस्तावेज़ बना दो',
     intgExample2: 'हमारे Q3 नतीजों पर 6 स्लाइड का प्रेज़ेंटेशन बनाओ',
     intgExample3: 'budget.xlsx को PDF में बदलो और UniWork Office में खोलो',
-    intgStep2Note: 'UniWork Office (genoffice) कमांड लाइन असिस्टेंट खुद चलाता है; आपको कभी टाइप नहीं करना पड़ता।',
+    intgStep2Note:
+      'UniWork Office (genoffice) कमांड लाइन असिस्टेंट खुद चलाता है; आपको कभी टाइप नहीं करना पड़ता।',
     intgCliPartTitle: 'CLI · कमांड लाइन + skill',
     intgCliPartDesc:
       'उन सहायकों के लिए जो टर्मिनल कमांड चला सकते हैं (Claude Code, Codex, Cursor आदि)। skill इंस्टॉल होने के बाद सहायक फ़ाइलें बनाने, बदलने, पढ़ने और संपादित करने के लिए खुद UniWork Office (genoffice) कमांड लाइन चलाता है; आपको कोई कमांड टाइप नहीं करना पड़ता।',
