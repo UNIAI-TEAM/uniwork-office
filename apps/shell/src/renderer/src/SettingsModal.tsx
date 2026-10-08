@@ -21,6 +21,7 @@ import {
   MAX_MAX_OUTPUT_TOKENS,
   MIN_MAX_OUTPUT_TOKENS,
   clampMaxOutputTokens,
+  updateMediaProviderConfig,
 } from '@genoffice/ai-provider/browser'
 import type {
   AiMediaProviderId,
@@ -942,25 +943,12 @@ function AiMediaPane({
       }
     )
   }
-  /** editing the shown vendor also stores it when the stored choice is hidden (the picker shows options[0]) */
+  /** editing the shown vendor also stores it when the stored choice is hidden and the vendor becomes usable */
   const updateMediaConfig = (
     cap: Exclude<Capability, 'search'>,
     id: AiMediaProviderId,
     patch: Partial<AiMediaSettings['providers'][AiMediaProviderId]>,
-  ) => {
-    const field =
-      cap === 'image'
-        ? 'imageProvider'
-        : cap === 'video'
-          ? 'videoAnalysisProvider'
-          : 'analysisProvider'
-    const shown = mediaOptions(cap).some((m) => m.id === media[field])
-    setMedia({
-      ...media,
-      ...(shown ? {} : { [field]: id }),
-      providers: { ...media.providers, [id]: { ...mediaConfigOf(id), ...patch } },
-    })
-  }
+  ) => setMedia(updateMediaProviderConfig(media, cap, id, patch))
 
   const save = () => {
     Promise.all([

@@ -353,6 +353,45 @@ export function visibleMediaProviders(): AiMediaProviderMeta[] {
     : AI_MEDIA_PROVIDERS.filter((m) => m.id !== 'genspark')
 }
 
+/**
+ * Settings after editing one vendor's config in a media block. The block shows
+ * the first offered provider when the stored choice is not offered, so the shown
+ * vendor is written into the capability's provider field only then, and only once
+ * its resulting config is usable; a keyless edit must not pin a vendor that would
+ * switch off a capability another vendor currently serves.
+ */
+export function updateMediaProviderConfig(
+  media: AiMediaSettings,
+  capability: MediaCapability,
+  id: AiMediaProviderId,
+  patch: Partial<AiMediaProviderConfig>,
+): AiMediaSettings {
+  const field =
+    capability === 'image'
+      ? 'imageProvider'
+      : capability === 'video'
+        ? 'videoAnalysisProvider'
+        : 'analysisProvider'
+  const meta = getMediaProviderMeta(id)
+  const config: AiMediaProviderConfig = {
+    ...(media.providers[id] ?? {
+      apiKey: '',
+      imageModel: meta?.defaultImageModel ?? '',
+      analysisModel: meta?.defaultAnalysisModel ?? '',
+    }),
+    ...patch,
+  }
+  const shown = visibleMediaProviders().some(
+    (m) => m.id === media[field] && providerHasCapability(m, capability),
+  )
+  const pin = !shown && !!meta && mediaConfigUsable(meta, config)
+  return {
+    ...media,
+    ...(pin ? { [field]: id } : {}),
+    providers: { ...media.providers, [id]: config },
+  }
+}
+
 /** BYOK-only while the cloud seam is off; the cloud fallback also needs a sign-in and the cloud toggle */
 function capabilityAvailable(
   settings: Pick<AiSettings, 'media' | 'gskToolsEnabled'> | null | undefined,

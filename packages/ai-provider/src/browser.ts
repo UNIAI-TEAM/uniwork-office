@@ -21,6 +21,7 @@ export {
   AI_MEDIA_PROVIDERS,
   imageGenerationAvailable,
   mediaAnalysisAvailable,
+  updateMediaProviderConfig,
   visibleMediaProviders,
 } from './media'
 export { UNIWORK_CLOUD_ENABLED, uniworkCloudEnabled } from './uniwork-cloud'

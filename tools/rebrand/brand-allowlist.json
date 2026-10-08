@@ -42,41 +42,6 @@
       "reason": "On-disk magic header of lazy-media stub files; changing it would orphan stubs already written by earlier versions. Never user visible."
     },
     {
-      "path": "{apps/sheets/src/main/sheets-main.ts,apps/slides/src/main/slides-main.ts,apps/shell/src/main/index.ts}",
-      "pattern": "genspark\\.ai",
-      "kind": "debt",
-      "reason": "Proxy-resolution probe against www.genspark.ai; the Genspark endpoints are removed under the telemetry/login/URL clean-up.",
-      "tracker": "GO-A4 UNI-1005"
-    },
-    {
-      "path": "apps/shell/src/main/cloud-projects.ts",
-      "pattern": "genspark\\.ai",
-      "kind": "debt",
-      "reason": "GENSPARK_ORIGIN cloud-projects endpoint; removed with the Genspark cloud integration.",
-      "tracker": "GO-A4 UNI-1005"
-    },
-    {
-      "path": "packages/ai-provider/src/{providers,protocols/shared}.ts",
-      "pattern": "genspark\\.ai",
-      "kind": "debt",
-      "reason": "Genspark LLM proxy base URLs and pricing-URL matcher kept for the legacy provider id until the provider is removed.",
-      "tracker": "GO-A4 UNI-1005"
-    },
-    {
-      "path": "packages/ai-search/src/{genoffice-auth,gsk}.ts",
-      "pattern": "genspark\\.ai",
-      "kind": "debt",
-      "reason": "Genspark device-login and gsk tool CLI base URLs; removed with the Genspark login (GO-A4) and replaced by UniWork sign-in (GO-A5).",
-      "tracker": "GO-A4 UNI-1005 / GO-A5"
-    },
-    {
-      "path": "packages/electron-utils/src/remote-image.ts",
-      "pattern": "genspark\\.ai",
-      "kind": "debt",
-      "reason": "Referer header rule for genspark.ai-hosted images; removed with the Genspark integration.",
-      "tracker": "GO-A4 UNI-1005"
-    },
-    {
       "path": "packaging/**",
       "pattern": "genspark-ai/",
       "kind": "debt",

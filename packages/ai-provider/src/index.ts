@@ -47,6 +47,7 @@ export {
   mediaConfigUsable,
   providerHasCapability,
   resolveAiMediaSettings,
+  updateMediaProviderConfig,
   videoAnalysisAvailable,
   visibleMediaProviders,
 } from './media'
