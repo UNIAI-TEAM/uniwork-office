@@ -164,10 +164,24 @@ export function buildManifest({
   }
 }
 
-/** For the host sync script: re-hash a synced directory against its manifest. Returns the problems (empty = identical). */
+/**
+ * For the host sync script: re-hash a synced directory against its manifest, and report any file
+ * the manifest does not list (a stale or injected file would be served same-origin with UniWork).
+ * Returns the problems (empty = identical).
+ */
 export function verifyManifest(dir: string, manifest: Pick<Manifest, 'files'>): string[] {
   const problems: string[] = []
   const root = resolve(dir)
+  const listed = new Set(manifest.files.map((f) => f.path))
+  let present: string[] = []
+  try {
+    present = walk(root).map((abs) => relative(root, abs).split(sep).join('/'))
+  } catch {
+    // a missing directory shows up below as every listed file missing
+  }
+  for (const path of present) {
+    if (path !== MANIFEST_FILE && !listed.has(path)) problems.push(`${path}: not in the manifest`)
+  }
   for (const f of manifest.files) {
     const abs = resolve(root, f.path)
     if (abs !== root && !abs.startsWith(root + sep)) {

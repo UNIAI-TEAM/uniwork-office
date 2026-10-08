@@ -27,7 +27,8 @@ dist-web/docs/<packageVersion>-<gitSha>[-dirty]/
 | `initial`, `deferred`                          | `{files, bytes, gzipBytes}`: static load path (html + script/link targets + static imports) vs everything else except metadata (fonts, lazy chunks) |
 
 A synced copy can be checked with `verifyManifest(dir, manifest)` (`web/docs/build/manifest.ts`): size + sha256 of every
-listed file, no path escapes the directory.
+listed file, no path escapes the directory, and no file the manifest does not list (a stale or injected file would be
+served same-origin with UniWork).
 
 ## Serving
 
@@ -51,6 +52,11 @@ font picker and saves under this exact header and fails on any `securitypolicyvi
   `fetch(dataUrl)`.
 - Another API origin: `WEB_DOCS_CSP_CONNECT_SRC="https://api.example.com"`; frame on its own origin:
   `WEB_DOCS_CSP_FRAME_ANCESTORS="https://app.example.com"` (build time).
+- Document downloads: the bridge `fetch`es a `FileSource {kind:'url'}` from inside the frame, so with `connect-src 'self'`
+  the host must give the frame **same-origin** URLs (its own proxy route) or the bytes themselves (`{kind:'bytes'}`). A
+  presigned URL on another origin (S3/MinIO) is blocked by the CSP; a host that needs one must add that origin to
+  `connect-src` in the CSP it serves (it ships `csp.json`, so the header can be widened without a rebuild).
+  See `web/docs/protocol/README.md`.
 
 ## Fonts
 
@@ -67,6 +73,8 @@ font picker and saves under this exact header and fails on any `securitypolicyvi
 
 ## Tests
 
+`npm run test:web` runs the protocol, bridge and build vitest suites; `npm run typecheck:web` the protocol and bridge
+tsconfigs (both run in CI, `.github/workflows/ci.yml`).
 `npx vitest run --root web/docs/build` (manifest, CSP, version, font rewrite + woff2 freshness),
 `npx playwright test -c web/e2e` (needs `npm run build:web` first; the specs open documents through the protocol test host at `/test-host/`, `csp-header.spec.ts` fails on any CSP violation),
 `node web/measure/measure-b3.mjs --before-dist <old-pipeline build> --before-desc "..."` (writes `web/measure/measurements-b3.{md,json}`; `measurements-b3-vs-spike.*` is the earlier run against the UNI-1011 spike build).

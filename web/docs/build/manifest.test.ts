@@ -176,6 +176,18 @@ describe('verifyManifest (host sync check)', () => {
     )
     expect(
       verifyManifest(dir, { files: [{ path: '../etc/passwd', bytes: 0, sha256: '' } as never] }),
-    ).toEqual(['../etc/passwd: escapes the version directory'])
+    ).toContain('../etc/passwd: escapes the version directory')
+  })
+
+  it('reports files the manifest does not list (stale or injected), ignoring manifest.json', () => {
+    const m = buildManifest({ dir, version: VERSION, builtAt: BUILT_AT })
+    put(MANIFEST_FILE, JSON.stringify(m))
+    expect(verifyManifest(dir, m)).toEqual([])
+    put('assets/injected.js', 'alert(1)')
+    put('old/app-0.js', 'stale')
+    expect(verifyManifest(dir, m)).toEqual([
+      'assets/injected.js: not in the manifest',
+      'old/app-0.js: not in the manifest',
+    ])
   })
 })
