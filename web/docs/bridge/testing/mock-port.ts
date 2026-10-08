@@ -44,6 +44,7 @@ export function createMockPort(session: Partial<PortSession> = {}) {
   const titles: string[] = []
   const saved: SavedPayload[] = []
   const errors: Array<{ error: unknown; fatal?: boolean }> = []
+  const renameListeners: Array<(file: FileMeta) => void> = []
 
   function put(name: string, bytes: Uint8Array, fileId = `f${++seq}`): FileMeta {
     const version = (store.get(fileId)?.meta.versionId ?? 'v0').replace(/\d+$/, (n) => String(+n + 1))
@@ -83,6 +84,13 @@ export function createMockPort(session: Partial<PortSession> = {}) {
     }),
     'api.attachments.add': () => ({ accepted: [], rejected: [] }),
     'api.images.upload': () => ({ imageId: 'i1', url: '/img/i1' }),
+    // the "user" picks the newest file
+    'file.pick': () => {
+      const last = [...store.keys()].at(-1)
+      return { file: last ? api['api.open']({ fileId: last }) : null }
+    },
+    'image.fetch': () => ({ image: { base64: 'iVBORw0KGgo=', mime: 'image/png' } }),
+    'convert.altChunkHtml': () => ({ data: new Uint8Array([0x50, 0x4b]).buffer }),
   }
 
   const initSession: PortSession = { documentId: session.documentId ?? 'missing', ...session }
@@ -101,6 +109,8 @@ export function createMockPort(session: Partial<PortSession> = {}) {
     handleSave: (h) => ((handlers.save = h as never), () => {}),
     handleSaveAs: (h) => ((handlers.saveAs = h as never), () => {}),
     handlePrint: (h) => ((handlers.print = h as never), () => {}),
+    handleCloseCheck: (h) => ((handlers['doc.closeCheck'] = h as never), () => {}),
+    onFileRenamed: (l) => (renameListeners.push(l), () => {}),
     setDirty: (d) => {
       if (dirty[dirty.length - 1] !== d) dirty.push(d)
     },
@@ -126,6 +136,12 @@ export function createMockPort(session: Partial<PortSession> = {}) {
     bytesOf: (fileId: string) => store.get(fileId)?.bytes,
     openPayload(fileId: string): OpenPayload {
       return api['api.open']({ fileId })
+    },
+    /** host event file.renamed */
+    rename(fileId: string, name: string) {
+      const f = store.get(fileId)!
+      f.meta = { ...f.meta, name }
+      for (const l of renameListeners) l({ ...f.meta })
     },
     override(type: FrameRequestType, fn: Override) {
       overrides.set(type, fn)

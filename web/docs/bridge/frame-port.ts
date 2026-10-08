@@ -5,6 +5,7 @@
  */
 import {
   toProtocolError,
+  type FileMeta,
   type FrameRequestType,
   type FrameRequests,
   type HostRequests,
@@ -41,6 +42,8 @@ export interface FramePort {
   handleSave(handler: HostHandler<'save'>): () => void
   handleSaveAs(handler: HostHandler<'saveAs'>): () => void
   handlePrint(handler: HostHandler<'print'>): () => void
+  handleCloseCheck(handler: HostHandler<'doc.closeCheck'>): () => void
+  onFileRenamed(listener: (file: FileMeta) => void): () => void
   setDirty(dirty: boolean): void
   setTitle(title: string): void
   reportSaved(payload: SavedPayload): void

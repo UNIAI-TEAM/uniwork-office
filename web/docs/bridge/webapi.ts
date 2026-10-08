@@ -11,7 +11,7 @@
  * | consumePendingOpenDocx    | init.open, else api.open {fileId: init.documentId} (once, at boot)               |
  * | onOpenDocx                | host request `open` {file, source} -> listeners -> {opened, title}                |
  * | openDocxPath(path)        | `uniwork://files/<id>/<name>` -> api.open {fileId}                                |
- * | openDocx                  | null: picking another document is the host's file browser (no frame picker)      |
+ * | openDocx                  | file.pick {purpose:'open'} (UniWork picker in the host); null = cancelled        |
  * | saveDocx(path,data,auto)  | api.save {fileId, data, etag, auto}; 'conflict' -> reason 'external-modified'    |
  * | saveDocxAs                | api.saveAs {name, data, sourceFileId} (host dialog); 'cancelled' -> {ok:false}   |
  * | saveDocxNew               | api.saveAs {name, data, silent: true} (first save of an untitled document)       |
@@ -19,7 +19,10 @@
  * | exportPdf                 | api.export {format:'pdf', fileId, page size} -> download; failure -> window.print |
  * | printPdfBuffer / saveMergedPdf | deferred marker parts -> one exportPdf of the current file                  |
  * | exportHtml                | renderer-built HTML -> browser download (no server needed)                       |
- * | onCloseCheck & co, onMenuCommand | ./session.ts: `dirty` / `title` events, host `save` / `saveAs` requests   |
+ * | onRenamedDocx             | host event file.renamed {file}                                                   |
+ * | fetchImage(url)           | data: URLs decoded locally; else image.fetch (server-side SSRF-guarded proxy)    |
+ * | convertAltChunkHtml       | convert.altChunkHtml; failure -> null (altChunk skipped, as on a failed convert) |
+ * | onCloseCheck & co, onMenuCommand | ./session.ts: `dirty` / `title` events, host `doc.closeCheck` / `save` / `saveAs` |
  * | projectApi.*              | ./project-memory.ts (AI-only; AI is hidden on the web)                           |
  * Every successful save emits `saved` {file, versionId, initiatedByFrame}.
  *
@@ -27,10 +30,9 @@
  * save flow), `saveAs` (runs the editor's Save As with the host's name),
  * `print` ({mode:'pdf'} = server export, else the in-frame print dialog).
  *
- * Not here on purpose: AI / search / image fetch (./ai.ts, stubbed + hidden),
- * attachments (./browser.ts keeps them in the browser; AI-panel only),
- * rename events / altChunk conversion / doc passwords (./hide.ts; the protocol
- * has no message for them yet). Encrypted (CFB) docx is passed through as-is.
+ * Not here on purpose: AI / search / image generation (./ai.ts, stubbed +
+ * hidden), attachments (./browser.ts keeps them in the browser; AI-panel only),
+ * doc passwords (./hide.ts). Encrypted (CFB) docx is passed through as-is.
  */
 import type {
   DesktopApi,
@@ -112,6 +114,20 @@ function downloadBlob(name: string, blob: Blob): void {
   a.click()
   a.remove()
   setTimeout(() => URL.revokeObjectURL(url), 30_000)
+}
+
+function decodeDataUrl(url: string): { base64: string; mime: string } | null {
+  const m = /^data:([^;,]*)((?:;[^;,]*)*?)(;base64)?,(.*)$/s.exec(url)
+  if (!m) return null
+  const mime = m[1] || 'text/plain'
+  if (m[3]) return { base64: m[4], mime }
+  try {
+    let bin = ''
+    for (const b of new TextEncoder().encode(decodeURIComponent(m[4]))) bin += String.fromCharCode(b)
+    return { base64: btoa(bin), mime }
+  } catch {
+    return null
+  }
 }
 
 function describe(err: unknown): string {
@@ -250,6 +266,16 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
     })
   })
 
+  type RenameHandler = (paths: { oldPath: string; newPath: string }) => void
+  const renameListeners = new Set<RenameHandler>()
+  port.onFileRenamed((file) => {
+    const prev = files.get(file.fileId)
+    if (!prev || prev.name === file.name) return
+    const oldPath = pathFor(prev)
+    files.set(file.fileId, { ...prev, ...file })
+    for (const l of renameListeners) l({ oldPath, newPath: pathFor(file) })
+  })
+
   // ------------------------------------------------------------ export / print
 
   function printViaBrowser(defaultName: string): { ok: boolean; path?: string } {
@@ -321,8 +347,25 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
       }
     },
 
+    onRenamedDocx(handler: RenameHandler): () => void {
+      renameListeners.add(handler)
+      return () => {
+        renameListeners.delete(handler)
+      }
+    },
+
     async openDocx(): Promise<OpenDocxResult> {
-      return null
+      try {
+        const res = await port.request(
+          'file.pick',
+          { purpose: 'open', accept: ['docx'] },
+          { timeoutMs: TIMEOUTS.dialog },
+        )
+        return res?.file ? await toOpenResult(res.file) : null
+      } catch (err) {
+        if (errorCode(err) !== 'cancelled') console.error('[docs-web] file.pick failed:', err)
+        return null
+      }
     },
 
     async openDocxPath(path: string): Promise<OpenDocxResult> {
@@ -430,6 +473,28 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
     async saveMergedPdf(defaultName: string, base64Parts: string[], _outPath?: string) {
       if (base64Parts.every((p) => p === WEB_PRINT_PART)) return exportCurrentPdf(defaultName, 0, 0)
       return { ok: false, error: 'merging real PDF parts is not supported on web' }
+    },
+
+    async fetchImage(url: string): Promise<{ base64: string; mime: string } | null> {
+      if (typeof url !== 'string' || !url) return null
+      if (url.startsWith('data:')) return decodeDataUrl(url)
+      if (!/^https?:\/\//i.test(url)) return null
+      try {
+        const res = await port.request('image.fetch', { url }, { timeoutMs: TIMEOUTS.short })
+        return res?.image ?? null
+      } catch {
+        return null
+      }
+    },
+
+    async convertAltChunkHtml(html: string): Promise<Uint8Array | null> {
+      if (typeof html !== 'string' || !html) return null
+      try {
+        const res = await port.request('convert.altChunkHtml', { html }, { timeoutMs: TIMEOUTS.transfer })
+        return res?.data ? new Uint8Array(copyBuffer(res.data)) : null
+      } catch {
+        return null
+      }
     },
   } satisfies Partial<DesktopApi>
 

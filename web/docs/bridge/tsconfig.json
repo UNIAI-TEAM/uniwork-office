@@ -13,6 +13,7 @@
     "jsx": "react-jsx"
   },
   "include": [
+    "install.ts",
     "webapi.ts",
     "session.ts",
     "frame-port.ts",

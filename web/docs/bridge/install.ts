@@ -42,7 +42,9 @@ const webapi = createWebApi(
 )
 
 export function installBridge(): void {
-  const modules: Bridge[] = [hide, webapi, ai, browser]
+  // later modules win: webapi's real fetchImage / convertAltChunkHtml / close
+  // guard replace the ai.ts and hide.ts stubs
+  const modules: Bridge[] = [hide, ai, webapi, browser]
   const desktop: Bridge = {}
   for (const mod of modules) for (const key of Object.keys(mod ?? {})) desktop[key] = mod[key]
 

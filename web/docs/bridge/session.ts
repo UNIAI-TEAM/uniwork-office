@@ -9,6 +9,7 @@
  *   - `onCloseSaveRequest` -> full save flow -> `reportCloseSaveResult(ok)`,
  *   - `onMenuCommand('save-as')` -> the Save As flow (-> saveDocxAs).
  * This module implements those three against the host:
+ *   - host request `doc.closeCheck` -> the guard -> {dirty, autoSave},
  *   - `dirty`: the guard is polled and every change goes to the host,
  *   - `title`: document.title (App.tsx sets it to the file name),
  *   - `runSave()` / `runMenuCommand()` for the host's `save` / `saveAs` requests.
@@ -26,7 +27,10 @@ export interface SessionOptions {
   saveTimeoutMs?: number
 }
 
-export function createSession(port: Pick<FramePort, 'setDirty' | 'setTitle'>, opts: SessionOptions = {}) {
+export function createSession(
+  port: Pick<FramePort, 'setDirty' | 'setTitle' | 'handleCloseCheck'>,
+  opts: SessionOptions = {},
+) {
   const pollMs = opts.pollMs ?? 1000
   const saveTimeoutMs = opts.saveTimeoutMs ?? 180_000
   const checkHandlers = new Set<() => void>()
@@ -49,6 +53,11 @@ export function createSession(port: Pick<FramePort, 'setDirty' | 'setTitle'>, op
     const state = query()
     if (state) port.setDirty(state.dirty)
   }
+
+  port.handleCloseCheck(() => {
+    const state = query()
+    return { dirty: state?.dirty ?? false, autoSave: state?.autoSave ?? false }
+  })
 
   let lastTitle: string | null = null
   function pushTitle(): void {

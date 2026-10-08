@@ -134,7 +134,21 @@ describe('openDocxPath / openDocx', () => {
     expect(await api.openDocxPath('uniwork://files/f1/a.docx')).toBeNull()
   })
 
-  it('openDocx has no frame picker on the web', async () => {
+  it('openDocx: success opens the picked file', async () => {
+    mock.seed('Picked.docx', DOCX)
+    const r = (await api.openDocx()) as OpenFileResult
+    expect(r.name).toBe('Picked.docx')
+    expect(mock.calls[0]).toMatchObject({ type: 'file.pick', payload: { purpose: 'open', accept: ['docx'] } })
+    expect(mock.calls[0].opts?.timeoutMs).toBe(600_000)
+  })
+
+  it('openDocx: cancelled / error / timeout -> null', async () => {
+    expect(await api.openDocx()).toBeNull() // empty store: picker returns {file: null}
+    mock.override('file.pick', () => Promise.reject(protocolError('cancelled')))
+    expect(await api.openDocx()).toBeNull()
+    mock.override('file.pick', () => Promise.reject(protocolError('internal')))
+    expect(await api.openDocx()).toBeNull()
+    mock.override('file.pick', timeoutAfter)
     expect(await api.openDocx()).toBeNull()
   })
 })
@@ -304,6 +318,62 @@ describe('exportPdf / print', () => {
   })
 })
 
+describe('onRenamedDocx', () => {
+  it('maps a host rename of a known file to old/new paths', async () => {
+    const doc = await bootWith()
+    const seen: Array<{ oldPath: string; newPath: string }> = []
+    api.onRenamedDocx((p) => seen.push(p))
+    mock.rename('f1', 'Renamed.docx')
+    mock.rename('f1', 'Renamed.docx') // unchanged name: no event
+    expect(seen).toEqual([{ oldPath: doc.path, newPath: 'uniwork://files/f1/Renamed.docx' }])
+    // later saves keep the renamed name
+    await api.saveDocx(seen[0].newPath, buf([1]))
+    expect(mock.saved.at(-1)!.file.name).toBe('Renamed.docx')
+  })
+
+  it('ignores renames of files this frame never opened', async () => {
+    const seen: unknown[] = []
+    api.onRenamedDocx((p) => seen.push(p))
+    mock.seed('Other.docx', DOCX)
+    mock.rename('f1', 'X.docx')
+    expect(seen).toEqual([])
+  })
+})
+
+describe('fetchImage / convertAltChunkHtml', () => {
+  it('fetchImage: data: URLs locally, http(s) through image.fetch', async () => {
+    expect(await api.fetchImage('data:image/png;base64,AAAA')).toEqual({ base64: 'AAAA', mime: 'image/png' })
+    expect(await api.fetchImage('data:image/svg+xml,%3Csvg%2F%3E')).toEqual({
+      base64: btoa('<svg/>'),
+      mime: 'image/svg+xml',
+    })
+    expect(mock.calls).toHaveLength(0)
+    expect(await api.fetchImage('https://cdn/x.png')).toEqual({ base64: 'iVBORw0KGgo=', mime: 'image/png' })
+    expect(mock.calls[0]).toMatchObject({ type: 'image.fetch', payload: { url: 'https://cdn/x.png' } })
+    expect(await api.fetchImage('file:///etc/passwd')).toBeNull()
+  })
+
+  it('fetchImage: not found / error / timeout -> null', async () => {
+    mock.override('image.fetch', () => ({ image: null }))
+    expect(await api.fetchImage('https://cdn/x.png')).toBeNull()
+    mock.override('image.fetch', () => Promise.reject(protocolError('forbidden')))
+    expect(await api.fetchImage('https://cdn/x.png')).toBeNull()
+    mock.override('image.fetch', timeoutAfter)
+    expect(await api.fetchImage('https://cdn/x.png')).toBeNull()
+  })
+
+  it('convertAltChunkHtml: bytes on success, null otherwise', async () => {
+    expect(await api.convertAltChunkHtml('<p>x</p>')).toEqual(new Uint8Array([0x50, 0x4b]))
+    expect(await api.convertAltChunkHtml('')).toBeNull()
+    mock.override('convert.altChunkHtml', () => ({ data: null }))
+    expect(await api.convertAltChunkHtml('<p>x</p>')).toBeNull()
+    mock.override('convert.altChunkHtml', () => Promise.reject(protocolError('unsupported')))
+    expect(await api.convertAltChunkHtml('<p>x</p>')).toBeNull()
+    mock.override('convert.altChunkHtml', timeoutAfter)
+    expect(await api.convertAltChunkHtml('<p>x</p>')).toBeNull()
+  })
+})
+
 describe('host save / saveAs requests (editor flows)', () => {
   /** stand-in for App.tsx's close-guard + menu wiring */
   function wireRenderer(path: () => string, save = () => api.saveDocx(path(), buf([4]))) {
@@ -357,6 +427,12 @@ describe('host save / saveAs requests (editor flows)', () => {
 })
 
 describe('dirty + title events', () => {
+  it('answers the host close check from the guard', async () => {
+    expect(await mock.host['doc.closeCheck']({})).toEqual({ dirty: false, autoSave: false })
+    api.onCloseCheck(() => api.reportCloseCheck({ dirty: true, autoSave: true, filePath: 'p' }))
+    expect(await mock.host['doc.closeCheck']({})).toEqual({ dirty: true, autoSave: true })
+  })
+
   it('polls the close guard and pushes dirty changes', async () => {
     vi.useFakeTimers()
     mock = createMockPort()
