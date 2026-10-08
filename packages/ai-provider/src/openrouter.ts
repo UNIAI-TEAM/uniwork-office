@@ -21,11 +21,11 @@ export const OPENROUTER_DEFAULT_MODEL = 'openrouter/auto'
 export interface OpenRouterKeyStatus {
   ok: boolean
   error?: string
-  label?: string
-  usage?: number
-  usageDaily?: number
-  usageWeekly?: number
-  usageMonthly?: number
+  label?: string | undefined
+  usage?: number | undefined
+  usageDaily?: number | undefined
+  usageWeekly?: number | undefined
+  usageMonthly?: number | undefined
   limit?: number | null
   limitRemaining?: number | null
   limitReset?: string | null
@@ -54,7 +54,7 @@ function money(n: number): string {
 export function formatOpenRouterKeySummary(data: {
   limitRemaining?: number | null
   limit?: number | null
-  usage?: number
+  usage?: number | undefined
   isFreeTier?: boolean
 }): string {
   const parts: string[] = []
