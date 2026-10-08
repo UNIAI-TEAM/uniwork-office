@@ -334,3 +334,20 @@ test('--exclude leaves paths out of the patch and lists them', () => {
   assert.deepEqual(s.excluded, ['c.txt'])
   assert.equal(existsSync(join(fork, 'c.txt')), false)
 })
+
+test('a failing or crashing check makes the run exit 2 instead of aborting', () => {
+  const { fork, upstream } = setup({ upstreamChanges: CLEAN_CHANGES })
+  const checks = {
+    ...fakeChecks(),
+    brandScan: () => ({ ran: true, ok: false, violations: ['c.txt:1 [source] GenOffice'] }),
+    tests: () => {
+      throw new Error('package.json: Unexpected token <')
+    },
+  }
+  const s = run(fork, upstream, { checks })
+  assert.equal(s.status, 'checks-failed')
+  assert.equal(s.exitCode, 2)
+  assert.match(s.tests.note, /crashed/)
+  assert.equal(readFileSync(join(fork, BASE_FILE), 'utf8'), `${s.target}\n`)
+  assert.match(renderReport(s), /Brand scan: FAIL[\s\S]*c\.txt:1/)
+})

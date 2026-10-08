@@ -378,7 +378,7 @@ function worktreeChanges(git) {
 // ---------------------------------------------------------------- default checks
 
 function runNode(args, cwd) {
-  const env = { ...process.env }
+  const env = { ...process.env, NO_COLOR: '1', FORCE_COLOR: '0' }
   delete env.NODE_TEST_CONTEXT
   const r = spawnSync(process.execPath, args, { cwd, env, maxBuffer: 1 << 28, windowsHide: true })
   if (r.error) throw r.error
@@ -455,8 +455,11 @@ export function defaultChecks({ prettier, repoGit } = {}) {
   }
 }
 
+const ANSI = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, 'g')
+
 function firstLine(s) {
-  return (s.split('\n').find((l) => l.trim()) ?? '').trim().slice(0, 300)
+  const plain = s.replace(ANSI, '')
+  return (plain.split('\n').find((l) => l.trim()) ?? '').trim().slice(0, 300)
 }
 
 // ---------------------------------------------------------------- pipeline
@@ -470,15 +473,26 @@ function stateFile(git) {
   return git(['rev-parse', '--path-format=absolute', '--git-path', 'upstream-sync-state.json']).text
 }
 
+/** A check that throws (e.g. on a file left with conflict markers) fails instead of aborting the run. */
+function guarded(fn) {
+  try {
+    return fn()
+  } catch (e) {
+    return { ran: true, ok: false, note: `crashed: ${firstLine(String(e.message))}` }
+  }
+}
+
 /** Steps after the patch commit: rebrand (+format), bump UPSTREAM_BASE, scan, test. */
 function finish(git, root, summary, checks) {
-  const reb = checks.rebrand(root)
+  const reb = guarded(() => checks.rebrand(root))
   summary.rebrand = { ...reb, changed: [] }
   if (reb.ran) {
     const changed = worktreeChanges(git)
     summary.rebrand.changed = changed
-    const existing = changed.filter((f) => existsSync(join(root, f)))
-    summary.format = checks.format(root, existing)
+    // files committed with conflict markers cannot be parsed, so they are not formatted
+    const markers = new Set(summary.apply.conflicted)
+    const existing = changed.filter((f) => !markers.has(f) && existsSync(join(root, f)))
+    summary.format = guarded(() => checks.format(root, existing))
     if (changed.length > 0) {
       git(['add', '-A'])
       if (hasStagedChanges(git)) {
@@ -502,8 +516,8 @@ function finish(git, root, summary, checks) {
       ),
     )
   }
-  summary.brandScan = checks.brandScan(root)
-  summary.tests = checks.tests(root)
+  summary.brandScan = guarded(() => checks.brandScan(root))
+  summary.tests = guarded(() => checks.tests(root))
 }
 
 function exitCodeOf(s) {
@@ -924,7 +938,7 @@ export function renderReport(s) {
     for (const v of (bs?.violations ?? []).slice(0, 50)) r.push(`  - \`${v}\``)
     const t = s.tests
     r.push(
-      `- Rebrand tests: ${checkLine(t, t?.ran ? `, ${t.pass} passed, ${t.fail} failed` : '')}`,
+      `- Rebrand tests: ${checkLine(t, t?.ran && t.pass !== undefined ? `, ${t.pass} passed, ${t.fail} failed` : '')}`,
       '',
     )
   }
