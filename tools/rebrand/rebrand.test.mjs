@@ -140,7 +140,7 @@ test('CLI launchers start the renamed app binaries', () => {
         '    if [ -x "$here/../../GenOffice.exe" ]; then app="$here/../../GenOffice.exe"; else app="$here/../../genoffice"; fi',
         '',
       ].join('\n'),
-      'packages/cli/bin/genoffice.cmd': '"%~dp0..\..\GenOffice.exe" "%~dp0genoffice.cjs" %*\n',
+      'packages/cli/bin/genoffice.cmd': '"%~dp0..\\..\\GenOffice.exe" "%~dp0genoffice.cjs" %*\n',
       'packages/cli/src/resources.ts': [
         "      return [...(shipped ? [shipped] : []), '/opt/GenOffice/genoffice', '/usr/bin/genoffice']",
         "  return join(install, 'genoffice')",
@@ -154,7 +154,7 @@ test('CLI launchers start the renamed app binaries', () => {
       assert.match(sh, /app="\$here\/\.\.\/\.\.\/uniwork-office"/)
       assert.match(
         get('packages/cli/bin/genoffice.cmd'),
-        /\.\.\UniWork Office\.exe" "%~dp0genoffice\.cjs"/,
+        /\.\.\\UniWork Office\.exe" "%~dp0genoffice\.cjs"/,
       )
       const res = get('packages/cli/src/resources.ts')
       assert.match(

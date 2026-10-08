@@ -8,7 +8,7 @@ import {
 describe('pendingKindForPath', () => {
   it('maps document extensions to the kind a new file is created as', () => {
     expect(pendingKindForPath('/p/a.docx')).toBe('doc')
-    expect(pendingKindForPath('C:\p\a.XLSX')).toBe('sheet')
+    expect(pendingKindForPath('C:\\p\\a.XLSX')).toBe('sheet')
     expect(pendingKindForPath('/p/a.csv')).toBe('sheet')
     expect(pendingKindForPath('/p/a.pptx')).toBe('slide')
     expect(pendingKindForPath('/p/a.markdown')).toBe('markdown')
