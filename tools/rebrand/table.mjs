@@ -352,7 +352,7 @@ export const rules = [
     skipComments: true,
     replace: [
       [/genspark\.ai\/pricing/g, 'uniwork.app/pricing'],
-      [/(?<![A-Za-z0-9.\/])genspark\.ai(?![A-Za-z0-9\/-])/g, 'uniwork.app'],
+      [/(?<![A-Za-z0-9./])genspark\.ai(?![A-Za-z0-9/-])/g, 'uniwork.app'],
     ],
   },
   {
@@ -388,6 +388,21 @@ export const rules = [
       [
         /errNoApiKey: 'Chưa cấu hình khóa API cho \{provider\}'/g,
         "errNoApiKey: 'Chưa kích hoạt / mua gói AI. Hãy mua gói để dùng Trợ lý AI.'",
+      ],
+    ],
+  },
+  {
+    id: 'en-no-api-key',
+    why: 'Main-process en errNoApiKey keeps the UniWork wording (no active AI plan), like vi-no-api-key; the upstream "No API key configured for {provider}" text comes back with every merge of these three dictionaries',
+    files: [
+      'apps/docs/src/main/docs-main.ts',
+      'apps/sheets/src/main/sheets-main.ts',
+      'apps/slides/src/main/i18n-main.ts',
+    ],
+    replace: [
+      [
+        /errNoApiKey: 'No API key configured for \{provider\}'/g,
+        "errNoApiKey: 'AI is not activated. Purchase a plan to use the AI assistant.'",
       ],
     ],
   },
@@ -449,7 +464,7 @@ export const rules = [
       [/packageName: 'genoffice'/g, "packageName: 'uniwork-office'"],
       // top-level artifactName: added right after the top-level productName, only when absent
       [
-        /^(  productName: 'UniWork Office',\n)(?!  artifactName:)/m,
+        /^( {2}productName: 'UniWork Office',\n)(?! {2}artifactName:)/m,
         "$1  artifactName: 'UniWork-Office-${version}-${arch}.${ext}',\n",
       ],
     ],

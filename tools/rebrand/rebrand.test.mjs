@@ -167,6 +167,44 @@ test('CLI launchers start the renamed app binaries', () => {
   )
 })
 
+test('CLI binary paths are fixed in the prettier-wrapped multi-line shape too', () => {
+  // a long product name pushes the candidate list over 100 columns, so prettier wraps it
+  const wrapped = (opt) =>
+    [
+      '    default:',
+      '      return [',
+      '        ...(shipped ? [shipped] : []),',
+      `        '/opt/${opt}/genoffice',`,
+      "        '/usr/bin/genoffice',",
+      '      ]',
+      '',
+    ].join('\n')
+  for (const opt of ['GenOffice', 'UniWork Office']) {
+    withFiles({ 'packages/cli/src/resources.ts': wrapped(opt) }, (get) => {
+      const res = get('packages/cli/src/resources.ts')
+      assert.match(res, /'\/opt\/UniWork Office\/uniwork-office'/, opt)
+      assert.ok(!res.includes('/usr/bin/'), `${opt}: no dead /usr/bin candidate`)
+      assert.ok(!res.includes('genoffice'), `${opt}: no pre-rebrand binary name`)
+    })
+  }
+})
+
+test('en and vi errNoApiKey keep the UniWork wording after an upstream merge', () => {
+  const upstreamEn = "    errNoApiKey: 'No API key configured for {provider}',\n"
+  for (const file of [
+    'apps/docs/src/main/docs-main.ts',
+    'apps/sheets/src/main/sheets-main.ts',
+    'apps/slides/src/main/i18n-main.ts',
+  ]) {
+    withFiles({ [file]: upstreamEn }, (get) => {
+      assert.equal(
+        get(file),
+        "    errNoApiKey: 'AI is not activated. Purchase a plan to use the AI assistant.',\n",
+      )
+    })
+  }
+})
+
 test('vi errNoApiKey keeps the UniWork wording after an upstream merge', () => {
   const upstreamVi = "    errNoApiKey: 'Chưa cấu hình khóa API cho {provider}',\n"
   withFiles({ 'apps/docs/src/main/docs-main.ts': upstreamVi }, (get) => {

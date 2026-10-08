@@ -292,7 +292,7 @@ test('GitHub allowlist entries are reasoned and suppress only their file', () =>
   const { violations, allowed } = run(files, [
     {
       path: 'apps/markdown/src/main/image-host.ts',
-      pattern: 'api\.github\.com',
+      pattern: 'api\\.github\\.com',
       kind: 'permanent',
       reason: 'third-party image host API endpoint the user configures',
     },

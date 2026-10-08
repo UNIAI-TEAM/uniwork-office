@@ -25,6 +25,7 @@ git fetch upstream
 git diff --binary $(cat tools/rebrand/UPSTREAM_BASE) <new-upstream-sha> | git apply -3
 # resolve conflicts: keep the UniWork brand and teacher-edu work, upstream wins elsewhere
 node tools/rebrand/rebrand.mjs        # re-apply the brand to whatever upstream brought in
+npm run format                        # rebrand.mjs does not run prettier; CI checks every changed file as a whole
 npm run check:brand                   # must be clean; fix copy the table cannot, or allowlist with a reason
 git rev-parse <new-upstream-sha> > tools/rebrand/UPSTREAM_BASE
 ```
@@ -127,7 +128,7 @@ image-host feature, the name GitHub Copilot, vendored-library attribution and th
 - The tracker `apps/shell/src/main/analytics.ts` and every `analytics.track(...)` call were deleted, not guarded; the scan and
   `apps/shell/tests/privacy-doc.test.ts` fail if an analytics endpoint or credential reappears.
 - Main-process `errNoApiKey` in `docs-main.ts`, `sheets-main.ts` and `slides/i18n-main.ts`: `en` and `vi` are ours (UniWork wording),
-  the other locales keep upstream's text; the rule `vi-no-api-key` re-applies the `vi` value after a merge.
+  the other locales keep upstream's text; the rules `en-no-api-key` and `vi-no-api-key` re-apply the `en` and `vi` values after a merge.
 - `skills/genoffice/SKILL.md` is rebranded by `skills-product-name`; after a sync bump its `metadata.version` once more
   (`tools/check-skill-version.mjs` in CI), or the new text never reaches installed copies.
 - `packaging/**` (flatpak, nix, docker) is in the scan scope but still names GenOffice, `com.genoffice.app` and fetches
