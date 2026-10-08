@@ -23,6 +23,7 @@
 import browser from './browser'
 import { createDocsFrameClient } from '../protocol/client'
 import { createWebApi } from './webapi'
+import { bindHostAppearance } from './host-appearance'
 import ai from './ai'
 import hide from './hide'
 
@@ -34,19 +35,20 @@ function fallbackFor(key: string): unknown {
 }
 
 /** same-origin iframe (lane decision): the only host the frame talks to */
-const webapi = createWebApi(
-  createDocsFrameClient({
-    allowedOrigins: [location.origin],
-    capabilities: {
-      save: true,
-      saveAs: true,
-      recents: true,
-      print: true,
-      exportPdf: true,
-      exportHtml: true,
-    },
-  }),
-)
+const client = createDocsFrameClient({
+  allowedOrigins: [location.origin],
+  capabilities: {
+    save: true,
+    saveAs: true,
+    recents: true,
+    print: true,
+    exportPdf: true,
+    exportHtml: true,
+  },
+})
+// theme + language come from the host (never localStorage) and must be in place before boot
+bindHostAppearance(client)
+const webapi = createWebApi(client)
 
 export function installBridge(): void {
   // later modules win: webapi's real fetchImage / convertAltChunkHtml / close

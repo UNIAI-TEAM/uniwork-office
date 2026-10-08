@@ -5,14 +5,17 @@
  *
  * method               | browser implementation                         | deviation from desktop
  * ---------------------|------------------------------------------------|------------------------------------------------
- * getTheme             | localStorage `genoffice.web.theme`, else       | desktop reads shell app-settings.json; web is
- *                      | 'system'                                       | per-origin. data-theme is applied at bridge load
- *                      |                                                | (main.tsx re-applies it identically).
- * onThemeChanged       | in-tab setWebTheme() + `storage` event         | desktop pushes from the shell home page; web
- *                      | (other tabs)                                   | changes come from setWebTheme() / other tabs.
- * getLanguage          | ?lang= URL param > localStorage                | desktop reads app-settings.json. Returns the
- *                      | `genoffice.web.lang` > navigator.languages,    | full 21-locale Lang like getUiLang() does — the
- *                      | via @genoffice/i18n normalizeLang              | DesktopApi type only lists 11 (stale type).
+ * getTheme             | host `init.theme` / `theme` event when the page  | desktop reads shell app-settings.json. In a
+ *                      | is a hosted frame; standalone: localStorage     | hosted frame the host is authoritative and
+ *                      | `genoffice.web.theme`, else 'system'            | localStorage is ignored (it is shared with the
+ *                      |                                                | UniWork page, same origin). Waits (<= 3 s) for
+ *                      |                                                | the host's init so boot has the right theme.
+ * onThemeChanged       | setWebTheme() (host events / standalone) +      | desktop pushes from the shell home page.
+ *                      | `storage` event (other tabs, standalone)        |
+ * getLanguage          | hosted: host `init.locale` / `language` event.  | desktop reads app-settings.json. Returns the
+ *                      | Standalone: ?lang= > localStorage               | full 21-locale Lang like getUiLang() does — the
+ *                      | `genoffice.web.lang` > navigator.languages,     | DesktopApi type only lists 11 (stale type).
+ *                      | via @genoffice/i18n normalizeLang               |
  * onLanguageChanged    | in-tab setWebLanguage() + `storage` event      | same as onThemeChanged.
  * print                | window.print() of THIS frame (an iframe prints   | no scaleFactor: the print-zoom is neutralised
  *                      | only its own document) with a temporary         | in CSS instead. Paper size comes from the
@@ -105,7 +108,42 @@ function subscribe<T>(key: string, read: () => T, handler: (value: T) => void): 
 
 // ---- theme ----
 
+/** a page embedded in a host (the UniWork page) gets its theme/language from the host */
+const hosted = (() => {
+  try {
+    return window.parent !== window
+  } catch {
+    return true
+  }
+})()
+
+/** set by the host's init / theme / language messages (memory only: never touches localStorage) */
+let hostTheme: UiTheme | null = null
+let hostLang: Lang | null = null
+/** settles when the host's init has been applied (or the wait timed out) */
+let hostReady: Promise<void> | null = null
+
+/** how long boot waits for the host's `init` before using the fallback appearance */
+const HOST_INIT_WAIT_MS = 3_000
+
+/**
+ * Register the host handshake: getTheme/getLanguage wait for it (bounded), so the
+ * renderer boots with the host's theme and language instead of flashing the fallback.
+ */
+export function awaitHostAppearance(init: Promise<unknown>): void {
+  hostReady = new Promise<void>((resolve) => {
+    const timer = window.setTimeout(resolve, HOST_INIT_WAIT_MS)
+    const done = () => {
+      window.clearTimeout(timer)
+      resolve()
+    }
+    init.then(done, done)
+  })
+}
+
 function currentTheme(): UiTheme {
+  if (hostTheme) return hostTheme
+  if (hosted) return 'system'
   const saved = readStorage(THEME_KEY)
   return saved === 'light' || saved === 'dark' ? saved : 'system'
 }
@@ -116,19 +154,25 @@ function applyTheme(theme: UiTheme): void {
   else document.documentElement.setAttribute('data-theme', theme)
 }
 
-/** web replacement for the shell home page's theme switch */
-export function setWebTheme(theme: UiTheme): void {
-  writeStorage(THEME_KEY, theme === 'system' ? null : theme)
-  applyTheme(theme)
+/**
+ * Switch the UI theme. `{ host: true }` = the host said so (init / `theme` event): kept in
+ * memory only and authoritative from then on. Without it (standalone / dev) the choice is
+ * persisted in localStorage and ignored while a host theme is in force.
+ */
+export function setWebTheme(theme: UiTheme, opts: { host?: boolean } = {}): void {
+  if (opts.host) hostTheme = theme
+  else writeStorage(THEME_KEY, theme === 'system' ? null : theme)
+  applyTheme(currentTheme())
   window.dispatchEvent(new Event(`${THEME_KEY}:changed`))
 }
 
 // ---- language ----
 
 function currentLanguage(): Lang {
+  if (hostLang) return hostLang
   const param = new URLSearchParams(window.location.search).get('lang')
   if (param) return isLang(param) ? param : normalizeLang(param)
-  const saved = readStorage(LANG_KEY)
+  const saved = hosted ? null : readStorage(LANG_KEY)
   if (isLang(saved)) return saved
   for (const raw of navigator.languages ?? [navigator.language]) {
     const lang = normalizeLang(raw)
@@ -138,9 +182,14 @@ function currentLanguage(): Lang {
   return 'en'
 }
 
-/** web replacement for the shell home page's language switch */
-export function setWebLanguage(lang: Lang | null): void {
-  writeStorage(LANG_KEY, lang)
+/**
+ * Switch the UI language (the renderer's LocaleProvider re-renders live). `{ host: true }`
+ * takes a host locale such as 'vi' or 'vi-VN' (memory only, authoritative); without it the
+ * choice is persisted for the standalone case. null clears the stored choice.
+ */
+export function setWebLanguage(lang: Lang | string | null, opts: { host?: boolean } = {}): void {
+  if (opts.host && lang) hostLang = isLang(lang) ? lang : normalizeLang(lang)
+  else writeStorage(LANG_KEY, lang)
   window.dispatchEvent(new Event(`${LANG_KEY}:changed`))
 }
 
@@ -423,47 +472,50 @@ function printCss(scale?: number): string {
   return `@media print { ${rules.join(' ')} }`
 }
 
+// An iframe's own window.print() prints only that frame's document, which is what
+// we want. The UI theme is pinned to light for the job so the output is the same
+// in both themes (the dark page is screen-only in styles.css; this also covers any
+// chrome token that could leak into print). Resolves on `afterprint`: Chromium blocks
+// inside print(), Firefox/Safari return at once, and the renderer clears its
+// print-only state (selected pages, zoom) when this promise settles.
+export function printFrame(scale?: number): Promise<{ ok: boolean; error?: string }> {
+  return new Promise<{ ok: boolean; error?: string }>((resolve) => {
+    document.getElementById(PRINT_STYLE_ID)?.remove()
+    const style = document.createElement('style')
+    style.id = PRINT_STYLE_ID
+    style.textContent = printCss(scale)
+    document.head.appendChild(style)
+    document.documentElement.setAttribute('data-theme', 'light')
+
+    let timer = 0
+    const finish = (result: { ok: boolean; error?: string }) => {
+      window.clearTimeout(timer)
+      window.removeEventListener('afterprint', onAfterPrint)
+      style.remove()
+      applyTheme(currentTheme())
+      resolve(result)
+    }
+    const onAfterPrint = () => finish({ ok: true })
+    window.addEventListener('afterprint', onAfterPrint)
+    timer = window.setTimeout(() => finish({ ok: true }), PRINT_TIMEOUT_MS)
+    try {
+      window.focus()
+      window.print()
+    } catch (err) {
+      finish({ ok: false, error: String(err) })
+    }
+  })
+}
+
 const browser = {
-  getTheme: () => Promise.resolve(currentTheme()),
+  getTheme: () => (hostReady ?? Promise.resolve()).then(currentTheme),
   onThemeChanged: (handler) => subscribe(THEME_KEY, currentTheme, handler),
 
-  getLanguage: () => Promise.resolve(currentLanguage() as DesktopLang),
+  getLanguage: () => (hostReady ?? Promise.resolve()).then(() => currentLanguage() as DesktopLang),
   onLanguageChanged: (handler) =>
     subscribe(LANG_KEY, currentLanguage, (lang) => handler(lang as DesktopLang)),
 
-  // An iframe's own window.print() prints only that frame's document, which is what
-  // we want. The UI theme is pinned to light for the job so the output is the same
-  // in both themes (the dark page is screen-only in styles.css; this also covers any
-  // chrome token that could leak into print). Resolves on `afterprint`: Chromium blocks
-  // inside print(), Firefox/Safari return at once, and the renderer clears its
-  // print-only state (selected pages, zoom) when this promise settles.
-  print: (scale?: number) =>
-    new Promise<{ ok: boolean; error?: string }>((resolve) => {
-      document.getElementById(PRINT_STYLE_ID)?.remove()
-      const style = document.createElement('style')
-      style.id = PRINT_STYLE_ID
-      style.textContent = printCss(scale)
-      document.head.appendChild(style)
-      document.documentElement.setAttribute('data-theme', 'light')
-
-      let timer = 0
-      const finish = (result: { ok: boolean; error?: string }) => {
-        window.clearTimeout(timer)
-        window.removeEventListener('afterprint', onAfterPrint)
-        style.remove()
-        applyTheme(currentTheme())
-        resolve(result)
-      }
-      const onAfterPrint = () => finish({ ok: true })
-      window.addEventListener('afterprint', onAfterPrint)
-      timer = window.setTimeout(() => finish({ ok: true }), PRINT_TIMEOUT_MS)
-      try {
-        window.focus()
-        window.print()
-      } catch (err) {
-        finish({ ok: false, error: String(err) })
-      }
-    }),
+  print: printFrame,
 
   pickImage: async () => {
     const [file] = await pickFiles('image/png,image/jpeg,image/gif,.png,.jpg,.jpeg,.gif', false)

@@ -14,6 +14,7 @@ import {
   type OpenPayload,
   type ProtocolErrorCode,
   type SavedPayload,
+  type Theme,
 } from '../../protocol/types'
 import type { FramePort, PortRequestOptions, PortSession } from '../frame-port'
 
@@ -45,6 +46,8 @@ export function createMockPort(session: Partial<PortSession> = {}) {
   const saved: SavedPayload[] = []
   const errors: Array<{ error: unknown; fatal?: boolean }> = []
   const renameListeners: Array<(file: FileMeta) => void> = []
+  const themeListeners: Array<(theme: Theme) => void> = []
+  const languageListeners: Array<(locale: string) => void> = []
 
   function put(name: string, bytes: Uint8Array, fileId = `f${++seq}`): FileMeta {
     const version = (store.get(fileId)?.meta.versionId ?? 'v0').replace(/\d+$/, (n) =>
@@ -124,6 +127,8 @@ export function createMockPort(session: Partial<PortSession> = {}) {
     handlePrint: (h) => ((handlers.print = h as never), () => {}),
     handleCloseCheck: (h) => ((handlers['doc.closeCheck'] = h as never), () => {}),
     onFileRenamed: (l) => (renameListeners.push(l), () => {}),
+    onTheme: (l) => (themeListeners.push(l), () => {}),
+    onLanguage: (l) => (languageListeners.push(l), () => {}),
     setDirty: (d) => {
       if (dirty[dirty.length - 1] !== d) dirty.push(d)
     },
@@ -156,6 +161,9 @@ export function createMockPort(session: Partial<PortSession> = {}) {
       f.meta = { ...f.meta, name }
       for (const l of renameListeners) l({ ...f.meta })
     },
+    /** host events theme / language */
+    sendTheme: (theme: Theme) => themeListeners.forEach((l) => l(theme)),
+    sendLanguage: (locale: string) => languageListeners.forEach((l) => l(locale)),
     override(type: FrameRequestType, fn: Override) {
       overrides.set(type, fn)
     },
