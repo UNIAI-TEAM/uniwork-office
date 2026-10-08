@@ -48,6 +48,42 @@ describe('scanText', () => {
     )
   })
 
+  it('flags the other Genspark, ads and analytics hosts and a gtag call', () => {
+    const hits = scanText(
+      [
+        "const u = 'https://www.genspark.com/x'",
+        "const cdn = 'https://page1.gensparkcdn.example/x.png'",
+        '// https://mainfunc.ai/',
+        "const ga = 'https://analytics.google.com/g/collect'",
+        "const ad = 'https://ad.doubleclick.net/x'",
+        "gtag ('config', 'G-1')",
+        'const tag = window.ai_gtag',
+      ].join('\n'),
+    )
+    assert.deepEqual(
+      hits.map((h) => [h.line, h.pattern]),
+      [
+        [1, 'genspark.com'],
+        [2, 'gensparkcdn'],
+        [3, 'mainfunc.ai'],
+        [4, 'analytics.google.com'],
+        [5, 'doubleclick.net'],
+        [6, 'gtag('],
+      ],
+    )
+  })
+
+  it('flags the escaped host forms of a regex literal and a RegExp string', () => {
+    assert.deepEqual(
+      scanText(String.raw`const re = /(^|\.)genspark\.ai$/i`).map((h) => h.pattern),
+      ['genspark.ai'],
+    )
+    assert.deepEqual(
+      scanText(String.raw`new RegExp('(^|\.)genoffice\.ai$')`).map((h) => h.pattern),
+      ['genoffice.ai'],
+    )
+  })
+
   it('is case-insensitive and ignores look-alike words without the domain', () => {
     assert.equal(scanText('WWW.GENSPARK.AI').length, 1)
     assert.equal(scanText('genspark provider id, GenOffice package names').length, 0)
@@ -64,6 +100,13 @@ describe('inScope', () => {
       'apps/shell/electron-builder.cjs',
       'scripts/update-feed-utils.cjs',
       'skills/genoffice/SKILL.md',
+      'apps/uniai-pwa/index.html',
+      'apps/sheets/native/excel-sidecar/src/main.rs',
+      'apps/docs/scripts/fetch-fonts.mjs',
+      'apps/shell/build/installer.nsh',
+      'apps/docs/electron-builder.cjs',
+      'apps/docs/electron.vite.config.ts',
+      'apps/docs/vite.renderer.config.ts',
     ]) {
       assert.equal(inScope(p), true, p)
     }
@@ -79,7 +122,8 @@ describe('inScope', () => {
       'README.md',
       'apps/shell/dist/main.js',
       'packages/cli/node_modules/x/index.js',
-      'apps/shell/build/notarize-dmg.js',
+      'apps/sheets/native/excel-sidecar/target/debug/build.rs',
+      'apps/docs/README.md',
     ]) {
       assert.equal(inScope(p), false, p)
     }

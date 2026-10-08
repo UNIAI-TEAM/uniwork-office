@@ -1,18 +1,33 @@
 // Egress gate: shipped code must not name a Genspark / GenOffice cloud host,
-// a Google Analytics endpoint or the @genspark/cli package. Comments count too
-// (cheap and simple); the few reasoned exemptions live in ALLOWLIST below.
-// Scope is what ships: app and package sources, package manifests, the
-// electron-builder config, scripts/ and skills/. Tests and packaging/ are out
-// of scope. Usage: node tools/check-egress.mjs [--root <dir>] [--json]
+// a Google Analytics / ads endpoint or the @genspark/cli package. Comments count
+// too (cheap and simple); the few reasoned exemptions live in ALLOWLIST below.
+// Host patterns also match the escaped forms used in regex literals and RegExp
+// strings (`genspark\.ai`, `genspark\\.ai`). A host split across strings or
+// built at runtime ('genspark' + '.ai', ['genspark', 'ai'].join('.'),
+// percent-encoding) is out of reach of a text scan; review catches those.
+// Scope is what ships: app sources, scripts, native sidecars and build
+// resources, package sources, package manifests, app build configs, the
+// uniai-pwa web app, scripts/ and skills/. Tests and packaging/ are out of
+// scope. Usage: node tools/check-egress.mjs [--root <dir>] [--json]
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+/** a literal dot, optionally escaped once (regex literal) or twice (RegExp string) */
+const DOT = String.raw`\\{0,2}\.`
+const host = (...labels) => new RegExp(labels.join(DOT), 'i')
+
 export const PATTERNS = [
-  { id: 'genspark.ai', re: /genspark\.ai/i },
-  { id: 'genoffice.ai', re: /genoffice\.ai/i },
-  { id: 'google-analytics.com', re: /google-analytics\.com/i },
-  { id: 'googletagmanager.com', re: /googletagmanager\.com/i },
+  { id: 'genspark.ai', re: host('genspark', 'ai') },
+  { id: 'genspark.com', re: host('genspark', 'com') },
+  { id: 'gensparkcdn', re: /gensparkcdn/i },
+  { id: 'genoffice.ai', re: host('genoffice', 'ai') },
+  { id: 'mainfunc.ai', re: host('mainfunc', 'ai') },
+  { id: 'google-analytics.com', re: host('google-analytics', 'com') },
+  { id: 'analytics.google.com', re: host('analytics', 'google', 'com') },
+  { id: 'googletagmanager.com', re: host('googletagmanager', 'com') },
+  { id: 'doubleclick.net', re: host('doubleclick', 'net') },
+  { id: 'gtag(', re: /\bgtag\s*\(/ },
   { id: '@genspark/cli', re: /@genspark\/cli/i },
 ]
 
@@ -23,11 +38,12 @@ export const PATTERNS = [
 export const ALLOWLIST = []
 
 const SCOPE = [
-  /^apps\/[^/]+\/src\//,
+  /^apps\/[^/]+\/(src|scripts|native|build)\//,
+  /^apps\/uniai-pwa\//,
+  /^apps\/[^/]+\/(electron-builder\.cjs|[\w.-]*\.config\.ts)$/,
   /^packages\/[^/]+\/src\//,
   /^apps\/[^/]+\/package\.json$/,
   /^packages\/[^/]+\/package\.json$/,
-  /^apps\/shell\/electron-builder\.cjs$/,
   /^scripts\//,
   /^skills\//,
 ]
