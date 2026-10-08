@@ -102,6 +102,11 @@ jobs:
       - name: Test rebrand tooling
         run: npm run test:rebrand
 
+      # Apache-2.0 attribution: NOTICE, MODIFICATIONS and package author /
+      # homepage must match apps/shell/src/shared/legal.json (npm run legal).
+      - name: Check legal notices
+        run: npm run legal:check && npm run test:legal
+
       # skills/*/SKILL.md ship to users' agent directories; a body change
       # without a metadata.version bump would never be offered as an update.
       - name: Check skill versions

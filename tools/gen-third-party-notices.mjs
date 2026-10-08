@@ -232,7 +232,14 @@ const seed = importedNames()
 const { resolved, missing } = closure(seed)
 resolved.sort(([a], [b]) => a.localeCompare(b))
 
-let out = `GenOffice — Third-Party Software Notices
+// product, company and upstream names come from the one legal identity file
+const legal = JSON.parse(readFileSync(join(ROOT, 'apps/shell/src/shared/legal.json'), 'utf8'))
+
+let out = `${legal.product} — Third-Party Software Notices
+
+${legal.product} is a modified version of ${legal.upstream.name}, licensed under the
+${legal.upstream.license}. The license (LICENSE), the attribution notice
+(NOTICE) and the statement of changes (MODIFICATIONS) ship next to this file.
 
 This application includes third-party software components under the licenses
 reproduced below.

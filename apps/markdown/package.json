@@ -60,7 +60,10 @@
     "vite": "^7.3.1",
     "vitest": "^4.1.11"
   },
-  "author": "UniWork Office",
+  "author": {
+    "name": "UniWork",
+    "email": "hello@uniwork.app"
+  },
   "dependencies": {
     "@tiptap/extension-mathematics": "3.31.0",
     "katex": "^0.16.47",

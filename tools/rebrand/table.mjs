@@ -39,6 +39,8 @@ export const GLOBAL_EXCLUDE = [
   '**/fixtures/**',
   '**/fonts/**',
   'tools/rebrand/**',
+  // Apache-2.0 attribution (upstream name and copyright): must stay verbatim
+  'apps/shell/src/shared/legal.json',
   // documents the removed upstream lockup by name
   '**/UNIWORK_BRAND_ASSET_REQUIRED.md',
   // document content / engine data (CLAUDE.md rule 4)
@@ -448,10 +450,17 @@ export const rules = [
   },
   {
     id: 'shell-builder-identity',
-    why: 'Shell installer identity: artifactName (dmg/nsis/AppImage), linux executableName, deb/rpm package + artifact names, maintainer/vendor',
+    why: 'Shell installer identity: artifactName (dmg/nsis/AppImage), linux executableName, deb/rpm package + artifact names, maintainer/vendor (read from legal.json)',
     files: ['apps/shell/electron-builder.cjs'],
     replace: [
-      [/'Mainfunc, Inc\. <team@genspark\.ai>'/g, "'UniWork Office'"],
+      // maintainer / vendor come from apps/shell/src/shared/legal.json (the `legal` const);
+      // upstream's literal identity, or the product name an earlier rule left, maps onto it
+      [
+        /maintainer: '(?:Mainfunc, Inc\. <team@genspark\.ai>|UniWork Office)'/g,
+        () => 'maintainer: `${legal.company} <${legal.email}>`',
+      ],
+      [/vendor: '(?:Mainfunc, Inc\.|UniWork Office)'/g, () => 'vendor: legal.company'],
+      [/'Mainfunc, Inc\. <team@genspark\.ai>'/g, () => '`${legal.company} <${legal.email}>`'],
       [/executableName: 'genoffice'/g, "executableName: 'uniwork-office'"],
       [
         /artifactName: 'genoffice_\$\{version\}_\$\{arch\}\.deb'/g,

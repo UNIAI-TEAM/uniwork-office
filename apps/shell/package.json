@@ -3,7 +3,7 @@
   "productName": "UniWork Office",
   "version": "0.11.0",
   "license": "Apache-2.0",
-  "homepage": "https://github.com/UNIAI-TEAM/uniwork-office",
+  "homepage": "https://uniwork.app",
   "private": true,
   "description": "Unified UniWork Office shell: one app hosting the docs and sheets modules behind a home/launcher window",
   "main": "out/main/index.js",
@@ -57,7 +57,10 @@
     "vite": "^7.3.1",
     "vitest": "^4.1.11"
   },
-  "author": "UniWork Office",
+  "author": {
+    "name": "UniWork",
+    "email": "hello@uniwork.app"
+  },
   "dependencies": {
     "qrcode": "^1.5.4"
   }
