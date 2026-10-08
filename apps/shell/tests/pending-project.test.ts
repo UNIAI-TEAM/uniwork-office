@@ -62,6 +62,44 @@ describe('PendingProjects', () => {
     ).toBeNull()
   })
 
+  it('counts the TTL of a tab-bound project from the bind, not from the click', () => {
+    // the tab was bound late (slow start): the user still has a full window to save the new file
+    const bindAt = T0 + PENDING_PROJECT_TTL_MS - 1000
+    const inTime = new PendingProjects()
+    inTime.remember('doc', 'proj-1', T0)
+    inTime.bind(inTime.take('doc', T0 + 1), 4, bindAt)
+    expect(
+      inTime.takeForTab(4, '/docs/a.docx', () => true, bindAt + PENDING_PROJECT_TTL_MS - 1),
+    ).toMatchObject({ projectId: 'proj-1', setAt: T0 })
+
+    const late = new PendingProjects()
+    late.remember('doc', 'proj-1', T0)
+    late.bind(late.take('doc', T0 + 1), 4, bindAt)
+    expect(
+      late.takeForTab(4, '/docs/a.docx', () => true, bindAt + PENDING_PROJECT_TTL_MS + 1),
+    ).toBeNull()
+  })
+
+  it('keeps a new sheet in its project when the fallback binds it after a later click', () => {
+    // newSheetTab takes the project up front; when the temp workbook cannot be created it writes
+    // the file into the default folder and binds the tab afterwards (no AI preset)
+    const pending = new PendingProjects()
+    pending.remember('sheet', 'proj-1', T0)
+    const firstClick = pending.take('sheet', T0)
+    // a second "new sheet" click from another project arrives while the first one still awaits
+    pending.remember('sheet', 'proj-2', T0 + 500)
+    const secondClick = pending.take('sheet', T0 + 500)
+    pending.bind(firstClick, 11, T0 + 800)
+    pending.bind(secondClick, 12, T0 + 900)
+    const accept = () => true
+    expect(pending.takeForTab(11, 'C:\\Docs\\Untitled.xlsx', accept, T0 + 1000)?.projectId).toBe(
+      'proj-1',
+    )
+    expect(pending.takeForTab(12, 'C:\\Docs\\Untitled 2.xlsx', accept, T0 + 1100)?.projectId).toBe(
+      'proj-2',
+    )
+  })
+
   it('a click without a project clears an earlier one; the default project is never pending', () => {
     const pending = new PendingProjects()
     pending.remember('slide', 'proj-1', T0)

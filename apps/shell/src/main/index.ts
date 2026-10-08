@@ -2997,17 +2997,31 @@ function newFileDir(kind: string): string {
   return takePendingDir(kind)?.dir ?? defaultSaveDir()
 }
 
-/** hand the remembered folder to the tab that was just opened for it */
-function bindPendingDir(kind: PendingProjectKind, tabId: string | undefined): void {
-  const pending = takePendingDir(kind)
+/**
+ * Hand the remembered folder and project of this kind to the tab `open` creates.
+ * Both are taken before `open` runs, so a tab that fails to open does not leave
+ * an entry behind to capture a later file of the same kind.
+ */
+function bindPendingDir(kind: PendingProjectKind, open: () => string | undefined): void {
+  const pendingDir = takePendingDir(kind)
+  const pendingProject = pendingProjects.take(kind)
+  const tabId = open()
   const wc = tabId ? tabManager?.webContentsForTab(tabId) : undefined
-  if (pending && wc) pendingDirByWc.set(wc.id, pending)
-  bindPendingProject(pendingProjects.take(kind), tabId)
+  if (pendingDir && wc) {
+    const wcId = wc.id
+    pendingDirByWc.set(wcId, pendingDir)
+    wc.once('destroyed', () => pendingDirByWc.delete(wcId))
+  }
+  bindPendingProject(pendingProject, tabId)
 }
 
-/** hand the project remembered for a new file to the tab that was just opened for it */
+/** hand the project remembered for a new file to the tab that was just opened for it; a closed tab forgets it */
 function bindPendingProject(pending: PendingProject | null, tabId: string | undefined): void {
-  pendingProjects.bind(pending, tabId ? tabManager?.webContentsForTab(tabId)?.id : undefined)
+  const wc = pending && tabId ? tabManager?.webContentsForTab(tabId) : undefined
+  if (!wc) return
+  const wcId = wc.id
+  pendingProjects.bind(pending, wcId)
+  wc.once('destroyed', () => pendingProjects.forgetTab(wcId))
 }
 
 /**
@@ -3791,7 +3805,10 @@ async function newSheetTab(recoverAs?: string, opts?: { aiPreset?: AiPresetInput
           pendingProject,
           tabManager.openSheetsTab(suggestedPath, { aiPreset: preset }),
         )
-      } else routeDocumentPath(suggestedPath)
+      } else if (routeDocumentPath(suggestedPath)) {
+        // the generic router does not return the tab: look it up so the project stays bound
+        bindPendingProject(pendingProject, tabManager?.findSheetsTabByPath(suggestedPath))
+      }
     } catch (fallbackErr) {
       console.warn(
         '[shell] blank workbook create failed, opening in-memory blank tab:',
@@ -3819,7 +3836,7 @@ function surfaceNewTabError(err: unknown): void {
 
 function newDocTab(): void {
   try {
-    bindPendingDir('doc', tabManager?.openDocsTab(undefined, { newBlank: true }))
+    bindPendingDir('doc', () => tabManager?.openDocsTab(undefined, { newBlank: true }))
     // creating a document is as much a value moment as opening one
   } catch (err) {
     surfaceNewTabError(err)
@@ -3921,7 +3938,7 @@ function openBlankSlidesTabForMcp(): number {
 
 function newSlideTab(): void {
   try {
-    bindPendingDir('slide', tabManager?.openSlidesTab())
+    bindPendingDir('slide', () => tabManager?.openSlidesTab())
   } catch (err) {
     surfaceNewTabError(err)
   }
@@ -3929,7 +3946,7 @@ function newSlideTab(): void {
 
 function newMarkdownTab(): void {
   try {
-    bindPendingDir('markdown', tabManager?.openMarkdownTab())
+    bindPendingDir('markdown', () => tabManager?.openMarkdownTab())
   } catch (err) {
     surfaceNewTabError(err)
   }
@@ -3937,7 +3954,7 @@ function newMarkdownTab(): void {
 
 function newHtmlTab(): void {
   try {
-    bindPendingDir('html', tabManager?.openHtmlTab())
+    bindPendingDir('html', () => tabManager?.openHtmlTab())
   } catch (err) {
     surfaceNewTabError(err)
   }
@@ -3951,13 +3968,14 @@ function newHtmlTab(): void {
 async function newPdfTab(opts?: {
   aiPreset?: { text: string; autoRun?: boolean; displayText?: string }
 }): Promise<void> {
+  // taken first: a failed write below must not leave the project waiting for a later PDF
+  const pendingProject = pendingProjects.take('pdf')
   try {
     const filePath = uniquePathIn(newFileDir('pdf'), `${tm('untitledPdf')}.pdf`)
     await atomicWriteFile(filePath, await blankPdfBuffer())
     // Opt the file into content-derived auto-naming on its first save
     markPdfUntitledPath(filePath)
     // PDF has no opened/saved shell hook — assign the pending project right here
-    const pendingProject = pendingProjects.take('pdf')
     if (pendingProject) assignToProject(filePath, pendingProject.projectId)
     const preset = normalizeAiPreset(opts?.aiPreset)
     if (preset && tabManager) {
@@ -4329,20 +4347,19 @@ function registerHomeIpc(): void {
     rememberPendingDir('doc', opts)
     rememberPendingProject('doc', opts)
     const preset = normalizeAiPreset(opts?.aiPreset)
-    if (opts?.aiContent?.title && opts.aiContent.html) {
-      bindPendingDir(
-        'doc',
+    const aiContent = opts?.aiContent
+    if (aiContent?.title && aiContent.html) {
+      bindPendingDir('doc', () =>
         tabManager?.openDocsTab(undefined, {
           newBlank: true,
-          aiContent: { title: opts.aiContent.title, html: opts.aiContent.html },
+          aiContent: { title: aiContent.title, html: aiContent.html },
           ...(preset ? { aiPreset: preset } : {}),
         }),
       )
       return
     }
     if (preset) {
-      bindPendingDir(
-        'doc',
+      bindPendingDir('doc', () =>
         tabManager?.openDocsTab(undefined, { newBlank: true, aiPreset: preset }),
       )
       return
@@ -4361,7 +4378,7 @@ function registerHomeIpc(): void {
     rememberPendingProject('slide', opts)
     const preset = normalizeAiPreset(opts?.aiPreset)
     if (preset) {
-      bindPendingDir('slide', tabManager?.openSlidesTab(undefined, { aiPreset: preset }))
+      bindPendingDir('slide', () => tabManager?.openSlidesTab(undefined, { aiPreset: preset }))
       return
     }
     newSlideTab()

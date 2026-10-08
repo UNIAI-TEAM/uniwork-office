@@ -5,17 +5,23 @@
  * first save moves the fresh file into the project. Binding to the tab (instead of
  * a bare per-kind slot) keeps an unrelated file of the same kind, e.g. a workbook
  * opened while a new sheet is still unsaved, out of the project. A pending project
- * also expires, so one that is never consumed cannot capture a file hours later.
+ * also expires, so one that is never consumed cannot capture a file hours later:
+ * an unbound entry counts from the click, a tab-bound one from the bind (the tab
+ * exists, so the user may take a while to save; the freshness check on the file
+ * keeps an old file out), and a tab that closes forgets its binding.
  */
 export type PendingProjectKind = 'doc' | 'sheet' | 'slide' | 'markdown' | 'html' | 'pdf'
 
 export interface PendingProject {
   kind: PendingProjectKind
   projectId: string
+  /** the click; a file born before it never qualifies */
   setAt: number
+  /** when the entry was bound to its tab; the TTL of a bound entry counts from here */
+  boundAt?: number
 }
 
-/** a pending project only applies to a file created within this window after the click */
+/** an unbound pending project only applies within this window after the click; a bound one, after the bind */
 export const PENDING_PROJECT_TTL_MS = 30 * 60 * 1000
 
 /** the kind of new file a path can be, by extension (null: not a document the project store tracks) */
@@ -59,7 +65,7 @@ export class PendingProjects {
   /** hand a taken project to the tab that was just opened for it */
   bind(pending: PendingProject | null, wcId: number | undefined, now: number = Date.now()): void {
     this.prune(now)
-    if (pending && wcId !== undefined) this.byWc.set(wcId, pending)
+    if (pending && wcId !== undefined) this.byWc.set(wcId, { ...pending, boundAt: now })
   }
 
   /**
@@ -75,7 +81,7 @@ export class PendingProjects {
   ): PendingProject | null {
     const pending = this.byWc.get(wcId)
     if (!pending) return null
-    if (now - pending.setAt > PENDING_PROJECT_TTL_MS) {
+    if (now - (pending.boundAt ?? pending.setAt) > PENDING_PROJECT_TTL_MS) {
       this.byWc.delete(wcId)
       return null
     }
@@ -94,7 +100,7 @@ export class PendingProjects {
       if (now - p.setAt > PENDING_PROJECT_TTL_MS) this.byKind.delete(kind)
     }
     for (const [wcId, p] of this.byWc) {
-      if (now - p.setAt > PENDING_PROJECT_TTL_MS) this.byWc.delete(wcId)
+      if (now - (p.boundAt ?? p.setAt) > PENDING_PROJECT_TTL_MS) this.byWc.delete(wcId)
     }
   }
 }
