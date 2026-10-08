@@ -70,16 +70,20 @@ try {
       }),
     )
   }
-  await page.goto(`${ORIGIN}/?open=${encodeURIComponent(`/fixtures/${DOC}.docx`)}`)
-  await page.waitForSelector('.ProseMirror[contenteditable="true"]', { timeout: 30000 })
+  // through the protocol test host, like production (the editor lives in iframe#frame)
+  await page.goto(
+    `${ORIGIN}/test-host/?open=${encodeURIComponent(`/fixtures/${DOC}.docx`)}&frame=${encodeURIComponent('/index.html')}`,
+  )
+  const ed = page.frameLocator('#frame')
+  await ed.locator('.ProseMirror[contenteditable="true"]').first().waitFor({ timeout: 30000 })
   await page.waitForLoadState('networkidle')
   await page.waitForTimeout(1000)
   phase = 'picker'
-  await page.locator('.rb-combo-caret').first().click()
-  await page.waitForSelector('.rb-font-family-menu')
+  await ed.locator('.rb-combo-caret').first().click()
+  await ed.locator('.rb-font-family-menu').waitFor()
   await page.waitForLoadState('networkidle')
   await page.waitForTimeout(2500)
-  const menuItems = await page.locator('.rb-font-family-menu button').count()
+  const menuItems = await ed.locator('.rb-font-family-menu button').count()
   const sum = (p) => fonts.filter((f) => f.phase === p).reduce((n, f) => n + f.wire, 0)
   const result = {
     generatedAt: new Date().toISOString(),

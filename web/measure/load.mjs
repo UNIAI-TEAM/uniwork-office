@@ -1,4 +1,8 @@
 // UNI-1011 spike: cold-load measurements for web/docs (Playwright chromium, headless).
+// GO-B3: the document is opened the way production does it: /test-host/ (web/server/test-host, a
+// minimal protocol host) embeds the frame (the build) in an iframe and sends init; time-to-editable is
+// therefore host boot + docx fetch + frame load + protocol handshake + render, measured from the host
+// page's navigation start.
 // Usage: node web/measure/load.mjs [--runs 5] [--out web/measure/load.json] [--dist <dir>] [--compress] [--mount /prefix/]
 // Spawns `node web/server/server.mjs` itself (PORT=4182). Each run = fresh browser context,
 // HTTP cache disabled (CDP Network.setCacheDisabled), so every run is a cold load.
@@ -12,7 +16,7 @@
 // known text snippet (detected in-page via MutationObserver + rAF; value = performance.now(),
 // i.e. ms since navigation start). Same selector/text check as web/e2e/docs-web.spec.ts.
 import { spawn } from 'node:child_process'
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { readFileSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright'
@@ -30,7 +34,6 @@ const COMPRESS = process.argv.includes('--compress')
 const MOUNT = arg('--mount', '')
 const PORT = 4182
 const ORIGIN = `http://localhost:${PORT}`
-const BASE = ORIGIN + (MOUNT ? '/' + MOUNT.replace(/^\/+|\/+$/g, '') : '')
 const TIMEOUT = 60_000
 
 const DOCS = [
@@ -73,11 +76,13 @@ async function startServer() {
 
 // in-page detector, installed before any page script runs
 const DETECTOR = (snippet) => {
+  // absolute (timeOrigin + now): the editor lives in the frame, whose performance clock starts later
+  // than the host page's navigation; the runner subtracts the top page's timeOrigin
   window.__tte = null
   const check = () => {
     for (const el of document.querySelectorAll('.ProseMirror[contenteditable="true"]')) {
       if (el.textContent && el.textContent.includes(snippet) && el.getClientRects().length > 0) {
-        window.__tte = performance.now()
+        window.__tte = performance.timeOrigin + performance.now()
         return true
       }
     }
@@ -138,50 +143,47 @@ async function runOnce(browser, doc, viaRoute) {
   }
   await page.addInitScript(DETECTOR, doc.snippet)
 
-  const url = `${BASE}/?open=${encodeURIComponent('/fixtures/' + doc.name)}`
+  // like production: the document is opened by a host page that embeds the frame and speaks the protocol
+  const frameIndex = `${MOUNT ? '/' + MOUNT.replace(/^\/+|\/+$/g, '') : ''}/index.html`
+  const url = `${ORIGIN}/test-host/?open=${encodeURIComponent('/fixtures/' + doc.name)}&frame=${encodeURIComponent(frameIndex)}`
   await page.goto(url, { waitUntil: 'commit' })
-  let opened = 'query'
-  // fall back to the shim API if ?open= is not honoured
-  const fallbackTimer = setTimeout(() => {}, 0)
-  clearTimeout(fallbackTimer)
   let tte = null
+  let editorFrame = null
   const deadline = Date.now() + TIMEOUT
-  let triedShim = false
   while (Date.now() < deadline) {
-    tte = await page.evaluate(() => window.__tte).catch(() => null)
+    for (const f of page.frames()) {
+      const v = await f.evaluate(() => window.__tte).catch(() => null)
+      if (v != null) {
+        const origin = await page.evaluate(() => performance.timeOrigin)
+        tte = v - origin
+        editorFrame = f
+        break
+      }
+    }
     if (tte != null) {
       editableSeen = true
       break
     }
-    if (!triedShim && Date.now() > deadline - TIMEOUT + 15_000) {
-      const has = await page
-        .evaluate(() => typeof window.__docsWeb?.openUrl === 'function')
-        .catch(() => false)
-      if (has) {
-        triedShim = true
-        opened = 'openUrl'
-        await page
-          .evaluate((u) => window.__docsWeb.openUrl(u), '/fixtures/' + doc.name)
-          .catch(() => {})
-      }
-    }
     await page.waitForTimeout(25)
   }
-  const nav = await page.evaluate(() => {
-    const n = performance.getEntriesByType('navigation')[0]
-    return n ? { dcl: n.domContentLoadedEventEnd, load: n.loadEventEnd } : null
-  })
+  const nav = editorFrame
+    ? await editorFrame
+        .evaluate(() => {
+          const n = performance.getEntriesByType('navigation')[0]
+          return n ? { dcl: n.domContentLoadedEventEnd, load: n.loadEventEnd } : null
+        })
+        .catch(() => null)
+    : null
   const transferredAtEditable = transferred
-  const fontsLoadedAtEditable =
-    tte != null
-      ? await page
-          .evaluate(() =>
-            [...document.fonts]
-              .filter((f) => f.status === 'loaded')
-              .map((f) => `${f.family} ${f.weight} ${f.style}`),
-          )
-          .catch(() => [])
-      : []
+  const fontsLoadedAtEditable = editorFrame
+    ? await editorFrame
+        .evaluate(() =>
+          [...document.fonts]
+            .filter((f) => f.status === 'loaded')
+            .map((f) => `${f.family} ${f.weight} ${f.style}`),
+        )
+        .catch(() => [])
+    : []
   let heap = null
   let heapAfterGc = null
   if (tte != null) {
@@ -201,7 +203,6 @@ async function runOnce(browser, doc, viaRoute) {
     fontsLoadedAtEditable,
     transferredAtEditable,
     ok: tte != null,
-    opened,
     dcl: nav?.dcl ?? null,
     load: nav?.load ?? null,
     tte,

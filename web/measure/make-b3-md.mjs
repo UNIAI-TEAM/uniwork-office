@@ -34,9 +34,9 @@ const docs = Object.keys(after.load.gzip.docs)
 const md = []
 md.push('# Web bundle measurements (UNI-1013 B3)', '')
 md.push(
-  `Generated ${result.generatedAt} on ${result.host.platform}, ${result.host.cpus} CPUs, node ${result.host.node}, chromium ${result.host.chromium} (headless), 1-min load average ${result.host.loadAvgBefore[0].toFixed(1)} → ${result.host.loadAvgAfter[0].toFixed(1)} (the host is shared with other workers: before/after runs are interleaved, absolute times still carry noise). Raw data: \`measurements-b3.json\`. Reproduce: \`node web/measure/measure-b3.mjs --before-dist <spike build>\` (before = \`npm run build:web\` at 4a70857, i.e. \`web/docs/dist\`).`,
+  `Generated ${result.generatedAt} on ${result.host.platform}, ${result.host.cpus} CPUs, node ${result.host.node}, chromium ${result.host.chromium} (headless), 1-min load average ${result.host.loadAvgBefore[0].toFixed(1)} → ${result.host.loadAvgAfter[0].toFixed(1)} (the host is shared with other workers: before/after runs are interleaved, absolute times still carry noise). Raw data: \`measurements-b3.json\`. Reproduce: \`node web/measure/measure-b3.mjs --before-dist <old-pipeline build> --before-desc \"...\"\`.`,
   '',
-  `- **before**: UNI-1011 spike build (single-directory output, TTF faces, meta CSP).`,
+  `- **before**: ${result.beforeDescription}.`,
   `- **after**: \`${after.manifest?.version ?? after.dist}\` (${after.manifest?.files ?? '?'} files; versioned dir, manifest + csp.json + headers.json, WOFF2 Latin faces, fonts under \`fonts/\` never inlined, no sourcemaps).`,
   `- Both are served by the same \`web/server/server.mjs\`; "gzip" = server compresses text/font responses level 9 (what a host sends), "raw" = no compression (the spike's original measurement setup). Cold load, HTTP cache disabled, ${RUNS} rounds of (before, after) per document, median shown.`,
   '',
@@ -81,7 +81,7 @@ if (after.manifest) {
 
 md.push('## 2. Cold load: transferred bytes and time-to-editable', '')
 md.push(
-  "time-to-editable = first moment a visible `.ProseMirror[contenteditable=true]` contains the document's known text (ms since navigation start). Wire bytes = sum of CDP `encodedDataLength`: *by editable* = finished when the doc became editable, *settled* = after network idle + 1.5 s (late fonts included).",
+  "time-to-editable = first moment a visible `.ProseMirror[contenteditable=true]` contains the document's known text, in ms since the host page's navigation start (the document is opened through /test-host/ and the frame protocol: host boot + docx fetch + frame load + init handshake + render). Wire bytes = sum of CDP `encodedDataLength`: *by editable* = finished when the doc became editable, *settled* = after network idle + 1.5 s (late fonts included).",
   '',
 )
 for (const mode of ['gzip', 'raw']) {

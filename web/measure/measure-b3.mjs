@@ -1,7 +1,8 @@
 // UNI-1013 B3: before/after report for the web bundle pipeline.
-//   node web/measure/measure-b3.mjs --before-dist <spike build dir> [--after-dist <dir>] [--runs 5]
+//   node web/measure/measure-b3.mjs --before-dist <old-pipeline build dir> [--after-dist <dir>] [--runs 5]
 //     [--out-json web/measure/measurements-b3.json] [--out-md web/measure/measurements-b3.md]
-// before = the UNI-1011 spike build (`npm run build:web` at 4a70857 -> web/docs/dist)
+// before = a build with the old pipeline to compare against (`npm run build:web` at an older commit -> web/docs/dist)
+//   --before-desc "text"  how the before build was made, printed in the report header
 // after  = this branch's build (default: newest dist-web/docs/<version>)
 // Everything runs through the same tools (bundle-size.mjs, load.mjs, font-picker.mjs) against the same
 // server (web/server/server.mjs, gzip on = what a host sends; raw = no compression) so the two builds are
@@ -30,7 +31,7 @@ const arg = (k, d) => {
 const RUNS = Number(arg('--runs', 5))
 const beforeDist = arg('--before-dist')
 if (!beforeDist) {
-  console.error('--before-dist <dir> is required (the spike build to compare against)')
+  console.error('--before-dist <dir> is required (an old-pipeline build to compare against)')
   process.exit(2)
 }
 
@@ -189,6 +190,10 @@ const subpath = {
 
 const result = {
   generatedAt: new Date().toISOString(),
+  beforeDescription: arg(
+    '--before-desc',
+    'old-pipeline build (single-directory output, TTF faces, meta CSP)',
+  ),
   host: {
     cpus: os.cpus().length,
     node: process.version,
