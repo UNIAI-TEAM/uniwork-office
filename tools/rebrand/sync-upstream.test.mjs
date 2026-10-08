@@ -445,8 +445,21 @@ test('a formatting failure counts as exit 2; --ci makes a missing Prettier a fai
 })
 
 /** A stand-in for the checkout the script runs from: tools/check-egress.mjs and package.json. */
-function fakeSourceRepo({ egressScript = false }) {
+function fakeSourceRepo({ egressScript = false, legalScript = false }) {
   const dir = join(TMP, `source-${++counter}`)
+  if (legalScript) {
+    // mimics tools/legal/sync-legal.mjs: --root <dir>, rewrites the MODIFICATIONS header from UPSTREAM_BASE
+    write(dir, {
+      'tools/legal/sync-legal.mjs': [
+        "import { readFileSync, writeFileSync } from 'node:fs'",
+        "import { join } from 'node:path'",
+        "const root = process.argv[process.argv.indexOf('--root') + 1]",
+        "const sha = readFileSync(join(root, 'tools/rebrand/UPSTREAM_BASE'), 'utf8').trim()",
+        "writeFileSync(join(root, 'MODIFICATIONS'), `Modified from genoffice commit ${sha}.\\n`)",
+        '',
+      ].join('\n'),
+    })
+  }
   write(dir, {
     'package.json': JSON.stringify({
       scripts: egressScript ? { 'check:egress': 'node tools/check-egress.mjs' } : {},
@@ -517,4 +530,64 @@ test('report: upstream text in code spans, failed files flagged loudly, PR body 
   assert.ok(body.length < 1500, `body is ${body.length} chars`)
   assert.match(body, /Report truncated/)
   assert.match(body, /NOT applied/)
+})
+
+test('legal headers are refreshed from the trusted copy in the base-bump commit', () => {
+  const { fork, upstream, target } = setup({
+    upstreamChanges: CLEAN_CHANGES,
+    forkChanges: { MODIFICATIONS: `Modified from genoffice commit old.\n` },
+  })
+  const trusted = trustedSnapshot({ sourceRepo: fakeSourceRepo({ legalScript: true }) })
+  try {
+    const s = run(fork, upstream, { checks: defaultChecks({ trusted }) })
+    assert.equal(s.exitCode, 0)
+    assert.equal(s.legal.ran, true)
+    assert.deepEqual(s.legal.changed, ['MODIFICATIONS'])
+    assert.equal(
+      git(fork, 'log', '-1', '--format=%s'),
+      `chore(rebrand): bump UPSTREAM_BASE to ${target.slice(0, 7)} and refresh legal headers`,
+    )
+    assert.deepEqual(git(fork, 'show', '--format=', '--name-only', 'HEAD').split('\n').sort(), [
+      'MODIFICATIONS',
+      BASE_FILE,
+    ])
+    assert.equal(
+      git(fork, 'show', 'HEAD:MODIFICATIONS'),
+      `Modified from genoffice commit ${target}.`,
+    )
+    assert.equal(git(fork, 'status', '--porcelain'), '')
+    assert.match(renderReport(s), /Legal headers .*pass, 1 file\(s\) refreshed/)
+  } finally {
+    trusted.cleanup()
+  }
+})
+
+test('without a legal script the bump commit keeps its plain title', () => {
+  const { fork, upstream, target } = setup({ upstreamChanges: CLEAN_CHANGES })
+  const trusted = trustedSnapshot({ sourceRepo: fakeSourceRepo({}) })
+  try {
+    const s = run(fork, upstream, { checks: defaultChecks({ trusted }) })
+    assert.equal(s.exitCode, 0)
+    assert.equal(s.legal.ran, false)
+    assert.equal(s.legal.note, 'not present')
+    assert.equal(
+      git(fork, 'log', '-1', '--format=%s'),
+      `chore(rebrand): bump UPSTREAM_BASE to ${target.slice(0, 7)}`,
+    )
+    assert.match(renderReport(s), /Legal headers .*skipped \(not present\)/)
+  } finally {
+    trusted.cleanup()
+  }
+})
+
+test('a failing legal sync is exit 2', () => {
+  const { fork, upstream } = setup({ upstreamChanges: CLEAN_CHANGES })
+  const checks = {
+    ...fakeChecks(),
+    legal: () => ({ ran: true, ok: false, note: 'bad legal.json' }),
+  }
+  const s = run(fork, upstream, { checks })
+  assert.equal(s.status, 'checks-failed')
+  assert.equal(s.exitCode, 2)
+  assert.match(renderReport(s), /Failed checks: legal headers/)
 })

@@ -22,7 +22,7 @@
 //   --ci                  CI mode: --commit-conflicts, and a missing Prettier fails the run
 //   --force               allow a target that does not descend from the base
 //   --no-fetch            use refs already present locally (refs/upstream-sync/target by default)
-//   --skip-checks         skip rebrand, formatting, brand scan, egress check and rebrand tests (toy repos)
+//   --skip-checks         skip rebrand, formatting, legal sync, brand scan, egress check, rebrand tests
 //   --json                print the summary as JSON on stdout (logs always go to stderr)
 //
 // Exit codes:
@@ -30,17 +30,19 @@
 //   1  usage or runtime error (bad arguments, dirty tree, fetch failure, a target that does
 //      not descend from the base, an unfinished sync branch, ...); a real run rolls back its branch
 //   2  needs a human: conflicts, patches that could not be applied, a failing check (rebrand,
-//      formatting, brand scan, egress check, rebrand tests); the report says which
+//      formatting, legal headers, brand scan, egress check, rebrand tests); the report says which
 //
 // The checks never execute code from the patched tree: before applying, the script copies
 // tools/ and the Prettier config of the checkout it runs from to a temp dir and runs the
-// rebrand, brand scan, egress check (when package.json defines check:egress) and the
+// rebrand, legal header sync (tools/legal/sync-legal.mjs, when present), brand scan,
+// egress check (when package.json defines check:egress) and the
 // rebrand tests from that copy with --root.
 //
 // Commits made in real mode (on the new branch, in this order, each only if it changes something):
 //   chore(upstream): apply genoffice <base7>..<target7>
 //   chore(rebrand): re-apply UniWork brand after upstream sync
-//   chore(rebrand): bump UPSTREAM_BASE to <target7>
+//   chore(rebrand): bump UPSTREAM_BASE to <target7> [and refresh legal headers]
+//     (tools/legal/sync-legal.mjs rewrites the NOTICE / MODIFICATIONS headers naming the commit)
 // See README.md ("Sync with upstream") for the human side of the flow.
 import { spawnSync } from 'node:child_process'
 import {
@@ -544,6 +546,12 @@ export function defaultChecks({ trusted, prettier, strictFormat = false, repoGit
         }
       }
     },
+    legal(root) {
+      const script = join(trusted.tools, 'legal', 'sync-legal.mjs')
+      if (!existsSync(script)) return { ran: false, note: 'not present' }
+      const r = runNode([script, '--root', root], trusted.dir)
+      return { ran: true, ok: r.status === 0, note: r.status === 0 ? '' : firstLine(r.stderr) }
+    },
     egress(root) {
       if (!trusted.egress) return { ran: false, note: 'not present: no check:egress script' }
       const r = runNode(
@@ -583,6 +591,7 @@ function noopChecks() {
     rebrand: () => skip,
     format: () => skip,
     brandScan: () => skip,
+    legal: () => skip,
     egress: () => skip,
     tests: () => skip,
   }
@@ -601,7 +610,7 @@ function guarded(fn) {
   }
 }
 
-/** Steps after the patch commit: rebrand (+format), bump UPSTREAM_BASE, scan, egress, test. */
+/** Steps after the patch commit: rebrand (+format), bump UPSTREAM_BASE (+legal headers), scan, egress, test. */
 function finish(git, root, summary, checks) {
   const reb = guarded(() => checks.rebrand(root))
   summary.rebrand = { ...reb, changed: [] }
@@ -626,14 +635,21 @@ function finish(git, root, summary, checks) {
   } else summary.format = { ran: false, note: 'skipped with the rebrand step' }
 
   writeFileSync(join(root, BASE_FILE), `${summary.target}\n`)
-  git(['add', '--', BASE_FILE])
+  // NOTICE / MODIFICATIONS embed the upstream commit, so they are refreshed in the same commit
+  const legal = checks.legal
+    ? guarded(() => checks.legal(root))
+    : { ran: false, note: 'not present' }
+  summary.legal = { ...legal, changed: [] }
+  git(['add', '-A'])
   if (hasStagedChanges(git)) {
-    summary.commitsCreated.push(
-      commit(
-        git,
-        `chore(rebrand): bump UPSTREAM_BASE to ${short(summary.target)}\n\nThe tree now absorbs genoffice ${summary.target}.\n`,
-      ),
-    )
+    const staged = splitZ(git(['diff', '--cached', '--name-only', '-z']).stdout)
+    summary.legal.changed = staged.filter((p) => p !== BASE_FILE)
+    const withLegal = legal.ran && summary.legal.changed.length > 0
+    const title = `chore(rebrand): bump UPSTREAM_BASE to ${short(summary.target)}${withLegal ? ' and refresh legal headers' : ''}`
+    const body = withLegal
+      ? `The tree now absorbs genoffice ${summary.target}; tools/legal/sync-legal.mjs refreshed the\nheaders that name it.\n`
+      : `The tree now absorbs genoffice ${summary.target}.\n`
+    summary.commitsCreated.push(commit(git, `${title}\n\n${body}`))
   }
   summary.brandScan = guarded(() => checks.brandScan(root))
   summary.egress = checks.egress
@@ -725,6 +741,7 @@ function runSync({ options, root, git, checks, log, started }) {
     rebrand: null,
     format: null,
     brandScan: null,
+    legal: null,
     egress: null,
     tests: null,
     watch: [],
@@ -826,7 +843,7 @@ function applyAndFinish({
 }
 
 function checksOk(s) {
-  return ![s.rebrand, s.format, s.brandScan, s.egress, s.tests].some(
+  return ![s.rebrand, s.format, s.legal, s.brandScan, s.egress, s.tests].some(
     (c) => c?.ran && c.ok === false,
   )
 }
@@ -924,6 +941,7 @@ function continueSync({ git, root, checks, log, started }) {
     rebrand: null,
     format: null,
     brandScan: null,
+    legal: null,
     egress: null,
     tests: null,
     stoppedForConflicts: false,
@@ -1073,6 +1091,7 @@ function reportLines(s) {
     ['rebrand', s.rebrand],
     ['formatting', s.format],
     ['brand scan', s.brandScan],
+    ['legal headers', s.legal],
     ['egress check', s.egress],
     ['rebrand tests', s.tests],
   ].filter(([, c]) => c?.ran && c.ok === false)
@@ -1140,6 +1159,10 @@ function reportLines(s) {
       `- Brand scan: ${checkLine(bs, bs?.ran ? `, ${bs.violations?.length ?? 0} violation(s), ${bs.allowed ?? 0} allowlisted hit(s)` : '')}`,
     )
     for (const v of (bs?.violations ?? []).slice(0, 50)) r.push(`  - ${codeSpan(v)}`)
+    const lg = s.legal
+    r.push(
+      `- Legal headers (NOTICE / MODIFICATIONS, in the base-bump commit): ${checkLine(lg, lg?.ran ? `, ${lg.changed?.length ?? 0} file(s) refreshed` : '')}`,
+    )
     const eg = s.egress
     r.push(
       `- Egress check: ${checkLine(eg, eg?.ran && eg.violations ? `, ${eg.violations.length} hit(s)` : '')}`,

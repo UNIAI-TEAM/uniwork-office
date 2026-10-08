@@ -42,12 +42,15 @@ What a real run does (it refuses a dirty working tree):
    rejects the patch as a whole, it applies file by file and lists the files no 3-way merge could take as "failed".
 3. Commits `chore(upstream): apply genoffice <base7>..<target7>`, runs `rebrand.mjs`, formats the files it touched
    with Prettier (when installed) and commits `chore(rebrand): re-apply UniWork brand after upstream sync`, then writes
-   the target to `UPSTREAM_BASE` and commits `chore(rebrand): bump UPSTREAM_BASE to <target7>`.
+   the target to `UPSTREAM_BASE`, runs `tools/legal/sync-legal.mjs` (when present) so the NOTICE / MODIFICATIONS
+   headers name the new upstream commit, and commits both as
+   `chore(rebrand): bump UPSTREAM_BASE to <target7> and refresh legal headers` (without the legal step the title is
+   `chore(rebrand): bump UPSTREAM_BASE to <target7>`).
 4. Runs the brand scan, the egress check (when `package.json` defines `check:egress`) and the rebrand tests, and
-   records them in the report.
+   records them, with the legal step, in the report.
 
 The checks never run code from the patched tree: before applying, the script copies `tools/` and the Prettier config
-and ignore file of the checkout it runs from to a temp dir, and runs the rebrand, the brand scan, the egress check,
+and ignore file of the checkout it runs from to a temp dir, and runs the rebrand, the legal sync, the brand scan, the egress check,
 the rebrand tests (a fixed file list) and Prettier (`--config` / `--ignore-path` from that copy) against the tree with
 `--root`. If a real run fails with an error after creating its branch, it resets, switches back to the original branch
 and deletes the new one.
@@ -59,11 +62,11 @@ shows them, and still finishes the remaining steps; `--ci` (the workflow's mode)
 failure when Prettier is missing. Files that did not apply are listed loudly at the top of the report:
 `UPSTREAM_BASE` is bumped anyway, so such a sync must not merge until they are ported by hand.
 
-| Exit code | Meaning                                                                                                                      |
-| --------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| 0         | up to date, already prepared (the branch exists and absorbs the target), or clean with every check green                     |
-| 1         | usage or runtime error: bad arguments, dirty tree, fetch failure, non-descendant target, existing unfinished sync branch     |
-| 2         | needs a human: conflicts, files that did not apply, a failing check (rebrand, formatting, brand scan, egress, rebrand tests) |
+| Exit code | Meaning                                                                                                                                  |
+| --------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| 0         | up to date, already prepared (the branch exists and absorbs the target), or clean with every check green                                 |
+| 1         | usage or runtime error: bad arguments, dirty tree, fetch failure, non-descendant target, existing unfinished sync branch                 |
+| 2         | needs a human: conflicts, files that did not apply, a failing check (rebrand, formatting, legal sync, brand scan, egress, rebrand tests) |
 
 Re-running is safe: a dry run leaves branches, `HEAD`, the index and the worktree list as they were (it works in a
 throwaway `git worktree` under the OS temp dir), and a second real run for the same target reports "already prepared"
@@ -105,9 +108,9 @@ pull request for it exists. Nothing is merged automatically.
 - Every conflicted or failed file, and the commits in order (patch, rebrand, base bump).
 - The watch list and "Known gaps" below: upstream brings back analytics / star prompt / offer panel code that the fork
   removed, a changed `skills/*/SKILL.md` needs its `metadata.version` bumped, packaging recipes stay upstream-branded.
-- `npm run legal` after the base bump: it refreshes the NOTICE / MODIFICATIONS header (new upstream commit) and the
-  package author / homepage. If upstream changed its own NOTICE header (year, wording), first copy the new text into
-  `upstream.notice` in `apps/shell/src/shared/legal.json` (the upstream NOTICE kept verbatim).
+- If upstream changed its own NOTICE header (year, wording), copy the new text into `upstream.notice` in
+  `apps/shell/src/shared/legal.json` (the upstream NOTICE kept verbatim) and run `npm run legal`; the script's legal
+  step only re-renders the headers from that file.
 - `npm run format` when the run had no Prettier (CI checks every changed file as a whole), then `npm run check:brand`,
   `npm run rebrand:check` and the app tests. Fix copy the table cannot, or allowlist it with a reason.
 
