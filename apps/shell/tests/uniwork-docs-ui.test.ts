@@ -21,6 +21,9 @@ import {
   pickerBodyOf,
   pickerReducer,
   pickerRowMeta,
+  recentOpenAction,
+  recentRowIsMissing,
+  recentRowModifiedMs,
   recentRowPolicy,
   retryActionOf,
   type PickerAction,
@@ -66,7 +69,7 @@ describe('chipModelOf: save state -> chip', () => {
     ['saving', 'Saving…', 'busy', undefined],
     ['offline', 'Not saved: offline', 'warn', 'retry'],
     ['signed-out', 'Sign in again to save', 'warn', 'sign-in'],
-    ['conflict', 'Conflict', 'warn', 'resolve'],
+    ['conflict', 'Version conflict', 'warn', 'resolve'],
     ['error', 'Couldn’t save', 'error', 'retry'],
   ])('%s -> "%s" (%s, action %s)', (state, label, tone, action) => {
     const chip = labelOf({ state })
@@ -103,6 +106,25 @@ describe('chipModelOf: save state -> chip', () => {
     expect(chip.action).toBeUndefined()
     expect(chip.tip).toContain('Your changes are kept on this computer.')
   })
+
+  it('says "offline" only when the network is the problem', () => {
+    for (const error of [undefined, 'network'] as const) {
+      const chip = labelOf({ state: 'offline', error })
+      expect(chip.label).toBe('Not saved: offline')
+      expect(chip.tip).toContain('back online')
+    }
+  })
+
+  it.each(['server_error', 'timeout', 'malformed_response'] as const)(
+    'a %s while the network is fine reads as UniWork being unreachable, not offline',
+    (error) => {
+      const chip = labelOf({ state: 'offline', error })
+      expect(chip.label).toBe("Not saved: can't reach UniWork")
+      expect(chip.tip).toBe('Your changes are safe on this computer. Retry in a moment.')
+      expect(chip.tone).toBe('warn')
+      expect(chip.action?.kind).toBe('retry')
+    },
+  )
 
   it('offers a browser sign-in while signed out, and Retry once the account is signed in again', () => {
     expect(labelOf({ state: 'signed-out' }, false).action).toEqual({
@@ -519,5 +541,28 @@ describe('recentRowPolicy', () => {
       showLocation: false,
       fileActions: false,
     })
+  })
+})
+
+describe('a UniWork recent whose working copy is gone', () => {
+  const uniwork = { documentId: 'd1', workspaceId: 'w1', title: 'Plan', access: 'edit' as const }
+
+  it('is not "missing": opening it downloads the document again', () => {
+    expect(recentRowIsMissing({ missing: true, uniwork })).toBe(false)
+    expect(recentRowIsMissing({ missing: true })).toBe(true)
+    expect(recentRowIsMissing({ missing: false })).toBe(false)
+    expect(recentRowIsMissing({})).toBe(false)
+  })
+
+  it('a click on it opens it (a fresh download), a local missing file asks first', () => {
+    expect(recentOpenAction({ missing: true, uniwork })).toBe('open')
+    expect(recentOpenAction({ missing: true })).toBe('confirm-missing')
+    expect(recentOpenAction({})).toBe('open')
+  })
+
+  it("shows no Modified time: the working copy's file time is the download time", () => {
+    expect(recentRowModifiedMs({ mtimeMs: 123, uniwork })).toBeNull()
+    expect(recentRowModifiedMs({ mtimeMs: 123, missing: true })).toBeNull()
+    expect(recentRowModifiedMs({ mtimeMs: 123 })).toBe(123)
   })
 })

@@ -160,7 +160,14 @@ export function UniworkStatusChip({
   }
 
   return (
-    <div className="uw-pill" data-tone={model.tone} data-state={status.state} title={tip}>
+    <div
+      className="uw-pill"
+      role="group"
+      aria-label={t('uwChipAria')}
+      data-tone={model.tone}
+      data-state={status.state}
+      title={tip}
+    >
       <span className="uw-pill-status" role="status">
         {model.tone === 'busy' ? <Spinner /> : <span className="uw-pill-dot" aria-hidden="true" />}
         <span className="uw-pill-label">{label}</span>

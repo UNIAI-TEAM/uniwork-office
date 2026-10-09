@@ -35,7 +35,12 @@ import { onFilesChanged } from './file-events'
 import { FileBadge } from './FileBadge'
 import { UniworkOpenCard } from './UniworkOpenCard'
 import { openRecentEntry } from './uniwork-open'
-import { recentRowPolicy } from './uniwork-docs-model'
+import {
+  recentOpenAction,
+  recentRowIsMissing,
+  recentRowModifiedMs,
+  recentRowPolicy,
+} from './uniwork-docs-model'
 
 declare global {
   interface Window {
@@ -2393,6 +2398,8 @@ export function Home() {
     const isRenaming = renaming?.path === entry.path
     // a UniWork document's working copy is managed by the app: no rename, move or file delete
     const policy = recentRowPolicy(entry)
+    const missing = recentRowIsMissing(entry)
+    const modifiedMs = recentRowModifiedMs(entry)
     const editable = editableAt(entry.path) && policy.fileActions
     const canDelete =
       context === 'folder' ? folderSelectedPaths.length === 0 : selectedPaths.length === 0
@@ -2403,19 +2410,19 @@ export function Home() {
     return (
       <li className="recent-row" key={entry.path}>
         <div
-          className={`recent-item${entry.missing ? ' missing' : ''}`}
+          className={`recent-item${missing ? ' missing' : ''}`}
           role="button"
           tabIndex={0}
-          draggable={!isRenaming && !entry.missing && policy.draggable}
+          draggable={!isRenaming && !missing && policy.draggable}
           onDragStart={(e) => onRowDragStart(e, dragPathsFor(entry.path, context))}
           onClick={() => {
             if (isRenaming) return
-            if (entry.missing) setConfirmMissing(entry)
+            if (recentOpenAction(entry) === 'confirm-missing') setConfirmMissing(entry)
             else void openRecentEntry(entry, window.aiOffice)
           }}
           onKeyDown={(event) => {
             if (event.key === 'Enter' && event.target === event.currentTarget) {
-              if (entry.missing) setConfirmMissing(entry)
+              if (recentOpenAction(entry) === 'confirm-missing') setConfirmMissing(entry)
               else void openRecentEntry(entry, window.aiOffice)
             }
           }}
@@ -2465,9 +2472,9 @@ export function Home() {
             </span>
           )}
           <span className="recent-time">
-            {entry.missing ? '—' : formatModified(entry.mtimeMs, i18n)}
+            {modifiedMs === null ? '—' : formatModified(modifiedMs, i18n)}
           </span>
-          <span className="recent-size">{entry.missing ? '—' : formatSize(entry.sizeBytes)}</span>
+          <span className="recent-size">{missing ? '—' : formatSize(entry.sizeBytes)}</span>
           <button
             className={`star-btn${entry.starred ? ' starred' : ''}`}
             aria-label={entry.starred ? t('unstar') : t('star')}

@@ -379,7 +379,7 @@ export function UniworkOpenDialog({
             role="combobox"
             aria-label={t('uwPickSearch')}
             aria-expanded={body.kind === 'list'}
-            aria-controls="uw-pick-list"
+            aria-controls={body.kind === 'list' ? 'uw-pick-list' : undefined}
             aria-activedescendant={activeIndex >= 0 ? optionId(activeIndex) : undefined}
             placeholder={t('uwPickSearchPh')}
             value={draft}

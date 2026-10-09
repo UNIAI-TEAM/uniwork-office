@@ -401,6 +401,21 @@ describe('picker dialog', () => {
     expect(dialog()!.textContent).toContain('Can’t reach UniWork.')
   })
 
+  it('points the search box at the list only while the list is on screen', async () => {
+    api.uniworkListDocuments.mockImplementationOnce(() => new Promise(() => {}))
+    await openPicker()
+    // still loading: there is no list element to control yet
+    expect(host.querySelector('#uw-pick-list')).toBeNull()
+    expect(search().hasAttribute('aria-controls')).toBe(false)
+  })
+
+  it('points the search box at the list once it is there', async () => {
+    await openPicker()
+    const list = host.querySelector('#uw-pick-list')
+    expect(list).not.toBeNull()
+    expect(search().getAttribute('aria-controls')).toBe('uw-pick-list')
+  })
+
   it('has labelled controls', async () => {
     await openPicker()
     expect(dialog()!.getAttribute('aria-labelledby')).toBe('uw-pick-title')
@@ -475,6 +490,14 @@ describe('status chip', () => {
     )
     expect(chip().textContent).toBe('Blocked: storage full')
     expect(chip().getAttribute('title')).toContain('Your UniWork storage is full.')
+  })
+
+  it('is a labelled group, so a screen reader knows what the status belongs to', async () => {
+    await mount(
+      createElement(UniworkStatusChip, { status: status({ state: 'dirty' }), onStatus: vi.fn() }),
+    )
+    expect(chip().getAttribute('role')).toBe('group')
+    expect(chip().getAttribute('aria-label')).toBe('UniWork save status')
   })
 
   it('announces its text as a status region', async () => {

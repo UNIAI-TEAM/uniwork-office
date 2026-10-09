@@ -110,6 +110,11 @@ export interface ChipModel {
   savedAt?: string
 }
 
+/** UniWork answered badly, slowly or not at all while the network itself may be fine */
+function isServerSideError(error: UniworkDocErrorCode | undefined): boolean {
+  return error === 'server_error' || error === 'timeout' || error === 'malformed_response'
+}
+
 const QUIET_STATES: ReadonlySet<UniworkSaveState> = new Set(['ready', 'saved', 'dirty', 'saving'])
 
 /**
@@ -138,13 +143,17 @@ export function chipModelOf(
       return { tone: 'neutral', labelKey: 'uwChipDirty', tipKey: 'uwTipDirty' }
     case 'saving':
       return { tone: 'busy', labelKey: 'uwChipSaving', tipKey: 'uwTipSaving' }
-    case 'offline':
+    case 'offline': {
+      // offline also covers a slow or failing server: only a network error means the
+      // computer is offline, so say so only then
+      const unreachable = isServerSideError(error)
       return {
         tone: 'warn',
-        labelKey: 'uwChipOffline',
-        tipKey: 'uwTipOffline',
+        labelKey: unreachable ? 'uwChipUnreachable' : 'uwChipOffline',
+        tipKey: unreachable ? 'uwTipUnreachable' : 'uwTipOffline',
         action: { kind: 'retry', labelKey: 'uwActRetry' },
       }
+    }
     case 'signed-out':
       return {
         tone: 'warn',
@@ -299,6 +308,32 @@ export function recentRowPolicy(entry: Pick<RecentEntry, 'uniwork'>): RecentRowP
     showLocation: local,
     fileActions: local,
   }
+}
+
+/**
+ * Whether the missing-file prompt applies to a recents row. A UniWork row whose
+ * working copy has gone (cleaned userData, deleted file) is still openable:
+ * opening it downloads the document again.
+ */
+export function recentRowIsMissing(entry: Pick<RecentEntry, 'missing' | 'uniwork'>): boolean {
+  return !!entry.missing && !entry.uniwork
+}
+
+/** What a click (or Enter) on a recents row does */
+export function recentOpenAction(
+  entry: Pick<RecentEntry, 'missing' | 'uniwork'>,
+): 'open' | 'confirm-missing' {
+  return recentRowIsMissing(entry) ? 'confirm-missing' : 'open'
+}
+
+/**
+ * The row's Modified time. A UniWork row's file time is when its working copy
+ * was downloaded, not when the document changed, so it has none to show.
+ */
+export function recentRowModifiedMs(
+  entry: Pick<RecentEntry, 'mtimeMs' | 'missing' | 'uniwork'>,
+): number | null {
+  return entry.missing || entry.uniwork ? null : entry.mtimeMs
 }
 
 // ── Picker ──────────────────────────────────────────────
