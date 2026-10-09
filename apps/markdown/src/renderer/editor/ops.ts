@@ -4,6 +4,7 @@ import { NodeSelection, TextSelection, type Transaction } from '@tiptap/pm/state
 import type { Mapping } from '@tiptap/pm/transform'
 import { createTable } from '@tiptap/extension-table'
 import { stripLegacyFencedDivs } from '../markdown/docText'
+import { degradeRawHtml } from './rawHtml'
 import type { StringKey } from '../i18n/locale'
 
 /**
@@ -421,10 +422,14 @@ export function selectionBlockRange(editor: Editor): Range {
 export function parseMarkdownToNodes(editor: Editor, markdown: string): PmNode[] {
   // model output guard: `:::` fenced divs are not GFM and would land as
   // literal text — strip the fences and keep the body (same as file open).
-  // Raw HTML needs no guard: parse runs it through the schema, so semantic
-  // tags degrade to their GFM equivalents (<b>→bold, <img>→image) and
-  // anything the schema cannot represent loses its styling, keeping text.
-  const json = editor.markdown?.parse(stripLegacyFencedDivs(markdown))
+  // Raw HTML is preserved verbatim on file open (rawHtml.ts); model output is
+  // degraded through the schema instead, so semantic tags map to their GFM
+  // equivalents (<b>→bold, <img>→image) and anything the schema cannot
+  // represent loses its styling, keeping text.
+  const manager = editor.markdown
+  const json = manager
+    ? degradeRawHtml(manager.parse(stripLegacyFencedDivs(markdown)), manager)
+    : null
   const content = json?.content ?? []
   return content.map((c) => editor.schema.nodeFromJSON(c))
 }

@@ -2143,9 +2143,51 @@ html.genoffice-popover-open .ribbon-tabs {
   margin-top: 8px;
 }
 
-.md-mermaid-preview svg {
+.md-mermaid-preview img {
+  display: inline-block;
   max-width: 100%;
   height: auto;
+  vertical-align: middle;
+}
+
+/* ---- raw HTML kept verbatim (rawHtml.ts): source shown as text, never rendered ---- */
+
+.doc-editor .md-raw-html {
+  margin: 0.8em 0;
+  padding: 6px 10px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 6px;
+  background: var(--md-code-bg);
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  cursor: default;
+}
+
+.doc-editor .md-raw-html code {
+  background: none;
+  padding: 0;
+  font-size: 0.8em;
+  line-height: 1.6;
+}
+
+.doc-editor .md-raw-html-comment {
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+.doc-editor .md-raw-html.ProseMirror-selectednode {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.doc-editor .md-raw-html-inline {
+  font-family: 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 0.8em;
+  color: var(--text-secondary);
+  background: var(--md-code-inline-bg);
+  border-radius: 4px;
+  padding: 0.1em 0.25em;
 }
 
 .md-mermaid-error {
