@@ -1641,6 +1641,7 @@
 }
 
 .cloud-state.credits-exhausted,
+.cloud-state.subscription-inactive,
 .cloud-state.unavailable {
   color: var(--danger-text);
 }

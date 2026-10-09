@@ -2,11 +2,11 @@ import type { zh } from './zh'
 
 export const de = {
   cloudTitle: 'UniWork Cloud-KI',
-  cloudStatus: 'Status',
   cloudStateReady: 'Verfügbar',
   cloudStateNotEntitled: 'Nicht in Ihrem Tarif',
   cloudStateExhausted: 'KI-Guthaben aufgebraucht',
   cloudStateUnavailable: 'Nicht verfügbar',
+  cloudStateInactive: 'Abonnement inaktiv',
   cloudCredits: 'KI-Guthaben',
   cloudCreditsLeft: '{remaining} / {limit} übrig',
   cloudCreditsUnlimited: 'Unbegrenzt',
@@ -19,6 +19,10 @@ export const de = {
     'Ihre Organisation hat ihr UniWork KI-Guthaben für diesen Zeitraum aufgebraucht. Cloud-Tools pausieren bis zur Erneuerung; Ihre eigenen Anbieter unten funktionieren weiter.',
   cloudUnavailableBody:
     'UniWork Cloud-KI ist gerade nicht verfügbar. Ihre eigenen Anbieter unten funktionieren weiter.',
+  cloudInactiveBody:
+    'Das UniWork-Abonnement Ihrer Organisation ist nicht aktiv, daher ist die Cloud-KI pausiert. Bitten Sie einen Administrator um die Verlängerung; Ihre eigenen Anbieter unten funktionieren weiter.',
+  cloudToolsOffBody:
+    'Die UniWork Cloud-Tools sind ausgeschaltet. Schalten Sie unter {section} „{switch}“ ein, um das KI-Guthaben Ihrer Organisation zu nutzen; Ihre eigenen Anbieter unten sind nicht betroffen.',
   cloudReadyBody:
     'Ohne eigenen Anbieter nutzen Suche, Bildgenerierung und Medienanalyse das UniWork KI-Guthaben Ihrer Organisation.',
   cloudToolsToggle: 'UniWork Cloud-Tools verwenden',

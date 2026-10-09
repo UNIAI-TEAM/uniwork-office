@@ -2,11 +2,11 @@ import type { zh } from './zh'
 
 export const ar = {
   cloudTitle: 'ذكاء UniWork السحابي',
-  cloudStatus: 'الحالة',
   cloudStateReady: 'متاح',
   cloudStateNotEntitled: 'غير مضمّن في خطتك',
   cloudStateExhausted: 'نفدت أرصدة الذكاء الاصطناعي',
   cloudStateUnavailable: 'غير متاح',
+  cloudStateInactive: 'الاشتراك غير نشط',
   cloudCredits: 'أرصدة الذكاء الاصطناعي',
   cloudCreditsLeft: 'متبقٍ {remaining} / {limit}',
   cloudCreditsUnlimited: 'غير محدود',
@@ -18,6 +18,10 @@ export const ar = {
   cloudExhaustedBody:
     'استهلكت مؤسستك كل أرصدة الذكاء الاصطناعي من UniWork لهذه الفترة. تتوقف الأدوات السحابية حتى تتجدد الأرصدة؛ ويستمر عمل مزوّديك أدناه.',
   cloudUnavailableBody: 'ذكاء UniWork السحابي غير متاح حاليًا. ويستمر عمل مزوّديك أدناه.',
+  cloudInactiveBody:
+    'اشتراك UniWork الخاص بمؤسستك غير نشط، لذا تم إيقاف الذكاء الاصطناعي السحابي مؤقتًا. اطلب من المسؤول تجديده؛ ستستمر مزوّداتك الخاصة أدناه في العمل.',
+  cloudToolsOffBody:
+    'أدوات UniWork السحابية متوقفة. فعّل «{switch}» في {section} لاستخدام رصيد الذكاء الاصطناعي لمؤسستك؛ مزوّداتك الخاصة أدناه لا تتأثر.',
   cloudReadyBody:
     'عند عدم وجود مزوّد خاص بك، يستخدم البحث وإنشاء الصور وتحليل الوسائط أرصدة الذكاء الاصطناعي من UniWork لمؤسستك.',
   cloudToolsToggle: 'استخدام أدوات UniWork السحابية',

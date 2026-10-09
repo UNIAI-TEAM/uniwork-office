@@ -2,11 +2,11 @@ import type { zh } from './zh'
 
 export const id = {
   cloudTitle: 'AI cloud UniWork',
-  cloudStatus: 'Status',
   cloudStateReady: 'Tersedia',
   cloudStateNotEntitled: 'Tidak termasuk dalam paket Anda',
   cloudStateExhausted: 'Kredit AI habis',
   cloudStateUnavailable: 'Tidak tersedia',
+  cloudStateInactive: 'Langganan tidak aktif',
   cloudCredits: 'Kredit AI',
   cloudCreditsLeft: 'Sisa {remaining} / {limit}',
   cloudCreditsUnlimited: 'Tanpa batas',
@@ -19,6 +19,10 @@ export const id = {
     'Organisasi Anda telah memakai semua kredit AI UniWork untuk periode ini. Alat cloud dijeda hingga kredit diperbarui; penyedia Anda sendiri di bawah tetap berfungsi.',
   cloudUnavailableBody:
     'AI cloud UniWork sedang tidak tersedia. Penyedia Anda sendiri di bawah tetap berfungsi.',
+  cloudInactiveBody:
+    'Langganan UniWork organisasi Anda tidak aktif, sehingga AI cloud dijeda. Minta admin untuk memperpanjangnya; penyedia Anda sendiri di bawah tetap berfungsi.',
+  cloudToolsOffBody:
+    'Alat cloud UniWork dimatikan. Aktifkan “{switch}” di {section} untuk memakai kredit AI organisasi Anda; penyedia Anda sendiri di bawah tidak terpengaruh.',
   cloudReadyBody:
     'Tanpa penyedia sendiri, pencarian, pembuatan gambar, dan analisis media memakai kredit AI UniWork organisasi Anda.',
   cloudToolsToggle: 'Gunakan alat cloud UniWork',

@@ -1,6 +1,7 @@
 import { app, safeStorage, shell, type IpcMain, type WebContents } from 'electron'
 import { setUniworkCloudStatus, setUniworkCloudTransport } from '@genoffice/ai-provider'
 import { safeExternalUrl } from '@genoffice/electron-utils'
+import { getUiLang } from '@genoffice/i18n'
 import { HOME_CHANNELS, type AccountEntitlements } from '../../shared/home-api'
 import { readAppSettings, writeAppSetting } from '../app-settings'
 import { createCredentialStore } from './credentials'
@@ -139,8 +140,12 @@ export function uniworkCloud(): UniworkCloudController {
       profile: () => account.deploymentProfile(),
       orgId: () => account.status().org?.id ?? null,
       withAccessToken: (call) => account.withAccessToken(call),
+      // the server answers media analysis in vi or en; every other UI language gets en
+      locale: () => (getUiLang() === 'vi' ? 'vi' : 'en'),
     }),
     account: cloudAccountView,
+    // a 403/404 on the cloud routes may mean the membership changed: reload orgs and plan
+    refreshAccount: () => account.retry(),
     publish: (status) => {
       setUniworkCloudStatus(status)
       push?.(HOME_CHANNELS.uniworkCloudStatusEvent, status)
@@ -187,6 +192,7 @@ export function startUniworkAccount(ready: Promise<unknown> = Promise.resolve())
 /** Stops the account timers (refresh, recovery, attempt) at quit. */
 export function stopUniworkAccount(): void {
   setUniworkCloudTransport(null)
+  cloud?.dispose()
   manager?.dispose()
 }
 

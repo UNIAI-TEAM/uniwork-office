@@ -2,11 +2,11 @@ import type { zh } from './zh'
 
 export const ja = {
   cloudTitle: 'UniWork クラウド AI',
-  cloudStatus: '状態',
   cloudStateReady: '利用可能',
   cloudStateNotEntitled: 'プランに含まれていません',
   cloudStateExhausted: 'AI クレジットを使い切りました',
   cloudStateUnavailable: '現在利用できません',
+  cloudStateInactive: 'サブスクリプション無効',
   cloudCredits: 'AI クレジット',
   cloudCreditsLeft: '残り {remaining} / {limit}',
   cloudCreditsUnlimited: '無制限',
@@ -19,6 +19,10 @@ export const ja = {
     '組織は今期の UniWork AI クレジットをすべて使い切りました。クレジットのリセットまでクラウドツールは停止します。下の独自プロバイダーは引き続き使えます。',
   cloudUnavailableBody:
     'UniWork クラウド AI は現在利用できません。下の独自プロバイダーは引き続き使えます。',
+  cloudInactiveBody:
+    '組織の UniWork サブスクリプションが有効でないため、クラウド AI は停止中です。管理者に更新を依頼してください。下の独自プロバイダーは引き続き使えます。',
+  cloudToolsOffBody:
+    'UniWork クラウドツールはオフです。組織の AI クレジットを使うには、{section} で「{switch}」をオンにしてください。下の独自プロバイダーには影響しません。',
   cloudReadyBody:
     '独自プロバイダーがない場合、検索・画像生成・メディア分析には組織の UniWork AI クレジットが使われます。',
   cloudToolsToggle: 'UniWork クラウドツールを使う',

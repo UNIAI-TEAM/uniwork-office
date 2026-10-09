@@ -2,11 +2,11 @@ import type { zh } from './zh'
 
 export const hi = {
   cloudTitle: 'UniWork क्लाउड AI',
-  cloudStatus: 'स्थिति',
   cloudStateReady: 'उपलब्ध',
   cloudStateNotEntitled: 'आपके प्लान में शामिल नहीं',
   cloudStateExhausted: 'AI क्रेडिट खत्म',
   cloudStateUnavailable: 'अभी उपलब्ध नहीं',
+  cloudStateInactive: 'सदस्यता सक्रिय नहीं है',
   cloudCredits: 'AI क्रेडिट',
   cloudCreditsLeft: '{remaining} / {limit} शेष',
   cloudCreditsUnlimited: 'असीमित',
@@ -18,6 +18,10 @@ export const hi = {
   cloudExhaustedBody:
     'आपके संगठन ने इस अवधि के सभी UniWork AI क्रेडिट इस्तेमाल कर लिए हैं। क्रेडिट रीन्यू होने तक क्लाउड टूल रुके रहेंगे; नीचे आपके प्रदाता काम करते रहेंगे।',
   cloudUnavailableBody: 'UniWork क्लाउड AI अभी उपलब्ध नहीं है। नीचे आपके प्रदाता काम करते रहेंगे।',
+  cloudInactiveBody:
+    'आपके संगठन की UniWork सदस्यता सक्रिय नहीं है, इसलिए क्लाउड AI रुका हुआ है। किसी एडमिन से इसे नवीनीकृत करवाएँ; नीचे आपके अपने प्रदाता काम करते रहेंगे।',
+  cloudToolsOffBody:
+    'UniWork क्लाउड टूल बंद हैं। संगठन के AI क्रेडिट इस्तेमाल करने के लिए {section} में “{switch}” चालू करें; नीचे आपके अपने प्रदाता प्रभावित नहीं होंगे।',
   cloudReadyBody:
     'अपना प्रदाता न होने पर सर्च, इमेज जनरेशन और मीडिया विश्लेषण आपके संगठन के UniWork AI क्रेडिट इस्तेमाल करते हैं।',
   cloudToolsToggle: 'UniWork क्लाउड टूल इस्तेमाल करें',
