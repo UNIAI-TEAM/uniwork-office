@@ -57,7 +57,9 @@ export function LicenseDevicesPane({
 
   return (
     <div className="set-license">
-      <h4 className="set-license-h">{L(lang, 'License UniWork Office', 'UniWork Office license')}</h4>
+      <h4 className="set-license-h">
+        {L(lang, 'License UniWork Office', 'UniWork Office license')}
+      </h4>
       <p className="set-field-desc">
         {L(
           lang,
@@ -94,12 +96,18 @@ export function LicenseDevicesPane({
         </div>
         <div>
           <span>AI token / {L(lang, 'tháng', 'month')}</span>
-          <strong>{ent.tokensMonth.toLocaleString(lang.startsWith('vi') ? 'vi-VN' : 'en-US')}</strong>
+          <strong>
+            {ent.tokensMonth.toLocaleString(lang.startsWith('vi') ? 'vi-VN' : 'en-US')}
+          </strong>
         </div>
         {ent.expiresAt ? (
           <div>
             <span>{L(lang, 'Hết hạn', 'Expires')}</span>
-            <strong>{new Date(ent.expiresAt).toLocaleDateString(lang.startsWith('vi') ? 'vi-VN' : 'en-US')}</strong>
+            <strong>
+              {new Date(ent.expiresAt).toLocaleDateString(
+                lang.startsWith('vi') ? 'vi-VN' : 'en-US',
+              )}
+            </strong>
           </div>
         ) : null}
       </div>
@@ -148,7 +156,9 @@ export function LicenseDevicesPane({
                   </strong>
                   <span>
                     {d.platform} · {L(lang, 'Hoạt động', 'Last seen')}{' '}
-                    {new Date(d.lastSeenAt).toLocaleString(lang.startsWith('vi') ? 'vi-VN' : 'en-US')}
+                    {new Date(d.lastSeenAt).toLocaleString(
+                      lang.startsWith('vi') ? 'vi-VN' : 'en-US',
+                    )}
                   </span>
                   <code>{d.deviceId.slice(0, 18)}…</code>
                 </div>
@@ -185,9 +195,7 @@ export function LicenseDevicesPane({
                 onClick={() => {
                   const next = simulateLicensePlan(p.id as LicensePlanId)
                   setEnt(next)
-                  setMsg(
-                    L(lang, `Đã mô phỏng gói ${p.labelVi}.`, `Simulated ${p.labelEn} plan.`),
-                  )
+                  setMsg(L(lang, `Đã mô phỏng gói ${p.labelVi}.`, `Simulated ${p.labelEn} plan.`))
                 }}
               >
                 {lang.startsWith('vi') ? p.labelVi : p.labelEn}

@@ -16,11 +16,7 @@ import {
   type PaymentAccount,
   type PaymentOrder,
 } from './payment-account'
-import {
-  getLicensePlan,
-  simulateLicensePlan,
-  type LicensePlanId,
-} from './license-entitlements'
+import { getLicensePlan, simulateLicensePlan, type LicensePlanId } from './license-entitlements'
 import { buildVietQrPayload } from './vietqr'
 
 function L(lang: string, vi: string, en: string): string {
@@ -86,7 +82,13 @@ export function BillingPaymentPane({
     } catch {
       if (!cancelled) {
         setQrUrl('')
-        setQrError(L(lang, 'Không tạo được VietQR — kiểm tra STK / BIN.', 'Could not build VietQR — check account / BIN.'))
+        setQrError(
+          L(
+            lang,
+            'Không tạo được VietQR — kiểm tra STK / BIN.',
+            'Could not build VietQR — check account / BIN.',
+          ),
+        )
       }
     }
     return () => {
@@ -103,7 +105,13 @@ export function BillingPaymentPane({
   const startCheckout = () => {
     if (!ready) {
       setEditingAccount(true)
-      setMsg(L(lang, 'Nhập tài khoản ngân hàng nhận tiền trước.', 'Set the receiving bank account first.'))
+      setMsg(
+        L(
+          lang,
+          'Nhập tài khoản ngân hàng nhận tiền trước.',
+          'Set the receiving bank account first.',
+        ),
+      )
       return
     }
     try {
@@ -156,9 +164,7 @@ export function BillingPaymentPane({
 
   return (
     <div className="set-billing">
-      <h4 className="set-license-h">
-        {L(lang, 'Thanh toán · VietQR', 'Billing · VietQR')}
-      </h4>
+      <h4 className="set-license-h">{L(lang, 'Thanh toán · VietQR', 'Billing · VietQR')}</h4>
       <p className="set-field-desc">
         {L(
           lang,
@@ -170,14 +176,8 @@ export function BillingPaymentPane({
       <div className="set-billing-account">
         <div className="set-billing-account-head">
           <strong>{L(lang, 'Tài khoản nhận tiền', 'Receiving account')}</strong>
-          <button
-            type="button"
-            className="set-btn"
-            onClick={() => setEditingAccount((v) => !v)}
-          >
-            {editingAccount
-              ? L(lang, 'Đóng', 'Close')
-              : L(lang, 'Chỉnh sửa', 'Edit')}
+          <button type="button" className="set-btn" onClick={() => setEditingAccount((v) => !v)}>
+            {editingAccount ? L(lang, 'Đóng', 'Close') : L(lang, 'Chỉnh sửa', 'Edit')}
           </button>
         </div>
         {!editingAccount ? (
@@ -252,10 +252,7 @@ export function BillingPaymentPane({
       <div className="set-billing-checkout">
         <label>
           <span>{L(lang, 'Gói', 'Plan')}</span>
-          <select
-            value={planId}
-            onChange={(e) => setPlanId(e.target.value as LicensePlanId)}
-          >
+          <select value={planId} onChange={(e) => setPlanId(e.target.value as LicensePlanId)}>
             {PAID_PLANS.map((id) => {
               const p = getLicensePlan(id)
               return (
@@ -268,10 +265,7 @@ export function BillingPaymentPane({
         </label>
         <label>
           <span>{L(lang, 'Chu kỳ', 'Cycle')}</span>
-          <select
-            value={cycle}
-            onChange={(e) => setCycle(e.target.value as BillingCycle)}
-          >
+          <select value={cycle} onChange={(e) => setCycle(e.target.value as BillingCycle)}>
             <option value="month">{L(lang, 'Theo tháng', 'Monthly')}</option>
             <option value="year">{L(lang, 'Theo năm (tiết kiệm)', 'Yearly (save)')}</option>
           </select>
@@ -293,10 +287,8 @@ export function BillingPaymentPane({
             </strong>
             <span>
               {getLicensePlan(activeOrder.planId).labelVi} ·{' '}
-              {activeOrder.cycle === 'year'
-                ? L(lang, 'Năm', 'Year')
-                : L(lang, 'Tháng', 'Month')}{' '}
-              · {activeOrder.amountVnd.toLocaleString('vi-VN')}đ
+              {activeOrder.cycle === 'year' ? L(lang, 'Năm', 'Year') : L(lang, 'Tháng', 'Month')} ·{' '}
+              {activeOrder.amountVnd.toLocaleString('vi-VN')}đ
             </span>
             <span>
               {L(lang, 'Nội dung CK', 'Transfer content')}: <code>{transferHint}</code>
@@ -306,13 +298,7 @@ export function BillingPaymentPane({
             </span>
           </div>
           {qrUrl ? (
-            <img
-              className="set-billing-qr"
-              src={qrUrl}
-              width={200}
-              height={200}
-              alt="VietQR"
-            />
+            <img className="set-billing-qr" src={qrUrl} width={200} height={200} alt="VietQR" />
           ) : (
             <div className="set-billing-qr set-billing-qr-ph">
               {qrError || L(lang, 'Đang tạo QR…', 'Generating QR…')}
