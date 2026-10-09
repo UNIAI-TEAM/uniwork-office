@@ -324,7 +324,7 @@ const homeApi: HomeApi = {
   },
   async accountStatus() {
     const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.accountStatus)
-    return (result ?? { loggedIn: false }) as AccountStatus
+    return (result ?? { loggedIn: false, state: 'signed-out' }) as AccountStatus
   },
   async accountLogin() {
     const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.accountLogin)
@@ -345,6 +345,23 @@ const homeApi: HomeApi = {
   },
   async accountLogout() {
     await ipcRenderer.invoke(HOME_CHANNELS.accountLogout)
+  },
+  onAccountStatus(handler) {
+    const listener = (_event: IpcRendererEvent, status: AccountStatus) => handler(status)
+    ipcRenderer.on(HOME_CHANNELS.accountStatusEvent, listener)
+    return () => ipcRenderer.removeListener(HOME_CHANNELS.accountStatusEvent, listener)
+  },
+  async accountCancelLogin() {
+    await ipcRenderer.invoke(HOME_CHANNELS.accountCancelLogin)
+  },
+  async accountRetry() {
+    const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.accountRetry)
+    return (result ?? { loggedIn: false, state: 'signed-out' }) as AccountStatus
+  },
+  async accountSelectOrg(orgId) {
+    if (typeof orgId !== 'string' || !orgId) throw new Error('Invalid organization id.')
+    const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.accountSelectOrg, orgId)
+    return (result ?? { loggedIn: false, state: 'signed-out' }) as AccountStatus
   },
   onOpenSettingsEvent(handler) {
     const listener = (_event: IpcRendererEvent, section: unknown) => {
