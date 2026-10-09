@@ -2231,14 +2231,23 @@ th.cell-rev-del {
 
 /* style gallery */
 /* The Styles group absorbs the row's free width and shrinks with the window
-   (min-width keeps one card + the expander visible, so a 1024px window — or the
-   ~940px web frame inside UniWork — never cuts a card in half); extra cards wrap onto
+   (min-width keeps the first cards + the expander visible); extra cards wrap onto
    a clipped second row inside .style-gallery — whole cards only, never a
    half-cut one — instead of widening the scrolling ribbon row, and the
    expander below makes the hidden ones reachable. */
 .ribbon-group-styles {
   flex: 1;
-  min-width: 103px;
+  min-width: 259px;
+}
+
+/* narrow windows (and the ~940px web frame inside UniWork at 1024px): the group
+   may shrink to its content minimum — one whole card, the expander and the
+   Styles Pane button, whatever the locale's button label — never to a gallery
+   too narrow for a card */
+@media (max-width: 1100px) {
+  .ribbon-group-styles {
+    min-width: min-content;
+  }
 }
 
 .style-gallery-wrap {
