@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { app, dialog, shell } from 'electron'
 import type { BrowserWindow } from 'electron'
@@ -537,7 +537,7 @@ export function applyUpdateChannel(channel: UpdateChannel): void {
  * feedback: an available update opens the standard update window (even a
  * version dismissed with "later" this session — the user just asked for it),
  * up-to-date and failure each get a dialog, and installs with no self-update
- * mechanism (dev runs, Linux .deb) are pointed at the download page instead
+ * mechanism (dev runs, Linux .deb, builds without an update feed) are pointed at the download page instead
  * of being told they're current. */
 export async function checkForUpdatesNow(): Promise<void> {
   if (manualCheckInFlight) return
@@ -616,6 +616,15 @@ export function initAutoUpdater(
   if (!app.isPackaged) return
   const isLinuxAppImage = process.platform === 'linux' && Boolean(process.env.APPIMAGE)
   if (process.platform !== 'win32' && process.platform !== 'darwin' && !isLinuxAppImage) return
+  // Builds shipped without an update feed (the unsigned dev/beta installers)
+  // have no resources/app-update.yml; electron-updater would reject every check
+  // with ENOENT. Stay inactive: no autoUpdater calls, no network, and the
+  // manual check falls into the same download-page answer as other installs
+  // without a self-update mechanism.
+  if (!existsSync(path.join(process.resourcesPath, 'app-update.yml'))) {
+    log('no app-update.yml in this build; updater inactive')
+    return
+  }
 
   updaterActive = true
   autoUpdater.channel = CHANNEL_FEED[initialChannel]
