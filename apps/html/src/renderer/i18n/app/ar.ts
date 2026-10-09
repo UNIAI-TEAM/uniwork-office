@@ -140,4 +140,5 @@ export const ar = {
   presentInTab: 'في هذه العلامة',
   presentFullscreen: 'ملء الشاشة',
   presentNewTab: 'علامة تبويب جديدة',
+  viewOnly: 'عرض فقط',
 } satisfies Record<keyof typeof zh, string>

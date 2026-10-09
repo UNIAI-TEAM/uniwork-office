@@ -140,4 +140,5 @@ export const pl = {
   presentInTab: 'W tej karcie',
   presentFullscreen: 'Pełny ekran',
   presentNewTab: 'Nowa karta',
+  viewOnly: 'Tylko do odczytu',
 } satisfies Record<keyof typeof zh, string>

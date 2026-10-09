@@ -2165,8 +2165,10 @@ html.genoffice-popover-open .ribbon-tabs {
 }
 
 .doc-editor .md-raw-html code {
+  display: block;
   background: none;
   padding: 0;
+  white-space: pre-wrap;
   font-size: 0.8em;
   line-height: 1.6;
 }
@@ -2924,4 +2926,13 @@ div.tiptap-mathematics-render {
   padding: 0 10px 4px;
   font-size: 12px;
   color: var(--color-text-secondary);
+}
+
+/* web frame, host withheld the save grant (capabilities.ts `save`) */
+.status-view-only {
+  padding: 1px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  color: var(--text-secondary);
+  font-weight: 500;
 }

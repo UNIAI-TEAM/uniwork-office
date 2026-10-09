@@ -143,4 +143,5 @@ export const nl = {
   presentInTab: 'In dit tabblad',
   presentFullscreen: 'Volledig scherm',
   presentNewTab: 'Nieuw tabblad',
+  viewOnly: 'Alleen-lezen',
 } satisfies Record<keyof typeof zh, string>

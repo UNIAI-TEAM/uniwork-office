@@ -19,6 +19,10 @@ Each `<module>/` has:
   theme/locale, `window.open` guard, capability object, safe no-op Proxy, in-memory `projectApi`) is shared; the module's
   file APIs (open/save/export over `api.*` requests) are added here by the module's worker.
 
+Text modules (`markdown`, `html`): `shared/` holds their common bridge (UTF-8 codec keeping BOM/EOL, open/save/
+conflict/view-only/print, pictures, static HTML copy for the sandboxed preview); see
+`docs/web-modules/markdown-html.md`. Tests: `npx vitest run --root web/modules` (part of `npm run test:web`).
+
 Capabilities: `installModuleBridge()` puts one mutable object on each global as `.capabilities` (web defaults
 `MODULE_WEB_CAPABILITIES`: `ai`, `open`, `recents`, `autoSave`, `autoSaveToDisk` false; host grants assigned on `init`).
 A renderer reads it with `createCapabilityReader()` from `@genoffice/ui/capabilities` (`cap(key)`: on unless explicitly

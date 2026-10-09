@@ -139,4 +139,5 @@ export const he = {
   presentInTab: 'בכרטיסייה זו',
   presentFullscreen: 'מסך מלא',
   presentNewTab: 'כרטיסייה חדשה',
+  viewOnly: 'צפייה בלבד',
 } satisfies Record<keyof typeof zh, string>

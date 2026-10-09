@@ -139,4 +139,5 @@ export const th = {
   presentInTab: 'ในแท็บนี้',
   presentFullscreen: 'เต็มจอ',
   presentNewTab: 'แท็บใหม่',
+  viewOnly: 'ดูอย่างเดียว',
 } satisfies Record<keyof typeof zh, string>

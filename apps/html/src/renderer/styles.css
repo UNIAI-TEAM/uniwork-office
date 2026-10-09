@@ -3623,3 +3623,12 @@ html.genoffice-popover-open .ribbon-tabs {
   min-width: 0;
   box-sizing: border-box;
 }
+
+/* web frame, host withheld the save grant (capabilities.ts `save`) */
+.status-view-only {
+  padding: 1px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}

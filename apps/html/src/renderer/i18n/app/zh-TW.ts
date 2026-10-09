@@ -138,4 +138,5 @@ export const zhTW = {
   presentInTab: '在目前分頁',
   presentFullscreen: '全螢幕',
   presentNewTab: '新分頁',
+  viewOnly: '僅檢視',
 } satisfies Record<keyof typeof zh, string>

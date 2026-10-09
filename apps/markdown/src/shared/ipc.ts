@@ -198,6 +198,13 @@ export interface MarkdownApi {
   imageSearch(query: string, maxResults?: number): Promise<ImageSearchResult>
   /** Download an image URL in the main process (CORS-free, scheme/target validated) */
   fetchImage(url: string): Promise<{ base64: string; mime: string } | null>
+  /**
+   * Web frame only (absent on desktop): display URL of a document-relative picture from the
+   * host's asset map; null when the path is not mapped.
+   */
+  resolveAssetUrl?(src: string): string | null
+  /** Web frame only: the authored path of a display URL from resolveAssetUrl; null otherwise */
+  unresolveAssetUrl?(url: string): string | null
   /** Genspark cloud image generation (markdown-owned channel, gsk login required) */
   aiGenerateImage(op: { prompt: string; aspectRatio?: string }): Promise<{
     url?: string

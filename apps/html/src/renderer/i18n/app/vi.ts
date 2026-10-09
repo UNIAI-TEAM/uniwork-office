@@ -141,4 +141,5 @@ export const vi = {
   presentInTab: 'Trong tab này',
   presentFullscreen: 'Toàn màn hình',
   presentNewTab: 'Tab mới',
+  viewOnly: 'Chỉ xem',
 } satisfies Record<keyof typeof zh, string>
