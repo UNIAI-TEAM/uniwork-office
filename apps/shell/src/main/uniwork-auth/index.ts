@@ -4,7 +4,7 @@ import { HOME_CHANNELS, type AccountEntitlements } from '../../shared/home-api'
 import { readAppSettings, writeAppSetting } from '../app-settings'
 import { createCredentialStore } from './credentials'
 import {
-  AUTH_CALLBACK_SCHEMES,
+  callbackSchemeForChannel,
   isLoopbackHost,
   resolveDeploymentProfile,
   type DeploymentProfile,
@@ -12,11 +12,7 @@ import {
 import { AccountManager } from './manager'
 import { createUniworkTransport } from './transport'
 
-export {
-  extractAuthCallbackFromArgv,
-  extractAuthCallbackFromLockData,
-  isAuthCallbackUrl,
-} from './callback'
+export { createAuthCallbackRouter, type AuthCallbackRouter } from './routing'
 export type { AccountManager } from './manager'
 
 /**
@@ -48,6 +44,16 @@ export async function openAuthorizationUrl(url: string, profile: DeploymentProfi
   await shell.openExternal(safe)
 }
 
+/** consent-page device metadata: windows | macos | linux, not Node's raw platform */
+export function deviceInfo(
+  platform: NodeJS.Platform,
+  build: string,
+): { label: string; platform: string; build: string } {
+  const friendly = platform === 'win32' ? 'windows' : platform === 'darwin' ? 'macos' : platform
+  const name = platform === 'win32' ? 'Windows' : platform === 'darwin' ? 'macOS' : 'Linux'
+  return { label: `UniWork Office (${name})`, platform: friendly, build }
+}
+
 /** Must be called once, before the first account call (the settings path is app-owned). */
 export function configureUniworkAccount(options: { settingsPath: () => string }): void {
   settingsPath = options.settingsPath
@@ -71,11 +77,7 @@ export function uniworkAccount(): AccountManager {
     openBrowser: openAuthorizationUrl,
     readSelectedOrgId: () => readAppSettings(settings()).uniworkOrgId,
     persistSelectedOrgId: (orgId) => writeAppSetting(settings(), 'uniworkOrgId', orgId),
-    device: {
-      label: `UniWork Office (${process.platform})`,
-      platform: process.platform,
-      build: app.getVersion(),
-    },
+    device: deviceInfo(process.platform, app.getVersion()),
   })
   created.onStatus((status) => push?.(HOME_CHANNELS.accountStatusEvent, status))
   created.onLoginEvent((event) => push?.(HOME_CHANNELS.accountLoginEvent, event))
@@ -103,19 +105,32 @@ export async function getAccessToken(): Promise<string | null> {
   return manager ? manager.getAccessToken() : null
 }
 
-/** Registers both sign-in callback schemes (dev form passes execPath + appPath). */
-export function registerAuthProtocols(): void {
-  for (const scheme of AUTH_CALLBACK_SCHEMES) {
-    if (!app.isPackaged)
-      app.setAsDefaultProtocolClient(scheme, process.execPath, [app.getAppPath()])
-    else app.setAsDefaultProtocolClient(scheme)
-  }
+/**
+ * Registers the callback scheme of the active profile's channel only, so a
+ * dev run never re-points the installed stable app's `uniwork-office://`
+ * (and a stable build never claims the dev scheme). No profile, no scheme.
+ * The dev form passes execPath + appPath.
+ */
+export function registerAuthProtocols(profile: DeploymentProfile | null): void {
+  if (!profile) return
+  const scheme = callbackSchemeForChannel(profile.channel)
+  if (!app.isPackaged) app.setAsDefaultProtocolClient(scheme, process.execPath, [app.getAppPath()])
+  else app.setAsDefaultProtocolClient(scheme)
 }
 
-/** Starts the session restore without blocking startup. */
-export function startUniworkAccount(): void {
-  registerAuthProtocols()
-  void uniworkAccount().restore()
+/**
+ * Registers the callback scheme and restores the session without blocking
+ * startup; the restore waits for `ready` (the main-process proxy install).
+ */
+export function startUniworkAccount(ready: Promise<unknown> = Promise.resolve()): void {
+  const account = uniworkAccount()
+  registerAuthProtocols(account.deploymentProfile())
+  void account.startupRestore(ready)
+}
+
+/** Stops the account timers (refresh, recovery, attempt) at quit. */
+export function stopUniworkAccount(): void {
+  manager?.dispose()
 }
 
 /**

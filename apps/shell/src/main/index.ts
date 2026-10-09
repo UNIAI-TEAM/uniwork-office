@@ -89,12 +89,11 @@ import {
 } from './office-bridge-host'
 import {
   configureUniworkAccount,
-  extractAuthCallbackFromArgv,
-  extractAuthCallbackFromLockData,
-  isAuthCallbackUrl,
+  createAuthCallbackRouter,
   registerAccountIpc,
   routeAuthCallbackUrl,
   startUniworkAccount,
+  stopUniworkAccount,
 } from './uniwork-auth'
 import { isAgentIntentUrl, parseAgentIntentUrl } from './agent-intent-host'
 import { extractLaunchUrlFromArgv, isOfficeAppUrl, parseOfficeAppUrl } from '@uniwork/office-bridge'
@@ -5938,8 +5937,8 @@ async function installMainProcessProxy(): Promise<void> {
 
 let pendingLaunchPaths = collectLaunchPaths(process.argv)
 let pendingLaunchUrl = extractLaunchUrlFromArgv(process.argv)
-// a sign-in callback that started this process (Windows/Linux argv, macOS open-url before ready)
-let pendingAuthCallbackUrl = extractAuthCallbackFromArgv(process.argv)
+// sign-in callbacks (argv, open-url, second instance); held until the account starts
+const authCallbacks = createAuthCallbackRouter(process.argv)
 let controlServer: ControlServer | null = null
 
 // show() does not un-minimize, and on macOS ⌘W destroys the shell window while the
@@ -5978,11 +5977,7 @@ function routeAuthCallback(url: string): void {
 
 app.on('open-url', (event, url) => {
   event.preventDefault()
-  if (isAuthCallbackUrl(url)) {
-    if (app.isReady()) routeAuthCallback(url)
-    else pendingAuthCallbackUrl = url
-    return
-  }
+  if (authCallbacks.openUrl(url)) return
   if (!app.isReady()) {
     pendingLaunchUrl = url
     return
@@ -5991,12 +5986,7 @@ app.on('open-url', (event, url) => {
 })
 
 app.on('second-instance', (_event, argv, _cwd, additionalData) => {
-  const authUrl =
-    extractAuthCallbackFromArgv(argv) ?? extractAuthCallbackFromLockData(additionalData)
-  if (authUrl) {
-    routeAuthCallback(authUrl)
-    return
-  }
+  if (authCallbacks.secondInstance(argv, additionalData)) return
   const extra = additionalData as { launchUrl?: string } | null
   const url = extractLaunchUrlFromArgv(argv) ?? extra?.launchUrl
   if (url) {
@@ -6106,8 +6096,8 @@ app.whenReady().then(async () => {
     return
   }
   const lockData = () =>
-    pendingAuthCallbackUrl
-      ? { authCallbackUrl: pendingAuthCallbackUrl }
+    authCallbacks.pending()
+      ? { authCallbackUrl: authCallbacks.pending() }
       : pendingLaunchUrl
         ? { launchUrl: pendingLaunchUrl }
         : pendingLaunchPaths.length > 0
@@ -6152,7 +6142,8 @@ app.whenReady().then(async () => {
     }
   }
 
-  void installMainProcessProxy()
+  // the UniWork account restore waits for this (system proxy before its first call)
+  const mainProxyReady = installMainProcessProxy()
   // the removed cloud projects page cached project titles here; clear our leftover copy
   try {
     rmSync(join(app.getPath('userData'), 'cloud-projects.json'), { force: true })
@@ -6274,13 +6265,10 @@ app.whenReady().then(async () => {
   setUpdateCheckInvoker(() => void checkForUpdatesNow())
   initAutoUpdater(() => shellWindow, currentUpdateChannel())
   persistUniWorkApiOriginFromEnv(APP_SETTINGS_PATH())
-  // UniWork account: register the sign-in schemes, restore the session in the
-  // background, then hand over a callback that launched this process
-  startUniworkAccount()
-  if (pendingAuthCallbackUrl) {
-    routeAuthCallback(pendingAuthCallbackUrl)
-    pendingAuthCallbackUrl = null
-  }
+  // UniWork account: register the active channel's sign-in scheme, restore the
+  // session in the background (after the proxy install), then route held callbacks
+  startUniworkAccount(mainProxyReady)
+  authCallbacks.start(routeAuthCallback)
 
   // resource watchdog: a renderer that stays hot for minutes gets diagnostics
   // recorded and the user an offer to close the document (headless exports
@@ -6347,6 +6335,7 @@ app.on('before-quit', () => {
 
 // after every window has closed, so the shell window's own 'closed' republish cannot revive the file
 app.on('will-quit', () => {
+  stopUniworkAccount()
   fileIndexer?.stop()
   fileIndexStore?.close()
   for (const watcher of folderWatchers.values()) watcher.close()

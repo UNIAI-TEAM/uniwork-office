@@ -17,7 +17,8 @@ const electron = vi.hoisted(() => ({
 }))
 vi.mock('electron', () => electron)
 
-import { openAuthorizationUrl, registerAuthProtocols } from '../src/main/uniwork-auth'
+import { deviceInfo, openAuthorizationUrl, registerAuthProtocols } from '../src/main/uniwork-auth'
+import { createAuthCallbackRouter } from '../src/main/uniwork-auth/routing'
 import type { DeploymentProfile } from '../src/main/uniwork-auth/deployment'
 
 const stable: DeploymentProfile = {
@@ -71,24 +72,74 @@ describe('authorization URL gate', () => {
 })
 
 describe('protocol registration', () => {
-  it('registers both sign-in schemes, dev form with execPath + appPath', () => {
-    registerAuthProtocols()
-    expect(electron.app.setAsDefaultProtocolClient).toHaveBeenCalledWith(
-      'uniwork-office',
-      process.execPath,
-      ['/app'],
-    )
-    expect(electron.app.setAsDefaultProtocolClient).toHaveBeenCalledWith(
-      'uniwork-office-dev',
-      process.execPath,
-      ['/app'],
-    )
+  it('registers only the active channel scheme, dev form with execPath + appPath', () => {
+    registerAuthProtocols(dev)
+    expect(electron.app.setAsDefaultProtocolClient.mock.calls).toEqual([
+      ['uniwork-office-dev', process.execPath, ['/app']],
+    ])
     electron.app.isPackaged = true
     electron.app.setAsDefaultProtocolClient.mockClear()
-    registerAuthProtocols()
-    expect(electron.app.setAsDefaultProtocolClient.mock.calls).toEqual([
-      ['uniwork-office'],
-      ['uniwork-office-dev'],
-    ])
+    registerAuthProtocols(stable)
+    expect(electron.app.setAsDefaultProtocolClient.mock.calls).toEqual([['uniwork-office']])
+  })
+
+  it('registers nothing without a deployment profile', () => {
+    registerAuthProtocols(null)
+    expect(electron.app.setAsDefaultProtocolClient).not.toHaveBeenCalled()
+  })
+})
+
+describe('device metadata', () => {
+  it('names the platform the way the consent page shows it', () => {
+    expect(deviceInfo('win32', '1.2.3')).toEqual({
+      label: 'UniWork Office (Windows)',
+      platform: 'windows',
+      build: '1.2.3',
+    })
+    expect(deviceInfo('darwin', '1').platform).toBe('macos')
+    expect(deviceInfo('linux', '1')).toMatchObject({
+      platform: 'linux',
+      label: 'UniWork Office (Linux)',
+    })
+  })
+})
+
+describe('sign-in callback routing', () => {
+  const callback = 'uniwork-office://auth/callback?code=c&state=s'
+
+  it('holds a cold-start argv callback until the account starts', () => {
+    const router = createAuthCallbackRouter(['electron.exe', '.', callback])
+    expect(router.pending()).toBe(callback)
+    const route = vi.fn()
+    router.start(route)
+    expect(route).toHaveBeenCalledWith(callback)
+    expect(router.pending()).toBeNull()
+  })
+
+  it('queues open-url before ready and routes directly afterwards', () => {
+    const router = createAuthCallbackRouter(['electron.exe'])
+    expect(router.openUrl(callback)).toBe(true)
+    expect(router.openUrl('uniwork://open?token=t')).toBe(false)
+    expect(router.pending()).toBe(callback)
+    const route = vi.fn()
+    router.start(route)
+    expect(route.mock.calls).toEqual([[callback]])
+    const later = 'uniwork-office://auth/callback?code=d&state=s'
+    expect(router.openUrl(later)).toBe(true)
+    expect(route.mock.calls).toEqual([[callback], [later]])
+  })
+
+  it('routes a second instance callback from argv first, then lock data', () => {
+    const router = createAuthCallbackRouter([])
+    const route = vi.fn()
+    router.start(route)
+    const fromLock = 'uniwork-office-dev://auth/callback?code=l&state=s'
+    expect(router.secondInstance(['electron.exe', callback], { authCallbackUrl: fromLock })).toBe(
+      true,
+    )
+    expect(router.secondInstance(['electron.exe'], { authCallbackUrl: fromLock })).toBe(true)
+    expect(router.secondInstance(['electron.exe'], { launchUrl: 'uniwork://open?x=1' })).toBe(false)
+    expect(router.secondInstance(['electron.exe', 'C:/doc.docx'], {})).toBe(false)
+    expect(route.mock.calls).toEqual([[callback], [fromLock]])
   })
 })

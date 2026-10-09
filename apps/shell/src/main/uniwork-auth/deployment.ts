@@ -18,7 +18,6 @@ export interface DeploymentProfile {
 
 export const STABLE_CLIENT_ID = 'uniwork-office'
 export const DEV_CLIENT_ID = 'uniwork-office-dev'
-export const AUTH_CALLBACK_SCHEMES = ['uniwork-office', 'uniwork-office-dev'] as const
 const DEPLOYMENT_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/
 const PROFILE_FILE = 'deployment-profile.json'
 
