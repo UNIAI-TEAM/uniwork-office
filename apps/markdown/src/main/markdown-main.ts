@@ -1217,6 +1217,7 @@ function grantAndTrack(wc: WebContents, openPath?: string | null): void {
     closeSaveWaiters.delete(wcId)
     saveWaiters.get(wcId)?.(false)
     saveWaiters.delete(wcId)
+    mcpSaveByWc.delete(wcId)
   })
 }
 
