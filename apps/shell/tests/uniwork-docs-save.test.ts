@@ -985,3 +985,100 @@ describe('review r2 follow-ups', () => {
     expect(await second.service.docStatus(path)).toBeNull()
   })
 })
+
+describe('Retry replays a pending intent, it does not rewrite the file (F8)', () => {
+  /** a module whose Save re-serializes the document into different bytes each time */
+  function reserializingModule(ctx: ReturnType<typeof setup>) {
+    let writes = 0
+    vi.mocked(ctx.deps.requestModuleSave).mockImplementation((p: string) => {
+      writes += 1
+      writeFileSync(p, `v4 re-serialized #${writes}`)
+      setTimeout(() => ctx.service.onUserSave(p), 0)
+      return true
+    })
+    return () => writes
+  }
+
+  it('chip Retry with a pending intent replays it without a module Save and ends saved', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'v4')
+    server.faults.push({ route: 'commit', kind: 'lost' })
+    expect(await ctx.service.save(path)).toMatchObject({ state: 'offline' })
+    const intent = binding(path).pendingIntent
+    const writes = reserializingModule(ctx)
+    vi.mocked(ctx.deps.requestModuleSave).mockClear()
+
+    const retried = await ctx.service.save(path)
+    expect(ctx.deps.requestModuleSave).not.toHaveBeenCalled()
+    expect(writes()).toBe(0)
+    expect(retried).toMatchObject({ state: 'saved' })
+    expect(retried?.error).toBeUndefined()
+    expect(binding(path)).toMatchObject({ state: 'saved', baseChecksum: hex(enc('v4')) })
+    expect(binding(path).pendingIntent).toBeUndefined()
+    expect(new Set(commits(server).map((c) => c.headers['idempotency-key']))).toEqual(
+      new Set([intent.idempotencyKey]),
+    )
+    expect(new TextDecoder().decode(server.state.bytes)).toBe('v4')
+    expect(readFileSync(path, 'utf8')).toBe('v4')
+  })
+
+  it('a Retry with a pending intent still reports dirty when the user really changed the file since', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'v4')
+    server.faults.push({ route: 'commit', kind: 'lost' })
+    await ctx.service.save(path)
+    writeFileSync(path, 'v5 typed later')
+    vi.mocked(ctx.deps.requestModuleSave).mockClear()
+    expect(await ctx.service.save(path)).toMatchObject({ state: 'dirty' })
+    expect(ctx.deps.requestModuleSave).not.toHaveBeenCalled()
+  })
+
+  it('a Retry without an intent still runs the module Save', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'v4')
+    await ctx.service.refreshPath(path)
+    expect(binding(path)).toMatchObject({ state: 'dirty' })
+    expect(binding(path).pendingIntent).toBeUndefined()
+    reserializingModule(ctx)
+    await ctx.service.save(path)
+    expect(ctx.deps.requestModuleSave).toHaveBeenCalledWith(path)
+    await vi.waitFor(() => expect(binding(path)).toMatchObject({ state: 'saved' }))
+    expect(new TextDecoder().decode(server.state.bytes)).toBe('v4 re-serialized #1')
+  })
+
+  it('close prompt "Save to UniWork" with a pending intent replays it without a module Save', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server, { closeChoice: 'save' })
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'v4')
+    server.faults.push({ route: 'commit', kind: 'lost' })
+    expect(await ctx.service.save(path)).toMatchObject({ state: 'offline' })
+    const intent = binding(path).pendingIntent
+    const writes = reserializingModule(ctx)
+    vi.mocked(ctx.deps.requestModuleSave).mockClear()
+
+    expect(await ctx.service.confirmClose(path)).toBe(true)
+    expect(ctx.deps.requestModuleSave).not.toHaveBeenCalled()
+    expect(writes()).toBe(0)
+    expect(binding(path)).toMatchObject({ state: 'saved', baseChecksum: hex(enc('v4')) })
+    expect(new Set(commits(server).map((c) => c.headers['idempotency-key']))).toEqual(
+      new Set([intent.idempotencyKey]),
+    )
+  })
+
+  it('close prompt "Save to UniWork" without an intent still goes through the module Save', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server, { closeChoice: 'save' })
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'v4')
+    reserializingModule(ctx)
+    expect(await ctx.service.confirmClose(path)).toBe(true)
+    expect(ctx.deps.requestModuleSave).toHaveBeenCalledWith(path, expect.any(Function))
+  })
+})

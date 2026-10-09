@@ -353,13 +353,18 @@ export class UniworkDocsService {
     return this.coordinator.commitState(fresh, next)
   }
 
-  /** Save/Retry from the chip: always through the module's own Save */
+  /**
+   * Save/Retry from the chip. A pending intent is replayed as it is (same key,
+   * its own payload) without asking the module to write: a module Save may
+   * re-serialize different bytes, which would leave a landed save looking
+   * dirty. With no intent it runs the module's own Save.
+   */
   async save(path: string): Promise<UniworkDocStatus | null> {
     const doc = typeof path === 'string' ? this.store.lookup(path) : null
     if (!doc || !this.ownsLocally(doc)) return null
     if (!this.canSave(doc)) return toStatus(doc)
-    if (this.deps.requestModuleSave(doc.path)) return toStatus(doc)
-    // no tab shows it: the file on disk is the user's last saved bytes
+    if (!doc.binding.pendingIntent && this.deps.requestModuleSave(doc.path)) return toStatus(doc)
+    // a pending intent, or no tab shows it: the file on disk is the user's last saved bytes
     const saved = await this.coordinator.save(doc.path)
     return saved ? toStatus(saved) : null
   }
@@ -456,7 +461,8 @@ export class UniworkDocsService {
     const notWritten = () => {
       if (!this.coordinator.isSaving(latest.path)) wait.cancel()
     }
-    if (!this.deps.requestModuleSave(latest.path, notWritten)) {
+    // a pending intent is replayed as it is, the module is not asked to write
+    if (latest.binding.pendingIntent || !this.deps.requestModuleSave(latest.path, notWritten)) {
       void this.coordinator.save(latest.path)
     }
     return (await wait.promise)?.state === 'saved' ? true : this.keepOpen(path)
