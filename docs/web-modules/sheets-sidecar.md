@@ -14,6 +14,14 @@
 > JSON per read. The same engine already compiles to `wasm32-wasip1` and ran every command correctly on all 11 G0
 > fixtures. It crashed Node's WASI at ≥15k rows × 22 columns (open item O1), and the size cap covers that until a
 > browser run fixes or bounds it.
+>
+> **Update 2026-10-09 (SH1, section 4.5): O1 and O7 are resolved.** In headless Chromium 151 (module Web Worker,
+> `@bjorn3/browser_wasi_shim`, Sheets CSP + `'wasm-unsafe-eval'`) the same wasm build ran every command on all 15
+> fixtures up to 100k rows × 22 (2.2M cells), with 0 traps, 0 crashes and 0 CSP violations. The ≥8 MB crash was Node's
+> `node:wasi`: Node plus the browser shim does not crash either. The cap in C therefore becomes a memory budget, not a
+> correctness limit: Chromium's renderer peaked at 777 MB at 2.2M cells. The real cost is latency before the first
+> paint, because the index now runs inline: 1.2 s at 440k cells and 4.9 s at 2.2M (native: tens of ms, with the index
+> built in the background).
 
 Analysis plus measurement only: no `apps/sheets` source was changed. Fork `uniwork-office` at `5a81008`, branch
 `zone17th/uni-1014-s6-sidecar` (child of `feature/UNI-1014-web-modules`). dev-uniwork lane worktree
@@ -219,6 +227,66 @@ fails on wasip1.
 | `convert_workbook` legacy-xls.xls              | 94 ms incl. instance start                            | n/a            |
 | process RSS (Node + wasm)                      | 74–134 MiB                                            | n/a            |
 | **large files (≥15k rows × 22)**               | **open segfaults the Node process** (O1); 10k rows OK | n/a            |
+
+### 4.5 The same build in a browser (O1/O7, SH1)
+
+Harness (`sheets-probes/browser/`):
+
+- `driver.mjs` holds **one scripted conversation** shared by every runtime. The wasm sidecar is single-threaded, so
+  stdin is a function that builds the next request from the previous answer (session id, sheet ids, entry names).
+  The sequence is: open → first viewport → bottom viewport → 90k-cell batch → `read_formula_cells` per sheet →
+  `archive_manifest` → `read_entries` (largest worksheet) → `save_archive` with that part as a replacement (the
+  sidecar half of a save) → `recalc_cells` cold/warm (files ≤ 3 MB) → `close`.
+- `worker.mjs` + `page.mjs` + `serve.mjs` + `run-chromium.mjs`: a module Worker per workbook (fresh wasm memory),
+  served with the Sheets frame CSP (`csp.ts` base) plus `script-src 'wasm-unsafe-eval'` on every response, in
+  Playwright headless Chromium 151.0.7922.34. The runner samples the renderer processes' `VmHWM`.
+- `run-node.mjs`: the same driver against the native binary and in Node 22 with the same shim.
+- The shim (`@bjorn3/browser_wasi_shim` 0.4.2, scratch copy, not a repo dependency) keeps files in memory. Its file
+  write grows the buffer to the exact size on every append, which makes writing a multi-MB xlsx quadratic, so
+  `driver.mjs` patches `fd_write` to grow geometrically. A product integration needs the same fix.
+
+Same machine as section 1. Single runs under the lane lock. Raw: `results/o7-{native,node-shim,chromium}.json`.
+
+| ms (native / Chromium)                | G0 corpus (11 files)                 | 220k cells (10k rows) | 330k (15k)              | 440k (20k)                | 2.2M (100k)      |
+| ------------------------------------- | ------------------------------------ | --------------------- | ----------------------- | ------------------------- | ---------------- |
+| wasm compile (6.8 MB, per Worker)     | – / 44–66                            | – / 58                | – / 79                  | – / 64                    | – / 51           |
+| open                                  | 1.4–4.4 / 54–74                      | 82 / 244              | 125 / 435               | 279 / 508                 | 903 / 1,822      |
+| first viewport (wasm: full index)     | 0.6–0.9 / 20–34                      | 18 / 559              | 15 / 1,244              | 30 / 1,219                | 16 / 4,924       |
+| bottom viewport (after index)         | 0.2–0.3 / 0.5–1.1                    | 0.2 / 21              | 0.2 / 11                | 0.2 / 22                  | 0.2 / 25         |
+| 90k-cell batch read                   | 0.2–0.4 / 0.4–1.5                    | 359 / 1,169           | 423 / 1,319             | 485 / 1,190               | 371 / 1,256      |
+| `read_formula_cells`                  | 0.1–0.8 / 0.7–3.8                    | 31 / 29               | 46 / 65                 | 45 / 117                  | 54 / 2,542       |
+| `read_entries` (largest worksheet)    | 0.2–0.8 / 3.0–4.9                    | 13 / 34               | 20 / 87                 | 28 / 82                   | 145 / 391        |
+| `save_archive` (sidecar part of save) | 3.8–28 / 11–19                       | 145 / 197             | 223 / 327               | 335 / 443                 | 2,167 / 2,186    |
+| `recalc_cells` cold / warm            | 1.0–3.2 / 94–107 · 0.2–0.5 / 0.2–0.4 | 583 / 898 · 52 / 68   | 999 / 1,615 · 136 / 133 | 1,315 / 1,975 · 112 / 214 | not run (> 3 MB) |
+| wasm linear memory                    | 3.3–3.4 MB                           | 73 MB                 | 112 MB                  | 143 MB                    | 271 MB           |
+| Chromium renderer peak RSS            | 197 MB (whole group)                 | 358 MB                | 357 MB                  | 410 MB                    | 777 MB           |
+| native sidecar peak RSS (sampled)     | 6.8–8.4 MiB                          | 110 MiB               | 162 MiB                 | 209 MiB                   | 101 MiB¹         |
+
+¹ Native sampling happens at each response. The 2.2M-cell native index runs in a background thread after the first
+viewport answers, so its peak is under-sampled here. Section 4.2 has the whole-sequence peak.
+
+Results:
+
+- **No crash and no trap in Chromium**: 0 renderer crashes, 0 console errors, 0 CSP violations over 15 workbooks.
+  **Node + the same shim does not crash either** (`o7-node-shim.json`; Node and Chromium timings agree within about
+  30 %). O1 was Node's experimental `node:wasi` (uvwasi), not the engine.
+- **The only failing command is `close`** on 5 of 15 workbooks (`io_error: Directory not empty`). The shim's
+  in-memory directory removal cannot remove the session's non-empty chunk-cache directory. It is harmless here (the
+  Worker is discarded) but needs a shim fix or an in-memory cache in the product.
+- **Factor vs native**:
+  - open: 2–3× on large files; small files pay a fixed ~55 ms (the first call JITs the module);
+  - batch reads: ~3×;
+  - `save_archive`: about 1×, deflate dominates;
+  - recalc: about 1.5×;
+  - formula lists at 2.2M cells: 47×, the one outlier, not investigated.
+- **The cost to fix before shipping is the first viewport.** The scratch build runs the per-sheet index inline on the
+  first read, so the grid's first paint waits for the whole sheet: 0.56 s / 1.2 s / 4.9 s at 0.22M / 0.44M / 2.2M
+  cells. Natively that index is a background thread, and the first viewport answers in 15–30 ms. Two fixes: index in
+  bounded slices between requests (the read path already waits per chunk, `RANGE_WAIT_MAX_LAG_ROWS`), or run a second
+  Worker over the same bytes.
+- **Memory**: the wasm heap grows to 271 MB at 2.2M cells and the renderer process to 777 MB (wasm heap + the shim's
+  in-memory chunk cache + JS). That is within a browser tab's budget and below wasm32's 4 GiB, so option C's cap becomes
+  a memory-budget decision (for example "≤ 2M cells, G3 above") rather than a crash guard.
 
 ### 4.4 Pure JS (`@genoffice/xlsx-gateway`, JSZip, no engine)
 
@@ -464,11 +532,9 @@ Command (under the lock, from `apps/sheets`):
 
 ## 9. Open items
 
-- **O1 (blocks "A" without a cap):** the wasm build segfaults the Node 22 process (`node:wasi`, experimental) on `open`
-  of a worksheet part ≥ ~8 MB uncompressed. Deterministic: 10k × 22 cells (6.8 MB XML) OK, 15k × 22 (10.4 MB) crash.
-  It also crashes in a worker with `stackSizeMb: 256` and with `ulimit -s unlimited`. `archive_manifest` on the same
-  file works. Not diagnosed; not yet run in Chromium with a browser WASI shim. Repro: `sheets-probes/wasm-probe.patch`
-  - `wasi-sidecar.mjs` + `gen-large.ts <f> 15000 20`.
+- **O1 (resolved, section 4.5):** the wasm build segfaulted the Node 22 process on `open` of a worksheet part ≥ ~8 MB
+  uncompressed under `node:wasi` (10k × 22 OK, 15k × 22 crash). Under the browser shim it does not crash, in Chromium or
+  in Node, up to 100k × 22 (70.8 MB sheet XML). Cause: Node's experimental `node:wasi` (uvwasi), not the engine.
 - **O2:** the native sidecar needs rustc ≥ 1.88 (box default 1.85). CI uses `dtolnay/rust-toolchain` stable, office-engine
   Docker uses 1.88.0. Anyone building on this VPS needs `cargo +1.90.0` (installed under `~/.rustup`).
 - **O3:** a fork-side wasm build needs a decision on `zip 0.6` default features via `ironcalc 0.7.1`: vendored
@@ -479,8 +545,11 @@ Command (under the lock, from `apps/sheets`):
 - **O5:** `read_media` is unmeasured: none of the 11 G0 fixtures and no fixture-builder variant (`buildSatelliteSheetFixture
 {sharedImage}`) produced an `image` visual in the open result. Cost is a zip entry read + base64.
 - **O6:** RSS figures are whole-sequence peaks (open + index + recalc + save), not per operation.
-- **O7:** the WASM numbers come from Node, not a browser. Before implementation, a short Chromium run (Web Worker + browser
-  WASI shim) should confirm the 2–6× factor, the memory, and O1.
+- **O7 (resolved, section 4.5):** Chromium numbers measured: 2–3× native for open and reads, about 1× for archive
+  writes, about 1.5× for recalc. The first viewport waits for the full index (0.56–4.9 s), which is the follow-up to fix.
+- **O8 (new):** the browser shim needs two fixes for product use: geometric file growth (patched in the probe) and
+  removal of non-empty directories (`close` fails with `Directory not empty`). Alternative: an in-memory chunk cache in
+  the engine instead of a temp directory.
 
 ## Appendix A. Reproduce
 
