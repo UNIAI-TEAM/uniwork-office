@@ -789,6 +789,7 @@ function parseWorkbookFile(input: unknown): WorkbookFile {
     csvPath,
     emptyCsv,
     restoredFromRecovery,
+    uniworkBound,
   } = input
   if (
     !isUuid(sessionId) ||
@@ -807,7 +808,8 @@ function parseWorkbookFile(input: unknown): WorkbookFile {
     (needsSaveAs !== undefined && typeof needsSaveAs !== 'boolean') ||
     (csvPath !== undefined && (typeof csvPath !== 'string' || csvPath.length === 0)) ||
     (emptyCsv !== undefined && typeof emptyCsv !== 'boolean') ||
-    (restoredFromRecovery !== undefined && typeof restoredFromRecovery !== 'boolean')
+    (restoredFromRecovery !== undefined && typeof restoredFromRecovery !== 'boolean') ||
+    (uniworkBound !== undefined && typeof uniworkBound !== 'boolean')
   ) {
     throw new Error('Invalid workbook response.')
   }
@@ -1108,6 +1110,7 @@ function parseWorkbookFile(input: unknown): WorkbookFile {
     ...(csvPath === undefined ? {} : { csvPath }),
     ...(emptyCsv === undefined ? {} : { emptyCsv }),
     ...(restoredFromRecovery === undefined ? {} : { restoredFromRecovery }),
+    ...(uniworkBound === undefined ? {} : { uniworkBound }),
     ...(themeColors === undefined ? {} : { themeColors: themeColors as string[] }),
     ...(parsedThemeFonts === undefined ? {} : { themeFonts: parsedThemeFonts }),
     ...(typeof input.normalFontName === 'string' && input.normalFontName !== ''
