@@ -54,6 +54,8 @@ export interface WebDocState {
   fatal: ProtocolErrorShape | null
   /** a host `save` / `saveAs` request runs the editor's flow: it owns the conflict UI */
   hostSaving: boolean
+  /** why the last save / save-as failed (the host request's SaveResult error) */
+  lastFailure: ProtocolErrorShape | null
   remember(file: FileMeta): void
 }
 
@@ -63,6 +65,7 @@ export function createDocState(): WebDocState {
     files,
     fatal: null,
     hostSaving: false,
+    lastFailure: null,
     remember(file) {
       files.set(file.fileId, { ...files.get(file.fileId), ...file })
     },
@@ -172,6 +175,7 @@ export function createWebHostIO(deps: WebHostDeps): HostIO {
   }
 
   function saveFailure(result: Extract<SaveResult, { ok: false }>): WebSaveError {
+    deps.state.lastFailure = result.error
     const code = result.error.code
     return new WebSaveError(
       code === 'timeout' ? 'save timed out' : result.error.message,
@@ -275,6 +279,7 @@ export function createWebHostIO(deps: WebHostDeps): HostIO {
     } else if (choice === 'reload') {
       await deps.reload(fileId)
     }
+    deps.state.lastFailure = res.error
     throw new WebSaveError(text('webConflictNotSaved'), 'conflict')
   }
 

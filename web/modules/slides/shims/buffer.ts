@@ -53,6 +53,14 @@ export class BrowserBuffer extends Uint8Array {
     return true
   }
 
+  /** write a string at `offset` (utf8 / ascii / latin1 / hex / base64); returns bytes written */
+  write(text: string, offset = 0, encoding?: string): number {
+    const bytes = from(text, encoding)
+    const n = Math.min(bytes.length, this.length - offset)
+    this.set(bytes.subarray(0, n), offset)
+    return n
+  }
+
   writeUInt32BE(value: number, offset = 0): number {
     this[offset] = (value >>> 24) & 0xff
     this[offset + 1] = (value >>> 16) & 0xff

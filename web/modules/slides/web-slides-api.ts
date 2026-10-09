@@ -17,7 +17,7 @@
  * | browser          | exports (zip / PDF downloads), printSlides (srcdoc frame), clipboard, fullscreen, media blob: URLs |
  * | hidden (stubs)   | AI (27), fonts download/install, presenter second screen, headless export, autosave (C10) |
  *
- * `satisfies SlidesApi` (with no Partial) makes a new preload method a build error here.
+ * Typed as the full SlidesApi (no Partial): a new preload method is a build error here.
  */
 import type { AiPanelPrefs } from '@genoffice/ui'
 import { base64ToBytes, bytesToBase64 } from '../../../apps/slides/src/session/bytes'
@@ -354,6 +354,7 @@ export function createWebSlidesApi(
       return { ok: false, error: { code: 'busy' as const, message: 'a save is already running' } }
     state.hostSaving = true
     lastSaveError = null
+    state.lastFailure = null
     try {
       const ok = await runRendererSave()
       const file = current ? state.files.get(current) : undefined
@@ -437,12 +438,8 @@ export function createWebSlidesApi(
 
   /** save / save-as results: remember the failure for the host request, keep the renderer shape */
   function noteResult(r: { ok: boolean; error?: string }): void {
-    if (!r.ok && r.error) {
-      lastSaveError = {
-        code: /changed elsewhere|conflict/i.test(r.error) ? 'conflict' : 'internal',
-        message: r.error,
-      }
-    }
+    if (!r.ok && r.error)
+      lastSaveError = state.lastFailure ?? { code: 'internal', message: r.error }
   }
 
   // ------------------------------------------------------------ media
@@ -526,7 +523,7 @@ export function createWebSlidesApi(
 
   // ------------------------------------------------------------ the api
 
-  const slidesApi = {
+  const slidesApi: SlidesApi = {
     // appearance (host-authoritative, shared with Docs)
     getLanguage: () => browser.getLanguage() as ReturnType<SlidesApi['getLanguage']>,
     onLanguageChanged: (handler) =>
@@ -852,7 +849,7 @@ export function createWebSlidesApi(
     onShowSync: disposer,
     onShowInk: disposer,
     onAudienceNav: disposer,
-  } satisfies SlidesApi
+  }
 
   return {
     slidesApi,

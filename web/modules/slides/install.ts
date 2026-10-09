@@ -9,27 +9,10 @@
  */
 import browser from '../../docs/bridge/browser'
 import { hostGrants } from '../../docs/bridge/hide'
-import { installModuleBridge, MODULE_WEB_CAPABILITIES } from '../../docs/bridge/module-bridge'
+import { installModuleBridge } from '../../docs/bridge/module-bridge'
 import type { BridgeObject } from '../../docs/bridge/safe-api'
+import { SLIDES_WEB_CAPABILITIES } from './capabilities'
 import { createWebSlidesApi } from './web-slides-api'
-
-/**
- * Slides capability keys on the web (inventory-b5 1.6; the renderer gates on them with
- * `cap()` once the S3 retrofit lands): AI, open/recents until granted and every autosave key
- * off (C10), plus the Slides-only desktop features with no web counterpart in v1.
- */
-export const SLIDES_WEB_CAPABILITIES: Readonly<Record<string, unknown>> = Object.freeze({
-  ...MODULE_WEB_CAPABILITIES,
-  tabs: false,
-  webSearch: false,
-  imageSearch: false,
-  imageGeneration: false,
-  fontDownload: false,
-  fontInstallLocal: false,
-  presenterWindow: false,
-  model3d: false,
-  headlessExport: false,
-})
 
 export const bridge = installModuleBridge({
   module: 'slides',

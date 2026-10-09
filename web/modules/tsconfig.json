@@ -10,6 +10,9 @@
     "*/install.ts",
     "*.ts",
     "slides/env.d.ts",
+    "slides/*.test.ts",
+    "slides/testing/*.ts",
+    "slides/vitest.config.ts",
     "../../packages/pptx-render/src/bidi-js.d.ts"
   ]
 }
