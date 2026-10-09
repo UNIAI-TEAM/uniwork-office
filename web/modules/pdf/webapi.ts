@@ -32,6 +32,9 @@
  * | onSaveAsRequest / send...         | host `saveAs` request runs the renderer's Save As flow                   |
  * | onPrintRequest                    | host `print` request opens the renderer's print dialog                  |
  * | onReloadRequest (web only)        | host `open`, or "Reload latest" in a save conflict                       |
+ * | provideSaveRequest (web only)     | draft recovery (C18): the renderer's pending edits, applied to the       |
+ * |                                   |   working copy every 30 s while dirty -> encrypted IndexedDB copy        |
+ * | consumeRecovered (web only)       | the open bytes are a restored draft: the renderer starts dirty           |
  * | AI, OCR, convert, auto-rename,    | typed stubs; their entries are hidden by capabilities (./install.ts)     |
  * |   createDocument, image search    |                                                                          |
  *
@@ -40,6 +43,11 @@
  * the head etag, save again), Reload latest (the renderer reopens the latest version, pending
  * edits are dropped) or Cancel (stays dirty, "Save failed"). Nothing is ever saved without an
  * explicit user action: no `auto` save exists on the web (CONTRACT C10).
+ *
+ * Draft recovery (C18, web/docs/bridge/draft-recovery.ts): the draft is what a save would write
+ * (working copy + the renderer's pending edits). It is offered before the renderer loads the
+ * document; Restore makes the draft bytes the working copy (the etag stays the head's, so
+ * If-Match still catches a newer version) and keeps the frame dirty until a save lands.
  */
 import type {
   PdfApi,
@@ -64,6 +72,8 @@ import browser, { downloadBlob } from '../../docs/bridge/browser'
 import { capEnabled } from '../../docs/bridge/capability-object'
 import { TIMEOUTS, errorCode } from '../../docs/bridge/frame-port'
 import type { ModuleBridgePort } from '../../docs/bridge/module-bridge'
+import type { DraftHost, DraftRecovery } from '../../docs/bridge/draft-recovery'
+import { bridgeDraftRecovery } from '../shared/recovery-prompt'
 import type { PdfCore } from './core'
 import { ask, hideFatal, showFatal, text } from './notice'
 import { createSignatureStore } from './signatures'
@@ -150,6 +160,8 @@ export interface PdfWebDeps {
   zip?(files: Array<{ name: string; data: Uint8Array }>): Promise<Blob>
   /** how long a host `save` may wait for the renderer's save flow (ms) */
   saveTimeoutMs?: number
+  /** draft recovery (C18; default: IndexedDB + the shared prompt); injectable for tests */
+  drafts?(host: DraftHost): DraftRecovery
 }
 
 async function jszip(files: Array<{ name: string; data: Uint8Array }>): Promise<Blob> {
@@ -179,6 +191,13 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
   let fatal: ProtocolErrorShape | null = null
   let author = ''
   let rendererDirty = false
+  /** the working copy is a restored draft not saved yet (dirty with no renderer edits) */
+  let restored = false
+  /** consumeRecovered's one-shot flag for the renderer's next open */
+  let recoveredFlag = false
+  /** the document `init` names: the only one the host's draft scope ("<user>:<document>") covers */
+  let initDocumentId: string | null = null
+  let saveRequestProvider: (() => SavePdfRequest | null) | null = null
 
   const currentPath = (): string | null => (doc ? pathFor(doc.file) : null)
   const owns = (path: unknown): boolean => typeof path === 'string' && path === currentPath()
@@ -189,11 +208,65 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
     return pathFor(file)
   }
 
+  const dirtyNow = (): boolean => rendererDirty || restored
+
+  /** the save core over `base`: the bytes `request` would write (throws on a core failure) */
+  async function applyRequest(
+    base: Uint8Array,
+    request: SavePdfRequest,
+  ): Promise<{ bytes: Uint8Array; skips: Skips }> {
+    const fonts = (request.textEdits?.length ?? 0) > 0 || (request.textInserts?.length ?? 0) > 0
+    const applied = await (await core(fonts)).applyAndVerifySaveRequest(base, request)
+    const { bytes, skippedTextEdits, skippedTextInserts, skippedImageEdits } = applied
+    return {
+      bytes,
+      skips: {
+        ...(skippedTextEdits.length > 0 ? { skippedTextEdits } : {}),
+        ...(skippedTextInserts.length > 0 ? { skippedTextInserts } : {}),
+        ...(skippedImageEdits.length > 0 ? { skippedImageEdits } : {}),
+      },
+    }
+  }
+
+  // ------------------------------------------------------------ draft recovery (C18)
+
+  const drafts = (deps.drafts ?? ((host) => bridgeDraftRecovery(port, 'pdf', host)))({
+    file: () =>
+      doc && doc.file.fileId === initDocumentId
+        ? { etag: doc.file.etag, name: doc.file.name }
+        : null,
+    isDirty: dirtyNow,
+    async bytes() {
+      if (!doc) return null
+      // nothing pending in the renderer: the working copy itself (a restored draft) is the draft
+      if (!rendererDirty) return restored ? doc.bytes.slice() : null
+      const request = saveRequestProvider?.() ?? null
+      if (!request || !owns(request.path)) return restored ? doc.bytes.slice() : null
+      return (await applyRequest(doc.bytes.slice(), request)).bytes
+    },
+    restore(bytes) {
+      if (!doc) return
+      doc = { ...doc, bytes: new Uint8Array(copyBuffer(bytes)) }
+      restored = true
+      recoveredFlag = true
+      port.setDirty(true)
+    },
+  })
+
+  /** offer the open document's draft before the renderer loads it */
+  async function withDraft(path: string): Promise<string> {
+    await drafts.opened()
+    return path
+  }
+
   async function openPayload(open: OpenPayload): Promise<string> {
     let bytes = await readSource(open.source)
     // a new, still empty Documents file: start from the desktop's blank A4 page ("New PDF"),
     // which becomes the file's first version on the first save
     if (bytes.byteLength === 0) bytes = new Uint8Array(await (await deps.core()).blankPdfBuffer())
+    // a newly opened version replaces any restored draft
+    restored = false
+    recoveredFlag = false
     return adopt(open.file, bytes)
   }
 
@@ -238,10 +311,11 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
     .whenInitialized()
     .then(async (s) => {
       author = s.user?.displayName ?? ''
+      initDocumentId = s.documentId
       const open =
         s.open ??
         (await port.request('api.open', { fileId: s.documentId }, { timeoutMs: TIMEOUTS.transfer }))
-      return openPayload(open)
+      return withDraft(await openPayload(open))
     })
     .catch((err: unknown) => {
       console.error('[pdf-web] initial open failed:', err)
@@ -251,7 +325,7 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
     })
 
   port.handleOpen(async (payload) => {
-    const path = await openPayload(payload)
+    const path = await withDraft(await openPayload(payload))
     fatal = null
     hideFatal()
     if (pendingOpen) pendingOpen = Promise.resolve(path)
@@ -347,6 +421,9 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
       const file: FileMeta = { ...(doc?.file ?? {}), ...res.file }
       if (res.versionId && !res.file.versionId) file.versionId = res.versionId
       adopt(file, bytes)
+      restored = false
+      recoveredFlag = false
+      void drafts.saved()
       port.reportSaved({
         file,
         ...(file.versionId ? { versionId: file.versionId } : {}),
@@ -422,7 +499,11 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
     )
     // the host learns the new file from its own request's result; this frame keeps the original
     pending?.settle(res)
-    if (res.ok) return { ok: true, ...skips }
+    if (res.ok) {
+      // the edits are in a saved file now; the writer keeps a fresh copy while still dirty
+      void drafts.saved()
+      return { ok: true, ...skips }
+    }
     // a cancelled host dialog wrote nothing: no error, like the desktop's cancelled dialog
     if (res.error.code === 'cancelled') return { ok: true }
     return fail(res.error.message)
@@ -462,7 +543,7 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
 
   // ------------------------------------------------------------ host requests
 
-  port.handleCloseCheck(() => ({ dirty: rendererDirty, autoSave: false }))
+  port.handleCloseCheck(() => ({ dirty: dirtyNow(), autoSave: false }))
 
   port.handleSave(async () => {
     if (fatal) return { ok: false, error: fatal }
@@ -555,24 +636,29 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
         reloadListeners.delete(handler)
       }
     },
+    provideSaveRequest(provider) {
+      saveRequestProvider = provider
+      return () => {
+        if (saveRequestProvider === provider) saveRequestProvider = null
+      }
+    },
+    consumeRecovered() {
+      const flag = recoveredFlag
+      recoveredFlag = false
+      return flag
+    },
 
     // ---- save
     async save(request: SavePdfRequest): Promise<SavePdfResult> {
       const refused = writeRefusal(request?.path)
       if (refused) return refused
       const fileId = doc!.file.fileId
-      const fonts = (request.textEdits?.length ?? 0) > 0 || (request.textInserts?.length ?? 0) > 0
-      let applied: Awaited<ReturnType<PdfCore['applyAndVerifySaveRequest']>>
+      let bytes: Uint8Array
+      let skips: Skips
       try {
-        applied = await (await core(fonts)).applyAndVerifySaveRequest(doc!.bytes.slice(), request)
+        ;({ bytes, skips } = await applyRequest(doc!.bytes.slice(), request))
       } catch (err) {
         return fail(describe(err))
-      }
-      const { bytes, skippedTextEdits, skippedTextInserts, skippedImageEdits } = applied
-      const skips: Skips = {
-        ...(skippedTextEdits.length > 0 ? { skippedTextEdits } : {}),
-        ...(skippedTextInserts.length > 0 ? { skippedTextInserts } : {}),
-        ...(skippedImageEdits.length > 0 ? { skippedImageEdits } : {}),
       }
       if (typeof request.targetPath === 'string' && request.targetPath !== request.path) {
         return saveCopy(request.targetPath, bytes, skips)
@@ -582,7 +668,7 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
     },
     setDirty(dirty) {
       rendererDirty = dirty === true
-      port.setDirty(rendererDirty)
+      port.setDirty(dirtyNow())
     },
     onCloseSaveRequest(handler) {
       closeSaveHandlers.add(handler)

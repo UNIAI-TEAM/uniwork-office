@@ -118,6 +118,7 @@ import type {
   NoteEditInput,
   PageImageRef,
   PdfConvertFormat,
+  SavePdfRequest,
   StaticFormFillRecord,
   StampInput,
   TextEditFailure,
@@ -775,6 +776,9 @@ export default function App() {
   const noticeTimerRef = useRef<number | null>(null)
   /** Autosave gate: this file was saved explicitly at least once */
   const savedOnceRef = useRef(false)
+  /** Web draft recovery: the open bytes are a restored draft not yet saved (dirty with no
+      pending edits; the next Save writes them as they are) */
+  const [recovered, setRecovered] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchMatches, setSearchMatches] = useState<SearchMatch[]>([])
@@ -1180,6 +1184,7 @@ export default function App() {
         // A newly opened file starts outside the autosave gate
         savedOnceRef.current = false
         await loadDoc(path, null)
+        setRecovered(window.pdfApi.consumeRecovered?.() === true)
         // Silently restore the last reading position (WPS-style). A saved custom
         // zoom (fitMode null) must be applied before 'ready', or the initial
         // fit-width recompute would take over; fit modes are recomputed anyway.
@@ -1568,7 +1573,8 @@ export default function App() {
     rotations.size > 0 ||
     deleted.size > 0 ||
     order !== null ||
-    metadata !== null
+    metadata !== null ||
+    recovered
 
   // Mirror dirty state to the main process (close-tab/close-window guard)
   useEffect(() => {
@@ -3266,6 +3272,13 @@ export default function App() {
     ...(metadata ? { metadata } : {}),
   })
 
+  // Web draft recovery: what a Save would send right now (no commitTextDraft / commitNoteEdit:
+  // the provider must not touch state; an open editor's draft joins on the next write)
+  const saveRequestRef = useRef<() => SavePdfRequest | null>(() => null)
+  saveRequestRef.current = () =>
+    filePath && status === 'ready' ? { path: filePath, ...editsPayload() } : null
+  useEffect(() => window.pdfApi.provideSaveRequest?.(() => saveRequestRef.current()), [])
+
   /** Resolved when the running save() lands; queued saves and Save As serialize behind it */
   const saveInFlightRef = useRef<Promise<boolean> | null>(null)
   /** objNum → /Contents the in-flight save is writing via noteEdits. appliedNoteEdit
@@ -3330,6 +3343,8 @@ export default function App() {
         opFailed(result.error)
         return false
       }
+      // the restored draft is the file's new version now
+      setRecovered(false)
       if (result.skippedTextEdits && result.skippedTextEdits.length > 0) {
         noticeSkippedEdits(result.skippedTextEdits)
       }

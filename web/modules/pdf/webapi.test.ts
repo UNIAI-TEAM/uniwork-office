@@ -5,6 +5,19 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { SavePdfRequest } from '../../../apps/pdf/src/shared/ipc'
 import { createMockPort, protocolError, type MockPort } from '../../docs/bridge/testing/mock-port'
+import {
+  DRAFTS_DB,
+  DRAFTS_STORE,
+  createDraftRecovery,
+  createIdbDraftStore,
+  decryptDraft,
+  encryptDraft,
+  type DraftChoice,
+  type DraftInfo,
+  type DraftRecord,
+  type DraftRecovery,
+} from '../../docs/bridge/draft-recovery'
+import { createFakeIdb } from '../../docs/bridge/testing/fake-idb'
 import type { PdfCore } from './core'
 import { createSignatureStore } from './signatures'
 import { createPdfWebApi, nameFromSaveAsTarget, pathFor, saveAsTarget } from './webapi'
@@ -438,5 +451,123 @@ describe('print and hidden members', () => {
     expect((await s.api.createDocument({} as never)).ok).toBe(false)
     expect(await s.api.gskStatus()).toEqual({ loggedIn: false })
     expect(await s.api.listEditFonts()).toEqual(['arial'])
+  })
+})
+
+describe('draft recovery (C18)', () => {
+  const recoveries: DraftRecovery[] = []
+  afterEach(() => {
+    for (const r of recoveries.splice(0)) r.dispose()
+  })
+
+  async function draftSetup(opts: { answer?: DraftChoice; draft?: string } = {}) {
+    const mock = createMockPort()
+    const meta = mock.seed('Report.pdf', PDF('v1'))
+    const fake = createFakeIdb()
+    const store = createIdbDraftStore(fake.idb)
+    const grant = {
+      key: await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, [
+        'encrypt',
+        'decrypt',
+      ]),
+      scope: `u1:${meta.fileId}`,
+    }
+    const recordKey = `${grant.scope}:${meta.etag}`
+    if (opts.draft !== undefined) {
+      const { iv, ciphertext } = await encryptDraft(grant.key, recordKey, PDF(opts.draft))
+      await store.put(recordKey, {
+        iv,
+        ciphertext,
+        baseEtag: meta.etag ?? '',
+        savedAt: 1,
+        module: 'pdf',
+        name: 'Report.pdf',
+      })
+    }
+    const prompt = vi.fn(async (_d: DraftInfo) => opts.answer ?? 'restore')
+    let recovery!: DraftRecovery
+    const core = fakeCore()
+    const { api } = createPdfWebApi(mock.port, {
+      capabilities: { edit: true },
+      core: async () => core,
+      ensureFonts: async () => {},
+      signatures: createSignatureStore(() => null),
+      drafts: (host) => {
+        recovery = createDraftRecovery({
+          module: 'pdf',
+          recovery: () => grant,
+          host,
+          prompt,
+          store,
+        })
+        recoveries.push(recovery)
+        return recovery
+      },
+    })
+    mock.init({ documentId: meta.fileId })
+    const records = () => fake.store(DRAFTS_DB, DRAFTS_STORE) ?? new Map<string, unknown>()
+    const decrypted = async () => {
+      const record = records().get(recordKey) as DraftRecord | undefined
+      return record ? str((await decryptDraft(grant.key, recordKey, record))!) : null
+    }
+    return { mock, api, core, meta, prompt, recovery: () => recovery, records, decrypted }
+  }
+
+  it('writes the encrypted working copy + pending edits while dirty, never api.save', async () => {
+    const s = await draftSetup()
+    const path = (await s.api.consumePending())!
+    expect(s.prompt).not.toHaveBeenCalled()
+    s.api.provideSaveRequest(() => req(path, { markups: [{} as never] }))
+    await s.recovery().flush()
+    expect(s.records().size).toBe(0) // clean: nothing kept
+    s.api.setDirty(true)
+    await s.recovery().flush()
+    expect(await s.decrypted()).toBe('%PDF-1.7 v1+m1')
+    const raw = s.records().values().next().value as DraftRecord
+    expect(str(raw.ciphertext)).not.toContain('PDF')
+    expect(s.mock.calls.some((c) => c.type === 'api.save')).toBe(false)
+    expect(s.mock.saved).toHaveLength(0)
+  })
+
+  it('Restore serves the draft bytes as a recovered, dirty document; Save writes them', async () => {
+    const s = await draftSetup({ draft: 'draft' })
+    const path = (await s.api.consumePending())!
+    expect(s.prompt).toHaveBeenCalledTimes(1)
+    expect(str(await s.api.readFile(path))).toBe('%PDF-1.7 draft')
+    expect(s.api.consumeRecovered()).toBe(true)
+    expect(s.api.consumeRecovered()).toBe(false) // one-shot
+    // the renderer has no pending edits yet: the frame stays dirty
+    s.api.setDirty(false)
+    expect(s.mock.dirty.at(-1)).toBe(true)
+    expect(await s.mock.host['doc.closeCheck']({})).toEqual({ dirty: true, autoSave: false })
+    // an empty edit request still writes the restored bytes, If-Match = the head etag
+    expect(await s.api.save(req(path))).toEqual({ ok: true })
+    const put = s.mock.calls.find((c) => c.type === 'api.save')!
+    expect(put.payload).toMatchObject({ fileId: s.meta.fileId, etag: s.meta.etag })
+    expect(str((put.payload as { data: ArrayBuffer }).data)).toBe('%PDF-1.7 draft+m0')
+    // a landed save deletes the scope's drafts and ends the recovered state
+    await vi.waitFor(() => expect(s.records().size).toBe(0))
+    expect(await s.mock.host['doc.closeCheck']({})).toEqual({ dirty: false, autoSave: false })
+  })
+
+  it('Discard serves the server bytes and deletes the draft', async () => {
+    const s = await draftSetup({ draft: 'draft', answer: 'discard' })
+    const path = (await s.api.consumePending())!
+    expect(s.prompt).toHaveBeenCalledTimes(1)
+    expect(str(await s.api.readFile(path))).toBe('%PDF-1.7 v1')
+    expect(s.api.consumeRecovered()).toBe(false)
+    expect(await s.mock.host['doc.closeCheck']({})).toEqual({ dirty: false, autoSave: false })
+    expect(s.records().size).toBe(0)
+  })
+
+  it('a save of edited bytes deletes the stored draft', async () => {
+    const s = await draftSetup()
+    const path = (await s.api.consumePending())!
+    s.api.provideSaveRequest(() => req(path, { markups: [{} as never] }))
+    s.api.setDirty(true)
+    await s.recovery().flush()
+    expect(s.records().size).toBe(1)
+    expect(await s.api.save(req(path, { markups: [{} as never] }))).toEqual({ ok: true })
+    await vi.waitFor(() => expect(s.records().size).toBe(0))
   })
 })
