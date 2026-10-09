@@ -1,0 +1,471 @@
+name: Release installers
+
+# Builds the UniWork Office desktop installers for the dev and beta channels:
+# Windows x64 (NSIS) and macOS arm64 + x64 (dmg), unsigned while no
+# certificates exist. See tools/release/README.md.
+#
+#   tag push v<version>-dev.<n> / v<version>-beta.<n>
+#       build both platforms, then publish a pre-release for the tag (never
+#       marked latest) with the installers and SHA256SUMS-<platform>.txt, and
+#       print OFFICE_INSTALLER_<CHANNEL>_URLS in the run summary.
+#   workflow_dispatch (channel dev | beta)
+#       build both platforms as version <version>-<channel>.<run number> and
+#       keep the installers as workflow artifacts only (no tag, no release).
+#
+# <version> must equal apps/shell/package.json. Stable is refused while builds
+# are unsigned. Auto-update stays off: no GENOFFICE_UPDATE_URL, --publish never,
+# and the output is checked for app-update.yml. Only the publish job holds a
+# write token; the build jobs run with contents: read.
+#
+# Signing hooks (off): set the repository variable UNIWORK_SIGNING_ENABLED to
+# 'true' once certificates exist. Secrets used then (names only):
+#   macOS    CSC_LINK, CSC_KEY_PASSWORD (Developer ID Application .p12),
+#            APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID (notarization)
+#   Windows  variable GENOFFICE_WIN_SIGN_MODE (test | production) and the
+#            secrets scripts/win-sign.cjs reads; that script is not in this
+#            repository yet and must be added before the hook can run.
+
+on:
+  push:
+    tags: ['v*-dev.*', 'v*-beta.*']
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: Release channel (stable is refused while builds are unsigned)
+        type: choice
+        options: [dev, beta]
+        default: dev
+
+concurrency:
+  group: release-installers-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  meta:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      channel: ${{ steps.resolve.outputs.channel }}
+      version: ${{ steps.resolve.outputs.version }}
+      tag: ${{ steps.resolve.outputs.tag }}
+      publish: ${{ steps.resolve.outputs.publish }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+
+      - name: Resolve channel and version
+        id: resolve
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_CHANNEL: ${{ inputs.channel }}
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          set -euo pipefail
+          base="$(node -p "require('./apps/shell/package.json').version")"
+          if [ "$EVENT_NAME" = "push" ]; then
+            if [ "$REF_TYPE" != "tag" ]; then
+              echo "::error::release builds run on tags only"
+              exit 1
+            fi
+            re='^v([0-9]+\.[0-9]+\.[0-9]+)-(dev|beta)\.([0-9]+)$'
+            if ! [[ "$REF_NAME" =~ $re ]]; then
+              echo "::error::tag $REF_NAME must look like v$base-dev.<n> or v$base-beta.<n>"
+              exit 1
+            fi
+            if [ "${BASH_REMATCH[1]}" != "$base" ]; then
+              echo "::error::tag version ${BASH_REMATCH[1]} differs from apps/shell/package.json $base"
+              exit 1
+            fi
+            channel="${BASH_REMATCH[2]}"
+            version="$base-$channel.${BASH_REMATCH[3]}"
+            tag="$REF_NAME"
+            publish=true
+          else
+            channel="$INPUT_CHANNEL"
+            case "$channel" in
+              dev | beta) ;;
+              *)
+                echo "::error::channel must be dev or beta, got '$channel'"
+                exit 1
+                ;;
+            esac
+            version="$base-$channel.$RUN_NUMBER"
+            tag=""
+            publish=false
+          fi
+          {
+            echo "channel=$channel"
+            echo "version=$version"
+            echo "tag=$tag"
+            echo "publish=$publish"
+          } >> "$GITHUB_OUTPUT"
+          echo "Release $version (channel $channel, publish $publish)" >> "$GITHUB_STEP_SUMMARY"
+
+      # UniWork brand gate on the sources (dependency-free, see tools/rebrand/README.md)
+      - name: Check brand
+        run: npm run check:brand
+
+      - name: Test the installer URL helper
+        run: node --test tools/release/installer-urls.test.mjs
+
+  windows:
+    needs: meta
+    runs-on: windows-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: bash
+    env:
+      UNIWORK_RELEASE_CHANNEL: ${{ needs.meta.outputs.channel }}
+      RELEASE_VERSION: ${{ needs.meta.outputs.version }}
+      BUILD_DIR: ${{ github.workspace }}/release-out
+      # Built natively on the Windows runner with MSVC; the crate's
+      # .cargo/config.toml links the CRT statically for this target.
+      GENOFFICE_WIN_SIDECAR_TARGET: x86_64-pc-windows-msvc
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable branch, 2026-07
+        with:
+          toolchain: stable
+          targets: x86_64-pc-windows-msvc
+
+      - name: Cache cargo (xlsx-sidecar)
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          workspaces: apps/sheets/native/xlsx-engine
+
+      - name: Cache electron binaries
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/AppData/Local/electron/Cache
+            ~/AppData/Local/electron-builder/Cache
+          key: release-electron-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: release-electron-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test the build brand check
+        run: node --test tools/release/check-build-brand.test.mjs
+
+      - name: Build apps
+        run: |
+          npm run notices
+          npm run build:all
+
+      - name: Build the xlsx sidecar (x86_64-pc-windows-msvc)
+        working-directory: apps/sheets
+        run: >-
+          cargo build --release
+          --manifest-path native/xlsx-engine/Cargo.toml
+          --config native/xlsx-engine/.cargo/config.toml
+          --target x86_64-pc-windows-msvc
+
+      - name: Build the Windows OCR helper
+        run: node packages/pdf2docx/ocr-helper/build-win.mjs
+
+      # Signing hook (off). electron-builder does not sign extraResources, so
+      # the two helper binaries are signed here; the app, uninstaller and
+      # installer go through the same script from electron-builder.cjs. When
+      # scripts/win-sign.cjs lands, pass the secrets it reads to this step and
+      # to "Package the installer".
+      - name: Sign the helper binaries (signing hook)
+        if: vars.UNIWORK_SIGNING_ENABLED == 'true'
+        env:
+          GENOFFICE_WIN_SIGN_MODE: ${{ vars.GENOFFICE_WIN_SIGN_MODE }}
+        run: |
+          set -euo pipefail
+          if [ ! -f scripts/win-sign.cjs ]; then
+            echo "::error::scripts/win-sign.cjs is not in this repository yet; add it before enabling signing"
+            exit 1
+          fi
+          for file in \
+            apps/sheets/native/xlsx-engine/target/x86_64-pc-windows-msvc/release/xlsx-sidecar.exe \
+            packages/pdf2docx/ocr-helper/win-ocr.exe; do
+            node scripts/win-sign.cjs "$GENOFFICE_WIN_SIGN_MODE" "$file"
+          done
+
+      - name: Package the installer
+        working-directory: apps/shell
+        env:
+          GENOFFICE_WIN_SIGN_MODE: ${{ vars.UNIWORK_SIGNING_ENABLED == 'true' && vars.GENOFFICE_WIN_SIGN_MODE || '' }}
+        run: npx electron-builder --win --x64 --publish never "-c.extraMetadata.version=$RELEASE_VERSION"
+
+      - name: Check the build output brand
+        run: node tools/release/check-build-brand.mjs --dir "$BUILD_DIR"
+
+      - name: Collect the installer and its SHA-256 sum
+        run: |
+          set -euo pipefail
+          mkdir -p upload
+          shopt -s nullglob
+          files=("$BUILD_DIR"/UniWork-Office_"$RELEASE_VERSION"_*win32_x64-setup.exe)
+          if [ "${#files[@]}" != 1 ]; then
+            echo "::error::expected one Windows installer for $RELEASE_VERSION, found ${#files[@]}"
+            ls -la "$BUILD_DIR"
+            exit 1
+          fi
+          cp "${files[@]}" upload/
+          cd upload
+          sha256sum -- * > SHA256SUMS-win32-x64.txt
+          cat SHA256SUMS-win32-x64.txt
+          {
+            echo "### Windows x64"
+            echo
+            for file in *; do
+              printf -- '- %s (%s bytes)\n' "$file" "$(wc -c < "$file" | tr -d ' ')"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the installer
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: installers-win32-x64
+          path: upload/*
+          if-no-files-found: error
+          retention-days: 14
+
+  macos:
+    needs: meta
+    runs-on: macos-latest
+    timeout-minutes: 120
+    permissions:
+      contents: read
+    env:
+      UNIWORK_RELEASE_CHANNEL: ${{ needs.meta.outputs.channel }}
+      RELEASE_VERSION: ${{ needs.meta.outputs.version }}
+      BUILD_DIR: ${{ github.workspace }}/release-out
+      # both arches: arm64 + x64 dmg from one fat sidecar / OCR helper
+      GENOFFICE_MAC_X64: '1'
+      SIGNING_ENABLED: ${{ vars.UNIWORK_SIGNING_ENABLED == 'true' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable branch, 2026-07
+        with:
+          toolchain: stable
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Cache cargo (xlsx-sidecar)
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          workspaces: apps/sheets/native/xlsx-engine
+
+      - name: Cache electron binaries
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/Library/Caches/electron
+            ~/Library/Caches/electron-builder
+          key: release-electron-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: release-electron-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build apps
+        run: |
+          npm run notices
+          npm run build:all
+
+      - name: Build the universal xlsx sidecar
+        run: npm run native:build:universal -w @genoffice/sheets
+
+      # Signing hook (off): with UNIWORK_SIGNING_ENABLED the package step gets
+      # the certificate and Apple credentials; electron-builder then signs with
+      # the Developer ID identity, notarizes the app, and build/notarize-dmg.js
+      # notarizes and staples the dmgs. Without it the app is ad-hoc signed.
+      - name: Check the signing secrets (signing hook)
+        if: vars.UNIWORK_SIGNING_ENABLED == 'true'
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          missing=""
+          for name in CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID; do
+            [ -n "${!name}" ] || missing="$missing $name"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::signing is enabled but these secrets are empty:$missing"
+            exit 1
+          fi
+
+      - name: Package the dmgs
+        working-directory: apps/shell
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: ${{ vars.UNIWORK_SIGNING_ENABLED == 'true' && 'true' || 'false' }}
+          CSC_LINK: ${{ vars.UNIWORK_SIGNING_ENABLED == 'true' && secrets.CSC_LINK || '' }}
+          CSC_KEY_PASSWORD: ${{ vars.UNIWORK_SIGNING_ENABLED == 'true' && secrets.CSC_KEY_PASSWORD || '' }}
+          APPLE_ID: ${{ vars.UNIWORK_SIGNING_ENABLED == 'true' && secrets.APPLE_ID || '' }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ vars.UNIWORK_SIGNING_ENABLED == 'true' && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
+          APPLE_TEAM_ID: ${{ vars.UNIWORK_SIGNING_ENABLED == 'true' && secrets.APPLE_TEAM_ID || '' }}
+        run: npx electron-builder --mac --publish never "-c.extraMetadata.version=$RELEASE_VERSION"
+
+      # Apple Silicon refuses to launch an app without a valid signature; an
+      # unsigned build must therefore carry an intact ad-hoc one.
+      - name: Verify the app signatures
+        run: |
+          set -euo pipefail
+          for dir in mac-arm64:arm64 mac:x86_64; do
+            app="$BUILD_DIR/${dir%%:*}/UniWork Office.app"
+            want="${dir##*:}"
+            codesign --verify --deep --strict --verbose=2 "$app"
+            details="$(codesign -dv --verbose=2 "$app" 2>&1)"
+            echo "$details"
+            if [ "$SIGNING_ENABLED" = "true" ]; then
+              grep -q '^Authority=Developer ID Application' <<<"$details"
+            else
+              grep -q '^Signature=adhoc' <<<"$details"
+            fi
+            archs="$(lipo -archs "$app/Contents/MacOS/UniWork Office")"
+            if [ "$archs" != "$want" ]; then
+              echo "::error::$app is $archs, expected $want"
+              exit 1
+            fi
+          done
+
+      - name: Check the build output brand
+        run: node tools/release/check-build-brand.mjs --dir "$BUILD_DIR"
+
+      - name: Collect the dmgs and their SHA-256 sums
+        run: |
+          set -euo pipefail
+          mkdir -p upload
+          shopt -s nullglob
+          files=("$BUILD_DIR"/UniWork-Office_"$RELEASE_VERSION"_*darwin_arm64.dmg "$BUILD_DIR"/UniWork-Office_"$RELEASE_VERSION"_*darwin_x64.dmg)
+          if [ "${#files[@]}" != 2 ]; then
+            echo "::error::expected the arm64 and x64 dmgs for $RELEASE_VERSION, found ${#files[@]}"
+            ls -la "$BUILD_DIR"
+            exit 1
+          fi
+          cp "${files[@]}" upload/
+          cd upload
+          shasum -a 256 -- * > SHA256SUMS-darwin.txt
+          cat SHA256SUMS-darwin.txt
+          {
+            echo "### macOS"
+            echo
+            for file in *; do
+              printf -- '- %s (%s bytes)\n' "$file" "$(wc -c < "$file" | tr -d ' ')"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the dmgs
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: installers-darwin
+          path: upload/*
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    needs: [meta, windows, macos]
+    if: needs.meta.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write # create the pre-release and upload its assets
+    env:
+      TAG: ${{ needs.meta.outputs.tag }}
+      CHANNEL: ${{ needs.meta.outputs.channel }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+
+      - name: Download the installers
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: installers-*
+          path: release-files
+          merge-multiple: true
+
+      # Computed before anything is published: a file the helper refuses
+      # (no unsigned label, another channel) stops the release.
+      - name: OFFICE_INSTALLER_*_URLS for this channel
+        id: urls
+        env:
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          ls -l release-files
+          urls="$(node tools/release/installer-urls.mjs --channel "$CHANNEL" \
+            --base-url "https://github.com/$REPOSITORY/releases/download/$TAG" --dir release-files)"
+          name="OFFICE_INSTALLER_$(tr '[:lower:]' '[:upper:]' <<<"$CHANNEL")_URLS"
+          echo "$urls" > "installer-urls-$CHANNEL.json"
+          {
+            echo "### $name"
+            echo
+            echo "Set this on the UniWork server (tools/release/README.md); OFFICE_INSTALLER_STABLE_URLS stays empty."
+            echo
+            echo '```'
+            echo "$name=$urls"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Create the pre-release and upload the assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --verify-tag --prerelease --latest=false \
+              --title "UniWork Office $TAG ($CHANNEL, unsigned)" \
+              --notes "Unsigned $CHANNEL build of UniWork Office for Windows x64 and macOS (Apple Silicon and Intel). No auto-update. SHA-256 sums are attached. First launch: Windows SmartScreen > More info > Run anyway; macOS right-click the app > Open."
+          fi
+          gh release upload "$TAG" release-files/* --clobber
+
+      - name: Upload the URL map
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: installer-urls-${{ needs.meta.outputs.channel }}
+          path: installer-urls-${{ needs.meta.outputs.channel }}.json
+          if-no-files-found: error
