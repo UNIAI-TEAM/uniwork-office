@@ -402,6 +402,11 @@ export async function saveWorkbookBytes(input: {
   }
   const targetPath = `${workDir}/saved.xlsx`
   try {
+    // the engine creates parent directories only on writeFile: a save with nothing to write
+    // (Save As or a restored draft's write-back without edits) still needs workDir to exist
+    const marker = `${workDir}/.dir`
+    await engine.writeFile(marker, new Uint8Array())
+    written.push(marker)
     const replacements = await write('replace', plan.replaced)
     const additions = [
       ...(await write('add', plan.added)),

@@ -4286,7 +4286,7 @@ export function App(): React.JSX.Element {
         onCommand={handleRibbonCommand}
         onIsCellEditing={isCellEditing}
         zoomPercent={zoomPercent}
-        canSave={pendingEdits > 0}
+        canSave={pendingEdits > 0 || workbookFile?.restoredFromRecovery === true}
         onSave={() => void handleSave('save')}
         canSaveAs={workbookFile !== null}
         onSaveAs={() => void handleSave('save-as')}
