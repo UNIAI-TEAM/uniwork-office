@@ -71,8 +71,9 @@ export default defineConfig(async ({ command, mode }) => {
             ...(spec.aliases
               ? {
                   alias: [
+                    // exact specifiers: 'node:fs' must not also rewrite 'node:fs/promises'
                     ...Object.entries(spec.aliases).map(([find, target]) => ({
-                      find,
+                      find: new RegExp(`^${find.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}$`),
                       replacement: resolve(repoRoot, target),
                     })),
                     ...(Array.isArray(renderer.resolve?.alias) ? renderer.resolve.alias : []),

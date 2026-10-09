@@ -445,6 +445,62 @@ describe('view-only (no save grant)', () => {
   })
 })
 
+describe('too large (frame size gate)', () => {
+  it('the open fails with too_large and the host hears a fatal too_large (it opens G3)', async () => {
+    const fake = fakeTransport()
+    const tooLarge = {
+      ...fake.transport,
+      open: async () => {
+        throw Object.assign(new Error('too_large: 42 MB of worksheet XML'), { code: 'too_large' })
+      },
+    }
+    const t = setup({ transport: tooLarge })
+    t.mock.init({ documentId: t.file.fileId, capabilities: ALL_GRANTS })
+    await flush()
+    const err = await t.desktop.selectWorkbook().catch((e: unknown) => e)
+    expect((err as { code?: string }).code).toBe('too_large')
+    const fatal = t.mock.errors.filter((e) => (e.error as { code?: string }).code === 'too_large')
+    expect(fatal).toHaveLength(1)
+    expect(fatal[0]!.fatal).toBe(true)
+  })
+})
+
+describe('keyboard accelerators (the desktop File menu keys)', () => {
+  const press = (key: string, init: KeyboardEventInit = {}) => {
+    const event = new KeyboardEvent('keydown', {
+      key,
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+      ...init,
+    })
+    document.dispatchEvent(event)
+    return event
+  }
+
+  it('Ctrl+S saves, Ctrl+Shift+S saves as, Ctrl+P prints; the browser defaults are suppressed', async () => {
+    const t = setup()
+    await t.boot()
+    const actions: string[] = []
+    const off = t.desktop.onMenuAction((a) => actions.push(a))
+    expect(press('s').defaultPrevented).toBe(true)
+    press('S', { shiftKey: true })
+    press('p')
+    off()
+    expect(actions).toEqual(['save', 'save-as', 'print'])
+  })
+
+  it('view-only: Ctrl+S is swallowed but saves nothing', async () => {
+    const t = setup({ grants: { filePick: true } })
+    await t.boot()
+    const actions: string[] = []
+    const off = t.desktop.onMenuAction((a) => actions.push(a))
+    expect(press('s').defaultPrevented).toBe(true)
+    off()
+    expect(actions).toEqual([])
+  })
+})
+
 describe('engine unavailable', () => {
   it('the stub answers engine-unavailable for every operation; close is a no-op', async () => {
     const stub = createUnavailableTransport()

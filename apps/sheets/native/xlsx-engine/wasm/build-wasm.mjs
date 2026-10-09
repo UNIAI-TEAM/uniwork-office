@@ -7,9 +7,10 @@
 // 1. `cargo fetch` of the parent crate (its own Cargo.lock) puts zip 0.6.6 in the registry.
 // 2. That crate is copied to .vendor/zip-0.6.6 with `default = ["deflate"]` (no bzip2/zstd C
 //    code; see Cargo.toml) and its registry sha256 is checked first.
-// 3. cargo builds wasm32-wasip1 release with the toolchain pinned in rust-toolchain.toml, the
-//    committed wasm/Cargo.lock (--locked) and source paths remapped, so the output does not
-//    depend on where the checkout or CARGO_HOME live.
+// 3. cargo builds wasm32-wasip1 release with the toolchain pinned in rust-toolchain.toml and the
+//    committed wasm/Cargo.lock (--locked), from a staging copy at
+//    /tmp/uniwork-xlsx-sidecar-wasm/<input hash>/ with paths remapped, so the output does not
+//    depend on where the checkout, the target dir or CARGO_HOME live.
 // 4. wasm-opt -O2 runs when it is on PATH (recorded in the checksum file's tool line; the
 //    checked-in checksum is for the module *without* wasm-opt unless that line says otherwise).
 // 5. dist/xlsx-sidecar.wasm is compared with xlsx-sidecar.wasm.sha256. A mismatch fails the
@@ -92,7 +93,7 @@ function cargoHome() {
   return process.env.CARGO_HOME || join(homedir(), '.cargo')
 }
 
-function vendorZip() {
+function vendorZip(wasmDir) {
   const registry = join(cargoHome(), 'registry', 'src')
   const source = readdirSync(registry)
     .map((index) => join(registry, index, `zip-${ZIP_VERSION}`))
@@ -102,7 +103,7 @@ function vendorZip() {
   if (sha256(toml) !== ZIP_CARGO_TOML_SHA256) {
     throw new Error(`unexpected zip-${ZIP_VERSION}/Cargo.toml (sha256 ${sha256(toml)})`)
   }
-  const target = join(here, '.vendor', `zip-${ZIP_VERSION}`)
+  const target = join(wasmDir, '.vendor', `zip-${ZIP_VERSION}`)
   rmSync(target, { recursive: true, force: true })
   cpSync(source, target, { recursive: true })
   const patched = toml.toString('utf8').replace(/^default = \[[^\]]*\]/m, 'default = ["deflate"]')
@@ -112,32 +113,48 @@ function vendorZip() {
   rmSync(join(target, '.cargo-checksum.json'), { force: true })
 }
 
-function build() {
+/**
+ * Cargo derives symbol metadata from a path dependency's absolute location, which
+ * --remap-path-prefix does not touch: the same sources built from two checkouts differ. So the
+ * sources are staged at a path that depends only on their content hash, identical on every
+ * machine, and built there.
+ */
+function stage(stamp) {
+  const root = join('/tmp', 'uniwork-xlsx-sidecar-wasm', stamp.slice(0, 16))
+  const stagedCrate = join(root, 'xlsx-engine')
+  rmSync(root, { recursive: true, force: true })
+  mkdirSync(join(stagedCrate, 'wasm'), { recursive: true })
+  for (const name of ['src', 'Cargo.toml', 'Cargo.lock']) {
+    cpSync(join(crateDir, name), join(stagedCrate, name), { recursive: true })
+  }
+  for (const name of ['src', 'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml']) {
+    cpSync(join(here, name), join(stagedCrate, 'wasm', name), { recursive: true })
+  }
+  return { root, crate: stagedCrate, wasm: join(stagedCrate, 'wasm') }
+}
+
+function build(stamp) {
+  const staged = stage(stamp)
   // fetch with the parent crate's lock so zip 0.6.6 is the exact published crate
-  run('cargo', ['fetch', '--manifest-path', join(crateDir, 'Cargo.toml')], { cwd: here })
-  vendorZip()
+  run('cargo', ['fetch', '--manifest-path', join(staged.crate, 'Cargo.toml')], { cwd: staged.wasm })
+  vendorZip(staged.wasm)
+  const targetDir = join(here, 'target')
   const remap = [
-    `--remap-path-prefix=${repoRoot}=/src`,
+    `--remap-path-prefix=${staged.root}=/src`,
+    `--remap-path-prefix=${targetDir}=/target`,
     `--remap-path-prefix=${cargoHome()}=/cargo`,
   ].join(' ')
   run(
     'cargo',
-    [
-      'build',
-      '--release',
-      '--locked',
-      '--target',
-      'wasm32-wasip1',
-      '--target-dir',
-      join(here, 'target'),
-    ],
+    ['build', '--release', '--locked', '--target', 'wasm32-wasip1', '--target-dir', targetDir],
     {
-      cwd: here, // rust-toolchain.toml is read from the working directory
+      cwd: staged.wasm, // rust-toolchain.toml is read from the working directory
       env: { ...process.env, RUSTFLAGS: remap, CARGO_INCREMENTAL: '0', SOURCE_DATE_EPOCH: '0' },
     },
   )
   mkdirSync(distDir, { recursive: true })
-  cpSync(join(here, 'target', 'wasm32-wasip1', 'release', 'xlsx_sidecar_wasm.wasm'), WASM_OUT)
+  cpSync(join(targetDir, 'wasm32-wasip1', 'release', 'xlsx_sidecar_wasm.wasm'), WASM_OUT)
+  rmSync(staged.root, { recursive: true, force: true })
 }
 
 function main() {
@@ -152,7 +169,7 @@ function main() {
     existsSync(STAMP) &&
     readFileSync(STAMP, 'utf8') === stamp
   )) {
-    build()
+    build(stamp)
     writeFileSync(STAMP, stamp)
   } else {
     log('inputs unchanged: reusing dist/xlsx-sidecar.wasm')

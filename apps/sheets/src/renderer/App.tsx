@@ -4169,10 +4169,10 @@ export function App(): React.JSX.Element {
 
   const aiScopeChip = resolveScopeChip(aiRunScope, aiScope, aiScopeDismissed)
 
-  if (engineUnavailable) return <EngineUnavailableScreen reason={engineUnavailable} />
-
   return (
     <>
+      {/* an overlay, not a replacement: the grid stays mounted (Univer must not lose its container) */}
+      {engineUnavailable && <EngineUnavailableScreen reason={engineUnavailable} overlay />}
       <ToastHost />
       {recoveryPrompt && (
         <RecoveryDialog

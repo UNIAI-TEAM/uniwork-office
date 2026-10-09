@@ -315,6 +315,20 @@ There is still no trap, crash or CSP violation at any size. The cap is a UX and 
 3. **After SH2 makes the index incremental** (first viewport ≈ open time: 1.1 s at 1.1M cells, 1.8 s at 2.2M), raise
    the gates to file ≤ **10 MB** and XML ≤ **80 MB** (2.2M cells, about 0.8 GB).
 
+#### 4.5.2 After SH2: incremental index (implemented)
+
+SH2 implemented option C (`docs/web-modules/sheets-module.md`, section SH2). The index now advances in resumable
+passes, so the first viewport no longer waits for the whole sheet.
+
+| cells | first viewport, before → after |
+| ----- | ------------------------------ |
+| 0.22M | 559 → 120 ms                   |
+| 0.44M | 1 219 → 49 ms                  |
+| 1.1M  | 2 864 → 29 ms                  |
+| 2.2M  | 4 924 → 31 ms                  |
+
+Open plus first viewport at 2.2M cells is 2.3 s. Proposed raised gates: 10 MB stored / 80 MB of worksheet XML.
+
 ### 4.4 Pure JS (`@genoffice/xlsx-gateway`, JSZip, no engine)
 
 | Cells                                   | G0 (3 files) | 0.44M   | 2.2M    | 6.6M      |

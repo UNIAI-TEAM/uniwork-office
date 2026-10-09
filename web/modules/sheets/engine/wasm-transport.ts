@@ -29,7 +29,8 @@ import type { ArchiveEntry } from '../../../../packages/xlsx-gateway/src/gateway
 import type { EngineChannel, EngineResponse } from './channel'
 import { blankWorkbook } from './blank'
 import { WORK_DIR } from './host'
-import { resolveSaveRequest, saveWorkbookBytes, type ArchiveEngine } from './save-plan'
+// the save planner (the gateway, most of this module's weight) loads on the first save
+import type { ArchiveEngine } from './save-plan'
 import type { EngineOpenInput, SheetsEngineTransport } from './transport'
 
 /** uncompressed xl/worksheets/*.xml above this opens in G3 instead (browser-measured, C11) */
@@ -235,6 +236,7 @@ export function createWasmTransport(options: WasmTransportOptions): SheetsEngine
     recalc: () => Promise.reject(new Error('recalculation fallback is not available on the web')),
     async serialize(request) {
       const s = session(request.sessionId)
+      const { resolveSaveRequest, saveWorkbookBytes } = await import('./save-plan')
       const { data, plan } = await saveWorkbookBytes({
         engine: archive,
         sourcePath: s.path,

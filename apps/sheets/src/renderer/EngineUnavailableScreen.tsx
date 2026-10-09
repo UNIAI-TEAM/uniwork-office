@@ -9,14 +9,17 @@ import { useI18n } from './i18n/locale'
 /// host replaces the frame with the G3 editor; this is what shows meanwhile.
 export function EngineUnavailableScreen({
   reason = 'engine',
+  overlay = false,
 }: {
   readonly reason?: 'engine' | 'too-large'
+  /// cover the already mounted workbook shell instead of replacing it
+  readonly overlay?: boolean
 } = {}): React.JSX.Element {
   const { t } = useI18n()
   const tooLarge = reason === 'too-large'
   return (
     <main
-      className="engine-unavailable"
+      className={`engine-unavailable${overlay ? ' engine-unavailable-overlay' : ''}`}
       data-testid={tooLarge ? 'sheets-too-large' : 'sheets-engine-unavailable'}
     >
       <section className="engine-unavailable-card" role="alert" aria-live="polite">
