@@ -115,7 +115,7 @@ describe('size gate', () => {
         { name: 'xl/sharedStrings.xml', uncompressedSize: 99, compressedSize: 1, crc32: 0 },
       ]),
     ).toBe(15)
-    expect(MAX_WORKSHEET_XML_BYTES).toBe(40 * 1024 * 1024)
+    expect(MAX_WORKSHEET_XML_BYTES).toBe(80 * 1024 * 1024)
   })
 })
 
@@ -150,7 +150,7 @@ describe('with a mocked engine channel', () => {
           entries: [
             {
               name: 'xl/worksheets/sheet1.xml',
-              uncompressedSize: 41 * 1024 * 1024,
+              uncompressedSize: 81 * 1024 * 1024,
               compressedSize: 1,
               crc32: 0,
             },

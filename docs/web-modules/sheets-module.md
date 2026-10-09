@@ -69,8 +69,9 @@ engine code in Node + the shim):
 | 50k (1.1M, 5.1 MB)      | 2 864 → 29 ms                 | 3.9 → 1.08 s                         | 3.5 s (2.4 s)                          |
 | 100k (2.2M, 10.3 MB)    | 4 924 → 31 ms                 | 6.7 → 2.33 s                         | 9.5 s (5.3 s)                          |
 
-"Before" is the SH1 Chromium probe. A read far below the indexed rows waits for at most one pass. Proposed gates
-(sent to the lead): host 10 MB stored, frame 80 MB of worksheet XML. The code keeps 40 MB until confirmed.
+"Before" is the SH1 Chromium probe. A read far below the indexed rows waits for at most one pass. Gates (lead-confirmed): host 10 MB stored, frame 80 MB of
+worksheet XML (`MAX_WORKSHEET_XML_BYTES`). Chromium, production build, from page load: 20k / 50k / 100k rows usable
+after 4.1 / 4.3 / 5.1 s (`sheets-sidecar.md` 4.5.3).
 
 **Tests (SH2):**
 
@@ -79,7 +80,7 @@ engine code in Node + the shim):
   deep read, close).
 - `bridge.test.ts`: plus too_large and the accelerators. `npx vitest run --root web/modules`: 38 passed.
 - `cargo +1.90.0 test` (desktop): 186 + 6 passed, unchanged.
-- `web/e2e/sheets.spec.ts`: 10 passed on the production build:
+- `web/e2e/sheets.spec.ts`: 13 passed (incl. 3 Chromium timing runs) on the production build:
   - fixtures: edit, kitchen sink, structure;
   - 20k × 22: open, scroll, value + formula, Ctrl+S, bytes at the host, reopened session shows the edit;
   - conflict → Overwrite; `.xls` (vi, dark); view-only (vi, light); too_large (en light, vi dark); blank workbook;

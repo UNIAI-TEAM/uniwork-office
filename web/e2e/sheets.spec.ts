@@ -210,8 +210,10 @@ test.beforeAll(async () => {
   writeFileSync(resolve(fixtures, 'Kitchen-Sink.xlsx'), await buildKitchenSinkFixture())
   writeFileSync(resolve(fixtures, 'Structure.xlsx'), await buildStructureFixture())
   writeFileSync(resolve(fixtures, 'Synthetic-20k.xlsx'), await synthetic(20_000))
-  // 60k x 22 is ~42 MB of worksheet XML: above the frame's 40 MB gate
-  writeFileSync(resolve(fixtures, 'Too-Large.xlsx'), await synthetic(60_000))
+  // 120k x 22 is ~85 MB of worksheet XML: above the frame's 80 MB gate
+  writeFileSync(resolve(fixtures, 'Too-Large.xlsx'), await synthetic(120_000))
+  writeFileSync(resolve(fixtures, 'Synthetic-50k.xlsx'), await synthetic(50_000))
+  writeFileSync(resolve(fixtures, 'Synthetic-100k.xlsx'), await synthetic(100_000))
 })
 
 test.describe.configure({ mode: 'serial' })
@@ -311,6 +313,29 @@ test('20k x 22: open, scroll, edit a value + a formula, save, reopen shows the e
     http: [],
   })
 })
+
+for (const rows of [20_000, 50_000, 100_000]) {
+  test(`Chromium timing: ${rows / 1000}k x 22 open and first viewport`, async ({ page }) => {
+    test.skip(!built(), 'no dist-web/sheets build: npm run build:web -- --module sheets')
+    const name = rows === 20_000 ? 'Synthetic-20k.xlsx' : `Synthetic-${rows / 1000}k.xlsx`
+    const t0 = Date.now()
+    const frame = await openFrame(page, `lang=en&theme=light&open=/fixtures/${name}`)
+    const tInit = Date.now()
+    const wb = await shown(frame)
+    const tOpen = Date.now()
+    const top = await readRange(frame, wb, {
+      startRow: 0,
+      endRow: 99,
+      startColumn: 0,
+      endColumn: 21,
+    })
+    const tFirst = Date.now()
+    expect(top.cells).toHaveLength(2200)
+    const line = `CHROMIUM ${rows} rows: handshake ${tInit - t0} ms, engine open ${tOpen - tInit} ms, first viewport ${tFirst - tOpen} ms, total ${tFirst - t0} ms`
+    console.log(line)
+    test.info().annotations.push({ type: 'timing', description: line })
+  })
+}
 
 test('save conflict: Overwrite saves over the newer version', async ({ page }) => {
   test.skip(!built(), 'no dist-web/sheets build: npm run build:web -- --module sheets')

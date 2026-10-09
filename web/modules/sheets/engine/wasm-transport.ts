@@ -33,8 +33,13 @@ import { WORK_DIR } from './host'
 import type { ArchiveEngine } from './save-plan'
 import type { EngineOpenInput, SheetsEngineTransport } from './transport'
 
-/** uncompressed xl/worksheets/*.xml above this opens in G3 instead (browser-measured, C11) */
-export const MAX_WORKSHEET_XML_BYTES = 40 * 1024 * 1024
+/**
+ * Uncompressed xl/worksheets/*.xml above this opens in G3 instead (C11; lead-confirmed
+ * 2026-10-09). Measured with the incremental index: 2.2M dense cells = 70.8 MB of worksheet XML
+ * open + first viewport in ~2.3 s, renderer peak ~0.8 GB; at 4.4M cells (145 MB) the first paint
+ * is ~4 s and the renderer passes 1.3 GB. Host-side counterpart: 10 MB stored file size.
+ */
+export const MAX_WORKSHEET_XML_BYTES = 80 * 1024 * 1024
 
 export const TOO_LARGE = 'too_large'
 
