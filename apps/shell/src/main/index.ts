@@ -96,6 +96,8 @@ import {
   startUniworkAccount,
   stopUniworkAccount,
 } from './uniwork-auth'
+import { createUniworkDocs, type UniworkDocsHandle } from './uniwork-docs/wiring'
+import { installUniworkModuleSeams } from './uniwork-docs/modules'
 import { isAgentIntentUrl, parseAgentIntentUrl } from './agent-intent-host'
 import { extractLaunchUrlFromArgv, isOfficeAppUrl, parseOfficeAppUrl } from '@uniwork/office-bridge'
 import { OFFICE_APP_KINDS } from '@uniwork/office-bridge-contracts'
@@ -3664,6 +3666,44 @@ const droppedFilesDeps = () => ({
   unsupportedMessage: (exts: string[]) => tm('errUnsupportedExt', { ext: exts.join(', ') }),
 })
 
+let uniworkDocs: UniworkDocsHandle | null = null
+
+/** the tab or detached window showing a path (UniWork documents: Save, reload) */
+function webContentsForPath(
+  path: string,
+): { tabId?: string; webContents: WebContents } | undefined {
+  const tab = tabManager?.findTabByPath(path)
+  if (tab) return { tabId: tab.id, webContents: tab.webContents }
+  const detached = findDetachedTabByPath(path)
+  return detached ? { webContents: detached.webContents } : undefined
+}
+
+function uniworkDocsWiring() {
+  return {
+    shellWindow: () => (shellWindow && !shellWindow.isDestroyed() ? shellWindow : null),
+    shellContents: () =>
+      shellWindow && !shellWindow.isDestroyed() ? shellWindow.webContents : null,
+    openPath: (path: string) => openDocumentPath(path),
+    isPathOpen: (path: string) => webContentsForPath(path) !== undefined,
+    // the module's own Save (same path as the menu), which ends in the user-save hook
+    requestModuleSave: (path: string) => {
+      const target = webContentsForPath(path)
+      if (!target || target.webContents.isDestroyed()) return false
+      target.webContents.send('menu:command', 'save')
+      return true
+    },
+    reloadPath: (path: string) => {
+      const target = webContentsForPath(path)
+      if (target?.tabId && tabManager) tabManager.reloadTab(target.tabId)
+      else if (target && !target.webContents.isDestroyed()) target.webContents.reload()
+    },
+    activePath: () => tabManager?.activeFilePath(),
+    reveal: revealShellWindow,
+    lang: () => currentLang(),
+    defaultSaveDir: () => defaultSaveDir(),
+  }
+}
+
 function registerDroppedFilesIpc(): void {
   ipcMain.on(DROP_OPEN_CHANNEL, (_event, raw: unknown) =>
     handleDroppedFiles(raw, droppedFilesDeps()),
@@ -4031,6 +4071,9 @@ function registerHomeIpc(): void {
   registerAccountIpc(ipcMain, () =>
     shellWindow && !shellWindow.isDestroyed() ? shellWindow.webContents : null,
   )
+  // UniWork documents (open from UniWork, launch links, Save to UniWork); logic in ./uniwork-docs
+  uniworkDocs = createUniworkDocs(ipcMain, uniworkDocsWiring())
+  installUniworkModuleSeams(uniworkDocs.service)
 
   // Reserved for the Hub result channel; the ack is not reported anywhere today.
   ipcMain.handle(HOME_CHANNELS.agentIntentAck, () => undefined)
@@ -4071,7 +4114,9 @@ function registerHomeIpc(): void {
   )
 
   ipcMain.handle(HOME_CHANNELS.recents, (_event, query: unknown): RecentPage =>
-    pageRecentPaths(readRecentFiles(), query, new Set(readStarredFiles())),
+    pageRecentPaths(readRecentFiles(), query, new Set(readStarredFiles()), (path) =>
+      uniworkDocs ? uniworkDocs.service.recentSource(path) : null,
+    ),
   )
 
   ipcMain.handle(HOME_CHANNELS.searchFiles, (_event, raw: unknown): FileSearchPage => {
@@ -6097,11 +6142,13 @@ app.whenReady().then(async () => {
   const lockData = () =>
     authCallbacks.pending()
       ? { authCallbackUrl: authCallbacks.pending() }
-      : pendingLaunchUrl
-        ? { launchUrl: pendingLaunchUrl }
-        : pendingLaunchPaths.length > 0
-          ? { launchPath: pendingLaunchPaths[0], launchPaths: pendingLaunchPaths }
-          : {}
+      : authCallbacks.pendingLaunch()
+        ? { officeLaunchUrl: authCallbacks.pendingLaunch() }
+        : pendingLaunchUrl
+          ? { launchUrl: pendingLaunchUrl }
+          : pendingLaunchPaths.length > 0
+            ? { launchPath: pendingLaunchPaths[0], launchPaths: pendingLaunchPaths }
+            : {}
   let hasLock = app.requestSingleInstanceLock(lockData())
   if (!hasLock && !app.isPackaged) {
     // Dev watch restart: electron-vite SIGTERMs the previous instance and spawns this
@@ -6268,6 +6315,8 @@ app.whenReady().then(async () => {
   // session in the background (after the proxy install), then route held callbacks
   startUniworkAccount(mainProxyReady)
   authCallbacks.start(routeAuthCallback)
+  // UniWork document launch links (held since startup) route from here on
+  uniworkDocs?.activate((route) => authCallbacks.startLaunch(route))
 
   // resource watchdog: a renderer that stays hot for minutes gets diagnostics
   // recorded and the user an offer to close the document (headless exports

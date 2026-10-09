@@ -294,6 +294,39 @@ export class SessionCore {
     this.refreshTimer = setTimeout(() => void this.refresh().catch(() => undefined), delay)
   }
 
+  /**
+   * Public form of authorized() for other main-process cloud callers: `call`
+   * signals a 401 by throwing TransportError('unauthorized'), which shares the
+   * single in-flight refresh and retries once. Only while the account shows a
+   * session (signed-in, refreshing, or server-unreachable with a credential).
+   */
+  authorizedRequest<T>(call: (token: string) => Promise<T>): Promise<T> {
+    if (
+      !this.session ||
+      !(
+        this.state === 'signed-in' ||
+        this.state === 'refreshing' ||
+        this.state === 'server-unreachable'
+      )
+    ) {
+      return Promise.reject(this.markHandled(new TransportError('unauthorized')))
+    }
+    return this.authorized(call)
+  }
+
+  /** who the session belongs to (never a token); null without a session */
+  sessionIdentity(): { accountId: string; deviceSessionId: string; deploymentId: string } | null {
+    if (!this.session || !this.profile) return null
+    if (!(
+      this.state === 'signed-in' ||
+      this.state === 'refreshing' ||
+      this.state === 'server-unreachable'
+    ))
+      return null
+    const { accountId, deviceSessionId } = this.session.credential
+    return { accountId, deviceSessionId, deploymentId: this.profile.deploymentId }
+  }
+
   /** one 401 -> refresh -> retry; session-level failures are applied once */
   protected async authorized<T>(call: (token: string) => Promise<T>): Promise<T> {
     if (!this.session) throw this.markHandled(new TransportError('unauthorized'))

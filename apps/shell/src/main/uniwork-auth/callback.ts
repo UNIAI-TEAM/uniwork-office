@@ -5,8 +5,31 @@ import type { PendingLoginAttempt } from './pkce'
  * to the `uniwork://` office-bridge router. */
 const AUTH_SCHEME_PREFIX = /^uniwork-office(-dev)?:\/\//i
 
+/** `uniwork-office[-dev]://open...`: a UniWork document launch link, not a
+ * sign-in callback (the launch parser validates the rest). */
+const LAUNCH_URL_PREFIX = /^uniwork-office(-dev)?:\/\/open(?:[/?#]|$)/i
+
+export function isOfficeLaunchUrl(url: unknown): url is string {
+  return typeof url === 'string' && LAUNCH_URL_PREFIX.test(url)
+}
+
 export function isAuthCallbackUrl(url: unknown): url is string {
-  return typeof url === 'string' && AUTH_SCHEME_PREFIX.test(url)
+  return typeof url === 'string' && AUTH_SCHEME_PREFIX.test(url) && !isOfficeLaunchUrl(url)
+}
+
+/** a document launch link from a cold-start or second-instance argv */
+export function extractOfficeLaunchFromArgv(argv: readonly unknown[]): string | null {
+  for (const arg of argv) if (isOfficeLaunchUrl(arg)) return arg
+  return null
+}
+
+/** a document launch link handed over in a second instance's lock data */
+export function extractOfficeLaunchFromLockData(data: unknown): string | null {
+  if (!data || typeof data !== 'object') return null
+  const value = data as Record<string, unknown>
+  if (isOfficeLaunchUrl(value.officeLaunchUrl)) return value.officeLaunchUrl
+  if (isOfficeLaunchUrl(value.launchUrl)) return value.launchUrl
+  return null
 }
 
 /** Windows/Linux deliver the callback as a command-line argument (cold start

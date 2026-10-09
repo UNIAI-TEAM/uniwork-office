@@ -1,0 +1,432 @@
+import { copyFile, readFile } from 'node:fs/promises'
+import { extname, join } from 'node:path'
+import type {
+  RecentUniworkSource,
+  UniworkConflictChoice,
+  UniworkDocAccess,
+  UniworkDocFormat,
+  UniworkDocListPage,
+  UniworkDocListQuery,
+  UniworkDocStatus,
+  UniworkLaunchEvent,
+  UniworkResult,
+  UniworkWorkspaceRef,
+} from '../../shared/home-api'
+import type { DeploymentProfile } from '../uniwork-auth/deployment'
+import { callbackSchemeForChannel } from '../uniwork-auth/deployment'
+import { type Binding, BindingStore, type BoundDocument } from './binding-store'
+import { type FetchLike, type UniworkDocsClient, createUniworkDocsClient } from './client'
+import { UniworkDocError } from './errors'
+import { formatForMime, formatForName, sanitizeFilename, sha256Hex } from './formats'
+import { LaunchController } from './launch'
+import type { DocumentDetail, LaunchDescriptor } from './parse'
+import { SaveCoordinator, toStatus } from './save-coordinator'
+
+/**
+ * UniWork documents in the shell main process: the picker reads, the open
+ * flow (download -> working copy + binding -> the normal module open), the
+ * launch bridge, the save coordinator, conflict resolution, the module
+ * policy and the recents filter. Electron-free: windows, dialogs, tabs and
+ * IPC come in through `deps` (see wiring.ts).
+ */
+
+export interface SessionIdentity {
+  accountId: string
+  deviceSessionId: string
+  deploymentId: string
+}
+
+/** the native conflict choice (rule 3); the strings live with the dialog */
+export interface ConflictUi {
+  chooseConflict(title: string): Promise<UniworkConflictChoice>
+  confirmDiscard(title: string): Promise<boolean>
+  /** Save As for "Save a copy on this computer" (default `<stem> (my copy).<ext>`); null when cancelled */
+  pickCopyPath(stem: string, format: UniworkDocFormat): Promise<string | null>
+  showOpenLatestFailed(): void
+}
+
+export interface UniworkDocsServiceDeps {
+  userDataDir: string
+  profile(): DeploymentProfile | null
+  identity(): SessionIdentity | null
+  selectedOrgId(): string | null
+  authorized<T>(call: (token: string) => Promise<T>): Promise<T>
+  fetch?: FetchLike
+  /** the shell's single document router; false = nothing opened */
+  openPath(path: string): boolean
+  /** a tab or detached window shows this path */
+  isPathOpen(path: string): boolean
+  /** runs the owning tab's module Save; false when no tab shows the path */
+  requestModuleSave(path: string): boolean
+  /** remounts the tab showing the path so it re-reads the file */
+  reloadPath(path: string): void
+  activePath(): string | undefined
+  ui: ConflictUi
+  pushStatus(status: UniworkDocStatus): void
+  pushLaunch(event: UniworkLaunchEvent): void
+  reveal(): void
+  /** test seam: replaces the HTTP client */
+  client?: UniworkDocsClient
+  sleep?(ms: number): Promise<void>
+  now?(): number
+}
+
+/** states whose working copy holds work UniWork does not have yet */
+const KEEP_LOCAL_STATES: ReadonlySet<string> = new Set([
+  'dirty',
+  'conflict',
+  'offline',
+  'blocked',
+  'signed-out',
+  'error',
+])
+
+async function result<T>(run: () => Promise<T>): Promise<UniworkResult<T>> {
+  try {
+    return { ok: true, value: await run() }
+  } catch (error) {
+    return { ok: false, error: error instanceof UniworkDocError ? error.code : 'server_error' }
+  }
+}
+
+function accessFor(level: string | null): UniworkDocAccess {
+  return level === 'edit' || level === 'manage' ? 'edit' : 'view'
+}
+
+export class UniworkDocsService {
+  readonly store: BindingStore
+  readonly coordinator: SaveCoordinator
+  readonly launch: LaunchController
+  private readonly deps: UniworkDocsServiceDeps
+  private client: UniworkDocsClient | null
+  private clientOrigin: string | null = null
+
+  constructor(deps: UniworkDocsServiceDeps) {
+    this.deps = deps
+    this.client = deps.client ?? null
+    this.store = new BindingStore(join(deps.userDataDir, 'uniwork-documents'))
+    this.coordinator = new SaveCoordinator({
+      store: this.store,
+      client: {
+        upload: (input) => this.api().upload(input),
+        commit: (input) => this.api().commit(input),
+      },
+      isSignedIn: () => deps.identity() !== null,
+      ownsBinding: (doc) => this.owns(doc),
+      publish: (status) => deps.pushStatus(status),
+      ...(deps.sleep ? { sleep: deps.sleep } : {}),
+    })
+    this.launch = new LaunchController({
+      scheme: () => {
+        const profile = deps.profile()
+        return profile ? callbackSchemeForChannel(profile.channel) : null
+      },
+      isSignedIn: () => deps.identity() !== null,
+      identity: () => deps.identity(),
+      profile: () => deps.profile(),
+      exchange: (input) => this.api().exchange(input),
+      open: (descriptor) => this.openFromServer(descriptor.id, descriptor),
+      emit: (event) => deps.pushLaunch(event),
+      reveal: () => deps.reveal(),
+      ...(deps.now ? { now: deps.now } : {}),
+    })
+  }
+
+  /** the client for the current profile origin (rebuilt if the origin changes) */
+  private api(): UniworkDocsClient {
+    if (this.deps.client) return this.deps.client
+    const profile = this.deps.profile()
+    if (!profile) throw new UniworkDocError('not_signed_in')
+    if (!this.client || this.clientOrigin !== profile.apiOrigin) {
+      this.client = createUniworkDocsClient({
+        apiOrigin: profile.apiOrigin,
+        authorized: (call) => this.deps.authorized(call),
+        isSignedIn: () => this.deps.identity() !== null,
+        ...(this.deps.fetch ? { fetch: this.deps.fetch } : {}),
+      })
+      this.clientOrigin = profile.apiOrigin
+    }
+    return this.client
+  }
+
+  /** the binding belongs to the signed-in account and the active deployment */
+  owns(doc: BoundDocument): boolean {
+    const identity = this.deps.identity()
+    const profile = this.deps.profile()
+    return (
+      !!identity &&
+      !!profile &&
+      identity.deploymentId === profile.deploymentId &&
+      doc.deploymentId === identity.deploymentId &&
+      doc.userId === identity.accountId
+    )
+  }
+
+  // ---- module policy -------------------------------------------------------
+
+  isBound(path: string): boolean {
+    return this.store.lookup(path) !== null
+  }
+
+  /** view access, or a working copy of another account/deployment */
+  isReadOnly(path: string): boolean {
+    const doc = this.store.lookup(path)
+    return !!doc && (doc.binding.access === 'view' || !this.owns(doc))
+  }
+
+  /** a module's successful explicit user Save of `path` */
+  onUserSave(path: string): void {
+    if (this.isBound(path)) void this.coordinator.save(path)
+  }
+
+  // ---- renderer API ----------------------------------------------------------
+
+  listWorkspaces(): Promise<UniworkResult<UniworkWorkspaceRef[]>> {
+    return result(async () => {
+      if (!this.deps.identity()) throw new UniworkDocError('not_signed_in')
+      const orgId = this.deps.selectedOrgId()
+      return orgId ? this.api().listWorkspaces(orgId) : []
+    })
+  }
+
+  listDocuments(query: UniworkDocListQuery): Promise<UniworkResult<UniworkDocListPage>> {
+    return result(async () => {
+      if (!query || typeof query.workspaceId !== 'string') throw new UniworkDocError('not_found')
+      return this.api().listDocuments({
+        workspaceId: query.workspaceId,
+        ...(typeof query.query === 'string' ? { query: query.query } : {}),
+        ...(typeof query.cursor === 'string' ? { cursor: query.cursor } : {}),
+        ...(typeof query.limit === 'number' ? { limit: query.limit } : {}),
+      })
+    })
+  }
+
+  openDocument(documentId: string): Promise<UniworkResult<{ path: string }>> {
+    return result(async () => {
+      if (typeof documentId !== 'string') throw new UniworkDocError('not_found')
+      const { path } = await this.openFromServer(documentId)
+      return { path }
+    })
+  }
+
+  docStatus(path: string): UniworkDocStatus | null {
+    if (typeof path !== 'string') return null
+    const doc = this.store.lookup(path)
+    return doc && this.owns(doc) ? toStatus(doc) : null
+  }
+
+  activeDocStatus(): UniworkDocStatus | null {
+    const path = this.deps.activePath()
+    return path ? this.docStatus(path) : null
+  }
+
+  /** Save/Retry from the chip: always through the module's own Save */
+  async save(path: string): Promise<UniworkDocStatus | null> {
+    const doc = typeof path === 'string' ? this.store.lookup(path) : null
+    if (!doc || !this.owns(doc)) return null
+    const b = doc.binding
+    if (b.access === 'view' || b.state === 'conflict' || this.coordinator.isSaving(doc.path)) {
+      return toStatus(doc)
+    }
+    if (b.state === 'blocked' && b.error !== 'quota_exceeded') return toStatus(doc)
+    if (this.deps.requestModuleSave(doc.path)) return toStatus(doc)
+    // no tab shows it: the file on disk is the user's last saved bytes
+    const saved = await this.coordinator.save(doc.path)
+    return saved ? toStatus(saved) : null
+  }
+
+  async resolveConflict(path: string): Promise<UniworkDocStatus | null> {
+    const doc = typeof path === 'string' ? this.store.lookup(path) : null
+    if (!doc || !this.owns(doc)) return null
+    if (doc.binding.state !== 'conflict') return toStatus(doc)
+    const choice = await this.deps.ui.chooseConflict(doc.binding.title)
+    if (choice === 'overwrite') return this.overwrite(doc)
+    if (choice === 'save-local-copy') {
+      const titleExt = extname(doc.binding.title)
+      const stem =
+        (titleExt ? doc.binding.title.slice(0, -titleExt.length) : doc.binding.title) || 'document'
+      const target = await this.deps.ui.pickCopyPath(stem, doc.binding.format)
+      // a plain local file; the document itself stays in conflict
+      if (target) await copyFile(doc.path, target).catch(() => undefined)
+      return toStatus(doc)
+    }
+    if (choice === 'open-latest') {
+      if (!(await this.deps.ui.confirmDiscard(doc.binding.title))) return toStatus(doc)
+      try {
+        return toStatus(await this.replaceWithLatest(doc))
+      } catch {
+        this.deps.ui.showOpenLatestFailed()
+        return toStatus(doc)
+      }
+    }
+    return toStatus(doc)
+  }
+
+  /** recents: null = not a UniWork copy, 'hidden' = another account/deployment */
+  recentSource(path: string): RecentUniworkSource | 'hidden' | null {
+    const doc = this.store.lookup(path)
+    if (!doc) return this.store.isInside(path) ? 'hidden' : null
+    if (!this.owns(doc)) return 'hidden'
+    const b = doc.binding
+    return {
+      documentId: b.documentId,
+      workspaceId: b.workspaceId,
+      title: b.title,
+      access: b.access,
+    }
+  }
+
+  // ---- flows -----------------------------------------------------------------
+
+  /** "Save my version as the newest version": a new intent on the server's revision */
+  private async overwrite(doc: BoundDocument): Promise<UniworkDocStatus | null> {
+    let serverRevision = doc.binding.serverRevision
+    if (!serverRevision) {
+      try {
+        serverRevision = (await this.api().getDocument(doc.binding.documentId)).revision
+      } catch (error) {
+        const code = error instanceof UniworkDocError ? error.code : 'server_error'
+        await this.coordinator.commitState(doc, { ...doc.binding, error: code })
+        return toStatus(doc)
+      }
+    }
+    const next: Binding = {
+      ...doc.binding,
+      baseRevision: serverRevision,
+      // the server's bytes are unknown here: the next Save always uploads
+      baseChecksum: '',
+      state: 'dirty',
+    }
+    delete next.error
+    delete next.serverRevision
+    delete next.pendingIntent
+    const ready = await this.coordinator.commitState(doc, next)
+    if (this.deps.requestModuleSave(ready.path)) return toStatus(ready)
+    const saved = await this.coordinator.save(ready.path)
+    return saved ? toStatus(saved) : toStatus(ready)
+  }
+
+  /** "Discard my changes and open the latest": download, replace, reload the tab */
+  private async replaceWithLatest(doc: BoundDocument): Promise<BoundDocument> {
+    const { detail, bytes } = await this.fetchLatest(doc.binding.documentId)
+    await this.store.writeWorkingCopy(doc.dir, doc.binding.filename, bytes)
+    await this.store.dropIntentPayload(doc.dir)
+    const next: Binding = {
+      ...doc.binding,
+      title: detail.title,
+      access: accessFor(detail.myLevel),
+      baseRevision: detail.revision,
+      baseVersion: detail.file.version,
+      baseChecksum: sha256Hex(bytes),
+      state: 'saved',
+    }
+    delete next.error
+    delete next.serverRevision
+    delete next.pendingIntent
+    const done = await this.coordinator.commitState(doc, next)
+    this.deps.reloadPath(doc.path)
+    return done
+  }
+
+  /** detail + bytes of the current version, consistent with each other */
+  private async fetchLatest(
+    documentId: string,
+    first?: DocumentDetail,
+  ): Promise<{ detail: DocumentDetail; bytes: Uint8Array }> {
+    let detail = first ?? (await this.api().getDocument(documentId))
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const { bytes } = await this.api().download(documentId)
+      if (sha256Hex(bytes) === detail.file.checksumSha256) return { detail, bytes }
+      // a save landed between the two reads: read the detail again
+      detail = await this.api().getDocument(documentId)
+    }
+    throw new UniworkDocError('malformed_response')
+  }
+
+  /** picker, recents reopen and launch: the one open flow */
+  async openFromServer(
+    documentId: string,
+    launch?: LaunchDescriptor,
+  ): Promise<{ path: string; title: string }> {
+    const identity = this.deps.identity()
+    if (!identity) throw new UniworkDocError('not_signed_in')
+    const profile = this.deps.profile()
+    if (!profile || profile.deploymentId !== identity.deploymentId) {
+      throw new UniworkDocError('wrong_deployment')
+    }
+    const detail = await this.api().getDocument(documentId)
+    const format =
+      formatForMime(detail.file.mimeType) ??
+      formatForName(detail.file.filename) ??
+      formatForName(detail.title)
+    if (!format) throw new UniworkDocError('unsupported_format')
+    const historical = !!launch && launch.version > 0
+    const access: UniworkDocAccess =
+      launch && (launch.operation === 'view' || historical) ? 'view' : accessFor(detail.myLevel)
+    const key = historical ? `${documentId}@v${launch.version}` : documentId
+    const dir = this.store.dirFor(identity.deploymentId, identity.accountId, key)
+    const existing = await this.store.readDir(dir)
+    const workspaceId = launch?.workspaceId ?? detail.workspaceId
+    const orgId = launch?.organizationId ?? detail.organizationId
+
+    if (existing && existing.documentId === documentId) {
+      const local = join(dir, existing.filename)
+      if (this.store.exists(local)) {
+        const localChecksum = await readFile(local)
+          .then((bytes) => sha256Hex(new Uint8Array(bytes)))
+          .catch(() => '')
+        const keepLocal =
+          !!existing.pendingIntent ||
+          KEEP_LOCAL_STATES.has(existing.state) ||
+          localChecksum !== existing.baseChecksum ||
+          this.deps.isPathOpen(local)
+        const current = historical || existing.baseRevision === detail.revision
+        if (keepLocal || current) {
+          // a forbidden save already downgraded access; the server never upgrades it here
+          const keptAccess: UniworkDocAccess =
+            existing.state === 'blocked' && existing.error === 'forbidden' ? 'view' : access
+          const binding: Binding = { ...existing, title: detail.title, access: keptAccess }
+          await this.store.write(dir, binding)
+          return this.show(local, binding)
+        }
+      }
+    }
+
+    let bytes: Uint8Array
+    let base = detail
+    if (historical) {
+      bytes = (await this.api().download(documentId, launch.version)).bytes
+    } else {
+      const latest = await this.fetchLatest(documentId, detail)
+      bytes = latest.bytes
+      base = latest.detail
+    }
+    const filename =
+      existing?.filename ?? sanitizeFilename(detail.file.filename || detail.title, format)
+    const path = await this.store.writeWorkingCopy(dir, filename, bytes)
+    const binding: Binding = {
+      schema: 1,
+      documentId,
+      workspaceId,
+      orgId,
+      title: base.title,
+      filename,
+      format,
+      access,
+      baseRevision: historical ? launch.revision : base.revision,
+      baseVersion: historical ? launch.version : base.file.version,
+      baseChecksum: sha256Hex(bytes),
+      state: 'ready',
+      ...(existing?.lastSavedAt ? { lastSavedAt: existing.lastSavedAt } : {}),
+    }
+    await this.store.write(dir, binding)
+    return this.show(path, binding)
+  }
+
+  private show(path: string, binding: Binding): { path: string; title: string } {
+    if (!this.deps.openPath(path)) throw new UniworkDocError('unsupported_format')
+    const doc = this.store.lookup(path)
+    if (doc) this.deps.pushStatus(toStatus(doc))
+    return { path, title: binding.title }
+  }
+}

@@ -1,6 +1,6 @@
 import { statSync } from 'node:fs'
 import { basename, extname } from 'node:path'
-import type { RecentEntry, RecentPage, RecentQuery } from '../shared/home-api'
+import type { RecentEntry, RecentPage, RecentQuery, RecentUniworkSource } from '../shared/home-api'
 
 const RECENT_PAGE_DEFAULT = 50
 const RECENT_PAGE_MAX = 200
@@ -90,21 +90,37 @@ export function matchesExtFamily(entryExt: string, filterExt: string): boolean {
   return family ? family.includes(entryExt) : entryExt === filterExt
 }
 
+/**
+ * What recents know about UniWork working copies: null = a plain local file,
+ * 'hidden' = a copy of another account or deployment (kept on disk, not listed),
+ * else the document it belongs to.
+ */
+export type RecentUniworkLookup = (path: string) => RecentUniworkSource | 'hidden' | null
+
 /** Page over the recents paths, preserving the source's newest-first order (unavailable paths stay, flagged missing). */
 export function pageRecentPaths(
   paths: readonly string[],
   raw: unknown,
   starredPaths: ReadonlySet<string>,
+  uniwork?: RecentUniworkLookup,
 ): RecentPage {
   const { offset, limit, ext } = normalizeRecentQuery(raw)
+  const visible = uniwork ? paths.filter((p) => uniwork(p) !== 'hidden') : paths
   // stat only the returned page: statting the whole list blocked main on long recents
   const filtered = ext
-    ? paths.filter((p) => matchesExtFamily(extname(p).slice(1).toLowerCase(), ext))
-    : paths
+    ? visible.filter((p) => matchesExtFamily(extname(p).slice(1).toLowerCase(), ext))
+    : visible
   const page = limit === 0 ? [] : filtered.slice(offset, offset + limit)
+  const entries = statPathEntries(page, starredPaths)
+  if (uniwork) {
+    for (const entry of entries) {
+      const source = uniwork(entry.path)
+      if (source && source !== 'hidden') entry.uniwork = source
+    }
+  }
   return {
-    entries: statPathEntries(page, starredPaths),
+    entries,
     total: filtered.length,
-    totalAll: paths.length,
+    totalAll: visible.length,
   }
 }
