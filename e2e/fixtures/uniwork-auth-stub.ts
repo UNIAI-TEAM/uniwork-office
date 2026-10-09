@@ -41,6 +41,32 @@ export interface StubAttempt {
 
 export type StubRefreshMode = 'ok' | 'device_revoked' | 'refresh_reused'
 
+/**
+ * What a route extension sees for a request that already carried a live bearer
+ * token and matched no auth route (see `UniworkAuthStubOptions.extend`).
+ */
+export interface StubRouteContext {
+  req: IncomingMessage
+  res: ServerResponse
+  /** path below `/api/v1` */
+  route: string
+  url: URL
+  /** the raw request body */
+  readBody(): Promise<Buffer>
+  send(status: number, body: unknown): void
+  /** the device session the stub issued last (what a launch exchange must carry) */
+  deviceSessionId(): string
+}
+
+export interface UniworkAuthStubOptions {
+  /**
+   * Extra authenticated routes on the same origin. Resolve true once the
+   * request was answered (or deliberately left hanging/dropped); false falls
+   * through to the stub's 404.
+   */
+  extend?: (ctx: StubRouteContext) => Promise<boolean> | boolean
+}
+
 export interface UniworkAuthStub {
   /** `http://127.0.0.1:<port>` */
   origin: string
@@ -55,6 +81,8 @@ export interface UniworkAuthStub {
   setRefreshBehavior(mode: StubRefreshMode): void
   /** every secret the stub issued or saw (tokens, codes, PKCE verifiers, attempt states) */
   issuedSecrets(): string[]
+  /** the device session id of the last sign-in ('' before one) */
+  deviceSessionId(): string
   close(): Promise<void>
 }
 
@@ -62,7 +90,9 @@ function b64url(buf: Buffer): string {
   return buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
 
-export async function startUniworkAuthStub(): Promise<UniworkAuthStub> {
+export async function startUniworkAuthStub(
+  options: UniworkAuthStubOptions = {},
+): Promise<UniworkAuthStub> {
   const attempts: StubAttempt[] = []
   const codes = new Map<string, StubAttempt>()
   const secrets: string[] = []
@@ -248,6 +278,22 @@ export async function startUniworkAuthStub(): Promise<UniworkAuthStub> {
         ],
       })
     }
+    if (options.extend) {
+      const handled = await options.extend({
+        req,
+        res,
+        route,
+        url,
+        readBody: async () => {
+          const chunks: Buffer[] = []
+          for await (const chunk of req) chunks.push(chunk as Buffer)
+          return Buffer.concat(chunks)
+        },
+        send: (status, body) => send(res, status, body),
+        deviceSessionId: () => deviceSessionId,
+      })
+      if (handled) return
+    }
     return fail(res, 404, 'not_found')
   }
 
@@ -278,6 +324,7 @@ export async function startUniworkAuthStub(): Promise<UniworkAuthStub> {
       refreshMode = mode
     },
     issuedSecrets: () => [...secrets],
+    deviceSessionId: () => deviceSessionId,
     close: () =>
       new Promise<void>((resolve, reject) => {
         server.closeAllConnections()
