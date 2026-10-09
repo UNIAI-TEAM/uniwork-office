@@ -12,6 +12,7 @@ import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { createRequire } from 'node:module'
+import { spawn } from 'node:child_process'
 
 export const SHELL_DIR = resolve(__dirname, '../apps/shell')
 export const ARTIFACTS_DIR = resolve(__dirname, 'artifacts')
@@ -31,6 +32,8 @@ interface LaunchOptions {
   videoDir: string
   /** absolute document path passed as argv, opened in an editor tab on launch */
   openFile?: string
+  /** URL (e.g. a uniwork:// launch token) appended to argv, like an OS protocol handoff */
+  openUrl?: string
   /** extra environment variables for the launched app */
   env?: Record<string, string>
 }
@@ -69,6 +72,7 @@ export async function launchShell(options: LaunchOptions): Promise<LaunchedApp> 
   if (process.platform === 'linux') args.push('--no-sandbox', '--disable-gpu')
   args.push(SHELL_DIR)
   if (options.openFile) args.push(options.openFile)
+  if (options.openUrl) args.push(options.openUrl)
   const app = await electron.launch({
     executablePath,
     args,
@@ -94,6 +98,49 @@ export async function launchShell(options: LaunchOptions): Promise<LaunchedApp> 
   const page = await app.firstWindow()
   await waitForDocumentReady(app, page)
   return { app, page, userDataDir }
+}
+
+/**
+ * Simulates the OS handing a protocol URL to an already-running app on
+ * Windows/Linux: a second process started with the URL in argv hits the
+ * single-instance lock, forwards its argv to the running instance and exits.
+ * Resolves with the second process's exit code.
+ */
+export async function handoffUrlToRunningApp(
+  userDataDir: string,
+  url: string,
+  env: Record<string, string> = {},
+): Promise<number | null> {
+  const require = createRequire(join(SHELL_DIR, 'package.json'))
+  const executablePath = require('electron') as unknown as string
+  const { ELECTRON_RUN_AS_NODE: _electronRunAsNode, ...hostEnv } = process.env
+  const args: string[] = []
+  if (process.platform === 'linux') args.push('--no-sandbox', '--disable-gpu')
+  args.push(SHELL_DIR, url)
+  const child = spawn(executablePath, args, {
+    env: {
+      ...hostEnv,
+      GENOFFICE_USER_DATA: userDataDir,
+      GENOFFICE_NO_SPARE_VIEW: '1',
+      ...env,
+      ...(process.platform === 'linux' ? { ELECTRON_DISABLE_SANDBOX: '1' } : {}),
+    },
+    stdio: 'ignore',
+  })
+  return new Promise((resolveExit, reject) => {
+    const timer = setTimeout(() => {
+      child.kill('SIGKILL')
+      reject(new Error('second instance did not exit after the single-instance handoff'))
+    }, 30_000)
+    child.once('error', (err) => {
+      clearTimeout(timer)
+      reject(err)
+    })
+    child.once('exit', (code) => {
+      clearTimeout(timer)
+      resolveExit(code)
+    })
+  })
 }
 
 /**
