@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
+  breakOpportunity,
   decideLineShrinks,
+  isShrinkCandidate,
   sameLine,
   type ShrinkGap,
   type ShrinkLine,
@@ -107,6 +109,39 @@ describe('decideLineShrinks — Word compat15 pull rule', () => {
     expect(decideLineShrinks([l])[0]).toBeNull()
   })
 
+  it('falls back to the hyphen fragment when the whole word overshoots the cap', () => {
+    // whole word: delta 12 > cap 8.75; fragment (5pt shorter than the word by
+    // 5): delta 7 passes both rules and sizes the compression
+    const l = line(10, 12, 60)
+    l.nextFragmentWidth = 55
+    const [pull] = decideLineShrinks([l])
+    expect(pull).not.toBeNull()
+    expect(pull!.perChar).toBeCloseTo((7 + 0.5) / 10, 5)
+  })
+
+  it('prefers the whole word when both candidates pass', () => {
+    const l = line(10, 5, 13.21)
+    l.nextFragmentWidth = 10
+    const [pull] = decideLineShrinks([l])
+    expect(pull!.perChar).toBeCloseTo((5 + 0.5) / 10, 5)
+  })
+
+  it("pulls across a hyphen break with the line's own spaces (zero-char boundary)", () => {
+    const l = line(10, 5, 30)
+    l.boundary = { width: 0, chars: 0, from: 0, to: 0 }
+    // re-balance: the helper priced a 3.5pt boundary space into the words
+    l.wordWidths[0] += SP
+    const [pull] = decideLineShrinks([l])
+    expect(pull).not.toBeNull()
+    expect(pull!.gaps).toHaveLength(10)
+    expect(pull!.perChar).toBeCloseTo((5 + 0.5) / 9, 5)
+  })
+
+  it('tolerates a cap overshoot below one LayoutUnit', () => {
+    expect(decideLineShrinks([line(10, 8.75 + 1 / 100, 25.66)])[0]).not.toBeNull()
+    expect(decideLineShrinks([line(10, 8.75 + 1 / 32, 25.66)])[0]).toBeNull()
+  })
+
   it('never divides by zero on a single-gap line', () => {
     const l: ShrinkLine = {
       wordWidths: [400],
@@ -148,5 +183,97 @@ describe('sameLine — rendered-line grouping of word boxes', () => {
   it('still separates lines that merely touch', () => {
     expect(sameLine(box(0, 14), box(14, 14))).toBe(false)
     expect(sameLine(box(0, 14), box(13.5, 14))).toBe(false)
+  })
+})
+
+describe('shrink meta survives plugin state application', () => {
+  it("keeps the meta array intact for 'transaction' listeners", async () => {
+    const { Editor } = await import('@tiptap/core')
+    const { Decoration } = await import('@tiptap/pm/view')
+    const { editorExtensions } = await import('../src/renderer/editor/extensions')
+    const { justifyShrinkPluginKey } = await import('../src/renderer/editor/justify-shrink')
+    const editor = new Editor({
+      element: document.createElement('div'),
+      extensions: editorExtensions,
+      content: {
+        type: 'doc',
+        content: [
+          {
+            type: 'docParagraph',
+            attrs: { align: 'justify' },
+            content: [{ type: 'text', text: 'un paragraphe justifié avec des espaces' }],
+          },
+        ],
+      },
+    })
+    try {
+      const decos = [
+        Decoration.inline(1, 3, { class: 'doc-jshrink', style: 'word-spacing:-0.1px' }),
+        Decoration.inline(4, 8, { class: 'doc-jshrink', style: 'word-spacing:-0.2px' }),
+      ]
+      // DecorationSet.create (run by the plugin's apply) nulls out consumed
+      // entries of the array it is handed; the App-level listener then read
+      // null.from and broke Enter, paste and save on shrink-active documents.
+      const seen: Array<unknown | null> = []
+      editor.on('transaction', ({ transaction }) => {
+        const meta = transaction.getMeta(justifyShrinkPluginKey) as Array<{ from: number } | null>
+        if (meta) seen.push(...meta)
+      })
+      editor.view.dispatch(
+        editor.state.tr.setMeta(justifyShrinkPluginKey, decos).setMeta('addToHistory', false),
+      )
+      expect(seen).toHaveLength(2)
+      expect(seen.every((d) => d !== null)).toBe(true)
+      expect(seen.map((d) => (d as { from: number }).from)).toEqual([1, 4])
+      // the original array must not have been consumed either
+      expect(decos.every((d) => d !== null)).toBe(true)
+    } finally {
+      editor.destroy()
+    }
+  })
+})
+
+describe('isShrinkCandidate', () => {
+  const para = (textContent: string, align?: string | null) => ({
+    attrs: { align: align ?? null },
+    textContent,
+  })
+
+  it('keeps paragraphs whose justification is inherited from the style (no align attr)', () => {
+    expect(isShrinkCandidate(para('two words'))).toBe(true)
+    expect(isShrinkCandidate(para('two words', 'justify'))).toBe(true)
+  })
+
+  it('drops explicit non-justified alignments', () => {
+    expect(isShrinkCandidate(para('two words', 'left'))).toBe(false)
+    expect(isShrinkCandidate(para('two words', 'center'))).toBe(false)
+  })
+
+  it('drops single-word, tabbed and CJK paragraphs', () => {
+    expect(isShrinkCandidate(para('word'))).toBe(false)
+    expect(isShrinkCandidate(para('a b\tc'))).toBe(false)
+    expect(isShrinkCandidate(para('\tfirst line indent'))).toBe(true)
+    expect(isShrinkCandidate(para('\u4e2d\u6587 text'))).toBe(false)
+  })
+})
+
+describe('breakOpportunity', () => {
+  it('finds the head through the first hyphen Chromium breaks after', () => {
+    expect(breakOpportunity('temir(II,III)-oksid,')).toBe(14)
+    expect(breakOpportunity("o'z-o'zini")).toBe(4)
+    expect(breakOpportunity('x\u2013y')).toBe(2)
+  })
+
+  it('breaks after a hyphen between digits like Chromium (a digit-hyphen word wrapped there bailed the whole paragraph)', () => {
+    expect(breakOpportunity('53:4-12),')).toBe(5)
+    expect(breakOpportunity('2020-2021')).toBe(5)
+    expect(breakOpportunity('re-1')).toBe(3)
+  })
+
+  it('ignores hyphens at the ends, before another hyphen, and words without one', () => {
+    expect(breakOpportunity('-abc')).toBe(0)
+    expect(breakOpportunity('a--b')).toBe(3)
+    expect(breakOpportunity('abc-')).toBe(0)
+    expect(breakOpportunity('plain')).toBe(0)
   })
 })

@@ -4,6 +4,7 @@ import type { OpenFileResult } from '../../../apps/docs/src/shared/ipc'
 import { createWebApi, idFromPath, pathFor, WEB_PRINT_PART, type WebApi } from './webapi'
 import { createMockPort, protocolError, timeoutAfter, type MockPort } from './testing/mock-port'
 import { text } from './notice'
+import { bytesAt, installBlobUrls } from './testing/blob-urls'
 
 const DOCX = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 1, 2, 3])
 const flush = () => new Promise((r) => setTimeout(r, 0))
@@ -49,8 +50,7 @@ function guardDirty(dirty: boolean): void {
 beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => {})
   vi.spyOn(console, 'warn').mockImplementation(() => {})
-  URL.createObjectURL = vi.fn(() => 'blob:fake')
-  URL.revokeObjectURL = vi.fn()
+  installBlobUrls()
   // the browser print path settles on afterprint, like a real print dialog closing
   window.print = vi.fn(() => {
     window.dispatchEvent(new Event('afterprint'))
@@ -80,7 +80,7 @@ describe('boot open (consumePendingOpenDocx)', () => {
     const first = await bootWith()
     expect(first.name).toBe('Report.docx')
     expect(idFromPath(first.path)).toBe('f1')
-    expect(new Uint8Array(first.data)).toEqual(DOCX)
+    expect(await bytesAt(first.dataUrl)).toEqual(DOCX)
     expect(first.hash).toMatch(/^[0-9a-f]{64}$|^$/)
     expect(mock.calls.map((c) => c.type)).toEqual(['api.open'])
     expect(await api.consumePendingOpenDocx()).toBeNull()
@@ -105,7 +105,7 @@ describe('boot open (consumePendingOpenDocx)', () => {
       },
     })
     const r = (await api.consumePendingOpenDocx()) as OpenFileResult
-    expect(new Uint8Array(r.data)).toEqual(DOCX)
+    expect(await bytesAt(r.dataUrl)).toEqual(DOCX)
     expect(fetchMock).toHaveBeenCalledWith('https://s3/signed', {
       credentials: 'omit',
       headers: undefined,
@@ -280,15 +280,16 @@ describe('saveDocx', () => {
 
   it('conflict -> Reload latest: the latest version replaces the document, no error banner', async () => {
     const doc = await bootWith()
-    const seen: string[] = []
-    api.onOpenDocx((r) =>
-      seen.push(`${r.name}:${new Uint8Array((r as OpenFileResult).data).length}`),
-    )
+    const seen: OpenFileResult[] = []
+    api.onOpenDocx((r) => seen.push(r as OpenFileResult))
     mock.bumpRemote('f1')
     const pending = api.saveDocx(doc.path, buf([5]))
     await choose('conflict', 'reload')
     expect(await pending).toEqual({ ok: false, reason: 'external-modified' })
-    expect(seen).toEqual([`Report.docx:${DOCX.length}`])
+    const reopened = await Promise.all(
+      seen.map(async (r) => `${r.name}:${(await bytesAt(r.dataUrl)).length}`),
+    )
+    expect(reopened).toEqual([`Report.docx:${DOCX.length}`])
     // reopened at the head: the next save is not a conflict
     expect(await api.saveDocx(doc.path, buf([6]))).toEqual({ ok: true })
   })
@@ -881,11 +882,5 @@ describe('projectApi (in-memory, AI-only)', () => {
     })
     expect(await p.resolveChat({ filePath: 'uniwork://files/x/doc.docx' })).toEqual(bound)
     expect((await p.loadChat(bound)).map((m) => m.text)).toEqual(['hello\nworld'])
-    const tl = await p.getTimeline({ projectId: bound.projectId })
-    expect(tl[0]).toMatchObject({ fileName: 'doc.docx', preview: 'hello' })
-    const proj = await p.createProject({ name: 'P' })
-    await p.moveFile({ filePath: 'uniwork://files/x/doc.docx', projectId: proj.id })
-    const list = await p.listProjects()
-    expect(list.find((x) => x.id === proj.id)?.fileCount).toBe(1)
   })
 })

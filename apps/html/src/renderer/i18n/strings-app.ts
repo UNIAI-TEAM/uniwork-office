@@ -18,8 +18,8 @@ import { nl } from './app/nl'
 import { ms } from './app/ms'
 import { he } from './app/he'
 import { hi } from './app/hi'
-import { vi } from './app/vi'
 import { zhTW } from './app/zh-TW'
+import { vi } from './app/vi'
 
 /** User-visible strings for the app shell (status, errors) */
 export const appStrings = defineStrings({
@@ -42,6 +42,6 @@ export const appStrings = defineStrings({
   ms,
   he,
   hi,
-  vi,
   'zh-TW': zhTW,
+  vi,
 })

@@ -1,13 +1,15 @@
 // DOM line-box sampling for page-crossing blocks (cached per element), the
 // line-split re-slice, table row cut positions and line anchors.
 import { rangeSlot } from './dom-range'
-import { applyBlockMeta } from './pagination-measure'
+import { applyBlockMeta, lineLeadPx } from './pagination-measure'
+import { CapacityWindows, SortedYs } from './pagination-index'
 import { blockInlineExtraPx } from './pagination-sections'
 import {
   columnLineSplits,
   computeSectionedSlicesF2,
   insertParityBlanks,
   sectionFirstPages,
+  type SliceResume,
 } from './pagination-slices'
 import type {
   BlockBox,
@@ -20,6 +22,7 @@ import type {
   SectionGeom,
   SliceOutputs,
   TableRowBox,
+  LineBox,
 } from './pagination-types'
 
 const rowRange = rangeSlot()
@@ -33,6 +36,76 @@ const anchorRange = rangeSlot()
  * one page get line collection (at most one per page, negligible cost).
  * metaOf: docxIndex → parse-layer pagination constraints (keepNext/widow/table row flags).
  */
+/**
+ * Resume a pass from the first page whose slicing can differ from the previous
+ * pass: the pages above it are taken over unchanged and only the blocks from
+ * that page on are sliced (Word starts repagination at the changed page too).
+ */
+export interface PassResume {
+  /** the previous pass's slicing before parity blanks (SliceOutputs.preParity) */
+  prevSlices: PageSlice[]
+  /** index into prevSlices of the first page to slice again */
+  page: number
+  /** index into blocks of that page's first block (its top is the page start) */
+  block: number
+  /** the previous pass's outputs: patches for blocks above the page are kept */
+  prevOut?: SliceOutputs
+}
+
+const PATCH_KEYS = [
+  'rowFills',
+  'rowSplits',
+  'floatVShifts',
+  'floatFlows',
+  'floatSplits',
+  'oversizeClips',
+] as const
+
+/**
+ * Carry the previous pass's line/row samples onto the freshly measured blocks
+ * of a streaming open's pass (genoffice#526): only the appended tail can
+ * change layout, and fillLineBoxes skips blocks that already carry samples, so
+ * the unchanged prefix pays no DOM sampling at all — the sampler's own
+ * per-element cache still charges a full subtree signature per block per pass.
+ *
+ * Gated on pure appends: `dirty` is the first top-level index the pass was
+ * triggered for, `lastPassChildCount` the document's child count at the last
+ * pass. An edit below the append frontier (dirty < lastPassChildCount)
+ * disables the carry outright — a same-height edit would keep stale line
+ * boxes the height gate cannot see; an edit above it sits beyond the element
+ * identity prefix and never matches. A webfont load reaches the pass with
+ * dirty = null, so the gate drops the carry there too (line boxes shift
+ * without height). Caller passes `pending` (a phased open is streaming) so
+ * this module stays decoupled from the phased-open state.
+ */
+export function carryStreamedSamples(
+  blocks: BlockBox[],
+  lastBlocks: BlockBox[],
+  opts: { pending: boolean; dirty: number | null; lastPassChildCount: number },
+): number {
+  if (!opts.pending || lastBlocks.length === 0) return 0
+  if (opts.dirty === null || opts.dirty < opts.lastPassChildCount) return 0
+  const n = Math.min(blocks.length, lastBlocks.length)
+  let carried = 0
+  for (let i = 0; i < n; i++) {
+    const b = blocks[i]
+    const p = lastBlocks[i]
+    // element identity is the append frontier: once it diverges (user
+    // insert/delete, remount), the arrays no longer align
+    if (!b.el || b.el !== p.el) break
+    if (Math.abs(b.height - p.height) > 0.01) continue
+    if ((b.spaceAfterPx ?? 0) !== (p.spaceAfterPx ?? 0)) continue
+    if ((b.widthPx ?? -1) !== (p.widthPx ?? -1)) continue
+    if (p.lineBoxes) b.lineBoxes = p.lineBoxes
+    if (p.tableRows) b.tableRows = p.tableRows
+    if (p.lineLeadPx !== undefined) b.lineLeadPx = p.lineLeadPx
+    if (p.colWraps) b.colWraps = p.colWraps
+    if (p.oversizeLineH !== undefined) b.oversizeLineH = p.oversizeLineH
+    if (p.lineBoxes || p.tableRows) carried++
+  }
+  return carried
+}
+
 export function sliceWithLineSplit(
   blocks: BlockBox[],
   geoms: SectionGeom[],
@@ -40,24 +113,78 @@ export function sliceWithLineSplit(
   zoomFactor: number,
   metaOf?: BlockMetaOf,
   out?: SliceOutputs,
+  resume?: PassResume,
 ): PageSlice[] {
-  if (metaOf) applyBlockMeta(blocks, metaOf, zoomFactor)
+  applyBlockMeta(blocks, metaOf, zoomFactor)
   const outs: SliceOutputs = out ?? {}
   outs.colWrapRequests ??= []
-  let slices = computeSectionedSlicesF2(blocks, geoms, totalHeight, outs)
+  const prefix = resume ? resume.prevSlices.slice(0, resume.page) : []
+  const run = resume ? blocks.slice(resume.block) : blocks
+  const seed = resume ? resumeSeed(resume.prevSlices, resume.page) : undefined
+  let slices = prefix.concat(computeSectionedSlicesF2(run, geoms, totalHeight, outs, seed))
   // re-slicing can surface new candidate blocks (a block pushed to a page top only
   // after an earlier block gained line data) — iterate to a fixed point, bounded.
   // The cascade can run one block per page boundary (a dense two-column grid doc
   // packs tighter on every pass: SAS prod_043 left whole paragraphs unsplit at
   // column bottoms with a bound of 3), so the bound follows the page count.
   const maxPasses = Math.max(3, Math.min(24, slices.length))
-  for (let i = 0; i < maxPasses; i++) {
-    const changed = fillLineBoxes(blocks, geoms, zoomFactor, slices, metaOf)
-    const wrapped = fillColWraps(blocks, colWrapRequestsOf(blocks, slices, geoms, outs), zoomFactor)
-    if (!changed && !wrapped) break
-    slices = computeSectionedSlicesF2(blocks, geoms, totalHeight, outs)
+  outs.iterations = 1
+  outs.fillMs = 0
+  outs.sliceRunMs = 0
+  sigMemo = new Map()
+  try {
+    for (let i = 0; i < maxPasses; i++) {
+      const t0 = performance.now()
+      const changed = fillLineBoxes(run, geoms, zoomFactor, slices, metaOf)
+      const wrapped = fillColWraps(run, colWrapRequestsOf(run, slices, geoms, outs), zoomFactor)
+      outs.fillMs += performance.now() - t0
+      if (!changed && !wrapped) break
+      const t1 = performance.now()
+      slices = prefix.concat(computeSectionedSlicesF2(run, geoms, totalHeight, outs, seed))
+      outs.sliceRunMs += performance.now() - t1
+      outs.iterations++
+    }
+  } finally {
+    sigMemo = null
   }
+  if (resume?.prevOut) keepPatchesAbove(outs, resume.prevOut, resume.prevSlices[resume.page].start)
+  outs.preParity = slices
   return insertParityBlanks(slices, geoms)
+}
+
+/**
+ * Whether a pass can resume at page `page` of a previous slicing: a page of its
+ * own (a blank sharing its start with the page before it is re-created by the
+ * first block's extra breaks, so resuming there would double it) that opens
+ * neither inside a table nor under a lifted block.
+ */
+export function isResumePage(prev: PageSlice[], page: number): boolean {
+  const p = prev[page]
+  if (page < 1 || !p || p.end <= p.start + 0.01) return false
+  if (prev[page - 1].start >= p.start - 0.5) return false
+  return !p.repeatHeader && !p.liftTop
+}
+
+function resumeSeed(prev: PageSlice[], page: number): SliceResume {
+  const p = prev[page]
+  const continued = !!p.continuedSection
+  return {
+    y: p.start,
+    section: p.section,
+    firstOfSection: !continued && (page === 0 || prev[page - 1].section !== p.section),
+    continued,
+  }
+}
+
+/** patches of the previous pass for blocks above `y` stay; the resumed run only produced the rest */
+function keepPatchesAbove(outs: SliceOutputs, prev: SliceOutputs, y: number): void {
+  type Patches = Record<string, Array<{ blockTop: number }> | undefined>
+  const o = outs as Patches
+  const p = prev as Patches
+  for (const key of PATCH_KEYS) {
+    const kept = p[key]?.filter((patch) => patch.blockTop < y - 0.5)
+    if (kept?.length) o[key] = [...kept, ...(o[key] ?? [])]
+  }
 }
 
 /** Balance requests plus the tables every line-cut paragraph between unequal
@@ -283,7 +410,13 @@ export function probeColWrap(
  */
 const lineSampleCache = new WeakMap<
   HTMLElement,
-  { sig: string; boundaries?: number[]; rows?: TableRowBox[]; soleLineBottom?: number }
+  {
+    sig: string
+    boundaries?: number[]
+    rows?: TableRowBox[]
+    soleLineBottom?: number
+    soleLineTop?: number
+  }
 >()
 
 // webfont loads shift line boxes without changing block height (explicit line
@@ -293,8 +426,20 @@ let lineSampleFontEpoch = 0
 export function bumpLineSampleFontEpoch(): void {
   lineSampleFontEpoch++
 }
+// the DOM does not change inside one slicing call, so its fixed-point iterations
+// share the per-element signature reads instead of repeating them
+let sigMemo: Map<HTMLElement, string> | null = null
 
 function lineSampleSig(el: HTMLElement, textH: number): string {
+  const memoKey = Math.round(textH * 4)
+  const memoHit = sigMemo?.get(el)
+  if (memoHit && memoHit.startsWith(`${memoKey}:`)) return memoHit.slice(memoHit.indexOf(':') + 1)
+  const sig = computeLineSampleSig(el, textH)
+  sigMemo?.set(el, `${memoKey}:${sig}`)
+  return sig
+}
+
+function computeLineSampleSig(el: HTMLElement, textH: number): string {
   // djb2 over the text: equal-length edits must still invalidate
   const text = el.textContent ?? ''
   let h = 5381
@@ -324,15 +469,27 @@ export function fillLineBoxes(
   const geomOf = (s: number) => geoms[Math.max(0, Math.min(s, geoms.length - 1))]
   // cut bounds = page bounds + column bounds of multi-column pages (blocks crossing within a column also need line-level splits)
   const breaks: number[] = []
+  // column windows of mixed-column pages and titlePg first pages, by start with
+  // a running max end: a block top lies in at most the few windows the back
+  // scan visits before the max end drops below it
+  const windows: Array<{ start: number; end: number; cap: number }> = []
   ;(slices ?? []).forEach((s, i) => {
     if (i > 0) breaks.push(s.start)
     for (const r of s.regions ?? []) {
       for (const c of r.columns) {
-        if (c.start > 0.5 && !breaks.includes(c.start)) breaks.push(c.start)
+        if (c.start > 0.5) breaks.push(c.start)
+        windows.push({ start: c.start, end: c.end, cap: r.height })
       }
     }
   })
   const firsts = sectionFirstPages(slices ?? [])
+  slices?.forEach((s, si) => {
+    if (!firsts[si]) return
+    const fc = geomOf(s.section)?.firstContentHeight
+    if (fc !== undefined) windows.push({ start: s.start, end: s.end, cap: fc })
+  })
+  const capWindows = new CapacityWindows(windows)
+  const breakYs = new SortedYs(breaks)
   let changed = false
   for (let i = 0; i < blocks.length; i++) {
     const block = blocks[i]
@@ -349,29 +506,15 @@ export function fillLineBoxes(
     const contentH = geomOf(block.section ?? 0)?.contentHeight ?? 0
     if (contentH <= 0) continue
     const bottom = block.top + block.height
-    const crossing = breaks.some((y) => block.top < y && y < bottom)
-    const atPageTop = breaks.some((y) => Math.abs(block.top - y) < 0.5)
+    const crossing = breakYs.hasBetween(block.top, bottom)
+    const atPageTop = breakYs.hasNear(block.top, 0.5)
     // region-aware capacity: a block in a mixed-column page's later region has
     // only the region's height, not the full page — a table there must get row
     // data even when its height fits a page (otherwise the first pass places
     // it whole as an "over-page" block and the collapse becomes a fixed point:
-    // the ANSI table after a 3-col region, real_run2/61)
-    let capH = contentH
-    for (const s of slices ?? []) {
-      for (const r of s.regions ?? []) {
-        if (r.columns.some((c) => c.start - 0.5 <= block.top && block.top < c.end - 0.5)) {
-          capH = Math.min(capH, r.height)
-        }
-      }
-    }
-    // a block on a section's FIRST page has only the titlePg capacity: it must
-    // get line/row data even when it fits the default page height, or the first
-    // pass places it whole and the collapse becomes a fixed point
-    slices?.forEach((s, si) => {
-      if (!firsts[si] || block.top < s.start - 0.5 || block.top >= s.end - 0.5) return
-      const fc = geomOf(s.section)?.firstContentHeight
-      if (fc !== undefined) capH = Math.min(capH, fc)
-    })
+    // the ANSI table after a 3-col region). A block on a
+    // section's FIRST page likewise has only the titlePg capacity.
+    const capH = capWindows.capAt(block.top, contentH)
     // a block already carrying the renderer-baked oversize clip measures at the
     // clipped (fitting) height, so it must bypass the fit gates to re-qualify —
     // otherwise the flag drops, the clip clears, and the layout oscillates
@@ -413,6 +556,7 @@ export function fillLineBoxes(
         ? hit.rows.map((r) => ({ ...r }))
         : domTableRows(block.el, textH, zoomFactor)
       if (!hit?.rows) lineSampleCache.set(block.el, { sig, rows: rows.map((r) => ({ ...r })) })
+      overlayLiveRowFlags(block.el, rows)
       if (rows.length > 0) {
         const flags =
           block.docxIndex !== undefined ? metaOf?.(block.docxIndex)?.tableRowFlags : undefined
@@ -422,7 +566,8 @@ export function fillLineBoxes(
             // it must beat the source XML so turning repetition off takes effect
             // before the document is saved and reopened.
             if (r.isHeader === undefined && flags[i]?.isHeader) r.isHeader = true
-            if (flags[i]?.cantSplit) r.cantSplit = true
+            if (r.cantSplit === undefined && flags[i]?.cantSplit) r.cantSplit = true
+            if (flags[i]?.keepNext) r.keepNext = true
             if (flags[i]?.minHPx) r.minHPx = flags[i].minHPx
           })
         const bands =
@@ -433,36 +578,68 @@ export function fillLineBoxes(
       }
       continue
     }
+    if (block.lineLeadPx === undefined) {
+      block.lineLeadPx = lineLeadPx(block.el)
+      if (block.lineLeadPx > 0.5) changed = true
+    }
     // synthesized over-page cuts below mutate the list, so cached entries are copied out
     let boundaries: number[]
     let soleLineBottom: number | undefined
+    let soleLineTop: number
     if (hit?.boundaries) {
       boundaries = [...hit.boundaries]
       soleLineBottom = hit.soleLineBottom
+      soleLineTop = hit.soleLineTop ?? 0
     } else {
       const lines = domLineRects(block.el, zoomFactor)
       boundaries = lineBreakBoundaries(lines)
       soleLineBottom = lines.length === 1 ? lines[0].bottom : undefined
+      soleLineTop = lines.length === 1 ? lines[0].offset : 0
       lineSampleCache.set(block.el, {
         sig,
         boundaries: [...boundaries],
-        ...(soleLineBottom !== undefined ? { soleLineBottom } : {}),
+        ...(soleLineBottom !== undefined ? { soleLineBottom, soleLineTop } : {}),
       })
     }
     // sole line taller than the column (oversized inline picture): no break
     // points exist, so flag the block for the atomic page-bottom clip instead
-    // of cutting (Word overflow-clips the line; see the placement branch)
-    if (boundaries.length === 0 && soleLineBottom !== undefined && soleLineBottom > capH + 0.5) {
-      if (block.oversizeLineH !== soleLineBottom) {
-        block.oversizeLineH = soleLineBottom
-        changed = true
+    // of cutting (Word overflow-clips the line; see the placement branch).
+    // Any excess counts, even a sub-pixel one: cutting it would leave an
+    // ink-less tail slice that opens a blank page. A block already clipped
+    // measures at the capacity, so only its unclipped line extent can tell.
+    // A text line counts by its own height: a short line pushed under a
+    // page-tall float ends below the capacity too, but it belongs at the next
+    // page top (the synthesized cut below), not under the clip.
+    if (boundaries.length === 0 && soleLineBottom !== undefined) {
+      const replaced = replacedSoleLine(block.el)
+      const overCap = !replaced
+        ? soleLineBottom - soleLineTop > capH + 0.5
+        : clipMarked
+          ? soleLineBottom > capH - 0.01
+          : soleLineBottom > capH + 0.5 || block.height - (block.spaceAfterPx ?? 0) > capH + 0.01
+      if (overCap) {
+        if (block.oversizeLineH !== soleLineBottom) {
+          block.oversizeLineH = soleLineBottom
+          changed = true
+        }
+        continue
       }
-      continue
+      // the space above a line pushed under a page-tall float is ink-less lead:
+      // the page bottom swallows it and the line opens the next page (Word).
+      // Cutting it at page height would push the lead whole instead.
+      if (!replaced && soleLineTop > 0.5 && block.height > contentH) {
+        const boxes = tileBoxes([soleLineTop], textH)
+        boxes[0].lead = true
+        block.lineBoxes = boxes
+        changed = true
+        continue
+      }
     }
     if (boundaries.length === 0 && block.height > contentH) {
       // over-page block with no in-flow lines at all (floated/absolute content):
-      // synthesize cut points at page height, equivalent to hard pixel cuts
-      for (let y = contentH; y < block.height; y += contentH) boundaries.push(y)
+      // synthesize cut points at page height, equivalent to hard pixel cuts;
+      // a sub-pixel remainder is not a slice
+      for (let y = contentH; y < block.height - 1; y += contentH) boundaries.push(y)
     }
     // a leading page break's line has no text rect, so its cut (the first text
     // line's ink top) lands inside the first sampled line box: make it a boundary
@@ -478,11 +655,14 @@ export function fillLineBoxes(
   return changed
 }
 
+function replacedSoleLine(el: HTMLElement): boolean {
+  if (el.classList.contains('doc-protected-image') || el.classList.contains('doc-protected-chart'))
+    return true
+  return el.querySelector('img') !== null && !(el.textContent ?? '').trim()
+}
+
 /** Boundary list (excluding 0) → line boxes tiling the block height (heights are adjacent-boundary diffs; the first box starts at 0) */
-function tileBoxes(
-  boundaries: number[],
-  blockHeight: number,
-): Array<{ offsetInBlock: number; height: number }> {
+function tileBoxes(boundaries: number[], blockHeight: number): LineBox[] {
   const tops = [0, ...boundaries.filter((b) => b > 0.5 && b < blockHeight)]
   return tops.map((top, i) => ({
     offsetInBlock: top,
@@ -496,7 +676,7 @@ function tileBoxes(
  *  decoration rows (page gaps / repeated tblHeader clones) are not page-split
  *  units — counting them would add phantom boundaries and shift the
  *  tableRowFlags index alignment */
-function outerTableRows(el: HTMLElement): HTMLElement[] {
+export function outerTableRows(el: HTMLElement): HTMLElement[] {
   return Array.from(el.querySelectorAll<HTMLElement>('tr')).filter(
     (tr) =>
       !tr.closest('.doc-nested-table') &&
@@ -563,6 +743,20 @@ export function applyRowNotes(
   })
 }
 
+/** tr attributes are live editor state (repeat header / cantSplit toggles change no text or
+ *  geometry, so the sample cache would otherwise keep the stale flags) */
+export function overlayLiveRowFlags(el: HTMLElement, rows: TableRowBox[]): void {
+  const trs = outerTableRows(el)
+  rows.forEach((row, i) => {
+    const tr = trs[i]
+    if (!tr) return
+    if (tr.hasAttribute('data-repeat-header'))
+      row.isHeader = tr.getAttribute('data-repeat-header') === '1'
+    if (tr.hasAttribute('data-cant-split'))
+      row.cantSplit = tr.getAttribute('data-cant-split') === '1'
+  })
+}
+
 function domTableRows(el: HTMLElement, blockHeight: number, zoomFactor: number): TableRowBox[] {
   const gaps = Array.from(el.querySelectorAll('.page-gap-inline')).map((g) =>
     g.getBoundingClientRect(),
@@ -595,6 +789,9 @@ function domTableRows(el: HTMLElement, blockHeight: number, zoomFactor: number):
       contentBottom,
       ...(trs[i].hasAttribute('data-repeat-header')
         ? { isHeader: trs[i].getAttribute('data-repeat-header') === '1' }
+        : {}),
+      ...(trs[i].hasAttribute('data-cant-split')
+        ? { cantSplit: trs[i].getAttribute('data-cant-split') === '1' }
         : {}),
       ...(cuts.length > 0 ? { cutYs: cuts } : {}),
       ...(cells ? { cells } : {}),
@@ -698,7 +895,7 @@ function rowCutYs(
     }
     if (bands.length > 0) cellBands.push(bands)
     for (const list of byPara.values()) paraBands.push(list)
-    if (cellsOk) cellBoxes.push(cellBoxOf(cell as HTMLElement, entries, zoomFactor))
+    if (cellsOk) cellBoxes.push(cellBoxOf(cell as HTMLElement, entries, zoomFactor, toBand))
   }
   const contentBottom = cellBands.reduce(
     (max, bands) => bands.reduce((m, [, b]) => Math.max(m, b), max),
@@ -718,6 +915,7 @@ function cellBoxOf(
   cell: HTMLElement,
   entries: Array<{ band: [number, number]; child: number; para: number }>,
   zoomFactor: number,
+  toBand: (r: DOMRect) => [number, number],
 ): RowCellBox {
   const va = cell.style.verticalAlign
   let alignDy = 0
@@ -740,7 +938,11 @@ function cellBoxOf(
         band: [e.band[0] - alignDy, e.band[1] - alignDy] as [number, number],
       }))
     : entries
-  return { ...cellLinesOf(shifted), alignDy, alignFrac }
+  const childBox = Array.from(cell.children, (ch): [number, number] => {
+    const [t, b] = toBand(ch.getBoundingClientRect())
+    return [t - alignDy, b - alignDy]
+  })
+  return { ...cellLinesOf(shifted), childBox, alignDy, alignFrac }
 }
 
 /** Pure core of cellBoxOf: rect entries → clustered lines (same overlap rule as
@@ -903,7 +1105,11 @@ function domLineRects(el: HTMLElement, zoomFactor: number): DomLineRect[] {
   const lines: DomLineRect[] = []
   let lineBottom = -Infinity
   for (const { r, node } of rects) {
-    if (r.top >= lineBottom - 1) {
+    // glyph boxes taller than the line pitch (Batang-class KR faces: 1.45em
+    // content area under a 1.3029 line) overlap the next line by a few px; a
+    // rect the open line covers less than half of starts a new line
+    const overlap = lineBottom - r.top
+    if (overlap <= 1 || overlap < r.height / 2) {
       lines.push({
         offset: (r.top - elTop - gapAbove(r.top)) / zoomFactor,
         bottom: (r.bottom - elTop - gapAbove(r.top)) / zoomFactor,

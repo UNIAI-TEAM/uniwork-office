@@ -1,5 +1,6 @@
+import { dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { analyzeMediaTool } from '@genoffice/ai-search'
+import { analyzeMediaTool, localMediaRoots } from '@genoffice/ai-search'
 import { flagString } from '../args'
 import { aiSettingsPath, prepareCloud } from '../cloud'
 import { resolveInput } from '../fs'
@@ -18,16 +19,30 @@ export const mediaCommand: CommandDef = {
   ],
   async run(args, ctx) {
     const ref = args.positionals[0]
-    if (!ref) throw new CliError(EXIT.usage, 'missing <file|url>')
+    if (!ref)
+      throw new CliError(EXIT.usage, 'missing <file|url>', undefined, {
+        reason: 'missing_argument',
+      })
     const target = /^https?:\/\//i.test(ref)
       ? ref
       : resolveInput(ref.startsWith('file:') ? fileURLToPath(ref) : ref, ctx)
     await prepareCloud(ctx.env)
-    const r = await analyzeMediaTool(aiSettingsPath(ctx.env), {
-      mediaUrls: [target],
-      requirements: flagString(args, 'ask') ?? DEFAULT_ASK,
-    })
-    if (r.text === undefined) throw new CliError(EXIT.app, r.error ?? 'media analysis failed')
+    // the user named this file on the command line, so its own directory is the
+    // allowlist: an http(s) target is fetched remotely and has no local root
+    const mediaRoots = localMediaRoots(/^https?:\/\//i.test(target) ? undefined : dirname(target))
+    const r = await analyzeMediaTool(
+      aiSettingsPath(ctx.env),
+      {
+        mediaUrls: [target],
+        requirements: flagString(args, 'ask') ?? DEFAULT_ASK,
+      },
+      { mediaRoots },
+    )
+    if (r.text === undefined)
+      throw new CliError(EXIT.app, r.error ?? 'media analysis failed', undefined, {
+        suggestion:
+          'configure an analysis provider under Settings (AI Media) in the UniWork Office app',
+      })
     const failure = providerFailure(r.text)
     if (failure) throw new CliError(EXIT.conversion, `media analysis failed: ${failure}`)
     const text = analysisText(r.text)
@@ -38,7 +53,7 @@ export const mediaCommand: CommandDef = {
   },
 }
 
-/** Genspark reports a fetch/analysis failure as { status: "error", error|message } per file. */
+/** A cloud provider may report a fetch/analysis failure as { status: "error", error|message } per file. */
 export function providerFailure(text: string): string | null {
   if (!text.trimStart().startsWith('{')) return null
   try {
@@ -53,7 +68,7 @@ export function providerFailure(text: string): string | null {
   }
 }
 
-/** Genspark answers with a JSON map of upload → { analysis }; BYOK providers with prose. */
+/** A cloud provider may answer with a JSON map of upload → { analysis }; BYOK providers with prose. */
 export function analysisText(text: string): string {
   if (!text.trimStart().startsWith('{')) return text
   try {

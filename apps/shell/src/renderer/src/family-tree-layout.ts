@@ -128,8 +128,7 @@ export function layoutFamilyTree(nodes: WbFamilyTreeNode[]): FtLayout {
 
     let cursorX = FT_PAD_X
     for (const unit of units) {
-      const unitW =
-        unit.length * FT_CARD_W + (unit.length - 1) * Math.round(FT_H_GAP * 0.45)
+      const unitW = unit.length * FT_CARD_W + (unit.length - 1) * Math.round(FT_H_GAP * 0.45)
       for (let i = 0; i < unit.length; i++) {
         const id = unit[i]!
         const node = byId.get(id)!
@@ -147,10 +146,11 @@ export function layoutFamilyTree(nodes: WbFamilyTreeNode[]): FtLayout {
   for (const g of gens) {
     const inGen = nodes.filter((n) => n.generation === g)
     for (const n of inGen) {
-      const parents = (n.parentIds ?? []).map((id) => laid.get(id)).filter(Boolean) as FtLaidOutNode[]
+      const parents = (n.parentIds ?? [])
+        .map((id) => laid.get(id))
+        .filter(Boolean) as FtLaidOutNode[]
       if (parents.length === 0) continue
-      const target =
-        parents.reduce((s, p) => s + p.x + p.w / 2, 0) / parents.length - FT_CARD_W / 2
+      const target = parents.reduce((s, p) => s + p.x + p.w / 2, 0) / parents.length - FT_CARD_W / 2
       const cur = laid.get(n.id)
       if (!cur) continue
       const spouse = n.spouseId ? laid.get(n.spouseId) : undefined
@@ -160,7 +160,6 @@ export function layoutFamilyTree(nodes: WbFamilyTreeNode[]): FtLayout {
       cur.x += delta
       parentCenterX.set(n.id, cur.x + FT_CARD_W / 2)
       if (spouse && n.spouseId) {
-        const pairLeft = Math.min(cur.x, spouse.x)
         const pairRight = Math.max(cur.x + FT_CARD_W, spouse.x + FT_CARD_W)
         // keep spouse glued
         if (cur.x <= spouse.x) {

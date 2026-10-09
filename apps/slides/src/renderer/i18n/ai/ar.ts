@@ -22,7 +22,6 @@ export const ar = {
   aiQcPageSkipped: 'الصفحة {n}: تم تخطي فحص التخطيط التلقائي',
   aiQcStopped: 'تم إيقاف فحص التخطيط',
   aiQcCapped: '{count} صفحة أخرى لم تُفحص (حد لكل تشغيل)',
-  aiGskLoginBtn: 'تسجيل الدخول إلى UniWork',
   aiPanelTitle: 'uniAI',
   aiOpenAssistant: 'فتح مساعد الذكاء الاصطناعي',
   aiFactCheckBtn: 'تدقيق حقائق AI',
@@ -137,6 +136,7 @@ export const ar = {
   aiClarifyOther: 'أخرى (يمكن الكتابة)',
   aiClarifySkip: 'تخطي الاستبيان',
   aiClarifyNext: 'التالي',
+  aiClarifyPrev: 'السابق',
   aiClarifySubmit: 'إنشاء',
   aiSumReadAttachment: 'قراءة المرفق',
   aiSumReadAttachmentName: 'قراءة المرفق {name}',
@@ -225,4 +225,5 @@ export const ar = {
   aiSumSaveTemplate: 'حفظ قالب النمط "{name}"',
   aiSumTemplatesEmpty: 'قوالب الأنماط (فارغ)',
   aiSumListTemplates: 'سرد {count} من قوالب الأنماط',
+  aiPageCloudToLocal: 'السحابة غير متاحة — تم التوليد محليًا',
 } satisfies Record<keyof typeof zh, string>

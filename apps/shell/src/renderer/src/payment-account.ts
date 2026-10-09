@@ -3,7 +3,6 @@
  */
 
 import type { LicensePlanId } from './license-entitlements'
-import { getLicensePlan } from './license-entitlements'
 
 export interface BankOption {
   bin: string
@@ -100,7 +99,6 @@ export function bankByBin(bin: string): BankOption | undefined {
 }
 
 export function planPriceVnd(planId: LicensePlanId, cycle: BillingCycle): number {
-  const plan = getLicensePlan(planId)
   if (planId === 'free') return 0
   // Align with docs/pricing/UNIWORK_PLANS.md
   const table: Record<Exclude<LicensePlanId, 'free'>, { month: number; year: number }> = {

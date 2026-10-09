@@ -2,6 +2,7 @@ node_modules/
 dist/
 out/
 release/
+!/tools/release/
 .build/
 target/
 coverage/

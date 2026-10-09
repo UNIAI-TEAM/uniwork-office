@@ -67,7 +67,7 @@ export async function extractAllowedFileExcerpts(
       continue
     }
 
-    let size = 0
+    let size: number
     try {
       size = statSync(resolved).size
     } catch {

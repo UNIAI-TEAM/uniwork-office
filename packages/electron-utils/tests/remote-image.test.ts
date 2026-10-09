@@ -1,19 +1,17 @@
 import { describe, expect, it, vi } from 'vitest'
-import { fetchRemoteImage, remoteImageHeaders } from '../src/remote-image'
+import {
+  ResponseTooLargeError,
+  fetchRemoteImage,
+  readBodyCapped,
+  remoteImageHeaders,
+} from '../src/remote-image'
 
 const png = () => new Response('img', { status: 200 })
 
 describe('remoteImageHeaders', () => {
-  it('sends a Referer for genspark hosts', () => {
-    expect(remoteImageHeaders('https://sspark.genspark.ai/a.png').Referer).toBe(
-      'https://www.genspark.ai/',
-    )
-    expect(remoteImageHeaders('https://genspark.ai/a.png').Referer).toBe('https://www.genspark.ai/')
-  })
-
-  it('sends no Referer for other hosts (including lookalikes)', () => {
+  it('sends no Referer to any host', () => {
     expect(remoteImageHeaders('https://example.com/a.png').Referer).toBeUndefined()
-    expect(remoteImageHeaders('https://evilgenspark.ai/a.png').Referer).toBeUndefined()
+    expect(remoteImageHeaders('https://cdn.example.net/a.png').Referer).toBeUndefined()
   })
 
   it('always sends a browser-like User-Agent and image Accept', () => {
@@ -32,14 +30,14 @@ describe('remoteImageHeaders', () => {
 describe('fetchRemoteImage', () => {
   it('returns the response on first success', async () => {
     const fetchImpl = vi.fn().mockResolvedValue(png())
-    const resp = await fetchRemoteImage('https://sspark.genspark.ai/a.png', {
+    const resp = await fetchRemoteImage('https://example.com/a.png', {
       fetchImpl,
       retryDelaysMs: [0, 0],
     })
     expect(resp?.ok).toBe(true)
     expect(fetchImpl).toHaveBeenCalledTimes(1)
     const headers = fetchImpl.mock.calls[0]![1].headers as Record<string, string>
-    expect(headers.Referer).toBe('https://www.genspark.ai/')
+    expect(headers.Referer).toBeUndefined()
   })
 
   it('retries transient statuses until success', async () => {
@@ -48,7 +46,7 @@ describe('fetchRemoteImage', () => {
       .mockResolvedValueOnce(new Response('nope', { status: 503 }))
       .mockResolvedValueOnce(new Response('nope', { status: 403 }))
       .mockResolvedValueOnce(png())
-    const resp = await fetchRemoteImage('https://sspark.genspark.ai/a.png', {
+    const resp = await fetchRemoteImage('https://example.com/a.png', {
       fetchImpl,
       retryDelaysMs: [0, 0],
     })
@@ -58,7 +56,7 @@ describe('fetchRemoteImage', () => {
 
   it('retries network errors and returns null when the budget is exhausted', async () => {
     const fetchImpl = vi.fn().mockRejectedValue(new Error('ECONNRESET'))
-    const resp = await fetchRemoteImage('https://sspark.genspark.ai/a.png', {
+    const resp = await fetchRemoteImage('https://example.com/a.png', {
       fetchImpl,
       retryDelaysMs: [0],
     })
@@ -68,7 +66,7 @@ describe('fetchRemoteImage', () => {
 
   it('does not retry permanent statuses like 404', async () => {
     const fetchImpl = vi.fn().mockResolvedValue(new Response('gone', { status: 404 }))
-    const resp = await fetchRemoteImage('https://sspark.genspark.ai/a.png', {
+    const resp = await fetchRemoteImage('https://example.com/a.png', {
       fetchImpl,
       retryDelaysMs: [0, 0],
     })
@@ -84,5 +82,57 @@ describe('fetchRemoteImage', () => {
     })
     expect(resp).toBeNull()
     expect(fetchImpl).not.toHaveBeenCalled()
+  })
+})
+
+describe('readBodyCapped', () => {
+  const chunked = (chunks: Uint8Array[], headers: Record<string, string> = {}) =>
+    new Response(
+      new ReadableStream<Uint8Array>({
+        pull(controller) {
+          const next = chunks.shift()
+          if (next) controller.enqueue(next)
+          else controller.close()
+        },
+      }),
+      { status: 200, headers },
+    )
+
+  it('concatenates a chunked body within the cap', async () => {
+    const bytes = await readBodyCapped(chunked([new Uint8Array([1, 2]), new Uint8Array([3])]), 10)
+    expect(Array.from(bytes)).toEqual([1, 2, 3])
+  })
+
+  it('rejects a Content-Length above the cap without reading the body', async () => {
+    const pull = vi.fn()
+    const resp = new Response(new ReadableStream({ pull }), {
+      headers: { 'content-length': '11' },
+    })
+    await expect(readBodyCapped(resp, 10)).rejects.toBeInstanceOf(ResponseTooLargeError)
+    expect(pull).not.toHaveBeenCalled()
+  })
+
+  it('stops a chunked body (no Content-Length) as soon as it passes the cap', async () => {
+    let served = 0
+    const resp = new Response(
+      new ReadableStream<Uint8Array>({
+        pull(controller) {
+          served++
+          controller.enqueue(new Uint8Array(4))
+        },
+      }),
+    )
+    await expect(readBodyCapped(resp, 10)).rejects.toBeInstanceOf(ResponseTooLargeError)
+    expect(served).toBeLessThanOrEqual(4)
+  })
+
+  it('does not trust a Content-Length that undercounts the body', async () => {
+    const resp = chunked([new Uint8Array(8), new Uint8Array(8)], { 'content-length': '1' })
+    await expect(readBodyCapped(resp, 10)).rejects.toBeInstanceOf(ResponseTooLargeError)
+  })
+
+  it('treats a missing Content-Length as unknown rather than zero', async () => {
+    const bytes = await readBodyCapped(chunked([new Uint8Array(5)]), 10)
+    expect(bytes.byteLength).toBe(5)
   })
 })

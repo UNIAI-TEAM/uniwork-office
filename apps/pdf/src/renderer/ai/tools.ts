@@ -3,6 +3,7 @@ import type { AgentToolCall, AgentToolDef, ToolExecution } from '@genoffice/agen
 import type { OutlineNode } from '../OutlinePanel'
 import type { PageEntry, SearchIndex } from '../search'
 import { searchInIndex } from '../search'
+import { foldCase } from '@genoffice/ui'
 import { geomDispSize, pdfRectToCss, pdfToView, quadToRect, viewToPdf } from '../annotations'
 import type { PageGeom } from '../annotations'
 import { EDIT_FONTS } from '../../shared/ipc'
@@ -27,6 +28,7 @@ import { t } from '../i18n/locale'
 import { buildFormCatalog } from '../form-catalog'
 import { flattenThread, type NoteThreadItem } from '../note-threads'
 import type { StampConfig } from '../edit-state'
+import { boldToken } from '../text-edit-preview'
 import type { LocalTextInsert } from '../text-edit-preview'
 import { DEFAULT_HEADER_FOOTER, DEFAULT_WATERMARK } from '../stamps'
 import { STATIC_FORM_MARK_SIZE } from '../static-form-fill'
@@ -165,7 +167,7 @@ export interface PdfAiDeps {
   /** Queue a pending delete of an existing image */
   deleteImage(ref: PageImageRef): void
   searchImages(query: string, maxResults: number): Promise<ImageSearchResponse>
-  /** live predicate (gsk login && cloud-tools toggle, or a BYOK media key); false hides generate_image */
+  /** live predicate (a BYOK media model is configured; the UniWork cloud route while its seam is on); false hides generate_image */
   imageGenAvailable?(): boolean
   generateImage(op: { prompt: string; aspectRatio?: string }): Promise<{
     url?: string
@@ -1195,7 +1197,16 @@ async function readPages(deps: PdfAiDeps, input: Record<string, unknown>): Promi
   const start = Number(input.start)
   const end = Math.min(Number(input.end ?? start), start + 9)
   const summary = t('aiToolReadPages', { start, end })
-  if (!Number.isInteger(start) || start < 1 || end < start || start > doc.numPages) {
+  // end is NaN when the model passes a non-numeric string (Number('all')); the
+  // old `end < start` test is false for NaN, so the range slipped through and
+  // the loop never ran — reported as "no extractable text" on valid pages.
+  if (
+    !Number.isInteger(start) ||
+    !Number.isFinite(end) ||
+    start < 1 ||
+    end < start ||
+    start > doc.numPages
+  ) {
     return err(`Invalid page range (document has ${doc.numPages} pages)`, summary)
   }
   let out = ''
@@ -1235,12 +1246,16 @@ async function searchText(deps: PdfAiDeps, input: Record<string, unknown>): Prom
   if (!indexPromise) return err('Document not ready', t('aiToolSearch', { query, count: 0 }))
   const index = await indexPromise
   const matches = searchInIndex(index, query)
+  // Fold the query the same way the index was built (search.ts uses
+  // foldCase, which is length-preserving for dotted capitals where
+  // toLowerCase is not): otherwise snippet offsets drift or miss.
+  const q = foldCase(query)
   const lines: string[] = []
   for (const m of matches.slice(0, 40)) {
     const entry = index[m.pageIndex]!
-    const pos = entry.lower.indexOf(query.toLowerCase())
+    const pos = entry.lower.indexOf(q)
     const from = Math.max(0, pos - 40)
-    const snippet = entry.text.slice(from, pos + query.length + 40).replace(/\s+/g, ' ')
+    const snippet = entry.text.slice(from, pos + q.length + 40).replace(/\s+/g, ' ')
     lines.push(`Page ${m.pageIndex + 1}: …${snippet}…`)
   }
   if (matches.length > 40) lines.push(`(${matches.length} matches total; only the first 40 listed)`)
@@ -1488,7 +1503,7 @@ function locateOccurrence(
   query: string,
   occurrence: number,
 ): { oldText: string; rect: [number, number, number, number]; fontSize: number } | null {
-  const q = query.toLowerCase()
+  const q = foldCase(query)
   let pos = -1
   let from = 0
   for (let i = 0; i < occurrence; i++) {
@@ -1518,7 +1533,7 @@ function locateOccurrence(
 }
 
 const countOccurrences = (entry: PageEntry, query: string): number => {
-  const q = query.toLowerCase()
+  const q = foldCase(query)
   let n = 0
   for (let from = 0; ; n++) {
     const pos = entry.lower.indexOf(q, from)
@@ -2171,7 +2186,8 @@ async function editBlock(deps: PdfAiDeps, input: Record<string, unknown>): Promi
     getComputedStyle(document.body).fontFamily
   const bold = input.bold === true ? true : undefined
   const italic = input.italic === true ? true : undefined
-  const cssStyle = `${italic ? 'italic ' : ''}${bold ? 'bold' : ''}`.trim()
+  // bold on the document's own face is a stroke with regular advances (boldToken)
+  const cssStyle = `${italic ? 'italic ' : ''}${boldToken(bold, !!newFont)}`.trim()
   const align = input.align === undefined ? block.align : String(input.align)
   if (align !== 'left' && align !== 'center' && align !== 'right') {
     return err('align must be one of left, center, right', summary)
@@ -2455,7 +2471,7 @@ function faceCss(font: string | undefined, bold: boolean | undefined, italic: bo
     cssFamily:
       (font ? EDIT_FONTS.find((f) => f.id === font)?.css : undefined) ??
       getComputedStyle(document.body).fontFamily,
-    cssStyle: `${italic ? 'italic ' : ''}${bold ? 'bold' : ''}`.trim(),
+    cssStyle: `${italic ? 'italic ' : ''}${boldToken(bold, !!font)}`.trim(),
   }
 }
 

@@ -196,7 +196,7 @@ export async function exportWorkbenchBackupUi(): Promise<
 > {
   const api = wbApi()
   if (!api) return { ok: false, error: 'unavailable' }
-  let media: WorkbenchIdbMediaDump | null = null
+  let media: WorkbenchIdbMediaDump | null
   try {
     media = await collectWorkbenchIdbMedia()
   } catch {

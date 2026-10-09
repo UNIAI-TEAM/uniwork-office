@@ -105,6 +105,17 @@ describe('createIpcTransport', () => {
     expect(unsubscribe).toHaveBeenCalledTimes(1)
   })
 
+  it('ignores an unknown future chunk type instead of failing the run', () => {
+    const { cb, emit, unsubscribe } = setup()
+    emit({ type: 'progress' } as never)
+    expect(cb.onError).not.toHaveBeenCalled()
+    expect(cb.onDone).not.toHaveBeenCalled()
+    expect(unsubscribe).not.toHaveBeenCalled()
+    // the run survived rather than merely going quiet
+    emit({ type: 'done' })
+    expect(cb.onDone).toHaveBeenCalledTimes(1)
+  })
+
   it('cancel forwards the requestId to the bridge', () => {
     const { started, cancelled, handle } = setup()
     handle.cancel()
@@ -121,7 +132,7 @@ describe('createIpcTransport', () => {
     const { cb, emit } = setup(undefined, () => 'credits used up')
     emit({
       type: 'error',
-      error: 'Your Genspark credits have been exhausted.',
+      error: 'Your credits have been exhausted.',
       errorCode: 'credits',
     })
     expect(cb.onError).toHaveBeenCalledWith('credits used up')
@@ -151,10 +162,10 @@ describe('createIpcTransport', () => {
     const { cb, emit } = setup()
     emit({
       type: 'error',
-      error: 'Your Genspark credits have been exhausted.',
+      error: 'Your credits have been exhausted.',
       errorCode: 'credits',
     })
-    expect(cb.onError).toHaveBeenCalledWith('Your Genspark credits have been exhausted.')
+    expect(cb.onError).toHaveBeenCalledWith('Your credits have been exhausted.')
   })
 
   it('maps an overloaded error code to the localized busy message', () => {

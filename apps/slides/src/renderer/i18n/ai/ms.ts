@@ -22,7 +22,6 @@ export const ms = {
   aiQcPageSkipped: 'Halaman {n}: semakan susun atur automatik dilangkau',
   aiQcStopped: 'Semakan susun atur dihentikan',
   aiQcCapped: '{count} halaman lagi tidak disemak (had setiap larian)',
-  aiGskLoginBtn: 'Log masuk ke UniWork',
   aiPanelTitle: 'uniAI',
   aiOpenAssistant: 'Buka pembantu AI',
   aiFactCheckBtn: 'Semak Fakta AI',
@@ -139,6 +138,7 @@ export const ms = {
   aiClarifyOther: 'Lain-lain (taip sendiri)',
   aiClarifySkip: 'Langkau tinjauan',
   aiClarifyNext: 'Seterusnya',
+  aiClarifyPrev: 'Sebelumnya',
   aiClarifySubmit: 'Jana',
   aiSumReadAttachment: 'Baca lampiran',
   aiSumReadAttachmentName: 'Baca lampiran {name}',
@@ -227,4 +227,5 @@ export const ms = {
   aiSumSaveTemplate: 'Menyimpan templat gaya "{name}"',
   aiSumTemplatesEmpty: 'Templat gaya (kosong)',
   aiSumListTemplates: 'Menyenaraikan {count} templat gaya',
+  aiPageCloudToLocal: 'Awan tidak tersedia — dijana secara setempat',
 } satisfies Record<keyof typeof zh, string>

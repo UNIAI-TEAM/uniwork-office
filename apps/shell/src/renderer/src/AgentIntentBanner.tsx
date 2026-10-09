@@ -21,7 +21,9 @@ export function AgentIntentBanner({ practiceId, ensureWorkbench }: Props): React
   const [notice, setNotice] = useState<string | null>(null)
 
   useEffect(() => {
-    const off = window.aiOffice.onAgentIntent?.((intent) => {
+    const off = window.aiOffice.onAgentIntent?.((dto) => {
+      // main validated the target ids; the DTO only widens them to string
+      const intent = dto as AgentIntent
       setNotice(null)
       if (intent.requireConsent) {
         setPending(intent)
@@ -70,7 +72,11 @@ export function AgentIntentBanner({ practiceId, ensureWorkbench }: Props): React
   if (!pending || !pack) return null
 
   return (
-    <div className="agent-intent-banner" role="dialog" aria-label={L('Xác nhận lệnh AI', 'Confirm AI intent')}>
+    <div
+      className="agent-intent-banner"
+      role="dialog"
+      aria-label={L('Xác nhận lệnh AI', 'Confirm AI intent')}
+    >
       <div className="agent-intent-main">
         <p className="agent-intent-kicker">
           {L('Lệnh từ', 'Intent from')} {pending.source.toUpperCase()}

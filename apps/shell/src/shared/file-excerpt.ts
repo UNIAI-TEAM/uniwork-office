@@ -18,21 +18,25 @@ export interface FileExcerpt {
 }
 
 export function clipExcerpt(text: string, max = FILE_EXCERPT_MAX_CHARS): string {
-  const t = text.replace(/\u0000/g, '').replace(/\s+\n/g, '\n').replace(/[ \t]+/g, ' ').trim()
+  const t = text
+    .replaceAll('\0', '')
+    .replace(/\s+\n/g, '\n')
+    .replace(/[ \t]+/g, ' ')
+    .trim()
   if (t.length <= max) return t
   return `${t.slice(0, max - 1)}…`
 }
 
 /** Flatten excerpts into a prompt block (pack-budgeted). */
-export function formatExcerptsForPrompt(items: readonly FileExcerpt[], maxChars = FILE_EXCERPT_PACK_CHARS): string {
+export function formatExcerptsForPrompt(
+  items: readonly FileExcerpt[],
+  maxChars = FILE_EXCERPT_PACK_CHARS,
+): string {
   const parts: string[] = []
   let used = 0
   for (const item of items) {
     const head = `### ${item.name} (.${item.ext}) [${item.status}]`
-    const body =
-      item.status === 'ok' && item.excerpt
-        ? item.excerpt
-        : item.error || item.status
+    const body = item.status === 'ok' && item.excerpt ? item.excerpt : item.error || item.status
     const block = `${head}\n${body}`
     const room = maxChars - used
     if (room < 80) break

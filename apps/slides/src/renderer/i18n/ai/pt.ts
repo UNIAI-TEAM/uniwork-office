@@ -22,7 +22,6 @@ export const pt = {
   aiQcPageSkipped: 'Página {n}: verificação automática de layout ignorada',
   aiQcStopped: 'Verificação de layout interrompida',
   aiQcCapped: 'Mais {count} página(s) não verificada(s) (limite por execução)',
-  aiGskLoginBtn: 'Entrar no UniWork',
   aiPanelTitle: 'uniAI',
   aiOpenAssistant: 'Abrir assistente de IA',
   aiFactCheckBtn: 'Checagem IA',
@@ -140,6 +139,7 @@ export const pt = {
   aiClarifyOther: 'Outro (digite)',
   aiClarifySkip: 'Pular pesquisa',
   aiClarifyNext: 'Próxima',
+  aiClarifyPrev: 'Anterior',
   aiClarifySubmit: 'Gerar',
   aiSumReadAttachment: 'Ler anexo',
   aiSumReadAttachmentName: 'Ler anexo {name}',
@@ -228,4 +228,5 @@ export const pt = {
   aiSumSaveTemplate: 'Modelo de estilo "{name}" salvo',
   aiSumTemplatesEmpty: 'Modelos de estilo (vazio)',
   aiSumListTemplates: '{count} modelos de estilo listados',
+  aiPageCloudToLocal: 'Nuvem indisponível — gerado localmente',
 } satisfies Record<keyof typeof zh, string>

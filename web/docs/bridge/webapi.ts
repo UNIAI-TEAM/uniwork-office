@@ -122,6 +122,17 @@ async function readSource(source: FileSource): Promise<ArrayBuffer> {
   return res.arrayBuffer()
 }
 
+/**
+ * OpenFileResult.dataUrl on the web: an object URL over the opened bytes. The
+ * renderer fetches it once right after the open settles, so it is revoked
+ * after a grace period instead of being kept for the frame's lifetime.
+ */
+function oneShotDocUrl(data: ArrayBuffer): string {
+  const url = URL.createObjectURL(new Blob([data]))
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+  return url
+}
+
 function decodeDataUrl(url: string): { base64: string; mime: string } | null {
   const m = /^data:([^;,]*)((?:;[^;,]*)*?)(;base64)?,(.*)$/s.exec(url)
   if (!m) return null
@@ -178,7 +189,12 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
   async function toOpenResult(open: OpenPayload): Promise<OpenFileResult> {
     const data = await readSource(open.source)
     remember(open.file)
-    return { path: pathFor(open.file), name: open.file.name, data, hash: await sha256Hex(data) }
+    return {
+      path: pathFor(open.file),
+      name: open.file.name,
+      dataUrl: oneShotDocUrl(data),
+      hash: await sha256Hex(data),
+    }
   }
 
   async function openById(fileId: string): Promise<OpenFileResult> {

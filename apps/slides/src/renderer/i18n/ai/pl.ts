@@ -22,7 +22,6 @@ export const pl = {
   aiQcPageSkipped: 'Strona {n}: pominięto automatyczne sprawdzanie układu',
   aiQcStopped: 'Sprawdzanie układu zatrzymane',
   aiQcCapped: 'Pozostałe {count} stron(y) nie sprawdzono (limit na uruchomienie)',
-  aiGskLoginBtn: 'Zaloguj się do UniWork',
   aiPanelTitle: 'uniAI',
   aiOpenAssistant: 'Otwórz asystenta AI',
   aiFactCheckBtn: 'Weryfikacja AI',
@@ -139,6 +138,7 @@ export const pl = {
   aiClarifyOther: 'Inne (wpisz)',
   aiClarifySkip: 'Pomiń ankietę',
   aiClarifyNext: 'Dalej',
+  aiClarifyPrev: 'Wstecz',
   aiClarifySubmit: 'Generuj',
   aiSumReadAttachment: 'Odczyt załącznika',
   aiSumReadAttachmentName: 'Odczyt załącznika {name}',
@@ -227,4 +227,5 @@ export const pl = {
   aiSumSaveTemplate: 'Zapisano szablon stylu „{name}”',
   aiSumTemplatesEmpty: 'Szablony stylu (pusto)',
   aiSumListTemplates: 'Wyświetlono szablony stylu: {count}',
+  aiPageCloudToLocal: 'Chmura niedostępna — wygenerowano lokalnie',
 } satisfies Record<keyof typeof zh, string>

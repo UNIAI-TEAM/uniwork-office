@@ -13,13 +13,6 @@
  * the publish config is omitted: electron-builder then bakes no
  * app-update.yml into the app and in-app auto-update stays disabled.
  *
- * GENOFFICE_GA4_MEASUREMENT_ID / GENOFFICE_GA4_API_SECRET — GA4 Measurement
- * Protocol credentials for anonymous usage analytics, injected the same way
- * (CI secrets, or apps/shell/electron-builder.env locally). They are written
- * into the packaged app's package.json via extraMetadata and read back by
- * src/main/analytics.ts. When either is unset — every source/fork build —
- * nothing is injected and the app runs with analytics fully disabled.
- *
  * GENOFFICE_FONT_CDN_URL — base URL for the curated downloadable-font catalog.
  * Official release jobs inject it through extraMetadata so the endpoint stays
  * out of source. Without it, font download prompts/catalog entries are hidden;
@@ -27,8 +20,13 @@
  */
 
 const { execFileSync } = require('node:child_process')
-const { existsSync, rmSync } = require('node:fs')
+const { existsSync, readFileSync, rmSync } = require('node:fs')
 const { join } = require('node:path')
+
+// Legal identity (company, contact, homepage, copyright year): one file shared
+// with Settings > About, the NOTICE / MODIFICATIONS sync (tools/legal) and the
+// third-party notice header. Absolute path so vm-based tests can load it too.
+const legal = require(join(__dirname, 'src/shared/legal.json'))
 
 function normalizeHttpsBaseUrl(name, value) {
   if (!value || !value.trim()) return null
@@ -44,20 +42,17 @@ function normalizeHttpsBaseUrl(name, value) {
 }
 
 const updateUrl = process.env.GENOFFICE_UPDATE_URL
-const ga4MeasurementId = process.env.GENOFFICE_GA4_MEASUREMENT_ID
-const ga4ApiSecret = process.env.GENOFFICE_GA4_API_SECRET
 const fontCdnUrl = normalizeHttpsBaseUrl(
   'GENOFFICE_FONT_CDN_URL',
   process.env.GENOFFICE_FONT_CDN_URL,
 )
 
 // GENOFFICE_MAC_X64=1 — opt into packaging the Intel (x64) dmg/zip alongside
-// arm64. Off by default: Intel packages must only ever ship signed with the
-// company certificate (planned dual-track pipeline), so the current release
-// pipeline stays arm64-only and never produces a personally-signed Intel
-// artifact. The downstream layout (feed archive name, UniWork Office-intel.dmg
-// alias) keys off which dmgs exist, so flipping this flag is the single
-// switch.
+// arm64. Off by default so a plain local `dist:mac` stays arm64-only. The
+// UniWork release workflow sets it: this fork ships unsigned dev/beta builds
+// for both arches (ad-hoc signed, see the release block below) until a company
+// certificate exists. Dual-arch packs share one fat xlsx-sidecar / vision-ocr
+// (assertUniversalSidecar / assertUniversalVisionOcr).
 const includeMacX64 = process.env.GENOFFICE_MAC_X64 === '1'
 
 // GENOFFICE_WIN_ARM64=1 — package the Windows ARM64 installer instead of x64.
@@ -74,30 +69,35 @@ if (winArm64 && !process.env.ELECTRON_BUILDER_7Z_FILTER) {
   process.env.ELECTRON_BUILDER_7Z_FILTER = 'BCJ'
 }
 const winArch = winArm64 ? 'arm64' : 'x64'
-const winSidecarTarget = winArm64 ? 'aarch64-pc-windows-msvc' : 'x86_64-pc-windows-gnu'
+// The x64 sidecar defaults to the MinGW cross-compile path (built on a
+// mac/linux host). A Windows host builds it natively with MSVC instead, where
+// native/xlsx-engine/.cargo/config.toml links the CRT statically;
+// GENOFFICE_WIN_SIDECAR_TARGET=x86_64-pc-windows-msvc points packaging there.
+const WIN_X64_SIDECAR_TARGETS = ['x86_64-pc-windows-gnu', 'x86_64-pc-windows-msvc']
+const winX64SidecarTarget = process.env.GENOFFICE_WIN_SIDECAR_TARGET || WIN_X64_SIDECAR_TARGETS[0]
+if (!WIN_X64_SIDECAR_TARGETS.includes(winX64SidecarTarget)) {
+  throw new Error(
+    `GENOFFICE_WIN_SIDECAR_TARGET must be one of ${WIN_X64_SIDECAR_TARGETS.join(', ')}, got "${winX64SidecarTarget}"`,
+  )
+}
+const winSidecarTarget = winArm64 ? 'aarch64-pc-windows-msvc' : winX64SidecarTarget
 const WIN_SIDECAR = `../sheets/native/xlsx-engine/target/${winSidecarTarget}/release/xlsx-sidecar.exe`
 
-// The gsk CLI tree below is copied verbatim from node_modules, and the
-// nested commander path depends on npm's current hoisting layout — fail the
-// build with a clear message if an install ever changes it, instead of
-// shipping an installer with a broken gsk runtime.
-// LICENSES.chromium.html only exists after the Electron binary download —
-// since Electron 42 that no longer happens during `npm ci` (the postinstall
-// script was replaced by the lazy `install-electron` bin), and electron-builder
-// exits 0 on a missing extraResources source, so without this check the
-// installer would silently ship without the Chromium license.
-for (const rel of [
-  '../../node_modules/@genspark/cli',
-  '../../node_modules/@genspark/cli/node_modules/commander',
-  '../../node_modules/ws',
-  '../../node_modules/electron/dist/LICENSES.chromium.html',
-  '../../node_modules/@embedpdf/pdfium/dist/pdfium.wasm',
-  '../pdf/node_modules/harfbuzzjs/hb-subset.wasm',
-]) {
-  if (!existsSync(join(__dirname, rel))) {
-    throw new Error(
-      `electron-builder extraResources source missing: ${rel} (npm hoisting changed?)`,
-    )
+// Shipped next to THIRD-PARTY-NOTICES.txt (see extraResources)
+const LEGAL_FILES = ['LICENSE', 'NOTICE', 'MODIFICATIONS', 'LICENSE-UNICODE.txt']
+
+function assertExtraResourceSources() {
+  for (const rel of [
+    '../../node_modules/electron/dist/LICENSES.chromium.html',
+    '../../node_modules/@embedpdf/pdfium/dist/pdfium.wasm',
+    '../pdf/node_modules/harfbuzzjs/hb-subset.wasm',
+    ...LEGAL_FILES.map((name) => `../../${name}`),
+  ]) {
+    if (!existsSync(join(__dirname, rel))) {
+      throw new Error(
+        `electron-builder extraResources source missing: ${rel} (npm hoisting changed?)`,
+      )
+    }
   }
 }
 
@@ -133,23 +133,22 @@ function compileVisionOcr({ universalOnly } = { universalOnly: false }) {
   }
 }
 
-if (process.platform === 'darwin' && !existsSync(join(__dirname, VISION_OCR_HELPER))) {
-  compileVisionOcr()
-}
-
-// Windows local-OCR helper (Windows.Media.Ocr): compiled by the in-box .NET
-// Framework csc via build-win.mjs — same on-demand policy as the mac helper,
-// and Windows installers must not silently ship without it.
 const WIN_OCR_HELPER = '../../packages/pdf2docx/ocr-helper/win-ocr.exe'
-if (process.platform === 'win32' && !existsSync(join(__dirname, WIN_OCR_HELPER))) {
-  try {
-    execFileSync(
-      process.execPath,
-      [join(__dirname, '../../packages/pdf2docx/ocr-helper/build-win.mjs')],
-      { stdio: 'inherit' },
-    )
-  } catch (err) {
-    throw new Error(`win-ocr helper compile failed: ${err}`, { cause: err })
+
+function ensurePlatformHelpers() {
+  if (process.platform === 'darwin' && !existsSync(join(__dirname, VISION_OCR_HELPER))) {
+    compileVisionOcr()
+  }
+  if (process.platform === 'win32' && !existsSync(join(__dirname, WIN_OCR_HELPER))) {
+    try {
+      execFileSync(
+        process.execPath,
+        [join(__dirname, '../../packages/pdf2docx/ocr-helper/build-win.mjs')],
+        { stdio: 'inherit' },
+      )
+    } catch (err) {
+      throw new Error(`win-ocr helper compile failed: ${err}`, { cause: err })
+    }
   }
 }
 
@@ -230,11 +229,86 @@ function assertModuleTreesPresent() {
   }
 }
 
+const CLI_BUNDLE_REL = '../../packages/cli/dist/genoffice.cjs'
+const CLI_BUILD_REL = '../../packages/cli/build.mjs'
+const CLI_VERSION_ENV = 'GENOFFICE_APP_VERSION'
+const CLI_VERSION_BANNER = /^const __cliAppVersion = ("(?:[^"\\]|\\.)*");$/m
+
+/**
+ * The version the packaged app reports: CI's -c.extraMetadata.version deep-merges
+ * into the block below, and without it electron-builder ships apps/shell/package.json.
+ */
+function packagedAppVersion() {
+  const injected = config.extraMetadata && config.extraMetadata.version
+  if (typeof injected === 'string' && injected.trim()) return injected.trim()
+  return require('./package.json').version
+}
+
+function bundledCliVersion(bundlePath) {
+  const baked = CLI_VERSION_BANNER.exec(readFileSync(bundlePath, 'utf-8'))
+  if (!baked) return null
+  try {
+    return JSON.parse(baked[1])
+  } catch {
+    return null
+  }
+}
+
+/**
+ * `genoffice --version` is baked into the CLI bundle, which is built before
+ * electron-builder runs and therefore before a release version is known. Rebuild
+ * it here with the app version whenever the two disagree, so the packaged
+ * command line can never answer with the workspace CLI version.
+ */
+function ensureCliBundleCarriesAppVersion() {
+  const bundlePath = join(__dirname, CLI_BUNDLE_REL)
+  const appVersion = packagedAppVersion()
+  if (bundledCliVersion(bundlePath) === appVersion) return
+  execFileSync(process.execPath, [join(__dirname, CLI_BUILD_REL)], {
+    stdio: 'inherit',
+    env: { ...process.env, [CLI_VERSION_ENV]: appVersion },
+  })
+  const baked = bundledCliVersion(bundlePath)
+  if (baked !== appVersion) {
+    throw new Error(
+      `packaged genoffice CLI reports ${baked ?? 'no version'} but the app ships ${appVersion} ` +
+        `(rebuild it with ${CLI_VERSION_ENV}=${appVersion})`,
+    )
+  }
+}
+
+const NOTICE_PATH = join(__dirname, 'build/THIRD-PARTY-NOTICES.txt')
+const PDFIUM_NOTICE_TERMS = ['@embedpdf/pdfium', 'Copyright 2014 PDFium Authors', 'Apache License']
+
+function hasValidThirdPartyNotice() {
+  if (!existsSync(NOTICE_PATH)) return false
+  try {
+    const text = readFileSync(NOTICE_PATH, 'utf8')
+    return PDFIUM_NOTICE_TERMS.every((term) => text.includes(term))
+  } catch {
+    return false
+  }
+}
+
+function ensureThirdPartyNotices() {
+  if (!hasValidThirdPartyNotice()) {
+    execFileSync(process.execPath, [join(__dirname, '../../tools/gen-third-party-notices.mjs')], {
+      stdio: 'inherit',
+    })
+  }
+  if (!hasValidThirdPartyNotice()) {
+    throw new Error('third-party notice missing PDFium redistribution terms')
+  }
+}
+
 /** @type {import('electron-builder').Configuration} */
 const config = {
   appId: 'com.uniwork.office',
   productName: 'UniWork Office',
   artifactName: 'UniWork-Office-${version}-${arch}.${ext}',
+  // binary metadata names the distributor only; the upstream attribution
+  // lives in the shipped NOTICE
+  copyright: `Copyright © ${legal.copyrightYear} ${legal.company}`,
   // Resolved from the installed electron package so dependency bumps can
   // never leave a stale hard-coded pin behind (packaging would silently ship
   // the old runtime).
@@ -247,6 +321,28 @@ const config = {
     {
       from: 'build/THIRD-PARTY-NOTICES.txt',
       to: 'THIRD-PARTY-NOTICES.txt',
+    },
+    // Apache-2.0 section 4: the license, the upstream NOTICE (with the fork's
+    // header) and the statement of changes travel with every copy. Settings >
+    // About opens them from Resources/ (apps/shell/src/main/legal-docs.ts).
+    // Shipped as .txt so the system viewer opens them without an "Open with"
+    // prompt; the text is byte-identical to the repo-root originals.
+    {
+      from: '../../LICENSE',
+      to: 'LICENSE.txt',
+    },
+    {
+      from: '../../NOTICE',
+      to: 'NOTICE.txt',
+    },
+    {
+      from: '../../MODIFICATIONS',
+      to: 'MODIFICATIONS.txt',
+    },
+    // NOTICE points at it for the Unicode data in the PDF module
+    {
+      from: '../../LICENSE-UNICODE.txt',
+      to: 'LICENSE-UNICODE.txt',
     },
     {
       from: '../../node_modules/electron/dist/LICENSES.chromium.html',
@@ -297,12 +393,8 @@ const config = {
       from: '../../packages/pdf2docx/ocr-helper/win-ocr.exe',
       to: 'ocr/win-ocr.exe',
     },
-    {
-      from: '../../node_modules/@genspark/cli',
-      to: 'gsk/node_modules/@genspark/cli',
-    },
-    // genoffice command line: runs on the app binary with ELECTRON_RUN_AS_NODE (as
-    // the gsk CLI above already does), so the RunAsNode fuse must stay enabled.
+    // genoffice command line: runs on the app binary with ELECTRON_RUN_AS_NODE,
+    // so the RunAsNode fuse must stay enabled.
     // Layout (Resources/cli next to wasm/, native/, ocr/) is what
     // packages/cli/src/resources.ts expects.
     {
@@ -333,14 +425,6 @@ const config = {
       from: '../../packages/cli/dist/node_modules',
       to: 'cli/node_modules',
     },
-    {
-      from: '../../node_modules/@genspark/cli/node_modules/commander',
-      to: 'gsk/node_modules/commander',
-    },
-    {
-      from: '../../node_modules/ws',
-      to: 'gsk/node_modules/ws',
-    },
   ],
   // `mimeType` is read only by the Linux target, where it becomes the
   // desktop entry's MimeType= list; associations without it are dropped
@@ -357,6 +441,7 @@ const config = {
     {
       ext: 'docx',
       name: 'Word Document',
+      description: 'Word Document',
       role: 'Editor',
       icon: 'docx',
       mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -364,6 +449,7 @@ const config = {
     {
       ext: 'xlsx',
       name: 'Excel Workbook',
+      description: 'Excel Workbook',
       role: 'Editor',
       icon: 'xlsx',
       mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -378,6 +464,7 @@ const config = {
     {
       ext: 'pptx',
       name: 'PowerPoint Presentation',
+      description: 'PowerPoint Presentation',
       role: 'Editor',
       icon: 'pptx',
       mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
@@ -395,6 +482,14 @@ const config = {
       role: 'Editor',
       icon: 'xlsx',
       mimeType: 'text/csv',
+    },
+    {
+      // opens as a converted copy and saves as .xlsx (genoffice#1146)
+      ext: 'tsv',
+      name: 'TSV Document',
+      role: 'Editor',
+      icon: 'xlsx',
+      mimeType: 'text/tab-separated-values',
     },
     {
       ext: 'pdf',
@@ -470,6 +565,11 @@ const config = {
         from: WIN_SIDECAR,
         to: 'native/xlsx-sidecar.exe',
       },
+      {
+        from: 'build/shell-new',
+        to: 'shell-new',
+        filter: ['*.docx', '*.xlsx', '*.pptx'],
+      },
     ],
   },
   // Unlike win (which cross-compiles the sidecar to an explicit target
@@ -490,12 +590,12 @@ const config = {
       { target: 'deb', arch: ['x64'] },
       { target: 'rpm', arch: ['x64'] },
     ],
-    // deb control metadata; values match the manually published 0.5.149 deb
-    // so apt sees the new packages as the same lineage. Homepage comes from
-    // package.json "homepage"; the Package field is pinned in the deb block
-    // below (packageName is a per-target option, rejected here by the schema).
-    maintainer: 'UniWork Office',
-    vendor: 'UniWork Office',
+    // deb / rpm control metadata from legal.json: Maintainer is "<company>
+    // <email>", Vendor the company. Homepage comes from extraMetadata.homepage
+    // (legal.json as well); the Package field is pinned in the deb block below
+    // (packageName is a per-target option, rejected here by the schema).
+    maintainer: `${legal.company} <${legal.email}>`,
+    vendor: legal.company,
     category: 'Office',
     // Icon SET directory, not the single 1024px png: electron-builder does
     // not resize a lone png, so deb/rpm would install only
@@ -556,13 +656,25 @@ const config = {
     publish: null,
     afterInstall: 'build/linux-after-install.sh',
     afterRemove: 'build/linux-after-remove.sh',
+    // rpmbuild links every packaged ELF file into /usr/lib/.build-id/<hash>.
+    // Two Electron apps built on the same Electron release ship identical
+    // binaries, so the links are identical too and dnf refuses the install
+    // with a file conflict against the other app (genoffice#1145). The links exist only
+    // to locate detached debuginfo, which this package does not ship, so turn
+    // them off. rpm-level `fpm` (not linux-level) keeps it away from the deb.
+    fpm: ['--rpm-rpmbuild-define=_build_id_links none'],
   },
   nsis: {
     oneClick: false,
     allowToChangeInstallationDirectory: true,
   },
   beforePack: async (context) => {
+    ensurePlatformHelpers()
+    assertExtraResourceSources()
+    ensureThirdPartyNotices()
     assertModuleTreesPresent()
+    ensureCliBundleCarriesAppVersion()
+    assertReleaseVersion()
     if (context.electronPlatformName === 'darwin' && includeMacX64) {
       assertUniversalSidecar()
       assertUniversalVisionOcr()
@@ -612,6 +724,86 @@ if (winSignMode) {
   }
 }
 
+// UniWork dev / beta release builds (tools/release/README.md). The release
+// workflow sets UNIWORK_RELEASE_CHANNEL; plain local `dist:*` runs leave it
+// unset and keep the artifactName above. Release names follow the download
+// server's contract: `_<version>_` carries the version, the `unsigned` token
+// marks a build without a signing identity for that platform (it disappears
+// once one is configured), then the platform and arch:
+//   UniWork-Office_0.11.0-dev.1_unsigned_win32_x64-setup.exe
+//   UniWork-Office_0.11.0-dev.1_unsigned_darwin_arm64.dmg
+// Only dev and beta exist; stable waits for signed builds.
+const RELEASE_CHANNELS = ['dev', 'beta']
+const RELEASE_SIGNING_ENV = [
+  'CSC_LINK',
+  'CSC_KEY_PASSWORD',
+  'CSC_NAME',
+  'WIN_CSC_LINK',
+  'WIN_CSC_KEY_PASSWORD',
+  'APPLE_ID',
+  'APPLE_APP_SPECIFIC_PASSWORD',
+  'APPLE_TEAM_ID',
+  'APPLE_KEYCHAIN_PROFILE',
+]
+const releaseChannel = process.env.UNIWORK_RELEASE_CHANNEL
+if (releaseChannel) {
+  if (!RELEASE_CHANNELS.includes(releaseChannel)) {
+    throw new Error(
+      `UNIWORK_RELEASE_CHANNEL must be one of ${RELEASE_CHANNELS.join(', ')}, got "${releaseChannel}"`,
+    )
+  }
+  // Dev / beta builds carry no update feed: no app-update.yml is baked in, so
+  // nothing polls an update server.
+  if (updateUrl) {
+    throw new Error('GENOFFICE_UPDATE_URL must stay unset for dev / beta release builds')
+  }
+  // An exported but empty signing variable counts as unset. electron-builder
+  // keeps CSC_LINK="" as a certificate path and the mac keychain import then
+  // fails on the project directory, so empty values are dropped before it
+  // reads them.
+  for (const key of RELEASE_SIGNING_ENV) {
+    if (process.env[key] === '') delete process.env[key]
+  }
+  // No publish target at all, even when GH_TOKEN / GITHUB_TOKEN is in the
+  // shell (electron-builder would otherwise pick GitHub and bake a feed).
+  config.publish = null
+  // The dmgs are the only mac downloads; the zips exist for the update feed.
+  config.mac.target = config.mac.target.filter((entry) => entry.target === 'dmg')
+  const macSigned = Boolean(process.env.CSC_LINK || process.env.CSC_NAME)
+  const winSigned = Boolean(winSignMode || process.env.WIN_CSC_LINK || process.env.CSC_LINK)
+  const unsignedLabel = (signed) => (signed ? '' : '_unsigned')
+  config.nsis.artifactName =
+    'UniWork-Office_${version}' + unsignedLabel(winSigned) + '_win32_${arch}-setup.${ext}'
+  config.mac.artifactName =
+    'UniWork-Office_${version}' + unsignedLabel(macSigned) + '_darwin_${arch}.${ext}'
+  if (!macSigned) {
+    // Without an identity electron-builder skips signing altogether, and
+    // packaging (renamed binary, rewritten Info.plist) breaks the signature
+    // Electron ships with: Apple Silicon then refuses the app as damaged.
+    // identity '-' ad-hoc signs every binary instead. Hardened runtime stays
+    // off because its library validation rejects ad-hoc signed frameworks
+    // (no team id), and there is nothing to notarize or sign the dmg with.
+    config.mac.identity = '-'
+    config.mac.hardenedRuntime = false
+    config.mac.notarize = false
+    config.dmg.sign = false
+  }
+}
+
+/** A release build must ship `<apps/shell version>-<channel>.<n>` (-c.extraMetadata.version). */
+function assertReleaseVersion() {
+  if (!releaseChannel) return
+  const base = require('./package.json').version
+  const version = packagedAppVersion()
+  const expected = new RegExp(`^${base.replace(/\./g, '\\.')}-${releaseChannel}\\.[0-9]+$`)
+  if (!expected.test(version)) {
+    throw new Error(
+      `${releaseChannel} release builds need version ${base}-${releaseChannel}.<n> ` +
+        `(-c.extraMetadata.version), got ${version}`,
+    )
+  }
+}
+
 if (updateUrl) {
   config.publish = [
     {
@@ -623,15 +815,14 @@ if (updateUrl) {
 }
 
 // CI's "-c.extraMetadata.version=..." CLI override deep-merges with this block,
-// so the version and all injected feature settings survive together.
-const extraMetadata = {}
-if (ga4MeasurementId && ga4ApiSecret) {
-  extraMetadata.genofficeAnalytics = {
-    measurementId: ga4MeasurementId,
-    apiSecret: ga4ApiSecret,
-  }
+// so the version and all injected feature settings survive together. author /
+// homepage restate legal.json so the packaged package.json (and the deb / rpm
+// fields electron-builder derives from it) never depend on a stale workspace copy.
+const extraMetadata = {
+  author: { name: legal.company, email: legal.email },
+  homepage: legal.homepage,
 }
 if (fontCdnUrl) extraMetadata.genofficeFontCdn = { baseUrl: fontCdnUrl }
-if (Object.keys(extraMetadata).length) config.extraMetadata = extraMetadata
+config.extraMetadata = extraMetadata
 
 module.exports = config

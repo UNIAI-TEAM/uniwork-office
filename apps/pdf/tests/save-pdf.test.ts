@@ -3,7 +3,19 @@ import { mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync } from 
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { PDFArray, PDFDict, PDFDocument, PDFHexString, PDFName, degrees } from 'pdf-lib'
+import {
+  PDFArray,
+  PDFContentStream,
+  PDFDict,
+  PDFDocument,
+  PDFHexString,
+  PDFName,
+  PDFRawStream,
+  PDFRef,
+  decodePDFRawStream,
+  degrees,
+  rgb,
+} from 'pdf-lib'
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
 import {
   applySaveRequest,
@@ -22,7 +34,10 @@ import {
   splitPdfBytes,
 } from '../src/main/save-pdf'
 import { VISUAL_SIGNATURE_CONTENT_PREFIX } from '../src/shared/ipc'
+import { PDFJS_ANNOT_TEXT } from '../src/renderer/note-threads'
 import type { SavePdfRequest } from '../src/shared/ipc'
+
+/** pdf.js AnnotationType.POPUP — a note's popup must never surface as its own entry */
 
 /** 1x1 red pixel PNG */
 const TINY_PNG =
@@ -163,6 +178,68 @@ describe('splitPdfBytes', () => {
 const mergeOpts = (perSheet: number) =>
   ({ perSheet, direction: 'horizontal', separator: false }) as const
 
+function decodedPageContent(page: ReturnType<PDFDocument['getPage']>): string {
+  const contents = page.node.Contents()
+  if (contents instanceof PDFContentStream) {
+    return Buffer.from(contents.getUnencodedContents()).toString('latin1')
+  }
+  if (contents instanceof PDFRawStream) {
+    return Buffer.from(decodePDFRawStream(contents).decode()).toString('latin1')
+  }
+  if (contents instanceof PDFArray) {
+    return Array.from({ length: contents.size() }, (_, index) => {
+      const value = contents.lookup(index)
+      if (value instanceof PDFContentStream) {
+        return Buffer.from(value.getUnencodedContents()).toString('latin1')
+      }
+      return value instanceof PDFRawStream
+        ? Buffer.from(decodePDFRawStream(value).decode()).toString('latin1')
+        : ''
+    }).join('')
+  }
+  return ''
+}
+
+type Matrix = [number, number, number, number, number, number]
+
+function multiplyMatrices(left: Matrix, right: Matrix): Matrix {
+  return [
+    left[0] * right[0] + left[2] * right[1],
+    left[1] * right[0] + left[3] * right[1],
+    left[0] * right[2] + left[2] * right[3],
+    left[1] * right[2] + left[3] * right[3],
+    left[0] * right[4] + left[2] * right[5] + left[4],
+    left[1] * right[4] + left[3] * right[5] + left[5],
+  ]
+}
+
+function composedMatrix(content: string): Matrix {
+  const matrices = [
+    ...content.matchAll(
+      /(-?(?:\d+\.?\d*|\.\d+))\s+(-?(?:\d+\.?\d*|\.\d+))\s+(-?(?:\d+\.?\d*|\.\d+))\s+(-?(?:\d+\.?\d*|\.\d+))\s+(-?(?:\d+\.?\d*|\.\d+))\s+(-?(?:\d+\.?\d*|\.\d+))\s+cm/g,
+    ),
+  ].map((match) => match.slice(1, 7).map(Number) as Matrix)
+  return matrices.reduce(multiplyMatrices, [1, 0, 0, 1, 0, 0])
+}
+
+function transformedBounds(matrix: Matrix, rect: [number, number, number, number]) {
+  const points = [
+    [rect[0], rect[1]],
+    [rect[0] + rect[2], rect[1]],
+    [rect[0], rect[1] + rect[3]],
+    [rect[0] + rect[2], rect[1] + rect[3]],
+  ].map(([x, y]) => [
+    matrix[0] * x + matrix[2] * y + matrix[4],
+    matrix[1] * x + matrix[3] * y + matrix[5],
+  ])
+  return {
+    minX: Math.min(...points.map(([x]) => x)),
+    minY: Math.min(...points.map(([, y]) => y)),
+    maxX: Math.max(...points.map(([x]) => x)),
+    maxY: Math.max(...points.map(([, y]) => y)),
+  }
+}
+
 describe('mergeGrid', () => {
   it('is a pair for 2 and a near-square grid otherwise', () => {
     expect(mergeGrid(2)).toEqual({ cols: 2, rows: 1 })
@@ -205,6 +282,29 @@ describe('mergePagesBytes', () => {
     expect(out.getPageCount()).toBe(2)
     expect(out.getPage(0).getWidth()).toBe(200)
     expect(out.getPage(0).getHeight()).toBe(100)
+  })
+
+  it('preserves source-page rotation when imposing pages', async () => {
+    const doc = await PDFDocument.create()
+    const page = doc.addPage([100, 200])
+    page.setRotation(degrees(90))
+    page.drawRectangle({ x: 10, y: 20, width: 30, height: 40, color: rgb(1, 0, 0) })
+    const bytes = await doc.save({ useObjectStreams: false })
+    const out = await PDFDocument.load(await mergePagesBytes(bytes, mergeOpts(2)))
+    expect(out.getPage(0).getWidth()).toBe(100)
+    expect(out.getPage(0).getHeight()).toBe(200)
+    const matrix = composedMatrix(decodedPageContent(out.getPage(0)))
+    expect(matrix[0]).toBeCloseTo(0)
+    expect(matrix[1]).toBeCloseTo(-0.25)
+    expect(matrix[2]).toBeCloseTo(0.25)
+    expect(matrix[3]).toBeCloseTo(0)
+    expect(matrix[4]).toBeCloseTo(0)
+    expect(matrix[5]).toBeCloseTo(112.5)
+    const bounds = transformedBounds(matrix, [10, 20, 30, 40])
+    expect(bounds.minX).toBeCloseTo(5)
+    expect(bounds.minY).toBeCloseTo(102.5)
+    expect(bounds.maxX).toBeCloseTo(15)
+    expect(bounds.maxY).toBeCloseTo(110)
   })
 
   it('draws the embedded pages onto each sheet', async () => {
@@ -453,6 +553,21 @@ describe('savePdfToPath', () => {
     expect(readdirSync(dir)).toEqual(['doc.pdf'])
   })
 
+  it('skips markups with non-finite colors or quads instead of corrupting the file', async () => {
+    const nanColor = { ...highlight, color: [NaN, 0, 0] as [number, number, number] }
+    const outOfRange = { ...highlight, color: [2, 0, 0] as [number, number, number] }
+    const nanQuads = { ...highlight, quads: [[10, NaN, 60, 100, 10, 88, 60, 88]] }
+    const emptyQuads = { ...highlight, quads: [] as number[][] }
+    const out = await PDFDocument.load(
+      await apply(
+        await makePdf([[612, 792]]),
+        request({ markups: [highlight, nanColor, outOfRange, nanQuads, emptyQuads] }),
+      ),
+    )
+    // only the valid highlight survives; the output still re-opens cleanly
+    expect(pageAnnots(out, 0).map(subtypeOf)).toEqual(['Highlight'])
+  })
+
   it('a failed save leaves the source and target untouched and cleans up temp files', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'gen-pdf-'))
     const src = join(dir, 'original.pdf')
@@ -545,6 +660,62 @@ describe('applySaveRequest', () => {
     )
     const out = await PDFDocument.load(saved)
     expect(pageAnnots(out, 0).map(subtypeOf)).toEqual(['Text', 'Ink', 'Square', 'Line'])
+  })
+
+  // A sticky note is the one annotation whose own entries are not enough for
+  // macOS Preview: without /AP it has no icon to draw, so the note reads as absent.
+  describe('sticky note interop (Preview / pdf.js)', () => {
+    const note = (over: Record<string, unknown> = {}) => ({
+      kind: 'note' as const,
+      pageIndex: 0,
+      color: [1, 0.9, 0.3] as [number, number, number],
+      at: [120, 700] as [number, number],
+      contents: 'hello note',
+      ...over,
+    })
+
+    async function saveNoteWith(drawing: ReturnType<typeof note>) {
+      const bytes = await makePdf([[612, 792]])
+      const saved = await apply(bytes, request({ drawings: [drawing] }))
+      const doc = await PDFDocument.load(saved)
+      const annots = doc.getPage(0).node.lookup(PDFName.of('Annots'), PDFArray)
+      return { doc, annots, noteRef: annots.lookup(0) as PDFRef }
+    }
+
+    it('writes an appearance stream for the note icon', async () => {
+      const { doc, noteRef } = await saveNoteWith(note())
+      const dict = doc.context.lookup(noteRef) as PDFDict
+      expect(dict.lookup(PDFName.of('AP'), PDFDict).has(PDFName.of('N'))).toBe(true)
+    })
+
+    it('gives the appearance form its own /Resources', async () => {
+      // A Form XObject with no /Resources key at all draws dark grey in Quartz
+      // and yellow in Poppler — the note appears in one viewer only. This is the
+      // difference that silently shipped, so it is asserted directly.
+      const { doc, noteRef } = await saveNoteWith(note())
+      const dict = doc.context.lookup(noteRef) as PDFDict
+      const apRef = dict.lookup(PDFName.of('AP'), PDFDict).lookup(PDFName.of('N')) as PDFRef
+      const ap = doc.context.lookup(apRef) as PDFRawStream
+      expect(ap.dict.lookup(PDFName.of('Subtype'), PDFName).decodeText()).toBe('Form')
+      expect(ap.dict.has(PDFName.of('Resources'))).toBe(true)
+    })
+
+    it('still reads back as exactly one note in pdf.js', async () => {
+      const bytes = await makePdf([[612, 792]])
+      const saved = await apply(
+        bytes,
+        request({ drawings: [note(), note({ at: [300, 400], contents: 'second' })] }),
+      )
+      const loadingTask = getDocument({ data: saved.slice() })
+      try {
+        const pdfJsDoc = await loadingTask.promise
+        const annos = await (await pdfJsDoc.getPage(1)).getAnnotations()
+        const texts = annos.filter((a) => a.annotationType === PDFJS_ANNOT_TEXT)
+        expect(texts.map((a) => a.contentsObj?.str)).toEqual(['hello note', 'second'])
+      } finally {
+        await loadingTask.destroy()
+      }
+    })
   })
 
   it('ignores markups and drawings addressing missing pages', async () => {
