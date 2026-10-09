@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test'
 import { randomBytes } from 'node:crypto'
 import { existsSync } from 'node:fs'
-import { mkdir, mkdtemp, readdir, readFile, stat, writeFile } from 'node:fs/promises'
+import { lstat, mkdir, mkdtemp, readdir, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { closeAndSaveVideo, handoffUrlToRunningApp, launchShell, type LaunchedApp } from './helpers'
@@ -118,9 +118,15 @@ async function userDataText(dir: string): Promise<string> {
     if (!existsSync(base)) continue
     for (const name of await readdir(base)) {
       const file = join(base, name)
-      const info = await stat(file)
-      if (!info.isFile() || info.size > 2_000_000) continue
-      parts.push((await readFile(file)).toString('latin1'))
+      try {
+        // lstat: Chromium's Singleton* entries are (possibly dangling) symlinks
+        const info = await lstat(file)
+        if (!info.isFile() || info.size > 2_000_000) continue
+        parts.push((await readFile(file)).toString('latin1'))
+      } catch (err) {
+        // entries can vanish between readdir and read
+        if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err
+      }
     }
   }
   return parts.join('\n')
