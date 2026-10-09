@@ -24,7 +24,9 @@ export function sheetsWebCapabilities(
     billing: false,
     // desktop-only inputs and stores
     screenshot: false,
-    recoveryCopy: false,
+    // the renderer's 30 s recovery tick feeds web draft recovery (C18: encrypted IndexedDB copy,
+    // never a save); the desktop recovery dialog stays unused (bridge.ts onRecoveryPrompt)
+    recoveryCopy: true,
     // granted by the host on `init` (see sheetsHostGrants)
     save: false,
     saveAs: false,
