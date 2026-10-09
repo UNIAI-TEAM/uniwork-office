@@ -1,0 +1,30 @@
+{
+  "fileButton": {
+    "color": "rgb(255, 255, 255)",
+    "background": "rgb(74, 158, 255)"
+  },
+  "hostDirtyEvents": [
+    {
+      "dirty": false
+    },
+    {
+      "dirty": true
+    }
+  ],
+  "conflictFocus": "overwrite",
+  "hostModalEvents": [],
+  "conflictAfterEsc": false,
+  "exportStatus": "Trang 1 / 110 từ — Đã xuất PDF: simple.pdf (browser print dialog)−+100%",
+  "ribbon944_vi": {
+    "scrollW": 1121,
+    "clientW": 944,
+    "stylesRight": 1109,
+    "more": true
+  },
+  "ribbon944_en": {
+    "scrollW": 1124,
+    "clientW": 944,
+    "stylesRight": 1112,
+    "more": true
+  }
+}
