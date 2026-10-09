@@ -49,19 +49,38 @@ export async function renderMermaid(source: string): Promise<MermaidResult> {
 
 const VIEWBOX_RE = /\bviewBox="[\d.\s-]*?\s([\d.]+)\s([\d.]+)"/
 
-/** Rasterize a rendered diagram for the docx export; null when it cannot be drawn */
-export async function mermaidSvgToPng(svg: string, maxWidthPx: number): Promise<NewImage | null> {
+/**
+ * Pin a rendered diagram's intrinsic size: mermaid emits width="100%", which
+ * an <img> would decode at the 300×150 SVG default instead of the viewBox
+ * dimensions. Null when the SVG has no usable viewBox.
+ */
+function sizeSvg(svg: string): { sized: string; width: number; height: number } | null {
   const box = VIEWBOX_RE.exec(svg)
   const width = Math.ceil(Number(box?.[1]))
   const height = Math.ceil(Number(box?.[2]))
   if (!width || !height) return null
-
-  // mermaid emits width="100%": pin the intrinsic size so <img> decodes at the
-  // viewBox dimensions instead of the 300×150 SVG default
   const sized = svg.replace(
     /<svg\b([^>]*?)\swidth="[^"]*"/,
     `<svg$1 width="${width}" height="${height}"`,
   )
+  return { sized, width, height }
+}
+
+/**
+ * Editor preview source for a rendered diagram. The SVG is shown through an
+ * <img> (never injected into the editor DOM): an image document runs no
+ * scripts or event handlers and loads nothing external, so even an SVG that
+ * slipped past mermaid's own sanitizer cannot act in the (same-origin) frame.
+ */
+export function mermaidSvgDataUrl(svg: string): string {
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(sizeSvg(svg)?.sized ?? svg)}`
+}
+
+/** Rasterize a rendered diagram for the docx export; null when it cannot be drawn */
+export async function mermaidSvgToPng(svg: string, maxWidthPx: number): Promise<NewImage | null> {
+  const pinned = sizeSvg(svg)
+  if (!pinned) return null
+  const { sized, width, height } = pinned
   const url = URL.createObjectURL(new Blob([sized], { type: 'image/svg+xml' }))
   try {
     const img = new Image()

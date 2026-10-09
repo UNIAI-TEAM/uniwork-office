@@ -15,6 +15,7 @@ import { AiQueueAnchors } from './aiQueueAnchors'
 import { InactiveSelection } from './inactiveSelection'
 import { SearchHighlight } from './searchHighlight'
 import { buildMathExtensions } from './math'
+import { RawHtmlBlock, RawHtmlInline } from './rawHtml'
 import { SlashCommand } from './slashCommand'
 import type { SlashController, SlashItem } from './slashCommand'
 import { t } from '../i18n/locale'
@@ -50,6 +51,9 @@ export function buildExtensions(options: BuildExtensionsOptions): AnyExtension[]
     TaskItem.configure({ nested: true }),
     // KaTeX-rendered $...$ / $$...$$ formulas (issue #100)
     ...buildMathExtensions(),
+    // raw HTML / comments survive open → save byte-identically
+    RawHtmlBlock,
+    RawHtmlInline,
     LocalImage,
     BlockDragHandle,
     BlockKeymap,

@@ -31,7 +31,10 @@ hr { border: none; border-top: 2px solid #e4e7eb; margin: 1.6em 0; }
 a { color: #0a69da; }
 img { max-width: 100%; height: auto; }
 .md-mermaid-preview { margin: 0.8em 0; text-align: center; break-inside: avoid; }
-.md-mermaid-preview svg { max-width: 100%; height: auto; }
+.md-mermaid-preview img { max-width: 100%; height: auto; }
+.md-raw-html { margin: 0.8em 0; padding: 6px 10px; border: 1px dashed #d0d5db; border-radius: 6px; color: #57606a; white-space: pre-wrap; overflow-wrap: anywhere; break-inside: avoid; }
+.md-raw-html code { background: none; padding: 0; font-size: 0.8em; }
+.md-raw-html-inline { font-family: 'SF Mono', Menlo, Consolas, monospace; font-size: 0.8em; color: #57606a; }
 .tableWrapper { margin: 0.8em 0; }
 table { border-collapse: collapse; width: 100%; margin: 0; break-inside: avoid; }
 th, td { border: 1px solid #d0d5db; padding: 6px 10px; vertical-align: top; text-align: start; }
@@ -64,6 +67,8 @@ export function buildPrintHtml(editorRoot: HTMLElement, title: string): string {
   for (const bar of clone.querySelectorAll('.md-codeblock-bar, .md-mermaid-error')) bar.remove()
   // a rendered mermaid block prints as its diagram; an unrendered one keeps its source
   for (const block of clone.querySelectorAll('[data-mermaid="rendered"] pre')) block.remove()
+  // HTML comments are invisible in rendered markdown: keep them off the page
+  for (const comment of clone.querySelectorAll('.md-raw-html-comment')) comment.remove()
 
   const escapedTitle = title.replace(/&/g, '&amp;').replace(/</g, '&lt;')
   // <base> lets the inlined KaTeX CSS resolve its relative font URLs from the

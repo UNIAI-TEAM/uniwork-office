@@ -3,7 +3,7 @@ import { NodeViewContent, NodeViewWrapper } from '@tiptap/react'
 import type { NodeViewProps } from '@tiptap/react'
 import { Dropdown } from '@genoffice/ui'
 import { t } from '../i18n/locale'
-import { MERMAID_LANGUAGE, renderMermaid } from './mermaid'
+import { MERMAID_LANGUAGE, mermaidSvgDataUrl, renderMermaid } from './mermaid'
 import type { MermaidResult } from './mermaid'
 
 const LANGUAGES = [
@@ -159,14 +159,16 @@ export function CodeBlockView({ node, updateAttributes, editor, getPos }: NodeVi
           {t('mermaidError')}: {error}
         </div>
       )}
-      {isMermaid && diagram?.ok && (
-        <div
-          className="md-mermaid-preview"
-          contentEditable={false}
-          onClick={editSource}
-          dangerouslySetInnerHTML={{ __html: diagram.svg }}
-        />
-      )}
+      {isMermaid && diagram?.ok && <MermaidPreview svg={diagram.svg} onClick={editSource} />}
     </NodeViewWrapper>
+  )
+}
+
+/** Rendered diagram as an <img>: the SVG markup never enters the editor DOM */
+export function MermaidPreview({ svg, onClick }: { svg: string; onClick?: () => void }) {
+  return (
+    <div className="md-mermaid-preview" contentEditable={false} onClick={onClick}>
+      <img src={mermaidSvgDataUrl(svg)} alt={t('insertDiagram')} draggable={false} />
+    </div>
   )
 }

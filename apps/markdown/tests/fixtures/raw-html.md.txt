@@ -1,0 +1,33 @@
+# Raw HTML survives
+
+<!-- editor note: keep this comment -->
+
+<div align="center" class="hero" onclick="alert(1)">
+  <img src="assets/logo.png" width="120" alt="logo">
+  <b>Centered</b> banner
+</div>
+
+A paragraph with an inline <span style="color: #e11d48" data-x='1'>styled span</span>, a <kbd>Ctrl</kbd>+<kbd>S</kbd> chord, a line<br>break, **bold <em>html</em> inside** and an inline <!-- trailing note --> comment.
+
+<details>
+<summary>More <i>details</i></summary>
+
+Hidden **markdown** body with a [link](https://example.com).
+
+</details>
+
+- item with <sup>1</sup> footnote marker
+- [link with <code>html</code> label](https://example.com)
+
+<table>
+  <tr><td>raw</td><td>table</td></tr>
+</table>
+
+Nearby paragraph to edit.
+
+<!--
+multi-line
+comment
+-->
+
+Tail paragraph with a <abbr title="HyperText Markup Language">HTML</abbr> abbreviation.
