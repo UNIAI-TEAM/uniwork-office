@@ -102,8 +102,17 @@ installer copies it to `<install dir>\resources\deployment-profile.json`
 (`process.resourcesPath` at runtime) when present and a real uninstall removes it. An
 over-install or update keeps the existing profile: the installer saves it before the old
 version's files are removed and puts it back afterwards. A profile beside the new installer
-always replaces the kept one. The installer's details log says which case applied (installed
-from beside the installer, kept, none found, or a failed copy).
+always replaces the kept one. Interactive installs hide the details list and silent installs
+write no log, so only a failure is visible: a failed save, copy or restore shows a message box
+(answered with OK automatically in a silent install) that tells the user to extract the
+bundle and run the installer again.
+
+The kept copy is read from the install location registered for the install context being
+installed into (per-machine or per-user), falling back to the per-user install when that
+context has none. So a profile that exists only in the per-user install is dropped when a
+per-machine install and a per-user install both exist and the per-machine one is updated; and
+switching a per-user install to per-machine copies its profile from the user-writable
+`%LOCALAPPDATA%` into `Program Files`. A bundle profile beside the installer avoids both.
 
 Extract the downloaded bundle before running the installer. Opening the installer straight
 from the zip in Explorer extracts only the installer to a temporary folder, so no profile is
