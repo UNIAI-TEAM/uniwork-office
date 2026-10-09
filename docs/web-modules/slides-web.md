@@ -72,17 +72,27 @@ AI tree-shaking is not cheap from the bridge: `App.tsx` imports `AiPanel` (and w
 | `web/e2e/slides-fidelity.spec.ts`                                                        | S4 drift table                                                                                                                                                                                                                                                                                                                                              |
 | `web/e2e/modules-smoke.spec.ts` (GF)                                                     | slides boots in the test host                                                                                                                                                                                                                                                                                                                               |
 
-## Still missing in the renderer (S3)
+## Renderer capability gating (S3)
 
-The renderer has no capability gating yet (inventory-b5 1.6); on the web these are visible and must be hidden by the S3 `cap()` retrofit:
+`apps/slides/src/renderer/capabilities.ts` (`cap()` over `@genoffice/ui` `createCapabilityReader`) reads the object the bridge
+installs on `window.slidesApi.capabilities`; Electron sets none, so the desktop keeps every entry. On the web:
 
-1. **AutoSave toggle** (`Ribbon.tsx:1821`, key `autoSaveToDisk`): visible on the web. If a user switches it on, the renderer's own timer saves through `slidesApi.save()`, which the bridge cannot tell from a manual save: **C10 is only enforced once this is hidden** (blocking for release).
-2. AI: the AI dock / uniAI panel, the stage AI bar (`stage-ai-bar`), Home tab AI buttons, `AiAskPopover`, context-menu AI actions (key `ai`; all stubs answer "unavailable").
-3. File > Open and the recent list (`open`, `recents`; the bridge already refuses Ctrl+O without the grant).
-4. Font catalog download / auto-download of missing fonts / install local font (`fontDownload`, `fontInstallLocal`).
-5. Insert 3D model (`model3d`; it works with a file input but has no poster on the web) and the presenter's swap-screens button (`presenterWindow`).
-6. `?mode=tab` / vibrancy chrome reads `window.location` (`Ribbon.tsx:130`, `main.tsx`): harmless on the web today; switch to `capabilities.platform === 'web'`.
-7. The macOS `IS_MAC` fullscreen gate (`SlideShowView.tsx:185`, `PresenterView.tsx:179`) is covered by the bridge's `setShowFullScreen`; S3 may still gate it on `platform` for clarity.
+| key                                | gated                                                                                                                                                                                                                                                     |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `autoSave`                         | AutoSave toggle hidden and its 30 s / blur timer never armed, whatever a stored preference says (C10; the e2e edits, idles 65 s with blurs and checks that no `saved` event reached the host)                                                             |
+| `ai`                               | AI dock / rail, stage AI bar, Home AI group, Review proofing + translate presets, ask-AI trigger, popover and Ctrl+K, AI settings / presets; `AiPanel` is a lazy chunk the frame never loads                                                              |
+| `open`, `recents`                  | File > Open (Ctrl+O), recent files; on with the host's `filePick` / `recents` grants                                                                                                                                                                      |
+| `save`, `saveAs`                   | QAT save, File > Save / Save As; on with the host's grants. Without `save` the frame is view-only: File, Slide Show and View tabs only, no format context tabs, `file-actions.save/saveAs` refuse, and the bridge serves only read channels of the engine |
+| `fontDownload`, `fontInstallLocal` | catalog download, missing-font banner, install local font                                                                                                                                                                                                 |
+| `model3d`                          | Insert > 3D Models                                                                                                                                                                                                                                        |
+| `presenterWindow`                  | presenter view swap-screens button                                                                                                                                                                                                                        |
+| `platform: 'web'`                  | no native window chrome (traffic-light / caption padding, vibrancy), the File tab on every OS, HTML fullscreen for the show and the presenter view in a macOS browser                                                                                     |
+
+Size after the AI split (`build:web --module slides`, same commit range): initial **4.05 MiB -> 3.73 MiB** (gzip 1.20 -> 1.09);
+the main chunk 4,108.8 kB -> 3,768.4 kB (gzip 1,246.2 -> 1,127.5 kB); `AiPanel-*.js` 342.2 kB (gzip 120.1 kB) moved to the deferred
+set and is never requested by the frame. On-demand i18n was not done: the renderer's translator is synchronous over one object merged
+from every locale shard (`i18n/strings.ts`), so loading locales lazily means an async locale switch in `LocaleProvider` plus
+loader-style aggregators in all four domains; not cheap, and the size win (about 17% of the chunk's sources) is left for a size pass.
 
 ## Open items
 

@@ -262,6 +262,62 @@ test.describe('slides web module', () => {
     })
   })
 
+  test('web gating: no AI / AutoSave / Open / recents / font install / 3D UI, no save without a user action', async ({
+    page,
+  }) => {
+    test.setTimeout(180_000)
+    const problems = await watch(page)
+    const frame = await openDeck(page)
+
+    // hidden by capability (the test host grants save/saveAs/recents/print/exportPdf, not filePick)
+    for (const sel of ['.autosave-toggle', '.ai-entry', '.ai-dock', '.ai-rail', '.stage-ai-bar'])
+      await expect(frame.locator(sel), sel).toHaveCount(0)
+    await frame.getByText('File', { exact: true }).click()
+    await expect(frame.locator('.file-menu')).toBeVisible()
+    await expect(frame.locator('.file-menu')).not.toContainText('Ctrl+O')
+    await expect(frame.locator('.file-menu')).toContainText('Ctrl+S')
+    await frame.getByText('File', { exact: true }).click()
+    await frame.getByRole('button', { name: 'Insert', exact: true }).click()
+    await expect(frame.getByText('3D Models', { exact: true })).toHaveCount(0)
+    await frame.getByRole('button', { name: 'Home', exact: true }).click()
+    await frame.locator('.rb-font-btn').first().click()
+    await expect(frame.locator('.rb-font-install-local')).toHaveCount(0)
+    await page.keyboard.press('Escape')
+    await frame.getByRole('button', { name: 'Review', exact: true }).click()
+    await expect(frame.locator('.ai-feature-icon')).toHaveCount(0)
+
+    // edits, then 65 s idle with a window blur in between: nothing is saved without the user
+    const saves = () =>
+      page.evaluate(
+        () =>
+          (
+            window as unknown as { __host: { events: Array<{ type: string }> } }
+          ).__host.events.filter((e) => e.type === 'saved').length,
+      )
+    const before = await saves()
+    const p = await titlePoint(page, frame)
+    await page.mouse.dblclick(p.x, p.y)
+    await page.keyboard.press('Control+A')
+    await page.keyboard.type('Idle edit')
+    await page.keyboard.press('Escape')
+    await frame.evaluate(() => window.slidesApi.setNotes({ slideIndex: 1, text: 'idle notes' }))
+    await expect.poll(() => frame.evaluate(() => window.slidesApi.isDirty())).toBe(true)
+    await frame.evaluate(() => window.dispatchEvent(new Event('blur')))
+    await page.waitForTimeout(65_000)
+    await frame.evaluate(() => window.dispatchEvent(new Event('blur')))
+    await page.waitForTimeout(1_000)
+    expect(await saves()).toBe(before)
+    expect(await hostSaved(page)).toBeNull()
+    expect(await frame.evaluate(() => window.slidesApi.isDirty())).toBe(true)
+
+    expect({ csp: await cspViolations(page, frame), ...problems }).toEqual({
+      csp: [],
+      console: [],
+      page: [],
+      http: [],
+    })
+  })
+
   test('screenshots: light + dark, vi + en', async ({ page }) => {
     mkdirSync(SHOTS, { recursive: true })
     const problems = await watch(page)
