@@ -9,7 +9,12 @@ import { join } from 'node:path'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { PDFDocument, StandardFonts } from 'pdf-lib'
 import { readPdfText } from '../../../pdf/src/main/read-text'
+import { installNodePdfEnv } from '../../../pdf/src/main/node-env'
 import { createPdfTools, parsePageList } from '../../src/main/mcp/tools/pdf-tools'
+
+// readPdfText loads pdfium through the pdf core's platform seams, installed by the pdf app at
+// runtime; the direct calls below need the desktop (Node) ones too
+installNodePdfEnv()
 
 let dir: string
 let threePages: string
