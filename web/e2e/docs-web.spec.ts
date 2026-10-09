@@ -27,7 +27,12 @@ interface DocCase {
 }
 
 const DOCS: DocCase[] = [
-  { name: 'simple', url: '/fixtures/simple.docx', expectText: '第一段', note: 'headline + 2 paragraphs' },
+  {
+    name: 'simple',
+    url: '/fixtures/simple.docx',
+    expectText: '第一段',
+    note: 'headline + 2 paragraphs',
+  },
   {
     name: 'kitchen-sink',
     url: '/fixtures/kitchen-sink.docx',
@@ -52,7 +57,9 @@ function attachConsole(page: Page, lines: string[]): void {
   const stamp = () => new Date().toISOString()
   page.on('console', (m) => {
     if (m.type() === 'error' || m.type() === 'warning')
-      lines.push(`${stamp()} console.${m.type()}: ${m.text()}  @ ${m.location().url}:${m.location().lineNumber}`)
+      lines.push(
+        `${stamp()} console.${m.type()}: ${m.text()}  @ ${m.location().url}:${m.location().lineNumber}`,
+      )
   })
   page.on('pageerror', (e) => lines.push(`${stamp()} pageerror: ${e.message}\n${e.stack ?? ''}`))
   page.on('requestfailed', (r) =>
@@ -80,7 +87,9 @@ async function serveBytes(ctx: BrowserContext, urlPath: string, body: Buffer): P
 /** open `urlPath` through the test host; returns the editor iframe */
 async function openDoc(page: Page, urlPath: string, expectText: string): Promise<Frame> {
   await page.goto(`/test-host/?open=${encodeURIComponent(urlPath)}`)
-  await page.waitForFunction(() => /index\.html/.test((document.getElementById('frame') as HTMLIFrameElement)?.src ?? ''))
+  await page.waitForFunction(() =>
+    /index\.html/.test((document.getElementById('frame') as HTMLIFrameElement)?.src ?? ''),
+  )
   const ed = (await (await page.waitForSelector('#frame')).contentFrame())!
   await ed
     .locator(EDITOR)
@@ -97,7 +106,17 @@ async function model(page: Frame, marker = ''): Promise<string> {
     const e = (document.querySelector('.ProseMirror') as any)?.editor
     if (!e) return 'no editor handle'
     const kids = e.state.doc.content.content.slice(-4)
-    return `${e.state.doc.childCount} blocks; last: ` + kids.map((n: any) => `${n.type.name}:${JSON.stringify(n.textContent.slice(0, 30))}${n.firstChild?.marks?.length ? '[' + n.firstChild.marks.map((m: any) => m.type.name) + ']' : ''}`).join(' / ') + ` sel=${e.state.selection.from}-${e.state.selection.to}` + (marker ? ` hasMarker=${e.state.doc.textContent.includes(marker)}` : '')
+    return (
+      `${e.state.doc.childCount} blocks; last: ` +
+      kids
+        .map(
+          (n: any) =>
+            `${n.type.name}:${JSON.stringify(n.textContent.slice(0, 30))}${n.firstChild?.marks?.length ? '[' + n.firstChild.marks.map((m: any) => m.type.name) + ']' : ''}`,
+        )
+        .join(' / ') +
+      ` sel=${e.state.selection.from}-${e.state.selection.to}` +
+      (marker ? ` hasMarker=${e.state.doc.textContent.includes(marker)}` : '')
+    )
   }, marker)
 }
 
@@ -113,12 +132,20 @@ async function waitForFullLoad(page: Frame): Promise<string> {
           const e = (document.querySelector('.ProseMirror') as any)?.editor
           return e ? { n: e.state.doc.childCount, editable: e.isEditable } : null
         })
-        if (!st || !st.editable) { last = -1; stableFor = 0; return false }
+        if (!st || !st.editable) {
+          last = -1
+          stableFor = 0
+          return false
+        }
         stableFor = st.n === last ? stableFor + 1 : 0
         last = st.n
         return stableFor >= 3
       },
-      { intervals: [400], timeout: 60_000, message: 'editor never became editable with a stable block count' },
+      {
+        intervals: [400],
+        timeout: 60_000,
+        message: 'editor never became editable with a stable block count',
+      },
     )
     .toBe(true)
   return `fully loaded (${last} blocks, editable) after ${Date.now() - t0}ms`
@@ -131,7 +158,10 @@ async function settleCaret(page: Frame): Promise<number> {
   await expect
     .poll(
       async () => {
-        const pos = await page.evaluate(() => (document.querySelector('.ProseMirror') as any).editor.state.selection.from as number)
+        const pos = await page.evaluate(
+          () =>
+            (document.querySelector('.ProseMirror') as any).editor.state.selection.from as number,
+        )
         same = pos === prev ? same + 1 : 0
         prev = pos
         return same >= 3
@@ -147,22 +177,33 @@ async function tableCount(page: Frame): Promise<number> {
 }
 
 type HostSave = { fileId: string; versionId: string; bytes: number[] } | null
-const lastHostSave = (page: Page): Promise<HostSave> => page.evaluate(() => (window as any).__host.lastSaved())
+const lastHostSave = (page: Page): Promise<HostSave> =>
+  page.evaluate(() => (window as any).__host.lastSaved())
 
 /** Ctrl+S in the editor; the bytes arrive at the test host through api.save. */
 async function saveAndCapture(page: Page, ed: Frame): Promise<Buffer> {
-  await ed.locator(EDITOR).first().click({ position: { x: 5, y: 5 }, force: true }).catch(() => {})
+  await ed
+    .locator(EDITOR)
+    .first()
+    .click({ position: { x: 5, y: 5 }, force: true })
+    .catch(() => {})
   const before = (await lastHostSave(page))?.versionId ?? null
   await page.keyboard.press('Control+s')
   let got: HostSave = null
   await expect
-    .poll(async () => {
-      got = await lastHostSave(page)
-      return !!got && got.versionId !== before && got.bytes.length > 100
-    }, { intervals: [250], timeout: 20_000, message: 'host received a new version via api.save' })
+    .poll(
+      async () => {
+        got = await lastHostSave(page)
+        return !!got && got.versionId !== before && got.bytes.length > 100
+      },
+      { intervals: [250], timeout: 20_000, message: 'host received a new version via api.save' },
+    )
     .toBe(true)
   const s = got as unknown as NonNullable<HostSave>
-  test.info().annotations.push({ type: 'save', description: `api.save ${s.fileId}@${s.versionId} ${s.bytes.length}B` })
+  test.info().annotations.push({
+    type: 'save',
+    description: `api.save ${s.fileId}@${s.versionId} ${s.bytes.length}B`,
+  })
   return Buffer.from(s.bytes)
 }
 
@@ -178,20 +219,47 @@ for (const d of DOCS) {
       p.screenshot({ path: resolve(SHOTS, `${d.name}-${step}.png`) }).catch(() => {})
     const failed: Record<string, boolean> = {}
 
-    async function step(name: string, needs: string[], fn: () => Promise<string | void>): Promise<void> {
+    async function step(
+      name: string,
+      needs: string[],
+      fn: () => Promise<string | void>,
+    ): Promise<void> {
       const t0 = Date.now()
       const blocked = needs.filter((n) => failed[n])
       if (blocked.length) {
-        results.push({ doc: d.name, step: name, ok: false, ms: 0, detail: `skipped: needs ${blocked.join(',')}` })
+        results.push({
+          doc: d.name,
+          step: name,
+          ok: false,
+          ms: 0,
+          detail: `skipped: needs ${blocked.join(',')}`,
+        })
         failed[name] = true
         return
       }
       try {
         const detail = await fn()
-        results.push({ doc: d.name, step: name, ok: true, ms: Date.now() - t0, detail: detail || undefined })
+        results.push({
+          doc: d.name,
+          step: name,
+          ok: true,
+          ms: Date.now() - t0,
+          detail: detail || undefined,
+        })
       } catch (e) {
         failed[name] = true
-        results.push({ doc: d.name, step: name, ok: false, ms: Date.now() - t0, detail: String((e as Error).message).replace(/\u001b\[[0-9;]*m/g, '').split('\n').slice(0, 6).join(' ⏎ ') })
+        results.push({
+          doc: d.name,
+          step: name,
+          ok: false,
+          ms: Date.now() - t0,
+          detail: String((e as Error).message)
+            // eslint-disable-next-line no-control-regex -- strips ANSI colour codes from Playwright errors
+            .replace(/\u001b\[[0-9;]*m/g, '')
+            .split('\n')
+            .slice(0, 6)
+            .join(' ⏎ '),
+        })
         await shot(`${name}-FAILED`)
       }
     }
@@ -237,17 +305,29 @@ for (const d of DOCS) {
       // PM learns of a DOM selection change asynchronously (selectionchange); wait until its model selection
       // is a real range, otherwise Ctrl+B races and only toggles a stored mark at the caret
       await expect
-        .poll(() => ed.evaluate(() => { const e = (document.querySelector('.ProseMirror') as any).editor; return e.state.selection.to - e.state.selection.from }))
+        .poll(() =>
+          ed.evaluate(() => {
+            const e = (document.querySelector('.ProseMirror') as any).editor
+            return e.state.selection.to - e.state.selection.from
+          }),
+        )
         .toBeGreaterThanOrEqual(marker.length)
       await page.keyboard.press('Control+b')
       const readBold = () =>
         ed.evaluate((m) => {
-          const walker = document.createTreeWalker(document.querySelector('.ProseMirror')!, NodeFilter.SHOW_TEXT)
+          const walker = document.createTreeWalker(
+            document.querySelector('.ProseMirror')!,
+            NodeFilter.SHOW_TEXT,
+          )
           let n: Node | null
           while ((n = walker.nextNode())) {
             if (n.textContent?.includes(m)) {
               const el = n.parentElement!
-              return { inStrong: !!el.closest('strong,b'), weight: getComputedStyle(el).fontWeight, tag: el.tagName }
+              return {
+                inStrong: !!el.closest('strong,b'),
+                weight: getComputedStyle(el).fontWeight,
+                tag: el.tagName,
+              }
             }
           }
           return null
@@ -271,7 +351,7 @@ for (const d of DOCS) {
     })
 
     await step('insert-table', ['editable'], async () => {
-      // Ribbon: 2nd regular tab = Insert (开始/Home first), Table split button -> 2x2 cell of the grid picker.
+      // Ribbon: 2nd regular tab = Insert (Home first), Table split button -> 2x2 cell of the grid picker.
       // Collapse caret out of the marker run first: press End to deselect, then new paragraph for the table.
       // collapse the marker selection (a still-selected marker would be replaced by Enter): click into the
       // doc, then Ctrl+End = end of the last paragraph (the marker paragraph), then a new empty paragraph
@@ -279,14 +359,26 @@ for (const d of DOCS) {
       await page.keyboard.press('Control+End')
       await settleCaret(ed)
       await expect
-        .poll(() => ed.evaluate(() => { const e = (document.querySelector('.ProseMirror') as any).editor; return e.state.selection.empty }))
+        .poll(() =>
+          ed.evaluate(() => {
+            const e = (document.querySelector('.ProseMirror') as any).editor
+            return e.state.selection.empty
+          }),
+        )
         .toBe(true)
       await page.keyboard.press('Enter')
-      expect(await model(ed, marker), 'marker survived the paragraph split').toContain('hasMarker=true')
+      expect(await model(ed, marker), 'marker survived the paragraph split').toContain(
+        'hasMarker=true',
+      )
       await ed.locator('.ribbon-tab:not(.ribbon-tab-file)').nth(1).click()
-      await ed.locator('button.rb-big', { hasText: /^(表格|Table)$/ }).first().click()
+      await ed
+        .locator('button.rb-big', { hasText: /^(表格|Table)$/ })
+        .first()
+        .click()
       await ed.locator('.table-picker-grid button.table-cell').nth(11).click() // 2x2 grid cell: index = row*10+col = 11
-      await expect.poll(() => tableCount(ed), { message: 'table count increased' }).toBeGreaterThan(tablesBefore)
+      await expect
+        .poll(() => tableCount(ed), { message: 'table count increased' })
+        .toBeGreaterThan(tablesBefore)
       await shot('table')
       return `tables ${tablesBefore} -> ${await tableCount(ed)}`
     })
@@ -308,7 +400,9 @@ for (const d of DOCS) {
       const idx = xml.indexOf(marker)
       const runStart = Math.max(xml.lastIndexOf('<w:r>', idx), xml.lastIndexOf('<w:r ', idx))
       const run = xml.slice(runStart, xml.indexOf('</w:r>', idx) + 6)
-      expect(run, `<w:b/> in marker run: ${run.slice(0, 300)}`).toMatch(/<w:b(\/>|\s[^>]*\/>)(?![^<]*w:val="(0|false)")/)
+      expect(run, `<w:b/> in marker run: ${run.slice(0, 300)}`).toMatch(
+        /<w:b(\/>|\s[^>]*\/>)(?![^<]*w:val="(0|false)")/,
+      )
       const tbl = (xml.match(/<w:tbl>/g) ?? []).length
       expect(tbl, 'w:tbl count in saved xml > source').toBeGreaterThan(tablesBefore)
       return `run=${run.slice(0, 160)} | w:tbl=${tbl}`
@@ -322,7 +416,10 @@ for (const d of DOCS) {
       const ed2 = await openDoc(page2, savedUrl, marker)
       await shot('reopened', page2)
       const bold = await ed2.evaluate((m) => {
-        const walker = document.createTreeWalker(document.querySelector('.ProseMirror')!, NodeFilter.SHOW_TEXT)
+        const walker = document.createTreeWalker(
+          document.querySelector('.ProseMirror')!,
+          NodeFilter.SHOW_TEXT,
+        )
         let n: Node | null
         while ((n = walker.nextNode())) {
           if (n.textContent?.includes(m)) {
@@ -335,7 +432,10 @@ for (const d of DOCS) {
       const tablesAfter = await ed2.locator(`${EDITOR} table`).count()
       await page2.close()
       expect(bold, 'marker found after reopen').not.toBeNull()
-      expect(bold!.inStrong || Number(bold!.weight) >= 600, `marker bold after reopen ${JSON.stringify(bold)}`).toBe(true)
+      expect(
+        bold!.inStrong || Number(bold!.weight) >= 600,
+        `marker bold after reopen ${JSON.stringify(bold)}`,
+      ).toBe(true)
       expect(tablesAfter, 'table count after reopen > before').toBeGreaterThan(tablesBefore)
       return `marker bold=${JSON.stringify(bold)}; tables ${tablesBefore} -> ${tablesAfter}`
     })
@@ -347,13 +447,20 @@ for (const d of DOCS) {
       const dirty = ev.filter((e) => e.type === 'dirty').map((e) => e.payload.dirty)
       expect(dirty, 'dirty went true while editing').toContain(true)
       await expect
-        .poll(async () => (await hostEvents(page)).filter((e) => e.type === 'dirty').at(-1)?.payload.dirty, {
-          message: 'dirty false after the save',
-        })
+        .poll(
+          async () =>
+            (await hostEvents(page)).filter((e) => e.type === 'dirty').at(-1)?.payload.dirty,
+          {
+            message: 'dirty false after the save',
+          },
+        )
         .toBe(false)
       const savedEv = ev.filter((e) => e.type === 'saved')
       expect(savedEv.length, 'saved event').toBeGreaterThan(0)
-      expect(savedEv.at(-1)!.payload).toMatchObject({ initiatedByFrame: true, file: { versionId: expect.stringMatching(/^v[2-9]/) } })
+      expect(savedEv.at(-1)!.payload).toMatchObject({
+        initiatedByFrame: true,
+        file: { versionId: expect.stringMatching(/^v[2-9]/) },
+      })
       const titles = ev.filter((e) => e.type === 'title').map((e) => e.payload.title)
       expect(titles, 'title event with the file name').toContain(d.url.split('/').pop())
       return `events: ${[...new Set(types)].join(',')}; dirty ${dirty.join('>')}; saved ${JSON.stringify(savedEv.at(-1)!.payload.file)}`
@@ -363,7 +470,10 @@ for (const d of DOCS) {
       // another writer bumps the server version: the next Ctrl+S must not write, must say so in the
       // frame and to the host, and must offer a way out (Cancel / Reload latest / Overwrite)
       const before = await lastHostSave(page)
-      const remote = await page.evaluate((id) => (window as any).__host.bumpRemote(id), before!.fileId)
+      const remote = await page.evaluate(
+        (id) => (window as any).__host.bumpRemote(id),
+        before!.fileId,
+      )
       const errorsBefore = (await hostEvents(page)).filter((e) => e.type === 'error').length
       await ed.locator(EDITOR).first().click()
       await page.keyboard.press('Control+End')
@@ -372,18 +482,34 @@ for (const d of DOCS) {
       const dialog = ed.locator('[data-docs-web="conflict"]')
       await expect(dialog, 'conflict dialog in the frame').toBeVisible({ timeout: 15_000 })
       await expect
-        .poll(async () => (await hostEvents(page)).filter((e) => e.type === 'error').slice(errorsBefore), {
-          message: 'host got a non-fatal conflict error event',
-        })
-        .toEqual([{ type: 'error', payload: { error: expect.objectContaining({ code: 'conflict' }), fatal: false } }])
+        .poll(
+          async () =>
+            (await hostEvents(page)).filter((e) => e.type === 'error').slice(errorsBefore),
+          {
+            message: 'host got a non-fatal conflict error event',
+          },
+        )
+        .toEqual([
+          {
+            type: 'error',
+            payload: { error: expect.objectContaining({ code: 'conflict' }), fatal: false },
+          },
+        ])
       await shot('conflict')
       // Cancel: nothing written, stays dirty, and the frame says why (status line + toast)
       await dialog.locator('[data-choice="cancel"]').click()
       await expect(dialog).toHaveCount(0)
-      await expect(ed.locator('body'), 'visible "not saved" message').toContainText('文档已在其他地方被修改')
-      expect((await lastHostSave(page))?.versionId, 'no new version was written').toBe(before!.versionId)
+      await expect(ed.locator('body'), 'visible "not saved" message').toContainText(
+        '文档已在其他地方被修改',
+      )
+      expect((await lastHostSave(page))?.versionId, 'no new version was written').toBe(
+        before!.versionId,
+      )
       await expect
-        .poll(async () => (await hostEvents(page)).filter((e) => e.type === 'dirty').at(-1)?.payload.dirty)
+        .poll(
+          async () =>
+            (await hostEvents(page)).filter((e) => e.type === 'dirty').at(-1)?.payload.dirty,
+        )
         .toBe(true)
       // the etag is not stuck: Ctrl+S asks again, and Overwrite lands on top of the remote version
       await ed.locator(EDITOR).first().click()
@@ -392,14 +518,23 @@ for (const d of DOCS) {
       await dialog.locator('[data-choice="overwrite"]').click()
       let after: HostSave = null
       await expect
-        .poll(async () => (after = await lastHostSave(page))?.versionId, { timeout: 20_000, message: 'overwrite saved a new version' })
+        .poll(async () => (after = await lastHostSave(page))?.versionId, {
+          timeout: 20_000,
+          message: 'overwrite saved a new version',
+        })
         .not.toBe(before!.versionId)
       const v = (after as unknown as NonNullable<HostSave>).versionId
-      expect(Number(v.slice(1)), 'overwrite is newer than the remote bump').toBeGreaterThan(Number(remote.versionId.slice(1)))
+      expect(Number(v.slice(1)), 'overwrite is newer than the remote bump').toBeGreaterThan(
+        Number(remote.versionId.slice(1)),
+      )
       await expect
-        .poll(async () => (await hostEvents(page)).filter((e) => e.type === 'dirty').at(-1)?.payload.dirty, {
-          message: 'dirty false after the overwrite',
-        })
+        .poll(
+          async () =>
+            (await hostEvents(page)).filter((e) => e.type === 'dirty').at(-1)?.payload.dirty,
+          {
+            message: 'dirty false after the overwrite',
+          },
+        )
         .toBe(false)
       return `conflict -> host error event + in-frame dialog; cancel kept ${before!.versionId} dirty with a visible message; overwrite -> ${v} over remote ${remote.versionId}`
     })
@@ -415,10 +550,10 @@ for (const d of DOCS) {
       await ed.evaluate(() => void (window as any).__exportPdf())
       let exp: { fileId: string | null; dataBytes: number[] | null } | null = null
       await expect
-        .poll(
-          async () => (exp = await page.evaluate(() => (window as any).__host.lastExport())),
-          { timeout: 30_000, message: 'host received api.export' },
-        )
+        .poll(async () => (exp = await page.evaluate(() => (window as any).__host.lastExport())), {
+          timeout: 30_000,
+          message: 'host received api.export',
+        })
         .not.toBeNull()
       const got = exp as unknown as { fileId: string | null; dataBytes: number[] | null }
       expect(got.dataBytes, 'live docx bytes sent with the export').not.toBeNull()
@@ -432,9 +567,25 @@ for (const d of DOCS) {
       return `api.export fileId=${got.fileId} data=${got.dataBytes!.length}B (unsaved edit present); download=${d0?.suggestedFilename() ?? 'none'}`
     })
 
-    writeFileSync(resolve(SHOTS, `console-${d.name}.txt`), consoleLines.join('\n') + (consoleLines.length ? '\n' : '(no console errors/warnings, pageerrors, failed or >=400 requests)\n'))
-    writeFileSync(resolve(SHOTS, `results-${d.name}.json`), JSON.stringify(results.filter((r) => r.doc === d.name), null, 2))
+    writeFileSync(
+      resolve(SHOTS, `console-${d.name}.txt`),
+      consoleLines.join('\n') +
+        (consoleLines.length
+          ? '\n'
+          : '(no console errors/warnings, pageerrors, failed or >=400 requests)\n'),
+    )
+    writeFileSync(
+      resolve(SHOTS, `results-${d.name}.json`),
+      JSON.stringify(
+        results.filter((r) => r.doc === d.name),
+        null,
+        2,
+      ),
+    )
     const bad = results.filter((r) => r.doc === d.name && !r.ok)
-    expect(bad, `failed steps: ${bad.map((b) => b.step + ' (' + b.detail + ')').join('; ')}`).toEqual([])
+    expect(
+      bad,
+      `failed steps: ${bad.map((b) => b.step + ' (' + b.detail + ')').join('; ')}`,
+    ).toEqual([])
   })
 }

@@ -89,6 +89,12 @@ font picker and saves under this exact header and fails on any `securitypolicyvi
 
 - Clipboard data: URLs: `connect-src` has no `data:` on purpose; `bridge/browser.ts` decodes `data:` URLs by hand instead of
   `fetch(dataUrl)`.
+- Opened document bytes: the renderer reads `OpenFileResult.dataUrl` with `fetchDocBytes()`
+  (`apps/docs/src/renderer/doc-bytes.ts`). On desktop that is a fetch of the main process's one-shot handoff URL; a
+  `blob:` object URL would need `blob:` in `connect-src`. Instead `bridge/doc-handoff.ts` mints an in-page
+  `uniwork-handoff:` handle and registers a resolver that `fetchDocBytes()` consults before `fetch()`, so the bytes
+  never cross a fetch and `connect-src` stays `'self'` (no `blob:`, no `data:`). Desktop registers no resolver and is
+  unchanged.
 - Another API origin: `WEB_DOCS_CSP_CONNECT_SRC="https://api.example.com"`; frame on its own origin:
   `WEB_DOCS_CSP_FRAME_ANCESTORS="https://app.example.com"` (build time).
 - Document downloads: the bridge `fetch`es a `FileSource {kind:'url'}` from inside the frame, so with `connect-src 'self'`

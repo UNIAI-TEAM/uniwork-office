@@ -4,7 +4,8 @@ import type { OpenFileResult } from '../../../apps/docs/src/shared/ipc'
 import { createWebApi, idFromPath, pathFor, WEB_PRINT_PART, type WebApi } from './webapi'
 import { createMockPort, protocolError, timeoutAfter, type MockPort } from './testing/mock-port'
 import { text } from './notice'
-import { bytesAt, installBlobUrls } from './testing/blob-urls'
+// the renderer's own reader: resolves the bridge's in-page handoff without fetch()
+import { fetchDocBytes as bytesAt } from '../../../apps/docs/src/renderer/doc-bytes'
 
 const DOCX = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 1, 2, 3])
 const flush = () => new Promise((r) => setTimeout(r, 0))
@@ -50,7 +51,6 @@ function guardDirty(dirty: boolean): void {
 beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => {})
   vi.spyOn(console, 'warn').mockImplementation(() => {})
-  installBlobUrls()
   // the browser print path settles on afterprint, like a real print dialog closing
   window.print = vi.fn(() => {
     window.dispatchEvent(new Event('afterprint'))

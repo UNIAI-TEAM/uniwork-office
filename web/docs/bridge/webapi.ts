@@ -67,6 +67,7 @@ import { downloadBlob, printFrame } from './browser'
 import { ask, hideFatal, onModalChange, showFatal, text } from './notice'
 import { createSession, type SessionOptions } from './session'
 import { projectApi } from './project-memory'
+import { mintDocHandoff } from './doc-handoff'
 
 // ---------------------------------------------------------------- paths
 
@@ -120,17 +121,6 @@ async function readSource(source: FileSource): Promise<ArrayBuffer> {
   const res = await fetch(source.url, { credentials: 'omit', headers: source.headers })
   if (!res.ok) throw new Error(`download failed: HTTP ${res.status}`)
   return res.arrayBuffer()
-}
-
-/**
- * OpenFileResult.dataUrl on the web: an object URL over the opened bytes. The
- * renderer fetches it once right after the open settles, so it is revoked
- * after a grace period instead of being kept for the frame's lifetime.
- */
-function oneShotDocUrl(data: ArrayBuffer): string {
-  const url = URL.createObjectURL(new Blob([data]))
-  window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
-  return url
 }
 
 function decodeDataUrl(url: string): { base64: string; mime: string } | null {
@@ -192,7 +182,7 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
     return {
       path: pathFor(open.file),
       name: open.file.name,
-      dataUrl: oneShotDocUrl(data),
+      dataUrl: mintDocHandoff(data),
       hash: await sha256Hex(data),
     }
   }

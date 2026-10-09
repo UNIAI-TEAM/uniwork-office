@@ -1,9 +1,6 @@
 {
   "generatedAt": "2026-10-08T13:32:01.645276Z",
-  "sources": [
-    "inventory-a-l.json (W2)",
-    "inventory-m-z.json (W3)"
-  ],
+  "sources": ["inventory-a-l.json (W2)", "inventory-m-z.json (W3)"],
   "summary": {
     "desktopApiMethods": 72,
     "byClass": {
@@ -12,11 +9,7 @@
       "BROWSER": 20
     },
     "projectApiMethods": 10,
-    "unusedDesktopMethods": [
-      "aiChat",
-      "fontMetrics",
-      "setAiSettings"
-    ]
+    "unusedDesktopMethods": ["aiChat", "fontMetrics", "setAiSettings"]
   },
   "desktop": [
     {
@@ -37,9 +30,7 @@
     {
       "name": "addPastedImage",
       "signature": "addPastedImage(data: ArrayBuffer, ext: string): Promise<AttachmentAddResult>",
-      "call_sites": [
-        "apps/docs/src/renderer/ai/AiPanel.tsx:1154"
-      ],
+      "call_sites": ["apps/docs/src/renderer/ai/AiPanel.tsx:1154"],
       "call_count": 1,
       "preload_channel": "invoke files:add-pasted-image",
       "preload_handler": "apps/docs/src/preload/index.ts:157",
@@ -64,9 +55,7 @@
     {
       "name": "aiGenerateImage",
       "signature": "aiGenerateImage(op: { prompt: string; aspectRatio?: string }): Promise<{ url?: string; error?: string }>",
-      "call_sites": [
-        "apps/docs/src/renderer/ai/tools.ts:615"
-      ],
+      "call_sites": ["apps/docs/src/renderer/ai/tools.ts:615"],
       "call_count": 1,
       "preload_channel": "invoke docs:ai-generate-image",
       "preload_handler": "apps/docs/src/preload/index.ts:153",
@@ -78,9 +67,7 @@
     {
       "name": "aiGskLogin",
       "signature": "aiGskLogin(): Promise<void>",
-      "call_sites": [
-        "apps/docs/src/renderer/ai/AiPanel.tsx:1395"
-      ],
+      "call_sites": ["apps/docs/src/renderer/ai/AiPanel.tsx:1395"],
       "call_count": 1,
       "preload_channel": "invoke ai:gsk-login",
       "preload_handler": "apps/docs/src/preload/index.ts:146",
@@ -108,9 +95,7 @@
     {
       "name": "aiOpenBilling",
       "signature": "aiOpenBilling(): Promise<void>",
-      "call_sites": [
-        "apps/docs/src/renderer/ai/AiPanel.tsx:1401"
-      ],
+      "call_sites": ["apps/docs/src/renderer/ai/AiPanel.tsx:1401"],
       "call_count": 1,
       "preload_channel": "invoke ai:open-billing",
       "preload_handler": "apps/docs/src/preload/index.ts:147",
@@ -122,9 +107,7 @@
     {
       "name": "aiStream",
       "signature": "aiStream(request: AiStreamRequest): Promise<void>",
-      "call_sites": [
-        "apps/docs/src/renderer/ai/transport.ts:9"
-      ],
+      "call_sites": ["apps/docs/src/renderer/ai/transport.ts:9"],
       "call_count": 1,
       "preload_channel": "invoke ai:stream",
       "preload_handler": "apps/docs/src/preload/index.ts:143",
@@ -136,9 +119,7 @@
     {
       "name": "aiStreamCancel",
       "signature": "aiStreamCancel(requestId: string): Promise<void>",
-      "call_sites": [
-        "apps/docs/src/renderer/ai/transport.ts:10"
-      ],
+      "call_sites": ["apps/docs/src/renderer/ai/transport.ts:10"],
       "call_count": 1,
       "preload_channel": "invoke ai:stream-cancel",
       "preload_handler": "apps/docs/src/preload/index.ts:144",
@@ -150,9 +131,7 @@
     {
       "name": "consumeAiDocContent",
       "signature": "consumeAiDocContent(): Promise<AiDocContent | null>",
-      "call_sites": [
-        "apps/docs/src/renderer/App.tsx:1733"
-      ],
+      "call_sites": ["apps/docs/src/renderer/App.tsx:1733"],
       "call_count": 1,
       "preload_channel": "invoke docs:consume-ai-doc-content",
       "preload_handler": "apps/docs/src/preload/index.ts:75",
@@ -164,9 +143,7 @@
     {
       "name": "consumeAiPreset",
       "signature": "consumeAiPreset(): Promise<AiPresetPayload | null>",
-      "call_sites": [
-        "apps/docs/src/renderer/App.tsx:1734"
-      ],
+      "call_sites": ["apps/docs/src/renderer/App.tsx:1734"],
       "call_count": 1,
       "preload_channel": "invoke docs:consume-ai-preset",
       "preload_handler": "apps/docs/src/preload/index.ts:76",
@@ -178,9 +155,7 @@
     {
       "name": "consumeHeadlessExport",
       "signature": "consumeHeadlessExport(): Promise<HeadlessExportTarget | null>",
-      "call_sites": [
-        "apps/docs/src/renderer/App.tsx:2179"
-      ],
+      "call_sites": ["apps/docs/src/renderer/App.tsx:2179"],
       "call_count": 1,
       "preload_channel": "invoke docs:consume-headless-export",
       "preload_handler": "apps/docs/src/preload/index.ts:85",
@@ -192,9 +167,7 @@
     {
       "name": "consumeNewBlankDoc",
       "signature": "consumeNewBlankDoc(): Promise<boolean>",
-      "call_sites": [
-        "apps/docs/src/renderer/App.tsx:1732"
-      ],
+      "call_sites": ["apps/docs/src/renderer/App.tsx:1732"],
       "call_count": 1,
       "preload_channel": "invoke docs:consume-new-blank",
       "preload_handler": "apps/docs/src/preload/index.ts:74",
@@ -206,9 +179,7 @@
     {
       "name": "consumePendingOpenDocx",
       "signature": "consumePendingOpenDocx(): Promise<OpenDocxResult>",
-      "call_sites": [
-        "apps/docs/src/renderer/App.tsx:1730"
-      ],
+      "call_sites": ["apps/docs/src/renderer/App.tsx:1730"],
       "call_count": 1,
       "preload_channel": "invoke docs:consume-pending-open",
       "preload_handler": "apps/docs/src/preload/index.ts:73",
@@ -220,10 +191,7 @@
     {
       "name": "convertAltChunkHtml",
       "signature": "convertAltChunkHtml(html: string): Promise<Uint8Array | null>",
-      "call_sites": [
-        "apps/docs/src/renderer/main.tsx:20",
-        "apps/docs/src/renderer/main.tsx:21"
-      ],
+      "call_sites": ["apps/docs/src/renderer/main.tsx:20", "apps/docs/src/renderer/main.tsx:21"],
       "call_count": 2,
       "preload_channel": "invoke docs:altchunk-html-to-docx",
       "preload_handler": "apps/docs/src/preload/index.ts:60",
@@ -236,9 +204,7 @@
     {
       "name": "copyImageToClipboard",
       "signature": "copyImageToClipboard(dataUrl: string, metaJson?: string): Promise<boolean>",
-      "call_sites": [
-        "apps/docs/src/renderer/editor/extensions.ts:3185"
-      ],
+      "call_sites": ["apps/docs/src/renderer/editor/extensions.ts:3185"],
       "call_count": 1,
       "preload_channel": "invoke docs:copy-image-to-clipboard",
       "preload_handler": "apps/docs/src/preload/index.ts:159",
@@ -250,9 +216,7 @@
     {
       "name": "createDocument",
       "signature": "createDocument(request: CreateDocumentRequest): Promise<CreateDocumentResult>",
-      "call_sites": [
-        "apps/docs/src/renderer/ai/tools.ts:659"
-      ],
+      "call_sites": ["apps/docs/src/renderer/ai/tools.ts:659"],
       "call_count": 1,
       "preload_channel": "invoke docs:create-document",
       "preload_handler": "apps/docs/src/preload/index.ts:88",
@@ -264,9 +228,7 @@
     {
       "name": "discardDocPasswordIntents",
       "signature": "discardDocPasswordIntents(throughRevision: number): Promise<{ ok: boolean }>",
-      "call_sites": [
-        "apps/docs/src/renderer/file-actions.ts:738"
-      ],
+      "call_sites": ["apps/docs/src/renderer/file-actions.ts:738"],
       "call_count": 1,
       "preload_channel": "invoke docs:discard-password-intents",
       "preload_handler": "apps/docs/src/preload/index.ts:71",
@@ -278,9 +240,7 @@
     {
       "name": "docPasswordIntentRevision",
       "signature": "docPasswordIntentRevision(): Promise<number>",
-      "call_sites": [
-        "apps/docs/src/renderer/file-actions.ts:735"
-      ],
+      "call_sites": ["apps/docs/src/renderer/file-actions.ts:735"],
       "call_count": 1,
       "preload_channel": "invoke docs:password-intent-revision",
       "preload_handler": "apps/docs/src/preload/index.ts:65",
@@ -292,9 +252,7 @@
     {
       "name": "exportHtml",
       "signature": "exportHtml(defaultName: string, html: string, outPath?: string): Promise<{ ok: boolean; path?: string; error?: string }>",
-      "call_sites": [
-        "apps/docs/src/renderer/file-actions.ts:1283"
-      ],
+      "call_sites": ["apps/docs/src/renderer/file-actions.ts:1283"],
       "call_count": 1,
       "preload_channel": "invoke docs:export-html",
       "preload_handler": "apps/docs/src/preload/index.ts:134",
@@ -336,9 +294,7 @@
     {
       "name": "focusDocsTab",
       "signature": "focusDocsTab(id: string): Promise<void>",
-      "call_sites": [
-        "apps/docs/src/renderer/components/ribbon-tabs.tsx:1371"
-      ],
+      "call_sites": ["apps/docs/src/renderer/components/ribbon-tabs.tsx:1371"],
       "call_count": 1,
       "preload_channel": "invoke win:focus",
       "preload_handler": "apps/docs/src/preload/index.ts:167",
@@ -363,9 +319,7 @@
     {
       "name": "getAiPanelPrefs",
       "signature": "getAiPanelPrefs(): Promise<AiPanelPrefs>",
-      "call_sites": [
-        "apps/docs/src/renderer/main.tsx:47"
-      ],
+      "call_sites": ["apps/docs/src/renderer/main.tsx:47"],
       "call_count": 1,
       "preload_channel": "invoke app:get-ai-panel-prefs",
       "preload_handler": "apps/docs/src/preload/index.ts:40",
@@ -378,9 +332,7 @@
     {
       "name": "getAiSettings",
       "signature": "getAiSettings(): Promise<AiSettings>",
-      "call_sites": [
-        "apps/docs/src/renderer/App.tsx:1220"
-      ],
+      "call_sites": ["apps/docs/src/renderer/App.tsx:1220"],
       "call_count": 1,
       "preload_channel": "invoke ai:get-settings",
       "preload_handler": "apps/docs/src/preload/index.ts:140",
@@ -407,9 +359,7 @@
     {
       "name": "getLanguage",
       "signature": "getLanguage(): Promise<'zh' | 'en' | 'ja' | 'ko' | 'fr' | 'de' | 'es' | 'th' | 'id' | 'ru' | 'ar'>",
-      "call_sites": [
-        "apps/docs/src/renderer/main.tsx:36"
-      ],
+      "call_sites": ["apps/docs/src/renderer/main.tsx:36"],
       "call_count": 1,
       "preload_channel": "invoke app:get-language",
       "preload_handler": "apps/docs/src/preload/index.ts:19",
@@ -452,9 +402,7 @@
     {
       "name": "getTheme",
       "signature": "getTheme(): Promise<UiTheme>",
-      "call_sites": [
-        "apps/docs/src/renderer/main.tsx:37"
-      ],
+      "call_sites": ["apps/docs/src/renderer/main.tsx:37"],
       "call_count": 1,
       "preload_channel": "invoke app:get-theme",
       "preload_handler": "apps/docs/src/preload/index.ts:28",
@@ -466,9 +414,7 @@
     {
       "name": "headlessExportDone",
       "signature": "headlessExportDone(result: { ok: boolean; error?: string }): void",
-      "call_sites": [
-        "apps/docs/src/renderer/App.tsx:2192"
-      ],
+      "call_sites": ["apps/docs/src/renderer/App.tsx:2192"],
       "call_count": 1,
       "preload_channel": "send docs:headless-export-done",
       "preload_handler": "apps/docs/src/preload/index.ts:86",
@@ -480,9 +426,7 @@
     {
       "name": "imageSearch",
       "signature": "imageSearch(query: string, maxResults?: number): Promise<{ images: Array<{ title: string; imageUrl: string; sourceUrl: string; source: string; width?: number; height?: number }>; method: string; error?: string }>",
-      "call_sites": [
-        "apps/docs/src/renderer/ai/tools.ts:584"
-      ],
+      "call_sites": ["apps/docs/src/renderer/ai/tools.ts:584"],
       "call_count": 1,
       "preload_channel": "invoke ai:image-search",
       "preload_handler": "apps/docs/src/preload/index.ts:150",
@@ -494,9 +438,7 @@
     {
       "name": "listDocsTabs",
       "signature": "listDocsTabs(): Promise<DocsTabInfo[]>",
-      "call_sites": [
-        "apps/docs/src/renderer/components/ribbon-tabs.tsx:1120"
-      ],
+      "call_sites": ["apps/docs/src/renderer/components/ribbon-tabs.tsx:1120"],
       "call_count": 1,
       "preload_channel": "invoke win:list",
       "preload_handler": "apps/docs/src/preload/index.ts:166",
@@ -508,9 +450,7 @@
     {
       "name": "onAiPanelPrefsChanged",
       "signature": "onAiPanelPrefsChanged(handler: (prefs: AiPanelPrefs) => void): () => void",
-      "call_sites": [
-        "apps/docs/src/renderer/main.tsx:50"
-      ],
+      "call_sites": ["apps/docs/src/renderer/main.tsx:50"],
       "call_count": 1,
       "preload_channel": "app:ai-panel-prefs-changed",
       "preload_kind": "push",
@@ -523,9 +463,7 @@
     {
       "name": "onAiPreset",
       "signature": "onAiPreset(handler: (preset: AiPresetPayload) => void): () => void",
-      "call_sites": [
-        "apps/docs/src/renderer/App.tsx:1771"
-      ],
+      "call_sites": ["apps/docs/src/renderer/App.tsx:1771"],
       "call_count": 1,
       "preload_channel": "my-ai:ai-preset",
       "preload_kind": "push",
@@ -538,9 +476,7 @@
     {
       "name": "onAiStream",
       "signature": "onAiStream(handler: (chunk: AiStreamChunk) => void): () => void",
-      "call_sites": [
-        "apps/docs/src/renderer/ai/transport.ts:8"
-      ],
+      "call_sites": ["apps/docs/src/renderer/ai/transport.ts:8"],
       "call_count": 1,
       "preload_channel": "ai:stream-chunk",
       "preload_kind": "push",
@@ -584,9 +520,7 @@
     {
       "name": "onCloseCheck",
       "signature": "onCloseCheck(handler: () => void): () => void",
-      "call_sites": [
-        "apps/docs/src/renderer/App.tsx:4209"
-      ],
+      "call_sites": ["apps/docs/src/renderer/App.tsx:4209"],
       "call_count": 1,
       "preload_channel": "docs:close-check",
       "preload_kind": "push",
@@ -599,9 +533,7 @@
     {
       "name": "onCloseSaveRequest",
       "signature": "onCloseSaveRequest(handler: () => void): () => void",
-      "call_sites": [
-        "apps/docs/src/renderer/App.tsx:4216"
-      ],
+      "call_sites": ["apps/docs/src/renderer/App.tsx:4216"],
       "call_count": 1,
       "preload_channel": "docs:close-save-request",
       "preload_kind": "push",
@@ -614,9 +546,7 @@
     {
       "name": "onLanguageChanged",
       "signature": "onLanguageChanged( handler: ( lang: 'zh' | 'en' | 'ja' | 'ko' | 'fr' | 'de' | 'es' | 'th' | 'id' | 'ru' | 'ar', ) => void, ): () => void",
-      "call_sites": [
-        "apps/docs/src/renderer/i18n/locale.tsx:81"
-      ],
+      "call_sites": ["apps/docs/src/renderer/i18n/locale.tsx:81"],
       "call_count": 1,
       "preload_channel": "app:language-changed",
       "preload_kind": "push",
@@ -629,9 +559,7 @@
     {
       "name": "onMenuCommand",
       "signature": "onMenuCommand(handler: (command: MenuCommand, payload?: string) => void): () => void",
-      "call_sites": [
-        "apps/docs/src/renderer/App.tsx:4521"
-      ],
+      "call_sites": ["apps/docs/src/renderer/App.tsx:4521"],
       "call_count": 1,
       "preload_channel": "menu:command",
       "preload_kind": "push",
@@ -644,9 +572,7 @@
     {
       "name": "onOpenDocx",
       "signature": "onOpenDocx(handler: (result: Exclude<OpenDocxResult, null>) => void): () => void",
-      "call_sites": [
-        "apps/docs/src/renderer/App.tsx:1722"
-      ],
+      "call_sites": ["apps/docs/src/renderer/App.tsx:1722"],
       "call_count": 1,
       "preload_channel": "docs:opened",
       "preload_kind": "push",
@@ -659,9 +585,7 @@
     {
       "name": "onRenamedDocx",
       "signature": "onRenamedDocx(handler: (paths: { oldPath: string; newPath: string }) => void): () => void",
-      "call_sites": [
-        "apps/docs/src/renderer/App.tsx:1706"
-      ],
+      "call_sites": ["apps/docs/src/renderer/App.tsx:1706"],
       "call_count": 1,
       "preload_channel": "docs:renamed",
       "preload_kind": "push",
@@ -674,9 +598,7 @@
     {
       "name": "onTeardown",
       "signature": "onTeardown(handler: () => void): () => void",
-      "call_sites": [
-        "apps/docs/src/renderer/App.tsx:1492"
-      ],
+      "call_sites": ["apps/docs/src/renderer/App.tsx:1492"],
       "call_count": 1,
       "preload_channel": "docs:teardown",
       "preload_kind": "push",
@@ -689,10 +611,7 @@
     {
       "name": "onThemeChanged",
       "signature": "onThemeChanged(handler: (theme: UiTheme) => void): () => void",
-      "call_sites": [
-        "apps/docs/src/renderer/ui-theme.ts:21",
-        "apps/docs/src/renderer/main.tsx:45"
-      ],
+      "call_sites": ["apps/docs/src/renderer/ui-theme.ts:21", "apps/docs/src/renderer/main.tsx:45"],
       "call_count": 2,
       "preload_channel": "app:theme-changed",
       "preload_kind": "push",
@@ -705,9 +624,7 @@
     {
       "name": "onZoteroRequest",
       "signature": "onZoteroRequest(handler: (request: ZoteroRendererRequest) => void): () => void",
-      "call_sites": [
-        "apps/docs/src/renderer/App.tsx:2061"
-      ],
+      "call_sites": ["apps/docs/src/renderer/App.tsx:2061"],
       "call_count": 1,
       "preload_channel": "zotero:request",
       "preload_kind": "push",
@@ -736,9 +653,7 @@
     {
       "name": "openDocxDecrypt",
       "signature": "openDocxDecrypt(path: string, password: string): Promise<DecryptOpenResult>",
-      "call_sites": [
-        "apps/docs/src/renderer/App.tsx:1809"
-      ],
+      "call_sites": ["apps/docs/src/renderer/App.tsx:1809"],
       "call_count": 1,
       "preload_channel": "docs:open-decrypt",
       "preload_kind": "invoke",
@@ -751,9 +666,7 @@
     {
       "name": "openDocxPath",
       "signature": "openDocxPath(path: string): Promise<OpenDocxResult>",
-      "call_sites": [
-        "apps/docs/src/renderer/App.tsx:1800"
-      ],
+      "call_sites": ["apps/docs/src/renderer/App.tsx:1800"],
       "call_count": 1,
       "preload_channel": "docs:open-path",
       "preload_kind": "invoke",
@@ -766,9 +679,7 @@
     {
       "name": "openNewTab",
       "signature": "openNewTab(openPath?: string | null): Promise<void>",
-      "call_sites": [
-        "apps/docs/src/renderer/components/ribbon-tabs.tsx:1335"
-      ],
+      "call_sites": ["apps/docs/src/renderer/components/ribbon-tabs.tsx:1335"],
       "call_count": 1,
       "preload_channel": "win:new",
       "preload_kind": "invoke",
@@ -781,9 +692,7 @@
     {
       "name": "pickAttachments",
       "signature": "pickAttachments(): Promise<AttachmentAddResult | null>",
-      "call_sites": [
-        "apps/docs/src/renderer/ai/AiPanel.tsx:1132"
-      ],
+      "call_sites": ["apps/docs/src/renderer/ai/AiPanel.tsx:1132"],
       "call_count": 1,
       "preload_channel": "files:pick",
       "preload_kind": "invoke",
@@ -812,9 +721,7 @@
     {
       "name": "print",
       "signature": "print(scale?: number): Promise<{ ok: boolean; error?: string }>",
-      "call_sites": [
-        "apps/docs/src/renderer/components/PrintDialog.tsx:123"
-      ],
+      "call_sites": ["apps/docs/src/renderer/components/PrintDialog.tsx:123"],
       "call_count": 1,
       "preload_channel": "docs:print",
       "preload_kind": "invoke",
@@ -827,9 +734,7 @@
     {
       "name": "printPdfBuffer",
       "signature": "printPdfBuffer( pageWidthTwips: number, pageHeightTwips: number, scale?: number, ): Promise<{ ok: boolean; base64?: string; error?: string }>",
-      "call_sites": [
-        "apps/docs/src/renderer/file-actions.ts:1091"
-      ],
+      "call_sites": ["apps/docs/src/renderer/file-actions.ts:1091"],
       "call_count": 1,
       "preload_channel": "docs:print-pdf-buffer",
       "preload_kind": "invoke",
@@ -842,9 +747,7 @@
     {
       "name": "readAttachment",
       "signature": "readAttachment(path: string, offset: number, maxChars: number): Promise<AttachmentReadResult>",
-      "call_sites": [
-        "apps/docs/src/renderer/ai/files-skill.ts:78"
-      ],
+      "call_sites": ["apps/docs/src/renderer/ai/files-skill.ts:78"],
       "call_count": 1,
       "preload_channel": "files:read",
       "preload_kind": "invoke",
@@ -873,9 +776,7 @@
     {
       "name": "reportCloseCheck",
       "signature": "reportCloseCheck(state: { dirty: boolean; autoSave: boolean; filePath?: string | null }): void",
-      "call_sites": [
-        "apps/docs/src/renderer/App.tsx:4210"
-      ],
+      "call_sites": ["apps/docs/src/renderer/App.tsx:4210"],
       "call_count": 1,
       "preload_channel": "docs:close-check-result",
       "preload_kind": "send",
@@ -888,10 +789,7 @@
     {
       "name": "reportCloseSaveResult",
       "signature": "reportCloseSaveResult(ok: boolean): void",
-      "call_sites": [
-        "apps/docs/src/renderer/App.tsx:4227",
-        "apps/docs/src/renderer/App.tsx:4228"
-      ],
+      "call_sites": ["apps/docs/src/renderer/App.tsx:4227", "apps/docs/src/renderer/App.tsx:4228"],
       "call_count": 2,
       "preload_channel": "docs:close-save-result",
       "preload_kind": "send",
@@ -904,9 +802,7 @@
     {
       "name": "reportViewMenuState",
       "signature": "reportViewMenuState(state: { aiSidebar: boolean; darkCanvas: boolean }): void }",
-      "call_sites": [
-        "apps/docs/src/renderer/App.tsx:1497"
-      ],
+      "call_sites": ["apps/docs/src/renderer/App.tsx:1497"],
       "call_count": 1,
       "preload_channel": "docs:view-menu-state",
       "preload_kind": "send",
@@ -919,9 +815,7 @@
     {
       "name": "respellKick",
       "signature": "respellKick(): Promise<void>",
-      "call_sites": [
-        "apps/docs/src/renderer/App.tsx:1337"
-      ],
+      "call_sites": ["apps/docs/src/renderer/App.tsx:1337"],
       "call_count": 1,
       "preload_channel": "docs:respell-kick",
       "preload_kind": "invoke",
@@ -934,10 +828,7 @@
     {
       "name": "respondToZotero",
       "signature": "respondToZotero(response: ZoteroRendererResponse): void",
-      "call_sites": [
-        "apps/docs/src/renderer/App.tsx:2076",
-        "apps/docs/src/renderer/App.tsx:2078"
-      ],
+      "call_sites": ["apps/docs/src/renderer/App.tsx:2076", "apps/docs/src/renderer/App.tsx:2078"],
       "call_count": 2,
       "preload_channel": "zotero:response",
       "preload_kind": "send",
@@ -950,9 +841,7 @@
     {
       "name": "saveDocx",
       "signature": "saveDocx( path: string, data: ArrayBuffer, auto?: boolean, ): Promise<{ ok: boolean error?: string reason?: 'external-modified' /** a newer password choice arrived after this save's snapshot */ passwordIntentPending?: boolean }>",
-      "call_sites": [
-        "apps/docs/src/renderer/file-actions.ts:892"
-      ],
+      "call_sites": ["apps/docs/src/renderer/file-actions.ts:892"],
       "call_count": 1,
       "preload_channel": "docs:save",
       "preload_kind": "invoke",
@@ -965,9 +854,7 @@
     {
       "name": "saveDocxAs",
       "signature": "saveDocxAs( defaultName: string, data: ArrayBuffer, sourcePath?: string | null, ): Promise<{ ok: boolean; path?: string; error?: string; passwordIntentPending?: boolean }>",
-      "call_sites": [
-        "apps/docs/src/renderer/file-actions.ts:879"
-      ],
+      "call_sites": ["apps/docs/src/renderer/file-actions.ts:879"],
       "call_count": 1,
       "preload_channel": "docs:save-as",
       "preload_kind": "invoke",
@@ -980,9 +867,7 @@
     {
       "name": "saveDocxNew",
       "signature": "saveDocxNew( defaultName: string, data: ArrayBuffer, ): Promise<{ ok: boolean; path?: string; error?: string; passwordIntentPending?: boolean }>",
-      "call_sites": [
-        "apps/docs/src/renderer/file-actions.ts:880"
-      ],
+      "call_sites": ["apps/docs/src/renderer/file-actions.ts:880"],
       "call_count": 1,
       "preload_channel": "docs:save-new",
       "preload_kind": "invoke",
@@ -995,9 +880,7 @@
     {
       "name": "saveMergedPdf",
       "signature": "saveMergedPdf( defaultName: string, base64Parts: string[], outPath?: string, ): Promise<{ ok: boolean; path?: string; error?: string }>",
-      "call_sites": [
-        "apps/docs/src/renderer/file-actions.ts:1110"
-      ],
+      "call_sites": ["apps/docs/src/renderer/file-actions.ts:1110"],
       "call_count": 1,
       "preload_channel": "docs:save-merged-pdf",
       "preload_kind": "invoke",
@@ -1023,9 +906,7 @@
     {
       "name": "setDocPassword",
       "signature": "setDocPassword(filePath: string | null, password: string | null): Promise<{ ok: boolean }>",
-      "call_sites": [
-        "apps/docs/src/renderer/App.tsx:1835"
-      ],
+      "call_sites": ["apps/docs/src/renderer/App.tsx:1835"],
       "call_count": 1,
       "preload_channel": "docs:set-password",
       "preload_kind": "invoke",
@@ -1038,9 +919,7 @@
     {
       "name": "webSearch",
       "signature": "webSearch( query: string, maxResults?: number, ): Promise<{ results: Array<{ title: string; url: string; snippet: string }> answer?: string method: string /** failure reason when method === 'error' */ error?: string }>",
-      "call_sites": [
-        "apps/docs/src/renderer/ai/tools.ts:562"
-      ],
+      "call_sites": ["apps/docs/src/renderer/ai/tools.ts:562"],
       "call_count": 1,
       "preload_channel": "ai:web-search",
       "preload_kind": "invoke",
@@ -1053,9 +932,7 @@
     {
       "name": "writeRecoveryCopy",
       "signature": "writeRecoveryCopy(path: string, data: ArrayBuffer): Promise<{ ok: boolean }>",
-      "call_sites": [
-        "apps/docs/src/renderer/file-actions.ts:718"
-      ],
+      "call_sites": ["apps/docs/src/renderer/file-actions.ts:718"],
       "call_count": 1,
       "preload_channel": "docs:write-recovery",
       "preload_kind": "invoke",
@@ -1068,9 +945,7 @@
     {
       "name": "zoteroCommand",
       "signature": "zoteroCommand(command: ZoteroCommand): Promise<ZoteroCommandResult>",
-      "call_sites": [
-        "apps/docs/src/renderer/components/ribbon-references-tab.tsx:378"
-      ],
+      "call_sites": ["apps/docs/src/renderer/components/ribbon-references-tab.tsx:378"],
       "call_count": 1,
       "preload_channel": "zotero:command",
       "preload_kind": "invoke",

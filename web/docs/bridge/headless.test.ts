@@ -12,7 +12,8 @@ import {
   type HeadlessStatus,
 } from './headless'
 import { createWebApi } from './webapi'
-import { bytesAt, installBlobUrls } from './testing/blob-urls'
+// the renderer's own reader: resolves the bridge's in-page handoff without fetch()
+import { fetchDocBytes as bytesAt } from '../../../apps/docs/src/renderer/doc-bytes'
 
 const PAGE = 'https://office.example.com/office-frame/docs/v1/index.html'
 const DOCX = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 1, 2, 3])
@@ -23,7 +24,6 @@ const open = (target: string) => `headless=1&open=${encodeURIComponent(target)}`
 const status = () => (window as unknown as { __docsWebHeadless?: HeadlessStatus }).__docsWebHeadless
 
 beforeEach(() => {
-  installBlobUrls()
   vi.spyOn(console, 'error').mockImplementation(() => {})
   vi.spyOn(console, 'warn').mockImplementation(() => {})
 })

@@ -10,6 +10,7 @@ export default tseslint.config(
     ignores: [
       '**/node_modules/**',
       '**/dist/**',
+      'dist-web/**',
       '**/out/**',
       '**/.build/**',
       '**/release/**',
@@ -76,6 +77,21 @@ export default tseslint.config(
     },
     rules: {
       '@typescript-eslint/no-require-imports': 'off',
+    },
+  },
+  {
+    // Docs web frame tooling: the protocol test host is plain browser JS; the
+    // measure / screenshot scripts run in Node but pass callbacks to
+    // page.evaluate that run in the page.
+    files: ['web/server/test-host/**/*.js'],
+    languageOptions: {
+      globals: { ...globals.browser },
+    },
+  },
+  {
+    files: ['web/measure/**/*.mjs', 'docs/web-docs/screenshots/**/*.mjs'],
+    languageOptions: {
+      globals: { ...globals.node, ...globals.browser },
     },
   },
   {
