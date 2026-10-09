@@ -1318,4 +1318,7 @@ export const th = {
   appWebDiscard: 'ละทิ้ง',
   appWebCancel: 'ยกเลิก',
   appWebSaveFailed: 'บันทึกไปยัง UniWork ไม่สำเร็จ',
+  appWebTooLargeTitle: 'เวิร์กบุ๊กนี้ใหญ่เกินกว่าจะเปิดบนเว็บ',
+  appWebTooLargeBody:
+    'มีขนาดเกินกว่าที่สเปรดชีตบนเว็บรองรับ จึงเปิดในตัวแก้ไขสเปรดชีตแบบคลาสสิกแทน',
 } satisfies Record<keyof typeof zh, string>

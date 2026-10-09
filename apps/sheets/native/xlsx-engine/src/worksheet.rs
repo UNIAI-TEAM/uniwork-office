@@ -836,6 +836,12 @@ pub(crate) fn index_worksheet(
                 }
             }
             Event::Eof => {
+                // wasm: the pass reached the end of the sheet, so the last chunk
+                // completes the index instead of pausing it
+                #[cfg(target_os = "wasi")]
+                if let Ok(mut index) = state.0.lock() {
+                    index.pause_after_chunk = None;
+                }
                 flush_chunk(
                     sheet_index,
                     chunk_index,
@@ -1193,6 +1199,11 @@ pub(crate) fn row_property<R: std::io::BufRead>(
     }))
 }
 
+/// wasm only: the error a resumable index pass stops with once it flushed its
+/// target chunk (WorkbookSession::advance_index treats it as "paused").
+#[cfg(target_os = "wasi")]
+pub(crate) const INDEX_PAUSED: &str = "xlsx-index-paused";
+
 pub(crate) fn flush_chunk(
     sheet_index: usize,
     chunk_index: usize,
@@ -1202,6 +1213,21 @@ pub(crate) fn flush_chunk(
     state: &Arc<(Mutex<SheetIndex>, Condvar)>,
     indexed_through_row: usize,
 ) -> Result<(), SidecarError> {
+    // wasm: a resumed pass re-parses chunks an earlier pass already flushed
+    #[cfg(target_os = "wasi")]
+    {
+        let (lock, _) = &**state;
+        let already_flushed = lock
+            .lock()
+            .map(|index| index.done_chunk.is_some_and(|done| chunk_index <= done))
+            .unwrap_or(false);
+        if already_flushed {
+            chunk.cells.clear();
+            chunk.rows.clear();
+            pending_formulas.clear();
+            return Ok(());
+        }
+    }
     let path = cache_directory.join(format!("sheet-{sheet_index}-chunk-{chunk_index}.json"));
     let has_data = !chunk.cells.is_empty() || !chunk.rows.is_empty();
     if has_data {
@@ -1230,6 +1256,16 @@ pub(crate) fn flush_chunk(
     }
     index.indexed_through_row = Some(indexed_through_row);
     condition.notify_all();
+    #[cfg(target_os = "wasi")]
+    {
+        index.done_chunk = Some(chunk_index);
+        if index
+            .pause_after_chunk
+            .is_some_and(|pause| chunk_index >= pause)
+        {
+            return Err(SidecarError::Io(INDEX_PAUSED.into()));
+        }
+    }
     Ok(())
 }
 

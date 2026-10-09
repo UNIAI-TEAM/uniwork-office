@@ -1381,4 +1381,7 @@ export const pl = {
   appWebDiscard: 'Odrzuć',
   appWebCancel: 'Anuluj',
   appWebSaveFailed: 'Nie udało się zapisać w UniWork.',
+  appWebTooLargeTitle: 'Ten skoroszyt jest za duży dla wersji internetowej',
+  appWebTooLargeBody:
+    'Przekracza rozmiar obsługiwany przez arkusz internetowy, więc otworzy się w klasycznym edytorze arkuszy.',
 } satisfies Record<keyof typeof zh, string>

@@ -1636,6 +1636,11 @@ button.check-item:hover {
   text-align: right;
 }
 
+/* web frame without AI (cap('ai') off): no dock column at all */
+.app-shell.no-copilot .sheet-body {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .app-shell.copilot-collapsed .sheet-body {
   grid-template-columns: 34px minmax(0, 1fr);
 }
@@ -5609,6 +5614,12 @@ textarea:focus {
   background: var(--canvas);
   color: var(--text);
   font-family: var(--gs-font-sans, system-ui, sans-serif);
+}
+
+.engine-unavailable-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
 }
 
 .engine-unavailable-card {

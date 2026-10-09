@@ -1333,4 +1333,7 @@ export const en = {
   appWebDiscard: 'Discard',
   appWebCancel: 'Cancel',
   appWebSaveFailed: 'Saving to UniWork failed.',
+  appWebTooLargeTitle: 'This workbook is too large for the web',
+  appWebTooLargeBody:
+    'It is above the size the web spreadsheet handles, so it opens in the classic spreadsheet editor instead.',
 } satisfies Record<keyof typeof zh, string>

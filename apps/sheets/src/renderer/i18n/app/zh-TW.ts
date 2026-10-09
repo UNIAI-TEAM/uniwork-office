@@ -1266,4 +1266,6 @@ export const zhTW = {
   appWebDiscard: '捨棄',
   appWebCancel: '取消',
   appWebSaveFailed: '儲存到 UniWork 失敗。',
+  appWebTooLargeTitle: '此活頁簿太大，無法在網頁版開啟',
+  appWebTooLargeBody: '它超出了網頁版試算表的大小上限，正改用傳統試算表編輯器開啟。',
 } satisfies Record<keyof typeof zh, string>

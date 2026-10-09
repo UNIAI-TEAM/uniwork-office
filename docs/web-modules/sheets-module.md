@@ -1,4 +1,4 @@
-# Sheets web module (UNI-1016, GO-B6, worker SH1)
+# Sheets web module (UNI-1016, GO-B6, workers SH1 + SH2)
 
 The Sheets frame without its engine. GO-D3 = **C** (CONTRACT C11): the xlsx engine runs as WASM in a Web Worker of
 this frame. Building that backend is the follow-up **SH2**. Everything that does not depend on it is here, so SH2 only
@@ -40,6 +40,64 @@ Engine-side items from the measurements:
 - the first viewport waits for the inline index (make the index incremental);
 - two browser-shim fixes: geometric file growth, and removing non-empty directories on `close`;
 - the size gates: host ≤ 5 MB stored, frame ≤ 40 MB of worksheet XML, until the index is incremental.
+
+## SH2: the WASM engine (GO-D3 = C, CONTRACT C11)
+
+The frame now ships its engine: `install.ts` installs `createWasmTransport` over a module Worker, in place of the
+engine-unavailable stub.
+
+| Piece                       | Where                                                                                                        | What                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Engine build                | `apps/sheets/native/xlsx-engine/wasm/`                                                                       | cdylib reactor over the unchanged sidecar sources (wasi-only `cfg` blocks, see `docs/upstream/SHEETS_WASM_ENGINE.md`). `build-wasm.mjs` uses the pinned toolchain (`rust-toolchain.toml`: 1.90.0 + wasm32-wasip1), a vendored zip 0.6.6 without C features, a staging path derived from the input hash, and remapped paths, and is verified against `xlsx-sidecar.wasm.sha256`. **Reproducible:** a copy of the crate at a different path with a fresh target dir built the identical module (`5587565a…`, 5 070 855 bytes). |
+| Why build instead of commit |                                                                                                              | The fork CI never runs `build:web` and has no wasm target. `build:web --module sheets` runs `build-wasm.mjs` as its prebuild step, which compiles the module or reuses a cached one whose inputs are unchanged, then verifies the checksum. `WEB_SHEETS_WASM=<file>` supplies a prebuilt module, verified the same way. No binary in git.                                                                                                                                                                                    |
+| Bundle                      | `assets/xlsx-sidecar-*.wasm` (5.07 MB, 1.70 MB gzip), `assets/engine.worker-*.js` (26 kB)                    | hashed files in the manifest; the Worker is a same-origin file (worker-src `'self'`, no `blob:`); `csp.json` adds `script-src 'wasm-unsafe-eval'` (sheets + pdf only), also sent on `/assets/**` for the Worker                                                                                                                                                                                                                                                                                                              |
+| Engine host                 | `engine/host.ts`                                                                                             | the reactor on `@bjorn3/browser_wasi_shim` 0.4.2 (pinned) with an in-memory `/tmp`; two shim fixes: geometric file growth, and a directory removal that clears the contents (the shim's readdir skipped entries deleted during iteration, so `close` failed with ENOTEMPTY)                                                                                                                                                                                                                                                  |
+| Transport                   | `engine/wasm-transport.ts`, `engine/save-plan.ts`, `engine/blank.ts`                                         | sessions, `.xls` via `convert_workbook`, the 40 MB worksheet-XML gate (`too_large`), reads, pivot definitions, save = the desktop `writeWorkbookTo` + `saveWorkbookViaSidecar` mirrored over the session's bytes (gateway planner loaded on the first save, `save_archive`, manifest checks), a 0-byte document opens blank, crash = reconnect                                                                                                                                                                               |
+| Bridge additions            | `bridge.ts`                                                                                                  | `too_large` → fatal `error` to the host (GD2 then opens G3); Ctrl/Cmd+S, Shift+S, O, P map to the renderer's File actions (the desktop gets them from its native menu)                                                                                                                                                                                                                                                                                                                                                       |
+| Renderer                    | `EngineUnavailableScreen` (`reason: 'too-large'`, shown as an overlay), `no-copilot` shell layout without AI | the grid used to lose its width when the AI dock was not rendered                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+
+Capabilities per decision C: `xlsxEngine`, `xlsImport` and `pivotRefresh` are on (from the transport's features).
+`recalcFallback`, `mergeWorkbooks` and `recoveryCopy` stay off.
+
+**First viewport** (incremental index, `docs/web-modules/sheets-probes/results/sh2-incremental-node-shim.json`; frame
+engine code in Node + the shim):
+
+| rows × 22 (cells, file) | first viewport before → after | open + first viewport before → after | background index, total (longest pass) |
+| ----------------------- | ----------------------------- | ------------------------------------ | -------------------------------------- |
+| 10k (0.22M, 1.0 MB)     | 559 → 120 ms                  | 0.8 → 0.48 s                         | 0.8 s (0.46 s)                         |
+| 20k (0.44M, 2.0 MB)     | 1 219 → 49 ms                 | 1.7 → 0.61 s                         | 1.9 s (0.94 s)                         |
+| 50k (1.1M, 5.1 MB)      | 2 864 → 29 ms                 | 3.9 → 1.08 s                         | 3.5 s (2.4 s)                          |
+| 100k (2.2M, 10.3 MB)    | 4 924 → 31 ms                 | 6.7 → 2.33 s                         | 9.5 s (5.3 s)                          |
+
+"Before" is the SH1 Chromium probe. A read far below the indexed rows waits for at most one pass. Gates (lead-confirmed): host 10 MB stored, frame 80 MB of
+worksheet XML (`MAX_WORKSHEET_XML_BYTES`). Chromium, production build, from page load: 20k / 50k / 100k rows usable
+after 4.1 / 4.3 / 5.1 s (`sheets-sidecar.md` 4.5.3).
+
+**Tests (SH2):**
+
+- `web/modules/sheets/engine/wasm-transport.test.ts`: mocked channel (gate, crash/reconnect, features), plus the
+  real engine in Node (open, read, value + formula save, reopen, `.xls`, incremental index exactly-once formulas,
+  deep read, close).
+- `bridge.test.ts`: plus too_large and the accelerators. `npx vitest run --root web/modules`: 38 passed.
+- `cargo +1.90.0 test` (desktop): 186 + 6 passed, unchanged.
+- `web/e2e/sheets.spec.ts`: 13 passed (incl. 3 Chromium timing runs) on the production build:
+  - fixtures: edit, kitchen sink, structure;
+  - 20k × 22: open, scroll, value + formula, Ctrl+S, bytes at the host, reopened session shows the edit;
+  - conflict → Overwrite; `.xls` (vi, dark); view-only (vi, light); too_large (en light, vi dark); blank workbook;
+  - 0 console errors, 0 page errors, 0 failed requests, 0 CSP violations.
+
+  Screenshots are in `docs/web-modules/screenshots/sheets/`.
+
+**Open (SH2):**
+
+- A formula typed into a _streamed_ workbook (the 20k sheet) is saved correctly, but after the save/reopen its cell
+  shows blank until Univer's formula closure covers it. The saved file carries no cached `<v>` for the new formula,
+  and the IronCalc fallback that fills it on the desktop is hidden on the web (C11). Small workbooks
+  (`formulaMode`) compute live.
+- The view-only grid lock (`FWorkbook.setEditable(false)`) is still save-layer only. Typing in a view-only frame edits
+  the in-memory grid, but nothing can be saved.
+- A Rust panic aborts the wasm instance (no unwinding on wasip1): the transport reconnects, and the open sessions are
+  lost (the renderer shows the error for the next read).
 
 ## Bridge mapping (`window.desktopApi`, 64 methods)
 

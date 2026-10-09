@@ -1310,4 +1310,7 @@ export const vi = {
   appWebDiscard: 'Bỏ thay đổi',
   appWebCancel: 'Hủy',
   appWebSaveFailed: 'Lưu vào UniWork thất bại.',
+  appWebTooLargeTitle: 'Sổ làm việc này quá lớn để mở trên web',
+  appWebTooLargeBody:
+    'Kích thước vượt giới hạn của bảng tính web, nên sổ sẽ được mở bằng trình chỉnh sửa bảng tính cổ điển.',
 } satisfies Record<keyof typeof zh, string>

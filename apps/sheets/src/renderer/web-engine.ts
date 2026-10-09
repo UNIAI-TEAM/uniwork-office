@@ -13,3 +13,16 @@ export function isEngineUnavailableError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : typeof error === 'string' ? error : ''
   return message.startsWith(`${ENGINE_UNAVAILABLE}:`)
 }
+
+/**
+ * The web engine's size gate (UNI-1016, CONTRACT C11): a workbook with more worksheet XML than
+ * the frame handles opens with this code; the host then opens the G3 editor, and until it does
+ * the frame shows its "too large for the web" state.
+ */
+export const WEB_TOO_LARGE = 'too_large'
+
+export function isTooLargeError(error: unknown): boolean {
+  if ((error as { code?: unknown } | null)?.code === WEB_TOO_LARGE) return true
+  const message = error instanceof Error ? error.message : typeof error === 'string' ? error : ''
+  return message.startsWith(`${WEB_TOO_LARGE}:`)
+}

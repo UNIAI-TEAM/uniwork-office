@@ -407,7 +407,7 @@ import {
 import { ChartFormatPane, SelectDataDialog } from './ChartPanels'
 import { cap } from './capabilities'
 import { EngineUnavailableScreen } from './EngineUnavailableScreen'
-import { isEngineUnavailableError } from './web-engine'
+import { isEngineUnavailableError, isTooLargeError } from './web-engine'
 
 // Source sheet id of an in-flight copy-sheet command; the next insert-sheet
 // mutation is that copy and must journal as a duplicate, not a blank add.
@@ -588,7 +588,7 @@ export function App(): React.JSX.Element {
   const [message, setMessage] = useState(t('appReadyInitial'))
   /// Web frame: the open failed because no workbook engine is installed
   /// (web-engine.ts); the whole window shows EngineUnavailableScreen.
-  const [engineUnavailable, setEngineUnavailable] = useState(false)
+  const [engineUnavailable, setEngineUnavailable] = useState<'engine' | 'too-large' | null>(null)
   /// Zoom of the active sheet in percent, echoed by the status-bar slider.
   const [zoomPercent, setZoomPercent] = useState(100)
   const [selectionFormat, setSelectionFormat] = useState<SelectionFormat | null>(null)
@@ -3985,8 +3985,8 @@ export function App(): React.JSX.Element {
       openLazyWorkbook(selected)
       setMessage(t('appOpened', { name: selected.name }))
     } catch (error: unknown) {
-      if (isEngineUnavailableError(error)) {
-        setEngineUnavailable(true)
+      if (isEngineUnavailableError(error) || isTooLargeError(error)) {
+        setEngineUnavailable(isTooLargeError(error) ? 'too-large' : 'engine')
         return
       }
       setMessage(error instanceof Error ? error.message : t('appOpenFailed'))
@@ -4169,10 +4169,10 @@ export function App(): React.JSX.Element {
 
   const aiScopeChip = resolveScopeChip(aiRunScope, aiScope, aiScopeDismissed)
 
-  if (engineUnavailable) return <EngineUnavailableScreen />
-
   return (
     <>
+      {/* an overlay, not a replacement: the grid stays mounted (Univer must not lose its container) */}
+      {engineUnavailable && <EngineUnavailableScreen reason={engineUnavailable} overlay />}
       <ToastHost />
       {recoveryPrompt && (
         <RecoveryDialog

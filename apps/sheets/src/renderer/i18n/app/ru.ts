@@ -1371,4 +1371,7 @@ export const ru = {
   appWebDiscard: 'Отменить изменения',
   appWebCancel: 'Отмена',
   appWebSaveFailed: 'Не удалось сохранить в UniWork.',
+  appWebTooLargeTitle: 'Эта книга слишком велика для веб-версии',
+  appWebTooLargeBody:
+    'Она превышает размер, с которым работает веб-таблица, поэтому откроется в классическом редакторе таблиц.',
 } satisfies Record<keyof typeof zh, string>

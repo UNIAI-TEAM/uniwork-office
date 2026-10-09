@@ -217,8 +217,12 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
     return menuListeners.size > 0
   }
 
+  /** the workbook the renderer shows last (inspection hook for e2e / diagnostics) */
+  let shown: WorkbookFile | null = null
+
   function decorate(file: WorkbookFile, meta: FileMeta): WorkbookFile {
-    return { ...file, name: meta.name, path: pathFor(meta), readOnly: !canSave() }
+    shown = { ...file, name: meta.name, path: pathFor(meta), readOnly: !canSave() }
+    return shown
   }
 
   async function openPayload(payload: OpenPayload): Promise<WorkbookFile> {
@@ -228,6 +232,10 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
       opened = await transport.open({ name: payload.file.name, data, locale: locale() })
     } catch (err) {
       if (isEngineUnavailable(err)) reportEngineUnavailable()
+      // above the frame's size gate: fatal, so the host opens the G3 editor instead (C11)
+      else if ((err as { code?: unknown })?.code === 'too_large') {
+        port.reportError({ code: 'too_large', message: describe(err) }, true)
+      }
       throw err
     }
     remember(payload.file)
@@ -249,6 +257,36 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
       marker: 'discard',
     })
     return choice === 'discard'
+  }
+
+  // The desktop's File accelerators come from the native menu (sheets-main.ts menu:action); in the
+  // frame the same keys drive the same renderer actions, and the browser's own "save page" /
+  // "open file" / "print page" dialogs never appear over the workbook.
+  if (typeof document !== 'undefined') {
+    document.addEventListener(
+      'keydown',
+      (event) => {
+        if (!(event.ctrlKey || event.metaKey) || event.altKey) return
+        const key = event.key.toLowerCase()
+        const action: MenuAction | null =
+          key === 's'
+            ? event.shiftKey
+              ? granted('saveAs')
+                ? 'save-as'
+                : null
+              : canSave()
+                ? 'save'
+                : null
+            : key === 'o' && !event.shiftKey && granted('open')
+              ? 'open'
+              : key === 'p' && !event.shiftKey
+                ? 'print'
+                : null
+        if (key === 's' || key === 'o' || key === 'p') event.preventDefault()
+        if (action && runMenu(action)) event.stopPropagation()
+      },
+      true,
+    )
   }
 
   port.handleOpen(async (payload) => {
@@ -671,6 +709,16 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
       currentFileId: () => current,
       sessionCount: () => sessions.size,
       file: (fileId: string) => files.get(fileId),
+      /** the current session: id, name and sheet ids (no cell data) */
+      workbook: () =>
+        shown && sessions.has(shown.sessionId)
+          ? {
+              sessionId: shown.sessionId,
+              name: shown.name,
+              needsSaveAs: shown.needsSaveAs === true,
+              sheets: shown.sheets.map((sheet) => ({ id: sheet.id, name: sheet.name })),
+            }
+          : null,
       toProtocolError,
     },
   }

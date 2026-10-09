@@ -1404,4 +1404,7 @@ export const de = {
   appWebDiscard: 'Verwerfen',
   appWebCancel: 'Abbrechen',
   appWebSaveFailed: 'Speichern in UniWork fehlgeschlagen.',
+  appWebTooLargeTitle: 'Diese Arbeitsmappe ist zu groß für das Web',
+  appWebTooLargeBody:
+    'Sie überschreitet die Größe, die die Web-Tabellenkalkulation verarbeitet, und wird stattdessen im klassischen Tabelleneditor geöffnet.',
 } satisfies Record<keyof typeof zh, string>
