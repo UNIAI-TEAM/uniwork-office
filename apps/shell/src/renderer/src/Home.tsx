@@ -28,8 +28,8 @@ import { fileCountLabel, visiblePageCount } from './counts'
 import { useI18n } from './locale'
 import type { I18n, StringKey } from './locale'
 import { CreditWallet } from './CreditWallet'
-import { SettingsModal, type SettingsSectionId } from './SettingsModal'
-import type { SettingsTarget } from './SettingsModal'
+import type { SettingsSectionId, SettingsTarget } from './SettingsModal'
+import { AccountEntry } from './AccountEntry'
 import { skillUpdateDue } from './IntegrationsPane'
 import { getPractice, isPracticeId, listPractices, type PracticeId } from '@uniwork/practice-core'
 import { AgentIntentBanner } from './AgentIntentBanner'
@@ -990,8 +990,8 @@ function ProjectPanel({ projects, selectedId, onSelect, onRefresh }: ProjectPane
 }
 
 // ── Sidebar footer: Settings + Sign-in (bottom-left) ─────
-// Settings is its own control. Sign-in opens the UniWork web link; when already
-// signed in, the account row opens Settings → Account (logout lives there).
+// Settings is its own control. The UniWork account entry (AccountEntry.tsx)
+// starts the browser sign-in or opens Settings → Account.
 
 function SidebarFooter({
   onStatusChange,
@@ -1087,221 +1087,6 @@ function SidebarFooter({
         onFileSearchSettingsChange={onFileSearchSettingsChange}
         target={target}
       />
-    </div>
-  )
-}
-
-function AccountEntry({
-  onStatusChange,
-  settingsOpen,
-  settingsSection,
-  onOpenSettings,
-  onCloseSettings,
-  skillUpdate,
-  onSkillUpdateDue,
-  onFileSearchSettingsChange,
-  target,
-}: {
-  onStatusChange?: (status: AccountStatus | null) => void
-  settingsOpen: boolean
-  settingsSection: SettingsSectionId
-  onOpenSettings: (section?: SettingsSectionId) => void
-  onCloseSettings: () => void
-  skillUpdate: boolean
-  onSkillUpdateDue: (due: boolean) => void
-  onFileSearchSettingsChange?: () => void
-  /** open on this section / block (e.g. the home list's rerank button) */
-  target?: SettingsTarget | null
-}) {
-  const { t } = useI18n()
-  const [status, setStatus] = useState<AccountStatus | null>(null)
-
-  useEffect(() => {
-    onStatusChange?.(status)
-  }, [status, onStatusChange])
-  const [waiting, setWaiting] = useState(false)
-  const [loginError, setLoginError] = useState<
-    'timeout' | 'launch' | 'network' | 'expired' | 'failed' | null
-  >(null)
-  // UniWork Sign-in URL from main — rescue / copy when the browser did not open
-  const [authUrl, setAuthUrl] = useState<string | null>(null)
-  const [urlCopied, setUrlCopied] = useState(false)
-  const [loggingOut, setLoggingOut] = useState(false)
-  // bumped on logout so an in-flight status refresh (which can still
-  // report logged-in) is discarded instead of resurrecting the UI
-  const statusSeq = useRef(0)
-
-  // query login state once on mount
-  useEffect(() => {
-    let alive = true
-    void window.aiOffice.accountStatus?.().then((s) => {
-      if (alive) setStatus(s)
-    })
-    return () => {
-      alive = false
-    }
-  }, [])
-
-  // UniWork Sign-in: main opens the browser link and reports the URL for rescue/copy.
-  useEffect(() => {
-    const off = window.aiOffice.onAccountLogin?.((ev) => {
-      if (ev.phase === 'url') {
-        if (ev.url) setAuthUrl(ev.url)
-      } else if (ev.phase === 'launched') {
-        setWaiting(false)
-      } else if (ev.phase === 'error') {
-        setWaiting(false)
-        setLoginError(
-          ev.error === 'network' ? 'network' : ev.error === 'expired' ? 'expired' : 'failed',
-        )
-      }
-    })
-    return off
-  }, [])
-
-  const loggedIn = status?.loggedIn ?? false
-  const email = status?.email ?? ''
-  const initial = email ? email[0].toUpperCase() : loggedIn ? 'U' : '?'
-  const errorText = loginError
-    ? {
-        timeout: t('loginTimeout'),
-        launch: t('loginLaunchFailed'),
-        network: t('loginNetworkError'),
-        expired: t('loginExpired'),
-        failed: t('loginFailed'),
-      }[loginError]
-    : null
-
-  const doLogout = () => {
-    setLoggingOut(true)
-    statusSeq.current++
-    void window.aiOffice.accountLogout().then(() => {
-      setLoggingOut(false)
-      setStatus({ loggedIn: false })
-    })
-  }
-
-  const startLogin = () => {
-    // Open UniWork Sign-in in the system browser (no Genspark device-code).
-    setLoginError(null)
-    setWaiting(true)
-    setAuthUrl(null)
-    setUrlCopied(false)
-    void window.aiOffice.accountLogin().then((launched) => {
-      if (!launched) {
-        setWaiting(false)
-        setLoginError('launch')
-      } else {
-        setWaiting(false)
-      }
-    })
-  }
-
-  const openLoginUrl = () => void window.aiOffice.openLoginUrl?.()
-
-  const copyLoginUrl = () => {
-    if (!authUrl) return
-    void navigator.clipboard.writeText(authUrl).then(() => {
-      setUrlCopied(true)
-      window.setTimeout(() => setUrlCopied(false), 2000)
-    })
-  }
-
-  const handleClick = () => {
-    // Sign-in only opens UniWork in the browser. Settings stays on its own button.
-    if (loggedIn) {
-      const seq = statusSeq.current
-      void window.aiOffice.accountStatus?.().then((s) => {
-        if (seq === statusSeq.current) setStatus(s)
-      })
-      onOpenSettings('account')
-      return
-    }
-    startLogin()
-  }
-
-  return (
-    <div className="account-entry">
-      {settingsOpen && (
-        <SettingsModal
-          status={status}
-          loggingOut={loggingOut}
-          loginWaiting={waiting}
-          loginUrl={authUrl}
-          urlCopied={urlCopied}
-          onOpenLoginUrl={openLoginUrl}
-          onCopyLoginUrl={copyLoginUrl}
-          onClose={onCloseSettings}
-          onFileSearchChange={onFileSearchSettingsChange}
-          onLogin={() => {
-            // Keep Settings open; Sign-in is only the UniWork link action.
-            startLogin()
-          }}
-          onLogout={doLogout}
-          skillUpdateDue={skillUpdate}
-          onSkillUpdateDue={onSkillUpdateDue}
-          initialSection={settingsSection}
-          target={target}
-        />
-      )}
-      <button
-        className="account-btn"
-        onClick={handleClick}
-        aria-haspopup={loggedIn ? 'dialog' : undefined}
-        aria-expanded={loggedIn ? settingsOpen : undefined}
-        data-tip={
-          loggedIn
-            ? email || t('loggedInGenspark')
-            : waiting
-              ? t('waitingLogin')
-              : (errorText ?? t('loginGenspark'))
-        }
-        aria-label={
-          loggedIn ? email || t('account') : waiting ? t('waitingLogin') : t('loginGenspark')
-        }
-      >
-        <span
-          className={`account-avatar${loggedIn ? ' logged-in' : ''}${waiting ? ' waiting' : ''}`}
-        >
-          {waiting ? (
-            <svg
-              className="account-spinner"
-              width="14"
-              height="14"
-              viewBox="0 0 16 16"
-              aria-hidden="true"
-            >
-              <circle
-                cx="8"
-                cy="8"
-                r="6"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                fill="none"
-                strokeDasharray="26"
-                strokeDashoffset="18"
-                strokeLinecap="round"
-              />
-            </svg>
-          ) : (
-            initial
-          )}
-        </span>
-        <span className="account-text">
-          <span className="account-name">
-            {loggedIn
-              ? email
-                ? email.split('@')[0]
-                : t('loggedIn')
-              : waiting
-                ? t('waitingShort')
-                : t('login')}
-          </span>
-          {!loggedIn && !waiting && errorText && (
-            <span className="account-sub error">{errorText}</span>
-          )}
-        </span>
-      </button>
     </div>
   )
 }
@@ -1459,9 +1244,18 @@ export function Home() {
   // single source of account state: AccountEntry reports every change (initial
   // load, login, logout), keeping the greeting name in sync
   const handleAccountStatus = useCallback((s: AccountStatus | null) => {
-    const on = s?.loggedIn ?? false
-    const name = on ? (s?.email ?? '').split('@')[0] : ''
-    setAccountName(name ? name[0].toUpperCase() + name.slice(1) : '')
+    if (!s?.loggedIn) {
+      setAccountName('')
+      return
+    }
+    const display = s.profile?.displayName?.trim()
+    if (display) {
+      setAccountName(display)
+      return
+    }
+    // no display name yet: the email's local part, capitalised like a name
+    const local = (s.profile?.email || s.email || '').split('@')[0] ?? ''
+    setAccountName(local ? local[0]!.toUpperCase() + local.slice(1) : '')
   }, [])
 
   const goHomeList = (next: 'recent' | 'starred' = 'recent') => {

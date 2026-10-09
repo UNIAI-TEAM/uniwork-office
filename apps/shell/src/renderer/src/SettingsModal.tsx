@@ -33,10 +33,12 @@ import type {
 } from '@genoffice/ai-provider'
 import { useI18n } from './locale'
 import type { StringKey, TFunc } from './locale'
-import type { AccountStatus, AiCatalogEntry, DocTheme, UiTheme } from '../../shared/home-api'
+import type { AiCatalogEntry, DocTheme, UiTheme } from '../../shared/home-api'
 import appIcon from './assets/app-icon.png'
 import legal from '../../shared/legal.json'
 import { ProviderLogo } from './provider-logos'
+import { AccountPane } from './AccountPane'
+import type { AccountController } from './account-model'
 import { BackupStoragePane } from './BackupStoragePane'
 import { BillingPaymentPane } from './BillingPaymentPane'
 import {
@@ -1451,21 +1453,11 @@ function AiStatusPill({ status }: { status: AiStatus | null }) {
 }
 
 export interface SettingsModalProps {
-  status: AccountStatus | null
-  loggingOut: boolean
-  /** browser sign-in in progress (spinner shows on the account entry) */
-  loginWaiting: boolean
-  /** device auth URL while waiting — rescue actions when the browser did not auto-open */
-  loginUrl: string | null
-  urlCopied: boolean
-  onOpenLoginUrl: () => void
-  onCopyLoginUrl: () => void
+  /** the UniWork account (owned by the sidebar AccountEntry); absent in isolated renders */
+  account?: AccountController
   onClose: () => void
   /** the decision-model search settings were saved; the home search re-judges or drops its current order */
   onFileSearchChange?: () => void
-  /** launches the UniWork sign-in flow (progress shows on the account entry) */
-  onLogin: () => void
-  onLogout: () => void
   /** an installed skill is older than the bundled one: dot on the Integrations entry */
   skillUpdateDue?: boolean
   onSkillUpdateDue?: (due: boolean) => void
@@ -1476,17 +1468,9 @@ export interface SettingsModalProps {
 }
 
 export function SettingsModal({
-  status,
-  loggingOut,
-  loginWaiting,
-  loginUrl,
-  urlCopied,
-  onOpenLoginUrl,
-  onCopyLoginUrl,
+  account,
   onClose,
   onFileSearchChange,
-  onLogin,
-  onLogout,
   skillUpdateDue: updateDue = false,
   onSkillUpdateDue,
   initialSection = 'general',
@@ -1635,8 +1619,8 @@ export function SettingsModal({
     return t('setDefaultAppDesc')
   })()
 
-  const loggedIn = status?.loggedIn ?? false
-  const email = status?.email ?? ''
+  const loggedIn = account?.status?.loggedIn ?? false
+  const signIn = account?.signIn ?? (() => undefined)
 
   return (
     <div
@@ -1692,30 +1676,7 @@ export function SettingsModal({
                     onPick={(v) => setLang(v as typeof lang)}
                   />
                 </div>
-                <Field label={t('setEmail')} value={loggedIn ? email : t('setNotLoggedIn')} />
-                <div className="set-pane-footer">
-                  {loggedIn ? (
-                    <button className="set-btn danger" disabled={loggingOut} onClick={onLogout}>
-                      {loggingOut ? t('loggingOut') : t('logout')}
-                    </button>
-                  ) : (
-                    <>
-                      {loginUrl && (
-                        <>
-                          <button className="set-btn" onClick={onOpenLoginUrl}>
-                            {t('loginOpenManually')}
-                          </button>
-                          <button className="set-btn" onClick={onCopyLoginUrl}>
-                            {urlCopied ? t('loginCopied') : t('loginCopyUrl')}
-                          </button>
-                        </>
-                      )}
-                      <button className="set-btn primary" onClick={onLogin}>
-                        {loginWaiting ? t('waitingShort') : t('loginGenspark')}
-                      </button>
-                    </>
-                  )}
-                </div>
+                {account && <AccountPane account={account} />}
                 <LicenseDevicesPane lang={lang} loggedIn={loggedIn} />
                 <BillingPaymentPane lang={lang} />
               </>
@@ -1729,7 +1690,7 @@ export function SettingsModal({
               />
             )}
             {section === 'backup' && (
-              <BackupStoragePane lang={lang} loggedIn={loggedIn} onLogin={onLogin} />
+              <BackupStoragePane lang={lang} loggedIn={loggedIn} onLogin={signIn} />
             )}
             {section === 'uniai' && <UniAiPwaPane lang={lang} />}
             {section === 'general' && (

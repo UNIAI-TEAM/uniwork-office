@@ -1,11 +1,25 @@
 import { createContext, useContext, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { createI18n, htmlDir, htmlLang, type Lang, type Params } from '@genoffice/i18n'
+import {
+  createI18n,
+  htmlDir,
+  htmlLang,
+  LANGS,
+  type Lang,
+  type LangDicts,
+  type Params,
+} from '@genoffice/i18n'
 import { strings } from './strings'
+import { accountStrings } from './i18n/strings-account'
 
-const translate = createI18n(strings)
+export type StringKey = keyof typeof strings.zh | keyof typeof accountStrings.zh
 
-export type StringKey = keyof typeof strings.zh
+// the home table plus the sharded domains (each shard type-checks its own key set)
+const dicts = Object.fromEntries(
+  LANGS.map((l) => [l, { ...strings[l], ...accountStrings[l] }]),
+) as unknown as LangDicts<Record<StringKey, string>>
+
+const translate = createI18n(dicts)
 export type TFunc = (key: StringKey, params?: Params) => string
 
 interface LocaleValue {

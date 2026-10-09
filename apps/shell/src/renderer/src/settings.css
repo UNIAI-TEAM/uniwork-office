@@ -1482,3 +1482,146 @@
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
+
+/* ── Settings → Account: UniWork account ── */
+
+.acct-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 12px 0 8px;
+}
+
+.acct-heading {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.acct-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: var(--surface-subtle);
+}
+
+.acct-card-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--surface);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.acct-card-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.acct-card-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.acct-card-email {
+  font-size: 12px;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.acct-card-sync {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.acct-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle);
+  background: var(--accent-soft);
+  color: var(--text-primary);
+}
+
+.acct-notice.warn {
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
+}
+
+.acct-notice-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.acct-notice-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.acct-notice-body {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.acct-notice-error,
+.acct-inline-error {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--danger);
+}
+
+.acct-dot-spinner {
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  margin-top: 2px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: acct-spin 0.9s linear infinite;
+}
+
+@keyframes acct-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .acct-dot-spinner {
+    animation: none;
+  }
+}
+
+.acct-actions {
+  flex-wrap: wrap;
+  padding-top: 12px;
+}
+
+.acct-actions .set-btn:focus-visible,
+.acct-org-dd .gs-dd-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
