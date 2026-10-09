@@ -266,6 +266,25 @@ describe('save', () => {
   })
 })
 
+describe('menu accelerators', () => {
+  it('mod+S / mod+Shift+S become the save / save-as menu commands; mod+O only when granted', async () => {
+    const { api } = await setup()
+    await api.consumePendingOpen(FIT)
+    const seen: string[] = []
+    api.onMenuCommand((c) => seen.push(c))
+    const press = (key: string, shiftKey = false) => {
+      const e = new KeyboardEvent('keydown', { key, ctrlKey: true, shiftKey, cancelable: true })
+      window.dispatchEvent(e)
+      return e.defaultPrevented
+    }
+    expect(press('s')).toBe(true)
+    expect(press('S', true)).toBe(true)
+    expect(press('o')).toBe(true)
+    expect(press('z')).toBe(false)
+    expect(seen).toEqual(['save', 'save-as'])
+  })
+})
+
 describe('host io', () => {
   it('recents only when granted; comment author from init.user', async () => {
     const off = await setup({ user: 'Lan Anh' })

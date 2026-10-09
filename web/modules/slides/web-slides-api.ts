@@ -19,6 +19,7 @@
  *
  * Typed as the full SlidesApi (no Partial): a new preload method is a build error here.
  */
+import { createBlankPptx } from '@genoffice/pptx-engine'
 import type { AiPanelPrefs } from '@genoffice/ui'
 import { base64ToBytes, bytesToBase64 } from '../../../apps/slides/src/session/bytes'
 import {
@@ -237,7 +238,9 @@ export function createWebSlidesApi(
 
   /** bytes of an OpenPayload -> the client's session; null after a fatal notice */
   async function openPayload(open: OpenPayload, fitWidthPx: number): Promise<OpenResult | null> {
-    const bytes = await readSource(open.source)
+    let bytes = await readSource(open.source)
+    // a new, still empty presentation file: start it as a blank deck bound to that file
+    if (bytes.length === 0) bytes = await createBlankPptx()
     const cfb = cfbKind(bytes)
     if (cfb) {
       fatal(
@@ -441,6 +444,27 @@ export function createWebSlidesApi(
     if (!r.ok && r.error)
       lastSaveError = state.lastFailure ?? { code: 'internal', message: r.error }
   }
+
+  // ------------------------------------------------------------ menu accelerators
+
+  /**
+   * The desktop's File shortcuts are accelerators of the native application menu, which sends
+   * `slides:menu` commands; the web has no such menu, so the frame maps the same keys onto
+   * onMenuCommand (and keeps the browser's own Save page / Open file from firing). Print
+   * (mod+P) and the edit keys are handled by the renderer itself.
+   */
+  function onAccelerator(e: KeyboardEvent): void {
+    if (!(e.ctrlKey || e.metaKey) || e.altKey) return
+    const key = e.key.toLowerCase()
+    const command: MenuCommand | null =
+      key === 's' ? (e.shiftKey ? 'save-as' : 'save') : key === 'o' && !e.shiftKey ? 'open' : null
+    if (!command) return
+    e.preventDefault()
+    if (command === 'open' && ctx.capabilities.open !== true) return
+    if (state.fatal) return
+    menuEvents.emit(command)
+  }
+  if (typeof window !== 'undefined') window.addEventListener('keydown', onAccelerator, true)
 
   // ------------------------------------------------------------ media
 
