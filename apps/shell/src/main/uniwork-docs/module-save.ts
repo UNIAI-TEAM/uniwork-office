@@ -23,14 +23,27 @@ export interface ModuleSaveDeps {
   flushPdfSave(contents: WebContents): Promise<boolean>
 }
 
-/** false when nothing shows the path (or its view is gone): the caller falls back */
-export function createModuleSaveRequester(deps: ModuleSaveDeps): (path: string) => boolean {
-  return (path) => {
+/**
+ * false when nothing shows the path (or its view is gone): the caller falls
+ * back. `onNotWritten` is called when the module says its Save wrote nothing.
+ */
+export function createModuleSaveRequester(
+  deps: ModuleSaveDeps,
+): (path: string, onNotWritten?: () => void) => boolean {
+  return (path, onNotWritten) => {
     const target = deps.targetForPath(path)
     if (!target || target.webContents.isDestroyed()) return false
     const wc = target.webContents
-    // the module reports its own failures through the user-save hook path
-    const ignore = (run: Promise<boolean>): void => void run.catch(() => undefined)
+    // the module reports its own failures through the user-save hook path; the
+    // ones that answer "did not write" also tell the caller, which stops
+    // waiting for a hook that will not come (docs, sheets and slides only send)
+    const ignore = (run: Promise<boolean>): void =>
+      void run.then(
+        (wrote) => {
+          if (!wrote) onNotWritten?.()
+        },
+        () => onNotWritten?.(),
+      )
     switch (target.kind) {
       case 'docs':
         wc.send('menu:command', 'save')

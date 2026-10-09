@@ -10,6 +10,7 @@ import type {
 } from '../src/shared/home-api'
 import type { DeploymentProfile } from '../src/main/uniwork-auth/deployment'
 import {
+  CLOSE_SAVE_WAIT_MS,
   UniworkDocsService,
   type ConflictUi,
   type UnsavedCloseChoice,
@@ -808,7 +809,7 @@ describe('closing a document with changes not in UniWork (A1.4)', () => {
     server.faults.push({ route: 'upload', kind: 'network' })
     await ctx.service.save(path)
     expect(await ctx.service.confirmClose(path)).toBe(false)
-    expect(ctx.ui.chooseUnsavedClose).toHaveBeenCalledWith('Q4 plan.docx')
+    expect(ctx.ui.chooseUnsavedClose).toHaveBeenCalledWith('Q4 plan.docx', 'unsent', 'network')
     vi.mocked(ctx.ui.chooseUnsavedClose).mockResolvedValueOnce('close')
     expect(await ctx.service.confirmClose(path)).toBe(true)
     expect(readFileSync(path, 'utf8')).toBe('v4')
@@ -839,7 +840,148 @@ describe('closing a document with changes not in UniWork (A1.4)', () => {
       return true
     })
     expect(await ctx.service.confirmClose(path)).toBe(true)
-    expect(ctx.deps.requestModuleSave).toHaveBeenCalledWith(path)
+    expect(ctx.deps.requestModuleSave).toHaveBeenCalledWith(path, expect.any(Function))
     expect(binding(path)).toMatchObject({ state: 'saved' })
+  })
+})
+
+describe('review r2 follow-ups', () => {
+  it('R2-1: a clean copy does not need a close prompt; edited, unsent or saving ones do', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    // saved/ready, no intent, bytes equal to the base: nothing to protect
+    expect(ctx.service.needsClosePrompt(path)).toBe(false)
+    expect(ctx.service.needsClosePrompt(path)).toBe(false)
+    // bytes written outside the save hook count, even before a status refresh
+    writeFileSync(path, 'a longer v4 written by something else')
+    expect(ctx.service.needsClosePrompt(path)).toBe(true)
+    // an unsent state with a pending intent
+    server.faults.push({ route: 'upload', kind: 'network' })
+    await ctx.service.save(path)
+    expect(ctx.service.needsClosePrompt(path)).toBe(true)
+    await ctx.service.save(path)
+    expect(binding(path)).toMatchObject({ state: 'saved' })
+    expect(ctx.service.needsClosePrompt(path)).toBe(false)
+    expect(ctx.service.needsClosePrompt(join(dir, 'unbound.docx'))).toBe(false)
+    const viewer = setup(fakeServer({ bytes: enc('v3'), myLevel: 'view' }))
+    const viewPath = await openDoc(viewer)
+    writeFileSync(viewPath, 'x')
+    expect(viewer.service.needsClosePrompt(viewPath)).toBe(false)
+  })
+
+  async function conflicted(opts: Parameters<typeof setup>[1] = {}) {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server, opts)
+    const path = await openDoc(ctx)
+    server.state.revision = 45
+    writeFileSync(path, 'mine')
+    await ctx.service.save(path)
+    expect(binding(path)).toMatchObject({ state: 'conflict' })
+    return { server, ctx, path }
+  }
+
+  it('R2-3: a conflict prompt defaults to the conflict dialog; the close follows only a saved result', async () => {
+    const { server, ctx, path } = await conflicted({ choice: 'overwrite' })
+    vi.mocked(ctx.ui.chooseUnsavedClose).mockResolvedValue('resolve')
+    expect(await ctx.service.confirmClose(path)).toBe(true)
+    expect(ctx.ui.chooseUnsavedClose).toHaveBeenCalledWith('Q4 plan.docx', 'conflict', 'conflict')
+    expect(ctx.ui.chooseConflict).toHaveBeenCalledTimes(1)
+    expect(binding(path)).toMatchObject({ state: 'saved' })
+    expect(new TextDecoder().decode(server.state.bytes)).toBe('mine')
+  })
+
+  it('R2-3: an overwrite that goes through the module Save closes once the hook has saved', async () => {
+    const { ctx, path } = await conflicted({ choice: 'overwrite' })
+    vi.mocked(ctx.ui.chooseUnsavedClose).mockResolvedValue('resolve')
+    vi.mocked(ctx.deps.requestModuleSave).mockImplementation((p: string) => {
+      setTimeout(() => ctx.service.onUserSave(p), 0)
+      return true
+    })
+    expect(await ctx.service.confirmClose(path)).toBe(true)
+    expect(binding(path)).toMatchObject({ state: 'saved' })
+  })
+
+  it('R2-3: deciding later keeps the prompt; Cancel or Close anyway then ends it', async () => {
+    const { ctx, path } = await conflicted({ choice: 'later' })
+    vi.mocked(ctx.ui.chooseUnsavedClose)
+      .mockResolvedValueOnce('resolve')
+      .mockResolvedValueOnce('cancel')
+    expect(await ctx.service.confirmClose(path)).toBe(false)
+    expect(ctx.ui.chooseUnsavedClose).toHaveBeenCalledTimes(2)
+    vi.mocked(ctx.ui.chooseUnsavedClose)
+      .mockResolvedValueOnce('resolve')
+      .mockResolvedValueOnce('close')
+    expect(await ctx.service.confirmClose(path)).toBe(true)
+    expect(binding(path)).toMatchObject({ state: 'conflict' })
+    expect(readFileSync(path, 'utf8')).toBe('mine')
+  })
+
+  it('R2-3: a blocked document has no Save: the prompt carries the reason and a stray save keeps it open', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server, { closeChoice: 'save' })
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'v4')
+    server.faults.push({ route: 'commit', kind: 410, code: 'document_deleted' })
+    server.faults.push({ route: 'detail', kind: 410, code: 'document_deleted' })
+    await ctx.service.save(path)
+    expect(binding(path)).toMatchObject({ state: 'blocked', error: 'deleted' })
+    vi.mocked(ctx.deps.requestModuleSave).mockClear()
+    expect(await ctx.service.confirmClose(path)).toBe(false)
+    expect(ctx.ui.chooseUnsavedClose).toHaveBeenCalledWith('Q4 plan.docx', 'blocked', 'deleted')
+    expect(ctx.deps.requestModuleSave).not.toHaveBeenCalled()
+    vi.mocked(ctx.ui.chooseUnsavedClose).mockResolvedValueOnce('close')
+    expect(await ctx.service.confirmClose(path)).toBe(true)
+  })
+
+  it('R2-4: a module that reports "did not write" ends the close wait at once and shows the chip state', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server, { closeChoice: 'save' })
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'v4')
+    await ctx.service.refreshPath(path)
+    vi.mocked(ctx.deps.requestModuleSave).mockImplementation(
+      (_p: string, onNotWritten?: () => void) => {
+        setTimeout(() => onNotWritten?.(), 0)
+        return true
+      },
+    )
+    const before = ctx.statuses.length
+    expect(await ctx.service.confirmClose(path)).toBe(false)
+    expect(ctx.statuses.length).toBeGreaterThan(before)
+    expect(ctx.statuses.at(-1)).toMatchObject({ path, state: 'dirty' })
+  })
+
+  it('R2-4: a module that never reaches the hook is waited for 30 s at most', async () => {
+    vi.useFakeTimers()
+    try {
+      const server = fakeServer({ bytes: enc('v3') })
+      const ctx = setup(server, { closeChoice: 'save' })
+      const path = await openDoc(ctx)
+      writeFileSync(path, 'v4')
+      await ctx.service.refreshPath(path)
+      vi.mocked(ctx.deps.requestModuleSave).mockReturnValue(true)
+      let outcome: boolean | undefined
+      void ctx.service.confirmClose(path).then((v) => (outcome = v))
+      await vi.advanceTimersByTimeAsync(CLOSE_SAVE_WAIT_MS - 1_000)
+      expect(outcome).toBeUndefined()
+      await vi.advanceTimersByTimeAsync(2_000)
+      expect(outcome).toBe(false)
+      expect(CLOSE_SAVE_WAIT_MS).toBeLessThanOrEqual(30_000)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('R2-5: the owner is recorded when the session identity changes, without any document call', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const first = setup(server)
+    const path = await openDoc(first)
+    // another account signs in on a fresh service and never touches a document
+    const second = setup(server, { account: 'acc_2' })
+    second.service.noteSessionIdentity()
+    second.signOut()
+    expect(second.service.isReadOnly(path)).toBe(true)
+    expect(await second.service.docStatus(path)).toBeNull()
   })
 })

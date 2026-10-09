@@ -1,9 +1,11 @@
+import { readFileSync, statSync } from 'node:fs'
 import { copyFile, readFile } from 'node:fs/promises'
 import { extname, join } from 'node:path'
 import type {
   RecentUniworkSource,
   UniworkConflictChoice,
   UniworkDocAccess,
+  UniworkDocErrorCode,
   UniworkDocFormat,
   UniworkDocListPage,
   UniworkDocListQuery,
@@ -45,11 +47,19 @@ export interface ConflictUi {
   showOpenLatestFailed(): void
   /** the "Save a copy on this computer" file could not be written */
   showCopyFailed(): void
-  /** closing a document whose local changes are not in UniWork yet */
-  chooseUnsavedClose(title: string): Promise<UnsavedCloseChoice>
+  /** closing a document whose local changes are not in UniWork yet; `reason` is the binding's error */
+  chooseUnsavedClose(
+    title: string,
+    kind: UnsavedCloseKind,
+    reason?: UniworkDocErrorCode,
+  ): Promise<UnsavedCloseChoice>
 }
 
-export type UnsavedCloseChoice = 'save' | 'close' | 'cancel'
+/** which close prompt: Save to UniWork, the conflict dialog, or the reason a save is not possible */
+export type UnsavedCloseKind = 'unsent' | 'conflict' | 'blocked'
+
+/** 'save' (unsent) and 'resolve' (conflict) are each kind's default button */
+export type UnsavedCloseChoice = 'save' | 'resolve' | 'close' | 'cancel'
 
 export interface UniworkDocsServiceDeps {
   userDataDir: string
@@ -62,8 +72,12 @@ export interface UniworkDocsServiceDeps {
   openPath(path: string): boolean
   /** a tab or detached window shows this path */
   isPathOpen(path: string): boolean
-  /** runs the owning tab's module Save; false when no tab shows the path */
-  requestModuleSave(path: string): boolean
+  /**
+   * Runs the owning tab's module Save; false when no tab shows the path.
+   * `onNotWritten` is called when the module reports that it did not write
+   * (so no user-save hook will follow); modules that cannot tell never call it.
+   */
+  requestModuleSave(path: string, onNotWritten?: () => void): boolean
   /** remounts the tab showing the path so it re-reads the file */
   reloadPath(path: string): void
   activePath(): string | undefined
@@ -97,8 +111,13 @@ const UNSENT_STATES: ReadonlySet<string> = new Set([
   'conflict',
 ])
 
-/** how long a close waits for a Save to UniWork to settle before the tab stays open */
-export const CLOSE_SAVE_WAIT_MS = 180_000
+/**
+ * How long a close waits for a Save to UniWork to settle before the tab stays
+ * open. A module that reports "did not write" ends the wait at once; this cap
+ * covers the modules that cannot tell (docs, sheets, slides) and a save that
+ * never reaches the user-save hook.
+ */
+export const CLOSE_SAVE_WAIT_MS = 30_000
 
 async function result<T>(run: () => Promise<T>): Promise<UniworkResult<T>> {
   try {
@@ -121,6 +140,8 @@ export class UniworkDocsService {
   private clientOrigin: string | null = null
   private lastOwner: LastOwner | null
   private readonly statusListeners = new Set<(status: UniworkDocStatus) => void>()
+  /** path -> checksum of the file as of its mtime/size (the sync close check) */
+  private readonly hashMemo = new Map<string, { mtimeMs: number; size: number; checksum: string }>()
 
   constructor(deps: UniworkDocsServiceDeps) {
     this.deps = deps
@@ -193,6 +214,11 @@ export class UniworkDocsService {
       void this.store.writeLastOwner(owner).catch(() => undefined)
     }
     return identity
+  }
+
+  /** the session's account may have changed: remember it as the last owner */
+  noteSessionIdentity(): void {
+    this.liveIdentity()
   }
 
   /** the binding belongs to the signed-in account and the active deployment */
@@ -356,56 +382,153 @@ export class UniworkDocsService {
   }
 
   /**
-   * Closing (or quitting) a bound document whose local bytes are not in
-   * UniWork: one native prompt. "Save to UniWork" runs the normal Save and
-   * allows the close only once it reaches `saved`; "Close anyway" closes (the
-   * copy stays on this computer); "Cancel" keeps it open. True = may close.
+   * Synchronous: would closing `path` show the prompt? An editable copy of ours
+   * that is not in `ready`/`saved`, has a pending intent or is saving, or whose
+   * file no longer matches the base. A clean copy is false, so a window with
+   * only clean documents closes without a prompt chain (see
+   * installShellCloseGuard). Hashing is memoized by mtime and size.
    */
-  async confirmClose(path: string): Promise<boolean> {
-    let doc = this.store.lookup(path)
-    if (!doc || doc.binding.access !== 'edit' || !this.ownsLocally(doc)) return true
-    // a Save from the module's own close prompt may still be uploading
-    if (this.coordinator.isSaving(doc.path)) {
-      await this.coordinator.settled(doc.path)
-      doc = this.store.lookup(path)
-      if (!doc) return true
-    }
-    doc = await this.refreshDirty(doc)
+  needsClosePrompt(path: string): boolean {
+    const doc = this.store.lookup(path)
+    if (!doc || doc.binding.access !== 'edit' || !this.ownsLocally(doc)) return false
     const b = doc.binding
-    if (!b.pendingIntent && !UNSENT_STATES.has(b.state)) return true
-    const choice = await this.deps.ui.chooseUnsavedClose(b.title)
-    if (choice === 'close') return true
-    if (choice !== 'save') return false
-    const latest = this.store.lookup(path)
-    if (!latest || !this.canSave(latest)) return false
-    const settled = this.waitForSettle(latest.path, CLOSE_SAVE_WAIT_MS)
-    if (!this.deps.requestModuleSave(latest.path)) void this.coordinator.save(latest.path)
-    return (await settled)?.state === 'saved'
+    if (b.pendingIntent || this.coordinator.isSaving(doc.path)) return true
+    if (b.state !== 'ready' && b.state !== 'saved') return true
+    try {
+      const { mtimeMs, size } = statSync(doc.path)
+      const memo = this.hashMemo.get(doc.path)
+      if (memo && memo.mtimeMs === mtimeMs && memo.size === size) {
+        return memo.checksum !== b.baseChecksum
+      }
+      const checksum = sha256Hex(new Uint8Array(readFileSync(doc.path)))
+      this.hashMemo.set(doc.path, { mtimeMs, size, checksum })
+      return checksum !== b.baseChecksum
+    } catch {
+      return false
+    }
   }
 
-  /** the next status of `path` that is not `saving` (null on timeout) */
-  private waitForSettle(path: string, timeoutMs: number): Promise<UniworkDocStatus | null> {
-    return new Promise((resolveWait) => {
+  /**
+   * Closing (or quitting) a bound document whose local bytes are not in
+   * UniWork: one native prompt. "Save to UniWork" runs the normal Save and
+   * allows the close only once it reaches `saved`; in a conflict the default
+   * button opens the conflict dialog (as the chip's "Resolve...") and the
+   * close goes ahead only if that ends in `saved`; a blocked document has no
+   * Save, only its reason. "Close anyway" closes (the copy stays on this
+   * computer); "Cancel" keeps it open. True = may close.
+   */
+  async confirmClose(path: string): Promise<boolean> {
+    for (;;) {
+      let doc = this.store.lookup(path)
+      if (!doc || doc.binding.access !== 'edit' || !this.ownsLocally(doc)) return true
+      // a Save from the module's own close prompt may still be uploading
+      if (this.coordinator.isSaving(doc.path)) {
+        await this.coordinator.settled(doc.path)
+        doc = this.store.lookup(path)
+        if (!doc) return true
+      }
+      doc = await this.refreshDirty(doc)
+      const b = doc.binding
+      if (!b.pendingIntent && !UNSENT_STATES.has(b.state)) return true
+      const kind: UnsavedCloseKind =
+        b.state === 'conflict'
+          ? 'conflict'
+          : b.state === 'blocked' && b.error !== 'quota_exceeded'
+            ? 'blocked'
+            : 'unsent'
+      const choice = await this.deps.ui.chooseUnsavedClose(b.title, kind, b.error)
+      if (choice === 'close') return true
+      if (kind === 'unsent' && choice === 'save') return this.saveForClose(path)
+      if (kind === 'conflict' && choice === 'resolve') {
+        const outcome = await this.resolveForClose(path)
+        if (outcome === 'again') continue
+        return outcome === 'closed'
+      }
+      return false
+    }
+  }
+
+  /** "Save to UniWork" from the close prompt: true only once the save reached `saved` */
+  private async saveForClose(path: string): Promise<boolean> {
+    const latest = this.store.lookup(path)
+    if (!latest || !this.canSave(latest)) return this.keepOpen(path)
+    const wait = this.waitForSettle(latest.path, CLOSE_SAVE_WAIT_MS)
+    const notWritten = () => {
+      if (!this.coordinator.isSaving(latest.path)) wait.cancel()
+    }
+    if (!this.deps.requestModuleSave(latest.path, notWritten)) {
+      void this.coordinator.save(latest.path)
+    }
+    return (await wait.promise)?.state === 'saved' ? true : this.keepOpen(path)
+  }
+
+  /**
+   * The conflict dialog from the close prompt. 'closed' = the resolution ended
+   * in `saved`; 'again' = still in conflict (decide later, a copy, a cancelled
+   * discard), so the prompt comes back; 'kept' = anything else (the tab stays).
+   */
+  private async resolveForClose(path: string): Promise<'closed' | 'again' | 'kept'> {
+    // an overwrite saves in the background: dirty and saving are not the end of it
+    const wait = this.waitForSettle(path, CLOSE_SAVE_WAIT_MS, new Set(['saving', 'dirty']))
+    const notWritten = () => {
+      if (!this.coordinator.isSaving(path)) wait.cancel()
+    }
+    await this.resolveConflict(path, notWritten)
+    const after = this.store.lookup(path)
+    if (!after || after.binding.state === 'saved') {
+      wait.cancel()
+      return 'closed'
+    }
+    if (after.binding.state === 'conflict') {
+      wait.cancel()
+      return 'again'
+    }
+    const status = await wait.promise
+    if (status?.state === 'saved') return 'closed'
+    if (status?.state === 'conflict') return 'again'
+    this.keepOpen(path)
+    return 'kept'
+  }
+
+  /** the tab stays open: publish its state so the chip says why */
+  private keepOpen(path: string): false {
+    const doc = this.store.lookup(path)
+    if (doc) this.publish(toStatus(doc))
+    return false
+  }
+
+  /**
+   * The next status of `path` whose state is not in `ignore` (default: not
+   * `saving`); null on timeout or `cancel()`.
+   */
+  private waitForSettle(
+    path: string,
+    timeoutMs: number,
+    ignore: ReadonlySet<string> = new Set(['saving']),
+  ): { promise: Promise<UniworkDocStatus | null>; cancel: () => void } {
+    let finish: (status: UniworkDocStatus | null) => void = () => undefined
+    const promise = new Promise<UniworkDocStatus | null>((resolveWait) => {
       const listener = (status: UniworkDocStatus) => {
-        if (status.path === path && status.state !== 'saving') finish(status)
+        if (status.path === path && !ignore.has(status.state)) finish(status)
       }
       const timer = setTimeout(() => finish(null), timeoutMs)
       ;(timer as { unref?: () => void }).unref?.()
-      const finish = (status: UniworkDocStatus | null) => {
+      finish = (status) => {
         clearTimeout(timer)
         this.statusListeners.delete(listener)
         resolveWait(status)
       }
       this.statusListeners.add(listener)
     })
+    return { promise, cancel: () => finish(null) }
   }
 
-  async resolveConflict(path: string): Promise<UniworkDocStatus | null> {
+  async resolveConflict(path: string, onNotWritten?: () => void): Promise<UniworkDocStatus | null> {
     const doc = typeof path === 'string' ? this.store.lookup(path) : null
     if (!doc || !this.ownsLocally(doc)) return null
     if (doc.binding.state !== 'conflict') return toStatus(doc)
     const choice = await this.deps.ui.chooseConflict(doc.binding.title)
-    if (choice === 'overwrite') return this.overwrite(doc)
+    if (choice === 'overwrite') return this.overwrite(doc, onNotWritten)
     if (choice === 'save-local-copy') {
       const titleExt = extname(doc.binding.title)
       const stem =
@@ -453,7 +576,10 @@ export class UniworkDocsService {
   // ---- flows -----------------------------------------------------------------
 
   /** "Save my version as the newest version": a new intent on the server's revision */
-  private async overwrite(doc: BoundDocument): Promise<UniworkDocStatus | null> {
+  private async overwrite(
+    doc: BoundDocument,
+    onNotWritten?: () => void,
+  ): Promise<UniworkDocStatus | null> {
     let serverRevision = doc.binding.serverRevision
     if (!serverRevision) {
       try {
@@ -475,7 +601,7 @@ export class UniworkDocsService {
     delete next.serverRevision
     delete next.pendingIntent
     const ready = await this.coordinator.commitState(doc, next)
-    if (this.deps.requestModuleSave(ready.path)) return toStatus(ready)
+    if (this.deps.requestModuleSave(ready.path, onNotWritten)) return toStatus(ready)
     const saved = await this.coordinator.save(ready.path)
     return saved ? toStatus(saved) : toStatus(ready)
   }

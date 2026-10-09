@@ -92,6 +92,40 @@ describe('UniWork chip Retry / conflict overwrite run the owning module Save', (
     await Promise.resolve()
   })
 
+  it('md/html/pdf tell the caller when the module did not write; docs/sheets/slides cannot (R2-4)', async () => {
+    for (const [kind, mock] of [
+      ['markdown', 'requestMarkdownSave'],
+      ['html', 'requestHtmlSave'],
+      ['pdf', 'flushPdfSave'],
+    ] as const) {
+      const { deps, save } = setup(kind)
+      const notWritten = vi.fn()
+      deps[mock].mockResolvedValue(false)
+      expect(save('/w/x', notWritten)).toBe(true)
+      await new Promise((r) => setTimeout(r, 0))
+      expect(notWritten).toHaveBeenCalledTimes(1)
+
+      const wrote = vi.fn()
+      deps[mock].mockResolvedValue(true)
+      save('/w/x', wrote)
+      await new Promise((r) => setTimeout(r, 0))
+      expect(wrote).not.toHaveBeenCalled()
+
+      const rejected = vi.fn()
+      deps[mock].mockRejectedValue(new Error('boom'))
+      save('/w/x', rejected)
+      await new Promise((r) => setTimeout(r, 0))
+      expect(rejected).toHaveBeenCalledTimes(1)
+    }
+    for (const kind of ['docs', 'sheets', 'slides'] as TabKind[]) {
+      const { save } = setup(kind)
+      const notWritten = vi.fn()
+      expect(save('/w/x', notWritten)).toBe(true)
+      await new Promise((r) => setTimeout(r, 0))
+      expect(notWritten).not.toHaveBeenCalled()
+    }
+  })
+
   it('is wired into the shell for every service Save path', () => {
     const source = readFileSync(join(__dirname, '../src/main/index.ts'), 'utf8')
     expect(source).toMatch(/requestModuleSave: requestUniworkModuleSave,/)

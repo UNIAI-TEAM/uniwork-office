@@ -408,7 +408,7 @@ describe('cold-start launch events are not lost before the renderer listens', ()
     expect(sent).toHaveLength(2)
   })
 
-  it('the preload hands an event that found no subscriber to the first one, once', () => {
+  it('a live event supersedes the held one, so a later subscriber gets nothing stale', () => {
     const replay = createLaunchReplay<UniworkLaunchEvent>(() => 1_000)
     replay.deliver({ phase: 'needs-sign-in' })
     const first: UniworkLaunchEvent[] = []
@@ -420,6 +420,42 @@ describe('cold-start launch events are not lost before the renderer listens', ()
     const second: UniworkLaunchEvent[] = []
     replay.subscribe((e) => second.push(e))
     expect(second).toEqual([])
+  })
+
+  it('every subscriber within the window gets the held cold-start event, in either order (R2-2)', () => {
+    const replay = createLaunchReplay<UniworkLaunchEvent>(() => 1_000)
+    replay.deliver({ phase: 'opening' })
+    const notice: UniworkLaunchEvent[] = []
+    const home: UniworkLaunchEvent[] = []
+    replay.subscribe((e) => home.push(e))
+    replay.subscribe((e) => notice.push(e))
+    expect(home).toEqual([{ phase: 'opening' }])
+    expect(notice).toEqual([{ phase: 'opening' }])
+    // the other order
+    const swapped = createLaunchReplay<UniworkLaunchEvent>(() => 1_000)
+    swapped.deliver({ phase: 'needs-sign-in' })
+    const a: UniworkLaunchEvent[] = []
+    const b: UniworkLaunchEvent[] = []
+    swapped.subscribe((e) => a.push(e))
+    swapped.subscribe((e) => b.push(e))
+    expect(a).toEqual([{ phase: 'needs-sign-in' }])
+    expect(b).toEqual([{ phase: 'needs-sign-in' }])
+  })
+
+  it('the held event expires for every subscriber after the window (R2-2)', () => {
+    let now = 1_000
+    const replay = createLaunchReplay<UniworkLaunchEvent>(() => now)
+    replay.deliver({ phase: 'opening' })
+    const early: UniworkLaunchEvent[] = []
+    replay.subscribe((e) => early.push(e))
+    now += LAUNCH_REPLAY_MS + 1
+    const late: UniworkLaunchEvent[] = []
+    replay.subscribe((e) => late.push(e))
+    expect(early).toHaveLength(1)
+    expect(late).toEqual([])
+    const again: UniworkLaunchEvent[] = []
+    replay.subscribe((e) => again.push(e))
+    expect(again).toEqual([])
   })
 
   it('a held event older than the ticket lifetime is not replayed', () => {

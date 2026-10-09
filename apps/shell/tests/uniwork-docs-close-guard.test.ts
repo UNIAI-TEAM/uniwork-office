@@ -3,6 +3,7 @@ import {
   confirmUniworkClose,
   isUniworkCloseGuarded,
   setUniworkCloseGuard,
+  uniworkNeedsClosePrompt,
 } from '../src/main/uniwork-docs/close-guard'
 
 /**
@@ -68,18 +69,30 @@ describe('UniWork close guard seam', () => {
   it('unbound paths and no guard close as before', async () => {
     expect(await confirmUniworkClose('/x/plain.docx')).toBe(true)
     const confirmClose = vi.fn(async () => false)
-    setUniworkCloseGuard({ isCloseGuarded: (p) => p.startsWith('/uw/'), confirmClose })
+    setUniworkCloseGuard({
+      isCloseGuarded: (p) => p.startsWith('/uw/'),
+      needsClosePrompt: (p) => p === '/uw/dirty.docx',
+      confirmClose,
+    })
     expect(isUniworkCloseGuarded('/x/plain.docx')).toBe(false)
     expect(await confirmUniworkClose('/x/plain.docx')).toBe(true)
     expect(await confirmUniworkClose(undefined)).toBe(true)
     expect(confirmClose).not.toHaveBeenCalled()
     expect(await confirmUniworkClose('/uw/a.docx')).toBe(false)
+    // a clean bound copy is guarded for a tab close but needs no prompt (R2-1)
+    expect(isUniworkCloseGuarded('/uw/a.docx')).toBe(true)
+    expect(uniworkNeedsClosePrompt('/uw/a.docx')).toBe(false)
+    expect(uniworkNeedsClosePrompt('/uw/dirty.docx')).toBe(true)
+    expect(uniworkNeedsClosePrompt('/x/plain.docx')).toBe(false)
+    expect(uniworkNeedsClosePrompt(undefined)).toBe(false)
+    setUniworkCloseGuard(null)
+    expect(uniworkNeedsClosePrompt('/uw/dirty.docx')).toBe(false)
   })
 
   it('quit: a refused UniWork prompt keeps the window open and shows that tab', async () => {
     const { installShellCloseGuard } = await import('../src/main/window-close-guard')
     const confirmClose = vi.fn(async (path: string) => path !== '/uw/b.docx')
-    setUniworkCloseGuard({ isCloseGuarded: () => true, confirmClose })
+    setUniworkCloseGuard({ isCloseGuarded: () => true, needsClosePrompt: () => true, confirmClose })
     const win = new FakeWindow()
     const manager = fakeManager([
       { id: 't1', path: '/uw/a.docx' },
@@ -95,7 +108,11 @@ describe('UniWork close guard seam', () => {
 
   it('quit: every UniWork prompt accepted closes the window', async () => {
     const { installShellCloseGuard } = await import('../src/main/window-close-guard')
-    setUniworkCloseGuard({ isCloseGuarded: () => true, confirmClose: async () => true })
+    setUniworkCloseGuard({
+      isCloseGuarded: () => true,
+      needsClosePrompt: () => true,
+      confirmClose: async () => true,
+    })
     const win = new FakeWindow()
     installShellCloseGuard(win as never, fakeManager([{ id: 't1', path: '/uw/a.docx' }]) as never)
     win.requestClose()

@@ -2,7 +2,11 @@ import { basename } from 'node:path'
 import { realpathSync } from 'node:fs'
 import { BrowserWindow } from 'electron'
 import type { Rectangle, WebContents, WebContentsView } from 'electron'
-import { confirmUniworkClose, isUniworkCloseGuarded } from './uniwork-docs/close-guard'
+import {
+  confirmUniworkClose,
+  isUniworkCloseGuarded,
+  uniworkNeedsClosePrompt,
+} from './uniwork-docs/close-guard'
 
 import {
   createDocsView,
@@ -745,10 +749,14 @@ export class TabManager {
     this.removeTab(id)
   }
 
-  /** tabs showing an editable UniWork copy of ours (shell-close guard) */
+  /**
+   * tabs showing an editable UniWork copy of ours whose close would show the
+   * UniWork prompt (shell-close guard); clean copies are not listed, so a
+   * window with only clean documents keeps the "nothing to protect" path
+   */
   uniworkGuardedTabs(): Array<{ id: string; path: string }> {
     return this.tabs
-      .filter((t) => t.view && !t.present && isUniworkCloseGuarded(t.filePath))
+      .filter((t) => t.view && !t.present && uniworkNeedsClosePrompt(t.filePath))
       .map((t) => ({ id: t.id, path: t.filePath as string }))
   }
 

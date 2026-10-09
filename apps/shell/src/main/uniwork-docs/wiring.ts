@@ -15,7 +15,12 @@ import {
 } from '../uniwork-auth'
 import { setUniworkCloseGuard } from './close-guard'
 import { createLaunchPusher } from './launch'
-import { UniworkDocsService, type ConflictUi, type UnsavedCloseChoice } from './service'
+import {
+  UniworkDocsService,
+  type ConflictUi,
+  type UnsavedCloseChoice,
+  type UnsavedCloseKind,
+} from './service'
 import { tUniworkDocs } from './strings'
 
 /**
@@ -31,7 +36,7 @@ export interface UniworkDocsWiring {
   shellContents(): WebContents | null
   openPath(path: string): boolean
   isPathOpen(path: string): boolean
-  requestModuleSave(path: string): boolean
+  requestModuleSave(path: string, onNotWritten?: () => void): boolean
   reloadPath(path: string): void
   activePath(): string | undefined
   reveal(): void
@@ -103,28 +108,52 @@ function conflictUi(wiring: UniworkDocsWiring): ConflictUi {
     showCopyFailed() {
       void box({ type: 'error', message: t('copyFailed'), buttons: ['OK'], noLink: true })
     },
-    async chooseUnsavedClose(title) {
+    async chooseUnsavedClose(title, kind, reason) {
       // over whichever window is closing (a detached editor or the shell)
       const focused = BrowserWindow.getFocusedWindow()
+      const choices = CLOSE_CHOICES[kind]
+      const labels = {
+        save: t('closeSave'),
+        resolve: t('closeResolve'),
+        close: t('closeAnyway'),
+        cancel: t('closeCancel'),
+      }
       const options: Electron.MessageBoxOptions = {
         type: 'warning',
         title,
         message: t('closeMessage'),
-        detail: t('closeDetail'),
-        buttons: [t('closeSave'), t('closeAnyway'), t('closeCancel')],
-        defaultId: 0,
-        cancelId: 2,
+        detail:
+          kind === 'conflict'
+            ? t('closeConflictDetail')
+            : kind === 'blocked'
+              ? t(blockedReasonKey(reason))
+              : t('closeDetail'),
+        buttons: choices.map((choice) => labels[choice]),
+        // a blocked document has no Save: the safe default is to keep it open
+        defaultId: kind === 'blocked' ? choices.indexOf('cancel') : 0,
+        cancelId: choices.indexOf('cancel'),
         noLink: true,
       }
       const { response } = focused
         ? await dialog.showMessageBox(focused, options)
         : await box(options)
-      return CLOSE_CHOICES[response] ?? 'cancel'
+      return choices[response] ?? 'cancel'
     },
   }
 }
 
-const CLOSE_CHOICES: readonly UnsavedCloseChoice[] = ['save', 'close', 'cancel']
+/** the buttons of each close prompt, in order; the first is the default (except blocked) */
+const CLOSE_CHOICES: Record<UnsavedCloseKind, readonly UnsavedCloseChoice[]> = {
+  unsent: ['save', 'close', 'cancel'],
+  conflict: ['resolve', 'close', 'cancel'],
+  blocked: ['close', 'cancel'],
+}
+
+function blockedReasonKey(reason: string | undefined): Parameters<typeof tUniworkDocs>[1] {
+  if (reason === 'not_found') return 'closeBlockedNotFound'
+  if (reason === 'deleted') return 'closeBlockedDeleted'
+  return 'closeBlockedOther'
+}
 
 export interface UniworkDocsHandle {
   service: UniworkDocsService
@@ -149,7 +178,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     authorized: (call) => authorizedRequest(call),
     openPath: (path) => wiring.openPath(path),
     isPathOpen: (path) => wiring.isPathOpen(path),
-    requestModuleSave: (path) => wiring.requestModuleSave(path),
+    requestModuleSave: (path, onNotWritten) => wiring.requestModuleSave(path, onNotWritten),
     reloadPath: (path) => wiring.reloadPath(path),
     activePath: () => wiring.activePath(),
     ui: conflictUi(wiring),
@@ -180,6 +209,8 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     activate(startLaunch) {
       let signedIn = uniworkAccount().status().state === 'signed-in'
       onUniworkAccountStatus((status) => {
+        // the session's account may have changed: it becomes the last owner
+        service.noteSessionIdentity()
         const now = status.state === 'signed-in'
         if (now && !signedIn) void service.launch.onSignedIn()
         signedIn = now

@@ -28,6 +28,15 @@ const en = {
   closeSave: 'Save to UniWork',
   closeAnyway: 'Close anyway',
   closeCancel: 'Cancel',
+  closeResolve: 'Resolve…',
+  closeConflictDetail:
+    'This document changed in UniWork after you opened it. Resolve it to save your version, or close and keep it on this computer.',
+  closeBlockedNotFound:
+    'The document can’t be found in UniWork, so your changes can’t be saved there. They stay on this computer.',
+  closeBlockedDeleted:
+    'The document was deleted in UniWork, so your changes can’t be saved there. They stay on this computer.',
+  closeBlockedOther:
+    'UniWork isn’t accepting this document right now, so your changes can’t be saved there. They stay on this computer.',
 }
 
 type Key = keyof typeof en
@@ -57,6 +66,15 @@ const vi = {
   closeSave: 'Lưu lên UniWork',
   closeAnyway: 'Vẫn đóng',
   closeCancel: 'Hủy',
+  closeResolve: 'Giải quyết…',
+  closeConflictDetail:
+    'Tài liệu đã thay đổi trên UniWork sau khi bạn mở. Hãy giải quyết để lưu phiên bản của bạn, hoặc đóng và giữ nó trên máy này.',
+  closeBlockedNotFound:
+    'Không tìm thấy tài liệu trên UniWork nên không thể lưu thay đổi lên đó. Các thay đổi vẫn còn trên máy này.',
+  closeBlockedDeleted:
+    'Tài liệu đã bị xóa trên UniWork nên không thể lưu thay đổi lên đó. Các thay đổi vẫn còn trên máy này.',
+  closeBlockedOther:
+    'UniWork hiện không nhận tài liệu này nên không thể lưu thay đổi lên đó. Các thay đổi vẫn còn trên máy này.',
 } satisfies Record<Key, string>
 
 export const UNIWORK_DOC_STRINGS = { en, vi } as const
