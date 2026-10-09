@@ -51,7 +51,7 @@ import fileVideoIcon from '../assets/file-video.png'
 import fileVoiceIcon from '../assets/file-voice.png'
 import fileDocumentIcon from '../assets/file-document.png'
 import fileGeneralIcon from '../assets/file-general.png'
-import { IconNewChat, IconSidebarCollapse } from '../components/icons'
+import { IconGear, IconNewChat, IconSidebarCollapse } from '../components/icons'
 import { cap } from '../capabilities'
 
 interface ToolActivity {
@@ -1277,6 +1277,16 @@ export function AiPanel({
               aria-label={t('aiNewChatTitle')}
             >
               <IconNewChat size={16} />
+            </button>
+          )}
+          {cap('aiCredentials') && window.desktop.openAiSettings && (
+            <button
+              className="ai-header-btn"
+              onClick={() => void window.desktop.openAiSettings?.()}
+              data-tip={t('appAiSettings')}
+              aria-label={t('appAiSettings')}
+            >
+              <IconGear size={15} />
             </button>
           )}
           {onCollapse && (

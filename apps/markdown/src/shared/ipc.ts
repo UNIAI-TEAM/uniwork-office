@@ -205,6 +205,8 @@ export interface MarkdownApi {
   resolveAssetUrl?(src: string): string | null
   /** Web frame only: the authored path of a display URL from resolveAssetUrl; null otherwise */
   unresolveAssetUrl?(url: string): string | null
+  /** Web frame only (absent on desktop): the in-frame AI settings (keys stored in UniWork) */
+  openAiSettings?(): Promise<void>
   /** Genspark cloud image generation (markdown-owned channel, gsk login required) */
   aiGenerateImage(op: { prompt: string; aspectRatio?: string }): Promise<{
     url?: string
