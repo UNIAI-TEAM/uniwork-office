@@ -8,6 +8,8 @@
 // /office-frame/<module>/<version|latest>/... (GO-B4/B5/B6) serves dist-web/<module>/<version>/ (latest = the
 // newest build with a manifest.json) with that build's own headers.json, the URL layout of the UniWork host. The
 // test host picks the frame through it: /test-host/?module=pdf.
+// /api/v1/office-frame/documents/<id>/ai/... are the fake frame-token AI routes (./fake-ai.mjs, CONTRACT C16),
+// driven by the e2e through /__fake-ai/*.
 // COMPRESS=gzip     gzip text/font responses (what a real host does), so measured transfer sizes are realistic.
 // When the build dir has headers.json (written by `build:web`) its response headers are applied, so the
 // Content-Security-Policy under test is the exact header the host will send (no <meta> CSP).
@@ -17,6 +19,7 @@ import { readFile, stat } from 'node:fs/promises'
 import zlib from 'node:zlib'
 import { dirname, extname, join, normalize, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { handleFakeAi, handleFakeAiControl } from './fake-ai.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(here, '../..')
@@ -180,6 +183,9 @@ function safeJoin(base, rel) {
 
 const server = createServer(async (req, res) => {
   try {
+    const aiPath = new URL(req.url ?? '/', 'http://x').pathname
+    if (await handleFakeAiControl(req, res, aiPath)) return
+    if (await handleFakeAi(req, res, aiPath)) return
     if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, 'method not allowed')
     const pathname = decodeURIComponent(new URL(req.url ?? '/', 'http://x').pathname)
 
