@@ -1576,5 +1576,6 @@ export const fr = {
   appVisualFlipV: 'Retourner verticalement',
   appVisualFlipH: 'Retourner horizontalement',
   appCtxPasteVisual: "Coller l'image ou la forme",
-  appAutoSaveUniworkOff: 'AutoSave is off for UniWork documents. Use Save to save a new version.',
+  appAutoSaveUniworkOff:
+    'L’enregistrement automatique est désactivé pour les documents UniWork. Utilisez Enregistrer pour enregistrer une nouvelle version.',
 } satisfies Record<keyof typeof zh, string>

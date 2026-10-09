@@ -39,7 +39,7 @@ export const pl = {
   ribbonAutoSave: 'Autozapis',
   ribbonAutoSaveTip: 'Po włączeniu zapisuje plik co 30 sekund',
   ribbonAutoSaveUniworkTip:
-    'AutoSave is off for UniWork documents. Use Save to save a new version.',
+    'Autozapis jest wyłączony dla dokumentów UniWork. Użyj opcji Zapisz, aby zapisać nową wersję.',
   ribbonUndo: 'Cofnij',
   ribbonRedo: 'Ponów',
   ribbonGroupClipboard: 'Schowek',

@@ -209,7 +209,8 @@ export const fr = {
   appFootnotePlaceholder: 'Texte de la note de bas de page…',
   appEndnotePlaceholder: 'Texte de la note de fin…',
   appAutoSave: 'Enregistrement automatique',
-  appAutoSaveUniworkTip: 'AutoSave is off for UniWork documents. Use Save to save a new version.',
+  appAutoSaveUniworkTip:
+    'L’enregistrement automatique est désactivé pour les documents UniWork. Utilisez Enregistrer pour enregistrer une nouvelle version.',
   appAutoSaveTip:
     'Enregistrement automatique (toutes les 30 secondes et lorsque la fenêtre perd le focus)',
   appSaveShortcutTip: 'Enregistrer (⌘S)',

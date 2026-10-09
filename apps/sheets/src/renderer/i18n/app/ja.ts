@@ -1556,5 +1556,6 @@ export const ja = {
   appVisualFlipV: '上下反転',
   appVisualFlipH: '左右反転',
   appCtxPasteVisual: '図または図形を貼り付け',
-  appAutoSaveUniworkOff: 'AutoSave is off for UniWork documents. Use Save to save a new version.',
+  appAutoSaveUniworkOff:
+    'UniWork のドキュメントでは自動保存はオフです。新しいバージョンを保存するには「保存」を使ってください。',
 } satisfies Record<keyof typeof zh, string>

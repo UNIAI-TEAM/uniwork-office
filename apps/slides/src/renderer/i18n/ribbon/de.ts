@@ -41,7 +41,7 @@ export const de = {
   ribbonAutoSave: 'AutoSpeichern',
   ribbonAutoSaveTip: 'Speichert alle 30 Sekunden in die Datei',
   ribbonAutoSaveUniworkTip:
-    'AutoSave is off for UniWork documents. Use Save to save a new version.',
+    'Automatisches Speichern ist für UniWork-Dokumente ausgeschaltet. Verwenden Sie „Speichern“, um eine neue Version zu speichern.',
   ribbonUndo: 'Rückgängig',
   ribbonRedo: 'Wiederholen',
   ribbonGroupClipboard: 'Zwischenablage',

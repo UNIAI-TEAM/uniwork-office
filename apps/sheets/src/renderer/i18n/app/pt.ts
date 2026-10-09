@@ -1550,5 +1550,6 @@ export const pt = {
   appVisualFlipV: 'Inverter verticalmente',
   appVisualFlipH: 'Inverter horizontalmente',
   appCtxPasteVisual: 'Colar imagem ou forma',
-  appAutoSaveUniworkOff: 'AutoSave is off for UniWork documents. Use Save to save a new version.',
+  appAutoSaveUniworkOff:
+    'O salvamento automático está desativado para documentos do UniWork. Use Salvar para salvar uma nova versão.',
 } satisfies Record<keyof typeof zh, string>

@@ -39,7 +39,7 @@ export const ms = {
   ribbonAutoSave: 'AutoSimpan',
   ribbonAutoSaveTip: 'Apabila diaktifkan, menyimpan ke fail setiap 30 saat',
   ribbonAutoSaveUniworkTip:
-    'AutoSave is off for UniWork documents. Use Save to save a new version.',
+    'Simpan automatik dimatikan untuk dokumen UniWork. Gunakan Simpan untuk menyimpan versi baharu.',
   ribbonUndo: 'Buat asal',
   ribbonRedo: 'Buat semula',
   ribbonGroupClipboard: 'Papan Klip',

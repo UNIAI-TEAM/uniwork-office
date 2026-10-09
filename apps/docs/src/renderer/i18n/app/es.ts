@@ -207,7 +207,8 @@ export const es = {
   appFootnotePlaceholder: 'Texto de la nota al pie…',
   appEndnotePlaceholder: 'Texto de la nota al final…',
   appAutoSave: 'Autoguardado',
-  appAutoSaveUniworkTip: 'AutoSave is off for UniWork documents. Use Save to save a new version.',
+  appAutoSaveUniworkTip:
+    'El autoguardado está desactivado para los documentos de UniWork. Usa Guardar para guardar una versión nueva.',
   appAutoSaveTip: 'Autoguardado (cada 30 segundos y cuando la ventana pierde el foco)',
   appSaveShortcutTip: 'Guardar (⌘S)',
   appUndo: 'Deshacer',

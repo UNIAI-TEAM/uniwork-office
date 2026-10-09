@@ -1564,5 +1564,6 @@ export const de = {
   appVisualFlipV: 'Vertikal spiegeln',
   appVisualFlipH: 'Horizontal spiegeln',
   appCtxPasteVisual: 'Bild oder Form einfügen',
-  appAutoSaveUniworkOff: 'AutoSave is off for UniWork documents. Use Save to save a new version.',
+  appAutoSaveUniworkOff:
+    'Automatisches Speichern ist für UniWork-Dokumente ausgeschaltet. Verwenden Sie „Speichern“, um eine neue Version zu speichern.',
 } satisfies Record<keyof typeof zh, string>

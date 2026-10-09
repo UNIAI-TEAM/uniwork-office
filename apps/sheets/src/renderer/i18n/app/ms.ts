@@ -1509,5 +1509,6 @@ export const ms = {
   appVisualFlipV: 'Balikkan Menegak',
   appVisualFlipH: 'Balikkan Mendatar',
   appCtxPasteVisual: 'Tampal Gambar atau Bentuk',
-  appAutoSaveUniworkOff: 'AutoSave is off for UniWork documents. Use Save to save a new version.',
+  appAutoSaveUniworkOff:
+    'Simpan automatik dimatikan untuk dokumen UniWork. Gunakan Simpan untuk menyimpan versi baharu.',
 } satisfies Record<keyof typeof zh, string>

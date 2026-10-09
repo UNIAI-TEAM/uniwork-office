@@ -29,7 +29,8 @@ export const nl = {
   replaceAll: 'Alles vervangen',
   findTip: 'Zoeken en vervangen (⌘F)',
   autoSaveTip: 'Slaat elke 30 seconden op en wanneer het venster de focus verliest',
-  autoSaveUniworkOff: 'AutoSave is off for UniWork documents. Use Save to save a new version.',
+  autoSaveUniworkOff:
+    'Automatisch opslaan staat uit voor UniWork-documenten. Gebruik Opslaan om een nieuwe versie op te slaan.',
   zoom: 'Zoom',
   zoomIn: 'Inzoomen',
   zoomOut: 'Uitzoomen',

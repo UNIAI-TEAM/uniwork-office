@@ -40,7 +40,7 @@ export const ja = {
   ribbonAutoSave: '自動保存',
   ribbonAutoSaveTip: 'オンにすると 30 秒ごとにファイルへ自動保存します',
   ribbonAutoSaveUniworkTip:
-    'AutoSave is off for UniWork documents. Use Save to save a new version.',
+    'UniWork のドキュメントでは自動保存はオフです。新しいバージョンを保存するには「保存」を使ってください。',
   ribbonUndo: '元に戻す',
   ribbonRedo: 'やり直し',
   // Home: clipboard

@@ -199,7 +199,8 @@ export const th = {
   appFootnotePlaceholder: 'ข้อความเชิงอรรถ…',
   appEndnotePlaceholder: 'ข้อความอ้างอิงท้ายเรื่อง…',
   appAutoSave: 'บันทึกอัตโนมัติ',
-  appAutoSaveUniworkTip: 'AutoSave is off for UniWork documents. Use Save to save a new version.',
+  appAutoSaveUniworkTip:
+    'การบันทึกอัตโนมัติปิดอยู่สำหรับเอกสาร UniWork ใช้ “บันทึก” เพื่อบันทึกเวอร์ชันใหม่',
   appAutoSaveTip: 'บันทึกอัตโนมัติ (ทุก 30 วินาทีและเมื่อหน้าต่างไม่ได้โฟกัส)',
   appSaveShortcutTip: 'บันทึก (⌘S)',
   appUndo: 'เลิกทำ',

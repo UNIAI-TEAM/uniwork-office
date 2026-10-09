@@ -39,7 +39,7 @@ export const nl = {
   ribbonAutoSave: 'Automatisch opslaan',
   ribbonAutoSaveTip: 'Indien ingeschakeld, wordt het bestand elke 30 seconden opgeslagen',
   ribbonAutoSaveUniworkTip:
-    'AutoSave is off for UniWork documents. Use Save to save a new version.',
+    'Automatisch opslaan staat uit voor UniWork-documenten. Gebruik Opslaan om een nieuwe versie op te slaan.',
   ribbonUndo: 'Ongedaan maken',
   ribbonRedo: 'Opnieuw',
   ribbonGroupClipboard: 'Klembord',

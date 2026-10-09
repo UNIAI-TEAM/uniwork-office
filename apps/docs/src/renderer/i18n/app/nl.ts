@@ -210,7 +210,8 @@ export const nl = {
   appFootnotePlaceholder: 'Voetnoottekst…',
   appEndnotePlaceholder: 'Eindnoottekst…',
   appAutoSave: 'Automatisch opslaan',
-  appAutoSaveUniworkTip: 'AutoSave is off for UniWork documents. Use Save to save a new version.',
+  appAutoSaveUniworkTip:
+    'Automatisch opslaan staat uit voor UniWork-documenten. Gebruik Opslaan om een nieuwe versie op te slaan.',
   appAutoSaveTip: 'Automatisch opslaan (elke 30 seconden en wanneer het venster de focus verliest)',
   appSaveShortcutTip: 'Opslaan (⌘S)',
   appUndo: 'Ongedaan maken',

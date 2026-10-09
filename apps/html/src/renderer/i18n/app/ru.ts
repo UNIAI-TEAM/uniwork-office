@@ -29,7 +29,8 @@ export const ru = {
   replaceAll: 'Заменить все',
   findTip: 'Найти и заменить (⌘F)',
   autoSaveTip: 'Сохраняет каждые 30 секунд и при потере фокуса окном',
-  autoSaveUniworkOff: 'AutoSave is off for UniWork documents. Use Save to save a new version.',
+  autoSaveUniworkOff:
+    'Автосохранение отключено для документов UniWork. Нажмите «Сохранить», чтобы сохранить новую версию.',
   zoom: 'Масштаб',
   zoomIn: 'Увеличить',
   zoomOut: 'Уменьшить',

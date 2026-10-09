@@ -40,7 +40,7 @@ export const ko = {
   ribbonAutoSave: '자동 저장',
   ribbonAutoSaveTip: '켜면 30초마다 파일에 자동 저장됩니다',
   ribbonAutoSaveUniworkTip:
-    'AutoSave is off for UniWork documents. Use Save to save a new version.',
+    'UniWork 문서에서는 자동 저장이 꺼져 있습니다. 새 버전을 저장하려면 ‘저장’을 사용하세요.',
   ribbonUndo: '실행 취소',
   ribbonRedo: '다시 실행',
   // Home: clipboard

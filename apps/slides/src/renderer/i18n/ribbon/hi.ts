@@ -38,7 +38,7 @@ export const hi = {
   ribbonAutoSave: 'स्वतः सहेजें',
   ribbonAutoSaveTip: 'चालू होने पर हर 30 सेकंड में फ़ाइल में सहेजता है',
   ribbonAutoSaveUniworkTip:
-    'AutoSave is off for UniWork documents. Use Save to save a new version.',
+    'UniWork दस्तावेज़ों के लिए ऑटो सेव बंद है। नया संस्करण सहेजने के लिए ‘सहेजें’ का उपयोग करें।',
   ribbonUndo: 'पूर्ववत करें',
   ribbonRedo: 'फिर से करें',
   ribbonGroupClipboard: 'क्लिपबोर्ड',

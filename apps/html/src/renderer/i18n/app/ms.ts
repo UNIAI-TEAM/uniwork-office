@@ -28,7 +28,8 @@ export const ms = {
   replaceAll: 'Ganti Semua',
   findTip: 'Cari dan Ganti (⌘F)',
   autoSaveTip: 'Menyimpan setiap 30 saat dan apabila tetingkap hilang fokus',
-  autoSaveUniworkOff: 'AutoSave is off for UniWork documents. Use Save to save a new version.',
+  autoSaveUniworkOff:
+    'Simpan automatik dimatikan untuk dokumen UniWork. Gunakan Simpan untuk menyimpan versi baharu.',
   zoom: 'Zum',
   zoomIn: 'Besarkan',
   zoomOut: 'Kecilkan',
