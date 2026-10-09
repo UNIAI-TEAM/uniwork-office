@@ -87,7 +87,7 @@ Fonts for text edit are document data (pdf-lib / pdfium embed them), so they shi
 ## 4. Assets and CSP (P-4)
 
 Module CSP = Docs CSP + `script-src 'wasm-unsafe-eval'` (lane decision B4-1; reason in `csp.json` notes), also sent on
-`/assets/**` for the pdf.js worker. Measured build (`0.1.0-3e18d7f`): 228 files, 16.0 MiB (gzip 7.6), initial 1.52 MiB
+`/assets/**` for the pdf.js worker. Measured build (`0.1.0-e9c78f5`): 229 files, 16.0 MiB (gzip 7.6), initial 1.52 MiB
 (gzip 0.46), deferred 14.5 MiB (pdf.js worker + `pdfjs/` CMaps / standard fonts / wasm codecs, pdfium, hb-subset,
 Liberation TTFs, lazily imported core chunks, jszip).
 
@@ -109,3 +109,9 @@ ghostscript cannot write them) - pdf.js decodes both with its wasm codecs, which
 - Every save uploads the whole rewritten file as a new version (same as G3).
 - The size gate is the host's (`too_large` on `api.open`); the frame shows its open-failure notice.
 - OCR and Convert to Office are hidden (desktop engines); AI is hidden (ADR GO-C2).
+
+## 6. Evidence
+
+- Screenshots (`web/e2e/pdf-web.spec.ts`, production build `0.1.0-e9c78f5`): `docs/web-modules/screenshots/pdf/`
+  `{main,conflict,view-only,password}-{en,vi}-{light,dark}.png`.
+- An empty new Documents file opens as the desktop's blank A4 page (`blank-pdf.ts`); the first save makes it real.
