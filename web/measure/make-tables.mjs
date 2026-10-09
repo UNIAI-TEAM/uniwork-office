@@ -59,7 +59,7 @@ if (css) {
   md += `- Generic class names shipped un-namespaced: ${css.genericUnprefixedClassNames.map((c) => '`.' + c + '`').join(', ') || 'none'}.\n\n`
   md += '| global-reaching selector kind | count | samples |\n|---|---|---|\n'
   for (const [k, v] of Object.entries(css.globalSelectors)) md += `| ${k} | ${v.count} | ${v.samples.slice(0, 5).map((s) => '`' + s.replace(/\|/g, '\\|') + '`').join('<br>')} |\n`
-  md += '\n**window globals written by the bundle:** ' + Object.entries(css.windowGlobalsWritten).map(([k, n]) => `\`${k}\``).join(', ') + '\n\n'
+  md += '\n**window globals written by the bundle:** ' + Object.entries(css.windowGlobalsWritten).map(([k]) => `\`${k}\``).join(', ') + '\n\n'
   md += '**window globals read:** ' + Object.entries(css.windowGlobalsRead).map(([k, n]) => `\`${k}\` ×${n}`).join(', ') + '\n\n'
   md += '| browser API / global-state usage in bundle | occurrences |\n|---|---|\n'
   for (const [k, n] of Object.entries(css.browserApiUsage)) md += `| \`${k}\` | ${n} |\n`

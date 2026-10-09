@@ -27,9 +27,9 @@ const selectors = selectorLists.flatMap((s) => s.split(',').map((x) => x.trim())
 const isRoot = (s) => /(^|[\s>+~])(:root)\b/.test(s) || s.startsWith(':root')
 const isHtml = (s) => /^html\b/.test(s) || /(^|[\s,>+~])html(\b|\[|\.|:)/.test(s)
 const isBody = (s) => /^body\b/.test(s) || /(^|[\s>+~])body(\b|\[|\.|:)/.test(s)
-const isUniversal = (s) => /(^|[\s>+~])\*(\s|$|[:.\[])/.test(s) || s === '*'
+const isUniversal = (s) => /(^|[\s>+~])\*(\s|$|[:.[])/.test(s) || s === '*'
 // bare element selectors (leak into a host page): first compound is a tag with no class/id
-const bareTag = (s) => /^[a-z][a-z0-9]*(\s|$|[:\[>+~])/.test(s) && !/^[a-z0-9]+[.#]/.test(s)
+const bareTag = (s) => /^[a-z][a-z0-9]*(\s|$|[:[>+~])/.test(s) && !/^[a-z0-9]+[.#]/.test(s)
 const dataTheme = (s) => /data-theme/.test(s)
 
 const cnt = (pred) => selectors.filter(pred)

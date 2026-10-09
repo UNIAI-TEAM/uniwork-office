@@ -79,6 +79,21 @@ export default tseslint.config(
     },
   },
   {
+    // Docs web frame tooling: the protocol test host is plain browser JS; the
+    // measure / screenshot scripts run in Node but pass callbacks to
+    // page.evaluate that run in the page.
+    files: ['web/server/test-host/**/*.js'],
+    languageOptions: {
+      globals: { ...globals.browser },
+    },
+  },
+  {
+    files: ['web/measure/**/*.mjs', 'docs/web-docs/screenshots/**/*.mjs'],
+    languageOptions: {
+      globals: { ...globals.node, ...globals.browser },
+    },
+  },
+  {
     // The uniAI PWA is plain browser JS served as static files; its service
     // worker runs in the ServiceWorkerGlobalScope.
     files: ['apps/uniai-pwa/**/*.js'],

@@ -191,6 +191,7 @@ for (const d of DOCS) {
         results.push({ doc: d.name, step: name, ok: true, ms: Date.now() - t0, detail: detail || undefined })
       } catch (e) {
         failed[name] = true
+        // eslint-disable-next-line no-control-regex -- strips ANSI colour codes from Playwright errors
         results.push({ doc: d.name, step: name, ok: false, ms: Date.now() - t0, detail: String((e as Error).message).replace(/\u001b\[[0-9;]*m/g, '').split('\n').slice(0, 6).join(' ⏎ ') })
         await shot(`${name}-FAILED`)
       }
@@ -271,7 +272,7 @@ for (const d of DOCS) {
     })
 
     await step('insert-table', ['editable'], async () => {
-      // Ribbon: 2nd regular tab = Insert (开始/Home first), Table split button -> 2x2 cell of the grid picker.
+      // Ribbon: 2nd regular tab = Insert (Home first), Table split button -> 2x2 cell of the grid picker.
       // Collapse caret out of the marker run first: press End to deselect, then new paragraph for the table.
       // collapse the marker selection (a still-selected marker would be replaced by Enter): click into the
       // doc, then Ctrl+End = end of the last paragraph (the marker paragraph), then a new empty paragraph

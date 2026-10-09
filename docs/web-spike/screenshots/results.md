@@ -7,7 +7,7 @@ The marker string is random per run, so saved byte sizes vary by a few bytes bet
 |---|---|---|---|---|
 | simple | open | PASS | 1924 | text visible in 1924ms; fully loaded (3 blocks, editable) after 1241ms; tables=0 |
 | simple | editable | PASS | 53 |  |
-| simple | type-marker | PASS | 978 | 4 blocks; last: docHeading:"标题" / docParagraph:"第一段。" / docParagraph:"第二段。" / docParagraph:"E2EMARKSIMPLEMUZLK661" sel=38-38 hasMarker=true |
+| simple | type-marker | PASS | 978 | 4 blocks; last: docHeading:"\u6807\u9898" / docParagraph:"\u7b2c\u4e00\u6bb5\u3002" / docParagraph:"\u7b2c\u4e8c\u6bb5\u3002" / docParagraph:"E2EMARKSIMPLEMUZLK661" sel=38-38 hasMarker=true |
 | simple | bold | PASS | 217 | Ctrl+B: {"inStrong":true,"weight":"700","tag":"STRONG"} |
 | simple | insert-table | PASS | 785 | tables 0 -> 1 |
 | simple | save | PASS | 181 | 2373 bytes |
@@ -15,7 +15,7 @@ The marker string is random per run, so saved byte sizes vary by a few bytes bet
 | simple | reopen | PASS | 896 | marker bold={"inStrong":true,"weight":"700"}; tables 0 -> 1 |
 | kitchen-sink | open | PASS | 2047 | text visible in 2047ms; fully loaded (11 blocks, editable) after 1238ms; tables=1 |
 | kitchen-sink | editable | PASS | 86 |  |
-| kitchen-sink | type-marker | PASS | 1114 | 12 blocks; last: docProtected:"" / docProtected:"" / docParagraph:"尾段。" / docParagraph:"E2EMARKKITCHENSINKMUZLKA4H" sel=148-148 hasMarker=true |
+| kitchen-sink | type-marker | PASS | 1114 | 12 blocks; last: docProtected:"" / docProtected:"" / docParagraph:"\u5c3e\u6bb5\u3002" / docParagraph:"E2EMARKKITCHENSINKMUZLKA4H" sel=148-148 hasMarker=true |
 | kitchen-sink | bold | PASS | 119 | Ctrl+B: {"inStrong":true,"weight":"700","tag":"STRONG"} |
 | kitchen-sink | insert-table | PASS | 904 | tables 1 -> 2 |
 | kitchen-sink | save | PASS | 217 | 3610 bytes |

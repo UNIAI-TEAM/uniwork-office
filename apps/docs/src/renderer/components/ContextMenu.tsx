@@ -43,7 +43,6 @@ import {
 } from '../editor/table-ops'
 import type { TableDialogKind } from './TableDialogs'
 import { IconSparkle } from './icons'
-import { useModalKeys } from './modal-keys'
 import { cap } from '../capabilities'
 import { spellcheckEnabled } from '../spellcheck-pref'
 import { applySpellingSuggestion } from '../editor/spell-replace'
