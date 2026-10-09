@@ -2925,3 +2925,12 @@ div.tiptap-mathematics-render {
   font-size: 12px;
   color: var(--color-text-secondary);
 }
+
+/* web frame, host withheld the save grant (capabilities.ts `save`) */
+.status-view-only {
+  padding: 1px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}

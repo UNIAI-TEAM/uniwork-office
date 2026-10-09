@@ -39,6 +39,7 @@ import { mermaidSvgToPng, renderMermaid } from './editor/mermaid'
 import { resolveImageSrc } from './editor/localImage'
 import type { ExportFormat, SaveMode } from '../shared/ipc'
 import { uiOp } from './editor/ops'
+import { cap } from './capabilities'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 type SaveState = 'idle' | 'saving' | 'saved' | 'failed'
@@ -158,8 +159,12 @@ export default function App() {
     [],
   )
 
+  // web frame (capabilities.ts): AI and autosave off, view only without the host's save grant
+  const aiEnabled = cap('ai')
+  const canEdit = cap('save')
+
   const markDirty = useCallback(() => {
-    if (statusRef.current !== 'ready' || dirtyRef.current) return
+    if (statusRef.current !== 'ready' || dirtyRef.current || !cap('save')) return
     dirtyRef.current = true
     setDirty(true)
     setSaveState('idle')
@@ -202,6 +207,10 @@ export default function App() {
   editorRef.current = editor
   filePathRef.current = filePath
   const findTarget = useMemo(() => (editor ? tiptapFindTarget(editor) : null), [editor])
+
+  useEffect(() => {
+    if (editor && editor.isEditable !== canEdit) editor.setEditable(canEdit)
+  }, [editor, canEdit, status])
 
   useEffect(() => {
     setImageBaseDir(filePath ? dirOf(filePath) : null)
@@ -261,7 +270,7 @@ export default function App() {
   /** Serialize and write to disk; false when canceled/failed (caller keeps the tab open) */
   const doSave = useCallback(async (mode: SaveMode, suggestedName?: string): Promise<boolean> => {
     const current = editorRef.current
-    if (!current || statusRef.current !== 'ready' || savingRef.current) return false
+    if (!current || statusRef.current !== 'ready' || savingRef.current || !cap('save')) return false
     savingRef.current = true
     setSaveState('saving')
     try {
@@ -522,7 +531,7 @@ export default function App() {
   // (same policy as the docs app; untitled documents are skipped — the first
   // save must go through the explicit save path that names the file)
   useEffect(() => {
-    if (!autoSave || !filePath) return
+    if (!autoSave || !filePath || !cap('autoSave')) return
     const tick = () => {
       if (!dirtyRef.current) return
       if (editorRef.current?.view.composing) return // don't interrupt IME input
@@ -665,7 +674,7 @@ export default function App() {
     <div className="app">
       <Ribbon
         editor={editor}
-        disabled={status !== 'ready'}
+        disabled={status !== 'ready' || !canEdit}
         dirty={dirty}
         onSave={() => void doSave('save')}
         onFind={() => openFind(false)}
@@ -678,6 +687,8 @@ export default function App() {
         outlineOpen={outlineOpen}
         onToggleOutline={() => setOutlineOpen((v) => !v)}
         hasOutline={outlineItems.length > 0}
+        showAutoSave={cap('autoSave')}
+        showAi={aiEnabled}
         aiOpen={aiOpen}
         onToggleAi={() => setAiOpen((v) => !v)}
         onAiPreset={(text) => {
@@ -687,33 +698,35 @@ export default function App() {
       />
       {status === 'loading' && <div className="center-note">{t('loading')}</div>}
       <div className="app-main" style={status === 'ready' ? undefined : { display: 'none' }}>
-        <div className={`ai-dock${aiOpen ? '' : ' collapsed'}`}>
-          {!aiOpen && (
-            <button
-              className="ai-rail"
-              data-tip={t('aiOpenAssistant')}
-              aria-label={t('aiOpenAssistant')}
-              onClick={() => setAiOpen(true)}
-            >
-              <GensparkMark size={22} />
-            </button>
-          )}
-          {/* mounted only after the file is loaded so chat history resolves against the real path */}
-          {status === 'ready' && (
-            <AiPanel
-              deps={aiDeps}
-              filePath={filePath}
-              preset={aiPreset}
-              onCollapse={() => setAiOpen(false)}
-              editQueue={editQueue}
-              onQueueEditInstruction={queueUpdate}
-              onQueueRemove={queueRemove}
-              onQueueClear={queueClear}
-              onQueueFocus={queueFocus}
-              onQueueConsume={queueConsume}
-            />
-          )}
-        </div>
+        {aiEnabled && (
+          <div className={`ai-dock${aiOpen ? '' : ' collapsed'}`}>
+            {!aiOpen && (
+              <button
+                className="ai-rail"
+                data-tip={t('aiOpenAssistant')}
+                aria-label={t('aiOpenAssistant')}
+                onClick={() => setAiOpen(true)}
+              >
+                <GensparkMark size={22} />
+              </button>
+            )}
+            {/* mounted only after the file is loaded so chat history resolves against the real path */}
+            {status === 'ready' && (
+              <AiPanel
+                deps={aiDeps}
+                filePath={filePath}
+                preset={aiPreset}
+                onCollapse={() => setAiOpen(false)}
+                editQueue={editQueue}
+                onQueueEditInstruction={queueUpdate}
+                onQueueRemove={queueRemove}
+                onQueueClear={queueClear}
+                onQueueFocus={queueFocus}
+                onQueueConsume={queueConsume}
+              />
+            )}
+          </div>
+        )}
         {outlineOpen && <OutlinePane items={outlineItems} onJump={jumpToOutline} />}
         <div className="app-content">
           {showFind && findTarget && (
@@ -726,13 +739,22 @@ export default function App() {
           )}
           <div className="editor-scroll" ref={scrollRef}>
             <div className="doc-page" style={{ zoom: zoom / 100 }}>
-              {fmOpen && <FrontmatterPanel value={fmText} onChange={onFrontmatterChange} />}
+              {fmOpen && (
+                <FrontmatterPanel
+                  value={fmText}
+                  onChange={onFrontmatterChange}
+                  readOnly={!canEdit}
+                />
+              )}
               <EditorContent editor={editor} />
             </div>
           </div>
           <footer className="status-bar">
             <div className="status-left">
               {fileName && <span className="status-item status-file">{fileName}</span>}
+              {!canEdit && status === 'ready' && (
+                <span className="status-item status-view-only">{t('viewOnly')}</span>
+              )}
             </div>
             <div className="status-right">
               {statusText && (
@@ -774,7 +796,7 @@ export default function App() {
       <SlashMenu ref={slashMenuRef} state={slashState} onDismiss={() => setSlashState(null)} />
       <ToastHost />
       <TableMenu editor={editor} scrollRef={scrollRef} zoom={zoom} />
-      {editor && status === 'ready' && (
+      {editor && status === 'ready' && aiEnabled && canEdit && (
         <AiAskPopover
           editor={editor}
           queueFull={editQueue.length >= EDIT_QUEUE_MAX}
