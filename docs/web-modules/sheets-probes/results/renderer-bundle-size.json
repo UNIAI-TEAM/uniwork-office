@@ -9,9 +9,7 @@
   },
   "initial": {
     "note": "index.html + <script>/<link> targets + static JS imports (no dynamic import(), no CSS url() fonts)",
-    "files": [
-      "index.html"
-    ],
+    "files": ["index.html"],
     "total": {
       "files": 1,
       "raw": 637,

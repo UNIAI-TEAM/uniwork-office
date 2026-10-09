@@ -97,7 +97,11 @@ const handlers = {
   }),
   'file.pick': () => {
     const f = files.get(picks.shift())
-    return { file: f ? { file: { ...f.meta }, source: { kind: 'bytes', data: f.bytes.slice().buffer } } : null }
+    return {
+      file: f
+        ? { file: { ...f.meta }, source: { kind: 'bytes', data: f.bytes.slice().buffer } }
+        : null,
+    }
   },
   // no server render in the harness: record what the frame sent, answer a stub PDF
   'api.export': ({ fileId, name, data }) => {

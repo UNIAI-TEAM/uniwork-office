@@ -25,7 +25,8 @@ import { applyTextInserts, fallbackFontFor } from '../src/main/text-edit'
 // test setup before this file's node:fs mock exists: hide the same files there too
 const GONE = ['Arial Unicode.ttf', 'arialuni.ttf', 'DejaVuSans.ttf']
 setPdfCoreEnv({
-  readFontFile: (path) => (GONE.some((g) => path.endsWith(g)) ? null : nodePdfEnv.readFontFile(path)),
+  readFontFile: (path) =>
+    GONE.some((g) => path.endsWith(g)) ? null : nodePdfEnv.readFontFile(path),
 })
 import type { TextInsertInput } from '../src/shared/ipc'
 

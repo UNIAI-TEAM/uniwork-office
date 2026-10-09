@@ -550,6 +550,15 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
     readWorkbookRange: (request) => transport.readRange(request),
     readWorkbookFormulas: (request) => transport.readFormulaCells(request),
     readWorkbookMedia: (request) => transport.readMedia(request),
+    // Find & Replace scan and the row outline read: the same sidecar commands as the desktop
+    findWorkbookCells: (request) =>
+      transport.findCells
+        ? (transport.findCells(request) as ReturnType<DesktopApi['findWorkbookCells']>)
+        : Promise.reject(new Error(`find: ${NOT_AVAILABLE}`)),
+    readWorkbookRowOutline: (request) =>
+      transport.readRowOutline
+        ? (transport.readRowOutline(request) as ReturnType<DesktopApi['readWorkbookRowOutline']>)
+        : Promise.reject(new Error(`row outline: ${NOT_AVAILABLE}`)),
     readPivotDefinition: (request) =>
       capabilities.pivotRefresh === false
         ? Promise.reject(new Error(`pivot refresh: ${NOT_AVAILABLE}`))
@@ -699,6 +708,15 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
     readAttachment: async () => ({ ok: false, error: NOT_AVAILABLE }),
     readAttachmentImage: async () => ({ ok: false, error: NOT_AVAILABLE }),
     getPathForFile: (_file: File) => '',
+    // printing is the browser dialog: no printer list; the page follows the UI theme
+    listPrinters: async () => [],
+    getDocumentTheme: async () => 'follow' as const,
+
+    // threaded-comment author: the signed-in UniWork user from the handshake ('' before it / none)
+    getUserDisplayName: async () => {
+      const session = await port.whenInitialized()
+      return session.user?.displayName ?? ''
+    },
   } satisfies Partial<DesktopApi>
 
   return {

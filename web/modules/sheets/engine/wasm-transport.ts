@@ -17,10 +17,12 @@
  */
 import {
   workbookFileSchema,
+  workbookFindCellsResultSchema,
   workbookFormulaCellsResultSchema,
   workbookMediaResultSchema,
   workbookPivotDefinitionSchema,
   workbookRangeResultSchema,
+  workbookRowOutlineResultSchema,
   type WorkbookFile,
 } from '../../../../apps/sheets/src/shared/desktop-api'
 import { allowsAutomaticWorkbookRecovery } from '../../../../apps/sheets/src/main/recovery-policy'
@@ -215,6 +217,14 @@ export function createWasmTransport(options: WasmTransportOptions): SheetsEngine
     async readFormulaCells(request) {
       session(request.sessionId)
       return workbookFormulaCellsResultSchema.parse(await call('read_formula_cells', request))
+    },
+    async findCells(request) {
+      session(request.sessionId)
+      return workbookFindCellsResultSchema.parse(await call('find_cells', request))
+    },
+    async readRowOutline(request) {
+      session(request.sessionId)
+      return workbookRowOutlineResultSchema.parse(await call('read_row_outline', request))
     },
     async readMedia(request) {
       session(request.sessionId)
