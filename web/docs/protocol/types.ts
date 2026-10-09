@@ -247,8 +247,18 @@ export type Capability =
   | 'exportHtml'
   | 'attachments'
   | 'images'
-  /** stays false on the web in this lane (AI/search/image stubbed + hidden) */
+  /**
+   * AI panels (GO-A7 web AI contract, CONTRACT C16): the frame calls the frame-token AI routes
+   * itself (/office-frame/documents/{id}/ai/...). Grant it only when the org entitlement and those
+   * routes are live; without it every AI entry stays hidden.
+   */
   | 'ai'
+  /** additive (C16): UniWork cloud web search for the AI tools; effective only together with `ai` */
+  | 'webSearch'
+  /** additive (C16): UniWork cloud image search for the AI tools; effective only together with `ai` */
+  | 'imageSearch'
+  /** additive (C16): UniWork cloud image generation (and media analysis); effective only with `ai` */
+  | 'imageGeneration'
 
 export type Capabilities = Partial<Record<Capability, boolean>>
 
@@ -263,6 +273,9 @@ export const CAPABILITY_KEYS: readonly Capability[] = [
   'attachments',
   'images',
   'ai',
+  'webSearch',
+  'imageSearch',
+  'imageGeneration',
 ]
 
 /**

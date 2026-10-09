@@ -80,7 +80,8 @@ gets no `init` within its retry budget (40 × 500 ms), or is opened top-level (`
 without a handler answers `unsupported` (e.g. AI-adjacent calls stay unavailable on the web).
 
 Capabilities: `save`, `saveAs`, `recents`, `filePick`, `print`, `exportPdf`, `exportHtml`, `attachments`, `images`,
-`ai`. The effective set is the frame's ∩ the host's grant. The frame hides File > Open / Ctrl+O unless `filePick`
+`ai`, and (additive, CONTRACT C16) `webSearch`, `imageSearch`, `imageGeneration`. The effective set is the frame's ∩
+the host's grant. The three cloud-tool keys only count together with `ai`; see "AI (web)" below. The frame hides File > Open / Ctrl+O unless `filePick`
 is granted (grant it only with an `api` handler for `file.pick`) and stops asking for recents without `recents`.
 
 `FileSource {kind:'url'}` (in `init.open`, `open`, `api.open`, `file.pick`) must be **same-origin** with the frame,
@@ -140,6 +141,30 @@ One protocol serves every genoffice editor on the web (lane GO-B4/B5/B6, UNI-101
   save. Hosts never send `save {reason: 'autosave'}`; web bridges never set `api.save.auto`; every module's
   autosave capability is false on the web and its UI hidden. The `autosave` / `auto` values stay in the types for
   wire compatibility only.
+
+## AI (web, CONTRACT C16)
+
+The frame calls the GO-A7 web AI routes itself; there is **no postMessage relay** for AI. The host only decides
+whether AI exists for this document (grants) and keeps answering `token.refresh`.
+
+- **Grants.** `ai` (the AI panels and every AI entry) and, each only together with `ai`, `webSearch`, `imageSearch`,
+  `imageGeneration` (UniWork cloud tools; image generation also covers media analysis). Grant `ai` only when the
+  organization has the entitlement **and** the frame-token AI mount below is live; without it every AI entry stays
+  hidden exactly as before. Every frame (Docs and all modules) declares the four keys in `ready`.
+- **Routes** (same origin as the frame: the bundle CSP is `connect-src 'self'`): the path of `init.apiBase`
+  (`/api` or `/api/v1`) on the frame's origin + `/v1/office-frame/documents/{documentId}/ai/...`:
+  `credentials` GET, `credentials/{provider}` PUT / DELETE (masked `key_hint` only, the key is write-only),
+  `byok/{provider}/chat/completions` | `/messages` | `/generate` POST and `/models` GET (the vendor's own wire
+  format; SSE stays SSE; no key from the frame), `cloud` GET, `cloud/search` | `/images` | `/media/analyze` |
+  `/transcribe` POST.
+- **Auth.** `Authorization: Bearer <frame token>`, `credentials: 'omit'`, `mode: 'same-origin'`; one retry with a
+  refreshed token after a 401 (a second 401 is the "session expired" state).
+- **Errors** (`{code, message}`; the UI picks a typed state from the status, never the message): 400
+  `provider_not_supported` / `base_url_refused`, 402 `credits_exhausted`, 403 `entitlement_required`, 404
+  `credential_missing`, 424 `provider_auth_failed`, 429 (+ `retry-after`), 502 `provider_unreachable`, 503
+  `cloud_unavailable`. A provider's own 400/404 passes through to the genoffice ai-provider unchanged.
+- Frame side: `web/modules/shared/ai/` (client, ai-provider proxy transport, streams, in-frame AI settings + state
+  card). Test host: `?ai=1` grants all four; `web/server/fake-ai.mjs` fakes the routes (`/__fake-ai/*` drives it).
 
 ## Origin model
 

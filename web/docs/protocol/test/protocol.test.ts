@@ -98,6 +98,9 @@ describe('handshake', () => {
         attachments: false,
         images: false,
         ai: false,
+        webSearch: false,
+        imageSearch: false,
+        imageGeneration: false,
       },
     })
     expect(session).toMatchObject({
