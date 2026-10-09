@@ -98,6 +98,8 @@ import {
 } from './uniwork-auth'
 import { createUniworkDocs, type UniworkDocsHandle } from './uniwork-docs/wiring'
 import { installUniworkModuleSeams } from './uniwork-docs/modules'
+import { createModuleSaveRequester } from './uniwork-docs/module-save'
+import { IPC_CHANNELS as SHEETS_IPC_CHANNELS } from '../../../sheets/src/shared/ipc-channels'
 import { isAgentIntentUrl, parseAgentIntentUrl } from './agent-intent-host'
 import { extractLaunchUrlFromArgv, isOfficeAppUrl, parseOfficeAppUrl } from '@uniwork/office-bridge'
 import { OFFICE_APP_KINDS } from '@uniwork/office-bridge-contracts'
@@ -3681,12 +3683,21 @@ let lastActiveDocPath: string | undefined
 /** the tab or detached window showing a path (UniWork documents: Save, reload) */
 function webContentsForPath(
   path: string,
-): { tabId?: string; webContents: WebContents } | undefined {
+): { tabId?: string; kind: TabKind; webContents: WebContents } | undefined {
   const tab = tabManager?.findTabByPath(path)
-  if (tab) return { tabId: tab.id, webContents: tab.webContents }
+  if (tab) return { tabId: tab.id, kind: tab.kind, webContents: tab.webContents }
   const detached = findDetachedTabByPath(path)
-  return detached ? { webContents: detached.webContents } : undefined
+  return detached ? { kind: detached.kind, webContents: detached.webContents } : undefined
 }
+
+/** each module's explicit Save, exactly what its File > Save runs */
+const requestUniworkModuleSave = createModuleSaveRequester({
+  targetForPath: webContentsForPath,
+  sheetsMenuChannel: SHEETS_IPC_CHANNELS.menuAction,
+  requestMarkdownSave,
+  requestHtmlSave,
+  flushPdfSave,
+})
 
 function uniworkDocsWiring() {
   return {
@@ -3696,12 +3707,7 @@ function uniworkDocsWiring() {
     openPath: (path: string) => openDocumentPath(path),
     isPathOpen: (path: string) => webContentsForPath(path) !== undefined,
     // the module's own Save (same path as the menu), which ends in the user-save hook
-    requestModuleSave: (path: string) => {
-      const target = webContentsForPath(path)
-      if (!target || target.webContents.isDestroyed()) return false
-      target.webContents.send('menu:command', 'save')
-      return true
-    },
+    requestModuleSave: requestUniworkModuleSave,
     reloadPath: (path: string) => {
       const target = webContentsForPath(path)
       if (target?.tabId && tabManager) tabManager.reloadTab(target.tabId)
