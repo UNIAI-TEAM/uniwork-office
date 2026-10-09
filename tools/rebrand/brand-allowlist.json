@@ -76,7 +76,7 @@
     },
     {
       "path": "apps/shell/src/main/updater.ts",
-      "pattern": "github\\.com/UNIAI-TEAM/uniwork-office/releases/latest",
+      "pattern": "github\\.com/UNIAI-TEAM/uniwork-office/releases'",
       "kind": "debt",
       "reason": "DOWNLOAD_PAGE_URL, the manual-download target of the update dialog when a build has no self-update feed. Functional URL, never displayed as text (the dialog says 'Download'); moves to a UniWork download page once one exists.",
       "tracker": "GO-A8 (release / download page) + GO-A4 UNI-1005 (release URLs)"

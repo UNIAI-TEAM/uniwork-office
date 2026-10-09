@@ -407,11 +407,12 @@ const RECHECK_INTERVAL_MS = 4 * 60 * 60 * 1000
 // code-signing identity (Apple Team ID) change, which Squirrel.Mac rejects
 // on every retry while the error looks like a download failure to the user.
 const MANUAL_FALLBACK_AFTER = 2
-// Last-resort manual link only: the GitHub Latest release tracks one channel
-// and signing track, so a stable/legacy-track user could land on the wrong
-// build. Preferred is the CDN installer derived from the user's own update
-// feed (see manualDownloadUrlFor), which matches channel, track, and arch.
-export const DOWNLOAD_PAGE_URL = 'https://github.com/UNIAI-TEAM/uniwork-office/releases/latest'
+// Last-resort manual link only: the release list mixes channels and signing
+// tracks, so a user could land on the wrong build. Preferred is the CDN
+// installer derived from the user's own update feed (see manualDownloadUrlFor),
+// which matches channel, track, and arch. The list, not /releases/latest: dev
+// and beta builds are pre-releases, which /latest never resolves to (404).
+export const DOWNLOAD_PAGE_URL = 'https://github.com/UNIAI-TEAM/uniwork-office/releases'
 
 /// Trusted HTTPS base URL baked into resources/app-update.yml. Manual download
 /// links are always rebuilt from this base rather than trusting URLs supplied

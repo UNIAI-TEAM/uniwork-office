@@ -559,6 +559,12 @@ describe('manual download fallback', () => {
     expect(openExternal).toHaveBeenCalledWith((await loadUpdater()).DOWNLOAD_PAGE_URL)
   })
 
+  it('uses the release list as the generic download page (pre-releases have no /latest)', async () => {
+    expect((await loadUpdater()).DOWNLOAD_PAGE_URL).toBe(
+      'https://github.com/UNIAI-TEAM/uniwork-office/releases',
+    )
+  })
+
   it('falls back to the generic download page when the feed base cannot be read', async () => {
     // readFileSyncMock throws by default (no app-update.yml)
     const actions = await failTwiceIntoManual([
