@@ -1350,4 +1350,7 @@ export const hi = {
   appWebDiscard: 'हटाएँ',
   appWebCancel: 'रद्द करें',
   appWebSaveFailed: 'UniWork में सहेजना विफल रहा।',
+  appWebTooLargeTitle: 'यह वर्कबुक वेब के लिए बहुत बड़ी है',
+  appWebTooLargeBody:
+    'यह वेब स्प्रेडशीट की सीमा से बड़ी है, इसलिए यह क्लासिक स्प्रेडशीट संपादक में खुलेगी।',
 } satisfies Record<keyof typeof zh, string>

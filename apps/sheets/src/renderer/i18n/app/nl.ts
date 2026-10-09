@@ -1388,4 +1388,7 @@ export const nl = {
   appWebDiscard: 'Verwerpen',
   appWebCancel: 'Annuleren',
   appWebSaveFailed: 'Opslaan in UniWork is mislukt.',
+  appWebTooLargeTitle: 'Deze werkmap is te groot voor het web',
+  appWebTooLargeBody:
+    'Hij is groter dan de webspreadsheet aankan en wordt daarom geopend in de klassieke spreadsheet-editor.',
 } satisfies Record<keyof typeof zh, string>

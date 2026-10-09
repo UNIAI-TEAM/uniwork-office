@@ -11,6 +11,10 @@
  *                   build predates the registry and stays byte-for-byte what it was
  *   globals         the window globals the installer provides (the app's preload contextBridge names)
  *   csp             sources on top of the shared header-only policy (csp.ts), each with its reason
+ *   aliases         module-specific import aliases (repo-relative targets), e.g. browser stubs for
+ *                   `node:*` imports of shared packages whose Node-only helpers the frame never calls
+ *   prebuild        node scripts (repo-relative) run before Vite, e.g. a native module build
+ *   workerFormat    'es' when the module starts module Workers that import other chunks
  *
  * Output: dist-web/<module>/<pkgver>-<sha>[-dirty]/ (docs: dist-web/docs/<v>/, unchanged).
  */
@@ -35,6 +39,12 @@ export interface WebModuleSpec {
   /** window globals the installer sets (besides __officeWebModule) */
   globals: readonly string[]
   csp?: CspExtra
+  /** import specifier -> repo-relative replacement module */
+  aliases?: Readonly<Record<string, string>>
+  /** repo-relative node scripts run (in order) before the Vite build starts */
+  prebuild?: readonly string[]
+  /** output format of `new Worker(new URL(...), { type: 'module' })` bundles (Vite default: iife) */
+  workerFormat?: 'es'
   /** top-level output directories with fixed (unhashed) names to serve as immutable */
   immutableDirs?: readonly string[]
 }
@@ -104,6 +114,26 @@ export const WEB_MODULES: Readonly<Record<WebModule, WebModuleSpec>> = {
     rendererConfig: 'apps/sheets/vite.renderer.config.ts',
     renderer: 'apps/sheets/src/renderer/main.tsx',
     globals: ['desktopApi', 'projectApi'],
+    csp: {
+      directives: { 'script-src': ["'wasm-unsafe-eval'"] },
+      alsoOn: ['/assets/**'],
+      why: [
+        "sheets: script-src 'wasm-unsafe-eval' compiles the same-origin xlsx engine (xlsx-sidecar built for wasm32-wasip1, assets/xlsx-sidecar-*.wasm) in the frame's engine Worker (GO-D3 = C, CONTRACT C11). It allows WebAssembly compilation only, not JavaScript eval; 'self' alone blocks every compile.",
+        'sheets: the policy is also sent on /assets/** because the engine Worker (assets/engine.worker-*.js) takes its CSP from its own script response, not from the page.',
+      ],
+    },
+    // the Sheets save planner (@genoffice/xlsx-gateway) imports node:* for file helpers the
+    // frame never calls; the stubs keep those imports resolvable in the browser bundle
+    aliases: {
+      'node:crypto': 'web/modules/sheets/engine/node-stubs.ts',
+      'node:fs': 'web/modules/sheets/engine/node-stubs.ts',
+      'node:fs/promises': 'web/modules/sheets/engine/node-stubs.ts',
+      'node:os': 'web/modules/sheets/engine/node-stubs.ts',
+      'node:path': 'web/modules/sheets/engine/node-stubs.ts',
+    },
+    // the engine module: built reproducibly with the pinned toolchain, checksum-verified
+    prebuild: ['apps/sheets/native/xlsx-engine/wasm/build-wasm.mjs'],
+    workerFormat: 'es',
   },
 }
 

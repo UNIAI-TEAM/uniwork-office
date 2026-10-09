@@ -1,0 +1,65 @@
+{
+  "runtime": "node v22.23.2 + browser_wasi_shim",
+  "results": [
+    {
+      "fixture": "large-10000.xlsx",
+      "fileBytes": 1011853,
+      "rows": 10000,
+      "openMs": 357.5,
+      "firstViewportMs": 119.8,
+      "firstViewportCells": 2200,
+      "firstViewportIndexedThroughRow": 255,
+      "backgroundIndexMs": 785.5,
+      "passes": 3,
+      "longestPassMs": 455.9,
+      "bottomViewportMs": 49.5,
+      "bottomComplete": true,
+      "wasmMemoryBytes": 18677760
+    },
+    {
+      "fixture": "large-20000.xlsx",
+      "fileBytes": 2044290,
+      "rows": 20000,
+      "openMs": 558.4,
+      "firstViewportMs": 48.9,
+      "firstViewportCells": 2200,
+      "firstViewportIndexedThroughRow": 255,
+      "backgroundIndexMs": 1949.5,
+      "passes": 4,
+      "longestPassMs": 943,
+      "bottomViewportMs": 59.2,
+      "bottomComplete": true,
+      "wasmMemoryBytes": 35454976
+    },
+    {
+      "fixture": "large-50000.xlsx",
+      "fileBytes": 5141479,
+      "rows": 50000,
+      "openMs": 1048.7,
+      "firstViewportMs": 28.5,
+      "firstViewportCells": 2200,
+      "firstViewportIndexedThroughRow": 255,
+      "backgroundIndexMs": 3510.2,
+      "passes": 4,
+      "longestPassMs": 2429.5,
+      "bottomViewportMs": 40.4,
+      "bottomComplete": true,
+      "wasmMemoryBytes": 136118272
+    },
+    {
+      "fixture": "large-100000.xlsx",
+      "fileBytes": 10303611,
+      "rows": 100000,
+      "openMs": 2301.4,
+      "firstViewportMs": 31.1,
+      "firstViewportCells": 2200,
+      "firstViewportIndexedThroughRow": 255,
+      "backgroundIndexMs": 9528.4,
+      "passes": 5,
+      "longestPassMs": 5345.2,
+      "bottomViewportMs": 23.1,
+      "bottomComplete": true,
+      "wasmMemoryBytes": 270336000
+    }
+  ]
+}

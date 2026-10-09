@@ -1354,4 +1354,7 @@ export const ms = {
   appWebDiscard: 'Buang',
   appWebCancel: 'Batal',
   appWebSaveFailed: 'Gagal menyimpan ke UniWork.',
+  appWebTooLargeTitle: 'Buku kerja ini terlalu besar untuk web',
+  appWebTooLargeBody:
+    'Saiznya melebihi had hamparan web, jadi ia dibuka dalam editor hamparan klasik.',
 } satisfies Record<keyof typeof zh, string>

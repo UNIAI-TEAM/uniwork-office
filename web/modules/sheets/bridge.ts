@@ -228,6 +228,10 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
       opened = await transport.open({ name: payload.file.name, data, locale: locale() })
     } catch (err) {
       if (isEngineUnavailable(err)) reportEngineUnavailable()
+      // above the frame's size gate: fatal, so the host opens the G3 editor instead (C11)
+      else if ((err as { code?: unknown })?.code === 'too_large') {
+        port.reportError({ code: 'too_large', message: describe(err) }, true)
+      }
       throw err
     }
     remember(payload.file)

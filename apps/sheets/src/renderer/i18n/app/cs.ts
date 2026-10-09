@@ -1356,4 +1356,7 @@ export const cs = {
   appWebDiscard: 'Zahodit',
   appWebCancel: 'Zrušit',
   appWebSaveFailed: 'Uložení do UniWork se nezdařilo.',
+  appWebTooLargeTitle: 'Tento sešit je pro web příliš velký',
+  appWebTooLargeBody:
+    'Překračuje velikost, kterou webová tabulka zvládne, proto se otevře v klasickém tabulkovém editoru.',
 } satisfies Record<keyof typeof zh, string>

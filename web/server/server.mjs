@@ -183,7 +183,7 @@ const server = createServer(async (req, res) => {
 
     if (pathname === '/healthz') return send(res, 200, 'ok')
 
-    const fx = /^\/fixtures\/([^/]+\.(?:docx|pdf|md|html|pptx|xlsx))$/.exec(pathname)
+    const fx = /^\/fixtures\/([^/]+\.(?:docx|pdf|md|html|pptx|xlsx|xlsm|xls))$/.exec(pathname)
     if (fx) {
       for (const dir of [fixturesDir, webFixturesDir]) {
         const file = safeJoin(dir, fx[1])
