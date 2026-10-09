@@ -1,4 +1,5 @@
 import { app, safeStorage, shell, type IpcMain, type WebContents } from 'electron'
+import { setUniworkCloudStatus, setUniworkCloudTransport } from '@genoffice/ai-provider'
 import { safeExternalUrl } from '@genoffice/electron-utils'
 import { HOME_CHANNELS, type AccountEntitlements } from '../../shared/home-api'
 import { readAppSettings, writeAppSetting } from '../app-settings'
@@ -9,6 +10,7 @@ import {
   resolveDeploymentProfile,
   type DeploymentProfile,
 } from './deployment'
+import { createUniworkCloudClient, UniworkCloudController, type CloudAccountView } from './cloud'
 import { AccountManager } from './manager'
 import { createUniworkTransport } from './transport'
 
@@ -27,6 +29,7 @@ export type { AccountManager } from './manager'
  */
 
 let manager: AccountManager | null = null
+let cloud: UniworkCloudController | null = null
 let settingsPath: (() => string) | null = null
 const entitlementListeners = new Set<(entitlements: AccountEntitlements | null) => void>()
 /** set by registerAccountIpc: delivers a push to the account renderers */
@@ -109,6 +112,55 @@ export async function getAccessToken(): Promise<string | null> {
   return manager ? manager.getAccessToken() : null
 }
 
+function cloudAccountView(): CloudAccountView {
+  if (!manager) return { signedIn: false, orgId: null }
+  const status = manager.status()
+  const email = status.profile?.email ?? status.email
+  const planName = status.entitlements?.planName
+  return {
+    signedIn: status.loggedIn,
+    orgId: status.org?.id ?? null,
+    ...(email ? { email } : {}),
+    ...(planName ? { planName } : {}),
+  }
+}
+
+/**
+ * The process-wide UniWork cloud controller: calls go out from main with the
+ * account's bearer token; every status it publishes is token-free and lands
+ * in this process's ai-provider seam (the editors' main code) and in the
+ * account renderers.
+ */
+export function uniworkCloud(): UniworkCloudController {
+  if (cloud) return cloud
+  const account = uniworkAccount()
+  cloud = new UniworkCloudController({
+    client: createUniworkCloudClient({
+      profile: () => account.deploymentProfile(),
+      orgId: () => account.status().org?.id ?? null,
+      withAccessToken: (call) => account.withAccessToken(call),
+    }),
+    account: cloudAccountView,
+    publish: (status) => {
+      setUniworkCloudStatus(status)
+      push?.(HOME_CHANNELS.uniworkCloudStatusEvent, status)
+    },
+  })
+  return cloud
+}
+
+/**
+ * Installs the cloud transport and keeps the status current: re-read on
+ * sign-in / sign-out / organization or plan change (entitlements), after
+ * every tool call (credits), and once now.
+ */
+export function startUniworkCloud(): void {
+  const controller = uniworkCloud()
+  setUniworkCloudTransport(controller.transport())
+  onAccountEntitlementsChanged(() => void controller.refresh().catch(() => undefined))
+  void controller.refresh().catch(() => undefined)
+}
+
 /**
  * Registers the callback scheme of the active profile's channel only, so a
  * dev run never re-points the installed stable app's `uniwork-office://`
@@ -134,6 +186,7 @@ export function startUniworkAccount(ready: Promise<unknown> = Promise.resolve())
 
 /** Stops the account timers (refresh, recovery, attempt) at quit. */
 export function stopUniworkAccount(): void {
+  setUniworkCloudTransport(null)
   manager?.dispose()
 }
 
@@ -171,6 +224,14 @@ export function registerAccountIpc(
     account(event.sender).cancelLogin()
   })
   ipcMain.handle(HOME_CHANNELS.accountRetry, (event) => account(event.sender).retry())
+  ipcMain.handle(HOME_CHANNELS.uniworkCloudStatus, (event) => {
+    account(event.sender)
+    return uniworkCloud().status()
+  })
+  ipcMain.handle(HOME_CHANNELS.uniworkCloudRefresh, (event) => {
+    account(event.sender)
+    return uniworkCloud().refresh()
+  })
   ipcMain.handle(HOME_CHANNELS.accountSelectOrg, (event, orgId: unknown) => {
     const current = account(event.sender)
     return typeof orgId === 'string' ? current.selectOrg(orgId) : current.status()

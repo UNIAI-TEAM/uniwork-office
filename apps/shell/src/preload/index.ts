@@ -4,9 +4,15 @@ import {
   AI_PROVIDERS,
   AI_SEARCH_PROVIDERS,
   getProviderAdapter,
+  normalizeUniworkCloudStatus,
+  setUniworkCloudStatus,
   visibleMediaProviders,
 } from '@genoffice/ai-provider/browser'
-import type { AiSettings, CodexModelCatalog } from '@genoffice/ai-provider/browser'
+import type {
+  AiSettings,
+  CodexModelCatalog,
+  UniworkCloudStatus,
+} from '@genoffice/ai-provider/browser'
 import type { AiStreamChunk, AiStreamRequest } from '@genoffice/ai-provider'
 import { installDropOpenBridge } from '@genoffice/electron-utils/drop-open'
 import type { UpdateUiState } from '../shared/update-api'
@@ -363,6 +369,18 @@ const homeApi: HomeApi = {
     const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.accountSelectOrg, orgId)
     return (result ?? { loggedIn: false, state: 'signed-out' }) as AccountStatus
   },
+  async uniworkCloudStatus() {
+    return normalizeUniworkCloudStatus(await ipcRenderer.invoke(HOME_CHANNELS.uniworkCloudStatus))
+  },
+  async uniworkCloudRefresh() {
+    return normalizeUniworkCloudStatus(await ipcRenderer.invoke(HOME_CHANNELS.uniworkCloudRefresh))
+  },
+  onUniworkCloudStatus(handler) {
+    const listener = (_event: IpcRendererEvent, status: unknown) =>
+      handler(normalizeUniworkCloudStatus(status))
+    ipcRenderer.on(HOME_CHANNELS.uniworkCloudStatusEvent, listener)
+    return () => ipcRenderer.removeListener(HOME_CHANNELS.uniworkCloudStatusEvent, listener)
+  },
   onOpenSettingsEvent(handler) {
     const listener = (_event: IpcRendererEvent, section: unknown) => {
       handler(typeof section === 'string' && section ? section : 'account')
@@ -707,6 +725,18 @@ const homeApi: HomeApi = {
     },
   },
 }
+
+// Mirror the cloud status into this preload's seam, so getAiMediaProviders()
+// lists the UniWork cloud entry only while the user is signed in + entitled.
+const mirrorCloudStatus = (status: unknown) =>
+  setUniworkCloudStatus(normalizeUniworkCloudStatus(status) satisfies UniworkCloudStatus)
+ipcRenderer.on(HOME_CHANNELS.uniworkCloudStatusEvent, (_event, status: unknown) =>
+  mirrorCloudStatus(status),
+)
+void ipcRenderer
+  .invoke(HOME_CHANNELS.uniworkCloudStatus)
+  .then(mirrorCloudStatus)
+  .catch(() => undefined)
 
 contextBridge.exposeInMainWorld('aiOffice', homeApi)
 

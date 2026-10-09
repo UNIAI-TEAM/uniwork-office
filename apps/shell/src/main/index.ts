@@ -94,6 +94,7 @@ import {
   registerAccountIpc,
   routeAuthCallbackUrl,
   startUniworkAccount,
+  startUniworkCloud,
   stopUniworkAccount,
 } from './uniwork-auth'
 import { isAgentIntentUrl, parseAgentIntentUrl } from './agent-intent-host'
@@ -6267,6 +6268,7 @@ app.whenReady().then(async () => {
   // UniWork account: register the active channel's sign-in scheme, restore the
   // session in the background (after the proxy install), then route held callbacks
   startUniworkAccount(mainProxyReady)
+  startUniworkCloud()
   authCallbacks.start(routeAuthCallback)
 
   // resource watchdog: a renderer that stays hot for minutes gets diagnostics
