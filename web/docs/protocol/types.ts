@@ -513,6 +513,15 @@ export interface TitlePayload {
   title: string
 }
 
+/**
+ * The frame opened / closed one of its own modal dialogs (save conflict, discard prompt, fatal
+ * notice). Its scrim only covers the iframe; a host may dim its own chrome around it while
+ * `open` is true. Advisory: hosts that ignore it lose nothing.
+ */
+export interface ModalPayload {
+  open: boolean
+}
+
 export interface ThemePayload {
   theme: Theme
 }
@@ -646,6 +655,8 @@ export interface FrameEvents {
   ready: ReadyPayload
   dirty: DirtyPayload
   title: TitlePayload
+  /** additive (UNI-1013 F4): a frame modal is open / closed */
+  modal: ModalPayload
   resize: ResizePayload
   saved: SavedPayload
   error: ErrorEventPayload
@@ -705,6 +716,7 @@ const FRAME_EVENTS: Record<FrameEventType, true> = {
   ready: true,
   dirty: true,
   title: true,
+  modal: true,
   resize: true,
   saved: true,
   error: true,
@@ -913,6 +925,7 @@ const PAYLOAD_VALIDATORS: Record<string, (x: unknown) => boolean> = {
   'event:ready': isReadyPayload,
   'event:dirty': (x) => isObj(x) && isBool(x.dirty),
   'event:title': (x) => isObj(x) && isStr(x.title),
+  'event:modal': (x) => isObj(x) && isBool(x.open),
   'event:resize': (x) => isObj(x) && isFiniteNum(x.height) && x.height >= 0,
   'event:saved': (x) =>
     isObj(x) && isFileMeta(x.file) && isOpt(x.versionId, isStr) && isBool(x.initiatedByFrame),

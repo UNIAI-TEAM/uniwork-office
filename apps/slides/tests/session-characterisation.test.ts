@@ -33,13 +33,15 @@ vi.mock(
   '@genoffice/electron-utils',
   async () => (await import('./helpers/slides-ipc-harness')).electronUtilsModule,
 )
+// node:crypto and globalThis.crypto share one counter: the session core uses the web API where
+// the Electron main used node:crypto, so the n-th UUID must not depend on which one is asked
+const uuids = vi.hoisted(() => {
+  let n = 0
+  return () => `00000000-0000-4000-8000-${String(++n).padStart(12, '0')}` as const
+})
 vi.mock('node:crypto', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:crypto')>()
-  let n = 0
-  return {
-    ...actual,
-    randomUUID: () => `00000000-0000-4000-8000-${String(++n).padStart(12, '0')}`,
-  }
+  return { ...actual, randomUUID: uuids }
 })
 vi.mock('../src/main/fonts', async () => {
   const { HeuristicMetrics } = await import('@genoffice/pptx-render')
@@ -145,10 +147,7 @@ const firstText = (slide: Slide): Node =>
 beforeAll(async () => {
   vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] })
   vi.setSystemTime(new Date('2026-10-09T03:00:00.000Z'))
-  let uuid = 0
-  vi.spyOn(globalThis.crypto, 'randomUUID').mockImplementation(
-    () => `10000000-0000-4000-8000-${String(++uuid).padStart(12, '0')}` as const,
-  )
+  vi.spyOn(globalThis.crypto, 'randomUUID').mockImplementation(uuids)
   // Field GUIDs (header/footer slide numbers) come from Math.random: a fixed LCG pins them
   let seed = 0x2f6b
   vi.spyOn(Math, 'random').mockImplementation(() => {
@@ -631,7 +630,7 @@ describe('slides session characterisation', () => {
     })
     await step(A, 'slides:get-animations', 0)
     await step(A, 'slides:get-shape-keys', 0)
-    await step(A, 'slides:copy-slide', 0, pngB64)
+    await step(A, 'slides:copy-slides', { slideIndexes: [0], pngs: [pngB64] })
     await step(A, 'slides:has-slide-clipboard')
     await step(A, 'slides:clipboard-external')
     await step(A, 'slides:paste-slide', { afterIndex: 2, fitWidthPx: FIT })

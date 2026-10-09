@@ -21,11 +21,13 @@ import type { WebContents } from 'electron'
 import { execFile } from 'node:child_process'
 import { readFile, writeFile, rm, stat, mkdir, open } from 'node:fs/promises'
 import { createHash, randomUUID } from 'node:crypto'
-import { existsSync, mkdirSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { basename, dirname, join, resolve } from 'node:path'
 import { cleanupExpiredGeneratedPages } from './generated-page-temp'
 import { exportSlidesPdf } from './pdf-export'
-import { gskApiKey, gskSlideGenerate, setGskProxyUrl } from '@genoffice/ai-search'
+import { printSlidesHtml } from './print-window'
+import { gskSlideGenerate, hasGskAuth } from '@genoffice/ai-search'
+import { uniworkCloudEnabled } from '@genoffice/ai-provider'
 import {
   appMenuLabels,
   configuredDefaultSaveDir,
@@ -38,24 +40,31 @@ import {
   saveAsSuggestion,
   showOpenDialogWithMemory,
   showSaveDialogWithMemory,
+  helpMenuTemplate,
   toggleDevToolsItem,
   installRendererProtocol,
   registerRendererScheme,
   rendererUrl,
+  MAX_REMOTE_IMAGE_BYTES,
+  readBodyCapped,
 } from '@genoffice/electron-utils'
 import { buildPagePptx, parsePageSpec } from '@genoffice/pipelines/slides'
 import { sniffImageMime } from './media-mime'
+import { canWriteElementClipboardImage, writeElementClipboardImage } from './element-clipboard'
 import { getUiLang, normalizeLang, setUiLang } from '@genoffice/i18n'
 import { ProjectStore } from '@genoffice/project-store'
 import {
+  createBlankPptx,
   listEmbeddedFonts,
   openPptx,
   mergeSlideFromPptx,
   extractMergeSlideSource,
   type MergeSlideSource,
   promoteSlideBackground,
+  autofitGeneratedTextBoxes,
   savePptx,
   savePptxToFile,
+  commitSaved,
   type OpenedPptx,
 } from '@genoffice/pptx-engine'
 import { refineComplexWidths, shapedMetricsReady } from './shaped-metrics'
@@ -64,6 +73,8 @@ import type {
   PrintSlidesOp,
   ExportImagesOp,
   ExportImagesResult,
+  SavePictureOp,
+  SavePictureResult,
   ExportPdfOp,
   ExportPdfResult,
   OpenResult,
@@ -77,6 +88,7 @@ import {
   carryHistoryForReplacement,
   dialogParent,
   getFontMetrics,
+  hostWindowFor,
   resetFontMetrics,
   pushHistory,
   runtime,
@@ -90,6 +102,7 @@ import {
 } from './session-state'
 import { registerAiIpc, registerSlidesOnlyAiIpc } from './ai-ipc'
 import {
+  appClipboard,
   deckDefaultFont,
   forgetClient,
   journaledTxn,
@@ -120,9 +133,11 @@ export {
   configureSlidesRuntime,
   setActiveSlidesWebContents,
   setSlidesShellWindow,
+  setSlidesHostWindowHook,
   setSlidesShowBleed,
 } from './session-state'
 export { registerAiIpc } from './ai-ipc'
+export { applySessionTxn } from '../session'
 
 /** standalone: path queued before window creation (argv/open-file) */
 let pendingOpenPath: string | null = null
@@ -193,7 +208,7 @@ async function handleRendererFreeze(wc: WebContents): Promise<void> {
   if (freezeDialogOpen.has(wc.id)) return
   freezeDialogOpen.add(wc.id)
   try {
-    const parent = BrowserWindow.fromWebContents(wc)
+    const parent = hostWindowFor(wc)
     const options = {
       type: 'warning' as const,
       message: tm('freezeTitle'),
@@ -268,12 +283,44 @@ function syncAttachedPaths(session: Session, path: string): void {
   }
 }
 
+/**
+ * MCP save: write a visible session's deck to an explicit path with no dialogs
+ * — the slides:save-as pipeline minus the dialog. Overwrite policy is the
+ * caller's (the MCP tool layer guards clobbering); this commits the save side
+ * effects: session path, recents, attached-surface titles, dirty-flag reset.
+ */
+export async function saveSessionDeckTo(session: Session, filePath: string): Promise<void> {
+  // the caller supplies an arbitrary absolute path, so its parent may not exist
+  // yet (the dialog-driven paths always land in an existing folder)
+  await mkdir(dirname(filePath), { recursive: true })
+  const metaRevAtSave = session.metaRev ?? 0
+  await savePptxToFile(session.opened, filePath)
+  session.path = filePath
+  autosaveBackoff.delete(filePath)
+  // mirror slides:save-as: a saved deck is no longer an unsaved untitled draft
+  for (const id of attachedIds(session)) dropUntitledRecovery(id)
+  await pushRecent(filePath)
+  syncAttachedPaths(session, filePath)
+  commitSaved(session.opened)
+  if ((session.metaRev ?? 0) === metaRevAtSave) session.metaDirty = false
+}
+
 const RECENT_PATH = () => join(app.getPath('userData'), 'slides-recent.json')
 
 async function readRecent(): Promise<string[]> {
   try {
     const raw = await readFile(RECENT_PATH(), 'utf8')
     return (JSON.parse(raw) as string[]).filter((p) => existsSync(p))
+  } catch {
+    return []
+  }
+}
+
+/** the raw recent list, for the shell's folder bookkeeping (no existence filter) */
+export function readSlidesRecentFiles(): string[] {
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(RECENT_PATH(), 'utf8'))
+    return Array.isArray(parsed) ? parsed.filter((p): p is string => typeof p === 'string') : []
   } catch {
     return []
   }
@@ -464,6 +511,19 @@ export async function requestSlidesClose(
   return requestRendererSave(contents)
 }
 
+/**
+ * Drop a session's crash-recovery copies without saving — the dialog-free
+ * counterpart of answering "Don't Save" in `requestSlidesClose`, for the MCP
+ * `open_documents` discard path (which must not raise a prompt the user did not
+ * start). Without this the autosave copy survives, and the next open offers to
+ * restore edits the caller explicitly discarded.
+ */
+export function discardSlidesRecovery(contents: WebContents): void {
+  const session = sessions.get(contents.id)
+  if (session?.path) void rm(autosavePathFor(session.path), { force: true }).catch(() => {})
+  dropUntitledRecovery(contents.id)
+}
+
 /** Electron HostIO for one calling webContents (save bookkeeping is per window). */
 function hostFor(wc: WebContents): HostIO {
   return createElectronHostIO({
@@ -618,7 +678,12 @@ async function openAndBuild(
     }
   }
   const raw = await readFile(path)
-  const { bytes, recovered } = await maybeRecoverBytes(path, new Uint8Array(raw))
+  // a 0-byte .pptx is an empty deck, not a corrupt one: open the blank template
+  // under the file's own path so Save writes back to it
+  const { bytes, recovered } = await maybeRecoverBytes(
+    path,
+    raw.length === 0 ? await createBlankPptx() : new Uint8Array(raw),
+  )
   await shapedMetricsReady() // Lay out only after complex-script shaped metrics are ready, avoiding an init race falling back to estimation
   const opened = await openPptx(bytes)
   adoptEmbeddedFonts(opened)
@@ -894,17 +959,30 @@ export function registerSlidesIpc(): void {
     return null
   })
 
-  // ── Cloud single-page generation (gsk slide_generate): brief → cloud HTML+conversion → one-slide
-  // pptx saved to a temp file. Returns a marker string that slides:land-generated-pages redeems for
-  // the bytes. Enabled when gsk is logged in; GENOFFICE_CLOUD_SLIDE=0 is the kill switch.
-  const cloudSlideEnabled = () => process.env.GENOFFICE_CLOUD_SLIDE !== '0' && !!gskApiKey()
+  // ── Cloud single-page generation: brief → cloud HTML+conversion → one-slide pptx saved to a
+  // temp file. Returns a marker string that slides:land-generated-pages redeems for the bytes.
+  // Off until the UniWork cloud seam is enabled and signed in; GENOFFICE_CLOUD_SLIDE=0 is the kill switch.
+  const cloudSlideEnabled = () =>
+    process.env.GENOFFICE_CLOUD_SLIDE !== '0' && uniworkCloudEnabled() && hasGskAuth()
 
   ipcMain.handle('slides:cloud-gen-status', () => ({ enabled: cloudSlideEnabled() }))
+
+  // In-flight cloud generations keyed by the requesting window: stop in one
+  // panel aborts all of that window's pages (a deck batch shares one stop
+  // signal) and none of another window's
+  const cloudPageAborts = new Map<number, Set<AbortController>>()
+
+  ipcMain.handle('slides:cloud-page-cancel', (e) => {
+    const aborts = cloudPageAborts.get(e.sender.id)
+    if (!aborts) return
+    for (const c of aborts) c.abort()
+    cloudPageAborts.delete(e.sender.id)
+  })
 
   ipcMain.handle(
     'slides:cloud-page-generate',
     async (
-      _e,
+      e,
       op: {
         brief: string
         title?: string
@@ -922,16 +1000,30 @@ export function registerSlidesIpc(): void {
         // comparisons and emergency rollback.
         const tier = process.env.GENOFFICE_CLOUD_SLIDE_TIER === 'standard' ? 'standard' : 'ultra'
         const started = Date.now()
-        const { bytes, model } = await gskSlideGenerate({
-          tier,
-          brief: String(op.brief ?? ''),
-          title: op.title ? String(op.title) : undefined,
-          styleSkill: op.styleSkill ? String(op.styleSkill) : undefined,
-          deckContext: op.deckContext,
-          images: Array.isArray(op.images) ? op.images : undefined,
-          width: op.width,
-          height: op.height,
-        })
+        // Stop must reach the cloud request: without this the generation keeps
+        // running (and billing) after the user pressed stop
+        const abort = new AbortController()
+        const windowAborts = cloudPageAborts.get(e.sender.id) ?? new Set<AbortController>()
+        windowAborts.add(abort)
+        cloudPageAborts.set(e.sender.id, windowAborts)
+        let bytes: Uint8Array
+        let model: string
+        try {
+          ;({ bytes, model } = await gskSlideGenerate({
+            tier,
+            brief: String(op.brief ?? ''),
+            title: op.title ? String(op.title) : undefined,
+            styleSkill: op.styleSkill ? String(op.styleSkill) : undefined,
+            deckContext: op.deckContext,
+            images: Array.isArray(op.images) ? op.images : undefined,
+            width: op.width,
+            height: op.height,
+            signal: abort.signal,
+          }))
+        } finally {
+          windowAborts.delete(abort)
+          if (windowAborts.size === 0) cloudPageAborts.delete(e.sender.id)
+        }
         console.log(
           `[cloud-slide] page generated: tier=${tier} model=${model} bytes=${bytes.length} ms=${Date.now() - started}`,
         )
@@ -947,7 +1039,7 @@ export function registerSlidesIpc(): void {
     },
   )
 
-  // ── Local single-page generation (no gsk needed, e.g. BYOK): a JSON slide spec written by
+  // ── Local single-page generation (no cloud needed, e.g. BYOK): a JSON slide spec written by
   // the renderer's LLM call is built directly into a one-slide pptx with pptx-engine
   // primitives — no HTML intermediate. Returns the same marker kind as the cloud path, so
   // landing (slides:land-generated-pages) is shared.
@@ -966,7 +1058,7 @@ export function registerSlidesIpc(): void {
           fetchImage: async (url) => {
             const resp = await fetchRemoteImage(url)
             if (!resp || !resp.ok) return null
-            const buf = new Uint8Array(await resp.arrayBuffer())
+            const buf = await readBodyCapped(resp, MAX_REMOTE_IMAGE_BYTES)
             const mime = sniffImageMime(buf) ?? resp.headers.get('content-type') ?? ''
             const ext = /png/.test(mime)
               ? 'png'
@@ -1042,7 +1134,10 @@ export function registerSlidesIpc(): void {
         const perPage = await Promise.all(pageMarkers.map(readCloudPage))
         const base = await openPptx(perPage[0]!.bytes)
         for (const one of perPage.slice(1)) await mergeSlideFromPptx(base, one.bytes)
-        for (const s of base.deck.slides) promoteSlideBackground(s, base.deck.size)
+        for (const s of base.deck.slides) {
+          promoteSlideBackground(s, base.deck.size)
+          autofitGeneratedTextBoxes(s)
+        }
         return { bytes: await savePptx(base) }
       }
 
@@ -1233,6 +1328,12 @@ export function registerSlidesIpc(): void {
     },
   )
 
+  ipcMain.handle('slides:copy-elements-image', (e, clipboardToken: string, pngBase64: string) => {
+    if (!canWriteElementClipboardImage(appClipboard.elements, e.sender.id, clipboardToken))
+      return false
+    return writeElementClipboardImage(clipboardToken, pngBase64)
+  })
+
   // System clipboard while text-editing (menu commands are echoed back by the renderer per context)
   ipcMain.handle('slides:native-clipboard', (e, op: 'cut' | 'copy' | 'paste') => {
     if (op === 'cut') e.sender.cut()
@@ -1283,10 +1384,35 @@ export function registerSlidesIpc(): void {
     return r.canceled || !r.filePath ? null : r.filePath
   })
 
+  ipcMain.handle(
+    'slides:save-picture',
+    async (_e, op: SavePictureOp): Promise<SavePictureResult> => {
+      const options = {
+        title: tm('dlgSavePicture'),
+        defaultPath: `${op.defaultName}.png`,
+        filters: [{ name: 'PNG', extensions: ['png'] }],
+      }
+      const r = await showSaveDialogWithMemory(dialog, dialogParent(), options, getDraftsDir())
+      if (r.canceled || !r.filePath) return { ok: false }
+      try {
+        await writeFile(r.filePath, Buffer.from(op.pngBase64, 'base64'))
+        return { ok: true, path: r.filePath }
+      } catch (err) {
+        return { ok: false, error: String(err) }
+      }
+    },
+  )
+
   ipcMain.handle('slides:export-pdf', async (_e, op: ExportPdfOp): Promise<ExportPdfResult> => {
     return exportSlidesPdf({
       ...op,
-      createWindow: () => new BrowserWindow({ show: false, webPreferences: { sandbox: true } }),
+      // hidden window: without this, throttled timers/rAF stall the
+      // PRINT_READY_SCRIPT settle wait (same as the headless export window)
+      createWindow: () =>
+        new BrowserWindow({
+          show: false,
+          webPreferences: { sandbox: true, backgroundThrottling: false },
+        }),
       openExportedPdf,
     })
   })
@@ -1303,7 +1429,7 @@ export function registerSlidesIpc(): void {
         ...(op.orientation ? { orientation: op.orientation } : {}),
         ...(op.frame ? { frame: true } : {}),
       })
-      const owner = BrowserWindow.fromWebContents(e.sender) ?? dialogParent()
+      const owner = hostWindowFor(e.sender) ?? dialogParent()
       const win = new BrowserWindow({
         show: false,
         ...(owner && !owner.isDestroyed() ? { parent: owner } : {}),
@@ -1318,36 +1444,7 @@ export function registerSlidesIpc(): void {
           : {}),
         webPreferences: { sandbox: true },
       })
-      try {
-        await win.loadURL('data:text/html;base64,' + Buffer.from(html, 'utf8').toString('base64'))
-        await win.webContents.executeJavaScript(
-          'Promise.all([document.fonts.ready, ...Array.from(document.images).map((i) => i.decode().catch(() => {}))])',
-          true,
-        )
-        // Chromium attaches the native Windows print dialog to the window being printed.
-        // If that owner is hidden, the dialog is hidden too and the layout buttons appear inert.
-        if (process.platform === 'win32') {
-          win.show()
-          win.focus()
-        }
-        const result = await new Promise<{ success: boolean; failureReason: string }>((resolve) => {
-          win.webContents.print(
-            { silent: false, printBackground: true },
-            (success, failureReason) => resolve({ success, failureReason }),
-          )
-        })
-        if (!result.success) {
-          // Canceling is a normal completion, not a print failure: ok=false without an
-          // error keeps the renderer's print dialog (and its chosen options) open.
-          if (result.failureReason === 'Print job canceled') return { ok: false }
-          return { ok: false, error: result.failureReason }
-        }
-        return { ok: true }
-      } catch (err) {
-        return { ok: false, error: String(err) }
-      } finally {
-        if (!win.isDestroyed()) win.destroy()
-      }
+      return printSlidesHtml(html, win)
     },
   )
 
@@ -1382,7 +1479,8 @@ export function registerSlidesIpc(): void {
   // immediately makes the window visibly bounce. ──
   let showFsRelease: ReturnType<typeof setTimeout> | null = null
   ipcMain.handle('slides:show-fullscreen', (e, on: boolean) => {
-    const win = BrowserWindow.fromWebContents(e.sender) ?? windowRefs.shellWindow
+    // a detached editor window fullscreens itself, never the shell behind it
+    const win = hostWindowFor(e.sender)
     if (!win || win.isDestroyed()) return
     const wc = e.sender
     if (showFsRelease) {
@@ -1475,6 +1573,16 @@ export function registerProjectIpc(): void {
         scope?: { label: string; text?: string }
       },
     ) => {
+      if (args.role !== 'user' && args.role !== 'assistant') {
+        throw new Error(`Invalid chat role: ${String(args.role)}`)
+      }
+      if (typeof args.text !== 'string' || args.text.length > 200_000) {
+        throw new Error('Invalid chat text: must be a string up to 200000 chars')
+      }
+      if (args.tools && !Array.isArray(args.tools)) throw new Error('Invalid chat tools')
+      if (args.attachments && !Array.isArray(args.attachments)) {
+        throw new Error('Invalid chat attachments')
+      }
       const msg: Parameters<ProjectStore['appendChatMessage']>[2] = {
         role: args.role,
         text: args.text,
@@ -1753,6 +1861,7 @@ export function buildSlidesMenu(): Menu {
         toggleDevToolsItem(labels),
       ],
     },
+    helpMenuTemplate(labels),
   ]
   return Menu.buildFromTemplate(template)
 }
@@ -1768,9 +1877,6 @@ export function installSlidesMenu(): void {
  */
 async function applyMainProcessProxy(): Promise<void> {
   const setDispatcher = async (proxyUrl: string) => {
-    // spawned gsk CLI children do their own fetch and never see the
-    // dispatcher below — forward the proxy to them via env
-    setGskProxyUrl(proxyUrl)
     try {
       const { ProxyAgent, setGlobalDispatcher } = await import('undici')
       setGlobalDispatcher(new ProxyAgent(proxyUrl))
@@ -1794,9 +1900,8 @@ async function applyMainProcessProxy(): Promise<void> {
   // No environment variables: read the system proxy (requires app ready)
   try {
     await app.whenReady()
-    // PAC/rule proxies answer per-host: probe the host the login flow, the
-    // UniWork LLM proxy and the gsk CLI actually target
-    const resolved = await electronSession.defaultSession.resolveProxy('https://www.genspark.ai/')
+    // PAC/rule proxies answer per-host: probe the host the default uniAI chat route targets
+    const resolved = await electronSession.defaultSession.resolveProxy('https://openrouter.ai/')
     // resolveProxy returns strings like "PROXY 127.0.0.1:1087" or "DIRECT"
     const m = /PROXY\s+([^;]+)/i.exec(resolved || '')
     if (m) {

@@ -112,7 +112,7 @@ export function createIpcTransport<S>(options: IpcTransportOptions<S>): AgentTra
           settle()
           if (chunk.stopReason) cb.onStopReason?.(chunk.stopReason)
           cb.onDone()
-        } else {
+        } else if (chunk.type === 'error') {
           settle()
           cb.onError(
             chunk.errorCode === 'timeout'
@@ -125,6 +125,9 @@ export function createIpcTransport<S>(options: IpcTransportOptions<S>): AgentTra
                     ? (options.overloadedErrorText?.() ?? chunk.error ?? options.unknownErrorText())
                     : (chunk.error ?? options.unknownErrorText()),
           )
+        } else {
+          // A chunk kind this build predates must not kill the run; traffic proves it is alive.
+          armSilence()
         }
       })
       armSilence()

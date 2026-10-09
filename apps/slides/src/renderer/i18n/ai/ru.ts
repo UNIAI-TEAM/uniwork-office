@@ -22,7 +22,6 @@ export const ru = {
   aiQcPageSkipped: 'Страница {n}: автоматическая проверка макета пропущена',
   aiQcStopped: 'Проверка макета остановлена',
   aiQcCapped: 'Ещё {count} стр. не проверено (лимит за один запуск)',
-  aiGskLoginBtn: 'Войти в UniWork',
   aiPanelTitle: 'uniAI',
   aiOpenAssistant: 'Открыть ИИ-помощника',
   aiFactCheckBtn: 'ИИ-фактчекинг',
@@ -111,7 +110,7 @@ export const ru = {
   aiTooManyImages:
     'В одном сообщении можно отправить не более {max} изображений; лишние были пропущены',
   aiErrStopped: 'Остановлено',
-  aiErrTimeout: 'Превышено время ожидания ({ms}ms)',
+  aiErrTimeout: 'Превышено время ожидания ({ms} мс)',
   aiErrEmptyOutput: 'Пустой вывод',
   aiErrUnknown: 'Неизвестная ошибка',
   aiErrStreamTimeout:
@@ -140,6 +139,7 @@ export const ru = {
   aiClarifyOther: 'Другое (впишите свой вариант)',
   aiClarifySkip: 'Пропустить опрос',
   aiClarifyNext: 'Далее',
+  aiClarifyPrev: 'Назад',
   aiClarifySubmit: 'Сгенерировать',
   aiSumReadAttachment: 'Чтение вложения',
   aiSumReadAttachmentName: 'Чтение вложения {name}',
@@ -218,7 +218,7 @@ export const ru = {
   aiSumReplaceImage: 'Изображение заменено на слайде {n}',
   aiSumClarifySkipped: 'Пользователь пропустил опрос',
   aiSumClarifyDone: 'Ответы на опрос собраны',
-  aiSumPlan: 'Спланировано страниц: {count} | Core Hook: {hook}',
+  aiSumPlan: 'Спланировано страниц: {count} | Ключевая идея: {hook}',
   aiSumHtmlAppend: 'Добавлено HTML-страниц: {count} (всего {total})',
   aiSumHtmlGenerate: 'Создано страниц из HTML: {count}',
   aiSumRegen: 'Слайд {n} переделан',
@@ -228,4 +228,5 @@ export const ru = {
   aiSumSaveTemplate: 'Сохранён шаблон стиля «{name}»',
   aiSumTemplatesEmpty: 'Шаблоны стиля (пусто)',
   aiSumListTemplates: 'Показано шаблонов стиля: {count}',
+  aiPageCloudToLocal: 'Облако недоступно — создано локально',
 } satisfies Record<keyof typeof zh, string>

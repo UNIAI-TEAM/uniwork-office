@@ -80,6 +80,7 @@ export const historySaveHandlers = {
       await ctx.host.saved({ kind: 'untitled', session, path: session.path })
     }
     try {
+      const metaRevAtSave = session.metaRev ?? 0
       await ctx.host.writeDeck(session.opened, session.path)
       await ctx.host.saved({ kind: 'save', session, path: session.path })
       // Bake the saved patches back into the in-memory model (clears dirty, syncs
@@ -87,7 +88,7 @@ export const historySaveHandlers = {
       // whole package, doubling save latency on large decks. Element ids survive,
       // but the renderer still expects the render tree in the response.
       commitSaved(session.opened)
-      session.metaDirty = false
+      if ((session.metaRev ?? 0) === metaRevAtSave) session.metaDirty = false
       return {
         ok: true,
         path: session.path,
@@ -104,11 +105,12 @@ export const historySaveHandlers = {
     const target = await ctx.host.saveTarget.saveAs(session.path, defaultName)
     if (!target) return { ok: false }
     try {
+      const metaRevAtSave = session.metaRev ?? 0
       await ctx.host.writeDeck(session.opened, target)
       session.path = target
       await ctx.host.saved({ kind: 'saveAs', session, path: target })
       commitSaved(session.opened)
-      session.metaDirty = false
+      if ((session.metaRev ?? 0) === metaRevAtSave) session.metaDirty = false
       return {
         ok: true,
         path: target,

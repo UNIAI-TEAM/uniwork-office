@@ -6,6 +6,9 @@ import type {
   AiStreamRequest,
   GenSparkAccountStatus,
 } from '@genoffice/ai-provider'
+import type { ExportImageMime } from './export-image-mime'
+
+export const MAX_PASTED_IMAGE_BYTES = 50 * 1024 * 1024
 
 export const MARKDOWN_CHANNELS = {
   consumePending: 'markdown:consume-pending',
@@ -13,6 +16,8 @@ export const MARKDOWN_CHANNELS = {
   save: 'markdown:save',
   saveRequest: 'markdown:save-request',
   saveRequestAck: 'markdown:save-request-ack',
+  readTextRequest: 'markdown:read-text-request',
+  readTextResult: 'markdown:read-text-result',
   dirtyChanged: 'markdown:dirty-changed',
   closeSaveRequest: 'markdown:close-save-request',
   closeSaveResult: 'markdown:close-save-result',
@@ -20,9 +25,17 @@ export const MARKDOWN_CHANNELS = {
   pickImage: 'markdown:pick-image',
   saveImage: 'markdown:save-image',
   readImage: 'markdown:read-image',
+  saveImageAs: 'markdown:save-image-as',
+  getImageHost: 'markdown:get-image-host',
+  setImageHost: 'markdown:set-image-host',
+  uploadImage: 'markdown:upload-image',
+  viewImage: 'genoffice:view-image',
   exportRequest: 'markdown:export-request',
   exportDocx: 'markdown:export-docx',
   exportPdf: 'markdown:export-pdf',
+  prepareImageExport: 'markdown:prepare-image-export',
+  writeExportImage: 'markdown:write-export-image',
+  finishImageExport: 'markdown:finish-image-export',
   consumeHeadlessExport: 'markdown:consume-headless-export',
   headlessExportDone: 'markdown:headless-export-done',
   printRequest: 'markdown:print-request',
@@ -31,6 +44,8 @@ export const MARKDOWN_CHANNELS = {
   languageChanged: 'app:language-changed',
   getTheme: 'app:get-theme',
   themeChanged: 'app:theme-changed',
+  getDocumentTheme: 'app:get-document-theme',
+  documentThemeChanged: 'app:document-theme-changed',
   getAutoSaveDefault: 'app:get-auto-save-default',
   autoSaveDefaultChanged: 'app:auto-save-default-changed',
   getAiPanelPrefs: 'app:get-ai-panel-prefs',
@@ -38,6 +53,56 @@ export const MARKDOWN_CHANNELS = {
 } as const
 
 export type UiTheme = 'light' | 'dark' | 'system'
+
+/**
+ * Document page theme preference (genoffice#1811): what the editors' canvas/paper does
+ * relative to the UI theme. 'follow' keeps the previous single-theme behavior.
+ */
+export type DocTheme = 'follow' | 'light' | 'dark'
+
+/**
+ * Bring-your-own image host for pasted/dropped pictures in Markdown
+ * (genoffice#388). Keys are stored plaintext in the user's own settings file,
+ * like every other credential in the app. The local assets/ copy stays the
+ * fallback whenever the host is disabled, unconfigured or the upload fails.
+ */
+export type ImageHostKind = 's3' | 'smms' | 'github'
+
+export interface ImageHostConfig {
+  kind: ImageHostKind
+  /** SM.MS and GitHub take a bearer token; S3 uses the key pair below */
+  token?: string
+  /** s3: endpoint base, path-style (`https://<account>.r2.cloudflarestorage.com`, `https://oss-<region>.aliyuncs.com`, …) */
+  endpoint?: string
+  /** s3 */
+  region?: string
+  /** s3 */
+  bucket?: string
+  /** s3 */
+  accessKeyId?: string
+  /** s3 */
+  secretAccessKey?: string
+  /** s3: optional key prefix inside the bucket (e.g. `notes/`) */
+  prefix?: string
+  /** s3: public base the bucket is served from when it differs from the API endpoint (R2 custom domain, CDN); URLs become `<publicBase>/<key>` */
+  publicBase?: string
+  /** github: repository coordinates of the image branch */
+  owner?: string
+  /** github */
+  repo?: string
+  /** github: branch to commit to (default `main`) */
+  branch?: string
+  /** github: directory inside the repo (default `images/`) */
+  dir?: string
+  /** github: serve URLs from this base instead of the API's download_url (e.g. a jsDelivr CDN) */
+  urlPrefix?: string
+}
+
+export interface ImageUploadResult {
+  ok: boolean
+  url?: string
+  error?: string
+}
 
 /** shell-wide AutoSave default; updatedAt is 0 until the user has ever set it */
 export interface AutoSaveDefault {
@@ -67,6 +132,8 @@ export type SaveMarkdownResult =
       path: string
       /** Save As may relocate local images into the new document's assets directory. */
       imageRewrites?: Array<{ from: string; to: string }>
+      /** Actual persisted source after Save As image rewrites. */
+      writtenText?: string
     }
   | { ok: true; canceled: true }
   | { ok: false; error: string }
@@ -74,6 +141,9 @@ export type SaveMarkdownResult =
 /** AI channels are app-wide shared ipcMain handlers (shell registers via docs-main registerAiIpc); pass-through only */
 export const AI_CHANNELS = {
   getSettings: 'ai:get-settings',
+  setSettings: 'ai:set-settings',
+  settingsChanged: 'ai:settings-changed',
+  openModelSettings: 'ai:open-model-settings',
   gskStatus: 'ai:gsk-status',
   stream: 'ai:stream',
   streamChunk: 'ai:stream-chunk',
@@ -98,7 +168,7 @@ export interface ImageSearchResult {
   error?: string
 }
 
-export type ExportFormat = 'pdf' | 'docx' | 'docs'
+export type ExportFormat = 'pdf' | 'docx' | 'docs' | 'png'
 
 export interface ExportDocxRequest {
   /** .docx bytes, base64 */
@@ -117,12 +187,17 @@ export interface ExportPdfRequest {
   outPath?: string
 }
 
+export type ImageExportPreparation =
+  | { ok: true; id: string; pdfBase64: string }
+  | { ok: true; canceled: true }
+  | { ok: false; error: string }
+
 export type ExportResult =
   { ok: true; path: string } | { ok: true; canceled: true } | { ok: false; error: string }
 
 export interface ImageData {
   base64: string
-  mime: 'image/png' | 'image/jpeg' | 'image/gif'
+  mime: ExportImageMime
 }
 
 /** API exposed by preload to the renderer (window.markdownApi) */
@@ -147,6 +222,12 @@ export interface MarkdownApi {
   onSaveRequest(handler: (mode: SaveMode) => void): () => void
   /** Resolves a menu-save waiter when doSave exits without ever invoking save() (busy/loading) */
   sendSaveRequestAck(ok: boolean): void
+  /**
+   * Main process asks for the live document text — the MCP read of an open
+   * document, unsaved edits included; reply through sendReadTextResult.
+   */
+  onReadTextRequest(handler: () => void): () => void
+  sendReadTextResult(result: { text: string } | { error: string }): void
   /** Main process picked "Save" in the close prompt → renderer saves and replies via sendCloseSaveResult */
   onCloseSaveRequest(handler: () => void): () => void
   sendCloseSaveResult(ok: boolean): void
@@ -164,30 +245,67 @@ export interface MarkdownApi {
    */
   saveImage(data: { base64: string; ext: string }): Promise<string | null>
   /**
+   * The configured image host (genoffice#388), or null when none was ever
+   * saved. Pasted/dropped images upload here first and fall back to the
+   * local `assets/` copy when the upload fails or the host is disabled.
+   */
+  getImageHost(): Promise<ImageHostConfig | null>
+  /** Validate and persist the image host configuration; returns null on invalid input */
+  setImageHost(config: ImageHostConfig | null): Promise<ImageHostConfig | null>
+  /**
+   * Upload one image through the configured host. Returns the public URL on
+   * success; ok=false with a message when the host rejected the upload or is
+   * not configured (the renderer then keeps the local-copy fallback).
+   */
+  uploadImage(data: { base64: string; ext: string; name?: string }): Promise<{
+    ok: boolean
+    url?: string
+    error?: string
+  }>
+  /**
    * Read an image referenced by the document for DOCX embedding. Only paths
    * inside the document's directory are allowed; anything else returns null.
    */
   readImage(src: string): Promise<ImageData | null>
+  /** Save a displayed image (md-asset://, data: or remote URL) through a Save dialog */
+  saveImageAs(src: string): Promise<{ ok: boolean; path?: string; error?: string }>
+  /** Native context menu "View Image" → renderer opens the viewer */
+  onViewImage(handler: (src: string) => void): () => void
   /** Shell menu export → renderer serializes and calls exportDocx/exportPdf */
   onExportRequest(handler: (format: ExportFormat) => void): () => void
   /** Shell menu Print → renderer builds the print HTML and opens the system print dialog */
   onPrintRequest(handler: () => void): () => void
   exportDocx(request: ExportDocxRequest): Promise<ExportResult>
   exportPdf(request: ExportPdfRequest): Promise<ExportResult>
+  prepareImageExport(request: Omit<ExportPdfRequest, 'outPath'>): Promise<ImageExportPreparation>
+  writeExportImage(
+    id: string,
+    page: number,
+    pngBase64: string,
+  ): Promise<{ ok: boolean; error?: string }>
+  finishImageExport(id: string, success: boolean): Promise<ExportResult>
   getLanguage(): Promise<Lang>
   onLanguageChanged(handler: (lang: Lang) => void): () => void
   getTheme(): Promise<UiTheme>
   onThemeChanged(handler: (theme: UiTheme) => void): () => void
+  getDocumentTheme(): Promise<DocTheme>
+  onDocumentThemeChanged(handler: (theme: DocTheme) => void): () => void
   getAutoSaveDefault(): Promise<AutoSaveDefault>
   onAutoSaveDefaultChanged(handler: (value: AutoSaveDefault) => void): () => void
   /** AI panel text size + chat-input spellcheck (Settings → General in the shell) */
   getAiPanelPrefs(): Promise<AiPanelPrefs>
+  setAiPanelPrefs(patch: Partial<AiPanelPrefs>): Promise<AiPanelPrefs>
   onAiPanelPrefsChanged(handler: (prefs: AiPanelPrefs) => void): () => void
   /** press on the shell chrome (tab strip is a sibling WebContentsView whose
    *  clicks produce no DOM event here) — dismiss open popovers */
   onChromePressed(handler: () => void): () => void
   getAiSettings(): Promise<AiSettings>
-  /** Genspark login state (shell-registered ai:gsk-status) — gates generate_image with the cloud-tools toggle */
+  setAiSettings(settings: AiSettings): Promise<void>
+  /** ai-settings.json was rewritten by any renderer; re-read it */
+  onAiSettingsChanged(handler: () => void): () => void
+  /** shell only: switch to Home and open Settings › AI Model (rejects in standalone) */
+  openAiModelSettings(): Promise<void>
+  /** UniWork cloud sign-in state (shell-registered ai:gsk-status; stub, always signed out while the seam is off) */
   aiGskStatus(): Promise<GenSparkAccountStatus>
   aiStream(request: AiStreamRequest): Promise<void>
   aiStreamCancel(requestId: string): Promise<void>
@@ -198,7 +316,7 @@ export interface MarkdownApi {
   imageSearch(query: string, maxResults?: number): Promise<ImageSearchResult>
   /** Download an image URL in the main process (CORS-free, scheme/target validated) */
   fetchImage(url: string): Promise<{ base64: string; mime: string } | null>
-  /** Genspark cloud image generation (markdown-owned channel, gsk login required) */
+  /** AI image generation via the configured media provider (markdown-owned channel) */
   aiGenerateImage(op: { prompt: string; aspectRatio?: string }): Promise<{
     url?: string
     error?: string

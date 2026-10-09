@@ -6,23 +6,30 @@ import {
   elementSpid,
   ensureBuiltinLayout,
   getSections,
+  normalizeSections,
   getSlideAnimations,
   getSlideTransition,
   listSlideLayouts,
   openPptx,
   shouldOfferBuiltinLayouts,
 } from '@genoffice/pptx-engine'
+import { runTxn } from '@genoffice/pptx-ops'
 import { tm } from '../../main/i18n-main'
 import type {
   AddBlankSlideOp,
   AddSlideOp,
   AddSlideWithLayoutOp,
+  DeleteSlidesOp,
+  DuplicateSlidesOp,
   AnimationItem,
   MoveSlideOp,
+  MoveSlidesOp,
+  RemoveSectionSlidesOp,
   OpenResult,
   SetAdvanceTimesOp,
   SetAnimationsOp,
   SetSlideHiddenOp,
+  SetSlidesHiddenOp,
   SetSlideLayoutOp,
   SetSlideSizeOp,
   SetTransitionOp,
@@ -30,7 +37,8 @@ import type {
 } from '../../shared/ipc'
 import type { HandlerContext } from '../host-io'
 import { buildAllRenderSlides, deckDefaultFont, rebuildSlide } from '../render'
-import { createSession, pushHistory, sessions, type Session } from '../state'
+import { planSlideDuplicates, planSlideMoves } from '../../shared/slide-selection'
+import { createSession, markMetaDirty, pushHistory, sessions, type Session } from '../state'
 import { journaledTxn, sessionTxn } from '../txn'
 
 // 'builtin:<key>' virtual paths get injected into the package on first use
@@ -71,6 +79,7 @@ export const slideHandlers = {
     })
     if (!r) return null
     session.fitWidthPx = op.fitWidthPx
+    markMetaDirty(session)
     return {
       slides: buildAllRenderSlides(session.opened, op.fitWidthPx),
       index: op.sourceIndex + 1,
@@ -81,13 +90,23 @@ export const slideHandlers = {
     const session = sessions.get(ctx.clientId)
     if (!session) return null
     const r = sessionTxn(session, {
-      ops: [{ op: 'addBlankSlide', target: { slide: op.sourceIndex } }],
+      ops: [
+        { op: 'addBlankSlide', target: { slide: op.sourceIndex } },
+        // ops are validated against the pre-transaction deck, so move the existing
+        // source slide down past the new one rather than targeting the new index
+        ...(op.before
+          ? [{ op: 'moveSlide', target: { slide: op.sourceIndex }, to: op.sourceIndex + 1 }]
+          : []),
+      ],
     })
     if (!r) return null
     session.fitWidthPx = op.fitWidthPx
+    // Always: the blank slide is parsed fresh, so neither structureDirty nor an
+    // element dirty flag is set and the insert would otherwise be unsaveable.
+    markMetaDirty(session)
     return {
       slides: buildAllRenderSlides(session.opened, op.fitWidthPx),
-      index: op.sourceIndex + 1,
+      index: op.before ? op.sourceIndex : op.sourceIndex + 1,
     }
   },
 
@@ -122,6 +141,7 @@ export const slideHandlers = {
       return null
     }
     session.fitWidthPx = op.fitWidthPx
+    markMetaDirty(session)
     return {
       slides: buildAllRenderSlides(session.opened, op.fitWidthPx),
       index: op.sourceIndex + 1,
@@ -158,7 +178,7 @@ export const slideHandlers = {
     if (!session) return null
     const r = sessionTxn(session, { ops: [{ op: 'setSlideSize', cx: op.cx, cy: op.cy }] })
     if (!r) return null
-    session.metaDirty = true
+    markMetaDirty(session)
     return buildAllRenderSlides(session.opened, session.fitWidthPx)
   },
 
@@ -171,7 +191,9 @@ export const slideHandlers = {
     const session = sessions.get(ctx.clientId)
     if (!session) return null
     const r = sessionTxn(session, { ops: [{ op: 'deleteSlide', target: { slide: slideIndex } }] })
-    return r ? buildAllRenderSlides(session.opened, session.fitWidthPx) : null
+    if (!r) return null
+    markMetaDirty(session)
+    return buildAllRenderSlides(session.opened, session.fitWidthPx)
   },
 
   // Drag to reorder slides (sldIdLst + deck.slides + section membership); must send back the full RenderSlide set
@@ -182,7 +204,7 @@ export const slideHandlers = {
       ops: [{ op: 'moveSlide', target: { slide: op.fromIndex }, to: op.toIndex }],
     })
     if (!r) return null
-    session.metaDirty = true
+    markMetaDirty(session)
     return {
       slides: buildAllRenderSlides(session.opened, session.fitWidthPx),
       sections: getSections(session.opened),
@@ -264,6 +286,9 @@ export const slideHandlers = {
         trigger: a.trigger,
         durationMs: a.durationMs,
         delayMs: a.delayMs,
+        // a modelled directional effect carries its own direction; a top wipe must not
+        // come back to the player as a bare 'wipe' and play bottom-up
+        ...(a.direction != null ? { direction: a.direction } : {}),
         ...(a.motionPath != null ? { motionPath: a.motionPath } : {}),
         ...(a.paragraph != null ? { paragraph: a.paragraph } : {}),
       })
@@ -290,5 +315,94 @@ export const slideHandlers = {
       ops: [{ op: 'setAnimations', target: { slide: op.slideIndex }, items: op.items }],
     })
     return r !== null
+  },
+  // Highest index first: every op is validated against the pre-transaction deck
+  // and applied in sequence, so the remaining indexes stay valid.
+  'slides:delete-slides': (ctx: HandlerContext, op: DeleteSlidesOp) => {
+    const session = sessions.get(ctx.clientId)
+    if (!session) return null
+    const indexes = [...new Set(op.slideIndexes)].sort((a, b) => b - a)
+    if (!indexes.length || indexes.length >= session.opened.deck.slides.length) return null
+    const r = sessionTxn(session, {
+      ops: indexes.map((i) => ({ op: 'deleteSlide' as const, target: { slide: i } })),
+    })
+    if (!r) return null
+    markMetaDirty(session)
+    return buildAllRenderSlides(session.opened, session.fitWidthPx)
+  },
+
+  'slides:duplicate-slides': (ctx: HandlerContext, op: DuplicateSlidesOp) => {
+    const session = sessions.get(ctx.clientId)
+    if (!session) return null
+    const steps = planSlideDuplicates(op.slideIndexes)
+    if (!steps.length) return null
+    const r = sessionTxn(session, {
+      ops: steps.map((st) =>
+        'duplicate' in st
+          ? { op: 'duplicateSlide' as const, target: { slide: st.duplicate } }
+          : { op: 'moveSlide' as const, target: { slide: st.from }, to: st.to },
+      ),
+    })
+    if (!r) return null
+    session.fitWidthPx = op.fitWidthPx
+    // Not just for multi-slide plans: a single duplicate is parsed fresh too and
+    // would otherwise leave the deck changed but reported clean.
+    markMetaDirty(session)
+    return {
+      slides: buildAllRenderSlides(session.opened, op.fitWidthPx),
+      index: Math.max(...op.slideIndexes) + 1,
+    }
+  },
+
+  'slides:set-slides-hidden': (ctx: HandlerContext, op: SetSlidesHiddenOp) => {
+    const session = sessions.get(ctx.clientId)
+    if (!session || !op.slideIndexes.length) return null
+    const r = sessionTxn(session, {
+      ops: op.slideIndexes.map((i) => ({
+        op: 'setHidden' as const,
+        target: { slide: i },
+        hidden: op.hidden,
+      })),
+    })
+    return r ? buildAllRenderSlides(session.opened, session.fitWidthPx) : null
+  },
+
+  'slides:move-slides': (ctx: HandlerContext, op: MoveSlidesOp) => {
+    const session = sessions.get(ctx.clientId)
+    if (!session) return null
+    const steps = planSlideMoves(session.opened.deck.slides.length, op.slideIndexes, op.insertAt)
+    if (!steps.length) return null
+    const r = sessionTxn(session, {
+      ops: steps.map((st) => ({ op: 'moveSlide' as const, target: { slide: st.from }, to: st.to })),
+    })
+    if (!r) return null
+    markMetaDirty(session)
+    return {
+      slides: buildAllRenderSlides(session.opened, session.fitWidthPx),
+      sections: getSections(session.opened),
+    }
+  },
+
+  // Section header + its slides in one undo step. Slides go highest index first so the
+  // numeric targets stay valid as the deck shrinks; the deck keeps at least one slide.
+  'slides:remove-section-slides': (ctx: HandlerContext, op: RemoveSectionSlidesOp) => {
+    const session = sessions.get(ctx.clientId)
+    if (!session) return null
+    const total = session.opened.deck.slides.length
+    const { lead, sections } = normalizeSections(getSections(session.opened), total)
+    const indices = op.id == null ? lead : sections.find((s) => s.id === op.id)?.slideIndices
+    if (!indices || indices.length >= total) return null
+    const ops: Parameters<typeof runTxn>[1]['ops'] = [...indices]
+      .reverse()
+      .map((i) => ({ op: 'deleteSlide', target: { slide: i } }))
+    if (op.id != null) ops.push({ op: 'removeSection', id: op.id })
+    if (!ops.length) return null
+    const r = sessionTxn(session, { ops })
+    if (!r) return null
+    markMetaDirty(session)
+    return {
+      slides: buildAllRenderSlides(session.opened, session.fitWidthPx),
+      sections: getSections(session.opened),
+    }
   },
 }

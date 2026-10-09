@@ -1,6 +1,6 @@
 # Text ops
 
-> Replace or restyle the text of a text box, shape or table: whole-body rewrite (setText), run-level font patch (setFont), paragraph format patch (setParagraphFormat).
+> Replace or restyle the text of a text box, shape or table: whole-body rewrite (setText), run-level font patch (setFont), paragraph format patch (setParagraphFormat), typeset math (insertEquation).
 
 All three take `target:{slide, el}`. `el` is an element id from the outline or
 `read_slide` (`e_*` ids are durable). For a direct child of a group put the
@@ -17,16 +17,16 @@ restyle inherit the formatting of the run they replace (position-wise), so a
 plain `{text}` run keeps the original size, color and font. A shape that has
 never had text gets a text body created (autoshapes default to centered text).
 
-| Field                                                    | Type                                                                                          | Notes                                                                                             |
-| -------------------------------------------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| paragraphs                                               | array                                                                                         | Required, one object per paragraph; an empty array clears the text                                |
-| paragraphs[].runs                                        | array of `{text, bold?, italic?, underline?, strike?, fontSize?, fontFamily?, color?, link?}` | `fontSize` in pt; `link` is `{kind:"url",url}` or `{kind:"slide",slideIndex}` or `null` to remove |
-| paragraphs[].align                                       | `"left"` / `"center"` / `"right"` / `"justify"`                                               | Optional                                                                                          |
-| paragraphs[].level                                       | 0..8                                                                                          | Indent level for multi-level lists                                                                |
-| paragraphs[].bullet                                      | `"char"` / `"number"` / `"none"`                                                              | Optional; `bulletChar` sets a custom glyph                                                        |
-| paragraphs[].lineSpacingPct, spaceBeforePt, spaceAfterPt | number                                                                                        | Optional paragraph spacing                                                                        |
-| paragraphs[].rtl                                         | boolean                                                                                       | Optional base direction                                                                           |
-| group                                                    | string                                                                                        | Only for a direct child of a group: the group id                                                  |
+| Field                                                    | Type                                                                                          | Notes                                                                                                                                                                                                                  |
+| -------------------------------------------------------- | --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| paragraphs                                               | array                                                                                         | Required, one object per paragraph; an empty array clears the text                                                                                                                                                     |
+| paragraphs[].runs                                        | array of `{text, bold?, italic?, underline?, strike?, fontSize?, fontFamily?, color?, link?}` | `fontSize` in pt; `link` is `{kind:"url",url}`, `{kind:"slide",slideIndex}`, `{kind:"action",action}` (`nextslide` / `previousslide` / `firstslide` / `lastslide` / `lastslideviewed` / `endshow`) or `null` to remove |
+| paragraphs[].align                                       | `"left"` / `"center"` / `"right"` / `"justify"`                                               | Optional                                                                                                                                                                                                               |
+| paragraphs[].level                                       | 0..8                                                                                          | Indent level for multi-level lists                                                                                                                                                                                     |
+| paragraphs[].bullet                                      | `"char"` / `"number"` / `"none"`                                                              | Optional; `bulletChar` sets a custom glyph                                                                                                                                                                             |
+| paragraphs[].lineSpacingPct, spaceBeforePt, spaceAfterPt | number                                                                                        | Optional paragraph spacing                                                                                                                                                                                             |
+| paragraphs[].rtl                                         | boolean                                                                                       | Optional base direction                                                                                                                                                                                                |
+| group                                                    | string                                                                                        | Only for a direct child of a group: the group id                                                                                                                                                                       |
 
 ```json
 {
@@ -58,7 +58,7 @@ Related: `setFont` (restyle without changing the words), `setTableCell` (table c
 
 ### setFont
 
-`{font:{fontFamily?,fontSizePt?,bold?,italic?,underline?,strike?,color?}} — merges onto every run of the element`
+`{font:{fontFamily?,fontSizePt?,fontSizeStep?,bold?,italic?,underline?,strike?,color?}} — merges onto every run of the element`
 
 Applies the given properties to every run of the element (or every cell of a
 table) and leaves everything else untouched. Use it for "make the title blue
@@ -68,6 +68,7 @@ and bold" style requests; use `setText` when the words change.
 | ------------------------------------ | ----------- | ---------------------------------------------- |
 | font.fontFamily                      | string      | Omit to keep the theme font (recommended)      |
 | font.fontSizePt                      | number > 0  | Points                                         |
+| font.fontSizeStep                    | {dir, mode} | Relative per run: 'ladder' rung or 'point' ±1  |
 | font.bold, italic, underline, strike | boolean     | Only the keys you pass change                  |
 | font.color                           | `"#RRGGBB"` | Explicit color; clears theme-color inheritance |
 | group                                | string      | Only for a direct child of a group             |
@@ -123,3 +124,32 @@ Common mistakes
 
 - Negative spacing values: all `...Pct` / `...Pt` / `...Emu` fields must be >= 0.
 - Using `setParagraphFormat` to change font size: that is a run property, use `setFont`.
+
+### insertEquation
+
+`{latex,position?} — target:{slide, el}; or {latex,box:{x,y,cx,cy}} to create a text box for it`
+
+Adds a typeset equation (PowerPoint's own math format) as a centered paragraph
+at the `position` (`"end"`, default, or `"start"`) of a text or shape element,
+or in a new text box at `box` (EMU, unit suffixes allowed). Older readers and
+the UniWork Office preview show the linearized text (`E=mc²`); PowerPoint 2010+
+renders the formula. LaTeX subset: `\frac`, `\sqrt[n]`, `^`, `_`,
+`\sum`/`\int`/`\prod` with limits, `\left(` `\right)`, matrices, Greek
+letters, accents, `\text{}`.
+
+```json
+{
+  "op": "insertEquation",
+  "target": { "slide": 0, "el": "e_TEXT" },
+  "latex": "E = mc^2"
+}
+```
+
+```json
+{
+  "op": "insertEquation",
+  "target": { "slide": 0 },
+  "box": { "x": 914400, "y": 2743200, "cx": 4572000, "cy": 914400 },
+  "latex": "\\frac{a}{b} + \\sqrt{x^2 + y^2}"
+}
+```

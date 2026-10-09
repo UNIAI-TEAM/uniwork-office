@@ -41,6 +41,8 @@ import type {
   ExportImagesOp,
   ExportImagesResult,
   ExportPdfOp,
+  SavePictureOp,
+  SavePictureResult,
   ExportPdfResult,
   MenuCommand,
   OpenResult,
@@ -61,9 +63,10 @@ import { TIMEOUTS, errorCode } from '../../docs/bridge/frame-port'
 import type { ModuleBridgePort } from '../../docs/bridge/module-bridge'
 import { idFromPath, pathFor } from '../../docs/bridge/webapi'
 import { ask, hideFatal, showFatal, text, type WebKey } from './dialogs'
-import { printDocument, printHtml, slidesPdf, zipImages } from './exports'
+import { exportPagesToPngs, printDocument, printHtml, slidesPdf, zipImages } from './exports'
 import { createWebFontMetrics, loadBundledFonts, registerEmbeddedFonts } from './fonts'
 import { tiffToPng } from './tiff'
+import { pictureDpiFor } from '../../../apps/slides/src/main/picture-frame'
 import { createDocState, createWebHostIO, SENTINEL_PREFIX, WebSaveError } from './web-host-io'
 
 /**
@@ -92,7 +95,7 @@ const READ_ONLY_CHANNELS: ReadonlySet<SessionChannel> = new Set<SessionChannel>(
   'slides:master-enter',
   'slides:master-open',
   'slides:master-close',
-  'slides:copy-slide',
+  'slides:copy-slides',
   'slides:copy-elements',
   'slides:has-slide-clipboard',
   'slides:clipboard-probe',
@@ -193,6 +196,7 @@ export function createWebSlidesApi(
     createFontMetrics: () => createWebFontMetrics(),
     decodeTiff: tiffToPng,
     defer: (fn) => void setTimeout(fn, 0),
+    defaultPictureDpi: pictureDpiFor(/Mac/i.test(navigator.platform)),
     events: {
       historyChanged: (ids, s) => {
         if (!ids.includes(WEB_CLIENT_ID)) return
@@ -548,10 +552,12 @@ export function createWebSlidesApi(
   async function clipboardExternal(): ReturnType<SlidesApi['clipboardExternal']> {
     const c = clip()
     const text = c ? await c.readText().catch(() => null) : null
-    const ours = (format: string) =>
-      host.clipboard.hasMarker(format) && (text === null || text === SENTINEL_PREFIX + format)
+    const ours = (format: string, value?: string) =>
+      host.clipboard.hasMarker(format, value) &&
+      (text === null || text === SENTINEL_PREFIX + format)
     if (appClipboard.slide && ours(SLIDE_MARKER)) return { kind: 'slide' }
-    if (appClipboard.elements && ours(ELEMENTS_MARKER)) return { kind: 'internal' }
+    if (appClipboard.elements && ours(ELEMENTS_MARKER, appClipboard.elements.token))
+      return { kind: 'internal' }
     if (c?.read) {
       try {
         for (const item of await c.read()) {
@@ -601,6 +607,7 @@ export function createWebSlidesApi(
     onAutoSaveDefaultChanged: disposer,
     getAiPanelPrefs: () => aiStubs.getAiPanelPrefs() as Promise<AiPanelPrefs>,
     onAiPanelPrefsChanged: disposer,
+    setAiPanelPrefs: () => aiStubs.getAiPanelPrefs() as Promise<AiPanelPrefs>,
     onChromePressed: disposer,
 
     // show: the Fullscreen API on the frame (the desktop snaps the native window)
@@ -813,11 +820,22 @@ export function createWebSlidesApi(
     addMediaBytes: engine('slides:add-media-bytes'),
     getMediaData: mediaData,
     insertModel3d: engine('slides:insert-model3d'),
-    copySlide: engine('slides:copy-slide'),
+    copySlides: engine('slides:copy-slides'),
     pasteSlide: engine('slides:paste-slide'),
     repasteSlide: engine('slides:repaste-slide'),
     hasSlideClipboard: engine('slides:has-slide-clipboard'),
     copyElements: engine('slides:copy-elements'),
+    // the desktop adds a picture of the copied elements for other apps; the frame keeps the
+    // text sentinel on the system clipboard only (an image write would replace it)
+    copyElementsImage: async () => false,
+    editTransformMulti: engine('slides:edit-transform-multi'),
+    setShapeGeometry: engine('slides:set-shape-geometry'),
+    deleteElements: engine('slides:delete-elements'),
+    deleteSlides: engine('slides:delete-slides'),
+    duplicateSlides: engine('slides:duplicate-slides'),
+    setSlidesHidden: engine('slides:set-slides-hidden'),
+    removeSectionSlides: engine('slides:remove-section-slides'),
+    moveSlides: engine('slides:move-slides'),
     pasteElements: engine('slides:paste-elements'),
     duplicateElements: engine('slides:duplicate-elements'),
     clipboardExternal,
@@ -837,6 +855,14 @@ export function createWebSlidesApi(
 
     // export / print: in-frame downloads and printing (no directory or path on the web)
     pickExportDir: async () => 'web-download',
+    savePicture: async (op: SavePictureOp): Promise<SavePictureResult> => {
+      const name = withExt(safeFileName(op.defaultName, 'picture'), '.png')
+      download(
+        name,
+        new Blob([base64ToBytes(op.pngBase64) as Uint8Array<ArrayBuffer>], { type: 'image/png' }),
+      )
+      return { ok: true, path: name }
+    },
     exportImages: async (op: ExportImagesOp): Promise<ExportImagesResult> => {
       try {
         const name = safeFileName(`${op.baseName}-images.zip`, 'slides-images.zip')
@@ -854,7 +880,11 @@ export function createWebSlidesApi(
           safeFileName(op.filePath.split(/[\\/]/).pop() || 'slides', 'slides'),
           '.pdf',
         )
-        const pdf = await slidesPdf(op)
+        const pdf = await slidesPdf({
+          pngsBase64: await exportPagesToPngs(op),
+          widthPx: op.widthPx,
+          heightPx: op.heightPx,
+        })
         download(name, new Blob([pdf as Uint8Array<ArrayBuffer>], { type: 'application/pdf' }))
         return { ok: true, path: name }
       } catch (err) {
@@ -877,9 +907,9 @@ export function createWebSlidesApi(
     onAiStream: (handler) =>
       aiStubs.onAiStream(handler as Parameters<typeof aiStubs.onAiStream>[0]),
     aiGskStatus: async () => ({ loggedIn: false }),
-    aiGskLogin: async () => {},
     aiLogRunFailure: async () => {},
-    gskStatus: async () => ({ available: false }),
+    onAiSettingsChanged: disposer,
+    openAiModelSettings: async () => {},
     webSearch: async () => ({
       results: [],
       method: 'none',
@@ -895,6 +925,7 @@ export function createWebSlidesApi(
     generateImage: async () => ({ error: aiUnavailableMessage('image generation') }),
     analyzeMedia: async () => ({ error: aiUnavailableMessage('media analysis') }),
     cloudGenStatus: async () => ({ enabled: false }),
+    cloudPageCancel: async () => {},
     cloudGeneratePage: async () => ({ ok: false, error: aiUnavailableMessage('slide generation') }),
     localGeneratePage: async () => ({ ok: false, error: aiUnavailableMessage('slide generation') }),
     landGeneratedPages: async () => ({ error: aiUnavailableMessage('slide generation') }),

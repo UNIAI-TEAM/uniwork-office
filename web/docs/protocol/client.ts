@@ -127,6 +127,8 @@ export interface DocsFrameClient {
   onLanguage(listener: (locale: string) => void): () => void
   setDirty(dirty: boolean): void
   setTitle(title: string): void
+  /** a frame modal opened / closed (de-duplicated) */
+  setModal(open: boolean): void
   reportHeight(height: number): void
   reportSaved(payload: SavedPayload): void
   reportError(error: ProtocolErrorShape | unknown, fatal?: boolean): void
@@ -154,6 +156,7 @@ export function createDocsFrameClient(options: DocsFrameClientOptions): DocsFram
   let refreshing: Promise<string> | null = null
   let session: FrameSession | null = null
   let lastDirty: boolean | null = null
+  let lastModal = false
 
   let resolveInit!: (s: FrameSession) => void
   let rejectInit!: (e: DocsProtocolError) => void
@@ -375,6 +378,11 @@ export function createDocsFrameClient(options: DocsFrameClientOptions): DocsFram
       guarded(() => ep.emit('dirty', { dirty }))
     },
     setTitle: (title) => guarded(() => ep.emit('title', { title })),
+    setModal(open) {
+      if (open === lastModal) return
+      lastModal = open
+      guarded(() => ep.emit('modal', { open }))
+    },
     reportHeight: (height) =>
       guarded(() => ep.emit('resize', { height: Math.max(0, Math.ceil(height)) })),
     reportSaved: (payload) => guarded(() => ep.emit('saved', payload)),

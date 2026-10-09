@@ -1,73 +1,24 @@
 # UniWork Office Privacy
 
-Last updated: 14 September 2026
+Last updated: 8 October 2026
 
 UniWork Office opens, edits, and saves documents locally. Document editing does not
-upload files to UniWork. Inherited AI features require a network connection and send
-requests only when you use them.
+upload files to UniWork.
 
-UniWork GO-1 packages do not inject analytics credentials. Source builds and this
-fork send no usage analytics unless someone later injects `GENOFFICE_GA4_*` at
-pack time.
+## Usage statistics
 
-## Usage analytics
+UniWork Office does not collect usage statistics. It has no analytics or telemetry
+component, no install identifier is created for reporting, and there is no setting to
+turn reporting on or off because nothing is reported.
 
-Upstream official GenOffice builds enabled GA4 by default when credentials were
-injected at package time. That path still exists in code. UniWork GO-1 does not
-inject those secrets, so the tracker is a no-op.
+## Network requests you trigger
 
-You can disable reporting at any time under **Settings → General → Send
-anonymous usage statistics**. An explicit opt-out is remembered.
+- AI features (assistant panels, web and file search, image tools) require a network
+  connection and send a request only when you use them, to the AI provider you chose or
+  to your UniWork account.
+- Sign-in, credit and plan information, and update checks contact the UniWork services
+  or the update feed configured for your build.
+- Opening a link from a document opens it in your default browser.
 
-### Events and parameters
-
-When enabled, the app sends these events:
-
-- `install_first_launch` — marks the first analytics-enabled use of a newly
-  assigned anonymous `client_id`; used for retention cohorts
-- `app_launch` — no event-specific parameter
-- `file_open` — `ext`, the file extension such as `docx` or `xlsx`
-- `file_new` — `kind`, one of `docx`, `xlsx`, `pptx`, `md`, or `pdf`
-- `login_click` — no event-specific parameter
-- `login_success` — no event-specific parameter
-
-Every event includes:
-
-- `app_version`
-- `platform`
-- `os_version`
-- `ui_lang`
-- a per-process `session_id` derived from the process start time
-- `engagement_time_msec` with the fixed value `100`
-
-When available, the payload also includes `country_id`, the two-letter country
-code from the operating system's regional locale. This can differ from the
-user's physical location.
-
-The Google Analytics 4 payload also uses a random install UUID as `client_id`.
-The country code is sent through GA4's country-only `user_location` field; the
-app does not send a city or region. Neither identifier is a Genspark account or
-email address.
-
-## Network information
-
-Events are sent to Google Analytics 4 using the Measurement Protocol over
-HTTPS. As the HTTPS recipient, Google necessarily sees the connection's public
-IP address and transport metadata, and may use them for coarse geolocation and
-security or spam-abuse processing. GenOffice does not add an IP address to the
-event payload.
-
-## Data not collected by analytics
-
-GenOffice analytics never sends:
-
-- document content
-- file names
-- file paths
-- Genspark account identity
-- email addresses
-
-The analytics metadata is injected only into packaged official builds and is
-not part of this repository. Source builds and forks without that packaged
-metadata install a no-op tracker and send no usage analytics; all features work
-the same.
+Document content, file names and file paths are never sent anywhere except as part of an
+AI request you start yourself.

@@ -156,7 +156,8 @@ async function videoPoster(file: File): Promise<{ bytes: Uint8Array; ext: string
 export function createWebHostIO(deps: WebHostDeps): HostIO {
   const pick = deps.pickFiles ?? pickFiles
   const origin = new WeakMap<PickedFile, File>()
-  const markers = new Set<string>()
+  /** format -> value (the element clipboard writes its token as the value) */
+  const markers = new Map<string, string>()
   const clip = (): Pick<Clipboard, 'writeText' | 'readText'> | null =>
     deps.clipboard ?? (typeof navigator !== 'undefined' ? (navigator.clipboard ?? null) : null)
   /** the path api.saveAs just created: writeDeck must not upload the same bytes again */
@@ -310,6 +311,10 @@ export function createWebHostIO(deps: WebHostDeps): HostIO {
   return {
     pickImage: (_purpose: ImagePickPurpose) => pickOne(IMAGE_ACCEPT),
     pickMedia: (kind: MediaPickKind) => pickOne(MEDIA_ACCEPT[kind]),
+    // a browser page cannot read a path: drops reach the frame as bytes (add-media-bytes base64)
+    readPath: async (path: string) => {
+      throw new Error(`no file system access on the web: ${path}`)
+    },
 
     async imageSize(file) {
       const source = origin.get(file) ?? new Blob([copyBuffer(file.bytes)])
@@ -339,14 +344,15 @@ export function createWebHostIO(deps: WebHostDeps): HostIO {
       }),
 
     clipboard: {
-      writeMarker(format) {
+      writeMarker(format, value = '1') {
         markers.clear()
-        markers.add(format)
+        markers.set(format, value)
         void clip()
           ?.writeText(SENTINEL_PREFIX + format)
           .catch(() => {})
       },
-      hasMarker: (format) => markers.has(format),
+      hasMarker: (format, value) =>
+        markers.has(format) && (value === undefined || markers.get(format) === value),
       // the async Clipboard API cannot answer synchronously: the slidesApi bridge answers
       // clipboardExternal / clipboardProbe itself; these keep the registry handlers total
       readImagePng: () => null,

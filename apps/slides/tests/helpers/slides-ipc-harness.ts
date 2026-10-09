@@ -8,6 +8,7 @@
  * filter list or event payload shows up in the trace.
  */
 import { createHash } from 'node:crypto'
+import { safeExternalUrl } from '@genoffice/electron-utils/safe-external-url'
 
 type Handler = (event: unknown, ...args: unknown[]) => unknown
 type Listener = (event: unknown, ...args: unknown[]) => void
@@ -207,7 +208,8 @@ export const electronUtilsModule = {
   installContextMenu: () => {},
   installNavigationGuard: () => {},
   isHeadlessMode: () => false,
-  safeExternalUrl: () => null,
+  // the real gate, the same function the session handlers import through the subpath
+  safeExternalUrl,
   saveAsSuggestion: (path: string, name: string) => {
     harness.platform.push({ kind: 'saveAsSuggestion', detail: [relPath(path), name] })
     return name

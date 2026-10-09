@@ -263,6 +263,9 @@ base-uri 'self'; form-action 'self'; frame-ancestors 'self'`), `X-Frame-Options:
 
 ## 6. Open items
 
+Decided (user, 2026-10-09): **no autosave on the web**, for Docs and every other module. Saving is an explicit
+user save only; `autoSaveToDisk` stays `false` in the web capability list, so the AutoSave toggle stays hidden.
+
 - **No autosave on the web: decided** (user, 2026-10-09 09:35 UTC+7, via the Advisor). Docs and every other genoffice module
   on the web save only on an explicit user save; `autoSaveToDisk` (and each module's autosave key) stays `false` and AutoSave stays
   hidden in the web capability list. Closed, not an open item.

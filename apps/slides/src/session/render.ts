@@ -20,6 +20,7 @@ import {
   makeViewport,
   EMU_PER_PX_96,
   type RenderSlide,
+  type RenderTextLayout,
 } from '@genoffice/pptx-render'
 import { displayMime } from '../main/media-mime'
 import { neutralizeJpegOrientation } from '../main/jpeg-orientation'
@@ -171,9 +172,10 @@ function findEl(slide: Slide, sourceId: string): TextElement | undefined {
 
 /**
  * spAutoFit (autofit='resize', "resize shape to fit text"): after a text change, the box height
- * grows/shrinks with the content and is written back to cy. rendered = the
- * rebuilt result after this change; when the height changed, update the transform and rebuild
- * once more. Top-level elements only (group children use a different coordinate system, skip).
+ * grows/shrinks with the content and is written back to cy; a wrap="none" body (PowerPoint's
+ * click-to-type text box) also follows its widest line in cx. rendered = the rebuilt result
+ * after this change; when the size changed, update the transform and rebuild once more.
+ * Top-level elements only (group children use a different coordinate system, skip).
  */
 export function applyAutofitResize(
   session: Session,
@@ -187,19 +189,41 @@ export function applyAutofitResize(
   if (!el?.text || el.text.autofit !== 'resize') return rendered
   const node = rendered.nodes.find((n) => n.sourceId === el.id)
   if (!node || (node.type !== 'shape' && node.type !== 'text') || !node.text) return rendered
-  const needH = node.text.contentHeight + node.text.insets.t + node.text.insets.b
-  if (Math.abs(needH - node.box.h) < 1) return rendered
+  const text = node.text
+  const needH = text.contentHeight + text.insets.t + text.insets.b
+  const needW = !text.wrap && !text.vert ? nowrapContentWidth(text) : node.box.w
+  if (Math.abs(needH - node.box.h) < 1 && Math.abs(needW - node.box.w) < 1) return rendered
   const baseWidthPx = session.opened.deck.size.cx / EMU_PER_PX_96
   const scale = session.fitWidthPx / baseWidthPx
+  const toEmu = (px: number) => Math.max(Math.round((px / scale) * EMU_PER_PX_96), 1)
+  // A nowrap box grows around its alignment: right-aligned text keeps the right edge, centered keeps the center
+  const align = text.lines[0]?.align
+  const shiftX =
+    align === 'right' ? node.box.w - needW : align === 'center' ? (node.box.w - needW) / 2 : 0
   el.transform = {
     ...el.transform,
     offset: {
       ...el.transform.offset,
-      cy: Math.max(Math.round((needH / scale) * EMU_PER_PX_96), 1),
+      x: el.transform.offset.x + Math.round((shiftX / scale) * EMU_PER_PX_96),
+      cx: toEmu(needW),
+      cy: toEmu(needH),
     },
   }
   el.dirtyTransform = true
   return rebuildSlide(session, slideIndex)
+}
+
+/** Box width a nowrap body needs: widest laid-out line plus the insets (an empty body keeps the insets alone). */
+function nowrapContentWidth(text: RenderTextLayout): number {
+  let left = Infinity
+  let right = -Infinity
+  for (const line of text.lines)
+    for (const run of line.runs) {
+      left = Math.min(left, run.x)
+      right = Math.max(right, run.x + run.widthPx)
+    }
+  const content = right > left ? right - left : 0
+  return content + text.insets.l + text.insets.r
 }
 
 /**

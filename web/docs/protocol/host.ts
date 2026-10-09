@@ -112,7 +112,7 @@ export interface DocsFrameHost {
   setLanguage(locale: string): void
   /** proactive token rotation */
   pushToken(token: TokenPayload): void
-  on<K extends 'dirty' | 'title' | 'resize' | 'saved' | 'error'>(
+  on<K extends 'dirty' | 'title' | 'modal' | 'resize' | 'saved' | 'error'>(
     type: K,
     listener: FrameEventListener<K>,
   ): () => void

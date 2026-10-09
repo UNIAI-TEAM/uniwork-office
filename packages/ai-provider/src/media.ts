@@ -5,6 +5,7 @@ import type {
   AiMediaSettings,
   AiSettings,
 } from './types'
+import { uniworkCloudEnabled } from './uniwork-cloud'
 
 export const OPENAI_IMAGES_BASE_URL = 'https://api.openai.com/v1'
 export const GEMINI_MEDIA_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta'
@@ -14,14 +15,18 @@ export const XAI_BASE_URL = 'https://api.x.ai/v1'
 /** DashScope root: images ride /api/v1/services/aigc/..., understanding rides /compatible-mode/v1 */
 export const DASHSCOPE_BASE_URL = 'https://dashscope.aliyuncs.com'
 export const MINIMAX_BASE_URL = 'https://api.minimax.io/v1'
+/** DeepSeek's OpenAI-compatible root; the Vision + Files API live at https://api.deepseek.com */
+export const DEEPSEEK_MEDIA_BASE_URL = 'https://api.deepseek.com/v1'
 
 // Model ids verified against vendor docs 2026-09; keep chat-capable analysis
-// models in step with the chat catalog in providers.ts.
+// models in step with the chat catalog in providers.ts. The `genspark` entry
+// is the UniWork cloud route, kept so stored settings still resolve; pickers
+// list visibleMediaProviders() instead.
 export const AI_MEDIA_PROVIDERS: AiMediaProviderMeta[] = [
   {
     id: 'genspark',
     label: 'UniWork',
-    description: 'Image generation, media analysis and search through your UniWork sign-in',
+    description: 'Image generation and media analysis through your UniWork sign-in',
     keyPlaceholder: 'Not required - sign in to UniWork',
     defaultBaseUrl: '',
     imageProtocol: 'openai-images',
@@ -39,10 +44,29 @@ export const AI_MEDIA_PROVIDERS: AiMediaProviderMeta[] = [
     keyPlaceholder: 'sk-...',
     defaultBaseUrl: OPENAI_IMAGES_BASE_URL,
     imageProtocol: 'openai-images',
-    imageModels: ['gpt-image-2', 'gpt-image-1.5', 'gpt-image-1', 'gpt-image-1-mini'],
+    // GPT Image 2.5 (sunburst = quality, flare = fast) per the OpenAI models page
+    // 2026-09-24, same token rates as GPT Image 2, both on generations and edits.
+    // GPT-6 reads images over Chat Completions; the tool-call caveat that keeps
+    // it off the chat provider does not apply to analysis.
+    imageModels: [
+      'gpt-image-2.5-sunburst',
+      'gpt-image-2.5-flare',
+      'gpt-image-2',
+      'gpt-image-1.5',
+      'gpt-image-1',
+      'gpt-image-1-mini',
+    ],
     defaultImageModel: 'gpt-image-2',
     analysisProtocol: 'openai-chat',
-    analysisModels: ['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.5', 'gpt-5.4-mini'],
+    analysisModels: [
+      'gpt-6-sol',
+      'gpt-6-luna',
+      'gpt-5.6-sol',
+      'gpt-5.6-terra',
+      'gpt-5.6-luna',
+      'gpt-5.5',
+      'gpt-5.4-mini',
+    ],
     defaultAnalysisModel: 'gpt-5.6-luna',
     videoAnalysis: false,
   },
@@ -62,8 +86,13 @@ export const AI_MEDIA_PROVIDERS: AiMediaProviderMeta[] = [
     ],
     defaultImageModel: 'gemini-3.1-flash-image',
     analysisProtocol: 'gemini',
-    analysisModels: ['gemini-3.7-flash', 'gemini-3.1-pro-preview', 'gemini-3.6-flash'],
-    defaultAnalysisModel: 'gemini-3.7-flash',
+    analysisModels: [
+      'gemini-3.8-flash',
+      'gemini-3.7-flash',
+      'gemini-3.1-pro-preview',
+      'gemini-3.6-flash',
+    ],
+    defaultAnalysisModel: 'gemini-3.8-flash',
     videoAnalysis: true,
   },
   {
@@ -130,14 +159,30 @@ export const AI_MEDIA_PROVIDERS: AiMediaProviderMeta[] = [
     id: 'minimax',
     label: 'MiniMax',
     description:
-      'image-01 image generation (api.minimax.io; use api.minimaxi.com/v1 for the CN region)',
+      'Image generation; MiniMax-M3 reads images and video (use api.minimaxi.com/v1 for CN)',
     keyPlaceholder: 'eyJ...',
     defaultBaseUrl: MINIMAX_BASE_URL,
     imageProtocol: 'minimax',
     imageModels: ['image-01'],
     defaultImageModel: 'image-01',
-    analysisModels: [],
-    defaultAnalysisModel: '',
+    analysisProtocol: 'openai-chat',
+    analysisModels: ['MiniMax-M3'],
+    defaultAnalysisModel: 'MiniMax-M3',
+    videoAnalysis: true,
+  },
+  {
+    id: 'deepseek',
+    label: 'DeepSeek',
+    // native multimodal (V4.1 Flash = wire id deepseek-flash): reads JPEG/PNG/GIF/WebP,
+    // no image generation and no video/audio, so it only appears for image analysis
+    description: 'DeepSeek V4.1 Flash reads images (native multimodal); no image generation',
+    keyPlaceholder: 'sk-...',
+    defaultBaseUrl: DEEPSEEK_MEDIA_BASE_URL,
+    imageModels: [],
+    defaultImageModel: '',
+    analysisProtocol: 'openai-chat',
+    analysisModels: ['deepseek-flash'],
+    defaultAnalysisModel: 'deepseek-flash',
     videoAnalysis: false,
   },
   {
@@ -203,13 +248,17 @@ export function resolveAiMediaSettings(
   const providers = { ...defaults.providers }
   for (const [id, config] of Object.entries(stored.providers ?? {})) {
     if (!config || typeof config !== 'object') continue
+    // Hand-edited settings files can carry non-string values: trim only
+    // strings (like the search-settings guard) instead of crashing.
+    const str = (v: unknown, fallback: string): string =>
+      typeof v === 'string' ? v.trim() : fallback
     const base = providers[id as AiMediaProviderId]
     providers[id as AiMediaProviderId] = {
-      apiKey: (config.apiKey ?? base?.apiKey ?? '').trim(),
-      imageModel: (config.imageModel ?? base?.imageModel ?? '').trim(),
-      analysisModel: (config.analysisModel ?? base?.analysisModel ?? '').trim(),
+      apiKey: str(config.apiKey, base?.apiKey ?? ''),
+      imageModel: str(config.imageModel, base?.imageModel ?? ''),
+      analysisModel: str(config.analysisModel, base?.analysisModel ?? ''),
       ...(config.baseUrl !== undefined
-        ? { baseUrl: config.baseUrl.trim() }
+        ? { baseUrl: str(config.baseUrl, base?.baseUrl ?? '') }
         : base?.baseUrl !== undefined
           ? { baseUrl: base.baseUrl }
           : {}),
@@ -232,14 +281,17 @@ export function mediaConfigUsable(
   config: AiMediaProviderConfig | undefined,
 ): boolean {
   if (!config) return false
-  if (meta.needsBaseUrl) return !!config.baseUrl
-  return !!config.apiKey
+  // Trim-aware like activeProvider: whitespace-only survivors of in-memory
+  // settings are not usable configs.
+  if (meta.needsBaseUrl) return !!config.baseUrl?.trim()
+  return !!config.apiKey?.trim()
 }
 
 /**
  * The stored provider for one capability, honored only when it exists, has
- * that capability and is usable; anything else falls back to genspark so a
- * half-filled setup degrades to the signed-in default.
+ * that capability and is usable; anything else resolves to `genspark` (no BYOK
+ * route). While the cloud seam is off, a stored `genspark` (the default) yields
+ * to the first visible BYOK provider with a usable config for the capability.
  */
 export function activeMediaProvider(
   settings: Pick<AiSettings, 'media'>,
@@ -253,14 +305,23 @@ export function activeMediaProvider(
       : capability === 'video'
         ? media.videoAnalysisProvider
         : media.analysisProvider
-  if (!id || id === 'genspark') return 'genspark'
+  if (!id || id === 'genspark') {
+    if (uniworkCloudEnabled()) return 'genspark'
+    const fallback = AI_MEDIA_PROVIDERS.find(
+      (m) =>
+        m.id !== 'genspark' &&
+        providerHasCapability(m, capability) &&
+        mediaConfigUsable(m, media.providers?.[m.id]),
+    )
+    return fallback?.id ?? 'genspark'
+  }
   const meta = getMediaProviderMeta(id)
   if (!meta || !providerHasCapability(meta, capability)) return 'genspark'
   if (!mediaConfigUsable(meta, media.providers?.[id])) return 'genspark'
   return id
 }
 
-/** the active BYOK config for one capability, or null when it runs through Genspark */
+/** the active BYOK config for one capability, or null when it falls back to the UniWork cloud route */
 export function activeMediaConfig(
   settings: Pick<AiSettings, 'media'>,
   capability: MediaCapability,
@@ -282,18 +343,69 @@ function byokModel(
     : active.config.analysisModel || meta.defaultAnalysisModel
 }
 
+/**
+ * Media providers a picker may offer: the UniWork cloud entry only while the
+ * cloud seam is on, so a stored `genspark` choice stays readable but hidden.
+ */
+export function visibleMediaProviders(): AiMediaProviderMeta[] {
+  return uniworkCloudEnabled()
+    ? AI_MEDIA_PROVIDERS
+    : AI_MEDIA_PROVIDERS.filter((m) => m.id !== 'genspark')
+}
+
+/**
+ * Settings after editing one vendor's config in a media block. The block shows
+ * the first offered provider when the stored choice is not offered, so the shown
+ * vendor is written into the capability's provider field only then, and only once
+ * its resulting config is usable; a keyless edit must not pin a vendor that would
+ * switch off a capability another vendor currently serves.
+ */
+export function updateMediaProviderConfig(
+  media: AiMediaSettings,
+  capability: MediaCapability,
+  id: AiMediaProviderId,
+  patch: Partial<AiMediaProviderConfig>,
+): AiMediaSettings {
+  const field =
+    capability === 'image'
+      ? 'imageProvider'
+      : capability === 'video'
+        ? 'videoAnalysisProvider'
+        : 'analysisProvider'
+  const meta = getMediaProviderMeta(id)
+  const config: AiMediaProviderConfig = {
+    ...(media.providers[id] ?? {
+      apiKey: '',
+      imageModel: meta?.defaultImageModel ?? '',
+      analysisModel: meta?.defaultAnalysisModel ?? '',
+    }),
+    ...patch,
+  }
+  const shown = visibleMediaProviders().some(
+    (m) => m.id === media[field] && providerHasCapability(m, capability),
+  )
+  const pin = !shown && !!meta && mediaConfigUsable(meta, config)
+  return {
+    ...media,
+    ...(pin ? { [field]: id } : {}),
+    providers: { ...media.providers, [id]: config },
+  }
+}
+
+/** BYOK-only while the cloud seam is off; the cloud fallback also needs a sign-in and the cloud toggle */
 function capabilityAvailable(
   settings: Pick<AiSettings, 'media' | 'gskToolsEnabled'> | null | undefined,
   gskLoggedIn: boolean,
   capability: MediaCapability,
 ): boolean {
-  if (!settings) return gskLoggedIn
+  const cloud = uniworkCloudEnabled() && gskLoggedIn
+  if (!settings) return cloud
   const model = byokModel(settings, capability)
   if (model !== null) return model !== ''
-  return gskLoggedIn && settings.gskToolsEnabled !== false
+  return cloud && settings.gskToolsEnabled !== false
 }
 
-/** live predicate for the generate_image tool: BYOK image model configured, or gsk login + cloud tools on */
+/** live predicate for the generate_image tool: BYOK image model configured, or cloud sign-in + cloud tools on */
 export function imageGenerationAvailable(
   settings: Pick<AiSettings, 'media' | 'gskToolsEnabled'> | null | undefined,
   gskLoggedIn: boolean,

@@ -23,7 +23,6 @@ export type {
 export {
   AI_PROVIDERS,
   DEFAULT_MAX_OUTPUT_TOKENS,
-  GENSPARK_LLM_BASE_URLS,
   MAX_MAX_OUTPUT_TOKENS,
   MIN_MAX_OUTPUT_TOKENS,
   activeProvider,
@@ -48,9 +47,12 @@ export {
   mediaConfigUsable,
   providerHasCapability,
   resolveAiMediaSettings,
+  updateMediaProviderConfig,
   videoAnalysisAvailable,
+  visibleMediaProviders,
 } from './media'
 export type { MediaCapability } from './media'
+export { UNIWORK_CLOUD_ENABLED, uniworkCloudEnabled } from './uniwork-cloud'
 export {
   AI_SEARCH_PROVIDERS,
   activeSearchProvider,
@@ -69,13 +71,19 @@ export type {
   GenerateImageInput,
   MediaBlob,
 } from './media-protocols'
-export { AI_PROVIDER_ADAPTERS, getProviderAdapter, modelLacksVision } from './registry'
+export {
+  AI_PROVIDER_ADAPTERS,
+  getProviderAdapter,
+  modelLacksVision,
+  normalizeBaseUrl,
+} from './registry'
 export type {
   AiProtocol,
   ProviderAdapter,
   ProviderCapabilities,
   ResolvedEndpoint,
 } from './registry'
+export { sanitizeAiSettings, sanitizeCliPath, validCliPath } from './ai-settings-guard'
 export { chatForProvider } from './chat'
 export { setAiUserAgent, setRescueFetch } from './fetch'
 export { isAiNetworkError } from './network-error'

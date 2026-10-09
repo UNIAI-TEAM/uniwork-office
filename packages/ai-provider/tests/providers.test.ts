@@ -37,11 +37,14 @@ describe('defaultAiSettings', () => {
 })
 
 describe('provider model catalog', () => {
-  it('offers DeepSeek Vision Exp only through the direct BYOK provider', () => {
+  it('offers DeepSeek V4.1 Flash directly under the same versioned name as the pool', () => {
     const genspark = AI_PROVIDERS.find((provider) => provider.id === 'genspark')!
     const deepseek = AI_PROVIDERS.find((provider) => provider.id === 'deepseek')!
 
-    expect(deepseek.models).toContain('deepseek-v4-flash-vision-exp')
+    expect(deepseek.models).toContain('deep-seek-v4.1-flash')
+    expect(deepseek.models).not.toContain('deepseek-flash')
+    expect(deepseek.models).not.toContain('deepseek-v4-flash')
+    expect(deepseek.models).not.toContain('deepseek-v4-flash-vision-exp')
     expect(genspark.models).not.toContain('deep-seek-v4-flash')
     expect(genspark.models).not.toContain('deep-seek-v4-flash-vision-exp-openrouter')
   })
@@ -65,12 +68,56 @@ describe('provider model catalog', () => {
       expect(model).not.toContain('/')
     }
   })
+
+  it('seeds Opper with pool ids (bare names, no vendor prefix)', () => {
+    const opper = AI_PROVIDERS.find((provider) => provider.id === 'opper')!
+    expect(opper.models).toContain(opper.defaultModel)
+    expect(opper.needsBaseUrl).toBeUndefined()
+    for (const model of opper.models) {
+      expect(model).not.toContain('/')
+    }
+  })
+
+  it('seeds Cheaper Inference with bare model ids (no vendor prefix)', () => {
+    const ci = AI_PROVIDERS.find((provider) => provider.id === 'cheaperinference')!
+    expect(ci.models).toContain(ci.defaultModel)
+    expect(ci.needsBaseUrl).toBeUndefined()
+    for (const model of ci.models) {
+      expect(model).not.toContain('/')
+    }
+  })
 })
 
 describe('resolveAiSettings', () => {
   it('returns fresh defaults when nothing is stored', () => {
     const defaults = defaultAiSettings({ anthropic: 'sk-ant-preset' })
     expect(resolveAiSettings({}, defaults)).toEqual(defaults)
+  })
+
+  it('falls back to defaults for null and non-object settings roots', () => {
+    for (const stored of [null, 'settings', 7, true, []]) {
+      const defaults = defaultAiSettings()
+      expect(resolveAiSettings(stored, defaults)).toEqual(defaults)
+    }
+  })
+
+  it('falls back to defaults for null and non-object provider maps', () => {
+    for (const providers of [null, 'providers', 7, true, []]) {
+      const defaults = defaultAiSettings()
+      expect(resolveAiSettings({ providers } as never, defaults)).toEqual(defaults)
+    }
+  })
+
+  it('ignores null and non-object provider entries', () => {
+    for (const entry of [null, 'provider', 7, true, []]) {
+      const defaults = defaultAiSettings()
+      const resolved = resolveAiSettings(
+        { provider: 'anthropic', providers: { anthropic: entry } } as never,
+        defaults,
+      )
+      expect(resolved.providers.anthropic).toEqual(defaults.providers.anthropic)
+      expect(activeProvider(resolved)).toBe('genspark')
+    }
   })
 
   it('migrates the pre-provider single-endpoint shape into the custom provider', () => {
@@ -122,7 +169,20 @@ describe('resolveAiSettings', () => {
       },
       defaultAiSettings(),
     )
-    expect(resolved.providers.deepseek).toEqual({ apiKey: 'sk-user', model: 'deepseek-v4-flash' })
+    expect(resolved.providers.deepseek).toEqual({
+      apiKey: 'sk-user',
+      model: 'deep-seek-v4.1-flash',
+    })
+  })
+
+  it('rewrites the retired V4 Flash id and the vendor wire id to the listed V4.1 Flash name', () => {
+    for (const model of ['deepseek-v4-flash', 'deepseek-flash']) {
+      const resolved = resolveAiSettings(
+        { providers: { deepseek: { apiKey: 'sk-user', model } } as never },
+        defaultAiSettings(),
+      )
+      expect(resolved.providers.deepseek.model).toBe('deep-seek-v4.1-flash')
+    }
   })
 
   it('rewrites legacy UniAI proxy model ids onto OpenRouter slugs', () => {
@@ -159,6 +219,12 @@ describe('resolveAiSettings', () => {
     )
     expect(resolved.providers.genspark.apiKey).toBe('sk-or-hub')
     expect(resolved.providers.openrouter.apiKey).toBe('sk-or-hub')
+
+    const glm = resolveAiSettings(
+      { providers: { glm: { apiKey: '', model: 'glm-5-turbo' } } as never },
+      defaultAiSettings(),
+    )
+    expect(glm.providers.glm.model).toBe('glm-5.3-flash')
   })
 
   it('leaves a still-supported model id alone', () => {
@@ -199,7 +265,7 @@ describe('resolveAiSettings', () => {
       },
       defaultAiSettings(),
     )
-    expect(resolved.providers.deepseek.model).toBe('deepseek-v4-flash')
+    expect(resolved.providers.deepseek.model).toBe('deep-seek-v4.1-flash')
   })
 
   it('trims the legacy single-endpoint key and base URL too', () => {
@@ -307,6 +373,24 @@ describe('activeProvider', () => {
     expect(resolved.providers.codex.apiKey).toBe('')
   })
 
+  it('treats whitespace-only keys, URLs, and models as unconfigured', () => {
+    const settings = defaultAiSettings()
+    settings.provider = 'kimi'
+    settings.providers.kimi.apiKey = '   '
+    expect(activeProvider(settings)).toBe('genspark')
+    settings.providers.kimi.apiKey = 'sk-user'
+    settings.providers.kimi.model = '  '
+    expect(activeProvider(settings)).toBe('genspark')
+    settings.providers.kimi.model = 'kimi-k2'
+    expect(activeProvider(settings)).toBe('kimi')
+
+    const custom = defaultAiSettings()
+    custom.provider = 'custom'
+    custom.providers.custom.baseUrl = '   '
+    custom.providers.custom.model = 'my-model'
+    expect(activeProvider(custom)).toBe('genspark')
+  })
+
   it('falls back to genspark for unknown ids from a hand-edited settings file', () => {
     const settings = defaultAiSettings()
     settings.provider = 'nonsense' as AiProviderId
@@ -344,11 +428,13 @@ describe('uniAi OpenRouter Token Hub key', () => {
 })
 
 describe('gskToolsEnabled', () => {
-  it('defaults on, survives resolveAiSettings, and only an explicit false turns it off', () => {
-    expect(cloudToolsEnabled(defaultAiSettings())).toBe(true)
-    // pre-toggle settings file (field absent) stays on
+  it('keeps the stored toggle but stays off while the UniWork cloud seam is off', () => {
+    expect(defaultAiSettings().gskToolsEnabled).toBe(true)
+    expect(cloudToolsEnabled(defaultAiSettings())).toBe(false)
+    // pre-toggle settings file (field absent) keeps the default on
     const legacy = resolveAiSettings({ providers: {} as never }, defaultAiSettings())
-    expect(cloudToolsEnabled(legacy)).toBe(true)
+    expect(legacy.gskToolsEnabled).toBe(true)
+    expect(cloudToolsEnabled(legacy)).toBe(false)
     const off = resolveAiSettings(
       { providers: {} as never, gskToolsEnabled: false },
       defaultAiSettings(),

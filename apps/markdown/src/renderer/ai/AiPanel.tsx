@@ -1,3 +1,9 @@
+import {
+  aiPanelWidthAtPointer,
+  AiPanelSideButton,
+  AiModelPicker,
+  type AiModelPickerBridge,
+} from '@genoffice/ui'
 import { useEffect, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent, ReactElement, ReactNode } from 'react'
 import { AgentLoop, composeSkills, streamText } from '@genoffice/agent-core'
@@ -129,6 +135,14 @@ export interface MarkdownAiDeps {
   onRunDone(mutated: boolean): void
 }
 
+const MODEL_BRIDGE: AiModelPickerBridge = {
+  getSettings: () => window.markdownApi.getAiSettings(),
+  setSettings: (settings) => window.markdownApi.setAiSettings(settings),
+  onSettingsChanged: (handler) => window.markdownApi.onAiSettingsChanged(handler),
+  gskLoggedIn: () => window.markdownApi.aiGskStatus().then((s) => !!s?.loggedIn),
+  openModelSettings: () => window.markdownApi.openAiModelSettings().catch(() => {}),
+}
+
 export function AiPanel({
   deps,
   filePath,
@@ -186,7 +200,7 @@ export function AiPanel({
   }, [panelWidth])
 
   const settingsRef = useRef<AiSettings | null>(null)
-  /** gsk login state for the generate_image gate (refreshed on mount and window focus) */
+  /** UniWork cloud sign-in state (stub, signed out while the seam is off) for the media tool gates */
   const gskLoggedInRef = useRef(false)
   useEffect(() => {
     let alive = true
@@ -715,7 +729,7 @@ export function AiPanel({
   const resizeCleanupRef = useRef<(() => void) | null>(null)
   useEffect(() => () => resizeCleanupRef.current?.(), [])
 
-  /** Drag the right edge to resize: the panel is flush with the window's left edge, so width = clientX */
+  /** Drag the inner panel edge to resize from the selected window side. */
   const startResize = (e: ReactPointerEvent<HTMLDivElement>): void => {
     e.preventDefault()
     const resizer = e.currentTarget
@@ -723,7 +737,7 @@ export function AiPanel({
     document.body.style.cursor = 'col-resize'
     document.body.style.userSelect = 'none'
     const onMove = (ev: PointerEvent): void => {
-      const w = clampPanelWidth(ev.clientX)
+      const w = clampPanelWidth(aiPanelWidthAtPointer(ev.clientX))
       preferredWidthRef.current = w
       setPanelWidth(w)
     }
@@ -769,6 +783,10 @@ export function AiPanel({
           uniAI
         </span>
         <div className="ai-panel-header-actions">
+          <AiPanelSideButton
+            lang={lang}
+            onMove={(side) => window.markdownApi.setAiPanelPrefs({ side })}
+          />
           {chat.length > 0 && (
             <button
               className="ai-header-btn"
@@ -786,7 +804,7 @@ export function AiPanel({
             </button>
           )}
           <button
-            className="ai-header-btn"
+            className="ai-header-btn ai-panel-collapse"
             onClick={onCollapse}
             data-tip={t('aiCollapsePanel')}
             aria-label={t('aiCollapsePanel')}
@@ -1031,6 +1049,7 @@ export function AiPanel({
           sendLabel={t('aiSend')}
           stopLabel={t('aiStop')}
           iconOnly
+          footerStart={<AiModelPicker bridge={MODEL_BRIDGE} lang={lang} />}
           sendIconEnabled={<img src={sendEnterOn} alt="" aria-hidden />}
           sendIconDisabled={<img src={sendEnterOff} alt="" aria-hidden />}
           stopIcon={<img src={sendStop} alt="" aria-hidden />}

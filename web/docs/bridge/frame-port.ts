@@ -56,6 +56,8 @@ export interface FramePort {
   onLanguage(listener: (locale: string) => void): () => void
   setDirty(dirty: boolean): void
   setTitle(title: string): void
+  /** a bridge dialog opened / closed (protocol `modal` event; optional for older clients) */
+  setModal?(open: boolean): void
   reportSaved(payload: SavedPayload): void
   reportError(error: ProtocolErrorShape | unknown, fatal?: boolean): void
 }

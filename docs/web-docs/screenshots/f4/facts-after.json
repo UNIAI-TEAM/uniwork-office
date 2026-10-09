@@ -1,0 +1,34 @@
+{
+  "fileButton": {
+    "color": "rgb(255, 255, 255)",
+    "background": "rgb(42, 111, 208)"
+  },
+  "hostDirtyEvents": [
+    {
+      "dirty": false
+    },
+    {
+      "dirty": true
+    }
+  ],
+  "conflictFocus": "cancel",
+  "hostModalEvents": [
+    {
+      "open": true
+    }
+  ],
+  "conflictAfterEsc": false,
+  "exportStatus": "Trang 1 / 110 từĐã lưu mọi thay đổi — Không xuất được PDF trực tiếp; đã dùng hộp thoại in của trình duyệt thay thế−+100%",
+  "ribbon944_vi": {
+    "scrollW": 944,
+    "clientW": 944,
+    "stylesRight": 932,
+    "more": true
+  },
+  "ribbon944_en": {
+    "scrollW": 944,
+    "clientW": 944,
+    "stylesRight": 932,
+    "more": true
+  }
+}

@@ -18,6 +18,9 @@ import type {
   PickedFile,
   SaveEvent,
 } from '../session'
+import { baseName } from '../shared/base-name'
+import { AUDIO_EXTS, VIDEO_EXTS } from '../shared/media-kinds'
+import { ELEMENT_CLIPBOARD_FORMAT, elementClipboardMarkerMatches } from './element-clipboard'
 import { tm } from './i18n-main'
 import { dialogParent } from './session-state'
 
@@ -44,7 +47,7 @@ async function pickFile(options: {
   const path = r.filePaths[0]
   return {
     bytes: new Uint8Array(await readFile(path)),
-    name: path.split('/').pop()!,
+    name: baseName(path),
     ext: path.split('.').pop()!.toLowerCase(),
     path,
   }
@@ -72,22 +75,20 @@ export function createElectronHostIO(files: ElectronFileHooks): HostIO {
         kind === 'video'
           ? {
               title: tm('dlgInsertVideo'),
-              filters: [
-                { name: tm('filterVideo'), extensions: ['mp4', 'm4v', 'mov', 'webm', 'avi'] },
-              ],
+              filters: [{ name: tm('filterVideo'), extensions: [...VIDEO_EXTS] }],
             }
           : kind === 'audio'
             ? {
                 title: tm('dlgInsertAudio'),
-                filters: [
-                  { name: tm('filterAudio'), extensions: ['mp3', 'wav', 'm4a', 'aac', 'ogg'] },
-                ],
+                filters: [{ name: tm('filterAudio'), extensions: [...AUDIO_EXTS] }],
               }
             : {
                 title: tm('dlgInsert3d'),
                 filters: [{ name: tm('filter3d'), extensions: ['glb', 'gltf'] }],
               },
       ),
+
+    readPath: async (path) => new Uint8Array(await readFile(path)),
 
     imageSize: async (file) => {
       if (!file.path) return null
@@ -118,12 +119,16 @@ export function createElectronHostIO(files: ElectronFileHooks): HostIO {
     },
 
     clipboard: {
-      writeMarker: (format) => clipboard.writeBuffer(format, Buffer.from('1')),
+      writeMarker: (format, value = '1') => clipboard.writeBuffer(format, Buffer.from(value)),
       // Our marker still present = the last copy came from this app -> use internal element paste
-      // (on macOS custom formats don't appear in availableFormats, so check via readBuffer)
-      hasMarker: (format) => {
+      // (on macOS custom formats don't appear in availableFormats, so check via readBuffer).
+      // An element copy carries its token, in the marker buffer or the HTML image twin.
+      hasMarker: (format, value) => {
+        if (value !== undefined && format === ELEMENT_CLIPBOARD_FORMAT)
+          return elementClipboardMarkerMatches(value)
         try {
-          return clipboard.readBuffer(format).length > 0
+          const buf = clipboard.readBuffer(format)
+          return value === undefined ? buf.length > 0 : buf.equals(Buffer.from(value))
         } catch {
           return false
         }

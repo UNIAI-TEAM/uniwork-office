@@ -1,11 +1,15 @@
 /** Session handlers: Pictures, picture/background fills, ink, audio/video and 3D models (pickers go through HostIO). */
-import { EMU_PER_PX_96 } from '@genoffice/pptx-render'
+import { EMU_PER_PX_96, imageDpiFromBytes } from '@genoffice/pptx-render'
+import { pictureFrame } from '../../main/picture-frame'
+import { audioFrame, videoFrame, videoSize, type Point, type Size } from '../../main/video-size'
+import { baseName } from '../../shared/base-name'
 import { tm } from '../../main/i18n-main'
 import { unplayableAudioCodec } from '../../main/mp4-audio-sniff'
 import type {
   AddImageBytesOp,
   AddInkOp,
   AddMediaBytesOp,
+  AddMediaResult,
   EditBackgroundOp,
   EditFillImageOp,
   EditPictureOpacityOp,
@@ -13,10 +17,10 @@ import type {
   ReplacePictureBytesOp,
 } from '../../shared/ipc'
 import { base64ToBytes, bytesToBase64 } from '../bytes'
-import type { HandlerContext } from '../host-io'
+import type { HandlerContext, PickedFile } from '../host-io'
 import { sessionPlatform } from '../platform'
 import { buildAllRenderSlides, rebuildSlide } from '../render'
-import { pushHistory, sessions } from '../state'
+import { pushHistory, sessions, type Session } from '../state'
 import { journaledTxn, sessionTxn } from '../txn'
 
 // Playback mime per media extension
@@ -35,6 +39,63 @@ const AV_MIME: Record<string, string> = {
   ogg: 'audio/ogg',
 }
 
+// In-app playback caveats: AVI has no Chromium demuxer at all; mp4/m4v/mov
+// with e.g. AC-3/DTS audio plays silent.
+const mediaPlaybackWarning = (kind: 'video' | 'audio', ext: string, bytes: Uint8Array) => {
+  if (kind !== 'video') return null
+  if (ext === 'avi') return tm('mediaAviBody')
+  if (ext === 'mp4' || ext === 'm4v' || ext === 'mov') {
+    const codec = unplayableAudioCodec(bytes)
+    if (codec) return tm('mediaNoAudioBody', { codec })
+  }
+  return null
+}
+
+const embedMedia = async (
+  ctx: HandlerContext,
+  session: Session,
+  slideIndex: number,
+  kind: 'video' | 'audio',
+  bytes: Uint8Array,
+  ext: string,
+  name: string | undefined,
+  opts: { file?: PickedFile; natural?: Size | null; center?: Point; fitWidthPx: number },
+): Promise<AddMediaResult | null> => {
+  // Video poster frame: the host's thumbnail (QuickLook on macOS), else a solid color
+  const poster =
+    kind === 'video' && opts.file ? await ctx.host.readMediaPoster(opts.file, 'video') : undefined
+  const deckSize = session.opened.deck.size
+  const slideSize = { width: deckSize.cx, height: deckSize.cy }
+  const offset =
+    kind === 'video'
+      ? videoFrame(slideSize, opts.natural ?? videoSize(bytes, ext), opts.center)
+      : audioFrame(slideSize, opts.center)
+  const txn = sessionTxn(session, {
+    ops: [
+      {
+        op: 'addMedia',
+        target: { slide: slideIndex },
+        kind,
+        bytes,
+        ext,
+        ...(poster ? { poster } : {}),
+        offset,
+        ...(name ? { name } : {}),
+      },
+    ],
+  })
+  if (!txn) return null
+  session.fitWidthPx = opts.fitWidthPx
+  const rebuilt = rebuildSlide(session, slideIndex)
+  if (!rebuilt) return null
+  const warning = mediaPlaybackWarning(kind, ext, bytes)
+  return {
+    slide: rebuilt,
+    sourceId: txn.records![0]!.created![0]!,
+    ...(warning ? { warning } : {}),
+  }
+}
+
 export const pictureMediaHandlers = {
   'slides:insert-image': async (ctx: HandlerContext, slideIndex: number, fitWidthPx: number) => {
     const session = sessions.get(ctx.clientId)
@@ -45,9 +106,8 @@ export const pictureMediaHandlers = {
     if (!file) return null
     const { bytes, ext } = file
 
-    // Scale proportionally to at most half the page width/height, centered
     const deckSize = session.opened.deck.size
-    let natural = { width: 4, height: 3 }
+    let natural: { width: number; height: number } | null = null
     if (ext === 'tif' || ext === 'tiff') {
       const decoded = sessionPlatform().decodeTiff(bytes)
       if (decoded) natural = { width: decoded.width, height: decoded.height }
@@ -55,17 +115,12 @@ export const pictureMediaHandlers = {
       const size = await ctx.host.imageSize(file)
       if (size) natural = size
     }
-    const maxW = deckSize.cx / 2
-    const maxH = deckSize.cy / 2
-    const scale = Math.min(maxW / natural.width, maxH / natural.height)
-    const cx = Math.round(natural.width * scale)
-    const cy = Math.round(natural.height * scale)
-    const offset = {
-      x: Math.round((deckSize.cx - cx) / 2),
-      y: Math.round((deckSize.cy - cy) / 2),
-      cx,
-      cy,
-    }
+    const offset = pictureFrame(
+      { width: deckSize.cx, height: deckSize.cy },
+      natural,
+      imageDpiFromBytes(new Uint8Array(bytes)),
+      sessionPlatform().defaultPictureDpi,
+    )
 
     const txn = sessionTxn(session, {
       ops: [
@@ -96,22 +151,39 @@ export const pictureMediaHandlers = {
     if (!session) return null
     const slide = session.opened.deck.slides[op.slideIndex]
     if (!slide) return null
-    const baseWidthPx = session.opened.deck.size.cx / EMU_PER_PX_96
+    const deckSize = session.opened.deck.size
+    const baseWidthPx = deckSize.cx / EMU_PER_PX_96
     const scale = op.fitWidthPx / baseWidthPx
     const toEmu = (px: number) => Math.round((px / scale) * EMU_PER_PX_96)
+    const bytes = base64ToBytes(op.base64)
+    let offset: { x: number; y: number; cx: number; cy: number }
+    if ('naturalPx' in op) {
+      offset = pictureFrame(
+        { width: deckSize.cx, height: deckSize.cy },
+        op.naturalPx,
+        imageDpiFromBytes(bytes),
+        sessionPlatform().defaultPictureDpi,
+        {
+          center: op.centerPx ? { x: toEmu(op.centerPx.x), y: toEmu(op.centerPx.y) } : undefined,
+          minEmu: toEmu(24),
+        },
+      )
+    } else {
+      offset = {
+        x: toEmu(op.xPx),
+        y: toEmu(op.yPx),
+        cx: Math.max(1, toEmu(op.wPx)),
+        cy: Math.max(1, toEmu(op.hPx)),
+      }
+    }
     const r = sessionTxn(session, {
       ops: [
         {
           op: 'addPicture',
           target: { slide: op.slideIndex },
-          bytes: base64ToBytes(op.base64),
+          bytes,
           ext: op.ext,
-          offset: {
-            x: toEmu(op.xPx),
-            y: toEmu(op.yPx),
-            cx: Math.max(1, toEmu(op.wPx)),
-            cy: Math.max(1, toEmu(op.hPx)),
-          },
+          offset,
           ...(op.name ? { name: op.name } : {}),
         },
       ],
@@ -345,7 +417,7 @@ export const pictureMediaHandlers = {
     return rebuilt ? { slide: rebuilt, sourceId: r.records![0]!.created![0]! } : null
   },
 
-  // Show a dialog to pick video/audio and embed it. Video poster frame prefers the system thumbnail (QuickLook), falling back to a solid color on failure.
+  // Show a dialog to pick video/audio and embed it.
   'slides:insert-media': async (
     ctx: HandlerContext,
     slideIndex: number,
@@ -358,70 +430,22 @@ export const pictureMediaHandlers = {
     if (!file) return null
     const { bytes, ext, name: fileName } = file
 
-    // Warn up front when in-app playback will be broken — AVI has no
-    // Chromium demuxer at all; mp4/m4v/mov with e.g. AC-3/DTS audio plays silent.
-    if (kind === 'video') {
-      let detail: string | null = null
-      if (ext === 'avi') detail = tm('mediaAviBody')
-      else if (ext === 'mp4' || ext === 'm4v' || ext === 'mov') {
-        const codec = unplayableAudioCodec(new Uint8Array(bytes))
-        if (codec) detail = tm('mediaNoAudioBody', { codec })
-      }
-      if (detail) {
-        await ctx.host.confirm({
-          type: 'warning',
-          buttons: [tm('legacyPptOk')],
-          message: tm('mediaUnsupportedTitle'),
-          detail,
-        })
-      }
+    // Warn up front, before the file lands on the slide
+    const detail = mediaPlaybackWarning(kind, ext, bytes)
+    if (detail) {
+      await ctx.host.confirm({
+        type: 'warning',
+        buttons: [tm('legacyPptOk')],
+        message: tm('mediaUnsupportedTitle'),
+        detail,
+      })
     }
 
-    // Solid-color fallback when the host has no poster frame
-    const poster = kind === 'video' ? await ctx.host.readMediaPoster(file, 'video') : undefined
-
-    const deckSize = session.opened.deck.size
-    const offset =
-      kind === 'video'
-        ? (() => {
-            const cx = Math.round(deckSize.cx * 0.6)
-            const cy = Math.round((cx * 9) / 16)
-            return {
-              x: Math.round((deckSize.cx - cx) / 2),
-              y: Math.round((deckSize.cy - cy) / 2),
-              cx,
-              cy,
-            }
-          })()
-        : (() => {
-            const cx = Math.round(deckSize.cx * 0.24)
-            const cy = Math.round(deckSize.cy * 0.09)
-            return {
-              x: Math.round((deckSize.cx - cx) / 2),
-              y: Math.round((deckSize.cy - cy) / 2),
-              cx,
-              cy,
-            }
-          })()
-
-    const txn = sessionTxn(session, {
-      ops: [
-        {
-          op: 'addMedia',
-          target: { slide: slideIndex },
-          kind,
-          bytes: new Uint8Array(bytes),
-          ext,
-          ...(poster ? { poster } : {}),
-          offset,
-          name: fileName,
-        },
-      ],
+    const result = await embedMedia(ctx, session, slideIndex, kind, bytes, ext, fileName, {
+      file,
+      fitWidthPx,
     })
-    if (!txn) return null
-    session.fitWidthPx = fitWidthPx
-    const rebuilt = rebuildSlide(session, slideIndex)
-    return rebuilt ? { slide: rebuilt, sourceId: txn.records![0]!.created![0]! } : null
+    return result ? { slide: result.slide, sourceId: result.sourceId } : null
   },
 
   // Double-click playback: read the media bytes of an audio/video element (embedded converts to dataUrl, external links return as-is)
@@ -446,35 +470,26 @@ export const pictureMediaHandlers = {
     }
   },
 
-  // Media recorded by the renderer (screen-recording webm): placed centered at 16:9
-  'slides:add-media-bytes': (ctx: HandlerContext, op: AddMediaBytesOp) => {
+  // Media recorded by the renderer (screen-recording webm) or dropped on the canvas: placed like an inserted file
+  'slides:add-media-bytes': async (ctx: HandlerContext, op: AddMediaBytesOp) => {
     const session = sessions.get(ctx.clientId)
     if (!session || !session.opened.deck.slides[op.slideIndex]) return null
+    let bytes: Uint8Array
+    try {
+      bytes = 'path' in op ? await ctx.host.readPath(op.path) : base64ToBytes(op.base64)
+    } catch {
+      return null
+    }
     const deckSize = session.opened.deck.size
-    const cx = Math.round(deckSize.cx * 0.6)
-    const cy = Math.round((cx * 9) / 16)
-    const r = sessionTxn(session, {
-      ops: [
-        {
-          op: 'addMedia',
-          target: { slide: op.slideIndex },
-          kind: op.kind,
-          bytes: base64ToBytes(op.base64),
-          ext: op.ext,
-          offset: {
-            x: Math.round((deckSize.cx - cx) / 2),
-            y: Math.round((deckSize.cy - cy) / 2),
-            cx,
-            cy,
-          },
-          ...(op.name ? { name: op.name } : {}),
-        },
-      ],
+    const scale = op.fitWidthPx / (deckSize.cx / EMU_PER_PX_96)
+    const toEmu = (px: number) => Math.round((px / scale) * EMU_PER_PX_96)
+    return embedMedia(ctx, session, op.slideIndex, op.kind, bytes, op.ext, op.name, {
+      file:
+        'path' in op ? { bytes, name: baseName(op.path), ext: op.ext, path: op.path } : undefined,
+      natural: op.natural,
+      center: op.centerPx ? { x: toEmu(op.centerPx.x), y: toEmu(op.centerPx.y) } : undefined,
+      fitWidthPx: op.fitWidthPx,
     })
-    if (!r) return null
-    session.fitWidthPx = op.fitWidthPx
-    const rebuilt = rebuildSlide(session, op.slideIndex)
-    return rebuilt ? { slide: rebuilt, sourceId: r.records![0]!.created![0]! } : null
   },
 
   // 3D model (simplified): glb embed + poster placeholder image

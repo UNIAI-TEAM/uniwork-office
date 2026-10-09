@@ -1,0 +1,46 @@
+UniWork Office — statement of modifications
+Modified by UniWork, 2026.
+
+UniWork Office is a modified version of GenOffice (Copyright 2026
+Mainfunc, Inc.), licensed under the Apache License, Version 2.0. It is
+derived from GenOffice at upstream commit
+b08e2ebf7204e28c94eb3fdcaf285891bab002a2 of the source repository
+genspark-ai/genoffice.
+
+As section 4(b) of the license requires, this file states that UniWork
+changed files of the original work. The statement applies collectively to
+every file that differs from that upstream commit, instead of a notice in
+each file; the authoritative list of modified files is the difference
+between this source tree and that commit.
+
+Summary of changes
+
+Branding and artwork
+  Product, module and window names, the About page, the first-run welcome
+  copy, the application, installer and Linux desktop icons, and the installer
+  identity (application ids, package and artifact names) carry the UniWork
+  Office brand. Code identifiers, package scopes, the genoffice command line,
+  environment variable names and font family names keep their upstream names.
+
+Privacy and network services
+  The usage-analytics tracker and its consent prompt were removed. Links to
+  the upstream source repository and the repository star prompt were removed
+  from the interface. Account, credit top-up and download links point at
+  UniWork services, and the update feed is configured at build time.
+
+Education and practice features
+  Teacher mode with lesson-pack templates and AI workflow prompts, practice
+  packs for several professions, the UniWork Office Bridge client and its
+  contracts, the uniAI web app, and additional Home panes (tasks, notes,
+  calendar, family, health, finance and others) were added. Vietnamese copy
+  was revised throughout.
+
+Packaging metadata
+  The copyright, maintainer, vendor, author and homepage of the installers
+  name UniWork. LICENSE, NOTICE, this file and the third-party notices ship
+  inside the application and open from Settings > About.
+
+Tooling
+  A rebranding script with a brand scan (tools/rebrand) re-applies these
+  changes after each upstream update, and tools/legal keeps NOTICE, this file
+  and the package metadata in line with apps/shell/src/shared/legal.json.

@@ -2,7 +2,7 @@
 /// English-only and (for role:'windowMenu' on Windows/Linux) follow macOS
 /// conventions (Zoom, Ctrl+M minimize, Bring All to Front).
 import type { MenuItemConstructorOptions, WebContents } from 'electron'
-import { contextMenuLabels, type ContextMenuLabels } from './context-menu'
+import { baseLang, contextMenuLabels, type ContextMenuLabels } from './context-menu'
 
 export interface AppMenuLabels extends ContextMenuLabels {
   window: string
@@ -20,6 +20,10 @@ export interface AppMenuLabels extends ContextMenuLabels {
   zoomIn: string
   zoomOut: string
   fullscreen: string
+  help: string
+  about: string
+  checkUpdates: string
+  version: string
 }
 
 type Labels = Omit<AppMenuLabels, keyof ContextMenuLabels>
@@ -40,6 +44,10 @@ const EN: Labels = {
   zoomIn: 'Zoom In',
   zoomOut: 'Zoom Out',
   fullscreen: 'Full Screen',
+  help: 'Help',
+  about: 'About UniWork Office',
+  checkUpdates: 'Check for Updates…',
+  version: 'Version',
 }
 
 // Shared table, same rationale as context-menu.ts: one copy instead of
@@ -61,6 +69,10 @@ const LABELS: Record<string, Labels> = {
     zoomIn: '放大',
     zoomOut: '缩小',
     fullscreen: '全屏',
+    help: '帮助',
+    about: '关于 UniWork Office',
+    checkUpdates: '检查更新…',
+    version: '版本',
   },
   en: EN,
   ja: {
@@ -79,6 +91,10 @@ const LABELS: Record<string, Labels> = {
     zoomIn: '拡大',
     zoomOut: '縮小',
     fullscreen: 'フルスクリーン',
+    help: 'ヘルプ',
+    about: 'UniWork Office について',
+    checkUpdates: '更新を確認…',
+    version: 'バージョン',
   },
   ko: {
     window: '창',
@@ -96,6 +112,10 @@ const LABELS: Record<string, Labels> = {
     zoomIn: '확대',
     zoomOut: '축소',
     fullscreen: '전체 화면',
+    help: '도움말',
+    about: 'UniWork Office 정보',
+    checkUpdates: '업데이트 확인…',
+    version: '버전',
   },
   fr: {
     window: 'Fenêtre',
@@ -113,6 +133,10 @@ const LABELS: Record<string, Labels> = {
     zoomIn: 'Zoom avant',
     zoomOut: 'Zoom arrière',
     fullscreen: 'Plein écran',
+    help: 'Aide',
+    about: 'À propos de UniWork Office',
+    checkUpdates: 'Rechercher les mises à jour…',
+    version: 'Version',
   },
   de: {
     window: 'Fenster',
@@ -130,6 +154,10 @@ const LABELS: Record<string, Labels> = {
     zoomIn: 'Vergrößern',
     zoomOut: 'Verkleinern',
     fullscreen: 'Vollbild',
+    help: 'Hilfe',
+    about: 'Über UniWork Office',
+    checkUpdates: 'Nach Updates suchen…',
+    version: 'Version',
   },
   es: {
     window: 'Ventana',
@@ -147,6 +175,10 @@ const LABELS: Record<string, Labels> = {
     zoomIn: 'Acercar',
     zoomOut: 'Alejar',
     fullscreen: 'Pantalla completa',
+    help: 'Ayuda',
+    about: 'Acerca de UniWork Office',
+    checkUpdates: 'Buscar actualizaciones…',
+    version: 'Versión',
   },
   th: {
     window: 'หน้าต่าง',
@@ -164,6 +196,10 @@ const LABELS: Record<string, Labels> = {
     zoomIn: 'ขยาย',
     zoomOut: 'ย่อ',
     fullscreen: 'เต็มหน้าจอ',
+    help: 'วิธีใช้',
+    about: 'เกี่ยวกับ UniWork Office',
+    checkUpdates: 'ตรวจหาการอัปเดต…',
+    version: 'เวอร์ชัน',
   },
   id: {
     window: 'Jendela',
@@ -181,6 +217,10 @@ const LABELS: Record<string, Labels> = {
     zoomIn: 'Perbesar',
     zoomOut: 'Perkecil',
     fullscreen: 'Layar Penuh',
+    help: 'Bantuan',
+    about: 'Tentang UniWork Office',
+    checkUpdates: 'Periksa Pembaruan…',
+    version: 'Versi',
   },
   ru: {
     window: 'Окно',
@@ -198,6 +238,10 @@ const LABELS: Record<string, Labels> = {
     zoomIn: 'Увеличить',
     zoomOut: 'Уменьшить',
     fullscreen: 'Полноэкранный режим',
+    help: 'Справка',
+    about: 'О UniWork Office',
+    checkUpdates: 'Проверить обновления…',
+    version: 'Версия',
   },
   ar: {
     window: 'نافذة',
@@ -215,6 +259,10 @@ const LABELS: Record<string, Labels> = {
     zoomIn: 'تكبير',
     zoomOut: 'تصغير العرض',
     fullscreen: 'ملء الشاشة',
+    help: 'تعليمات',
+    about: 'حول UniWork Office',
+    checkUpdates: 'التحقق من التحديثات…',
+    version: 'الإصدار',
   },
   pt: {
     window: 'Janela',
@@ -232,6 +280,10 @@ const LABELS: Record<string, Labels> = {
     zoomIn: 'Ampliar',
     zoomOut: 'Reduzir',
     fullscreen: 'Tela Cheia',
+    help: 'Ajuda',
+    about: 'Sobre o UniWork Office',
+    checkUpdates: 'Procurar atualizações…',
+    version: 'Versão',
   },
   it: {
     window: 'Finestra',
@@ -249,6 +301,10 @@ const LABELS: Record<string, Labels> = {
     zoomIn: 'Ingrandisci',
     zoomOut: 'Riduci',
     fullscreen: 'Schermo intero',
+    help: 'Aiuto',
+    about: 'Informazioni su UniWork Office',
+    checkUpdates: 'Controlla aggiornamenti…',
+    version: 'Versione',
   },
   pl: {
     window: 'Okno',
@@ -266,6 +322,10 @@ const LABELS: Record<string, Labels> = {
     zoomIn: 'Powiększ',
     zoomOut: 'Pomniejsz',
     fullscreen: 'Pełny ekran',
+    help: 'Pomoc',
+    about: 'O programie UniWork Office',
+    checkUpdates: 'Sprawdź aktualizacje…',
+    version: 'Wersja',
   },
   cs: {
     window: 'Okno',
@@ -283,6 +343,10 @@ const LABELS: Record<string, Labels> = {
     zoomIn: 'Přiblížit',
     zoomOut: 'Oddálit',
     fullscreen: 'Celá obrazovka',
+    help: 'Nápověda',
+    about: 'O aplikaci UniWork Office',
+    checkUpdates: 'Zkontrolovat aktualizace…',
+    version: 'Verze',
   },
   nl: {
     window: 'Venster',
@@ -300,6 +364,10 @@ const LABELS: Record<string, Labels> = {
     zoomIn: 'Inzoomen',
     zoomOut: 'Uitzoomen',
     fullscreen: 'Volledig scherm',
+    help: 'Help',
+    about: 'Over UniWork Office',
+    checkUpdates: 'Controleren op updates…',
+    version: 'Versie',
   },
   ms: {
     window: 'Tetingkap',
@@ -317,6 +385,10 @@ const LABELS: Record<string, Labels> = {
     zoomIn: 'Zum Masuk',
     zoomOut: 'Zum Keluar',
     fullscreen: 'Skrin Penuh',
+    help: 'Bantuan',
+    about: 'Perihal UniWork Office',
+    checkUpdates: 'Semak Kemas Kini…',
+    version: 'Versi',
   },
   he: {
     window: 'חלון',
@@ -334,6 +406,10 @@ const LABELS: Record<string, Labels> = {
     zoomIn: 'הגדל',
     zoomOut: 'הקטן',
     fullscreen: 'מסך מלא',
+    help: 'עזרה',
+    about: 'אודות UniWork Office',
+    checkUpdates: 'בדוק עדכונים…',
+    version: 'גרסה',
   },
   hi: {
     window: 'विंडो',
@@ -351,6 +427,10 @@ const LABELS: Record<string, Labels> = {
     zoomIn: 'ज़ूम इन',
     zoomOut: 'ज़ूम आउट',
     fullscreen: 'पूर्ण स्क्रीन',
+    help: 'सहायता',
+    about: 'UniWork Office के बारे में',
+    checkUpdates: 'अपडेट जांचें…',
+    version: 'संस्करण',
   },
   vi: {
     window: 'Cửa sổ',
@@ -362,12 +442,16 @@ const LABELS: Record<string, Labels> = {
     delete: 'Xóa',
     view: 'Xem',
     reload: 'Tải lại',
-    forceReload: 'Tải lại bắt buộc',
+    forceReload: 'Buộc tải lại',
     toggleDevTools: 'Công cụ nhà phát triển',
-    actualSize: 'Kích thước thực',
+    actualSize: 'Kích cỡ thực',
     zoomIn: 'Phóng to',
     zoomOut: 'Thu nhỏ',
     fullscreen: 'Toàn màn hình',
+    help: 'Trợ giúp',
+    about: 'Giới thiệu UniWork Office',
+    checkUpdates: 'Kiểm tra bản cập nhật…',
+    version: 'Phiên bản',
   },
   'zh-TW': {
     window: '視窗',
@@ -385,11 +469,15 @@ const LABELS: Record<string, Labels> = {
     zoomIn: '放大',
     zoomOut: '縮小',
     fullscreen: '全螢幕',
+    help: '說明',
+    about: '關於 UniWork Office',
+    checkUpdates: '檢查更新…',
+    version: '版本',
   },
 }
 
 export function appMenuLabels(lang: string): AppMenuLabels {
-  return { ...contextMenuLabels(lang), ...(LABELS[lang] ?? EN) }
+  return { ...contextMenuLabels(lang), ...(LABELS[lang] ?? LABELS[baseLang(lang)] ?? EN) }
 }
 
 /** macOS keeps the native role (Minimize/Zoom/Front, window list); Windows/Linux
@@ -462,20 +550,105 @@ export function toggleDevToolsItem(labels: AppMenuLabels): MenuItemConstructorOp
   }
 }
 
-/** role:'viewMenu' expands identically on every platform, so no branch. */
-export function viewMenuTemplate(labels: AppMenuLabels): MenuItemConstructorOptions {
-  return {
-    label: labels.view,
-    submenu: [
+export interface ViewMenuOptions {
+  /** Reload / Force Reload / DevTools (default on) */
+  readonly devItems?: boolean
+  /** Actual Size / Zoom In / Zoom Out page-zoom roles (default on) */
+  readonly pageZoom?: boolean
+}
+
+/**
+ * role:'viewMenu' expands identically on every platform, so no branch. Menu
+ * accelerators beat renderer key handlers on macOS, so apps whose document
+ * shortcuts collide with ⌘R / ⌘0 / ⌘+ / ⌘- opt those groups out.
+ */
+export function viewMenuTemplate(
+  labels: AppMenuLabels,
+  { devItems = true, pageZoom = true }: ViewMenuOptions = {},
+): MenuItemConstructorOptions {
+  const groups: MenuItemConstructorOptions[][] = []
+  if (devItems) {
+    groups.push([
       { role: 'reload', label: labels.reload },
       { role: 'forceReload', label: labels.forceReload },
       toggleDevToolsItem(labels),
-      { type: 'separator' },
+    ])
+  }
+  if (pageZoom) {
+    groups.push([
       { role: 'resetZoom', label: labels.actualSize },
       { role: 'zoomIn', label: labels.zoomIn },
       { role: 'zoomOut', label: labels.zoomOut },
-      { type: 'separator' },
-      { role: 'togglefullscreen', label: labels.fullscreen },
+    ])
+  }
+  groups.push([{ role: 'togglefullscreen', label: labels.fullscreen }])
+  return {
+    label: labels.view,
+    submenu: groups.flatMap((group, index) =>
+      index === 0 ? group : [{ type: 'separator' }, ...group],
+    ),
+  }
+}
+
+/** The manual update check lives in the shell (electron-updater and its
+ * result dialogs), while the menus that expose it are built here — the shell
+ * injects the check at startup. Read at click time, so registration order
+ * relative to menu construction doesn't matter; until registered the menu
+ * entry no-ops and the About dialog doesn't offer the button. */
+let updateCheckInvoker: (() => void) | null = null
+
+export function setUpdateCheckInvoker(invoke: (() => void) | null): void {
+  updateCheckInvoker = invoke
+}
+
+/** Help > Check for Updates…: user-triggered update check (sits right above
+ * About, like Word). The shell-injected check owns all feedback: the update
+ * window when newer exists, "you're up to date (version x)" otherwise. */
+export function checkUpdatesMenuItem(labels: AppMenuLabels): MenuItemConstructorOptions {
+  return {
+    label: labels.checkUpdates,
+    click: () => updateCheckInvoker?.(),
+  }
+}
+
+/** Help > About: a native dialog with the app version — every window's menu
+ * gets one, so users can report the exact build they run. */
+export function aboutMenuItem(labels: AppMenuLabels): MenuItemConstructorOptions {
+  return {
+    label: labels.about,
+    click: async () => {
+      const { app, dialog, clipboard } = await import('electron')
+      const version = app.getVersion()
+      const canCheck = updateCheckInvoker !== null
+      const { response } = await dialog.showMessageBox({
+        type: 'info',
+        title: 'UniWork Office',
+        message: 'UniWork Office',
+        detail: `${labels.version} ${version}`,
+        buttons: ['OK', labels.copy, ...(canCheck ? [labels.checkUpdates] : [])],
+        defaultId: 0,
+        cancelId: 0,
+      })
+      if (response === 1) clipboard.writeText(`UniWork Office ${version}`)
+      if (response === 2) updateCheckInvoker?.()
+    },
+  }
+}
+
+/** Help menu with Check for Updates… + About; extra app-specific items go
+ * before the separator. */
+export function helpMenuTemplate(
+  labels: AppMenuLabels,
+  extraItems: MenuItemConstructorOptions[] = [],
+): MenuItemConstructorOptions {
+  return {
+    role: 'help',
+    label: labels.help,
+    submenu: [
+      ...extraItems,
+      ...(extraItems.length > 0 ? [{ type: 'separator' } as const] : []),
+      checkUpdatesMenuItem(labels),
+      aboutMenuItem(labels),
     ],
   }
 }

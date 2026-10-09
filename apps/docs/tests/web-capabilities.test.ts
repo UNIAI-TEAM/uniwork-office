@@ -246,6 +246,8 @@ describe('EditorContextMenu', () => {
             onLink: noop,
             onNewComment: noop,
             onAiPreset: noop,
+            onViewImage: noop,
+            onSaveImageAs: noop,
           }),
         }),
       ),

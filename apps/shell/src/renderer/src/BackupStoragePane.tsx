@@ -19,10 +19,7 @@ import {
   type AddonSkuId,
   type LocalBackupSnapshot,
 } from './backup-addons'
-import {
-  exportWorkbenchBackupUi,
-  importWorkbenchBackupUi,
-} from './workbench-store-client'
+import { exportWorkbenchBackupUi, importWorkbenchBackupUi } from './workbench-store-client'
 
 function L(lang: Lang, vi: string, en: string): string {
   return lang === 'vi' ? vi : en
@@ -49,7 +46,9 @@ export function BackupStoragePane({
     setErr(null)
     setMsg(null)
     if (!loggedIn) {
-      setErr(L(lang, 'Đăng nhập UniWork để mua Addon cloud.', 'Sign in to UniWork to buy cloud addons.'))
+      setErr(
+        L(lang, 'Đăng nhập UniWork để mua Addon cloud.', 'Sign in to UniWork to buy cloud addons.'),
+      )
       return
     }
     // Real checkout is server-hosted; open pricing until billing API ships.
@@ -81,13 +80,7 @@ export function BackupStoragePane({
     setMsg(null)
     const r = await exportWorkbenchBackupUi()
     if (r.ok) {
-      setMsg(
-        L(
-          lang,
-          `Đã xuất backup SQLite: ${r.path}`,
-          `Exported SQLite backup: ${r.path}`,
-        ),
-      )
+      setMsg(L(lang, `Đã xuất backup SQLite: ${r.path}`, `Exported SQLite backup: ${r.path}`))
       return
     }
     if (r.canceled) return
@@ -234,7 +227,11 @@ export function BackupStoragePane({
         <button type="button" className="btn btn-secondary" onClick={doExport}>
           {L(lang, 'Xuất backup JSON', 'Export JSON backup')}
         </button>
-        <button type="button" className="btn btn-secondary" onClick={() => fileRef.current?.click()}>
+        <button
+          type="button"
+          className="btn btn-secondary"
+          onClick={() => fileRef.current?.click()}
+        >
           {L(lang, 'Nhập backup JSON', 'Import JSON backup')}
         </button>
         <input
@@ -250,9 +247,7 @@ export function BackupStoragePane({
           disabled={!hasCloudBackup(ent)}
           onClick={cloudBackup}
           title={
-            hasCloudBackup(ent)
-              ? undefined
-              : L(lang, 'Cần gói Backup', 'Requires a Backup plan')
+            hasCloudBackup(ent) ? undefined : L(lang, 'Cần gói Backup', 'Requires a Backup plan')
           }
         >
           {L(lang, 'Sao lưu lên Cloud', 'Backup to Cloud')}
@@ -289,7 +284,7 @@ export function BackupStoragePane({
             key={sku.id}
             sku={sku}
             lang={lang}
-            active={ent.storagePackIds.includes(sku.id)}
+            active={(ent.storagePackIds as readonly AddonSkuId[]).includes(sku.id)}
             onBuy={() => buy(sku.id)}
             onSimulate={
               isDev

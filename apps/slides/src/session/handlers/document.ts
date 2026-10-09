@@ -23,9 +23,11 @@ import type {
   SetLinkOp,
   SetNotesOp,
 } from '../../shared/ipc'
+import { safeExternalUrl } from '@genoffice/electron-utils/safe-external-url'
+import { DECK_LINK_PROTOCOLS } from '../../shared/run-link'
 import type { HandlerContext } from '../host-io'
 import { buildAllRenderSlides, rebuildSlide } from '../render'
-import { pushHistory, sessions } from '../state'
+import { markMetaDirty, pushHistory, sessions } from '../state'
 import { journaledTxn, sessionTxn } from '../txn'
 
 // Section shims share one shape: single op, metaDirty, echo the op's section payload back.
@@ -34,7 +36,7 @@ const sectionShim = (ctx: HandlerContext, op: Record<string, unknown>) => {
   if (!session) return null
   const r = sessionTxn(session, { ops: [op as Parameters<typeof runTxn>[1]['ops'][0]] })
   if (!r) return null
-  session.metaDirty = true
+  markMetaDirty(session)
   return r.records![0]!.after
 }
 
@@ -42,6 +44,13 @@ export const documentHandlers = {
   'slides:set-link': (ctx: HandlerContext, op: SetLinkOp) => {
     const session = sessions.get(ctx.clientId)
     if (!session) return null
+    // A javascript:/file: target must never be saved into the package.
+    if (
+      op.target?.kind === 'url' &&
+      safeExternalUrl(op.target.url, { allowedProtocols: DECK_LINK_PROTOCOLS }) === null
+    ) {
+      return null
+    }
     const r = sessionTxn(session, {
       ops: [{ op: 'setLink', target: { slide: op.slideIndex, el: op.sourceId }, link: op.target }],
     })
@@ -134,7 +143,7 @@ export const documentHandlers = {
     // contiguous buffer fails on large decks
     session.opened = reparseDeck(session.opened)
     // Reopening cleared element-level dirty; the session-level flag preserves the "unsaved" state (reset on save)
-    session.metaDirty = true
+    markMetaDirty(session)
     session.fitWidthPx = op.fitWidthPx
     return buildAllRenderSlides(session.opened, op.fitWidthPx)
   },
@@ -145,7 +154,7 @@ export const documentHandlers = {
     const r = sessionTxn(session, {
       ops: [{ op: 'setNotes', target: { slide: op.slideIndex }, text: op.text }],
     })
-    if (r) session.metaDirty = true
+    if (r) markMetaDirty(session)
     return r !== null
   },
 
@@ -171,7 +180,7 @@ export const documentHandlers = {
       ],
     })
     if (!r) return null
-    session.metaDirty = true
+    markMetaDirty(session)
     return getSlideComments(session.opened.archive, slide.path)
   },
 
@@ -196,7 +205,7 @@ export const documentHandlers = {
       ],
     })
     if (!r) return null
-    session.metaDirty = true
+    markMetaDirty(session)
     return getSlideComments(session.opened.archive, slide.path)
   },
 

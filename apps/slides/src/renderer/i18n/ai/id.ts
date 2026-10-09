@@ -22,7 +22,6 @@ export const id = {
   aiQcPageSkipped: 'Halaman {n}: pemeriksaan tata letak otomatis dilewati',
   aiQcStopped: 'Pemeriksaan tata letak dihentikan',
   aiQcCapped: '{count} halaman lagi tidak diperiksa (batas per proses)',
-  aiGskLoginBtn: 'Masuk ke UniWork',
   aiPanelTitle: 'uniAI',
   aiOpenAssistant: 'Buka asisten AI',
   aiFactCheckBtn: 'Cek Fakta AI',
@@ -140,6 +139,7 @@ export const id = {
   aiClarifyOther: 'Lainnya (isi sendiri)',
   aiClarifySkip: 'Lewati survei',
   aiClarifyNext: 'Berikutnya',
+  aiClarifyPrev: 'Sebelumnya',
   aiClarifySubmit: 'Buat',
   aiSumReadAttachment: 'Baca lampiran',
   aiSumReadAttachmentName: 'Baca lampiran {name}',
@@ -228,4 +228,5 @@ export const id = {
   aiSumSaveTemplate: 'Menyimpan templat gaya "{name}"',
   aiSumTemplatesEmpty: 'Daftar templat gaya (kosong)',
   aiSumListTemplates: 'Menampilkan {count} templat gaya',
+  aiPageCloudToLocal: 'Awan tidak tersedia — dibuat secara lokal',
 } satisfies Record<keyof typeof zh, string>

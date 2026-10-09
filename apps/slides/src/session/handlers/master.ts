@@ -14,7 +14,7 @@ import { gradientFillTo, gradientPathKind, gradientStops } from '../fill'
 import type { HandlerContext } from '../host-io'
 import { getFontMetrics } from '../platform'
 import { buildAllRenderSlides, makeMediaResolver } from '../render'
-import { pushHistory, sessions, type Session } from '../state'
+import { markMetaDirty, pushHistory, sessions, type Session } from '../state'
 import { journaledTxn, sessionTxn } from '../txn'
 
 // Exception to the fidelity rule: only parts the user actively changed in master view are
@@ -40,7 +40,7 @@ const masterTxn = (session: Session, me: { partPath: string; slide: Slide }, op:
   sessionTxn(session, { ops: [op], parts: new Map([[me.partPath, me.slide]]) })
 
 const masterEditDone = (session: Session): RenderSlide | null => {
-  session.metaDirty = true
+  markMetaDirty(session)
   return buildMasterRenderSlide(session)
 }
 

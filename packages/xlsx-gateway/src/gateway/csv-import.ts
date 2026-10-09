@@ -5,8 +5,15 @@
 import JSZip from 'jszip'
 
 import { encodeXlsxEscapes } from './xlsx-escapes'
+import { DEFAULT_THEME_XML } from './xlsx-default-theme'
+import { MINIMAL_STYLESHEET_XML } from './xlsx-default-styles'
+import { validateSheetName } from './xlsx-sheets'
 
 const DELIMITERS = [',', ';', '\t'] as const
+
+/** Excel's sheet bounds; anything past them cannot land in a workbook anyway. */
+export const MAX_CSV_ROWS = 1_048_576
+export const MAX_CSV_COLS = 16_384
 
 // Excel writes CSV in the system's legacy charset, not UTF-8 (GBK on Chinese
 // Windows, Shift_JIS on Japanese), so decoding everything as UTF-8 turns every
@@ -49,20 +56,47 @@ function score(text: string): number {
  * produce — GBK and Shift_JIS both decode the same bytes to plausible-looking
  * but different CJK.
  */
+/**
+ * UTF-16 without a BOM (Excel writes it; editors strip it): NUL bytes then
+ * interleave the text, which strict UTF-8 accepts — so this must run before
+ * the UTF-8 attempt or the NULs survive as garbage. NUL bytes never occur in
+ * UTF-8/legacy CSV text (GBK/Shift_JIS trail bytes exclude 0x00), so any
+ * meaningful NUL presence means UTF-16, with the NUL-heavy side picking the
+ * byte order (ties go LE, Excel's order).
+ */
+function sniffUtf16WithoutBom(bytes: Uint8Array): 'utf-16le' | 'utf-16be' | null {
+  const sample = bytes.subarray(0, Math.min(bytes.length, 1024))
+  let pairs = 0
+  let evenNul = 0
+  let oddNul = 0
+  for (let i = 0; i + 1 < sample.length; i += 2) {
+    pairs += 1
+    if (sample[i] === 0) evenNul += 1
+    if (sample[i + 1] === 0) oddNul += 1
+  }
+  if (pairs < 2) return null
+  if ((evenNul + oddNul) / (pairs * 2) < 0.05) return null
+  return oddNul >= evenNul ? 'utf-16le' : 'utf-16be'
+}
+
 export function decodeCsvBuffer(bytes: Uint8Array, preferred?: string): string {
   if (bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) {
     return decode(bytes.subarray(3), 'utf-8') ?? ''
   }
   if (bytes[0] === 0xff && bytes[1] === 0xfe) return decode(bytes.subarray(2), 'utf-16le') ?? ''
   if (bytes[0] === 0xfe && bytes[1] === 0xff) return decode(bytes.subarray(2), 'utf-16be') ?? ''
+  const bomless = sniffUtf16WithoutBom(bytes)
+  if (bomless) return decode(bytes, bomless) ?? ''
 
   const utf8 = decode(bytes, 'utf-8', true)
   if (utf8 !== null) return utf8
 
   let best = decode(bytes, 'utf-8') ?? ''
   let bestScore = score(best)
+  const utf16 = ['utf-16le', 'utf-16be'] as const
   const candidates = preferred ? [preferred, ...LEGACY_CHARSETS] : LEGACY_CHARSETS
-  for (const charset of candidates) {
+  // CJK-only UTF-16 carries too few NUL bytes for the sniffer above; let the scorer pick.
+  for (const charset of [...utf16, ...candidates]) {
     const candidate = decode(bytes, charset)
     if (candidate === null) continue
     const candidateScore = score(candidate)
@@ -74,9 +108,22 @@ export function decodeCsvBuffer(bytes: Uint8Array, preferred?: string): string {
   return best
 }
 
+/// Excel's own hint line: a first line of exactly `sep=<char>` names the
+/// delimiter and is not data. Excel writes it for CSV exports in locales
+/// that use ";" and honours it on open.
+const SEP_DECLARATION = /^\uFEFF?sep=(.)\r?\n/i
+
+export function splitSepDeclaration(text: string): { text: string; delimiter?: string } {
+  const match = SEP_DECLARATION.exec(text)
+  if (!match) return { text }
+  return { text: text.slice(match[0].length), delimiter: match[1]! }
+}
+
 /// Counts delimiter occurrences outside quotes over the first lines and
-/// picks the most frequent one; ties favor the comma.
-export function sniffDelimiter(text: string): string {
+/// picks the most frequent one; ties favor the comma. A `sep=` line wins.
+export function sniffDelimiter(input: string): string {
+  const { text, delimiter } = splitSepDeclaration(input)
+  if (delimiter !== undefined) return delimiter
   const sample = text
     .slice(0, 64 * 1024)
     .split(/\r?\n/)
@@ -115,10 +162,24 @@ export function sniffDelimiter(text: string): string {
 }
 
 export function parseCsv(input: string, delimiter = sniffDelimiter(input)): string[][] {
-  const text = input.startsWith('﻿') ? input.slice(1) : input
+  const stripped = splitSepDeclaration(input).text
+  const text = stripped.startsWith('﻿') ? stripped.slice(1) : stripped
   const rows: string[][] = []
+  const fail = (msg: string): never => {
+    throw new Error(`CSV import rejected: ${msg}`)
+  }
   let row: string[] = []
   let field = ''
+  const pushField = (): void => {
+    row.push(field)
+    if (row.length > MAX_CSV_COLS) fail(`too many columns (cap ${MAX_CSV_COLS})`)
+    field = ''
+  }
+  const pushRow = (): void => {
+    rows.push(row)
+    if (rows.length > MAX_CSV_ROWS) fail(`too many rows (cap ${MAX_CSV_ROWS})`)
+    row = []
+  }
   let quoted = false
   for (let index = 0; index < text.length; index += 1) {
     const character = text[index]
@@ -130,6 +191,9 @@ export function parseCsv(input: string, delimiter = sniffDelimiter(input)): stri
         } else {
           quoted = false
         }
+      } else if (character === '\r') {
+        if (text[index + 1] === '\n') index += 1
+        field += '\n'
       } else {
         field += character
       }
@@ -138,32 +202,31 @@ export function parseCsv(input: string, delimiter = sniffDelimiter(input)): stri
     if (character === '"' && field === '') {
       quoted = true
     } else if (character === delimiter) {
-      row.push(field)
-      field = ''
+      pushField()
     } else if (character === '\n' || character === '\r') {
       if (character === '\r' && text[index + 1] === '\n') index += 1
-      row.push(field)
-      rows.push(row)
-      row = []
-      field = ''
+      pushField()
+      pushRow()
     } else {
       field += character
     }
   }
   if (field !== '' || row.length > 0) {
-    row.push(field)
-    rows.push(row)
+    pushField()
+    pushRow()
   }
   // A trailing newline produces one empty row — drop it.
   while (rows.length > 0 && rows[rows.length - 1]?.every((cell) => cell === '')) rows.pop()
   return rows
 }
 
-/// Plain decimal numbers only; leading zeros ("007") stay text so codes and
-/// phone numbers survive the import. Integers past Excel's 15-digit precision
-/// stay text too, so long IDs are not corrupted on open.
+/// Plain decimal numbers only (".5", "1." and "-.5" count, as in Excel); leading
+/// zeros ("007") and a "+" sign ("+86") stay text so codes and phone numbers
+/// survive the import. Integers past Excel's 15-digit precision stay text too,
+/// so long IDs are not corrupted on open.
 export function isNumericCell(value: string): boolean {
-  if (!/^-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?$/.test(value)) return false
+  if (!/^-?(?:(?:0|[1-9][0-9]*)(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?$/.test(value))
+    return false
   if (!/[.eE]/.test(value) && value.replace(/^-/, '').length > 15) return false
   return Number.isFinite(Number(value))
 }
@@ -198,7 +261,7 @@ export function buildWorksheetXml(rows: readonly (readonly string[])[]): string 
       const reference = `${columnLabel(columnIndex)}${rowIndex + 1}`
       cells.push(
         isNumericCell(value)
-          ? `<c r="${reference}"><v>${value}</v></c>`
+          ? `<c r="${reference}"><v>${Number(value)}</v></c>`
           : `<c r="${reference}" t="inlineStr"><is><t xml:space="preserve">${escapeXml(encodeXlsxEscapes(value))}</t></is></c>`,
       )
     })
@@ -219,6 +282,21 @@ export async function csvToXlsxBuffer(csvText: string, sheetName = 'Sheet1'): Pr
 }
 
 /**
+ * Open-path conversion. `delimiter` pins the split for callers that already
+ * know the format (a .tsv); leaving it unset lets the sniffer and its
+ * prose-shatter guard decide, which is right for a bare .csv but unreliable
+ * for a tab-delimited file whose fields hold enough commas to out-count tabs.
+ */
+export async function csvToXlsxBufferForOpen(
+  csvText: string,
+  sheetName = 'Sheet1',
+  delimiter?: string,
+): Promise<{ buffer: Buffer; empty: boolean }> {
+  const rows = parseCsv(csvText, delimiter ?? resolveImportDelimiter(csvText))
+  return { buffer: await xlsxBufferFromRows(rows, sheetName), empty: rows.length === 0 }
+}
+
+/**
  * Delimiter for the open-file path. The sniffer counts raw occurrences, so a
  * single-column prose file whose notes hold more semicolons/tabs than commas
  * ("hello; world") mis-sniffs and shatters into phantom columns — the same
@@ -229,8 +307,11 @@ export async function csvToXlsxBuffer(csvText: string, sheetName = 'Sheet1'): Pr
  * one column. A genuine table keeps its delimiter: multi-field header, or a
  * title row over body rows that mostly share the same width (a comma-free
  * `;`/tab table must not collapse just because its first line is a title).
+ * A `sep=` line is Excel's own declaration and skips the guard.
  */
 export function resolveImportDelimiter(csvText: string): string {
+  const declared = splitSepDeclaration(csvText).delimiter
+  if (declared !== undefined) return declared
   const sniffed = sniffDelimiter(csvText)
   if (sniffed === ',') return sniffed
   const sniffedRows = parseCsv(csvText, sniffed)
@@ -270,6 +351,7 @@ async function xlsxBufferFromRows(
   rows: readonly (readonly string[])[],
   sheetName: string,
 ): Promise<Buffer> {
+  validateSheetName(sheetName)
   const zip = new JSZip()
   zip.file(
     '[Content_Types].xml',
@@ -279,6 +361,8 @@ async function xlsxBufferFromRows(
       '<Default Extension="xml" ContentType="application/xml"/>' +
       '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +
       '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>' +
+      '<Override PartName="/xl/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/>' +
+      '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' +
       '</Types>',
   )
   zip.file(
@@ -299,8 +383,12 @@ async function xlsxBufferFromRows(
     '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
       '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
       '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>' +
+      '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme" Target="theme/theme1.xml"/>' +
+      '<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>' +
       '</Relationships>',
   )
+  zip.file('xl/theme/theme1.xml', DEFAULT_THEME_XML)
+  zip.file('xl/styles.xml', MINIMAL_STYLESHEET_XML)
   zip.file('xl/worksheets/sheet1.xml', buildWorksheetXml(rows))
   return zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' })
 }

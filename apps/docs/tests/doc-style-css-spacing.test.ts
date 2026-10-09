@@ -13,8 +13,22 @@ import { docStyleCss } from '../src/renderer/doc-style-css'
 
 function parsedWith(styleId: string, display: StyleDisplay): ParsedDocFull {
   const styles = new Map<string, StyleInfo>()
-  styles.set(styleId, { styleId, name: styleId, type: 'paragraph', display } as StyleInfo)
-  return { styles, docDefaults: {}, blocks: [] } as unknown as ParsedDocFull
+  styles.set('Normal', {
+    styleId: 'Normal',
+    name: 'Normal',
+    type: 'paragraph',
+    isDefault: true,
+  } as StyleInfo)
+  styles.set(styleId, {
+    styleId,
+    name: styleId,
+    type: 'paragraph',
+    basedOn: 'Normal',
+    display,
+  } as StyleInfo)
+  // one list definition: the .doc-li collapse rules are keyed per list (data-num)
+  const numbering = new Map([['1', { numId: '1', abstractNumId: '0' }]])
+  return { styles, docDefaults: {}, blocks: [], numbering } as unknown as ParsedDocFull
 }
 
 describe('docStyleCss spacing', () => {
@@ -28,15 +42,19 @@ describe('docStyleCss spacing', () => {
       }),
     )
     expect(css).toContain('[data-style="text-start"] { margin-top:14.0pt;margin-bottom:14.0pt }')
-    expect(css).toContain('.doc-li[data-style="text-start"]:has(+ .doc-li) { margin-bottom:0 }')
-    expect(css).toContain('.doc-li + .doc-li[data-style="text-start"] { margin-top:0 }')
+    expect(css).toContain(
+      '.doc-li[data-num="1"][data-style="text-start"]:has(+ .doc-li[data-num="1"]) { margin-bottom:0 }',
+    )
+    expect(css).toContain(
+      '.doc-li[data-num="1"] + .doc-li[data-num="1"][data-style="text-start"] { margin-top:0 }',
+    )
     // no !important: a direct explicit w:before/w:after (inline margin, auto off)
     // must override the style-level list collapse
-    expect(css).not.toContain(
-      '.doc-li[data-style="text-start"]:has(+ .doc-li) { margin-bottom:0 !important }',
+    expect(css).not.toMatch(
+      /\[data-style="text-start"\]:has\(\+ [^{]*\{ margin-bottom:0 !important/,
     )
-    expect(css).not.toContain(
-      '.doc-li + .doc-li[data-style="text-start"] { margin-top:0 !important }',
+    expect(css).not.toMatch(
+      /\+ \.doc-li[^{]*\[data-style="text-start"\] \{ margin-top:0 !important/,
     )
   })
 
@@ -76,10 +94,10 @@ describe('docStyleCss spacing', () => {
     const css = docStyleCss(parsed)
     const cell = '.doc-table :is(td, th, .cell-clip, .cell-vert) > '
     expect(css).toContain(
-      `${cell}:is(p, .doc-li, h1, h2, h3, h4, h5, h6, .doc-protected-field):not([data-style]):nth-child(1 of :not(.doc-cell-boxes)) { margin-top:0 }`,
+      `${cell}:is(p, .doc-li, h1, h2, h3, h4, h5, h6, .doc-protected-field, .doc-protected-formula-display, .doc-img-para):not([data-style]):nth-child(1 of :not(.doc-cell-boxes)) { margin-top:0 }`,
     )
     expect(css).toContain(
-      `${cell}:is(p, .doc-li, h1, h2, h3, h4, h5, h6, .doc-protected-field):not([data-style]):nth-last-child(1 of :not(.doc-cell-boxes)) { margin-bottom:0 }`,
+      `${cell}:is(p, .doc-li, h1, h2, h3, h4, h5, h6, .doc-protected-field, .doc-protected-formula-display, .doc-img-para):not([data-style]):nth-last-child(1 of :not(.doc-cell-boxes)) { margin-bottom:0 }`,
     )
   })
 
@@ -106,6 +124,37 @@ describe('docStyleCss spacing', () => {
     expect(zero).toContain('[data-style="Loose"]:not(.doc-lh-fixed) span { line-height:inherit }')
   })
 
+  it('emits the strut face box for the glyph shift at the document and style level', () => {
+    const parsed = parsedWith('Serif', { fontAscii: 'Times New Roman', font: 'Times New Roman' })
+    ;(parsed as { docDefaults: object }).docDefaults = { asciiFont: 'Calibri' }
+    const css = docStyleCss(parsed)
+    expect(css).toMatch(/--doc-font-box:1\.0000;--doc-font-skew:0\.5000/)
+    expect(css).toMatch(
+      /\[data-style="Serif"\] \{[^}]*--doc-font-box:1\.1074;--doc-font-skew:0\.6748/,
+    )
+    // an unknown face resets the document box so it stays at the CSS centre
+    const unknown = docStyleCss(parsedWith('Odd', { fontAscii: 'HCI Poppy', font: 'HCI Poppy' }))
+    expect(unknown).toMatch(
+      /\[data-style="Odd"\] \{[^}]*--doc-font-box:initial;--doc-font-skew:initial/,
+    )
+  })
+
+  it('emits the fixed-rule glyph shift override per style, released by auto multiples', () => {
+    const atLeast = docStyleCss(parsedWith('Tight', { lineRule: 'atLeast', lineRawTwips: 480 }))
+    expect(atLeast).toMatch(
+      /\[data-style="Tight"\] \{[^}]*--doc-lead-top:calc\(max\(0px, \(24\.0pt - var\(--doc-line-grid, calc\(var\(--doc-line-factor,1\.2\) \* 1em\)\)\) \/ 2\) \+ var\(--doc-lead-gap, 0px\)\)/,
+    )
+    expect(atLeast).not.toMatch(/\[data-style="Tight"\] \{[^}]*--doc-lh-cap/)
+    const exact = docStyleCss(parsedWith('Fixed', { lineRule: 'exact', lineRawTwips: 480 }))
+    expect(exact).toMatch(
+      /\[data-style="Fixed"\] \{[^}]*--doc-lead-top:var\(--doc-lead-exact, 0px\)/,
+    )
+    // the 0.8 h shift reads the rule height from --doc-lh-cap
+    expect(exact).toMatch(/\[data-style="Fixed"\] \{[^}]*--doc-lh-cap:24\.0pt/)
+    const auto = docStyleCss(parsedWith('Body', { lineRule: 'auto', lineRawTwips: 360 }))
+    expect(auto).toMatch(/\[data-style="Body"\] \{[^}]*--doc-lead-top:initial/)
+  })
+
   it('lets a direct ctxSp off (.ctx-sp-off) escape the style-level suppression', () => {
     const css = docStyleCss(parsedWith('ListBullet', { contextualSpacing: true }))
     expect(css).toContain(
@@ -124,5 +173,84 @@ describe('docStyleCss spacing', () => {
     expect(css).toContain(
       '[data-style="SBul"] + [data-style="SBul"].ctx-sp { margin-top:0 !important }',
     )
+  })
+})
+
+describe('docStyleCss styles off the Normal chain', () => {
+  const parsedOff = (display: StyleDisplay, docDefaults: object = {}): ParsedDocFull => {
+    const styles = new Map<string, StyleInfo>()
+    styles.set('Normal', {
+      styleId: 'Normal',
+      name: 'Normal',
+      type: 'paragraph',
+      isDefault: true,
+      display: {
+        spaceAfterTwips: 160,
+        lineRule: 'auto',
+        lineRawTwips: 259,
+        lineSpacing: 259 / 240,
+      },
+    } as StyleInfo)
+    styles.set('NoSpacing', {
+      styleId: 'NoSpacing',
+      name: 'No Spacing',
+      type: 'paragraph',
+      display,
+    } as StyleInfo)
+    return { styles, docDefaults, blocks: [] } as unknown as ParsedDocFull
+  }
+
+  it('a paragraph style without w:basedOn takes docDefaults spacing and line, not Normal', () => {
+    const css = docStyleCss(parsedOff({ sizeHalfPoints: 22 }))
+    const rule = /\[data-style="NoSpacing"\] \{ ([^}]*) \}/.exec(css)![1]
+    expect(rule).toContain('margin-top:0.0pt')
+    expect(rule).toContain('margin-bottom:0.0pt')
+    expect(rule).toMatch(/line-height:/)
+    expect(rule).not.toContain('1.079')
+  })
+
+  it('docDefaults spacing reaches it when declared', () => {
+    const css = docStyleCss(
+      parsedOff({ sizeHalfPoints: 22 }, { spaceAfterTwips: 200, spaceBeforeAuto: true }),
+    )
+    const rule = /\[data-style="NoSpacing"\] \{ ([^}]*) \}/.exec(css)![1]
+    expect(rule).toContain('margin-top:14.0pt')
+    expect(rule).toContain('margin-bottom:10.0pt')
+  })
+
+  it('own spacing still wins over docDefaults', () => {
+    const css = docStyleCss(parsedOff({ spaceAfterTwips: 60 }, { spaceAfterTwips: 200 }))
+    expect(/\[data-style="NoSpacing"\] \{ ([^}]*) \}/.exec(css)![1]).toContain(
+      'margin-bottom:3.0pt',
+    )
+  })
+
+  it('resets the glyph shift and snapping multiple to the line it lays out with', () => {
+    const rule = (css: string): string => /\[data-style="NoSpacing"\] \{ ([^}]*) \}/.exec(css)![1]
+    // single line: Normal's 1.08 multiple must not shift its glyphs
+    const single = rule(docStyleCss(parsedOff({ sizeHalfPoints: 22 })))
+    expect(single).toContain('--doc-lead-top:initial')
+    expect(single).toContain('--doc-line-mult:1')
+    // docDefaults multiple
+    const ddAuto = rule(
+      docStyleCss(parsedOff({}, { lineRule: 'auto', lineRawTwips: 360, lineSpacing: 1.5 })),
+    )
+    expect(ddAuto).toContain('--doc-lead-top:initial')
+    expect(ddAuto).toContain('--doc-line-mult:1.5')
+    // docDefaults atLeast bottom-aligns by its own floor
+    const ddAtLeast = rule(docStyleCss(parsedOff({}, { lineRule: 'atLeast', lineRawTwips: 480 })))
+    expect(ddAtLeast).toMatch(/--doc-lead-top:calc\(max\(0px, \(24\.0pt - /)
+    expect(ddAtLeast).not.toContain('--doc-line-mult')
+    // the style's own rule still wins over docDefaults
+    const own = rule(
+      docStyleCss(
+        parsedOff(
+          { lineRule: 'auto', lineRawTwips: 480, lineSpacing: 2 },
+          { lineRule: 'atLeast', lineRawTwips: 480 },
+        ),
+      ),
+    )
+    expect(own).toContain('--doc-lead-top:initial')
+    expect(own).toContain('--doc-line-mult:2')
   })
 })

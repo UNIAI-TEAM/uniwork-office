@@ -29,13 +29,14 @@ import type {
   RenderFill,
   ShapeRenderNode,
   TableRenderNode,
+  ChartRenderNode,
   PictureRenderNode,
   GroupRenderNode,
 } from '@genoffice/pptx-render'
-import { boxPivotProps, fillToKonva, isEditableText } from './konva-adapter'
-import { tableCellAtPoint, tableLocalPointFromStage } from './table-hit'
-import { isPromptPlaceholder, textHitAtPoint } from './text-hit-area'
-import type { EditCaret } from './action-context'
+import { boxPivotProps, fillToKonva, isConnectorNode, isEditableText } from './konva-adapter'
+import { tableCellAtPoint, tableCellOverlayBox, tableLocalPointFromStage } from './table-hit'
+import { EDGE_GRIP_PX, isPromptPlaceholder, textHitAtPoint } from './text-hit-area'
+import type { EditCaret, EditPointsState } from './action-context'
 import {
   computeSnap,
   computeSpacingSnap,
@@ -55,23 +56,39 @@ import {
 } from './draw-shape'
 import { shapePreviewPath } from './components/gallery-previews'
 import { adjustHandleSpecs } from './adjust-handles'
+import {
+  insertVertex,
+  moveControl,
+  moveVertex,
+  nearestOnPath,
+  shapeToEditablePath,
+  toSvgPath,
+  vertices,
+  type PathCmd,
+} from './edit-points'
+import { isDuplicateDragModifier, isToggleModifier } from './platform-modifiers'
+import { constrainAxis } from './drag-axis-lock'
+import { dblClickActionFor } from './dblclick-action'
+import type { ContextTab } from './components/context-tabs'
 
-/** Whether a node is a connector (read-only, no Transformer attached). */
-function isConnectorNode(node: RenderNode): boolean {
-  return (node.type === 'shape' || node.type === 'text') && !!(node as ShapeRenderNode).line
-}
+/** Luminance (0..1) + alpha (0..1) pair — the unit the background-darkness composite works in. */
+type LumAlpha = { lum: number; alpha: number }
 
-/** Perceived luminance (0..1) of a CSS color (#rgb/#rrggbb[aa]/rgb[a]()); null when unparseable. */
-function colorLuminance(color: string): number | null {
+/** Perceived luminance and alpha of a CSS color (#rgb/#rrggbb[aa]/rgb[a]()); null when
+ * unparseable. Alpha must survive parsing: a transparent full-page overlay otherwise
+ * reads as its base color and flips the chrome to white on a white slide. */
+function colorLumAlpha(color: string): LumAlpha | null {
   const c = color.trim()
   let r: number, g: number, b: number
-  const hex6 = /^#([0-9a-f]{6})/i.exec(c)
+  let a = 1
+  const hex6 = /^#([0-9a-f]{6})([0-9a-f]{2})?/i.exec(c)
   const hex3 = /^#([0-9a-f]{3})$/i.exec(c)
-  const rgb = /^rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/i.exec(c)
+  const rgb = /^rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)(?:[,\s/]+([\d.]+%?))?/i.exec(c)
   if (hex6) {
     r = parseInt(hex6[1]!.slice(0, 2), 16)
     g = parseInt(hex6[1]!.slice(2, 4), 16)
     b = parseInt(hex6[1]!.slice(4, 6), 16)
+    if (hex6[2]) a = parseInt(hex6[2], 16) / 255
   } else if (hex3) {
     r = parseInt(hex3[1]![0]! + hex3[1]![0]!, 16)
     g = parseInt(hex3[1]![1]! + hex3[1]![1]!, 16)
@@ -80,19 +97,26 @@ function colorLuminance(color: string): number | null {
     r = Number(rgb[1])
     g = Number(rgb[2])
     b = Number(rgb[3])
+    if (rgb[4]) a = rgb[4].endsWith('%') ? Number(rgb[4].slice(0, -1)) / 100 : Number(rgb[4])
   } else {
     return null
   }
-  return (0.299 * r + 0.587 * g + 0.114 * b) / 255
+  if (!Number.isFinite(a)) a = 1
+  return {
+    lum: (0.299 * r + 0.587 * g + 0.114 * b) / 255,
+    alpha: Math.max(0, Math.min(1, a)),
+  }
 }
 
-/** Average luminance of an image (8×8 downsample), cached per element; null while not loaded. */
-const imageLumCache = new WeakMap<HTMLImageElement, number | null>()
-function imageLuminance(img: HTMLImageElement | undefined): number | null {
+/** Alpha-weighted average luminance + mean coverage of an image (8×8 downsample), cached
+ * per element; null while not loaded. Transparent pixels must not count as black — a
+ * mostly-transparent decor PNG is (near-)invisible, not a dark background. */
+const imageLumCache = new WeakMap<HTMLImageElement, LumAlpha | null>()
+function imageLumAlpha(img: HTMLImageElement | undefined): LumAlpha | null {
   if (!img || !img.complete || !img.naturalWidth) return null
   const hit = imageLumCache.get(img)
   if (hit !== undefined) return hit
-  let lum: number | null
+  let out: LumAlpha | null
   try {
     const c = document.createElement('canvas')
     c.width = 8
@@ -101,59 +125,164 @@ function imageLuminance(img: HTMLImageElement | undefined): number | null {
     ctx.drawImage(img, 0, 0, 8, 8)
     const d = ctx.getImageData(0, 0, 8, 8).data
     let sum = 0
-    for (let i = 0; i < d.length; i += 4)
-      sum += 0.299 * d[i]! + 0.587 * d[i + 1]! + 0.114 * d[i + 2]!
-    lum = sum / (d.length / 4) / 255
+    let cover = 0
+    for (let i = 0; i < d.length; i += 4) {
+      const a = d[i + 3]! / 255
+      sum += ((0.299 * d[i]! + 0.587 * d[i + 1]! + 0.114 * d[i + 2]!) / 255) * a
+      cover += a
+    }
+    out = cover > 0 ? { lum: sum / cover, alpha: cover / (d.length / 4) } : { lum: 1, alpha: 0 }
   } catch {
-    lum = null // tainted canvas etc. — treat as unknown
+    out = null // tainted canvas etc. — treat as unknown
   }
-  imageLumCache.set(img, lum)
-  return lum
+  imageLumCache.set(img, out)
+  return out
 }
 
-/** Luminance of a render fill; gradients average their stops, images sample the bitmap. */
-function fillLuminance(fill: RenderFill, images: Map<string, HTMLImageElement>): number | null {
-  if (fill.kind === 'solid') return colorLuminance(fill.color)
+/** Luminance/alpha of a render fill; gradients alpha-weight their stops, images sample the bitmap. */
+function fillLumAlpha(fill: RenderFill, images: Map<string, HTMLImageElement>): LumAlpha | null {
+  if (fill.kind === 'solid') return colorLumAlpha(fill.color)
   if (fill.kind === 'gradient') {
-    const vals = fill.stops
-      .map((s) => colorLuminance(s.color))
-      .filter((v): v is number => v != null)
-    return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null
+    const stops = fill.stops
+      .map((s) => colorLumAlpha(s.color))
+      .filter((v): v is LumAlpha => v != null)
+    if (!stops.length) return null
+    const cover = stops.reduce((acc, s) => acc + s.alpha, 0)
+    return {
+      lum: cover > 0 ? stops.reduce((acc, s) => acc + s.lum * s.alpha, 0) / cover : 1,
+      alpha: cover / stops.length,
+    }
   }
-  if (fill.kind === 'image')
-    return imageLuminance(fill.dataUrl ? images.get(fill.dataUrl) : undefined)
+  if (fill.kind === 'image') {
+    const la = imageLumAlpha(fill.dataUrl ? images.get(fill.dataUrl) : undefined)
+    return la && { lum: la.lum, alpha: la.alpha * (fill.alpha ?? 1) }
+  }
   return null
 }
 
 /** Whether the slide's effective background is dark (selection chrome flips to white on it).
- * Full-page background-like nodes paint over the slide background, so the topmost one wins. */
+ * The slide background, full-page master/layout decorations and background-flagged elements
+ * composite bottom-up, each blended by its alpha over an assumed light page — so a
+ * transparent or lightly-tinted overlay can't flip the verdict with its base color, while
+ * an opaque or heavy dark scrim still does. Unknown layers (unloaded images, unparseable
+ * colors) are skipped and keep whatever is below. */
 function slideBackgroundIsDark(slide: RenderSlide, images: Map<string, HTMLImageElement>): boolean {
   let lum: number | null = null
-  for (const n of slide.nodes) {
-    if (!n.background) continue
-    const l =
-      n.type === 'picture'
-        ? imageLuminance(
-            (n as PictureRenderNode).dataUrl
-              ? images.get((n as PictureRenderNode).dataUrl!)
-              : undefined,
-          )
-        : n.type === 'shape' || n.type === 'text'
-          ? fillLuminance((n as ShapeRenderNode).fill, images)
-          : null
-    if (l != null) lum = l
+  const blend = (la: LumAlpha | null) => {
+    if (!la || la.alpha <= 0) return
+    lum = la.alpha >= 1 ? la.lum : la.lum * la.alpha + (lum ?? 1) * (1 - la.alpha)
   }
-  if (lum == null) lum = fillLuminance(slide.background, images)
+  const tol = 2
+  const coversPage = (n: RenderNode, ox: number, oy: number): boolean =>
+    !n.box.rotationDeg &&
+    ox + n.box.x <= tol &&
+    oy + n.box.y <= tol &&
+    ox + n.box.x + n.box.w >= slide.widthPx - tol &&
+    oy + n.box.y + n.box.h >= slide.heightPx - tol
+  // Group children are in group-local coords; a master plate nested in a decoration group
+  // still paints the page, so walk into covering groups with the group's offset applied.
+  const visit = (nodes: RenderNode[], ox: number, oy: number, inherited: boolean) => {
+    for (const n of nodes) {
+      const flagged = inherited || !!n.background || !!n.decoration
+      if (!n.background && !(flagged && coversPage(n, ox, oy))) continue
+      if (n.type === 'group') {
+        if (!n.box.rotationDeg)
+          visit((n as GroupRenderNode).children, ox + n.box.x, oy + n.box.y, true)
+        continue
+      }
+      if (n.type === 'picture') {
+        const pic = n as PictureRenderNode
+        const la = imageLumAlpha(pic.dataUrl ? images.get(pic.dataUrl) : undefined)
+        blend(la && { lum: la.lum, alpha: la.alpha * (pic.opacity ?? 1) })
+      } else if (n.type === 'shape' || n.type === 'text') {
+        blend(fillLumAlpha((n as ShapeRenderNode).fill, images))
+      }
+    }
+  }
+  blend(fillLumAlpha(slide.background, images))
+  visit(slide.nodes, 0, 0, false)
   return (lum ?? 1) < 0.5
 }
 
-/** Selection/edit chrome color for a slide: white on dark backgrounds, near-black otherwise
- * (shared with the text-edit overlay so the edit frame matches the selection frame). */
+/** Whether the slide looks dark UNDER a specific region: composite the slide background
+ * plus every node whose box overlaps the region, bottom-up in z-order, each blended by
+ * alpha × the fraction of the region it covers. The page-average verdict fails the most
+ * common template — a colored page with a white content plate: a text box ON the plate
+ * needs dark chrome even though the page itself is dark. Rotation is
+ * approximated by the unrotated box; tables blend their cell fills (the cell-edit overlay
+ * samples one cell), charts their chart-space and plot-area fills; unknown layers
+ * (unloaded images) are skipped and keep whatever is below. */
+function regionIsDark(
+  slide: RenderSlide,
+  images: Map<string, HTMLImageElement>,
+  region: { x: number; y: number; w: number; h: number },
+): boolean {
+  const area = region.w * region.h
+  if (!(area > 0)) return slideBackgroundIsDark(slide, images)
+  let lum: number | null = null
+  const blend = (la: LumAlpha | null, cover: number) => {
+    if (!la || la.alpha <= 0 || cover <= 0) return
+    const a = Math.min(1, la.alpha * cover)
+    lum = a >= 1 ? la.lum : la.lum * a + (lum ?? 1) * (1 - a)
+  }
+  const coverage = (x: number, y: number, w: number, h: number): number => {
+    const ix = Math.max(0, Math.min(x + w, region.x + region.w) - Math.max(x, region.x))
+    const iy = Math.max(0, Math.min(y + h, region.y + region.h) - Math.max(y, region.y))
+    return (ix * iy) / area
+  }
+  // Group children are in group-local coords (same walk as slideBackgroundIsDark)
+  const visit = (nodes: RenderNode[], ox: number, oy: number) => {
+    for (const n of nodes) {
+      const cover = coverage(ox + n.box.x, oy + n.box.y, n.box.w, n.box.h)
+      // a rotated table's cells can lie outside its unrotated box; they gate themselves below
+      if (cover <= 0 && n.type !== 'table') continue
+      if (n.type === 'group') {
+        if (!n.box.rotationDeg) visit((n as GroupRenderNode).children, ox + n.box.x, oy + n.box.y)
+        continue
+      }
+      if (n.type === 'picture') {
+        const pic = n as PictureRenderNode
+        const la = imageLumAlpha(pic.dataUrl ? images.get(pic.dataUrl) : undefined)
+        blend(la && { lum: la.lum, alpha: la.alpha * (pic.opacity ?? 1) }, cover)
+      } else if (n.type === 'shape' || n.type === 'text') {
+        blend(fillLumAlpha((n as ShapeRenderNode).fill, images), cover)
+      } else if (n.type === 'table') {
+        const tbl = n as TableRenderNode
+        if (tbl.bgFill && cover > 0) blend(fillLumAlpha(tbl.bgFill, images), cover)
+        // same placement as the cell-edit overlay, so a rotated or flipped table samples the edited cell
+        const placed = { ...n.box, x: ox + n.box.x, y: oy + n.box.y }
+        for (const c of tbl.cells) {
+          const cb = tableCellOverlayBox(placed, c)
+          blend(fillLumAlpha(c.fill, images), coverage(cb.x, cb.y, cb.w, cb.h))
+        }
+      } else if (n.type === 'chart') {
+        const chart = n as ChartRenderNode
+        if (chart.bgFill) blend(fillLumAlpha(chart.bgFill, images), cover)
+        const plot = chart.plotRect
+        if (plot?.fill) {
+          const px = ox + n.box.x + plot.x
+          const py = oy + n.box.y + plot.y
+          blend(fillLumAlpha(plot.fill, images), coverage(px, py, plot.w, plot.h))
+        }
+      }
+    }
+  }
+  blend(fillLumAlpha(slide.background, images), 1)
+  visit(slide.nodes, 0, 0)
+  return (lum ?? 1) < 0.5
+}
+
+/** Selection/edit chrome color: white on dark backgrounds, near-black otherwise (shared
+ * with the text-edit overlay so the edit frame matches the selection frame). With a
+ * region (the selection's bounding box in slide px) the verdict samples what is actually
+ * painted under it; without one it falls back to the whole-page verdict. */
 export function selectionChromeColor(
   slide: RenderSlide,
   images: Map<string, HTMLImageElement>,
+  region?: { x: number; y: number; w: number; h: number } | null,
 ): string {
-  return slideBackgroundIsDark(slide, images) ? '#ffffff' : '#232425'
+  const dark = region ? regionIsDark(slide, images, region) : slideBackgroundIsDark(slide, images)
+  return dark ? '#ffffff' : '#232425'
 }
 
 /** PowerPoint-style rotate handle: white disc with a clockwise circular arrow.
@@ -284,6 +413,8 @@ interface Props {
   onEditTableCell: (sourceId: string, row: number, col: number) => void
   /** Double-click an audio/video element: trigger the playback overlay */
   onPlayMedia?: (sourceId: string) => void
+  /** Double-click a non-text object: activate its contextual ribbon tab */
+  onOpenContextTab?: (tab: ContextTab) => void
   /** Right-click: hit element gives sourceId, blank area gives null; table hits include cell model coordinates */
   onContextMenu: (
     sourceId: string | null,
@@ -301,7 +432,7 @@ interface Props {
   zoom?: number
   /** Rubber-band selection (drag a rectangle on blank area): set of elements fully inside the rectangle */
   onMarqueeSelect?: (sourceIds: string[]) => void
-  /** Option+drag duplicate: original snaps back, a copy is created at the drop offset (dx/dy in slide px) */
+  /** Ctrl+drag (Option+drag on mac) duplicate: original snaps back, a copy is created at the drop offset (dx/dy in slide px) */
   onDuplicateTo?: (sourceId: string, dxPx: number, dyPx: number) => void
   /** Group being edited from inside after double-click-into-group (its children are selectable/editable) */
   enteredGroupId?: string | null
@@ -327,6 +458,15 @@ interface Props {
   onDrawCancel?: () => void
   /** Yellow adjust-handle drag: full avLst map; preview=true during the drag, false on release */
   onAdjust?: (sourceId: string, adjust: Record<string, number>, preview: boolean) => void
+  /** Edit Points mode: the shape shows draggable vertices instead of the transform frame */
+  editPoints?: EditPointsState | null
+  onEditPoints?: (
+    sourceId: string,
+    path: { w: number; h: number; cmds: PathCmd[] },
+    preview: boolean,
+  ) => void
+  onEditPointsVertex?: (vertex: number | null) => void
+  onEditPointsDragging?: (dragging: boolean) => void
 }
 
 /**
@@ -436,6 +576,182 @@ function applyChromeZoom(tr: Konva.Transformer, zoom: number, nodeCount: number)
  * themes (like the Transformer's white anchors). */
 const ADJUST_HANDLE_FILL = '#ffc94d'
 const ADJUST_HANDLE_STROKE = '#a97d00'
+/** PowerPoint's Edit Points chrome: black vertex squares, white control squares (both themes). */
+const EDIT_POINT_FILL = '#000000'
+const EDIT_POINT_CONTROL_FILL = '#ffffff'
+const EDIT_POINT_SIZE = 7
+
+/** Box-local px ↔ stage (slide px) for a possibly rotated/flipped element frame. */
+function boxMappers(b: ShapeRenderNode['box']) {
+  const rot = ((b.rotationDeg || 0) * Math.PI) / 180
+  const cos = Math.cos(rot)
+  const sin = Math.sin(rot)
+  const toStage = (px: number, py: number) => {
+    const lx = b.flipH ? b.w - px : px
+    const ly = b.flipV ? b.h - py : py
+    const dx = lx - b.w / 2
+    const dy = ly - b.h / 2
+    return { x: b.x + b.w / 2 + dx * cos - dy * sin, y: b.y + b.h / 2 + dx * sin + dy * cos }
+  }
+  const toLocal = (sx: number, sy: number) => {
+    const dx = sx - (b.x + b.w / 2)
+    const dy = sy - (b.y + b.h / 2)
+    let lx = b.w / 2 + dx * cos + dy * sin
+    let ly = b.h / 2 - dx * sin + dy * cos
+    if (b.flipH) lx = b.w - lx
+    if (b.flipV) ly = b.h - ly
+    return { x: lx, y: ly }
+  }
+  return { toStage, toLocal }
+}
+
+/**
+ * Edit Points handles: black squares on the path vertices, white squares on the
+ * selected vertex's Bezier controls. Dragging edits a copy of the path taken at
+ * drag start and commits it as previews (the rebuilt slide re-renders the
+ * geometry live) with a final commit on release; the drag-start copy keeps the
+ * handles honest while throttled previews are still in flight. Double-clicking
+ * the outline adds a vertex there.
+ */
+function EditPointsHandles({
+  node,
+  zoom,
+  chromeScale,
+  chrome,
+  selected,
+  onSelectVertex,
+  onChange,
+  onDragging,
+}: {
+  node: ShapeRenderNode
+  zoom: number
+  chromeScale: number
+  chrome: string
+  selected: number | null
+  onSelectVertex: (vertex: number | null) => void
+  onChange: (path: { w: number; h: number; cmds: PathCmd[] }, preview: boolean) => void
+  onDragging: (dragging: boolean) => void
+}) {
+  const b = node.box
+  const base = useMemo(() => shapeToEditablePath(node), [node])
+  const [live, setLive] = useState<PathCmd[] | null>(null)
+  const dragRef = useRef<{ cmds: PathCmd[]; sx: number; sy: number } | null>(null)
+  useEffect(() => {
+    if (!dragRef.current) setLive(null)
+  }, [node])
+  const cmds = live ?? base
+  if (!cmds) return null
+  const { toStage, toLocal } = boxMappers(b)
+  const z = Math.max(zoom, 0.1)
+  const size = (EDIT_POINT_SIZE * chromeScale) / z
+  const verts = vertices(cmds)
+  const sel = selected != null ? verts[selected] : undefined
+  const commit = (next: PathCmd[], preview: boolean) => {
+    setLive(next)
+    onChange({ w: b.w, h: b.h, cmds: next }, preview)
+  }
+  /** Stage-space drag delta → box-local delta (rotation/flip are linear, so map the two ends) */
+  const localDelta = (t: Konva.Node) => {
+    const d = dragRef.current!
+    const a = toLocal(d.sx, d.sy)
+    const c = toLocal(t.x(), t.y())
+    return { dx: c.x - a.x, dy: c.y - a.y }
+  }
+  const startDrag = (t: Konva.Node) => {
+    dragRef.current = { cmds, sx: t.x(), sy: t.y() }
+    onDragging(true)
+  }
+  const dragHandlers = (apply: (cmds: PathCmd[], dx: number, dy: number) => PathCmd[]) => ({
+    draggable: true,
+    onDragStart: (e: Konva.KonvaEventObject<DragEvent>) => startDrag(e.target),
+    onDragMove: (e: Konva.KonvaEventObject<DragEvent>) => {
+      const d = dragRef.current
+      if (!d) return
+      const { dx, dy } = localDelta(e.target)
+      commit(apply(d.cmds, dx, dy), true)
+    },
+    onDragEnd: (e: Konva.KonvaEventObject<DragEvent>) => {
+      const d = dragRef.current
+      if (!d) return
+      const { dx, dy } = localDelta(e.target)
+      dragRef.current = null
+      commit(apply(d.cmds, dx, dy), false)
+      onDragging(false)
+    },
+  })
+  const square = (p: { x: number; y: number }, fill: string) => ({
+    x: p.x,
+    y: p.y,
+    width: size,
+    height: size,
+    offsetX: size / 2,
+    offsetY: size / 2,
+    fill,
+    stroke: fill === EDIT_POINT_FILL ? EDIT_POINT_CONTROL_FILL : EDIT_POINT_FILL,
+    strokeWidth: 1 / z,
+  })
+  const outline = toSvgPath(
+    cmds.map((c) => {
+      const pts: number[] = []
+      for (let i = 0; i < c.pts.length; i += 2) {
+        const p = toStage(c.pts[i]!, c.pts[i + 1]!)
+        pts.push(p.x, p.y)
+      }
+      return { op: c.op, pts }
+    }),
+  )
+  return (
+    <>
+      <Path
+        data={outline}
+        stroke={chrome}
+        strokeWidth={1 / z}
+        opacity={0}
+        hitStrokeWidth={(10 * chromeScale) / z}
+        onDblClick={(e) => {
+          const p = e.target.getRelativePointerPosition()
+          if (!p) return
+          const l = toLocal(p.x, p.y)
+          const hit = nearestOnPath(cmds, l.x, l.y)
+          if (!hit || hit.dist > (10 * chromeScale) / z) return
+          const next = insertVertex(cmds, hit.cmd, hit.t)
+          commit(next, false)
+          onSelectVertex(vertices(next).findIndex((v) => v.cmd === hit.cmd))
+        }}
+      />
+      {sel &&
+        (['in', 'out'] as const).map((which) => {
+          const h = which === 'in' ? sel.cIn : sel.cOut
+          if (!h) return null
+          const from = toStage(sel.x, sel.y)
+          const to = toStage(h.x, h.y)
+          return (
+            <React.Fragment key={which}>
+              <Line points={[from.x, from.y, to.x, to.y]} stroke={chrome} strokeWidth={1 / z} />
+              <Rect
+                {...square(to, EDIT_POINT_CONTROL_FILL)}
+                {...dragHandlers((c, dx, dy) =>
+                  moveControl(c, vertices(c)[selected!]!, which, dx, dy),
+                )}
+              />
+            </React.Fragment>
+          )
+        })}
+      {verts.map((v, i) => {
+        const p = toStage(v.x, v.y)
+        return (
+          <Rect
+            key={i}
+            {...square(p, EDIT_POINT_FILL)}
+            {...(i === selected ? { stroke: chrome, strokeWidth: 2 / z } : {})}
+            onMouseDown={() => onSelectVertex(i)}
+            {...dragHandlers((c, dx, dy) => moveVertex(c, vertices(c)[i]!, dx, dy))}
+          />
+        )
+      })}
+    </>
+  )
+}
 
 /**
  * Yellow adjust handles for the single selected adjustable shape (preset avLst
@@ -465,25 +781,7 @@ function AdjustHandles({
     for (const sp of specs) for (const k of sp.keys) if (out[k.name] == null) out[k.name] = k.def
     return out
   }
-  const rot = ((b.rotationDeg || 0) * Math.PI) / 180
-  const cos = Math.cos(rot)
-  const sin = Math.sin(rot)
-  const toStage = (px: number, py: number) => {
-    const lx = b.flipH ? b.w - px : px
-    const ly = b.flipV ? b.h - py : py
-    const dx = lx - b.w / 2
-    const dy = ly - b.h / 2
-    return { x: b.x + b.w / 2 + dx * cos - dy * sin, y: b.y + b.h / 2 + dx * sin + dy * cos }
-  }
-  const toLocal = (sx: number, sy: number) => {
-    const dx = sx - (b.x + b.w / 2)
-    const dy = sy - (b.y + b.h / 2)
-    let lx = b.w / 2 + dx * cos + dy * sin
-    let ly = b.h / 2 - dx * sin + dy * cos
-    if (b.flipH) lx = b.w - lx
-    if (b.flipV) ly = b.h - ly
-    return { x: lx, y: ly }
-  }
+  const { toStage, toLocal } = boxMappers(b)
   const z = Math.max(zoom, 0.1)
   return (
     <>
@@ -532,6 +830,7 @@ export function SlideCanvas({
   onTableColResize,
   onTableRowResize,
   onPlayMedia,
+  onOpenContextTab,
   onContextMenu,
   images,
   editingText,
@@ -545,6 +844,10 @@ export function SlideCanvas({
   onDrawCommit,
   onDrawCancel,
   onAdjust,
+  editPoints,
+  onEditPoints,
+  onEditPointsVertex,
+  onEditPointsDragging,
   ref,
 }: Props) {
   const trRef = useRef<Konva.Transformer>(null)
@@ -653,8 +956,27 @@ export function SlideCanvas({
     [chromeScale],
   )
 
-  // Selection chrome flips to white on dark slide backgrounds so the frame stays visible
-  const selStroke = useMemo(() => selectionChromeColor(slide, images), [slide, images])
+  // Selection chrome flips to white on dark backgrounds so the frame stays visible —
+  // judged under the selection itself (a text box on a white plate over a colored page
+  // needs dark chrome), falling back to the page verdict when nothing is selected or a
+  // selected id lives inside a group (group-local coords).
+  const selStroke = useMemo(() => {
+    const boxes = selectedIds
+      .map((id) => slide.nodes.find((n) => n.sourceId === id)?.box)
+      .filter((b): b is NonNullable<typeof b> => !!b)
+    let region: { x: number; y: number; w: number; h: number } | null = null
+    if (boxes.length === selectedIds.length && boxes.length > 0) {
+      const x = Math.min(...boxes.map((b) => b.x))
+      const y = Math.min(...boxes.map((b) => b.y))
+      region = {
+        x,
+        y,
+        w: Math.max(...boxes.map((b) => b.x + b.w)) - x,
+        h: Math.max(...boxes.map((b) => b.y + b.h)) - y,
+      }
+    }
+    return selectionChromeColor(slide, images, region)
+  }, [slide, images, selectedIds])
 
   // Hairline width for the current zoom + raster resolution (canvas px)
   const hairline = useMemo(() => chromeHairline(zoom, nodeCount), [zoom, nodeCount])
@@ -734,13 +1056,13 @@ export function SlideCanvas({
     const nodes = selectedIds
       .filter((id) => {
         const n = findNodeDeep(slide.nodes, id)
-        return n && !isConnectorNode(n)
+        return n && !isConnectorNode(n) && id !== editPoints?.sourceId
       })
       .map((id) => layer.findOne(`#node_${id}`))
       .filter((n): n is Konva.Node => !!n)
     tr.nodes(nodes)
     tr.getLayer()?.batchDraw()
-  }, [selectedIds, slide, enteredGroupId])
+  }, [selectedIds, slide, enteredGroupId, editPoints?.sourceId])
 
   // Snap target edges of the other elements (excluding the dragged selection and decoration layer) + page center lines
   const snapTargets = (excludeIds: string[]): SnapTarget[] => {
@@ -848,7 +1170,7 @@ export function SlideCanvas({
           // Click (no real drag) = insert at the predefined default size, PowerPoint-style
           const rect =
             Math.hypot(d.x2 - d.x1, d.y2 - d.y1) * zoom <= 3
-              ? { x: d.x1, y: d.y1, ...defaultDrawSize(drawMode.kind) }
+              ? { x: d.x1, y: d.y1, ...defaultDrawSize(drawMode.kind), click: true }
               : resolveDrawRect(drawMode.kind, d.x1, d.y1, d.x2, d.y2, d.shift)
           onDrawCommit(rect)
           return
@@ -902,7 +1224,7 @@ export function SlideCanvas({
         position: 'absolute',
         left: -CANVAS_BLEED,
         top: -CANVAS_BLEED,
-        cursor: drawMode ? 'crosshair' : undefined,
+        cursor: drawMode ? (drawMode.kind === 'textbox' ? 'text' : 'crosshair') : undefined,
       }}
     >
       {/* Draw mode disables node hit-testing: the crosshair gesture must not select/drag elements underneath */}
@@ -938,6 +1260,7 @@ export function SlideCanvas({
             onTransform={onTransform}
             onEditTableCell={onEditTableCell}
             onPlayMedia={onPlayMedia}
+            onOpenContextTab={onOpenContextTab}
             onDragGuides={(g, sp) => {
               setGuides(g)
               setSpacing(sp ?? [])
@@ -1302,7 +1625,28 @@ export function SlideCanvas({
             setSizeMatch(null)
           }}
         />
+        {editPoints &&
+          onEditPoints &&
+          !editingText &&
+          (() => {
+            const n = slide.nodes.find((x) => x.sourceId === editPoints.sourceId)
+            if (!n || (n.type !== 'shape' && n.type !== 'text')) return null
+            const id = n.sourceId
+            return (
+              <EditPointsHandles
+                node={n as ShapeRenderNode}
+                zoom={zoom}
+                chromeScale={chromeScale}
+                chrome={selStroke}
+                selected={editPoints.vertex}
+                onSelectVertex={(v) => onEditPointsVertex?.(v)}
+                onChange={(path, preview) => onEditPoints(id, path, preview)}
+                onDragging={(dragging) => onEditPointsDragging?.(dragging)}
+              />
+            )
+          })()}
         {onAdjust &&
+          !editPoints &&
           selectedIds.length === 1 &&
           !editingText &&
           (() => {
@@ -1480,6 +1824,7 @@ interface NodeProps {
   onTransform: Props['onTransform']
   onEditTableCell: Props['onEditTableCell']
   onPlayMedia?: Props['onPlayMedia']
+  onOpenContextTab?: Props['onOpenContextTab']
   onDragGuides: (g: Guide[], spacing?: SpacingIndicator[]) => void
   snapTargets: (excludeIds: string[]) => SnapTarget[]
   /** Neighbor boxes for equal-spacing snapping (excluding the dragged selection) */
@@ -1521,6 +1866,7 @@ function NodeView({
   onTransform,
   onEditTableCell,
   onPlayMedia,
+  onOpenContextTab,
   onDragGuides,
   snapTargets,
   spacingBoxes,
@@ -1553,18 +1899,18 @@ function NodeView({
   /** Node position captured on every transform event: boxPivotProps derives Konva x/y from
    * box.w/h, so a live-preview re-render would otherwise teleport the node mid-gesture. */
   const gesturePosRef = useRef<{ x: number; y: number } | null>(null)
-  // Option+drag ghost: while Alt is held mid-drag, the dragged node becomes the semi-transparent
+  // Duplicate-drag ghost: while the modifier is held mid-drag, the dragged node becomes the semi-transparent
   // "copy" (dashed frame) and a static render of the original stays at the source position.
-  const [altDragging, setAltDragging] = useState(false)
-  const altDraggingRef = useRef(false)
-  const setAltDrag = (on: boolean) => {
-    if (altDraggingRef.current === on) return
-    altDraggingRef.current = on
-    setAltDragging(on)
+  const [dupDragging, setDupDragging] = useState(false)
+  const dupDraggingRef = useRef(false)
+  const setDupDrag = (on: boolean) => {
+    if (dupDraggingRef.current === on) return
+    dupDraggingRef.current = on
+    setDupDragging(on)
   }
-  /** Window key listeners active during a drag, so pressing/releasing Alt with a still pointer
-   * still toggles the ghost (drop semantics keep reading Alt from the mouse event on release). */
-  const altKeyCleanupRef = useRef<(() => void) | null>(null)
+  /** Window key listeners active during a drag, so pressing/releasing the duplicate modifier with a still
+   * pointer still toggles the ghost (drop semantics keep reading it from the mouse event on release). */
+  const dupKeyCleanupRef = useRef<(() => void) | null>(null)
   /** Live drag position: the ghost toggle re-renders mid-drag, and the controlled x/y from
    * boxPivotProps must not teleport the node back to the model position (same idea as gesturePosRef). */
   const dragPosRef = useRef<{ x: number; y: number } | null>(null)
@@ -1572,7 +1918,7 @@ function NodeView({
     const g = groupRef.current
     if (g && dragPosRef.current && g.isDragging()) g.position(dragPosRef.current)
   })
-  useEffect(() => () => altKeyCleanupRef.current?.(), [])
+  useEffect(() => () => dupKeyCleanupRef.current?.(), [])
 
   // The Transformer's frame/scale basis defaults to getClientRect() (content bounding box). When text
   // overflows the shape box (autofit off and content too tall), overflowing glyphs inflate the bounding
@@ -1646,12 +1992,17 @@ function NodeView({
         suppressClickRef.current = false
         return
       }
-      const additive = e.evt.shiftKey || e.evt.metaKey
+      // Konva fires click for every button, and on Windows the DOM contextmenu event
+      // arrives only after mouseup — selecting here on a right click would collapse a
+      // multi-selection before the menu reads it (menu built without Group, second
+      // frame visibly dropped). Right-click selection is owned by onContextMenu, whose
+      // guard keeps an existing multi-selection.
+      if (e.evt.button !== 0) return
+      const additive = isToggleModifier(e.evt)
       onSelect(node.sourceId, additive)
       // Single left click on the text itself starts editing with the caret at the click
       // (PowerPoint/WPS); the frame around the text only selects, so it stays the drag grip.
-      // Konva fires click for every button: a right click must keep the shape context menu
-      if (e.evt.button === 0 && !additive && editable && clickOnText())
+      if (!additive && editable && clickOnText())
         onEditText(node.sourceId, { x: e.evt.clientX, y: e.evt.clientY })
     },
     onTap: () => onSelect(node.sourceId),
@@ -1660,28 +2011,41 @@ function NodeView({
       // Konva stops routing mousemove to shapes while dragging: pin the move cursor here
       setStageCursor(e, 'move')
       if (!(onDuplicateTo && !multiDrag && !insideGroupId)) return
-      const onKey = (ev: KeyboardEvent) => setAltDrag(ev.altKey)
+      const onKey = (ev: KeyboardEvent) => setDupDrag(isDuplicateDragModifier(ev))
       window.addEventListener('keydown', onKey)
       window.addEventListener('keyup', onKey)
-      altKeyCleanupRef.current = () => {
+      dupKeyCleanupRef.current = () => {
         window.removeEventListener('keydown', onKey)
         window.removeEventListener('keyup', onKey)
-        altKeyCleanupRef.current = null
+        dupKeyCleanupRef.current = null
       }
     },
     onDragMove: (e: Konva.KonvaEventObject<DragEvent>) => {
-      // Alt held mid-drag = duplicate gesture: show the ghost (Alt can be pressed/released at any time during the drag)
-      setAltDrag(!!(e.evt?.altKey && onDuplicateTo && !multiDrag && !insideGroupId))
-      dragPosRef.current = { x: e.target.x(), y: e.target.y() }
+      // Duplicate modifier held mid-drag shows the ghost (it can be pressed/released at any time during the drag)
+      setDupDrag(
+        !!(
+          e.evt &&
+          isDuplicateDragModifier(e.evt) &&
+          onDuplicateTo &&
+          !multiDrag &&
+          !insideGroupId
+        ),
+      )
+      const t = e.target
+      const free = { x: t.x() - box.w / 2, y: t.y() - box.h / 2 }
+      // Shift = axis lock. Every selected node measures its own delta from its own model box, so a
+      // multi-selection locks to the same axis without coordination.
+      const lock = e.evt?.shiftKey ? constrainAxis(free.x - box.x, free.y - box.y) : null
+      const raw = lock ? { x: box.x + lock.dx, y: box.y + lock.dy } : free
+      if (lock) t.position({ x: raw.x + box.w / 2, y: raw.y + box.h / 2 })
+      dragPosRef.current = { x: t.x(), y: t.y() }
       // Children in in-group editing use a different coordinate system from page snap targets; don't snap
       if (insideGroupId) {
         onDragGuides([])
         return
       }
-      const t = e.target
       // Snap threshold semantics are "6 screen px": convert back by the canvas CSS zoom (same as dragDistance)
       const thr = 6 / Math.max(zoom, 0.1)
-      const raw = { x: t.x() - box.w / 2, y: t.y() - box.h / 2 }
       // Multi-select drag: snap the selection bounding box as a whole. All selected
       // nodes fire their own dragmove under the Transformer's proxy drag, but each computes the same snap
       // delta from the same model bounding box + its own fixed offset -> relative positions stay unchanged.
@@ -1699,21 +2063,24 @@ function NodeView({
       }
       const exclude = multiDrag ? selectedIds! : [node.sourceId]
       const snap = computeSnap(bb, snapTargets(exclude), thr)
-      let fx = snap.x
-      let fy = snap.y
+      // The locked axis is pinned to the origin; snapping and guides only apply on the free axis
+      const snapX = !lock || lock.dx !== 0
+      const snapY = !lock || lock.dy !== 0
+      let fx = snapX ? snap.x : null
+      let fy = snapY ? snap.y : null
       // Axes not consumed by edge snapping then try equal-spacing (smart guides)
       const indicators: SpacingIndicator[] = []
-      if (spacingBoxes && (fx == null || fy == null)) {
+      if (spacingBoxes && ((snapX && fx == null) || (snapY && fy == null))) {
         const sp = computeSpacingSnap(
           { x: fx ?? bb.x, y: fy ?? bb.y, w: bb.w, h: bb.h },
           spacingBoxes(exclude),
           thr,
         )
-        if (fx == null && sp.x != null) {
+        if (snapX && fx == null && sp.x != null) {
           fx = sp.x
           indicators.push(...sp.indicators.filter((i) => i.axis === 'x'))
         }
-        if (fy == null && sp.y != null) {
+        if (snapY && fy == null && sp.y != null) {
           fy = sp.y
           indicators.push(...sp.indicators.filter((i) => i.axis === 'y'))
         }
@@ -1721,18 +2088,33 @@ function NodeView({
       if (fx != null) t.x(raw.x + (fx - bb.x) + box.w / 2)
       if (fy != null) t.y(raw.y + (fy - bb.y) + box.h / 2)
       dragPosRef.current = { x: t.x(), y: t.y() }
-      onDragGuides(snap.guides, indicators)
+      onDragGuides(
+        snap.guides.filter((g) => (g.axis === 'v' ? snapX : snapY)),
+        indicators,
+      )
     },
     onDragEnd: (e: Konva.KonvaEventObject<DragEvent>) => {
-      altKeyCleanupRef.current?.()
+      dupKeyCleanupRef.current?.()
       dragPosRef.current = null
-      setAltDrag(false)
+      setDupDrag(false)
       onDragGuides([])
-      const dropX = e.target.x() - box.w / 2
-      const dropY = e.target.y() - box.h / 2
-      // Option+drag = duplicate at the drop point;
+      let dropX = e.target.x() - box.w / 2
+      let dropY = e.target.y() - box.h / 2
+      // Shift pressed after the last move (still pointer) must still constrain the drop
+      if (e.evt?.shiftKey) {
+        const lock = constrainAxis(dropX - box.x, dropY - box.y)
+        dropX = box.x + lock.dx
+        dropY = box.y + lock.dy
+      }
+      // Ctrl+drag (Option+drag on mac) = duplicate at the drop point;
       // original snaps back (model unchanged, the Konva node position must be manually restored); multi-select/in-group gestures not supported yet
-      if (e.evt?.altKey && onDuplicateTo && !multiDrag && !insideGroupId) {
+      if (
+        e.evt &&
+        isDuplicateDragModifier(e.evt) &&
+        onDuplicateTo &&
+        !multiDrag &&
+        !insideGroupId
+      ) {
         e.target.position({ x: box.x + box.w / 2, y: box.y + box.h / 2 })
         onDuplicateTo(node.sourceId, dropX - box.x, dropY - box.y)
         return
@@ -1834,6 +2216,7 @@ function NodeView({
               onTransform={onTransform}
               onEditTableCell={onEditTableCell}
               onPlayMedia={onPlayMedia}
+              onOpenContextTab={onOpenContextTab}
               onDragGuides={onDragGuides}
               snapTargets={snapTargets}
               images={images}
@@ -1854,7 +2237,7 @@ function NodeView({
     )
   }
 
-  const editable = isEditableText(node) && (!insideGroupId || allowChildTextEdit)
+  const editable = isEditableText(node) && (!insideGroupId || !!allowChildTextEdit)
   const clickOnText = (): boolean => {
     const g = groupRef.current
     const pos = g?.getStage()?.getPointerPosition()
@@ -1862,7 +2245,8 @@ function NodeView({
     const local = g.getAbsoluteTransform().copy().invert().point(pos)
     // NodeBody counter-flips the text, so mirror the point back into text coordinates
     const p = { x: box.flipH ? box.w - local.x : local.x, y: box.flipV ? box.h - local.y : local.y }
-    return textHitAtPoint(node as ShapeRenderNode, box, p, 4 / Math.max(zoom, 0.1))
+    const z = Math.max(zoom, 0.1)
+    return textHitAtPoint(node as ShapeRenderNode, box, p, 4 / z, EDGE_GRIP_PX / z)
   }
   // Double-click a group = enter in-group editing and select the child hit by the double-click (pointer converted to group-local coordinates, bounding-box hit)
   const onGroupDblClick = (e: Konva.KonvaEventObject<Event>) => {
@@ -1885,17 +2269,29 @@ function NodeView({
     }
     onEnterGroup(node.sourceId, childId)
   }
-  // Table: double-click hits a cell in table-local coordinates, regardless of rotation/flip.
-  const onTableDblClick = (e: Konva.KonvaEventObject<Event>) => {
-    if (node.type !== 'table') return
+  // Table: the hit cell is resolved in table-local coordinates, regardless of rotation/flip.
+  const tableCellHit = (e: Konva.KonvaEventObject<Event>) => {
+    if (node.type !== 'table') return null
     const pos = e.target.getStage()?.getPointerPosition()
-    if (!pos) return
-    const local = tableLocalPointFromStage(pos, box, CANVAS_BLEED)
-    const cell = tableCellAtPoint(node, local)
-    if (cell) onEditTableCell(node.sourceId, cell.row, cell.col)
+    return pos ? tableCellAtPoint(node, tableLocalPointFromStage(pos, box, CANVAS_BLEED)) : null
   }
-  // Audio/video (image is the poster frame): double-click opens the playback overlay
-  const isMedia = node.type === 'picture' && !!(node as PictureRenderNode).media && !!onPlayMedia
+  // Text edit > enter group > edit cell > media playback > the object's contextual tab (PowerPoint)
+  const onNodeDblClick = (e: Konva.KonvaEventObject<Event>, caret?: EditCaret) => {
+    const cell = tableCellHit(e)
+    const action = dblClickActionFor(node, {
+      editable,
+      insideGroup: !!insideGroupId,
+      canEnterGroup: !!onEnterGroup,
+      canPlayMedia: !!onPlayMedia,
+      hitCell: !!cell,
+    })
+    if (!action) return
+    if (action.kind === 'editText') onEditText(node.sourceId, caret)
+    else if (action.kind === 'enterGroup') onGroupDblClick(e)
+    else if (action.kind === 'editCell') onEditTableCell(node.sourceId, cell!.row, cell!.col)
+    else if (action.kind === 'playMedia') onPlayMedia!(node.sourceId)
+    else onOpenContextTab?.(action.tab)
+  }
   // Empty placeholder: canvas draws a gray click hint (edit canvas only, not in thumbnails/export)
   const phPrompt = (() => {
     if (hidePhPrompts) return null
@@ -1914,29 +2310,17 @@ function NodeView({
   })()
   return (
     <>
-      {/* Option+drag: the original stays rendered at the source position while the dragged ghost travels */}
-      {altDragging && <StaticNode key="ghost-src" node={node} images={images} />}
+      {/* Duplicate drag: the original stays rendered at the source position while the dragged ghost travels */}
+      {dupDragging && <StaticNode key="ghost-src" node={node} images={images} />}
       <Group
         key="node"
         ref={groupRef}
-        opacity={altDragging ? 0.5 : 1}
+        opacity={dupDragging ? 0.5 : 1}
         {...common}
-        {...(editable
-          ? {
-              onDblClick: (e: Konva.KonvaEventObject<MouseEvent>) =>
-                onEditText(node.sourceId, { x: e.evt.clientX, y: e.evt.clientY, select: 'word' }),
-              onDblTap: () => onEditText(node.sourceId),
-            }
-          : node.type === 'group' && !insideGroupId && onEnterGroup
-            ? { onDblClick: onGroupDblClick, onDblTap: onGroupDblClick }
-            : node.type === 'table' && !insideGroupId
-              ? { onDblClick: onTableDblClick, onDblTap: onTableDblClick }
-              : isMedia && !insideGroupId
-                ? {
-                    onDblClick: () => onPlayMedia!(node.sourceId),
-                    onDblTap: () => onPlayMedia!(node.sourceId),
-                  }
-                : {})}
+        onDblClick={(e: Konva.KonvaEventObject<MouseEvent>) =>
+          onNodeDblClick(e, { x: e.evt.clientX, y: e.evt.clientY, select: 'word' })
+        }
+        onDblTap={onNodeDblClick}
       >
         {/* The selection frame is grabbable a few screen px around the box: half of the hairline border
             lies outside the shape, so a pointer on it would otherwise miss and fall back to the arrow */}
@@ -1946,7 +2330,7 @@ function NodeView({
             height={box.h}
             stroke="transparent"
             strokeWidth={0}
-            hitStrokeWidth={8 / Math.max(zoom, 0.1)}
+            hitStrokeWidth={(2 * EDGE_GRIP_PX) / Math.max(zoom, 0.1)}
           />
         )}
         {/* group children don't take hits (listening=false); add a transparent hit area so the whole group can be selected/dragged */}
@@ -1971,8 +2355,8 @@ function NodeView({
             listening={false}
           />
         )}
-        {/* Option+drag ghost: dashed frame marks the travelling copy */}
-        {altDragging && (
+        {/* Duplicate-drag ghost: dashed frame marks the travelling copy */}
+        {dupDragging && (
           <Rect
             width={box.w}
             height={box.h}

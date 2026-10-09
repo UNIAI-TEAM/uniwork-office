@@ -186,8 +186,8 @@ export function HealthMetricsViz({ vi }: { vi: boolean }): ReactElement {
       <div className="wb-hdash-top">
         <p className="teacher-hint">
           {label(
-            'Dashboard chỉ số — giai đoạn này nhập thủ công. Giao diện kết nối Apple Watch / đồng hồ sức khoẻ đã sẵn, bật khi có mạng.',
-            'Metrics dashboard — manual entry for now. Apple Watch / wearables UI is ready for when network sync is available.',
+            'Bảng chỉ số sức khoẻ — hiện bạn nhập số liệu bằng tay.',
+            'Health metrics dashboard — you enter readings by hand.',
           )}
         </p>
         <DeviceConnectStrip vi={vi} />
@@ -255,7 +255,11 @@ export function HealthMetricsViz({ vi }: { vi: boolean }): ReactElement {
                 {meta.unit ? ` ${meta.unit}` : ''}
               </span>
             </header>
-            <BarTrend values={trend} color={meta.color} empty={label('Chưa đủ dữ liệu', 'Not enough data')} />
+            <BarTrend
+              values={trend}
+              color={meta.color}
+              empty={label('Chưa đủ dữ liệu', 'Not enough data')}
+            />
           </section>
           <section className="wb-hdash-card">
             <header>
@@ -270,7 +274,6 @@ export function HealthMetricsViz({ vi }: { vi: boolean }): ReactElement {
           <section className="wb-hdash-card wb-hdash-entry">
             <header>
               <h3>{label('Nhập thủ công', 'Manual entry')}</h3>
-              <span className="wb-hdash-badge">{label('Giai đoạn 1', 'Phase 1')}</span>
             </header>
             <div className="wb-module-form wb-hm-form">
               <label>
@@ -436,7 +439,12 @@ function AreaWave({
   const line = pts.join(' ')
   const area = `0,${h} ${line} ${w},${h}`
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="wb-hdash-chart-svg" role="img" opacity={muted ? 0.45 : 1}>
+    <svg
+      viewBox={`0 0 ${w} ${h}`}
+      className="wb-hdash-chart-svg"
+      role="img"
+      opacity={muted ? 0.45 : 1}
+    >
       <polygon points={area} fill={color} opacity="0.22" />
       <polyline points={line} fill="none" stroke={color} strokeWidth="2.5" strokeLinejoin="round" />
     </svg>
@@ -605,7 +613,12 @@ function DashboardBody({
           {label('📁 Tải ảnh lên', '📁 Upload')}
         </button>
         {bodySource !== 'default' ? (
-          <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => void resetDefault()}>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            disabled={busy}
+            onClick={() => void resetDefault()}
+          >
             {label('Mô hình mặc định', 'Default model')}
           </button>
         ) : null}

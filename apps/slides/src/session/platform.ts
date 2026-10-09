@@ -36,6 +36,8 @@ export interface SessionPlatform {
   /** Run after the current task (coalesces history/deck notifications). */
   defer(fn: () => void): void
   events: SessionEventSink
+  /** Pixel density for bitmaps without a dpi tag (picture-frame.ts pictureDpiFor) */
+  defaultPictureDpi: number
   /** A deck was opened from bytes (open.ts): register its embedded fonts before the first layout */
   deckOpened?(opened: OpenedPptx): void
 }
@@ -45,6 +47,7 @@ const platform: SessionPlatform = {
   decodeTiff: () => null,
   defer: (fn) => void setTimeout(fn, 0),
   events: { historyChanged: () => {}, deckChanged: () => {} },
+  defaultPictureDpi: 96,
 }
 
 export function configureSessionPlatform(next: Partial<SessionPlatform>): void {

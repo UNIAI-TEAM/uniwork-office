@@ -23,12 +23,17 @@ import type {
   TableModel,
   TableParagraph,
 } from '@genoffice/docx-engine'
+import { diagramLanguage } from '../editor/diagrams'
+import type { DiagramLanguage } from '../editor/diagrams'
 
 /** Resolve an authored image src to embeddable bytes; null → fall back to alt text */
 export type ImageLoader = (src: string) => Promise<NewImage | null>
 
-/** Rasterize a ```mermaid block; null → the source is exported as code */
-export type DiagramRenderer = (source: string) => Promise<NewImage | null>
+/** Rasterize a diagram code block; null → the source is exported as code */
+export type DiagramRenderer = (
+  source: string,
+  language: DiagramLanguage,
+) => Promise<NewImage | null>
 
 /** widest image that fits the A4 text column */
 export const DOCX_MAX_IMAGE_PX = 620
@@ -58,6 +63,10 @@ function runsFromInline(content: JSONContent[] | undefined): Run[] {
       // Run[] cannot carry OMML — keep the LaTeX source visible instead
       const latex = String(child.attrs?.latex ?? '')
       if (latex) runs.push({ text: `$${latex}$`, font: CODE_FONT })
+      continue
+    }
+    if (child.type === 'image') {
+      runs.push(altTextRun(child))
       continue
     }
     if (child.type !== 'text' || !child.text) continue
@@ -90,7 +99,7 @@ interface WalkContext {
   loadImage: ImageLoader
   renderDiagram?: DiagramRenderer
   pendingImages: Array<{ index: number; src: string; alt: string }>
-  pendingDiagrams: Array<{ index: number; source: string }>
+  pendingDiagrams: Array<{ index: number; source: string; language: DiagramLanguage }>
 }
 
 function mergeFormat(base: ParaFormat | undefined, extra: ParaFormat): ParaFormat {
@@ -99,6 +108,47 @@ function mergeFormat(base: ParaFormat | undefined, extra: ParaFormat): ParaForma
 
 function pushParagraph(ctx: WalkContext, block: GeneratedBlock): void {
   ctx.blocks.push({ kind: 'generated', block })
+}
+
+function altTextRun(image: JSONContent): Run {
+  const alt = String(image.attrs?.alt ?? '') || String(image.attrs?.src ?? '')
+  return { text: `[${alt}]`, italic: true, color: '888888' }
+}
+
+/**
+ * Runs cannot carry pictures: each inline image becomes a picture block of its
+ * own (a placeholder until the async load), the text around it its own block.
+ */
+function pushTextblock(
+  ctx: WalkContext,
+  content: JSONContent[] | undefined,
+  block: (runs: Run[]) => GeneratedBlock,
+): void {
+  if (!content?.some((child) => child.type === 'image')) {
+    pushParagraph(ctx, block(runsFromInline(content)))
+    return
+  }
+  let segment: JSONContent[] = []
+  const flush = () => {
+    if (segment.some((child) => child.type !== 'text' || child.text?.trim())) {
+      pushParagraph(ctx, block(runsFromInline(segment)))
+    }
+    segment = []
+  }
+  for (const child of content) {
+    if (child.type !== 'image') {
+      segment.push(child)
+      continue
+    }
+    flush()
+    ctx.pendingImages.push({
+      index: ctx.blocks.length,
+      src: String(child.attrs?.src ?? ''),
+      alt: String(child.attrs?.alt ?? ''),
+    })
+    ctx.blocks.push({ kind: 'generated', block: { type: 'paragraph', runs: [] } })
+  }
+  flush()
 }
 
 function walkList(
@@ -187,20 +237,11 @@ function mapTable(node: JSONContent): TableModel {
 function walkBlock(ctx: WalkContext, node: JSONContent, base?: ParaFormat): void {
   switch (node.type) {
     case 'paragraph':
-      pushParagraph(ctx, {
-        type: 'paragraph',
-        runs: runsFromInline(node.content),
-        format: base,
-      })
+      pushTextblock(ctx, node.content, (runs) => ({ type: 'paragraph', runs, format: base }))
       break
     case 'heading': {
       const level = Math.min(Math.max(Number(node.attrs?.level) || 1, 1), 6) as number
-      pushParagraph(ctx, {
-        type: 'heading',
-        level,
-        runs: runsFromInline(node.content),
-        format: base,
-      })
+      pushTextblock(ctx, node.content, (runs) => ({ type: 'heading', level, runs, format: base }))
       break
     }
     case 'bulletList':
@@ -224,8 +265,9 @@ function walkBlock(ctx: WalkContext, node: JSONContent, base?: ParaFormat): void
         runs: [{ text: source, font: CODE_FONT, sizeHalfPoints: 19 }],
         format: mergeFormat(base, { shadingFill: CODE_FILL }),
       }
-      if (node.attrs?.language === 'mermaid' && ctx.renderDiagram && source.trim()) {
-        ctx.pendingDiagrams.push({ index: ctx.blocks.length, source })
+      const language = diagramLanguage(node.attrs?.language)
+      if (language && ctx.renderDiagram && source.trim()) {
+        ctx.pendingDiagrams.push({ index: ctx.blocks.length, source, language })
       }
       pushParagraph(ctx, code)
       break
@@ -237,14 +279,6 @@ function walkBlock(ctx: WalkContext, node: JSONContent, base?: ParaFormat): void
         format: mergeFormat(base, { borders: 'b' }),
       })
       break
-    case 'image': {
-      const src = String(node.attrs?.src ?? '')
-      const alt = String(node.attrs?.alt ?? '')
-      // placeholder now, replaced by the loaded image (or alt text) after the async pass
-      ctx.pendingImages.push({ index: ctx.blocks.length, src, alt })
-      ctx.blocks.push({ kind: 'generated', block: { type: 'paragraph', runs: [] } })
-      break
-    }
     case 'table':
       ctx.blocks.push({ kind: 'xml', xml: generateTableModelXml(mapTable(node)) })
       break
@@ -308,7 +342,7 @@ export async function mapDocToSaveBlocks(
   for (const node of degradeRawHtml(doc, rawHtmlDegrader()).content ?? []) walkBlock(ctx, node)
 
   for (const pending of ctx.pendingDiagrams) {
-    const image = await ctx.renderDiagram!(pending.source).catch(() => null)
+    const image = await ctx.renderDiagram!(pending.source, pending.language).catch(() => null)
     if (image) ctx.blocks[pending.index] = { kind: 'image', image }
   }
 
@@ -319,10 +353,7 @@ export async function mapDocToSaveBlocks(
     } else {
       ctx.blocks[pending.index] = {
         kind: 'generated',
-        block: {
-          type: 'paragraph',
-          runs: [{ text: `[${pending.alt || pending.src}]`, italic: true, color: '888888' }],
-        },
+        block: { type: 'paragraph', runs: [altTextRun({ attrs: pending })] },
       }
     }
   }

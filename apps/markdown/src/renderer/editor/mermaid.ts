@@ -1,5 +1,5 @@
 import type { Mermaid } from 'mermaid'
-import type { NewImage } from '@genoffice/docx-engine'
+import type { DiagramResult } from './diagrams'
 
 export const MERMAID_LANGUAGE = 'mermaid'
 
@@ -33,80 +33,14 @@ export function loadMermaid(): Promise<Mermaid> {
   return loading
 }
 
-export type MermaidResult = { ok: true; svg: string } | { ok: false; error: string }
-
 let renderSeq = 0
 
-export async function renderMermaid(source: string): Promise<MermaidResult> {
+export async function renderMermaid(source: string): Promise<DiagramResult> {
   const mermaid = await loadMermaid()
   try {
     const { svg } = await mermaid.render(`md-mermaid-${++renderSeq}`, source)
     return { ok: true, svg }
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) }
-  }
-}
-
-const VIEWBOX_RE = /\bviewBox="[\d.\s-]*?\s([\d.]+)\s([\d.]+)"/
-
-/**
- * Pin a rendered diagram's intrinsic size: mermaid emits width="100%", which
- * an <img> would decode at the 300×150 SVG default instead of the viewBox
- * dimensions. Null when the SVG has no usable viewBox.
- */
-function sizeSvg(svg: string): { sized: string; width: number; height: number } | null {
-  const box = VIEWBOX_RE.exec(svg)
-  const width = Math.ceil(Number(box?.[1]))
-  const height = Math.ceil(Number(box?.[2]))
-  if (!width || !height) return null
-  const sized = svg.replace(
-    /<svg\b([^>]*?)\swidth="[^"]*"/,
-    `<svg$1 width="${width}" height="${height}"`,
-  )
-  return { sized, width, height }
-}
-
-/**
- * Editor preview source for a rendered diagram. The SVG is shown through an
- * <img> (never injected into the editor DOM): an image document runs no
- * scripts or event handlers and loads nothing external, so even an SVG that
- * slipped past mermaid's own sanitizer cannot act in the (same-origin) frame.
- */
-export function mermaidSvgDataUrl(svg: string): string {
-  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(sizeSvg(svg)?.sized ?? svg)}`
-}
-
-/** Rasterize a rendered diagram for the docx export; null when it cannot be drawn */
-export async function mermaidSvgToPng(svg: string, maxWidthPx: number): Promise<NewImage | null> {
-  const pinned = sizeSvg(svg)
-  if (!pinned) return null
-  const { sized, width, height } = pinned
-  const url = URL.createObjectURL(new Blob([sized], { type: 'image/svg+xml' }))
-  try {
-    const img = new Image()
-    await new Promise<void>((resolve, reject) => {
-      img.onload = () => resolve()
-      img.onerror = () => reject(new Error('svg decode failed'))
-      img.src = url
-    })
-    const scale = 2
-    const canvas = document.createElement('canvas')
-    canvas.width = width * scale
-    canvas.height = height * scale
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return null
-    ctx.fillStyle = '#ffffff'
-    ctx.fillRect(0, 0, canvas.width, canvas.height)
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
-    const dataUrl = canvas.toDataURL('image/png')
-    const base64 = dataUrl.slice(dataUrl.indexOf(',') + 1)
-    if (!base64) return null
-    const widthPx = Math.min(width, maxWidthPx)
-    const heightPx = Math.round((height * widthPx) / width)
-    return { base64, mime: 'image/png', widthPx, heightPx, align: 'center' }
-  } catch {
-    return null
-  } finally {
-    URL.revokeObjectURL(url)
   }
 }

@@ -152,8 +152,25 @@ export interface ShadowEffect {
 // ── Text ───────────────────────────────────────────────────────────────
 
 /** A run of contiguous same-format text (maps to <a:r>); line breaks/soft returns split into separate runs or paragraphs */
+/** Where a run's displayed style values were inherited from (`slides read` reports them). */
+export interface RunStyleSource {
+  fontSize: string
+  fontFamily: string
+  color: string
+  bold: string
+  italic: string
+}
+
 export interface TextRun {
   text: string
+  /**
+   * Verbatim paragraph child that is not an <a:r> (an <mc:AlternateContent> math
+   * block); `text` is its plain-text fallback for layout and display, save emits
+   * these bytes unchanged.
+   */
+  rawXml?: string
+  /** provenance of fontSize / fontFamily / color / bold / italic: 'run', 'paragraph defRPr', 'shape lstStyle', 'layout placeholder', 'master bodyStyle', 'theme minor', … */
+  styleSrc?: RunStyleSource
   bold?: boolean
   /** Run has no explicit b (bold resolved from inheritance); rebuild/patch omits b to keep the master/layout linkage */
   boldImplicit?: boolean
@@ -282,8 +299,16 @@ export interface ParagraphDefaultRunProps {
 export interface Paragraph {
   runs: TextRun[]
   align?: TextAlign
+  /** provenance of align: 'paragraph' or the inheritance layer */
+  alignSrc?: string
   /** Paragraph base direction (a:pPr rtl): true = RTL base, false = explicit LTR base, absent = inferred from the first strong character */
   rtl?: boolean
+  /** <a:pPr hangingPunct="0"> switches off East Asian hanging punctuation (a trailing closing mark may overhang the margin); absent = PowerPoint's default, on */
+  hangingPunct?: boolean
+  /** <a:pPr latinLnBrk="1"> ("allow Latin text to wrap in the middle of a word"): Hangul words then break per syllable like CJK; absent = word wrap */
+  latinLnBrk?: boolean
+  /** <a:pPr eaLnBrk="0"> switches off East Asian line-break rules (kinsoku: no closing mark at a line start, no opening bracket at a line end) */
+  eaLnBrk?: boolean
   /** Indent level (bullet level) */
   level?: number
   /** Line spacing (%, 100 = single) or absolute (pt, via lineExact) */
@@ -502,6 +527,8 @@ export interface Scene3D {
   extrusionColor?: ResolvedColor
   /** <a:sp3d prstMaterial> (legacyWireframe renders edges only) */
   material?: string
+  /** <a:sp3d><a:bevelT>: front-face bevel (width/height EMU, ST_BevelPresetType; defaults 76200/circle) */
+  bevelTop?: { wEmu: number; hEmu: number; preset: string }
 }
 
 export interface TextElement extends ElementBase {
@@ -512,6 +539,8 @@ export interface TextElement extends ElementBase {
   adjust?: Record<string, number>
   /** Custom geometry (mutually exclusive with presetGeometry) */
   customGeometry?: CustomGeometry
+  /** spPr carried neither a:prstGeom nor a:custGeom (non-placeholder): PowerPoint draws only the text */
+  noGeometry?: true
   fill?: Fill
   /** <p:sp useBgFill="1">: painted with the slide's effective background fill (fill is only a fallback) */
   useBgFill?: boolean
@@ -536,6 +565,8 @@ export interface PictureElement extends ElementBase {
   dataUrl?: string
   /** Source crop <a:srcRect>: fraction cropped from each edge (0..1) */
   srcRect?: { l: number; t: number; r: number; b: number }
+  /** <a:tile> fill mode: the bitmap repeats across the frame instead of stretching to it */
+  tile?: true
   /** Whole-image opacity <a:blip><a:alphaModFix amt> (0..1, 1 = opaque; default 1) */
   opacity?: number
   /** Soft edges <a:softEdge rad> (EMU feather radius) */
@@ -607,6 +638,8 @@ export interface TableCell {
   /** Cell fill (explicit tcPr fill; table-style inheritance not yet supported) */
   fill?: Fill
   borders?: TableCellBorders
+  /** <a:tcPr><a:cell3D>: bevelled cell (width EMU from a:bevel@w, default 76200) */
+  bevel?: { widthEmu: number; preset?: string; lightDir?: string }
   /** Horizontal merge span in columns (gridSpan, default 1) */
   gridSpan?: number
   /** Vertical merge span in rows (rowSpan, default 1) */
@@ -623,8 +656,17 @@ export interface TableElement extends ElementBase {
   rowHeights: number[]
   /** rows[r][c], aligned with rowHeights/colWidths */
   rows: TableCell[][]
-  /** tblPr's header-row/banded-rows toggles (echoed in the Ribbon's "Table Design") */
-  styleFlags?: { firstRow: boolean; bandRow: boolean }
+  /** a:tblPr/a:tableStyleId (built-in GUID or a custom style in ppt/tableStyles.xml) */
+  styleId?: string
+  /** tblPr's region toggles (echoed in the Ribbon's "Table Design") */
+  styleFlags?: {
+    firstRow: boolean
+    bandRow: boolean
+    lastRow?: boolean
+    firstCol?: boolean
+    lastCol?: boolean
+    bandCol?: boolean
+  }
   /** tblPr rtl="1": PowerPoint mirrors the grid horizontally (logical column 1 renders rightmost) */
   rtl?: boolean
   /** Table-style <a:tblBg>: drawn under the cells (alpha band fills composite over it) */

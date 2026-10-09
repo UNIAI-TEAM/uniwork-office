@@ -1,22 +1,20 @@
 # UniWork Office
 
-Open document productivity runtime for the UniWork ecosystem.
+Documents, spreadsheets, slides and PDFs in one desktop app.
 
-This repository is currently a **desktop office runtime**. UniWork platform integration is not part of GO-1.
-
-UniWork Office is an independently branded fork of [GenOffice](https://github.com/genspark-ai/genoffice) (Apache-2.0). The document engines are unchanged. There is no Supabase, UniWork authentication, Work Graph, cloud sync, or UniWork AI Gateway in this phase.
+UniWork Office is an independently branded fork of [GenOffice](https://github.com/genspark-ai/genoffice) (Apache-2.0). The document engines are unchanged.
 
 ## Supported applications
 
-| App | Package | Formats |
-| --- | --- | --- |
-| UniWork Docs | `@genoffice/docs` | `.docx` open / edit / save |
-| UniWork Sheets | `@genoffice/sheets` | `.xlsx` (and `.xlsm`, `.xls`, `.csv` associations) |
-| UniWork Slides | `@genoffice/slides` | `.pptx` open / edit / save |
-| UniWork PDF | `@genoffice/pdf` | `.pdf` view / edit (content-stream rewrite where supported) |
-| Markdown | `@genoffice/markdown` | `.md` |
-| HTML | `@genoffice/html` | `.html` |
-| UniWork Office Desktop | `@genoffice/shell` | suite shell hosting the editors |
+| App                    | Package               | Formats                                                     |
+| ---------------------- | --------------------- | ----------------------------------------------------------- |
+| UniWork Docs           | `@genoffice/docs`     | `.docx` open / edit / save                                  |
+| UniWork Sheets         | `@genoffice/sheets`   | `.xlsx` (and `.xlsm`, `.xls`, `.csv` associations)          |
+| UniWork Slides         | `@genoffice/slides`   | `.pptx` open / edit / save                                  |
+| UniWork PDF            | `@genoffice/pdf`      | `.pdf` view / edit (content-stream rewrite where supported) |
+| Markdown               | `@genoffice/markdown` | `.md`                                                       |
+| HTML                   | `@genoffice/html`     | `.html`                                                     |
+| UniWork Office Desktop | `@genoffice/shell`    | suite shell hosting the editors                             |
 
 Internal npm workspace names remain `@genoffice/*` so upstream merges stay possible.
 
@@ -75,16 +73,14 @@ npm run dist:win      # Windows NSIS (from Windows or with a Windows sidecar)
 npm run dist:linux    # AppImage / deb / rpm
 ```
 
-Do not set `GENOFFICE_GA4_*` or `GENOFFICE_UPDATE_URL` for UniWork GO-1 packaging. Without those values, analytics and in-app updates stay disabled.
+Do not set `GENOFFICE_UPDATE_URL` until a UniWork update feed exists; without it in-app auto-update stays disabled. The app has no usage-statistics component (see [PRIVACY.md](PRIVACY.md)).
 
-## GO-1 limitations
+## Scope notes
 
-- No UniWork backend, auth, Work Graph, or AI Context Engine
-- No cloud sync or collaboration
-- No PWA / browser conversion
-- No new AI providers beyond the inherited Genspark / BYOK configuration
-- Official UniWork logo assets are not in this tree; packager icons are labelled `UNIWORK_BRAND_ASSET_REQUIRED`
-- The `genoffice` CLI command and `@genoffice/*` package names are retained for upstream mergeability
+- The app is a desktop editor suite; opening and saving files needs no account. AI features use a UniWork account or your own provider key
+- Collaboration, cloud sync and a PWA / browser conversion are not part of the desktop app
+- The `genoffice` CLI command, the MCP server names and `@genoffice/*` package names are retained for upstream mergeability
+- The icon artwork lives in `tools/rebrand/assets/` (see `tools/rebrand/README.md` for the asset-to-target list)
 - `ee/` is **not** Apache-2.0 (GenOffice Enterprise License). It is empty and must not be reused
 
 ## Upstream acknowledgement

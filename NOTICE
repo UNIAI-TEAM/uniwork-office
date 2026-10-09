@@ -1,11 +1,19 @@
+UniWork Office
+Copyright 2026 UniWork
+
+UniWork Office is a modified version of GenOffice, licensed under the Apache
+License, Version 2.0 (see LICENSE). The original GenOffice NOTICE follows;
+it is retained as section 4(d) of the license requires.
+
 GenOffice
 Copyright 2026 Mainfunc, Inc.
 
 This product includes software developed at Mainfunc, Inc.
 
-UniWork Office is an independently branded fork of that Apache-2.0 project.
-The GenOffice and Genspark names and logos remain trademarks of Mainfunc, Inc.
-and are not used as UniWork product branding.
+The GenOffice and Genspark names and logos remain trademarks of
+Mainfunc, Inc. and are not used as UniWork product branding.
+
+The changes UniWork made to GenOffice are described in MODIFICATIONS.
 
 Bundled third-party components are listed in THIRD-PARTY-NOTICES.txt, which
 tools/gen-third-party-notices.mjs generates at packaging time. It is not
@@ -16,6 +24,27 @@ checkout.
 
 Bundled fonts and their licenses are documented in
 apps/docs/src/renderer/fonts/README.md.
+
+Downloadable fonts
+
+Any app can offer additional font families, at the reader's request, from the
+build-injected font mirror. Those families are not in the bundle and so are not
+in that README; the catalogue is
+packages/electron-utils/src/font-catalog.ts, and every family there carries its
+SPDX licence id in a `license` field, checked against a permissive allowlist by
+packages/electron-utils/tests/font-store.test.ts.
+
+All of them are licensed under the SIL Open Font License, Version 1.1
+(https://openfontlicense.org), which permits the bundling and redistribution
+this application performs. The families are: Open Sans, Roboto, Lato,
+Montserrat, Poppins, Inter, Source Sans 3, Oswald, Raleway, Nunito,
+Merriweather, Playfair Display, Work Sans, Rubik, Noto Sans JP, Noto Sans KR,
+Noto Sans SC, Noto Sans TC, Nanum Gothic, Noto Serif SC, Noto Serif TC,
+Noto Serif JP, Noto Serif KR, Nanum Myeongjo.
+
+Each downloaded file is verified against the sha256 recorded in the catalogue
+before it is installed, and the catalogue states each family's size so an app
+can ask before fetching tens of megabytes.
 
 Unicode Character Database
 

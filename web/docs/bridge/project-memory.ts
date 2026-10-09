@@ -10,42 +10,12 @@
  *   appendChat    POST   /api/projects/:pid/chats/:cid/messages  {role, text, tools?, attachments?, scope?}
  *   loadChat      GET    /api/projects/:pid/chats/:cid/messages?limit=N -> ChatMessage[]
  *   rebindChat    POST   /api/projects/:pid/chats/:tempCid/rebind {newChatId|fileId} -> {projectId, chatId}
- *   listProjects  GET    /api/projects -> ProjectSummary[]
- *   createProject POST   /api/projects {name} -> ProjectSummary
- *   renameProject PATCH  /api/projects/:id {name}
- *   deleteProject DELETE /api/projects/:id (soft delete)
- *   moveFile      PUT    /api/files/:id/project {projectId}
- *   getTimeline   GET    /api/projects/:id/timeline?limit=N -> TimelineEntry[]
  */
-import type {
-  ChatMessage,
-  ProjectApi,
-  ProjectSummary,
-  ResolveChatResult,
-  TimelineEntry,
-} from '@genoffice/project-store'
-
-function basename(path: string): string {
-  return path.split(/[\\/]/).pop() ?? path
-}
+import type { ChatMessage, ProjectApi, ResolveChatResult } from '@genoffice/project-store'
 
 const DEFAULT_PROJECT = 'default'
 
-interface FakeProject {
-  id: string
-  name: string
-  createdAt: string
-  updatedAt: string
-}
-
-const projects = new Map<string, FakeProject>()
 const nowIso = () => new Date().toISOString()
-projects.set(DEFAULT_PROJECT, {
-  id: DEFAULT_PROJECT,
-  name: 'Default',
-  createdAt: nowIso(),
-  updatedAt: nowIso(),
-})
 /** `${projectId}/${chatId}` -> messages */
 const chats = new Map<string, ChatMessage[]>()
 /** file path -> projectId */
@@ -68,17 +38,6 @@ function chatIdFor(filePath: string): string {
 function filePathOfChat(chatId: string): string {
   for (const [path, id] of chatIdByPath) if (id === chatId) return path
   return ''
-}
-
-function summary(p: FakeProject): ProjectSummary {
-  let lastActiveAt = p.updatedAt
-  for (const [key, msgs] of chats) {
-    if (!key.startsWith(`${p.id}/`)) continue
-    const ts = msgs[msgs.length - 1]?.ts
-    if (ts && ts > lastActiveAt) lastActiveAt = ts
-  }
-  const fileCount = [...fileMap.values()].filter((pid) => pid === p.id).length
-  return { ...p, fileCount, lastActiveAt, isDefault: p.id === DEFAULT_PROJECT }
 }
 
 export const projectApi = {
@@ -128,59 +87,5 @@ export const projectApi = {
       chats.delete(from)
     }
     return { projectId, chatId }
-  },
-
-  async listProjects() {
-    return [...projects.values()].map(summary)
-  },
-
-  async createProject({ name }) {
-    const p: FakeProject = {
-      id: `p-${Date.now().toString(36)}-${projects.size}`,
-      name,
-      createdAt: nowIso(),
-      updatedAt: nowIso(),
-    }
-    projects.set(p.id, p)
-    return summary(p)
-  },
-
-  async renameProject({ id, name }) {
-    const p = projects.get(id)
-    if (!p || id === DEFAULT_PROJECT) return
-    p.name = name
-    p.updatedAt = nowIso()
-  },
-
-  async deleteProject({ id }) {
-    if (id === DEFAULT_PROJECT) return
-    projects.delete(id)
-    for (const [path, pid] of fileMap) if (pid === id) fileMap.set(path, DEFAULT_PROJECT)
-  },
-
-  async moveFile({ filePath, projectId }) {
-    if (projects.has(projectId)) fileMap.set(filePath, projectId)
-  },
-
-  async getTimeline({ projectId, limit }) {
-    const out: TimelineEntry[] = []
-    for (const [key, msgs] of chats) {
-      if (!key.startsWith(`${projectId}/`)) continue
-      const chatId = key.slice(projectId.length + 1)
-      const filePath = filePathOfChat(chatId)
-      for (const m of msgs) {
-        out.push({
-          filePath,
-          fileName: basename(filePath),
-          chatId,
-          ts: m.ts,
-          role: m.role,
-          preview: (m.text.split('\n')[0] ?? '').slice(0, 120),
-          seq: m.seq,
-        })
-      }
-    }
-    out.sort((a, b) => (a.ts < b.ts ? 1 : a.ts > b.ts ? -1 : b.seq - a.seq))
-    return limit && limit > 0 ? out.slice(0, limit) : out
   },
 } satisfies ProjectApi

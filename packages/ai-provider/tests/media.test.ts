@@ -7,6 +7,7 @@ import {
   imageGenerationAvailable,
   mediaAnalysisAvailable,
   resolveAiMediaSettings,
+  visibleMediaProviders,
 } from '../src/media'
 import {
   analyzeMediaWithProvider,
@@ -38,11 +39,12 @@ function openaiSettings(apiKey = 'sk-test', imageModel = 'gpt-image-2'): AiSetti
 }
 
 describe('media settings', () => {
-  it('defaults every provider to its default models and genspark as the active one', () => {
+  it('defaults every provider to its default models with no active BYOK route', () => {
     const media = defaultAiMediaSettings()
-    expect(media.imageProvider).toBe('genspark')
-    expect(media.analysisProvider).toBe('genspark')
-    expect(media.videoAnalysisProvider).toBe('genspark')
+    const settings = withMedia(media)
+    expect(activeMediaConfig(settings, 'image')).toBeNull()
+    expect(activeMediaConfig(settings, 'analysis')).toBeNull()
+    expect(activeMediaConfig(settings, 'video')).toBeNull()
     for (const meta of AI_MEDIA_PROVIDERS) {
       expect(media.providers[meta.id].imageModel).toBe(meta.defaultImageModel)
       expect(media.providers[meta.id].apiKey).toBe('')
@@ -53,7 +55,7 @@ describe('media settings', () => {
 
   it('is carried by defaultAiSettings and healed in from a pre-media settings file', () => {
     const defaults = defaultAiSettings()
-    expect(defaults.media?.imageProvider).toBe('genspark')
+    expect(defaults.media).toEqual(defaultAiMediaSettings())
     const resolved = resolveAiSettings(
       { provider: 'genspark', providers: defaults.providers },
       defaultAiSettings(),
@@ -92,22 +94,44 @@ describe('media settings', () => {
     expect(media.providers.openai.imageModel).toBe('gpt-image-2')
   })
 
+  it('tolerates non-string values in a hand-edited settings file', () => {
+    const media = resolveAiMediaSettings({
+      providers: {
+        openai: { apiKey: 123, baseUrl: null, imageModel: 42, analysisModel: {} },
+      },
+    } as never)
+    expect(media.providers.openai.apiKey).toBe('')
+    expect(media.providers.openai.baseUrl).toBe('')
+    expect(media.providers.openai.imageModel).toBe('gpt-image-2')
+  })
+
   it('activates a BYOK media provider per capability, only when usable and capable', () => {
     expect(activeMediaProvider(openaiSettings(), 'image')).toBe('openai')
     expect(activeMediaProvider(openaiSettings(), 'analysis')).toBe('openai')
     expect(activeMediaProvider(openaiSettings(''), 'image')).toBe('genspark')
+    expect(activeMediaProvider(openaiSettings('   '), 'image')).toBe('genspark')
     const custom = defaultAiMediaSettings()
     custom.imageProvider = 'custom'
     expect(activeMediaProvider(withMedia(custom), 'image')).toBe('genspark')
     custom.providers.custom.baseUrl = 'http://localhost:1234/v1'
     expect(activeMediaProvider(withMedia(custom), 'image')).toBe('custom')
-    expect(activeMediaProvider(withMedia(custom), 'analysis')).toBe('genspark')
+    // the default (hidden cloud) analysis choice yields to the usable endpoint
+    expect(activeMediaProvider(withMedia(custom), 'analysis')).toBe('custom')
     expect(activeMediaConfig(withMedia(custom), 'image')?.provider).toBe('custom')
-    // MiniMax has no analysis endpoint: picking it for analysis falls back
+    // MiniMax-M3 supports both image and video analysis
     const mm = defaultAiMediaSettings()
     mm.analysisProvider = 'minimax'
     mm.providers.minimax.apiKey = 'k'
-    expect(activeMediaProvider(withMedia(mm), 'analysis')).toBe('genspark')
+    expect(activeMediaProvider(withMedia(mm), 'analysis')).toBe('minimax')
+    mm.videoAnalysisProvider = 'minimax'
+    expect(activeMediaProvider(withMedia(mm), 'video')).toBe('minimax')
+    // DeepSeek reads images (V4.1 Flash vision) but takes no video
+    const ds = defaultAiMediaSettings()
+    ds.analysisProvider = 'deepseek'
+    ds.providers.deepseek.apiKey = 'sk-ds'
+    expect(activeMediaProvider(withMedia(ds), 'analysis')).toBe('deepseek')
+    ds.videoAnalysisProvider = 'deepseek'
+    expect(activeMediaProvider(withMedia(ds), 'video')).toBe('genspark')
     // OpenAI reads images but not video: as the video provider it falls back
     const oa = openaiSettings()
     oa.media!.videoAnalysisProvider = 'openai'
@@ -121,9 +145,29 @@ describe('media settings', () => {
     ).toBe('genspark')
   })
 
-  it('gates the tools on gsk login + toggle without BYOK, and on the BYOK model with it', () => {
+  it('lets a key for the first visible provider work from fresh defaults', () => {
+    const settings = defaultAiSettings()
+    const first = visibleMediaProviders().find((m) => !!m.imageProtocol)!
+    settings.media!.providers[first.id].apiKey = 'sk-test'
+    expect(activeMediaProvider(settings, 'image')).toBe(first.id)
+    expect(imageGenerationAvailable(settings, false)).toBe(true)
+    // the stored cloud choice yields to whichever BYOK vendor is usable
+    const gemini = defaultAiSettings()
+    gemini.media!.providers.gemini.apiKey = 'AIza'
+    expect(activeMediaProvider(gemini, 'image')).toBe('gemini')
+    expect(activeMediaProvider(gemini, 'video')).toBe('gemini')
+    expect(mediaAnalysisAvailable(gemini, false)).toBe(true)
+    // an explicit BYOK choice is never swapped for another vendor
+    const explicit = openaiSettings('')
+    explicit.media!.providers.gemini.apiKey = 'AIza'
+    expect(activeMediaProvider(explicit, 'image')).toBe('genspark')
+  })
+
+  it('is BYOK-only while the UniWork cloud seam is off, and gated on the BYOK model', () => {
     const genspark = defaultAiSettings()
-    expect(imageGenerationAvailable(genspark, true)).toBe(true)
+    // no cloud route: a signed-in flag alone never enables the tools
+    expect(imageGenerationAvailable(genspark, true)).toBe(false)
+    expect(mediaAnalysisAvailable(genspark, true)).toBe(false)
     expect(imageGenerationAvailable(genspark, false)).toBe(false)
     expect(imageGenerationAvailable({ ...genspark, gskToolsEnabled: false }, true)).toBe(false)
     expect(mediaAnalysisAvailable({ ...genspark, gskToolsEnabled: false }, true)).toBe(false)
@@ -148,7 +192,13 @@ describe('media settings', () => {
     }
     expect(mediaAnalysisAvailable(withMedia(custom), false)).toBe(false)
     expect(imageGenerationAvailable(withMedia(custom), false)).toBe(true)
-    expect(imageGenerationAvailable(null, true)).toBe(true)
+    expect(imageGenerationAvailable(null, true)).toBe(false)
+  })
+
+  it('hides the UniWork cloud entry from pickers while keeping it for stored settings', () => {
+    expect(AI_MEDIA_PROVIDERS.some((m) => m.id === 'genspark')).toBe(true)
+    expect(visibleMediaProviders().map((m) => m.id)).not.toContain('genspark')
+    expect(visibleMediaProviders()).toHaveLength(AI_MEDIA_PROVIDERS.length - 1)
   })
 })
 
@@ -204,6 +254,48 @@ describe('generateImageWithProvider', () => {
     expect(form.get('model')).toBe('flux')
     expect(form.get('image')).toBeInstanceOf(Blob)
     expect((init.headers as Record<string, string>).Authorization).toBeUndefined()
+  })
+
+  it('passes background=transparent only to gpt-image models', async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({ data: [{ b64_json: PNG_B64 }] }))
+    vi.stubGlobal('fetch', fetchMock)
+    await generateImageWithProvider(
+      'openai',
+      { apiKey: 'sk-1', imageModel: 'gpt-image-1', analysisModel: '' },
+      { prompt: 'a red icon', transparent: true },
+    )
+    let body = JSON.parse(
+      (fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body as string,
+    )
+    expect(body.background).toBe('transparent')
+    // dall-e-3 and lookalike vendors reject the field — it must stay off their requests
+    fetchMock.mockClear()
+    await generateImageWithProvider(
+      'openai',
+      { apiKey: 'sk-1', imageModel: 'dall-e-3', analysisModel: '' },
+      { prompt: 'a red icon', transparent: true },
+    )
+    body = JSON.parse(
+      (fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body as string,
+    )
+    expect(body.background).toBeUndefined()
+  })
+
+  it('passes background=transparent on gpt-image multipart edits', async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({ data: [{ b64_json: PNG_B64 }] }))
+    vi.stubGlobal('fetch', fetchMock)
+    await generateImageWithProvider(
+      'openai',
+      { apiKey: 'sk-1', imageModel: 'gpt-image-1', analysisModel: '' },
+      {
+        prompt: 'isolate the icon',
+        references: [{ bytes: PNG, mime: 'image/png' }],
+        transparent: true,
+      },
+    )
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('https://api.openai.com/v1/images/edits')
+    expect((init.body as FormData).get('background')).toBe('transparent')
   })
 
   it('calls Gemini generateContent with IMAGE modality and reads inlineData back', async () => {
@@ -460,6 +552,32 @@ describe('analyzeMediaWithProvider', () => {
     expect(body.contents[0].parts[0].inline_data.mime_type).toBe('video/mp4')
     expect(body.contents[0].parts[1].text).toBe('summarize')
   })
+
+  it('posts DeepSeek V4.1 Flash images to the direct API and rejects video', async () => {
+    const fetchMock = vi.fn(async () =>
+      jsonResponse({ choices: [{ message: { content: 'a logo' } }] }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    const config = { apiKey: 'sk-ds', imageModel: '', analysisModel: 'deepseek-flash' }
+    const text = await analyzeMediaWithProvider('deepseek', config, {
+      media: [{ bytes: PNG, mime: 'image/png' }],
+      requirements: 'what is this',
+    })
+    expect(text).toBe('a logo')
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('https://api.deepseek.com/v1/chat/completions')
+    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer sk-ds')
+    const body = JSON.parse(init.body as string)
+    expect(body.model).toBe('deepseek-flash')
+    expect(body.messages[0].content[1].image_url.url).toBe(`data:image/png;base64,${PNG_B64}`)
+    await expect(
+      analyzeMediaWithProvider('deepseek', config, {
+        media: [{ bytes: PNG, mime: 'video/mp4', name: 'clip.mp4' }],
+        requirements: 'summarize',
+      }),
+    ).rejects.toThrow(/video and audio analysis needs/)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
 })
 
 describe('testMediaProvider', () => {
@@ -483,5 +601,253 @@ describe('testMediaProvider', () => {
     })
     expect(failed.ok).toBe(false)
     expect(failed.error).toMatch(/403/)
+  })
+})
+
+describe('endpoint composition with a query string in the base URL', () => {
+  /** gateway-style base: a path prefix and a pinned query parameter */
+  const queryBase = 'https://gw.example.com/v1?key=abc'
+
+  it('keeps the query when appending the images path to a custom base', async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({ data: [{ b64_json: PNG_B64 }] }))
+    vi.stubGlobal('fetch', fetchMock)
+    await generateImageWithProvider(
+      'custom',
+      { apiKey: '', baseUrl: queryBase, imageModel: 'flux', analysisModel: '' },
+      { prompt: 'a cat' },
+    )
+    expect((fetchMock.mock.calls[0] as unknown as [string])[0]).toBe(
+      'https://gw.example.com/v1/images/generations?key=abc',
+    )
+  })
+
+  it('keeps the query when appending the chat path to a custom base', async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({ choices: [{ message: { content: 'ok' } }] }))
+    vi.stubGlobal('fetch', fetchMock)
+    await analyzeMediaWithProvider(
+      'custom',
+      { apiKey: '', baseUrl: queryBase, imageModel: '', analysisModel: 'vision-1' },
+      { media: [{ bytes: PNG, mime: 'image/png' }], requirements: 'describe' },
+    )
+    expect((fetchMock.mock.calls[0] as unknown as [string])[0]).toBe(
+      'https://gw.example.com/v1/chat/completions?key=abc',
+    )
+  })
+
+  it('appends the path of a trailing-slash base without query (unchanged)', async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({ data: [{ b64_json: PNG_B64 }] }))
+    vi.stubGlobal('fetch', fetchMock)
+    await generateImageWithProvider(
+      'custom',
+      { apiKey: '', baseUrl: 'http://localhost:1234/v1/', imageModel: 'flux', analysisModel: '' },
+      { prompt: 'a cat' },
+    )
+    expect((fetchMock.mock.calls[0] as unknown as [string])[0]).toBe(
+      'http://localhost:1234/v1/images/generations',
+    )
+  })
+
+  it('rides the compatible-mode suffix on the path, keeping the query (qwen chat)', async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({ choices: [{ message: { content: 'ok' } }] }))
+    vi.stubGlobal('fetch', fetchMock)
+    await analyzeMediaWithProvider(
+      'qwen',
+      {
+        apiKey: 'k',
+        baseUrl: 'https://gw.example.com/ds?key=abc',
+        imageModel: '',
+        analysisModel: 'qwen3-vl-plus',
+      },
+      { media: [{ bytes: PNG, mime: 'image/png' }], requirements: 'describe' },
+    )
+    expect((fetchMock.mock.calls[0] as unknown as [string])[0]).toBe(
+      'https://gw.example.com/ds/compatible-mode/v1/chat/completions?key=abc',
+    )
+  })
+
+  it('builds the DashScope generation URL on the path, keeping the query (qwen image)', async () => {
+    const fetchMock = vi.fn(async (url: string) =>
+      url.includes('multimodal-generation')
+        ? jsonResponse({
+            output: {
+              choices: [{ message: { content: [{ image: 'https://oss.example/q.png' }] } }],
+            },
+          })
+        : new Response(PNG, { status: 200, headers: { 'content-type': 'image/png' } }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    await generateImageWithProvider(
+      'qwen',
+      {
+        apiKey: 'k',
+        baseUrl: 'https://gw.example.com/ds?key=abc',
+        imageModel: 'qwen-image-plus',
+        analysisModel: '',
+      },
+      { prompt: 'a fox' },
+    )
+    expect((fetchMock.mock.calls[0] as unknown as [string])[0]).toBe(
+      'https://gw.example.com/ds/api/v1/services/aigc/multimodal-generation/generation?key=abc',
+    )
+  })
+
+  it('reduces a pasted compatible-mode URL that carries a query to the DashScope root', async () => {
+    const fetchMock = vi.fn(async (url: string) =>
+      url.includes('multimodal-generation')
+        ? jsonResponse({
+            output: {
+              choices: [{ message: { content: [{ image: 'https://oss.example/q.png' }] } }],
+            },
+          })
+        : new Response(PNG, { status: 200, headers: { 'content-type': 'image/png' } }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    await generateImageWithProvider(
+      'qwen',
+      {
+        apiKey: 'k',
+        baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1?x=1',
+        imageModel: 'qwen-image-plus',
+        analysisModel: '',
+      },
+      { prompt: 'a fox' },
+    )
+    expect((fetchMock.mock.calls[0] as unknown as [string])[0]).toBe(
+      'https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation?x=1',
+    )
+  })
+
+  it('keeps the query when composing the Gemini generateContent URL', async () => {
+    const fetchMock = vi.fn(async () =>
+      jsonResponse({
+        candidates: [
+          { content: { parts: [{ inlineData: { mimeType: 'image/png', data: PNG_B64 } }] } },
+        ],
+      }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    await generateImageWithProvider(
+      'gemini',
+      {
+        apiKey: 'AIza',
+        baseUrl: 'https://gw.example.com/v1beta?key=abc',
+        imageModel: 'gemini-3.1-flash-image',
+        analysisModel: '',
+      },
+      { prompt: 'a dog' },
+    )
+    expect((fetchMock.mock.calls[0] as unknown as [string])[0]).toBe(
+      'https://gw.example.com/v1beta/models/gemini-3.1-flash-image:generateContent?key=abc',
+    )
+  })
+
+  it('keeps the query when composing the Gemini inline-analysis URL', async () => {
+    const fetchMock = vi.fn(async () =>
+      jsonResponse({ candidates: [{ content: { parts: [{ text: 'a cat' }] } }] }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    await analyzeMediaWithProvider(
+      'gemini',
+      {
+        apiKey: 'AIza',
+        baseUrl: 'https://gw.example.com/v1beta?key=abc',
+        imageModel: '',
+        analysisModel: 'gemini-3.8-flash',
+      },
+      { media: [{ bytes: PNG, mime: 'image/png' }], requirements: 'describe' },
+    )
+    expect((fetchMock.mock.calls[0] as unknown as [string])[0]).toBe(
+      'https://gw.example.com/v1beta/models/gemini-3.8-flash:generateContent?key=abc',
+    )
+  })
+
+  it('uploads through the Files API on the path and keeps the query for oversized media', async () => {
+    // one byte over the inline cap forces the Files API route
+    const huge = new Uint8Array(18 * 1024 * 1024 + 1)
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/upload/session')) {
+        return jsonResponse({
+          file: { state: 'ACTIVE', uri: 'https://files.example/1', mimeType: 'video/mp4' },
+        })
+      }
+      if (url.includes('/upload/')) {
+        return new Response('', {
+          status: 200,
+          headers: { 'x-goog-upload-url': 'https://gw.example.com/upload/session?up=1' },
+        })
+      }
+      return jsonResponse({ candidates: [{ content: { parts: [{ text: 'a summary' }] } }] })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const text = await analyzeMediaWithProvider(
+      'gemini',
+      {
+        apiKey: 'AIza',
+        baseUrl: 'https://gw.example.com/v1beta?key=abc',
+        imageModel: '',
+        analysisModel: 'gemini-3.8-flash',
+      },
+      { media: [{ bytes: huge, mime: 'video/mp4', name: 'clip.mp4' }], requirements: 'summarize' },
+    )
+    expect(text).toBe('a summary')
+    const urls = fetchMock.mock.calls.map((c) => (c as unknown as [string])[0])
+    expect(urls[0]).toBe('https://gw.example.com/upload/v1beta/files?key=abc')
+    expect(urls[1]).toBe('https://gw.example.com/upload/session?up=1')
+    expect(urls[2]).toBe(
+      'https://gw.example.com/v1beta/models/gemini-3.8-flash:generateContent?key=abc',
+    )
+  })
+})
+
+describe('a failed media request does not buffer the whole error body', () => {
+  /** an error body far larger than any diagnostic needs; counts what the reader pulls */
+  function hugeErrorBody(): { response: Response; pulled: () => number } {
+    const chunk = new TextEncoder().encode('x'.repeat(64 * 1024))
+    const chunks = 64
+    let sent = 0
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (sent >= chunks) return controller.close()
+        sent += 1
+        controller.enqueue(chunk)
+      },
+    })
+    return {
+      response: new Response(body, { status: 500 }),
+      pulled: () => sent * chunk.byteLength,
+    }
+  }
+
+  it('reads only the diagnostic prefix of an analysis failure', async () => {
+    const { response, pulled } = hugeErrorBody()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => response),
+    )
+    await expect(
+      analyzeMediaWithProvider(
+        'openai',
+        { apiKey: 'sk', imageModel: '', analysisModel: 'gpt-5.6-luna' },
+        { media: [{ bytes: PNG, mime: 'image/png', name: 'logo.png' }], requirements: 'describe' },
+      ),
+    ).rejects.toThrow(/Media analysis failed: 500/)
+    // httpBodyDetail keeps 500 characters; the rest of the 4 MB body is never buffered
+    expect(pulled()).toBeLessThanOrEqual(128 * 1024)
+  })
+
+  it('reads only the diagnostic prefix of a credential-test failure', async () => {
+    const { response, pulled } = hugeErrorBody()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => response),
+    )
+    const failed = await testMediaProvider('openai', {
+      apiKey: 'sk',
+      imageModel: '',
+      analysisModel: '',
+    })
+    expect(failed.ok).toBe(false)
+    expect(failed.error).toMatch(/500/)
+    expect(pulled()).toBeLessThanOrEqual(128 * 1024)
   })
 })

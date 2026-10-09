@@ -15,6 +15,9 @@ import { t } from '../i18n/locale'
  *   close) → text carrying the `rawHtmlInline` mark. A mark instead of an
  *   inline atom so surrounding bold/link marks still wrap it on save; the mark
  *   is `code`, so the serializer neither escapes nor entity-encodes the text.
+ *   Formatting tags the schema maps losslessly (`<b>`, `<em>`, `<br>`, `<a href>`…
+ *   with no attribute the mapping would drop) are left to the upstream inline
+ *   pass (inlineTokens.ts) and render as marks; see `mapsToSchema`.
  *
  * The HTML is never rendered: the editor shows the source as escaped text
  * (textContent only), so nothing in a document can reach the frame DOM as
@@ -68,6 +71,40 @@ export function matchInlineHtml(src: string): number {
     if (depth === 0) return m.index + m[0].length
   }
   return open[0].length
+}
+
+/**
+ * Inline tags the schema represents without loss, with the attributes it keeps
+ * (the FORMATTING_TAGS of inlineTokens.ts). Such a tag goes through the
+ * upstream inline pass and renders as a mark; any other attribute would be
+ * dropped on save, so the tag then stays opaque raw HTML.
+ */
+const SCHEMA_TAGS: Record<string, readonly string[]> = {
+  a: ['href', 'title'],
+  b: [],
+  br: [],
+  code: [],
+  del: [],
+  em: [],
+  i: [],
+  img: ['src', 'alt', 'title', 'width', 'height'],
+  s: [],
+  strike: [],
+  strong: [],
+}
+const TAG_HEAD_RE = /^<\/?([a-zA-Z][a-zA-Z0-9-]*)/
+const ATTR_NAME_RE = new RegExp(ATTR, 'g')
+
+/** Whether this inline HTML chunk is a formatting tag the schema maps losslessly */
+export function mapsToSchema(raw: string): boolean {
+  const head = TAG_HEAD_RE.exec(raw)
+  const allowed = head ? SCHEMA_TAGS[head[1]!.toLowerCase()] : undefined
+  if (!allowed) return false
+  if (raw.startsWith('</')) return true
+  const open = OPEN_TAG_RE.exec(raw)
+  if (!open) return false
+  const attrs = open[0].slice(head![0].length).match(ATTR_NAME_RE) ?? []
+  return attrs.every((a) => allowed.includes(a.trim().split(/[\s=]/)[0]!.toLowerCase()))
 }
 
 function isComment(raw: string): boolean {
@@ -170,7 +207,9 @@ export const RawHtmlInline = Mark.create({
     tokenize: (src: string) => {
       const length = matchInlineHtml(src)
       if (!length) return undefined
-      return { type: RAW_HTML_INLINE, raw: src.slice(0, length) }
+      const raw = src.slice(0, length)
+      if (mapsToSchema(raw)) return undefined
+      return { type: RAW_HTML_INLINE, raw }
     },
   },
 })

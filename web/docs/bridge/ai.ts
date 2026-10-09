@@ -20,7 +20,7 @@
  * | aiGenerateImage             | { error }                                           |
  * | fetchImage                  | null (cross-origin fetch is not possible in a page) |
  * | aiGskStatus                 | { loggedIn: false }                                 |
- * | aiGskLogin / aiOpenBilling  | no-op                                               |
+ * | aiOpenBilling               | no-op                                               |
  * | getAiSettings               | empty provider config, Genspark tools off           |
  * | setAiSettings               | accepted and dropped (nothing is persisted)         |
  *
@@ -77,7 +77,13 @@ function emptySettings(): AiSettings {
 export default {
   getAiSettings: async () => emptySettings(),
   setAiSettings: async () => {},
-  getAiPanelPrefs: async () => ({ fontSize: 'default', customFontSize: 14, spellcheck: true }),
+  getAiPanelPrefs: async () => ({
+    side: 'left',
+    fontSize: 'default',
+    customFontSize: 14,
+    spellcheck: true,
+    openInNewDocs: true,
+  }),
 
   aiChat: async (): Promise<AiChatResponse> => ({
     ok: false,
@@ -97,7 +103,6 @@ export default {
   },
 
   aiGskStatus: async () => ({ loggedIn: false }),
-  aiGskLogin: async () => {},
   aiOpenBilling: async () => {},
 
   webSearch: async () => ({

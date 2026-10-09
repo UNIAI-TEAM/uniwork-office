@@ -48,6 +48,17 @@ jobs:
         with:
           workspaces: apps/sheets/native/xlsx-engine
 
+      # electron's postinstall downloads its binary from GitHub Releases on every
+      # fresh install; a cache hit skips the download (and its 5xx flakes)
+      - name: Cache electron binaries
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/electron
+          # own prefix: the build workflows' electron-* entries also hold
+          # ~/.cache/electron-builder, and a saved key is never updated
+          key: electron-bin-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: electron-bin-${{ runner.os }}-
+
       - name: Install dependencies
         run: npm ci
 
@@ -67,9 +78,13 @@ jobs:
         # exact main revision the merge was built against. The event's base.sha can
         # lag behind a fast-moving main, which pulls unrelated main-side files into
         # the changed-file set and fails the check on files the PR never touched.
+        # A workflow_dispatch run (e.g. the one upstream-sync.yml starts on its
+        # branch) has no event base, so it diffs against the default branch.
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             FORMAT_BASE_REF=$(git rev-parse HEAD^1)
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            FORMAT_BASE_REF=$(git merge-base HEAD "origin/${{ github.event.repository.default_branch }}")
           fi
           npm run format:check
 
@@ -79,8 +94,51 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             FORMAT_BASE_REF=$(git rev-parse HEAD^1)
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            FORMAT_BASE_REF=$(git merge-base HEAD "origin/${{ github.event.repository.default_branch }}")
           fi
           npm run check:theme-colors
+
+      # UniWork brand gate: no GenOffice / Genspark / genspark.ai in user-visible
+      # strings, i18n catalogs, package metadata or installer config except the
+      # reasoned entries in tools/rebrand/brand-allowlist.json (see tools/rebrand/README.md).
+      - name: Check brand
+        run: npm run check:brand
+
+      - name: Test rebrand tooling
+        run: npm run test:rebrand
+
+      # Release helpers (installer URL map, packaged-output brand check); the
+      # release workflow only runs on tags, so regressions surface here first.
+      - name: Test release tooling
+        run: node --test tools/release/*.test.mjs
+
+      # Apache-2.0 attribution: NOTICE, MODIFICATIONS and package author /
+      # homepage must match apps/shell/src/shared/legal.json (npm run legal).
+      - name: Check legal notices
+        run: npm run legal:check && npm run test:legal
+
+      # No shipped code may name a blocked cloud / analytics host
+      # (tools/check-egress.mjs and its tests).
+      - name: Check egress
+        run: npm run check:egress
+
+      # An upstream sync PR carries merge-conflict markers until a person resolves
+      # them. A file fails only when it holds all three of git's marker lines
+      # (<<<<<<< x, =======, >>>>>>> y), so a lone ======= underline does not;
+      # binary files are skipped.
+      - name: Check for conflict markers
+        run: |
+          set +e
+          files=$(git grep -I -l --all-match -e '^<<<<<<< ' -e '^=======$' -e '^>>>>>>> ')
+          rc=$?
+          set -e
+          if [ "$rc" -eq 0 ]; then
+            echo "Unresolved merge-conflict markers committed in:"
+            echo "$files"
+            exit 1
+          fi
+          if [ "$rc" -gt 1 ]; then exit "$rc"; fi
 
       # skills/*/SKILL.md ship to users' agent directories; a body change
       # without a metadata.version bump would never be offered as an update.
@@ -90,6 +148,8 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             FORMAT_BASE_REF=$(git rev-parse HEAD^1)
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            FORMAT_BASE_REF=$(git merge-base HEAD "origin/${{ github.event.repository.default_branch }}")
           fi
           npm run check:skill-version
 
@@ -102,6 +162,8 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             FORMAT_BASE_REF=$(git rev-parse HEAD^1)
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            FORMAT_BASE_REF=$(git merge-base HEAD "origin/${{ github.event.repository.default_branch }}")
           fi
           if [ -f tools/check-public-hygiene.mjs ]; then
             node tools/check-public-hygiene.mjs
@@ -138,7 +200,7 @@ jobs:
       # pptx-engine's OOXML schema gate validates saved decks with xmllint
       # (tools/ooxml-validate); the runner image is not guaranteed to have it.
       - name: Install xmllint
-        run: sudo apt-get install -y --no-install-recommends libxml2-utils
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libxml2-utils
 
       - name: Test
         run: npm test
@@ -181,6 +243,17 @@ jobs:
         with:
           workspaces: apps/sheets/native/xlsx-engine
 
+      # electron's postinstall downloads its binary from GitHub Releases on every
+      # fresh install; a cache hit skips the download (and its 5xx flakes)
+      - name: Cache electron binaries
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/electron
+          # own prefix: the build workflows' electron-* entries also hold
+          # ~/.cache/electron-builder, and a saved key is never updated
+          key: electron-bin-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: electron-bin-${{ runner.os }}-
+
       - name: Install dependencies
         run: npm ci
 
@@ -211,6 +284,16 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             fonts-crosextra-carlito fonts-crosextra-caladea fonts-noto-cjk
+
+      # CSS layout tests use standalone Chromium in addition to Electron.
+      # Keep the pinned document font stack unchanged: --with-deps adds fonts
+      # that alter the existing pixel baselines. Electron already supplies the
+      # required system libraries on this runner.
+      - name: Install Chromium for layout tests
+        run: npx playwright install chromium
+
+      - name: Markdown browser tests
+        run: npx playwright test --config apps/markdown/playwright.config.ts
 
       # Electron needs a display server on Linux runners. DEBUG=pw:browser
       # forwards the Electron process stdout/stderr into the CI log so launch

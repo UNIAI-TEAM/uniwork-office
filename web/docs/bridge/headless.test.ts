@@ -12,6 +12,7 @@ import {
   type HeadlessStatus,
 } from './headless'
 import { createWebApi } from './webapi'
+import { bytesAt, installBlobUrls } from './testing/blob-urls'
 
 const PAGE = 'https://office.example.com/office-frame/docs/v1/index.html'
 const DOCX = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 1, 2, 3])
@@ -22,6 +23,7 @@ const open = (target: string) => `headless=1&open=${encodeURIComponent(target)}`
 const status = () => (window as unknown as { __docsWebHeadless?: HeadlessStatus }).__docsWebHeadless
 
 beforeEach(() => {
+  installBlobUrls()
   vi.spyOn(console, 'error').mockImplementation(() => {})
   vi.spyOn(console, 'warn').mockImplementation(() => {})
 })
@@ -153,7 +155,7 @@ describe('createHeadless + webapi', () => {
       headers: undefined,
     })
     expect(opened.path).toBe('uniwork://files/headless/Report.docx')
-    expect(new Uint8Array(opened.data)).toEqual(DOCX)
+    expect(await bytesAt(opened.dataUrl)).toEqual(DOCX)
     expect(status()?.state).toBe('opened')
 
     // the renderer's headless-export path: one target, prints, then the report

@@ -22,7 +22,6 @@ export const nl = {
   aiQcPageSkipped: 'Pagina {n}: automatische lay-outcontrole overgeslagen',
   aiQcStopped: 'Lay-outcontrole gestopt',
   aiQcCapped: 'Nog {count} pagina(’s) niet gecontroleerd (limiet per run)',
-  aiGskLoginBtn: 'Aanmelden bij UniWork',
   aiPanelTitle: 'uniAI',
   aiOpenAssistant: 'AI-assistent openen',
   aiFactCheckBtn: 'AI-factcheck',
@@ -141,6 +140,7 @@ export const nl = {
   aiClarifyOther: 'Anders (typ zelf)',
   aiClarifySkip: 'Enquête overslaan',
   aiClarifyNext: 'Volgende',
+  aiClarifyPrev: 'Vorige',
   aiClarifySubmit: 'Genereren',
   aiSumReadAttachment: 'Bijlage gelezen',
   aiSumReadAttachmentName: 'Bijlage {name} gelezen',
@@ -229,4 +229,5 @@ export const nl = {
   aiSumSaveTemplate: 'Stijlsjabloon "{name}" opgeslagen',
   aiSumTemplatesEmpty: 'Stijlsjablonen (leeg)',
   aiSumListTemplates: '{count} stijlsjablonen weergegeven',
+  aiPageCloudToLocal: 'Cloud niet beschikbaar — lokaal gegenereerd',
 } satisfies Record<keyof typeof zh, string>

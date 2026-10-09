@@ -25,6 +25,9 @@ export interface Session {
   aiSnapshots?: Map<number, HistorySnapshot>
   /** Edits that only touch archive entries (notes/comments; element-level dirty cannot detect them), reset after save */
   metaDirty?: boolean
+  /** Monotonic count of metaDirty transitions, so a save can tell a notes/comments
+      edit committed while its write was streaming from one the write carried. */
+  metaRev?: number
   /** Transform preview gesture in progress (the first preview already pushed an undo snapshot; later previews/final commit do not) */
   transformPreview?: boolean
   /** The part currently edited in master view (exception to the fidelity rule: only that part is written back) */
@@ -41,6 +44,12 @@ export interface Session {
 
 /** One session per client, keyed by client id (aliased entries share a session). */
 export const sessions = new Map<number, Session>()
+
+/** Flag an archive-only edit (notes/comments) and advance the save-snapshot counter. */
+export function markMetaDirty(session: Session): void {
+  session.metaDirty = true
+  session.metaRev = (session.metaRev ?? 0) + 1
+}
 
 /** Register a fresh session for a client and announce its (empty) history. */
 export function createSession(
@@ -114,6 +123,8 @@ export interface HistorySnapshot {
   slides: Slide[]
   entries: Map<string, Uint8Array>
   size: { cx: number; cy: number }
+  /** archive-only edits (notes, theme) flag the session, so undo must restore that too */
+  metaDirty: boolean
 }
 const MAX_HISTORY = 50
 
@@ -126,6 +137,7 @@ export function takeSnapshot(session: Session): HistorySnapshot {
     slides: structuredClone(session.opened.deck.slides),
     entries: new Map(session.opened.archive.entries),
     size: { ...session.opened.deck.size },
+    metaDirty: !!session.metaDirty,
   }
 }
 
@@ -135,6 +147,7 @@ function cloneSnapshot(snap: HistorySnapshot): HistorySnapshot {
     slides: structuredClone(snap.slides),
     entries: new Map(snap.entries),
     size: { ...snap.size },
+    metaDirty: snap.metaDirty,
   }
 }
 
@@ -286,6 +299,7 @@ export function restoreSnapshot(session: Session, snap: HistorySnapshot): void {
   const fresh = cloneSnapshot(snap)
   session.opened.deck.slides = fresh.slides
   session.opened.deck.size = fresh.size
+  session.metaDirty = fresh.metaDirty
   const entries = session.opened.archive.entries
   entries.clear()
   for (const [k, v] of fresh.entries) entries.set(k, v)

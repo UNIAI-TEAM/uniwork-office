@@ -25,10 +25,22 @@ interface LaunchOptions {
   lang?: string
   /** pre-seed app-settings.json with onboardingSeen=true to start at the home screen */
   onboardingSeen?: boolean
+  /** extra app-settings.json keys (e.g. defaultSaveDir) written before launch */
+  settings?: Record<string, unknown>
   /** subdir of e2e/artifacts to store this launch's video in */
   videoDir: string
   /** absolute document path passed as argv, opened in an editor tab on launch */
   openFile?: string
+  /** URL (e.g. a uniwork:// launch token) appended to argv, like an OS protocol handoff */
+  openUrl?: string
+  /**
+   * Home view to land on when onboarding is pre-seeded and nothing is opened
+   * from argv. The product starts on the My AI chat; the suite defaults to the
+   * Recent files view (hero, quick-create cards, file search).
+   */
+  homeView?: 'files' | 'chat'
+  /** extra environment variables for the launched app */
+  env?: Record<string, string>
 }
 
 export interface LaunchedApp {
@@ -42,10 +54,13 @@ export async function launchShell(options: LaunchOptions): Promise<LaunchedApp> 
     throw new Error(`Missing build output at ${SHELL_MAIN} — run \`npm run build:all\` first`)
   }
   const userDataDir = options.userDataDir ?? (await mkdtemp(join(tmpdir(), 'genoffice-e2e-')))
-  if (options.onboardingSeen) {
+  if (options.onboardingSeen || options.settings) {
     await writeFile(
       join(userDataDir, 'app-settings.json'),
-      JSON.stringify({ onboardingSeen: true }),
+      JSON.stringify({
+        ...(options.onboardingSeen ? { onboardingSeen: true } : {}),
+        ...options.settings,
+      }),
     )
   }
   const require = createRequire(join(SHELL_DIR, 'package.json'))
@@ -62,6 +77,7 @@ export async function launchShell(options: LaunchOptions): Promise<LaunchedApp> 
   if (process.platform === 'linux') args.push('--no-sandbox', '--disable-gpu')
   args.push(SHELL_DIR)
   if (options.openFile) args.push(options.openFile)
+  if (options.openUrl) args.push(options.openUrl)
   const app = await electron.launch({
     executablePath,
     args,
@@ -70,6 +86,7 @@ export async function launchShell(options: LaunchOptions): Promise<LaunchedApp> 
       GENOFFICE_USER_DATA: userDataDir,
       GENOFFICE_NO_SPARE_VIEW: '1',
       GENOFFICE_LANG: options.lang ?? 'en',
+      ...(options.env ?? {}),
       ...(process.platform === 'linux' ? { ELECTRON_DISABLE_SANDBOX: '1' } : {}),
     },
     // Playwright's Electron screencast wedges the page CDP session on Linux
@@ -85,7 +102,21 @@ export async function launchShell(options: LaunchOptions): Promise<LaunchedApp> 
   })
   const page = await app.firstWindow()
   await waitForDocumentReady(app, page)
+  if (
+    options.onboardingSeen &&
+    !options.openFile &&
+    !options.openUrl &&
+    (options.homeView ?? 'files') === 'files'
+  ) {
+    await openHomeFiles(page)
+  }
   return { app, page, userDataDir }
+}
+
+/** Switches Home from the My AI chat to the Recent files view (hero + quick cards). */
+export async function openHomeFiles(page: Page): Promise<void> {
+  await page.locator('.nav-item[data-nav="recent"]').click({ timeout: 30_000 })
+  await page.locator('.home-hero').waitFor({ timeout: 15_000 })
 }
 
 /**
@@ -128,7 +159,7 @@ async function waitForDocumentReady(
  * Open editor tabs trigger a native Save/Don't Save/Cancel dialog on close,
  * which would block app.close() forever — stub the dialog to answer
  * "Don't Save" (button index 1) so shutdown stays unattended. If close still
- * hangs, kill the process after 20s so the suite never wedges.
+ * hangs, force-kill the process after 20s and wait for close to finish.
  */
 export async function closeAndSaveVideo(
   launched: LaunchedApp,
@@ -143,17 +174,17 @@ export async function closeAndSaveVideo(
       })) as typeof dialog.showMessageBox
     })
     .catch(() => {})
-  let killTimer: NodeJS.Timeout | undefined
-  await Promise.race([
-    launched.app.close(),
-    new Promise<void>((resolvePromise) => {
-      killTimer = setTimeout(() => {
-        launched.app.process().kill()
-        resolvePromise()
-      }, 20_000)
-    }),
-  ])
-  if (killTimer) clearTimeout(killTimer)
+  const child = launched.app.process()
+  const killTimer = setTimeout(() => {
+    // SIGTERM can enter Electron's graceful quit path and leave it alive.
+    // child.killed only means a signal was sent, not that the process exited.
+    if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL')
+  }, 20_000)
+  try {
+    await launched.app.close()
+  } finally {
+    clearTimeout(killTimer)
+  }
   if (!video) return undefined
   const target = join(ARTIFACTS_DIR, 'videos', `${name}.webm`)
   try {

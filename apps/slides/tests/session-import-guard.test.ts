@@ -24,6 +24,8 @@ const ALLOWED_PACKAGES = [
   '@genoffice/pptx-ops',
   '@genoffice/pptx-render',
   '@genoffice/i18n',
+  // a pure string check (no Electron despite the package name)
+  '@genoffice/electron-utils/safe-external-url',
 ]
 
 const NODE_BUILTINS = new Set(builtinModules.flatMap((m) => [m, `node:${m}`]))
@@ -91,7 +93,7 @@ describe('session core import guard', () => {
     for (const file of files) {
       const rel = relative(SRC, file)
       expect(rel.startsWith('..'), rel).toBe(false)
-      // Only the pure leaf helpers of main/ may be shared (strings, media sniffers)
+      // Only the pure leaf helpers of main/ may be shared (strings, media sniffers, placement math)
       if (rel.startsWith('main/'))
         expect(
           [
@@ -99,6 +101,9 @@ describe('session core import guard', () => {
             'main/media-mime.ts',
             'main/jpeg-orientation.ts',
             'main/mp4-audio-sniff.ts',
+            'main/paste-cascade.ts',
+            'main/picture-frame.ts',
+            'main/video-size.ts',
           ],
           rel,
         ).toContain(rel)

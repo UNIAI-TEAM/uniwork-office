@@ -20,6 +20,7 @@ export default defineConfig({
       '@genoffice/pptx-engine/identity': pkg('pptx-engine/src/identity.ts'),
       '@genoffice/pptx-engine/background-promote': pkg('pptx-engine/src/background-promote.ts'),
       '@genoffice/pptx-engine/custgeom': pkg('pptx-engine/src/custgeom.ts'),
+      '@genoffice/pptx-engine/named-action': pkg('pptx-engine/src/named-action.ts'),
       '@genoffice/pptx-engine': pkg('pptx-engine/src/index.ts'),
       '@genoffice/pptx-ops/op-docs': pkg('pptx-ops/src/op-docs.ts'),
       '@genoffice/pptx-ops/font-size': pkg('pptx-ops/src/font-size.ts'),
@@ -27,6 +28,7 @@ export default defineConfig({
       '@genoffice/pptx-render/preset-geometry': pkg('pptx-render/src/preset-geometry.ts'),
       '@genoffice/pptx-render': pkg('pptx-render/src/index.ts'),
       '@genoffice/docx-engine/metafile': pkg('docx-engine/src/metafile.ts'),
+      '@genoffice/electron-utils/safe-external-url': pkg('electron-utils/src/safe-external-url.ts'),
     },
   },
   test: {

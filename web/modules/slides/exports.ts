@@ -2,7 +2,7 @@
  * Export and print in the Slides web frame, all client-side (B5 decision 6, inventory-b5 3.4):
  * the renderer already rasterises every slide to PNG (export-render.tsx), so
  *   - images: one .zip of `<base>-NN.png` (jszip, an engine dependency) as a download,
- *   - PDF: an image-per-page PDF, each page the slide as a JPEG (DCTDecode pass-through, no
+ *   - PDF: an image-per-page PDF (vector SVG pages are rasterised first, links are not kept), each page the slide as a JPEG (DCTDecode pass-through, no
  *     re-encoding inside the PDF), page 7.5in tall and as wide as the slide ratio, the same
  *     geometry as the desktop's printToPDF export (main/pdf-export.ts exportPageWidthIn),
  *   - print: a hidden `<iframe srcdoc>` with the desktop's print document
@@ -10,7 +10,7 @@
  */
 import JSZip from 'jszip'
 import { buildPrintDocumentHtml } from '../../../apps/slides/src/shared/print-html'
-import type { PrintSlidesOp } from '../../../apps/slides/src/shared/ipc'
+import type { ExportPdfPage, PrintSlidesOp } from '../../../apps/slides/src/shared/ipc'
 import { base64ToBytes } from '../../../apps/slides/src/session/bytes'
 
 export const PDF_PAGE_HEIGHT_IN = 7.5
@@ -116,6 +116,55 @@ export function pdfFromJpegs(
     out.set(c, at)
     at += c.length
   }
+  return out
+}
+
+/** SVG page markup -> PNG (base64) at 2x the slide size; `fontCss` carries the faces it uses */
+async function svgToPngBase64(
+  svg: string,
+  widthPx: number,
+  heightPx: number,
+  fontCss?: string,
+): Promise<string> {
+  // an <img> SVG document loads nothing external: the @font-face data URLs go inside it
+  const markup = fontCss
+    ? svg.replace(/<svg\b[^>]*>/, (open) => `${open}<style>${fontCss}</style>`)
+    : svg
+  const url = URL.createObjectURL(new Blob([markup], { type: 'image/svg+xml' }))
+  try {
+    const img = new Image()
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve()
+      img.onerror = () => reject(new Error('svg page decode failed'))
+      img.src = url
+    })
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.max(1, Math.round(widthPx * 2))
+    canvas.height = Math.max(1, Math.round(heightPx * 2))
+    const g = canvas.getContext('2d')
+    if (!g) throw new Error('canvas 2d context unavailable')
+    g.drawImage(img, 0, 0, canvas.width, canvas.height)
+    const dataUrl = canvas.toDataURL('image/png')
+    return dataUrl.slice(dataUrl.indexOf(',') + 1)
+  } finally {
+    URL.revokeObjectURL(url)
+  }
+}
+
+/** The desktop's export pages (vector SVG or PNG) as PNGs for the image-per-page PDF */
+export async function exportPagesToPngs(op: {
+  pages: readonly ExportPdfPage[]
+  widthPx: number
+  heightPx: number
+  fontCss?: string
+}): Promise<string[]> {
+  const out: string[] = []
+  for (const page of op.pages)
+    out.push(
+      'png' in page
+        ? page.png
+        : await svgToPngBase64(page.svg, op.widthPx, op.heightPx, op.fontCss),
+    )
   return out
 }
 

@@ -7,15 +7,15 @@ A second line in the same paragraph, an autolink [https://example.com](https://e
 
 - first item
 - second item with `code`
-    - nested item
-        - deeper item
+  - nested item
+    - deeper item
 
 - [ ] open task
 - [x] done task
 
 1. one
 2. two
-    1. two-a
+   1. two-a
 3. three
 
 > A quote
@@ -33,12 +33,10 @@ flowchart LR
     A --> B
 ```
 
-
 | Name | Value |
 | ---- | -----: |
 | a    | 1     |
 | b    | 2     |
-
 
 Inline math $x^2$ and a price of $5.
 

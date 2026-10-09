@@ -9,7 +9,7 @@ import {
 } from 'node:fs'
 import { mkdtemp, open, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { basename, dirname, extname, join, relative, resolve, sep } from 'node:path'
+import { basename, dirname, extname, join, relative, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import {
   BrowserWindow,
@@ -37,9 +37,13 @@ import {
   type HeadlessExportTarget,
   installRendererProtocol,
   rendererUrl,
+  MAX_REMOTE_IMAGE_BYTES,
+  readBodyCapped,
+  printHtmlDocument,
+  type PrintDialogOutcome,
 } from '@genoffice/electron-utils'
 import { createI18n, getUiLang } from '@genoffice/i18n'
-import { generateImageTool } from '@genoffice/ai-search'
+import { generateImageTool, documentMediaRoots } from '@genoffice/ai-search'
 import { parseFileToText } from '@genoffice/file-parse'
 import { convertHtmlToDocx } from '../../../../packages/html2docx/src'
 import { atomicWriteFile } from './atomic-write'
@@ -47,7 +51,8 @@ import { ElectronBrowserDriver } from '../../../../packages/html2docx/src/driver
 import {
   copyImageIntoOwnedAssets,
   discardPendingOwnedAssets,
-  extractHtmlImageSources,
+  extractHtmlAssetReferences,
+  isInDocDir,
   pendingOwnedAssetsForDocument,
   prepareAssetsForSaveAs,
   reconcileOwnedAssets,
@@ -83,6 +88,8 @@ import type {
   ExportPdfRequest,
   ExportResult,
   ImageData,
+  PrintHtmlRequest,
+  PrintResult,
   SaveHtmlRequest,
   SaveHtmlResult,
   SaveMode,
@@ -136,6 +143,31 @@ const tDlg = createI18n({
     errParseFailed: 'Failed to parse file',
     errImageNoText: 'Image attachments have no text; the image is sent along with the user message',
     errNotImage: 'not a supported image type',
+  },
+  vi: {
+    dlgSaveTitle: 'Lưu tài liệu HTML',
+    filterHtml: 'Tài liệu HTML',
+    dlgPickImage: 'Chọn một hình ảnh',
+    filterImages: 'Hình ảnh',
+    untitledFile: 'Không có tiêu đề',
+    closeUnsavedMsg: 'Tài liệu này có những thay đổi chưa được lưu.',
+    closeUnsavedDetail: 'Bạn có muốn lưu các thay đổi trước khi đóng không?',
+    btnSave: 'Lưu',
+    btnDontSave: 'Không lưu',
+    btnCancel: 'Hủy',
+    dlgAddAttachment: 'Thêm tệp đính kèm',
+    filterSupported: 'Các tệp được hỗ trợ',
+    filterAll: 'Tất cả các tệp',
+    errUnsupportedExt: 'Tệp .{ext} không được hỗ trợ',
+    errNotFile: 'không phải là tệp',
+    errTooLarge: 'vượt quá giới hạn {mb}MB',
+    errImageTooLarge: 'hình ảnh vượt quá giới hạn 5MB',
+    errUnreadable: 'không thể đọc được',
+    errFileTooLarge: 'Tệp vượt quá giới hạn kích thước',
+    errParseFailed: 'Không thể phân tích tệp',
+    errImageNoText:
+      'Tệp đính kèm hình ảnh không có văn bản; hình ảnh được gửi cùng với tin nhắn của người dùng',
+    errNotImage: 'loại hình ảnh không được hỗ trợ',
   },
   ja: {
     dlgSaveTitle: 'HTML ドキュメントを保存',
@@ -562,30 +594,6 @@ const tDlg = createI18n({
       'छवि अनुलग्नक टेक्स्ट प्रदान नहीं करते; छवि उपयोगकर्ता संदेश के साथ भेजी जाती है, उसे सीधे देखें',
     errNotImage: 'समर्थित छवि प्रकार नहीं है',
   },
-  vi: {
-    dlgSaveTitle: 'Lưu tài liệu HTML',
-    filterHtml: 'Tài liệu HTML',
-    dlgPickImage: 'Chọn ảnh',
-    filterImages: 'Ảnh',
-    untitledFile: 'Chưa đặt tên',
-    closeUnsavedMsg: 'Tài liệu này có thay đổi chưa lưu.',
-    closeUnsavedDetail: 'Bạn có muốn lưu trước khi đóng không?',
-    btnSave: 'Lưu',
-    btnDontSave: 'Không lưu',
-    btnCancel: 'Hủy',
-    dlgAddAttachment: 'Thêm tệp đính kèm',
-    filterSupported: 'Tệp được hỗ trợ',
-    filterAll: 'Tất cả tệp',
-    errUnsupportedExt: 'Tệp .{ext} không được hỗ trợ',
-    errNotFile: 'không phải tệp',
-    errTooLarge: 'vượt quá giới hạn {mb}MB',
-    errImageTooLarge: 'ảnh vượt quá giới hạn 5MB',
-    errUnreadable: 'không đọc được',
-    errFileTooLarge: 'Tệp vượt quá giới hạn kích thước',
-    errParseFailed: 'Phân tích tệp thất bại',
-    errImageNoText: 'Tệp đính kèm ảnh không có văn bản; ảnh được gửi kèm tin nhắn của người dùng',
-    errNotImage: 'không phải loại ảnh được hỗ trợ',
-  },
   'zh-TW': {
     dlgSaveTitle: '儲存 HTML 文件',
     filterHtml: 'HTML 文件',
@@ -829,6 +837,10 @@ const previewTextByWc = new Map<number, string>()
 const closeSaveWaiters = new Map<number, (ok: boolean) => void>()
 /** Resolvers for menu-triggered saves, resolved when the renderer's save invoke completes */
 const saveWaiters = new Map<number, (ok: boolean) => void>()
+/** Resolvers for MCP reads of the live document source, resolved by the renderer's reply */
+const readTextWaiters = new Map<number, (result: { text: string } | { error: string }) => void>()
+/** one read per tab at a time: concurrent callers share this promise */
+const readTextInFlight = new Map<number, Promise<string>>()
 
 /** Fired after a save lands on a NEW path (untitled first save / Save As) — the shell syncs tab title, recents, projects */
 let fileSavedHook: ((wc: WebContents, path: string) => void) | null = null
@@ -915,6 +927,9 @@ function closePresentViewsOf(ownerWcId: number): void {
 
 /** A4 at 96dpi; html2docx re-measures at the authored width itself when the page asks for more. */
 const HTML2DOCX_VIEWPORT = { width: 794, height: 1123, deviceScaleFactor: 2 }
+// A renderer that never yields must not strand the export: watchdog destroys
+// the hidden conversion window.
+const HTML_EXPORT_TIMEOUT_MS = 180_000
 
 /** Print the document in a hidden script-free window (sheets-style). Relative assets
  * resolve through html-asset:// against the document's folder, exactly as in the preview. */
@@ -952,6 +967,19 @@ export function sendHtmlExportRequest(contents: WebContents, format: ExportForma
 export function sendHtmlPrintRequest(contents: WebContents): void {
   if (contents.isDestroyed() || presentOwnerByWc.has(contents.id)) return
   contents.send(HTML_CHANNELS.printRequest)
+}
+
+// Scripting stays on here, unlike the PDF export window: Chromium rejects
+// executeJavaScript under `javascript: false`, and the fonts/images readiness
+// probe needs it. Print and Export-PDF therefore differ for <script>-built content.
+function printHtml(html: string, docPath: string | undefined): Promise<PrintDialogOutcome> {
+  const base = docPath ? assetBaseHref(dirname(docPath)) : null
+  return printHtmlDocument({
+    html: buildPreviewDocument(html, base),
+    window: new BrowserWindow({ show: false, webPreferences: { sandbox: true } }),
+    fileName: 'print.html',
+    dirPrefix: 'genoffice-html-print-',
+  })
 }
 
 export function htmlIsDirty(webContentsId: number): boolean {
@@ -1022,6 +1050,20 @@ export async function requestHtmlClose(
   })
 }
 
+/**
+ * Drop assets staged next to the document but never written into it — the MCP
+ * "discard unsaved changes" path, same cleanup the interactive close prompt
+ * runs when the user picks "Don't Save".
+ */
+export async function htmlDiscardPendingAssets(contents: WebContents): Promise<void> {
+  const documentPath = savePathByWc.get(contents.id)
+  if (!documentPath) return
+  const discarded = await discardPendingOwnedAssets(documentPath)
+  if (discarded.errors.length > 0) {
+    console.warn('[html] pending asset discard incomplete:', discarded.errors)
+  }
+}
+
 /** Menu Save / Save As: ask the renderer to serialize and save; clean views resolve true immediately on plain save */
 export function requestHtmlSave(contents: WebContents, mode: SaveMode): Promise<boolean> {
   if (contents.isDestroyed()) return Promise.resolve(false)
@@ -1039,6 +1081,94 @@ export function requestHtmlSave(contents: WebContents, mode: SaveMode): Promise<
       resolve(ok)
     })
     contents.send(HTML_CHANNELS.saveRequest, mode)
+  })
+}
+
+/**
+ * Read the live document source for an MCP `open_documents` read. The buffer the
+ * renderer pushes for the preview is instrumented for the iframe, so it cannot
+ * be reused here: this asks for the saved serialization instead, unsaved edits
+ * included.
+ */
+export function htmlReadText(contents: WebContents): Promise<string> {
+  if (contents.isDestroyed()) return Promise.reject(new Error('the document is no longer open'))
+  const wcId = contents.id
+  const inFlight = readTextInFlight.get(wcId)
+  if (inFlight) return inFlight
+  const request = new Promise<string>((resolve, reject) => {
+    // The renderer registers its listener while mounting, which can land after
+    // the tab appears; a request sent before that is dropped silently. Re-send
+    // on an interval until the renderer answers, the way the shell's own
+    // control channel polls for a not-yet-ready editor.
+    let settled = false
+    const settle = (finish: () => void): void => {
+      if (settled) return
+      settled = true
+      clearInterval(retry)
+      clearTimeout(timer)
+      readTextWaiters.delete(wcId)
+      readTextInFlight.delete(wcId)
+      finish()
+    }
+    const retry = setInterval(() => {
+      if (contents.isDestroyed()) {
+        settle(() => reject(new Error('the document is no longer open')))
+        return
+      }
+      contents.send(HTML_CHANNELS.readTextRequest)
+    }, 250)
+    const timer = setTimeout(
+      () => settle(() => reject(new Error('timed out reading the document'))),
+      30_000,
+    )
+    readTextWaiters.set(wcId, (result) => {
+      settle(() => {
+        if ('text' in result) resolve(result.text)
+        else reject(new Error(result.error))
+      })
+    })
+    contents.send(HTML_CHANNELS.readTextRequest)
+  })
+  readTextInFlight.set(wcId, request)
+  return request
+}
+
+/**
+ * Save the live document to `filePath` with no dialog — the MCP close path
+ * ("save before closing"). Pointing the view's save target at `filePath` first
+ * keeps `resolveSaveTarget` from opening the save dialog, so the renderer's
+ * normal save runs unattended.
+ */
+export function htmlSaveToPath(contents: WebContents, filePath: string): Promise<void> {
+  if (contents.isDestroyed()) return Promise.reject(new Error('the document is no longer open'))
+  const wcId = contents.id
+  const previousPath = savePathByWc.get(wcId)
+  const previousOpenPath = openPathByWc.get(wcId)
+  savePathByWc.set(wcId, filePath)
+  const allowed = allowedByWc.get(wcId) ?? new Set<string>()
+  allowed.add(filePath)
+  allowedByWc.set(wcId, allowed)
+  return new Promise<void>((resolve, reject) => {
+    const restore = (): void => {
+      if (previousPath === undefined) savePathByWc.delete(wcId)
+      else savePathByWc.set(wcId, previousPath)
+      if (previousOpenPath === undefined) openPathByWc.delete(wcId)
+      else openPathByWc.set(wcId, previousOpenPath)
+    }
+    const timer = setTimeout(() => {
+      saveWaiters.delete(wcId)
+      restore()
+      reject(new Error('timed out saving the document'))
+    }, 120_000)
+    saveWaiters.set(wcId, (ok) => {
+      clearTimeout(timer)
+      if (ok) resolve()
+      else {
+        restore()
+        reject(new Error('could not save the document'))
+      }
+    })
+    contents.send(HTML_CHANNELS.saveRequest, 'save')
   })
 }
 
@@ -1107,7 +1237,7 @@ function registerImageProtocol(): void {
     let inDocDir = false
     for (const doc of new Set([...openPathByWc.values(), ...savePathByWc.values()])) {
       const dir = resolve(dirname(doc))
-      if (target === dir || !target.startsWith(dir + sep)) continue
+      if (!isInDocDir(target, dir)) continue
       if (await resolveSafeRelativeImagePath(doc, relative(dir, target))) {
         inDocDir = true
         break
@@ -1279,7 +1409,7 @@ function registerHtmlIpc(): void {
         const isNewPath = currentPath !== target
         const imageSources = [...(request.imageSources ?? [])]
         const knownImageSources = new Set(imageSources)
-        for (const source of extractHtmlImageSources(request.text)) {
+        for (const source of extractHtmlAssetReferences(request.text)) {
           if (knownImageSources.has(source)) continue
           knownImageSources.add(source)
           imageSources.push(source)
@@ -1440,11 +1570,20 @@ function registerHtmlIpc(): void {
   // shell-registered, but image generation is gated per app
   ipcMain.handle(
     HTML_CHANNELS.aiGenerateImage,
-    (_e, op: { prompt?: unknown; aspectRatio?: unknown }) =>
-      generateImageTool(join(app.getPath('userData'), 'ai-settings.json'), {
-        prompt: String(op?.prompt ?? ''),
-        aspectRatio: op?.aspectRatio ? String(op.aspectRatio) : undefined,
-      }),
+    (e, op: { prompt?: unknown; aspectRatio?: unknown }) =>
+      generateImageTool(
+        join(app.getPath('userData'), 'ai-settings.json'),
+        {
+          prompt: String(op?.prompt ?? ''),
+          aspectRatio: op?.aspectRatio ? String(op.aspectRatio) : undefined,
+        },
+        {
+          mediaRoots: documentMediaRoots(
+            htmlFilePath(e.sender.id),
+            join(app.getPath('temp'), 'genoffice-pasted'),
+          ),
+        },
+      ),
   )
 
   const MIME_BY_EXT: Record<string, ImageData['mime']> = {
@@ -1483,7 +1622,8 @@ function registerHtmlIpc(): void {
         : ct.includes('gif')
           ? 'image/gif'
           : 'image/jpeg'
-      return { base64: Buffer.from(await resp.arrayBuffer()).toString('base64'), mime }
+      const bytes = await readBodyCapped(resp, MAX_REMOTE_IMAGE_BYTES)
+      return { base64: Buffer.from(bytes).toString('base64'), mime }
     } catch {
       return null
     }
@@ -1524,7 +1664,24 @@ function registerHtmlIpc(): void {
         const htmlPath = join(workDir, 'export.html')
         await writeFile(htmlPath, buildPreviewDocument(request.html, base), 'utf8')
         driver = await ElectronBrowserDriver.create(HTML2DOCX_VIEWPORT)
-        const { docx } = await convertHtmlToDocx({ url: pathToFileURL(htmlPath).href }, driver)
+        // AI-generated markup with a script that never yields keeps
+        // executeJavaScript pending forever, which would strand the hidden
+        // window and this handler; race a watchdog and destroy the window on
+        // timeout (same shape as the slides export guard).
+        const conversion = convertHtmlToDocx({ url: pathToFileURL(htmlPath).href }, driver).then(
+          ({ docx }) => docx,
+        )
+        let watchdog: ReturnType<typeof setTimeout> | undefined
+        const docx = await Promise.race([
+          conversion,
+          new Promise<Uint8Array>((_, reject) => {
+            watchdog = setTimeout(() => {
+              if (driver && !driver.isWindowDestroyed()) driver.destroyNow()
+              driver = null
+              reject(new Error('html export timed out'))
+            }, HTML_EXPORT_TIMEOUT_MS)
+          }),
+        ]).finally(() => clearTimeout(watchdog))
         await writeFile(picked.filePath, docx)
         openExportedDocx(picked.filePath)
         return { ok: true, path: picked.filePath }
@@ -1574,6 +1731,20 @@ function registerHtmlIpc(): void {
   )
 
   ipcMain.handle(
+    HTML_CHANNELS.printHtml,
+    async (e, request: PrintHtmlRequest): Promise<PrintResult> => {
+      if (typeof request?.html !== 'string') {
+        return { ok: false, error: 'html: bad print request' }
+      }
+      // printHtml already reports why it failed and separates a dialog the
+      // user closed from a real failure, so the outcome maps straight onto
+      // PrintResult: the renderer can stay silent on cancel and must surface
+      // a failure instead of swallowing it.
+      return printHtml(request.html, savePathByWc.get(e.sender.id))
+    },
+  )
+
+  ipcMain.handle(
     HTML_CHANNELS.exportHtml,
     async (e, request: ExportHtmlRequest): Promise<ExportResult> => {
       if (typeof request?.html !== 'string') {
@@ -1601,10 +1772,12 @@ function registerHtmlIpc(): void {
         return { ok: false, error: 'single-file export cannot overwrite the open document' }
       }
       try {
-        const { html } = await inlineImagesForSingleFile(request.html, docPath)
+        const { html, skipped } = await inlineImagesForSingleFile(request.html, docPath)
         await writeFile(picked.filePath, html, 'utf8')
         if (!isHeadlessMode()) shell.showItemInFolder(picked.filePath)
-        return { ok: true, path: picked.filePath }
+        return skipped.length
+          ? { ok: true, path: picked.filePath, skipped }
+          : { ok: true, path: picked.filePath }
       } catch (err) {
         return { ok: false, error: err instanceof Error ? err.message : String(err) }
       }
@@ -1626,6 +1799,17 @@ function registerHtmlIpc(): void {
     const waiter = closeSaveWaiters.get(e.sender.id)
     closeSaveWaiters.delete(e.sender.id)
     waiter?.(ok === true)
+  })
+
+  ipcMain.on(HTML_CHANNELS.readTextResult, (e, result: unknown) => {
+    const waiter = readTextWaiters.get(e.sender.id)
+    readTextWaiters.delete(e.sender.id)
+    if (!waiter) return
+    if (result && typeof result === 'object' && 'text' in result) {
+      waiter({ text: String((result as { text: unknown }).text) })
+    } else {
+      waiter({ error: 'the document could not be read' })
+    }
   })
 
   // safety net for menu saves the renderer declined without invoking save()

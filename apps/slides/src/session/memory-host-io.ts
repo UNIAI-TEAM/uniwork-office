@@ -37,16 +37,17 @@ export class MemoryHostIO implements HostIO {
   readonly recentPaths: string[] = []
   readonly calls: MemoryHostCall[] = []
 
-  private readonly markers = new Set<string>()
+  private readonly markers = new Map<string, string>()
   clipboardImage: Uint8Array | null = null
   clipboardText = ''
 
   readonly clipboard = {
-    writeMarker: (format: string): void => {
+    writeMarker: (format: string, value = '1'): void => {
       this.calls.push({ kind: 'clipboard.writeMarker', detail: format })
-      this.markers.add(format)
+      this.markers.set(format, value)
     },
-    hasMarker: (format: string): boolean => this.markers.has(format),
+    hasMarker: (format: string, value?: string): boolean =>
+      this.markers.has(format) && (value === undefined || this.markers.get(format) === value),
     readImagePng: (): Uint8Array | null => this.clipboardImage,
     hasImage: (): boolean => this.clipboardImage !== null,
     readText: (): string => this.clipboardText,
@@ -67,6 +68,15 @@ export class MemoryHostIO implements HostIO {
   async pickMedia(kind: MediaPickKind): Promise<PickedFile | null> {
     this.calls.push({ kind: 'pickMedia', detail: kind })
     return this.mediaPicks.shift() ?? null
+  }
+
+  /** Files readable through readPath (drop targets) */
+  readonly paths = new Map<string, Uint8Array>()
+
+  async readPath(path: string): Promise<Uint8Array> {
+    const bytes = this.paths.get(path)
+    if (!bytes) throw new Error(`no file ${path}`)
+    return bytes
   }
 
   async imageSize(): Promise<{ width: number; height: number } | null> {

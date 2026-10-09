@@ -6,23 +6,72 @@ import type {
   AddElementOp,
   BatchEditTransformOp,
   DeleteElementOp,
+  DeleteElementsOp,
   DuplicateElementsOp,
   EditConnectorEndpointsOp,
   EditFillOp,
   EditStrokeOp,
   EditTransformOp,
+  EditTransformMultiOp,
   FlipElementOp,
   GroupElementsOp,
   ReorderElementOp,
   SetEffectsPatch,
+  SetShapeGeometryOp,
   UngroupElementOp,
 } from '../../shared/ipc'
 import type { Paragraph } from '@genoffice/pptx-engine'
 import { gradientFillTo, gradientPathKind, gradientStops } from '../fill'
 import type { HandlerContext } from '../host-io'
 import { rebuildSlide } from '../render'
-import { pushHistory, sessions } from '../state'
+import { pushHistory, sessions, type Session } from '../state'
 import { journaledTxn, sessionTxn } from '../txn'
+
+// px→EMU (inverting the viewport scale) for one setTransform. In-group editing: the
+// pixel box is in group-local coords (with ext/chExt scaling baked in); divide out
+// the group scale first, then convert back to the child EMU coordinate system.
+const transformPayload = (
+  session: Session,
+  slideIndex: number,
+  fitWidthPx: number,
+  item: Omit<EditTransformOp, 'slideIndex' | 'fitWidthPx' | 'preview'>,
+) => {
+  const slide = session.opened.deck.slides[slideIndex]
+  if (!slide) return null
+  const childId = item.groupId
+    ? resolveGroupChildId(slide, item.groupId, item.sourceId)
+    : item.sourceId
+  const grpChild = item.groupId ? findGroupChild(slide, item.groupId, childId) : null
+  if (item.groupId && !grpChild) return null
+  const baseWidthPx = session.opened.deck.size.cx / EMU_PER_PX_96
+  const scale = fitWidthPx / baseWidthPx
+  const toEmu = (px: number) => Math.round((px / scale) * EMU_PER_PX_96)
+  let box: { x: number; y: number; cx: number; cy: number }
+  if (grpChild) {
+    const ch = grpChild.grp.childOffset
+    const chX = ch?.x ?? grpChild.grp.transform.offset.x
+    const chY = ch?.y ?? grpChild.grp.transform.offset.y
+    const gExt = grpChild.grp.transform.offset
+    const gsx = ch?.cx ? gExt.cx / ch.cx : 1
+    const gsy = ch?.cy ? gExt.cy / ch.cy : 1
+    box = {
+      x: toEmu(item.xPx / gsx) + chX,
+      y: toEmu(item.yPx / gsy) + chY,
+      cx: toEmu(item.wPx / gsx),
+      cy: toEmu(item.hPx / gsy),
+    }
+  } else {
+    box = { x: toEmu(item.xPx), y: toEmu(item.yPx), cx: toEmu(item.wPx), cy: toEmu(item.hPx) }
+  }
+  return {
+    op: 'setTransform' as const,
+    target: { slide: slideIndex, el: item.sourceId },
+    box,
+    rotDeg: item.rotationDeg,
+    // Tables redistribute gridCol widths / tr heights so the file matches the frame
+    ...(item.groupId ? { group: item.groupId } : { resizeTableGrid: true }),
+  }
+}
 
 export const elementHandlers = {
   'slides:add-element': (ctx: HandlerContext, op: AddElementOp) => {
@@ -53,6 +102,7 @@ export const elementHandlers = {
                 },
               }
             : {}),
+          ...(op.bodyPr ? { bodyPr: op.bodyPr } : {}),
         },
       ],
     })
@@ -61,46 +111,13 @@ export const elementHandlers = {
     return rebuilt ? { slide: rebuilt, sourceId: r.records![0]!.created![0]! } : null
   },
 
-  // Shim over the canonical setTransform op. Preview-gesture undo bookkeeping and the
-  // px→EMU (and group-local scale) translation are surface concerns and stay here.
+  // Shim over the canonical setTransform op. Preview-gesture undo bookkeeping is a
+  // surface concern and stays here.
   'slides:edit-transform': (ctx: HandlerContext, op: EditTransformOp) => {
     const session = sessions.get(ctx.clientId)
     if (!session) return null
-    const slide = session.opened.deck.slides[op.slideIndex]
-    if (!slide) return null
-    const childId = op.groupId ? resolveGroupChildId(slide, op.groupId, op.sourceId) : op.sourceId
-    const grpChild = op.groupId ? findGroupChild(slide, op.groupId, childId) : null
-    if (op.groupId && !grpChild) return null
-    // px -> EMU (inverting the viewport scale)
-    const baseWidthPx = session.opened.deck.size.cx / EMU_PER_PX_96
-    const scale = op.fitWidthPx / baseWidthPx
-    const toEmu = (px: number) => Math.round((px / scale) * EMU_PER_PX_96)
-    // In-group editing: the pixel box is in group-local coords (with ext/chExt scaling baked in); divide out the group scale first, then convert back to the child EMU coordinate system
-    let box: { x: number; y: number; cx: number; cy: number }
-    if (grpChild) {
-      const ch = grpChild.grp.childOffset
-      const chX = ch?.x ?? grpChild.grp.transform.offset.x
-      const chY = ch?.y ?? grpChild.grp.transform.offset.y
-      const gExt = grpChild.grp.transform.offset
-      const gsx = ch?.cx ? gExt.cx / ch.cx : 1
-      const gsy = ch?.cy ? gExt.cy / ch.cy : 1
-      box = {
-        x: toEmu(op.xPx / gsx) + chX,
-        y: toEmu(op.yPx / gsy) + chY,
-        cx: toEmu(op.wPx / gsx),
-        cy: toEmu(op.hPx / gsy),
-      }
-    } else {
-      box = { x: toEmu(op.xPx), y: toEmu(op.yPx), cx: toEmu(op.wPx), cy: toEmu(op.hPx) }
-    }
-    const payload = {
-      op: 'setTransform',
-      target: { slide: op.slideIndex, el: op.sourceId },
-      box,
-      rotDeg: op.rotationDeg,
-      // Tables redistribute gridCol widths / tr heights so the file matches the frame
-      ...(op.groupId ? { group: op.groupId } : { resizeTableGrid: true }),
-    }
+    const payload = transformPayload(session, op.slideIndex, op.fitWidthPx, op)
+    if (!payload) return null
     // Validate BEFORE the preview bookkeeping: a failed first preview must not set
     // transformPreview (later frames would skip pushHistory and the eventual commit
     // would lose its undo step) and must not clear the redo stack.
@@ -439,5 +456,76 @@ export const elementHandlers = {
     session.fitWidthPx = op.fitWidthPx
     const rebuilt = rebuildSlide(session, op.slideIndex)
     return rebuilt ? { slide: rebuilt, sourceIds: r.records![0]!.created! } : null
+  },
+  // A multi-selection nudge/rotate: every item commits exactly like edit-transform,
+  // the whole batch is one undo step (PowerPoint undoes the action, not each shape).
+  'slides:edit-transform-multi': (ctx: HandlerContext, op: EditTransformMultiOp) => {
+    const session = sessions.get(ctx.clientId)
+    if (!session) return null
+    const ops: NonNullable<ReturnType<typeof transformPayload>>[] = []
+    for (const item of op.items) {
+      const payload = transformPayload(session, op.slideIndex, op.fitWidthPx, item)
+      if (!payload) return null
+      ops.push(payload)
+    }
+    if (!ops.length) return null
+    const r = sessionTxn(session, { ops })
+    return r ? rebuildSlide(session, op.slideIndex) : null
+  },
+
+  // Whole-selection delete as one undo step. per_op mirrors the old per-element
+  // loop: an id that already vanished is skipped instead of aborting the rest.
+  'slides:delete-elements': (ctx: HandlerContext, op: DeleteElementsOp) => {
+    const session = sessions.get(ctx.clientId)
+    if (!session || !op.sourceIds.length) return null
+    const r = sessionTxn(session, {
+      isolation: 'per_op',
+      ops: op.sourceIds.map((id) => ({
+        op: 'deleteElement' as const,
+        target: { slide: op.slideIndex, el: id },
+      })),
+    })
+    return r ? rebuildSlide(session, op.slideIndex) : null
+  },
+
+  // Edit Points: same gesture-undo contract as set-shape-adjust (one drag = one undo step)
+  'slides:set-shape-geometry': (ctx: HandlerContext, op: SetShapeGeometryOp) => {
+    const session = sessions.get(ctx.clientId)
+    if (!session) return null
+    const scale = op.fitWidthPx / (session.opened.deck.size.cx / EMU_PER_PX_96)
+    const toEmu = (px: number) => Math.round((px / scale) * EMU_PER_PX_96)
+    const payload = {
+      op: 'setShapeCustomGeometry',
+      target: { slide: op.slideIndex, el: op.sourceId },
+      path: {
+        w: toEmu(op.pathPx.w),
+        h: toEmu(op.pathPx.h),
+        cmds: op.pathPx.cmds.map((c) => ({ op: c.op, pts: c.pts.map(toEmu) })),
+      },
+      ...(op.groupId ? { group: op.groupId } : {}),
+    }
+    if (runTxn(session.opened, { dryRun: true, ops: [payload] }).failures?.length) return null
+    let pushed = false
+    if (op.preview) {
+      if (!session.transformPreview) {
+        pushHistory(session)
+        session.transformPreview = true
+        pushed = true
+      }
+    } else if (session.transformPreview) {
+      session.transformPreview = false
+    } else {
+      pushHistory(session)
+      pushed = true
+    }
+    const r = journaledTxn(session, 'edit', { ops: [payload] })
+    if (!r.applied) {
+      if (pushed) {
+        session.undoStack.pop()
+        if (op.preview) session.transformPreview = false
+      }
+      return null
+    }
+    return rebuildSlide(session, op.slideIndex)
   },
 }

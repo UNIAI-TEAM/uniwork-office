@@ -23,7 +23,6 @@ export const cs = {
   aiQcPageSkipped: 'Stránka {n}: automatická kontrola rozložení přeskočena',
   aiQcStopped: 'Kontrola rozložení zastavena',
   aiQcCapped: 'Dalších {count} stránek nebylo zkontrolováno (limit na jedno spuštění)',
-  aiGskLoginBtn: 'Přihlásit se ke UniWork',
   aiPanelTitle: 'uniAI',
   aiOpenAssistant: 'Otevřít asistenta AI',
   aiFactCheckBtn: 'Ověření faktů AI',
@@ -140,6 +139,7 @@ export const cs = {
   aiClarifyOther: 'Jiné (napsat)',
   aiClarifySkip: 'Přeskočit dotazník',
   aiClarifyNext: 'Další',
+  aiClarifyPrev: 'Předchozí',
   aiClarifySubmit: 'Generovat',
   aiSumReadAttachment: 'Přečtena příloha',
   aiSumReadAttachmentName: 'Přečtena příloha {name}',
@@ -228,4 +228,5 @@ export const cs = {
   aiSumSaveTemplate: 'Uložena šablona stylu „{name}“',
   aiSumTemplatesEmpty: 'Šablony stylu (prázdné)',
   aiSumListTemplates: 'Vypsáno šablon stylu: {count}',
+  aiPageCloudToLocal: 'Cloud není dostupný — vygenerováno lokálně',
 } satisfies Record<keyof typeof zh, string>

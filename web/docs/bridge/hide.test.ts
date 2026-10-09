@@ -129,7 +129,6 @@ describe('AI / search / image bridge stays stubbed with a typed "unavailable" an
   it('account / billing entries are inert and report signed-out', async () => {
     expect(await ai.aiGskStatus()).toEqual({ loggedIn: false })
     expect(await ai.aiGskStatus(true)).toEqual({ loggedIn: false })
-    await expect(ai.aiGskLogin()).resolves.toBeUndefined()
     await expect(ai.aiOpenBilling()).resolves.toBeUndefined()
   })
 

@@ -40,7 +40,7 @@ export async function exportViaApp(
   const launch = appLaunch(env)
   if (!launch) {
     throw new CliError(EXIT.app, 'UniWork Office app not found (needed for this conversion)', {
-      hint: 'install GenOffice, or set GENOFFICE_APP_BIN to its executable',
+      hint: 'install UniWork Office, or set GENOFFICE_APP_BIN to its executable',
     })
   }
   const args = [
@@ -55,41 +55,61 @@ export async function exportViaApp(
   ]
   const childEnv = { ...env }
   delete childEnv.ELECTRON_RUN_AS_NODE
-  opts.log?.(`starting GenOffice for ${target} export`)
+  opts.log?.(`starting UniWork Office for ${target} export`)
   const spawn = opts.spawn ?? nodeSpawn
   const child = spawn(launch.command, args, { env: childEnv, stdio: ['ignore', 'pipe', 'pipe'] })
-  const { code, stdout, stderr, timedOut } = await waitFor(
+  const { code, signal, stdout, stderr, timedOut } = await waitFor(
     child,
     opts.timeoutMs ?? DEFAULT_TIMEOUT_MS,
     opts.killGraceMs ?? 2000,
   )
   const envelope = parseEnvelope(stdout)
-  const exported = envelope?.status === 'ok' && existsSync(outputPath)
-  if (exported && (code === 0 || timedOut)) {
-    if (timedOut) opts.log?.('export finished but GenOffice had to be terminated on quit')
+  // The envelope is printed after the file is written and every teardown the
+  // export owns is done; a crash or kill during Electron's own quit must not
+  // turn a finished export into a failure.
+  if (envelope?.status === 'ok' && existsSync(outputPath)) {
+    if (timedOut) opts.log?.('export finished but UniWork Office had to be terminated on quit')
+    else if (code !== 0)
+      opts.log?.(`export finished but UniWork Office ${describeExit(code, signal)} while quitting`)
     return { outputPath, summary: envelope.summary ?? `exported to ${outputPath}` }
   }
   if (timedOut) {
     throw new CliError(
       EXIT.conversion,
-      `GenOffice did not finish the export within ${Math.round((opts.timeoutMs ?? DEFAULT_TIMEOUT_MS) / 1000)}s`,
+      `UniWork Office did not finish the export within ${Math.round((opts.timeoutMs ?? DEFAULT_TIMEOUT_MS) / 1000)}s`,
       {
         app: launch.command,
       },
     )
   }
   const tail = stderr.trim().split('\n').filter(Boolean).slice(-3).join(' ')
+  if (!envelope && (signal || code === null)) {
+    throw new CliError(
+      EXIT.app,
+      `UniWork Office ${describeExit(code, signal)} while exporting ${input}${tail ? `: ${tail}` : ''}`,
+      { app: launch.command, exit_code: code, signal },
+      {
+        reason: 'app_crashed',
+        suggestion:
+          'retry once; if it crashes again, report it with the document and the crash log (macOS: ~/Library/Logs/DiagnosticReports)',
+      },
+    )
+  }
   const message =
     envelope?.error ??
     envelope?.summary ??
     (tail ||
       (code === 0
-        ? 'GenOffice exited without writing the file; this GenOffice version may not support --headless-export'
-        : `GenOffice exited with code ${code}`))
+        ? 'UniWork Office exited without writing the file; this UniWork Office version may not support --headless-export'
+        : `UniWork Office exited with code ${code}`))
   throw new CliError(exitCodeFor(code), message, {
     app: launch.command,
     exit_code: code,
   })
+}
+
+function describeExit(code: number | null, signal: NodeJS.Signals | null): string {
+  return signal ? `crashed (${signal})` : `exited with code ${code}`
 }
 
 /** The app's HEADLESS_EXIT codes: 1 bad args, 2 input error, 3 conversion failure. */
@@ -129,7 +149,13 @@ function waitFor(
   child: ChildProcess,
   timeoutMs: number,
   killGraceMs: number,
-): Promise<{ code: number | null; stdout: string; stderr: string; timedOut: boolean }> {
+): Promise<{
+  code: number | null
+  signal: NodeJS.Signals | null
+  stdout: string
+  stderr: string
+  timedOut: boolean
+}> {
   return new Promise((resolve) => {
     let stdout = ''
     let stderr = ''
@@ -137,13 +163,13 @@ function waitFor(
     let timedOut = false
     child.stdout?.on('data', (d) => (stdout += String(d)))
     child.stderr?.on('data', (d) => (stderr += String(d)))
-    const finish = (code: number | null) => {
+    const finish = (code: number | null, signal: NodeJS.Signals | null = null) => {
       if (settled) return
       settled = true
       clearTimeout(timer)
       child.stdout?.destroy()
       child.stderr?.destroy()
-      resolve({ code, stdout, stderr, timedOut })
+      resolve({ code, signal, stdout, stderr, timedOut })
     }
     // On timeout: ask Electron to quit (it tears its children down), give it
     // a grace period, then kill; only report once the process is gone, so the
@@ -161,10 +187,10 @@ function waitFor(
       stderr += `\n${err.message}`
       finish(null)
     })
-    child.once('close', (code) => finish(code))
+    child.once('close', (code, signal) => finish(code, signal))
     // `close` waits for every stdio handle to reach EOF, and Electron's renderer
     // and GPU helpers can hold the inherited pipes open after the main process
     // has printed the envelope and exited; settle shortly after `exit` instead.
-    child.once('exit', (code) => setTimeout(() => finish(code), STDIO_DRAIN_MS))
+    child.once('exit', (code, signal) => setTimeout(() => finish(code, signal), STDIO_DRAIN_MS))
   })
 }

@@ -5,7 +5,6 @@ export const de = {
   aiEmptyBuildTitle: 'Lass die KI diese Arbeitsmappe für dich aufbauen',
   aiEmptyBuildBody:
     'Beschreibe die gewünschte Tabelle, Daten oder Diagramme — die KI erstellt sie direkt.',
-  aiGskLoginBtn: 'Bei UniWork anmelden',
   aiUndelivered: 'Nicht gesendet',
   aiRetry: 'Erneut versuchen',
   aiOpenAssistant: 'KI-Assistenten öffnen',
@@ -50,13 +49,6 @@ export const de = {
   aiFileTooltip:
     'SHA-256 {sha}\nBeim Speichern werden nur die bearbeiteten Einträge neu geschrieben; alles andere bleibt erhalten.',
   aiFileMeta: '{sheets} Blätter · {entries} Einträge',
-  aiGensparkAccount: 'UniWork-Konto',
-  aiAccountChecking: 'Wird überprüft…',
-  aiLoggedIn: 'Angemeldet',
-  aiLoggedInAs: 'Angemeldet: {email}',
-  aiNotLoggedIn: 'Nicht angemeldet (KI-Funktionen erfordern ein UniWork-Konto)',
-  aiWaitingBrowserLogin: 'Warten auf Anmeldung im Browser…',
-  aiLoginGenspark: 'Bei UniWork anmelden',
   aiModel: 'Modell',
   aiCancel: 'Abbrechen',
   aiSave: 'Speichern',

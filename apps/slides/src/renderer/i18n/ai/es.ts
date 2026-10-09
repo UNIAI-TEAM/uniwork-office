@@ -22,7 +22,6 @@ export const es = {
   aiQcPageSkipped: 'Página {n}: comprobación automática de diseño omitida',
   aiQcStopped: 'Comprobación de diseño detenida',
   aiQcCapped: '{count} página(s) más sin comprobar (límite por ejecución)',
-  aiGskLoginBtn: 'Iniciar sesión en UniWork',
   aiPanelTitle: 'uniAI',
   aiOpenAssistant: 'Abrir el asistente de IA',
   aiFactCheckBtn: 'Verificación IA',
@@ -142,6 +141,7 @@ export const es = {
   aiClarifyOther: 'Otro (escríbelo)',
   aiClarifySkip: 'Omitir encuesta',
   aiClarifyNext: 'Siguiente',
+  aiClarifyPrev: 'Anterior',
   aiClarifySubmit: 'Generar',
   aiSumReadAttachment: 'Leer datos adjuntos',
   aiSumReadAttachmentName: 'Leer archivo adjunto {name}',
@@ -230,4 +230,5 @@ export const es = {
   aiSumSaveTemplate: 'Plantilla de estilo "{name}" guardada',
   aiSumTemplatesEmpty: 'Plantillas de estilo (vacío)',
   aiSumListTemplates: 'Se enumeraron {count} plantillas de estilo',
+  aiPageCloudToLocal: 'Nube no disponible — generado localmente',
 } satisfies Record<keyof typeof zh, string>

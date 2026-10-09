@@ -1,14 +1,14 @@
-import { writeFileSync } from 'node:fs'
+import { realpathSync } from 'node:fs'
 import { basename, dirname, extname, join } from 'node:path'
 import { PdfLoadError } from '@genoffice/pdf2docx'
 import { flagBool, flagString, type ParsedArgs } from '../args'
-import { csvToXlsx } from '../formats/csv'
+import { csvToXlsx, sheetNameFromStem } from '../formats/csv'
 import { convertPdf, type PdfTarget } from '../formats/pdf'
 import { convertLegacyWorkbook, sheetToCsv } from '../formats/xlsx'
 import { exportViaApp, type AppExportTarget } from '../formats/app-export'
 import { htmlToMarkdown, markdownToDocx, markdownToHtml } from '../formats/markdown'
 import { closeDocument, documentHtml, openDocument } from '../formats/docx'
-import { extension, readInput, resolveInput, resolveOutput } from '../fs'
+import { extension, readInput, resolveInput, resolveOutput, writeOutput } from '../fs'
 import type { CommandContext, CommandDef } from '../registry'
 import { CliError, EXIT } from '../result'
 
@@ -75,12 +75,18 @@ export const convertCommand: CommandDef = {
     const input = resolveInput(args.positionals[0], ctx)
     const from = extension(input)
     const to = flagString(args, 'to')?.toLowerCase()
-    if (!to) throw new CliError(EXIT.usage, 'missing --to <format>')
+    if (!to)
+      throw new CliError(EXIT.usage, 'missing --to <format>', undefined, {
+        reason: 'missing_argument',
+      })
     const targets = ROUTES[from]
     if (!targets?.includes(to)) {
-      throw new CliError(EXIT.usage, `cannot convert .${from} to .${to}`, {
-        supported: describeRoutes(),
-      })
+      throw new CliError(
+        EXIT.usage,
+        `cannot convert .${from} to .${to}`,
+        { supported: describeRoutes() },
+        { reason: 'unsupported', suggestion: 'pick a route from detail.supported' },
+      )
     }
     // before run(): the sidecar and app routes write the output themselves
     const output = resolveOutput(flagString(args, 'out'), ctx, {
@@ -88,14 +94,36 @@ export const convertCommand: CommandDef = {
       force: flagBool(args, 'force'),
       fresh: true,
     })
+    if (samePath(input, output))
+      throw new CliError(
+        EXIT.usage,
+        `output path must differ from the input: ${output}`,
+        undefined,
+        {
+          reason: 'invalid_argument',
+          suggestion: 'pass a different --out',
+        },
+      )
     const result = await run(input, from, to, output, args, ctx)
-    if (result.bytes) writeFileSync(output, result.bytes)
+    if (result.bytes) writeOutput(output, result.bytes)
     return {
       summary: `converted ${basename(input)} → ${basename(output)}`,
       outputPath: output,
       detail: result.detail,
     }
   },
+}
+
+function samePath(a: string, b: string): boolean {
+  const real = (p: string) => {
+    try {
+      return realpathSync.native(p)
+    } catch {
+      return join(realpathSync.native(dirname(p)), basename(p))
+    }
+  }
+  const [x, y] = [real(a), real(b)]
+  return process.platform === 'win32' ? x.toLowerCase() === y.toLowerCase() : x === y
 }
 
 interface Produced {
@@ -141,7 +169,7 @@ async function run(
     return { bytes: await markdownToDocx(text, { file: input, ctx }), detail: { title } }
   }
   if (from === 'csv') {
-    const sheet = basename(input, extname(input)).slice(0, 31) || 'Sheet1'
+    const sheet = sheetNameFromStem(basename(input, extname(input)))
     return { bytes: await csvToXlsx(readInput(input), sheet), detail: { sheet } }
   }
   if (to === 'csv') {
@@ -154,6 +182,13 @@ async function run(
     try {
       const exported = documentHtml(doc)
       const markdown = await htmlToMarkdown(exported.html)
+      if (exported.skipped.images > 0) {
+        ctx.warn({
+          code: 'images_dropped',
+          message: `${exported.skipped.images} image(s) have no Markdown form and were dropped`,
+          suggestion: 'use `genoffice docs read --html` when the images matter',
+        })
+      }
       return {
         bytes: Buffer.from(markdown.replace(/\n{3,}/g, '\n\n').trimEnd() + '\n', 'utf-8'),
         detail: {

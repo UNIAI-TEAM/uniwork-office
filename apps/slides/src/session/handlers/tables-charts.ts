@@ -30,6 +30,7 @@ export const tableChartHandlers = {
     const baseWidthPx = session.opened.deck.size.cx / EMU_PER_PX_96
     const scale = op.fitWidthPx / baseWidthPx
     const toEmu = (px: number) => Math.round((px / scale) * EMU_PER_PX_96)
+    const rowH = op.rowHeightEmu && op.rowHeightEmu > 0 ? Math.round(op.rowHeightEmu) : null
     const r = sessionTxn(session, {
       ops: [
         {
@@ -37,7 +38,13 @@ export const tableChartHandlers = {
           target: { slide: op.slideIndex },
           rows: op.rows,
           cols: op.cols,
-          offset: { x: toEmu(op.xPx), y: toEmu(op.yPx), cx: toEmu(op.wPx), cy: toEmu(op.hPx) },
+          offset: {
+            x: toEmu(op.xPx),
+            y: toEmu(op.yPx),
+            cx: toEmu(op.wPx),
+            cy: rowH ? rowH * op.rows : toEmu(op.hPx),
+          },
+          ...(rowH ? { rowHeightsEmu: Array.from({ length: op.rows }, () => rowH) } : {}),
         },
       ],
     })

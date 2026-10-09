@@ -22,7 +22,6 @@ export const th = {
   aiQcPageSkipped: 'หน้า {n}: ข้ามการตรวจสอบเลย์เอาต์อัตโนมัติ',
   aiQcStopped: 'หยุดการตรวจสอบเลย์เอาต์แล้ว',
   aiQcCapped: 'อีก {count} หน้าไม่ได้ตรวจสอบ (ขีดจำกัดต่อครั้ง)',
-  aiGskLoginBtn: 'ลงชื่อเข้าใช้ UniWork',
   aiPanelTitle: 'uniAI',
   aiOpenAssistant: 'เปิดผู้ช่วย AI',
   aiFactCheckBtn: 'ตรวจสอบข้อเท็จจริง AI',
@@ -137,6 +136,7 @@ export const th = {
   aiClarifyOther: 'อื่น ๆ (พิมพ์เอง)',
   aiClarifySkip: 'ข้ามแบบสอบถาม',
   aiClarifyNext: 'ถัดไป',
+  aiClarifyPrev: 'ก่อนหน้า',
   aiClarifySubmit: 'สร้าง',
   aiSumReadAttachment: 'อ่านสิ่งที่แนบ',
   aiSumReadAttachmentName: 'อ่านสิ่งที่แนบ {name}',
@@ -225,4 +225,5 @@ export const th = {
   aiSumSaveTemplate: 'บันทึกเทมเพลตสไตล์ "{name}"',
   aiSumTemplatesEmpty: 'รายการเทมเพลตสไตล์ (ว่าง)',
   aiSumListTemplates: 'แสดงเทมเพลตสไตล์ {count} รายการ',
+  aiPageCloudToLocal: 'คลาวด์ไม่พร้อมใช้ — สร้างในเครื่อง',
 } satisfies Record<keyof typeof zh, string>

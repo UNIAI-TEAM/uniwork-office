@@ -22,7 +22,6 @@ export const ko = {
   aiQcPageSkipped: '{n}페이지: 자동 레이아웃 검사 건너뜀',
   aiQcStopped: '레이아웃 검사를 중지했습니다',
   aiQcCapped: '나머지 {count}페이지는 검사하지 않음(회당 상한)',
-  aiGskLoginBtn: 'UniWork 로그인',
   aiPanelTitle: 'uniAI',
   aiOpenAssistant: 'AI 도우미 열기',
   aiFactCheckBtn: 'AI 팩트체크',
@@ -139,6 +138,7 @@ export const ko = {
   aiClarifyOther: '기타(직접 입력)',
   aiClarifySkip: '설문 건너뛰기',
   aiClarifyNext: '다음',
+  aiClarifyPrev: '이전',
   aiClarifySubmit: '생성하기',
   aiSumReadAttachment: '첨부 파일 읽기',
   aiSumReadAttachmentName: '첨부 파일 {name} 읽기',
@@ -227,4 +227,5 @@ export const ko = {
   aiSumSaveTemplate: '스타일 템플릿 "{name}" 저장',
   aiSumTemplatesEmpty: '스타일 템플릿 목록(비어 있음)',
   aiSumListTemplates: '스타일 템플릿 {count}개 나열',
+  aiPageCloudToLocal: '클라우드 생성 불가 — 로컬로 생성',
 } satisfies Record<keyof typeof zh, string>

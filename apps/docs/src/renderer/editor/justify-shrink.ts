@@ -3,7 +3,9 @@ import { Plugin, PluginKey, type EditorState } from '@tiptap/pm/state'
 import { Decoration, DecorationSet, type EditorView } from '@tiptap/pm/view'
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model'
 import { rangeSlot } from '../dom-range'
-import { SettledParagraphCache } from './settled-measure'
+import { SettledParagraphCache, noteFloatTransaction } from './settled-measure'
+import { PHASED_CONTENT_SETTLED_EVENT, isPhasedContentPending } from '../phased-content'
+import { DOC_CSS_COMMITTED_EVENT } from './cjk-punct-shrink'
 
 /**
  * Word 2013+ (settings compatibilityMode >= 15) justified line breaking pulls
@@ -42,6 +44,9 @@ export interface ShrinkLine {
   avail: number
   /** natural width of the next line's first word; null = no pull candidate */
   nextWordWidth: number | null
+  /** natural width of that word's head up to its first break opportunity (a
+   *  hyphen fragment); null = the word breaks nowhere */
+  nextFragmentWidth?: number | null
 }
 
 export interface ShrinkDecision {
@@ -58,6 +63,8 @@ const SHRINK_EPS = 0.5
  *  overflow of one unit or more is a real wrap (a Cyrillic Times line that
  *  Word fits by twip rounding overflows Chromium by ~1/64px) */
 const NOISE = 1 / 128
+/** Blink's LayoutUnit: a cap missed by less than one is a measurement artefact */
+const LAYOUT_UNIT = 1 / 64
 
 export function decideLineShrinks(lines: ShrinkLine[]): Array<ShrinkDecision | null> {
   return lines.map((line) => {
@@ -71,18 +78,41 @@ export function decideLineShrinks(lines: ShrinkLine[]): Array<ShrinkDecision | n
       if (spaceChars === 0) return null
       return { gaps: line.gaps, perChar: (needed + SHRINK_EPS) / spaceChars }
     }
+    // a zero-char boundary is a hyphen break: the line's own spaces carry the pull
     const b = line.boundary
-    const w = line.nextWordWidth
-    if (!b || b.chars === 0 || w == null) return null
-    const delta = natural + b.width + w - line.avail
-    if (delta <= NOISE) return null
+    if (!b || line.nextWordWidth == null) return null
     const S = spaceChars + b.chars
-    const sPrev = S - b.chars
+    const sPrev = spaceChars
     if (sPrev < 1) return null
-    if (delta > SPACE_SHRINK_MAX * (spaceW + b.width)) return null
-    if (delta / S > (SHRINK_VS_STRETCH * (w + b.width - delta)) / sPrev) return null
-    return { gaps: [...line.gaps, b], perChar: (delta + SHRINK_EPS) / S }
+    // the whole word first (Word takes the longest candidate that fits), then
+    // the fragment before its first break opportunity
+    const candidates = [line.nextWordWidth]
+    if (line.nextFragmentWidth != null && line.nextFragmentWidth < line.nextWordWidth)
+      candidates.push(line.nextFragmentWidth)
+    for (const w of candidates) {
+      const delta = natural + b.width + w - line.avail
+      if (delta <= NOISE) return null
+      if (delta > SPACE_SHRINK_MAX * (spaceW + b.width) + LAYOUT_UNIT) continue
+      if (delta / S > (SHRINK_VS_STRETCH * (w + b.width - delta)) / sPrev) continue
+      return { gaps: [...line.gaps, b], perChar: (delta + SHRINK_EPS) / S }
+    }
+    return null
   })
+}
+
+const BREAK_HYPHENS = new Set(['-', '\u2010', '\u2013'])
+
+/** length of the word's head through its first hyphen Chromium breaks after
+ *  (anything but whitespace or another hyphen following; digits on either
+ *  side break too, "53:4-" | "12"), or 0 */
+export function breakOpportunity(text: string): number {
+  for (let i = 1; i < text.length - 1; i++) {
+    if (!BREAK_HYPHENS.has(text[i])) continue
+    const next = text[i + 1]
+    if (/\s/.test(next) || BREAK_HYPHENS.has(next)) continue
+    return i + 1
+  }
+  return 0
 }
 
 // ── DOM measurement / decoration plumbing ──────────────────────────────────
@@ -109,6 +139,24 @@ const SKIP_SCRIPT_RE = new RegExp(
     '\\uF900-\\uFAFF\\uFE30-\\uFE4F\\uFF00-\\uFFEF]', // compat ideographs, fullwidth forms
 )
 
+/** Justification usually comes from the paragraph style (Normal w:jc=both) and
+ *  then is not a node attr: an inherited (null) alignment stays a candidate and
+ *  the rendered text-align decides in measureParagraph. */
+export function isShrinkCandidate(node: {
+  attrs?: Record<string, unknown>
+  textContent: string
+}): boolean {
+  const align = node.attrs?.align
+  if (align != null && align !== 'justify') return false
+  const text = node.textContent
+  if (!text.includes(' ') || SKIP_SCRIPT_RE.test(text)) return false
+  // a tab after the first space absorbs any shrink of the spaces before it
+  // (the segment re-anchors at its stop), so the word model only holds for
+  // leading tabs ("5.<tab>The claim...", "<tab>First line indent")
+  if (text.lastIndexOf('\t') > text.indexOf(' ')) return false
+  return true
+}
+
 const MEASURE_RETRY_MAX = 10
 const MEASURE_SIGS_MAX = 12
 
@@ -119,7 +167,7 @@ interface MeasuredShrink {
 }
 
 type Token =
-  | { kind: 'word'; from: number; to: number; atom: boolean }
+  | { kind: 'word'; from: number; to: number; atom: boolean; text?: string }
   | { kind: 'space'; from: number; to: number; chars: number }
   | { kind: 'break' }
 
@@ -129,7 +177,17 @@ interface WordBox {
   bottom: number
   left: number
   right: number
+  /** width of the head before the first break opportunity (hyphen fragment) */
+  frag?: number
 }
+
+/** a word Chromium broke at a hyphen: head on one line, tail on the next */
+interface SplitWord {
+  head: WordBox
+  tail: WordBox
+}
+
+const HYPHEN_GAP: ShrinkGap = { width: 0, chars: 0, from: 0, to: 0 }
 
 interface LineAcc {
   words: WordBox[]
@@ -170,8 +228,20 @@ class JustifyShrinkView {
   private retries = 0
   private resizeObserver?: ResizeObserver
   private lastDomWidth = -1
-  private results = new SettledParagraphCache<MeasuredShrink[]>()
+  private results = new SettledParagraphCache<MeasuredShrink[]>(
+    (r, d) => r.map((s) => ({ ...s, from: s.from + d, to: s.to + d })),
+    (r) => r.length === 0,
+  )
   private onFontsLoaded = () => {
+    this.invalidate()
+    this.measure()
+  }
+  // style-level w:jc arrives with the doc stylesheet after setContent measured
+  private onDocCss = () => {
+    this.invalidate()
+    this.measure()
+  }
+  private onPhasedSettled = () => {
     this.invalidate()
     this.measure()
   }
@@ -182,6 +252,8 @@ class JustifyShrinkView {
   ) {
     this.measure()
     document.fonts?.addEventListener('loadingdone', this.onFontsLoaded)
+    document.addEventListener(DOC_CSS_COMMITTED_EVENT, this.onDocCss)
+    document.addEventListener(PHASED_CONTENT_SETTLED_EVENT, this.onPhasedSettled)
     if (typeof ResizeObserver !== 'undefined') {
       this.resizeObserver = new ResizeObserver(() => {
         const w = this.view.dom.offsetWidth
@@ -194,10 +266,15 @@ class JustifyShrinkView {
     }
   }
 
+  /** layout input changed (resize, fonts): every paragraph re-measures */
   private invalidate() {
+    this.results.clear()
+    this.restartConvergence()
+  }
+
+  private restartConvergence() {
     this.seenSigs.clear()
     this.frozen = false
-    this.results.clear()
     // decorations may have been dropped with the old doc (setContent/reload):
     // an unchanged shrink list must still re-dispatch
     this.lastSig = ''
@@ -205,7 +282,8 @@ class JustifyShrinkView {
 
   update(view: EditorView, prevState: EditorState) {
     if (view.state.doc !== prevState.doc) {
-      this.invalidate()
+      // untouched paragraphs keep their settled results (keyed on node identity)
+      this.restartConvergence()
     } else if (
       justifyShrinkPluginKey.getState(view.state) === justifyShrinkPluginKey.getState(prevState)
     ) {
@@ -216,6 +294,8 @@ class JustifyShrinkView {
 
   destroy() {
     document.fonts?.removeEventListener('loadingdone', this.onFontsLoaded)
+    document.removeEventListener(DOC_CSS_COMMITTED_EVENT, this.onDocCss)
+    document.removeEventListener(PHASED_CONTENT_SETTLED_EVENT, this.onPhasedSettled)
     this.resizeObserver?.disconnect()
     if (this.retryRaf) cancelAnimationFrame(this.retryRaf)
   }
@@ -235,6 +315,8 @@ class JustifyShrinkView {
       this.retryRaf = 0
     }
     const { view } = this
+    // a streamed tail is still landing: measured once, when it has (settled event)
+    if (isPhasedContentPending()) return
     // PDF export parks the editor subtree (.app.pv-exporting); any layout
     // read here would force the parked document to re-lay out per print chunk
     if (view.dom.closest('.app.pv-exporting')) {
@@ -258,23 +340,21 @@ class JustifyShrinkView {
     const paras: Array<{ node: ProseMirrorNode; pos: number }> = []
     view.state.doc.descendants((node, pos) => {
       if (!node.isTextblock) return true
-      if (node.attrs?.align !== 'justify') return false
-      const text = node.textContent
-      if (!text.includes(' ') || SKIP_SCRIPT_RE.test(text)) return false
-      // a tab after the first space absorbs any shrink of the spaces before it
-      // (the segment re-anchors at its stop), so the word model only holds for
-      // leading tabs ("5.<tab>The claim...", "<tab>First line indent")
-      if (text.lastIndexOf('\t') > text.indexOf(' ')) return false
-      paras.push({ node, pos })
+      if (isShrinkCandidate(node)) paras.push({ node, pos })
       return false
     })
 
     const shrinks: MeasuredShrink[] = []
     let measurable = paras.length === 0
     this.results.beginPass(view)
+    const topLevel = SettledParagraphCache.topLevelDom(view)
     for (const para of paras) {
-      const measured = this.results.measure(view, para.node, para.pos, () =>
-        this.measureParagraph(para.node, para.pos),
+      const measured = this.results.measure(
+        view,
+        para.node,
+        para.pos,
+        (el) => this.measureParagraph(para.node, para.pos, el),
+        topLevel.get(para.node),
       )
       if (!measured) continue
       measurable = true
@@ -310,17 +390,19 @@ class JustifyShrinkView {
   }
 
   /** null = not measurable right now (hidden / not mounted) → retry */
-  private measureParagraph(node: ProseMirrorNode, pos: number): MeasuredShrink[] | null {
+  private measureParagraph(
+    node: ProseMirrorNode,
+    pos: number,
+    el: HTMLElement,
+  ): MeasuredShrink[] | null {
     const { view } = this
-    const el = view.nodeDOM(pos)
-    if (!(el instanceof HTMLElement)) return null
     if (el.offsetWidth === 0) return null
     const rect = el.getBoundingClientRect()
     if (rect.width === 0) return null
     // rects are screen px (page zoom transform); emitted widths are layout px
     const zoom = rect.width / el.offsetWidth
     const cs = window.getComputedStyle(el)
-    if (cs.direction === 'rtl') return []
+    if (cs.direction === 'rtl' || cs.textAlign !== 'justify') return []
     // content-box width (layout px): capacity reference for the ragged last
     // line, whose rendered extent shrinks with its own compression
     const contentW =
@@ -347,6 +429,7 @@ class JustifyShrinkView {
               from: base + m.index,
               to: base + m.index + m[0].length,
               atom: false,
+              text: m[0],
             })
         }
       } else if (child.type.name === 'hardBreak') {
@@ -376,25 +459,19 @@ class JustifyShrinkView {
       return { width: adv * t.chars, chars: t.chars, from: t.from, to: t.to }
     }
 
-    // 'wrapped' = the token spans two rendered lines: the word model breaks down
-    const measureWord = (t: Extract<Token, { kind: 'word' }>): WordBox | null | 'wrapped' => {
-      let rects: DOMRect[]
-      const dom = t.atom ? view.nodeDOM(t.from) : null
-      if (dom instanceof HTMLElement) {
-        rects = [dom.getBoundingClientRect()]
-      } else {
-        const a = domAt(t.from)
-        const b = domAt(t.to)
-        const range = wordRange()
-        try {
-          range.setStart(a.node, a.offset)
-          range.setEnd(b.node, b.offset)
-        } catch {
-          return 'wrapped'
-        }
-        rects = Array.from(range.getClientRects()).filter((r) => r.width > 0.01)
+    const rangeRects = (from: number, to: number): DOMRect[] | null => {
+      const a = domAt(from)
+      const b = domAt(to)
+      const range = wordRange()
+      try {
+        range.setStart(a.node, a.offset)
+        range.setEnd(b.node, b.offset)
+      } catch {
+        return null
       }
-      if (rects.length === 0) return null // zero-width (hidden run): ignore
+      return Array.from(range.getClientRects()).filter((r) => r.width > 0.01)
+    }
+    const boxOf = (rects: DOMRect[]): WordBox => {
       const box: WordBox = {
         width: 0,
         top: Infinity,
@@ -408,8 +485,41 @@ class JustifyShrinkView {
         box.left = Math.min(box.left, r.left)
         box.right = Math.max(box.right, r.right)
       }
-      for (const r of rects) if (r.top - box.top > r.height / 2) return 'wrapped'
       box.width = (box.right - box.left) / zoom
+      return box
+    }
+    // 'wrapped' = the token spans two rendered lines other than at a hyphen:
+    // the word model breaks down
+    const measureWord = (
+      t: Extract<Token, { kind: 'word' }>,
+    ): WordBox | SplitWord | null | 'wrapped' => {
+      let rects: DOMRect[] | null
+      const dom = t.atom ? view.nodeDOM(t.from) : null
+      if (dom instanceof HTMLElement) {
+        rects = [dom.getBoundingClientRect()]
+      } else {
+        rects = rangeRects(t.from, t.to)
+        if (!rects) return 'wrapped'
+      }
+      if (rects.length === 0) return null // zero-width (hidden run): ignore
+      const top = Math.min(...rects.map((r) => r.top))
+      const first = rects.filter((r) => r.top - top <= r.height / 2)
+      const rest = rects.filter((r) => r.top - top > r.height / 2)
+      const headLen = t.text ? breakOpportunity(t.text) : 0
+      if (rest.length > 0) {
+        if (!headLen) return 'wrapped'
+        const tail = boxOf(rest)
+        for (const r of rest) if (r.top - tail.top > r.height / 2) return 'wrapped'
+        return { head: boxOf(first), tail }
+      }
+      const box = boxOf(first)
+      if (headLen) {
+        const head = rangeRects(t.from, t.from + headLen)
+        if (head && head.length > 0) {
+          const frag = boxOf(head).width
+          if (frag > 0 && frag < box.width) box.frag = frag
+        }
+      }
       return box
     }
 
@@ -418,6 +528,7 @@ class JustifyShrinkView {
     let lastWord: WordBox | null = null
     let pendingSpaces: Array<Extract<Token, { kind: 'space' }>> = []
     let pendingBreak = false
+    let pendingHyphen = false
     let pendingWord: WordBox | null = null // mark-split word pieces merge until a space
 
     const mergedGap = (): ShrinkGap | null => {
@@ -435,19 +546,43 @@ class JustifyShrinkView {
       if (!pendingWord) return
       const w = pendingWord
       pendingWord = null
-      if (cur && lastWord && sameLine(w, lastWord) && !pendingBreak) {
-        cur.gaps.push(mergedGap() ?? { width: 0, chars: 0, from: 0, to: 0 })
+      if (cur && lastWord && sameLine(w, lastWord) && !pendingBreak && !pendingHyphen) {
+        cur.gaps.push(mergedGap() ?? HYPHEN_GAP)
         cur.words.push(w)
         cur.left = Math.min(cur.left, w.left)
         cur.right = Math.max(cur.right, w.right)
       } else {
-        if (cur) cur.boundary = pendingBreak ? null : mergedGap()
+        if (cur) cur.boundary = pendingBreak ? null : pendingHyphen ? HYPHEN_GAP : mergedGap()
         cur = { words: [w], gaps: [], boundary: null, left: w.left, right: w.right }
         lines.push(cur)
       }
       lastWord = w
       pendingSpaces = []
       pendingBreak = false
+      pendingHyphen = false
+    }
+
+    // pieces of one visual word split by mark boundaries: merge (a line
+    // mismatch means the compound wrapped mid-word — bail)
+    const joinPiece = (w: WordBox): boolean => {
+      if (!pendingWord) {
+        pendingWord = w
+        return true
+      }
+      if (!sameLine(w, pendingWord)) return false
+      pendingWord = {
+        width: pendingWord.width + w.width,
+        top: Math.min(pendingWord.top, w.top),
+        bottom: Math.max(pendingWord.bottom, w.bottom),
+        left: Math.min(pendingWord.left, w.left),
+        right: Math.max(pendingWord.right, w.right),
+        ...(pendingWord.frag != null
+          ? { frag: pendingWord.frag }
+          : w.frag != null
+            ? { frag: pendingWord.width + w.frag }
+            : {}),
+      }
+      return true
     }
 
     for (const t of tokens) {
@@ -462,20 +597,13 @@ class JustifyShrinkView {
         const w = measureWord(t)
         if (w === 'wrapped') return []
         if (w === null) continue
-        if (pendingWord) {
-          // pieces of one visual word split by mark boundaries: merge (a line
-          // mismatch means the compound wrapped mid-word — bail)
-          if (!sameLine(w, pendingWord)) return []
-          pendingWord = {
-            width: pendingWord.width + w.width,
-            top: Math.min(pendingWord.top, w.top),
-            bottom: Math.max(pendingWord.bottom, w.bottom),
-            left: Math.min(pendingWord.left, w.left),
-            right: Math.max(pendingWord.right, w.right),
-          }
-        } else {
-          pendingWord = w
-        }
+        if ('tail' in w) {
+          // the head ends its line at the hyphen; the tail opens the next one
+          if (!joinPiece(w.head)) return []
+          flushWord()
+          pendingHyphen = true
+          pendingWord = w.tail
+        } else if (!joinPiece(w)) return []
       }
     }
     flushWord()
@@ -494,6 +622,7 @@ class JustifyShrinkView {
       avail:
         k === lines.length - 1 ? contentW - (k === 0 ? textIndent : 0) : (l.right - l.left) / zoom,
       nextWordWidth: l.boundary ? (lines[k + 1]?.words[0]?.width ?? null) : null,
+      nextFragmentWidth: l.boundary ? (lines[k + 1]?.words[0]?.frag ?? null) : null,
     }))
 
     const out: MeasuredShrink[] = []
@@ -523,9 +652,13 @@ export const JustifyShrinkExtension = Extension.create({
         state: {
           init: () => DecorationSet.empty,
           apply(tr, old) {
+            noteFloatTransaction(tr)
             const meta = tr.getMeta(justifyShrinkPluginKey) as Decoration[] | undefined
             if (meta)
-              return meta.length > 0 ? DecorationSet.create(tr.doc, meta) : DecorationSet.empty
+              // create() consumes (nulls out) entries of the array it is given;
+              // the meta array must survive for the App-level 'transaction'
+              // listener that re-anchors the pagination pass on it
+              return meta.length > 0 ? DecorationSet.create(tr.doc, [...meta]) : DecorationSet.empty
             return old.map(tr.mapping, tr.doc)
           },
         },

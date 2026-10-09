@@ -1,3 +1,4 @@
+export { AiPanelSideButton } from './AiPanelSideButton'
 export { AiComposer } from './AiComposer'
 export { AiScopeQuote, type AiScopeQuoteData } from './AiScopeQuote'
 export {
@@ -12,8 +13,15 @@ export {
   normalizeAiPanelPrefs,
   type AiFontSize,
   type AiPanelPrefs,
+  type AiPanelSide,
 } from './ai-panel-prefs'
-export { applyAiPanelPrefs, useAiPanelPrefs } from './ai-panel-prefs-store'
+export {
+  applyAiPanelPrefs,
+  aiPanelInitiallyOpen,
+  rememberAiPanelOpen,
+  useAiPanelPrefs,
+  aiPanelWidthAtPointer,
+} from './ai-panel-prefs-store'
 export {
   ColorPicker,
   THEME_COLORS,
@@ -41,18 +49,26 @@ export {
   useRibbonCollapse,
   RibbonCollapseButton,
   RibbonExpandButton,
-  installRibbonPeekDismiss,
+  isRibbonCompactShortcut,
   isRibbonToggleShortcut,
   readRibbonCollapsed,
+  readRibbonDensity,
+  RIBBON_COMPACT_SHORTCUT,
   RIBBON_TOGGLE_SHORTCUT,
   type RibbonCollapse,
   type RibbonCollapseLabels,
+  type RibbonDensity,
 } from './ribbon-collapse'
 export { AiTypingIndicator } from './AiTypingIndicator'
 export { IconSend, IconStop, type IconProps } from './icons'
 export { Markdown, type MarkdownNav } from './Markdown'
 export { isSymbolFontFamily } from './symbol-fonts'
-export { BUILTIN_FONT_FAMILIES, fontFamiliesFor } from './font-list'
+export {
+  BUILTIN_FONT_FAMILIES,
+  fontFamiliesFor,
+  partitionFontFamilies,
+  systemFamiliesBesidesCandidates,
+} from './font-list'
 export {
   WORDART_PRESETS,
   wordArtSolidColor,
@@ -71,11 +87,21 @@ export {
 export {
   CropDialog,
   CutoutDialog,
+  cropEdgeArrowDelta,
+  cropEdgeValue,
   cropImagePng,
   DEFAULT_CUTOUT_TOLERANCE,
+  nudgeCropEdge,
+  CROP_EDGES,
+  CROP_EDGE_STEP,
+  CROP_EDGE_STEP_COARSE,
+  type CropEdge,
   type CropFractions,
   type ImageDialogLabels,
 } from './image-dialogs'
+export { CROP_EDGE_LABELS } from './strings-crop-edges'
+export { ImageViewer, type ImageViewerLabels } from './image-viewer'
+export { trapTab, useModalKeys } from './modal-keys'
 export {
   removeBackground,
   sampleBackgroundColors,
@@ -97,3 +123,20 @@ export {
   type CapabilityObject,
   type CapabilityReader,
 } from './capabilities'
+export {
+  NOTCH,
+  clampZoom,
+  createWheelPager,
+  createZoomWheelClassifier,
+  notchStep,
+  type ZoomWheelIntent,
+} from './wheel-zoom'
+export { AiModelPicker, type AiModelPickerBridge } from './AiModelPicker'
+export {
+  aiModelPickerGroups,
+  aiModelPickerSelection,
+  withAiModelSelection,
+  type AiModelPickerGroup,
+  type AiModelPickerSelection,
+} from './ai-model-picker-options'
+export { ProviderLogo } from './provider-logos'

@@ -34,10 +34,11 @@ export interface HostMessageBox {
 }
 
 export interface HostClipboard {
-  /** Write an app marker format: an external copy overwrites it, so paste can tell which copy is newer */
-  writeMarker(format: string): void
-  /** Our marker format is still on the system clipboard */
-  hasMarker(format: string): boolean
+  /** Write an app marker format (optionally carrying `value`, e.g. the copy's token): an
+   *  external copy overwrites it, so paste can tell which copy is newer */
+  writeMarker(format: string, value?: string): void
+  /** Our marker format is still on the system clipboard (and carries `value`, when given) */
+  hasMarker(format: string, value?: string): boolean
   /** Clipboard image as PNG bytes, or null when the clipboard holds no image */
   readImagePng(): Uint8Array | null
   /** Cheap probe: an image is on the clipboard (no decode) */
@@ -48,6 +49,8 @@ export interface HostClipboard {
 export interface HostIO {
   pickImage(purpose: ImagePickPurpose): Promise<PickedFile | null>
   pickMedia(kind: MediaPickKind): Promise<PickedFile | null>
+  /** Bytes of a file the renderer named by path (a file dropped on the canvas) */
+  readPath(path: string): Promise<Uint8Array>
   /** Natural pixel size of a picked image (null when the host cannot decode it) */
   imageSize(file: PickedFile): Promise<{ width: number; height: number } | null>
   /** Poster frame for a picked video / 3D model; undefined = the element draws a solid placeholder */
