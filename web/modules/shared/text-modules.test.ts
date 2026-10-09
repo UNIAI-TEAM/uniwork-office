@@ -87,11 +87,12 @@ describe('static HTML copy (P1 preview / print)', () => {
   })
 
   it('links and forms cannot navigate or submit', () => {
-    const hrefs = [...doc.querySelectorAll('a')].map((a) => a.getAttribute('href'))
-    expect(hrefs).toEqual(['#', '#', '#sec'])
-    expect(doc.querySelector('a[target]')).toBeNull()
-    expect(doc.querySelector('a')?.hasAttribute('data-gx-href')).toBe(false)
-    expect(doc.querySelectorAll('a')[1]?.getAttribute('data-gx-href')).toBe('https://example.com')
+    // no href at all: in srcdoc even "#sec" would resolve against the embedding page
+    expect(doc.querySelectorAll('a[href], area[href], a[target]').length).toBe(0)
+    const kept = [...doc.querySelectorAll('a')].map((a) => a.getAttribute('data-gx-href'))
+    expect(kept).toEqual([null, 'https://example.com', '#sec'])
+    expect(doc.querySelectorAll('a[data-gx-link]').length).toBe(3)
+    expect(doc.head.querySelector('style')?.textContent).toContain('a[data-gx-link]')
     expect(doc.querySelector('form')?.hasAttribute('action')).toBe(false)
     expect(doc.querySelector('[formaction]')).toBeNull()
   })

@@ -1470,6 +1470,7 @@ export default function App() {
               sid={selectedSid}
               state={selectedState}
               onSelect={(sid) => selectSid(sid, { reveal: true })}
+              showHint={visualEdit}
             />
           )}
           <div className={`workspace view-${canvasMode === 'present' ? 'preview' : view}`}>

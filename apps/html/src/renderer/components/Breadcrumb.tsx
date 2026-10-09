@@ -10,6 +10,8 @@ interface Props {
   sid: number | null
   state: NodeState
   onSelect: (sid: number) => void
+  /** false when click-to-select in the preview is off (web: cap 'htmlVisualEdit'): no hint */
+  showHint?: boolean
 }
 
 function label(text: string | undefined, tag: string): string {
@@ -22,11 +24,19 @@ function label(text: string | undefined, tag: string): string {
 }
 
 /** Ancestor chain of the selected element; clicking a crumb selects that ancestor */
-export function Breadcrumb({ text, map, sid, state, onSelect }: Props): ReactElement | null {
+export function Breadcrumb({
+  text,
+  map,
+  sid,
+  state,
+  onSelect,
+  showHint = true,
+}: Props): ReactElement | null {
   const { t } = useI18n()
-  if (sid === null) return <div className="crumbs crumbs-empty">{t('inspectHint')}</div>
+  const empty = <div className="crumbs crumbs-empty">{showHint ? t('inspectHint') : null}</div>
+  if (sid === null) return empty
   const current = map.bySid.get(sid)
-  if (!current) return <div className="crumbs crumbs-empty">{t('inspectHint')}</div>
+  if (!current) return empty
   const chain = [
     ...ancestorsOf(map, sid).filter((e) => !['html', 'head', 'body'].includes(e.tag)),
     current,

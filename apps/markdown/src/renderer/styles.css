@@ -2165,8 +2165,10 @@ html.genoffice-popover-open .ribbon-tabs {
 }
 
 .doc-editor .md-raw-html code {
+  display: block;
   background: none;
   padding: 0;
+  white-space: pre-wrap;
   font-size: 0.8em;
   line-height: 1.6;
 }

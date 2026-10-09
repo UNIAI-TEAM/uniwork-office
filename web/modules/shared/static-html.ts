@@ -14,8 +14,11 @@
  *   - URLs (src, href of svg <image>/<use>, poster, background, CSS url()): kept when data:image
  *     (img-src allows it) or a document asset mapped by the host (same-origin), otherwise dropped,
  *     so nothing leaves the frame and no relative path 404s against the frame's own URL;
- *   - links: `href` becomes "#" (a click in the sandbox must not navigate the preview to a remote
- *     page or a javascript: URL); an http(s) target is kept in `data-gx-href` + the hover title.
+ *   - links lose `href`: a click in the sandbox must not navigate the preview anywhere (a srcdoc
+ *     document resolves even "#x" against the embedding page's URL, so a fragment link would load
+ *     that page into the preview, which frame-src 'none' turns into an error page). The target is
+ *     kept in `data-gx-href` (http(s) also as the hover title, script URLs never) and a link look
+ *     is restored with a lowest-priority rule the document's own CSS can override.
  * The saved text is never touched: this only builds the copy shown in the iframe.
  */
 
@@ -61,8 +64,13 @@ export function staticCss(css: string, resolve: AssetResolver): string {
     })
 }
 
+/** `<base ...>` tags anywhere in the source (also inside comments: harmless to drop there) */
+const BASE_TAG = /<base\b[^>]*>/gi
+
 export function toStaticHtml(html: string, resolve: AssetResolver = () => null): string {
-  const doc = new DOMParser().parseFromString(html, 'text/html')
+  // even an inert DOMParser document applies the frame's `base-uri 'self'` to a <base> while
+  // parsing (a CSP violation report), so the tag is cut from the text first
+  const doc = new DOMParser().parseFromString(html.replace(BASE_TAG, ''), 'text/html')
   for (const el of doc.querySelectorAll(DROP_ELEMENTS.join(','))) el.remove()
   for (const link of doc.querySelectorAll('link')) {
     const href = link.getAttribute('href') ?? ''
@@ -91,14 +99,11 @@ export function toStaticHtml(html: string, resolve: AssetResolver = () => null):
         // <link> was settled above (mapped stylesheet or removed)
         if (tag === 'link') continue
         if (tag === 'a' || tag === 'area') {
-          if (!attr.value.startsWith('#')) {
-            // the target stays readable on hover; script URLs are not kept at all
-            if (/^\s*https?:/i.test(attr.value)) {
-              el.setAttribute('data-gx-href', attr.value)
-              if (!el.hasAttribute('title')) el.setAttribute('title', attr.value)
-            }
-            el.setAttribute(attr.name, '#')
-          }
+          const web = /^\s*https?:/i.test(attr.value)
+          if (web || attr.value.startsWith('#')) el.setAttribute('data-gx-href', attr.value)
+          if (web && !el.hasAttribute('title')) el.setAttribute('title', attr.value)
+          el.setAttribute('data-gx-link', '')
+          el.removeAttribute(attr.name)
           el.removeAttribute('target')
         } else if (!attr.value.startsWith('#')) {
           // svg <image>/<use>/<feImage> and friends: a resource load
@@ -108,6 +113,11 @@ export function toStaticHtml(html: string, resolve: AssetResolver = () => null):
         }
       }
     }
+  }
+  if (doc.querySelector('[data-gx-link]')) {
+    const look = doc.createElement('style')
+    look.textContent = 'a[data-gx-link]{color:LinkText;text-decoration:underline}'
+    doc.head.prepend(look)
   }
   const doctype = doc.doctype ? `<!doctype ${doc.doctype.name}>` : '<!doctype html>'
   return `${doctype}\n${doc.documentElement.outerHTML}`
