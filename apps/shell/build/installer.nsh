@@ -34,6 +34,12 @@
   !insertmacro GenOfficeRegisterShellNew "xlsx" "Excel Workbook"
   !insertmacro GenOfficeRegisterShellNew "pptx" "PowerPoint Presentation"
   !insertmacro UPDATEFILEASSOC
+  ; An organization download bundle ships deployment-profile.json next to the
+  ; installer; the app reads it from resources\ (process.resourcesPath). A
+  ; plain installer download has none and installs without it.
+  ${If} ${FileExists} "$EXEDIR\deployment-profile.json"
+    CopyFiles /SILENT "$EXEDIR\deployment-profile.json" "$INSTDIR\resources\deployment-profile.json"
+  ${EndIf}
 !macroend
 
 !macro customUnInstall
@@ -45,6 +51,7 @@
   !insertmacro GenOfficeUnregisterShellNew "pptx" "PowerPoint Presentation"
   Pop $0
   !insertmacro UPDATEFILEASSOC
+  Delete "$INSTDIR\resources\deployment-profile.json"
 !macroend
 
 !ifndef BUILD_UNINSTALLER
