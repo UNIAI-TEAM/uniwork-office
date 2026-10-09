@@ -563,8 +563,8 @@ export function applyUpdateChannel(channel: UpdateChannel): void {
  * feedback: an available update opens the standard update window (even a
  * version dismissed with "later" this session — the user just asked for it),
  * up-to-date and failure each get a dialog, and installs with no self-update
- * mechanism (dev runs, Linux .deb, builds without an update feed) are pointed at the download page instead
- * of being told they're current. */
+ * mechanism (dev runs, Linux .deb, builds without an update feed) are pointed
+ * at the download page instead of being told they're current. */
 export async function checkForUpdatesNow(): Promise<void> {
   if (manualCheckInFlight) return
   manualCheckInFlight = true
