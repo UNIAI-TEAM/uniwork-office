@@ -8,9 +8,15 @@ import { after, describe, it } from 'node:test'
 import {
   BRAND,
   checkBuildDir,
+  checkDebControl,
+  checkDesktopEntry,
   checkInfoPlist,
+  impliedUnpackedDir,
+  parseControl,
+  parseDesktopEntry,
   parsePlist,
   parseVersionInfo,
+  visibleDebMembers,
 } from './check-build-brand.mjs'
 
 const asar = createRequire(import.meta.url)('@electron/asar')
@@ -373,5 +379,106 @@ describe('checkBuildDir', () => {
     const root = mkdtempSync(join(tmpdir(), 'brand-empty-'))
     roots.push(root)
     assert.match(checkBuildDir(root).problems[0], /no packaged output/)
+  })
+})
+
+/** electron-builder's linux layout: linux-unpacked/ next to the deb and AppImage (no .deb here). */
+async function fakeLinuxOutput({ executable = 'uniwork-office', unpacked = true } = {}) {
+  const root = newRoot()
+  writeFileSync(join(root, 'UniWork-Office_0.11.0-dev.0_unsigned_linux_x64.AppImage'), '')
+  if (!unpacked) return root
+  const resources = join(root, 'linux-unpacked', 'resources')
+  mkdirSync(resources, { recursive: true })
+  writeFileSync(join(root, 'linux-unpacked', executable), '')
+  await writeAsar(root, resources, {})
+  return root
+}
+
+const DESKTOP = `[Desktop Entry]
+Name=UniWork Office
+Exec=/opt/UniWork\ Office/uniwork-office %U
+Terminal=false
+Type=Application
+Icon=uniwork-office
+StartupWMClass=uniwork-office
+MimeType=application/pdf;x-scheme-handler/uniwork;x-scheme-handler/uniwork-office;x-scheme-handler/uniwork-office-dev;
+Categories=Office;
+
+[Desktop Action new]
+Name=GenOffice ignored outside the main group
+`
+
+describe('Linux packages', () => {
+  const collect = () => {
+    const problems = []
+    return { problems, report: { problem: (p) => p && problems.push(p), checked: () => {} } }
+  }
+
+  it('maps deb / AppImage names to linux-unpacked', () => {
+    assert.deepEqual(impliedUnpackedDir('UniWork-Office_1.0.0-dev.1_unsigned_linux_x64.deb'), {
+      platform: 'linux',
+      dir: 'linux-unpacked',
+    })
+    assert.deepEqual(impliedUnpackedDir('UniWork Office-1.0.0-arm64.AppImage'), {
+      platform: 'linux',
+      dir: 'linux-arm64-unpacked',
+    })
+  })
+
+  it('passes a clean linux-unpacked and requires it for an AppImage', async () => {
+    assert.deepEqual(checkBuildDir(await fakeLinuxOutput()).problems, [])
+    assert.deepEqual(checkBuildDir(await fakeLinuxOutput({ unpacked: false })).problems, [
+      'linux-unpacked: unpacked app directory missing (required by UniWork-Office_0.11.0-dev.0_unsigned_linux_x64.AppImage)',
+    ])
+    const upstream = checkBuildDir(await fakeLinuxOutput({ executable: 'genoffice' })).problems
+    assert.ok(upstream.some((p) => p.startsWith('linux-unpacked file name:')))
+    assert.ok(upstream.includes('linux-unpacked: no "uniwork-office" executable'))
+  })
+
+  it('checks the deb control fields', () => {
+    const control = parseControl(
+      'Package: uniwork-office\nVersion: 0.11.0-dev.1\nMaintainer: UniWork <hello@uniwork.app>\nDescription: UniWork Office\n more text\n',
+    )
+    assert.equal(control.Description, 'UniWork Office\nmore text')
+    const ok = collect()
+    checkDebControl('x.deb', control, ok.report)
+    assert.deepEqual(ok.problems, [])
+    const bad = collect()
+    checkDebControl('x.deb', { ...control, Package: 'genoffice' }, bad.report)
+    assert.equal(bad.problems.length, 2)
+  })
+
+  it('checks the desktop entry names and its URL scheme handlers', () => {
+    const entry = parseDesktopEntry(DESKTOP)
+    assert.equal(entry.Name, 'UniWork Office')
+    const ok = collect()
+    checkDesktopEntry('d', entry, ok.report)
+    assert.deepEqual(ok.problems, [])
+    const bad = collect()
+    checkDesktopEntry(
+      'd',
+      { ...entry, Icon: 'genoffice', MimeType: 'x-scheme-handler/uniwork;' },
+      bad.report,
+    )
+    assert.ok(bad.problems.some((p) => p.startsWith('d Icon:')))
+    assert.ok(
+      bad.problems.includes(
+        'd: MimeType does not route uniwork-office:// (x-scheme-handler/uniwork-office)',
+      ),
+    )
+    assert.ok(bad.problems.some((p) => p.includes('uniwork-office-dev://')))
+  })
+
+  it('lists the desktop entries and theme icons of a deb listing', () => {
+    const listing = [
+      'drwxr-xr-x 0/0 0 2026-10-09 10:00 ./usr/share/applications/',
+      '-rw-r--r-- 0/0 300 2026-10-09 10:00 ./usr/share/applications/uniwork-office.desktop',
+      '-rw-r--r-- 0/0 900 2026-10-09 10:00 ./usr/share/icons/hicolor/64x64/apps/uniwork-office.png',
+      '-rwxr-xr-x 0/0 900 2026-10-09 10:00 ./opt/UniWork Office/resources/cli/genoffice',
+    ].join('\n')
+    assert.deepEqual(visibleDebMembers(listing), [
+      './usr/share/applications/uniwork-office.desktop',
+      './usr/share/icons/hicolor/64x64/apps/uniwork-office.png',
+    ])
   })
 })

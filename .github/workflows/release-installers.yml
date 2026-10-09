@@ -1,15 +1,15 @@
 name: Release installers
 
 # Builds the UniWork Office desktop installers for the dev and beta channels:
-# Windows x64 (NSIS) and macOS arm64 + x64 (dmg), unsigned while no
-# certificates exist. See tools/release/README.md.
+# Windows x64 (NSIS), macOS arm64 + x64 (dmg) and Linux x64 (AppImage, deb),
+# unsigned while no certificates exist. See tools/release/README.md.
 #
 #   tag push v<version>-dev.<n> / v<version>-beta.<n>
-#       build both platforms, then publish a pre-release for the tag (never
+#       build every platform, then publish a pre-release for the tag (never
 #       marked latest) with the installers and SHA256SUMS-<platform>.txt, and
 #       print OFFICE_INSTALLER_<CHANNEL>_URLS in the run summary.
 #   workflow_dispatch (channel dev | beta)
-#       build both platforms as version <version>-<channel>.<run number> and
+#       build every platform as version <version>-<channel>.<run number> and
 #       keep the installers as workflow artifacts only (no tag, no release).
 #
 # <version> must equal apps/shell/package.json. Stable is refused while builds
@@ -434,11 +434,111 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  linux:
+    needs: meta
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    env:
+      UNIWORK_RELEASE_CHANNEL: ${{ needs.meta.outputs.channel }}
+      RELEASE_VERSION: ${{ needs.meta.outputs.version }}
+      BUILD_DIR: ${{ github.workspace }}/release-out
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable branch, 2026-07
+        with:
+          toolchain: stable
+
+      - name: Cache cargo (xlsx-sidecar)
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          workspaces: apps/sheets/native/xlsx-engine
+
+      - name: Cache electron binaries
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/electron
+            ~/.cache/electron-builder
+          key: release-electron-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: release-electron-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: npm ci
+
+      # build:all also builds the xlsx sidecar natively (cargo's host
+      # target/release/, which the linux packaging config ships)
+      - name: Build apps and the xlsx sidecar
+        run: |
+          npm run notices
+          npm run build:all
+          test -x apps/sheets/native/xlsx-engine/target/release/xlsx-sidecar
+
+      # Linux packages are unsigned in every mode; the release config builds
+      # the AppImage and the deb only (the download server has no rpm key).
+      - name: Package the AppImage and the deb
+        working-directory: apps/shell
+        run: npx electron-builder --linux --x64 --publish never "-c.extraMetadata.version=$RELEASE_VERSION"
+
+      # dpkg-deb reads the deb's control fields and desktop entry
+      - name: Check the build output brand
+        run: node tools/release/check-build-brand.mjs --dir "$BUILD_DIR" --expect linux-unpacked
+
+      # The post-install script replaces electron-builder's default one, so a
+      # real install proves the launcher link, the URL handler registration,
+      # the deployment profile carry-over and a clean uninstall.
+      - name: Install check (deb)
+        run: bash tools/release/linux-install-check.sh "$BUILD_DIR/UniWork-Office_${RELEASE_VERSION}_unsigned_linux_x64.deb"
+
+      - name: Collect the packages and their SHA-256 sums
+        run: |
+          set -euo pipefail
+          mkdir -p upload
+          shopt -s nullglob
+          files=("$BUILD_DIR"/UniWork-Office_"$RELEASE_VERSION"_*linux_x64.deb "$BUILD_DIR"/UniWork-Office_"$RELEASE_VERSION"_*linux_x64.AppImage)
+          if [ "${#files[@]}" != 2 ]; then
+            echo "::error::expected the deb and the AppImage for $RELEASE_VERSION, found ${#files[@]}"
+            ls -la "$BUILD_DIR"
+            exit 1
+          fi
+          cp "${files[@]}" upload/
+          cd upload
+          sha256sum -- * > SHA256SUMS-linux-x64.txt
+          cat SHA256SUMS-linux-x64.txt
+          {
+            echo "### Linux x64"
+            echo
+            for file in *; do
+              printf -- '- %s (%s bytes)\n' "$file" "$(wc -c < "$file" | tr -d ' ')"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the packages
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: installers-linux-x64
+          path: upload/*
+          if-no-files-found: error
+          retention-days: 14
+
   # Read-only: runs the repository's URL helper on the built files. A file it
   # refuses (no unsigned label, another channel) stops the release before
   # anything is published.
   urls:
-    needs: [meta, windows, macos]
+    needs: [meta, windows, macos, linux]
     if: needs.meta.outputs.publish == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -521,6 +621,6 @@ jobs:
           if ! gh release view "$TAG" >/dev/null 2>&1; then
             gh release create "$TAG" --verify-tag --prerelease --latest=false \
               --title "UniWork Office $TAG ($CHANNEL, unsigned)" \
-              --notes "Unsigned $CHANNEL build of UniWork Office for Windows x64 and macOS (Apple Silicon and Intel). No auto-update. SHA-256 sums are attached. First launch: Windows SmartScreen > More info > Run anyway; macOS right-click the app > Open, or on macOS 15 and later System Settings > Privacy & Security > Open Anyway."
+              --notes "Unsigned $CHANNEL build of UniWork Office for Windows x64, macOS (Apple Silicon and Intel) and Linux x64 (deb, AppImage). No auto-update. SHA-256 sums are attached. First launch: Windows SmartScreen > More info > Run anyway; macOS right-click the app > Open, or on macOS 15 and later System Settings > Privacy & Security > Open Anyway; Linux: sudo apt install ./<file>.deb, or chmod +x the AppImage and run it."
           fi
           gh release upload "$TAG" release-files/* --clobber

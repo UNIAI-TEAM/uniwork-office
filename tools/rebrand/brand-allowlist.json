@@ -8,12 +8,6 @@
       "reason": "Reference to an upstream issue/PR number inside a comment; attribution to where the behaviour was designed."
     },
     {
-      "path": "apps/shell/electron-builder.cjs",
-      "pattern": "@genofficeshell",
-      "kind": "permanent",
-      "reason": "Comment quoting the invalid npm-scope-derived desktop name that syncDesktopName avoids; describes upstream behaviour, not product branding."
-    },
-    {
       "path": "apps/shell/src/renderer/src/assets/UNIWORK_BRAND_ASSET_REQUIRED.md",
       "kind": "permanent",
       "reason": "Internal note that names the removed upstream lockup to explain why placeholder artwork is in place (trademark attribution)."
