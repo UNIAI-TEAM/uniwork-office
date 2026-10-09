@@ -263,8 +263,9 @@ base-uri 'self'; form-action 'self'; frame-ancestors 'self'`), `X-Frame-Options:
 
 ## 6. Open items
 
-- **No autosave on the web** (product decision): `autoSaveToDisk` is `false`, since each autosave would create a new
-  Documents version. A server-backed autosave would flip that capability (or add a key).
+- **No autosave on the web: decided** (user, 2026-10-09 09:35 UTC+7, via the Advisor). Docs and every other genoffice module
+  on the web save only on an explicit user save; `autoSaveToDisk` (and each module's autosave key) stays `false` and AutoSave stays
+  hidden in the web capability list. Closed, not an open item.
 - **Attachments and `projectApi`** are browser-local / in-memory while AI is hidden; they need host-backed versions
   (`api.attachments.add`, `api.images.upload` exist in the protocol, unused) when AI ships on the web.
 - **Images on file documents are kept until purge** (dev-uniwork storage side).
