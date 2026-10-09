@@ -146,6 +146,8 @@ export const nl = {
   appProtectSecurity: 'Beveiliging',
   appProtectDesc:
     'Stel wachtwoorden voor openen en wijzigen, bewerkingsbeperkingen en privacyopties in; toegepast bij opslaan',
+  appProtectDescWeb:
+    'Stel een wachtwoord voor wijzigen, bewerkingsbeperkingen en privacyopties in; toegepast bij opslaan',
   appOptional: '(optioneel)',
   appOptionalBlank: '(optioneel)',
   appProtectOpenPwd: 'Wachtwoord om dit document te openen',
@@ -517,4 +519,24 @@ export const nl = {
     'Deze stijl bijwerken met de huidige selectie (teruggeschreven naar styles.xml)',
   appNewStyleFromSelection: 'Nieuwe stijl op basis van de huidige selectie',
   appStyleNamePlaceholder: 'Stijlnaam',
+  appWebConflictTitle: 'Dit document is elders gewijzigd',
+  appWebConflictBody:
+    'Tijdens het bewerken is een nieuwere versie opgeslagen. Wilt u die overschrijven met uw versie, of de nieuwste versie opnieuw laden en uw wijzigingen negeren?',
+  appWebConflictOverwrite: 'Overschrijven',
+  appWebConflictReload: 'Nieuwste versie laden',
+  appWebConflictNotSaved: 'het document is elders gewijzigd',
+  appWebDiscardTitle: 'Niet-opgeslagen wijzigingen negeren?',
+  appWebDiscardBody:
+    'Als u een ander document opent, wordt dit document vervangen en gaan niet-opgeslagen wijzigingen verloren.',
+  appWebDiscard: 'Negeren en openen',
+  appWebFatalTitle: 'Het document kan niet worden geopend',
+  appWebFatalBody:
+    'Bewerken en opslaan zijn uitgeschakeld. Laad de pagina opnieuw of open het document opnieuw vanuit UniWork.',
+  appWebNoHost: 'Deze editor werkt binnen UniWork. Open het document vanuit UniWork.',
+  appSaveStateUnsaved: 'Niet-opgeslagen wijzigingen',
+  appSaveStateSaved: 'Alle wijzigingen opgeslagen',
+  appSaving: 'Opslaan…',
+  appSavingAs: 'Opslaan als…',
+  appPdfPrintFallback:
+    'PDF-export is hier niet beschikbaar; in plaats daarvan is het afdrukvenster van de browser gebruikt',
 } satisfies Record<keyof typeof zh, string>

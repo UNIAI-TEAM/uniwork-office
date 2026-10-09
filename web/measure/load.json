@@ -1,0 +1,380 @@
+{
+  "generatedAt": "2026-10-08T13:47:05.026Z",
+  "runs": 5,
+  "chromium": "151.0.7922.34",
+  "server": "web/server/server.mjs (no compression, Cache-Control: no-store)",
+  "docs": {
+    "simple.docx": {
+      "fixtureServedBy": "server",
+      "okRuns": 5,
+      "domContentLoadedMs": {
+        "median": 313,
+        "min": 307.09999990463257,
+        "max": 317.3999996185303,
+        "n": 5
+      },
+      "loadMs": {
+        "median": 313.3999996185303,
+        "min": 307.5,
+        "max": 317.7999997138977,
+        "n": 5
+      },
+      "timeToEditableMs": {
+        "median": 567.3999996185303,
+        "min": 553.4000000953674,
+        "max": 591.6999998092651,
+        "n": 5
+      },
+      "jsHeapUsedBytes": {
+        "median": 11131500,
+        "min": 11095968,
+        "max": 11141208,
+        "n": 5
+      },
+      "jsHeapUsedAfterGcBytes": {
+        "median": 8627840,
+        "min": 8627824,
+        "max": 8627884,
+        "n": 5
+      },
+      "transferredAtEditableBytes": {
+        "median": 5346155,
+        "min": 5346155,
+        "max": 5346155,
+        "n": 5
+      },
+      "transferredBytes": {
+        "median": 7879494,
+        "min": 7879494,
+        "max": 7879494,
+        "n": 5
+      },
+      "requests": {
+        "median": 9,
+        "min": 9,
+        "max": 9,
+        "n": 5
+      },
+      "raw": [
+        {
+          "transferredAtEditable": 5346155,
+          "ok": true,
+          "opened": "query",
+          "dcl": 317.3999996185303,
+          "load": 317.7999997138977,
+          "tte": 591.6999998092651,
+          "heap": 11111924,
+          "heapAfterGc": 8627824,
+          "transferred": 7879494,
+          "requests": 9,
+          "failed": [],
+          "consoleErrors": []
+        },
+        {
+          "transferredAtEditable": 5346155,
+          "ok": true,
+          "opened": "query",
+          "dcl": 314.1000003814697,
+          "load": 314.6000003814697,
+          "tte": 570.9000000953674,
+          "heap": 11137536,
+          "heapAfterGc": 8627840,
+          "transferred": 7879494,
+          "requests": 9,
+          "failed": [],
+          "consoleErrors": []
+        },
+        {
+          "transferredAtEditable": 5346155,
+          "ok": true,
+          "opened": "query",
+          "dcl": 307.09999990463257,
+          "load": 307.5,
+          "tte": 553.4000000953674,
+          "heap": 11141208,
+          "heapAfterGc": 8627836,
+          "transferred": 7879494,
+          "requests": 9,
+          "failed": [],
+          "consoleErrors": []
+        },
+        {
+          "transferredAtEditable": 5346155,
+          "ok": true,
+          "opened": "query",
+          "dcl": 313,
+          "load": 313.3999996185303,
+          "tte": 567.3999996185303,
+          "heap": 11131500,
+          "heapAfterGc": 8627884,
+          "transferred": 7879494,
+          "requests": 9,
+          "failed": [],
+          "consoleErrors": []
+        },
+        {
+          "transferredAtEditable": 5346155,
+          "ok": true,
+          "opened": "query",
+          "dcl": 308.2000002861023,
+          "load": 308.5,
+          "tte": 553.5,
+          "heap": 11095968,
+          "heapAfterGc": 8627844,
+          "transferred": 7879494,
+          "requests": 9,
+          "failed": [],
+          "consoleErrors": []
+        }
+      ]
+    },
+    "kitchen-sink.docx": {
+      "fixtureServedBy": "server",
+      "okRuns": 5,
+      "domContentLoadedMs": {
+        "median": 310.19999980926514,
+        "min": 305.5,
+        "max": 317.5,
+        "n": 5
+      },
+      "loadMs": {
+        "median": 310.5,
+        "min": 305.90000009536743,
+        "max": 317.90000009536743,
+        "n": 5
+      },
+      "timeToEditableMs": {
+        "median": 640.6999998092651,
+        "min": 627,
+        "max": 648.5,
+        "n": 5
+      },
+      "jsHeapUsedBytes": {
+        "median": 12137668,
+        "min": 12104216,
+        "max": 12140552,
+        "n": 5
+      },
+      "jsHeapUsedAfterGcBytes": {
+        "median": 9614636,
+        "min": 9610660,
+        "max": 9616060,
+        "n": 5
+      },
+      "transferredAtEditableBytes": {
+        "median": 5966642,
+        "min": 5966642,
+        "max": 5966642,
+        "n": 5
+      },
+      "transferredBytes": {
+        "median": 8499981,
+        "min": 8499981,
+        "max": 8499981,
+        "n": 5
+      },
+      "requests": {
+        "median": 11,
+        "min": 11,
+        "max": 11,
+        "n": 5
+      },
+      "raw": [
+        {
+          "transferredAtEditable": 5966642,
+          "ok": true,
+          "opened": "query",
+          "dcl": 317.5,
+          "load": 317.90000009536743,
+          "tte": 648.5,
+          "heap": 12104216,
+          "heapAfterGc": 9614576,
+          "transferred": 8499981,
+          "requests": 11,
+          "failed": [],
+          "consoleErrors": []
+        },
+        {
+          "transferredAtEditable": 5966642,
+          "ok": true,
+          "opened": "query",
+          "dcl": 305.5,
+          "load": 305.90000009536743,
+          "tte": 636.6000003814697,
+          "heap": 12138676,
+          "heapAfterGc": 9616028,
+          "transferred": 8499981,
+          "requests": 11,
+          "failed": [],
+          "consoleErrors": []
+        },
+        {
+          "transferredAtEditable": 5966642,
+          "ok": true,
+          "opened": "query",
+          "dcl": 310.2000002861023,
+          "load": 310.5,
+          "tte": 642,
+          "heap": 12104280,
+          "heapAfterGc": 9614636,
+          "transferred": 8499981,
+          "requests": 11,
+          "failed": [],
+          "consoleErrors": []
+        },
+        {
+          "transferredAtEditable": 5966642,
+          "ok": true,
+          "opened": "query",
+          "dcl": 310.19999980926514,
+          "load": 310.69999980926514,
+          "tte": 640.6999998092651,
+          "heap": 12137668,
+          "heapAfterGc": 9616060,
+          "transferred": 8499981,
+          "requests": 11,
+          "failed": [],
+          "consoleErrors": []
+        },
+        {
+          "transferredAtEditable": 5966642,
+          "ok": true,
+          "opened": "query",
+          "dcl": 305.59999990463257,
+          "load": 306,
+          "tte": 627,
+          "heap": 12140552,
+          "heapAfterGc": 9610660,
+          "transferred": 8499981,
+          "requests": 11,
+          "failed": [],
+          "consoleErrors": []
+        }
+      ]
+    },
+    "long.docx": {
+      "fixtureServedBy": "playwright route (server 404)",
+      "okRuns": 5,
+      "domContentLoadedMs": {
+        "median": 310.80000019073486,
+        "min": 306.8999996185303,
+        "max": 311.8999996185303,
+        "n": 5
+      },
+      "loadMs": {
+        "median": 311.1000003814697,
+        "min": 307.2999997138977,
+        "max": 312.2999997138977,
+        "n": 5
+      },
+      "timeToEditableMs": {
+        "median": 986.6999998092651,
+        "min": 972.0999999046326,
+        "max": 1007.5,
+        "n": 5
+      },
+      "jsHeapUsedBytes": {
+        "median": 22077268,
+        "min": 20907432,
+        "max": 22081080,
+        "n": 5
+      },
+      "jsHeapUsedAfterGcBytes": {
+        "median": 12509216,
+        "min": 12507612,
+        "max": 12510092,
+        "n": 5
+      },
+      "transferredAtEditableBytes": {
+        "median": 5348503,
+        "min": 5348503,
+        "max": 5348503,
+        "n": 5
+      },
+      "transferredBytes": {
+        "median": 5348503,
+        "min": 5348503,
+        "max": 5348503,
+        "n": 5
+      },
+      "requests": {
+        "median": 8,
+        "min": 8,
+        "max": 8,
+        "n": 5
+      },
+      "raw": [
+        {
+          "transferredAtEditable": 5348503,
+          "ok": true,
+          "opened": "query",
+          "dcl": 308.90000009536743,
+          "load": 309.30000019073486,
+          "tte": 987.0999999046326,
+          "heap": 22077268,
+          "heapAfterGc": 12510092,
+          "transferred": 5348503,
+          "requests": 8,
+          "failed": [],
+          "consoleErrors": []
+        },
+        {
+          "transferredAtEditable": 5348503,
+          "ok": true,
+          "opened": "query",
+          "dcl": 311.8999996185303,
+          "load": 312.2999997138977,
+          "tte": 972.0999999046326,
+          "heap": 22080944,
+          "heapAfterGc": 12509216,
+          "transferred": 5348503,
+          "requests": 8,
+          "failed": [],
+          "consoleErrors": []
+        },
+        {
+          "transferredAtEditable": 5348503,
+          "ok": true,
+          "opened": "query",
+          "dcl": 310.80000019073486,
+          "load": 311.1000003814697,
+          "tte": 980.4000000953674,
+          "heap": 22081080,
+          "heapAfterGc": 12509140,
+          "transferred": 5348503,
+          "requests": 8,
+          "failed": [],
+          "consoleErrors": []
+        },
+        {
+          "transferredAtEditable": 5348503,
+          "ok": true,
+          "opened": "query",
+          "dcl": 306.8999996185303,
+          "load": 307.2999997138977,
+          "tte": 1007.5,
+          "heap": 22076764,
+          "heapAfterGc": 12509960,
+          "transferred": 5348503,
+          "requests": 8,
+          "failed": [],
+          "consoleErrors": []
+        },
+        {
+          "transferredAtEditable": 5348503,
+          "ok": true,
+          "opened": "query",
+          "dcl": 311.59999990463257,
+          "load": 312,
+          "tte": 986.6999998092651,
+          "heap": 20907432,
+          "heapAfterGc": 12507612,
+          "transferred": 5348503,
+          "requests": 8,
+          "failed": [],
+          "consoleErrors": []
+        }
+      ]
+    }
+  }
+}

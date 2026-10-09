@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <!--
+      No <meta> Content-Security-Policy on purpose: the policy is delivered by the host as an HTTP
+      header (frame-ancestors only works as a header). `npm run build:web` writes the exact value to
+      csp.json / headers.json next to manifest.json (source: web/docs/build/csp.ts).
+    -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>UniWork Docs (web)</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <!-- bridge must run first: it installs window.desktop / window.projectApi -->
+    <script type="module" src="./bridge/install.ts"></script>
+    <script type="module" src="../../apps/docs/src/renderer/main.tsx"></script>
+  </body>
+</html>

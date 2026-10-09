@@ -111,6 +111,7 @@ import { hfFooterLine, hfLayoutResolved, hfPhantomSpec, hfWithPhantom } from './
 import { textColorValue } from './editor/text-color'
 import { textOutlineCssValue } from './editor/text-outline'
 import { AiAskPopover } from './components/AiAskPopover'
+import { cap } from './capabilities'
 import { EDIT_QUEUE_MAX, selectionForAnchor, type DocsEditQueueItem } from './ai/edit-queue'
 import { addQueueAnchor, clearQueueAnchors, removeQueueAnchors } from './editor/ai-queue-anchors'
 import {
@@ -374,6 +375,7 @@ import {
 } from './doc-state'
 import {
   applyAiDocContent as applyAiDocContentImpl,
+  buildDocBytes as buildDocBytesImpl,
   exportPdf as exportPdfImpl,
   exportHtml as exportHtmlImpl,
   exportImages as exportImagesImpl,
@@ -777,7 +779,11 @@ export function App() {
   } | null>(null)
   const [_recent, setRecent] = useState<string[]>([])
   const [settings, setSettings] = useState<AiSettings>(DEFAULT_SETTINGS)
-  const [showAi, setShowAi] = useState(() => aiPanelInitiallyOpen('aidocs.showAi'))
+  // capability-gated: when the platform has no AI the dock never shows, whatever
+  // the stored preference or a stray setShowAi(true) says
+  const aiEnabled = cap('ai')
+  const [showAiPref, setShowAi] = useState(() => aiPanelInitiallyOpen('aidocs.showAi'))
+  const showAi = aiEnabled && showAiPref
   const [spellcheck, setSpellcheck] = useState(spellcheckEnabled)
   const [largeDocSpellOff, setLargeDocSpellOff] = useState(false)
   const spellcheckActive = spellcheck && !largeDocSpellOff
@@ -1035,7 +1041,10 @@ export function App() {
     otherName: string
     entries: CompareEntry[]
   } | null>(null)
-  const [autoSave, setAutoSave] = useAutoSavePref('aidocs.autoSave', window.desktop)
+  const [autoSavePref, setAutoSave] = useAutoSavePref('aidocs.autoSave', window.desktop)
+  // autosave writes to a local path: platforms without one force it off
+  const autoSaveToDisk = cap('autoSaveToDisk')
+  const autoSave = autoSaveToDisk && autoSavePref
   // tab closed but this renderer kept alive (shell freeze workaround): go inert
   const [tornDown, setTornDown] = useState(false)
   const [aiPreset, setAiPreset] = useState<{
@@ -1399,8 +1408,11 @@ export function App() {
     onSelectionUpdate: () => scheduleUiRefresh(),
     // typing in the main document takes ribbon routing back from any textbox
     onFocus: () => setActiveSubEditor(null),
-    onUpdate: () => {
+    onUpdate: ({ transaction }) => {
       dirtyRef.current = true
+      // an edit makes the last file message ("Opened …", "Exported …") stale; streamed
+      // content and other non-history transactions keep it
+      if (transaction.getMeta('addToHistory') !== false) setStatus('')
       scheduleUiRefresh()
     },
   })
@@ -1524,15 +1536,15 @@ export function App() {
   )
 
   useEffect(() => {
-    void window.desktop.getRecentFiles().then(setRecent)
+    if (cap('recents')) void window.desktop.getRecentFiles().then(setRecent)
     const loadSettings = () => void window.desktop.getAiSettings().then(setSettings)
     loadSettings()
     return window.desktop.onAiSettingsChanged?.(loadSettings)
   }, [])
 
   useEffect(() => {
-    rememberAiPanelOpen('aidocs.showAi', showAi)
-  }, [showAi])
+    if (aiEnabled) rememberAiPanelOpen('aidocs.showAi', showAi)
+  }, [aiEnabled, showAi])
 
   useEffect(() => {
     localStorage.setItem('aidocs.showNav', showNav ? '1' : '0')
@@ -1887,12 +1899,23 @@ export function App() {
   // copy to the main process every 30s; a normal save (or discarding on close) removes
   // it, and reopening the file offers Restore/Discard when a newer copy exists.
   useEffect(() => {
-    if (tornDown) return
+    // recovery copies live under the desktop userData dir: no local disk, no timer
+    if (tornDown || !cap('autoSaveToDisk')) return
     const timer = window.setInterval(() => {
       void writeRecoveryCopyImpl(fileCtxRef.current)
     }, 30_000)
     return () => window.clearInterval(timer)
   }, [tornDown])
+
+  // web bridge: serialize the live document on demand (server PDF export of unsaved edits)
+  useEffect(
+    () =>
+      window.desktop.provideDocBytes?.(async () => {
+        const bytes = await buildDocBytesImpl(fileCtxRef.current)
+        return bytes ? (bytes.slice().buffer as ArrayBuffer) : null
+      }),
+    [],
+  )
 
   // MCP bridge: let an external agent drive this visible editor. Commands arrive
   // from the shell main process and run against the live ctx (refs refresh per render).
@@ -5193,6 +5216,7 @@ export function App() {
   // Review > Editor, the Tools menu and Word's F7 all run the same AI proofread
   // behind the one-time whole-document-rewrite acknowledgement
   const runAiProofread = useCallback(() => {
+    if (!cap('ai')) return
     if (
       localStorage.getItem(AI_REWRITE_ACK_KEY) !== '1' &&
       !window.confirm(t('ribbonAiRewriteConfirm'))
@@ -5289,7 +5313,7 @@ export function App() {
       }
       if ((e.metaKey || e.ctrlKey) && e.key === 'o') {
         e.preventDefault()
-        void openFile()
+        if (cap('open')) void openFile()
       }
       if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
         e.preventDefault()
@@ -6785,15 +6809,20 @@ export function App() {
         >
           <IconRedo size={16} />
         </button>
-        <label className={`autosave-toggle ${autoSave ? 'on' : ''}`} data-tip={t('appAutoSaveTip')}>
-          <span className="autosave-knob" />
-          <span className="autosave-text">{t('appAutoSave')}</span>
-          <input
-            type="checkbox"
-            checked={autoSave}
-            onChange={(e) => setAutoSave(e.target.checked)}
-          />
-        </label>
+        {autoSaveToDisk && (
+          <label
+            className={`autosave-toggle ${autoSave ? 'on' : ''}`}
+            data-tip={t('appAutoSaveTip')}
+          >
+            <span className="autosave-knob" />
+            <span className="autosave-text">{t('appAutoSave')}</span>
+            <input
+              type="checkbox"
+              checked={autoSave}
+              onChange={(e) => setAutoSave(e.target.checked)}
+            />
+          </label>
+        )}
         <span className="qa-sep" aria-hidden="true" />
       </>
     ),
@@ -7004,7 +7033,7 @@ export function App() {
       />
 
       <div className="app-main">
-        {doc && (
+        {doc && aiEnabled && (
           <div className={`ai-dock${showAi ? '' : ' collapsed'}`}>
             {/* always mounted: collapse must not drop state or in-flight runs */}
             <AiPanel
@@ -7062,7 +7091,7 @@ export function App() {
                 onClose={closeNav}
               />
             )}
-            {doc && (
+            {doc && aiEnabled && (
               <AiAskPopover
                 editor={editor}
                 queueFull={editQueue.length >= EDIT_QUEUE_MAX}
@@ -7378,7 +7407,20 @@ export function App() {
                   </button>
                 </>
               )}
-              {!doc && t('appReady')}
+              {/* no document yet means the boot-time open is still running */}
+              {(!doc || docLoading) && (
+                <span className="status-item status-loading" role="status">
+                  {t('appStartOpening')}
+                </span>
+              )}
+              {doc && !docLoading && (hasUnsavedChanges || doc.filePath) && (
+                <span
+                  className={`status-item status-save-state${hasUnsavedChanges ? ' unsaved' : ''}`}
+                  role="status"
+                >
+                  {hasUnsavedChanges ? t('appSaveStateUnsaved') : t('appSaveStateSaved')}
+                </span>
+              )}
               {status && <span className="status-msg"> — {status}</span>}
             </div>
             <div className="status-right">

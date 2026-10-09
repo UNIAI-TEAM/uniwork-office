@@ -142,6 +142,8 @@ export const pt = {
   appProtectSecurity: 'Segurança',
   appProtectDesc:
     'Defina senhas de abertura e modificação, restrições de edição e opções de privacidade; aplica-se ao salvar',
+  appProtectDescWeb:
+    'Defina a senha de modificação, restrições de edição e opções de privacidade; aplica-se ao salvar',
   appOptional: '(opcional)',
   appOptionalBlank: '(opcional)',
   appProtectOpenPwd: 'Senha para abrir este documento',
@@ -507,4 +509,24 @@ export const pt = {
   appUpdateStyleTip: 'Atualizar este estilo com a seleção atual (gravado de volta em styles.xml)',
   appNewStyleFromSelection: 'Novo estilo a partir da seleção atual',
   appStyleNamePlaceholder: 'Nome do estilo',
+  appWebConflictTitle: 'Este documento foi alterado em outro lugar',
+  appWebConflictBody:
+    'Uma versão mais recente foi salva enquanto você editava. Deseja substituí-la pela sua versão ou recarregar a versão mais recente e descartar suas alterações?',
+  appWebConflictOverwrite: 'Substituir',
+  appWebConflictReload: 'Recarregar a versão mais recente',
+  appWebConflictNotSaved: 'o documento foi alterado em outro lugar',
+  appWebDiscardTitle: 'Descartar as alterações não salvas?',
+  appWebDiscardBody:
+    'Abrir outro documento substitui este, e as alterações não salvas serão perdidas.',
+  appWebDiscard: 'Descartar e abrir',
+  appWebFatalTitle: 'Não foi possível abrir o documento',
+  appWebFatalBody:
+    'A edição e o salvamento estão desativados. Recarregue a página ou abra o documento novamente pelo UniWork.',
+  appWebNoHost: 'Este editor funciona dentro do UniWork. Abra o documento pelo UniWork.',
+  appSaveStateUnsaved: 'Alterações não salvas',
+  appSaveStateSaved: 'Todas as alterações salvas',
+  appSaving: 'Salvando…',
+  appSavingAs: 'Salvando como…',
+  appPdfPrintFallback:
+    'A exportação para PDF não está disponível aqui; foi usada a caixa de impressão do navegador',
 } satisfies Record<keyof typeof zh, string>

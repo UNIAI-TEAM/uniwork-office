@@ -1,0 +1,462 @@
+{
+  "generatedAt": "2026-10-08T13:31:46Z",
+  "scope": "A-L",
+  "summary": {
+    "methods_total": 34,
+    "by_class": {
+      "WEB-API": 15,
+      "HIDE": 12,
+      "BROWSER": 7
+    },
+    "methods_with_zero_call_sites": ["aiChat", "fontMetrics"],
+    "total_call_sites": 39
+  },
+  "dynamic_access": {
+    "bare_window_desktop_references": [
+      "apps/docs/src/renderer/App.tsx:872",
+      "apps/docs/src/renderer/ai/transport.ts:5"
+    ],
+    "dynamic_property_access": [
+      "packages/ui/src/popover-dismiss.ts:25-34 probes window[name] for name in slidesApi|desktopApi|desktop|pdfApi|markdownApi|aiOfficeTabs and calls .onChromePressed (method name is O, outside A-L; listed for W-completeness)"
+    ],
+    "window.desktop[x] computed access": [],
+    "unknown_method_names_not_on_DesktopApi": []
+  },
+  "methods": [
+    {
+      "name": "addAttachmentPaths",
+      "signature": "addAttachmentPaths(paths: string[]): Promise<AttachmentAddResult>",
+      "call_sites": [
+        "apps/docs/src/renderer/ai/AiPanel.tsx:1141",
+        "apps/docs/src/renderer/ai/AiPanel.tsx:1156"
+      ],
+      "call_count": 2,
+      "preload_channel": "invoke files:add",
+      "preload_handler": "apps/docs/src/preload/index.ts:156",
+      "main_handler": "apps/docs/src/main/docs-main.ts:3864",
+      "args_returns": "in: absolute local paths (string[]) from dropped Files; out: {accepted: AttachmentMeta[] (path,name,ext,sizeBytes), rejected: string[]} after main validates type/size via collectAttachments",
+      "class": "WEB-API",
+      "reason": "Needs the dropped File uploaded to a UniWork attachment endpoint; a local path is meaningless in the browser."
+    },
+    {
+      "name": "addPastedImage",
+      "signature": "addPastedImage(data: ArrayBuffer, ext: string): Promise<AttachmentAddResult>",
+      "call_sites": ["apps/docs/src/renderer/ai/AiPanel.tsx:1154"],
+      "call_count": 1,
+      "preload_channel": "invoke files:add-pasted-image",
+      "preload_handler": "apps/docs/src/preload/index.ts:157",
+      "main_handler": "apps/docs/src/main/docs-main.ts:3916",
+      "args_returns": "in: ArrayBuffer bitmap + ext; out: AttachmentAddResult; main writes the bytes to a temp file (savePastedImage) then runs collectAttachments",
+      "class": "WEB-API",
+      "reason": "Pasted bitmap must be uploaded to a server attachment endpoint that returns attachment metadata."
+    },
+    {
+      "name": "aiChat",
+      "signature": "aiChat(request: AiChatRequest): Promise<AiChatResponse>",
+      "call_sites": [],
+      "call_count": 0,
+      "preload_channel": "invoke ai:chat",
+      "preload_handler": "apps/docs/src/preload/index.ts:142",
+      "main_handler": "apps/docs/src/main/docs-main.ts:3095",
+      "args_returns": "in: AiChatRequest {settings, system, user}; out: AiChatResponse {ok, text|error}; one-shot provider call using the stored API key",
+      "class": "WEB-API",
+      "reason": "One-shot AI call needs a server chat endpoint; no renderer call site today.",
+      "notes": "declared in DesktopApi and preload but never called from the renderer or any package."
+    },
+    {
+      "name": "aiGenerateImage",
+      "signature": "aiGenerateImage(op: { prompt: string; aspectRatio?: string }): Promise<{ url?: string; error?: string }>",
+      "call_sites": ["apps/docs/src/renderer/ai/tools.ts:615"],
+      "call_count": 1,
+      "preload_channel": "invoke docs:ai-generate-image",
+      "preload_handler": "apps/docs/src/preload/index.ts:153",
+      "main_handler": "apps/docs/src/main/docs-main.ts:3066",
+      "args_returns": "in: {prompt, aspectRatio?}; out: {url?, error?}; main calls generateImageTool (Genspark cloud channel) with stored settings",
+      "class": "WEB-API",
+      "reason": "AI image generation needs a server endpoint holding the provider credentials."
+    },
+    {
+      "name": "aiGskLogin",
+      "signature": "aiGskLogin(): Promise<void>",
+      "call_sites": ["apps/docs/src/renderer/ai/AiPanel.tsx:1395"],
+      "call_count": 1,
+      "preload_channel": "invoke ai:gsk-login",
+      "preload_handler": "apps/docs/src/preload/index.ts:146",
+      "main_handler": "apps/docs/src/main/docs-main.ts:2920",
+      "args_returns": "in: none; out: void; main opens the system browser to the Genspark/genoffice login URL (shell.openExternal), fire-and-forget",
+      "class": "HIDE",
+      "reason": "Desktop Genspark/gsk CLI login flow; the web build authenticates through the UniWork session instead."
+    },
+    {
+      "name": "aiGskStatus",
+      "signature": "aiGskStatus(withEmail?: boolean): Promise<GenSparkAccountStatus>",
+      "call_sites": [
+        "apps/docs/src/renderer/ai/AiPanel.tsx:466",
+        "apps/docs/src/renderer/ai/AiPanel.tsx:841"
+      ],
+      "call_count": 2,
+      "preload_channel": "invoke ai:gsk-status",
+      "preload_handler": "apps/docs/src/preload/index.ts:145",
+      "main_handler": "apps/docs/src/main/docs-main.ts:2911",
+      "args_returns": "in: withEmail? boolean; out: GenSparkAccountStatus {loggedIn, email?}; main reads local gsk auth file (+ network call if withEmail)",
+      "class": "WEB-API",
+      "reason": "Login/entitlement probe for AI features; map to a UniWork session or AI-entitlement status endpoint.",
+      "notes": "both sites are multi-line chains (`void window.desktop\\n.aiGskStatus()`), invisible to a single-line grep; AiPanel.tsx:466 is optional-chained."
+    },
+    {
+      "name": "aiOpenBilling",
+      "signature": "aiOpenBilling(): Promise<void>",
+      "call_sites": ["apps/docs/src/renderer/ai/AiPanel.tsx:1401"],
+      "call_count": 1,
+      "preload_channel": "invoke ai:open-billing",
+      "preload_handler": "apps/docs/src/preload/index.ts:147",
+      "main_handler": "apps/docs/src/main/docs-main.ts:2925",
+      "args_returns": "in: none; out: void; main asks the shell to focus Home > Settings > Account (shellHooks.openSettings)",
+      "class": "BROWSER",
+      "reason": "Only focuses the shell Settings > Account page; on the web it is a plain navigation to the billing URL."
+    },
+    {
+      "name": "aiStream",
+      "signature": "aiStream(request: AiStreamRequest): Promise<void>",
+      "call_sites": ["apps/docs/src/renderer/ai/transport.ts:9"],
+      "call_count": 1,
+      "preload_channel": "invoke ai:stream",
+      "preload_handler": "apps/docs/src/preload/index.ts:143",
+      "main_handler": "apps/docs/src/main/docs-main.ts:2941",
+      "args_returns": "in: AiStreamRequest {requestId, settings, system, messages, tools?, maxTokens?}; out: void, chunks pushed on channel ai:stream-chunk (AiStreamChunk) tagged with requestId",
+      "class": "WEB-API",
+      "reason": "Streaming AI needs a server proxy endpoint (SSE or fetch stream) that emits the AiStreamChunk sequence."
+    },
+    {
+      "name": "aiStreamCancel",
+      "signature": "aiStreamCancel(requestId: string): Promise<void>",
+      "call_sites": ["apps/docs/src/renderer/ai/transport.ts:10"],
+      "call_count": 1,
+      "preload_channel": "invoke ai:stream-cancel",
+      "preload_handler": "apps/docs/src/preload/index.ts:144",
+      "main_handler": "apps/docs/src/main/docs-main.ts:3010",
+      "args_returns": "in: requestId; out: void; main aborts the matching AbortController in activeAiStreams",
+      "class": "WEB-API",
+      "reason": "Cancels a server-side stream; web can abort the fetch or call a cancel endpoint keyed by requestId."
+    },
+    {
+      "name": "consumeAiDocContent",
+      "signature": "consumeAiDocContent(): Promise<AiDocContent | null>",
+      "call_sites": ["apps/docs/src/renderer/App.tsx:1733"],
+      "call_count": 1,
+      "preload_channel": "invoke docs:consume-ai-doc-content",
+      "preload_handler": "apps/docs/src/preload/index.ts:75",
+      "main_handler": "apps/docs/src/main/docs-main.ts:3597",
+      "args_returns": "in: none; out: AiDocContent {title, html} | null; one-shot read-and-delete of content queued for this webContents by create_document",
+      "class": "HIDE",
+      "reason": "Handoff queue between create_document and the tab it spawns; web has no tab spawning, so the shim returns null."
+    },
+    {
+      "name": "consumeAiPreset",
+      "signature": "consumeAiPreset(): Promise<AiPresetPayload | null>",
+      "call_sites": ["apps/docs/src/renderer/App.tsx:1734"],
+      "call_count": 1,
+      "preload_channel": "invoke docs:consume-ai-preset",
+      "preload_handler": "apps/docs/src/preload/index.ts:76",
+      "main_handler": "apps/docs/src/main/docs-main.ts:3603",
+      "args_returns": "in: none; out: AiPresetPayload {text, autoRun?, displayText?} | null; one-shot read-and-delete of the Home/Teacher preset queued for this tab",
+      "class": "HIDE",
+      "reason": "One-shot preset queued by the desktop Home/Teacher launcher; shim returns null (or reads a URL param)."
+    },
+    {
+      "name": "consumeHeadlessExport",
+      "signature": "consumeHeadlessExport(): Promise<HeadlessExportTarget | null>",
+      "call_sites": ["apps/docs/src/renderer/App.tsx:2179"],
+      "call_count": 1,
+      "preload_channel": "invoke docs:consume-headless-export",
+      "preload_handler": "apps/docs/src/preload/index.ts:85",
+      "main_handler": "apps/docs/src/main/docs-main.ts:3611",
+      "args_returns": "in: none; out: HeadlessExportTarget {outPath, format} | null; non-null only when the app was launched with --headless-export",
+      "class": "HIDE",
+      "reason": "Only the --headless-export CLI mode sets it; the web shim returns null."
+    },
+    {
+      "name": "consumeNewBlankDoc",
+      "signature": "consumeNewBlankDoc(): Promise<boolean>",
+      "call_sites": ["apps/docs/src/renderer/App.tsx:1732"],
+      "call_count": 1,
+      "preload_channel": "invoke docs:consume-new-blank",
+      "preload_handler": "apps/docs/src/preload/index.ts:74",
+      "main_handler": "apps/docs/src/main/docs-main.ts:3587",
+      "args_returns": "in: none; out: boolean; true once if this tab was opened via New Document (one-shot flag)",
+      "class": "HIDE",
+      "reason": "Flag set by the desktop New Document tab spawn; the web shim returns false (new vs open is a route)."
+    },
+    {
+      "name": "consumePendingOpenDocx",
+      "signature": "consumePendingOpenDocx(): Promise<OpenDocxResult>",
+      "call_sites": ["apps/docs/src/renderer/App.tsx:1730"],
+      "call_count": 1,
+      "preload_channel": "invoke docs:consume-pending-open",
+      "preload_handler": "apps/docs/src/preload/index.ts:73",
+      "main_handler": "apps/docs/src/main/docs-main.ts:3573",
+      "args_returns": "in: none; out: OpenDocxResult (OpenFileResult | {needsPassword,path,name} | null); also sets rendererReady and loads the file passed via Finder/CLI or queued by New Tab",
+      "class": "WEB-API",
+      "reason": "Boot-time open of the doc named by the URL/route needs the server open endpoint; the Finder/CLI launch half is desktop-only."
+    },
+    {
+      "name": "convertAltChunkHtml",
+      "signature": "convertAltChunkHtml(html: string): Promise<Uint8Array | null>",
+      "call_sites": ["apps/docs/src/renderer/main.tsx:20", "apps/docs/src/renderer/main.tsx:21"],
+      "call_count": 2,
+      "preload_channel": "invoke docs:altchunk-html-to-docx",
+      "preload_handler": "apps/docs/src/preload/index.ts:60",
+      "main_handler": "apps/docs/src/main/docs-main.ts:3489",
+      "args_returns": "in: html string; out: Uint8Array docx | null; main renders the HTML in a hidden ElectronBrowserDriver window through html2docx (limit ALT_CHUNK_HTML_MAX_CHARS)",
+      "class": "WEB-API",
+      "reason": "html2docx runs in a hidden Electron window; web needs a server-side HTML-to-docx endpoint or must skip altChunk.",
+      "notes": "main.tsx:20 is an existence guard (`window.desktop?.convertAltChunkHtml`), main.tsx:21 is the call; both counted."
+    },
+    {
+      "name": "copyImageToClipboard",
+      "signature": "copyImageToClipboard(dataUrl: string, metaJson?: string): Promise<boolean>",
+      "call_sites": ["apps/docs/src/renderer/editor/extensions.ts:3185"],
+      "call_count": 1,
+      "preload_channel": "invoke docs:copy-image-to-clipboard",
+      "preload_handler": "apps/docs/src/preload/index.ts:159",
+      "main_handler": "apps/docs/src/main/docs-main.ts:3929",
+      "args_returns": "in: data:image/* URL + optional layout-meta JSON; out: boolean; main builds a nativeImage and writes bitmap + <img> html flavors to the OS clipboard",
+      "class": "BROWSER",
+      "reason": "Replaceable with navigator.clipboard.write([ClipboardItem]) for image/png plus text/html."
+    },
+    {
+      "name": "createDocument",
+      "signature": "createDocument(request: CreateDocumentRequest): Promise<CreateDocumentResult>",
+      "call_sites": ["apps/docs/src/renderer/ai/tools.ts:659"],
+      "call_count": 1,
+      "preload_channel": "invoke docs:create-document",
+      "preload_handler": "apps/docs/src/preload/index.ts:88",
+      "main_handler": "apps/docs/src/main/docs-main.ts:3824",
+      "args_returns": "in: CreateDocumentRequest {type docx|pdf|md|html, title, content}; out: {ok, path?, error?}; docx opens a new blank tab that inserts the HTML and saves itself, pdf/md/html are written to the default save dir",
+      "class": "WEB-API",
+      "reason": "AI create_document writes a new file into the user store; needs a server create-document endpoint."
+    },
+    {
+      "name": "discardDocPasswordIntents",
+      "signature": "discardDocPasswordIntents(throughRevision: number): Promise<{ ok: boolean }>",
+      "call_sites": ["apps/docs/src/renderer/file-actions.ts:738"],
+      "call_count": 1,
+      "preload_channel": "invoke docs:discard-password-intents",
+      "preload_handler": "apps/docs/src/preload/index.ts:71",
+      "main_handler": "apps/docs/src/main/docs-main.ts:3536",
+      "args_returns": "in: throughRevision number; out: {ok}; drops queued password intents of this webContents up to that revision",
+      "class": "HIDE",
+      "reason": "Document password (Review > Protect) intent bookkeeping; no web equivalent."
+    },
+    {
+      "name": "docPasswordIntentRevision",
+      "signature": "docPasswordIntentRevision(): Promise<number>",
+      "call_sites": ["apps/docs/src/renderer/file-actions.ts:735"],
+      "call_count": 1,
+      "preload_channel": "invoke docs:password-intent-revision",
+      "preload_handler": "apps/docs/src/preload/index.ts:65",
+      "main_handler": "apps/docs/src/main/docs-main.ts:3530",
+      "args_returns": "in: none; out: number (-1 when torn down); snapshot of the main-side password-intent sequence",
+      "class": "HIDE",
+      "reason": "Document password (Review > Protect) intent bookkeeping; no web equivalent."
+    },
+    {
+      "name": "exportHtml",
+      "signature": "exportHtml(defaultName: string, html: string, outPath?: string): Promise<{ ok: boolean; path?: string; error?: string }>",
+      "call_sites": ["apps/docs/src/renderer/file-actions.ts:1283"],
+      "call_count": 1,
+      "preload_channel": "invoke docs:export-html",
+      "preload_handler": "apps/docs/src/preload/index.ts:134",
+      "main_handler": "apps/docs/src/main/docs-main.ts:4032",
+      "args_returns": "in: defaultName, html string, outPath?; out: {ok, path?, error?}; main shows a Save dialog (unless outPath was pre-authorized) and writes the UTF-8 file",
+      "class": "BROWSER",
+      "reason": "The renderer already holds the full HTML string, so a Blob download replaces the Save dialog and file write."
+    },
+    {
+      "name": "exportPdf",
+      "signature": "exportPdf(defaultName: string, pageWidthTwips: number, pageHeightTwips: number, outPath?: string, scale?: number): Promise<{ ok: boolean; path?: string; error?: string }>",
+      "call_sites": [
+        "apps/docs/src/renderer/file-actions.ts:1181",
+        "apps/docs/src/renderer/file-actions.ts:1245"
+      ],
+      "call_count": 2,
+      "preload_channel": "invoke docs:export-pdf",
+      "preload_handler": "apps/docs/src/preload/index.ts:119",
+      "main_handler": "apps/docs/src/main/docs-main.ts:3986",
+      "args_returns": "in: defaultName, pageWidthTwips, pageHeightTwips, outPath?, scale?; out: {ok, path?, error?}; main Save dialog then webContents.printToPDF of the live window",
+      "class": "WEB-API",
+      "reason": "Uses webContents.printToPDF at custom page sizes; web needs a server-side PDF render endpoint (browser print is only a lossy fallback)."
+    },
+    {
+      "name": "fetchImage",
+      "signature": "fetchImage(url: string): Promise<{ base64: string; mime: string } | null>",
+      "call_sites": [
+        "apps/docs/src/renderer/App.tsx:1128",
+        "apps/docs/src/renderer/ai/tools.ts:698"
+      ],
+      "call_count": 2,
+      "preload_channel": "invoke ai:fetch-image",
+      "preload_handler": "apps/docs/src/preload/index.ts:152",
+      "main_handler": "apps/docs/src/main/docs-main.ts:3040",
+      "args_returns": "in: url string; out: {base64, mime} | null; main fetches with SSRF guard (http(s) only, no private targets, validated redirects) to bypass CORS",
+      "class": "WEB-API",
+      "reason": "Cross-origin image download with an SSRF guard must be a server proxy endpoint."
+    },
+    {
+      "name": "focusDocsTab",
+      "signature": "focusDocsTab(id: string): Promise<void>",
+      "call_sites": ["apps/docs/src/renderer/components/ribbon-tabs.tsx:1371"],
+      "call_count": 1,
+      "preload_channel": "invoke win:focus",
+      "preload_handler": "apps/docs/src/preload/index.ts:167",
+      "main_handler": "apps/docs/src/main/docs-main.ts:4134",
+      "args_returns": "in: tab id string; out: void; shell focuses that tab (or BrowserWindow.focus standalone)",
+      "class": "HIDE",
+      "reason": "Switches desktop shell tabs/windows; no web equivalent."
+    },
+    {
+      "name": "fontMetrics",
+      "signature": "fontMetrics(family: string): Promise<FaceVerticalMetrics | null>",
+      "call_sites": [],
+      "call_count": 0,
+      "preload_channel": "invoke docs:font-metrics",
+      "preload_handler": "apps/docs/src/preload/index.ts:117",
+      "main_handler": "apps/docs/src/main/docs-main.ts:3471",
+      "args_returns": "in: family name; out: FaceVerticalMetrics | null; main reads an installed system font (familyVerticalMetrics, cached under userData/font-metrics)",
+      "class": "HIDE",
+      "reason": "Reads installed system fonts from disk and has no renderer call site; the browser cannot enumerate them.",
+      "notes": "declared in DesktopApi and preload but never called from the renderer or any package."
+    },
+    {
+      "name": "getAiPanelPrefs",
+      "signature": "getAiPanelPrefs(): Promise<AiPanelPrefs>",
+      "call_sites": ["apps/docs/src/renderer/main.tsx:47"],
+      "call_count": 1,
+      "preload_channel": "invoke app:get-ai-panel-prefs",
+      "preload_handler": "apps/docs/src/preload/index.ts:40",
+      "main_handler": "apps/shell/src/main/index.ts:3967",
+      "args_returns": "in: none; out: AiPanelPrefs {fontSize, customFontSize, spellcheck}; read from shell app-settings.json",
+      "class": "BROWSER",
+      "reason": "Local UI preference (panel font size, spellcheck); serve from localStorage or user settings.",
+      "notes": "multi-line optional chain `window.desktop\\n?.getAiPanelPrefs?.()` (invisible to a single-line grep)."
+    },
+    {
+      "name": "getAiSettings",
+      "signature": "getAiSettings(): Promise<AiSettings>",
+      "call_sites": ["apps/docs/src/renderer/App.tsx:1220"],
+      "call_count": 1,
+      "preload_channel": "invoke ai:get-settings",
+      "preload_handler": "apps/docs/src/preload/index.ts:140",
+      "main_handler": "apps/docs/src/main/docs-main.ts:2892",
+      "args_returns": "in: none; out: AiSettings (active provider, per-provider config incl. API keys, gskToolsEnabled); read from the local ai settings file",
+      "class": "WEB-API",
+      "reason": "Provider settings hold API keys locally; web needs a server endpoint returning only a non-secret provider/entitlement view."
+    },
+    {
+      "name": "getAutoSaveDefault",
+      "signature": "getAutoSaveDefault(): Promise<AutoSaveDefault>",
+      "call_sites": [
+        "apps/docs/src/renderer/App.tsx:872 (window.desktop passed whole to useAutoSavePref; the call itself is packages/ui/src/auto-save-pref.ts:78)"
+      ],
+      "call_count": 1,
+      "preload_channel": "invoke app:get-auto-save-default",
+      "preload_handler": "apps/docs/src/preload/index.ts:34",
+      "main_handler": "apps/shell/src/main/index.ts:3945",
+      "args_returns": "in: none; out: AutoSaveDefault {on, updatedAt}; read from shell app-settings.json",
+      "class": "BROWSER",
+      "reason": "Local UI preference; useAutoSavePref already falls back to localStorage when the API is absent.",
+      "notes": "only reached through packages/ui useAutoSavePref(storageKey, window.desktop); optional-chained so an absent API is tolerated."
+    },
+    {
+      "name": "getLanguage",
+      "signature": "getLanguage(): Promise<'zh' | 'en' | 'ja' | 'ko' | 'fr' | 'de' | 'es' | 'th' | 'id' | 'ru' | 'ar'>",
+      "call_sites": ["apps/docs/src/renderer/main.tsx:36"],
+      "call_count": 1,
+      "preload_channel": "invoke app:get-language",
+      "preload_handler": "apps/docs/src/preload/index.ts:19",
+      "main_handler": "apps/docs/src/main/docs-main.ts:3468",
+      "args_returns": "in: none; out: UI language code (zh|en|ja|ko|fr|de|es|th|id|ru|ar); getUiLang() persisted by the shell",
+      "class": "BROWSER",
+      "reason": "UI language; derive from localStorage or navigator.language."
+    },
+    {
+      "name": "getPathForFile",
+      "signature": "getPathForFile(file: File): string",
+      "call_sites": [
+        "apps/docs/src/renderer/ai/AiPanel.tsx:1139",
+        "apps/docs/src/renderer/ai/AiPanel.tsx:1148"
+      ],
+      "call_count": 2,
+      "preload_channel": "invoke win:new",
+      "preload_handler": "apps/docs/src/preload/index.ts:164",
+      "main_handler": "(none: preload-only, electron webUtils.getPathForFile)",
+      "args_returns": "in: File; out: absolute path string (empty when the File has no disk path); synchronous, runs in the preload only",
+      "class": "HIDE",
+      "reason": "Electron webUtils path lookup; browser Files have no disk path, the attach flow must upload the File object instead.",
+      "notes": "runs synchronously in the preload; no ipc channel."
+    },
+    {
+      "name": "getRecentFiles",
+      "signature": "getRecentFiles(): Promise<string[]>",
+      "call_sites": [
+        "apps/docs/src/renderer/App.tsx:1219",
+        "apps/docs/src/renderer/file-actions.ts:438"
+      ],
+      "call_count": 2,
+      "preload_channel": "invoke docs:recent",
+      "preload_handler": "apps/docs/src/preload/index.ts:115",
+      "main_handler": "apps/docs/src/main/docs-main.ts:3829",
+      "args_returns": "in: none; out: string[] absolute paths of recent docs that still exist on disk",
+      "class": "WEB-API",
+      "reason": "Recents list needs a server endpoint over the user documents."
+    },
+    {
+      "name": "getTheme",
+      "signature": "getTheme(): Promise<UiTheme>",
+      "call_sites": ["apps/docs/src/renderer/main.tsx:37"],
+      "call_count": 1,
+      "preload_channel": "invoke app:get-theme",
+      "preload_handler": "apps/docs/src/preload/index.ts:28",
+      "main_handler": "apps/shell/src/main/index.ts:3932",
+      "args_returns": "in: none; out: UiTheme light|dark|system; read from shell app-settings.json",
+      "class": "BROWSER",
+      "reason": "UI theme; derive from localStorage or prefers-color-scheme."
+    },
+    {
+      "name": "headlessExportDone",
+      "signature": "headlessExportDone(result: { ok: boolean; error?: string }): void",
+      "call_sites": ["apps/docs/src/renderer/App.tsx:2192"],
+      "call_count": 1,
+      "preload_channel": "send docs:headless-export-done",
+      "preload_handler": "apps/docs/src/preload/index.ts:86",
+      "main_handler": "apps/docs/src/main/docs-main.ts:3617",
+      "args_returns": "in: {ok, error?}; out: void (ipc send); main settles the headless-export waiter so the process can quit",
+      "class": "HIDE",
+      "reason": "Reports back to the CLI headless-export process; only reachable after consumeHeadlessExport returns non-null."
+    },
+    {
+      "name": "imageSearch",
+      "signature": "imageSearch(query: string, maxResults?: number): Promise<{ images: Array<{ title: string; imageUrl: string; sourceUrl: string; source: string; width?: number; height?: number }>; method: string; error?: string }>",
+      "call_sites": ["apps/docs/src/renderer/ai/tools.ts:584"],
+      "call_count": 1,
+      "preload_channel": "invoke ai:image-search",
+      "preload_handler": "apps/docs/src/preload/index.ts:150",
+      "main_handler": "apps/docs/src/main/docs-main.ts:3026",
+      "args_returns": "in: query, maxResults? (default 8); out: {images: [{title,imageUrl,sourceUrl,source,width?,height?}], method, error?}; main runs imageSearchTool (Serper w/ DuckDuckGo fallback)",
+      "class": "WEB-API",
+      "reason": "Search-provider call with server-held keys; needs a server image-search endpoint."
+    },
+    {
+      "name": "listDocsTabs",
+      "signature": "listDocsTabs(): Promise<DocsTabInfo[]>",
+      "call_sites": ["apps/docs/src/renderer/components/ribbon-tabs.tsx:1120"],
+      "call_count": 1,
+      "preload_channel": "invoke win:list",
+      "preload_handler": "apps/docs/src/preload/index.ts:166",
+      "main_handler": "apps/docs/src/main/docs-main.ts:4125",
+      "args_returns": "in: none; out: DocsTabInfo[] {id,title,focused}; from shellHooks.listTabs() or BrowserWindow.getAllWindows()",
+      "class": "HIDE",
+      "reason": "Lists desktop shell tabs for View > Switch Tab; no web equivalent."
+    }
+  ]
+}

@@ -149,6 +149,7 @@ export const ja = {
   appProtectTitle: '文書の保護',
   appProtectSecurity: 'セキュリティ',
   appProtectDesc: '開く/変更のパスワード、編集制限、プライバシーを設定します(保存時に適用)',
+  appProtectDescWeb: '変更のパスワード、編集制限、プライバシーを設定します(保存時に適用)',
   appOptional: '(省略可)',
   appOptionalBlank: '(省略可)',
   appProtectOpenPwd: 'この文書を開くパスワード',
@@ -532,4 +533,25 @@ export const ja = {
   appUpdateStyleTip: '現在の選択範囲の書式でこのスタイルを更新します(styles.xml に書き戻し)',
   appNewStyleFromSelection: '選択範囲から新しいスタイルを作成',
   appStyleNamePlaceholder: 'スタイル名',
+  appWebConflictTitle: 'このドキュメントは別の場所で変更されました',
+  appWebConflictBody:
+    '編集中に新しいバージョンが保存されました。自分のバージョンで上書きしますか?それとも最新バージョンを再読み込みして変更を破棄しますか?',
+  appWebConflictOverwrite: '上書き',
+  appWebConflictReload: '最新版を再読み込み',
+  appWebConflictNotSaved: 'ドキュメントは別の場所で変更されています',
+  appWebDiscardTitle: '保存されていない変更を破棄しますか?',
+  appWebDiscardBody:
+    '別のドキュメントを開くと現在のドキュメントが置き換えられ、保存されていない変更は失われます。',
+  appWebDiscard: '破棄して開く',
+  appWebFatalTitle: 'ドキュメントを開けませんでした',
+  appWebFatalBody:
+    '編集と保存は無効になっています。ページを再読み込みするか、UniWork からドキュメントを開き直してください。',
+  appWebNoHost:
+    'このエディターは UniWork 内で動作します。UniWork からドキュメントを開いてください。',
+  appSaveStateUnsaved: '未保存の変更があります',
+  appSaveStateSaved: 'すべての変更を保存しました',
+  appSaving: '保存しています…',
+  appSavingAs: '名前を付けて保存しています…',
+  appPdfPrintFallback:
+    'PDF を直接エクスポートできないため、ブラウザーの印刷ダイアログを使用しました',
 } satisfies Record<keyof typeof zh, string>

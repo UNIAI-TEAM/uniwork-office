@@ -44,7 +44,7 @@ import {
   type WatermarkSpec,
 } from '@genoffice/docx-engine'
 import type { Dispatch, SetStateAction } from 'react'
-import type { AiDocContent, OpenDocxResult } from '../shared/ipc'
+import type { AiDocContent, OpenDocxResult, PdfExportResult } from '../shared/ipc'
 import {
   hfVariantsFromParsed,
   openedFileStartsDirty,
@@ -92,6 +92,7 @@ import { defaultEastAsiaFontFor } from './font-list'
 import { hasPrintableHeaderFooter } from './pagination'
 import { clearPrintZoom, setPrintZoom } from './print-zoom'
 import { showToast } from './components/toast-bus'
+import { cap } from './capabilities'
 import { buildStandaloneHtml } from './html-export'
 import { aiPanelInitiallyOpen } from '@genoffice/ui'
 
@@ -532,7 +533,7 @@ export async function loadFile(
     } else {
       ctx.setStatus(t('appOpenedFile', { name: result.name }))
     }
-    void window.desktop.getRecentFiles().then(ctx.setRecent)
+    if (cap('recents')) void window.desktop.getRecentFiles().then(ctx.setRecent)
     return 'ok'
   } catch (err) {
     if (generation !== openGeneration) return 'superseded'
@@ -981,12 +982,22 @@ async function saveOnce(
   if (!doc || !editor) return false
   ctx.saveInFlightRef.current = true
   ctx.saveIncompleteRef.current = false
+  // visible progress for a manual save (Save As can wait on a dialog and an upload); every
+  // outcome below replaces it, and an outcome without a message of its own clears it
+  const progress = auto ? null : t(saveAs ? 'appSavingAs' : 'appSaving')
+  if (progress) ctx.setStatus(progress)
+  const dropProgress = () => {
+    if (progress) ctx.setStatus('')
+  }
   try {
     // a mid-stream save would serialize (and write) a truncated document
     const generation = docGeneration
     await waitForFullContent()
     // the wait ended because another document replaced this one: nothing to write
-    if (docGeneration !== generation) return false
+    if (docGeneration !== generation) {
+      dropProgress()
+      return false
+    }
     // flush pending in-place table cell / textbox edits into the PM doc first
     window.dispatchEvent(new Event('ai-docs-commit-tables'))
     // identity snapshot: detects edits that arrive while the save is in flight
@@ -994,7 +1005,10 @@ async function saveOnce(
     const docSnapshot = editor.state.doc
     const selectionPos = editor.state.selection.from
     const bytes = await buildDocBytes(ctx)
-    if (!bytes) return false
+    if (!bytes) {
+      dropProgress()
+      return false
+    }
     const buffer = bytes.buffer.slice(
       bytes.byteOffset,
       bytes.byteOffset + bytes.byteLength,
@@ -1035,7 +1049,7 @@ async function saveOnce(
         if (result.error) {
           ctx.setStatus(t('appSaveFailed', { error: result.error }))
           if (!auto) showToast(t('appSaveFailed', { error: result.error }), 'error')
-        }
+        } else dropProgress()
         return false
       }
       savedPath = result.path!
@@ -1050,7 +1064,7 @@ async function saveOnce(
         if (result.reason !== 'external-modified') {
           ctx.setStatus(t('appSaveFailed', { error: result.error ?? '' }))
           if (!auto) showToast(t('appSaveFailed', { error: result.error ?? '' }), 'error')
-        }
+        } else dropProgress()
         return false
       }
       passwordIntentPending = result.passwordIntentPending === true
@@ -1078,9 +1092,8 @@ async function saveOnce(
             }
           : prev,
       )
-      ctx.setStatus(
-        auto ? t('appAutoSavedAt', { time: new Date().toLocaleTimeString() }) : t('appSaved'),
-      )
+      // a manual save leaves no message: the status bar's save state says it
+      ctx.setStatus(auto ? t('appAutoSavedAt', { time: new Date().toLocaleTimeString() }) : '')
       // No success toast: the doc is still dirty (state raced the save), and the
       // close-guard's saveUntilPersisted retries would repeat it on every pass —
       // the converging complete save below toasts once.
@@ -1182,9 +1195,7 @@ async function saveOnce(
     ctx.setRemovePersonalInfo(reparsed.removePersonalInfo)
     ctx.setRemovePersonalInfoDirty(false)
     ctx.dirtyRef.current = false
-    ctx.setStatus(
-      auto ? t('appAutoSavedAt', { time: new Date().toLocaleTimeString() }) : t('appSaved'),
-    )
+    ctx.setStatus(auto ? t('appAutoSavedAt', { time: new Date().toLocaleTimeString() }) : '')
     if (!auto) showToast(t('appSaved'))
     return true
   } catch (err) {
@@ -1275,9 +1286,11 @@ async function printGroupsMerged(
   const mixed = groups.some((g) => g.w !== groups[0].w || g.h !== groups[0].h)
   ctx.setStatus(
     result.ok
-      ? mixed
-        ? t('appExportedPdfMixed', { path: result.path ?? '', n: parts.length })
-        : t('appExportedPdf', { path: result.path ?? '' })
+      ? result.printDialog
+        ? t('appPdfPrintFallback')
+        : mixed
+          ? t('appExportedPdfMixed', { path: result.path ?? '', n: parts.length })
+          : t('appExportedPdf', { path: result.path ?? '' })
       : result.error
         ? t('appExportPdfFailed', { error: result.error })
         : t('appExportPdfCanceled'),
@@ -1304,6 +1317,13 @@ function deferExportToPreview(ctx: FileActionContext, outPath?: string): Promise
 let printJobActive = false
 
 /** Resolves true only when a PDF was written to disk. */
+/** status line for a successful exportPdf: the web's print-dialog fallback wrote no file */
+function exportedPdfStatus(result: PdfExportResult): string {
+  return result.printDialog
+    ? t('appPdfPrintFallback')
+    : t('appExportedPdf', { path: result.path ?? '' })
+}
+
 export async function exportPdf(ctx: FileActionContext, outPath?: string): Promise<boolean> {
   const { doc } = ctx
   if (!doc) return false
@@ -1344,7 +1364,7 @@ export async function exportPdf(ctx: FileActionContext, outPath?: string): Promi
       if (g) {
         const result = await window.desktop.exportPdf(doc.fileName, g.w, g.h, outPath, scale)
         if (result.ok) {
-          ctx.setStatus(t('appExportedPdf', { path: result.path ?? '' }))
+          ctx.setStatus(exportedPdfStatus(result))
           return true
         }
         if (!result.error) {
@@ -1415,7 +1435,7 @@ export async function exportPdf(ctx: FileActionContext, outPath?: string): Promi
       outPath,
     )
     if (result.ok) {
-      ctx.setStatus(t('appExportedPdf', { path: result.path ?? '' }))
+      ctx.setStatus(exportedPdfStatus(result))
       return true
     }
     if (!result.error) {

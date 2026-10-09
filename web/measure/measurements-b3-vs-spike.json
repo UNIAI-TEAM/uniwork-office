@@ -1,0 +1,2388 @@
+{
+  "generatedAt": "2026-10-08T15:41:01.708Z",
+  "host": {
+    "cpus": 4,
+    "node": "v22.23.2",
+    "platform": "linux arm64",
+    "chromium": "151.0.7922.34",
+    "loadAvgBefore": [7.88, 9.09, 8.68],
+    "loadAvgAfter": [1.67, 5.7, 7.45]
+  },
+  "runsPerDoc": 5,
+  "before": {
+    "label": "before",
+    "dist": "../../../../../../tmp/claude-1001/-home-ubuntu-orca-workspaces-uniwork-office-uni-1013-w1-bundle/68868d2d-b533-433a-9883-e3f4eb54f125/scratchpad/baseline-dist",
+    "bundle": {
+      "generatedAt": "2026-10-08T15:33:59.085Z",
+      "dist": "../../../../../../tmp/claude-1001/-home-ubuntu-orca-workspaces-uniwork-office-uni-1013-w1-bundle/68868d2d-b533-433a-9883-e3f4eb54f125/scratchpad/baseline-dist",
+      "total": {
+        "files": 37,
+        "raw": 18719234,
+        "gzip": 12219372,
+        "brotli": 11242596
+      },
+      "initial": {
+        "note": "index.html + <script>/<link> targets + static JS imports (no dynamic import(), no CSS url() fonts)",
+        "files": ["index.html", "assets/index-DLjs18ti.js", "assets/index-BdX_MuC4.css"],
+        "total": {
+          "files": 3,
+          "raw": 4020855,
+          "gzip": 1196267,
+          "brotli": 941753
+        }
+      },
+      "sourcemapBytes": 12239933,
+      "byType": {
+        "js": {
+          "files": 1,
+          "raw": 3818627,
+          "gzip": 1161592,
+          "brotli": 912526
+        },
+        "font": {
+          "files": 33,
+          "raw": 14694132,
+          "gzip": 11018867,
+          "brotli": 10296631
+        },
+        "css": {
+          "files": 1,
+          "raw": 201051,
+          "gzip": 34113,
+          "brotli": 28807
+        },
+        "other": {
+          "files": 1,
+          "raw": 4247,
+          "gzip": 4238,
+          "brotli": 4212
+        },
+        "html": {
+          "files": 1,
+          "raw": 1177,
+          "gzip": 562,
+          "brotli": 420
+        }
+      },
+      "top15": [
+        {
+          "file": "assets/index-DLjs18ti.js",
+          "type": "js",
+          "raw": 3818627,
+          "gzip": 1161592,
+          "brotli": 912526
+        },
+        {
+          "file": "assets/NotoSerifCJKsc-Regular-subset-CLPB6QGT.woff2",
+          "type": "font",
+          "raw": 3495928,
+          "gzip": 3495814,
+          "brotli": 3495940
+        },
+        {
+          "file": "assets/NotoSansCJKsc-Regular-subset-BuHGXxnc.woff2",
+          "type": "font",
+          "raw": 2533160,
+          "gzip": 2533871,
+          "brotli": 2533169
+        },
+        {
+          "file": "assets/Carlito-BoldItalic-0dXjwGA0.ttf",
+          "type": "font",
+          "raw": 812344,
+          "gzip": 324624,
+          "brotli": 245119
+        },
+        {
+          "file": "assets/Carlito-Bold-BhbXr__n.ttf",
+          "type": "font",
+          "raw": 686240,
+          "gzip": 281928,
+          "brotli": 220989
+        },
+        {
+          "file": "assets/Carlito-Regular-Cbe9FLjp.ttf",
+          "type": "font",
+          "raw": 631712,
+          "gzip": 270501,
+          "brotli": 212809
+        },
+        {
+          "file": "assets/Carlito-Italic-KkZUqxJW.ttf",
+          "type": "font",
+          "raw": 619052,
+          "gzip": 284113,
+          "brotli": 227947
+        },
+        {
+          "file": "assets/GenOfficeSerifKR-Regular-subset-BkQyd75u.woff2",
+          "type": "font",
+          "raw": 512436,
+          "gzip": 512597,
+          "brotli": 512441
+        },
+        {
+          "file": "assets/LiberationSans-Italic-D6GtLuAT.ttf",
+          "type": "font",
+          "raw": 415816,
+          "gzip": 219784,
+          "brotli": 176566
+        },
+        {
+          "file": "assets/LiberationSans-Bold-CAnzDFU4.ttf",
+          "type": "font",
+          "raw": 414456,
+          "gzip": 214613,
+          "brotli": 170316
+        },
+        {
+          "file": "assets/LiberationSans-Regular-CqxnOoBp.ttf",
+          "type": "font",
+          "raw": 410712,
+          "gzip": 213267,
+          "brotli": 169061
+        },
+        {
+          "file": "assets/LiberationSans-BoldItalic-BC07J_j6.ttf",
+          "type": "font",
+          "raw": 408996,
+          "gzip": 216399,
+          "brotli": 174207
+        },
+        {
+          "file": "assets/LiberationSerif-Regular-DREh6cMU.ttf",
+          "type": "font",
+          "raw": 393576,
+          "gzip": 214018,
+          "brotli": 173370
+        },
+        {
+          "file": "assets/LiberationSerif-BoldItalic-DHf5skZ4.ttf",
+          "type": "font",
+          "raw": 376772,
+          "gzip": 214014,
+          "brotli": 175277
+        },
+        {
+          "file": "assets/LiberationSerif-Italic-Bwtmn-ni.ttf",
+          "type": "font",
+          "raw": 375632,
+          "gzip": 212549,
+          "brotli": 175187
+        }
+      ],
+      "files": [
+        {
+          "file": "assets/index-DLjs18ti.js",
+          "type": "js",
+          "raw": 3818627,
+          "gzip": 1161592,
+          "brotli": 912526
+        },
+        {
+          "file": "assets/NotoSerifCJKsc-Regular-subset-CLPB6QGT.woff2",
+          "type": "font",
+          "raw": 3495928,
+          "gzip": 3495814,
+          "brotli": 3495940
+        },
+        {
+          "file": "assets/NotoSansCJKsc-Regular-subset-BuHGXxnc.woff2",
+          "type": "font",
+          "raw": 2533160,
+          "gzip": 2533871,
+          "brotli": 2533169
+        },
+        {
+          "file": "assets/Carlito-BoldItalic-0dXjwGA0.ttf",
+          "type": "font",
+          "raw": 812344,
+          "gzip": 324624,
+          "brotli": 245119
+        },
+        {
+          "file": "assets/Carlito-Bold-BhbXr__n.ttf",
+          "type": "font",
+          "raw": 686240,
+          "gzip": 281928,
+          "brotli": 220989
+        },
+        {
+          "file": "assets/Carlito-Regular-Cbe9FLjp.ttf",
+          "type": "font",
+          "raw": 631712,
+          "gzip": 270501,
+          "brotli": 212809
+        },
+        {
+          "file": "assets/Carlito-Italic-KkZUqxJW.ttf",
+          "type": "font",
+          "raw": 619052,
+          "gzip": 284113,
+          "brotli": 227947
+        },
+        {
+          "file": "assets/GenOfficeSerifKR-Regular-subset-BkQyd75u.woff2",
+          "type": "font",
+          "raw": 512436,
+          "gzip": 512597,
+          "brotli": 512441
+        },
+        {
+          "file": "assets/LiberationSans-Italic-D6GtLuAT.ttf",
+          "type": "font",
+          "raw": 415816,
+          "gzip": 219784,
+          "brotli": 176566
+        },
+        {
+          "file": "assets/LiberationSans-Bold-CAnzDFU4.ttf",
+          "type": "font",
+          "raw": 414456,
+          "gzip": 214613,
+          "brotli": 170316
+        },
+        {
+          "file": "assets/LiberationSans-Regular-CqxnOoBp.ttf",
+          "type": "font",
+          "raw": 410712,
+          "gzip": 213267,
+          "brotli": 169061
+        },
+        {
+          "file": "assets/LiberationSans-BoldItalic-BC07J_j6.ttf",
+          "type": "font",
+          "raw": 408996,
+          "gzip": 216399,
+          "brotli": 174207
+        },
+        {
+          "file": "assets/LiberationSerif-Regular-DREh6cMU.ttf",
+          "type": "font",
+          "raw": 393576,
+          "gzip": 214018,
+          "brotli": 173370
+        },
+        {
+          "file": "assets/LiberationSerif-BoldItalic-DHf5skZ4.ttf",
+          "type": "font",
+          "raw": 376772,
+          "gzip": 214014,
+          "brotli": 175277
+        },
+        {
+          "file": "assets/LiberationSerif-Italic-Bwtmn-ni.ttf",
+          "type": "font",
+          "raw": 375632,
+          "gzip": 212549,
+          "brotli": 175187
+        },
+        {
+          "file": "assets/LiberationSerif-Bold-CT7WGLoV.ttf",
+          "type": "font",
+          "raw": 370096,
+          "gzip": 203918,
+          "brotli": 166862
+        },
+        {
+          "file": "assets/LiberationMono-Regular-CscJ8ftk.ttf",
+          "type": "font",
+          "raw": 319508,
+          "gzip": 180494,
+          "brotli": 147255
+        },
+        {
+          "file": "assets/LiberationMono-Bold-JpIqZVyK.ttf",
+          "type": "font",
+          "raw": 307996,
+          "gzip": 175797,
+          "brotli": 144696
+        },
+        {
+          "file": "assets/LiberationMono-BoldItalic-CW50-m9W.ttf",
+          "type": "font",
+          "raw": 284068,
+          "gzip": 167996,
+          "brotli": 139423
+        },
+        {
+          "file": "assets/GenOfficeGothicKR-Regular-subset-Bkvj_MFZ.woff2",
+          "type": "font",
+          "raw": 281980,
+          "gzip": 281687,
+          "brotli": 281985
+        },
+        {
+          "file": "assets/LiberationMono-Italic-BaW6sbi8.ttf",
+          "type": "font",
+          "raw": 281536,
+          "gzip": 165789,
+          "brotli": 137044
+        },
+        {
+          "file": "assets/GenOfficeSansKR-Regular-subset-CVxxonE8.woff2",
+          "type": "font",
+          "raw": 266128,
+          "gzip": 266063,
+          "brotli": 266133
+        },
+        {
+          "file": "assets/index-BdX_MuC4.css",
+          "type": "css",
+          "raw": 201051,
+          "gzip": 34113,
+          "brotli": 28807
+        },
+        {
+          "file": "assets/NotoNaskhArabic-Regular-subset-DQSqx2ZA.woff2",
+          "type": "font",
+          "raw": 69624,
+          "gzip": 69667,
+          "brotli": 69629
+        },
+        {
+          "file": "assets/NotoSansArabic-Regular-subset-D207GVuU.woff2",
+          "type": "font",
+          "raw": 63672,
+          "gzip": 63710,
+          "brotli": 63676
+        },
+        {
+          "file": "assets/Caladea-Italic-B_Jy4Zu6.ttf",
+          "type": "font",
+          "raw": 61860,
+          "gzip": 29279,
+          "brotli": 24767
+        },
+        {
+          "file": "assets/Caladea-BoldItalic-wZEKqfeH.ttf",
+          "type": "font",
+          "raw": 61828,
+          "gzip": 28992,
+          "brotli": 24298
+        },
+        {
+          "file": "assets/Caladea-Regular-BTbwo_Qo.ttf",
+          "type": "font",
+          "raw": 58964,
+          "gzip": 28194,
+          "brotli": 23876
+        },
+        {
+          "file": "assets/Caladea-Bold-D8qQyaGr.ttf",
+          "type": "font",
+          "raw": 58892,
+          "gzip": 27883,
+          "brotli": 23417
+        },
+        {
+          "file": "assets/GenOfficeTamil-Regular-DLISHPmH.woff2",
+          "type": "font",
+          "raw": 33072,
+          "gzip": 33105,
+          "brotli": 33076
+        },
+        {
+          "file": "assets/GenOfficeUIKanaJP-Bold-DbcaglVT.woff2",
+          "type": "font",
+          "raw": 26204,
+          "gzip": 26232,
+          "brotli": 26208
+        },
+        {
+          "file": "assets/GenOfficeUIKanaJP-Regular-Bj_7JzTT.woff2",
+          "type": "font",
+          "raw": 25288,
+          "gzip": 25316,
+          "brotli": 25292
+        },
+        {
+          "file": "assets/GenOfficePoppins-Regular-subset-RElVmxhA.woff2",
+          "type": "font",
+          "raw": 14160,
+          "gzip": 14183,
+          "brotli": 14164
+        },
+        {
+          "file": "assets/GenOfficePoppins-Bold-subset-CLJyStaw.woff2",
+          "type": "font",
+          "raw": 14128,
+          "gzip": 14151,
+          "brotli": 14132
+        },
+        {
+          "file": "assets/GenOfficeCheLatinKR-CFVfemg_.woff2",
+          "type": "font",
+          "raw": 8296,
+          "gzip": 8319,
+          "brotli": 8300
+        },
+        {
+          "file": "assets/send-enter-off-B0IfWMyy.png",
+          "type": "other",
+          "raw": 4247,
+          "gzip": 4238,
+          "brotli": 4212
+        },
+        {
+          "file": "index.html",
+          "type": "html",
+          "raw": 1177,
+          "gzip": 562,
+          "brotli": 420
+        }
+      ],
+      "biggestJsComposition": {
+        "file": "assets/index-DLjs18ti.js",
+        "method": "sourcemap VLQ decode: generated bytes attributed to originating source by segment span, grouped by top-level npm package / workspace dir (source-map-explorer is not installed; not run)",
+        "attributedBytes": 3818186,
+        "top": [
+          {
+            "name": "apps/docs/src/renderer/i18n",
+            "bytes": 1337402,
+            "pct": 35
+          },
+          {
+            "name": "packages/docx-engine",
+            "bytes": 463320,
+            "pct": 12.1
+          },
+          {
+            "name": "apps/docs/src/renderer/editor",
+            "bytes": 348115,
+            "pct": 9.1
+          },
+          {
+            "name": "apps/docs/src/renderer/components",
+            "bytes": 295916,
+            "pct": 7.8
+          },
+          {
+            "name": "apps/docs/src/renderer",
+            "bytes": 236899,
+            "pct": 6.2
+          },
+          {
+            "name": "react-dom",
+            "bytes": 182727,
+            "pct": 4.8
+          },
+          {
+            "name": "apps/docs/src/renderer/ai",
+            "bytes": 137147,
+            "pct": 3.6
+          },
+          {
+            "name": "jszip",
+            "bytes": 98156,
+            "pct": 2.6
+          },
+          {
+            "name": "prosemirror-view",
+            "bytes": 98111,
+            "pct": 2.6
+          },
+          {
+            "name": "@tiptap/core",
+            "bytes": 77177,
+            "pct": 2
+          },
+          {
+            "name": "utif2",
+            "bytes": 62891,
+            "pct": 1.6
+          },
+          {
+            "name": "pako",
+            "bytes": 48215,
+            "pct": 1.3
+          },
+          {
+            "name": "prosemirror-model",
+            "bytes": 45002,
+            "pct": 1.2
+          },
+          {
+            "name": "marked",
+            "bytes": 41270,
+            "pct": 1.1
+          },
+          {
+            "name": "prosemirror-tables",
+            "bytes": 35274,
+            "pct": 0.9
+          },
+          {
+            "name": "prosemirror-transform",
+            "bytes": 31342,
+            "pct": 0.8
+          },
+          {
+            "name": "packages/ui",
+            "bytes": 29180,
+            "pct": 0.8
+          },
+          {
+            "name": "fast-xml-parser",
+            "bytes": 27252,
+            "pct": 0.7
+          },
+          {
+            "name": "apps/docs/src/renderer/assets",
+            "bytes": 23272,
+            "pct": 0.6
+          },
+          {
+            "name": "packages/pptx-render",
+            "bytes": 20583,
+            "pct": 0.5
+          },
+          {
+            "name": "(other) bridge",
+            "bytes": 19938,
+            "pct": 0.5
+          },
+          {
+            "name": "is-unsafe",
+            "bytes": 16638,
+            "pct": 0.4
+          },
+          {
+            "name": "packages/agent-core",
+            "bytes": 14602,
+            "pct": 0.4
+          },
+          {
+            "name": "prosemirror-state",
+            "bytes": 11886,
+            "pct": 0.3
+          },
+          {
+            "name": "apps/docs/src/renderer/zotero",
+            "bytes": 11569,
+            "pct": 0.3
+          },
+          {
+            "name": "prosemirror-commands",
+            "bytes": 9056,
+            "pct": 0.2
+          },
+          {
+            "name": "@tiptap/extensions",
+            "bytes": 9028,
+            "pct": 0.2
+          },
+          {
+            "name": "@tiptap/react",
+            "bytes": 8926,
+            "pct": 0.2
+          },
+          {
+            "name": "path-expression-matcher",
+            "bytes": 8650,
+            "pct": 0.2
+          },
+          {
+            "name": "react",
+            "bytes": 8306,
+            "pct": 0.2
+          }
+        ]
+      }
+    },
+    "picker": {
+      "simple": {
+        "generatedAt": "2026-10-08T15:34:06.246Z",
+        "dist": "/tmp/claude-1001/-home-ubuntu-orca-workspaces-uniwork-office-uni-1013-w1-bundle/68868d2d-b533-433a-9883-e3f4eb54f125/scratchpad/baseline-dist",
+        "compress": true,
+        "doc": "simple",
+        "onLoad": {
+          "files": 3,
+          "wireBytes": 3086214,
+          "list": [
+            {
+              "phase": "load",
+              "file": "Carlito-Bold-BhbXr__n.ttf",
+              "wire": 282151
+            },
+            {
+              "phase": "load",
+              "file": "Carlito-Regular-Cbe9FLjp.ttf",
+              "wire": 270724
+            },
+            {
+              "phase": "load",
+              "file": "NotoSansCJKsc-Regular-subset-BuHGXxnc.woff2",
+              "wire": 2533339
+            }
+          ]
+        },
+        "onPickerOpen": {
+          "menuItems": 32,
+          "files": 6,
+          "wireBytes": 4697650,
+          "list": [
+            {
+              "phase": "picker",
+              "file": "Caladea-Regular-BTbwo_Qo.ttf",
+              "wire": 28416
+            },
+            {
+              "phase": "picker",
+              "file": "LiberationSans-Regular-CqxnOoBp.ttf",
+              "wire": 213490
+            },
+            {
+              "phase": "picker",
+              "file": "LiberationMono-Regular-CscJ8ftk.ttf",
+              "wire": 180717
+            },
+            {
+              "phase": "picker",
+              "file": "GenOfficeSansKR-Regular-subset-CVxxonE8.woff2",
+              "wire": 266306
+            },
+            {
+              "phase": "picker",
+              "file": "GenOfficeSerifKR-Regular-subset-BkQyd75u.woff2",
+              "wire": 512614
+            },
+            {
+              "phase": "picker",
+              "file": "NotoSerifCJKsc-Regular-subset-CLPB6QGT.woff2",
+              "wire": 3496107
+            }
+          ]
+        }
+      },
+      "long": {
+        "generatedAt": "2026-10-08T15:34:22.475Z",
+        "dist": "/tmp/claude-1001/-home-ubuntu-orca-workspaces-uniwork-office-uni-1013-w1-bundle/68868d2d-b533-433a-9883-e3f4eb54f125/scratchpad/baseline-dist",
+        "compress": true,
+        "doc": "long",
+        "onLoad": {
+          "files": 2,
+          "wireBytes": 552875,
+          "list": [
+            {
+              "phase": "load",
+              "file": "Carlito-Regular-Cbe9FLjp.ttf",
+              "wire": 270724
+            },
+            {
+              "phase": "load",
+              "file": "Carlito-Bold-BhbXr__n.ttf",
+              "wire": 282151
+            }
+          ]
+        },
+        "onPickerOpen": {
+          "menuItems": 32,
+          "files": 7,
+          "wireBytes": 7230989,
+          "list": [
+            {
+              "phase": "picker",
+              "file": "Caladea-Regular-BTbwo_Qo.ttf",
+              "wire": 28416
+            },
+            {
+              "phase": "picker",
+              "file": "LiberationSans-Regular-CqxnOoBp.ttf",
+              "wire": 213490
+            },
+            {
+              "phase": "picker",
+              "file": "LiberationMono-Regular-CscJ8ftk.ttf",
+              "wire": 180717
+            },
+            {
+              "phase": "picker",
+              "file": "GenOfficeSansKR-Regular-subset-CVxxonE8.woff2",
+              "wire": 266306
+            },
+            {
+              "phase": "picker",
+              "file": "GenOfficeSerifKR-Regular-subset-BkQyd75u.woff2",
+              "wire": 512614
+            },
+            {
+              "phase": "picker",
+              "file": "NotoSansCJKsc-Regular-subset-BuHGXxnc.woff2",
+              "wire": 2533339
+            },
+            {
+              "phase": "picker",
+              "file": "NotoSerifCJKsc-Regular-subset-CLPB6QGT.woff2",
+              "wire": 3496107
+            }
+          ]
+        }
+      }
+    },
+    "load": {
+      "gzip": {
+        "docs": {
+          "simple.docx": {
+            "okRuns": 5,
+            "timeToEditableMs": {
+              "median": 1212.8000001907349,
+              "min": 1141.9000000953674,
+              "max": 1442.1999998092651,
+              "n": 5
+            },
+            "transferredAtEditableBytes": {
+              "median": 1481530,
+              "min": 1481530,
+              "max": 1485952,
+              "n": 5
+            },
+            "transferredBytes": {
+              "median": 4290015,
+              "min": 4290015,
+              "max": 4290015,
+              "n": 5
+            },
+            "requests": {
+              "median": 9,
+              "min": 9,
+              "max": 9,
+              "n": 5
+            },
+            "failedRequests": 0,
+            "firstRunRequests": [
+              {
+                "url": "/?open=%2Ffixtures%2Fsimple.docx",
+                "type": "Document",
+                "wire": 798,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/index-BdX_MuC4.css",
+                "type": "Stylesheet",
+                "wire": 34350,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/index-DLjs18ti.js",
+                "type": "Script",
+                "wire": 1161838,
+                "afterEditable": false
+              },
+              {
+                "url": "/fixtures/simple.docx",
+                "type": "Fetch",
+                "wire": 2393,
+                "afterEditable": false
+              },
+              {
+                "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYAAACOEfKtAAAACXBIWXMAACxLAAAsSwGlPZapAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAOdEVYdFNvZnR3YXJlAEZpZ21hnrGWYwAABQJJREFUeAHtnH9OG0cUx79vbEikRgo9QTcnwNzAnKD0BOA/EkRJBD4B5gRrBK4F+cNwgpITdHOC0htsTlD/U6l17H2dWTsS8c7YxrOzu4nm80cUZr1j+Hh+vLXmPcDj8Xg8njUhlEjYHwQYj4OvGl/UH9qt1hDfCIUKDAeDLfwzOiDQz2BuyHffMrw0BlHECd21372OUGEKE3jRuznhhDsLpJmImZNW+91RhAriXGDY7wc0qQ0AbsICItE5OX59jorhVOBUnvhD/jdAHhDdnh6/aaFCCDgkV3kK5oPub9chKoSzEXjRe38m166O8QWMIQTdy3XxEziJIcSWHGEBMbaXTXfZ725V1sQ6HKCmLk8M8qQ4RnKBF8+7pnBF3Y+J6MhPd193Xa6Hck3FK1QAJyOw27sZqOmWuaDkifFu+/j4YYVuEF72O1LWme5aVUZh7mtgGMpYTydPwoLaq8pTSEEdZr7QXSOqnaEC5L+J1EdN/QWK2sdvbvFUxs868l/NVOdm+mGVjINdWL8BMOEOa9But+SaiQ/ai89MH1Zx5C5Qrlnb2gujjXusS5JE+vYcQ6Q1cTECA03jgxpJWJcNRLpmItpGybgIY4JsE2Xkhb1eg1A/k3M7gOCI/9s8N0luHx3F3avrTLvciX+06TcPnMSBy0gf8cbyKSX9YoHVVGzQxueGvLT7lH4I4qWLfp+C00c5I2NxkP1WJodd1VW/CyhHIBkW/+ew+0Nd9buAcgR+R3iBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlpQjkPmbSWddRkkjkPQCedTQNYe9m4a+G8QomZJGYBJr2yfQi8Kkoe+GP6FkyhFoPDSOkzTN6xHpsV0WhqQaw+n9AinljPTs0HiM7IH0LZXhGV5e34EppjptY5LsQZ/xGVch1cuFQLW+zZ9TzhyxZcadHHG6kRWk7aQOiTNMMCeZxB0C/ZQeLp/nXzjbtFxMYd0vG2RaxptdYO1NIFbZntlmbY7K0GWaQ+4C5ef/UdO8lVboeESawkXjX4Anjg6V8Snvm0+Vne3UQfYGWjm5cR1cjED9LzwZ7c03qcxNriU7WH0kxsZ0WTbk6DF/hEPyF8iJVmBa6kSD2lD48+YOU6JqIcTQ9ilHHSfn/MPmjildloAT7b2Od2o3CddX138D0Gwcy5Ok0zBm/Ggq1uVuKyUvvKfXP5ChzkBzKT59e+g0s91JGCOnjdxhKTMiZknS0aJ7Z7JirMisMog+q53IeZkUR4E0G1JbuamKUSBHpjVp9HEixCSCY5wInE5TinTXVCWP8Or6FDnQvboxFvRRceKyqZ8HzsqezKbWn4AhT02gKzeOi3X+yFk1pN+lJsOzs/u17wtuKxfJkSbfYFGhnJhI3CZivNJoCS/fN0nwvqmoxRdkaPSqiNGncF8767J/KyXtL3+lDHiJY07w1/RHGWCzfDauiZcyNAqQoLlK4TJWMfrbwy4KopDqbatLtEPFiqpUCgqksPJ3i4roWKMC7Rpa7V8P1y9ssSbFFmCcBrxKYoDcoIhrk1ZRa17m3VEC+YiU4nhyXvZ3guXWUL3sNyFqe2nFtsUlQafV3ogeGPwBteS+rBE3T6kC58k8BytEMoQQw6oI83g8Ho8nN/4Hy5P2XBWj5dcAAAAASUVORK5CYII=",
+                "type": "Image",
+                "wire": 0,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/Carlito-Bold-BhbXr__n.ttf",
+                "type": "Font",
+                "wire": 282151,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/Carlito-Regular-Cbe9FLjp.ttf",
+                "type": "Font",
+                "wire": 270724,
+                "afterEditable": true
+              },
+              {
+                "url": "/assets/send-enter-off-B0IfWMyy.png",
+                "type": "Image",
+                "wire": 4422,
+                "afterEditable": true
+              },
+              {
+                "url": "/assets/NotoSansCJKsc-Regular-subset-BuHGXxnc.woff2",
+                "type": "Font",
+                "wire": 2533339,
+                "afterEditable": true
+              }
+            ]
+          },
+          "kitchen-sink.docx": {
+            "okRuns": 5,
+            "timeToEditableMs": {
+              "median": 1100.0999999046326,
+              "min": 1064.9000000953674,
+              "max": 1251.4000000953674,
+              "n": 5
+            },
+            "transferredAtEditableBytes": {
+              "median": 2042271,
+              "min": 2042271,
+              "max": 2042271,
+              "n": 5
+            },
+            "transferredBytes": {
+              "median": 4575610,
+              "min": 4575610,
+              "max": 4575610,
+              "n": 5
+            },
+            "requests": {
+              "median": 11,
+              "min": 11,
+              "max": 11,
+              "n": 5
+            },
+            "failedRequests": 0,
+            "firstRunRequests": [
+              {
+                "url": "/?open=%2Ffixtures%2Fkitchen-sink.docx",
+                "type": "Document",
+                "wire": 798,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/index-BdX_MuC4.css",
+                "type": "Stylesheet",
+                "wire": 34350,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/index-DLjs18ti.js",
+                "type": "Script",
+                "wire": 1161838,
+                "afterEditable": false
+              },
+              {
+                "url": "/fixtures/kitchen-sink.docx",
+                "type": "Fetch",
+                "wire": 3652,
+                "afterEditable": false
+              },
+              {
+                "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+                "type": "Image",
+                "wire": 0,
+                "afterEditable": false
+              },
+              {
+                "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYAAACOEfKtAAAACXBIWXMAACxLAAAsSwGlPZapAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAOdEVYdFNvZnR3YXJlAEZpZ21hnrGWYwAABQJJREFUeAHtnH9OG0cUx79vbEikRgo9QTcnwNzAnKD0BOA/EkRJBD4B5gRrBK4F+cNwgpITdHOC0htsTlD/U6l17H2dWTsS8c7YxrOzu4nm80cUZr1j+Hh+vLXmPcDj8Xg8njUhlEjYHwQYj4OvGl/UH9qt1hDfCIUKDAeDLfwzOiDQz2BuyHffMrw0BlHECd21372OUGEKE3jRuznhhDsLpJmImZNW+91RhAriXGDY7wc0qQ0AbsICItE5OX59jorhVOBUnvhD/jdAHhDdnh6/aaFCCDgkV3kK5oPub9chKoSzEXjRe38m166O8QWMIQTdy3XxEziJIcSWHGEBMbaXTXfZ725V1sQ6HKCmLk8M8qQ4RnKBF8+7pnBF3Y+J6MhPd193Xa6Hck3FK1QAJyOw27sZqOmWuaDkifFu+/j4YYVuEF72O1LWme5aVUZh7mtgGMpYTydPwoLaq8pTSEEdZr7QXSOqnaEC5L+J1EdN/QWK2sdvbvFUxs868l/NVOdm+mGVjINdWL8BMOEOa9But+SaiQ/ai89MH1Zx5C5Qrlnb2gujjXusS5JE+vYcQ6Q1cTECA03jgxpJWJcNRLpmItpGybgIY4JsE2Xkhb1eg1A/k3M7gOCI/9s8N0luHx3F3avrTLvciX+06TcPnMSBy0gf8cbyKSX9YoHVVGzQxueGvLT7lH4I4qWLfp+C00c5I2NxkP1WJodd1VW/CyhHIBkW/+ew+0Nd9buAcgR+R3iBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlpQjkPmbSWddRkkjkPQCedTQNYe9m4a+G8QomZJGYBJr2yfQi8Kkoe+GP6FkyhFoPDSOkzTN6xHpsV0WhqQaw+n9AinljPTs0HiM7IH0LZXhGV5e34EppjptY5LsQZ/xGVch1cuFQLW+zZ9TzhyxZcadHHG6kRWk7aQOiTNMMCeZxB0C/ZQeLp/nXzjbtFxMYd0vG2RaxptdYO1NIFbZntlmbY7K0GWaQ+4C5ef/UdO8lVboeESawkXjX4Anjg6V8Snvm0+Vne3UQfYGWjm5cR1cjED9LzwZ7c03qcxNriU7WH0kxsZ0WTbk6DF/hEPyF8iJVmBa6kSD2lD48+YOU6JqIcTQ9ilHHSfn/MPmjildloAT7b2Od2o3CddX138D0Gwcy5Ok0zBm/Ggq1uVuKyUvvKfXP5ChzkBzKT59e+g0s91JGCOnjdxhKTMiZknS0aJ7Z7JirMisMog+q53IeZkUR4E0G1JbuamKUSBHpjVp9HEixCSCY5wInE5TinTXVCWP8Or6FDnQvboxFvRRceKyqZ8HzsqezKbWn4AhT02gKzeOi3X+yFk1pN+lJsOzs/u17wtuKxfJkSbfYFGhnJhI3CZivNJoCS/fN0nwvqmoxRdkaPSqiNGncF8767J/KyXtL3+lDHiJY07w1/RHGWCzfDauiZcyNAqQoLlK4TJWMfrbwy4KopDqbatLtEPFiqpUCgqksPJ3i4roWKMC7Rpa7V8P1y9ssSbFFmCcBrxKYoDcoIhrk1ZRa17m3VEC+YiU4nhyXvZ3guXWUL3sNyFqe2nFtsUlQafV3ogeGPwBteS+rBE3T6kC58k8BytEMoQQw6oI83g8Ho8nN/4Hy5P2XBWj5dcAAAAASUVORK5CYII=",
+                "type": "Image",
+                "wire": 0,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/Carlito-Bold-BhbXr__n.ttf",
+                "type": "Font",
+                "wire": 282151,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/Carlito-Regular-Cbe9FLjp.ttf",
+                "type": "Font",
+                "wire": 270724,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/Carlito-Italic-KkZUqxJW.ttf",
+                "type": "Font",
+                "wire": 284336,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/send-enter-off-B0IfWMyy.png",
+                "type": "Image",
+                "wire": 4422,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/NotoSansCJKsc-Regular-subset-BuHGXxnc.woff2",
+                "type": "Font",
+                "wire": 2533339,
+                "afterEditable": true
+              }
+            ]
+          },
+          "long.docx": {
+            "okRuns": 5,
+            "timeToEditableMs": {
+              "median": 1748,
+              "min": 1671.0999999046326,
+              "max": 1776.7999997138977,
+              "n": 5
+            },
+            "transferredAtEditableBytes": {
+              "median": 1759024,
+              "min": 1759024,
+              "max": 1759024,
+              "n": 5
+            },
+            "transferredBytes": {
+              "median": 1759024,
+              "min": 1759024,
+              "max": 1759024,
+              "n": 5
+            },
+            "requests": {
+              "median": 8,
+              "min": 8,
+              "max": 8,
+              "n": 5
+            },
+            "failedRequests": 0,
+            "firstRunRequests": [
+              {
+                "url": "/?open=%2Ffixtures%2Flong.docx",
+                "type": "Document",
+                "wire": 798,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/index-BdX_MuC4.css",
+                "type": "Stylesheet",
+                "wire": 34350,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/index-DLjs18ti.js",
+                "type": "Script",
+                "wire": 1161838,
+                "afterEditable": false
+              },
+              {
+                "url": "/fixtures/long.docx",
+                "type": "Fetch",
+                "wire": 4741,
+                "afterEditable": false
+              },
+              {
+                "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYAAACOEfKtAAAACXBIWXMAACxLAAAsSwGlPZapAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAOdEVYdFNvZnR3YXJlAEZpZ21hnrGWYwAABQJJREFUeAHtnH9OG0cUx79vbEikRgo9QTcnwNzAnKD0BOA/EkRJBD4B5gRrBK4F+cNwgpITdHOC0htsTlD/U6l17H2dWTsS8c7YxrOzu4nm80cUZr1j+Hh+vLXmPcDj8Xg8njUhlEjYHwQYj4OvGl/UH9qt1hDfCIUKDAeDLfwzOiDQz2BuyHffMrw0BlHECd21372OUGEKE3jRuznhhDsLpJmImZNW+91RhAriXGDY7wc0qQ0AbsICItE5OX59jorhVOBUnvhD/jdAHhDdnh6/aaFCCDgkV3kK5oPub9chKoSzEXjRe38m166O8QWMIQTdy3XxEziJIcSWHGEBMbaXTXfZ725V1sQ6HKCmLk8M8qQ4RnKBF8+7pnBF3Y+J6MhPd193Xa6Hck3FK1QAJyOw27sZqOmWuaDkifFu+/j4YYVuEF72O1LWme5aVUZh7mtgGMpYTydPwoLaq8pTSEEdZr7QXSOqnaEC5L+J1EdN/QWK2sdvbvFUxs868l/NVOdm+mGVjINdWL8BMOEOa9But+SaiQ/ai89MH1Zx5C5Qrlnb2gujjXusS5JE+vYcQ6Q1cTECA03jgxpJWJcNRLpmItpGybgIY4JsE2Xkhb1eg1A/k3M7gOCI/9s8N0luHx3F3avrTLvciX+06TcPnMSBy0gf8cbyKSX9YoHVVGzQxueGvLT7lH4I4qWLfp+C00c5I2NxkP1WJodd1VW/CyhHIBkW/+ew+0Nd9buAcgR+R3iBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlpQjkPmbSWddRkkjkPQCedTQNYe9m4a+G8QomZJGYBJr2yfQi8Kkoe+GP6FkyhFoPDSOkzTN6xHpsV0WhqQaw+n9AinljPTs0HiM7IH0LZXhGV5e34EppjptY5LsQZ/xGVch1cuFQLW+zZ9TzhyxZcadHHG6kRWk7aQOiTNMMCeZxB0C/ZQeLp/nXzjbtFxMYd0vG2RaxptdYO1NIFbZntlmbY7K0GWaQ+4C5ef/UdO8lVboeESawkXjX4Anjg6V8Snvm0+Vne3UQfYGWjm5cR1cjED9LzwZ7c03qcxNriU7WH0kxsZ0WTbk6DF/hEPyF8iJVmBa6kSD2lD48+YOU6JqIcTQ9ilHHSfn/MPmjildloAT7b2Od2o3CddX138D0Gwcy5Ok0zBm/Ggq1uVuKyUvvKfXP5ChzkBzKT59e+g0s91JGCOnjdxhKTMiZknS0aJ7Z7JirMisMog+q53IeZkUR4E0G1JbuamKUSBHpjVp9HEixCSCY5wInE5TinTXVCWP8Or6FDnQvboxFvRRceKyqZ8HzsqezKbWn4AhT02gKzeOi3X+yFk1pN+lJsOzs/u17wtuKxfJkSbfYFGhnJhI3CZivNJoCS/fN0nwvqmoxRdkaPSqiNGncF8767J/KyXtL3+lDHiJY07w1/RHGWCzfDauiZcyNAqQoLlK4TJWMfrbwy4KopDqbatLtEPFiqpUCgqksPJ3i4roWKMC7Rpa7V8P1y9ssSbFFmCcBrxKYoDcoIhrk1ZRa17m3VEC+YiU4nhyXvZ3guXWUL3sNyFqe2nFtsUlQafV3ogeGPwBteS+rBE3T6kC58k8BytEMoQQw6oI83g8Ho8nN/4Hy5P2XBWj5dcAAAAASUVORK5CYII=",
+                "type": "Image",
+                "wire": 0,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/send-enter-off-B0IfWMyy.png",
+                "type": "Image",
+                "wire": 4422,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/Carlito-Bold-BhbXr__n.ttf",
+                "type": "Font",
+                "wire": 282151,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/Carlito-Regular-Cbe9FLjp.ttf",
+                "type": "Font",
+                "wire": 270724,
+                "afterEditable": false
+              }
+            ]
+          }
+        }
+      },
+      "raw": {
+        "docs": {
+          "simple.docx": {
+            "okRuns": 5,
+            "timeToEditableMs": {
+              "median": 685.1000003814697,
+              "min": 611.2000002861023,
+              "max": 949,
+              "n": 5
+            },
+            "transferredAtEditableBytes": {
+              "median": 5346554,
+              "min": 5346554,
+              "max": 5346554,
+              "n": 5
+            },
+            "transferredBytes": {
+              "median": 7879893,
+              "min": 7879893,
+              "max": 7879893,
+              "n": 5
+            },
+            "requests": {
+              "median": 9,
+              "min": 9,
+              "max": 9,
+              "n": 5
+            },
+            "failedRequests": 0,
+            "firstRunRequests": [
+              {
+                "url": "/?open=%2Ffixtures%2Fsimple.docx",
+                "type": "Document",
+                "wire": 1367,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/index-BdX_MuC4.css",
+                "type": "Stylesheet",
+                "wire": 201242,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/index-DLjs18ti.js",
+                "type": "Script",
+                "wire": 3818826,
+                "afterEditable": false
+              },
+              {
+                "url": "/fixtures/simple.docx",
+                "type": "Fetch",
+                "wire": 2393,
+                "afterEditable": false
+              },
+              {
+                "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYAAACOEfKtAAAACXBIWXMAACxLAAAsSwGlPZapAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAOdEVYdFNvZnR3YXJlAEZpZ21hnrGWYwAABQJJREFUeAHtnH9OG0cUx79vbEikRgo9QTcnwNzAnKD0BOA/EkRJBD4B5gRrBK4F+cNwgpITdHOC0htsTlD/U6l17H2dWTsS8c7YxrOzu4nm80cUZr1j+Hh+vLXmPcDj8Xg8njUhlEjYHwQYj4OvGl/UH9qt1hDfCIUKDAeDLfwzOiDQz2BuyHffMrw0BlHECd21372OUGEKE3jRuznhhDsLpJmImZNW+91RhAriXGDY7wc0qQ0AbsICItE5OX59jorhVOBUnvhD/jdAHhDdnh6/aaFCCDgkV3kK5oPub9chKoSzEXjRe38m166O8QWMIQTdy3XxEziJIcSWHGEBMbaXTXfZ725V1sQ6HKCmLk8M8qQ4RnKBF8+7pnBF3Y+J6MhPd193Xa6Hck3FK1QAJyOw27sZqOmWuaDkifFu+/j4YYVuEF72O1LWme5aVUZh7mtgGMpYTydPwoLaq8pTSEEdZr7QXSOqnaEC5L+J1EdN/QWK2sdvbvFUxs868l/NVOdm+mGVjINdWL8BMOEOa9But+SaiQ/ai89MH1Zx5C5Qrlnb2gujjXusS5JE+vYcQ6Q1cTECA03jgxpJWJcNRLpmItpGybgIY4JsE2Xkhb1eg1A/k3M7gOCI/9s8N0luHx3F3avrTLvciX+06TcPnMSBy0gf8cbyKSX9YoHVVGzQxueGvLT7lH4I4qWLfp+C00c5I2NxkP1WJodd1VW/CyhHIBkW/+ew+0Nd9buAcgR+R3iBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlpQjkPmbSWddRkkjkPQCedTQNYe9m4a+G8QomZJGYBJr2yfQi8Kkoe+GP6FkyhFoPDSOkzTN6xHpsV0WhqQaw+n9AinljPTs0HiM7IH0LZXhGV5e34EppjptY5LsQZ/xGVch1cuFQLW+zZ9TzhyxZcadHHG6kRWk7aQOiTNMMCeZxB0C/ZQeLp/nXzjbtFxMYd0vG2RaxptdYO1NIFbZntlmbY7K0GWaQ+4C5ef/UdO8lVboeESawkXjX4Anjg6V8Snvm0+Vne3UQfYGWjm5cR1cjED9LzwZ7c03qcxNriU7WH0kxsZ0WTbk6DF/hEPyF8iJVmBa6kSD2lD48+YOU6JqIcTQ9ilHHSfn/MPmjildloAT7b2Od2o3CddX138D0Gwcy5Ok0zBm/Ggq1uVuKyUvvKfXP5ChzkBzKT59e+g0s91JGCOnjdxhKTMiZknS0aJ7Z7JirMisMog+q53IeZkUR4E0G1JbuamKUSBHpjVp9HEixCSCY5wInE5TinTXVCWP8Or6FDnQvboxFvRRceKyqZ8HzsqezKbWn4AhT02gKzeOi3X+yFk1pN+lJsOzs/u17wtuKxfJkSbfYFGhnJhI3CZivNJoCS/fN0nwvqmoxRdkaPSqiNGncF8767J/KyXtL3+lDHiJY07w1/RHGWCzfDauiZcyNAqQoLlK4TJWMfrbwy4KopDqbatLtEPFiqpUCgqksPJ3i4roWKMC7Rpa7V8P1y9ssSbFFmCcBrxKYoDcoIhrk1ZRa17m3VEC+YiU4nhyXvZ3guXWUL3sNyFqe2nFtsUlQafV3ogeGPwBteS+rBE3T6kC58k8BytEMoQQw6oI83g8Ho8nN/4Hy5P2XBWj5dcAAAAASUVORK5CYII=",
+                "type": "Image",
+                "wire": 0,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/Carlito-Bold-BhbXr__n.ttf",
+                "type": "Font",
+                "wire": 686416,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/Carlito-Regular-Cbe9FLjp.ttf",
+                "type": "Font",
+                "wire": 631888,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/send-enter-off-B0IfWMyy.png",
+                "type": "Image",
+                "wire": 4422,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/NotoSansCJKsc-Regular-subset-BuHGXxnc.woff2",
+                "type": "Font",
+                "wire": 2533339,
+                "afterEditable": true
+              }
+            ]
+          },
+          "kitchen-sink.docx": {
+            "okRuns": 5,
+            "timeToEditableMs": {
+              "median": 774.0999999046326,
+              "min": 665.1999998092651,
+              "max": 1253.2999997138977,
+              "n": 5
+            },
+            "transferredAtEditableBytes": {
+              "median": 5967041,
+              "min": 5967041,
+              "max": 5967041,
+              "n": 5
+            },
+            "transferredBytes": {
+              "median": 8500380,
+              "min": 8500380,
+              "max": 8500380,
+              "n": 5
+            },
+            "requests": {
+              "median": 11,
+              "min": 11,
+              "max": 11,
+              "n": 5
+            },
+            "failedRequests": 0,
+            "firstRunRequests": [
+              {
+                "url": "/?open=%2Ffixtures%2Fkitchen-sink.docx",
+                "type": "Document",
+                "wire": 1367,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/index-BdX_MuC4.css",
+                "type": "Stylesheet",
+                "wire": 201242,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/index-DLjs18ti.js",
+                "type": "Script",
+                "wire": 3818826,
+                "afterEditable": false
+              },
+              {
+                "url": "/fixtures/kitchen-sink.docx",
+                "type": "Fetch",
+                "wire": 3652,
+                "afterEditable": false
+              },
+              {
+                "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+                "type": "Image",
+                "wire": 0,
+                "afterEditable": false
+              },
+              {
+                "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYAAACOEfKtAAAACXBIWXMAACxLAAAsSwGlPZapAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAOdEVYdFNvZnR3YXJlAEZpZ21hnrGWYwAABQJJREFUeAHtnH9OG0cUx79vbEikRgo9QTcnwNzAnKD0BOA/EkRJBD4B5gRrBK4F+cNwgpITdHOC0htsTlD/U6l17H2dWTsS8c7YxrOzu4nm80cUZr1j+Hh+vLXmPcDj8Xg8njUhlEjYHwQYj4OvGl/UH9qt1hDfCIUKDAeDLfwzOiDQz2BuyHffMrw0BlHECd21372OUGEKE3jRuznhhDsLpJmImZNW+91RhAriXGDY7wc0qQ0AbsICItE5OX59jorhVOBUnvhD/jdAHhDdnh6/aaFCCDgkV3kK5oPub9chKoSzEXjRe38m166O8QWMIQTdy3XxEziJIcSWHGEBMbaXTXfZ725V1sQ6HKCmLk8M8qQ4RnKBF8+7pnBF3Y+J6MhPd193Xa6Hck3FK1QAJyOw27sZqOmWuaDkifFu+/j4YYVuEF72O1LWme5aVUZh7mtgGMpYTydPwoLaq8pTSEEdZr7QXSOqnaEC5L+J1EdN/QWK2sdvbvFUxs868l/NVOdm+mGVjINdWL8BMOEOa9But+SaiQ/ai89MH1Zx5C5Qrlnb2gujjXusS5JE+vYcQ6Q1cTECA03jgxpJWJcNRLpmItpGybgIY4JsE2Xkhb1eg1A/k3M7gOCI/9s8N0luHx3F3avrTLvciX+06TcPnMSBy0gf8cbyKSX9YoHVVGzQxueGvLT7lH4I4qWLfp+C00c5I2NxkP1WJodd1VW/CyhHIBkW/+ew+0Nd9buAcgR+R3iBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlpQjkPmbSWddRkkjkPQCedTQNYe9m4a+G8QomZJGYBJr2yfQi8Kkoe+GP6FkyhFoPDSOkzTN6xHpsV0WhqQaw+n9AinljPTs0HiM7IH0LZXhGV5e34EppjptY5LsQZ/xGVch1cuFQLW+zZ9TzhyxZcadHHG6kRWk7aQOiTNMMCeZxB0C/ZQeLp/nXzjbtFxMYd0vG2RaxptdYO1NIFbZntlmbY7K0GWaQ+4C5ef/UdO8lVboeESawkXjX4Anjg6V8Snvm0+Vne3UQfYGWjm5cR1cjED9LzwZ7c03qcxNriU7WH0kxsZ0WTbk6DF/hEPyF8iJVmBa6kSD2lD48+YOU6JqIcTQ9ilHHSfn/MPmjildloAT7b2Od2o3CddX138D0Gwcy5Ok0zBm/Ggq1uVuKyUvvKfXP5ChzkBzKT59e+g0s91JGCOnjdxhKTMiZknS0aJ7Z7JirMisMog+q53IeZkUR4E0G1JbuamKUSBHpjVp9HEixCSCY5wInE5TinTXVCWP8Or6FDnQvboxFvRRceKyqZ8HzsqezKbWn4AhT02gKzeOi3X+yFk1pN+lJsOzs/u17wtuKxfJkSbfYFGhnJhI3CZivNJoCS/fN0nwvqmoxRdkaPSqiNGncF8767J/KyXtL3+lDHiJY07w1/RHGWCzfDauiZcyNAqQoLlK4TJWMfrbwy4KopDqbatLtEPFiqpUCgqksPJ3i4roWKMC7Rpa7V8P1y9ssSbFFmCcBrxKYoDcoIhrk1ZRa17m3VEC+YiU4nhyXvZ3guXWUL3sNyFqe2nFtsUlQafV3ogeGPwBteS+rBE3T6kC58k8BytEMoQQw6oI83g8Ho8nN/4Hy5P2XBWj5dcAAAAASUVORK5CYII=",
+                "type": "Image",
+                "wire": 0,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/Carlito-Bold-BhbXr__n.ttf",
+                "type": "Font",
+                "wire": 686416,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/Carlito-Regular-Cbe9FLjp.ttf",
+                "type": "Font",
+                "wire": 631888,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/Carlito-Italic-KkZUqxJW.ttf",
+                "type": "Font",
+                "wire": 619228,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/send-enter-off-B0IfWMyy.png",
+                "type": "Image",
+                "wire": 4422,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/NotoSansCJKsc-Regular-subset-BuHGXxnc.woff2",
+                "type": "Font",
+                "wire": 2533339,
+                "afterEditable": true
+              }
+            ]
+          },
+          "long.docx": {
+            "okRuns": 5,
+            "timeToEditableMs": {
+              "median": 1211,
+              "min": 1066,
+              "max": 2036.1999998092651,
+              "n": 5
+            },
+            "transferredAtEditableBytes": {
+              "median": 5348902,
+              "min": 5348902,
+              "max": 5348902,
+              "n": 5
+            },
+            "transferredBytes": {
+              "median": 5348902,
+              "min": 5348902,
+              "max": 5348902,
+              "n": 5
+            },
+            "requests": {
+              "median": 8,
+              "min": 8,
+              "max": 8,
+              "n": 5
+            },
+            "failedRequests": 0,
+            "firstRunRequests": [
+              {
+                "url": "/?open=%2Ffixtures%2Flong.docx",
+                "type": "Document",
+                "wire": 1367,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/index-BdX_MuC4.css",
+                "type": "Stylesheet",
+                "wire": 201242,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/index-DLjs18ti.js",
+                "type": "Script",
+                "wire": 3818826,
+                "afterEditable": false
+              },
+              {
+                "url": "/fixtures/long.docx",
+                "type": "Fetch",
+                "wire": 4741,
+                "afterEditable": false
+              },
+              {
+                "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYAAACOEfKtAAAACXBIWXMAACxLAAAsSwGlPZapAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAOdEVYdFNvZnR3YXJlAEZpZ21hnrGWYwAABQJJREFUeAHtnH9OG0cUx79vbEikRgo9QTcnwNzAnKD0BOA/EkRJBD4B5gRrBK4F+cNwgpITdHOC0htsTlD/U6l17H2dWTsS8c7YxrOzu4nm80cUZr1j+Hh+vLXmPcDj8Xg8njUhlEjYHwQYj4OvGl/UH9qt1hDfCIUKDAeDLfwzOiDQz2BuyHffMrw0BlHECd21372OUGEKE3jRuznhhDsLpJmImZNW+91RhAriXGDY7wc0qQ0AbsICItE5OX59jorhVOBUnvhD/jdAHhDdnh6/aaFCCDgkV3kK5oPub9chKoSzEXjRe38m166O8QWMIQTdy3XxEziJIcSWHGEBMbaXTXfZ725V1sQ6HKCmLk8M8qQ4RnKBF8+7pnBF3Y+J6MhPd193Xa6Hck3FK1QAJyOw27sZqOmWuaDkifFu+/j4YYVuEF72O1LWme5aVUZh7mtgGMpYTydPwoLaq8pTSEEdZr7QXSOqnaEC5L+J1EdN/QWK2sdvbvFUxs868l/NVOdm+mGVjINdWL8BMOEOa9But+SaiQ/ai89MH1Zx5C5Qrlnb2gujjXusS5JE+vYcQ6Q1cTECA03jgxpJWJcNRLpmItpGybgIY4JsE2Xkhb1eg1A/k3M7gOCI/9s8N0luHx3F3avrTLvciX+06TcPnMSBy0gf8cbyKSX9YoHVVGzQxueGvLT7lH4I4qWLfp+C00c5I2NxkP1WJodd1VW/CyhHIBkW/+ew+0Nd9buAcgR+R3iBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlpQjkPmbSWddRkkjkPQCedTQNYe9m4a+G8QomZJGYBJr2yfQi8Kkoe+GP6FkyhFoPDSOkzTN6xHpsV0WhqQaw+n9AinljPTs0HiM7IH0LZXhGV5e34EppjptY5LsQZ/xGVch1cuFQLW+zZ9TzhyxZcadHHG6kRWk7aQOiTNMMCeZxB0C/ZQeLp/nXzjbtFxMYd0vG2RaxptdYO1NIFbZntlmbY7K0GWaQ+4C5ef/UdO8lVboeESawkXjX4Anjg6V8Snvm0+Vne3UQfYGWjm5cR1cjED9LzwZ7c03qcxNriU7WH0kxsZ0WTbk6DF/hEPyF8iJVmBa6kSD2lD48+YOU6JqIcTQ9ilHHSfn/MPmjildloAT7b2Od2o3CddX138D0Gwcy5Ok0zBm/Ggq1uVuKyUvvKfXP5ChzkBzKT59e+g0s91JGCOnjdxhKTMiZknS0aJ7Z7JirMisMog+q53IeZkUR4E0G1JbuamKUSBHpjVp9HEixCSCY5wInE5TinTXVCWP8Or6FDnQvboxFvRRceKyqZ8HzsqezKbWn4AhT02gKzeOi3X+yFk1pN+lJsOzs/u17wtuKxfJkSbfYFGhnJhI3CZivNJoCS/fN0nwvqmoxRdkaPSqiNGncF8767J/KyXtL3+lDHiJY07w1/RHGWCzfDauiZcyNAqQoLlK4TJWMfrbwy4KopDqbatLtEPFiqpUCgqksPJ3i4roWKMC7Rpa7V8P1y9ssSbFFmCcBrxKYoDcoIhrk1ZRa17m3VEC+YiU4nhyXvZ3guXWUL3sNyFqe2nFtsUlQafV3ogeGPwBteS+rBE3T6kC58k8BytEMoQQw6oI83g8Ho8nN/4Hy5P2XBWj5dcAAAAASUVORK5CYII=",
+                "type": "Image",
+                "wire": 0,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/send-enter-off-B0IfWMyy.png",
+                "type": "Image",
+                "wire": 4422,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/Carlito-Regular-Cbe9FLjp.ttf",
+                "type": "Font",
+                "wire": 631888,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/Carlito-Bold-BhbXr__n.ttf",
+                "type": "Font",
+                "wire": 686416,
+                "afterEditable": false
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "after": {
+    "label": "after",
+    "dist": "dist-web/docs/0.1.0-12b6000",
+    "bundle": {
+      "generatedAt": "2026-10-08T15:34:57.850Z",
+      "dist": "dist-web/docs/0.1.0-12b6000",
+      "total": {
+        "files": 41,
+        "raw": 13919992,
+        "gzip": 11076314,
+        "brotli": 10822038
+      },
+      "initial": {
+        "note": "index.html + <script>/<link> targets + static JS imports (no dynamic import(), no CSS url() fonts)",
+        "files": ["index.html", "assets/index-BVZB0WQT.js", "assets/index-CGJNJzuU.css"],
+        "total": {
+          "files": 3,
+          "raw": 4021101,
+          "gzip": 1195846,
+          "brotli": 941875
+        }
+      },
+      "sourcemapBytes": 0,
+      "byType": {
+        "js": {
+          "files": 1,
+          "raw": 3818584,
+          "gzip": 1161558,
+          "brotli": 913006
+        },
+        "font": {
+          "files": 34,
+          "raw": 9882008,
+          "gzip": 9872415,
+          "brotli": 9872588
+        },
+        "css": {
+          "files": 1,
+          "raw": 201665,
+          "gzip": 33765,
+          "brotli": 28504
+        },
+        "other": {
+          "files": 4,
+          "raw": 16883,
+          "gzip": 8053,
+          "brotli": 7575
+        },
+        "html": {
+          "files": 1,
+          "raw": 852,
+          "gzip": 523,
+          "brotli": 365
+        }
+      },
+      "top15": [
+        {
+          "file": "assets/index-BVZB0WQT.js",
+          "type": "js",
+          "raw": 3818584,
+          "gzip": 1161558,
+          "brotli": 913006
+        },
+        {
+          "file": "fonts/NotoSerifCJKsc-Regular-subset-CLPB6QGT.woff2",
+          "type": "font",
+          "raw": 3495928,
+          "gzip": 3495814,
+          "brotli": 3495940
+        },
+        {
+          "file": "fonts/NotoSansCJKsc-Regular-subset-BuHGXxnc.woff2",
+          "type": "font",
+          "raw": 2533160,
+          "gzip": 2533871,
+          "brotli": 2533169
+        },
+        {
+          "file": "fonts/GenOfficeSerifKR-Regular-subset-BkQyd75u.woff2",
+          "type": "font",
+          "raw": 512436,
+          "gzip": 512597,
+          "brotli": 512441
+        },
+        {
+          "file": "fonts/GenOfficeGothicKR-Regular-subset-Bkvj_MFZ.woff2",
+          "type": "font",
+          "raw": 281980,
+          "gzip": 281687,
+          "brotli": 281985
+        },
+        {
+          "file": "fonts/GenOfficeSansKR-Regular-subset-CVxxonE8.woff2",
+          "type": "font",
+          "raw": 266128,
+          "gzip": 266063,
+          "brotli": 266133
+        },
+        {
+          "file": "fonts/Carlito-BoldItalic-BqaEwLjh.woff2",
+          "type": "font",
+          "raw": 207116,
+          "gzip": 207199,
+          "brotli": 207121
+        },
+        {
+          "file": "fonts/Carlito-Italic-CcV9hCBk.woff2",
+          "type": "font",
+          "raw": 202000,
+          "gzip": 202083,
+          "brotli": 202005
+        },
+        {
+          "file": "assets/index-CGJNJzuU.css",
+          "type": "css",
+          "raw": 201665,
+          "gzip": 33765,
+          "brotli": 28504
+        },
+        {
+          "file": "fonts/Carlito-Bold-DN11iCUU.woff2",
+          "type": "font",
+          "raw": 198468,
+          "gzip": 198551,
+          "brotli": 198473
+        },
+        {
+          "file": "fonts/Carlito-Regular-fal-2WfU.woff2",
+          "type": "font",
+          "raw": 190604,
+          "gzip": 190682,
+          "brotli": 190609
+        },
+        {
+          "file": "fonts/LiberationSans-Italic-B67WhyiB.woff2",
+          "type": "font",
+          "raw": 153144,
+          "gzip": 152071,
+          "brotli": 151765
+        },
+        {
+          "file": "fonts/LiberationSans-BoldItalic-BYHlqTuw.woff2",
+          "type": "font",
+          "raw": 150908,
+          "gzip": 149615,
+          "brotli": 149336
+        },
+        {
+          "file": "fonts/LiberationSans-Bold-BlSkeIb-.woff2",
+          "type": "font",
+          "raw": 148756,
+          "gzip": 147718,
+          "brotli": 147450
+        },
+        {
+          "file": "fonts/LiberationSerif-Italic-BdGY3XA4.woff2",
+          "type": "font",
+          "raw": 147536,
+          "gzip": 146726,
+          "brotli": 147541
+        }
+      ],
+      "files": [
+        {
+          "file": "assets/index-BVZB0WQT.js",
+          "type": "js",
+          "raw": 3818584,
+          "gzip": 1161558,
+          "brotli": 913006
+        },
+        {
+          "file": "fonts/NotoSerifCJKsc-Regular-subset-CLPB6QGT.woff2",
+          "type": "font",
+          "raw": 3495928,
+          "gzip": 3495814,
+          "brotli": 3495940
+        },
+        {
+          "file": "fonts/NotoSansCJKsc-Regular-subset-BuHGXxnc.woff2",
+          "type": "font",
+          "raw": 2533160,
+          "gzip": 2533871,
+          "brotli": 2533169
+        },
+        {
+          "file": "fonts/GenOfficeSerifKR-Regular-subset-BkQyd75u.woff2",
+          "type": "font",
+          "raw": 512436,
+          "gzip": 512597,
+          "brotli": 512441
+        },
+        {
+          "file": "fonts/GenOfficeGothicKR-Regular-subset-Bkvj_MFZ.woff2",
+          "type": "font",
+          "raw": 281980,
+          "gzip": 281687,
+          "brotli": 281985
+        },
+        {
+          "file": "fonts/GenOfficeSansKR-Regular-subset-CVxxonE8.woff2",
+          "type": "font",
+          "raw": 266128,
+          "gzip": 266063,
+          "brotli": 266133
+        },
+        {
+          "file": "fonts/Carlito-BoldItalic-BqaEwLjh.woff2",
+          "type": "font",
+          "raw": 207116,
+          "gzip": 207199,
+          "brotli": 207121
+        },
+        {
+          "file": "fonts/Carlito-Italic-CcV9hCBk.woff2",
+          "type": "font",
+          "raw": 202000,
+          "gzip": 202083,
+          "brotli": 202005
+        },
+        {
+          "file": "assets/index-CGJNJzuU.css",
+          "type": "css",
+          "raw": 201665,
+          "gzip": 33765,
+          "brotli": 28504
+        },
+        {
+          "file": "fonts/Carlito-Bold-DN11iCUU.woff2",
+          "type": "font",
+          "raw": 198468,
+          "gzip": 198551,
+          "brotli": 198473
+        },
+        {
+          "file": "fonts/Carlito-Regular-fal-2WfU.woff2",
+          "type": "font",
+          "raw": 190604,
+          "gzip": 190682,
+          "brotli": 190609
+        },
+        {
+          "file": "fonts/LiberationSans-Italic-B67WhyiB.woff2",
+          "type": "font",
+          "raw": 153144,
+          "gzip": 152071,
+          "brotli": 151765
+        },
+        {
+          "file": "fonts/LiberationSans-BoldItalic-BYHlqTuw.woff2",
+          "type": "font",
+          "raw": 150908,
+          "gzip": 149615,
+          "brotli": 149336
+        },
+        {
+          "file": "fonts/LiberationSans-Bold-BlSkeIb-.woff2",
+          "type": "font",
+          "raw": 148756,
+          "gzip": 147718,
+          "brotli": 147450
+        },
+        {
+          "file": "fonts/LiberationSerif-Italic-BdGY3XA4.woff2",
+          "type": "font",
+          "raw": 147536,
+          "gzip": 146726,
+          "brotli": 147541
+        },
+        {
+          "file": "fonts/LiberationSerif-BoldItalic-DqILcGx7.woff2",
+          "type": "font",
+          "raw": 147132,
+          "gzip": 146291,
+          "brotli": 147137
+        },
+        {
+          "file": "fonts/LiberationSans-Regular-r-gFvyde.woff2",
+          "type": "font",
+          "raw": 147108,
+          "gzip": 146149,
+          "brotli": 145920
+        },
+        {
+          "file": "fonts/LiberationSerif-Regular-Bm6iK1hG.woff2",
+          "type": "font",
+          "raw": 146880,
+          "gzip": 145920,
+          "brotli": 145761
+        },
+        {
+          "file": "fonts/LiberationSerif-Bold-DS5JG3CL.woff2",
+          "type": "font",
+          "raw": 141068,
+          "gzip": 140249,
+          "brotli": 140089
+        },
+        {
+          "file": "fonts/LiberationMono-Regular-Bv_fWIHn.woff2",
+          "type": "font",
+          "raw": 125996,
+          "gzip": 125111,
+          "brotli": 124973
+        },
+        {
+          "file": "fonts/LiberationMono-Bold-BZxqunF8.woff2",
+          "type": "font",
+          "raw": 122928,
+          "gzip": 122211,
+          "brotli": 122027
+        },
+        {
+          "file": "fonts/LiberationMono-BoldItalic-BTDQyQp_.woff2",
+          "type": "font",
+          "raw": 117028,
+          "gzip": 116453,
+          "brotli": 117033
+        },
+        {
+          "file": "fonts/LiberationMono-Italic-Bprp0jhy.woff2",
+          "type": "font",
+          "raw": 114728,
+          "gzip": 114055,
+          "brotli": 114733
+        },
+        {
+          "file": "fonts/NotoNaskhArabic-Regular-subset-DQSqx2ZA.woff2",
+          "type": "font",
+          "raw": 69624,
+          "gzip": 69667,
+          "brotli": 69629
+        },
+        {
+          "file": "fonts/NotoSansArabic-Regular-subset-D207GVuU.woff2",
+          "type": "font",
+          "raw": 63672,
+          "gzip": 63710,
+          "brotli": 63676
+        },
+        {
+          "file": "fonts/GenOfficeTamil-Regular-DLISHPmH.woff2",
+          "type": "font",
+          "raw": 33072,
+          "gzip": 33105,
+          "brotli": 33076
+        },
+        {
+          "file": "fonts/GenOfficeUIKanaJP-Bold-DbcaglVT.woff2",
+          "type": "font",
+          "raw": 26204,
+          "gzip": 26232,
+          "brotli": 26208
+        },
+        {
+          "file": "fonts/GenOfficeUIKanaJP-Regular-Bj_7JzTT.woff2",
+          "type": "font",
+          "raw": 25288,
+          "gzip": 25316,
+          "brotli": 25292
+        },
+        {
+          "file": "fonts/Caladea-Italic-BlypM-0H.woff2",
+          "type": "font",
+          "raw": 19616,
+          "gzip": 19639,
+          "brotli": 19603
+        },
+        {
+          "file": "fonts/Caladea-BoldItalic-Ba27xK_q.woff2",
+          "type": "font",
+          "raw": 19328,
+          "gzip": 19351,
+          "brotli": 19321
+        },
+        {
+          "file": "fonts/Caladea-Regular-DaybilA1.woff2",
+          "type": "font",
+          "raw": 18848,
+          "gzip": 18862,
+          "brotli": 18830
+        },
+        {
+          "file": "fonts/Caladea-Bold-CZKSWaR4.woff2",
+          "type": "font",
+          "raw": 18428,
+          "gzip": 18443,
+          "brotli": 18411
+        },
+        {
+          "file": "fonts/GenOfficePoppins-Regular-subset-RElVmxhA.woff2",
+          "type": "font",
+          "raw": 14160,
+          "gzip": 14183,
+          "brotli": 14164
+        },
+        {
+          "file": "fonts/GenOfficePoppins-Bold-subset-CLJyStaw.woff2",
+          "type": "font",
+          "raw": 14128,
+          "gzip": 14151,
+          "brotli": 14132
+        },
+        {
+          "file": "manifest.json",
+          "type": "other",
+          "raw": 10407,
+          "gzip": 2915,
+          "brotli": 2607
+        },
+        {
+          "file": "fonts/GenOfficeCheLatinKR-CFVfemg_.woff2",
+          "type": "font",
+          "raw": 8296,
+          "gzip": 8319,
+          "brotli": 8300
+        },
+        {
+          "file": "assets/send-enter-off-B0IfWMyy.png",
+          "type": "other",
+          "raw": 4247,
+          "gzip": 4238,
+          "brotli": 4212
+        },
+        {
+          "file": "csp.json",
+          "type": "other",
+          "raw": 1374,
+          "gzip": 551,
+          "brotli": 467
+        },
+        {
+          "file": "headers.json",
+          "type": "other",
+          "raw": 855,
+          "gzip": 349,
+          "brotli": 289
+        },
+        {
+          "file": "index.html",
+          "type": "html",
+          "raw": 852,
+          "gzip": 523,
+          "brotli": 365
+        },
+        {
+          "file": "fonts/GenOfficePUABlank-DhfF4Y_f.woff2",
+          "type": "font",
+          "raw": 312,
+          "gzip": 321,
+          "brotli": 305
+        }
+      ],
+      "biggestJsComposition": null
+    },
+    "picker": {
+      "simple": {
+        "generatedAt": "2026-10-08T15:35:04.749Z",
+        "dist": "/home/ubuntu/orca/workspaces/uniwork-office/uni-1013-w1-bundle/dist-web/docs/0.1.0-12b6000",
+        "compress": true,
+        "doc": "simple",
+        "onLoad": {
+          "files": 3,
+          "wireBytes": 2923037,
+          "list": [
+            {
+              "phase": "load",
+              "file": "Carlito-Bold-DN11iCUU.woff2",
+              "wire": 198736
+            },
+            {
+              "phase": "load",
+              "file": "Carlito-Regular-fal-2WfU.woff2",
+              "wire": 190872
+            },
+            {
+              "phase": "load",
+              "file": "NotoSansCJKsc-Regular-subset-BuHGXxnc.woff2",
+              "wire": 2533429
+            }
+          ]
+        },
+        "onPickerOpen": {
+          "menuItems": 32,
+          "files": 6,
+          "wireBytes": 4568052,
+          "list": [
+            {
+              "phase": "picker",
+              "file": "Caladea-Regular-DaybilA1.woff2",
+              "wire": 19115
+            },
+            {
+              "phase": "picker",
+              "file": "LiberationSans-Regular-r-gFvyde.woff2",
+              "wire": 147376
+            },
+            {
+              "phase": "picker",
+              "file": "LiberationMono-Regular-Bv_fWIHn.woff2",
+              "wire": 126264
+            },
+            {
+              "phase": "picker",
+              "file": "GenOfficeSansKR-Regular-subset-CVxxonE8.woff2",
+              "wire": 266396
+            },
+            {
+              "phase": "picker",
+              "file": "GenOfficeSerifKR-Regular-subset-BkQyd75u.woff2",
+              "wire": 512704
+            },
+            {
+              "phase": "picker",
+              "file": "NotoSerifCJKsc-Regular-subset-CLPB6QGT.woff2",
+              "wire": 3496197
+            }
+          ]
+        }
+      },
+      "long": {
+        "generatedAt": "2026-10-08T15:35:21.116Z",
+        "dist": "/home/ubuntu/orca/workspaces/uniwork-office/uni-1013-w1-bundle/dist-web/docs/0.1.0-12b6000",
+        "compress": true,
+        "doc": "long",
+        "onLoad": {
+          "files": 2,
+          "wireBytes": 389608,
+          "list": [
+            {
+              "phase": "load",
+              "file": "Carlito-Bold-DN11iCUU.woff2",
+              "wire": 198736
+            },
+            {
+              "phase": "load",
+              "file": "Carlito-Regular-fal-2WfU.woff2",
+              "wire": 190872
+            }
+          ]
+        },
+        "onPickerOpen": {
+          "menuItems": 32,
+          "files": 7,
+          "wireBytes": 7101481,
+          "list": [
+            {
+              "phase": "picker",
+              "file": "Caladea-Regular-DaybilA1.woff2",
+              "wire": 19115
+            },
+            {
+              "phase": "picker",
+              "file": "LiberationSans-Regular-r-gFvyde.woff2",
+              "wire": 147376
+            },
+            {
+              "phase": "picker",
+              "file": "LiberationMono-Regular-Bv_fWIHn.woff2",
+              "wire": 126264
+            },
+            {
+              "phase": "picker",
+              "file": "GenOfficeSansKR-Regular-subset-CVxxonE8.woff2",
+              "wire": 266396
+            },
+            {
+              "phase": "picker",
+              "file": "GenOfficeSerifKR-Regular-subset-BkQyd75u.woff2",
+              "wire": 512704
+            },
+            {
+              "phase": "picker",
+              "file": "NotoSansCJKsc-Regular-subset-BuHGXxnc.woff2",
+              "wire": 2533429
+            },
+            {
+              "phase": "picker",
+              "file": "NotoSerifCJKsc-Regular-subset-CLPB6QGT.woff2",
+              "wire": 3496197
+            }
+          ]
+        }
+      }
+    },
+    "manifest": {
+      "version": "0.1.0-12b6000",
+      "gitSha": "12b6000",
+      "dirty": false,
+      "totalBytes": 13909585,
+      "gzipBytes": 11073399,
+      "initial": {
+        "files": 3,
+        "bytes": 4021101,
+        "gzipBytes": 1195846
+      },
+      "deferred": {
+        "files": 35,
+        "bytes": 9886255,
+        "gzipBytes": 9876653
+      },
+      "files": 40
+    },
+    "load": {
+      "gzip": {
+        "docs": {
+          "simple.docx": {
+            "okRuns": 5,
+            "timeToEditableMs": {
+              "median": 1279.7000002861023,
+              "min": 1180.9000000953674,
+              "max": 1379.0999999046326,
+              "n": 5
+            },
+            "transferredAtEditableBytes": {
+              "median": 1593664,
+              "min": 1593664,
+              "max": 1593664,
+              "n": 5
+            },
+            "transferredBytes": {
+              "median": 4127093,
+              "min": 4127093,
+              "max": 4127093,
+              "n": 5
+            },
+            "requests": {
+              "median": 9,
+              "min": 9,
+              "max": 9,
+              "n": 5
+            },
+            "failedRequests": 0,
+            "firstRunRequests": [
+              {
+                "url": "/?open=%2Ffixtures%2Fsimple.docx",
+                "type": "Document",
+                "wire": 1102,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/index-CGJNJzuU.css",
+                "type": "Stylesheet",
+                "wire": 34092,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/index-BVZB0WQT.js",
+                "type": "Script",
+                "wire": 1161894,
+                "afterEditable": false
+              },
+              {
+                "url": "/fixtures/simple.docx",
+                "type": "Fetch",
+                "wire": 2456,
+                "afterEditable": false
+              },
+              {
+                "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYAAACOEfKtAAAACXBIWXMAACxLAAAsSwGlPZapAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAOdEVYdFNvZnR3YXJlAEZpZ21hnrGWYwAABQJJREFUeAHtnH9OG0cUx79vbEikRgo9QTcnwNzAnKD0BOA/EkRJBD4B5gRrBK4F+cNwgpITdHOC0htsTlD/U6l17H2dWTsS8c7YxrOzu4nm80cUZr1j+Hh+vLXmPcDj8Xg8njUhlEjYHwQYj4OvGl/UH9qt1hDfCIUKDAeDLfwzOiDQz2BuyHffMrw0BlHECd21372OUGEKE3jRuznhhDsLpJmImZNW+91RhAriXGDY7wc0qQ0AbsICItE5OX59jorhVOBUnvhD/jdAHhDdnh6/aaFCCDgkV3kK5oPub9chKoSzEXjRe38m166O8QWMIQTdy3XxEziJIcSWHGEBMbaXTXfZ725V1sQ6HKCmLk8M8qQ4RnKBF8+7pnBF3Y+J6MhPd193Xa6Hck3FK1QAJyOw27sZqOmWuaDkifFu+/j4YYVuEF72O1LWme5aVUZh7mtgGMpYTydPwoLaq8pTSEEdZr7QXSOqnaEC5L+J1EdN/QWK2sdvbvFUxs868l/NVOdm+mGVjINdWL8BMOEOa9But+SaiQ/ai89MH1Zx5C5Qrlnb2gujjXusS5JE+vYcQ6Q1cTECA03jgxpJWJcNRLpmItpGybgIY4JsE2Xkhb1eg1A/k3M7gOCI/9s8N0luHx3F3avrTLvciX+06TcPnMSBy0gf8cbyKSX9YoHVVGzQxueGvLT7lH4I4qWLfp+C00c5I2NxkP1WJodd1VW/CyhHIBkW/+ew+0Nd9buAcgR+R3iBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlpQjkPmbSWddRkkjkPQCedTQNYe9m4a+G8QomZJGYBJr2yfQi8Kkoe+GP6FkyhFoPDSOkzTN6xHpsV0WhqQaw+n9AinljPTs0HiM7IH0LZXhGV5e34EppjptY5LsQZ/xGVch1cuFQLW+zZ9TzhyxZcadHHG6kRWk7aQOiTNMMCeZxB0C/ZQeLp/nXzjbtFxMYd0vG2RaxptdYO1NIFbZntlmbY7K0GWaQ+4C5ef/UdO8lVboeESawkXjX4Anjg6V8Snvm0+Vne3UQfYGWjm5cR1cjED9LzwZ7c03qcxNriU7WH0kxsZ0WTbk6DF/hEPyF8iJVmBa6kSD2lD48+YOU6JqIcTQ9ilHHSfn/MPmjildloAT7b2Od2o3CddX138D0Gwcy5Ok0zBm/Ggq1uVuKyUvvKfXP5ChzkBzKT59e+g0s91JGCOnjdxhKTMiZknS0aJ7Z7JirMisMog+q53IeZkUR4E0G1JbuamKUSBHpjVp9HEixCSCY5wInE5TinTXVCWP8Or6FDnQvboxFvRRceKyqZ8HzsqezKbWn4AhT02gKzeOi3X+yFk1pN+lJsOzs/u17wtuKxfJkSbfYFGhnJhI3CZivNJoCS/fN0nwvqmoxRdkaPSqiNGncF8767J/KyXtL3+lDHiJY07w1/RHGWCzfDauiZcyNAqQoLlK4TJWMfrbwy4KopDqbatLtEPFiqpUCgqksPJ3i4roWKMC7Rpa7V8P1y9ssSbFFmCcBrxKYoDcoIhrk1ZRa17m3VEC+YiU4nhyXvZ3guXWUL3sNyFqe2nFtsUlQafV3ogeGPwBteS+rBE3T6kC58k8BytEMoQQw6oI83g8Ho8nN/4Hy5P2XBWj5dcAAAAASUVORK5CYII=",
+                "type": "Image",
+                "wire": 0,
+                "afterEditable": false
+              },
+              {
+                "url": "/fonts/Carlito-Bold-DN11iCUU.woff2",
+                "type": "Font",
+                "wire": 198736,
+                "afterEditable": false
+              },
+              {
+                "url": "/fonts/Carlito-Regular-fal-2WfU.woff2",
+                "type": "Font",
+                "wire": 190872,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/send-enter-off-B0IfWMyy.png",
+                "type": "Image",
+                "wire": 4512,
+                "afterEditable": false
+              },
+              {
+                "url": "/fonts/NotoSansCJKsc-Regular-subset-BuHGXxnc.woff2",
+                "type": "Font",
+                "wire": 2533429,
+                "afterEditable": true
+              }
+            ]
+          },
+          "kitchen-sink.docx": {
+            "okRuns": 5,
+            "timeToEditableMs": {
+              "median": 1088.2999997138977,
+              "min": 1021,
+              "max": 1313.5,
+              "n": 5
+            },
+            "transferredAtEditableBytes": {
+              "median": 1797191,
+              "min": 1797191,
+              "max": 1797191,
+              "n": 5
+            },
+            "transferredBytes": {
+              "median": 4330620,
+              "min": 4330620,
+              "max": 4330620,
+              "n": 5
+            },
+            "requests": {
+              "median": 11,
+              "min": 11,
+              "max": 11,
+              "n": 5
+            },
+            "failedRequests": 0,
+            "firstRunRequests": [
+              {
+                "url": "/?open=%2Ffixtures%2Fkitchen-sink.docx",
+                "type": "Document",
+                "wire": 1102,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/index-CGJNJzuU.css",
+                "type": "Stylesheet",
+                "wire": 34092,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/index-BVZB0WQT.js",
+                "type": "Script",
+                "wire": 1161894,
+                "afterEditable": false
+              },
+              {
+                "url": "/fixtures/kitchen-sink.docx",
+                "type": "Fetch",
+                "wire": 3715,
+                "afterEditable": false
+              },
+              {
+                "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+                "type": "Image",
+                "wire": 0,
+                "afterEditable": false
+              },
+              {
+                "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYAAACOEfKtAAAACXBIWXMAACxLAAAsSwGlPZapAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAOdEVYdFNvZnR3YXJlAEZpZ21hnrGWYwAABQJJREFUeAHtnH9OG0cUx79vbEikRgo9QTcnwNzAnKD0BOA/EkRJBD4B5gRrBK4F+cNwgpITdHOC0htsTlD/U6l17H2dWTsS8c7YxrOzu4nm80cUZr1j+Hh+vLXmPcDj8Xg8njUhlEjYHwQYj4OvGl/UH9qt1hDfCIUKDAeDLfwzOiDQz2BuyHffMrw0BlHECd21372OUGEKE3jRuznhhDsLpJmImZNW+91RhAriXGDY7wc0qQ0AbsICItE5OX59jorhVOBUnvhD/jdAHhDdnh6/aaFCCDgkV3kK5oPub9chKoSzEXjRe38m166O8QWMIQTdy3XxEziJIcSWHGEBMbaXTXfZ725V1sQ6HKCmLk8M8qQ4RnKBF8+7pnBF3Y+J6MhPd193Xa6Hck3FK1QAJyOw27sZqOmWuaDkifFu+/j4YYVuEF72O1LWme5aVUZh7mtgGMpYTydPwoLaq8pTSEEdZr7QXSOqnaEC5L+J1EdN/QWK2sdvbvFUxs868l/NVOdm+mGVjINdWL8BMOEOa9But+SaiQ/ai89MH1Zx5C5Qrlnb2gujjXusS5JE+vYcQ6Q1cTECA03jgxpJWJcNRLpmItpGybgIY4JsE2Xkhb1eg1A/k3M7gOCI/9s8N0luHx3F3avrTLvciX+06TcPnMSBy0gf8cbyKSX9YoHVVGzQxueGvLT7lH4I4qWLfp+C00c5I2NxkP1WJodd1VW/CyhHIBkW/+ew+0Nd9buAcgR+R3iBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlpQjkPmbSWddRkkjkPQCedTQNYe9m4a+G8QomZJGYBJr2yfQi8Kkoe+GP6FkyhFoPDSOkzTN6xHpsV0WhqQaw+n9AinljPTs0HiM7IH0LZXhGV5e34EppjptY5LsQZ/xGVch1cuFQLW+zZ9TzhyxZcadHHG6kRWk7aQOiTNMMCeZxB0C/ZQeLp/nXzjbtFxMYd0vG2RaxptdYO1NIFbZntlmbY7K0GWaQ+4C5ef/UdO8lVboeESawkXjX4Anjg6V8Snvm0+Vne3UQfYGWjm5cR1cjED9LzwZ7c03qcxNriU7WH0kxsZ0WTbk6DF/hEPyF8iJVmBa6kSD2lD48+YOU6JqIcTQ9ilHHSfn/MPmjildloAT7b2Od2o3CddX138D0Gwcy5Ok0zBm/Ggq1uVuKyUvvKfXP5ChzkBzKT59e+g0s91JGCOnjdxhKTMiZknS0aJ7Z7JirMisMog+q53IeZkUR4E0G1JbuamKUSBHpjVp9HEixCSCY5wInE5TinTXVCWP8Or6FDnQvboxFvRRceKyqZ8HzsqezKbWn4AhT02gKzeOi3X+yFk1pN+lJsOzs/u17wtuKxfJkSbfYFGhnJhI3CZivNJoCS/fN0nwvqmoxRdkaPSqiNGncF8767J/KyXtL3+lDHiJY07w1/RHGWCzfDauiZcyNAqQoLlK4TJWMfrbwy4KopDqbatLtEPFiqpUCgqksPJ3i4roWKMC7Rpa7V8P1y9ssSbFFmCcBrxKYoDcoIhrk1ZRa17m3VEC+YiU4nhyXvZ3guXWUL3sNyFqe2nFtsUlQafV3ogeGPwBteS+rBE3T6kC58k8BytEMoQQw6oI83g8Ho8nN/4Hy5P2XBWj5dcAAAAASUVORK5CYII=",
+                "type": "Image",
+                "wire": 0,
+                "afterEditable": false
+              },
+              {
+                "url": "/fonts/Carlito-Bold-DN11iCUU.woff2",
+                "type": "Font",
+                "wire": 198736,
+                "afterEditable": false
+              },
+              {
+                "url": "/fonts/Carlito-Regular-fal-2WfU.woff2",
+                "type": "Font",
+                "wire": 190872,
+                "afterEditable": false
+              },
+              {
+                "url": "/fonts/Carlito-Italic-CcV9hCBk.woff2",
+                "type": "Font",
+                "wire": 202268,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/send-enter-off-B0IfWMyy.png",
+                "type": "Image",
+                "wire": 4512,
+                "afterEditable": false
+              },
+              {
+                "url": "/fonts/NotoSansCJKsc-Regular-subset-BuHGXxnc.woff2",
+                "type": "Font",
+                "wire": 2533429,
+                "afterEditable": true
+              }
+            ]
+          },
+          "long.docx": {
+            "okRuns": 5,
+            "timeToEditableMs": {
+              "median": 1741.8999996185303,
+              "min": 1660.2999997138977,
+              "max": 1827.5,
+              "n": 5
+            },
+            "transferredAtEditableBytes": {
+              "median": 1595949,
+              "min": 1595949,
+              "max": 1595949,
+              "n": 5
+            },
+            "transferredBytes": {
+              "median": 1595949,
+              "min": 1595949,
+              "max": 1595949,
+              "n": 5
+            },
+            "requests": {
+              "median": 8,
+              "min": 8,
+              "max": 8,
+              "n": 5
+            },
+            "failedRequests": 0,
+            "firstRunRequests": [
+              {
+                "url": "/?open=%2Ffixtures%2Flong.docx",
+                "type": "Document",
+                "wire": 1102,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/index-CGJNJzuU.css",
+                "type": "Stylesheet",
+                "wire": 34092,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/index-BVZB0WQT.js",
+                "type": "Script",
+                "wire": 1161894,
+                "afterEditable": false
+              },
+              {
+                "url": "/fixtures/long.docx",
+                "type": "Fetch",
+                "wire": 4741,
+                "afterEditable": false
+              },
+              {
+                "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYAAACOEfKtAAAACXBIWXMAACxLAAAsSwGlPZapAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAOdEVYdFNvZnR3YXJlAEZpZ21hnrGWYwAABQJJREFUeAHtnH9OG0cUx79vbEikRgo9QTcnwNzAnKD0BOA/EkRJBD4B5gRrBK4F+cNwgpITdHOC0htsTlD/U6l17H2dWTsS8c7YxrOzu4nm80cUZr1j+Hh+vLXmPcDj8Xg8njUhlEjYHwQYj4OvGl/UH9qt1hDfCIUKDAeDLfwzOiDQz2BuyHffMrw0BlHECd21372OUGEKE3jRuznhhDsLpJmImZNW+91RhAriXGDY7wc0qQ0AbsICItE5OX59jorhVOBUnvhD/jdAHhDdnh6/aaFCCDgkV3kK5oPub9chKoSzEXjRe38m166O8QWMIQTdy3XxEziJIcSWHGEBMbaXTXfZ725V1sQ6HKCmLk8M8qQ4RnKBF8+7pnBF3Y+J6MhPd193Xa6Hck3FK1QAJyOw27sZqOmWuaDkifFu+/j4YYVuEF72O1LWme5aVUZh7mtgGMpYTydPwoLaq8pTSEEdZr7QXSOqnaEC5L+J1EdN/QWK2sdvbvFUxs868l/NVOdm+mGVjINdWL8BMOEOa9But+SaiQ/ai89MH1Zx5C5Qrlnb2gujjXusS5JE+vYcQ6Q1cTECA03jgxpJWJcNRLpmItpGybgIY4JsE2Xkhb1eg1A/k3M7gOCI/9s8N0luHx3F3avrTLvciX+06TcPnMSBy0gf8cbyKSX9YoHVVGzQxueGvLT7lH4I4qWLfp+C00c5I2NxkP1WJodd1VW/CyhHIBkW/+ew+0Nd9buAcgR+R3iBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlpQjkPmbSWddRkkjkPQCedTQNYe9m4a+G8QomZJGYBJr2yfQi8Kkoe+GP6FkyhFoPDSOkzTN6xHpsV0WhqQaw+n9AinljPTs0HiM7IH0LZXhGV5e34EppjptY5LsQZ/xGVch1cuFQLW+zZ9TzhyxZcadHHG6kRWk7aQOiTNMMCeZxB0C/ZQeLp/nXzjbtFxMYd0vG2RaxptdYO1NIFbZntlmbY7K0GWaQ+4C5ef/UdO8lVboeESawkXjX4Anjg6V8Snvm0+Vne3UQfYGWjm5cR1cjED9LzwZ7c03qcxNriU7WH0kxsZ0WTbk6DF/hEPyF8iJVmBa6kSD2lD48+YOU6JqIcTQ9ilHHSfn/MPmjildloAT7b2Od2o3CddX138D0Gwcy5Ok0zBm/Ggq1uVuKyUvvKfXP5ChzkBzKT59e+g0s91JGCOnjdxhKTMiZknS0aJ7Z7JirMisMog+q53IeZkUR4E0G1JbuamKUSBHpjVp9HEixCSCY5wInE5TinTXVCWP8Or6FDnQvboxFvRRceKyqZ8HzsqezKbWn4AhT02gKzeOi3X+yFk1pN+lJsOzs/u17wtuKxfJkSbfYFGhnJhI3CZivNJoCS/fN0nwvqmoxRdkaPSqiNGncF8767J/KyXtL3+lDHiJY07w1/RHGWCzfDauiZcyNAqQoLlK4TJWMfrbwy4KopDqbatLtEPFiqpUCgqksPJ3i4roWKMC7Rpa7V8P1y9ssSbFFmCcBrxKYoDcoIhrk1ZRa17m3VEC+YiU4nhyXvZ3guXWUL3sNyFqe2nFtsUlQafV3ogeGPwBteS+rBE3T6kC58k8BytEMoQQw6oI83g8Ho8nN/4Hy5P2XBWj5dcAAAAASUVORK5CYII=",
+                "type": "Image",
+                "wire": 0,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/send-enter-off-B0IfWMyy.png",
+                "type": "Image",
+                "wire": 4512,
+                "afterEditable": false
+              },
+              {
+                "url": "/fonts/Carlito-Bold-DN11iCUU.woff2",
+                "type": "Font",
+                "wire": 198736,
+                "afterEditable": false
+              },
+              {
+                "url": "/fonts/Carlito-Regular-fal-2WfU.woff2",
+                "type": "Font",
+                "wire": 190872,
+                "afterEditable": false
+              }
+            ]
+          }
+        }
+      },
+      "raw": {
+        "docs": {
+          "simple.docx": {
+            "okRuns": 5,
+            "timeToEditableMs": {
+              "median": 619.8000001907349,
+              "min": 584.7000002861023,
+              "max": 1345.1999998092651,
+              "n": 5
+            },
+            "transferredAtEditableBytes": {
+              "median": 4418779,
+              "min": 4418779,
+              "max": 4418779,
+              "n": 5
+            },
+            "transferredBytes": {
+              "median": 6952208,
+              "min": 6952208,
+              "max": 6952208,
+              "n": 5
+            },
+            "requests": {
+              "median": 9,
+              "min": 9,
+              "max": 9,
+              "n": 5
+            },
+            "failedRequests": 0,
+            "firstRunRequests": [
+              {
+                "url": "/?open=%2Ffixtures%2Fsimple.docx",
+                "type": "Document",
+                "wire": 1384,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/index-CGJNJzuU.css",
+                "type": "Stylesheet",
+                "wire": 201946,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/index-BVZB0WQT.js",
+                "type": "Script",
+                "wire": 3818873,
+                "afterEditable": false
+              },
+              {
+                "url": "/fixtures/simple.docx",
+                "type": "Fetch",
+                "wire": 2456,
+                "afterEditable": false
+              },
+              {
+                "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYAAACOEfKtAAAACXBIWXMAACxLAAAsSwGlPZapAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAOdEVYdFNvZnR3YXJlAEZpZ21hnrGWYwAABQJJREFUeAHtnH9OG0cUx79vbEikRgo9QTcnwNzAnKD0BOA/EkRJBD4B5gRrBK4F+cNwgpITdHOC0htsTlD/U6l17H2dWTsS8c7YxrOzu4nm80cUZr1j+Hh+vLXmPcDj8Xg8njUhlEjYHwQYj4OvGl/UH9qt1hDfCIUKDAeDLfwzOiDQz2BuyHffMrw0BlHECd21372OUGEKE3jRuznhhDsLpJmImZNW+91RhAriXGDY7wc0qQ0AbsICItE5OX59jorhVOBUnvhD/jdAHhDdnh6/aaFCCDgkV3kK5oPub9chKoSzEXjRe38m166O8QWMIQTdy3XxEziJIcSWHGEBMbaXTXfZ725V1sQ6HKCmLk8M8qQ4RnKBF8+7pnBF3Y+J6MhPd193Xa6Hck3FK1QAJyOw27sZqOmWuaDkifFu+/j4YYVuEF72O1LWme5aVUZh7mtgGMpYTydPwoLaq8pTSEEdZr7QXSOqnaEC5L+J1EdN/QWK2sdvbvFUxs868l/NVOdm+mGVjINdWL8BMOEOa9But+SaiQ/ai89MH1Zx5C5Qrlnb2gujjXusS5JE+vYcQ6Q1cTECA03jgxpJWJcNRLpmItpGybgIY4JsE2Xkhb1eg1A/k3M7gOCI/9s8N0luHx3F3avrTLvciX+06TcPnMSBy0gf8cbyKSX9YoHVVGzQxueGvLT7lH4I4qWLfp+C00c5I2NxkP1WJodd1VW/CyhHIBkW/+ew+0Nd9buAcgR+R3iBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlpQjkPmbSWddRkkjkPQCedTQNYe9m4a+G8QomZJGYBJr2yfQi8Kkoe+GP6FkyhFoPDSOkzTN6xHpsV0WhqQaw+n9AinljPTs0HiM7IH0LZXhGV5e34EppjptY5LsQZ/xGVch1cuFQLW+zZ9TzhyxZcadHHG6kRWk7aQOiTNMMCeZxB0C/ZQeLp/nXzjbtFxMYd0vG2RaxptdYO1NIFbZntlmbY7K0GWaQ+4C5ef/UdO8lVboeESawkXjX4Anjg6V8Snvm0+Vne3UQfYGWjm5cR1cjED9LzwZ7c03qcxNriU7WH0kxsZ0WTbk6DF/hEPyF8iJVmBa6kSD2lD48+YOU6JqIcTQ9ilHHSfn/MPmjildloAT7b2Od2o3CddX138D0Gwcy5Ok0zBm/Ggq1uVuKyUvvKfXP5ChzkBzKT59e+g0s91JGCOnjdxhKTMiZknS0aJ7Z7JirMisMog+q53IeZkUR4E0G1JbuamKUSBHpjVp9HEixCSCY5wInE5TinTXVCWP8Or6FDnQvboxFvRRceKyqZ8HzsqezKbWn4AhT02gKzeOi3X+yFk1pN+lJsOzs/u17wtuKxfJkSbfYFGhnJhI3CZivNJoCS/fN0nwvqmoxRdkaPSqiNGncF8767J/KyXtL3+lDHiJY07w1/RHGWCzfDauiZcyNAqQoLlK4TJWMfrbwy4KopDqbatLtEPFiqpUCgqksPJ3i4roWKMC7Rpa7V8P1y9ssSbFFmCcBrxKYoDcoIhrk1ZRa17m3VEC+YiU4nhyXvZ3guXWUL3sNyFqe2nFtsUlQafV3ogeGPwBteS+rBE3T6kC58k8BytEMoQQw6oI83g8Ho8nN/4Hy5P2XBWj5dcAAAAASUVORK5CYII=",
+                "type": "Image",
+                "wire": 0,
+                "afterEditable": false
+              },
+              {
+                "url": "/fonts/Carlito-Bold-DN11iCUU.woff2",
+                "type": "Font",
+                "wire": 198736,
+                "afterEditable": false
+              },
+              {
+                "url": "/fonts/Carlito-Regular-fal-2WfU.woff2",
+                "type": "Font",
+                "wire": 190872,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/send-enter-off-B0IfWMyy.png",
+                "type": "Image",
+                "wire": 4512,
+                "afterEditable": false
+              },
+              {
+                "url": "/fonts/NotoSansCJKsc-Regular-subset-BuHGXxnc.woff2",
+                "type": "Font",
+                "wire": 2533429,
+                "afterEditable": true
+              }
+            ]
+          },
+          "kitchen-sink.docx": {
+            "okRuns": 5,
+            "timeToEditableMs": {
+              "median": 739.4000000953674,
+              "min": 662.8999996185303,
+              "max": 1477.0999999046326,
+              "n": 5
+            },
+            "transferredAtEditableBytes": {
+              "median": 4622306,
+              "min": 4622306,
+              "max": 4622306,
+              "n": 5
+            },
+            "transferredBytes": {
+              "median": 7155735,
+              "min": 7155735,
+              "max": 7155735,
+              "n": 5
+            },
+            "requests": {
+              "median": 11,
+              "min": 11,
+              "max": 11,
+              "n": 5
+            },
+            "failedRequests": 0,
+            "firstRunRequests": [
+              {
+                "url": "/?open=%2Ffixtures%2Fkitchen-sink.docx",
+                "type": "Document",
+                "wire": 1384,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/index-CGJNJzuU.css",
+                "type": "Stylesheet",
+                "wire": 201946,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/index-BVZB0WQT.js",
+                "type": "Script",
+                "wire": 3818873,
+                "afterEditable": false
+              },
+              {
+                "url": "/fixtures/kitchen-sink.docx",
+                "type": "Fetch",
+                "wire": 3715,
+                "afterEditable": false
+              },
+              {
+                "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+                "type": "Image",
+                "wire": 0,
+                "afterEditable": false
+              },
+              {
+                "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYAAACOEfKtAAAACXBIWXMAACxLAAAsSwGlPZapAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAOdEVYdFNvZnR3YXJlAEZpZ21hnrGWYwAABQJJREFUeAHtnH9OG0cUx79vbEikRgo9QTcnwNzAnKD0BOA/EkRJBD4B5gRrBK4F+cNwgpITdHOC0htsTlD/U6l17H2dWTsS8c7YxrOzu4nm80cUZr1j+Hh+vLXmPcDj8Xg8njUhlEjYHwQYj4OvGl/UH9qt1hDfCIUKDAeDLfwzOiDQz2BuyHffMrw0BlHECd21372OUGEKE3jRuznhhDsLpJmImZNW+91RhAriXGDY7wc0qQ0AbsICItE5OX59jorhVOBUnvhD/jdAHhDdnh6/aaFCCDgkV3kK5oPub9chKoSzEXjRe38m166O8QWMIQTdy3XxEziJIcSWHGEBMbaXTXfZ725V1sQ6HKCmLk8M8qQ4RnKBF8+7pnBF3Y+J6MhPd193Xa6Hck3FK1QAJyOw27sZqOmWuaDkifFu+/j4YYVuEF72O1LWme5aVUZh7mtgGMpYTydPwoLaq8pTSEEdZr7QXSOqnaEC5L+J1EdN/QWK2sdvbvFUxs868l/NVOdm+mGVjINdWL8BMOEOa9But+SaiQ/ai89MH1Zx5C5Qrlnb2gujjXusS5JE+vYcQ6Q1cTECA03jgxpJWJcNRLpmItpGybgIY4JsE2Xkhb1eg1A/k3M7gOCI/9s8N0luHx3F3avrTLvciX+06TcPnMSBy0gf8cbyKSX9YoHVVGzQxueGvLT7lH4I4qWLfp+C00c5I2NxkP1WJodd1VW/CyhHIBkW/+ew+0Nd9buAcgR+R3iBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlpQjkPmbSWddRkkjkPQCedTQNYe9m4a+G8QomZJGYBJr2yfQi8Kkoe+GP6FkyhFoPDSOkzTN6xHpsV0WhqQaw+n9AinljPTs0HiM7IH0LZXhGV5e34EppjptY5LsQZ/xGVch1cuFQLW+zZ9TzhyxZcadHHG6kRWk7aQOiTNMMCeZxB0C/ZQeLp/nXzjbtFxMYd0vG2RaxptdYO1NIFbZntlmbY7K0GWaQ+4C5ef/UdO8lVboeESawkXjX4Anjg6V8Snvm0+Vne3UQfYGWjm5cR1cjED9LzwZ7c03qcxNriU7WH0kxsZ0WTbk6DF/hEPyF8iJVmBa6kSD2lD48+YOU6JqIcTQ9ilHHSfn/MPmjildloAT7b2Od2o3CddX138D0Gwcy5Ok0zBm/Ggq1uVuKyUvvKfXP5ChzkBzKT59e+g0s91JGCOnjdxhKTMiZknS0aJ7Z7JirMisMog+q53IeZkUR4E0G1JbuamKUSBHpjVp9HEixCSCY5wInE5TinTXVCWP8Or6FDnQvboxFvRRceKyqZ8HzsqezKbWn4AhT02gKzeOi3X+yFk1pN+lJsOzs/u17wtuKxfJkSbfYFGhnJhI3CZivNJoCS/fN0nwvqmoxRdkaPSqiNGncF8767J/KyXtL3+lDHiJY07w1/RHGWCzfDauiZcyNAqQoLlK4TJWMfrbwy4KopDqbatLtEPFiqpUCgqksPJ3i4roWKMC7Rpa7V8P1y9ssSbFFmCcBrxKYoDcoIhrk1ZRa17m3VEC+YiU4nhyXvZ3guXWUL3sNyFqe2nFtsUlQafV3ogeGPwBteS+rBE3T6kC58k8BytEMoQQw6oI83g8Ho8nN/4Hy5P2XBWj5dcAAAAASUVORK5CYII=",
+                "type": "Image",
+                "wire": 0,
+                "afterEditable": false
+              },
+              {
+                "url": "/fonts/Carlito-Bold-DN11iCUU.woff2",
+                "type": "Font",
+                "wire": 198736,
+                "afterEditable": false
+              },
+              {
+                "url": "/fonts/Carlito-Regular-fal-2WfU.woff2",
+                "type": "Font",
+                "wire": 190872,
+                "afterEditable": false
+              },
+              {
+                "url": "/fonts/Carlito-Italic-CcV9hCBk.woff2",
+                "type": "Font",
+                "wire": 202268,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/send-enter-off-B0IfWMyy.png",
+                "type": "Image",
+                "wire": 4512,
+                "afterEditable": false
+              },
+              {
+                "url": "/fonts/NotoSansCJKsc-Regular-subset-BuHGXxnc.woff2",
+                "type": "Font",
+                "wire": 2533429,
+                "afterEditable": true
+              }
+            ]
+          },
+          "long.docx": {
+            "okRuns": 5,
+            "timeToEditableMs": {
+              "median": 1011.5,
+              "min": 985.5999999046326,
+              "max": 2155.3999996185303,
+              "n": 5
+            },
+            "transferredAtEditableBytes": {
+              "median": 4421064,
+              "min": 4421064,
+              "max": 4421064,
+              "n": 5
+            },
+            "transferredBytes": {
+              "median": 4421064,
+              "min": 4421064,
+              "max": 4421064,
+              "n": 5
+            },
+            "requests": {
+              "median": 8,
+              "min": 8,
+              "max": 8,
+              "n": 5
+            },
+            "failedRequests": 0,
+            "firstRunRequests": [
+              {
+                "url": "/?open=%2Ffixtures%2Flong.docx",
+                "type": "Document",
+                "wire": 1384,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/index-CGJNJzuU.css",
+                "type": "Stylesheet",
+                "wire": 201946,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/index-BVZB0WQT.js",
+                "type": "Script",
+                "wire": 3818873,
+                "afterEditable": false
+              },
+              {
+                "url": "/fixtures/long.docx",
+                "type": "Fetch",
+                "wire": 4741,
+                "afterEditable": false
+              },
+              {
+                "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYAAACOEfKtAAAACXBIWXMAACxLAAAsSwGlPZapAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAOdEVYdFNvZnR3YXJlAEZpZ21hnrGWYwAABQJJREFUeAHtnH9OG0cUx79vbEikRgo9QTcnwNzAnKD0BOA/EkRJBD4B5gRrBK4F+cNwgpITdHOC0htsTlD/U6l17H2dWTsS8c7YxrOzu4nm80cUZr1j+Hh+vLXmPcDj8Xg8njUhlEjYHwQYj4OvGl/UH9qt1hDfCIUKDAeDLfwzOiDQz2BuyHffMrw0BlHECd21372OUGEKE3jRuznhhDsLpJmImZNW+91RhAriXGDY7wc0qQ0AbsICItE5OX59jorhVOBUnvhD/jdAHhDdnh6/aaFCCDgkV3kK5oPub9chKoSzEXjRe38m166O8QWMIQTdy3XxEziJIcSWHGEBMbaXTXfZ725V1sQ6HKCmLk8M8qQ4RnKBF8+7pnBF3Y+J6MhPd193Xa6Hck3FK1QAJyOw27sZqOmWuaDkifFu+/j4YYVuEF72O1LWme5aVUZh7mtgGMpYTydPwoLaq8pTSEEdZr7QXSOqnaEC5L+J1EdN/QWK2sdvbvFUxs868l/NVOdm+mGVjINdWL8BMOEOa9But+SaiQ/ai89MH1Zx5C5Qrlnb2gujjXusS5JE+vYcQ6Q1cTECA03jgxpJWJcNRLpmItpGybgIY4JsE2Xkhb1eg1A/k3M7gOCI/9s8N0luHx3F3avrTLvciX+06TcPnMSBy0gf8cbyKSX9YoHVVGzQxueGvLT7lH4I4qWLfp+C00c5I2NxkP1WJodd1VW/CyhHIBkW/+ew+0Nd9buAcgR+R3iBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlniBlpQjkPmbSWddRkkjkPQCedTQNYe9m4a+G8QomZJGYBJr2yfQi8Kkoe+GP6FkyhFoPDSOkzTN6xHpsV0WhqQaw+n9AinljPTs0HiM7IH0LZXhGV5e34EppjptY5LsQZ/xGVch1cuFQLW+zZ9TzhyxZcadHHG6kRWk7aQOiTNMMCeZxB0C/ZQeLp/nXzjbtFxMYd0vG2RaxptdYO1NIFbZntlmbY7K0GWaQ+4C5ef/UdO8lVboeESawkXjX4Anjg6V8Snvm0+Vne3UQfYGWjm5cR1cjED9LzwZ7c03qcxNriU7WH0kxsZ0WTbk6DF/hEPyF8iJVmBa6kSD2lD48+YOU6JqIcTQ9ilHHSfn/MPmjildloAT7b2Od2o3CddX138D0Gwcy5Ok0zBm/Ggq1uVuKyUvvKfXP5ChzkBzKT59e+g0s91JGCOnjdxhKTMiZknS0aJ7Z7JirMisMog+q53IeZkUR4E0G1JbuamKUSBHpjVp9HEixCSCY5wInE5TinTXVCWP8Or6FDnQvboxFvRRceKyqZ8HzsqezKbWn4AhT02gKzeOi3X+yFk1pN+lJsOzs/u17wtuKxfJkSbfYFGhnJhI3CZivNJoCS/fN0nwvqmoxRdkaPSqiNGncF8767J/KyXtL3+lDHiJY07w1/RHGWCzfDauiZcyNAqQoLlK4TJWMfrbwy4KopDqbatLtEPFiqpUCgqksPJ3i4roWKMC7Rpa7V8P1y9ssSbFFmCcBrxKYoDcoIhrk1ZRa17m3VEC+YiU4nhyXvZ3guXWUL3sNyFqe2nFtsUlQafV3ogeGPwBteS+rBE3T6kC58k8BytEMoQQw6oI83g8Ho8nN/4Hy5P2XBWj5dcAAAAASUVORK5CYII=",
+                "type": "Image",
+                "wire": 0,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/send-enter-off-B0IfWMyy.png",
+                "type": "Image",
+                "wire": 4512,
+                "afterEditable": false
+              },
+              {
+                "url": "/fonts/Carlito-Bold-DN11iCUU.woff2",
+                "type": "Font",
+                "wire": 198736,
+                "afterEditable": false
+              },
+              {
+                "url": "/fonts/Carlito-Regular-fal-2WfU.woff2",
+                "type": "Font",
+                "wire": 190872,
+                "afterEditable": false
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "subpath": {
+    "mount": "/office-frame/docs/0.1.0-12b6000/",
+    "allEditable": true,
+    "failedRequests": 0,
+    "timeToEditableMs": {
+      "simple.docx": 738,
+      "kitchen-sink.docx": 794,
+      "long.docx": 1169
+    }
+  }
+}

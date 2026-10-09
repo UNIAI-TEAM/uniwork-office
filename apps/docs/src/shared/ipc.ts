@@ -259,6 +259,49 @@ export interface ZoteroRendererResponse {
   error?: string
 }
 
+/** exportPdf / saveMergedPdf outcome */
+export interface PdfExportResult {
+  ok: boolean
+  path?: string
+  error?: string
+  /** web: no PDF file was written, the browser print dialog ran instead (ok = it closed) */
+  printDialog?: boolean
+}
+
+/**
+ * Per-platform UI capabilities. The Electron preload does not set this (every
+ * entry is on); the web bridge sets it once at install (web/docs/bridge/hide.ts).
+ * Renderer code reads it only through `renderer/capabilities.ts`: an absent key
+ * means "available", so only an explicit `false` hides an entry.
+ */
+export interface DesktopCapabilities {
+  platform?: 'desktop' | 'web'
+  /** References > Zotero group (local Zotero connector) */
+  zotero?: boolean
+  /** open-password fields of the Protect dialog (main-process crypto) */
+  docPassword?: boolean
+  /** View > New Tab / Switch Tabs (shell tab strip) */
+  tabs?: boolean
+  /** local-disk persistence: the quick-access AutoSave toggle and the 30 s crash-recovery copy */
+  autoSaveToDisk?: boolean
+  /** every AI entry: panel, ribbon actions, ask popover, context-menu actions */
+  ai?: boolean
+  /** AI tool web_search */
+  webSearch?: boolean
+  /** AI tool image_search */
+  imageSearch?: boolean
+  /** AI tool generate_image */
+  imageGeneration?: boolean
+  /** AI tool create_document (opens a new tab) */
+  createDocument?: boolean
+  /** AI panel "Buy plan" button */
+  billing?: boolean
+  /** File > Open / Ctrl+O (web: only when the host grants its document picker, `filePick`) */
+  open?: boolean
+  /** recent-files lookups (web: only when the host grants `recents`) */
+  recents?: boolean
+}
+
 /**
  * MCP bridge: an editor command pushed from the shell main process into a docs
  * tab so an external agent drives the *visible* editor instead of writing a file
@@ -304,6 +347,8 @@ export interface SpellLanguages {
 }
 
 export interface DesktopApi {
+  /** platform capability flags; absent on desktop (see DesktopCapabilities) */
+  capabilities?: DesktopCapabilities
   /** current UI language (persisted by the shell in app-settings.json) */
   getLanguage(): Promise<'zh' | 'en' | 'ja' | 'ko' | 'fr' | 'de' | 'es' | 'th' | 'id' | 'ru' | 'ar'>
   /** OS regional-settings locale (BCP 47); Word derives the new-document paper size from it */
@@ -388,6 +433,9 @@ export interface DesktopApi {
   }>
   /** crash-recovery copy of a dirty document, stored under userData */
   writeRecoveryCopy(path: string, data: ArrayBuffer): Promise<{ ok: boolean }>
+  /** web bridge only (absent on desktop): the renderer registers a serializer of the
+   *  live document so a server-side PDF export includes unsaved edits; returns an unregister */
+  provideDocBytes?(provider: () => Promise<ArrayBuffer | null>): () => void
   /** tab closed but webContents kept alive (shell freeze workaround) — stop background timers */
   onTeardown(handler: () => void): () => void
   /** one trusted space keystroke into this webContents — the only thing that
@@ -467,7 +515,7 @@ export interface DesktopApi {
     pageHeightTwips: number,
     outPath?: string,
     scale?: number,
-  ): Promise<{ ok: boolean; path?: string; error?: string }>
+  ): Promise<PdfExportResult>
   exportHtml(
     defaultName: string,
     html: string,
@@ -485,7 +533,7 @@ export interface DesktopApi {
     defaultName: string,
     base64Parts: string[],
     outPath?: string,
-  ): Promise<{ ok: boolean; path?: string; error?: string }>
+  ): Promise<PdfExportResult>
   /** Export as images: the folder picker plus a pre-authorized temp PDF path the
    *  regular PDF export writes to silently (no reveal, no open) */
   pickExportImagesTarget(): Promise<{ dir: string; pdfPath: string } | null>

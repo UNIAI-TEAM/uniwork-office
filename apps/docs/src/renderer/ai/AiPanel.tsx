@@ -66,6 +66,7 @@ import fileVoiceIcon from '../assets/file-voice.png'
 import fileDocumentIcon from '../assets/file-document.png'
 import fileGeneralIcon from '../assets/file-general.png'
 import { IconNewChat, IconSidebarCollapse } from '../components/icons'
+import { cap } from '../capabilities'
 
 interface ToolActivity {
   name: string
@@ -1417,7 +1418,8 @@ export function AiPanel({
               {entry.error && (
                 <div className="ai-msg-error">{t('aiErrorPrefix', { error: entry.error })}</div>
               )}
-              {entry.error &&
+              {cap('billing') &&
+                entry.error &&
                 /API\s*[Kk]ey|api key|khóa API|kích hoạt|mua gói AI|not activated|purchase an AI|未配置|未設定/i.test(
                   entry.error,
                 ) && (

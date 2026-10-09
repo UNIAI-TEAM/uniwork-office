@@ -143,6 +143,8 @@ export const id = {
   appProtectSecurity: 'Keamanan',
   appProtectDesc:
     'Atur kata sandi buka/ubah, pembatasan pengeditan, dan opsi privasi; berlaku saat disimpan',
+  appProtectDescWeb:
+    'Atur kata sandi ubah, pembatasan pengeditan, dan opsi privasi; berlaku saat disimpan',
   appOptional: '(opsional)',
   appOptionalBlank: '(opsional)',
   appProtectOpenPwd: 'Kata sandi untuk membuka dokumen ini',
@@ -509,4 +511,24 @@ export const id = {
     'Perbarui gaya ini dengan format pilihan saat ini (ditulis kembali ke styles.xml)',
   appNewStyleFromSelection: 'Gaya baru dari pilihan saat ini',
   appStyleNamePlaceholder: 'Nama gaya',
+  appWebConflictTitle: 'Dokumen ini telah diubah di tempat lain',
+  appWebConflictBody:
+    'Versi yang lebih baru disimpan saat Anda mengedit. Timpa dengan versi Anda, atau muat ulang versi terbaru dan buang perubahan Anda?',
+  appWebConflictOverwrite: 'Timpa',
+  appWebConflictReload: 'Muat versi terbaru',
+  appWebConflictNotSaved: 'dokumen telah diubah di tempat lain',
+  appWebDiscardTitle: 'Buang perubahan yang belum disimpan?',
+  appWebDiscardBody:
+    'Membuka dokumen lain akan menggantikan dokumen ini, dan perubahan yang belum disimpan akan hilang.',
+  appWebDiscard: 'Buang dan buka',
+  appWebFatalTitle: 'Dokumen tidak dapat dibuka',
+  appWebFatalBody:
+    'Pengeditan dan penyimpanan dinonaktifkan. Muat ulang halaman atau buka kembali dokumen dari UniWork.',
+  appWebNoHost: 'Editor ini berjalan di dalam UniWork. Buka dokumen dari UniWork.',
+  appSaveStateUnsaved: 'Ada perubahan yang belum disimpan',
+  appSaveStateSaved: 'Semua perubahan tersimpan',
+  appSaving: 'Menyimpan…',
+  appSavingAs: 'Menyimpan sebagai…',
+  appPdfPrintFallback:
+    'Ekspor PDF tidak tersedia di sini; dialog cetak browser digunakan sebagai gantinya',
 } satisfies Record<keyof typeof zh, string>

@@ -1,0 +1,57 @@
+[
+  {
+    "doc": "simple",
+    "step": "open",
+    "ok": true,
+    "ms": 1924,
+    "detail": "text visible in 1924ms; fully loaded (3 blocks, editable) after 1241ms; tables=0"
+  },
+  {
+    "doc": "simple",
+    "step": "editable",
+    "ok": true,
+    "ms": 53
+  },
+  {
+    "doc": "simple",
+    "step": "type-marker",
+    "ok": true,
+    "ms": 978,
+    "detail": "4 blocks; last: docHeading:\"标题\" / docParagraph:\"第一段。\" / docParagraph:\"第二段。\" / docParagraph:\"E2EMARKSIMPLEMUZLK661\" sel=38-38 hasMarker=true"
+  },
+  {
+    "doc": "simple",
+    "step": "bold",
+    "ok": true,
+    "ms": 217,
+    "detail": "Ctrl+B: {\"inStrong\":true,\"weight\":\"700\",\"tag\":\"STRONG\"}"
+  },
+  {
+    "doc": "simple",
+    "step": "insert-table",
+    "ok": true,
+    "ms": 785,
+    "detail": "tables 0 -> 1"
+  },
+  {
+    "doc": "simple",
+    "step": "save",
+    "ok": true,
+    "ms": 181,
+    "detail": "2373 bytes"
+  },
+  {
+    "doc": "simple",
+    "step": "saved-xml",
+    "ok": true,
+    "ms": 10,
+    "detail": "run=<w:r><w:rPr><w:b/><w:bCs/></w:rPr><w:t xml:space=\"preserve\">E2EMARKSIMPLEMUZLK661</w:t></w:r> | w:tbl=1"
+  },
+  {
+    "doc": "simple",
+    "step": "reopen",
+    "ok": true,
+    "ms": 896,
+    "detail": "marker bold={\"inStrong\":true,\"weight\":\"700\"}; tables 0 -> 1"
+  }
+]

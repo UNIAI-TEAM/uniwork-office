@@ -146,6 +146,8 @@ export const de = {
   appProtectSecurity: 'Sicherheit',
   appProtectDesc:
     'Kennwörter zum Öffnen und Ändern, Bearbeitungseinschränkungen und Datenschutzoptionen festlegen; wird beim Speichern angewendet',
+  appProtectDescWeb:
+    'Kennwort zum Ändern, Bearbeitungseinschränkungen und Datenschutzoptionen festlegen; wird beim Speichern angewendet',
   appOptional: '(optional)',
   appOptionalBlank: '(optional)',
   appProtectOpenPwd: 'Kennwort zum Öffnen dieses Dokuments',
@@ -520,4 +522,24 @@ export const de = {
     'Diese Formatvorlage mit der Formatierung der aktuellen Auswahl aktualisieren (wird in styles.xml zurückgeschrieben)',
   appNewStyleFromSelection: 'Neue Formatvorlage aus der aktuellen Auswahl',
   appStyleNamePlaceholder: 'Name der Formatvorlage',
+  appWebConflictTitle: 'Dieses Dokument wurde an anderer Stelle geändert',
+  appWebConflictBody:
+    'Während Sie bearbeitet haben, wurde eine neuere Version gespeichert. Mit Ihrer Version überschreiben oder die neueste Version neu laden und Ihre Änderungen verwerfen?',
+  appWebConflictOverwrite: 'Überschreiben',
+  appWebConflictReload: 'Neueste Version laden',
+  appWebConflictNotSaved: 'das Dokument wurde an anderer Stelle geändert',
+  appWebDiscardTitle: 'Nicht gespeicherte Änderungen verwerfen?',
+  appWebDiscardBody:
+    'Wenn Sie ein anderes Dokument öffnen, wird dieses ersetzt, und Ihre nicht gespeicherten Änderungen gehen verloren.',
+  appWebDiscard: 'Verwerfen und öffnen',
+  appWebFatalTitle: 'Das Dokument konnte nicht geöffnet werden',
+  appWebFatalBody:
+    'Bearbeiten und Speichern sind deaktiviert. Laden Sie die Seite neu oder öffnen Sie das Dokument erneut in UniWork.',
+  appWebNoHost: 'Dieser Editor läuft in UniWork. Öffnen Sie das Dokument in UniWork.',
+  appSaveStateUnsaved: 'Ungespeicherte Änderungen',
+  appSaveStateSaved: 'Alle Änderungen gespeichert',
+  appSaving: 'Wird gespeichert…',
+  appSavingAs: 'Wird gespeichert unter…',
+  appPdfPrintFallback:
+    'PDF-Export ist hier nicht verfügbar; stattdessen wurde der Druckdialog des Browsers verwendet',
 } satisfies Record<keyof typeof zh, string>
