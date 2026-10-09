@@ -5,6 +5,9 @@
 //   dist-web/docs/<v> the most recently built versioned dir that has a manifest.json (`npm run build:web`)
 //   web/docs/dist     the UNI-1011 spike layout (kept so old measurements stay reproducible)
 // MOUNT=/office-frame/docs/<v>/ serves the build under that URL prefix (subpath hosting check).
+// /office-frame/<module>/<version|latest>/... (GO-B4/B5/B6) serves dist-web/<module>/<version>/ (latest = the
+// newest build with a manifest.json) with that build's own headers.json, the URL layout of the UniWork host. The
+// test host picks the frame through it: /test-host/?module=pdf.
 // COMPRESS=gzip     gzip text/font responses (what a real host does), so measured transfer sizes are realistic.
 // When the build dir has headers.json (written by `build:web`) its response headers are applied, so the
 // Content-Security-Policy under test is the exact header the host will send (no <meta> CSP).
@@ -18,8 +21,10 @@ import { fileURLToPath } from 'node:url'
 const here = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(here, '../..')
 
-function newestVersionDir() {
-  const root = resolve(repoRoot, 'dist-web/docs')
+const MODULES = new Set(['docs', 'pdf', 'markdown', 'html', 'slides', 'sheets'])
+
+function newestVersionDir(module = 'docs') {
+  const root = resolve(repoRoot, 'dist-web', module)
   if (!existsSync(root)) return null
   const dirs = readdirSync(root, { withFileTypes: true })
     .filter((e) => e.isDirectory() && existsSync(join(root, e.name, 'manifest.json')))
@@ -36,9 +41,26 @@ const distDir = process.env.DIST_DIR
 const mount = process.env.MOUNT ? `/${process.env.MOUNT.replace(/^\/+|\/+$/g, '')}` : ''
 const compress = process.env.COMPRESS === 'gzip' || process.env.COMPRESS === '1'
 // headers.json: [{ source: '/index.html' | '/assets/**' | '/**', headers: { name: value } }], first match wins per header name
-const headerRules = existsSync(join(distDir, 'headers.json'))
-  ? JSON.parse(readFileSync(join(distDir, 'headers.json'), 'utf8')).rules
-  : []
+function readHeaderRules(dir) {
+  return existsSync(join(dir, 'headers.json'))
+    ? JSON.parse(readFileSync(join(dir, 'headers.json'), 'utf8')).rules
+    : []
+}
+const headerRules = readHeaderRules(distDir)
+
+/** /office-frame/<module>/<version|latest>/<rest> -> { dir, rules, rel } | { error } | null */
+function moduleFrame(pathname) {
+  const m = /^\/office-frame\/([a-z]+)\/([0-9A-Za-z][0-9A-Za-z._-]{0,63})(\/.*)?$/.exec(pathname)
+  if (!m) return null
+  const [, module, version, rest] = m
+  if (!MODULES.has(module) || version.includes('..')) return { error: 'unknown module or version' }
+  const dir =
+    version === 'latest' ? newestVersionDir(module) : resolve(repoRoot, 'dist-web', module, version)
+  if (!dir || !existsSync(join(dir, 'manifest.json'))) {
+    return { error: `no ${module} build: run \`npm run build:web -- --module ${module}\`` }
+  }
+  return { dir, rules: readHeaderRules(dir), rel: !rest || rest === '/' ? '/index.html' : rest }
+}
 const fixturesDir = resolve(repoRoot, 'fixtures/generated')
 // GO-B3: test-only host page that embeds the frame and speaks the protocol (web/e2e)
 const testHostDir = resolve(here, 'test-host')
@@ -65,6 +87,12 @@ const MIME = {
   '.ico': 'image/x-icon',
   '.txt': 'text/plain; charset=utf-8',
   '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  '.pdf': 'application/pdf',
+  '.md': 'text/markdown; charset=utf-8',
+  '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  '.bcmap': 'application/octet-stream',
+  '.pfb': 'application/octet-stream',
 }
 
 async function isFile(p) {
@@ -97,9 +125,9 @@ function ruleMatches(source, path) {
   return source === path
 }
 
-function headersFor(path) {
+function headersFor(path, rules = headerRules) {
   const out = {}
-  for (const rule of headerRules) {
+  for (const rule of rules) {
     if (!ruleMatches(rule.source, path)) continue
     for (const [k, v] of Object.entries(rule.headers)) if (!(k in out)) out[k] = v
   }
@@ -112,13 +140,13 @@ function send(res, status, body, type = 'text/plain; charset=utf-8') {
 }
 
 // `path` is the build-relative URL path (e.g. /assets/x.js), used for headers.json matching
-async function sendFile(req, res, file, path = '/') {
+async function sendFile(req, res, file, path = '/', rules = headerRules) {
   const s = await stat(file)
   const ext = extname(file).toLowerCase()
   const headers = {
     'Content-Type': MIME[ext] ?? 'application/octet-stream',
     'Cache-Control': 'no-store',
-    ...headersFor(path),
+    ...headersFor(path, rules),
   }
   const acceptsGzip = /\bgzip\b/.test(String(req.headers['accept-encoding'] ?? ''))
   if (compress && acceptsGzip && COMPRESSIBLE.has(ext)) {
@@ -153,7 +181,7 @@ const server = createServer(async (req, res) => {
 
     if (pathname === '/healthz') return send(res, 200, 'ok')
 
-    const fx = /^\/fixtures\/([^/]+\.docx)$/.exec(pathname)
+    const fx = /^\/fixtures\/([^/]+\.(?:docx|pdf|md|html|pptx|xlsx))$/.exec(pathname)
     if (fx) {
       const file = safeJoin(fixturesDir, fx[1])
       if (file && (await isFile(file))) return sendFile(req, res, file)
@@ -163,6 +191,14 @@ const server = createServer(async (req, res) => {
     if (th) {
       const file = safeJoin(testHostDir, th[1] || 'index.html')
       if (file && (await isFile(file))) return sendFile(req, res, file)
+      return send(res, 404, 'not found')
+    }
+
+    const mf = moduleFrame(pathname)
+    if (mf) {
+      if (mf.error) return send(res, 404, mf.error)
+      const file = safeJoin(mf.dir, mf.rel)
+      if (file && (await isFile(file))) return sendFile(req, res, file, mf.rel, mf.rules)
       return send(res, 404, 'not found')
     }
 

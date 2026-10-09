@@ -1,4 +1,9 @@
 // Usage: /test-host/?open=<docx url>[&frame=/office-frame/docs/<v>/index.html][&lang=en][&theme=dark]
+//        /test-host/?module=<pdf|markdown|html|slides|sheets>[&open=<url>][&version=<v>] (GO-B4/B5/B6)
+//
+// module (default docs): the frame defaults to /office-frame/<module>/<version|latest>/index.html (docs keeps
+// the site root, as before), `init.module` names the module, and the host refuses a frame whose
+// `ready.module` (absent = docs) differs, like createDocsFrameHost({ module }) (status "module mismatch").
 //
 // Test host for the Docs frame (GO-B3 e2e): a minimal, dependency-free
 // implementation of the host side of the W2 protocol (web/docs/protocol/types.ts)
@@ -105,6 +110,11 @@ window.addEventListener('message', async (e) => {
   if (m.kind === 'event') {
     events.push({ type: m.type, payload: m.payload })
     if (m.type === 'ready') {
+      const frameModule = m.payload?.module ?? 'docs'
+      if (frameModule !== MODULE) {
+        statusEl.textContent = `module mismatch: frame ${frameModule}, document ${MODULE}`
+        return
+      }
       statusEl.textContent = 'frame ready, sending init'
       try {
         await request('init', initPayload)
@@ -136,6 +146,15 @@ window.addEventListener('message', async (e) => {
 })
 
 const params = new URLSearchParams(location.search)
+const MODULE = params.get('module') || 'docs'
+const DEFAULT_NAME = {
+  docs: 'Untitled.docx',
+  pdf: 'Untitled.pdf',
+  markdown: 'Untitled.md',
+  html: 'Untitled.html',
+  slides: 'Untitled.pptx',
+  sheets: 'Untitled.xlsx',
+}
 const initPayload = {
   protocolVersion: V,
   token: 'test-token',
@@ -154,6 +173,8 @@ const initPayload = {
     exportPdf: true,
     exportHtml: true,
   },
+  // absent = docs: a docs run sends exactly the pre-module init
+  ...(MODULE !== 'docs' ? { module: MODULE } : {}),
 }
 
 async function boot() {
@@ -166,9 +187,10 @@ async function boot() {
     )
     initPayload.documentId = put(name, new Uint8Array(await res.arrayBuffer())).fileId
   } else {
-    initPayload.documentId = put('Untitled.docx', new Uint8Array()).fileId
+    initPayload.documentId = put(DEFAULT_NAME[MODULE] ?? 'Untitled', new Uint8Array()).fileId
   }
   window.__host = {
+    module: MODULE,
     lastSaved: () => (lastSaved ? { ...lastSaved, bytes: Array.from(lastSaved.bytes) } : null),
     lastExport: () => lastExport,
     events,
@@ -181,8 +203,13 @@ async function boot() {
       return f ? put(f.meta.name, f.bytes, fileId) : null
     },
   }
-  // the frame is the web/docs build: site root by default, ?frame=<path> for a MOUNT prefix
-  frame.src = new URL(params.get('frame') || '/index.html', location.origin).pathname
+  // docs: the web/docs build at the site root by default; other modules: their /office-frame/ path.
+  // ?frame=<path> overrides (MOUNT prefix, a pinned version dir)
+  const defaultFrame =
+    MODULE === 'docs'
+      ? '/index.html'
+      : `/office-frame/${MODULE}/${params.get('version') || 'latest'}/index.html`
+  frame.src = new URL(params.get('frame') || defaultFrame, location.origin).pathname
 }
 
 boot().catch((err) => {

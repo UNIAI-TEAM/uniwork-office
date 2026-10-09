@@ -22,6 +22,7 @@ import browser from './browser'
 import { createCapabilityObject } from './capability-object'
 import { bindHostAppearance, createFrameClient, frameVersionFromDocument } from './frame-boot'
 import type { FramePort } from './frame-port'
+import { hostGrants } from './hide'
 import { projectApi } from './project-memory'
 import { mergeModules, safeApi, type BridgeObject } from './safe-api'
 
@@ -58,7 +59,10 @@ export interface ModuleBridgeSpec {
   frameCapabilities: Capabilities
   /** window global name -> its members (merged over the appearance members) */
   globals: Record<string, (ctx: ModuleBridgeContext) => BridgeObject>
-  /** web capability defaults (desktop-only entries off) + how host grants turn entries on */
+  /**
+   * web capability defaults (desktop-only entries off) + how host grants turn entries on.
+   * Default: MODULE_WEB_CAPABILITIES, grants as Docs (`open` <- filePick, `recents` <- recents).
+   */
   capabilities?: {
     defaults: Readonly<Record<string, unknown>>
     grants?: (granted: Capabilities | undefined) => Record<string, unknown>
@@ -76,6 +80,13 @@ export interface InstalledModuleBridge {
   capabilities: Record<string, unknown>
   globals: Record<string, BridgeObject>
 }
+
+/** what every module starts with on the web: AI hidden (as Docs), File > Open / recents until granted */
+export const MODULE_WEB_CAPABILITIES: Readonly<Record<string, unknown>> = Object.freeze({
+  ai: false,
+  open: false,
+  recents: false,
+})
 
 /** members every module renderer calls at boot (main.tsx) */
 export function appearanceMembers(): BridgeObject {
@@ -96,9 +107,9 @@ export function installModuleBridge(spec: ModuleBridgeSpec): InstalledModuleBrid
       frameVersion: frameVersionFromDocument(),
     })
   const capabilities = createCapabilityObject<Record<string, unknown>>(
-    { platform: 'web', ...(spec.capabilities?.defaults ?? {}) },
+    { platform: 'web', ...(spec.capabilities?.defaults ?? MODULE_WEB_CAPABILITIES) },
     client,
-    spec.capabilities?.grants,
+    spec.capabilities?.grants ?? hostGrants,
   )
   bindHostAppearance(client)
 

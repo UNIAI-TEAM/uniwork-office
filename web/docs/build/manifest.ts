@@ -26,6 +26,8 @@ export interface SizeTotals {
 
 export interface Manifest {
   schemaVersion: 1
+  /** the genoffice editor this bundle runs (GO-B4/B5/B6): docs, pdf, markdown, html, slides, sheets */
+  module: string
   version: string
   packageVersion: string
   gitSha: string
@@ -111,6 +113,8 @@ export interface BuildManifestInput {
   /** version directory (the build output) */
   dir: string
   version: VersionInfo
+  /** default 'docs' */
+  module?: string
   entry?: string
   /** injectable for tests */
   builtAt?: string
@@ -120,6 +124,7 @@ export interface BuildManifestInput {
 export function buildManifest({
   dir,
   version,
+  module = 'docs',
   entry = 'index.html',
   builtAt = new Date().toISOString(),
 }: BuildManifestInput): Manifest {
@@ -148,6 +153,7 @@ export function buildManifest({
   const totals = sum(files)
   return {
     schemaVersion: 1,
+    module,
     version: version.version,
     packageVersion: version.packageVersion,
     gitSha: version.gitSha,

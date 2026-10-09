@@ -20,11 +20,24 @@
  *  - frame-ancestors 'self' only the same-origin UniWork page may embed the frame
  */
 
+/**
+ * Sources a module adds on top of the Docs policy (GO-B4/B5/B6), each with the reason it needs
+ * them (registry: web/docs/build/modules.ts). A directive listed here gets these sources appended
+ * (an `'none'` it had is dropped); a directive the base policy lacks is created.
+ */
+export interface CspExtra {
+  directives: CspDirectives
+  /** one line per addition, copied into csp.json `notes` */
+  why: string[]
+}
+
 export interface CspOptions {
   /** extra connect-src origins (e.g. a separate API origin). Default: none, same-origin only. */
   connectSrc?: string[]
   /** extra frame-ancestors origins (e.g. when the frame moves to its own subdomain). Default: 'self' only. */
   frameAncestors?: string[]
+  /** module-specific additions (never frame-ancestors / connect-src: those stay deployment knobs) */
+  extra?: CspExtra
 }
 
 export type CspDirectives = Record<string, string[]>
@@ -44,7 +57,42 @@ function assertSource(src: string): string {
   return src
 }
 
+const KEYWORD_SOURCES = new Set(["'self'", "'none'", "'unsafe-inline'", "'wasm-unsafe-eval'"])
+const SCHEME_SOURCES = new Set(['data:', 'blob:', 'mediastream:'])
+const DIRECTIVE_NAME = /^[a-z]+(-[a-z]+)*$/
+/** directives a module may not widen: who embeds the frame and where it connects are deployment decisions */
+const LOCKED_DIRECTIVES = new Set([
+  'frame-ancestors',
+  'connect-src',
+  'default-src',
+  'base-uri',
+  'form-action',
+])
+
+/** a module's extra source: a known keyword, a scheme, or a plain source token */
+function assertExtraSource(src: string): string {
+  if (KEYWORD_SOURCES.has(src) || SCHEME_SOURCES.has(src)) return src
+  return assertSource(src)
+}
+
+function applyExtra(base: CspDirectives, extra: CspExtra | undefined): CspDirectives {
+  if (!extra) return base
+  const out: CspDirectives = { ...base }
+  for (const [name, sources] of Object.entries(extra.directives)) {
+    if (!DIRECTIVE_NAME.test(name)) throw new Error(`invalid CSP directive "${name}"`)
+    if (LOCKED_DIRECTIVES.has(name)) throw new Error(`a module cannot widen ${name}`)
+    const add = sources.map(assertExtraSource)
+    const current = (out[name] ?? []).filter((s) => s !== "'none'")
+    out[name] = [...current, ...add.filter((s) => !current.includes(s))]
+  }
+  return out
+}
+
 export function buildCspDirectives(opts: CspOptions = {}): CspDirectives {
+  return applyExtra(baseDirectives(opts), opts.extra)
+}
+
+function baseDirectives(opts: CspOptions): CspDirectives {
   const connect = (opts.connectSrc ?? []).map(assertSource)
   const ancestors = (opts.frameAncestors ?? []).map(assertSource)
   return {
@@ -92,6 +140,7 @@ export function buildCspManifest(opts: CspOptions = {}): CspManifest {
       'Send as an HTTP response header on index.html. index.html deliberately has no <meta> CSP.',
       "frame-ancestors 'self': the frame is embedded by a same-origin UniWork page. Moving the frame to its own origin only needs WEB_DOCS_CSP_FRAME_ANCESTORS=<host origin> at build time.",
       "connect-src has no data:/blob:. If the host's API lives on another origin, add it with WEB_DOCS_CSP_CONNECT_SRC.",
+      ...(opts.extra?.why ?? []),
     ],
   }
 }
