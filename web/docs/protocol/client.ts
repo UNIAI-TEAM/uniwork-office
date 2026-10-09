@@ -21,8 +21,10 @@ import {
 } from './endpoint'
 import {
   CAPABILITY_KEYS,
+  DEFAULT_OFFICE_MODULE,
   DocsProtocolError,
   PROTOCOL_VERSION,
+  moduleOf,
   errorFromHttpStatus,
   toProtocolError,
   type ApiMode,
@@ -34,6 +36,7 @@ import {
   type HostRequests,
   type InitAck,
   type InitPayload,
+  type OfficeModule,
   type OpenPayload,
   type ProtocolErrorShape,
   type SavedPayload,
@@ -47,6 +50,12 @@ export interface DocsFrameClientOptions {
   /** what this frame build supports */
   capabilities: Capabilities
   frameVersion?: string
+  /**
+   * the editor this frame runs (GO-B4/B5/B6). Sent in `ready` when set; an `init` for another
+   * module is refused with `malformed`. Unset = 'docs' and `ready` carries no `module` (the
+   * pre-module wire format).
+   */
+  module?: OfficeModule
   /** default: window.parent */
   parent?: PostTarget
   /** default: window */
@@ -66,6 +75,8 @@ export interface DocsFrameClientOptions {
 
 /** Everything from `init` except the token, which stays private. */
 export interface FrameSession {
+  /** the module of the opened document (= this frame's module) */
+  module: OfficeModule
   documentId: string
   workspaceId: string
   apiBase: string
@@ -164,6 +175,7 @@ export function createDocsFrameClient(options: DocsFrameClientOptions): DocsFram
         frameVersion: options.frameVersion,
         capabilities: options.capabilities,
         instanceId,
+        ...(options.module !== undefined ? { module: options.module } : {}),
       })
     } catch {
       // not framed / parent gone: keep retrying until the budget runs out
@@ -183,6 +195,16 @@ export function createDocsFrameClient(options: DocsFrameClientOptions): DocsFram
       rejectInit(e)
       throw e
     }
+    const ownModule = options.module ?? DEFAULT_OFFICE_MODULE
+    if (moduleOf(p) !== ownModule) {
+      // a host bug (wrong frame URL for the document): never open it in the wrong editor
+      const e = err('malformed', `init for a "${moduleOf(p)}" document, frame is "${ownModule}"`, {
+        details: { frameModule: ownModule, expectedModule: moduleOf(p) },
+      })
+      stopReady()
+      rejectInit(e)
+      throw e
+    }
     stopReady()
     token = { token: p.token, tokenExpiresAt: p.tokenExpiresAt }
     const capabilities: Capabilities = {}
@@ -190,6 +212,7 @@ export function createDocsFrameClient(options: DocsFrameClientOptions): DocsFram
       capabilities[k] = p.capabilities[k] === true && options.capabilities[k] === true
     }
     const next: FrameSession = {
+      module: ownModule,
       documentId: p.documentId,
       workspaceId: p.workspaceId,
       apiBase: p.apiBase,
