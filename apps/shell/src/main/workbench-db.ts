@@ -56,7 +56,7 @@ function loadDatabaseSync(): DatabaseSyncCtor {
     return DatabaseSyncRef
   } catch (err) {
     sqliteLoadError = err instanceof Error ? err.message : String(err)
-    throw new Error(sqliteLoadError)
+    throw new Error(sqliteLoadError, { cause: err })
   }
 }
 
@@ -93,8 +93,7 @@ export class WorkbenchDb {
   private migrate(): void {
     this.db.exec(SCHEMA_SQL)
     const row = this.db.prepare('SELECT value FROM meta WHERE key = ?').get('schema_version') as
-      | { value: string }
-      | undefined
+      { value: string } | undefined
     const current = row ? Number(row.value) : 0
     if (!Number.isFinite(current) || current < SCHEMA_VERSION) {
       this.db
@@ -115,8 +114,7 @@ export class WorkbenchDb {
 
   getMeta(key: string): string | null {
     const row = this.db.prepare('SELECT value FROM meta WHERE key = ?').get(key) as
-      | { value: string }
-      | undefined
+      { value: string } | undefined
     return row?.value ?? null
   }
 
@@ -130,8 +128,7 @@ export class WorkbenchDb {
 
   get(key: string): string | null {
     const row = this.db.prepare('SELECT value FROM wb_kv WHERE key = ?').get(key) as
-      | { value: string }
-      | undefined
+      { value: string } | undefined
     return row?.value ?? null
   }
 

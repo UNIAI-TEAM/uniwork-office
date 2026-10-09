@@ -56,7 +56,8 @@ export async function probeAiHub(baseUrl: string, apiKey: string): Promise<HubPr
     const data = json && typeof json === 'object' ? (json as { data?: unknown[] }) : null
     const modelCount = Array.isArray(data?.data) ? data.data.length : undefined
     let balanceText = extractHubBalanceHint(json)
-    const remaining = res.headers.get('x-remaining-credits') || res.headers.get('x-credits-remaining')
+    const remaining =
+      res.headers.get('x-remaining-credits') || res.headers.get('x-credits-remaining')
     if (!balanceText && remaining) balanceText = remaining
 
     // OpenRouter: enrich with GET /api/v1/key (limit_remaining / usage).
@@ -128,7 +129,12 @@ export async function exportLessonPackZip(opts: {
 }
 
 function sanitizeFolderName(name: string): string {
-  return name.replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_').trim().slice(0, 80) || 'goi-bai'
+  return (
+    name
+      .replace(/[<>:"/\\|?*\p{Cc}]/gu, '_')
+      .trim()
+      .slice(0, 80) || 'goi-bai'
+  )
 }
 
 export function hubBaseNormalized(baseUrl: string): string {

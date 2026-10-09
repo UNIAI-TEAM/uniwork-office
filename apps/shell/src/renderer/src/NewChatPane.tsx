@@ -23,10 +23,7 @@ import {
   workbenchModuleLabel,
 } from './my-ai-consent'
 import { clearMyAiHistory, loadMyAiHistory, saveMyAiHistory } from './my-ai-history'
-import {
-  answerMyAiLocally,
-  buildLocalAnswerSnapshot,
-} from './my-ai-local-answer'
+import { answerMyAiLocally, buildLocalAnswerSnapshot } from './my-ai-local-answer'
 import { practiceMyAiChips } from './my-ai-playbooks'
 import {
   buildFormFillBrief,
@@ -36,11 +33,7 @@ import {
   readFormFileExcerpt,
   resolveFormFillContext,
 } from './my-ai-forms'
-import {
-  buildTemplateBrief,
-  resolveTemplateSlots,
-  slotPromptPrefix,
-} from './my-ai-templates'
+import { buildTemplateBrief, resolveTemplateSlots, slotPromptPrefix } from './my-ai-templates'
 import { readClients, readForms } from './workbench-pins'
 import {
   isAmbiguousRecentMatch,
@@ -325,10 +318,7 @@ export function NewChatPane({ practiceId, ensureWorkbench }: Props): ReactElemen
 
   useEffect(() => {
     let cancelled = false
-    const allAtts = [
-      ...attachments,
-      ...messages.flatMap((m) => m.attachments ?? []),
-    ]
+    const allAtts = [...attachments, ...messages.flatMap((m) => m.attachments ?? [])]
     const wanted = new Set(allAtts.filter(isImageAttachment).map((a) => a.path))
     const loadPreviews = async () => {
       const next: Record<string, string> = { ...attachmentPreviews }
@@ -380,9 +370,7 @@ export function NewChatPane({ practiceId, ensureWorkbench }: Props): ReactElemen
     streamCancelRef.current = null
   }
 
-  const applyAttachResult = (
-    result: Parameters<typeof mergeAttachmentResult>[1],
-  ) => {
+  const applyAttachResult = (result: Parameters<typeof mergeAttachmentResult>[1]) => {
     const { next, notice } = mergeAttachmentResult(attachments, result)
     setAttachments(next)
     if (notice) {
@@ -486,7 +474,7 @@ export function NewChatPane({ practiceId, ensureWorkbench }: Props): ReactElemen
     }
 
     const msgId = showBubble
-      ? opts.messageId ?? push({ role: 'assistant', text: '', streaming: true })
+      ? (opts.messageId ?? push({ role: 'assistant', text: '', streaming: true }))
       : undefined
     if (opts.messageId && showBubble) patchMessage(msgId!, { text: '', streaming: true })
     try {
@@ -630,9 +618,7 @@ export function NewChatPane({ practiceId, ensureWorkbench }: Props): ReactElemen
 
   const onChoice = (msgId: string, choice: ChatChoice) => {
     if (busy) return
-    setMessages((prev) =>
-      prev.map((m) => (m.id === msgId ? { ...m, choicesResolved: true } : m)),
-    )
+    setMessages((prev) => prev.map((m) => (m.id === msgId ? { ...m, choicesResolved: true } : m)))
     if (choice.kind === 'open_path') {
       void openPathChoice(choice.value, choice.label)
       return
@@ -726,10 +712,7 @@ export function NewChatPane({ practiceId, ensureWorkbench }: Props): ReactElemen
           }
         }
         return {
-          text: label(
-            'Bạn muốn điền biểu mẫu nào?',
-            'Which library form should I fill?',
-          ),
+          text: label('Bạn muốn điền biểu mẫu nào?', 'Which library form should I fill?'),
           choices: fallback.slice(0, 8).map((f) => ({
             id: `form-${f.id}`,
             label: f.fileName ? `${f.title} (${f.fileName})` : f.title,
@@ -757,11 +740,7 @@ export function NewChatPane({ practiceId, ensureWorkbench }: Props): ReactElemen
     }
 
     if (step.kind === 'fill_template') {
-      const resolved = resolveTemplateSlots(
-        practiceId,
-        step.templateId,
-        step.hint || userText,
-      )
+      const resolved = resolveTemplateSlots(practiceId, step.templateId, step.hint || userText)
       if (!resolved) {
         return {
           text: label('Không tìm thấy mẫu tài liệu.', 'Document template not found.'),
@@ -774,8 +753,8 @@ export function NewChatPane({ practiceId, ensureWorkbench }: Props): ReactElemen
           .join(vi ? ', ' : ', ')
         const clients = readClients(practiceId).slice(0, 5)
         const choices: ChatChoice[] = []
-        const needsClient = resolved.missing.some((s) =>
-          s.id === 'client' || s.id === 'party' || s.id === 'investor',
+        const needsClient = resolved.missing.some(
+          (s) => s.id === 'client' || s.id === 'party' || s.id === 'investor',
         )
         if (needsClient) {
           for (const c of clients) {
@@ -826,7 +805,10 @@ export function NewChatPane({ practiceId, ensureWorkbench }: Props): ReactElemen
       }
     }
 
-    if (step.kind === 'ask_create' || (step.kind === 'create_file' && !step.blank && !isSubstantiveCreateBrief(step.brief ?? ''))) {
+    if (
+      step.kind === 'ask_create' ||
+      (step.kind === 'create_file' && !step.blank && !isSubstantiveCreateBrief(step.brief ?? ''))
+    ) {
       const app = step.app
       const name = officeAppLabel(app, vi)
       const draftPrefix =
@@ -895,9 +877,7 @@ export function NewChatPane({ practiceId, ensureWorkbench }: Props): ReactElemen
           pausePlan: true,
         }
       }
-      const usedCtx = Boolean(
-        (brief && brief !== rawBrief) || (attachBlock && brief),
-      )
+      const usedCtx = Boolean((brief && brief !== rawBrief) || (attachBlock && brief))
       const mode = await createOfficeFile(step.app, brief)
       return {
         text: describeCreate(step.app, mode, brief, usedCtx),
@@ -928,12 +908,8 @@ export function NewChatPane({ practiceId, ensureWorkbench }: Props): ReactElemen
         return {
           // P4: short ask — choices carry the list
           text: label(
-            step.query.trim()
-              ? `Vài file khớp “${step.query}” — mở cái nào?`
-              : 'Mở file nào?',
-            step.query.trim()
-              ? `A few match “${step.query}” — which one?`
-              : 'Which file?',
+            step.query.trim() ? `Vài file khớp “${step.query}” — mở cái nào?` : 'Mở file nào?',
+            step.query.trim() ? `A few match “${step.query}” — which one?` : 'Which file?',
           ),
           choices: scored.map((s) => ({
             id: s.entry.path,
@@ -1005,15 +981,16 @@ export function NewChatPane({ practiceId, ensureWorkbench }: Props): ReactElemen
         .map((e, i) => `${i + 1}. ${e.name} (.${e.ext}) — ${new Date(e.mtimeMs).toLocaleString()}`)
         .join('\n')
 
-      let summary = ''
-      if (okCount > 0) {
-        summary = excerpts
-          .filter((e) => e.status === 'ok' && e.excerpt)
-          .map((e) => `• ${e.name}: ${e.excerpt!.slice(0, 280)}${e.excerpt!.length > 280 ? '…' : ''}`)
-          .join('\n')
-      } else {
-        summary = listing
-      }
+      let summary =
+        okCount > 0
+          ? excerpts
+              .filter((e) => e.status === 'ok' && e.excerpt)
+              .map(
+                (e) =>
+                  `• ${e.name}: ${e.excerpt!.slice(0, 280)}${e.excerpt!.length > 280 ? '…' : ''}`,
+              )
+              .join('\n')
+          : listing
 
       let usedAi = false
       let streamedMessageId: string | undefined
@@ -1128,10 +1105,7 @@ export function NewChatPane({ practiceId, ensureWorkbench }: Props): ReactElemen
       const tab = await window.aiOffice.activeOfficeTab?.()
       if (!tab) {
         return {
-          text: label(
-            'Chưa có tab Office đang mở để tóm tắt.',
-            'No open Office tab to summarize.',
-          ),
+          text: label('Chưa có tab Office đang mở để tóm tắt.', 'No open Office tab to summarize.'),
           pausePlan: true,
         }
       }
@@ -1144,7 +1118,10 @@ export function NewChatPane({ practiceId, ensureWorkbench }: Props): ReactElemen
               .filter((e) => e.status === 'ok' && e.excerpt)
               .map((e) => e.excerpt!.slice(0, 600))
               .join('\n')
-          : label('(Không đọc được excerpt — sẽ hỏi AI trong tab.)', '(No excerpt — will ask AI in-tab.)')
+          : label(
+              '(Không đọc được excerpt — sẽ hỏi AI trong tab.)',
+              '(No excerpt — will ask AI in-tab.)',
+            )
         let streamedMessageId: string | undefined
         const attachBlock = await collectAttachmentTextBlock(turnAttachmentsRef.current)
         const images = await collectImageAttachments(turnAttachmentsRef.current)
@@ -1184,10 +1161,8 @@ export function NewChatPane({ practiceId, ensureWorkbench }: Props): ReactElemen
           },
         ]
         const text =
-          label(
-            `Tóm tắt “${tab.title}”:\n${summary}`,
-            `Summary of “${tab.title}”:\n${summary}`,
-          ) + contextFootnote(vi, ok)
+          label(`Tóm tắt “${tab.title}”:\n${summary}`, `Summary of “${tab.title}”:\n${summary}`) +
+          contextFootnote(vi, ok)
         if (streamedMessageId) {
           patchMessage(streamedMessageId, { text, contextUsed: true, choices, streaming: false })
         }
@@ -1294,9 +1269,7 @@ export function NewChatPane({ practiceId, ensureWorkbench }: Props): ReactElemen
         pendingConsentRef.current = { route, userText }
         push({
           role: 'assistant',
-          text:
-            describeConsent(route, vi) +
-            label('\n\nLàm luôn?', '\n\nDo it now?'),
+          text: describeConsent(route, vi) + label('\n\nLàm luôn?', '\n\nDo it now?'),
           choices: [
             {
               id: 'consent-ok',
@@ -1337,7 +1310,6 @@ export function NewChatPane({ practiceId, ensureWorkbench }: Props): ReactElemen
         const stepOuts: StepOutcome[] = []
         let contextUsed = false
         let paused = false
-        let completedSteps = 0
         for (let i = 0; i < route.steps.length; i++) {
           const step = route.steps[i]!
           const out = await executeStep(step, userText, entries, pack, { showAiBubble: false })
@@ -1368,27 +1340,21 @@ export function NewChatPane({ practiceId, ensureWorkbench }: Props): ReactElemen
             }
             break
           }
-          completedSteps++
         }
         if (!paused) pendingResumeRef.current = null
 
         // P2/P4 result card: one headline + CTAs (no plan-pause jargon)
         const lastOut = stepOuts[stepOuts.length - 1]
-        const pickingFile =
-          paused && Boolean(lastOut?.choices?.some((c) => c.kind === 'open_path'))
+        const pickingFile = paused && Boolean(lastOut?.choices?.some((c) => c.kind === 'open_path'))
         let headline: string
         let showDetail: boolean
         if (pickingFile) {
           // Soft ask — choice chips are the file list; skip “Chi tiết” dump
-          headline =
-            lastOut?.text?.trim() ||
-            describeRouteDone(route, vi, { paused: true })
+          headline = lastOut?.text?.trim() || describeRouteDone(route, vi, { paused: true })
           showDetail = false
         } else if (paused) {
           // Blocked / not found — step copy is the message
-          headline =
-            lastOut?.text?.trim() ||
-            label('Chưa làm tiếp được.', 'Couldn’t continue yet.')
+          headline = lastOut?.text?.trim() || label('Chưa làm tiếp được.', 'Couldn’t continue yet.')
           showDetail = false
         } else {
           headline = describeRouteDone(route, vi, {
@@ -1400,8 +1366,7 @@ export function NewChatPane({ practiceId, ensureWorkbench }: Props): ReactElemen
             .filter((t, idx, arr) => arr.indexOf(t) === idx)
           showDetail = detailLines.some(
             (t) =>
-              /không|no recent|không thấy|không tìm|chưa thấy|error|lỗi/i.test(t) ||
-              t.length > 120,
+              /không|no recent|không thấy|không tìm|chưa thấy|error|lỗi/i.test(t) || t.length > 120,
           )
           const text =
             headline +
@@ -1563,9 +1528,7 @@ export function NewChatPane({ practiceId, ensureWorkbench }: Props): ReactElemen
       })
 
       const offerAi =
-        !usedAi &&
-        local.offerAi &&
-        (userText.length >= 8 || turnAttachmentsRef.current.length > 0)
+        !usedAi && local.offerAi && (userText.length >= 8 || turnAttachmentsRef.current.length > 0)
       if (offerAi) {
         pendingConsentRef.current = { route, userText }
         uniqueChoices.unshift({
@@ -1744,14 +1707,19 @@ export function NewChatPane({ practiceId, ensureWorkbench }: Props): ReactElemen
                       : label('Hệ thống', 'System')}
                 </span>
                 {m.attachments && m.attachments.length > 0 ? (
-                  <div className="new-chat-msg-atts" aria-label={label('Tệp đính kèm', 'Attachments')}>
+                  <div
+                    className="new-chat-msg-atts"
+                    aria-label={label('Tệp đính kèm', 'Attachments')}
+                  >
                     {m.attachments.map((a) =>
                       isImageAttachment(a) ? (
                         <span key={a.path} className="new-chat-att-thumb" title={a.name}>
                           {attachmentPreviews[a.path] ? (
                             <img src={attachmentPreviews[a.path]} alt={a.name} />
                           ) : (
-                            <span className="new-chat-att-thumb-fallback">{a.ext.toUpperCase()}</span>
+                            <span className="new-chat-att-thumb-fallback">
+                              {a.ext.toUpperCase()}
+                            </span>
                           )}
                         </span>
                       ) : (
@@ -1806,7 +1774,11 @@ export function NewChatPane({ practiceId, ensureWorkbench }: Props): ReactElemen
             {attachments.map((a) => (
               <div key={a.path} className="new-chat-composer-att" role="listitem">
                 {isImageAttachment(a) && attachmentPreviews[a.path] ? (
-                  <img src={attachmentPreviews[a.path]} alt="" className="new-chat-composer-att-img" />
+                  <img
+                    src={attachmentPreviews[a.path]}
+                    alt=""
+                    className="new-chat-composer-att-img"
+                  />
                 ) : (
                   <span className="new-chat-composer-att-ext">{a.ext.toUpperCase()}</span>
                 )}
@@ -1897,11 +1869,19 @@ export function NewChatPane({ practiceId, ensureWorkbench }: Props): ReactElemen
               {label('Đính kèm', 'Attach')}
             </button>
             <span>
-              {label('Enter gửi · Shift+Enter xuống dòng', 'Enter to send · Shift+Enter for newline')}
+              {label(
+                'Enter gửi · Shift+Enter xuống dòng',
+                'Enter to send · Shift+Enter for newline',
+              )}
             </span>
           </div>
           {busy ? (
-            <button type="button" className="btn" onClick={stopStream} title={label('Dừng', 'Stop')}>
+            <button
+              type="button"
+              className="btn"
+              onClick={stopStream}
+              title={label('Dừng', 'Stop')}
+            >
               <IconStop />
               <span>{label('Dừng', 'Stop')}</span>
             </button>

@@ -31,6 +31,14 @@ interface LaunchOptions {
   videoDir: string
   /** absolute document path passed as argv, opened in an editor tab on launch */
   openFile?: string
+  /** URL (e.g. a uniwork:// launch token) appended to argv, like an OS protocol handoff */
+  openUrl?: string
+  /**
+   * Home view to land on when onboarding is pre-seeded and nothing is opened
+   * from argv. The product starts on the My AI chat; the suite defaults to the
+   * Recent files view (hero, quick-create cards, file search).
+   */
+  homeView?: 'files' | 'chat'
   /** extra environment variables for the launched app */
   env?: Record<string, string>
 }
@@ -69,6 +77,7 @@ export async function launchShell(options: LaunchOptions): Promise<LaunchedApp> 
   if (process.platform === 'linux') args.push('--no-sandbox', '--disable-gpu')
   args.push(SHELL_DIR)
   if (options.openFile) args.push(options.openFile)
+  if (options.openUrl) args.push(options.openUrl)
   const app = await electron.launch({
     executablePath,
     args,
@@ -93,7 +102,21 @@ export async function launchShell(options: LaunchOptions): Promise<LaunchedApp> 
   })
   const page = await app.firstWindow()
   await waitForDocumentReady(app, page)
+  if (
+    options.onboardingSeen &&
+    !options.openFile &&
+    !options.openUrl &&
+    (options.homeView ?? 'files') === 'files'
+  ) {
+    await openHomeFiles(page)
+  }
   return { app, page, userDataDir }
+}
+
+/** Switches Home from the My AI chat to the Recent files view (hero + quick cards). */
+export async function openHomeFiles(page: Page): Promise<void> {
+  await page.locator('.nav-item[data-nav="recent"]').click({ timeout: 30_000 })
+  await page.locator('.home-hero').waitFor({ timeout: 15_000 })
 }
 
 /**

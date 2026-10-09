@@ -3532,6 +3532,7 @@ export function Home() {
         <nav className="sidebar-nav">
           <button
             className={`nav-item${chatMode && !selectedProjectId && !eduMode ? ' active' : ''}`}
+            data-nav="chat"
             onClick={goNewChat}
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -3558,6 +3559,7 @@ export function Home() {
           </button>
           <button
             className={`nav-item${view === 'recent' && !selectedFolder && !selectedProjectId && !eduMode && !chatMode ? ' active' : ''}`}
+            data-nav="recent"
             onClick={() => goHomeList('recent')}
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -3668,7 +3670,6 @@ export function Home() {
               listPractices().find((p) => p.id !== 'teacher') ??
               listPractices()[0]!
             }
-            practices={listPractices()}
             projects={projects}
             selectedId={eduSelectedId}
             onSelectPack={setEduSelectedId}

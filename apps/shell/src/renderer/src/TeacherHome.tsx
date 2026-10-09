@@ -36,7 +36,6 @@ import {
   isPracticePillarId,
   isWorkbenchModuleId,
   listPracticeGroups,
-  listPractices,
   skillsForDomain,
   type PracticeId,
   type SkillDomainId,
@@ -239,7 +238,10 @@ export function TeacherHome({
       setPackFiles([])
       return
     }
-    void window.aiOfficeProject.listFiles(selectedId).then(setPackFiles).catch(() => setPackFiles([]))
+    void window.aiOfficeProject
+      .listFiles(selectedId)
+      .then(setPackFiles)
+      .catch(() => setPackFiles([]))
   }, [selectedId, selected?.fileCount, selected?.updatedAt])
 
   useEffect(() => {
@@ -266,7 +268,9 @@ export function TeacherHome({
     })
     const coveredRoles = new Set(fromFiles.map((r) => r.role))
     const pending = Object.entries(roleMap)
-      .filter(([key, role]) => key.startsWith('role:') && !coveredRoles.has(role as EduMaterialRole))
+      .filter(
+        ([key, role]) => key.startsWith('role:') && !coveredRoles.has(role as EduMaterialRole),
+      )
       .map(([key, role]) => ({
         key,
         title: materialRoleLabel(role as EduMaterialRole, vi),
@@ -336,7 +340,9 @@ export function TeacherHome({
     const grade = form.grade.trim()
     const lessonTitle = form.lessonTitle.trim()
     if (!subject || !grade || !lessonTitle) {
-      setError(label('Cần nhập Môn, Lớp và Tên bài.', 'Subject, grade, and lesson title are required.'))
+      setError(
+        label('Cần nhập Môn, Lớp và Tên bài.', 'Subject, grade, and lesson title are required.'),
+      )
       return
     }
     setCreating(true)
@@ -618,12 +624,7 @@ export function TeacherHome({
       } else {
         const role: EduMaterialRole = 'phieu-hoc-tap'
         const html = eduMaterialSeedHtml(role, meta)
-        await openDocsSeed(
-          selected.id,
-          `${skill.labelVi} — ${meta.lessonTitle}`,
-          html,
-          preset,
-        )
+        await openDocsSeed(selected.id, `${skill.labelVi} — ${meta.lessonTitle}`, html, preset)
         await rememberRole(selected.id, role)
       }
       setNotice(label(`Đã chạy kỹ năng: ${skill.labelVi}`, `Ran skill: ${skill.labelEn}`))
@@ -654,7 +655,9 @@ export function TeacherHome({
       <section className="teacher-hero" aria-label={label('Giáo viên', 'Teacher')}>
         <div className="teacher-hero-top">
           <div>
-            <h1 className="teacher-title">{label('Bàn làm việc giáo viên', 'Teacher workbench')}</h1>
+            <h1 className="teacher-title">
+              {label('Bàn làm việc giáo viên', 'Teacher workbench')}
+            </h1>
             <p className="teacher-subtitle">
               {label(
                 'Tri thức · Học liệu · Kỹ năng · Soạn mẫu. Desktop miễn phí; Token AI chỉ khi bạn chạy kỹ năng/workflow.',
@@ -662,7 +665,10 @@ export function TeacherHome({
               )}
             </p>
             <p className="teacher-hint">
-              {label(`${knowledge.length} bài trong thư viện`, `${knowledge.length} packs in library`)}
+              {label(
+                `${knowledge.length} bài trong thư viện`,
+                `${knowledge.length} packs in library`,
+              )}
             </p>
           </div>
           <div className="teacher-hero-controls">
@@ -798,7 +804,9 @@ export function TeacherHome({
                       >
                         <strong>{item.edu.lessonTitle}</strong>
                         <span>
-                          {[item.edu.subject, item.edu.grade, item.edu.week].filter(Boolean).join(' · ')}
+                          {[item.edu.subject, item.edu.grade, item.edu.week]
+                            .filter(Boolean)
+                            .join(' · ')}
                         </span>
                         <em>
                           {item.fileCount} {label('tệp', 'files')}
@@ -820,7 +828,12 @@ export function TeacherHome({
                     <div>
                       <h2>{meta.lessonTitle}</h2>
                       <p>
-                        {[meta.subject, meta.grade, meta.week, meta.durationMinutes ? `${meta.durationMinutes}'` : null]
+                        {[
+                          meta.subject,
+                          meta.grade,
+                          meta.week,
+                          meta.durationMinutes ? `${meta.durationMinutes}'` : null,
+                        ]
                           .filter(Boolean)
                           .join(' · ')}
                       </p>
@@ -838,7 +851,11 @@ export function TeacherHome({
                     >
                       {label('Học liệu', 'Materials')}
                     </button>
-                    <button type="button" className="btn btn-secondary" onClick={() => onOpenPackFiles(selected.id)}>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => onOpenPackFiles(selected.id)}
+                    >
                       {label('Xem file', 'View files')}
                     </button>
                     <button
@@ -847,7 +864,9 @@ export function TeacherHome({
                       disabled={busy === 'export'}
                       onClick={() => void exportPack()}
                     >
-                      {busy === 'export' ? label('Đang xuất…', 'Exporting…') : label('Xuất ZIP', 'Export ZIP')}
+                      {busy === 'export'
+                        ? label('Đang xuất…', 'Exporting…')
+                        : label('Xuất ZIP', 'Export ZIP')}
                     </button>
                     <button
                       type="button"
@@ -866,7 +885,11 @@ export function TeacherHome({
                     </label>
                     <label className="teacher-form-wide">
                       <span>{label('Ghi chú tri thức', 'Knowledge notes')}</span>
-                      <textarea rows={4} value={noteDraft} onChange={(e) => setNoteDraft(e.target.value)} />
+                      <textarea
+                        rows={4}
+                        value={noteDraft}
+                        onChange={(e) => setNoteDraft(e.target.value)}
+                      />
                     </label>
                   </div>
                   <button
@@ -889,7 +912,10 @@ export function TeacherHome({
       )}
 
       {tab === 'materials' && (
-        <section className="teacher-panel teacher-detail" aria-label={label('Học liệu', 'Materials')}>
+        <section
+          className="teacher-panel teacher-detail"
+          aria-label={label('Học liệu', 'Materials')}
+        >
           {!selected || !meta ? (
             <p className="teacher-empty">
               {label('Chọn bài ở tab Tri thức trước.', 'Select a pack in Knowledge first.')}
@@ -907,7 +933,9 @@ export function TeacherHome({
               </p>
               <ul className="teacher-material-list">
                 {materialRows.length === 0 ? (
-                  <li className="teacher-empty">{label('Chưa có học liệu — thêm bên dưới.', 'No materials yet — add below.')}</li>
+                  <li className="teacher-empty">
+                    {label('Chưa có học liệu — thêm bên dưới.', 'No materials yet — add below.')}
+                  </li>
                 ) : (
                   materialRows.map((row) => (
                     <li key={row.key} className="teacher-material-row">
@@ -937,7 +965,10 @@ export function TeacherHome({
               <div className="teacher-add-row">
                 <label>
                   <span>{label('Thêm học liệu', 'Add material')}</span>
-                  <select value={addRole} onChange={(e) => setAddRole(e.target.value as EduMaterialRole)}>
+                  <select
+                    value={addRole}
+                    onChange={(e) => setAddRole(e.target.value as EduMaterialRole)}
+                  >
                     {EDU_MATERIAL_ROLES.map((r) => (
                       <option key={r.id} value={r.id}>
                         {vi ? r.labelVi : r.labelEn}
@@ -985,7 +1016,11 @@ export function TeacherHome({
                 >
                   {label('Xuất gói ZIP', 'Export ZIP')}
                 </button>
-                <button type="button" className="btn btn-secondary" onClick={() => onOpenPackFiles(selected.id)}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => onOpenPackFiles(selected.id)}
+                >
                   {label('Xem tất cả file', 'View all files')}
                 </button>
               </div>
@@ -1040,7 +1075,8 @@ export function TeacherHome({
                         <strong>{vi ? s.labelVi : s.labelEn}</strong>
                         <span>{vi ? s.descVi : s.descEn}</span>
                         <em>
-                          {eduSkillCategoryLabel(s.category, vi)} · {label('Tốn Token', 'Uses Tokens')}
+                          {eduSkillCategoryLabel(s.category, vi)} ·{' '}
+                          {label('Tốn Token', 'Uses Tokens')}
                         </em>
                       </div>
                       <button
@@ -1132,15 +1168,27 @@ export function TeacherHome({
                 </label>
                 <label>
                   <span>{label('Model (tuỳ chọn)', 'Model (optional)')}</span>
-                  <input value={hubModel} onChange={(e) => setHubModel(e.target.value)} placeholder="gpt-4o" />
+                  <input
+                    value={hubModel}
+                    onChange={(e) => setHubModel(e.target.value)}
+                    placeholder="gpt-4o"
+                  />
                 </label>
               </div>
               {hubStatus && (
-                <p className={`teacher-hint${hubOk === false ? ' teacher-error-inline' : ''}`}>{hubStatus}</p>
+                <p className={`teacher-hint${hubOk === false ? ' teacher-error-inline' : ''}`}>
+                  {hubStatus}
+                </p>
               )}
               <div className="teacher-chip-row">
-                <button className="btn btn-secondary" disabled={hubSaving} onClick={() => void saveHub()}>
-                  {hubSaving ? label('Đang lưu…', 'Saving…') : label('Lưu & kiểm tra', 'Save & check')}
+                <button
+                  className="btn btn-secondary"
+                  disabled={hubSaving}
+                  onClick={() => void saveHub()}
+                >
+                  {hubSaving
+                    ? label('Đang lưu…', 'Saving…')
+                    : label('Lưu & kiểm tra', 'Save & check')}
                 </button>
                 <button className="btn btn-secondary" type="button" onClick={() => void probeHub()}>
                   {label('Kiểm tra lại', 'Re-check')}
@@ -1170,7 +1218,10 @@ export function TeacherHome({
             </label>
             <label>
               <span>{label('Lớp', 'Grade')}</span>
-              <select value={form.grade} onChange={(e) => setForm((f) => ({ ...f, grade: e.target.value }))}>
+              <select
+                value={form.grade}
+                onChange={(e) => setForm((f) => ({ ...f, grade: e.target.value }))}
+              >
                 {EDU_GRADES.map((g) => (
                   <option key={g} value={g}>
                     {g}
@@ -1220,12 +1271,19 @@ export function TeacherHome({
                 rows={3}
                 value={objectiveText}
                 onChange={(e) => setObjectiveText(e.target.value)}
-                placeholder={label('Nhận biết phân số\nSo sánh phân số', 'Identify fractions\nCompare fractions')}
+                placeholder={label(
+                  'Nhận biết phân số\nSo sánh phân số',
+                  'Identify fractions\nCompare fractions',
+                )}
               />
             </label>
           </div>
           {error && tab === 'compose' && <p className="teacher-error">{error}</p>}
-          <button className="btn btn-primary" disabled={creating} onClick={() => void submitCreate()}>
+          <button
+            className="btn btn-primary"
+            disabled={creating}
+            onClick={() => void submitCreate()}
+          >
             {creating
               ? label('Đang tạo…', 'Creating…')
               : label('Tạo bài vào Tri thức + mở giáo án', 'Create pack + open lesson plan')}
@@ -1250,7 +1308,11 @@ export function TeacherHome({
               )}
             </p>
             <div className="modal-buttons">
-              <button className="btn btn-secondary" type="button" onClick={() => setConfirmAi(null)}>
+              <button
+                className="btn btn-secondary"
+                type="button"
+                onClick={() => setConfirmAi(null)}
+              >
                 {label('Huỷ', 'Cancel')}
               </button>
               <button

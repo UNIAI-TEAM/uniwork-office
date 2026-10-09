@@ -46,7 +46,6 @@ interface PracticeHomeProps {
   onOpenPackFiles: (id: string) => void
   onRefresh: () => void
   onSwitchPractice: (id: PracticeId) => void
-  practices: readonly PracticeDefinition[]
 }
 
 function toPracticeMeta(entry: ProjectSummaryEntry, practiceId: PracticeId): PracticeMeta | null {
@@ -74,7 +73,6 @@ export function PracticeHome({
   onOpenPackFiles,
   onRefresh,
   onSwitchPractice,
-  practices,
 }: PracticeHomeProps): ReactElement {
   const { lang, setLang } = useI18n()
   const vi = lang === 'vi'
@@ -91,9 +89,10 @@ export function PracticeHome({
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
-  const [confirmSkill, setConfirmSkill] = useState<
-    { kind: 'domain' | 'practice'; id: string } | null
-  >(null)
+  const [confirmSkill, setConfirmSkill] = useState<{
+    kind: 'domain' | 'practice'
+    id: string
+  } | null>(null)
   const [skillDomain, setSkillDomain] = useState<SkillDomainId>(() =>
     readActiveSkillDomain(readPinnedSkillDomains()),
   )
@@ -228,7 +227,10 @@ export function PracticeHome({
       setPackFiles([])
       return
     }
-    void window.aiOfficeProject.listFiles(selectedId).then(setPackFiles).catch(() => setPackFiles([]))
+    void window.aiOfficeProject
+      .listFiles(selectedId)
+      .then(setPackFiles)
+      .catch(() => setPackFiles([]))
   }, [selectedId, selected?.fileCount])
 
   const rememberRole = async (projectId: string, role: string) => {
@@ -687,10 +689,19 @@ export function PracticeHome({
                     </label>
                     <label className="teacher-form-wide">
                       <span>{label('Ghi chú', 'Notes')}</span>
-                      <textarea rows={3} value={noteDraft} onChange={(e) => setNoteDraft(e.target.value)} />
+                      <textarea
+                        rows={3}
+                        value={noteDraft}
+                        onChange={(e) => setNoteDraft(e.target.value)}
+                      />
                     </label>
                   </div>
-                  <button type="button" className="btn btn-primary" disabled={!!busy} onClick={() => void saveMeta()}>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    disabled={!!busy}
+                    onClick={() => void saveMeta()}
+                  >
                     {label('Lưu', 'Save')}
                   </button>
                 </>
@@ -705,7 +716,9 @@ export function PracticeHome({
       {tab === 'materials' && (
         <section className="teacher-panel teacher-detail">
           {!selected || !meta ? (
-            <p className="teacher-empty">{label('Chọn gói ở Tri thức trước.', 'Select a Knowledge pack first.')}</p>
+            <p className="teacher-empty">
+              {label('Chọn gói ở Tri thức trước.', 'Select a Knowledge pack first.')}
+            </p>
           ) : (
             <>
               <h2>
@@ -713,7 +726,9 @@ export function PracticeHome({
               </h2>
               <ul className="teacher-material-list">
                 {packFiles.length === 0 ? (
-                  <li className="teacher-empty">{label('Chưa có file — thêm bên dưới.', 'No files yet — add below.')}</li>
+                  <li className="teacher-empty">
+                    {label('Chưa có file — thêm bên dưới.', 'No files yet — add below.')}
+                  </li>
                 ) : (
                   packFiles.map((fp) => {
                     const base = fp.split(/[/\\]/).pop() || fp
@@ -721,7 +736,9 @@ export function PracticeHome({
                       <li key={fp} className="teacher-material-row">
                         <div>
                           <strong>{base}</strong>
-                          <span>{meta.materials?.[fp] ?? meta.materials?.[`role:${base}`] ?? '—'}</span>
+                          <span>
+                            {meta.materials?.[fp] ?? meta.materials?.[`role:${base}`] ?? '—'}
+                          </span>
                         </div>
                         <WbRowActions>
                           <WbOpenBtn
@@ -750,7 +767,12 @@ export function PracticeHome({
                     ))}
                   </select>
                 </label>
-                <button type="button" className="btn btn-primary" disabled={!!busy} onClick={() => void addMaterial()}>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  disabled={!!busy}
+                  onClick={() => void addMaterial()}
+                >
                   {label('Thêm & mở', 'Add & open')}
                 </button>
               </div>
@@ -891,11 +913,7 @@ export function PracticeHome({
                 : label('Kỹ năng', 'Skills')}
             </h3>
             <p className="teacher-hint">
-              {skillDomainDef
-                ? vi
-                  ? skillDomainDef.hintVi
-                  : skillDomainDef.hintEn
-                : ''}
+              {skillDomainDef ? (vi ? skillDomainDef.hintVi : skillDomainDef.hintEn) : ''}
             </p>
             <ul className="teacher-skill-list">
               {domainSkills.map((s) => (
@@ -983,7 +1001,12 @@ export function PracticeHome({
 
       {confirmSkill && (
         <div className="modal-overlay" onClick={() => setConfirmSkill(null)}>
-          <div className="modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="modal"
+            role="dialog"
+            aria-modal="true"
+            onClick={(e) => e.stopPropagation()}
+          >
             <h3>{label('Dùng Token AI?', 'Use AI Tokens?')}</h3>
             <p>
               {label(
@@ -992,7 +1015,11 @@ export function PracticeHome({
               )}
             </p>
             <div className="modal-buttons">
-              <button className="btn btn-secondary" type="button" onClick={() => setConfirmSkill(null)}>
+              <button
+                className="btn btn-secondary"
+                type="button"
+                onClick={() => setConfirmSkill(null)}
+              >
                 {label('Huỷ', 'Cancel')}
               </button>
               <button
