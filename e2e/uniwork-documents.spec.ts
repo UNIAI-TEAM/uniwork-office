@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test'
 import JSZip from 'jszip'
 import { createHash } from 'node:crypto'
 import { existsSync } from 'node:fs'
-import { copyFile, mkdtemp, readdir, readFile, writeFile } from 'node:fs/promises'
+import { appendFile, copyFile, mkdtemp, readdir, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import {
@@ -187,6 +187,24 @@ interface AidocsWindow {
   }
 }
 
+/** a page of a kind that was not there before (several tabs of one module can be open) */
+async function pageAfter(
+  app: LaunchedApp['app'],
+  urlPart: string,
+  before: readonly Page[],
+): Promise<Page> {
+  const deadline = Date.now() + 30_000
+  for (;;) {
+    for (const candidate of app.windows()) {
+      if (before.includes(candidate)) continue
+      const href = await candidate.evaluate(() => window.location.href).catch(() => '')
+      if (href.includes(urlPart)) return candidate
+    }
+    if (Date.now() > deadline) throw new Error(`No new window with URL containing "${urlPart}"`)
+    await sleep(250)
+  }
+}
+
 async function docsEditor(app: LaunchedApp['app']): Promise<Page> {
   const editor = await waitForPageWithUrl(app, '://docs/')
   await editor.waitForFunction(
@@ -274,13 +292,14 @@ test.describe.serial('UniWork documents', () => {
   async function withApp(
     name: string,
     run: (ctx: AppContext) => Promise<void>,
-    options: { openFile?: string } = {},
+    options: { openFile?: string; lang?: string } = {},
   ): Promise<void> {
     const launched = await launchShell({
       userDataDir,
       onboardingSeen: true,
       videoDir: name,
       env: shellEnv(stub),
+      ...(options.lang ? { lang: options.lang } : {}),
       ...(options.openFile ? { openFile: options.openFile } : {}),
     })
     try {
@@ -351,9 +370,6 @@ test.describe.serial('UniWork documents', () => {
       // recents list the UniWork copy with its badge
       await shell.locator('.tab-item.tab-home').click()
       const row = shell.locator('.recent-row', { hasText: name })
-      // Home reloads its list on window focus; returning through the tab strip
-      // does not refocus (known gap, reported), so ask for the same reload
-      await shell.evaluate(() => window.dispatchEvent(new Event('focus')))
       await expect(row).toBeVisible()
       await expect(row.locator('.uw-recent-badge')).toBeVisible()
       await shell.screenshot({ path: screenshotPath('uniwork-docs-recents') })
@@ -501,7 +517,7 @@ test.describe.serial('UniWork documents', () => {
       expect(first).toHaveLength(1)
       expect(first[0]).toMatchObject({ status: 409, baseRevision: '41' })
       await expect(chip(shell)).toHaveAttribute('data-state', 'conflict')
-      await expect(label(shell)).toHaveText('Conflict')
+      await expect(label(shell)).toHaveText('Version conflict')
       await expect(chip(shell).getByRole('button', { name: 'Resolve…' })).toBeVisible()
       await shell.screenshot({ path: screenshotPath('uniwork-docs-conflict-chip') })
 
@@ -914,6 +930,194 @@ test.describe.serial('UniWork documents', () => {
       { openFile: local },
     )
   })
+
+  // j ───────────────────────────────────────────────────────────────────────
+  /** resizes the shell window; resolves with the width the window really got */
+  async function resizeShell({ app }: LaunchedApp, width: number): Promise<number> {
+    return app.evaluate(({ BrowserWindow }, w) => {
+      const win = BrowserWindow.getAllWindows().find((x) => !x.isDestroyed())!
+      win.setSize(w, 800)
+      return win.getSize()[0]!
+    }, width)
+  }
+
+  /**
+   * The chip's text is whole inside its pill: the label is not clipped (its
+   * text ends inside its box), or - when the pill is too narrow and the label
+   * is cut with an ellipsis - the pill carries the full sentence as its title
+   * and itself stays inside the strip.
+   */
+  async function expectChipFits(shell: Page, where: string): Promise<void> {
+    const m = await shell.evaluate(() => {
+      const pill = document.querySelector('.uw-pill:not(.uw-notice)') as HTMLElement | null
+      const label = pill?.querySelector('.uw-pill-label') as HTMLElement | null
+      if (!pill || !label) return null
+      const range = document.createRange()
+      range.selectNodeContents(label)
+      const text = range.getBoundingClientRect()
+      const box = label.getBoundingClientRect()
+      const outer = pill.getBoundingClientRect()
+      // the nearest ancestor that clips its content is where a pill gets cut off
+      let clipRight = window.innerWidth
+      let clipLeft = 0
+      for (let el = pill.parentElement; el; el = el.parentElement) {
+        const style = getComputedStyle(el)
+        if (/(hidden|clip|auto|scroll)/.test(`${style.overflowX} ${style.overflow}`)) {
+          const r = el.getBoundingClientRect()
+          clipRight = Math.min(clipRight, r.right)
+          clipLeft = Math.max(clipLeft, r.left)
+        }
+      }
+      // nothing else is painted over the pill's ends (the rounded border is whole)
+      const midY = outer.top + outer.height / 2
+      const covered: string[] = []
+      for (const x of [outer.left + 3, outer.right - 3]) {
+        const top = document.elementFromPoint(x, midY)
+        if (top && !pill.contains(top)) {
+          covered.push(`${top.tagName.toLowerCase()}.${String(top.className)} at ${Math.round(x)}`)
+        }
+      }
+      // padding: the first and last things in the pill sit the same distance from its border
+      const first = pill.firstElementChild?.getBoundingClientRect()
+      const lastEl = pill.lastElementChild as HTMLElement | null
+      const last = lastEl?.getBoundingClientRect()
+      const hasButton = !!pill.querySelector('.uw-pill-action, .uw-pill-close')
+      return {
+        hasButton,
+        padLeft: first ? first.left - outer.left : 0,
+        padRight: last ? outer.right - last.right : 0,
+        covered,
+        clipLeft,
+        clipRight,
+        text: label.textContent ?? '',
+        title: pill.getAttribute('title') ?? '',
+        labelScroll: label.scrollWidth,
+        labelClient: label.clientWidth,
+        textRight: text.right,
+        boxRight: box.right,
+        pillScroll: pill.scrollWidth,
+        pillClient: pill.clientWidth,
+        pillLeft: outer.left,
+        pillRight: outer.right,
+        viewport: window.innerWidth,
+      }
+    })
+    expect(m, `${where}: a chip is shown`).not.toBeNull()
+    const c = m!
+    const note = `${where}: "${c.text}" ${JSON.stringify(c)}`
+    // the pill's own box is not overflowed and sits inside the window
+    expect(c.pillScroll, note).toBeLessThanOrEqual(c.pillClient)
+    expect(c.covered, note).toEqual([])
+    // a label never runs into the border: even padding when it is the last thing in the pill,
+    // and some room either way when a button ends the pill
+    expect(c.padLeft, note).toBeGreaterThanOrEqual(6)
+    expect(c.padRight, note).toBeGreaterThanOrEqual(c.hasButton ? 2 : 6)
+    if (!c.hasButton) expect(Math.abs(c.padLeft - c.padRight), note).toBeLessThanOrEqual(3)
+    expect(c.pillLeft, note).toBeGreaterThanOrEqual(c.clipLeft - 0.5)
+    expect(c.pillRight, note).toBeLessThanOrEqual(c.clipRight + 0.5)
+    expect(c.pillRight, note).toBeLessThanOrEqual(c.viewport)
+    if (c.labelScroll > c.labelClient) {
+      // truncated on purpose: the full sentence is one hover away
+      expect(c.title.length, `${note} (truncated without a title)`).toBeGreaterThan(0)
+    } else {
+      // whole: no glyph past the label's right edge (sub-pixel clipping included)
+      expect(c.textRight, note).toBeLessThanOrEqual(c.boxRight + 0.01)
+    }
+  }
+
+  for (const lang of ['en', 'vi'] as const) {
+    test(`j. the chip text is never clipped, in every state, wide and narrow (${lang})`, async () => {
+      test.setTimeout(240_000)
+      const files = {
+        saved: `fit-saved-${lang}.docx`,
+        view: `fit-view-${lang}.pdf`,
+        offline: `fit-offline-${lang}.docx`,
+        conflict: `fit-conflict-${lang}.docx`,
+        dirty: `fit-dirty-${lang}.pdf`,
+      }
+      stub.addDocument({ filename: files.saved, bytes: await docxBytes() })
+      stub.addDocument({ filename: files.view, bytes: pdfBytes(), myLevel: 'view' })
+      const offlineDoc = stub.addDocument({ filename: files.offline, bytes: await docxBytes() })
+      const conflictDoc = stub.addDocument({ filename: files.conflict, bytes: await docxBytes() })
+      stub.addDocument({ filename: files.dirty, bytes: pdfBytes() })
+      await withApp(
+        `uniwork-docs-chip-fit-${lang}`,
+        async (ctx) => {
+          const { shell, launched } = ctx
+          const check = async (state: string, enLabel: string) => {
+            await expect(chip(shell)).toBeVisible()
+            if (lang === 'en') await expect(label(shell)).toHaveText(enLabel)
+            for (const width of [1280, 800]) {
+              const got = await resizeShell(launched, width)
+              await shell.waitForTimeout(300)
+              await expectChipFits(shell, `${lang} ${state} @${got}px`)
+            }
+            await resizeShell(launched, 1280)
+            await shell.waitForTimeout(200)
+          }
+
+          // saved
+          await openFromPicker(shell, files.saved)
+          await docsEditor(launched.app)
+          await check('saved', 'Saved to UniWork')
+          await shell.screenshot({ path: screenshotPath(`uniwork-chip-saved-${lang}`) })
+
+          // view only
+          await shell.locator('.tab-item.tab-home').click()
+          await openFromPicker(shell, files.view)
+          await expectState(shell, 'ready')
+          await check('view only', 'View only')
+
+          // offline: a dropped commit
+          await shell.locator('.tab-item.tab-home').click()
+          const beforeoffline = launched.app.windows()
+          await openFromPicker(shell, files.offline)
+          const offlineEditor = await pageAfter(launched.app, '://docs/', beforeoffline)
+          await offlineEditor.waitForFunction(
+            () => Boolean((window as unknown as AidocsWindow).__aidocs?.editor),
+            undefined,
+            { timeout: 30_000 },
+          )
+          await offlineEditor.locator('.doc-page').first().waitFor({ timeout: 30_000 })
+          await typeInDocs(offlineEditor, MARKER)
+          stub.failNextCommit('before')
+          await saveShortcut(offlineEditor)
+          await expectState(shell, 'offline')
+          await check('offline', 'Not saved: offline')
+          expect(stub.commits(offlineDoc.id)).toHaveLength(1)
+
+          // conflict: the web version moved on
+          await shell.locator('.tab-item.tab-home').click()
+          const beforeconflict = launched.app.windows()
+          await openFromPicker(shell, files.conflict)
+          const conflictEditor = await pageAfter(launched.app, '://docs/', beforeconflict)
+          await conflictEditor.waitForFunction(
+            () => Boolean((window as unknown as AidocsWindow).__aidocs?.editor),
+            undefined,
+            { timeout: 30_000 },
+          )
+          await conflictEditor.locator('.doc-page').first().waitFor({ timeout: 30_000 })
+          await typeInDocs(conflictEditor, MARKER)
+          stub.bumpRevision(conflictDoc.id)
+          await saveShortcut(conflictEditor)
+          await expectState(shell, 'conflict')
+          await check('conflict', 'Version conflict')
+          await shell.screenshot({ path: screenshotPath(`uniwork-chip-conflict-${lang}`) })
+
+          // unsaved: the working copy changed outside the save hook, seen when the tab is active again
+          await shell.locator('.tab-item.tab-home').click()
+          await openFromPicker(shell, files.dirty)
+          const dirtyPath = (await activeStatus(shell))!.path
+          await shell.locator('.tab-item.tab-home').click()
+          await appendFile(dirtyPath, '\n% edited elsewhere\n')
+          await shell.locator('.tab-item', { hasText: files.dirty }).click()
+          await expectState(shell, 'dirty')
+          await check('unsaved', 'Unsaved changes')
+        },
+        { lang },
+      )
+    })
+  }
 
   // the chip's Retry runs each module's own Save, not only the docs one
   for (const [index, driver] of drivers.entries()) {
