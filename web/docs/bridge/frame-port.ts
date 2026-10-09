@@ -34,6 +34,8 @@ export interface PortSession {
   capabilities?: Capabilities
   /** the viewer's display data from `init.user` (additive, GO-B4: PDF note author) */
   user?: InitUser
+  /** `init.apiBase` (additive, C16: the frame-token AI routes live under it); absent in tests */
+  apiBase?: string
 }
 
 type HostHandler<K extends keyof HostRequests> = (
@@ -61,6 +63,12 @@ export interface FramePort {
   setTitle(title: string): void
   reportSaved(payload: SavedPayload): void
   reportError(error: ProtocolErrorShape | unknown, fatal?: boolean): void
+  /**
+   * The frame token for the direct AI calls (C16; the real client has both). Absent on ports with
+   * no token (headless entry, unit tests): AI then stays off.
+   */
+  getToken?(): Promise<string>
+  refreshToken?(reason: 'expiring' | 'unauthorized'): Promise<string>
 }
 
 export function errorCode(err: unknown): ProtocolErrorCode {

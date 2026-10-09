@@ -1,0 +1,54 @@
+import type { zh } from './zh'
+
+export const it = {
+  aiWebSettingsTitle: 'Impostazioni IA',
+  aiWebSettingsIntro:
+    "L'assistente usa la tua chiave API del fornitore. UniWork la conserva cifrata; la chiave non viene mai inviata a questa pagina.",
+  aiWebProvider: 'Fornitore',
+  aiWebModel: 'Modello',
+  aiWebKeySaved: 'Chiave salvata {hint}',
+  aiWebNoKey: 'Nessuna chiave salvata',
+  aiWebApiKey: 'Chiave API',
+  aiWebApiKeyKeep: 'Nuova chiave API (lascia vuoto per mantenere quella salvata)',
+  aiWebBaseUrl: 'URL di base',
+  aiWebSaveKey: 'Salva chiave',
+  aiWebRemoveKey: 'Rimuovi chiave',
+  aiWebDone: 'Fine',
+  aiWebLoading: 'Caricamento…',
+  aiWebLoadFailed: 'Impossibile caricare le impostazioni IA. Riprova più tardi.',
+  aiWebCloudTitle: 'Strumenti cloud di UniWork AI',
+  aiWebCloudOff: 'Non incluso nel piano della tua organizzazione',
+  aiWebCredits: 'Crediti rimanenti: {remaining} su {limit}',
+  aiWebCreditsUnlimited: 'Crediti: illimitati',
+  aiWebCreditsRenew: 'Si rinnova il {date}',
+  aiWebOpenSettings: 'Impostazioni IA',
+  aiWebClose: 'Chiudi',
+  aiWebStateCreditsTitle: 'Crediti IA esauriti',
+  aiWebStateCreditsBody:
+    "La tua organizzazione ha usato tutti i crediti UniWork AI di questo periodo. Rivolgiti all'amministratore o attendi il rinnovo.",
+  aiWebStateEntitlementTitle: "L'IA non è nel tuo piano",
+  aiWebStateEntitlementBody:
+    "Il piano UniWork della tua organizzazione non include questa funzione IA. Rivolgiti all'amministratore.",
+  aiWebStateKeyMissingTitle: 'Nessuna chiave {provider}',
+  aiWebStateKeyMissingBody:
+    "Aggiungi la tua chiave API {provider} nelle impostazioni IA per usare l'assistente.",
+  aiWebStateKeyRejectedTitle: '{provider} ha rifiutato la chiave',
+  aiWebStateKeyRejectedBody:
+    'Il fornitore ha rifiutato la chiave salvata. Sostituiscila nelle impostazioni IA.',
+  aiWebStateRateTitle: 'Troppe richieste IA',
+  aiWebStateRateBody: 'Attendi {seconds} s e riprova.',
+  aiWebStateRateBodyNow: 'Attendi un momento e riprova.',
+  aiWebStateUnreachableTitle: 'Fornitore IA non raggiungibile',
+  aiWebStateUnreachableBody:
+    'UniWork non è riuscito a raggiungere il fornitore IA. Riprova tra poco.',
+  aiWebStateCloudTitle: 'Strumento cloud non disponibile',
+  aiWebStateCloudBody: 'Questo strumento UniWork AI non è ancora configurato sul server.',
+  aiWebStateSessionTitle: 'Sessione scaduta',
+  aiWebStateSessionBody: 'Riapri il documento da UniWork per continuare.',
+  aiWebStateRefusedTitle: 'Richiesta rifiutata',
+  aiWebStateRefusedBody: 'Il server ha rifiutato la richiesta IA.',
+  aiWebStateBaseUrlBody: 'Questo URL di base non è consentito. Usa un indirizzo https:// pubblico.',
+  aiWebStateProviderBody: 'Questo fornitore non è supportato.',
+  aiWebStateUnknownTitle: 'Richiesta IA non riuscita',
+  aiWebStateUnknownBody: 'Si è verificato un problema. Riprova.',
+} satisfies Record<keyof typeof zh, string>

@@ -1,0 +1,53 @@
+import type { zh } from './zh'
+
+export const nl = {
+  aiWebSettingsTitle: 'AI-instellingen',
+  aiWebSettingsIntro:
+    'De assistent gebruikt je eigen API-sleutel van de aanbieder. UniWork bewaart die versleuteld; de sleutel wordt nooit naar deze pagina gestuurd.',
+  aiWebProvider: 'Aanbieder',
+  aiWebModel: 'Model',
+  aiWebKeySaved: 'Opgeslagen sleutel {hint}',
+  aiWebNoKey: 'Geen sleutel opgeslagen',
+  aiWebApiKey: 'API-sleutel',
+  aiWebApiKeyKeep: 'Nieuwe API-sleutel (leeg laten om de opgeslagen te houden)',
+  aiWebBaseUrl: 'Basis-URL',
+  aiWebSaveKey: 'Sleutel opslaan',
+  aiWebRemoveKey: 'Sleutel verwijderen',
+  aiWebDone: 'Klaar',
+  aiWebLoading: 'Laden…',
+  aiWebLoadFailed: 'AI-instellingen konden niet worden geladen. Probeer het later opnieuw.',
+  aiWebCloudTitle: 'UniWork AI-cloudtools',
+  aiWebCloudOff: 'Niet inbegrepen in het abonnement van je organisatie',
+  aiWebCredits: 'Resterende credits: {remaining} van {limit}',
+  aiWebCreditsUnlimited: 'Credits: onbeperkt',
+  aiWebCreditsRenew: 'Wordt vernieuwd op {date}',
+  aiWebOpenSettings: 'AI-instellingen',
+  aiWebClose: 'Sluiten',
+  aiWebStateCreditsTitle: 'AI-credits op',
+  aiWebStateCreditsBody:
+    'Je organisatie heeft alle UniWork AI-credits van deze periode gebruikt. Vraag je beheerder of wacht tot ze worden vernieuwd.',
+  aiWebStateEntitlementTitle: 'AI zit niet in je abonnement',
+  aiWebStateEntitlementBody:
+    'Het UniWork-abonnement van je organisatie bevat deze AI-functie niet. Vraag je beheerder.',
+  aiWebStateKeyMissingTitle: 'Geen {provider}-sleutel',
+  aiWebStateKeyMissingBody:
+    'Voeg je {provider}-API-sleutel toe in de AI-instellingen om de assistent te gebruiken.',
+  aiWebStateKeyRejectedTitle: '{provider} weigerde de sleutel',
+  aiWebStateKeyRejectedBody:
+    'De aanbieder weigerde de opgeslagen sleutel. Vervang hem in de AI-instellingen.',
+  aiWebStateRateTitle: 'Te veel AI-verzoeken',
+  aiWebStateRateBody: 'Wacht {seconds} s en probeer het opnieuw.',
+  aiWebStateRateBodyNow: 'Wacht even en probeer het opnieuw.',
+  aiWebStateUnreachableTitle: 'AI-aanbieder onbereikbaar',
+  aiWebStateUnreachableBody: 'UniWork kon de AI-aanbieder niet bereiken. Probeer het zo opnieuw.',
+  aiWebStateCloudTitle: 'Cloudtool niet beschikbaar',
+  aiWebStateCloudBody: 'Deze UniWork AI-tool is nog niet ingesteld op de server.',
+  aiWebStateSessionTitle: 'Sessie verlopen',
+  aiWebStateSessionBody: 'Open het document opnieuw vanuit UniWork om verder te gaan.',
+  aiWebStateRefusedTitle: 'Verzoek geweigerd',
+  aiWebStateRefusedBody: 'De server weigerde het AI-verzoek.',
+  aiWebStateBaseUrlBody: 'Deze basis-URL is niet toegestaan. Gebruik een openbaar https://-adres.',
+  aiWebStateProviderBody: 'Deze aanbieder wordt niet ondersteund.',
+  aiWebStateUnknownTitle: 'AI-verzoek mislukt',
+  aiWebStateUnknownBody: 'Er ging iets mis. Probeer het opnieuw.',
+} satisfies Record<keyof typeof zh, string>

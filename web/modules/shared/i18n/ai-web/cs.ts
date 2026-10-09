@@ -1,0 +1,53 @@
+import type { zh } from './zh'
+
+export const cs = {
+  aiWebSettingsTitle: 'Nastavení AI',
+  aiWebSettingsIntro:
+    'Asistent používá váš vlastní klíč API poskytovatele. UniWork jej ukládá šifrovaně; klíč se nikdy neodesílá na tuto stránku.',
+  aiWebProvider: 'Poskytovatel',
+  aiWebModel: 'Model',
+  aiWebKeySaved: 'Uložený klíč {hint}',
+  aiWebNoKey: 'Žádný uložený klíč',
+  aiWebApiKey: 'Klíč API',
+  aiWebApiKeyKeep: 'Nový klíč API (ponechte prázdné pro zachování uloženého)',
+  aiWebBaseUrl: 'Základní URL',
+  aiWebSaveKey: 'Uložit klíč',
+  aiWebRemoveKey: 'Odebrat klíč',
+  aiWebDone: 'Hotovo',
+  aiWebLoading: 'Načítání…',
+  aiWebLoadFailed: 'Nastavení AI se nepodařilo načíst. Zkuste to později.',
+  aiWebCloudTitle: 'Cloudové nástroje UniWork AI',
+  aiWebCloudOff: 'Není součástí tarifu vaší organizace',
+  aiWebCredits: 'Zbývající kredity: {remaining} z {limit}',
+  aiWebCreditsUnlimited: 'Kredity: bez omezení',
+  aiWebCreditsRenew: 'Obnoví se {date}',
+  aiWebOpenSettings: 'Nastavení AI',
+  aiWebClose: 'Zavřít',
+  aiWebStateCreditsTitle: 'Kredity AI vyčerpány',
+  aiWebStateCreditsBody:
+    'Vaše organizace vyčerpala všechny kredity UniWork AI pro toto období. Obraťte se na správce nebo počkejte na obnovení.',
+  aiWebStateEntitlementTitle: 'AI není ve vašem tarifu',
+  aiWebStateEntitlementBody:
+    'Tarif UniWork vaší organizace tuto funkci AI nezahrnuje. Obraťte se na správce.',
+  aiWebStateKeyMissingTitle: 'Chybí klíč {provider}',
+  aiWebStateKeyMissingBody:
+    'Pro použití asistenta přidejte v nastavení AI svůj klíč API {provider}.',
+  aiWebStateKeyRejectedTitle: '{provider} klíč odmítl',
+  aiWebStateKeyRejectedBody: 'Poskytovatel odmítl uložený klíč. Nahraďte jej v nastavení AI.',
+  aiWebStateRateTitle: 'Příliš mnoho požadavků AI',
+  aiWebStateRateBody: 'Počkejte {seconds} s a zkuste to znovu.',
+  aiWebStateRateBodyNow: 'Chvíli počkejte a zkuste to znovu.',
+  aiWebStateUnreachableTitle: 'Poskytovatel AI je nedostupný',
+  aiWebStateUnreachableBody:
+    'UniWork se nepodařilo spojit s poskytovatelem AI. Zkuste to za chvíli.',
+  aiWebStateCloudTitle: 'Cloudový nástroj není k dispozici',
+  aiWebStateCloudBody: 'Tento nástroj UniWork AI zatím není na serveru nastaven.',
+  aiWebStateSessionTitle: 'Relace vypršela',
+  aiWebStateSessionBody: 'Pokračujte opětovným otevřením dokumentu z UniWork.',
+  aiWebStateRefusedTitle: 'Požadavek odmítnut',
+  aiWebStateRefusedBody: 'Server odmítl požadavek AI.',
+  aiWebStateBaseUrlBody: 'Tato základní URL není povolena. Použijte veřejnou adresu https://.',
+  aiWebStateProviderBody: 'Tento poskytovatel není podporován.',
+  aiWebStateUnknownTitle: 'Požadavek AI selhal',
+  aiWebStateUnknownBody: 'Něco se pokazilo. Zkuste to znovu.',
+} satisfies Record<keyof typeof zh, string>

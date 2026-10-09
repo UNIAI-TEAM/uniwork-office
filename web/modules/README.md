@@ -24,7 +24,15 @@ conflict/view-only/print, pictures, static HTML copy for the sandboxed preview);
 `docs/web-modules/markdown-html.md`. Tests: `npx vitest run --root web/modules` (part of `npm run test:web`).
 
 Capabilities: `installModuleBridge()` puts one mutable object on each global as `.capabilities` (web defaults
-`MODULE_WEB_CAPABILITIES`: `ai`, `open`, `recents`, `autoSave`, `autoSaveToDisk` false; host grants assigned on `init`).
+`MODULE_WEB_CAPABILITIES`: `ai`, `aiCredentials`, `open`, `recents`, `autoSave`, `autoSaveToDisk` false; host grants
+assigned on `init`).
+
+AI (CONTRACT C16): `shared/ai/` is the `ai` web bridge of every frame (Docs too, through web/docs/bridge/install.ts).
+`installModuleBridge()` wraps each global that has AI members (`withWebAi`): while the host grants `ai` they call the
+frame-token AI routes (BYOK proxy for aiStream/aiChat with ai-provider's native wire format, UniWork cloud tools,
+in-frame AI settings over the UniWork credentials, typed state card per error code); without the grant every member is
+the module's own "unavailable" stub and every AI key stays false. Routes and grants: web/docs/protocol/README.md
+"AI (web)". Tests: `shared/ai/ai.test.ts`, e2e `web/e2e/ai-web.spec.ts` (Docs + Markdown).
 A renderer reads it with `createCapabilityReader()` from `@genoffice/ui/capabilities` (`cap(key)`: on unless explicitly
 false, so desktop keeps everything). No autosave on the web (CONTRACT C10): the shared `getAutoSaveDefault` answers
 "off" and the bridges never send `api.save` with `auto`.

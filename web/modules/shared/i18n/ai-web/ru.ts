@@ -1,0 +1,53 @@
+import type { zh } from './zh'
+
+export const ru = {
+  aiWebSettingsTitle: 'Настройки ИИ',
+  aiWebSettingsIntro:
+    'Ассистент использует ваш собственный API-ключ провайдера. UniWork хранит его в зашифрованном виде; ключ никогда не передаётся на эту страницу.',
+  aiWebProvider: 'Провайдер',
+  aiWebModel: 'Модель',
+  aiWebKeySaved: 'Сохранённый ключ {hint}',
+  aiWebNoKey: 'Ключ не сохранён',
+  aiWebApiKey: 'API-ключ',
+  aiWebApiKeyKeep: 'Новый API-ключ (оставьте пустым, чтобы сохранить текущий)',
+  aiWebBaseUrl: 'Базовый URL',
+  aiWebSaveKey: 'Сохранить ключ',
+  aiWebRemoveKey: 'Удалить ключ',
+  aiWebDone: 'Готово',
+  aiWebLoading: 'Загрузка…',
+  aiWebLoadFailed: 'Не удалось загрузить настройки ИИ. Повторите попытку позже.',
+  aiWebCloudTitle: 'Облачные инструменты UniWork AI',
+  aiWebCloudOff: 'Не входит в тариф вашей организации',
+  aiWebCredits: 'Осталось кредитов: {remaining} из {limit}',
+  aiWebCreditsUnlimited: 'Кредиты: без ограничений',
+  aiWebCreditsRenew: 'Обновится {date}',
+  aiWebOpenSettings: 'Настройки ИИ',
+  aiWebClose: 'Закрыть',
+  aiWebStateCreditsTitle: 'Кредиты ИИ закончились',
+  aiWebStateCreditsBody:
+    'Ваша организация израсходовала все кредиты UniWork AI за этот период. Обратитесь к администратору или дождитесь обновления.',
+  aiWebStateEntitlementTitle: 'ИИ не входит в тариф',
+  aiWebStateEntitlementBody:
+    'Тариф UniWork вашей организации не включает эту функцию ИИ. Обратитесь к администратору.',
+  aiWebStateKeyMissingTitle: 'Нет ключа {provider}',
+  aiWebStateKeyMissingBody:
+    'Добавьте свой API-ключ {provider} в настройках ИИ, чтобы пользоваться ассистентом.',
+  aiWebStateKeyRejectedTitle: '{provider} отклонил ключ',
+  aiWebStateKeyRejectedBody: 'Провайдер отклонил сохранённый ключ. Замените его в настройках ИИ.',
+  aiWebStateRateTitle: 'Слишком много запросов к ИИ',
+  aiWebStateRateBody: 'Подождите {seconds} с и повторите попытку.',
+  aiWebStateRateBodyNow: 'Подождите немного и повторите попытку.',
+  aiWebStateUnreachableTitle: 'Провайдер ИИ недоступен',
+  aiWebStateUnreachableBody:
+    'UniWork не удалось связаться с провайдером ИИ. Повторите попытку чуть позже.',
+  aiWebStateCloudTitle: 'Облачный инструмент недоступен',
+  aiWebStateCloudBody: 'Этот инструмент UniWork AI ещё не настроен на сервере.',
+  aiWebStateSessionTitle: 'Сеанс истёк',
+  aiWebStateSessionBody: 'Чтобы продолжить, откройте документ заново из UniWork.',
+  aiWebStateRefusedTitle: 'Запрос отклонён',
+  aiWebStateRefusedBody: 'Сервер отклонил запрос к ИИ.',
+  aiWebStateBaseUrlBody: 'Этот базовый URL не разрешён. Используйте публичный адрес https://.',
+  aiWebStateProviderBody: 'Этот провайдер не поддерживается.',
+  aiWebStateUnknownTitle: 'Ошибка запроса к ИИ',
+  aiWebStateUnknownBody: 'Что-то пошло не так. Повторите попытку.',
+} satisfies Record<keyof typeof zh, string>

@@ -9,7 +9,10 @@
  *   ./hide     HIDE class no-ops (Zotero, doc passwords, recovery copy,
  *              tabs/menu, window chrome) + the capability source.
  *   ./ai       aiStream / webSearch / imageSearch / aiGenerateImage /
- *              getAiSettings / aiChat / fetchImage stubs (AI is hidden).
+ *              getAiSettings / aiChat / fetchImage stubs (AI hidden).
+ * The merged object then gets the web AI bridge (web/modules/shared/ai,
+ * CONTRACT C16): while the host grants `ai` its members replace the stubs
+ * (frame-token AI routes); without the grant the stubs answer as before.
  *   ./webapi   WEB-API class: open/save/recents/export over the host
  *              protocol (../protocol/client.ts) + in-memory projectApi.
  *   ./browser  BROWSER class: print, download, file picker, clipboard,
@@ -40,6 +43,12 @@ import { mergeModules, safeApi, type BridgeObject } from './safe-api'
 import ai from './ai'
 import hide, { hostGrants, webCapabilities } from './hide'
 import { createHeadless, isTopLevel, parseHeadlessEntry } from './headless'
+import {
+  AI_FRAME_CAPABILITIES,
+  aiHostGrants,
+  createWebAi,
+  withWebAi,
+} from '../../modules/shared/ai/web-ai'
 import type { DesktopCapabilities } from '../../../apps/docs/src/shared/ipc'
 
 const headlessEntry = parseHeadlessEntry(location.href, isTopLevel(window))
@@ -50,6 +59,7 @@ const client =
   headless?.port ??
   createFrameClient({
     capabilities: {
+      ...AI_FRAME_CAPABILITIES,
       save: true,
       saveAs: true,
       recents: true,
@@ -63,7 +73,7 @@ const client =
 const capabilities: DesktopCapabilities = createCapabilityObject<DesktopCapabilities>(
   webCapabilities,
   client,
-  hostGrants,
+  (granted) => ({ ...aiHostGrants(granted), ...hostGrants(granted) }),
 )
 // theme + language come from the host (never localStorage) and must be in place before boot
 bindHostAppearance(client)
@@ -74,7 +84,11 @@ export function installBridge(): void {
   // guard replace the ai.ts and hide.ts stubs
   const modules: BridgeObject[] = [hide, ai, webapi, browser]
   if (headless) modules.push(headless.desktopFor(webapi))
-  const desktop = mergeModules(modules)
+  // the headless entry has no frame token: AI stays off there
+  const desktop = withWebAi(
+    mergeModules(modules),
+    createWebAi({ port: client, capabilities: capabilities as Record<string, unknown> }),
+  )
   desktop.capabilities = capabilities
 
   const win = window as unknown as {
