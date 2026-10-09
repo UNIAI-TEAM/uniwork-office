@@ -28,6 +28,7 @@ export const th = {
   replaceAll: 'แทนที่ทั้งหมด',
   findTip: 'ค้นหาและแทนที่ (⌘F)',
   autoSaveTip: 'บันทึกทุก 30 วินาทีและเมื่อหน้าต่างเสียโฟกัส',
+  autoSaveUniworkOff: 'AutoSave is off for UniWork documents. Use Save to save a new version.',
   zoom: 'ซูม',
   zoomIn: 'ขยาย',
   zoomOut: 'ย่อ',

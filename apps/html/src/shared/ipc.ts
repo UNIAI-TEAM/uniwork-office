@@ -16,6 +16,7 @@ export const HTML_CHANNELS = {
   presentNewTab: 'html:present-new-tab',
   readFile: 'html:read-file',
   save: 'html:save',
+  uniworkState: 'html:uniwork-state',
   saveRequest: 'html:save-request',
   saveRequestAck: 'html:save-request-ack',
   readTextRequest: 'html:read-text-request',
@@ -97,12 +98,19 @@ export interface AttachmentImageResult {
 
 export type SaveMode = 'save' | 'saveAs'
 
+export interface UniworkViewState {
+  bound: boolean
+  readOnly: boolean
+}
+
 export interface SaveHtmlRequest {
   /** full document text (frontmatter included) */
   text: string
   /** Authored image paths in document order; the main process validates every path. */
   imageSources: string[]
   mode: SaveMode
+  /** 'auto' = the AutoSave timer/blur save; absent = an explicit user save */
+  origin?: 'user' | 'auto'
   /**
    * Silent first save for an untitled document (AI auto-naming): saves to a
    * unique path under Documents derived from this name, without a dialog.
@@ -225,6 +233,8 @@ export interface HtmlApi {
    * save dialog first. The resolved path is granted to the view and returned.
    */
   save(request: SaveHtmlRequest): Promise<SaveHtmlResult>
+  /** Whether this view's document is a UniWork copy (AutoSave off) and whether it is view only */
+  uniworkState(): Promise<UniworkViewState>
   /** Mirror unsaved-changes state to the main process; drives the save prompt before closing a tab/window */
   setDirty(dirty: boolean): void
   /** Shell menu Save / Save As → renderer serializes and calls save() with the given mode */

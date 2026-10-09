@@ -17,6 +17,7 @@ export const cs = {
   unsaved: 'Neuloženo',
   autoSave: 'Automatické ukládání',
   autoSaveTip: 'Ukládá každých 30 sekund a při ztrátě fokusu okna',
+  autoSaveUniworkOff: 'AutoSave is off for UniWork documents. Use Save to save a new version.',
   zoom: 'Lupa',
   zoomIn: 'Přiblížit',
   zoomOut: 'Oddálit',

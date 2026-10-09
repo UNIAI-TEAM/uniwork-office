@@ -28,6 +28,7 @@ export const ar = {
   replaceAll: 'استبدال الكل',
   findTip: 'بحث واستبدال (⌘F)',
   autoSaveTip: 'يحفظ كل 30 ثانية وعند فقدان النافذة للتركيز',
+  autoSaveUniworkOff: 'AutoSave is off for UniWork documents. Use Save to save a new version.',
   zoom: 'تكبير',
   zoomIn: 'تكبير',
   zoomOut: 'تصغير',

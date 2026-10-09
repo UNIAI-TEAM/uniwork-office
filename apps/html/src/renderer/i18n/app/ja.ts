@@ -29,6 +29,7 @@ export const ja = {
   replaceAll: 'すべて置換',
   findTip: '検索と置換 (⌘F)',
   autoSaveTip: '30 秒ごととウィンドウのフォーカスが外れたときに自動保存',
+  autoSaveUniworkOff: 'AutoSave is off for UniWork documents. Use Save to save a new version.',
   zoom: 'ズーム',
   zoomIn: '拡大',
   zoomOut: '縮小',

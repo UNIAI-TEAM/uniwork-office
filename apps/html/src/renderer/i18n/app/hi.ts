@@ -28,6 +28,7 @@ export const hi = {
   replaceAll: 'सभी बदलें',
   findTip: 'ढूँढें और बदलें (⌘F)',
   autoSaveTip: 'हर 30 सेकंड और विंडो का फ़ोकस हटने पर सहेजता है',
+  autoSaveUniworkOff: 'AutoSave is off for UniWork documents. Use Save to save a new version.',
   zoom: 'ज़ूम',
   zoomIn: 'बड़ा करें',
   zoomOut: 'छोटा करें',

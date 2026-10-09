@@ -29,6 +29,7 @@ export const it = {
   replaceAll: 'Sostituisci tutto',
   findTip: 'Trova e sostituisci (⌘F)',
   autoSaveTip: 'Salva ogni 30 secondi e quando la finestra perde il focus',
+  autoSaveUniworkOff: 'AutoSave is off for UniWork documents. Use Save to save a new version.',
   zoom: 'Zoom',
   zoomIn: 'Ingrandisci',
   zoomOut: 'Riduci',
