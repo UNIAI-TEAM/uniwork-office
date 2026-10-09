@@ -35,6 +35,8 @@ export interface WebModuleSpec {
   /** window globals the installer sets (besides __officeWebModule) */
   globals: readonly string[]
   csp?: CspExtra
+  /** top-level output directories with fixed (unhashed) names to serve as immutable */
+  immutableDirs?: readonly string[]
 }
 
 export const WEB_MODULES: Readonly<Record<WebModule, WebModuleSpec>> = {
@@ -54,10 +56,14 @@ export const WEB_MODULES: Readonly<Record<WebModule, WebModuleSpec>> = {
     globals: ['pdfApi', 'projectApi'],
     csp: {
       directives: { 'script-src': ["'wasm-unsafe-eval'"] },
+      alsoOn: ['/assets/**'],
       why: [
-        "pdf: script-src 'wasm-unsafe-eval' compiles pdf.js's image decoders (openjpeg / jbig2 / qcms, pdfjs/wasm/*.wasm, same origin). It allows WebAssembly compilation only, not eval.",
+        "pdf: script-src 'wasm-unsafe-eval' compiles same-origin WebAssembly: pdf.js's image codecs (openjpeg / jbig2 / qcms, pdfjs/wasm/*.wasm) and pdfium (annotation delete, text and image edit). It allows WebAssembly compilation only, not JavaScript eval; Docs-style 'self' blocks every compile (measured, inventory-b4 3.3).",
+        'pdf: the policy is also sent on /assets/** because the pdf.js worker (assets/pdf.worker.min-*.mjs) takes its CSP from its own script response, not from the page.',
       ],
     },
+    // pdf.js CMaps, standard fonts and wasm keep their upstream names (viteStaticCopy)
+    immutableDirs: ['pdfjs'],
   },
   markdown: {
     module: 'markdown',

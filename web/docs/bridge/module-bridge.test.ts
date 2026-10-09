@@ -2,7 +2,7 @@
 // GO-B4/B5/B6: the generic pieces (safe-api, capability-object) and the module installer.
 import { afterEach, describe, expect, it } from 'vitest'
 import { capEnabled, createCapabilityObject } from './capability-object'
-import { appearanceMembers, installModuleBridge } from './module-bridge'
+import { sharedMembers, installModuleBridge } from './module-bridge'
 import { fallbackFor, mergeModules, safeApi } from './safe-api'
 import { createMockPort } from './testing/mock-port'
 
@@ -89,7 +89,7 @@ describe('installModuleBridge', () => {
     expect(seen).toEqual(['pdf'])
     const pdfApi = target.pdfApi as Record<string, unknown>
     expect(pdfApi).toBe(globals.pdfApi)
-    for (const key of Object.keys(appearanceMembers())) expect(typeof pdfApi[key]).toBe('function')
+    for (const key of Object.keys(sharedMembers())) expect(typeof pdfApi[key]).toBe('function')
     expect((pdfApi.isUntitled as () => boolean)()).toBe(true)
     // a member the scaffold does not implement: never throws
     await expect((pdfApi.readFile as () => Promise<unknown>)()).resolves.toBeUndefined()
@@ -98,6 +98,11 @@ describe('installModuleBridge', () => {
     )
     expect(pdfApi.capabilities).toBe(capabilities)
     expect(capabilities).toEqual({ platform: 'web', ai: false, open: false })
+    // C10: the autosave preference is pinned off on the web
+    expect(await (pdfApi.getAutoSaveDefault as () => Promise<unknown>)()).toEqual({
+      on: false,
+      updatedAt: 0,
+    })
     expect(target.projectApi).toBeDefined()
     expect(target.__officeWebModule).toBe('pdf')
 
@@ -121,5 +126,19 @@ describe('installModuleBridge', () => {
     })
     expect((target.slidesApi as Record<string, unknown>).capabilities).toBeDefined()
     expect(Object.keys(target.desktop as object)).not.toContain('capabilities')
+  })
+})
+
+describe('C10: no autosave on the web', () => {
+  it('default capabilities turn every autosave key off', () => {
+    const mock = createMockPort()
+    const { capabilities } = installModuleBridge({
+      module: 'markdown',
+      frameCapabilities: {},
+      client: mock.port,
+      target: {},
+      globals: { markdownApi: () => ({}) },
+    })
+    expect(capabilities).toMatchObject({ autoSave: false, autoSaveToDisk: false, ai: false })
   })
 })

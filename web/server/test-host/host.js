@@ -1,9 +1,12 @@
 // Usage: /test-host/?open=<docx url>[&frame=/office-frame/docs/<v>/index.html][&lang=en][&theme=dark]
-//        /test-host/?module=<pdf|markdown|html|slides|sheets>[&open=<url>][&version=<v>] (GO-B4/B5/B6)
+//        /test-host/?module=<pdf|markdown|html|slides|sheets>[&open=<url>][&version=<v>][&readonly=1] (GO-B4/B5/B6)
+//        e.g. ?module=pdf&open=/fixtures/sample.pdf (web/fixtures: sample.pdf, sample.md, sample.html)
 //
 // module (default docs): the frame defaults to /office-frame/<module>/<version|latest>/index.html (docs keeps
 // the site root, as before), `init.module` names the module, and the host refuses a frame whose
 // `ready.module` (absent = docs) differs, like createDocsFrameHost({ module }) (status "module mismatch").
+// Module runs also send `init.user` ({displayName: 'Test User'}); readonly=1 withholds the `save` grant
+// (view-only, protocol README "Read-only documents"). No autosave is ever requested (CONTRACT C10).
 //
 // Test host for the Docs frame (GO-B3 e2e): a minimal, dependency-free
 // implementation of the host side of the W2 protocol (web/docs/protocol/types.ts)
@@ -174,8 +177,9 @@ const initPayload = {
     exportHtml: true,
   },
   // absent = docs: a docs run sends exactly the pre-module init
-  ...(MODULE !== 'docs' ? { module: MODULE } : {}),
+  ...(MODULE !== 'docs' ? { module: MODULE, user: { displayName: 'Test User' } } : {}),
 }
+if (params.get('readonly') === '1') delete initPayload.capabilities.save
 
 async function boot() {
   const url = params.get('open')

@@ -1,7 +1,7 @@
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Plugin } from 'vite'
-import { buildCspManifest, buildHeadersManifest, type CspOptions } from './csp'
+import { buildCspManifest, buildHeadersManifest, type CspOptions, type HeadersOptions } from './csp'
 import { buildManifest, MANIFEST_FILE } from './manifest'
 import type { VersionInfo } from './version'
 
@@ -29,6 +29,7 @@ export interface WebDocsPluginOptions {
   csp?: CspOptions
   /** written to manifest.json `module` (default 'docs') */
   module?: string
+  headers?: HeadersOptions
 }
 
 /**
@@ -39,6 +40,7 @@ export function webDocsManifestPlugin({
   version,
   csp,
   module = 'docs',
+  headers,
 }: WebDocsPluginOptions): Plugin {
   let outDir = ''
   return {
@@ -64,7 +66,7 @@ export function webDocsManifestPlugin({
         writeFileSync(join(outDir, 'csp.json'), JSON.stringify(cspManifest, null, 2) + '\n')
         writeFileSync(
           join(outDir, 'headers.json'),
-          JSON.stringify(buildHeadersManifest(cspManifest), null, 2) + '\n',
+          JSON.stringify(buildHeadersManifest(cspManifest, headers), null, 2) + '\n',
         )
         const manifest = buildManifest({ dir: outDir, version, module })
         writeFileSync(join(outDir, MANIFEST_FILE), JSON.stringify(manifest, null, 2) + '\n')

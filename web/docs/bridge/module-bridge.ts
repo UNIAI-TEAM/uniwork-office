@@ -12,9 +12,9 @@
  *   ./safe-api            safe no-op Proxy: a member nobody implements never throws
  *   ./project-memory      in-memory projectApi (AI-only; AI is hidden on the web)
  *
- * Every global starts with the appearance members all renderers call at boot (getTheme,
- * onThemeChanged, getLanguage, onLanguageChanged) and then the module's own members (later
- * wins). The module workers replace the scaffold's members with real file APIs over the
+ * Every global starts with the shared members (`sharedMembers`: getTheme, onThemeChanged,
+ * getLanguage, onLanguageChanged, and the autosave preference pinned off, CONTRACT C10) and then
+ * the module's own members (later wins). The module workers replace the scaffold's members with real file APIs over the
  * protocol (`ctx.client.request('api.open', ...)`).
  */
 import type { Capabilities, OfficeModule } from '../protocol/types'
@@ -81,20 +81,34 @@ export interface InstalledModuleBridge {
   globals: Record<string, BridgeObject>
 }
 
-/** what every module starts with on the web: AI hidden (as Docs), File > Open / recents until granted */
+/**
+ * What every module starts with on the web: AI hidden (as Docs), File > Open / recents until
+ * granted, and no autosave of any kind (CONTRACT C10: explicit user save only; the renderers'
+ * autosave toggles, timers and crash-recovery copies are hidden behind these keys).
+ */
 export const MODULE_WEB_CAPABILITIES: Readonly<Record<string, unknown>> = Object.freeze({
   ai: false,
   open: false,
   recents: false,
+  autoSave: false,
+  autoSaveToDisk: false,
 })
 
-/** members every module renderer calls at boot (main.tsx) */
-export function appearanceMembers(): BridgeObject {
+/** NO_AUTO_SAVE_DEFAULT of @genoffice/ui auto-save-pref.ts: autosave off, never set */
+const NO_AUTO_SAVE = Object.freeze({ on: false, updatedAt: 0 })
+
+/**
+ * Members every module global starts with: what the renderers call at boot (main.tsx: theme and
+ * language, host-authoritative) and the shared autosave preference, pinned off on the web (C10).
+ */
+export function sharedMembers(): BridgeObject {
   return {
     getTheme: browser.getTheme,
     onThemeChanged: browser.onThemeChanged,
     getLanguage: browser.getLanguage,
     onLanguageChanged: browser.onLanguageChanged,
+    getAutoSaveDefault: async () => ({ ...NO_AUTO_SAVE }),
+    onAutoSaveDefaultChanged: () => () => {},
   }
 }
 
@@ -118,7 +132,7 @@ export function installModuleBridge(spec: ModuleBridgeSpec): InstalledModuleBrid
   const capsOn = spec.capabilities?.on ?? Object.keys(spec.globals)
   const globals: Record<string, BridgeObject> = {}
   for (const [name, factory] of Object.entries(spec.globals)) {
-    const api = mergeModules([appearanceMembers(), factory(ctx)])
+    const api = mergeModules([sharedMembers(), factory(ctx)])
     if (capsOn.includes(name)) api.capabilities = capabilities
     globals[name] = safeApi(api)
     target[name] = globals[name]

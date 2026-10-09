@@ -27,6 +27,12 @@
  */
 export interface CspExtra {
   directives: CspDirectives
+  /**
+   * more build-relative paths (headers.json sources: exact or `/dir/**`) that must carry the
+   * policy besides index.html, e.g. `/assets/**` when the module starts a worker: a worker's CSP
+   * comes from its own script response, not from the page
+   */
+  alsoOn?: string[]
   /** one line per addition, copied into csp.json `notes` */
   why: string[]
 }
@@ -135,7 +141,7 @@ export function buildCspManifest(opts: CspOptions = {}): CspManifest {
     header: 'Content-Security-Policy',
     value: serializeCsp(directives),
     directives,
-    appliesTo: ['/index.html'],
+    appliesTo: ['/index.html', ...(opts.extra?.alsoOn ?? []).map(assertHeaderSource)],
     notes: [
       'Send as an HTTP response header on index.html. index.html deliberately has no <meta> CSP.',
       "frame-ancestors 'self': the frame is embedded by a same-origin UniWork page. Moving the frame to its own origin only needs WEB_DOCS_CSP_FRAME_ANCESTORS=<host origin> at build time.",
@@ -157,8 +163,29 @@ export interface HeadersManifest {
   rules: HeaderRule[]
 }
 
+function assertHeaderSource(source: string): string {
+  if (!/^\/[0-9A-Za-z._-]+(\/[0-9A-Za-z._-]+)*(\/\*\*)?$/.test(source) || source.includes('..'))
+    throw new Error(`invalid headers.json source "${source}"`)
+  return source
+}
+
+export interface HeadersOptions {
+  /**
+   * more top-level directories (besides assets/ and fonts/) whose files never change within a
+   * version directory, e.g. pdf's `pdfjs` (CMaps, standard fonts, wasm: fixed names, but the
+   * version directory itself is immutable)
+   */
+  immutableDirs?: string[]
+}
+
+const IMMUTABLE = 'public, max-age=31536000, immutable'
+
 /** First matching rule wins per header name (specific rules first). Paths are relative to the version directory. */
-export function buildHeadersManifest(csp: CspManifest): HeadersManifest {
+export function buildHeadersManifest(csp: CspManifest, opts: HeadersOptions = {}): HeadersManifest {
+  const extraDirs = (opts.immutableDirs ?? []).map((d) => {
+    if (!/^[0-9A-Za-z._-]+$/.test(d) || d.startsWith('.')) throw new Error(`invalid dir "${d}"`)
+    return d
+  })
   return {
     schemaVersion: 1,
     rules: [
@@ -166,8 +193,12 @@ export function buildHeadersManifest(csp: CspManifest): HeadersManifest {
         source: '/index.html',
         headers: { [csp.header]: csp.value, 'Cache-Control': 'no-cache' },
       },
-      { source: '/assets/**', headers: { 'Cache-Control': 'public, max-age=31536000, immutable' } },
-      { source: '/fonts/**', headers: { 'Cache-Control': 'public, max-age=31536000, immutable' } },
+      ...csp.appliesTo
+        .filter((source) => source !== '/index.html')
+        .map((source) => ({ source, headers: { [csp.header]: csp.value } })),
+      { source: '/assets/**', headers: { 'Cache-Control': IMMUTABLE } },
+      { source: '/fonts/**', headers: { 'Cache-Control': IMMUTABLE } },
+      ...extraDirs.map((d) => ({ source: `/${d}/**`, headers: { 'Cache-Control': IMMUTABLE } })),
       {
         source: '/**',
         headers: { 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer' },

@@ -62,6 +62,8 @@ function moduleFrame(pathname) {
   return { dir, rules: readHeaderRules(dir), rel: !rest || rest === '/' ? '/index.html' : rest }
 }
 const fixturesDir = resolve(repoRoot, 'fixtures/generated')
+// hand-made samples for the other modules (sample.pdf / .md / .html), GO-B4
+const webFixturesDir = resolve(repoRoot, 'web/fixtures')
 // GO-B3: test-only host page that embeds the frame and speaks the protocol (web/e2e)
 const testHostDir = resolve(here, 'test-host')
 const port = Number(process.env.PORT) || 4180
@@ -183,8 +185,10 @@ const server = createServer(async (req, res) => {
 
     const fx = /^\/fixtures\/([^/]+\.(?:docx|pdf|md|html|pptx|xlsx))$/.exec(pathname)
     if (fx) {
-      const file = safeJoin(fixturesDir, fx[1])
-      if (file && (await isFile(file))) return sendFile(req, res, file)
+      for (const dir of [fixturesDir, webFixturesDir]) {
+        const file = safeJoin(dir, fx[1])
+        if (file && (await isFile(file))) return sendFile(req, res, file)
+      }
       return send(res, 404, 'fixture not found')
     }
     const th = /^\/test-host\/(.*)$/.exec(pathname)

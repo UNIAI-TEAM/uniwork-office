@@ -92,3 +92,8 @@ export {
   type AutoSaveDefault,
   type AutoSaveDefaultApi,
 } from './auto-save-pref'
+export {
+  createCapabilityReader,
+  type CapabilityObject,
+  type CapabilityReader,
+} from './capabilities'

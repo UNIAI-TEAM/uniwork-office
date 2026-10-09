@@ -33,15 +33,33 @@ export function rewriteTtfUrls(
   })
 }
 
+const SRC_DECL = /(\bsrc\s*:\s*)([^;}]*)/g
+const WOFF2_URL = /url\(\s*(['"]?)[^'")]*\.woff2(?:[?#][^'")]*)?\1\s*\)/i
+
+/**
+ * In an @font-face `src` list that offers a WOFF2 file, drop the other formats (GO-B4: KaTeX ships
+ * every face as woff2 + woff + ttf). Every browser the frames support reads WOFF2, so the
+ * alternatives are never fetched; dropping them keeps Vite from emitting them (about two thirds
+ * of the KaTeX font bytes). Lists without a WOFF2 entry are left alone.
+ */
+export function keepWoff2Only(css: string): string {
+  return css.replace(SRC_DECL, (whole, head: string, list: string) => {
+    const items = list.split(/,(?=\s*url\()/)
+    if (items.length < 2 || !items.some((i) => WOFF2_URL.test(i))) return whole
+    const kept = items.filter((i) => WOFF2_URL.test(i)).map((i) => i.trim())
+    return `${head}${kept.join(',')}`
+  })
+}
+
 export function woff2FontsPlugin(): Plugin {
   return {
     name: 'web-docs-woff2-fonts',
     enforce: 'pre',
     transform(code, id) {
       const file = id.split('?')[0]
-      if (!file.endsWith('.css') || !code.includes('.ttf')) return null
+      if (!file.endsWith('.css') || !/\.(ttf|woff)\b/.test(code)) return null
       const missing: string[] = []
-      const out = rewriteTtfUrls(code, file, { onMissing: (n) => missing.push(n) })
+      const out = keepWoff2Only(rewriteTtfUrls(code, file, { onMissing: (n) => missing.push(n) }))
       for (const n of missing)
         this.warn(`no WOFF2 twin for ${n}.ttf (run web/docs/fonts/make-woff2.py); shipping the TTF`)
       return out === code ? null : { code: out, map: null }

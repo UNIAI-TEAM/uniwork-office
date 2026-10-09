@@ -43,6 +43,7 @@ export default defineConfig(async ({ command, mode }) => {
       version,
       module: spec.module,
       csp: { ...cspOptionsFromEnv(), ...(spec.csp ? { extra: spec.csp } : {}) },
+      headers: { immutableDirs: [...(spec.immutableDirs ?? [])] },
     }),
   ]
   return {
