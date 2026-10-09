@@ -1,0 +1,2584 @@
+[
+ {
+  "wc": 1,
+  "channel": "slides:open-path",
+  "result": {
+   "defaultFont": "Calibri",
+   "path": "<tmp>/in/business.pptx",
+   "size": "object",
+   "slides": "array(5)"
+  },
+  "digest": "fea913e0609f7520",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "92f2cf0f42dc68d8"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:get-render-slides",
+  "result": "array(5)",
+  "digest": "6010ed8cb1fa4595"
+ },
+ {
+  "wc": 1,
+  "channel": "slides:edit-text",
+  "result": {
+   "background": "object",
+   "heightPx": 720.0180122616257,
+   "nodes": "array(2)",
+   "scale": 1.0000250170300358,
+   "widthPx": 1280
+  },
+  "digest": "96c03faaba61a8aa",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:set-element-font",
+  "result": {
+   "background": "object",
+   "heightPx": 720.0180122616257,
+   "nodes": "array(2)",
+   "scale": 1.0000250170300358,
+   "widthPx": 1280
+  },
+  "digest": "93348ae6865045d9",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:set-element-paragraph-format",
+  "result": {
+   "background": "object",
+   "heightPx": 720.0180122616257,
+   "nodes": "array(2)",
+   "scale": 1.0000250170300358,
+   "widthPx": 1280
+  },
+  "digest": "4c419e3387d0a379",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:set-element-paragraph-format",
+  "result": {
+   "background": "object",
+   "heightPx": 720.0180122616257,
+   "nodes": "array(2)",
+   "scale": 1.0000250170300358,
+   "widthPx": 1280
+  },
+  "digest": "d0b4c7368b8078c2",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:find-replace",
+  "result": {
+   "count": 1,
+   "slides": "array(5)"
+  },
+  "digest": "5d26ea1129c16f0d",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:add-element",
+  "result": {
+   "slide": "object",
+   "sourceId": "spnew_1_mv0dnmo0"
+  },
+  "digest": "acb2bdcc97a7458a",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:edit-transform",
+  "result": {
+   "background": "object",
+   "heightPx": 720.0180122616257,
+   "nodes": "array(3)",
+   "scale": 1.0000250170300358,
+   "widthPx": 1280
+  },
+  "digest": "3b78286933d52773",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:edit-transform",
+  "result": {
+   "background": "object",
+   "heightPx": 720.0180122616257,
+   "nodes": "array(3)",
+   "scale": 1.0000250170300358,
+   "widthPx": 1280
+  },
+  "digest": "39d47832a8d119f3"
+ },
+ {
+  "wc": 1,
+  "channel": "slides:edit-transform",
+  "result": {
+   "background": "object",
+   "heightPx": 720.0180122616257,
+   "nodes": "array(3)",
+   "scale": 1.0000250170300358,
+   "widthPx": 1280
+  },
+  "digest": "c101b26215facac8"
+ },
+ {
+  "wc": 1,
+  "channel": "slides:edit-fill",
+  "result": {
+   "background": "object",
+   "heightPx": 720.0180122616257,
+   "nodes": "array(3)",
+   "scale": 1.0000250170300358,
+   "widthPx": 1280
+  },
+  "digest": "0f3f5999a8d64027",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:edit-fill",
+  "result": {
+   "background": "object",
+   "heightPx": 720.0180122616257,
+   "nodes": "array(3)",
+   "scale": 1.0000250170300358,
+   "widthPx": 1280
+  },
+  "digest": "894d3109d4d1e4e1",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:edit-fill",
+  "result": {
+   "background": "object",
+   "heightPx": 720.0180122616257,
+   "nodes": "array(3)",
+   "scale": 1.0000250170300358,
+   "widthPx": 1280
+  },
+  "digest": "4c426c162e00841d",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:edit-stroke",
+  "result": {
+   "background": "object",
+   "heightPx": 720.0180122616257,
+   "nodes": "array(3)",
+   "scale": 1.0000250170300358,
+   "widthPx": 1280
+  },
+  "digest": "d1e457afc0e7b880",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:flip-elements",
+  "result": {
+   "background": "object",
+   "heightPx": 720.0180122616257,
+   "nodes": "array(3)",
+   "scale": 1.0000250170300358,
+   "widthPx": 1280
+  },
+  "digest": "3dfe5b21d39cadb8",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:change-shape",
+  "result": {
+   "background": "object",
+   "heightPx": 720.0180122616257,
+   "nodes": "array(3)",
+   "scale": 1.0000250170300358,
+   "widthPx": 1280
+  },
+  "digest": "7f91e18f3c9e6051",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:set-shape-adjust",
+  "result": {
+   "background": "object",
+   "heightPx": 720.0180122616257,
+   "nodes": "array(3)",
+   "scale": 1.0000250170300358,
+   "widthPx": 1280
+  },
+  "digest": "95f3e99e77831803",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:set-shape-adjust",
+  "result": {
+   "background": "object",
+   "heightPx": 720.0180122616257,
+   "nodes": "array(3)",
+   "scale": 1.0000250170300358,
+   "widthPx": 1280
+  },
+  "digest": "95f3e99e77831803"
+ },
+ {
+  "wc": 1,
+  "channel": "slides:set-text-anchor",
+  "result": {
+   "background": "object",
+   "heightPx": 720.0180122616257,
+   "nodes": "array(3)",
+   "scale": 1.0000250170300358,
+   "widthPx": 1280
+  },
+  "digest": "d7de8f0be52a3013",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:set-text-body-props",
+  "result": {
+   "background": "object",
+   "heightPx": 720.0180122616257,
+   "nodes": "array(3)",
+   "scale": 1.0000250170300358,
+   "widthPx": 1280
+  },
+  "digest": "92277af456b9aa3a",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:set-effects",
+  "result": {
+   "background": "object",
+   "heightPx": 720.0180122616257,
+   "nodes": "array(3)",
+   "scale": 1.0000250170300358,
+   "widthPx": 1280
+  },
+  "digest": "40236da3d4d8b2ea",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:edit-connector-endpoints",
+  "result": null,
+  "digest": "74234e98afe7498f"
+ },
+ {
+  "wc": 1,
+  "channel": "slides:add-element",
+  "result": {
+   "slide": "object",
+   "sourceId": "spnew_2_mv0dnmo0"
+  },
+  "digest": "da0cd7af03513d6a",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:batch-edit-transform",
+  "result": {
+   "background": "object",
+   "heightPx": 720.0180122616257,
+   "nodes": "array(4)",
+   "scale": 1.0000250170300358,
+   "widthPx": 1280
+  },
+  "digest": "fc73b9e23055ae80",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:reorder-element",
+  "result": {
+   "background": "object",
+   "heightPx": 720.0180122616257,
+   "nodes": "array(4)",
+   "scale": 1.0000250170300358,
+   "widthPx": 1280
+  },
+  "digest": "def2803b610d30ff",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:group-elements",
+  "result": {
+   "groupId": "grp_23",
+   "slide": "object"
+  },
+  "digest": "dccf7bb1a1c5b5c1",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:ungroup-element",
+  "result": {
+   "background": "object",
+   "heightPx": 720.0180122616257,
+   "nodes": "array(4)",
+   "scale": 1.0000250170300358,
+   "widthPx": 1280
+  },
+  "digest": "3cb997e7ffce803e",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:get-render-slides",
+  "result": "array(5)",
+  "digest": "a5636be4055dbc2c"
+ },
+ {
+  "wc": 1,
+  "channel": "slides:copy-elements",
+  "result": 2,
+  "digest": "d4735e3a265e16ee",
+  "platform": [
+   {
+    "kind": "clipboard.writeBuffer",
+    "detail": "io.genoffice.slides.elements"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:clipboard-probe",
+  "result": true,
+  "digest": "b5bea41b6c623f7c"
+ },
+ {
+  "wc": 1,
+  "channel": "slides:clipboard-external",
+  "result": {
+   "kind": "internal"
+  },
+  "digest": "39581dad72766472"
+ },
+ {
+  "wc": 1,
+  "channel": "slides:paste-elements",
+  "result": {
+   "slide": "object",
+   "sourceIds": "array(2)"
+  },
+  "digest": "868edbce6fc45983",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:paste-elements",
+  "result": {
+   "slide": "object",
+   "sourceIds": "array(2)"
+  },
+  "digest": "e27ee29fefc183ad",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:duplicate-elements",
+  "result": {
+   "slide": "object",
+   "sourceIds": "array(1)"
+  },
+  "digest": "ab7d5729066fdee3",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:delete-element",
+  "result": {
+   "background": "object",
+   "heightPx": 720.0180122616257,
+   "nodes": "array(4)",
+   "scale": 1.0000250170300358,
+   "widthPx": 1280
+  },
+  "digest": "079f9686db594085",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:get-render-slides",
+  "result": "array(5)",
+  "digest": "5c9d2bb76f59e9d8"
+ },
+ {
+  "wc": 1,
+  "channel": "slides:apply-edit-script",
+  "result": {
+   "slide": "object"
+  },
+  "digest": "982185cf04b13987",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:add-table",
+  "result": {
+   "slide": "object",
+   "sourceId": "tbl_48"
+  },
+  "digest": "921de098b49efcb2",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:edit-table-cell",
+  "result": {
+   "background": "object",
+   "heightPx": 720.0180122616257,
+   "nodes": "array(8)",
+   "scale": 1.0000250170300358,
+   "widthPx": 1280
+  },
+  "digest": "415a2cc3d8d4ea7f",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:table-structure",
+  "result": {
+   "slide": "object",
+   "sourceId": "tbl_4p"
+  },
+  "digest": "bb7c6f9e9c201ec8",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:table-merge",
+  "result": {
+   "slide": "object",
+   "sourceId": "tbl_56"
+  },
+  "digest": "08ebe1577356482e",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:set-table-col-width",
+  "result": {
+   "background": "object",
+   "heightPx": 720.0180122616257,
+   "nodes": "array(8)",
+   "scale": 1.0000250170300358,
+   "widthPx": 1280
+  },
+  "digest": "8a08f828f7be6673",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:set-table-row-height",
+  "result": {
+   "background": "object",
+   "heightPx": 720.0180122616257,
+   "nodes": "array(8)",
+   "scale": 1.0000250170300358,
+   "widthPx": 1280
+  },
+  "digest": "9f979986d036eb2a",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:set-table-cell-anchor",
+  "result": {
+   "background": "object",
+   "heightPx": 720.0180122616257,
+   "nodes": "array(8)",
+   "scale": 1.0000250170300358,
+   "widthPx": 1280
+  },
+  "digest": "b3bb8ab381258b0c",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:edit-table-style",
+  "result": {
+   "slide": "object",
+   "sourceId": "tbl_5n"
+  },
+  "digest": "612fd2a8e377e0fc",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:add-chart",
+  "result": {
+   "slide": "object",
+   "sourceId": "chart_5z"
+  },
+  "digest": "7bef72374092c275",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:get-chart-data",
+  "result": {
+   "categories": "array(3)",
+   "kind": "bar",
+   "pointColors": "array(2)",
+   "series": "array(2)",
+   "seriesColors": "array(2)",
+   "title": "Sales"
+  },
+  "digest": "13e5970eb7835987"
+ },
+ {
+  "wc": 1,
+  "channel": "slides:chart-color-schemes",
+  "result": "array(9)",
+  "digest": "001e120cbdefa8e9"
+ },
+ {
+  "wc": 1,
+  "channel": "slides:edit-chart",
+  "result": {
+   "slide": "object",
+   "sourceId": "chart_6b"
+  },
+  "digest": "0a164a047cad7602",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:edit-chart",
+  "result": {
+   "slide": "object",
+   "sourceId": "chart_6n"
+  },
+  "digest": "fe2e9cbd6f61ff0d",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:add-smartart",
+  "result": {
+   "slide": "object",
+   "sourceId": "grp_73"
+  },
+  "digest": "9609a283a8e134fc",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:insert-image",
+  "result": {
+   "slide": "object",
+   "sourceId": "picnew_3_mv0dnmo0"
+  },
+  "digest": "49b13c4e417b2244",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ],
+  "platform": [
+   {
+    "kind": "showOpenDialog",
+    "detail": {
+     "filters": [
+      {
+       "extensions": [
+        "png",
+        "jpg",
+        "jpeg",
+        "gif",
+        "bmp",
+        "webp",
+        "tif",
+        "tiff"
+       ],
+       "name": "图片"
+      }
+     ],
+     "properties": [
+      "openFile"
+     ],
+     "title": "插入图片"
+    }
+   },
+   {
+    "kind": "nativeImage.createFromPath",
+    "detail": "picture.png"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:insert-image",
+  "result": null,
+  "digest": "74234e98afe7498f",
+  "platform": [
+   {
+    "kind": "showOpenDialog",
+    "detail": {
+     "filters": [
+      {
+       "extensions": [
+        "png",
+        "jpg",
+        "jpeg",
+        "gif",
+        "bmp",
+        "webp",
+        "tif",
+        "tiff"
+       ],
+       "name": "图片"
+      }
+     ],
+     "properties": [
+      "openFile"
+     ],
+     "title": "插入图片"
+    }
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:add-image-bytes",
+  "result": {
+   "slide": "object",
+   "sourceId": "picnew_4_mv0dnmo0"
+  },
+  "digest": "fa59f518b983fa66",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:replace-picture-bytes",
+  "result": {
+   "background": "object",
+   "heightPx": 720.0180122616257,
+   "nodes": "array(4)",
+   "scale": 1.0000250170300358,
+   "widthPx": 1280
+  },
+  "digest": "99c9846b9b295615",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:edit-picture-opacity",
+  "result": {
+   "background": "object",
+   "heightPx": 720.0180122616257,
+   "nodes": "array(4)",
+   "scale": 1.0000250170300358,
+   "widthPx": 1280
+  },
+  "digest": "e5947324421875df",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:edit-picture-src-rect",
+  "result": {
+   "background": "object",
+   "heightPx": 720.0180122616257,
+   "nodes": "array(4)",
+   "scale": 1.0000250170300358,
+   "widthPx": 1280
+  },
+  "digest": "4e516552c5bad796",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:pick-picture-file",
+  "result": {
+   "base64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+   "ext": "png"
+  },
+  "digest": "9fbaacc88e9bf60d",
+  "platform": [
+   {
+    "kind": "showOpenDialog",
+    "detail": {
+     "filters": [
+      {
+       "extensions": [
+        "png",
+        "jpg",
+        "jpeg",
+        "gif",
+        "bmp",
+        "webp",
+        "tif",
+        "tiff"
+       ],
+       "name": "图片"
+      }
+     ],
+     "properties": [
+      "openFile"
+     ],
+     "title": "替换图片"
+    }
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:get-render-slides",
+  "result": "array(5)",
+  "digest": "b5b306d0c3ce03f2"
+ },
+ {
+  "wc": 1,
+  "channel": "slides:edit-image-fill",
+  "result": {
+   "background": "object",
+   "heightPx": 720.0180122616257,
+   "nodes": "array(4)",
+   "scale": 1.0000250170300358,
+   "widthPx": 1280
+  },
+  "digest": "ba817c90f592d36d",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:edit-image-fill",
+  "result": {
+   "background": "object",
+   "heightPx": 720.0180122616257,
+   "nodes": "array(4)",
+   "scale": 1.0000250170300358,
+   "widthPx": 1280
+  },
+  "digest": "193958d0d5e86827",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ],
+  "platform": [
+   {
+    "kind": "showOpenDialog",
+    "detail": {
+     "filters": [
+      {
+       "extensions": [
+        "png",
+        "jpg",
+        "jpeg",
+        "gif",
+        "bmp",
+        "webp",
+        "tif",
+        "tiff"
+       ],
+       "name": "图片"
+      }
+     ],
+     "properties": [
+      "openFile"
+     ],
+     "title": "插入图片"
+    }
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:insert-media",
+  "result": {
+   "slide": "object",
+   "sourceId": "pic_7h"
+  },
+  "digest": "58472fa63a42e1df",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ],
+  "platform": [
+   {
+    "kind": "showOpenDialog",
+    "detail": {
+     "filters": [
+      {
+       "extensions": [
+        "mp3",
+        "wav",
+        "m4a",
+        "aac",
+        "ogg"
+       ],
+       "name": "音频"
+      }
+     ],
+     "properties": [
+      "openFile"
+     ],
+     "title": "插入音频"
+    }
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:media-data",
+  "result": {
+   "dataUrl": "data:audio/mpeg;base64,AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gISIjJCUmJygpKissLS4vMDEyMzQ1Njc4OTo7PD0+Pw==",
+   "kind": "audio"
+  },
+  "digest": "07b633ca80001cba"
+ },
+ {
+  "wc": 1,
+  "channel": "slides:add-media-bytes",
+  "result": {
+   "slide": "object",
+   "sourceId": "pic_7x"
+  },
+  "digest": "d0d604ec7042061e",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:add-ink",
+  "result": {
+   "slide": "object",
+   "sourceId": "picnew_5_mv0dnmo0"
+  },
+  "digest": "ce66977ab7460484",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:edit-background",
+  "result": "array(5)",
+  "digest": "dfcd8cd38c6fbc12",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:edit-background",
+  "result": "array(5)",
+  "digest": "5aabbf5deba45d59",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:edit-background",
+  "result": "array(5)",
+  "digest": "310ad14e3b55f14a",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ],
+  "platform": [
+   {
+    "kind": "showOpenDialog",
+    "detail": {
+     "filters": [
+      {
+       "extensions": [
+        "png",
+        "jpg",
+        "jpeg",
+        "gif",
+        "bmp",
+        "webp",
+        "tif",
+        "tiff"
+       ],
+       "name": "图片"
+      }
+     ],
+     "properties": [
+      "openFile"
+     ],
+     "title": "插入图片"
+    }
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:edit-background",
+  "result": "array(5)",
+  "digest": "d204af01125ce560",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:edit-background",
+  "result": "array(5)",
+  "digest": "82d02dfba40384e0",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:edit-background",
+  "result": "array(5)",
+  "digest": "e97fb1aacd18c313",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:get-render-slides",
+  "result": "array(5)",
+  "digest": "e97fb1aacd18c313"
+ },
+ {
+  "wc": 1,
+  "channel": "slides:set-link",
+  "result": {
+   "background": "object",
+   "bgOwn": true,
+   "heightPx": 720.0180122616257,
+   "nodes": "array(4)",
+   "scale": 1.0000250170300358,
+   "widthPx": 1280
+  },
+  "digest": "f478b041093c46df",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:get-link",
+  "result": null,
+  "digest": "74234e98afe7498f"
+ },
+ {
+  "wc": 1,
+  "channel": "slides:get-slide-links",
+  "result": "array(1)",
+  "digest": "35dc38dffd532054"
+ },
+ {
+  "wc": 1,
+  "channel": "slides:get-run-links",
+  "result": "array(0)",
+  "digest": "4f53cda18c2baa0c"
+ },
+ {
+  "wc": 1,
+  "channel": "slides:apply-header-footer",
+  "result": "array(5)",
+  "digest": "aa4f166e454b186f",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:get-header-footer",
+  "result": {
+   "date": "2026-10-09",
+   "footer": "Confidential",
+   "slideNum": true
+  },
+  "digest": "c410b2add6853325"
+ },
+ {
+  "wc": 1,
+  "channel": "slides:apply-theme",
+  "result": "array(5)",
+  "digest": "5ae4007a01892e48",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:add-slide",
+  "result": {
+   "index": 1,
+   "slides": "array(6)"
+  },
+  "digest": "d4d09ab0aee914ca",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:add-slide",
+  "result": {
+   "index": 2,
+   "slides": "array(7)"
+  },
+  "digest": "80970a757064ce5e",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:add-blank-slide",
+  "result": {
+   "index": 3,
+   "slides": "array(8)"
+  },
+  "digest": "5d4c541e9056dc3b",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:get-layouts",
+  "result": {
+   "layouts": "array(11)",
+   "size": "object"
+  },
+  "digest": "a44836ae081a4190"
+ },
+ {
+  "wc": 1,
+  "channel": "slides:add-slide-with-layout",
+  "result": {
+   "index": 4,
+   "slides": "array(9)"
+  },
+  "digest": "fc14b495163518d9",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:set-slide-layout",
+  "result": {
+   "background": "object",
+   "heightPx": 720.0180122616257,
+   "nodes": "array(2)",
+   "scale": 1.0000250170300358,
+   "widthPx": 1280
+  },
+  "digest": "e44358eb36fd7032",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:set-slide-layout",
+  "result": {
+   "background": "object",
+   "heightPx": 720.0180122616257,
+   "nodes": "array(2)",
+   "scale": 1.0000250170300358,
+   "widthPx": 1280
+  },
+  "digest": "7f5d21bb52c8d425",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:delete-slide",
+  "result": "array(8)",
+  "digest": "2ac458287435c735",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:move-slide",
+  "result": {
+   "sections": "array(0)",
+   "slides": "array(8)"
+  },
+  "digest": "663ad2f8b9d09b12",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:set-hidden",
+  "result": {
+   "background": "object",
+   "bgOwn": true,
+   "heightPx": 720.0180122616257,
+   "hidden": true,
+   "nodes": "array(5)",
+   "scale": 1.0000250170300358,
+   "widthPx": 1280
+  },
+  "digest": "7a580b33adb4e914",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:set-transition",
+  "result": true,
+  "digest": "b5bea41b6c623f7c",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:get-transition",
+  "result": "fade",
+  "digest": "3dffb753e1400397"
+ },
+ {
+  "wc": 1,
+  "channel": "slides:set-advance-times",
+  "result": true,
+  "digest": "b5bea41b6c623f7c",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:get-render-slides",
+  "result": "array(8)",
+  "digest": "255bcd58882f123d"
+ },
+ {
+  "wc": 1,
+  "channel": "slides:set-animations",
+  "result": true,
+  "digest": "b5bea41b6c623f7c",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:get-animations",
+  "result": "array(1)",
+  "digest": "316051fc502e98c8"
+ },
+ {
+  "wc": 1,
+  "channel": "slides:get-shape-keys",
+  "result": "array(5)",
+  "digest": "51d2b1359f0e0a6b"
+ },
+ {
+  "wc": 1,
+  "channel": "slides:copy-slide",
+  "result": true,
+  "digest": "b5bea41b6c623f7c",
+  "platform": [
+   {
+    "kind": "clipboard.writeBuffer",
+    "detail": "io.genoffice.slides.slide"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:has-slide-clipboard",
+  "result": true,
+  "digest": "b5bea41b6c623f7c"
+ },
+ {
+  "wc": 1,
+  "channel": "slides:clipboard-external",
+  "result": {
+   "kind": "slide"
+  },
+  "digest": "23fae82b5dfe5944"
+ },
+ {
+  "wc": 1,
+  "channel": "slides:paste-slide",
+  "result": {
+   "index": 3,
+   "slides": "array(9)"
+  },
+  "digest": "8cfe5af6f5f733ff",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:repaste-slide",
+  "result": {
+   "index": 3,
+   "slides": "array(9)"
+  },
+  "digest": "9c9d243fb2eb3220",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:repaste-slide",
+  "result": {
+   "index": 2,
+   "slides": "array(8)",
+   "sourceId": "picnew_6_mv0dnmo0"
+  },
+  "digest": "b0f18f8b4ce1bd8b",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:set-notes",
+  "result": true,
+  "digest": "b5bea41b6c623f7c",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:get-notes",
+  "result": "Speaker notes\nsecond line",
+  "digest": "0aa7eca006bd26a4"
+ },
+ {
+  "wc": 1,
+  "channel": "slides:add-comment",
+  "result": "array(1)",
+  "digest": "97ade83b99efc471",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:get-comments",
+  "result": "array(1)",
+  "digest": "97ade83b99efc471"
+ },
+ {
+  "wc": 1,
+  "channel": "slides:add-comment",
+  "result": "array(2)",
+  "digest": "087978d3ee3922ba",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:delete-comment",
+  "result": "array(1)",
+  "digest": "e68d24d328555274",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:add-section",
+  "result": "array(1)",
+  "digest": "e63f70f457443a3b",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:add-section",
+  "result": "array(2)",
+  "digest": "797b8b27e9b21db6",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:rename-section",
+  "result": "array(2)",
+  "digest": "51977b39751ce55d",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:get-sections",
+  "result": "array(2)",
+  "digest": "51977b39751ce55d"
+ },
+ {
+  "wc": 1,
+  "channel": "slides:move-section",
+  "result": {
+   "sections": "array(2)",
+   "slides": "array(8)"
+  },
+  "digest": "92985031d4510765",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:set-sections",
+  "result": "array(2)",
+  "digest": "51977b39751ce55d",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:remove-section",
+  "result": "array(1)",
+  "digest": "d7d8ec13670197f2",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:master-enter",
+  "result": {
+   "items": "array(12)"
+  },
+  "digest": "1a59aef23a3c5e7f"
+ },
+ {
+  "wc": 1,
+  "channel": "slides:master-open",
+  "result": {
+   "background": "object",
+   "heightPx": 720.0180122616257,
+   "nodes": "array(5)",
+   "scale": 1.0000250170300358,
+   "widthPx": 1280
+  },
+  "digest": "6a968a5ea3b79828"
+ },
+ {
+  "wc": 1,
+  "channel": "slides:master-edit-text",
+  "result": {
+   "background": "object",
+   "heightPx": 720.0180122616257,
+   "nodes": "array(5)",
+   "scale": 1.0000250170300358,
+   "widthPx": 1280
+  },
+  "digest": "71985b71352ae8f1",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:master-edit-fill",
+  "result": {
+   "background": "object",
+   "heightPx": 720.0180122616257,
+   "nodes": "array(5)",
+   "scale": 1.0000250170300358,
+   "widthPx": 1280
+  },
+  "digest": "a6f7074d53186395",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:master-edit-stroke",
+  "result": {
+   "background": "object",
+   "heightPx": 720.0180122616257,
+   "nodes": "array(5)",
+   "scale": 1.0000250170300358,
+   "widthPx": 1280
+  },
+  "digest": "27b095f1d89e3229",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:master-edit-transform",
+  "result": {
+   "background": "object",
+   "heightPx": 720.0180122616257,
+   "nodes": "array(5)",
+   "scale": 1.0000250170300358,
+   "widthPx": 1280
+  },
+  "digest": "8f20e30286e36c9d",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:master-edit-transform",
+  "result": {
+   "background": "object",
+   "heightPx": 720.0180122616257,
+   "nodes": "array(5)",
+   "scale": 1.0000250170300358,
+   "widthPx": 1280
+  },
+  "digest": "8f20e30286e36c9d"
+ },
+ {
+  "wc": 1,
+  "channel": "slides:undo",
+  "result": null,
+  "digest": "74234e98afe7498f"
+ },
+ {
+  "wc": 1,
+  "channel": "slides:master-close",
+  "result": "array(8)",
+  "digest": "778c4659eac92d45"
+ },
+ {
+  "wc": 1,
+  "channel": "slides:apply-txn",
+  "result": {
+   "applied": false,
+   "dryRun": true,
+   "plan": "array(1)"
+  },
+  "digest": "74ed44e1dca02b40"
+ },
+ {
+  "wc": 1,
+  "channel": "slides:apply-txn",
+  "result": {
+   "applied": true,
+   "failures": "array(2)",
+   "records": "array(1)",
+   "slides": "array(8)"
+  },
+  "digest": "bfb0f6c7e041c538",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:apply-txn",
+  "result": {
+   "applied": false,
+   "failures": "array(1)"
+  },
+  "digest": "7507018e9c1537c3"
+ },
+ {
+  "wc": 1,
+  "channel": "slides:history-batch-begin",
+  "result": true,
+  "digest": "b5bea41b6c623f7c"
+ },
+ {
+  "wc": 1,
+  "channel": "slides:set-hidden",
+  "result": {
+   "background": "object",
+   "bgOwn": true,
+   "heightPx": 720.0180122616257,
+   "hidden": true,
+   "nodes": "array(11)",
+   "scale": 1.0000250170300358,
+   "widthPx": 1280
+  },
+  "digest": "f10857843b0e61f8",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:set-notes",
+  "result": true,
+  "digest": "b5bea41b6c623f7c",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:history-batch-end",
+  "result": null,
+  "digest": "74234e98afe7498f"
+ },
+ {
+  "wc": 1,
+  "channel": "slides:set-slide-size",
+  "result": "array(8)",
+  "digest": "c4617ff55d20d7ef",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:get-slide-size",
+  "result": {
+   "cx": 9144000,
+   "cy": 6858000
+  },
+  "digest": "8c808395c66843fd"
+ },
+ {
+  "wc": 1,
+  "channel": "slides:ai-snapshot-restore",
+  "result": null,
+  "digest": "74234e98afe7498f"
+ },
+ {
+  "wc": 1,
+  "channel": "slides:undo",
+  "result": "array(8)",
+  "digest": "dd7c1ca22bf6d0b2",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "55973f1bf8991fd1"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:undo",
+  "result": "array(8)",
+  "digest": "dd7c1ca22bf6d0b2",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "55973f1bf8991fd1"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:undo",
+  "result": "array(8)",
+  "digest": "778c4659eac92d45",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "55973f1bf8991fd1"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:redo",
+  "result": "array(8)",
+  "digest": "dd7c1ca22bf6d0b2",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "55973f1bf8991fd1"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:redo",
+  "result": "array(8)",
+  "digest": "dd7c1ca22bf6d0b2",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "55973f1bf8991fd1"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:is-dirty",
+  "result": true,
+  "digest": "b5bea41b6c623f7c"
+ },
+ {
+  "wc": 2,
+  "channel": "slides:open-path",
+  "result": {
+   "defaultFont": "Verdana",
+   "path": "<tmp>/in/business.pptx",
+   "size": "object",
+   "slides": "array(8)"
+  },
+  "digest": "0aaac1d6b609a0e9",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "55973f1bf8991fd1"
+   },
+   {
+    "wc": 2,
+    "channel": "slides:history-changed",
+    "digest": "55973f1bf8991fd1"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:set-hidden",
+  "result": {
+   "background": "object",
+   "heightPx": 720.0180122616257,
+   "nodes": "array(0)",
+   "scale": 1.0000250170300358,
+   "widthPx": 1280
+  },
+  "digest": "5b4a9b53fc6a5e16",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   },
+   {
+    "wc": 2,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   },
+   {
+    "wc": 1,
+    "channel": "slides:deck-changed",
+    "digest": "442949a54b65f231"
+   },
+   {
+    "wc": 2,
+    "channel": "slides:deck-changed",
+    "digest": "442949a54b65f231"
+   }
+  ]
+ },
+ {
+  "wc": 2,
+  "channel": "slides:consume-pending-open",
+  "result": {
+   "defaultFont": "Verdana",
+   "path": "<tmp>/in/business.pptx",
+   "size": "object",
+   "slides": "array(8)"
+  },
+  "digest": "dd10df86c7e77a18"
+ },
+ {
+  "wc": 1,
+  "channel": "slides:save",
+  "result": {
+   "ok": true,
+   "path": "<tmp>/in/business.pptx",
+   "slides": "array(8)"
+  },
+  "digest": "d6f29a577dbe23af"
+ },
+ {
+  "saved": "business after save",
+  "bytes": "#bytes:61430:9e8cb6cf6dbf9aa053aaa86969143e03c7325e838e427c1428dd356d2bdd22de"
+ },
+ {
+  "wc": 1,
+  "channel": "slides:is-dirty",
+  "result": false,
+  "digest": "fcbcf165908dd18a"
+ },
+ {
+  "wc": 1,
+  "channel": "slides:set-notes",
+  "result": true,
+  "digest": "b5bea41b6c623f7c",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   },
+   {
+    "wc": 2,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   },
+   {
+    "wc": 1,
+    "channel": "slides:deck-changed",
+    "digest": "95cfdc1841b48bd9"
+   },
+   {
+    "wc": 2,
+    "channel": "slides:deck-changed",
+    "digest": "95cfdc1841b48bd9"
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:save-as",
+  "result": {
+   "ok": true,
+   "path": "<tmp>/in/business-copy.pptx",
+   "slides": "array(8)"
+  },
+  "digest": "b79c7999a044bbd6",
+  "sent": [
+   {
+    "wc": 1,
+    "channel": "slides:renamed",
+    "digest": "9ccba2a2a0e2aeac"
+   },
+   {
+    "wc": 2,
+    "channel": "slides:renamed",
+    "digest": "9ccba2a2a0e2aeac"
+   }
+  ],
+  "platform": [
+   {
+    "kind": "saveAsSuggestion",
+    "detail": [
+     "business.pptx",
+     "Deck"
+    ]
+   },
+   {
+    "kind": "showSaveDialog",
+    "detail": {
+     "fallbackDir": "drafts",
+     "options": {
+      "defaultPath": "Deck",
+      "filters": [
+       {
+        "extensions": [
+         "pptx"
+        ],
+        "name": "PowerPoint"
+       }
+      ]
+     }
+    }
+   }
+  ]
+ },
+ {
+  "saved": "business save-as",
+  "bytes": "#bytes:62454:7cddf3985050ccc984474779509b5cebffab6e9311253d5449bc677fefe5e873"
+ },
+ {
+  "wc": 1,
+  "channel": "slides:save-as",
+  "result": {
+   "ok": false
+  },
+  "digest": "38667e60226bf997",
+  "platform": [
+   {
+    "kind": "saveAsSuggestion",
+    "detail": [
+     "business-copy.pptx",
+     "Deck"
+    ]
+   },
+   {
+    "kind": "showSaveDialog",
+    "detail": {
+     "fallbackDir": "drafts",
+     "options": {
+      "defaultPath": "Deck",
+      "filters": [
+       {
+        "extensions": [
+         "pptx"
+        ],
+        "name": "PowerPoint"
+       }
+      ]
+     }
+    }
+   }
+  ]
+ },
+ {
+  "wc": 1,
+  "channel": "slides:recent",
+  "result": "array(2)",
+  "digest": "eeaf25549756386d"
+ },
+ {
+  "wc": 3,
+  "channel": "slides:new-blank",
+  "result": {
+   "defaultFont": "Calibri",
+   "path": "",
+   "size": "object",
+   "slides": "array(1)"
+  },
+  "digest": "08bbb84f04de5eb1",
+  "sent": [
+   {
+    "wc": 3,
+    "channel": "slides:history-changed",
+    "digest": "92f2cf0f42dc68d8"
+   }
+  ]
+ },
+ {
+  "wc": 3,
+  "channel": "slides:get-render-slides",
+  "result": "array(1)",
+  "digest": "bc57645c2ad7e869"
+ },
+ {
+  "wc": 3,
+  "channel": "slides:add-element",
+  "result": {
+   "slide": "object",
+   "sourceId": "spnew_7_mv0dnmo0"
+  },
+  "digest": "63a16e74a752dde4",
+  "sent": [
+   {
+    "wc": 3,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 3,
+  "channel": "slides:save",
+  "result": {
+   "ok": true,
+   "path": "<tmp>/drafts/未命名演示文稿.pptx",
+   "slides": "array(1)"
+  },
+  "digest": "af5e79b3fb1b452c"
+ },
+ {
+  "saved": "untitled draft",
+  "bytes": "#bytes:5933:8bf6f083ed3beb232de4c4b363ba513600caa77fdb5b6495f288fcc0854293ff"
+ },
+ {
+  "wc": 4,
+  "channel": "slides:open-path",
+  "result": {
+   "defaultFont": "Calibri",
+   "path": "<tmp>/in/unicode.pptx",
+   "size": "object",
+   "slides": "array(1)"
+  },
+  "digest": "1ec3c9e2133604f1",
+  "sent": [
+   {
+    "wc": 4,
+    "channel": "slides:history-changed",
+    "digest": "92f2cf0f42dc68d8"
+   }
+  ]
+ },
+ {
+  "wc": 4,
+  "channel": "slides:get-render-slides",
+  "result": "array(1)",
+  "digest": "29a028e83aec6d96"
+ },
+ {
+  "wc": 4,
+  "channel": "slides:edit-text",
+  "result": {
+   "background": "object",
+   "heightPx": 720.0180122616257,
+   "nodes": "array(2)",
+   "scale": 1.0000250170300358,
+   "widthPx": 1280
+  },
+  "digest": "70ebd5cb9732ea31",
+  "sent": [
+   {
+    "wc": 4,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 4,
+  "channel": "slides:save",
+  "result": {
+   "ok": true,
+   "path": "<tmp>/in/unicode.pptx",
+   "slides": "array(1)"
+  },
+  "digest": "63ca56053c49f15f"
+ },
+ {
+  "saved": "unicode after save",
+  "bytes": "#bytes:41484:7cd9f78747366d79ee9b3d0ec7fa5b48dbbeb8ada89b1b96c57041b1205741d8"
+ },
+ {
+  "wc": 4,
+  "channel": "slides:history-batch-begin",
+  "result": true,
+  "digest": "b5bea41b6c623f7c"
+ },
+ {
+  "wc": 4,
+  "channel": "slides:history-batch-begin",
+  "result": true,
+  "digest": "b5bea41b6c623f7c"
+ },
+ {
+  "wc": 4,
+  "channel": "slides:set-notes",
+  "result": true,
+  "digest": "b5bea41b6c623f7c",
+  "sent": [
+   {
+    "wc": 4,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 4,
+  "channel": "slides:history-batch-end",
+  "result": null,
+  "digest": "74234e98afe7498f"
+ },
+ {
+  "wc": 4,
+  "channel": "slides:set-hidden",
+  "result": {
+   "background": "object",
+   "heightPx": 720.0180122616257,
+   "hidden": true,
+   "nodes": "array(2)",
+   "scale": 1.0000250170300358,
+   "widthPx": 1280
+  },
+  "digest": "2174be6d9b6d96ed",
+  "sent": [
+   {
+    "wc": 4,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 4,
+  "channel": "slides:history-batch-end",
+  "result": 1,
+  "digest": "6b86b273ff34fce1",
+  "sent": [
+   {
+    "wc": 4,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 4,
+  "channel": "slides:undo",
+  "result": "array(1)",
+  "digest": "8cfaa3b789bff24d",
+  "sent": [
+   {
+    "wc": 4,
+    "channel": "slides:history-changed",
+    "digest": "55973f1bf8991fd1"
+   }
+  ]
+ },
+ {
+  "wc": 4,
+  "channel": "slides:redo",
+  "result": "array(1)",
+  "digest": "28ad2acde5fff4c3",
+  "sent": [
+   {
+    "wc": 4,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 4,
+  "channel": "slides:ai-snapshot-restore",
+  "result": "array(1)",
+  "digest": "8cfaa3b789bff24d",
+  "sent": [
+   {
+    "wc": 4,
+    "channel": "slides:history-changed",
+    "digest": "988167f261580812"
+   }
+  ]
+ },
+ {
+  "wc": 4,
+  "channel": "slides:ai-snapshot-restore",
+  "result": null,
+  "digest": "74234e98afe7498f"
+ },
+ {
+  "wc": 4,
+  "channel": "slides:is-dirty",
+  "result": true,
+  "digest": "b5bea41b6c623f7c"
+ },
+ {
+  "wc": 9,
+  "channel": "slides:get-render-slides",
+  "result": null,
+  "digest": "74234e98afe7498f"
+ },
+ {
+  "wc": 9,
+  "channel": "slides:is-dirty",
+  "result": false,
+  "digest": "fcbcf165908dd18a"
+ },
+ {
+  "wc": 9,
+  "channel": "slides:get-slide-links",
+  "result": "array(0)",
+  "digest": "4f53cda18c2baa0c"
+ },
+ {
+  "wc": 9,
+  "channel": "slides:get-header-footer",
+  "result": {
+   "date": null,
+   "footer": null,
+   "slideNum": false
+  },
+  "digest": "3f3d44198efe071b"
+ },
+ {
+  "wc": 9,
+  "channel": "slides:get-transition",
+  "result": "none",
+  "digest": "30a0924a3360be68"
+ },
+ {
+  "wc": 9,
+  "channel": "slides:get-notes",
+  "result": "",
+  "digest": "12ae32cb1ec02d01"
+ },
+ {
+  "wc": 9,
+  "channel": "slides:copy-elements",
+  "result": 0,
+  "digest": "5feceb66ffc86f38"
+ },
+ {
+  "wc": 9,
+  "channel": "slides:set-transition",
+  "result": false,
+  "digest": "fcbcf165908dd18a"
+ },
+ {
+  "wc": 9,
+  "channel": "slides:save",
+  "result": {
+   "error": "no file open",
+   "ok": false
+  },
+  "digest": "8d575b6ce8abaf07"
+ }
+]
