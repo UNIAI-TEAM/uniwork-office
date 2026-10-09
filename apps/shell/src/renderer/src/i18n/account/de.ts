@@ -53,7 +53,7 @@ export const de = {
   acctKeyringShort: 'Sicherer Speicher erforderlich',
   acctKeyringTitle: 'Der sichere Speicher ist nicht verfügbar',
   acctKeyringBody:
-    'UniWork Office speichert Ihre Anmeldedaten im sicheren Speicher Ihres Systems (Schlüsselbund, Anmeldeinformationsverwaltung oder Keyring). Entsperren oder richten Sie ihn ein und starten Sie die App anschließend neu.',
+    'UniWork Office speichert Ihre Anmeldedaten im sicheren Speicher Ihres Systems (Schlüsselbund, Anmeldeinformationsverwaltung oder Keyring). Entsperren oder richten Sie ihn ein und wählen Sie anschließend „Erneut versuchen“.',
   acctErrLaunch: 'Die Anmeldung konnte nicht gestartet werden. Bitte versuchen Sie es erneut.',
   acctErrNetwork:
     'Verbindung zu UniWork nicht möglich. Prüfen Sie Ihre Internetverbindung oder Proxy-Einstellungen.',

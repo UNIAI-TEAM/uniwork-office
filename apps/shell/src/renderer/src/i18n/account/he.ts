@@ -50,7 +50,7 @@ export const he = {
   acctKeyringShort: 'נדרש אחסון מאובטח',
   acctKeyringTitle: 'האחסון המאובטח אינו זמין',
   acctKeyringBody:
-    'UniWork Office שומר את פרטי הכניסה שלך באחסון המאובטח של המערכת (Keychain, Credential Manager או keyring). בטל את נעילתו או הגדר אותו, ואז הפעל מחדש את האפליקציה.',
+    'UniWork Office שומר את פרטי הכניסה שלך באחסון המאובטח של המערכת (Keychain, Credential Manager או keyring). בטל את נעילתו או הגדר אותו, ואז לחץ על ״נסה שוב״.',
   acctErrLaunch: 'לא ניתן להתחיל את הכניסה. נסה שוב.',
   acctErrNetwork: 'לא ניתן להתחבר ל-UniWork. בדוק את החיבור לאינטרנט או את הגדרות ה-proxy.',
   acctErrTimeout: 'UniWork מגיב לאט מדי. נסה שוב.',

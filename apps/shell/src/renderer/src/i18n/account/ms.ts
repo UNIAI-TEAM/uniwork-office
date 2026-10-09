@@ -52,7 +52,7 @@ export const ms = {
   acctKeyringShort: 'Storan selamat diperlukan',
   acctKeyringTitle: 'Storan selamat tidak tersedia',
   acctKeyringBody:
-    'UniWork Office menyimpan log masuk anda dalam storan selamat sistem anda (Keychain, Credential Manager atau keyring). Buka kunci atau sediakannya, kemudian mulakan semula apl.',
+    'UniWork Office menyimpan log masuk anda dalam storan selamat sistem anda (Keychain, Credential Manager atau keyring). Buka kunci atau sediakannya, kemudian tekan Cuba lagi.',
   acctErrLaunch: 'Tidak dapat memulakan log masuk. Sila cuba lagi.',
   acctErrNetwork:
     'Tidak dapat menyambung ke UniWork. Semak sambungan internet atau tetapan proksi anda.',

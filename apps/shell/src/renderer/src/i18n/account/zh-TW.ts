@@ -49,7 +49,7 @@ export const zhTW = {
   acctKeyringShort: '需要安全儲存空間',
   acctKeyringTitle: '無法使用安全儲存空間',
   acctKeyringBody:
-    'UniWork Office 會將您的登入資訊保存在系統的安全儲存空間（鑰匙圈、認證管理員或金鑰環）中。請解除鎖定或完成設定，然後重新啟動應用程式。',
+    'UniWork Office 會將您的登入資訊保存在系統的安全儲存空間（鑰匙圈、認證管理員或金鑰環）中。請解除鎖定或完成設定，然後按一下「重試」。',
   acctErrLaunch: '無法開始登入，請再試一次。',
   acctErrNetwork: '無法連線至 UniWork。請檢查網際網路連線或 Proxy 設定。',
   acctErrTimeout: 'UniWork 回應時間過長，請再試一次。',

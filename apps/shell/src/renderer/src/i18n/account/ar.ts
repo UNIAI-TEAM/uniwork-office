@@ -50,7 +50,7 @@ export const ar = {
   acctKeyringShort: 'التخزين الآمن مطلوب',
   acctKeyringTitle: 'التخزين الآمن غير متاح',
   acctKeyringBody:
-    'يحتفظ UniWork Office ببيانات تسجيل دخولك في التخزين الآمن للنظام (سلسلة المفاتيح Keychain أو Credential Manager أو keyring). افتح قفله أو أعدّه، ثم أعد تشغيل التطبيق.',
+    'يحتفظ UniWork Office ببيانات تسجيل دخولك في التخزين الآمن للنظام (سلسلة المفاتيح Keychain أو Credential Manager أو keyring). افتح قفله أو أعدّه، ثم اضغط «إعادة المحاولة».',
   acctErrLaunch: 'تعذّر بدء تسجيل الدخول. يُرجى المحاولة مرة أخرى.',
   acctErrNetwork: 'تعذّر الاتصال بـ UniWork. تحقق من اتصالك بالإنترنت أو إعدادات الوكيل.',
   acctErrTimeout: 'استغرق UniWork وقتًا طويلًا للرد. يُرجى المحاولة مرة أخرى.',

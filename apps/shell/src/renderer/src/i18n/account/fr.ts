@@ -52,7 +52,7 @@ export const fr = {
   acctKeyringShort: 'Stockage sécurisé requis',
   acctKeyringTitle: 'Le stockage sécurisé est indisponible',
   acctKeyringBody:
-    'UniWork Office conserve vos informations de connexion dans le stockage sécurisé de votre système (Trousseau d’accès, Gestionnaire d’identification ou trousseau de clés). Déverrouillez-le ou configurez-le, puis redémarrez l’application.',
+    'UniWork Office conserve vos informations de connexion dans le stockage sécurisé de votre système (Trousseau d’accès, Gestionnaire d’identification ou trousseau de clés). Déverrouillez-le ou configurez-le, puis cliquez sur Réessayer.',
   acctErrLaunch: 'Impossible de démarrer la connexion. Veuillez réessayer.',
   acctErrNetwork:
     'Impossible de se connecter à UniWork. Vérifiez votre connexion Internet ou vos paramètres de proxy.',

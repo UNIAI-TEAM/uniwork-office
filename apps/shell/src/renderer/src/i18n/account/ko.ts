@@ -50,7 +50,7 @@ export const ko = {
   acctKeyringShort: '보안 저장소 필요',
   acctKeyringTitle: '보안 저장소를 사용할 수 없습니다',
   acctKeyringBody:
-    'UniWork Office는 로그인 정보를 시스템의 보안 저장소(키체인, 자격 증명 관리자 또는 키링)에 보관합니다. 잠금을 해제하거나 설정한 다음 앱을 다시 시작하세요.',
+    'UniWork Office는 로그인 정보를 시스템의 보안 저장소(키체인, 자격 증명 관리자 또는 키링)에 보관합니다. 잠금을 해제하거나 설정한 다음 ‘다시 시도’를 누르세요.',
   acctErrLaunch: '로그인을 시작하지 못했습니다. 다시 시도해 주세요.',
   acctErrNetwork: 'UniWork에 연결할 수 없습니다. 인터넷 연결 또는 프록시 설정을 확인하세요.',
   acctErrTimeout: 'UniWork의 응답이 너무 오래 걸립니다. 다시 시도해 주세요.',

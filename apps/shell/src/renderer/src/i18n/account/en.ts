@@ -51,7 +51,7 @@ export const en = {
   acctKeyringShort: 'Secure storage needed',
   acctKeyringTitle: 'Secure storage is unavailable',
   acctKeyringBody:
-    'UniWork Office keeps your sign-in in your system’s secure storage (Keychain, Credential Manager or a keyring). Unlock or set it up, then restart the app.',
+    'UniWork Office keeps your sign-in in your system’s secure storage (Keychain, Credential Manager or a keyring). Unlock or set it up, then press Retry.',
   acctErrLaunch: 'Couldn’t start sign-in. Please try again.',
   acctErrNetwork: 'Can’t connect to UniWork. Check your internet connection or proxy settings.',
   acctErrTimeout: 'UniWork took too long to respond. Please try again.',

@@ -52,7 +52,7 @@ export const es = {
   acctKeyringShort: 'Se necesita almacenamiento seguro',
   acctKeyringTitle: 'El almacenamiento seguro no está disponible',
   acctKeyringBody:
-    'UniWork Office guarda tu inicio de sesión en el almacenamiento seguro del sistema (Llavero, Administrador de credenciales o un llavero de claves). Desbloquéalo o configúralo y reinicia la aplicación.',
+    'UniWork Office guarda tu inicio de sesión en el almacenamiento seguro del sistema (Llavero, Administrador de credenciales o un llavero de claves). Desbloquéalo o configúralo y pulsa Reintentar.',
   acctErrLaunch: 'No se pudo iniciar el proceso de inicio de sesión. Inténtalo de nuevo.',
   acctErrNetwork:
     'No se puede conectar con UniWork. Comprueba tu conexión a Internet o la configuración del proxy.',

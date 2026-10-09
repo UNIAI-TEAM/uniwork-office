@@ -51,7 +51,7 @@ export const vi = {
   acctKeyringShort: 'Cần kho lưu trữ bảo mật',
   acctKeyringTitle: 'Không dùng được kho lưu trữ bảo mật',
   acctKeyringBody:
-    'UniWork Office lưu thông tin đăng nhập trong kho lưu trữ bảo mật của hệ thống (Keychain, Credential Manager hoặc keyring). Hãy mở khóa hoặc thiết lập kho này, rồi khởi động lại ứng dụng.',
+    'UniWork Office lưu thông tin đăng nhập trong kho lưu trữ bảo mật của hệ thống (Keychain, Credential Manager hoặc keyring). Hãy mở khóa hoặc thiết lập kho này, rồi bấm Thử lại.',
   acctErrLaunch: 'Không thể bắt đầu đăng nhập. Vui lòng thử lại.',
   acctErrNetwork: 'Không thể kết nối tới UniWork. Hãy kiểm tra kết nối mạng hoặc cài đặt proxy.',
   acctErrTimeout: 'UniWork phản hồi quá lâu. Vui lòng thử lại.',

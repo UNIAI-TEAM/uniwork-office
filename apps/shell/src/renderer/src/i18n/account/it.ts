@@ -52,7 +52,7 @@ export const it = {
   acctKeyringShort: 'Archivio sicuro necessario',
   acctKeyringTitle: 'Archivio sicuro non disponibile',
   acctKeyringBody:
-    'UniWork Office conserva i dati di accesso nell’archivio sicuro del sistema (Keychain, Gestione credenziali o un keyring). Sbloccalo o configuralo, poi riavvia l’app.',
+    'UniWork Office conserva i dati di accesso nell’archivio sicuro del sistema (Keychain, Gestione credenziali o un keyring). Sbloccalo o configuralo, poi premi Riprova.',
   acctErrLaunch: 'Impossibile avviare l’accesso. Riprova.',
   acctErrNetwork:
     'Impossibile connettersi a UniWork. Controlla la connessione a Internet o le impostazioni del proxy.',

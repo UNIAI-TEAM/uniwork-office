@@ -40,6 +40,14 @@ describe('account string shards', () => {
     },
   )
 
+  it.each([...LANGS])(
+    'locale %s: the keyring notice points to the Retry button, not a restart',
+    (lang) => {
+      const table = accountStrings[lang] as Record<string, string>
+      expect(table.acctKeyringBody).toContain(table.acctRetry)
+    },
+  )
+
   it('does not collide with the home table keys', () => {
     expect(referenceKeys.filter((k) => k in strings.zh)).toEqual([])
   })

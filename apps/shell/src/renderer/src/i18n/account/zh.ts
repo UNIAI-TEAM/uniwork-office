@@ -47,7 +47,7 @@ export const zh = {
   acctKeyringShort: '需要安全存储',
   acctKeyringTitle: '安全存储不可用',
   acctKeyringBody:
-    'UniWork Office 会将登录信息保存在系统的安全存储中（钥匙串、凭据管理器或密钥环）。请解锁或设置后重新启动应用。',
+    'UniWork Office 会将登录信息保存在系统的安全存储中（钥匙串、凭据管理器或密钥环）。请解锁或设置后点击“重试”。',
   acctErrLaunch: '无法开始登录，请重试。',
   acctErrNetwork: '无法连接 UniWork，请检查网络连接或代理设置。',
   acctErrTimeout: 'UniWork 响应超时，请重试。',

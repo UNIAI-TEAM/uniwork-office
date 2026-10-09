@@ -51,7 +51,7 @@ export const id = {
   acctKeyringShort: 'Perlu penyimpanan aman',
   acctKeyringTitle: 'Penyimpanan aman tidak tersedia',
   acctKeyringBody:
-    'UniWork Office menyimpan data masuk Anda di penyimpanan aman sistem (Keychain, Credential Manager, atau keyring). Buka kunci atau siapkan penyimpanan tersebut, lalu mulai ulang aplikasi.',
+    'UniWork Office menyimpan data masuk Anda di penyimpanan aman sistem (Keychain, Credential Manager, atau keyring). Buka kunci atau siapkan penyimpanan tersebut, lalu tekan Coba lagi.',
   acctErrLaunch: 'Tidak dapat memulai proses masuk. Silakan coba lagi.',
   acctErrNetwork:
     'Tidak dapat terhubung ke UniWork. Periksa koneksi internet atau pengaturan proxy Anda.',

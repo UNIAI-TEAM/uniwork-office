@@ -52,7 +52,7 @@ export const pl = {
   acctKeyringShort: 'Wymagany bezpieczny magazyn',
   acctKeyringTitle: 'Bezpieczny magazyn jest niedostępny',
   acctKeyringBody:
-    'UniWork Office przechowuje dane logowania w bezpiecznym magazynie systemu (Keychain, Credential Manager lub keyring). Odblokuj go lub skonfiguruj, a następnie uruchom aplikację ponownie.',
+    'UniWork Office przechowuje dane logowania w bezpiecznym magazynie systemu (Keychain, Credential Manager lub keyring). Odblokuj go lub skonfiguruj, a następnie wybierz Spróbuj ponownie.',
   acctErrLaunch: 'Nie udało się rozpocząć logowania. Spróbuj ponownie.',
   acctErrNetwork:
     'Nie można połączyć się z UniWork. Sprawdź połączenie z internetem lub ustawienia proxy.',

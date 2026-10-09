@@ -51,7 +51,7 @@ export const hi = {
   acctKeyringShort: 'सुरक्षित स्टोरेज ज़रूरी है',
   acctKeyringTitle: 'सुरक्षित स्टोरेज उपलब्ध नहीं है',
   acctKeyringBody:
-    'UniWork Office आपका साइन-इन आपके सिस्टम के सुरक्षित स्टोरेज (Keychain, Credential Manager या keyring) में रखता है। उसे अनलॉक या सेट अप करें, फिर ऐप को फिर से शुरू करें।',
+    'UniWork Office आपका साइन-इन आपके सिस्टम के सुरक्षित स्टोरेज (Keychain, Credential Manager या keyring) में रखता है। उसे अनलॉक या सेट अप करें, फिर “फिर से प्रयास करें” दबाएँ।',
   acctErrLaunch: 'साइन इन शुरू नहीं हो सका। कृपया फिर से प्रयास करें।',
   acctErrNetwork:
     'UniWork से कनेक्ट नहीं हो पा रहा। अपना इंटरनेट कनेक्शन या प्रॉक्सी सेटिंग जाँचें।',

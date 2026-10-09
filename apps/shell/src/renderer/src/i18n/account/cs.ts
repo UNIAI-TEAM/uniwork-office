@@ -52,7 +52,7 @@ export const cs = {
   acctKeyringShort: 'Nutné zabezpečené úložiště',
   acctKeyringTitle: 'Zabezpečené úložiště není dostupné',
   acctKeyringBody:
-    'UniWork Office ukládá vaše přihlášení do zabezpečeného úložiště systému (Keychain, Credential Manager nebo keyring). Odemkněte je nebo nastavte a poté aplikaci restartujte.',
+    'UniWork Office ukládá vaše přihlášení do zabezpečeného úložiště systému (Keychain, Credential Manager nebo keyring). Odemkněte je nebo nastavte a poté klikněte na Zkusit znovu.',
   acctErrLaunch: 'Přihlášení se nepodařilo spustit. Zkuste to prosím znovu.',
   acctErrNetwork:
     'Nelze se připojit k UniWork. Zkontrolujte připojení k internetu nebo nastavení proxy.',

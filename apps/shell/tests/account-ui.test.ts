@@ -554,6 +554,16 @@ describe('error text contrast', () => {
   }
 
   it.each([':root', "[data-theme='dark']", '@media (prefers-color-scheme: dark)'])(
+    '%s: the account card "refreshing" label meets WCAG AA on the card',
+    (selector) => {
+      const settings = css('apps/shell/src/renderer/src/settings.css')
+      expect(settings).toMatch(/\.acct-card-sync \{[^}]*color: var\(--text-secondary\)/)
+      const bg = tokenIn(selector, '--surface-subtle')
+      expect(contrast(tokenIn(selector, '--text-secondary'), bg)).toBeGreaterThanOrEqual(4.5)
+    },
+  )
+
+  it.each([':root', "[data-theme='dark']", '@media (prefers-color-scheme: dark)'])(
     '%s: account error text meets WCAG AA on its backgrounds',
     (selector) => {
       const text = tokenIn(selector, '--danger-text')

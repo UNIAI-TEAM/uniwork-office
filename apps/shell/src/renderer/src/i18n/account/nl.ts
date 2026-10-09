@@ -51,7 +51,7 @@ export const nl = {
   acctKeyringShort: 'Beveiligde opslag vereist',
   acctKeyringTitle: 'Beveiligde opslag is niet beschikbaar',
   acctKeyringBody:
-    'UniWork Office bewaart je inloggegevens in de beveiligde opslag van je systeem (Keychain, Credential Manager of een keyring). Ontgrendel of configureer deze en start de app opnieuw.',
+    'UniWork Office bewaart je inloggegevens in de beveiligde opslag van je systeem (Keychain, Credential Manager of een keyring). Ontgrendel of configureer deze en kies Opnieuw proberen.',
   acctErrLaunch: 'Inloggen kon niet worden gestart. Probeer het opnieuw.',
   acctErrNetwork:
     'Geen verbinding met UniWork. Controleer je internetverbinding of proxyinstellingen.',

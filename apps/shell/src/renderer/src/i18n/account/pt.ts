@@ -51,7 +51,7 @@ export const pt = {
   acctKeyringShort: 'Armazenamento seguro necessário',
   acctKeyringTitle: 'Armazenamento seguro indisponível',
   acctKeyringBody:
-    'O UniWork Office guarda seu login no armazenamento seguro do sistema (Keychain, Gerenciador de Credenciais ou um keyring). Desbloqueie ou configure-o e reinicie o app.',
+    'O UniWork Office guarda seu login no armazenamento seguro do sistema (Keychain, Gerenciador de Credenciais ou um keyring). Desbloqueie ou configure-o e toque em Tentar novamente.',
   acctErrLaunch: 'Não foi possível iniciar o login. Tente novamente.',
   acctErrNetwork:
     'Não foi possível conectar ao UniWork. Verifique sua conexão com a internet ou as configurações de proxy.',
