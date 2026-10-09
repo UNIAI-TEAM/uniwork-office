@@ -22,7 +22,7 @@ interface BuilderConfig {
   extraMetadata?: { version?: string }
   fileAssociations: { ext: string; name: string; description?: string }[]
   nsis: Record<string, unknown>
-  mac: Record<string, unknown>
+  mac: Record<string, unknown> & { target: { target: string; arch: string[] }[] }
   dmg: Record<string, unknown>
   win: { extraResources: { from: string; to: string }[] }
   beforePack: (context: { electronPlatformName: string }) => Promise<void>
@@ -33,7 +33,7 @@ interface BuilderConfig {
  * matter for beforePack: every packaging input exists and the CLI bundle already
  * carries `bakedCliVersion`, so the release-version check is what runs.
  */
-function loadConfig(env: Record<string, string>, bakedCliVersion = ''): BuilderConfig {
+function loadConfig(env: Record<string, string | undefined>, bakedCliVersion = ''): BuilderConfig {
   const configModule = { exports: {} as Record<string, unknown> }
   runInNewContext(readFileSync(resolve(shellRoot, 'electron-builder.cjs'), 'utf8'), {
     module: configModule,
@@ -112,7 +112,32 @@ describe('dev / beta release builds', () => {
       'UniWork-Office_${version}_unsigned_win32_${arch}-setup.${ext}',
     )
     expect(config.mac.artifactName).toBe('UniWork-Office_${version}_unsigned_darwin_${arch}.${ext}')
-    expect(config.publish).toBeUndefined()
+  })
+
+  it('publish nothing and build only the mac dmgs', () => {
+    const config = loadConfig({ UNIWORK_RELEASE_CHANNEL: 'dev', GH_TOKEN: 'token' })
+    expect(config.publish).toBeNull()
+    expect(config.mac.target.map((entry) => entry.target)).toEqual(['dmg'])
+    expect(loadConfig({}).mac.target.map((entry) => entry.target)).toEqual(['dmg', 'zip'])
+  })
+
+  it('treat empty signing variables as unset', () => {
+    const env: Record<string, string | undefined> = {
+      UNIWORK_RELEASE_CHANNEL: 'dev',
+      CSC_LINK: '',
+      CSC_KEY_PASSWORD: '',
+      CSC_NAME: '',
+      APPLE_ID: '',
+      APPLE_APP_SPECIFIC_PASSWORD: '',
+      APPLE_TEAM_ID: '',
+    }
+    const config = loadConfig(env)
+    // electron-builder would take CSC_LINK="" as a certificate path
+    for (const key of ['CSC_LINK', 'CSC_KEY_PASSWORD', 'CSC_NAME', 'APPLE_ID']) {
+      expect(key in env).toBe(false)
+    }
+    expect(config.mac.identity).toBe('-')
+    expect(config.mac.artifactName).toBe('UniWork-Office_${version}_unsigned_darwin_${arch}.${ext}')
   })
 
   it('ad-hoc sign the mac app without hardened runtime, notarization or dmg signing', () => {

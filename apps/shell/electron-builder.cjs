@@ -731,9 +731,20 @@ if (winSignMode) {
 // marks a build without a signing identity for that platform (it disappears
 // once one is configured), then the platform and arch:
 //   UniWork-Office_0.11.0-dev.1_unsigned_win32_x64-setup.exe
-//   UniWork-Office_0.11.0-dev.1_unsigned_darwin_arm64.dmg (and .zip)
+//   UniWork-Office_0.11.0-dev.1_unsigned_darwin_arm64.dmg
 // Only dev and beta exist; stable waits for signed builds.
 const RELEASE_CHANNELS = ['dev', 'beta']
+const RELEASE_SIGNING_ENV = [
+  'CSC_LINK',
+  'CSC_KEY_PASSWORD',
+  'CSC_NAME',
+  'WIN_CSC_LINK',
+  'WIN_CSC_KEY_PASSWORD',
+  'APPLE_ID',
+  'APPLE_APP_SPECIFIC_PASSWORD',
+  'APPLE_TEAM_ID',
+  'APPLE_KEYCHAIN_PROFILE',
+]
 const releaseChannel = process.env.UNIWORK_RELEASE_CHANNEL
 if (releaseChannel) {
   if (!RELEASE_CHANNELS.includes(releaseChannel)) {
@@ -746,6 +757,18 @@ if (releaseChannel) {
   if (updateUrl) {
     throw new Error('GENOFFICE_UPDATE_URL must stay unset for dev / beta release builds')
   }
+  // An exported but empty signing variable counts as unset. electron-builder
+  // keeps CSC_LINK="" as a certificate path and the mac keychain import then
+  // fails on the project directory, so empty values are dropped before it
+  // reads them.
+  for (const key of RELEASE_SIGNING_ENV) {
+    if (process.env[key] === '') delete process.env[key]
+  }
+  // No publish target at all, even when GH_TOKEN / GITHUB_TOKEN is in the
+  // shell (electron-builder would otherwise pick GitHub and bake a feed).
+  config.publish = null
+  // The dmgs are the only mac downloads; the zips exist for the update feed.
+  config.mac.target = config.mac.target.filter((entry) => entry.target === 'dmg')
   const macSigned = Boolean(process.env.CSC_LINK || process.env.CSC_NAME)
   const winSigned = Boolean(winSignMode || process.env.WIN_CSC_LINK || process.env.CSC_LINK)
   const unsignedLabel = (signed) => (signed ? '' : '_unsigned')
