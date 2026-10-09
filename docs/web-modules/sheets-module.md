@@ -57,7 +57,9 @@ engine-unavailable stub.
 | Renderer                    | `EngineUnavailableScreen` (`reason: 'too-large'`, shown as an overlay), `no-copilot` shell layout without AI | the grid used to lose its width when the AI dock was not rendered                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 
 Capabilities per decision C: `xlsxEngine`, `xlsImport` and `pivotRefresh` are on (from the transport's features).
-`recalcFallback`, `mergeWorkbooks` and `recoveryCopy` stay off.
+`recalcFallback` and `mergeWorkbooks` stay off. `recoveryCopy` is on only as the trigger of the renderer's 30 s
+tick that feeds web draft recovery (C18, [draft-recovery.md](draft-recovery.md)); no recovery copy reaches disk or the
+server and the desktop recovery dialog stays off.
 
 **First viewport** (incremental index, `docs/web-modules/sheets-probes/results/sh2-incremental-node-shim.json`; frame
 engine code in Node + the shim):

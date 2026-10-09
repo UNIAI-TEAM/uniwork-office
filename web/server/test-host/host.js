@@ -1,6 +1,9 @@
 // Usage: /test-host/?open=<docx url>[&frame=/office-frame/docs/<v>/index.html][&lang=en][&theme=dark]
 //        /test-host/?module=<pdf|markdown|html|slides|sheets>[&open=<url>][&version=<v>][&readonly=1] (GO-B4/B5/B6)
 //        e.g. ?module=pdf&open=/fixtures/sample.pdf (web/fixtures: sample.pdf, sample.md, sample.html)
+//        &recovery=1: draft recovery on (CONTRACT C18): `init.recovery` carries a non-extractable
+//        AES-GCM key generated once per host page (= one signed-in session) and the scope
+//        "test-user:<documentId>"; a frame reload gets the same key again
 //
 // module (default docs): the frame defaults to /office-frame/<module>/<version|latest>/index.html (docs keeps
 // the site root, as before), `init.module` names the module, and the host refuses a frame whose
@@ -23,6 +26,8 @@
 //   addFile(url)     -> fetch a fixture into the store, resolves with its meta (GO-B4)
 //   queuePick(id)    -> the next file.pick answers this file (nothing queued = the user cancelled);
 //                       file.pick is granted with ?pick=1
+//   newSessionKey()  -> replace the recovery key (a new sign-in); the next init carries it
+//   documentId       -> the init document's file id
 
 const NS = 'uniwork.office.docs'
 const V = 1
@@ -190,6 +195,14 @@ const initPayload = {
 if (params.get('readonly') === '1') delete initPayload.capabilities.save
 if (params.get('pick') === '1') initPayload.capabilities.filePick = true
 
+async function newSessionKey() {
+  const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, [
+    'encrypt',
+    'decrypt',
+  ])
+  initPayload.recovery = { key, scope: `test-user:${initPayload.documentId}` }
+}
+
 async function boot() {
   const url = params.get('open')
   if (url) {
@@ -202,8 +215,11 @@ async function boot() {
   } else {
     initPayload.documentId = put(DEFAULT_NAME[MODULE] ?? 'Untitled', new Uint8Array()).fileId
   }
+  if (params.get('recovery') === '1') await newSessionKey()
   window.__host = {
     module: MODULE,
+    documentId: initPayload.documentId,
+    newSessionKey,
     lastSaved: () => (lastSaved ? { ...lastSaved, bytes: Array.from(lastSaved.bytes) } : null),
     lastExport: () => lastExport,
     events,

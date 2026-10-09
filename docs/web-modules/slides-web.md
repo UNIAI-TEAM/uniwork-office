@@ -97,6 +97,7 @@ loader-style aggregators in all four domains; not cheap, and the size win (about
 ## Open items
 
 - Read-only documents: the host falls back to G3 for `writable:false` (B5 decision 1); the frame has no read-only mode.
-- No draft recovery on the web (B5 decision 3), no autosave (C10).
+- Draft recovery: encrypted IndexedDB copy while dirty, Restore/Discard on reopen (C15(3)/C18, supersedes B5
+  decision 3; [draft-recovery.md](draft-recovery.md)); still no autosave (C10).
 - Second-screen audience window (v2), external linked media playback (hidden), server-side print-quality PDF (not needed in v1).
 - Clipboard read needs a user gesture and permission in the browser; `clipboardExternal` degrades to text / none.
