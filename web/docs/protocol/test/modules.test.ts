@@ -9,6 +9,7 @@ import {
   PROTOCOL_VERSION,
   checkFrameModule,
   isInitPayload,
+  isInitRecovery,
   isOfficeModule,
   isReadyPayload,
   moduleOf,
@@ -223,5 +224,29 @@ describe('additive fields for the modules (GO-B4)', () => {
     const session = await client.whenInitialized()
     expect(session.user).toEqual({ displayName: 'Lan' })
     expect(session.open?.assets).toEqual({ 'img/a.png': '/x/a' })
+  })
+
+  it('init.recovery carries a CryptoKey and a non-empty scope (C18)', async () => {
+    const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, [
+      'encrypt',
+      'decrypt',
+    ])
+    expect(isInitPayload({ ...init, recovery: { key, scope: 'u1:d1' } })).toBe(true)
+    expect(isInitPayload({ ...init, recovery: { key, scope: '' } })).toBe(false)
+    expect(isInitPayload({ ...init, recovery: { key: 'k', scope: 'u1:d1' } })).toBe(false)
+    expect(isInitPayload({ ...init, recovery: { scope: 'u1:d1' } })).toBe(false)
+    expect(isInitRecovery({ key, scope: 'u1:d1' })).toBe(true)
+  })
+
+  it('the frame session carries recovery through structured clone', async () => {
+    const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, [
+      'encrypt',
+      'decrypt',
+    ])
+    const getInit = vi.fn(async () => baseInit({ recovery: { key, scope: 'u1:d1' } }))
+    const { client } = setup({ getInit }, {})
+    const session = await client.whenInitialized()
+    expect(session.recovery?.scope).toBe('u1:d1')
+    expect(session.recovery?.key).toBeInstanceOf(CryptoKey)
   })
 })

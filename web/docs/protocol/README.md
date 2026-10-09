@@ -41,7 +41,7 @@ gets no `init` within its retry budget (40 × 500 ms), or is opened top-level (`
 
 | type             | kind    | payload → result                                                                                                                                                                                                             |
 | ---------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `init`           | request | `InitPayload` {protocolVersion, token, tokenExpiresAt, documentId, workspaceId, apiBase, apiMode, locale, theme, capabilities, open?, module?, user?} → `InitAck` {protocolVersion, frameVersion?, capabilities (effective)} |
+| `init`           | request | `InitPayload` {protocolVersion, token, tokenExpiresAt, documentId, workspaceId, apiBase, apiMode, locale, theme, capabilities, open?, module?, user?, recovery?} → `InitAck` {protocolVersion, frameVersion?, capabilities (effective)} |
 | `open`           | request | `OpenPayload` {file: FileMeta, source: {kind:'url', url} \| {kind:'bytes', data}, assets?} → {opened, title?}                                                                                                                |
 | `save`           | request | {reason: 'user' \| 'navigate' \| 'autosave'} → `SaveResult`                                                                                                                                                                  |
 | `saveAs`         | request | {name?} → `SaveResult`                                                                                                                                                                                                       |
@@ -140,6 +140,23 @@ One protocol serves every genoffice editor on the web (lane GO-B4/B5/B6, UNI-101
   save. Hosts never send `save {reason: 'autosave'}`; web bridges never set `api.save.auto`; every module's
   autosave capability is false on the web and its UI hidden. The `autosave` / `auto` values stay in the types for
   wire compatibility only.
+
+### Draft recovery (`init.recovery`, CONTRACT C18)
+
+- `init.recovery?: {key: CryptoKey, scope: string}` (`InitRecovery`, `isInitRecovery()`): the host's grant for
+  local draft copies. `key` is an AES-GCM 256 key the host generates per signed-in session with
+  `extractable: false` and holds in memory only; it reaches the frame by structured clone (again in a later
+  `init` after a frame reload). `scope` is `"<userId>:<documentId>"`, opaque to the frame. Absent = recovery off:
+  the frame writes nothing and shows nothing. `FrameSession.recovery` carries a copy.
+- Frame side (`web/docs/bridge/draft-recovery.ts`, used by Docs and every module bridge): while the document is
+  dirty, every 30 s and on `pagehide`, the frame writes `{iv, ciphertext, baseEtag, savedAt, module, name}`
+  (ciphertext = AES-GCM of the document's current bytes) into IndexedDB database `uniwork-office-frame-drafts`,
+  store `drafts`, key `scope + ":" + baseEtag` (overwrite). A successful save or an explicit Discard deletes the
+  record. On open, a record for the same scope (same etag, or an older etag labelled as based on an older
+  version) is decrypted and offered as Restore / Discard; Restore loads the bytes as a dirty document (the user
+  must save). A record that does not decrypt (another session's key) is deleted silently.
+- Drafts never leave the browser: no `api.save` (and never `auto`), no version, no host message (C10 holds).
+  The host deletes the whole database on sign-out / session switch.
 
 ## Origin model
 
