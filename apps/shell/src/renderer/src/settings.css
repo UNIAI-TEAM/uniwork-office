@@ -1625,3 +1625,32 @@
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
+
+/* UniWork cloud AI (Settings → Account rows, AI media notice) */
+.cloud-notice {
+  margin-bottom: 12px;
+}
+
+.cloud-notice .acct-notice-text {
+  flex: 1;
+}
+
+.cloud-notice-action {
+  flex-shrink: 0;
+  align-self: center;
+}
+
+.cloud-state.credits-exhausted,
+.cloud-state.unavailable {
+  color: var(--danger-text);
+}
+
+.cloud-state.not-entitled,
+.cloud-renews {
+  color: var(--text-secondary);
+}
+
+.cloud-renews {
+  margin-left: 8px;
+  font-size: 12px;
+}
