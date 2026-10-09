@@ -690,6 +690,18 @@ html.genoffice-popover-open .ribbon-tabs {
   margin: 2px 6px;
 }
 
+/* narrow windows (and the ~940px web frame inside UniWork at 1024px): tighter
+   separators buy the Styles gallery room for a whole card + its expander */
+@media (max-width: 1100px) {
+  .ribbon-sep {
+    margin: 2px 3px;
+  }
+
+  .ribbon-group {
+    padding: 2px 3px;
+  }
+}
+
 .ribbon-placeholder {
   align-self: center;
   color: var(--text-dim);
