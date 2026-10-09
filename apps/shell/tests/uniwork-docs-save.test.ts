@@ -510,6 +510,23 @@ describe('save pipeline', () => {
     expect(readFileSync(path, 'utf8')).toBe('v4')
   })
 
+  it('a reopen after a 403 follows the server: still view stays view, edit again unblocks', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'v4')
+    server.faults.push({ route: 'commit', kind: 403, code: 'forbidden' })
+    await ctx.service.save(path)
+    server.state.myLevel = 'view'
+    await openDoc(ctx)
+    expect(binding(path)).toMatchObject({ access: 'view', state: 'blocked' })
+    expect(readFileSync(path, 'utf8')).toBe('v4')
+    server.state.myLevel = 'edit'
+    await openDoc(ctx)
+    expect(binding(path)).toMatchObject({ access: 'edit', state: 'dirty' })
+    expect(await ctx.service.save(path)).toMatchObject({ state: 'saved' })
+  })
+
   it('a view-only document never reaches the network', async () => {
     const server = fakeServer({ bytes: enc('v3'), myLevel: 'view' })
     const ctx = setup(server)

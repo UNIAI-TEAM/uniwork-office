@@ -382,10 +382,14 @@ export class UniworkDocsService {
           this.deps.isPathOpen(local)
         const current = historical || existing.baseRevision === detail.revision
         if (keepLocal || current) {
-          // a forbidden save already downgraded access; the server never upgrades it here
-          const keptAccess: UniworkDocAccess =
-            existing.state === 'blocked' && existing.error === 'forbidden' ? 'view' : access
-          const binding: Binding = { ...existing, title: detail.title, access: keptAccess }
+          // permissions come from the server: a save refused with 403 left the
+          // copy view-only; once the server grants edit again, its local work
+          // can be saved (dirty), otherwise it stays view-only
+          const binding: Binding = { ...existing, title: detail.title, access }
+          if (existing.state === 'blocked' && existing.error === 'forbidden' && access === 'edit') {
+            binding.state = 'dirty'
+            delete binding.error
+          }
           await this.store.write(dir, binding)
           return this.show(local, binding)
         }
