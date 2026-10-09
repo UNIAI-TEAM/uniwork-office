@@ -1,6 +1,8 @@
 import { test, expect, type Page } from '@playwright/test'
+import { randomBytes } from 'node:crypto'
 import { existsSync } from 'node:fs'
-import { readdir, readFile, stat } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, readFile, stat, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { closeAndSaveVideo, handoffUrlToRunningApp, launchShell, type LaunchedApp } from './helpers'
 import {
@@ -55,8 +57,13 @@ async function deliverCallback(
  * process starts, so every later write carries the same key.
  */
 async function waitForSafeStorageKeyOnDisk(launched: LaunchedApp): Promise<void> {
+  const localState = join(launched.userDataDir, 'Local State')
   await expect
-    .poll(() => existsSync(join(launched.userDataDir, 'Local State')), { timeout: 30_000 })
+    .poll(
+      async () =>
+        existsSync(localState) && (await readFile(localState, 'utf8')).includes('encrypted_key'),
+      { timeout: 30_000 },
+    )
     .toBe(true)
 }
 
@@ -83,14 +90,23 @@ async function visibleSecrets(page: Page): Promise<string> {
   )
 }
 
-/** top-level userData files (settings, credential store); Chromium cache dirs are skipped */
-async function userDataTopLevelText(dir: string): Promise<string> {
+const sessionFile = (userDataDir: string) => join(userDataDir, 'uniwork-auth', 'session.bin')
+
+/**
+ * Top-level userData files (settings) plus the credential store directory;
+ * Chromium cache dirs are skipped.
+ */
+async function userDataText(dir: string): Promise<string> {
   const parts: string[] = []
-  for (const name of await readdir(dir)) {
-    const file = join(dir, name)
-    const info = await stat(file)
-    if (!info.isFile() || info.size > 2_000_000) continue
-    parts.push((await readFile(file)).toString('latin1'))
+  for (const sub of ['', 'uniwork-auth']) {
+    const base = join(dir, sub)
+    if (!existsSync(base)) continue
+    for (const name of await readdir(base)) {
+      const file = join(base, name)
+      const info = await stat(file)
+      if (!info.isFile() || info.size > 2_000_000) continue
+      parts.push((await readFile(file)).toString('latin1'))
+    }
   }
   return parts.join('\n')
 }
@@ -111,9 +127,10 @@ test.describe('UniWork account sign-in', () => {
       // the attempt used the dev channel's registered redirect and a fresh S256 challenge
       expect(stub.lastAttempt()?.redeemed).toBe(true)
 
-      // profile: sidebar sub-line, then the Account pane in Settings
+      // profile: sidebar (plan on the sub-line, organization in the tooltip), then Settings
       await expect(accountButton(page)).toContainText(STUB_ACCOUNT.displayName)
-      await expect(accountButton(page)).toContainText(STUB_ORG.name)
+      await expect(accountButton(page)).toContainText(STUB_PLAN.name)
+      await expect(accountButton(page)).toHaveAttribute('data-tip', new RegExp(STUB_ORG.name))
       await accountButton(page).click()
       const pane = page.locator('.acct-pane')
       await expect(pane).toHaveAttribute('data-state', 'signed-in')
@@ -122,11 +139,13 @@ test.describe('UniWork account sign-in', () => {
       await expect(pane).toContainText(STUB_ORG.name)
       await expect(pane).toContainText(STUB_PLAN.name)
 
-      // no credential string reaches the renderer or the plain-text settings files
+      // no credential string (tokens, code, PKCE verifier, state) reaches the
+      // renderer, the settings files or the credential store in plaintext
       const secrets = stub.issuedSecrets()
-      expect(secrets.length).toBeGreaterThan(2)
+      expect(secrets.length).toBeGreaterThan(4)
+      expect(existsSync(sessionFile(launched.userDataDir))).toBe(true)
       const rendered = await visibleSecrets(page)
-      const files = await userDataTopLevelText(launched.userDataDir)
+      const files = await userDataText(launched.userDataDir)
       for (const secret of secrets) {
         expect(rendered, 'renderer DOM/storage').not.toContain(secret)
         expect(files, 'userData files').not.toContain(secret)
@@ -136,6 +155,8 @@ test.describe('UniWork account sign-in', () => {
       await pane.getByRole('button', { name: 'Sign out' }).click()
       await expect(accountButton(page)).toHaveAttribute('data-state', 'signed-out')
       await expect(pane).toHaveAttribute('data-state', 'signed-out')
+      // local first: the stored credential is gone
+      expect(existsSync(sessionFile(launched.userDataDir))).toBe(false)
       // the device revoke goes out after the local sign-out (it never blocks it)
       await expect.poll(() => stub.logoutCalls()).toBe(1)
     } finally {
@@ -179,6 +200,50 @@ test.describe('UniWork account sign-in', () => {
       await expect(accountButton(page)).not.toContainText(STUB_ACCOUNT.displayName)
     } finally {
       await closeAndSaveVideo(second, 'uniwork-signin-revoked-b')
+      await stub.close()
+    }
+  })
+
+  test('a stored sign-in this computer cannot decrypt offers retry and sign in again', async () => {
+    test.setTimeout(90_000)
+    const stub = await startUniworkAuthStub()
+    // bytes no key on this machine can open (e.g. written under an older OS key)
+    const userDataDir = await mkdtemp(join(tmpdir(), 'genoffice-e2e-'))
+    await mkdir(join(userDataDir, 'uniwork-auth'), { recursive: true })
+    await writeFile(sessionFile(userDataDir), randomBytes(256))
+    const launched = await launchShell({
+      userDataDir,
+      onboardingSeen: true,
+      videoDir: 'uniwork-signin-keyring',
+      env: shellEnv(stub),
+    })
+    try {
+      const { page } = launched
+      await expect(accountButton(page)).toHaveAttribute('data-state', 'keyring-unavailable', {
+        timeout: 30_000,
+      })
+      await accountButton(page).click()
+      const pane = page.locator('.acct-pane')
+      await expect(pane).toHaveAttribute('data-state', 'keyring-unavailable')
+
+      // Retry reads the file again: still unreadable, and it is kept
+      await pane.getByRole('button', { name: 'Retry' }).click()
+      await expect(pane).toHaveAttribute('data-state', 'keyring-unavailable')
+      expect(existsSync(sessionFile(userDataDir))).toBe(true)
+      expect(stub.refreshCalls()).toBe(0)
+
+      // Sign in again replaces it with a credential this machine can read
+      await pane.getByRole('button', { name: 'Sign in again' }).click()
+      await expect(accountButton(page)).toHaveAttribute('data-state', 'signing-in')
+      await expect.poll(() => stub.lastAttempt()?.state ?? '').not.toBe('')
+      if (process.platform !== 'darwin') await waitForSafeStorageKeyOnDisk(launched)
+      await deliverCallback(launched, shellEnv(stub), stub.approve())
+      await expect(accountButton(page)).toHaveAttribute('data-state', 'signed-in', {
+        timeout: 30_000,
+      })
+      await expect(pane).toContainText(STUB_PLAN.name)
+    } finally {
+      await closeAndSaveVideo(launched, 'uniwork-signin-keyring')
       await stub.close()
     }
   })

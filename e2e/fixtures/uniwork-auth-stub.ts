@@ -53,7 +53,7 @@ export interface UniworkAuthStub {
   refreshCalls(): number
   /** what refresh answers: a rotated session, or a 401 with that error code */
   setRefreshBehavior(mode: StubRefreshMode): void
-  /** every secret the stub ever issued (access/refresh tokens, codes) */
+  /** every secret the stub issued or saw (tokens, codes, PKCE verifiers, attempt states) */
   issuedSecrets(): string[]
   close(): Promise<void>
 }
@@ -67,6 +67,9 @@ export async function startUniworkAuthStub(): Promise<UniworkAuthStub> {
   const codes = new Map<string, StubAttempt>()
   const secrets: string[] = []
   const accessTokens = new Set<string>()
+  /** access tokens of a revoked device: the server answers device_revoked */
+  const revokedAccess = new Set<string>()
+  let deviceRevoked = false
   let refreshToken = ''
   let deviceSessionId = ''
   let logouts = 0
@@ -104,9 +107,19 @@ export async function startUniworkAuthStub(): Promise<UniworkAuthStub> {
     }
   }
 
-  const authed = (req: IncomingMessage): boolean => {
+  /** logout, refresh reuse: the whole device family dies, as on the server */
+  const revokeDevice = (): void => {
+    deviceRevoked = true
+    for (const token of accessTokens) revokedAccess.add(token)
+    accessTokens.clear()
+  }
+
+  /** null when the bearer token is live, else the error code the server sends */
+  const bearerError = (req: IncomingMessage): string | null => {
     const header = req.headers.authorization ?? ''
-    return header.startsWith('Bearer ') && accessTokens.has(header.slice(7))
+    const token = header.startsWith('Bearer ') ? header.slice(7) : ''
+    if (accessTokens.has(token)) return null
+    return revokedAccess.has(token) ? 'device_revoked' : 'unauthorized'
   }
 
   async function readJson(req: IncomingMessage): Promise<Record<string, unknown>> {
@@ -143,6 +156,7 @@ export async function startUniworkAuthStub(): Promise<UniworkAuthStub> {
       redeemed: false,
     }
     attempts.push(attempt)
+    secrets.push(attempt.state)
     send(res, 200, {
       authorization_url: `${origin}/auth/desktop/authorize?attempt=${attempt.id}`,
       attempt_expires_at: new Date(Date.now() + 600_000).toISOString(),
@@ -152,6 +166,7 @@ export async function startUniworkAuthStub(): Promise<UniworkAuthStub> {
   function exchange(body: Record<string, unknown>, res: ServerResponse): void {
     const attempt = typeof body.code === 'string' ? codes.get(body.code) : undefined
     const verifier = typeof body.code_verifier === 'string' ? body.code_verifier : ''
+    if (verifier) secrets.push(verifier)
     const valid =
       attempt &&
       !attempt.redeemed &&
@@ -163,6 +178,7 @@ export async function startUniworkAuthStub(): Promise<UniworkAuthStub> {
     if (!attempt || !valid) return fail(res, 401, 'auth_code_invalid')
     attempt.redeemed = true
     deviceSessionId = `dev_${b64url(randomBytes(9))}`
+    deviceRevoked = false
     send(res, 200, session())
   }
 
@@ -179,22 +195,32 @@ export async function startUniworkAuthStub(): Promise<UniworkAuthStub> {
       const body = await readJson(req)
       refreshes += 1
       if (refreshMode !== 'ok') return fail(res, 401, refreshMode)
-      if (body.device_session_id !== deviceSessionId || body.deployment_id !== STUB_DEPLOYMENT_ID) {
-        return fail(res, 401, 'unauthorized')
+      if (
+        deviceRevoked ||
+        body.device_session_id !== deviceSessionId ||
+        body.deployment_id !== STUB_DEPLOYMENT_ID
+      ) {
+        return fail(res, 401, 'device_revoked')
       }
-      if (body.refresh_token !== refreshToken) return fail(res, 401, 'refresh_reused')
+      if (body.refresh_token !== refreshToken) {
+        revokeDevice()
+        return fail(res, 401, 'refresh_reused')
+      }
       return send(res, 200, session())
     }
     if (req.method === 'POST' && route === '/auth/desktop/logout') {
-      if (!authed(req)) return fail(res, 401, 'unauthorized')
+      const denied = bearerError(req)
+      if (denied) return fail(res, 401, denied)
       const body = await readJson(req)
       if (body.scope !== 'device' || body.device_session_id !== deviceSessionId) {
         return fail(res, 400, 'invalid_request')
       }
       logouts += 1
+      revokeDevice()
       return send(res, 200, { status: 'ok' })
     }
-    if (!authed(req)) return fail(res, 401, 'unauthorized')
+    const denied = bearerError(req)
+    if (denied) return fail(res, 401, denied)
     if (req.method === 'GET' && route === '/me') {
       return send(res, 200, {
         user: {
