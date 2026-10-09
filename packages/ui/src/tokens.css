@@ -43,6 +43,9 @@
   --success: #107c41;
   --success-bg: #eaf7ef;
   --success-border: #c8e8d4;
+  --warning-text: #8a5300;
+  --warning-bg: #fff4e0;
+  --warning-border: #f2d9a6;
   --color-bg-overlay: rgb(0 0 0 / 50%);
   --shadow-modal-strong: 0 20px 25px rgb(0 0 0 / 10%);
   --shadow-btn-hover: 0 2px 8px rgb(35 36 37 / 15%);
@@ -120,6 +123,9 @@
   --success: #52c082;
   --success-bg: #20342a;
   --success-border: #33543f;
+  --warning-text: #f0b95a;
+  --warning-bg: #3a2f1a;
+  --warning-border: #5a4a28;
   --color-bg-overlay: rgb(0 0 0 / 60%);
   --shadow-modal-strong: 0 20px 25px rgb(0 0 0 / 30%);
   --shadow-btn-hover: 0 2px 8px rgb(0 0 0 / 50%);
@@ -181,6 +187,9 @@
     --success: #52c082;
     --success-bg: #20342a;
     --success-border: #33543f;
+    --warning-text: #f0b95a;
+    --warning-bg: #3a2f1a;
+    --warning-border: #5a4a28;
     --color-bg-overlay: rgb(0 0 0 / 60%);
     --shadow-modal-strong: 0 20px 25px rgb(0 0 0 / 30%);
     --shadow-btn-hover: 0 2px 8px rgb(0 0 0 / 50%);

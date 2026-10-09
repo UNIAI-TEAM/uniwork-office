@@ -11,12 +11,14 @@ import {
 } from '@genoffice/i18n'
 import { strings } from './strings'
 import { accountStrings } from './i18n/strings-account'
+import { uniworkDocumentStrings } from './i18n/strings-uniwork-documents'
 
-export type StringKey = keyof typeof strings.zh | keyof typeof accountStrings.zh
+export type StringKey =
+  keyof typeof strings.zh | keyof typeof accountStrings.zh | keyof typeof uniworkDocumentStrings.zh
 
 // the home table plus the sharded domains (each shard type-checks its own key set)
 const dicts = Object.fromEntries(
-  LANGS.map((l) => [l, { ...strings[l], ...accountStrings[l] }]),
+  LANGS.map((l) => [l, { ...strings[l], ...accountStrings[l], ...uniworkDocumentStrings[l] }]),
 ) as unknown as LangDicts<Record<StringKey, string>>
 
 const translate = createI18n(dicts)

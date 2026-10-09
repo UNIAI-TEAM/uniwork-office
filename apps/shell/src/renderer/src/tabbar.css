@@ -398,3 +398,160 @@ body.overlay-title-bar .tab-bar-drag-spacer {
   padding: 1px 4px;
   outline: none;
 }
+
+/* ── UniWork: save-state chip, launch notice, bound-tab marker ── */
+
+.uw-chrome {
+  -webkit-app-region: no-drag;
+  align-self: center;
+  display: flex;
+  align-items: center;
+  flex: 0 1 auto;
+  gap: 6px;
+  min-width: 0;
+  max-width: 55%;
+  margin-left: 6px;
+}
+
+.uw-chrome:empty {
+  display: none;
+}
+
+.uw-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+  height: 26px;
+  padding: 0 4px 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1;
+}
+
+.uw-pill-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.uw-pill-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.uw-pill-dot {
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.uw-pill[data-tone='ok'] {
+  border-color: var(--success-border);
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.uw-pill[data-tone='warn'] {
+  border-color: var(--warning-border);
+  background: var(--warning-bg);
+  color: var(--warning-text);
+}
+
+.uw-pill[data-tone='error'] {
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+
+.uw-pill-action,
+.uw-pill-close {
+  flex-shrink: 0;
+  height: 20px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.uw-pill-action {
+  padding: 0 8px;
+  text-decoration: underline;
+}
+
+.uw-pill-close {
+  display: grid;
+  place-items: center;
+  width: 20px;
+}
+
+.uw-pill-action:hover:not(:disabled),
+.uw-pill-close:hover {
+  background: var(--hover);
+}
+
+.uw-pill-action:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.uw-pill-action:focus-visible,
+.uw-pill-close:focus-visible {
+  outline: 2px solid var(--color-border-brand);
+  outline-offset: 1px;
+}
+
+.uw-spinner {
+  flex-shrink: 0;
+  animation: uw-tab-spin 0.9s linear infinite;
+}
+
+@keyframes uw-tab-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .uw-spinner {
+    animation: none;
+  }
+}
+
+.tab-icon {
+  position: relative;
+}
+
+.uw-tab-marker {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  width: 8px;
+  height: 8px;
+  border: 1.5px solid var(--surface);
+  border-radius: 50%;
+  background: var(--text-secondary);
+}
+
+.uw-tab-marker[data-tone='ok'] {
+  background: var(--success);
+}
+
+.uw-tab-marker[data-tone='warn'] {
+  background: var(--warning-text);
+}
+
+.uw-tab-marker[data-tone='error'] {
+  background: var(--danger);
+}
