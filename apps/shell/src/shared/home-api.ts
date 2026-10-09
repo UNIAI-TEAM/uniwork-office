@@ -342,6 +342,14 @@ export interface HomeApi {
   openLoginUrl(): Promise<void>
   /** log out (clears any leftover local auth material) */
   accountLogout(): Promise<void>
+  /** account status pushes (every state change); returns an unsubscribe */
+  onAccountStatus(handler: (status: AccountStatus) => void): () => void
+  /** abandon the pending sign-in attempt (state -> signed-out) */
+  accountCancelLogin(): Promise<void>
+  /** retry after server-unreachable (refresh + profile reload); resolves with the new status */
+  accountRetry(): Promise<AccountStatus>
+  /** choose the active organization (persists uniworkOrgId, reloads entitlements) */
+  accountSelectOrg(orgId: string): Promise<AccountStatus>
   /** Editor AI “Buy AI plan” → open Settings section (e.g. account); unsubscribe returned */
   onOpenSettingsEvent?(handler: (section: string) => void): () => void
   /** app version (from package.json / electron app.getVersion) */
@@ -485,19 +493,92 @@ export interface AiCatalogEntry extends AiProviderMeta {
   defaultBaseUrl: string
 }
 
-export interface AccountStatus {
-  /** UniWork desktop session present (web Sign-in link used until sync lands) */
-  loggedIn: boolean
-  email?: string
+export type AccountState =
+  | 'not-configured'
+  | 'signed-out'
+  | 'signing-in'
+  | 'signed-in'
+  | 'refreshing'
+  | 'session-expired'
+  | 'session-revoked'
+  | 'server-unreachable'
+  | 'wrong-deployment'
+  | 'keyring-unavailable'
+
+export type AccountErrorCode =
+  | 'network'
+  | 'timeout'
+  | 'login_timeout'
+  | 'cancelled'
+  | 'invalid_callback'
+  | 'state_mismatch'
+  | 'auth_code_invalid'
+  | 'rate_limited'
+  | 'unauthorized'
+  | 'device_revoked'
+  | 'refresh_reused'
+  | 'wrong_deployment'
+  | 'not_configured'
+  | 'keyring_unavailable'
+  | 'server_error'
+  | 'malformed_response'
+
+export interface AccountProfile {
+  accountId: string
+  email: string
+  displayName: string
+  avatarUrl?: string
 }
 
-/** login flow progress pushed from main (UniWork Sign-in URL open) */
+export interface AccountOrg {
+  id: string
+  name: string
+  slug: string
+  role: string
+}
+
+export interface AccountEntitlement {
+  featureKey: string
+  name: string
+  kind: 'flag' | 'quota'
+  enabled: boolean
+  quotaLimit: number | null
+  currentUsage: number
+  unit?: string
+}
+
+export interface AccountEntitlements {
+  orgId: string
+  planCode: string
+  planName: string
+  /** subscription status as issued by the server (e.g. active, trialing, past_due) */
+  status: string
+  features: AccountEntitlement[]
+  /** epoch ms when main fetched them */
+  fetchedAt: number
+}
+
+export interface AccountStatus {
+  /** true only in states signed-in / refreshing (kept for existing callers) */
+  loggedIn: boolean
+  /** profile email when known (kept for existing callers) */
+  email?: string
+  state: AccountState
+  profile?: AccountProfile
+  org?: AccountOrg
+  orgs?: AccountOrg[]
+  entitlements?: AccountEntitlements | null
+  /** API origin of the active deployment profile (display only, e.g. "uniwork.app") */
+  serverOrigin?: string
+  error?: AccountErrorCode
+}
+
+/** login flow progress pushed from main */
 export interface AccountLoginEvent {
   phase: 'launched' | 'url' | 'success' | 'error'
   url?: string
   expiresInSec?: number
-  /** 'network' | 'expired' | error text */
-  error?: string
+  error?: AccountErrorCode
 }
 
 /** Serializable Agent Intent (PWA / Hub → desktop Workbench router). */
@@ -835,6 +916,10 @@ export const HOME_CHANNELS = {
   openSettings: 'home:open-settings',
   accountLoginOpenUrl: 'home:account-login-open-url',
   accountLogout: 'home:account-logout',
+  accountStatusEvent: 'home:account-status-event',
+  accountCancelLogin: 'home:account-cancel-login',
+  accountRetry: 'home:account-retry',
+  accountSelectOrg: 'home:account-select-org',
   /** Main → shell renderer: open Settings to a section (from editor AI billing CTA). */
   openSettingsEvent: 'home:open-settings-event',
   getAppVersion: 'home:get-app-version',

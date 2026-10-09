@@ -475,8 +475,26 @@ body.vib .home {
 }
 
 .account-avatar.logged-in {
-  background: linear-gradient(135deg, #3d7ff5, #1b58cf);
-  color: #fff;
+  background: var(--accent);
+  color: var(--surface);
+  font-size: 12px;
+}
+
+.account-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* attention states (expired, revoked, unreachable, …): small dot on the avatar */
+.account-state-dot {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 2px solid var(--chrome-bg);
+  background: var(--danger);
 }
 
 .account-avatar.waiting {
@@ -534,8 +552,19 @@ body.vib .home {
   white-space: nowrap;
 }
 
-.account-sub.error {
-  color: #b3261e;
+.account-name.wrap,
+.account-sub.wrap {
+  /* state copy (vi runs long) wraps instead of being cut at the sidebar width */
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.account-sub.warn {
+  color: var(--danger);
+}
+
+.account-sub.refreshing {
+  opacity: 0.7;
 }
 
 /* ---- Agent Intent (PWA / Hub → on-device Workbench) ---- */
