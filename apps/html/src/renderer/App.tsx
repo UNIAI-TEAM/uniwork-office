@@ -1113,7 +1113,6 @@ export default function App() {
   const doSave = useCallback(
     async (mode: SaveMode, suggestedName?: string, origin?: 'auto'): Promise<boolean> => {
       if (statusRef.current !== 'ready') return false
-      if (mode === 'save' && uniworkRef.current.readOnly) return false
       // uncommitted live style pokes belong to the document being saved
       flushPending()
       // a menu save or ⌘S during an autosave queues behind it instead of being dropped;

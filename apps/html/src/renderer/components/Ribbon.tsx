@@ -206,6 +206,8 @@ export function Ribbon(p: Props) {
 
   const notReady = p.disabled
   const off = notReady || !!p.readOnly
+  // a view-only copy can still be searched (the find panel itself stays read-only)
+  const findOff = notReady
   const insertOff = off || !p.canInsert
 
   return (
@@ -260,7 +262,7 @@ export function Ribbon(p: Props) {
           className="qa-btn"
           data-tip={t('findTip')}
           aria-label={t('findTip')}
-          disabled={off}
+          disabled={findOff}
           onMouseDown={(e) => e.preventDefault()}
           onClick={p.onFind}
         >

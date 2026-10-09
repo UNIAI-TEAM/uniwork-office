@@ -823,8 +823,11 @@ function registerMarkdownIpc(): void {
           mcp,
         })
         if (!uniwork.write) {
-          // AutoSave never writes a UniWork copy; a view-only copy is never written
-          if (request.origin === 'auto') return done({ ok: true, canceled: true })
+          // AutoSave never writes a UniWork copy; a view-only copy is never written.
+          // An in-place Save of one ends quietly (the renderer lets main decide, so an
+          // agent save to another path still works); a Save As onto it says why.
+          if (request.origin === 'auto' || mode === 'save')
+            return done({ ok: true, canceled: true })
           return done({ ok: false, error: 'markdown: this document is view only' })
         }
         const imageSources = [...(request.imageSources ?? [])]

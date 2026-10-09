@@ -253,7 +253,9 @@ export function Ribbon({
   // editor-shaped commands stand down while the pane hides the selection;
   // Save As never does, and Find only while the source view hides its target
   const off = disabled || sourceMode || sourceViewOpen || !editor || !state
-  const findOff = disabled || sourceViewOpen
+  // a view-only copy can still be read: Find, the outline, spellcheck and the
+  // (read-only) properties stay on; everything that edits or saves goes off
+  const findOff = notReady || sourceViewOpen
 
   const openLink = () => {
     if (!editor) return
@@ -572,7 +574,7 @@ export function Ribbon({
               <IconBtn
                 title={t('fmProperties')}
                 active={frontmatterOpen}
-                disabled={disabled}
+                disabled={notReady}
                 onClick={onToggleFrontmatter}
               >
                 <IconProperties size={ICON} />
@@ -582,7 +584,7 @@ export function Ribbon({
               <IconBtn
                 title={t('outline')}
                 active={outlineOpen}
-                disabled={disabled || (!hasOutline && !outlineOpen)}
+                disabled={notReady || (!hasOutline && !outlineOpen)}
                 onClick={onToggleOutline}
               >
                 <IconOutlineView size={ICON} />
@@ -591,7 +593,7 @@ export function Ribbon({
             <IconBtn
               title={t('spellcheck')}
               active={spellcheck}
-              disabled={disabled}
+              disabled={notReady}
               onClick={onToggleSpellcheck}
             >
               <IconSpellcheck size={ICON} />

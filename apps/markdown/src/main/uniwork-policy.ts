@@ -42,6 +42,19 @@ export function uniworkIsReadOnly(path: string | null | undefined): boolean {
   }
 }
 
+/** Same file, ignoring separators and (on Windows) letter case, so a dialog pick of the open file matches. */
+export function uniworkSamePath(
+  a: string | null | undefined,
+  b: string | null | undefined,
+): boolean {
+  if (!a || !b) return false
+  const norm = (p: string): string => {
+    const r = resolve(p)
+    return process.platform === 'win32' ? r.toLowerCase() : r
+  }
+  return norm(a) === norm(b)
+}
+
 /** Called once after an explicit user Save wrote bytes to `path` (never autosave/save-as). */
 export function notifyUniworkUserSave(path: string): void {
   if (!userSaveHook) return
@@ -67,7 +80,8 @@ export interface UniworkSaveInput {
 
 /**
  * Whether a save may write `targetPath`, and whether it counts as the user's
- * explicit Save of the document they already had open. A view-only UniWork
+ * explicit Save of the document they already had open (a Save As onto its own
+ * file counts). A view-only UniWork
  * copy is never written; a bound copy is never written by autosave.
  */
 export function uniworkSaveDecision(input: UniworkSaveInput): {
@@ -78,9 +92,9 @@ export function uniworkSaveDecision(input: UniworkSaveInput): {
   if (uniworkIsReadOnly(input.targetPath)) return { write: false, fireHook: false }
   if (origin === 'auto' && uniworkIsBound(input.targetPath))
     return { write: false, fireHook: false }
-  const samePath = !!input.currentPath && resolve(input.currentPath) === resolve(input.targetPath)
+  const samePath = uniworkSamePath(input.currentPath, input.targetPath)
   return {
     write: true,
-    fireHook: origin === 'user' && !input.mcp && input.mode === 'save' && samePath,
+    fireHook: origin === 'user' && !input.mcp && samePath,
   }
 }

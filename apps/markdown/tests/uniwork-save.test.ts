@@ -157,6 +157,17 @@ describe('markdown UniWork user-save hook', () => {
     expect(hook).not.toHaveBeenCalled()
   })
 
+  it('fires once for a Save As that picks the open file itself', async () => {
+    const { path, contents } = await openDocument()
+    showSaveDialogWithMemory.mockResolvedValue({ canceled: false, filePath: path })
+    const hook = vi.fn()
+    setMarkdownUserSaveHook(hook)
+    await expect(save(contents, { mode: 'saveAs' })).resolves.toMatchObject({ ok: true, path })
+    expect(await readFile(path, 'utf8')).toBe('new')
+    expect(hook).toHaveBeenCalledTimes(1)
+    expect(hook).toHaveBeenCalledWith(path)
+  })
+
   it('does not fire for an agent save-to-path', async () => {
     const { path, contents } = await openDocument()
     const hook = vi.fn()
@@ -194,7 +205,12 @@ describe('markdown bound and view-only UniWork copies', () => {
     bindPolicy(path, true)
     const hook = vi.fn()
     setMarkdownUserSaveHook(hook)
-    await expect(save(contents, {})).resolves.toMatchObject({ ok: false })
+    // an in-place Save ends quietly (the renderer leaves the decision to main)
+    await expect(save(contents, {})).resolves.toEqual({ ok: true, canceled: true })
+    expect(await readFile(path, 'utf8')).toBe('old')
+    // picking the view-only file itself in Save As is refused with a reason
+    showSaveDialogWithMemory.mockResolvedValue({ canceled: false, filePath: path })
+    await expect(save(contents, { mode: 'saveAs' })).resolves.toMatchObject({ ok: false })
     expect(await readFile(path, 'utf8')).toBe('old')
     expect(hook).not.toHaveBeenCalled()
   })

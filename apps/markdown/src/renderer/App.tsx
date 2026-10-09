@@ -389,6 +389,8 @@ export default function App() {
 
   const onFrontmatterChange = useCallback(
     (inner: string) => {
+      // a view-only UniWork copy has no editable properties (panel, AI, MCP alike)
+      if (uniworkRef.current.readOnly) return
       setFmText(inner)
       envelopeRef.current.frontmatter = buildFrontmatterRaw(inner)
       markDirty()
@@ -403,7 +405,6 @@ export default function App() {
    */
   const doSaveSource = useCallback(async (mode: SaveMode, origin?: 'auto'): Promise<boolean> => {
     if (statusRef.current !== 'ready' || savingRef.current) return false
-    if (mode === 'save' && uniworkRef.current.readOnly) return false
     savingRef.current = true
     setSaveState('saving')
     const textAtSave = sourceTextRef.current
@@ -535,7 +536,6 @@ export default function App() {
       flushSource()
       const current = editorRef.current
       if (!current || statusRef.current !== 'ready' || savingRef.current) return false
-      if (mode === 'save' && uniworkRef.current.readOnly) return false
       savingRef.current = true
       setSaveState('saving')
       try {
@@ -1209,7 +1209,13 @@ export default function App() {
                 ref={scrollRef}
               >
                 <div className="doc-page" style={{ zoom: zoom / 100 }}>
-                  {fmOpen && <FrontmatterPanel value={fmText} onChange={onFrontmatterChange} />}
+                  {fmOpen && (
+                    <FrontmatterPanel
+                      value={fmText}
+                      onChange={onFrontmatterChange}
+                      readOnly={uniwork.readOnly}
+                    />
+                  )}
                   <EditorContent editor={editor} />
                 </div>
               </div>

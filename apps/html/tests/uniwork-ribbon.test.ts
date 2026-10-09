@@ -86,4 +86,13 @@ describe('Ribbon on a UniWork copy', () => {
     expect(saveButton(container).disabled).toBe(true)
     expect(button(container, '另存为…').disabled).toBe(false)
   })
+
+  it('a view-only copy can still be searched, while editing stays off', () => {
+    const { container } = renderRibbon({ uniworkBound: true, readOnly: true })
+    const find = container.querySelector<HTMLButtonElement>(
+      '.ribbon-tabs button[aria-label^="查找和替换"]',
+    )!
+    expect(find.disabled).toBe(false)
+    expect(saveButton(container).disabled).toBe(true)
+  })
 })

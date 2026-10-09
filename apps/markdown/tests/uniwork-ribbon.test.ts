@@ -15,7 +15,12 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-function renderRibbon(extra: { uniworkBound?: boolean; readOnly?: boolean; autoSave?: boolean }) {
+function renderRibbon(extra: {
+  uniworkBound?: boolean
+  readOnly?: boolean
+  autoSave?: boolean
+  hasOutline?: boolean
+}) {
   const editor = new Editor({
     extensions: buildExtensions({
       slashController: { onOpen() {}, onUpdate() {}, onKeyDown: () => false, onClose() {} },
@@ -93,5 +98,20 @@ describe('Ribbon on a UniWork copy', () => {
     const { container } = renderRibbon({ uniworkBound: true, readOnly: true })
     expect(saveButton(container).disabled).toBe(true)
     expect(button(container, '另存为…').disabled).toBe(false)
+  })
+
+  it('a view-only copy can still be read: Find, outline, spelling and properties stay on', () => {
+    const { container } = renderRibbon({ uniworkBound: true, readOnly: true, hasOutline: true })
+    const find = container.querySelector<HTMLButtonElement>(
+      '.ribbon-tabs button[aria-label^="查找和替换"]',
+    )!
+    const body = (label: string) =>
+      container.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)!
+    expect(find.disabled).toBe(false)
+    expect(body('大纲').disabled).toBe(false)
+    expect(body('拼写检查').disabled).toBe(false)
+    expect(body('属性').disabled).toBe(false)
+    // the editable source pane stays off
+    expect(body('源码').disabled).toBe(true)
   })
 })
