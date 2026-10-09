@@ -1508,4 +1508,5 @@ export const cs = {
   appVisualFlipV: 'Převrátit svisle',
   appVisualFlipH: 'Převrátit vodorovně',
   appCtxPasteVisual: 'Vložit obrázek nebo obrazec',
+  appAutoSaveUniworkOff: 'AutoSave is off for UniWork documents. Use Save to save a new version.',
 } satisfies Record<keyof typeof zh, string>

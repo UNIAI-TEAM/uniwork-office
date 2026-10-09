@@ -304,6 +304,9 @@ interface ExcelShellProps {
   /// AutoSave toggle in the tab row (docs/slides parity).
   readonly autoSave: boolean
   readonly onAutoSaveChange: (on: boolean) => void
+  /// Non-null: AutoSave is forced off (UniWork document) — the toggle is
+  /// disabled and shows this tooltip instead.
+  readonly autoSaveLockedTip?: string | null
   /// Non-null while a floating chart is selected in the grid.
   readonly selectedChart: SelectedChartRibbon | null
   /// Non-null while an editable shape is selected (Shape Format tab).
@@ -525,6 +528,7 @@ export function ExcelShell({
   canRedo,
   autoSave,
   onAutoSaveChange,
+  autoSaveLockedTip = null,
   selectedChart,
   selectedShape,
   selectedTable,
@@ -881,14 +885,15 @@ export function ExcelShell({
             <RedoIcon />
           </button>
           <label
-            className={`autosave-toggle ${autoSave ? 'on' : ''}`}
-            data-tip={t('appAutoSaveTip')}
+            className={`autosave-toggle ${autoSave ? 'on' : ''} ${autoSaveLockedTip ? 'disabled' : ''}`}
+            data-tip={autoSaveLockedTip ?? t('appAutoSaveTip')}
           >
             <span className="autosave-knob" />
             <span className="autosave-text">{t('appAutoSave')}</span>
             <input
               type="checkbox"
               checked={autoSave}
+              disabled={autoSaveLockedTip !== null}
               onChange={(e) => onAutoSaveChange(e.target.checked)}
             />
           </label>

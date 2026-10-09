@@ -1553,4 +1553,5 @@ export const es = {
   appVisualFlipV: 'Voltear verticalmente',
   appVisualFlipH: 'Voltear horizontalmente',
   appCtxPasteVisual: 'Pegar imagen o forma',
+  appAutoSaveUniworkOff: 'AutoSave is off for UniWork documents. Use Save to save a new version.',
 } satisfies Record<keyof typeof zh, string>

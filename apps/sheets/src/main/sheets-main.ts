@@ -1,4 +1,10 @@
-import { setUniworkUserSaveHook } from './uniwork-policy'
+import {
+  notifyUniworkUserSave,
+  setUniworkUserSaveHook,
+  uniworkIsBound,
+  uniworkIsReadOnly,
+  uniworkSaveDecision,
+} from './uniwork-policy'
 import { createHash, randomUUID } from 'node:crypto'
 import {
   createReadStream,
@@ -3213,6 +3219,29 @@ export function registerSheetsIpc(): void {
     // on the temp copy and the serialized csvContent is written back to the
     // original .csv afterwards.
     const csvInPlace = request.mode === 'save' && session.csvSourcePath !== undefined
+    // UniWork seam: the file the user knows this workbook as (none yet for an
+    // unsaved new workbook or a converted import, whose first save is a Save As).
+    const documentPath =
+      session.suggestSaveAs !== undefined
+        ? null
+        : (session.csvSourcePath ?? session.restoreTarget ?? session.path)
+    const mcpSave = request.targetPath !== undefined
+    // A plain Save of a read-only document, or AutoSave of a bound one, stops
+    // before any guard or dialog: nothing is written, nothing is reported.
+    if (
+      request.mode === 'save' &&
+      !mcpSave &&
+      documentPath !== null &&
+      !uniworkSaveDecision({
+        mode: 'save',
+        origin: request.origin,
+        documentPath,
+        targetPath: documentPath,
+        mcp: false,
+      }).write
+    ) {
+      return { canceled: true }
+    }
     let targetPath = session.path
     // MCP explicit-path save (planning/mcp-server.md): dialog-free Save As to
     // an exact path with a clobber guard — docs:save-to parity. Only the xlsx
@@ -3298,6 +3327,21 @@ export function registerSheetsIpc(): void {
       }
     }
 
+    // The resolved target (Save As pick, MCP path) gets the same gate: a
+    // read-only UniWork file is never overwritten from here.
+    const userTargetPath = (csvInPlace ? session.csvSourcePath : undefined) ?? targetPath
+    const uniworkDecision = uniworkSaveDecision({
+      mode: request.mode,
+      origin: request.origin,
+      documentPath,
+      targetPath: userTargetPath,
+      mcp: mcpSave,
+    })
+    if (!uniworkDecision.write) {
+      if (mcpSave) throw new Error('save target is read-only')
+      return { canceled: true }
+    }
+
     const mutation = await writeWorkbookTo(client, session, request, targetPath)
 
     if (csvInPlace && session.csvSourcePath !== undefined && request.csvContent !== undefined) {
@@ -3376,6 +3420,8 @@ export function registerSheetsIpc(): void {
     // Restored session saved (possibly Save As elsewhere): the unsaved work is
     // persisted, so the original's recovery copy must not re-offer it.
     if (session.restoreTarget !== undefined) clearWorkbookRecovery(session.restoreTarget)
+    // An explicit Save wrote the file this document already was: tell the shell.
+    if (uniworkDecision.fireHook) notifyUniworkUserSave(userTargetPath)
     return { canceled: false, file, touchedEntries: mutation.touchedEntries }
   })
 
@@ -4344,6 +4390,7 @@ async function openWorkbookSession(
       ...(unsavedNew ? { unsavedNew } : {}),
     })
     unsavedNewWorkbooks.delete(path)
+    const uniworkPath = csvSourcePath ?? restoreTarget ?? path
     return workbookFileSchema.parse({
       ...opened,
       // The renderer-facing path is what the user opened: for a restored
@@ -4351,7 +4398,10 @@ async function openWorkbookSession(
       path: restoreTarget ?? path,
       sha256: digest,
       fileBytes: snapshotStat.size,
-      readOnly: false,
+      // UniWork seam: re-asked on every (re)open, so a Save As to a plain
+      // local path comes back unbound and editable.
+      readOnly: suggestSaveAs === undefined && uniworkIsReadOnly(uniworkPath),
+      ...(suggestSaveAs === undefined && uniworkIsBound(uniworkPath) ? { uniworkBound: true } : {}),
       needsSaveAs: suggestSaveAs !== undefined,
       ...(unsavedNew ? { unsavedNew: true } : {}),
       ...(csvSourcePath === undefined ? {} : { csvPath: csvSourcePath }),

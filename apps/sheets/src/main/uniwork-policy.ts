@@ -49,3 +49,41 @@ export function notifyUniworkUserSave(path: string): void {
     console.error('[uniwork] user-save hook failed', err)
   }
 }
+
+/** Who asked for a workbook save: the user (Save, menu, shortcut, close guard) or the AutoSave timer / AI-run autosave. */
+export type UniworkSaveOrigin = 'user' | 'auto'
+
+export interface UniworkSaveInput {
+  mode: 'save' | 'save-as'
+  /** Absent = an older caller: saves exactly as before, never fires the hook. */
+  origin: UniworkSaveOrigin | undefined
+  /** The document's user-visible file before the save; null while it has none yet (unsaved new workbook, converted import). */
+  documentPath: string | null
+  /** The user-visible file the bytes land on. */
+  targetPath: string
+  /** MCP / agent explicit-path save (save_to). */
+  mcp: boolean
+}
+
+export interface UniworkSaveDecision {
+  write: boolean
+  fireHook: boolean
+}
+
+/**
+ * Pure save gate for the workbook:save handler. A read-only target is never
+ * written; AutoSave never writes a bound document; only an explicit user Save
+ * that lands on the file the document already had reports to the shell.
+ */
+export function uniworkSaveDecision(input: UniworkSaveInput): UniworkSaveDecision {
+  const { mode, origin, documentPath, targetPath, mcp } = input
+  if (uniworkIsReadOnly(targetPath)) return { write: false, fireHook: false }
+  if (origin === 'auto' && uniworkIsBound(documentPath)) return { write: false, fireHook: false }
+  const fireHook =
+    !mcp &&
+    mode === 'save' &&
+    origin === 'user' &&
+    documentPath !== null &&
+    targetPath === documentPath
+  return { write: true, fireHook }
+}

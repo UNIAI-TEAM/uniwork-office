@@ -1497,4 +1497,6 @@ export const vi = {
   appVisualFlipV: 'Lật dọc',
   appVisualFlipH: 'Lật ngang',
   appCtxPasteVisual: 'Dán ảnh hoặc hình',
+  appAutoSaveUniworkOff:
+    'Tự động lưu đã tắt cho tài liệu UniWork. Hãy dùng Lưu để lưu phiên bản mới.',
 } satisfies Record<keyof typeof zh, string>

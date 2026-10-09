@@ -1469,4 +1469,5 @@ export const ar = {
   appVisualFlipV: 'قلب رأسي',
   appVisualFlipH: 'قلب أفقي',
   appCtxPasteVisual: 'لصق صورة أو شكل',
+  appAutoSaveUniworkOff: 'AutoSave is off for UniWork documents. Use Save to save a new version.',
 } satisfies Record<keyof typeof zh, string>

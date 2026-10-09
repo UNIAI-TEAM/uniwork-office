@@ -1528,4 +1528,5 @@ export const ko = {
   appVisualFlipV: '상하 대칭',
   appVisualFlipH: '좌우 대칭',
   appCtxPasteVisual: '그림/도형 붙여넣기',
+  appAutoSaveUniworkOff: 'AutoSave is off for UniWork documents. Use Save to save a new version.',
 } satisfies Record<keyof typeof zh, string>
