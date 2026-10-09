@@ -40,6 +40,8 @@ export const de = {
   ribbonSaveTip: 'Speichern (⌘S)',
   ribbonAutoSave: 'AutoSpeichern',
   ribbonAutoSaveTip: 'Speichert alle 30 Sekunden in die Datei',
+  ribbonAutoSaveUniworkTip:
+    'AutoSave is off for UniWork documents. Use Save to save a new version.',
   ribbonUndo: 'Rückgängig',
   ribbonRedo: 'Wiederholen',
   ribbonGroupClipboard: 'Zwischenablage',

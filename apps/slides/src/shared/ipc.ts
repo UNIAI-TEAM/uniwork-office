@@ -1687,12 +1687,17 @@ export interface SlidesApi {
   exportPdf: (op: ExportPdfOp) => Promise<ExportPdfResult>
   /** Print (system dialog; cancel counts as ok=false without an error) */
   printSlides: (op: PrintSlidesOp) => Promise<{ ok: boolean; error?: string }>
-  save: () => Promise<{ ok: boolean; path?: string; error?: string; slides?: RenderSlide[] }>
+  /** `origin` 'auto' = AutoSave pass (never writes a UniWork document); omitted = explicit Save */
+  save: (
+    origin?: 'user' | 'auto',
+  ) => Promise<{ ok: boolean; path?: string; error?: string; slides?: RenderSlide[] }>
+  /** UniWork seam: this deck is a UniWork working copy (AutoSave off) / view-only (Save off) */
+  uniworkState: () => Promise<{ bound: boolean; readOnly: boolean }>
   saveAs: (
     defaultName: string,
   ) => Promise<{ ok: boolean; path?: string; error?: string; slides?: RenderSlide[] }>
   /** The close guard chose "Save": the main process asks the renderer to run the full save flow */
-  onCloseSaveRequest: (handler: () => void) => () => void
+  onCloseSaveRequest: (handler: (origin?: 'user' | 'auto') => void) => () => void
   /** Undo/redo stack occupancy pushed by the main process (drives the QAT button gray states) */
   onHistoryChanged: (handler: (state: { canUndo: boolean; canRedo: boolean }) => void) => () => void
   /** Another window attached to the same file changed the deck (shared session): fresh render state to apply */

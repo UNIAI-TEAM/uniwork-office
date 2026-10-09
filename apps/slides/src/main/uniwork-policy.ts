@@ -49,3 +49,50 @@ export function notifyUniworkUserSave(path: string): void {
     console.error('[uniwork] user-save hook failed', err)
   }
 }
+
+/**
+ * Who started a save. `'auto'` is the AutoSave timer / blur tick and the silent
+ * close-guard save of an AutoSave-on deck; everything else (button, menu,
+ * shortcut, close-guard "Save") is `'user'`. A missing value reads as `'user'`,
+ * which keeps every existing caller on today's path.
+ */
+export type UniworkSaveOrigin = 'user' | 'auto'
+
+export function parseUniworkSaveOrigin(value: unknown): UniworkSaveOrigin {
+  return value === 'auto' ? 'auto' : 'user'
+}
+
+export interface UniworkSaveInput {
+  /** `save` = in-place Save, `save-as` = dialog-picked path, `mcp` = agent save-to-path */
+  kind: 'save' | 'save-as' | 'mcp'
+  origin: UniworkSaveOrigin
+  /** The path the document had before this save (null for an untitled deck) */
+  currentPath: string | null
+  /** Where the bytes would be written */
+  targetPath: string
+}
+
+export interface UniworkSaveDecision {
+  write: boolean
+  fireHook: boolean
+}
+
+/**
+ * Pure save gate (no Electron): a read-only UniWork path is never written; an
+ * AutoSave pass never writes a bound path (UniWork only takes explicit saves);
+ * the user-save hook fires only for an explicit in-place Save of a deck that
+ * already had that path. With no policy installed this always writes and the
+ * hook (null outside the shell) is the only difference.
+ */
+export function uniworkSaveDecision(input: UniworkSaveInput): UniworkSaveDecision {
+  if (uniworkIsReadOnly(input.targetPath)) return { write: false, fireHook: false }
+  if (input.origin === 'auto' && uniworkIsBound(input.targetPath)) {
+    return { write: false, fireHook: false }
+  }
+  const fireHook =
+    input.kind === 'save' &&
+    input.origin === 'user' &&
+    !!input.currentPath &&
+    input.currentPath === input.targetPath
+  return { write: true, fireHook }
+}

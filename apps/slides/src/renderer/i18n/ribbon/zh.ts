@@ -38,6 +38,7 @@ export const zh = {
   ribbonSaveTip: '保存 (⌘S)',
   ribbonAutoSave: '自动保存',
   ribbonAutoSaveTip: '开启后每 30 秒自动保存到原文件',
+  ribbonAutoSaveUniworkTip: 'UniWork 文档已关闭自动保存。请使用保存来保存新版本。',
   ribbonUndo: '撤销',
   ribbonRedo: '恢复',
   // Home: clipboard

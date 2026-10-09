@@ -40,6 +40,8 @@ export const id = {
   ribbonSaveTip: 'Simpan (⌘S)',
   ribbonAutoSave: 'Simpan Otomatis',
   ribbonAutoSaveTip: 'Menyimpan ke file setiap 30 detik saat aktif',
+  ribbonAutoSaveUniworkTip:
+    'AutoSave is off for UniWork documents. Use Save to save a new version.',
   ribbonUndo: 'Urungkan',
   ribbonRedo: 'Ulangi',
   ribbonGroupClipboard: 'Papan Klip',

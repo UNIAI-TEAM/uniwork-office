@@ -38,6 +38,8 @@ export const cs = {
   ribbonSaveTip: 'Uložit (⌘S)',
   ribbonAutoSave: 'Automatické ukládání',
   ribbonAutoSaveTip: 'Pokud je zapnuto, ukládá do souboru každých 30 sekund',
+  ribbonAutoSaveUniworkTip:
+    'AutoSave is off for UniWork documents. Use Save to save a new version.',
   ribbonUndo: 'Zpět',
   ribbonRedo: 'Znovu',
   ribbonGroupClipboard: 'Schránka',

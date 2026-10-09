@@ -37,6 +37,8 @@ export const he = {
   ribbonSaveTip: 'שמירה (⌘S)',
   ribbonAutoSave: 'שמירה אוטומטית',
   ribbonAutoSaveTip: 'כאשר מופעל, שומר לקובץ כל 30 שניות',
+  ribbonAutoSaveUniworkTip:
+    'AutoSave is off for UniWork documents. Use Save to save a new version.',
   ribbonUndo: 'ביטול פעולה',
   ribbonRedo: 'ביצוע מחדש',
   ribbonGroupClipboard: 'לוח',

@@ -375,6 +375,12 @@ button {
   display: none;
 }
 
+/* UniWork document: AutoSave is forced off; the tooltip says why */
+.autosave-toggle.disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
 .autosave-knob {
   width: 26px;
   height: 14px;

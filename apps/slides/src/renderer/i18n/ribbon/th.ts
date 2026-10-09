@@ -39,6 +39,8 @@ export const th = {
   ribbonSaveTip: 'บันทึก (⌘S)',
   ribbonAutoSave: 'บันทึกอัตโนมัติ',
   ribbonAutoSaveTip: 'เมื่อเปิด จะบันทึกลงไฟล์ทุก 30 วินาที',
+  ribbonAutoSaveUniworkTip:
+    'AutoSave is off for UniWork documents. Use Save to save a new version.',
   ribbonUndo: 'เลิกทำ',
   ribbonRedo: 'ทำซ้ำ',
   ribbonGroupClipboard: 'คลิปบอร์ด',

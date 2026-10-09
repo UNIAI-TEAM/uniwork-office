@@ -39,6 +39,8 @@ export const ar = {
   ribbonSaveTip: 'حفظ (⌘S)',
   ribbonAutoSave: 'حفظ تلقائي',
   ribbonAutoSaveTip: 'يحفظ إلى الملف كل 30 ثانية عند التفعيل',
+  ribbonAutoSaveUniworkTip:
+    'AutoSave is off for UniWork documents. Use Save to save a new version.',
   ribbonUndo: 'تراجع',
   ribbonRedo: 'إعادة',
   ribbonGroupClipboard: 'الحافظة',

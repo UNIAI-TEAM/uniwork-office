@@ -87,13 +87,22 @@ async function runSerialized<T>(pass: () => Promise<T>): Promise<T> {
   return current
 }
 
-export async function save(getCtx: () => ActionCtx, quiet = false): Promise<boolean> {
+/**
+ * `origin` 'auto' marks an AutoSave pass so the main process can keep it off a
+ * UniWork document and out of the UniWork user-save hook; every explicit Save
+ * (button, menu, shortcut, close-guard Save) leaves it at 'user'.
+ */
+export async function save(
+  getCtx: () => ActionCtx,
+  quiet = false,
+  origin: 'user' | 'auto' = 'user',
+): Promise<boolean> {
   return runSerialized(async () => {
     // resolved only now: a queued pass must remap selection against the tree the prior save adopted
     const ctx = getCtx()
     await flushActiveEdit(ctx)
     await ctx.flushNotes()
-    const r = await window.slidesApi.save()
+    const r = await window.slidesApi.save(origin)
     if (r.ok) {
       if (r.slides) adoptSavedSlides(ctx, r.slides)
       if (r.path) ctx.setPath(r.path)
