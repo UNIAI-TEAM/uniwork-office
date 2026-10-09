@@ -79,6 +79,12 @@ export const WEB_MODULES: Readonly<Record<WebModule, WebModuleSpec>> = {
     },
     // pdf.js CMaps, standard fonts and wasm keep their upstream names (viteStaticCopy)
     immutableDirs: ['pdfjs'],
+    // the save core imports main's redaction.ts (createHash('sha256') over image data). Redaction
+    // is off on the web (capability `redaction`), but the import is static: the Slides shim is the
+    // real synchronous SHA-256, so the bundle resolves and a stray call still hashes correctly
+    aliases: {
+      'node:crypto': 'web/modules/slides/shims/crypto.ts',
+    },
   },
   markdown: {
     module: 'markdown',
