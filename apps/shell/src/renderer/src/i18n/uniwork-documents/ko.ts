@@ -28,7 +28,6 @@ export const ko = {
   uwPickNoWorkspacesHint: '먼저 UniWork에서 워크스페이스를 만들거나 참여하세요.',
   uwPickUnsupported: 'UniWork Office에서 지원되지 않습니다',
   uwPickOpening: '“{title}” 여는 중…',
-  uwPickOpen: '열기',
 
   uwErrNotSignedIn: '계속하려면 UniWork에 로그인하세요.',
   uwErrSessionExpired: 'UniWork 로그인이 만료되었습니다. 다시 로그인하세요.',
@@ -55,6 +54,7 @@ export const ko = {
   uwChipSaving: '저장 중…',
   uwChipViewOnly: '보기 전용',
   uwChipOffline: '저장되지 않음: 오프라인',
+  uwChipUnreachable: '저장되지 않음: UniWork에 연결할 수 없음',
   uwChipSignedOut: '저장하려면 다시 로그인하세요',
   uwChipConflict: '충돌',
   uwChipBlocked: '차단됨: {reason}',
@@ -76,6 +76,7 @@ export const ko = {
   uwTipViewOnly: '이 문서는 볼 수만 있고 변경할 수는 없습니다.',
   uwTipOffline:
     '변경 사항은 이 컴퓨터에 안전하게 보관되어 있습니다. 온라인 상태가 되면 다시 시도하세요.',
+  uwTipUnreachable: '변경 사항은 이 컴퓨터에 안전하게 보관되어 있습니다. 잠시 후 다시 시도하세요.',
   uwTipSignedOut:
     '변경 사항은 이 컴퓨터에 안전하게 보관되어 있습니다. 로그인한 뒤 다시 시도하세요.',
   uwTipConflict: '다른 사용자가 더 최신 버전을 저장했습니다. 변경 사항은 이 컴퓨터에 보관됩니다.',
@@ -90,5 +91,4 @@ export const ko = {
 
   uwRecentBadge: 'UniWork',
   uwRecentBadgeTip: 'UniWork에 저장된 문서',
-  uwRecentLocation: 'UniWork',
 } satisfies Record<keyof typeof zh, string>

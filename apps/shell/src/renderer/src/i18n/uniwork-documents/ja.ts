@@ -28,7 +28,6 @@ export const ja = {
   uwPickNoWorkspacesHint: 'まず UniWork でワークスペースを作成するか、参加してください。',
   uwPickUnsupported: 'UniWork Office では未対応です',
   uwPickOpening: '「{title}」を開いています…',
-  uwPickOpen: '開く',
 
   uwErrNotSignedIn: '続行するには UniWork にサインインしてください。',
   uwErrSessionExpired: 'UniWork のサインインの有効期限が切れました。再度サインインしてください。',
@@ -56,6 +55,7 @@ export const ja = {
   uwChipSaving: '保存中…',
   uwChipViewOnly: '閲覧のみ',
   uwChipOffline: '未保存：オフライン',
+  uwChipUnreachable: '未保存：UniWorkに接続できません',
   uwChipSignedOut: '保存するには再度サインインしてください',
   uwChipConflict: '競合',
   uwChipBlocked: 'ブロック中：{reason}',
@@ -77,6 +77,8 @@ export const ja = {
   uwTipViewOnly: 'このドキュメントは表示できますが、変更はできません。',
   uwTipOffline:
     '変更はこのコンピューターに安全に保存されています。オンラインに戻ったら再試行してください。',
+  uwTipUnreachable:
+    '変更はこのコンピューターに安全に保存されています。しばらくしてから再試行してください。',
   uwTipSignedOut:
     '変更はこのコンピューターに安全に保存されています。サインインしてから再試行してください。',
   uwTipConflict: '新しいバージョンが保存されています。変更はこのコンピューターに残されています。',
@@ -91,5 +93,4 @@ export const ja = {
 
   uwRecentBadge: 'UniWork',
   uwRecentBadgeTip: 'UniWork に保存されたドキュメント',
-  uwRecentLocation: 'UniWork',
 } satisfies Record<keyof typeof zh, string>

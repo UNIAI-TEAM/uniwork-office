@@ -28,7 +28,6 @@ export const hi = {
   uwPickNoWorkspacesHint: 'पहले UniWork में एक वर्कस्पेस बनाएँ या उससे जुड़ें।',
   uwPickUnsupported: 'UniWork Office में समर्थित नहीं',
   uwPickOpening: '“{title}” खोला जा रहा है…',
-  uwPickOpen: 'खोलें',
 
   uwErrNotSignedIn: 'जारी रखने के लिए UniWork में साइन इन करें।',
   uwErrSessionExpired: 'आपका UniWork साइन-इन समाप्त हो गया है। फिर से साइन इन करें।',
@@ -55,6 +54,7 @@ export const hi = {
   uwChipSaving: 'सहेजा जा रहा है…',
   uwChipViewOnly: 'केवल देखें',
   uwChipOffline: 'सहेजा नहीं गया: ऑफ़लाइन',
+  uwChipUnreachable: 'सहेजा नहीं गया: UniWork से संपर्क नहीं हो पा रहा',
   uwChipSignedOut: 'सहेजने के लिए फिर से साइन इन करें',
   uwChipConflict: 'टकराव',
   uwChipBlocked: 'अवरुद्ध: {reason}',
@@ -75,6 +75,7 @@ export const hi = {
   uwTipSaving: 'UniWork में सहेजा जा रहा है…',
   uwTipViewOnly: 'आप यह दस्तावेज़ देख सकते हैं, पर बदल नहीं सकते।',
   uwTipOffline: 'आपके बदलाव इस कंप्यूटर पर सुरक्षित हैं। ऑनलाइन होने पर फिर से कोशिश करें।',
+  uwTipUnreachable: 'आपके बदलाव इस कंप्यूटर पर सुरक्षित हैं। थोड़ी देर बाद फिर से कोशिश करें।',
   uwTipSignedOut: 'आपके बदलाव इस कंप्यूटर पर सुरक्षित हैं। साइन इन करें, फिर फिर से कोशिश करें।',
   uwTipConflict: 'किसी ने नया संस्करण सहेजा है। आपके बदलाव इस कंप्यूटर पर रखे गए हैं।',
   uwTipBlocked: 'आपके बदलाव इस कंप्यूटर पर रखे गए हैं।',
@@ -88,5 +89,4 @@ export const hi = {
 
   uwRecentBadge: 'UniWork',
   uwRecentBadgeTip: 'UniWork में संग्रहीत दस्तावेज़',
-  uwRecentLocation: 'UniWork',
 } satisfies Record<keyof typeof zh, string>

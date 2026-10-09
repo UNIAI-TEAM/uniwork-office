@@ -28,7 +28,6 @@ export const he = {
   uwPickNoWorkspacesHint: 'צור או הצטרף למרחב עבודה ב-UniWork קודם.',
   uwPickUnsupported: 'לא נתמך ב-UniWork Office',
   uwPickOpening: 'פותח את “{title}”…',
-  uwPickOpen: 'פתח',
 
   uwErrNotSignedIn: 'יש להתחבר ל-UniWork כדי להמשיך.',
   uwErrSessionExpired: 'פג תוקף הכניסה שלך ל-UniWork. יש להתחבר שוב.',
@@ -55,6 +54,7 @@ export const he = {
   uwChipSaving: 'שומר…',
   uwChipViewOnly: 'לצפייה בלבד',
   uwChipOffline: 'לא נשמר: אין חיבור',
+  uwChipUnreachable: 'לא נשמר: לא ניתן להתחבר ל-UniWork',
   uwChipSignedOut: 'יש להתחבר שוב כדי לשמור',
   uwChipConflict: 'התנגשות',
   uwChipBlocked: 'חסום: {reason}',
@@ -75,6 +75,7 @@ export const he = {
   uwTipSaving: 'שומר ב-UniWork…',
   uwTipViewOnly: 'ניתן לצפות במסמך זה, אך לא לשנות אותו.',
   uwTipOffline: 'השינויים שלך שמורים בבטחה במחשב זה. נסה שוב כשהחיבור יחזור.',
+  uwTipUnreachable: 'השינויים שלך שמורים בבטחה במחשב זה. נסה שוב בעוד רגע.',
   uwTipSignedOut: 'השינויים שלך שמורים בבטחה במחשב זה. התחבר ואז נסה שוב.',
   uwTipConflict: 'מישהו שמר גרסה חדשה יותר. השינויים שלך נשמרים במחשב זה.',
   uwTipBlocked: 'השינויים שלך נשמרים במחשב זה.',
@@ -88,5 +89,4 @@ export const he = {
 
   uwRecentBadge: 'UniWork',
   uwRecentBadgeTip: 'מסמך השמור ב-UniWork',
-  uwRecentLocation: 'UniWork',
 } satisfies Record<keyof typeof zh, string>

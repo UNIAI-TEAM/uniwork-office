@@ -28,7 +28,6 @@ export const en = {
   uwPickNoWorkspacesHint: 'Create or join a workspace in UniWork first.',
   uwPickUnsupported: 'Not supported in UniWork Office',
   uwPickOpening: 'Opening “{title}”…',
-  uwPickOpen: 'Open',
 
   uwErrNotSignedIn: 'Sign in to UniWork to continue.',
   uwErrSessionExpired: 'Your UniWork sign-in expired. Sign in again.',
@@ -55,8 +54,9 @@ export const en = {
   uwChipSaving: 'Saving…',
   uwChipViewOnly: 'View only',
   uwChipOffline: 'Not saved: offline',
+  uwChipUnreachable: "Not saved: can't reach UniWork",
   uwChipSignedOut: 'Sign in again to save',
-  uwChipConflict: 'Conflict',
+  uwChipConflict: 'Version conflict',
   uwChipBlocked: 'Blocked: {reason}',
   uwChipError: 'Couldn’t save',
   uwActRetry: 'Retry',
@@ -75,6 +75,7 @@ export const en = {
   uwTipSaving: 'Saving to UniWork…',
   uwTipViewOnly: 'You can view this document but not change it.',
   uwTipOffline: 'Your changes are safe on this computer. Retry when you’re back online.',
+  uwTipUnreachable: 'Your changes are safe on this computer. Retry in a moment.',
   uwTipSignedOut: 'Your changes are safe on this computer. Sign in, then retry.',
   uwTipConflict: 'Someone saved a newer version. Your changes are kept on this computer.',
   uwTipBlocked: 'Your changes are kept on this computer.',
@@ -88,5 +89,4 @@ export const en = {
 
   uwRecentBadge: 'UniWork',
   uwRecentBadgeTip: 'Document stored in UniWork',
-  uwRecentLocation: 'UniWork',
 } satisfies Record<keyof typeof zh, string>

@@ -28,7 +28,6 @@ export const ar = {
   uwPickNoWorkspacesHint: 'أنشئ مساحة عمل في UniWork أو انضم إليها أولاً.',
   uwPickUnsupported: 'غير مدعوم في UniWork Office',
   uwPickOpening: 'جارٍ فتح “{title}”…',
-  uwPickOpen: 'فتح',
 
   uwErrNotSignedIn: 'سجّل الدخول إلى UniWork للمتابعة.',
   uwErrSessionExpired: 'انتهت صلاحية تسجيل الدخول إلى UniWork. سجّل الدخول مرة أخرى.',
@@ -55,6 +54,7 @@ export const ar = {
   uwChipSaving: 'جارٍ الحفظ…',
   uwChipViewOnly: 'للعرض فقط',
   uwChipOffline: 'لم يُحفظ: غير متصل',
+  uwChipUnreachable: 'لم يُحفظ: تعذّر الوصول إلى UniWork',
   uwChipSignedOut: 'سجّل الدخول مرة أخرى للحفظ',
   uwChipConflict: 'تعارض',
   uwChipBlocked: 'متوقف: {reason}',
@@ -75,6 +75,7 @@ export const ar = {
   uwTipSaving: 'جارٍ الحفظ في UniWork…',
   uwTipViewOnly: 'يمكنك عرض هذا المستند لكن لا يمكنك تعديله.',
   uwTipOffline: 'تغييراتك محفوظة بأمان على هذا الكمبيوتر. أعد المحاولة عند عودة الاتصال.',
+  uwTipUnreachable: 'تغييراتك محفوظة بأمان على هذا الكمبيوتر. أعد المحاولة بعد لحظات.',
   uwTipSignedOut: 'تغييراتك محفوظة بأمان على هذا الكمبيوتر. سجّل الدخول ثم أعد المحاولة.',
   uwTipConflict: 'حفظ شخص ما نسخة أحدث. تبقى تغييراتك محفوظة على هذا الكمبيوتر.',
   uwTipBlocked: 'تبقى تغييراتك محفوظة على هذا الكمبيوتر.',
@@ -88,5 +89,4 @@ export const ar = {
 
   uwRecentBadge: 'UniWork',
   uwRecentBadgeTip: 'مستند محفوظ في UniWork',
-  uwRecentLocation: 'UniWork',
 } satisfies Record<keyof typeof zh, string>

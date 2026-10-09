@@ -28,7 +28,6 @@ export const fr = {
   uwPickNoWorkspacesHint: 'Créez ou rejoignez d’abord un espace de travail dans UniWork.',
   uwPickUnsupported: 'Non pris en charge dans UniWork Office',
   uwPickOpening: 'Ouverture de “{title}”…',
-  uwPickOpen: 'Ouvrir',
 
   uwErrNotSignedIn: 'Connectez-vous à UniWork pour continuer.',
   uwErrSessionExpired: 'Votre connexion à UniWork a expiré. Reconnectez-vous.',
@@ -56,6 +55,7 @@ export const fr = {
   uwChipSaving: 'Enregistrement…',
   uwChipViewOnly: 'Lecture seule',
   uwChipOffline: 'Non enregistré : hors ligne',
+  uwChipUnreachable: 'Non enregistré : UniWork injoignable',
   uwChipSignedOut: 'Reconnectez-vous pour enregistrer',
   uwChipConflict: 'Conflit',
   uwChipBlocked: 'Bloqué : {reason}',
@@ -78,6 +78,8 @@ export const fr = {
   uwTipViewOnly: 'Vous pouvez consulter ce document, mais pas le modifier.',
   uwTipOffline:
     'Vos modifications sont en sécurité sur cet ordinateur. Réessayez lorsque la connexion sera rétablie.',
+  uwTipUnreachable:
+    'Vos modifications sont en sécurité sur cet ordinateur. Réessayez dans un instant.',
   uwTipSignedOut:
     'Vos modifications sont en sécurité sur cet ordinateur. Connectez-vous, puis réessayez.',
   uwTipConflict:
@@ -94,5 +96,4 @@ export const fr = {
 
   uwRecentBadge: 'UniWork',
   uwRecentBadgeTip: 'Document enregistré dans UniWork',
-  uwRecentLocation: 'UniWork',
 } satisfies Record<keyof typeof zh, string>

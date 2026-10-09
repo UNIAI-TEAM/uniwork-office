@@ -28,7 +28,6 @@ export const id = {
   uwPickNoWorkspacesHint: 'Buat atau gabung ke ruang kerja di UniWork terlebih dahulu.',
   uwPickUnsupported: 'Tidak didukung di UniWork Office',
   uwPickOpening: 'Membuka “{title}”…',
-  uwPickOpen: 'Buka',
 
   uwErrNotSignedIn: 'Masuk ke UniWork untuk melanjutkan.',
   uwErrSessionExpired: 'Masuk UniWork Anda sudah kedaluwarsa. Silakan masuk lagi.',
@@ -55,6 +54,7 @@ export const id = {
   uwChipSaving: 'Menyimpan…',
   uwChipViewOnly: 'Hanya lihat',
   uwChipOffline: 'Belum disimpan: offline',
+  uwChipUnreachable: 'Belum disimpan: tidak dapat terhubung ke UniWork',
   uwChipSignedOut: 'Masuk lagi untuk menyimpan',
   uwChipConflict: 'Konflik',
   uwChipBlocked: 'Diblokir: {reason}',
@@ -75,6 +75,7 @@ export const id = {
   uwTipSaving: 'Menyimpan ke UniWork…',
   uwTipViewOnly: 'Anda dapat melihat dokumen ini tetapi tidak dapat mengubahnya.',
   uwTipOffline: 'Perubahan Anda aman di komputer ini. Coba lagi saat sudah kembali online.',
+  uwTipUnreachable: 'Perubahan Anda aman di komputer ini. Coba lagi dalam beberapa saat.',
   uwTipSignedOut: 'Perubahan Anda aman di komputer ini. Masuk, lalu coba lagi.',
   uwTipConflict:
     'Seseorang sudah menyimpan versi yang lebih baru. Perubahan Anda tetap disimpan di komputer ini.',
@@ -89,5 +90,4 @@ export const id = {
 
   uwRecentBadge: 'UniWork',
   uwRecentBadgeTip: 'Dokumen disimpan di UniWork',
-  uwRecentLocation: 'UniWork',
 } satisfies Record<keyof typeof zh, string>

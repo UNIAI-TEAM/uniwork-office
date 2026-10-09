@@ -28,7 +28,6 @@ export const th = {
   uwPickNoWorkspacesHint: 'สร้างหรือเข้าร่วมพื้นที่ทำงานใน UniWork ก่อน',
   uwPickUnsupported: 'ไม่รองรับใน UniWork Office',
   uwPickOpening: 'กำลังเปิด “{title}”…',
-  uwPickOpen: 'เปิด',
 
   uwErrNotSignedIn: 'ลงชื่อเข้าใช้ UniWork เพื่อดำเนินการต่อ',
   uwErrSessionExpired: 'การลงชื่อเข้าใช้ UniWork ของคุณหมดอายุแล้ว กรุณาลงชื่อเข้าใช้อีกครั้ง',
@@ -55,6 +54,7 @@ export const th = {
   uwChipSaving: 'กำลังบันทึก…',
   uwChipViewOnly: 'ดูได้อย่างเดียว',
   uwChipOffline: 'ยังไม่ได้บันทึก: ออฟไลน์',
+  uwChipUnreachable: 'ยังไม่ได้บันทึก: เชื่อมต่อ UniWork ไม่ได้',
   uwChipSignedOut: 'ลงชื่อเข้าใช้อีกครั้งเพื่อบันทึก',
   uwChipConflict: 'ข้อขัดแย้ง',
   uwChipBlocked: 'ถูกบล็อก: {reason}',
@@ -76,6 +76,8 @@ export const th = {
   uwTipViewOnly: 'คุณดูเอกสารนี้ได้ แต่แก้ไขไม่ได้',
   uwTipOffline:
     'การเปลี่ยนแปลงของคุณปลอดภัยอยู่บนคอมพิวเตอร์เครื่องนี้ ลองอีกครั้งเมื่อกลับมาออนไลน์',
+  uwTipUnreachable:
+    'การเปลี่ยนแปลงของคุณปลอดภัยอยู่บนคอมพิวเตอร์เครื่องนี้ ลองอีกครั้งในอีกสักครู่',
   uwTipSignedOut:
     'การเปลี่ยนแปลงของคุณปลอดภัยอยู่บนคอมพิวเตอร์เครื่องนี้ ลงชื่อเข้าใช้แล้วลองอีกครั้ง',
   uwTipConflict:
@@ -91,5 +93,4 @@ export const th = {
 
   uwRecentBadge: 'UniWork',
   uwRecentBadgeTip: 'เอกสารที่จัดเก็บใน UniWork',
-  uwRecentLocation: 'UniWork',
 } satisfies Record<keyof typeof zh, string>

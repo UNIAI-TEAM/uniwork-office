@@ -28,7 +28,6 @@ export const cs = {
   uwPickNoWorkspacesHint: 'Nejprve v UniWork vytvořte pracovní prostor nebo se k němu připojte.',
   uwPickUnsupported: 'V UniWork Office nepodporováno',
   uwPickOpening: 'Otevírání „{title}“…',
-  uwPickOpen: 'Otevřít',
 
   uwErrNotSignedIn: 'Pro pokračování se přihlaste do UniWork.',
   uwErrSessionExpired: 'Vaše přihlášení do UniWork vypršelo. Přihlaste se znovu.',
@@ -55,6 +54,7 @@ export const cs = {
   uwChipSaving: 'Ukládání…',
   uwChipViewOnly: 'Pouze pro čtení',
   uwChipOffline: 'Neuloženo: offline',
+  uwChipUnreachable: 'Neuloženo: UniWork není dostupný',
   uwChipSignedOut: 'Pro uložení se znovu přihlaste',
   uwChipConflict: 'Konflikt',
   uwChipBlocked: 'Blokováno: {reason}',
@@ -76,6 +76,7 @@ export const cs = {
   uwTipViewOnly: 'Tento dokument si můžete prohlédnout, ale nemůžete ho upravovat.',
   uwTipOffline:
     'Vaše změny jsou v bezpečí na tomto počítači. Až budete zase online, zkuste to znovu.',
+  uwTipUnreachable: 'Vaše změny jsou v bezpečí na tomto počítači. Zkuste to znovu za chvíli.',
   uwTipSignedOut: 'Vaše změny jsou v bezpečí na tomto počítači. Přihlaste se a zkuste to znovu.',
   uwTipConflict: 'Někdo uložil novější verzi. Vaše změny zůstávají uloženy na tomto počítači.',
   uwTipBlocked: 'Vaše změny zůstávají uloženy na tomto počítači.',
@@ -89,5 +90,4 @@ export const cs = {
 
   uwRecentBadge: 'UniWork',
   uwRecentBadgeTip: 'Dokument uložený v UniWork',
-  uwRecentLocation: 'UniWork',
 } satisfies Record<keyof typeof zh, string>

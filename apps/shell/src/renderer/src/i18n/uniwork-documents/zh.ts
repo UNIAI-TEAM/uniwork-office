@@ -27,7 +27,6 @@ export const zh = {
   uwPickNoWorkspacesHint: '请先在 UniWork 中创建或加入一个工作区。',
   uwPickUnsupported: 'UniWork Office 不支持此类型',
   uwPickOpening: '正在打开“{title}”…',
-  uwPickOpen: '打开',
 
   uwErrNotSignedIn: '请先登录 UniWork。',
   uwErrSessionExpired: 'UniWork 登录已过期，请重新登录。',
@@ -54,6 +53,7 @@ export const zh = {
   uwChipSaving: '正在保存…',
   uwChipViewOnly: '仅查看',
   uwChipOffline: '未保存：离线',
+  uwChipUnreachable: '未保存：无法连接到 UniWork',
   uwChipSignedOut: '请重新登录以保存',
   uwChipConflict: '版本冲突',
   uwChipBlocked: '无法保存：{reason}',
@@ -74,6 +74,7 @@ export const zh = {
   uwTipSaving: '正在保存到 UniWork…',
   uwTipViewOnly: '你可以查看此文档，但不能修改。',
   uwTipOffline: '更改已安全保存在这台电脑上。恢复网络后点“重试”。',
+  uwTipUnreachable: '更改已安全保存在这台电脑上。稍后点“重试”。',
   uwTipSignedOut: '更改已安全保存在这台电脑上。登录后再点“重试”。',
   uwTipConflict: '有人保存了更新的版本。你的更改仍保留在这台电脑上。',
   uwTipBlocked: '你的更改仍保留在这台电脑上。',
@@ -87,5 +88,4 @@ export const zh = {
 
   uwRecentBadge: 'UniWork',
   uwRecentBadgeTip: '保存在 UniWork 的文档',
-  uwRecentLocation: 'UniWork',
 }

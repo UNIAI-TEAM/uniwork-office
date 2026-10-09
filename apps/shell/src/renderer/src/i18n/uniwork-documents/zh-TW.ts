@@ -28,7 +28,6 @@ export const zhTW = {
   uwPickNoWorkspacesHint: '請先在 UniWork 中建立或加入工作區。',
   uwPickUnsupported: 'UniWork Office 不支援此類型',
   uwPickOpening: '正在開啟“{title}”…',
-  uwPickOpen: '開啟',
 
   uwErrNotSignedIn: '請先登入 UniWork 以繼續。',
   uwErrSessionExpired: 'UniWork 登入已過期，請重新登入。',
@@ -55,6 +54,7 @@ export const zhTW = {
   uwChipSaving: '正在儲存…',
   uwChipViewOnly: '僅供檢視',
   uwChipOffline: '未儲存：離線',
+  uwChipUnreachable: '未儲存：無法連線到 UniWork',
   uwChipSignedOut: '請重新登入以儲存',
   uwChipConflict: '版本衝突',
   uwChipBlocked: '無法儲存：{reason}',
@@ -75,6 +75,7 @@ export const zhTW = {
   uwTipSaving: '正在儲存到 UniWork…',
   uwTipViewOnly: '你可以檢視此文件，但無法修改。',
   uwTipOffline: '變更已安全保存在這台電腦上。恢復連線後請點選「重試」。',
+  uwTipUnreachable: '變更已安全保存在這台電腦上。稍後請點選「重試」。',
   uwTipSignedOut: '變更已安全保存在這台電腦上。登入後再點選「重試」。',
   uwTipConflict: '有人儲存了較新的版本。你的變更仍保留在這台電腦上。',
   uwTipBlocked: '你的變更仍保留在這台電腦上。',
@@ -88,5 +89,4 @@ export const zhTW = {
 
   uwRecentBadge: 'UniWork',
   uwRecentBadgeTip: '儲存在 UniWork 的文件',
-  uwRecentLocation: 'UniWork',
 } satisfies Record<keyof typeof zh, string>

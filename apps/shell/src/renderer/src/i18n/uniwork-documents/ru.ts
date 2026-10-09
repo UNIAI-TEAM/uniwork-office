@@ -29,7 +29,6 @@ export const ru = {
     'Сначала создайте рабочее пространство или присоединитесь к нему в UniWork.',
   uwPickUnsupported: 'Не поддерживается в UniWork Office',
   uwPickOpening: 'Открываем “{title}”…',
-  uwPickOpen: 'Открыть',
 
   uwErrNotSignedIn: 'Войдите в UniWork, чтобы продолжить.',
   uwErrSessionExpired: 'Срок входа в UniWork истёк. Войдите снова.',
@@ -56,6 +55,7 @@ export const ru = {
   uwChipSaving: 'Сохранение…',
   uwChipViewOnly: 'Только просмотр',
   uwChipOffline: 'Не сохранено: нет сети',
+  uwChipUnreachable: 'Не сохранено: нет связи с UniWork',
   uwChipSignedOut: 'Войдите снова, чтобы сохранить',
   uwChipConflict: 'Конфликт',
   uwChipBlocked: 'Заблокировано: {reason}',
@@ -77,6 +77,8 @@ export const ru = {
   uwTipViewOnly: 'Вы можете просматривать этот документ, но не можете его изменить.',
   uwTipOffline:
     'Ваши изменения сохранены на этом компьютере. Повторите попытку, когда появится подключение.',
+  uwTipUnreachable:
+    'Ваши изменения в безопасности на этом компьютере. Повторите попытку чуть позже.',
   uwTipSignedOut: 'Ваши изменения сохранены на этом компьютере. Войдите и повторите попытку.',
   uwTipConflict: 'Кто-то сохранил более новую версию. Ваши изменения сохранены на этом компьютере.',
   uwTipBlocked: 'Ваши изменения сохранены на этом компьютере.',
@@ -90,5 +92,4 @@ export const ru = {
 
   uwRecentBadge: 'UniWork',
   uwRecentBadgeTip: 'Документ хранится в UniWork',
-  uwRecentLocation: 'UniWork',
 } satisfies Record<keyof typeof zh, string>

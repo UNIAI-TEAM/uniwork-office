@@ -28,7 +28,6 @@ export const vi = {
   uwPickNoWorkspacesHint: 'Hãy tạo hoặc tham gia một không gian làm việc trong UniWork trước.',
   uwPickUnsupported: 'UniWork Office chưa hỗ trợ định dạng này',
   uwPickOpening: 'Đang mở “{title}”…',
-  uwPickOpen: 'Mở',
 
   uwErrNotSignedIn: 'Hãy đăng nhập UniWork để tiếp tục.',
   uwErrSessionExpired: 'Phiên đăng nhập UniWork đã hết hạn. Hãy đăng nhập lại.',
@@ -55,6 +54,7 @@ export const vi = {
   uwChipSaving: 'Đang lưu…',
   uwChipViewOnly: 'Chỉ xem',
   uwChipOffline: 'Chưa lưu: không có mạng',
+  uwChipUnreachable: 'Chưa lưu: không kết nối được UniWork',
   uwChipSignedOut: 'Đăng nhập lại để lưu',
   uwChipConflict: 'Xung đột phiên bản',
   uwChipBlocked: 'Không lưu được: {reason}',
@@ -75,6 +75,7 @@ export const vi = {
   uwTipSaving: 'Đang lưu vào UniWork…',
   uwTipViewOnly: 'Bạn xem được tài liệu này nhưng không chỉnh sửa được.',
   uwTipOffline: 'Thay đổi của bạn vẫn an toàn trên máy này. Hãy thử lại khi có mạng.',
+  uwTipUnreachable: 'Thay đổi của bạn vẫn an toàn trên máy này. Hãy thử lại sau giây lát.',
   uwTipSignedOut: 'Thay đổi của bạn vẫn an toàn trên máy này. Hãy đăng nhập rồi thử lại.',
   uwTipConflict: 'Đã có người lưu phiên bản mới hơn. Thay đổi của bạn vẫn được giữ trên máy này.',
   uwTipBlocked: 'Thay đổi của bạn vẫn được giữ trên máy này.',
@@ -88,5 +89,4 @@ export const vi = {
 
   uwRecentBadge: 'UniWork',
   uwRecentBadgeTip: 'Tài liệu lưu trong UniWork',
-  uwRecentLocation: 'UniWork',
 } satisfies Record<keyof typeof zh, string>

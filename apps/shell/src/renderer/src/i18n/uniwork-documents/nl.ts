@@ -28,7 +28,6 @@ export const nl = {
   uwPickNoWorkspacesHint: 'Maak of word eerst lid van een werkruimte in UniWork.',
   uwPickUnsupported: 'Niet ondersteund in UniWork Office',
   uwPickOpening: '“{title}” openen…',
-  uwPickOpen: 'Openen',
 
   uwErrNotSignedIn: 'Meld je aan bij UniWork om door te gaan.',
   uwErrSessionExpired: 'Je aanmelding bij UniWork is verlopen. Meld je opnieuw aan.',
@@ -55,8 +54,9 @@ export const nl = {
   uwChipSaving: 'Opslaan…',
   uwChipViewOnly: 'Alleen bekijken',
   uwChipOffline: 'Niet opgeslagen: offline',
+  uwChipUnreachable: 'Niet opgeslagen: UniWork is niet bereikbaar',
   uwChipSignedOut: 'Meld je opnieuw aan om op te slaan',
-  uwChipConflict: 'Conflict',
+  uwChipConflict: 'Versieconflict',
   uwChipBlocked: 'Geblokkeerd: {reason}',
   uwChipError: 'Opslaan mislukt',
   uwActRetry: 'Opnieuw proberen',
@@ -76,6 +76,7 @@ export const nl = {
   uwTipViewOnly: 'Je kunt dit document bekijken, maar niet wijzigen.',
   uwTipOffline:
     'Je wijzigingen staan veilig op deze computer. Probeer het opnieuw zodra je weer online bent.',
+  uwTipUnreachable: 'Je wijzigingen zijn veilig op deze computer. Probeer het zo opnieuw.',
   uwTipSignedOut:
     'Je wijzigingen staan veilig op deze computer. Meld je aan en probeer het dan opnieuw.',
   uwTipConflict:
@@ -91,5 +92,4 @@ export const nl = {
 
   uwRecentBadge: 'UniWork',
   uwRecentBadgeTip: 'Document opgeslagen in UniWork',
-  uwRecentLocation: 'UniWork',
 } satisfies Record<keyof typeof zh, string>

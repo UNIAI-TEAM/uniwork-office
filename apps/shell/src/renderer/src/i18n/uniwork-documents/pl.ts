@@ -28,7 +28,6 @@ export const pl = {
   uwPickNoWorkspacesHint: 'Najpierw utwórz przestrzeń roboczą lub dołącz do niej w UniWork.',
   uwPickUnsupported: 'Nieobsługiwane w UniWork Office',
   uwPickOpening: 'Otwieranie „{title}”…',
-  uwPickOpen: 'Otwórz',
 
   uwErrNotSignedIn: 'Zaloguj się do UniWork, aby kontynuować.',
   uwErrSessionExpired: 'Logowanie do UniWork wygasło. Zaloguj się ponownie.',
@@ -55,6 +54,7 @@ export const pl = {
   uwChipSaving: 'Zapisywanie…',
   uwChipViewOnly: 'Tylko podgląd',
   uwChipOffline: 'Niezapisane: brak połączenia',
+  uwChipUnreachable: 'Niezapisane: nie można połączyć się z UniWork',
   uwChipSignedOut: 'Zaloguj się ponownie, aby zapisać',
   uwChipConflict: 'Konflikt',
   uwChipBlocked: 'Zablokowane: {reason}',
@@ -76,6 +76,7 @@ export const pl = {
   uwTipViewOnly: 'Możesz wyświetlić ten dokument, ale nie możesz go zmieniać.',
   uwTipOffline:
     'Twoje zmiany są bezpieczne na tym komputerze. Spróbuj ponownie, gdy połączenie wróci.',
+  uwTipUnreachable: 'Twoje zmiany są bezpieczne na tym komputerze. Spróbuj ponownie za chwilę.',
   uwTipSignedOut: 'Twoje zmiany są bezpieczne na tym komputerze. Zaloguj się i spróbuj ponownie.',
   uwTipConflict: 'Ktoś zapisał nowszą wersję. Twoje zmiany zostały zachowane na tym komputerze.',
   uwTipBlocked: 'Twoje zmiany zostały zachowane na tym komputerze.',
@@ -89,5 +90,4 @@ export const pl = {
 
   uwRecentBadge: 'UniWork',
   uwRecentBadgeTip: 'Dokument zapisany w UniWork',
-  uwRecentLocation: 'UniWork',
 } satisfies Record<keyof typeof zh, string>
