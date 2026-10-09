@@ -1,4 +1,5 @@
 import { app, safeStorage, shell, type IpcMain, type WebContents } from 'electron'
+import { dirname } from 'node:path'
 import { safeExternalUrl } from '@genoffice/electron-utils'
 import { HOME_CHANNELS, type AccountEntitlements } from '../../shared/home-api'
 import { readAppSettings, writeAppSetting } from '../app-settings'
@@ -72,6 +73,10 @@ export function uniworkAccount(): AccountManager {
     resolveProfile: () =>
       resolveDeploymentProfile({
         resourcesDir: app.isPackaged ? process.resourcesPath : undefined,
+        appImageDir:
+          app.isPackaged && process.platform === 'linux' && process.env.APPIMAGE
+            ? dirname(process.env.APPIMAGE)
+            : undefined,
         userDataDir: app.getPath('userData'),
         isPackaged: app.isPackaged,
         settingsApiOrigin: readAppSettings(settings()).uniworkApiOrigin,
