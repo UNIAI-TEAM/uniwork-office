@@ -894,9 +894,15 @@ function registerMarkdownIpc(): void {
           prompt: String(op?.prompt ?? ''),
           aspectRatio: op?.aspectRatio ? String(op.aspectRatio) : undefined,
         },
-        // markdown keeps pasted/picked images as doc-relative assets, so the
-        // open document's own directory is the media root
-        { mediaRoots: documentMediaRoots(markdownFilePath(e.sender.id), undefined) },
+        // markdown keeps pasted/picked images as doc-relative assets, so the open
+        // document's own directory is a media root; the shared attachment staging dir
+        // (like the other apps) keeps an unsaved document from having no root at all
+        {
+          mediaRoots: documentMediaRoots(
+            markdownFilePath(e.sender.id),
+            join(app.getPath('temp'), 'genoffice-pasted'),
+          ),
+        },
       ),
   )
 

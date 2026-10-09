@@ -12,6 +12,7 @@ import {
   type UniworkCloudTransport,
 } from '@genoffice/ai-provider'
 import {
+  gskAnalyzeLoadedMedia,
   gskAnalyzeMedia,
   gskGenerateImage,
   gskImageSearch,
@@ -270,5 +271,145 @@ describe('media tools and search options route to the cloud only while it is on'
     expect(searchOptionsFromSettings({ ...settings, gskToolsEnabled: false })).toEqual({
       useGsk: false,
     })
+  })
+})
+
+describe('cloud media reads fail closed without media roots', () => {
+  const SETTINGS = '/nonexistent/ai-settings.json'
+  const SECRET = join(tmpdir(), 'passport.jpg')
+
+  function ready() {
+    setUniworkCloudStatus(READY)
+    const transport = fakeTransport()
+    setUniworkCloudTransport(transport)
+    return transport
+  }
+
+  it.each([undefined, []] as const)(
+    'a bare local path is refused before any transport call (roots: %j)',
+    async (roots) => {
+      const transport = ready()
+      writeFileSync(SECRET, PNG_1PX)
+      const media = roots ? { mediaRoots: roots } : {}
+      await expect(
+        gskGenerateImage({ prompt: 'p', referenceImageUrls: [SECRET] }, undefined, media),
+      ).rejects.toThrow(/Local files can only be sent/)
+      await expect(
+        gskAnalyzeMedia({ mediaUrls: [SECRET], requirements: 'r' }, undefined, media),
+      ).rejects.toThrow(/Local files can only be sent/)
+      await expect(gskTranscribe({ audioUrls: [SECRET] }, undefined, media)).rejects.toThrow(
+        /Local files can only be sent/,
+      )
+      expect(transport.generateImage).not.toHaveBeenCalled()
+      expect(transport.analyzeMedia).not.toHaveBeenCalled()
+      expect(transport.transcribe).not.toHaveBeenCalled()
+    },
+  )
+
+  it('the tools return the refusal as a tool error and never upload the file', async () => {
+    const transport = ready()
+    writeFileSync(SECRET, PNG_1PX)
+    const image = await generateImageTool(SETTINGS, { prompt: 'p', referenceImageUrls: [SECRET] })
+    expect(image.error).toMatch(/Local files can only be sent/)
+    const analysis = await analyzeMediaTool(SETTINGS, { mediaUrls: [SECRET], requirements: 'r' })
+    expect(analysis.error).toMatch(/Local files can only be sent/)
+    expect(transport.generateImage).not.toHaveBeenCalled()
+    expect(transport.analyzeMedia).not.toHaveBeenCalled()
+  })
+
+  it('data URLs still pass with no roots, and a path under a root still works', async () => {
+    const transport = ready()
+    await gskAnalyzeMedia({ mediaUrls: ['data:image/png;base64,AAAA'], requirements: 'r' })
+    expect(transport.analyzeMedia).toHaveBeenCalledTimes(1)
+    const dir = mkdtempSync(join(tmpdir(), 'cloud-root-'))
+    const inside = join(dir, 'ok.png')
+    writeFileSync(inside, PNG_1PX)
+    await gskGenerateImage({ prompt: 'p', referenceImageUrls: [inside] }, undefined, {
+      mediaRoots: [dir],
+    })
+    expect(transport.generateImage).toHaveBeenCalledTimes(1)
+  })
+
+  it('a mixed batch (video to the cloud, images to BYOK) refuses local paths without roots', async () => {
+    const transport = ready()
+    const dir = mkdtempSync(join(tmpdir(), 'cloud-mixed-'))
+    const settingsPath = join(dir, 'ai-settings.json')
+    writeFileSync(
+      settingsPath,
+      JSON.stringify({
+        ...defaultAiSettings(),
+        media: {
+          ...defaultAiSettings().media,
+          analysisProvider: 'openai',
+          providers: {
+            ...defaultAiSettings().media!.providers,
+            openai: { apiKey: 'sk-test', imageModel: '', analysisModel: '' },
+          },
+        },
+      }),
+    )
+    const clip = join(dir, 'clip.mp4')
+    writeFileSync(clip, Buffer.from([0, 0, 0, 0]))
+    const refused = await analyzeMediaTool(settingsPath, { mediaUrls: [clip], requirements: 'r' })
+    expect(refused.error).toMatch(/Local files can only be sent/)
+    const ok = await analyzeMediaTool(
+      settingsPath,
+      { mediaUrls: [clip], requirements: 'r' },
+      { mediaRoots: [dir] },
+    )
+    expect(ok).toEqual({ text: 'a cat' })
+    expect(transport.analyzeMedia).toHaveBeenCalledTimes(1)
+    expect(transport.analyzeMedia.mock.calls[0]![0].media).toEqual([
+      { mime: 'video/mp4', dataBase64: Buffer.from([0, 0, 0, 0]).toString('base64') },
+    ])
+  })
+
+  it('already-loaded media is capped like loaded-by-URL media', async () => {
+    const transport = ready()
+    const blob = { bytes: new Uint8Array(4), mime: 'image/png' }
+    await expect(
+      gskAnalyzeLoadedMedia({ requirements: 'r', media: Array(5).fill(blob) }),
+    ).rejects.toThrow(/Too many/)
+    expect(transport.analyzeMedia).not.toHaveBeenCalled()
+    await expect(gskAnalyzeLoadedMedia({ requirements: 'r', media: [blob] })).resolves.toBe('a cat')
+  })
+})
+
+describe('cloud request shaping', () => {
+  it('sends the image size only as WxH, so an aspect ratio is not cancelled by auto', async () => {
+    setUniworkCloudStatus(READY)
+    const transport = fakeTransport()
+    setUniworkCloudTransport(transport)
+    await gskGenerateImage({ prompt: 'p', aspectRatio: '16:9', imageSize: 'auto' })
+    expect(transport.generateImage.mock.calls[0]![0]).toEqual({ prompt: 'p', aspectRatio: '16:9' })
+    await gskGenerateImage({ prompt: 'p', aspectRatio: '16:9', imageSize: '2k' })
+    expect(transport.generateImage.mock.calls[1]![0]).toEqual({ prompt: 'p', aspectRatio: '16:9' })
+    await gskGenerateImage({ prompt: 'p', imageSize: '1024x768' })
+    expect(transport.generateImage.mock.calls[2]![0]).toEqual({
+      prompt: 'p',
+      imageSize: '1024x768',
+    })
+  })
+
+  it('cuts at the cap without splitting a surrogate pair', async () => {
+    setUniworkCloudStatus(READY)
+    const transport = fakeTransport()
+    setUniworkCloudTransport(transport)
+    await gskWebSearch('a'.repeat(399) + '😀😀')
+    const sent = transport.search.mock.calls[0]![0].query
+    expect(Array.from(sent)).toHaveLength(400)
+    expect(sent.endsWith('😀')).toBe(true)
+    expect(sent).not.toContain('�')
+    expect(sent.length).toBe(401)
+  })
+
+  it('an inactive subscription is its own tool error', async () => {
+    setUniworkCloudStatus({
+      state: 'subscription-inactive',
+      enabled: false,
+      tools: READY.tools,
+      credits: null,
+    })
+    await expect(gskWebSearch('q')).rejects.toThrow(/subscription is not active/)
   })
 })

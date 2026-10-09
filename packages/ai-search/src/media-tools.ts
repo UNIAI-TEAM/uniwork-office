@@ -29,7 +29,14 @@ import {
   readBodyCapped,
 } from '@genoffice/electron-utils/remote-image'
 import { fetchWithSsrfGuard } from '@genoffice/electron-utils/safe-remote-url'
-import { gskAnalyzeMedia, gskGenerateImage, hasGskAuth, type GskGenerateImageOptions } from './gsk'
+import {
+  assertCloudMediaRefs,
+  gskAnalyzeLoadedMedia,
+  gskAnalyzeMedia,
+  gskGenerateImage,
+  hasGskAuth,
+  type GskGenerateImageOptions,
+} from './gsk'
 
 export const MEDIA_NOT_CONFIGURED_ERROR =
   'No media provider is configured; ask the user to set one up under Settings (AI Media) to use this tool'
@@ -383,8 +390,13 @@ export async function analyzeMediaTool(
     }
     const hasVideo = media.some((m) => !m.mime.startsWith('image/'))
     const byok = hasVideo ? videoByok : imageByok
-    // the other kind has a BYOK provider only: this one goes to the cloud when it is on
-    if (!byok) return cloud ? await viaCloud() : notConfigured
+    // the other kind has a BYOK provider only: this one goes to the cloud when it is on,
+    // with the bytes already loaded (the cloud applies its own caps and local-read rule)
+    if (!byok) {
+      if (!cloud) return notConfigured
+      assertCloudMediaRefs(mediaUrls, mediaRoots)
+      return { text: await gskAnalyzeLoadedMedia({ requirements, media }) }
+    }
     return {
       text: await analyzeMediaWithProvider(byok.provider, byok.config, { media, requirements }),
     }
