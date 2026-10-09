@@ -58,6 +58,7 @@ const tUpd = createI18n({
     updUpToDate: '已是最新版本（{version}）。',
     updCheckFailed: '无法检查更新，请检查网络后重试。',
     updOpenDownload: '前往下载页面',
+    updNoFeed: '此版本的更新需从下载页面获取并安装。',
   },
   en: {
     updTitle: 'Software Update',
@@ -75,6 +76,7 @@ const tUpd = createI18n({
     updUpToDate: "You're up to date (version {version}).",
     updCheckFailed: "Couldn't check for updates. Check your network and try again.",
     updOpenDownload: 'Open Download Page',
+    updNoFeed: 'Updates for this version are installed from the download page.',
   },
   vi: {
     updTitle: 'Cập nhật phần mềm',
@@ -92,6 +94,7 @@ const tUpd = createI18n({
     updUpToDate: 'Bạn đang sử dụng phiên bản mới nhất (phiên bản {version}).',
     updCheckFailed: 'Không thể kiểm tra bản cập nhật. Kiểm tra mạng của bạn và thử lại.',
     updOpenDownload: 'Mở trang tải xuống',
+    updNoFeed: 'Bản cập nhật cho phiên bản này được cài từ trang tải về.',
   },
   ja: {
     updTitle: 'ソフトウェアアップデート',
@@ -109,6 +112,7 @@ const tUpd = createI18n({
     updUpToDate: '最新の状態です（バージョン {version}）。',
     updCheckFailed: '更新を確認できませんでした。ネットワークを確認して再試行してください。',
     updOpenDownload: 'ダウンロードページを開く',
+    updNoFeed: 'このバージョンの更新は、ダウンロードページから入手してインストールします。',
   },
   ko: {
     updTitle: '소프트웨어 업데이트',
@@ -126,6 +130,7 @@ const tUpd = createI18n({
     updUpToDate: '최신 버전입니다 (버전 {version}).',
     updCheckFailed: '업데이트를 확인할 수 없습니다. 네트워크를 확인한 후 다시 시도하세요.',
     updOpenDownload: '다운로드 페이지 열기',
+    updNoFeed: '이 버전의 업데이트는 다운로드 페이지에서 받아 설치합니다.',
   },
   fr: {
     updTitle: 'Mise à jour logicielle',
@@ -144,6 +149,8 @@ const tUpd = createI18n({
     updCheckFailed:
       'Impossible de rechercher les mises à jour. Vérifiez votre réseau et réessayez.',
     updOpenDownload: 'Ouvrir la page de téléchargement',
+    updNoFeed:
+      'Les mises à jour de cette version sont installées depuis la page de téléchargement.',
   },
   de: {
     updTitle: 'Softwareaktualisierung',
@@ -163,6 +170,7 @@ const tUpd = createI18n({
     updCheckFailed:
       'Updates konnten nicht geprüft werden. Prüfen Sie Ihre Netzwerkverbindung und versuchen Sie es erneut.',
     updOpenDownload: 'Download-Seite öffnen',
+    updNoFeed: 'Updates für diese Version werden über die Download-Seite installiert.',
   },
   es: {
     updTitle: 'Actualización de software',
@@ -180,6 +188,7 @@ const tUpd = createI18n({
     updUpToDate: 'Está actualizado (versión {version}).',
     updCheckFailed: 'No se pudo buscar actualizaciones. Compruebe su red e inténtelo de nuevo.',
     updOpenDownload: 'Abrir página de descargas',
+    updNoFeed: 'Las actualizaciones de esta versión se instalan desde la página de descargas.',
   },
   th: {
     updTitle: 'อัปเดตซอฟต์แวร์',
@@ -196,6 +205,7 @@ const tUpd = createI18n({
     updUpToDate: 'คุณใช้เวอร์ชันล่าสุดแล้ว (เวอร์ชัน {version})',
     updCheckFailed: 'ไม่สามารถตรวจหาการอัปเดตได้ โปรดตรวจสอบเครือข่ายแล้วลองอีกครั้ง',
     updOpenDownload: 'เปิดหน้าดาวน์โหลด',
+    updNoFeed: 'การอัปเดตของเวอร์ชันนี้ติดตั้งจากหน้าดาวน์โหลด',
   },
   id: {
     updTitle: 'Pembaruan Perangkat Lunak',
@@ -213,6 +223,7 @@ const tUpd = createI18n({
     updUpToDate: 'Sudah versi terbaru (versi {version}).',
     updCheckFailed: 'Tidak dapat memeriksa pembaruan. Periksa jaringan Anda dan coba lagi.',
     updOpenDownload: 'Buka Halaman Unduhan',
+    updNoFeed: 'Pembaruan untuk versi ini dipasang dari halaman unduhan.',
   },
   ru: {
     updTitle: 'Обновление программы',
@@ -230,6 +241,7 @@ const tUpd = createI18n({
     updUpToDate: 'У вас последняя версия ({version}).',
     updCheckFailed: 'Не удалось проверить обновления. Проверьте сеть и повторите попытку.',
     updOpenDownload: 'Открыть страницу загрузки',
+    updNoFeed: 'Обновления для этой версии устанавливаются со страницы загрузки.',
   },
   ar: {
     updTitle: 'تحديث البرنامج',
@@ -245,6 +257,7 @@ const tUpd = createI18n({
     updUpToDate: 'أنت على أحدث إصدار (الإصدار {version}).',
     updCheckFailed: 'تعذر التحقق من التحديثات. تحقق من الشبكة وحاول مرة أخرى.',
     updOpenDownload: 'فتح صفحة التنزيل',
+    updNoFeed: 'تُثبَّت تحديثات هذا الإصدار من صفحة التنزيل.',
   },
   pt: {
     updTitle: 'Atualização de Software',
@@ -262,6 +275,7 @@ const tUpd = createI18n({
     updUpToDate: 'Você está atualizado (versão {version}).',
     updCheckFailed: 'Não foi possível procurar atualizações. Verifique sua rede e tente novamente.',
     updOpenDownload: 'Abrir página de download',
+    updNoFeed: 'As atualizações desta versão são instaladas a partir da página de download.',
   },
   it: {
     updTitle: 'Aggiornamento software',
@@ -279,6 +293,7 @@ const tUpd = createI18n({
     updUpToDate: 'Sei aggiornato (versione {version}).',
     updCheckFailed: 'Impossibile controllare gli aggiornamenti. Verifica la rete e riprova.',
     updOpenDownload: 'Apri pagina di download',
+    updNoFeed: 'Gli aggiornamenti di questa versione si installano dalla pagina di download.',
   },
   pl: {
     updTitle: 'Aktualizacja oprogramowania',
@@ -296,6 +311,7 @@ const tUpd = createI18n({
     updUpToDate: 'Masz aktualną wersję ({version}).',
     updCheckFailed: 'Nie udało się sprawdzić aktualizacji. Sprawdź sieć i spróbuj ponownie.',
     updOpenDownload: 'Otwórz stronę pobierania',
+    updNoFeed: 'Aktualizacje tej wersji instaluje się ze strony pobierania.',
   },
   cs: {
     updTitle: 'Aktualizace softwaru',
@@ -313,6 +329,7 @@ const tUpd = createI18n({
     updUpToDate: 'Máte aktuální verzi ({version}).',
     updCheckFailed: 'Aktualizace se nepodařilo zkontrolovat. Zkontrolujte síť a zkuste to znovu.',
     updOpenDownload: 'Otevřít stránku pro stažení',
+    updNoFeed: 'Aktualizace této verze se instalují ze stránky pro stažení.',
   },
   nl: {
     updTitle: 'Software-update',
@@ -331,6 +348,7 @@ const tUpd = createI18n({
     updCheckFailed:
       'Kan niet controleren op updates. Controleer uw netwerk en probeer het opnieuw.',
     updOpenDownload: 'Downloadpagina openen',
+    updNoFeed: 'Updates voor deze versie installeert u via de downloadpagina.',
   },
   ms: {
     updTitle: 'Kemas Kini Perisian',
@@ -348,6 +366,7 @@ const tUpd = createI18n({
     updUpToDate: 'Anda menggunakan versi terkini (versi {version}).',
     updCheckFailed: 'Tidak dapat menyemak kemas kini. Semak rangkaian anda dan cuba lagi.',
     updOpenDownload: 'Buka Halaman Muat Turun',
+    updNoFeed: 'Kemas kini untuk versi ini dipasang dari halaman muat turun.',
   },
   he: {
     updTitle: 'עדכון תוכנה',
@@ -363,6 +382,7 @@ const tUpd = createI18n({
     updUpToDate: 'הגרסה שלך עדכנית (גרסה {version}).',
     updCheckFailed: 'לא ניתן לבדוק עדכונים. בדקו את הרשת ונסו שוב.',
     updOpenDownload: 'פתח את דף ההורדות',
+    updNoFeed: 'עדכונים לגרסה זו מותקנים מדף ההורדות.',
   },
   hi: {
     updTitle: 'सॉफ़्टवेयर अपडेट',
@@ -380,6 +400,7 @@ const tUpd = createI18n({
     updUpToDate: 'आप अपडेटेड हैं (संस्करण {version}).',
     updCheckFailed: 'अपडेट जांच नहीं हो सकी। अपना नेटवर्क जांचें और फिर से प्रयास करें।',
     updOpenDownload: 'डाउनलोड पृष्ठ खोलें',
+    updNoFeed: 'इस संस्करण के अपडेट डाउनलोड पृष्ठ से इंस्टॉल किए जाते हैं।',
   },
   'zh-TW': {
     updTitle: '軟體更新',
@@ -395,6 +416,7 @@ const tUpd = createI18n({
     updUpToDate: '已是最新版本（{version}）。',
     updCheckFailed: '無法檢查更新，請檢查網路後重試。',
     updOpenDownload: '前往下載頁面',
+    updNoFeed: '此版本的更新需從下載頁面取得並安裝。',
   },
 })
 
@@ -488,6 +510,10 @@ const CHANNEL_FEED: Record<UpdateChannel, string> = { stable: 'latest', beta: 'b
 // true once the packaged-run updater is configured; channel switches before
 // that (or in dev runs) must not touch electron-updater
 let updaterActive = false
+// true for a packaged build shipped without resources/app-update.yml (the
+// dev/beta installers): the manual check then explains where updates come
+// from instead of reporting a failed automatic update
+let noUpdateFeed = false
 
 function log(...args: unknown[]): void {
   console.log('[updater]', ...args)
@@ -552,7 +578,8 @@ export async function checkForUpdatesNow(): Promise<void> {
       const { response } = await dialog.showMessageBox({
         type: 'info',
         title: tUpd(lang, 'updTitle'),
-        message: tUpd(lang, 'updManual'),
+        // nothing failed in a build without a feed: say where updates come from
+        message: tUpd(lang, noUpdateFeed ? 'updNoFeed' : 'updManual'),
         buttons: ['OK', tUpd(lang, 'updOpenDownload')],
         defaultId: 0,
         cancelId: 0,
@@ -623,6 +650,7 @@ export function initAutoUpdater(
   // without a self-update mechanism.
   if (!existsSync(path.join(process.resourcesPath, 'app-update.yml'))) {
     log('no app-update.yml in this build; updater inactive')
+    noUpdateFeed = true
     return
   }
 

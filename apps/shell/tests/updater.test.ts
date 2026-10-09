@@ -649,6 +649,8 @@ describe('checkForUpdatesNow (r148 manual check)', () => {
 
     expect(showMessageBox).toHaveBeenCalledTimes(1)
     expect(lastDialogOpts().buttons.length).toBe(2)
+    // dev runs / deb keep the established manual-update wording
+    expect(lastDialogOpts().message).toBe('自动更新失败，请从下载页面获取最新版本并手动安装。')
     expect(openExternal).toHaveBeenCalledWith((await loadUpdater()).DOWNLOAD_PAGE_URL)
     expect(checkForUpdates).not.toHaveBeenCalled()
   })
@@ -664,8 +666,19 @@ describe('checkForUpdatesNow (r148 manual check)', () => {
     expect(showMessageBox).toHaveBeenCalledTimes(1)
     expect(lastDialogOpts().type).toBe('info')
     expect(lastDialogOpts().buttons.length).toBe(2)
+    // nothing failed: a neutral sentence instead of "Automatic update failed"
+    expect(lastDialogOpts().message).toBe('此版本的更新需从下载页面获取并安装。')
     expect(openExternal).toHaveBeenCalledWith(DOWNLOAD_PAGE_URL)
     expect(checkForUpdates).not.toHaveBeenCalled()
+
+    const { setUiLang } = await import('@genoffice/i18n')
+    setUiLang('en')
+    await checkForUpdatesNow()
+    expect(lastDialogOpts().message).toBe(
+      'Updates for this version are installed from the download page.',
+    )
+    expect(lastDialogOpts().buttons).toEqual(['OK', 'Open Download Page'])
+    setUiLang('zh')
   })
 
   it("shows you're-up-to-date (with the current version) when nothing newer exists", async () => {
