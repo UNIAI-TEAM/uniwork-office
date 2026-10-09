@@ -263,8 +263,9 @@ base-uri 'self'; form-action 'self'; frame-ancestors 'self'`), `X-Frame-Options:
 
 ## 6. Open items
 
-- **No autosave on the web** (product decision): `autoSaveToDisk` is `false`, since each autosave would create a new
-  Documents version. A server-backed autosave would flip that capability (or add a key).
+Decided (user, 2026-10-09): **no autosave on the web**, for Docs and every other module. Saving is an explicit
+user save only; `autoSaveToDisk` stays `false` in the web capability list, so the AutoSave toggle stays hidden.
+
 - **Attachments and `projectApi`** are browser-local / in-memory while AI is hidden; they need host-backed versions
   (`api.attachments.add`, `api.images.upload` exist in the protocol, unused) when AI ships on the web.
 - **Images on file documents are kept until purge** (dev-uniwork storage side).
