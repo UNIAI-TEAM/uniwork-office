@@ -270,13 +270,24 @@ export function resolveAiMediaSettings(
   }
   const legacy = stored.provider
   const analysisProvider = stored.analysisProvider ?? legacy ?? defaults.analysisProvider
+  const cloudPicked = resolveCloudPicked(stored.cloudPicked)
   return {
     imageProvider: stored.imageProvider ?? legacy ?? defaults.imageProvider,
     analysisProvider,
     // a pre-split file used one vendor for all media analysis
     videoAnalysisProvider: stored.videoAnalysisProvider ?? analysisProvider,
     providers,
+    ...(cloudPicked ? { cloudPicked } : {}),
   }
+}
+
+/** the explicit-cloud marks of a stored block; hand-edited junk reads as none */
+function resolveCloudPicked(raw: unknown): AiMediaSettings['cloudPicked'] {
+  if (!raw || typeof raw !== 'object') return undefined
+  const r = raw as Record<string, unknown>
+  const picked: NonNullable<AiMediaSettings['cloudPicked']> = {}
+  for (const cap of ['image', 'analysis', 'video'] as const) if (r[cap] === true) picked[cap] = true
+  return Object.keys(picked).length ? picked : undefined
 }
 
 /** Key (or base URL for custom) present — the minimum for a BYOK media provider to be honored */
@@ -296,35 +307,54 @@ export function cloudToolFor(capability: MediaCapability): UniworkCloudTool {
   return capability === 'image' ? 'image_generate' : 'media_analyze'
 }
 
+function storedMediaProvider(
+  media: AiMediaSettings,
+  capability: MediaCapability,
+): AiMediaProviderId | undefined {
+  return capability === 'image'
+    ? media.imageProvider
+    : capability === 'video'
+      ? media.videoAnalysisProvider
+      : media.analysisProvider
+}
+
+/** the first BYOK vendor (catalog order) that has this capability and a usable config */
+function firstUsableByok(
+  media: AiMediaSettings,
+  capability: MediaCapability,
+  offered: readonly AiMediaProviderMeta[] = AI_MEDIA_PROVIDERS,
+): AiMediaProviderMeta | undefined {
+  return offered.find(
+    (m) =>
+      m.id !== 'genspark' &&
+      providerHasCapability(m, capability) &&
+      mediaConfigUsable(m, media.providers?.[m.id]),
+  )
+}
+
 /**
  * The stored provider for one capability, honored only when it exists, has
  * that capability and is usable; anything else resolves to `genspark` (the
- * UniWork cloud route, no BYOK config). While the cloud tool for the
- * capability is not offered (signed out, not entitled, not configured), a
- * stored `genspark` (the default) yields to the first visible BYOK provider
- * with a usable config for the capability.
+ * UniWork cloud route, no BYOK config). A stored `genspark` is only the
+ * default unless the user picked the cloud entry themselves
+ * (`media.cloudPicked`): the default yields to the first BYOK provider with a
+ * usable config, so a user's own key is never silently replaced by paid cloud
+ * credits after sign-in. An explicit cloud pick stays on the cloud while the
+ * capability's tool is offered (signed out, not entitled or not configured
+ * fall back to BYOK).
  */
 export function activeMediaProvider(
-  settings: Pick<AiSettings, 'media'>,
+  settings: Pick<AiSettings, 'media'> & Partial<Pick<AiSettings, 'gskToolsEnabled'>>,
   capability: MediaCapability,
 ): AiMediaProviderId {
   const media = settings.media
   if (!media) return 'genspark'
-  const id =
-    capability === 'image'
-      ? media.imageProvider
-      : capability === 'video'
-        ? media.videoAnalysisProvider
-        : media.analysisProvider
+  const id = storedMediaProvider(media, capability)
   if (!id || id === 'genspark') {
-    if (uniworkCloudToolAvailable(cloudToolFor(capability))) return 'genspark'
-    const fallback = AI_MEDIA_PROVIDERS.find(
-      (m) =>
-        m.id !== 'genspark' &&
-        providerHasCapability(m, capability) &&
-        mediaConfigUsable(m, media.providers?.[m.id]),
-    )
-    return fallback?.id ?? 'genspark'
+    // the AI model switch turns the cloud off even for an explicit pick
+    const picked = media.cloudPicked?.[capability] === true && settings.gskToolsEnabled !== false
+    if (picked && uniworkCloudToolAvailable(cloudToolFor(capability))) return 'genspark'
+    return firstUsableByok(media, capability)?.id ?? 'genspark'
   }
   const meta = getMediaProviderMeta(id)
   if (!meta || !providerHasCapability(meta, capability)) return 'genspark'
@@ -334,7 +364,7 @@ export function activeMediaProvider(
 
 /** the active BYOK config for one capability, or null when it falls back to the UniWork cloud route */
 export function activeMediaConfig(
-  settings: Pick<AiSettings, 'media'>,
+  settings: Pick<AiSettings, 'media'> & Partial<Pick<AiSettings, 'gskToolsEnabled'>>,
   capability: MediaCapability,
 ): { provider: Exclude<AiMediaProviderId, 'genspark'>; config: AiMediaProviderConfig } | null {
   const provider = activeMediaProvider(settings, capability)
@@ -342,8 +372,67 @@ export function activeMediaConfig(
   return { provider, config: settings.media!.providers[provider] }
 }
 
+/**
+ * The providers one media block offers from the catalog the shell published.
+ * The UniWork cloud entry is offered only while its tools are in use: signed in,
+ * entitled and the "Use UniWork cloud tools" switch on.
+ */
+export function offeredMediaProviders(
+  catalog: readonly AiMediaProviderMeta[],
+  capability: MediaCapability,
+  cloudToolsOn: boolean,
+): AiMediaProviderMeta[] {
+  return catalog.filter(
+    (m) => (m.id !== 'genspark' || cloudToolsOn) && providerHasCapability(m, capability),
+  )
+}
+
+/**
+ * The provider a picker shows for one capability among `offered` (the entries
+ * that block lists): the stored choice when the block offers it, except that a
+ * default `genspark` shows the BYOK vendor that actually serves the capability
+ * (see activeMediaProvider), and a stored choice the block does not offer
+ * shows as its first entry.
+ */
+export function shownMediaProvider(
+  media: AiMediaSettings,
+  capability: MediaCapability,
+  offered: readonly AiMediaProviderMeta[],
+): AiMediaProviderId {
+  const stored = storedMediaProvider(media, capability)
+  if ((!stored || stored === 'genspark') && media.cloudPicked?.[capability] !== true) {
+    const byok = firstUsableByok(media, capability, offered)
+    if (byok) return byok.id
+  }
+  return (offered.find((m) => m.id === stored) ?? offered[0])?.id ?? stored ?? 'genspark'
+}
+
+function mediaProviderField(capability: MediaCapability) {
+  return capability === 'image'
+    ? 'imageProvider'
+    : capability === 'video'
+      ? 'videoAnalysisProvider'
+      : 'analysisProvider'
+}
+
+/** Stores the provider the user picked for one capability; picking the cloud entry is remembered as explicit. */
+export function setMediaProviderChoice(
+  media: AiMediaSettings,
+  capability: MediaCapability,
+  id: AiMediaProviderId,
+): AiMediaSettings {
+  const { [capability]: _previous, ...rest } = media.cloudPicked ?? {}
+  const cloudPicked = id === 'genspark' ? { ...rest, [capability]: true } : rest
+  const { cloudPicked: _old, ...base } = media
+  return {
+    ...base,
+    [mediaProviderField(capability)]: id,
+    ...(Object.keys(cloudPicked).length ? { cloudPicked } : {}),
+  }
+}
+
 function byokModel(
-  settings: Pick<AiSettings, 'media'>,
+  settings: Pick<AiSettings, 'media'> & Partial<Pick<AiSettings, 'gskToolsEnabled'>>,
   capability: MediaCapability,
 ): string | null {
   const active = activeMediaConfig(settings, capability)
@@ -378,12 +467,6 @@ export function updateMediaProviderConfig(
   id: AiMediaProviderId,
   patch: Partial<AiMediaProviderConfig>,
 ): AiMediaSettings {
-  const field =
-    capability === 'image'
-      ? 'imageProvider'
-      : capability === 'video'
-        ? 'videoAnalysisProvider'
-        : 'analysisProvider'
   const meta = getMediaProviderMeta(id)
   const config: AiMediaProviderConfig = {
     ...(media.providers[id] ?? {
@@ -393,15 +476,20 @@ export function updateMediaProviderConfig(
     }),
     ...patch,
   }
+  const stored = storedMediaProvider(media, capability)
+  // a stored cloud default shows (and serves) the first usable BYOK vendor instead, so
+  // it only counts as a shown choice when the user picked the cloud entry
   const shown = visibleMediaProviders().some(
-    (m) => m.id === media[field] && providerHasCapability(m, capability),
+    (m) =>
+      m.id === stored &&
+      providerHasCapability(m, capability) &&
+      (m.id !== 'genspark' || media.cloudPicked?.[capability] === true),
   )
-  const pin = !shown && !!meta && mediaConfigUsable(meta, config)
-  return {
-    ...media,
-    ...(pin ? { [field]: id } : {}),
-    providers: { ...media.providers, [id]: config },
-  }
+  // an edit to the vendor that already serves the capability (it was usable) keeps it
+  const wasUsable = !!meta && mediaConfigUsable(meta, media.providers[id])
+  const pin = !shown && !!meta && (mediaConfigUsable(meta, config) || wasUsable)
+  const updated = { ...media, providers: { ...media.providers, [id]: config } }
+  return pin ? setMediaProviderChoice(updated, capability, id) : updated
 }
 
 /**

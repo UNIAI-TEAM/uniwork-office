@@ -2,11 +2,11 @@ import type { zh } from './zh'
 
 export const zhTW = {
   cloudTitle: 'UniWork 雲端 AI',
-  cloudStatus: '狀態',
   cloudStateReady: '可用',
   cloudStateNotEntitled: '方案未包含此功能',
   cloudStateExhausted: 'AI 額度已用完',
   cloudStateUnavailable: '暫時無法使用',
+  cloudStateInactive: '訂閱未生效',
   cloudCredits: 'AI 額度',
   cloudCreditsLeft: '剩餘 {remaining} / {limit}',
   cloudCreditsUnlimited: '不限量',
@@ -16,6 +16,10 @@ export const zhTW = {
   cloudExhaustedBody:
     '你所在組織本週期的 UniWork AI 額度已用完。雲端工具會暫停到額度重置；下方自己的服務商不受影響。',
   cloudUnavailableBody: 'UniWork 雲端 AI 暫時無法使用。下方自己的服務商不受影響。',
+  cloudInactiveBody:
+    '你所在組織的 UniWork 訂閱未生效，雲端 AI 已暫停。請聯絡管理員續訂；下方自己的服務商不受影響。',
+  cloudToolsOffBody:
+    'UniWork 雲端工具已關閉。請在「{section}」中開啟「{switch}」以使用組織的 AI 額度；下方自己的服務商不受影響。',
   cloudReadyBody: '未設定自有服務商時，搜尋、圖片生成和媒體分析會使用組織的 UniWork AI 額度。',
   cloudToolsToggle: '使用 UniWork 雲端工具',
   cloudToolsToggleDesc:

@@ -2,11 +2,11 @@ import type { zh } from './zh'
 
 export const fr = {
   cloudTitle: 'IA cloud UniWork',
-  cloudStatus: 'Statut',
   cloudStateReady: 'Disponible',
   cloudStateNotEntitled: 'Non inclus dans votre offre',
   cloudStateExhausted: 'Crédits IA épuisés',
   cloudStateUnavailable: 'Indisponible',
+  cloudStateInactive: 'Abonnement inactif',
   cloudCredits: 'Crédits IA',
   cloudCreditsLeft: '{remaining} / {limit} restants',
   cloudCreditsUnlimited: 'Illimité',
@@ -19,6 +19,10 @@ export const fr = {
     'Votre organisation a utilisé tous ses crédits IA UniWork pour cette période. Les outils cloud sont suspendus jusqu’au renouvellement ; vos propres fournisseurs ci-dessous fonctionnent toujours.',
   cloudUnavailableBody:
     'L’IA cloud UniWork est indisponible pour le moment. Vos propres fournisseurs ci-dessous fonctionnent toujours.',
+  cloudInactiveBody:
+    'L’abonnement UniWork de votre organisation n’est pas actif : l’IA cloud est suspendue. Demandez à un administrateur de le renouveler ; vos propres fournisseurs ci-dessous continuent de fonctionner.',
+  cloudToolsOffBody:
+    'Les outils cloud UniWork sont désactivés. Activez « {switch} » dans {section} pour utiliser les crédits IA de votre organisation ; vos propres fournisseurs ci-dessous ne sont pas concernés.',
   cloudReadyBody:
     'Sans fournisseur personnel, la recherche, la génération d’images et l’analyse de médias utilisent les crédits IA UniWork de votre organisation.',
   cloudToolsToggle: 'Utiliser les outils cloud UniWork',

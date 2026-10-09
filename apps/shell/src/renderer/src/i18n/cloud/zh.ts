@@ -1,11 +1,11 @@
 /** UniWork cloud AI copy (Settings → Account / AI model / AI media); zh defines the key set */
 export const zh = {
   cloudTitle: 'UniWork 云端 AI',
-  cloudStatus: '状态',
   cloudStateReady: '可用',
   cloudStateNotEntitled: '套餐不含此功能',
   cloudStateExhausted: 'AI 额度已用完',
   cloudStateUnavailable: '暂不可用',
+  cloudStateInactive: '订阅未生效',
   cloudCredits: 'AI 额度',
   cloudCreditsLeft: '剩余 {remaining} / {limit}',
   cloudCreditsUnlimited: '不限量',
@@ -15,6 +15,10 @@ export const zh = {
   cloudExhaustedBody:
     '你所在组织本周期的 UniWork AI 额度已用完。云端工具会暂停到额度重置；下方自己的服务商不受影响。',
   cloudUnavailableBody: 'UniWork 云端 AI 暂时不可用。下方自己的服务商不受影响。',
+  cloudInactiveBody:
+    '你所在组织的 UniWork 订阅未生效，云端 AI 已暂停。请联系管理员续订；下方自己的服务商不受影响。',
+  cloudToolsOffBody:
+    'UniWork 云端工具已关闭。请在“{section}”中开启“{switch}”以使用组织的 AI 额度；下方自己的服务商不受影响。',
   cloudReadyBody: '未设置自有服务商时，搜索、图片生成和媒体分析会使用组织的 UniWork AI 额度。',
   cloudToolsToggle: '使用 UniWork 云端工具',
   cloudToolsToggleDesc:

@@ -115,6 +115,12 @@ export interface AiMediaSettings {
   /** provider behind analyze_media when the input has video/audio (only video-capable vendors qualify) */
   videoAnalysisProvider: AiMediaProviderId
   providers: Record<AiMediaProviderId, AiMediaProviderConfig>
+  /**
+   * Capabilities where the user picked the UniWork cloud entry themselves. A
+   * stored `genspark` without this mark is only the default and yields to a
+   * BYOK vendor with a usable config.
+   */
+  cloudPicked?: { image?: boolean; analysis?: boolean; video?: boolean } | undefined
   /** pre-catalog shape (one provider for both); migrated by resolveAiMediaSettings */
   provider?: AiMediaProviderId | undefined
 }

@@ -2,11 +2,11 @@ import type { zh } from './zh'
 
 export const ru = {
   cloudTitle: 'Облачный ИИ UniWork',
-  cloudStatus: 'Статус',
   cloudStateReady: 'Доступен',
   cloudStateNotEntitled: 'Не входит в ваш тариф',
   cloudStateExhausted: 'Кредиты ИИ закончились',
   cloudStateUnavailable: 'Недоступен',
+  cloudStateInactive: 'Подписка неактивна',
   cloudCredits: 'Кредиты ИИ',
   cloudCreditsLeft: 'Осталось {remaining} / {limit}',
   cloudCreditsUnlimited: 'Без ограничений',
@@ -19,6 +19,10 @@ export const ru = {
     'Ваша организация израсходовала все кредиты ИИ UniWork за этот период. Облачные инструменты приостановлены до обновления; ваши провайдеры ниже продолжают работать.',
   cloudUnavailableBody:
     'Облачный ИИ UniWork сейчас недоступен. Ваши провайдеры ниже продолжают работать.',
+  cloudInactiveBody:
+    'Подписка UniWork вашей организации неактивна, поэтому облачный ИИ приостановлен. Попросите администратора продлить её; ваши собственные провайдеры ниже продолжают работать.',
+  cloudToolsOffBody:
+    'Облачные инструменты UniWork выключены. Включите «{switch}» в разделе «{section}», чтобы использовать ИИ-кредиты организации; ваши собственные провайдеры ниже не затронуты.',
   cloudReadyBody:
     'Без собственного провайдера поиск, генерация изображений и анализ медиа используют кредиты ИИ UniWork вашей организации.',
   cloudToolsToggle: 'Использовать облачные инструменты UniWork',

@@ -46,9 +46,17 @@ export type StubRefreshMode = 'ok' | 'device_revoked' | 'refresh_reused'
  * What the cloud routes answer: `ready` (entitled, credits left, every tool
  * on), `not_entitled` (status enabled=false, tools 403), `credits_exhausted`
  * (remaining 0, tools 402), `unavailable` (entitled, no tool configured,
- * tools 503).
+ * tools 503), `subscription_inactive` (status enabled=false with that reason,
+ * tools 403) and `not_configured` (status enabled=false, reason
+ * cloud_unavailable: the plan has it but the server has no tool configured).
  */
-export type StubCloudMode = 'ready' | 'not_entitled' | 'credits_exhausted' | 'unavailable'
+export type StubCloudMode =
+  | 'ready'
+  | 'not_entitled'
+  | 'credits_exhausted'
+  | 'unavailable'
+  | 'subscription_inactive'
+  | 'not_configured'
 
 /** a 1x1 PNG the image route returns */
 export const STUB_CLOUD_IMAGE_BASE64 =
@@ -281,7 +289,15 @@ export async function startUniworkAuthStub(
   const CLOUD_LIMIT = 50_000
 
   function cloudStatus(): Record<string, unknown> {
-    const entitled = cloudMode !== 'not_entitled'
+    const reason =
+      cloudMode === 'not_entitled'
+        ? 'entitlement_required'
+        : cloudMode === 'subscription_inactive'
+          ? 'subscription_inactive'
+          : cloudMode === 'not_configured'
+            ? 'cloud_unavailable'
+            : null
+    const entitled = reason === null
     const toolsOn = cloudMode === 'ready' || cloudMode === 'credits_exhausted'
     const tools = Object.fromEntries(
       ['web_search', 'image_search', 'image_generate', 'media_analyze', 'transcribe'].map((t) => [
@@ -291,7 +307,7 @@ export async function startUniworkAuthStub(
     )
     return {
       enabled: entitled,
-      ...(entitled ? {} : { reason: 'entitlement_required' }),
+      ...(reason ? { reason } : {}),
       tools,
       credits: {
         unit: 'ai.tokens',
@@ -311,6 +327,8 @@ export async function startUniworkAuthStub(
     if (req.method !== 'POST') return fail(res, 404, 'not_found')
     const body = await readJson(req)
     if (cloudMode === 'not_entitled') return fail(res, 403, 'entitlement_required')
+    if (cloudMode === 'subscription_inactive') return fail(res, 403, 'subscription_inactive')
+    if (cloudMode === 'not_configured') return fail(res, 503, 'cloud_unavailable')
     if (cloudMode === 'credits_exhausted') return fail(res, 402, 'credits_exhausted')
     if (cloudMode === 'unavailable') return fail(res, 503, 'cloud_unavailable')
     if (sub === '/search') {

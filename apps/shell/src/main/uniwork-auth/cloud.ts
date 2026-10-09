@@ -6,6 +6,7 @@ import {
   type UniworkCloudErrorCode,
   type UniworkCloudMedia,
   type UniworkCloudSearchResult,
+  type UniworkCloudState,
   type UniworkCloudStatus,
   type UniworkCloudTool,
   type UniworkCloudTransport,
@@ -42,6 +43,8 @@ export interface CloudClientDeps {
   orgId(): string | null
   /** account manager: a fresh token per call, one refresh + retry on TransportError `unauthorized` */
   withAccessToken<T>(call: (token: string) => Promise<T>): Promise<T>
+  /** the app UI language as the server's analysis language (vi | en); omitted = the server default */
+  locale?(): string | null
   fetch?: FetchLike
   timeouts?: Partial<typeof CLOUD_TIMEOUTS_MS>
 }
@@ -61,6 +64,8 @@ export interface UniworkCloudClient extends UniworkCloudTransport {
 /** server error code -> cloud error code; anything else falls back by status */
 const SERVER_CODES: ReadonlySet<string> = new Set<UniworkCloudErrorCode>([
   'entitlement_required',
+  'subscription_inactive',
+  'no_access',
   'credits_exhausted',
   'cloud_unavailable',
   'rate_limited',
@@ -85,8 +90,12 @@ async function cloudErrorFrom(response: Response): Promise<UniworkCloudError | T
   if (typeof code === 'string' && SERVER_CODES.has(code)) {
     return new UniworkCloudError(code as UniworkCloudErrorCode, status)
   }
+  // the organization is not (or no longer) the caller's: not a plan problem
+  if (code === 'forbidden' || code === 'not_found')
+    return new UniworkCloudError('no_access', status)
   if (status === 402) return new UniworkCloudError('credits_exhausted', status)
   if (status === 403) return new UniworkCloudError('entitlement_required', status)
+  if (status === 404) return new UniworkCloudError('no_access', status)
   if (status === 429) return new UniworkCloudError('rate_limited', status)
   if (status === 503) return new UniworkCloudError('cloud_unavailable', status)
   if (status >= 500) return new UniworkCloudError('server_error', status)
@@ -302,15 +311,21 @@ export function createUniworkCloudClient(deps: CloudClientDeps): UniworkCloudCli
         },
         signal,
       ),
-    analyzeMedia: (request, signal) =>
-      call(
+    analyzeMedia: (request, signal) => {
+      const locale = deps.locale?.()
+      return call(
         'POST',
         '/media/analyze',
-        { requirements: request.requirements, media: request.media.map(media) },
+        {
+          requirements: request.requirements,
+          media: request.media.map(media),
+          ...(locale ? { locale } : {}),
+        },
         timeouts.analyze,
         parseText,
         signal,
-      ),
+      )
+    },
     transcribe: (request, signal) =>
       call(
         'POST',
@@ -337,6 +352,36 @@ export interface CloudControllerDeps {
   account(): CloudAccountView
   /** receives every new status (ai-provider seam + renderer push) */
   publish(status: UniworkCloudStatus): void
+  /** re-reads the account's organizations and plan (a 403/404 may mean the membership changed) */
+  refreshAccount?(): Promise<unknown>
+  /** pauses between automatic re-reads after a transient failure; the last one repeats */
+  retryDelaysMs?: readonly number[]
+}
+
+/** failures that say nothing about the plan: the cloud is re-read later on its own */
+const TRANSIENT_CODES: ReadonlySet<string> = new Set<UniworkCloudErrorCode>([
+  'network',
+  'timeout',
+  'server_error',
+  'rate_limited',
+  'cloud_unavailable',
+])
+const DEFAULT_RETRY_DELAYS_MS: readonly number[] = [30_000, 120_000, 600_000]
+/** at most one account re-read per this long when calls keep answering "no access" */
+const ACCOUNT_REFRESH_MIN_GAP_MS = 60_000
+
+/** why the server says the cloud is off: a plan, billing or server-side configuration problem */
+function stateForDisabled(reason: string | undefined): UniworkCloudState {
+  switch (reason) {
+    case undefined:
+    case 'entitlement_required':
+      return 'not-entitled'
+    case 'subscription_inactive':
+      return 'subscription-inactive'
+    default:
+      // cloud_unavailable (no tool configured on the server) and anything unknown
+      return 'unavailable'
+  }
 }
 
 /** the published status for a server answer */
@@ -351,10 +396,14 @@ export function statusFromServer(
   if (!server.enabled) {
     return {
       ...UNIWORK_CLOUD_SIGNED_OUT,
-      state: 'not-entitled',
+      state: stateForDisabled(server.reason),
       credits: server.credits,
       ...display,
     }
+  }
+  // enabled with a zero cap: the plan has no AI credits at all, which is not "used up"
+  if (server.credits?.limit === 0) {
+    return { ...UNIWORK_CLOUD_SIGNED_OUT, state: 'not-entitled', credits: null, ...display }
   }
   const anyTool = UNIWORK_CLOUD_TOOLS.some((tool) => server.tools[tool])
   const exhausted = server.credits?.remaining === 0
@@ -380,9 +429,46 @@ export class UniworkCloudController {
   private currentOrg: string | null = null
   private generation = 0
   private inFlight: { key: string; run: Promise<UniworkCloudStatus> } | null = null
+  private retryTimer: ReturnType<typeof setTimeout> | null = null
+  private retryAttempt = 0
+  private lastAccountRefresh = 0
 
   constructor(deps: CloudControllerDeps) {
     this.deps = deps
+  }
+
+  /** stops the automatic re-read (quit) */
+  dispose(): void {
+    this.generation++
+    this.inFlight = null
+    this.clearRetry()
+  }
+
+  private clearRetry(): void {
+    if (this.retryTimer) clearTimeout(this.retryTimer)
+    this.retryTimer = null
+    this.retryAttempt = 0
+  }
+
+  /** a transient failure left the status unread or stale: read again after a growing pause */
+  private scheduleRetry(): void {
+    if (this.retryTimer) clearTimeout(this.retryTimer)
+    const delays = this.deps.retryDelaysMs ?? DEFAULT_RETRY_DELAYS_MS
+    const delay = delays[Math.min(this.retryAttempt, delays.length - 1)] ?? 600_000
+    this.retryAttempt++
+    this.retryTimer = setTimeout(() => {
+      this.retryTimer = null
+      void this.refresh().catch(() => undefined)
+    }, delay)
+    this.retryTimer.unref?.()
+  }
+
+  /** the membership may have changed: re-read the account, at most once a minute */
+  private refreshAccountSoon(): void {
+    const refresh = this.deps.refreshAccount
+    if (!refresh || Date.now() - this.lastAccountRefresh < ACCOUNT_REFRESH_MIN_GAP_MS) return
+    this.lastAccountRefresh = Date.now()
+    void Promise.resolve(refresh()).catch(() => undefined)
   }
 
   status(): UniworkCloudStatus {
@@ -395,17 +481,23 @@ export class UniworkCloudController {
     this.deps.publish(next)
   }
 
-  /** re-reads the status (or publishes signed-out at once when there is no session) */
-  refresh(): Promise<UniworkCloudStatus> {
+  /**
+   * Re-reads the status (or publishes signed-out at once when there is no
+   * session). A read already in flight is joined unless `fresh` is set: the
+   * credits moved after that read started, so it is superseded (its answer is
+   * dropped) by a new one.
+   */
+  refresh(options: { fresh?: boolean } = {}): Promise<UniworkCloudStatus> {
     const account = this.deps.account()
     if (!account.signedIn || !account.orgId) {
       this.generation++
       this.inFlight = null
+      this.clearRetry()
       if (this.current.state !== 'signed-out') this.set(UNIWORK_CLOUD_SIGNED_OUT, null)
       return Promise.resolve(this.current)
     }
     const key = account.orgId
-    if (this.inFlight?.key === key) return this.inFlight.run
+    if (!options.fresh && this.inFlight?.key === key) return this.inFlight.run
     const generation = ++this.generation
     const run = this.read(account, generation).finally(() => {
       if (this.inFlight?.run === run) this.inFlight = null
@@ -416,8 +508,10 @@ export class UniworkCloudController {
 
   private async read(account: CloudAccountView, generation: number): Promise<UniworkCloudStatus> {
     let next: UniworkCloudStatus
+    let answered = false
     try {
       next = statusFromServer(await this.deps.client.status(), account)
+      answered = true
     } catch (error) {
       if (generation !== this.generation) return this.current
       const code = error instanceof UniworkCloudError ? error.code : 'network'
@@ -425,14 +519,24 @@ export class UniworkCloudController {
         next = UNIWORK_CLOUD_SIGNED_OUT
       } else if (code === 'entitlement_required') {
         next = { ...UNIWORK_CLOUD_SIGNED_OUT, state: 'not-entitled' }
-      } else if (this.currentOrg === account.orgId && this.current.state !== 'signed-out') {
-        // a passing outage keeps the last known answer for this organization
-        return this.current
+      } else if (code === 'subscription_inactive') {
+        next = { ...UNIWORK_CLOUD_SIGNED_OUT, state: 'subscription-inactive' }
+      } else if (code === 'no_access') {
+        // not a plan problem: the organization is gone for this user, so re-read the account
+        this.refreshAccountSoon()
+        next = { ...UNIWORK_CLOUD_SIGNED_OUT, state: 'unavailable' }
       } else {
+        if (TRANSIENT_CODES.has(code)) this.scheduleRetry()
+        if (this.currentOrg === account.orgId && this.current.state !== 'signed-out') {
+          // a passing outage keeps the last known answer for this organization
+          return this.current
+        }
         next = { ...UNIWORK_CLOUD_SIGNED_OUT, state: 'unavailable' }
       }
     }
     if (generation !== this.generation) return this.current
+    // any answer from the server (even "off") ends the retry cycle; a failure that left a status keeps it
+    if (answered || next.state !== 'unavailable') this.clearRetry()
     this.set(next, account.orgId)
     return next
   }
@@ -446,6 +550,11 @@ export class UniworkCloudController {
       this.set({ ...this.current, state: 'credits-exhausted', credits }, orgId)
     } else if (error.code === 'entitlement_required') {
       this.set({ ...UNIWORK_CLOUD_SIGNED_OUT, state: 'not-entitled' }, orgId)
+    } else if (error.code === 'subscription_inactive') {
+      this.set({ ...UNIWORK_CLOUD_SIGNED_OUT, state: 'subscription-inactive' }, orgId)
+    } else if (error.code === 'no_access') {
+      this.set({ ...UNIWORK_CLOUD_SIGNED_OUT, state: 'unavailable' }, orgId)
+      this.refreshAccountSoon()
     }
   }
 
@@ -456,8 +565,9 @@ export class UniworkCloudController {
       this.noteError(error)
       throw error
     } finally {
-      // credits moved (or the verdict changed): re-read in the background
-      void this.refresh().catch(() => undefined)
+      // credits moved (or the verdict changed): re-read in the background, superseding
+      // a read that started before this call was charged
+      void this.refresh({ fresh: true }).catch(() => undefined)
     }
   }
 

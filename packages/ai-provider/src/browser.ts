@@ -21,6 +21,9 @@ export {
   AI_MEDIA_PROVIDERS,
   imageGenerationAvailable,
   mediaAnalysisAvailable,
+  offeredMediaProviders,
+  setMediaProviderChoice,
+  shownMediaProvider,
   updateMediaProviderConfig,
   visibleMediaProviders,
 } from './media'

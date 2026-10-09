@@ -124,6 +124,8 @@ describe('cloud client against the e2e stub', () => {
     ['not_entitled', 'entitlement_required'],
     ['credits_exhausted', 'credits_exhausted'],
     ['unavailable', 'cloud_unavailable'],
+    ['subscription_inactive', 'subscription_inactive'],
+    ['not_configured', 'cloud_unavailable'],
   ] as const)(
     '%s: tools answer %s, the controller shows the matching state',
     async (mode, expected) => {
@@ -140,9 +142,11 @@ describe('cloud client against the e2e stub', () => {
       expect(published.at(-1)).toBe(
         mode === 'not_entitled'
           ? 'not-entitled'
-          : mode === 'credits_exhausted'
-            ? 'credits-exhausted'
-            : 'unavailable',
+          : mode === 'subscription_inactive'
+            ? 'subscription-inactive'
+            : mode === 'credits_exhausted'
+              ? 'credits-exhausted'
+              : 'unavailable',
       )
     },
   )

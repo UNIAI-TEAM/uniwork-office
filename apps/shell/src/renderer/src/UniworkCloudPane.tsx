@@ -18,6 +18,7 @@ import type { StringKey, TFunc } from './locale'
 export const CLOUD_STATE_KEYS: Record<Exclude<UniworkCloudState, 'signed-out'>, StringKey> = {
   ready: 'cloudStateReady',
   'not-entitled': 'cloudStateNotEntitled',
+  'subscription-inactive': 'cloudStateInactive',
   'credits-exhausted': 'cloudStateExhausted',
   unavailable: 'cloudStateUnavailable',
 }
@@ -30,19 +31,29 @@ export interface CloudNotice {
   signIn?: boolean
 }
 
-/** the AI media notice for one cloud state */
-export function cloudNoticeFor(state: UniworkCloudState): CloudNotice {
+/**
+ * The AI media notice for one cloud state. `toolsEnabled` is the AI model
+ * switch: with it off a ready cloud is only available, not in use.
+ */
+export function cloudNoticeFor(state: UniworkCloudState, toolsEnabled = true): CloudNotice {
   switch (state) {
     case 'signed-out':
       return { tone: 'info', title: 'cloudTitle', body: 'cloudSignedOutBody', signIn: true }
     case 'not-entitled':
       return { tone: 'info', title: 'cloudStateNotEntitled', body: 'cloudNotEntitledBody' }
+    case 'subscription-inactive':
+      return { tone: 'warn', title: 'cloudStateInactive', body: 'cloudInactiveBody' }
     case 'credits-exhausted':
       return { tone: 'warn', title: 'cloudStateExhausted', body: 'cloudExhaustedBody' }
     case 'unavailable':
-      return { tone: 'warn', title: 'cloudStateUnavailable', body: 'cloudUnavailableBody' }
+      // the product name leads: the body says what is unavailable
+      return { tone: 'warn', title: 'cloudTitle', body: 'cloudUnavailableBody' }
     case 'ready':
-      return { tone: 'info', title: 'cloudTitle', body: 'cloudReadyBody' }
+      return {
+        tone: 'info',
+        title: 'cloudTitle',
+        body: toolsEnabled ? 'cloudReadyBody' : 'cloudToolsOffBody',
+      }
   }
 }
 
@@ -126,7 +137,9 @@ export function UniworkCloudAccountRows({ status }: { status: UniworkCloudStatus
   const { t, dateLocale } = useI18n()
   if (!status || status.state === 'signed-out') return null
   const credits =
-    status.state === 'not-entitled' ? null : creditsText(status.credits, t, dateLocale)
+    status.state === 'not-entitled' || status.state === 'subscription-inactive'
+      ? null
+      : creditsText(status.credits, t, dateLocale)
   const renews = credits ? renewsText(status.credits, t, dateLocale) : null
   return (
     <section className="cloud-rows" aria-label={t('cloudTitle')} data-cloud-state={status.state}>
@@ -147,13 +160,16 @@ export function UniworkCloudAccountRows({ status }: { status: UniworkCloudStatus
 export function UniworkCloudNotice({
   status,
   onSignIn,
+  toolsEnabled = true,
 }: {
   status: UniworkCloudStatus | null
   onSignIn?: () => void
+  /** the AI model "Use UniWork cloud tools" switch */
+  toolsEnabled?: boolean
 }) {
   const { t, dateLocale } = useI18n()
   if (!status) return null
-  const notice = cloudNoticeFor(status.state)
+  const notice = cloudNoticeFor(status.state, toolsEnabled)
   const credits =
     status.state === 'ready' || status.state === 'credits-exhausted'
       ? creditsText(status.credits, t, dateLocale)
@@ -166,7 +182,9 @@ export function UniworkCloudNotice({
     >
       <div className="acct-notice-text">
         <div className="acct-notice-title">{t(notice.title)}</div>
-        <div className="acct-notice-body">{t(notice.body)}</div>
+        <div className="acct-notice-body">
+          {t(notice.body, { switch: t('cloudToolsToggle'), section: t('setSecAiModel') })}
+        </div>
         {credits && (
           <div className="acct-notice-body cloud-notice-credits">
             {t('cloudCredits')}: {credits}

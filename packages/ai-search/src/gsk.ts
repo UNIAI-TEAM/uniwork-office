@@ -18,12 +18,13 @@ import {
   uniworkCloudToolAvailable,
   uniworkCloudTransport,
   UniworkCloudError,
+  type MediaBlob,
   type UniworkCloudMedia,
   type UniworkCloudTool,
 } from '@genoffice/ai-provider'
 // deep import: the package root re-exports Electron-bound modules, and this file also runs in the genoffice CLI
 import { storeGeneratedImage } from '@genoffice/electron-utils/generated-images'
-import { loadMediaReferences } from './media-tools'
+import { loadMediaReferences, type MediaBudget } from './media-tools'
 import { safeHost, type ImageSearchResult, type WebSearchResult } from './shared'
 
 const MIB = 1024 * 1024
@@ -40,12 +41,15 @@ export const UNIWORK_CLOUD_LIMITS = {
   maxAudioBytes: 25 * MIB,
 } as const
 
+const EXACT_SIZE = /^\d+x\d+$/
+
 const SLIDES_UNAVAILABLE = 'UniWork cloud slide generation is not available'
 
 function requireTool(tool: UniworkCloudTool): void {
   const status = getUniworkCloudStatus()
   if (status.state === 'signed-out') throw new UniworkCloudError('signed_out')
   if (status.state === 'not-entitled') throw new UniworkCloudError('entitlement_required')
+  if (status.state === 'subscription-inactive') throw new UniworkCloudError('subscription_inactive')
   if (!uniworkCloudToolAvailable(tool)) throw new UniworkCloudError('cloud_unavailable')
 }
 
@@ -60,6 +64,37 @@ function fromBase64(data: string): Uint8Array {
 /** options every media entry point accepts: where bare local paths may be read from */
 export interface GskMediaOptions {
   mediaRoots?: readonly string[]
+}
+
+/** `s` cut to `max` characters (code points, so a surrogate pair is never split) */
+function clip(s: string, max: number): string {
+  return s.length <= max ? s : Array.from(s).slice(0, max).join('')
+}
+
+const LOCAL_READ_REFUSED =
+  'Local files can only be sent to UniWork cloud AI from the open document folder or its attachments; this document has no such folder (save it first), so use an https or data URL instead'
+
+/**
+ * Fails closed on the cloud path: a bare local path is read only under the
+ * caller's media roots. With no roots the extension check would be the only
+ * gate and a prompt-injected path could ship any image, audio or video on the
+ * disk to the server, so only https, data: and generated-store file: URLs pass.
+ */
+export function assertCloudMediaRefs(refs: readonly string[], roots?: readonly string[]): void {
+  if (roots && roots.length > 0) return
+  for (const ref of refs) {
+    if (!/^(https?:|data:|file:)/i.test(ref)) throw new Error(LOCAL_READ_REFUSED)
+  }
+}
+
+/** loads the references of one cloud call, refusing local reads the roots do not cover */
+async function loadCloudMedia(
+  refs: readonly string[],
+  budget: MediaBudget,
+  roots?: readonly string[],
+): Promise<MediaBlob[]> {
+  assertCloudMediaRefs(refs, roots)
+  return loadMediaReferences(refs, budget, roots)
 }
 
 /**
@@ -104,7 +139,7 @@ export async function gskWebSearch(
   requireTool('web_search')
   const r = await uniworkCloudTransport().search(
     {
-      query: String(query ?? '').slice(0, UNIWORK_CLOUD_LIMITS.maxQueryChars),
+      query: clip(String(query ?? ''), UNIWORK_CLOUD_LIMITS.maxQueryChars),
       kind: 'web',
       maxResults: clampResults(maxResults, 6),
     },
@@ -124,7 +159,7 @@ export async function gskImageSearch(
   requireTool('image_search')
   const r = await uniworkCloudTransport().search(
     {
-      query: String(query ?? '').slice(0, UNIWORK_CLOUD_LIMITS.maxQueryChars),
+      query: clip(String(query ?? ''), UNIWORK_CLOUD_LIMITS.maxQueryChars),
       kind: 'image',
       maxResults: clampResults(maxResults, 8),
     },
@@ -147,11 +182,11 @@ export interface GskGenerateImageOptions {
   /** Generation model; ignored by the UniWork cloud (the server picks it) */
   model?: string
   /** Reference/edit-target image URLs or local paths (read here, sent as bytes) */
-  referenceImageUrls?: string[]
+  referenceImageUrls?: string[] | undefined
   /** 1:1 | 4:3 | 16:9 | 9:16 | 3:4 | 2:3 | 3:2 | auto */
-  aspectRatio?: string
+  aspectRatio?: string | undefined
   /** auto | 0.5k | 1k | 2k | 3k | 4k */
-  imageSize?: string
+  imageSize?: string | undefined
 }
 
 export interface GskGeneratedImage {
@@ -167,12 +202,10 @@ export async function gskGenerateImage(
   media: GskMediaOptions = {},
 ): Promise<GskGeneratedImage> {
   requireTool('image_generate')
-  const prompt = String(options.prompt ?? '')
-    .trim()
-    .slice(0, UNIWORK_CLOUD_LIMITS.maxPromptChars)
+  const prompt = clip(String(options.prompt ?? '').trim(), UNIWORK_CLOUD_LIMITS.maxPromptChars)
   if (!prompt) throw new Error('prompt must not be empty')
   const refs = (options.referenceImageUrls ?? []).map(String).filter(Boolean)
-  const blobs = await loadMediaReferences(
+  const blobs = await loadCloudMedia(
     refs,
     {
       maxItems: UNIWORK_CLOUD_LIMITS.maxReferenceImages,
@@ -193,7 +226,10 @@ export async function gskGenerateImage(
     {
       prompt,
       ...(options.aspectRatio ? { aspectRatio: options.aspectRatio } : {}),
-      ...(options.imageSize ? { imageSize: options.imageSize } : {}),
+      // the server lets an exact size (and 'auto') override the aspect ratio: send WxH only
+      ...(options.imageSize && EXACT_SIZE.test(options.imageSize)
+        ? { imageSize: options.imageSize }
+        : {}),
       ...(referenceImages.length ? { referenceImages } : {}),
     },
     signal,
@@ -250,13 +286,51 @@ export async function gskAnalyzeMedia(
   media: GskMediaOptions = {},
 ): Promise<string> {
   requireTool('media_analyze')
-  const requirements = String(options.requirements ?? '')
-    .trim()
-    .slice(0, UNIWORK_CLOUD_LIMITS.maxPromptChars)
+  const requirements = clip(
+    String(options.requirements ?? '').trim(),
+    UNIWORK_CLOUD_LIMITS.maxPromptChars,
+  )
   if (!requirements) throw new Error('requirements must not be empty')
   const refs = (options.mediaUrls ?? []).map(String).filter(Boolean)
   if (!refs.length) throw new Error('mediaUrls must not be empty')
-  const blobs = await loadMediaReferences(refs, CLOUD_MEDIA_BUDGET, media.mediaRoots)
+  const blobs = await loadCloudMedia(refs, CLOUD_MEDIA_BUDGET, media.mediaRoots)
+  return analyzeLoadedMedia(requirements, blobs, signal)
+}
+
+/**
+ * Analysis of references the caller already loaded (the mixed BYOK / cloud
+ * batch, which loads once): applies the cloud caps, then sends the bytes. The
+ * caller has already checked local reads with assertCloudMediaRefs.
+ */
+export async function gskAnalyzeLoadedMedia(
+  options: { requirements: string; media: readonly MediaBlob[] },
+  signal?: AbortSignal,
+): Promise<string> {
+  requireTool('media_analyze')
+  const requirements = clip(
+    String(options.requirements ?? '').trim(),
+    UNIWORK_CLOUD_LIMITS.maxPromptChars,
+  )
+  if (!requirements) throw new Error('requirements must not be empty')
+  return analyzeLoadedMedia(requirements, options.media, signal)
+}
+
+async function analyzeLoadedMedia(
+  requirements: string,
+  blobs: readonly MediaBlob[],
+  signal?: AbortSignal,
+): Promise<string> {
+  if (blobs.length > CLOUD_MEDIA_BUDGET.maxItems) {
+    throw new Error(
+      `Too many media items for UniWork cloud AI (${blobs.length}, limit ${CLOUD_MEDIA_BUDGET.maxItems}); analyze them in smaller batches`,
+    )
+  }
+  const total = blobs.reduce((n, b) => n + b.bytes.byteLength, 0)
+  if (total > CLOUD_MEDIA_BUDGET.maxTotalBytes) {
+    throw new Error(
+      `Media is too large for UniWork cloud AI (limit ${CLOUD_MEDIA_BUDGET.maxTotalBytes / MIB} MB in total); analyze it in smaller batches`,
+    )
+  }
   const r = await uniworkCloudTransport().analyzeMedia(
     {
       requirements,
@@ -284,12 +358,14 @@ export async function gskTranscribe(
   requireTool('transcribe')
   const refs = (options.audioUrls ?? []).map(String).filter(Boolean)
   if (!refs.length) throw new Error('audioUrls must not be empty')
-  const blobs = await loadMediaReferences(
+  const blobs = await loadCloudMedia(
     refs,
     { ...CLOUD_MEDIA_BUDGET, maxItemBytes: UNIWORK_CLOUD_LIMITS.maxAudioBytes },
     media.mediaRoots,
   )
-  const prompt = options.prompt?.trim().slice(0, UNIWORK_CLOUD_LIMITS.maxPromptChars)
+  const prompt = options.prompt
+    ? clip(options.prompt.trim(), UNIWORK_CLOUD_LIMITS.maxPromptChars)
+    : undefined
   const parts: string[] = []
   for (const b of blobs) {
     const r = await uniworkCloudTransport().transcribe(

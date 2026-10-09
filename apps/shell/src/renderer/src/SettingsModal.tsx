@@ -21,6 +21,9 @@ import {
   MAX_MAX_OUTPUT_TOKENS,
   MIN_MAX_OUTPUT_TOKENS,
   clampMaxOutputTokens,
+  offeredMediaProviders,
+  setMediaProviderChoice,
+  shownMediaProvider,
   updateMediaProviderConfig,
 } from '@genoffice/ai-provider/browser'
 import type {
@@ -54,6 +57,7 @@ import {
   UniworkCloudNotice,
   useUniworkCloudStatus,
 } from './UniworkCloudPane'
+import type { UniworkCloudStatus } from '@genoffice/ai-provider/browser'
 import { IntegrationsPane, skillUpdateDue } from './IntegrationsPane'
 import './settings.css'
 
@@ -347,9 +351,8 @@ function foldModels(providerId: string, models: string[]) {
 }
 
 /** AI model pane: provider / model / key / base URL, saved to userData/ai-settings.json */
-function AiModelPane({ t }: { t: TFunc }) {
+function AiModelPane({ t, cloud }: { t: TFunc; cloud: UniworkCloudStatus | null }) {
   const { lang } = useI18n()
-  const cloud = useUniworkCloudStatus()
   const [catalog, setCatalog] = useState<AiCatalogEntry[]>(
     () => window.aiOffice.getAiProviders?.() ?? [],
   )
@@ -865,13 +868,14 @@ function AiMediaPane({
   onFileSearchChange,
   focusBlock,
   onSignIn,
+  cloud,
 }: {
   t: TFunc
   onFileSearchChange?: () => void
   focusBlock?: TestedBlock
   onSignIn?: () => void
+  cloud: UniworkCloudStatus | null
 }) {
-  const cloud = useUniworkCloudStatus()
   // re-listed when the cloud turns on or off: the UniWork cloud entry is offered only while it is on
   const cloudOn = cloud?.enabled === true
   const mediaCatalog = useMemo<AiMediaProviderMeta[]>(
@@ -949,25 +953,14 @@ function AiMediaPane({
     setSettings({ ...settings, search: next })
     touch()
   }
+  // the AI model switch: with it off the cloud is not in use, so no picker offers it
+  const cloudToolsOn = cloudOn && settings.gskToolsEnabled !== false
   /** providers one media block offers; a stored provider outside them shows as the first one */
   const mediaOptions = (cap: Exclude<Capability, 'search'>) =>
-    mediaCatalog.filter((m) =>
-      cap === 'image'
-        ? !!m.imageProtocol
-        : cap === 'video'
-          ? !!m.analysisProtocol && m.videoAnalysis
-          : !!m.analysisProtocol,
-    )
-  const mediaProviderOf = (cap: Exclude<Capability, 'search'>): AiMediaProviderId => {
-    const current =
-      cap === 'image'
-        ? media.imageProvider
-        : cap === 'video'
-          ? media.videoAnalysisProvider
-          : media.analysisProvider
-    const options = mediaOptions(cap)
-    return (options.find((m) => m.id === current) ?? options[0])?.id ?? current
-  }
+    offeredMediaProviders(mediaCatalog, cap, cloudToolsOn)
+  /** the provider that serves the capability: a stored cloud default shows the BYOK vendor with a usable key */
+  const mediaProviderOf = (cap: Exclude<Capability, 'search'>): AiMediaProviderId =>
+    shownMediaProvider(media, cap, mediaOptions(cap))
   const setFileSearch = (next: FileSearchSettings) => {
     setFileSearchState(next)
     touch()
@@ -1270,14 +1263,8 @@ function AiMediaPane({
     const id = meta.id
     const config = mediaConfigOf(id)
     const pick = (next: string) => {
-      const p = next as AiMediaProviderId
-      setMedia(
-        cap === 'image'
-          ? { ...media, imageProvider: p }
-          : cap === 'video'
-            ? { ...media, videoAnalysisProvider: p }
-            : { ...media, analysisProvider: p },
-      )
+      // picking the UniWork cloud entry is remembered as an explicit choice
+      setMedia(setMediaProviderChoice(media, cap, next as AiMediaProviderId))
     }
     const modelField = cap === 'image' ? 'imageModel' : 'analysisModel'
     return (
@@ -1332,7 +1319,11 @@ function AiMediaPane({
           </button>
         </div>
       </div>
-      <UniworkCloudNotice status={cloud} onSignIn={onSignIn} />
+      <UniworkCloudNotice
+        status={cloud}
+        onSignIn={onSignIn}
+        toolsEnabled={settings.gskToolsEnabled !== false}
+      />
       <div className="set-field-desc set-ai-note">{t('setAiSharedKeyHint')}</div>
       <section>
         {subhead('search', t('setAiCapSearch'))}
@@ -1344,7 +1335,7 @@ function AiMediaPane({
         )}
         <div className="set-field-desc set-ai-note">
           {search.provider === 'auto'
-            ? cloudOn && settings.gskToolsEnabled !== false
+            ? cloudToolsOn
               ? t('cloudSearchAutoHint')
               : t('setAiSearchAutoHint')
             : search.provider === 'parallel'
@@ -1742,9 +1733,10 @@ export function SettingsModal({
                 <BillingPaymentPane lang={lang} signedIn={loggedIn} />
               </>
             )}
-            {section === 'aiModel' && <AiModelPane t={t} />}
+            {section === 'aiModel' && <AiModelPane t={t} cloud={cloud} />}
             {section === 'aiMedia' && (
               <AiMediaPane
+                cloud={cloud}
                 t={t}
                 onFileSearchChange={onFileSearchChange}
                 focusBlock={target?.block}
