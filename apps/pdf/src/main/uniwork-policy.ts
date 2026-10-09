@@ -49,3 +49,66 @@ export function notifyUniworkUserSave(path: string): void {
     console.error('[uniwork] user-save hook failed', err)
   }
 }
+
+/**
+ * Who asked for a pdf:save. `user` = an explicit Save (toolbar, ⌘S, menu Save,
+ * close-guard Save); `auto` = the renderer's autosave tick / blur; `internal` =
+ * a flush the app does on its own before another operation (page tools,
+ * exports). Absent (older renderer, Save As) behaves like today and never
+ * fires the user-save hook.
+ */
+export type UniworkSaveOrigin = 'user' | 'auto' | 'internal'
+
+export interface UniworkSaveInput {
+  origin: UniworkSaveOrigin | undefined
+  /** The document the view has open */
+  currentPath: string
+  /** Where the bytes go (equals currentPath for a plain Save) */
+  targetPath: string
+  /** Save As / redaction copy flow (granted by the main-process dialog) */
+  saveAs: boolean
+}
+
+export interface UniworkSaveDecision {
+  /** false = refuse the save: nothing is written and the hook does not fire */
+  write: boolean
+  /** Fire the user-save hook after the write succeeds */
+  fireHook: boolean
+  /** Write even when there are no pending edits (bound document, explicit Save) */
+  forceWrite: boolean
+  /** Readable reason when write is false */
+  reason?: string
+}
+
+/** Pure save policy for one pdf:save request; with no policy installed it is a pass-through. */
+export function uniworkSaveDecision(input: UniworkSaveInput): UniworkSaveDecision {
+  const { origin, currentPath, targetPath, saveAs } = input
+  const inPlace = targetPath === currentPath && !saveAs
+  if (uniworkIsReadOnly(targetPath)) {
+    return {
+      write: false,
+      fireHook: false,
+      forceWrite: false,
+      reason: 'pdf: document is view only',
+    }
+  }
+  if (origin === 'auto' && uniworkIsBound(targetPath)) {
+    return {
+      write: false,
+      fireHook: false,
+      forceWrite: false,
+      reason: 'pdf: autosave is off for this document',
+    }
+  }
+  const explicitInPlace = inPlace && origin === 'user'
+  return {
+    write: true,
+    fireHook: explicitInPlace,
+    forceWrite: explicitInPlace && uniworkIsBound(currentPath),
+  }
+}
+
+/** Page tools and other immediate rewrites of the open file: refused for view-only documents. */
+export function uniworkMayRewriteInPlace(path: string): boolean {
+  return !uniworkIsReadOnly(path)
+}

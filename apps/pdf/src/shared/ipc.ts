@@ -10,6 +10,7 @@ export const PDF_CHANNELS = {
   requestRedactionCopy: 'pdf:request-redaction-copy',
   autoRename: 'pdf:auto-rename',
   isUntitled: 'pdf:is-untitled',
+  uniworkState: 'pdf:uniwork-state',
   validateTextEdits: 'pdf:validate-text-edits',
   listEditFonts: 'pdf:list-edit-fonts',
   canDrawText: 'pdf:can-draw-text',
@@ -511,6 +512,15 @@ export interface SavePdfRequest {
   /** New page order (array of original page indices, excluding deleted); omitted if unreordered */
   pageOrder?: number[]
   metadata?: MetadataInput
+  /** Who asked: explicit Save (`user`), autosave (`auto`) or an app-internal flush
+      (`internal`). Absent behaves as before (Save As never sets it). */
+  origin?: 'user' | 'auto' | 'internal'
+}
+
+/** UniWork document state of the open file: bound working copy and/or view only */
+export interface PdfUniworkState {
+  bound: boolean
+  readOnly: boolean
 }
 
 /** A text edit that could not be matched to the document at save time and was skipped */
@@ -723,6 +733,8 @@ export interface PdfApi {
   /** Whether the file is a shell-created blank still carrying its untitled name
       (gates the after-AI-run silent save; a PDF the user merely opened must never auto-write) */
   isUntitled(path: string): Promise<boolean>
+  /** UniWork state of a path granted to this view (all false for plain local files) */
+  uniworkState(path: string): Promise<PdfUniworkState>
   /** Dry-run match of pending text edits against the file: reason null = would apply */
   validateTextEdits(request: ValidateTextEditsRequest): Promise<TextEditValidation[]>
   /** EDIT_FONTS ids whose font file exists on this machine */

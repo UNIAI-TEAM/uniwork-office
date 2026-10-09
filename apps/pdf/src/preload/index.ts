@@ -22,6 +22,7 @@ const api: PdfApi = {
   requestRedactionCopy: (path) => ipcRenderer.invoke(PDF_CHANNELS.requestRedactionCopy, path),
   autoRename: (path, baseName) => ipcRenderer.invoke(PDF_CHANNELS.autoRename, path, baseName),
   isUntitled: (path) => ipcRenderer.invoke(PDF_CHANNELS.isUntitled, path),
+  uniworkState: (path) => ipcRenderer.invoke(PDF_CHANNELS.uniworkState, path),
   validateTextEdits: (request) => ipcRenderer.invoke(PDF_CHANNELS.validateTextEdits, request),
   listEditFonts: () => ipcRenderer.invoke(PDF_CHANNELS.listEditFonts),
   canDrawText: (text, font, bold, italic) =>

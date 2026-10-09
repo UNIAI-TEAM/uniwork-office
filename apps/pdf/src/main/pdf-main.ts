@@ -1,4 +1,11 @@
-import { setUniworkUserSaveHook } from './uniwork-policy'
+import {
+  notifyUniworkUserSave,
+  setUniworkUserSaveHook,
+  uniworkIsBound,
+  uniworkIsReadOnly,
+  uniworkMayRewriteInPlace,
+  uniworkSaveDecision,
+} from './uniwork-policy'
 import {
   constants,
   copyFileSync,
@@ -55,6 +62,7 @@ import type {
   SplitPagesResult,
   SplitPdfRequest,
   SplitPdfResult,
+  PdfUniworkState,
   SavePdfRequest,
   SavePdfResult,
   CropPagesRequest,
@@ -471,6 +479,27 @@ const tDlg = createI18n({
   },
 })
 
+/** Whether a save request carries any edit to apply (staticFormFills is the complete
+ * resulting set, sent on every save, so it does not count as pending on its own). */
+function hasPendingSaveEdits(request: SavePdfRequest): boolean {
+  return !!(
+    request.markups?.length ||
+    request.annotDeletes?.length ||
+    request.drawings?.length ||
+    request.noteEdits?.length ||
+    request.formValues?.length ||
+    request.stamps?.length ||
+    request.textEdits?.length ||
+    request.textInserts?.length ||
+    request.imageEdits?.length ||
+    request.redactions !== undefined ||
+    request.rotations?.length ||
+    request.deletedPages?.length ||
+    request.pageOrder?.length ||
+    request.metadata
+  )
+}
+
 /** A redaction copy must never be the same file through a symlink, `.`/`..`,
  * or an existing hard link. For a new destination, canonicalize its parent
  * directory so a symlinked directory cannot disguise the source path. */
@@ -637,6 +666,9 @@ const closeSaveWaiters = new Map<number, (ok: boolean) => void>()
 const saveAsWaiters = new Map<number, (ok: boolean) => void>()
 /** Save As destination granted per view (main-process dialog pick); the save handler refuses any other non-source target */
 const saveAsTargetByWc = new Map<number, string>()
+/** Views whose pending renderer save was asked for by an app-internal flush (export),
+    not by the user: their next `user` save must not fire the UniWork user-save hook. */
+const internalFlushByWc = new Set<number>()
 /** Only a copy produced by this view may receive subsequent in-place redactions. */
 const redactionPathByWc = new Map<number, string>()
 const redactionFlows = new Set<number>()
@@ -854,9 +886,25 @@ function requestRendererSave(contents: WebContents): Promise<boolean> {
   })
 }
 
-/** Menu Save: ask the renderer to write pending edits to disk; clean views resolve true immediately */
-export function flushPdfSave(contents: WebContents): Promise<boolean> {
-  if (contents.isDestroyed() || !dirtyByWc.has(contents.id)) return Promise.resolve(true)
+/**
+ * Menu Save: ask the renderer to write pending edits to disk; clean views resolve true
+ * immediately. A clean UniWork-bound (editable) view still saves on an explicit Save,
+ * so Retry after a failed upload works. Pass `{ explicit: false }` for app-internal
+ * flushes (e.g. before an export): they never count as a user Save.
+ */
+export function flushPdfSave(
+  contents: WebContents,
+  options: { explicit?: boolean } = {},
+): Promise<boolean> {
+  if (contents.isDestroyed()) return Promise.resolve(true)
+  const explicit = options.explicit !== false
+  const path = openPathByWc.get(contents.id)
+  const forceBound = explicit && uniworkIsBound(path) && !uniworkIsReadOnly(path)
+  if (!dirtyByWc.has(contents.id) && !forceBound) return Promise.resolve(true)
+  if (!explicit) {
+    internalFlushByWc.add(contents.id)
+    return requestRendererSave(contents).finally(() => internalFlushByWc.delete(contents.id))
+  }
   return requestRendererSave(contents)
 }
 
@@ -1020,6 +1068,17 @@ function registerPdfIpc(): void {
     if (target !== path && saveAsTargetByWc.get(e.sender.id) !== target) {
       return { ok: false, error: 'pdf: target path not granted to this view' }
     }
+    // UniWork seam: view-only targets and autosave onto a bound copy never write;
+    // only an explicit Save of the open file reaches the user-save hook.
+    const origin =
+      request.origin === 'user' && internalFlushByWc.has(e.sender.id) ? 'internal' : request.origin
+    const uniwork = uniworkSaveDecision({
+      origin,
+      currentPath: path,
+      targetPath: target,
+      saveAs: request.targetPath !== undefined || saveAsTargetByWc.get(e.sender.id) === target,
+    })
+    if (!uniwork.write) return { ok: false, error: uniwork.reason ?? 'pdf: save refused' }
     if (request.redactions !== undefined) {
       let regions
       try {
@@ -1060,11 +1119,19 @@ function registerPdfIpc(): void {
       request = { ...request, redactions: regions }
     }
     try {
+      if (uniwork.forceWrite && !hasPendingSaveEdits(request)) {
+        // Bound document, explicit Save, nothing pending: rewrite the file's own bytes
+        // (no re-serialization) so the save still lands and the hook fires.
+        await writePdfAtomically(target, new Uint8Array(await readFile(path)))
+        notifyUniworkUserSave(target)
+        return { ok: true }
+      }
       const { skippedTextEdits, skippedTextInserts, skippedImageEdits } = await savePdfToPath(
         path,
         target,
         request,
       )
+      if (uniwork.fireHook) notifyUniworkUserSave(target)
       if (request.redactions !== undefined) {
         // Commit document identity only after the atomic write succeeds. Revoke the
         // source grant so stale renderer requests cannot write back to the original.
@@ -1124,6 +1191,13 @@ function registerPdfIpc(): void {
     )
   })
 
+  ipcMain.handle(PDF_CHANNELS.uniworkState, (e, path: unknown): PdfUniworkState => {
+    if (typeof path !== 'string' || !allowedByWc.get(e.sender.id)?.has(path)) {
+      return { bound: false, readOnly: false }
+    }
+    return { bound: uniworkIsBound(path), readOnly: uniworkIsReadOnly(path) }
+  })
+
   ipcMain.handle(
     PDF_CHANNELS.autoRename,
     (e, path: unknown, baseName: unknown): PdfAutoRenameResult => {
@@ -1132,6 +1206,7 @@ function registerPdfIpc(): void {
       }
       // Only shell-created blanks still carrying their untitled name; user-chosen names never move
       if (!untitledPdfPaths.has(path)) return { renamed: false }
+      if (uniworkIsBound(path) || uniworkIsReadOnly(path)) return { renamed: false }
       if (typeof baseName !== 'string') return { renamed: false }
       const base = sanitizeAutoRenameBase(baseName)
       if (!base) return { renamed: false }
@@ -1320,6 +1395,9 @@ function registerPdfIpc(): void {
       if (typeof path !== 'string' || !allowedByWc.get(e.sender.id)?.has(path)) {
         return { ok: false, error: 'pdf: path not granted to this view' }
       }
+      if (!uniworkMayRewriteInPlace(path)) {
+        return { ok: false, error: 'pdf: document is view only' }
+      }
       const win =
         BrowserWindow.fromWebContents(e.sender) ?? BrowserWindow.getFocusedWindow() ?? undefined
       const picked = await showOpenDialogWithMemory(dialog, win, {
@@ -1349,6 +1427,9 @@ function registerPdfIpc(): void {
       const { path, afterPageIndex } = request ?? {}
       if (typeof path !== 'string' || !allowedByWc.get(e.sender.id)?.has(path)) {
         return { ok: false, error: 'pdf: path not granted to this view' }
+      }
+      if (!uniworkMayRewriteInPlace(path)) {
+        return { ok: false, error: 'pdf: document is view only' }
       }
       try {
         const bytes = await insertBlankPageBytes(
@@ -1468,6 +1549,9 @@ function registerPdfIpc(): void {
       ) {
         return { ok: false, error: 'pdf: path not granted to this view' }
       }
+      if (!uniworkMayRewriteInPlace(path)) {
+        return { ok: false, error: 'pdf: document is view only' }
+      }
       const win =
         BrowserWindow.fromWebContents(e.sender) ?? BrowserWindow.getFocusedWindow() ?? undefined
       const picked = await showOpenDialogWithMemory(dialog, win, {
@@ -1497,6 +1581,9 @@ function registerPdfIpc(): void {
       const { path, width, height } = request ?? {}
       if (typeof path !== 'string' || !allowedByWc.get(e.sender.id)?.has(path)) {
         return { ok: false, error: 'pdf: path not granted to this view' }
+      }
+      if (!uniworkMayRewriteInPlace(path)) {
+        return { ok: false, error: 'pdf: document is view only' }
       }
       if (!(Number.isFinite(width) && width > 0 && Number.isFinite(height) && height > 0)) {
         return { ok: false, error: 'pdf: invalid page size' }
@@ -1548,6 +1635,9 @@ function registerPdfIpc(): void {
         !rect
       ) {
         return { ok: false, error: 'pdf: path not granted to this view' }
+      }
+      if (!uniworkMayRewriteInPlace(path)) {
+        return { ok: false, error: 'pdf: document is view only' }
       }
       try {
         const bytes = await cropPagesBytes(new Uint8Array(await readFile(path)), pages, rect)
@@ -1671,6 +1761,7 @@ function grantAndTrack(wc: WebContents, openPath?: string | null): void {
     allowedByWc.delete(wcId)
     dirtyByWc.delete(wcId)
     saveAsTargetByWc.delete(wcId)
+    internalFlushByWc.delete(wcId)
     closeSaveWaiters.get(wcId)?.(false)
     closeSaveWaiters.delete(wcId)
     saveAsWaiters.get(wcId)?.(false)
