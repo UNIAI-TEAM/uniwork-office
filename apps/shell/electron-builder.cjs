@@ -48,12 +48,11 @@ const fontCdnUrl = normalizeHttpsBaseUrl(
 )
 
 // GENOFFICE_MAC_X64=1 — opt into packaging the Intel (x64) dmg/zip alongside
-// arm64. Off by default: Intel packages must only ever ship signed with the
-// company certificate (planned dual-track pipeline), so the current release
-// pipeline stays arm64-only and never produces a personally-signed Intel
-// artifact. The downstream layout (feed archive name, UniWork Office-intel.dmg
-// alias) keys off which dmgs exist, so flipping this flag is the single
-// switch.
+// arm64. Off by default so a plain local `dist:mac` stays arm64-only. The
+// UniWork release workflow sets it: this fork ships unsigned dev/beta builds
+// for both arches (ad-hoc signed, see the release block below) until a company
+// certificate exists. Dual-arch packs share one fat xlsx-sidecar / vision-ocr
+// (assertUniversalSidecar / assertUniversalVisionOcr).
 const includeMacX64 = process.env.GENOFFICE_MAC_X64 === '1'
 
 // GENOFFICE_WIN_ARM64=1 — package the Windows ARM64 installer instead of x64.
@@ -70,7 +69,18 @@ if (winArm64 && !process.env.ELECTRON_BUILDER_7Z_FILTER) {
   process.env.ELECTRON_BUILDER_7Z_FILTER = 'BCJ'
 }
 const winArch = winArm64 ? 'arm64' : 'x64'
-const winSidecarTarget = winArm64 ? 'aarch64-pc-windows-msvc' : 'x86_64-pc-windows-gnu'
+// The x64 sidecar defaults to the MinGW cross-compile path (built on a
+// mac/linux host). A Windows host builds it natively with MSVC instead, where
+// native/xlsx-engine/.cargo/config.toml links the CRT statically;
+// GENOFFICE_WIN_SIDECAR_TARGET=x86_64-pc-windows-msvc points packaging there.
+const WIN_X64_SIDECAR_TARGETS = ['x86_64-pc-windows-gnu', 'x86_64-pc-windows-msvc']
+const winX64SidecarTarget = process.env.GENOFFICE_WIN_SIDECAR_TARGET || WIN_X64_SIDECAR_TARGETS[0]
+if (!WIN_X64_SIDECAR_TARGETS.includes(winX64SidecarTarget)) {
+  throw new Error(
+    `GENOFFICE_WIN_SIDECAR_TARGET must be one of ${WIN_X64_SIDECAR_TARGETS.join(', ')}, got "${winX64SidecarTarget}"`,
+  )
+}
+const winSidecarTarget = winArm64 ? 'aarch64-pc-windows-msvc' : winX64SidecarTarget
 const WIN_SIDECAR = `../sheets/native/xlsx-engine/target/${winSidecarTarget}/release/xlsx-sidecar.exe`
 
 // Shipped next to THIRD-PARTY-NOTICES.txt (see extraResources)
@@ -664,6 +674,7 @@ const config = {
     ensureThirdPartyNotices()
     assertModuleTreesPresent()
     ensureCliBundleCarriesAppVersion()
+    assertReleaseVersion()
     if (context.electronPlatformName === 'darwin' && includeMacX64) {
       assertUniversalSidecar()
       assertUniversalVisionOcr()
@@ -710,6 +721,63 @@ if (winSignMode) {
       )
       return Promise.resolve()
     },
+  }
+}
+
+// UniWork dev / beta release builds (tools/release/README.md). The release
+// workflow sets UNIWORK_RELEASE_CHANNEL; plain local `dist:*` runs leave it
+// unset and keep the artifactName above. Release names follow the download
+// server's contract: `_<version>_` carries the version, the `unsigned` token
+// marks a build without a signing identity for that platform (it disappears
+// once one is configured), then the platform and arch:
+//   UniWork-Office_0.11.0-dev.1_unsigned_win32_x64-setup.exe
+//   UniWork-Office_0.11.0-dev.1_unsigned_darwin_arm64.dmg (and .zip)
+// Only dev and beta exist; stable waits for signed builds.
+const RELEASE_CHANNELS = ['dev', 'beta']
+const releaseChannel = process.env.UNIWORK_RELEASE_CHANNEL
+if (releaseChannel) {
+  if (!RELEASE_CHANNELS.includes(releaseChannel)) {
+    throw new Error(
+      `UNIWORK_RELEASE_CHANNEL must be one of ${RELEASE_CHANNELS.join(', ')}, got "${releaseChannel}"`,
+    )
+  }
+  // Dev / beta builds carry no update feed: no app-update.yml is baked in, so
+  // nothing polls an update server.
+  if (updateUrl) {
+    throw new Error('GENOFFICE_UPDATE_URL must stay unset for dev / beta release builds')
+  }
+  const macSigned = Boolean(process.env.CSC_LINK || process.env.CSC_NAME)
+  const winSigned = Boolean(winSignMode || process.env.WIN_CSC_LINK || process.env.CSC_LINK)
+  const unsignedLabel = (signed) => (signed ? '' : '_unsigned')
+  config.nsis.artifactName =
+    'UniWork-Office_${version}' + unsignedLabel(winSigned) + '_win32_${arch}-setup.${ext}'
+  config.mac.artifactName =
+    'UniWork-Office_${version}' + unsignedLabel(macSigned) + '_darwin_${arch}.${ext}'
+  if (!macSigned) {
+    // Without an identity electron-builder skips signing altogether, and
+    // packaging (renamed binary, rewritten Info.plist) breaks the signature
+    // Electron ships with: Apple Silicon then refuses the app as damaged.
+    // identity '-' ad-hoc signs every binary instead. Hardened runtime stays
+    // off because its library validation rejects ad-hoc signed frameworks
+    // (no team id), and there is nothing to notarize or sign the dmg with.
+    config.mac.identity = '-'
+    config.mac.hardenedRuntime = false
+    config.mac.notarize = false
+    config.dmg.sign = false
+  }
+}
+
+/** A release build must ship `<apps/shell version>-<channel>.<n>` (-c.extraMetadata.version). */
+function assertReleaseVersion() {
+  if (!releaseChannel) return
+  const base = require('./package.json').version
+  const version = packagedAppVersion()
+  const expected = new RegExp(`^${base.replace(/\./g, '\\.')}-${releaseChannel}\\.[0-9]+$`)
+  if (!expected.test(version)) {
+    throw new Error(
+      `${releaseChannel} release builds need version ${base}-${releaseChannel}.<n> ` +
+        `(-c.extraMetadata.version), got ${version}`,
+    )
   }
 }
 
