@@ -1,0 +1,574 @@
+import { createHash } from 'node:crypto'
+import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type {
+  UniworkConflictChoice,
+  UniworkDocStatus,
+  UniworkLaunchEvent,
+} from '../src/shared/home-api'
+import type { DeploymentProfile } from '../src/main/uniwork-auth/deployment'
+import { UniworkDocsService, type ConflictUi } from '../src/main/uniwork-docs/service'
+import { BINDING_FILE } from '../src/main/uniwork-docs/binding-store'
+import { pageRecentPaths } from '../src/main/recent-files'
+
+const TOKEN = 'secret-access-token-0123456789'
+const ORIGIN = 'https://uniwork.example'
+const profile: DeploymentProfile = {
+  deploymentId: 'default',
+  apiOrigin: ORIGIN,
+  clientId: 'uniwork-office',
+  channel: 'stable',
+}
+const DOC = '01J8X4DOC0N1P2Q3R4S5T6U7'
+const enc = (text: string) => new TextEncoder().encode(text)
+const hex = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex')
+
+interface Call {
+  method: string
+  url: string
+  path: string
+  headers: Record<string, string>
+  body?: unknown
+}
+
+type Fault = {
+  route: 'upload' | 'commit' | 'download' | 'detail'
+  kind: 'lost' | 'network' | number
+  code?: string
+}
+
+/** a small UniWork documents server: idempotent uploads and commits, revisions, ACL level */
+function fakeServer(initial: { bytes: Uint8Array; myLevel?: string; title?: string }) {
+  const state = {
+    revision: 41,
+    version: 3,
+    bytes: initial.bytes,
+    myLevel: initial.myLevel ?? 'edit',
+    title: initial.title ?? 'Q4 plan.docx',
+  }
+  const calls: Call[] = []
+  const faults: Fault[] = []
+  const uploads = new Map<string, { id: string; checksum: string; bytes: Uint8Array }>()
+  const commits = new Map<string, unknown>()
+  let seq = 0
+
+  const docJson = () => ({
+    id: DOC,
+    organization_id: 'org_a',
+    workspace_id: 'ws_1',
+    title: state.title,
+    kind: 'file',
+    revision: String(state.revision),
+    current_version: state.version,
+    my_level: state.myLevel,
+    file: {
+      file_id: 'f',
+      version_id: `v${state.version}`,
+      version: state.version,
+      filename: state.title,
+      mime_type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      size_bytes: state.bytes.byteLength,
+      checksum_sha256: hex(state.bytes),
+    },
+  })
+  const json = (status: number, body: unknown) =>
+    new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
+  const error = (status: number, code: string, fields?: Record<string, unknown>) =>
+    json(status, { error: { code, message: 'x', ...(fields ? { fields } : {}) } })
+
+  function takeFault(route: Fault['route']): Fault | undefined {
+    const index = faults.findIndex((f) => f.route === route)
+    return index >= 0 ? faults.splice(index, 1)[0] : undefined
+  }
+
+  const fetch = vi.fn(async (url: string, init: RequestInit): Promise<Response> => {
+    const u = new URL(url)
+    const headers = Object.fromEntries(
+      Object.entries((init.headers ?? {}) as Record<string, string>).map(([k, v]) => [
+        k.toLowerCase(),
+        v,
+      ]),
+    )
+    const call: Call = { method: init.method ?? 'GET', url, path: u.pathname, headers }
+    calls.push(call)
+    const key = headers['idempotency-key'] ?? ''
+    if (u.pathname === `/api/v1/documents/${DOC}` && call.method === 'GET') {
+      const fault = takeFault('detail')
+      if (typeof fault?.kind === 'number') return error(fault.kind, fault.code ?? 'x')
+      return json(200, { document: docJson() })
+    }
+    if (u.pathname === `/api/v1/documents/${DOC}/download`) {
+      const fault = takeFault('download')
+      if (typeof fault?.kind === 'number') return error(fault.kind, fault.code ?? 'x')
+      return new Response(state.bytes as BodyInit, { status: 200 })
+    }
+    if (u.pathname === `/api/v1/documents/${DOC}/uploads`) {
+      const file = (init.body as FormData).get('file') as Blob
+      const bytes = new Uint8Array(await file.arrayBuffer())
+      call.body = { bytes }
+      const fault = takeFault('upload')
+      if (fault?.kind === 'network') throw new TypeError('fetch failed')
+      if (typeof fault?.kind === 'number') return error(fault.kind, fault.code ?? 'x')
+      const known = uploads.get(key)
+      if (known && known.checksum !== hex(bytes)) return error(409, 'idempotency_payload_mismatch')
+      const upload = known ?? { id: `up_${++seq}`, checksum: hex(bytes), bytes }
+      uploads.set(key, upload)
+      return json(201, {
+        upload_id: upload.id,
+        checksum_sha256: upload.checksum,
+        size_bytes: bytes.byteLength,
+        claim_expires_at: '2026-10-10T00:00:00Z',
+      })
+    }
+    if (u.pathname === `/api/v1/documents/${DOC}/versions/commit`) {
+      const body = JSON.parse(String(init.body)) as { upload_id: string; base_revision: string }
+      call.body = body
+      const fault = takeFault('commit')
+      if (fault?.kind === 'network') throw new TypeError('fetch failed')
+      if (typeof fault?.kind === 'number') return error(fault.kind, fault.code ?? 'x')
+      const stored = commits.get(key)
+      let result = stored
+      if (!result) {
+        if (body.base_revision !== String(state.revision)) {
+          return error(409, 'document_version_conflict', {
+            current_revision: String(state.revision),
+          })
+        }
+        const upload = [...uploads.values()].find((x) => x.id === body.upload_id)
+        if (!upload) return error(409, 'document_upload_invalid')
+        state.revision += 1
+        state.version += 1
+        state.bytes = upload.bytes
+        result = {
+          document: docJson(),
+          version: {
+            id: `ver_${state.version}`,
+            document_id: DOC,
+            version: state.version,
+            kind: 'file',
+            checksum_sha256: upload.checksum,
+            size_bytes: upload.bytes.byteLength,
+          },
+        }
+        commits.set(key, result)
+      }
+      // the commit landed but its answer never arrived
+      if (fault?.kind === 'lost') throw new TypeError('fetch failed')
+      return json(200, result)
+    }
+    return error(404, 'not_found')
+  })
+
+  return { state, calls, faults, fetch, uploads, commits }
+}
+
+let dir: string
+beforeEach(() => {
+  dir = mkdtempSync(join(tmpdir(), 'uw-docs-save-'))
+})
+afterEach(() => {
+  rmSync(dir, { recursive: true, force: true })
+})
+
+function setup(
+  server: ReturnType<typeof fakeServer>,
+  opts: { signedIn?: boolean; choice?: UniworkConflictChoice } = {},
+) {
+  const statuses: UniworkDocStatus[] = []
+  const launches: UniworkLaunchEvent[] = []
+  let signedIn = opts.signedIn ?? true
+  const ui: ConflictUi = {
+    chooseConflict: vi.fn(async () => opts.choice ?? 'later'),
+    confirmDiscard: vi.fn(async () => true),
+    pickCopyPath: vi.fn(async (stem: string, format: string) =>
+      join(dir, `${stem} (my copy).${format}`),
+    ),
+    showOpenLatestFailed: vi.fn(),
+  }
+  const deps = {
+    userDataDir: dir,
+    profile: () => profile,
+    identity: () =>
+      signedIn ? { accountId: 'acc_1', deviceSessionId: 'dev_1', deploymentId: 'default' } : null,
+    selectedOrgId: () => 'org_a',
+    authorized: <T>(call: (token: string) => Promise<T>) => call(TOKEN),
+    fetch: server.fetch,
+    openPath: vi.fn(() => true),
+    isPathOpen: vi.fn(() => false),
+    requestModuleSave: vi.fn(() => false),
+    reloadPath: vi.fn(),
+    activePath: () => undefined,
+    ui,
+    pushStatus: (s: UniworkDocStatus) => statuses.push(s),
+    pushLaunch: (e: UniworkLaunchEvent) => launches.push(e),
+    reveal: vi.fn(),
+    sleep: async () => undefined,
+  }
+  const service = new UniworkDocsService(deps)
+  return {
+    service,
+    deps,
+    ui,
+    statuses,
+    launches,
+    signOut: () => {
+      signedIn = false
+    },
+  }
+}
+
+async function openDoc(ctx: ReturnType<typeof setup>) {
+  const opened = await ctx.service.openDocument(DOC)
+  if (!opened.ok) throw new Error(opened.error)
+  return opened.value.path
+}
+
+const uploads = (server: ReturnType<typeof fakeServer>) =>
+  server.calls.filter((c) => c.path.endsWith('/uploads'))
+const commits = (server: ReturnType<typeof fakeServer>) =>
+  server.calls.filter((c) => c.path.endsWith('/versions/commit'))
+const binding = (path: string) => JSON.parse(readFileSync(join(path, '..', BINDING_FILE), 'utf8'))
+
+function allFiles(root: string): string[] {
+  return readdirSync(root).flatMap((name) => {
+    const full = join(root, name)
+    return statSync(full).isDirectory() ? allFiles(full) : [full]
+  })
+}
+
+describe('open flow', () => {
+  it('downloads into the working copy with a binding and opens it through the module router', async () => {
+    const server = fakeServer({ bytes: enc('v3 bytes') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    expect(path).toBe(join(dir, 'uniwork-documents', 'default', 'acc_1', DOC, 'Q4 plan.docx'))
+    expect(readFileSync(path, 'utf8')).toBe('v3 bytes')
+    expect(binding(path)).toMatchObject({
+      schema: 1,
+      documentId: DOC,
+      workspaceId: 'ws_1',
+      orgId: 'org_a',
+      format: 'docx',
+      access: 'edit',
+      baseRevision: '41',
+      baseVersion: 3,
+      baseChecksum: hex(enc('v3 bytes')),
+      state: 'ready',
+    })
+    expect(ctx.deps.openPath).toHaveBeenCalledWith(path)
+  })
+
+  it('view level opens read-only and a pending save reopens the local copy without downloading', async () => {
+    const server = fakeServer({ bytes: enc('v3'), myLevel: 'view' })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    expect(ctx.service.isReadOnly(path)).toBe(true)
+    server.state.myLevel = 'edit'
+    await openDoc(ctx)
+    writeFileSync(path, 'local edits')
+    server.faults.push({ route: 'upload', kind: 'network' })
+    await ctx.service.save(path)
+    expect(binding(path).pendingIntent).toBeTruthy()
+    server.state.revision = 50
+    const downloadsBefore = server.calls.filter((c) => c.path.endsWith('/download')).length
+    await openDoc(ctx)
+    expect(server.calls.filter((c) => c.path.endsWith('/download')).length).toBe(downloadsBefore)
+    expect(readFileSync(path, 'utf8')).toBe('local edits')
+  })
+
+  it('recents hide copies of another account and enrich our own', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    const other = join(dir, 'uniwork-documents', 'default', 'acc_2', DOC, 'Q4 plan.docx')
+    const local = join(dir, 'plain.docx')
+    writeFileSync(local, 'x')
+    const page = pageRecentPaths([path, other, local], {}, new Set(), (p) =>
+      ctx.service.recentSource(p),
+    )
+    expect(page.entries.map((e) => e.path)).toEqual([path, local])
+    expect(page.entries[0]?.uniwork).toEqual({
+      documentId: DOC,
+      workspaceId: 'ws_1',
+      title: 'Q4 plan.docx',
+      access: 'edit',
+    })
+    expect(page.entries[1]?.uniwork).toBeUndefined()
+    ctx.signOut()
+    const hidden = pageRecentPaths([path, local], {}, new Set(), (p) => ctx.service.recentSource(p))
+    expect(hidden.entries.map((e) => e.path)).toEqual([local])
+  })
+})
+
+describe('launch descriptor', () => {
+  it("opens with the descriptor's workspace and operation; a historical version is its own view-only copy", async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const base = {
+      receiptId: 'r',
+      redeemedAt: '2026-09-30T10:01:02Z',
+      id: DOC,
+      organizationId: 'org_launch',
+      workspaceId: 'ws_launch',
+      title: 'Q4 plan',
+      revision: '41',
+      downloadPath: `/api/v1/documents/${DOC}/download`,
+    }
+    const viewed = await ctx.service.openFromServer(DOC, { ...base, operation: 'view', version: 0 })
+    expect(binding(viewed.path)).toMatchObject({
+      workspaceId: 'ws_launch',
+      orgId: 'org_launch',
+      access: 'view',
+    })
+    const old = await ctx.service.openFromServer(DOC, { ...base, operation: 'edit', version: 2 })
+    expect(old.path).toContain(`${DOC}@v2`)
+    expect(binding(old.path)).toMatchObject({ access: 'view', baseVersion: 2 })
+    expect(server.calls.some((c) => c.url.endsWith('/download?version=2'))).toBe(true)
+  })
+})
+
+describe('save pipeline', () => {
+  it('uploads then commits with one key and moves the base only on a matching receipt', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'v4 from desktop')
+    const status = await ctx.service.save(path)
+    expect(status).toMatchObject({ state: 'saved', documentId: DOC })
+    expect(uploads(server)).toHaveLength(1)
+    expect(commits(server)).toHaveLength(1)
+    const key = uploads(server)[0]?.headers['idempotency-key']
+    expect(key).toMatch(/^office-key-[0-9a-f-]{36}$/)
+    expect(commits(server)[0]?.headers['idempotency-key']).toBe(key)
+    expect(commits(server)[0]?.body).toMatchObject({ base_revision: '41' })
+    expect(binding(path)).toMatchObject({ baseRevision: '42', baseVersion: 4, state: 'saved' })
+    expect(binding(path).pendingIntent).toBeUndefined()
+    expect(ctx.statuses.map((s) => s.state)).toContain('saving')
+  })
+
+  it('persists the intent before the first network call', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'v4')
+    let seen: unknown
+    server.fetch.mockImplementationOnce(async () => {
+      seen = binding(path).pendingIntent
+      throw new TypeError('fetch failed')
+    })
+    await ctx.service.save(path)
+    expect(seen).toMatchObject({ documentId: DOC, baseRevision: '41', checksum: hex(enc('v4')) })
+    expect(typeof (seen as { baseRevision: unknown }).baseRevision).toBe('string')
+  })
+
+  it('two rapid saves make one intent (no queue)', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'v4')
+    const [a, b] = await Promise.all([
+      ctx.service.coordinator.save(path),
+      ctx.service.coordinator.save(path),
+    ])
+    expect(uploads(server)).toHaveLength(1)
+    expect(commits(server)).toHaveLength(1)
+    expect([a?.binding.state, b?.binding.state]).toContain('saved')
+  })
+
+  it('a lost commit answer keeps the intent; the next save replays the SAME key and lands once', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'v4')
+    server.faults.push({ route: 'commit', kind: 'lost' })
+    const first = await ctx.service.save(path)
+    expect(first).toMatchObject({ state: 'offline', error: 'network' })
+    const intent = binding(path).pendingIntent
+    expect(intent.idempotencyKey).toMatch(/^office-key-/)
+    // edits after the failure do not change the replayed payload
+    writeFileSync(path, 'v5 typed later')
+    const second = await ctx.service.save(path)
+    expect(new Set(commits(server).map((c) => c.headers['idempotency-key']))).toEqual(
+      new Set([intent.idempotencyKey]),
+    )
+    expect(server.state.version).toBe(4)
+    expect(new TextDecoder().decode(server.state.bytes)).toBe('v4')
+    // the file moved on during the failure: saved base, but not "saved"
+    expect(second).toMatchObject({ state: 'dirty' })
+    expect(binding(path)).toMatchObject({ baseRevision: '42', baseChecksum: hex(enc('v4')) })
+  })
+
+  it('409 conflict keeps the working copy and the base, then refuses every save without network', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    server.state.revision = 45 // someone saved on the web
+    writeFileSync(path, 'mine')
+    const status = await ctx.service.save(path)
+    expect(status).toMatchObject({ state: 'conflict', error: 'conflict' })
+    expect(readFileSync(path, 'utf8')).toBe('mine')
+    expect(binding(path)).toMatchObject({ baseRevision: '41', serverRevision: '45' })
+    expect(binding(path).pendingIntent).toBeUndefined()
+    const calls = server.calls.length
+    await ctx.service.save(path)
+    await ctx.service.coordinator.save(path)
+    expect(server.calls.length).toBe(calls)
+  })
+
+  it('also treats 422 revision_conflict as a conflict', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'mine')
+    server.faults.push({ route: 'commit', kind: 422, code: 'revision_conflict' })
+    expect(await ctx.service.save(path)).toMatchObject({ state: 'conflict' })
+  })
+
+  it('overwrite saves my version on the server revision; the other stays in history', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server, { choice: 'overwrite' })
+    const path = await openDoc(ctx)
+    server.state.revision = 45
+    writeFileSync(path, 'mine')
+    await ctx.service.save(path)
+    const status = await ctx.service.resolveConflict(path)
+    expect(status).toMatchObject({ state: 'saved' })
+    expect(commits(server).at(-1)?.body).toMatchObject({ base_revision: '45' })
+    expect(new TextDecoder().decode(server.state.bytes)).toBe('mine')
+  })
+
+  it('open-latest replaces the working copy after confirmation and reloads the tab', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server, { choice: 'open-latest' })
+    const path = await openDoc(ctx)
+    server.state.revision = 45
+    server.state.bytes = enc('theirs')
+    writeFileSync(path, 'mine')
+    await ctx.service.save(path)
+    const status = await ctx.service.resolveConflict(path)
+    expect(ctx.ui.confirmDiscard).toHaveBeenCalled()
+    expect(status).toMatchObject({ state: 'saved' })
+    expect(readFileSync(path, 'utf8')).toBe('theirs')
+    expect(binding(path)).toMatchObject({ baseRevision: '45' })
+    expect(ctx.deps.reloadPath).toHaveBeenCalledWith(path)
+  })
+
+  it('save-local-copy writes a plain copy and the document stays in conflict', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server, { choice: 'save-local-copy' })
+    const path = await openDoc(ctx)
+    server.state.revision = 45
+    writeFileSync(path, 'mine')
+    await ctx.service.save(path)
+    expect(await ctx.service.resolveConflict(path)).toMatchObject({ state: 'conflict' })
+    expect(ctx.ui.pickCopyPath).toHaveBeenCalledWith('Q4 plan', 'docx')
+    expect(readFileSync(join(dir, 'Q4 plan (my copy).docx'), 'utf8')).toBe('mine')
+  })
+
+  it('a payload mismatch drops the intent; the next save mints a new key', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'v4')
+    server.faults.push({ route: 'upload', kind: 409, code: 'idempotency_payload_mismatch' })
+    expect(await ctx.service.save(path)).toMatchObject({
+      state: 'error',
+      error: 'idempotency_mismatch',
+    })
+    expect(binding(path).pendingIntent).toBeUndefined()
+    await ctx.service.save(path)
+    const keys = uploads(server).map((c) => c.headers['idempotency-key'])
+    expect(keys).toHaveLength(2)
+    expect(keys[0]).not.toBe(keys[1])
+  })
+
+  it('idempotency_in_flight retries with a bounded backoff, then goes offline keeping the intent', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'v4')
+    for (let i = 0; i < 4; i += 1)
+      server.faults.push({ route: 'upload', kind: 409, code: 'idempotency_in_flight' })
+    expect(await ctx.service.save(path)).toMatchObject({ state: 'offline' })
+    expect(uploads(server)).toHaveLength(4)
+    expect(binding(path).pendingIntent).toBeTruthy()
+  })
+
+  it('403 forbidden blocks the save, keeps the file and downgrades access', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'v4')
+    server.faults.push({ route: 'commit', kind: 403, code: 'forbidden' })
+    expect(await ctx.service.save(path)).toMatchObject({
+      state: 'blocked',
+      error: 'forbidden',
+      access: 'view',
+    })
+    expect(readFileSync(path, 'utf8')).toBe('v4')
+  })
+
+  it('a view-only document never reaches the network', async () => {
+    const server = fakeServer({ bytes: enc('v3'), myLevel: 'view' })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'edited anyway')
+    const before = server.calls.length
+    await ctx.service.save(path)
+    await ctx.service.coordinator.save(path)
+    ctx.service.onUserSave(path)
+    await new Promise((r) => setTimeout(r, 10))
+    expect(server.calls.length).toBe(before)
+  })
+
+  it('bytes identical to the base save without any network', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    const before = server.calls.length
+    expect(await ctx.service.save(path)).toMatchObject({ state: 'saved' })
+    expect(server.calls.length).toBe(before)
+  })
+
+  it('signed out: no network, state signed-out', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'v4')
+    ctx.signOut()
+    const before = server.calls.length
+    await ctx.service.coordinator.save(path)
+    expect(server.calls.length).toBe(before)
+    expect(binding(path)).toMatchObject({ state: 'signed-out', error: 'not_signed_in' })
+  })
+})
+
+describe('secrets and egress', () => {
+  it('the token is only ever an Authorization header: never in files or pushed payloads', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'v4')
+    server.faults.push({ route: 'commit', kind: 'lost' })
+    await ctx.service.save(path)
+    await ctx.service.save(path)
+    for (const file of allFiles(dir)) expect(readFileSync(file, 'latin1')).not.toContain(TOKEN)
+    const payloads = JSON.stringify([
+      ctx.statuses,
+      ctx.launches,
+      await ctx.service.listWorkspaces(),
+    ])
+    expect(payloads).not.toContain(TOKEN)
+    for (const call of server.calls) {
+      expect(call.headers.authorization).toBe(`Bearer ${TOKEN}`)
+      expect(call.url.startsWith(`${ORIGIN}/api/v1/`)).toBe(true)
+      expect(call.url).not.toContain(TOKEN)
+    }
+    for (const [, init] of server.fetch.mock.calls) {
+      expect(init.redirect).toBe('error')
+      expect(init.cache).toBe('no-store')
+    }
+  })
+})
