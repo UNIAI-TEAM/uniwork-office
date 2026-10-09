@@ -90,6 +90,21 @@ async function visibleSecrets(page: Page): Promise<string> {
   )
 }
 
+const NO_KEYRING_SKIP = 'no OS keyring on this runner; sign-in flow runs on Windows/macOS'
+
+/**
+ * Whether the app can keep a credential encrypted. Linux without a Secret
+ * Service (headless CI) selects safeStorage's `basic_text` backend, which the
+ * app refuses by contract (no plaintext fallback); Windows and macOS always
+ * have an OS store.
+ */
+async function hasOsKeyring(launched: LaunchedApp): Promise<boolean> {
+  return launched.app.evaluate(({ safeStorage }) => {
+    if (!safeStorage.isEncryptionAvailable()) return false
+    return process.platform !== 'linux' || safeStorage.getSelectedStorageBackend() !== 'basic_text'
+  })
+}
+
 const sessionFile = (userDataDir: string) => join(userDataDir, 'uniwork-auth', 'session.bin')
 
 /**
@@ -121,6 +136,7 @@ test.describe('UniWork account sign-in', () => {
       env: shellEnv(stub),
     })
     try {
+      test.skip(!(await hasOsKeyring(launched)), NO_KEYRING_SKIP)
       await signIn(launched, stub)
       const { page } = launched
 
@@ -175,6 +191,7 @@ test.describe('UniWork account sign-in', () => {
     })
     const { userDataDir } = first
     try {
+      test.skip(!(await hasOsKeyring(first)), NO_KEYRING_SKIP)
       await signIn(first, stub)
     } finally {
       await closeAndSaveVideo(first, 'uniwork-signin-revoked-a')
@@ -218,6 +235,7 @@ test.describe('UniWork account sign-in', () => {
       env: shellEnv(stub),
     })
     try {
+      test.skip(!(await hasOsKeyring(launched)), NO_KEYRING_SKIP)
       const { page } = launched
       await expect(accountButton(page)).toHaveAttribute('data-state', 'keyring-unavailable', {
         timeout: 30_000,
@@ -244,6 +262,47 @@ test.describe('UniWork account sign-in', () => {
       await expect(pane).toContainText(STUB_PLAN.name)
     } finally {
       await closeAndSaveVideo(launched, 'uniwork-signin-keyring')
+      await stub.close()
+    }
+  })
+
+  test('without an OS keyring sign-in is refused and nothing is written', async () => {
+    test.setTimeout(90_000)
+    const stub = await startUniworkAuthStub()
+    const launched = await launchShell({
+      onboardingSeen: true,
+      videoDir: 'uniwork-signin-no-keyring',
+      env: shellEnv(stub),
+    })
+    try {
+      test.skip(await hasOsKeyring(launched), 'runs only where no OS keyring is available')
+      const { page, userDataDir } = launched
+      const credentialDir = join(userDataDir, 'uniwork-auth')
+
+      // the app refuses the plaintext backend: the entry says so from the start
+      await expect(accountButton(page)).toHaveAttribute('data-state', 'keyring-unavailable', {
+        timeout: 30_000,
+      })
+      await accountButton(page).click()
+      const pane = page.locator('.acct-pane')
+      await expect(pane).toHaveAttribute('data-state', 'keyring-unavailable')
+
+      // Sign in is refused before any attempt: still keyring-unavailable, the
+      // auth server never saw a request, and the credential store is untouched
+      await pane.getByRole('button', { name: 'Sign in again' }).click()
+      await expect(pane.locator('.acct-notice-error')).toBeVisible()
+      await expect(pane).toHaveAttribute('data-state', 'keyring-unavailable')
+      await expect(accountButton(page)).toHaveAttribute('data-state', 'keyring-unavailable')
+      expect(stub.lastAttempt()).toBeFalsy()
+      const stored = existsSync(credentialDir) ? await readdir(credentialDir) : []
+      expect(stored, 'credential store dir').toEqual([])
+
+      // no token-like string reached the renderer or the userData files
+      const tokenLike = /\b(?:at|rt|code)_[\w-]{20,}|eyJ[\w-]{8,}/
+      expect(await visibleSecrets(page), 'renderer DOM/storage').not.toMatch(tokenLike)
+      expect(await userDataText(userDataDir), 'userData files').not.toMatch(tokenLike)
+    } finally {
+      await closeAndSaveVideo(launched, 'uniwork-signin-no-keyring')
       await stub.close()
     }
   })
