@@ -1386,4 +1386,22 @@ export const de = {
   appFindTitle: 'Suchen und Auswählen ⌘F',
   appReplace: 'Ersetzen',
   appGoTo: 'Gehe zu',
+  // web frame (UNI-1016): engine-unavailable screen, view-only, save conflicts
+  appWebEngineTitle: 'Diese Arbeitsmappe kann noch nicht im Web geöffnet werden',
+  appWebEngineBody:
+    'Die Webversion von UniWork Sheets erhält ihre Tabellen-Engine erst noch. Öffnen Sie diese Arbeitsmappe bis dahin in der UniWork-Desktop-App.',
+  appWebEngineHint: 'Ihre Datei wurde nicht verändert.',
+  appWebViewOnly: 'Nur Ansicht: Sie können Änderungen an dieser Arbeitsmappe nicht speichern.',
+  appWebConflictTitle: 'Diese Arbeitsmappe wurde an anderer Stelle geändert',
+  appWebConflictBody:
+    'Während Sie bearbeitet haben, wurde eine neuere Version gespeichert. Überschreiben Sie sie mit Ihrer Version oder laden Sie die neueste Version neu (nicht gespeicherte Änderungen gehen verloren).',
+  appWebConflictOverwrite: 'Überschreiben',
+  appWebConflictReload: 'Neueste Version laden',
+  appWebConflictNotSaved: 'Nicht gespeichert: Es gibt eine neuere Version.',
+  appWebDiscardTitle: 'Nicht gespeicherte Änderungen verwerfen?',
+  appWebDiscardBody:
+    'Beim Öffnen einer anderen Arbeitsmappe gehen nicht gespeicherte Änderungen verloren.',
+  appWebDiscard: 'Verwerfen',
+  appWebCancel: 'Abbrechen',
+  appWebSaveFailed: 'Speichern in UniWork fehlgeschlagen.',
 } satisfies Record<keyof typeof zh, string>

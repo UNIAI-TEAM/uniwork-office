@@ -405,6 +405,9 @@ import {
   type ShapeEditChanges,
 } from './WorkbookVisuals'
 import { ChartFormatPane, SelectDataDialog } from './ChartPanels'
+import { cap } from './capabilities'
+import { EngineUnavailableScreen } from './EngineUnavailableScreen'
+import { isEngineUnavailableError } from './web-engine'
 
 // Source sheet id of an in-flight copy-sheet command; the next insert-sheet
 // mutation is that copy and must journal as a duplicate, not a blank add.
@@ -516,7 +519,8 @@ export function App(): React.JSX.Element {
   // pending edits of the open workbook. The journal is read at tick time so
   // the interval stays stable; demo mode has no backing file and is skipped.
   useEffect(() => {
-    if (!autoSave) return
+    // web frame: explicit save only (CONTRACT C10)
+    if (!autoSave || !cap('autoSave')) return
     let saving = false
     const tick = () => {
       const state = lazyWorkbookRef.current
@@ -545,6 +549,8 @@ export function App(): React.JSX.Element {
   // renderer crash no longer costs everything since the last manual save. A normal
   // save removes the copy; reopening a file whose copy is newer offers Restore.
   useEffect(() => {
+    // web frame: no crash-recovery copy (C10, C11)
+    if (!cap('recoveryCopy')) return
     let writing = false
     const tick = () => {
       const state = lazyWorkbookRef.current
@@ -580,6 +586,9 @@ export function App(): React.JSX.Element {
   const [fullLoadPrompt, setFullLoadPrompt] = useState<'ask' | 'tooLarge' | null>(null)
   const fullLoadRunning = useRef(false)
   const [message, setMessage] = useState(t('appReadyInitial'))
+  /// Web frame: the open failed because no workbook engine is installed
+  /// (web-engine.ts); the whole window shows EngineUnavailableScreen.
+  const [engineUnavailable, setEngineUnavailable] = useState(false)
   /// Zoom of the active sheet in percent, echoed by the status-bar slider.
   const [zoomPercent, setZoomPercent] = useState(100)
   const [selectionFormat, setSelectionFormat] = useState<SelectionFormat | null>(null)
@@ -3777,7 +3786,8 @@ export function App(): React.JSX.Element {
     lazyWorkbookRef.current = state
     // Pivot definitions load eagerly so refresh (a synchronous apply step)
     // never waits on IPC. Best effort: a failed parse just disables refresh.
-    for (const sheet of selected.sheets) {
+    // web frame without pivot support in the engine: no definitions, refresh stays hidden
+    for (const sheet of cap('pivotRefresh') ? selected.sheets : []) {
       for (const pivot of sheet.pivotTables) {
         if (pivot.cachePath === null) continue
         void window.desktopApi
@@ -3975,6 +3985,10 @@ export function App(): React.JSX.Element {
       openLazyWorkbook(selected)
       setMessage(t('appOpened', { name: selected.name }))
     } catch (error: unknown) {
+      if (isEngineUnavailableError(error)) {
+        setEngineUnavailable(true)
+        return
+      }
       setMessage(error instanceof Error ? error.message : t('appOpenFailed'))
     } finally {
       workbookOpeningRef.current = false
@@ -4154,6 +4168,8 @@ export function App(): React.JSX.Element {
   })()
 
   const aiScopeChip = resolveScopeChip(aiRunScope, aiScope, aiScopeDismissed)
+
+  if (engineUnavailable) return <EngineUnavailableScreen />
 
   return (
     <>

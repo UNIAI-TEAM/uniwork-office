@@ -1375,4 +1375,21 @@ export const it = {
   appFindTitle: 'Trova e seleziona ⌘F',
   appReplace: 'Sostituisci',
   appGoTo: 'Vai a',
+  // web frame (UNI-1016): engine-unavailable screen, view-only, save conflicts
+  appWebEngineTitle: 'Questa cartella di lavoro non può ancora essere aperta sul web',
+  appWebEngineBody:
+    "La versione web di UniWork Sheets sta ancora ricevendo il suo motore di calcolo. Nel frattempo, apri questa cartella di lavoro nell'app desktop di UniWork.",
+  appWebEngineHint: 'Il file non è stato modificato.',
+  appWebViewOnly: 'Sola lettura: non puoi salvare le modifiche a questa cartella di lavoro.',
+  appWebConflictTitle: 'Questa cartella di lavoro è stata modificata altrove',
+  appWebConflictBody:
+    "Qualcuno ha salvato una versione più recente mentre modificavi. Sovrascrivila con la tua versione oppure ricarica l'ultima versione (le modifiche non salvate andranno perse).",
+  appWebConflictOverwrite: 'Sovrascrivi',
+  appWebConflictReload: "Ricarica l'ultima versione",
+  appWebConflictNotSaved: 'Non salvato: esiste una versione più recente.',
+  appWebDiscardTitle: 'Annullare le modifiche non salvate?',
+  appWebDiscardBody: "Aprendo un'altra cartella di lavoro le modifiche non salvate andranno perse.",
+  appWebDiscard: 'Annulla modifiche',
+  appWebCancel: 'Annulla',
+  appWebSaveFailed: 'Salvataggio in UniWork non riuscito.',
 } satisfies Record<keyof typeof zh, string>

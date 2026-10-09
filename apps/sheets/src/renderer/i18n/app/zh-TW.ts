@@ -1249,4 +1249,21 @@ export const zhTW = {
   appFindTitle: '尋找與選取 ⌘F',
   appReplace: '取代',
   appGoTo: '到',
+  // web frame (UNI-1016): engine-unavailable screen, view-only, save conflicts
+  appWebEngineTitle: '此活頁簿暫時無法在網頁版開啟',
+  appWebEngineBody:
+    '網頁版 UniWork 試算表的計算引擎仍在準備中。在此之前，請在 UniWork 桌面應用程式中開啟此活頁簿。',
+  appWebEngineHint: '您的檔案未被變更。',
+  appWebViewOnly: '僅供檢視：您無法儲存對此活頁簿的變更。',
+  appWebConflictTitle: '此活頁簿已在別處被修改',
+  appWebConflictBody:
+    '在您編輯期間，有人儲存了較新的版本。可以用您的版本覆寫，或重新載入最新版本（未儲存的變更將被捨棄）。',
+  appWebConflictOverwrite: '覆寫',
+  appWebConflictReload: '重新載入最新版本',
+  appWebConflictNotSaved: '未儲存：已有較新的版本。',
+  appWebDiscardTitle: '捨棄未儲存的變更？',
+  appWebDiscardBody: '開啟其他活頁簿會捨棄尚未儲存的變更。',
+  appWebDiscard: '捨棄',
+  appWebCancel: '取消',
+  appWebSaveFailed: '儲存到 UniWork 失敗。',
 } satisfies Record<keyof typeof zh, string>

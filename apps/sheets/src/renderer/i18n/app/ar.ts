@@ -1301,4 +1301,21 @@ export const ar = {
   appFindTitle: 'بحث وتحديد ⌘F',
   appReplace: 'استبدال',
   appGoTo: 'الانتقال إلى',
+  // web frame (UNI-1016): engine-unavailable screen, view-only, save conflicts
+  appWebEngineTitle: 'لا يمكن فتح هذا المصنف على الويب بعد',
+  appWebEngineBody:
+    'لا يزال إصدار الويب من UniWork Sheets بانتظار محرك جداول البيانات. حتى ذلك الحين، افتح هذا المصنف في تطبيق UniWork لسطح المكتب.',
+  appWebEngineHint: 'لم يتغير ملفك.',
+  appWebViewOnly: 'عرض فقط: لا يمكنك حفظ التغييرات على هذا المصنف.',
+  appWebConflictTitle: 'تم تغيير هذا المصنف في مكان آخر',
+  appWebConflictBody:
+    'قام شخص ما بحفظ إصدار أحدث أثناء التحرير. استبدله بإصدارك، أو أعد تحميل أحدث إصدار (سيتم تجاهل التغييرات غير المحفوظة).',
+  appWebConflictOverwrite: 'استبدال',
+  appWebConflictReload: 'إعادة تحميل أحدث إصدار',
+  appWebConflictNotSaved: 'لم يتم الحفظ: يوجد إصدار أحدث.',
+  appWebDiscardTitle: 'تجاهل التغييرات غير المحفوظة؟',
+  appWebDiscardBody: 'يؤدي فتح مصنف آخر إلى تجاهل التغييرات غير المحفوظة.',
+  appWebDiscard: 'تجاهل',
+  appWebCancel: 'إلغاء',
+  appWebSaveFailed: 'فشل الحفظ في UniWork.',
 } satisfies Record<keyof typeof zh, string>

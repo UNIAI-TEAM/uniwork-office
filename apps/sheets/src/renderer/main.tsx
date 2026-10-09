@@ -13,6 +13,8 @@ import '@genoffice/ui/ai-scope-quote.css'
 import '@univerjs/preset-sheets-core/lib/index.css'
 
 import { App } from './App'
+import { cap } from './capabilities'
+import { EngineUnavailableScreen } from './EngineUnavailableScreen'
 import { installCanvasFontFallback, registerCellFontAliases } from './cell-font-fallback'
 import { LocaleProvider, setModuleLang } from './i18n/locale'
 import type { UiTheme } from '../shared/desktop-api'
@@ -69,6 +71,17 @@ async function bootstrap(): Promise<void> {
   setModuleLang(lang)
   document.documentElement.lang = htmlLang(lang)
   applyTheme(theme)
+  // Web frame without a workbook engine (UNI-1016): show the styled state
+  // instead of booting the grid; the desktop never sets the capability.
+  if (!cap('xlsxEngine')) {
+    window.desktopApi?.onThemeChanged(applyTheme)
+    ReactDOM.createRoot(root!).render(
+      <LocaleProvider initial={lang}>
+        <EngineUnavailableScreen />
+      </LocaleProvider>,
+    )
+    return
+  }
   await loadCellFonts()
   window.desktopApi?.onThemeChanged(applyTheme)
   void window.desktopApi

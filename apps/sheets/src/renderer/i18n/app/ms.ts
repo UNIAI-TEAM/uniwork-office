@@ -1337,4 +1337,21 @@ export const ms = {
   appFindTitle: 'Cari & Pilih ⌘F',
   appReplace: 'Ganti',
   appGoTo: 'Pergi Ke',
+  // web frame (UNI-1016): engine-unavailable screen, view-only, save conflicts
+  appWebEngineTitle: 'Buku kerja ini belum boleh dibuka di web',
+  appWebEngineBody:
+    'Versi web UniWork Sheets masih menunggu enjin hamparannya. Sementara itu, buka buku kerja ini dalam apl desktop UniWork.',
+  appWebEngineHint: 'Fail anda tidak berubah.',
+  appWebViewOnly: 'Lihat sahaja: anda tidak boleh menyimpan perubahan pada buku kerja ini.',
+  appWebConflictTitle: 'Buku kerja ini telah diubah di tempat lain',
+  appWebConflictBody:
+    'Seseorang telah menyimpan versi yang lebih baharu semasa anda menyunting. Tulis gantinya dengan versi anda, atau muat semula versi terkini (perubahan yang belum disimpan akan dibuang).',
+  appWebConflictOverwrite: 'Tulis ganti',
+  appWebConflictReload: 'Muat semula versi terkini',
+  appWebConflictNotSaved: 'Tidak disimpan: terdapat versi yang lebih baharu.',
+  appWebDiscardTitle: 'Buang perubahan yang belum disimpan?',
+  appWebDiscardBody: 'Membuka buku kerja lain akan membuang perubahan yang belum disimpan.',
+  appWebDiscard: 'Buang',
+  appWebCancel: 'Batal',
+  appWebSaveFailed: 'Gagal menyimpan ke UniWork.',
 } satisfies Record<keyof typeof zh, string>

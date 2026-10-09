@@ -165,6 +165,7 @@ import {
   type WrapMeasureCoverage,
 } from './univer-state'
 import { isManualCalculation } from './calc-options'
+import { cap } from './capabilities'
 import { noteFormulaStreamChunk, requestFullRecalcAfterStream } from './formula-stream-hold'
 
 export const MINIMUM_SHEET_ROW_COUNT = 1000
@@ -2253,6 +2254,8 @@ export function queueFormulaRecalc(
 ): void {
   const state = lazyWorkbookRef.current
   if (!state || state.formulaMode || state.closure.status !== 'unavailable') return
+  // web frame: the IronCalc fallback is hidden (CONTRACT C11); cached values stand
+  if (!cap('recalcFallback')) return
   // minimal states (tests, partial teardown) may carry no recalc slot
   if (!state.recalc || state.recalc.failures >= RECALC_MAX_FAILURES) return
   if (state.recalc.engineOverBudget) return

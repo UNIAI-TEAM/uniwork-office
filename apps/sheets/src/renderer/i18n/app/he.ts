@@ -1280,4 +1280,21 @@ export const he = {
   appFindTitle: 'חפש ובחר ⌘F',
   appReplace: 'החלף',
   appGoTo: 'עבור אל',
+  // web frame (UNI-1016): engine-unavailable screen, view-only, save conflicts
+  appWebEngineTitle: 'עדיין לא ניתן לפתוח את חוברת העבודה הזו באינטרנט',
+  appWebEngineBody:
+    'גרסת האינטרנט של UniWork Sheets עדיין מקבלת את מנוע הגיליונות שלה. עד אז, פתחו את חוברת העבודה באפליקציית UniWork למחשב.',
+  appWebEngineHint: 'הקובץ שלך לא השתנה.',
+  appWebViewOnly: 'צפייה בלבד: לא ניתן לשמור שינויים בחוברת העבודה הזו.',
+  appWebConflictTitle: 'חוברת העבודה שונתה במקום אחר',
+  appWebConflictBody:
+    'מישהו שמר גרסה חדשה יותר בזמן שערכת. החלף אותה בגרסה שלך, או טען מחדש את הגרסה האחרונה (שינויים שלא נשמרו יימחקו).',
+  appWebConflictOverwrite: 'החלף',
+  appWebConflictReload: 'טען את הגרסה האחרונה',
+  appWebConflictNotSaved: 'לא נשמר: קיימת גרסה חדשה יותר.',
+  appWebDiscardTitle: 'לבטל שינויים שלא נשמרו?',
+  appWebDiscardBody: 'פתיחת חוברת עבודה אחרת מבטלת שינויים שלא נשמרו.',
+  appWebDiscard: 'בטל שינויים',
+  appWebCancel: 'ביטול',
+  appWebSaveFailed: 'השמירה ב-UniWork נכשלה.',
 } satisfies Record<keyof typeof zh, string>

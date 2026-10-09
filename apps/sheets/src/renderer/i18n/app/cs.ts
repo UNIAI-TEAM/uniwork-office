@@ -1339,4 +1339,21 @@ export const cs = {
   appFindTitle: 'Najít a vybrat ⌘F',
   appReplace: 'Nahradit',
   appGoTo: 'Přejít na',
+  // web frame (UNI-1016): engine-unavailable screen, view-only, save conflicts
+  appWebEngineTitle: 'Tento sešit zatím nelze otevřít na webu',
+  appWebEngineBody:
+    'Webová verze UniWork Sheets teprve dostává svůj tabulkový engine. Do té doby otevřete tento sešit v desktopové aplikaci UniWork.',
+  appWebEngineHint: 'Váš soubor nebyl změněn.',
+  appWebViewOnly: 'Pouze ke čtení: změny v tomto sešitu nelze uložit.',
+  appWebConflictTitle: 'Tento sešit byl změněn jinde',
+  appWebConflictBody:
+    'Během vašich úprav někdo uložil novější verzi. Přepište ji svou verzí, nebo načtěte nejnovější verzi (neuložené změny budou zahozeny).',
+  appWebConflictOverwrite: 'Přepsat',
+  appWebConflictReload: 'Načíst nejnovější verzi',
+  appWebConflictNotSaved: 'Neuloženo: existuje novější verze.',
+  appWebDiscardTitle: 'Zahodit neuložené změny?',
+  appWebDiscardBody: 'Otevřením jiného sešitu se neuložené změny zahodí.',
+  appWebDiscard: 'Zahodit',
+  appWebCancel: 'Zrušit',
+  appWebSaveFailed: 'Uložení do UniWork se nezdařilo.',
 } satisfies Record<keyof typeof zh, string>
