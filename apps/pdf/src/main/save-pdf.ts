@@ -1,4 +1,3 @@
-import { readFile } from 'node:fs/promises'
 import {
   PDFArray,
   PDFBool,
@@ -28,7 +27,6 @@ import type {
   TextEditFailure,
   TextInsertFailure,
 } from '../shared/ipc'
-import { writePdfAtomically } from './atomic-write'
 
 const num = (v: number) => Math.round(v * 100) / 100
 const STATIC_FORM_FILLS_KEY = PDFName.of('GenOfficeStaticFormFills')
@@ -756,14 +754,7 @@ function applyMetadata(pdfDoc: PDFDocument, meta: MetadataInput): void {
   pdfDoc.setModificationDate(new Date())
 }
 
-/**
- * Apply the request to the PDF at sourcePath and atomically write the result to targetPath
- * (temp file next to the target + rename, so a mid-write crash can't corrupt it).
- * The source file is only ever read: Save As (targetPath !== sourcePath) must never mutate
- * the original document, and a failed or cancelled save leaves both paths untouched.
- * In-place Save passes targetPath === sourcePath.
- * Returns the text edits that no longer matched the document and were skipped.
- */
+/** What a save skipped: edits that no longer matched the document */
 export interface SavePdfSkips {
   skippedTextEdits: TextEditFailure[]
   skippedTextInserts: TextInsertFailure[]
@@ -837,18 +828,20 @@ async function verifyContentEdits(
   }
 }
 
-export async function savePdfToPath(
-  sourcePath: string,
-  targetPath: string,
+/**
+ * applySaveRequest + the read-back verification, i.e. everything a save does except the
+ * write. Browser-safe (bytes in, bytes out): the desktop writes the result atomically
+ * (save-pdf-file.ts savePdfToPath), the web frame uploads it (web/modules/pdf).
+ * Throws "save-verify-failed ..." when an applied content edit did not land.
+ */
+export async function applyAndVerifySaveRequest(
+  bytes: Uint8Array,
   request: SavePdfRequest,
-): Promise<SavePdfSkips> {
-  const { bytes, ...skips } = await applySaveRequest(
-    new Uint8Array(await readFile(sourcePath)),
-    request,
-  )
-  await verifyContentEdits(bytes, request, skips)
-  await writePdfAtomically(targetPath, bytes)
-  return skips
+): Promise<AppliedSaveRequest> {
+  const applied = await applySaveRequest(bytes, request)
+  const { bytes: out, ...skips } = applied
+  await verifyContentEdits(out, request, skips)
+  return applied
 }
 
 export interface AppliedSaveRequest {

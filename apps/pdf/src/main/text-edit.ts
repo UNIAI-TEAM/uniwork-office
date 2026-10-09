@@ -1,9 +1,7 @@
-import { readFileSync } from 'node:fs'
 import { PDFDict, PDFDocument, PDFName, PDFRawStream, decodePDFRawStream } from 'pdf-lib'
 import { fontCoversText } from './font-cmap'
-import { findFontCovering, findSystemFont, isTruetype } from './font-locate'
+import { isTruetype, pdfCoreEnv } from './core-env'
 import { identityCffCharset, subsetTtf } from './font-subset'
-import { pdfiumWasmPath } from './wasm-path'
 import type {
   TextEditFailure,
   TextEditInput,
@@ -126,9 +124,8 @@ export function loadPdfium(): Promise<Pdfium> {
     const { init } = (await import('@embedpdf/pdfium')) as unknown as {
       init(overrides: object): Promise<{ pdfium: Pdfium } | Pdfium>
     }
-    const raw = readFileSync(pdfiumWasmPath())
-    // Exact slice: Buffer.buffer may be a shared pool larger than the file
-    const wasmBinary = raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength)
+    // Exact bytes of the wasm file (desktop: node-env.ts; web: the frame's same-origin asset)
+    const wasmBinary = await pdfCoreEnv().pdfiumWasm()
     // thisProgram: emscripten synthesizes an environ whose `_` entry defaults
     // to process.argv[1] and writes it through ASCII-asserting stringToAscii,
     // so a non-ASCII path in argv — a CJK checkout running vitest, or a
@@ -180,11 +177,7 @@ const fallbackPathCache = new Map<string, Buffer | null>()
 function readFallbackPath(p: string): Buffer | null {
   let bytes = fallbackPathCache.get(p)
   if (bytes === undefined) {
-    try {
-      bytes = readFileSync(p)
-    } catch {
-      bytes = null
-    }
+    bytes = pdfCoreEnv().readFontFile(p)
     fallbackPathCache.set(p, bytes)
   }
   return bytes
@@ -201,10 +194,10 @@ export function fallbackFontFor(drawn: string): Buffer | null {
     if (bytes && fontCoversText(bytes, drawn)) return bytes
   }
   for (const [ps, family] of FALLBACK_SYSTEM_FACES) {
-    const bytes = findSystemFont(ps, family)
+    const bytes = pdfCoreEnv().findSystemFont(ps, family)
     if (bytes && fontCoversText(bytes, drawn)) return bytes
   }
-  return findFontCovering(drawn)
+  return pdfCoreEnv().findFontCovering(drawn)
 }
 
 export type EditFontStyle = 'regular' | 'bold' | 'italic' | 'bolditalic'
@@ -288,12 +281,8 @@ function loadEditFont(id: string, style: EditFontStyle = 'regular'): Buffer | nu
   if (cached === undefined) {
     cached = null
     for (const p of EDIT_FONT_PATHS[id]?.[style] ?? []) {
-      try {
-        cached = readFileSync(p)
-        break
-      } catch {
-        /* try next */
-      }
+      cached = pdfCoreEnv().readFontFile(p)
+      if (cached) break
     }
     editFontCache.set(key, cached)
   }
@@ -975,8 +964,8 @@ async function rebuildFontBytes(
         // a silent no-op for the toggle. Detect that (byte-equal to the plain-PS
         // lookup) and retry with the requested style alone, so the user's latest
         // toggle wins over the run's inherited style.
-        let sys = findSystemFont(`${ps}-${style}`, family)
-        const original = findSystemFont(ps, family)
+        let sys = pdfCoreEnv().findSystemFont(`${ps}-${style}`, family)
+        const original = pdfCoreEnv().findSystemFont(ps, family)
         // A run whose face already carries the requested style makes the combined
         // lookup legitimately return that face — that is a hit, not a no-op
         const psTokens = (ps.toLowerCase().match(/bolditalic|bold|italic|oblique/g) ?? []).flatMap(
@@ -986,7 +975,7 @@ async function rebuildFontBytes(
         const alreadyStyled = wanted.every((t) => psTokens.includes(t))
         if (!alreadyStyled && sys && original && sys.equals(original)) {
           const stripped = ps.replace(/bolditalic|bold|italic|oblique/gi, '')
-          const alt = findSystemFont(`${stripped}-${style}`, family)
+          const alt = pdfCoreEnv().findSystemFont(`${stripped}-${style}`, family)
           sys = alt && !alt.equals(original) ? alt : null
         }
         if (sys && fontCoversText(sys, drawn)) {
@@ -1015,7 +1004,7 @@ async function rebuildFontBytes(
     )
     const family = fontString(m, (b, l) => m._FPDFFont_GetFamilyName(font, b, l))
     if (ps || family) {
-      const sys = findSystemFont(ps, family)
+      const sys = pdfCoreEnv().findSystemFont(ps, family)
       if (sys && fontCoversText(sys, drawn)) {
         try {
           return identityCffCharset(await subsetTtf(sys, drawn))

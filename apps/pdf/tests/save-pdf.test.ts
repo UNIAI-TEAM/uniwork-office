@@ -16,11 +16,11 @@ import {
   mergePdfBytes,
   readStaticFormFills,
   replacePagesBytes,
-  savePdfToPath,
   setPageSizeBytes,
   splitPagesBytes,
   splitPdfBytes,
 } from '../src/main/save-pdf'
+import { savePdfToPath } from '../src/main/save-pdf-file'
 import { VISUAL_SIGNATURE_CONTENT_PREFIX } from '../src/shared/ipc'
 import type { SavePdfRequest } from '../src/shared/ipc'
 
