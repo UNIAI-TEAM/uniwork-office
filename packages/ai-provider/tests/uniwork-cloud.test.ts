@@ -57,6 +57,13 @@ describe('UniWork cloud seam', () => {
     expect(
       normalizeUniworkCloudStatus({ state: 'not-entitled', enabled: true, tools }).enabled,
     ).toBe(false)
+    const inactive = normalizeUniworkCloudStatus({
+      state: 'subscription-inactive',
+      enabled: true,
+      tools,
+    })
+    expect(inactive.state).toBe('subscription-inactive')
+    expect(inactive.enabled).toBe(false)
     const n = normalizeUniworkCloudStatus({
       state: 'ready',
       enabled: true,
@@ -74,6 +81,14 @@ describe('UniWork cloud seam', () => {
       periodEnd: null,
     })
     expect(JSON.stringify(n)).not.toContain('never-copied')
+  })
+
+  it('has guidance for the billing and membership errors, with no URL or token', () => {
+    for (const code of ['subscription_inactive', 'no_access'] as const) {
+      const message = new UniworkCloudError(code, 403).message
+      expect(message).not.toMatch(/https?:|bearer/i)
+      expect(message.length).toBeGreaterThan(20)
+    }
   })
 
   it('error messages carry no URL or token, only guidance', () => {

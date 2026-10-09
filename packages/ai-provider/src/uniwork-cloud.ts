@@ -29,12 +29,25 @@ export const UNIWORK_CLOUD_TOOLS: readonly UniworkCloudTool[] = [
  * What the UI shows:
  * - `signed-out`: no UniWork session (sign in to use the cloud)
  * - `not-entitled`: signed in, the plan does not include UniWork cloud AI
+ * - `subscription-inactive`: the plan has it but the organization's subscription is not active
  * - `credits-exhausted`: entitled, no credits left this period
  * - `unavailable`: entitled but the server could not be read, or no tool is configured
  * - `ready`: entitled with tools to offer
  */
 export type UniworkCloudState =
-  'signed-out' | 'not-entitled' | 'credits-exhausted' | 'unavailable' | 'ready'
+  | 'signed-out'
+  | 'not-entitled'
+  | 'subscription-inactive'
+  | 'credits-exhausted'
+  | 'unavailable'
+  | 'ready'
+
+/** states in which the cloud is not offered at all (no tool, no picker entry) */
+const CLOUD_OFF_STATES: readonly UniworkCloudState[] = [
+  'signed-out',
+  'not-entitled',
+  'subscription-inactive',
+]
 
 export interface UniworkCloudCredits {
   /** the server meter (`ai.tokens`) */
@@ -107,6 +120,7 @@ export function normalizeUniworkCloudStatus(raw: unknown): UniworkCloudStatus {
   const states: UniworkCloudState[] = [
     'signed-out',
     'not-entitled',
+    'subscription-inactive',
     'credits-exhausted',
     'unavailable',
     'ready',
@@ -128,7 +142,7 @@ export function normalizeUniworkCloudStatus(raw: unknown): UniworkCloudStatus {
       : null
   return {
     state: r.state as UniworkCloudState,
-    enabled: r.enabled === true && r.state !== 'signed-out' && r.state !== 'not-entitled',
+    enabled: r.enabled === true && !CLOUD_OFF_STATES.includes(r.state as UniworkCloudState),
     tools,
     credits,
     ...(typeof r.email === 'string' && r.email ? { email: r.email } : {}),
@@ -141,6 +155,8 @@ export function normalizeUniworkCloudStatus(raw: unknown): UniworkCloudStatus {
 export type UniworkCloudErrorCode =
   | 'signed_out'
   | 'entitlement_required'
+  | 'subscription_inactive'
+  | 'no_access'
   | 'credits_exhausted'
   | 'cloud_unavailable'
   | 'rate_limited'
@@ -157,6 +173,10 @@ const ERROR_TEXT: Record<UniworkCloudErrorCode, string> = {
     'UniWork cloud AI needs a UniWork sign-in; ask the user to sign in under Settings (Account)',
   entitlement_required:
     "The organization's UniWork plan does not include UniWork cloud AI; ask the user to upgrade the plan or set up their own provider under Settings (AI Media)",
+  subscription_inactive:
+    "The organization's UniWork subscription is not active; ask the user to renew it or set up their own provider under Settings (AI Media)",
+  no_access:
+    'The user no longer has access to the selected UniWork organization; ask them to check the organization under Settings (Account) or set up their own provider under Settings (AI Media)',
   credits_exhausted:
     'The UniWork AI credits for this billing period are used up; tell the user they are out of credits (they can add credits or use their own provider under Settings (AI Media))',
   cloud_unavailable: 'This UniWork cloud AI tool is unavailable right now; try again later',
@@ -171,7 +191,7 @@ const ERROR_TEXT: Record<UniworkCloudErrorCode, string> = {
 
 export class UniworkCloudError extends Error {
   readonly code: UniworkCloudErrorCode
-  readonly status?: number
+  readonly status?: number | undefined
   constructor(code: UniworkCloudErrorCode, status?: number) {
     super(ERROR_TEXT[code])
     this.name = 'UniworkCloudError'

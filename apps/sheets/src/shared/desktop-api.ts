@@ -2511,6 +2511,15 @@ export const aiSettingsInputSchema = z
         imageProvider: z.string().min(1).optional(),
         analysisProvider: z.string().min(1).optional(),
         videoAnalysisProvider: z.string().min(1).optional(),
+        // capabilities where the user picked the UniWork cloud entry explicitly
+        cloudPicked: z
+          .object({
+            image: z.boolean().optional(),
+            analysis: z.boolean().optional(),
+            video: z.boolean().optional(),
+          })
+          .strict()
+          .optional(),
         // pre-catalog single choice, still accepted on read
         provider: z.string().min(1).optional(),
         providers: z.record(z.string(), aiMediaProviderConfigSchema),
