@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <!--
+      No <meta> Content-Security-Policy on purpose: the policy is delivered by the host as an HTTP
+      header (frame-ancestors only works as a header). `npm run build:web -- --module pdf` writes the
+      exact value to csp.json / headers.json next to manifest.json (sources: web/docs/build/csp.ts +
+      the pdf entry of web/docs/build/modules.ts).
+    -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>UniWork PDF (web)</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <!-- bridge must run first: it installs window.pdfApi / window.projectApi -->
+    <script type="module" src="./install.ts"></script>
+    <script type="module" src="../../../apps/pdf/src/renderer/main.tsx"></script>
+  </body>
+</html>

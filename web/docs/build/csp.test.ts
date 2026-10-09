@@ -82,3 +82,67 @@ describe('csp', () => {
     expect(h.rules.at(-1)?.source).toBe('/**')
   })
 })
+
+describe('csp module additions (GO-B4/B5/B6)', () => {
+  it('appends sources, creates missing directives, drops a replaced none, adds notes', () => {
+    const m = buildCspManifest({
+      extra: {
+        directives: {
+          'script-src': ["'wasm-unsafe-eval'"],
+          'media-src': ["'self'", 'blob:'],
+          'frame-src': ['blob:'],
+        },
+        why: ['because'],
+      },
+    })
+    expect(m.directives['script-src']).toEqual(["'self'", "'wasm-unsafe-eval'"])
+    expect(m.directives['media-src']).toEqual(["'self'", 'blob:'])
+    expect(m.directives['frame-src']).toEqual(['blob:'])
+    expect(m.value).toContain("script-src 'self' 'wasm-unsafe-eval';")
+    expect(m.notes.at(-1)).toBe('because')
+  })
+
+  it('refuses to widen locked directives or smuggle sources', () => {
+    const extra = (directives: Record<string, string[]>) => () =>
+      buildCspDirectives({ extra: { directives, why: [] } })
+    expect(extra({ 'frame-ancestors': ['https://evil.test'] })).toThrow(/cannot widen/)
+    expect(extra({ 'connect-src': ['*'] })).toThrow(/cannot widen/)
+    expect(extra({ 'script-src': ["'unsafe-eval'"] })).toThrow(/invalid CSP source/)
+    expect(extra({ 'img-src': ['x; script-src *'] })).toThrow(/invalid CSP source/)
+    expect(extra({ 'Bad Name': ["'self'"] })).toThrow(/invalid CSP directive/)
+  })
+})
+
+describe('per-module header rules (GO-B4/B5/B6)', () => {
+  it('docs: unchanged rules without options', () => {
+    const h = buildHeadersManifest(buildCspManifest())
+    expect(h.rules.map((r) => r.source)).toEqual(['/index.html', '/assets/**', '/fonts/**', '/**'])
+  })
+
+  it('alsoOn sends the policy on more paths; immutableDirs adds cache rules', () => {
+    const csp = buildCspManifest({
+      extra: { directives: {}, alsoOn: ['/assets/**'], why: [] },
+    })
+    expect(csp.appliesTo).toEqual(['/index.html', '/assets/**'])
+    const h = buildHeadersManifest(csp, { immutableDirs: ['pdfjs'] })
+    expect(h.rules.map((r) => r.source)).toEqual([
+      '/index.html',
+      '/assets/**',
+      '/assets/**',
+      '/fonts/**',
+      '/pdfjs/**',
+      '/**',
+    ])
+    expect(h.rules[1].headers).toEqual({ 'Content-Security-Policy': csp.value })
+    expect(h.rules[4].headers['Cache-Control']).toContain('immutable')
+  })
+
+  it('refuses odd paths', () => {
+    expect(() =>
+      buildCspManifest({ extra: { directives: {}, alsoOn: ['/../x/**'], why: [] } }),
+    ).toThrow(/invalid headers.json source/)
+    expect(() => buildHeadersManifest(buildCspManifest(), { immutableDirs: ['../x'] })).toThrow(
+      /invalid dir/,
+    )
+  })
+})
