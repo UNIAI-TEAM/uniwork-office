@@ -1,3 +1,4 @@
+import { setUniworkUserSaveHook } from './uniwork-policy'
 import {
   constants,
   copyFileSync,
@@ -1727,4 +1728,12 @@ export function startPdfStandalone(): void {
     void win.loadURL(rendererUrl(runtime.rendererUrl, 'pdf'))
   })
   app.on('window-all-closed', () => app.quit())
+}
+
+export type { UniworkDocumentPolicy } from './uniwork-policy'
+export { setUniworkDocumentPolicy } from './uniwork-policy'
+
+/** Fires once per explicit user Save that wrote to the same path (UniWork seam). */
+export function setPdfUserSaveHook(hook: ((path: string) => void) | null): void {
+  setUniworkUserSaveHook(hook)
 }

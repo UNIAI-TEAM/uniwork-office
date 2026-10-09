@@ -1,3 +1,4 @@
+import { setUniworkUserSaveHook } from './uniwork-policy'
 import { createHash, randomUUID } from 'node:crypto'
 import {
   createReadStream,
@@ -4741,4 +4742,12 @@ async function closeAllSessions(entry: {
       })
     }),
   )
+}
+
+export type { UniworkDocumentPolicy } from './uniwork-policy'
+export { setUniworkDocumentPolicy } from './uniwork-policy'
+
+/** Fires once per explicit user Save that wrote to the same path (UniWork seam). */
+export function setSheetsUserSaveHook(hook: ((path: string) => void) | null): void {
+  setUniworkUserSaveHook(hook)
 }

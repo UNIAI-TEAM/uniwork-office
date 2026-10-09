@@ -4,6 +4,7 @@
  * here to apply. Structure mirrors apps/docs: exports embeddable configure/register/start for
  * future shell reuse.
  */
+import { setUniworkUserSaveHook } from './uniwork-policy'
 import {
   clipboard,
   app,
@@ -5170,4 +5171,12 @@ export function startSlidesStandalone(): void {
   app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') app.quit()
   })
+}
+
+export type { UniworkDocumentPolicy } from './uniwork-policy'
+export { setUniworkDocumentPolicy } from './uniwork-policy'
+
+/** Fires once per explicit user Save that wrote to the same path (UniWork seam). */
+export function setSlidesUserSaveHook(hook: ((path: string) => void) | null): void {
+  setUniworkUserSaveHook(hook)
 }

@@ -1,3 +1,4 @@
+import { setUniworkUserSaveHook } from './uniwork-policy'
 import { existsSync } from 'node:fs'
 import { readFile, writeFile } from 'node:fs/promises'
 import { basename, dirname, extname, join, relative, resolve } from 'node:path'
@@ -1287,4 +1288,12 @@ export function startMarkdownStandalone(): void {
     void win.loadURL(rendererUrl(runtime.rendererUrl, 'markdown'))
   })
   app.on('window-all-closed', () => app.quit())
+}
+
+export type { UniworkDocumentPolicy } from './uniwork-policy'
+export { setUniworkDocumentPolicy } from './uniwork-policy'
+
+/** Fires once per explicit user Save that wrote to the same path (UniWork seam). */
+export function setMarkdownUserSaveHook(hook: ((path: string) => void) | null): void {
+  setUniworkUserSaveHook(hook)
 }

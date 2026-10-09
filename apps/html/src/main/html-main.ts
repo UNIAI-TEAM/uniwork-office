@@ -1,3 +1,4 @@
+import { setUniworkUserSaveHook } from './uniwork-policy'
 import {
   existsSync,
   mkdirSync,
@@ -1981,4 +1982,12 @@ export function startHtmlStandalone(): void {
     void win.loadURL(rendererUrl(runtime.rendererUrl, 'html'))
   })
   app.on('window-all-closed', () => app.quit())
+}
+
+export type { UniworkDocumentPolicy } from './uniwork-policy'
+export { setUniworkDocumentPolicy } from './uniwork-policy'
+
+/** Fires once per explicit user Save that wrote to the same path (UniWork seam). */
+export function setHtmlUserSaveHook(hook: ((path: string) => void) | null): void {
+  setUniworkUserSaveHook(hook)
 }
