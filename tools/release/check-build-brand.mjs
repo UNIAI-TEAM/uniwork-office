@@ -4,7 +4,13 @@
 // build must carry no update feed. Runs on an electron-builder output directory
 // (BUILD_DIR) after packaging:
 //
-//   node tools/release/check-build-brand.mjs --dir apps/shell/release [--json]
+//   node tools/release/check-build-brand.mjs --dir apps/shell/release
+//     [--expect win-unpacked | --expect mac-arm64,mac] [--json]
+//
+// The unpacked app directories are required, never optional: the ones named
+// with --expect, and the ones the installers imply (a Windows setup .exe needs
+// win-unpacked, an arm64 dmg mac-arm64, an x64 dmg mac). A missing one is a
+// problem, so a wrong --dir cannot pass on file names alone.
 //
 // Checked, when present in the directory:
 //   - every top-level artifact file name (installers, dmg / zip, blockmaps)
@@ -325,18 +331,41 @@ function checkMacApp(appDir, report) {
   checkNoUpdateFeed(where, resources, report)
 }
 
+/**
+ * The unpacked directories an installer implies: a Windows setup exe its
+ * win[-arch]-unpacked, a dmg its mac[-arch] (x64 is plain `mac`). Null when the
+ * arch is not in the name; then any directory of that platform satisfies it.
+ */
+export function impliedUnpackedDir(name) {
+  if (/\.exe$/i.test(name)) {
+    const arch = /(?:^|[_-])(arm64|ia32|x64)(?:[_-]|-setup|\.exe$)/i.exec(name)?.[1]?.toLowerCase()
+    if (!arch) return { platform: 'win', dir: null }
+    return { platform: 'win', dir: arch === 'x64' ? 'win-unpacked' : `win-${arch}-unpacked` }
+  }
+  if (/\.dmg$/i.test(name)) {
+    const arch = /(?:^|[_-])(arm64|x64|universal)\.dmg$/i.exec(name)?.[1]?.toLowerCase()
+    if (!arch) return { platform: 'mac', dir: null }
+    return { platform: 'mac', dir: arch === 'x64' ? 'mac' : `mac-${arch}` }
+  }
+  return null
+}
+
 /** Runs every check on an electron-builder output directory. */
-export function checkBuildDir(dir) {
+export function checkBuildDir(dir, { expect = [] } = {}) {
   const problems = []
   const checked = []
   const report = {
     problem: (message) => message && problems.push(message),
     checked: (what) => checked.push(what),
   }
+  const inspected = new Set()
+  const required = new Map(expect.map((name) => [name, '--expect']))
+  const requiredPlatforms = new Map()
   for (const name of readdirSync(dir)) {
     const path = join(dir, name)
     if (statSync(path).isDirectory()) {
       if (!UNPACKED_DIR.test(name)) continue
+      inspected.add(name)
       if (name.startsWith('win')) {
         checkWindowsUnpacked(path, report)
       } else if (name.startsWith('mac')) {
@@ -357,6 +386,19 @@ export function checkBuildDir(dir) {
     if (/\.exe$/i.test(name)) {
       checkVersionInfo(name, parseVersionInfo(readFileSync(path)), report, { requireKeys: true })
     }
+    const implied = impliedUnpackedDir(name)
+    if (implied?.dir) required.set(implied.dir, name)
+    else if (implied) requiredPlatforms.set(implied.platform, name)
+  }
+  for (const [name, by] of required) {
+    if (!inspected.has(name)) {
+      problems.push(`${name}: unpacked app directory missing (required by ${by})`)
+    }
+  }
+  for (const [platform, by] of requiredPlatforms) {
+    if (![...inspected].some((name) => name.startsWith(platform))) {
+      problems.push(`no ${platform} unpacked app directory (required by ${by})`)
+    }
   }
   if (checked.length === 0) problems.push(`${dir}: no packaged output to check`)
   return { checked, problems }
@@ -365,13 +407,23 @@ export function checkBuildDir(dir) {
 function main(argv) {
   let dir
   let json = false
+  const expect = []
   for (let index = 0; index < argv.length; index += 1) {
     if (argv[index] === '--dir') dir = argv[++index]
-    else if (argv[index] === '--json') json = true
+    else if (argv[index] === '--expect') {
+      expect.push(...(argv[++index] ?? '').split(',').filter(Boolean))
+    } else if (argv[index] === '--json') json = true
     else throw new Error(`unknown argument: ${argv[index]}`)
   }
-  if (!dir) throw new Error('usage: check-build-brand.mjs --dir <electron-builder output> [--json]')
-  const result = checkBuildDir(resolve(dir))
+  if (!dir) {
+    throw new Error(
+      'usage: check-build-brand.mjs --dir <electron-builder output> [--expect <dir>[,<dir>]] [--json]',
+    )
+  }
+  for (const name of expect) {
+    if (!UNPACKED_DIR.test(name)) throw new Error(`--expect ${name}: not an unpacked app directory`)
+  }
+  const result = checkBuildDir(resolve(dir), { expect })
   if (json) {
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`)
   } else {

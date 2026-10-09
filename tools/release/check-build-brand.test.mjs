@@ -185,22 +185,13 @@ describe('BRAND', () => {
 const roots = []
 after(() => roots.forEach((root) => rmSync(root, { recursive: true, force: true })))
 
-async function fakeWindowsOutput({
-  installer = 'UniWork-Office_0.11.0-dev.0_unsigned_win32_x64-setup.exe',
-  exeStrings = GOOD_STRINGS,
-  pkg = {},
-  updateFeed = false,
-} = {}) {
+function newRoot() {
   const root = mkdtempSync(join(tmpdir(), 'brand-out-'))
   roots.push(root)
-  writeFileSync(join(root, installer), fakeExe(GOOD_STRINGS))
-  writeFileSync(join(root, `${installer}.blockmap`), '')
-  writeFileSync(join(root, 'builder-debug.yml'), '')
-  const unpacked = join(root, 'win-unpacked')
-  mkdirSync(join(unpacked, 'resources'), { recursive: true })
-  writeFileSync(join(unpacked, 'UniWork Office.exe'), fakeExe(exeStrings))
-  if (updateFeed)
-    writeFileSync(join(unpacked, 'resources', 'app-update.yml'), 'provider: generic\n')
+  return root
+}
+
+async function writeAsar(root, resources, pkg) {
   const app = join(root, 'app-src')
   mkdirSync(app)
   writeFileSync(
@@ -214,8 +205,54 @@ async function fakeWindowsOutput({
       ...pkg,
     }),
   )
-  await asar.createPackage(app, join(unpacked, 'resources', 'app.asar'))
+  await asar.createPackage(app, join(resources, 'app.asar'))
   rmSync(app, { recursive: true })
+}
+
+async function fakeWindowsOutput({
+  installer = 'UniWork-Office_0.11.0-dev.0_unsigned_win32_x64-setup.exe',
+  installerStrings = GOOD_STRINGS,
+  exeStrings = GOOD_STRINGS,
+  pkg = {},
+  updateFeed = false,
+  unpacked = true,
+} = {}) {
+  const root = newRoot()
+  writeFileSync(join(root, installer), fakeExe(installerStrings))
+  writeFileSync(join(root, `${installer}.blockmap`), '')
+  writeFileSync(join(root, 'builder-debug.yml'), '')
+  if (!unpacked) return root
+  const resources = join(root, 'win-unpacked', 'resources')
+  mkdirSync(resources, { recursive: true })
+  writeFileSync(join(root, 'win-unpacked', 'UniWork Office.exe'), fakeExe(exeStrings))
+  if (updateFeed) writeFileSync(join(resources, 'app-update.yml'), 'provider: generic\n')
+  await writeAsar(root, resources, pkg)
+  return root
+}
+
+/** electron-builder's mac layout: mac-arm64/ and mac/ (x64), each with the .app. */
+async function fakeMacOutput({
+  arches = ['arm64', 'x64'],
+  unpacked = arches,
+  helper = 'UniWork Office Helper.app',
+  plist = plistXml(),
+  updateFeed = false,
+} = {}) {
+  const root = newRoot()
+  for (const arch of arches) {
+    writeFileSync(join(root, `UniWork-Office_0.11.0-dev.0_unsigned_darwin_${arch}.dmg`), '')
+  }
+  for (const arch of unpacked) {
+    const appDir = join(root, arch === 'x64' ? 'mac' : `mac-${arch}`, 'UniWork Office.app')
+    const contents = join(appDir, 'Contents')
+    const resources = join(contents, 'Resources')
+    mkdirSync(resources, { recursive: true })
+    mkdirSync(join(contents, 'Frameworks', helper), { recursive: true })
+    mkdirSync(join(contents, 'Frameworks', 'Electron Framework.framework'))
+    writeFileSync(join(contents, 'Info.plist'), plist)
+    if (updateFeed) writeFileSync(join(resources, 'app-update.yml'), 'provider: generic\n')
+    await writeAsar(root, resources, {})
+  }
   return root
 }
 
@@ -254,6 +291,82 @@ describe('checkBuildDir', () => {
   it('flags a baked update feed', async () => {
     const result = checkBuildDir(await fakeWindowsOutput({ updateFeed: true }))
     assert.ok(result.problems.some((p) => p.includes('app-update.yml')))
+  })
+
+  it('flags an upstream-branded installer exe', async () => {
+    const result = checkBuildDir(
+      await fakeWindowsOutput({
+        installerStrings: { ...GOOD_STRINGS, FileDescription: 'GenOffice Setup' },
+      }),
+    )
+    assert.deepEqual(result.problems, [
+      'UniWork-Office_0.11.0-dev.0_unsigned_win32_x64-setup.exe FileDescription: "GenOffice Setup" names GenOffice',
+    ])
+  })
+
+  it('flags update feed metadata next to the installers', async () => {
+    const root = await fakeWindowsOutput()
+    writeFileSync(join(root, 'latest.yml'), 'version: 0.11.0\n')
+    writeFileSync(join(root, 'latest-mac.yml'), 'version: 0.11.0\n')
+    const result = checkBuildDir(root)
+    assert.ok(result.problems.some((p) => p.startsWith('latest.yml: update feed')))
+    assert.ok(result.problems.some((p) => p.startsWith('latest-mac.yml: update feed')))
+  })
+
+  it('fails when the installer is present but win-unpacked is missing', async () => {
+    const root = await fakeWindowsOutput({ unpacked: false })
+    assert.deepEqual(checkBuildDir(root).problems, [
+      'win-unpacked: unpacked app directory missing (required by UniWork-Office_0.11.0-dev.0_unsigned_win32_x64-setup.exe)',
+    ])
+    assert.ok(
+      checkBuildDir(root, { expect: ['win-unpacked'] }).problems.some((p) =>
+        p.startsWith('win-unpacked: unpacked app directory missing'),
+      ),
+    )
+  })
+
+  it('fails when an --expect directory is missing', async () => {
+    const result = checkBuildDir(await fakeWindowsOutput(), { expect: ['win-unpacked', 'mac'] })
+    assert.deepEqual(result.problems, [
+      'mac: unpacked app directory missing (required by --expect)',
+    ])
+  })
+
+  it('passes a clean dual-arch mac output', async () => {
+    const result = checkBuildDir(await fakeMacOutput(), { expect: ['mac-arm64', 'mac'] })
+    assert.deepEqual(result.problems, [])
+    assert.ok(result.checked.includes('UniWork Office.app Info.plist'))
+    assert.ok(result.checked.includes('UniWork Office.app package.json'))
+  })
+
+  it('fails when a dmg is present but its mac directory is missing', async () => {
+    const result = checkBuildDir(await fakeMacOutput({ unpacked: ['arm64'] }))
+    assert.deepEqual(result.problems, [
+      'mac: unpacked app directory missing (required by UniWork-Office_0.11.0-dev.0_unsigned_darwin_x64.dmg)',
+    ])
+  })
+
+  it('flags an upstream mac helper, Info.plist and a baked update feed', async () => {
+    const result = checkBuildDir(
+      await fakeMacOutput({
+        arches: ['arm64'],
+        helper: 'GenOffice Helper (Renderer).app',
+        plist: plistXml({ id: 'ai.genspark.office' }),
+        updateFeed: true,
+      }),
+    )
+    assert.ok(result.problems.some((p) => p.startsWith('UniWork Office.app helper:')))
+    assert.ok(result.problems.some((p) => p.includes('CFBundleIdentifier is "ai.genspark.office"')))
+    assert.ok(result.problems.some((p) => p.includes('app-update.yml')))
+  })
+
+  it('reads a binary Info.plist only through plutil (macOS)', async () => {
+    const root = await fakeMacOutput({ arches: ['arm64'], plist: 'bplist00' })
+    if (process.platform === 'darwin') {
+      assert.throws(() => checkBuildDir(root))
+    } else {
+      assert.throws(() => checkBuildDir(root), /binary plist \(needs plutil\)/)
+    }
   })
 
   it('fails on a directory with nothing to check', () => {
