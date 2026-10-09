@@ -157,6 +157,15 @@ export class SessionCore {
    * account reload follows in the background.
    */
   private async recoverAccessToken(): Promise<string | null> {
+    // a still-valid access token needs no refresh (and no refresh-token rotation)
+    if (
+      !this.refreshInFlight &&
+      this.session &&
+      this.session.accessExpiresAt - this.now() > ACCESS_TOKEN_SKEW_MS
+    ) {
+      void this.runRecovery()
+      return this.session.accessToken
+    }
     if (!this.refreshInFlight) {
       if (this.recoveryInFlight || this.now() - this.lastRecoveryAt < RECOVERY_MIN_MS) return null
       this.lastRecoveryAt = this.now()
@@ -370,9 +379,13 @@ export class SessionCore {
     this.setEntitlements(null)
   }
 
-  protected setEntitlements(next: AccountEntitlements | null): void {
+  /** `keepCache`: a plan that stays display-only (never live) while billing is unreadable */
+  protected setEntitlements(
+    next: AccountEntitlements | null,
+    keepCache: AccountEntitlements | null = null,
+  ): void {
     this.entitlements = next
-    this.cachedEntitlements = null
+    this.cachedEntitlements = keepCache
     this.publishEntitlements()
   }
 

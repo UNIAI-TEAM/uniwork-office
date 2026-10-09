@@ -462,6 +462,20 @@ describe('restore and refresh', () => {
     expect(await ctx.manager.getAccessToken()).toMatch(/^at_/)
   })
 
+  it('getAccessToken() while offline does not refresh when the access token is still valid', async () => {
+    const ctx = setup({ credentials: createMemoryCredentialStore(stored()) })
+    // the refresh succeeds, the account reload does not
+    ctx.transport.orgs.mockImplementationOnce(fail('network'))
+    expect((await ctx.manager.restore()).state).toBe('server-unreachable')
+    expect(ctx.transport.refresh).toHaveBeenCalledTimes(1)
+    vi.setSystemTime(Date.now() + 5_000)
+    expect(await ctx.manager.getAccessToken()).toMatch(/^at_/)
+    expect(ctx.transport.refresh).toHaveBeenCalledTimes(1)
+    // the account reload still follows in the background
+    await vi.advanceTimersByTimeAsync(0)
+    expect(ctx.manager.status().state).toBe('signed-in')
+  })
+
   it('getAccessToken() bursts while offline share one attempt and are throttled', async () => {
     const ctx = setup({ credentials: createMemoryCredentialStore(stored()) })
     ctx.transport.refresh.mockImplementation(fail('network'))
@@ -669,6 +683,23 @@ describe('organizations and entitlements', () => {
     expect(ctx.entitlements.at(-1)).toMatchObject({ orgId: 'org_b' })
     await ctx.manager.selectOrg('not-a-member')
     expect(ctx.persistSelectedOrgId).toHaveBeenCalledTimes(1)
+  })
+
+  it('a billing failure after a restart shows the cached plan but never publishes it as live', async () => {
+    const first = setup({ credentials: createMemoryCredentialStore(stored()) })
+    expect((await first.manager.restore()).state).toBe('signed-in')
+    const next = setup({ credentials: first.credentials })
+    next.transport.billing.mockImplementation(fail('server_error'))
+    const status = await next.manager.restore()
+    expect(status).toMatchObject({
+      state: 'signed-in',
+      entitlements: { orgId: 'org_a', planName: 'Starter' },
+    })
+    expect(next.manager.getEntitlements()).toBeNull()
+    expect(next.entitlements.filter((e) => e !== null)).toEqual([])
+    // the cache survives for the next start
+    expect(first.credentials.load()?.entitlements).toMatchObject({ planName: 'Starter' })
+    expect(next.credentials.load()?.entitlements).toMatchObject({ planName: 'Starter' })
   })
 
   it('a billing failure leaves entitlements unknown but stays signed in', async () => {

@@ -380,6 +380,7 @@ export class AccountManager extends SessionCore {
   private async loadEntitlements(generation: number): Promise<void> {
     const org = this.org
     let next: AccountEntitlements | null = null
+    let keepCache: AccountEntitlements | null = null
     if (org) {
       try {
         const billing = await this.authorized((token) =>
@@ -394,13 +395,16 @@ export class AccountManager extends SessionCore {
         ) {
           throw error
         }
-        // entitlements are data only: a billing read failure keeps the last
-        // known plan of this organization, else leaves it unknown
-        next = [this.entitlements, this.cachedEntitlements].find((e) => e?.orgId === org.id) ?? null
+        // entitlements are data only: a billing read failure keeps this
+        // session's last plan of the organization, else leaves it unknown. A
+        // plan from the stored credential stays display-only (status), it is
+        // never published as live entitlements
+        next = this.entitlements?.orgId === org.id ? this.entitlements : null
+        if (!next && this.cachedEntitlements?.orgId === org.id) keepCache = this.cachedEntitlements
       }
     }
     if (generation !== this.generation) return
-    this.setEntitlements(next)
+    this.setEntitlements(next, keepCache)
   }
 
   /**
@@ -414,7 +418,7 @@ export class AccountManager extends SessionCore {
       ...this.session.credential,
       profile: this.accountProfile,
       org: this.org ? toAccountOrg(this.org) : undefined,
-      entitlements: this.entitlements,
+      entitlements: this.entitlements ?? this.cachedEntitlements,
     }
     this.persist(this.session.credential, false)
   }
