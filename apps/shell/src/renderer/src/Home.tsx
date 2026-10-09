@@ -1244,7 +1244,8 @@ export function Home() {
   // single source of account state: AccountEntry reports every change (initial
   // load, login, logout), keeping the greeting name in sync
   const handleAccountStatus = useCallback((s: AccountStatus | null) => {
-    if (!s?.loggedIn) {
+    // the cached profile still names the user while UniWork is unreachable
+    if (!s?.loggedIn && !(s?.state === 'server-unreachable' && s.profile)) {
       setAccountName('')
       return
     }

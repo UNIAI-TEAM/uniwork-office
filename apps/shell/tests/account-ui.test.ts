@@ -1,6 +1,8 @@
 /**
  * @vitest-environment jsdom
  */
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { act, createElement, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
@@ -59,6 +61,14 @@ function statusFor(state: AccountState, extra: Partial<AccountStatus> = {}): Acc
       : {}),
     ...extra,
   }
+}
+
+const NO_PROFILE = {
+  email: undefined,
+  profile: undefined,
+  org: undefined,
+  orgs: undefined,
+  entitlements: undefined,
 }
 
 let host: HTMLDivElement
@@ -246,6 +256,32 @@ describe('sidebar account entry', () => {
     expectNoRawKeys()
   })
 
+  it('a login error from main wins over the generic launch failure', async () => {
+    await render(statusFor('signed-out'))
+    api.accountLogin.mockImplementationOnce(async () => {
+      api.login({ phase: 'error', error: 'rate_limited' })
+      return false
+    })
+    await click(entry())
+    expect(entry().querySelector('.account-sub')?.textContent).toBe(en.acctErrRateLimited)
+  })
+
+  it('sign-in that could not reach UniWork offers sign in again, not a session outage', async () => {
+    await render(statusFor('server-unreachable', { error: 'network', ...NO_PROFILE }))
+    expect(entry().dataset.state).toBe('signed-out')
+    expect(entry().querySelector('.account-name')?.textContent).toBe(en.acctSignIn)
+    expect(entry().querySelector('.account-sub')?.textContent).toBe(en.acctErrNetwork)
+    expect(entry().querySelector('.account-sub')?.classList.contains('warn')).toBe(true)
+    await click(entry())
+    expect(api.accountLogin).toHaveBeenCalledTimes(1)
+    expect(pane()).toBeNull()
+  })
+
+  it('a rejected sign-in start never says the session is no longer valid', async () => {
+    await render(statusFor('signed-out', { error: 'unauthorized' }))
+    expect(entry().querySelector('.account-sub')?.textContent).toBe(en.acctErrServerError)
+  })
+
   it('a failed launch is reported', async () => {
     await render(statusFor('signed-out'))
     api.accountLogin.mockResolvedValueOnce(false)
@@ -338,6 +374,33 @@ describe('Settings → Account pane', () => {
     expect(pane()?.dataset.state).toBe('signed-in')
   })
 
+  it('failed sign-in (unreachable, no session): error copy and Sign in, no sign out', async () => {
+    await render(statusFor('server-unreachable', { error: 'network', ...NO_PROFILE }), {
+      open: true,
+    })
+    const text = pane()?.textContent ?? ''
+    expect(pane()?.dataset.state).toBe('signed-out')
+    expect(text).toContain(en.acctErrNetwork)
+    expect(text).not.toContain(en.acctUnreachableBody)
+    expect(button(en.acctSignOut)).toBeUndefined()
+    expect(button(en.acctRetry)).toBeUndefined()
+    await click(button(en.acctSignIn))
+    expect(api.accountLogin).toHaveBeenCalledTimes(1)
+  })
+
+  it.each([
+    ['not-configured', 'not_configured', en.acctErrNotConfigured],
+    ['keyring-unavailable', 'keyring_unavailable', en.acctErrKeyringUnavailable],
+    ['wrong-deployment', 'wrong_deployment', en.acctErrWrongDeployment],
+  ] as const)(
+    '%s: the notice does not repeat itself as an error line',
+    async (state, error, line) => {
+      await render(statusFor(state, { error }), { open: true })
+      expect(pane()?.textContent).not.toContain(line)
+      expect(pane()?.querySelector('.acct-notice-error')).toBeNull()
+    },
+  )
+
   it('wrong deployment: names the server, offers sign in again and sign out', async () => {
     await render(statusFor('wrong-deployment'), { open: true })
     expect(pane()?.textContent).toContain(en.acctWrongServerTitle)
@@ -392,5 +455,45 @@ describe('error copy', () => {
     expect(texts.every((x) => typeof x === 'string' && x.length > 0)).toBe(true)
     expect(new Set(texts).size).toBe(texts.length)
     for (const c of codes) expect(vi_[ACCOUNT_ERROR_KEYS[c] as keyof typeof vi_]).toBeTruthy()
+  })
+})
+
+describe('error text contrast', () => {
+  const css = (rel: string) => readFileSync(join(__dirname, '..', '..', '..', rel), 'utf8')
+  const tokens = css('packages/ui/src/tokens.css')
+
+  /** the value of a token inside the block that starts at `selector` */
+  function tokenIn(selector: string, name: string): string {
+    const block = tokens.slice(tokens.indexOf(selector))
+    const m = new RegExp(`${name}:\\s*(#[0-9a-fA-F]{6})`).exec(block)
+    if (!m) throw new Error(`${name} missing after ${selector}`)
+    return m[1]!
+  }
+  const luminance = (hex: string) => {
+    const [r, g, b] = [1, 3, 5].map((i) => {
+      const c = parseInt(hex.slice(i, i + 2), 16) / 255
+      return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
+    })
+    return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!
+  }
+  const contrast = (a: string, b: string) => {
+    const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x)
+    return (hi! + 0.05) / (lo! + 0.05)
+  }
+
+  it.each([':root', "[data-theme='dark']", '@media (prefers-color-scheme: dark)'])(
+    '%s: account error text meets WCAG AA on its backgrounds',
+    (selector) => {
+      const text = tokenIn(selector, '--danger-text')
+      expect(contrast(text, tokenIn(selector, '--danger-bg'))).toBeGreaterThanOrEqual(4.5)
+      expect(contrast(text, tokenIn(selector, '--chrome-bg'))).toBeGreaterThanOrEqual(4.5)
+    },
+  )
+
+  it('the account error rules use the legible token', () => {
+    const settings = css('apps/shell/src/renderer/src/settings.css')
+    const home = css('apps/shell/src/renderer/src/home.css')
+    expect(settings).toMatch(/\.acct-inline-error \{[^}]*color: var\(--danger-text\)/)
+    expect(home).toMatch(/\.account-sub\.warn \{[^}]*color: var\(--danger-text\)/)
   })
 })

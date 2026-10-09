@@ -32,6 +32,8 @@
   --icon-muted: #b9bfc7;
   --danger: #d13438;
   --danger-bg: #fdf3f3;
+  /* error text on --danger-bg / chrome: AA (4.5:1) in both themes */
+  --danger-text: #d13438;
   /* Word's changed-line bar (Simple Markup): fixed red, tuned per theme */
   --docs-revision-bar: #c00000;
   --search-hit-bg: #ffe28a;
@@ -108,6 +110,8 @@
   --icon-muted: #666;
   --danger: #d13438;
   --danger-bg: #3a2020;
+  /* error text on --danger-bg / chrome: AA (4.5:1) in both themes */
+  --danger-text: #ff8a8d;
   --docs-revision-bar: #ff6b6b;
   --search-hit-bg: #745a1e;
   --search-hit-active-bg: #d4781f;
@@ -167,6 +171,8 @@
     --icon-muted: #666;
     --danger: #d13438;
     --danger-bg: #3a2020;
+    /* error text on --danger-bg / chrome: AA (4.5:1) in both themes */
+    --danger-text: #ff8a8d;
     --docs-revision-bar: #ff6b6b;
     --search-hit-bg: #745a1e;
     --search-hit-active-bg: #d4781f;

@@ -1589,7 +1589,7 @@
 .acct-inline-error {
   font-size: 12px;
   line-height: 1.45;
-  color: var(--danger);
+  color: var(--danger-text);
 }
 
 .acct-dot-spinner {

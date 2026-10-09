@@ -560,7 +560,7 @@ body.vib .home {
 }
 
 .account-sub.warn {
-  color: var(--danger);
+  color: var(--danger-text);
 }
 
 .account-sub.refreshing {

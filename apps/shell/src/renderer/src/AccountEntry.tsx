@@ -3,8 +3,8 @@ import type { AccountStatus } from '../../shared/home-api'
 import { useI18n } from './locale'
 import type { StringKey } from './locale'
 import {
-  ACCOUNT_ERROR_KEYS,
   displayNameOf,
+  errorKeyFor,
   initialsOf,
   needsSignIn,
   showsProfile,
@@ -102,7 +102,7 @@ export function AccountEntry({
   else if (withProfile) {
     sub = [status?.org?.name, status?.entitlements?.planName].filter(Boolean).join(' · ') || null
   } else if (view === 'signed-out' && error && error !== 'cancelled') {
-    sub = t(ACCOUNT_ERROR_KEYS[error])
+    sub = t(errorKeyFor(error, view))
   }
   const warn = WARN_STATES.has(view) || (view === 'signed-out' && sub !== null)
 

@@ -3,8 +3,8 @@ import type { ReactNode } from 'react'
 import { useI18n } from './locale'
 import type { StringKey } from './locale'
 import {
-  ACCOUNT_ERROR_KEYS,
   displayNameOf,
+  errorKeyFor,
   initialsOf,
   showsProfile,
   type AccountController,
@@ -33,6 +33,15 @@ const NOTICE: Partial<
   'keyring-unavailable': { title: 'acctKeyringTitle', body: 'acctKeyringBody', tone: 'warn' },
 }
 
+/** states whose notice body is the whole explanation (the error code would repeat it) */
+const SELF_EXPLAINED: ReadonlySet<AccountView> = new Set([
+  'session-expired',
+  'session-revoked',
+  'not-configured',
+  'keyring-unavailable',
+  'wrong-deployment',
+])
+
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="set-field">
@@ -55,8 +64,10 @@ export function AccountPane({ account }: { account: AccountController }) {
   const server = status?.serverOrigin || t('acctThisServer')
   const notice = NOTICE[view]
   const withProfile = showsProfile(view, status)
-  // a cancelled attempt was the user's own choice, not a failure worth a red line
-  const errorText = error && error !== 'cancelled' ? t(ACCOUNT_ERROR_KEYS[error]) : null
+  // a cancelled attempt was the user's own choice, not a failure worth a red line;
+  // states whose notice body already says it all get no repeated error line
+  const errorText =
+    error && error !== 'cancelled' && !SELF_EXPLAINED.has(view) ? t(errorKeyFor(error, view)) : null
 
   const signOutBtn = (
     <button
@@ -164,9 +175,7 @@ export function AccountPane({ account }: { account: AccountController }) {
           <div className="acct-notice-text">
             <div className="acct-notice-title">{t(notice.title)}</div>
             <div className="acct-notice-body">{t(notice.body, { server })}</div>
-            {errorText && view !== 'session-expired' && view !== 'session-revoked' && (
-              <div className="acct-notice-error">{errorText}</div>
-            )}
+            {errorText && <div className="acct-notice-error">{errorText}</div>}
           </div>
         </div>
       )}

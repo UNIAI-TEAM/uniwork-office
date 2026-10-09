@@ -36,6 +36,24 @@ export const ACCOUNT_ERROR_KEYS: Record<AccountUiError, StringKey> = {
   malformed_response: 'acctErrMalformedResponse',
 }
 
+/**
+ * The view for a main-process status. server-unreachable without a profile
+ * means sign-in itself could not reach UniWork (no session to keep): that is
+ * a failed sign-in, shown as signed-out with the error and a Sign in button,
+ * never as the "you're still signed in" session outage.
+ */
+export function viewOf(status: AccountStatus): AccountState {
+  const state = stateOf(status)
+  if (state === 'server-unreachable' && !(status.profile || status.email)) return 'signed-out'
+  return state
+}
+
+/** copy for an error in this view; a sign-in that never had a session is not "no longer valid" */
+export function errorKeyFor(error: AccountUiError, view: AccountView): StringKey {
+  if (error === 'unauthorized' && view === 'signed-out') return ACCOUNT_ERROR_KEYS.server_error
+  return ACCOUNT_ERROR_KEYS[error]
+}
+
 /** states in which the cached profile is shown */
 export function showsProfile(view: AccountView, status: AccountStatus | null): boolean {
   if (view === 'signed-in' || view === 'refreshing') return true
@@ -108,6 +126,9 @@ export function useAccount(): AccountController {
   // bumped on sign-out so an in-flight status read (which can still report
   // signed-in) is discarded instead of resurrecting the profile
   const seq = useRef(0)
+  // set when main reported why the current sign-in failed (more specific than `launch`)
+  const loginErrorSeen = useRef(false)
+  const copiedTimer = useRef<number | null>(null)
 
   const apply = useCallback((next: AccountStatus) => {
     setStatus(next)
@@ -136,6 +157,7 @@ export function useAccount(): AccountController {
         setLocalError(null)
         setLoginUrl(null)
       } else if (ev.phase === 'error') {
+        loginErrorSeen.current = true
         setLaunching(false)
         setLoginUrl(null)
         setLocalError(ev.error ?? 'server_error')
@@ -144,10 +166,11 @@ export function useAccount(): AccountController {
     return () => {
       offStatus?.()
       offLogin?.()
+      if (copiedTimer.current !== null) window.clearTimeout(copiedTimer.current)
     }
   }, [apply, refresh])
 
-  const mainState = status ? stateOf(status) : null
+  const mainState = status ? viewOf(status) : null
   const view: AccountView =
     launching && (mainState === null || needsSignIn(mainState))
       ? 'signing-in'
@@ -160,12 +183,15 @@ export function useAccount(): AccountController {
     setLoginUrl(null)
     setUrlCopied(false)
     setLaunching(true)
+    loginErrorSeen.current = false
     void window.aiOffice
       .accountLogin()
       .then((launched) => {
-        if (!launched) setLocalError('launch')
+        if (!launched && !loginErrorSeen.current) setLocalError('launch')
       })
-      .catch(() => setLocalError('launch'))
+      .catch(() => {
+        if (!loginErrorSeen.current) setLocalError('launch')
+      })
       .finally(() => {
         setLaunching(false)
         refresh()
@@ -183,10 +209,17 @@ export function useAccount(): AccountController {
 
   const copyLoginUrl = () => {
     if (!loginUrl) return
-    void navigator.clipboard.writeText(loginUrl).then(() => {
-      setUrlCopied(true)
-      window.setTimeout(() => setUrlCopied(false), 2000)
-    })
+    void navigator.clipboard
+      .writeText(loginUrl)
+      .then(() => {
+        setUrlCopied(true)
+        if (copiedTimer.current !== null) window.clearTimeout(copiedTimer.current)
+        copiedTimer.current = window.setTimeout(() => {
+          copiedTimer.current = null
+          setUrlCopied(false)
+        }, 2000)
+      })
+      .catch(() => undefined)
   }
 
   const signOut = () => {
