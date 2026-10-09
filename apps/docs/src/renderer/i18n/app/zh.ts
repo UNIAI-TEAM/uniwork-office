@@ -388,4 +388,9 @@ export const zh = {
   appWebFatalTitle: '无法打开文档',
   appWebFatalBody: '编辑和保存已停用。请刷新页面或从 UniWork 重新打开文档。',
   appWebNoHost: '此编辑器需在 UniWork 中运行。请从 UniWork 打开文档。',
+  appSaveStateUnsaved: '有未保存的更改',
+  appSaveStateSaved: '所有更改已保存',
+  appSaving: '正在保存…',
+  appSavingAs: '正在另存为…',
+  appPdfPrintFallback: '无法直接导出 PDF,已改用浏览器打印对话框',
 }

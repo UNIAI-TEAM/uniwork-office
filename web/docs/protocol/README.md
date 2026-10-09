@@ -71,6 +71,7 @@ gets no `init` within its retry budget (40 × 500 ms), or is opened top-level (`
 | `convert.altChunkHtml` | request | {html} → {data: ArrayBuffer \| null}                                                  |
 | `dirty`                | event   | {dirty} (client de-duplicates)                                                        |
 | `title`                | event   | {title}                                                                               |
+| `modal`                | event   | {open} — a frame dialog is open; the host may dim its own chrome (advisory, additive) |
 | `resize`               | event   | {height} (CSS px, content height)                                                     |
 | `saved`                | event   | {file, versionId?, initiatedByFrame}                                                  |
 | `error`                | event   | {error: ProtocolErrorShape, fatal}                                                    |

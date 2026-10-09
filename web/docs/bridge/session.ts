@@ -10,7 +10,8 @@
  *   - `onMenuCommand('save-as')` -> the Save As flow (-> saveDocxAs).
  * This module implements those three against the host:
  *   - host request `doc.closeCheck` -> the guard -> {dirty, autoSave},
- *   - `dirty`: the guard is polled and every change goes to the host,
+ *   - `dirty`: the guard is queried shortly after each edit event and polled, and every
+ *     change goes to the host,
  *   - `title`: document.title (App.tsx sets it to the file name),
  *   - `runSave()` / `runMenuCommand()` for the host's `save` / `saveAs` requests.
  */
@@ -52,6 +53,22 @@ export function createSession(
   function pushDirty(): void {
     const state = query()
     if (state) port.setDirty(state.dirty)
+  }
+
+  // the poll is the safety net; an edit (typing, paste, a ribbon click) reports within ~150 ms
+  // so the host's unsaved indicator and leave guard follow the editor closely
+  let soon: ReturnType<typeof setTimeout> | null = null
+  function pushDirtySoon(): void {
+    if (soon !== null) return
+    soon = setTimeout(() => {
+      soon = null
+      pushDirty()
+    }, 150)
+  }
+  if (typeof document !== 'undefined') {
+    for (const type of ['input', 'keyup', 'pointerup', 'paste', 'drop', 'cut']) {
+      document.addEventListener(type, pushDirtySoon, true)
+    }
   }
 
   port.handleCloseCheck(() => {

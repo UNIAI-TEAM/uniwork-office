@@ -380,4 +380,10 @@ export const ms = {
   appWebFatalBody:
     'Penyuntingan dan penyimpanan dilumpuhkan. Muat semula halaman atau buka semula dokumen daripada UniWork.',
   appWebNoHost: 'Editor ini berjalan di dalam UniWork. Buka dokumen daripada UniWork.',
+  appSaveStateUnsaved: 'Perubahan belum disimpan',
+  appSaveStateSaved: 'Semua perubahan disimpan',
+  appSaving: 'Menyimpan…',
+  appSavingAs: 'Menyimpan sebagai…',
+  appPdfPrintFallback:
+    'Eksport PDF tidak tersedia di sini; dialog cetak pelayar digunakan sebagai ganti',
 } satisfies Record<keyof typeof zh, string>

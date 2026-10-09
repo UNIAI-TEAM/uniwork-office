@@ -371,4 +371,10 @@ export const vi = {
   appWebFatalTitle: 'Không thể mở tài liệu',
   appWebFatalBody: 'Đã tắt chỉnh sửa và lưu. Hãy tải lại trang hoặc mở lại tài liệu từ UniWork.',
   appWebNoHost: 'Trình soạn thảo này chạy bên trong UniWork. Hãy mở tài liệu từ UniWork.',
+  appSaveStateUnsaved: 'Có thay đổi chưa lưu',
+  appSaveStateSaved: 'Đã lưu mọi thay đổi',
+  appSaving: 'Đang lưu…',
+  appSavingAs: 'Đang lưu thành…',
+  appPdfPrintFallback:
+    'Không xuất được PDF trực tiếp; đã dùng hộp thoại in của trình duyệt thay thế',
 } satisfies Record<keyof typeof zh, string>

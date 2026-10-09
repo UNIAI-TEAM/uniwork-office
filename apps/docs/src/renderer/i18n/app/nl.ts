@@ -387,4 +387,10 @@ export const nl = {
   appWebFatalBody:
     'Bewerken en opslaan zijn uitgeschakeld. Laad de pagina opnieuw of open het document opnieuw vanuit UniWork.',
   appWebNoHost: 'Deze editor werkt binnen UniWork. Open het document vanuit UniWork.',
+  appSaveStateUnsaved: 'Niet-opgeslagen wijzigingen',
+  appSaveStateSaved: 'Alle wijzigingen opgeslagen',
+  appSaving: 'Opslaan…',
+  appSavingAs: 'Opslaan als…',
+  appPdfPrintFallback:
+    'PDF-export is hier niet beschikbaar; in plaats daarvan is het afdrukvenster van de browser gebruikt',
 } satisfies Record<keyof typeof zh, string>

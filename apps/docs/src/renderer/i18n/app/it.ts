@@ -380,4 +380,10 @@ export const it = {
   appWebFatalBody:
     'Modifica e salvataggio sono disattivati. Ricarica la pagina o riapri il documento da UniWork.',
   appWebNoHost: 'Questo editor funziona all’interno di UniWork. Apri il documento da UniWork.',
+  appSaveStateUnsaved: 'Modifiche non salvate',
+  appSaveStateSaved: 'Tutte le modifiche salvate',
+  appSaving: 'Salvataggio…',
+  appSavingAs: 'Salvataggio con nome…',
+  appPdfPrintFallback:
+    "L'esportazione PDF non è disponibile qui; è stata usata la finestra di stampa del browser",
 } satisfies Record<keyof typeof zh, string>

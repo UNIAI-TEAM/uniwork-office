@@ -8,6 +8,13 @@
   --accent: var(--word-blue);
   --accent-dark: var(--word-blue-dark);
   --accent-soft: #e8f1fb;
+  /* filled accent behind --docs-on-accent text (File tab, primary buttons): >= 4.5:1 in both themes */
+  --docs-accent-fill: var(--word-blue);
+  --docs-accent-fill-hover: var(--word-blue-dark);
+  /* destructive dialog action ink on --danger-bg (>= 4.5:1) */
+  --docs-danger-ink: var(--danger);
+  /* web frame dialogs: a light, blurred scrim like the UniWork host's own dialogs */
+  --docs-web-scrim: rgb(255 255 255 / 45%);
 
   --docs-heading-3: #1f3864;
   --docs-accent-ghost: rgb(24 90 189 / 10%);
@@ -177,6 +184,11 @@
   --word-blue-dark: #3a8eef;
   --word-heading: #6cabf0;
   --accent-soft: #1e3a5f;
+  /* the light #4a9eff accent is 2.75:1 under white text; fills take a deeper blue (4.9:1) */
+  --docs-accent-fill: #2a6fd0;
+  --docs-accent-fill-hover: #2566c4;
+  --docs-danger-ink: #f28b82;
+  --docs-web-scrim: rgb(0 0 0 / 45%);
 
   --docs-heading-3: #7fa8e0;
   --docs-accent-ghost: rgb(74 158 255 / 18%);
@@ -248,6 +260,10 @@
     --word-blue-dark: #3a8eef;
     --word-heading: #6cabf0;
     --accent-soft: #1e3a5f;
+    --docs-accent-fill: #2a6fd0;
+    --docs-accent-fill-hover: #2566c4;
+    --docs-danger-ink: #f28b82;
+    --docs-web-scrim: rgb(0 0 0 / 45%);
 
     --docs-heading-3: #7fa8e0;
     --docs-accent-ghost: rgb(74 158 255 / 18%);
@@ -492,7 +508,7 @@ html.genoffice-popover-open .ribbon-tabs {
 
 .ribbon-tab-file {
   color: var(--docs-on-accent);
-  background: var(--word-blue);
+  background: var(--docs-accent-fill);
   border-radius: 4px;
   padding: 6px 16px;
   margin-right: 6px;
@@ -500,7 +516,7 @@ html.genoffice-popover-open .ribbon-tabs {
 
 .ribbon-tab-file:hover,
 .ribbon-tab-file.open {
-  background: var(--word-blue-dark);
+  background: var(--docs-accent-fill-hover);
 }
 
 .file-tab-wrap {
@@ -2043,13 +2059,14 @@ th.cell-rev-del {
 
 /* style gallery */
 /* The Styles group absorbs the row's free width and shrinks with the window
-   (min-width keeps three cards + the expander visible); extra cards wrap onto
+   (min-width keeps one card + the expander visible, so a 1024px window — or the
+   ~940px web frame inside UniWork — never cuts a card in half); extra cards wrap onto
    a clipped second row inside .style-gallery — whole cards only, never a
    half-cut one — instead of widening the scrolling ribbon row, and the
    expander below makes the hidden ones reachable. */
 .ribbon-group-styles {
   flex: 1;
-  min-width: 259px;
+  min-width: 103px;
 }
 
 .style-gallery-wrap {
@@ -2780,8 +2797,8 @@ th.cell-rev-del {
 }
 
 .hf-variant-chips button.on {
-  background: var(--word-blue);
-  border-color: var(--word-blue);
+  background: var(--docs-accent-fill);
+  border-color: var(--docs-accent-fill);
   color: var(--docs-on-accent);
 }
 
@@ -3060,8 +3077,8 @@ th.cell-rev-del {
 }
 
 .comment-compose-actions button.primary {
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--docs-accent-fill);
+  border-color: var(--docs-accent-fill);
   color: var(--docs-on-accent);
 }
 
@@ -3409,8 +3426,8 @@ th.cell-rev-del {
 }
 
 .hf-menu-actions .btn-primary {
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--docs-accent-fill);
+  border-color: var(--docs-accent-fill);
   color: var(--docs-on-accent);
 }
 
@@ -3973,8 +3990,8 @@ th.cell-rev-del {
 }
 
 .pv-close:hover {
-  background: var(--word-blue);
-  border-color: var(--word-blue);
+  background: var(--docs-accent-fill);
+  border-color: var(--docs-accent-fill);
   color: var(--docs-on-accent);
 }
 
@@ -6005,8 +6022,8 @@ body.docs-crop-active .doc-protected[data-doc-protected='image'] .doc-img-wrap {
 }
 
 .find-opt.on {
-  background: var(--word-blue);
-  border-color: var(--word-blue);
+  background: var(--docs-accent-fill);
+  border-color: var(--docs-accent-fill);
   color: var(--docs-on-accent);
 }
 
@@ -6340,19 +6357,37 @@ body.docs-crop-active
   font-size: 13px;
 }
 
+/* visible progress while the document opens (the web frame can take seconds) */
+.start-booting::before {
+  content: '';
+  width: 14px;
+  height: 14px;
+  margin-right: 8px;
+  border: 2px solid var(--border-strong);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: docs-status-spin 0.8s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .start-booting::before {
+    animation: none;
+  }
+}
+
 .btn-primary {
   height: 34px;
   padding: 0 16px;
   border: none;
   border-radius: 12px;
-  background: var(--word-blue);
+  background: var(--docs-accent-fill);
   color: var(--docs-on-accent);
   font-size: 13px;
   cursor: pointer;
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: var(--word-blue-dark);
+  background: var(--docs-accent-fill-hover);
 }
 
 .btn-primary:disabled {
@@ -7229,7 +7264,7 @@ body.docs-crop-active
   padding: 5px 12px;
   border: 1px solid var(--word-blue);
   border-radius: 6px;
-  background: var(--word-blue);
+  background: var(--docs-accent-fill);
   color: var(--docs-on-accent);
   font-size: 13px;
   font-weight: 600;
@@ -7729,7 +7764,7 @@ body.docs-crop-active
   padding: 4px 12px;
   border: 1px solid transparent;
   border-radius: var(--radius-6);
-  background: var(--accent);
+  background: var(--docs-accent-fill);
   color: var(--docs-on-accent);
   font-size: 11.5px;
   cursor: pointer;
@@ -8189,6 +8224,47 @@ body.docs-crop-active
   text-decoration: underline;
 }
 
+/* save state (Word: "Saved" / unsaved): a dot + label, always the first status item */
+.status-save-state::before,
+.status-loading::before {
+  content: '';
+  display: inline-block;
+  vertical-align: -1px;
+  margin-right: 6px;
+  border-radius: 50%;
+}
+
+.status-save-state::before {
+  width: 7px;
+  height: 7px;
+  background: var(--docs-ok-dot);
+}
+
+.status-save-state.unsaved::before {
+  background: var(--docs-comment-accent);
+}
+
+/* opening / streaming a document: a small spinner next to "Opening…" */
+.status-loading::before {
+  width: 9px;
+  height: 9px;
+  border: 1.5px solid var(--border-strong);
+  border-top-color: var(--accent);
+  animation: docs-status-spin 0.8s linear infinite;
+}
+
+@keyframes docs-status-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-loading::before {
+    animation: none;
+  }
+}
+
 .status-msg {
   opacity: 0.85;
   overflow: hidden;
@@ -8340,6 +8416,26 @@ body.docs-crop-active
   border-color: var(--color-btn-primary-hover);
   background: var(--color-btn-primary-hover);
   color: var(--color-btn-primary-text);
+}
+
+/* destructive choice (web save conflict "Overwrite"): red ink on a pale red fill, never filled black */
+.modal-actions button.danger {
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
+  color: var(--docs-danger-ink);
+}
+
+.modal-actions button.danger:hover:not(:disabled) {
+  border-color: var(--docs-danger-ink);
+  background: var(--danger-bg);
+  color: var(--docs-danger-ink);
+}
+
+/* web frame dialogs (web/docs/bridge/notice.ts): same scrim as the UniWork host's dialogs; the
+   host dims its own chrome on the protocol `modal` event so both read as one modal layer */
+.modal-backdrop.docs-web-backdrop {
+  background: var(--docs-web-scrim);
+  backdrop-filter: blur(8px);
 }
 
 /* ---- keyboard shortcuts sheet ---- */
@@ -9865,7 +9961,7 @@ ruby.doc-ruby rt {
 }
 
 .ctx-item:hover:not(:disabled) {
-  background: var(--word-blue);
+  background: var(--docs-accent-fill);
   color: var(--docs-on-accent);
 }
 
@@ -10916,7 +11012,7 @@ tr > .page-gap-cut {
   margin-top: 8px;
   border: 1px solid var(--accent);
   border-radius: 6px;
-  background: var(--accent);
+  background: var(--docs-accent-fill);
   padding: 4px 14px;
   font-size: 13px;
   color: var(--docs-on-accent);

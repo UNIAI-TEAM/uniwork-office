@@ -379,4 +379,10 @@ export const id = {
   appWebFatalBody:
     'Pengeditan dan penyimpanan dinonaktifkan. Muat ulang halaman atau buka kembali dokumen dari UniWork.',
   appWebNoHost: 'Editor ini berjalan di dalam UniWork. Buka dokumen dari UniWork.',
+  appSaveStateUnsaved: 'Ada perubahan yang belum disimpan',
+  appSaveStateSaved: 'Semua perubahan tersimpan',
+  appSaving: 'Menyimpan…',
+  appSavingAs: 'Menyimpan sebagai…',
+  appPdfPrintFallback:
+    'Ekspor PDF tidak tersedia di sini; dialog cetak browser digunakan sebagai gantinya',
 } satisfies Record<keyof typeof zh, string>

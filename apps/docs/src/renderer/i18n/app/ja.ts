@@ -403,4 +403,10 @@ export const ja = {
     '編集と保存は無効になっています。ページを再読み込みするか、UniWork からドキュメントを開き直してください。',
   appWebNoHost:
     'このエディターは UniWork 内で動作します。UniWork からドキュメントを開いてください。',
+  appSaveStateUnsaved: '未保存の変更があります',
+  appSaveStateSaved: 'すべての変更を保存しました',
+  appSaving: '保存しています…',
+  appSavingAs: '名前を付けて保存しています…',
+  appPdfPrintFallback:
+    'PDF を直接エクスポートできないため、ブラウザーの印刷ダイアログを使用しました',
 } satisfies Record<keyof typeof zh, string>

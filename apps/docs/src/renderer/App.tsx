@@ -1191,8 +1191,11 @@ export function App() {
     onSelectionUpdate: () => scheduleUiRefresh(),
     // typing in the main document takes ribbon routing back from any textbox
     onFocus: () => setActiveSubEditor(null),
-    onUpdate: () => {
+    onUpdate: ({ transaction }) => {
       dirtyRef.current = true
+      // an edit makes the last file message ("Opened …", "Exported …") stale; streamed
+      // content and other non-history transactions keep it
+      if (transaction.getMeta('addToHistory') !== false) setStatus('')
       scheduleUiRefresh()
     },
   })
@@ -5571,7 +5574,20 @@ export function App() {
                   </button>
                 </>
               )}
-              {!doc && t('appReady')}
+              {/* no document yet means the boot-time open is still running */}
+              {(!doc || docLoading) && (
+                <span className="status-item status-loading" role="status">
+                  {t('appStartOpening')}
+                </span>
+              )}
+              {doc && !docLoading && (hasUnsavedChanges || doc.filePath) && (
+                <span
+                  className={`status-item status-save-state${hasUnsavedChanges ? ' unsaved' : ''}`}
+                  role="status"
+                >
+                  {hasUnsavedChanges ? t('appSaveStateUnsaved') : t('appSaveStateSaved')}
+                </span>
+              )}
               {status && <span className="status-msg"> — {status}</span>}
             </div>
             <div className="status-right">

@@ -48,7 +48,12 @@
  * hidden), attachments (./browser.ts keeps them in the browser; AI-panel only),
  * doc passwords (./hide.ts). Encrypted (CFB) docx is passed through as-is.
  */
-import type { DesktopApi, OpenDocxResult, OpenFileResult } from '../../../apps/docs/src/shared/ipc'
+import type {
+  DesktopApi,
+  OpenDocxResult,
+  OpenFileResult,
+  PdfExportResult,
+} from '../../../apps/docs/src/shared/ipc'
 import {
   toProtocolError,
   type FileMeta,
@@ -59,7 +64,7 @@ import {
 } from '../protocol/types'
 import { TIMEOUTS, errorCode, type FramePort } from './frame-port'
 import { downloadBlob, printFrame } from './browser'
-import { ask, hideFatal, showFatal, text } from './notice'
+import { ask, hideFatal, onModalChange, showFatal, text } from './notice'
 import { createSession, type SessionOptions } from './session'
 import { projectApi } from './project-memory'
 
@@ -162,6 +167,8 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
   /** the document this frame shows (save / export target) */
   let current: string | null = null
   const session = createSession(port, opts.session)
+  // the frame dialogs only dim the iframe: tell the host so it can dim its own chrome
+  onModalChange((open) => port.setModal?.(open))
 
   function remember(file: FileMeta): void {
     files.set(file.fileId, { ...files.get(file.fileId), ...file })
@@ -344,7 +351,7 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
       choices: [
         { id: 'cancel', label: 'appCancel' },
         { id: 'reload', label: 'appWebConflictReload' },
-        { id: 'overwrite', label: 'appWebConflictOverwrite', primary: true },
+        { id: 'overwrite', label: 'appWebConflictOverwrite', danger: true },
       ],
       cancelId: 'cancel',
       marker: 'conflict',
@@ -399,12 +406,11 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
    * The in-frame print dialog through the BROWSER print path (browser.ts printFrame: print
    * sheet, print-color-adjust, light theme pin, settles on `afterprint`).
    */
-  async function printViaBrowser(
-    defaultName: string,
-  ): Promise<{ ok: boolean; path?: string; error?: string }> {
+  async function printViaBrowser(): Promise<PdfExportResult> {
     const r = await (opts.print ?? printFrame)()
+    // no file was produced: `printDialog` lets the renderer say so instead of "exported"
     return r.ok
-      ? { ok: true, path: `${withExt(defaultName, '.pdf')} (browser print dialog)` }
+      ? { ok: true, printDialog: true }
       : { ok: false, ...(r.error ? { error: r.error } : {}) }
   }
 
@@ -431,10 +437,10 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
     pageWidthTwips: number,
     pageHeightTwips: number,
     scale?: number,
-  ): Promise<{ ok: boolean; path?: string; error?: string }> {
+  ): Promise<PdfExportResult> {
     const fileId = current
     const data = !fileId || session.isDirty() ? await liveDocBytes() : null
-    if (!fileId && !data) return printViaBrowser(defaultName)
+    if (!fileId && !data) return printViaBrowser()
     const name = withExt(defaultName || (fileId && files.get(fileId)?.name) || 'document', '.pdf')
     try {
       const out = await port.request(
@@ -458,7 +464,7 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
     } catch (err) {
       if (errorCode(err) === 'cancelled') return { ok: false }
       console.warn('[docs-web] api.export failed, falling back to print:', err)
-      return printViaBrowser(defaultName)
+      return printViaBrowser()
     }
   }
 

@@ -401,4 +401,9 @@ export const ko = {
   appWebFatalBody:
     '편집과 저장이 비활성화되었습니다. 페이지를 새로 고치거나 UniWork에서 문서를 다시 여세요.',
   appWebNoHost: '이 편집기는 UniWork 안에서 실행됩니다. UniWork에서 문서를 여세요.',
+  appSaveStateUnsaved: '저장되지 않은 변경 내용',
+  appSaveStateSaved: '모든 변경 내용이 저장됨',
+  appSaving: '저장 중…',
+  appSavingAs: '다른 이름으로 저장 중…',
+  appPdfPrintFallback: 'PDF를 직접 내보낼 수 없어 브라우저 인쇄 대화 상자를 대신 사용했습니다',
 } satisfies Record<keyof typeof zh, string>

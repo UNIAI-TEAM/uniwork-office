@@ -382,4 +382,10 @@ export const pl = {
   appWebFatalBody:
     'Edycja i zapisywanie są wyłączone. Odśwież stronę lub otwórz dokument ponownie z UniWork.',
   appWebNoHost: 'Ten edytor działa w UniWork. Otwórz dokument z UniWork.',
+  appSaveStateUnsaved: 'Niezapisane zmiany',
+  appSaveStateSaved: 'Wszystkie zmiany zapisane',
+  appSaving: 'Zapisywanie…',
+  appSavingAs: 'Zapisywanie jako…',
+  appPdfPrintFallback:
+    'Eksport do PDF nie jest tu dostępny; zamiast tego użyto okna drukowania przeglądarki',
 } satisfies Record<keyof typeof zh, string>

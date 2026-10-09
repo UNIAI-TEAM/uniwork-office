@@ -377,4 +377,10 @@ export const pt = {
   appWebFatalBody:
     'A edição e o salvamento estão desativados. Recarregue a página ou abra o documento novamente pelo UniWork.',
   appWebNoHost: 'Este editor funciona dentro do UniWork. Abra o documento pelo UniWork.',
+  appSaveStateUnsaved: 'Alterações não salvas',
+  appSaveStateSaved: 'Todas as alterações salvas',
+  appSaving: 'Salvando…',
+  appSavingAs: 'Salvando como…',
+  appPdfPrintFallback:
+    'A exportação para PDF não está disponível aqui; foi usada a caixa de impressão do navegador',
 } satisfies Record<keyof typeof zh, string>

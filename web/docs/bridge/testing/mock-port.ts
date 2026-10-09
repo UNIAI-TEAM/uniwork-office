@@ -43,6 +43,7 @@ export function createMockPort(session: Partial<PortSession> = {}) {
   const calls: Array<{ type: string; payload: unknown; opts?: PortRequestOptions }> = []
   const dirty: boolean[] = []
   const titles: string[] = []
+  const modals: boolean[] = []
   const saved: SavedPayload[] = []
   const errors: Array<{ error: unknown; fatal?: boolean }> = []
   const renameListeners: Array<(file: FileMeta) => void> = []
@@ -133,6 +134,7 @@ export function createMockPort(session: Partial<PortSession> = {}) {
       if (dirty[dirty.length - 1] !== d) dirty.push(d)
     },
     setTitle: (t) => titles.push(t),
+    setModal: (open) => modals.push(open),
     reportSaved: (p) => saved.push(p),
     reportError: (error, fatal) => errors.push({ error, fatal }),
   }
@@ -176,6 +178,7 @@ export function createMockPort(session: Partial<PortSession> = {}) {
     calls,
     dirty,
     titles,
+    modals,
     saved,
     errors,
   }

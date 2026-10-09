@@ -380,4 +380,10 @@ export const ru = {
   appWebFatalBody:
     'Редактирование и сохранение отключены. Обновите страницу или снова откройте документ из UniWork.',
   appWebNoHost: 'Этот редактор работает внутри UniWork. Откройте документ из UniWork.',
+  appSaveStateUnsaved: 'Есть несохранённые изменения',
+  appSaveStateSaved: 'Все изменения сохранены',
+  appSaving: 'Сохранение…',
+  appSavingAs: 'Сохранение как…',
+  appPdfPrintFallback:
+    'Экспорт в PDF здесь недоступен; вместо него использовано окно печати браузера',
 } satisfies Record<keyof typeof zh, string>

@@ -24,31 +24,66 @@ export interface Choice<T extends string> {
   id: T
   label: AppKey
   primary?: boolean
+  /** destructive (e.g. Overwrite): danger styling, never the initial focus */
+  danger?: boolean
 }
+
+// ------------------------------------------------------------ open-dialog tracking
+
+type ModalListener = (open: boolean) => void
+let modalListener: ModalListener | null = null
+let reportedOpen = false
+
+/** the bridge reports open/closed to the host (protocol `modal`) so it can dim its own chrome */
+export function onModalChange(listener: ModalListener | null): void {
+  modalListener = listener
+  reportedOpen = false
+  syncModal()
+}
+
+/** read from the DOM, so a dialog removed by anyone (or a reset body) still reports closed */
+function syncModal(): void {
+  if (typeof document === 'undefined') return
+  const open = document.querySelector('.docs-web-backdrop') !== null
+  if (open === reportedOpen) return
+  reportedOpen = open
+  modalListener?.(open)
+}
+
+let dialogSeq = 0
 
 function dialog(
   title: AppKey,
   body: AppKey,
   marker: string,
 ): { root: HTMLElement; box: HTMLElement } {
+  const id = `docs-web-dialog-${++dialogSeq}`
   const root = document.createElement('div')
-  root.className = 'modal-backdrop'
+  root.className = 'modal-backdrop docs-web-backdrop'
   root.dataset.docsWeb = marker
   const box = document.createElement('div')
   box.className = 'modal gs-form'
   box.setAttribute('role', 'alertdialog')
   box.setAttribute('aria-modal', 'true')
+  box.setAttribute('aria-labelledby', `${id}-title`)
+  box.setAttribute('aria-describedby', `${id}-desc`)
   const h = document.createElement('h2')
+  h.id = `${id}-title`
   h.textContent = text(title)
   const p = document.createElement('p')
   p.className = 'modal-desc'
+  p.id = `${id}-desc`
   p.textContent = text(body)
   box.append(h, p)
   root.append(box)
   return { root, box }
 }
 
-/** modal choice; resolves with the chosen id, or `cancelId` on Escape */
+/**
+ * Modal choice; resolves with the chosen id, or `cancelId` on Escape. Initial focus is the
+ * cancel choice (the safe one), so a stray Enter never runs a destructive action; Tab stays
+ * inside the dialog.
+ */
 export function ask<T extends string>(opts: {
   title: AppKey
   body: AppKey
@@ -60,16 +95,28 @@ export function ask<T extends string>(opts: {
     const { root, box } = dialog(opts.title, opts.body, opts.marker)
     const actions = document.createElement('div')
     actions.className = 'modal-actions'
+    const buttons: HTMLButtonElement[] = []
     const finish = (id: T): void => {
       document.removeEventListener('keydown', onKey, true)
       root.remove()
+      syncModal()
       resolve(id)
     }
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key !== 'Escape') return
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        e.stopPropagation()
+        finish(opts.cancelId)
+        return
+      }
+      if (e.key !== 'Tab' || buttons.length === 0) return
+      // focus trap: cycle through the dialog's buttons only
       e.preventDefault()
       e.stopPropagation()
-      finish(opts.cancelId)
+      const at = buttons.indexOf(document.activeElement as HTMLButtonElement)
+      const step = e.shiftKey ? -1 : 1
+      const next = at < 0 ? 0 : (at + step + buttons.length) % buttons.length
+      buttons[next].focus()
     }
     let focus: HTMLButtonElement | null = null
     for (const c of opts.choices) {
@@ -77,17 +124,19 @@ export function ask<T extends string>(opts: {
       b.type = 'button'
       b.dataset.choice = c.id
       b.textContent = text(c.label)
-      if (c.primary) {
-        b.className = 'btn-primary'
-        focus = b
-      }
+      if (c.danger) b.className = 'danger'
+      else if (c.primary) b.className = 'btn-primary'
+      if (c.id === opts.cancelId) focus = b
       b.addEventListener('click', () => finish(c.id))
       actions.append(b)
+      buttons.push(b)
     }
     box.append(actions)
     document.addEventListener('keydown', onKey, true)
     document.body.append(root)
-    focus?.focus()
+    syncModal()
+    const initial = focus ?? buttons.find((b) => !b.classList.contains('danger'))
+    initial?.focus()
   })
 }
 
@@ -98,8 +147,10 @@ export function showFatal(body: AppKey): void {
   hideFatal()
   const { root } = dialog('appWebFatalTitle', body, FATAL)
   document.body.append(root)
+  syncModal()
 }
 
 export function hideFatal(): void {
   for (const el of document.querySelectorAll(`[data-docs-web="${FATAL}"]`)) el.remove()
+  syncModal()
 }

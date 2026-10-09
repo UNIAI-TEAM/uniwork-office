@@ -382,4 +382,10 @@ export const es = {
   appWebFatalBody:
     'La edición y el guardado están desactivados. Recarga la página o vuelve a abrir el documento desde UniWork.',
   appWebNoHost: 'Este editor funciona dentro de UniWork. Abre el documento desde UniWork.',
+  appSaveStateUnsaved: 'Cambios sin guardar',
+  appSaveStateSaved: 'Todos los cambios guardados',
+  appSaving: 'Guardando…',
+  appSavingAs: 'Guardando como…',
+  appPdfPrintFallback:
+    'La exportación a PDF no está disponible aquí; se usó el cuadro de impresión del navegador',
 } satisfies Record<keyof typeof zh, string>

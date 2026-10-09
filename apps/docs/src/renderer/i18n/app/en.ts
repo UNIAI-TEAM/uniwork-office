@@ -372,4 +372,9 @@ export const en = {
   appWebFatalBody:
     'Editing and saving are disabled. Reload the page or open the document again from UniWork.',
   appWebNoHost: 'This editor runs inside UniWork. Open the document from UniWork.',
+  appSaveStateUnsaved: 'Unsaved changes',
+  appSaveStateSaved: 'All changes saved',
+  appSaving: 'Saving…',
+  appSavingAs: 'Saving as…',
+  appPdfPrintFallback: 'PDF export is unavailable here; the browser print dialog was used instead',
 } satisfies Record<keyof typeof zh, string>

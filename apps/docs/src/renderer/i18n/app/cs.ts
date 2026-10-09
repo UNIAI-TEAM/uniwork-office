@@ -375,4 +375,10 @@ export const cs = {
   appWebFatalBody:
     'Úpravy a ukládání jsou vypnuté. Obnovte stránku nebo dokument znovu otevřete z UniWork.',
   appWebNoHost: 'Tento editor běží v UniWork. Otevřete dokument z UniWork.',
+  appSaveStateUnsaved: 'Neuložené změny',
+  appSaveStateSaved: 'Všechny změny uloženy',
+  appSaving: 'Ukládání…',
+  appSavingAs: 'Ukládání jako…',
+  appPdfPrintFallback:
+    'Export do PDF zde není k dispozici; místo něj byl použit tiskový dialog prohlížeče',
 } satisfies Record<keyof typeof zh, string>

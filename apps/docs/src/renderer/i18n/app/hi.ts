@@ -376,4 +376,10 @@ export const hi = {
   appWebFatalBody:
     'संपादन और सहेजना बंद हैं। पेज फिर से लोड करें या UniWork से दस्तावेज़ दोबारा खोलें।',
   appWebNoHost: 'यह संपादक UniWork के अंदर चलता है। UniWork से दस्तावेज़ खोलें।',
+  appSaveStateUnsaved: 'बिना सहेजे गए बदलाव',
+  appSaveStateSaved: 'सभी बदलाव सहेजे गए',
+  appSaving: 'सहेजा जा रहा है…',
+  appSavingAs: 'इस रूप में सहेजा जा रहा है…',
+  appPdfPrintFallback:
+    'यहाँ PDF निर्यात उपलब्ध नहीं है; इसके बजाय ब्राउज़र का प्रिंट डायलॉग इस्तेमाल किया गया',
 } satisfies Record<keyof typeof zh, string>

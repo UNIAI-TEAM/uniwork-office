@@ -362,4 +362,9 @@ export const zhTW = {
   appWebFatalTitle: '無法開啟文件',
   appWebFatalBody: '編輯與儲存已停用。請重新整理頁面,或從 UniWork 重新開啟文件。',
   appWebNoHost: '此編輯器需在 UniWork 中執行。請從 UniWork 開啟文件。',
+  appSaveStateUnsaved: '有未儲存的變更',
+  appSaveStateSaved: '所有變更已儲存',
+  appSaving: '正在儲存…',
+  appSavingAs: '正在另存新檔…',
+  appPdfPrintFallback: '無法直接匯出 PDF,已改用瀏覽器列印對話方塊',
 } satisfies Record<keyof typeof zh, string>

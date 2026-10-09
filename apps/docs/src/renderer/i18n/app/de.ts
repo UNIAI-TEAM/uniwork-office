@@ -388,4 +388,10 @@ export const de = {
   appWebFatalBody:
     'Bearbeiten und Speichern sind deaktiviert. Laden Sie die Seite neu oder öffnen Sie das Dokument erneut in UniWork.',
   appWebNoHost: 'Dieser Editor läuft in UniWork. Öffnen Sie das Dokument in UniWork.',
+  appSaveStateUnsaved: 'Ungespeicherte Änderungen',
+  appSaveStateSaved: 'Alle Änderungen gespeichert',
+  appSaving: 'Wird gespeichert…',
+  appSavingAs: 'Wird gespeichert unter…',
+  appPdfPrintFallback:
+    'PDF-Export ist hier nicht verfügbar; stattdessen wurde der Druckdialog des Browsers verwendet',
 } satisfies Record<keyof typeof zh, string>

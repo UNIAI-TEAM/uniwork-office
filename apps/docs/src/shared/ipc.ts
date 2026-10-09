@@ -229,6 +229,15 @@ export interface ZoteroRendererResponse {
  * Renderer code reads it only through `renderer/capabilities.ts`: an absent key
  * means "available", so only an explicit `false` hides an entry.
  */
+/** exportPdf / saveMergedPdf outcome */
+export interface PdfExportResult {
+  ok: boolean
+  path?: string
+  error?: string
+  /** web: no PDF file was written, the browser print dialog ran instead (ok = it closed) */
+  printDialog?: boolean
+}
+
 export interface DesktopCapabilities {
   platform?: 'desktop' | 'web'
   /** References > Zotero group (local Zotero connector) */
@@ -372,7 +381,7 @@ export interface DesktopApi {
     pageHeightTwips: number,
     outPath?: string,
     scale?: number,
-  ): Promise<{ ok: boolean; path?: string; error?: string }>
+  ): Promise<PdfExportResult>
   exportHtml(
     defaultName: string,
     html: string,
@@ -390,7 +399,7 @@ export interface DesktopApi {
     defaultName: string,
     base64Parts: string[],
     outPath?: string,
-  ): Promise<{ ok: boolean; path?: string; error?: string }>
+  ): Promise<PdfExportResult>
   aiChat(request: AiChatRequest): Promise<AiChatResponse>
   /** start a streaming AI call; deltas arrive via onAiStream with the same requestId */
   aiStream(request: AiStreamRequest): Promise<void>

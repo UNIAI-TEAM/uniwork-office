@@ -374,4 +374,9 @@ export const th = {
   appWebFatalTitle: 'ไม่สามารถเปิดเอกสารได้',
   appWebFatalBody: 'ปิดการแก้ไขและการบันทึกแล้ว โปรดโหลดหน้าใหม่หรือเปิดเอกสารอีกครั้งจาก UniWork',
   appWebNoHost: 'ตัวแก้ไขนี้ทำงานภายใน UniWork โปรดเปิดเอกสารจาก UniWork',
+  appSaveStateUnsaved: 'มีการเปลี่ยนแปลงที่ยังไม่บันทึก',
+  appSaveStateSaved: 'บันทึกการเปลี่ยนแปลงทั้งหมดแล้ว',
+  appSaving: 'กำลังบันทึก…',
+  appSavingAs: 'กำลังบันทึกเป็น…',
+  appPdfPrintFallback: 'ส่งออก PDF โดยตรงไม่ได้ จึงใช้กล่องโต้ตอบการพิมพ์ของเบราว์เซอร์แทน',
 } satisfies Record<keyof typeof zh, string>

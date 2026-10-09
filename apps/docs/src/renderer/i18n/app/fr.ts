@@ -387,4 +387,10 @@ export const fr = {
   appWebFatalBody:
     'La modification et l’enregistrement sont désactivés. Rechargez la page ou rouvrez le document depuis UniWork.',
   appWebNoHost: 'Cet éditeur fonctionne dans UniWork. Ouvrez le document depuis UniWork.',
+  appSaveStateUnsaved: 'Modifications non enregistrées',
+  appSaveStateSaved: 'Toutes les modifications sont enregistrées',
+  appSaving: 'Enregistrement…',
+  appSavingAs: 'Enregistrement sous…',
+  appPdfPrintFallback:
+    "L'export PDF n'est pas disponible ici ; la boîte de dialogue d'impression du navigateur a été utilisée à la place",
 } satisfies Record<keyof typeof zh, string>

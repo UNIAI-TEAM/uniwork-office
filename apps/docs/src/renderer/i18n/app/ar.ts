@@ -370,4 +370,9 @@ export const ar = {
   appWebFatalTitle: 'تعذر فتح المستند',
   appWebFatalBody: 'تم تعطيل التحرير والحفظ. أعد تحميل الصفحة أو افتح المستند مرة أخرى من UniWork.',
   appWebNoHost: 'يعمل هذا المحرر داخل UniWork. افتح المستند من UniWork.',
+  appSaveStateUnsaved: 'تغييرات غير محفوظة',
+  appSaveStateSaved: 'تم حفظ كل التغييرات',
+  appSaving: 'جارٍ الحفظ…',
+  appSavingAs: 'جارٍ الحفظ باسم…',
+  appPdfPrintFallback: 'تصدير PDF غير متاح هنا؛ تم استخدام مربع حوار الطباعة في المتصفح بدلاً منه',
 } satisfies Record<keyof typeof zh, string>

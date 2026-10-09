@@ -823,6 +823,19 @@ describe('events', () => {
     ])
   })
 
+  it('frame -> host: modal open/close (deduplicated, starts closed)', async () => {
+    const { host, client } = setup()
+    await host.whenReady()
+    const seen: unknown[] = []
+    host.on('modal', (p) => seen.push(p))
+    client.setModal(false)
+    client.setModal(true)
+    client.setModal(true)
+    client.setModal(false)
+    await flush()
+    expect(seen).toEqual([{ open: true }, { open: false }])
+  })
+
   it('host -> frame: theme, language, file.renamed', async () => {
     const { host, client } = setup()
     await host.whenReady()
