@@ -44,9 +44,16 @@ async function openDoc(page: Page, theme?: 'light' | 'dark', lang: string = 'en'
 const tab = (ed: Frame, name: string) =>
   ed.locator('.ribbon-tab', { hasText: new RegExp(`^${name}$`) })
 const shot = (page: Page, name: string) => page.screenshot({ path: resolve(SHOTS, `${name}.png`) })
-/** visible control labels of the open ribbon tab */
+/**
+ * control labels of the open ribbon tab: the text, else the aria-label (an
+ * icon-only big button such as Paste, whose caption sits on its split caret)
+ */
 const controls = (ed: Frame) =>
-  ed.locator('.ribbon button.rb-big, .ribbon .ribbon-group-label').allTextContents()
+  ed
+    .locator('.ribbon button.rb-big, .ribbon .ribbon-group-label')
+    .evaluateAll((els) =>
+      els.map((el) => el.textContent?.trim() || el.getAttribute('aria-label') || ''),
+    )
 
 test.afterAll(() => {
   // surfaced in the run summary; the specs below fail on a page error, console errors are reported

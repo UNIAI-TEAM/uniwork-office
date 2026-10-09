@@ -9,6 +9,8 @@
   "include": [
     "install.ts",
     "webapi.ts",
+    "doc-handoff.ts",
+    "doc-handoff.test.ts",
     "session.ts",
     "frame-port.ts",
     "host-appearance.ts",
