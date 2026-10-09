@@ -36,10 +36,32 @@
   !insertmacro UPDATEFILEASSOC
   ; An organization download bundle ships deployment-profile.json next to the
   ; installer; the app reads it from resources\ (process.resourcesPath). A
-  ; plain installer download has none and installs without it.
+  ; profile beside this installer always wins; otherwise the copy that
+  ; customInit saved from the install being replaced is put back, so a plain
+  ; installer (or an auto-update) does not drop the profile.
   ${If} ${FileExists} "$EXEDIR\deployment-profile.json"
     CopyFiles /SILENT "$EXEDIR\deployment-profile.json" "$INSTDIR\resources\deployment-profile.json"
+  ${ElseIf} ${FileExists} "$PLUGINSDIR\deployment-profile.keep"
+    CopyFiles /SILENT "$PLUGINSDIR\deployment-profile.keep" "$INSTDIR\resources\deployment-profile.json"
   ${EndIf}
+!macroend
+
+; Runs in .onInit, before the install section starts the old uninstaller. That
+; uninstaller empties the whole install directory when updating, deployment
+; profile included (and releases that predate this macro delete it
+; unconditionally), so the file is saved to the installer's temp dir first.
+!macro customInit
+  InitPluginsDir
+  Push $0
+  ReadRegStr $0 SHELL_CONTEXT "${INSTALL_REGISTRY_KEY}" InstallLocation
+  ${If} $0 == ""
+    ReadRegStr $0 HKCU "${INSTALL_REGISTRY_KEY}" InstallLocation
+  ${EndIf}
+  ${If} $0 != ""
+  ${AndIf} ${FileExists} "$0\resources\deployment-profile.json"
+    CopyFiles /SILENT "$0\resources\deployment-profile.json" "$PLUGINSDIR\deployment-profile.keep"
+  ${EndIf}
+  Pop $0
 !macroend
 
 !macro customUnInstall
@@ -51,7 +73,11 @@
   !insertmacro GenOfficeUnregisterShellNew "pptx" "PowerPoint Presentation"
   Pop $0
   !insertmacro UPDATEFILEASSOC
-  Delete "$INSTDIR\resources\deployment-profile.json"
+  ; Only a real uninstall removes the profile; an update keeps it (the
+  ; installer restores it after this uninstaller has emptied the directory).
+  ${IfNot} ${isUpdated}
+    Delete "$INSTDIR\resources\deployment-profile.json"
+  ${EndIf}
 !macroend
 
 !ifndef BUILD_UNINSTALLER

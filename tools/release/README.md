@@ -89,9 +89,10 @@ The mac job checks every app with `codesign --verify --deep --strict` and `codes
 
 A server download bundle carries `deployment-profile.json` next to the installer. The NSIS
 installer copies it to `<install dir>\resources\deployment-profile.json`
-(`process.resourcesPath` at runtime) when present and the uninstaller removes it. An
-over-install from a plain installer download (no profile beside it) leaves the app without
-one, because the previous version's files are removed first.
+(`process.resourcesPath` at runtime) when present and a real uninstall removes it. An
+over-install or update keeps the existing profile: the installer saves it before the old
+version's files are removed and puts it back afterwards. A profile beside the new installer
+always replaces the kept one.
 
 ## Auto-update is off
 
