@@ -485,7 +485,7 @@ export function AiPanel({
   editorRef.current = editor
   const settingsRef = useRef(settings)
   settingsRef.current = settings
-  /** UniWork cloud sign-in state (stub, signed out while the seam is off) for the media tool gates */
+  /** UniWork cloud sign-in state (signed in + entitled, from the shell main status) for the media tool gates */
   const gskLoggedInRef = useRef(false)
   useEffect(() => {
     let alive = true

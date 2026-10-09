@@ -505,7 +505,7 @@ export interface DesktopApi {
   /** start a streaming AI call; deltas arrive via onAiStream with the same requestId */
   aiStream(request: AiStreamRequest): Promise<void>
   aiStreamCancel(requestId: string): Promise<void>
-  /** UniWork cloud account status (internal gsk name); always signed out while the cloud seam is off */
+  /** UniWork cloud account status (internal gsk name); loggedIn = signed in to UniWork + plan includes cloud AI */
   aiGskStatus(withEmail?: boolean): Promise<GenSparkAccountStatus>
   /** Focus Home → Settings → Account (AI plan purchase UI) */
   aiOpenBilling(): Promise<void>
