@@ -14,6 +14,7 @@ import '@genoffice/ui/markdown.css'
 import '@genoffice/ui/ai-panel-prefs.css'
 import '@genoffice/ui/ai-scope-quote.css'
 import './styles.css'
+import { isWeb } from './capabilities'
 import { applyAiPanelPrefs, installScreenTips } from '@genoffice/ui'
 
 installScreenTips()
@@ -30,7 +31,8 @@ const mode = new URLSearchParams(window.location.search).get('mode')
 
 // macOS windows are created with vibrancy; let the thumbnail pane show it
 // (the audience show window stays fully opaque)
-if (mode !== 'audience' && navigator.platform.toLowerCase().includes('mac'))
+// (the web frame has no window material behind it)
+if (mode !== 'audience' && !isWeb() && navigator.platform.toLowerCase().includes('mac'))
   document.body.classList.add('vib')
 
 function applyTheme(theme: UiTheme): void {

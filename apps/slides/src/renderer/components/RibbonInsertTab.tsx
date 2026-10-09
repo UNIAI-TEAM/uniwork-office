@@ -9,6 +9,7 @@ import {
   SMARTART_GALLERY,
 } from '../insert-presets'
 import type { StringKey } from '../i18n/locale'
+import { cap } from '../capabilities'
 import { ChartKindThumb } from './ChartTypeDialog'
 import { TableInsertDialog } from './InsertDialogs'
 import { ShapePreview, SmartArtPreview } from './gallery-previews'
@@ -256,17 +257,19 @@ export function RibbonInsertTab({ rb }: { rb: RibbonTabCtx }) {
             </div>
           </div>,
         )}
-        <button
-          className="rb-big"
-          disabled={!hasDoc}
-          onClick={onInsertModel3d}
-          data-tip={t('ribbon3dModelTip')}
-        >
-          <span className="rb-big-icon">
-            <Icon3d size={BIG} />
-          </span>
-          <span>{t('ribbon3dModel')}</span>
-        </button>
+        {cap('model3d') && (
+          <button
+            className="rb-big"
+            disabled={!hasDoc}
+            onClick={onInsertModel3d}
+            data-tip={t('ribbon3dModelTip')}
+          >
+            <span className="rb-big-icon">
+              <Icon3d size={BIG} />
+            </span>
+            <span>{t('ribbon3dModel')}</span>
+          </button>
+        )}
       </Group>
       <div className="ribbon-sep" />
       <Group label={t('ribbonGroupIllustrations')}>

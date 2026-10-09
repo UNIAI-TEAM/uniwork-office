@@ -13,7 +13,7 @@ import { appClipboard, sessions } from '../../../apps/slides/src/session'
 import { createMockPort, protocolError, type MockPort } from '../../docs/bridge/testing/mock-port'
 import { encodePng } from './tiff'
 import { cfbKind, createWebSlidesApi, type WebSlidesOptions } from './web-slides-api'
-import { SLIDES_WEB_CAPABILITIES } from './capabilities'
+import { SLIDES_WEB_CAPABILITIES, slidesHostGrants } from './capabilities'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const FIXTURE = new Uint8Array(readFileSync(join(here, '..', '..', 'fixtures', 'sample.pptx')))
@@ -55,7 +55,10 @@ async function setup(
   const file = mock.seed('deck.pptx', opts.bytes ?? FIXTURE)
   const downloads: Setup['downloads'] = []
   const web = createWebSlidesApi(
-    { client: mock.port, capabilities: opts.capabilities ?? { ...SLIDES_WEB_CAPABILITIES } },
+    {
+      client: mock.port,
+      capabilities: opts.capabilities ?? { ...SLIDES_WEB_CAPABILITIES, save: true, saveAs: true },
+    },
     { download: (name, blob) => downloads.push({ name, blob }), editorStartMs: 1000, ...opts },
   )
   mock.init({
@@ -266,6 +269,40 @@ describe('save', () => {
   })
 })
 
+describe('view-only (no host save grant)', () => {
+  it('serves reads, refuses edits and saves, ignores Ctrl+S', async () => {
+    const { api, mock } = await setup({ capabilities: { ...SLIDES_WEB_CAPABILITIES } })
+    expect((await api.consumePendingOpen(FIT))?.slides).toHaveLength(5)
+    expect(await api.getRenderSlides()).toHaveLength(5)
+    expect(await api.setNotes({ slideIndex: 0, text: 'x' })).toBeNull()
+    expect(await api.getNotes(0)).not.toBe('x')
+    expect(await api.isDirty()).toBe(false)
+    expect(await api.save()).toMatchObject({ ok: false, error: expect.any(String) })
+    const seen: string[] = []
+    api.onMenuCommand((c) => seen.push(c))
+    window.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 's', ctrlKey: true, cancelable: true }),
+    )
+    expect(seen).toEqual([])
+    expect(mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(0)
+  })
+
+  it('host grants turn save / saveAs / open / recents on', () => {
+    expect(slidesHostGrants({ save: true, saveAs: true, filePick: true, recents: true })).toEqual({
+      save: true,
+      saveAs: true,
+      open: true,
+      recents: true,
+    })
+    expect(slidesHostGrants({})).toEqual({
+      save: false,
+      saveAs: false,
+      open: false,
+      recents: false,
+    })
+  })
+})
+
 describe('menu accelerators', () => {
   it('mod+S / mod+Shift+S become the save / save-as menu commands; mod+O only when granted', async () => {
     const { api } = await setup()
@@ -293,7 +330,9 @@ describe('host io', () => {
     const comments = await off.api.addComment({ slideIndex: 0, text: 'hi' })
     expect(comments?.[0]).toMatchObject({ author: 'Lan Anh' })
     sessions.clear()
-    const on = await setup({ capabilities: { ...SLIDES_WEB_CAPABILITIES, recents: true } })
+    const on = await setup({
+      capabilities: { ...SLIDES_WEB_CAPABILITIES, save: true, saveAs: true, recents: true },
+    })
     await on.api.consumePendingOpen(FIT)
     expect(await on.api.getRecentFiles()).toEqual([`uniwork://files/${on.fileId}/deck.pptx`])
   })

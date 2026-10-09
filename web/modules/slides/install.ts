@@ -8,10 +8,9 @@
  * installModuleBridge). Everything generic comes from web/docs/bridge/module-bridge.ts.
  */
 import browser from '../../docs/bridge/browser'
-import { hostGrants } from '../../docs/bridge/hide'
 import { installModuleBridge } from '../../docs/bridge/module-bridge'
 import type { BridgeObject } from '../../docs/bridge/safe-api'
-import { SLIDES_WEB_CAPABILITIES } from './capabilities'
+import { SLIDES_WEB_CAPABILITIES, slidesHostGrants } from './capabilities'
 import { createWebSlidesApi } from './web-slides-api'
 
 export const bridge = installModuleBridge({
@@ -27,7 +26,7 @@ export const bridge = installModuleBridge({
     exportPdf: true,
     images: true,
   },
-  capabilities: { defaults: SLIDES_WEB_CAPABILITIES, grants: hostGrants },
+  capabilities: { defaults: SLIDES_WEB_CAPABILITIES, grants: slidesHostGrants },
   globals: {
     slidesApi: (ctx) => createWebSlidesApi(ctx).slidesApi as unknown as BridgeObject,
     desktop: () => ({

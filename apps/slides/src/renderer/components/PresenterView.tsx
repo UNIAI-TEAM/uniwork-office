@@ -21,9 +21,11 @@ import { useI18n } from '../i18n/locale'
 import { SlideThumb } from '../SlideThumb'
 import { InkLayer, type InkStroke } from './ShowInk'
 import { liftShowCurtain } from '../show-actions'
+import { cap, isWeb } from '../capabilities'
 
 /** Layout constants (aligned with styles.css) */
-const IS_MAC = navigator.platform.toLowerCase().includes('mac')
+// macOS Electron snaps the native window instead of HTML fullscreen; a browser always uses HTML fullscreen
+const IS_MAC = navigator.platform.toLowerCase().includes('mac') && !isWeb()
 const SIDE_W = 340
 const TOP_H = 44
 const TIMER_H = 40
@@ -390,14 +392,16 @@ export function PresenterView({
         >
           ⊗ {t('panePresenterEndShow')}
         </button>
-        <button
-          className="pv-top-btn"
-          disabled={!hasAudience}
-          onClick={() => void window.slidesApi.presenterSwap()}
-          data-tip={hasAudience ? t('panePresenterSwapTip') : t('panePresenterNoSecond')}
-        >
-          ⇄ {t('panePresenterSwap')}
-        </button>
+        {cap('presenterWindow') && (
+          <button
+            className="pv-top-btn"
+            disabled={!hasAudience}
+            onClick={() => void window.slidesApi.presenterSwap()}
+            data-tip={hasAudience ? t('panePresenterSwapTip') : t('panePresenterNoSecond')}
+          >
+            ⇄ {t('panePresenterSwap')}
+          </button>
+        )}
         {onUseSlideShow && (
           <button className="pv-top-btn" onClick={useShow} data-tip={t('panePresenterUseShowTip')}>
             ▤ {t('panePresenterUseShow')}

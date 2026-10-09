@@ -24,6 +24,7 @@ import {
   type RehearseTiming,
 } from '../slideshow-utils'
 import { liftShowCurtain } from '../show-actions'
+import { isWeb } from '../capabilities'
 
 const ANIMATED = [
   'fade',
@@ -37,7 +38,8 @@ const ANIMATED = [
   'zoom',
 ] as const
 
-const IS_MAC = navigator.platform.toLowerCase().includes('mac')
+// macOS Electron snaps the native window instead of HTML fullscreen; a browser always uses HTML fullscreen
+const IS_MAC = navigator.platform.toLowerCase().includes('mac') && !isWeb()
 
 export function SlideShowView({
   slides,

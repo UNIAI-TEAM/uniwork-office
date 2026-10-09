@@ -60,11 +60,44 @@ import browser, { downloadBlob, safeFileName } from '../../docs/bridge/browser'
 import { TIMEOUTS, errorCode } from '../../docs/bridge/frame-port'
 import type { ModuleBridgePort } from '../../docs/bridge/module-bridge'
 import { idFromPath, pathFor } from '../../docs/bridge/webapi'
-import { ask, hideFatal, showFatal, type WebKey } from './dialogs'
+import { ask, hideFatal, showFatal, text, type WebKey } from './dialogs'
 import { printDocument, printHtml, slidesPdf, zipImages } from './exports'
 import { createWebFontMetrics, loadBundledFonts, registerEmbeddedFonts } from './fonts'
 import { tiffToPng } from './tiff'
 import { createDocState, createWebHostIO, SENTINEL_PREFIX, WebSaveError } from './web-host-io'
+
+/**
+ * Engine channels that never change the deck: the only ones a view-only frame (no host `save`
+ * grant) still serves; every other channel answers null (save / save-as: {ok:false}).
+ */
+const READ_ONLY_CHANNELS: ReadonlySet<SessionChannel> = new Set<SessionChannel>([
+  'slides:get-render-slides',
+  'slides:get-slide-size',
+  'slides:get-layouts',
+  'slides:chart-color-schemes',
+  'slides:get-chart-data',
+  'slides:get-link',
+  'slides:get-slide-links',
+  'slides:get-run-links',
+  'slides:get-header-footer',
+  'slides:get-transition',
+  'slides:get-animations',
+  'slides:get-shape-keys',
+  'slides:get-sections',
+  'slides:get-notes',
+  'slides:get-comments',
+  'slides:is-dirty',
+  'slides:recent',
+  'slides:media-data',
+  'slides:master-enter',
+  'slides:master-open',
+  'slides:master-close',
+  'slides:copy-slide',
+  'slides:copy-elements',
+  'slides:has-slide-clipboard',
+  'slides:clipboard-probe',
+  'slides:clipboard-external',
+])
 
 /** the one client of the frame (Electron keys sessions by webContents id) */
 export const WEB_CLIENT_ID = 1
@@ -213,8 +246,16 @@ export function createWebSlidesApi(
   })
   const handlerCtx: HandlerContext = { clientId: WEB_CLIENT_ID, host }
 
+  /** without the host's `save` grant the frame is view-only: the deck is never changed */
+  const viewOnly = (): boolean => ctx.capabilities.save === false
+
   /** a session handler with IPC semantics: cloned in, cloned out, rejections for throws */
   async function invoke(channel: SessionChannel, ...args: unknown[]): Promise<any> {
+    if (viewOnly() && !READ_ONLY_CHANNELS.has(channel)) {
+      return channel === 'slides:save' || channel === 'slides:save-as'
+        ? { ok: false, error: text('webReadOnly') }
+        : null
+    }
     const handler = callSessionHandler as (
       c: SessionChannel,
       h: HandlerContext,
@@ -461,6 +502,8 @@ export function createWebSlidesApi(
     if (!command) return
     e.preventDefault()
     if (command === 'open' && ctx.capabilities.open !== true) return
+    if (command === 'save' && ctx.capabilities.save === false) return
+    if (command === 'save-as' && ctx.capabilities.saveAs === false) return
     if (state.fatal) return
     menuEvents.emit(command)
   }
