@@ -6,7 +6,10 @@ import {
   defaultAiMediaSettings,
   imageGenerationAvailable,
   mediaAnalysisAvailable,
+  offeredMediaProviders,
   resolveAiMediaSettings,
+  setMediaProviderChoice,
+  shownMediaProvider,
   visibleMediaProviders,
 } from '../src/media'
 import {
@@ -16,11 +19,30 @@ import {
   testMediaProvider,
 } from '../src/media-protocols'
 import { defaultAiSettings, resolveAiSettings } from '../src/providers'
+import {
+  UNIWORK_CLOUD_SIGNED_OUT,
+  setUniworkCloudStatus,
+  type UniworkCloudStatus,
+} from '../src/uniwork-cloud'
 import type { AiSettings } from '../src/types'
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  setUniworkCloudStatus(UNIWORK_CLOUD_SIGNED_OUT)
 })
+
+const CLOUD_READY: UniworkCloudStatus = {
+  state: 'ready',
+  enabled: true,
+  tools: {
+    web_search: true,
+    image_search: true,
+    image_generate: true,
+    media_analyze: false,
+    transcribe: false,
+  },
+  credits: null,
+}
 
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0])
 const PNG_B64 = Buffer.from(PNG).toString('base64')
@@ -163,11 +185,11 @@ describe('media settings', () => {
     expect(activeMediaProvider(explicit, 'image')).toBe('genspark')
   })
 
-  it('is BYOK-only while the UniWork cloud seam is off, and gated on the BYOK model', () => {
+  it('falls back to the UniWork cloud only on the main-process verdict, gated on the BYOK model', () => {
     const genspark = defaultAiSettings()
-    // no cloud route: a signed-in flag alone never enables the tools
-    expect(imageGenerationAvailable(genspark, true)).toBe(false)
-    expect(mediaAnalysisAvailable(genspark, true)).toBe(false)
+    // gskLoggedIn is main's hasGskAuth(): signed in + entitled; the cloud toggle can still say no
+    expect(imageGenerationAvailable(genspark, true)).toBe(true)
+    expect(mediaAnalysisAvailable(genspark, true)).toBe(true)
     expect(imageGenerationAvailable(genspark, false)).toBe(false)
     expect(imageGenerationAvailable({ ...genspark, gskToolsEnabled: false }, true)).toBe(false)
     expect(mediaAnalysisAvailable({ ...genspark, gskToolsEnabled: false }, true)).toBe(false)
@@ -192,13 +214,108 @@ describe('media settings', () => {
     }
     expect(mediaAnalysisAvailable(withMedia(custom), false)).toBe(false)
     expect(imageGenerationAvailable(withMedia(custom), false)).toBe(true)
-    expect(imageGenerationAvailable(null, true)).toBe(false)
+    // no settings read yet: the main-process verdict alone decides
+    expect(imageGenerationAvailable(null, true)).toBe(true)
+    expect(imageGenerationAvailable(null, false)).toBe(false)
   })
 
   it('hides the UniWork cloud entry from pickers while keeping it for stored settings', () => {
     expect(AI_MEDIA_PROVIDERS.some((m) => m.id === 'genspark')).toBe(true)
     expect(visibleMediaProviders().map((m) => m.id)).not.toContain('genspark')
     expect(visibleMediaProviders()).toHaveLength(AI_MEDIA_PROVIDERS.length - 1)
+  })
+
+  it('offers the UniWork cloud entry and route per tool while signed in + entitled', () => {
+    setUniworkCloudStatus(CLOUD_READY)
+    expect(visibleMediaProviders().map((m) => m.id)).toContain('genspark')
+    const settings = defaultAiSettings()
+    settings.media!.providers.gemini.apiKey = 'AIza'
+    // the stored default (never picked) yields to the usable BYOK key even though the cloud offers
+    // image generation: signing in does not move a user's own key onto paid credits
+    expect(activeMediaProvider(settings, 'image')).toBe('gemini')
+    expect(activeMediaProvider(settings, 'analysis')).toBe('gemini')
+    // an explicit BYOK choice always wins over the cloud
+    expect(activeMediaProvider(openaiSettings(), 'image')).toBe('openai')
+  })
+
+  it('uses the cloud for the default only when no BYOK config is usable, or when the user picked it', () => {
+    setUniworkCloudStatus(CLOUD_READY)
+    const none = defaultAiSettings()
+    expect(activeMediaProvider(none, 'image')).toBe('genspark')
+    expect(activeMediaConfig(none, 'image')).toBeNull()
+    // an explicit cloud pick stays on the cloud although a BYOK key exists
+    const picked = defaultAiSettings()
+    picked.media!.providers.gemini.apiKey = 'AIza'
+    picked.media = setMediaProviderChoice(picked.media!, 'image', 'genspark')
+    expect(picked.media.cloudPicked).toEqual({ image: true })
+    expect(activeMediaProvider(picked, 'image')).toBe('genspark')
+    expect(activeMediaProvider(picked, 'analysis')).toBe('gemini')
+    // the AI model switch turns even an explicit pick off
+    expect(activeMediaProvider({ ...picked, gskToolsEnabled: false }, 'image')).toBe('gemini')
+    // the pick falls back to BYOK while the cloud tool is not offered
+    setUniworkCloudStatus(UNIWORK_CLOUD_SIGNED_OUT)
+    expect(activeMediaProvider(picked, 'image')).toBe('gemini')
+  })
+
+  it('keeps the BYOK default after sign-in and shows the vendor that serves the capability', () => {
+    setUniworkCloudStatus(CLOUD_READY)
+    const settings = defaultAiSettings()
+    settings.media!.providers.openai.apiKey = 'sk-test'
+    const offered = visibleMediaProviders().filter((m) => !!m.imageProtocol)
+    // stored id is the default genspark, the picker still shows OpenAI
+    expect(settings.media!.imageProvider).toBe('genspark')
+    expect(shownMediaProvider(settings.media!, 'image', offered)).toBe('openai')
+    // picking the cloud entry is explicit; picking a vendor clears the mark
+    const cloud = setMediaProviderChoice(settings.media!, 'image', 'genspark')
+    expect(shownMediaProvider(cloud, 'image', offered)).toBe('genspark')
+    const back = setMediaProviderChoice(cloud, 'image', 'openai')
+    expect(back.cloudPicked).toBeUndefined()
+    expect(shownMediaProvider(back, 'image', offered)).toBe('openai')
+    // with no usable key the default shows the cloud entry
+    expect(shownMediaProvider(defaultAiMediaSettings(), 'image', offered)).toBe('genspark')
+  })
+
+  it('shows the BYOK vendor that serves after an explicit cloud pick when the cloud is switched off', () => {
+    setUniworkCloudStatus(CLOUD_READY)
+    const settings = defaultAiSettings()
+    // a usable key for a vendor that is not first in the catalog
+    settings.media!.providers.qwen.apiKey = 'sk-qwen'
+    const cloudMedia = setMediaProviderChoice(settings.media!, 'image', 'genspark')
+    const catalog = visibleMediaProviders()
+    const withCloud = offeredMediaProviders(catalog, 'image', true)
+    const withoutCloud = offeredMediaProviders(catalog, 'image', false)
+    expect(shownMediaProvider(cloudMedia, 'image', withCloud)).toBe('genspark')
+    // the AI model switch is off: the picker shows what the runtime serves
+    const off = { ...settings, media: cloudMedia, gskToolsEnabled: false }
+    expect(activeMediaProvider(off, 'image')).toBe('qwen')
+    expect(shownMediaProvider(cloudMedia, 'image', withoutCloud)).toBe('qwen')
+    // nothing usable: the first offered vendor shows, with no key yet
+    const keyless = setMediaProviderChoice(defaultAiMediaSettings(), 'image', 'genspark')
+    expect(shownMediaProvider(keyless, 'image', withoutCloud)).toBe(withoutCloud[0]!.id)
+  })
+
+  it('offers the cloud entry in a picker only while its tools are on (signed in, entitled, switch on)', () => {
+    setUniworkCloudStatus(CLOUD_READY)
+    const catalog = visibleMediaProviders()
+    const ids = (cloudToolsOn: boolean) =>
+      offeredMediaProviders(catalog, 'image', cloudToolsOn).map((m) => m.id)
+    expect(ids(true)).toContain('genspark')
+    // the AI model switch is off: no picker lists the cloud as if it were in use
+    expect(ids(false)).not.toContain('genspark')
+    expect(ids(false)).toContain('openai')
+    for (const cap of ['analysis', 'video'] as const) {
+      expect(offeredMediaProviders(catalog, cap, false).map((m) => m.id)).not.toContain('genspark')
+    }
+    // DeepSeek reads images only
+    expect(offeredMediaProviders(catalog, 'video', true).map((m) => m.id)).not.toContain('deepseek')
+  })
+
+  it('round-trips the explicit cloud pick through resolveAiMediaSettings and drops junk', () => {
+    expect(
+      resolveAiMediaSettings({ cloudPicked: { image: true, video: false } } as never).cloudPicked,
+    ).toEqual({ image: true })
+    expect(resolveAiMediaSettings({ cloudPicked: 'yes' } as never).cloudPicked).toBeUndefined()
+    expect(resolveAiMediaSettings({} as never).cloudPicked).toBeUndefined()
   })
 })
 

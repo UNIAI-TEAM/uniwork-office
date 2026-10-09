@@ -1,8 +1,9 @@
 /**
  * generate_image / analyze_media for the five editors' main processes: one
  * place that reads ai-settings.json live, routes to the BYOK media provider
- * when one is configured, and otherwise reports that no provider is set up.
- * BYOK providers answer with bytes; those land in
+ * when one is configured, otherwise to the UniWork cloud (signed in, entitled,
+ * cloud tools on; see ./gsk.ts), and otherwise reports that no provider is set
+ * up. Both routes answer with bytes; those land in
  * the local generated-image store and come back as a file:// URL that the
  * insert pipelines' fetchRemoteImage accepts.
  */
@@ -12,6 +13,7 @@ import { basename, dirname, extname, sep } from 'node:path'
 import {
   activeMediaConfig,
   analyzeMediaWithProvider,
+  cloudToolsEnabled,
   defaultAiSettings,
   generateImageWithProvider,
   resolveAiSettings,
@@ -27,7 +29,14 @@ import {
   readBodyCapped,
 } from '@genoffice/electron-utils/remote-image'
 import { fetchWithSsrfGuard } from '@genoffice/electron-utils/safe-remote-url'
-import type { GskGenerateImageOptions } from './gsk'
+import {
+  assertCloudMediaRefs,
+  gskAnalyzeLoadedMedia,
+  gskAnalyzeMedia,
+  gskGenerateImage,
+  hasGskAuth,
+  type GskGenerateImageOptions,
+} from './gsk'
 
 export const MEDIA_NOT_CONFIGURED_ERROR =
   'No media provider is configured; ask the user to set one up under Settings (AI Media) to use this tool'
@@ -316,7 +325,23 @@ export async function generateImageTool(
   const settings = readAiSettingsFile(settingsPath)
   const byok = activeMediaConfig(settings, 'image')
   try {
-    if (!byok) return { error: options.notLoggedInError ?? MEDIA_NOT_CONFIGURED_ERROR }
+    if (!byok) {
+      if (!cloudToolsEnabled(settings) || !hasGskAuth('image_generate')) {
+        return { error: options.notLoggedInError ?? MEDIA_NOT_CONFIGURED_ERROR }
+      }
+      // the server has no background-removal pass: transparentBackground gets an opaque image
+      const gen = await gskGenerateImage(
+        {
+          prompt,
+          referenceImageUrls: op.referenceImageUrls,
+          aspectRatio: op.aspectRatio,
+          imageSize: op.imageSize,
+        },
+        undefined,
+        { mediaRoots },
+      )
+      return { url: gen.url }
+    }
     // `model` names cloud-only special models; BYOK uses the configured image model
     const references = await loadMediaReferences(
       op.referenceImageUrls ?? [],
@@ -350,7 +375,11 @@ export async function analyzeMediaTool(
   const videoByok = activeMediaConfig(settings, 'video')
   try {
     const notConfigured = { error: options.notLoggedInError ?? MEDIA_NOT_CONFIGURED_ERROR }
-    if (!imageByok && !videoByok) return notConfigured
+    const cloud = cloudToolsEnabled(settings) && hasGskAuth('media_analyze')
+    const viaCloud = async () => ({
+      text: await gskAnalyzeMedia({ mediaUrls, requirements }, undefined, { mediaRoots }),
+    })
+    if (!imageByok && !videoByok) return cloud ? await viaCloud() : notConfigured
     // route on the loaded bytes' real MIME, not the URL spelling: images go to the
     // image-analysis provider, anything with video/audio to the video one
     let media: MediaBlob[]
@@ -361,7 +390,13 @@ export async function analyzeMediaTool(
     }
     const hasVideo = media.some((m) => !m.mime.startsWith('image/'))
     const byok = hasVideo ? videoByok : imageByok
-    if (!byok) return notConfigured
+    // the other kind has a BYOK provider only: this one goes to the cloud when it is on,
+    // with the bytes already loaded (the cloud applies its own caps and local-read rule)
+    if (!byok) {
+      if (!cloud) return notConfigured
+      assertCloudMediaRefs(mediaUrls, mediaRoots)
+      return { text: await gskAnalyzeLoadedMedia({ requirements, media }) }
+    }
     return {
       text: await analyzeMediaWithProvider(byok.provider, byok.config, { media, requirements }),
     }

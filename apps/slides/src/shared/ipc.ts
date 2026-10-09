@@ -1357,7 +1357,7 @@ export interface SlidesApi {
       })
     | { error: string }
   >
-  /** Whether cloud single-page generation is available (UniWork cloud seam on + signed in; GENOFFICE_CLOUD_SLIDE=0 disables) */
+  /** Whether cloud single-page generation is available (always false: slide generation is not a UniWork cloud tool) */
   cloudGenStatus: () => Promise<{ enabled: boolean }>
   /** Abort every in-flight cloud page generation of this window (AI panel stop) */
   cloudPageCancel: () => Promise<void>
@@ -1716,7 +1716,7 @@ export interface SlidesApi {
   openAiModelSettings: () => Promise<void>
   aiStream: (request: AiStreamRequest) => Promise<void>
   aiStreamCancel: (requestId: string) => Promise<void>
-  /** UniWork cloud account status (internal gsk name; signed out while the cloud seam is off) */
+  /** UniWork cloud account status (internal gsk name; signed in to UniWork + plan includes cloud AI) */
   aiGskStatus: (withEmail?: boolean) => Promise<GenSparkAccountStatus>
   /** Record a run that ended without a usable reply, for post-mortem (fire-and-forget, never throws) */
   aiLogRunFailure: (entry: AiRunFailure) => Promise<void>
