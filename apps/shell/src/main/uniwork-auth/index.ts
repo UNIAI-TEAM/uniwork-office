@@ -12,7 +12,11 @@ import {
 import { AccountManager } from './manager'
 import { createUniworkTransport } from './transport'
 
-export { createAuthCallbackRouter, type AuthCallbackRouter } from './routing'
+export {
+  bindAuthCallbackEvents,
+  createAuthCallbackRouter,
+  type AuthCallbackRouter,
+} from './routing'
 export type { AccountManager } from './manager'
 
 /**

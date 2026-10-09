@@ -18,7 +18,11 @@ const electron = vi.hoisted(() => ({
 vi.mock('electron', () => electron)
 
 import { deviceInfo, openAuthorizationUrl, registerAuthProtocols } from '../src/main/uniwork-auth'
-import { createAuthCallbackRouter } from '../src/main/uniwork-auth/routing'
+import { EventEmitter } from 'node:events'
+import {
+  bindAuthCallbackEvents,
+  createAuthCallbackRouter,
+} from '../src/main/uniwork-auth/routing'
 import type { DeploymentProfile } from '../src/main/uniwork-auth/deployment'
 
 const stable: DeploymentProfile = {
@@ -141,5 +145,37 @@ describe('sign-in callback routing', () => {
     expect(router.secondInstance(['electron.exe'], { launchUrl: 'uniwork://open?x=1' })).toBe(false)
     expect(router.secondInstance(['electron.exe', 'C:/doc.docx'], {})).toBe(false)
     expect(route.mock.calls).toEqual([[callback], [fromLock]])
+  })
+})
+
+describe('sign-in callback app events', () => {
+  const callback = 'uniwork-office://auth/callback?code=c&state=s'
+
+  function bound() {
+    const app = new EventEmitter()
+    const router = createAuthCallbackRouter([])
+    const route = vi.fn()
+    router.start(route)
+    const fallback = { openUrl: vi.fn(), secondInstance: vi.fn() }
+    bindAuthCallbackEvents(app, router, fallback)
+    return { app, route, fallback }
+  }
+
+  it('open-url: a sign-in callback goes to the account, anything else to the fallback', () => {
+    const { app, route, fallback } = bound()
+    const event = { preventDefault: vi.fn() }
+    app.emit('open-url', event, callback)
+    app.emit('open-url', event, 'uniwork://office/app?kind=docs')
+    expect(event.preventDefault).toHaveBeenCalledTimes(2)
+    expect(route.mock.calls).toEqual([[callback]])
+    expect(fallback.openUrl.mock.calls).toEqual([['uniwork://office/app?kind=docs']])
+  })
+
+  it('second-instance: a sign-in callback is consumed, files and bridge URLs fall through', () => {
+    const { app, route, fallback } = bound()
+    app.emit('second-instance', {}, ['electron.exe', callback], '/cwd', {})
+    app.emit('second-instance', {}, ['electron.exe', 'C:/doc.docx'], '/cwd', { x: 1 })
+    expect(route.mock.calls).toEqual([[callback]])
+    expect(fallback.secondInstance.mock.calls).toEqual([[['electron.exe', 'C:/doc.docx'], { x: 1 }]])
   })
 })

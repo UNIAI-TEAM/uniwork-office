@@ -110,6 +110,38 @@ describe('uniwork credential store', () => {
     expect(writer.load()).toEqual(credential())
   })
 
+  it('a fresh save replaces a credential the keyring can no longer decrypt', () => {
+    // written under an old OS key; the current key cannot open it
+    const old = createCredentialStore({ userDataDir: dir, safeStorage: fakeSafeStorage() })
+    old.save(credential('rt_secret_value_old'))
+    writeFileSync(sessionFile(), Buffer.from('bytes from another key'))
+    const store = createCredentialStore({ userDataDir: dir, safeStorage: fakeSafeStorage() })
+    expect(() => store.load()).toThrow(CredentialStoreError)
+    expect(store.canStore()).toBe(true)
+    store.save(credential('rt_secret_value_new'))
+    expect(store.load()?.refreshToken).toBe('rt_secret_value_new')
+  })
+
+  it('canStore() is false without usable encryption and writes nothing', () => {
+    const cases: Partial<SafeStorageLike>[] = [
+      { isEncryptionAvailable: () => false },
+      { getSelectedStorageBackend: () => 'basic_text' },
+      {
+        encryptString: () => {
+          throw new Error('keychain access denied')
+        },
+      },
+    ]
+    for (const overrides of cases) {
+      const store = createCredentialStore({
+        userDataDir: dir,
+        safeStorage: fakeSafeStorage(overrides),
+      })
+      expect(store.canStore()).toBe(false)
+    }
+    expect(readdirSync(dir)).toEqual([])
+  })
+
   it('drops a file that decrypts to garbage', () => {
     const store = createCredentialStore({ userDataDir: dir, safeStorage: fakeSafeStorage() })
     store.save(credential())

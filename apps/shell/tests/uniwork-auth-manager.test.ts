@@ -6,7 +6,7 @@ import {
   type StoredCredential,
 } from '../src/main/uniwork-auth/credentials'
 import type { DeploymentProfile } from '../src/main/uniwork-auth/deployment'
-import { AccountManager } from '../src/main/uniwork-auth/manager'
+import { AccountManager, STARTUP_GATE_DEADLINE_MS } from '../src/main/uniwork-auth/manager'
 import {
   TransportError,
   type DesktopSession,
@@ -207,8 +207,14 @@ describe('sign-in', () => {
     await ctx.manager.completeCallback(`uniwork-office://auth/callback?code=c&state=${state}&x=1`)
     await ctx.manager.completeCallback('uniwork-office://auth/callback#code=c')
     expect(ctx.manager.status().state).toBe('signing-in')
+    expect(ctx.manager.status().error).toBeUndefined()
     expect(ctx.transport.exchange).not.toHaveBeenCalled()
-    expect(ctx.events.filter((e) => e.phase === 'error')).toEqual([])
+    // reported for a passing notice only; the attempt is not over
+    expect(ctx.events.filter((e) => e.phase === 'error')).toEqual([
+      { phase: 'error', error: 'state_mismatch' },
+      { phase: 'error', error: 'invalid_callback' },
+      { phase: 'error', error: 'invalid_callback' },
+    ])
     await ctx.manager.completeCallback(`uniwork-office://auth/callback?code=c1&state=${state}`)
     expect(ctx.transport.exchange).toHaveBeenCalledTimes(1)
     expect(ctx.manager.status().state).toBe('signed-in')
@@ -293,6 +299,52 @@ describe('sign-in', () => {
       loggedIn: false,
     })
     expect(await ctx.manager.getAccessToken()).toBeNull()
+  })
+
+  it('keyring-unavailable: a fresh sign-in replaces the unreadable credential', async () => {
+    const credentials = createMemoryCredentialStore()
+    const load = credentials.load
+    let unreadable = true
+    credentials.load = () => {
+      if (unreadable) throw new CredentialStoreError('keyring_unavailable')
+      return load()
+    }
+    const save = credentials.save
+    credentials.save = (c) => {
+      unreadable = false
+      save(c)
+    }
+    const ctx = setup({ credentials })
+    expect((await ctx.manager.restore()).state).toBe('keyring-unavailable')
+    await signIn(ctx)
+    expect(ctx.manager.status().state).toBe('signed-in')
+    expect(ctx.credentials.load()?.deviceSessionId).toBe('dev_1')
+  })
+
+  it('keyring-unavailable: sign-in opens no browser while nothing could be stored', async () => {
+    const credentials = createMemoryCredentialStore()
+    credentials.load = () => {
+      throw new CredentialStoreError('keyring_unavailable')
+    }
+    credentials.canStore = () => false
+    const ctx = setup({ credentials })
+    await ctx.manager.restore()
+    expect(await ctx.manager.login()).toBe(false)
+    expect(ctx.transport.start).not.toHaveBeenCalled()
+    expect(ctx.openBrowser).not.toHaveBeenCalled()
+    expect(ctx.events.at(-1)).toEqual({ phase: 'error', error: 'keyring_unavailable' })
+    expect(ctx.manager.status().state).toBe('keyring-unavailable')
+  })
+
+  it('a secure-store failure during the account reload leaves no session to recover', async () => {
+    const ctx = setup({ credentials: createMemoryCredentialStore(stored()) })
+    ctx.transport.me.mockImplementationOnce(() =>
+      Promise.reject(new CredentialStoreError('keyring_unavailable')),
+    )
+    expect((await ctx.manager.restore()).state).toBe('keyring-unavailable')
+    // sign-in starts a fresh attempt instead of "recovering" a dropped session
+    expect(await ctx.manager.login()).toBe(true)
+    expect(ctx.transport.start).toHaveBeenCalledTimes(1)
   })
 
   it('not-configured without a deployment profile', async () => {
@@ -394,8 +446,38 @@ describe('restore and refresh', () => {
     const ctx = setup({ credentials: createMemoryCredentialStore(stored()) })
     ctx.transport.refresh.mockImplementationOnce(fail('network'))
     expect((await ctx.manager.restore()).state).toBe('server-unreachable')
+    vi.setSystemTime(Date.now() + 5_000)
     expect(await ctx.manager.getAccessToken()).toMatch(/^at_/)
+    // the account reload follows in the background
+    await vi.advanceTimersByTimeAsync(0)
     expect(ctx.manager.status().state).toBe('signed-in')
+  })
+
+  it('getAccessToken() while offline is refresh-only and does not wait for the account reload', async () => {
+    const ctx = setup({ credentials: createMemoryCredentialStore(stored()) })
+    ctx.transport.refresh.mockImplementationOnce(fail('network'))
+    await ctx.manager.restore()
+    ctx.transport.me.mockImplementationOnce(() => new Promise(() => undefined))
+    vi.setSystemTime(Date.now() + 5_000)
+    expect(await ctx.manager.getAccessToken()).toMatch(/^at_/)
+  })
+
+  it('getAccessToken() bursts while offline share one attempt and are throttled', async () => {
+    const ctx = setup({ credentials: createMemoryCredentialStore(stored()) })
+    ctx.transport.refresh.mockImplementation(fail('network'))
+    await ctx.manager.restore()
+    expect(ctx.transport.refresh).toHaveBeenCalledTimes(1)
+    // right after a failed attempt: null at once, no network call
+    expect(await ctx.manager.getAccessToken()).toBeNull()
+    vi.setSystemTime(Date.now() + 4_000)
+    const burst = await Promise.all([1, 2, 3, 4].map(() => ctx.manager.getAccessToken()))
+    expect(burst).toEqual([null, null, null, null])
+    expect(ctx.transport.refresh).toHaveBeenCalledTimes(1)
+    vi.setSystemTime(Date.now() + 1_000)
+    const second = await Promise.all([1, 2, 3].map(() => ctx.manager.getAccessToken()))
+    expect(second).toEqual([null, null, null])
+    expect(ctx.transport.refresh).toHaveBeenCalledTimes(2)
+    expect(ctx.transport.me).not.toHaveBeenCalled()
   })
 
   it('startup restore waits for the gate (proxy install) before the first refresh', async () => {
@@ -410,15 +492,57 @@ describe('restore and refresh', () => {
     expect(ctx.transport.refresh).toHaveBeenCalledTimes(1)
   })
 
-  it('startup restore stands down when the user started signing in first', async () => {
+  it('startup restore shows the stored account as refreshing while it waits for the gate', async () => {
     const ctx = setup({ credentials: createMemoryCredentialStore(stored()) })
     let open: () => void = () => undefined
     const restoring = ctx.manager.startupRestore(new Promise<void>((r) => (open = r)))
-    await ctx.manager.login()
+    expect(ctx.manager.status()).toMatchObject({ state: 'refreshing', email: 'cached@example.com' })
+    expect(ctx.statuses.map((s) => s.state)).not.toContain('signed-out')
+    // a click meanwhile does not open a second sign-in (no orphaned device)
+    expect(await ctx.manager.login()).toBe(true)
+    expect(ctx.transport.start).not.toHaveBeenCalled()
+    open()
+    expect((await restoring).state).toBe('signed-in')
+  })
+
+  it('startup restore stands down when the user signed out while it waited', async () => {
+    const ctx = setup({ credentials: createMemoryCredentialStore(stored()) })
+    let open: () => void = () => undefined
+    const restoring = ctx.manager.startupRestore(new Promise<void>((r) => (open = r)))
+    await ctx.manager.logout()
     open()
     await restoring
-    expect(ctx.manager.status().state).toBe('signing-in')
+    expect(ctx.manager.status().state).toBe('signed-out')
+    // only the background device revoke ran; no restore refresh, no reload
+    expect(ctx.transport.refresh).toHaveBeenCalledTimes(1)
+    expect(ctx.transport.logout).toHaveBeenCalledTimes(1)
+    expect(ctx.transport.me).not.toHaveBeenCalled()
+  })
+
+  it('startup restore stops waiting for a gate that never settles', async () => {
+    const ctx = setup({ credentials: createMemoryCredentialStore(stored()) })
+    const restoring = ctx.manager.startupRestore(new Promise<void>(() => undefined))
+    await vi.advanceTimersByTimeAsync(STARTUP_GATE_DEADLINE_MS - 1)
     expect(ctx.transport.refresh).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(1)
+    expect((await restoring).state).toBe('signed-in')
+  })
+
+  it('server-unreachable after a restart shows the cached organization and plan', async () => {
+    const ctx = setup({ credentials: createMemoryCredentialStore(stored()) })
+    expect((await ctx.manager.restore()).state).toBe('signed-in')
+    // a new process: only the stored credential survives
+    const next = setup({ credentials: ctx.credentials })
+    next.transport.refresh.mockImplementation(fail('network'))
+    const status = await next.manager.restore()
+    expect(status).toMatchObject({
+      state: 'server-unreachable',
+      email: 'mai@example.com',
+      org: { id: 'org_a', name: 'Acme' },
+      entitlements: { orgId: 'org_a', planName: 'Starter' },
+    })
+    // shown, but not handed to main-process consumers as live entitlements
+    expect(next.manager.getEntitlements()).toBeNull()
   })
 
   it('restore stays refreshing until the account reload has finished', async () => {

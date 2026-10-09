@@ -73,6 +73,8 @@ export class SessionCore {
   protected orgs: OrgResponse[] = []
   protected org: OrgResponse | undefined
   protected entitlements: AccountEntitlements | null = null
+  /** last known plan from the stored credential: shown, never published, until fresh data arrives */
+  protected cachedEntitlements: AccountEntitlements | null = null
   private publishedEntitlements: AccountEntitlements | null = null
   protected generation = 0
   protected refreshInFlight: Promise<void> | null = null
@@ -80,6 +82,8 @@ export class SessionCore {
   private recoveryTimer: ReturnType<typeof setTimeout> | null = null
   private recoveryAttempts = 0
   private recoveryInFlight: Promise<void> | null = null
+  /** when the last recovery attempt started or a session refresh last failed */
+  private lastRecoveryAt = Number.NEGATIVE_INFINITY
   protected readonly statusListeners = new Set<(status: AccountStatus) => void>()
   protected readonly loginListeners = new Set<(event: AccountLoginEvent) => void>()
   protected readonly entitlementListeners = new Set<(e: AccountEntitlements | null) => void>()
@@ -101,7 +105,7 @@ export class SessionCore {
       state: this.state,
       ...(showsAccount && this.org ? { org: toAccountOrg(this.org) } : {}),
       ...(showsAccount && this.orgs.length ? { orgs: this.orgs.map(toAccountOrg) } : {}),
-      ...(showsAccount ? { entitlements: this.entitlements } : {}),
+      ...(showsAccount ? { entitlements: this.entitlements ?? this.cachedEntitlements } : {}),
       ...(this.profile ? { serverOrigin: new URL(this.profile.apiOrigin).host } : {}),
       ...(this.error ? { error: this.error } : {}),
     }
@@ -128,13 +132,13 @@ export class SessionCore {
 
   /**
    * A valid access token for main-process cloud calls, refreshing if needed.
-   * From server-unreachable (credential kept) it tries to recover first, so a
+   * From server-unreachable (credential kept) it tries a refresh itself, so a
    * caller does not have to wait for the next automatic retry.
    */
   async getAccessToken(): Promise<string | null> {
     if (!this.session) return null
-    if (this.state === 'server-unreachable') await this.runRecovery()
-    if (!this.session || !(this.state === 'signed-in' || this.state === 'refreshing')) return null
+    if (this.state === 'server-unreachable') return this.recoverAccessToken()
+    if (!(this.state === 'signed-in' || this.state === 'refreshing')) return null
     if (this.session.accessExpiresAt - this.now() > ACCESS_TOKEN_SKEW_MS)
       return this.session.accessToken
     try {
@@ -143,6 +147,29 @@ export class SessionCore {
       return null
     }
     return this.session?.accessToken ?? null
+  }
+
+  /**
+   * Refresh-only recovery for a getAccessToken() caller while offline. Calls
+   * share one refresh, and a new one starts at most once per RECOVERY_MIN_MS
+   * after the last failed or caller-started attempt, so a burst of offline
+   * calls returns null at once instead of each waiting on the network. The
+   * account reload follows in the background.
+   */
+  private async recoverAccessToken(): Promise<string | null> {
+    if (!this.refreshInFlight) {
+      if (this.recoveryInFlight || this.now() - this.lastRecoveryAt < RECOVERY_MIN_MS) return null
+      this.lastRecoveryAt = this.now()
+    }
+    try {
+      await this.refresh()
+    } catch {
+      return null
+    }
+    const token = this.session?.accessToken
+    if (!token) return null
+    if (this.state === 'server-unreachable') void this.runRecovery()
+    return token
   }
 
   /** single in-flight refresh; applies the failure state itself, then rethrows */
@@ -200,6 +227,7 @@ export class SessionCore {
   /** one recovery at a time, shared by the backoff timer and getAccessToken() */
   protected runRecovery(): Promise<void> {
     if (!this.recoveryInFlight) {
+      this.lastRecoveryAt = this.now()
       const run = this.recover()
         .then(
           () => undefined,
@@ -313,7 +341,12 @@ export class SessionCore {
     if (outcome.clearCredentials) {
       this.deps.credentials.clear()
       this.resetSession()
-    } else if (outcome.state === 'wrong-deployment' || outcome.state === 'signed-out') {
+    } else if (
+      outcome.state === 'wrong-deployment' ||
+      outcome.state === 'signed-out' ||
+      outcome.state === 'keyring-unavailable'
+    ) {
+      // no usable session: a later sign-in must start fresh, not "recover" this one
       this.resetSession()
     }
     this.setState(outcome.state, outcome.error)
@@ -339,13 +372,17 @@ export class SessionCore {
 
   protected setEntitlements(next: AccountEntitlements | null): void {
     this.entitlements = next
+    this.cachedEntitlements = null
     this.publishEntitlements()
   }
 
   protected setState(state: AccountState, error?: AccountErrorCode): void {
     this.state = state
     this.error = error
-    if (state === 'server-unreachable' && this.session) this.scheduleRecovery()
+    if (state === 'server-unreachable' && this.session) {
+      this.lastRecoveryAt = this.now()
+      this.scheduleRecovery()
+    }
     else if (state !== 'refreshing') {
       this.clearRecoveryTimer()
       if (state === 'signed-in') this.recoveryAttempts = 0

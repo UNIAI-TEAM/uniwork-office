@@ -13,5 +13,6 @@ export function createMemoryCredentialStore(
     clear: () => {
       current = null
     },
+    canStore: () => true,
   }
 }

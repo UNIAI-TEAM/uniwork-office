@@ -2,7 +2,7 @@ import type { AccountEntitlements, AccountErrorCode, AccountStatus } from '../..
 import { isAuthCallbackUrl, validateCallback } from './callback'
 import type { StoredCredential } from './credentials'
 import { redirectUriForProfile, type DeploymentProfile } from './deployment'
-import { pickOrg, toEntitlements, toProfile } from './mapping'
+import { pickOrg, toAccountOrg, toEntitlements, toProfile } from './mapping'
 import { LoginAttemptStore } from './pkce'
 import {
   ACCESS_TOKEN_SKEW_MS,
@@ -14,6 +14,9 @@ import {
 import { TransportError, type DesktopSession, type UniworkTransport } from './transport'
 
 export type { AccountManagerDeps } from './session-core'
+
+/** the startup restore waits at most this long for the proxy install */
+export const STARTUP_GATE_DEADLINE_MS = 4_000
 
 /**
  * Main-process owner of the UniWork desktop session: startup restore, the
@@ -31,33 +34,58 @@ export class AccountManager extends SessionCore {
   }
 
   /**
-   * Startup restore once `gate` settles (the main-process proxy install), so
-   * the first refresh does not go out before the system proxy is in place.
-   * Skipped when the user already started something in the meantime.
+   * Startup restore. The stored credential is read and `refreshing` shown at
+   * once (a click meanwhile does not open a second sign-in); only the network
+   * step waits for `gate` (the main-process proxy install), and for at most
+   * `gateDeadlineMs` so a hung proxy lookup cannot block the restore.
+   * Skipped when the user signed out or cancelled in the meantime.
    */
-  async startupRestore(gate: Promise<unknown>): Promise<AccountStatus> {
-    const generation = this.generation
-    await gate.catch(() => undefined)
+  async startupRestore(
+    gate: Promise<unknown>,
+    gateDeadlineMs = STARTUP_GATE_DEADLINE_MS,
+  ): Promise<AccountStatus> {
+    const generation = this.beginRestore()
+    if (generation === null) return this.status()
+    await new Promise<void>((resolve) => {
+      const timer = setTimeout(resolve, gateDeadlineMs)
+      void gate
+        .catch(() => undefined)
+        .then(() => {
+          clearTimeout(timer)
+          resolve()
+        })
+    })
     if (generation !== this.generation) return this.status()
-    return this.restore()
+    return this.finishRestore(generation)
   }
 
   /** Restores the stored session (refresh + account reload); never throws. */
   async restore(): Promise<AccountStatus> {
+    const generation = this.beginRestore()
+    if (generation === null) return this.status()
+    return this.finishRestore(generation)
+  }
+
+  /**
+   * The synchronous half of a restore: reads the credential and shows it as
+   * `refreshing` with the cached account. Null when there is nothing to
+   * refresh (the final state is already applied).
+   */
+  private beginRestore(): number | null {
     const generation = ++this.generation
     this.resetSession()
-    if (!this.ensureProfile()) return this.status()
+    if (!this.ensureProfile()) return null
     const profile = this.profile as DeploymentProfile
     let credential: StoredCredential | null
     try {
       credential = this.deps.credentials.load()
     } catch {
       this.setState('keyring-unavailable', 'keyring_unavailable')
-      return this.status()
+      return null
     }
     if (!credential) {
       this.setState('signed-out')
-      return this.status()
+      return null
     }
     if (
       credential.deploymentId !== profile.deploymentId ||
@@ -66,11 +94,23 @@ export class AccountManager extends SessionCore {
     ) {
       // a credential issued by another deployment is never sent to this one
       this.setState('wrong-deployment', 'wrong_deployment')
-      return this.status()
+      return null
     }
     this.session = { credential, accessToken: '', accessExpiresAt: 0 }
     this.accountProfile = credential.profile
+    // the last known organization and plan, shown until the server answers
+    // (or while it cannot be reached)
+    const org = credential.org
+    if (org && typeof org.id === 'string' && typeof org.name === 'string') {
+      this.org = { ...org, status: 'active' }
+      this.orgs = [this.org]
+      if (credential.entitlements?.orgId === org.id) this.cachedEntitlements = credential.entitlements
+    }
     this.setState('refreshing')
+    return generation
+  }
+
+  private async finishRestore(generation: number): Promise<AccountStatus> {
     try {
       await this.refresh()
       await this.loadAccount(generation)
@@ -87,6 +127,12 @@ export class AccountManager extends SessionCore {
     if (this.session) return (await this.retry()).loggedIn
     if (!this.ensureProfile()) {
       this.emitLogin({ phase: 'error', error: 'not_configured' })
+      return false
+    }
+    // a fresh sign-in overwrites an unreadable credential, but only when it can
+    // be stored encrypted: otherwise the redeemed code would orphan a device
+    if (this.state === 'keyring-unavailable' && !this.deps.credentials.canStore()) {
+      this.emitLogin({ phase: 'error', error: 'keyring_unavailable' })
       return false
     }
     const profile = this.profile as DeploymentProfile
@@ -168,9 +214,17 @@ export class AccountManager extends SessionCore {
     if (!attempt || !this.profile || !this.transport) return
     const validation = validateCallback(url, attempt, this.now())
     if (!validation.ok) {
-      if (validation.reason === 'expired') this.expireAttempt(attempt.attemptId)
+      if (validation.reason === 'expired') {
+        this.expireAttempt(attempt.attemptId)
+        return
+      }
       // a forged, stale or foreign-scheme callback is discarded; the user's
-      // live attempt and its state are left alone (anything can open a URL)
+      // live attempt and its state are left alone (anything can open a URL).
+      // The renderer shows it as a passing notice, not as a failed sign-in.
+      this.emitLogin({
+        phase: 'error',
+        error: validation.reason === 'state_mismatch' ? 'state_mismatch' : 'invalid_callback',
+      })
       return
     }
     this.clearAttemptTimer()
@@ -250,6 +304,8 @@ export class AccountManager extends SessionCore {
       if (generation === this.generation) this.applyFailure(error, 'session')
       return this.status()
     }
+    if (generation !== this.generation) return this.status()
+    this.cacheAccount()
     this.setState(this.state, this.error)
     return this.status()
   }
@@ -257,6 +313,10 @@ export class AccountManager extends SessionCore {
   /**
    * Clears locally first (disk, memory, state push), then revokes the device
    * (scope device) in the background; a failed revoke changes nothing locally.
+   * There is no retry or tombstone: if the revoke never lands (offline, quit
+   * within the request timeout) the server-side device session stays valid
+   * until its refresh expiry, but its refresh token no longer exists anywhere
+   * on this machine.
    */
   async logout(): Promise<AccountStatus> {
     this.generation++
@@ -312,10 +372,7 @@ export class AccountManager extends SessionCore {
     this.org = pickOrg(orgs, this.deps.readSelectedOrgId())
     await this.loadEntitlements(generation)
     if (generation !== this.generation || !this.session) return
-    // cache the profile (encrypted) so server-unreachable can still show it;
-    // later rotations persist it from session.credential
-    this.session.credential = { ...this.session.credential, profile: this.accountProfile }
-    this.persist(this.session.credential, false)
+    this.cacheAccount()
     this.setState('signed-in')
   }
 
@@ -336,12 +393,30 @@ export class AccountManager extends SessionCore {
         ) {
           throw error
         }
-        // entitlements are data only: a billing read failure leaves them unknown
-        next = this.entitlements?.orgId === org.id ? this.entitlements : null
+        // entitlements are data only: a billing read failure keeps the last
+        // known plan of this organization, else leaves it unknown
+        next =
+          [this.entitlements, this.cachedEntitlements].find((e) => e?.orgId === org.id) ?? null
       }
     }
     if (generation !== this.generation) return
     this.setEntitlements(next)
+  }
+
+  /**
+   * Caches the profile, organization and plan in the (encrypted) credential so
+   * a restart that cannot reach UniWork still shows them; later rotations
+   * persist them from session.credential.
+   */
+  private cacheAccount(): void {
+    if (!this.session) return
+    this.session.credential = {
+      ...this.session.credential,
+      profile: this.accountProfile,
+      org: this.org ? toAccountOrg(this.org) : undefined,
+      entitlements: this.entitlements,
+    }
+    this.persist(this.session.credential, false)
   }
 
   /** the failure state is already applied unless the attempt was still pending */

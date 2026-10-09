@@ -88,6 +88,7 @@ import {
   saveActivePathToUniWork,
 } from './office-bridge-host'
 import {
+  bindAuthCallbackEvents,
   configureUniworkAccount,
   createAuthCallbackRouter,
   registerAccountIpc,
@@ -5975,27 +5976,25 @@ function routeAuthCallback(url: string): void {
   if (routeAuthCallbackUrl(url)) revealShellWindow()
 }
 
-app.on('open-url', (event, url) => {
-  event.preventDefault()
-  if (authCallbacks.openUrl(url)) return
-  if (!app.isReady()) {
-    pendingLaunchUrl = url
-    return
-  }
-  void openOfficeBridgeUrl(url)
-})
-
-app.on('second-instance', (_event, argv, _cwd, additionalData) => {
-  if (authCallbacks.secondInstance(argv, additionalData)) return
-  const extra = additionalData as { launchUrl?: string } | null
-  const url = extractLaunchUrlFromArgv(argv) ?? extra?.launchUrl
-  if (url) {
+bindAuthCallbackEvents(app, authCallbacks, {
+  openUrl(url) {
+    if (!app.isReady()) {
+      pendingLaunchUrl = url
+      return
+    }
     void openOfficeBridgeUrl(url)
-    return
-  }
-  const paths = collectLaunchPaths(argv, additionalData)
-  revealShellWindow()
-  openLaunchPaths(paths)
+  },
+  secondInstance(argv, additionalData) {
+    const extra = additionalData as { launchUrl?: string } | null
+    const url = extractLaunchUrlFromArgv(argv) ?? extra?.launchUrl
+    if (url) {
+      void openOfficeBridgeUrl(url)
+      return
+    }
+    const paths = collectLaunchPaths(argv, additionalData)
+    revealShellWindow()
+    openLaunchPaths(paths)
+  },
 })
 
 installNavigationGuard(app)

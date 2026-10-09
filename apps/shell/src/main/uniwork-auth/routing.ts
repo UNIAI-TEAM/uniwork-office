@@ -22,6 +22,37 @@ export interface AuthCallbackRouter {
   start(route: (url: string) => void): void
 }
 
+/** the slice of Electron's `app` the callback events need */
+export interface AuthCallbackEventSource {
+  on(event: string, listener: (...args: never[]) => void): unknown
+}
+
+/**
+ * Binds `open-url` and `second-instance` to the router. A sign-in callback
+ * stops there; anything else goes to `fallback` (office-bridge URLs, files).
+ */
+export function bindAuthCallbackEvents(
+  app: AuthCallbackEventSource,
+  router: AuthCallbackRouter,
+  fallback: {
+    openUrl(url: string): void
+    secondInstance(argv: string[], additionalData: unknown): void
+  },
+): void {
+  app.on('open-url', (event: { preventDefault(): void }, url: string) => {
+    event.preventDefault()
+    if (router.openUrl(url)) return
+    fallback.openUrl(url)
+  })
+  app.on(
+    'second-instance',
+    (_event: unknown, argv: string[], _cwd: string, additionalData: unknown) => {
+      if (router.secondInstance(argv, additionalData)) return
+      fallback.secondInstance(argv, additionalData)
+    },
+  )
+}
+
 export function createAuthCallbackRouter(initialArgv: readonly unknown[]): AuthCallbackRouter {
   let held = extractAuthCallbackFromArgv(initialArgv)
   let route: ((url: string) => void) | null = null

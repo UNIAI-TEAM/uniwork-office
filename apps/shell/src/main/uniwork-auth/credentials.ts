@@ -10,13 +10,13 @@ import {
   writeFileSync,
 } from 'node:fs'
 import { join } from 'node:path'
-import type { AccountProfile } from '../../shared/home-api'
+import type { AccountEntitlements, AccountOrg, AccountProfile } from '../../shared/home-api'
 
 /**
  * The persisted half of a desktop session: refresh token + device session,
  * bound to the deployment it was issued by. The access token is never
- * persisted (main-process memory only). The cached profile rides along so
- * server-unreachable can still show who is signed in.
+ * persisted (main-process memory only). The cached profile, organization and
+ * plan ride along so server-unreachable can still show who is signed in.
  */
 export interface StoredCredential {
   deploymentId: string
@@ -29,6 +29,9 @@ export interface StoredCredential {
   /** epoch ms; past this the refresh token is dead and the session expired */
   refreshExpiresAt: number
   profile?: AccountProfile
+  /** last known organization and plan (display while UniWork is unreachable) */
+  org?: AccountOrg
+  entitlements?: AccountEntitlements | null
 }
 
 export type CredentialStoreErrorCode = 'keyring_unavailable' | 'io'
@@ -56,6 +59,8 @@ export interface CredentialStore {
   load(): StoredCredential | null
   save(credential: StoredCredential): void
   clear(): void
+  /** true when save() could encrypt right now (writes nothing, never plaintext) */
+  canStore(): boolean
 }
 
 const VERSION = 1
@@ -212,6 +217,15 @@ export function createCredentialStore(options: {
     clear() {
       removeQuietly(target)
       removeQuietly(legacyBackup)
+    },
+    canStore() {
+      try {
+        ensureAvailable()
+        safeStorage.encryptString('probe')
+        return true
+      } catch {
+        return false
+      }
     },
   }
 }
