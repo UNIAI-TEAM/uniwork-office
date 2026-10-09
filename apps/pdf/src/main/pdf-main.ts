@@ -62,6 +62,7 @@ import type {
   SplitPagesResult,
   SplitPdfRequest,
   SplitPdfResult,
+  PdfCloseSaveRequest,
   PdfUniworkState,
   SavePdfRequest,
   SavePdfResult,
@@ -666,9 +667,6 @@ const closeSaveWaiters = new Map<number, (ok: boolean) => void>()
 const saveAsWaiters = new Map<number, (ok: boolean) => void>()
 /** Save As destination granted per view (main-process dialog pick); the save handler refuses any other non-source target */
 const saveAsTargetByWc = new Map<number, string>()
-/** Views whose pending renderer save was asked for by an app-internal flush (export),
-    not by the user: their next `user` save must not fire the UniWork user-save hook. */
-const internalFlushByWc = new Set<number>()
 /** Only a copy produced by this view may receive subsequent in-place redactions. */
 const redactionPathByWc = new Map<number, string>()
 const redactionFlows = new Set<number>()
@@ -869,10 +867,13 @@ export async function requestPdfClose(
       : await dialog.showMessageBox(options)
   if (response === 2) return false
   if (response === 1) return true
-  return await requestRendererSave(contents)
+  return await requestRendererSave(contents, 'user')
 }
 
-function requestRendererSave(contents: WebContents): Promise<boolean> {
+function requestRendererSave(
+  contents: WebContents,
+  origin: PdfCloseSaveRequest['origin'] = 'user',
+): Promise<boolean> {
   return new Promise<boolean>((resolve) => {
     const timer = setTimeout(() => {
       closeSaveWaiters.delete(contents.id)
@@ -882,7 +883,7 @@ function requestRendererSave(contents: WebContents): Promise<boolean> {
       clearTimeout(timer)
       resolve(ok)
     })
-    contents.send(PDF_CHANNELS.closeSaveRequest)
+    contents.send(PDF_CHANNELS.closeSaveRequest, { origin } satisfies PdfCloseSaveRequest)
   })
 }
 
@@ -901,11 +902,9 @@ export function flushPdfSave(
   const path = openPathByWc.get(contents.id)
   const forceBound = explicit && uniworkIsBound(path) && !uniworkIsReadOnly(path)
   if (!dirtyByWc.has(contents.id) && !forceBound) return Promise.resolve(true)
-  if (!explicit) {
-    internalFlushByWc.add(contents.id)
-    return requestRendererSave(contents).finally(() => internalFlushByWc.delete(contents.id))
-  }
-  return requestRendererSave(contents)
+  // The renderer saves with the origin it is told, so a Ctrl+S that lands while an
+  // export flush is pending still counts as the user's Save.
+  return requestRendererSave(contents, explicit ? 'user' : 'internal')
 }
 
 /** Menu Print: ask the renderer to run its print flow (save, rasterize, system dialog) */
@@ -1070,10 +1069,8 @@ function registerPdfIpc(): void {
     }
     // UniWork seam: view-only targets and autosave onto a bound copy never write;
     // only an explicit Save of the open file reaches the user-save hook.
-    const origin =
-      request.origin === 'user' && internalFlushByWc.has(e.sender.id) ? 'internal' : request.origin
     const uniwork = uniworkSaveDecision({
-      origin,
+      origin: request.origin,
       currentPath: path,
       targetPath: target,
       saveAs: request.targetPath !== undefined || saveAsTargetByWc.get(e.sender.id) === target,
@@ -1761,7 +1758,6 @@ function grantAndTrack(wc: WebContents, openPath?: string | null): void {
     allowedByWc.delete(wcId)
     dirtyByWc.delete(wcId)
     saveAsTargetByWc.delete(wcId)
-    internalFlushByWc.delete(wcId)
     closeSaveWaiters.get(wcId)?.(false)
     closeSaveWaiters.delete(wcId)
     saveAsWaiters.get(wcId)?.(false)

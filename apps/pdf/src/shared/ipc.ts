@@ -518,6 +518,15 @@ export interface SavePdfRequest {
 }
 
 /** UniWork document state of the open file: bound working copy and/or view only */
+/**
+ * What main asks the renderer to save on closeSaveRequest. `user`: the close
+ * prompt's Save or the menu Save. `internal`: an app-driven flush before an
+ * export, which is never the user's Save (it must not report to UniWork).
+ */
+export interface PdfCloseSaveRequest {
+  origin: 'user' | 'internal'
+}
+
 export interface PdfUniworkState {
   bound: boolean
   readOnly: boolean
@@ -795,8 +804,8 @@ export interface PdfApi {
   getUsername(): Promise<string>
   /** Mirror unsaved-changes state to the main process; drives the save prompt before closing a tab/window */
   setDirty(dirty: boolean): void
-  /** Main process picked "Save" in the close prompt → renderer saves and replies via sendCloseSaveResult */
-  onCloseSaveRequest(handler: () => void): () => void
+  /** Main process picked "Save" in the close prompt, or flushes before an export → renderer saves with that origin and replies via sendCloseSaveResult */
+  onCloseSaveRequest(handler: (request: PdfCloseSaveRequest) => void): () => void
   sendCloseSaveResult(ok: boolean): void
   /** Shell menu Save As → renderer writes pending edits to targetPath only (original untouched) and replies via sendSaveAsResult */
   onSaveAsRequest(handler: (targetPath: string) => void): () => void

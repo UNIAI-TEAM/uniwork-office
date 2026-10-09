@@ -5,6 +5,9 @@
  * app, or the shell before sign-in wiring) every path is a plain local file
  * and nothing here changes behaviour.
  */
+import { resolve } from 'node:path'
+import { PDF_UNIWORK_AUTOSAVE_OFF, PDF_UNIWORK_VIEW_ONLY } from '../shared/uniwork-refusal'
+
 export interface UniworkDocumentPolicy {
   isBound(path: string): boolean
   isReadOnly(path: string): boolean
@@ -38,6 +41,19 @@ export function uniworkIsReadOnly(path: string | null | undefined): boolean {
   } catch {
     return false
   }
+}
+
+/** Same file, ignoring separators and (on Windows) letter case, so a dialog pick of the open file matches. */
+export function uniworkSamePath(
+  a: string | null | undefined,
+  b: string | null | undefined,
+): boolean {
+  if (!a || !b) return false
+  const norm = (p: string): string => {
+    const r = resolve(p)
+    return process.platform === 'win32' ? r.toLowerCase() : r
+  }
+  return norm(a) === norm(b)
 }
 
 /** Called once after an explicit user Save wrote bytes to `path` (never autosave/save-as). */
@@ -83,13 +99,13 @@ export interface UniworkSaveDecision {
 /** Pure save policy for one pdf:save request; with no policy installed it is a pass-through. */
 export function uniworkSaveDecision(input: UniworkSaveInput): UniworkSaveDecision {
   const { origin, currentPath, targetPath, saveAs } = input
-  const inPlace = targetPath === currentPath && !saveAs
+  const sameFile = uniworkSamePath(currentPath, targetPath)
   if (uniworkIsReadOnly(targetPath)) {
     return {
       write: false,
       fireHook: false,
       forceWrite: false,
-      reason: 'pdf: document is view only',
+      reason: PDF_UNIWORK_VIEW_ONLY,
     }
   }
   if (origin === 'auto' && uniworkIsBound(targetPath)) {
@@ -97,10 +113,13 @@ export function uniworkSaveDecision(input: UniworkSaveInput): UniworkSaveDecisio
       write: false,
       fireHook: false,
       forceWrite: false,
-      reason: 'pdf: autosave is off for this document',
+      reason: PDF_UNIWORK_AUTOSAVE_OFF,
     }
   }
-  const explicitInPlace = inPlace && origin === 'user'
+  // A Save As that picks the open file itself is an explicit Save of it (the
+  // renderer sends no origin on that path); onto any other file it is a copy.
+  const explicitInPlace =
+    sameFile && (saveAs ? origin === undefined || origin === 'user' : origin === 'user')
   return {
     write: true,
     fireHook: explicitInPlace,

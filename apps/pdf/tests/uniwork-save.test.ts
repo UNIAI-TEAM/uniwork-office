@@ -121,6 +121,15 @@ describe('uniworkSaveDecision (pure)', () => {
     expect(uniworkSaveDecision({ ...base, origin: 'auto' }).write).toBe(true)
     expect(uniworkSaveDecision({ ...base, origin: undefined }).fireHook).toBe(false)
   })
+
+  it('a Save As onto the open file is an explicit Save, onto another file it is a copy', () => {
+    setUniworkDocumentPolicy(null)
+    const same = { currentPath: 'a.pdf', targetPath: 'a.pdf', saveAs: true }
+    expect(uniworkSaveDecision({ ...same, origin: undefined }).fireHook).toBe(true)
+    expect(uniworkSaveDecision({ ...same, targetPath: 'b.pdf', origin: undefined }).fireHook).toBe(
+      false,
+    )
+  })
 })
 
 describe('pdf:save UniWork seam', () => {
@@ -251,25 +260,79 @@ describe('flushPdfSave UniWork seam', () => {
     bound.add(path)
     const wc = openView(path)
     const pending = flushPdfSave(wc as never)
-    expect(wc.send).toHaveBeenCalledWith(PDF_CHANNELS.closeSaveRequest)
+    expect(wc.send).toHaveBeenCalledWith(PDF_CHANNELS.closeSaveRequest, { origin: 'user' })
     handlers.get(PDF_CHANNELS.closeSaveResult)!({ sender: wc }, true)
     expect(await pending).toBe(true)
   })
 
-  it('an export flush ({ explicit: false }) never fires the hook', async () => {
+  it('an export flush ({ explicit: false }) asks the renderer to save as internal', async () => {
     const path = await makePdf('doc.pdf')
     bound.add(path)
     const wc = openView(path)
     handlers.get(PDF_CHANNELS.dirtyChanged)!({ sender: wc }, true)
-    wc.send.mockImplementation(async (channel: string) => {
-      if (channel !== PDF_CHANNELS.closeSaveRequest) return
-      const result = await save(wc, request(path, { ...rotate, origin: 'user' }))
-      handlers.get(PDF_CHANNELS.closeSaveResult)!({ sender: wc }, result.ok)
-    })
+    // the renderer saves with the origin main asked for
+    wc.send.mockImplementation(
+      async (channel: string, payload: { origin: 'user' | 'internal' }) => {
+        if (channel !== PDF_CHANNELS.closeSaveRequest) return
+        const result = await save(wc, request(path, { ...rotate, origin: payload.origin }))
+        handlers.get(PDF_CHANNELS.closeSaveResult)!({ sender: wc }, result.ok)
+      },
+    )
     expect(await flushPdfSave(wc as never, { explicit: false })).toBe(true)
+    expect(wc.send).toHaveBeenLastCalledWith(PDF_CHANNELS.closeSaveRequest, { origin: 'internal' })
     expect(hook).not.toHaveBeenCalled()
     // the same flush as a menu Save does fire it
     expect(await flushPdfSave(wc as never)).toBe(true)
+    expect(wc.send).toHaveBeenLastCalledWith(PDF_CHANNELS.closeSaveRequest, { origin: 'user' })
     expect(hook).toHaveBeenCalledTimes(1)
+  })
+
+  it('a user Save landing while an export flush is pending still fires the hook', async () => {
+    const path = await makePdf('doc.pdf')
+    bound.add(path)
+    const wc = openView(path)
+    handlers.get(PDF_CHANNELS.dirtyChanged)!({ sender: wc }, true)
+    // the flush is asked for but the renderer has not answered yet
+    const pending = flushPdfSave(wc as never, { explicit: false })
+    expect(wc.send).toHaveBeenLastCalledWith(PDF_CHANNELS.closeSaveRequest, { origin: 'internal' })
+    // the user presses Ctrl+S in the meantime: its own request carries origin user
+    expect((await save(wc, request(path, { ...rotate, origin: 'user' }))).ok).toBe(true)
+    expect(hook).toHaveBeenCalledTimes(1)
+    handlers.get(PDF_CHANNELS.closeSaveResult)!({ sender: wc }, true)
+    expect(await pending).toBe(true)
+  })
+})
+
+describe('pdf:save Save As onto the open file', () => {
+  async function saveAs(wc: FakeWebContents, path: string, target: string): Promise<boolean> {
+    const done = new Promise<boolean>((resolve) => {
+      wc.send.mockImplementation(async (channel: string) => {
+        if (channel !== PDF_CHANNELS.saveAsRequest) return
+        const result = await save(wc, request(path, { ...rotate, targetPath: target }))
+        handlers.get(PDF_CHANNELS.saveAsResult)!({ sender: wc }, result.ok)
+        resolve(result.ok)
+      })
+    })
+    const { requestPdfSaveAs } = await import('../src/main/pdf-main')
+    void requestPdfSaveAs(wc as never, target)
+    return done
+  }
+
+  it('is an explicit Save: it writes and fires the hook once', async () => {
+    const path = await makePdf('doc.pdf')
+    bound.add(path)
+    const wc = openView(path)
+    expect(await saveAs(wc, path, path)).toBe(true)
+    expect(hook).toHaveBeenCalledTimes(1)
+    expect(hook).toHaveBeenCalledWith(path)
+  })
+
+  it('still never fires for a view-only document', async () => {
+    const path = await makePdf('doc.pdf')
+    bound.add(path)
+    readOnly.add(path)
+    const wc = openView(path)
+    expect(await saveAs(wc, path, path)).toBe(false)
+    expect(hook).not.toHaveBeenCalled()
   })
 })

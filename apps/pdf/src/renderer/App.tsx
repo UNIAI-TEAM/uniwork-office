@@ -122,6 +122,8 @@ import {
 } from '@genoffice/ui'
 import { useI18n } from './i18n/locale'
 import { useAutosave } from './useAutosave'
+import { drainedOrigin, forcesBoundSave, type SaveOrigin } from './uniwork-save'
+import { isUniworkRefusal } from '../shared/uniwork-refusal'
 import type {
   AnnotDeleteInput,
   DrawingInput,
@@ -275,8 +277,6 @@ import {
   IconAiKeyPoints,
 } from './icons'
 
-/** Who asked for a save; main fires the UniWork user-save hook only for 'user' */
-type SaveOrigin = NonNullable<SavePdfRequest['origin']>
 
 GlobalWorkerOptions.workerSrc = workerUrl
 
@@ -1359,9 +1359,13 @@ export default function App() {
   const [uniwork, setUniwork] = useState<PdfUniworkState>({ bound: false, readOnly: false })
   useEffect(() => {
     let live = true
-    setUniwork({ bound: false, readOnly: false })
-    if (!filePath) return
-    // Re-queried whenever the open path changes (open, rename, redaction copy)
+    if (!filePath) {
+      setUniwork({ bound: false, readOnly: false })
+      return
+    }
+    // Re-queried whenever the open path changes (open, rename, redaction copy). The
+    // previous answer stays until the new one arrives: a view-only copy must not turn
+    // editable, nor a bound one autosave, in the gap.
     window.pdfApi
       .uniworkState(filePath)
       .then((state) => {
@@ -3533,10 +3537,12 @@ export default function App() {
       promise would reuse the pre-reload render's closure — dirty still true, the saved
       edits still listed — and write them onto the file a second time. */
   const queuedSavesRef = useRef<{ origin: SaveOrigin; resolve: (ok: boolean) => void }[]>([])
+  /** Origin of the save that most recently started writing (a queued save checks it) */
+  const lastWriteOriginRef = useRef<SaveOrigin | null>(null)
 
   /** `user` = explicit Save (button, ⌘S, menu, close prompt); `auto` = autosave tick/blur;
       `internal` = flush before a page tool. Main fires the UniWork user-save hook only for `user`. */
-  const save = (origin: SaveOrigin = 'user'): Promise<boolean> => {
+  const save = (origin: SaveOrigin = 'user', afterUserSave = false): Promise<boolean> => {
     if (redactionRequestInFlightRef.current) return Promise.resolve(false)
     // A save is already writing: queue behind it instead of reporting failure — the
     // close prompt's "Save" and ⌘S regularly collide with the blur-triggered autosave
@@ -3559,9 +3565,15 @@ export default function App() {
       noteFlush.noteEdits !== noteEdits
     // A UniWork-bound (editable) document saves on every explicit Save, even when
     // clean, so a retry after a failed upload still reaches UniWork
-    const forceBound =
-      origin === 'user' && uniwork.bound && !uniwork.readOnly && redactions.length === 0
+    const forceBound = forcesBoundSave({
+      origin,
+      bound: uniwork.bound,
+      readOnly: uniwork.readOnly,
+      pendingRedactions: redactions.length,
+      afterUserSave,
+    })
     if (!filePath || (!anythingToSave && !forceBound)) return Promise.resolve(!anythingToSave)
+    lastWriteOriginRef.current = origin
     // An explicit save opts this file into autosave
     if (origin !== 'auto') savedOnceRef.current = true
     // What this save writes — the post-save reload subtracts exactly this, keeping
@@ -3591,7 +3603,9 @@ export default function App() {
         origin,
       })
       if (!result.ok) {
-        opFailed(result.error)
+        // main declining an autosave tick that raced the document's UniWork state is
+        // not a failure the user can act on
+        if (!(origin === 'auto' && isUniworkRefusal(result.error))) opFailed(result.error)
         return false
       }
       if (!anythingToSave) {
@@ -3668,12 +3682,8 @@ export default function App() {
     const queued = queuedSavesRef.current
     queuedSavesRef.current = []
     // One explicit request makes the whole drained batch explicit (autosave opt-in)
-    const origin: SaveOrigin = queued.some((q) => q.origin === 'user')
-      ? 'user'
-      : queued.every((q) => q.origin === 'auto')
-        ? 'auto'
-        : 'internal'
-    void save(origin).then((ok) => {
+    const origin = drainedOrigin(queued.map((q) => q.origin))
+    void save(origin, lastWriteOriginRef.current === 'user').then((ok) => {
       for (const q of queued) q.resolve(ok)
     })
   })
@@ -5810,13 +5820,13 @@ export default function App() {
 
   // Main process picked "Save" in the close prompt → save and report the result
   useEffect(() => {
-    return window.pdfApi.onCloseSaveRequest(() => {
+    return window.pdfApi.onCloseSaveRequest((request) => {
       if (redactions.length > 0) {
         showNotice(t('redactSaveAsHint'))
         window.pdfApi.sendCloseSaveResult(false)
         return
       }
-      void save().then((ok) => window.pdfApi.sendCloseSaveResult(ok))
+      void save(request.origin).then((ok) => window.pdfApi.sendCloseSaveResult(ok))
     })
   })
 
