@@ -53,13 +53,21 @@ for (const f of fontFaces) families[f.family] = (families[f.family] ?? 0) + 1
 const keyframes = [...flat.matchAll(/@keyframes\s+([\w-]+)/g)].map((m) => m[1])
 const customProps = new Set([...flat.matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1]))
 const classes = new Set([...flat.matchAll(/\.(-?[_a-zA-Z][\w-]*)/g)].map((m) => m[1]))
-const unprefixedCommon = [...classes].filter((c) => /^(app|btn|button|menu|toolbar|modal|dialog|panel|tab|tabs|icon|page|editor|container|content|header|footer|sidebar|toast|tooltip|popup|overlay|input|select|row|col|card|list|item)$/.test(c))
+const unprefixedCommon = [...classes].filter((c) =>
+  /^(app|btn|button|menu|toolbar|modal|dialog|panel|tab|tabs|icon|page|editor|container|content|header|footer|sidebar|toast|tooltip|popup|overlay|input|select|row|col|card|list|item)$/.test(
+    c,
+  ),
+)
 
 const js = jsFiles.map((f) => readFileSync(resolve(dist, f), 'utf8')).join('\n')
 const globalsWritten = {}
-for (const m of js.matchAll(/\b(?:window|globalThis)\.(__?[A-Za-z][\w$]*|[a-z][A-Za-z0-9_$]*)\s*=[^=]/g)) globalsWritten[m[1]] = (globalsWritten[m[1]] ?? 0) + 1
+for (const m of js.matchAll(
+  /\b(?:window|globalThis)\.(__?[A-Za-z][\w$]*|[a-z][A-Za-z0-9_$]*)\s*=[^=]/g,
+))
+  globalsWritten[m[1]] = (globalsWritten[m[1]] ?? 0) + 1
 const globalsRead = {}
-for (const m of js.matchAll(/\b(?:window|globalThis)\.(desktop|projectApi|__[A-Za-z][\w$]*)\b/g)) globalsRead[m[1]] = (globalsRead[m[1]] ?? 0) + 1
+for (const m of js.matchAll(/\b(?:window|globalThis)\.(desktop|projectApi|__[A-Za-z][\w$]*)\b/g))
+  globalsRead[m[1]] = (globalsRead[m[1]] ?? 0) + 1
 const docListeners = {
   'document.addEventListener': (js.match(/document\.addEventListener\(/g) ?? []).length,
   'window.addEventListener': (js.match(/window\.addEventListener\(/g) ?? []).length,
@@ -67,15 +75,15 @@ const docListeners = {
   'document.documentElement': (js.match(/document\.documentElement\b/g) ?? []).length,
   'document.head': (js.match(/document\.head\b/g) ?? []).length,
   'document.fonts': (js.match(/document\.fonts\b/g) ?? []).length,
-  'localStorage': (js.match(/localStorage\b/g) ?? []).length,
-  'sessionStorage': (js.match(/sessionStorage\b/g) ?? []).length,
-  'indexedDB': (js.match(/indexedDB\b/g) ?? []).length,
+  localStorage: (js.match(/localStorage\b/g) ?? []).length,
+  sessionStorage: (js.match(/sessionStorage\b/g) ?? []).length,
+  indexedDB: (js.match(/indexedDB\b/g) ?? []).length,
   'navigator.clipboard': (js.match(/navigator\.clipboard/g) ?? []).length,
   'window.print': (js.match(/window\.print\(/g) ?? []).length,
   'window.open': (js.match(/window\.open\(/g) ?? []).length,
   'new Worker': (js.match(/new Worker\(/g) ?? []).length,
-  'postMessage': (js.match(/postMessage\(/g) ?? []).length,
-  'BroadcastChannel': (js.match(/BroadcastChannel/g) ?? []).length,
+  postMessage: (js.match(/postMessage\(/g) ?? []).length,
+  BroadcastChannel: (js.match(/BroadcastChannel/g) ?? []).length,
   'Konva/canvas': (js.match(/getContext\(["']2d["']/g) ?? []).length,
 }
 
@@ -89,7 +97,12 @@ const result = {
   customPropertyCount: customProps.size,
   classCount: classes.size,
   genericUnprefixedClassNames: unprefixedCommon,
-  globalSelectors: Object.fromEntries(Object.entries(cat).map(([k, v]) => [k, { count: v.length, samples: [...new Set(v)].slice(0, 12) }])),
+  globalSelectors: Object.fromEntries(
+    Object.entries(cat).map(([k, v]) => [
+      k,
+      { count: v.length, samples: [...new Set(v)].slice(0, 12) },
+    ]),
+  ),
   windowGlobalsWritten: globalsWritten,
   windowGlobalsRead: globalsRead,
   browserApiUsage: docListeners,

@@ -37,4 +37,6 @@ const doc = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document 
 base.file('word/document.xml', doc)
 const buf = await base.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' })
 writeFileSync(resolve(here, 'long.docx'), buf)
-console.log(`long.docx ${buf.length} bytes, ${CHAPTERS} chapters x 8 paras, ${Math.floor(CHAPTERS / 10)} tables`)
+console.log(
+  `long.docx ${buf.length} bytes, ${CHAPTERS} chapters x 8 paras, ${Math.floor(CHAPTERS / 10)} tables`,
+)
