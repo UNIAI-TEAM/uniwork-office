@@ -1,6 +1,6 @@
-import { nativeImage } from 'electron'
 import { FPDF_PAGEOBJ_TEXT, chainPdfium, loadPdfium, saveDoc, withDocument } from './text-edit'
 import type { Pdfium } from './text-edit'
+import { pdfImageCodec } from './core-env'
 import type {
   ImageEditFailure,
   ImageEditInput,
@@ -67,23 +67,10 @@ function matchImage(objects: PageObj[], rect: Rect): PageObj | null {
 const firstTextIndex = (objects: PageObj[]): number | undefined =>
   objects.find((o) => o.type === FPDF_PAGEOBJ_TEXT)?.index
 
-/** Decode a PNG/JPEG into straight-alpha BGRA (pdfium splits alpha into an SMask itself) */
-function decodeImage(b64: string): { width: number; height: number; bgra: Buffer } {
-  const img = nativeImage.createFromBuffer(Buffer.from(b64, 'base64'))
-  if (img.isEmpty()) throw new Error('could not decode the image data')
-  const { width, height } = img.getSize()
-  // toBitmap() hands back premultiplied BGRA; un-premultiply so translucent pixels
-  // keep their color once pdfium separates them into image + SMask
-  const bgra = Buffer.from(img.toBitmap())
-  for (let i = 0; i < bgra.length; i += 4) {
-    const a = bgra[i + 3]!
-    if (a > 0 && a < 255) {
-      bgra[i] = Math.min(255, Math.round((bgra[i]! * 255) / a))
-      bgra[i + 1] = Math.min(255, Math.round((bgra[i + 1]! * 255) / a))
-      bgra[i + 2] = Math.min(255, Math.round((bgra[i + 2]! * 255) / a))
-    }
-  }
-  return { width, height, bgra }
+/** Decode a PNG/JPEG into straight-alpha BGRA (pdfium splits alpha into an SMask itself);
+    the platform codec does the work (core-env.ts) */
+function decodeImage(b64: string): Promise<{ width: number; height: number; bgra: Uint8Array }> {
+  return pdfImageCodec().decode(b64)
 }
 
 /** Content matrix for a footprint rect, counter-rotated against the page's display
@@ -104,9 +91,14 @@ function imageMatrix(rect: Rect, rotate: number): number[] {
   }
 }
 
-function insertImage(m: Pdfium, doc: number, page: number, edit: ImageEditInput): void {
+async function insertImage(
+  m: Pdfium,
+  doc: number,
+  page: number,
+  edit: ImageEditInput,
+): Promise<void> {
   if (edit.kind !== 'insertImage') return
-  const { width, height, bgra } = decodeImage(edit.image)
+  const { width, height, bgra } = await decodeImage(edit.image)
   const bufPtr = m._malloc(bgra.length)
   m.HEAPU8.set(bgra, bufPtr)
   const bmp = m._FPDFBitmap_CreateEx(width, height, FPDF_BITMAP_BGRA, bufPtr, width * 4)
@@ -206,12 +198,12 @@ function transformImage(m: Pdfium, page: number, edit: ImageEditInput): void {
 
 /** Swap the image object's pixels for a new bitmap (matrix untouched: the footprint,
     z-order and any original rotation stay), then apply the shared geometry pass */
-function replaceImage(m: Pdfium, page: number, edit: ImageEditInput): void {
+async function replaceImage(m: Pdfium, page: number, edit: ImageEditInput): Promise<void> {
   if (edit.kind !== 'replaceImage') return
   const target = matchImage(collectObjects(m, page), edit.oldRect)
   if (!target) throw new Error('the image could not be located on the page')
   if (edit.layer) moveToLayer(m, page, target.obj, edit.layer)
-  const { width, height, bgra } = decodeImage(edit.image)
+  const { width, height, bgra } = await decodeImage(edit.image)
   const bufPtr = m._malloc(bgra.length)
   m.HEAPU8.set(bgra, bufPtr)
   const bmp = m._FPDFBitmap_CreateEx(width, height, FPDF_BITMAP_BGRA, bufPtr, width * 4)
@@ -270,9 +262,9 @@ export function applyImageEdits(
           // Objects are re-collected inside each op: every mutation shifts indices
           for (const { edit, editIndex } of pageEdits) {
             try {
-              if (edit.kind === 'insertImage') insertImage(m, doc, page, edit)
+              if (edit.kind === 'insertImage') await insertImage(m, doc, page, edit)
               else if (edit.kind === 'transformImage') transformImage(m, page, edit)
-              else if (edit.kind === 'replaceImage') replaceImage(m, page, edit)
+              else if (edit.kind === 'replaceImage') await replaceImage(m, page, edit)
               else deleteImage(m, page, edit)
               applied++
             } catch (err) {
@@ -363,15 +355,14 @@ export function renderImagePng(
           const stride = m._FPDFBitmap_GetStride(bmp)
           const buf = m._FPDFBitmap_GetBuffer(bmp)
           if (!w || !h || !buf) return null
-          const tight = Buffer.alloc(w * h * 4)
+          const tight = new Uint8Array(w * h * 4)
           for (let row = 0; row < h; row++) {
             tight.set(
               m.HEAPU8.subarray(buf + row * stride, buf + row * stride + w * 4),
               row * w * 4,
             )
           }
-          const png = nativeImage.createFromBitmap(tight, { width: w, height: h }).toPNG()
-          return png.toString('base64')
+          return await pdfImageCodec().encodePng(tight, w, h)
         } finally {
           m._FPDFBitmap_Destroy(bmp)
         }
@@ -441,9 +432,8 @@ export function renderPagePreviewPng(
             turns,
             flags,
           )
-          const tight = Buffer.from(m.HEAPU8.subarray(bufPtr, bufPtr + w * h * 4))
-          const png = nativeImage.createFromBitmap(tight, { width: w, height: h }).toPNG()
-          return png.toString('base64')
+          const tight = m.HEAPU8.slice(bufPtr, bufPtr + w * h * 4)
+          return await pdfImageCodec().encodePng(tight, w, h)
         } finally {
           m._FPDFBitmap_Destroy(bmp)
           m._free(bufPtr)
