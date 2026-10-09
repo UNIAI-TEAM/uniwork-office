@@ -7930,7 +7930,8 @@ export default function App() {
                 </button>
               </div>
             )}
-            {selPopup && (
+            {/* read-only without AI leaves the popup with nothing in it */}
+            {selPopup && (!readOnly || cap('ai')) && (
               <div
                 className="pdf-sel-popup"
                 style={{ left: selPopup.x, top: selPopup.y }}
