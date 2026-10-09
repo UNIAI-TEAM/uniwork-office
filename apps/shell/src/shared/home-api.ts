@@ -109,6 +109,94 @@ export interface McpStatus {
   error?: string
 }
 
+export type UniworkDocFormat = 'docx' | 'xlsx' | 'pptx' | 'pdf' | 'md' | 'html'
+export type UniworkDocAccess = 'edit' | 'view'
+export type UniworkSaveState =
+  | 'ready'
+  | 'dirty'
+  | 'saving'
+  | 'saved'
+  | 'conflict'
+  | 'blocked'
+  | 'offline'
+  | 'signed-out'
+  | 'error'
+export type UniworkDocErrorCode =
+  | 'not_signed_in'
+  | 'session_expired'
+  | 'wrong_deployment'
+  | 'forbidden'
+  | 'not_found'
+  | 'deleted'
+  | 'conflict'
+  | 'quota_exceeded'
+  | 'too_large'
+  | 'unsupported_format'
+  | 'engine_incompatible'
+  | 'idempotency_mismatch'
+  | 'ticket_invalid'
+  | 'ticket_expired'
+  | 'network'
+  | 'timeout'
+  | 'server_error'
+  | 'malformed_response'
+
+export interface UniworkWorkspaceRef {
+  id: string
+  name: string
+  orgId: string
+}
+
+export interface UniworkDocSummary {
+  id: string
+  workspaceId: string
+  title: string
+  format: UniworkDocFormat | null
+  updatedAt: string
+  updatedByName?: string
+}
+
+export interface UniworkDocListQuery {
+  workspaceId: string
+  query?: string
+  cursor?: string
+  limit?: number
+}
+
+export type UniworkResult<T> = { ok: true; value: T } | { ok: false; error: UniworkDocErrorCode }
+
+export interface UniworkDocListPage {
+  documents: UniworkDocSummary[]
+  nextCursor: string | null
+}
+
+export interface UniworkDocStatus {
+  path: string
+  documentId: string
+  workspaceId: string
+  title: string
+  format: UniworkDocFormat
+  access: UniworkDocAccess
+  state: UniworkSaveState
+  error?: UniworkDocErrorCode
+  lastSavedAt?: string
+}
+
+export type UniworkConflictChoice = 'overwrite' | 'save-local-copy' | 'open-latest' | 'later'
+
+export type UniworkLaunchEvent =
+  | { phase: 'opening'; title?: string }
+  | { phase: 'opened'; path: string; title: string }
+  | { phase: 'needs-sign-in' }
+  | { phase: 'failed'; error: UniworkDocErrorCode }
+
+export interface RecentUniworkSource {
+  documentId: string
+  workspaceId: string
+  title: string
+  access: UniworkDocAccess
+}
+
 /** a recent file entry shown on the home screen; type derives from the extension */
 export interface RecentEntry {
   path: string
@@ -124,6 +212,8 @@ export interface RecentEntry {
   /** the path failed to stat (disconnected drive, moved, deleted) — kept
       listed like Word's recents instead of silently dropped (r158) */
   missing?: boolean
+  /** set when the file is a working copy of a UniWork document */
+  uniwork?: RecentUniworkSource
 }
 
 /** paged query for the home file lists */
@@ -455,6 +545,15 @@ export interface HomeApi {
   }): Promise<{ ok: boolean; error?: string }>
   /** Local Workbench SQLite store (main-process source of truth) */
   wb: WorkbenchStoreApi
+  uniworkListWorkspaces(): Promise<UniworkResult<UniworkWorkspaceRef[]>>
+  uniworkListDocuments(query: UniworkDocListQuery): Promise<UniworkResult<UniworkDocListPage>>
+  uniworkOpenDocument(documentId: string): Promise<UniworkResult<{ path: string }>>
+  uniworkDocStatus(path: string): Promise<UniworkDocStatus | null>
+  uniworkActiveDocStatus(): Promise<UniworkDocStatus | null>
+  onUniworkDocStatus(cb: (status: UniworkDocStatus) => void): () => void
+  uniworkSave(path: string): Promise<UniworkDocStatus | null>
+  uniworkResolveConflict(path: string): Promise<UniworkDocStatus | null>
+  onUniworkLaunch(cb: (event: UniworkLaunchEvent) => void): () => void
 }
 
 /** IndexedDB media blobs embedded in Workbench ZIP backup (optional). */
@@ -960,6 +1059,19 @@ export const HOME_CHANNELS = {
   wbImportKeys: 'home:wb-import-keys',
   wbExportBackup: 'home:wb-export-backup',
   wbImportBackup: 'home:wb-import-backup',
+} as const
+
+/** UniWork documents (open/save against UniWork); handlers live in main/uniwork-docs */
+export const UNIWORK_DOC_CHANNELS = {
+  listWorkspaces: 'uniwork-doc:list-workspaces',
+  listDocuments: 'uniwork-doc:list-documents',
+  openDocument: 'uniwork-doc:open-document',
+  docStatus: 'uniwork-doc:status',
+  activeDocStatus: 'uniwork-doc:active-status',
+  docStatusEvent: 'uniwork-doc:status-event',
+  save: 'uniwork-doc:save',
+  resolveConflict: 'uniwork-doc:resolve-conflict',
+  launchEvent: 'uniwork-doc:launch-event',
 } as const
 
 export const PROJECT_CHANNELS = {
