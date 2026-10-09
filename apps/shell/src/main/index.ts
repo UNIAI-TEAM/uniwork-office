@@ -273,12 +273,14 @@ import {
 import type { TabKind } from '../shared/tabs-api'
 import { TABS_CHANNELS } from '../shared/tabs-api'
 import { showErrorDialog } from './error-dialog'
+import { flushPdfForExport } from './pdf-flush'
 import { startRendererWatchdog } from './renderer-watchdog'
 import {
   capStatPaths,
-  matchesExtFamily,
-  normalizeRecentQuery,
+  enrichWithUniwork,
   pageRecentPaths,
+  pageStarredPaths,
+  type RecentUniworkLookup,
   statPathEntries,
 } from './recent-files'
 import { isMoveSource, isUserVisibleFile, type FileTargetSources } from './file-targets'
@@ -4064,6 +4066,10 @@ function statEntries(paths: string[]): RecentEntry[] {
   return statPathEntries(paths, new Set(readStarredFiles()))
 }
 
+/** recents, starred and search share one rule for UniWork working copies */
+const uniworkRecentLookup: RecentUniworkLookup = (path) =>
+  uniworkDocs ? uniworkDocs.service.recentSource(path) : null
+
 function registerHomeIpc(): void {
   // UniWork account (desktop PKCE sign-in): the manager in ./uniwork-auth owns
   // tokens and state; the renderer only gets AccountStatus pushes.
@@ -4114,9 +4120,7 @@ function registerHomeIpc(): void {
   )
 
   ipcMain.handle(HOME_CHANNELS.recents, (_event, query: unknown): RecentPage =>
-    pageRecentPaths(readRecentFiles(), query, new Set(readStarredFiles()), (path) =>
-      uniworkDocs ? uniworkDocs.service.recentSource(path) : null,
-    ),
+    pageRecentPaths(readRecentFiles(), query, new Set(readStarredFiles()), uniworkRecentLookup),
   )
 
   ipcMain.handle(HOME_CHANNELS.searchFiles, (_event, raw: unknown): FileSearchPage => {
@@ -4134,9 +4138,14 @@ function registerHomeIpc(): void {
     const limit = Number.isFinite(query.limit) ? Math.max(0, Math.floor(query.limit!)) : 50
     const starred = new Set(readStarredFiles())
     const result = q ? fileIndexStore.search(q, { exts, offset, limit }) : { hits: [], total: 0 }
+    const hits = enrichWithUniwork(
+      result.hits.map((h) => ({ ...h, starred: starred.has(h.path) })),
+      uniworkRecentLookup,
+    )
     return {
-      hits: result.hits.map((h) => ({ ...h, starred: starred.has(h.path) })),
-      total: result.total,
+      hits,
+      // another account's copies are dropped from the page, so the count follows
+      total: Math.max(hits.length, result.total - (result.hits.length - hits.length)),
       index: indexer.progress(),
     }
   })
@@ -4180,17 +4189,9 @@ function registerHomeIpc(): void {
     probeDecision(normalizeFileSearchSettings(input)),
   )
 
-  // Starred files sort by mtime, which requires stat-ing them all first; they are hand-picked and few, so this is fine
-  ipcMain.handle(HOME_CHANNELS.starred, (_event, query: unknown): RecentPage => {
-    const { offset, limit, ext } = normalizeRecentQuery(query)
-    const all = statEntries(readStarredFiles()).sort((a, b) => b.mtimeMs - a.mtimeMs)
-    const filtered = ext ? all.filter((entry) => matchesExtFamily(entry.ext, ext)) : all
-    return {
-      entries: limit === 0 ? [] : filtered.slice(offset, offset + limit),
-      total: filtered.length,
-      totalAll: all.length,
-    }
-  })
+  ipcMain.handle(HOME_CHANNELS.starred, (_event, query: unknown): RecentPage =>
+    pageStarredPaths(readStarredFiles(), query, uniworkRecentLookup),
+  )
 
   ipcMain.handle(HOME_CHANNELS.statPaths, (_event, paths: unknown): RecentEntry[] =>
     statEntries(capStatPaths(stringPaths(paths))),
@@ -5540,7 +5541,7 @@ async function exportPdfAsDocxLocal(): Promise<void> {
   }
   exportingPdfDocx = true
   try {
-    if (!(await flushPdfSave(tab.webContents))) return
+    if (!(await flushPdfForExport(flushPdfSave, tab.webContents))) return
     const picked = await showSaveDialogWithMemory(dialog, host, {
       defaultPath: tab.filePath.replace(/\.pdf$/i, '.docx'),
       filters: [{ name: tm('filterWord'), extensions: ['docx'] }],
@@ -5680,7 +5681,7 @@ async function exportPdfAsPptxLocal(): Promise<void> {
   }
   exportingPdfDocx = true
   try {
-    if (!(await flushPdfSave(tab.webContents))) return
+    if (!(await flushPdfForExport(flushPdfSave, tab.webContents))) return
     const picked = await showSaveDialogWithMemory(dialog, host, {
       defaultPath: tab.filePath.replace(/\.pdf$/i, '.pptx'),
       filters: [{ name: tm('filterPpt'), extensions: ['pptx'] }],
@@ -5791,7 +5792,7 @@ async function exportPdfAsXlsxLocal(): Promise<void> {
   }
   exportingPdfDocx = true
   try {
-    if (!(await flushPdfSave(tab.webContents))) return
+    if (!(await flushPdfForExport(flushPdfSave, tab.webContents))) return
     const picked = await showSaveDialogWithMemory(dialog, host, {
       defaultPath: tab.filePath.replace(/\.pdf$/i, '.xlsx'),
       filters: [{ name: tm('filterExcel'), extensions: ['xlsx'] }],

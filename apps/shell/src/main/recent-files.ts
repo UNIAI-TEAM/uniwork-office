@@ -97,6 +97,47 @@ export function matchesExtFamily(entryExt: string, filterExt: string): boolean {
  */
 export type RecentUniworkLookup = (path: string) => RecentUniworkSource | 'hidden' | null
 
+/**
+ * Starred files sort by mtime, which requires stat-ing them all first; they are
+ * hand-picked and few, so this is fine. Applies the same UniWork lookup as recents:
+ * copies of another account or deployment are hidden, bound ones carry `uniwork`.
+ */
+export function pageStarredPaths(
+  paths: readonly string[],
+  raw: unknown,
+  uniwork?: RecentUniworkLookup,
+): RecentPage {
+  const { offset, limit, ext } = normalizeRecentQuery(raw)
+  const all = enrichWithUniwork(statPathEntries(paths, new Set(paths)), uniwork).sort(
+    (a, b) => b.mtimeMs - a.mtimeMs,
+  )
+  const filtered = ext ? all.filter((entry) => matchesExtFamily(entry.ext, ext)) : all
+  return {
+    entries: limit === 0 ? [] : filtered.slice(offset, offset + limit),
+    total: filtered.length,
+    totalAll: all.length,
+  }
+}
+
+/**
+ * Drops entries bound to another account or deployment and tags bound ones with
+ * their UniWork document. Shared by starred and search results; without a lookup
+ * the list is returned untouched.
+ */
+export function enrichWithUniwork<T extends RecentEntry>(
+  entries: readonly T[],
+  uniwork?: RecentUniworkLookup,
+): T[] {
+  if (!uniwork) return [...entries]
+  const out: T[] = []
+  for (const entry of entries) {
+    const source = uniwork(entry.path)
+    if (source === 'hidden') continue
+    out.push(source ? { ...entry, uniwork: source } : entry)
+  }
+  return out
+}
+
 /** Page over the recents paths, preserving the source's newest-first order (unavailable paths stay, flagged missing). */
 export function pageRecentPaths(
   paths: readonly string[],
