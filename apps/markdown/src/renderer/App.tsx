@@ -59,7 +59,7 @@ import { decodeImageDataUrl, toDocxImage } from './export/exportImage'
 import { buildPrintHtml } from './export/printHtml'
 import { diagramSvgToPng, renderDiagram } from './editor/diagrams'
 import type { DiagramLanguage } from './editor/diagrams'
-import type { ExportFormat, SaveMode } from '../shared/ipc'
+import type { ExportFormat, SaveMode, UniworkViewState } from '../shared/ipc'
 import { uiOp } from './editor/ops'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
@@ -162,6 +162,10 @@ export default function App() {
   editQueueRef.current = editQueue
   const queueSeqRef = useRef(0)
   const [autoSave, setAutoSave] = useAutoSavePref('mdapp.autoSave', window.markdownApi)
+  // a UniWork copy never autosaves; a view-only one is not editable
+  const [uniwork, setUniwork] = useState<UniworkViewState>({ bound: false, readOnly: false })
+  const uniworkRef = useRef(uniwork)
+  uniworkRef.current = uniwork
   const [showFind, setShowFind] = useState(false)
   const [findFocus, setFindFocus] = useState<FindFocusRequest>({ field: 'find', nonce: 0 })
   const [outlineOpen, setOutlineOpen] = useState(false)
@@ -283,6 +287,27 @@ export default function App() {
     setImageBaseDir(filePath ? dirOf(filePath) : null)
   }, [filePath])
 
+  useEffect(() => {
+    let live = true
+    if (!filePath) {
+      setUniwork({ bound: false, readOnly: false })
+      return
+    }
+    void window.markdownApi
+      .uniworkState()
+      .then((state) => {
+        if (live) setUniwork(state)
+      })
+      .catch(() => {})
+    return () => {
+      live = false
+    }
+  }, [filePath])
+
+  useEffect(() => {
+    editor?.setEditable(!uniwork.readOnly)
+  }, [editor, uniwork.readOnly])
+
   /**
    * Read `path` and put it on the surface its extension calls for. Shared by
    * the initial load and by a rename that crossed surfaces, so a file cannot
@@ -376,8 +401,9 @@ export default function App() {
    * holds it, with the file's own BOM and line endings restored — no markdown
    * serialization, no image extraction, no trailing-newline fixups.
    */
-  const doSaveSource = useCallback(async (mode: SaveMode): Promise<boolean> => {
+  const doSaveSource = useCallback(async (mode: SaveMode, origin?: 'auto'): Promise<boolean> => {
     if (statusRef.current !== 'ready' || savingRef.current) return false
+    if (mode === 'save' && uniworkRef.current.readOnly) return false
     savingRef.current = true
     setSaveState('saving')
     const textAtSave = sourceTextRef.current
@@ -386,6 +412,7 @@ export default function App() {
         text: writeSourceText(textAtSave, sourceFormatRef.current),
         imageSources: [],
         mode,
+        ...(origin ? { origin } : {}),
       })
       if (result.ok && 'path' in result) {
         // an edit that landed mid-write is still unsaved
@@ -503,11 +530,12 @@ export default function App() {
 
   /** Serialize and write to disk; false when canceled/failed (caller keeps the tab open) */
   const doSave = useCallback(
-    async (mode: SaveMode, suggestedName?: string): Promise<boolean> => {
-      if (sourceMode) return doSaveSource(mode)
+    async (mode: SaveMode, suggestedName?: string, origin?: 'auto'): Promise<boolean> => {
+      if (sourceMode) return doSaveSource(mode, origin)
       flushSource()
       const current = editorRef.current
       if (!current || statusRef.current !== 'ready' || savingRef.current) return false
+      if (mode === 'save' && uniworkRef.current.readOnly) return false
       savingRef.current = true
       setSaveState('saving')
       try {
@@ -524,7 +552,13 @@ export default function App() {
           sourceAtSave,
         )
         const imageSources = imageSourcesFromEditor(current)
-        const result = await window.markdownApi.save({ text, imageSources, mode, suggestedName })
+        const result = await window.markdownApi.save({
+          text,
+          imageSources,
+          mode,
+          suggestedName,
+          ...(origin ? { origin } : {}),
+        })
         if (result.ok && 'path' in result) {
           const unchanged =
             editorRef.current?.state.doc === docAtSave &&
@@ -928,11 +962,11 @@ export default function App() {
   // (same policy as the docs app; untitled documents are skipped — the first
   // save must go through the explicit save path that names the file)
   useEffect(() => {
-    if (!autoSave || !filePath) return
+    if (!autoSave || !filePath || uniwork.bound) return
     const tick = () => {
       if (!dirtyRef.current) return
       if (editorRef.current?.view.composing) return // don't interrupt IME input
-      void doSave('save')
+      void doSave('save', undefined, 'auto')
     }
     const id = window.setInterval(tick, 30_000)
     window.addEventListener('blur', tick)
@@ -940,7 +974,7 @@ export default function App() {
       window.clearInterval(id)
       window.removeEventListener('blur', tick)
     }
-  }, [autoSave, filePath, doSave])
+  }, [autoSave, filePath, uniwork.bound, doSave])
 
   // ---- selection-scoped AI edit queue (anchors live in the editor as decorations) ----
   const getQueueItem = useCallback(
@@ -1079,6 +1113,8 @@ export default function App() {
         onFind={() => openFind(false)}
         autoSave={autoSave}
         onToggleAutoSave={setAutoSave}
+        uniworkBound={uniwork.bound}
+        readOnly={uniwork.readOnly}
         imageEnabled={Boolean(filePath)}
         onInsertImage={insertImage}
         onImageHost={() => setImageHostOpen(true)}

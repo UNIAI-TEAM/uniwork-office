@@ -42,6 +42,10 @@ interface Props {
   onFind: () => void
   autoSave: boolean
   onToggleAutoSave: (on: boolean) => void
+  /** a UniWork copy: AutoSave is forced off and Save always writes, even when clean */
+  uniworkBound?: boolean
+  /** a view-only UniWork copy: editing and Save are off, Save As still makes a local copy */
+  readOnly?: boolean
   imageEnabled: boolean
   onInsertImage: () => void
   /** open the image host configuration (genoffice#388) */
@@ -172,13 +176,15 @@ function IconBtn({
 
 export function Ribbon({
   editor,
-  disabled,
+  disabled: notReady,
   dirty,
   onSave,
   onSaveAs,
   onFind,
   autoSave,
   onToggleAutoSave,
+  uniworkBound = false,
+  readOnly = false,
   imageEnabled,
   onInsertImage,
   onImageHost,
@@ -198,6 +204,7 @@ export function Ribbon({
   sourceHistory,
 }: Props) {
   const { t } = useI18n()
+  const disabled = notReady || readOnly
   const collapse = useRibbonCollapse('mdapp.ribbonCollapsed', {
     collapse: t('ribbonCollapse'),
     expand: t('ribbonExpand'),
@@ -290,7 +297,7 @@ export function Ribbon({
           className="qa-btn"
           data-tip={t('save')}
           aria-label={t('save')}
-          disabled={disabled || !dirty}
+          disabled={disabled || (!dirty && !uniworkBound)}
           onMouseDown={(e) => e.preventDefault()}
           onClick={onSave}
         >
@@ -301,7 +308,7 @@ export function Ribbon({
           className="qa-btn qa-save-as"
           data-tip={t('saveAs')}
           aria-label={t('saveAs')}
-          disabled={disabled}
+          disabled={notReady}
           onMouseDown={(e) => e.preventDefault()}
           onClick={onSaveAs}
         >
@@ -344,12 +351,16 @@ export function Ribbon({
         >
           <IconSearch size={16} />
         </button>
-        <label className={`autosave-toggle${autoSave ? ' on' : ''}`} data-tip={t('autoSaveTip')}>
+        <label
+          className={`autosave-toggle${autoSave && !uniworkBound ? ' on' : ''}`}
+          data-tip={t(uniworkBound ? 'autoSaveUniworkOff' : 'autoSaveTip')}
+        >
           <span className="autosave-knob" />
           <span className="autosave-text">{t('autoSave')}</span>
           <input
             type="checkbox"
-            checked={autoSave}
+            checked={autoSave && !uniworkBound}
+            disabled={uniworkBound}
             onChange={(e) => onToggleAutoSave(e.target.checked)}
           />
         </label>

@@ -14,6 +14,7 @@ export const MARKDOWN_CHANNELS = {
   consumePending: 'markdown:consume-pending',
   readFile: 'markdown:read-file',
   save: 'markdown:save',
+  uniworkState: 'markdown:uniwork-state',
   saveRequest: 'markdown:save-request',
   saveRequestAck: 'markdown:save-request-ack',
   readTextRequest: 'markdown:read-text-request',
@@ -112,12 +113,19 @@ export interface AutoSaveDefault {
 
 export type SaveMode = 'save' | 'saveAs'
 
+export interface UniworkViewState {
+  bound: boolean
+  readOnly: boolean
+}
+
 export interface SaveMarkdownRequest {
   /** full document text (frontmatter included) */
   text: string
   /** Authored image paths in document order; the main process validates every path. */
   imageSources: string[]
   mode: SaveMode
+  /** 'auto' = the AutoSave timer/blur save; absent = an explicit user save */
+  origin?: 'user' | 'auto'
   /**
    * Silent first save for an untitled document (AI auto-naming): saves to a
    * unique path under Documents derived from this name, without a dialog.
@@ -216,6 +224,8 @@ export interface MarkdownApi {
    * save dialog first. The resolved path is granted to the view and returned.
    */
   save(request: SaveMarkdownRequest): Promise<SaveMarkdownResult>
+  /** Whether this view's document is a UniWork copy (AutoSave off) and whether it is view only */
+  uniworkState(): Promise<UniworkViewState>
   /** Mirror unsaved-changes state to the main process; drives the save prompt before closing a tab/window */
   setDirty(dirty: boolean): void
   /** Shell menu Save / Save As → renderer serializes and calls save() with the given mode */

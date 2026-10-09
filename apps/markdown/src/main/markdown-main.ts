@@ -1,4 +1,10 @@
-import { setUniworkUserSaveHook } from './uniwork-policy'
+import {
+  notifyUniworkUserSave,
+  setUniworkUserSaveHook,
+  uniworkIsBound,
+  uniworkIsReadOnly,
+  uniworkSaveDecision,
+} from './uniwork-policy'
 import { existsSync } from 'node:fs'
 import { readFile, writeFile } from 'node:fs/promises'
 import { basename, dirname, extname, join, relative, resolve } from 'node:path'
@@ -67,6 +73,7 @@ import type {
   ExportResult,
   ImageData,
   SaveMarkdownRequest,
+  UniworkViewState,
   SaveMarkdownResult,
   SaveMode,
 } from '../shared/ipc'
@@ -400,6 +407,8 @@ const dirtyByWc = new Set<number>()
 const closeSaveWaiters = new Map<number, (ok: boolean) => void>()
 /** Resolvers for menu-triggered saves, resolved when the renderer's save invoke completes */
 const saveWaiters = new Map<number, (ok: boolean) => void>()
+/** Views whose next save was started by markdownSaveToPath (agent/MCP), not by the user */
+const mcpSaveByWc = new Set<number>()
 /** Resolvers for MCP reads of the live document text, resolved by the renderer's reply */
 const readTextWaiters = new Map<number, (result: { text: string } | { error: string }) => void>()
 /** one read per tab at a time: concurrent callers share this promise */
@@ -523,7 +532,9 @@ export async function markdownDiscardPendingAssets(contents: WebContents): Promi
 /** Menu Save / Save As: ask the renderer to serialize and save; clean views resolve true immediately on plain save */
 export function requestMarkdownSave(contents: WebContents, mode: SaveMode): Promise<boolean> {
   if (contents.isDestroyed()) return Promise.resolve(false)
-  if (mode === 'save' && !dirtyByWc.has(contents.id) && savePathByWc.has(contents.id)) {
+  // a UniWork copy always writes on an explicit Save, so a Retry after a failed upload has bytes to send
+  const path = savePathByWc.get(contents.id)
+  if (mode === 'save' && !dirtyByWc.has(contents.id) && path && !uniworkIsBound(path)) {
     return Promise.resolve(true)
   }
   return new Promise<boolean>((resolve) => {
@@ -617,11 +628,14 @@ export function markdownSaveToPath(contents: WebContents, filePath: string): Pro
     }
     const timer = setTimeout(() => {
       saveWaiters.delete(wcId)
+      mcpSaveByWc.delete(wcId)
       restore()
       reject(new Error('timed out saving the document'))
     }, 120_000)
+    mcpSaveByWc.add(wcId)
     saveWaiters.set(wcId, (ok) => {
       clearTimeout(timer)
+      mcpSaveByWc.delete(wcId)
       if (ok) resolve()
       else {
         restore()
@@ -763,11 +777,17 @@ function registerMarkdownIpc(): void {
     return await readFile(path, 'utf8')
   })
 
+  ipcMain.handle(MARKDOWN_CHANNELS.uniworkState, (e): UniworkViewState => {
+    const path = savePathByWc.get(e.sender.id)
+    return { bound: uniworkIsBound(path), readOnly: uniworkIsReadOnly(path) }
+  })
+
   ipcMain.handle(
     MARKDOWN_CHANNELS.save,
     async (e, request: SaveMarkdownRequest): Promise<SaveMarkdownResult> => {
       const waiter = saveWaiters.get(e.sender.id)
       saveWaiters.delete(e.sender.id)
+      const mcp = mcpSaveByWc.delete(e.sender.id)
       const done = (result: SaveMarkdownResult): SaveMarkdownResult => {
         waiter?.(result.ok && !('canceled' in result))
         return result
@@ -795,6 +815,18 @@ function registerMarkdownIpc(): void {
         if (!target) return done({ ok: false, error: 'markdown: no save target' })
         const currentPath = pathAtRequest
         const isNewPath = currentPath !== target
+        const uniwork = uniworkSaveDecision({
+          origin: request.origin === 'auto' ? 'auto' : 'user',
+          mode,
+          currentPath,
+          targetPath: target,
+          mcp,
+        })
+        if (!uniwork.write) {
+          // AutoSave never writes a UniWork copy; a view-only copy is never written
+          if (request.origin === 'auto') return done({ ok: true, canceled: true })
+          return done({ ok: false, error: 'markdown: this document is view only' })
+        }
         const imageSources = [...(request.imageSources ?? [])]
         const knownImageSources = new Set(imageSources)
         for (const source of extractMarkdownImageSources(request.text)) {
@@ -844,6 +876,7 @@ function registerMarkdownIpc(): void {
           }
         }
         if (isNewPath) fileSavedHook?.(e.sender, target)
+        if (uniwork.fireHook) notifyUniworkUserSave(target)
         return done({
           ok: true,
           path: target,
