@@ -275,6 +275,25 @@ describe('media settings', () => {
     expect(shownMediaProvider(defaultAiMediaSettings(), 'image', offered)).toBe('genspark')
   })
 
+  it('shows the BYOK vendor that serves after an explicit cloud pick when the cloud is switched off', () => {
+    setUniworkCloudStatus(CLOUD_READY)
+    const settings = defaultAiSettings()
+    // a usable key for a vendor that is not first in the catalog
+    settings.media!.providers.qwen.apiKey = 'sk-qwen'
+    const cloudMedia = setMediaProviderChoice(settings.media!, 'image', 'genspark')
+    const catalog = visibleMediaProviders()
+    const withCloud = offeredMediaProviders(catalog, 'image', true)
+    const withoutCloud = offeredMediaProviders(catalog, 'image', false)
+    expect(shownMediaProvider(cloudMedia, 'image', withCloud)).toBe('genspark')
+    // the AI model switch is off: the picker shows what the runtime serves
+    const off = { ...settings, media: cloudMedia, gskToolsEnabled: false }
+    expect(activeMediaProvider(off, 'image')).toBe('qwen')
+    expect(shownMediaProvider(cloudMedia, 'image', withoutCloud)).toBe('qwen')
+    // nothing usable: the first offered vendor shows, with no key yet
+    const keyless = setMediaProviderChoice(defaultAiMediaSettings(), 'image', 'genspark')
+    expect(shownMediaProvider(keyless, 'image', withoutCloud)).toBe(withoutCloud[0]!.id)
+  })
+
   it('offers the cloud entry in a picker only while its tools are on (signed in, entitled, switch on)', () => {
     setUniworkCloudStatus(CLOUD_READY)
     const catalog = visibleMediaProviders()

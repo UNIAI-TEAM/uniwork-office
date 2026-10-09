@@ -392,7 +392,9 @@ export function offeredMediaProviders(
  * that block lists): the stored choice when the block offers it, except that a
  * default `genspark` shows the BYOK vendor that actually serves the capability
  * (see activeMediaProvider), and a stored choice the block does not offer
- * shows as its first entry.
+ * shows as its first entry. An explicit cloud pick whose entry is no longer
+ * offered (AI model switch off, signed out) shows the BYOK vendor that serves
+ * the capability now, or the first entry (no key yet) when none is usable.
  */
 export function shownMediaProvider(
   media: AiMediaSettings,
@@ -400,9 +402,16 @@ export function shownMediaProvider(
   offered: readonly AiMediaProviderMeta[],
 ): AiMediaProviderId {
   const stored = storedMediaProvider(media, capability)
-  if ((!stored || stored === 'genspark') && media.cloudPicked?.[capability] !== true) {
-    const byok = firstUsableByok(media, capability, offered)
-    if (byok) return byok.id
+  if (!stored || stored === 'genspark') {
+    // a cloud choice only shows while the block offers the cloud entry; otherwise (a
+    // default, or an explicit pick whose cloud is now off) the runtime serves the first
+    // usable BYOK vendor, so the picker shows that one
+    const cloudShown =
+      media.cloudPicked?.[capability] === true && offered.some((m) => m.id === 'genspark')
+    if (!cloudShown) {
+      const byok = firstUsableByok(media, capability, offered)
+      if (byok) return byok.id
+    }
   }
   return (offered.find((m) => m.id === stored) ?? offered[0])?.id ?? stored ?? 'genspark'
 }
@@ -459,7 +468,8 @@ export function visibleMediaProviders(): AiMediaProviderMeta[] {
  * the first offered provider when the stored choice is not offered, so the shown
  * vendor is written into the capability's provider field only then, and only once
  * its resulting config is usable; a keyless edit must not pin a vendor that would
- * switch off a capability another vendor currently serves.
+ * switch off a capability another vendor currently serves. An explicit cloud
+ * pick stays stored while the cloud is off, so it resumes when the cloud is back.
  */
 export function updateMediaProviderConfig(
   media: AiMediaSettings,

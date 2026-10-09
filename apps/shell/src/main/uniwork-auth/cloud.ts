@@ -535,8 +535,11 @@ export class UniworkCloudController {
       }
     }
     if (generation !== this.generation) return this.current
-    // any answer from the server (even "off") ends the retry cycle; a failure that left a status keeps it
-    if (answered || next.state !== 'unavailable') this.clearRetry()
+    // an answer from the server (even "off") ends the retry cycle, except that "unavailable"
+    // (no tool configured yet, a deploy-time condition) is re-read slowly so it heals on
+    // its own; a failure that left a status keeps its pending retry
+    if (answered && next.state === 'unavailable') this.scheduleRetry()
+    else if (answered || next.state !== 'unavailable') this.clearRetry()
     this.set(next, account.orgId)
     return next
   }
