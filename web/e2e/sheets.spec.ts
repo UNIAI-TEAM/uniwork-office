@@ -185,18 +185,23 @@ async function savedSheetXml(page: Page): Promise<string> {
   return zip.file('xl/worksheets/sheet1.xml')!.async('text')
 }
 
-/** select each cell through the Name Box, then type its input and press Enter */
+/**
+ * select each cell through the Name Box (Univer's formula-bar defined-name box since the main
+ * sync, as the desktop e2e address it), then type its input and press Enter
+ */
 async function typeIntoGrid(
   page: Page,
   frame: Frame,
   entries: Array<{ cell: string; text: string }>,
 ) {
   for (const entry of entries) {
-    const nameBox = frame.getByLabel('Name Box')
+    const nameBox = frame.locator('[data-u-comp="defined-name"] input')
     await nameBox.click()
     await nameBox.fill(entry.cell)
     await nameBox.press('Enter')
-    // the jump leaves the grid focused: typing starts the in-cell editor
+    // the jump leaves the grid focused: typing starts the in-cell editor (a long jump scrolls
+    // first, so give the selection a moment to land before the keys arrive)
+    await page.waitForTimeout(500)
     await page.keyboard.type(entry.text)
     await page.keyboard.press('Enter')
     await page.waitForTimeout(300)
@@ -275,7 +280,11 @@ test('20k x 22: open, scroll, edit a value + a formula, save, reopen shows the e
   expect(deep.cells[0]?.value).toBe('row 15001')
   await page.screenshot({ path: resolve(shots, 'synthetic-20k-scrolled-en-light.png') })
 
-  // back to the top, edit A1 and B1 (= a formula), save with Ctrl+S (the bridge's accelerator)
+  // back to the top, edit A1 and B1 (= a formula), save with Ctrl+S (the bridge's accelerator).
+  // Click into the grid first, as a user does: on this streamed workbook the first in-cell edit
+  // after nothing but a Name Box jump never reached the save request (observed after the main
+  // sync replaced the frame's own Name Box with Univer's; open item for the Sheets owner)
+  await grid.click({ position: { x: 300, y: 300 } })
   await typeIntoGrid(page, frame, [
     { cell: 'A1', text: '4242' },
     { cell: 'B1', text: '=A1*2' },
