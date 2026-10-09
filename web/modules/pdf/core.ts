@@ -6,6 +6,7 @@
 import type * as SavePdf from '../../../apps/pdf/src/main/save-pdf'
 import type * as TextEdit from '../../../apps/pdf/src/main/text-edit'
 import type * as ImageEdit from '../../../apps/pdf/src/main/image-edit'
+import type * as BlankPdf from '../../../apps/pdf/src/main/blank-pdf'
 
 export interface PdfCore {
   applyAndVerifySaveRequest: typeof SavePdf.applyAndVerifySaveRequest
@@ -26,6 +27,7 @@ export interface PdfCore {
   listPageImages: typeof ImageEdit.listPageImages
   renderImagePng: typeof ImageEdit.renderImagePng
   renderPagePreviewPng: typeof ImageEdit.renderPagePreviewPng
+  blankPdfBuffer: typeof BlankPdf.blankPdfBuffer
 }
 
 let core: Promise<PdfCore> | null = null
@@ -35,8 +37,9 @@ export function loadPdfCore(): Promise<PdfCore> {
     import('../../../apps/pdf/src/main/save-pdf'),
     import('../../../apps/pdf/src/main/text-edit'),
     import('../../../apps/pdf/src/main/image-edit'),
+    import('../../../apps/pdf/src/main/blank-pdf'),
   ]).then(
-    ([save, text, image]) => ({
+    ([save, text, image, blank]) => ({
       applyAndVerifySaveRequest: save.applyAndVerifySaveRequest,
       readStaticFormFills: save.readStaticFormFills,
       extractPagesBytes: save.extractPagesBytes,
@@ -55,6 +58,7 @@ export function loadPdfCore(): Promise<PdfCore> {
       listPageImages: image.listPageImages,
       renderImagePng: image.renderImagePng,
       renderPagePreviewPng: image.renderPagePreviewPng,
+      blankPdfBuffer: blank.blankPdfBuffer,
     }),
     (err: unknown) => {
       core = null

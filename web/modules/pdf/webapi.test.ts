@@ -57,6 +57,7 @@ function fakeCore(): PdfCore & { calls: string[] } {
     listPageImages: async () => [],
     renderImagePng: async () => null,
     renderPagePreviewPng: async () => null,
+    blankPdfBuffer: async () => Buffer.from(PDF('blank')),
   } as PdfCore & { calls: string[] }
 }
 
@@ -138,6 +139,19 @@ describe('open and the working copy', () => {
     expect(str(await s.api.readFile(path!))).toBe('%PDF-1.7 v1')
     await expect(s.api.readFile('uniwork://files/other/x.pdf')).rejects.toThrow(/not granted/)
     expect(await s.api.getUsername()).toBe('Test User')
+  })
+
+  it('an empty new file opens as the blank PDF page', async () => {
+    const mock = createMockPort()
+    const meta = mock.seed('Untitled.pdf', new Uint8Array())
+    const { api } = createPdfWebApi(mock.port, {
+      capabilities: { edit: true },
+      core: async () => fakeCore(),
+      ensureFonts: async () => {},
+    })
+    mock.init({ documentId: meta.fileId })
+    const path = (await api.consumePending())!
+    expect(str(await api.readFile(path))).toBe('%PDF-1.7 blank')
   })
 
   it('boots through api.open when init carries no document', async () => {

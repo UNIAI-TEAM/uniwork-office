@@ -190,7 +190,11 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
   }
 
   async function openPayload(open: OpenPayload): Promise<string> {
-    return adopt(open.file, await readSource(open.source))
+    let bytes = await readSource(open.source)
+    // a new, still empty Documents file: start from the desktop's blank A4 page ("New PDF"),
+    // which becomes the file's first version on the first save
+    if (bytes.byteLength === 0) bytes = new Uint8Array(await (await deps.core()).blankPdfBuffer())
+    return adopt(open.file, bytes)
   }
 
   function setFatal(err: unknown): void {
