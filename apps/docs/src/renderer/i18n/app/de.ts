@@ -212,6 +212,7 @@ export const de = {
   appFootnotePlaceholder: 'Fußnotentext…',
   appEndnotePlaceholder: 'Endnotentext…',
   appAutoSave: 'Automatisches Speichern',
+  appAutoSaveUniworkTip: 'AutoSave is off for UniWork documents. Use Save to save a new version.',
   appAutoSaveTip:
     'Automatisches Speichern (alle 30 Sekunden und wenn das Fenster den Fokus verliert)',
   appSaveShortcutTip: 'Speichern (⌘S)',

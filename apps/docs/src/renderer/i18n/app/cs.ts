@@ -201,6 +201,7 @@ export const cs = {
   appFootnotePlaceholder: 'Text poznámky pod čarou…',
   appEndnotePlaceholder: 'Text vysvětlivky…',
   appAutoSave: 'Automatické ukládání',
+  appAutoSaveUniworkTip: 'AutoSave is off for UniWork documents. Use Save to save a new version.',
   appAutoSaveTip: 'Automatické ukládání (každých 30 sekund a při ztrátě fokusu okna)',
   appSaveShortcutTip: 'Uložit (⌘S)',
   appUndo: 'Zpět',

@@ -201,6 +201,7 @@ export const hi = {
   appFootnotePlaceholder: 'पाद टिप्पणी का टेक्स्ट…',
   appEndnotePlaceholder: 'अंत टिप्पणी का टेक्स्ट…',
   appAutoSave: 'स्वतः सहेजना',
+  appAutoSaveUniworkTip: 'AutoSave is off for UniWork documents. Use Save to save a new version.',
   appAutoSaveTip: 'स्वतः सहेजना (हर 30 सेकंड में और विंडो का फ़ोकस हटने पर)',
   appSaveShortcutTip: 'सहेजें (⌘S)',
   appUndo: 'पूर्ववत करें',

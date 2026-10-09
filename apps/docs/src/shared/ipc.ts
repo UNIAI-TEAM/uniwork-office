@@ -379,7 +379,9 @@ export interface DesktopApi {
   ): Promise<{
     ok: boolean
     error?: string
-    reason?: 'external-modified'
+    /** uniwork-read-only: a view-only UniWork document is never written;
+     *  uniwork-bound: autosave never writes a UniWork document (explicit Save only) */
+    reason?: 'external-modified' | 'uniwork-read-only' | 'uniwork-bound'
     /** a newer password choice arrived after this save's snapshot */
     passwordIntentPending?: boolean
     /** one-shot URL of the saved document in full when an encrypted save absorbed
@@ -388,6 +390,9 @@ export interface DesktopApi {
   }>
   /** crash-recovery copy of a dirty document, stored under userData */
   writeRecoveryCopy(path: string, data: ArrayBuffer): Promise<{ ok: boolean }>
+  /** UniWork seam: whether this document is a UniWork working copy (bound: file
+   *  autosave off) and whether the user may only view it */
+  uniworkState(path: string): Promise<{ bound: boolean; readOnly: boolean }>
   /** tab closed but webContents kept alive (shell freeze workaround) — stop background timers */
   onTeardown(handler: () => void): () => void
   /** one trusted space keystroke into this webContents — the only thing that

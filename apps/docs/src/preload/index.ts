@@ -117,6 +117,7 @@ const api: DesktopApi = {
     ipcRenderer.invoke('docs:save', path, data, auto === true),
   writeRecoveryCopy: (path: string, data: ArrayBuffer) =>
     ipcRenderer.invoke('docs:write-recovery', path, data),
+  uniworkState: (path: string) => ipcRenderer.invoke('docs:uniwork-state', path),
   onTeardown: (handler) => {
     const listener = () => handler()
     ipcRenderer.on('docs:teardown', listener)

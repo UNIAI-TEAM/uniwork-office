@@ -214,6 +214,7 @@ export const ko = {
   appEndnotePlaceholder: '미주 내용…',
   // Quick actions bar
   appAutoSave: '자동 저장',
+  appAutoSaveUniworkTip: 'AutoSave is off for UniWork documents. Use Save to save a new version.',
   appAutoSaveTip: '자동 저장(30초마다, 창 포커스가 해제될 때)',
   appSaveShortcutTip: '저장 (⌘S)',
   appUndo: '실행 취소',

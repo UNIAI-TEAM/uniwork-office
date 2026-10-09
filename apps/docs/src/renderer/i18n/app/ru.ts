@@ -205,6 +205,7 @@ export const ru = {
   appFootnotePlaceholder: 'Текст сноски…',
   appEndnotePlaceholder: 'Текст концевой сноски…',
   appAutoSave: 'Автосохранение',
+  appAutoSaveUniworkTip: 'AutoSave is off for UniWork documents. Use Save to save a new version.',
   appAutoSaveTip: 'Автосохранение (каждые 30 секунд и при потере фокуса окном)',
   appSaveShortcutTip: 'Сохранить (⌘S)',
   appUndo: 'Отменить',

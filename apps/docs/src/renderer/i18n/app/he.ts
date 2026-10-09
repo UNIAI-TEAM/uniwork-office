@@ -193,6 +193,7 @@ export const he = {
   appFootnotePlaceholder: 'טקסט הערת שוליים…',
   appEndnotePlaceholder: 'טקסט הערת סיום…',
   appAutoSave: 'שמירה אוטומטית',
+  appAutoSaveUniworkTip: 'AutoSave is off for UniWork documents. Use Save to save a new version.',
   appAutoSaveTip: 'שמירה אוטומטית (כל 30 שניות וכאשר החלון מאבד מיקוד)',
   appSaveShortcutTip: 'שמירה (⌘S)',
   appUndo: 'ביטול פעולה',

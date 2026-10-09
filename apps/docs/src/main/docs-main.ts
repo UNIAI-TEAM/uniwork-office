@@ -1,4 +1,10 @@
-import { setUniworkUserSaveHook } from './uniwork-policy'
+import {
+  notifyUniworkUserSave,
+  setUniworkUserSaveHook,
+  uniworkDocState,
+  uniworkIsBound,
+  uniworkSaveDecision,
+} from './uniwork-policy'
 import { createHash, randomUUID } from 'node:crypto'
 import { handOffBytes } from './byte-handoff'
 import {
@@ -4593,6 +4599,10 @@ export function registerDocsIpc(): void {
         if (typeof filePath !== 'string' || !canDocWrite(event.sender.id, filePath)) {
           return { ok: false, error: 'save target is not an opened document' }
         }
+        // UniWork seam: a view-only document is never written, a bound one never
+        // by autosave; only an explicit Save onto this path reports a user save
+        const uniwork = uniworkSaveDecision(auto === true ? 'auto' : 'user', filePath)
+        if (!uniwork.write) return { ok: false, reason: uniwork.reason }
         if (await diskChangedExternally(event.sender.id, filePath)) {
           // autosave must never clobber another program's edits silently; the
           // renderer stays dirty and the next manual save raises the dialog
@@ -4649,6 +4659,7 @@ export function registerDocsIpc(): void {
         )
         clearRecoveryCopy(filePath)
         pushRecent(filePath)
+        if (uniwork.fireHook) notifyUniworkUserSave(filePath)
         return {
           ok: true,
           passwordIntentPending,
@@ -4659,6 +4670,14 @@ export function registerDocsIpc(): void {
       }
     },
   )
+
+  // UniWork seam: bound / view-only state of a document this renderer may write
+  ipcMain.handle('docs:uniwork-state', (event, filePath: unknown) => {
+    if (typeof filePath !== 'string' || !canDocWrite(event.sender.id, filePath)) {
+      return { bound: false, readOnly: false }
+    }
+    return uniworkDocState(filePath)
+  })
 
   // crash-recovery copy from a dirty renderer; best-effort, never surfaces
   ipcMain.handle('docs:write-recovery', async (event, filePath: string, data: ArrayBuffer) => {
@@ -4831,6 +4850,8 @@ export function registerDocsIpc(): void {
       // the tab may have been closed while the dialog was open; checked before the
       // write because Save As may overwrite an existing file (no safe rollback)
       if (tornDownWcIds.has(event.sender.id)) return { ok: false }
+      // UniWork seam: Save As may not overwrite a view-only UniWork working copy
+      if (!uniworkSaveDecision('save-as', result.filePath).write) return { ok: false }
       try {
         const passwordState = snapshotDocPassword(
           event.sender.id,
@@ -4938,6 +4959,10 @@ export function registerDocsIpc(): void {
         // only a target the MCP layer resolved for this tab may be written
         if (!canDocWrite(event.sender.id, filePath)) {
           return { ok: false, error: 'save target was not authorized' }
+        }
+        // UniWork seam: an MCP write never lands on a view-only UniWork document
+        if (!uniworkSaveDecision('mcp', filePath).write) {
+          return { ok: false, error: 'this document is view-only' }
         }
         const existed = existsSync(filePath)
         if (!overwrite && existed) {
@@ -6151,7 +6176,9 @@ async function performDocsClose(
     return response === 0
   }
   // autosave on (and has a path, already checked when the renderer reported): save silently and proceed; only prompt on failure
-  if (state.autoSave && (await requestRendererSave(contents))) return true
+  // a UniWork document never saves silently: closing it always asks (explicit save only)
+  if (state.autoSave && !uniworkIsBound(state.filePath) && (await requestRendererSave(contents)))
+    return true
   const options = {
     type: 'warning' as const,
     message: tm('closeUnsavedMsg'),

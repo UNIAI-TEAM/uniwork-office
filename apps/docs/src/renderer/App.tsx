@@ -243,6 +243,7 @@ import {
   textHasCjk,
 } from './line-metrics'
 import { saveUntilPersisted } from './save-until-persisted'
+import { uniworkAllowsSave, uniworkStateFor, useUniworkDocState } from './uniwork-doc-state'
 import { SPELLCHECK_KEY, spellcheckEnabled } from './spellcheck-pref'
 import { cachedByDoc } from './doc-cache'
 import { useShallowStable, useStableCallbacks } from './use-stable'
@@ -1036,6 +1037,13 @@ export function App() {
     entries: CompareEntry[]
   } | null>(null)
   const [autoSave, setAutoSave] = useAutoSavePref('aidocs.autoSave', window.desktop)
+  // UniWork seam: a UniWork working copy never autosaves; a view-only one is not editable
+  const uniworkState = useUniworkDocState(doc?.filePath)
+  const uniwork = uniworkStateFor(uniworkState, doc?.filePath)
+  const uniworkRef = useRef(uniworkState)
+  uniworkRef.current = uniworkState
+  /** autosave as it actually runs: the pref, forced off for a UniWork document */
+  const autoSaveActive = autoSave && !uniwork.bound
   // tab closed but this renderer kept alive (shell freeze workaround): go inert
   const [tornDown, setTornDown] = useState(false)
   const [aiPreset, setAiPreset] = useState<{
@@ -1826,11 +1834,13 @@ export function App() {
   /** modify password set but not entered: honor-system write lock, document read-only */
   const writeLocked = !!writeProtection?.hash && !modifyUnlocked
   /** body is read-only (readOnly/forms/comments restriction or write lock) */
-  const isProtected =
+  const docProtected =
     writeLocked ||
     editRestriction === 'readOnly' ||
     editRestriction === 'forms' ||
     editRestriction === 'comments'
+  /** a view-only UniWork document reuses the protection read-only mode */
+  const isProtected = docProtected || uniwork.readOnly
   /** comments restriction: body read-only but adding comments stays allowed */
   const commentsAllowed = !writeLocked && editRestriction === 'comments'
   /** trackedChanges restriction: editing allowed, revision recording forced on */
@@ -2308,10 +2318,12 @@ export function App() {
     }
   }
 
-  const save = useCallback(
-    (saveAs: boolean, auto = false) => saveImpl(fileCtxRef.current, saveAs, auto),
-    [],
-  )
+  const save = useCallback((saveAs: boolean, auto = false) => {
+    // UniWork seam: no autosave onto a UniWork document, no in-place Save of a view-only one
+    const state = uniworkStateFor(uniworkRef.current, fileCtxRef.current.doc?.filePath)
+    if (!uniworkAllowsSave(state, saveAs, auto)) return Promise.resolve(false)
+    return saveImpl(fileCtxRef.current, saveAs, auto)
+  }, [])
 
   // inserting a section break needs one save for the new section to take effect; the
   // flag is consumed in the render after state commit, guaranteeing the save closure
@@ -5213,8 +5225,9 @@ export function App() {
   useEffect(() => {
     const offCheck = window.desktop.onCloseCheck?.(() => {
       window.desktop.reportCloseCheck({
-        dirty: !!doc && (anyDirtyRef.current || dirtyRef.current),
-        autoSave: autoSave && !!doc?.filePath,
+        // a view-only UniWork document cannot be saved in place: nothing to ask
+        dirty: !!doc && !uniwork.readOnly && (anyDirtyRef.current || dirtyRef.current),
+        autoSave: autoSaveActive && !!doc?.filePath,
         filePath: doc?.filePath ?? null,
       })
     })
@@ -5237,11 +5250,11 @@ export function App() {
       offCheck?.()
       offSave?.()
     }
-  }, [doc, save, autoSave])
+  }, [doc, save, autoSaveActive, uniwork.readOnly])
 
   // autosave: every 30s and on window blur, silently persist pending changes
   useEffect(() => {
-    if (tornDown || !autoSave || !doc || !doc.filePath) return
+    if (tornDown || !autoSaveActive || !doc || !doc.filePath) return
     const tick = () => {
       if (!isDocDirty(fileCtxRef.current)) return
       if (editor?.view.composing) return // don't interrupt IME input
@@ -5255,7 +5268,7 @@ export function App() {
       window.clearInterval(id)
       window.removeEventListener('blur', tick)
     }
-  }, [tornDown, autoSave, doc, editor, save])
+  }, [tornDown, autoSaveActive, doc, editor, save])
 
   // After an AI run finishes on a never-saved document, silently save it once: the
   // first save derives the file name from the first heading (see deriveAutoFileName
@@ -6762,7 +6775,8 @@ export function App() {
           className="qa-btn"
           data-tip={t('appSaveShortcutTip')}
           aria-label={t('appSaveShortcutTip')}
-          disabled={!hasDoc || !hasUnsavedChanges}
+          // a UniWork document saves even when clean (retry after a failed upload)
+          disabled={!hasDoc || uniwork.readOnly || (!hasUnsavedChanges && !uniwork.bound)}
           onClick={() => void save(false)}
         >
           <IconSave size={16} />
@@ -6785,12 +6799,16 @@ export function App() {
         >
           <IconRedo size={16} />
         </button>
-        <label className={`autosave-toggle ${autoSave ? 'on' : ''}`} data-tip={t('appAutoSaveTip')}>
+        <label
+          className={`autosave-toggle ${autoSaveActive ? 'on' : ''}${uniwork.bound ? ' disabled' : ''}`}
+          data-tip={t(uniwork.bound ? 'appAutoSaveUniworkTip' : 'appAutoSaveTip')}
+        >
           <span className="autosave-knob" />
           <span className="autosave-text">{t('appAutoSave')}</span>
           <input
             type="checkbox"
-            checked={autoSave}
+            checked={autoSaveActive}
+            disabled={uniwork.bound}
             onChange={(e) => setAutoSave(e.target.checked)}
           />
         </label>
@@ -6798,7 +6816,17 @@ export function App() {
       </>
     ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [hasDoc, hasUnsavedChanges, autoSave, editor, save, lang, histState],
+    [
+      hasDoc,
+      hasUnsavedChanges,
+      autoSaveActive,
+      uniwork.bound,
+      uniwork.readOnly,
+      editor,
+      save,
+      lang,
+      histState,
+    ],
   )
 
   if (!editor) return null
@@ -6993,7 +7021,7 @@ export function App() {
         commentsAllowed={commentsAllowed}
         trackChangesForced={trackChangesForced}
         protectActive={
-          isProtected || trackChangesForced || (doc?.encrypted ?? false) || !!writeProtection?.hash
+          docProtected || trackChangesForced || (doc?.encrypted ?? false) || !!writeProtection?.hash
         }
         filePath={doc?.filePath ?? null}
         viewMode={viewMode}

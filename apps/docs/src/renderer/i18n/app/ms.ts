@@ -205,6 +205,7 @@ export const ms = {
   appFootnotePlaceholder: 'Teks nota kaki…',
   appEndnotePlaceholder: 'Teks nota hujung…',
   appAutoSave: 'Autosimpan',
+  appAutoSaveUniworkTip: 'AutoSave is off for UniWork documents. Use Save to save a new version.',
   appAutoSaveTip: 'Autosimpan (setiap 30 saat dan apabila tetingkap hilang fokus)',
   appSaveShortcutTip: 'Simpan (⌘S)',
   appUndo: 'Buat asal',

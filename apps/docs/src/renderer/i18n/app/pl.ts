@@ -206,6 +206,7 @@ export const pl = {
   appFootnotePlaceholder: 'Treść przypisu dolnego…',
   appEndnotePlaceholder: 'Treść przypisu końcowego…',
   appAutoSave: 'Autozapis',
+  appAutoSaveUniworkTip: 'AutoSave is off for UniWork documents. Use Save to save a new version.',
   appAutoSaveTip: 'Autozapis (co 30 sekund oraz gdy okno traci fokus)',
   appSaveShortcutTip: 'Zapisz (⌘S)',
   appUndo: 'Cofnij',

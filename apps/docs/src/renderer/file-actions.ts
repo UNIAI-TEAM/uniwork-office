@@ -1046,8 +1046,9 @@ async function saveOnce(
       const result = await window.desktop.saveDocx(savedPath, buffer, auto)
       if (!result.ok) {
         // external-modified: the main process already prompted (or the autosave
-        // deferred to a manual save) — stay dirty, no second dialog/error banner
-        if (result.reason !== 'external-modified') {
+        // deferred to a manual save) — stay dirty, no second dialog/error banner.
+        // uniwork-*: a UniWork document refused an autosave / a view-only write.
+        if (!result.reason) {
           ctx.setStatus(t('appSaveFailed', { error: result.error ?? '' }))
           if (!auto) showToast(t('appSaveFailed', { error: result.error ?? '' }), 'error')
         }
