@@ -407,20 +407,27 @@ describe('streams', () => {
     expect(chunks.at(-1)!.type).toBe('done')
   })
 
-  it.each([
-    [402, 'credits_exhausted'],
-    [403, 'entitlement_required'],
-    [404, 'credential_missing'],
-    [424, 'provider_auth_failed'],
-    [429, 'rate_limited'],
-    [502, 'provider_unreachable'],
-  ])('a proxy %i ends the turn with the typed %s state', async (status, code) => {
+  // anthropic / gemini rethrow a failed fetch wrapped in `cause`: still the typed state, not "network"
+  it.each(
+    ['openai', 'anthropic', 'gemini'].flatMap((provider) =>
+      (
+        [
+          [402, 'credits_exhausted'],
+          [403, 'entitlement_required'],
+          [404, 'credential_missing'],
+          [424, 'provider_auth_failed'],
+          [429, 'rate_limited'],
+          [502, 'provider_unreachable'],
+        ] as const
+      ).map(([status, code]) => [provider, status, code] as const),
+    ),
+  )('%s: a proxy %i ends the turn with the typed %s state', async (provider, status, code) => {
     const { s, chunks, onTypedError } = streams(() =>
       jsonResponse(status, status === 429 ? { message: 'x' } : { code }),
     )
     await s.aiStream({
       requestId: 'r3',
-      settings: settings('openai'),
+      settings: settings(provider),
       system: 's',
       messages: [{ role: 'user', content: 'hi' }],
     } as never)
@@ -743,7 +750,11 @@ describe('installModuleBridge wiring', () => {
     expect(Object.prototype.hasOwnProperty.call(target.other, 'openAiSettings')).toBe(false)
     mock.init({ apiBase: '/api/v1', capabilities: { ai: true, webSearch: true } })
     await vi.waitFor(() => expect(capabilities.ai).toBe(true))
-    expect(capabilities).toMatchObject({ aiCredentials: true, webSearch: true, imageGeneration: false })
+    expect(capabilities).toMatchObject({
+      aiCredentials: true,
+      webSearch: true,
+      imageGeneration: false,
+    })
     vi.unstubAllGlobals()
   })
 })

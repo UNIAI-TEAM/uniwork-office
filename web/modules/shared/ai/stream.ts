@@ -42,7 +42,7 @@ import {
   createStreamWatchdog,
 } from '../../../../packages/ai-provider/src/watchdog'
 import type { AiWebClient } from './client'
-import { AiWebError, isAiWebError } from './errors'
+import { AiWebError, findAiWebError } from './errors'
 import { createProxyFetch } from './transport'
 
 export type WireProtocol = 'openai-compatible' | 'anthropic' | 'gemini'
@@ -185,10 +185,11 @@ export function createWebAiStreams(deps: StreamDeps): WebAiStreams {
           : { requestId, type: 'done', stopReason },
       )
     } catch (err) {
+      const web = findAiWebError(err)
       if (controller.signal.aborted) {
         emit({ requestId, type: 'done' })
-      } else if (isAiWebError(err)) {
-        emit({ requestId, type: 'error', error: typed(err, provider) })
+      } else if (web) {
+        emit({ requestId, type: 'error', error: typed(web, provider) })
       } else {
         const code = errorCodeOf(err)
         emit({
@@ -239,7 +240,8 @@ export function createWebAiStreams(deps: StreamDeps): WebAiStreams {
         }
       })
     } catch (err) {
-      if (isAiWebError(err)) return { ok: false, error: typed(err, provider) }
+      const web = findAiWebError(err)
+      if (web) return { ok: false, error: typed(web, provider) }
       const code = errorCodeOf(err)
       return {
         ok: false,

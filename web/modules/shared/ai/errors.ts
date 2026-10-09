@@ -79,6 +79,20 @@ export function isAiWebError(err: unknown): err is AiWebError {
   return err instanceof AiWebError
 }
 
+/**
+ * The proxy's typed error inside a protocol adapter's wrapper: anthropic/gemini rethrow a failed
+ * fetch as `new Error('... fetch failed ...', { cause })`, which would otherwise read as a network
+ * problem.
+ */
+export function findAiWebError(err: unknown): AiWebError | undefined {
+  let current: unknown = err
+  for (let depth = 0; current && depth < 5; depth++) {
+    if (current instanceof AiWebError) return current
+    current = (current as { cause?: unknown }).cause
+  }
+  return undefined
+}
+
 const BY_STATUS: Record<number, AiWebErrorCode> = {
   401: 'unauthorized',
   402: 'credits_exhausted',
