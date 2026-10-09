@@ -478,12 +478,6 @@ function openDeepLink(url) {
   }
 }
 
-function officeAppDeepLink(kind) {
-  const k = ['docs', 'sheets', 'slides', 'pdf', 'markdown', 'html'].includes(kind) ? kind : 'docs'
-  // Prefer office/app; agent/intent?tab=<kind> is also accepted by updated shell.
-  return Office()?.officeAppUrl?.(k) || `uniwork://office/app?kind=${k}`
-}
-
 /** Fire both protocol forms so slightly older handlers still have a chance. */
 function launchOfficeApp(kind) {
   const k = ['docs', 'sheets', 'slides', 'pdf', 'markdown', 'html'].includes(kind) ? kind : 'docs'

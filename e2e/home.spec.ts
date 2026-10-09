@@ -30,7 +30,7 @@ test.describe('home screen', () => {
     })
     const { page } = launched
     try {
-      await expect(page.locator('.nav-item .nav-label').first()).toHaveText('最近')
+      await expect(page.locator('.nav-item[data-nav="recent"] .nav-label')).toHaveText('最近')
       await page.screenshot({ path: screenshotPath('home-zh-cn') })
     } finally {
       await closeAndSaveVideo(launched, 'home-zh-cn')

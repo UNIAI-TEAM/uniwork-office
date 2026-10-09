@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { launchShell, closeAndSaveVideo, waitForPageWithUrl } from './helpers'
+import { launchShell, closeAndSaveVideo, openHomeFiles, waitForPageWithUrl } from './helpers'
 
 /**
  * Settings → General → "Open the AI panel in new documents" (genoffice#1589), the way the
@@ -44,6 +44,7 @@ test.describe('#1589 the "open the AI panel in new documents" setting', () => {
 
     const restarted = await launchShell({ userDataDir, videoDir: 'ai-panel-1589-new-doc' })
     try {
+      await openHomeFiles(restarted.page)
       await expect(restarted.page.locator('.quick-card').first()).toContainText('AI Docs')
       await restarted.page.locator('.quick-card').first().click()
       const editor = await waitForPageWithUrl(restarted.app, '://docs/')

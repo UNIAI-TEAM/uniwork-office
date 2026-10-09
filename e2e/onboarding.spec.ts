@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { launchShell, closeAndSaveVideo, screenshotPath } from './helpers'
+import { launchShell, closeAndSaveVideo, openHomeFiles, screenshotPath } from './helpers'
 
 test.describe('first-run onboarding', () => {
   test('fresh install walks all slides and persists the seen flag', async () => {
@@ -29,6 +29,9 @@ test.describe('first-run onboarding', () => {
       // last slide's primary button finishes the onboarding
       await page.locator('.onb-next').click()
       await expect(overlay).toBeHidden()
+      // Home starts on the My AI chat; Recent shows the hero and quick cards
+      await expect(page.locator('.nav-item[data-nav="chat"]')).toHaveClass(/active/)
+      await openHomeFiles(page)
       await expect(page.locator('.home-hero')).toBeVisible()
       await page.screenshot({ path: screenshotPath('onboarding-done-home') })
 
@@ -48,7 +51,7 @@ test.describe('first-run onboarding', () => {
       videoDir: 'onboarding-relaunch',
     })
     try {
-      await expect(relaunch.page.locator('.home-hero')).toBeVisible()
+      await expect(relaunch.page.locator('.nav-item[data-nav="chat"]')).toHaveClass(/active/)
       await expect(relaunch.page.locator('.onb-overlay')).toHaveCount(0)
       await relaunch.page.screenshot({ path: screenshotPath('onboarding-relaunch-no-overlay') })
     } finally {
