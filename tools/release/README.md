@@ -18,8 +18,9 @@ end); `apps/shell/tests/release-config.test.ts` covers it.
 The version is `<apps/shell/package.json version>-<channel>.<n>`, for example `0.11.0-dev.1`.
 
 - **Release (published):** the release owner pushes a tag `v<version>`, e.g. `v0.11.0-dev.1` or
-  `v0.11.0-beta.2`. Nobody else pushes release tags. The workflow checks that the tag's base
-  version equals `apps/shell/package.json` and that the channel is `dev` or `beta`, builds
+  `v0.11.0-beta.2`, on a commit that is on `main`. Nobody else pushes release tags. The
+  workflow checks that the tag's base version equals `apps/shell/package.json`, that the
+  channel is `dev` or `beta` and that the tagged commit is an ancestor of `main`, builds
   Windows and macOS, then creates a **pre-release** for the tag (never marked latest; not a
   draft, because the server downloads the installer without credentials) with the installers
   and their `SHA256SUMS-<platform>.txt`.
@@ -29,6 +30,15 @@ The version is `<apps/shell/package.json version>-<channel>.<n>`, for example `0
 
 Bump `apps/shell/package.json` first when the base version changes; `<n>` counts builds of
 one base version per channel.
+
+### Who may publish
+
+"Only the release owner pushes tags" is a convention until the repository enforces it.
+Repository admins should add a tag ruleset for `v*-dev.*` and `v*-beta.*` (create / update /
+delete restricted to the release owners), or a `release` environment with required reviewers
+for the publish job. The workflow keeps the write token small either way: the build jobs and
+the `urls` job (which runs `installer-urls.mjs`) are read-only, and the `publish` job checks
+out no code; it only downloads the built files and runs `gh release create` / `upload`.
 
 ## Artifact names
 
@@ -44,12 +54,12 @@ plain local `npm run dist:win` / `dist:mac` keeps `UniWork-Office-<version>-<arc
 
 The server reads the version from `_<version>_` and the `unsigned` flag from the name. The
 `_unsigned` token disappears by itself once a signing identity is configured for that
-platform (see "Signing hooks"). The mac zips are built too but not published (they only feed
-an updater, which is off).
+platform (see "Signing hooks"). Release builds produce no mac zips (they only feed an
+updater, which is off); plain local `dist:mac` still builds them.
 
 ## Putting the links on the server
 
-The publish job prints a line like this in the run summary and uploads it as the
+The `urls` job prints a line like this in the run summary and uploads it as the
 `installer-urls-<channel>` artifact:
 
 ```text
@@ -92,7 +102,12 @@ installer copies it to `<install dir>\resources\deployment-profile.json`
 (`process.resourcesPath` at runtime) when present and a real uninstall removes it. An
 over-install or update keeps the existing profile: the installer saves it before the old
 version's files are removed and puts it back afterwards. A profile beside the new installer
-always replaces the kept one.
+always replaces the kept one. The installer's details log says which case applied (installed
+from beside the installer, kept, none found, or a failed copy).
+
+Extract the downloaded bundle before running the installer. Opening the installer straight
+from the zip in Explorer extracts only the installer to a temporary folder, so no profile is
+found next to it.
 
 ## Auto-update is off
 
@@ -105,16 +120,25 @@ needs signed builds (Squirrel.Mac requires them) and a feed host, which are back
 ## Signing hooks
 
 All signing steps are gated by the repository variable `UNIWORK_SIGNING_ENABLED` (`'true'`
-turns them on). With it unset nothing below runs and no signing secret reaches a job.
+turns them on). With it unset nothing below runs and no signing variable reaches
+electron-builder, not even an empty one (the unsigned mac step unsets them, and the release
+config drops empty `CSC_*` / `APPLE_*` values; `CSC_LINK=""` would otherwise be read as a
+certificate path and fail the build).
+
+**Before flipping the variable**, move the signing steps (or the build jobs) behind a GitHub
+environment whose deployment branches are restricted to the release tags, and keep the secrets
+in that environment. Otherwise a `workflow_dispatch` run from any branch receives them.
 
 - **macOS:** secrets `CSC_LINK` (base64 Developer ID Application `.p12`), `CSC_KEY_PASSWORD`,
   `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`. electron-builder signs with the
   hardened runtime and notarizes the app; `apps/shell/build/notarize-dmg.js` notarizes and
-  staples the dmgs. A "Check the signing secrets" step fails early when one is empty.
+  staples the dmgs. A "Check the signing secrets" step fails early when one is empty, and the
+  signed package step is a separate step that alone receives the secrets.
 - **Windows:** repository variable `GENOFFICE_WIN_SIGN_MODE` (`test` = self-signed PFX,
   `production` = DigiCert KeyLocker). The config routes every binary electron-builder signs
   through `scripts/win-sign.cjs`, and the workflow signs the helper binaries
-  (`xlsx-sidecar.exe`, `win-ocr.exe`) with it before packaging. **That script does not exist
+  (`xlsx-sidecar.exe`, `win-ocr.exe`) with it before packaging. A "Check the signing mode" step
+  fails early unless the mode is `test` or `production`. **That script does not exist
   in this repository yet**: add it, then pass the secrets it reads (for KeyLocker typically
   `SM_HOST`, `SM_API_KEY`, `SM_CLIENT_CERT_FILE_B64`, `SM_CLIENT_CERT_PASSWORD`,
   `SM_CODE_SIGNING_CERT_SHA1_HASH`; for a PFX the file and its password) to the "Sign the
@@ -130,7 +154,7 @@ cd apps/sheets && cargo build --release --manifest-path native/xlsx-engine/Cargo
 cd apps/shell
 GENOFFICE_WIN_SIDECAR_TARGET=x86_64-pc-windows-msvc UNIWORK_RELEASE_CHANNEL=dev BUILD_DIR=release-local \
   npx electron-builder --win --x64 --publish never -c.extraMetadata.version=0.11.0-dev.0
-cd ../.. && node tools/release/check-build-brand.mjs --dir apps/shell/release-local
+cd ../.. && node tools/release/check-build-brand.mjs --dir apps/shell/release-local --expect win-unpacked
 ```
 
 `GENOFFICE_WIN_SIDECAR_TARGET=x86_64-pc-windows-msvc` takes the sidecar from the MSVC build
