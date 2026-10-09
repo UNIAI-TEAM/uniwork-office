@@ -19,6 +19,13 @@ export const bridge = installModuleBridge({
   frameCapabilities: {},
   globals: {
     // window.htmlApi: scaffold only; the html module worker maps it onto the protocol
-    htmlApi: () => ({}),
+    htmlApi: () => ({
+      // nothing pending: the renderer boots on an empty document instead of calling readFile
+      consumePending: async () => null,
+      // App.tsx reads `info.url` at boot; '' makes PreviewFrame show about:blank. The desktop
+      // preview is the html-preview: protocol; its web replacement (and the frame-src it needs,
+      // inventory-b4 C-3) belongs to the html module worker.
+      getPreviewInfo: async () => ({ url: '' }),
+    }),
   },
 })

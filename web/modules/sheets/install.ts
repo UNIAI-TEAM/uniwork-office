@@ -11,7 +11,14 @@
  * The scaffold implements no file API yet: open/save/export over the protocol
  * (`ctx.client.request('api.open', ...)`) are wired by the sheets module worker in this file.
  */
+import { config as zodConfig } from 'zod'
 import { installModuleBridge } from '../../docs/bridge/module-bridge'
+
+// zod v4 probes `new Function("")` once to decide on its JIT parsers; under the frame's
+// script-src 'self' that probe is a CSP violation report (harmless, but noise in every
+// security-policy check). jitless skips the probe and the eval-based fast path; the CSP would
+// block that path anyway. Must run before the renderer's first schema parse.
+zodConfig({ jitless: true })
 
 export const bridge = installModuleBridge({
   module: 'sheets',
