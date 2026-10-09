@@ -343,6 +343,15 @@ export interface InitPayload extends TokenPayload {
    * module refuses the `init` with `malformed`.
    */
   module?: OfficeModule
+  /**
+   * the signed-in user as editors show them (additive, GO-B4: PDF note author, comment author).
+   * Display data only, never an identity the frame may authorise with.
+   */
+  user?: InitUser
+}
+
+export interface InitUser {
+  displayName: string
 }
 
 export interface InitAck {
@@ -357,6 +366,12 @@ export interface InitAck {
 export interface OpenPayload {
   file: FileMeta
   source: FileSource
+  /**
+   * relative resource path (as written in the document, e.g. "assets/x.png") -> URL the frame may
+   * load it from (additive, GO-B4: Markdown/HTML documents with relative images). Same rules as
+   * `FileSource {kind:'url'}`: same-origin with the frame (CSP), fetched with credentials: 'omit'.
+   */
+  assets?: Record<string, string>
 }
 
 export interface OpenResult {
@@ -778,8 +793,16 @@ export function isFileSource(x: unknown): x is FileSource {
   return x.kind === 'bytes' && isBuffer(x.data)
 }
 
+function isAssetMap(x: unknown): x is Record<string, string> {
+  return isObj(x) && Object.entries(x).every(([k, v]) => k.length > 0 && isNonEmptyStr(v))
+}
+
 export function isOpenPayload(x: unknown): x is OpenPayload {
-  return isObj(x) && isFileMeta(x.file) && isFileSource(x.source)
+  return isObj(x) && isFileMeta(x.file) && isFileSource(x.source) && isOpt(x.assets, isAssetMap)
+}
+
+function isInitUser(x: unknown): x is InitUser {
+  return isObj(x) && isStr(x.displayName)
 }
 
 export function isReadyPayload(x: unknown): x is ReadyPayload {
@@ -806,7 +829,8 @@ export function isInitPayload(x: unknown): x is InitPayload {
     isTheme(x.theme) &&
     isCapabilities(x.capabilities) &&
     isOpt(x.open, isOpenPayload) &&
-    isOpt(x.module, isOfficeModule)
+    isOpt(x.module, isOfficeModule) &&
+    isOpt(x.user, isInitUser)
   )
 }
 

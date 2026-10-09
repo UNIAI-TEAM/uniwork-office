@@ -39,19 +39,19 @@ gets no `init` within its retry budget (40 × 500 ms), or is opened top-level (`
 
 ### Host → frame
 
-| type             | kind    | payload → result                                                                                                                                                                                                      |
-| ---------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `init`           | request | `InitPayload` {protocolVersion, token, tokenExpiresAt, documentId, workspaceId, apiBase, apiMode, locale, theme, capabilities, open?, module?} → `InitAck` {protocolVersion, frameVersion?, capabilities (effective)} |
-| `open`           | request | `OpenPayload` {file: FileMeta, source: {kind:'url', url} \| {kind:'bytes', data}} → {opened, title?}                                                                                                                  |
-| `save`           | request | {reason: 'user' \| 'navigate' \| 'autosave'} → `SaveResult`                                                                                                                                                           |
-| `saveAs`         | request | {name?} → `SaveResult`                                                                                                                                                                                                |
-| `print`          | request | {mode?: 'dialog' \| 'pdf'} → {printed}                                                                                                                                                                                |
-| `doc.closeCheck` | request | {} → {dirty, autoSave}                                                                                                                                                                                                |
-| `token.update`   | event   | {token, tokenExpiresAt} — proactive rotation                                                                                                                                                                          |
-| `theme`          | event   | {theme: 'light' \| 'dark'} (host resolves "system")                                                                                                                                                                   |
-| `language`       | event   | {locale}                                                                                                                                                                                                              |
-| `file.renamed`   | event   | {file: FileMeta}                                                                                                                                                                                                      |
-| `cancel`         | event   | {id} — abort a host→frame request                                                                                                                                                                                     |
+| type             | kind    | payload → result                                                                                                                                                                                                             |
+| ---------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `init`           | request | `InitPayload` {protocolVersion, token, tokenExpiresAt, documentId, workspaceId, apiBase, apiMode, locale, theme, capabilities, open?, module?, user?} → `InitAck` {protocolVersion, frameVersion?, capabilities (effective)} |
+| `open`           | request | `OpenPayload` {file: FileMeta, source: {kind:'url', url} \| {kind:'bytes', data}, assets?} → {opened, title?}                                                                                                                |
+| `save`           | request | {reason: 'user' \| 'navigate' \| 'autosave'} → `SaveResult`                                                                                                                                                                  |
+| `saveAs`         | request | {name?} → `SaveResult`                                                                                                                                                                                                       |
+| `print`          | request | {mode?: 'dialog' \| 'pdf'} → {printed}                                                                                                                                                                                       |
+| `doc.closeCheck` | request | {} → {dirty, autoSave}                                                                                                                                                                                                       |
+| `token.update`   | event   | {token, tokenExpiresAt} — proactive rotation                                                                                                                                                                                 |
+| `theme`          | event   | {theme: 'light' \| 'dark'} (host resolves "system")                                                                                                                                                                          |
+| `language`       | event   | {locale}                                                                                                                                                                                                                     |
+| `file.renamed`   | event   | {file: FileMeta}                                                                                                                                                                                                             |
+| `cancel`         | event   | {id} — abort a host→frame request                                                                                                                                                                                            |
 
 ### Frame → host
 
@@ -117,9 +117,29 @@ One protocol serves every genoffice editor on the web (lane GO-B4/B5/B6, UNI-101
   option, a `module` returned by `getInit()` is checked the same way after the call.
 - Frame check: `createDocsFrameClient({ module })` sends `module` in `ready` and refuses an `init` for another
   module (`malformed`, `whenInitialized()` rejects); `FrameSession.module` reports the module.
+- `init.user?: {displayName}`: who is signed in, as editors display it (PDF note author, comment author). Display
+  data only; the frame never authorises anything with it. `FrameSession.user` carries a copy.
+- `OpenPayload.assets?: Record<path, url>` (in `init.open`, `open`, `api.open`, `file.pick`): relative resources of a
+  text document (Markdown/HTML `assets/x.png`) mapped to URLs the frame loads them from. Same rules as
+  `FileSource {kind:'url'}`: same-origin (frame CSP), fetched with `credentials: 'omit'`. Empty keys/values are
+  `malformed`.
 - New capability keys for a module are optional `Capabilities` fields (absent = false on the host grant side);
   receivers already ignore unknown keys. New message types are added only when a module truly needs one, as
   optional/additive entries documented here.
+
+## Read-only documents and saving
+
+- **View-only** is the host withholding the `save` grant: when the effective capabilities (`InitAck` /
+  `FrameSession.capabilities`) have `save !== true`, the frame is a viewer. A frame then hides or disables its save
+  entries (Ctrl+S, File > Save, close-guard "Save"), never sends `api.save`, and answers a host `save` with
+  `ok:false` / `unsupported`. `FileMeta.writable === false` means the same for that file. No extra field is needed.
+  `saveAs` is a separate grant (a host may allow "save a copy" of a document the user cannot overwrite).
+  The module bridges (`web/modules/<module>/`) implement this; the Docs bridge does not wire it yet (open item
+  from GO-B4: the Docs host always grants `save` today).
+- **No autosave on the web** (lane decision C10, 2026-10-09): Docs and every module save only on an explicit user
+  save. Hosts never send `save {reason: 'autosave'}`; web bridges never set `api.save.auto`; every module's
+  autosave capability is false on the web and its UI hidden. The `autosave` / `auto` values stay in the types for
+  wire compatibility only.
 
 ## Origin model
 

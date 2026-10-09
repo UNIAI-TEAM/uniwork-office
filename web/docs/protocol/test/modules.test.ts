@@ -185,3 +185,43 @@ describe('handshake with modules', () => {
     expect(onHandshakeError).toHaveBeenCalledWith(expect.objectContaining({ code: 'malformed' }))
   })
 })
+
+describe('additive fields for the modules (GO-B4)', () => {
+  const init = { ...baseInit(), protocolVersion: 1 }
+  const open = {
+    file: { fileId: 'f1', name: 'a.md' },
+    source: { kind: 'url', url: `${ORIGIN}/f1` },
+  }
+
+  it('init.user is optional display data', () => {
+    expect(isInitPayload({ ...init, user: { displayName: 'Lan' } })).toBe(true)
+    expect(isInitPayload({ ...init, user: { displayName: '' } })).toBe(true)
+    expect(isInitPayload({ ...init, user: {} })).toBe(false)
+    expect(isInitPayload({ ...init, user: 'Lan' })).toBe(false)
+  })
+
+  it('open.assets maps relative paths to URLs', () => {
+    expect(isInitPayload({ ...init, open })).toBe(true)
+    expect(isInitPayload({ ...init, open: { ...open, assets: { 'assets/x.png': '/a/1' } } })).toBe(
+      true,
+    )
+    expect(isInitPayload({ ...init, open: { ...open, assets: { 'assets/x.png': '' } } })).toBe(
+      false,
+    )
+    expect(isInitPayload({ ...init, open: { ...open, assets: { 'x.png': 1 } } })).toBe(false)
+    expect(isInitPayload({ ...init, open: { ...open, assets: ['x'] } })).toBe(false)
+  })
+
+  it('the frame session carries user (copied) and open.assets', async () => {
+    const getInit = vi.fn(async () =>
+      baseInit({
+        user: { displayName: 'Lan' },
+        open: { ...(open as InitPayload['open'] & object), assets: { 'img/a.png': '/x/a' } },
+      }),
+    )
+    const { client } = setup({ getInit }, {})
+    const session = await client.whenInitialized()
+    expect(session.user).toEqual({ displayName: 'Lan' })
+    expect(session.open?.assets).toEqual({ 'img/a.png': '/x/a' })
+  })
+})

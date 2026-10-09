@@ -36,6 +36,7 @@ import {
   type HostRequests,
   type InitAck,
   type InitPayload,
+  type InitUser,
   type OfficeModule,
   type OpenPayload,
   type ProtocolErrorShape,
@@ -87,6 +88,8 @@ export interface FrameSession {
   capabilities: Capabilities
   /** document to open right away, if the host put one in `init` */
   open?: OpenPayload
+  /** the signed-in user's display data, if the host sent it */
+  user?: InitUser
 }
 
 type HostRequestHandler<K extends keyof HostRequests> = (
@@ -222,9 +225,11 @@ export function createDocsFrameClient(options: DocsFrameClientOptions): DocsFram
       capabilities,
     }
     if (p.open) next.open = p.open
+    if (p.user) next.user = { displayName: p.user.displayName }
     // a repeated init (host re-handshake) updates the object callers already hold
     if (session) {
       delete session.open
+      delete session.user
       Object.assign(session, next)
     } else session = next
     resolveInit(session)
