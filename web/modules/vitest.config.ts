@@ -6,5 +6,7 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     include: ['**/*.test.ts'],
+    // slides/ runs under its own config (engine shims as Vite plugins): --root web/modules/slides
+    exclude: ['**/node_modules/**', 'slides/**'],
   },
 })

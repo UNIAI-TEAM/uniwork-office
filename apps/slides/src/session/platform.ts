@@ -9,6 +9,7 @@ import {
   type FontMetricsProvider,
   type RenderSlide,
 } from '@genoffice/pptx-render'
+import type { OpenedPptx } from '@genoffice/pptx-engine'
 
 /** Push notifications from the session to the renderer(s) attached to it. */
 export interface SessionEventSink {
@@ -35,6 +36,8 @@ export interface SessionPlatform {
   /** Run after the current task (coalesces history/deck notifications). */
   defer(fn: () => void): void
   events: SessionEventSink
+  /** A deck was opened from bytes (open.ts): register its embedded fonts before the first layout */
+  deckOpened?(opened: OpenedPptx): void
 }
 
 const platform: SessionPlatform = {

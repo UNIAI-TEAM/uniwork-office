@@ -34,11 +34,21 @@ async function rendererParts(
   return { plugins: loaded.config.plugins ?? [], resolve: loaded.config.resolve }
 }
 
+/** the module's web-only plugins (modules.ts `webPlugins`), none for most modules */
+async function webOnlyPlugins(s: WebModuleSpec): Promise<PluginOption[]> {
+  if (!s.webPlugins) return []
+  const mod = (await import(resolve(repoRoot, s.webPlugins))) as {
+    default: () => PluginOption[]
+  }
+  return mod.default()
+}
+
 export default defineConfig(async ({ command, mode }) => {
   const renderer = await rendererParts(spec, { command, mode })
   const plugins: PluginOption[] = [
     woff2FontsPlugin(),
     ...(renderer.plugins ?? []),
+    ...(await webOnlyPlugins(spec)),
     webDocsManifestPlugin({
       version,
       module: spec.module,
