@@ -61,6 +61,8 @@ export const pt = {
   acctErrInvalidCallback: 'A resposta de login não era válida. Tente novamente.',
   acctErrStateMismatch:
     'Este link de login não corresponde à tentativa atual. Inicie o login novamente pelo app.',
+  acctCallbackMismatch:
+    'Este link de login não corresponde. Conclua o login na janela do navegador que este app abriu.',
   acctErrAuthCodeInvalid: 'O código de login expirou ou já foi usado. Entre novamente.',
   acctErrRateLimited: 'Muitas tentativas. Aguarde um momento e tente novamente.',
   acctErrUnauthorized: 'Sua sessão não é mais válida. Entre novamente.',

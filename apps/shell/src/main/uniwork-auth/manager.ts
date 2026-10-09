@@ -104,7 +104,8 @@ export class AccountManager extends SessionCore {
     if (org && typeof org.id === 'string' && typeof org.name === 'string') {
       this.org = { ...org, status: 'active' }
       this.orgs = [this.org]
-      if (credential.entitlements?.orgId === org.id) this.cachedEntitlements = credential.entitlements
+      if (credential.entitlements?.orgId === org.id)
+        this.cachedEntitlements = credential.entitlements
     }
     this.setState('refreshing')
     return generation
@@ -395,8 +396,7 @@ export class AccountManager extends SessionCore {
         }
         // entitlements are data only: a billing read failure keeps the last
         // known plan of this organization, else leaves it unknown
-        next =
-          [this.entitlements, this.cachedEntitlements].find((e) => e?.orgId === org.id) ?? null
+        next = [this.entitlements, this.cachedEntitlements].find((e) => e?.orgId === org.id) ?? null
       }
     }
     if (generation !== this.generation) return

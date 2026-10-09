@@ -19,10 +19,7 @@ vi.mock('electron', () => electron)
 
 import { deviceInfo, openAuthorizationUrl, registerAuthProtocols } from '../src/main/uniwork-auth'
 import { EventEmitter } from 'node:events'
-import {
-  bindAuthCallbackEvents,
-  createAuthCallbackRouter,
-} from '../src/main/uniwork-auth/routing'
+import { bindAuthCallbackEvents, createAuthCallbackRouter } from '../src/main/uniwork-auth/routing'
 import type { DeploymentProfile } from '../src/main/uniwork-auth/deployment'
 
 const stable: DeploymentProfile = {
@@ -176,6 +173,8 @@ describe('sign-in callback app events', () => {
     app.emit('second-instance', {}, ['electron.exe', callback], '/cwd', {})
     app.emit('second-instance', {}, ['electron.exe', 'C:/doc.docx'], '/cwd', { x: 1 })
     expect(route.mock.calls).toEqual([[callback]])
-    expect(fallback.secondInstance.mock.calls).toEqual([[['electron.exe', 'C:/doc.docx'], { x: 1 }]])
+    expect(fallback.secondInstance.mock.calls).toEqual([
+      [['electron.exe', 'C:/doc.docx'], { x: 1 }],
+    ])
   })
 })

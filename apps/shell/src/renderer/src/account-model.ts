@@ -54,6 +54,17 @@ export function errorKeyFor(error: AccountUiError, view: AccountView): StringKey
   return ACCOUNT_ERROR_KEYS[error]
 }
 
+/**
+ * Login events that reject a stray callback (wrong state, malformed URL)
+ * while the real attempt goes on: shown as a passing notice, never as a
+ * failed sign-in.
+ */
+export const CALLBACK_NOTICE_ERRORS: ReadonlySet<AccountErrorCode> = new Set([
+  'state_mismatch',
+  'invalid_callback',
+])
+export const CALLBACK_NOTICE_MS = 8000
+
 /** states in which the cached profile is shown */
 export function showsProfile(view: AccountView, status: AccountStatus | null): boolean {
   if (view === 'signed-in' || view === 'refreshing') return true
@@ -94,6 +105,10 @@ export interface AccountController {
   view: AccountView
   /** last sign-in error worth showing (null once signed in) */
   error: AccountUiError | null
+  /** the error reported by this window's own sign-in attempt (not main's status) */
+  loginError: AccountUiError | null
+  /** a stray sign-in link was ignored; the attempt is still live (passing notice) */
+  callbackNotice: boolean
   /** pending browser sign-in URL (open again / copy) */
   loginUrl: string | null
   urlCopied: boolean
@@ -123,6 +138,8 @@ export function useAccount(): AccountController {
   const [urlCopied, setUrlCopied] = useState(false)
   const [busy, setBusy] = useState<AccountBusy>(null)
   const [orgSwitchFailed, setOrgSwitchFailed] = useState(false)
+  const [callbackNotice, setCallbackNotice] = useState(false)
+  const noticeTimer = useRef<number | null>(null)
   // bumped on sign-out so an in-flight status read (which can still report
   // signed-in) is discarded instead of resurrecting the profile
   const seq = useRef(0)
@@ -133,7 +150,10 @@ export function useAccount(): AccountController {
   const apply = useCallback((next: AccountStatus) => {
     setStatus(next)
     const state = stateOf(next)
-    if (state !== 'signing-in') setLoginUrl(null)
+    if (state !== 'signing-in') {
+      setLoginUrl(null)
+      setCallbackNotice(false)
+    }
     if (state === 'signed-in' || state === 'refreshing') setLocalError(null)
   }, [])
 
@@ -156,6 +176,14 @@ export function useAccount(): AccountController {
       } else if (ev.phase === 'success') {
         setLocalError(null)
         setLoginUrl(null)
+      } else if (ev.phase === 'error' && ev.error && CALLBACK_NOTICE_ERRORS.has(ev.error)) {
+        // the attempt is still live: keep the link and the waiting state
+        setCallbackNotice(true)
+        if (noticeTimer.current !== null) window.clearTimeout(noticeTimer.current)
+        noticeTimer.current = window.setTimeout(() => {
+          noticeTimer.current = null
+          setCallbackNotice(false)
+        }, CALLBACK_NOTICE_MS)
       } else if (ev.phase === 'error') {
         loginErrorSeen.current = true
         setLaunching(false)
@@ -167,6 +195,7 @@ export function useAccount(): AccountController {
       offStatus?.()
       offLogin?.()
       if (copiedTimer.current !== null) window.clearTimeout(copiedTimer.current)
+      if (noticeTimer.current !== null) window.clearTimeout(noticeTimer.current)
     }
   }, [apply, refresh])
 
@@ -180,6 +209,7 @@ export function useAccount(): AccountController {
 
   const signIn = () => {
     setLocalError(null)
+    setCallbackNotice(false)
     setLoginUrl(null)
     setUrlCopied(false)
     setLaunching(true)
@@ -263,6 +293,8 @@ export function useAccount(): AccountController {
     status,
     view,
     error,
+    loginError: localError,
+    callbackNotice: callbackNotice && view === 'signing-in',
     loginUrl,
     urlCopied,
     busy,

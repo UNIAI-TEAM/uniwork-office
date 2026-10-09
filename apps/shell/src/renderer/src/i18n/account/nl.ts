@@ -61,6 +61,8 @@ export const nl = {
   acctErrInvalidCallback: 'Het inlogantwoord was ongeldig. Probeer het opnieuw.',
   acctErrStateMismatch:
     'Deze inloglink hoort niet bij de huidige poging. Begin opnieuw met inloggen vanuit de app.',
+  acctCallbackMismatch:
+    'Deze inloglink klopt niet. Rond het inloggen af in het browservenster dat deze app heeft geopend.',
   acctErrAuthCodeInvalid: 'De inlogcode is verlopen of al gebruikt. Log opnieuw in.',
   acctErrRateLimited: 'Te veel pogingen. Wacht even en probeer het opnieuw.',
   acctErrUnauthorized: 'Je sessie is niet meer geldig. Log opnieuw in.',

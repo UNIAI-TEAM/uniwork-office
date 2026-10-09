@@ -32,8 +32,8 @@
   --icon-muted: #b9bfc7;
   --danger: #d13438;
   --danger-bg: #fdf3f3;
-  /* error text on --danger-bg / chrome: AA (4.5:1) in both themes */
-  --danger-text: #d13438;
+  /* error text on --danger-bg / chrome / info tints: AA (4.5:1) in both themes */
+  --danger-text: #b3261e;
   /* Word's changed-line bar (Simple Markup): fixed red, tuned per theme */
   --docs-revision-bar: #c00000;
   --search-hit-bg: #ffe28a;

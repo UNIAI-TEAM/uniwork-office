@@ -59,6 +59,8 @@ export const ko = {
   acctErrInvalidCallback: '로그인 응답이 올바르지 않습니다. 다시 시도해 주세요.',
   acctErrStateMismatch:
     '이 로그인 링크는 현재 시도와 일치하지 않습니다. 앱에서 로그인을 다시 시작하세요.',
+  acctCallbackMismatch:
+    '이 로그인 링크가 일치하지 않습니다. 이 앱이 연 브라우저 창에서 로그인을 완료하세요.',
   acctErrAuthCodeInvalid: '로그인 코드가 만료되었거나 이미 사용되었습니다. 다시 로그인하세요.',
   acctErrRateLimited: '시도 횟수가 너무 많습니다. 잠시 후 다시 시도하세요.',
   acctErrUnauthorized: '세션이 더 이상 유효하지 않습니다. 다시 로그인하세요.',

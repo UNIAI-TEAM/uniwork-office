@@ -15,7 +15,9 @@ import type {
   HomeApi,
 } from '../src/shared/home-api'
 import { AccountEntry } from '../src/renderer/src/AccountEntry'
-import { ACCOUNT_ERROR_KEYS } from '../src/renderer/src/account-model'
+import { BillingPaymentPane } from '../src/renderer/src/BillingPaymentPane'
+import { LicenseDevicesPane } from '../src/renderer/src/LicenseDevicesPane'
+import { ACCOUNT_ERROR_KEYS, CALLBACK_NOTICE_MS } from '../src/renderer/src/account-model'
 import { LocaleProvider } from '../src/renderer/src/locale'
 import type { Lang } from '../src/renderer/src/locale'
 import type { SettingsSectionId } from '../src/renderer/src/SettingsModal'
@@ -191,8 +193,8 @@ afterEach(() => {
 describe('sidebar account entry', () => {
   const cases: Array<[AccountState, string, string | null]> = [
     ['signed-out', en.acctSignIn, null],
-    ['signed-in', 'Lan Nguyen', 'Acme School · Pro'],
-    ['refreshing', 'Lan Nguyen', 'Acme School · Pro'],
+    ['signed-in', 'Lan Nguyen', 'Pro'],
+    ['refreshing', 'Lan Nguyen', 'Pro'],
     ['session-expired', en.acctSignInAgain, en.acctExpiredShort],
     ['session-revoked', en.acctSignInAgain, en.acctRevokedShort],
     ['server-unreachable', 'Lan Nguyen', en.acctUnreachableTitle],
@@ -214,6 +216,19 @@ describe('sidebar account entry', () => {
     expect(entry().querySelector('.account-spinner')).not.toBeNull()
     expect(entry().querySelector('.account-name')?.textContent).toBe(en.acctSigningIn)
     expect(entry().getAttribute('data-tip')).toBe(en.acctSigningInHint)
+  })
+
+  it('signed in: the plan fits the sub-line; the tooltip names account, organization and plan', async () => {
+    await render(statusFor('signed-in'))
+    expect(entry().querySelector('.account-sub')?.textContent).toBe('Pro')
+    expect(entry().getAttribute('data-tip')).toBe(
+      `${en.acctSignedInAs.replace('{name}', PROFILE.email)}\nAcme School · Pro`,
+    )
+  })
+
+  it('signed in without a plan: the organization is the sub-line', async () => {
+    await render(statusFor('signed-in', { entitlements: null }))
+    expect(entry().querySelector('.account-sub')?.textContent).toBe('Acme School')
   })
 
   it('shows initials for the signed-in profile', async () => {
@@ -364,11 +379,14 @@ describe('Settings → Account pane', () => {
     expect(api.accountLogin).toHaveBeenCalledTimes(1)
   })
 
-  it('server unreachable: cached profile, message and retry', async () => {
+  it('server unreachable: cached profile and plan, one message and retry', async () => {
     await render(statusFor('server-unreachable', { error: 'network' }), { open: true })
     expect(pane()?.querySelector('.acct-card-name')?.textContent).toBe('Lan Nguyen')
     expect(pane()?.textContent).toContain(en.acctUnreachableTitle)
-    expect(pane()?.textContent).toContain(en.acctErrNetwork)
+    expect(pane()?.textContent).toContain('Pro')
+    // the notice body already says to check the connection: no second copy
+    expect(pane()?.textContent).toContain(en.acctUnreachableBody)
+    expect(pane()?.textContent).not.toContain(en.acctErrNetwork)
     await click(button(en.acctRetry))
     expect(api.accountRetry).toHaveBeenCalledTimes(1)
     expect(pane()?.dataset.state).toBe('signed-in')
@@ -411,14 +429,57 @@ describe('Settings → Account pane', () => {
     expect(api.accountLogin).toHaveBeenCalledTimes(1)
   })
 
-  it.each([
-    ['not-configured', en.acctNotConfiguredTitle],
-    ['keyring-unavailable', en.acctKeyringTitle],
-  ] as const)('%s: explains, with no dead button', async (state, title) => {
-    await render(statusFor(state, { serverOrigin: undefined }), { open: true })
-    expect(pane()?.textContent).toContain(title)
+  it('not-configured: explains, with no dead button', async () => {
+    await render(statusFor('not-configured', { serverOrigin: undefined }), { open: true })
+    expect(pane()?.textContent).toContain(en.acctNotConfiguredTitle)
     expect(pane()?.querySelectorAll('button').length).toBe(0)
     expectNoRawKeys()
+  })
+
+  it('keyring unavailable: retry reads the stored sign-in again', async () => {
+    await render(statusFor('keyring-unavailable', { error: 'keyring_unavailable' }), {
+      open: true,
+    })
+    expect(pane()?.textContent).toContain(en.acctKeyringTitle)
+    await click(button(en.acctRetry))
+    expect(api.accountRetry).toHaveBeenCalledTimes(1)
+    expect(api.accountLogin).not.toHaveBeenCalled()
+  })
+
+  it('keyring unavailable: sign in again, and a refused attempt says why', async () => {
+    await render(statusFor('keyring-unavailable', { error: 'keyring_unavailable' }), {
+      open: true,
+    })
+    api.accountLogin.mockImplementationOnce(async () => {
+      api.login({ phase: 'error', error: 'keyring_unavailable' })
+      return false
+    })
+    await click(button(en.acctSignInAgain))
+    expect(api.accountLogin).toHaveBeenCalledTimes(1)
+    expect(pane()?.querySelector('.acct-notice-error')?.textContent).toBe(
+      en.acctErrKeyringUnavailable,
+    )
+  })
+
+  it('a rejected sign-in link shows a passing notice and the attempt goes on', async () => {
+    await render(statusFor('signing-in'), { open: true })
+    await act(async () => api.login({ phase: 'url', url: 'https://uniwork.example/consent?x=1' }))
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      await act(async () => api.login({ phase: 'error', error: 'state_mismatch' }))
+      expect(pane()?.dataset.state).toBe('signing-in')
+      expect(pane()?.textContent).toContain(en.acctCallbackMismatch)
+      expect(entry().querySelector('.account-sub')?.textContent).toBe(en.acctCallbackMismatch)
+      expect(button(en.acctOpenAgain)).toBeDefined()
+      expect(pane()?.textContent).not.toContain(en.acctErrStateMismatch)
+      await act(async () => {
+        vi.advanceTimersByTime(CALLBACK_NOTICE_MS)
+      })
+      expect(pane()?.textContent).not.toContain(en.acctCallbackMismatch)
+      expect(pane()?.dataset.state).toBe('signing-in')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('renders the pane in Vietnamese', async () => {
@@ -462,12 +523,23 @@ describe('error text contrast', () => {
   const css = (rel: string) => readFileSync(join(__dirname, '..', '..', '..', rel), 'utf8')
   const tokens = css('packages/ui/src/tokens.css')
 
-  /** the value of a token inside the block that starts at `selector` */
-  function tokenIn(selector: string, name: string): string {
-    const block = tokens.slice(tokens.indexOf(selector))
-    const m = new RegExp(`${name}:\\s*(#[0-9a-fA-F]{6})`).exec(block)
-    if (!m) throw new Error(`${name} missing after ${selector}`)
-    return m[1]!
+  const home = css('apps/shell/src/renderer/src/home.css')
+  /** where each theme block opens (a rule at column 0, not a comment mentioning it) */
+  const OPENERS: Record<string, string> = {
+    ':root': '\n:root {',
+    "[data-theme='dark']": "\n[data-theme='dark'] {",
+    '@media (prefers-color-scheme: dark)': '\n@media (prefers-color-scheme: dark) {',
+  }
+
+  /** the value of a token inside the theme block `selector` of `source` (tokens.css by default) */
+  function tokenIn(selector: string, name: string, source = tokens): string {
+    const start = source.indexOf(OPENERS[selector]!)
+    if (start < 0) throw new Error(`no ${selector} block`)
+    const block = source.slice(start, source.indexOf('\n}', start + 1))
+    const m = new RegExp(`${name}:\\s*(#[0-9a-fA-F]{3,6})\\b`).exec(block)
+    if (!m) throw new Error(`${name} missing in ${selector}`)
+    const hex = m[1]!
+    return hex.length === 4 ? `#${[...hex.slice(1)].map((c) => c + c).join('')}` : hex
   }
   const luminance = (hex: string) => {
     const [r, g, b] = [1, 3, 5].map((i) => {
@@ -487,13 +559,77 @@ describe('error text contrast', () => {
       const text = tokenIn(selector, '--danger-text')
       expect(contrast(text, tokenIn(selector, '--danger-bg'))).toBeGreaterThanOrEqual(4.5)
       expect(contrast(text, tokenIn(selector, '--chrome-bg'))).toBeGreaterThanOrEqual(4.5)
+      expect(contrast(text, tokenIn(selector, '--surface'))).toBeGreaterThanOrEqual(4.5)
+      // error lines also sit on the info notice (accent tint)
+      expect(contrast(text, tokenIn(selector, '--accent-soft', home))).toBeGreaterThanOrEqual(4.5)
+    },
+  )
+
+  it('reads each theme block, not the first match in the file', () => {
+    expect(tokenIn(':root', '--surface')).toBe('#ffffff')
+    expect(tokenIn("[data-theme='dark']", '--surface')).toBe('#1e1e1e')
+    expect(tokenIn('@media (prefers-color-scheme: dark)', '--surface')).toBe('#1e1e1e')
+    expect(tokenIn("[data-theme='dark']", '--danger-text')).not.toBe(
+      tokenIn(':root', '--danger-text'),
+    )
+  })
+
+  it.each([':root', "[data-theme='dark']", '@media (prefers-color-scheme: dark)'])(
+    '%s: avatar initials and the empty avatar glyph meet WCAG AA',
+    (selector) => {
+      const avatar = tokenIn(selector, '--account-avatar-bg', home)
+      expect(contrast(tokenIn(selector, '--surface'), avatar)).toBeGreaterThanOrEqual(4.5)
+      const empty = tokenIn(selector, '--avatar-bg', home)
+      expect(contrast(tokenIn(selector, '--text-secondary'), empty)).toBeGreaterThanOrEqual(4.5)
     },
   )
 
   it('the account error rules use the legible token', () => {
     const settings = css('apps/shell/src/renderer/src/settings.css')
-    const home = css('apps/shell/src/renderer/src/home.css')
     expect(settings).toMatch(/\.acct-inline-error \{[^}]*color: var\(--danger-text\)/)
     expect(home).toMatch(/\.account-sub\.warn \{[^}]*color: var\(--danger-text\)/)
+    // Sign out: --danger itself is about 2.6:1 on the dark surface
+    expect(settings).toMatch(/\.set-btn\.danger \{[^}]*color: var\(--danger-text\)/)
+    expect(settings).toMatch(/\.set-license-warn \{[^}]*color: var\(--danger-text\)/)
+    expect(home).toMatch(/\.account-avatar \{[^}]*color: var\(--text-secondary\)/)
+    expect(home).toMatch(
+      /\.account-avatar\.logged-in \{[^}]*background: var\(--account-avatar-bg\)/,
+    )
+    expect(settings).toMatch(/\.acct-card-avatar \{[^}]*background: var\(--account-avatar-bg\)/)
+  })
+})
+
+describe('legacy license panes next to the UniWork account', () => {
+  async function renderPane(el: ReturnType<typeof createElement>) {
+    await act(async () => {
+      root.render(el)
+    })
+    await flush()
+  }
+
+  it('signed in: the license pane shows the account plan and no sign-in hint', async () => {
+    await renderPane(
+      createElement(LicenseDevicesPane, {
+        lang: 'en',
+        loggedIn: true,
+        accountPlanName: 'Team Plan',
+      }),
+    )
+    const text = host.textContent ?? ''
+    expect(host.querySelector('.set-license-summary strong')?.textContent).toBe('Team Plan')
+    expect(text).not.toContain('Sign in to sync license')
+    expect(text).not.toContain('when the license API is live')
+  })
+
+  it('signed out: the license pane is unchanged', async () => {
+    await renderPane(createElement(LicenseDevicesPane, { lang: 'en', loggedIn: false }))
+    expect(host.textContent).toContain('Sign in to sync license')
+  })
+
+  it('signed in: no payout account warning; signed out: unchanged', async () => {
+    await renderPane(createElement(BillingPaymentPane, { lang: 'en', signedIn: true }))
+    expect(host.textContent).not.toContain('No account number')
+    await renderPane(createElement(BillingPaymentPane, { lang: 'en' }))
+    expect(host.textContent).toContain('No account number')
   })
 })

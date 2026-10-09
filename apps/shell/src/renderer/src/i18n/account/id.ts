@@ -61,6 +61,8 @@ export const id = {
   acctErrInvalidCallback: 'Respons masuk tidak valid. Silakan coba lagi.',
   acctErrStateMismatch:
     'Tautan masuk ini tidak cocok dengan percobaan saat ini. Mulai masuk lagi dari aplikasi.',
+  acctCallbackMismatch:
+    'Tautan masuk ini tidak cocok. Selesaikan proses masuk di jendela browser yang dibuka aplikasi ini.',
   acctErrAuthCodeInvalid: 'Kode masuk sudah kedaluwarsa atau telah digunakan. Silakan masuk lagi.',
   acctErrRateLimited: 'Terlalu banyak percobaan. Tunggu sebentar lalu coba lagi.',
   acctErrUnauthorized: 'Sesi Anda tidak lagi valid. Silakan masuk lagi.',

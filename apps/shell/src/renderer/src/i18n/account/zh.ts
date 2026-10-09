@@ -55,6 +55,7 @@ export const zh = {
   acctErrCancelled: '已取消登录。',
   acctErrInvalidCallback: '登录返回的信息无效，请重试。',
   acctErrStateMismatch: '此登录链接与当前登录请求不匹配，请从应用中重新开始登录。',
+  acctCallbackMismatch: '此登录链接不匹配。请在本应用打开的浏览器窗口中完成登录。',
   acctErrAuthCodeInvalid: '登录码已过期或已被使用，请重新登录。',
   acctErrRateLimited: '尝试次数过多，请稍后再试。',
   acctErrUnauthorized: '登录已失效，请重新登录。',

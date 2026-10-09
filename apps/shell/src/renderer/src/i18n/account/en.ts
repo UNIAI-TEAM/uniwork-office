@@ -60,6 +60,8 @@ export const en = {
   acctErrInvalidCallback: 'The sign-in response wasn’t valid. Please try again.',
   acctErrStateMismatch:
     'This sign-in link doesn’t match the current attempt. Start signing in again from the app.',
+  acctCallbackMismatch:
+    'This sign-in link didn’t match. Finish signing in from the browser window this app opened.',
   acctErrAuthCodeInvalid: 'The sign-in code has expired or was already used. Please sign in again.',
   acctErrRateLimited: 'Too many attempts. Wait a moment and try again.',
   acctErrUnauthorized: 'Your session is no longer valid. Please sign in again.',

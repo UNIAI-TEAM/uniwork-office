@@ -30,7 +30,14 @@ function L(lang: string, vi: string, en: string): string {
 const isDev = Boolean(import.meta.env?.DEV)
 const PAID_PLANS: LicensePlanId[] = ['personal', 'pro', 'team']
 
-export function BillingPaymentPane({ lang }: { lang: string }): ReactElement {
+export function BillingPaymentPane({
+  lang,
+  signedIn = false,
+}: {
+  lang: string
+  /** signed in to the UniWork account: the account, not this device, carries the plan */
+  signedIn?: boolean
+}): ReactElement {
   const [account, setAccount] = useState<PaymentAccount>(() => readPaymentAccount())
   const [orders, setOrders] = useState<PaymentOrder[]>(() => readPaymentOrders())
   const [planId, setPlanId] = useState<LicensePlanId>('personal')
@@ -231,7 +238,7 @@ export function BillingPaymentPane({ lang }: { lang: string }): ReactElement {
             </button>
           </div>
         )}
-        {!ready ? (
+        {!ready && !signedIn ? (
           <p className="set-license-warn">
             {L(
               lang,

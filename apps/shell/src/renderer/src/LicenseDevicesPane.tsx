@@ -23,9 +23,12 @@ const isDev = Boolean(import.meta.env?.DEV)
 export function LicenseDevicesPane({
   lang,
   loggedIn,
+  accountPlanName,
 }: {
   lang: string
   loggedIn: boolean
+  /** plan of the signed-in UniWork account (server entitlements); wins over the on-device one */
+  accountPlanName?: string
 }): ReactElement {
   const [ent, setEnt] = useState<LicenseEntitlement>(() => readLicenseEntitlement())
   const [msg, setMsg] = useState('')
@@ -67,8 +70,8 @@ export function LicenseDevicesPane({
         <div>
           <span>{L(lang, 'Gói', 'Plan')}</span>
           <strong>
-            {lang.startsWith('vi') ? plan.labelVi : plan.labelEn}
-            {ent.simulated ? ' · DEV' : ''}
+            {accountPlanName ?? (lang.startsWith('vi') ? plan.labelVi : plan.labelEn)}
+            {!accountPlanName && ent.simulated ? ' · DEV' : ''}
           </strong>
         </div>
         <div>
@@ -111,7 +114,7 @@ export function LicenseDevicesPane({
         </p>
       ) : null}
 
-      {!loggedIn ? (
+      {accountPlanName ? null : !loggedIn ? (
         <p className="set-field-desc">
           {L(
             lang,

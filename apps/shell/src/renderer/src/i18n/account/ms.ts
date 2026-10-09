@@ -62,6 +62,8 @@ export const ms = {
   acctErrInvalidCallback: 'Respons log masuk tidak sah. Sila cuba lagi.',
   acctErrStateMismatch:
     'Pautan log masuk ini tidak sepadan dengan percubaan semasa. Mulakan log masuk semula daripada apl.',
+  acctCallbackMismatch:
+    'Pautan log masuk ini tidak sepadan. Selesaikan log masuk dalam tetingkap pelayar yang dibuka oleh apl ini.',
   acctErrAuthCodeInvalid:
     'Kod log masuk telah tamat tempoh atau sudah digunakan. Sila log masuk semula.',
   acctErrRateLimited: 'Terlalu banyak percubaan. Tunggu sebentar dan cuba lagi.',

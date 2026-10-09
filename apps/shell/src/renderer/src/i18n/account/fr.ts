@@ -62,6 +62,8 @@ export const fr = {
   acctErrInvalidCallback: 'La réponse de connexion n’était pas valide. Veuillez réessayer.',
   acctErrStateMismatch:
     'Ce lien de connexion ne correspond pas à la tentative en cours. Relancez la connexion depuis l’application.',
+  acctCallbackMismatch:
+    'Ce lien de connexion ne correspond pas. Terminez la connexion dans la fenêtre du navigateur ouverte par cette application.',
   acctErrAuthCodeInvalid:
     'Le code de connexion a expiré ou a déjà été utilisé. Veuillez vous reconnecter.',
   acctErrRateLimited: 'Trop de tentatives. Patientez un instant, puis réessayez.',

@@ -1677,8 +1677,14 @@ export function SettingsModal({
                   />
                 </div>
                 {account && <AccountPane account={account} />}
-                <LicenseDevicesPane lang={lang} loggedIn={loggedIn} />
-                <BillingPaymentPane lang={lang} />
+                <LicenseDevicesPane
+                  lang={lang}
+                  loggedIn={loggedIn}
+                  accountPlanName={
+                    (loggedIn && account?.status?.entitlements?.planName) || undefined
+                  }
+                />
+                <BillingPaymentPane lang={lang} signedIn={loggedIn} />
               </>
             )}
             {section === 'aiModel' && <AiModelPane t={t} />}

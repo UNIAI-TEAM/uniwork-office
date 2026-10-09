@@ -63,6 +63,8 @@ export const de = {
   acctErrInvalidCallback: 'Die Anmeldeantwort war ungültig. Bitte versuchen Sie es erneut.',
   acctErrStateMismatch:
     'Dieser Anmeldelink passt nicht zum aktuellen Anmeldeversuch. Starten Sie die Anmeldung erneut in der App.',
+  acctCallbackMismatch:
+    'Dieser Anmeldelink passt nicht. Schließen Sie die Anmeldung in dem Browserfenster ab, das diese App geöffnet hat.',
   acctErrAuthCodeInvalid:
     'Der Anmeldecode ist abgelaufen oder wurde bereits verwendet. Bitte melden Sie sich erneut an.',
   acctErrRateLimited:

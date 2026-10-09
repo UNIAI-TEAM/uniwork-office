@@ -382,8 +382,7 @@ export class SessionCore {
     if (state === 'server-unreachable' && this.session) {
       this.lastRecoveryAt = this.now()
       this.scheduleRecovery()
-    }
-    else if (state !== 'refreshing') {
+    } else if (state !== 'refreshing') {
       this.clearRecoveryTimer()
       if (state === 'signed-in') this.recoveryAttempts = 0
     }

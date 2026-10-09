@@ -62,6 +62,8 @@ export const it = {
   acctErrInvalidCallback: 'La risposta di accesso non era valida. Riprova.',
   acctErrStateMismatch:
     'Questo link di accesso non corrisponde al tentativo in corso. Riavvia l’accesso dall’app.',
+  acctCallbackMismatch:
+    'Questo link di accesso non corrisponde. Completa l’accesso nella finestra del browser aperta da questa app.',
   acctErrAuthCodeInvalid: 'Il codice di accesso è scaduto o è già stato usato. Accedi di nuovo.',
   acctErrRateLimited: 'Troppi tentativi. Attendi un momento e riprova.',
   acctErrUnauthorized: 'La tua sessione non è più valida. Accedi di nuovo.',

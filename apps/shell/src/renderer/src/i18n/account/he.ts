@@ -59,6 +59,7 @@ export const he = {
   acctErrInvalidCallback: 'תגובת הכניסה לא הייתה תקינה. נסה שוב.',
   acctErrStateMismatch:
     'קישור הכניסה הזה אינו תואם לניסיון הנוכחי. התחל את הכניסה מחדש מתוך האפליקציה.',
+  acctCallbackMismatch: 'קישור הכניסה הזה אינו תואם. השלם את הכניסה בחלון הדפדפן שהאפליקציה פתחה.',
   acctErrAuthCodeInvalid: 'קוד הכניסה פג תוקף או שכבר נעשה בו שימוש. היכנס שוב.',
   acctErrRateLimited: 'יותר מדי ניסיונות. המתן רגע ונסה שוב.',
   acctErrUnauthorized: 'ההפעלה שלך אינה תקפה עוד. היכנס שוב.',

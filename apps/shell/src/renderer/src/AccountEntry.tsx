@@ -100,11 +100,15 @@ export function AccountEntry({
   const stateSub = STATE_SUB[view]
   if (stateSub) sub = t(stateSub)
   else if (withProfile) {
-    sub = [status?.org?.name, status?.entitlements?.planName].filter(Boolean).join(' · ') || null
+    // the plan fits the sidebar width; the organization is in the tooltip
+    sub = status?.entitlements?.planName || status?.org?.name || null
   } else if (view === 'signed-out' && error && error !== 'cancelled') {
     sub = t(errorKeyFor(error, view))
+  } else if (account.callbackNotice) {
+    sub = t('acctCallbackMismatch')
   }
-  const warn = WARN_STATES.has(view) || (view === 'signed-out' && sub !== null)
+  const warn =
+    WARN_STATES.has(view) || (view === 'signed-out' && sub !== null) || account.callbackNotice
 
   const tip =
     view === 'signing-in'
@@ -112,7 +116,12 @@ export function AccountEntry({
       : signInFirst
         ? t('acctSignInUniwork')
         : withProfile
-          ? t('acctSignedInAs', { name: email || name })
+          ? [
+              t('acctSignedInAs', { name: email || name }),
+              [status?.org?.name, status?.entitlements?.planName].filter(Boolean).join(' · '),
+            ]
+              .filter(Boolean)
+              .join('\n')
           : t('acctOpenSettings')
 
   const handleClick = () => {

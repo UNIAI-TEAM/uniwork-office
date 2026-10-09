@@ -57,6 +57,7 @@ export const zhTW = {
   acctErrCancelled: '已取消登入。',
   acctErrInvalidCallback: '登入回應無效，請再試一次。',
   acctErrStateMismatch: '此登入連結與目前的登入嘗試不符。請從應用程式重新開始登入。',
+  acctCallbackMismatch: '此登入連結不相符。請在本應用程式開啟的瀏覽器視窗中完成登入。',
   acctErrAuthCodeInvalid: '登入代碼已過期或已使用過，請重新登入。',
   acctErrRateLimited: '嘗試次數過多，請稍候再試。',
   acctErrUnauthorized: '您的工作階段已失效，請重新登入。',

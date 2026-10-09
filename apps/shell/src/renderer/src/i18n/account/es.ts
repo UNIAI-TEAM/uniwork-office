@@ -62,6 +62,8 @@ export const es = {
   acctErrInvalidCallback: 'La respuesta de inicio de sesión no era válida. Inténtalo de nuevo.',
   acctErrStateMismatch:
     'Este enlace de inicio de sesión no coincide con el intento actual. Vuelve a iniciar sesión desde la aplicación.',
+  acctCallbackMismatch:
+    'Este enlace de inicio de sesión no coincide. Termina de iniciar sesión en la ventana del navegador que abrió esta aplicación.',
   acctErrAuthCodeInvalid:
     'El código de inicio de sesión ha caducado o ya se usó. Vuelve a iniciar sesión.',
   acctErrRateLimited: 'Demasiados intentos. Espera un momento e inténtalo de nuevo.',

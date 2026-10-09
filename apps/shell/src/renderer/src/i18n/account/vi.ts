@@ -39,7 +39,7 @@ export const vi = {
     'Hãy kiểm tra kết nối mạng hoặc cài đặt proxy. Bạn vẫn đang đăng nhập; thông tin bên dưới có thể chưa được cập nhật.',
   acctRetry: 'Thử lại',
   acctRetrying: 'Đang thử lại…',
-  acctWrongServerShort: 'Khác máy chủ',
+  acctWrongServerShort: 'Đã đăng nhập vào máy chủ khác',
   acctWrongServerTitle: 'Đã đăng nhập vào máy chủ khác',
   acctWrongServerBody:
     'Ứng dụng này được liên kết với {server}, nhưng phiên đăng nhập của bạn thuộc một máy chủ UniWork khác. Hãy đăng nhập lại với {server} hoặc đăng xuất.',
@@ -60,6 +60,8 @@ export const vi = {
   acctErrInvalidCallback: 'Phản hồi đăng nhập không hợp lệ. Vui lòng thử lại.',
   acctErrStateMismatch:
     'Liên kết đăng nhập này không khớp với lần đăng nhập hiện tại. Hãy bắt đầu đăng nhập lại từ ứng dụng.',
+  acctCallbackMismatch:
+    'Liên kết đăng nhập này không khớp. Hãy hoàn tất đăng nhập trong cửa sổ trình duyệt mà ứng dụng đã mở.',
   acctErrAuthCodeInvalid: 'Mã đăng nhập đã hết hạn hoặc đã được dùng. Vui lòng đăng nhập lại.',
   acctErrRateLimited: 'Bạn đã thử quá nhiều lần. Hãy đợi một lát rồi thử lại.',
   acctErrUnauthorized: 'Phiên đăng nhập không còn hợp lệ. Vui lòng đăng nhập lại.',

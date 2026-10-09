@@ -62,6 +62,8 @@ export const ja = {
   acctErrInvalidCallback: 'サインインの応答が無効でした。もう一度お試しください。',
   acctErrStateMismatch:
     'このサインインリンクは現在の操作と一致しません。アプリからもう一度サインインを開始してください。',
+  acctCallbackMismatch:
+    'このサインインリンクは一致しません。このアプリが開いたブラウザーのウィンドウでサインインを完了してください。',
   acctErrAuthCodeInvalid:
     'サインインコードの有効期限が切れているか、すでに使用されています。再度サインインしてください。',
   acctErrRateLimited: '試行回数が多すぎます。しばらく待ってからもう一度お試しください。',

@@ -62,6 +62,8 @@ export const cs = {
   acctErrInvalidCallback: 'Odpověď přihlášení není platná. Zkuste to prosím znovu.',
   acctErrStateMismatch:
     'Tento odkaz pro přihlášení neodpovídá aktuálnímu pokusu. Spusťte přihlášení znovu v aplikaci.',
+  acctCallbackMismatch:
+    'Tento odkaz pro přihlášení neodpovídá. Dokončete přihlášení v okně prohlížeče, které otevřela tato aplikace.',
   acctErrAuthCodeInvalid: 'Přihlašovací kód vypršel nebo už byl použit. Přihlaste se prosím znovu.',
   acctErrRateLimited: 'Příliš mnoho pokusů. Chvíli počkejte a zkuste to znovu.',
   acctErrUnauthorized: 'Vaše relace již není platná. Přihlaste se prosím znovu.',

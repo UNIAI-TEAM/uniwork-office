@@ -8,6 +8,8 @@
   --accent-soft: #eaf0fd;
   --modal-width-sm: 480px;
   --avatar-bg: #e8ebef;
+  /* signed-in avatar behind var(--surface) initials: AA (4.5:1) in both themes */
+  --account-avatar-bg: #0a66d8;
   --badge-bg: #eaf0fd;
   --checkbox-bg: #ececec;
   --timeline-user-bg: #eef1f5;
@@ -61,6 +63,7 @@
   --accent-hover: #5ba5ff;
   --accent-soft: #24354d;
   --avatar-bg: #333;
+  --account-avatar-bg: #3f99ff;
   --badge-bg: #2a3a4a;
   --checkbox-bg: #333;
   --timeline-user-bg: #2a2a3a;
@@ -79,6 +82,7 @@
     --accent-hover: #5ba5ff;
     --accent-soft: #24354d;
     --avatar-bg: #333;
+    --account-avatar-bg: #3f99ff;
     --badge-bg: #2a3a4a;
     --checkbox-bg: #333;
     --timeline-user-bg: #2a2a3a;
@@ -469,13 +473,13 @@ body.vib .home {
   height: 28px;
   border-radius: 50%;
   background: var(--avatar-bg);
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-size: 14px;
   font-weight: 700;
 }
 
 .account-avatar.logged-in {
-  background: var(--accent);
+  background: var(--account-avatar-bg);
   color: var(--surface);
   font-size: 12px;
 }

@@ -62,6 +62,8 @@ export const pl = {
   acctErrInvalidCallback: 'Odpowiedź logowania jest nieprawidłowa. Spróbuj ponownie.',
   acctErrStateMismatch:
     'Ten link do logowania nie pasuje do bieżącej próby. Rozpocznij logowanie ponownie w aplikacji.',
+  acctCallbackMismatch:
+    'Ten link do logowania nie pasuje. Dokończ logowanie w oknie przeglądarki otwartym przez tę aplikację.',
   acctErrAuthCodeInvalid: 'Kod logowania wygasł lub został już użyty. Zaloguj się ponownie.',
   acctErrRateLimited: 'Zbyt wiele prób. Zaczekaj chwilę i spróbuj ponownie.',
   acctErrUnauthorized: 'Twoja sesja nie jest już ważna. Zaloguj się ponownie.',

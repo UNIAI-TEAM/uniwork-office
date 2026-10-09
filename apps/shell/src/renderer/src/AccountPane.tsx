@@ -42,6 +42,17 @@ const SELF_EXPLAINED: ReadonlySet<AccountView> = new Set([
   'wrong-deployment',
 ])
 
+/** whether the error line adds something to the state's notice */
+function showsErrorLine(account: AccountController): boolean {
+  const { error, view } = account
+  if (!error || error === 'cancelled') return false
+  // a sign-in the user just tried from here failed: say so, even if the notice explains the state
+  if (view === 'keyring-unavailable') return account.loginError === error
+  // the outage notice already says to check the connection
+  if (view === 'server-unreachable' && error === 'network') return false
+  return !SELF_EXPLAINED.has(view)
+}
+
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="set-field">
@@ -66,8 +77,7 @@ export function AccountPane({ account }: { account: AccountController }) {
   const withProfile = showsProfile(view, status)
   // a cancelled attempt was the user's own choice, not a failure worth a red line;
   // states whose notice body already says it all get no repeated error line
-  const errorText =
-    error && error !== 'cancelled' && !SELF_EXPLAINED.has(view) ? t(errorKeyFor(error, view)) : null
+  const errorText = error && showsErrorLine(account) ? t(errorKeyFor(error, view)) : null
 
   const signOutBtn = (
     <button
@@ -82,6 +92,16 @@ export function AccountPane({ account }: { account: AccountController }) {
   const signInBtn = (label: StringKey) => (
     <button type="button" className="set-btn primary" onClick={account.signIn}>
       {t(label)}
+    </button>
+  )
+  const retryBtn = (
+    <button
+      type="button"
+      className="set-btn"
+      disabled={busy === 'retrying'}
+      onClick={account.retry}
+    >
+      {busy === 'retrying' ? t('acctRetrying') : t('acctRetry')}
     </button>
   )
 
@@ -136,11 +156,21 @@ export function AccountPane({ account }: { account: AccountController }) {
         </>
       )
       break
+    case 'keyring-unavailable':
+      // Retry reads the stored sign-in again (keyring unlocked meanwhile);
+      // signing in again replaces one this computer can no longer decrypt
+      actions = (
+        <>
+          {retryBtn}
+          {signInBtn('acctSignInAgain')}
+        </>
+      )
+      break
     case 'signed-in':
     case 'refreshing':
       actions = signOutBtn
       break
-    // not-configured / keyring-unavailable / loading: nothing the user can press here
+    // not-configured / loading: nothing the user can press here
   }
 
   return (
@@ -175,6 +205,11 @@ export function AccountPane({ account }: { account: AccountController }) {
           <div className="acct-notice-text">
             <div className="acct-notice-title">{t(notice.title)}</div>
             <div className="acct-notice-body">{t(notice.body, { server })}</div>
+            {account.callbackNotice && (
+              <div className="acct-notice-error" role="alert">
+                {t('acctCallbackMismatch')}
+              </div>
+            )}
             {errorText && <div className="acct-notice-error">{errorText}</div>}
           </div>
         </div>
