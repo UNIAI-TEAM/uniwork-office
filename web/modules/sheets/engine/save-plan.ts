@@ -55,6 +55,8 @@ export interface ResolvedSave {
       workbookProtectionState: PlanArgs[22]
       protectedRangeStates: PlanArgs[23]
       bulkConstantFills: PlanArgs[24]
+      tabColorStates: PlanArgs[25]
+      tableEdits: PlanArgs[26]
     },
     never
   >
@@ -72,6 +74,7 @@ export function resolveSaveRequest(
   const renames: { sheetName: string; newName: string }[] = []
   const removals: string[] = []
   const hiddenChanges: { sheetName: string; hidden: boolean }[] = []
+  const tabColorStates: { sheetName: string; color: string | null }[] = []
   let orderChanged = false
   for (const op of request.sheetOps) {
     if (op.kind === 'add-sheet') {
@@ -93,6 +96,7 @@ export function resolveSaveRequest(
     if (!sheetName) throw new Error(`Unknown worksheet ${op.sheetId}.`)
     if (op.kind === 'rename-sheet') renames.push({ sheetName, newName: op.newName })
     else if (op.kind === 'set-sheet-hidden') hiddenChanges.push({ sheetName, hidden: op.hidden })
+    else if (op.kind === 'set-sheet-tab-color') tabColorStates.push({ sheetName, color: op.color })
     else removals.push(sheetName)
   }
   const renameByOriginal = new Map(renames.map((rename) => [rename.sheetName, rename.newName]))
@@ -102,7 +106,7 @@ export function resolveSaveRequest(
     return sheetName
   }
   let sheetPlan: SheetEditPlan | undefined
-  if (request.sheetOps.length > 0) {
+  if (request.sheetOps.some((op) => op.kind !== 'set-sheet-tab-color')) {
     sheetPlan = {
       renames,
       additions: [...addedSheetNames].map(([sheetId, name]) => ({
@@ -151,6 +155,12 @@ export function resolveSaveRequest(
         level: op.level,
         ...(op.collapsed === undefined ? {} : { collapsed: op.collapsed }),
       })
+    } else if ('summaryBelow' in op) {
+      sheetOps.push({
+        kind: op.kind,
+        summaryBelow: op.summaryBelow,
+        summaryRight: op.summaryRight,
+      })
     } else if ('hidden' in op) {
       sheetOps.push({ kind: op.kind, start: op.start, end: op.end, hidden: op.hidden })
     } else if ('style' in op) {
@@ -175,7 +185,7 @@ export function resolveSaveRequest(
   }
   const formulaValuesBySheet = new Map<
     string,
-    { row: number; column: number; value: string | number | boolean | null }[]
+    { row: number; column: number; value: string | number | boolean | null | { error: string } }[]
   >()
   for (const cell of request.formulaValues) {
     const sheetName = resolveSheetName(cell.sheetId)
@@ -204,9 +214,9 @@ export function resolveSaveRequest(
         sheetName: resolveSheetName(state.sheetId),
         rules: state.rules,
       })),
-      sheetProtections: request.sheetProtections.map((state) => ({
-        sheetName: resolveSheetName(state.sheetId),
-        protected: state.protected,
+      sheetProtections: request.sheetProtections.map(({ sheetId, ...state }) => ({
+        sheetName: resolveSheetName(sheetId),
+        ...state,
       })),
       definedNamesState: request.definedNamesState,
       visualAdditions: request.visualAdditions.map((addition) => ({
@@ -231,6 +241,18 @@ export function resolveSaveRequest(
         columnNames: table.columnNames,
         style: table.style,
         bandedRows: table.bandedRows,
+        options: {
+          headerRow: table.headerRow,
+          totalsRow: table.totalsRow,
+          firstColumn: table.firstColumn,
+          lastColumn: table.lastColumn,
+          bandedColumns: table.bandedColumns,
+          filterButton: table.filterButton,
+        },
+      })),
+      tableEdits: (request.tableEdits ?? []).map(({ sheetId, ...edit }) => ({
+        ...edit,
+        sheetName: resolveSheetName(sheetId),
       })),
       pivotAdditions: request.pivotAdditions.map((pivot) => ({
         sheetName: resolveSheetName(pivot.sheetId),
@@ -242,6 +264,8 @@ export function resolveSaveRequest(
         rowFieldIndices: pivot.rowFieldIndices,
         columnFieldIndex: pivot.columnFieldIndex,
         pageFieldIndices: pivot.pageFieldIndices,
+        pageLevelItems: pivot.pageLevelItems,
+        pageItems: pivot.pageItems,
         rowItems: pivot.rowItems,
         rowLevelItems: pivot.rowLevelItems,
         rowLines: pivot.rowLines,
@@ -282,6 +306,7 @@ export function resolveSaveRequest(
         ranges: state.ranges,
       })),
       bulkConstantFills,
+      tabColorStates,
     },
   }
 }
@@ -384,6 +409,8 @@ export async function saveWorkbookBytes(input: {
     a.workbookProtectionState,
     a.protectedRangeStates,
     a.bulkConstantFills,
+    a.tabColorStates,
+    a.tableEdits,
   )
   const written: string[] = []
   const write = async (prefix: string, contents: ReadonlyMap<string, string | Uint8Array>) => {

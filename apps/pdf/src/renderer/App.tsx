@@ -6548,38 +6548,43 @@ export default function App() {
                       {t(key)}
                     </button>
                   ))}
-                  <button
-                    className={`rb-big${drawTool === 'redact' ? ' active' : ''}`}
-                    disabled={readOnly}
-                    data-tip={t('redactHint')}
-                    onClick={() => {
-                      setEditTextMode(false)
-                      setTextDraft(null)
-                      setEditImageMode(false)
-                      setDrawTool((tool) => (tool === 'redact' ? null : 'redact'))
-                    }}
-                  >
-                    <span className="rb-big-icon">
-                      <IconRect />
-                    </span>
-                    {t('redact')}
-                  </button>
-                  {redactions.length > 0 && (
+                  {/* redaction writes a working copy next to the file: desktop only (cap 'redaction') */}
+                  {cap('redaction') && (
                     <>
                       <button
-                        className="rb-big"
-                        data-tip={t('redactClear')}
-                        onClick={() => setRedactions([])}
+                        className={`rb-big${drawTool === 'redact' ? ' active' : ''}`}
+                        disabled={readOnly}
+                        data-tip={t('redactHint')}
+                        onClick={() => {
+                          setEditTextMode(false)
+                          setTextDraft(null)
+                          setEditImageMode(false)
+                          setDrawTool((tool) => (tool === 'redact' ? null : 'redact'))
+                        }}
                       >
-                        {t('redactClear')}
+                        <span className="rb-big-icon">
+                          <IconRect />
+                        </span>
+                        {t('redact')}
                       </button>
-                      <button
-                        className="rb-big"
-                        data-tip={t('redactApply')}
-                        onClick={requestRedactionSaveAs}
-                      >
-                        {t('redactApply')}
-                      </button>
+                      {redactions.length > 0 && (
+                        <>
+                          <button
+                            className="rb-big"
+                            data-tip={t('redactClear')}
+                            onClick={() => setRedactions([])}
+                          >
+                            {t('redactClear')}
+                          </button>
+                          <button
+                            className="rb-big"
+                            data-tip={t('redactApply')}
+                            onClick={requestRedactionSaveAs}
+                          >
+                            {t('redactApply')}
+                          </button>
+                        </>
+                      )}
                     </>
                   )}
                   <button

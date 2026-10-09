@@ -45,7 +45,8 @@ interface Props {
   imageEnabled: boolean
   onInsertImage: () => void
   /** open the image host configuration (genoffice#388) */
-  onImageHost: () => void
+  /** absent = no image host settings (web frame, cap 'imageHost') */
+  onImageHost?: () => void
   frontmatterOpen: boolean
   onToggleFrontmatter: () => void
   /** the markdown source view, distinct from the .txt/.json `sourceMode` */
@@ -539,9 +540,11 @@ export function Ribbon({
               >
                 <IconPicture size={ICON} />
               </IconBtn>
-              <IconBtn title={t('imageHostTitle')} onClick={onImageHost}>
-                <IconCloudUpload size={ICON} />
-              </IconBtn>
+              {onImageHost && (
+                <IconBtn title={t('imageHostTitle')} onClick={onImageHost}>
+                  <IconCloudUpload size={ICON} />
+                </IconBtn>
+              )}
               <IconBtn
                 title={t('insertHr')}
                 disabled={off}

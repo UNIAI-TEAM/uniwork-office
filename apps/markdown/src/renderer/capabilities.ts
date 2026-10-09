@@ -7,10 +7,18 @@ import { createCapabilityReader, type CapabilityObject } from '@genoffice/ui/cap
  *   ai, webSearch, imageSearch, imageGeneration  AI panel, AI ribbon group, ask-AI popover
  *   autoSave                                     AutoSave toggle + 30 s / blur autosave timer
  *   openInDocs                                   "export .docx and open in Docs"
+ *   imageHost                                    bring-your-own image host settings (Insert ribbon)
  *   save                                         false = view only (host withheld `save`)
  */
 export type MarkdownCapability =
-  'ai' | 'webSearch' | 'imageSearch' | 'imageGeneration' | 'autoSave' | 'openInDocs' | 'save'
+  | 'ai'
+  | 'webSearch'
+  | 'imageSearch'
+  | 'imageGeneration'
+  | 'autoSave'
+  | 'openInDocs'
+  | 'imageHost'
+  | 'save'
 
 export const { cap, platform, resetForTest } = createCapabilityReader<MarkdownCapability>(
   () => (window.markdownApi as { capabilities?: CapabilityObject } | undefined)?.capabilities,

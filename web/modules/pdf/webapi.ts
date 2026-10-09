@@ -900,6 +900,13 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
     onAiPanelPrefsChanged: () => () => {},
     gskStatus: async () => ({ loggedIn: false }),
     getAiSettings: ai.getAiSettings,
+    setAiSettings: async () => {},
+    onAiSettingsChanged: () => () => {},
+    openAiModelSettings: async () => {},
+    setAiPanelPrefs: async () => ({ ...DEFAULT_AI_PANEL_PREFS }),
+    requestRedactionCopy: async () => false,
+    // the host's file.renamed only renames: the web document id (its "path") never changes
+    onFileRenamed: () => () => {},
     aiStream: ai.aiStream,
     aiStreamCancel: ai.aiStreamCancel,
     onAiStream: ai.onAiStream,

@@ -363,11 +363,14 @@ describe('save', () => {
   it('a host `saveAs` request names the copy', async () => {
     const t = setup()
     const wb = await t.boot()
-    t.desktop.onMenuAction((action) => {
+    // unsubscribed below: the document keydown listener of every bridge outlives its test, so a
+    // later Ctrl+Shift+S would reach this handler with a session that no longer exists
+    const off = t.desktop.onMenuAction((action) => {
       if (action === 'save-as')
         void t.desktop.saveWorkbookEdits(saveRequest(wb.sessionId, [], 'save-as'))
     })
     const res = await t.mock.host.saveAs({ name: 'Copy.xlsx' })
+    off()
     expect(res).toMatchObject({ ok: true, file: { name: 'Copy.xlsx' } })
   })
 })

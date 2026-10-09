@@ -1094,7 +1094,7 @@ export default function App() {
         onToggleAutoSave={setAutoSave}
         imageEnabled={Boolean(filePath)}
         onInsertImage={insertImage}
-        onImageHost={() => setImageHostOpen(true)}
+        onImageHost={cap('imageHost') ? () => setImageHostOpen(true) : undefined}
         frontmatterOpen={fmOpen}
         onToggleFrontmatter={() => setFmOpen((v) => !v)}
         sourceViewOpen={sourceViewOpen}

@@ -17,6 +17,7 @@
 import type { HtmlApi } from '../../../apps/html/src/shared/ipc'
 import aiStubs, { aiUnavailableMessage } from '../../docs/bridge/ai'
 import type { ModuleBridgeContext } from '../../docs/bridge/module-bridge'
+import { printHtmlDocument } from '../shared/print'
 import { toStaticHtml } from '../shared/static-html'
 import { createTextWebApi, type TextWebApiOptions } from '../shared/text-webapi'
 
@@ -94,11 +95,23 @@ export function createHtmlWebApi(ctx: ModuleBridgeContext, opts: TextWebApiOptio
     }),
     exportPdf: web.exportPdf,
     exportHtml: web.exportHtml,
+    // Print = the browser print dialog over the static copy (no scripts, handlers or remote loads)
+    printHtml: async ({ html }) => {
+      const r = await printHtmlDocument(toStaticHtml(html, web.resolveAssetUrl))
+      return r.ok ? { ok: true as const } : { ok: false as const, error: r.error ?? 'print failed' }
+    },
+    // MCP read-text is a desktop shell feature
+    onReadTextRequest: () => () => {},
+    sendReadTextResult: () => {},
 
     getAiPanelPrefs: aiStubs.getAiPanelPrefs,
     onAiPanelPrefsChanged: () => () => {},
     onChromePressed: () => () => {},
     getAiSettings: aiStubs.getAiSettings,
+    setAiSettings: async () => {},
+    onAiSettingsChanged: () => () => {},
+    openAiModelSettings: async () => {},
+    setAiPanelPrefs: aiStubs.getAiPanelPrefs,
     aiGskStatus: aiStubs.aiGskStatus,
     aiStream: aiStubs.aiStream,
     aiStreamCancel: aiStubs.aiStreamCancel,

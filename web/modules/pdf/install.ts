@@ -15,6 +15,7 @@
  * | pdfTextEdit, pdfImageEdit,   | on; turned off when pdfium cannot be compiled in this frame (the    |
  * |   pdfAnnotDelete             |   module CSP carries 'wasm-unsafe-eval' for it)                     |
  * | savedSignatures              | on, browser-local store (./signatures.ts)                           |
+ * | redaction                    | off (the desktop redacts into a working copy file next to the PDF)   |
  * | ai, autoSave(ToDisk), auto-  | off (AI stays desktop-only; no autosave on the web, CONTRACT C10;   |
  * |   Rename, convertOffice, ocr,|   the rest need the desktop shell or an OS engine)                  |
  * |   webSearch, imageSearch,    |                                                                     |
@@ -38,6 +39,8 @@ export const PDF_WEB_CAPABILITIES: Readonly<Record<string, unknown>> = Object.fr
   pdfImageEdit: true,
   pdfAnnotDelete: true,
   savedSignatures: true,
+  // redaction writes a working copy next to the file (desktop only)
+  redaction: false,
   autoRename: false,
   convertOffice: false,
   ocr: false,

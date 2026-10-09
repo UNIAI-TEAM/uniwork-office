@@ -19,6 +19,7 @@ import { createCapabilityReader } from '@genoffice/ui/capabilities'
  * | pdfAnnotDelete   | deleting annotations already saved in the file (pdfium)                 |
  * | insertPages      | import / replace pages from another PDF (host file picker)              |
  * | savedSignatures  | the reusable signature library                                          |
+ * | redaction        | the Redact tool (applies into a working copy of the file)               |
  */
 export type PdfCapability =
   | 'edit'
@@ -32,6 +33,7 @@ export type PdfCapability =
   | 'pdfAnnotDelete'
   | 'insertPages'
   | 'savedSignatures'
+  | 'redaction'
 
 export const { cap, platform, resetForTest } = createCapabilityReader<PdfCapability>(
   () => window.pdfApi?.capabilities,
