@@ -80,12 +80,26 @@ function isStoredCredential(value: unknown): value is StoredCredential {
   )
 }
 
+/** what one file on disk holds: a credential, nothing usable, or bytes the keyring cannot open now */
+type ReadResult =
+  | { kind: 'ok'; credential: StoredCredential }
+  | { kind: 'corrupt' }
+  | { kind: 'unsupported' }
+  | { kind: 'locked' }
+
 /**
  * Electron safeStorage (DPAPI on Windows, Keychain on macOS, Secret Service
- * on Linux) encrypts one envelope file. Writes go to a fsync'd temp file and
- * are renamed into place; the previous good file is kept as `.bak` so a torn
- * or corrupt write recovers. There is no plaintext fallback: a Linux host on
- * the `basic_text` backend or with encryption unavailable is refused.
+ * on Linux) encrypts one envelope file. Writes go to a fsync'd temp file that
+ * is renamed over the previous one, so a crash leaves either the old or the
+ * new credential, never a torn one. There is no backup copy: refresh tokens
+ * rotate, so an older copy is dead server-side and replaying it would make
+ * the server revoke the whole device (refresh_reused).
+ *
+ * A file the keyring cannot decrypt right now (locked Keychain, keyring
+ * swapped, DPAPI hiccup) is kept and reported as keyring_unavailable; only a
+ * file that decrypts to garbage is dropped. There is no plaintext fallback: a
+ * Linux host on the `basic_text` backend or with encryption unavailable is
+ * refused.
  */
 export function createCredentialStore(options: {
   userDataDir: string
@@ -93,7 +107,8 @@ export function createCredentialStore(options: {
 }): CredentialStore {
   const dir = join(options.userDataDir, 'uniwork-auth')
   const target = join(dir, FILE)
-  const backup = `${target}.bak`
+  /** written by earlier builds; never read, only cleaned up */
+  const legacyBackup = `${target}.bak`
   const { safeStorage } = options
 
   const ensureAvailable = () => {
@@ -104,7 +119,7 @@ export function createCredentialStore(options: {
       backend = undefined
     }
     if (backend === 'basic_text') throw new CredentialStoreError('keyring_unavailable')
-    let available = false
+    let available: boolean
     try {
       available = safeStorage.isEncryptionAvailable()
     } catch {
@@ -113,15 +128,27 @@ export function createCredentialStore(options: {
     if (!available) throw new CredentialStoreError('keyring_unavailable')
   }
 
-  const readFile = (path: string): StoredCredential | null => {
+  const readTarget = (): ReadResult => {
+    let plain: string
     try {
-      const parsed: unknown = JSON.parse(safeStorage.decryptString(readFileSync(path)))
-      const envelope = parsed as { version?: unknown; credential?: unknown }
-      if (envelope?.version !== VERSION || !isStoredCredential(envelope.credential)) return null
-      return envelope.credential
+      plain = safeStorage.decryptString(readFileSync(target))
     } catch {
-      return null
+      return { kind: 'locked' }
     }
+    let envelope: { version?: unknown; credential?: unknown }
+    try {
+      envelope = JSON.parse(plain) as { version?: unknown; credential?: unknown }
+    } catch {
+      return { kind: 'corrupt' }
+    }
+    // a newer build's format: leave it for that build, sign in fresh here
+    if (typeof envelope?.version === 'number' && envelope.version > VERSION) {
+      return { kind: 'unsupported' }
+    }
+    if (envelope?.version !== VERSION || !isStoredCredential(envelope.credential)) {
+      return { kind: 'corrupt' }
+    }
+    return { kind: 'ok', credential: envelope.credential }
   }
 
   const removeQuietly = (path: string) => {
@@ -135,22 +162,21 @@ export function createCredentialStore(options: {
   return {
     load() {
       ensureAvailable()
-      const primary = existsSync(target) ? readFile(target) : null
-      if (primary) return primary
-      const fallback = existsSync(backup) ? readFile(backup) : null
-      if (fallback) {
-        // restore the last good copy over the missing/corrupt primary
-        try {
-          writeFileSync(target, readFileSync(backup), { mode: 0o600 })
-        } catch {
-          // the backup still serves the next load
-        }
-        return fallback
+      removeQuietly(legacyBackup)
+      if (!existsSync(target)) return null
+      const read = readTarget()
+      switch (read.kind) {
+        case 'ok':
+          return read.credential
+        case 'locked':
+          // the refresh token may still be good once the keyring opens again
+          throw new CredentialStoreError('keyring_unavailable')
+        case 'unsupported':
+          return null
+        case 'corrupt':
+          removeQuietly(target)
+          return null
       }
-      // nothing readable: drop the unreadable bytes so they cannot linger
-      removeQuietly(target)
-      removeQuietly(backup)
-      return null
     },
     save(credential) {
       ensureAvailable()
@@ -167,7 +193,7 @@ export function createCredentialStore(options: {
         fsyncSync(fd)
         closeSync(fd)
         fd = undefined
-        if (existsSync(target) && readFile(target)) renameSync(target, backup)
+        // atomic replace (MoveFileEx REPLACE_EXISTING on Windows, rename(2) elsewhere)
         renameSync(temp, target)
       } catch (error) {
         if (fd !== undefined) {
@@ -181,26 +207,11 @@ export function createCredentialStore(options: {
         if (error instanceof CredentialStoreError) throw error
         throw new CredentialStoreError('io')
       }
+      removeQuietly(legacyBackup)
     },
     clear() {
       removeQuietly(target)
-      removeQuietly(backup)
-    },
-  }
-}
-
-/** test/dev seam: same contract, nothing on disk */
-export function createMemoryCredentialStore(
-  initial: StoredCredential | null = null,
-): CredentialStore {
-  let current = initial
-  return {
-    load: () => current,
-    save: (credential) => {
-      current = { ...credential }
-    },
-    clear: () => {
-      current = null
+      removeQuietly(legacyBackup)
     },
   }
 }

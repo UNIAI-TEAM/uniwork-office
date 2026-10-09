@@ -5,7 +5,6 @@ import type {
   AccountProfile,
   AccountState,
 } from '../../shared/home-api'
-import type { CallbackRejectReason } from './callback'
 import type { BillingResponse, MeResponse, OrgResponse, TransportErrorCode } from './transport'
 
 /** where a failure happened: no credential yet (sign-in) or with one (session) */
@@ -26,6 +25,8 @@ export interface FailureOutcome {
 export function classifyTransportFailure(
   code: TransportErrorCode,
   phase: FailurePhase,
+  /** false when the code was inferred from a bare HTTP status (no server envelope) */
+  fromServer = true,
 ): FailureOutcome {
   const keep = (state: AccountState, error: AccountErrorCode): FailureOutcome => ({
     state,
@@ -50,9 +51,11 @@ export function classifyTransportFailure(
       return { state: 'session-revoked', error: code, clearCredentials: true }
     case 'unauthorized':
     case 'auth_code_invalid':
-      return phase === 'sign-in'
-        ? keep('signed-out', code)
-        : { state: 'session-expired', error: code, clearCredentials: true }
+      if (phase === 'sign-in') return keep('signed-out', code)
+      // only the UniWork server's own verdict ends a session; a bare 401 from
+      // something in between keeps the credential for a later retry
+      if (!fromServer) return keep('server-unreachable', 'server_error')
+      return { state: 'session-expired', error: code, clearCredentials: true }
     case 'rate_limited':
       return soft('rate_limited')
     case 'malformed_response':
@@ -60,24 +63,6 @@ export function classifyTransportFailure(
     case 'invalid_request':
     case 'forbidden':
       return soft('server_error')
-  }
-}
-
-export function classifyCallbackRejection(reason: CallbackRejectReason): FailureOutcome {
-  const out = (state: AccountState, error: AccountErrorCode): FailureOutcome => ({
-    state,
-    error,
-    clearCredentials: false,
-  })
-  switch (reason) {
-    case 'expired':
-      return out('signed-out', 'login_timeout')
-    case 'wrong_redirect':
-      return out('wrong-deployment', 'wrong_deployment')
-    case 'state_mismatch':
-      return out('signed-out', 'state_mismatch')
-    default:
-      return out('signed-out', 'invalid_callback')
   }
 }
 

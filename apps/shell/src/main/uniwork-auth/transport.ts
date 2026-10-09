@@ -25,12 +25,19 @@ export type TransportErrorCode =
 export class TransportError extends Error {
   readonly code: TransportErrorCode
   readonly status?: number
-  constructor(code: TransportErrorCode, status?: number) {
+  /**
+   * true when the code is the server's own `{error:{code}}` verdict; false
+   * when it was only inferred from the HTTP status (a gateway, WAF or captive
+   * portal can answer 401 without the UniWork server ever seeing the call)
+   */
+  readonly fromServer: boolean
+  constructor(code: TransportErrorCode, status?: number, fromServer = false) {
     // never carries a URL, body, or token: the code is the whole story
     super(`uniwork request failed: ${code}`)
     this.name = 'TransportError'
     this.code = code
     this.status = status
+    this.fromServer = fromServer
   }
 }
 
@@ -137,7 +144,7 @@ async function errorFromResponse(response: Response): Promise<TransportError> {
   }
   const status = response.status
   if (typeof code === 'string' && SERVER_CODES.has(code)) {
-    return new TransportError(code as TransportErrorCode, status)
+    return new TransportError(code as TransportErrorCode, status, true)
   }
   if (status === 429) return new TransportError('rate_limited', status)
   if (status >= 500) return new TransportError('server_error', status)
@@ -277,30 +284,37 @@ export function createUniworkTransport(
     if (opts.accessToken) headers.Authorization = `Bearer ${opts.accessToken}`
     const controller = new AbortController()
     let timedOut = false
+    // the deadline covers the whole exchange, body included: a server or proxy
+    // that sends headers and then stalls must not hang a shared refresh forever
     const timer = setTimeout(() => {
       timedOut = true
       controller.abort()
     }, timeoutMs)
-    let response: Response
     try {
-      response = await fetchImpl(`${base}${route}${opts.query ? `?${opts.query}` : ''}`, {
-        method,
-        headers,
-        cache: 'no-store',
-        redirect: 'error',
-        signal: controller.signal,
-        ...(opts.body !== undefined ? { body: JSON.stringify(opts.body) } : {}),
-      })
-    } catch {
-      throw new TransportError(timedOut ? 'timeout' : 'network')
+      let response: Response
+      try {
+        response = await fetchImpl(`${base}${route}${opts.query ? `?${opts.query}` : ''}`, {
+          method,
+          headers,
+          cache: 'no-store',
+          redirect: 'error',
+          signal: controller.signal,
+          ...(opts.body !== undefined ? { body: JSON.stringify(opts.body) } : {}),
+        })
+      } catch {
+        throw new TransportError(timedOut ? 'timeout' : 'network')
+      }
+      if (!response.ok) {
+        const error = await errorFromResponse(response)
+        throw timedOut ? new TransportError('timeout') : error
+      }
+      try {
+        return await response.json()
+      } catch {
+        throw new TransportError(timedOut ? 'timeout' : 'malformed_response', response.status)
+      }
     } finally {
       clearTimeout(timer)
-    }
-    if (!response.ok) throw await errorFromResponse(response)
-    try {
-      return await response.json()
-    } catch {
-      throw new TransportError('malformed_response', response.status)
     }
   }
 

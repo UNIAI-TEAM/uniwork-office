@@ -5,11 +5,7 @@ import {
   resolveDeploymentProfile,
   type DeploymentProfile,
 } from '../src/main/uniwork-auth/deployment'
-import {
-  classifyCallbackRejection,
-  classifyTransportFailure,
-  pickOrg,
-} from '../src/main/uniwork-auth/mapping'
+import { classifyTransportFailure, pickOrg } from '../src/main/uniwork-auth/mapping'
 import {
   TransportError,
   createUniworkTransport,
@@ -182,6 +178,44 @@ describe('UniWork transport', () => {
     expect(await codeOf(garbled.me('at'))).toBe('malformed_response')
   })
 
+  it('times out a response whose body stalls after the headers', async () => {
+    const stalled = createUniworkTransport(profile, {
+      timeoutMs: 10,
+      fetch: async (_url, init) => {
+        const body = new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode('{"user":'))
+            // headers and a first chunk arrive, then nothing until the abort
+            init.signal?.addEventListener('abort', () =>
+              controller.error(new DOMException('aborted', 'AbortError')),
+            )
+          },
+        })
+        return new Response(body, { status: 200 })
+      },
+    })
+    expect(await codeOf(stalled.me('at'))).toBe('timeout')
+  })
+
+  it('tells a server verdict from a bare HTTP 401', async () => {
+    const enveloped = createUniworkTransport(profile, {
+      fetch: async () => json(401, { error: { code: 'unauthorized', message: 'x' } }),
+    })
+    const bare = createUniworkTransport(profile, {
+      fetch: async () => new Response('<html>blocked</html>', { status: 401 }),
+    })
+    const errorOf = async (p: Promise<unknown>) =>
+      p.then(
+        () => null,
+        (e: TransportError) => e,
+      )
+    expect(await errorOf(enveloped.me('at'))).toMatchObject({
+      code: 'unauthorized',
+      fromServer: true,
+    })
+    expect(await errorOf(bare.me('at'))).toMatchObject({ code: 'unauthorized', fromServer: false })
+  })
+
   it('reads profile, orgs and billing with a bearer token', async () => {
     const fetch = vi.fn<FetchLike>(async (url) => {
       if (url.endsWith('/me'))
@@ -302,18 +336,15 @@ describe('error mapping', () => {
     })
   })
 
-  it('maps callback rejections', () => {
-    expect(classifyCallbackRejection('expired')).toMatchObject({
-      state: 'signed-out',
-      error: 'login_timeout',
+  it('a bare 401 (no server envelope) never clears the session', () => {
+    expect(classifyTransportFailure('unauthorized', 'session', false)).toEqual({
+      state: 'server-unreachable',
+      error: 'server_error',
+      clearCredentials: false,
     })
-    expect(classifyCallbackRejection('wrong_redirect')).toMatchObject({
-      state: 'wrong-deployment',
-      error: 'wrong_deployment',
-    })
-    expect(classifyCallbackRejection('state_mismatch')).toMatchObject({ error: 'state_mismatch' })
-    expect(classifyCallbackRejection('unexpected_query')).toMatchObject({
-      error: 'invalid_callback',
+    expect(classifyTransportFailure('unauthorized', 'session', true)).toMatchObject({
+      state: 'session-expired',
+      clearCredentials: true,
     })
   })
 

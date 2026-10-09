@@ -88,22 +88,54 @@ describe('uniwork credential store', () => {
     }
   })
 
-  it('recovers the previous credential from .bak when the primary is corrupt', () => {
+  it('keeps the file and reports keyring_unavailable when decryption fails (locked keyring)', () => {
+    const writer = createCredentialStore({ userDataDir: dir, safeStorage: fakeSafeStorage() })
+    writer.save(credential())
+    const locked = createCredentialStore({
+      userDataDir: dir,
+      safeStorage: fakeSafeStorage({
+        decryptString: () => {
+          throw new Error('keychain access denied')
+        },
+      }),
+    })
+    try {
+      locked.load()
+      expect.unreachable()
+    } catch (error) {
+      expect((error as CredentialStoreError).code).toBe('keyring_unavailable')
+    }
+    // the refresh token survives: once the keyring opens again it is still there
+    expect(readdirSync(join(dir, 'uniwork-auth'))).toEqual(['session.bin'])
+    expect(writer.load()).toEqual(credential())
+  })
+
+  it('drops a file that decrypts to garbage', () => {
+    const store = createCredentialStore({ userDataDir: dir, safeStorage: fakeSafeStorage() })
+    store.save(credential())
+    writeFileSync(sessionFile(), fakeSafeStorage().encryptString('{not json'))
+    expect(store.load()).toBeNull()
+    expect(readdirSync(join(dir, 'uniwork-auth'))).toEqual([])
+  })
+
+  it('leaves a newer-format file alone and reads as signed out', () => {
+    const store = createCredentialStore({ userDataDir: dir, safeStorage: fakeSafeStorage() })
+    store.save(credential())
+    const newer = fakeSafeStorage().encryptString(JSON.stringify({ version: 99, credential: {} }))
+    writeFileSync(sessionFile(), newer)
+    expect(store.load()).toBeNull()
+    expect(readFileSync(sessionFile())).toEqual(newer)
+  })
+
+  it('never resurrects a rotated-out refresh token (no backup copy)', () => {
     const store = createCredentialStore({ userDataDir: dir, safeStorage: fakeSafeStorage() })
     store.save(credential('rt_secret_value_1'))
     store.save(credential('rt_secret_value_2'))
-    writeFileSync(sessionFile(), 'garbage')
-    expect(store.load()?.refreshToken).toBe('rt_secret_value_1')
-    // the good copy was restored over the corrupt primary
-    expect(store.load()?.refreshToken).toBe('rt_secret_value_1')
-  })
-
-  it('treats unreadable primary and backup as signed out and removes them', () => {
-    const store = createCredentialStore({ userDataDir: dir, safeStorage: fakeSafeStorage() })
-    store.save(credential())
-    store.save(credential())
-    writeFileSync(sessionFile(), 'garbage')
-    writeFileSync(`${sessionFile()}.bak`, 'garbage')
+    expect(readdirSync(join(dir, 'uniwork-auth'))).toEqual(['session.bin'])
+    expect(store.load()?.refreshToken).toBe('rt_secret_value_2')
+    // a leftover backup from an earlier build is removed, never read
+    writeFileSync(`${sessionFile()}.bak`, fakeSafeStorage().encryptString('{}'))
+    writeFileSync(sessionFile(), fakeSafeStorage().encryptString('{not json'))
     expect(store.load()).toBeNull()
     expect(readdirSync(join(dir, 'uniwork-auth'))).toEqual([])
   })

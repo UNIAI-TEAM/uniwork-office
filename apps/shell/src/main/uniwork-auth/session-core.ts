@@ -39,6 +39,11 @@ export interface AccountManagerDeps {
 const PROACTIVE_REFRESH_RATIO = 0.8
 /** an access token this close to expiry is refreshed before use */
 export const ACCESS_TOKEN_SKEW_MS = 30_000
+/** automatic retry after a transient failure: 5 s doubling up to 5 min */
+export const RECOVERY_MIN_MS = 5_000
+export const RECOVERY_MAX_MS = 300_000
+/** setTimeout fires at once past 2^31-1 ms, so longer delays are clamped */
+const MAX_TIMER_MS = 2_147_483_647
 
 export interface LiveSession {
   credential: StoredCredential
@@ -72,6 +77,9 @@ export class SessionCore {
   protected generation = 0
   protected refreshInFlight: Promise<void> | null = null
   protected refreshTimer: ReturnType<typeof setTimeout> | null = null
+  private recoveryTimer: ReturnType<typeof setTimeout> | null = null
+  private recoveryAttempts = 0
+  private recoveryInFlight: Promise<void> | null = null
   protected readonly statusListeners = new Set<(status: AccountStatus) => void>()
   protected readonly loginListeners = new Set<(event: AccountLoginEvent) => void>()
   protected readonly entitlementListeners = new Set<(e: AccountEntitlements | null) => void>()
@@ -118,8 +126,14 @@ export class SessionCore {
     return this.state === 'signed-in' || this.state === 'refreshing' ? this.entitlements : null
   }
 
-  /** a valid access token for main-process cloud calls, refreshing if needed */
+  /**
+   * A valid access token for main-process cloud calls, refreshing if needed.
+   * From server-unreachable (credential kept) it tries to recover first, so a
+   * caller does not have to wait for the next automatic retry.
+   */
   async getAccessToken(): Promise<string | null> {
+    if (!this.session) return null
+    if (this.state === 'server-unreachable') await this.runRecovery()
     if (!this.session || !(this.state === 'signed-in' || this.state === 'refreshing')) return null
     if (this.session.accessExpiresAt - this.now() > ACCESS_TOKEN_SKEW_MS)
       return this.session.accessToken
@@ -150,7 +164,10 @@ export class SessionCore {
       this.applyOutcome({ state: 'session-expired', error: 'unauthorized', clearCredentials: true })
       throw this.markHandled(new TransportError('unauthorized'))
     }
-    if (this.state === 'signed-in') this.setState('refreshing')
+    // only a refresh that showed `refreshing` itself flips it back: startup
+    // restore keeps `refreshing` until the account reload has verified it
+    const showsRefreshing = this.state === 'signed-in'
+    if (showsRefreshing) this.setState('refreshing')
     let next: DesktopSession
     try {
       next = await this.transport.refresh({
@@ -172,15 +189,57 @@ export class SessionCore {
     }
     if (!this.persist(credential)) throw this.markHandled(new TransportError('unauthorized'))
     this.adoptSession(credential, next)
-    if (this.state === 'refreshing') this.setState('signed-in')
+    if (showsRefreshing && this.state === 'refreshing') this.setState('signed-in')
   }
 
-  protected ensureProfile(): boolean {
+  /** what an automatic recovery runs; the manager reloads the account too */
+  protected recover(): Promise<unknown> {
+    return this.refresh()
+  }
+
+  /** one recovery at a time, shared by the backoff timer and getAccessToken() */
+  protected runRecovery(): Promise<void> {
+    if (!this.recoveryInFlight) {
+      const run = this.recover()
+        .then(
+          () => undefined,
+          () => undefined,
+        )
+        .finally(() => {
+          if (this.recoveryInFlight === run) this.recoveryInFlight = null
+        })
+      this.recoveryInFlight = run
+    }
+    return this.recoveryInFlight
+  }
+
+  /** server-unreachable with a credential retries on its own, with a bounded backoff */
+  private scheduleRecovery(): void {
+    if (this.recoveryTimer) return
+    const delay = Math.min(RECOVERY_MAX_MS, RECOVERY_MIN_MS * 2 ** this.recoveryAttempts)
+    this.recoveryAttempts = Math.min(this.recoveryAttempts + 1, 16)
+    this.recoveryTimer = setTimeout(() => {
+      this.recoveryTimer = null
+      void this.runRecovery()
+    }, delay)
+  }
+
+  protected clearRecoveryTimer(): void {
+    if (this.recoveryTimer) clearTimeout(this.recoveryTimer)
+    this.recoveryTimer = null
+  }
+
+  /** the active deployment profile (resolved once per process), or null */
+  deploymentProfile(): DeploymentProfile | null {
     if (!this.profile) {
       this.profile = this.deps.resolveProfile()
       this.transport = this.profile ? this.deps.createTransport(this.profile) : null
     }
-    if (!this.profile) this.setState('not-configured', 'not_configured')
+    return this.profile
+  }
+
+  protected ensureProfile(): boolean {
+    if (!this.deploymentProfile()) this.setState('not-configured', 'not_configured')
     return this.profile !== null
   }
 
@@ -191,7 +250,10 @@ export class SessionCore {
       accessExpiresAt: this.now() + session.expiresIn * 1000,
     }
     this.clearRefreshTimer()
-    const delay = Math.max(1000, session.expiresIn * 1000 * PROACTIVE_REFRESH_RATIO)
+    const delay = Math.min(
+      MAX_TIMER_MS,
+      Math.max(1000, session.expiresIn * 1000 * PROACTIVE_REFRESH_RATIO),
+    )
     this.refreshTimer = setTimeout(() => void this.refresh().catch(() => undefined), delay)
   }
 
@@ -241,8 +303,10 @@ export class SessionCore {
         clearCredentials: false,
       })
     }
-    const code = error instanceof TransportError ? error.code : 'server_error'
-    return this.applyOutcome(classifyTransportFailure(code, phase))
+    if (!(error instanceof TransportError)) {
+      return this.applyOutcome(classifyTransportFailure('server_error', phase))
+    }
+    return this.applyOutcome(classifyTransportFailure(error.code, phase, error.fromServer))
   }
 
   protected applyOutcome(outcome: FailureOutcome): AccountErrorCode {
@@ -264,6 +328,7 @@ export class SessionCore {
   /** drops in-memory tokens and account data (the disk credential is untouched) */
   protected resetSession(): void {
     this.clearRefreshTimer()
+    this.clearRecoveryTimer()
     this.refreshInFlight = null
     this.session = null
     this.accountProfile = undefined
@@ -280,6 +345,11 @@ export class SessionCore {
   protected setState(state: AccountState, error?: AccountErrorCode): void {
     this.state = state
     this.error = error
+    if (state === 'server-unreachable' && this.session) this.scheduleRecovery()
+    else if (state !== 'refreshing') {
+      this.clearRecoveryTimer()
+      if (state === 'signed-in') this.recoveryAttempts = 0
+    }
     const status = this.status()
     for (const listener of this.statusListeners) listener(status)
     this.publishEntitlements()

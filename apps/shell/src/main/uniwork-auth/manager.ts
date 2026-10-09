@@ -2,9 +2,15 @@ import type { AccountEntitlements, AccountErrorCode, AccountStatus } from '../..
 import { isAuthCallbackUrl, validateCallback } from './callback'
 import type { StoredCredential } from './credentials'
 import { redirectUriForProfile, type DeploymentProfile } from './deployment'
-import { classifyCallbackRejection, pickOrg, toEntitlements, toProfile } from './mapping'
+import { pickOrg, toEntitlements, toProfile } from './mapping'
 import { LoginAttemptStore } from './pkce'
-import { ACCESS_TOKEN_SKEW_MS, SessionCore, handled, type AccountManagerDeps } from './session-core'
+import {
+  ACCESS_TOKEN_SKEW_MS,
+  SessionCore,
+  handled,
+  type AccountManagerDeps,
+  type LiveSession,
+} from './session-core'
 import { TransportError, type DesktopSession, type UniworkTransport } from './transport'
 
 export type { AccountManagerDeps } from './session-core'
@@ -22,6 +28,18 @@ export class AccountManager extends SessionCore {
   constructor(deps: AccountManagerDeps) {
     super(deps)
     this.attempts = deps.attempts ?? new LoginAttemptStore()
+  }
+
+  /**
+   * Startup restore once `gate` settles (the main-process proxy install), so
+   * the first refresh does not go out before the system proxy is in place.
+   * Skipped when the user already started something in the meantime.
+   */
+  async startupRestore(gate: Promise<unknown>): Promise<AccountStatus> {
+    const generation = this.generation
+    await gate.catch(() => undefined)
+    if (generation !== this.generation) return this.status()
+    return this.restore()
   }
 
   /** Restores the stored session (refresh + account reload); never throws. */
@@ -64,6 +82,9 @@ export class AccountManager extends SessionCore {
 
   async login(): Promise<boolean> {
     if (this.state === 'signed-in' || this.state === 'refreshing') return true
+    // a live session (server-unreachable) is recovered, never shadowed by a
+    // second attempt whose cancel would hide it behind signed-out
+    if (this.session) return (await this.retry()).loggedIn
     if (!this.ensureProfile()) {
       this.emitLogin({ phase: 'error', error: 'not_configured' })
       return false
@@ -146,13 +167,13 @@ export class AccountManager extends SessionCore {
     // a stray callback (e.g. after a restart lost the verifier) changes nothing
     if (!attempt || !this.profile || !this.transport) return
     const validation = validateCallback(url, attempt, this.now())
-    this.clearAttemptTimer()
     if (!validation.ok) {
-      this.attempts.cancel()
-      this.generation++
-      this.failLogin(this.applyOutcome(classifyCallbackRejection(validation.reason)))
+      if (validation.reason === 'expired') this.expireAttempt(attempt.attemptId)
+      // a forged, stale or foreign-scheme callback is discarded; the user's
+      // live attempt and its state are left alone (anything can open a URL)
       return
     }
+    this.clearAttemptTimer()
     const claimed = this.attempts.consume(validation.attemptId)
     if (!claimed) return
     const generation = this.generation
@@ -199,7 +220,8 @@ export class AccountManager extends SessionCore {
       return this.restore()
     if (this.state !== 'server-unreachable' && this.state !== 'signed-in') return this.status()
     if (!this.session) {
-      this.setState('signed-out')
+      // the failure happened while signing in: retrying means signing in again
+      await this.login()
       return this.status()
     }
     const generation = this.generation
@@ -232,7 +254,10 @@ export class AccountManager extends SessionCore {
     return this.status()
   }
 
-  /** server revoke (device scope) then clear; a failed revoke still clears locally */
+  /**
+   * Clears locally first (disk, memory, state push), then revokes the device
+   * (scope device) in the background; a failed revoke changes nothing locally.
+   */
   async logout(): Promise<AccountStatus> {
     this.generation++
     this.attempts.cancel()
@@ -240,37 +265,48 @@ export class AccountManager extends SessionCore {
     const live = this.session
     const transport = this.transport
     this.resetSession()
-    if (live && transport) {
-      try {
-        let token = live.accessToken
-        if (!token || live.accessExpiresAt <= this.now()) {
-          token = (
-            await transport.refresh({
-              deviceSessionId: live.credential.deviceSessionId,
-              refreshToken: live.credential.refreshToken,
-            })
-          ).accessToken
-        }
-        await transport.logout({ deviceSessionId: live.credential.deviceSessionId }, token)
-      } catch {
-        // offline or already revoked: the server-side device expires on its own
-      }
-    }
     this.deps.credentials.clear()
     this.setState('signed-out')
+    if (live && transport) void this.revokeDevice(live, transport)
     return this.status()
+  }
+
+  private async revokeDevice(live: LiveSession, transport: UniworkTransport): Promise<void> {
+    try {
+      let token = live.accessToken
+      if (!token || live.accessExpiresAt <= this.now()) {
+        token = (
+          await transport.refresh({
+            deviceSessionId: live.credential.deviceSessionId,
+            refreshToken: live.credential.refreshToken,
+          })
+        ).accessToken
+      }
+      await transport.logout({ deviceSessionId: live.credential.deviceSessionId }, token)
+    } catch {
+      // offline or already revoked: the server-side device expires on its own
+    }
   }
 
   dispose(): void {
     this.generation++
     this.clearAttemptTimer()
     this.clearRefreshTimer()
+    this.clearRecoveryTimer()
+  }
+
+  protected override recover(): Promise<unknown> {
+    return this.retry()
   }
 
   private async loadAccount(generation: number): Promise<void> {
     const me = await this.authorized((token) => (this.transport as UniworkTransport).me(token))
     const orgs = await this.authorized((token) => (this.transport as UniworkTransport).orgs(token))
     if (generation !== this.generation) return
+    // the tokens belong to the account the credential was issued for
+    if (this.session && me.id !== this.session.credential.accountId) {
+      throw new TransportError('unauthorized', undefined, true)
+    }
     this.accountProfile = toProfile(me)
     this.orgs = orgs
     this.org = pickOrg(orgs, this.deps.readSelectedOrgId())
@@ -318,7 +354,7 @@ export class AccountManager extends SessionCore {
     if (this.attempts.peek()?.attemptId !== attemptId) return
     this.attempts.cancel()
     this.generation++
-    this.attemptTimer = null
+    this.clearAttemptTimer()
     this.failLogin('login_timeout')
   }
 
