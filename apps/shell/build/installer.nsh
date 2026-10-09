@@ -38,11 +38,27 @@
   ; installer; the app reads it from resources\ (process.resourcesPath). A
   ; profile beside this installer always wins; otherwise the copy that
   ; customInit saved from the install being replaced is put back, so a plain
-  ; installer (or an auto-update) does not drop the profile.
+  ; installer (or an auto-update) does not drop the profile. Each outcome is
+  ; written to the details log: an installer started from inside a zip (the
+  ; bundle not extracted first) finds no profile beside it.
   ${If} ${FileExists} "$EXEDIR\deployment-profile.json"
+    ClearErrors
     CopyFiles /SILENT "$EXEDIR\deployment-profile.json" "$INSTDIR\resources\deployment-profile.json"
+    ${If} ${Errors}
+      DetailPrint "Deployment profile: copying $EXEDIR\deployment-profile.json failed"
+    ${Else}
+      DetailPrint "Deployment profile: installed from $EXEDIR\deployment-profile.json"
+    ${EndIf}
   ${ElseIf} ${FileExists} "$PLUGINSDIR\deployment-profile.keep"
+    ClearErrors
     CopyFiles /SILENT "$PLUGINSDIR\deployment-profile.keep" "$INSTDIR\resources\deployment-profile.json"
+    ${If} ${Errors}
+      DetailPrint "Deployment profile: restoring the profile of the previous install failed"
+    ${Else}
+      DetailPrint "Deployment profile: kept the profile of the previous install"
+    ${EndIf}
+  ${Else}
+    DetailPrint "Deployment profile: none next to the installer ($EXEDIR), none to keep"
   ${EndIf}
 !macroend
 
