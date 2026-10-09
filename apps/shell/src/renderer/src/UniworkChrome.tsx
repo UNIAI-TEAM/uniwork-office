@@ -139,7 +139,7 @@ export function UniworkStatusChip({
   const [busy, setBusy] = useState(false)
   const accountOk = account.view === 'signed-in' || account.view === 'refreshing'
   const model = chipModelOf(status, { needsSignIn: !accountOk })
-  const { label, tip } = chipCopy(model, t, dateLocale)
+  const { label, title } = chipCopy(model, t, dateLocale)
 
   const run = (kind: ChipActionKind) => {
     if (kind === 'sign-in') {
@@ -166,7 +166,7 @@ export function UniworkStatusChip({
       aria-label={t('uwChipAria')}
       data-tone={model.tone}
       data-state={status.state}
-      title={tip}
+      title={title}
     >
       <span className="uw-pill-status" role="status">
         {model.tone === 'busy' ? <Spinner /> : <span className="uw-pill-dot" aria-hidden="true" />}

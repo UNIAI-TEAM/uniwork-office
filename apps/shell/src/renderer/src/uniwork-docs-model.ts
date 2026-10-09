@@ -189,20 +189,25 @@ export function chipModelOf(
   }
 }
 
-/** the chip's visible label and its tooltip, translated */
+/**
+ * the chip's visible label, its explanation and the hover text, translated. The
+ * label truncates in a narrow window, so the hover text always starts with the
+ * full label.
+ */
 export function chipCopy(
   model: ChipModel,
   t: TFunc,
   dateLocale: string,
   now: Date = new Date(),
-): { label: string; tip: string } {
+): { label: string; tip: string; title: string } {
   const label = model.reasonKey
     ? t(model.labelKey, { reason: t(model.reasonKey) })
     : t(model.labelKey)
   const tip = model.savedAt
     ? t(model.tipKey, { time: formatWhen(model.savedAt, dateLocale, now) })
     : t(model.tipKey)
-  return { label, tip: model.errorKey ? `${t(model.errorKey)} ${tip}` : tip }
+  const fullTip = model.errorKey ? `${t(model.errorKey)} ${tip}` : tip
+  return { label, tip: fullTip, title: `${label}\n${fullTip}` }
 }
 
 /** status of a bound tab, keyed so a path spelled with the other slash or case still finds it */

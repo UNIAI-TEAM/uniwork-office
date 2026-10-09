@@ -418,32 +418,42 @@ body.overlay-title-bar .tab-bar-drag-spacer {
 }
 
 .uw-pill {
+  box-sizing: border-box;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  flex: 0 1 auto;
+  gap: 6px;
   min-width: 0;
   max-width: 100%;
-  height: 26px;
-  padding: 0 4px 0 10px;
+  /* same height as the neighbouring 28px title-bar buttons; the radius is half of it */
+  height: 28px;
+  /* equal left and right: a pill with no button must not look clipped on the right */
+  padding: 0 12px;
   border: 1px solid var(--border);
-  border-radius: 13px;
+  border-radius: 14px;
   background: var(--surface);
   color: var(--text-secondary);
   font-size: 12px;
-  line-height: 1;
+  line-height: 1.4;
 }
 
+/* the status (dot or spinner + label) is the part that gives way: it truncates,
+   the pill border and the buttons never do */
 .uw-pill-status {
   display: inline-flex;
   align-items: center;
+  flex: 0 1 auto;
   gap: 6px;
   min-width: 0;
 }
 
 .uw-pill-label {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  /* tall enough for stacked Vietnamese tone marks, which overflow:hidden would cut */
+  line-height: 18px;
 }
 
 .uw-pill-dot {
@@ -474,14 +484,17 @@ body.overlay-title-bar .tab-bar-drag-spacer {
 
 .uw-pill-action,
 .uw-pill-close {
-  flex-shrink: 0;
-  height: 20px;
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  height: 22px;
   border: none;
-  border-radius: 10px;
+  border-radius: 11px;
   background: transparent;
   color: inherit;
   font: inherit;
   font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
   cursor: pointer;
 }
 
@@ -493,7 +506,19 @@ body.overlay-title-bar .tab-bar-drag-spacer {
 .uw-pill-close {
   display: grid;
   place-items: center;
-  width: 20px;
+  width: 22px;
+  padding: 0;
+}
+
+/* a trailing button sits closer to the border than the label does on the left,
+   so the pill looks evenly padded around its content */
+.uw-pill-action:last-child,
+.uw-pill-close:last-child {
+  margin-right: -6px;
+}
+
+.uw-pill-action + .uw-pill-close {
+  margin-left: -4px;
 }
 
 .uw-pill-action:hover:not(:disabled),

@@ -1,6 +1,8 @@
 /**
  * @vitest-environment jsdom
  */
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
@@ -117,9 +119,12 @@ async function flush(): Promise<void> {
   })
 }
 
-async function mount(node: ReturnType<typeof createElement>): Promise<void> {
+async function mount(
+  node: ReturnType<typeof createElement>,
+  locale: 'en' | 'vi' = 'en',
+): Promise<void> {
   await act(async () => {
-    root.render(createElement(LocaleProvider, { initial: 'en' }, node))
+    root.render(createElement(LocaleProvider, { initial: locale }, node))
   })
   await flush()
 }
@@ -532,6 +537,85 @@ describe('status chip', () => {
       createElement(UniworkStatusChip, { status: status({ state: 'saving' }), onStatus: vi.fn() }),
     )
     expect(chip().querySelector('[role="status"]')!.textContent).toBe('Saving…')
+  })
+})
+
+describe('chip truncation and hover text', () => {
+  const pillOf = () => host.querySelector<HTMLElement>('.uw-pill')!
+  const labelOf = () => pillOf().querySelector<HTMLElement>('.uw-pill-label')!
+
+  const STATES: Array<[string, Partial<UniworkDocStatus>]> = [
+    ['saved', { state: 'saved' }],
+    ['ready', { state: 'ready' }],
+    ['unsaved', { state: 'dirty' }],
+    ['saving', { state: 'saving' }],
+    ['view only', { access: 'view' }],
+    ['offline', { state: 'offline', error: 'network' }],
+    ["can't reach UniWork", { state: 'offline', error: 'server_error' }],
+    ['sign in again', { state: 'signed-out' }],
+    ['conflict', { state: 'conflict' }],
+    ['blocked', { state: 'blocked', error: 'quota_exceeded' }],
+    ['error', { state: 'error', error: 'server_error' }],
+  ]
+
+  for (const locale of ['en', 'vi'] as const) {
+    for (const [name, partial] of STATES) {
+      it(`${locale}: ${name} shows its label, truncates it, and carries the full text as title`, async () => {
+        account = 'session-expired'
+        await mount(
+          createElement(UniworkStatusChip, { status: status(partial), onStatus: vi.fn() }),
+          locale,
+        )
+        const label = labelOf()
+        expect(label.textContent!.trim().length).toBeGreaterThan(0)
+        expect(label.classList.contains('uw-pill-label')).toBe(true)
+        // the full label leads the hover text, followed by the explanation
+        const title = pillOf().getAttribute('title')!
+        expect(title.startsWith(`${label.textContent}\n`)).toBe(true)
+        expect(title.length).toBeGreaterThan(label.textContent!.length + 1)
+        // the label is the only thing that gives way, never a button
+        for (const button of pillOf().querySelectorAll('button')) {
+          expect(button.closest('.uw-pill-status')).toBeNull()
+        }
+      })
+    }
+  }
+
+  it('launch notices carry their full message as title and truncate the label', async () => {
+    await mount(createElement(UniworkNotice))
+    for (const event of [
+      { phase: 'opening', title: 'A very long quarterly planning document name.docx' },
+      { phase: 'needs-sign-in' },
+      { phase: 'failed', error: 'ticket_expired' },
+    ] as UniworkLaunchEvent[]) {
+      await act(async () => pushLaunch!(event))
+      const pill = host.querySelector<HTMLElement>('.uw-notice')!
+      const label = pill.querySelector<HTMLElement>('.uw-pill-label')!
+      expect(pill.getAttribute('title')).toBe(label.textContent)
+    }
+  })
+
+  it('the stylesheet lets only the label shrink, with an ellipsis, and pads the pill evenly', () => {
+    const css = readFileSync(resolve(__dirname, '../src/renderer/src/tabbar.css'), 'utf8').replace(
+      /\r\n/g,
+      '\n',
+    )
+    const body = (selector: string): string => {
+      const start = css.indexOf(`\n${selector} {`)
+      expect(start, selector).toBeGreaterThanOrEqual(0)
+      return css.slice(start, css.indexOf('}', start))
+    }
+    const label = body('.uw-pill-label')
+    expect(label).toMatch(/min-width: 0/)
+    expect(label).toMatch(/overflow: hidden/)
+    expect(label).toMatch(/text-overflow: ellipsis/)
+    expect(label).toMatch(/white-space: nowrap/)
+    const pill = body('.uw-pill')
+    expect(pill).toMatch(/padding: 0 \d+px;/)
+    expect(pill).not.toMatch(/overflow: hidden/)
+    expect(body('.uw-pill-status')).toMatch(/min-width: 0/)
+    // buttons never get squeezed off
+    expect(css).toMatch(/\.uw-pill-action,\n\.uw-pill-close \{[^}]*flex: 0 0 auto/)
   })
 })
 
