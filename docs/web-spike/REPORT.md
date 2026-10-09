@@ -39,11 +39,11 @@ editable → type a unique marker → Ctrl+B → insert table (ribbon) → Ctrl+
 PASS**, 0 console errors, 0 page errors, 0 failed requests. Per-step table: `screenshots/results.md`; 24 step screenshots +
 the 3 saved docx files in `screenshots/`.
 
-| doc | open | editable | type | bold | insert table | save | saved XML | reopen |
-|---|---|---|---|---|---|---|---|---|
-| simple | PASS | PASS | PASS | PASS | PASS (0→1) | PASS (2,373 B) | PASS | PASS |
-| kitchen-sink | PASS | PASS | PASS | PASS | PASS (1→2) | PASS (3,610 B) | PASS | PASS |
-| long | PASS | PASS | PASS | PASS | PASS (5→6) | PASS (4,845 B) | PASS | PASS |
+| doc          | open | editable | type | bold | insert table | save           | saved XML | reopen |
+| ------------ | ---- | -------- | ---- | ---- | ------------ | -------------- | --------- | ------ |
+| simple       | PASS | PASS     | PASS | PASS | PASS (0→1)   | PASS (2,373 B) | PASS      | PASS   |
+| kitchen-sink | PASS | PASS     | PASS | PASS | PASS (1→2)   | PASS (3,610 B) | PASS      | PASS   |
+| long         | PASS | PASS     | PASS | PASS | PASS (5→6)   | PASS (4,845 B) | PASS      | PASS   |
 
 **Shim behaviour (`web/docs/bridge/`, headers of each file carry the per-method table):**
 
@@ -70,20 +70,19 @@ Cold-load runs (`web/measure/load.mjs`, 15 runs, 3 docs, all 15 reached "editabl
 - Fonts are lazy: the 33 bundled font files (14.0 MiB) are fetched on demand; only Carlito ×3 + Noto Sans CJK SC were requested
   for the kitchen-sink doc.
 
-
 ## 3. What breaks on the web, and why
 
 Taken from the inventory (`bridge-inventory.md`) and `hide-flags.md`; summarised, not re-derived:
 
-| Area | Why it cannot work as-is in a browser | Web answer |
-|---|---|---|
-| File open/save by absolute path (`openDocxPath`, `saveDocx*`, `getRecentFiles`) | Renderer passes local file paths; the browser has none | Server file ids (`/api/files`), section 8 |
-| PDF export / print (`exportPdf`, `printPdfBuffer`, `saveMergedPdf`) | Desktop uses `webContents.printToPDF` at custom page sizes; browser print is lossy and only prints the current document | Server-side headless render (section 8); `window.print()` as fallback (only valid in an iframe, section 6) |
-| AI (`aiStream`, `webSearch`, `imageSearch`, `fetchImage`, `aiGenerateImage`, `getAiSettings`) | Provider keys and SSRF-guarded fetches live in the Electron main process | UniWork ai.Gateway endpoints |
-| `convertAltChunkHtml` | html→docx runs in a hidden Electron window | server endpoint or skip altChunk |
-| Attachments (`addAttachmentPaths`, `getPathForFile`, `addPastedImage`) | `File` objects have no disk path | upload the `File`, server returns attachment metadata |
-| Multi-tab / shell chrome (`openNewTab`, `listDocsTabs`, `focusDocsTab`, menu, close-check, Zotero, doc passwords, recovery copy) | No Electron shell | HIDE no-ops; per `hide-flags.md` **7 members have no renderer flag, so their UI stays visible** and needs a small renderer change (`zoteroCommand`, `setDocPassword`, `openNewTab`, `listDocsTabs`, `focusDocsTab`, `getAutoSaveDefault`, `createDocument`) |
-| Encrypted (CFB) docx | `openDocxDecrypt` is main-process | web falls back to a blank document (no password prompt) — product decision needed |
+| Area                                                                                                                             | Why it cannot work as-is in a browser                                                                                   | Web answer                                                                                                                                                                                                                                                  |
+| -------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| File open/save by absolute path (`openDocxPath`, `saveDocx*`, `getRecentFiles`)                                                  | Renderer passes local file paths; the browser has none                                                                  | Server file ids (`/api/files`), section 8                                                                                                                                                                                                                   |
+| PDF export / print (`exportPdf`, `printPdfBuffer`, `saveMergedPdf`)                                                              | Desktop uses `webContents.printToPDF` at custom page sizes; browser print is lossy and only prints the current document | Server-side headless render (section 8); `window.print()` as fallback (only valid in an iframe, section 6)                                                                                                                                                  |
+| AI (`aiStream`, `webSearch`, `imageSearch`, `fetchImage`, `aiGenerateImage`, `getAiSettings`)                                    | Provider keys and SSRF-guarded fetches live in the Electron main process                                                | UniWork ai.Gateway endpoints                                                                                                                                                                                                                                |
+| `convertAltChunkHtml`                                                                                                            | html→docx runs in a hidden Electron window                                                                              | server endpoint or skip altChunk                                                                                                                                                                                                                            |
+| Attachments (`addAttachmentPaths`, `getPathForFile`, `addPastedImage`)                                                           | `File` objects have no disk path                                                                                        | upload the `File`, server returns attachment metadata                                                                                                                                                                                                       |
+| Multi-tab / shell chrome (`openNewTab`, `listDocsTabs`, `focusDocsTab`, menu, close-check, Zotero, doc passwords, recovery copy) | No Electron shell                                                                                                       | HIDE no-ops; per `hide-flags.md` **7 members have no renderer flag, so their UI stays visible** and needs a small renderer change (`zoteroCommand`, `setDocPassword`, `openNewTab`, `listDocsTabs`, `focusDocsTab`, `getAutoSaveDefault`, `createDocument`) |
+| Encrypted (CFB) docx                                                                                                             | `openDocxDecrypt` is main-process                                                                                       | web falls back to a blank document (no password prompt) — product decision needed                                                                                                                                                                           |
 
 Further findings from the e2e proof and the lead's review of the shims (none blocked the proof):
 
@@ -104,10 +103,10 @@ Further findings from the e2e proof and the lead's review of the shims (none blo
 
 From `docs/web-spike/bridge-inventory.json` (W2 A–L + W3 M–Z + projectApi):
 
-| | WEB-API (needs UniWork server) | BROWSER (plain web API) | HIDE (desktop-only, no-op) | total |
-|---|---|---|---|---|
-| `window.desktop` (DesktopApi) | 26 | 20 | 26 | **72** |
-| `window.projectApi` | 10 | 0 | 0 | **10** |
+|                               | WEB-API (needs UniWork server) | BROWSER (plain web API) | HIDE (desktop-only, no-op) | total  |
+| ----------------------------- | ------------------------------ | ----------------------- | -------------------------- | ------ |
+| `window.desktop` (DesktopApi) | 26                             | 20                      | 26                         | **72** |
+| `window.projectApi`           | 10                             | 0                       | 0                          | **10** |
 
 - Members never called by the renderer: `aiChat`, `fontMetrics`, `setAiSettings`.
 - `window.projectApi` is used only from `ai/AiPanel.tsx` (4 call sites; chat persistence).
@@ -120,15 +119,15 @@ openDocxPath printPdfBuffer readAttachment saveDocx saveDocxAs saveDocxNew setAi
 
 Counts re-checked by the lead against the final merged `bridge-inventory.json`: 72 DesktopApi (26/20/26) + 10 projectApi.
 
-**Inventory class vs what the spike shim actually ships.** The class above is the *target* (what GO-B3 must provide). For the
+**Inventory class vs what the spike shim actually ships.** The class above is the _target_ (what GO-B3 must provide). For the
 spike, some members were shipped differently, so the shim files do not split 26/20/26:
 
-| member(s) | inventory class | spike shim | why |
-|---|---|---|---|
-| `createDocument`, `convertAltChunkHtml`, `onRenamedDocx` | WEB-API | no-op in `hide.ts` | no fake needed for the proof; GO-B3 must implement |
-| `getAutoSaveDefault`, `onAutoSaveDefaultChanged`, `onCloseCheck`, `onCloseSaveRequest`, `reportCloseCheck`, `reportCloseSaveResult` | BROWSER | no-op in `hide.ts` | autosave pref / window-close handshake not wired to `localStorage` / `beforeunload` in the spike |
-| `aiGskLogin` | HIDE | stub in `ai.ts` | keeps the AI login path exercisable |
-| `getPathForFile`, `fontMetrics` | HIDE | implemented in `browser.ts` | `web-file://` registry; `fontMetrics` → `null` |
+| member(s)                                                                                                                           | inventory class | spike shim                  | why                                                                                              |
+| ----------------------------------------------------------------------------------------------------------------------------------- | --------------- | --------------------------- | ------------------------------------------------------------------------------------------------ |
+| `createDocument`, `convertAltChunkHtml`, `onRenamedDocx`                                                                            | WEB-API         | no-op in `hide.ts`          | no fake needed for the proof; GO-B3 must implement                                               |
+| `getAutoSaveDefault`, `onAutoSaveDefaultChanged`, `onCloseCheck`, `onCloseSaveRequest`, `reportCloseCheck`, `reportCloseSaveResult` | BROWSER         | no-op in `hide.ts`          | autosave pref / window-close handshake not wired to `localStorage` / `beforeunload` in the spike |
+| `aiGskLogin`                                                                                                                        | HIDE            | stub in `ai.ts`             | keeps the AI login path exercisable                                                              |
+| `getPathForFile`, `fontMetrics`                                                                                                     | HIDE            | implemented in `browser.ts` | `web-file://` registry; `fontMetrics` → `null`                                                   |
 
 The only key no module implements is `onAiPanelPrefsChanged` (Proxy no-op disposer). Merge collisions (later module wins):
 `onOpenDocx`, `consumePendingOpenDocx` (webapi over hide), `getPathForFile` (browser over hide) — all intended.
@@ -139,13 +138,13 @@ Full tables: `measurements.md`. Headlines:
 
 **Bundle** (`web/measure/bundle-size.mjs`; gzip = zlib level 9, brotli = q11, per file, sourcemaps excluded):
 
-| | raw | gzip | brotli |
-|---|---|---|---|
-| total (37 files) | 17.85 MiB | 11.65 MiB | 10.72 MiB |
-| fonts (33 files) | 14.01 MiB | 10.51 MiB | 9.82 MiB |
-| JS (1 chunk, `index-*.js`) | 3.64 MiB | 1.11 MiB | 0.87 MiB |
-| CSS (1 file) | 196 KiB | 33 KiB | 28 KiB |
-| everything except fonts | 3.84 MiB | 1.14 MiB | 0.90 MiB |
+|                            | raw       | gzip      | brotli    |
+| -------------------------- | --------- | --------- | --------- |
+| total (37 files)           | 17.85 MiB | 11.65 MiB | 10.72 MiB |
+| fonts (33 files)           | 14.01 MiB | 10.51 MiB | 9.82 MiB  |
+| JS (1 chunk, `index-*.js`) | 3.64 MiB  | 1.11 MiB  | 0.87 MiB  |
+| CSS (1 file)               | 196 KiB   | 33 KiB    | 28 KiB    |
+| everything except fonts    | 3.84 MiB  | 1.14 MiB  | 0.90 MiB  |
 
 - There is **one JS chunk** (no code splitting): the biggest chunk is the whole app. Biggest file overall is the JS
   (3.64 MiB); the next are `NotoSerifCJKsc` (3.33 MiB) and `NotoSansCJKsc` (2.42 MiB) woff2.
@@ -159,11 +158,11 @@ Full tables: `measurements.md`. Headlines:
 
 **Cold load** (`web/measure/load.mjs`, 5 runs per doc, fresh context, cache disabled; median (min–max)):
 
-| doc | DOMContentLoaded | time-to-editable | JS heap after editable | heap after forced GC | transferred by editable / settled |
-|---|---|---|---|---|---|
-| simple.docx | 313 ms (307–317) | **567 ms** (553–592) | 10.6 MiB | 8.2 MiB | 5.10 / 7.51 MiB |
-| kitchen-sink.docx | 310 ms (306–318) | **641 ms** (627–649) | 11.6 MiB | 9.2 MiB | 5.69 / 8.11 MiB |
-| long.docx (~41 pages) | 311 ms (307–312) | **987 ms** (972–1008) | 21.1 MiB | 11.9 MiB | 5.10 / 5.10 MiB |
+| doc                   | DOMContentLoaded | time-to-editable      | JS heap after editable | heap after forced GC | transferred by editable / settled |
+| --------------------- | ---------------- | --------------------- | ---------------------- | -------------------- | --------------------------------- |
+| simple.docx           | 313 ms (307–317) | **567 ms** (553–592)  | 10.6 MiB               | 8.2 MiB              | 5.10 / 7.51 MiB                   |
+| kitchen-sink.docx     | 310 ms (306–318) | **641 ms** (627–649)  | 11.6 MiB               | 9.2 MiB              | 5.69 / 8.11 MiB                   |
+| long.docx (~41 pages) | 311 ms (307–312) | **987 ms** (972–1008) | 21.1 MiB               | 11.9 MiB             | 5.10 / 5.10 MiB                   |
 
 Notes: time-to-editable = first visible `.ProseMirror[contenteditable=true]` containing the doc's known text (same selector/text
 check as `web/e2e/docs-web.spec.ts`), measured in-page from navigation start. Transfer is uncompressed because the spike
@@ -191,9 +190,9 @@ The CJK docs download Noto Sans CJK on demand, which is why their settled transf
 3. **Storage.** 28 `localStorage` reads/writes under unscoped keys (`aidocs.showAi`, `aidocs.spellcheck`, `aidocs.pasteFromOtherApps`,
    `aidocs.marginLastCustom`, `docs-ai-panel-width`, `docs-ai-rewrite-ack`, track-changes key). A same-origin iframe still shares
    `localStorage` with the host, so serve the iframe from its own origin/subdomain if isolation matters (then the `postMessage`
-   channel is the *only* coupling — preferable for GO-D2).
+   channel is the _only_ coupling — preferable for GO-D2).
 4. **CSP.** `web/docs/index.html` carries the CSP as a `<meta>`: `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';
-   img-src 'self' data: blob:; font-src 'self' data: blob:; worker-src 'self' blob:; connect-src 'self' http://localhost:* ws://localhost:*`.
+img-src 'self' data: blob:; font-src 'self' data: blob:; worker-src 'self' blob:; connect-src 'self' http://localhost:* ws://localhost:*`.
    A meta CSP governs only its own document, so it is **lost when the renderer is mounted** in a host page — the host's CSP would
    have to be loosened to `style-src 'unsafe-inline'` + `blob:`/`data:` for fonts/images, and the spike's `http://localhost:*`
    in `connect-src` must be replaced by the real API origin. In an iframe the renderer keeps its own tight CSP (deliver it as an HTTP
@@ -208,7 +207,7 @@ The CJK docs download Noto Sans CJK on demand, which is why their settled transf
    it if a host page can show several). Clipboard/file-drop/focus need explicit forwarding; drag-and-drop across the boundary needs
    `postMessage` plumbing. Auto-sizing needs a `resize` message. None of these is a blocker.
 
-When *mount in page* would be right: only if the host needs shared React/ProseMirror instances or in-page deep integration
+When _mount in page_ would be right: only if the host needs shared React/ProseMirror instances or in-page deep integration
 (comments sidebar owned by the host). The evidence above says that would first require namespacing all CSS, replacing
 the `<html>`/`<body>` theming hooks, scoping storage keys and moving the CSP — a refactor of `apps/docs`, not a bridge.
 
@@ -217,15 +216,15 @@ the `<html>`/`<body>` theming hooks, scoping storage keys and moving the CSP —
 Estimate, not measurement — assumes the endpoints in section 8 exist on the UniWork side and one engineer familiar with the
 renderer; roughly:
 
-| Work item | Estimate |
-|---|---|
-| Replace `FakeBackend` with `/api/files` (open/save/create/recent, ETag/`If-Match`, session auth) + `?file=<id>` routing | 4–5 d |
-| iframe host component + `postMessage` protocol (open, save, dirty, title, theme, language, resize, print) | 3 d |
-| AI gateway wiring (`aiStream` SSE + cancel, settings/entitlement, web/image search, `fetchImage` proxy, image generation) | 4–5 d |
-| Attachments upload + `projectApi` over `/api/projects`, `/api/chats` | 3–4 d |
-| Server-side PDF export (headless Chromium, custom page sizes, merge) | 4–6 d — **biggest risk**: page-accurate pagination output and font parity |
-| Renderer hardening: 7 members with no HIDE flag (UI stays visible), lazy-load i18n, gzip/brotli + immutable caching + font strategy, CSP as header | 3–4 d |
-| Tests/e2e on real backend (reuse W7 specs), a11y/IME/paste checks | 3–4 d |
+| Work item                                                                                                                                          | Estimate                                                                  |
+| -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| Replace `FakeBackend` with `/api/files` (open/save/create/recent, ETag/`If-Match`, session auth) + `?file=<id>` routing                            | 4–5 d                                                                     |
+| iframe host component + `postMessage` protocol (open, save, dirty, title, theme, language, resize, print)                                          | 3 d                                                                       |
+| AI gateway wiring (`aiStream` SSE + cancel, settings/entitlement, web/image search, `fetchImage` proxy, image generation)                          | 4–5 d                                                                     |
+| Attachments upload + `projectApi` over `/api/projects`, `/api/chats`                                                                               | 3–4 d                                                                     |
+| Server-side PDF export (headless Chromium, custom page sizes, merge)                                                                               | 4–6 d — **biggest risk**: page-accurate pagination output and font parity |
+| Renderer hardening: 7 members with no HIDE flag (UI stays visible), lazy-load i18n, gzip/brotli + immutable caching + font strategy, CSP as header | 3–4 d                                                                     |
+| Tests/e2e on real backend (reuse W7 specs), a11y/IME/paste checks                                                                                  | 3–4 d                                                                     |
 
 Total **~24–31 working days ≈ 4–5 engineer-weeks**. Largest uncertainties: PDF fidelity, encrypted-docx product decision, and
 whether HIDE-class UI needs renderer changes (touching `apps/**`, which the spike forbade).
@@ -237,17 +236,17 @@ Compiled from the header tables of `web/docs/bridge/webapi.ts` and `web/docs/bri
 
 **Files / documents** (`webapi.ts`)
 
-| Renderer call | Endpoint + payload |
-|---|---|
-| `openDocx` (file picker) | `POST /api/files` multipart `{name, bytes}` → `{id,name,size,mtime}`; then `GET /api/files/:id/content` |
-| `openDocxPath(id)` | `GET /api/files/:id` + `GET /api/files/:id/content` (bytes, ETag) |
-| `consumePendingOpenDocx` | none — URL `/docs?file=<id>` → `GET /api/files/:id/content` |
-| `saveDocx(path,data,auto)` | `PUT /api/files/:id/content` body bytes, `If-Match: etag` → `{mtime,etag}`; `412` → reason `external-modified` |
-| `saveDocxAs` / `saveDocxNew` | `POST /api/files {name, folderId?}` + content → `{id}` (server picks folder + unique name for `New`) |
-| `getRecentFiles` | `GET /api/files/recent` → `[{id,name,path}]` |
-| `exportHtml` | optional `POST /api/files {name:.html}` (otherwise a Blob download) |
-| `exportPdf` / `printPdfBuffer` | `POST /api/export/pdf {fileId | html, pageWidthTwips, pageHeightTwips, scale}` → PDF bytes (headless Chromium) |
-| `saveMergedPdf` | `POST /api/export/pdf/merge {parts[]}` → PDF bytes |
+| Renderer call                  | Endpoint + payload                                                                                             |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------- |
+| `openDocx` (file picker)       | `POST /api/files` multipart `{name, bytes}` → `{id,name,size,mtime}`; then `GET /api/files/:id/content`        |
+| `openDocxPath(id)`             | `GET /api/files/:id` + `GET /api/files/:id/content` (bytes, ETag)                                              |
+| `consumePendingOpenDocx`       | none — URL `/docs?file=<id>` → `GET /api/files/:id/content`                                                    |
+| `saveDocx(path,data,auto)`     | `PUT /api/files/:id/content` body bytes, `If-Match: etag` → `{mtime,etag}`; `412` → reason `external-modified` |
+| `saveDocxAs` / `saveDocxNew`   | `POST /api/files {name, folderId?}` + content → `{id}` (server picks folder + unique name for `New`)           |
+| `getRecentFiles`               | `GET /api/files/recent` → `[{id,name,path}]`                                                                   |
+| `exportHtml`                   | optional `POST /api/files {name:.html}` (otherwise a Blob download)                                            |
+| `exportPdf` / `printPdfBuffer` | `POST /api/export/pdf {fileId                                                                                  | html, pageWidthTwips, pageHeightTwips, scale}` → PDF bytes (headless Chromium) |
+| `saveMergedPdf`                | `POST /api/export/pdf/merge {parts[]}` → PDF bytes                                                             |
 
 **Projects / chat persistence** (`projectApi`)
 
@@ -257,17 +256,17 @@ Compiled from the header tables of `web/docs/bridge/webapi.ts` and `web/docs/bri
 
 **AI gateway** (`ai.ts`)
 
-| Renderer call | Endpoint (proposed) |
-|---|---|
-| `aiStream` (chunks `delta|reasoning|tool-call|ping|done|error`, exactly one terminal chunk per request) | `POST /api/ai/stream` (SSE, one event per chunk) |
-| `aiStreamCancel` | `DELETE /api/ai/stream/:requestId` or close SSE (server must emit `done`, not `error`) |
-| `aiChat` (uncalled today) | `POST /api/ai/chat` |
-| `getAiSettings` / `setAiSettings` | `GET/PUT /api/ai/settings` (non-secret provider/entitlement view only) |
-| `aiGskStatus` | `GET /api/ai/account` → `{loggedIn, email?}` (UniWork session → plan/quota) |
-| `webSearch` / `imageSearch` | `POST /api/ai/web-search`, `POST /api/ai/image-search` |
-| `fetchImage` | `GET /api/ai/fetch-image?url=` (SSRF-guarded: http(s) only, no private targets, validated redirects) |
-| `aiGenerateImage` | `POST /api/ai/generate-image {prompt, aspectRatio?}` → `{url?|error?}` |
-| login / billing | redirect to UniWork login / billing page (not Gateway calls) |
+| Renderer call                     | Endpoint (proposed)                                                                                  |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `aiStream` (chunks `delta         | reasoning                                                                                            | tool-call | ping | done | error`, exactly one terminal chunk per request) | `POST /api/ai/stream` (SSE, one event per chunk) |
+| `aiStreamCancel`                  | `DELETE /api/ai/stream/:requestId` or close SSE (server must emit `done`, not `error`)               |
+| `aiChat` (uncalled today)         | `POST /api/ai/chat`                                                                                  |
+| `getAiSettings` / `setAiSettings` | `GET/PUT /api/ai/settings` (non-secret provider/entitlement view only)                               |
+| `aiGskStatus`                     | `GET /api/ai/account` → `{loggedIn, email?}` (UniWork session → plan/quota)                          |
+| `webSearch` / `imageSearch`       | `POST /api/ai/web-search`, `POST /api/ai/image-search`                                               |
+| `fetchImage`                      | `GET /api/ai/fetch-image?url=` (SSRF-guarded: http(s) only, no private targets, validated redirects) |
+| `aiGenerateImage`                 | `POST /api/ai/generate-image {prompt, aspectRatio?}` → `{url?                                        | error?}`  |
+| login / billing                   | redirect to UniWork login / billing page (not Gateway calls)                                         |
 
 **Cross-cutting requirements**: same-origin or CORS+credentials session auth; `Content-Security-Policy` header for the editor
 document; gzip/brotli + immutable caching for hashed assets (the spike server does neither); `Content-Type` for `.docx`/`.woff2`;

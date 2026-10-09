@@ -123,18 +123,18 @@ Spike = UNI-1011 build (`docs/web-spike/REPORT.md`, `measurements.md`; no compre
 median, cold cache, headless Chromium 151 on a shared 4-CPU arm64 box (ratios, not SLAs). Source:
 `web/measure/measurements-b3.md` (+ `.json`), runner `web/measure/measure-b3.mjs`.
 
-| Metric | Spike (UNI-1011) | Before (425edd9) | After (B3) | Source |
-| --- | --- | --- | --- | --- |
-| Initial download, raw | ~3.6 MiB JS chunk | 3.85 MiB | 3.85 MiB (same) | b3 §1 |
-| Initial download, gzip | 1.11 MiB JS | 1.15 MiB | 1.15 MiB (same; brotli 0.90) | b3 §1 |
-| Fonts in the initial download | not guaranteed (lazy by `@font-face`) | 0 | 0, enforced: under `fonts/`, never inlined | b3 §1, §5 |
-| Total build, raw / gzip | 17.85 / 11.65 MiB | 17.87 / 11.66 MiB | 13.29 / 10.57 MiB (-26% / -9%) | b3 §1 |
-| Font files | 14 MiB | 33 files, 14.01 MiB | 34 files, 9.42 MiB (20 Latin faces as lossless WOFF2) | b3 §1 |
-| Latin doc font bytes (`long.docx`) | - | 0.53 MiB | 0.37 MiB (-30%) | b3 §3 |
-| Wire by editable, gzip | - | 1.68-1.95 MiB | 1.53-1.72 MiB (-9 to -12%; simple +7%, late-font noise) | b3 §2 |
-| Time-to-editable, gzip server | 0.57-0.99 s (raw server) | 1.00-1.51 s | 0.98-1.55 s (+/-9%, within noise) | b3 §2 |
-| Time-to-editable, no compression | 0.57 / 0.64 / 0.99 s | 0.83-1.25 s | 0.78-1.19 s | b3 §2 |
-| Served under `/office-frame/docs/<v>/` | - | - | 3/3 editable, 0 failed requests (0.85-1.14 s) | b3 §4 |
+| Metric                                 | Spike (UNI-1011)                      | Before (425edd9)    | After (B3)                                              | Source    |
+| -------------------------------------- | ------------------------------------- | ------------------- | ------------------------------------------------------- | --------- |
+| Initial download, raw                  | ~3.6 MiB JS chunk                     | 3.85 MiB            | 3.85 MiB (same)                                         | b3 §1     |
+| Initial download, gzip                 | 1.11 MiB JS                           | 1.15 MiB            | 1.15 MiB (same; brotli 0.90)                            | b3 §1     |
+| Fonts in the initial download          | not guaranteed (lazy by `@font-face`) | 0                   | 0, enforced: under `fonts/`, never inlined              | b3 §1, §5 |
+| Total build, raw / gzip                | 17.85 / 11.65 MiB                     | 17.87 / 11.66 MiB   | 13.29 / 10.57 MiB (-26% / -9%)                          | b3 §1     |
+| Font files                             | 14 MiB                                | 33 files, 14.01 MiB | 34 files, 9.42 MiB (20 Latin faces as lossless WOFF2)   | b3 §1     |
+| Latin doc font bytes (`long.docx`)     | -                                     | 0.53 MiB            | 0.37 MiB (-30%)                                         | b3 §3     |
+| Wire by editable, gzip                 | -                                     | 1.68-1.95 MiB       | 1.53-1.72 MiB (-9 to -12%; simple +7%, late-font noise) | b3 §2     |
+| Time-to-editable, gzip server          | 0.57-0.99 s (raw server)              | 1.00-1.51 s         | 0.98-1.55 s (+/-9%, within noise)                       | b3 §2     |
+| Time-to-editable, no compression       | 0.57 / 0.64 / 0.99 s                  | 0.83-1.25 s         | 0.78-1.19 s                                             | b3 §2     |
+| Served under `/office-frame/docs/<v>/` | -                                     | -                   | 3/3 editable, 0 failed requests (0.85-1.14 s)           | b3 §4     |
 
 B3 times include the test-host boot, docx fetch and init handshake, so they are not comparable one to one with the
 spike's standalone `?open=` load; the before/after columns are the like-for-like pair.
@@ -156,18 +156,18 @@ headless Chromium; no new service.
 Baseline = desktop `--headless-export` (Electron 43.3.0 / Chromium 150 `printToPDF`). Pixel diff at 96 dpi grey,
 threshold 32/255.
 
-| Fixture | Desktop pages | (b) pages | (b) pixels differing | (a) pages | (a) pixels differing |
-| --- | --- | --- | --- | --- | --- |
-| simple | 1 | 1 | 0.000 % | 1 | 0.17 % |
-| kitchen-sink | 1 | 1 | 0.341 % (CJK punctuation) | 1 | 3.23 % |
-| long (tables) | 34 | 34 | 0.000 % (all pages) | **46** | 18.3 % mean |
+| Fixture       | Desktop pages | (b) pages | (b) pixels differing      | (a) pages | (a) pixels differing |
+| ------------- | ------------- | --------- | ------------------------- | --------- | -------------------- |
+| simple        | 1             | 1         | 0.000 %                   | 1         | 0.17 %               |
+| kitchen-sink  | 1             | 1         | 0.341 % (CJK punctuation) | 1         | 3.23 %               |
+| long (tables) | 34            | 34        | 0.000 % (all pages)       | **46**    | 18.3 % mean          |
 
-| Arm (arm64, load ~10) | Per document | Peak RSS |
-| --- | --- | --- |
-| **(b) engine prototype**, Chromium per job | 1.6 / 1.7 / 2.5 s render (2.0-2.8 s wall) | 687-711 MB |
-| (b) Playwright, warm / cold | 2.2-3.6 s / 4.6-6.1 s | ~708 / 652-688 MB |
-| Desktop baseline (incl. app boot) | 5.1-11.7 s | 843-929 MB |
-| (a) LibreOffice (container per doc) | 1.6-3.0 s | ~160 MB, image 888 MB |
+| Arm (arm64, load ~10)                      | Per document                              | Peak RSS              |
+| ------------------------------------------ | ----------------------------------------- | --------------------- |
+| **(b) engine prototype**, Chromium per job | 1.6 / 1.7 / 2.5 s render (2.0-2.8 s wall) | 687-711 MB            |
+| (b) Playwright, warm / cold                | 2.2-3.6 s / 4.6-6.1 s                     | ~708 / 652-688 MB     |
+| Desktop baseline (incl. app boot)          | 5.1-11.7 s                                | 843-929 MB            |
+| (a) LibreOffice (container per doc)        | 1.6-3.0 s                                 | ~160 MB, image 888 MB |
 
 **Why LibreOffice was rejected:** `long.docx` re-paginates 34 -> 46 pages; fonts are substituted (Carlito -> Noto
 Sans, CJK -> serif JP, FreeSans/Liberation Serif dropped); on kitchen-sink the bullets render as tofu, the equation
@@ -197,12 +197,12 @@ Serving note: `docs/office/docs-web-frame.md`.
 
 **Components** (`packages/views/office/frame`, `packages/core/office`, `apps/web/platform/office-frame`):
 
-| Piece | Role |
-| --- | --- |
-| `DocxOpenSwitch` | Reads `office_docs_web` for the document's organization (`useOfficeDocsWebEnabled`, org-scoped `GET /api/v1/config`); mounts `OfficeDocsFrame` only on a settled "on", the G3 host on anything else; no pinned version = G3 alone |
-| `OfficeDocsFrame` | Iframe + protocol host: mints the token, answers `init` (theme from the app theme, `locale` from i18n), relays `dirty` / `title` / `saved` / `error`, leave-dialog on dirty, save-as (session `createDocumentFile`, mint a token for the copy, rebind the frame, `onSavedAs` navigates) |
-| `docs-frame-protocol.ts`, `docs-frame-endpoint.ts`, `docs-frame-host.ts` | Vendored fork copy, header names the fork SHA; currently `b6f773f` (the W7c re-vendor to `5bce54c` is in progress, see section 6) |
-| `createDocsFrameApi` (`packages/core`, `docs-frame-api.ts`) | `api.*` over `createOfficeFrameClient`: open, save (409 -> `conflict`), recents, images, `exportPdf` (live bytes win; 501 -> `unsupported`; 504 timeout; 413 `too_large`; `%PDF-` check) |
+| Piece                                                                    | Role                                                                                                                                                                                                                                                                                    |
+| ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DocxOpenSwitch`                                                         | Reads `office_docs_web` for the document's organization (`useOfficeDocsWebEnabled`, org-scoped `GET /api/v1/config`); mounts `OfficeDocsFrame` only on a settled "on", the G3 host on anything else; no pinned version = G3 alone                                                       |
+| `OfficeDocsFrame`                                                        | Iframe + protocol host: mints the token, answers `init` (theme from the app theme, `locale` from i18n), relays `dirty` / `title` / `saved` / `error`, leave-dialog on dirty, save-as (session `createDocumentFile`, mint a token for the copy, rebind the frame, `onSavedAs` navigates) |
+| `docs-frame-protocol.ts`, `docs-frame-endpoint.ts`, `docs-frame-host.ts` | Vendored fork copy, header names the fork SHA; currently `b6f773f` (the W7c re-vendor to `5bce54c` is in progress, see section 6)                                                                                                                                                       |
+| `createDocsFrameApi` (`packages/core`, `docs-frame-api.ts`)              | `api.*` over `createOfficeFrameClient`: open, save (409 -> `conflict`), recents, images, `exportPdf` (live bytes win; 501 -> `unsupported`; 504 timeout; 413 `too_large`; `%PDF-` check)                                                                                                |
 
 **Frame token** (`server/internal/service/office_frame.go`): HMAC-signed, minted by
 `POST /api/v1/documents/{id}/office/frame-token` (session auth). Claims `{v, d documentId, w workspaceId,
@@ -214,16 +214,16 @@ storage); the frame sends it as `Authorization: Bearer` only on `/api/v1/office-
 
 **Routes** (`server/internal/handler/router/office_frame.go`, `office_frame_export.go`):
 
-| Method + path (`/api/v1/office-frame/...`) | Purpose |
-| --- | --- |
-| `POST /token` | Refresh |
-| `GET /documents/{id}` | Open (metadata, content URL, etag) |
-| `GET|HEAD /documents/{id}/content` | Document bytes |
-| `POST /documents/{id}/uploads` | Save intent |
-| `POST /documents/{id}/versions/commit` | Save; stale etag -> 409 `conflict` |
-| `GET /documents/{id}/recents` | Recents |
-| `POST /documents/{id}/assets`, `/assets/sign`, `GET|HEAD /assets/{assetId}` | Images (Bearer or `?sig=` bound to the asset) |
-| `POST /documents/{id}/export/pdf` | Server PDF: view access suffices, 20 req/min per frame user, optional multipart `file` xor `version`, `Idempotency-Key`; 200 `application/pdf`, 501 / 503 / 504 as in section 4 |
+| Method + path (`/api/v1/office-frame/...`)          | Purpose                                                                                                                                                                         |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /token`                                       | Refresh                                                                                                                                                                         |
+| `GET /documents/{id}`                               | Open (metadata, content URL, etag)                                                                                                                                              |
+| `GET                                                | HEAD /documents/{id}/content`                                                                                                                                                   | Document bytes                                |
+| `POST /documents/{id}/uploads`                      | Save intent                                                                                                                                                                     |
+| `POST /documents/{id}/versions/commit`              | Save; stale etag -> 409 `conflict`                                                                                                                                              |
+| `GET /documents/{id}/recents`                       | Recents                                                                                                                                                                         |
+| `POST /documents/{id}/assets`, `/assets/sign`, `GET | HEAD /assets/{assetId}`                                                                                                                                                         | Images (Bearer or `?sig=` bound to the asset) |
+| `POST /documents/{id}/export/pdf`                   | Server PDF: view access suffices, 20 req/min per frame user, optional multipart `file` xor `version`, `Idempotency-Key`; 200 `application/pdf`, 501 / 503 / 504 as in section 4 |
 
 All routes are Bearer-only, behind `documents` + `office_docs_web`, recheck access per request, and reuse
 Documents/FileService so audit and outbox stay in the existing transaction (no migration). Export is an office
@@ -275,7 +275,7 @@ user save only; `autoSaveToDisk` stays `false` in the web capability list, so th
 - **CJK fallback font cost and i18n share of JS** (section 3): lazy font previews / `unicode-range` slices and lazy
   locales are renderer work.
 - **Engine image** needs Chromium + the pinned bundle (`UNIWORK_DOCS_PDF_ASSETS`) and `OFFICE_ENGINE_MEMORY_MB`
-  >= 1024; until then the export route answers 501 and the frame falls back to print.
+  > = 1024; until then the export route answers 501 and the frame falls back to print.
 - **`fontMetrics`** (null on the web) is the likely cause of the 0.34 % kitchen-sink PDF difference; implement in the
   web bridge or the engine page shim, then re-measure.
 - **Protect dialog** keeps a web string variant (`appProtectDescWeb`); the "modify password / restrict editing"
@@ -293,27 +293,27 @@ user save only; `autoSaveToDisk` stays `false` in the web capability list, so th
 
 Fork (`uniwork-office`, branch `feature/UNI-1013-docs-web-bridge`):
 
-| What | Where |
-| --- | --- |
-| Spike report, inventory, hide audit, baseline measurements | `docs/web-spike/REPORT.md`, `bridge-inventory.json`, `hide-flags.md`, `measurements.md` |
-| Protocol contract + auth/origin model | `web/docs/protocol/README.md`, `types.ts`; tests `web/docs/protocol/test/` |
-| Bridge (WEB-API, session) + tests | `web/docs/bridge/webapi.ts`, `session.ts`, `webapi.test.ts`, `testing/mock-port.ts` |
-| Hide / capabilities / print | `docs/web-docs/w4-hide-browser.md`, `apps/docs/tests/web-capabilities.test.ts`, `web/docs/bridge/hide.test.ts`, `browser.test.ts` |
-| W4 screenshots + Playwright | `docs/web-docs/screenshots/w4/` (01-10), `web/e2e/w4-hide.spec.ts` |
-| Test host | `web/server/test-host/` |
-| Bridge e2e results + screenshots | `docs/web-docs/bridge-e2e/results.md`, `results-*.json`, `*-saved.png`, `*-conflict.png`, `console-*.txt` |
-| Build pipeline, manifest, CSP | `web/docs/build/README.md`, `web/e2e/csp-header.spec.ts` |
-| Measurements | `web/measure/measurements-b3.md`, `measurements-b3.json`, `measure-b3.mjs` |
-| Fork code review (R1) + fixes | lane file `.uniwork-lane/review-fork.md`; fix commits `a0f5fd4`, `db550c0`, `5b5008e`, `5bce54c` |
+| What                                                       | Where                                                                                                                             |
+| ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Spike report, inventory, hide audit, baseline measurements | `docs/web-spike/REPORT.md`, `bridge-inventory.json`, `hide-flags.md`, `measurements.md`                                           |
+| Protocol contract + auth/origin model                      | `web/docs/protocol/README.md`, `types.ts`; tests `web/docs/protocol/test/`                                                        |
+| Bridge (WEB-API, session) + tests                          | `web/docs/bridge/webapi.ts`, `session.ts`, `webapi.test.ts`, `testing/mock-port.ts`                                               |
+| Hide / capabilities / print                                | `docs/web-docs/w4-hide-browser.md`, `apps/docs/tests/web-capabilities.test.ts`, `web/docs/bridge/hide.test.ts`, `browser.test.ts` |
+| W4 screenshots + Playwright                                | `docs/web-docs/screenshots/w4/` (01-10), `web/e2e/w4-hide.spec.ts`                                                                |
+| Test host                                                  | `web/server/test-host/`                                                                                                           |
+| Bridge e2e results + screenshots                           | `docs/web-docs/bridge-e2e/results.md`, `results-*.json`, `*-saved.png`, `*-conflict.png`, `console-*.txt`                         |
+| Build pipeline, manifest, CSP                              | `web/docs/build/README.md`, `web/e2e/csp-header.spec.ts`                                                                          |
+| Measurements                                               | `web/measure/measurements-b3.md`, `measurements-b3.json`, `measure-b3.mjs`                                                        |
+| Fork code review (R1) + fixes                              | lane file `.uniwork-lane/review-fork.md`; fix commits `a0f5fd4`, `db550c0`, `5b5008e`, `5bce54c`                                  |
 
 dev-uniwork (branch `feature/UNI-1013-office-docs-web`):
 
-| What | Where |
-| --- | --- |
-| Serving, pin, headers | `docs/office/docs-web-frame.md`, `apps/web/platform/office-frame/` (`docs.pin.json`, `frame-headers.mjs`), `apps/web/scripts/office-frame-sync.mjs` |
-| PDF export decision + repro scripts | `docs/office/pdf-export-decision.md`, `docs/office/pdf-export/` |
-| Host e2e results + screenshots | `reports/uni-1013-w7-evidence/RESULTS.md`, `screenshots/01-04`; spec `e2e/office-docs-web.spec.ts` |
-| Frame, token, routes | `packages/views/office/frame/`, `packages/core/office/docs-frame-*.ts`, `server/internal/service/office_frame.go`, `office_frame_export.go`, `server/internal/handler/router/office_frame*.go` |
-| Flag | `server/internal/featureflags/keys.go` (`office_docs_web`) |
+| What                                | Where                                                                                                                                                                                          |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Serving, pin, headers               | `docs/office/docs-web-frame.md`, `apps/web/platform/office-frame/` (`docs.pin.json`, `frame-headers.mjs`), `apps/web/scripts/office-frame-sync.mjs`                                            |
+| PDF export decision + repro scripts | `docs/office/pdf-export-decision.md`, `docs/office/pdf-export/`                                                                                                                                |
+| Host e2e results + screenshots      | `reports/uni-1013-w7-evidence/RESULTS.md`, `screenshots/01-04`; spec `e2e/office-docs-web.spec.ts`                                                                                             |
+| Frame, token, routes                | `packages/views/office/frame/`, `packages/core/office/docs-frame-*.ts`, `server/internal/service/office_frame.go`, `office_frame_export.go`, `server/internal/handler/router/office_frame*.go` |
+| Flag                                | `server/internal/featureflags/keys.go` (`office_docs_web`)                                                                                                                                     |
 
 **Final SHAs:** fork FORK_SHA, dev-uniwork DEV_SHA (filled by the lead).

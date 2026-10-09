@@ -6,10 +6,15 @@ const SHOTS = resolve(import.meta.dirname, '../../docs/web-spike/screenshots')
 const rows = ['simple', 'kitchen-sink', 'long'].flatMap((doc) =>
   JSON.parse(readFileSync(resolve(SHOTS, `results-${doc}.json`), 'utf8')),
 )
+// CJK fixture text is escaped (\uXXXX): docs prose must stay English-only (check:english-comments)
 const cell = (v) =>
   String(v ?? '')
     .replace(/\|/g, '\\|')
     .replace(/\n/g, ' ')
+    .replace(
+      /[\u3400-\u9fff\u3000-\u303f\uff00-\uffef]/g,
+      (c) => `\\u${c.charCodeAt(0).toString(16)}`,
+    )
 const lines = [
   '# W7 Playwright results (headless Chromium, last run)',
   '',

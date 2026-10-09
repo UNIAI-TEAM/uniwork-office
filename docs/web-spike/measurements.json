@@ -948,9 +948,7 @@
     }
   },
   "cssEvidence": {
-    "cssFiles": [
-      "index-BdX_MuC4.css"
-    ],
+    "cssFiles": ["index-BdX_MuC4.css"],
     "cssBytes": 200552,
     "totalSelectors": 1740,
     "families": {
@@ -1024,10 +1022,7 @@
     ],
     "customPropertyCount": 220,
     "classCount": 874,
-    "genericUnprefixedClassNames": [
-      "app",
-      "modal"
-    ],
+    "genericUnprefixedClassNames": ["app", "modal"],
     "globalSelectors": {
       ":root": {
         "count": 9,
@@ -1089,10 +1084,7 @@
       },
       "[data-theme] (needs <html data-theme>)": {
         "count": 4,
-        "samples": [
-          "[data-theme=dark]",
-          ":root:not([data-theme=light]):not([data-theme=dark])"
-        ]
+        "samples": ["[data-theme=dark]", ":root:not([data-theme=light]):not([data-theme=dark])"]
       }
     },
     "windowGlobalsWritten": {

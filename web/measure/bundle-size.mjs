@@ -78,7 +78,7 @@ const mapBytes = walk(dist)
 // have it installed, and the spike must not npm install). Falls back to sourcesContent length.
 const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
 const B64IDX = Object.fromEntries([...B64].map((c, i) => [c, i]))
-function decodeVlqSegment(s, pos, out) {
+function decodeVlqSegment(s, pos) {
   // decode one VLQ value starting at pos; returns [value, newPos]
   let result = 0
   let shift = 0
@@ -131,12 +131,10 @@ if (bigJs && existsSync(join(dist, bigJs.file + '.map'))) {
       genCol += v
       let idx = null
       if (p < seg.length) {
-        ;[v, p] = decodeVlqSegment(seg, p)
+        v = decodeVlqSegment(seg, p)[0]
         srcIdx += v
         idx = srcIdx
-        ;[v, p] = decodeVlqSegment(seg, p) // orig line
-        ;[v, p] = decodeVlqSegment(seg, p) // orig col
-        if (p < seg.length) [v, p] = decodeVlqSegment(seg, p) // name
+        // the original line / column / name fields that follow are not needed
       }
       spans.push([genCol, idx])
     }
