@@ -3269,6 +3269,12 @@ function createShellWindow(): void {
     () => {
       win.webContents.send(TABS_CHANNELS.changed, manager.list())
       publishOpenDocumentsIfOwner([...manager.openFilePaths(), ...detachedFilePaths()])
+      // a UniWork copy written outside the save hook shows as dirty once its tab is active
+      const active = manager.activeFilePath()
+      if (active !== lastActiveDocPath) {
+        lastActiveDocPath = active
+        void uniworkDocs?.service.refreshPath(active).catch(() => undefined)
+      }
     },
     applyMenuFor,
     // no extension: these tabs have no file on disk yet; the title becomes the
@@ -3669,6 +3675,8 @@ const droppedFilesDeps = () => ({
 })
 
 let uniworkDocs: UniworkDocsHandle | null = null
+/** the active tab's file at the last tab change (UniWork re-checks it on activation) */
+let lastActiveDocPath: string | undefined
 
 /** the tab or detached window showing a path (UniWork documents: Save, reload) */
 function webContentsForPath(

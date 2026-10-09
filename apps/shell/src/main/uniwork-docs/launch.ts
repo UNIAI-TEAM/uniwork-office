@@ -68,6 +68,43 @@ export function parseOfficeDeepLink(value: unknown, scheme: string): DeepLinkPar
   return { ok: true, ticket }
 }
 
+/** the slice of the shell window's WebContents a launch push needs */
+export interface LaunchPushTarget {
+  isDestroyed(): boolean
+  isLoadingMainFrame(): boolean
+  send(channel: string, payload: unknown): void
+  once(event: 'did-finish-load', listener: () => void): unknown
+}
+
+/**
+ * Launch events of a cold start arrive before the shell page has loaded; a
+ * send then is lost. While the page loads the latest event is kept and sent
+ * once it finished loading (the preload holds it until the renderer
+ * subscribes).
+ */
+export function createLaunchPusher(
+  target: () => LaunchPushTarget | null,
+  channel: string,
+): (event: UniworkLaunchEvent) => void {
+  let held: UniworkLaunchEvent | null = null
+  return (event) => {
+    const wc = target()
+    if (!wc || wc.isDestroyed()) return
+    if (!wc.isLoadingMainFrame()) {
+      wc.send(channel, event)
+      return
+    }
+    const waiting = held !== null
+    held = event
+    if (waiting) return
+    wc.once('did-finish-load', () => {
+      const latest = held
+      held = null
+      if (latest && !wc.isDestroyed()) wc.send(channel, latest)
+    })
+  }
+}
+
 export interface LaunchControllerDeps {
   /** the active channel's launch scheme, or null without a deployment profile */
   scheme(): string | null
@@ -191,13 +228,23 @@ export class LaunchController {
         deviceSessionId: identity.deviceSessionId,
       })
     } catch (error) {
-      this.deps.emit({ phase: 'failed', error: codeOf(error) })
-      return
-    } finally {
-      // terminal whatever happened: a lost response may have redeemed it
       this.inFlight.delete(ticket)
+      const code = codeOf(error)
+      if (code === 'session_expired' || code === 'not_signed_in') {
+        // the server's auth refuses before the ticket is consumed (and after
+        // one refresh): the session restore failed or ended, so the ticket
+        // waits for sign-in like a link received while signed out
+        this.hold(ticket)
+        this.deps.emit({ phase: 'needs-sign-in' })
+        return
+      }
+      // terminal: a lost response may have redeemed it
       this.terminal.add(ticket)
+      this.deps.emit({ phase: 'failed', error: code })
+      return
     }
+    this.inFlight.delete(ticket)
+    this.terminal.add(ticket)
     this.deps.emit({ phase: 'opening', title: descriptor.title })
     try {
       const opened = await this.deps.open(descriptor)

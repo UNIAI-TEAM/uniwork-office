@@ -2,6 +2,7 @@ import { basename } from 'node:path'
 import { realpathSync } from 'node:fs'
 import { BrowserWindow } from 'electron'
 import type { Rectangle, WebContents, WebContentsView } from 'electron'
+import { confirmUniworkClose, isUniworkCloseGuarded } from './uniwork-docs/close-guard'
 
 import {
   createDocsView,
@@ -732,7 +733,23 @@ export class TabManager {
         this.closingIds.delete(id)
       }
     }
+    // a UniWork document whose local changes are not in UniWork yet
+    if (tab.view && !tab.present && isUniworkCloseGuarded(tab.filePath)) {
+      this.closingIds.add(id)
+      try {
+        if (!(await confirmUniworkClose(tab.filePath))) return
+      } finally {
+        this.closingIds.delete(id)
+      }
+    }
     this.removeTab(id)
+  }
+
+  /** tabs showing an editable UniWork copy of ours (shell-close guard) */
+  uniworkGuardedTabs(): Array<{ id: string; path: string }> {
+    return this.tabs
+      .filter((t) => t.view && !t.present && isUniworkCloseGuarded(t.filePath))
+      .map((t) => ({ id: t.id, path: t.filePath as string }))
   }
 
   /**

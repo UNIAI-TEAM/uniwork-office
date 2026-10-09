@@ -119,8 +119,6 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
     form?: FormData
     idempotencyKey?: string
     timeoutMs: number
-    /** false: a 401 is final (the launch exchange never replays a ticket) */
-    retryOn401?: boolean
     read(response: Response): Promise<T>
   }
 
@@ -167,7 +165,7 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
           ) {
             throw new UniworkDocError('server_error')
           }
-          if (response.status === 401 && call.retryOn401 !== false) {
+          if (response.status === 401) {
             // authorized() refreshes once and calls again; a second 401 ends it
             throw new TransportError('unauthorized', 401)
           }
@@ -304,6 +302,9 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
     },
 
     async exchange(input) {
+      // a 401 refreshes once and retries like every other call: the server's
+      // auth rejects before the ticket is consumed, so this never replays a
+      // redeemed ticket; a second 401 is session_expired
       let raw: unknown
       try {
         raw = await send({
@@ -316,7 +317,6 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
             device_session_id: input.deviceSessionId,
           },
           timeoutMs: metadataTimeout,
-          retryOn401: false,
           read: json,
         })
       } catch (error) {

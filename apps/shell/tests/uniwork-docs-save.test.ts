@@ -9,7 +9,11 @@ import type {
   UniworkLaunchEvent,
 } from '../src/shared/home-api'
 import type { DeploymentProfile } from '../src/main/uniwork-auth/deployment'
-import { UniworkDocsService, type ConflictUi } from '../src/main/uniwork-docs/service'
+import {
+  UniworkDocsService,
+  type ConflictUi,
+  type UnsavedCloseChoice,
+} from '../src/main/uniwork-docs/service'
 import { BINDING_FILE } from '../src/main/uniwork-docs/binding-store'
 import { pageRecentPaths } from '../src/main/recent-files'
 
@@ -35,7 +39,8 @@ interface Call {
 
 type Fault = {
   route: 'upload' | 'commit' | 'download' | 'detail'
-  kind: 'lost' | 'network' | number
+  /** 'no-checksum': the commit lands but its receipt omits version.checksum_sha256 */
+  kind: 'lost' | 'network' | 'no-checksum' | number
   code?: string
 }
 
@@ -156,6 +161,12 @@ function fakeServer(initial: { bytes: Uint8Array; myLevel?: string; title?: stri
       }
       // the commit landed but its answer never arrived
       if (fault?.kind === 'lost') throw new TypeError('fetch failed')
+      if (fault?.kind === 'no-checksum') {
+        const r = result as { version: Record<string, unknown> }
+        const version = { ...r.version }
+        delete version.checksum_sha256
+        return json(200, { ...r, version })
+      }
       return json(200, result)
     }
     return error(404, 'not_found')
@@ -174,11 +185,16 @@ afterEach(() => {
 
 function setup(
   server: ReturnType<typeof fakeServer>,
-  opts: { signedIn?: boolean; choice?: UniworkConflictChoice } = {},
+  opts: {
+    signedIn?: boolean
+    choice?: UniworkConflictChoice
+    closeChoice?: UnsavedCloseChoice
+    account?: string
+  } = {},
 ) {
   const statuses: UniworkDocStatus[] = []
   const launches: UniworkLaunchEvent[] = []
-  let signedIn = opts.signedIn ?? true
+  let account: string | null = (opts.signedIn ?? true) ? (opts.account ?? 'acc_1') : null
   const ui: ConflictUi = {
     chooseConflict: vi.fn(async () => opts.choice ?? 'later'),
     confirmDiscard: vi.fn(async () => true),
@@ -186,12 +202,14 @@ function setup(
       join(dir, `${stem} (my copy).${format}`),
     ),
     showOpenLatestFailed: vi.fn(),
+    showCopyFailed: vi.fn(),
+    chooseUnsavedClose: vi.fn(async () => opts.closeChoice ?? 'cancel'),
   }
   const deps = {
     userDataDir: dir,
     profile: () => profile,
     identity: () =>
-      signedIn ? { accountId: 'acc_1', deviceSessionId: 'dev_1', deploymentId: 'default' } : null,
+      account ? { accountId: account, deviceSessionId: 'dev_1', deploymentId: 'default' } : null,
     selectedOrgId: () => 'org_a',
     authorized: <T>(call: (token: string) => Promise<T>) => call(TOKEN),
     fetch: server.fetch,
@@ -214,7 +232,10 @@ function setup(
     statuses,
     launches,
     signOut: () => {
-      signedIn = false
+      account = null
+    },
+    signInAs: (id: string) => {
+      account = id
     },
   }
 }
@@ -587,5 +608,238 @@ describe('secrets and egress', () => {
       expect(init.redirect).toBe('error')
       expect(init.cache).toBe('no-store')
     }
+  })
+})
+
+const flushSaves = () => new Promise((r) => setTimeout(r, 20))
+
+describe('local saves never depend on a live session (review r1 BE-1)', () => {
+  it("signed out: the last account's copy stays editable, saves locally and lands in signed-out", async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    ctx.signOut()
+    expect(ctx.service.isReadOnly(path)).toBe(false)
+    // the module wrote the bytes, then fired the user-save hook
+    writeFileSync(path, 'v4 while signed out')
+    const before = server.calls.length
+    ctx.service.onUserSave(path)
+    await flushSaves()
+    expect(server.calls.length).toBe(before)
+    expect(readFileSync(path, 'utf8')).toBe('v4 while signed out')
+    expect(binding(path)).toMatchObject({ state: 'signed-out', error: 'not_signed_in' })
+    expect(await ctx.service.docStatus(path)).toMatchObject({ state: 'signed-out' })
+    // signed in again, Retry sends it
+    ctx.signInAs('acc_1')
+    expect(await ctx.service.save(path)).toMatchObject({ state: 'saved' })
+  })
+
+  it('a fresh start with no session yet (restoring) keeps the last account editable; another live account is read-only', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const path = await openDoc(setup(server))
+    const restoring = setup(server, { signedIn: false })
+    expect(restoring.service.isReadOnly(path)).toBe(false)
+    const other = setup(server, { account: 'acc_2' })
+    expect(other.service.isReadOnly(path)).toBe(true)
+    expect(await other.service.docStatus(path)).toBeNull()
+  })
+})
+
+describe('review r1 save fixes', () => {
+  it('a document blocked as deleted can be saved again after a successful reopen (BE-2)', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'v4')
+    server.faults.push({ route: 'commit', kind: 410, code: 'document_deleted' })
+    server.faults.push({ route: 'detail', kind: 410, code: 'document_deleted' })
+    expect(await ctx.service.save(path)).toMatchObject({ state: 'blocked', error: 'deleted' })
+    // restored from the trash: the reopen answers again
+    await openDoc(ctx)
+    expect(binding(path)).toMatchObject({ state: 'dirty' })
+    expect(binding(path).error).toBeUndefined()
+    expect(readFileSync(path, 'utf8')).toBe('v4')
+    expect(await ctx.service.save(path)).toMatchObject({ state: 'saved' })
+  })
+
+  it('an expired staged upload drops the intent, stays dirty, and the next save mints a new key on the same base (A1.2)', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'v4')
+    server.faults.push({ route: 'commit', kind: 409, code: 'document_upload_invalid' })
+    expect(await ctx.service.save(path)).toMatchObject({ state: 'dirty', error: 'server_error' })
+    expect(binding(path).pendingIntent).toBeUndefined()
+    const firstKey = uploads(server)[0]?.headers['idempotency-key']
+    expect(await ctx.service.save(path)).toMatchObject({ state: 'saved' })
+    const lastCommit = commits(server).at(-1)
+    expect(lastCommit?.headers['idempotency-key']).not.toBe(firstKey)
+    expect(lastCommit?.body).toMatchObject({ base_revision: '41' })
+  })
+
+  it('a 404 on commit is checked against the document: still there -> dirty, gone -> not_found (A1.2)', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'v4')
+    server.faults.push({ route: 'commit', kind: 404, code: 'not_found' })
+    expect(await ctx.service.save(path)).toMatchObject({ state: 'dirty', error: 'server_error' })
+    server.faults.push({ route: 'commit', kind: 404, code: 'not_found' })
+    server.faults.push({ route: 'detail', kind: 404, code: 'not_found' })
+    expect(await ctx.service.save(path)).toMatchObject({ state: 'blocked', error: 'not_found' })
+    expect(binding(path).pendingIntent).toBeUndefined()
+    expect(readFileSync(path, 'utf8')).toBe('v4')
+  })
+
+  it('a replay whose upload is gone settles when an earlier attempt already committed the bytes', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'v4')
+    server.faults.push({ route: 'commit', kind: 'lost' })
+    expect(await ctx.service.save(path)).toMatchObject({ state: 'offline' })
+    server.faults.push({ route: 'commit', kind: 409, code: 'upload_missing' })
+    expect(await ctx.service.save(path)).toMatchObject({ state: 'saved' })
+    expect(binding(path)).toMatchObject({ baseRevision: '42', baseChecksum: hex(enc('v4')) })
+    expect(server.state.version).toBe(4)
+  })
+
+  it('an account switch during the upload never commits under the other account (BE-3)', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'v4')
+    const serve = server.fetch.getMockImplementation()!
+    server.fetch.mockImplementationOnce(async (url, init) => {
+      ctx.signInAs('acc_2')
+      return serve(url, init)
+    })
+    expect(await ctx.service.coordinator.save(path)).toMatchObject({
+      binding: { state: 'signed-out' },
+    })
+    expect(uploads(server)).toHaveLength(1)
+    expect(commits(server)).toHaveLength(0)
+    expect(binding(path).pendingIntent).toBeTruthy()
+  })
+
+  it('a receipt without a checksum is confirmed against the document instead of failing forever (BE-4)', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'v4')
+    server.faults.push({ route: 'commit', kind: 'no-checksum' })
+    expect(await ctx.service.save(path)).toMatchObject({ state: 'saved' })
+    expect(binding(path)).toMatchObject({ baseRevision: '42', baseVersion: 4 })
+    expect(binding(path).pendingIntent).toBeUndefined()
+  })
+
+  it('save-local-copy reports a copy that could not be written (BE-6)', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server, { choice: 'save-local-copy' })
+    const path = await openDoc(ctx)
+    server.state.revision = 45
+    writeFileSync(path, 'mine')
+    await ctx.service.save(path)
+    vi.mocked(ctx.ui.pickCopyPath).mockResolvedValueOnce(join(dir, 'missing-dir', 'copy.docx'))
+    await ctx.service.resolveConflict(path)
+    expect(ctx.ui.showCopyFailed).toHaveBeenCalledTimes(1)
+    // the working copy itself is never a "copy on this computer"
+    vi.mocked(ctx.ui.pickCopyPath).mockResolvedValueOnce(path)
+    await ctx.service.resolveConflict(path)
+    expect(ctx.ui.showCopyFailed).toHaveBeenCalledTimes(2)
+    expect(readFileSync(path, 'utf8')).toBe('mine')
+    expect(binding(path)).toMatchObject({ state: 'conflict' })
+  })
+
+  it('a file changed while saving settles as dirty, not saved (BE-7)', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'v4')
+    const serve = server.fetch.getMockImplementation()!
+    server.fetch.mockImplementationOnce(async (url, init) => {
+      writeFileSync(path, 'v5 typed during the upload')
+      return serve(url, init)
+    })
+    expect(await ctx.service.save(path)).toMatchObject({ state: 'dirty' })
+    expect(binding(path)).toMatchObject({ baseRevision: '42', baseChecksum: hex(enc('v4')) })
+    expect(new TextDecoder().decode(server.state.bytes)).toBe('v4')
+  })
+
+  it('bytes written outside the save hook mark a clean copy dirty on status read and activation (A1.3)', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    const before = server.calls.length
+    expect(await ctx.service.docStatus(path)).toMatchObject({ state: 'ready' })
+    // e.g. Save As onto the working copy's own path, an agent save-to
+    writeFileSync(path, 'written by save-to')
+    expect(await ctx.service.docStatus(path)).toMatchObject({ state: 'dirty' })
+    expect(server.calls.length).toBe(before)
+    expect(await ctx.service.save(path)).toMatchObject({ state: 'saved' })
+    writeFileSync(path, 'pdf page tool')
+    await ctx.service.refreshPath(path)
+    expect(binding(path)).toMatchObject({ state: 'dirty' })
+    expect(ctx.statuses.at(-1)).toMatchObject({ state: 'dirty' })
+  })
+})
+
+describe('closing a document with changes not in UniWork (A1.4)', () => {
+  it('no prompt for a saved/ready or view-only document', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    expect(ctx.service.isCloseGuarded(path)).toBe(true)
+    expect(await ctx.service.confirmClose(path)).toBe(true)
+    const viewer = setup(fakeServer({ bytes: enc('v3'), myLevel: 'view' }))
+    const viewPath = await openDoc(viewer)
+    writeFileSync(viewPath, 'x')
+    expect(viewer.service.isCloseGuarded(viewPath)).toBe(false)
+    expect(await viewer.service.confirmClose(viewPath)).toBe(true)
+    expect(ctx.ui.chooseUnsavedClose).not.toHaveBeenCalled()
+    expect(viewer.ui.chooseUnsavedClose).not.toHaveBeenCalled()
+  })
+
+  it('cancel keeps it open, close anyway closes and keeps the local copy', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'v4')
+    server.faults.push({ route: 'upload', kind: 'network' })
+    await ctx.service.save(path)
+    expect(await ctx.service.confirmClose(path)).toBe(false)
+    expect(ctx.ui.chooseUnsavedClose).toHaveBeenCalledWith('Q4 plan.docx')
+    vi.mocked(ctx.ui.chooseUnsavedClose).mockResolvedValueOnce('close')
+    expect(await ctx.service.confirmClose(path)).toBe(true)
+    expect(readFileSync(path, 'utf8')).toBe('v4')
+    expect(binding(path).pendingIntent).toBeTruthy()
+  })
+
+  it('save to UniWork closes once saved, and keeps the tab open when the save fails', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server, { closeChoice: 'save' })
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'v4')
+    server.faults.push({ route: 'upload', kind: 'network' })
+    expect(await ctx.service.confirmClose(path)).toBe(false)
+    expect(binding(path)).toMatchObject({ state: 'offline' })
+    expect(await ctx.service.confirmClose(path)).toBe(true)
+    expect(binding(path)).toMatchObject({ state: 'saved' })
+    expect(new TextDecoder().decode(server.state.bytes)).toBe('v4')
+  })
+
+  it('save to UniWork goes through the module Save when a tab shows the document', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server, { closeChoice: 'save' })
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'v4')
+    vi.mocked(ctx.deps.requestModuleSave).mockImplementation((p: string) => {
+      // the module writes the bytes and fires its user-save hook
+      setTimeout(() => ctx.service.onUserSave(p), 0)
+      return true
+    })
+    expect(await ctx.service.confirmClose(path)).toBe(true)
+    expect(ctx.deps.requestModuleSave).toHaveBeenCalledWith(path)
+    expect(binding(path)).toMatchObject({ state: 'saved' })
   })
 })

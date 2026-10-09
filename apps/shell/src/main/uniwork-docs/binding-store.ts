@@ -22,6 +22,13 @@ import { isDecimalString } from './formats'
 export const BINDING_FILE = 'binding.json'
 /** the bytes of a pending save intent, kept so a replay sends the same payload */
 export const INTENT_PAYLOAD_FILE = 'pending-upload.bin'
+/** at the root: who last had a live session (see readLastOwner) */
+export const LAST_OWNER_FILE = 'last-account.json'
+
+export interface LastOwner {
+  accountId: string
+  deploymentId: string
+}
 
 export interface PendingIntent {
   intentId: string
@@ -220,6 +227,32 @@ export class BindingStore {
 
   async dropIntentPayload(dir: string): Promise<void> {
     await unlink(join(dir, INTENT_PAYLOAD_FILE)).catch(() => undefined)
+  }
+
+  /**
+   * The account + deployment that last had a live session here. Their copies
+   * stay editable (saved locally) while the session is gone or restoring; a
+   * live session of anyone else makes them read-only. Ids only, no token.
+   */
+  readLastOwner(): LastOwner | null {
+    try {
+      const raw = JSON.parse(readFileSync(join(this.root, LAST_OWNER_FILE), 'utf8')) as unknown
+      if (!raw || typeof raw !== 'object') return null
+      const { accountId, deploymentId } = raw as Record<string, unknown>
+      if (typeof accountId !== 'string' || !SEGMENT.test(accountId)) return null
+      if (typeof deploymentId !== 'string' || !SEGMENT.test(deploymentId)) return null
+      return { accountId, deploymentId }
+    } catch {
+      return null
+    }
+  }
+
+  async writeLastOwner(owner: LastOwner): Promise<void> {
+    await mkdir(this.root, { recursive: true })
+    await atomicWriteFile(
+      join(this.root, LAST_OWNER_FILE),
+      new TextEncoder().encode(`${JSON.stringify(owner)}\n`),
+    )
   }
 
   /** the path lies under the working-copy root (bound or not) */

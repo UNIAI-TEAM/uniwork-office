@@ -7,8 +7,10 @@ import { UniworkDocError } from '../src/main/uniwork-docs/errors'
 import {
   LAUNCH_TICKET_TTL_MS,
   LaunchController,
+  createLaunchPusher,
   parseOfficeDeepLink,
 } from '../src/main/uniwork-docs/launch'
+import { LAUNCH_REPLAY_MS, createLaunchReplay } from '../src/preload/launch-replay'
 import { parseExchange, type LaunchDescriptor } from '../src/main/uniwork-docs/parse'
 
 // verbatim from dev-uniwork docs/office/g3g4/vectors/deep-link.json
@@ -336,6 +338,25 @@ describe('launch controller', () => {
     expect(ctx.events.at(-1)).toEqual({ phase: 'failed', error: 'network' })
   })
 
+  it('an exchange refused as session_expired (auth before the ticket) holds the ticket and asks for sign-in', async () => {
+    let calls = 0
+    const ctx = setup({
+      exchange: async () => {
+        calls += 1
+        if (calls === 1) throw new UniworkDocError('session_expired')
+        return descriptor
+      },
+    })
+    await ctx.controller.handleUrl(link(TICKET))
+    expect(ctx.events.at(-1)).toEqual({ phase: 'needs-sign-in' })
+    // the same link again while held: not a second exchange
+    await ctx.controller.handleUrl(link(TICKET))
+    expect(ctx.exchange).toHaveBeenCalledTimes(1)
+    await ctx.controller.onSignedIn()
+    expect(ctx.exchange).toHaveBeenCalledTimes(2)
+    expect(ctx.events.at(-1)?.phase).toBe('opened')
+  })
+
   it('a session of another deployment never exchanges', async () => {
     const events: UniworkLaunchEvent[] = []
     const exchange = vi.fn()
@@ -352,6 +373,63 @@ describe('launch controller', () => {
     await controller.handleUrl(link(TICKET))
     expect(exchange).not.toHaveBeenCalled()
     expect(events.at(-1)).toEqual({ phase: 'failed', error: 'wrong_deployment' })
+  })
+})
+
+describe('cold-start launch events are not lost before the renderer listens', () => {
+  function fakeContents(loading: boolean) {
+    const sent: unknown[] = []
+    let onLoad: (() => void) | null = null
+    const wc = {
+      loading,
+      isDestroyed: () => false,
+      isLoadingMainFrame: () => wc.loading,
+      send: (_channel: string, payload: unknown) => sent.push(payload),
+      once: (_event: 'did-finish-load', listener: () => void) => {
+        onLoad = listener
+      },
+      finishLoad: () => {
+        wc.loading = false
+        onLoad?.()
+      },
+    }
+    return { wc, sent }
+  }
+
+  it('main keeps the latest event while the shell page loads and sends it once loaded', () => {
+    const { wc, sent } = fakeContents(true)
+    const push = createLaunchPusher(() => wc, 'uniwork-doc:launch-event')
+    push({ phase: 'opening' })
+    push({ phase: 'failed', error: 'ticket_invalid' })
+    expect(sent).toEqual([])
+    wc.finishLoad()
+    expect(sent).toEqual([{ phase: 'failed', error: 'ticket_invalid' }])
+    push({ phase: 'opening' })
+    expect(sent).toHaveLength(2)
+  })
+
+  it('the preload hands an event that found no subscriber to the first one, once', () => {
+    const replay = createLaunchReplay<UniworkLaunchEvent>(() => 1_000)
+    replay.deliver({ phase: 'needs-sign-in' })
+    const first: UniworkLaunchEvent[] = []
+    const off = replay.subscribe((e) => first.push(e))
+    expect(first).toEqual([{ phase: 'needs-sign-in' }])
+    replay.deliver({ phase: 'opening' })
+    expect(first).toHaveLength(2)
+    off()
+    const second: UniworkLaunchEvent[] = []
+    replay.subscribe((e) => second.push(e))
+    expect(second).toEqual([])
+  })
+
+  it('a held event older than the ticket lifetime is not replayed', () => {
+    let now = 1_000
+    const replay = createLaunchReplay<UniworkLaunchEvent>(() => now)
+    replay.deliver({ phase: 'failed', error: 'ticket_invalid' })
+    now += LAUNCH_REPLAY_MS + 1
+    const seen: UniworkLaunchEvent[] = []
+    replay.subscribe((e) => seen.push(e))
+    expect(seen).toEqual([])
   })
 })
 

@@ -48,6 +48,15 @@ import type {
 } from '../shared/integrations-api'
 import type { TabsApi, TabSummary } from '../shared/tabs-api'
 import { TABS_CHANNELS } from '../shared/tabs-api'
+import { createLaunchReplay } from './launch-replay'
+
+// subscribed at preload time: a cold-start launch event can arrive before the
+// renderer subscribes, and is then held for the first subscriber
+const uniworkLaunches = createLaunchReplay<UniworkLaunchEvent>()
+ipcRenderer.on(
+  UNIWORK_DOC_CHANNELS.launchEvent,
+  (_event: IpcRendererEvent, event: UniworkLaunchEvent) => uniworkLaunches.deliver(event),
+)
 
 const UI_LANGUAGES: readonly UiLanguage[] = [
   'zh',
@@ -765,9 +774,7 @@ const homeApi: HomeApi = {
     return asUniworkStatus(await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.resolveConflict, path))
   },
   onUniworkLaunch(cb) {
-    const listener = (_event: IpcRendererEvent, event: UniworkLaunchEvent) => cb(event)
-    ipcRenderer.on(UNIWORK_DOC_CHANNELS.launchEvent, listener)
-    return () => ipcRenderer.removeListener(UNIWORK_DOC_CHANNELS.launchEvent, listener)
+    return uniworkLaunches.subscribe(cb)
   },
 }
 

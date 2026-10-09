@@ -14,7 +14,7 @@ import type {
 } from '../../shared/home-api'
 import type { DeploymentProfile } from '../uniwork-auth/deployment'
 import { callbackSchemeForChannel } from '../uniwork-auth/deployment'
-import { type Binding, BindingStore, type BoundDocument } from './binding-store'
+import { type Binding, BindingStore, type BoundDocument, type LastOwner } from './binding-store'
 import { type FetchLike, type UniworkDocsClient, createUniworkDocsClient } from './client'
 import { UniworkDocError } from './errors'
 import { formatForMime, formatForName, sanitizeFilename, sha256Hex } from './formats'
@@ -43,7 +43,13 @@ export interface ConflictUi {
   /** Save As for "Save a copy on this computer" (default `<stem> (my copy).<ext>`); null when cancelled */
   pickCopyPath(stem: string, format: UniworkDocFormat): Promise<string | null>
   showOpenLatestFailed(): void
+  /** the "Save a copy on this computer" file could not be written */
+  showCopyFailed(): void
+  /** closing a document whose local changes are not in UniWork yet */
+  chooseUnsavedClose(title: string): Promise<UnsavedCloseChoice>
 }
+
+export type UnsavedCloseChoice = 'save' | 'close' | 'cancel'
 
 export interface UniworkDocsServiceDeps {
   userDataDir: string
@@ -81,6 +87,19 @@ const KEEP_LOCAL_STATES: ReadonlySet<string> = new Set([
   'error',
 ])
 
+/** states whose local bytes are not in UniWork (the close prompt) */
+const UNSENT_STATES: ReadonlySet<string> = new Set([
+  'dirty',
+  'offline',
+  'signed-out',
+  'error',
+  'blocked',
+  'conflict',
+])
+
+/** how long a close waits for a Save to UniWork to settle before the tab stays open */
+export const CLOSE_SAVE_WAIT_MS = 180_000
+
 async function result<T>(run: () => Promise<T>): Promise<UniworkResult<T>> {
   try {
     return { ok: true, value: await run() }
@@ -100,20 +119,24 @@ export class UniworkDocsService {
   private readonly deps: UniworkDocsServiceDeps
   private client: UniworkDocsClient | null
   private clientOrigin: string | null = null
+  private lastOwner: LastOwner | null
+  private readonly statusListeners = new Set<(status: UniworkDocStatus) => void>()
 
   constructor(deps: UniworkDocsServiceDeps) {
     this.deps = deps
     this.client = deps.client ?? null
     this.store = new BindingStore(join(deps.userDataDir, 'uniwork-documents'))
+    this.lastOwner = this.store.readLastOwner()
     this.coordinator = new SaveCoordinator({
       store: this.store,
       client: {
         upload: (input) => this.api().upload(input),
         commit: (input) => this.api().commit(input),
+        getDocument: (documentId) => this.api().getDocument(documentId),
       },
       isSignedIn: () => deps.identity() !== null,
       ownsBinding: (doc) => this.owns(doc),
-      publish: (status) => deps.pushStatus(status),
+      publish: (status) => this.publish(status),
       ...(deps.sleep ? { sleep: deps.sleep } : {}),
     })
     this.launch = new LaunchController({
@@ -149,9 +172,32 @@ export class UniworkDocsService {
     return this.client
   }
 
+  /** every status push: the shell window, then in-process waiters (close prompt) */
+  private publish(status: UniworkDocStatus): void {
+    this.deps.pushStatus(status)
+    for (const listener of [...this.statusListeners]) listener(status)
+  }
+
+  /** the live session's identity; remembered (on disk) as the last owner */
+  private liveIdentity(): SessionIdentity | null {
+    const identity = this.deps.identity()
+    if (!identity) return null
+    const last = this.lastOwner
+    if (
+      !last ||
+      last.accountId !== identity.accountId ||
+      last.deploymentId !== identity.deploymentId
+    ) {
+      const owner = { accountId: identity.accountId, deploymentId: identity.deploymentId }
+      this.lastOwner = owner
+      void this.store.writeLastOwner(owner).catch(() => undefined)
+    }
+    return identity
+  }
+
   /** the binding belongs to the signed-in account and the active deployment */
   owns(doc: BoundDocument): boolean {
-    const identity = this.deps.identity()
+    const identity = this.liveIdentity()
     const profile = this.deps.profile()
     return (
       !!identity &&
@@ -168,22 +214,43 @@ export class UniworkDocsService {
     return this.store.lookup(path) !== null
   }
 
+  /**
+   * Local ownership, which never depends on the session being live: with a
+   * session the copy must be its account's on the active deployment; without
+   * one (signed out, expired, restoring) the last signed-in account's copies
+   * on the active deployment stay editable and save locally, and only the
+   * UniWork step reports signed-out.
+   */
+  ownsLocally(doc: BoundDocument): boolean {
+    if (this.liveIdentity()) return this.owns(doc)
+    const last = this.lastOwner
+    const profile = this.deps.profile()
+    return (
+      !!last &&
+      !!profile &&
+      last.deploymentId === profile.deploymentId &&
+      doc.deploymentId === last.deploymentId &&
+      doc.userId === last.accountId
+    )
+  }
+
   /** view access, or a working copy of another account/deployment */
   isReadOnly(path: string): boolean {
     const doc = this.store.lookup(path)
-    return !!doc && (doc.binding.access === 'view' || !this.owns(doc))
+    return !!doc && (doc.binding.access === 'view' || !this.ownsLocally(doc))
   }
 
   /** a module's successful explicit user Save of `path` */
   onUserSave(path: string): void {
-    if (this.isBound(path)) void this.coordinator.save(path)
+    const doc = this.store.lookup(path)
+    if (doc && this.ownsLocally(doc)) void this.coordinator.save(path)
   }
 
   // ---- renderer API ----------------------------------------------------------
 
   listWorkspaces(): Promise<UniworkResult<UniworkWorkspaceRef[]>> {
     return result(async () => {
-      if (!this.deps.identity()) throw new UniworkDocError('not_signed_in')
+      if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
       const orgId = this.deps.selectedOrgId()
       return orgId ? this.api().listWorkspaces(orgId) : []
     })
@@ -209,35 +276,133 @@ export class UniworkDocsService {
     })
   }
 
-  docStatus(path: string): UniworkDocStatus | null {
+  /** the status, after re-checking the working copy's bytes (A1.3) */
+  async docStatus(path: string): Promise<UniworkDocStatus | null> {
     if (typeof path !== 'string') return null
     const doc = this.store.lookup(path)
-    return doc && this.owns(doc) ? toStatus(doc) : null
+    return doc && this.ownsLocally(doc) ? toStatus(await this.refreshDirty(doc)) : null
   }
 
-  activeDocStatus(): UniworkDocStatus | null {
+  activeDocStatus(): Promise<UniworkDocStatus | null> {
     const path = this.deps.activePath()
-    return path ? this.docStatus(path) : null
+    return path ? this.docStatus(path) : Promise.resolve(null)
+  }
+
+  /** tab activation: bytes written outside the save hook show as dirty */
+  async refreshPath(path: string | undefined): Promise<void> {
+    const doc = path ? this.store.lookup(path) : null
+    if (doc && this.ownsLocally(doc)) await this.refreshDirty(doc)
+  }
+
+  /**
+   * Bytes changed with no user-save hook (Save As onto the working copy, an
+   * agent save-to, pdf page tools): a ready/saved binding whose file no
+   * longer matches the base becomes dirty. Never uploads anything.
+   */
+  private async refreshDirty(doc: BoundDocument): Promise<BoundDocument> {
+    const clean = (b: Binding) =>
+      b.access === 'edit' &&
+      (b.state === 'ready' || b.state === 'saved') &&
+      !b.pendingIntent &&
+      !this.coordinator.isSaving(doc.path)
+    if (!clean(doc.binding)) return doc
+    let checksum: string
+    try {
+      checksum = sha256Hex(new Uint8Array(await readFile(doc.path)))
+    } catch {
+      return doc
+    }
+    if (checksum === doc.binding.baseChecksum) return doc
+    // a save may have started or settled while hashing: decide on the latest binding
+    const fresh = this.store.lookup(doc.path)
+    if (
+      !fresh ||
+      !clean(fresh.binding) ||
+      fresh.binding.baseChecksum !== doc.binding.baseChecksum
+    ) {
+      return fresh ?? doc
+    }
+    const next: Binding = { ...fresh.binding, state: 'dirty' }
+    delete next.error
+    return this.coordinator.commitState(fresh, next)
   }
 
   /** Save/Retry from the chip: always through the module's own Save */
   async save(path: string): Promise<UniworkDocStatus | null> {
     const doc = typeof path === 'string' ? this.store.lookup(path) : null
-    if (!doc || !this.owns(doc)) return null
-    const b = doc.binding
-    if (b.access === 'view' || b.state === 'conflict' || this.coordinator.isSaving(doc.path)) {
-      return toStatus(doc)
-    }
-    if (b.state === 'blocked' && b.error !== 'quota_exceeded') return toStatus(doc)
+    if (!doc || !this.ownsLocally(doc)) return null
+    if (!this.canSave(doc)) return toStatus(doc)
     if (this.deps.requestModuleSave(doc.path)) return toStatus(doc)
     // no tab shows it: the file on disk is the user's last saved bytes
     const saved = await this.coordinator.save(doc.path)
     return saved ? toStatus(saved) : null
   }
 
+  /** a Save that can reach the UniWork step (not view, conflict, saving or blocked) */
+  private canSave(doc: BoundDocument): boolean {
+    const b = doc.binding
+    if (b.access === 'view' || b.state === 'conflict' || this.coordinator.isSaving(doc.path)) {
+      return false
+    }
+    return !(b.state === 'blocked' && b.error !== 'quota_exceeded')
+  }
+
+  // ---- close guard (A1.4) ----------------------------------------------------
+
+  /** synchronous pre-check for the close guards: an editable copy of ours */
+  isCloseGuarded(path: string): boolean {
+    const doc = this.store.lookup(path)
+    return !!doc && doc.binding.access === 'edit' && this.ownsLocally(doc)
+  }
+
+  /**
+   * Closing (or quitting) a bound document whose local bytes are not in
+   * UniWork: one native prompt. "Save to UniWork" runs the normal Save and
+   * allows the close only once it reaches `saved`; "Close anyway" closes (the
+   * copy stays on this computer); "Cancel" keeps it open. True = may close.
+   */
+  async confirmClose(path: string): Promise<boolean> {
+    let doc = this.store.lookup(path)
+    if (!doc || doc.binding.access !== 'edit' || !this.ownsLocally(doc)) return true
+    // a Save from the module's own close prompt may still be uploading
+    if (this.coordinator.isSaving(doc.path)) {
+      await this.coordinator.settled(doc.path)
+      doc = this.store.lookup(path)
+      if (!doc) return true
+    }
+    doc = await this.refreshDirty(doc)
+    const b = doc.binding
+    if (!b.pendingIntent && !UNSENT_STATES.has(b.state)) return true
+    const choice = await this.deps.ui.chooseUnsavedClose(b.title)
+    if (choice === 'close') return true
+    if (choice !== 'save') return false
+    const latest = this.store.lookup(path)
+    if (!latest || !this.canSave(latest)) return false
+    const settled = this.waitForSettle(latest.path, CLOSE_SAVE_WAIT_MS)
+    if (!this.deps.requestModuleSave(latest.path)) void this.coordinator.save(latest.path)
+    return (await settled)?.state === 'saved'
+  }
+
+  /** the next status of `path` that is not `saving` (null on timeout) */
+  private waitForSettle(path: string, timeoutMs: number): Promise<UniworkDocStatus | null> {
+    return new Promise((resolveWait) => {
+      const listener = (status: UniworkDocStatus) => {
+        if (status.path === path && status.state !== 'saving') finish(status)
+      }
+      const timer = setTimeout(() => finish(null), timeoutMs)
+      ;(timer as { unref?: () => void }).unref?.()
+      const finish = (status: UniworkDocStatus | null) => {
+        clearTimeout(timer)
+        this.statusListeners.delete(listener)
+        resolveWait(status)
+      }
+      this.statusListeners.add(listener)
+    })
+  }
+
   async resolveConflict(path: string): Promise<UniworkDocStatus | null> {
     const doc = typeof path === 'string' ? this.store.lookup(path) : null
-    if (!doc || !this.owns(doc)) return null
+    if (!doc || !this.ownsLocally(doc)) return null
     if (doc.binding.state !== 'conflict') return toStatus(doc)
     const choice = await this.deps.ui.chooseConflict(doc.binding.title)
     if (choice === 'overwrite') return this.overwrite(doc)
@@ -246,8 +411,17 @@ export class UniworkDocsService {
       const stem =
         (titleExt ? doc.binding.title.slice(0, -titleExt.length) : doc.binding.title) || 'document'
       const target = await this.deps.ui.pickCopyPath(stem, doc.binding.format)
-      // a plain local file; the document itself stays in conflict
-      if (target) await copyFile(doc.path, target).catch(() => undefined)
+      // a plain local file; the document itself stays in conflict. A target
+      // inside the working-copy folders would not be one (or is the copy itself)
+      if (target) {
+        const copied =
+          !this.store.isInside(target) &&
+          (await copyFile(doc.path, target).then(
+            () => true,
+            () => false,
+          ))
+        if (!copied) this.deps.ui.showCopyFailed()
+      }
       return toStatus(doc)
     }
     if (choice === 'open-latest') {
@@ -348,7 +522,7 @@ export class UniworkDocsService {
     documentId: string,
     launch?: LaunchDescriptor,
   ): Promise<{ path: string; title: string }> {
-    const identity = this.deps.identity()
+    const identity = this.liveIdentity()
     if (!identity) throw new UniworkDocError('not_signed_in')
     const profile = this.deps.profile()
     if (!profile || profile.deploymentId !== identity.deploymentId) {
@@ -388,6 +562,16 @@ export class UniworkDocsService {
           const binding: Binding = { ...existing, title: detail.title, access }
           if (existing.state === 'blocked' && existing.error === 'forbidden' && access === 'edit') {
             binding.state = 'dirty'
+            delete binding.error
+          }
+          // the document answers again (restored from the trash, a transient
+          // 404): its local work can be saved once more
+          if (
+            existing.state === 'blocked' &&
+            (existing.error === 'not_found' || existing.error === 'deleted')
+          ) {
+            binding.state =
+              !existing.pendingIntent && localChecksum === existing.baseChecksum ? 'ready' : 'dirty'
             delete binding.error
           }
           await this.store.write(dir, binding)
@@ -430,7 +614,7 @@ export class UniworkDocsService {
   private show(path: string, binding: Binding): { path: string; title: string } {
     if (!this.deps.openPath(path)) throw new UniworkDocError('unsupported_format')
     const doc = this.store.lookup(path)
-    if (doc) this.deps.pushStatus(toStatus(doc))
+    if (doc) this.publish(toStatus(doc))
     return { path, title: binding.title }
   }
 }

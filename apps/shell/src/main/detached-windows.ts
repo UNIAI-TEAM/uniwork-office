@@ -23,6 +23,7 @@ import { pdfIsDirty, requestPdfClose } from '../../../pdf/src/main/pdf-main'
 import { markdownIsDirty, requestMarkdownClose } from '../../../markdown/src/main/markdown-main'
 import { htmlIsDirty, requestHtmlClose } from '../../../html/src/main/html-main'
 import { canonicalPath } from './tab-manager'
+import { confirmUniworkClose } from './uniwork-docs/close-guard'
 import type { DetachedTab } from './tab-manager'
 import type { OpenDocumentTab, TabKind } from '../shared/tabs-api'
 import { DOCK_DWELL_MS, dockBand, pointInRect } from '../shared/tab-drag-geometry'
@@ -232,6 +233,12 @@ async function detachedIsDirty(rec: DetachedRecord): Promise<boolean> {
 /** run the family's save/don't-save/cancel prompt when the document is dirty;
  *  true when the window may close (same helpers as the tab close path) */
 async function confirmDetachedClose(rec: DetachedRecord): Promise<boolean> {
+  if (!(await confirmModuleClose(rec))) return false
+  // then a UniWork document whose local changes are not in UniWork yet
+  return confirmUniworkClose(rec.filePath)
+}
+
+async function confirmModuleClose(rec: DetachedRecord): Promise<boolean> {
   if (!(await detachedIsDirty(rec))) return true
   const wc = rec.view.webContents
   const win = rec.window

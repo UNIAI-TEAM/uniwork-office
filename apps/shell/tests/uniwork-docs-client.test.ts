@@ -280,20 +280,48 @@ describe('401: one shared refresh, one retry (real account session)', () => {
     expect(transport.refresh).toHaveBeenCalledTimes(1)
   })
 
-  it('the launch exchange never retries a 401', async () => {
+  const exchangeInput = {
+    launchTicket: 't',
+    deploymentId: 'default',
+    clientId: 'uniwork-office',
+    deviceSessionId: 'dev_1',
+  }
+  const exchanged = {
+    receipt_id: 'r1',
+    redeemed_at: '2026-10-01T00:00:00Z',
+    document: {
+      id: DOC,
+      organization_id: 'org_a',
+      workspace_id: 'ws_1',
+      title: 'Plan.docx',
+      kind: 'file',
+      operation: 'edit',
+      version: 0,
+      revision: '4',
+      download_path: `/api/v1/documents/${DOC}/download`,
+    },
+  }
+
+  it('the launch exchange refreshes once on a 401 (an idle-expired token) and redeems', async () => {
+    const { manager, transport } = await signedIn()
+    const seen: string[] = []
+    const fetch = vi.fn<FetchLike>(async (_url, init) => {
+      seen.push((init.headers as Record<string, string>).Authorization)
+      return seen.length === 1 ? envelope(401, 'unauthorized') : json(200, exchanged)
+    })
+    const api = client(fetch, (call) => manager.authorizedRequest(call))
+    expect((await api.exchange(exchangeInput)).id).toBe(DOC)
+    expect(fetch).toHaveBeenCalledTimes(2)
+    expect(transport.refresh).toHaveBeenCalledTimes(1)
+    expect(seen[0]).not.toBe(seen[1])
+  })
+
+  it('a second 401 on the launch exchange is session_expired', async () => {
     const { manager, transport } = await signedIn()
     const fetch = vi.fn<FetchLike>(async () => envelope(401, 'unauthorized'))
     const api = client(fetch, (call) => manager.authorizedRequest(call))
-    const code = await codeOf(
-      api.exchange({
-        launchTicket: 't',
-        deploymentId: 'default',
-        clientId: 'uniwork-office',
-        deviceSessionId: 'dev_1',
-      }),
-    )
-    expect(code).toBe('session_expired')
-    expect(fetch).toHaveBeenCalledTimes(1)
-    expect(transport.refresh).not.toHaveBeenCalled()
+    expect(await codeOf(api.exchange(exchangeInput))).toBe('session_expired')
+    expect(fetch).toHaveBeenCalledTimes(2)
+    expect(transport.refresh).toHaveBeenCalledTimes(1)
   })
 })

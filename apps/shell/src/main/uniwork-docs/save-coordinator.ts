@@ -5,7 +5,7 @@ import type { Binding, BindingStore, BoundDocument, PendingIntent } from './bind
 import type { UniworkDocsClient } from './client'
 import { UniworkDocError, isTerminalRefusal } from './errors'
 import { sha256Hex } from './formats'
-import type { CommitReceipt } from './parse'
+import type { CommitReceipt, DocumentDetail } from './parse'
 
 /**
  * Saves a bound working copy to UniWork, once per explicit user Save. The
@@ -19,18 +19,41 @@ import type { CommitReceipt } from './parse'
  * - timeout / network / 5xx / malformed keep the intent, and the next Save
  *   replays the same intent and key first (the server returns the stored
  *   result when it already committed);
- * - a refusal that proves nothing committed (409 conflict, 403, 404/410,
- *   payload mismatch, ...) drops the intent;
+ * - a refusal that proves nothing committed (409 conflict, 403, payload
+ *   mismatch, ...) drops the intent;
+ * - a staged upload that is gone (expired claim, 404 on upload/commit) or a
+ *   receipt that does not verify is checked against the document itself: its
+ *   current checksum equal to the intent's settles the save, a 404/410 there
+ *   blocks the document, anything else drops the intent so the next Save
+ *   mints a new one from the current bytes on the same base;
+ * - the account that started the save must still be the signed-in one when
+ *   the commit is sent (an account switch mid-upload never commits);
  * - while saving, another Save returns at once (no queue); bytes identical to
  *   the base never touch the network; a conflict refuses every Save until the
  *   user resolves it; a view-only document never reaches the network.
  */
 
 const IN_FLIGHT_BACKOFF_MS = [250, 1000, 2000] as const
+/** the server's answers for a staged upload that no longer resolves */
+const UPLOAD_GONE_CODES: ReadonlySet<string> = new Set([
+  'document_upload_invalid',
+  'upload_missing',
+  'upload_checksum_mismatch',
+])
+
+/** a failure the document itself has to settle (did it commit? does it still exist?) */
+function needsRecheck(error: unknown): error is UniworkDocError {
+  return (
+    error instanceof UniworkDocError &&
+    (error.code === 'not_found' ||
+      error.code === 'deleted' ||
+      (error.serverCode !== undefined && UPLOAD_GONE_CODES.has(error.serverCode)))
+  )
+}
 
 export interface SaveCoordinatorDeps {
   store: BindingStore
-  client: Pick<UniworkDocsClient, 'upload' | 'commit'>
+  client: Pick<UniworkDocsClient, 'upload' | 'commit' | 'getDocument'>
   isSignedIn(): boolean
   /** the binding belongs to the signed-in account and the active deployment */
   ownsBinding(doc: BoundDocument): boolean
@@ -72,6 +95,7 @@ function withoutIntent(binding: Binding): Binding {
 export class SaveCoordinator {
   private readonly deps: SaveCoordinatorDeps
   private readonly saving = new Set<string>()
+  private readonly running = new Map<string, Promise<BoundDocument>>()
   private readonly now: () => Date
   private readonly uuid: () => string
   private readonly sleep: (ms: number) => Promise<void>
@@ -89,6 +113,11 @@ export class SaveCoordinator {
     return this.saving.has(path)
   }
 
+  /** resolves once the running save of `path` (if any) has finished */
+  async settled(path: string): Promise<void> {
+    await this.running.get(path)?.catch(() => undefined)
+  }
+
   /**
    * The UniWork step of one explicit Save of `path`. Resolves with the
    * document after the attempt (null for an unbound path); never throws.
@@ -103,12 +132,15 @@ export class SaveCoordinator {
     // permission and existence refusals stay until the document is opened again
     if (b.state === 'blocked' && b.error !== 'quota_exceeded') return doc
     this.saving.add(doc.path)
+    const attempt = this.run(doc).catch(() =>
+      this.commitState(doc, { ...doc.binding, state: 'error', error: 'server_error' }),
+    )
+    this.running.set(doc.path, attempt)
     try {
-      return await this.run(doc)
-    } catch {
-      return this.commitState(doc, { ...doc.binding, state: 'error', error: 'server_error' })
+      return await attempt
     } finally {
       this.saving.delete(doc.path)
+      this.running.delete(doc.path)
     }
   }
 
@@ -168,16 +200,25 @@ export class SaveCoordinator {
     try {
       receipt = await this.uploadAndCommit(saving, intent, payload as Uint8Array)
     } catch (error) {
+      if (needsRecheck(error)) {
+        return this.recheck(saving, intent, { state: 'dirty', error: 'server_error' })
+      }
       return this.fail(saving, intent, error)
     }
     if (receipt.documentId !== intent.documentId || receipt.checksumSha256 !== intent.checksum) {
-      // not evidence of this commit: the intent stays for the next Save to replay
-      return this.commitState(saving, {
-        ...saving.binding,
-        state: 'error',
-        error: 'malformed_response',
-      })
+      // not evidence of this commit (a replay keeps answering the same): the
+      // document says whether these bytes landed; otherwise a new key next time
+      return this.recheck(saving, intent, { state: 'error', error: 'malformed_response' })
     }
+    return this.settle(saving, intent, receipt)
+  }
+
+  /** a verified commit of the intent's bytes: the base moves, the intent clears */
+  private async settle(
+    doc: BoundDocument,
+    intent: PendingIntent,
+    landed: { revision: string; version: number },
+  ): Promise<BoundDocument> {
     let current: string | null = null
     try {
       current = sha256Hex(await this.readBytes(doc.path))
@@ -186,9 +227,9 @@ export class SaveCoordinator {
     }
     const settled: Binding = withoutIntent(
       withoutError({
-        ...saving.binding,
-        baseRevision: receipt.revision,
-        baseVersion: receipt.version,
+        ...doc.binding,
+        baseRevision: landed.revision,
+        baseVersion: landed.version,
         baseChecksum: intent.checksum,
         // the file changed while saving: those edits are not in UniWork yet
         state: current === intent.checksum ? 'saved' : 'dirty',
@@ -196,9 +237,34 @@ export class SaveCoordinator {
       }),
     )
     delete settled.serverRevision
-    const done = await this.commitState(saving, settled)
-    await store.dropIntentPayload(doc.dir)
+    const done = await this.commitState(doc, settled)
+    await this.deps.store.dropIntentPayload(doc.dir)
     return done
+  }
+
+  /**
+   * The intent can no longer be replayed or its receipt does not verify: the
+   * document's current checksum decides. Equal -> these bytes are the current
+   * version (an earlier attempt committed them); 404/410 -> the document is
+   * gone; a transient failure keeps the intent; otherwise the intent is
+   * dropped and the next Save mints a new one on the same base.
+   */
+  private async recheck(
+    doc: BoundDocument,
+    intent: PendingIntent,
+    otherwise: { state: 'dirty' | 'error'; error: 'server_error' | 'malformed_response' },
+  ): Promise<BoundDocument> {
+    let detail: DocumentDetail
+    try {
+      detail = await this.deps.client.getDocument(intent.documentId)
+    } catch (error) {
+      return this.fail(doc, intent, error)
+    }
+    if (detail.id === intent.documentId && detail.file.checksumSha256 === intent.checksum) {
+      return this.settle(doc, intent, { revision: detail.revision, version: detail.file.version })
+    }
+    await this.deps.store.dropIntentPayload(doc.dir)
+    return this.commitState(doc, { ...withoutIntent(doc.binding), ...otherwise })
   }
 
   private async uploadAndCommit(
@@ -220,6 +286,11 @@ export class SaveCoordinator {
           throw new UniworkDocError('malformed_response', {
             serverCode: 'upload_checksum_mismatch',
           })
+        }
+        // the upload can take minutes: an account switch meanwhile must not
+        // commit this copy under the other account (the intent stays)
+        if (!this.deps.isSignedIn() || !this.deps.ownsBinding(doc)) {
+          throw new UniworkDocError('not_signed_in')
         }
         return await this.deps.client.commit({
           documentId: intent.documentId,
@@ -244,7 +315,7 @@ export class SaveCoordinator {
   ): Promise<BoundDocument> {
     const error = raw instanceof UniworkDocError ? raw : new UniworkDocError('server_error')
     const b = doc.binding
-    const dropped = error.serverCode === 'upload_checksum_mismatch' || isTerminalRefusal(error)
+    const dropped = isTerminalRefusal(error)
     if (dropped) await this.deps.store.dropIntentPayload(doc.dir)
     const base = dropped ? withoutIntent(b) : { ...b, pendingIntent: intent }
     switch (error.code) {

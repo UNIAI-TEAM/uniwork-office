@@ -1,4 +1,4 @@
-import { app, dialog, type BrowserWindow, type IpcMain, type WebContents } from 'electron'
+import { app, BrowserWindow, dialog, type IpcMain, type WebContents } from 'electron'
 import { join } from 'node:path'
 import {
   UNIWORK_DOC_CHANNELS,
@@ -13,7 +13,9 @@ import {
   uniworkDeploymentProfile,
   uniworkSessionIdentity,
 } from '../uniwork-auth'
-import { UniworkDocsService, type ConflictUi } from './service'
+import { setUniworkCloseGuard } from './close-guard'
+import { createLaunchPusher } from './launch'
+import { UniworkDocsService, type ConflictUi, type UnsavedCloseChoice } from './service'
 import { tUniworkDocs } from './strings'
 
 /**
@@ -98,8 +100,31 @@ function conflictUi(wiring: UniworkDocsWiring): ConflictUi {
     showOpenLatestFailed() {
       void box({ type: 'error', message: t('openLatestFailed'), buttons: ['OK'], noLink: true })
     },
+    showCopyFailed() {
+      void box({ type: 'error', message: t('copyFailed'), buttons: ['OK'], noLink: true })
+    },
+    async chooseUnsavedClose(title) {
+      // over whichever window is closing (a detached editor or the shell)
+      const focused = BrowserWindow.getFocusedWindow()
+      const options: Electron.MessageBoxOptions = {
+        type: 'warning',
+        title,
+        message: t('closeMessage'),
+        detail: t('closeDetail'),
+        buttons: [t('closeSave'), t('closeAnyway'), t('closeCancel')],
+        defaultId: 0,
+        cancelId: 2,
+        noLink: true,
+      }
+      const { response } = focused
+        ? await dialog.showMessageBox(focused, options)
+        : await box(options)
+      return CLOSE_CHOICES[response] ?? 'cancel'
+    },
   }
 }
+
+const CLOSE_CHOICES: readonly UnsavedCloseChoice[] = ['save', 'close', 'cancel']
 
 export interface UniworkDocsHandle {
   service: UniworkDocsService
@@ -129,7 +154,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     activePath: () => wiring.activePath(),
     ui: conflictUi(wiring),
     pushStatus: (status) => push(UNIWORK_DOC_CHANNELS.docStatusEvent, status),
-    pushLaunch: (event) => push(UNIWORK_DOC_CHANNELS.launchEvent, event),
+    pushLaunch: createLaunchPusher(() => wiring.shellContents(), UNIWORK_DOC_CHANNELS.launchEvent),
     reveal: () => wiring.reveal(),
   })
 
@@ -148,6 +173,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   ipcMain.handle(UNIWORK_DOC_CHANNELS.resolveConflict, (_event, path: unknown) =>
     service.resolveConflict(path as string),
   )
+  setUniworkCloseGuard(service)
 
   return {
     service,
