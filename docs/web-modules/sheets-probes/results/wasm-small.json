@@ -1,0 +1,624 @@
+{
+  "node": "v22.23.2",
+  "platform": "linux-arm64",
+  "results": [
+    {
+      "fixture": "xlsx-chart.xlsx",
+      "fileBytes": 4440,
+      "open": {
+        "coldMsInclSpawn": 166.7,
+        "resultBytes": 1646,
+        "warmMs": 5.7
+      },
+      "sheets": [
+        {
+          "name": "Data",
+          "rows": 6,
+          "cols": 3
+        }
+      ],
+      "visuals": 0,
+      "readRangeFirstViewport": {
+        "ms": 63.2,
+        "cells": 18,
+        "resultBytes": 1927
+      },
+      "fullIndex": {
+        "ms": 64.8
+      },
+      "readRange90kBatch": {
+        "ms": 0.7,
+        "cells": 18,
+        "resultBytes": 1927
+      },
+      "readFormulaCells": {
+        "ms": 1.4,
+        "cells": 2,
+        "resultBytes": 211
+      },
+      "archiveManifest": {
+        "ms": 8.2,
+        "entries": 9,
+        "resultBytes": 862
+      },
+      "recalcCells": {
+        "coldMs": 200.7,
+        "warmMs": 1.2,
+        "readCells": 2,
+        "resultBytes": 222
+      },
+      "saveViaSidecar": {
+        "ms": 102.5,
+        "edits": 10,
+        "requestBytes": 797,
+        "outputBytes": 4456,
+        "touchedEntries": 1
+      },
+      "closeMs": 1.3,
+      "sidecarPeakRssKb": 126444
+    },
+    {
+      "fixture": "xlsx-compatibility-basic.xlsx",
+      "fileBytes": 4110,
+      "open": {
+        "coldMsInclSpawn": 344.7,
+        "resultBytes": 1660,
+        "warmMs": 6.2
+      },
+      "sheets": [
+        {
+          "name": "Data",
+          "rows": 6,
+          "cols": 3
+        }
+      ],
+      "visuals": 0,
+      "readRangeFirstViewport": {
+        "ms": 73.5,
+        "cells": 18,
+        "resultBytes": 1927
+      },
+      "fullIndex": {
+        "ms": 75.3
+      },
+      "readRange90kBatch": {
+        "ms": 0.5,
+        "cells": 18,
+        "resultBytes": 1927
+      },
+      "readFormulaCells": {
+        "ms": 3.1,
+        "cells": 2,
+        "resultBytes": 211
+      },
+      "archiveManifest": {
+        "ms": 3.3,
+        "entries": 9,
+        "resultBytes": 859
+      },
+      "recalcCells": {
+        "coldMs": 199.6,
+        "warmMs": 0.5,
+        "readCells": 2,
+        "resultBytes": 222
+      },
+      "saveViaSidecar": {
+        "ms": 59.4,
+        "edits": 10,
+        "requestBytes": 797,
+        "outputBytes": 4126,
+        "touchedEntries": 1
+      },
+      "closeMs": 1.1,
+      "sidecarPeakRssKb": 137316
+    },
+    {
+      "fixture": "xlsx-compatibility-edit.xlsx",
+      "fileBytes": 3340,
+      "open": {
+        "coldMsInclSpawn": 199.5,
+        "resultBytes": 1659,
+        "warmMs": 6.6
+      },
+      "sheets": [
+        {
+          "name": "Data",
+          "rows": 5,
+          "cols": 3
+        }
+      ],
+      "visuals": 0,
+      "readRangeFirstViewport": {
+        "ms": 29.9,
+        "cells": 9,
+        "resultBytes": 1374
+      },
+      "fullIndex": {
+        "ms": 30.7
+      },
+      "readRange90kBatch": {
+        "ms": 0.4,
+        "cells": 9,
+        "resultBytes": 1374
+      },
+      "readFormulaCells": {
+        "ms": 0.8,
+        "cells": 0,
+        "resultBytes": 54
+      },
+      "archiveManifest": {
+        "ms": 1.8,
+        "entries": 7,
+        "resultBytes": 666
+      },
+      "saveViaSidecar": {
+        "ms": 47.8,
+        "edits": 10,
+        "requestBytes": 797,
+        "outputBytes": 3368,
+        "touchedEntries": 1
+      },
+      "closeMs": 1.7,
+      "sidecarPeakRssKb": 76008
+    },
+    {
+      "fixture": "xlsx-compatibility-structure.xlsx",
+      "fileBytes": 5029,
+      "open": {
+        "coldMsInclSpawn": 160.4,
+        "resultBytes": 2137,
+        "warmMs": 9.3
+      },
+      "sheets": [
+        {
+          "name": "Data",
+          "rows": 6,
+          "cols": 3
+        },
+        {
+          "name": "PhuLuc",
+          "rows": 2,
+          "cols": 2
+        }
+      ],
+      "visuals": 0,
+      "readRangeFirstViewport": {
+        "ms": 60.4,
+        "cells": 18,
+        "resultBytes": 1927
+      },
+      "fullIndex": {
+        "ms": 64.2
+      },
+      "readRange90kBatch": {
+        "ms": 0.6,
+        "cells": 18,
+        "resultBytes": 1927
+      },
+      "readFormulaCells": {
+        "ms": 8.6,
+        "cells": 3,
+        "resultBytes": 348
+      },
+      "archiveManifest": {
+        "ms": 5.9,
+        "entries": 10,
+        "resultBytes": 959
+      },
+      "recalcCells": {
+        "coldMs": 151.4,
+        "warmMs": 0.9,
+        "readCells": 2,
+        "resultBytes": 222
+      },
+      "saveViaSidecar": {
+        "ms": 38.4,
+        "edits": 10,
+        "requestBytes": 797,
+        "outputBytes": 5045,
+        "touchedEntries": 1
+      },
+      "closeMs": 5.1,
+      "sidecarPeakRssKb": 130296
+    },
+    {
+      "fixture": "xlsx-kitchen-sink.xlsx",
+      "fileBytes": 5046,
+      "open": {
+        "coldMsInclSpawn": 158.3,
+        "resultBytes": 2169,
+        "warmMs": 4.2
+      },
+      "sheets": [
+        {
+          "name": "Data",
+          "rows": 6,
+          "cols": 3
+        },
+        {
+          "name": "PhuLuc",
+          "rows": 3,
+          "cols": 2
+        }
+      ],
+      "visuals": 0,
+      "readRangeFirstViewport": {
+        "ms": 19,
+        "cells": 18,
+        "resultBytes": 2412
+      },
+      "fullIndex": {
+        "ms": 19.8
+      },
+      "readRange90kBatch": {
+        "ms": 0.6,
+        "cells": 18,
+        "resultBytes": 2412
+      },
+      "readFormulaCells": {
+        "ms": 3.9,
+        "cells": 4,
+        "resultBytes": 426
+      },
+      "archiveManifest": {
+        "ms": 3.5,
+        "entries": 10,
+        "resultBytes": 959
+      },
+      "recalcCells": {
+        "coldMs": 89,
+        "warmMs": 0.7,
+        "readCells": 2,
+        "resultBytes": 222
+      },
+      "saveViaSidecar": {
+        "ms": 28,
+        "edits": 10,
+        "requestBytes": 797,
+        "outputBytes": 5066,
+        "touchedEntries": 1
+      },
+      "closeMs": 1.8,
+      "sidecarPeakRssKb": 127468
+    },
+    {
+      "fixture": "xlsx-number-format.xlsx",
+      "fileBytes": 3383,
+      "open": {
+        "coldMsInclSpawn": 221.7,
+        "resultBytes": 1844,
+        "warmMs": 6
+      },
+      "sheets": [
+        {
+          "name": "Data",
+          "rows": 5,
+          "cols": 3
+        }
+      ],
+      "visuals": 0,
+      "readRangeFirstViewport": {
+        "ms": 51.1,
+        "cells": 15,
+        "resultBytes": 1697
+      },
+      "fullIndex": {
+        "ms": 61.8
+      },
+      "readRange90kBatch": {
+        "ms": 0.6,
+        "cells": 15,
+        "resultBytes": 1697
+      },
+      "readFormulaCells": {
+        "ms": 0.9,
+        "cells": 0,
+        "resultBytes": 54
+      },
+      "archiveManifest": {
+        "ms": 6.8,
+        "entries": 7,
+        "resultBytes": 666
+      },
+      "saveViaSidecar": {
+        "ms": 45.5,
+        "edits": 10,
+        "requestBytes": 797,
+        "outputBytes": 3402,
+        "touchedEntries": 1
+      },
+      "closeMs": 0.6,
+      "sidecarPeakRssKb": 88860
+    },
+    {
+      "fixture": "xlsx-pivot.xlsx",
+      "fileBytes": 6880,
+      "open": {
+        "coldMsInclSpawn": 188.7,
+        "resultBytes": 1327,
+        "warmMs": 13.9
+      },
+      "sheets": [
+        {
+          "name": "Data",
+          "rows": 4,
+          "cols": 2
+        }
+      ],
+      "visuals": 0,
+      "readRangeFirstViewport": {
+        "ms": 18.4,
+        "cells": 8,
+        "resultBytes": 672
+      },
+      "fullIndex": {
+        "ms": 18.9
+      },
+      "readRange90kBatch": {
+        "ms": 0.4,
+        "cells": 8,
+        "resultBytes": 672
+      },
+      "readFormulaCells": {
+        "ms": 1.3,
+        "cells": 0,
+        "resultBytes": 54
+      },
+      "archiveManifest": {
+        "ms": 4,
+        "entries": 12,
+        "resultBytes": 1258
+      },
+      "readPivotEntry": {
+        "ms": 9.4,
+        "textBytes": 326
+      },
+      "saveViaSidecar": {
+        "ms": 58.1,
+        "edits": 10,
+        "requestBytes": 797,
+        "outputBytes": 6887,
+        "touchedEntries": 2
+      },
+      "closeMs": 1.7,
+      "sidecarPeakRssKb": 77200
+    },
+    {
+      "fixture": "xlsx-protected.xlsx",
+      "fileBytes": 3489,
+      "open": {
+        "coldMsInclSpawn": 190.3,
+        "resultBytes": 1650,
+        "warmMs": 6.2
+      },
+      "sheets": [
+        {
+          "name": "Data",
+          "rows": 6,
+          "cols": 3
+        }
+      ],
+      "visuals": 0,
+      "readRangeFirstViewport": {
+        "ms": 34.3,
+        "cells": 18,
+        "resultBytes": 2019
+      },
+      "fullIndex": {
+        "ms": 35.1
+      },
+      "readRange90kBatch": {
+        "ms": 0.5,
+        "cells": 18,
+        "resultBytes": 2019
+      },
+      "readFormulaCells": {
+        "ms": 0.9,
+        "cells": 2,
+        "resultBytes": 211
+      },
+      "archiveManifest": {
+        "ms": 1.5,
+        "entries": 7,
+        "resultBytes": 666
+      },
+      "recalcCells": {
+        "coldMs": 109.2,
+        "warmMs": 1.9,
+        "readCells": 2,
+        "resultBytes": 222
+      },
+      "saveViaSidecar": {
+        "ms": 37.7,
+        "edits": 10,
+        "requestBytes": 797,
+        "outputBytes": 3504,
+        "touchedEntries": 1
+      },
+      "closeMs": 1.4,
+      "sidecarPeakRssKb": 126728
+    },
+    {
+      "fixture": "xlsx-satellite-sheets.xlsx",
+      "fileBytes": 3933,
+      "open": {
+        "coldMsInclSpawn": 113.8,
+        "resultBytes": 2130,
+        "warmMs": 5.1
+      },
+      "sheets": [
+        {
+          "name": "Data",
+          "rows": 6,
+          "cols": 3
+        },
+        {
+          "name": "PhuLuc",
+          "rows": 2,
+          "cols": 2
+        }
+      ],
+      "visuals": 0,
+      "readRangeFirstViewport": {
+        "ms": 21.1,
+        "cells": 18,
+        "resultBytes": 1927
+      },
+      "fullIndex": {
+        "ms": 22
+      },
+      "readRange90kBatch": {
+        "ms": 0.5,
+        "cells": 18,
+        "resultBytes": 1927
+      },
+      "readFormulaCells": {
+        "ms": 1.5,
+        "cells": 3,
+        "resultBytes": 348
+      },
+      "archiveManifest": {
+        "ms": 1.7,
+        "entries": 8,
+        "resultBytes": 766
+      },
+      "recalcCells": {
+        "coldMs": 105.7,
+        "warmMs": 0.8,
+        "readCells": 2,
+        "resultBytes": 222
+      },
+      "saveViaSidecar": {
+        "ms": 27.6,
+        "edits": 10,
+        "requestBytes": 797,
+        "outputBytes": 3949,
+        "touchedEntries": 1
+      },
+      "closeMs": 1,
+      "sidecarPeakRssKb": 137132
+    },
+    {
+      "fixture": "xlsx-vietnamese.xlsx",
+      "fileBytes": 4953,
+      "open": {
+        "coldMsInclSpawn": 133.1,
+        "resultBytes": 2124,
+        "warmMs": 2.2
+      },
+      "sheets": [
+        {
+          "name": "Data",
+          "rows": 6,
+          "cols": 3
+        },
+        {
+          "name": "PhuLuc",
+          "rows": 2,
+          "cols": 2
+        }
+      ],
+      "visuals": 0,
+      "readRangeFirstViewport": {
+        "ms": 23.9,
+        "cells": 18,
+        "resultBytes": 1927
+      },
+      "fullIndex": {
+        "ms": 25.1
+      },
+      "readRange90kBatch": {
+        "ms": 0.5,
+        "cells": 18,
+        "resultBytes": 1927
+      },
+      "readFormulaCells": {
+        "ms": 1.7,
+        "cells": 3,
+        "resultBytes": 348
+      },
+      "archiveManifest": {
+        "ms": 1.8,
+        "entries": 10,
+        "resultBytes": 959
+      },
+      "recalcCells": {
+        "coldMs": 121.1,
+        "warmMs": 0.7,
+        "readCells": 2,
+        "resultBytes": 222
+      },
+      "saveViaSidecar": {
+        "ms": 25.7,
+        "edits": 10,
+        "requestBytes": 797,
+        "outputBytes": 4969,
+        "touchedEntries": 1
+      },
+      "closeMs": 1.1,
+      "sidecarPeakRssKb": 135444
+    },
+    {
+      "fixture": "xlsx-macro.xlsm",
+      "fileBytes": 3912,
+      "open": {
+        "coldMsInclSpawn": 189,
+        "resultBytes": 1646,
+        "warmMs": 2.6
+      },
+      "sheets": [
+        {
+          "name": "Data",
+          "rows": 6,
+          "cols": 3
+        }
+      ],
+      "visuals": 0,
+      "readRangeFirstViewport": {
+        "ms": 55.9,
+        "cells": 18,
+        "resultBytes": 1927
+      },
+      "fullIndex": {
+        "ms": 57.9
+      },
+      "readRange90kBatch": {
+        "ms": 2.2,
+        "cells": 18,
+        "resultBytes": 1927
+      },
+      "readFormulaCells": {
+        "ms": 0.9,
+        "cells": 2,
+        "resultBytes": 211
+      },
+      "archiveManifest": {
+        "ms": 1.6,
+        "entries": 8,
+        "resultBytes": 761
+      },
+      "recalcCells": {
+        "coldMs": 115.1,
+        "warmMs": 0.4,
+        "readCells": 2,
+        "resultBytes": 222
+      },
+      "saveViaSidecar": {
+        "ms": 26.7,
+        "edits": 10,
+        "requestBytes": 797,
+        "outputBytes": 3928,
+        "touchedEntries": 1
+      },
+      "closeMs": 1.4,
+      "sidecarPeakRssKb": 128212
+    }
+  ],
+  "convert": {
+    "fixture": "legacy-xls.xls",
+    "fileBytes": 13824,
+    "convertMsInclSpawn": 94.1,
+    "outputBytes": 2668,
+    "sidecarPeakRssKb": 69720
+  }
+}
