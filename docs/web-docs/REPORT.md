@@ -231,10 +231,11 @@ job (`export:docx`) with the per-job signed grant and uid sandbox; audit = `offi
 `document_access_logs` action `export`; an export output is never committed as a version
 (`office_job_export_not_a_version`).
 
-**Flag.** `office_docs_web` (`server/internal/featureflags/keys.go`): default off, Public, Owner `office`,
-**ReviewAt 2026-12-05**. Evaluated per organization at token mint (fix `2a01d6c03`;
-`TestOfficeFrameFlagIsEvaluatedPerOrganization`: an org override opens mint/open/save/refresh, another org stays
-closed). G3 stays the default editor until acceptance.
+**Flag.** `office_docs_web` (`server/internal/featureflags/keys.go`): **default on** (user decision 2026-10-09:
+every Office web module flag defaults on), Public, Owner `office`, **ReviewAt 2026-12-05**. Evaluated per
+organization at token mint (fix `2a01d6c03`; `TestOfficeFrameFlagIsEvaluatedPerOrganization`). An org or user
+override can still turn it off (mint answers 403 `feature_disabled` and the page shows the G3 editor), and the
+frame falls back to G3 whenever the pinned bundle is not installed or does not verify.
 
 **Bundle sync / pin / CSP** (`apps/web`): the ~18 MiB fork build is not committed. `platform/office-frame/docs.pin.json`
 pins `version` (`0.1.0-2953d27`), `gitSha`, `entry`, `manifestSha256` and the CSP header; `office-frame-sync.mjs`
