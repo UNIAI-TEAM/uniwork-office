@@ -621,9 +621,30 @@ describe('legacy license panes next to the UniWork account', () => {
     expect(text).not.toContain('when the license API is live')
   })
 
+  it('signed in: the rows derived from the on-device license are hidden', async () => {
+    await renderPane(
+      createElement(LicenseDevicesPane, {
+        lang: 'en',
+        loggedIn: true,
+        accountPlanName: 'Team Plan',
+      }),
+    )
+    const labels = [...host.querySelectorAll('.set-license-summary span')].map((n) => n.textContent)
+    expect(labels).toEqual(['Plan'])
+    const text = host.textContent ?? ''
+    expect(text).not.toContain('Office Bridge')
+    expect(text).not.toContain('needs Personal+')
+    expect(text).not.toContain('AI token')
+    expect(host.querySelector('.set-license-devices')).toBeNull()
+    expect(host.querySelector('.set-license-sim')).toBeNull()
+  })
+
   it('signed out: the license pane is unchanged', async () => {
     await renderPane(createElement(LicenseDevicesPane, { lang: 'en', loggedIn: false }))
     expect(host.textContent).toContain('Sign in to sync license')
+    const labels = [...host.querySelectorAll('.set-license-summary span')].map((n) => n.textContent)
+    expect(labels).toEqual(expect.arrayContaining(['Plan', 'Status', 'Devices', 'Office Bridge']))
+    expect(host.querySelector('.set-license-devices')).not.toBeNull()
   })
 
   it('signed in: no payout account warning; signed out: unchanged', async () => {
