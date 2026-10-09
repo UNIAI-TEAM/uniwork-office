@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
+import { existsSync } from 'node:fs'
 import { readdir, readFile, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { closeAndSaveVideo, handoffUrlToRunningApp, launchShell, type LaunchedApp } from './helpers'
@@ -42,12 +43,30 @@ async function deliverCallback(
   await handoffUrlToRunningApp(launched.userDataDir, url, env)
 }
 
+/**
+ * Chromium creates the safeStorage (os_crypt) key at startup but commits it to
+ * `Local State` only ~10 s later. A second instance started before that (the
+ * callback handoff shares this userData) finds no key on disk, makes its own
+ * and writes it when it quits. The running app keeps encrypting with its own
+ * key and only rewrites `Local State` on its next commit or a graceful quit;
+ * if a slow close ends in the SIGKILL fallback first, the next launch cannot
+ * decrypt the credential (seen as keyring-unavailable, flaky under load).
+ * Waiting for the first commit puts the app's key on disk before any second
+ * process starts, so every later write carries the same key.
+ */
+async function waitForSafeStorageKeyOnDisk(launched: LaunchedApp): Promise<void> {
+  await expect
+    .poll(() => existsSync(join(launched.userDataDir, 'Local State')), { timeout: 30_000 })
+    .toBe(true)
+}
+
 async function signIn(launched: LaunchedApp, stub: UniworkAuthStub): Promise<void> {
   const { page } = launched
   await expect(accountButton(page)).toHaveAttribute('data-state', 'signed-out')
   await accountButton(page).click()
   await expect(accountButton(page)).toHaveAttribute('data-state', 'signing-in')
   await expect.poll(() => stub.lastAttempt()?.state ?? '').not.toBe('')
+  if (process.platform !== 'darwin') await waitForSafeStorageKeyOnDisk(launched)
   const url = stub.approve()
   await deliverCallback(launched, shellEnv(stub), url)
   await expect(accountButton(page)).toHaveAttribute('data-state', 'signed-in', { timeout: 30_000 })
@@ -117,7 +136,8 @@ test.describe('UniWork account sign-in', () => {
       await pane.getByRole('button', { name: 'Sign out' }).click()
       await expect(accountButton(page)).toHaveAttribute('data-state', 'signed-out')
       await expect(pane).toHaveAttribute('data-state', 'signed-out')
-      expect(stub.logoutCalls()).toBe(1)
+      // the device revoke goes out after the local sign-out (it never blocks it)
+      await expect.poll(() => stub.logoutCalls()).toBe(1)
     } finally {
       await closeAndSaveVideo(launched, 'uniwork-signin')
       await stub.close()
@@ -139,6 +159,8 @@ test.describe('UniWork account sign-in', () => {
       await closeAndSaveVideo(first, 'uniwork-signin-revoked-a')
     }
 
+    // the encrypted credential survived the first run
+    expect(existsSync(join(userDataDir, 'uniwork-auth', 'session.bin'))).toBe(true)
     stub.setRefreshBehavior('device_revoked')
     const second = await launchShell({
       userDataDir,
