@@ -1,6 +1,7 @@
 /**
  * Local stand-in for the UniWork desktop auth server, replaying the wire
- * contract (`/api/v1/auth/desktop/*`, `/me`, `/orgs`, `/orgs/{id}/billing`).
+ * contract (`/api/v1/auth/desktop/*`, `/me`, `/orgs`, `/orgs/{id}/billing`)
+ * plus the UniWork cloud tool routes (`/orgs/{id}/ai/cloud*`, GO-A7 contract).
  * It validates what the real server validates (client id, S256 challenge
  * length, exact redirect URI, deployment id, PKCE on exchange, single-use
  * codes, refresh rotation) so the shell's sign-in flow is exercised end to end
@@ -41,6 +42,18 @@ export interface StubAttempt {
 
 export type StubRefreshMode = 'ok' | 'device_revoked' | 'refresh_reused'
 
+/**
+ * What the cloud routes answer: `ready` (entitled, credits left, every tool
+ * on), `not_entitled` (status enabled=false, tools 403), `credits_exhausted`
+ * (remaining 0, tools 402), `unavailable` (entitled, no tool configured,
+ * tools 503).
+ */
+export type StubCloudMode = 'ready' | 'not_entitled' | 'credits_exhausted' | 'unavailable'
+
+/** a 1x1 PNG the image route returns */
+export const STUB_CLOUD_IMAGE_BASE64 =
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='
+
 export interface UniworkAuthStub {
   /** `http://127.0.0.1:<port>` */
   origin: string
@@ -53,6 +66,10 @@ export interface UniworkAuthStub {
   refreshCalls(): number
   /** what refresh answers: a rotated session, or a 401 with that error code */
   setRefreshBehavior(mode: StubRefreshMode): void
+  /** what the `/ai/cloud*` routes answer from now on (default `ready`) */
+  setCloudMode(mode: StubCloudMode): void
+  /** every cloud route call: method, route under the org, and whether the bearer was live */
+  cloudCalls(): { method: string; route: string; authorized: boolean }[]
   /** every secret the stub issued or saw (tokens, codes, PKCE verifiers, attempt states) */
   issuedSecrets(): string[]
   close(): Promise<void>
@@ -62,7 +79,9 @@ function b64url(buf: Buffer): string {
   return buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
 
-export async function startUniworkAuthStub(): Promise<UniworkAuthStub> {
+export async function startUniworkAuthStub(
+  options: { cloudMode?: StubCloudMode } = {},
+): Promise<UniworkAuthStub> {
   const attempts: StubAttempt[] = []
   const codes = new Map<string, StubAttempt>()
   const secrets: string[] = []
@@ -75,6 +94,9 @@ export async function startUniworkAuthStub(): Promise<UniworkAuthStub> {
   let logouts = 0
   let refreshes = 0
   let refreshMode: StubRefreshMode = 'ok'
+  let cloudMode: StubCloudMode = options.cloudMode ?? 'ready'
+  const cloudLog: { method: string; route: string; authorized: boolean }[] = []
+  let creditsUsed = 1_200
 
   const issue = (prefix: string): string => {
     const value = `${prefix}_${b64url(randomBytes(24))}`
@@ -219,6 +241,11 @@ export async function startUniworkAuthStub(): Promise<UniworkAuthStub> {
       revokeDevice()
       return send(res, 200, { status: 'ok' })
     }
+    // cloud routes check (and log) the bearer themselves
+    const cloudPrefix = `/orgs/${STUB_ORG.id}/ai/cloud`
+    if (route === cloudPrefix || route.startsWith(`${cloudPrefix}/`)) {
+      return cloud(req, res, route.slice(cloudPrefix.length))
+    }
     const denied = bearerError(req)
     if (denied) return fail(res, 401, denied)
     if (req.method === 'GET' && route === '/me') {
@@ -251,6 +278,74 @@ export async function startUniworkAuthStub(): Promise<UniworkAuthStub> {
     return fail(res, 404, 'not_found')
   }
 
+  const CLOUD_LIMIT = 50_000
+
+  function cloudStatus(): Record<string, unknown> {
+    const entitled = cloudMode !== 'not_entitled'
+    const toolsOn = cloudMode === 'ready' || cloudMode === 'credits_exhausted'
+    const tools = Object.fromEntries(
+      ['web_search', 'image_search', 'image_generate', 'media_analyze', 'transcribe'].map((t) => [
+        t,
+        entitled && toolsOn,
+      ]),
+    )
+    return {
+      enabled: entitled,
+      ...(entitled ? {} : { reason: 'entitlement_required' }),
+      tools,
+      credits: {
+        unit: 'ai.tokens',
+        used: cloudMode === 'credits_exhausted' ? CLOUD_LIMIT : creditsUsed,
+        limit: CLOUD_LIMIT,
+        remaining: cloudMode === 'credits_exhausted' ? 0 : CLOUD_LIMIT - creditsUsed,
+        period_end: '2026-11-01T00:00:00Z',
+      },
+    }
+  }
+
+  async function cloud(req: IncomingMessage, res: ServerResponse, sub: string): Promise<void> {
+    const authError = bearerError(req)
+    cloudLog.push({ method: req.method ?? '', route: sub || '/', authorized: !authError })
+    if (authError) return fail(res, 401, authError)
+    if (req.method === 'GET' && sub === '') return send(res, 200, cloudStatus())
+    if (req.method !== 'POST') return fail(res, 404, 'not_found')
+    const body = await readJson(req)
+    if (cloudMode === 'not_entitled') return fail(res, 403, 'entitlement_required')
+    if (cloudMode === 'credits_exhausted') return fail(res, 402, 'credits_exhausted')
+    if (cloudMode === 'unavailable') return fail(res, 503, 'cloud_unavailable')
+    if (sub === '/search') {
+      if (typeof body.query !== 'string' || !body.query) return fail(res, 400, 'invalid_request')
+      creditsUsed += 500
+      const image = body.kind === 'image'
+      return send(res, 200, {
+        results: [
+          {
+            title: `UniWork result for ${body.query}`,
+            url: 'https://example.com/article',
+            snippet: 'A stub search result.',
+            ...(image ? { image_url: 'https://example.com/photo.png' } : {}),
+          },
+        ],
+        ...(image ? {} : { answer: 'Stub answer.' }),
+      })
+    }
+    if (sub === '/images') {
+      if (typeof body.prompt !== 'string' || !body.prompt) return fail(res, 400, 'invalid_request')
+      creditsUsed += 4_000
+      return send(res, 200, {
+        images: [{ mime: 'image/png', data_base64: STUB_CLOUD_IMAGE_BASE64 }],
+        model: 'stub-image',
+      })
+    }
+    if (sub === '/media/analyze' || sub === '/transcribe') {
+      creditsUsed += 1_000
+      return send(res, 200, {
+        text: sub === '/transcribe' ? 'Stub transcript.' : 'A stub analysis.',
+      })
+    }
+    return fail(res, 404, 'not_found')
+  }
+
   const server: Server = createServer((req, res) => {
     handle(req, res).catch(() => {
       if (!res.headersSent) fail(res, 500, 'server_error')
@@ -277,6 +372,10 @@ export async function startUniworkAuthStub(): Promise<UniworkAuthStub> {
     setRefreshBehavior: (mode) => {
       refreshMode = mode
     },
+    setCloudMode: (mode) => {
+      cloudMode = mode
+    },
+    cloudCalls: () => [...cloudLog],
     issuedSecrets: () => [...secrets],
     close: () =>
       new Promise<void>((resolve, reject) => {

@@ -1046,7 +1046,7 @@ export function App({
   const aiSettingsRef = useRef<AiSettings | null>(null)
   aiSettingsRef.current = aiSettings
 
-  /** UniWork cloud sign-in state for the cloud-tools gate (always signed out while the cloud seam is off) */
+  /** UniWork cloud sign-in state for the cloud-tools gate (signed in to UniWork + plan includes cloud AI) */
   const gskLoggedInRef = useRef(false)
   useEffect(() => {
     let alive = true

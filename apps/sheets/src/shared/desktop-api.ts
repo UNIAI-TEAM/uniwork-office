@@ -2985,7 +2985,7 @@ export interface DesktopApi {
   /// start a streaming AI call; deltas arrive via onAiStream with the same requestId
   aiStream(request: AiStreamRequest): Promise<void>
   aiStreamCancel(requestId: string): Promise<void>
-  /// UniWork cloud sign-in state (always signed out while the cloud seam is off);
+  /// UniWork cloud sign-in state (signed in to UniWork + plan includes cloud AI);
   /// withEmail also returns the email
   aiGskStatus(withEmail?: boolean): Promise<GenSparkAccountStatus>
   /// Web search (main-process Serper/DuckDuckGo, shared with docs/slides)

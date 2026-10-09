@@ -390,7 +390,7 @@ export function defaultAiSettings(
 }
 
 /**
- * UniWork cloud tools are reachable only while the cloud seam is on; then
+ * UniWork cloud tools are reachable only while signed in + entitled (uniwork-cloud.ts); then
  * false only on an explicit opt-out (absent, from pre-toggle settings files, means on).
  */
 export function cloudToolsEnabled(settings: Pick<AiSettings, 'gskToolsEnabled'>): boolean {

@@ -305,7 +305,7 @@ export interface MarkdownApi {
   onAiSettingsChanged(handler: () => void): () => void
   /** shell only: switch to Home and open Settings › AI Model (rejects in standalone) */
   openAiModelSettings(): Promise<void>
-  /** UniWork cloud sign-in state (shell-registered ai:gsk-status; stub, always signed out while the seam is off) */
+  /** UniWork cloud sign-in state (shell-registered ai:gsk-status; loggedIn = signed in + entitled) */
   aiGskStatus(): Promise<GenSparkAccountStatus>
   aiStream(request: AiStreamRequest): Promise<void>
   aiStreamCancel(requestId: string): Promise<void>

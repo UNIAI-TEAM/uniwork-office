@@ -1029,8 +1029,8 @@ export function AiPanel({
       },
       isCloudPageGenEnabled: async () => {
         // Cloud page generation runs on the UniWork cloud slide model, so it is
-        // gated by the cloud-tools setting plus the main-process status (off
-        // while the UniWork cloud seam is disabled) — the chat provider does not
+        // gated by the cloud-tools setting plus the main-process status (always
+        // off: slides are not a UniWork cloud tool) — the chat provider does not
         // gate it. A failing cloud run falls back to the local pipeline mid-run.
         const cur = settingsRef.current
         if (!cloudToolsEnabled(cur)) return false

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import {
   AI_CUSTOM_FONT_MAX_PX,
@@ -49,6 +49,11 @@ import {
 } from './credit-wallet'
 import { LicenseDevicesPane } from './LicenseDevicesPane'
 import { UniAiPwaPane } from './UniAiPwaPane'
+import {
+  UniworkCloudAccountRows,
+  UniworkCloudNotice,
+  useUniworkCloudStatus,
+} from './UniworkCloudPane'
 import { IntegrationsPane, skillUpdateDue } from './IntegrationsPane'
 import './settings.css'
 
@@ -344,6 +349,7 @@ function foldModels(providerId: string, models: string[]) {
 /** AI model pane: provider / model / key / base URL, saved to userData/ai-settings.json */
 function AiModelPane({ t }: { t: TFunc }) {
   const { lang } = useI18n()
+  const cloud = useUniworkCloudStatus()
   const [catalog, setCatalog] = useState<AiCatalogEntry[]>(
     () => window.aiOffice.getAiProviders?.() ?? [],
   )
@@ -767,6 +773,27 @@ function AiModelPane({ t }: { t: TFunc }) {
           onBlur={commitMaxTokens}
         />
       </div>
+      {/* offered only while signed in to UniWork and the plan includes cloud AI */}
+      {cloud?.enabled && (
+        <div className="set-field">
+          <div className="set-field-text">
+            <div className="set-field-stack">
+              <div className="set-field-label">{t('cloudToolsToggle')}</div>
+              <div className="set-field-desc">{t('cloudToolsToggleDesc')}</div>
+            </div>
+          </div>
+          <button
+            className="set-switch"
+            role="switch"
+            aria-checked={settings.gskToolsEnabled !== false}
+            aria-label={t('cloudToolsToggle')}
+            onClick={() => {
+              setSettings({ ...settings, gskToolsEnabled: settings.gskToolsEnabled === false })
+              touch()
+            }}
+          />
+        </div>
+      )}
       {isTokenHub ? (
         <div className="set-field">
           <div className="set-field-text">
@@ -837,14 +864,24 @@ function AiMediaPane({
   t,
   onFileSearchChange,
   focusBlock,
+  onSignIn,
 }: {
   t: TFunc
   onFileSearchChange?: () => void
   focusBlock?: TestedBlock
+  onSignIn?: () => void
 }) {
-  const [mediaCatalog] = useState<AiMediaProviderMeta[]>(
+  const cloud = useUniworkCloudStatus()
+  // re-listed when the cloud turns on or off: the UniWork cloud entry is offered only while it is on
+  const cloudOn = cloud?.enabled === true
+  const mediaCatalog = useMemo<AiMediaProviderMeta[]>(
     () => window.aiOffice.getAiMediaProviders?.() ?? [],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- cloudOn re-reads the preload's mirror
+    [cloudOn],
   )
+  // the cloud entry's label is localized here; vendor names stay as-is
+  const mediaLabel = (m: { id: string; label: string }) =>
+    m.id === 'genspark' ? t('cloudMediaLabel') : m.label
   const [searchCatalog] = useState<AiSearchProviderMeta[]>(
     () => window.aiOffice.getAiSearchProviders?.() ?? [],
   )
@@ -1039,7 +1076,8 @@ function AiMediaPane({
       return entry ? searchLabel(entry) : search.provider
     }
     const id = mediaProviderOf(block)
-    return mediaCatalog.find((m) => m.id === id)?.label ?? id
+    const entry = mediaCatalog.find((m) => m.id === id)
+    return entry ? mediaLabel(entry) : id
   }
   const blockStatus = (block: TestedBlock): AiStatus | null => {
     if (testing) return { kind: 'testing', text: t('setAiTesting') }
@@ -1245,20 +1283,32 @@ function AiMediaPane({
     return (
       <section key={cap}>
         {subhead(cap, title)}
-        {providerRow(title, id, options, pick)}
-        <div className="set-field-desc set-ai-note">{meta.description}</div>
-        {modelRow(
-          `set-ai-${cap}-model`,
-          cap === 'image' ? meta.imageModels : meta.analysisModels,
-          cap === 'image' ? meta.defaultImageModel : meta.defaultAnalysisModel,
-          config[modelField],
-          (m) => updateMediaConfig(cap, id, { [modelField]: m }),
+        {providerRow(
+          title,
+          id,
+          options.map((m) => ({ id: m.id, label: mediaLabel(m) })),
+          pick,
         )}
-        {keyRow(`set-ai-${cap}-key`, config.apiKey, meta.keyPlaceholder, (v) =>
-          updateMediaConfig(cap, id, { apiKey: v }),
-        )}
-        {baseUrlRow(`set-ai-${cap}-base-url`, meta, config.baseUrl ?? '', (v) =>
-          updateMediaConfig(cap, id, { baseUrl: v }),
+        <div className="set-field-desc set-ai-note">
+          {id === 'genspark' ? t('cloudMediaDesc') : meta.description}
+        </div>
+        {/* the UniWork cloud entry has no model, key or endpoint of its own */}
+        {id !== 'genspark' && (
+          <>
+            {modelRow(
+              `set-ai-${cap}-model`,
+              cap === 'image' ? meta.imageModels : meta.analysisModels,
+              cap === 'image' ? meta.defaultImageModel : meta.defaultAnalysisModel,
+              config[modelField],
+              (m) => updateMediaConfig(cap, id, { [modelField]: m }),
+            )}
+            {keyRow(`set-ai-${cap}-key`, config.apiKey, meta.keyPlaceholder, (v) =>
+              updateMediaConfig(cap, id, { apiKey: v }),
+            )}
+            {baseUrlRow(`set-ai-${cap}-base-url`, meta, config.baseUrl ?? '', (v) =>
+              updateMediaConfig(cap, id, { baseUrl: v }),
+            )}
+          </>
         )}
       </section>
     )
@@ -1282,6 +1332,7 @@ function AiMediaPane({
           </button>
         </div>
       </div>
+      <UniworkCloudNotice status={cloud} onSignIn={onSignIn} />
       <div className="set-field-desc set-ai-note">{t('setAiSharedKeyHint')}</div>
       <section>
         {subhead('search', t('setAiCapSearch'))}
@@ -1293,7 +1344,9 @@ function AiMediaPane({
         )}
         <div className="set-field-desc set-ai-note">
           {search.provider === 'auto'
-            ? t('setAiSearchAutoHint')
+            ? cloudOn && settings.gskToolsEnabled !== false
+              ? t('cloudSearchAutoHint')
+              : t('setAiSearchAutoHint')
             : search.provider === 'parallel'
               ? t('setAiSearchParallelHint')
               : search.provider === 'serply'
@@ -1621,6 +1674,7 @@ export function SettingsModal({
 
   const loggedIn = account?.status?.loggedIn ?? false
   const signIn = account?.signIn ?? (() => undefined)
+  const cloud = useUniworkCloudStatus()
 
   return (
     <div
@@ -1677,6 +1731,7 @@ export function SettingsModal({
                   />
                 </div>
                 {account && <AccountPane account={account} />}
+                {loggedIn && <UniworkCloudAccountRows status={cloud} />}
                 <LicenseDevicesPane
                   lang={lang}
                   loggedIn={loggedIn}
@@ -1693,6 +1748,7 @@ export function SettingsModal({
                 t={t}
                 onFileSearchChange={onFileSearchChange}
                 focusBlock={target?.block}
+                onSignIn={signIn}
               />
             )}
             {section === 'backup' && (

@@ -16,11 +16,30 @@ import {
   testMediaProvider,
 } from '../src/media-protocols'
 import { defaultAiSettings, resolveAiSettings } from '../src/providers'
+import {
+  UNIWORK_CLOUD_SIGNED_OUT,
+  setUniworkCloudStatus,
+  type UniworkCloudStatus,
+} from '../src/uniwork-cloud'
 import type { AiSettings } from '../src/types'
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  setUniworkCloudStatus(UNIWORK_CLOUD_SIGNED_OUT)
 })
+
+const CLOUD_READY: UniworkCloudStatus = {
+  state: 'ready',
+  enabled: true,
+  tools: {
+    web_search: true,
+    image_search: true,
+    image_generate: true,
+    media_analyze: false,
+    transcribe: false,
+  },
+  credits: null,
+}
 
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0])
 const PNG_B64 = Buffer.from(PNG).toString('base64')
@@ -163,11 +182,11 @@ describe('media settings', () => {
     expect(activeMediaProvider(explicit, 'image')).toBe('genspark')
   })
 
-  it('is BYOK-only while the UniWork cloud seam is off, and gated on the BYOK model', () => {
+  it('falls back to the UniWork cloud only on the main-process verdict, gated on the BYOK model', () => {
     const genspark = defaultAiSettings()
-    // no cloud route: a signed-in flag alone never enables the tools
-    expect(imageGenerationAvailable(genspark, true)).toBe(false)
-    expect(mediaAnalysisAvailable(genspark, true)).toBe(false)
+    // gskLoggedIn is main's hasGskAuth(): signed in + entitled; the cloud toggle can still say no
+    expect(imageGenerationAvailable(genspark, true)).toBe(true)
+    expect(mediaAnalysisAvailable(genspark, true)).toBe(true)
     expect(imageGenerationAvailable(genspark, false)).toBe(false)
     expect(imageGenerationAvailable({ ...genspark, gskToolsEnabled: false }, true)).toBe(false)
     expect(mediaAnalysisAvailable({ ...genspark, gskToolsEnabled: false }, true)).toBe(false)
@@ -192,13 +211,29 @@ describe('media settings', () => {
     }
     expect(mediaAnalysisAvailable(withMedia(custom), false)).toBe(false)
     expect(imageGenerationAvailable(withMedia(custom), false)).toBe(true)
-    expect(imageGenerationAvailable(null, true)).toBe(false)
+    // no settings read yet: the main-process verdict alone decides
+    expect(imageGenerationAvailable(null, true)).toBe(true)
+    expect(imageGenerationAvailable(null, false)).toBe(false)
   })
 
   it('hides the UniWork cloud entry from pickers while keeping it for stored settings', () => {
     expect(AI_MEDIA_PROVIDERS.some((m) => m.id === 'genspark')).toBe(true)
     expect(visibleMediaProviders().map((m) => m.id)).not.toContain('genspark')
     expect(visibleMediaProviders()).toHaveLength(AI_MEDIA_PROVIDERS.length - 1)
+  })
+
+  it('offers the UniWork cloud entry and route per tool while signed in + entitled', () => {
+    setUniworkCloudStatus(CLOUD_READY)
+    expect(visibleMediaProviders().map((m) => m.id)).toContain('genspark')
+    const settings = defaultAiSettings()
+    settings.media!.providers.gemini.apiKey = 'AIza'
+    // image generation is offered by the cloud: the stored default stays on it
+    expect(activeMediaProvider(settings, 'image')).toBe('genspark')
+    expect(activeMediaConfig(settings, 'image')).toBeNull()
+    // media analysis is not: the default yields to the usable BYOK vendor
+    expect(activeMediaProvider(settings, 'analysis')).toBe('gemini')
+    // an explicit BYOK choice always wins over the cloud
+    expect(activeMediaProvider(openaiSettings(), 'image')).toBe('openai')
   })
 })
 

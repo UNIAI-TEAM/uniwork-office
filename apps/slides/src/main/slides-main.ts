@@ -28,8 +28,7 @@ import { basename, dirname, join, resolve } from 'node:path'
 import { cleanupExpiredGeneratedPages } from './generated-page-temp'
 import { exportSlidesPdf } from './pdf-export'
 import { printSlidesHtml } from './print-window'
-import { gskSlideGenerate, hasGskAuth } from '@genoffice/ai-search'
-import { uniworkCloudEnabled } from '@genoffice/ai-provider'
+import { gskSlideGenerate } from '@genoffice/ai-search'
 import {
   appMenuLabels,
   configuredDefaultSaveDir,
@@ -1771,9 +1770,9 @@ export function registerSlidesIpc(): void {
   })
   // ── Cloud single-page generation: brief → cloud HTML+conversion → one-slide pptx saved to a
   // temp file. Returns a marker string that slides:land-generated-pages redeems for the bytes.
-  // Off until the UniWork cloud seam is enabled and signed in; GENOFFICE_CLOUD_SLIDE=0 is the kill switch.
-  const cloudSlideEnabled = () =>
-    process.env.GENOFFICE_CLOUD_SLIDE !== '0' && uniworkCloudEnabled() && hasGskAuth()
+  // Off: slide generation is not a UniWork cloud tool (gskSlideGenerate always
+  // rejects), so the panel keeps the local pipeline even while signed in.
+  const cloudSlideEnabled = () => false
 
   ipcMain.handle('slides:cloud-gen-status', () => ({ enabled: cloudSlideEnabled() }))
 
