@@ -12,7 +12,6 @@ import '@genoffice/ui/ai-panel-prefs.css'
 import '@genoffice/ui/ai-scope-quote.css'
 import '@univerjs/preset-sheets-core/lib/index.css'
 
-import { App } from './App'
 import { cap } from './capabilities'
 import { EngineUnavailableScreen } from './EngineUnavailableScreen'
 import { installCanvasFontFallback, registerCellFontAliases } from './cell-font-fallback'
@@ -82,7 +81,11 @@ async function bootstrap(): Promise<void> {
     )
     return
   }
+  // The grid (App + Univer, most of the bundle) is its own chunk: it downloads
+  // in parallel with the cell fonts, and the screen above never fetches it.
+  const appModule = import('./App')
   await loadCellFonts()
+  const { App } = await appModule
   window.desktopApi?.onThemeChanged(applyTheme)
   void window.desktopApi
     ?.getAiPanelPrefs?.()
