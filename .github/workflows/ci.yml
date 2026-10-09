@@ -108,6 +108,11 @@ jobs:
       - name: Test rebrand tooling
         run: npm run test:rebrand
 
+      # Release helpers (installer URL map, packaged-output brand check); the
+      # release workflow only runs on tags, so regressions surface here first.
+      - name: Test release tooling
+        run: node --test tools/release/*.test.mjs
+
       # Apache-2.0 attribution: NOTICE, MODIFICATIONS and package author /
       # homepage must match apps/shell/src/shared/legal.json (npm run legal).
       - name: Check legal notices

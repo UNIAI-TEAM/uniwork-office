@@ -1,3 +1,4 @@
+import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { UpdateUiState } from '../src/shared/update-api'
 
@@ -14,6 +15,7 @@ const showMessageBox = vi.hoisted(() =>
   vi.fn<(opts: unknown) => Promise<{ response: number }>>(() => Promise.resolve({ response: 0 })),
 )
 const readFileSyncMock = vi.hoisted(() => vi.fn<(...args: unknown[]) => string>())
+const existsSyncMock = vi.hoisted(() => vi.fn<(...args: unknown[]) => boolean>())
 
 vi.mock('electron', () => ({
   app: {
@@ -32,6 +34,7 @@ vi.mock('electron', () => ({
 
 vi.mock('node:fs', () => ({
   readFileSync: (...args: unknown[]) => readFileSyncMock(...args),
+  existsSync: (...args: unknown[]) => existsSyncMock(...args),
 }))
 
 type Listener = (...args: unknown[]) => unknown
@@ -164,6 +167,9 @@ beforeEach(() => {
   openExternal.mockClear()
   showMessageBox.mockReset()
   showMessageBox.mockImplementation(() => Promise.resolve({ response: 0 }))
+  Object.defineProperty(process, 'resourcesPath', { value: '/res', configurable: true })
+  existsSyncMock.mockReset()
+  existsSyncMock.mockReturnValue(true)
   readFileSyncMock.mockReset()
   readFileSyncMock.mockImplementation(() => {
     throw new Error('no app-update.yml')
@@ -196,6 +202,22 @@ describe('initAutoUpdater', () => {
     initAutoUpdater(() => null)
     vi.advanceTimersByTime(FIRST_CHECK_DELAY_MS)
     expect(updaterState.listeners.size).toBe(0)
+    expect(checkForUpdates).not.toHaveBeenCalled()
+  })
+
+  it('stays inactive in a packaged build without app-update.yml', async () => {
+    existsSyncMock.mockReturnValue(false)
+    const { initAutoUpdater, applyUpdateChannel } = await loadUpdater()
+    initAutoUpdater(() => null, 'beta')
+    vi.advanceTimersByTime(FIRST_CHECK_DELAY_MS)
+    expect(existsSyncMock).toHaveBeenCalledWith(path.join('/res', 'app-update.yml'))
+    expect(updaterState.listeners.size).toBe(0)
+    expect(updaterState.channel).toBeNull()
+    expect(updaterState.autoDownload).toBe(true)
+    expect(checkForUpdates).not.toHaveBeenCalled()
+    // the About channel switch stays inert (it only persists the choice)
+    applyUpdateChannel('stable')
+    expect(updaterState.channel).toBeNull()
     expect(checkForUpdates).not.toHaveBeenCalled()
   })
 
@@ -559,6 +581,12 @@ describe('manual download fallback', () => {
     expect(openExternal).toHaveBeenCalledWith((await loadUpdater()).DOWNLOAD_PAGE_URL)
   })
 
+  it('uses the release list as the generic download page (pre-releases have no /latest)', async () => {
+    expect((await loadUpdater()).DOWNLOAD_PAGE_URL).toBe(
+      'https://github.com/UNIAI-TEAM/uniwork-office/releases',
+    )
+  })
+
   it('falls back to the generic download page when the feed base cannot be read', async () => {
     // readFileSyncMock throws by default (no app-update.yml)
     const actions = await failTwiceIntoManual([
@@ -621,8 +649,36 @@ describe('checkForUpdatesNow (r148 manual check)', () => {
 
     expect(showMessageBox).toHaveBeenCalledTimes(1)
     expect(lastDialogOpts().buttons.length).toBe(2)
+    // dev runs / deb keep the established manual-update wording
+    expect(lastDialogOpts().message).toBe('自动更新失败，请从下载页面获取最新版本并手动安装。')
     expect(openExternal).toHaveBeenCalledWith((await loadUpdater()).DOWNLOAD_PAGE_URL)
     expect(checkForUpdates).not.toHaveBeenCalled()
+  })
+
+  it('answers a manual check with the download page when the build has no update feed', async () => {
+    existsSyncMock.mockReturnValue(false)
+    const { initAutoUpdater, checkForUpdatesNow, DOWNLOAD_PAGE_URL } = await loadUpdater()
+    initAutoUpdater(() => null)
+    showMessageBox.mockImplementation(() => Promise.resolve({ response: 1 }))
+
+    await checkForUpdatesNow()
+
+    expect(showMessageBox).toHaveBeenCalledTimes(1)
+    expect(lastDialogOpts().type).toBe('info')
+    expect(lastDialogOpts().buttons.length).toBe(2)
+    // nothing failed: a neutral sentence instead of "Automatic update failed"
+    expect(lastDialogOpts().message).toBe('此版本的更新需从下载页面获取并安装。')
+    expect(openExternal).toHaveBeenCalledWith(DOWNLOAD_PAGE_URL)
+    expect(checkForUpdates).not.toHaveBeenCalled()
+
+    const { setUiLang } = await import('@genoffice/i18n')
+    setUiLang('en')
+    await checkForUpdatesNow()
+    expect(lastDialogOpts().message).toBe(
+      'Updates for this version are installed from the download page.',
+    )
+    expect(lastDialogOpts().buttons).toEqual(['OK', 'Open Download Page'])
+    setUiLang('zh')
   })
 
   it("shows you're-up-to-date (with the current version) when nothing newer exists", async () => {
