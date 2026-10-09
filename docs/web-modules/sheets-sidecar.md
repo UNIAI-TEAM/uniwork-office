@@ -288,6 +288,33 @@ Results:
   in-memory chunk cache + JS). That is within a browser tab's budget and below wasm32's 4 GiB, so option C's cap becomes
   a memory-budget decision (for example "≤ 2M cells, G3 above") rather than a crash guard.
 
+#### 4.5.1 Size cap for option C (after the user chose C, CONTRACT C11)
+
+Same harness with larger and wider synthetic workbooks: `results/o7-chromium-cap.json`, `results/o7-native-cap.json`.
+"First viewport" means open plus the first `read_range`, i.e. what the user waits for before the grid paints.
+
+| workbook (rows × cols) | cells | file / sheet XML | first viewport, Chromium (native) | save_archive, Chromium (native) | wasm heap | renderer peak RSS |
+| ---------------------- | ----- | ---------------- | --------------------------------- | ------------------------------- | --------- | ----------------- |
+| 10k × 22               | 0.22M | 1.0 / 6.8 MB     | 0.8 s (0.10 s)                    | 0.20 s (0.14 s)                 | 73 MB     | 358 MB            |
+| 20k × 22               | 0.44M | 2.0 / 13.9 MB    | 1.7 s (0.31 s)                    | 0.44 s (0.33 s)                 | 143 MB    | 410 MB            |
+| 50k × 22               | 1.1M  | 5.1 / 35.3 MB    | 3.9 s (0.49 s)                    | 1.15 s (0.83 s)                 | 137 MB    | 497 MB            |
+| 5k × 400 (wide)        | 2.0M  | 9.2 MB / –       | 7.8 s (0.95 s)                    | 1.81 s (1.35 s)                 | 137 MB    | 611 MB            |
+| 100k × 22              | 2.2M  | 10.3 / 70.8 MB   | 6.7 s (0.92 s)                    | 2.19 s (2.17 s)                 | 271 MB    | 777 MB            |
+| 200k × 22              | 4.4M  | 20.5 / 144.6 MB  | 15.6 s (2.54 s)                   | 5.55 s (3.64 s)                 | 540 MB    | 1,328 MB          |
+
+There is still no trap, crash or CSP violation at any size. The cap is a UX and memory budget.
+
+**Cap proposal (sent to the lead 2026-10-09):**
+
+1. **Host gate at token mint** on the stored file size: ≤ **5 MB** opens in the frame, above it the host opens G3. The
+   server knows the size without parsing. 5 MB of dense cells is about 1M cells: ≤ 4 s to the first viewport and
+   < 0.5 GB.
+2. **Frame gate after `archive_manifest`**: the sum of uncompressed `xl/worksheets/*.xml` must be ≤ **40 MB**. Above
+   that the frame answers `too_large` and the host falls back to G3. This catches string- and style-heavy files that
+   are small when compressed.
+3. **After SH2 makes the index incremental** (first viewport ≈ open time: 1.1 s at 1.1M cells, 1.8 s at 2.2M), raise
+   the gates to file ≤ **10 MB** and XML ≤ **80 MB** (2.2M cells, about 0.8 GB).
+
 ### 4.4 Pure JS (`@genoffice/xlsx-gateway`, JSZip, no engine)
 
 | Cells                                   | G0 (3 files) | 0.44M   | 2.2M    | 6.6M      |
