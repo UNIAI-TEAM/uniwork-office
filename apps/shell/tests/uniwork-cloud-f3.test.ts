@@ -200,6 +200,33 @@ describe('controller: retries, fresh reads, membership (m1, m2, m6)', () => {
     }
   })
 
+  it('re-reads slowly while the server answers "no tool configured" and heals when it is set up', async () => {
+    vi.useFakeTimers()
+    try {
+      let configured = false
+      const status = vi.fn(async () =>
+        configured
+          ? parseCloudStatus(STATUS_BODY)
+          : parseCloudStatus({ enabled: false, reason: 'cloud_unavailable' }),
+      )
+      const { controller } = make(status, { retryDelaysMs: [1000, 5000] })
+      expect((await controller.refresh()).state).toBe('unavailable')
+      await vi.advanceTimersByTimeAsync(1000)
+      expect(status).toHaveBeenCalledTimes(2)
+      // the pause grows while the answer stays the same
+      await vi.advanceTimersByTimeAsync(4999)
+      expect(status).toHaveBeenCalledTimes(2)
+      configured = true
+      await vi.advanceTimersByTimeAsync(1)
+      expect(status).toHaveBeenCalledTimes(3)
+      expect(controller.status().state).toBe('ready')
+      await vi.advanceTimersByTimeAsync(60_000)
+      expect(status).toHaveBeenCalledTimes(3)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('a charge during an in-flight read supersedes it: the stale answer is dropped', async () => {
     let release: () => void = () => undefined
     let calls = 0
