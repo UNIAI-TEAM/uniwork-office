@@ -16,4 +16,12 @@ export const cs = {
   webViewOnlyNotSaved: 'Tento dokument je pouze pro čtení a nelze jej uložit',
   webNotUtf8:
     'Tento soubor není text UTF-8. Otevře se pouze pro čtení, aby uložení nezměnilo jeho bajty',
+  webDraftTitle: 'Obnovit neuložené změny?',
+  webDraftBody:
+    'Tento prohlížeč uchoval kopii neuložených změn tohoto dokumentu. Obnovit je, nebo zahodit?',
+  webDraftOlder:
+    'Kopie vychází ze starší verze dokumentu. Jejím uložením se nahradí novější verze.',
+  webDraftSavedAt: 'Kopie uložena v',
+  webDraftRestore: 'Obnovit',
+  webDraftDiscard: 'Zahodit',
 } satisfies Record<keyof typeof zh, string>

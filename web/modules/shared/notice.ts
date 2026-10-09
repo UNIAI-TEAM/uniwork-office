@@ -28,6 +28,7 @@ function dialog(
   title: WebStringKey,
   body: WebStringKey,
   marker: string,
+  details: readonly string[] = [],
 ): { root: HTMLElement; box: HTMLElement } {
   const root = document.createElement('div')
   root.className = 'gs-imgdlg-mask'
@@ -48,6 +49,12 @@ function dialog(
   box.setAttribute('aria-labelledby', h.id)
   box.setAttribute('aria-describedby', p.id)
   box.append(h, p)
+  for (const line of details) {
+    const d = document.createElement('div')
+    d.className = 'gs-imgdlg-hint'
+    d.textContent = line
+    box.append(d)
+  }
   root.append(box)
   return { root, box }
 }
@@ -59,9 +66,11 @@ export function ask<T extends string>(opts: {
   choices: Choice<T>[]
   cancelId: T
   marker: string
+  /** extra lines under the body (already translated: names, times) */
+  details?: readonly string[]
 }): Promise<T> {
   return new Promise<T>((resolve) => {
-    const { root, box } = dialog(opts.title, opts.body, opts.marker)
+    const { root, box } = dialog(opts.title, opts.body, opts.marker, opts.details)
     const actions = document.createElement('div')
     actions.className = 'gs-imgdlg-actions'
     const finish = (id: T): void => {

@@ -14,4 +14,10 @@ export const he = {
   webViewOnly: 'צפייה בלבד',
   webViewOnlyNotSaved: 'מסמך זה לצפייה בלבד ולא ניתן לשמור אותו',
   webNotUtf8: 'קובץ זה אינו טקסט UTF-8. הוא נפתח לצפייה בלבד כדי ששמירה לא תשנה את תוכנו',
+  webDraftTitle: 'לשחזר שינויים שלא נשמרו?',
+  webDraftBody: 'הדפדפן שמר עותק של שינויים במסמך זה שלא נשמרו. לשחזר אותם או למחוק?',
+  webDraftOlder: 'העותק מבוסס על גרסה ישנה יותר של המסמך. שמירתו תחליף את הגרסה החדשה יותר.',
+  webDraftSavedAt: 'העותק נשמר ב-',
+  webDraftRestore: 'שחזור',
+  webDraftDiscard: 'מחיקה',
 } satisfies Record<keyof typeof zh, string>

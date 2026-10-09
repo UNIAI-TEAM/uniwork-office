@@ -15,4 +15,12 @@ export const en = {
   webViewOnly: 'View only',
   webViewOnlyNotSaved: 'This document is view only and cannot be saved',
   webNotUtf8: 'This file is not UTF-8 text. It opens view only so saving cannot change its bytes',
+  webDraftTitle: 'Restore unsaved changes?',
+  webDraftBody:
+    'This browser kept a copy of changes to this document that were not saved. Restore them or discard them?',
+  webDraftOlder:
+    'The copy is based on an older version of the document. Saving it replaces the newer version.',
+  webDraftSavedAt: 'Copy kept at',
+  webDraftRestore: 'Restore',
+  webDraftDiscard: 'Discard',
 } satisfies Record<keyof typeof zh, string>

@@ -16,4 +16,12 @@ export const pl = {
   webViewOnlyNotSaved: 'Ten dokument jest tylko do odczytu i nie można go zapisać',
   webNotUtf8:
     'Ten plik nie jest tekstem UTF-8. Otwiera się tylko do odczytu, aby zapis nie zmienił jego bajtów',
+  webDraftTitle: 'Przywrócić niezapisane zmiany?',
+  webDraftBody:
+    'Ta przeglądarka zachowała kopię niezapisanych zmian w tym dokumencie. Przywrócić je czy odrzucić?',
+  webDraftOlder:
+    'Kopia opiera się na starszej wersji dokumentu. Zapisanie jej zastąpi nowszą wersję.',
+  webDraftSavedAt: 'Kopia zachowana o',
+  webDraftRestore: 'Przywróć',
+  webDraftDiscard: 'Odrzuć',
 } satisfies Record<keyof typeof zh, string>

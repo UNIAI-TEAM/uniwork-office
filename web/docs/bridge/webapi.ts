@@ -25,6 +25,8 @@
  * | convertAltChunkHtml       | convert.altChunkHtml; failure -> null (altChunk skipped, as on a failed convert) |
  * | onCloseCheck & co, onMenuCommand | ./session.ts: `dirty` / `title` events, host `doc.closeCheck` / `save` / `saveAs` |
  * | projectApi.*              | ./project-memory.ts (AI-only; AI is hidden on the web)                           |
+ * | draft recovery (C18)      | ./draft-recovery.ts: encrypted IndexedDB copy of provideDocBytes every 30 s while |
+ * |                           | dirty; offered before the renderer loads (Restore = `recovered`, starts dirty)    |
  * Every successful save emits `saved` {file, versionId, initiatedByFrame}.
  *
  * Save conflicts (the host answers `conflict`: someone saved a newer version). A host `save`
@@ -61,6 +63,8 @@ import { TIMEOUTS, errorCode, type FramePort } from './frame-port'
 import { downloadBlob, printFrame } from './browser'
 import { ask, hideFatal, showFatal, text } from './notice'
 import { createSession, type SessionOptions } from './session'
+import type { DraftHost, DraftRecovery } from './draft-recovery'
+import { bridgeDraftRecovery } from '../../modules/shared/recovery-prompt'
 import { projectApi } from './project-memory'
 
 // ---------------------------------------------------------------- paths
@@ -152,6 +156,8 @@ export interface WebApiOptions {
   session?: SessionOptions
   /** the in-frame print (default: browser.ts printFrame); injectable for tests */
   print?: (scale?: number) => Promise<{ ok: boolean; error?: string }>
+  /** draft recovery (C18; default: IndexedDB + the shared prompt); injectable for tests */
+  drafts?: (host: DraftHost) => DraftRecovery
 }
 
 // ---------------------------------------------------------------- factory
@@ -162,6 +168,35 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
   /** the document this frame shows (save / export target) */
   let current: string | null = null
   const session = createSession(port, opts.session)
+
+  // ------------------------------------------------------------ draft recovery (C18)
+
+  /** the document `init` names: the only one the host's draft scope ("<user>:<document>") covers */
+  let initDocumentId: string | null = null
+  let restoredDraft: ArrayBuffer | null = null
+  const drafts = (opts.drafts ?? ((host) => bridgeDraftRecovery(port, 'docs', host)))({
+    file: () => {
+      const file = current !== null && current === initDocumentId ? files.get(current) : undefined
+      return file ? { etag: file.etag, name: file.name } : null
+    },
+    isDirty: () => session.isDirty(),
+    bytes: () => liveDocBytes(),
+    restore: (bytes) => {
+      restoredDraft = bytes
+    },
+  })
+
+  /**
+   * Offer the document's draft before the renderer loads it (like the desktop's recovery copy):
+   * Restore opens the draft bytes as `recovered` (the renderer starts dirty, the user saves).
+   */
+  async function withDraft(result: OpenFileResult): Promise<OpenFileResult> {
+    restoredDraft = null
+    await drafts.opened()
+    const data = restoredDraft
+    restoredDraft = null
+    return data ? { ...result, data, recovered: true } : result
+  }
 
   function remember(file: FileMeta): void {
     files.set(file.fileId, { ...files.get(file.fileId), ...file })
@@ -212,6 +247,7 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
     const file = { ...result.file }
     if (result.versionId && !file.versionId) file.versionId = result.versionId
     remember(file)
+    void drafts.saved()
     port.reportSaved({
       file: files.get(file.fileId)!,
       ...(result.versionId ? { versionId: result.versionId } : {}),
@@ -241,7 +277,11 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
   let booted = false
   let pendingOpen: Promise<OpenDocxResult> | null = port
     .whenInitialized()
-    .then((s) => (s.open ? toOpenResult(s.open) : openById(s.documentId)))
+    .then((s) => {
+      initDocumentId = s.documentId
+      return s.open ? toOpenResult(s.open) : openById(s.documentId)
+    })
+    .then(withDraft)
     .catch((err: unknown) => {
       console.error('[docs-web] initial open failed:', err)
       port.reportError(err, true)
@@ -255,7 +295,7 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
   }
 
   port.handleOpen(async (payload) => {
-    const result = await toOpenResult(payload)
+    const result = await withDraft(await toOpenResult(payload))
     fatal = null
     hideFatal()
     deliver(result)

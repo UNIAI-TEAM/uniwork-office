@@ -16,4 +16,11 @@ export const ko = {
   webViewOnlyNotSaved: '이 문서는 보기 전용이라 저장할 수 없습니다',
   webNotUtf8:
     '이 파일은 UTF-8 텍스트가 아닙니다. 저장으로 내용이 바뀌지 않도록 보기 전용으로 엽니다',
+  webDraftTitle: '저장하지 않은 변경 내용을 복원할까요?',
+  webDraftBody:
+    '이 브라우저에 이 문서의 저장하지 않은 변경 내용 사본이 남아 있습니다. 복원하거나 삭제하시겠습니까?',
+  webDraftOlder: '이 사본은 문서의 이전 버전을 기반으로 합니다. 저장하면 최신 버전이 대체됩니다.',
+  webDraftSavedAt: '사본 저장 시각',
+  webDraftRestore: '복원',
+  webDraftDiscard: '삭제',
 } satisfies Record<keyof typeof zh, string>

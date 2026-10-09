@@ -16,4 +16,12 @@ export const ja = {
   webViewOnlyNotSaved: 'このドキュメントは表示のみのため保存できません',
   webNotUtf8:
     'このファイルは UTF-8 テキストではありません。保存で内容が変わらないよう表示のみで開きます',
+  webDraftTitle: '保存されていない変更を復元しますか？',
+  webDraftBody:
+    'このブラウザーに、この文書の保存されていない変更のコピーが残っています。復元しますか、それとも破棄しますか？',
+  webDraftOlder:
+    'このコピーは文書の古いバージョンに基づいています。保存すると新しいバージョンが置き換えられます。',
+  webDraftSavedAt: 'コピーの保存時刻',
+  webDraftRestore: '復元',
+  webDraftDiscard: '破棄',
 } satisfies Record<keyof typeof zh, string>
