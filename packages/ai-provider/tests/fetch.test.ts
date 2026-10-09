@@ -1,9 +1,16 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { AI_DEFAULT_USER_AGENT, aiFetch, setAiUserAgent, setRescueFetch } from '../src/fetch'
+import {
+  AI_DEFAULT_USER_AGENT,
+  aiFetch,
+  setAiUserAgent,
+  setPrimaryFetch,
+  setRescueFetch,
+} from '../src/fetch'
 
 afterEach(() => {
   vi.unstubAllGlobals()
   setRescueFetch(null)
+  setPrimaryFetch(null)
   setAiUserAgent(AI_DEFAULT_USER_AGENT)
 })
 
@@ -13,6 +20,17 @@ function sentHeaders(fetchMock: ReturnType<typeof vi.fn>): Headers {
 }
 
 describe('aiFetch', () => {
+  it('sends through the installed primary transport instead of the global fetch (web builds)', async () => {
+    const global = vi.fn().mockResolvedValue(new Response('global'))
+    vi.stubGlobal('fetch', global)
+    const primary = vi.fn().mockResolvedValue(new Response('proxied'))
+    setPrimaryFetch(primary)
+    const res = await aiFetch('https://proxy/x', { method: 'POST', body: '{}' })
+    expect(await res.text()).toBe('proxied')
+    expect(global).not.toHaveBeenCalled()
+    expect(primary.mock.calls[0]![0]).toBe('https://proxy/x')
+  })
+
   it('identifies the client to gateways that flag anonymous traffic', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response('ok'))
     vi.stubGlobal('fetch', fetchMock)

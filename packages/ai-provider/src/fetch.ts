@@ -17,6 +17,18 @@ export function setRescueFetch(fn: FetchLike | null): void {
 }
 
 /**
+ * Web builds (no main process) cannot reach a vendor API from the page: every AI request goes
+ * through the host's authorised proxy instead (UniWork BYOK routes, ADR 0029). The web bridge
+ * installs that transport here; it then replaces the global fetch for every protocol call.
+ * Desktop never sets it.
+ */
+let primaryFetch: FetchLike | null = null
+
+export function setPrimaryFetch(fn: FetchLike | null): void {
+  primaryFetch = fn
+}
+
+/**
  * Node's fetch announces itself as a bare `node`, which gateways that watch
  * for anonymous automation treat as abusive traffic (OpenCode Go requires
  * clients to identify themselves and flags "broad" user agents). Main
@@ -59,7 +71,7 @@ export async function aiFetch(url: string, rawInit: RequestInit): Promise<Respon
   const signal = init.signal as AbortSignal | null | undefined
   let response: Response
   try {
-    response = await fetch(url, init)
+    response = await (primaryFetch ?? fetch)(url, init)
   } catch (primaryError) {
     if (!rescueFetch || signal?.aborted) throw primaryError
     console.warn('[ai-provider] fetch failed, retrying via rescue fetch:', String(primaryError))

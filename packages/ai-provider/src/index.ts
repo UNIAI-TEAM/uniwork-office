@@ -77,7 +77,7 @@ export type {
   ResolvedEndpoint,
 } from './registry'
 export { chatForProvider } from './chat'
-export { setAiUserAgent, setRescueFetch } from './fetch'
+export { setAiUserAgent, setPrimaryFetch, setRescueFetch } from './fetch'
 export { isAiNetworkError } from './network-error'
 export { isAiOverloadedError } from './overload-error'
 export { parseOutputCapRejection } from './output-cap'
