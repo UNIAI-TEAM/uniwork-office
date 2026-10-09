@@ -4532,7 +4532,9 @@ export function registerSlidesIpc(): void {
     }
     const r = await showSaveDialogWithMemory(dialog, parent, options, getDraftsDir())
     if (r.canceled || !r.filePath) return { ok: false }
-    // Save As never fires the UniWork hook; a view-only UniWork path is refused (cancel shape)
+    // A view-only UniWork path is refused (cancel shape); picking the deck's own
+    // file is an explicit Save of it and reports a user save, any other target is
+    // a plain local copy
     const uniwork = uniworkSaveDecision({
       kind: 'save-as',
       origin: 'user',
@@ -4550,6 +4552,7 @@ export function registerSlidesIpc(): void {
       syncAttachedPaths(session, r.filePath)
       commitSaved(session.opened)
       if ((session.metaRev ?? 0) === metaRevAtSave) session.metaDirty = false
+      if (uniwork.fireHook) notifyUniworkUserSave(r.filePath)
       return {
         ok: true,
         path: r.filePath,

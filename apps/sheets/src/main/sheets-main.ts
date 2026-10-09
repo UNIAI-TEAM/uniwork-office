@@ -3,6 +3,7 @@ import {
   setUniworkUserSaveHook,
   uniworkIsBound,
   uniworkIsReadOnly,
+  uniworkRequestOrigin,
   uniworkSaveDecision,
 } from './uniwork-policy'
 import { createHash, randomUUID } from 'node:crypto'
@@ -3226,6 +3227,7 @@ export function registerSheetsIpc(): void {
         ? null
         : (session.csvSourcePath ?? session.restoreTarget ?? session.path)
     const mcpSave = request.targetPath !== undefined
+    const saveOrigin = uniworkRequestOrigin(request)
     // A plain Save of a read-only document, or AutoSave of a bound one, stops
     // before any guard or dialog: nothing is written, nothing is reported.
     if (
@@ -3234,7 +3236,7 @@ export function registerSheetsIpc(): void {
       documentPath !== null &&
       !uniworkSaveDecision({
         mode: 'save',
-        origin: request.origin,
+        origin: saveOrigin,
         documentPath,
         targetPath: documentPath,
         mcp: false,
@@ -3332,7 +3334,7 @@ export function registerSheetsIpc(): void {
     const userTargetPath = (csvInPlace ? session.csvSourcePath : undefined) ?? targetPath
     const uniworkDecision = uniworkSaveDecision({
       mode: request.mode,
-      origin: request.origin,
+      origin: saveOrigin,
       documentPath,
       targetPath: userTargetPath,
       mcp: mcpSave,

@@ -1,15 +1,15 @@
 /**
- * UniWork document seam in docs: which saves write, which report a user save
- * to the shell, and how the renderer gates autosave / view-only saves.
+ * UniWork document seam in docs: the pure save decision and how the renderer gates
+ * autosave / view-only saves. The real docs:save / save-as / save-to handlers are
+ * driven in uniwork-save-handler.test.ts.
  */
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   notifyUniworkUserSave,
   setUniworkDocumentPolicy,
   setUniworkUserSaveHook,
   uniworkDocState,
+  uniworkSamePath,
   uniworkSaveDecision,
   type UniworkSaveOrigin,
 } from '../src/main/uniwork-policy'
@@ -90,6 +90,13 @@ describe('uniworkSaveDecision (main)', () => {
     expect(hook).not.toHaveBeenCalled()
   })
 
+  it('a Save As that picks the open file is judged as the explicit Save it is', () => {
+    installPolicy()
+    // the handler asks as 'user' when the dialog's pick is the document's own file
+    expect(uniworkSaveDecision('user', BOUND)).toEqual({ write: true, fireHook: true })
+    expect(uniworkSaveDecision('user', VIEW).write).toBe(false)
+  })
+
   it('lets Save As from a view-only document land on another, plain path', () => {
     installPolicy()
     expect(uniworkSaveDecision('save-as', LOCAL)).toEqual({ write: true, fireHook: false })
@@ -140,26 +147,13 @@ describe('renderer save gate', () => {
   })
 })
 
-describe('docs-main wiring', () => {
-  const src = readFileSync(join(__dirname, '../src/main/docs-main.ts'), 'utf8')
-  const handler = (channel: string) => {
-    const start = src.indexOf(`'${channel}',`)
-    expect(start, channel).toBeGreaterThan(-1)
-    return src.slice(start, src.indexOf('ipcMain.handle', start + 1))
-  }
-
-  it('docs:save decides by origin and reports the user save', () => {
-    const body = handler('docs:save')
-    expect(body).toContain("uniworkSaveDecision(auto === true ? 'auto' : 'user', filePath)")
-    expect(body).toContain('if (uniwork.fireHook) notifyUniworkUserSave(filePath)')
-  })
-
-  it('save-as, save-to and the recovery copy never report a user save', () => {
-    expect(handler('docs:save-as')).toContain("uniworkSaveDecision('save-as', result.filePath)")
-    expect(handler('docs:save-to')).toContain("uniworkSaveDecision('mcp', filePath)")
-    for (const ch of ['docs:save-as', 'docs:save-new', 'docs:save-to', 'docs:write-recovery']) {
-      expect(handler(ch), ch).not.toContain('notifyUniworkUserSave')
-    }
-    expect(src.match(/notifyUniworkUserSave\(/g)?.length).toBe(1)
+describe('uniworkSamePath', () => {
+  it('matches the same file however the dialog spells it', () => {
+    expect(uniworkSamePath(BOUND, BOUND)).toBe(true)
+    // Windows paths are case-insensitive; elsewhere they are not
+    expect(uniworkSamePath(BOUND, BOUND.toUpperCase())).toBe(process.platform === 'win32')
+    expect(uniworkSamePath(BOUND, LOCAL)).toBe(false)
+    expect(uniworkSamePath(null, BOUND)).toBe(false)
+    expect(uniworkSamePath(BOUND, undefined)).toBe(false)
   })
 })

@@ -3,6 +3,7 @@ import {
   setUniworkUserSaveHook,
   uniworkDocState,
   uniworkIsBound,
+  uniworkSamePath,
   uniworkSaveDecision,
 } from './uniwork-policy'
 import { createHash, randomUUID } from 'node:crypto'
@@ -4850,8 +4851,14 @@ export function registerDocsIpc(): void {
       // the tab may have been closed while the dialog was open; checked before the
       // write because Save As may overwrite an existing file (no safe rollback)
       if (tornDownWcIds.has(event.sender.id)) return { ok: false }
-      // UniWork seam: Save As may not overwrite a view-only UniWork working copy
-      if (!uniworkSaveDecision('save-as', result.filePath).write) return { ok: false }
+      // UniWork seam: Save As may not overwrite a view-only UniWork working copy.
+      // Picking the document's own file is an explicit Save of it, so it reports a
+      // user save; any other target is a plain local copy.
+      const uniwork = uniworkSaveDecision(
+        uniworkSamePath(sourcePath, result.filePath) ? 'user' : 'save-as',
+        result.filePath,
+      )
+      if (!uniwork.write) return { ok: false }
       try {
         const passwordState = snapshotDocPassword(
           event.sender.id,
@@ -4877,6 +4884,7 @@ export function registerDocsIpc(): void {
           result.filePath,
         )
         pushRecent(result.filePath)
+        if (uniwork.fireHook) notifyUniworkUserSave(result.filePath)
         // the renderer has no path yet to match a rename notification against,
         // so the reply must carry the path it may save to next
         const savedPath = notifyFileSaved(event.sender, result.filePath)

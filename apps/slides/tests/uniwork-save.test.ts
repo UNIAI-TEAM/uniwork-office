@@ -142,7 +142,12 @@ describe('uniworkSaveDecision (pure gate)', () => {
       fireHook: true,
     })
     expect(uniworkSaveDecision({ ...base, kind: 'save', origin: 'auto' }).fireHook).toBe(false)
-    expect(uniworkSaveDecision({ ...base, kind: 'save-as', origin: 'user' }).fireHook).toBe(false)
+    // a Save As that picks the deck's own file is an explicit Save; onto another file it is a copy
+    expect(uniworkSaveDecision({ ...base, kind: 'save-as', origin: 'user' }).fireHook).toBe(true)
+    expect(
+      uniworkSaveDecision({ ...base, targetPath: '/d/copy.pptx', kind: 'save-as', origin: 'user' })
+        .fireHook,
+    ).toBe(false)
     expect(uniworkSaveDecision({ ...base, kind: 'mcp', origin: 'user' }).fireHook).toBe(false)
     expect(
       uniworkSaveDecision({ kind: 'save', origin: 'user', currentPath: null, targetPath: p })
@@ -239,6 +244,17 @@ describe('slides:save-as and MCP save UniWork seam', () => {
     expect(written(env.saveDialogPath)).toBe(true)
     expect(readFileSync(deckPath, 'utf8')).toBe(ORIGINAL)
     expect(hook).not.toHaveBeenCalled()
+  })
+
+  it('Save As onto the open deck itself is an explicit Save: it writes and fires once', async () => {
+    bindPolicy({ bound: [deckPath] })
+    env.saveDialogPath = deckPath
+    const r = (await call('slides:save-as', 'deck.pptx')) as { ok: boolean; path?: string }
+    expect(r.ok).toBe(true)
+    expect(r.path).toBe(deckPath)
+    expect(written(deckPath)).toBe(true)
+    expect(hook).toHaveBeenCalledTimes(1)
+    expect(hook).toHaveBeenCalledWith(deckPath)
   })
 
   it('Save As onto a read-only path is refused', async () => {

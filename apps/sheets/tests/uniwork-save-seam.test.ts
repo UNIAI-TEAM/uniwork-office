@@ -7,6 +7,7 @@ import {
   notifyUniworkUserSave,
   setUniworkDocumentPolicy,
   setUniworkUserSaveHook,
+  uniworkRequestOrigin,
   uniworkSaveDecision,
   type UniworkSaveInput,
 } from '../src/main/uniwork-policy'
@@ -78,6 +79,20 @@ describe('uniworkSaveDecision (main workbook:save gate)', () => {
     })
   })
 
+  it('a Save As that picks the open file itself is an explicit Save and fires once', () => {
+    const hook = vi.fn()
+    setUniworkUserSaveHook(hook)
+    const decision = decide({ mode: 'save-as', targetPath: 'c:/users/u/uniwork/budget.xlsx' })
+    // the same file, whatever the dialog's separators and (on Windows) letter case
+    expect(decision.write).toBe(true)
+    expect(decision.fireHook).toBe(process.platform === 'win32')
+    expect(decide({ mode: 'save-as', targetPath: DOC })).toEqual({ write: true, fireHook: true })
+    // a copy elsewhere, an agent save-to and a view-only target still never fire
+    expect(decide({ mode: 'save-as', targetPath: LOCAL }).fireHook).toBe(false)
+    expect(decide({ mode: 'save-as', targetPath: DOC, mcp: true }).fireHook).toBe(false)
+    expect(decide({ mode: 'save-as', documentPath: VIEW, targetPath: VIEW }).write).toBe(false)
+  })
+
   it('first save of a new / converted workbook does not fire', () => {
     expect(decide({ documentPath: null, targetPath: DOC })).toEqual({
       write: true,
@@ -137,6 +152,21 @@ describe('null policy = unchanged', () => {
     expect(decide({ documentPath: VIEW, targetPath: VIEW }).write).toBe(true)
     expect(uniworkAutoSaveLocked({ readOnly: false })).toBe(false)
     expect(uniworkForcesWrite({ readOnly: false })).toBe(false)
+  })
+})
+
+describe('uniworkRequestOrigin', () => {
+  it('keeps an explicit origin as sent', () => {
+    expect(uniworkRequestOrigin({ origin: 'auto', quiet: false })).toBe('auto')
+    expect(uniworkRequestOrigin({ origin: 'user', quiet: true })).toBe('user')
+  })
+
+  it('reads a request without one by its quiet flag, so a missing origin cannot write a bound document', () => {
+    installPolicy()
+    expect(uniworkRequestOrigin({ quiet: true })).toBe('auto')
+    expect(uniworkRequestOrigin({})).toBe('user')
+    const tick = decide({ origin: uniworkRequestOrigin({ quiet: true }) })
+    expect(tick).toEqual({ write: false, fireHook: false })
   })
 })
 

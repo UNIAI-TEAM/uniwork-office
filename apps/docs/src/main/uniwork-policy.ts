@@ -5,6 +5,8 @@
  * app, or the shell before sign-in wiring) every path is a plain local file
  * and nothing here changes behaviour.
  */
+import { resolve } from 'node:path'
+
 export interface UniworkDocumentPolicy {
   isBound(path: string): boolean
   isReadOnly(path: string): boolean
@@ -38,6 +40,19 @@ export function uniworkIsReadOnly(path: string | null | undefined): boolean {
   } catch {
     return false
   }
+}
+
+/** Same file, ignoring separators and (on Windows) letter case, so a dialog pick of the open file matches. */
+export function uniworkSamePath(
+  a: string | null | undefined,
+  b: string | null | undefined,
+): boolean {
+  if (!a || !b) return false
+  const norm = (p: string): string => {
+    const r = resolve(p)
+    return process.platform === 'win32' ? r.toLowerCase() : r
+  }
+  return norm(a) === norm(b)
 }
 
 /** Called once after an explicit user Save wrote bytes to `path` (never autosave/save-as). */

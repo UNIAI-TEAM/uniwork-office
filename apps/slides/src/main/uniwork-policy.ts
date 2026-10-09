@@ -5,6 +5,8 @@
  * app, or the shell before sign-in wiring) every path is a plain local file
  * and nothing here changes behaviour.
  */
+import { resolve } from 'node:path'
+
 export interface UniworkDocumentPolicy {
   isBound(path: string): boolean
   isReadOnly(path: string): boolean
@@ -38,6 +40,19 @@ export function uniworkIsReadOnly(path: string | null | undefined): boolean {
   } catch {
     return false
   }
+}
+
+/** Same file, ignoring separators and (on Windows) letter case, so a dialog pick of the open file matches. */
+export function uniworkSamePath(
+  a: string | null | undefined,
+  b: string | null | undefined,
+): boolean {
+  if (!a || !b) return false
+  const norm = (p: string): string => {
+    const r = resolve(p)
+    return process.platform === 'win32' ? r.toLowerCase() : r
+  }
+  return norm(a) === norm(b)
 }
 
 /** Called once after an explicit user Save wrote bytes to `path` (never autosave/save-as). */
@@ -80,8 +95,8 @@ export interface UniworkSaveDecision {
 /**
  * Pure save gate (no Electron): a read-only UniWork path is never written; an
  * AutoSave pass never writes a bound path (UniWork only takes explicit saves);
- * the user-save hook fires only for an explicit in-place Save of a deck that
- * already had that path. With no policy installed this always writes and the
+ * the user-save hook fires only for an explicit Save (or a Save As that picks
+ * the deck's own file) of a deck that already had that path. With no policy installed this always writes and the
  * hook (null outside the shell) is the only difference.
  */
 export function uniworkSaveDecision(input: UniworkSaveInput): UniworkSaveDecision {
@@ -90,9 +105,8 @@ export function uniworkSaveDecision(input: UniworkSaveInput): UniworkSaveDecisio
     return { write: false, fireHook: false }
   }
   const fireHook =
-    input.kind === 'save' &&
+    input.kind !== 'mcp' &&
     input.origin === 'user' &&
-    !!input.currentPath &&
-    input.currentPath === input.targetPath
+    uniworkSamePath(input.currentPath, input.targetPath)
   return { write: true, fireHook }
 }
