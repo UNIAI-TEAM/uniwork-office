@@ -4,7 +4,21 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { installModuleBridge } from '../../docs/bridge/module-bridge'
 import { createMockPort, type MockPort } from '../../docs/bridge/testing/mock-port'
 import type { Capabilities } from '../../docs/protocol/types'
+import {
+  DRAFTS_DB,
+  DRAFTS_STORE,
+  createDraftRecovery,
+  createIdbDraftStore,
+  decryptDraft,
+  type DraftChoice,
+  type DraftInfo,
+  type DraftRecord,
+  type DraftRecovery,
+  type DraftStore,
+} from '../../docs/bridge/draft-recovery'
+import { createFakeIdb } from '../../docs/bridge/testing/fake-idb'
 import { TEXT_MODULE_WEB_CAPABILITIES, textModuleGrants } from '../shared/capabilities'
+import type { TextWebApiOptions } from '../shared/text-webapi'
 import { MARKDOWN_WEB_CAPABILITIES, createMarkdownWebApi } from './webapi'
 
 type Api = ReturnType<typeof createMarkdownWebApi> & { capabilities: Record<string, unknown> }
@@ -20,7 +34,14 @@ const FIXTURE = new Uint8Array([
 
 const FULL: Capabilities = { save: true, saveAs: true, print: true, exportPdf: true, images: true }
 
-function setup(opts: { caps?: Capabilities; bytes?: Uint8Array; name?: string } = {}) {
+function setup(
+  opts: {
+    caps?: Capabilities
+    bytes?: Uint8Array
+    name?: string
+    drafts?: TextWebApiOptions['drafts']
+  } = {},
+) {
   const mock = createMockPort()
   const file = mock.seed(opts.name ?? 'Notes.md', opts.bytes ?? FIXTURE)
   const print = vi.fn(async (_html: string) => ({ ok: true }))
@@ -33,7 +54,9 @@ function setup(opts: { caps?: Capabilities; bytes?: Uint8Array; name?: string } 
       defaults: { ...TEXT_MODULE_WEB_CAPABILITIES, ...MARKDOWN_WEB_CAPABILITIES },
       grants: textModuleGrants,
     },
-    globals: { markdownApi: (ctx) => createMarkdownWebApi(ctx, { print, reload }) },
+    globals: {
+      markdownApi: (ctx) => createMarkdownWebApi(ctx, { print, reload, drafts: opts.drafts }),
+    },
     client: mock.port,
     target,
   })
@@ -323,5 +346,123 @@ describe('markdownApi: pictures and exports', () => {
     expect(
       (await api.exportDocx({ base64: 'UEsDBA==', suggestedName: 'Notes', mode: 'openInDocs' })).ok,
     ).toBe(false)
+  })
+})
+
+describe('markdownApi: draft recovery (C18)', () => {
+  const SCOPE = 'u1:doc-1'
+  const dec = (b: ArrayBuffer) => new TextDecoder().decode(b)
+  let disposers: Array<() => void> = []
+  afterEach(() => {
+    for (const d of disposers) d()
+    disposers = []
+  })
+
+  /** one browser profile: the IndexedDB and the session key survive a frame reload */
+  async function profile() {
+    const fake = createFakeIdb()
+    const store: DraftStore = createIdbDraftStore(fake.idb)
+    const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, [
+      'encrypt',
+      'decrypt',
+    ])
+    const records = () =>
+      (fake.store(DRAFTS_DB, DRAFTS_STORE) ?? new Map<string, unknown>()) as Map<
+        string,
+        DraftRecord
+      >
+    /** one frame load; `answer` = the user's choice in the Restore / Discard prompt */
+    function frame(answer: DraftChoice = 'restore', caps: Capabilities = FULL) {
+      let recovery: DraftRecovery | null = null
+      const prompt = vi.fn(async (_d: DraftInfo) => answer)
+      const s = setup({
+        caps,
+        drafts: (host) => {
+          recovery = createDraftRecovery({
+            module: 'markdown',
+            host,
+            prompt,
+            store,
+            recovery: () => ({ key, scope: SCOPE }),
+            target: new EventTarget() as unknown as Window,
+            intervalMs: 3_600_000,
+          })
+          disposers.push(() => recovery?.dispose())
+          return recovery
+        },
+      })
+      return { ...s, prompt, flush: () => recovery!.flush() }
+    }
+    return { key, records, frame }
+  }
+
+  it('writes the renderer text encrypted while dirty, never while clean', async () => {
+    const p = await profile()
+    const f = p.frame()
+    const { text } = await open(f.api)
+    f.api.provideText(() => `${text}draft line\r\n`)
+    await f.flush()
+    expect(p.records().size).toBe(0)
+
+    f.api.setDirty(true)
+    await f.flush()
+    const [[key, record]] = [...p.records()]
+    expect(key).toBe(`${SCOPE}:${f.file.etag}`)
+    expect(record).toMatchObject({ module: 'markdown', name: 'Notes.md', baseEtag: f.file.etag })
+    expect(dec(record.ciphertext)).not.toContain('draft line')
+    // the BOM is part of the saved bytes: keep it while decoding
+    const plain = new TextDecoder('utf-8', { ignoreBOM: true }).decode(
+      (await decryptDraft(p.key, key, record))!,
+    )
+    expect(plain.startsWith('\uFEFF# Notes\r\n')).toBe(true)
+    expect(plain).toContain('draft line')
+  })
+
+  it('Restore on boot loads the draft text as a recovered (dirty) document; a save deletes it', async () => {
+    const p = await profile()
+    const first = p.frame()
+    const { text: original } = await open(first.api)
+    first.api.provideText(() => `${original}restored\r\n`)
+    first.api.setDirty(true)
+    await first.flush()
+
+    const second = p.frame('restore')
+    const { text } = await open(second.api)
+    expect(second.prompt).toHaveBeenCalledOnce()
+    expect(text).toBe(`${original}restored\r\n`)
+    expect(second.api.consumeRecovered()).toBe(original)
+    expect(second.api.consumeRecovered()).toBeNull()
+
+    second.api.setDirty(true)
+    expect(await second.api.save({ text, imageSources: [], mode: 'save' })).toMatchObject({
+      ok: true,
+    })
+    await vi.waitFor(() => expect(p.records().size).toBe(0))
+  })
+
+  it('Discard keeps the server text and deletes the draft', async () => {
+    const p = await profile()
+    const first = p.frame()
+    const { text: original } = await open(first.api)
+    first.api.provideText(() => 'lost edits')
+    first.api.setDirty(true)
+    await first.flush()
+
+    const second = p.frame('discard')
+    const { text } = await open(second.api)
+    expect(second.prompt).toHaveBeenCalledOnce()
+    expect(text).toBe(original)
+    expect(second.api.consumeRecovered()).toBeNull()
+    expect(p.records().size).toBe(0)
+  })
+
+  it('a view-only document is never drafted', async () => {
+    const p = await profile()
+    const f = p.frame('restore', { print: true })
+    await open(f.api)
+    f.api.provideText(() => 'x')
+    f.api.setDirty(true)
+    await f.flush()
+    expect(p.records().size).toBe(0)
   })
 })

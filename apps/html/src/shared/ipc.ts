@@ -193,6 +193,16 @@ export interface HtmlApi {
   headlessExportDone(result: { ok: boolean; error?: string }): void
   /** Read the file as UTF-8 text. Only paths granted to this view are allowed */
   readFile(path: string): Promise<string>
+  /**
+   * Web bridge only (draft recovery): the server text a restored draft replaced, read once right
+   * after the initial load; null = not a restored draft. The renderer opens the document dirty.
+   */
+  consumeRecovered?(): string | null
+  /**
+   * Web bridge only (draft recovery): register how to read the text a save would write now,
+   * without saving (null = not ready). Returns the unregister function.
+   */
+  provideText?(provider: () => string | null): () => void
   /** Push the current buffer so html-preview:// serves it to the preview iframe */
   updatePreview(text: string): void
   /** The html-preview:// URL bound to this view (a present tab gets its owner's URL) */

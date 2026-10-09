@@ -36,7 +36,7 @@ const NO_ATTACHMENTS = { accepted: [], rejected: [] }
 export function createHtmlWebApi(ctx: ModuleBridgeContext, opts: TextWebApiOptions = {}) {
   const web = createTextWebApi(
     ctx.client,
-    { ext: '.html', extPattern: /\.(html?|xhtml)$/i, mimeType: 'text/html' },
+    { module: 'html', ext: '.html', extPattern: /\.(html?|xhtml)$/i, mimeType: 'text/html' },
     {
       capabilities: ctx.capabilities,
       printable: (html, resolve) => toStaticHtml(html, resolve),
@@ -49,6 +49,8 @@ export function createHtmlWebApi(ctx: ModuleBridgeContext, opts: TextWebApiOptio
 
   const api = {
     consumePending: web.consumePending,
+    consumeRecovered: web.consumeRecovered,
+    provideText: web.provideText,
     async consumeHeadlessExport() {
       return null
     },

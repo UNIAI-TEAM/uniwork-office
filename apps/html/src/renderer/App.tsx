@@ -272,7 +272,9 @@ export default function App() {
         frameScrollRef.current = null
         setPath(pending)
         setText(doc.text)
-        setSavedText(doc.text)
+        // web: a restored draft opens dirty; its saved twin is the server text it replaced
+        const recoveredBase = pending ? (window.htmlApi.consumeRecovered?.() ?? null) : null
+        setSavedText(recoveredBase === null ? doc.text : parseDocText(recoveredBase).text)
         setPreviewUrl(info.url)
         setStatus('ready')
       } catch (err) {
@@ -284,6 +286,18 @@ export default function App() {
       cancelled = true
     }
   }, [getMap])
+
+  // web bridge: the text a save would write now, read by the draft writer without saving.
+  // Reads the committed source only: flushing live style pokes would mutate the editor state.
+  useEffect(
+    () =>
+      window.htmlApi.provideText?.(() =>
+        statusRef.current === 'ready'
+          ? serializeDocText({ text: textRef.current, envelope: envelopeRef.current })
+          : null,
+      ),
+    [],
+  )
 
   // mirror dirtiness to the main process (close prompt) — untitled blank docs never count
   useEffect(() => {

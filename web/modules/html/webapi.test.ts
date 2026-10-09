@@ -4,7 +4,15 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { installModuleBridge } from '../../docs/bridge/module-bridge'
 import { createMockPort } from '../../docs/bridge/testing/mock-port'
 import type { Capabilities } from '../../docs/protocol/types'
+import {
+  DRAFTS_DB,
+  DRAFTS_STORE,
+  createDraftRecovery,
+  createIdbDraftStore,
+} from '../../docs/bridge/draft-recovery'
+import { createFakeIdb } from '../../docs/bridge/testing/fake-idb'
 import { TEXT_MODULE_WEB_CAPABILITIES, textModuleGrants } from '../shared/capabilities'
+import type { TextWebApiOptions } from '../shared/text-webapi'
 import { HTML_WEB_CAPABILITIES, createHtmlWebApi } from './webapi'
 
 type Api = ReturnType<typeof createHtmlWebApi> & { capabilities: Record<string, unknown> }
@@ -21,7 +29,7 @@ const FULL: Capabilities = {
   images: true,
 }
 
-function setup(caps: Capabilities = FULL) {
+function setup(caps: Capabilities = FULL, drafts?: TextWebApiOptions['drafts']) {
   const mock = createMockPort()
   const file = mock.seed('Page.html', enc(PAGE))
   const print = vi.fn(async (_html: string) => ({ ok: true }))
@@ -33,7 +41,7 @@ function setup(caps: Capabilities = FULL) {
       defaults: { ...TEXT_MODULE_WEB_CAPABILITIES, ...HTML_WEB_CAPABILITIES },
       grants: textModuleGrants,
     },
-    globals: { htmlApi: (ctx) => createHtmlWebApi(ctx, { print }) },
+    globals: { htmlApi: (ctx) => createHtmlWebApi(ctx, { print, drafts }) },
     client: mock.port,
     target,
   })
@@ -138,5 +146,49 @@ describe('htmlApi', () => {
     const res = await api.save({ text: await api.readFile(path), imageSources: [], mode: 'save' })
     expect(res.ok).toBe(false)
     expect(mock.calls.some((c) => c.type === 'api.save')).toBe(false)
+  })
+})
+
+describe('htmlApi: draft recovery (C18)', () => {
+  it('a dirty draft written by one frame load is restored by the next as module html', async () => {
+    const fake = createFakeIdb()
+    const store = createIdbDraftStore(fake.idb)
+    const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, [
+      'encrypt',
+      'decrypt',
+    ])
+    const stops: Array<() => void> = []
+    const flushers: Array<() => Promise<void>> = []
+    const prompt = vi.fn(async () => 'restore' as const)
+    const drafts: TextWebApiOptions['drafts'] = (host) => {
+      const r = createDraftRecovery({
+        module: 'html',
+        host,
+        prompt,
+        store,
+        recovery: () => ({ key, scope: 'u1:doc-1' }),
+        target: new EventTarget() as unknown as Window,
+        intervalMs: 3_600_000,
+      })
+      stops.push(() => r.dispose())
+      flushers.push(() => r.flush())
+      return r
+    }
+
+    const first = setup(FULL, drafts)
+    const path = (await first.api.consumePending())!
+    first.api.provideText(() => PAGE.replace('Hi', 'Edited'))
+    first.api.setDirty(true)
+    await flushers[0]()
+    const records = fake.store(DRAFTS_DB, DRAFTS_STORE)!
+    expect([...records.values()]).toMatchObject([{ module: 'html', name: 'Page.html' }])
+
+    const second = setup(FULL, drafts)
+    const restored = (await second.api.consumePending())!
+    expect(prompt).toHaveBeenCalledOnce()
+    expect(await second.api.readFile(restored)).toContain('<h1>Edited</h1>')
+    expect(second.api.consumeRecovered()).toBe(PAGE)
+    expect(path).toBe(restored)
+    for (const stop of stops) stop()
   })
 })

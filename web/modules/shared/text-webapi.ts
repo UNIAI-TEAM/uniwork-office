@@ -20,6 +20,9 @@
  * | pickImage / saveImage / readImage  | ./assets.ts (api.images.upload with the `images` grant, else data: URI)|
  * | resolveAssetUrl / unresolveAssetUrl| web-only: OpenPayload.assets map for relative pictures                |
  * | consumeHeadlessExport              | null (no headless web export)                                         |
+ * | provideText / consumeRecovered     | web-only, draft recovery (C18): ../../docs/bridge/draft-recovery.ts   |
+ * |                                    | keeps an encrypted copy of the renderer's text every 30 s while dirty;|
+ * |                                    | offered before the renderer loads (Restore = dirty document)          |
  *
  * View-only: the host withholds `save` (protocol README "Read-only documents"). The renderer reads
  * `cap('save')` and turns editing off; the bridge refuses every write as well. A file whose bytes
@@ -35,6 +38,7 @@ import {
   toProtocolError,
   type FileMeta,
   type FileSource,
+  type OfficeModule,
   type OpenPayload,
   type ProtocolErrorShape,
   type SaveResult,
@@ -42,9 +46,11 @@ import {
 import { downloadBlob, pickFiles } from '../../docs/bridge/browser'
 import { TIMEOUTS, errorCode } from '../../docs/bridge/frame-port'
 import type { ModuleBridgePort } from '../../docs/bridge/module-bridge'
+import type { DraftHost, DraftRecovery } from '../../docs/bridge/draft-recovery'
 import { createAssetStore } from './assets'
 import { ask, hideFatal, showFatal, text } from './notice'
 import { printHtmlDocument } from './print'
+import { bridgeDraftRecovery } from './recovery-prompt'
 import { decodeText, encodeText } from './text-codec'
 
 // ---------------------------------------------------------------- paths
@@ -86,6 +92,8 @@ export type ExportResult =
   { ok: true; path: string } | { ok: true; canceled: true } | { ok: false; error: string }
 
 export interface TextModuleConfig {
+  /** module id (draft records, CONTRACT C18) */
+  module: Extract<OfficeModule, 'markdown' | 'html'>
   /** extension of new / saved-as files, with the dot ('.md', '.html') */
   ext: string
   /** extensions stripped from a suggested name before `ext` is added */
@@ -108,6 +116,8 @@ export interface TextWebApiOptions {
    * file cannot be saved back faithfully (not UTF-8), so the renderer goes view-only
    */
   capabilities?: Record<string, unknown>
+  /** draft recovery (C18; default: IndexedDB + the shared prompt); injectable for tests */
+  drafts?: (host: DraftHost) => DraftRecovery
 }
 
 type Waiter<T> = { settle: (r: T) => void; started: () => void } | null
@@ -170,6 +180,49 @@ export function createTextWebApi(
 
   const viewOnly = (): boolean => !saveGranted || inexact
 
+  // ------------------------------------------------------------ draft recovery (C18)
+
+  /** the document `init` names: the only one the host's draft scope ("<user>:<document>") covers */
+  let initDocumentId: string | null = null
+  /** the renderer's "text a save would write now" (web-only preload member provideText) */
+  let textProvider: (() => string | null) | null = null
+  let restoredDraft: ArrayBuffer | null = null
+  /** server text the restored draft replaced; the renderer reads it once (consumeRecovered) */
+  let recoveredBase: string | null = null
+  const drafts = (opts.drafts ?? ((host) => bridgeDraftRecovery(port, config.module, host)))({
+    file: () => {
+      // a view-only document is never drafted (nothing could save it back)
+      if (viewOnly() || current === null || current !== initDocumentId) return null
+      const file = files.get(current)
+      return file ? { etag: file.etag, name: file.name } : null
+    },
+    isDirty: () => dirty && !viewOnly(),
+    bytes: async () => {
+      const live = textProvider?.()
+      return typeof live === 'string' ? encodeText(live) : null
+    },
+    restore: (bytes) => {
+      restoredDraft = bytes
+    },
+  })
+
+  /**
+   * Offer the document's draft before the renderer loads it: Restore swaps the text readFile
+   * returns for the draft's and flags the open as recovered (the renderer starts dirty).
+   */
+  async function withDraft(path: string): Promise<string> {
+    restoredDraft = null
+    recoveredBase = null
+    await drafts.opened()
+    const data = restoredDraft as ArrayBuffer | null
+    restoredDraft = null
+    if (data) {
+      recoveredBase = texts.get(path) ?? ''
+      texts.set(path, decodeText(data).text)
+    }
+    return path
+  }
+
   function remember(file: FileMeta): void {
     files.set(file.fileId, { ...files.get(file.fileId), ...file })
     current = file.fileId
@@ -208,8 +261,10 @@ export function createTextWebApi(
     .then((s) => {
       saveGranted = s.capabilities?.save === true
       imagesGranted = s.capabilities?.images === true
+      initDocumentId = s.documentId
       return s.open ? accept(s.open) : openById(s.documentId)
     })
+    .then(withDraft)
     .catch((err: unknown) => {
       console.error('[office-web] initial open failed:', err)
       port.reportError(err, true)
@@ -224,7 +279,7 @@ export function createTextWebApi(
         message: 'this editor opens one document per frame load; open a new frame',
       })
     }
-    const path = accept(payload)
+    const path = accept(payload).then(withDraft)
     pendingOpen = path
     await path
     fatal = null
@@ -376,6 +431,7 @@ export function createTextWebApi(
     const file = { ...res.file }
     if (res.versionId && !file.versionId) file.versionId = res.versionId
     remember(file)
+    void drafts.saved()
     port.reportSaved({
       file: files.get(file.fileId)!,
       ...(res.versionId ? { versionId: res.versionId } : {}),
@@ -459,6 +515,8 @@ export function createTextWebApi(
       // version. The unsaved edits are dropped on purpose (that is what "Reload latest" means).
       dirty = false
       port.setDirty(false)
+      // the dropped edits must not come back as a draft after the reload
+      await drafts.saved()
       ;(opts.reload ?? (() => location.reload()))()
     }
     return { ok: false, error: text('webConflictNotSaved') }
@@ -543,6 +601,27 @@ export function createTextWebApi(
       const pending = pendingOpen
       pendingOpen = null
       return pending ? await pending : null
+    },
+
+    /**
+     * web-only (C18): the renderer registers how to read its current text (what a save would
+     * write) without saving; the draft writer calls it while the document is dirty
+     */
+    provideText(provider: () => string | null): () => void {
+      textProvider = provider
+      return () => {
+        if (textProvider === provider) textProvider = null
+      }
+    },
+
+    /**
+     * web-only (C18): after consumePending, the server text a restored draft replaced (the
+     * renderer opens the draft as a dirty document); null = not a restored draft. Read once.
+     */
+    consumeRecovered(): string | null {
+      const base = recoveredBase
+      recoveredBase = null
+      return base
     },
 
     async consumeHeadlessExport(): Promise<null> {
