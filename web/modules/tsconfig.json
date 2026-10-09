@@ -6,5 +6,5 @@
     "noEmit": true,
     "jsx": "react-jsx"
   },
-  "include": ["*/install.ts", "*.ts"]
+  "include": ["*/install.ts", "*.ts", "sheets/**/*.ts"]
 }

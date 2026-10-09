@@ -1371,4 +1371,21 @@ export const nl = {
   appFindTitle: 'Zoeken en selecteren ⌘F',
   appReplace: 'Vervangen',
   appGoTo: 'Ga naar',
+  // web frame (UNI-1016): engine-unavailable screen, view-only, save conflicts
+  appWebEngineTitle: 'Deze werkmap kan nog niet op het web worden geopend',
+  appWebEngineBody:
+    'De webversie van UniWork Sheets krijgt zijn rekenmachine nog. Open deze werkmap tot die tijd in de UniWork-desktopapp.',
+  appWebEngineHint: 'Je bestand is niet gewijzigd.',
+  appWebViewOnly: 'Alleen-lezen: je kunt wijzigingen in deze werkmap niet opslaan.',
+  appWebConflictTitle: 'Deze werkmap is ergens anders gewijzigd',
+  appWebConflictBody:
+    'Iemand heeft een nieuwere versie opgeslagen terwijl je bewerkte. Overschrijf die met jouw versie of laad de nieuwste versie opnieuw (niet-opgeslagen wijzigingen gaan verloren).',
+  appWebConflictOverwrite: 'Overschrijven',
+  appWebConflictReload: 'Nieuwste versie laden',
+  appWebConflictNotSaved: 'Niet opgeslagen: er is een nieuwere versie.',
+  appWebDiscardTitle: 'Niet-opgeslagen wijzigingen verwerpen?',
+  appWebDiscardBody: 'Als je een andere werkmap opent, gaan niet-opgeslagen wijzigingen verloren.',
+  appWebDiscard: 'Verwerpen',
+  appWebCancel: 'Annuleren',
+  appWebSaveFailed: 'Opslaan in UniWork is mislukt.',
 } satisfies Record<keyof typeof zh, string>

@@ -1358,4 +1358,21 @@ export const ko = {
   appFindTitle: '찾기 및 선택 ⌘F',
   appReplace: '바꾸기',
   appGoTo: '이동',
+  // web frame (UNI-1016): engine-unavailable screen, view-only, save conflicts
+  appWebEngineTitle: '이 통합 문서는 아직 웹에서 열 수 없습니다',
+  appWebEngineBody:
+    '웹용 UniWork Sheets의 계산 엔진을 준비 중입니다. 그때까지는 UniWork 데스크톱 앱에서 이 통합 문서를 여세요.',
+  appWebEngineHint: '파일은 변경되지 않았습니다.',
+  appWebViewOnly: '보기 전용: 이 통합 문서의 변경 내용을 저장할 수 없습니다.',
+  appWebConflictTitle: '이 통합 문서가 다른 곳에서 변경되었습니다',
+  appWebConflictBody:
+    '편집하는 동안 다른 사람이 새 버전을 저장했습니다. 내 버전으로 덮어쓰거나 최신 버전을 다시 불러오세요(저장하지 않은 변경 내용은 삭제됨).',
+  appWebConflictOverwrite: '덮어쓰기',
+  appWebConflictReload: '최신 버전 다시 불러오기',
+  appWebConflictNotSaved: '저장되지 않음: 더 새로운 버전이 있습니다.',
+  appWebDiscardTitle: '저장하지 않은 변경 내용을 삭제할까요?',
+  appWebDiscardBody: '다른 통합 문서를 열면 저장하지 않은 변경 내용이 삭제됩니다.',
+  appWebDiscard: '삭제',
+  appWebCancel: '취소',
+  appWebSaveFailed: 'UniWork에 저장하지 못했습니다.',
 } satisfies Record<keyof typeof zh, string>

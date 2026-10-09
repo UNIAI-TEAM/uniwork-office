@@ -1336,4 +1336,21 @@ export const id = {
   appFindTitle: 'Temukan & Pilih ⌘F',
   appReplace: 'Ganti',
   appGoTo: 'Buka',
+  // web frame (UNI-1016): engine-unavailable screen, view-only, save conflicts
+  appWebEngineTitle: 'Buku kerja ini belum dapat dibuka di web',
+  appWebEngineBody:
+    'Versi web UniWork Sheets masih menunggu mesin spreadsheet-nya. Sementara itu, buka buku kerja ini di aplikasi desktop UniWork.',
+  appWebEngineHint: 'File Anda tidak berubah.',
+  appWebViewOnly: 'Hanya lihat: Anda tidak dapat menyimpan perubahan pada buku kerja ini.',
+  appWebConflictTitle: 'Buku kerja ini diubah di tempat lain',
+  appWebConflictBody:
+    'Seseorang menyimpan versi yang lebih baru saat Anda mengedit. Timpa dengan versi Anda, atau muat ulang versi terbaru (perubahan yang belum disimpan akan dibuang).',
+  appWebConflictOverwrite: 'Timpa',
+  appWebConflictReload: 'Muat ulang versi terbaru',
+  appWebConflictNotSaved: 'Tidak disimpan: ada versi yang lebih baru.',
+  appWebDiscardTitle: 'Buang perubahan yang belum disimpan?',
+  appWebDiscardBody: 'Membuka buku kerja lain akan membuang perubahan yang belum disimpan.',
+  appWebDiscard: 'Buang',
+  appWebCancel: 'Batal',
+  appWebSaveFailed: 'Gagal menyimpan ke UniWork.',
 } satisfies Record<keyof typeof zh, string>

@@ -1364,4 +1364,21 @@ export const pl = {
   appFindTitle: 'Znajdź i zaznacz ⌘F',
   appReplace: 'Zamień',
   appGoTo: 'Przejdź do',
+  // web frame (UNI-1016): engine-unavailable screen, view-only, save conflicts
+  appWebEngineTitle: 'Tego skoroszytu nie można jeszcze otworzyć w sieci',
+  appWebEngineBody:
+    'Wersja internetowa UniWork Sheets wciąż czeka na swój silnik arkuszy. Do tego czasu otwórz ten skoroszyt w aplikacji UniWork na komputer.',
+  appWebEngineHint: 'Twój plik nie został zmieniony.',
+  appWebViewOnly: 'Tylko do odczytu: nie możesz zapisać zmian w tym skoroszycie.',
+  appWebConflictTitle: 'Ten skoroszyt został zmieniony w innym miejscu',
+  appWebConflictBody:
+    'Ktoś zapisał nowszą wersję podczas Twojej edycji. Zastąp ją swoją wersją lub wczytaj najnowszą wersję (niezapisane zmiany zostaną odrzucone).',
+  appWebConflictOverwrite: 'Zastąp',
+  appWebConflictReload: 'Wczytaj najnowszą wersję',
+  appWebConflictNotSaved: 'Nie zapisano: istnieje nowsza wersja.',
+  appWebDiscardTitle: 'Odrzucić niezapisane zmiany?',
+  appWebDiscardBody: 'Otwarcie innego skoroszytu odrzuca niezapisane zmiany.',
+  appWebDiscard: 'Odrzuć',
+  appWebCancel: 'Anuluj',
+  appWebSaveFailed: 'Nie udało się zapisać w UniWork.',
 } satisfies Record<keyof typeof zh, string>

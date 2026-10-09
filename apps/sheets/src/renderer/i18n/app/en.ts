@@ -1316,4 +1316,21 @@ export const en = {
   appFindTitle: 'Find & Select ⌘F',
   appReplace: 'Replace',
   appGoTo: 'Go To',
+  // web frame (UNI-1016): engine-unavailable screen, view-only, save conflicts
+  appWebEngineTitle: "This workbook can't be opened on the web yet",
+  appWebEngineBody:
+    'The web version of UniWork Sheets is still getting its spreadsheet engine. Until then, open this workbook in the UniWork desktop app.',
+  appWebEngineHint: 'Your file is unchanged.',
+  appWebViewOnly: "View only: you can't save changes to this workbook.",
+  appWebConflictTitle: 'This workbook was changed elsewhere',
+  appWebConflictBody:
+    'Someone saved a newer version while you were editing. Overwrite it with your version, or reload the latest version (your unsaved changes are discarded).',
+  appWebConflictOverwrite: 'Overwrite',
+  appWebConflictReload: 'Reload latest',
+  appWebConflictNotSaved: 'Not saved: a newer version exists.',
+  appWebDiscardTitle: 'Discard unsaved changes?',
+  appWebDiscardBody: 'Opening another workbook discards the changes you have not saved.',
+  appWebDiscard: 'Discard',
+  appWebCancel: 'Cancel',
+  appWebSaveFailed: 'Saving to UniWork failed.',
 } satisfies Record<keyof typeof zh, string>

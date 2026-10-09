@@ -1354,4 +1354,21 @@ export const ru = {
   appFindTitle: 'Найти и выделить ⌘F',
   appReplace: 'Заменить',
   appGoTo: 'Перейти',
+  // web frame (UNI-1016): engine-unavailable screen, view-only, save conflicts
+  appWebEngineTitle: 'Эту книгу пока нельзя открыть в веб-версии',
+  appWebEngineBody:
+    'Веб-версия UniWork Sheets ещё получает свой табличный движок. До тех пор откройте эту книгу в настольном приложении UniWork.',
+  appWebEngineHint: 'Ваш файл не изменён.',
+  appWebViewOnly: 'Только просмотр: сохранить изменения в этой книге нельзя.',
+  appWebConflictTitle: 'Эта книга была изменена в другом месте',
+  appWebConflictBody:
+    'Пока вы редактировали, кто-то сохранил более новую версию. Перезапишите её своей версией или загрузите последнюю версию (несохранённые изменения будут потеряны).',
+  appWebConflictOverwrite: 'Перезаписать',
+  appWebConflictReload: 'Загрузить последнюю версию',
+  appWebConflictNotSaved: 'Не сохранено: существует более новая версия.',
+  appWebDiscardTitle: 'Отменить несохранённые изменения?',
+  appWebDiscardBody: 'При открытии другой книги несохранённые изменения будут потеряны.',
+  appWebDiscard: 'Отменить изменения',
+  appWebCancel: 'Отмена',
+  appWebSaveFailed: 'Не удалось сохранить в UniWork.',
 } satisfies Record<keyof typeof zh, string>

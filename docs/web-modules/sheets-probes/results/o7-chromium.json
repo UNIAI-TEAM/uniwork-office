@@ -1,0 +1,1159 @@
+{
+  "small": {
+    "browser": "151.0.7922.34",
+    "crashed": null,
+    "current": "xlsx-vietnamese.xlsx",
+    "rendererPeakRssKb": 196884,
+    "consoleErrors": [],
+    "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36",
+    "results": [
+      {
+        "wallMs": 375,
+        "ok": true,
+        "compileMs": 52.8,
+        "fixture": "xlsx-chart.xlsx",
+        "fileBytes": 4440,
+        "instantiateMs": 1,
+        "wasmMemoryBytes": 3407872,
+        "results": {
+          "open": {
+            "ms": 73.5,
+            "bytes": 1708,
+            "ok": true
+          },
+          "viewport": {
+            "ms": 29.5,
+            "bytes": 1977,
+            "ok": true
+          },
+          "bottomViewport": {
+            "ms": 0.8,
+            "bytes": 1983,
+            "ok": true
+          },
+          "batch90k": {
+            "ms": 0.5,
+            "bytes": 1977,
+            "ok": true
+          },
+          "formulas": {
+            "ms": 0.8,
+            "bytes": 273,
+            "ok": true
+          },
+          "manifest": {
+            "ms": 2.3,
+            "bytes": 920,
+            "ok": true
+          },
+          "readEntry": {
+            "ms": 4.9,
+            "bytes": 144,
+            "ok": true
+          },
+          "saveArchive": {
+            "ms": 13.9,
+            "bytes": 1795,
+            "ok": true
+          },
+          "recalcCold": {
+            "ms": 101.1,
+            "bytes": 286,
+            "ok": true
+          },
+          "recalcWarm": {
+            "ms": 0.3,
+            "bytes": 285,
+            "ok": true
+          },
+          "close": {
+            "ms": 7.7,
+            "bytes": 71,
+            "ok": true
+          }
+        },
+        "trap": null,
+        "stderrTail": [
+          "wasm-probe elapsed_ms=4.80",
+          "wasm-probe elapsed_ms=13.90",
+          "wasm-probe elapsed_ms=101.20",
+          "wasm-probe elapsed_ms=0.30",
+          "wasm-probe elapsed_ms=7.70"
+        ]
+      },
+      {
+        "wallMs": 298,
+        "ok": true,
+        "compileMs": 48.3,
+        "fixture": "xlsx-compatibility-basic.xlsx",
+        "fileBytes": 4110,
+        "instantiateMs": 0.9,
+        "wasmMemoryBytes": 3407872,
+        "results": {
+          "open": {
+            "ms": 54.6,
+            "bytes": 1722,
+            "ok": true
+          },
+          "viewport": {
+            "ms": 23.7,
+            "bytes": 1977,
+            "ok": true
+          },
+          "bottomViewport": {
+            "ms": 0.9,
+            "bytes": 1983,
+            "ok": true
+          },
+          "batch90k": {
+            "ms": 0.7,
+            "bytes": 1977,
+            "ok": true
+          },
+          "formulas": {
+            "ms": 1,
+            "bytes": 273,
+            "ok": true
+          },
+          "manifest": {
+            "ms": 2.1,
+            "bytes": 917,
+            "ok": true
+          },
+          "readEntry": {
+            "ms": 3.9,
+            "bytes": 144,
+            "ok": true
+          },
+          "saveArchive": {
+            "ms": 12.6,
+            "bytes": 1789,
+            "ok": true
+          },
+          "recalcCold": {
+            "ms": 94.2,
+            "bytes": 286,
+            "ok": true
+          },
+          "recalcWarm": {
+            "ms": 0.4,
+            "bytes": 285,
+            "ok": true
+          },
+          "close": {
+            "ms": 3.6,
+            "bytes": 71,
+            "ok": true
+          }
+        },
+        "trap": null,
+        "stderrTail": [
+          "wasm-probe elapsed_ms=3.80",
+          "wasm-probe elapsed_ms=12.60",
+          "wasm-probe elapsed_ms=94.20",
+          "wasm-probe elapsed_ms=0.30",
+          "wasm-probe elapsed_ms=3.60"
+        ]
+      },
+      {
+        "wallMs": 191,
+        "ok": true,
+        "compileMs": 43.7,
+        "fixture": "xlsx-compatibility-edit.xlsx",
+        "fileBytes": 3340,
+        "instantiateMs": 0.9,
+        "wasmMemoryBytes": 3342336,
+        "results": {
+          "open": {
+            "ms": 54.4,
+            "bytes": 1721,
+            "ok": true
+          },
+          "viewport": {
+            "ms": 20.6,
+            "bytes": 1421,
+            "ok": true
+          },
+          "bottomViewport": {
+            "ms": 0.6,
+            "bytes": 1427,
+            "ok": true
+          },
+          "batch90k": {
+            "ms": 0.4,
+            "bytes": 1421,
+            "ok": true
+          },
+          "formulas": {
+            "ms": 0.9,
+            "bytes": 112,
+            "ok": true
+          },
+          "manifest": {
+            "ms": 2.2,
+            "bytes": 724,
+            "ok": true
+          },
+          "readEntry": {
+            "ms": 3,
+            "bytes": 144,
+            "ok": true
+          },
+          "saveArchive": {
+            "ms": 11,
+            "bytes": 1403,
+            "ok": true
+          },
+          "close": {
+            "ms": 2.8,
+            "bytes": 70,
+            "ok": true
+          }
+        },
+        "trap": null,
+        "stderrTail": [
+          "wasm-probe elapsed_ms=0.90",
+          "wasm-probe elapsed_ms=2.10",
+          "wasm-probe elapsed_ms=3.00",
+          "wasm-probe elapsed_ms=11.10",
+          "wasm-probe elapsed_ms=2.80"
+        ]
+      },
+      {
+        "wallMs": 309,
+        "ok": true,
+        "compileMs": 44.3,
+        "fixture": "xlsx-compatibility-structure.xlsx",
+        "fileBytes": 5029,
+        "instantiateMs": 0.9,
+        "wasmMemoryBytes": 3342336,
+        "results": {
+          "open": {
+            "ms": 55.7,
+            "bytes": 2199,
+            "ok": true
+          },
+          "viewport": {
+            "ms": 25.6,
+            "bytes": 1977,
+            "ok": true
+          },
+          "bottomViewport": {
+            "ms": 0.6,
+            "bytes": 1983,
+            "ok": true
+          },
+          "batch90k": {
+            "ms": 0.5,
+            "bytes": 1977,
+            "ok": true
+          },
+          "formulas": {
+            "ms": 3.8,
+            "bytes": 470,
+            "ok": true
+          },
+          "manifest": {
+            "ms": 3.8,
+            "bytes": 1017,
+            "ok": true
+          },
+          "readEntry": {
+            "ms": 3,
+            "bytes": 144,
+            "ok": true
+          },
+          "saveArchive": {
+            "ms": 13.8,
+            "bytes": 1989,
+            "ok": true
+          },
+          "recalcCold": {
+            "ms": 97.2,
+            "bytes": 286,
+            "ok": true
+          },
+          "recalcWarm": {
+            "ms": 0.2,
+            "bytes": 286,
+            "ok": true
+          },
+          "close": {
+            "ms": 8.7,
+            "bytes": 121,
+            "ok": false,
+            "error": {
+              "code": "io_error",
+              "message": "Directory not empty (os error 55)"
+            }
+          }
+        },
+        "trap": null,
+        "stderrTail": [
+          "wasm-probe elapsed_ms=3.00",
+          "wasm-probe elapsed_ms=13.80",
+          "wasm-probe elapsed_ms=97.20",
+          "wasm-probe elapsed_ms=0.20",
+          "wasm-probe elapsed_ms=8.60"
+        ]
+      },
+      {
+        "wallMs": 312,
+        "ok": true,
+        "compileMs": 47.9,
+        "fixture": "xlsx-kitchen-sink.xlsx",
+        "fileBytes": 5046,
+        "instantiateMs": 1,
+        "wasmMemoryBytes": 3342336,
+        "results": {
+          "open": {
+            "ms": 58.2,
+            "bytes": 2231,
+            "ok": true
+          },
+          "viewport": {
+            "ms": 23.4,
+            "bytes": 2460,
+            "ok": true
+          },
+          "bottomViewport": {
+            "ms": 0.8,
+            "bytes": 2466,
+            "ok": true
+          },
+          "batch90k": {
+            "ms": 0.6,
+            "bytes": 2460,
+            "ok": true
+          },
+          "formulas": {
+            "ms": 2.8,
+            "bytes": 550,
+            "ok": true
+          },
+          "manifest": {
+            "ms": 2.4,
+            "bytes": 1017,
+            "ok": true
+          },
+          "readEntry": {
+            "ms": 3.3,
+            "bytes": 144,
+            "ok": true
+          },
+          "saveArchive": {
+            "ms": 14.7,
+            "bytes": 1989,
+            "ok": true
+          },
+          "recalcCold": {
+            "ms": 107.2,
+            "bytes": 286,
+            "ok": true
+          },
+          "recalcWarm": {
+            "ms": 0.3,
+            "bytes": 286,
+            "ok": true
+          },
+          "close": {
+            "ms": 4,
+            "bytes": 121,
+            "ok": false,
+            "error": {
+              "code": "io_error",
+              "message": "Directory not empty (os error 55)"
+            }
+          }
+        },
+        "trap": null,
+        "stderrTail": [
+          "wasm-probe elapsed_ms=3.20",
+          "wasm-probe elapsed_ms=14.70",
+          "wasm-probe elapsed_ms=107.40",
+          "wasm-probe elapsed_ms=0.30",
+          "wasm-probe elapsed_ms=4.00"
+        ]
+      },
+      {
+        "wallMs": 335,
+        "ok": true,
+        "compileMs": 51.5,
+        "fixture": "xlsx-macro.xlsm",
+        "fileBytes": 3912,
+        "instantiateMs": 1.2,
+        "wasmMemoryBytes": 3342336,
+        "results": {
+          "open": {
+            "ms": 64.1,
+            "bytes": 1708,
+            "ok": true
+          },
+          "viewport": {
+            "ms": 24.9,
+            "bytes": 1977,
+            "ok": true
+          },
+          "bottomViewport": {
+            "ms": 1,
+            "bytes": 1983,
+            "ok": true
+          },
+          "batch90k": {
+            "ms": 1.1,
+            "bytes": 1977,
+            "ok": true
+          },
+          "formulas": {
+            "ms": 0.8,
+            "bytes": 273,
+            "ok": true
+          },
+          "manifest": {
+            "ms": 2.9,
+            "bytes": 819,
+            "ok": true
+          },
+          "readEntry": {
+            "ms": 3.5,
+            "bytes": 144,
+            "ok": true
+          },
+          "saveArchive": {
+            "ms": 14.5,
+            "bytes": 1593,
+            "ok": true
+          },
+          "recalcCold": {
+            "ms": 97.4,
+            "bytes": 286,
+            "ok": true
+          },
+          "recalcWarm": {
+            "ms": 0.3,
+            "bytes": 285,
+            "ok": true
+          },
+          "close": {
+            "ms": 4,
+            "bytes": 71,
+            "ok": true
+          }
+        },
+        "trap": null,
+        "stderrTail": [
+          "wasm-probe elapsed_ms=3.50",
+          "wasm-probe elapsed_ms=14.60",
+          "wasm-probe elapsed_ms=97.60",
+          "wasm-probe elapsed_ms=0.40",
+          "wasm-probe elapsed_ms=4.00"
+        ]
+      },
+      {
+        "wallMs": 219,
+        "ok": true,
+        "compileMs": 46.5,
+        "fixture": "xlsx-number-format.xlsx",
+        "fileBytes": 3383,
+        "instantiateMs": 1.6,
+        "wasmMemoryBytes": 3342336,
+        "results": {
+          "open": {
+            "ms": 59.7,
+            "bytes": 1908,
+            "ok": true
+          },
+          "viewport": {
+            "ms": 24,
+            "bytes": 1739,
+            "ok": true
+          },
+          "bottomViewport": {
+            "ms": 0.6,
+            "bytes": 1745,
+            "ok": true
+          },
+          "batch90k": {
+            "ms": 0.4,
+            "bytes": 1739,
+            "ok": true
+          },
+          "formulas": {
+            "ms": 2.7,
+            "bytes": 112,
+            "ok": true
+          },
+          "manifest": {
+            "ms": 2.3,
+            "bytes": 724,
+            "ok": true
+          },
+          "readEntry": {
+            "ms": 3.3,
+            "bytes": 144,
+            "ok": true
+          },
+          "saveArchive": {
+            "ms": 19,
+            "bytes": 1403,
+            "ok": true
+          },
+          "close": {
+            "ms": 3.1,
+            "bytes": 70,
+            "ok": true
+          }
+        },
+        "trap": null,
+        "stderrTail": [
+          "wasm-probe elapsed_ms=2.60",
+          "wasm-probe elapsed_ms=2.40",
+          "wasm-probe elapsed_ms=3.20",
+          "wasm-probe elapsed_ms=19.00",
+          "wasm-probe elapsed_ms=3.20"
+        ]
+      },
+      {
+        "wallMs": 234,
+        "ok": true,
+        "compileMs": 65.7,
+        "fixture": "xlsx-pivot.xlsx",
+        "fileBytes": 6880,
+        "instantiateMs": 1,
+        "wasmMemoryBytes": 3342336,
+        "results": {
+          "open": {
+            "ms": 57,
+            "bytes": 1381,
+            "ok": true
+          },
+          "viewport": {
+            "ms": 20.4,
+            "bytes": 736,
+            "ok": true
+          },
+          "bottomViewport": {
+            "ms": 0.5,
+            "bytes": 742,
+            "ok": true
+          },
+          "batch90k": {
+            "ms": 0.4,
+            "bytes": 736,
+            "ok": true
+          },
+          "formulas": {
+            "ms": 0.7,
+            "bytes": 112,
+            "ok": true
+          },
+          "manifest": {
+            "ms": 2.4,
+            "bytes": 1316,
+            "ok": true
+          },
+          "readEntry": {
+            "ms": 3,
+            "bytes": 144,
+            "ok": true
+          },
+          "saveArchive": {
+            "ms": 13.3,
+            "bytes": 2587,
+            "ok": true
+          },
+          "close": {
+            "ms": 3.3,
+            "bytes": 70,
+            "ok": true
+          }
+        },
+        "trap": null,
+        "stderrTail": [
+          "wasm-probe elapsed_ms=0.70",
+          "wasm-probe elapsed_ms=2.30",
+          "wasm-probe elapsed_ms=3.00",
+          "wasm-probe elapsed_ms=13.30",
+          "wasm-probe elapsed_ms=3.20"
+        ]
+      },
+      {
+        "wallMs": 325,
+        "ok": true,
+        "compileMs": 48.4,
+        "fixture": "xlsx-protected.xlsx",
+        "fileBytes": 3489,
+        "instantiateMs": 1.1,
+        "wasmMemoryBytes": 3342336,
+        "results": {
+          "open": {
+            "ms": 63,
+            "bytes": 1712,
+            "ok": true
+          },
+          "viewport": {
+            "ms": 26.1,
+            "bytes": 2069,
+            "ok": true
+          },
+          "bottomViewport": {
+            "ms": 0.8,
+            "bytes": 2075,
+            "ok": true
+          },
+          "batch90k": {
+            "ms": 0.7,
+            "bytes": 2069,
+            "ok": true
+          },
+          "formulas": {
+            "ms": 0.8,
+            "bytes": 273,
+            "ok": true
+          },
+          "manifest": {
+            "ms": 3.2,
+            "bytes": 724,
+            "ok": true
+          },
+          "readEntry": {
+            "ms": 3.5,
+            "bytes": 144,
+            "ok": true
+          },
+          "saveArchive": {
+            "ms": 14.1,
+            "bytes": 1403,
+            "ok": true
+          },
+          "recalcCold": {
+            "ms": 95.3,
+            "bytes": 286,
+            "ok": true
+          },
+          "recalcWarm": {
+            "ms": 0.3,
+            "bytes": 285,
+            "ok": true
+          },
+          "close": {
+            "ms": 5.3,
+            "bytes": 71,
+            "ok": true
+          }
+        },
+        "trap": null,
+        "stderrTail": [
+          "wasm-probe elapsed_ms=3.40",
+          "wasm-probe elapsed_ms=14.10",
+          "wasm-probe elapsed_ms=95.40",
+          "wasm-probe elapsed_ms=0.30",
+          "wasm-probe elapsed_ms=5.40"
+        ]
+      },
+      {
+        "wallMs": 348,
+        "ok": true,
+        "compileMs": 52.4,
+        "fixture": "xlsx-satellite-sheets.xlsx",
+        "fileBytes": 3933,
+        "instantiateMs": 1,
+        "wasmMemoryBytes": 3342336,
+        "results": {
+          "open": {
+            "ms": 70.1,
+            "bytes": 2192,
+            "ok": true
+          },
+          "viewport": {
+            "ms": 34.4,
+            "bytes": 1977,
+            "ok": true
+          },
+          "bottomViewport": {
+            "ms": 1.1,
+            "bytes": 1983,
+            "ok": true
+          },
+          "batch90k": {
+            "ms": 0.9,
+            "bytes": 1977,
+            "ok": true
+          },
+          "formulas": {
+            "ms": 3.1,
+            "bytes": 470,
+            "ok": true
+          },
+          "manifest": {
+            "ms": 2.2,
+            "bytes": 824,
+            "ok": true
+          },
+          "readEntry": {
+            "ms": 4.7,
+            "bytes": 144,
+            "ok": true
+          },
+          "saveArchive": {
+            "ms": 15.2,
+            "bytes": 1603,
+            "ok": true
+          },
+          "recalcCold": {
+            "ms": 99.2,
+            "bytes": 286,
+            "ok": true
+          },
+          "recalcWarm": {
+            "ms": 0.2,
+            "bytes": 286,
+            "ok": true
+          },
+          "close": {
+            "ms": 4,
+            "bytes": 121,
+            "ok": false,
+            "error": {
+              "code": "io_error",
+              "message": "Directory not empty (os error 55)"
+            }
+          }
+        },
+        "trap": null,
+        "stderrTail": [
+          "wasm-probe elapsed_ms=4.30",
+          "wasm-probe elapsed_ms=15.20",
+          "wasm-probe elapsed_ms=99.30",
+          "wasm-probe elapsed_ms=0.20",
+          "wasm-probe elapsed_ms=4.00"
+        ]
+      },
+      {
+        "wallMs": 316,
+        "ok": true,
+        "compileMs": 46.5,
+        "fixture": "xlsx-vietnamese.xlsx",
+        "fileBytes": 4953,
+        "instantiateMs": 0.9,
+        "wasmMemoryBytes": 3342336,
+        "results": {
+          "open": {
+            "ms": 58.6,
+            "bytes": 2186,
+            "ok": true
+          },
+          "viewport": {
+            "ms": 23.1,
+            "bytes": 1977,
+            "ok": true
+          },
+          "bottomViewport": {
+            "ms": 0.8,
+            "bytes": 1983,
+            "ok": true
+          },
+          "batch90k": {
+            "ms": 1.5,
+            "bytes": 1977,
+            "ok": true
+          },
+          "formulas": {
+            "ms": 2.8,
+            "bytes": 470,
+            "ok": true
+          },
+          "manifest": {
+            "ms": 3.7,
+            "bytes": 1017,
+            "ok": true
+          },
+          "readEntry": {
+            "ms": 4.3,
+            "bytes": 144,
+            "ok": true
+          },
+          "saveArchive": {
+            "ms": 13.5,
+            "bytes": 1989,
+            "ok": true
+          },
+          "recalcCold": {
+            "ms": 102.6,
+            "bytes": 286,
+            "ok": true
+          },
+          "recalcWarm": {
+            "ms": 0.2,
+            "bytes": 286,
+            "ok": true
+          },
+          "close": {
+            "ms": 3.8,
+            "bytes": 121,
+            "ok": false,
+            "error": {
+              "code": "io_error",
+              "message": "Directory not empty (os error 55)"
+            }
+          }
+        },
+        "trap": null,
+        "stderrTail": [
+          "wasm-probe elapsed_ms=4.30",
+          "wasm-probe elapsed_ms=13.50",
+          "wasm-probe elapsed_ms=102.70",
+          "wasm-probe elapsed_ms=0.20",
+          "wasm-probe elapsed_ms=3.70"
+        ]
+      }
+    ],
+    "violations": []
+  },
+  "r10000": {
+    "browser": "151.0.7922.34",
+    "crashed": null,
+    "current": "large-10000.xlsx",
+    "rendererPeakRssKb": 357792,
+    "consoleErrors": [],
+    "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36",
+    "results": [
+      {
+        "wallMs": 3380,
+        "ok": true,
+        "compileMs": 58.4,
+        "fixture": "large-10000.xlsx",
+        "fileBytes": 1011853,
+        "instantiateMs": 1.3,
+        "wasmMemoryBytes": 73007104,
+        "results": {
+          "open": {
+            "ms": 243.8,
+            "bytes": 881,
+            "ok": true
+          },
+          "viewport": {
+            "ms": 559.3,
+            "bytes": 117961,
+            "ok": true
+          },
+          "bottomViewport": {
+            "ms": 21.4,
+            "bytes": 123940,
+            "ok": true
+          },
+          "batch90k": {
+            "ms": 1169.2,
+            "bytes": 5016356,
+            "ok": true
+          },
+          "formulas": {
+            "ms": 28.7,
+            "bytes": 801250,
+            "ok": true
+          },
+          "manifest": {
+            "ms": 2.2,
+            "bytes": 637,
+            "ok": true
+          },
+          "readEntry": {
+            "ms": 34.3,
+            "bytes": 144,
+            "ok": true
+          },
+          "saveArchive": {
+            "ms": 197.2,
+            "bytes": 1229,
+            "ok": true
+          },
+          "recalcCold": {
+            "ms": 897.7,
+            "bytes": 927898,
+            "ok": true
+          },
+          "recalcWarm": {
+            "ms": 68,
+            "bytes": 927897,
+            "ok": true
+          },
+          "close": {
+            "ms": 11.7,
+            "bytes": 121,
+            "ok": false,
+            "error": {
+              "code": "io_error",
+              "message": "Directory not empty (os error 55)"
+            }
+          }
+        },
+        "trap": null,
+        "stderrTail": [
+          "wasm-probe elapsed_ms=34.40",
+          "wasm-probe elapsed_ms=197.20",
+          "wasm-probe elapsed_ms=899.70",
+          "wasm-probe elapsed_ms=69.90",
+          "wasm-probe elapsed_ms=11.70"
+        ]
+      }
+    ],
+    "violations": []
+  },
+  "r15000": {
+    "browser": "151.0.7922.34",
+    "crashed": null,
+    "current": "large-15000.xlsx",
+    "rendererPeakRssKb": 356672,
+    "consoleErrors": [],
+    "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36",
+    "results": [
+      {
+        "wallMs": 5464,
+        "ok": true,
+        "compileMs": 78.6,
+        "fixture": "large-15000.xlsx",
+        "fileBytes": 1528131,
+        "instantiateMs": 1.2,
+        "wasmMemoryBytes": 111869952,
+        "results": {
+          "open": {
+            "ms": 434.8,
+            "bytes": 882,
+            "ok": true
+          },
+          "viewport": {
+            "ms": 1244,
+            "bytes": 117962,
+            "ok": true
+          },
+          "bottomViewport": {
+            "ms": 10.6,
+            "bytes": 126338,
+            "ok": true
+          },
+          "batch90k": {
+            "ms": 1319,
+            "bytes": 5016357,
+            "ok": true
+          },
+          "formulas": {
+            "ms": 65,
+            "bytes": 1218400,
+            "ok": true
+          },
+          "manifest": {
+            "ms": 2.4,
+            "bytes": 638,
+            "ok": true
+          },
+          "readEntry": {
+            "ms": 87.1,
+            "bytes": 144,
+            "ok": true
+          },
+          "saveArchive": {
+            "ms": 327.1,
+            "bytes": 1231,
+            "ok": true
+          },
+          "recalcCold": {
+            "ms": 1614.9,
+            "bytes": 1397198,
+            "ok": true
+          },
+          "recalcWarm": {
+            "ms": 132.6,
+            "bytes": 1397197,
+            "ok": true
+          },
+          "close": {
+            "ms": 15.7,
+            "bytes": 121,
+            "ok": false,
+            "error": {
+              "code": "io_error",
+              "message": "Directory not empty (os error 55)"
+            }
+          }
+        },
+        "trap": null,
+        "stderrTail": [
+          "wasm-probe elapsed_ms=87.00",
+          "wasm-probe elapsed_ms=327.00",
+          "wasm-probe elapsed_ms=1617.70",
+          "wasm-probe elapsed_ms=135.10",
+          "wasm-probe elapsed_ms=15.60"
+        ]
+      }
+    ],
+    "violations": []
+  },
+  "r20000": {
+    "browser": "151.0.7922.34",
+    "crashed": null,
+    "current": "large-20000.xlsx",
+    "rendererPeakRssKb": 409608,
+    "consoleErrors": [],
+    "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36",
+    "results": [
+      {
+        "wallMs": 6004,
+        "ok": true,
+        "compileMs": 64.1,
+        "fixture": "large-20000.xlsx",
+        "fileBytes": 2044290,
+        "instantiateMs": 1,
+        "wasmMemoryBytes": 142999552,
+        "results": {
+          "open": {
+            "ms": 508.4,
+            "bytes": 882,
+            "ok": true
+          },
+          "viewport": {
+            "ms": 1218.5,
+            "bytes": 117962,
+            "ok": true
+          },
+          "bottomViewport": {
+            "ms": 21.5,
+            "bytes": 126438,
+            "ok": true
+          },
+          "batch90k": {
+            "ms": 1190.2,
+            "bytes": 5016357,
+            "ok": true
+          },
+          "formulas": {
+            "ms": 116.6,
+            "bytes": 1635707,
+            "ok": true
+          },
+          "manifest": {
+            "ms": 2.9,
+            "bytes": 638,
+            "ok": true
+          },
+          "readEntry": {
+            "ms": 81.7,
+            "bytes": 144,
+            "ok": true
+          },
+          "saveArchive": {
+            "ms": 443.3,
+            "bytes": 1231,
+            "ok": true
+          },
+          "recalcCold": {
+            "ms": 1974.5,
+            "bytes": 1866812,
+            "ok": true
+          },
+          "recalcWarm": {
+            "ms": 214.4,
+            "bytes": 1866811,
+            "ok": true
+          },
+          "close": {
+            "ms": 20.1,
+            "bytes": 121,
+            "ok": false,
+            "error": {
+              "code": "io_error",
+              "message": "Directory not empty (os error 55)"
+            }
+          }
+        },
+        "trap": null,
+        "stderrTail": [
+          "wasm-probe elapsed_ms=81.60",
+          "wasm-probe elapsed_ms=443.30",
+          "wasm-probe elapsed_ms=1978.20",
+          "wasm-probe elapsed_ms=216.10",
+          "wasm-probe elapsed_ms=20.20"
+        ]
+      }
+    ],
+    "violations": []
+  },
+  "r100000": {
+    "browser": "151.0.7922.34",
+    "crashed": null,
+    "current": "large-100000.xlsx",
+    "rendererPeakRssKb": 776644,
+    "consoleErrors": [],
+    "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36",
+    "results": [
+      {
+        "wallMs": 13380,
+        "ok": true,
+        "compileMs": 50.7,
+        "fixture": "large-100000.xlsx",
+        "fileBytes": 10303611,
+        "instantiateMs": 1.2,
+        "wasmMemoryBytes": 271384576,
+        "results": {
+          "open": {
+            "ms": 1822,
+            "bytes": 884,
+            "ok": true
+          },
+          "viewport": {
+            "ms": 4924.2,
+            "bytes": 117962,
+            "ok": true
+          },
+          "bottomViewport": {
+            "ms": 25.3,
+            "bytes": 126433,
+            "ok": true
+          },
+          "batch90k": {
+            "ms": 1255.9,
+            "bytes": 5016357,
+            "ok": true
+          },
+          "formulas": {
+            "ms": 2541.7,
+            "bytes": 8311365,
+            "ok": true
+          },
+          "manifest": {
+            "ms": 2.7,
+            "bytes": 639,
+            "ok": true
+          },
+          "readEntry": {
+            "ms": 391.3,
+            "bytes": 144,
+            "ok": true
+          },
+          "saveArchive": {
+            "ms": 2185.5,
+            "bytes": 1233,
+            "ok": true
+          },
+          "close": {
+            "ms": 16.4,
+            "bytes": 120,
+            "ok": false,
+            "error": {
+              "code": "io_error",
+              "message": "Directory not empty (os error 55)"
+            }
+          }
+        },
+        "trap": null,
+        "stderrTail": [
+          "wasm-probe elapsed_ms=2555.40",
+          "wasm-probe elapsed_ms=2.60",
+          "wasm-probe elapsed_ms=391.30",
+          "wasm-probe elapsed_ms=2185.60",
+          "wasm-probe elapsed_ms=16.30"
+        ]
+      }
+    ],
+    "violations": []
+  }
+}

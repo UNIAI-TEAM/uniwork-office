@@ -1333,4 +1333,21 @@ export const hi = {
   appFindTitle: 'ढूँढें और चुनें ⌘F',
   appReplace: 'बदलें',
   appGoTo: 'इस पर जाएँ',
+  // web frame (UNI-1016): engine-unavailable screen, view-only, save conflicts
+  appWebEngineTitle: 'यह वर्कबुक अभी वेब पर नहीं खोली जा सकती',
+  appWebEngineBody:
+    'UniWork Sheets के वेब संस्करण को अभी उसका स्प्रेडशीट इंजन मिल रहा है। तब तक, इस वर्कबुक को UniWork डेस्कटॉप ऐप में खोलें।',
+  appWebEngineHint: 'आपकी फ़ाइल नहीं बदली गई है।',
+  appWebViewOnly: 'केवल देखें: आप इस वर्कबुक में परिवर्तन सहेज नहीं सकते।',
+  appWebConflictTitle: 'यह वर्कबुक कहीं और बदली गई थी',
+  appWebConflictBody:
+    'आपके संपादन के दौरान किसी ने नया संस्करण सहेजा। इसे अपने संस्करण से अधिलेखित करें, या नवीनतम संस्करण फिर से लोड करें (बिना सहेजे परिवर्तन हटा दिए जाएँगे)।',
+  appWebConflictOverwrite: 'अधिलेखित करें',
+  appWebConflictReload: 'नवीनतम संस्करण लोड करें',
+  appWebConflictNotSaved: 'सहेजा नहीं गया: एक नया संस्करण मौजूद है।',
+  appWebDiscardTitle: 'बिना सहेजे परिवर्तन हटाएँ?',
+  appWebDiscardBody: 'दूसरी वर्कबुक खोलने से बिना सहेजे परिवर्तन हट जाते हैं।',
+  appWebDiscard: 'हटाएँ',
+  appWebCancel: 'रद्द करें',
+  appWebSaveFailed: 'UniWork में सहेजना विफल रहा।',
 } satisfies Record<keyof typeof zh, string>

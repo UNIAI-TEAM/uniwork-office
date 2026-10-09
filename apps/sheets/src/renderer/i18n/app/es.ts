@@ -1377,4 +1377,21 @@ export const es = {
   appFindTitle: 'Buscar y seleccionar ⌘F',
   appReplace: 'Reemplazar',
   appGoTo: 'Ir a',
+  // web frame (UNI-1016): engine-unavailable screen, view-only, save conflicts
+  appWebEngineTitle: 'Este libro aún no se puede abrir en la web',
+  appWebEngineBody:
+    'La versión web de UniWork Sheets todavía está recibiendo su motor de hojas de cálculo. Mientras tanto, abre este libro en la aplicación de escritorio de UniWork.',
+  appWebEngineHint: 'Tu archivo no ha cambiado.',
+  appWebViewOnly: 'Solo lectura: no puedes guardar cambios en este libro.',
+  appWebConflictTitle: 'Este libro se modificó en otro lugar',
+  appWebConflictBody:
+    'Alguien guardó una versión más reciente mientras editabas. Sobrescríbela con tu versión o vuelve a cargar la última versión (se descartarán los cambios sin guardar).',
+  appWebConflictOverwrite: 'Sobrescribir',
+  appWebConflictReload: 'Cargar la última versión',
+  appWebConflictNotSaved: 'No guardado: existe una versión más reciente.',
+  appWebDiscardTitle: '¿Descartar los cambios sin guardar?',
+  appWebDiscardBody: 'Abrir otro libro descarta los cambios que no has guardado.',
+  appWebDiscard: 'Descartar',
+  appWebCancel: 'Cancelar',
+  appWebSaveFailed: 'No se pudo guardar en UniWork.',
 } satisfies Record<keyof typeof zh, string>

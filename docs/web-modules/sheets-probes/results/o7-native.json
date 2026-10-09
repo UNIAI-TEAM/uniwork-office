@@ -1,0 +1,880 @@
+{
+  "runtime": "native",
+  "results": [
+    {
+      "fixture": "xlsx-chart.xlsx",
+      "results": {
+        "open": {
+          "ms": 2.4,
+          "bytes": 1708,
+          "ok": true
+        },
+        "viewport": {
+          "ms": 0.8,
+          "bytes": 1977,
+          "ok": true
+        },
+        "bottomViewport": {
+          "ms": 0.3,
+          "bytes": 1983,
+          "ok": true
+        },
+        "batch90k": {
+          "ms": 0.2,
+          "bytes": 1977,
+          "ok": true
+        },
+        "formulas": {
+          "ms": 0.2,
+          "bytes": 273,
+          "ok": true
+        },
+        "manifest": {
+          "ms": 0.2,
+          "bytes": 920,
+          "ok": true
+        },
+        "readEntry": {
+          "ms": 0.4,
+          "bytes": 162,
+          "ok": true
+        },
+        "saveArchive": {
+          "ms": 28.3,
+          "bytes": 1795,
+          "ok": true
+        },
+        "recalcCold": {
+          "ms": 3.2,
+          "bytes": 286,
+          "ok": true
+        },
+        "recalcWarm": {
+          "ms": 0.4,
+          "bytes": 285,
+          "ok": true
+        },
+        "close": {
+          "ms": 0.3,
+          "bytes": 71,
+          "ok": true
+        }
+      },
+      "peakRssKb": 8468
+    },
+    {
+      "fixture": "xlsx-compatibility-basic.xlsx",
+      "results": {
+        "open": {
+          "ms": 4.4,
+          "bytes": 1722,
+          "ok": true
+        },
+        "viewport": {
+          "ms": 0.9,
+          "bytes": 1977,
+          "ok": true
+        },
+        "bottomViewport": {
+          "ms": 0.3,
+          "bytes": 1983,
+          "ok": true
+        },
+        "batch90k": {
+          "ms": 0.2,
+          "bytes": 1977,
+          "ok": true
+        },
+        "formulas": {
+          "ms": 0.8,
+          "bytes": 273,
+          "ok": true
+        },
+        "manifest": {
+          "ms": 0.3,
+          "bytes": 917,
+          "ok": true
+        },
+        "readEntry": {
+          "ms": 0.6,
+          "bytes": 162,
+          "ok": true
+        },
+        "saveArchive": {
+          "ms": 6.1,
+          "bytes": 1789,
+          "ok": true
+        },
+        "recalcCold": {
+          "ms": 1.7,
+          "bytes": 286,
+          "ok": true
+        },
+        "recalcWarm": {
+          "ms": 0.3,
+          "bytes": 285,
+          "ok": true
+        },
+        "close": {
+          "ms": 0.3,
+          "bytes": 71,
+          "ok": true
+        }
+      },
+      "peakRssKb": 8464
+    },
+    {
+      "fixture": "xlsx-compatibility-edit.xlsx",
+      "results": {
+        "open": {
+          "ms": 1.4,
+          "bytes": 1721,
+          "ok": true
+        },
+        "viewport": {
+          "ms": 0.7,
+          "bytes": 1421,
+          "ok": true
+        },
+        "bottomViewport": {
+          "ms": 0.3,
+          "bytes": 1427,
+          "ok": true
+        },
+        "batch90k": {
+          "ms": 0.2,
+          "bytes": 1421,
+          "ok": true
+        },
+        "formulas": {
+          "ms": 0.3,
+          "bytes": 112,
+          "ok": true
+        },
+        "manifest": {
+          "ms": 0.2,
+          "bytes": 724,
+          "ok": true
+        },
+        "readEntry": {
+          "ms": 0.2,
+          "bytes": 162,
+          "ok": true
+        },
+        "saveArchive": {
+          "ms": 6.1,
+          "bytes": 1403,
+          "ok": true
+        },
+        "close": {
+          "ms": 0.3,
+          "bytes": 70,
+          "ok": true
+        }
+      },
+      "peakRssKb": 6948
+    },
+    {
+      "fixture": "xlsx-compatibility-structure.xlsx",
+      "results": {
+        "open": {
+          "ms": 2.6,
+          "bytes": 2199,
+          "ok": true
+        },
+        "viewport": {
+          "ms": 0.7,
+          "bytes": 1977,
+          "ok": true
+        },
+        "bottomViewport": {
+          "ms": 0.3,
+          "bytes": 1983,
+          "ok": true
+        },
+        "batch90k": {
+          "ms": 0.4,
+          "bytes": 1977,
+          "ok": true
+        },
+        "formulas": {
+          "ms": 0.5,
+          "bytes": 386,
+          "ok": true
+        },
+        "manifest": {
+          "ms": 0.3,
+          "bytes": 1017,
+          "ok": true
+        },
+        "readEntry": {
+          "ms": 0.3,
+          "bytes": 162,
+          "ok": true
+        },
+        "saveArchive": {
+          "ms": 6.2,
+          "bytes": 1989,
+          "ok": true
+        },
+        "recalcCold": {
+          "ms": 1.2,
+          "bytes": 286,
+          "ok": true
+        },
+        "recalcWarm": {
+          "ms": 0.3,
+          "bytes": 286,
+          "ok": true
+        },
+        "close": {
+          "ms": 0.3,
+          "bytes": 71,
+          "ok": true
+        }
+      },
+      "peakRssKb": 8536
+    },
+    {
+      "fixture": "xlsx-kitchen-sink.xlsx",
+      "results": {
+        "open": {
+          "ms": 2.1,
+          "bytes": 2231,
+          "ok": true
+        },
+        "viewport": {
+          "ms": 0.6,
+          "bytes": 1383,
+          "ok": true
+        },
+        "bottomViewport": {
+          "ms": 0.3,
+          "bytes": 2466,
+          "ok": true
+        },
+        "batch90k": {
+          "ms": 0.2,
+          "bytes": 2460,
+          "ok": true
+        },
+        "formulas": {
+          "ms": 0.3,
+          "bytes": 386,
+          "ok": true
+        },
+        "manifest": {
+          "ms": 0.3,
+          "bytes": 1017,
+          "ok": true
+        },
+        "readEntry": {
+          "ms": 0.2,
+          "bytes": 162,
+          "ok": true
+        },
+        "saveArchive": {
+          "ms": 6.2,
+          "bytes": 1989,
+          "ok": true
+        },
+        "recalcCold": {
+          "ms": 2.3,
+          "bytes": 286,
+          "ok": true
+        },
+        "recalcWarm": {
+          "ms": 0.5,
+          "bytes": 286,
+          "ok": true
+        },
+        "close": {
+          "ms": 0.3,
+          "bytes": 71,
+          "ok": true
+        }
+      },
+      "peakRssKb": 8596
+    },
+    {
+      "fixture": "xlsx-macro.xlsm",
+      "results": {
+        "open": {
+          "ms": 2.3,
+          "bytes": 1708,
+          "ok": true
+        },
+        "viewport": {
+          "ms": 0.7,
+          "bytes": 1977,
+          "ok": true
+        },
+        "bottomViewport": {
+          "ms": 0.3,
+          "bytes": 1983,
+          "ok": true
+        },
+        "batch90k": {
+          "ms": 0.2,
+          "bytes": 1977,
+          "ok": true
+        },
+        "formulas": {
+          "ms": 0.1,
+          "bytes": 273,
+          "ok": true
+        },
+        "manifest": {
+          "ms": 0.2,
+          "bytes": 819,
+          "ok": true
+        },
+        "readEntry": {
+          "ms": 0.3,
+          "bytes": 162,
+          "ok": true
+        },
+        "saveArchive": {
+          "ms": 4.4,
+          "bytes": 1593,
+          "ok": true
+        },
+        "recalcCold": {
+          "ms": 1,
+          "bytes": 286,
+          "ok": true
+        },
+        "recalcWarm": {
+          "ms": 0.2,
+          "bytes": 285,
+          "ok": true
+        },
+        "close": {
+          "ms": 0.3,
+          "bytes": 71,
+          "ok": true
+        }
+      },
+      "peakRssKb": 8480
+    },
+    {
+      "fixture": "xlsx-number-format.xlsx",
+      "results": {
+        "open": {
+          "ms": 2.5,
+          "bytes": 1908,
+          "ok": true
+        },
+        "viewport": {
+          "ms": 0.6,
+          "bytes": 1739,
+          "ok": true
+        },
+        "bottomViewport": {
+          "ms": 0.2,
+          "bytes": 1745,
+          "ok": true
+        },
+        "batch90k": {
+          "ms": 0.2,
+          "bytes": 1739,
+          "ok": true
+        },
+        "formulas": {
+          "ms": 0.1,
+          "bytes": 112,
+          "ok": true
+        },
+        "manifest": {
+          "ms": 0.2,
+          "bytes": 724,
+          "ok": true
+        },
+        "readEntry": {
+          "ms": 0.8,
+          "bytes": 162,
+          "ok": true
+        },
+        "saveArchive": {
+          "ms": 3.8,
+          "bytes": 1403,
+          "ok": true
+        },
+        "close": {
+          "ms": 0.2,
+          "bytes": 70,
+          "ok": true
+        }
+      },
+      "peakRssKb": 6932
+    },
+    {
+      "fixture": "xlsx-pivot.xlsx",
+      "results": {
+        "open": {
+          "ms": 3.2,
+          "bytes": 1381,
+          "ok": true
+        },
+        "viewport": {
+          "ms": 0.6,
+          "bytes": 737,
+          "ok": true
+        },
+        "bottomViewport": {
+          "ms": 0.2,
+          "bytes": 742,
+          "ok": true
+        },
+        "batch90k": {
+          "ms": 0.2,
+          "bytes": 736,
+          "ok": true
+        },
+        "formulas": {
+          "ms": 0.1,
+          "bytes": 112,
+          "ok": true
+        },
+        "manifest": {
+          "ms": 0.2,
+          "bytes": 1316,
+          "ok": true
+        },
+        "readEntry": {
+          "ms": 0.3,
+          "bytes": 162,
+          "ok": true
+        },
+        "saveArchive": {
+          "ms": 4.4,
+          "bytes": 2587,
+          "ok": true
+        },
+        "close": {
+          "ms": 0.6,
+          "bytes": 70,
+          "ok": true
+        }
+      },
+      "peakRssKb": 7204
+    },
+    {
+      "fixture": "xlsx-protected.xlsx",
+      "results": {
+        "open": {
+          "ms": 2.7,
+          "bytes": 1712,
+          "ok": true
+        },
+        "viewport": {
+          "ms": 0.7,
+          "bytes": 2069,
+          "ok": true
+        },
+        "bottomViewport": {
+          "ms": 0.2,
+          "bytes": 2075,
+          "ok": true
+        },
+        "batch90k": {
+          "ms": 0.2,
+          "bytes": 2069,
+          "ok": true
+        },
+        "formulas": {
+          "ms": 0.2,
+          "bytes": 273,
+          "ok": true
+        },
+        "manifest": {
+          "ms": 0.2,
+          "bytes": 724,
+          "ok": true
+        },
+        "readEntry": {
+          "ms": 0.2,
+          "bytes": 162,
+          "ok": true
+        },
+        "saveArchive": {
+          "ms": 4,
+          "bytes": 1403,
+          "ok": true
+        },
+        "recalcCold": {
+          "ms": 1.4,
+          "bytes": 286,
+          "ok": true
+        },
+        "recalcWarm": {
+          "ms": 0.3,
+          "bytes": 285,
+          "ok": true
+        },
+        "close": {
+          "ms": 0.3,
+          "bytes": 71,
+          "ok": true
+        }
+      },
+      "peakRssKb": 8488
+    },
+    {
+      "fixture": "xlsx-satellite-sheets.xlsx",
+      "results": {
+        "open": {
+          "ms": 2.3,
+          "bytes": 2192,
+          "ok": true
+        },
+        "viewport": {
+          "ms": 0.7,
+          "bytes": 1977,
+          "ok": true
+        },
+        "bottomViewport": {
+          "ms": 0.2,
+          "bytes": 1983,
+          "ok": true
+        },
+        "batch90k": {
+          "ms": 0.2,
+          "bytes": 1977,
+          "ok": true
+        },
+        "formulas": {
+          "ms": 0.3,
+          "bytes": 386,
+          "ok": true
+        },
+        "manifest": {
+          "ms": 0.2,
+          "bytes": 824,
+          "ok": true
+        },
+        "readEntry": {
+          "ms": 0.3,
+          "bytes": 162,
+          "ok": true
+        },
+        "saveArchive": {
+          "ms": 5.8,
+          "bytes": 1603,
+          "ok": true
+        },
+        "recalcCold": {
+          "ms": 2.7,
+          "bytes": 286,
+          "ok": true
+        },
+        "recalcWarm": {
+          "ms": 0.4,
+          "bytes": 286,
+          "ok": true
+        },
+        "close": {
+          "ms": 0.3,
+          "bytes": 71,
+          "ok": true
+        }
+      },
+      "peakRssKb": 8528
+    },
+    {
+      "fixture": "xlsx-vietnamese.xlsx",
+      "results": {
+        "open": {
+          "ms": 2.4,
+          "bytes": 2186,
+          "ok": true
+        },
+        "viewport": {
+          "ms": 0.7,
+          "bytes": 1977,
+          "ok": true
+        },
+        "bottomViewport": {
+          "ms": 0.3,
+          "bytes": 1983,
+          "ok": true
+        },
+        "batch90k": {
+          "ms": 0.2,
+          "bytes": 1977,
+          "ok": true
+        },
+        "formulas": {
+          "ms": 0.3,
+          "bytes": 386,
+          "ok": true
+        },
+        "manifest": {
+          "ms": 0.3,
+          "bytes": 1017,
+          "ok": true
+        },
+        "readEntry": {
+          "ms": 0.3,
+          "bytes": 162,
+          "ok": true
+        },
+        "saveArchive": {
+          "ms": 6,
+          "bytes": 1989,
+          "ok": true
+        },
+        "recalcCold": {
+          "ms": 1.4,
+          "bytes": 286,
+          "ok": true
+        },
+        "recalcWarm": {
+          "ms": 0.3,
+          "bytes": 286,
+          "ok": true
+        },
+        "close": {
+          "ms": 0.3,
+          "bytes": 71,
+          "ok": true
+        }
+      },
+      "peakRssKb": 8544
+    },
+    {
+      "fixture": "large-10000.xlsx",
+      "results": {
+        "open": {
+          "ms": 81.7,
+          "bytes": 881,
+          "ok": true
+        },
+        "viewport": {
+          "ms": 17.6,
+          "bytes": 117961,
+          "ok": true
+        },
+        "bottomViewport": {
+          "ms": 0.2,
+          "bytes": 338,
+          "ok": true
+        },
+        "batch90k": {
+          "ms": 359,
+          "bytes": 5016357,
+          "ok": true
+        },
+        "formulas": {
+          "ms": 30.6,
+          "bytes": 801250,
+          "ok": true
+        },
+        "manifest": {
+          "ms": 0.4,
+          "bytes": 637,
+          "ok": true
+        },
+        "readEntry": {
+          "ms": 12.7,
+          "bytes": 162,
+          "ok": true
+        },
+        "saveArchive": {
+          "ms": 144.6,
+          "bytes": 1229,
+          "ok": true
+        },
+        "recalcCold": {
+          "ms": 583.2,
+          "bytes": 927898,
+          "ok": true
+        },
+        "recalcWarm": {
+          "ms": 52.2,
+          "bytes": 927897,
+          "ok": true
+        },
+        "close": {
+          "ms": 13,
+          "bytes": 71,
+          "ok": true
+        }
+      },
+      "peakRssKb": 113108
+    },
+    {
+      "fixture": "large-15000.xlsx",
+      "results": {
+        "open": {
+          "ms": 125.2,
+          "bytes": 882,
+          "ok": true
+        },
+        "viewport": {
+          "ms": 15.3,
+          "bytes": 117961,
+          "ok": true
+        },
+        "bottomViewport": {
+          "ms": 0.2,
+          "bytes": 338,
+          "ok": true
+        },
+        "batch90k": {
+          "ms": 422.8,
+          "bytes": 5016357,
+          "ok": true
+        },
+        "formulas": {
+          "ms": 45.7,
+          "bytes": 1218400,
+          "ok": true
+        },
+        "manifest": {
+          "ms": 0.4,
+          "bytes": 638,
+          "ok": true
+        },
+        "readEntry": {
+          "ms": 19.8,
+          "bytes": 162,
+          "ok": true
+        },
+        "saveArchive": {
+          "ms": 223.3,
+          "bytes": 1231,
+          "ok": true
+        },
+        "recalcCold": {
+          "ms": 998.6,
+          "bytes": 1397198,
+          "ok": true
+        },
+        "recalcWarm": {
+          "ms": 136.3,
+          "bytes": 1397197,
+          "ok": true
+        },
+        "close": {
+          "ms": 18.2,
+          "bytes": 71,
+          "ok": true
+        }
+      },
+      "peakRssKb": 166240
+    },
+    {
+      "fixture": "large-20000.xlsx",
+      "results": {
+        "open": {
+          "ms": 278.8,
+          "bytes": 882,
+          "ok": true
+        },
+        "viewport": {
+          "ms": 29.8,
+          "bytes": 117961,
+          "ok": true
+        },
+        "bottomViewport": {
+          "ms": 0.2,
+          "bytes": 338,
+          "ok": true
+        },
+        "batch90k": {
+          "ms": 484.7,
+          "bytes": 5016357,
+          "ok": true
+        },
+        "formulas": {
+          "ms": 44.8,
+          "bytes": 1205801,
+          "ok": true
+        },
+        "manifest": {
+          "ms": 0.4,
+          "bytes": 638,
+          "ok": true
+        },
+        "readEntry": {
+          "ms": 28.3,
+          "bytes": 162,
+          "ok": true
+        },
+        "saveArchive": {
+          "ms": 334.7,
+          "bytes": 1231,
+          "ok": true
+        },
+        "recalcCold": {
+          "ms": 1315.4,
+          "bytes": 1383094,
+          "ok": true
+        },
+        "recalcWarm": {
+          "ms": 111.9,
+          "bytes": 1383093,
+          "ok": true
+        },
+        "close": {
+          "ms": 24.1,
+          "bytes": 71,
+          "ok": true
+        }
+      },
+      "peakRssKb": 214120
+    },
+    {
+      "fixture": "large-100000.xlsx",
+      "results": {
+        "open": {
+          "ms": 902.7,
+          "bytes": 884,
+          "ok": true
+        },
+        "viewport": {
+          "ms": 15.7,
+          "bytes": 117961,
+          "ok": true
+        },
+        "bottomViewport": {
+          "ms": 0.2,
+          "bytes": 338,
+          "ok": true
+        },
+        "batch90k": {
+          "ms": 370.6,
+          "bytes": 5016357,
+          "ok": true
+        },
+        "formulas": {
+          "ms": 54,
+          "bytes": 1120320,
+          "ok": true
+        },
+        "manifest": {
+          "ms": 0.3,
+          "bytes": 639,
+          "ok": true
+        },
+        "readEntry": {
+          "ms": 144.8,
+          "bytes": 162,
+          "ok": true
+        },
+        "saveArchive": {
+          "ms": 2166.5,
+          "bytes": 1233,
+          "ok": true
+        },
+        "close": {
+          "ms": 54.3,
+          "bytes": 70,
+          "ok": true
+        }
+      },
+      "peakRssKb": 103472
+    }
+  ]
+}

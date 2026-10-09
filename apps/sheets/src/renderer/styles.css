@@ -5599,3 +5599,63 @@ textarea:focus {
 .menu-select-drop .menu-option-icon:hover {
   background: transparent;
 }
+
+/* ---- web frame: no workbook engine yet (UNI-1016, EngineUnavailableScreen.tsx) ---- */
+.engine-unavailable {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  padding: 32px 16px;
+  background: var(--canvas);
+  color: var(--text);
+  font-family: var(--gs-font-sans, system-ui, sans-serif);
+}
+
+.engine-unavailable-card {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  max-width: 480px;
+  padding: 36px 32px 32px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-16, 16px);
+  background: var(--surface);
+  box-shadow: var(--shadow-menu);
+  text-align: center;
+}
+
+.engine-unavailable-icon {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-16, 16px);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.engine-unavailable-icon svg {
+  width: 36px;
+  height: 36px;
+}
+
+.engine-unavailable-title {
+  margin: 4px 0 0;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text-primary);
+}
+
+.engine-unavailable-body {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+.engine-unavailable-hint {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
