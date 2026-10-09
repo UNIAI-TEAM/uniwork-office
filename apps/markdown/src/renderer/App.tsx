@@ -38,6 +38,7 @@ import { PlainTextEditor, type PlainTextEditorHandle } from './source/PlainTextE
 import { buildExtensions } from './editor/extensions'
 import { tiptapFindTarget } from './editor/findTarget'
 import { collectOutline, type OutlineItem } from './editor/outline'
+import { rewriteRawHtmlImages } from './editor/rawHtml'
 import { buildSlashItems } from './editor/slashCommand'
 import type { SlashController, SlashMenuState } from './editor/slashCommand'
 import { dirOf, setImageBaseDir, VIEW_IMAGE_EVENT } from './editor/localImage'
@@ -112,6 +113,8 @@ function applyImageRewrites(
     transaction = transaction.setNodeMarkup(pos, undefined, { ...node.attrs, src: replacement })
     changed = true
   })
+  // raw HTML kept verbatim (rawHtml.ts) carries its own <img src> paths
+  if (rewriteRawHtmlImages(editor.state.doc, transaction, bySource)) changed = true
   if (!changed) return
   transaction.setMeta('addToHistory', false).setMeta('uiOnly', true)
   editor.view.dispatch(transaction)

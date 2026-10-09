@@ -1,5 +1,7 @@
 import { Mark, Node } from '@tiptap/core'
 import type { JSONContent, MarkdownToken } from '@tiptap/core'
+import type { Node as PmNode } from '@tiptap/pm/model'
+import type { Transaction } from '@tiptap/pm/state'
 import type { MarkdownManager } from '@tiptap/markdown'
 import { t } from '../i18n/locale'
 
@@ -213,6 +215,65 @@ export const RawHtmlInline = Mark.create({
     },
   },
 })
+
+// ── Save As image rebasing ──
+
+const IMG_SRC_RE = /(<img\b[^>]*?\ssrc\s*=\s*)(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/gi
+
+/** `raw` with every <img src> listed in `rewrites` replaced (same quoting, attribute-encoded) */
+export function rewriteRawHtmlImageSources(
+  raw: string,
+  rewrites: ReadonlyMap<string, string>,
+): string {
+  return raw.replace(IMG_SRC_RE, (match, head: string, dq?: string, sq?: string, bare?: string) => {
+    const value = dq ?? sq ?? bare ?? ''
+    const to = rewrites.get(value)
+    if (to === undefined) return match
+    const encoded = to.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    if (dq !== undefined) return `${head}"${encoded.replace(/"/g, '&quot;')}"`
+    if (sq !== undefined) return `${head}'${encoded.replace(/'/g, '&#39;')}'`
+    return `${head}"${encoded.replace(/"/g, '&quot;')}"`
+  })
+}
+
+/**
+ * Apply a Save As image rewrite (main rewrote the file's image paths) to the
+ * preserved raw HTML too, so the next save writes the new paths. Returns
+ * whether anything changed.
+ */
+export function rewriteRawHtmlImages(
+  doc: PmNode,
+  tr: Transaction,
+  rewrites: ReadonlyMap<string, string>,
+): boolean {
+  let changed = false
+  doc.descendants((node, pos) => {
+    if (node.type.name === RAW_HTML_BLOCK) {
+      const raw = String(node.attrs.raw ?? '')
+      const next = rewriteRawHtmlImageSources(raw, rewrites)
+      if (next !== raw) {
+        tr.setNodeMarkup(tr.mapping.map(pos), undefined, { ...node.attrs, raw: next })
+        changed = true
+      }
+      return false
+    }
+    if (node.isText && node.marks.some((m) => m.type.name === RAW_HTML_INLINE)) {
+      const text = node.text ?? ''
+      const next = rewriteRawHtmlImageSources(text, rewrites)
+      if (next !== text) {
+        const from = tr.mapping.map(pos)
+        tr.replaceWith(
+          from,
+          tr.mapping.map(pos + node.nodeSize),
+          doc.type.schema.text(next, node.marks),
+        )
+        changed = true
+      }
+    }
+    return true
+  })
+  return changed
+}
 
 // ── conversions: degrade raw HTML through the schema (pre-preservation behaviour) ──
 

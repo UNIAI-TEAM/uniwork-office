@@ -6,7 +6,7 @@ import { createRoot } from 'react-dom/client'
 import { flushSync } from 'react-dom'
 import { Editor } from '@tiptap/core'
 import { buildExtensions } from '../src/renderer/editor/extensions'
-import { matchInlineHtml } from '../src/renderer/editor/rawHtml'
+import { matchInlineHtml, rewriteRawHtmlImageSources } from '../src/renderer/editor/rawHtml'
 import { parseMarkdownToNodes } from '../src/renderer/editor/ops'
 import { DiagramPreview } from '../src/renderer/editor/CodeBlockView'
 import { diagramSvgDataUrl } from '../src/renderer/editor/diagrams'
@@ -225,5 +225,19 @@ describe('mermaid preview never injects the SVG markup', () => {
   it('the data URL pins the viewBox size so the diagram keeps its layout size', () => {
     const svg = decodeURIComponent(diagramSvgDataUrl(payload).split(',').slice(1).join(','))
     expect(svg).toMatch(/^<svg [^>]*width="120" height="40"/)
+  })
+})
+
+describe('Save As image rebasing reaches raw HTML', () => {
+  it('rewrites listed <img src> values, keeping quoting and everything else', () => {
+    const map = new Map([['assets/old.png', 'assets/new.png']])
+    expect(
+      rewriteRawHtmlImageSources(
+        '<details>\n<img src="assets/old.png" width="3"><img src=\'assets/old.png\'><img src=assets/old.png><img src="x.png">\n</details>',
+        map,
+      ),
+    ).toBe(
+      '<details>\n<img src="assets/new.png" width="3"><img src=\'assets/new.png\'><img src="assets/new.png"><img src="x.png">\n</details>',
+    )
   })
 })

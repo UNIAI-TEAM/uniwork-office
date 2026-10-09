@@ -59,7 +59,8 @@ for (const enabled of [false, true]) {
     page,
   }) => {
     await openSource(page, enabled, true)
-    await expect(page.locator('.doc-editor img:not(.ProseMirror-separator)')).toHaveCount(1)
+    // block HTML is kept verbatim and shown as its source (rawHtml.ts), never rendered
+    await expect(page.locator('.doc-editor .md-raw-html')).toContainText('assets/old.png')
     await page.evaluate(() => window.dispatchEvent(new Event('test:save')))
     await expect(page.locator('body')).toHaveAttribute('data-saved', rebaseSource)
     await page.evaluate(() => window.dispatchEvent(new Event('test:save')))
