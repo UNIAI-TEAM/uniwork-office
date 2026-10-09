@@ -37,6 +37,11 @@ export interface WebModuleSpec {
   csp?: CspExtra
   /** top-level output directories with fixed (unhashed) names to serve as immutable */
   immutableDirs?: readonly string[]
+  /**
+   * repo-relative module whose default export returns web-only Vite plugins (e.g. browser shims
+   * for an engine that runs in the frame); added after the renderer's own plugins
+   */
+  webPlugins?: string
 }
 
 export const WEB_MODULES: Readonly<Record<WebModule, WebModuleSpec>> = {
@@ -91,11 +96,13 @@ export const WEB_MODULES: Readonly<Record<WebModule, WebModuleSpec>> = {
     renderer: 'apps/slides/src/renderer/main.tsx',
     globals: ['slidesApi', 'desktop', 'projectApi'],
     csp: {
-      directives: { 'media-src': ["'self'", 'data:', 'blob:'] },
+      directives: { 'media-src': ['blob:'] },
       why: [
-        "slides: media-src 'self' data: blob: plays the audio/video embedded in a pptx, which the renderer hands to <audio>/<video> as blob:/data: URLs (default-src 'none' would block them).",
+        "slides: media-src blob: plays the audio/video embedded in a pptx: the frame's getMediaData hands <audio>/<video> a blob: URL of the zip entry (default-src 'none' would block it). No data: (a 100 MB video as a base64 string), no 'self' (no media file is served), and external linked media stay hidden (poster only), so no remote source (inventory-b5 3.3).",
       ],
     },
+    // the pptx engine runs in the frame: node:* shims + Buffer for engine/ops/render
+    webPlugins: 'web/modules/slides/vite-web.ts',
   },
   sheets: {
     module: 'sheets',

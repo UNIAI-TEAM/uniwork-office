@@ -1,26 +1,59 @@
 /**
- * Web bridge entry for the Slides frame (UNI-1015, lane GO-B4/B5/B6 scaffold).
+ * Web bridge entry for the Slides frame (GO-B5, UNI-1015).
  *
- * Loaded by ./index.html BEFORE the renderer entry (apps/slides/src/renderer/main.tsx) so the renderer finds its
- * preload globals (slidesApi, desktop, projectApi). Everything generic comes from
- * web/docs/bridge/module-bridge.ts: the protocol client (`module: 'slides'` in `ready`), host
- * theme/locale, the window.open guard, the capability object and the safe no-op Proxy (every
- * member nobody implements is an async no-op / no-op disposer, so the renderer boots without a
- * file and never throws on a missing desktop API).
- *
- * The scaffold implements no file API yet: open/save/export over the protocol
- * (`ctx.client.request('api.open', ...)`) are wired by the slides module worker in this file.
+ * Loaded by ./index.html BEFORE the renderer entry (apps/slides/src/renderer/main.tsx) so the
+ * renderer finds its preload globals: window.slidesApi (./web-slides-api.ts: the document
+ * engine in the frame + the protocol file APIs), window.desktop (the Docs attachment subset of
+ * web/docs/bridge/browser.ts; AI panel only) and window.projectApi (in-memory, added by
+ * installModuleBridge). Everything generic comes from web/docs/bridge/module-bridge.ts.
  */
-import { installModuleBridge } from '../../docs/bridge/module-bridge'
+import browser from '../../docs/bridge/browser'
+import { hostGrants } from '../../docs/bridge/hide'
+import { installModuleBridge, MODULE_WEB_CAPABILITIES } from '../../docs/bridge/module-bridge'
+import type { BridgeObject } from '../../docs/bridge/safe-api'
+import { createWebSlidesApi } from './web-slides-api'
+
+/**
+ * Slides capability keys on the web (inventory-b5 1.6; the renderer gates on them with
+ * `cap()` once the S3 retrofit lands): AI, open/recents until granted and every autosave key
+ * off (C10), plus the Slides-only desktop features with no web counterpart in v1.
+ */
+export const SLIDES_WEB_CAPABILITIES: Readonly<Record<string, unknown>> = Object.freeze({
+  ...MODULE_WEB_CAPABILITIES,
+  tabs: false,
+  webSearch: false,
+  imageSearch: false,
+  imageGeneration: false,
+  fontDownload: false,
+  fontInstallLocal: false,
+  presenterWindow: false,
+  model3d: false,
+  headlessExport: false,
+})
 
 export const bridge = installModuleBridge({
   module: 'slides',
-  // what the bundle supports; the module worker declares save / print / ... once they are wired
-  frameCapabilities: {},
+  // the frame saves (api.save / api.saveAs), opens other decks (file.pick), lists recents, and
+  // prints / exports PDF in the frame; no AI, no attachments upload
+  frameCapabilities: {
+    save: true,
+    saveAs: true,
+    recents: true,
+    filePick: true,
+    print: true,
+    exportPdf: true,
+    images: true,
+  },
+  capabilities: { defaults: SLIDES_WEB_CAPABILITIES, grants: hostGrants },
   globals: {
-    // window.slidesApi: scaffold only; the slides module worker maps it onto the protocol
-    slidesApi: () => ({}),
-    // window.desktop (files API): scaffold only; the slides module worker maps it onto the protocol
-    desktop: () => ({}),
+    slidesApi: (ctx) => createWebSlidesApi(ctx).slidesApi as unknown as BridgeObject,
+    desktop: () => ({
+      pickAttachments: browser.pickAttachments,
+      addAttachmentPaths: browser.addAttachmentPaths,
+      addPastedImage: browser.addPastedImage,
+      readAttachment: browser.readAttachment,
+      readAttachmentImage: browser.readAttachmentImage,
+      getPathForFile: browser.getPathForFile,
+    }),
   },
 })
