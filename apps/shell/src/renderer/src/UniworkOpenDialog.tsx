@@ -147,6 +147,8 @@ export function UniworkOpenDialog({
     dispatch({ type: 'open-start', id: doc.id, title: doc.title })
     void settle(window.aiOffice.uniworkOpenDocument(doc.id)).then((result) => {
       if (result.ok) {
+        // lets the recents list pick the document up at once
+        publishUniworkNotice({ phase: 'opened', path: result.value.path, title: doc.title })
         if (mounted.current) onClose()
       } else if (mounted.current) {
         dispatch({ type: 'open-failed', error: result.error })

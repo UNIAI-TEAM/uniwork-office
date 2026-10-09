@@ -23,7 +23,7 @@ import {
   UniworkStatusChip,
   useUniworkStatuses,
 } from '../src/renderer/src/UniworkChrome'
-import { publishUniworkNotice } from '../src/renderer/src/uniwork-notice-bus'
+import { onUniworkNotice, publishUniworkNotice } from '../src/renderer/src/uniwork-notice-bus'
 
 const actEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 actEnvironment.IS_REACT_ACT_ENVIRONMENT = true
@@ -244,6 +244,33 @@ describe('picker dialog', () => {
     await key(search(), 'Enter')
     expect(api.uniworkOpenDocument).toHaveBeenCalledWith('b')
     expect(dialog()).toBeNull()
+  })
+
+  it('tells the rest of the renderer which document it opened, so recents can refresh', async () => {
+    const seen: unknown[] = []
+    const off = onUniworkNotice((event) => seen.push(event))
+    try {
+      await openPicker()
+      await key(search(), 'Enter')
+    } finally {
+      off()
+    }
+    expect(seen).toEqual([
+      { phase: 'opened', path: expect.any(String), title: expect.stringContaining('Plan') },
+    ])
+  })
+
+  it('says nothing about an open that failed', async () => {
+    api.uniworkOpenDocument.mockResolvedValueOnce({ ok: false, error: 'network' })
+    const seen: unknown[] = []
+    const off = onUniworkNotice((event) => seen.push(event))
+    try {
+      await openPicker()
+      await key(search(), 'Enter')
+    } finally {
+      off()
+    }
+    expect(seen).toEqual([])
   })
 
   it('clicking a disabled row opens nothing', async () => {

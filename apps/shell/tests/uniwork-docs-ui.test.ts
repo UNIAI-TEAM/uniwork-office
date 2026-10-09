@@ -30,6 +30,8 @@ import {
   type PickerState,
 } from '../src/renderer/src/uniwork-docs-model'
 import { openRecentEntry } from '../src/renderer/src/uniwork-open'
+import { publishUniworkNotice } from '../src/renderer/src/uniwork-notice-bus'
+import { subscribeUniworkOpened } from '../src/renderer/src/uniwork-recents-refresh'
 import { uniworkDocumentStrings } from '../src/renderer/src/i18n/strings-uniwork-documents'
 import { accountStrings } from '../src/renderer/src/i18n/strings-account'
 import type { StringKey, TFunc } from '../src/renderer/src/locale'
@@ -564,5 +566,52 @@ describe('a UniWork recent whose working copy is gone', () => {
     expect(recentRowModifiedMs({ mtimeMs: 123, uniwork })).toBeNull()
     expect(recentRowModifiedMs({ mtimeMs: 123, missing: true })).toBeNull()
     expect(recentRowModifiedMs({ mtimeMs: 123 })).toBe(123)
+  })
+})
+
+describe('recents refresh after a UniWork document opens', () => {
+  function setup() {
+    let push: ((event: { phase: string }) => void) | null = null
+    const offMain = vi.fn()
+    const api = {
+      onUniworkLaunch: vi.fn((cb: (event: never) => void) => {
+        push = cb as never
+        return offMain
+      }),
+    }
+    const refresh = vi.fn()
+    const off = subscribeUniworkOpened(api, refresh)
+    return { api, refresh, off, offMain, push: (event: { phase: string }) => push!(event) }
+  }
+
+  it('refreshes when the picker or a recents row reports an opened document', () => {
+    const { refresh, off } = setup()
+    publishUniworkNotice({ phase: 'opened', path: 'C:\w\Plan.docx', title: 'Plan' })
+    expect(refresh).toHaveBeenCalledTimes(1)
+    off()
+  })
+
+  it('refreshes when main reports a document opened from the web', () => {
+    const { refresh, push, off } = setup()
+    push({ phase: 'opened' })
+    expect(refresh).toHaveBeenCalledTimes(1)
+    off()
+  })
+
+  it('ignores opening, sign-in and failure events', () => {
+    const { refresh, push, off } = setup()
+    publishUniworkNotice({ phase: 'opening', title: 'Plan' })
+    publishUniworkNotice({ phase: 'failed', error: 'network' })
+    push({ phase: 'needs-sign-in' })
+    expect(refresh).not.toHaveBeenCalled()
+    off()
+  })
+
+  it('stops listening once unsubscribed', () => {
+    const { refresh, off, offMain } = setup()
+    off()
+    expect(offMain).toHaveBeenCalledTimes(1)
+    publishUniworkNotice({ phase: 'opened', path: 'p', title: 'Plan' })
+    expect(refresh).not.toHaveBeenCalled()
   })
 })

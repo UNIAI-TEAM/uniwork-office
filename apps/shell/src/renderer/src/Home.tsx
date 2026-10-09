@@ -35,6 +35,7 @@ import { onFilesChanged } from './file-events'
 import { FileBadge } from './FileBadge'
 import { UniworkOpenCard } from './UniworkOpenCard'
 import { openRecentEntry } from './uniwork-open'
+import { subscribeUniworkOpened } from './uniwork-recents-refresh'
 import {
   recentOpenAction,
   recentRowIsMissing,
@@ -1494,6 +1495,9 @@ export function Home() {
 
   // a rename from the tab strip happens while this renderer already has focus
   useEffect(() => onFilesChanged(() => refreshRef.current()), [])
+
+  // so does opening a UniWork document: its recents entry is already written
+  useEffect(() => subscribeUniworkOpened(window.aiOffice, () => refreshRef.current()), [])
 
   const hasMore = entries.length < listTotal
 
