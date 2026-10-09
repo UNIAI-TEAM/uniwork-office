@@ -128,12 +128,3 @@ export type FromInspectorBody =
   | { type: 'gx:moveTo'; sid: number; position: 'before' | 'after'; ref_sid: number }
   /** a resize or reorder drag started / ended (the host hides its chrome meanwhile) */
   | { type: 'gx:drag'; active: boolean }
-
-export function isFromInspector(data: unknown): data is FromInspector {
-  return (
-    typeof data === 'object' &&
-    data !== null &&
-    typeof (data as { type?: unknown }).type === 'string' &&
-    (data as { type: string }).type.startsWith('gx:')
-  )
-}

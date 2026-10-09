@@ -146,3 +146,77 @@ describe('per-module header rules (GO-B4/B5/B6)', () => {
     )
   })
 })
+
+describe('documents with their own sandboxed policy (html preview, UNI-1014)', () => {
+  const preview = {
+    path: '/preview.html',
+    directives: {
+      'default-src': ["'none'"],
+      'script-src': ["'unsafe-inline'", "'unsafe-eval'", 'https:'],
+      'connect-src': ["'none'"],
+      'form-action': ["'none'"],
+      sandbox: ['allow-scripts', 'allow-popups'],
+    },
+    why: ['preview: why'],
+  }
+
+  it('builds the policy (+ the frame ancestors), lists it in csp.json, serves it first', () => {
+    const csp = buildCspManifest({
+      frameAncestors: ['https://app.example'],
+      extra: { directives: { 'frame-src': ["'self'"] }, why: ['frame why'], documents: [preview] },
+    })
+    expect(csp.directives['frame-src']).toEqual(["'self'"])
+    expect(csp.documents).toEqual([
+      {
+        path: '/preview.html',
+        directives: { ...preview.directives, 'frame-ancestors': ["'self'", 'https://app.example'] },
+        value:
+          "default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' https:; connect-src 'none'; form-action 'none'; sandbox allow-scripts allow-popups; frame-ancestors 'self' https://app.example",
+      },
+    ])
+    expect(csp.notes.slice(-2)).toEqual(['frame why', 'preview: why'])
+    const h = buildHeadersManifest(csp)
+    expect(h.rules[0]).toEqual({
+      source: '/preview.html',
+      headers: { 'Content-Security-Policy': csp.documents![0].value, 'Cache-Control': 'no-cache' },
+    })
+    expect(h.rules[1].source).toBe('/index.html')
+    // without documents csp.json stays as it was
+    expect('documents' in buildCspManifest()).toBe(false)
+  })
+
+  it('refuses a document policy that is not opaque, names self, or opens the network', () => {
+    const build = (d: { path?: string; directives: Record<string, string[]> }) =>
+      buildCspManifest({ extra: { directives: {}, why: [], documents: [{ ...preview, ...d }] } })
+    const { sandbox: _s, ...noSandbox } = preview.directives
+    expect(() => build({ directives: noSandbox })).toThrow(/must carry a sandbox/)
+    for (const flag of [
+      'allow-same-origin',
+      'allow-top-navigation',
+      'allow-top-navigation-by-user-activation',
+      'allow-popups-to-escape-sandbox',
+    ])
+      expect(() => build({ directives: { ...preview.directives, sandbox: [flag] } })).toThrow(
+        /not allowed/,
+      )
+    expect(() => build({ directives: { ...preview.directives, 'img-src': ["'self'"] } })).toThrow(
+      /cannot name 'self'/,
+    )
+    expect(() =>
+      build({ directives: { ...preview.directives, 'connect-src': ['https:'] } }),
+    ).toThrow(/connect-src must be 'none'/)
+    expect(() =>
+      build({ directives: { ...preview.directives, 'form-action': ['https:'] } }),
+    ).toThrow(/form-action must be 'none'/)
+    expect(() =>
+      build({ directives: { ...preview.directives, 'frame-ancestors': ['*'] } }),
+    ).toThrow(/frame-ancestors/)
+    expect(() => build({ path: '/index.html', directives: preview.directives })).toThrow(
+      /one file other than index.html/,
+    )
+    expect(() => build({ path: '/a/**', directives: preview.directives })).toThrow(/one file/)
+    expect(() =>
+      build({ directives: { ...preview.directives, 'script-src': ['https:;x'] } }),
+    ).toThrow(/invalid CSP source/)
+  })
+})

@@ -34,6 +34,17 @@ Every module uses the same fonts/WOFF2/never-inline rules and the same header-on
 | -------- | ------------------------------- | ------------------------------------------------------------------------------------------- |
 | `pdf`    | `script-src 'wasm-unsafe-eval'` | pdf.js image decoders (openjpeg / jbig2 / qcms) are same-origin WebAssembly (`pdfjs/wasm/`) |
 | `slides` | `media-src 'self' data: blob:`  | pptx-embedded audio/video are played from `blob:` / `data:` URLs                            |
+| `html`   | `frame-src 'self'`              | embeds the bundle's `preview.html` (the page preview with scripts, sandboxed opaque)        |
+
+**Documents with their own policy** (`csp.documents`, html only): `preview.html` runs the user's page with its scripts
+(CONTRACT C15(1)), so it must never get the frame's policy, and the frame's policy must not be loosened for it. It is
+served with a complete policy of its own (`csp.json` `documents[]`, first rule of `headers.json`): `sandbox
+allow-scripts allow-forms allow-popups allow-modals` (opaque origin even when the file is opened directly),
+`connect-src 'none'`, `form-action 'none'`, no `'self'` anywhere, scripts / styles / pictures / fonts from `https:` and
+inline (the app's behaviour). `csp.ts` refuses a document policy without `sandbox`, with `allow-same-origin` / top
+navigation / escaping popups, naming `'self'`, or opening `connect-src` / `form-action`. **A host must serve
+`<version>/preview.html` with `documents[].value`, not with `value`**; served with the frame policy the preview's boot
+script is blocked and the frame falls back to the static preview (`web/e2e/html-web.spec.ts`).
 
 A module may not widen `frame-ancestors`, `connect-src`, `default-src`, `base-uri` or `form-action` (deployment decisions,
 `WEB_DOCS_CSP_*` knobs), and `'unsafe-eval'` is refused (`csp.ts`, `modules.test.ts`).
@@ -44,7 +55,8 @@ dist-web/<module>/<packageVersion>-<gitSha>[-dirty]/
   assets/*.js|css     hashed bundle (initial download)
   fonts/*.woff2|ttf   hashed font faces, fetched one by one on demand (never in the initial download)
   manifest.json       what is in the build (below)
-  csp.json            the Content-Security-Policy the frame needs
+  preview.html        html only: the sandboxed page preview (Vite public dir), served with its own policy
+  csp.json            the Content-Security-Policy the frame needs (+ `documents`: per-file policies)
   headers.json        response headers per path (CSP on index.html, immutable cache on assets/fonts)
 ```
 

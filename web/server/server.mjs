@@ -178,8 +178,28 @@ function safeJoin(base, rel) {
   return p === base || p.startsWith(base + sep) ? p : null
 }
 
+// Every request this server saw (GO-B4 H2 security e2e: what a sandboxed preview managed to send):
+// method, path, Origin, whether cookies came along, WebSocket upgrades too. Read with
+// GET /__e2e/requests (not logged itself); a probe that never shows up here never left the browser.
+const requestLog = []
+function logRequest(req, kind = 'http') {
+  if (requestLog.length >= 5000) requestLog.shift()
+  requestLog.push({
+    kind,
+    method: req.method,
+    url: req.url,
+    origin: req.headers.origin ?? null,
+    cookie: req.headers.cookie ?? null,
+    secFetchSite: req.headers['sec-fetch-site'] ?? null,
+    secFetchDest: req.headers['sec-fetch-dest'] ?? null,
+  })
+}
+
 const server = createServer(async (req, res) => {
   try {
+    if (req.url === '/__e2e/requests')
+      return send(res, 200, JSON.stringify(requestLog), 'application/json; charset=utf-8')
+    logRequest(req)
     if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, 'method not allowed')
     const pathname = decodeURIComponent(new URL(req.url ?? '/', 'http://x').pathname)
 
@@ -227,6 +247,12 @@ const server = createServer(async (req, res) => {
   } catch (err) {
     send(res, 500, String(err))
   }
+})
+
+// no WebSocket endpoint: an upgrade is logged and refused
+server.on('upgrade', (req, socket) => {
+  logRequest(req, 'websocket')
+  socket.destroy()
 })
 
 server.listen(port, () =>

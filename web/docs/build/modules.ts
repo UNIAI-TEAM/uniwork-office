@@ -95,8 +95,38 @@ export const WEB_MODULES: Readonly<Record<WebModule, WebModuleSpec>> = {
     rendererConfig: 'apps/html/vite.renderer.config.ts',
     renderer: 'apps/html/src/renderer/main.tsx',
     globals: ['htmlApi', 'projectApi'],
-    // the desktop preview iframe uses the html-preview: protocol; its web replacement (and any
-    // frame-src it needs) is the html module worker's decision, so the scaffold keeps frame-src 'none'
+    // preview with scripts, like the app (CONTRACT C15(1)): the document runs in preview.html,
+    // embedded sandboxed (opaque origin, credentialless) with a policy of its own
+    csp: {
+      directives: { 'frame-src': ["'self'"] },
+      why: [
+        "html: frame-src 'self' embeds the bundle's preview.html (the document preview with scripts). It is loaded in an iframe with sandbox=\"allow-scripts allow-forms allow-popups allow-modals\" (no allow-same-origin: opaque origin) and credentialless; a srcdoc/blob preview cannot run scripts because it inherits this frame policy, and loosening this policy would loosen the same-origin frame itself (inventory-b4 C-3). frame-src also stops the preview from navigating itself to any other origin.",
+      ],
+      documents: [
+        {
+          path: '/preview.html',
+          directives: {
+            'default-src': ["'none'"],
+            'script-src': ["'unsafe-inline'", "'unsafe-eval'", 'https:'],
+            'style-src': ["'unsafe-inline'", 'https:'],
+            'img-src': ['data:', 'blob:', 'https:'],
+            'font-src': ['data:', 'https:'],
+            'media-src': ['data:', 'blob:', 'https:'],
+            'connect-src': ["'none'"],
+            'frame-src': ["'none'"],
+            'worker-src': ["'none'"],
+            'object-src': ["'none'"],
+            'base-uri': ['https:'],
+            'form-action': ["'none'"],
+            sandbox: ['allow-scripts', 'allow-forms', 'allow-popups', 'allow-modals'],
+          },
+          why: [
+            "html preview.html: own policy (the document's scripts run here, so it must not share the frame policy). sandbox allow-scripts allow-forms allow-popups allow-modals = the iframe's flags, repeated in the header so the file is opaque-origin even when opened directly. script-src 'unsafe-inline' 'unsafe-eval' https: and style/img/font/media https: = the app's behaviour (inline scripts, CDN libraries and pictures run and load); safe only because the origin is opaque and the frame is credentialless (no cookies, no storage of the app, nothing of the frame/host reachable). No 'self': nothing is loaded from the app origin by URL (document pictures arrive as data: URIs).",
+            "html preview.html: connect-src 'none' (no fetch / XHR / WebSocket / EventSource / sendBeacon anywhere, the UniWork API included), form-action 'none' (no form post leaves the preview), frame-src / worker-src / object-src 'none', base-uri https: (a document's <base> only re-resolves its own URLs).",
+          ],
+        },
+      ],
+    },
   },
   slides: {
     module: 'slides',
