@@ -6641,6 +6641,23 @@ body.show-curtain::after {
   background: var(--slides-show-white);
 }
 
+/* Web audience window: "click for full screen" until the browser window is fullscreen */
+.slideshow .ss-fs-hint {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 30;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: var(--slides-show-pill-bg);
+  color: var(--slides-show-ink-88);
+  font-size: 14px;
+  line-height: 1.4;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
 /* "See All Slides" overlay: numbered thumbnails of the play order, click to jump */
 .slideshow .ss-grid {
   position: fixed;
@@ -6953,6 +6970,12 @@ body.show-curtain::after {
 
 .presenter .pv-top-btn:hover:not(:disabled) {
   background: var(--slides-show-fill-12);
+}
+
+/* web: the audience window toggle while the window is open */
+.presenter .pv-top-btn.pv-top-on {
+  background: var(--slides-show-fill-18);
+  color: var(--slides-show-ink);
 }
 
 .presenter .pv-top-btn:disabled {

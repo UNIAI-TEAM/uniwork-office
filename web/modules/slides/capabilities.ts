@@ -6,7 +6,8 @@ import { MODULE_WEB_CAPABILITIES } from '../../docs/bridge/module-bridge'
 /**
  * The web defaults the renderer gates on with `cap()` (apps/slides/src/renderer/capabilities.ts;
  * inventory-b5 1.6): AI, open/recents and save/saveAs until granted, every autosave key off
- * (C10), plus the Slides-only desktop features with no web counterpart in v1.
+ * (C10), plus the Slides-only desktop features with no web counterpart in v1. presenterWindow is
+ * on: the presenter view opens its audience window in the browser (SP1, CONTRACT C15(2)).
  */
 export const SLIDES_WEB_CAPABILITIES: Readonly<Record<string, unknown>> = Object.freeze({
   ...MODULE_WEB_CAPABILITIES,
@@ -18,7 +19,7 @@ export const SLIDES_WEB_CAPABILITIES: Readonly<Record<string, unknown>> = Object
   imageGeneration: false,
   fontDownload: false,
   fontInstallLocal: false,
-  presenterWindow: false,
+  presenterWindow: true,
   model3d: false,
   headlessExport: false,
 })

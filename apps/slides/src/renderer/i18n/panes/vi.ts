@@ -253,6 +253,15 @@ export const vi = {
   panePresenterUseShowTip: 'Chuyển sang trình chiếu thông thường trên màn hình này',
   panePresenterSingleHint:
     'Chế độ một màn hình (kết nối màn hình thứ hai để tự động toàn màn hình)',
+  panePresenterOpenAudience: 'Cửa sổ khán giả',
+  panePresenterOpenAudienceTip: 'Mở trình chiếu trong một cửa sổ riêng để kéo sang máy chiếu',
+  panePresenterCloseAudience: 'Đóng cửa sổ khán giả',
+  panePresenterCloseAudienceTip: 'Đóng cửa sổ khán giả; chế độ người thuyết trình vẫn tiếp tục',
+  panePresenterWebHint:
+    'Mở cửa sổ khán giả, kéo sang máy chiếu rồi nhấp vào đó để xem toàn màn hình',
+  panePresenterPopupBlocked:
+    'Trình duyệt đã chặn cửa sổ. Hãy cho phép cửa sổ bật lên cho trang này rồi thử lại.',
+  paneAudienceFullscreenHint: 'Nhấp để hiển thị toàn màn hình',
   panePresenterElapsed: 'Thời gian đã trôi qua',
   panePresenterPause: 'Tạm dừng bấm giờ',
   panePresenterResume: 'Tiếp tục bấm giờ',

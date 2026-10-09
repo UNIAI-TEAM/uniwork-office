@@ -15,7 +15,8 @@
  * | engine           | the `slides:*` session handlers (edits, queries, history, save, save-as)  |
  * | protocol         | consumePendingOpen (init.open / api.open), onOpened (host `open`), openPptx (file.pick), openPptxPath / getRecentFiles (api.open / api.recents), onRenamed (file.renamed), host save / saveAs / print / doc.closeCheck |
  * | browser          | exports (zip / PDF downloads), printSlides (srcdoc frame), clipboard, fullscreen, media blob: URLs |
- * | hidden (stubs)   | AI (27), fonts download/install, presenter second screen, headless export, autosave (C10) |
+ * | presenter        | presenter* / onAudienceNav: the audience window (./presenter-window.ts, SP1)              |
+ * | hidden (stubs)   | AI (27), fonts download/install, headless export, autosave (C10)                         |
  *
  * Typed as the full SlidesApi (no Partial): a new preload method is a build error here.
  */
@@ -64,7 +65,15 @@ import type { ModuleBridgePort } from '../../docs/bridge/module-bridge'
 import { idFromPath, pathFor } from '../../docs/bridge/webapi'
 import { ask, hideFatal, showFatal, text, type WebKey } from './dialogs'
 import { exportPagesToPngs, printDocument, printHtml, slidesPdf, zipImages } from './exports'
-import { createWebFontMetrics, loadBundledFonts, registerEmbeddedFonts } from './fonts'
+import {
+  createWebFontMetrics,
+  embeddedFontSources,
+  loadBundledFonts,
+  registerEmbeddedFonts,
+} from './fonts'
+import { nativeOpen } from './native-open'
+import { createPresenterWindow, type PresenterWindow } from './presenter-window'
+import type { ScreenPlacer } from './screens'
 import { tiffToPng } from './tiff'
 import { pictureDpiFor } from '../../../apps/slides/src/main/picture-frame'
 import { createDocState, createWebHostIO, SENTINEL_PREFIX, WebSaveError } from './web-host-io'
@@ -113,6 +122,9 @@ export interface WebSlidesOptions {
   print?: (html: string) => Promise<{ ok: boolean; error?: string }>
   /** how long the editor may take to start a host-requested Save As / save flow */
   editorStartMs?: number
+  /** the presenter's audience window: window.open and screen placement */
+  openWindow?: typeof window.open | null
+  screens?: ScreenPlacer
 }
 
 type Listener<T> = (value: T) => void
@@ -189,6 +201,8 @@ export function createWebSlidesApi(
   const closeSaveEvents = listeners<void>()
 
   let userName: string | undefined
+  // set below; deck edits reach an open audience window through it
+  let presenter: PresenterWindow | null = null
   let fontsPending: Promise<void> = Promise.resolve()
   let fontsRelaid = false
 
@@ -204,7 +218,9 @@ export function createWebSlidesApi(
         pushDirty()
       },
       deckChanged: (ids, payload) => {
-        if (ids.includes(WEB_CLIENT_ID)) deckEvents.emit(payload)
+        if (!ids.includes(WEB_CLIENT_ID)) return
+        deckEvents.emit(payload)
+        presenter?.deckChanged(payload.slides)
       },
     },
     deckOpened: (opened) => {
@@ -522,27 +538,53 @@ export function createWebSlidesApi(
     mediaUrls.clear()
   }
 
-  /** data: -> blob: (CSP media-src blob:); external linked media stay hidden (poster only) */
-  async function mediaData(slideIndex: number, sourceId: string) {
+  /** an embedded media part as kind + mime + base64 (null: none, or external linked media) */
+  async function mediaPart(slideIndex: number, sourceId: string) {
     const r = (await invoke('slides:media-data', slideIndex, sourceId)) as {
       kind: 'video' | 'audio'
       dataUrl: string
     } | null
-    if (!r) return null
-    const m = /^data:([^;,]*);base64,(.*)$/s.exec(r.dataUrl)
-    if (!m) return null
-    const key = `${slideIndex}|${sourceId}|${m[2]!.length}`
+    const m = r ? /^data:([^;,]*);base64,(.*)$/s.exec(r.dataUrl) : null
+    return r && m ? { kind: r.kind, mime: m[1] || 'application/octet-stream', base64: m[2]! } : null
+  }
+
+  /** data: -> blob: (CSP media-src blob:); external linked media stay hidden (poster only) */
+  async function mediaData(slideIndex: number, sourceId: string) {
+    const part = await mediaPart(slideIndex, sourceId)
+    if (!part) return null
+    const key = `${slideIndex}|${sourceId}|${part.base64.length}`
     let url = mediaUrls.get(key)
     if (!url) {
       url = URL.createObjectURL(
-        new Blob([base64ToBytes(m[2]!) as Uint8Array<ArrayBuffer>], {
-          type: m[1] || 'application/octet-stream',
-        }),
+        new Blob([base64ToBytes(part.base64) as Uint8Array<ArrayBuffer>], { type: part.mime }),
       )
       mediaUrls.set(key, url)
     }
-    return { kind: r.kind, dataUrl: url }
+    return { kind: part.kind, dataUrl: url }
   }
+
+  // ------------------------------------------------------------ presenter view
+
+  const presenterWindow = createPresenterWindow({
+    open: opts.openWindow === undefined ? nativeOpen : opts.openWindow,
+    screens: opts.screens,
+    // read-only queries only (AUDIENCE_METHODS): the audience window renders, never edits
+    source: {
+      getRenderSlides: () => invoke('slides:get-render-slides'),
+      getTransition: (i) => invoke('slides:get-transition', i),
+      getAnimations: (i) => invoke('slides:get-animations', i),
+      getShapeKeys: (i) => invoke('slides:get-shape-keys', i),
+      getMediaBytes: async (i, sourceId) => {
+        const part = await mediaPart(i, sourceId)
+        if (!part) return null
+        const bytes = base64ToBytes(part.base64)
+        return { kind: part.kind, mime: part.mime, bytes: bytes.slice().buffer as ArrayBuffer }
+      },
+      getEmbeddedFonts: () => embeddedFontSources(),
+      getLanguage: () => browser.getLanguage(),
+    },
+  })
+  presenter = presenterWindow
 
   // ------------------------------------------------------------ clipboard
 
@@ -936,17 +978,13 @@ export function createWebSlidesApi(
     listStyleTemplates: async () => [],
     loadStyleTemplate: async () => ({ ok: false, error: aiUnavailableMessage('style templates') }),
 
-    // presenter: single screen in the frame (B5 decision 4); no audience window
-    presenterStart: async () => ({ audience: false }),
-    presenterSync: noop,
-    presenterInk: noop,
-    presenterSwap: async () => false,
-    presenterEnd: async () => {},
+    // presenter view: the audience window it opens (CONTRACT C15(2)); the audience* / onShow*
+    // members belong to the audience window's own bridge (./audience-bridge.ts)
+    ...presenterWindow.api,
     audienceReady: async () => null,
     audienceNav: noop,
     onShowSync: disposer,
     onShowInk: disposer,
-    onAudienceNav: disposer,
   }
 
   return {
@@ -956,6 +994,7 @@ export function createWebSlidesApi(
     host,
     isDirty,
     revokeMedia,
+    presenter: presenterWindow,
   }
 }
 

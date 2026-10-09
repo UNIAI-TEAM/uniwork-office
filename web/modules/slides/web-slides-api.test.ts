@@ -109,7 +109,12 @@ describe('slidesApi contract', () => {
     const keys = preloadKeys()
     expect(keys.length).toBeGreaterThanOrEqual(181)
     expect(keys.filter((k) => !(k in api))).toEqual([])
-    expect(Object.keys(api).filter((k) => !keys.includes(k))).toEqual([])
+    // the web-only optional presenter members (SlidesApi: the desktop never sets them)
+    expect(Object.keys(api).filter((k) => !keys.includes(k))).toEqual([
+      'presenterOpenAudience',
+      'presenterCloseAudience',
+      'onPresenterAudience',
+    ])
   })
 
   it('the installed web capabilities keep AI, autosave and desktop-only features off', () => {
@@ -121,11 +126,12 @@ describe('slidesApi contract', () => {
       'recents',
       'fontDownload',
       'fontInstallLocal',
-      'presenterWindow',
       'model3d',
       'headlessExport',
     ])
       expect(SLIDES_WEB_CAPABILITIES[key]).toBe(false)
+    // the presenter view's audience window works in the browser (SP1)
+    expect(SLIDES_WEB_CAPABILITIES.presenterWindow).toBe(true)
   })
 })
 

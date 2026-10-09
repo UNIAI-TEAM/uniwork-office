@@ -257,6 +257,17 @@ export const de = {
   panePresenterUseShowTip: 'Auf diesem Bildschirm zur normalen Bildschirmpräsentation wechseln',
   panePresenterSingleHint:
     'Einzelbildschirmmodus (schließen Sie einen zweiten Bildschirm an, um automatisch im Vollbild zu präsentieren)',
+  panePresenterOpenAudience: 'Publikumsfenster',
+  panePresenterOpenAudienceTip:
+    'Die Bildschirmpräsentation in einem eigenen Fenster öffnen, das Sie auf den Projektor ziehen können',
+  panePresenterCloseAudience: 'Publikumsfenster schließen',
+  panePresenterCloseAudienceTip:
+    'Das Publikumsfenster schließen; die Referentenansicht läuft weiter',
+  panePresenterWebHint:
+    'Öffnen Sie das Publikumsfenster, ziehen Sie es auf den Projektor und klicken Sie es für den Vollbildmodus an',
+  panePresenterPopupBlocked:
+    'Der Browser hat das Fenster blockiert. Erlauben Sie Pop-ups für diese Website und versuchen Sie es erneut.',
+  paneAudienceFullscreenHint: 'Für Vollbild klicken',
   panePresenterElapsed: 'Verstrichene Zeit',
   panePresenterPause: 'Timer anhalten',
   panePresenterResume: 'Timer fortsetzen',
