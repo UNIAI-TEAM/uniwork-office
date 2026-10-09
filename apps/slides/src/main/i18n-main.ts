@@ -183,7 +183,8 @@ export const tMain = createI18n({
     errNotImage: 'not a supported image type',
     errNoApiKey: 'AI is not activated. Purchase a plan to use the AI assistant.',
     errNoModel: 'No model name configured',
-    errMediaNotConfigured: 'No image/media model configured: set one up in Settings → AI media, then retry',
+    errMediaNotConfigured:
+      'No image/media model configured: set one up in Settings → AI media, then retry',
     errNoDeckAppend:
       'No deck to append to (session missing). Generate the first page with mode:"replace" or add pages with the native tools.',
     errAppendFailed: 'Append failed: {reason}',
@@ -293,7 +294,8 @@ export const tMain = createI18n({
     errNotImage: 'loại hình ảnh không được hỗ trợ',
     errNoApiKey: 'Chưa kích hoạt / mua gói AI. Hãy mua gói để dùng Trợ lý AI.',
     errNoModel: 'Chưa cấu hình tên mô hình',
-    errMediaNotConfigured: 'Chưa cấu hình mô hình hình ảnh/đa phương tiện: hãy thiết lập trong Cài đặt → AI Media & Tìm kiếm rồi thử lại',
+    errMediaNotConfigured:
+      'Chưa cấu hình mô hình hình ảnh/đa phương tiện: hãy thiết lập trong Cài đặt → AI Media & Tìm kiếm rồi thử lại',
     errNoDeckAppend:
       'Không có bản trình bày để nối thêm vào (thiếu phiên làm việc). Hãy tạo trang đầu tiên với mode:"replace" hoặc thêm trang bằng các công cụ gốc.',
     errAppendFailed: 'Nối thêm thất bại: {reason}',
@@ -405,7 +407,8 @@ export const tMain = createI18n({
     errNotImage: 'サポートされていない画像形式です',
     errNoApiKey: '{provider} の API キーが設定されていません',
     errNoModel: 'モデル名が設定されていません',
-    errMediaNotConfigured: '画像/メディアモデルが設定されていません。設定 → AI メディアで設定してから再試行してください',
+    errMediaNotConfigured:
+      '画像/メディアモデルが設定されていません。設定 → AI メディアで設定してから再試行してください',
     errNoDeckAppend:
       '追加先のプレゼンテーションがありません（セッションが存在しません）。まず mode:"replace" で最初のページを生成するか、ネイティブ ツールでページを追加してください。',
     errAppendFailed: '追加に失敗しました: {reason}',
@@ -518,7 +521,8 @@ export const tMain = createI18n({
     errNotImage: '지원되는 이미지 형식이 아님',
     errNoApiKey: '{provider}의 API 키가 설정되지 않았습니다',
     errNoModel: '모델 이름이 설정되지 않았습니다',
-    errMediaNotConfigured: '이미지/미디어 모델이 설정되지 않았습니다. 설정 → AI 미디어에서 설정한 뒤 다시 시도하세요',
+    errMediaNotConfigured:
+      '이미지/미디어 모델이 설정되지 않았습니다. 설정 → AI 미디어에서 설정한 뒤 다시 시도하세요',
     errNoDeckAppend:
       '추가할 수 있는 문서가 없습니다(세션 없음). 먼저 mode:"replace"로 첫 페이지를 생성하거나 네이티브 도구로 페이지를 추가하세요.',
     errAppendFailed: '추가 실패: {reason}',
@@ -628,7 +632,8 @@ export const tMain = createI18n({
     errNotImage: "n'est pas un type d'image pris en charge",
     errNoApiKey: 'Aucune clé API configurée pour {provider}',
     errNoModel: 'Aucun nom de modèle configuré',
-    errMediaNotConfigured: 'Aucun modèle image/média configuré : configurez-en un dans Paramètres → Médias IA, puis réessayez',
+    errMediaNotConfigured:
+      'Aucun modèle image/média configuré : configurez-en un dans Paramètres → Médias IA, puis réessayez',
     errNoDeckAppend:
       'Aucune présentation à compléter (session inexistante). Générez d\'abord la première page avec mode:"replace" ou ajoutez des pages avec les outils natifs.',
     errAppendFailed: "Échec de l'ajout : {reason}",
@@ -743,7 +748,8 @@ export const tMain = createI18n({
     errNotImage: 'kein unterstütztes Bildformat',
     errNoApiKey: 'Kein API-Schlüssel für {provider} konfiguriert',
     errNoModel: 'Kein Modellname konfiguriert',
-    errMediaNotConfigured: 'Kein Bild-/Medienmodell konfiguriert: Richten Sie eines unter Einstellungen → KI-Medien ein und versuchen Sie es erneut',
+    errMediaNotConfigured:
+      'Kein Bild-/Medienmodell konfiguriert: Richten Sie eines unter Einstellungen → KI-Medien ein und versuchen Sie es erneut',
     errNoDeckAppend:
       'Keine Präsentation zum Anfügen vorhanden (Sitzung fehlt). Generieren Sie zuerst die erste Seite mit mode:"replace" oder fügen Sie Seiten mit den nativen Tools hinzu.',
     errAppendFailed: 'Anfügen fehlgeschlagen: {reason}',
@@ -857,7 +863,8 @@ export const tMain = createI18n({
     errNotImage: 'no es un tipo de imagen compatible',
     errNoApiKey: 'No hay clave de API configurada para {provider}',
     errNoModel: 'No hay nombre de modelo configurado',
-    errMediaNotConfigured: 'No hay ningún modelo de imagen/medios configurado: configúralo en Ajustes → Medios de IA y vuelve a intentarlo',
+    errMediaNotConfigured:
+      'No hay ningún modelo de imagen/medios configurado: configúralo en Ajustes → Medios de IA y vuelve a intentarlo',
     errNoDeckAppend:
       'No hay ninguna presentación a la que anexar (no existe la sesión). Genera primero la primera página con mode:"replace" o añade páginas con las herramientas nativas.',
     errAppendFailed: 'Error al anexar: {reason}',
@@ -970,7 +977,8 @@ export const tMain = createI18n({
     errNotImage: 'ไม่ใช่ชนิดรูปภาพที่รองรับ',
     errNoApiKey: 'ยังไม่ได้ตั้งค่า API Key ของ {provider}',
     errNoModel: 'ยังไม่ได้ตั้งค่าชื่อโมเดล',
-    errMediaNotConfigured: 'ยังไม่ได้ตั้งค่าโมเดลรูปภาพ/สื่อ: ตั้งค่าใน การตั้งค่า → สื่อ AI แล้วลองอีกครั้ง',
+    errMediaNotConfigured:
+      'ยังไม่ได้ตั้งค่าโมเดลรูปภาพ/สื่อ: ตั้งค่าใน การตั้งค่า → สื่อ AI แล้วลองอีกครั้ง',
     errNoDeckAppend:
       'ไม่มีเอกสารให้เพิ่มต่อท้าย (ไม่มีเซสชัน) โปรดสร้างหน้าแรกด้วย mode:"replace" ก่อน หรือใช้เครื่องมือเนทีฟเพิ่มหน้าแทน',
     errAppendFailed: 'เพิ่มต่อท้ายไม่สำเร็จ: {reason}',
@@ -1080,7 +1088,8 @@ export const tMain = createI18n({
     errNotImage: 'bukan jenis gambar yang didukung',
     errNoApiKey: 'API Key untuk {provider} belum dikonfigurasi',
     errNoModel: 'Nama model belum dikonfigurasi',
-    errMediaNotConfigured: 'Model gambar/media belum dikonfigurasi: atur di Pengaturan → Media AI, lalu coba lagi',
+    errMediaNotConfigured:
+      'Model gambar/media belum dikonfigurasi: atur di Pengaturan → Media AI, lalu coba lagi',
     errNoDeckAppend:
       'Tidak ada dokumen yang bisa ditambahi (sesi tidak ada). Buat halaman pertama dengan mode:"replace" dulu, atau tambahkan halaman dengan alat bawaan.',
     errAppendFailed: 'Gagal menambahkan: {reason}',
@@ -1194,7 +1203,8 @@ export const tMain = createI18n({
     errNotImage: 'неподдерживаемый тип изображения',
     errNoApiKey: 'API-ключ для {provider} не настроен',
     errNoModel: 'Не указано имя модели',
-    errMediaNotConfigured: 'Модель изображений/медиа не настроена: настройте её в разделе «Настройки → ИИ-медиа» и повторите попытку',
+    errMediaNotConfigured:
+      'Модель изображений/медиа не настроена: настройте её в разделе «Настройки → ИИ-медиа» и повторите попытку',
     errNoDeckAppend:
       'Нет презентации для добавления страниц (сессия отсутствует). Сначала создайте первую страницу с mode:"replace" или добавьте страницы нативными инструментами.',
     errAppendFailed: 'Сбой добавления: {reason}',
@@ -1307,7 +1317,8 @@ export const tMain = createI18n({
     errNotImage: 'ليس نوع صورة مدعومًا',
     errNoApiKey: 'لم يتم تكوين مفتاح API لـ {provider}',
     errNoModel: 'لم يتم تكوين اسم النموذج',
-    errMediaNotConfigured: 'لم يتم تكوين نموذج للصور/الوسائط: قم بإعداده من الإعدادات ← وسائط الذكاء الاصطناعي ثم أعد المحاولة',
+    errMediaNotConfigured:
+      'لم يتم تكوين نموذج للصور/الوسائط: قم بإعداده من الإعدادات ← وسائط الذكاء الاصطناعي ثم أعد المحاولة',
     errNoDeckAppend:
       'لا يوجد مستند يمكن الإلحاق به (الجلسة غير موجودة). أنشئ الصفحة الأولى باستخدام mode:"replace" أولًا، أو أضف صفحات بالأدوات الأصلية.',
     errAppendFailed: 'فشل الإلحاق: {reason}',
@@ -1417,7 +1428,8 @@ export const tMain = createI18n({
     errNotImage: 'não é um tipo de imagem suportado',
     errNoApiKey: 'Nenhuma chave de API configurada para {provider}',
     errNoModel: 'Nenhum nome de modelo configurado',
-    errMediaNotConfigured: 'Nenhum modelo de imagem/mídia configurado: configure um em Configurações → Mídia de IA e tente novamente',
+    errMediaNotConfigured:
+      'Nenhum modelo de imagem/mídia configurado: configure um em Configurações → Mídia de IA e tente novamente',
     errNoDeckAppend:
       'Não há apresentação para anexar (sessão inexistente). Gere a primeira página com mode:"replace" ou adicione páginas com as ferramentas nativas.',
     errAppendFailed: 'Falha ao anexar: {reason}',
@@ -1531,7 +1543,8 @@ export const tMain = createI18n({
     errNotImage: 'tipo di immagine non supportato',
     errNoApiKey: 'Nessuna chiave API configurata per {provider}',
     errNoModel: 'Nessun nome di modello configurato',
-    errMediaNotConfigured: 'Nessun modello immagine/media configurato: configuralo in Impostazioni → Media IA, quindi riprova',
+    errMediaNotConfigured:
+      'Nessun modello immagine/media configurato: configuralo in Impostazioni → Media IA, quindi riprova',
     errNoDeckAppend:
       'Nessuna presentazione a cui aggiungere pagine (sessione mancante). Genera la prima pagina con mode:"replace" o aggiungi pagine con gli strumenti nativi.',
     errAppendFailed: 'Aggiunta non riuscita: {reason}',
@@ -1646,7 +1659,8 @@ export const tMain = createI18n({
     errNotImage: 'nieobsługiwany typ obrazu',
     errNoApiKey: 'Nie skonfigurowano klucza API dla {provider}',
     errNoModel: 'Nie skonfigurowano nazwy modelu',
-    errMediaNotConfigured: 'Nie skonfigurowano modelu obrazów/multimediów: skonfiguruj go w Ustawienia → Multimedia AI i spróbuj ponownie',
+    errMediaNotConfigured:
+      'Nie skonfigurowano modelu obrazów/multimediów: skonfiguruj go w Ustawienia → Multimedia AI i spróbuj ponownie',
     errNoDeckAppend:
       'Brak prezentacji do rozszerzenia (brak sesji). Najpierw wygeneruj pierwszą stronę z mode:"replace" albo dodaj strony narzędziami natywnymi.',
     errAppendFailed: 'Dołączanie nie powiodło się: {reason}',
@@ -1759,7 +1773,8 @@ export const tMain = createI18n({
     errNotImage: 'nepodporovaný typ obrázku',
     errNoApiKey: 'Pro {provider} není nakonfigurován žádný klíč API',
     errNoModel: 'Není nakonfigurován název modelu',
-    errMediaNotConfigured: 'Není nakonfigurován model pro obrázky/média: nastavte jej v Nastavení → AI média a zkuste to znovu',
+    errMediaNotConfigured:
+      'Není nakonfigurován model pro obrázky/média: nastavte jej v Nastavení → AI média a zkuste to znovu',
     errNoDeckAppend:
       'Není k čemu přidávat (chybí relace). Vygenerujte první stránku s mode:"replace" nebo přidejte stránky nativními nástroji.',
     errAppendFailed: 'Přidání se nezdařilo: {reason}',
@@ -1871,7 +1886,8 @@ export const tMain = createI18n({
     errNotImage: 'geen ondersteund afbeeldingstype',
     errNoApiKey: 'Geen API-sleutel geconfigureerd voor {provider}',
     errNoModel: 'Geen modelnaam geconfigureerd',
-    errMediaNotConfigured: 'Geen beeld-/mediamodel geconfigureerd: stel er een in via Instellingen → AI-media en probeer het opnieuw',
+    errMediaNotConfigured:
+      'Geen beeld-/mediamodel geconfigureerd: stel er een in via Instellingen → AI-media en probeer het opnieuw',
     errNoDeckAppend:
       'Geen presentatie om aan toe te voegen (sessie ontbreekt). Genereer eerst de eerste pagina met mode:"replace" of voeg pagina\'s toe met de native tools.',
     errAppendFailed: 'Toevoegen mislukt: {reason}',
@@ -1983,7 +1999,8 @@ export const tMain = createI18n({
     errNotImage: 'bukan jenis imej yang disokong',
     errNoApiKey: 'Kunci API untuk {provider} belum dikonfigurasikan',
     errNoModel: 'Nama model belum dikonfigurasikan',
-    errMediaNotConfigured: 'Model imej/media belum dikonfigurasikan: tetapkan dalam Tetapan → Media AI, kemudian cuba lagi',
+    errMediaNotConfigured:
+      'Model imej/media belum dikonfigurasikan: tetapkan dalam Tetapan → Media AI, kemudian cuba lagi',
     errNoDeckAppend:
       'Tiada persembahan untuk ditambah (sesi tidak wujud). Jana halaman pertama dengan mode:"replace" dahulu, atau tambah halaman dengan alat asli.',
     errAppendFailed: 'Gagal menambah: {reason}',
@@ -2203,7 +2220,8 @@ export const tMain = createI18n({
     errNotImage: 'समर्थित छवि प्रकार नहीं है',
     errNoApiKey: '{provider} के लिए कोई API कुंजी कॉन्फ़िगर नहीं है',
     errNoModel: 'कोई मॉडल नाम कॉन्फ़िगर नहीं है',
-    errMediaNotConfigured: 'कोई इमेज/मीडिया मॉडल कॉन्फ़िगर नहीं है: सेटिंग्स → AI मीडिया में सेट करें, फिर पुनः प्रयास करें',
+    errMediaNotConfigured:
+      'कोई इमेज/मीडिया मॉडल कॉन्फ़िगर नहीं है: सेटिंग्स → AI मीडिया में सेट करें, फिर पुनः प्रयास करें',
     errNoDeckAppend:
       'जोड़ने के लिए कोई प्रस्तुति नहीं है (सत्र मौजूद नहीं)। पहले mode:"replace" से पहला पृष्ठ बनाएँ, या नेटिव टूल से पृष्ठ जोड़ें।',
     errAppendFailed: 'जोड़ना विफल: {reason}',

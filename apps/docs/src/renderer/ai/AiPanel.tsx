@@ -1421,15 +1421,15 @@ export function AiPanel({
                 /API\s*[Kk]ey|api key|khóa API|kích hoạt|mua gói AI|not activated|purchase an AI|未配置|未設定/i.test(
                   entry.error,
                 ) && (
-                <div className="ai-msg-actions">
-                  <button
-                    className="ai-login-btn"
-                    onClick={() => void window.desktop.aiOpenBilling?.()}
-                  >
-                    {t('aiBuyPlanBtn')}
-                  </button>
-                </div>
-              )}
+                  <div className="ai-msg-actions">
+                    <button
+                      className="ai-login-btn"
+                      onClick={() => void window.desktop.aiOpenBilling?.()}
+                    >
+                      {t('aiBuyPlanBtn')}
+                    </button>
+                  </div>
+                )}
               {showToolbar && (
                 <div className="ai-msg-toolbar">
                   {entry.text && (
