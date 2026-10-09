@@ -140,4 +140,5 @@ export const ru = {
   presentInTab: 'В этой вкладке',
   presentFullscreen: 'Во весь экран',
   presentNewTab: 'Новая вкладка',
+  viewOnly: 'Только просмотр',
 } satisfies Record<keyof typeof zh, string>

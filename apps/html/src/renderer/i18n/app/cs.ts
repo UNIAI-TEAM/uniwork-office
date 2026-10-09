@@ -140,4 +140,5 @@ export const cs = {
   replace: 'Nahradit',
   replaceAll: 'Nahradit vše',
   findTip: 'Najít a nahradit (⌘F)',
+  viewOnly: 'Pouze pro čtení',
 } satisfies Record<keyof typeof zh, string>
