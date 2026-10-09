@@ -55,3 +55,15 @@ Treat these as **expected conflict areas**. Prefer UniWork display strings and i
 - After every sync, `npm run check:brand` must be clean (the script runs it and lists violations in its report)
 - Keep `@genoffice/*` package names and `GENOFFICE_*` env vars unless a future phase has a migration plan
 - Keep `docs/go1/` and `docs/upstream/` as UniWork-owned documentation
+
+## Sheets wasm engine (fork delta, UNI-1016)
+
+The Sheets web frame runs `apps/sheets/native/xlsx-engine` compiled to WebAssembly. That delta must survive every
+upstream sync. Details and the full list are in [`SHEETS_WASM_ENGINE.md`](SHEETS_WASM_ENGINE.md). In short:
+
+- Upstream's sidecar sources keep their desktop behaviour. Every web change sits behind `cfg(target_os = "wasi")`
+  (or a `cfg!(target_os = "wasi")` guard) in `src/lib.rs`, `src/main.rs`, `src/worksheet.rs` and `src/archive.rs`.
+  When a sync conflicts in those files, take upstream's code and re-apply the wasi blocks. Never delete them.
+- `apps/sheets/native/xlsx-engine/wasm/` is UniWork-owned (ours; keep).
+- After a sync that touches the engine, run `node apps/sheets/native/xlsx-engine/wasm/build-wasm.mjs`. A checksum
+  mismatch is expected when upstream changed the engine: check the web tests, then `--update-checksum` and commit.

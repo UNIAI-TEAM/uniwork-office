@@ -4,7 +4,9 @@ use std::io::{BufReader, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
-use std::thread::{self, JoinHandle};
+#[cfg(not(target_os = "wasi"))]
+use std::thread;
+use std::thread::JoinHandle;
 use std::time::Duration;
 
 use quick_xml::Reader;
@@ -159,7 +161,7 @@ fn create_cache_directory(
     session_id: &str,
     cancelled: &AtomicBool,
 ) -> Result<CacheDirectory, SidecarError> {
-    let path = std::env::temp_dir().join(format!("ai-excel-session-{session_id}"));
+    let path = temp_root().join(format!("ai-excel-session-{session_id}"));
     let directory = CacheDirectory::create(path)?;
     if cancelled.load(Ordering::Acquire) {
         return Err(SidecarError::cancelled());
@@ -205,7 +207,11 @@ impl WorkbookSessions {
         if cancelled.load(Ordering::Acquire) {
             return Err(SidecarError::cancelled());
         }
+        // wasm32-wasip1 has no realpath: the in-memory FS paths are already canonical
+        #[cfg(not(target_os = "wasi"))]
         let canonical_path = path.canonicalize()?;
+        #[cfg(target_os = "wasi")]
+        let canonical_path = path.to_path_buf();
         let file = File::open(&canonical_path)?;
         let mut archive = ZipArchive::new(file)?;
         archive::validate_entries(&mut archive)?;
@@ -472,6 +478,10 @@ impl WorkbookSessions {
             .position(|sheet| sheet.id == sheet_id)
             .ok_or_else(|| SidecarError::InvalidRequest("Unknown worksheet.".into()))?;
         range.validate(&session.sheets[sheet_index])?;
+        // wasm: index (in passes) at least through the requested rows first,
+        // so the read below never waits on an index that no thread advances
+        #[cfg(target_os = "wasi")]
+        session.advance_index(sheet_index, Some(range.end_row / CHUNK_ROW_COUNT))?;
         session.ensure_parser(sheet_index)?;
         session.read_range(sheet_index, range)
     }
@@ -564,6 +574,27 @@ impl WorkbookSessions {
     }
 }
 
+#[cfg(target_os = "wasi")]
+impl WorkbookSessions {
+    /// One background index pass for the first read-but-incomplete sheet of
+    /// any session; true while work remains. The host calls it between
+    /// requests (the wasm build has no index threads).
+    pub fn index_step(&mut self) -> Result<bool, SidecarError> {
+        for session in self.sessions.values_mut() {
+            for sheet_index in 0..session.runtimes.len() {
+                if session.runtimes[sheet_index].started && session.index_pending(sheet_index) {
+                    session.advance_index(sheet_index, None)?;
+                    return Ok(self
+                        .sessions
+                        .values()
+                        .any(WorkbookSession::any_index_pending));
+                }
+            }
+        }
+        Ok(false)
+    }
+}
+
 impl Default for WorkbookSessions {
     fn default() -> Self {
         Self::new()
@@ -607,6 +638,14 @@ impl WorkbookSession {
         })
     }
 
+    /// wasm32-wasip1 has no threads: the index advances inline, in passes
+    /// (see `advance_index`), instead of on a background thread.
+    #[cfg(target_os = "wasi")]
+    fn ensure_parser(&mut self, sheet_index: usize) -> Result<(), SidecarError> {
+        self.advance_index(sheet_index, Some(0)).map(|_| ())
+    }
+
+    #[cfg(not(target_os = "wasi"))]
     fn ensure_parser(&mut self, sheet_index: usize) -> Result<(), SidecarError> {
         let runtime = &mut self.runtimes[sheet_index];
         if runtime.handle.is_some() {
@@ -657,6 +696,82 @@ impl WorkbookSession {
         Ok(())
     }
 
+    #[cfg(target_os = "wasi")]
+    fn index_pending(&self, sheet_index: usize) -> bool {
+        let (lock, _) = &*self.runtimes[sheet_index].state;
+        lock.lock()
+            .map(|index| !index.complete && index.error.is_none())
+            .unwrap_or(false)
+    }
+
+    #[cfg(target_os = "wasi")]
+    fn any_index_pending(&self) -> bool {
+        (0..self.runtimes.len())
+            .any(|sheet| self.runtimes[sheet].started && self.index_pending(sheet))
+    }
+
+    /// wasm: run one index pass for `sheet_index` unless the index already
+    /// covers `target_chunk` (None = the next background pass). A pass parses
+    /// the worksheet from the start, skips the chunks earlier passes flushed,
+    /// and pauses after max(target, 4 x the previous extent), so the first
+    /// viewport needs only its own chunk and the whole sheet costs about two
+    /// parses in total.
+    #[cfg(target_os = "wasi")]
+    fn advance_index(
+        &mut self,
+        sheet_index: usize,
+        target_chunk: Option<usize>,
+    ) -> Result<(), SidecarError> {
+        self.runtimes[sheet_index].started = true;
+        let state = Arc::clone(&self.runtimes[sheet_index].state);
+        {
+            let (lock, _) = &*state;
+            let mut index = lock
+                .lock()
+                .map_err(|_| SidecarError::Io("Worksheet index lock was poisoned.".into()))?;
+            if index.complete || index.error.is_some() {
+                return Ok(());
+            }
+            let grown = index.done_chunk.map_or(0, |done| (done + 1) * 4 - 1);
+            let pause = match target_chunk {
+                Some(target) if index.done_chunk.is_some_and(|done| done >= target) => {
+                    return Ok(());
+                }
+                Some(target) => target.max(grown),
+                None => grown,
+            };
+            index.pause_after_chunk = Some(pause);
+        }
+        let rich_image_cells: HashSet<(usize, usize)> = self.sheets[sheet_index]
+            .cell_images
+            .iter()
+            .map(|image| (image.row, image.column))
+            .collect();
+        let result = index_worksheet(
+            &self.path,
+            &self.runtimes[sheet_index].worksheet_path,
+            sheet_index,
+            &self.cache_directory,
+            &self.shared_strings,
+            &self.styled_xfs,
+            &self.color_context,
+            &rich_image_cells,
+            &state,
+            &self.cancelled,
+        );
+        let (lock, condition) = &*state;
+        if let Ok(mut index) = lock.lock() {
+            index.pause_after_chunk = None;
+            match result {
+                Ok(()) => index.complete = true,
+                Err(SidecarError::Io(message)) if message == worksheet::INDEX_PAUSED => {}
+                Err(error) => index.error = Some(error.to_string()),
+            }
+            condition.notify_all();
+        }
+        Ok(())
+    }
+
     fn read_range(
         &self,
         sheet_index: usize,
@@ -673,7 +788,9 @@ impl WorkbookSession {
                 .indexed_through_row
                 .map_or(range.start_row, |row| range.start_row.saturating_sub(row))
                 >= RANGE_WAIT_MAX_LAG_ROWS;
-        let index = if far_ahead {
+        // wasm: no index thread could advance during a wait (and wasip1 has no
+        // timed wait); WorkbookSessions::read_range indexed the rows first
+        let index = if far_ahead || cfg!(target_os = "wasi") {
             index
         } else {
             condition
@@ -872,6 +989,10 @@ struct SheetRuntime {
     worksheet_path: String,
     state: Arc<(Mutex<SheetIndex>, Condvar)>,
     handle: Option<JoinHandle<()>>,
+    /// wasm: a first index pass ran (the background step only continues sheets
+    /// that were read, like the desktop's lazily started index threads)
+    #[cfg(target_os = "wasi")]
+    started: bool,
 }
 
 impl SheetRuntime {
@@ -880,6 +1001,8 @@ impl SheetRuntime {
             worksheet_path,
             state: Arc::new((Mutex::new(SheetIndex::default()), Condvar::new())),
             handle: None,
+            #[cfg(target_os = "wasi")]
+            started: false,
         }
     }
 }
@@ -908,6 +1031,13 @@ struct SheetIndex {
     formula_truncated: bool,
     shared_formula_groups: Vec<SharedFormulaGroup>,
     outline_rows: Vec<RowOutlineEntry>,
+    /// wasm: last chunk an earlier pass already flushed (a resumed pass
+    /// re-parses from the start but skips writing these again)
+    #[cfg(target_os = "wasi")]
+    done_chunk: Option<usize>,
+    /// wasm: the pass in progress stops after flushing this chunk
+    #[cfg(target_os = "wasi")]
+    pause_after_chunk: Option<usize>,
 }
 
 #[derive(Debug)]
@@ -917,4 +1047,17 @@ struct SheetDeclaration {
     relationship_id: String,
     hidden: bool,
     very_hidden: bool,
+}
+
+/// Where session chunk caches live: the OS temp dir, or on wasm32-wasip1 (whose
+/// std::env::temp_dir() panics) $TMPDIR or /tmp of the host-provided FS.
+fn temp_root() -> PathBuf {
+    #[cfg(target_os = "wasi")]
+    {
+        std::env::var_os("TMPDIR").map_or_else(|| PathBuf::from("/tmp"), PathBuf::from)
+    }
+    #[cfg(not(target_os = "wasi"))]
+    {
+        std::env::temp_dir()
+    }
 }

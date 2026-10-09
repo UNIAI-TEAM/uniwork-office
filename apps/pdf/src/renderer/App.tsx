@@ -8,6 +8,7 @@ import type { PDFDocumentProxy } from 'pdfjs-dist'
 import workerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url'
 import { AiPanel, GensparkMark } from './ai/AiPanel'
 import { AiAskPopover, type AskAnchorRect } from './AiAskPopover'
+import { cap } from './capabilities'
 import {
   createSavedAnnotCountsLoader,
   loadSavedAnnots,
@@ -1342,6 +1343,8 @@ export default function App() {
     })()
   }, [openPath])
 
+  useEffect(() => window.pdfApi.onReloadRequest?.((path) => void openPath(path)), [openPath])
+
   useEffect(() => {
     return window.pdfApi.onAiPreset?.((preset) => {
       if (!preset?.text) return
@@ -1351,7 +1354,11 @@ export default function App() {
   }, [])
 
   /** pdf-lib cannot write encrypted files, including owner-protected files that open without a password. */
-  const readOnly = status === 'ready' && (passwordRef.current !== undefined || documentEncrypted)
+  const encryptedReadOnly =
+    status === 'ready' && (passwordRef.current !== undefined || documentEncrypted)
+  /** View-only platform (web viewer without the save grant): the same read-only mode */
+  const viewOnly = !cap('edit')
+  const readOnly = viewOnly || encryptedReadOnly
 
   useEffect(() => {
     if (
@@ -2029,7 +2036,7 @@ export default function App() {
   useEffect(() => {
     setOcrPages(new Map())
     setOcrRun(null)
-    if (!doc || sizes.length !== doc.numPages) return
+    if (!doc || sizes.length !== doc.numPages || !cap('ocr')) return
     startOcrPass(null)
     return () => {
       // tears down the pass this effect started, so its teardown still cancels
@@ -3592,7 +3599,7 @@ export default function App() {
         )[0]
         ?.input.text.split('\n')[0]
         ?.trim()
-      if (nameCandidate) {
+      if (nameCandidate && cap('autoRename')) {
         try {
           const renamed = await window.pdfApi.autoRename(filePath, nameCandidate)
           if (renamed.renamed && renamed.path) setFilePath(renamed.path)
@@ -3793,6 +3800,7 @@ export default function App() {
   // toolbar button / File ▸ Save) is what opts this file into unattended writes.
   useAutosave(
     () =>
+      cap('autoSave') &&
       savedOnceRef.current &&
       ordinaryDirty &&
       saveInFlightRef.current === null &&
@@ -6317,7 +6325,9 @@ export default function App() {
             </button>
           )}
           <span className="ribbon-tabs-spacer" />
-          {readOnly && <span className="tb-readonly">{t('roEncrypted')}</span>}
+          {readOnly && (
+            <span className="tb-readonly">{t(viewOnly ? 'webViewOnly' : 'roEncrypted')}</span>
+          )}
           {/* The file on disk is only touched by an explicit save until then. */}
           {saveState === 'saving' ? (
             <span className="tb-save-pending">{t('saving')}</span>
@@ -6341,91 +6351,103 @@ export default function App() {
           {ribbonTab === 'home' && (
             <>
               {/* ---- AI (first slot: entry + one-click AI actions, docs parity) ---- */}
-              <div className="ribbon-group">
-                <div className="ribbon-group-items">
-                  <button
-                    className={`rb-big ai-entry${aiCollapsed ? '' : ' active'}`}
-                    data-tip={t('aiOpenAssistant')}
-                    onClick={() => setAiCollapsed((v) => !v)}
-                  >
-                    <span className="rb-big-icon">
-                      <GensparkMark size={26} />
-                    </span>
-                    <span>AI</span>
-                  </button>
-                  <button
-                    className="rb-big ai-entry"
-                    data-tip={t('aiSummarizeBtn')}
-                    onClick={() =>
-                      runAiPreset(
-                        t(aiSelection ? 'aiQuickSummarySelPrompt' : 'aiQuickSummaryPrompt'),
-                      )
-                    }
-                  >
-                    <span className="rb-big-icon">
-                      <span className="ai-feature-icon" aria-hidden="true">
-                        <IconAiSummarize />
+              {cap('ai') && (
+                <div className="ribbon-group">
+                  <div className="ribbon-group-items">
+                    <button
+                      className={`rb-big ai-entry${aiCollapsed ? '' : ' active'}`}
+                      data-tip={t('aiOpenAssistant')}
+                      onClick={() => setAiCollapsed((v) => !v)}
+                    >
+                      <span className="rb-big-icon">
+                        <GensparkMark size={26} />
                       </span>
-                    </span>
-                    <span>{t('aiSummarizeBtn')}</span>
-                  </button>
-                  <button
-                    className="rb-big ai-entry"
-                    data-tip={t('aiKeyPointsBtn')}
-                    onClick={() =>
-                      runAiPreset(
-                        t(aiSelection ? 'aiQuickKeyPointsSelPrompt' : 'aiQuickKeyPointsPrompt'),
-                      )
-                    }
-                  >
-                    <span className="rb-big-icon">
-                      <span className="ai-feature-icon" aria-hidden="true">
-                        <IconAiKeyPoints />
+                      <span>AI</span>
+                    </button>
+                    <button
+                      className="rb-big ai-entry"
+                      data-tip={t('aiSummarizeBtn')}
+                      onClick={() =>
+                        runAiPreset(
+                          t(aiSelection ? 'aiQuickSummarySelPrompt' : 'aiQuickSummaryPrompt'),
+                        )
+                      }
+                    >
+                      <span className="rb-big-icon">
+                        <span className="ai-feature-icon" aria-hidden="true">
+                          <IconAiSummarize />
+                        </span>
                       </span>
-                    </span>
-                    <span>{t('aiKeyPointsBtn')}</span>
-                  </button>
+                      <span>{t('aiSummarizeBtn')}</span>
+                    </button>
+                    <button
+                      className="rb-big ai-entry"
+                      data-tip={t('aiKeyPointsBtn')}
+                      onClick={() =>
+                        runAiPreset(
+                          t(aiSelection ? 'aiQuickKeyPointsSelPrompt' : 'aiQuickKeyPointsPrompt'),
+                        )
+                      }
+                    >
+                      <span className="rb-big-icon">
+                        <span className="ai-feature-icon" aria-hidden="true">
+                          <IconAiKeyPoints />
+                        </span>
+                      </span>
+                      <span>{t('aiKeyPointsBtn')}</span>
+                    </button>
+                  </div>
                 </div>
-              </div>
-              <div className="ribbon-sep" />
+              )}
+              {cap('ai') && <div className="ribbon-sep" />}
               {markupGroup}
               <div className="ribbon-sep" />
               {/* Edit entries lead; Search moved after page/zoom (⌘F is the common path) */}
-              <div className="ribbon-group">
-                <div className="ribbon-group-items">
-                  {editTextBtn}
-                  {insertTextBtn}
-                </div>
-              </div>
-              <div className="ribbon-sep" />
-              <div className="ribbon-group">
-                <div className="ribbon-group-items">
-                  <div className="rb-drop-wrap" ref={convertWrapRef}>
-                    <button
-                      className={`rb-big${convertOpen ? ' active' : ''}`}
-                      data-tip={t('convertPdfTip')}
-                      disabled={convertBusy}
-                      onClick={() => setConvertOpen((v) => !v)}
-                    >
-                      <span className="rb-big-icon">
-                        <IconConvertPdf />
-                        <RbCaret />
-                      </span>
-                      {t('convertPdf')}
-                    </button>
-                    {convertOpen && (
-                      <div className="rb-drop rb-menu">
-                        <button onClick={() => void convertTo('docx')}>{t('convertToWord')}</button>
-                        <button onClick={() => void convertTo('xlsx')}>
-                          {t('convertToExcel')}
-                        </button>
-                        <button onClick={() => void convertTo('pptx')}>{t('convertToPpt')}</button>
-                      </div>
-                    )}
+              {cap('pdfTextEdit') && (
+                <>
+                  <div className="ribbon-group">
+                    <div className="ribbon-group-items">
+                      {editTextBtn}
+                      {insertTextBtn}
+                    </div>
+                  </div>
+                  <div className="ribbon-sep" />
+                </>
+              )}
+              {cap('convertOffice') && (
+                <div className="ribbon-group">
+                  <div className="ribbon-group-items">
+                    <div className="rb-drop-wrap" ref={convertWrapRef}>
+                      <button
+                        className={`rb-big${convertOpen ? ' active' : ''}`}
+                        data-tip={t('convertPdfTip')}
+                        disabled={convertBusy}
+                        onClick={() => setConvertOpen((v) => !v)}
+                      >
+                        <span className="rb-big-icon">
+                          <IconConvertPdf />
+                          <RbCaret />
+                        </span>
+                        {t('convertPdf')}
+                      </button>
+                      {convertOpen && (
+                        <div className="rb-drop rb-menu">
+                          <button onClick={() => void convertTo('docx')}>
+                            {t('convertToWord')}
+                          </button>
+                          <button onClick={() => void convertTo('xlsx')}>
+                            {t('convertToExcel')}
+                          </button>
+                          <button onClick={() => void convertTo('pptx')}>
+                            {t('convertToPpt')}
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div className="ribbon-sep" />
+              )}
+              {cap('convertOffice') && <div className="ribbon-sep" />}
               {pageZoomGroup}
               <div className="ribbon-sep" />
               <div className="ribbon-group">
@@ -6469,36 +6491,38 @@ export default function App() {
           )}
           {ribbonTab === 'annotate' && (
             <>
-              <div className="ribbon-group">
-                <div className="ribbon-group-items">
-                  <button
-                    className="rb-big ai-entry"
-                    data-tip={t('aiReviewSummaryBtn')}
-                    onClick={() => runAiPreset(t('aiReviewSummaryPrompt'))}
-                  >
-                    <span className="rb-big-icon">
-                      <span className="ai-feature-icon" aria-hidden="true">
-                        <IconAiSummarize />
+              {cap('ai') && (
+                <div className="ribbon-group">
+                  <div className="ribbon-group-items">
+                    <button
+                      className="rb-big ai-entry"
+                      data-tip={t('aiReviewSummaryBtn')}
+                      onClick={() => runAiPreset(t('aiReviewSummaryPrompt'))}
+                    >
+                      <span className="rb-big-icon">
+                        <span className="ai-feature-icon" aria-hidden="true">
+                          <IconAiSummarize />
+                        </span>
                       </span>
-                    </span>
-                    <span>{t('aiReviewSummaryBtn')}</span>
-                  </button>
-                  <button
-                    className="rb-big ai-entry"
-                    disabled={readOnly}
-                    data-tip={t('aiProcessNotesBtn')}
-                    onClick={() => runAiPreset(t('aiProcessNotesPrompt'))}
-                  >
-                    <span className="rb-big-icon">
-                      <span className="ai-feature-icon" aria-hidden="true">
-                        <GensparkMark size={20} />
+                      <span>{t('aiReviewSummaryBtn')}</span>
+                    </button>
+                    <button
+                      className="rb-big ai-entry"
+                      disabled={readOnly}
+                      data-tip={t('aiProcessNotesBtn')}
+                      onClick={() => runAiPreset(t('aiProcessNotesPrompt'))}
+                    >
+                      <span className="rb-big-icon">
+                        <span className="ai-feature-icon" aria-hidden="true">
+                          <GensparkMark size={20} />
+                        </span>
                       </span>
-                    </span>
-                    <span>{t('aiProcessNotesBtn')}</span>
-                  </button>
+                      <span>{t('aiProcessNotesBtn')}</span>
+                    </button>
+                  </div>
                 </div>
-              </div>
-              <div className="ribbon-sep" />
+              )}
+              {cap('ai') && <div className="ribbon-sep" />}
               {markupGroup}
               <div className="ribbon-sep" />
               <div className="ribbon-group">
@@ -6608,8 +6632,8 @@ export default function App() {
             <>
               <div className="ribbon-group">
                 <div className="ribbon-group-items">
-                  {editTextBtn}
-                  {insertTextBtn}
+                  {cap('pdfTextEdit') && editTextBtn}
+                  {cap('pdfTextEdit') && insertTextBtn}
                   <button
                     className={`rb-big${imagePick && !pendingStaticFill ? ' active' : ''}`}
                     disabled={readOnly}
@@ -6621,25 +6645,27 @@ export default function App() {
                     </span>
                     {t('insertImage')}
                   </button>
-                  <button
-                    className={`rb-big${editImageMode ? ' active' : ''}`}
-                    disabled={readOnly}
-                    data-tip={t('editImageHint')}
-                    onClick={() => {
-                      setEditTextMode(false)
-                      setTextDraft(null)
-                      setDrawTool(null)
-                      setPendingSign(null)
-                      setImagePick(null)
-                      setPendingTextInsert(null)
-                      setEditImageMode((v) => !v)
-                    }}
-                  >
-                    <span className="rb-big-icon">
-                      <IconEditImage />
-                    </span>
-                    {t('editImage')}
-                  </button>
+                  {cap('pdfImageEdit') && (
+                    <button
+                      className={`rb-big${editImageMode ? ' active' : ''}`}
+                      disabled={readOnly}
+                      data-tip={t('editImageHint')}
+                      onClick={() => {
+                        setEditTextMode(false)
+                        setTextDraft(null)
+                        setDrawTool(null)
+                        setPendingSign(null)
+                        setImagePick(null)
+                        setPendingTextInsert(null)
+                        setEditImageMode((v) => !v)
+                      }}
+                    >
+                      <span className="rb-big-icon">
+                        <IconEditImage />
+                      </span>
+                      {t('editImage')}
+                    </button>
+                  )}
                 </div>
               </div>
               <div className="ribbon-sep" />
@@ -6664,19 +6690,21 @@ export default function App() {
             <>
               <div className="ribbon-group">
                 <div className="ribbon-group-items">
-                  <button
-                    className="rb-big ai-entry"
-                    disabled={readOnly}
-                    data-tip={t('aiFillFormBtn')}
-                    onClick={() => runAiPreset(t('aiFillFormPrompt'))}
-                  >
-                    <span className="rb-big-icon">
-                      <span className="ai-feature-icon" aria-hidden="true">
-                        <GensparkMark size={20} />
+                  {cap('ai') && (
+                    <button
+                      className="rb-big ai-entry"
+                      disabled={readOnly}
+                      data-tip={t('aiFillFormBtn')}
+                      onClick={() => runAiPreset(t('aiFillFormPrompt'))}
+                    >
+                      <span className="rb-big-icon">
+                        <span className="ai-feature-icon" aria-hidden="true">
+                          <GensparkMark size={20} />
+                        </span>
                       </span>
-                    </span>
-                    <span>{t('aiFillFormBtn')}</span>
-                  </button>
+                      <span>{t('aiFillFormBtn')}</span>
+                    </button>
+                  )}
                   <button
                     className={`rb-big${pendingStaticFill === 'text' ? ' active' : ''}`}
                     disabled={readOnly}
@@ -6860,16 +6888,18 @@ export default function App() {
                     </span>
                     {t('extractPage')}
                   </button>
-                  <button
-                    className="rb-big"
-                    disabled={readOnly}
-                    onClick={() => void insertPdf(curOrigIdx)}
-                  >
-                    <span className="rb-big-icon">
-                      <IconInsertPdf />
-                    </span>
-                    {t('insertPdf')}
-                  </button>
+                  {cap('insertPages') && (
+                    <button
+                      className="rb-big"
+                      disabled={readOnly}
+                      onClick={() => void insertPdf(curOrigIdx)}
+                    >
+                      <span className="rb-big-icon">
+                        <IconInsertPdf />
+                      </span>
+                      {t('insertPdf')}
+                    </button>
+                  )}
                   <button
                     className="rb-big"
                     disabled={readOnly}
@@ -6880,16 +6910,18 @@ export default function App() {
                     </span>
                     {t('insertBlankPage')}
                   </button>
-                  <button
-                    className="rb-big"
-                    disabled={curOrigIdx < 0 || readOnly}
-                    onClick={openReplaceDlg}
-                  >
-                    <span className="rb-big-icon">
-                      <IconReplacePages />
-                    </span>
-                    {t('replacePages')}
-                  </button>
+                  {cap('insertPages') && (
+                    <button
+                      className="rb-big"
+                      disabled={curOrigIdx < 0 || readOnly}
+                      onClick={openReplaceDlg}
+                    >
+                      <span className="rb-big-icon">
+                        <IconReplacePages />
+                      </span>
+                      {t('replacePages')}
+                    </button>
+                  )}
                 </div>
               </div>
               <div className="ribbon-sep" />
@@ -6993,27 +7025,29 @@ export default function App() {
       <div className="app-main">
         {/* dock wrapper animates the width between panel and rail (docs-style 180ms ease);
             the panel stays mounted while collapsed so the chat history survives */}
-        <div className={`ai-dock${aiCollapsed ? ' collapsed' : ''}`}>
-          {aiCollapsed && (
-            <button
-              className="ai-rail"
-              data-tip={t('aiOpenAssistant')}
-              aria-label={t('aiOpenAssistant')}
-              onClick={() => setAiCollapsed(false)}
-            >
-              <GensparkMark size={22} />
-            </button>
-          )}
-          <AiPanel
-            api={aiApi}
-            filePath={filePath}
-            preset={aiPreset}
-            open={!aiCollapsed}
-            onCollapse={() => setAiCollapsed(true)}
-            onRunDone={() => void autoSaveAfterAiRun()}
-            onClearSelection={() => setAiSelection(null)}
-          />
-        </div>
+        {cap('ai') && (
+          <div className={`ai-dock${aiCollapsed ? ' collapsed' : ''}`}>
+            {aiCollapsed && (
+              <button
+                className="ai-rail"
+                data-tip={t('aiOpenAssistant')}
+                aria-label={t('aiOpenAssistant')}
+                onClick={() => setAiCollapsed(false)}
+              >
+                <GensparkMark size={22} />
+              </button>
+            )}
+            <AiPanel
+              api={aiApi}
+              filePath={filePath}
+              preset={aiPreset}
+              open={!aiCollapsed}
+              onCollapse={() => setAiCollapsed(true)}
+              onRunDone={() => void autoSaveAfterAiRun()}
+              onClearSelection={() => setAiSelection(null)}
+            />
+          </div>
+        )}
         <div className="app-content">
           <div className="pdf-body">
             {sidebar === 'outline' && outline && (
@@ -8419,7 +8453,8 @@ export default function App() {
                 </button>
               </div>
             )}
-            {selPopup && (
+            {/* read-only without AI leaves the popup with nothing in it */}
+            {selPopup && (!readOnly || cap('ai')) && (
               <div
                 className="pdf-sel-popup"
                 style={{ left: selPopup.x, top: selPopup.y }}
@@ -8472,21 +8507,23 @@ export default function App() {
                     <span className="pdf-sel-popup-sep" aria-hidden />
                   </>
                 )}
-                <button
-                  type="button"
-                  className="pdf-sel-ask"
-                  data-tip={t('aiAskTitle')}
-                  aria-label={t('aiAskBtn')}
-                  onClick={openAskPopover}
-                >
-                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" aria-hidden>
-                    <path
-                      d="M12 3l1.7 4.6L18 9.3l-4.3 1.7L12 15.6l-1.7-4.6L6 9.3l4.3-1.7L12 3zM19 15l.85 2.3L22 18.15l-2.15.85L19 21.3l-.85-2.3-2.15-.85 2.15-.85L19 15z"
-                      fill="currentColor"
-                    />
-                  </svg>
-                  {t('aiAskBtn')}
-                </button>
+                {cap('ai') && (
+                  <button
+                    type="button"
+                    className="pdf-sel-ask"
+                    data-tip={t('aiAskTitle')}
+                    aria-label={t('aiAskBtn')}
+                    onClick={openAskPopover}
+                  >
+                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" aria-hidden>
+                      <path
+                        d="M12 3l1.7 4.6L18 9.3l-4.3 1.7L12 15.6l-1.7-4.6L6 9.3l4.3-1.7L12 3zM19 15l.85 2.3L22 18.15l-2.15.85L19 21.3l-.85-2.3-2.15-.85 2.15-.85L19 15z"
+                        fill="currentColor"
+                      />
+                    </svg>
+                    {t('aiAskBtn')}
+                  </button>
+                )}
               </div>
             )}
             {askPop && (
@@ -8724,14 +8761,16 @@ export default function App() {
                 >
                   {t('extractPage')}
                 </button>
-                <button
-                  onClick={() => {
-                    setThumbMenu(null)
-                    void insertPdf(menuOrig)
-                  }}
-                >
-                  {t('insertPdf')}
-                </button>
+                {cap('insertPages') && (
+                  <button
+                    onClick={() => {
+                      setThumbMenu(null)
+                      void insertPdf(menuOrig)
+                    }}
+                  >
+                    {t('insertPdf')}
+                  </button>
+                )}
                 <button
                   onClick={() => {
                     setThumbMenu(null)

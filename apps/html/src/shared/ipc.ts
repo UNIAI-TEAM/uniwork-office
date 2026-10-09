@@ -311,6 +311,11 @@ export interface HtmlApi {
   imageSearch(query: string, maxResults?: number): Promise<ImageSearchResult>
   /** Download an image URL in the main process (CORS-free, scheme/target validated) */
   fetchImage(url: string): Promise<ImageData | null>
+  /**
+   * Web frame only (absent on desktop): the static preview copy of the document (no scripts,
+   * handlers or remote loads), now and after every updatePreview; returns the unsubscribe.
+   */
+  onStaticPreview?(handler: (html: string) => void): () => void
   /** AI image generation via the configured media provider (html-owned channel) */
   aiGenerateImage(op: { prompt: string; aspectRatio?: string }): Promise<{
     url?: string

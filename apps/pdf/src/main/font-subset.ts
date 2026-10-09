@@ -1,5 +1,4 @@
-import { readFileSync } from 'node:fs'
-import { hbSubsetWasmPath } from './wasm-path'
+import { pdfCoreEnv } from './core-env'
 
 /** hb-subset.wasm exports we call (numbers are pointers into its linear memory) */
 interface HbSubset {
@@ -30,7 +29,7 @@ let hbPromise: Promise<HbSubset> | null = null
 
 function loadHb(): Promise<HbSubset> {
   hbPromise ??= (async () => {
-    const wasmBytes = readFileSync(hbSubsetWasmPath())
+    const wasmBytes = await pdfCoreEnv().hbSubsetWasm()
     const { instance } = await WebAssembly.instantiate(wasmBytes)
     return instance.exports as unknown as HbSubset
   })()

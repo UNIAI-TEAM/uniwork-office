@@ -148,4 +148,5 @@ export const it = {
   presentInTab: 'In questa scheda',
   presentFullscreen: 'Schermo intero',
   presentNewTab: 'Nuova scheda',
+  viewOnly: 'Sola lettura',
 } satisfies Record<keyof typeof zh, string>

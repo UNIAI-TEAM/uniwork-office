@@ -315,6 +315,38 @@ There is still no trap, crash or CSP violation at any size. The cap is a UX and 
 3. **After SH2 makes the index incremental** (first viewport ≈ open time: 1.1 s at 1.1M cells, 1.8 s at 2.2M), raise
    the gates to file ≤ **10 MB** and XML ≤ **80 MB** (2.2M cells, about 0.8 GB).
 
+#### 4.5.2 After SH2: incremental index (implemented)
+
+SH2 implemented option C (`docs/web-modules/sheets-module.md`, section SH2). The index now advances in resumable
+passes, so the first viewport no longer waits for the whole sheet.
+
+| cells | first viewport, before → after |
+| ----- | ------------------------------ |
+| 0.22M | 559 → 120 ms                   |
+| 0.44M | 1 219 → 49 ms                  |
+| 1.1M  | 2 864 → 29 ms                  |
+| 2.2M  | 4 924 → 31 ms                  |
+
+Open plus first viewport at 2.2M cells is 2.3 s. Proposed raised gates: 10 MB stored / 80 MB of worksheet XML.
+
+#### 4.5.3 Final gates and Chromium numbers (SH2, production build)
+
+**Gates (lead-confirmed 2026-10-09):** the host opens G3 above **10 MB stored**; the frame refuses an open above
+**80 MB of uncompressed worksheet XML** (`MAX_WORKSHEET_XML_BYTES`, fatal `too_large` → G3).
+
+Chromium 151 headless runs the production `build:web --module sheets` in the test host (`web/e2e/sheets.spec.ts`
+"Chromium timing"). Times are from page load. "Engine open" covers the frame bundle and Univer boot, the Worker start,
+the wasm compile and the `open`. The first viewport is a 100 × 22 read issued after the renderer's own reads, so it
+can queue behind one background index pass.
+
+| rows × 22 (cells, file)           | handshake | engine open | first viewport | usable after |
+| --------------------------------- | --------- | ----------- | -------------- | ------------ |
+| 20k (0.44M, 2.0 MB)               | 1.0 s     | 2.5 s       | 0.6 s          | **4.1 s**    |
+| 50k (1.1M, 5.1 MB)                | 0.7 s     | 2.9 s       | 0.6 s          | **4.3 s**    |
+| 100k (2.2M, 10.3 MB, 70.8 MB XML) | 0.8 s     | 3.8 s       | 0.6 s          | **5.1 s**    |
+
+Single runs on the loaded VPS (4 vCPU), under the lane lock.
+
 ### 4.4 Pure JS (`@genoffice/xlsx-gateway`, JSZip, no engine)
 
 | Cells                                   | G0 (3 files) | 0.44M   | 2.2M    | 6.6M      |

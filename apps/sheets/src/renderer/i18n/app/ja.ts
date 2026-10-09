@@ -1573,4 +1573,7 @@ export const ja = {
   appWebDiscard: '破棄',
   appWebCancel: 'キャンセル',
   appWebSaveFailed: 'UniWork への保存に失敗しました。',
+  appWebTooLargeTitle: 'このブックは大きすぎて Web では開けません',
+  appWebTooLargeBody:
+    'Web 版スプレッドシートで扱えるサイズを超えているため、クラシック スプレッドシート エディターで開きます。',
 } satisfies Record<keyof typeof zh, string>

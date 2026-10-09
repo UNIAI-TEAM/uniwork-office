@@ -1790,6 +1790,11 @@ button.check-item:hover {
   margin-left: 6px;
 }
 
+/* web frame without AI (cap('ai') off): no dock column at all */
+.app-shell.no-copilot .sheet-body {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .app-shell.copilot-collapsed .sheet-body {
   grid-template-columns: 34px minmax(0, 1fr);
 }
@@ -6977,6 +6982,12 @@ body > div:has([data-u-comp='find-replace-dialog']) {
   background: var(--canvas);
   color: var(--text);
   font-family: var(--gs-font-sans, system-ui, sans-serif);
+}
+
+.engine-unavailable-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
 }
 
 .engine-unavailable-card {

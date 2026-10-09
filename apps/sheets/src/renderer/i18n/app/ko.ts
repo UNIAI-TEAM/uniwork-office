@@ -1545,4 +1545,7 @@ export const ko = {
   appWebDiscard: '삭제',
   appWebCancel: '취소',
   appWebSaveFailed: 'UniWork에 저장하지 못했습니다.',
+  appWebTooLargeTitle: '이 통합 문서는 너무 커서 웹에서 열 수 없습니다',
+  appWebTooLargeBody:
+    '웹 스프레드시트가 처리할 수 있는 크기를 넘으므로 클래식 스프레드시트 편집기에서 엽니다.',
 } satisfies Record<keyof typeof zh, string>

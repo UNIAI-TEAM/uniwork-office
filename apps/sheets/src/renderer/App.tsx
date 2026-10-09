@@ -502,7 +502,7 @@ import {
 import { ChartFormatPane, SelectDataDialog } from './ChartPanels'
 import { cap } from './capabilities'
 import { EngineUnavailableScreen } from './EngineUnavailableScreen'
-import { isEngineUnavailableError } from './web-engine'
+import { isEngineUnavailableError, isTooLargeError } from './web-engine'
 import { handleSheetsControl, type ControlRequest } from './control'
 
 // Source sheet id of an in-flight copy-sheet command; the next insert-sheet
@@ -708,7 +708,7 @@ export function App({
   const [message, setMessage] = useState(t('appReadyInitial'))
   /// Web frame: the open failed because no workbook engine is installed
   /// (web-engine.ts); the whole window shows EngineUnavailableScreen.
-  const [engineUnavailable, setEngineUnavailable] = useState(false)
+  const [engineUnavailable, setEngineUnavailable] = useState<'engine' | 'too-large' | null>(null)
   // a language switch re-renders the static status texts ("Workbook fully loaded ...")
   const { lang: uiLang } = useI18n()
   useEffect(() => setMessage((prev) => retranslateStatus(prev, uiLang)), [uiLang])
@@ -4556,8 +4556,8 @@ export function App({
       setEmptyCsvNotice(selected.emptyCsv === true)
       setMessage(selected.emptyCsv ? '' : t('appOpened', { name: selected.name }))
     } catch (error: unknown) {
-      if (isEngineUnavailableError(error)) {
-        setEngineUnavailable(true)
+      if (isEngineUnavailableError(error) || isTooLargeError(error)) {
+        setEngineUnavailable(isTooLargeError(error) ? 'too-large' : 'engine')
         return
       }
       setMessage(error instanceof Error ? error.message : t('appOpenFailed'))
@@ -4912,10 +4912,10 @@ export function App({
 
   const aiScopeChip = resolveScopeChip(aiRunScope, aiScope, aiScopeDismissed)
 
-  if (engineUnavailable) return <EngineUnavailableScreen />
-
   return (
     <>
+      {/* an overlay, not a replacement: the grid stays mounted (Univer must not lose its container) */}
+      {engineUnavailable && <EngineUnavailableScreen reason={engineUnavailable} overlay />}
       <ToastHost />
       {recoveryPrompt && (
         <RecoveryDialog

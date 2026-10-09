@@ -147,4 +147,5 @@ export const pt = {
   presentInTab: 'Nesta guia',
   presentFullscreen: 'Tela cheia',
   presentNewTab: 'Nova guia',
+  viewOnly: 'Somente leitura',
 } satisfies Record<keyof typeof zh, string>

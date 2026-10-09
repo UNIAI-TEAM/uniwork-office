@@ -15,6 +15,7 @@ import {
   runHeadlessRendererExport,
 } from '@genoffice/electron-utils/headless-export'
 import { useI18n } from './i18n/locale'
+import { cap } from './capabilities'
 import { parseDocText, serializeDocText, type Envelope } from './document/envelope'
 import { SourceEditor, type CursorInfo, type SourceEditorHandle } from './source/SourceEditor'
 import { PreviewFrame, type PreviewFrameHandle } from './preview/PreviewFrame'
@@ -240,6 +241,10 @@ export default function App() {
   statusRef.current = status
   selectedSidRef.current = selectedSid
   const dirty = text !== savedText
+  // web frame (capabilities.ts): AI, autosave and visual edit off, view only without `save`
+  const aiEnabled = cap('ai')
+  const canEdit = cap('save')
+  const visualEdit = cap('htmlVisualEdit')
 
   const getMap = useCallback((): ParseMap => {
     const cached = mapRef.current
@@ -290,8 +295,8 @@ export default function App() {
   // mirror dirtiness to the main process (close prompt) — untitled blank docs never count
   useEffect(() => {
     if (status !== 'ready') return
-    window.htmlApi.setDirty(dirty || pendingCount > 0)
-  }, [dirty, pendingCount, status])
+    window.htmlApi.setDirty(canEdit && (dirty || pendingCount > 0))
+  }, [dirty, pendingCount, status, canEdit])
 
   /**
    * Serve the current source to html-preview://. `reload` = false for a commit the frame already
@@ -1098,7 +1103,7 @@ export default function App() {
 
   const doSave = useCallback(
     async (mode: SaveMode, suggestedName?: string): Promise<boolean> => {
-      if (statusRef.current !== 'ready') return false
+      if (statusRef.current !== 'ready' || !cap('save')) return false
       // uncommitted live style pokes belong to the document being saved
       flushPending()
       // a menu save or ⌘S during an autosave queues behind it instead of being dropped;
@@ -1362,7 +1367,7 @@ export default function App() {
 
   // autosave: every 30s and on window blur; untitled documents wait for an explicit first save
   useEffect(() => {
-    if (!autoSave || !path) return
+    if (!autoSave || !path || !cap('autoSave')) return
     const tick = () => {
       // a native Save As dialog blurs the window: autosave must not queue a write behind
       // a user-driven save, only explicit saves do
@@ -1471,7 +1476,7 @@ export default function App() {
       className={`app${canvasMode === 'present' ? ` present${presentFull ? ' present-full' : ''}` : ''}`}
     >
       <Ribbon
-        disabled={status !== 'ready'}
+        disabled={status !== 'ready' || !canEdit}
         dirty={dirty}
         onSave={() => void doSave('save')}
         onSaveAs={() => void doSave('saveAs')}
@@ -1488,6 +1493,9 @@ export default function App() {
         }}
         autoSave={autoSave}
         onToggleAutoSave={setAutoSave}
+        showAutoSave={cap('autoSave')}
+        showAi={aiEnabled}
+        presentNewTab={cap('presentNewTab')}
         view={view}
         onView={setView}
         aiOpen={aiOpen}
@@ -1506,31 +1514,33 @@ export default function App() {
       />
 
       <div className="app-main">
-        <div className={`ai-dock${aiOpen ? '' : ' collapsed'}`}>
-          {!aiOpen && (
-            <button
-              className="ai-rail"
-              data-tip={t('aiOpenAssistant')}
-              aria-label={t('aiOpenAssistant')}
-              onClick={() => setAiOpen(true)}
-            >
-              <GensparkMark size={18} />
-            </button>
-          )}
-          {/* stays mounted while collapsed: an in-flight run, its snapshots and the loop context survive */}
-          <AiPanel
-            deps={aiDeps}
-            filePath={path}
-            preset={aiPreset}
-            editQueue={editQueue}
-            onQueueEditInstruction={queueUpdate}
-            onQueueRemove={queueRemove}
-            onQueueClear={() => setEditQueue([])}
-            onQueueFocus={queueFocus}
-            onQueueConsume={queueConsume}
-            onCollapse={() => setAiOpen(false)}
-          />
-        </div>
+        {aiEnabled && (
+          <div className={`ai-dock${aiOpen ? '' : ' collapsed'}`}>
+            {!aiOpen && (
+              <button
+                className="ai-rail"
+                data-tip={t('aiOpenAssistant')}
+                aria-label={t('aiOpenAssistant')}
+                onClick={() => setAiOpen(true)}
+              >
+                <GensparkMark size={18} />
+              </button>
+            )}
+            {/* stays mounted while collapsed: an in-flight run, its snapshots and the loop context survive */}
+            <AiPanel
+              deps={aiDeps}
+              filePath={path}
+              preset={aiPreset}
+              editQueue={editQueue}
+              onQueueEditInstruction={queueUpdate}
+              onQueueRemove={queueRemove}
+              onQueueClear={() => setEditQueue([])}
+              onQueueFocus={queueFocus}
+              onQueueConsume={queueConsume}
+              onCollapse={() => setAiOpen(false)}
+            />
+          </div>
+        )}
         <div className="app-content">
           {findTarget && (
             <FindPanel
@@ -1547,6 +1557,7 @@ export default function App() {
               sid={selectedSid}
               state={selectedState}
               onSelect={(sid) => selectSid(sid, { reveal: true })}
+              showHint={visualEdit}
             />
           )}
           <div className={`workspace view-${canvasMode === 'present' ? 'preview' : view}`}>
@@ -1577,7 +1588,8 @@ export default function App() {
                     {t('presentExit')}
                   </button>
                 )}
-                {canvasMode === 'edit' &&
+                {visualEdit &&
+                  canvasMode === 'edit' &&
                   !dragging &&
                   hasElement &&
                   selectedEntry &&
@@ -1617,7 +1629,8 @@ export default function App() {
                       }}
                     />
                   )}
-                {canvasMode === 'edit' &&
+                {visualEdit &&
+                  canvasMode === 'edit' &&
                   hasElement &&
                   selectedEntry &&
                   selComputed &&
@@ -1647,6 +1660,7 @@ export default function App() {
                 ref={editorRef}
                 className="source-editor"
                 initialText={text}
+                readOnly={!canEdit}
                 onChange={onEditorChange}
                 onCursor={onCursor}
                 onBeforeReplace={flushPending}
@@ -1660,6 +1674,9 @@ export default function App() {
                 <span className="status-item status-notice">{notice}</span>
               ) : (
                 !path && <span className="status-item status-hint">{t('previewNeedsSave')}</span>
+              )}
+              {!canEdit && status === 'ready' && (
+                <span className="status-item status-view-only">{t('viewOnly')}</span>
               )}
             </div>
             <div className="status-right">
@@ -1718,7 +1735,7 @@ export default function App() {
           </footer>
         </div>
       </div>
-      {askTarget && askMode && canvasMode !== 'present' && (
+      {aiEnabled && askTarget && askMode && canvasMode !== 'present' && (
         <AiAskPopover
           key={askMode.kind === 'edit' ? askMode.qid : 'new'}
           target={askTarget}

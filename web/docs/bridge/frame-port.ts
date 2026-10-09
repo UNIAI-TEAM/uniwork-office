@@ -10,6 +10,7 @@ import {
   type FrameRequestType,
   type FrameRequests,
   type HostRequests,
+  type InitUser,
   type ProtocolErrorCode,
   type ProtocolErrorShape,
   type SavedPayload,
@@ -31,6 +32,8 @@ export interface PortSession {
   locale?: string
   /** effective capabilities (frame ∩ host grant); absent in unit-test sessions */
   capabilities?: Capabilities
+  /** the viewer's display data from `init.user` (additive, GO-B4: PDF note author) */
+  user?: InitUser
 }
 
 type HostHandler<K extends keyof HostRequests> = (

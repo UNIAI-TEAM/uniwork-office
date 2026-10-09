@@ -1459,4 +1459,6 @@ export const zh = {
   appWebDiscard: '放弃',
   appWebCancel: '取消',
   appWebSaveFailed: '保存到 UniWork 失败。',
+  appWebTooLargeTitle: '此工作簿太大，无法在网页端打开',
+  appWebTooLargeBody: '它超出了网页版表格的大小上限，正在改用经典表格编辑器打开。',
 }

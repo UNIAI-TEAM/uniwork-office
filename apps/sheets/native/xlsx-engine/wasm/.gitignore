@@ -1,0 +1,4 @@
+# build-wasm.mjs outputs (the module is rebuilt from source and checked against xlsx-sidecar.wasm.sha256)
+/target/
+/.vendor/
+/dist/

@@ -74,7 +74,6 @@ import {
   mergePdfBytes,
   readStaticFormFills,
   replacePagesBytes,
-  savePdfToPath,
   setPageSizeBytes,
   splitPagesBytes,
   splitPdfBytes,
@@ -88,6 +87,9 @@ import {
 } from './signature-store'
 import { uniqueGeneratedPdfPath } from './generated-output'
 import { validateRedactionRegions } from './redaction'
+import { savePdfToPath } from './save-pdf-file'
+import { installNodePdfEnv } from './node-env'
+import { electronImageCodec } from './electron-image'
 
 const tDlg = createI18n({
   zh: {
@@ -966,6 +968,8 @@ export async function readMergeInputs(
 function registerPdfIpc(): void {
   if (ipcRegistered) return
   ipcRegistered = true
+  // the save core's platform seams: wasm + fonts from disk, images through nativeImage
+  installNodePdfEnv({ image: electronImageCodec })
 
   ipcMain.handle(PDF_CHANNELS.consumePending, (e) => openPathByWc.get(e.sender.id) ?? null)
 

@@ -1463,4 +1463,7 @@ export const he = {
   appWebDiscard: 'בטל שינויים',
   appWebCancel: 'ביטול',
   appWebSaveFailed: 'השמירה ב-UniWork נכשלה.',
+  appWebTooLargeTitle: 'חוברת העבודה גדולה מדי לאינטרנט',
+  appWebTooLargeBody:
+    'היא חורגת מהגודל שגיליון האינטרנט מטפל בו, ולכן תיפתח בעורך הגיליונות הקלאסי.',
 } satisfies Record<keyof typeof zh, string>

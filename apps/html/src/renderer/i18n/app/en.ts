@@ -145,4 +145,5 @@ export const en = {
   presentInTab: 'In this tab',
   presentFullscreen: 'Fullscreen',
   presentNewTab: 'New tab',
+  viewOnly: 'View only',
 } satisfies Record<keyof typeof zh, string>

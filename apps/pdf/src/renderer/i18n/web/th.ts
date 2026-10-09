@@ -1,0 +1,21 @@
+import type { zh } from './zh'
+
+export const th = {
+  webCancel: 'ยกเลิก',
+  webConflictTitle: 'เอกสารนี้ถูกแก้ไขจากที่อื่น',
+  webConflictBody:
+    'มีการบันทึกเวอร์ชันใหม่กว่าระหว่างที่คุณแก้ไข ต้องการเขียนทับด้วยเวอร์ชันของคุณ หรือโหลดเวอร์ชันล่าสุดใหม่และละทิ้งการเปลี่ยนแปลงของคุณ?',
+  webConflictOverwrite: 'เขียนทับ',
+  webConflictReload: 'โหลดเวอร์ชันล่าสุด',
+  webConflictNotSaved: 'เอกสารถูกแก้ไขจากที่อื่น',
+  webFatalTitle: 'ไม่สามารถเปิดเอกสารได้',
+  webFatalBody: 'ปิดการแก้ไขและการบันทึกแล้ว โปรดโหลดหน้าใหม่หรือเปิดเอกสารอีกครั้งจาก UniWork',
+  webNoHost: 'ตัวแก้ไขนี้ทำงานภายใน UniWork โปรดเปิดเอกสารจาก UniWork',
+  webViewOnly: 'ดูอย่างเดียว',
+  webReloaded: 'โหลดเวอร์ชันล่าสุดใหม่แล้ว และละทิ้งการเปลี่ยนแปลงของคุณ',
+  webViewOnlyNoSave: 'เอกสารนี้ดูได้อย่างเดียว',
+  webMergeTitle: 'รวม PDF',
+  webMergeBody: 'เลือก PDF แล้ว {count} ไฟล์ จะเพิ่ม PDF อีกหรือรวมเลย?',
+  webMergeAdd: 'เพิ่ม PDF อีก',
+  webMergeNow: 'รวมเลย',
+} satisfies Record<keyof typeof zh, string>

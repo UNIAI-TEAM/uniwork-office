@@ -1594,4 +1594,7 @@ export const fr = {
   appWebDiscard: 'Abandonner',
   appWebCancel: 'Annuler',
   appWebSaveFailed: "L'enregistrement dans UniWork a échoué.",
+  appWebTooLargeTitle: 'Ce classeur est trop volumineux pour le web',
+  appWebTooLargeBody:
+    "Il dépasse la taille que le tableur web prend en charge ; il s'ouvre donc dans l'éditeur de tableur classique.",
 } satisfies Record<keyof typeof zh, string>

@@ -144,4 +144,5 @@ export const ms = {
   presentInTab: 'Dalam tab ini',
   presentFullscreen: 'Skrin penuh',
   presentNewTab: 'Tab baharu',
+  viewOnly: 'Lihat sahaja',
 } satisfies Record<keyof typeof zh, string>

@@ -1567,4 +1567,7 @@ export const pt = {
   appWebDiscard: 'Descartar',
   appWebCancel: 'Cancelar',
   appWebSaveFailed: 'Falha ao salvar no UniWork.',
+  appWebTooLargeTitle: 'Esta pasta de trabalho é grande demais para a web',
+  appWebTooLargeBody:
+    'Ela excede o tamanho que a planilha web suporta, por isso abre no editor de planilhas clássico.',
 } satisfies Record<keyof typeof zh, string>

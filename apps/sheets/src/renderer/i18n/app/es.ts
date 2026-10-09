@@ -1570,4 +1570,7 @@ export const es = {
   appWebDiscard: 'Descartar',
   appWebCancel: 'Cancelar',
   appWebSaveFailed: 'No se pudo guardar en UniWork.',
+  appWebTooLargeTitle: 'Este libro es demasiado grande para la web',
+  appWebTooLargeBody:
+    'Supera el tamaño que admite la hoja de cálculo web, así que se abre en el editor de hojas de cálculo clásico.',
 } satisfies Record<keyof typeof zh, string>

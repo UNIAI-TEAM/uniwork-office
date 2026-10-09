@@ -835,7 +835,7 @@ export function ExcelShell({
 
   return (
     <main
-      className={`app-shell ${isCopilotOpen ? '' : 'copilot-collapsed'}`}
+      className={`app-shell ${!cap('ai') ? 'no-copilot' : isCopilotOpen ? '' : 'copilot-collapsed'}`}
       inert={openingWorkbook}
       aria-busy={openingWorkbook}
     >

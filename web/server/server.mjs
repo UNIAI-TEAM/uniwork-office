@@ -64,6 +64,8 @@ function moduleFrame(pathname) {
 const fixturesDir = resolve(repoRoot, 'fixtures/generated')
 // hand-made samples for the other modules (sample.pdf / .md / .html), GO-B4
 const webFixturesDir = resolve(repoRoot, 'web/fixtures')
+// fixtures an e2e generates at run time (e.g. large synthetic workbooks), never committed
+const e2eFixturesDir = resolve(repoRoot, 'web/e2e/.results/fixtures')
 // GO-B3: test-only host page that embeds the frame and speaks the protocol (web/e2e)
 const testHostDir = resolve(here, 'test-host')
 const port = Number(process.env.PORT) || 4180
@@ -183,9 +185,9 @@ const server = createServer(async (req, res) => {
 
     if (pathname === '/healthz') return send(res, 200, 'ok')
 
-    const fx = /^\/fixtures\/([^/]+\.(?:docx|pdf|md|html|pptx|xlsx))$/.exec(pathname)
+    const fx = /^\/fixtures\/([^/]+\.(?:docx|pdf|md|html|pptx|xlsx|xlsm|xls))$/.exec(pathname)
     if (fx) {
-      for (const dir of [fixturesDir, webFixturesDir]) {
+      for (const dir of [fixturesDir, webFixturesDir, e2eFixturesDir]) {
         const file = safeJoin(dir, fx[1])
         if (file && (await isFile(file))) return sendFile(req, res, file)
       }

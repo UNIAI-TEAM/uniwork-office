@@ -1486,4 +1486,7 @@ export const ar = {
   appWebDiscard: 'تجاهل',
   appWebCancel: 'إلغاء',
   appWebSaveFailed: 'فشل الحفظ في UniWork.',
+  appWebTooLargeTitle: 'هذا المصنف كبير جدًا بالنسبة للويب',
+  appWebTooLargeBody:
+    'حجمه يتجاوز ما يتعامل معه جدول البيانات على الويب، لذلك يُفتح في محرر جداول البيانات الكلاسيكي بدلًا من ذلك.',
 } satisfies Record<keyof typeof zh, string>

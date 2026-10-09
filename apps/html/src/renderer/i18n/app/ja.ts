@@ -146,4 +146,5 @@ export const ja = {
   presentInTab: 'このタブで',
   presentFullscreen: '全画面',
   presentNewTab: '新しいタブ',
+  viewOnly: '表示のみ',
 } satisfies Record<keyof typeof zh, string>

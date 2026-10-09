@@ -20,6 +20,9 @@
 //   send(type, p)    -> send a host->frame event (theme / language / ...)
 //   bumpRemote(id)   -> simulate a concurrent server-side save (next frame save conflicts)
 //   lastExport()     -> {fileId, name, dataBytes: number[] | null} of the last api.export | null
+//   addFile(url)     -> fetch a fixture into the store, resolves with its meta (GO-B4)
+//   queuePick(id)    -> the next file.pick answers this file (nothing queued = the user cancelled);
+//                       file.pick is granted with ?pick=1
 
 const NS = 'uniwork.office.docs'
 const V = 1
@@ -32,6 +35,7 @@ let seq = 0
 let lastSaved = null
 let lastExport = null
 const events = []
+const picks = [] // fileIds the next file.pick requests answer, in order
 const pending = new Map() // id -> {resolve, reject}
 let reqSeq = 0
 
@@ -91,6 +95,10 @@ const handlers = {
       .reverse()
       .slice(0, limit ?? 20),
   }),
+  'file.pick': () => {
+    const f = files.get(picks.shift())
+    return { file: f ? { file: { ...f.meta }, source: { kind: 'bytes', data: f.bytes.slice().buffer } } : null }
+  },
   // no server render in the harness: record what the frame sent, answer a stub PDF
   'api.export': ({ fileId, name, data }) => {
     lastExport = {
@@ -180,6 +188,7 @@ const initPayload = {
   ...(MODULE !== 'docs' ? { module: MODULE, user: { displayName: 'Test User' } } : {}),
 }
 if (params.get('readonly') === '1') delete initPayload.capabilities.save
+if (params.get('pick') === '1') initPayload.capabilities.filePick = true
 
 async function boot() {
   const url = params.get('open')
@@ -202,6 +211,13 @@ async function boot() {
     request,
     // host -> frame event, e.g. send('theme', {theme: 'dark'}), send('language', {locale: 'vi'})
     send: (type, payload) => post({ id: `h${++reqSeq}`, kind: 'event', type, payload }),
+    addFile: async (url) => {
+      const res = await fetch(url)
+      if (!res.ok) throw new Error(`GET ${url} -> ${res.status}`)
+      const name = decodeURIComponent(new URL(url, location.href).pathname.split('/').pop())
+      return put(name, new Uint8Array(await res.arrayBuffer()))
+    },
+    queuePick: (fileId) => picks.push(fileId),
     bumpRemote: (fileId) => {
       const f = files.get(fileId)
       return f ? put(f.meta.name, f.bytes, fileId) : null

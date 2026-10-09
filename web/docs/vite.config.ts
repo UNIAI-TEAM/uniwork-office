@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import react from '@vitejs/plugin-react'
@@ -46,6 +47,19 @@ async function webOnlyPlugins(s: WebModuleSpec): Promise<PluginOption[]> {
 export default defineConfig(async ({ command, mode }) => {
   const renderer = await rendererParts(spec, { command, mode })
   const plugins: PluginOption[] = [
+    // module prebuild steps (e.g. the Sheets wasm engine) finish before Vite resolves imports
+    ...(command === 'build' && spec.prebuild?.length
+      ? [
+          {
+            name: 'web-module-prebuild',
+            buildStart() {
+              for (const script of spec.prebuild ?? []) {
+                execFileSync(process.execPath, [resolve(repoRoot, script)], { stdio: 'inherit' })
+              }
+            },
+          },
+        ]
+      : []),
     woff2FontsPlugin(),
     ...(renderer.plugins ?? []),
     ...(await webOnlyPlugins(spec)),
@@ -60,7 +74,26 @@ export default defineConfig(async ({ command, mode }) => {
     root: resolve(repoRoot, spec.root),
     base: './',
     plugins,
-    ...(renderer.resolve ? { resolve: renderer.resolve } : {}),
+    ...(renderer.resolve || spec.aliases
+      ? {
+          resolve: {
+            ...renderer.resolve,
+            ...(spec.aliases
+              ? {
+                  alias: [
+                    // exact specifiers: 'node:fs' must not also rewrite 'node:fs/promises'
+                    ...Object.entries(spec.aliases).map(([find, target]) => ({
+                      find: new RegExp(`^${find.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}$`),
+                      replacement: resolve(repoRoot, target),
+                    })),
+                    ...(Array.isArray(renderer.resolve?.alias) ? renderer.resolve.alias : []),
+                  ],
+                }
+              : {}),
+          },
+        }
+      : {}),
+    ...(spec.workerFormat ? { worker: { format: spec.workerFormat } } : {}),
     server: {
       fs: { allow: [repoRoot] },
     },

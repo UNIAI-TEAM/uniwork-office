@@ -62,6 +62,7 @@ import { diagramSvgToPng, renderDiagram } from './editor/diagrams'
 import type { DiagramLanguage } from './editor/diagrams'
 import type { ExportFormat, SaveMode } from '../shared/ipc'
 import { uiOp } from './editor/ops'
+import { cap } from './capabilities'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 type SaveState = 'idle' | 'saving' | 'saved' | 'failed'
@@ -221,8 +222,12 @@ export default function App() {
     [],
   )
 
+  // web frame (capabilities.ts): AI and autosave off, view only without the host's save grant
+  const aiEnabled = cap('ai')
+  const canEdit = cap('save')
+
   const markDirty = useCallback(() => {
-    if (statusRef.current !== 'ready' || dirtyRef.current) return
+    if (statusRef.current !== 'ready' || dirtyRef.current || !cap('save')) return
     dirtyRef.current = true
     setDirty(true)
     setSaveState('idle')
@@ -281,6 +286,10 @@ export default function App() {
   const tiptapTarget = useMemo(() => (editor ? tiptapFindTarget(editor) : null), [editor])
   // source mode searches the buffer the user is actually looking at
   const findTarget = sourceMode ? (sourceRef.current?.findTarget() ?? null) : tiptapTarget
+
+  useEffect(() => {
+    if (editor && editor.isEditable !== canEdit) editor.setEditable(canEdit)
+  }, [editor, canEdit, status])
 
   useEffect(() => {
     setImageBaseDir(filePath ? dirOf(filePath) : null)
@@ -380,7 +389,7 @@ export default function App() {
    * serialization, no image extraction, no trailing-newline fixups.
    */
   const doSaveSource = useCallback(async (mode: SaveMode): Promise<boolean> => {
-    if (statusRef.current !== 'ready' || savingRef.current) return false
+    if (statusRef.current !== 'ready' || savingRef.current || !cap('save')) return false
     savingRef.current = true
     setSaveState('saving')
     const textAtSave = sourceTextRef.current
@@ -510,7 +519,8 @@ export default function App() {
       if (sourceMode) return doSaveSource(mode)
       flushSource()
       const current = editorRef.current
-      if (!current || statusRef.current !== 'ready' || savingRef.current) return false
+      if (!current || statusRef.current !== 'ready' || savingRef.current || !cap('save'))
+        return false
       savingRef.current = true
       setSaveState('saving')
       try {
@@ -931,7 +941,7 @@ export default function App() {
   // (same policy as the docs app; untitled documents are skipped — the first
   // save must go through the explicit save path that names the file)
   useEffect(() => {
-    if (!autoSave || !filePath) return
+    if (!autoSave || !filePath || !cap('autoSave')) return
     const tick = () => {
       if (!dirtyRef.current) return
       if (editorRef.current?.view.composing) return // don't interrupt IME input
@@ -1075,7 +1085,7 @@ export default function App() {
     <div className="app">
       <Ribbon
         editor={editor}
-        disabled={status !== 'ready'}
+        disabled={status !== 'ready' || !canEdit}
         dirty={dirty}
         onSave={() => void doSave('save')}
         onSaveAs={() => void doSave('saveAs')}
@@ -1096,6 +1106,8 @@ export default function App() {
         onToggleSpellcheck={() => setSpellcheck((v) => !v)}
         sourceMode={sourceMode}
         sourceHistory={sourceMode ? sourceHistory : undefined}
+        showAutoSave={cap('autoSave')}
+        showAi={aiEnabled}
         aiOpen={aiOpen}
         onToggleAi={() => setAiOpen((v) => !v)}
         onAiPreset={(text) => {
@@ -1105,33 +1117,35 @@ export default function App() {
       />
       {status === 'loading' && <div className="center-note">{t('loading')}</div>}
       <div className="app-main" style={status === 'ready' ? undefined : { display: 'none' }}>
-        <div className={`ai-dock${aiOpen ? '' : ' collapsed'}`}>
-          {!aiOpen && (
-            <button
-              className="ai-rail"
-              data-tip={t('aiOpenAssistant')}
-              aria-label={t('aiOpenAssistant')}
-              onClick={() => setAiOpen(true)}
-            >
-              <GensparkMark size={22} />
-            </button>
-          )}
-          {/* mounted only after the file is loaded so chat history resolves against the real path */}
-          {status === 'ready' && (
-            <AiPanel
-              deps={aiDeps}
-              filePath={filePath}
-              preset={aiPreset}
-              onCollapse={() => setAiOpen(false)}
-              editQueue={editQueue}
-              onQueueEditInstruction={queueUpdate}
-              onQueueRemove={queueRemove}
-              onQueueClear={queueClear}
-              onQueueFocus={queueFocus}
-              onQueueConsume={queueConsume}
-            />
-          )}
-        </div>
+        {aiEnabled && (
+          <div className={`ai-dock${aiOpen ? '' : ' collapsed'}`}>
+            {!aiOpen && (
+              <button
+                className="ai-rail"
+                data-tip={t('aiOpenAssistant')}
+                aria-label={t('aiOpenAssistant')}
+                onClick={() => setAiOpen(true)}
+              >
+                <GensparkMark size={22} />
+              </button>
+            )}
+            {/* mounted only after the file is loaded so chat history resolves against the real path */}
+            {status === 'ready' && (
+              <AiPanel
+                deps={aiDeps}
+                filePath={filePath}
+                preset={aiPreset}
+                onCollapse={() => setAiOpen(false)}
+                editQueue={editQueue}
+                onQueueEditInstruction={queueUpdate}
+                onQueueRemove={queueRemove}
+                onQueueClear={queueClear}
+                onQueueFocus={queueFocus}
+                onQueueConsume={queueConsume}
+              />
+            )}
+          </div>
+        )}
         {outlineOpen && !sourceMode && (
           <OutlinePane
             items={outlineItems}
@@ -1176,7 +1190,13 @@ export default function App() {
                 ref={scrollRef}
               >
                 <div className="doc-page" style={{ zoom: zoom / 100 }}>
-                  {fmOpen && <FrontmatterPanel value={fmText} onChange={onFrontmatterChange} />}
+                  {fmOpen && (
+                    <FrontmatterPanel
+                      value={fmText}
+                      onChange={onFrontmatterChange}
+                      readOnly={!canEdit}
+                    />
+                  )}
                   <EditorContent editor={editor} />
                 </div>
               </div>
@@ -1197,6 +1217,9 @@ export default function App() {
                 </span>
               )}
               {fileName && <span className="status-item status-file">{fileName}</span>}
+              {!canEdit && status === 'ready' && (
+                <span className="status-item status-view-only">{t('viewOnly')}</span>
+              )}
             </div>
             <div className="status-right">
               {statusText && (
@@ -1259,7 +1282,7 @@ export default function App() {
         />
       )}
       {!sourceMode && <TableMenu editor={editor} scrollRef={scrollRef} zoom={zoom} />}
-      {editor && !sourceMode && status === 'ready' && (
+      {editor && !sourceMode && status === 'ready' && aiEnabled && canEdit && (
         <AiAskPopover
           editor={editor}
           queueFull={editQueue.length >= EDIT_QUEUE_MAX}

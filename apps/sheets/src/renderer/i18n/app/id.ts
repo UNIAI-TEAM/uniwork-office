@@ -1527,4 +1527,7 @@ export const id = {
   appWebDiscard: 'Buang',
   appWebCancel: 'Batal',
   appWebSaveFailed: 'Gagal menyimpan ke UniWork.',
+  appWebTooLargeTitle: 'Buku kerja ini terlalu besar untuk web',
+  appWebTooLargeBody:
+    'Ukurannya melebihi batas spreadsheet web, jadi dibuka di editor spreadsheet klasik.',
 } satisfies Record<keyof typeof zh, string>

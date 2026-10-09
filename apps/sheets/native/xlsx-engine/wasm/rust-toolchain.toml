@@ -1,0 +1,7 @@
+# Pinned so the wasm module is reproducible: build-wasm.mjs checks its sha256 against
+# xlsx-sidecar.wasm.sha256 (rustup installs this toolchain + target on first use).
+# calamine 0.36 / time 0.3.54 need rustc >= 1.88.
+[toolchain]
+channel = "1.90.0"
+targets = ["wasm32-wasip1"]
+profile = "minimal"
