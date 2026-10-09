@@ -18,10 +18,13 @@ export function openResultFor(session: Session, fitWidthPx: number): OpenResult 
   }
 }
 
-/** Parse `bytes`, register the deck's fonts with the host, and make it the client's session. */
+/**
+ * Parse `bytes`, register the deck's fonts with the host, and make it the client's session.
+ * `recovered` (a restored draft copy) starts the session dirty, so the user still has to save.
+ */
 export async function openSessionFromBytes(
   clientId: number,
-  init: { path: string; bytes: Uint8Array; fitWidthPx: number },
+  init: { path: string; bytes: Uint8Array; fitWidthPx: number; recovered?: boolean },
 ): Promise<{ session: Session; result: OpenResult }> {
   const opened: OpenedPptx = await openPptx(init.bytes)
   sessionPlatform().deckOpened?.(opened)
@@ -29,6 +32,7 @@ export async function openSessionFromBytes(
     path: init.path,
     opened,
     fitWidthPx: init.fitWidthPx,
+    ...(init.recovered ? { recovered: true } : {}),
   })
   return { session, result: openResultFor(session, init.fitWidthPx) }
 }
