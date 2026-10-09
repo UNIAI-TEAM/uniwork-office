@@ -97,13 +97,17 @@ test.describe('docs floating table click', () => {
       const box = (await nameCell.boundingBox())!
       // the empty top band of the cell, well away from the glyphs
       await page.mouse.click(box.x + box.width / 2, box.y + 6)
-      const path = await page.evaluate(() => {
-        const $from = (window as unknown as AidocsWindow).__aidocs!.editor!.state.selection.$from
-        const names: string[] = []
-        for (let d = $from.depth; d >= 0; d--) names.push($from.node(d).type.name)
-        return names
-      })
-      expect(path).toContain('docTableCell')
+      // the browser places the caret; ProseMirror adopts it on the async
+      // selectionchange that follows mouseup, so a read right after click()
+      // can still see the open-time caret at the document start
+      const caretPath = () =>
+        page.evaluate(() => {
+          const $from = (window as unknown as AidocsWindow).__aidocs!.editor!.state.selection.$from
+          const names: string[] = []
+          for (let d = $from.depth; d >= 0; d--) names.push($from.node(d).type.name)
+          return names
+        })
+      await expect.poll(caretPath, { timeout: 5_000 }).toContain('docTableCell')
       await page.keyboard.type('Z')
       await expect(nameCell).toHaveText(/Z/)
     } finally {

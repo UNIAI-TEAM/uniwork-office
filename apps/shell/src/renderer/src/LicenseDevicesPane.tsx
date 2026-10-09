@@ -23,9 +23,12 @@ const isDev = Boolean(import.meta.env?.DEV)
 export function LicenseDevicesPane({
   lang,
   loggedIn,
+  accountPlanName,
 }: {
   lang: string
   loggedIn: boolean
+  /** plan of the signed-in UniWork account (server entitlements); wins over the on-device one */
+  accountPlanName?: string
 }): ReactElement {
   const [ent, setEnt] = useState<LicenseEntitlement>(() => readLicenseEntitlement())
   const [msg, setMsg] = useState('')
@@ -33,6 +36,9 @@ export function LicenseDevicesPane({
   const plan = getLicensePlan(ent.planId)
   const over = isOverDeviceLimit(ent)
   const bridgeOk = canUseOfficeBridge(ent)
+  // a signed-in UniWork account owns the plan: the on-device license rows
+  // (status, devices, tokens, Office Bridge tier) would contradict it
+  const onDevice = !loggedIn
 
   const persist = (next: LicenseEntitlement) => {
     writeLicenseEntitlement(next)
@@ -54,7 +60,9 @@ export function LicenseDevicesPane({
 
   return (
     <div className="set-license">
-      <h4 className="set-license-h">{L(lang, 'License UniWork Office', 'UniWork Office license')}</h4>
+      <h4 className="set-license-h">
+        {L(lang, 'License UniWork Office', 'UniWork Office license')}
+      </h4>
       <p className="set-field-desc">
         {L(
           lang,
@@ -67,41 +75,55 @@ export function LicenseDevicesPane({
         <div>
           <span>{L(lang, 'Gói', 'Plan')}</span>
           <strong>
-            {lang.startsWith('vi') ? plan.labelVi : plan.labelEn}
-            {ent.simulated ? ' · DEV' : ''}
+            {loggedIn
+              ? (accountPlanName ?? '—')
+              : lang.startsWith('vi')
+                ? plan.labelVi
+                : plan.labelEn}
+            {onDevice && ent.simulated ? ' · DEV' : ''}
           </strong>
         </div>
-        <div>
-          <span>{L(lang, 'Trạng thái', 'Status')}</span>
-          <strong>{statusLabel()}</strong>
-        </div>
-        <div>
-          <span>{L(lang, 'Thiết bị', 'Devices')}</span>
-          <strong>
-            {ent.devices.length} / {ent.maxDevices}
-          </strong>
-        </div>
-        <div>
-          <span>Office Bridge</span>
-          <strong>
-            {bridgeOk
-              ? L(lang, 'Được phép', 'Allowed')
-              : L(lang, 'Chỉ local / cần Personal+', 'Local only / needs Personal+')}
-          </strong>
-        </div>
-        <div>
-          <span>AI token / {L(lang, 'tháng', 'month')}</span>
-          <strong>{ent.tokensMonth.toLocaleString(lang.startsWith('vi') ? 'vi-VN' : 'en-US')}</strong>
-        </div>
-        {ent.expiresAt ? (
-          <div>
-            <span>{L(lang, 'Hết hạn', 'Expires')}</span>
-            <strong>{new Date(ent.expiresAt).toLocaleDateString(lang.startsWith('vi') ? 'vi-VN' : 'en-US')}</strong>
-          </div>
+        {onDevice ? (
+          <>
+            <div>
+              <span>{L(lang, 'Trạng thái', 'Status')}</span>
+              <strong>{statusLabel()}</strong>
+            </div>
+            <div>
+              <span>{L(lang, 'Thiết bị', 'Devices')}</span>
+              <strong>
+                {ent.devices.length} / {ent.maxDevices}
+              </strong>
+            </div>
+            <div>
+              <span>Office Bridge</span>
+              <strong>
+                {bridgeOk
+                  ? L(lang, 'Được phép', 'Allowed')
+                  : L(lang, 'Chỉ local / cần Personal+', 'Local only / needs Personal+')}
+              </strong>
+            </div>
+            <div>
+              <span>AI token / {L(lang, 'tháng', 'month')}</span>
+              <strong>
+                {ent.tokensMonth.toLocaleString(lang.startsWith('vi') ? 'vi-VN' : 'en-US')}
+              </strong>
+            </div>
+            {ent.expiresAt ? (
+              <div>
+                <span>{L(lang, 'Hết hạn', 'Expires')}</span>
+                <strong>
+                  {new Date(ent.expiresAt).toLocaleDateString(
+                    lang.startsWith('vi') ? 'vi-VN' : 'en-US',
+                  )}
+                </strong>
+              </div>
+            ) : null}
+          </>
         ) : null}
       </div>
 
-      {over ? (
+      {onDevice && over ? (
         <p className="set-license-warn">
           {L(
             lang,
@@ -111,7 +133,7 @@ export function LicenseDevicesPane({
         </p>
       ) : null}
 
-      {!loggedIn ? (
+      {accountPlanName ? null : !loggedIn ? (
         <p className="set-field-desc">
           {L(
             lang,
@@ -129,68 +151,78 @@ export function LicenseDevicesPane({
         </p>
       )}
 
-      <h4 className="set-license-h">{L(lang, 'Thiết bị đã đăng nhập', 'Devices signed in')}</h4>
-      <ul className="set-license-devices">
-        {ent.devices.length === 0 ? (
-          <li className="set-license-empty">{L(lang, 'Chưa có thiết bị.', 'No devices yet.')}</li>
-        ) : (
-          ent.devices.map((d) => {
-            const mine = d.deviceId === thisId
-            return (
-              <li key={d.deviceId} className={`set-license-device${mine ? ' is-current' : ''}`}>
-                <div>
-                  <strong>
-                    {d.label}
-                    {mine ? ` · ${L(lang, 'Máy này', 'This device')}` : ''}
-                  </strong>
-                  <span>
-                    {d.platform} · {L(lang, 'Hoạt động', 'Last seen')}{' '}
-                    {new Date(d.lastSeenAt).toLocaleString(lang.startsWith('vi') ? 'vi-VN' : 'en-US')}
-                  </span>
-                  <code>{d.deviceId.slice(0, 18)}…</code>
-                </div>
-                {!mine ? (
+      {onDevice ? (
+        <>
+          <h4 className="set-license-h">{L(lang, 'Thiết bị đã đăng nhập', 'Devices signed in')}</h4>
+          <ul className="set-license-devices">
+            {ent.devices.length === 0 ? (
+              <li className="set-license-empty">
+                {L(lang, 'Chưa có thiết bị.', 'No devices yet.')}
+              </li>
+            ) : (
+              ent.devices.map((d) => {
+                const mine = d.deviceId === thisId
+                return (
+                  <li key={d.deviceId} className={`set-license-device${mine ? ' is-current' : ''}`}>
+                    <div>
+                      <strong>
+                        {d.label}
+                        {mine ? ` · ${L(lang, 'Máy này', 'This device')}` : ''}
+                      </strong>
+                      <span>
+                        {d.platform} · {L(lang, 'Hoạt động', 'Last seen')}{' '}
+                        {new Date(d.lastSeenAt).toLocaleString(
+                          lang.startsWith('vi') ? 'vi-VN' : 'en-US',
+                        )}
+                      </span>
+                      <code>{d.deviceId.slice(0, 18)}…</code>
+                    </div>
+                    {!mine ? (
+                      <button
+                        type="button"
+                        className="set-btn"
+                        onClick={() => {
+                          const next = revokeLicenseDevice(ent, d.deviceId)
+                          persist(next)
+                          setMsg(L(lang, 'Đã thu hồi thiết bị.', 'Device revoked.'))
+                        }}
+                      >
+                        {L(lang, 'Thu hồi', 'Revoke')}
+                      </button>
+                    ) : (
+                      <span className="set-license-pill">{L(lang, 'Hiện tại', 'Current')}</span>
+                    )}
+                  </li>
+                )
+              })
+            )}
+          </ul>
+
+          {onDevice && isDev ? (
+            <>
+              <h4 className="set-license-h">
+                {L(lang, 'Mô phỏng gói (DEV)', 'Simulate plan (DEV)')}
+              </h4>
+              <div className="set-license-sim">
+                {LICENSE_PLANS.map((p) => (
                   <button
+                    key={p.id}
                     type="button"
-                    className="set-btn"
+                    className={`set-btn${ent.planId === p.id ? ' primary' : ''}`}
                     onClick={() => {
-                      const next = revokeLicenseDevice(ent, d.deviceId)
-                      persist(next)
-                      setMsg(L(lang, 'Đã thu hồi thiết bị.', 'Device revoked.'))
+                      const next = simulateLicensePlan(p.id as LicensePlanId)
+                      setEnt(next)
+                      setMsg(
+                        L(lang, `Đã mô phỏng gói ${p.labelVi}.`, `Simulated ${p.labelEn} plan.`),
+                      )
                     }}
                   >
-                    {L(lang, 'Thu hồi', 'Revoke')}
+                    {lang.startsWith('vi') ? p.labelVi : p.labelEn}
                   </button>
-                ) : (
-                  <span className="set-license-pill">{L(lang, 'Hiện tại', 'Current')}</span>
-                )}
-              </li>
-            )
-          })
-        )}
-      </ul>
-
-      {isDev ? (
-        <>
-          <h4 className="set-license-h">{L(lang, 'Mô phỏng gói (DEV)', 'Simulate plan (DEV)')}</h4>
-          <div className="set-license-sim">
-            {LICENSE_PLANS.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                className={`set-btn${ent.planId === p.id ? ' primary' : ''}`}
-                onClick={() => {
-                  const next = simulateLicensePlan(p.id as LicensePlanId)
-                  setEnt(next)
-                  setMsg(
-                    L(lang, `Đã mô phỏng gói ${p.labelVi}.`, `Simulated ${p.labelEn} plan.`),
-                  )
-                }}
-              >
-                {lang.startsWith('vi') ? p.labelVi : p.labelEn}
-              </button>
-            ))}
-          </div>
+                ))}
+              </div>
+            </>
+          ) : null}
         </>
       ) : null}
 

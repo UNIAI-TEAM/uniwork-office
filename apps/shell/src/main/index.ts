@@ -85,9 +85,17 @@ import {
   handleOfficeLaunchUrl,
   liveBridgeSessionForPath,
   persistUniWorkApiOriginFromEnv,
-  resolveUniWorkSignInUrl,
   saveActivePathToUniWork,
 } from './office-bridge-host'
+import {
+  bindAuthCallbackEvents,
+  configureUniworkAccount,
+  createAuthCallbackRouter,
+  registerAccountIpc,
+  routeAuthCallbackUrl,
+  startUniworkAccount,
+  stopUniworkAccount,
+} from './uniwork-auth'
 import { isAgentIntentUrl, parseAgentIntentUrl } from './agent-intent-host'
 import { extractLaunchUrlFromArgv, isOfficeAppUrl, parseOfficeAppUrl } from '@uniwork/office-bridge'
 import { OFFICE_APP_KINDS } from '@uniwork/office-bridge-contracts'
@@ -235,7 +243,6 @@ import {
   setHtmlProvisionalTitleHook,
 } from '../../../html/src/main/html-main'
 import type {
-  AccountLoginEvent,
   AutoSaveDefault,
   FolderListing,
   FolderRoot,
@@ -4018,39 +4025,12 @@ function statEntries(paths: string[]): RecentEntry[] {
 }
 
 function registerHomeIpc(): void {
-  // Desktop UniWork session sync is not wired yet — Sign-in opens the UniWork web link.
-  ipcMain.handle(HOME_CHANNELS.accountStatus, async () => {
-    return { loggedIn: false }
-  })
-
-  // Sign-in opens the UniWork account URL in the system browser. The URL is
-  // kept main-side so the "open manually" rescue never opens a renderer-supplied URL.
-  let pendingLoginUrl = ''
-  ipcMain.handle(HOME_CHANNELS.accountLogin, async (event) => {
-    const sender = event.sender
-    const send = (payload: AccountLoginEvent) => {
-      if (!sender.isDestroyed()) sender.send(HOME_CHANNELS.accountLoginEvent, payload)
-    }
-    const url = resolveUniWorkSignInUrl(APP_SETTINGS_PATH())
-    pendingLoginUrl = url
-    send({ phase: 'url', url })
-    try {
-      await shell.openExternal(url)
-      send({ phase: 'launched' })
-      return true
-    } catch {
-      send({ phase: 'error', error: 'network' })
-      return false
-    }
-  })
-
-  ipcMain.handle(HOME_CHANNELS.accountLoginOpenUrl, () => {
-    if (pendingLoginUrl) void shell.openExternal(pendingLoginUrl)
-  })
-
-  // No desktop UniWork session exists yet, so there is nothing to clear; the
-  // channel stays as the seam the UniWork session sync will fill in.
-  ipcMain.handle(HOME_CHANNELS.accountLogout, async () => undefined)
+  // UniWork account (desktop PKCE sign-in): the manager in ./uniwork-auth owns
+  // tokens and state; the renderer only gets AccountStatus pushes.
+  configureUniworkAccount({ settingsPath: APP_SETTINGS_PATH })
+  registerAccountIpc(ipcMain, () =>
+    shellWindow && !shellWindow.isDestroyed() ? shellWindow.webContents : null,
+  )
 
   // Reserved for the Hub result channel; the ack is not reported anywhere today.
   ipcMain.handle(HOME_CHANNELS.agentIntentAck, () => undefined)
@@ -5958,6 +5938,8 @@ async function installMainProcessProxy(): Promise<void> {
 
 let pendingLaunchPaths = collectLaunchPaths(process.argv)
 let pendingLaunchUrl = extractLaunchUrlFromArgv(process.argv)
+// sign-in callbacks (argv, open-url, second instance); held until the account starts
+const authCallbacks = createAuthCallbackRouter(process.argv)
 let controlServer: ControlServer | null = null
 
 // show() does not un-minimize, and on macOS ⌘W destroys the shell window while the
@@ -5989,25 +5971,30 @@ app.on('open-file', (event, filePath) => {
   openLaunchPaths([filePath])
 })
 
-app.on('open-url', (event, url) => {
-  event.preventDefault()
-  if (!app.isReady()) {
-    pendingLaunchUrl = url
-    return
-  }
-  void openOfficeBridgeUrl(url)
-})
+/** sign-in callbacks go to the account manager, never to the office-bridge router */
+function routeAuthCallback(url: string): void {
+  if (routeAuthCallbackUrl(url)) revealShellWindow()
+}
 
-app.on('second-instance', (_event, argv, _cwd, additionalData) => {
-  const extra = additionalData as { launchUrl?: string } | null
-  const url = extractLaunchUrlFromArgv(argv) ?? extra?.launchUrl
-  if (url) {
+bindAuthCallbackEvents(app, authCallbacks, {
+  openUrl(url) {
+    if (!app.isReady()) {
+      pendingLaunchUrl = url
+      return
+    }
     void openOfficeBridgeUrl(url)
-    return
-  }
-  const paths = collectLaunchPaths(argv, additionalData)
-  revealShellWindow()
-  openLaunchPaths(paths)
+  },
+  secondInstance(argv, additionalData) {
+    const extra = additionalData as { launchUrl?: string } | null
+    const url = extractLaunchUrlFromArgv(argv) ?? extra?.launchUrl
+    if (url) {
+      void openOfficeBridgeUrl(url)
+      return
+    }
+    const paths = collectLaunchPaths(argv, additionalData)
+    revealShellWindow()
+    openLaunchPaths(paths)
+  },
 })
 
 installNavigationGuard(app)
@@ -6108,11 +6095,13 @@ app.whenReady().then(async () => {
     return
   }
   const lockData = () =>
-    pendingLaunchUrl
-      ? { launchUrl: pendingLaunchUrl }
-      : pendingLaunchPaths.length > 0
-        ? { launchPath: pendingLaunchPaths[0], launchPaths: pendingLaunchPaths }
-        : {}
+    authCallbacks.pending()
+      ? { authCallbackUrl: authCallbacks.pending() }
+      : pendingLaunchUrl
+        ? { launchUrl: pendingLaunchUrl }
+        : pendingLaunchPaths.length > 0
+          ? { launchPath: pendingLaunchPaths[0], launchPaths: pendingLaunchPaths }
+          : {}
   let hasLock = app.requestSingleInstanceLock(lockData())
   if (!hasLock && !app.isPackaged) {
     // Dev watch restart: electron-vite SIGTERMs the previous instance and spawns this
@@ -6152,7 +6141,8 @@ app.whenReady().then(async () => {
     }
   }
 
-  void installMainProcessProxy()
+  // the UniWork account restore waits for this (system proxy before its first call)
+  const mainProxyReady = installMainProcessProxy()
   // the removed cloud projects page cached project titles here; clear our leftover copy
   try {
     rmSync(join(app.getPath('userData'), 'cloud-projects.json'), { force: true })
@@ -6274,6 +6264,10 @@ app.whenReady().then(async () => {
   setUpdateCheckInvoker(() => void checkForUpdatesNow())
   initAutoUpdater(() => shellWindow, currentUpdateChannel())
   persistUniWorkApiOriginFromEnv(APP_SETTINGS_PATH())
+  // UniWork account: register the active channel's sign-in scheme, restore the
+  // session in the background (after the proxy install), then route held callbacks
+  startUniworkAccount(mainProxyReady)
+  authCallbacks.start(routeAuthCallback)
 
   // resource watchdog: a renderer that stays hot for minutes gets diagnostics
   // recorded and the user an offer to close the document (headless exports
@@ -6340,6 +6334,7 @@ app.on('before-quit', () => {
 
 // after every window has closed, so the shell window's own 'closed' republish cannot revive the file
 app.on('will-quit', () => {
+  stopUniworkAccount()
   fileIndexer?.stop()
   fileIndexStore?.close()
   for (const watcher of folderWatchers.values()) watcher.close()

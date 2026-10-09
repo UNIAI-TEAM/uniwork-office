@@ -527,6 +527,16 @@ const config = {
       mimeType: 'text/html',
     },
   ],
+  // URL schemes the packaged app handles: `uniwork://` opens documents from
+  // UniWork, `uniwork-office://auth/callback` completes the desktop sign-in.
+  // Declared here so macOS (Info.plist CFBundleURLTypes) and Linux (.desktop
+  // MimeType) route them; Windows also registers them at runtime. The dev
+  // sign-in scheme (`uniwork-office-dev`) is not declared: this config has a
+  // single (stable) identity, and dev runs register it at runtime.
+  protocols: [
+    { name: 'UniWork', schemes: ['uniwork'] },
+    { name: 'UniWork Office sign-in', schemes: ['uniwork-office'] },
+  ],
   npmRebuild: false,
   mac: {
     // Two separate arch packages (NOT universal): arm64 keeps the exact

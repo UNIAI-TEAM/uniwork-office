@@ -56,29 +56,6 @@ export function resolveUniWorkApiOrigin(settingsPath: string): string | null {
   return typeof fromSettings === 'string' && fromSettings.trim() ? fromSettings.trim() : null
 }
 
-const DEFAULT_UNIWORK_WEB_ORIGIN = 'https://uniwork.app'
-const DEFAULT_UNIWORK_SIGN_IN_PATH = '/login'
-
-/**
- * Browser Sign-in URL for UniWork accounts (not Genspark device-code).
- * Priority: UNIWORK_SIGN_IN_URL → UNIWORK_WEB_ORIGIN|/login → API origin|/login → https://uniwork.app/login
- */
-export function resolveUniWorkSignInUrl(settingsPath: string): string {
-  const full = process.env.UNIWORK_SIGN_IN_URL?.trim()
-  if (full) return full
-
-  const webOrigin =
-    process.env.UNIWORK_WEB_ORIGIN?.trim() ||
-    resolveUniWorkApiOrigin(settingsPath) ||
-    DEFAULT_UNIWORK_WEB_ORIGIN
-  const path =
-    process.env.UNIWORK_SIGN_IN_PATH?.trim() ||
-    DEFAULT_UNIWORK_SIGN_IN_PATH
-  const origin = webOrigin.replace(/\/+$/, '')
-  const suffix = path.startsWith('/') ? path : `/${path}`
-  return `${origin}${suffix}`
-}
-
 /** Keep env origin in local settings so protocol launches (no env) still resolve it. */
 export function persistUniWorkApiOriginFromEnv(settingsPath: string): void {
   const fromEnv = process.env.UNIWORK_API_ORIGIN?.trim()
@@ -96,7 +73,10 @@ function clientFor(deps: OfficeBridgeHostDeps): OfficeBridgeClient {
   return createOfficeBridgeClient(origin)
 }
 
-export async function handleOfficeLaunchUrl(raw: string, deps: OfficeBridgeHostDeps): Promise<boolean> {
+export async function handleOfficeLaunchUrl(
+  raw: string,
+  deps: OfficeBridgeHostDeps,
+): Promise<boolean> {
   const parsed = parseOfficeLaunchUrl(raw)
   if (!parsed.ok) {
     deps.showWarning(deps.t('uwUnsupported'))
