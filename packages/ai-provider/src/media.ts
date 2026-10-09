@@ -5,7 +5,11 @@ import type {
   AiMediaSettings,
   AiSettings,
 } from './types'
-import { uniworkCloudEnabled } from './uniwork-cloud'
+import {
+  uniworkCloudEnabled,
+  uniworkCloudToolAvailable,
+  type UniworkCloudTool,
+} from './uniwork-cloud'
 
 export const OPENAI_IMAGES_BASE_URL = 'https://api.openai.com/v1'
 export const GEMINI_MEDIA_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta'
@@ -25,9 +29,9 @@ export const DEEPSEEK_MEDIA_BASE_URL = 'https://api.deepseek.com/v1'
 export const AI_MEDIA_PROVIDERS: AiMediaProviderMeta[] = [
   {
     id: 'genspark',
-    label: 'UniWork',
-    description: 'Image generation and media analysis through your UniWork sign-in',
-    keyPlaceholder: 'Not required - sign in to UniWork',
+    label: 'UniWork cloud',
+    description: "Image generation and media analysis with your organization's UniWork AI credits",
+    keyPlaceholder: 'Not required - uses your UniWork sign-in',
     defaultBaseUrl: '',
     imageProtocol: 'openai-images',
     imageModels: [],
@@ -287,11 +291,18 @@ export function mediaConfigUsable(
   return !!config.apiKey?.trim()
 }
 
+/** the UniWork cloud tool that serves one media capability */
+export function cloudToolFor(capability: MediaCapability): UniworkCloudTool {
+  return capability === 'image' ? 'image_generate' : 'media_analyze'
+}
+
 /**
  * The stored provider for one capability, honored only when it exists, has
- * that capability and is usable; anything else resolves to `genspark` (no BYOK
- * route). While the cloud seam is off, a stored `genspark` (the default) yields
- * to the first visible BYOK provider with a usable config for the capability.
+ * that capability and is usable; anything else resolves to `genspark` (the
+ * UniWork cloud route, no BYOK config). While the cloud tool for the
+ * capability is not offered (signed out, not entitled, not configured), a
+ * stored `genspark` (the default) yields to the first visible BYOK provider
+ * with a usable config for the capability.
  */
 export function activeMediaProvider(
   settings: Pick<AiSettings, 'media'>,
@@ -306,7 +317,7 @@ export function activeMediaProvider(
         ? media.videoAnalysisProvider
         : media.analysisProvider
   if (!id || id === 'genspark') {
-    if (uniworkCloudEnabled()) return 'genspark'
+    if (uniworkCloudToolAvailable(cloudToolFor(capability))) return 'genspark'
     const fallback = AI_MEDIA_PROVIDERS.find(
       (m) =>
         m.id !== 'genspark' &&
@@ -344,8 +355,9 @@ function byokModel(
 }
 
 /**
- * Media providers a picker may offer: the UniWork cloud entry only while the
- * cloud seam is on, so a stored `genspark` choice stays readable but hidden.
+ * Media providers a picker may offer: the UniWork cloud entry only while this
+ * process's cloud status says signed in + entitled, so a stored `genspark`
+ * choice stays readable but hidden otherwise.
  */
 export function visibleMediaProviders(): AiMediaProviderMeta[] {
   return uniworkCloudEnabled()
@@ -392,13 +404,18 @@ export function updateMediaProviderConfig(
   }
 }
 
-/** BYOK-only while the cloud seam is off; the cloud fallback also needs a sign-in and the cloud toggle */
+/**
+ * BYOK first; the cloud fallback needs the cloud toggle and `gskLoggedIn`,
+ * which callers take from the shell main process (`ai:gsk-status` /
+ * hasGskAuth(): signed in to UniWork and entitled), since a renderer holds
+ * no cloud status of its own.
+ */
 function capabilityAvailable(
   settings: Pick<AiSettings, 'media' | 'gskToolsEnabled'> | null | undefined,
   gskLoggedIn: boolean,
   capability: MediaCapability,
 ): boolean {
-  const cloud = uniworkCloudEnabled() && gskLoggedIn
+  const cloud = gskLoggedIn
   if (!settings) return cloud
   const model = byokModel(settings, capability)
   if (model !== null) return model !== ''
