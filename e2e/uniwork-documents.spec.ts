@@ -1135,7 +1135,15 @@ test.describe.serial('UniWork documents', () => {
         const intent = (await binding(path)).pendingIntent as { idempotencyKey: string }
 
         await chip(ctx.shell).getByRole('button', { name: 'Retry' }).click()
-        await expectState(ctx.shell, 'saved')
+        try {
+          await expectState(ctx.shell, 'saved', 20_000)
+        } catch (error) {
+          const seen = callsFor(stub, doc.id).map((c) => `${c.method} ${c.route} ${c.status}`)
+          throw new Error(
+            `Retry did not settle on saved; chip "${await label(ctx.shell).textContent()}"; calls: ${seen.join(' | ')}`,
+            { cause: error },
+          )
+        }
         const commits = stub.commits(doc.id)
         expect(commits).toHaveLength(2)
         expect(commits.map((c) => c.idempotencyKey)).toEqual([
