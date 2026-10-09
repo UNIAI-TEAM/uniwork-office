@@ -19,6 +19,12 @@ Each `<module>/` has:
   theme/locale, `window.open` guard, capability object, safe no-op Proxy, in-memory `projectApi`) is shared; the module's
   file APIs (open/save/export over `api.*` requests) are added here by the module's worker.
 
+Capabilities: `installModuleBridge()` puts one mutable object on each global as `.capabilities` (web defaults
+`MODULE_WEB_CAPABILITIES`: `ai`, `open`, `recents`, `autoSave`, `autoSaveToDisk` false; host grants assigned on `init`).
+A renderer reads it with `createCapabilityReader()` from `@genoffice/ui/capabilities` (`cap(key)`: on unless explicitly
+false, so desktop keeps everything). No autosave on the web (CONTRACT C10): the shared `getAutoSaveDefault` answers
+"off" and the bridges never send `api.save` with `auto`.
+
 Build: `npm run build:web -- --module <module>` -> `dist-web/<module>/<version>/` (see `web/docs/build/README.md`); the
 registry `web/docs/build/modules.ts` holds the one entry per module (root, renderer config, globals, CSP additions).
 Run in the test host: `/test-host/?module=<module>` (see `web/server/server.mjs`). Smoke e2e: `web/e2e/modules-smoke.spec.ts`.

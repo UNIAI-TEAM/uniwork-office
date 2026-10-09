@@ -104,6 +104,8 @@ font picker and saves under this exact header and fails on any `securitypolicyvi
   `fonts/`, never inlined as `data:` URIs, and reported as `deferred` in the manifest.
 - The 20 TTF faces (Carlito GO, Caladea, Liberation) are served as WOFF2 twins from `web/docs/fonts/` (lossless; see its README);
   the desktop app still uses the TTFs.
+- An `@font-face` `src` list that offers a WOFF2 keeps only that entry (`keepWoff2Only`): KaTeX (markdown) ships each
+  face as woff2 + woff + ttf and only the WOFF2 files are emitted. No-op for the Docs CSS.
 
 ## Other knobs
 
