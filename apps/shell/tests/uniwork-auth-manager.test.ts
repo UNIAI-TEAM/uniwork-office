@@ -1,0 +1,444 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { AccountLoginEvent, AccountStatus } from '../src/shared/home-api'
+import {
+  CredentialStoreError,
+  createMemoryCredentialStore,
+  type CredentialStore,
+  type StoredCredential,
+} from '../src/main/uniwork-auth/credentials'
+import type { DeploymentProfile } from '../src/main/uniwork-auth/deployment'
+import { AccountManager } from '../src/main/uniwork-auth/manager'
+import {
+  TransportError,
+  type DesktopSession,
+  type TransportErrorCode,
+  type UniworkTransport,
+} from '../src/main/uniwork-auth/transport'
+
+const profile: DeploymentProfile = {
+  deploymentId: 'default',
+  apiOrigin: 'https://uniwork.example',
+  clientId: 'uniwork-office',
+  channel: 'stable',
+}
+
+let tokenSeq = 0
+const session = (overrides: Partial<DesktopSession> = {}): DesktopSession => {
+  tokenSeq += 1
+  return {
+    accountId: 'acc_1',
+    deviceSessionId: 'dev_1',
+    sessionId: 'sess_1',
+    deploymentId: 'default',
+    accessToken: `at_${tokenSeq}`,
+    refreshToken: `rt_${tokenSeq}`,
+    expiresIn: 900,
+    refreshExpiresIn: 30 * 24 * 3600,
+    ...overrides,
+  }
+}
+
+const fail = (code: TransportErrorCode) => () => Promise.reject(new TransportError(code))
+
+function fakeTransport() {
+  return {
+    start: vi.fn(async () => ({
+      authorizationUrl: 'https://uniwork.example/auth/desktop/authorize?attempt=1',
+    })),
+    exchange: vi.fn(async () => session()),
+    refresh: vi.fn(async () => session()),
+    logout: vi.fn(async () => undefined),
+    me: vi.fn(async () => ({ id: 'acc_1', email: 'mai@example.com', displayName: 'Mai' })),
+    orgs: vi.fn(async () => [
+      { id: 'org_s', name: 'Old', slug: 'old', role: 'member', status: 'suspended' },
+      { id: 'org_a', name: 'Acme', slug: 'acme', role: 'owner', status: 'active' },
+      { id: 'org_b', name: 'Beta', slug: 'beta', role: 'member', status: 'active' },
+    ]),
+    billing: vi.fn(async (orgId: string) => ({
+      planCode: orgId === 'org_b' ? 'pro' : 'starter',
+      planName: orgId === 'org_b' ? 'Pro' : 'Starter',
+      status: 'active',
+      features: [
+        {
+          featureKey: 'members.max',
+          name: 'Members',
+          kind: 'quota' as const,
+          enabled: true,
+          quotaLimit: 50,
+          currentUsage: 3,
+        },
+      ],
+    })),
+  } satisfies UniworkTransport
+}
+
+const stored = (overrides: Partial<StoredCredential> = {}): StoredCredential => ({
+  deploymentId: 'default',
+  apiOrigin: 'https://uniwork.example',
+  clientId: 'uniwork-office',
+  accountId: 'acc_1',
+  deviceSessionId: 'dev_1',
+  sessionId: 'sess_1',
+  refreshToken: 'rt_stored',
+  refreshExpiresAt: Date.now() + 86_400_000,
+  profile: { accountId: 'acc_1', email: 'cached@example.com', displayName: 'Cached' },
+  ...overrides,
+})
+
+function setup(
+  options: {
+    credentials?: CredentialStore
+    profile?: DeploymentProfile | null
+    orgId?: string
+  } = {},
+) {
+  const transport = fakeTransport()
+  const credentials = options.credentials ?? createMemoryCredentialStore()
+  const openBrowser = vi.fn(async () => undefined)
+  const persistSelectedOrgId = vi.fn()
+  const manager = new AccountManager({
+    resolveProfile: () => (options.profile === undefined ? profile : options.profile),
+    createTransport: () => transport,
+    credentials,
+    openBrowser,
+    readSelectedOrgId: () => options.orgId,
+    persistSelectedOrgId,
+  })
+  const statuses: AccountStatus[] = []
+  const events: AccountLoginEvent[] = []
+  const entitlements: unknown[] = []
+  manager.onStatus((s) => statuses.push(s))
+  manager.onLoginEvent((e) => events.push(e))
+  manager.onEntitlementsChanged((e) => entitlements.push(e))
+  return {
+    manager,
+    transport,
+    credentials,
+    openBrowser,
+    persistSelectedOrgId,
+    statuses,
+    events,
+    entitlements,
+  }
+}
+
+/** signs in through start -> callback -> exchange with the real attempt state */
+async function signIn(ctx: ReturnType<typeof setup>) {
+  expect(await ctx.manager.login()).toBe(true)
+  const startArgs = ctx.transport.start.mock.calls.at(-1)?.[0] as { state: string }
+  await ctx.manager.completeCallback(
+    `uniwork-office://auth/callback?code=c1&state=${encodeURIComponent(startArgs.state)}`,
+  )
+}
+
+beforeEach(() => {
+  vi.useFakeTimers({ now: new Date('2026-10-01T00:00:00Z') })
+})
+afterEach(() => {
+  vi.useRealTimers()
+})
+
+describe('sign-in', () => {
+  it('starts PKCE, opens the browser, exchanges the code and loads the account', async () => {
+    const ctx = setup()
+    await signIn(ctx)
+    const start = ctx.transport.start.mock.calls[0][0]
+    expect(start).toMatchObject({
+      clientId: 'uniwork-office',
+      redirectUri: 'uniwork-office://auth/callback',
+    })
+    expect(start.codeChallenge).toMatch(/^[A-Za-z0-9_-]{43}$/)
+    const exchange = ctx.transport.exchange.mock.calls[0][0]
+    expect(exchange.code).toBe('c1')
+    expect(exchange.codeVerifier).toMatch(/^[A-Za-z0-9._~-]{64}$/)
+    expect(ctx.openBrowser).toHaveBeenCalledWith(
+      'https://uniwork.example/auth/desktop/authorize?attempt=1',
+      profile,
+    )
+    expect(ctx.events.map((e) => e.phase)).toEqual(['url', 'launched', 'success'])
+    expect(ctx.events[1].expiresInSec).toBe(600)
+
+    const status = ctx.manager.status()
+    expect(status).toMatchObject({
+      loggedIn: true,
+      state: 'signed-in',
+      email: 'mai@example.com',
+      profile: { accountId: 'acc_1', displayName: 'Mai' },
+      org: { id: 'org_a', name: 'Acme', slug: 'acme', role: 'owner' },
+      serverOrigin: 'uniwork.example',
+      entitlements: { orgId: 'org_a', planCode: 'starter' },
+    })
+    expect(status.orgs).toHaveLength(3)
+    expect(ctx.statuses.map((s) => s.state)).toContain('signing-in')
+    // tokens never reach a status payload; the refresh token is persisted
+    expect(JSON.stringify(ctx.statuses)).not.toMatch(/at_\d|rt_\d/)
+    expect(ctx.credentials.load()?.refreshToken).toMatch(/^rt_/)
+    expect(ctx.manager.getEntitlements()?.orgId).toBe('org_a')
+    expect(ctx.entitlements.at(-1)).toMatchObject({ orgId: 'org_a' })
+    expect(await ctx.manager.getAccessToken()).toMatch(/^at_/)
+  })
+
+  it('wrong redirect base -> wrong-deployment, no exchange', async () => {
+    const ctx = setup()
+    await ctx.manager.login()
+    const state = (ctx.transport.start.mock.calls[0][0] as { state: string }).state
+    await ctx.manager.completeCallback(`uniwork-office-dev://auth/callback?code=c&state=${state}`)
+    expect(ctx.manager.status()).toMatchObject({
+      state: 'wrong-deployment',
+      error: 'wrong_deployment',
+    })
+    expect(ctx.transport.exchange).not.toHaveBeenCalled()
+  })
+
+  it('state mismatch and extra keys reject before exchange', async () => {
+    const ctx = setup()
+    await ctx.manager.login()
+    await ctx.manager.completeCallback('uniwork-office://auth/callback?code=c&state=forged')
+    expect(ctx.manager.status()).toMatchObject({ state: 'signed-out', error: 'state_mismatch' })
+    await ctx.manager.login()
+    const state = (ctx.transport.start.mock.calls[1][0] as { state: string }).state
+    await ctx.manager.completeCallback(`uniwork-office://auth/callback?code=c&state=${state}&x=1`)
+    expect(ctx.manager.status()).toMatchObject({ state: 'signed-out', error: 'invalid_callback' })
+    expect(ctx.transport.exchange).not.toHaveBeenCalled()
+    expect(ctx.events.filter((e) => e.phase === 'error').map((e) => e.error)).toEqual([
+      'state_mismatch',
+      'invalid_callback',
+    ])
+  })
+
+  it('times out after 10 minutes', async () => {
+    const ctx = setup()
+    await ctx.manager.login()
+    await vi.advanceTimersByTimeAsync(10 * 60 * 1000)
+    expect(ctx.manager.status()).toMatchObject({ state: 'signed-out', error: 'login_timeout' })
+    expect(ctx.events.at(-1)).toEqual({ phase: 'error', error: 'login_timeout' })
+  })
+
+  it('cancel returns to signed-out and ignores a late callback', async () => {
+    const ctx = setup()
+    await ctx.manager.login()
+    const state = (ctx.transport.start.mock.calls[0][0] as { state: string }).state
+    ctx.manager.cancelLogin()
+    expect(ctx.manager.status().state).toBe('signed-out')
+    expect(ctx.events.at(-1)).toEqual({ phase: 'error', error: 'cancelled' })
+    await ctx.manager.completeCallback(`uniwork-office://auth/callback?code=c&state=${state}`)
+    expect(ctx.transport.exchange).not.toHaveBeenCalled()
+  })
+
+  it.each<[TransportErrorCode, string, string]>([
+    ['auth_code_invalid', 'signed-out', 'auth_code_invalid'],
+    ['rate_limited', 'signed-out', 'rate_limited'],
+    ['network', 'server-unreachable', 'network'],
+    ['desktop_auth_unavailable', 'server-unreachable', 'server_error'],
+    ['wrong_deployment', 'wrong-deployment', 'wrong_deployment'],
+  ])('exchange failure %s -> %s', async (code, state, error) => {
+    const ctx = setup()
+    ctx.transport.exchange.mockImplementation(fail(code))
+    await signIn(ctx)
+    expect(ctx.manager.status()).toMatchObject({ state, error, loggedIn: false })
+    expect(ctx.events.at(-1)).toEqual({ phase: 'error', error })
+    expect(ctx.credentials.load()).toBeNull()
+  })
+
+  it('start failure maps to state and keeps no attempt', async () => {
+    const ctx = setup()
+    ctx.transport.start.mockImplementation(fail('timeout'))
+    expect(await ctx.manager.login()).toBe(false)
+    expect(ctx.manager.status()).toMatchObject({ state: 'server-unreachable', error: 'timeout' })
+    expect(ctx.openBrowser).not.toHaveBeenCalled()
+  })
+
+  it('refuses to store when the keyring is unavailable', async () => {
+    const credentials = createMemoryCredentialStore()
+    credentials.save = () => {
+      throw new CredentialStoreError('keyring_unavailable')
+    }
+    const ctx = setup({ credentials })
+    await signIn(ctx)
+    expect(ctx.manager.status()).toMatchObject({
+      state: 'keyring-unavailable',
+      error: 'keyring_unavailable',
+      loggedIn: false,
+    })
+    expect(await ctx.manager.getAccessToken()).toBeNull()
+  })
+
+  it('not-configured without a deployment profile', async () => {
+    const ctx = setup({ profile: null })
+    expect((await ctx.manager.restore()).state).toBe('not-configured')
+    expect(await ctx.manager.login()).toBe(false)
+    expect(ctx.events.at(-1)).toEqual({ phase: 'error', error: 'not_configured' })
+  })
+})
+
+describe('restore and refresh', () => {
+  it('restores by refreshing; the rotated refresh token is persisted', async () => {
+    const ctx = setup({ credentials: createMemoryCredentialStore(stored()) })
+    const status = await ctx.manager.restore()
+    expect(ctx.transport.refresh).toHaveBeenCalledWith({
+      deviceSessionId: 'dev_1',
+      refreshToken: 'rt_stored',
+    })
+    expect(status).toMatchObject({ state: 'signed-in', email: 'mai@example.com' })
+    const saved = ctx.credentials.load()
+    expect(saved?.refreshToken).not.toBe('rt_stored')
+    expect(saved?.profile?.email).toBe('mai@example.com')
+  })
+
+  it('a credential bound to another deployment is never used', async () => {
+    const ctx = setup({
+      credentials: createMemoryCredentialStore(stored({ apiOrigin: 'https://other.example' })),
+    })
+    expect(await ctx.manager.restore()).toMatchObject({
+      state: 'wrong-deployment',
+      error: 'wrong_deployment',
+    })
+    expect(ctx.transport.refresh).not.toHaveBeenCalled()
+  })
+
+  it('an expired refresh token is session-expired without a network call', async () => {
+    const ctx = setup({
+      credentials: createMemoryCredentialStore(stored({ refreshExpiresAt: Date.now() - 1 })),
+    })
+    expect((await ctx.manager.restore()).state).toBe('session-expired')
+    expect(ctx.transport.refresh).not.toHaveBeenCalled()
+    expect(ctx.credentials.load()).toBeNull()
+  })
+
+  it.each<[TransportErrorCode, string, boolean]>([
+    ['refresh_reused', 'session-revoked', true],
+    ['device_revoked', 'session-revoked', true],
+    ['unauthorized', 'session-expired', true],
+    ['auth_code_invalid', 'session-expired', true],
+    ['network', 'server-unreachable', false],
+    ['timeout', 'server-unreachable', false],
+    ['server_error', 'server-unreachable', false],
+    ['malformed_response', 'server-unreachable', false],
+    ['wrong_deployment', 'wrong-deployment', false],
+  ])('refresh failure %s -> %s', async (code, state, cleared) => {
+    const ctx = setup({ credentials: createMemoryCredentialStore(stored()) })
+    ctx.transport.refresh.mockImplementation(fail(code))
+    const status = await ctx.manager.restore()
+    expect(status.state).toBe(state)
+    expect(status.loggedIn).toBe(false)
+    expect(ctx.credentials.load() === null).toBe(cleared)
+    if (state === 'server-unreachable') expect(status.profile?.email).toBe('cached@example.com')
+  })
+
+  it('retry after server-unreachable recovers', async () => {
+    const ctx = setup({ credentials: createMemoryCredentialStore(stored()) })
+    ctx.transport.refresh.mockImplementationOnce(fail('network'))
+    expect((await ctx.manager.restore()).state).toBe('server-unreachable')
+    expect((await ctx.manager.retry()).state).toBe('signed-in')
+  })
+
+  it('runs a single refresh for concurrent callers', async () => {
+    const ctx = setup({ credentials: createMemoryCredentialStore(stored()) })
+    await ctx.manager.restore()
+    ctx.transport.refresh.mockClear()
+    await vi.advanceTimersByTimeAsync(0)
+    vi.setSystemTime(Date.now() + 899_000)
+    const [a, b, c] = await Promise.all([
+      ctx.manager.getAccessToken(),
+      ctx.manager.getAccessToken(),
+      ctx.manager.getAccessToken(),
+    ])
+    expect(ctx.transport.refresh).toHaveBeenCalledTimes(1)
+    expect(a).toBe(b)
+    expect(b).toBe(c)
+  })
+
+  it('refreshes proactively at 80% of the access token lifetime', async () => {
+    const ctx = setup()
+    await signIn(ctx)
+    expect(ctx.transport.refresh).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(720_000)
+    expect(ctx.transport.refresh).toHaveBeenCalledTimes(1)
+    expect(ctx.manager.status().state).toBe('signed-in')
+    expect(ctx.statuses.map((s) => s.state)).toContain('refreshing')
+  })
+
+  it('401 -> refresh -> retry once', async () => {
+    const ctx = setup()
+    ctx.transport.me.mockImplementationOnce(fail('unauthorized'))
+    await signIn(ctx)
+    expect(ctx.transport.refresh).toHaveBeenCalledTimes(1)
+    expect(ctx.transport.me).toHaveBeenCalledTimes(2)
+    expect(ctx.manager.status().state).toBe('signed-in')
+  })
+
+  it('a second 401 after refresh ends the session', async () => {
+    const ctx = setup()
+    ctx.transport.me.mockImplementation(fail('unauthorized'))
+    await signIn(ctx)
+    expect(ctx.transport.me).toHaveBeenCalledTimes(2)
+    expect(ctx.manager.status().state).toBe('session-expired')
+  })
+})
+
+describe('organizations and entitlements', () => {
+  it('keeps the persisted org while still a member', async () => {
+    const ctx = setup({ orgId: 'org_b' })
+    await signIn(ctx)
+    expect(ctx.manager.status().org?.id).toBe('org_b')
+    expect(ctx.manager.getEntitlements()?.planCode).toBe('pro')
+  })
+
+  it('selectOrg persists the choice and reloads entitlements', async () => {
+    const ctx = setup()
+    await signIn(ctx)
+    const status = await ctx.manager.selectOrg('org_b')
+    expect(ctx.persistSelectedOrgId).toHaveBeenCalledWith('org_b')
+    expect(status.org?.id).toBe('org_b')
+    expect(status.entitlements).toMatchObject({ orgId: 'org_b', planCode: 'pro' })
+    expect(ctx.entitlements.at(-1)).toMatchObject({ orgId: 'org_b' })
+    await ctx.manager.selectOrg('not-a-member')
+    expect(ctx.persistSelectedOrgId).toHaveBeenCalledTimes(1)
+  })
+
+  it('a billing failure leaves entitlements unknown but stays signed in', async () => {
+    const ctx = setup()
+    ctx.transport.billing.mockImplementation(fail('forbidden'))
+    await signIn(ctx)
+    expect(ctx.manager.status()).toMatchObject({ state: 'signed-in', entitlements: null })
+  })
+})
+
+describe('logout', () => {
+  it('revokes the device, then clears local credentials', async () => {
+    const ctx = setup()
+    await signIn(ctx)
+    const status = await ctx.manager.logout()
+    expect(ctx.transport.logout).toHaveBeenCalledWith(
+      { deviceSessionId: 'dev_1' },
+      expect.stringMatching(/^at_/),
+    )
+    expect(status).toMatchObject({ state: 'signed-out', loggedIn: false })
+    expect(status.profile).toBeUndefined()
+    expect(ctx.credentials.load()).toBeNull()
+    expect(ctx.entitlements.at(-1)).toBeNull()
+    expect(await ctx.manager.getAccessToken()).toBeNull()
+  })
+
+  it('still clears when the server is unreachable', async () => {
+    const ctx = setup()
+    await signIn(ctx)
+    ctx.transport.logout.mockImplementation(fail('network'))
+    expect((await ctx.manager.logout()).state).toBe('signed-out')
+    expect(ctx.credentials.load()).toBeNull()
+  })
+
+  it('drops a refresh response that lands after logout', async () => {
+    const ctx = setup({ credentials: createMemoryCredentialStore(stored()) })
+    let release: (s: DesktopSession) => void = () => undefined
+    ctx.transport.refresh.mockImplementationOnce(
+      () => new Promise((resolve) => (release = resolve)),
+    )
+    const restoring = ctx.manager.restore()
+    await ctx.manager.logout()
+    release(session())
+    await restoring
+    expect(ctx.manager.status().state).toBe('signed-out')
+    expect(ctx.credentials.load()).toBeNull()
+  })
+})
