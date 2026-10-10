@@ -52,3 +52,15 @@ export async function hasNoPrinter(sender: {
     return false
   }
 }
+
+/**
+ * The file an "Export as PDF" save dialog result lands on. A name the user typed with the
+ * document's own `.docx` extension (the dialog opens on `<name>.pdf`, and typing the docx name
+ * is natural) becomes `.pdf` instead of `<name>.docx.pdf`; any other name without `.pdf` gets
+ * the extension. The result is never the open `.docx` itself.
+ */
+export function pdfExportPath(picked: string): string {
+  if (/\.pdf$/i.test(picked)) return picked
+  if (/\.docx$/i.test(picked)) return picked.replace(/\.docx$/i, '.pdf')
+  return `${picked}.pdf`
+}

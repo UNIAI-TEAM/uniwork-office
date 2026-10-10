@@ -92,4 +92,7 @@ export const ru = {
 
   uwRecentBadge: 'UniWork',
   uwRecentBadgeTip: 'Документ хранится в UniWork',
+
+  setCliLinkReady: 'Инструмент командной строки доступен.',
+  setAutoSaveUniworkNote: 'Не распространяется на документы UniWork.',
 } satisfies Record<keyof typeof zh, string>

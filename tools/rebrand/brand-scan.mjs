@@ -56,6 +56,15 @@ const INTERNAL_COPY = [
   /giai đoạn\s+(?:này|\d+)/gi,
 ]
 /**
+ * The lowercase `genoffice` CLI command is masked everywhere (it is a functional id), so a
+ * sentence that announces it next to a local-path placeholder ("genoffice is available at {path}")
+ * passed the scan although it shows the upstream name and a raw install path. In catalog values
+ * the command may be named where it has to be typed, but not tied to a path placeholder unless
+ * the product is named too (the Integrations rows).
+ */
+const CLI_COMMAND_WITH_PATH =
+  /\bgenoffice\b[^'"`]*\{(?:path|dir|folder|location)\}|\{(?:path|dir|folder|location)\}[^'"`]*\bgenoffice\b/gi
+/**
  * Repo and open-source calls to action are not product copy: the user-visible UI names no
  * GitHub, links no repository and asks for no star. Matches the word (any case) and the hosts;
  * camel-case identifiers (openGitHubRepo) are not hits. Applied to catalog values and
@@ -188,6 +197,10 @@ export function brandMatches(text, scope = 'source') {
   }
   if (scope === 'source' || scope === 'installer') {
     for (const re of TELEMETRY) for (const m of text.matchAll(re)) hits.push(m[0])
+  }
+  // the Integrations rows name the product first ("UniWork Office (genoffice) ... ({path})"): there the path is the answer
+  if (scope === 'catalog' && !text.includes('UniWork Office')) {
+    for (const m of text.matchAll(CLI_COMMAND_WITH_PATH)) hits.push(m[0])
   }
   if (scope === 'catalog' || scope === 'source') {
     for (const re of INTERNAL_COPY) for (const m of text.matchAll(re)) hits.push(m[0])

@@ -532,6 +532,68 @@ describe('closing tabs', () => {
     expect(manager.list()).toHaveLength(1)
   })
 
+  describe('Ctrl/Cmd+W key event on a sheets view', () => {
+    type InputHandler = (event: { preventDefault: () => void }, input: unknown) => void
+    const chord = (over: Record<string, unknown> = {}) => ({
+      type: 'keyDown',
+      key: 'w',
+      control: true,
+      meta: false,
+      alt: false,
+      shift: false,
+      ...over,
+    })
+    const press = (view: FakeView, input: unknown) => {
+      const preventDefault = vi.fn()
+      const handler = view.webContents.listeners.get(
+        'before-input-event',
+      ) as unknown as InputHandler
+      handler({ preventDefault }, input)
+      return preventDefault
+    }
+
+    it('closes the active sheets tab without the menu accelerator', async () => {
+      manager.openSheetsTab('/tmp/fresh.xlsx')
+      const view = lastCreatedView(createSheetsView)
+      const preventDefault = press(view, chord())
+      expect(preventDefault).toHaveBeenCalledTimes(1)
+      await vi.waitFor(() => expect(manager.list().map((t) => t.id)).toEqual(['home']))
+    })
+
+    it('also takes Cmd+W', async () => {
+      manager.openSheetsTab()
+      const view = lastCreatedView(createSheetsView)
+      press(view, chord({ control: false, meta: true }))
+      await vi.waitFor(() => expect(manager.list()).toHaveLength(1))
+    })
+
+    it('ignores other chords, key repeat and key-up', () => {
+      manager.openSheetsTab()
+      const view = lastCreatedView(createSheetsView)
+      for (const input of [
+        chord({ key: 'q' }),
+        chord({ control: false }),
+        chord({ shift: true }),
+        chord({ alt: true }),
+        chord({ isAutoRepeat: true }),
+        chord({ type: 'keyUp' }),
+      ]) {
+        expect(press(view, input)).not.toHaveBeenCalled()
+      }
+      expect(manager.list()).toHaveLength(2)
+    })
+
+    it('does nothing from a sheets view that is not the active tab', async () => {
+      manager.openSheetsTab()
+      const sheetsView = lastCreatedView(createSheetsView)
+      manager.openSlidesTab()
+      const preventDefault = press(sheetsView, chord())
+      await Promise.resolve()
+      expect(preventDefault).not.toHaveBeenCalled()
+      expect(manager.list()).toHaveLength(3)
+    })
+  })
+
   it('removes a clean tab and falls back to the previous tab', async () => {
     manager.openSheetsTab()
     const sheetsView = lastCreatedView(createSheetsView)

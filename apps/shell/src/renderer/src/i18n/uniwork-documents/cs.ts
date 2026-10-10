@@ -90,4 +90,7 @@ export const cs = {
 
   uwRecentBadge: 'UniWork',
   uwRecentBadgeTip: 'Dokument uložený v UniWork',
+
+  setCliLinkReady: 'Nástroj příkazového řádku je k dispozici.',
+  setAutoSaveUniworkNote: 'Netýká se dokumentů UniWork.',
 } satisfies Record<keyof typeof zh, string>

@@ -188,7 +188,7 @@ import {
 } from './docx-encryption'
 import { isExternallyModified, type DiskFileState } from './external-change'
 import { copyImageDisplaySize, validCopyImageDataUrl } from './copy-image-guard'
-import { hasNoPrinter, printScaleOption, validPrintGeometry } from './print-args'
+import { hasNoPrinter, pdfExportPath, printScaleOption, validPrintGeometry } from './print-args'
 import { initDocsAutoUpdater } from './updater'
 import { registerZoteroIpc, teardownZoteroIpc } from './zotero-ipc'
 
@@ -5270,7 +5270,7 @@ export function registerDocsIpc(): void {
         if (result.canceled || !result.filePath) return { ok: false }
         // a local export only: never lands on the open .docx (a UniWork working copy) even
         // if the user typed its name, and never goes through the user-save hook
-        filePath = /\.pdf$/i.test(result.filePath) ? result.filePath : `${result.filePath}.pdf`
+        filePath = pdfExportPath(result.filePath)
         allowPdfWrite(event.sender.id, filePath)
       }
       try {
@@ -5374,7 +5374,8 @@ export function registerDocsIpc(): void {
           filters: [{ name: 'HTML', extensions: ['html'] }],
         })
         if (result.canceled || !result.filePath) return { ok: false }
-        filePath = result.filePath
+        // same rule as docs:export-pdf: a merged export never lands on the open .docx either
+        filePath = pdfExportPath(result.filePath)
         allowPdfWrite(event.sender.id, filePath)
       }
       try {

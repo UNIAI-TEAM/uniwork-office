@@ -90,4 +90,7 @@ export const ms = {
 
   uwRecentBadge: 'UniWork',
   uwRecentBadgeTip: 'Dokumen disimpan dalam UniWork',
+
+  setCliLinkReady: 'Alat baris perintah tersedia.',
+  setAutoSaveUniworkNote: 'Tidak terpakai untuk dokumen UniWork.',
 } satisfies Record<keyof typeof zh, string>

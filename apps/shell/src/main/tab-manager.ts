@@ -60,6 +60,7 @@ import {
 } from '../../../slides/src/main/slides-main'
 import type { DocumentTabKind, OpenDocumentTab, TabKind, TabSummary } from '../shared/tabs-api'
 import { TAB_STRIP_HEIGHT } from '../shared/tab-drag-geometry'
+import { isCloseTabChord } from './close-tab-chord'
 
 /** a tab lifted out of the strip with its live view: what "Open in New Window",
  *  tear-off and dock hand back and forth between the shell and a detached window */
@@ -108,6 +109,7 @@ export class TabManager {
   /** views whose HTML-fullscreen listeners are installed: a view that leaves
    *  for a detached window and docks back must not get a second pair */
   private readonly fullScreenTracked = new WeakSet<WebContentsView>()
+  private readonly closeChordTracked = new WeakSet<WebContentsView>()
   /** Sheets renderer mounted ahead of the next open: parsing its bundle and
    *  booting Univer is the bulk of a workbook's open time, and the shell hands
    *  the path over after mount anyway. */
@@ -214,6 +216,25 @@ export class TabManager {
       const id = currentId()
       if (id !== undefined && this.htmlFullScreenId === id) this.htmlFullScreenId = null
       this.layout()
+    })
+  }
+
+  /**
+   * Ctrl/Cmd+W on a sheets view closes its tab straight from the key event. The
+   * menu accelerator only fires once the page's unhandled key reaches the
+   * window, and a freshly opened workbook (the spare view) does not have
+   * keyboard focus yet. Only the active tab's own view acts: a view that moved
+   * to a detached window keeps this listener.
+   */
+  private trackCloseChord(view: WebContentsView): void {
+    if (this.closeChordTracked.has(view)) return
+    this.closeChordTracked.add(view)
+    view.webContents.on('before-input-event', (event, input) => {
+      if (!isCloseTabChord(input)) return
+      const active = this.tabs.find((t) => t.id === this.activeId)
+      if (active?.view !== view || active.present) return
+      event.preventDefault()
+      this.closeActiveTab()
     })
   }
 
@@ -455,6 +476,7 @@ export class TabManager {
       view.setVisible(false)
     }
     this.trackHtmlFullScreen(view)
+    this.trackCloseChord(view)
     this.tabs.push({
       id,
       kind: 'sheets',

@@ -770,6 +770,35 @@ describe('local saves never depend on a live session (review r1 BE-1)', () => {
     expect(await ctx.service.save(path)).toMatchObject({ state: 'saved' })
   })
 
+  it('reopening a copy left in signed-out by an earlier session reads ready/dirty, not "Sign in again"', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    // an earlier session ended while the copy was saved locally
+    ctx.signOut()
+    writeFileSync(path, 'v4 while signed out')
+    ctx.service.onUserSave(path)
+    await flushSaves()
+    expect(binding(path)).toMatchObject({ state: 'signed-out' })
+    // the session is valid again and the document is opened (the web launch)
+    ctx.signInAs('acc_1')
+    await ctx.service.openFromServer(DOC)
+    expect(binding(path)).toMatchObject({ state: 'dirty' })
+    expect(binding(path).error).toBeUndefined()
+    expect(ctx.statuses.at(-1)).toMatchObject({ state: 'dirty' })
+    expect(await ctx.service.save(path)).toMatchObject({ state: 'saved' })
+
+    // a copy whose bytes match UniWork has nothing to send: it reads ready
+    ctx.signOut()
+    ctx.service.onUserSave(path)
+    await flushSaves()
+    expect(binding(path)).toMatchObject({ state: 'signed-out' })
+    ctx.signInAs('acc_1')
+    await ctx.service.openFromServer(DOC)
+    expect(binding(path)).toMatchObject({ state: 'ready' })
+    expect(ctx.statuses.at(-1)).toMatchObject({ state: 'ready' })
+  })
+
   it('a fresh start with no session yet (restoring) keeps the last account editable; another live account is read-only', async () => {
     const server = fakeServer({ bytes: enc('v3') })
     const path = await openDoc(setup(server))

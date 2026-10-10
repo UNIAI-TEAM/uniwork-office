@@ -91,4 +91,7 @@ export const ko = {
 
   uwRecentBadge: 'UniWork',
   uwRecentBadgeTip: 'UniWork에 저장된 문서',
+
+  setCliLinkReady: '명령줄 도구를 사용할 수 있습니다.',
+  setAutoSaveUniworkNote: 'UniWork 문서에는 적용되지 않습니다.',
 } satisfies Record<keyof typeof zh, string>

@@ -853,6 +853,14 @@ export class UniworkDocsService {
             binding.state = 'dirty'
             delete binding.error
           }
+          // a reopen has a live session (the identity check above): a "sign in
+          // again" left by an earlier session is stale, so the copy reads as what
+          // it holds now (its local work can be saved, or it matches UniWork)
+          if (existing.state === 'signed-out') {
+            binding.state =
+              !existing.pendingIntent && localChecksum === existing.baseChecksum ? 'ready' : 'dirty'
+            delete binding.error
+          }
           // the document answers again (restored from the trash, a transient
           // 404): its local work can be saved once more
           if (

@@ -96,4 +96,7 @@ export const fr = {
 
   uwRecentBadge: 'UniWork',
   uwRecentBadgeTip: 'Document enregistré dans UniWork',
+
+  setCliLinkReady: 'L’outil en ligne de commande est disponible.',
+  setAutoSaveUniworkNote: 'Ne s’applique pas aux documents UniWork.',
 } satisfies Record<keyof typeof zh, string>
