@@ -122,6 +122,25 @@ test.describe('markdown editor', () => {
       await expect(editor.locator('h1')).toHaveText('Hello')
       await expect(editor.locator('strong')).toHaveText('bold')
 
+      // The editor autofocuses (caret at the start) inside a requestAnimationFrame that TipTap queues
+      // when the editor is created; ProseMirror's view.focus() there rewrites the DOM selection from
+      // its own state. A window that paints late (a busy or backgrounded runner) runs that callback
+      // after the caret was moved below and sends the typed text to the start of the heading. Frames
+      // run in order, so two frames from now the autofocus has settled; the timeout only bounds a
+      // window that never paints.
+      await editorPage.evaluate(
+        () =>
+          new Promise<void>((resolve) => {
+            const bound = window.setTimeout(resolve, 5_000)
+            requestAnimationFrame(() =>
+              requestAnimationFrame(() => {
+                window.clearTimeout(bound)
+                resolve()
+              }),
+            )
+          }),
+      )
+
       // type at the end of the document, save with ⌘/Ctrl+S
       await editor.focus()
       await editor.evaluate((element) => {
