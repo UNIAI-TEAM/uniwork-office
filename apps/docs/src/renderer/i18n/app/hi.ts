@@ -120,6 +120,7 @@ export const hi = {
   appCommentResolvedMsg: 'टिप्पणी हल की गई',
   appCommentReopenedMsg: 'टिप्पणी फिर से खोली गई',
   appCommentsTitle: 'टिप्पणियाँ ({n})',
+  appCommentsTitleDoc: 'दस्तावेज़ में टिप्पणियाँ ({n})',
   appCommentPlaceholder: 'टिप्पणी लिखें…',
   appCommentBtn: 'टिप्पणी',
   appUnknownAuthor: '(अज्ञात लेखक)',

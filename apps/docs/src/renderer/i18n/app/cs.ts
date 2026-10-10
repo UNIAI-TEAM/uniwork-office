@@ -120,6 +120,7 @@ export const cs = {
   appCommentResolvedMsg: 'Komentář vyřešen',
   appCommentReopenedMsg: 'Komentář znovu otevřen',
   appCommentsTitle: 'Komentáře ({n})',
+  appCommentsTitleDoc: 'Komentáře v dokumentu ({n})',
   appCommentPlaceholder: 'Napište komentář…',
   appCommentBtn: 'Komentovat',
   appUnknownAuthor: '(Neznámý autor)',

@@ -117,6 +117,7 @@ export const en = {
   appCommentResolvedMsg: 'Comment resolved',
   appCommentReopenedMsg: 'Comment reopened',
   appCommentsTitle: 'Comments ({n})',
+  appCommentsTitleDoc: 'Comments in this document ({n})',
   appCommentPlaceholder: 'Type a comment…',
   appCommentBtn: 'Comment',
   appUnknownAuthor: '(Unknown author)',

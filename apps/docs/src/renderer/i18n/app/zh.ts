@@ -121,6 +121,7 @@ export const zh = {
   appCommentResolvedMsg: '批注已解决',
   appCommentReopenedMsg: '批注已重新打开',
   appCommentsTitle: '批注 ({n})',
+  appCommentsTitleDoc: '文档批注 ({n})',
   appCommentPlaceholder: '输入批注内容…',
   appCommentBtn: '批注',
   appUnknownAuthor: '(未知作者)',

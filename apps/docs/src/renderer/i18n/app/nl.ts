@@ -125,6 +125,7 @@ export const nl = {
   appCommentResolvedMsg: 'Opmerking opgelost',
   appCommentReopenedMsg: 'Opmerking heropend',
   appCommentsTitle: 'Opmerkingen ({n})',
+  appCommentsTitleDoc: 'Opmerkingen in het document ({n})',
   appCommentPlaceholder: 'Typ een opmerking…',
   appCommentBtn: 'Opmerking',
   appUnknownAuthor: '(Onbekende auteur)',

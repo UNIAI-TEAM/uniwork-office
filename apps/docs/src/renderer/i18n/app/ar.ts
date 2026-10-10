@@ -117,6 +117,7 @@ export const ar = {
   appCommentResolvedMsg: 'تم حل التعليق',
   appCommentReopenedMsg: 'تمت إعادة فتح التعليق',
   appCommentsTitle: 'التعليقات ({n})',
+  appCommentsTitleDoc: 'تعليقات المستند ({n})',
   appCommentPlaceholder: 'اكتب تعليقًا…',
   appCommentBtn: 'تعليق',
   appUnknownAuthor: '(كاتب غير معروف)',

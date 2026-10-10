@@ -123,6 +123,7 @@ export const pl = {
   appCommentResolvedMsg: 'Komentarz rozwiązany',
   appCommentReopenedMsg: 'Komentarz otwarto ponownie',
   appCommentsTitle: 'Komentarze ({n})',
+  appCommentsTitleDoc: 'Komentarze w dokumencie ({n})',
   appCommentPlaceholder: 'Wpisz komentarz…',
   appCommentBtn: 'Komentarz',
   appUnknownAuthor: '(Nieznany autor)',

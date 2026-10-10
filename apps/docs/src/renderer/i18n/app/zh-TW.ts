@@ -114,6 +114,7 @@ export const zhTW = {
   appCommentResolvedMsg: '註解已解決',
   appCommentReopenedMsg: '註解已重新開啟',
   appCommentsTitle: '註解 ({n})',
+  appCommentsTitleDoc: '文件註解 ({n})',
   appCommentPlaceholder: '輸入註解內容…',
   appCommentBtn: '註解',
   appUnknownAuthor: '(未知作者)',
