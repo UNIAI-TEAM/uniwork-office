@@ -302,6 +302,9 @@ export interface DesktopCapabilities {
   open?: boolean
   /** recent-files lookups (web: only when the host grants `recents`) */
   recents?: boolean
+  /** web only (A7): the "Open in app" action of the "use the app" messages; granted by the host while
+   *  its own launch action is available */
+  desktopOpen?: boolean
 }
 
 /**
@@ -351,6 +354,10 @@ export interface SpellLanguages {
 export interface DesktopApi {
   /** platform capability flags; absent on desktop (see DesktopCapabilities) */
   capabilities?: DesktopCapabilities
+  /** Web frame only (A7): ask the host to run its "Open in the UniWork Office app" flow. Resolves
+   *  `unavailable` when the host cannot (no `desktopOpen` grant, old host; it already showed its own
+   *  alert), so callers show nothing more. `feature` is an opaque diagnostics tag. Absent on desktop */
+  openInApp?(feature?: string): Promise<{ outcome: 'launched' | 'installer' | 'unavailable' }>
   /** current UI language (persisted by the shell in app-settings.json) */
   getLanguage(): Promise<'zh' | 'en' | 'ja' | 'ko' | 'fr' | 'de' | 'es' | 'th' | 'id' | 'ru' | 'ar'>
   /** OS regional-settings locale (BCP 47); Word derives the new-document paper size from it */

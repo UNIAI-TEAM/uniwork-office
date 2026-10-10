@@ -21,6 +21,13 @@ export function cap(key: Capability): boolean {
   return capabilities()[key] !== false
 }
 
+/** the "Open in app" action exists: web frame only, and only on the host's explicit grant (an unset
+    key reads as on in `cap()`, so this tests the value) */
+export function appOpenAvailable(): boolean {
+  const caps = capabilities()
+  return caps.platform === 'web' && caps.desktopOpen === true
+}
+
 /** test hook: forget the cached capabilities so the next `cap()` re-reads `window.desktop` */
 export function resetCapabilitiesForTest(): void {
   resolved = null

@@ -59,6 +59,8 @@ import type { Capabilities } from '../protocol/types'
  * | aiCredentials   | AI panel "AI settings" button (web only, UniWork-stored keys)       |
  * | open            | File > Open, Ctrl+O (on only with the host's `filePick` grant)      |
  * | recents         | recent-files lookups (on only with the host's `recents` grant)      |
+ * | desktopOpen     | the "Open in app" action of the "use the app" messages (Zotero group,|
+ * |                 | open-password row, password-protected open); on only with the grant |
  */
 export const webCapabilities: Readonly<Required<DesktopCapabilities>> = Object.freeze({
   platform: 'web',
@@ -75,6 +77,7 @@ export const webCapabilities: Readonly<Required<DesktopCapabilities>> = Object.f
   aiCredentials: false,
   open: false,
   recents: false,
+  desktopOpen: false,
 })
 
 /**
@@ -84,8 +87,12 @@ export const webCapabilities: Readonly<Required<DesktopCapabilities>> = Object.f
  */
 export function hostGrants(
   granted: Capabilities | undefined,
-): Required<Pick<DesktopCapabilities, 'open' | 'recents'>> {
-  return { open: granted?.filePick === true, recents: granted?.recents === true }
+): Required<Pick<DesktopCapabilities, 'open' | 'recents' | 'desktopOpen'>> {
+  return {
+    open: granted?.filePick === true,
+    recents: granted?.recents === true,
+    desktopOpen: granted?.desktopOpen === true,
+  }
 }
 
 const noopDisposer = () => () => {}

@@ -521,4 +521,9 @@ export const he = {
   appSaving: 'שומר…',
   appSavingAs: 'שומר בשם…',
   appPdfPrintFallback: 'ייצוא PDF אינו זמין כאן; נעשה שימוש בתיבת ההדפסה של הדפדפן במקום',
+  appOnlyHint: 'פתחו באפליקציית UniWork Office כדי להשתמש בתכונה זו',
+  appOnlyOpen: 'פתח באפליקציה',
+  appOnlyZotero: 'ציטוטי Zotero אינם זמינים כאן.',
+  appOnlyOpenPassword: 'לא ניתן להגדיר כאן סיסמה לפתיחת המסמך.',
+  appOnlyEncrypted: 'המסמך "{name}" מוגן בסיסמה ולא ניתן לפתוח אותו כאן.',
 } satisfies Record<keyof typeof zh, string>

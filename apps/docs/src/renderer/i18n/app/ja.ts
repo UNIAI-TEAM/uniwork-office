@@ -559,4 +559,9 @@ export const ja = {
   appSavingAs: '名前を付けて保存しています…',
   appPdfPrintFallback:
     'PDF を直接エクスポートできないため、ブラウザーの印刷ダイアログを使用しました',
+  appOnlyHint: 'この機能を使うには、UniWork Office アプリで開いてください',
+  appOnlyOpen: 'アプリで開く',
+  appOnlyZotero: 'ここでは Zotero の引用は使えません。',
+  appOnlyOpenPassword: 'ここでは文書を開くパスワードを設定できません。',
+  appOnlyEncrypted: '「{name}」はパスワードで保護されているため、ここでは開けません。',
 } satisfies Record<keyof typeof zh, string>

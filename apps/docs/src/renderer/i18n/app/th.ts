@@ -528,4 +528,9 @@ export const th = {
   appSaving: 'กำลังบันทึก…',
   appSavingAs: 'กำลังบันทึกเป็น…',
   appPdfPrintFallback: 'ส่งออก PDF โดยตรงไม่ได้ จึงใช้กล่องโต้ตอบการพิมพ์ของเบราว์เซอร์แทน',
+  appOnlyHint: 'เปิดในแอป UniWork Office เพื่อใช้ฟีเจอร์นี้',
+  appOnlyOpen: 'เปิดในแอป',
+  appOnlyZotero: 'ไม่สามารถใช้การอ้างอิง Zotero ที่นี่ได้',
+  appOnlyOpenPassword: 'ไม่สามารถตั้งรหัสผ่านสำหรับเปิดเอกสารที่นี่ได้',
+  appOnlyEncrypted: '"{name}" ถูกป้องกันด้วยรหัสผ่านและไม่สามารถเปิดที่นี่ได้',
 } satisfies Record<keyof typeof zh, string>
