@@ -29,10 +29,9 @@ export const it = {
   aiWebStateEntitlementTitle: "L'IA non è nel tuo piano",
   aiWebStateEntitlementBody:
     "Il piano UniWork della tua organizzazione non include questa funzione IA. Rivolgiti all'amministratore.",
-  aiWebStateKeyMissingTitle: 'Nessuna chiave {provider}',
-  aiWebStateKeyMissingBody:
-    "Aggiungi la tua chiave API {provider} nelle impostazioni IA per usare l'assistente.",
-  aiWebStateKeyRejectedTitle: '{provider} ha rifiutato la chiave',
+  aiWebStateKeyMissingTitle: 'Nessuna chiave IA per ora',
+  aiWebStateKeyMissingBody: 'Aggiungi una chiave API nelle impostazioni IA per usare l’assistente.',
+  aiWebStateKeyRejectedTitle: 'La chiave IA è stata rifiutata',
   aiWebStateKeyRejectedBody:
     'Il fornitore ha rifiutato la chiave salvata. Sostituiscila nelle impostazioni IA.',
   aiWebStateRateTitle: 'Troppe richieste IA',

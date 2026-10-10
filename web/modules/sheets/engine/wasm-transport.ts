@@ -57,6 +57,8 @@ export const TOO_LARGE = 'too_large'
 /** the workbook is above the frame's size gate; the host falls back to the G3 editor */
 export class SheetsTooLargeError extends Error {
   readonly code = TOO_LARGE
+  /** the gate the workbook is above, for the host's explanation */
+  readonly limitBytes = MAX_WORKSHEET_XML_BYTES
   constructor(readonly worksheetXmlBytes: number) {
     super(
       `${TOO_LARGE}: ${Math.round(worksheetXmlBytes / 1048576)} MB of worksheet XML is above the web limit of ` +

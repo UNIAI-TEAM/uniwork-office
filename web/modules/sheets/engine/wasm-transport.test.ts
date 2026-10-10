@@ -265,6 +265,8 @@ describe('with a mocked engine channel', () => {
       .catch((e: unknown) => e)
     expect(err).toBeInstanceOf(SheetsTooLargeError)
     expect((err as SheetsTooLargeError).code).toBe('too_large')
+    expect((err as SheetsTooLargeError).worksheetXmlBytes).toBe(81 * 1024 * 1024)
+    expect((err as SheetsTooLargeError).limitBytes).toBe(80 * 1024 * 1024)
     expect(m.calls.map((c) => c.command)).toEqual(['archive_manifest'])
     // the staged bytes are cleaned up
     expect(m.files.size).toBe(0)

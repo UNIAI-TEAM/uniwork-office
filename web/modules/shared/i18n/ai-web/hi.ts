@@ -29,10 +29,9 @@ export const hi = {
   aiWebStateEntitlementTitle: 'आपकी योजना में AI नहीं है',
   aiWebStateEntitlementBody:
     'आपके संगठन की UniWork योजना में यह AI सुविधा शामिल नहीं है। अपने व्यवस्थापक से संपर्क करें।',
-  aiWebStateKeyMissingTitle: '{provider} कुंजी नहीं है',
-  aiWebStateKeyMissingBody:
-    'सहायक का उपयोग करने के लिए AI सेटिंग्स में अपनी {provider} API कुंजी जोड़ें।',
-  aiWebStateKeyRejectedTitle: '{provider} ने कुंजी अस्वीकार की',
+  aiWebStateKeyMissingTitle: 'अभी तक कोई AI कुंजी नहीं',
+  aiWebStateKeyMissingBody: 'सहायक का उपयोग करने के लिए AI सेटिंग में API कुंजी जोड़ें।',
+  aiWebStateKeyRejectedTitle: 'AI कुंजी अस्वीकार कर दी गई',
   aiWebStateKeyRejectedBody: 'प्रदाता ने सहेजी गई कुंजी अस्वीकार कर दी। AI सेटिंग्स में इसे बदलें।',
   aiWebStateRateTitle: 'बहुत अधिक AI अनुरोध',
   aiWebStateRateBody: '{seconds} सेकंड रुकें और फिर कोशिश करें।',

@@ -27,4 +27,13 @@ export const cs = {
   webDraftDiscard: 'Zahodit',
   webSaveNetwork: 'K UniWork se nepodařilo připojit. Zkontrolujte připojení a zkuste to znovu.',
   webSaveTimeout: 'Ukládání trvalo příliš dlouho. Zkontrolujte připojení a zkuste to znovu.',
+  webClose: 'Zavřít',
+  webSaveUnauthorized:
+    'Vaše relace UniWork skončila. Přihlaste se znovu a zkuste uložení zopakovat.',
+  webSaveForbidden: 'Nemáte oprávnění tento dokument uložit.',
+  webSaveNotFound: 'Tento dokument už neexistuje nebo byl přesunut.',
+  webSaveTooLarge: 'Dokument je příliš velký na uložení.',
+  webSaveRateLimited: 'Příliš mnoho požadavků. Chvíli počkejte a zkuste to znovu.',
+  webSaveServer: 'UniWork narazil při ukládání na potíž. Zkuste to za chvíli znovu.',
+  webSaveFailedGeneric: 'Dokument se nepodařilo uložit. Zkuste to znovu.',
 } satisfies Record<keyof typeof zh, string>

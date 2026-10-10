@@ -835,8 +835,10 @@ export function createWebSlidesApi(
       noteResult(r)
       return r as Awaited<ReturnType<SlidesApi['save']>>
     },
-    // the frame is the UniWork document: no desktop working-copy state, view-only comes from the host grant
-    uniworkState: async () => ({ bound: false, readOnly: false }),
+    // the frame is the UniWork document: no desktop working-copy state. A frame without the
+    // host's `save` grant is read-only: the renderer then stays in Reading view (no text, cell or
+    // notes editing surface), the same path as a view-only working copy on the desktop
+    uniworkState: async () => ({ bound: false, readOnly: viewOnly() }),
     saveAs: async (defaultName) => {
       const pending = hostSaveAs
       pending?.started()

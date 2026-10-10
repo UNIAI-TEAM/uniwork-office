@@ -48,6 +48,9 @@ export function wrapWithEnterActivation(
   }
 }
 
+/** the wrappers this module registered: a registry entry in the set is already wrapped */
+const wrappers = new WeakSet<object>()
+
 export function installMenuInputEnter(runtime: UniverRuntime): void {
   const componentManager = runtime.univer.__getInjector().get(ComponentManager)
   const attempt = (retries: number): void => {
@@ -57,7 +60,15 @@ export function installMenuInputEnter(runtime: UniverRuntime): void {
       if (retries > 0) setTimeout(() => attempt(retries - 1), INSTALL_RETRY_MS)
       return
     }
-    componentManager.register(MENU_ITEM_INPUT_COMPONENT, wrapWithEnterActivation(original))
+    // a re-mount, HMR or StrictMode double effect finds our own wrapper registered: wrapping it
+    // again would run the row's action twice per Enter
+    if (wrappers.has(original)) return
+    const wrapper = wrapWithEnterActivation(original)
+    wrappers.add(wrapper)
+    // ComponentManager.register warns "Component … already exists" for an overwrite; the delete
+    // makes this a deliberate replacement instead of a console warning on every open
+    componentManager.delete(MENU_ITEM_INPUT_COMPONENT)
+    componentManager.register(MENU_ITEM_INPUT_COMPONENT, wrapper)
   }
   attempt(INSTALL_RETRIES)
 }

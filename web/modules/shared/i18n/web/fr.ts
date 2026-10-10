@@ -27,4 +27,14 @@ export const fr = {
   webDraftDiscard: 'Ignorer',
   webSaveNetwork: 'Impossible de joindre UniWork. Vérifiez votre connexion et réessayez.',
   webSaveTimeout: "L'enregistrement a pris trop de temps. Vérifiez votre connexion et réessayez.",
+  webClose: 'Fermer',
+  webSaveUnauthorized:
+    'Votre session UniWork a expiré. Reconnectez-vous, puis réessayez d’enregistrer.',
+  webSaveForbidden: 'Vous n’avez pas l’autorisation d’enregistrer ce document.',
+  webSaveNotFound: 'Ce document n’existe plus ou a été déplacé.',
+  webSaveTooLarge: 'Le document est trop volumineux pour être enregistré.',
+  webSaveRateLimited: 'Trop de requêtes. Patientez un instant, puis réessayez.',
+  webSaveServer:
+    'UniWork a rencontré un problème lors de l’enregistrement. Réessayez dans un instant.',
+  webSaveFailedGeneric: 'Le document n’a pas pu être enregistré. Réessayez.',
 } satisfies Record<keyof typeof zh, string>

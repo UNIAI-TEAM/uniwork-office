@@ -29,9 +29,9 @@ export const ko = {
   aiWebStateEntitlementTitle: '요금제에 AI가 없습니다',
   aiWebStateEntitlementBody:
     '조직의 UniWork 요금제에 이 AI 기능이 포함되어 있지 않습니다. 관리자에게 문의하세요.',
-  aiWebStateKeyMissingTitle: '{provider} 키 없음',
-  aiWebStateKeyMissingBody: '어시스턴트를 사용하려면 AI 설정에서 {provider} API 키를 추가하세요.',
-  aiWebStateKeyRejectedTitle: '{provider}이(가) 키를 거부함',
+  aiWebStateKeyMissingTitle: '아직 AI 키가 없습니다',
+  aiWebStateKeyMissingBody: '어시스턴트를 사용하려면 AI 설정에서 API 키를 추가하세요.',
+  aiWebStateKeyRejectedTitle: 'AI 키가 거부되었습니다',
   aiWebStateKeyRejectedBody: '공급자가 저장된 키를 거부했습니다. AI 설정에서 키를 교체하세요.',
   aiWebStateRateTitle: 'AI 요청이 너무 많음',
   aiWebStateRateBody: '{seconds}초 후에 다시 시도하세요.',

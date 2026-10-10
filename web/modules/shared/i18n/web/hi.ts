@@ -27,4 +27,13 @@ export const hi = {
   webDraftDiscard: 'हटाएँ',
   webSaveNetwork: 'UniWork से संपर्क नहीं हो सका। अपना कनेक्शन जाँचें और फिर से प्रयास करें।',
   webSaveTimeout: 'सहेजने में बहुत अधिक समय लगा। अपना कनेक्शन जाँचें और फिर से प्रयास करें।',
+  webClose: 'बंद करें',
+  webSaveUnauthorized:
+    'आपका UniWork सत्र समाप्त हो गया। फिर से साइन इन करें और दोबारा सहेजने का प्रयास करें।',
+  webSaveForbidden: 'आपको इस दस्तावेज़ को सहेजने की अनुमति नहीं है।',
+  webSaveNotFound: 'यह दस्तावेज़ अब मौजूद नहीं है या कहीं और ले जाया गया है।',
+  webSaveTooLarge: 'दस्तावेज़ सहेजने के लिए बहुत बड़ा है।',
+  webSaveRateLimited: 'बहुत अधिक अनुरोध। कुछ देर प्रतीक्षा करें और फिर प्रयास करें।',
+  webSaveServer: 'UniWork को सहेजते समय समस्या हुई। थोड़ी देर बाद फिर प्रयास करें।',
+  webSaveFailedGeneric: 'दस्तावेज़ सहेजा नहीं जा सका। फिर प्रयास करें।',
 } satisfies Record<keyof typeof zh, string>

@@ -145,6 +145,7 @@
 
   /* black playback chrome (slideshow / presenter / reading view) holds in
    * both themes; numeric suffix = white alpha % */
+  --slides-mask-opaque: #000; /* mask-image stops: only the alpha matters */
   --slides-show-black: #000;
   --slides-show-white: #fff;
   --slides-show-ink: #fff;
@@ -591,6 +592,45 @@ button {
 
 .ribbon-tabs-spacer {
   flex: 1;
+}
+
+/* the tab buttons: scroll sideways when the frame is too narrow (the File menu and the quick
+ * buttons sit outside); an edge fade (data-fade-*, set by RibbonTabScroller) is the cue */
+.ribbon-tab-scroll {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.ribbon-tab-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.ribbon-tab-scroll .ribbon-tab {
+  flex: none;
+  white-space: nowrap;
+}
+
+.ribbon-tab-scroll[data-fade-end] {
+  mask-image: linear-gradient(to right, var(--slides-mask-opaque) calc(100% - 28px), transparent);
+}
+
+.ribbon-tab-scroll[data-fade-start] {
+  mask-image: linear-gradient(to left, var(--slides-mask-opaque) calc(100% - 28px), transparent);
+}
+
+.ribbon-tab-scroll[data-fade-start][data-fade-end] {
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    var(--slides-mask-opaque) 28px,
+    var(--slides-mask-opaque) calc(100% - 28px),
+    transparent
+  );
 }
 
 .qa-sep {
@@ -1273,6 +1313,13 @@ body.vib .slide-list {
  * larger zoom levels the base overflow:auto rule restores canvas panning. */
 .stage-wrap.stage-fits-viewport {
   overflow: hidden;
+}
+
+/* phone-width frame: the slide takes the width (App.tsx rawFit pads 12px a side here too) */
+@media (max-width: 719px) {
+  .stage-wrap {
+    padding: 48px 12px 12px;
+  }
 }
 
 .stage-zoom-box {
@@ -5725,6 +5772,16 @@ body.vib .slide-list {
   white-space: nowrap;
 }
 
+/* phone width: the deck-wide and selection pills wrap instead of running off the frame */
+@media (max-width: 719px) {
+  .stage-ai-bar {
+    flex-wrap: wrap;
+    width: max-content;
+    max-width: calc(100vw - 40px);
+    row-gap: 4px;
+  }
+}
+
 .stage-ai-group {
   display: inline-flex;
   align-items: center;
@@ -6614,8 +6671,8 @@ body.show-curtain::after {
   position: absolute;
   right: 14px;
   bottom: 10px;
-  font-size: 12px;
-  color: var(--slides-show-ink-40);
+  font-size: 13px;
+  color: var(--slides-show-ink-85);
   background: var(--slides-show-counter-bg);
   border-radius: 4px;
   padding: 3px 8px;
@@ -6954,7 +7011,7 @@ body.show-curtain::after {
 }
 
 .presenter .pv-top {
-  height: 44px;
+  height: 48px;
   flex: none;
   box-sizing: border-box;
   display: flex;
@@ -6969,8 +7026,8 @@ body.show-curtain::after {
   color: var(--slides-show-ink-85);
   border: none;
   border-radius: 4px;
-  font-size: 13px;
-  padding: 6px 12px;
+  font-size: 14px;
+  padding: 8px 12px;
   cursor: pointer;
 }
 
@@ -6998,7 +7055,7 @@ body.show-curtain::after {
 }
 
 .presenter .pv-top-hint {
-  font-size: 13px;
+  font-size: 14px;
   /* white at 75% on the black chrome: 9.4:1 (the old 40% was 3.7:1) */
   color: var(--slides-show-ink-75);
 }
@@ -7044,9 +7101,9 @@ body.show-curtain::after {
   color: var(--slides-show-ink-75);
   border: none;
   border-radius: 4px;
-  font-size: 13px;
-  min-width: 28px;
-  padding: 5px 6px;
+  font-size: 14px;
+  min-width: 32px;
+  padding: 6px 8px;
   cursor: pointer;
   line-height: 1;
 }
@@ -7096,7 +7153,7 @@ body.show-curtain::after {
 }
 
 .presenter .pv-bottomrow {
-  height: 56px;
+  height: 64px;
   flex: none;
   display: flex;
   align-items: center;
@@ -7111,13 +7168,13 @@ body.show-curtain::after {
 }
 
 .presenter .pv-tool-btn {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   background: var(--slides-show-fill-8);
   border: 1px solid var(--slides-show-line-18);
   color: var(--slides-show-ink-85);
-  font-size: 15px;
+  font-size: 18px;
   line-height: 1;
   cursor: pointer;
   display: flex;
@@ -7147,8 +7204,8 @@ body.show-curtain::after {
 }
 
 .presenter .pv-round {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   background: var(--slides-show-fill-8);
   border: 1px solid var(--slides-show-line-25);
@@ -7180,7 +7237,7 @@ body.show-curtain::after {
 }
 
 .presenter .pv-nav-label {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--slides-show-ink-85);
   font-variant-numeric: tabular-nums;
 }
@@ -7212,7 +7269,7 @@ body.show-curtain::after {
 }
 
 .presenter .pv-section-label {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--slides-show-ink-75);
   margin: 6px 0 6px;
@@ -7228,8 +7285,8 @@ body.show-curtain::after {
 
 .presenter .pv-next-none {
   line-height: 1.4;
-  font-size: 13px;
-  color: var(--slides-show-ink-60);
+  font-size: 14px;
+  color: var(--slides-show-ink-75);
   padding: 18px 12px;
 }
 

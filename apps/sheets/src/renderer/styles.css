@@ -599,9 +599,13 @@ html.genoffice-popover-open .ribbon-tabs {
   max-width: min(360px, 30vw);
   overflow: hidden;
   color: var(--text-muted);
-  font-size: 11px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-size: 12px;
+  line-height: 1.25;
+  /* wraps to two lines before it ellipsises (the full text is the tooltip) */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow-wrap: anywhere;
 }
 
 /* Hovering a tab tints the label, it doesn't paint a box */
@@ -1599,9 +1603,84 @@ button.check-item:hover {
   z-index: 35;
   display: grid;
   place-items: center;
-  background: var(--surface);
+  padding: 16px;
+  background: var(--canvas);
   color: var(--text-primary);
+  font-family: var(--gs-font-sans, system-ui, sans-serif);
   font-size: 14px;
+}
+
+/* loading state of the web frame: spinner, the localised line, a sheet-shaped skeleton */
+.workbook-opening-card {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  width: min(360px, 100%);
+  padding: 28px 28px 24px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-16, 16px);
+  background: var(--surface);
+  box-shadow: var(--shadow-menu);
+}
+
+.workbook-opening-spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--accent-soft);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: workbook-opening-spin 0.9s linear infinite;
+}
+
+.workbook-opening-text {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.workbook-opening-skeleton {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  margin-top: 4px;
+}
+
+.workbook-opening-skeleton-row {
+  display: block;
+  height: 10px;
+  border-radius: 5px;
+  background: var(--border);
+  animation: workbook-opening-pulse 1.4s ease-in-out infinite;
+}
+
+.workbook-opening-skeleton-row:nth-child(2n) {
+  width: 82%;
+  animation-delay: 0.15s;
+}
+
+.workbook-opening-skeleton-row:nth-child(3n) {
+  width: 64%;
+  animation-delay: 0.3s;
+}
+
+@keyframes workbook-opening-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes workbook-opening-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workbook-opening-spinner,
+  .workbook-opening-skeleton-row {
+    animation: none;
+  }
 }
 
 .csv-empty-notice {

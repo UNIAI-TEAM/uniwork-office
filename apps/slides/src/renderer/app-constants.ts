@@ -6,3 +6,6 @@ export const PX_PER_INCH = 96
 
 /** Arrow-key nudge step: PowerPoint's default grid, measured 7.2 pt = 0.1 in on Mac (Windows default 0.083 in). */
 export const NUDGE_STEP_PX = PX_PER_INCH / 10
+
+/** Below this frame width (phone layouts) the thumbnail column starts hidden and the stage pads less. */
+export const NARROW_FRAME_PX = 720

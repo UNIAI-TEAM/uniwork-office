@@ -35,6 +35,7 @@ import { ownHeadAfterUnknown } from '../../docs/bridge/head-match'
 import { idFromPath, pathFor } from '../../docs/bridge/webapi'
 import { tm } from '../../../apps/slides/src/main/i18n-main'
 import { ask, choose, text } from './dialogs'
+import { saveFailureText } from '../shared/save-failure'
 
 const IMAGE_ACCEPT = '.png,.jpg,.jpeg,.gif,.bmp,.webp,.tif,.tiff'
 const MEDIA_ACCEPT: Record<MediaPickKind, string> = {
@@ -186,11 +187,7 @@ export function createWebHostIO(deps: WebHostDeps): HostIO {
     const code = result.error.code
     return new WebSaveError(
       // the protocol message is developer English: the user gets the localised text
-      code === 'timeout'
-        ? text('webSaveTimeout')
-        : code === 'network'
-          ? text('webSaveNetwork')
-          : result.error.message,
+      saveFailureText(result.error, text),
       code === 'conflict' ? 'conflict' : code === 'cancelled' ? 'cancelled' : 'failed',
     )
   }

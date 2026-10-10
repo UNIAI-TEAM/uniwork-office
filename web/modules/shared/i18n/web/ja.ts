@@ -27,4 +27,13 @@ export const ja = {
   webDraftDiscard: '破棄',
   webSaveNetwork: 'UniWork に接続できませんでした。接続を確認してもう一度お試しください。',
   webSaveTimeout: '保存に時間がかかりすぎました。接続を確認してもう一度お試しください。',
+  webClose: '閉じる',
+  webSaveUnauthorized:
+    'UniWork のセッションが終了しました。もう一度サインインしてから保存してください。',
+  webSaveForbidden: 'このドキュメントを保存する権限がありません。',
+  webSaveNotFound: 'このドキュメントは存在しないか、移動されました。',
+  webSaveTooLarge: 'ドキュメントが大きすぎて保存できません。',
+  webSaveRateLimited: 'リクエストが多すぎます。しばらく待ってからもう一度お試しください。',
+  webSaveServer: 'UniWork で保存中に問題が発生しました。しばらくしてからもう一度お試しください。',
+  webSaveFailedGeneric: 'ドキュメントを保存できませんでした。もう一度お試しください。',
 } satisfies Record<keyof typeof zh, string>

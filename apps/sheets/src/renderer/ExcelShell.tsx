@@ -934,7 +934,12 @@ export function ExcelShell({
             </button>
           ))}
           <span className="ribbon-tabs-spacer" />
-          <span className="workbook-status" role="status" aria-live="polite">
+          <span
+            className="workbook-status"
+            role="status"
+            aria-live="polite"
+            title={statusMessage || undefined}
+          >
             {statusMessage}
           </span>
         </nav>

@@ -24,4 +24,12 @@ export const ar = {
   webDraftDiscard: 'تجاهل',
   webSaveNetwork: 'تعذّر الوصول إلى UniWork. تحقق من اتصالك وحاول مرة أخرى.',
   webSaveTimeout: 'استغرق الحفظ وقتًا طويلًا. تحقق من اتصالك وحاول مرة أخرى.',
+  webClose: 'إغلاق',
+  webSaveUnauthorized: 'انتهت جلسة UniWork. سجّل الدخول مرة أخرى ثم حاول الحفظ من جديد.',
+  webSaveForbidden: 'ليس لديك إذن بحفظ هذا المستند.',
+  webSaveNotFound: 'لم يعد هذا المستند موجودًا أو تم نقله.',
+  webSaveTooLarge: 'المستند كبير جدًا بحيث لا يمكن حفظه.',
+  webSaveRateLimited: 'طلبات كثيرة جدًا. انتظر لحظة ثم حاول مرة أخرى.',
+  webSaveServer: 'واجه UniWork مشكلة أثناء الحفظ. حاول مرة أخرى بعد قليل.',
+  webSaveFailedGeneric: 'تعذّر حفظ المستند. حاول مرة أخرى.',
 } satisfies Record<keyof typeof zh, string>

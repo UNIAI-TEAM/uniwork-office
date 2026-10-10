@@ -204,14 +204,15 @@ describe('save', () => {
     expect(await api.isDirty()).toBe(false)
   })
 
-  it('conflict dialog focuses the safe Cancel, not the destructive Overwrite', async () => {
+  it('conflict dialog focuses the safe primary (Reload latest), not the destructive Overwrite', async () => {
     const { mock, api, fileId } = await setup()
     await api.consumePendingOpen(FIT)
     await api.setNotes({ slideIndex: 0, text: 'mine' })
     mock.bumpRemote(fileId)
     const pending = api.save()
     await waitFor(() => document.querySelector('[data-slides-web="conflict"]'))
-    expect((document.activeElement as HTMLElement | null)?.textContent).toBe('Cancel')
+    expect((document.activeElement as HTMLElement | null)?.textContent).toBe('Reload latest')
+    expect(document.querySelector('[data-slides-web="conflict"] .ow-dlg-close')).not.toBeNull()
     clickChoice('conflict', 'Cancel')
     await pending
   })
@@ -529,6 +530,27 @@ describe('view-only (no host save grant)', () => {
     )
     expect(seen).toEqual([])
     expect(mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(0)
+  })
+
+  // N-02 (visual round 2): with a token `can_edit: false` the canvas still took typing
+  it('answers uniworkState readOnly so the renderer keeps Reading view, and typing never marks dirty', async () => {
+    const view = await setup({ capabilities: { ...SLIDES_WEB_CAPABILITIES } })
+    await view.api.consumePendingOpen(FIT)
+    expect(await view.api.uniworkState()).toEqual({ bound: false, readOnly: true })
+    const editor = document.createElement('div')
+    editor.className = 'slide-text-editor'
+    editor.contentEditable = 'true'
+    document.body.append(editor)
+    editor.dispatchEvent(new Event('input', { bubbles: true }))
+    expect(view.web.isDirty()).toBe(false)
+    expect(view.mock.dirty.at(-1)).not.toBe(true)
+    expect(await view.api.save()).toMatchObject({ ok: false })
+    editor.remove()
+  })
+
+  it('an editing frame is not read-only', async () => {
+    const { api } = await setup()
+    expect(await api.uniworkState()).toEqual({ bound: false, readOnly: false })
   })
 
   it('host grants turn save / saveAs / open / recents on', () => {

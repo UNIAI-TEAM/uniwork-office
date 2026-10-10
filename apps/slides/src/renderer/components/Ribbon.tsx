@@ -122,6 +122,7 @@ export type { FormatCmd, SlidesViewMode } from './ribbon-shared'
 import type { FormatCmd } from './ribbon-shared'
 import { RibbonHomeTab } from './RibbonHomeTab'
 import { RibbonInsertTab } from './RibbonInsertTab'
+import { RibbonTabScroller } from './RibbonTabScroller'
 import { ShapeGalleryContent } from './ShapeGalleryPopover'
 import { autoContextTabForElement, contextTabForElement, type ContextTab } from './context-tabs'
 import { cap, isViewOnly, isWeb } from '../capabilities'
@@ -1884,35 +1885,37 @@ export function Ribbon({
           </label>
         )}
         <span className="qa-sep" aria-hidden="true" />
-        {mainTabs()
-          .filter((tb) => tb !== 'file')
-          .map((tb) => (
+        <RibbonTabScroller activeKey={tab}>
+          {mainTabs()
+            .filter((tb) => tb !== 'file')
+            .map((tb) => (
+              <button
+                key={tb}
+                className={`ribbon-tab ${collapse.tabClass(tab === tb)}`}
+                data-tip={collapse.tabTip(tab === tb)}
+                onClick={() => {
+                  collapse.onTabPress(tab === tb)
+                  setTab(tb)
+                  setFileOpen(false)
+                }}
+              >
+                {t(TAB_LABEL[tb])}
+              </button>
+            ))}
+          {contextTab && (
             <button
-              key={tb}
-              className={`ribbon-tab ${collapse.tabClass(tab === tb)}`}
-              data-tip={collapse.tabTip(tab === tb)}
+              key={contextTab}
+              className={`ribbon-tab ribbon-tab-context ${collapse.tabClass(tab === contextTab)}`}
               onClick={() => {
-                collapse.onTabPress(tab === tb)
-                setTab(tb)
-                setFileOpen(false)
+                collapse.onTabPress(tab === contextTab)
+                setTab(contextTab)
               }}
+              data-tip={collapse.tabTip(tab === contextTab) ?? t(TAB_LABEL[contextTab])}
             >
-              {t(TAB_LABEL[tb])}
+              {t(TAB_LABEL[contextTab])}
             </button>
-          ))}
-        {contextTab && (
-          <button
-            key={contextTab}
-            className={`ribbon-tab ribbon-tab-context ${collapse.tabClass(tab === contextTab)}`}
-            onClick={() => {
-              collapse.onTabPress(tab === contextTab)
-              setTab(contextTab)
-            }}
-            data-tip={collapse.tabTip(tab === contextTab) ?? t(TAB_LABEL[contextTab])}
-          >
-            {t(TAB_LABEL[contextTab])}
-          </button>
-        )}
+          )}
+        </RibbonTabScroller>
         <span className="ribbon-tabs-spacer" />
       </div>
 

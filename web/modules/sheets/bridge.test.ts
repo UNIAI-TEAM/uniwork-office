@@ -472,14 +472,16 @@ describe('save failures', () => {
     await expect(
       t.desktop.saveWorkbookEdits(saveRequest(wb.sessionId, [[0, 0, 5]])),
     ).rejects.toThrow(/^Saving to UniWork failed\.$/)
-    // a server-side failure keeps its detail
+    // a server-side failure adds the localized sentence of its status, never the raw status line
     t.mock.override('api.save', () => ({
       ok: false,
-      error: { code: 'internal', message: 'disk full' },
+      error: { code: 'internal', message: 'Internal Server Error', status: 500 },
     }))
     await expect(
       t.desktop.saveWorkbookEdits(saveRequest(wb.sessionId, [[0, 0, 5]])),
-    ).rejects.toThrow('Saving to UniWork failed. (disk full)')
+    ).rejects.toThrow(
+      /^Saving to UniWork failed\. UniWork had a problem saving\. Try again in a moment\.$/,
+    )
     expect(t.mock.dirty.at(-1)).toBe(true)
   })
 })
@@ -563,7 +565,11 @@ describe('too large (frame size gate)', () => {
     const tooLarge = {
       ...fake.transport,
       open: async () => {
-        throw Object.assign(new Error('too_large: 42 MB of worksheet XML'), { code: 'too_large' })
+        throw Object.assign(new Error('too_large: 42 MB of worksheet XML'), {
+          code: 'too_large',
+          worksheetXmlBytes: 42 * 1048576,
+          limitBytes: 80 * 1048576,
+        })
       },
     }
     const t = setup({ transport: tooLarge })
@@ -574,6 +580,10 @@ describe('too large (frame size gate)', () => {
     const fatal = t.mock.errors.filter((e) => (e.error as { code?: string }).code === 'too_large')
     expect(fatal).toHaveLength(1)
     expect(fatal[0]!.fatal).toBe(true)
+    // the sizes the host needs for its one-sentence reason (visual round 2, S-07)
+    expect(fatal[0]!.error).toMatchObject({
+      details: { worksheetXmlBytes: 42 * 1048576, limitBytes: 80 * 1048576 },
+    })
   })
 })
 

@@ -19,6 +19,8 @@ import { createProxyFetch, toProxyRequest } from './transport'
 import { createWebAiStreams } from './stream'
 import { aiHostGrants, createWebAi, mediaFromUrl, withWebAi } from './web-ai'
 import { describeAiError, hideAiState, openAiSettingsDialog, showAiState } from './ui'
+import { aiWebStrings, aiWebText } from '../i18n/strings-ai-web'
+import type { Lang } from '@genoffice/i18n'
 
 const ORIGIN = 'https://app.test'
 const BASE = `${ORIGIN}/api/v1/office-frame/documents/doc-1/ai`
@@ -389,7 +391,7 @@ describe('streams', () => {
   function streams(answer: (c: Call) => Response) {
     const { calls, fetch } = recorder((c) => answer(c))
     const client = { base: BASE, fetch: (u: string, i?: RequestInit) => fetch(u, i) }
-    const onTypedError = vi.fn()
+    const onChatFailure = vi.fn()
     const s = createWebAiStreams({
       client,
       protocolOf: (id) =>
@@ -401,11 +403,11 @@ describe('streams', () => {
               ? 'gemini'
               : null,
       describe: (err) => `typed:${err.code}`,
-      onTypedError,
+      onChatFailure,
     })
     const chunks: Array<{ type: string; text?: string; error?: string }> = []
     s.onAiStream((c) => chunks.push(c))
-    return { s, calls, chunks, onTypedError }
+    return { s, calls, chunks, onChatFailure }
   }
 
   it('streams an openai-compatible turn through the proxy (native wire format, no key)', async () => {
@@ -476,7 +478,7 @@ describe('streams', () => {
       ).map(([status, code]) => [provider, status, code] as const),
     ),
   )('%s: a proxy %i ends the turn with the typed %s state', async (provider, status, code) => {
-    const { s, chunks, onTypedError } = streams(() =>
+    const { s, chunks } = streams(() =>
       jsonResponse(status, status === 429 ? { message: 'x' } : { error: { code, message: 'm' } }),
     )
     await s.aiStream({
@@ -486,7 +488,25 @@ describe('streams', () => {
       messages: [{ role: 'user', content: 'hi' }],
     } as never)
     expect(chunks.at(-1)).toMatchObject({ type: 'error', error: `typed:${code}` })
-    expect(onTypedError.mock.calls[0]![0].code).toBe(code)
+    expect(chunks.filter((c) => c.type === 'error')).toHaveLength(1)
+  })
+
+  it('a typed chat turn never raises the card; a typed one-shot aiChat does (no transcript to show it)', async () => {
+    const { s, chunks, onChatFailure } = streams(() =>
+      jsonResponse(404, { error: { code: 'credential_missing', message: 'm' } }),
+    )
+    await s.aiStream({
+      requestId: 'r-turn',
+      settings: settings('openai'),
+      system: 's',
+      messages: [{ role: 'user', content: 'hi' }],
+    } as never)
+    expect(chunks.at(-1)).toMatchObject({ type: 'error', error: 'typed:credential_missing' })
+    expect(onChatFailure).not.toHaveBeenCalled()
+    const r = await s.aiChat({ settings: settings('openai'), system: 's', user: 'hi' })
+    expect(r).toMatchObject({ ok: false, error: 'typed:credential_missing' })
+    expect(onChatFailure).toHaveBeenCalledTimes(1)
+    expect(onChatFailure.mock.calls[0]![0].code).toBe('credential_missing')
   })
 
   it('reads the code and message from the wrapped and the flat error body', async () => {
@@ -514,7 +534,7 @@ describe('streams', () => {
     expect(rawFailureAsTyped(new Error('Gemini HTTP 500: boom'))).toMatchObject({ code: 'unknown' })
     expect(rawFailureAsTyped(new Error('{"detail":"nope"}'))).toMatchObject({ code: 'unknown' })
     expect(rawFailureAsTyped(new Error('The model returned no text'))).toBeUndefined()
-    const { s, chunks, onTypedError } = streams(() =>
+    const { s, chunks } = streams(() =>
       jsonResponse(500, { error: { type: 'api_error', message: 'upstream exploded' } }),
     )
     await s.aiStream({
@@ -526,7 +546,7 @@ describe('streams', () => {
     const last = chunks.at(-1) as { type: string; error: string }
     expect(last.type).toBe('error')
     expect(last.error).toBe('typed:unknown')
-    expect(onTypedError).toHaveBeenCalledTimes(1)
+    expect(chunks.filter((c) => c.type === 'error')).toHaveLength(1)
   })
 
   it('a provider without a server route is credential_missing (no request sent)', async () => {
@@ -708,6 +728,68 @@ describe('members (off = as today, on = UniWork routes)', () => {
     expect(document.querySelector('[data-ai-state="credits_exhausted"]')).not.toBeNull()
   })
 
+  it('a typed stream failure reaches the panel once: one error chunk, no floating card', async () => {
+    const { fetch } = recorder((c) => {
+      if (c.url.endsWith('/credentials'))
+        return jsonResponse(200, { items: [], providers: CREDENTIALS.providers })
+      if (c.url.endsWith('/cloud')) return jsonResponse(200, CLOUD)
+      return jsonResponse(404, { error: { code: 'credential_missing', message: 'm' } })
+    })
+    const ai = createWebAi({
+      port: port({ ai: true }),
+      capabilities: { ai: true },
+      fetch,
+      origin: ORIGIN,
+    })
+    const api = withWebAi({ ...stubs }, ai)
+    const chunks: Array<{ type: string; error?: string }> = []
+    ;(api.onAiStream as (h: (c: { type: string; error?: string }) => void) => () => void)((c) =>
+      chunks.push(c),
+    )
+    await (api.aiStream as (r: object) => Promise<void>)({
+      requestId: 'once',
+      settings: { provider: 'openai', providers: { openai: { apiKey: '', model: 'm' } } },
+      system: 's',
+      messages: [{ role: 'user', content: 'hi' }],
+    })
+    const errors = chunks.filter((c) => c.type === 'error')
+    expect(errors).toHaveLength(1)
+    expect(errors[0]!.error).toMatch(/No AI key yet/)
+    // the panel's inline error is the one surface: no .ow-ai-state toast beside it
+    expect(document.querySelector('.ow-ai-state')).toBeNull()
+  })
+
+  it('the model chip manage row opens the AI settings while AI is on (module stub when off)', async () => {
+    const stub = vi.fn(async () => {})
+    const { fetch } = recorder((c) => {
+      if (c.url.endsWith('/credentials')) return jsonResponse(200, CREDENTIALS)
+      return jsonResponse(200, CLOUD)
+    })
+    const off = createWebAi({ port: port({ ai: false }), capabilities: {}, fetch, origin: ORIGIN })
+    const apiOff = withWebAi({ ...stubs, openAiModelSettings: stub }, off)
+    await (apiOff.openAiModelSettings as () => Promise<void>)()
+    expect(stub).toHaveBeenCalledTimes(1)
+    expect(document.querySelector('[data-office-web="ai-settings"]')).toBeNull()
+
+    const on = createWebAi({
+      port: port({ ai: true }),
+      capabilities: { ai: true },
+      fetch,
+      origin: ORIGIN,
+    })
+    const apiOn = withWebAi({ ...stubs, openAiModelSettings: stub }, on)
+    void (apiOn.openAiModelSettings as () => Promise<void>)()
+    await vi.waitFor(() =>
+      expect(document.querySelector('[data-office-web="ai-settings"]')).not.toBeNull(),
+    )
+    expect(stub).toHaveBeenCalledTimes(1)
+    // the dialog is a module singleton: close it so the next case opens its own
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    await vi.waitFor(() =>
+      expect(document.querySelector('[data-office-web="ai-settings"]')).toBeNull(),
+    )
+  })
+
   it('reads data: URLs as media bytes only', () => {
     expect(mediaFromUrl('data:image/png;base64,QUJD')).toEqual({
       mime: 'image/png',
@@ -730,11 +812,36 @@ describe('in-frame UI', () => {
     )
     expect(document.querySelectorAll('.ow-ai-state')).toHaveLength(1)
     expect(card.dataset.aiState).toBe('credential_missing')
-    expect(card.textContent).toContain('OpenAI')
+    expect(card.textContent).toContain('No AI key yet')
     const settingsBtn = card.querySelector('button.primary') as HTMLButtonElement
     settingsBtn.click()
     expect(openSettings).toHaveBeenCalled()
     expect(document.querySelector('.ow-ai-state')).toBeNull()
+  })
+
+  it('the key-state copy names no vendor, so it cannot disagree with the model chip, in any locale', () => {
+    const keys = [
+      'aiWebStateKeyMissingTitle',
+      'aiWebStateKeyMissingBody',
+      'aiWebStateKeyRejectedTitle',
+    ] as const
+    const langs = Object.keys(aiWebStrings) as Lang[]
+    expect(langs).toHaveLength(21)
+    for (const lang of langs) {
+      for (const key of keys) {
+        const withOpenAi = aiWebText(lang, key, { provider: 'OpenAI' })
+        const withClaude = aiWebText(lang, key, { provider: 'Claude' })
+        expect(withOpenAi, `${lang} ${key}`).toBe(withClaude)
+        expect(withOpenAi).not.toMatch(/OpenAI|Claude|\{provider\}/)
+      }
+    }
+    const missing = describeAiError(
+      new AiWebError({ code: 'credential_missing', status: 404 }),
+      'OpenAI',
+    )
+    expect(missing).toBe(
+      describeAiError(new AiWebError({ code: 'credential_missing', status: 404 }), 'Claude'),
+    )
   })
 
   it('every error code has its own text', () => {
