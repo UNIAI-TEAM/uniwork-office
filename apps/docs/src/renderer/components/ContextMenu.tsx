@@ -46,6 +46,7 @@ import { IconSparkle } from './icons'
 import { cap } from '../capabilities'
 import { spellcheckEnabled } from '../spellcheck-pref'
 import { applySpellingSuggestion } from '../editor/spell-replace'
+import { requestRespellKick } from '../editor/respell-kick-gate'
 import { linkRangeAt, linkTarget, removeLink } from '../editor/link-actions'
 import { fieldRangeAt, toggleFieldCodes, type FieldRange } from '../editor/field-codes'
 import type { SpellLanguages } from '../../shared/ipc'
@@ -190,11 +191,17 @@ export function EditorContextMenu({
       window.desktop.spellReplace,
     )
   }
+  // the respell kick these trigger starts only after an IPC round trip and a
+  // render: hold spelling suggestions from the click on, not from the kick
   const addToDictionary = () => {
-    if (spell) void window.desktop.spellAddWord?.(spell.word).then(() => onRespell?.())
+    if (!spell || !window.desktop.spellAddWord) return
+    requestRespellKick()
+    void window.desktop.spellAddWord(spell.word).then(() => onRespell?.())
   }
   const ignoreAll = () => {
-    if (spell) void window.desktop.spellIgnoreWord?.(spell.word).then(() => onRespell?.())
+    if (!spell || !window.desktop.spellIgnoreWord) return
+    requestRespellKick()
+    void window.desktop.spellIgnoreWord(spell.word).then(() => onRespell?.())
   }
   const toggleLanguage = (code: string) => {
     if (!spellLangs) return
@@ -204,7 +211,9 @@ export function EditorContextMenu({
     if (!active.length) return
     // the respell kick that follows must not run under an open menu (Word closes it too)
     onClose()
-    void window.desktop.spellSetLanguages?.(active).then(() => onRespell?.())
+    if (!window.desktop.spellSetLanguages) return
+    requestRespellKick()
+    void window.desktop.spellSetLanguages(active).then(() => onRespell?.())
   }
 
   const { from, to } = editor.state.selection

@@ -26,7 +26,11 @@ import {
   useAutoSavePref,
 } from '@genoffice/ui'
 import { wordRangeAtCaret } from './editor/comments'
-import { beginRespellKick } from './editor/respell-kick-gate'
+import {
+  beginRespellKick,
+  requestRespellKick,
+  spellingEditInFlight,
+} from './editor/respell-kick-gate'
 import { setFieldInstr, toggleAllFieldCodes, type FieldRange } from './editor/field-codes'
 import { linkTarget } from './editor/link-actions'
 import { FieldDialog } from './components/FieldDialog'
@@ -1643,12 +1647,18 @@ export function App() {
         // kick used to make the re-enable return silently, so existing typos
         // were never re-marked (one "the toggle worked only once" path).
         // Retry for a few seconds instead of dropping the kick.
-        if (view.composing || respellKickBusy.current) {
+        // a spelling suggestion still landing (Blink round trip + grace) must
+        // not be snapshotted mid-edit: the scrub would restore the old text
+        const editing = spellingEditInFlight()
+        if (view.composing || respellKickBusy.current || editing) {
           spellDiag(
-            `kick deferred composing=${view.composing} busy=${respellKickBusy.current} attempt=${attempts}`,
+            `kick deferred composing=${view.composing} busy=${respellKickBusy.current} editing=${editing} attempt=${attempts}`,
           )
-          if (attempts++ < 8) retryTimer = setTimeout(runKick, 600)
-          else spellDiag('kick gave up after retries')
+          if (attempts++ < 8) {
+            // keep later suggestions held while this kick waits its turn
+            if (respellRequested) requestRespellKick()
+            retryTimer = setTimeout(runKick, 600)
+          } else spellDiag('kick gave up after retries')
           return
         }
         respellKickBusy.current = true
