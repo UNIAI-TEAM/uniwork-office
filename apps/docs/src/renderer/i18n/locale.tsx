@@ -8,6 +8,13 @@ const translate = createI18n(strings)
 export type StringKey = keyof typeof strings.zh
 export type TFunc = (key: StringKey, params?: Params) => string
 
+/** a status-bar line kept as key + params, translated when drawn so a live language switch rewrites it */
+export type StatusMessage = { key: StringKey; params?: Params }
+/** a status line is either ready text or a deferred translation */
+export type StatusLine = string | StatusMessage
+export const statusText = (line: StatusLine, tr: TFunc): string =>
+  typeof line === 'string' ? line : tr(line.key, line.params)
+
 // mirror for non-React modules (pagination, editor extensions, AI tools …);
 // set before first render and on every language switch
 let moduleLang: Lang = 'zh'

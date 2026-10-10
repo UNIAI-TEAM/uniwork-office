@@ -112,7 +112,7 @@ import { textColorValue } from './editor/text-color'
 import { textOutlineCssValue } from './editor/text-outline'
 import { AiAskPopover } from './components/AiAskPopover'
 import { cap } from './capabilities'
-import { isNarrowViewport } from './narrow-viewport'
+import { isNarrowViewport, widthFitZoom } from './narrow-viewport'
 import { EDIT_QUEUE_MAX, selectionForAnchor, type DocsEditQueueItem } from './ai/edit-queue'
 import { addQueueAnchor, clearQueueAnchors, removeQueueAnchors } from './editor/ai-queue-anchors'
 import {
@@ -334,7 +334,7 @@ import { applyCase, nextCaseMode, selectionText } from './editor/case-transform'
 import { stepHangingIndent, stepParagraphIndent } from './editor/indent'
 import { PasswordDialog } from './components/PasswordDialog'
 import { ProtectDialog, type ProtectDialogResult } from './components/ProtectDialog'
-import { t, useI18n } from './i18n/locale'
+import { t, statusText, useI18n, type StatusLine } from './i18n/locale'
 import {
   getActiveSubEditor,
   setActiveSubEditor,
@@ -805,7 +805,7 @@ export function App() {
   const [ribbonTabRequest, setRibbonTabRequest] = useState<{ tab: string; nonce: number } | null>(
     null,
   )
-  const [status, setStatus] = useState('')
+  const [status, setStatus] = useState<StatusLine>('')
   const [zoom, setZoom] = useState(100)
   const scrollContainerRef = useRef<HTMLElement>(null)
   // Word-style dark page (editor/dark-page.ts): the shell's document-page-theme
@@ -2974,12 +2974,15 @@ export function App() {
     [comments, revisionDisplay],
   )
 
-  /** Uncapped width-fit ratio (%) from the scroller's measured size */
+  /** Uncapped width-fit ratio (%) from the scroller's measured size (with the narrow-pane readable floor) */
   const rawFitWidth = useCallback(() => {
     if (!section) return null
     const scroller = document.querySelector('.editor-scroll')
     if (!scroller) return null
-    return ((scroller.clientWidth - 48) / (twipsToPx(section.pageWidth) + markupExtra)) * 100
+    return widthFitZoom(
+      ((scroller.clientWidth - 48) / (twipsToPx(section.pageWidth) + markupExtra)) * 100,
+      scroller.clientWidth,
+    )
   }, [section, markupExtra])
 
   /** Last auto-fit: if current zoom still equals its value → "fit mode", re-fit on size changes */
@@ -3003,7 +3006,12 @@ export function App() {
       const tFit = ((scroller.clientWidth - pad) / (textW + markupExtra)) * 100
       // whole page = the entire page visible, so it must fit both dimensions;
       // floor, not round: rounding up would push the page past the pane edge
-      const next = mode === 'width' ? wFit : mode === 'text' ? tFit : Math.min(wFit, hFit)
+      const next =
+        mode === 'width'
+          ? widthFitZoom(wFit, scroller.clientWidth)
+          : mode === 'text'
+            ? tFit
+            : Math.min(wFit, hFit)
       return clampDocsZoom(Math.floor(next))
     },
     [section, markupExtra],
@@ -6135,7 +6143,7 @@ export function App() {
       editor,
       openPath: (path: string) => openRecent(path),
       save: () => save(false),
-      getStatus: () => status,
+      getStatus: () => statusText(status, t),
       exportPdfTo: (path: string) => exportPdf(path),
       exportHtmlTo: (path: string) => exportHtml(path),
     }
@@ -7464,7 +7472,12 @@ export function App() {
                     </span>
                   )
                 })()}
-              {status && <span className="status-msg"> — {status}</span>}
+              {status && (
+                <span className="status-msg" title={statusText(status, t)}>
+                  {' '}
+                  — {statusText(status, t)}
+                </span>
+              )}
             </div>
             <div className="status-right">
               {doc && (

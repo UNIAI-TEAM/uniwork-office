@@ -3894,7 +3894,9 @@ th.cell-rev-del {
 .comment-card-head {
   display: flex;
   align-items: center;
-  gap: 6px;
+  /* a long author name wraps its own line instead of being cut to an ellipsis */
+  flex-wrap: wrap;
+  gap: 2px 6px;
   margin-bottom: 4px;
 }
 
@@ -3915,9 +3917,10 @@ th.cell-rev-del {
 .comment-author {
   font-weight: 600;
   font-size: 12px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  /* shows the whole name: it takes the free width and wraps (at spaces, else anywhere) */
+  flex: 1 1 5em;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .comment-date {
@@ -9272,6 +9275,14 @@ body.docs-crop-active
   height: 3px;
 }
 
+/* in a frame at most 1280px wide (the host's side panel and the AI dock take much of a 1440px screen)
+   the status message has little room: a shorter slider keeps "Opened <file name>" from an ellipsis */
+@media (max-width: 1280px) {
+  .zoom-slider {
+    width: 56px;
+  }
+}
+
 .zoom-value {
   min-width: 38px;
   text-align: right;
@@ -12218,7 +12229,9 @@ tr > .page-gap-cut {
 .table-style-card {
   display: flex;
   box-sizing: border-box;
-  flex: 0 0 76px;
+  /* the card grows to its label (the gallery scrolls), so no name is cut to an ellipsis */
+  flex: 0 0 auto;
+  min-width: 76px;
   flex-direction: column;
   align-items: center;
   gap: 3px;
@@ -12232,10 +12245,7 @@ tr > .page-gap-cut {
 }
 
 .table-style-card span:last-child {
-  overflow: hidden;
   white-space: nowrap;
-  text-overflow: ellipsis;
-  max-width: 68px;
 }
 
 .table-style-card:hover {
