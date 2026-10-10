@@ -7374,8 +7374,31 @@ body.docs-crop-active
   margin-top: 2px;
 }
 
+/* inside a ribbon popover (.layout-menu) the menu-row button rules (0,1,1, hover 0,3,1) would
+   strip the primary button down to plain text; restate its frame at a higher specificity */
+.app-only-note .btn-primary.app-only-open {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  height: 34px;
+  padding: 0 16px;
+  border-radius: 12px;
+  background: var(--docs-accent-fill);
+  color: var(--docs-on-accent);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.app-only-note .btn-primary.app-only-open:not(:disabled):hover {
+  background: var(--docs-accent-fill-hover);
+}
+
 .protect-dialog .app-only-note {
   max-width: none;
+  /* air between the Open-in-app button and the next field's label */
+  margin-bottom: 18px;
 }
 
 .btn-primary:hover:not(:disabled) {
@@ -9673,11 +9696,13 @@ body.docs-crop-active
   box-shadow: 0 0 0 3px var(--docs-error-ring);
 }
 
-/* side-by-side password + confirm pair */
+/* side-by-side password + confirm pair; end-aligned so a label that wraps to two lines (vi) in one
+   cell does not lift its input above the neighbour's */
 .gs-form .fld-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
+  align-items: end;
 }
 
 /* wrapper positioning the shared .pwd-eye toggle (defined below) inside a

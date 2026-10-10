@@ -154,6 +154,7 @@ export const cs = {
   ribbonStyleIntenseReference: 'Výrazný odkaz',
   ribbonStyleBookTitle: 'Název knihy',
   ribbonStyleListParagraph: 'Odstavec se seznamem',
+  ribbonTableStyleGrid: 'Mřížka tabulky',
   ribbonStylesPane: 'Podokno stylů',
   ribbonStylesPaneTip: 'Otevřít podokno stylů: zobrazení, použití a úprava všech stylů v dokumentu',
   ribbonStylesSearch: 'Hledat styly',

@@ -154,6 +154,7 @@ export const ar = {
   ribbonStyleIntenseReference: 'مرجع مكثف',
   ribbonStyleBookTitle: 'عنوان الكتاب',
   ribbonStyleListParagraph: 'فقرة قائمة',
+  ribbonTableStyleGrid: 'شبكة الجدول',
   ribbonStylesPane: 'جزء الأنماط',
   ribbonStylesPaneTip: 'فتح جزء الأنماط لعرض كل أنماط المستند وتطبيقها وتعديلها',
   ribbonStylesSearch: 'البحث عن الأنماط',

@@ -155,6 +155,7 @@ export const hi = {
   ribbonStyleIntenseReference: 'गहन संदर्भ',
   ribbonStyleBookTitle: 'पुस्तक शीर्षक',
   ribbonStyleListParagraph: 'सूची अनुच्छेद',
+  ribbonTableStyleGrid: 'तालिका ग्रिड',
   ribbonStylesPane: 'शैलियाँ फलक',
   ribbonStylesPaneTip:
     'दस्तावेज़ की सभी शैलियाँ देखने, लागू करने और बदलने के लिए शैलियाँ फलक खोलें',

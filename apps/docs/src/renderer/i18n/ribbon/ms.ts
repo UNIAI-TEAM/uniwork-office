@@ -155,6 +155,7 @@ export const ms = {
   ribbonStyleIntenseReference: 'Rujukan Kuat',
   ribbonStyleBookTitle: 'Tajuk Buku',
   ribbonStyleListParagraph: 'Perenggan Senarai',
+  ribbonTableStyleGrid: 'Grid Jadual',
   ribbonStylesPane: 'Anak Tetingkap Gaya',
   ribbonStylesPaneTip:
     'Buka anak tetingkap Gaya untuk melihat, menggunakan dan mengubah suai semua gaya dalam dokumen',

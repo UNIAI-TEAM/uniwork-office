@@ -156,6 +156,7 @@ export const nl = {
   ribbonStyleIntenseReference: 'Intense verwijzing',
   ribbonStyleBookTitle: 'Titel van boek',
   ribbonStyleListParagraph: 'Lijstalinea',
+  ribbonTableStyleGrid: 'Tabelraster',
   ribbonStylesPane: 'Deelvenster Stijlen',
   ribbonStylesPaneTip:
     'Deelvenster Stijlen openen om alle stijlen in het document te bekijken, toe te passen en te wijzigen',

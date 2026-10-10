@@ -154,6 +154,7 @@ export const en = {
   ribbonStyleIntenseReference: 'Intense Reference',
   ribbonStyleBookTitle: 'Book Title',
   ribbonStyleListParagraph: 'List Paragraph',
+  ribbonTableStyleGrid: 'Table Grid',
   ribbonStylesPane: 'Styles Pane',
   ribbonStylesPaneTip: 'Open the Styles pane to view, apply and modify every style in the document',
   ribbonStylesSearch: 'Search styles',

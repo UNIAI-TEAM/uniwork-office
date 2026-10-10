@@ -155,6 +155,7 @@ export const id = {
   ribbonStyleIntenseReference: 'Referensi Kuat',
   ribbonStyleBookTitle: 'Judul Buku',
   ribbonStyleListParagraph: 'Paragraf Daftar',
+  ribbonTableStyleGrid: 'Kisi Tabel',
   ribbonStylesPane: 'Panel Gaya',
   ribbonStylesPaneTip:
     'Buka panel Gaya untuk melihat, menerapkan, dan mengubah semua gaya dalam dokumen',

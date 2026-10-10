@@ -155,6 +155,7 @@ export const pl = {
   ribbonStyleIntenseReference: 'Odwołanie intensywne',
   ribbonStyleBookTitle: 'Tytuł książki',
   ribbonStyleListParagraph: 'Akapit z listą',
+  ribbonTableStyleGrid: 'Siatka tabeli',
   ribbonStylesPane: 'Okienko stylów',
   ribbonStylesPaneTip:
     'Otwórz okienko stylów, aby wyświetlać, stosować i modyfikować wszystkie style w dokumencie',

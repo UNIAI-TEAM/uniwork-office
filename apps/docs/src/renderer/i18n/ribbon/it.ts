@@ -156,6 +156,7 @@ export const it = {
   ribbonStyleIntenseReference: 'Riferimento intenso',
   ribbonStyleBookTitle: 'Titolo libro',
   ribbonStyleListParagraph: 'Paragrafo elenco',
+  ribbonTableStyleGrid: 'Griglia tabella',
   ribbonStylesPane: 'Riquadro Stili',
   ribbonStylesPaneTip:
     'Apri il riquadro Stili per visualizzare, applicare e modificare tutti gli stili del documento',

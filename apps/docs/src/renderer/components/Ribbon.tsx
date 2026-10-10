@@ -2510,8 +2510,8 @@ function RibbonInner({
                           ? 'table-style-card active'
                           : 'table-style-card'
                       }
-                      data-tip={t('ribbonApplyTableStyleTip', { name: info.name })}
-                      aria-label={info.name}
+                      data-tip={t('ribbonApplyTableStyleTip', { name: styleLabel(info, t) })}
+                      aria-label={styleLabel(info, t)}
                       onClick={() =>
                         chain().updateAttributes('docTable', { tblStyleId: info.styleId }).run()
                       }
@@ -2527,7 +2527,7 @@ function RibbonInner({
                             : undefined,
                         }}
                       />
-                      <span>{info.name}</span>
+                      <span>{styleLabel(info, t)}</span>
                     </button>
                   ))}
               </div>

@@ -170,6 +170,8 @@ const BUILT_IN_LABELS: Record<string, StringKey> = {
   'intense reference': 'ribbonStyleIntenseReference',
   'book title': 'ribbonStyleBookTitle',
   'list paragraph': 'ribbonStyleListParagraph',
+  // the table style Word writes into every document with a bordered table
+  'table grid': 'ribbonTableStyleGrid',
 }
 
 export function styleLabel(info: Pick<StyleInfo, 'name'>, t: TFunc): string {

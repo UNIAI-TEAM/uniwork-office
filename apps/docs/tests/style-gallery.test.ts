@@ -192,4 +192,13 @@ describe('quick style gallery (Word order and hiding)', () => {
     expect(stylePreviewCss(styles.get('IntenseReference')!).fontVariant).toBe('small-caps')
     expect(stylePreviewCss(styles.get('Title')!).fontSize).toBe('20px')
   })
+
+  // D-N2 (visual round 3): the Table Design gallery showed Word's stored name "Table Grid" in
+  // every language; the stored name stays in the file, only the display label is localised
+  it('localises the built-in Table Grid name for display and keeps other table style names', () => {
+    const t = (key: string) => key
+    expect(styleLabel({ name: 'Table Grid' }, t as never)).toBe('ribbonTableStyleGrid')
+    expect(styleLabel({ name: 'table grid' }, t as never)).toBe('ribbonTableStyleGrid')
+    expect(styleLabel({ name: 'Grid Table 4 Accent 1' }, t as never)).toBe('Grid Table 4 Accent 1')
+  })
 })
