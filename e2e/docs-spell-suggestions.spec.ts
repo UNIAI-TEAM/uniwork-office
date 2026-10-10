@@ -193,6 +193,43 @@ test('context menu offers spelling suggestions and applies one', async () => {
 
     await editor.keyboard.press(process.platform === 'darwin' ? 'Meta+z' : 'Control+z')
     await expect.poll(() => pageText(editor), POLL).toContain('jumsp')
+
+    // Add to Dictionary on one word, then at once a suggestion for another:
+    // the suggestion must wait for the respell kick that Add starts and land
+    // on its own word (it once produced "quickik"). Fresh typing, since the
+    // undo above re-rendered the first paragraph and dropped its markers
+    const dictWord2 = `qzw${Date.now() % 100000}y`
+    await editor.keyboard.press('End')
+    await editor.keyboard.press('Enter')
+    await editor.keyboard.type(`${dictWord2} quik end `, { delay: 20 })
+    await expect.poll(() => pageText(editor), POLL).toContain(`${dictWord2} quik end`)
+    await editor.waitForTimeout(1500)
+    const addRect = await wordRect(editor, dictWord2)
+    const quikRect = await wordRect(editor, 'quik')
+    expect(addRect && quikRect).toBeTruthy()
+    const addAt = center(addRect!)
+    const quikAt = center(quikRect!)
+    for (let attempt = 0; attempt < 6 && !(await addToDict.count()); attempt++) {
+      await editor.mouse.click(addAt.x, addAt.y, { button: 'right' })
+      await editor.locator('.ctx-menu').waitFor()
+      await editor.waitForTimeout(400)
+      if (!(await addToDict.count())) {
+        await editor.keyboard.press('Escape')
+        await editor.waitForTimeout(800)
+      }
+    }
+    await addToDict.click()
+    // no pause: right-click the other word and pick its first suggestion
+    await editor.mouse.click(quikAt.x, quikAt.y, { button: 'right' })
+    const quikSuggestion = editor.locator('.ctx-menu .ctx-item-strong .ctx-label').first()
+    await quikSuggestion.waitFor({ timeout: 5000 })
+    const picked = (await quikSuggestion.textContent()) ?? ''
+    await editor.locator('.ctx-menu .ctx-item-strong').first().click()
+    await expect.poll(() => pageText(editor), POLL).toContain(`${dictWord2} ${picked} end`)
+    // settle past the kick's scrub: the screen must not drift back or double up
+    await editor.waitForTimeout(2500)
+    expect(await pageText(editor)).toContain(`${dictWord2} ${picked} end`)
+    expect(await pageText(editor)).not.toContain('quik ')
   } finally {
     await closeAndSaveVideo(launched)
   }

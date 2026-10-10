@@ -9,7 +9,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Editor } from '@tiptap/core'
 import { editorExtensions } from '../src/renderer/editor/extensions'
 import { applySpellingSuggestion, misspelledRangeAt } from '../src/renderer/editor/spell-replace'
-import { beginRespellKick } from '../src/renderer/editor/respell-kick-gate'
+import {
+  RESPELL_REQUEST_TIMEOUT_MS,
+  beginRespellKick,
+  requestRespellKick,
+  spellingEditInFlight,
+} from '../src/renderer/editor/respell-kick-gate'
 
 const liveEditors: Editor[] = []
 afterEach(() => {
@@ -152,6 +157,88 @@ describe('applySpellingSuggestion', () => {
     await settle()
     expect(blink).toHaveBeenCalledWith('maison')
     expect(editor.state.doc.textContent).toBe('a maison b')
+  })
+
+  it('holds a suggestion picked after Add to Dictionary but before the kick started', async () => {
+    vi.useFakeTimers()
+    const editor = makeEditor('teh quik')
+    const blink = blinkStandIn(editor)
+    // Add to Dictionary on "teh": the kick only starts after the IPC reply,
+    // two frames and a render. The suggestion for "quik" picked in that gap
+    // used to start its Blink round trip right before the kick snapshotted
+    // the caret text node, and the scrub then rewrote the half-replaced word
+    requestRespellKick()
+    applySpellingSuggestion(editor, 1 + 6, 'quik', 'quick', blink)
+    await vi.advanceTimersByTimeAsync(100)
+    expect(blink).not.toHaveBeenCalled()
+    const endKick = beginRespellKick()
+    await settle()
+    expect(blink).not.toHaveBeenCalled()
+    endKick()
+    await settle()
+    expect(blink).toHaveBeenCalledWith('quick')
+    expect(editor.state.doc.textContent).toBe('teh quick')
+  })
+
+  it('releases a requested kick that never started', async () => {
+    vi.useFakeTimers()
+    const editor = makeEditor('teh quik')
+    requestRespellKick()
+    applySpellingSuggestion(editor, 1 + 6, 'quik', 'quick')
+    expect(editor.state.doc.textContent).toBe('teh quik')
+    await vi.advanceTimersByTimeAsync(RESPELL_REQUEST_TIMEOUT_MS)
+    expect(editor.state.doc.textContent).toBe('teh quick')
+  })
+
+  it('keeps the gate closed when another kick is requested while one runs', async () => {
+    vi.useFakeTimers()
+    const editor = makeEditor('teh quik')
+    const endFirst = beginRespellKick()
+    requestRespellKick()
+    applySpellingSuggestion(editor, 1 + 6, 'quik', 'quick')
+    endFirst()
+    await vi.advanceTimersByTimeAsync(100)
+    expect(editor.state.doc.textContent).toBe('teh quik')
+    beginRespellKick()()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(editor.state.doc.textContent).toBe('teh quick')
+  })
+
+  it('reports the replacement in flight until Blink and the grace period are done', async () => {
+    vi.useFakeTimers()
+    const editor = makeEditor('teh quik')
+    let landBlink = () => {}
+    const blink = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          landBlink = resolve
+        }),
+    )
+    applySpellingSuggestion(editor, 1 + 6, 'quik', 'quick', blink)
+    // a kick starting now would snapshot the caret text node mid-replacement
+    expect(spellingEditInFlight()).toBe(true)
+    landBlink()
+    await settle()
+    expect(spellingEditInFlight()).toBe(false)
+    expect(editor.state.doc.textContent).toBe('teh quick')
+  })
+
+  it('re-resolves the click position after edits that landed while it waited', async () => {
+    vi.useFakeTimers()
+    const editor = makeEditor('quik a quik')
+    const blink = blinkStandIn(editor)
+    const endKick = beginRespellKick()
+    // right-click on the second "quik" (offsets 7..11)
+    applySpellingSuggestion(editor, 1 + 8, 'quik', 'quick', blink)
+    // text lands before it while the suggestion waits: the captured position
+    // now points into the first "quik" of 'quik a quik a quik'
+    editor.commands.command(({ tr }) => {
+      tr.insertText('quik a ', 1)
+      return true
+    })
+    endKick()
+    await settle()
+    expect(editor.state.doc.textContent).toBe('quik a quik a quick')
   })
 
   it('does nothing when the click position is unknown and Blink does not act', async () => {
