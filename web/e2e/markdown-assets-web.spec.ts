@@ -232,6 +232,119 @@ test('markdown: view only still exports', async ({ page }) => {
   expect(download.suggestedFilename()).toBe('Pictures.docx')
 })
 
+async function resolves(page: Page) {
+  return page.evaluate(() =>
+    (
+      window as unknown as {
+        __host: { resolves(): Array<{ fileId: string; paths: string[] }> }
+      }
+    ).__host.resolves(),
+  )
+}
+
+/** the dirty events the frame has sent (a picture refresh must not make the document dirty) */
+async function dirtyEvents(page: Page) {
+  return page.evaluate(
+    () =>
+      (window as unknown as { __host: { events: Array<{ type: string }> } }).__host.events.filter(
+        (e) => e.type === 'dirty',
+      ).length,
+  )
+}
+
+const FRESH_DOC = '# Pictures\n\n![ok](assets/a.png)\n\nTail paragraph.\n'
+
+test('markdown: a URL the host refuses by the time the picture loads is re-resolved once and the picture reloads (A1b)', async ({
+  page,
+}) => {
+  await serveFixture(page, DOC_PATH, encode(FRESH_DOC), 'text/markdown')
+  await serveAssets(page)
+  // the open answer's URL: served to the open-time probe (HEAD), refused afterwards, as a signature
+  // that expires between the open and the moment the picture is drawn does
+  let probed = false
+  await page.route(/\/e2e-assets\/a\.png\?exp=1/, (route) => {
+    if (route.request().method() === 'HEAD' && !probed) {
+      probed = true
+      return route.fulfill({ status: 200 })
+    }
+    return route.fulfill({ status: 403, body: 'expired' })
+  })
+  const frame = await openModule(page, 'markdown', {
+    open: DOC_PATH,
+    lang: 'en',
+    resolve: '1',
+    assets: JSON.stringify({ 'assets/a.png': '/e2e-assets/a.png?exp=1' }),
+  })
+  await shown(frame)
+  await expect
+    .poll(async () => (await resolves(page)).map((r) => r.paths))
+    .toEqual([['assets/a.png']])
+  await expect(frame.locator('.doc-editor img[alt="ok"]')).toHaveAttribute('src', /a\.png\?r=1$/)
+  await expect.poll(() => loaded(frame, 'ok')).toBe(true)
+  // asked exactly once, and the document is exactly what it was
+  expect(await resolves(page)).toHaveLength(1)
+  expect(await dirtyEvents(page)).toBe(0)
+  await frame.locator('.doc-editor p', { hasText: 'Tail paragraph' }).click()
+  await page.keyboard.press('Control+s')
+  const saved = (await hostState(page)).lastSaved
+  if (saved) expect(new TextDecoder().decode(new Uint8Array(saved.bytes))).toBe(FRESH_DOC)
+  await page.screenshot({ path: screenshotPath('markdown', 'pictures-refreshed-light-en') })
+})
+
+test('markdown: a picture typed after the open gets its URL from the host (A1b); an old host leaves a placeholder', async ({
+  page,
+}) => {
+  await serveFixture(page, DOC_PATH, encode(FRESH_DOC), 'text/markdown')
+  await serveAssets(page)
+  await page.route(/\/e2e-assets\/newpic\.png/, (route) =>
+    route.fulfill({
+      status: 200,
+      body: PNG,
+      headers: { 'content-type': 'image/png', 'cache-control': 'no-store' },
+    }),
+  )
+  const frame = await openModule(page, 'markdown', {
+    open: DOC_PATH,
+    lang: 'en',
+    resolve: '1',
+    assets: JSON.stringify({ 'assets/a.png': '/e2e-assets/a.png' }),
+  })
+  await shown(frame)
+  await frame.locator('.doc-editor p', { hasText: 'Tail paragraph' }).click()
+  await page.keyboard.press('End')
+  await page.keyboard.type(' ![typed](./newpic.png) ')
+  await expect
+    .poll(async () => (await resolves(page)).flatMap((r) => r.paths))
+    .toEqual(['./newpic.png'])
+  await expect(frame.locator('.doc-editor img[alt="typed"]')).toHaveAttribute(
+    'src',
+    /newpic\.png\?r=1$/,
+  )
+  await expect.poll(() => loaded(frame, 'typed')).toBe(true)
+  // the authored spelling is what the document keeps
+  await page.keyboard.press('Control+s')
+  await expect.poll(async () => (await hostState(page)).lastSaved?.versionId).toBe('v2')
+  const text = new TextDecoder().decode(new Uint8Array((await hostState(page)).lastSaved!.bytes))
+  expect(text).toContain('![typed](./newpic.png)')
+  expect(text).not.toContain('sig=')
+
+  // an old host (no api.assets.resolve): the typed picture stays a placeholder, nothing breaks
+  const old = await page.context().newPage()
+  await serveFixture(old, DOC_PATH, encode(FRESH_DOC), 'text/markdown')
+  await serveAssets(old)
+  const oldFrame = await openModule(old, 'markdown', { open: DOC_PATH, lang: 'en' })
+  await shown(oldFrame)
+  await oldFrame.locator('.doc-editor p', { hasText: 'Tail paragraph' }).click()
+  await old.keyboard.press('End')
+  await old.keyboard.type(' ![typed](./newpic.png) ')
+  await old.waitForTimeout(1500)
+  await expect(oldFrame.locator('.doc-editor img[alt="typed"]')).toHaveAttribute(
+    'src',
+    /^data:image\/svg\+xml/,
+  )
+  await old.close()
+})
+
 async function uploads(page: Page) {
   return page.evaluate(() =>
     (
