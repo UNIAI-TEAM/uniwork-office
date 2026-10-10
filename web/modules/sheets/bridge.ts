@@ -49,6 +49,7 @@ import {
 import aiStubs from '../../docs/bridge/ai'
 import { downloadBlob, openExternal as guardedExternal } from '../../docs/bridge/browser'
 import { TIMEOUTS, errorCode } from '../../docs/bridge/frame-port'
+import { ownHeadAfterUnknown } from '../../docs/bridge/head-match'
 import type { ModuleBridgePort } from '../../docs/bridge/module-bridge'
 import { idFromPath, pathFor } from '../../docs/bridge/webapi'
 import type { DraftHost, DraftRecovery } from '../../docs/bridge/draft-recovery'
@@ -544,12 +545,9 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
       return resolveConflict(fileId, data)
     }
     if (res.error.code === 'timeout' || res.error.code === 'network') {
-      // the save may have landed: adopt the head when it looks like our own write
-      const before = files.get(fileId)
-      const head = await headMeta(fileId)
-      if (head && before?.etag && head.etag !== before.etag && head.sizeBytes === data.byteLength) {
-        remember(head)
-      }
+      // the save may have landed: adopt the head when it holds exactly our bytes
+      const head = await ownHeadAfterUnknown(port, fileId, files.get(fileId)?.etag, data)
+      if (head) remember(head)
     }
     throw new Error(`${text('appWebSaveFailed')} (${res.error.message})`)
   }

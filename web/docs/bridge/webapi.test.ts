@@ -364,6 +364,21 @@ describe('saveDocx', () => {
     expect((await pending).ok).toBe(false)
   })
 
+  it('timeout while someone else committed a same-size version: not adopted, the conflict is asked (RF-7)', async () => {
+    const doc = await bootWith()
+    mock.override('api.save', (payload) => {
+      const { fileId } = payload as { fileId: string }
+      // a foreign writer: same length as ours, other content
+      mock.commit(fileId, new Uint8Array([9, 9]))
+      return timeoutAfter(payload, { timeoutMs: 120_000 })
+    })
+    await api.saveDocx(doc.path, buf([5, 5]))
+    mock.clearOverrides()
+    const pending = api.saveDocx(doc.path, buf([5, 5, 5]))
+    await choose('conflict', 'cancel')
+    expect((await pending).ok).toBe(false)
+  })
+
   it('rejects a path that is not a UniWork document', async () => {
     expect((await api.saveDocx('/tmp/a.docx', buf([1]))).ok).toBe(false)
     expect(mock.calls).toHaveLength(0)

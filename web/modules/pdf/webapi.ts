@@ -71,6 +71,7 @@ import aiStub from '../../docs/bridge/ai'
 import browser, { downloadBlob } from '../../docs/bridge/browser'
 import { capEnabled } from '../../docs/bridge/capability-object'
 import { TIMEOUTS, errorCode } from '../../docs/bridge/frame-port'
+import { ownHeadAfterUnknown } from '../../docs/bridge/head-match'
 import type { ModuleBridgePort } from '../../docs/bridge/module-bridge'
 import type { DraftHost, DraftRecovery } from '../../docs/bridge/draft-recovery'
 import { bridgeDraftRecovery, bridgeRecoveryGrant } from '../shared/recovery-prompt'
@@ -371,14 +372,10 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
     }
   }
 
-  /** after a timed-out / network-failed save: adopt the head when it looks like our own write */
+  /** after a timed-out / network-failed save: adopt the head when its bytes are our own write */
   async function reconcileAfterUnknown(fileId: string, sent: Uint8Array): Promise<void> {
-    const before = doc?.file
-    const head = await headMeta(fileId)
-    if (!head || !before?.etag || head.etag === before.etag) return
-    if (head.sizeBytes === sent.byteLength && doc?.file.fileId === fileId) {
-      doc = { file: { ...doc.file, ...head }, bytes: sent }
-    }
+    const head = await ownHeadAfterUnknown(port, fileId, doc?.file.etag, sent)
+    if (head && doc?.file.fileId === fileId) doc = { file: { ...doc.file, ...head }, bytes: sent }
   }
 
   async function resolveConflict(fileId: string, bytes: Uint8Array): Promise<{ ok: true } | Fail> {
