@@ -605,7 +605,14 @@ export function TabBar() {
       </div>
       <div className="uw-chrome">
         <UniworkNotice />
-        {activeStatus && <UniworkStatusChip status={activeStatus} onStatus={uniwork.apply} />}
+        {activeStatus && (
+          // one chip per document: a Resolve still running stays with its own tab
+          <UniworkStatusChip
+            key={activeStatus.path}
+            status={activeStatus}
+            onStatus={uniwork.apply}
+          />
+        )}
       </div>
       <button
         className="tab-overflow-btn"

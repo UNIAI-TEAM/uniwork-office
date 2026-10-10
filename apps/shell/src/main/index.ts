@@ -3277,6 +3277,8 @@ function createShellWindow(): void {
       const active = manager.activeFilePath()
       if (active !== lastActiveDocPath) {
         lastActiveDocPath = active
+        // a conflict dialog names one document: it closes when that tab is left
+        uniworkDocs?.service.noteActivePath(active)
         void uniworkDocs?.service.refreshPath(active).catch(() => undefined)
       }
     },
@@ -4546,6 +4548,8 @@ function registerHomeIpc(): void {
   ipcMain.handle(HOME_CHANNELS.setLanguage, (_event, lang: unknown) => {
     if (!isLang(lang) || lang === currentLang()) return
     persistLang(lang)
+    // an open conflict dialog keeps the old language: it closes as "Decide later"
+    uniworkDocs?.service.closeConflictPrompt()
     // the switcher lives on the home page, so the home menu is the active one
     buildHomeMenu()
     installDockMenu()

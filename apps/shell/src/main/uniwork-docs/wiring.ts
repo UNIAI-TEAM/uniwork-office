@@ -59,7 +59,7 @@ function conflictUi(wiring: UniworkDocsWiring): ConflictUi {
     return parent ? dialog.showMessageBox(parent, options) : dialog.showMessageBox(options)
   }
   return {
-    async chooseConflict(title) {
+    async chooseConflict(title, signal) {
       const { response } = await box({
         type: 'warning',
         title: t('conflictTitle'),
@@ -74,10 +74,11 @@ function conflictUi(wiring: UniworkDocsWiring): ConflictUi {
         defaultId: 3,
         cancelId: 3,
         noLink: true,
+        ...(signal ? { signal } : {}),
       })
       return CHOICES[response] ?? 'later'
     },
-    async confirmDiscard(title) {
+    async confirmDiscard(title, signal) {
       const { response } = await box({
         type: 'warning',
         title: t('discardTitle'),
@@ -87,6 +88,7 @@ function conflictUi(wiring: UniworkDocsWiring): ConflictUi {
         defaultId: 1,
         cancelId: 1,
         noLink: true,
+        ...(signal ? { signal } : {}),
       })
       return response === 0
     },

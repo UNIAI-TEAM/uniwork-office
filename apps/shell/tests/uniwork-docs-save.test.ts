@@ -1304,3 +1304,156 @@ describe('editor state on the chip (one state source)', () => {
     expect(ctx.statuses.map((s) => s.state)).toEqual(['saving', 'saved'])
   })
 })
+
+describe('the conflict dialog belongs to the document that hit the conflict (GOA9-r2-01/07)', () => {
+  const SHEET = '01J8X4SHEET1P2Q3R4S5T6U7V'
+
+  /** a docx and an xlsx of the same account, both in conflict */
+  async function twoConflicts(opts: Parameters<typeof setup>[1] = {}) {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server, opts)
+    const docx = await openDoc(ctx)
+    server.state.revision = 45
+    writeFileSync(docx, 'my docx')
+    await ctx.service.save(docx)
+    expect(binding(docx)).toMatchObject({ state: 'conflict' })
+    const sheetDir = join(docx, '..', '..', SHEET)
+    const xlsx = join(sheetDir, 'Budget.xlsx')
+    await ctx.service.store.writeWorkingCopy(sheetDir, 'Budget.xlsx', enc('my xlsx'))
+    await ctx.service.store.write(sheetDir, {
+      schema: 1,
+      documentId: SHEET,
+      workspaceId: 'ws_1',
+      orgId: 'org_a',
+      title: 'Budget.xlsx',
+      filename: 'Budget.xlsx',
+      format: 'xlsx',
+      access: 'edit',
+      baseRevision: '7',
+      baseVersion: 2,
+      baseChecksum: hex(enc('base xlsx')),
+      state: 'conflict',
+      error: 'conflict',
+      serverRevision: '8',
+    })
+    return { server, ctx, docx, xlsx }
+  }
+
+  /** a native dialog that stays open until it is answered or closed by its signal */
+  function heldDialog(ctx: ReturnType<typeof setup>, onAbort: UniworkConflictChoice = 'later') {
+    let answer: (choice: UniworkConflictChoice) => void = () => undefined
+    let seen: AbortSignal | undefined
+    vi.mocked(ctx.ui.chooseConflict).mockImplementationOnce(
+      (_title, signal) =>
+        new Promise((resolveChoice) => {
+          seen = signal
+          answer = resolveChoice
+          signal?.addEventListener('abort', () => resolveChoice(onAbort))
+        }),
+    )
+    return { answer: (choice: UniworkConflictChoice) => answer(choice), signal: () => seen }
+  }
+
+  it('a conflict on the non-focused xlsx names the xlsx and copies the xlsx', async () => {
+    const { ctx, xlsx } = await twoConflicts({ choice: 'save-local-copy' })
+    expect(await ctx.service.resolveConflict(xlsx)).toMatchObject({
+      path: xlsx,
+      state: 'conflict',
+    })
+    expect(ctx.ui.chooseConflict).toHaveBeenCalledWith('Budget.xlsx', expect.any(AbortSignal))
+    expect(ctx.ui.pickCopyPath).toHaveBeenCalledWith('Budget', 'xlsx')
+    expect(readFileSync(join(dir, 'Budget (my copy).xlsx'), 'utf8')).toBe('my xlsx')
+  })
+
+  it('a docx dialog still open closes as "Decide later" before the xlsx dialog opens', async () => {
+    const { ctx, docx, xlsx } = await twoConflicts()
+    // the docx dialog answers "Save a copy" only after it was closed: too late to count
+    const held = heldDialog(ctx, 'save-local-copy')
+    const docxFlow = ctx.service.resolveConflict(docx)
+    await vi.waitFor(() => expect(held.signal()).toBeDefined())
+    vi.mocked(ctx.ui.chooseConflict).mockResolvedValueOnce('save-local-copy')
+    const xlsxStatus = await ctx.service.resolveConflict(xlsx)
+    expect(held.signal()?.aborted).toBe(true)
+    expect(await docxFlow).toMatchObject({ path: docx, state: 'conflict' })
+    expect(xlsxStatus).toMatchObject({ path: xlsx, state: 'conflict' })
+    expect(vi.mocked(ctx.ui.chooseConflict).mock.calls.map(([title]) => title)).toEqual([
+      'Q4 plan.docx',
+      'Budget.xlsx',
+    ])
+    // exactly one copy, of the xlsx, typed xlsx
+    expect(vi.mocked(ctx.ui.pickCopyPath).mock.calls).toEqual([['Budget', 'xlsx']])
+    expect(readdirSync(dir).filter((name) => name.includes('(my copy)'))).toEqual([
+      'Budget (my copy).xlsx',
+    ])
+  })
+
+  it('leaving the tab closes its chip dialog; the close prompt dialog stays', async () => {
+    const { ctx, docx } = await twoConflicts({ choice: 'overwrite' })
+    const held = heldDialog(ctx)
+    const flow = ctx.service.resolveConflict(docx)
+    await vi.waitFor(() => expect(held.signal()).toBeDefined())
+    ctx.service.noteActivePath(docx.toUpperCase())
+    if (process.platform === 'win32') expect(held.signal()?.aborted).toBe(false)
+    ctx.service.noteActivePath(undefined)
+    expect(held.signal()?.aborted).toBe(true)
+    expect(await flow).toMatchObject({ state: 'conflict' })
+    expect(binding(docx)).toMatchObject({ state: 'conflict' })
+
+    const fromClose = heldDialog(ctx)
+    vi.mocked(ctx.ui.chooseUnsavedClose).mockResolvedValueOnce('resolve').mockResolvedValue('close')
+    const closing = ctx.service.confirmClose(docx)
+    await vi.waitFor(() => expect(fromClose.signal()).toBeDefined())
+    ctx.service.noteActivePath(undefined)
+    expect(fromClose.signal()?.aborted).toBe(false)
+    fromClose.answer('later')
+    expect(await closing).toBe(true)
+  })
+
+  it('a second Resolve of the same document does not open a second dialog', async () => {
+    const { ctx, xlsx } = await twoConflicts()
+    const held = heldDialog(ctx)
+    const first = ctx.service.resolveConflict(xlsx)
+    await vi.waitFor(() => expect(held.signal()).toBeDefined())
+    expect(await ctx.service.resolveConflict(xlsx)).toMatchObject({ state: 'conflict' })
+    expect(ctx.ui.chooseConflict).toHaveBeenCalledTimes(1)
+    held.answer('later')
+    await first
+  })
+
+  it('a choice made after the document left conflict is not applied', async () => {
+    const { server, ctx, docx } = await twoConflicts()
+    const held = heldDialog(ctx)
+    const flow = ctx.service.resolveConflict(docx)
+    await vi.waitFor(() => expect(held.signal()).toBeDefined())
+    // resolved elsewhere meanwhile (e.g. the close prompt's discard)
+    writeFileSync(
+      join(docx, '..', BINDING_FILE),
+      JSON.stringify({ ...binding(docx), state: 'saved', error: undefined }),
+    )
+    const before = commits(server).length
+    const moduleSaves = ctx.deps.requestModuleSave.mock.calls.length
+    held.answer('overwrite')
+    expect(await flow).toMatchObject({ state: 'saved' })
+    expect(commits(server).length).toBe(before)
+    expect(ctx.deps.requestModuleSave).toHaveBeenCalledTimes(moduleSaves)
+  })
+
+  it('the discard confirmation is closed with its conflict dialog', async () => {
+    const { ctx, xlsx } = await twoConflicts({ choice: 'open-latest' })
+    let discardSignal: AbortSignal | undefined
+    vi.mocked(ctx.ui.confirmDiscard).mockImplementationOnce(
+      (_title, signal) =>
+        new Promise((resolveConfirm) => {
+          discardSignal = signal
+          signal?.addEventListener('abort', () => resolveConfirm(false))
+        }),
+    )
+    const flow = ctx.service.resolveConflict(xlsx)
+    await vi.waitFor(() => expect(discardSignal).toBeDefined())
+    expect(ctx.ui.confirmDiscard).toHaveBeenCalledWith('Budget.xlsx', expect.any(AbortSignal))
+    ctx.service.closeConflictPrompt()
+    expect(await flow).toMatchObject({ path: xlsx, state: 'conflict' })
+    expect(readFileSync(xlsx, 'utf8')).toBe('my xlsx')
+    expect(ctx.deps.reloadPath).not.toHaveBeenCalled()
+  })
+})
