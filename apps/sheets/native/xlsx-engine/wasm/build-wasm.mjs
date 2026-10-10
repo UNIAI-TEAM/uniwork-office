@@ -16,6 +16,11 @@
 // 5. dist/xlsx-sidecar.wasm is compared with xlsx-sidecar.wasm.sha256. A mismatch fails the
 //    build (a different toolchain or source than the committed checksum describes); after an
 //    intended source change run --update-checksum and commit the new checksum.
+//    The module is byte-identical on every machine of one platform (same toolchain, any checkout
+//    path) but NOT across CPU architectures (measured 2026-10-10: linux-arm64 and linux-x64 build
+//    different modules from the same inputs), so the checksum file holds one line per platform:
+//    `<sha256>  xlsx-sidecar.wasm  <platform>-<arch>`; --update-checksum rewrites only the line of
+//    the machine it runs on. A line without a platform matches every host (the old format).
 //
 // Inputs are hashed into dist/.stamp: an unchanged tree skips cargo entirely.
 // WEB_SHEETS_WASM=<file> uses a prebuilt module instead of cargo (still checksum-verified).
@@ -84,9 +89,32 @@ function inputHash() {
   return h.digest('hex')
 }
 
-function expectedChecksum() {
-  if (!existsSync(CHECKSUM_FILE)) return null
-  return readFileSync(CHECKSUM_FILE, 'utf8').split(/\s+/)[0] || null
+const HOST = `${process.platform}-${process.arch}`
+
+/** `<sha256>  xlsx-sidecar.wasm  [<platform>-<arch>]` lines -> [{sha, host|null}] */
+export function parseChecksums(text) {
+  const entries = []
+  for (const line of text.split('\n')) {
+    const [sha, , host] = line.trim().split(/\s+/)
+    if (/^[0-9a-f]{64}$/.test(sha ?? '')) entries.push({ sha, host: host ?? null })
+  }
+  return entries
+}
+
+/** the checksum file with the line of `host` replaced (others kept, an unplatformed line dropped) */
+export function withChecksum(text, host, sha) {
+  const kept = parseChecksums(text).filter((e) => e.host && e.host !== host)
+  kept.push({ sha, host })
+  kept.sort((a, b) => a.host.localeCompare(b.host))
+  return kept.map((e) => `${e.sha}  xlsx-sidecar.wasm  ${e.host}\n`).join('')
+}
+
+/** the checksum this machine's build must have, or null when the file has none for it */
+export function expectedChecksum(
+  text = existsSync(CHECKSUM_FILE) ? readFileSync(CHECKSUM_FILE, 'utf8') : '',
+) {
+  const entries = parseChecksums(text)
+  return (entries.find((e) => e.host === HOST) ?? entries.find((e) => e.host === null))?.sha ?? null
 }
 
 function cargoHome() {
@@ -177,15 +205,17 @@ function main() {
   const actual = sha256(readFileSync(WASM_OUT))
   const bytes = statSync(WASM_OUT).size
   if (args.has('--update-checksum')) {
-    writeFileSync(CHECKSUM_FILE, `${actual}  xlsx-sidecar.wasm\n`)
-    log(`wrote ${relative(repoRoot, CHECKSUM_FILE)}: ${actual} (${bytes} bytes)`)
+    const text = existsSync(CHECKSUM_FILE) ? readFileSync(CHECKSUM_FILE, 'utf8') : ''
+    writeFileSync(CHECKSUM_FILE, withChecksum(text, HOST, actual))
+    log(`wrote ${relative(repoRoot, CHECKSUM_FILE)} for ${HOST}: ${actual} (${bytes} bytes)`)
   } else {
     const expected = expectedChecksum()
     if (expected !== actual) {
       throw new Error(
         `xlsx-sidecar.wasm sha256 ${actual} does not match ${relative(repoRoot, CHECKSUM_FILE)} ` +
-          `(${expected ?? 'missing'}). A different toolchain or engine source built it; after an ` +
-          'intended engine change run build-wasm.mjs --update-checksum and commit the checksum.',
+          `(${expected ?? `no line for ${HOST}`}). A different toolchain or engine source built it; ` +
+          `after an intended engine change, or on a platform the file has no line for (${HOST}), ` +
+          'run build-wasm.mjs --update-checksum and commit the checksum.',
       )
     }
     log(`verified ${actual} (${bytes} bytes)`)

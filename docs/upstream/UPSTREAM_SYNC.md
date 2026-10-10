@@ -70,7 +70,8 @@ upstream sync. Details and the full list are in [`SHEETS_WASM_ENGINE.md`](SHEETS
 - Do not touch any file under `wasm/` casually, not even a comment in `wasm/Cargo.toml`: the staging directory
   `build-wasm.mjs` compiles in is named after a hash of those files, and that name reaches the binary (symbol hashes),
   so a one-line comment edit changed the module's sha256 (verified 2026-10-10: original 7fa3df40…, comment edited
-  956c2dae… on the same host). Any edit there needs `--update-checksum` in the same commit.
+  956c2dae… on the same host). Any edit there needs `--update-checksum` in the same commit, for **both** platform
+  lines of `xlsx-sidecar.wasm.sha256` (`linux-arm64`, `linux-x64`: the module differs per CPU architecture).
 
 ## Web module refactors (fork delta, UNI-1014 / UNI-1015 / UNI-1016)
 

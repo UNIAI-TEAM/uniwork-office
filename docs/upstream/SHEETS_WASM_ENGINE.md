@@ -32,7 +32,14 @@ parses spread over background passes. The Worker runs `xlsx_sidecar_index_step` 
     registry `Cargo.toml` sha256 is checked first.
   - builds with the toolchain pinned in `rust-toolchain.toml` (1.90.0 + wasm32-wasip1, installed by rustup on demand),
     `--locked`, with remapped paths;
-  - checks the module against `xlsx-sidecar.wasm.sha256`, or `--update-checksum` after an intended engine change.
+  - checks the module against `xlsx-sidecar.wasm.sha256`, or `--update-checksum` after an intended engine change. The
+    file has **one line per platform** (`<sha256>  xlsx-sidecar.wasm  linux-arm64|linux-x64`): the same inputs build
+    a byte-different module on arm64 and x64 (measured 2026-10-10), so each platform is pinned on its own and
+    `--update-checksum` rewrites only the line of the machine it runs on. After an engine change update **both**
+    lines (the x64 one on the cloud runner or in CI, the arm64 one on the VPS).
+  - The hash of every file under `wasm/` (this script included, the `.sha256` file excluded) names the staging
+    directory the crate is compiled in, and that name reaches the binary: **any edit under `wasm/` changes the
+    module**, so it comes with `--update-checksum` for both platforms in the same commit.
   - `WEB_SHEETS_WASM=<file>` supplies a prebuilt module, still checksum-verified.
 - Upstream `cargo` changes to the parent's dependency versions flow in through `cargo fetch`. If a new upstream
   dependency needs C code for wasm, the build fails at `cargo build`; patch it the way zip is patched.
