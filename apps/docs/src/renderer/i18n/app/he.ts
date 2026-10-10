@@ -513,6 +513,7 @@ export const he = {
   appWebDiscard: 'ביטול ופתיחה',
   appWebFatalTitle: 'לא ניתן לפתוח את המסמך',
   appWebFatalBody: 'העריכה והשמירה מושבתות. טען מחדש את הדף או פתח את המסמך שוב מ-UniWork.',
+  appWebSaveOffline: 'לא ניתן להתחבר ל-UniWork. בדוק את החיבור ונסה שוב.',
   appWebNoHost: 'עורך זה פועל בתוך UniWork. פתח את המסמך מ-UniWork.',
   appSaveStateUnsaved: 'שינויים שלא נשמרו',
   appSaveStateSaved: 'כל השינויים נשמרו',

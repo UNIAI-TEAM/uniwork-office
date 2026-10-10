@@ -533,6 +533,7 @@ export const zh = {
   appWebDiscard: '放弃并打开',
   appWebFatalTitle: '无法打开文档',
   appWebFatalBody: '编辑和保存已停用。请刷新页面或从 UniWork 重新打开文档。',
+  appWebSaveOffline: '无法连接 UniWork。请检查网络后重试。',
   appWebNoHost: '此编辑器需在 UniWork 中运行。请从 UniWork 打开文档。',
   appSaveStateUnsaved: '有未保存的更改',
   appSaveStateSaved: '所有更改已保存',

@@ -515,6 +515,7 @@ export const ar = {
   appWebDiscard: 'تجاهل وفتح',
   appWebFatalTitle: 'تعذر فتح المستند',
   appWebFatalBody: 'تم تعطيل التحرير والحفظ. أعد تحميل الصفحة أو افتح المستند مرة أخرى من UniWork.',
+  appWebSaveOffline: 'تعذّر الاتصال بـ UniWork. تحقق من اتصالك وحاول مرة أخرى.',
   appWebNoHost: 'يعمل هذا المحرر داخل UniWork. افتح المستند من UniWork.',
   appSaveStateUnsaved: 'تغييرات غير محفوظة',
   appSaveStateSaved: 'تم حفظ كل التغييرات',
