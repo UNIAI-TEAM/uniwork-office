@@ -404,13 +404,16 @@ export default function App() {
     return () => ro.disconnect()
   }, [status])
 
+  // The bar wraps to the room beside the style panel, so its box changes whenever the stage or the
+  // panel does (split view, AI dock, panel open/close) - not only when the selection moves. Measure
+  // on those too, or a height taken at an intermediate width keeps placing the bar over the page.
   useLayoutEffect(() => {
     const el = barRef.current
     if (!el) return
     const r = el.getBoundingClientRect()
     if (r.width && (r.width !== barSize.w || r.height !== barSize.h))
       setBarSize({ w: r.width, h: r.height })
-  }, [selRect, selText.run, barSize.w, barSize.h])
+  }, [selRect, selText.run, barSize.w, barSize.h, stageTick, panelOpen, panelDismissedSid])
 
   useEffect(() => {
     if (!notice) return
