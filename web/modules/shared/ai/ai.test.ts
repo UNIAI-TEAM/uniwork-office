@@ -490,7 +490,10 @@ describe('streams', () => {
   })
 
   it('reads the code and message from the wrapped and the flat error body', async () => {
-    expect(errorBodyFields({ error: { code: 'a', message: 'b' } })).toEqual({ code: 'a', message: 'b' })
+    expect(errorBodyFields({ error: { code: 'a', message: 'b' } })).toEqual({
+      code: 'a',
+      message: 'b',
+    })
     expect(errorBodyFields({ code: 'a', message: 'b' })).toEqual({ code: 'a', message: 'b' })
     expect(errorBodyFields({ error: { message: 'only' } })).toEqual({})
     expect(errorBodyFields('x')).toEqual({})
@@ -501,9 +504,10 @@ describe('streams', () => {
   })
 
   it('maps a vendor adapter failure text to a typed state, never the raw payload', async () => {
-    expect(
-      rawFailureAsTyped(new Error('Claude HTTP 404: {"error":{"code":"x"}}')),
-    ).toMatchObject({ code: 'credential_missing', status: 404 })
+    expect(rawFailureAsTyped(new Error('Claude HTTP 404: {"error":{"code":"x"}}'))).toMatchObject({
+      code: 'credential_missing',
+      status: 404,
+    })
     expect(rawFailureAsTyped(new Error('OpenAI HTTP 401: bad key'))).toMatchObject({
       code: 'provider_auth_failed',
     })
