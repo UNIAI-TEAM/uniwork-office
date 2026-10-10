@@ -539,8 +539,8 @@ export const it = {
   appSavingAs: 'Salvataggio con nome…',
   appPdfPrintFallback:
     "L'esportazione PDF non è disponibile qui; è stata usata la finestra di stampa del browser",
-  appOnlyHint: 'Apri nell\'app UniWork Office per usare questa funzione',
-  appOnlyOpen: 'Apri nell\'app',
+  appOnlyHint: "Apri nell'app UniWork Office per usare questa funzione",
+  appOnlyOpen: "Apri nell'app",
   appOnlyZotero: 'Le citazioni di Zotero non sono disponibili qui.',
   appOnlyOpenPassword: 'Qui non è possibile impostare una password di apertura.',
   appOnlyEncrypted: '"{name}" è protetto da password e non può essere aperto qui.',

@@ -26,5 +26,6 @@ export const it = {
   webAppOnlyOcr:
     'Questo PDF contiene pagine scansionate. Il riconoscimento del testo (OCR) non è disponibile qui.',
   webAppOnlyConvert: 'La conversione di un PDF in Word, Excel o PowerPoint non è disponibile qui.',
-  webAppOnlyRedact: 'L\'oscuramento (rimozione definitiva del contenuto contrassegnato) non è disponibile qui.',
+  webAppOnlyRedact:
+    "L'oscuramento (rimozione definitiva del contenuto contrassegnato) non è disponibile qui.",
 } satisfies Record<keyof typeof zh, string>

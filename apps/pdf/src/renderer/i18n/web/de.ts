@@ -29,5 +29,6 @@ export const de = {
     'Dieses PDF enthält gescannte Seiten. Die Texterkennung (OCR) ist hier nicht verfügbar.',
   webAppOnlyConvert:
     'Die Umwandlung eines PDFs in Word, Excel oder PowerPoint ist hier nicht verfügbar.',
-  webAppOnlyRedact: 'Schwärzen (endgültiges Entfernen markierter Inhalte) ist hier nicht verfügbar.',
+  webAppOnlyRedact:
+    'Schwärzen (endgültiges Entfernen markierter Inhalte) ist hier nicht verfügbar.',
 } satisfies Record<keyof typeof zh, string>

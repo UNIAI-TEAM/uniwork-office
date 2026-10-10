@@ -27,5 +27,6 @@ export const fr = {
     "Ce PDF contient des pages numérisées. La reconnaissance de texte (OCR) n'est pas disponible ici.",
   webAppOnlyConvert:
     "La conversion d'un PDF en Word, Excel ou PowerPoint n'est pas disponible ici.",
-  webAppOnlyRedact: 'La rédaction (suppression définitive du contenu marqué) n\'est pas disponible ici.',
+  webAppOnlyRedact:
+    "La rédaction (suppression définitive du contenu marqué) n'est pas disponible ici.",
 } satisfies Record<keyof typeof zh, string>

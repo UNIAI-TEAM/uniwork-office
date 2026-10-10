@@ -544,9 +544,9 @@ export const fr = {
   appSavingAs: 'Enregistrement sous…',
   appPdfPrintFallback:
     "L'export PDF n'est pas disponible ici ; la boîte de dialogue d'impression du navigateur a été utilisée à la place",
-  appOnlyHint: 'Ouvrez dans l\'application UniWork Office pour utiliser cette fonctionnalité',
-  appOnlyOpen: 'Ouvrir dans l\'application',
+  appOnlyHint: "Ouvrez dans l'application UniWork Office pour utiliser cette fonctionnalité",
+  appOnlyOpen: "Ouvrir dans l'application",
   appOnlyZotero: 'Les citations Zotero ne sont pas disponibles ici.',
-  appOnlyOpenPassword: 'Il n\'est pas possible de définir ici un mot de passe d\'ouverture.',
+  appOnlyOpenPassword: "Il n'est pas possible de définir ici un mot de passe d'ouverture.",
   appOnlyEncrypted: '« {name} » est protégé par un mot de passe et ne peut pas être ouvert ici.',
 } satisfies Record<keyof typeof zh, string>

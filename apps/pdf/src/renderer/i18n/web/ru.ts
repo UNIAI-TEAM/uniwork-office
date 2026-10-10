@@ -27,5 +27,6 @@ export const ru = {
   webAppOnlyOcr:
     'В этом PDF есть отсканированные страницы. Распознавание текста (OCR) здесь недоступно.',
   webAppOnlyConvert: 'Преобразование PDF в Word, Excel или PowerPoint здесь недоступно.',
-  webAppOnlyRedact: 'Редактирование с удалением (безвозвратное удаление отмеченного содержимого) здесь недоступно.',
+  webAppOnlyRedact:
+    'Редактирование с удалением (безвозвратное удаление отмеченного содержимого) здесь недоступно.',
 } satisfies Record<keyof typeof zh, string>

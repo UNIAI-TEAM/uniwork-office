@@ -25,5 +25,6 @@ export const ms = {
   webAppOnlyOpen: 'Buka dalam aplikasi',
   webAppOnlyOcr: 'PDF ini mempunyai halaman imbasan. Pengecaman teks (OCR) tidak tersedia di sini.',
   webAppOnlyConvert: 'Penukaran PDF kepada Word, Excel atau PowerPoint tidak tersedia di sini.',
-  webAppOnlyRedact: 'Penyuntingan sulit (membuang kandungan yang ditanda secara kekal) tidak tersedia di sini.',
+  webAppOnlyRedact:
+    'Penyuntingan sulit (membuang kandungan yang ditanda secara kekal) tidak tersedia di sini.',
 } satisfies Record<keyof typeof zh, string>

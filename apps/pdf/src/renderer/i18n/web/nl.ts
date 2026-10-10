@@ -26,5 +26,6 @@ export const nl = {
   webAppOnlyOcr:
     "Deze pdf bevat gescande pagina's. Tekstherkenning (OCR) is hier niet beschikbaar.",
   webAppOnlyConvert: 'PDF omzetten naar Word, Excel of PowerPoint is hier niet beschikbaar.',
-  webAppOnlyRedact: 'Redigeren (gemarkeerde inhoud definitief verwijderen) is hier niet beschikbaar.',
+  webAppOnlyRedact:
+    'Redigeren (gemarkeerde inhoud definitief verwijderen) is hier niet beschikbaar.',
 } satisfies Record<keyof typeof zh, string>
