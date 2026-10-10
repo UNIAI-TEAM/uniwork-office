@@ -1073,6 +1073,7 @@ export default function App() {
   }
 
   const fileName = filePath ? filePath.replace(/^.*[/\\]/, '') : null
+  // no local "Saved" on a UniWork copy: the title-bar chip says whether the Save reached UniWork
   const statusText =
     saveState === 'saving'
       ? t('saving')
@@ -1080,7 +1081,7 @@ export default function App() {
         ? t('saveFailed')
         : dirty
           ? t('unsaved')
-          : saveState === 'saved'
+          : saveState === 'saved' && !uniwork.bound
             ? t('savedOk')
             : ''
 

@@ -52,6 +52,16 @@ describe('saveStateLabel', () => {
     expect(saveStateLabel(false, false)).toEqual({ key: 'appSaveStateSaved', unsaved: false })
   })
 
+  it('never says "All changes saved" for a UniWork copy: the title-bar chip owns that state', () => {
+    // the chip may read Version conflict / Not saved: offline / Sign in again to save
+    expect(saveStateLabel(false, false, true)).toBeNull()
+    expect(saveStateLabel(true, false, true)).toEqual({ key: 'appSaveStateUnsaved', unsaved: true })
+    expect(saveStateLabel(true, true, true)).toEqual({
+      key: 'appSaveStateViewOnly',
+      unsaved: false,
+    })
+  })
+
   it('has en and vi copy', () => {
     expect(en.appSaveStateViewOnly).toBe('View only')
     expect(viStrings.appSaveStateViewOnly).toBe('Chỉ xem')

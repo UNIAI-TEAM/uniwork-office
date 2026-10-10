@@ -26,7 +26,10 @@ interface Harness {
 /** how the browser harness may differ from the desktop preload */
 type StateApi = { bound: boolean; readOnly: boolean } | 'missing' | 'rejects'
 
-async function mount(uniwork: StateApi): Promise<Harness> {
+async function mount(
+  uniwork: StateApi,
+  saveResult: unknown = { ok: true, canceled: true },
+): Promise<Harness> {
   const handlers: Record<string, (...args: never[]) => void> = {}
   const stubs: Record<string, ReturnType<typeof vi.fn>> = {
     consumePending: vi.fn(async () => PATH),
@@ -35,7 +38,7 @@ async function mount(uniwork: StateApi): Promise<Harness> {
       if (uniwork === 'rejects') throw new Error('no handler')
       return uniwork as { bound: boolean; readOnly: boolean }
     }),
-    save: vi.fn(async () => ({ ok: true, canceled: true })),
+    save: vi.fn(async () => saveResult),
   }
   const api = new Proxy(stubs, {
     get(target, prop: string) {
@@ -147,5 +150,39 @@ describe('markdown App on a UniWork copy', () => {
       await new Promise((r) => setTimeout(r, 20))
     })
     expect(h.api.save).toHaveBeenCalledTimes(1)
+  })
+
+  it.each([
+    [true, null],
+    [false, 'Saved'],
+  ] as const)(
+    'after a Save of a copy bound=%s the status bar says %s (the chip owns the UniWork outcome)',
+    async (bound, expected) => {
+      const h = await mount({ bound, readOnly: false }, { ok: true, path: PATH })
+      open.push(h)
+      await act(async () => {
+        h.saveRequest()('save')
+        await new Promise((r) => setTimeout(r, 20))
+      })
+      expect(h.api.save).toHaveBeenCalledTimes(1)
+      const text = h.container.querySelector('.status-save')?.textContent ?? null
+      expect(text).toBe(expected)
+    },
+  )
+
+  it('Ctrl+S on a UniWork copy is a plain Save (no dialog); only Ctrl+Shift+S is Save As', async () => {
+    const h = await mount({ bound: true, readOnly: false }, { ok: true, path: PATH })
+    open.push(h)
+    const press = async (shiftKey: boolean) =>
+      act(async () => {
+        window.dispatchEvent(
+          new KeyboardEvent('keydown', { key: shiftKey ? 'S' : 's', ctrlKey: true, shiftKey }),
+        )
+        await new Promise((r) => setTimeout(r, 20))
+      })
+    await press(false)
+    expect(h.api.save.mock.calls.at(-1)?.[0]).toMatchObject({ mode: 'save' })
+    await press(true)
+    expect(h.api.save.mock.calls.at(-1)?.[0]).toMatchObject({ mode: 'saveAs' })
   })
 })
