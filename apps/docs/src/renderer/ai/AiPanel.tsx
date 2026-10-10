@@ -2,6 +2,7 @@ import {
   aiPanelWidthAtPointer,
   AiPanelSideButton,
   AiModelPicker,
+  useCloudSignedIn,
   type AiModelPickerBridge,
 } from '@genoffice/ui'
 import { useEffect, useRef, useState } from 'react'
@@ -498,25 +499,10 @@ export function AiPanel({
   const settingsRef = useRef(settings)
   settingsRef.current = settings
   /** UniWork cloud sign-in state (signed in + entitled, from the shell main status) for the media tool gates */
-  const gskLoggedInRef = useRef(false)
-  useEffect(() => {
-    let alive = true
-    const refresh = () => {
-      // tests render the panel without a preload bridge
-      void window.desktop
-        ?.aiGskStatus?.()
-        .then((s) => {
-          if (alive) gskLoggedInRef.current = !!s?.loggedIn
-        })
-        .catch(() => {})
-    }
-    refresh()
-    window.addEventListener('focus', refresh)
-    return () => {
-      alive = false
-      window.removeEventListener('focus', refresh)
-    }
-  }, [])
+  const { loggedInRef: gskLoggedInRef } = useCloudSignedIn(
+    () => window.desktop?.aiGskStatus?.(),
+    open,
+  )
   const blocksRef = useRef(blocks)
   blocksRef.current = blocks
   const numIdFallbackRef = useRef(numIdFallback)

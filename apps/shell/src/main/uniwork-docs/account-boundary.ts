@@ -22,6 +22,10 @@ export interface AccountBoundaryDeps {
   openPaths(): string[]
   /** the normal close of whatever shows `path`, prompts included; true = it closed */
   closeDocument(path: string): Promise<boolean>
+  /** only the prompts of that close, nothing is closed; true = the user let it go ahead */
+  confirmClose(path: string): Promise<boolean>
+  /** closes whatever shows `path` with no prompt (its prompts were answered by confirmClose) */
+  closeNow(path: string): void
   /** every file path the AI chat store keys a transcript or project entry on */
   aiHistoryPaths(): string[]
   /** deletes the AI transcripts and project entries of these paths for good */
@@ -71,14 +75,19 @@ export class AccountBoundary {
   }
 
   /**
-   * Before an explicit Sign out: closes every document that is a working copy
-   * (of any account), one prompt at a time. False when the user cancelled a
-   * prompt: the sign-out does not go ahead and the remaining documents stay.
+   * Before an explicit Sign out: every document that is a working copy (of any
+   * account) gets its close prompt, one at a time, and only when all of them
+   * went ahead are the documents closed. False when the user cancelled a
+   * prompt: the sign-out does not go ahead and no document was closed.
    */
   async beforeSignOut(): Promise<boolean> {
     await this.running?.catch(() => undefined)
     this.deps.closeConflictPrompt()
-    return this.closeWhere(this.anyAccount)
+    const paths = this.pathsWhere(this.anyAccount)
+    for (const path of paths) if (!(await this.deps.confirmClose(path))) return false
+    // a prompt may have taken a while: close what still shows a working copy
+    for (const path of this.pathsWhere(this.anyAccount)) this.deps.closeNow(path)
+    return true
   }
 
   /** After an explicit Sign out: the AI history of every working copy is deleted. */
@@ -111,13 +120,22 @@ export class AccountBoundary {
     }
   }
 
-  private async closeWhere(match: (path: string) => boolean): Promise<boolean> {
+  /** the open paths that match, each once */
+  private pathsWhere(match: (path: string) => boolean): string[] {
     const seen = new Set<string>()
-    let allClosed = true
+    const found: string[] = []
     for (const path of this.deps.openPaths()) {
       const key = resolve(path)
       if (seen.has(key) || !match(path)) continue
       seen.add(key)
+      found.push(path)
+    }
+    return found
+  }
+
+  private async closeWhere(match: (path: string) => boolean): Promise<boolean> {
+    let allClosed = true
+    for (const path of this.pathsWhere(match)) {
       if (!(await this.deps.closeDocument(path))) allClosed = false
     }
     return allClosed

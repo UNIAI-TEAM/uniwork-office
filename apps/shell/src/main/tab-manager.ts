@@ -61,6 +61,7 @@ import {
 import type { DocumentTabKind, OpenDocumentTab, TabKind, TabSummary } from '../shared/tabs-api'
 import { TAB_STRIP_HEIGHT } from '../shared/tab-drag-geometry'
 import { isCloseTabChord } from './close-tab-chord'
+import { blankRetiredPage } from './retire-page'
 
 /** a tab lifted out of the strip with its live view: what "Open in New Window",
  *  tear-off and dock hand back and forth between the shell and a detached window */
@@ -751,6 +752,17 @@ export class TabManager {
     if (id === HOME_ID) return
     const tab = this.tabs.find((t) => t.id === id)
     if (!tab || this.closingIds.has(id)) return
+    if (!(await this.confirmTabClose(tab))) return
+    this.removeTab(id)
+  }
+
+  /**
+   * The prompts of a close, with nothing removed: the module's unsaved-changes
+   * prompt, then the UniWork prompt. False when the user cancelled one (or one
+   * is already open on the tab) and the tab must stay.
+   */
+  private async confirmTabClose(tab: TabRecord): Promise<boolean> {
+    const id = tab.id
     let closeGuard =
       tab.view &&
       (tab.kind === 'sheets' && sheetsPendingEditCount(tab.view.webContents.id) > 0
@@ -778,7 +790,7 @@ export class TabManager {
       if (this.activeId !== id) this.activateTab(id)
       this.closingIds.add(id)
       try {
-        if (!(await closeGuard(tab.view.webContents, this.shellWindow))) return
+        if (!(await closeGuard(tab.view.webContents, this.shellWindow))) return false
       } finally {
         this.closingIds.delete(id)
       }
@@ -787,12 +799,12 @@ export class TabManager {
     if (tab.view && !tab.present && isUniworkCloseGuarded(tab.filePath)) {
       this.closingIds.add(id)
       try {
-        if (!(await confirmUniworkClose(tab.filePath))) return
+        if (!(await confirmUniworkClose(tab.filePath))) return false
       } finally {
         this.closingIds.delete(id)
       }
     }
-    this.removeTab(id)
+    return true
   }
 
   /**
@@ -806,6 +818,28 @@ export class TabManager {
       this.tabs.filter((t) => t.filePath && canonicalPath(t.filePath) === wanted).map((t) => t.id)
     for (const id of showing()) await this.closeTab(id)
     return showing().length === 0
+  }
+
+  /**
+   * Runs the close prompts of every tab showing `path` and removes nothing
+   * (the first half of an all-or-nothing close, see closeTabsShowingNow).
+   * False when a prompt was cancelled.
+   */
+  async confirmCloseTabsShowing(path: string): Promise<boolean> {
+    const wanted = canonicalPath(path)
+    const showing = this.tabs.filter((t) => t.filePath && canonicalPath(t.filePath) === wanted)
+    for (const tab of showing) {
+      if (this.closingIds.has(tab.id)) return false
+      if (!(await this.confirmTabClose(tab))) return false
+    }
+    return true
+  }
+
+  /** Removes every tab showing `path` with no prompt: its prompts were answered already. */
+  closeTabsShowingNow(path: string): void {
+    const wanted = canonicalPath(path)
+    for (const tab of this.tabs.filter((t) => t.filePath && canonicalPath(t.filePath) === wanted))
+      this.closeTabWithoutPrompt(tab.id)
   }
 
   /**
@@ -857,6 +891,7 @@ export class TabManager {
         // issue, not something fixable from here). Detaching without destroying
         // avoids the freeze; the orphaned webContents is reclaimed when the app quits.
         teardownDocsRenderer(removed.view.webContents)
+        blankRetiredPage(removed.view.webContents)
       } else {
         removed.view.webContents.close()
       }

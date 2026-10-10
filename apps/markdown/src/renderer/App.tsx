@@ -1196,6 +1196,7 @@ export default function App() {
                 onQueueFocus={queueFocus}
                 onQueueConsume={queueConsume}
                 readOnly={uniwork.readOnly}
+                open={aiOpen}
               />
             )}
           </div>

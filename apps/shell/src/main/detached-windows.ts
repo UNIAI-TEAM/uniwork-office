@@ -22,6 +22,7 @@ import {
 import { pdfIsDirty, requestPdfClose } from '../../../pdf/src/main/pdf-main'
 import { markdownIsDirty, requestMarkdownClose } from '../../../markdown/src/main/markdown-main'
 import { htmlIsDirty, requestHtmlClose } from '../../../html/src/main/html-main'
+import { blankRetiredPage } from './retire-page'
 import { canonicalPath } from './tab-manager'
 import { confirmUniworkClose } from './uniwork-docs/close-guard'
 import type { DetachedTab } from './tab-manager'
@@ -225,6 +226,34 @@ export async function closeDetachedByPath(path: string): Promise<boolean> {
     else resetSheetsShuttingDown()
   }
   return showing().length === 0
+}
+
+/**
+ * Runs the close prompts of the detached editors showing `path` and closes
+ * nothing. False when a prompt was cancelled.
+ */
+export async function confirmCloseDetachedByPath(path: string): Promise<boolean> {
+  const wanted = canonicalPath(path)
+  const showing = [...detached.values()].filter(
+    (rec) => rec.filePath && canonicalPath(rec.filePath) === wanted && !rec.window.isDestroyed(),
+  )
+  for (const rec of showing) {
+    if (rec.released) continue
+    if (!(await confirmDetachedClose(rec))) {
+      resetSheetsShuttingDown()
+      return false
+    }
+  }
+  return true
+}
+
+/** Closes the detached editors showing `path` with no prompt (answered already). */
+export function closeDetachedByPathNow(path: string): void {
+  const wanted = canonicalPath(path)
+  for (const rec of [...detached.values()]) {
+    if (rec.filePath && canonicalPath(rec.filePath) === wanted && !rec.window.isDestroyed())
+      if (!rec.released) rec.closeWithoutPrompt()
+  }
 }
 
 /** unsaved-changes state of one detached document, whichever family owns it */
@@ -460,8 +489,10 @@ export function createDetachedEditorWindow(options: {
     if (torn?.rec === rec) torn = null
     win.contentView.removeChildView(view)
     detached.delete(wcId)
-    if (kind === 'docs') teardownDocsRenderer(view.webContents)
-    else view.webContents.close()
+    if (kind === 'docs') {
+      teardownDocsRenderer(view.webContents)
+      blankRetiredPage(view.webContents)
+    } else view.webContents.close()
     win.destroy()
   }
   const rec: DetachedRecord = {

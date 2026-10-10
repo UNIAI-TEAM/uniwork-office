@@ -2,6 +2,7 @@ import {
   aiPanelWidthAtPointer,
   AiPanelSideButton,
   AiModelPicker,
+  useCloudSignedIn,
   type AiModelPickerBridge,
 } from '@genoffice/ui'
 import { useEffect, useRef, useState } from 'react'
@@ -275,24 +276,7 @@ export function AiPanel({
   const settingsRef = useRef<AiSettings | null>(null)
 
   /** UniWork cloud sign-in state (signed in + entitled, from the shell main status) for the media tool gates */
-  const gskLoggedInRef = useRef(false)
-  useEffect(() => {
-    let alive = true
-    const refresh = () => {
-      void window.pdfApi
-        ?.gskStatus()
-        .then((s) => {
-          if (alive) gskLoggedInRef.current = !!s?.loggedIn
-        })
-        .catch(() => {})
-    }
-    refresh()
-    window.addEventListener('focus', refresh)
-    return () => {
-      alive = false
-      window.removeEventListener('focus', refresh)
-    }
-  }, [])
+  const { loggedInRef: gskLoggedInRef } = useCloudSignedIn(() => window.pdfApi?.gskStatus(), open)
   const langRef = useRef(lang)
   langRef.current = lang
   const apiRef = useRef(api)

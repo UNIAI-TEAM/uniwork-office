@@ -2,6 +2,7 @@ import {
   aiPanelWidthAtPointer,
   AiPanelSideButton,
   AiModelPicker,
+  useCloudSignedIn,
   type AiModelPickerBridge,
 } from '@genoffice/ui'
 import { useEffect, useRef, useState } from 'react'
@@ -161,6 +162,7 @@ export function AiPanel({
   onQueueFocus,
   onQueueConsume,
   readOnly = false,
+  open,
 }: {
   deps: MarkdownAiDeps
   filePath: string | null
@@ -175,6 +177,8 @@ export function AiPanel({
   onQueueConsume?: (qids: string[]) => void
   /** a view-only UniWork document: the assistant reads and answers, it never edits */
   readOnly?: boolean
+  /** false while the dock is collapsed (the panel stays mounted); reopening re-reads the cloud plan */
+  open?: boolean
 }): ReactElement {
   const { lang, t } = useI18n()
   const readOnlyRef = useRef(readOnly)
@@ -212,24 +216,10 @@ export function AiPanel({
 
   const settingsRef = useRef<AiSettings | null>(null)
   /** UniWork cloud sign-in state (signed in + entitled, from the shell main status) for the media tool gates */
-  const gskLoggedInRef = useRef(false)
-  useEffect(() => {
-    let alive = true
-    const refresh = () => {
-      void window.markdownApi
-        .aiGskStatus?.()
-        .then((s) => {
-          if (alive) gskLoggedInRef.current = !!s?.loggedIn
-        })
-        .catch(() => {})
-    }
-    refresh()
-    window.addEventListener('focus', refresh)
-    return () => {
-      alive = false
-      window.removeEventListener('focus', refresh)
-    }
-  }, [])
+  const { loggedInRef: gskLoggedInRef } = useCloudSignedIn(
+    () => window.markdownApi.aiGskStatus?.(),
+    open,
+  )
   const langRef = useRef(lang)
   langRef.current = lang
   const depsRef = useRef(deps)

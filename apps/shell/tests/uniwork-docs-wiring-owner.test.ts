@@ -60,6 +60,8 @@ describe('last owner follows the session identity (R2-5)', () => {
       defaultSaveDir: () => dir,
       openPaths: () => [],
       closePath: async () => true,
+      confirmClosePath: async () => true,
+      closePathNow: () => undefined,
       aiHistoryPaths: () => [],
       forgetAiHistory: () => undefined,
     })
@@ -107,6 +109,8 @@ describe('a sign-in as another account (GOA9-r3-04)', () => {
       defaultSaveDir: () => dir,
       openPaths: () => [...open],
       closePath,
+      confirmClosePath: async () => true,
+      closePathNow: () => undefined,
       aiHistoryPaths: () => [previous, own, local],
       forgetAiHistory,
     })
