@@ -1082,3 +1082,72 @@ describe('Retry replays a pending intent, it does not rewrite the file (F8)', ()
     expect(ctx.deps.requestModuleSave).toHaveBeenCalledWith(path, expect.any(Function))
   })
 })
+
+describe('editor state on the chip (one state source)', () => {
+  const last = (ctx: ReturnType<typeof setup>) => ctx.statuses[ctx.statuses.length - 1]
+
+  it('an unsaved edit in the editor reads dirty; the explicit Save then shows saving and saved', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    expect(await ctx.service.docStatus(path)).toMatchObject({ state: 'ready' })
+
+    ctx.service.noteEditorDirty(path, true)
+    expect(last(ctx)).toMatchObject({ path, state: 'dirty' })
+    expect(await ctx.service.docStatus(path)).toMatchObject({ state: 'dirty' })
+    expect(await ctx.service.activeDocStatus()).toBeNull()
+
+    // the module's Save writes the editor's bytes, then reports the user save
+    ctx.statuses.length = 0
+    writeFileSync(path, 'v4')
+    ctx.service.onUserSave(path)
+    await vi.waitFor(() => expect(last(ctx)).toMatchObject({ state: 'saved' }))
+    expect(ctx.statuses.map((s) => s.state)).toEqual(['saving', 'saved'])
+    expect(commits(server)).toHaveLength(1)
+    // the editor's clean report after the save changes nothing
+    ctx.service.noteEditorDirty(path, false)
+    expect(ctx.statuses.map((s) => s.state)).toEqual(['saving', 'saved'])
+  })
+
+  it('reports only changes, and never hides a conflict, offline or signed-out state', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    ctx.statuses.length = 0
+    ctx.service.noteEditorDirty(path, false)
+    expect(ctx.statuses).toHaveLength(0)
+    ctx.service.noteEditorDirty(path, true)
+    ctx.service.noteEditorDirty(path, true)
+    expect(ctx.statuses.map((s) => s.state)).toEqual(['dirty'])
+
+    writeFileSync(path, 'v4')
+    server.faults.push({ route: 'upload', kind: 'network' })
+    expect(await ctx.service.save(path)).toMatchObject({ state: 'offline' })
+    ctx.service.noteEditorDirty(path, true)
+    expect(last(ctx)).toMatchObject({ state: 'offline' })
+    expect(await ctx.service.docStatus(path)).toMatchObject({ state: 'offline' })
+  })
+
+  it('a view-only copy and a plain local file ignore editor reports', async () => {
+    const server = fakeServer({ bytes: enc('v3'), myLevel: 'view' })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    ctx.statuses.length = 0
+    ctx.service.noteEditorDirty(path, true)
+    ctx.service.noteEditorDirty(join(dir, 'plain.docx'), true)
+    expect(ctx.statuses).toHaveLength(0)
+    expect(await ctx.service.docStatus(path)).toMatchObject({ state: 'ready', access: 'view' })
+  })
+
+  it('offline Retry that lands is pushed as saved', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'v4')
+    server.faults.push({ route: 'upload', kind: 'network' })
+    expect(await ctx.service.save(path)).toMatchObject({ state: 'offline' })
+    ctx.statuses.length = 0
+    expect(await ctx.service.save(path)).toMatchObject({ state: 'saved' })
+    expect(ctx.statuses.map((s) => s.state)).toEqual(['saving', 'saved'])
+  })
+})

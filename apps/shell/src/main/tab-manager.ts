@@ -11,6 +11,7 @@ import {
 import {
   createDocsView,
   docsQueryDirty,
+  docsQueryEditorDirty,
   markDocsNewBlank,
   queueDocsAiContent,
   queueDocsAiPreset,
@@ -383,6 +384,26 @@ export class TabManager {
       default:
         return false
     }
+  }
+
+  /**
+   * Unsaved edits in the editor of every tab showing a file `wanted` accepts
+   * (the UniWork chip's dirty state). null: the editor did not answer (docs
+   * busy saving), so the caller keeps what it last knew.
+   */
+  async editorDirtyStates(
+    wanted: (path: string) => boolean,
+  ): Promise<Array<{ path: string; dirty: boolean | null }>> {
+    const tabs = this.tabs.filter((t) => t.view && t.filePath && !t.present && wanted(t.filePath))
+    return Promise.all(
+      tabs.map(async (tab) => ({
+        path: tab.filePath!,
+        dirty:
+          tab.kind === 'docs' && tab.view && !tab.view.webContents.isDestroyed()
+            ? await docsQueryEditorDirty(tab.view.webContents)
+            : await this.tabIsDirty(tab),
+      })),
+    )
   }
 
   openHomeTab(): void {
