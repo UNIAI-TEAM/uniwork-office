@@ -154,3 +154,71 @@ for (const theme of ['light', 'dark'] as const) {
     })
   }
 }
+
+// visual r2 polish (UNI-1232): the placeholder explains itself, raw HTML says it is inert, a broken
+// diagram leads with the UI-language sentence, and the page keeps phone-sized gutters
+const POLISH = [
+  '# Polish fixture',
+  '',
+  '![sơ đồ](assets/missing.png)',
+  '',
+  '<div class="x">raw</div>',
+  '',
+  '```mermaid',
+  'graph TD',
+  '  A -->',
+  '```',
+  '',
+  'thư tiếng Việt',
+  '',
+].join('\n')
+const POLISH_PATH = '/e2e-fixtures/Polish.md'
+
+test('markdown: placeholder, raw HTML label and a broken diagram speak the UI language', async ({
+  page,
+}) => {
+  await serveFixture(page, POLISH_PATH, encode(POLISH), 'text/markdown')
+  const frame = await openModule(page, 'markdown', { open: POLISH_PATH, lang: 'vi' })
+  await expect(frame.locator('.doc-editor')).toContainText('Polish fixture', { timeout: 30_000 })
+
+  // a relative picture without an asset: named for assistive tech, explained inside the picture
+  const img = frame.locator('.doc-editor img[src^="data:image/svg+xml"]')
+  await expect(img).toHaveAttribute('aria-label', /Ảnh không khả dụng: sơ đồ\. .*chưa được tải lên/)
+  const svg = decodeURIComponent((await img.getAttribute('src'))!.split('#')[0]!.slice(33))
+  expect(svg).toContain('assets/missing.png')
+  expect(svg.replace(/<[^>]+>/g, '')).toContain('Chưa hiển thị')
+
+  // raw HTML is kept as written and says so
+  const label = await frame
+    .locator('.doc-editor .md-raw-html')
+    .first()
+    .evaluate((el) => getComputedStyle(el, '::before').content)
+  expect(label).toContain('HTML giữ nguyên, không hiển thị')
+
+  // the parser's own English message is detail, behind the UI-language sentence
+  const error = frame.locator('.md-diagram-error')
+  await expect(error).toBeVisible({ timeout: 45_000 })
+  await expect(error.locator('.md-diagram-error-lead')).toHaveText('Lỗi cú pháp sơ đồ')
+  await expect(error.locator('details')).not.toHaveAttribute('open', '')
+  await expect(error.locator('summary')).toHaveText('Chi tiết kỹ thuật')
+  await page.screenshot({ path: screenshotPath('markdown', 'polish-light-vi') })
+})
+
+test('markdown: a phone keeps small page gutters (no 72 px margins), no sideways page scroll', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await serveFixture(page, POLISH_PATH, encode(POLISH), 'text/markdown')
+  const frame = await openModule(page, 'markdown', { open: POLISH_PATH, lang: 'en' })
+  await expect(frame.locator('.doc-editor')).toContainText('Polish fixture', { timeout: 30_000 })
+  const { pad, scroll, text } = await frame.locator('.doc-page').evaluate((el) => ({
+    pad: parseFloat(getComputedStyle(el).paddingLeft),
+    scroll: document.documentElement.scrollWidth,
+    text: el.querySelector('p')!.getBoundingClientRect().width,
+  }))
+  expect(pad).toBeLessThanOrEqual(16)
+  expect(scroll).toBeLessThanOrEqual(390)
+  // 390 minus two 16 px gutters (the old 72 px gutters left ~212 px)
+  expect(text).toBeGreaterThan(300)
+  await page.screenshot({ path: screenshotPath('markdown', 'narrow-390-light-en') })
+})
