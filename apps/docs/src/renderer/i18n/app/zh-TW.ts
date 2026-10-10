@@ -509,6 +509,7 @@ export const zhTW = {
   appWebNoHost: '此編輯器需在 UniWork 中執行。請從 UniWork 開啟文件。',
   appSaveStateUnsaved: '有未儲存的變更',
   appSaveStateSaved: '所有變更已儲存',
+  appSaveStateViewOnly: '僅供檢視',
   appSaving: '正在儲存…',
   appSavingAs: '正在另存新檔…',
   appPdfPrintFallback: '無法直接匯出 PDF,已改用瀏覽器列印對話方塊',

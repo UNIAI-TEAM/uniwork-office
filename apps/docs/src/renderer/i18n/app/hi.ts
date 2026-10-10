@@ -526,6 +526,7 @@ export const hi = {
   appWebNoHost: 'यह संपादक UniWork के अंदर चलता है। UniWork से दस्तावेज़ खोलें।',
   appSaveStateUnsaved: 'बिना सहेजे गए बदलाव',
   appSaveStateSaved: 'सभी बदलाव सहेजे गए',
+  appSaveStateViewOnly: 'केवल देखने के लिए',
   appSaving: 'सहेजा जा रहा है…',
   appSavingAs: 'इस रूप में सहेजा जा रहा है…',
   appPdfPrintFallback:

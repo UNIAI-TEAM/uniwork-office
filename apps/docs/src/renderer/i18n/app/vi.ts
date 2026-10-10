@@ -523,6 +523,7 @@ export const vi = {
   appWebNoHost: 'Trình soạn thảo này chạy bên trong UniWork. Hãy mở tài liệu từ UniWork.',
   appSaveStateUnsaved: 'Có thay đổi chưa lưu',
   appSaveStateSaved: 'Đã lưu mọi thay đổi',
+  appSaveStateViewOnly: 'Chỉ xem',
   appSaving: 'Đang lưu…',
   appSavingAs: 'Đang lưu thành…',
   appPdfPrintFallback:

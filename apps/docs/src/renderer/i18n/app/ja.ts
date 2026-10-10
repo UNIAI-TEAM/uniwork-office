@@ -552,6 +552,7 @@ export const ja = {
     'このエディターは UniWork 内で動作します。UniWork からドキュメントを開いてください。',
   appSaveStateUnsaved: '未保存の変更があります',
   appSaveStateSaved: 'すべての変更を保存しました',
+  appSaveStateViewOnly: '閲覧のみ',
   appSaving: '保存しています…',
   appSavingAs: '名前を付けて保存しています…',
   appPdfPrintFallback:

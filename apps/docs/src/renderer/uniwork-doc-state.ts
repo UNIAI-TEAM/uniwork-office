@@ -67,3 +67,27 @@ export function useUniworkDocState(path: string | null | undefined): UniworkDocS
   }, [path])
   return state
 }
+
+/**
+ * Switch the editor between editable and read-only without counting it as an
+ * edit. TipTap's setEditable emits `update` by default, and the renderer's
+ * onUpdate marks the document dirty: a view-only UniWork document (switched
+ * to read-only once main answers) would open as "Unsaved changes".
+ */
+export function setEditorEditable(
+  editor: { setEditable(editable: boolean, emitUpdate?: boolean): void },
+  editable: boolean,
+): void {
+  editor.setEditable(editable, false)
+}
+
+/** Footer save-state label: a view-only document is never "unsaved", it has no save state. */
+export function saveStateLabel(
+  hasUnsavedChanges: boolean,
+  readOnly: boolean,
+): { key: 'appSaveStateViewOnly' | 'appSaveStateUnsaved' | 'appSaveStateSaved'; unsaved: boolean } {
+  if (readOnly) return { key: 'appSaveStateViewOnly', unsaved: false }
+  return hasUnsavedChanges
+    ? { key: 'appSaveStateUnsaved', unsaved: true }
+    : { key: 'appSaveStateSaved', unsaved: false }
+}

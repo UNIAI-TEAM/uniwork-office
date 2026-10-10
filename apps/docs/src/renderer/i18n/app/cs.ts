@@ -525,6 +525,7 @@ export const cs = {
   appWebNoHost: 'Tento editor běží v UniWork. Otevřete dokument z UniWork.',
   appSaveStateUnsaved: 'Neuložené změny',
   appSaveStateSaved: 'Všechny změny uloženy',
+  appSaveStateViewOnly: 'Pouze pro čtení',
   appSaving: 'Ukládání…',
   appSavingAs: 'Ukládání jako…',
   appPdfPrintFallback:

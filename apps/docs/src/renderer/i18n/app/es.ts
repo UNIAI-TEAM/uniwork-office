@@ -532,6 +532,7 @@ export const es = {
   appWebNoHost: 'Este editor funciona dentro de UniWork. Abre el documento desde UniWork.',
   appSaveStateUnsaved: 'Cambios sin guardar',
   appSaveStateSaved: 'Todos los cambios guardados',
+  appSaveStateViewOnly: 'Solo lectura',
   appSaving: 'Guardando…',
   appSavingAs: 'Guardando como…',
   appPdfPrintFallback:

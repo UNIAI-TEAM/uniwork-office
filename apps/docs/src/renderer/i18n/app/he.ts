@@ -515,6 +515,7 @@ export const he = {
   appWebNoHost: 'עורך זה פועל בתוך UniWork. פתח את המסמך מ-UniWork.',
   appSaveStateUnsaved: 'שינויים שלא נשמרו',
   appSaveStateSaved: 'כל השינויים נשמרו',
+  appSaveStateViewOnly: 'לצפייה בלבד',
   appSaving: 'שומר…',
   appSavingAs: 'שומר בשם…',
   appPdfPrintFallback: 'ייצוא PDF אינו זמין כאן; נעשה שימוש בתיבת ההדפסה של הדפדפן במקום',

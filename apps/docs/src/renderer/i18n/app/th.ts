@@ -522,6 +522,7 @@ export const th = {
   appWebNoHost: 'ตัวแก้ไขนี้ทำงานภายใน UniWork โปรดเปิดเอกสารจาก UniWork',
   appSaveStateUnsaved: 'มีการเปลี่ยนแปลงที่ยังไม่บันทึก',
   appSaveStateSaved: 'บันทึกการเปลี่ยนแปลงทั้งหมดแล้ว',
+  appSaveStateViewOnly: 'ดูได้อย่างเดียว',
   appSaving: 'กำลังบันทึก…',
   appSavingAs: 'กำลังบันทึกเป็น…',
   appPdfPrintFallback: 'ส่งออก PDF โดยตรงไม่ได้ จึงใช้กล่องโต้ตอบการพิมพ์ของเบราว์เซอร์แทน',

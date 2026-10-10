@@ -532,6 +532,7 @@ export const pl = {
   appWebNoHost: 'Ten edytor działa w UniWork. Otwórz dokument z UniWork.',
   appSaveStateUnsaved: 'Niezapisane zmiany',
   appSaveStateSaved: 'Wszystkie zmiany zapisane',
+  appSaveStateViewOnly: 'Tylko do odczytu',
   appSaving: 'Zapisywanie…',
   appSavingAs: 'Zapisywanie jako…',
   appPdfPrintFallback:

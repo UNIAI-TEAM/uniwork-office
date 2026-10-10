@@ -550,6 +550,7 @@ export const ko = {
   appWebNoHost: '이 편집기는 UniWork 안에서 실행됩니다. UniWork에서 문서를 여세요.',
   appSaveStateUnsaved: '저장되지 않은 변경 내용',
   appSaveStateSaved: '모든 변경 내용이 저장됨',
+  appSaveStateViewOnly: '보기 전용',
   appSaving: '저장 중…',
   appSavingAs: '다른 이름으로 저장 중…',
   appPdfPrintFallback: 'PDF를 직접 내보낼 수 없어 브라우저 인쇄 대화 상자를 대신 사용했습니다',

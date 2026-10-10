@@ -532,6 +532,7 @@ export const ru = {
   appWebNoHost: 'Этот редактор работает внутри UniWork. Откройте документ из UniWork.',
   appSaveStateUnsaved: 'Есть несохранённые изменения',
   appSaveStateSaved: 'Все изменения сохранены',
+  appSaveStateViewOnly: 'Только просмотр',
   appSaving: 'Сохранение…',
   appSavingAs: 'Сохранение как…',
   appPdfPrintFallback:

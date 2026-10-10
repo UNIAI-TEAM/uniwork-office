@@ -244,7 +244,13 @@ import {
   textHasCjk,
 } from './line-metrics'
 import { saveUntilPersisted } from './save-until-persisted'
-import { uniworkAllowsSave, uniworkStateFor, useUniworkDocState } from './uniwork-doc-state'
+import {
+  saveStateLabel,
+  setEditorEditable,
+  uniworkAllowsSave,
+  uniworkStateFor,
+  useUniworkDocState,
+} from './uniwork-doc-state'
 import { SPELLCHECK_KEY, spellcheckEnabled } from './spellcheck-pref'
 import { cachedByDoc } from './doc-cache'
 import { useShallowStable, useStableCallbacks } from './use-stable'
@@ -1868,14 +1874,15 @@ export function App() {
   // StreamingTailGuardExtension; saves wait for the full content).
   useEffect(() => {
     if (!editor) return
-    editor.setEditable(!readMode && !isProtected)
+    setEditorEditable(editor, !readMode && !isProtected)
+    scheduleUiRefresh()
     if (!readMode) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setReadMode(false)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [editor, readMode, isProtected])
+  }, [editor, readMode, isProtected, scheduleUiRefresh])
 
   // Track Changes: the recorder plugin reads its toggle from extension storage
   useEffect(() => {
@@ -7438,14 +7445,20 @@ export function App() {
                   {t('appStartOpening')}
                 </span>
               )}
-              {doc && !docLoading && (hasUnsavedChanges || doc.filePath) && (
-                <span
-                  className={`status-item status-save-state${hasUnsavedChanges ? ' unsaved' : ''}`}
-                  role="status"
-                >
-                  {hasUnsavedChanges ? t('appSaveStateUnsaved') : t('appSaveStateSaved')}
-                </span>
-              )}
+              {doc &&
+                !docLoading &&
+                (hasUnsavedChanges || doc.filePath) &&
+                (() => {
+                  const saveState = saveStateLabel(hasUnsavedChanges, uniwork.readOnly)
+                  return (
+                    <span
+                      className={`status-item status-save-state${saveState.unsaved ? ' unsaved' : ''}`}
+                      role="status"
+                    >
+                      {t(saveState.key)}
+                    </span>
+                  )
+                })()}
               {status && <span className="status-msg"> — {status}</span>}
             </div>
             <div className="status-right">

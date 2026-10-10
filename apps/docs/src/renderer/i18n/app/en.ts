@@ -520,6 +520,7 @@ export const en = {
   appWebNoHost: 'This editor runs inside UniWork. Open the document from UniWork.',
   appSaveStateUnsaved: 'Unsaved changes',
   appSaveStateSaved: 'All changes saved',
+  appSaveStateViewOnly: 'View only',
   appSaving: 'Saving…',
   appSavingAs: 'Saving as…',
   appPdfPrintFallback: 'PDF export is unavailable here; the browser print dialog was used instead',

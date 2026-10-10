@@ -517,6 +517,7 @@ export const ar = {
   appWebNoHost: 'يعمل هذا المحرر داخل UniWork. افتح المستند من UniWork.',
   appSaveStateUnsaved: 'تغييرات غير محفوظة',
   appSaveStateSaved: 'تم حفظ كل التغييرات',
+  appSaveStateViewOnly: 'للعرض فقط',
   appSaving: 'جارٍ الحفظ…',
   appSavingAs: 'جارٍ الحفظ باسم…',
   appPdfPrintFallback: 'تصدير PDF غير متاح هنا؛ تم استخدام مربع حوار الطباعة في المتصفح بدلاً منه',

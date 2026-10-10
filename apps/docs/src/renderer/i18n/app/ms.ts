@@ -530,6 +530,7 @@ export const ms = {
   appWebNoHost: 'Editor ini berjalan di dalam UniWork. Buka dokumen daripada UniWork.',
   appSaveStateUnsaved: 'Perubahan belum disimpan',
   appSaveStateSaved: 'Semua perubahan disimpan',
+  appSaveStateViewOnly: 'Lihat sahaja',
   appSaving: 'Menyimpan…',
   appSavingAs: 'Menyimpan sebagai…',
   appPdfPrintFallback:

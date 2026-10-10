@@ -529,6 +529,7 @@ export const id = {
   appWebNoHost: 'Editor ini berjalan di dalam UniWork. Buka dokumen dari UniWork.',
   appSaveStateUnsaved: 'Ada perubahan yang belum disimpan',
   appSaveStateSaved: 'Semua perubahan tersimpan',
+  appSaveStateViewOnly: 'Hanya lihat',
   appSaving: 'Menyimpan…',
   appSavingAs: 'Menyimpan sebagai…',
   appPdfPrintFallback:
