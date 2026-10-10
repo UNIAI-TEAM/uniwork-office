@@ -828,6 +828,9 @@ export const workbookFileSchema = z
     /// writes back to the original file, and the 30s recovery writer stands
     /// down (it would overwrite the copy the sidecar is streaming from).
     restoredFromRecovery: z.boolean().optional(),
+    /// The file is the working copy of a UniWork document: AutoSave stays off
+    /// and an explicit Save always writes.
+    uniworkBound: z.boolean().optional(),
     /// Very large worksheet XML entries use too much memory in the current
     /// string-based patcher to rewrite safely every 30 seconds. Manual Save
     /// remains available; only the background crash-recovery copy is disabled.
@@ -1994,6 +1997,12 @@ export const workbookSaveRequestSchema = z
     /// Background save (AutoSave, AI-run autosave): an unsaved new workbook
     /// then writes its backing file in place instead of asking where to save.
     quiet: z.boolean().optional(),
+    /// Who asked: 'user' (Save, menu, shortcut, close guard) or 'auto'
+    /// (AutoSave timer, AI-run autosave). Absent = saved exactly as before.
+    origin: z.enum(['user', 'auto']).optional(),
+    /// Explicit Save of a UniWork-bound workbook with nothing pending: writes
+    /// the unchanged workbook so the shell can retry its upload.
+    forceWrite: z.boolean().optional(),
     /// CSV session in-place save: the active sheet serialized as CSV text.
     /// Written back to the session's original .csv after the xlsx save.
     csvContent: z.string().max(MAX_CSV_EXPORT_CHARS).optional(),
@@ -2180,6 +2189,7 @@ export const workbookSaveRequestSchema = z
       // with nothing to apply: they write the unchanged workbook to a path.
       request.mode === 'save-as' ||
       request.restoreWriteBack === true ||
+      request.forceWrite === true ||
       request.editsTransferId !== undefined ||
       request.edits.length > 0 ||
       (request.bulkConstantFills?.length ?? 0) > 0 ||

@@ -18,6 +18,7 @@ const api: HtmlApi = {
   setPresentFullScreen: (on) => ipcRenderer.invoke(HTML_CHANNELS.presentFullScreen, on),
   presentInNewTab: (title) => ipcRenderer.invoke(HTML_CHANNELS.presentNewTab, title),
   save: (request) => ipcRenderer.invoke(HTML_CHANNELS.save, request),
+  uniworkState: () => ipcRenderer.invoke(HTML_CHANNELS.uniworkState),
   setDirty: (dirty) => ipcRenderer.send(HTML_CHANNELS.dirtyChanged, dirty),
   onSaveRequest: (handler) => {
     const listener = (_e: Electron.IpcRendererEvent, mode: SaveMode) => handler(mode)

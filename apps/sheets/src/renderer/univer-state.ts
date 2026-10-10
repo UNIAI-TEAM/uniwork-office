@@ -242,7 +242,26 @@ export const CLOSURE_MAX_CELLS = 50_000
 /// freshly opened workbook already "has undo", and undoing would strip loaded
 /// file content/layout instead of user edits.
 /// Shared mutable state between App.tsx and univer-sync.ts.
-export const journalSuppression = { active: false }
+export const journalSuppression = {
+  get active(): boolean {
+    return suppressionActive
+  },
+  set active(value: boolean) {
+    if (value === suppressionActive) return
+    suppressionActive = value
+    for (const listener of [...suppressionListeners]) listener(value)
+  },
+}
+
+let suppressionActive = false
+const suppressionListeners = new Set<(active: boolean) => void>()
+
+/// Fires when journalSuppression flips; every programmatic install (file
+/// content, layout, decorations) runs inside that window.
+export function onJournalSuppressionChange(listener: (active: boolean) => void): () => void {
+  suppressionListeners.add(listener)
+  return () => suppressionListeners.delete(listener)
+}
 
 /// An AI batch whose applied payload exceeds this many cells keeps no undo
 /// entry: the stack retains the full mutation matrices both ways (five

@@ -1534,4 +1534,6 @@ export const pl = {
   appVisualFlipV: 'Odbij w pionie',
   appVisualFlipH: 'Odbij w poziomie',
   appCtxPasteVisual: 'Wklej obraz lub kształt',
+  appAutoSaveUniworkOff:
+    'Autozapis jest wyłączony dla dokumentów UniWork. Użyj opcji Zapisz, aby zapisać nową wersję.',
 } satisfies Record<keyof typeof zh, string>

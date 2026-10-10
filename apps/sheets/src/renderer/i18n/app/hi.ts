@@ -1506,4 +1506,6 @@ export const hi = {
   appVisualFlipV: 'लंबवत पलटें',
   appVisualFlipH: 'क्षैतिज पलटें',
   appCtxPasteVisual: 'चित्र या आकृति पेस्ट करें',
+  appAutoSaveUniworkOff:
+    'UniWork दस्तावेज़ों के लिए ऑटो सेव बंद है। नया संस्करण सहेजने के लिए ‘सहेजें’ का उपयोग करें।',
 } satisfies Record<keyof typeof zh, string>

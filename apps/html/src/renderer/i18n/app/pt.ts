@@ -29,6 +29,8 @@ export const pt = {
   replaceAll: 'Substituir tudo',
   findTip: 'Localizar e Substituir (⌘F)',
   autoSaveTip: 'Salva a cada 30 segundos e quando a janela perde o foco',
+  autoSaveUniworkOff:
+    'O salvamento automático está desativado para documentos do UniWork. Use Salvar para salvar uma nova versão.',
   zoom: 'Zoom',
   zoomIn: 'Ampliar',
   zoomOut: 'Reduzir',

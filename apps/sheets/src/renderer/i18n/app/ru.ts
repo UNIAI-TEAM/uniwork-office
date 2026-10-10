@@ -1525,4 +1525,6 @@ export const ru = {
   appVisualFlipV: 'Отразить сверху вниз',
   appVisualFlipH: 'Отразить слева направо',
   appCtxPasteVisual: 'Вставить рисунок или фигуру',
+  appAutoSaveUniworkOff:
+    'Автосохранение отключено для документов UniWork. Нажмите «Сохранить», чтобы сохранить новую версию.',
 } satisfies Record<keyof typeof zh, string>

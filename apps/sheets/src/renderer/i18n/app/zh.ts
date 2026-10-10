@@ -1442,4 +1442,5 @@ export const zh = {
   appVisualFlipV: '垂直翻转',
   appVisualFlipH: '水平翻转',
   appCtxPasteVisual: '粘贴图片/形状',
+  appAutoSaveUniworkOff: 'UniWork 文档已关闭自动保存。请使用“保存”保存新版本。',
 }

@@ -5,6 +5,15 @@
  * future shell reuse.
  */
 import {
+  notifyUniworkUserSave,
+  parseUniworkSaveOrigin,
+  setUniworkUserSaveHook,
+  uniworkIsBound,
+  uniworkIsReadOnly,
+  uniworkSaveDecision,
+  type UniworkSaveOrigin,
+} from './uniwork-policy'
+import {
   clipboard,
   app,
   BrowserWindow,
@@ -485,6 +494,15 @@ function syncAttachedPaths(session: Session, path: string): void {
  * effects: session path, recents, attached-surface titles, dirty-flag reset.
  */
 export async function saveSessionDeckTo(session: Session, filePath: string): Promise<void> {
+  // A view-only UniWork document is never written; an agent save never fires
+  // the UniWork user-save hook (only an explicit Save does).
+  const uniwork = uniworkSaveDecision({
+    kind: 'mcp',
+    origin: 'user',
+    currentPath: session.path || null,
+    targetPath: filePath,
+  })
+  if (!uniwork.write) throw new Error(`file is view-only: ${filePath}`)
   // the caller supplies an arbitrary absolute path, so its parent may not exist
   // yet (the dialog-driven paths always land in an existing folder)
   await mkdir(dirname(filePath), { recursive: true })
@@ -661,7 +679,10 @@ ipcMain.on('slides:close-save-result', (event, ok: unknown) => {
 })
 
 /** Ask the renderer to run the full save flow and await the result (failure/timeout = false). */
-function requestRendererSave(contents: WebContents): Promise<boolean> {
+function requestRendererSave(
+  contents: WebContents,
+  origin: UniworkSaveOrigin = 'user',
+): Promise<boolean> {
   return new Promise<boolean>((resolve) => {
     const timer = setTimeout(() => {
       closeSaveWaiters.delete(contents.id)
@@ -671,7 +692,7 @@ function requestRendererSave(contents: WebContents): Promise<boolean> {
       clearTimeout(timer)
       resolve(ok)
     })
-    contents.send('slides:close-save-request')
+    contents.send('slides:close-save-request', origin)
   })
 }
 
@@ -697,8 +718,10 @@ export async function requestSlidesClose(
   const shared = sessions.get(contents.id)
   if (shared && editorAttachedIds(shared).length > 1) return true
   // Autosave on and a path exists: save silently and proceed without bothering the user; only a failed save falls through to the dialog
-  if (autoSavePrefByWc.get(contents.id) && sessions.get(contents.id)?.path) {
-    if (await requestRendererSave(contents)) return true
+  // (never for a UniWork document: it only takes explicit saves, so it gets the normal prompt)
+  const autoSavePath = sessions.get(contents.id)?.path
+  if (autoSavePrefByWc.get(contents.id) && autoSavePath && !uniworkIsBound(autoSavePath)) {
+    if (await requestRendererSave(contents, 'auto')) return true
   }
   const options = {
     type: 'warning' as const,
@@ -4446,9 +4469,27 @@ export function registerSlidesIpc(): void {
     )
   })
 
-  ipcMain.handle('slides:save', async (e) => {
+  // UniWork seam: whether this webContents' own document is a UniWork working
+  // copy (AutoSave forced off) and whether it is view-only (Save disabled)
+  ipcMain.handle('slides:uniwork-state', (e) => {
+    const path = sessions.get(e.sender.id)?.path || null
+    return { bound: uniworkIsBound(path), readOnly: uniworkIsReadOnly(path) }
+  })
+
+  ipcMain.handle('slides:save', async (e, rawOrigin?: unknown) => {
     const session = sessions.get(e.sender.id)
     if (!session) return { ok: false, error: 'no file open' }
+    const pathBefore = session.path || null
+    const uniwork = pathBefore
+      ? uniworkSaveDecision({
+          kind: 'save',
+          origin: parseUniworkSaveOrigin(rawOrigin),
+          currentPath: pathBefore,
+          targetPath: pathBefore,
+        })
+      : { write: true, fireHook: false }
+    // view-only UniWork document, or an AutoSave pass on one: no write, cancel shape
+    if (!uniwork.write) return { ok: false }
     // Untitled (new blank file): the first save lands silently in the drafts folder (Save As keeps its dialog)
     if (!session.path) {
       const draftsDir = getDraftsDir()
@@ -4469,6 +4510,7 @@ export function registerSlidesIpc(): void {
       // but the renderer still expects the render tree in the response.
       commitSaved(session.opened)
       if ((session.metaRev ?? 0) === metaRevAtSave) session.metaDirty = false
+      if (uniwork.fireHook) notifyUniworkUserSave(session.path)
       return {
         ok: true,
         path: session.path,
@@ -4489,6 +4531,16 @@ export function registerSlidesIpc(): void {
     }
     const r = await showSaveDialogWithMemory(dialog, parent, options, getDraftsDir())
     if (r.canceled || !r.filePath) return { ok: false }
+    // A view-only UniWork path is refused (cancel shape); picking the deck's own
+    // file is an explicit Save of it and reports a user save, any other target is
+    // a plain local copy
+    const uniwork = uniworkSaveDecision({
+      kind: 'save-as',
+      origin: 'user',
+      currentPath: session.path || null,
+      targetPath: r.filePath,
+    })
+    if (!uniwork.write) return { ok: false }
     try {
       const metaRevAtSave = session.metaRev ?? 0
       await savePptxToFile(session.opened, r.filePath)
@@ -4499,6 +4551,7 @@ export function registerSlidesIpc(): void {
       syncAttachedPaths(session, r.filePath)
       commitSaved(session.opened)
       if ((session.metaRev ?? 0) === metaRevAtSave) session.metaDirty = false
+      if (uniwork.fireHook) notifyUniworkUserSave(r.filePath)
       return {
         ok: true,
         path: r.filePath,
@@ -5169,4 +5222,12 @@ export function startSlidesStandalone(): void {
   app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') app.quit()
   })
+}
+
+export type { UniworkDocumentPolicy } from './uniwork-policy'
+export { setUniworkDocumentPolicy } from './uniwork-policy'
+
+/** Fires once per explicit user Save that wrote to the same path (UniWork seam). */
+export function setSlidesUserSaveHook(hook: ((path: string) => void) | null): void {
+  setUniworkUserSaveHook(hook)
 }

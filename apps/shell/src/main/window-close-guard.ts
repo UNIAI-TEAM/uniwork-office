@@ -7,6 +7,7 @@ import { requestPdfClose } from '../../../pdf/src/main/pdf-main'
 import { requestMarkdownClose } from '../../../markdown/src/main/markdown-main'
 import { requestHtmlClose } from '../../../html/src/main/html-main'
 import type { TabManager } from './tab-manager'
+import { confirmUniworkClose } from './uniwork-docs/close-guard'
 
 /**
  * Unsaved-changes guard for the shell window: closing the whole window walks
@@ -34,6 +35,7 @@ export function installShellCloseGuard(win: BrowserWindow, manager: TabManager):
     const dirtyHtml = manager.dirtyHtmlTabs()
     const dirtySlides = manager.dirtySlidesTabs()
     const docsTabs = manager.docsTabs()
+    const uniworkTabs = manager.uniworkGuardedTabs()
     // Nothing to protect, so let this close event through untouched. Cancelling
     // it and re-issuing win.close() would also cancel an in-flight app.quit();
     // on macOS, where window-all-closed does not quit, ⌘Q with a clean
@@ -45,7 +47,8 @@ export function installShellCloseGuard(win: BrowserWindow, manager: TabManager):
       dirtyMarkdown.length === 0 &&
       dirtyHtml.length === 0 &&
       dirtySlides.length === 0 &&
-      docsTabs.length === 0
+      docsTabs.length === 0 &&
+      uniworkTabs.length === 0
     ) {
       return
     }
@@ -82,6 +85,13 @@ export function installShellCloseGuard(win: BrowserWindow, manager: TabManager):
             if (!(await docsQueryDirty(tab.webContents))) continue
             manager.activateTab(tab.id)
             if (!(await requestDocsClose(tab.webContents, win))) return true
+          }
+          // after the module prompts: local changes not in UniWork yet
+          for (const tab of uniworkTabs) {
+            if (!(await confirmUniworkClose(tab.path))) {
+              manager.activateTab(tab.id)
+              return true
+            }
           }
           return false
         })()

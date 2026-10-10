@@ -194,6 +194,8 @@ export const he = {
   appFootnotePlaceholder: 'טקסט הערת שוליים…',
   appEndnotePlaceholder: 'טקסט הערת סיום…',
   appAutoSave: 'שמירה אוטומטית',
+  appAutoSaveUniworkTip:
+    'השמירה האוטומטית כבויה עבור מסמכי UniWork. השתמשו ב״שמירה״ כדי לשמור גרסה חדשה.',
   appAutoSaveTip: 'שמירה אוטומטית (כל 30 שניות וכאשר החלון מאבד מיקוד)',
   appSaveShortcutTip: 'שמירה (⌘S)',
   appUndo: 'ביטול פעולה',
@@ -513,6 +515,7 @@ export const he = {
   appWebNoHost: 'עורך זה פועל בתוך UniWork. פתח את המסמך מ-UniWork.',
   appSaveStateUnsaved: 'שינויים שלא נשמרו',
   appSaveStateSaved: 'כל השינויים נשמרו',
+  appSaveStateViewOnly: 'לצפייה בלבד',
   appSaving: 'שומר…',
   appSavingAs: 'שומר בשם…',
   appPdfPrintFallback: 'ייצוא PDF אינו זמין כאן; נעשה שימוש בתיבת ההדפסה של הדפדפן במקום',

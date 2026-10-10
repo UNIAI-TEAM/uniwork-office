@@ -1546,4 +1546,6 @@ export const nl = {
   appVisualFlipV: 'Verticaal spiegelen',
   appVisualFlipH: 'Horizontaal spiegelen',
   appCtxPasteVisual: 'Afbeelding of vorm plakken',
+  appAutoSaveUniworkOff:
+    'Automatisch opslaan staat uit voor UniWork-documenten. Gebruik Opslaan om een nieuwe versie op te slaan.',
 } satisfies Record<keyof typeof zh, string>

@@ -1446,4 +1446,6 @@ export const he = {
   appVisualFlipV: 'הפוך אנכית',
   appVisualFlipH: 'הפוך אופקית',
   appCtxPasteVisual: 'הדבק תמונה או צורה',
+  appAutoSaveUniworkOff:
+    'השמירה האוטומטית כבויה עבור מסמכי UniWork. השתמשו ב״שמירה״ כדי לשמור גרסה חדשה.',
 } satisfies Record<keyof typeof zh, string>

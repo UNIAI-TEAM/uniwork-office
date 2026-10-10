@@ -3,7 +3,7 @@ import { dirname } from 'node:path'
 import { setUniworkCloudStatus, setUniworkCloudTransport } from '@genoffice/ai-provider'
 import { safeExternalUrl } from '@genoffice/electron-utils'
 import { getUiLang } from '@genoffice/i18n'
-import { HOME_CHANNELS, type AccountEntitlements } from '../../shared/home-api'
+import { HOME_CHANNELS, type AccountEntitlements, type AccountStatus } from '../../shared/home-api'
 import { readAppSettings, writeAppSetting } from '../app-settings'
 import { createCredentialStore } from './credentials'
 import {
@@ -14,7 +14,7 @@ import {
 } from './deployment'
 import { createUniworkCloudClient, UniworkCloudController, type CloudAccountView } from './cloud'
 import { AccountManager } from './manager'
-import { createUniworkTransport } from './transport'
+import { TransportError, createUniworkTransport } from './transport'
 
 export {
   bindAuthCallbackEvents,
@@ -22,6 +22,8 @@ export {
   type AuthCallbackRouter,
 } from './routing'
 export type { AccountManager } from './manager'
+export { TransportError } from './transport'
+export type { DeploymentProfile } from './deployment'
 
 /**
  * Electron wiring for the UniWork account: one AccountManager per process,
@@ -169,6 +171,37 @@ export function startUniworkCloud(): void {
   setUniworkCloudTransport(controller.transport())
   onAccountEntitlementsChanged(() => void controller.refresh().catch(() => undefined))
   void controller.refresh().catch(() => undefined)
+}
+
+/**
+ * Runs `call` with a bearer token: a 401 (signalled by throwing
+ * TransportError('unauthorized')) refreshes once through the shared in-flight
+ * refresh and retries once. Rejects with TransportError('unauthorized') when
+ * there is no session. The token stays inside `call`.
+ */
+export function authorizedRequest<T>(call: (token: string) => Promise<T>): Promise<T> {
+  if (!manager) return Promise.reject(new TransportError('unauthorized'))
+  return manager.authorizedRequest(call)
+}
+
+/** account + device of the live session, or null when signed out (never a token) */
+export function uniworkSessionIdentity(): {
+  accountId: string
+  deviceSessionId: string
+  deploymentId: string
+} | null {
+  return manager?.sessionIdentity() ?? null
+}
+
+/** the active deployment profile, or null when none is configured */
+export function uniworkDeploymentProfile(): DeploymentProfile | null {
+  if (!settingsPath) return null
+  return uniworkAccount().deploymentProfile()
+}
+
+/** status pushes of the account (sign-in completion, sign-out) */
+export function onUniworkAccountStatus(listener: (status: AccountStatus) => void): () => void {
+  return uniworkAccount().onStatus(listener)
 }
 
 /**

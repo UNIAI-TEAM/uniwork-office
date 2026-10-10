@@ -207,6 +207,8 @@ export const ru = {
   appFootnotePlaceholder: 'Текст сноски…',
   appEndnotePlaceholder: 'Текст концевой сноски…',
   appAutoSave: 'Автосохранение',
+  appAutoSaveUniworkTip:
+    'Автосохранение отключено для документов UniWork. Нажмите «Сохранить», чтобы сохранить новую версию.',
   appAutoSaveTip: 'Автосохранение (каждые 30 секунд и при потере фокуса окном)',
   appSaveShortcutTip: 'Сохранить (⌘S)',
   appUndo: 'Отменить',
@@ -530,6 +532,7 @@ export const ru = {
   appWebNoHost: 'Этот редактор работает внутри UniWork. Откройте документ из UniWork.',
   appSaveStateUnsaved: 'Есть несохранённые изменения',
   appSaveStateSaved: 'Все изменения сохранены',
+  appSaveStateViewOnly: 'Только просмотр',
   appSaving: 'Сохранение…',
   appSavingAs: 'Сохранение как…',
   appPdfPrintFallback:

@@ -211,6 +211,8 @@ export const fr = {
   appFootnotePlaceholder: 'Texte de la note de bas de page…',
   appEndnotePlaceholder: 'Texte de la note de fin…',
   appAutoSave: 'Enregistrement automatique',
+  appAutoSaveUniworkTip:
+    'L’enregistrement automatique est désactivé pour les documents UniWork. Utilisez Enregistrer pour enregistrer une nouvelle version.',
   appAutoSaveTip:
     'Enregistrement automatique (toutes les 30 secondes et lorsque la fenêtre perd le focus)',
   appSaveShortcutTip: 'Enregistrer (⌘S)',
@@ -535,6 +537,7 @@ export const fr = {
   appWebNoHost: 'Cet éditeur fonctionne dans UniWork. Ouvrez le document depuis UniWork.',
   appSaveStateUnsaved: 'Modifications non enregistrées',
   appSaveStateSaved: 'Toutes les modifications sont enregistrées',
+  appSaveStateViewOnly: 'Lecture seule',
   appSaving: 'Enregistrement…',
   appSavingAs: 'Enregistrement sous…',
   appPdfPrintFallback:

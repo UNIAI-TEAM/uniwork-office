@@ -28,6 +28,8 @@ export const pl = {
   replaceAll: 'Zamień wszystko',
   findTip: 'Znajdź i zamień (⌘F)',
   autoSaveTip: 'Zapisuje co 30 sekund i gdy okno traci fokus',
+  autoSaveUniworkOff:
+    'Autozapis jest wyłączony dla dokumentów UniWork. Użyj opcji Zapisz, aby zapisać nową wersję.',
   zoom: 'Powiększenie',
   zoomIn: 'Powiększ',
   zoomOut: 'Pomniejsz',

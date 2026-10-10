@@ -205,6 +205,8 @@ export const id = {
   appFootnotePlaceholder: 'Teks catatan kaki…',
   appEndnotePlaceholder: 'Teks catatan akhir…',
   appAutoSave: 'Simpan Otomatis',
+  appAutoSaveUniworkTip:
+    'Simpan otomatis dinonaktifkan untuk dokumen UniWork. Gunakan Simpan untuk menyimpan versi baru.',
   appAutoSaveTip: 'Simpan otomatis (setiap 30 detik dan saat jendela kehilangan fokus)',
   appSaveShortcutTip: 'Simpan (⌘S)',
   appUndo: 'Urungkan',
@@ -527,6 +529,7 @@ export const id = {
   appWebNoHost: 'Editor ini berjalan di dalam UniWork. Buka dokumen dari UniWork.',
   appSaveStateUnsaved: 'Ada perubahan yang belum disimpan',
   appSaveStateSaved: 'Semua perubahan tersimpan',
+  appSaveStateViewOnly: 'Hanya lihat',
   appSaving: 'Menyimpan…',
   appSavingAs: 'Menyimpan sebagai…',
   appPdfPrintFallback:

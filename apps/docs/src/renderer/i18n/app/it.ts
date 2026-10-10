@@ -209,6 +209,8 @@ export const it = {
   appFootnotePlaceholder: 'Testo della nota a piè di pagina…',
   appEndnotePlaceholder: 'Testo della nota di chiusura…',
   appAutoSave: 'Salvataggio automatico',
+  appAutoSaveUniworkTip:
+    'Il salvataggio automatico è disattivato per i documenti UniWork. Usa Salva per salvare una nuova versione.',
   appAutoSaveTip: 'Salvataggio automatico (ogni 30 secondi e quando la finestra perde il focus)',
   appSaveShortcutTip: 'Salva (⌘S)',
   appUndo: 'Annulla',
@@ -530,6 +532,7 @@ export const it = {
   appWebNoHost: 'Questo editor funziona all’interno di UniWork. Apri il documento da UniWork.',
   appSaveStateUnsaved: 'Modifiche non salvate',
   appSaveStateSaved: 'Tutte le modifiche salvate',
+  appSaveStateViewOnly: 'Sola lettura',
   appSaving: 'Salvataggio…',
   appSavingAs: 'Salvataggio con nome…',
   appPdfPrintFallback:

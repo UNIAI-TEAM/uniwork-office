@@ -553,6 +553,12 @@ html.genoffice-popover-open .ribbon-tabs {
   display: none;
 }
 
+/* forced off for a UniWork document: still shown, not switchable */
+.autosave-toggle.disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
 .autosave-knob {
   width: 26px;
   height: 14px;

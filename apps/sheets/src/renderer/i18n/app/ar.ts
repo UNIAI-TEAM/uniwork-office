@@ -1469,4 +1469,5 @@ export const ar = {
   appVisualFlipV: 'قلب رأسي',
   appVisualFlipH: 'قلب أفقي',
   appCtxPasteVisual: 'لصق صورة أو شكل',
+  appAutoSaveUniworkOff: 'الحفظ التلقائي متوقف لمستندات UniWork. استخدم «حفظ» لحفظ إصدار جديد.',
 } satisfies Record<keyof typeof zh, string>

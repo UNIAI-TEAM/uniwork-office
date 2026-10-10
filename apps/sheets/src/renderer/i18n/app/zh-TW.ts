@@ -1414,4 +1414,5 @@ export const zhTW = {
   appVisualFlipV: '垂直翻轉',
   appVisualFlipH: '水平翻轉',
   appCtxPasteVisual: '貼上圖片/圖形',
+  appAutoSaveUniworkOff: 'UniWork 文件已關閉自動儲存。請使用「儲存」儲存新版本。',
 } satisfies Record<keyof typeof zh, string>

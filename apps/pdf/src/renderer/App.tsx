@@ -122,6 +122,9 @@ import {
 } from '@genoffice/ui'
 import { useI18n } from './i18n/locale'
 import { useAutosave } from './useAutosave'
+import { drainedOrigin, forcesBoundSave, type SaveOrigin } from './uniwork-save'
+import { queryPdfUniworkState } from './uniwork-state'
+import { isUniworkRefusal } from '../shared/uniwork-refusal'
 import type {
   AnnotDeleteInput,
   DrawingInput,
@@ -134,6 +137,7 @@ import type {
   NoteEditInput,
   PageImageRef,
   PdfConvertFormat,
+  PdfUniworkState,
   StaticFormFillRecord,
   StampInput,
   TextEditFailure,
@@ -1350,8 +1354,31 @@ export default function App() {
     })
   }, [])
 
+  /** UniWork document state of the open file (bound working copy / view only); all false for local files */
+  const [uniwork, setUniwork] = useState<PdfUniworkState>({ bound: false, readOnly: false })
+  useEffect(() => {
+    let live = true
+    if (!filePath) {
+      setUniwork({ bound: false, readOnly: false })
+      return
+    }
+    // Re-queried whenever the open path changes (open, rename, redaction copy). The
+    // previous answer stays until the new one arrives: a view-only copy must not turn
+    // editable, nor a bound one autosave, in the gap.
+    // A missing method or a failed query reads as a plain local file.
+    void queryPdfUniworkState(window.pdfApi, filePath).then((state) => {
+      if (live) setUniwork(state)
+    })
+    return () => {
+      live = false
+    }
+  }, [filePath])
+
   /** pdf-lib cannot write encrypted files, including owner-protected files that open without a password. */
-  const readOnly = status === 'ready' && (passwordRef.current !== undefined || documentEncrypted)
+  const encryptedReadOnly =
+    status === 'ready' && (passwordRef.current !== undefined || documentEncrypted)
+  /** View-only UniWork documents reuse the same read-only mode (edit tools and Save off) */
+  const readOnly = encryptedReadOnly || uniwork.readOnly
 
   useEffect(() => {
     if (
@@ -3504,9 +3531,13 @@ export default function App() {
       post-save reload has committed. Running the follow-up straight off the completion
       promise would reuse the pre-reload render's closure — dirty still true, the saved
       edits still listed — and write them onto the file a second time. */
-  const queuedSavesRef = useRef<{ autosave: boolean; resolve: (ok: boolean) => void }[]>([])
+  const queuedSavesRef = useRef<{ origin: SaveOrigin; resolve: (ok: boolean) => void }[]>([])
+  /** Origin of the save that most recently started writing (a queued save checks it) */
+  const lastWriteOriginRef = useRef<SaveOrigin | null>(null)
 
-  const save = (autosave = false): Promise<boolean> => {
+  /** `user` = explicit Save (button, ⌘S, menu, close prompt); `auto` = autosave tick/blur;
+      `internal` = flush before a page tool. Main fires the UniWork user-save hook only for `user`. */
+  const save = (origin: SaveOrigin = 'user', afterUserSave = false): Promise<boolean> => {
     if (redactionRequestInFlightRef.current) return Promise.resolve(false)
     // A save is already writing: queue behind it instead of reporting failure — the
     // close prompt's "Save" and ⌘S regularly collide with the blur-triggered autosave
@@ -3514,7 +3545,7 @@ export default function App() {
     // covers two triggers landing in the same frame, where the saveState snapshot
     // still reads 'idle' for both.
     if (saveInFlightRef.current !== null) {
-      return new Promise<boolean>((resolve) => queuedSavesRef.current.push({ autosave, resolve }))
+      return new Promise<boolean>((resolve) => queuedSavesRef.current.push({ origin, resolve }))
     }
     // Fold an open floating-editor draft in first: keyboard save and autosave can land
     // mid-typing, and the post-save reload closes the editor — without this the
@@ -3527,9 +3558,19 @@ export default function App() {
       edits !== textEdits ||
       noteFlush.drawings !== drawings ||
       noteFlush.noteEdits !== noteEdits
-    if (!anythingToSave || !filePath) return Promise.resolve(!anythingToSave)
+    // A UniWork-bound (editable) document saves on every explicit Save, even when
+    // clean, so a retry after a failed upload still reaches UniWork
+    const forceBound = forcesBoundSave({
+      origin,
+      bound: uniwork.bound,
+      readOnly: uniwork.readOnly,
+      pendingRedactions: redactions.length,
+      afterUserSave,
+    })
+    if (!filePath || (!anythingToSave && !forceBound)) return Promise.resolve(!anythingToSave)
+    lastWriteOriginRef.current = origin
     // An explicit save opts this file into autosave
-    if (!autosave) savedOnceRef.current = true
+    if (origin !== 'auto') savedOnceRef.current = true
     // What this save writes — the post-save reload subtracts exactly this, keeping
     // any edits the user makes while the write is in flight
     const snapshot: SavedSnapshot = {
@@ -3551,10 +3592,22 @@ export default function App() {
     inFlightPageMapRef.current = snapshot.pageMap
     const run = (async (): Promise<boolean> => {
       setSaveState('saving')
-      const result = await window.pdfApi.save({ path: filePath, ...editsPayload(edits, noteFlush) })
+      const result = await window.pdfApi.save({
+        path: filePath,
+        ...editsPayload(edits, noteFlush),
+        origin,
+      })
       if (!result.ok) {
-        opFailed(result.error)
+        // main declining an autosave tick that raced the document's UniWork state is
+        // not a failure the user can act on
+        if (!(origin === 'auto' && isUniworkRefusal(result.error))) opFailed(result.error)
         return false
+      }
+      if (!anythingToSave) {
+        // Forced save of a clean bound document: the file is unchanged, nothing to reload
+        setSaveState('saved')
+        setTimeout(() => setSaveState((s) => (s === 'saved' ? 'idle' : s)), 2000)
+        return true
       }
       if (result.skippedTextEdits && result.skippedTextEdits.length > 0) {
         noticeSkippedEdits(result.skippedTextEdits)
@@ -3624,8 +3677,8 @@ export default function App() {
     const queued = queuedSavesRef.current
     queuedSavesRef.current = []
     // One explicit request makes the whole drained batch explicit (autosave opt-in)
-    const autosaveOnly = queued.every((q) => q.autosave)
-    void save(autosaveOnly).then((ok) => {
+    const origin = drainedOrigin(queued.map((q) => q.origin))
+    void save(origin, lastWriteOriginRef.current === 'user').then((ok) => {
       for (const q of queued) q.resolve(ok)
     })
   })
@@ -3798,9 +3851,11 @@ export default function App() {
       saveInFlightRef.current === null &&
       filePath !== '' &&
       !readOnly &&
+      // UniWork-bound copies never autosave: only an explicit Save writes them
+      !uniwork.bound &&
       !saveAsFlowRef.current &&
       !redactionRequestInFlightRef.current,
-    () => void save(true),
+    () => void save('auto'),
   )
 
   // ── Page operations ──
@@ -5065,7 +5120,7 @@ export default function App() {
       opFailed(t('redactStructureBlocked'))
       return undefined
     }
-    if (dirty && !(await save())) return undefined
+    if (dirty && !(await save('internal'))) return undefined
     return fn()
   }
 
@@ -5682,7 +5737,7 @@ export default function App() {
     }
     // A file we created ourselves is safe to keep autosaving from here on
     savedOnceRef.current = true
-    void save(true)
+    void save('auto')
   }
 
   /** Internal destination of a Link annotation → jump to that page */
@@ -5760,13 +5815,13 @@ export default function App() {
 
   // Main process picked "Save" in the close prompt → save and report the result
   useEffect(() => {
-    return window.pdfApi.onCloseSaveRequest(() => {
+    return window.pdfApi.onCloseSaveRequest((request) => {
       if (redactions.length > 0) {
         showNotice(t('redactSaveAsHint'))
         window.pdfApi.sendCloseSaveResult(false)
         return
       }
-      void save().then((ok) => window.pdfApi.sendCloseSaveResult(ok))
+      void save(request.origin).then((ok) => window.pdfApi.sendCloseSaveResult(ok))
     })
   })
 
@@ -6267,7 +6322,11 @@ export default function App() {
             className="qa-btn"
             data-tip={`${t('save')} (${platformShortcuts('⌘S')})`}
             aria-label={t('save')}
-            disabled={!dirty || saveState === 'saving'}
+            disabled={
+              (!dirty && !(uniwork.bound && !uniwork.readOnly)) ||
+              uniwork.readOnly ||
+              saveState === 'saving'
+            }
             onClick={() => void save()}
           >
             <IconSave />
@@ -6317,7 +6376,7 @@ export default function App() {
             </button>
           )}
           <span className="ribbon-tabs-spacer" />
-          {readOnly && <span className="tb-readonly">{t('roEncrypted')}</span>}
+          {encryptedReadOnly && <span className="tb-readonly">{t('roEncrypted')}</span>}
           {/* The file on disk is only touched by an explicit save until then. */}
           {saveState === 'saving' ? (
             <span className="tb-save-pending">{t('saving')}</span>

@@ -1,0 +1,93 @@
+import { useEffect, useState } from 'react'
+
+/**
+ * UniWork seam, renderer half. The main process answers whether the open file
+ * is a UniWork working copy (bound: file autosave is forced off, Save always
+ * writes) and whether the user may only view it. A plain local file (or no
+ * shell policy) reads as neither, so nothing changes.
+ */
+export interface UniworkDocState {
+  /** the path this answer belongs to: a stale answer never applies to a new path */
+  path: string | null
+  bound: boolean
+  readOnly: boolean
+}
+
+export const NO_UNIWORK_STATE: UniworkDocState = { path: null, bound: false, readOnly: false }
+
+/** the answer for `path`, or "plain local file" while it is unknown / for another path */
+export function uniworkStateFor(
+  state: UniworkDocState,
+  path: string | null | undefined,
+): { bound: boolean; readOnly: boolean } {
+  if (!path || state.path !== path) return { bound: false, readOnly: false }
+  return { bound: state.bound, readOnly: state.readOnly }
+}
+
+/**
+ * Whether a renderer save request may run. Autosave never runs on a bound
+ * document; an in-place Save never runs on a view-only one (Save As to
+ * another path stays allowed and produces a plain local copy). Saves of a
+ * pathless document are never gated: it cannot be a UniWork document.
+ */
+export function uniworkAllowsSave(
+  state: { bound: boolean; readOnly: boolean },
+  saveAs: boolean,
+  auto: boolean,
+): boolean {
+  if (saveAs) return true
+  if (state.readOnly) return false
+  if (auto && state.bound) return false
+  return true
+}
+
+/** Query main for the document at `path`; re-queried whenever the path changes. */
+export function useUniworkDocState(path: string | null | undefined): UniworkDocState {
+  const [state, setState] = useState<UniworkDocState>(NO_UNIWORK_STATE)
+  useEffect(() => {
+    if (!path) {
+      setState(NO_UNIWORK_STATE)
+      return
+    }
+    let live = true
+    const query = window.desktop.uniworkState?.(path)
+    if (!query) return
+    query.then(
+      (answer) => {
+        if (!live) return
+        setState({ path, bound: answer?.bound === true, readOnly: answer?.readOnly === true })
+      },
+      () => {
+        /* no answer: keep treating it as a plain local file */
+      },
+    )
+    return () => {
+      live = false
+    }
+  }, [path])
+  return state
+}
+
+/**
+ * Switch the editor between editable and read-only without counting it as an
+ * edit. TipTap's setEditable emits `update` by default, and the renderer's
+ * onUpdate marks the document dirty: a view-only UniWork document (switched
+ * to read-only once main answers) would open as "Unsaved changes".
+ */
+export function setEditorEditable(
+  editor: { setEditable(editable: boolean, emitUpdate?: boolean): void },
+  editable: boolean,
+): void {
+  editor.setEditable(editable, false)
+}
+
+/** Footer save-state label: a view-only document is never "unsaved", it has no save state. */
+export function saveStateLabel(
+  hasUnsavedChanges: boolean,
+  readOnly: boolean,
+): { key: 'appSaveStateViewOnly' | 'appSaveStateUnsaved' | 'appSaveStateSaved'; unsaved: boolean } {
+  if (readOnly) return { key: 'appSaveStateViewOnly', unsaved: false }
+  return hasUnsavedChanges
+    ? { key: 'appSaveStateUnsaved', unsaved: true }
+    : { key: 'appSaveStateSaved', unsaved: false }
+}

@@ -52,6 +52,7 @@ import {
   type UniverRuntime,
   type UniverWorksheet,
 } from './univer-state'
+import { viewOnlyLock } from './view-only-lock'
 import { applyChangePlan, planFromOps, type OpExecutorContext } from './op-executor'
 import { installSheetsMcpBridge, type McpSheetHandlers } from './mcp-bridge'
 import { renameChartRefsForSheet } from './workbook-ops'
@@ -402,7 +403,12 @@ import {
 import { handleExportCsv as handleExportCsvImpl, type CsvExportContext } from './csv-export'
 import { effectivePageBreaks, installPageBreakPreview } from './page-break-preview'
 import { mapProtectedRanges } from './protected-ranges'
-import { handleSave as handleSaveImpl, type SaveContext, type SaveOutcome } from './save-actions'
+import {
+  handleSave as handleSaveImpl,
+  uniworkAutoSaveLocked,
+  type SaveContext,
+  type SaveOutcome,
+} from './save-actions'
 import {
   applyChartEdit as applyChartEditImpl,
   applyShapeEdit as applyShapeEditImpl,
@@ -617,15 +623,19 @@ export function App({
     )
   }, [pendingEdits])
   const [autoSave, setAutoSave] = useAutoSavePref('ai-sheets-auto-save', window.desktopApi)
+  // A UniWork document saves only on an explicit Save: AutoSave is forced off
+  // for it (the stored preference is left alone for local files).
+  const autoSaveLocked = uniworkAutoSaveLocked(workbookFile)
+  const autoSaveOn = autoSave && !autoSaveLocked
   // Ref mirror for callbacks captured when an AI run starts
-  const autoSaveRef = useRef(autoSave)
-  autoSaveRef.current = autoSave
+  const autoSaveRef = useRef(autoSaveOn)
+  autoSaveRef.current = autoSaveOn
   const saveGateRef = useRef(createSaveGate())
   // AutoSave tick (docs/slides parity): every 30 s and on window blur, flush
   // pending edits of the open workbook. The journal is read at tick time so
   // the interval stays stable; demo mode has no backing file and is skipped.
   useEffect(() => {
-    if (!autoSave) return
+    if (!autoSaveOn) return
     const tick = () => {
       const state = lazyWorkbookRef.current
       // Never while the in-cell editor is open (saving reloads the workbook
@@ -656,7 +666,7 @@ export function App({
       window.clearInterval(id)
       window.removeEventListener('blur', tick)
     }
-  }, [autoSave])
+  }, [autoSaveOn])
 
   // Crash-recovery copy: independent of the AutoSave pill — a dirty
   // workbook gets a real .xlsx copy under userData every 30 s, so a force-quit or a
@@ -4359,6 +4369,10 @@ export function App({
           opts?.onInitialRangeLoaded?.()
           return
         }
+        // View-only UniWork document: Univer's workbook permission blocks
+        // editing commands (the main process refuses a Save regardless). The
+        // lock opens around the loader's own installs so the data still renders.
+        viewOnlyLock.set(selected.readOnly ? workbook : null)
         // Register existing file tables under their displayName so Univer
         // renders filter dropdowns and resolves structured references. The
         // journal stays empty for file tables, so failures are swallowed —
@@ -4560,6 +4574,8 @@ export function App({
     // written beside a real save would outlive it as a phantom Restore prompt.
     const gate = saveGateRef.current
     if (mode === 'recovery' && gate.busy) return { ok: false }
+    // View-only UniWork document: Save is unavailable (Save As stays open).
+    if (mode === 'save' && lazyWorkbookRef.current?.file.readOnly === true) return { ok: false }
     return gate.run(async () => {
       if (!(await commitActiveEditor())) return { ok: false }
       return handleSaveImpl(saveContext(), mode, quiet, explicitTarget)
@@ -5059,13 +5075,19 @@ export function App({
         zoomPercent={zoomPercent}
         statusBarFuncs={statusBarFuncs}
         onToggleStatusBarFunc={toggleStatusBarStat}
-        canSave={pendingEdits > 0 || workbookFile?.unsavedNew === true}
+        canSave={
+          workbookFile?.readOnly !== true &&
+          (pendingEdits > 0 ||
+            workbookFile?.unsavedNew === true ||
+            workbookFile?.uniworkBound === true)
+        }
         onSave={() => void handleSave('save')}
         canSaveAs={workbookFile !== null}
         onSaveAs={() => void handleSave('save-as')}
         onRedo={handleRedo}
-        autoSave={autoSave}
+        autoSave={autoSaveOn}
         onAutoSaveChange={setAutoSave}
+        autoSaveLockedTip={autoSaveLocked ? t('appAutoSaveUniworkOff') : null}
         selectedChart={selectedChart}
         selectedShape={selectedShape}
         selectedVisualKind={

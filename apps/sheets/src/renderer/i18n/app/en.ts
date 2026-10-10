@@ -1486,4 +1486,5 @@ export const en = {
   appVisualFlipV: 'Flip Vertical',
   appVisualFlipH: 'Flip Horizontal',
   appCtxPasteVisual: 'Paste Picture or Shape',
+  appAutoSaveUniworkOff: 'AutoSave is off for UniWork documents. Use Save to save a new version.',
 } satisfies Record<keyof typeof zh, string>

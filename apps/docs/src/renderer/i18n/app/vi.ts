@@ -201,6 +201,8 @@ export const vi = {
   appFootnotePlaceholder: 'Văn bản chú thích cuối trang…',
   appEndnotePlaceholder: 'Văn bản chú thích cuối tài liệu…',
   appAutoSave: 'Tự động lưu',
+  appAutoSaveUniworkTip:
+    'Tự động lưu đã tắt cho tài liệu UniWork. Hãy dùng Lưu để lưu phiên bản mới.',
   appAutoSaveTip: 'Tự động lưu (mỗi 30 giây và khi cửa sổ mất tiêu điểm)',
   appSaveShortcutTip: 'Lưu (⌘S)',
   appUndo: 'Hoàn tác',
@@ -521,6 +523,7 @@ export const vi = {
   appWebNoHost: 'Trình soạn thảo này chạy bên trong UniWork. Hãy mở tài liệu từ UniWork.',
   appSaveStateUnsaved: 'Có thay đổi chưa lưu',
   appSaveStateSaved: 'Đã lưu mọi thay đổi',
+  appSaveStateViewOnly: 'Chỉ xem',
   appSaving: 'Đang lưu…',
   appSavingAs: 'Đang lưu thành…',
   appPdfPrintFallback:

@@ -203,6 +203,8 @@ export const hi = {
   appFootnotePlaceholder: 'पाद टिप्पणी का टेक्स्ट…',
   appEndnotePlaceholder: 'अंत टिप्पणी का टेक्स्ट…',
   appAutoSave: 'स्वतः सहेजना',
+  appAutoSaveUniworkTip:
+    'UniWork दस्तावेज़ों के लिए ऑटो सेव बंद है। नया संस्करण सहेजने के लिए ‘सहेजें’ का उपयोग करें।',
   appAutoSaveTip: 'स्वतः सहेजना (हर 30 सेकंड में और विंडो का फ़ोकस हटने पर)',
   appSaveShortcutTip: 'सहेजें (⌘S)',
   appUndo: 'पूर्ववत करें',
@@ -524,6 +526,7 @@ export const hi = {
   appWebNoHost: 'यह संपादक UniWork के अंदर चलता है। UniWork से दस्तावेज़ खोलें।',
   appSaveStateUnsaved: 'बिना सहेजे गए बदलाव',
   appSaveStateSaved: 'सभी बदलाव सहेजे गए',
+  appSaveStateViewOnly: 'केवल देखने के लिए',
   appSaving: 'सहेजा जा रहा है…',
   appSavingAs: 'इस रूप में सहेजा जा रहा है…',
   appPdfPrintFallback:

@@ -61,6 +61,10 @@ const VIEW_ICON: Record<ViewMode, (p: { size?: number }) => React.JSX.Element> =
 
 interface Props {
   disabled: boolean
+  /** a UniWork copy: AutoSave is forced off and Save always writes, even when clean */
+  uniworkBound?: boolean
+  /** a view-only UniWork copy: editing and Save are off, Save As still makes a local copy */
+  readOnly?: boolean
   dirty: boolean
   onSave: () => void
   onSaveAs: () => void
@@ -200,7 +204,10 @@ export function Ribbon(p: Props) {
     p.onInsert(kind, opts)
   }
 
-  const off = p.disabled
+  const notReady = p.disabled
+  const off = notReady || !!p.readOnly
+  // a view-only copy can still be searched (the find panel itself stays read-only)
+  const findOff = notReady
   const insertOff = off || !p.canInsert
 
   return (
@@ -211,7 +218,7 @@ export function Ribbon(p: Props) {
           className="qa-btn"
           data-tip={t('save')}
           aria-label={t('save')}
-          disabled={off || !p.dirty}
+          disabled={off || (!p.dirty && !p.uniworkBound)}
           onMouseDown={(e) => e.preventDefault()}
           onClick={p.onSave}
         >
@@ -222,7 +229,7 @@ export function Ribbon(p: Props) {
           className="qa-btn qa-save-as"
           data-tip={t('saveAs')}
           aria-label={t('saveAs')}
-          disabled={off}
+          disabled={notReady}
           onMouseDown={(e) => e.preventDefault()}
           onClick={p.onSaveAs}
         >
@@ -255,18 +262,22 @@ export function Ribbon(p: Props) {
           className="qa-btn"
           data-tip={t('findTip')}
           aria-label={t('findTip')}
-          disabled={off}
+          disabled={findOff}
           onMouseDown={(e) => e.preventDefault()}
           onClick={p.onFind}
         >
           <IconSearch size={16} />
         </button>
-        <label className={`autosave-toggle${p.autoSave ? ' on' : ''}`} data-tip={t('autoSaveTip')}>
+        <label
+          className={`autosave-toggle${p.autoSave && !p.uniworkBound ? ' on' : ''}`}
+          data-tip={t(p.uniworkBound ? 'autoSaveUniworkOff' : 'autoSaveTip')}
+        >
           <span className="autosave-knob" />
           <span className="autosave-text">{t('autoSave')}</span>
           <input
             type="checkbox"
-            checked={p.autoSave}
+            checked={p.autoSave && !p.uniworkBound}
+            disabled={p.uniworkBound}
             onChange={(e) => p.onToggleAutoSave(e.target.checked)}
           />
         </label>

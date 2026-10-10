@@ -1528,4 +1528,6 @@ export const ko = {
   appVisualFlipV: '상하 대칭',
   appVisualFlipH: '좌우 대칭',
   appCtxPasteVisual: '그림/도형 붙여넣기',
+  appAutoSaveUniworkOff:
+    'UniWork 문서에서는 자동 저장이 꺼져 있습니다. 새 버전을 저장하려면 ‘저장’을 사용하세요.',
 } satisfies Record<keyof typeof zh, string>

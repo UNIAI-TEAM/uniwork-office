@@ -1,4 +1,11 @@
 import {
+  notifyUniworkUserSave,
+  setUniworkUserSaveHook,
+  uniworkIsBound,
+  uniworkIsReadOnly,
+  uniworkSaveDecision,
+} from './uniwork-policy'
+import {
   existsSync,
   mkdirSync,
   readFileSync,
@@ -91,6 +98,7 @@ import type {
   PrintHtmlRequest,
   PrintResult,
   SaveHtmlRequest,
+  UniworkViewState,
   SaveHtmlResult,
   SaveMode,
 } from '../shared/ipc'
@@ -837,6 +845,8 @@ const previewTextByWc = new Map<number, string>()
 const closeSaveWaiters = new Map<number, (ok: boolean) => void>()
 /** Resolvers for menu-triggered saves, resolved when the renderer's save invoke completes */
 const saveWaiters = new Map<number, (ok: boolean) => void>()
+/** Views whose next save was started by htmlSaveToPath (agent/MCP), not by the user */
+const mcpSaveByWc = new Set<number>()
 /** Resolvers for MCP reads of the live document source, resolved by the renderer's reply */
 const readTextWaiters = new Map<number, (result: { text: string } | { error: string }) => void>()
 /** one read per tab at a time: concurrent callers share this promise */
@@ -1068,7 +1078,9 @@ export async function htmlDiscardPendingAssets(contents: WebContents): Promise<v
 export function requestHtmlSave(contents: WebContents, mode: SaveMode): Promise<boolean> {
   if (contents.isDestroyed()) return Promise.resolve(false)
   if (presentOwnerByWc.has(contents.id)) return Promise.resolve(true)
-  if (mode === 'save' && !dirtyByWc.has(contents.id) && savePathByWc.has(contents.id)) {
+  // a UniWork copy always writes on an explicit Save, so a Retry after a failed upload has bytes to send
+  const path = savePathByWc.get(contents.id)
+  if (mode === 'save' && !dirtyByWc.has(contents.id) && path && !uniworkIsBound(path)) {
     return Promise.resolve(true)
   }
   return new Promise<boolean>((resolve) => {
@@ -1157,11 +1169,14 @@ export function htmlSaveToPath(contents: WebContents, filePath: string): Promise
     }
     const timer = setTimeout(() => {
       saveWaiters.delete(wcId)
+      mcpSaveByWc.delete(wcId)
       restore()
       reject(new Error('timed out saving the document'))
     }, 120_000)
+    mcpSaveByWc.add(wcId)
     saveWaiters.set(wcId, (ok) => {
       clearTimeout(timer)
+      mcpSaveByWc.delete(wcId)
       if (ok) resolve()
       else {
         restore()
@@ -1373,11 +1388,17 @@ function registerHtmlIpc(): void {
     return await readFile(path, 'utf8')
   })
 
+  ipcMain.handle(HTML_CHANNELS.uniworkState, (e): UniworkViewState => {
+    const path = savePathByWc.get(e.sender.id)
+    return { bound: uniworkIsBound(path), readOnly: uniworkIsReadOnly(path) }
+  })
+
   ipcMain.handle(
     HTML_CHANNELS.save,
     async (e, request: SaveHtmlRequest): Promise<SaveHtmlResult> => {
       const waiter = saveWaiters.get(e.sender.id)
       saveWaiters.delete(e.sender.id)
+      const mcp = mcpSaveByWc.delete(e.sender.id)
       const done = (result: SaveHtmlResult): SaveHtmlResult => {
         waiter?.(result.ok && !('canceled' in result))
         return result
@@ -1407,6 +1428,21 @@ function registerHtmlIpc(): void {
         if (!target) return done({ ok: false, error: 'html: no save target' })
         const currentPath = pathAtRequest
         const isNewPath = currentPath !== target
+        const uniwork = uniworkSaveDecision({
+          origin: request.origin === 'auto' ? 'auto' : 'user',
+          mode,
+          currentPath,
+          targetPath: target,
+          mcp,
+        })
+        if (!uniwork.write) {
+          // AutoSave never writes a UniWork copy; a view-only copy is never written.
+          // An in-place Save of one ends quietly (the renderer lets main decide, so an
+          // agent save to another path still works); a Save As onto it says why.
+          if (request.origin === 'auto' || mode === 'save')
+            return done({ ok: true, canceled: true })
+          return done({ ok: false, error: 'html: this document is view only' })
+        }
         const imageSources = [...(request.imageSources ?? [])]
         const knownImageSources = new Set(imageSources)
         for (const source of extractHtmlAssetReferences(request.text)) {
@@ -1453,6 +1489,7 @@ function registerHtmlIpc(): void {
           }
         }
         if (isNewPath) fileSavedHook?.(e.sender, target)
+        if (uniwork.fireHook) notifyUniworkUserSave(target)
         return done({
           ok: true,
           path: target,
@@ -1844,6 +1881,7 @@ function grantAndTrack(wc: WebContents, openPath?: string | null): void {
     closeSaveWaiters.delete(wcId)
     saveWaiters.get(wcId)?.(false)
     saveWaiters.delete(wcId)
+    mcpSaveByWc.delete(wcId)
   })
 }
 
@@ -1981,4 +2019,12 @@ export function startHtmlStandalone(): void {
     void win.loadURL(rendererUrl(runtime.rendererUrl, 'html'))
   })
   app.on('window-all-closed', () => app.quit())
+}
+
+export type { UniworkDocumentPolicy } from './uniwork-policy'
+export { setUniworkDocumentPolicy } from './uniwork-policy'
+
+/** Fires once per explicit user Save that wrote to the same path (UniWork seam). */
+export function setHtmlUserSaveHook(hook: ((path: string) => void) | null): void {
+  setUniworkUserSaveHook(hook)
 }

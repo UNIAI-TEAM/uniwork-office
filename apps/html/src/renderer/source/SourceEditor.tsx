@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
-import { EditorState } from '@codemirror/state'
+import { Compartment, EditorState, type Extension } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import { redo, redoDepth, undo, undoDepth } from '@codemirror/commands'
 import { External, buildExtensions } from './cm-setup'
@@ -41,14 +41,19 @@ interface Props {
   onBeforeReplace?: () => void
   /** only the editor's own transactions report changes; External-annotated ones are already known to the caller */
   className?: string
+  /** a view-only document: typing is refused, programmatic replacements still apply */
+  readOnly?: boolean
 }
 
 export const SourceEditor = forwardRef<SourceEditorHandle, Props>(function SourceEditor(
-  { initialText, onChange, onCursor, onBeforeReplace, className },
+  { initialText, onChange, onCursor, onBeforeReplace, className, readOnly = false },
   ref,
 ) {
   const hostRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
+  const readOnlyCompartment = useRef(new Compartment())
+  const readOnlyRef = useRef(readOnly)
+  readOnlyRef.current = readOnly
   const findTargetRef = useRef<FindTarget | null>(null)
   const docListeners = useRef(new Set<() => void>())
   const onChangeRef = useRef(onChange)
@@ -63,11 +68,14 @@ export const SourceEditor = forwardRef<SourceEditorHandle, Props>(function Sourc
       parent: host,
       state: EditorState.create({
         doc: initialText,
-        extensions: buildExtensions((v) => {
-          const head = v.state.selection.main.head
-          const line = v.state.doc.lineAt(head)
-          onCursorRef.current({ line: line.number, col: head - line.from + 1, pos: head })
-        }),
+        extensions: [
+          buildExtensions((v) => {
+            const head = v.state.selection.main.head
+            const line = v.state.doc.lineAt(head)
+            onCursorRef.current({ line: line.number, col: head - line.from + 1, pos: head })
+          }),
+          readOnlyCompartment.current.of(readOnlyExtensions(readOnlyRef.current)),
+        ],
       }),
       dispatchTransactions: (trs, v) => {
         v.update(trs)
@@ -94,6 +102,12 @@ export const SourceEditor = forwardRef<SourceEditorHandle, Props>(function Sourc
     // the document is seeded once; later external replacements go through setDoc
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    viewRef.current?.dispatch({
+      effects: readOnlyCompartment.current.reconfigure(readOnlyExtensions(readOnly)),
+    })
+  }, [readOnly])
 
   useImperativeHandle(ref, () => ({
     setDoc(text) {
@@ -159,3 +173,7 @@ export const SourceEditor = forwardRef<SourceEditorHandle, Props>(function Sourc
 
   return <div ref={hostRef} className={className} />
 })
+
+function readOnlyExtensions(readOnly: boolean): Extension {
+  return readOnly ? [EditorState.readOnly.of(true), EditorView.editable.of(false)] : []
+}

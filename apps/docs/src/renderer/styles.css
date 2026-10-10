@@ -10423,6 +10423,12 @@ body.docs-crop-active
   left: 14px;
 }
 
+/* UniWork documents: AutoSave is forced off; the pill stays visible with a tooltip */
+.autosave-toggle.disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
 .autosave-text {
   font-size: 11px;
   color: var(--text-dim);

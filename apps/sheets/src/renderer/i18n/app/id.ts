@@ -1510,4 +1510,6 @@ export const id = {
   appVisualFlipV: 'Balik Vertikal',
   appVisualFlipH: 'Balik Horizontal',
   appCtxPasteVisual: 'Tempel Gambar atau Bentuk',
+  appAutoSaveUniworkOff:
+    'Simpan otomatis dinonaktifkan untuk dokumen UniWork. Gunakan Simpan untuk menyimpan versi baru.',
 } satisfies Record<keyof typeof zh, string>

@@ -1,8 +1,14 @@
-import { describe, expect, it } from 'vitest'
+import { mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { afterAll, describe, expect, it } from 'vitest'
 import {
   capStatPaths,
+  enrichWithUniwork,
   matchesExtFamily,
   normalizeRecentQuery,
+  pageStarredPaths,
+  type RecentUniworkLookup,
   STAT_PATHS_MAX,
 } from '../src/main/recent-files'
 
@@ -73,5 +79,50 @@ describe('capStatPaths', () => {
     expect(capped).toHaveLength(STAT_PATHS_MAX)
     expect(capped[0]).toBe('/f0.docx')
     expect(capped.at(-1)).toBe(`/f${STAT_PATHS_MAX - 1}.docx`)
+  })
+})
+
+describe('starred and search lists follow the UniWork lookup like recents', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'recent-uniwork-'))
+  const make = (name: string, mtime: number): string => {
+    const path = join(dir, name)
+    writeFileSync(path, 'x')
+    utimesSync(path, mtime, mtime)
+    return path
+  }
+  const local = make('local.docx', 300)
+  const mine = make('mine.docx', 200)
+  const other = make('other.docx', 100)
+  const source = {
+    documentId: 'doc-1',
+    workspaceId: 'ws-1',
+    title: 'Mine',
+    access: 'edit' as const,
+  }
+  const lookup: RecentUniworkLookup = (p) => (p === mine ? source : p === other ? 'hidden' : null)
+
+  afterAll(() => rmSync(dir, { recursive: true, force: true }))
+
+  it('hides another account copy and enriches a bound one in starred', () => {
+    const page = pageStarredPaths([other, mine, local], {}, lookup)
+    expect(page.entries.map((e) => e.path)).toEqual([local, mine])
+    expect(page.entries.find((e) => e.path === mine)?.uniwork).toEqual(source)
+    expect(page.entries.find((e) => e.path === local)?.uniwork).toBeUndefined()
+    expect(page.total).toBe(2)
+    expect(page.totalAll).toBe(2)
+  })
+
+  it('keeps starred untouched without a lookup', () => {
+    const page = pageStarredPaths([other, mine, local], {})
+    expect(page.entries).toHaveLength(3)
+    expect(page.entries.every((e) => e.uniwork === undefined)).toBe(true)
+  })
+
+  it('filters and enriches search hits', () => {
+    const hit = (path: string) => ({ path, name: path, snippet: null, needles: [] })
+    const out = enrichWithUniwork([hit(other), hit(mine), hit(local)], lookup)
+    expect(out.map((h) => h.path)).toEqual([mine, local])
+    expect(out[0].uniwork).toEqual(source)
+    expect(out[1].uniwork).toBeUndefined()
   })
 })

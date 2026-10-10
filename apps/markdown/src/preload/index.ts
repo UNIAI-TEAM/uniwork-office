@@ -21,6 +21,7 @@ const api: MarkdownApi = {
     ipcRenderer.send(MARKDOWN_CHANNELS.headlessExportDone, result),
   readFile: (path) => ipcRenderer.invoke(MARKDOWN_CHANNELS.readFile, path),
   save: (request) => ipcRenderer.invoke(MARKDOWN_CHANNELS.save, request),
+  uniworkState: () => ipcRenderer.invoke(MARKDOWN_CHANNELS.uniworkState),
   setDirty: (dirty) => ipcRenderer.send(MARKDOWN_CHANNELS.dirtyChanged, dirty),
   onSaveRequest: (handler) => {
     const listener = (_e: Electron.IpcRendererEvent, mode: SaveMode) => handler(mode)

@@ -1221,17 +1221,18 @@ body.vib .home {
   font-weight: 500;
 }
 
+/* eight cards: two rows of four, so every title and subtitle has room to read in
+   full (one row of eight cut "Open from UniWork" to "Open fro…") */
 .quick-cards {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 280px));
   align-items: stretch;
   gap: 10px;
 }
 
 .quick-card {
   position: relative;
-  flex: 1;
   min-width: 0;
-  max-width: 280px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -1279,23 +1280,27 @@ body.vib .home {
   gap: 2px 6px;
 }
 
+/* a long title wraps instead of being cut */
 .quick-title {
   min-width: 0;
-  overflow: hidden;
   font-size: 14px;
   font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
+/* up to two lines; the card's title attribute carries the full text */
 .quick-sub {
-  display: block;
+  display: -webkit-box;
   width: 100%;
   overflow: hidden;
   font-size: 12px;
+  line-height: 1.4;
   color: var(--text-muted);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow-wrap: anywhere;
 }
 
 .quick-folder {
@@ -1321,12 +1326,7 @@ body.vib .home {
 
 @media (max-width: 1100px) {
   .quick-cards {
-    flex-wrap: wrap;
-  }
-
-  .quick-card {
-    flex: 1 1 calc(50% - 5px);
-    max-width: none;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -7671,4 +7671,297 @@ html[dir='rtl'] body.mac .content {
 html[dir='rtl'] .quick-title-row {
   direction: ltr;
   unicode-bidi: isolate;
+}
+
+/* ── UniWork documents: Open from UniWork card, picker, recents badge ── */
+
+.quick-sub.attention {
+  color: var(--warning-text);
+}
+
+.quick-card:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.quick-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.uw-recent-badge {
+  display: inline-block;
+  padding: 1px 7px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.uw-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.modal.uw-pick {
+  width: min(640px, 92vw);
+  max-width: none;
+  max-height: min(640px, 86vh);
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+}
+
+.uw-pick-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px 8px;
+}
+
+.uw-pick-head h3 {
+  margin: 0;
+}
+
+.uw-pick-close {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.uw-pick-close:hover {
+  background: var(--hover);
+}
+
+.uw-pick-close:focus-visible,
+.uw-pick-search:focus-visible,
+.uw-pick-ws:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.uw-pick-tools {
+  display: flex;
+  gap: 8px;
+  padding: 0 20px 12px;
+}
+
+.uw-pick-ws {
+  flex: 0 1 200px;
+  min-width: 0;
+  height: 34px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+
+.uw-pick-search {
+  flex: 1;
+  min-width: 0;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+
+.uw-pick-body {
+  flex: 1;
+  min-height: 220px;
+  overflow-y: auto;
+  padding: 0 12px 12px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.uw-pick-heading {
+  padding: 10px 8px 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.uw-pick-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.uw-pick-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.uw-pick-row.active {
+  background: var(--hover);
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.uw-pick-row.disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.uw-pick-row.opening {
+  background: var(--hover);
+}
+
+.uw-pick-row-text {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.uw-pick-row-title {
+  overflow: hidden;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.uw-pick-row-meta {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.uw-pick-more {
+  display: block;
+  margin: 10px auto 0;
+}
+
+.uw-pick-more-error {
+  margin: 8px 8px 0;
+  color: var(--danger-text);
+  font-size: 12px;
+}
+
+.uw-pick-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.uw-pick-state-title {
+  margin: 0;
+  font-size: 14px;
+}
+
+.uw-pick-state-hint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.uw-pick-skeleton {
+  padding-top: 10px;
+}
+
+.uw-pick-skel-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+}
+
+.uw-skel {
+  display: block;
+  border-radius: 6px;
+  background: var(--bg-hover-strong);
+  animation: uw-skel-pulse 1.2s ease-in-out infinite;
+}
+
+.uw-skel-icon {
+  width: 24px;
+  height: 24px;
+}
+
+.uw-skel-lines {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.uw-skel-line {
+  width: 60%;
+  height: 10px;
+}
+
+.uw-skel-line.short {
+  width: 30%;
+}
+
+@keyframes uw-skel-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.uw-pick-progress,
+.uw-pick-open-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-top: 1px solid var(--border-subtle);
+  font-size: 13px;
+}
+
+.uw-pick-progress {
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
+}
+
+.uw-pick-open-error {
+  justify-content: space-between;
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+
+.uw-spinner {
+  flex-shrink: 0;
+  animation: account-spin 0.9s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .uw-skel,
+  .uw-spinner {
+    animation: none;
+  }
 }

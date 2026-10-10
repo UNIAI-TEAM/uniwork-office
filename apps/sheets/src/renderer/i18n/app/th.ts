@@ -1469,4 +1469,6 @@ export const th = {
   appVisualFlipV: 'พลิกแนวตั้ง',
   appVisualFlipH: 'พลิกแนวนอน',
   appCtxPasteVisual: 'วางรูปภาพหรือรูปร่าง',
+  appAutoSaveUniworkOff:
+    'การบันทึกอัตโนมัติปิดอยู่สำหรับเอกสาร UniWork ใช้ “บันทึก” เพื่อบันทึกเวอร์ชันใหม่',
 } satisfies Record<keyof typeof zh, string>

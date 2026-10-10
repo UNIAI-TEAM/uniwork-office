@@ -209,6 +209,8 @@ export const es = {
   appFootnotePlaceholder: 'Texto de la nota al pie…',
   appEndnotePlaceholder: 'Texto de la nota al final…',
   appAutoSave: 'Autoguardado',
+  appAutoSaveUniworkTip:
+    'El autoguardado está desactivado para los documentos de UniWork. Usa Guardar para guardar una versión nueva.',
   appAutoSaveTip: 'Autoguardado (cada 30 segundos y cuando la ventana pierde el foco)',
   appSaveShortcutTip: 'Guardar (⌘S)',
   appUndo: 'Deshacer',
@@ -530,6 +532,7 @@ export const es = {
   appWebNoHost: 'Este editor funciona dentro de UniWork. Abre el documento desde UniWork.',
   appSaveStateUnsaved: 'Cambios sin guardar',
   appSaveStateSaved: 'Todos los cambios guardados',
+  appSaveStateViewOnly: 'Solo lectura',
   appSaving: 'Guardando…',
   appSavingAs: 'Guardando como…',
   appPdfPrintFallback:

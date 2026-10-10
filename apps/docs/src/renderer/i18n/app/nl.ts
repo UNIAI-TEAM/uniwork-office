@@ -212,6 +212,8 @@ export const nl = {
   appFootnotePlaceholder: 'Voetnoottekst…',
   appEndnotePlaceholder: 'Eindnoottekst…',
   appAutoSave: 'Automatisch opslaan',
+  appAutoSaveUniworkTip:
+    'Automatisch opslaan staat uit voor UniWork-documenten. Gebruik Opslaan om een nieuwe versie op te slaan.',
   appAutoSaveTip: 'Automatisch opslaan (elke 30 seconden en wanneer het venster de focus verliest)',
   appSaveShortcutTip: 'Opslaan (⌘S)',
   appUndo: 'Ongedaan maken',
@@ -535,6 +537,7 @@ export const nl = {
   appWebNoHost: 'Deze editor werkt binnen UniWork. Open het document vanuit UniWork.',
   appSaveStateUnsaved: 'Niet-opgeslagen wijzigingen',
   appSaveStateSaved: 'Alle wijzigingen opgeslagen',
+  appSaveStateViewOnly: 'Alleen weergave',
   appSaving: 'Opslaan…',
   appSavingAs: 'Opslaan als…',
   appPdfPrintFallback:

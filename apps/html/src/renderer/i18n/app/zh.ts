@@ -27,6 +27,7 @@ export const zh = {
   replaceAll: '全部替换',
   findTip: '查找和替换 (⌘F)',
   autoSaveTip: '每 30 秒及窗口失焦时自动保存',
+  autoSaveUniworkOff: 'UniWork 文档不使用自动保存。请用“保存”来保存新版本。',
   zoom: '缩放',
   zoomIn: '放大',
   zoomOut: '缩小',
