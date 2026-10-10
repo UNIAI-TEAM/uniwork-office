@@ -21,21 +21,22 @@ User decisions applied in this lane (lane CONTRACT numbers in brackets; all give
 
 ## Verification summary
 
-Final state: fork code `9b5e409` (lane head, pushed), dev lane head `c66158951` (pushed), all six dev pins
-`0.1.0-9b5e409`. Final SHAs are in section 9.
+Final state: fork code `98e1d20` on `feature/UNI-1014-web-modules` (includes fork main `1d78e047` = GO-A6, merged by
+MM4), dev lane head `12cae471f` (pins `0.1.0-98e1d20`). Both are pushed; final SHAs are in section 9.
 
-| Check                                             | Target                  | Result                                                                                                                                                                                                                                                                                                    |
-| ------------------------------------------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Fork cloud CI replica, final (fresh VMs)          | `9b5e409`               | **PASS**, 3 shards, ~33 cents: `office-ci-test` pass; `office-ci-e2e` pass (Electron Playwright 176 passed, 10 skipped, 1 retry-flake `docs-spell-suggestions.spec.ts:71` in untouched Docs code; markdown config 46 passed); `web-ci` pass (typecheck:web, test:web, build:web --all, web e2e 56 passed) |
-| Fork `test:web` roots (cloud)                     | `9b5e409`               | protocol 90, bridge 175, build 53, modules 156 passed + 10 env-gated skips, slides 68, pdf 44 (all passed)                                                                                                                                                                                                |
-| Dev cloud r4b (`tester_cloud`)                    | `d68df2f5e`             | **PASS**: ts 9/9 (core/views/web vitest, 551 repo script tests, check-boundaries, typecheck, lint, knip, web build), go 4/4 (incl. real `TestRelay*` on Redis 7.4.2, isolation matrix, service AI/OfficeFrame), e2e 14 passed / 18 skipped / 0 failed. ~33 cents                                          |
-| Dev local prod e2e with all six bundles           | `c66158951` (DP3)       | **PASS**: `office-docs-web` + `office-markdown-web` + `office-modules-web` = 29 passed / 2 expected skips (the bundle-not-installed cases)                                                                                                                                                                |
-| Dev affected tests (DP3)                          | `c66158951`             | core 8, views 40, web 84, scripts 3 (exact files)                                                                                                                                                                                                                                                         |
-| Code review RD (dev) / RF (fork)                  | `0b0039d37` / `11a5eba` | Both "ship after fixes": RD 0 blocker / 1 major / 5 minor / 4 nit, all fixed by FD1; RF 0 / 5 major / 7 minor / 4 nit, all majors + minors/nits fixed by FF1 (+ SH3, FD3). Section 6                                                                                                                      |
-| Visual (`tester_visual`, 9 criteria, six modules) | final pins              | **pending tester_visual** (section 8)                                                                                                                                                                                                                                                                     |
+| Check                                             | Target                  | Result                                                                                                                                                                                                                                                                                                                                                                      |
+| ------------------------------------------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Fork final cloud round 2 (CI replica)             | `98e1d20`               | **PASS** (3 shards green, 1 known flake rerun-passed), ~54 cents: `office-ci-test` pass; `web-ci` pass (typecheck:web, test:web, build:web --all, six web e2e specs); `office-ci-e2e` Electron Playwright 176 passed / 33 skipped / 1 failed = the known flake `docs-spell-suggestions.spec.ts:71` (untouched Docs code), which passed on a rerun on a fresh VM (7.9 cents) |
+| Fork cloud after the GO-A6 merge (MM4)            | `08fafd4`               | **PASS** 3/3 shards, ~37 cents (`office-ci-test`, `office-ci-e2e`, `web-ci`); reports `.uniwork-lane/cloud/mm4/`                                                                                                                                                                                                                                                            |
+| Dev cloud r5 (`tester_cloud`)                     | `1c43b9612`             | **PASS**: ts 10/10 (incl. the `office-desktop` suite), go 4/4 (incl. real `TestRelay*`), e2e 14 passed / 33 skipped / 0 failed (the 33 skips are the bundle-installed cases: the runner cannot fetch the tarball). ~25 cents                                                                                                                                                |
+| Dev cloud r6 (ts + e2e)                           | `12cae471f`             | RESULT_R6 (placeholder: the coordinator fills it from the r6 report)                                                                                                                                                                                                                                                                                                        |
+| Dev local prod e2e with all six bundles           | `1c43b9612` (DP5)       | **PASS**: 33 passed / 2 expected skips (the bundle-not-installed cases)                                                                                                                                                                                                                                                                                                     |
+| Code review RD (dev) / RF (fork)                  | `0b0039d37` / `11a5eba` | Both "ship after fixes": RD 0 blocker / 1 major / 5 minor / 4 nit, all fixed by FD1; RF 0 / 5 major / 7 minor / 4 nit, all majors + minors/nits fixed by FF1 (+ SH3, FD3). Section 6                                                                                                                                                                                        |
+| Visual (`tester_visual`, 9 criteria, six modules) | `98e1d20` / `1c43b9612` | Round 1: markdown and html PASS, docs, pdf, slides and sheets FAIL (11 major, 0 blocking). Round 2 after the fixes: **all six PASS, 0 blocking, 0 major**. Section 8                                                                                                                                                                                                        |
 
-Cloud rounds on the way (verdicts and costs in section 6): dev r1 PASS, r2 FAIL (one lane regression, fixed), r3 PASS,
-r4 never ran (Haiku session thrashed its context), r4b PASS; fork replica rounds in MM1, MM2, MM3, final PASS.
+Earlier rounds (verdicts and costs in section 6): dev r1 PASS, r2 FAIL (one lane regression, fixed), r3 PASS, r4 never
+ran (Haiku session thrashed its context), r4b PASS; fork replica rounds in MM1, MM2, MM3 and the `9b5e409` final PASS
+(superseded by the `98e1d20` round above).
 
 ## 1. What works, per module
 
@@ -55,11 +56,23 @@ Common to every module (Docs included, through the generic host):
   reload, until the user signs out. Wired into Docs, Markdown, HTML, PDF, Slides and Sheets; e2e for Docs, Markdown, Sheets.
 - **Open in desktop app** (GD3): every module frame header carries the G3 "Open in desktop app" split button with the
   installer menu; shown when the frame is ready and the user may edit.
-- **View-only**: a user who may view but not edit (page `readonly`, or the minted token's `can_edit: false` outside Docs)
-  gets the frame without save / save-as grants. The server enforces view-only on commit and uploads by ACL, so withholding
-  grants is a UI matter only. Slides is the exception: a view-only user opens the G3 pptx host.
+- **Shared frame dialog** (FM1): conflict, discard, draft recovery, merge and fatal notices in all six modules are one
+  component, `web/modules/shared/frame-dialog.ts` (tokens `--color-dialog-primary*`), in the look of the host's leave
+  dialog (danger actions marked, first focus on Cancel).
+- **Frame-load fallback** (FV1, then FL): the host session probes the frame's `index.html` (a status >= 400 fails at once)
+  and its `script[src]` (a script that fails to load falls back at once), and runs a handshake timer. A frame that has not
+  said ready after ~8 s shows a "taking longer than usual" state with **Use the standard editor** and **Try again**; at
+  ~25 s (was 60 s) the host falls back by itself. A failed frame load switches to the G3 host like `feature_disabled` or
+  `too_large`, and G3 shows an inline notice that the switch was a load failure (G3 switch notice). Without a G3 host for
+  the format, a styled i18n (vi/en) "editor could not load" panel with Try again replaces the endless skeleton.
+- **View-only**: a user who may view but not edit (page `readonly`, or the minted token's `can_edit: false`) gets the frame
+  without save / save-as grants, never dirty and with no save path (Docs included, FDX). The server enforces view-only on
+  commit and uploads by ACL, so withholding grants is a UI matter only. Slides is the exception: a view-only user opens
+  the G3 pptx host.
 - **AI** [C16]: AI panels are hidden unless the host grants `ai` (organization entitlement + the frame-token AI mount
-  live). Then every module calls the AI routes directly from the frame (section 2).
+  live). Then every module calls the AI routes directly from the frame (section 2). Since FM1 a missing key or any other
+  vendor error shows a typed state card in every module (the server answers `{error:{code,message}}` and the bridge read a
+  flat `code`, so the first version showed the raw `credential_missing` JSON).
 - `init.user.displayName` reaches every module (comment and note authors).
 
 ### Docs (generic host)
@@ -67,7 +80,12 @@ Common to every module (Docs included, through the generic host):
 Behaviour is the UNI-1013 behaviour (`docs/web-docs/REPORT.md` section 1). `OfficeDocsFrame` and `DocxOpenSwitch` are thin
 wrappers over the generic host, Docs files in the fork were not moved, `docs.pin.json` and the Docs URL are unchanged.
 What the lane adds to Docs: draft recovery, Open in desktop app, `init.user`, AI through the frame-token mount when
-granted.
+granted, and **view-only on the web** (FDX): the Docs bridge answers `uniworkState` with `readOnly` when the host grants no
+`save` (or `writable: false`), which puts the renderer in its read-only mode (read-only editor and ribbon, never dirty,
+`api.save`, host save and Save As refused). Before FDX a viewer could type into a read-only Docs document. FDX also made
+the narrow layouts usable below 900 px (the AI dock starts collapsed and overlays, the comments and styles panes overlay,
+phones get a full-width AI panel, the ribbon tab row scrolls) and translated the vi Table Design tab and the save-offline
+error.
 
 ### PDF (`web/modules/pdf`)
 
@@ -129,6 +147,10 @@ without edits returns the input bytes, proven for a BOM + CRLF + raw-HTML fixtur
 - Fonts: Carlito (the Calibri twin) as WOFF2, canvas `measureText` metrics. Fidelity against the engine's own metrics on
   two decks: same line breaks on the Calibri deck, mean run width drift 1.01 % (max 3.02 %); CJK/emoji deck mean 4.73 %
   (the reference has no font file for those runs).
+- **Visual-round fixes** (FS1, FM1): typing in the slide text editor or the notes pane is dirty at once (leaving no longer
+  loses it); speaker notes kept in a plain shape named "Notes Placeholder" (no `p:ph type=body`) are now read, fixed in
+  `packages/pptx-engine` `notes.ts` for the desktop too (new fixture `notes-plain-shape.pptx`); plural status text,
+  presenter-view contrast, a fullscreen hint.
 - Size at the final lane (S3 + later): initial 3.73 MiB / 1.09 gzip after the lazy AI split; final pin 19 files, 5.47 MiB
   unpacked, 4.15 MiB initial download.
 
@@ -142,7 +164,9 @@ without edits returns the input bytes, proven for a BOM + CRLF + raw-HTML fixtur
   written as `<v>` next to the untouched `<f>`; a formula typed at W15000 of a 20k-row workbook is saved, reopened by the
   host and shown (e2e).
 - **View-only locks the grid** (a `BeforeCommandExecute` guard; `setEditable(false)` was rejected because it blocks the
-  loader's own streamed writes). **Wasm panic recovery**: the Worker is rebuilt and sessions reopen from their last
+  loader's own streamed writes; the guard also cancels `BeforeSheetEditStart` for the formula bar, F2 and double click, and
+  the bridge never reports dirty without the save grant, FSH). Below 719 px the AI dock starts collapsed and overlays the
+  grid. **Wasm panic recovery**: the Worker is rebuilt and sessions reopen from their last
   opened/saved bytes under the same renderer session id, with a toast; the renderer's unsaved edits are kept.
 - **Sheets AI** is on (SH4): the shared web AI bridge, host grant mapping, AI settings gear; four desktop-only members of
   the desktop Sheets AI stay hidden (`createDocument`, `readLocalImage`, `openWorkbooksForMerge`, `autoRenameWorkbook`).
@@ -197,7 +221,8 @@ sandboxed kind; the host pin verifier does the same.
 - Archive limits (64 MiB archive, 160 MiB unpacked, 2,000 entries) hold with ~2x headroom for six builds: 31.8 MiB as a
   tarball, 72.4 MiB unpacked, 644 entries.
 
-Final pins (all `0.1.0-9b5e409`):
+Final pins are all `0.1.0-98e1d20`. The sizes below were measured at the `9b5e409` pins (the later changes are the GO-A6
+merge, the visual fixes and the shared dialog; the table was not re-measured):
 
 | module     | files | unpacked  | gzip      | initial download | CSP beyond the shared policy                    |
 | ---------- | ----- | --------- | --------- | ---------------- | ----------------------------------------------- |
@@ -234,7 +259,10 @@ Docs; only Docs has the server PDF export.
    `too_large` after the ACL check) or the Sheets frame refuses an open above **80 MB of uncompressed worksheet XML**
    (`MAX_WORKSHEET_XML_BYTES`, fatal `too_large` → G3);
 4. a view-only user opens a pptx (`viewOnlyInG3`);
-5. the minted module differs from the frame (`malformed`).
+5. the minted module differs from the frame (`malformed`);
+6. the frame fails to load (`details.frameBundle`: `index.html` status >= 400, a frame script that does not load, or no
+   ready handshake within ~25 s, or the user picks **Use the standard editor** on the "taking longer" state); G3 then shows
+   a notice that the switch was a load failure.
 
 Formats with no web module (xls, odt, ...) always use G3.
 
@@ -250,9 +278,21 @@ map to typed UI states: 402 `credits_exhausted`, 403 `entitlement_required`, 404
 (`ai`, `web_search`, `image_search`, `image_generation`); the host maps it to capability keys for all six modules
 (`officeModuleSpec(m).ai`). Without the grant every AI entry stays hidden.
 
-**GO-A6 (UniWork documents in the desktop modules).** Fork main moved to `1d78e047` after the lane's final code (`9b5e409`);
-its UniWork-document UI is desktop-only and is gated off in the web frames by the follow-up merge (MM4). The details and
-the resulting capability keys are confirmed by the coordinator after that merge; this report describes the lane at `9b5e409`.
+**GO-A6 (UniWork documents in the desktop modules), merged.** Fork main moved to `1d78e047` (GO-A6, 38 commits, no server
+change) after the lane's earlier code (`9b5e409`). MM4 merged it into the lane (33 conflicted files: the app and ribbon of
+html, markdown, pdf, sheets and slides, the html `SourceEditor`, the sheets `ExcelShell`, 21 sheets i18n shards, the slides
+`slides-main` and file actions), head `08fafd4`, and the final fork code is `98e1d20`. What it means on the web:
+
+- GO-A6's UniWork-document UI (open from and save to UniWork inside the desktop module) is **shell-only**; the in-module UI
+  follows `uniworkState`, which is `bound: false, readOnly: false` on the web (a typed stub in every web bridge, and `readOnly`
+  from the host grant in Docs, section 1). No new capability key was needed.
+- **Slides:** GO-A6's `slides-main` changes were re-applied to the split session core: `HostIO` gained the optional
+  `saveGate` and `userSaved`; the desktop shell installs its `uniwork-policy`, the web leaves them absent.
+- **Sheets:** GO-A6's `setEditable` lock is skipped on the web (`d43febf`); the lane's `BeforeCommandExecute` guard stays
+  the view-only lock (section 1).
+- The lane's `cap()` gates wrap GO-A6's AutoSave, Save and view-only changes, so the web keeps no autosave and the same
+  save grants. Verified by MM4 locally (`typecheck:web`, `tsc` on 7 apps, `test:web` 6 roots, web e2e 45/45, Slides session
+  and GO-A6 uniwork tests) and on the cloud runner (3/3 shards, section 6).
 
 ## 3. GO-D3: measurements and decision (Sheets and the native xlsx-sidecar)
 
@@ -348,8 +388,8 @@ follow a host grant are on only when the host grants them.
 | `platform: 'web'`                                                       | web                                                          | slides (and others) | no native window chrome; File tab on every OS; HTML fullscreen for show and presenter                                |
 
 Every hidden member of a preload global still exists with a typed safe answer (never throws); `PdfWebApi` and the other
-web APIs are mapped types over the desktop contracts. The module docs written before AI1 (`pdf.md`, `markdown-html.md`)
-still say "AI is hidden": that is true only without the host grant.
+web APIs are mapped types over the desktop contracts. AI is hidden only without the host grant; `pdf.md` and
+`markdown-html.md` were updated for that in FM1.
 
 ## 5. Security notes
 
@@ -416,19 +456,24 @@ characterisation/core/guard 14/14; markdown fidelity 19/19.
 
 **Cloud rounds** (Cursor cloud runner; verdicts and costs):
 
-| Round                          | Repo, target          | Verdict                       | Cost      | Notes                                                                                                         |
-| ------------------------------ | --------------------- | ----------------------------- | --------- | ------------------------------------------------------------------------------------------------------------- |
-| dev r1                         | `5cd897574`           | PASS                          | ~20 cents | ts, go, e2e (9 passed / 18 skipped: no bundle source in the VM)                                               |
-| dev r2                         | `dc19db30b`           | go PASS, ts FAIL, e2e blocked | ~45 cents | one lane regression, TS2769 in `module-frame-host.test.tsx` (breaks web typecheck + next build); fixed by FD2 |
-| dev r3                         | `5900e1111`           | PASS                          | ~26 cents | ts 11/11, e2e 14 passed / 18 skipped / 0 failed incl. `documents.spec.ts` on default-ON flags                 |
-| dev r4                         | `0b264deed`           | did not run                   | n/a       | Haiku session thrashed its context three times and sent no `worker_done`                                      |
-| dev r4b                        | `d68df2f5e`           | PASS                          | ~33 cents | ts 9/9, go 4/4, e2e 14 / 18 / 0                                                                               |
-| fork baseline + MM1/MM2 rounds | `092e1c1`, `07482d9`  | green after classification    | n/a       | remaining reds classified main-also, B2B3-owned, VM-environment or one flake                                  |
-| fork MM3                       | `11a5eba` / `b41eddd` | PASS                          | ~39 cents | CI replica test + e2e                                                                                         |
-| **fork final**                 | `9b5e409`             | **PASS**                      | ~33 cents | office-ci-test 8.79c, office-ci-e2e 12.22c, web-ci 12.22c; reports `.uniwork-lane/cloud/final-9b5e409/`       |
+| Round                          | Repo, target          | Verdict                         | Cost      | Notes                                                                                                                                                                                          |
+| ------------------------------ | --------------------- | ------------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| dev r1                         | `5cd897574`           | PASS                            | ~20 cents | ts, go, e2e (9 passed / 18 skipped: no bundle source in the VM)                                                                                                                                |
+| dev r2                         | `dc19db30b`           | go PASS, ts FAIL, e2e blocked   | ~45 cents | one lane regression, TS2769 in `module-frame-host.test.tsx` (breaks web typecheck + next build); fixed by FD2                                                                                  |
+| dev r3                         | `5900e1111`           | PASS                            | ~26 cents | ts 11/11, e2e 14 passed / 18 skipped / 0 failed incl. `documents.spec.ts` on default-ON flags                                                                                                  |
+| dev r4                         | `0b264deed`           | did not run                     | n/a       | Haiku session thrashed its context three times and sent no `worker_done`                                                                                                                       |
+| dev r4b                        | `d68df2f5e`           | PASS                            | ~33 cents | ts 9/9, go 4/4, e2e 14 / 18 / 0                                                                                                                                                                |
+| fork baseline + MM1/MM2 rounds | `092e1c1`, `07482d9`  | green after classification      | n/a       | remaining reds classified main-also, B2B3-owned, VM-environment or one flake                                                                                                                   |
+| fork MM3                       | `11a5eba` / `b41eddd` | PASS                            | ~39 cents | CI replica test + e2e                                                                                                                                                                          |
+| fork final (before GO-A6)      | `9b5e409`             | PASS                            | ~33 cents | office-ci-test 8.79c, office-ci-e2e 12.22c, web-ci 12.22c; reports `.uniwork-lane/cloud/final-9b5e409/`                                                                                        |
+| fork MM4 (GO-A6 merge)         | `08fafd4`             | PASS (3/3 shards)               | ~37 cents | office-ci-test 12.64c, office-ci-e2e 12.27c, web-ci 11.57c; reports `.uniwork-lane/cloud/mm4/`                                                                                                 |
+| **fork final round 2**         | `98e1d20`             | **PASS** (1 flake rerun-passed) | ~54 cents | office-ci-test 13.48c, office-ci-e2e 19.73c, web-ci 12.47c; rerun of `docs-spell-suggestions.spec.ts:71` on a fresh VM 7.94c, pass; reports `.uniwork-lane/cloud/final-98e1d20/` (+ `-rerun/`) |
+| dev r5                         | `1c43b9612`           | **PASS**                        | ~25 cents | ts 10/10 (6.79c), go 4/4 (5.94c), e2e 14 passed / 33 skipped / 0 failed (12.04c); `reports/uni-1014-cloud/r5/SUMMARY.md`                                                                       |
+| dev r6 (ts + e2e)              | `12cae471f`           | RESULT_R6                       | RESULT_R6 | placeholder: the coordinator fills it from the r6 report                                                                                                                                       |
 
-Dev e2e cases that need an installed bundle (18) skip in the cloud (no bundle source on the VM); they ran locally on a
-production build with all six bundles (29 passed / 2 expected skips).
+Dev e2e cases that need an installed bundle (33 since r5; 18 before) skip in the cloud (the runner cannot fetch the CI
+tarball); they ran locally on a production build with all six bundles (DP5: 33 passed / 2 expected skips, the
+bundle-not-installed cases).
 
 **e2e specs** (fork, `web/e2e/`, production builds in the test host): `docs-web`, `pdf-web`, `markdown-web`, `html-web`,
 `html-preview-security`, `slides-web`, `slides-presenter`, `slides-fidelity`, `sheets`, `sheets-ai`, `draft-recovery`
@@ -448,7 +493,8 @@ arguments, CSP test pin, `rawHtml` regex bound, random asset names).
 **Screenshots and evidence folders.** Fork `docs/web-modules/screenshots/{ai,draft-recovery,html,markdown,pdf,sheets,slides}/`
 (en/vi × light/dark where the spec captured them); dev `reports/uni-1014-evidence/desktop-open/` (12 screenshots, vi + en,
 light + dark); dev cloud reports `reports/uni-1014-cloud/r1..r4` (untracked by design); fork cloud reports
-`.uniwork-lane/cloud/final-9b5e409/`. Module docs: `docs/web-modules/{pdf,markdown-html,slides-web,slides-fidelity,
+`.uniwork-lane/cloud/final-98e1d20/` (earlier: `final-9b5e409/`, `mm4/`); visual-test reports and screenshots in section 8.
+Module docs: `docs/web-modules/{pdf,markdown-html,slides-web,slides-fidelity,
 sheets-module,sheets-sidecar,draft-recovery}.md`, inventories `inventory-b4.md`, `inventory-b5.md`, GO-D3 probes in
 `sheets-probes/`; dev `docs/office/office-web-modules.md`; fork `docs/upstream/UPSTREAM_SYNC.md` and `SHEETS_WASM_ENGINE.md`.
 
@@ -487,7 +533,6 @@ Product / behaviour:
 - **Draft recovery**: a record nobody restores or discards stays until sign-out; the `pagehide` write is asynchronous;
   uncommitted HTML style edits and open PDF editor boxes are not in the copy until committed; Sheets does not re-draft edits
   made after a Restore until the next save; Slides and PDF wiring is unit-tested only (e2e covers Docs, Markdown, Sheets).
-- **Docs view-only** still ignores the token's `can_edit` (UNI-1013 behaviour; modules other than Docs honour it).
 - **Open in desktop app**: launch target (GO-A6) and installer URLs (GO-A8) are not wired here; the prompt says the link is
   unavailable until they land.
 - **Images in Markdown/HTML on the UniWork host**: the dev host does not grant `images` and leaves `open.assets` unfilled
@@ -497,12 +542,50 @@ Product / behaviour:
 - **Desktop-visible Markdown changes** (raw HTML verbatim, Mermaid as `<img>`) are intentional; a desktop document that
   relied on rendered raw HTML or inline diagram DOM looks different. Recorded in `UPSTREAM_SYNC.md`.
 
+Open minor and nit findings of visual round 2 (all six modules PASS with 0 blocking and 0 major; reports in section 8; the
+60 s silent skeleton before the G3 fallback reported by five modules was fixed afterwards by FL: "taking longer" at ~8 s,
+auto fallback at ~25 s, no fork re-pin). Cosmetic, not blocking:
+
+- **Cross-module:**
+  - At 390 px layouts are usable but cramped (Docs page opens at 29–36 % zoom with the ribbon cut and no Save / desktop button
+    in the header; Markdown keeps ~72 px gutters; Slides canvas at 14 %, ribbon tabs clipped; HTML loses the save-state chip
+    and has ~110 px of preview with the AI panel open).
+  - Spurious "Saved" toast after a language switch (Docs, HTML, PDF; probably the host preference toast).
+  - AI error copy is doubled (inline plus toast) and its provider name does not match the model chip or differs by locale
+    ("No Claude key" in en, "No OpenAI key" or "Chưa có khóa OpenAI" in vi, model chip `openrouter/auto`).
+  - Frame dialogs look lighter than the host leave dialog (outlined buttons, no filled primary or close X on the conflict
+    dialog, flat scrim vs blur); dark-theme **Restore button contrast ~2.8:1** (white on light blue; light theme is fine).
+- **Docs:** keyboard focus lands on the frame body after the leave dialog closes (typing and Ctrl+S do nothing until a click;
+  Markdown, HTML and Sheets return it to the editor); status bar ellipsis and an English "Opened …" in vi; comment author
+  truncated; table style gallery labels truncated; empty font-name box on one fixture.
+- **PDF:** raw English HTTP status text in the vi save toast for server errors ("Lưu thất bại: Internal Server Error"); "Unsaved"
+  and "View only" repeated in header, ribbon row and banner; **clipped vi ribbon item** "Xuất hình ảnh" at 1440 px with the AI
+  panel open (no overflow cue); save failure shown three times; Sign / Add-text dialogs keep a black primary; the 390 px tab
+  row wraps.
+- **Markdown:** 390 px viewer header title collapses to one letter (host header); a relative image without an asset shows a
+  placeholder with no explanation; raw HTML block has no "inert" label; mermaid syntax errors keep English parser text in
+  vi; source mode puts combining marks off in the mono font; view-only announced three times and the AI composer stays
+  enabled for a viewer; the header keeps "Save could not be confirmed" after a further edit until the next save.
+- **HTML:** inspector covers the right end of the floating toolbar; no hint why AI is missing; "Denied" panel offers a Try
+  again that cannot help; viewer banner mixes the English "edit" into vi; Cancel carries the default focus in the conflict
+  dialog.
+- **Slides:** with a mocked `can_edit: false` token the canvas still accepts typing (view-only Slides opens the G3 viewer by
+  design, so this is unreachable today); Presenter View chrome is small (11–12 px) with low-contrast hints; the AI panel
+  clips the Home ribbon at 1440 px; fullscreen user-gesture warning not re-verified in a headed browser.
+- **Sheets:** ribbon cut at the right edge with the AI panel open and a truncated ribbon hint; the loading state is a bare
+  "Opening workbook…" line and the 11 MiB workbook opens in G3 without a word on why; raw "(Internal Server Error)" in the
+  vi ribbon hint; the same AI error four times (panel, ribbon hint, toast, status bar); console warning
+  `UI_PLUGIN_SHEETS_MENU_ITEM_INPUT_COMPONENT already exists`.
+- Not exercised by the testers: the frame-fatal dialog (cannot be triggered from outside), AI with a real provider (the
+  host has no model vendor), the HTML Present menu, a second display for the Slides audience window.
+
 Build, CI and release:
 
 - **CI secret republish.** `OFFICE_FRAME_SOURCE` must become a tarball of the fork's whole `dist-web` root (all six
   modules). The final tarball is the linux-arm64 build made on bro,
-  `/home/ubuntu/orca/workspaces/uniwork-office/dist-web-0.1.0-9b5e409.tar.gz` (33,350,229 bytes, 644 entries, sha256
-  `0579fc3372c200f3fcbcae31ac32e8a872caee154420840aaa34c2eb240bc7b5`). Whoever holds the secret must re-publish it; until
+  `/home/ubuntu/orca/workspaces/uniwork-office/dist-web-0.1.0-98e1d20.tar.gz` (sha256
+  `9f125931c9e7cb0bf2890564a64d75476f70ac07c0d29e7f75b5130908ee2b3a`, also in the `.sha256` file next to it; it replaces the
+  `9b5e409` and `08fafd4` tarballs). Whoever holds the secret must re-publish it; until
   then the dev `e2e` job runs only the Docs frame cases and the other modules' cases skip themselves. The fork CI does
   not publish a `dist-web` tarball.
 - **Per-platform wasm checksum.** The Sheets `xlsx-sidecar.wasm` is byte-different on linux-arm64 and linux-x64 from the same
@@ -510,8 +593,6 @@ Build, CI and release:
   bytes: the pin is the arm64 build. A tarball built on x64 is refused against this pin; publish from the bro tarball or
   re-pin from x64, never mix. Any edit under `apps/sheets/native/xlsx-engine/wasm/` (even a comment) changes the staging
   hash and the module, and needs `--update-checksum` for **both** platform lines in the same commit.
-- Stale number in dev docs: `docs/office/office-web-modules.md` "Sheets size cap" says the frame gate is 40 MB of worksheet
-  XML; the fork constant `MAX_WORKSHEET_XML_BYTES` is 80 MB (final gates 10 MiB / 80 MB).
 - The `wasm` toolchain is pinned (`rust-toolchain.toml`: 1.90.0 + `wasm32-wasip1`); `web-e2e` CI installs it before
   `build:web -- --all`.
 - Known non-lane reds on the base: `docs-spell-suggestions.spec.ts:71` (flaky on main, native spellchecker; one retry-flake in
@@ -523,26 +604,62 @@ Build, CI and release:
 
 ## 8. Visual test results
 
-**pending tester_visual** — the coordinator fills this section from the six `tester_visual` reports (9 criteria: hierarchy
-and typography, spacing and alignment, consistency with UniWork primitives and the genoffice look, tokens and light/dark
-legibility, states, responsiveness, vi/en copy, visible accessibility, polish; severity blocking / major / minor / nit per
-finding with screenshot crops; an unstyled, raw-DOM or placeholder screen is blocking). Run against the final pins on the
-shared visual host (lane VH).
+The six modules were tested by `tester_visual` sessions (Sonnet 5.5 medium) on one shared visual host (lane VH): one
+production build with all six bundles installed, the Go API, the web app, a one-origin proxy and the office engine, an
+organization with an editor (vi), a second editor (en) and a viewer, and 28 seeded documents. Each report scores the 9
+criteria (hierarchy and typography, spacing and alignment, consistency with UniWork primitives and the genoffice look,
+tokens and light/dark legibility, states, responsiveness, vi/en copy, visible accessibility, polish) plus the lane checks
+(the document is never recoloured, host-frame integration, Open in desktop app), with a severity per finding (blocking /
+major / minor / nit) and screenshot crops. An unstyled, raw-DOM or placeholder screen is blocking; none was found in
+either round. Round 1 ran on fork `08fafd4` / dev `c25e234b2`, round 2 on the final pins (fork `98e1d20`, dev `1c43b9612`;
+the later dev commit `12cae471f` only changes the frame-load fallback, FL).
 
-| Module              | Round | Verdict | Blocking / major / minor / nit | Report |
-| ------------------- | ----- | ------- | ------------------------------ | ------ |
-| Docs (generic host) |       | pending |                                |        |
-| PDF                 |       | pending |                                |        |
-| Markdown            |       | pending |                                |        |
-| HTML                |       | pending |                                |        |
-| Slides              |       | pending |                                |        |
-| Sheets              |       | pending |                                |        |
+Reports are in the fork lane worktree (`.uniwork-lane/visual/<module>.md` for round 1, `<module>-r2.md` for round 2);
+screenshots and crops are in the visual host worktree, `reports/uni-1014-visual/<module>/` (round 2 files are prefixed
+`r2-`, round 1 files are kept).
+
+| Module              | Round 1 verdict | Round 1 blocking / major / minor / nit | Round 2 verdict | Round 2 blocking / major / minor / nit (open) | Reports                                              |
+| ------------------- | --------------- | -------------------------------------- | --------------- | --------------------------------------------- | ---------------------------------------------------- |
+| Docs (generic host) | FAIL            | 0 / 4 / 7 / 3                          | **PASS**        | 0 / 0 / 7 / 3                                 | `.uniwork-lane/visual/docs.md`, `docs-r2.md`         |
+| PDF                 | FAIL            | 0 / 1 / 7 / 2                          | **PASS**        | 0 / 0 / 5 / 7                                 | `.uniwork-lane/visual/pdf.md`, `pdf-r2.md`           |
+| Markdown            | PASS            | 0 / 0 / 5 / 3                          | **PASS**        | 0 / 0 / 3 / 8                                 | `.uniwork-lane/visual/markdown.md`, `markdown-r2.md` |
+| HTML                | PASS            | 0 / 0 / 5 / 4                          | **PASS**        | 0 / 0 / 5 / 7                                 | `.uniwork-lane/visual/html.md`, `html-r2.md`         |
+| Slides              | FAIL            | 0 / 3 / 5 / 2                          | **PASS**        | 0 / 0 / 5 / 4                                 | `.uniwork-lane/visual/slides.md`, `slides-r2.md`     |
+| Sheets              | FAIL            | 0 / 3 / 4 / 3                          | **PASS**        | 0 / 0 / 3 / 6                                 | `.uniwork-lane/visual/sheets.md`, `sheets-r2.md`     |
+
+The round 2 counts are the open findings after the fixes; findings that are by design (a viewer has no Open in desktop
+app, the same rule as the G3 host; the document page stays white in dark) are not counted as defects. The open minors and
+nits are listed in section 7.
+
+**What round 1 found, and how it was fixed.** Markdown and HTML passed with minors; Docs, PDF, Slides and Sheets failed
+on 11 majors, none of them a styling failure:
+
+- **A frame that never loads left the host on the skeleton forever** (Slides S-03, Sheets S-02, PDF-01, Docs F-03: the
+  frame bundle answers 404, no error, no way back to the G3 editor). Fixed by **FV1** (dev host: index probe, handshake
+  timer, fallback to G3 or a styled "editor could not load" panel with Try again, for every module including Docs) and
+  refined by **FL** (script probe, "taking longer than usual" at ~8 s, auto fallback at ~25 s instead of 60 s, G3
+  notice) after five round 2 reports found the silent 60 s wait.
+- **View-only users could edit** (Docs F-01 typed into a read-only document; Sheets S-01 became dirty and got a Save leave
+  dialog). Fixed by **FDX** (the Docs bridge answers `uniworkState` read-only without the save grant) and **FSH** (Sheets
+  cancels the edit start, never reports dirty without the grant).
+- **Slides lost text** (S-01: typing in the canvas text box was not dirty until committed, so leaving lost it; S-02:
+  speaker notes of a deck not loaded in the editor and the Presenter View, an engine bug that also affected the desktop).
+  Fixed by **FS1**.
+- **Narrow layouts unusable** (Docs 768/390 px, Sheets 390 px where the AI panel left a 30 px grid). Fixed by **FDX** and
+  **FSH** (AI dock starts collapsed and overlays below 900 px for Docs and 719 px for Sheets; later also PDF, Markdown,
+  HTML through **FM1**).
+
+The minors of round 1 went into one batch, **FM1**: one shared frame dialog for every module, a typed AI error state
+instead of the raw `credential_missing` JSON, translated network and timeout save errors, the Slides plural and
+presenter contrast, the HTML ribbon that sheds labels in steps, a placeholder for a missing relative Markdown picture; the
+dev side added a save-error chip without a stray focus ring, a leave-dialog close button named Close, the save state
+visible below 640 px, and focus returned to the frame after the leave dialog (F-12, DP5). Round 2 confirmed every major
+closed and all six modules PASS.
 
 ## 9. Final SHAs
 
-- Fork `feature/UNI-1014-web-modules`: `FORK_SHA` (the commit that adds the final lines of this report; the code under test
-  is `9b5e409`, verified by the final cloud round, plus any visual-fix commits recorded in section 8).
-- dev-uniwork `feature/UNI-1014-office-web-modules`: `DEV_SHA` (head at the time of writing `c66158951`; pins
-  `0.1.0-9b5e409`).
+- Fork `feature/UNI-1014-web-modules`: the commit that adds this report version (see `git log` of
+  `docs/web-docs/REPORT-modules.md`); code under test `98e1d20` (includes fork main `1d78e047` = GO-A6).
+- dev-uniwork `feature/UNI-1014-office-web-modules`: `12cae471f` (pins `0.1.0-98e1d20`).
 
 Both branches are pushed to origin; no pull requests.
