@@ -6,10 +6,11 @@
  *   - `openAiSettingsDialog()`: the AI settings on the web = the UniWork-stored provider keys
  *     (GET / PUT / DELETE credentials, masked `key_hint`; the key is write-only and never read
  *     back), the provider + model this viewer uses, and the cloud tools / credits status.
- * Chrome: the shared .gs-imgdlg dialog of @genoffice/ui + ./ai-web.css (theme tokens only).
+ * Chrome: the frame dialog family (../frame-dialog.css: blur scrim, close X, filled primary, soft
+ * destructive) + ./ai-web.css (theme tokens only).
  * Strings: ../i18n/strings-ai-web.ts in the UI language.
  */
-import '@genoffice/ui/image-dialogs.css'
+import '../frame-dialog.css'
 import './ai-web.css'
 import { webLanguage } from '../../../docs/bridge/browser'
 import { aiWebText, type AiWebStringKey } from '../i18n/strings-ai-web'
@@ -92,7 +93,7 @@ export function hideAiState(): void {
 function button(label: string, onClick: () => void, cls = ''): HTMLButtonElement {
   const b = document.createElement('button')
   b.type = 'button'
-  b.className = `gs-imgdlg-btn${cls ? ` ${cls}` : ''}`
+  b.className = `ow-dlg-btn${cls ? ` ${cls}` : ''}`
   b.textContent = label
   b.addEventListener('click', onClick)
   return b
@@ -119,7 +120,7 @@ export function showAiState(
   p.className = 'ow-ai-state-body'
   p.textContent = body
   const row = document.createElement('div')
-  row.className = 'gs-imgdlg-actions'
+  row.className = 'ow-ai-actions'
   if (s.settings) {
     row.append(
       button(
@@ -132,7 +133,7 @@ export function showAiState(
       ),
     )
   }
-  row.append(button(t('aiWebClose'), () => card.remove()))
+  row.append(button(t('aiWebClose'), () => card.remove(), s.settings ? 'ghost' : 'primary'))
   card.append(h, p, row)
   document.body.append(card)
   return card
@@ -185,30 +186,49 @@ function formatDate(iso: string): string {
   }
 }
 
+const CLOSE_ICON =
+  '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" focusable="false">' +
+  '<path d="M3 3l8 8M11 3l-8 8" fill="none" stroke="currentColor" stroke-width="1.6" ' +
+  'stroke-linecap="round"/></svg>'
+
 /** the AI settings dialog; resolves when it closes. A second call while open joins the first. */
 export function openAiSettingsDialog(deps: SettingsDialogDeps): Promise<void> {
   if (openDialog) return openDialog
   openDialog = new Promise<void>((resolve) => {
     hideAiState()
+    const returnTo = document.activeElement as HTMLElement | null
     const root = document.createElement('div')
-    root.className = 'gs-imgdlg-mask'
+    root.className = 'ow-dlg-mask'
     root.setAttribute('data-office-web', DIALOG_MARKER)
     const box = document.createElement('div')
-    box.className = 'gs-imgdlg ow-ai-dialog'
+    box.className = 'ow-dlg ow-ai-dialog'
     box.setAttribute('role', 'dialog')
     box.setAttribute('aria-modal', 'true')
-    const title = document.createElement('div')
-    title.className = 'gs-imgdlg-title'
+    const head = document.createElement('div')
+    head.className = 'ow-dlg-head'
+    const title = document.createElement('h2')
+    title.className = 'ow-dlg-title'
     title.id = 'ow-ai-settings-title'
     title.textContent = t('aiWebSettingsTitle')
     box.setAttribute('aria-labelledby', title.id)
-    const intro = document.createElement('div')
-    intro.className = 'gs-imgdlg-hint'
+    const intro = document.createElement('p')
+    intro.className = 'ow-dlg-body'
     intro.textContent = t('aiWebSettingsIntro')
+    head.append(title, intro)
+    const form = document.createElement('div')
+    form.className = 'ow-ai-form'
     const status = document.createElement('div')
-    status.className = 'gs-imgdlg-hint'
+    status.className = 'ow-ai-hint'
     status.textContent = t('aiWebLoading')
-    box.append(title, intro, status)
+    form.append(status)
+    const footer = document.createElement('div')
+    footer.className = 'ow-dlg-actions'
+    const x = document.createElement('button')
+    x.type = 'button'
+    x.className = 'ow-dlg-close'
+    x.setAttribute('aria-label', t('aiWebClose'))
+    x.innerHTML = CLOSE_ICON
+    box.append(head, form, footer, x)
     root.append(box)
     document.body.append(root)
 
@@ -216,8 +236,10 @@ export function openAiSettingsDialog(deps: SettingsDialogDeps): Promise<void> {
       document.removeEventListener('keydown', onKey, true)
       root.remove()
       openDialog = null
+      if (returnTo?.isConnected) returnTo.focus({ preventScroll: true })
       resolve()
     }
+    x.addEventListener('click', close)
     const onKey = (e: KeyboardEvent): void => {
       if (e.key !== 'Escape') return
       e.preventDefault()
@@ -233,14 +255,11 @@ export function openAiSettingsDialog(deps: SettingsDialogDeps): Promise<void> {
         ;[state, chosen] = await Promise.all([deps.load(), deps.current()])
       } catch {
         status.textContent = t('aiWebLoadFailed')
-        const actions = document.createElement('div')
-        actions.className = 'gs-imgdlg-actions'
-        actions.append(button(t('aiWebClose'), close))
-        box.append(actions)
+        footer.append(button(t('aiWebClose'), close, 'primary'))
         return
       }
       status.remove()
-      renderForm(box, state, chosen, deps, close)
+      renderForm(form, footer, state, chosen, deps, close)
     })()
   })
   return openDialog
@@ -248,6 +267,7 @@ export function openAiSettingsDialog(deps: SettingsDialogDeps): Promise<void> {
 
 function renderForm(
   box: HTMLElement,
+  footer: HTMLElement,
   initial: WebAiState,
   chosen: { provider: string; model: string },
   deps: SettingsDialogDeps,
@@ -260,7 +280,7 @@ function renderForm(
     state.credentials.items.find((c) => c.provider === id)
 
   const select = document.createElement('select')
-  select.className = 'ow-ai-input'
+  select.className = 'ow-ai-input ow-ai-select'
   select.name = 'provider'
   const model = input('text', 'model')
   const models = document.createElement('datalist')
@@ -279,7 +299,7 @@ function renderForm(
   const save = button(t('aiWebSaveKey'), () => void onSave(), 'primary')
   const remove = button(t('aiWebRemoveKey'), () => void onRemove(), 'danger')
   const keyActions = document.createElement('div')
-  keyActions.className = 'gs-imgdlg-actions'
+  keyActions.className = 'ow-ai-actions'
   keyActions.append(remove, save)
 
   const fillProviders = (selected: string): void => {
@@ -383,7 +403,7 @@ function renderForm(
     head.className = 'ow-ai-section-title'
     head.textContent = t('aiWebCloudTitle')
     const line = document.createElement('div')
-    line.className = 'gs-imgdlg-hint'
+    line.className = 'ow-ai-hint'
     line.dataset.aiCloud = c?.enabled ? 'on' : 'off'
     if (!c || !c.enabled) {
       line.textContent = t('aiWebCloudOff')
@@ -412,8 +432,7 @@ function renderForm(
     },
     'primary',
   )
-  const footer = document.createElement('div')
-  footer.className = 'gs-imgdlg-actions'
+  done.classList.add('ow-ai-done')
   footer.append(done)
 
   const keyRow = document.createElement('div')
@@ -433,7 +452,6 @@ function renderForm(
     error,
     keyActions,
     cloud,
-    footer,
   )
   select.focus()
 }

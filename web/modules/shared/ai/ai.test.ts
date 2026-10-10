@@ -958,11 +958,45 @@ describe('in-frame UI', () => {
     // Done keeps the choice
     select.value = 'openai'
     select.dispatchEvent(new Event('change'))
-    const done = [...document.querySelectorAll('.ow-ai-dialog button')].at(-1) as HTMLButtonElement
+    const done = document.querySelector('.ow-ai-done') as HTMLButtonElement
     done.click()
     await closed
     expect(choose).toHaveBeenCalledWith('openai', 'gpt-x')
     expect(document.querySelector('.ow-ai-dialog')).toBeNull()
+  })
+
+  // visual r3 N3-03: the settings dialog was a flat card with black pill buttons and a native
+  // select; it is the frame dialog family now (blur scrim, close X, filled blue primary)
+  it('the settings dialog is the frame dialog: scrim, close X, filled primary, no gs-imgdlg chrome', async () => {
+    const closed = openAiSettingsDialog({
+      load: async () => ({
+        credentials: { items: CREDENTIALS.items, providers: CREDENTIALS.providers },
+        cloud: readCloudStatus(CLOUD),
+      }),
+      client: { saveCredential: vi.fn(), deleteCredential: vi.fn() },
+      current: async () => ({ provider: 'openai', model: 'gpt-x' }),
+      choose: vi.fn(),
+      supported: () => true,
+      label: (id) => id,
+      models: () => [],
+    })
+    await vi.waitFor(() => expect(document.querySelector('select[name="provider"]')).not.toBeNull())
+    const mask = document.querySelector('[data-office-web="ai-settings"]')!
+    expect(mask.classList.contains('ow-dlg-mask')).toBe(true)
+    const box = mask.querySelector('.ow-dlg.ow-ai-dialog')!
+    expect(box.getAttribute('role')).toBe('dialog')
+    expect(box.querySelector('h2.ow-dlg-title')).not.toBeNull()
+    expect(document.querySelector('[class*="gs-imgdlg"]')).toBeNull()
+    // Done is the filled primary in the footer band, Save key the other primary
+    expect(box.querySelector(':scope > .ow-dlg-actions .ow-dlg-btn.primary')?.textContent).toBe(
+      'Done',
+    )
+    expect(box.querySelector('.ow-dlg-btn.danger')).not.toBeNull()
+    const x = box.querySelector<HTMLButtonElement>('.ow-dlg-close')!
+    expect(x.getAttribute('aria-label')).toBe('Close')
+    x.click()
+    await closed
+    expect(document.querySelector('[data-office-web="ai-settings"]')).toBeNull()
   })
 })
 
