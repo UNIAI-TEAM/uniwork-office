@@ -630,6 +630,22 @@ export interface AppOpenResult {
   outcome: AppOpenOutcome
 }
 
+/** at most this many paths per `api.assets.resolve` request, each at most MAX_ASSET_PATH_BYTES (UTF-8) */
+export const MAX_ASSET_RESOLVE_PATHS = 50
+export const MAX_ASSET_PATH_BYTES = 512
+
+export interface ApiAssetsResolvePayload {
+  /** the open document (default: the document of the frame's token) */
+  fileId?: string
+  /** relative paths exactly as written in the document ("assets/x.png", "./img/y.svg"), 1..50 */
+  paths: string[]
+}
+
+export interface ApiAssetsResolveResult {
+  /** same rules as `OpenPayload.assets`; a path the host cannot serve is absent */
+  assets: Record<string, string>
+}
+
 export interface ConvertAltChunkHtmlPayload {
   html: string
 }
@@ -702,6 +718,12 @@ export interface FrameRequests {
   'convert.altChunkHtml': Rpc<ConvertAltChunkHtmlPayload, ConvertAltChunkHtmlResult>
   /** additive (A7): run the host's "Open in desktop app" flow; send only with the `desktopOpen` capability */
   'app.open': Rpc<AppOpenPayload, AppOpenResult>
+  /**
+   * additive (A1b, Markdown/HTML frames): fresh URLs for relative paths as written in the document
+   * (typed after the open, or the open answer's URLs about to expire). An old host answers
+   * `unsupported`; the frame keeps the URLs it has.
+   */
+  'api.assets.resolve': Rpc<ApiAssetsResolvePayload, ApiAssetsResolveResult>
 }
 
 /** Events the frame sends to the host. */
@@ -767,6 +789,7 @@ const FRAME_REQUESTS: Record<FrameRequestType, true> = {
   'image.fetch': true,
   'convert.altChunkHtml': true,
   'app.open': true,
+  'api.assets.resolve': true,
 }
 const FRAME_EVENTS: Record<FrameEventType, true> = {
   ready: true,
@@ -988,6 +1011,15 @@ const PAYLOAD_VALIDATORS: Record<string, (x: unknown) => boolean> = {
   'request:image.fetch': (x) => isObj(x) && isNonEmptyStr(x.url) && /^https?:\/\//i.test(x.url),
   'request:convert.altChunkHtml': (x) => isObj(x) && isStr(x.html),
   'request:app.open': (x) => isObj(x) && isOpt(x.feature, isStr),
+  'request:api.assets.resolve': (x) =>
+    isObj(x) &&
+    isOpt(x.fileId, isStr) &&
+    Array.isArray(x.paths) &&
+    x.paths.length >= 1 &&
+    x.paths.length <= MAX_ASSET_RESOLVE_PATHS &&
+    x.paths.every(
+      (p) => isStr(p) && new TextEncoder().encode(p).byteLength <= MAX_ASSET_PATH_BYTES,
+    ),
   // frame -> host events
   'event:ready': isReadyPayload,
   'event:dirty': (x) => isObj(x) && isBool(x.dirty),
@@ -1022,6 +1054,7 @@ const PAYLOAD_VALIDATORS: Record<string, (x: unknown) => boolean> = {
   'response:image.fetch': (x) =>
     isObj(x) &&
     (x.image === null || (isObj(x.image) && isStr(x.image.base64) && isStr(x.image.mime))),
+  'response:api.assets.resolve': (x) => isObj(x) && isAssetMap(x.assets),
   'response:app.open': (x) =>
     isObj(x) && isStr(x.outcome) && (APP_OPEN_OUTCOMES as readonly string[]).includes(x.outcome),
   'response:convert.altChunkHtml': (x) => isObj(x) && (x.data === null || isBuffer(x.data)),

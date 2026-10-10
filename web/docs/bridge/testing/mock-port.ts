@@ -109,6 +109,13 @@ export function createMockPort(session: Partial<PortSession> = {}) {
     },
     'image.fetch': () => ({ image: { base64: 'iVBORw0KGgo=', mime: 'image/png' } }),
     'convert.altChunkHtml': () => ({ data: new Uint8Array([0x50, 0x4b]).buffer }),
+    // not offered by the default mock host (an old host): the frame keeps the URLs it has
+    'app.open': () => {
+      throw protocolError('unsupported', 'app.open')
+    },
+    'api.assets.resolve': () => {
+      throw protocolError('unsupported', 'api.assets.resolve')
+    },
   }
 
   const initSession: PortSession = { documentId: session.documentId ?? 'missing', ...session }

@@ -213,3 +213,49 @@ describe('app.open + desktopOpen (A7 contract, additive)', () => {
     expect(ready({ desktopOpen: 'yes' }).ok).toBe(false)
   })
 })
+
+describe('api.assets.resolve (A1b contract, additive)', () => {
+  const req = (payload: unknown) =>
+    parseEnvelope(env({ kind: 'request', type: 'api.assets.resolve', payload }))
+  const res = (payload: unknown) =>
+    parseEnvelope(env({ kind: 'response', type: 'api.assets.resolve', payload }))
+
+  it('accepts 1..50 paths, with or without the file id', () => {
+    expect(req({ paths: ['assets/a.png'] }).ok).toBe(true)
+    expect(req({ fileId: 'f1', paths: ['./img/new.svg', 'a b.png'] }).ok).toBe(true)
+    expect(req({ paths: Array.from({ length: 50 }, (_, i) => `p${i}.png`) }).ok).toBe(true)
+  })
+
+  it('rejects an empty list, more than 50 paths and a path over 512 bytes', () => {
+    expect(req({ paths: [] })).toMatchObject({ ok: false, reason: 'malformed' })
+    expect(req({ paths: Array.from({ length: 51 }, (_, i) => `p${i}.png`) })).toMatchObject({
+      ok: false,
+      reason: 'malformed',
+    })
+    expect(req({ paths: ['a'.repeat(512)] }).ok).toBe(true)
+    expect(req({ paths: ['a'.repeat(513)] })).toMatchObject({ ok: false, reason: 'malformed' })
+    // the limit is in bytes: 171 three-byte characters are 513 bytes
+    expect(req({ paths: ['\u4e2d'.repeat(171)] })).toMatchObject({ ok: false, reason: 'malformed' })
+    expect(req({ paths: ['\u4e2d'.repeat(170)] }).ok).toBe(true)
+  })
+
+  it('rejects a malformed request payload', () => {
+    expect(req({})).toMatchObject({ ok: false, reason: 'malformed' })
+    expect(req({ paths: 'assets/a.png' })).toMatchObject({ ok: false, reason: 'malformed' })
+    expect(req({ paths: [1] })).toMatchObject({ ok: false, reason: 'malformed' })
+    expect(req({ fileId: 5, paths: ['a'] })).toMatchObject({ ok: false, reason: 'malformed' })
+    expect(req(['a'])).toMatchObject({ ok: false, reason: 'malformed' })
+  })
+
+  it('the result is a path -> URL map; an empty map is valid (nothing resolved)', () => {
+    expect(res({ assets: {} }).ok).toBe(true)
+    expect(res({ assets: { 'assets/a.png': '/frame/assets/a.png?sig=1' } }).ok).toBe(true)
+    expect(res({ assets: { 'assets/a.png': 3 } })).toMatchObject({ ok: false, reason: 'malformed' })
+    expect(res({ assets: { 'assets/a.png': '' } })).toMatchObject({
+      ok: false,
+      reason: 'malformed',
+    })
+    expect(res({ assets: ['a'] })).toMatchObject({ ok: false, reason: 'malformed' })
+    expect(res({})).toMatchObject({ ok: false, reason: 'malformed' })
+  })
+})

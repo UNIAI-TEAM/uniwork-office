@@ -635,6 +635,46 @@ describe('app.open (A7 contract)', () => {
   })
 })
 
+describe('api.assets.resolve (A1b contract)', () => {
+  it('round-trips through the host api handler', async () => {
+    const handler = vi.fn(async () => ({ assets: { 'assets/a.png': '/f/a.png?sig=2' } }))
+    const { host, client } = setup({ api: { 'api.assets.resolve': handler } })
+    await host.whenReady()
+    await client.whenInitialized()
+    await expect(
+      client.request('api.assets.resolve', { fileId: 'f1', paths: ['assets/a.png'] }),
+    ).resolves.toEqual({ assets: { 'assets/a.png': '/f/a.png?sig=2' } })
+    expect(handler).toHaveBeenCalledWith(
+      { fileId: 'f1', paths: ['assets/a.png'] },
+      expect.anything(),
+    )
+  })
+
+  it('an old host without a handler answers unsupported', async () => {
+    const { host, client } = setup({})
+    await host.whenReady()
+    await client.whenInitialized()
+    await expect(
+      client.request('api.assets.resolve', { paths: ['assets/a.png'] }),
+    ).rejects.toMatchObject({ code: 'unsupported' })
+  })
+
+  it('the host rejects 0 or 51 paths before the handler runs', async () => {
+    const handler = vi.fn(async () => ({ assets: {} }))
+    const { host, client } = setup({ api: { 'api.assets.resolve': handler } })
+    await host.whenReady()
+    await expect(client.request('api.assets.resolve', { paths: [] })).rejects.toMatchObject({
+      code: 'malformed',
+    })
+    await expect(
+      client.request('api.assets.resolve', {
+        paths: Array.from({ length: 51 }, (_, i) => `p${i}.png`),
+      }),
+    ).rejects.toMatchObject({ code: 'malformed' })
+    expect(handler).not.toHaveBeenCalled()
+  })
+})
+
 describe('timeouts and cancellation', () => {
   it('rejects with timeout and clears the pending entry', async () => {
     vi.useFakeTimers()
