@@ -50,12 +50,29 @@ describe('frameAsk', () => {
     expect(document.querySelector('.ow-dlg-mask')).toBeNull()
   })
 
-  it('first focus is the safe primary (Reload latest), never the destructive choice', async () => {
+  it('first focus is Cancel when the caller names no primary: Enter never discards edits', async () => {
     const done = conflict()
-    expect(document.activeElement).toBe(btn('reload'))
+    // Reload latest is lifted to the filled primary for looks, yet Enter must not trigger it
+    expect(btn('reload').className).toBe('ow-dlg-btn primary')
+    expect(document.activeElement).toBe(btn('cancel'))
+    expect(document.activeElement).not.toBe(btn('reload'))
     expect(document.activeElement).not.toBe(btn('overwrite'))
     btn('overwrite').click()
     expect(await done).toBe('overwrite')
+  })
+
+  it('a named safe primary keeps the first focus (leave and draft dialogs)', () => {
+    void frameAsk({
+      title: 't',
+      body: 'b',
+      choices: [
+        { id: 'discard', label: 'Discard', danger: true },
+        { id: 'restore', label: 'Restore', primary: true },
+      ],
+      cancelId: 'dismiss',
+      marker: 'draft',
+    })
+    expect(document.activeElement).toBe(btn('restore'))
   })
 
   it('a dialog with no primary lifts its first neutral choice to the filled primary', () => {
@@ -176,14 +193,16 @@ describe('frameAsk', () => {
     document.body.append(opener)
     opener.focus()
     const done = conflict()
-    // order: Reload latest, Overwrite, Cancel, then the close X; the loop wraps both ways
-    keydown('Tab')
-    expect(document.activeElement).toBe(btn('overwrite'))
-    keydown('Tab')
+    // order: Reload latest, Overwrite, Cancel, then the close X; the focus starts on Cancel and
+    // the loop wraps both ways
     expect(document.activeElement).toBe(btn('cancel'))
     keydown('Tab')
     expect(document.activeElement).toBe(document.querySelector('.ow-dlg-close'))
     keydown('Tab')
+    expect(document.activeElement).toBe(btn('reload'))
+    keydown('Tab')
+    expect(document.activeElement).toBe(btn('overwrite'))
+    keydown('Tab', true)
     expect(document.activeElement).toBe(btn('reload'))
     keydown('Tab', true)
     expect(document.activeElement).toBe(document.querySelector('.ow-dlg-close'))

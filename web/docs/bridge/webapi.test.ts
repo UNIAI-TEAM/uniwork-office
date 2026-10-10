@@ -237,14 +237,14 @@ describe('saveDocx', () => {
     expect(mock.errors).toHaveLength(2)
   })
 
-  it('conflict dialog: focus starts on Reload latest, Overwrite is destructive, Esc cancels, Tab stays inside', async () => {
+  it('conflict dialog: focus starts on Cancel, Overwrite is destructive, Esc cancels, Tab stays inside', async () => {
     const doc = await bootWith()
     mock.bumpRemote('f1')
     const pending = api.saveDocx(doc.path, buf([5]))
     const dlg = await dialogShown('conflict')
     const btn = (id: string) => dlg.querySelector<HTMLButtonElement>(`[data-choice="${id}"]`)!
-    // a stray Enter must not overwrite the other writer's version
-    expect(document.activeElement).toBe(btn('reload'))
+    // a stray Enter must neither overwrite the other writer's version nor discard the edits
+    expect(document.activeElement).toBe(btn('cancel'))
     expect(btn('reload').className).toBe('ow-dlg-btn primary')
     expect(btn('overwrite').className).toBe('ow-dlg-btn danger')
     expect(btn('overwrite').classList.contains('primary')).toBe(false)
@@ -254,16 +254,19 @@ describe('saveDocx', () => {
     )
     // the host learns that a frame modal is open (protocol `modal`)
     expect(mock.modals).toEqual([true])
-    // Tab cycles inside the dialog (reload, overwrite, the way out, then the close X): reload ->
-    // overwrite -> cancel -> X -> reload; Shift+Tab goes back
+    // Tab cycles inside the dialog (reload, overwrite, the way out, then the close X), starting
+    // from Cancel: cancel -> X -> reload -> overwrite; Shift+Tab goes back
     const tab = (shiftKey = false) =>
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey, bubbles: true }))
     tab()
-    expect(document.activeElement).toBe(btn('overwrite'))
-    tab()
-    expect(document.activeElement).toBe(btn('cancel'))
-    tab()
     expect(document.activeElement).toBe(dlg.querySelector('.ow-dlg-close'))
+    tab()
+    expect(document.activeElement).toBe(btn('reload'))
+    tab()
+    expect(document.activeElement).toBe(btn('overwrite'))
+    tab(true)
+    expect(document.activeElement).toBe(btn('reload'))
+    tab(true)
     tab(true)
     expect(document.activeElement).toBe(btn('cancel'))
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
