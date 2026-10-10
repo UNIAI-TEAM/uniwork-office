@@ -48,7 +48,7 @@ async function mount(activeKey: string, widths: { scrollWidth: number; clientWid
   roots.push({ root, container })
   const el = container.querySelector<HTMLElement>('.ribbon-tab-scroll')!
   metrics(el, widths)
-  return { el, render, scrolled: () => scrolledIntoView }
+  return { el, container, render, scrolled: () => scrolledIntoView }
 }
 
 describe('RibbonTabScroller', () => {
@@ -72,6 +72,31 @@ describe('RibbonTabScroller', () => {
     await act(async () => el.dispatchEvent(new Event('scroll')))
     expect(el.hasAttribute('data-fade-end')).toBe(false)
     expect(el.hasAttribute('data-fade-start')).toBe(true)
+  })
+
+  // N3-06 (visual round 3): the fade alone was not read as "more tabs" at 390 px
+  it('shows a chevron on the edge that hides tabs, and a click scrolls the row', async () => {
+    const { el, container } = await mount('home', { scrollWidth: 600, clientWidth: 300 })
+    let scrolled = 0
+    el.scrollBy = ((opts: ScrollToOptions) => {
+      scrolled += opts.left ?? 0
+    }) as typeof el.scrollBy
+    await act(async () => el.dispatchEvent(new Event('scroll')))
+    const end = container.querySelector<HTMLElement>('.ribbon-tab-cue[data-edge="end"]')
+    expect(end).not.toBeNull()
+    expect(container.querySelector('.ribbon-tab-cue[data-edge="start"]')).toBeNull()
+    await act(async () => end!.click())
+    expect(scrolled).toBeGreaterThan(0)
+    el.scrollLeft = 300
+    await act(async () => el.dispatchEvent(new Event('scroll')))
+    expect(container.querySelector('.ribbon-tab-cue[data-edge="end"]')).toBeNull()
+    expect(container.querySelector('.ribbon-tab-cue[data-edge="start"]')).not.toBeNull()
+  })
+
+  it('shows no chevron while every tab fits', async () => {
+    const { el, container } = await mount('home', { scrollWidth: 300, clientWidth: 300 })
+    await act(async () => el.dispatchEvent(new Event('scroll')))
+    expect(container.querySelector('.ribbon-tab-cue')).toBeNull()
   })
 
   it('scrolls the selected tab into view when the selection changes', async () => {

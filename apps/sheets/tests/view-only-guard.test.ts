@@ -103,6 +103,16 @@ describe('installViewOnlyGuard', () => {
     expect(run('sheet.operation.set-cell-edit-visible', { visible: false })).toBe(false)
   })
 
+  it('still cancels edits but says nothing when the host banner owns view-only (viewOnlyChip off)', () => {
+    frame({ platform: 'web', save: false, viewOnlyChip: false })
+    const { runtime, run, startEdit } = fakeRuntime()
+    const notify = vi.fn()
+    installViewOnlyGuard(runtime, notify)
+    expect(run('sheet.command.set-range-values', { value: { v: 1 } })).toBe(true)
+    expect(startEdit()).toBe(true)
+    expect(notify).not.toHaveBeenCalled()
+  })
+
   it('refuses to open any cell editor (formula bar, F2, double click), so nothing turns dirty', () => {
     frame({ platform: 'web', save: false })
     const { runtime, startEdit } = fakeRuntime()

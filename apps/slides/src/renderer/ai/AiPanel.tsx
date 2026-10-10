@@ -70,6 +70,7 @@ import fileVoiceIcon from '../assets/file-voice.png'
 import fileDocumentIcon from '../assets/file-document.png'
 import fileGeneralIcon from '../assets/file-general.png'
 import { IconNewChat, IconSidebarCollapseLeft } from '../components/icons'
+import { cap } from '../capabilities'
 
 interface ToolActivity {
   name: string
@@ -2253,7 +2254,9 @@ export function AiPanel({
               )}
               {entry.tools && entry.tools.length > 0 && <ToolChipList tools={entry.tools} />}
               {entry.error && (
-                <div className="ai-msg-error">{t('aiMsgError', { error: entry.error })}</div>
+                <div className="ai-msg-error">
+                  {cap('errorLabel') ? t('aiMsgError', { error: entry.error }) : entry.error}
+                </div>
               )}
               {entry.deckProgress && <DeckProgressCard progress={entry.deckProgress} />}
               {showToolbar && (

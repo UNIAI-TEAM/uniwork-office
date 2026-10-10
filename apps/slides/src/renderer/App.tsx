@@ -49,6 +49,7 @@ import { ZOOM_PREVIEW_EVENT } from './zoom-preview'
 import { ZOOM_MAX, ZOOM_MIN, clampZoom, nextPreset, notchStep, prevPreset } from './zoom-steps'
 import type { DrawRect } from './draw-shape'
 import { paragraphsBlank } from './textbox-insert'
+import { setPendingTextEditProbe } from './pending-text-edit'
 import { SlideThumb } from './SlideThumb'
 import { useVisibleThumbs } from './use-visible-thumbs'
 import { MasterView } from './MasterView'
@@ -2623,6 +2624,24 @@ export function App() {
     [editing, current, discardEmptyTextBox],
   )
 
+  // The open text box's uncommitted content, for the web frame's draft copy (see pending-text-edit.ts)
+  const pendingParagraphsRef = useRef<(() => EditParagraph[] | null) | null>(null)
+  useEffect(() => {
+    if (!editing) return
+    setPendingTextEditProbe(() => {
+      const paragraphs = pendingParagraphsRef.current?.()
+      if (!paragraphs) return null
+      if (editing.discardIfEmpty && paragraphsBlank(paragraphs)) return null
+      return {
+        slideIndex: current,
+        sourceId: editing.sourceId,
+        ...(editing.groupId ? { groupId: editing.groupId } : {}),
+        paragraphs,
+      }
+    })
+    return () => setPendingTextEditProbe(null)
+  }, [editing, current])
+
   // ⌘+click on a linked run while editing: jump in the editor / open externally (same routing as the show)
   const followRunLink = useCallback(
     (target: LinkTargetOp) => {
@@ -4246,6 +4265,7 @@ export function App() {
                                     : (paragraphs) => void nextPlaceholder(paragraphs)
                                 }
                                 onFollowLink={followRunLink}
+                                probeRef={pendingParagraphsRef}
                                 frameColor={selectionChromeColor(slide, images, editNode.box)}
                                 zoom={zoom}
                                 onContextMenu={onTextContextMenu}

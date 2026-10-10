@@ -465,6 +465,10 @@ test.describe('slides web module', () => {
     await expect(scroll).toHaveAttribute('data-fade-end', /.*/)
     const m = await scroll.evaluate((el) => ({ sw: el.scrollWidth, cw: el.clientWidth }))
     expect(m.sw).toBeGreaterThan(m.cw)
+    // the fade is joined by a chevron on the hidden edge, and the tabs are touch-sized (N3-06)
+    await expect(frame.locator('.ribbon-tab-cue[data-edge="end"]')).toBeVisible()
+    const tab = (await frame.locator('.ribbon-tab-scroll .ribbon-tab').first().boundingBox())!
+    expect(tab.height).toBeGreaterThanOrEqual(44)
     // the page itself never scrolls sideways
     expect(await frame.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,

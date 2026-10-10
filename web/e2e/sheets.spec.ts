@@ -470,14 +470,13 @@ test('view-only without the save grant (vi, light)', async ({ page }) => {
   // no Save / Save As in the quick-access bar; Ctrl+S saves nothing
   expect(await frame.locator('button.qa-btn[aria-label*="⌘S"]').count()).toBe(0)
   // the grid itself is locked (SH3): typing starts no editor and changes nothing, so the host never
-  // hears of pending edits; the user is told once that the workbook is view-only
+  // hears of pending edits. The host banner is the one announcement of view-only: no red toast per
+  // refused keystroke and no copy in the status bar (N3-05)
   await typeIntoGrid(page, frame, [{ cell: 'A1', text: '1' }])
-  await expect(
-    frame
-      .locator('.app-toast')
-      .filter({ hasText: /chỉ xem/i })
-      .first(),
-  ).toBeVisible()
+  await page.waitForTimeout(500)
+  await expect(frame.locator('.app-toast').filter({ hasText: /chỉ xem/i })).toHaveCount(0)
+  await expect(frame.locator('.status-msg')).not.toContainText(/chỉ xem/i)
+  await expect(frame.locator('.workbook-status')).toHaveCount(0)
   // the formula bar, F2 and a double click open an editor too: none of them may start one, so the
   // frame never turns dirty (no Save leave dialog for a workbook that can never be saved)
   const formulaBar = frame.locator(

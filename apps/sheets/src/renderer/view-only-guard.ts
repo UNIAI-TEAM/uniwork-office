@@ -14,7 +14,7 @@
  * modal "no permission" dialog (unlocalized to the host language, blocks the page). The guard is
  * the equivalent lock without either effect, and its notice is the app's own localized toast.
  */
-import { isViewOnly } from './capabilities'
+import { cap, isViewOnly } from './capabilities'
 import { t } from './i18n/locale'
 import { commandGuardKind } from './sheet-protection'
 import { journalSuppression, type UniverRuntime } from './univer-state'
@@ -45,6 +45,8 @@ export function installViewOnlyGuard(
   let lastNotice = 0
   const refuse = (event: { cancel?: boolean }): void => {
     event.cancel = true
+    // the web host's banner says it (viewOnlyChip off): no toast per refused keystroke
+    if (!cap('viewOnlyChip')) return
     const now = Date.now()
     if (now - lastNotice < NOTIFY_INTERVAL_MS) return
     lastNotice = now

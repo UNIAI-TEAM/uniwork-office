@@ -16,9 +16,12 @@ export function sheetsWebCapabilities(
 ): Readonly<Omit<SheetsCapabilities, 'platform'>> {
   return Object.freeze({
     ...(MODULE_WEB_CAPABILITIES as Record<
-      'ai' | 'aiCredentials' | 'open' | 'recents' | 'autoSave',
+      'ai' | 'aiCredentials' | 'open' | 'recents' | 'autoSave' | 'viewOnlyChip',
       boolean
     >),
+    // one announcement per state: the status bar says it once, the ribbon row does not repeat it
+    // and the AI run states stay in the AI panel
+    statusEcho: false,
     // AI family: off until the host grants it (sheetsHostGrants, CONTRACT C16); the cloud tools also
     // need the server's tool switch (modules/shared/ai/web-ai.ts applyCloud)
     webSearch: false,

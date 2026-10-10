@@ -25,6 +25,9 @@ export const SLIDES_WEB_CAPABILITIES: Readonly<Record<string, unknown>> = Object
   // the host's "Open in desktop app" flow (A7 contract, `app.open`): on with the host's grant; the
   // "use the app" notes show their action only then
   desktopOpen: false,
+  // the AI panel's inline error is a full, typed sentence on the web ("No AI key yet. ..."): no
+  // "Error:" label before it
+  errorLabel: false,
 })
 
 /** host grants -> keys: File > Open (filePick), recents, and saving (a frame without `save` is view-only) */

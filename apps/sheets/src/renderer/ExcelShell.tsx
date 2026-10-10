@@ -956,14 +956,16 @@ export function ExcelShell({
             ))}
           </RibbonTabScroller>
           <span className="ribbon-tabs-spacer" />
-          <span
-            className="workbook-status"
-            role="status"
-            aria-live="polite"
-            title={statusMessage || undefined}
-          >
-            {statusMessage}
-          </span>
+          {cap('statusEcho') && (
+            <span
+              className="workbook-status"
+              role="status"
+              aria-live="polite"
+              title={statusMessage || undefined}
+            >
+              {statusMessage}
+            </span>
+          )}
         </nav>
 
         <Ribbon
@@ -1069,7 +1071,13 @@ export function ExcelShell({
           {/* Status bar spans the sheet column only — the AI dock keeps the full window height (unified with docs/slides). */}
           <footer className="status-bar" onContextMenu={openStatsMenu}>
             <div className="status-left">
-              <span className="status-msg">{statusMessage}</span>
+              {/* without the ribbon-row copy (statusEcho off) the status bar is the live region */}
+              <span
+                className="status-msg"
+                {...(cap('statusEcho') ? {} : { role: 'status', 'aria-live': 'polite' as const })}
+              >
+                {statusMessage}
+              </span>
             </div>
             <div className="status-right">
               {/* One-of-N view switcher, so it is a radiogroup rather than a

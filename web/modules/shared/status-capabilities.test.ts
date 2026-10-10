@@ -35,6 +35,15 @@ describe('host-announced states', () => {
     })
   }
 
+  it('sheets: the ribbon-row echo of the status bar and the AI run states are off too', () => {
+    expect(sheetsWebCapabilities({ kind: 'wasm', features: {} } as never).statusEcho).toBe(false)
+  })
+
+  it('slides: the AI panel keeps no "Error:" label before its typed inline error', () => {
+    expect(SLIDES_WEB_CAPABILITIES.errorLabel).toBe(false)
+    expect('errorLabel' in slidesHostGrants(ALL_GRANTS as never)).toBe(false)
+  })
+
   it('no host grant switches them back on', () => {
     for (const grants of [
       hostGrants(ALL_GRANTS as never),

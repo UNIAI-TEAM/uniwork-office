@@ -563,7 +563,9 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
     if (hostSave) hostSave.error = res.error
     if (res.error.code === 'conflict') {
       port.reportError(res.error, false)
-      if (hostSave) throw new Error(res.error.message)
+      // the host owns the conflict UI; the frame only says so in the page language (the server's
+      // own message is in the account language and never shown)
+      if (hostSave) throw new Error(text('appWebConflictNotSaved'))
       return resolveConflict(fileId, data)
     }
     if (res.error.code === 'timeout' || res.error.code === 'network') {

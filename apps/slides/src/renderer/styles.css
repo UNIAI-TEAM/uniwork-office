@@ -596,6 +596,57 @@ button {
 
 /* the tab buttons: scroll sideways when the frame is too narrow (the File menu and the quick
  * buttons sit outside); an edge fade (data-fade-*, set by RibbonTabScroller) is the cue */
+/* the wrapper carries the chevron cues, which cannot sit inside the scroll container */
+.ribbon-tab-scroll-wrap {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  align-items: center;
+}
+
+.ribbon-tab-cue {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  width: 20px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.ribbon-tab-cue[data-edge='start'] {
+  inset-inline-start: 0;
+  justify-content: flex-start;
+}
+
+.ribbon-tab-cue[data-edge='end'] {
+  inset-inline-end: 0;
+  justify-content: flex-end;
+}
+
+/* the chevron points the way the row will scroll */
+.ribbon-tab-cue[data-edge='start'] svg {
+  transform: scaleX(-1);
+}
+
+[dir='rtl'] .ribbon-tab-cue[data-edge='start'] svg {
+  transform: none;
+}
+
+[dir='rtl'] .ribbon-tab-cue[data-edge='end'] svg {
+  transform: scaleX(-1);
+}
+
+.ribbon-tab-cue:hover {
+  color: var(--text);
+}
+
 .ribbon-tab-scroll {
   display: flex;
   align-items: center;
@@ -613,6 +664,14 @@ button {
 .ribbon-tab-scroll .ribbon-tab {
   flex: none;
   white-space: nowrap;
+}
+
+/* phone width: the tabs reach the 44 px touch target */
+@media (max-width: 719px) {
+  .ribbon-tab-scroll .ribbon-tab {
+    min-height: 44px;
+    padding-inline: 12px;
+  }
 }
 
 .ribbon-tab-scroll[data-fade-end] {

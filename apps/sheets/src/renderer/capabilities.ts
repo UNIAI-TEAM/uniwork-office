@@ -20,6 +20,9 @@
  * | open             | File > Open / Ctrl+O (on with the host's `filePick` grant)                        |
  * | save / saveAs    | Save, Ctrl+S / Save As (on with the host's grants; no `save` = view-only)        |
  * | exportCsv        | CSV export                                                                       |
+ * | viewOnlyChip     | the renderer's own "view only" status text + toast (one host banner owns it)     |
+ * | statusEcho       | the ribbon-row copy of the status bar message and the AI run states ("AI is      |
+ * |                  | thinking…" / "AI finished") that the AI panel already shows                      |
  * | xlsxEngine       | the whole workbook surface: off = the "cannot be opened on the web yet" screen   |
  * | recalcFallback   | IronCalc recalc fallback (C11: hidden on the web)                                |
  * | xlsImport        | opening legacy .xls (until the engine converts it)                               |
@@ -51,6 +54,8 @@ export type SheetsCapability =
   | 'xlsImport'
   | 'pivotRefresh'
   | 'mergeWorkbooks'
+  | 'viewOnlyChip'
+  | 'statusEcho'
 
 // structural read: the web module typechecks this file without the renderer's Window augmentation
 type CapabilityHolder = { desktopApi?: { capabilities?: Readonly<Record<string, unknown>> } }

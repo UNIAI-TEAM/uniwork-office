@@ -1411,8 +1411,8 @@ export function App({
         onText: (text) => {
           if (text) runLastTextRef.current = text
           // Status bar (and the ribbon-row status span) show a short state only;
-          // the full streamed prose lives in the chat panel.
-          setMessage(t('appAiThinking'))
+          // the full streamed prose lives in the chat panel (web: not echoed at all).
+          if (cap('statusEcho')) setMessage(t('appAiThinking'))
           // When the model retries successfully and keeps streaming after a
           // mid-run failure (e.g. one apply error), clear the error flag —
           // otherwise the whole successful message stays rendered in red.
@@ -1500,7 +1500,7 @@ export function App({
           const finalText = truncated
             ? [baseText, t('appAiTruncatedNote')].filter(Boolean).join('\n\n')
             : baseText
-          setMessage(cancelled ? t('appAiStopped') : t('appAiDone'))
+          if (cap('statusEcho')) setMessage(cancelled ? t('appAiStopped') : t('appAiDone'))
           patchLastAssistant((entry) => ({
             ...entry,
             text: finalText,
@@ -1579,7 +1579,7 @@ export function App({
     runLastTextRef.current = ''
     runMutatedRef.current = false
     setAiBusy(true)
-    setMessage(t('appAiThinking'))
+    if (cap('statusEcho')) setMessage(t('appAiThinking'))
     appendChat({ role: 'assistant', text: '', tools: [], streaming: true })
     void collectImageAttachments(sentAttachments)
       .then((images) => {
