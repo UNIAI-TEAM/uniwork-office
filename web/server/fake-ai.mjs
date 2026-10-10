@@ -22,6 +22,9 @@
 //     unauthorizedOnce?: true                          next AI request answers 401 (token refresh)
 //     cloud?: { enabled?, reason?, tools?, credits? }  GET cloud state
 //     reply?: string                                   the model's streamed answer
+//     toolCalls?: [{ name, input }]                    scripted tool calls (openai-compatible stream):
+//                                                      the next streamed turns answer one each; the
+//                                                      turn after them is the plain `reply`
 //     credentials?: [{ provider, api_key, base_url? }] seed stored keys }
 // GET /__fake-ai/log -> [{ method, path, authorization, cookie, body }] of the AI requests.
 
@@ -61,6 +64,7 @@ function freshState() {
     fail: [],
     unauthorizedOnce: false,
     reply: 'Hello from the UniWork AI proxy.',
+    toolCalls: [],
     cloud: {
       enabled: true,
       tools: {
@@ -170,6 +174,25 @@ async function byok(req, res, provider, tail, body) {
           { index: 0, message: { role: 'assistant', content: reply }, finish_reason: 'stop' },
         ],
       })
+    }
+    // a scripted tool call (agent turns): one per streamed turn, then the plain reply
+    const call = state.toolCalls.shift()
+    if (call) {
+      const delta = {
+        tool_calls: [
+          {
+            index: 0,
+            id: `call_${Date.now()}`,
+            type: 'function',
+            function: { name: call.name, arguments: JSON.stringify(call.input ?? {}) },
+          },
+        ],
+      }
+      return sse(res, [
+        `data: ${JSON.stringify({ choices: [{ index: 0, delta }] })}\n\n`,
+        `data: ${JSON.stringify({ choices: [{ index: 0, delta: {}, finish_reason: 'tool_calls' }] })}\n\n`,
+        'data: [DONE]\n\n',
+      ])
     }
     return sse(res, [
       ...parts(reply).map(
@@ -331,6 +354,7 @@ export async function handleFakeAiControl(req, res, pathname) {
     if (Array.isArray(body.fail)) state.fail.push(...body.fail)
     if (body.unauthorizedOnce) state.unauthorizedOnce = true
     if (typeof body.reply === 'string') state.reply = body.reply
+    if (Array.isArray(body.toolCalls)) state.toolCalls.push(...body.toolCalls)
     if (body.cloud)
       state.cloud = {
         ...state.cloud,
