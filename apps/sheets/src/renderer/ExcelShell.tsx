@@ -107,12 +107,13 @@ import { HeaderFooterDialog, type HeaderFooterResult } from './HeaderFooterDialo
 import type { PrintPreviewHost } from './page-layout-actions'
 import { PrintDialog } from './PrintDialog'
 import type { HeaderFooterParts } from './edit-journal'
-import { cap } from './capabilities'
+import { cap, platform } from './capabilities'
 import { isNarrowViewport } from './narrow-layout'
 import { useModalDialog } from './modal-dialog'
 import type { SelectedTableRibbon } from './table-design-actions'
 import type { TableOptionKey } from './table-design'
 import { builtinTablePalette, tableStyleNames, type TableStyleFamily } from './table-styles'
+import { RibbonTabScroller } from './RibbonTabScroller'
 import { STATUS_BAR_FUNCS, type StatusBarFunc } from './status-bar-stats'
 import { SHEET_ZOOM_MAX, SHEET_ZOOM_MIN, clampZoomPercent } from './zoom-range'
 import { ZoomDialog } from './ZoomDialog'
@@ -806,6 +807,8 @@ export function ExcelShell({
   const gotoTip = t('appGoToButtonTitle')
   const gotoTipRef = useRef(gotoTip)
   gotoTipRef.current = gotoTip
+  const onGoToReferenceRef = useRef(onGoToReference)
+  onGoToReferenceRef.current = onGoToReference
   useEffect(() => {
     const button = document.querySelector<HTMLButtonElement>('.goto-in-bar')
     if (button) button.dataset['tip'] = gotoTip
@@ -828,6 +831,22 @@ export function ExcelShell({
         wrapper.after(button)
       }
       if (button.dataset['tip'] !== gotoTipRef.current) button.dataset['tip'] = gotoTipRef.current
+      // Enter in Univer's Name Box: a reference we can resolve goes through goToReference (the
+      // Go To dialog's path) instead of Univer's own jump. Univer selects the cell but does not
+      // scroll to it or stream its rows in when the selection does not change, so a jump back to
+      // the already active cell left the grid where it was, and the first edit there was refused
+      // ("still streaming in") instead of landing. Anything goToReference cannot resolve (a new
+      // name to define) is left to Univer. A native listener runs before React's delegated one.
+      const input = wrapper.querySelector<HTMLInputElement>('input')
+      if (input && input.dataset['gotoHook'] === undefined) {
+        input.dataset['gotoHook'] = '1'
+        input.addEventListener('keydown', (event) => {
+          if (event.key !== 'Enter' || event.isComposing) return
+          if (onGoToReferenceRef.current(input.value) !== null) return
+          event.preventDefault()
+          event.stopPropagation()
+        })
+      }
     }
     ensure()
     const container = document.getElementById('univer-container')
@@ -856,7 +875,8 @@ export function ExcelShell({
     >
       <header className={`excel-header ${collapse.rootClass}`} ref={collapse.rootRef}>
         <nav
-          className={`ribbon-tabs ${IN_TAB ? '' : IS_MAC ? 'ribbon-tabs-mac' : 'ribbon-tabs-win'}`}
+          // the window-chrome insets are desktop caption buttons: a web frame has none (150px lost at 390 px)
+          className={`ribbon-tabs ${IN_TAB || platform() === 'web' ? '' : IS_MAC ? 'ribbon-tabs-mac' : 'ribbon-tabs-win'}`}
           aria-label={t('appScopeWorkbook')}
           onDoubleClick={collapse.onTabsDoubleClick}
         >
@@ -920,19 +940,21 @@ export function ExcelShell({
             </label>
           )}
           <span className="qa-sep" aria-hidden="true" />
-          {visibleTabs.map((tab) => (
-            <button
-              className={`${collapse.tabClass(tab === activeTab)} ${CONTEXTUAL_TABS.includes(tab) ? 'contextual' : ''}`}
-              data-tip={collapse.tabTip(tab === activeTab)}
-              key={tab}
-              onClick={() => {
-                collapse.onTabPress(tab === activeTab)
-                setActiveTab(tab)
-              }}
-            >
-              {t(TAB_LABEL[tab])}
-            </button>
-          ))}
+          <RibbonTabScroller activeKey={activeTab}>
+            {visibleTabs.map((tab) => (
+              <button
+                className={`ribbon-tab ${collapse.tabClass(tab === activeTab)} ${CONTEXTUAL_TABS.includes(tab) ? 'contextual' : ''}`}
+                data-tip={collapse.tabTip(tab === activeTab)}
+                key={tab}
+                onClick={() => {
+                  collapse.onTabPress(tab === activeTab)
+                  setActiveTab(tab)
+                }}
+              >
+                {t(TAB_LABEL[tab])}
+              </button>
+            ))}
+          </RibbonTabScroller>
           <span className="ribbon-tabs-spacer" />
           <span
             className="workbook-status"

@@ -778,4 +778,5 @@ export const nl = {
   ribbonZoomSectionItem: 'Dia {n} Sectie {k}: {name}',
   ribbonZoomSelectedSlides: "{n} dia's geselecteerd",
   ribbonZoomSelectedSections: '{n} secties geselecteerd',
+  ribbonFileExportPdfPrint: 'PDF in drukkwaliteit…',
 } satisfies Record<keyof typeof zh, string>

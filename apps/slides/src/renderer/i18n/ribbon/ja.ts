@@ -785,4 +785,5 @@ export const ja = {
   ribbonZoomSectionItem: 'スライド {n} セクション {k}: {name}',
   ribbonZoomSelectedSlides: '{n} 枚のスライドを選択中',
   ribbonZoomSelectedSections: '{n} 個のセクションを選択中',
+  ribbonFileExportPdfPrint: '印刷品質の PDF…',
 } satisfies Record<keyof typeof zh, string>

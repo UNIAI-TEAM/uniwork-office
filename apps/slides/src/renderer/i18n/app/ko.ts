@@ -239,4 +239,8 @@ export const ko = {
   appStatusSummaryZoomInserted: '타일 {count}개가 있는 요약 확대/축소 슬라이드 삽입됨',
   appSectionSummary: '요약 구역',
   appSectionN: '구역 {n}',
+  appUseAppTitle: '앱에서 사용 가능',
+  appUseAppMessage: 'UniWork Office 앱에서 열어 이 기능을 사용하세요',
+  appUseAppAction: '앱에서 열기',
+  appUseAppClose: '닫기',
 } satisfies Record<keyof typeof zh, string>

@@ -135,7 +135,11 @@ loader-style aggregators in all four domains; not cheap, and the size win (about
 - Read-only documents: the host falls back to G3 for `writable:false` (B5 decision 1); the frame has no read-only mode.
 - Draft recovery: encrypted IndexedDB copy while dirty, Restore/Discard on reopen (C15(3)/C18, supersedes B5
   decision 3; [draft-recovery.md](draft-recovery.md)); still no autosave (C10).
-- External linked media playback (hidden), server-side print-quality PDF (not needed in v1).
+- External linked media playback and server-side print-quality PDF are not in the web (UNI-1232): a click on a linked
+  clip in the show, and File > Print-quality PDF, open the localised "Open in the UniWork Office app to use this
+  feature" dialog (`UseAppDialog`, keys `appUseApp*`). Only when the host grants the `desktopOpen` capability does the
+  dialog add an Open-in-app button that sends the protocol request `app.open` (`feature`: `slides.linkedMedia` /
+  `slides.printPdf`); an old host or a refusal leaves the message alone.
 - Audience fullscreen needs one click in the audience window (browser rule); a Chrome "fullscreen popup" (window-management +
   one gesture) could remove it once it ships by default.
 - Clipboard read needs a user gesture and permission in the browser; `clipboardExternal` degrades to text / none.

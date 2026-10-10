@@ -229,4 +229,8 @@ export const zhTW = {
   appStatusSummaryZoomInserted: '已插入摘要縮放頁（{count} 個縮圖）',
   appSectionSummary: '摘要節',
   appSectionN: '第 {n} 節',
+  appUseAppTitle: '應用程式中提供',
+  appUseAppMessage: '在 UniWork Office 應用程式中開啟以使用此功能',
+  appUseAppAction: '在應用程式中開啟',
+  appUseAppClose: '關閉',
 } satisfies Record<keyof typeof zh, string>

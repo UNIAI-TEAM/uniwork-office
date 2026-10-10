@@ -755,4 +755,5 @@ export const th = {
   ribbonZoomSectionItem: 'สไลด์ {n} ส่วน {k}: {name}',
   ribbonZoomSelectedSlides: 'เลือกแล้ว {n} สไลด์',
   ribbonZoomSelectedSections: 'เลือกแล้ว {n} ส่วน',
+  ribbonFileExportPdfPrint: 'PDF คุณภาพสำหรับพิมพ์…',
 } satisfies Record<keyof typeof zh, string>

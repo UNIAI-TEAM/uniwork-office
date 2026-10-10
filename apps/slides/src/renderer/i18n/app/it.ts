@@ -256,4 +256,8 @@ export const it = {
   appStatusSummaryZoomInserted: 'Diapositiva zoom riepilogo inserita con {count} riquadri',
   appSectionSummary: 'Sezione riepilogo',
   appSectionN: 'Sezione {n}',
+  appUseAppTitle: 'Disponibile nell’app',
+  appUseAppMessage: 'Apri nell’app UniWork Office per usare questa funzione',
+  appUseAppAction: 'Apri nell’app',
+  appUseAppClose: 'Chiudi',
 } satisfies Record<keyof typeof zh, string>

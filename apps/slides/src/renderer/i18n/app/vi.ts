@@ -244,4 +244,8 @@ export const vi = {
   appStatusSummaryZoomInserted: 'Đã chèn trang chiếu Thu phóng tóm tắt với {count} ô thu nhỏ',
   appSectionSummary: 'Phần tóm tắt',
   appSectionN: 'Phần {n}',
+  appUseAppTitle: 'Có trong ứng dụng',
+  appUseAppMessage: 'Mở trong ứng dụng UniWork Office để dùng tính năng này',
+  appUseAppAction: 'Mở trong ứng dụng',
+  appUseAppClose: 'Đóng',
 } satisfies Record<keyof typeof zh, string>

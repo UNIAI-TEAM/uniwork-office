@@ -771,4 +771,5 @@ export const ru = {
   ribbonZoomSectionItem: 'Слайд {n} Раздел {k}: {name}',
   ribbonZoomSelectedSlides: 'Выбрано слайдов: {n}',
   ribbonZoomSelectedSections: 'Выбрано разделов: {n}',
+  ribbonFileExportPdfPrint: 'PDF в печатном качестве…',
 } satisfies Record<keyof typeof zh, string>

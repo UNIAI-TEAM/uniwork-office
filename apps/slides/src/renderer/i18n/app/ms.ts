@@ -251,4 +251,8 @@ export const ms = {
   appStatusSummaryZoomInserted: 'Slaid Zum Ringkasan disisipkan dengan {count} jubin',
   appSectionSummary: 'Seksyen Ringkasan',
   appSectionN: 'Seksyen {n}',
+  appUseAppTitle: 'Tersedia dalam aplikasi',
+  appUseAppMessage: 'Buka dalam aplikasi UniWork Office untuk menggunakan ciri ini',
+  appUseAppAction: 'Buka dalam aplikasi',
+  appUseAppClose: 'Tutup',
 } satisfies Record<keyof typeof zh, string>

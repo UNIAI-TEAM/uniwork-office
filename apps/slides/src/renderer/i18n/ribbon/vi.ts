@@ -769,4 +769,5 @@ export const vi = {
   ribbonZoomSectionItem: 'Trang chiếu {n} Phần {k}: {name}',
   ribbonZoomSelectedSlides: 'Đã chọn {n} trang chiếu',
   ribbonZoomSelectedSections: 'Đã chọn {n} phần',
+  ribbonFileExportPdfPrint: 'PDF chất lượng in…',
 } satisfies Record<keyof typeof zh, string>

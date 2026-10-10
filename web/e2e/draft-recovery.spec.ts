@@ -1,5 +1,5 @@
 // Web draft recovery (UNI-1014 DR1, CONTRACT C15(3) / C18) on the production builds of Docs,
-// Markdown and Sheets in the protocol test host (`?recovery=1`: the host sends `init.recovery`
+// Markdown, Sheets and Slides in the protocol test host (`?recovery=1`: the host sends `init.recovery`
 // with a non-extractable AES-GCM key it persists in IndexedDB "keys", as the real host does).
 // Per module, with the browser clock under test control:
 //   edit -> 30 s -> an encrypted record in IndexedDB "uniwork-office-frame-drafts" (nothing saved)
@@ -131,7 +131,7 @@ async function tick(page: Page): Promise<void> {
 }
 
 interface ModuleCase {
-  module: 'docs' | 'markdown' | 'sheets'
+  module: 'docs' | 'markdown' | 'sheets' | 'slides'
   query: Record<string, string>
   /** wait until the document is shown */
   shown(frame: Frame): Promise<void>
@@ -219,11 +219,11 @@ async function workbook(frame: Frame): Promise<ShownWorkbook | null> {
   )
 }
 
-async function cellA1(frame: Frame): Promise<unknown> {
+async function cellAt(frame: Frame, row: number, column: number): Promise<unknown> {
   const wb = await workbook(frame)
   if (!wb) return undefined
   const r = await frame.evaluate(
-    ({ sessionId, sheetId }) =>
+    ({ sessionId, sheetId, row, column }) =>
       (
         window as unknown as {
           desktopApi: {
@@ -235,11 +235,25 @@ async function cellA1(frame: Frame): Promise<unknown> {
       ).desktopApi.readWorkbookRange({
         sessionId,
         sheetId,
-        range: { startRow: 0, endRow: 0, startColumn: 0, endColumn: 0 },
+        range: { startRow: row, endRow: row, startColumn: column, endColumn: column },
       }),
-    { sessionId: wb.sessionId, sheetId: wb.sheets[0]!.id },
+    { sessionId: wb.sessionId, sheetId: wb.sheets[0]!.id, row, column },
   )
   return r.cells[0]?.value
+}
+
+const cellA1 = (frame: Frame) => cellAt(frame, 0, 0)
+
+/** jump to `cell` through Univer's Name Box and type `text` into it */
+async function typeAt(page: Page, frame: Frame, cell: string, text: string): Promise<void> {
+  const nameBox = frame.locator('[data-u-comp="defined-name"] input')
+  await nameBox.click()
+  await nameBox.fill(cell)
+  await nameBox.press('Enter')
+  await page.waitForTimeout(500)
+  await page.keyboard.type(text)
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(500)
 }
 
 const sheetsCase: ModuleCase = {
@@ -257,14 +271,7 @@ const sheetsCase: ModuleCase = {
   },
   async edit(page, frame, marker) {
     // Univer's formula-bar defined-name box since the main sync (as web/e2e/sheets.spec.ts)
-    const nameBox = frame.locator('[data-u-comp="defined-name"] input')
-    await nameBox.click()
-    await nameBox.fill('A1')
-    await nameBox.press('Enter')
-    await page.waitForTimeout(500)
-    await page.keyboard.type(marker)
-    await page.keyboard.press('Enter')
-    await page.waitForTimeout(500)
+    await typeAt(page, frame, 'A1', marker)
   },
   async showsMarker(frame, marker) {
     return (await cellA1(frame)) === marker
@@ -274,6 +281,70 @@ const sheetsCase: ModuleCase = {
     const shared = (await zip.file('xl/sharedStrings.xml')?.async('text')) ?? ''
     const sheet = (await zip.file('xl/worksheets/sheet1.xml')!.async('text')) ?? ''
     return shared.includes(marker) || sheet.includes(marker)
+  },
+}
+
+// ---------------------------------------------------------------- slides
+
+/** text of the first text node of slide 1, from the engine */
+function slideTitle(frame: Frame): Promise<string> {
+  return frame.evaluate(async () => {
+    type Node = { text?: { lines: Array<{ runs: Array<{ text: string }> }> } }
+    const slides = (await window.slidesApi.getRenderSlides()) as unknown as Array<{
+      nodes: Node[]
+    }>
+    const node = slides[0]!.nodes.find((n) => n.text)!
+    return node.text!.lines.map((l) => l.runs.map((r) => r.text).join('')).join('\n')
+  })
+}
+
+/** page coordinates of the centre of slide 1's title on the editing stage */
+async function slideTitlePoint(page: Page, frame: Frame): Promise<{ x: number; y: number }> {
+  const p = await frame.evaluate(async () => {
+    type Node = { text?: unknown; box: { x: number; y: number; w: number; h: number } }
+    const slide = (
+      (await window.slidesApi.getRenderSlides()) as unknown as Array<{
+        widthPx: number
+        nodes: Node[]
+      }>
+    )[0]!
+    const node = slide.nodes.find((n) => n.text)!
+    const box = document.querySelector('.stage-zoom-box')!.getBoundingClientRect()
+    const k = box.width / slide.widthPx
+    return {
+      x: box.left + (node.box.x + node.box.w / 2) * k,
+      y: box.top + (node.box.y + node.box.h / 2) * k,
+    }
+  })
+  const f = (await page.locator('#frame').boundingBox())!
+  return { x: f.x + p.x, y: f.y + p.y }
+}
+
+const slidesCase: ModuleCase = {
+  module: 'slides',
+  query: { module: 'slides', open: '/fixtures/sample.pptx' },
+  async shown(frame) {
+    await expect(frame.locator('.thumb')).toHaveCount(5, { timeout: 60_000 })
+  },
+  async focus(frame) {
+    // a click on the stage outside the title keeps the keyboard in the editor (Ctrl+S)
+    await frame.locator('.stage-zoom-box').click({ position: { x: 20, y: 20 } })
+  },
+  async edit(page, frame, marker) {
+    const p = await slideTitlePoint(page, frame)
+    await page.mouse.dblclick(p.x, p.y)
+    await expect(frame.locator('[contenteditable=true]')).toBeVisible()
+    await page.keyboard.press('Control+A')
+    await page.keyboard.type(marker)
+    await page.keyboard.press('Escape')
+    await expect.poll(() => slideTitle(frame)).toBe(marker)
+  },
+  async showsMarker(frame, marker) {
+    return (await slideTitle(frame)) === marker
+  },
+  async savedHasMarker(bytes, marker) {
+    const zip = await JSZip.loadAsync(Uint8Array.from(bytes))
+    return (await zip.file('ppt/slides/slide1.xml')!.async('string')).includes(marker)
   },
 }
 
@@ -304,7 +375,7 @@ test.beforeEach(async ({ page }) => {
   await page.clock.install()
 })
 
-for (const c of [docsCase, markdownCase, sheetsCase]) {
+for (const c of [docsCase, markdownCase, sheetsCase, slidesCase]) {
   test.describe(c.module, () => {
     test.skip(!built(c.module), `no dist-web/${c.module} build`)
 
@@ -566,6 +637,48 @@ test.describe('html: style edits in progress', () => {
       { timeout: 30_000 },
     )
     await expect.poll(() => lastDirty(page), { timeout: 15_000 }).toBe(true)
+    expect(problems).toEqual({ console: [], page: [] })
+  })
+})
+
+test.describe('sheets: edits made after a Restore are drafted again (A6)', () => {
+  test.skip(!built('sheets'), 'no dist-web/sheets build')
+
+  test('edit -> 30 s -> reload -> Restore -> edit again -> 30 s -> reload -> Restore brings both back', async ({
+    page,
+  }) => {
+    const problems = await watch(page)
+    const first = 'ReDraftOne'
+    const second = 'ReDraftTwo'
+    let frame = await openHost(page, { ...sheetsCase.query, lang: 'en' })
+    await sheetsCase.shown(frame)
+    await sheetsCase.edit(page, frame, first)
+    await expect.poll(() => lastDirty(page), { timeout: 15_000 }).toBe(true)
+    await tick(page)
+    await expect.poll(async () => (await drafts(frame, first)).length, { timeout: 15_000 }).toBe(1)
+
+    frame = await reloadFrame(page)
+    let prompt = frame.locator(PROMPT)
+    await expect(prompt).toBeVisible({ timeout: 30_000 })
+    await prompt.locator('[data-choice="restore"]').click()
+    await expect(prompt).toBeHidden()
+    await sheetsCase.shown(frame)
+    await expect.poll(() => cellAt(frame, 0, 0), { timeout: 30_000 }).toBe(first)
+
+    // a second edit after the Restore, no save in between: the next tick drafts it
+    await typeAt(page, frame, 'B2', second)
+    await tick(page)
+    expect(await lastSaved(page)).toBeNull()
+
+    frame = await reloadFrame(page)
+    prompt = frame.locator(PROMPT)
+    await expect(prompt).toBeVisible({ timeout: 30_000 })
+    await prompt.locator('[data-choice="restore"]').click()
+    await expect(prompt).toBeHidden()
+    await sheetsCase.shown(frame)
+    await expect.poll(() => cellAt(frame, 0, 0), { timeout: 30_000 }).toBe(first)
+    await expect.poll(() => cellAt(frame, 1, 1), { timeout: 30_000 }).toBe(second)
+    expect(await lastSaved(page)).toBeNull()
     expect(problems).toEqual({ console: [], page: [] })
   })
 })

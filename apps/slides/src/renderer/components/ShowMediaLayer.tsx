@@ -10,6 +10,9 @@
 import React, { useEffect, useRef, useState } from 'react'
 import type { PictureRenderNode, RenderSlide } from '@genoffice/pptx-render'
 import type { MediaCommand } from '../animation-play'
+import { isWeb } from '../capabilities'
+import { useI18n } from '../i18n/locale'
+import { canOpenInApp, openInApp } from '../use-app'
 
 export function ShowMediaLayer({
   slide,
@@ -38,16 +41,24 @@ export function ShowMediaLayer({
   const nodes = slide.nodes.filter(
     (n): n is PictureRenderNode => n.type === 'picture' && !!(n as PictureRenderNode).media,
   )
+  const { t } = useI18n()
   const [urls, setUrls] = useState<Record<string, { kind: 'video' | 'audio'; dataUrl: string }>>({})
   const [playing, setPlaying] = useState<Record<string, boolean>>({})
+  // web frame: linked external media have no bytes here; a click on the poster says why
+  const [unavailable, setUnavailable] = useState<Record<string, true>>({})
+  const [note, setNote] = useState<string | null>(null)
   const els = useRef(new Map<string, HTMLMediaElement>())
   useEffect(() => {
     let cancelled = false
     setUrls({})
     setPlaying({})
+    setUnavailable({})
+    setNote(null)
     for (const n of nodes) {
       void window.slidesApi.getMediaData(slideIndex, n.sourceId).then((d) => {
-        if (!cancelled && d) setUrls((u) => ({ ...u, [n.sourceId]: d }))
+        if (cancelled) return
+        if (d) setUrls((u) => ({ ...u, [n.sourceId]: d }))
+        else if (interactive && isWeb()) setUnavailable((u) => ({ ...u, [n.sourceId]: true }))
       })
     }
     return () => {
@@ -97,6 +108,35 @@ export function ShowMediaLayer({
     <>
       {nodes.map((n) => {
         const media = urls[n.sourceId]
+        if (!media && unavailable[n.sourceId]) {
+          return (
+            <div
+              key={n.sourceId}
+              role="button"
+              tabIndex={0}
+              aria-label={t('appUseAppMessage')}
+              data-use-app="media"
+              style={{
+                position: 'absolute',
+                left: n.box.x * k,
+                top: n.box.y * k,
+                width: n.box.w * k,
+                height: n.box.h * k,
+                cursor: 'pointer',
+              }}
+              onClick={(e) => {
+                e.stopPropagation()
+                setNote(n.sourceId)
+              }}
+              onKeyDown={(e) => {
+                if (e.key !== 'Enter' && e.key !== ' ') return
+                e.preventDefault()
+                e.stopPropagation()
+                setNote(n.sourceId)
+              }}
+            />
+          )
+        }
         if (!media) return null
         const style: React.CSSProperties = {
           position: 'absolute',
@@ -157,6 +197,35 @@ export function ShowMediaLayer({
           </div>
         )
       })}
+      {note &&
+        (() => {
+          const n = nodes.find((x) => x.sourceId === note)
+          if (!n) return null
+          return (
+            <div
+              className="use-app-note"
+              data-use-app="note"
+              role="status"
+              style={{ left: (n.box.x + n.box.w / 2) * k, top: (n.box.y + n.box.h / 2) * k }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <span>{t('appUseAppMessage')}</span>
+              {canOpenInApp() && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    void openInApp('slides.linkedMedia').then((handled) => {
+                      if (handled) setNote(null)
+                    })
+                  }}
+                >
+                  {t('appUseAppAction')}
+                </button>
+              )}
+            </div>
+          )
+        })()}
     </>
   )
 }

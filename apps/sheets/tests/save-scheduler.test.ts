@@ -9,7 +9,11 @@
  * of racing, and retries on its next 30 s wake-up.
  */
 import { describe, expect, it } from 'vitest'
-import { createSaveGate, shouldRunSaveTick } from '../src/renderer/save-scheduler'
+import {
+  createSaveGate,
+  recoveryCopyBacksSession,
+  shouldRunSaveTick,
+} from '../src/renderer/save-scheduler'
 
 function dirtyWorkbookState(overrides: Partial<Parameters<typeof shouldRunSaveTick>[0]> = {}) {
   return {
@@ -75,6 +79,30 @@ describe('shouldRunSaveTick', () => {
     expect(
       shouldRunSaveTick(dirtyWorkbookState({ kind: 'save', restoredFromRecovery: true })),
     ).toBe(true)
+  })
+})
+
+describe('recoveryCopyBacksSession (A6: edits after a draft Restore are re-drafted)', () => {
+  it('desktop: a restored session is the recovery copy itself, its tick stands down', () => {
+    expect(recoveryCopyBacksSession(true, undefined)).toBe(true)
+    expect(recoveryCopyBacksSession(true, 'desktop')).toBe(true)
+    expect(recoveryCopyBacksSession(false, undefined)).toBe(false)
+  })
+
+  it('web: the draft lives in the browser store, so edits made after a Restore are drafted again', () => {
+    expect(recoveryCopyBacksSession(true, 'web')).toBe(false)
+    // the tick of a restored web session runs once the user edits (journal not empty)
+    const restoredWeb = dirtyWorkbookState({
+      restoredFromRecovery: recoveryCopyBacksSession(true, 'web'),
+    })
+    expect(shouldRunSaveTick(restoredWeb)).toBe(true)
+    expect(shouldRunSaveTick({ ...restoredWeb, journalEmpty: true })).toBe(false)
+    // while the restored desktop session keeps standing down
+    expect(
+      shouldRunSaveTick(
+        dirtyWorkbookState({ restoredFromRecovery: recoveryCopyBacksSession(true, undefined) }),
+      ),
+    ).toBe(false)
   })
 })
 

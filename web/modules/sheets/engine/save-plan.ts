@@ -24,6 +24,7 @@ import { normalizeOoxmlPartPrefix } from '../../../../packages/xlsx-gateway/src/
 import type { SheetEditPlan } from '../../../../packages/xlsx-gateway/src/gateway/xlsx-sheets'
 import { MAX_PATCH_ENTRY_BYTES } from '../../../../packages/xlsx-gateway/src/shared/edit-schemas'
 import type { WorkbookSaveRequest } from '../../../../apps/sheets/src/shared/desktop-api'
+import { rewriteFormulaCachedValues, type CachedValue } from './stale-values'
 
 type PlanArgs = Parameters<typeof planCellEditsToXlsx>
 
@@ -369,6 +370,42 @@ function manifestsEqual(left: readonly ArchiveEntry[], right: readonly ArchiveEn
 
 const textEncoder = new TextEncoder()
 
+/**
+ * The plan with every worksheet part's formula cells holding exactly `keep` (the part as the plan
+ * wrote it, else as in the source). Only parts that change are added to the plan, so the engine
+ * stream-copies the rest. The gateway writes cached values only into worksheets it already edits;
+ * a dependent on another sheet is reached here.
+ */
+async function rewriteCachedValues(
+  plan: MutationPlan,
+  source: EntrySource,
+  keep: ReadonlyMap<string, ReadonlyMap<string, CachedValue>>,
+): Promise<MutationPlan> {
+  const isSheet = (path: string) => /^xl\/worksheets\/[^/]+\.xml$/i.test(path)
+  const rewrite = (path: string, xml: string) => {
+    const values = keep.get(path)
+    return rewriteFormulaCachedValues(
+      xml,
+      values && ((row, column) => values.get(`${row}:${column}`)),
+    )
+  }
+  const replaced = new Map(plan.replaced)
+  const added = new Map(plan.added)
+  const touched = new Set(plan.touchedEntries)
+  const removed = new Set(plan.removedEntries)
+  // a sheet added this session (a duplicate copies the source part, cached values included)
+  for (const [path, xml] of plan.added) if (isSheet(path)) added.set(path, rewrite(path, xml))
+  for (const path of await source.paths()) {
+    if (!isSheet(path) || removed.has(path)) continue
+    const before = replaced.get(path) ?? (await source.readText(path))
+    const after = rewrite(path, before)
+    if (after === before) continue
+    replaced.set(path, after)
+    touched.add(path)
+  }
+  return { ...plan, replaced, added, touchedEntries: [...touched] }
+}
+
 /** xlsx-package-io.ts saveWorkbookViaSidecar over the in-memory engine */
 export async function saveWorkbookBytes(input: {
   engine: ArchiveEngine
@@ -379,12 +416,19 @@ export async function saveWorkbookBytes(input: {
   /** a scratch directory under /tmp for this save */
   workDir: string
   save: ResolvedSave
+  /**
+   * stale-values.ts: the ONLY cached values the saved file may carry. Every formula cell of every
+   * worksheet part gets its entry (worksheet part path -> "row:column", 0-based) or loses its `<v>`;
+   * an empty map is the sweep. Absent: cached values stay as they are.
+   */
+  cachedValues?: ReadonlyMap<string, ReadonlyMap<string, CachedValue>>
 }): Promise<{ data: Uint8Array; plan: MutationPlan }> {
   const { engine, sourcePath, workDir, save } = input
   const manifest = await engine.manifest(sourcePath)
   const a = save.args
-  const plan = await planCellEditsToXlsx(
-    bytesEntrySource(input.sourceBytes, manifest),
+  const source = bytesEntrySource(input.sourceBytes, manifest)
+  const planned = await planCellEditsToXlsx(
+    source,
     save.edits,
     a.structuralOps,
     a.chartEdits,
@@ -412,6 +456,9 @@ export async function saveWorkbookBytes(input: {
     a.tabColorStates,
     a.tableEdits,
   )
+  const plan = input.cachedValues
+    ? await rewriteCachedValues(planned, source, input.cachedValues)
+    : planned
   const written: string[] = []
   const write = async (prefix: string, contents: ReadonlyMap<string, string | Uint8Array>) => {
     const out: { name: string; contentPath: string }[] = []

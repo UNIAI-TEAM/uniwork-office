@@ -258,4 +258,8 @@ export const de = {
   appStatusSummaryZoomInserted: 'Zusammenfassungszoom-Folie mit {count} Kacheln eingefügt',
   appSectionSummary: 'Zusammenfassungsabschnitt',
   appSectionN: 'Abschnitt {n}',
+  appUseAppTitle: 'In der App verfügbar',
+  appUseAppMessage: 'In der UniWork Office-App öffnen, um diese Funktion zu nutzen',
+  appUseAppAction: 'In der App öffnen',
+  appUseAppClose: 'Schließen',
 } satisfies Record<keyof typeof zh, string>

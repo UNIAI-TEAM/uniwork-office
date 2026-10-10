@@ -1550,6 +1550,14 @@ export interface SlidesApi {
   ) => Promise<{ slide: RenderSlide; sourceId: string } | null>
   /** Insert renderer-recorded or dropped media; placed centered on the slide or the drop point */
   addMediaBytes: (op: AddMediaBytesOp) => Promise<AddMediaResult | null>
+  /**
+   * Web frame only (absent on the desktop): run the host's "Open in desktop app" flow for a feature
+   * the web cannot do (A7 contract, protocol `app.open`). `feature` is a short opaque tag. Resolves
+   * `unavailable` when the host has no such flow.
+   */
+  openInDesktopApp?: (
+    feature: string,
+  ) => Promise<{ outcome: 'launched' | 'installer' | 'unavailable' }>
   /** Read an audio/video element's media data (double-click playback); embedded media converts to dataUrl, external links return as-is */
   getMediaData: (
     slideIndex: number,

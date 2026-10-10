@@ -242,4 +242,8 @@ export const en = {
   appStatusSummaryZoomInserted: 'Summary Zoom slide inserted with {count} tiles',
   appSectionSummary: 'Summary Section',
   appSectionN: 'Section {n}',
+  appUseAppTitle: 'Available in the app',
+  appUseAppMessage: 'Open in the UniWork Office app to use this feature',
+  appUseAppAction: 'Open in app',
+  appUseAppClose: 'Close',
 } satisfies Record<keyof typeof zh, string>

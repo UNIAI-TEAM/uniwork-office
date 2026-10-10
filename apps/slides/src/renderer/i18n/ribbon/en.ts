@@ -759,4 +759,5 @@ export const en = {
   ribbonZoomSectionItem: 'Slide {n} Section {k}: {name}',
   ribbonZoomSelectedSlides: '{n} slides selected',
   ribbonZoomSelectedSections: '{n} sections selected',
+  ribbonFileExportPdfPrint: 'Print-quality PDF…',
 } satisfies Record<keyof typeof zh, string>

@@ -22,6 +22,9 @@ export const SLIDES_WEB_CAPABILITIES: Readonly<Record<string, unknown>> = Object
   presenterWindow: true,
   model3d: false,
   headlessExport: false,
+  // the host's "Open in desktop app" flow (A7 contract, `app.open`): on with the host's grant; the
+  // "use the app" notes show their action only then
+  desktopOpen: false,
 })
 
 /** host grants -> keys: File > Open (filePick), recents, and saving (a frame without `save` is view-only) */
@@ -30,5 +33,6 @@ export function slidesHostGrants(granted: Capabilities | undefined): Record<stri
     ...hostGrants(granted),
     save: granted?.save === true,
     saveAs: granted?.saveAs === true,
+    desktopOpen: granted?.desktopOpen === true,
   }
 }

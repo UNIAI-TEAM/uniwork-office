@@ -237,4 +237,8 @@ export const th = {
   appStatusSummaryZoomInserted: 'แทรกสไลด์ซูมสรุปพร้อม {count} ช่อง',
   appSectionSummary: 'ส่วนสรุป',
   appSectionN: 'ส่วน {n}',
+  appUseAppTitle: 'ใช้ได้ในแอป',
+  appUseAppMessage: 'เปิดในแอป UniWork Office เพื่อใช้ฟีเจอร์นี้',
+  appUseAppAction: 'เปิดในแอป',
+  appUseAppClose: 'ปิด',
 } satisfies Record<keyof typeof zh, string>

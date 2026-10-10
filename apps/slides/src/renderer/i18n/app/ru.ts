@@ -249,4 +249,8 @@ export const ru = {
   appStatusSummaryZoomInserted: 'Вставлен слайд сводного масштабирования с {count} плитками',
   appSectionSummary: 'Сводный раздел',
   appSectionN: 'Раздел {n}',
+  appUseAppTitle: 'Доступно в приложении',
+  appUseAppMessage: 'Откройте в приложении UniWork Office, чтобы использовать эту функцию',
+  appUseAppAction: 'Открыть в приложении',
+  appUseAppClose: 'Закрыть',
 } satisfies Record<keyof typeof zh, string>

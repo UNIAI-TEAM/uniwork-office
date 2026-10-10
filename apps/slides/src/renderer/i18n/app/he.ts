@@ -235,4 +235,8 @@ export const he = {
   appStatusSummaryZoomInserted: 'הוזנה שקופית זום סיכום עם {count} אריחים',
   appSectionSummary: 'מקטע סיכום',
   appSectionN: 'מקטע {n}',
+  appUseAppTitle: 'זמין באפליקציה',
+  appUseAppMessage: 'פתחו באפליקציית UniWork Office כדי להשתמש בתכונה זו',
+  appUseAppAction: 'פתח באפליקציה',
+  appUseAppClose: 'סגור',
 } satisfies Record<keyof typeof zh, string>

@@ -779,4 +779,5 @@ export const de = {
   ribbonZoomSectionItem: 'Folie {n} Abschnitt {k}: {name}',
   ribbonZoomSelectedSlides: '{n} Folien ausgewählt',
   ribbonZoomSelectedSections: '{n} Abschnitte ausgewählt',
+  ribbonFileExportPdfPrint: 'PDF in Druckqualität…',
 } satisfies Record<keyof typeof zh, string>

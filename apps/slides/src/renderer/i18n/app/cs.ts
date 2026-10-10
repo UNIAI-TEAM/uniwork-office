@@ -244,4 +244,8 @@ export const cs = {
   appStatusSummaryZoomInserted: 'Vložen souhrnný snímek Zoom s {count} dlaždicemi',
   appSectionSummary: 'Souhrnný oddíl',
   appSectionN: 'Oddíl {n}',
+  appUseAppTitle: 'K dispozici v aplikaci',
+  appUseAppMessage: 'Otevřete v aplikaci UniWork Office a tuto funkci použijte',
+  appUseAppAction: 'Otevřít v aplikaci',
+  appUseAppClose: 'Zavřít',
 } satisfies Record<keyof typeof zh, string>

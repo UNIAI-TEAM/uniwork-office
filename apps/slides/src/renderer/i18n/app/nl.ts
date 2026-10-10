@@ -257,4 +257,8 @@ export const nl = {
   appStatusSummaryZoomInserted: 'Samenvattingszoomdia ingevoegd met {count} tegels',
   appSectionSummary: 'Samenvattingssectie',
   appSectionN: 'Sectie {n}',
+  appUseAppTitle: 'Beschikbaar in de app',
+  appUseAppMessage: 'Open in de UniWork Office-app om deze functie te gebruiken',
+  appUseAppAction: 'Openen in de app',
+  appUseAppClose: 'Sluiten',
 } satisfies Record<keyof typeof zh, string>

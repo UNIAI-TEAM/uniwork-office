@@ -251,4 +251,8 @@ export const hi = {
   appStatusSummaryZoomInserted: '{count} टाइलों के साथ सारांश ज़ूम स्लाइड डाली गई',
   appSectionSummary: 'सारांश अनुभाग',
   appSectionN: 'अनुभाग {n}',
+  appUseAppTitle: 'ऐप में उपलब्ध',
+  appUseAppMessage: 'इस सुविधा का उपयोग करने के लिए UniWork Office ऐप में खोलें',
+  appUseAppAction: 'ऐप में खोलें',
+  appUseAppClose: 'बंद करें',
 } satisfies Record<keyof typeof zh, string>

@@ -296,6 +296,8 @@ export interface Props {
   onSaveAs: () => void
   /** Export as PDF (hidden slides skipped) */
   onExportPdf: () => void
+  /** Web frame: a feature the web does not offer (File > Print-quality PDF) says so (UseAppDialog) */
+  onUseApp: (feature: string) => void
   onPrint: () => void
   /** Export as images (one PNG per page, hidden slides skipped) */
   onExportImages: () => void

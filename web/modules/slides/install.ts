@@ -38,6 +38,7 @@ export const bridge = audienceShow
         print: true,
         exportPdf: true,
         images: true,
+        desktopOpen: true,
       },
       capabilities: { defaults: SLIDES_WEB_CAPABILITIES, grants: slidesHostGrants },
       globals: {

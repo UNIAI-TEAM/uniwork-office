@@ -787,4 +787,5 @@ export const fr = {
   ribbonZoomSectionItem: 'Diapositive {n} Section {k} : {name}',
   ribbonZoomSelectedSlides: '{n} diapositives sélectionnées',
   ribbonZoomSelectedSections: '{n} sections sélectionnées',
+  ribbonFileExportPdfPrint: 'PDF de qualité d’impression…',
 } satisfies Record<keyof typeof zh, string>

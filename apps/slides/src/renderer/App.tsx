@@ -104,6 +104,7 @@ import { CommentsPane } from './components/CommentsPane'
 import { AnimationPane } from './components/AnimationPane'
 import { AnimPreviewOverlay } from './components/AnimatedSlide'
 import { EquationDialog, HeaderFooterDialog, LinkDialog } from './components/InsertDialogs'
+import { UseAppDialog } from './components/UseAppDialog'
 import { ZoomDialog } from './components/ZoomDialog'
 import { CutoutDialog } from './components/CutoutDialog'
 import {
@@ -120,7 +121,7 @@ import { GensparkMark, IconAiBeautify, IconAiFactCheck, IconAiImage } from './co
 import { ToastHost } from './components/toast'
 import { showToast } from './components/toast-bus'
 import { t, useI18n } from './i18n/locale'
-import { cap, isViewOnly } from './capabilities'
+import { cap, isViewOnly, isWeb } from './capabilities'
 import { ChartDataDialog } from './components/ChartDataDialog'
 import type { BrushFormat } from './format-brush'
 import { isTextUndoTarget, shouldRouteHistoryToDeck } from './undo-routing'
@@ -728,8 +729,10 @@ export function App() {
         stageViewportSize.w ||
         window.innerWidth - (showThumbs ? thumbsW : 0) - (showAi ? 360 : aiEnabled ? 34 : 0)
       const viewportH = el?.clientHeight || stageViewportSize.h || window.innerHeight - 150
-      // 56 = the stage's 2 x 32 padding minus slack; a narrow stage pads 12 px a side
-      const availW = viewportW - (viewportW < NARROW_FRAME_PX ? 28 : 56)
+      // 56 = the stage's 2 x 32 padding minus slack; a phone-width WINDOW pads 12 px a side (the
+      // styles.css media query keys off the window, not the stage, so this must too: a narrow stage
+      // in a wide window, e.g. next to the thumbnails and the AI dock, still pads 32)
+      const availW = viewportW - (window.innerWidth < NARROW_FRAME_PX ? 28 : 56)
       // -72: vertical padding is 48 (AI-bar headroom) + 32, minus the same 8px slack as width
       const availH = viewportH - 72
       return Math.min(availW / s.widthPx, availH / s.heightPx)
@@ -2510,10 +2513,14 @@ export function App() {
     dataUrl: string
   } | null>(null)
   useEffect(() => setMediaPlay(null), [current])
+  // web frame: what the web does not offer says so and offers the host's Open-in-app action
+  const [useAppFeature, setUseAppFeature] = useState<string | null>(null)
   const startMediaPlayback = useCallback(
     async (sourceId: string) => {
       const r = await window.slidesApi.getMediaData(current, sourceId)
       if (r) setMediaPlay({ sourceId, ...r })
+      // a linked external clip has no bytes in the frame (the desktop plays it from its link)
+      else if (isWeb()) setUseAppFeature('slides.linkedMedia')
     },
     [current],
   )
@@ -3298,6 +3305,7 @@ export function App() {
         onRedo={() => void redo()}
         onSaveAs={() => void saveAs()}
         onExportPdf={() => void exportPdf()}
+        onUseApp={setUseAppFeature}
         onPrint={() => setPrintDlgOpen(true)}
         onExportImages={() => void exportImages()}
         onFormat={onFormat}
@@ -4571,6 +4579,9 @@ export function App() {
           onInsert={(text) => void insertEquation(text)}
           onClose={() => setEqDialogOpen(false)}
         />
+      )}
+      {useAppFeature && (
+        <UseAppDialog feature={useAppFeature} onClose={() => setUseAppFeature(null)} />
       )}
       {zoomDialog && (
         <ZoomDialog
