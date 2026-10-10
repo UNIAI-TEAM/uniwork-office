@@ -29,9 +29,9 @@ export const en = {
   aiWebStateEntitlementTitle: 'AI is not in your plan',
   aiWebStateEntitlementBody:
     "Your organization's UniWork plan does not include this AI feature. Ask your administrator.",
-  aiWebStateKeyMissingTitle: 'No {provider} key',
-  aiWebStateKeyMissingBody: 'Add your {provider} API key in AI settings to use the assistant.',
-  aiWebStateKeyRejectedTitle: '{provider} refused the key',
+  aiWebStateKeyMissingTitle: 'No AI key yet',
+  aiWebStateKeyMissingBody: 'Add an API key in AI settings to use the assistant.',
+  aiWebStateKeyRejectedTitle: 'The AI key was refused',
   aiWebStateKeyRejectedBody: 'The provider refused the saved key. Replace it in AI settings.',
   aiWebStateRateTitle: 'Too many AI requests',
   aiWebStateRateBody: 'Wait {seconds} s and try again.',

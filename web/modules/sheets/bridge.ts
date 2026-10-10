@@ -60,6 +60,7 @@ import type { ModuleBridgePort } from '../../docs/bridge/module-bridge'
 import { decodeDataUrl, idFromPath, pathFor } from '../../docs/bridge/webapi'
 import type { DraftHost, DraftRecovery } from '../../docs/bridge/draft-recovery'
 import { bridgeDraftRecovery } from '../shared/recovery-prompt'
+import { saveFailureDetail } from '../shared/save-failure'
 import type {
   DesktopApi,
   MenuAction,
@@ -573,12 +574,14 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
     throw saveFailure(res.error)
   }
 
-  /** a transport failure ("Failed to fetch") is browser jargon: the localized sentence alone says it */
-  function saveFailure(error: { code: string; message: string }): Error {
-    const raw = error.code === 'network' || error.code === 'timeout'
-    return new Error(
-      raw ? text('appWebSaveFailed') : `${text('appWebSaveFailed')} (${error.message})`,
-    )
+  /**
+   * a transport failure ("Failed to fetch") is browser jargon: the localized sentence alone says
+   * it; any other failure adds the shared localized sentence of its status, never the host's raw
+   * English status line ("Internal Server Error")
+   */
+  function saveFailure(error: { code: string; message: string; status?: number }): Error {
+    const detail = saveFailureDetail(error)
+    return new Error(detail ? `${text('appWebSaveFailed')} ${detail}` : text('appWebSaveFailed'))
   }
 
   async function saveAsNew(

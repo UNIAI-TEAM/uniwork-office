@@ -237,14 +237,15 @@ describe('saveDocx', () => {
     expect(mock.errors).toHaveLength(2)
   })
 
-  it('conflict dialog: focus starts on Cancel, Overwrite is destructive, Esc cancels, Tab stays inside', async () => {
+  it('conflict dialog: focus starts on Reload latest, Overwrite is destructive, Esc cancels, Tab stays inside', async () => {
     const doc = await bootWith()
     mock.bumpRemote('f1')
     const pending = api.saveDocx(doc.path, buf([5]))
     const dlg = await dialogShown('conflict')
     const btn = (id: string) => dlg.querySelector<HTMLButtonElement>(`[data-choice="${id}"]`)!
     // a stray Enter must not overwrite the other writer's version
-    expect(document.activeElement).toBe(btn('cancel'))
+    expect(document.activeElement).toBe(btn('reload'))
+    expect(btn('reload').className).toBe('ow-dlg-btn primary')
     expect(btn('overwrite').className).toBe('ow-dlg-btn danger')
     expect(btn('overwrite').classList.contains('primary')).toBe(false)
     const box = dlg.querySelector('[role="alertdialog"]')!
@@ -253,16 +254,18 @@ describe('saveDocx', () => {
     )
     // the host learns that a frame modal is open (protocol `modal`)
     expect(mock.modals).toEqual([true])
-    // Tab cycles inside the dialog (reload, overwrite, then the way out last): cancel -> reload -> overwrite -> cancel; Shift+Tab goes back
+    // Tab cycles inside the dialog (reload, overwrite, the way out, then the close X): reload ->
+    // overwrite -> cancel -> X -> reload; Shift+Tab goes back
     const tab = (shiftKey = false) =>
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey, bubbles: true }))
     tab()
-    expect(document.activeElement).toBe(btn('reload'))
-    tab()
+    expect(document.activeElement).toBe(btn('overwrite'))
     tab()
     expect(document.activeElement).toBe(btn('cancel'))
+    tab()
+    expect(document.activeElement).toBe(dlg.querySelector('.ow-dlg-close'))
     tab(true)
-    expect(document.activeElement).toBe(btn('overwrite'))
+    expect(document.activeElement).toBe(btn('cancel'))
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
     expect(await pending).toEqual({ ok: false, error: text('appWebConflictNotSaved') })
     expect(mock.saved).toHaveLength(0)
@@ -314,15 +317,21 @@ describe('saveDocx', () => {
     expect(mock.errors[0]).toMatchObject({ error: { code: 'conflict' }, fatal: false })
   })
 
-  it('error: surfaces the message', async () => {
+  it('error: shows the localized sentence of the failure, never the host message', async () => {
     const doc = await bootWith()
     mock.override('api.save', () => ({
       ok: false,
       error: { code: 'forbidden', message: 'read-only' },
     }))
-    expect(await api.saveDocx(doc.path, buf([5]))).toEqual({ ok: false, error: 'read-only' })
+    expect(await api.saveDocx(doc.path, buf([5]))).toEqual({
+      ok: false,
+      error: 'You do not have permission to save this document.',
+    })
     mock.override('api.save', () => Promise.reject(protocolError('internal', 'HTTP 500')))
-    expect(await api.saveDocx(doc.path, buf([5]))).toEqual({ ok: false, error: 'HTTP 500' })
+    expect(await api.saveDocx(doc.path, buf([5]))).toEqual({
+      ok: false,
+      error: 'The document could not be saved. Try again.',
+    })
     mock.override('api.save', () => ({ nonsense: true }))
     expect((await api.saveDocx(doc.path, buf([5]))).ok).toBe(false)
   })
@@ -419,7 +428,10 @@ describe('saveDocxAs / saveDocxNew', () => {
 
   it('saveDocxAs error / timeout', async () => {
     mock.override('api.saveAs', () => Promise.reject(protocolError('too_large', 'HTTP 413')))
-    expect(await api.saveDocxAs('Copy', buf([7]))).toEqual({ ok: false, error: 'HTTP 413' })
+    expect(await api.saveDocxAs('Copy', buf([7]))).toEqual({
+      ok: false,
+      error: 'The document is too large to save.',
+    })
     mock.override('api.saveAs', timeoutAfter)
     expect((await api.saveDocxAs('Copy', buf([7]))).ok).toBe(false)
   })

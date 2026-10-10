@@ -29,4 +29,13 @@ export const de = {
     'UniWork ist nicht erreichbar. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.',
   webSaveTimeout:
     'Das Speichern hat zu lange gedauert. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.',
+  webClose: 'Schließen',
+  webSaveUnauthorized:
+    'Ihre UniWork-Sitzung ist abgelaufen. Melden Sie sich erneut an und speichern Sie noch einmal.',
+  webSaveForbidden: 'Sie haben keine Berechtigung, dieses Dokument zu speichern.',
+  webSaveNotFound: 'Dieses Dokument existiert nicht mehr oder wurde verschoben.',
+  webSaveTooLarge: 'Das Dokument ist zu groß zum Speichern.',
+  webSaveRateLimited: 'Zu viele Anfragen. Warten Sie einen Moment und versuchen Sie es erneut.',
+  webSaveServer: 'UniWork hatte ein Problem beim Speichern. Versuchen Sie es gleich noch einmal.',
+  webSaveFailedGeneric: 'Das Dokument konnte nicht gespeichert werden. Versuchen Sie es erneut.',
 } satisfies Record<keyof typeof zh, string>

@@ -29,10 +29,9 @@ export const fr = {
   aiWebStateEntitlementTitle: "L'IA n'est pas dans votre offre",
   aiWebStateEntitlementBody:
     "L'offre UniWork de votre organisation n'inclut pas cette fonction IA. Contactez votre administrateur.",
-  aiWebStateKeyMissingTitle: 'Aucune clé {provider}',
-  aiWebStateKeyMissingBody:
-    "Ajoutez votre clé API {provider} dans les paramètres IA pour utiliser l'assistant.",
-  aiWebStateKeyRejectedTitle: '{provider} a refusé la clé',
+  aiWebStateKeyMissingTitle: 'Pas encore de clé IA',
+  aiWebStateKeyMissingBody: 'Ajoutez une clé API dans les paramètres IA pour utiliser l’assistant.',
+  aiWebStateKeyRejectedTitle: 'La clé IA a été refusée',
   aiWebStateKeyRejectedBody:
     'Le fournisseur a refusé la clé enregistrée. Remplacez-la dans les paramètres IA.',
   aiWebStateRateTitle: 'Trop de requêtes IA',

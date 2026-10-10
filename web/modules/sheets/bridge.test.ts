@@ -472,14 +472,16 @@ describe('save failures', () => {
     await expect(
       t.desktop.saveWorkbookEdits(saveRequest(wb.sessionId, [[0, 0, 5]])),
     ).rejects.toThrow(/^Saving to UniWork failed\.$/)
-    // a server-side failure keeps its detail
+    // a server-side failure adds the localized sentence of its status, never the raw status line
     t.mock.override('api.save', () => ({
       ok: false,
-      error: { code: 'internal', message: 'disk full' },
+      error: { code: 'internal', message: 'Internal Server Error', status: 500 },
     }))
     await expect(
       t.desktop.saveWorkbookEdits(saveRequest(wb.sessionId, [[0, 0, 5]])),
-    ).rejects.toThrow('Saving to UniWork failed. (disk full)')
+    ).rejects.toThrow(
+      /^Saving to UniWork failed\. UniWork had a problem saving\. Try again in a moment\.$/,
+    )
     expect(t.mock.dirty.at(-1)).toBe(true)
   })
 })

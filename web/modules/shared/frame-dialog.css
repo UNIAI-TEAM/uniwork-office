@@ -12,11 +12,14 @@
   justify-content: center;
   box-sizing: border-box;
   padding: 16px;
-  background: var(--color-bg-overlay);
+  /* the host's scrim: a tint plus a 4 px blur of what sits behind (token, both themes) */
+  background: var(--color-dialog-scrim);
+  -webkit-backdrop-filter: blur(4px);
   backdrop-filter: blur(4px);
 }
 
 .ow-dlg {
+  position: relative;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -42,6 +45,7 @@
 
 .ow-dlg-title {
   margin: 0;
+  padding-inline-end: 28px; /* clear of the close X */
   font-size: 16px;
   font-weight: 600;
   line-height: 1.35;
@@ -59,6 +63,35 @@
   font-size: var(--text-caption);
   color: var(--text-dim);
   overflow-wrap: anywhere;
+}
+
+/* close X: top right like the host dialog's, quiet until hovered or focused */
+.ow-dlg-close {
+  position: absolute;
+  inset-block-start: 8px;
+  inset-inline-end: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.ow-dlg-close:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.ow-dlg-close:focus-visible {
+  outline: 2px solid var(--color-dialog-primary);
+  outline-offset: 2px;
 }
 
 .ow-dlg-actions {

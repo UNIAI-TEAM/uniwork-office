@@ -51,10 +51,17 @@ export interface StreamDeps {
   client: Pick<AiWebClient, 'base' | 'fetch'>
   /** the server's wire protocol of a provider id (from GET credentials `providers`); null = unknown */
   protocolOf(provider: string): WireProtocol | null
-  /** the localized text of a typed failure (the panel shows it as the turn's error) */
+  /**
+   * the localized text of a typed failure: the panel shows it as the turn's error, and that inline
+   * error is the ONE surface of a failed turn (no floating card beside it)
+   */
   describe(error: AiWebError, provider: string): string
-  /** a typed failure happened (the bridge raises its in-frame state card) */
-  onTypedError?(error: AiWebError, provider: string): void
+  /**
+   * a one-shot `aiChat` failed with a typed state. Only that path: a chat turn (`aiStream`) has
+   * the panel's inline error, a one-shot call (feature actions, hints) may have no surface at all,
+   * so the bridge raises its in-frame state card for it.
+   */
+  onChatFailure?(error: AiWebError, provider: string): void
 }
 
 /** the request config ai-provider sees: proxy base URL, no key */
@@ -135,9 +142,10 @@ export function createWebAiStreams(deps: StreamDeps): WebAiStreams {
     }
   }
 
-  const typed = (err: AiWebError, provider: string): string => {
-    deps.onTypedError?.(err, provider)
-    return deps.describe(err, provider)
+  const typed = (err: AiWebError, provider: string): string => deps.describe(err, provider)
+  const chatTyped = (err: AiWebError, provider: string): string => {
+    deps.onChatFailure?.(err, provider)
+    return typed(err, provider)
   }
 
   async function aiStream(request: AiStreamRequest): Promise<void> {
@@ -211,7 +219,7 @@ export function createWebAiStreams(deps: StreamDeps): WebAiStreams {
   }): Promise<AiChatResponse> {
     const provider = request.settings.provider
     const protocol = deps.protocolOf(provider)
-    if (!protocol) return { ok: false, error: typed(missing(provider), provider) }
+    if (!protocol) return { ok: false, error: chatTyped(missing(provider), provider) }
     installProxyTransport(deps.client)
     const config = proxyConfig(deps.client, provider, request.settings)
     const endpoint = resolveWebEndpoint(provider, config, protocol)
@@ -241,7 +249,7 @@ export function createWebAiStreams(deps: StreamDeps): WebAiStreams {
       })
     } catch (err) {
       const web = findAiWebError(err) ?? (errorCodeOf(err) ? undefined : rawFailureAsTyped(err))
-      if (web) return { ok: false, error: typed(web, provider) }
+      if (web) return { ok: false, error: chatTyped(web, provider) }
       const code = errorCodeOf(err)
       return {
         ok: false,

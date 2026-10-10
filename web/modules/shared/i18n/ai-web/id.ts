@@ -29,10 +29,9 @@ export const id = {
   aiWebStateEntitlementTitle: 'AI tidak ada di paket Anda',
   aiWebStateEntitlementBody:
     'Paket UniWork organisasi Anda tidak mencakup fitur AI ini. Hubungi administrator.',
-  aiWebStateKeyMissingTitle: 'Tidak ada kunci {provider}',
-  aiWebStateKeyMissingBody:
-    'Tambahkan kunci API {provider} Anda di Pengaturan AI untuk memakai asisten.',
-  aiWebStateKeyRejectedTitle: '{provider} menolak kunci',
+  aiWebStateKeyMissingTitle: 'Belum ada kunci AI',
+  aiWebStateKeyMissingBody: 'Tambahkan kunci API di pengaturan AI untuk memakai asisten.',
+  aiWebStateKeyRejectedTitle: 'Kunci AI ditolak',
   aiWebStateKeyRejectedBody: 'Penyedia menolak kunci tersimpan. Ganti kunci di Pengaturan AI.',
   aiWebStateRateTitle: 'Terlalu banyak permintaan AI',
   aiWebStateRateBody: 'Tunggu {seconds} detik lalu coba lagi.',

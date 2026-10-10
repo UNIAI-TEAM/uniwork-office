@@ -27,4 +27,13 @@ export const ms = {
   webDraftDiscard: 'Buang',
   webSaveNetwork: 'UniWork tidak dapat dicapai. Semak sambungan anda dan cuba lagi.',
   webSaveTimeout: 'Penyimpanan mengambil masa terlalu lama. Semak sambungan anda dan cuba lagi.',
+  webClose: 'Tutup',
+  webSaveUnauthorized:
+    'Sesi UniWork anda telah tamat. Log masuk semula, kemudian cuba simpan lagi.',
+  webSaveForbidden: 'Anda tiada kebenaran untuk menyimpan dokumen ini.',
+  webSaveNotFound: 'Dokumen ini sudah tiada atau telah dialihkan.',
+  webSaveTooLarge: 'Dokumen terlalu besar untuk disimpan.',
+  webSaveRateLimited: 'Terlalu banyak permintaan. Tunggu sebentar dan cuba lagi.',
+  webSaveServer: 'UniWork menghadapi masalah semasa menyimpan. Cuba lagi sebentar lagi.',
+  webSaveFailedGeneric: 'Dokumen tidak dapat disimpan. Cuba lagi.',
 } satisfies Record<keyof typeof zh, string>

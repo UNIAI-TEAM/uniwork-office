@@ -23,4 +23,12 @@ export const he = {
   webDraftDiscard: 'מחיקה',
   webSaveNetwork: 'לא ניתן להתחבר ל-UniWork. בדקו את החיבור ונסו שוב.',
   webSaveTimeout: 'השמירה ארכה זמן רב מדי. בדקו את החיבור ונסו שוב.',
+  webClose: 'סגור',
+  webSaveUnauthorized: 'ההתחברות שלך ל-UniWork פגה. היכנס שוב ונסה לשמור שוב.',
+  webSaveForbidden: 'אין לך הרשאה לשמור מסמך זה.',
+  webSaveNotFound: 'מסמך זה כבר לא קיים או שהועבר.',
+  webSaveTooLarge: 'המסמך גדול מדי לשמירה.',
+  webSaveRateLimited: 'יותר מדי בקשות. המתן רגע ונסה שוב.',
+  webSaveServer: 'ל-UniWork הייתה בעיה בשמירה. נסה שוב בעוד רגע.',
+  webSaveFailedGeneric: 'לא ניתן היה לשמור את המסמך. נסה שוב.',
 } satisfies Record<keyof typeof zh, string>

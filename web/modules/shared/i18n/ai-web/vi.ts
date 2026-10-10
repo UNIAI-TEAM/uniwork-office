@@ -29,9 +29,9 @@ export const vi = {
   aiWebStateEntitlementTitle: 'Gói không bao gồm AI',
   aiWebStateEntitlementBody:
     'Gói UniWork của tổ chức bạn không bao gồm tính năng AI này. Hãy liên hệ quản trị viên.',
-  aiWebStateKeyMissingTitle: 'Chưa có khóa {provider}',
-  aiWebStateKeyMissingBody: 'Thêm khóa API {provider} của bạn trong Cài đặt AI để dùng trợ lý.',
-  aiWebStateKeyRejectedTitle: '{provider} từ chối khóa',
+  aiWebStateKeyMissingTitle: 'Chưa có khóa AI',
+  aiWebStateKeyMissingBody: 'Thêm khóa API trong Cài đặt AI để dùng trợ lý.',
+  aiWebStateKeyRejectedTitle: 'Khóa AI bị từ chối',
   aiWebStateKeyRejectedBody: 'Nhà cung cấp đã từ chối khóa đã lưu. Hãy thay khóa trong Cài đặt AI.',
   aiWebStateRateTitle: 'Quá nhiều yêu cầu AI',
   aiWebStateRateBody: 'Hãy chờ {seconds} giây rồi thử lại.',
