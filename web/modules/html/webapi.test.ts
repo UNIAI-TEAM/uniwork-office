@@ -92,6 +92,26 @@ describe('htmlApi', () => {
     expect(late).toHaveBeenCalledWith(seen[0])
   })
 
+  it('A1b: a picture typed after the first edit gets its URL from the host and the static preview follows', async () => {
+    vi.useFakeTimers()
+    const { api, mock } = setup()
+    mock.override('api.assets.resolve', (p) => {
+      const { paths } = p as { paths: string[] }
+      return { assets: Object.fromEntries(paths.map((x) => [x, `/files/${x}?sig=2`])) }
+    })
+    await api.consumePending()
+    const seen: string[] = []
+    api.onStaticPreview((html) => seen.push(html))
+    api.setDirty(true)
+    api.updatePreview('<html><body><img src="img/new.webp"></body></html>')
+    expect(seen).toHaveLength(1)
+    expect(seen[0]).not.toContain('/files/')
+    await vi.advanceTimersByTimeAsync(700)
+    expect(seen).toHaveLength(2)
+    expect(seen[1]).toContain('src="/files/img/new.webp?sig=2"')
+    vi.useRealTimers()
+  })
+
   it('the scripts preview: preview.html next to the frame, the page over one MessagePort', async () => {
     const { api } = setup()
     await api.consumePending()

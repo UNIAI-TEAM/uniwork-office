@@ -19,6 +19,7 @@
  * | exportDocx / exportHtml            | browser download of the bytes the renderer built                      |
  * | pickImage / saveImage / readImage  | ./assets.ts (api.images.upload with the `images` grant, else data: URI)|
  * | resolveAssetUrl / unresolveAssetUrl| web-only: OpenPayload.assets map for relative pictures                |
+ * | onAssetsChanged                    | web-only: fresh URLs via api.assets.resolve (typed paths, 50 min, 401) |
  * | consumeHeadlessExport              | null (no headless web export)                                         |
  * | provideText / consumeRecovered     | web-only, draft recovery (C18): ../../docs/bridge/draft-recovery.ts   |
  * |                                    | keeps an encrypted copy of the renderer's text every 30 s while dirty;|
@@ -176,10 +177,25 @@ export function createTextWebApi(
   let fatal: ProtocolErrorShape | null = null
   let booted = false
 
+  const assetListeners = new Set<() => void>()
   const assets = createAssetStore(port, {
     fileId: () => current,
     canUpload: () => imagesGranted,
+    onChange: () => {
+      for (const listener of [...assetListeners]) listener()
+    },
   })
+  // a picture of the map that fails to load: the store asks the host for a fresh URL once (A1b)
+  if (typeof window !== 'undefined') {
+    window.addEventListener(
+      'error',
+      (event) => {
+        const el = event.target
+        if (el instanceof HTMLImageElement) void assets.imageFailed(el.currentSrc || el.src)
+      },
+      true,
+    )
+  }
   let imagesGranted = false
   let desktopOpenGranted = false
 
@@ -674,6 +690,8 @@ export function createTextWebApi(
 
     setDirty(next: boolean): void {
       dirty = next === true
+      // pictures named from the first edit on are "typed after the open": the store may ask for them
+      if (dirty) assets.arm()
       // after a failed save the host's header shows "could not be confirmed" while the dirty flag
       // never changed (the client dedupes): the first edit since then is sent again so the header
       // goes back to "unsaved" instead of staying on the stale failure until the next save
@@ -797,6 +815,14 @@ export function createTextWebApi(
 
     /** web-only: display URL of a relative document picture (null = not mapped) */
     resolveAssetUrl: (src: string): string | null => assets.resolve(src),
+
+    /** web-only: fresh URLs arrived or a picture became missing: redraw the pictures (returns unsubscribe) */
+    onAssetsChanged(listener: () => void): () => void {
+      assetListeners.add(listener)
+      return () => {
+        assetListeners.delete(listener)
+      }
+    },
 
     /** web-only: the authored path of a display URL (null = not one of ours) */
     unresolveAssetUrl: (url: string): string | null => assets.unresolve(url),

@@ -15,7 +15,14 @@
  *     PNG/JPEG/GIF/WebP only, a pasted SVG stays a data: URI (document_asset purpose is raster),
  *   - a mapped URL the host no longer serves (401/403/404/410: a revoked share, an expired
  *     signature) counts as missing: `verify()` drops it from the map, so the renderer shows its
- *     missing-picture placeholder instead of a broken-image icon.
+ *     missing-picture placeholder instead of a broken-image icon,
+ *   - fresh URLs (CONTRACT A1b, `api.assets.resolve`): the URLs of the open answer live an hour and
+ *     a path typed after the open has none, so the store asks the host again with paths as written:
+ *     (a) for a picture/sibling path it meets that the map does not name once the user edited the
+ *     document, (b) for every mapped path shortly before the URLs expire, (c) when a mapped URL
+ *     answers 401/403 mid-session (one retry, else the picture shows as missing). An old host
+ *     answers `unsupported`: the store keeps what it has and stops asking. `onChange` tells the
+ *     renderer to redraw its pictures.
  */
 import { TIMEOUTS, type FramePort } from '../../docs/bridge/frame-port'
 
@@ -49,6 +56,17 @@ const GONE_STATUSES = new Set([401, 403, 404, 410])
 /** HEAD probes of a freshly opened document run at most this many at a time, for at most this long */
 const VERIFY_CONCURRENCY = 6
 const VERIFY_BUDGET_MS = 4000
+/** paths the store asks the host about: something a document can show or inline, never a bare word */
+const RESOLVABLE_PATH = /\.(?:png|jpe?g|gif|webp|svg|css|m?js)(?:[?#].*)?$/i
+const MAX_RESOLVE_PATHS = 50
+const MAX_PATH_BYTES = 512
+/** a document can ask about this many distinct typed paths in all (a runaway editor must not flood the host) */
+const MAX_ASKED_PATHS = 200
+/** typing settles for this long before the typed paths are sent */
+const ASK_DELAY_MS = 600
+/** the open answer's URLs live 1 h: ask again at about 50 min, retry a failed refresh after 5 */
+const REFRESH_AFTER_MS = 50 * 60 * 1000
+const REFRESH_RETRY_MS = 5 * 60 * 1000
 /** a sibling stylesheet or script inlined into the HTML preview: far above any hand-written file */
 const MAX_TEXT_BYTES = 2 * 1024 * 1024
 
@@ -119,6 +137,25 @@ export interface AssetStoreOptions {
   fileId: () => string | null
   /** the host granted `images` (api.images.upload exists) */
   canUpload: () => boolean
+  /** the map changed under the renderer (fresh URLs, a picture now missing): redraw the pictures */
+  onChange?: () => void
+  /** URL lifetime guard of the open answer, ms (default 50 min); tests shorten it */
+  refreshAfterMs?: number
+}
+
+/** a relative document path the host could serve (not a URL, not absolute, a picture/css/js name) */
+function isAskablePath(src: string): boolean {
+  if (!src || src.length > 2048 || /^(?:[a-z][a-z0-9+.-]*:|\/|#)/i.test(src)) return false
+  if (new TextEncoder().encode(src).byteLength > MAX_PATH_BYTES) return false
+  return RESOLVABLE_PATH.test(src)
+}
+
+function absoluteUrl(url: string): string {
+  try {
+    return new URL(url, globalThis.location?.href).href
+  } catch {
+    return url
+  }
 }
 
 export function createAssetStore(port: Pick<FramePort, 'request'>, opts: AssetStoreOptions) {
@@ -126,6 +163,30 @@ export function createAssetStore(port: Pick<FramePort, 'request'>, opts: AssetSt
   const urls = new Map<string, string>()
   /** URL -> document path (copy/paste inside the editor must not bake URLs into the file) */
   const paths = new Map<string, string>()
+
+  /** the host has no `api.assets.resolve` (old host): keep the URLs we have, ask no more */
+  let unsupported = false
+  /** typed after the open: asked only once the user has edited the document (open-time misses are the host's answer) */
+  let armed = false
+  const pending = new Set<string>()
+  const asked = new Set<string>()
+  /** URLs a retry obtained: one that fails again goes to the placeholder */
+  const retried = new Set<string>()
+  /** URLs no longer mapped (swapped for a fresh one, or dropped) -> authored path: a picture still showing one maps back */
+  const former = new Map<string, string>()
+  const inflight = new Set<string>()
+  let askTimer: ReturnType<typeof setTimeout> | undefined
+  let refreshTimer: ReturnType<typeof setTimeout> | undefined
+  /** bumps with every reset: answers of a previous document are dropped */
+  let epoch = 0
+
+  function changed(): void {
+    try {
+      opts.onChange?.()
+    } catch (err) {
+      console.warn('[office-web] assets change listener failed:', err)
+    }
+  }
 
   function learn(path: string, url: string): void {
     urls.set(path, url)
@@ -149,6 +210,123 @@ export function createAssetStore(port: Pick<FramePort, 'request'>, opts: AssetSt
     } catch {
       return true
     }
+  }
+
+  /** every key (path as written, normalised alias) of a URL */
+  function keysOf(url: string): string[] {
+    return [...urls].filter(([, value]) => value === url).map(([key]) => key)
+  }
+
+  /** forget a URL the host no longer serves: the picture is missing from now on */
+  function drop(url: string): void {
+    const authored = paths.get(url)
+    if (authored) former.set(url, authored)
+    for (const key of keysOf(url)) urls.delete(key)
+    paths.delete(url)
+    retried.delete(url)
+  }
+
+  /** swap one URL for a fresh one under every key it is known by */
+  function swap(oldUrl: string, newUrl: string): void {
+    const authored = paths.get(oldUrl)
+    if (authored) former.set(oldUrl, authored)
+    for (const key of keysOf(oldUrl)) urls.set(key, newUrl)
+    paths.delete(oldUrl)
+    retried.delete(oldUrl)
+    if (authored) paths.set(newUrl, authored)
+  }
+
+  /** one api.assets.resolve call; null = nothing came back (old host, a failure, a stale document) */
+  async function resolveRemote(list: string[]): Promise<Record<string, string> | null> {
+    if (unsupported || list.length === 0) return null
+    const mine = epoch
+    const fileId = opts.fileId()
+    try {
+      const res = await port.request(
+        'api.assets.resolve',
+        { ...(fileId ? { fileId } : {}), paths: list },
+        { timeoutMs: TIMEOUTS.short },
+      )
+      return mine === epoch ? (res?.assets ?? {}) : null
+    } catch (err) {
+      const code = (err as { code?: string } | null)?.code
+      if (code === 'unsupported' || code === 'unknown_type') unsupported = true
+      else console.warn('[office-web] api.assets.resolve failed, keeping the current URLs:', err)
+      return null
+    }
+  }
+
+  /** (a) the paths typed after the open */
+  async function askTyped(): Promise<void> {
+    askTimer = undefined
+    const batch = [...pending].slice(0, MAX_RESOLVE_PATHS)
+    for (const path of batch) pending.delete(path)
+    const got = await resolveRemote(batch)
+    let any = false
+    for (const [path, url] of Object.entries(got ?? {})) {
+      if (!url || find(path)) continue
+      learn(path, url)
+      if (!urls.has(normalizeAssetPath(path))) urls.set(normalizeAssetPath(path), url)
+      any = true
+    }
+    if (any) changed()
+    if (pending.size > 0) scheduleAsk()
+  }
+
+  function scheduleAsk(): void {
+    if (askTimer !== undefined || unsupported || pending.size === 0) return
+    askTimer = setTimeout(() => void askTyped(), ASK_DELAY_MS)
+  }
+
+  /** a relative path the renderer asked for and the map does not name */
+  function noteMiss(src: string): void {
+    if (unsupported || asked.has(src) || pending.has(src) || !isAskablePath(src)) return
+    if (asked.size >= MAX_ASKED_PATHS) return
+    asked.add(src)
+    if (!armed) return
+    pending.add(src)
+    scheduleAsk()
+  }
+
+  /** (b) fresh URLs for every mapped path before the open answer's expire */
+  async function refreshAll(): Promise<void> {
+    refreshTimer = undefined
+    if (unsupported) return
+    const mine = epoch
+    const authored = [...new Set(paths.values())].filter(
+      (p) => new TextEncoder().encode(p).byteLength <= MAX_PATH_BYTES,
+    )
+    let failed = false
+    let any = false
+    for (let i = 0; i < authored.length; i += MAX_RESOLVE_PATHS) {
+      const chunk = authored.slice(i, i + MAX_RESOLVE_PATHS)
+      const got = await resolveRemote(chunk)
+      if (mine !== epoch) return
+      if (!got) {
+        failed = true
+        continue
+      }
+      for (const path of chunk) {
+        const before = find(path)
+        if (!before) continue
+        const url = got[path]
+        if (!url) {
+          drop(before.url)
+          any = true
+        } else if (url !== before.url) {
+          swap(before.url, url)
+          any = true
+        }
+      }
+    }
+    if (any) changed()
+    scheduleRefresh(failed ? REFRESH_RETRY_MS : (opts.refreshAfterMs ?? REFRESH_AFTER_MS))
+  }
+
+  function scheduleRefresh(ms: number): void {
+    clearTimeout(refreshTimer)
+    refreshTimer =
+      unsupported || paths.size === 0 ? undefined : setTimeout(() => void refreshAll(), ms)
   }
 
   async function upload(bytes: Uint8Array, ext: string): Promise<string | null> {
@@ -177,12 +355,56 @@ export function createAssetStore(port: Pick<FramePort, 'request'>, opts: AssetSt
   return {
     /** replace the map with the one of a newly opened document */
     reset(assets: Record<string, string> | undefined): void {
+      epoch++
       urls.clear()
       paths.clear()
+      pending.clear()
+      asked.clear()
+      retried.clear()
+      former.clear()
+      inflight.clear()
+      armed = false
+      clearTimeout(askTimer)
+      askTimer = undefined
       for (const [path, url] of Object.entries(assets ?? {})) {
         // keys exactly as written, and the normalised form a differently written src may use
         learn(path, url)
         if (!urls.has(normalizeAssetPath(path))) urls.set(normalizeAssetPath(path), url)
+      }
+      scheduleRefresh(opts.refreshAfterMs ?? REFRESH_AFTER_MS)
+    },
+
+    /** the user edited the document: pictures it names from now on are "typed after the open" */
+    arm(): void {
+      armed = true
+    },
+
+    /**
+     * (c) a picture of ours failed to load. When the host really refuses its URL (401/403/404/410),
+     * ask for a fresh one once; a second refusal, an absent answer or an old host makes it missing.
+     */
+    async imageFailed(src: string): Promise<void> {
+      const url = [...paths.keys()].find((u) => u === src || absoluteUrl(u) === absoluteUrl(src))
+      const authored = url ? paths.get(url) : undefined
+      if (!url || !authored || inflight.has(url)) return
+      inflight.add(url)
+      try {
+        if (await reachable(url)) return
+        let fresh: string | undefined
+        if (!retried.has(url)) {
+          const got = await resolveRemote([authored])
+          // an old host or a failed call: keep what we have
+          if (!got) return
+          fresh = got[authored]
+        }
+        if (!paths.has(url)) return
+        if (fresh && fresh !== url) {
+          swap(url, fresh)
+          retried.add(fresh)
+        } else drop(url)
+        changed()
+      } finally {
+        inflight.delete(url)
       }
     },
 
@@ -198,6 +420,8 @@ export function createAssetStore(port: Pick<FramePort, 'request'>, opts: AssetSt
       const probe = async (): Promise<void> => {
         for (let url = queue.shift(); url; url = queue.shift()) {
           if (await reachable(url)) continue
+          const authored = paths.get(url)
+          if (authored) former.set(url, authored)
           for (const [key, value] of [...urls]) {
             if (value !== url) continue
             urls.delete(key)
@@ -223,12 +447,14 @@ export function createAssetStore(port: Pick<FramePort, 'request'>, opts: AssetSt
 
     /** display URL of an authored src; null = not a mapped document path */
     resolve(src: string): string | null {
-      return find(src)?.url ?? null
+      const hit = find(src)
+      if (!hit) noteMiss(src)
+      return hit?.url ?? null
     },
 
     /** authored path of a display URL; null = not one of ours */
     unresolve(url: string): string | null {
-      return paths.get(url) ?? null
+      return paths.get(url) ?? former.get(url) ?? null
     },
 
     /**

@@ -148,6 +148,7 @@ export function createMarkdownWebApi(ctx: ModuleBridgeContext, opts: TextWebApiO
     resolveAssetUrl: (src: string, missingNote?: string): string | null =>
       web.resolveAssetUrl(src) ?? missingImageUrl(src, missingNote),
     isMissingAsset: (url: string): boolean => isMissingImageUrl(url),
+    onAssetsChanged: web.onAssetsChanged,
     unresolveAssetUrl: (url: string): string | null =>
       web.unresolveAssetUrl(url) ?? unresolveMissingImage(url),
   })

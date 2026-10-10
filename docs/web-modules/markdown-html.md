@@ -46,6 +46,18 @@ text-module bridge. Contract: lane CONTRACT C1-C13, protocol `web/docs/protocol`
   broken-image icon (a network error or a host without HEAD keeps the URL). Markdown: `localImage.ts` asks
   `markdownApi.resolveAssetUrl`; HTML: the preview copy (below). Mermaid diagrams render through
   `<img src="data:image/svg+xml,...">` (M0).
+- **Fresh URLs and paths typed after the open (CONTRACT A1b, `api.assets.resolve`).** The open answer's URLs live an
+  hour and a new `![](x.png)` has no URL, so the asset store asks the host again with paths as written (1..50 per
+  request, protocol README "Fresh URLs"): (a) a relative picture/stylesheet/script path (`.png .jpg .gif .webp .svg
+.css .js .mjs`, never a URL, an absolute path or a bare word) that the map does not name, once the user has edited
+  the document (what the renderer asks while the document renders is the open answer's own "no"), after 600 ms of
+  quiet, once per path and at most 200 per document; (b) every mapped path at about 50 minutes (retry in 5 minutes
+  when the call fails); (c) when a mapped picture fails to load and a HEAD says 401/403/404/410: one fresh URL, and a
+  second refusal or an answer without the path makes it missing. A host without `api.assets.resolve` answers
+  `unsupported`: the frame keeps what it has and stops asking for the session. `onAssetsChanged` tells the renderer:
+  Markdown points the pictures on screen at the new URLs (`refreshWebPictures`, the document text and dirty flag
+  are untouched), the HTML static copy is rebuilt (the scripts preview takes its copy, pictures as data: URIs, at the
+  next load).
 - **HTML preview with scripts (H2, CONTRACT C15(1), like the app).** `getPreviewInfo` names the bundle's
   `preview.html`; `PreviewFrame` loads it with `sandbox="allow-scripts allow-forms allow-popups allow-modals"` (no
   `allow-same-origin`: opaque origin), `credentialless` and `referrerpolicy="no-referrer"`. The host serves it with a
@@ -132,8 +144,7 @@ text-module bridge. Contract: lane CONTRACT C1-C13, protocol `web/docs/protocol`
 - Markdown: the source view works on the web (the ribbon's source toggle); what stays out of reach is rendering raw
   HTML (kept byte-identically and shown as text, never executed).
 - HTML preview: `fetch` / XHR data and nested frames stay blocked by the preview policy (`connect-src 'none'`,
-  `frame-src 'none'`); the note above says so and offers the app. A path typed into a document after it opened (a new
-  `![](x.png)`) resolves on the next open; there is no resolve request yet. The URLs live one hour: a document left
-  open for longer shows its pictures as missing until it is reopened (a re-sign request is the host's to add).
+  `frame-src 'none'`); the note above says so and offers the app. A path typed into a document after it opened and the
+  one-hour URLs are covered by `api.assets.resolve` above (needs a host that offers it).
 - The UniWork host (dev-uniwork `frame-headers.mjs`) must serve `preview.html` with `csp.json` `documents[0].value`;
   until it does, the web shows the static preview.

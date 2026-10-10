@@ -6,8 +6,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Editor } from '@tiptap/core'
 import { buildExtensions } from '../src/renderer/editor/extensions'
+import { refreshWebPictures } from '../src/renderer/editor/localImage'
 import { strings } from '../src/renderer/i18n/strings'
-import { missingImageUrl, isMissingImageUrl } from '../../../web/modules/markdown/missing-image'
+import {
+  missingImageUrl,
+  isMissingImageUrl,
+  unresolveMissingImage,
+} from '../../../web/modules/markdown/missing-image'
 
 const editors: Editor[] = []
 afterEach(() => {
@@ -60,5 +65,61 @@ describe('missing picture placeholder in the editor', () => {
     })
     const editor = open('![diagram](assets/a.png)\n')
     expect(editor.view.dom.querySelector('img[src]')!.hasAttribute('aria-label')).toBe(false)
+  })
+})
+
+describe('fresh picture URLs (A1b): refreshWebPictures redraws what is on screen', () => {
+  /** the bridge's store, reduced: path -> URL, plus the URL every picture ever showed -> path */
+  function bridge(map: Map<string, string>) {
+    const former = new Map<string, string>()
+    return {
+      resolveAssetUrl: (src: string, note?: string) => map.get(src) ?? missingImageUrl(src, note),
+      isMissingAsset: (url: string) => isMissingImageUrl(url),
+      unresolveAssetUrl: (url: string) => {
+        for (const [path, u] of map) if (u === url) return path
+        return former.get(url) ?? unresolveMissingImage(url)
+      },
+      remember: (url: string, path: string) => former.set(url, path),
+    }
+  }
+
+  it('a typed path that got its URL, an expired URL swapped, a refused one made missing', () => {
+    const map = new Map<string, string>([['assets/a.png', '/f/a1']])
+    const api = bridge(map)
+    vi.stubGlobal('markdownApi', api)
+    const editor = open('![a](assets/a.png)\n\n![b](./typed.png)\n')
+    const imgs = () => [...editor.view.dom.querySelectorAll('img[src]')]
+    expect(imgs().map((i) => i.getAttribute('src'))).toEqual([
+      '/f/a1',
+      expect.stringMatching(/^data:image\/svg\+xml/),
+    ])
+    const markdown = editor.getMarkdown()
+
+    // the host answered for ./typed.png and re-signed assets/a.png
+    map.set('./typed.png', '/f/typed')
+    api.remember('/f/a1', 'assets/a.png')
+    map.set('assets/a.png', '/f/a2')
+    refreshWebPictures(editor.view.dom)
+    expect(imgs().map((i) => i.getAttribute('src'))).toEqual(['/f/a2', '/f/typed'])
+    expect(imgs()[1]!.hasAttribute('aria-label')).toBe(false)
+
+    // refused for good: back to the labelled placeholder
+    api.remember('/f/a2', 'assets/a.png')
+    map.delete('assets/a.png')
+    refreshWebPictures(editor.view.dom)
+    expect(api.isMissingAsset(imgs()[0]!.getAttribute('src')!)).toBe(true)
+    expect(imgs()[0]!.getAttribute('aria-label')).toContain('a')
+
+    // the document never saw any of it
+    expect(editor.getMarkdown()).toBe(markdown)
+  })
+
+  it('leaves remote and data: pictures alone', () => {
+    vi.stubGlobal('markdownApi', bridge(new Map()))
+    const editor = open('![r](https://x.test/r.png)\n')
+    refreshWebPictures(editor.view.dom)
+    expect(editor.view.dom.querySelector('img[src]')!.getAttribute('src')).toBe(
+      'https://x.test/r.png',
+    )
   })
 })

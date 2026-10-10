@@ -348,6 +348,8 @@ export interface HtmlApi {
     target: Window,
     handlers: { onMessage: (data: unknown) => void; onFailed: () => void },
   ): { post(msg: unknown): void; close(): void }
+  /** Web frame only: the asset map changed (fresh URLs, a picture became missing): rebuild the preview */
+  onAssetsChanged?(listener: () => void): () => void
   /**
    * Web frame only (absent on desktop): the host's "Open in desktop app" flow, for the use-the-app
    * messages. Resolves to the host's outcome; `unavailable` = the host already showed its own alert.

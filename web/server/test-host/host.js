@@ -9,6 +9,8 @@
 //        &images=1 grants `images`: api.images.upload keeps the bytes (__host.uploads()) and answers
 //        {imageId, url: /e2e-assets/<name>}; the spec serves that URL with page.route (UNI-1232 A1)
 //        &assets=<json> puts {path as written: same-origin URL} into api.open's OpenPayload.assets
+//        &resolve=1 offers api.assets.resolve: every path answers /e2e-assets/<last segment>?r=<call number>, a
+//        name starting with "gone" is left out; the requests are kept (__host.resolves()) (UNI-1232 A1b)
 //        &desktopOpen=1 grants `desktopOpen`: app.open requests are kept (__host.appOpens()) and answered with
 //        &appOpen=<launched|installer|unavailable> (default launched) (UNI-1232 A7)
 //
@@ -32,6 +34,7 @@
 //   lastExport()     -> {fileId, name, dataBytes: number[] | null} of the last api.export | null
 //   uploads()        -> the api.images.upload requests so far ({fileId, name, mimeType, bytes: number[]})
 //   appOpens()       -> the app.open requests so far ({feature})
+//   resolves()       -> the api.assets.resolve requests so far ({fileId, paths})
 //   addFile(url)     -> fetch a fixture into the store, resolves with its meta (GO-B4)
 //   queuePick(id)    -> the next file.pick answers this file (nothing queued = the user cancelled);
 //                       file.pick is granted with ?pick=1
@@ -53,6 +56,7 @@ let lastExport = null
 const events = []
 const uploads = [] // api.images.upload requests: {fileId, name, mimeType, bytes}
 const appOpens = [] // app.open requests: {feature}
+const resolves = [] // api.assets.resolve requests: {fileId, paths}
 const picks = [] // fileIds the next file.pick requests answer, in order
 const pending = new Map() // id -> {resolve, reject}
 let reqSeq = 0
@@ -132,6 +136,17 @@ const handlers = {
   'app.open': (payload) => {
     appOpens.push({ feature: payload?.feature })
     return { outcome: params.get('appOpen') || 'launched' }
+  },
+  'api.assets.resolve': ({ fileId, paths }) => {
+    if (params.get('resolve') !== '1') throw apiError('unsupported', 'api.assets.resolve')
+    resolves.push({ fileId, paths: [...paths] })
+    const assets = {}
+    for (const path of paths) {
+      const name = path.split(/[?#]/)[0].split('/').pop()
+      if (name && !name.startsWith('gone'))
+        assets[path] = `/e2e-assets/${name}?r=${resolves.length}`
+    }
+    return { assets }
   },
   // no server render in the harness: record what the frame sent, answer a stub PDF
   'api.export': ({ fileId, name, data }) => {
@@ -322,6 +337,7 @@ async function boot() {
     lastExport: () => lastExport,
     uploads: () => uploads.map((u) => ({ ...u })),
     appOpens: () => appOpens.map((a) => ({ ...a })),
+    resolves: () => resolves.map((r) => ({ ...r })),
     events,
     files: () => [...files.values()].map((f) => ({ ...f.meta, size: f.bytes.byteLength })),
     request,

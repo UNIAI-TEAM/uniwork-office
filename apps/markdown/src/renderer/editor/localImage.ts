@@ -54,6 +54,32 @@ export function resolveImageSrc(src: string, baseDir: string | null = imageBaseD
 }
 
 /**
+ * Web frame: the asset map changed (a fresh URL replaced an expired one, a typed path got its URL, a
+ * refused picture became missing): point the pictures already on screen at what the map says now.
+ * Same attribute work as the node's renderHTML, applied to the live DOM; ProseMirror reads the authored
+ * path back through unresolveImageSrc, so the document does not change (not dirty).
+ */
+export function refreshWebPictures(root: ParentNode): void {
+  for (const img of root.querySelectorAll<HTMLImageElement>('img')) {
+    const shown = img.getAttribute('src') ?? ''
+    const authored = unresolveImageSrc(shown)
+    if (!authored) continue
+    const display = resolveImageSrc(authored)
+    if (!display || display === shown) continue
+    img.setAttribute('src', display)
+    if (window.markdownApi?.isMissingAsset?.(display)) {
+      const name = (img.getAttribute('alt') ?? '').trim() || authored
+      img.setAttribute(
+        'aria-label',
+        `${t('imageMissingName', { path: name })}. ${t('imageMissingWeb')}`,
+      )
+    } else {
+      img.removeAttribute('aria-label')
+    }
+  }
+}
+
+/**
  * Reverse of {@link resolveImageSrc}: map a display URL (md-asset://) back to
  * the authored path so DOM-parsed content (copy/paste inside the editor) never
  * bakes display URLs into the stored document / serialized markdown.

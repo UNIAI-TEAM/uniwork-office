@@ -67,6 +67,14 @@ export function createHtmlWebApi(ctx: ModuleBridgeContext, opts: TextWebApiOptio
   /** mapped sibling stylesheets / scripts (src -> text), kept per frame like the picture cache */
   const inlinedText = new Map<string, string>()
 
+  // fresh URLs / a picture that became missing (api.assets.resolve): the static copy follows. The scripts
+  // preview takes its copy at the handshake with pictures as data: URIs, so it picks them up on its next load
+  web.onAssetsChanged(() => {
+    if (!source || previewListeners.size === 0) return
+    preview = toStaticHtml(source, web.resolveAssetUrl)
+    for (const l of previewListeners) l(preview)
+  })
+
   const api = {
     consumePending: web.consumePending,
     consumeRecovered: web.consumeRecovered,
@@ -183,6 +191,7 @@ export function createHtmlWebApi(ctx: ModuleBridgeContext, opts: TextWebApiOptio
     },
     resolveAssetUrl: web.resolveAssetUrl,
     unresolveAssetUrl: web.unresolveAssetUrl,
+    onAssetsChanged: web.onAssetsChanged,
     openInDesktopApp: web.openInDesktopApp,
   })
 }

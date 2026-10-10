@@ -456,6 +456,43 @@ describe('markdownApi: pictures and exports', () => {
     vi.unstubAllGlobals()
   })
 
+  it('A1b: a picture typed after the first edit asks the host for its URL and redraws; a refused image gets a fresh one', async () => {
+    vi.useFakeTimers()
+    const { api, mock } = setup()
+    mock.override('api.assets.resolve', (p) => {
+      const { paths } = p as { paths: string[] }
+      return { assets: Object.fromEntries(paths.map((x) => [x, `/files/${x}?sig=2`])) }
+    })
+    const changed = vi.fn()
+    api.onAssetsChanged(changed)
+    await open(api)
+    // met while the document renders: the host's open answer already said no
+    expect(api.isMissingAsset(api.resolveAssetUrl('assets/open-time.png')!)).toBe(true)
+    api.setDirty(true)
+    const typed = api.resolveAssetUrl('./typed.png')!
+    expect(api.isMissingAsset(typed)).toBe(true)
+    await vi.advanceTimersByTimeAsync(700)
+    const calls = mock.calls.filter((c) => c.type === 'api.assets.resolve')
+    expect(calls.map((c) => (c.payload as { paths: string[] }).paths)).toEqual([['./typed.png']])
+    expect(api.resolveAssetUrl('./typed.png')).toBe('/files/./typed.png?sig=2')
+    expect(changed).toHaveBeenCalledTimes(1)
+
+    // an <img> of the map that fails to load with a 403: one fresh URL
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(null, { status: 403 })),
+    )
+    const img = document.createElement('img')
+    img.src = '/files/./typed.png?sig=2'
+    document.body.appendChild(img)
+    img.dispatchEvent(new Event('error'))
+    await vi.advanceTimersByTimeAsync(10)
+    expect(mock.calls.filter((c) => c.type === 'api.assets.resolve')).toHaveLength(2)
+    expect(changed).toHaveBeenCalledTimes(2)
+    vi.unstubAllGlobals()
+    vi.useRealTimers()
+  })
+
   it('exportDocx downloads the renderer-built bytes; open-in-Docs is refused', async () => {
     const { api } = setup()
     const create = vi.fn(() => 'blob:x')

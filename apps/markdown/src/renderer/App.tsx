@@ -42,7 +42,7 @@ import { collectOutline, type OutlineItem } from './editor/outline'
 import { rewriteRawHtmlImages } from './editor/rawHtml'
 import { buildSlashItems } from './editor/slashCommand'
 import type { SlashController, SlashMenuState } from './editor/slashCommand'
-import { dirOf, setImageBaseDir, VIEW_IMAGE_EVENT } from './editor/localImage'
+import { dirOf, refreshWebPictures, setImageBaseDir, VIEW_IMAGE_EVENT } from './editor/localImage'
 import { Ribbon } from './components/Ribbon'
 import { ImageHostDialog } from './components/ImageHostDialog'
 import { OutlinePane } from './components/OutlinePane'
@@ -295,6 +295,12 @@ export default function App() {
   useEffect(() => {
     setImageBaseDir(filePath ? dirOf(filePath) : null)
   }, [filePath])
+
+  // web frame: fresh picture URLs / a picture that became missing (the host's api.assets.resolve)
+  useEffect(() => {
+    if (!editor) return
+    return window.markdownApi?.onAssetsChanged?.(() => refreshWebPictures(editor.view.dom))
+  }, [editor])
 
   useEffect(() => {
     let live = true
