@@ -182,9 +182,33 @@ test('context menu offers spelling suggestions and applies one', async () => {
     // "jumsp" was typed too and never re-rendered, so its marker is still there
     await editor.mouse.click(target.x, target.y, { button: 'right' })
     await editor.locator('.ctx-menu .ctx-item-strong').first().waitFor()
+    // DIAG (GO-A9 flake): which path replaced the word — Blink's in-place edit
+    // (beforeinput insertReplacementText) or the scripted ProseMirror fallback
+    await editor.evaluate(() => {
+      const w = window as unknown as { __spellLog: string[] }
+      const t0 = performance.now()
+      const at = () => Math.round(performance.now() - t0)
+      w.__spellLog = []
+      const root = document.querySelector('.doc-page')!
+      root.addEventListener(
+        'beforeinput',
+        (e) => w.__spellLog.push(`${at()} beforeinput ${(e as InputEvent).inputType}`),
+        true,
+      )
+      new MutationObserver((records) => {
+        for (const r of records)
+          w.__spellLog.push(
+            `${at()} ${r.type} ${r.type === 'characterData' ? JSON.stringify(r.target.textContent) : `+${r.addedNodes.length}/-${r.removedNodes.length}`}`,
+          )
+      }).observe(root, { characterData: true, childList: true, subtree: true })
+    })
     await editor.locator('.ctx-menu .ctx-item-strong').first().click()
     await expect.poll(() => pageText(editor), POLL).toContain(`fox ${suggestion} over`)
     await expect.poll(() => pageText(editor), POLL).not.toContain('jumsp')
+    await editor.waitForTimeout(400)
+    console.log(
+      `[spell-diag] ${(await editor.evaluate(() => (window as unknown as { __spellLog: string[] }).__spellLog)).join(' | ')}`,
+    )
     // the fix went through Blink, so the paragraph's other misspelling keeps
     // its marker (a scripted text-node rewrite would have dropped it)
     await editor.mouse.click(blank.x, blank.y)
