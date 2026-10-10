@@ -9,9 +9,12 @@
 
 import {
   activeSearchProvider,
+  aiTestFailure,
+  aiTestFailureKindForText,
   cloudToolsEnabled,
   type AiSearchProviderId,
   type AiSettings,
+  type AiTestResult,
 } from '@genoffice/ai-provider'
 import { imageSearch, webSearch, type SearchOptions } from './index'
 import { readAiSettingsFile } from './media-tools'
@@ -37,14 +40,17 @@ export function imageSearchTool(settingsPath: string, query: string, maxResults 
   return imageSearch(query, maxResults, searchOptionsFromSettings(readAiSettingsFile(settingsPath)))
 }
 
-/** settings-UI test: the selected backend (keyed or free) must answer one minimal query. */
+/**
+ * settings-UI test: the selected backend (keyed or free) must answer one minimal query.
+ * `error` is the log detail; `errorKind` is what the settings UI shows.
+ */
 export async function testSearchProvider(
   provider: AiSearchProviderId,
   apiKey: string,
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<AiTestResult> {
   if (provider === 'auto') return { ok: true }
   apiKey = apiKey.trim()
-  if (!apiKey && provider !== 'parallel') return { ok: false, error: 'API key is empty' }
+  if (!apiKey && provider !== 'parallel') return aiTestFailure('invalid_key', 'API key is empty')
   const options: SearchOptions = {
     useGsk: false,
     serperKey: provider === 'serper' ? apiKey : '',
@@ -57,11 +63,12 @@ export async function testSearchProvider(
   }
   const r = await webSearch('UniWork Office', 1, options)
   if (r.method === provider) return { ok: true }
-  return {
-    ok: false,
-    error:
-      r.method === 'error'
-        ? (r.error ?? 'search failed')
-        : `${provider} did not answer (service unavailable, key rejected or quota exhausted); fell back to ${r.method}`,
+  if (r.method === 'error') {
+    const detail = r.error ?? 'search failed'
+    return aiTestFailure(aiTestFailureKindForText(detail), detail)
   }
+  return aiTestFailure(
+    'unavailable',
+    `${provider} did not answer (service unavailable, key rejected or quota exhausted); fell back to ${r.method}`,
+  )
 }

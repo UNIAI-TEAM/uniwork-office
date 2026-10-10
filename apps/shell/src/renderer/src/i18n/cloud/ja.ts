@@ -32,4 +32,8 @@ export const ja = {
   cloudMediaLabel: 'UniWork クラウド',
   cloudMediaDesc: '組織の UniWork AI クレジットを使用します。キーは不要です。',
   cloudSearchAutoHint: 'まず UniWork クラウド（AI クレジットを消費）、次に無料検索を使います。',
+  aiTestErrInvalidKey: 'API キーがないか、拒否されました',
+  aiTestErrNetwork: '接続できません。ネットワークを確認してください',
+  aiTestErrLimit: 'プロバイダーの上限に達しました。後でもう一度お試しください',
+  aiTestErrUnavailable: 'サービスが応答しません。後でもう一度お試しください',
 } satisfies Record<keyof typeof zh, string>

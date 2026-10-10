@@ -31,4 +31,8 @@ export const ar = {
   cloudMediaLabel: 'سحابة UniWork',
   cloudMediaDesc: 'يستخدم أرصدة الذكاء الاصطناعي من UniWork لمؤسستك؛ لا يلزم مفتاح.',
   cloudSearchAutoHint: 'سحابة UniWork أولًا (تستهلك أرصدة الذكاء الاصطناعي)، ثم البحث المجاني.',
+  aiTestErrInvalidKey: 'مفتاح API مفقود أو مرفوض',
+  aiTestErrNetwork: 'تعذّر الاتصال. تحقّق من الشبكة',
+  aiTestErrLimit: 'تم بلوغ حد المزوّد. حاول لاحقًا',
+  aiTestErrUnavailable: 'الخدمة لا تستجيب. حاول لاحقًا',
 } satisfies Record<keyof typeof zh, string>

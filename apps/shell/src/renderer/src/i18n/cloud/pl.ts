@@ -32,4 +32,8 @@ export const pl = {
   cloudMediaLabel: 'Chmura UniWork',
   cloudMediaDesc: 'Korzysta z kredytów AI UniWork organizacji; klucz nie jest potrzebny.',
   cloudSearchAutoHint: 'Najpierw chmura UniWork (zużywa kredyty AI), potem darmowe wyszukiwanie.',
+  aiTestErrInvalidKey: 'Brak klucza API lub został odrzucony',
+  aiTestErrNetwork: 'Nie można się połączyć. Sprawdź sieć',
+  aiTestErrLimit: 'Osiągnięto limit dostawcy. Spróbuj później',
+  aiTestErrUnavailable: 'Usługa nie odpowiada. Spróbuj później',
 } satisfies Record<keyof typeof zh, string>

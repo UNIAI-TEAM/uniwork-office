@@ -33,4 +33,8 @@ export const fr = {
   cloudMediaDesc: 'Utilise les crédits IA UniWork de votre organisation ; aucune clé requise.',
   cloudSearchAutoHint:
     'D’abord le cloud UniWork (consomme des crédits IA), puis la recherche gratuite.',
+  aiTestErrInvalidKey: 'Clé API absente ou refusée',
+  aiTestErrNetwork: 'Connexion impossible. Vérifiez votre réseau',
+  aiTestErrLimit: 'Limite du fournisseur atteinte. Réessayez plus tard',
+  aiTestErrUnavailable: 'Le service ne répond pas. Réessayez plus tard',
 } satisfies Record<keyof typeof zh, string>

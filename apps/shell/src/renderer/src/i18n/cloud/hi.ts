@@ -31,4 +31,8 @@ export const hi = {
   cloudMediaLabel: 'UniWork क्लाउड',
   cloudMediaDesc: 'आपके संगठन के UniWork AI क्रेडिट इस्तेमाल करता है; कुंजी की ज़रूरत नहीं।',
   cloudSearchAutoHint: 'पहले UniWork क्लाउड (AI क्रेडिट खर्च), फिर मुफ़्त सर्च।',
+  aiTestErrInvalidKey: 'API कुंजी नहीं है या अस्वीकार हुई',
+  aiTestErrNetwork: 'कनेक्ट नहीं हो सका। अपना नेटवर्क जाँचें',
+  aiTestErrLimit: 'प्रदाता की सीमा पूरी हो गई। बाद में फिर कोशिश करें',
+  aiTestErrUnavailable: 'सेवा जवाब नहीं दे रही। बाद में फिर कोशिश करें',
 } satisfies Record<keyof typeof zh, string>

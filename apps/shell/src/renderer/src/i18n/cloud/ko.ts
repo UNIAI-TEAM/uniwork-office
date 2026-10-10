@@ -32,4 +32,8 @@ export const ko = {
   cloudMediaLabel: 'UniWork 클라우드',
   cloudMediaDesc: '조직의 UniWork AI 크레딧을 사용하며 키가 필요 없습니다.',
   cloudSearchAutoHint: '먼저 UniWork 클라우드(AI 크레딧 차감), 그다음 무료 검색을 사용합니다.',
+  aiTestErrInvalidKey: 'API 키가 없거나 거부되었습니다',
+  aiTestErrNetwork: '연결할 수 없습니다. 네트워크를 확인하세요',
+  aiTestErrLimit: '제공업체 한도에 도달했습니다. 나중에 다시 시도하세요',
+  aiTestErrUnavailable: '서비스가 응답하지 않습니다. 나중에 다시 시도하세요',
 } satisfies Record<keyof typeof zh, string>

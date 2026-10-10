@@ -32,4 +32,8 @@ export const en = {
   cloudMediaLabel: 'UniWork cloud',
   cloudMediaDesc: 'Uses your organization’s UniWork AI credits; no key needed.',
   cloudSearchAutoHint: 'UniWork cloud first (spends AI credits), then free search.',
+  aiTestErrInvalidKey: 'API key missing or rejected',
+  aiTestErrNetwork: 'Can’t connect. Check your connection',
+  aiTestErrLimit: 'Provider limit reached. Try again later',
+  aiTestErrUnavailable: 'Service not answering. Try again later',
 } satisfies Record<keyof typeof zh, string>

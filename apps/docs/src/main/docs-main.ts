@@ -107,15 +107,21 @@ import {
   sanitizeAiSettings,
   sanitizeCliPath,
   aiNoticeBody,
+  aiTestFailure,
+  aiTestFailureKindForChat,
+  aiTestFailureKindForText,
   noModelMessage,
   setAiUserAgent,
   setRescueFetch,
   streamForProvider,
   withUniAiOpenRouterAuth,
   type AiChatRequest,
+  type AiChatResponse,
   type AiSettings,
   type AiStreamChunk,
   type AiStreamRequest,
+  type AiTestFailureKind,
+  type AiTestResult,
   type GenSparkAccountStatus,
   type LegacyAiSettings,
 } from '@genoffice/ai-provider'
@@ -3984,31 +3990,48 @@ export function registerAiIpc(): void {
       ),
   )
 
-  ipcMain.handle('ai:search-test', (_event, input: unknown) => {
+  // a failed settings test keeps its raw detail here (the log); the renderer only gets the kind
+  const logAiTest = (what: string, provider: string, result: AiTestResult): AiTestResult => {
+    if (!result.ok) console.warn(`[ai] ${what} test failed (${provider}):`, result.error)
+    return result
+  }
+
+  ipcMain.handle('ai:search-test', async (_event, input: unknown) => {
     const { provider, apiKey } = (input ?? {}) as { provider?: AiSearchProviderId; apiKey?: string }
     // `auto` is the keyless free chain: nothing to test
     if (!provider || provider === 'auto') return { ok: true }
-    return testSearchProvider(provider, String(apiKey ?? ''))
+    return logAiTest('search', provider, await testSearchProvider(provider, String(apiKey ?? '')))
   })
 
   // settings-UI connection test for the media provider (the UniWork cloud entry shows only while signed in + entitled)
-  ipcMain.handle('ai:media-test', (_event, input: unknown) => {
+  ipcMain.handle('ai:media-test', async (_event, input: unknown) => {
     const { provider, config } = (input ?? {}) as {
       provider?: AiMediaProviderId
       config?: AiMediaProviderConfig
     }
     if (!provider || provider === 'genspark') {
-      return hasGskAuth() ? { ok: true } : { ok: false, error: 'No media provider configuration' }
+      return hasGskAuth()
+        ? { ok: true }
+        : logAiTest('media', 'cloud', aiTestFailure('failed', 'No media provider configuration'))
     }
-    if (!config) return { ok: false, error: 'No media provider configuration' }
-    return testMediaProvider(provider, config)
+    if (!config) {
+      return logAiTest(
+        'media',
+        provider,
+        aiTestFailure('failed', 'No media provider configuration'),
+      )
+    }
+    return logAiTest('media', provider, await testMediaProvider(provider, config))
   })
 
-  ipcMain.handle('ai:chat', async (_event, request: AiChatRequest) => {
+  // one-shot chat; `errorKind` says why a failure failed for the settings test (other callers ignore it)
+  const runAiChat = async (
+    request: AiChatRequest,
+  ): Promise<AiChatResponse & { errorKind?: AiTestFailureKind }> => {
     // same schema check as ai:stream: one-shot requests would otherwise act on
     // the renderer's settings copy verbatim
     const settings = sanitizeAiSettings(request.settings)
-    if (!settings) return { ok: false, error: 'invalid AI settings payload' }
+    if (!settings) return { ok: false, error: 'invalid AI settings payload', errorKind: 'failed' }
     const { system, user } = request
     const provider = settings.provider
     const config = withUniAiOpenRouterAuth(settings, provider, settings.providers?.[provider])
@@ -4017,20 +4040,38 @@ export function registerAiIpc(): void {
         ok: false,
         // one-shot callers (settings test, email, one-click actions) print the string as is, so no notice code
         error: aiNoticeBody(noModelMessage(getUiLang(), tm('errNoApiKey', { provider }))),
+        errorKind: 'invalid_key',
       }
     }
-    if (provider !== 'codex' && !config.model) return { ok: false, error: tm('errNoModel') }
+    if (provider !== 'codex' && !config.model) {
+      return { ok: false, error: tm('errNoModel'), errorKind: 'failed' }
+    }
     try {
       const result = await chatForProvider(provider, config, system, user)
       // the one-shot path reports HTTP failures as ok:false with the raw body —
       // replace capacity/rate-limit dumps with the localized "busy" message
       if (!result.ok && isAiOverloadedError(result.error)) {
-        return { ok: false, error: tm('errAiBusy') }
+        return { ok: false, error: tm('errAiBusy'), errorKind: 'unavailable' }
       }
-      return result
+      return result.ok ? result : { ...result, errorKind: aiTestFailureKindForChat(result) }
     } catch (err) {
-      return { ok: false, error: isAiOverloadedError(err) ? tm('errAiBusy') : String(err) }
+      return isAiOverloadedError(err)
+        ? { ok: false, error: tm('errAiBusy'), errorKind: 'unavailable' }
+        : { ok: false, error: String(err), errorKind: aiTestFailureKindForText(String(err), err) }
     }
+  }
+
+  ipcMain.handle('ai:chat', (_event, request: AiChatRequest) => runAiChat(request))
+
+  // settings > AI model "Test": the chat model answers one ping; a failure keeps its raw text in the log
+  ipcMain.handle('ai:settings-test', async (_event, request: AiChatRequest) => {
+    const result = await runAiChat(request)
+    if (result.ok) return { ok: true }
+    return logAiTest(
+      'model',
+      String(request?.settings?.provider ?? ''),
+      aiTestFailure(result.errorKind ?? 'failed', result.error ?? ''),
+    )
   })
 }
 

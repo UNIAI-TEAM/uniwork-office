@@ -40,6 +40,8 @@ import type { AiCatalogEntry, DocTheme, UiTheme } from '../../shared/home-api'
 import appIcon from './assets/app-icon.png'
 import legal from '../../shared/legal.json'
 import { ProviderLogo } from './provider-logos'
+import { connectionTestResult, runConnectionTests, testFailureText } from './ai-connection-test'
+import type { BlockCheck, TestedBlock, TestResult } from './ai-connection-test'
 import { AccountPane } from './AccountPane'
 import type { AccountController } from './account-model'
 import { BackupStoragePane } from './BackupStoragePane'
@@ -55,7 +57,6 @@ import { UniAiPwaPane } from './UniAiPwaPane'
 import {
   UniworkCloudAccountRows,
   UniworkCloudNotice,
-  cloudTestVerdict,
   useUniworkCloudStatus,
 } from './UniworkCloudPane'
 import type { UniworkCloudStatus } from '@genoffice/ai-provider/browser'
@@ -557,7 +558,7 @@ function AiModelPane({ t, cloud }: { t: TFunc; cloud: UniworkCloudStatus | null 
       .testAiSettings?.(settings)
       .then((r) => {
         if (seq !== testSeqRef.current) return
-        setTestResult(r ?? { ok: false })
+        setTestResult(connectionTestResult(r ?? { ok: false }, t))
         if (r?.ok && isCodex) {
           void refreshCodexModels(config.cliPath ?? '', config.model).catch(() => undefined)
         }
@@ -565,9 +566,9 @@ function AiModelPane({ t, cloud }: { t: TFunc; cloud: UniworkCloudStatus | null 
           void checkOpenRouterHub(config.apiKey)
         }
       })
-      .catch((error) => {
+      .catch(() => {
         if (seq !== testSeqRef.current) return
-        setTestResult({ ok: false, error: error instanceof Error ? error.message : String(error) })
+        setTestResult({ ok: false, error: testFailureText('failed', t) })
       })
       .finally(() => {
         if (seq === testSeqRef.current) setTesting(false)
@@ -837,14 +838,11 @@ function AiModelPane({ t, cloud }: { t: TFunc; cloud: UniworkCloudStatus | null 
 }
 
 type Capability = 'image' | 'analysis' | 'video' | 'search'
-/** a tested block: the four capabilities plus the decision-model reranker of the local file search */
-type TestedBlock = Capability | 'rerank'
 /** where an outside entry point (e.g. the home list's rerank button) lands when it opens the modal */
 export interface SettingsTarget {
   section: SectionId
   block?: TestedBlock
 }
-type TestResult = { ok: boolean; error?: string }
 
 /** Jev routes first (OpenRouter is the default), then the other decision-model servers */
 const DECISION_ENDPOINTS: { value: DecisionEndpoint; label: string }[] = [
@@ -927,6 +925,9 @@ function AiMediaPane({
     void window.aiOffice.getFileSearchSettings?.().then((v) => {
       if (alive && v) setFileSearchState(v)
     })
+    // the plan notice follows the entitlement: opening the pane re-reads it (the main process
+    // pushes the answer to the status the notice draws), not only opening Settings
+    void window.aiOffice.uniworkCloudRefresh?.().catch(() => undefined)
     // this pane saves the whole file too: follow chip switches while clean
     const off = window.aiOffice.onAiSettingsChanged?.(() => {
       if (!dirtyRef.current) load()
@@ -1002,65 +1003,29 @@ function AiMediaPane({
     const seq = ++testSeqRef.current
     setTesting(true)
     setTestResults(null)
-    const results: Partial<Record<TestedBlock, TestResult>> = {}
-    const fallback: TestResult = { ok: true }
-    // the cloud blocks read the status from the server once (not the local sign-in flag), so
+    // a block on the cloud reads the status from the server (not the local sign-in flag), so
     // the verdict names a plan, credits or availability problem instead of passing silently
-    let cloudPending: Promise<TestResult> | undefined
-    const cloudCheck = () => {
-      cloudPending ??= (window.aiOffice.uniworkCloudRefresh?.() ?? Promise.resolve(null))
-        .then((status) => cloudTestVerdict(status, t))
-        .catch((): TestResult => ({ ok: false, error: t('cloudStateUnavailable') }))
-      return cloudPending
-    }
-    const vendorChecks = new Map<AiMediaProviderId, Promise<TestResult>>()
-    const vendorCheck = (id: AiMediaProviderId) => {
-      if (id === 'genspark') return cloudCheck()
-      let pending = vendorChecks.get(id)
-      if (!pending) {
-        pending =
-          window.aiOffice.testAiMediaSettings?.({ provider: id, config: mediaConfigOf(id) }) ??
-          Promise.resolve(fallback)
-        vendorChecks.set(id, pending)
-      }
-      return pending
-    }
-    const blocks: [TestedBlock, () => Promise<TestResult>][] = [
-      [
-        'search',
-        () =>
-          search.provider === 'auto' && cloudToolsOn
-            ? cloudCheck()
-            : (window.aiOffice.testAiSearchSettings?.({
-                provider: search.provider,
-                apiKey:
-                  search.provider === 'auto'
-                    ? ''
-                    : (search.providers[search.provider]?.apiKey ?? ''),
-              }) ?? Promise.resolve(fallback)),
-      ],
-      ['image', () => vendorCheck(mediaProviderOf('image'))],
-      ['analysis', () => vendorCheck(mediaProviderOf('analysis'))],
-      ['video', () => vendorCheck(mediaProviderOf('video'))],
+    const checks: BlockCheck[] = [
+      search.provider === 'auto' && cloudToolsOn
+        ? { block: 'search', kind: 'cloud' }
+        : {
+            block: 'search',
+            kind: 'search',
+            provider: search.provider,
+            apiKey:
+              search.provider === 'auto' ? '' : (search.providers[search.provider]?.apiKey ?? ''),
+          },
     ]
-    if (fileSearch?.rerank) {
-      blocks.push([
-        'rerank',
-        () => window.aiOffice.testFileSearchRerank?.(fileSearch) ?? Promise.resolve(fallback),
-      ])
+    for (const block of ['image', 'analysis', 'video'] as const) {
+      const provider = mediaProviderOf(block)
+      checks.push(
+        provider === 'genspark'
+          ? { block, kind: 'cloud' }
+          : { block, kind: 'media', provider, config: mediaConfigOf(provider) },
+      )
     }
-    await Promise.all(
-      blocks.map(async ([block, run]) => {
-        try {
-          results[block] = await run()
-        } catch (error) {
-          results[block] = {
-            ok: false,
-            error: error instanceof Error ? error.message : String(error),
-          }
-        }
-      }),
-    )
+    if (fileSearch?.rerank) checks.push({ block: 'rerank', kind: 'rerank', settings: fileSearch })
+    const results = await runConnectionTests(checks, window.aiOffice, t)
     if (seq !== testSeqRef.current) return
     setTestResults(results)
     setTesting(false)

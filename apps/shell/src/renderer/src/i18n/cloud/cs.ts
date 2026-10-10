@@ -33,4 +33,8 @@ export const cs = {
   cloudMediaDesc: 'Používá kredity AI UniWork vaší organizace; klíč není potřeba.',
   cloudSearchAutoHint:
     'Nejprve cloud UniWork (spotřebovává kredity AI), pak bezplatné vyhledávání.',
+  aiTestErrInvalidKey: 'Klíč API chybí nebo byl odmítnut',
+  aiTestErrNetwork: 'Nelze se připojit. Zkontrolujte síť',
+  aiTestErrLimit: 'Dosažen limit poskytovatele. Zkuste to později',
+  aiTestErrUnavailable: 'Služba neodpovídá. Zkuste to později',
 } satisfies Record<keyof typeof zh, string>
