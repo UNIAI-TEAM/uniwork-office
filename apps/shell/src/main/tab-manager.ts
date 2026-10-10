@@ -109,7 +109,7 @@ export class TabManager {
   /** views whose HTML-fullscreen listeners are installed: a view that leaves
    *  for a detached window and docks back must not get a second pair */
   private readonly fullScreenTracked = new WeakSet<WebContentsView>()
-  private readonly closeChordTracked = new WeakSet<WebContentsView>()
+  private readonly closeChordTracked = new WeakSet<WebContents>()
   /** Sheets renderer mounted ahead of the next open: parsing its bundle and
    *  booting Univer is the bulk of a workbook's open time, and the shell hands
    *  the path over after mount anyway. */
@@ -132,6 +132,8 @@ export class TabManager {
       this.layout()
       setImmediate(() => this.layout())
     })
+    // the chrome (tab strip, Home, a dialog) can hold keyboard focus while a tab is active
+    this.trackCloseChord(shellWindow.webContents)
   }
 
   private scheduleSpareSheetsView(delayMs: number): void {
@@ -145,6 +147,14 @@ export class TabManager {
       const view = createSheetsView({ includeAiHandlers: false })
       // registering the session made the spare the menu-action target
       setActiveSheetsWebContents(active.view?.webContents ?? null)
+      // the spare is mounted seconds after a workbook opened, so it is the newest
+      // webContents in the window and its first load can take keyboard focus away
+      // from the visible tab: keys then reach a hidden page (Ctrl+W, typing).
+      // Close on the chord here too, and hand focus straight back.
+      this.trackCloseChord(view.webContents)
+      view.webContents.on('focus', () => {
+        if (this.spareSheetsView === view) this.focusActiveView()
+      })
       this.shellWindow.contentView.addChildView(view)
       view.setVisible(false)
       view.setBounds(this.contentBounds())
@@ -220,22 +230,32 @@ export class TabManager {
   }
 
   /**
-   * Ctrl/Cmd+W on a sheets view closes its tab straight from the key event. The
-   * menu accelerator only fires once the page's unhandled key reaches the
-   * window, and a freshly opened workbook (the spare view) does not have
-   * keyboard focus yet. Only the active tab's own view acts: a view that moved
-   * to a detached window keeps this listener.
+   * Ctrl/Cmd+W closes the active tab straight from the key event, whichever
+   * webContents of this window has keyboard focus: the active tab's view, the
+   * shell chrome, a hidden view (the spare sheets view mounted after an open
+   * can take focus), so the chord never depends on the menu accelerator
+   * receiving the page's unhandled key. A view that moved to a detached window
+   * keeps this listener but is no longer ours, so its own window handles it.
+   * Home and chrome-free Present tabs keep the default path.
    */
-  private trackCloseChord(view: WebContentsView): void {
-    if (this.closeChordTracked.has(view)) return
-    this.closeChordTracked.add(view)
-    view.webContents.on('before-input-event', (event, input) => {
+  private trackCloseChord(wc: WebContents): void {
+    if (this.closeChordTracked.has(wc)) return
+    this.closeChordTracked.add(wc)
+    wc.on('before-input-event', (event, input) => {
       if (!isCloseTabChord(input)) return
+      if (!this.ownsWebContents(wc)) return
       const active = this.tabs.find((t) => t.id === this.activeId)
-      if (active?.view !== view || active.present) return
+      if (!active?.view || active.present) return
       event.preventDefault()
       this.closeActiveTab()
     })
+  }
+
+  /** the shell's own webContents, a tab view's or the spare's (not a detached window's) */
+  private ownsWebContents(wc: WebContents): boolean {
+    if (wc === this.shellWindow.webContents) return true
+    if (this.spareSheetsView?.webContents === wc) return true
+    return this.tabs.some((t) => t.view?.webContents === wc)
   }
 
   /** re-fit the active tab's view after a window resize */
@@ -443,6 +463,7 @@ export class TabManager {
     this.shellWindow.contentView.addChildView(view)
     view.setVisible(false)
     this.trackHtmlFullScreen(view)
+    this.trackCloseChord(view.webContents)
     this.tabs.push({
       id,
       kind: 'docs',
@@ -476,7 +497,7 @@ export class TabManager {
       view.setVisible(false)
     }
     this.trackHtmlFullScreen(view)
-    this.trackCloseChord(view)
+    this.trackCloseChord(view.webContents)
     this.tabs.push({
       id,
       kind: 'sheets',
@@ -495,6 +516,7 @@ export class TabManager {
     this.shellWindow.contentView.addChildView(view)
     view.setVisible(false)
     this.trackHtmlFullScreen(view)
+    this.trackCloseChord(view.webContents)
     this.tabs.push({
       id,
       kind: 'slides',
@@ -513,6 +535,7 @@ export class TabManager {
     this.shellWindow.contentView.addChildView(view)
     view.setVisible(false)
     this.trackHtmlFullScreen(view)
+    this.trackCloseChord(view.webContents)
     this.tabs.push({ id, kind: 'pdf', view, title: basename(openPath), filePath: openPath })
     this.activateTab(id)
     return id
@@ -536,6 +559,7 @@ export class TabManager {
     this.shellWindow.contentView.addChildView(view)
     view.setVisible(false)
     this.trackHtmlFullScreen(view)
+    this.trackCloseChord(view.webContents)
     this.tabs.push({
       id,
       kind: 'markdown',
@@ -553,6 +577,7 @@ export class TabManager {
     this.shellWindow.contentView.addChildView(view)
     view.setVisible(false)
     this.trackHtmlFullScreen(view)
+    this.trackCloseChord(view.webContents)
     this.tabs.push({
       id,
       kind: 'html',
@@ -571,6 +596,7 @@ export class TabManager {
     this.shellWindow.contentView.addChildView(view)
     view.setVisible(false)
     this.trackHtmlFullScreen(view)
+    this.trackCloseChord(view.webContents)
     this.tabs.push({
       id,
       kind: 'html',
@@ -906,6 +932,7 @@ export class TabManager {
     this.shellWindow.contentView.addChildView(view)
     view.setVisible(false)
     this.trackHtmlFullScreen(view)
+    this.trackCloseChord(view.webContents)
     const slot =
       index === undefined || !Number.isFinite(index)
         ? this.tabs.length
