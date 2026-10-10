@@ -113,7 +113,7 @@ only); an old frame never sends it.
 
 `OpenPayload.assets` maps the relative paths a Markdown/HTML document names to URLs that live about an hour, and the
 user can type `![](./new.png)` after the open. Both are "paths as written -> URLs", so the frame asks again with the
-paths it holds: `api.assets.resolve` with `{fileId?, paths}` (1..50 strings, each at most 512 bytes UTF-8; a bad
+paths it holds: `api.assets.resolve` with `{fileId?, paths}` (1..50 non-empty strings; a bad
 payload is rejected by the host before the handler runs) and result `{assets}` with the rules of `OpenPayload.assets`
 (same-origin frame routes, fetched with `credentials: 'omit'`); a path the host cannot serve is absent.
 

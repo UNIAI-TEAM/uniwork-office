@@ -630,19 +630,15 @@ export interface AppOpenResult {
   outcome: AppOpenOutcome
 }
 
-/** at most this many paths per `api.assets.resolve` request, each at most MAX_ASSET_PATH_BYTES (UTF-8) */
-export const MAX_ASSET_RESOLVE_PATHS = 50
-export const MAX_ASSET_PATH_BYTES = 512
-
 export interface ApiAssetsResolvePayload {
   /** the open document (default: the document of the frame's token) */
   fileId?: string
-  /** relative paths exactly as written in the document ("assets/x.png", "./img/y.svg"), 1..50 */
+  /** relative paths as written in the document ("assets/x.png", "./img/y.svg") (1..50) */
   paths: string[]
 }
 
 export interface ApiAssetsResolveResult {
-  /** same rules as `OpenPayload.assets`; a path the host cannot serve is absent */
+  /** path as sent -> URL, with the rules of `OpenPayload.assets`; a path that resolves to nothing is absent */
   assets: Record<string, string>
 }
 
@@ -1016,10 +1012,8 @@ const PAYLOAD_VALIDATORS: Record<string, (x: unknown) => boolean> = {
     isOpt(x.fileId, isStr) &&
     Array.isArray(x.paths) &&
     x.paths.length >= 1 &&
-    x.paths.length <= MAX_ASSET_RESOLVE_PATHS &&
-    x.paths.every(
-      (p) => isStr(p) && new TextEncoder().encode(p).byteLength <= MAX_ASSET_PATH_BYTES,
-    ),
+    x.paths.length <= 50 &&
+    x.paths.every(isNonEmptyStr),
   // frame -> host events
   'event:ready': isReadyPayload,
   'event:dirty': (x) => isObj(x) && isBool(x.dirty),

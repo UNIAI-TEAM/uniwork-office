@@ -226,17 +226,13 @@ describe('api.assets.resolve (A1b contract, additive)', () => {
     expect(req({ paths: Array.from({ length: 50 }, (_, i) => `p${i}.png`) }).ok).toBe(true)
   })
 
-  it('rejects an empty list, more than 50 paths and a path over 512 bytes', () => {
+  it('rejects an empty list, more than 50 paths and an empty path', () => {
     expect(req({ paths: [] })).toMatchObject({ ok: false, reason: 'malformed' })
     expect(req({ paths: Array.from({ length: 51 }, (_, i) => `p${i}.png`) })).toMatchObject({
       ok: false,
       reason: 'malformed',
     })
-    expect(req({ paths: ['a'.repeat(512)] }).ok).toBe(true)
-    expect(req({ paths: ['a'.repeat(513)] })).toMatchObject({ ok: false, reason: 'malformed' })
-    // the limit is in bytes: 171 three-byte characters are 513 bytes
-    expect(req({ paths: ['\u4e2d'.repeat(171)] })).toMatchObject({ ok: false, reason: 'malformed' })
-    expect(req({ paths: ['\u4e2d'.repeat(170)] }).ok).toBe(true)
+    expect(req({ paths: ['a.png', ''] })).toMatchObject({ ok: false, reason: 'malformed' })
   })
 
   it('rejects a malformed request payload', () => {
