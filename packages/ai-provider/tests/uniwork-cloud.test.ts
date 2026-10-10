@@ -5,6 +5,9 @@ import {
   getUniworkCloudStatus,
   normalizeUniworkCloudStatus,
   onUniworkCloudStatus,
+  refreshUniworkCloudStatus,
+  refreshUniworkCloudStatusIfNotReady,
+  setUniworkCloudRefresher,
   setUniworkCloudStatus,
   setUniworkCloudTransport,
   uniworkCloudEnabled,
@@ -16,6 +19,8 @@ import { cloudToolsEnabled } from '../src/providers'
 afterEach(() => {
   setUniworkCloudStatus(UNIWORK_CLOUD_SIGNED_OUT)
   setUniworkCloudTransport(null)
+  setUniworkCloudRefresher(null)
+  vi.useRealTimers()
 })
 
 const tools = {
@@ -95,5 +100,51 @@ describe('UniWork cloud seam', () => {
     const e = new UniworkCloudError('credits_exhausted', 402)
     expect(e.message).toMatch(/out of credits/)
     expect(e.message).not.toMatch(/https?:|Bearer/)
+  })
+})
+
+describe('re-reading the status', () => {
+  const ready = { state: 'ready', enabled: true, tools, credits: null } as const
+
+  it('does nothing where no refresher is installed (renderers, the CLI)', async () => {
+    await expect(refreshUniworkCloudStatus(0)).resolves.toBeUndefined()
+    await expect(refreshUniworkCloudStatusIfNotReady()).resolves.toBeUndefined()
+  })
+
+  it('picks up a plan switched back on before a tool is refused for the old state', async () => {
+    setUniworkCloudStatus({ ...UNIWORK_CLOUD_SIGNED_OUT, state: 'not-entitled' })
+    expect(uniworkCloudToolAvailable('image_generate')).toBe(false)
+    setUniworkCloudRefresher(async () => setUniworkCloudStatus(ready))
+    await refreshUniworkCloudStatusIfNotReady()
+    expect(uniworkCloudToolAvailable('image_generate')).toBe(true)
+  })
+
+  it('does not re-read a ready status for a tool, but does for an AI panel opening', async () => {
+    const read = vi.fn(async () => undefined)
+    setUniworkCloudStatus(ready)
+    setUniworkCloudRefresher(read)
+    await refreshUniworkCloudStatusIfNotReady()
+    expect(read).not.toHaveBeenCalled()
+    await refreshUniworkCloudStatus()
+    expect(read).toHaveBeenCalledTimes(1)
+  })
+
+  it('is rate-limited and single-flight, and a throwing or stalled read never throws or hangs', async () => {
+    vi.useFakeTimers()
+    const read = vi.fn(() => Promise.reject(new Error('offline')))
+    setUniworkCloudRefresher(read)
+    await Promise.all([refreshUniworkCloudStatus(), refreshUniworkCloudStatus()])
+    expect(read).toHaveBeenCalledTimes(1)
+    await refreshUniworkCloudStatus() // inside the minimum gap
+    expect(read).toHaveBeenCalledTimes(1)
+    vi.advanceTimersByTime(3_001)
+    await refreshUniworkCloudStatus()
+    expect(read).toHaveBeenCalledTimes(2)
+
+    const stalled = vi.fn(() => new Promise<never>(() => undefined))
+    setUniworkCloudRefresher(stalled)
+    const waiting = refreshUniworkCloudStatus()
+    vi.advanceTimersByTime(5_001)
+    await expect(waiting).resolves.toBeUndefined()
   })
 })

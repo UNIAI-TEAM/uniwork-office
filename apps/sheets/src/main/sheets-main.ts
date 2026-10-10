@@ -73,14 +73,14 @@ import { createI18n, getUiLang, type Lang, normalizeLang, setUiLang } from '@gen
 import { ProjectStore } from '@genoffice/project-store'
 
 import {
-  AiCreditsError,
-  AiTimeoutError,
-  isAiNetworkError,
-  isAiOverloadedError,
+  aiChatFailure,
+  aiChatFailureFromError,
+  aiStreamErrorFields,
   chatForProvider,
   defaultAiSettings,
   activeProvider,
   maxOutputTokensOf,
+  refreshUniworkCloudStatus,
   resolveAiSettings,
   aiNoticeBody,
   noModelMessage,
@@ -88,6 +88,7 @@ import {
   setRescueFetch,
   streamForProvider,
   withUniAiOpenRouterAuth,
+  type AiChatFailure,
   type AiProviderId,
   type AiSettings,
   type AiStreamChunk,
@@ -3713,6 +3714,8 @@ export function registerSheetsAiIpc(): void {
   ipcMain.handle(
     IPC_CHANNELS.aiGskStatus,
     async (_event, withEmail?: unknown): Promise<GenSparkAccountStatus> => {
+      // an AI panel asks when it opens: re-read the plan so a change made since shows at once
+      await refreshUniworkCloudStatus()
       if (!hasGskAuth()) return { loggedIn: false }
       if (!withEmail) return { loggedIn: true }
       const info = await gskLoginInfo()
@@ -3745,16 +3748,16 @@ export function registerSheetsAiIpc(): void {
       }
     }
     if (provider !== 'codex' && !config.model) return { ok: false, error: tm('errNoModel') }
+    const failed = (failure: AiChatFailure) => {
+      console.warn('[ai] chat failed:', failure.raw)
+      return { ok: false, error: failure.error, errorKind: failure.errorKind }
+    }
     try {
       const result = await chatForProvider(provider, config, request.system, request.user)
-      // the one-shot path reports HTTP failures as ok:false with the raw body —
-      // replace capacity/rate-limit dumps with the localized "busy" message
-      if (!result.ok && isAiOverloadedError(result.error)) {
-        return { ok: false, error: tm('errAiBusy') }
-      }
-      return result
+      // the one-shot path reports HTTP failures as ok:false with the raw body
+      return result.ok ? result : failed(aiChatFailure(result, getUiLang(), tm('errAiBusy')))
     } catch (err) {
-      return { ok: false, error: isAiOverloadedError(err) ? tm('errAiBusy') : String(err) }
+      return failed(aiChatFailureFromError(err, getUiLang(), tm('errAiBusy')))
     }
   })
 
@@ -3821,20 +3824,10 @@ export function registerSheetsAiIpc(): void {
       if (controller.signal.aborted) {
         send({ requestId, type: 'done' })
       } else {
-        send({
-          requestId,
-          type: 'error',
-          error: err instanceof Error ? err.message : String(err),
-          ...(err instanceof AiTimeoutError
-            ? { errorCode: 'timeout' as const }
-            : err instanceof AiCreditsError
-              ? { errorCode: 'credits' as const }
-              : isAiNetworkError(err)
-                ? { errorCode: 'network' as const }
-                : isAiOverloadedError(err)
-                  ? { errorCode: 'overloaded' as const }
-                  : {}),
-        })
+        const { raw, ...fields } = aiStreamErrorFields(err, getUiLang())
+        // the panel gets the product message; the provider's own text stays in the log
+        console.warn(`[ai-stream] ${requestId} (${provider}/${config.model}) failed:`, raw)
+        send({ requestId, type: 'error', ...fields })
       }
     } finally {
       unwatchSender()

@@ -12,6 +12,7 @@ import {
   aiTestFailure,
   aiTestFailureKindForText,
   cloudToolsEnabled,
+  refreshUniworkCloudStatusIfNotReady,
   type AiSearchProviderId,
   type AiSettings,
   type AiTestResult,
@@ -32,11 +33,14 @@ export function searchOptionsFromSettings(settings: AiSettings): SearchOptions {
     : { useGsk: false, serperKey: key }
 }
 
-export function webSearchTool(settingsPath: string, query: string, maxResults = 6) {
+export async function webSearchTool(settingsPath: string, query: string, maxResults = 6) {
+  // the snapshot may predate a plan change: Auto search re-reads before it settles for the free chain
+  await refreshUniworkCloudStatusIfNotReady()
   return webSearch(query, maxResults, searchOptionsFromSettings(readAiSettingsFile(settingsPath)))
 }
 
-export function imageSearchTool(settingsPath: string, query: string, maxResults = 8) {
+export async function imageSearchTool(settingsPath: string, query: string, maxResults = 8) {
+  await refreshUniworkCloudStatusIfNotReady()
   return imageSearch(query, maxResults, searchOptionsFromSettings(readAiSettingsFile(settingsPath)))
 }
 

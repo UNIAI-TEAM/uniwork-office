@@ -2,13 +2,15 @@
  * Streaming My AI replies over the same IPC transport as editor AI panels.
  */
 import { createIpcTransport, type AgentImage } from '@genoffice/agent-core'
-import type { AiSettings } from '@genoffice/ai-provider'
+import { aiChatFailureText, type AiSettings } from '@genoffice/ai-provider/browser'
 
 export interface StreamMyAiOptions {
   system: string
   user: string
   images?: AgentImage[]
   settings: AiSettings
+  /** UI language of the failure messages (vi or en; any other reads English) */
+  lang?: string
   maxChars?: number
   onDelta: (cumulative: string) => void
   /** Called with a cancel function once the stream starts */
@@ -22,24 +24,24 @@ export interface StreamMyAiResult {
   cancelled?: boolean
 }
 
-export function createMyAiTransport(getSettings: () => AiSettings) {
+export function createMyAiTransport(getSettings: () => AiSettings, lang = 'en') {
   return createIpcTransport<AiSettings>({
     onStream: (listener) => window.aiOffice.onAiStream(listener),
     start: (request) => window.aiOffice.aiStream(request),
     cancel: (requestId) => void window.aiOffice.aiStreamCancel(requestId),
     getSettings,
-    unknownErrorText: () => 'AI request failed',
-    timeoutErrorText: () => 'AI request timed out',
-    creditsErrorText: () => 'AI credits exhausted',
-    networkErrorText: () => 'Network error talking to AI',
-    overloadedErrorText: () => 'AI provider overloaded — try again shortly',
+    unknownErrorText: () => aiChatFailureText('failed', lang),
+    timeoutErrorText: () => aiChatFailureText('network', lang),
+    creditsErrorText: () => aiChatFailureText('limit', lang),
+    networkErrorText: () => aiChatFailureText('network', lang),
+    overloadedErrorText: () => aiChatFailureText('unavailable', lang),
   })
 }
 
 /** Tool-less streaming turn; resolves with cumulative text (never throws). */
 export function streamMyAiReply(opts: StreamMyAiOptions): Promise<StreamMyAiResult> {
   const maxChars = opts.maxChars ?? 12_000
-  const transport = createMyAiTransport(() => opts.settings)
+  const transport = createMyAiTransport(() => opts.settings, opts.lang)
   return new Promise((resolve) => {
     let raw = ''
     let settled = false

@@ -104,6 +104,65 @@ export function onUniworkCloudStatus(listener: (status: UniworkCloudStatus) => v
   return () => listeners.delete(listener)
 }
 
+// ── Re-reading the status (shell main process only) ────────────────
+
+let refresher: (() => Promise<unknown>) | null = null
+let lastRefreshAt = 0
+let refreshing: Promise<void> | null = null
+
+/** the server can change a plan without telling us: a re-read no sooner than this after the last one */
+export const UNIWORK_CLOUD_REFRESH_MIN_GAP_MS = 3_000
+/** a status read that stalls must not hold the tool that asked for it */
+export const UNIWORK_CLOUD_REFRESH_WAIT_MS = 5_000
+
+/** Shell main only: installs (or clears) the function that re-reads the status from the server. */
+export function setUniworkCloudRefresher(next: (() => Promise<unknown>) | null): void {
+  refresher = next
+  lastRefreshAt = 0
+  refreshing = null
+}
+
+/**
+ * Re-reads the cloud status now so a plan change made on the server (the
+ * entitlement turned on or off, credits added) shows up without reopening
+ * Settings. Single-flight and rate-limited (`minGapMs` since the last read),
+ * bounded by `UNIWORK_CLOUD_REFRESH_WAIT_MS`, and it never throws; it does
+ * nothing where no refresher is installed (renderers, the CLI).
+ */
+export function refreshUniworkCloudStatus(
+  minGapMs = UNIWORK_CLOUD_REFRESH_MIN_GAP_MS,
+): Promise<void> {
+  const read = refresher
+  if (!read) return Promise.resolve()
+  if (refreshing) return refreshing
+  if (Date.now() - lastRefreshAt < minGapMs) return Promise.resolve()
+  lastRefreshAt = Date.now()
+  const run = new Promise<void>((resolve) => {
+    const timer = setTimeout(resolve, UNIWORK_CLOUD_REFRESH_WAIT_MS)
+    timer.unref?.()
+    void Promise.resolve()
+      .then(read)
+      .catch(() => undefined)
+      .finally(() => {
+        clearTimeout(timer)
+        resolve()
+      })
+  })
+  refreshing = run
+  void run.then(() => {
+    if (refreshing === run) refreshing = null
+  })
+  return run
+}
+
+/**
+ * Before a cloud tool is refused for the snapshot's state: anything but `ready`
+ * may be stale (the plan changed since the last read), so read it once more.
+ */
+export function refreshUniworkCloudStatusIfNotReady(): Promise<void> {
+  return current.state === 'ready' ? Promise.resolve() : refreshUniworkCloudStatus()
+}
+
 /** Signed in and entitled: the cloud route is offered (each tool still needs its flag). */
 export function uniworkCloudEnabled(): boolean {
   return current.enabled
