@@ -742,7 +742,7 @@ describe('host save / saveAs requests (editor flows)', () => {
 
   it('save conflict: the editor result carries the localized conflict sentence, not the server message', async () => {
     const doc = await bootWith()
-    let seen: { ok: boolean; error?: string; reason?: string } | null = null
+    let seen: { ok: boolean; error?: string; reason?: 'external-modified' } | null = null
     wireRenderer(
       () => doc.path,
       async () => {
