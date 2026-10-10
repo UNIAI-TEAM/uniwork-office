@@ -277,13 +277,18 @@ for (const theme of ['light', 'dark'] as const) {
       await expect(frame.locator('.ow-ai-state')).toHaveCount(0)
       await page.screenshot({ path: screenshotPath('ai', `docs-state-${theme}-${lang}`) })
       // the header gear is localized: open the same dialog through the member it calls
-      void frame.evaluate(() =>
+      // the call settles only when the dialog closes, so hold the promise and await it after Escape
+      const settings = frame.evaluate(() =>
         (
           window as unknown as { desktop: { openAiSettings(): Promise<void> } }
         ).desktop.openAiSettings(),
       )
-      await expect(frame.locator('.ow-ai-dialog select[name="provider"]')).toBeVisible()
+      const dialog = frame.locator('.ow-ai-dialog')
+      await expect(dialog.locator('select[name="provider"]')).toBeVisible()
       await page.screenshot({ path: screenshotPath('ai', `docs-settings-${theme}-${lang}`) })
+      await frame.locator('body').press('Escape')
+      await expect(dialog).toHaveCount(0)
+      await settings
     })
   }
 }
