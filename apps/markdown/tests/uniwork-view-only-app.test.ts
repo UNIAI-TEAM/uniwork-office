@@ -104,12 +104,14 @@ describe('markdown App on a UniWork copy', () => {
     const textarea = h.container.querySelector<HTMLTextAreaElement>('.fm-textarea')!
     expect(textarea).not.toBeNull()
     expect(textarea.readOnly).toBe(true)
-    const dirtyCalls = h.api.setDirty!.mock.calls.length
+    // opening a view-only copy must not mark it dirty, so setDirty may never have been called
+    const dirtyCalls = h.api.setDirty?.mock.calls.length ?? 0
+    expect(dirtyCalls).toBe(0)
     await typeInto(textarea, 'title: Changed')
     expect(h.container.querySelector<HTMLTextAreaElement>('.fm-textarea')!.value).toBe(
       'title: Quarterly',
     )
-    expect(h.api.setDirty!.mock.calls.length).toBe(dirtyCalls)
+    expect(h.api.setDirty?.mock.calls.length ?? 0).toBe(dirtyCalls)
   })
 
   it('keeps the properties panel editable on an editable copy', async () => {
