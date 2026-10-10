@@ -122,18 +122,46 @@ test.describe('markdown editor', () => {
       await expect(editor.locator('h1')).toHaveText('Hello')
       await expect(editor.locator('strong')).toHaveText('bold')
 
-      // type at the end of the document, save with ⌘/Ctrl+S
-      await editor.focus()
+      // type at the end of the document, save with ⌘/Ctrl+S. The caret goes
+      // through the editor state, not a scripted DOM range: ProseMirror's focus
+      // handling (and Tiptap's autofocus frame) write the state selection back
+      // to the DOM, so a DOM-only range read late snaps back to the title
       await editor.evaluate((element) => {
-        const last = element.lastElementChild
-        const selection = window.getSelection()
-        if (!last || !selection) throw new Error('Markdown editor has no final block')
-        const range = document.createRange()
-        range.selectNodeContents(last)
-        range.collapse(false)
-        selection.removeAllRanges()
-        selection.addRange(range)
+        const tiptap = (
+          element as HTMLElement & { editor?: { commands: { focus(p: 'end'): boolean } } }
+        ).editor
+        if (!tiptap) throw new Error('Markdown editor has no Tiptap instance')
+        tiptap.commands.focus('end')
       })
+      await expect
+        .poll(() =>
+          editor.evaluate((element) => {
+            type Pos = { parent: unknown; parentOffset: number }
+            const tiptap = (
+              element as HTMLElement & {
+                editor?: {
+                  state: {
+                    doc: { lastChild: { content: { size: number } } | null }
+                    selection: { empty: boolean; $head: Pos }
+                  }
+                }
+              }
+            ).editor
+            const last = tiptap?.state.doc.lastChild
+            const { empty, $head } = tiptap?.state.selection ?? {}
+            const dom = window.getSelection()
+            return (
+              document.activeElement === element &&
+              !!last &&
+              !!empty &&
+              $head?.parent === last &&
+              $head.parentOffset === last.content.size &&
+              !!dom?.focusNode &&
+              !!element.lastElementChild?.contains(dom.focusNode)
+            )
+          }),
+        )
+        .toBe(true)
       await editorPage.keyboard.press('Enter')
       await editorPage.keyboard.type('Appended line.')
       await editorPage.keyboard.press('ControlOrMeta+s')
