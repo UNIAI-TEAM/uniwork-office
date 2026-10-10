@@ -35,6 +35,22 @@ export interface CspExtra {
   alsoOn?: string[]
   /** one line per addition, copied into csp.json `notes` */
   why: string[]
+  /**
+   * documents of the bundle served with their OWN policy instead of the module's (csp.json
+   * `documents`, headers.json rules). Only for a document that the module embeds sandboxed into an
+   * opaque origin (e.g. the html preview, html: preview.html): the policy must carry a `sandbox`
+   * directive that keeps it opaque even when the file is opened directly.
+   */
+  documents?: CspDocument[]
+}
+
+export interface CspDocument {
+  /** build-relative exact path, e.g. `/preview.html` */
+  path: string
+  /** the complete policy (frame-ancestors is added: same embedders as the frame) */
+  directives: CspDirectives
+  /** one line per directive, copied into csp.json `notes` */
+  why: string[]
 }
 
 export interface CspOptions {
@@ -94,6 +110,41 @@ function applyExtra(base: CspDirectives, extra: CspExtra | undefined): CspDirect
   return out
 }
 
+/** sources a sandboxed document policy may use on top of the frame's (never 'self': see documentDirectives) */
+const DOCUMENT_SOURCES = new Set(["'unsafe-inline'", "'unsafe-eval'", 'https:'])
+/** sandbox flags that would give a document back an origin, top navigation or an unsandboxed popup */
+const FORBIDDEN_SANDBOX_FLAGS =
+  /^allow-(same-origin|top-navigation.*|popups-to-escape-sandbox|storage-access-by-user-activation)$/
+
+/**
+ * A sandboxed document's own policy. Rules: it must sandbox itself into an opaque origin (a
+ * `sandbox` directive without allow-same-origin / top navigation / escaping popups), it never
+ * names 'self' (an opaque document must not reach the frame's origin by URL), connect-src and
+ * form-action are 'none', and frame-ancestors is the frame's own list.
+ */
+function documentDirectives(doc: CspDocument, opts: CspOptions): CspDirectives {
+  const out: CspDirectives = {}
+  for (const [name, sources] of Object.entries(doc.directives)) {
+    if (!DIRECTIVE_NAME.test(name)) throw new Error(`invalid CSP directive "${name}"`)
+    if (name === 'frame-ancestors') throw new Error("frame-ancestors of a document is the frame's")
+    out[name] = sources.map((src) => {
+      if (name === 'sandbox') {
+        if (!/^allow-[a-z-]+$/.test(src) || FORBIDDEN_SANDBOX_FLAGS.test(src))
+          throw new Error(`sandbox flag "${src}" is not allowed in a document policy`)
+        return src
+      }
+      if (src === "'self'") throw new Error(`a document policy cannot name 'self' (${name})`)
+      return DOCUMENT_SOURCES.has(src) ? src : assertExtraSource(src)
+    })
+  }
+  if (!out.sandbox) throw new Error(`document ${doc.path} must carry a sandbox directive`)
+  for (const name of ['default-src', 'connect-src', 'form-action'])
+    if (out[name]?.join(' ') !== "'none'")
+      throw new Error(`document ${doc.path}: ${name} must be 'none'`)
+  out['frame-ancestors'] = baseDirectives(opts)['frame-ancestors']
+  return out
+}
+
 export function buildCspDirectives(opts: CspOptions = {}): CspDirectives {
   return applyExtra(baseDirectives(opts), opts.extra)
 }
@@ -132,6 +183,8 @@ export interface CspManifest {
   /** build-relative paths the header must be sent with (documents; assets do not need it) */
   appliesTo: string[]
   notes: string[]
+  /** documents served with their own (sandboxed) policy instead of `value`; absent = none */
+  documents?: Array<{ path: string; value: string; directives: CspDirectives }>
 }
 
 export function buildCspManifest(opts: CspOptions = {}): CspManifest {
@@ -147,7 +200,19 @@ export function buildCspManifest(opts: CspOptions = {}): CspManifest {
       "frame-ancestors 'self': the frame is embedded by a same-origin UniWork page. Moving the frame to its own origin only needs WEB_DOCS_CSP_FRAME_ANCESTORS=<host origin> at build time.",
       "connect-src has no data:/blob:. If the host's API lives on another origin, add it with WEB_DOCS_CSP_CONNECT_SRC.",
       ...(opts.extra?.why ?? []),
+      ...(opts.extra?.documents ?? []).flatMap((d) => d.why),
     ],
+    ...(opts.extra?.documents?.length
+      ? {
+          documents: opts.extra.documents.map((d) => {
+            const path = assertHeaderSource(d.path)
+            if (path.endsWith('/**') || path === '/index.html')
+              throw new Error(`document path "${path}" must be one file other than index.html`)
+            const directives = documentDirectives(d, opts)
+            return { path, value: serializeCsp(directives), directives }
+          }),
+        }
+      : {}),
   }
 }
 
@@ -189,6 +254,11 @@ export function buildHeadersManifest(csp: CspManifest, opts: HeadersOptions = {}
   return {
     schemaVersion: 1,
     rules: [
+      // a document with its own policy: listed first so the module policy never reaches it
+      ...(csp.documents ?? []).map((d) => ({
+        source: d.path,
+        headers: { [csp.header]: d.value, 'Cache-Control': 'no-cache' },
+      })),
       {
         source: '/index.html',
         headers: { [csp.header]: csp.value, 'Cache-Control': 'no-cache' },

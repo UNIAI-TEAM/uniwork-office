@@ -1,5 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
-import { isFromInspector, type FromInspector, type ToInspector } from './inspector-protocol'
+import type { FromInspector, ToInspector } from './inspector-protocol'
+import { parseFromInspector } from './inspector-validate'
 import { DraftPreview } from './DraftPreview'
 import { useI18n } from '../i18n/locale'
 import { cap } from '../capabilities'
@@ -27,11 +28,19 @@ interface Props {
  * of reach. Reloads go through the src attribute because the frame's window is
  * cross-origin to us; the inspector talks back over postMessage.
  *
- * Web frame (cap 'htmlPreviewScripts' off): the app shares its origin with the
- * host page, so the preview is static instead: the bridge hands over a copy
- * without scripts, handlers or remote loads (`onStaticPreview`), shown through
- * srcdoc in a frame with an empty sandbox (no scripts, no same-origin, no forms,
- * no popups) and `credentialless`. No inspector runs there.
+ * Web frame, scripts on (`htmlApi.connectPreview`): the same sandbox flags plus
+ * `credentialless`; `url` is the bundle's preview.html, served with a policy of its own
+ * (opaque even when opened directly, no network to any API, no form posts). On each load of a
+ * new src the bridge hands the copy to that document with a MessagePort; inspector traffic uses
+ * only that port, never window messages, so a page posting to its parent reaches nothing.
+ *
+ * Web frame, static (cap 'htmlPreviewScripts' off, or preview.html never answered): the bridge
+ * hands over a copy without scripts, handlers or remote loads (`onStaticPreview`), shown through
+ * srcdoc in a frame with an empty sandbox (no scripts, no same-origin, no forms, no popups) and
+ * `credentialless`. No inspector runs there.
+ *
+ * Every inspector message goes through the strict parser (inspector-validate.ts): the page's
+ * own scripts share the inspector's realm and can forge anything it sends.
  */
 export const PreviewFrame = forwardRef<PreviewFrameHandle, Props>(function PreviewFrame(
   { url, nonce, zoom, onMessage, onLoad, draft },
@@ -42,8 +51,14 @@ export const PreviewFrame = forwardRef<PreviewFrameHandle, Props>(function Previ
   const onMessageRef = useRef(onMessage)
   onMessageRef.current = onMessage
   const src = useMemo(() => (url ? `${url}?v=${nonce}` : 'about:blank'), [url, nonce])
-  const staticMode = !cap('htmlPreviewScripts')
+  const connectPreview = window.htmlApi.connectPreview
+  // preview.html did not boot (host without its policy): static from then on
+  const [fallback, setFallback] = useState(false)
+  const staticMode = !cap('htmlPreviewScripts') || fallback
+  const portMode = !staticMode && !!connectPreview
   const [staticDoc, setStaticDoc] = useState('')
+  const channelRef = useRef<{ post(msg: unknown): void; close(): void } | null>(null)
+  const connectedSrcRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (!staticMode) return
@@ -51,17 +66,51 @@ export const PreviewFrame = forwardRef<PreviewFrameHandle, Props>(function Previ
   }, [staticMode])
 
   useEffect(() => {
+    // web: the port is the only channel (connectPreview); window messages are never read
+    if (connectPreview) return
     const listener = (event: MessageEvent) => {
       if (event.source !== frameRef.current?.contentWindow) return
-      if (isFromInspector(event.data)) onMessageRef.current(event.data)
+      const msg = parseFromInspector(event.data)
+      if (msg) onMessageRef.current(msg)
     }
     window.addEventListener('message', listener)
     return () => window.removeEventListener('message', listener)
-  }, [])
+  }, [connectPreview])
+
+  useEffect(
+    () => () => {
+      channelRef.current?.close()
+      channelRef.current = null
+    },
+    [],
+  )
+
+  const handleLoad = () => {
+    // once per src: a later load is the page navigating itself, which must not get the copy
+    if (portMode && url && connectedSrcRef.current !== src) {
+      connectedSrcRef.current = src
+      channelRef.current?.close()
+      const win = frameRef.current?.contentWindow
+      channelRef.current = win
+        ? connectPreview!(win, {
+            onMessage: (data) => {
+              const msg = parseFromInspector(data)
+              if (msg) onMessageRef.current(msg)
+            },
+            onFailed: () => {
+              console.warn('[html] the preview did not start; showing the static preview')
+              setFallback(true)
+            },
+          })
+        : null
+    }
+    onLoad?.()
+  }
 
   useImperativeHandle(ref, () => ({
     post(msg) {
-      frameRef.current?.contentWindow?.postMessage(msg, '*')
+      if (portMode) channelRef.current?.post(msg)
+      else frameRef.current?.contentWindow?.postMessage(msg, '*')
     },
   }))
 
@@ -85,8 +134,10 @@ export const PreviewFrame = forwardRef<PreviewFrameHandle, Props>(function Previ
           className="preview-frame"
           title={t('viewPreview')}
           src={src}
-          onLoad={onLoad}
+          onLoad={handleLoad}
           sandbox="allow-scripts allow-forms allow-popups allow-modals"
+          // web: no cookies or storage of the app in the preview (desktop: no-op)
+          {...(portMode ? { credentialless: '' } : {})}
           referrerPolicy="no-referrer"
         />
       )}

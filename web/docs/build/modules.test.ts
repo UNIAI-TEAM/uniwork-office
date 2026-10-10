@@ -59,7 +59,17 @@ describe('module registry', () => {
       expect(Object.values(m.directives).flat()).not.toContain("'unsafe-eval'")
       if (spec.csp) {
         expect(spec.csp.why.length).toBeGreaterThanOrEqual(Object.keys(spec.csp.directives).length)
-        expect(m.notes).toEqual([...base.notes, ...spec.csp.why])
+        const docs = spec.csp.documents ?? []
+        expect(m.notes).toEqual([...base.notes, ...spec.csp.why, ...docs.flatMap((d) => d.why)])
+        // a document with its own policy (html preview.html) is sandboxed and offline
+        for (const d of m.documents ?? []) {
+          expect(d.directives.sandbox).not.toContain('allow-same-origin')
+          expect(d.directives['connect-src']).toEqual(["'none'"])
+          expect(d.directives['form-action']).toEqual(["'none'"])
+          expect(d.directives['frame-ancestors']).toEqual(["'self'"])
+          const { 'frame-ancestors': _a, ...own } = d.directives
+          expect(Object.values(own).flat()).not.toContain("'self'")
+        }
       } else expect(m).toEqual(base)
     }
   })

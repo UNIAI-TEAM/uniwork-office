@@ -3,13 +3,15 @@
  * (apps/html/src/shared/ipc.ts) over the frame protocol. File members come from the shared
  * text-module bridge (../shared/text-webapi.ts); this file maps the HTML-specific ones.
  *
- * Preview = lane decision P1 (static): the desktop serves the buffer on html-preview:// to a frame
- * that runs scripts with network access; that cannot be safe in a frame that is same-origin with
- * UniWork. Here `updatePreview(text)` turns the instrumented buffer into a static copy
- * (../shared/static-html.ts: no scripts, handlers, refresh, <base>, remote loads) and hands it to
- * the renderer's PreviewFrame (`onStaticPreview`), which shows it in `srcdoc` with `sandbox=""`
- * (+ `credentialless`). Hidden on the web (capability keys): htmlPreviewScripts, htmlVisualEdit
- * (inspector, visual edit, style panel, float toolbar), presentNewTab, exportDocx, the AI family.
+ * Preview with scripts, like the app (CONTRACT C15(1)): the desktop serves the buffer on
+ * html-preview:// to a sandboxed opaque frame; here `getPreviewInfo` names the bundle's
+ * preview.html (served with its own sandboxed policy, see web/docs/build/modules.ts) and
+ * `connectPreview` hands the latest copy (pictures inlined, ./preview-copy.ts) to it over a
+ * MessagePort (./preview-channel.ts). Visual edit (inspector, float toolbar, style panel) runs on
+ * that port and needs the host's `save` grant. The static copy (../shared/static-html.ts: no
+ * scripts, handlers, refresh, <base>, remote loads, `onStaticPreview`) remains the fallback when
+ * preview.html does not start, and is what print uses. Hidden on the web (capability keys):
+ * presentNewTab, exportDocx, the AI family.
  *
  * Exports: PDF = the browser print dialog over the same static copy (lane decision 5);
  * single-file HTML = in-frame download with document pictures inlined; Word = hidden.
@@ -19,18 +21,28 @@ import aiStubs, { aiUnavailableMessage } from '../../docs/bridge/ai'
 import type { ModuleBridgeContext } from '../../docs/bridge/module-bridge'
 import { printHtmlDocument } from '../shared/print'
 import { toStaticHtml } from '../shared/static-html'
+import type { Capabilities } from '../../docs/protocol/types'
+import { textModuleGrants } from '../shared/capabilities'
 import { createTextWebApi, type TextWebApiOptions } from '../shared/text-webapi'
+import { openPreviewChannel } from './preview-channel'
+import { inlineAssetsForPreview } from './preview-copy'
 
 /** keys the HTML renderer hides on the web besides the shared text-module ones */
 export const HTML_WEB_CAPABILITIES = Object.freeze({
-  // option P2 (preview origin + nonce'd inspector) is a later lane; until then the preview is static
-  htmlPreviewScripts: false,
+  // scripts run in the sandboxed preview.html (opaque origin, credentialless)
+  htmlPreviewScripts: true,
+  // visual edit writes the source: on with the host's `save` grant (./install.ts)
   htmlVisualEdit: false,
   // a chrome-free shell tab; the in-frame present mode stays
   presentNewTab: false,
   // html2docx drives a hidden browser window (desktop main process)
   exportDocx: false,
 })
+
+/** host grants -> entries: the text-module ones, and visual edit only where the user may save */
+export function htmlModuleGrants(granted: Capabilities | undefined): Record<string, unknown> {
+  return { ...textModuleGrants(granted), htmlVisualEdit: granted?.save === true }
+}
 
 const NO_ATTACHMENTS = { accepted: [], rejected: [] }
 
@@ -45,8 +57,11 @@ export function createHtmlWebApi(ctx: ModuleBridgeContext, opts: TextWebApiOptio
     },
   )
 
+  /** the latest instrumented buffer (scripts preview) and its static copy (fallback, on demand) */
+  let source = ''
   let preview = ''
   const previewListeners = new Set<(html: string) => void>()
+  const inlined = new Map<string, string>()
 
   const api = {
     consumePending: web.consumePending,
@@ -58,11 +73,14 @@ export function createHtmlWebApi(ctx: ModuleBridgeContext, opts: TextWebApiOptio
 
     updatePreview(text: string): void {
       if (typeof text !== 'string') return
-      preview = toStaticHtml(text, web.resolveAssetUrl)
+      source = text
+      preview = previewListeners.size ? toStaticHtml(text, web.resolveAssetUrl) : ''
       for (const l of previewListeners) l(preview)
     },
-    // no preview URL on the web: PreviewFrame takes the static copy from onStaticPreview
-    getPreviewInfo: async () => ({ url: '' }),
+    // the bundle's preview document, next to index.html (PreviewFrame adds ?v=<reload>)
+    getPreviewInfo: async () => ({
+      url: new URL('preview.html', location.href).href.split('?')[0],
+    }),
     setPresentFullScreen: async () => {},
     presentInNewTab: async () => false,
 
@@ -135,10 +153,21 @@ export function createHtmlWebApi(ctx: ModuleBridgeContext, opts: TextWebApiOptio
     /** web-only (renderer PreviewFrame, static mode): the latest static preview, now and on change */
     onStaticPreview(handler: (html: string) => void): () => void {
       previewListeners.add(handler)
+      if (!preview && source) preview = toStaticHtml(source, web.resolveAssetUrl)
       if (preview) handler(preview)
       return () => {
         previewListeners.delete(handler)
       }
+    },
+    /** web-only (renderer PreviewFrame, scripts on): see HtmlApi.connectPreview */
+    connectPreview(
+      target: Window,
+      handlers: { onMessage: (data: unknown) => void; onFailed: () => void },
+    ) {
+      return openPreviewChannel(target, {
+        html: () => inlineAssetsForPreview(source, web.resolveAssetUrl, web.readImage, inlined),
+        ...handlers,
+      })
     },
     resolveAssetUrl: web.resolveAssetUrl,
     unresolveAssetUrl: web.unresolveAssetUrl,
