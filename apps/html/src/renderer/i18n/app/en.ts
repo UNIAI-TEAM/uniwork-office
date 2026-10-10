@@ -7,6 +7,11 @@ export const en = {
   saveFailed: 'Save failed: {error}',
   saveFailedStatus: 'Save failed',
   exportFailed: 'Export failed',
+  exportHtmlEntry: 'Export HTML',
+  previewLimitNote:
+    'This page asks the network for data or embeds other pages, which the web preview blocks.',
+  useInAppMessage: 'Open in the UniWork Office app to use this feature',
+  openInApp: 'Open in app',
   printFailed: 'Print failed: {error}',
   exportHtmlSkipped: 'Exported, but {count} asset(s) could not be inlined (e.g. {first})',
   viewPreview: 'Preview',

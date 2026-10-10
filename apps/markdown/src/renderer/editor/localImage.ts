@@ -72,10 +72,13 @@ export function unresolveImageSrc(src: string, baseDir: string | null = imageBas
   return path
 }
 
+// the pictures a paste/drop takes (the web frame uploads all but SVG as document assets, SVG stays a data: URI)
 const EXT_BY_MIME: Record<string, string> = {
   'image/png': 'png',
   'image/jpeg': 'jpg',
   'image/gif': 'gif',
+  'image/webp': 'webp',
+  'image/svg+xml': 'svg',
 }
 
 function imageFileIn(data: DataTransfer | null): File | null {

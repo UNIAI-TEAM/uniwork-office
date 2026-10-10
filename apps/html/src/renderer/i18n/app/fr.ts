@@ -7,6 +7,11 @@ export const fr = {
   saveFailed: "Échec de l'enregistrement : {error}",
   saveFailedStatus: "Échec de l'enregistrement",
   exportFailed: "Échec de l'export",
+  exportHtmlEntry: 'Exporter en HTML (fichier unique)',
+  previewLimitNote:
+    "Cette page demande des données au réseau ou intègre d'autres pages, ce que l'aperçu web bloque.",
+  useInAppMessage: "Ouvrez dans l'application UniWork Office pour utiliser cette fonctionnalité",
+  openInApp: "Ouvrir dans l'application",
   printFailed: "Échec de l'impression : {error}",
   exportHtmlSkipped: 'Exporté, mais {count} ressource(s) n’ont pas pu être intégrées (ex. {first})',
   viewPreview: 'Aperçu',

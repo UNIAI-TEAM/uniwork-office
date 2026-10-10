@@ -12,6 +12,8 @@ import { createCapabilityReader, type CapabilityObject } from '@genoffice/ui/cap
  *   exportDocx           Word export (needs a headless browser)
  *   saveStatus, viewOnlyChip                     the renderer's own save-state label (status bar) and "view only" chip;
  *                                                false on the web: the host header + one banner announce them
+ *   htmlPreviewNetwork   false on the web: the preview blocks fetch/XHR and nested frames (a note says so)
+ *   desktopOpen          the host's "Open in desktop app" action (web: off until granted)
  *   save                 false = view only (host withheld `save`)
  */
 export type HtmlCapability =
@@ -22,6 +24,8 @@ export type HtmlCapability =
   | 'autoSave'
   | 'htmlPreviewScripts'
   | 'htmlVisualEdit'
+  | 'htmlPreviewNetwork'
+  | 'desktopOpen'
   | 'presentNewTab'
   | 'exportDocx'
   | 'save'

@@ -3771,3 +3771,45 @@ html.genoffice-popover-open .ribbon-tabs {
   min-width: 0;
   box-sizing: border-box;
 }
+
+/* ---- web preview limits note (UNI-1232 B): one inline note above the preview, chrome only ---- */
+
+.preview-limit-note {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  padding: 6px 12px;
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  border-bottom: 1px solid var(--warning-border);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.preview-limit-text {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+.preview-limit-action {
+  flex: none;
+  height: 24px;
+  padding: 0 10px;
+  border: 1px solid var(--warning-border);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.preview-limit-action:hover {
+  background: var(--hover);
+}
+
+.preview-limit-action:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}

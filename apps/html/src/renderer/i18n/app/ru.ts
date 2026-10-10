@@ -7,6 +7,11 @@ export const ru = {
   saveFailed: 'Не удалось сохранить: {error}',
   saveFailedStatus: 'Не удалось сохранить',
   exportFailed: 'Не удалось экспортировать',
+  exportHtmlEntry: 'Экспортировать в один файл HTML',
+  previewLimitNote:
+    'Эта страница запрашивает данные по сети или встраивает другие страницы — веб-просмотр это блокирует.',
+  useInAppMessage: 'Откройте в приложении UniWork Office, чтобы использовать эту функцию',
+  openInApp: 'Открыть в приложении',
   printFailed: 'Не удалось напечатать: {error}',
   exportHtmlSkipped:
     'Экспортировано, но {count} ресурс(ов) не удалось встроить (например, {first})',

@@ -7,6 +7,11 @@ export const nl = {
   saveFailed: 'Opslaan mislukt: {error}',
   saveFailedStatus: 'Opslaan mislukt',
   exportFailed: 'Exporteren mislukt',
+  exportHtmlEntry: 'Exporteren als één HTML-bestand',
+  previewLimitNote:
+    "Deze pagina vraagt gegevens op via het netwerk of sluit andere pagina's in; de webvoorbeeldweergave blokkeert dat.",
+  useInAppMessage: 'Open in de UniWork Office-app om deze functie te gebruiken',
+  openInApp: 'Openen in de app',
   printFailed: 'Afdrukken mislukt: {error}',
   exportHtmlSkipped:
     'Geëxporteerd, maar {count} bron(nen) konden niet worden ingesloten (bijv. {first})',

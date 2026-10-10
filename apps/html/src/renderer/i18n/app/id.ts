@@ -7,6 +7,11 @@ export const id = {
   saveFailed: 'Gagal menyimpan: {error}',
   saveFailedStatus: 'Gagal menyimpan',
   exportFailed: 'Ekspor gagal',
+  exportHtmlEntry: 'Ekspor sebagai HTML satu file',
+  previewLimitNote:
+    'Halaman ini meminta data lewat jaringan atau menyematkan halaman lain, yang diblokir oleh pratinjau web.',
+  useInAppMessage: 'Buka di aplikasi UniWork Office untuk menggunakan fitur ini',
+  openInApp: 'Buka di aplikasi',
   printFailed: 'Gagal mencetak: {error}',
   exportHtmlSkipped: 'Diekspor, tetapi {count} aset tidak dapat disematkan (mis. {first})',
   viewPreview: 'Pratinjau',

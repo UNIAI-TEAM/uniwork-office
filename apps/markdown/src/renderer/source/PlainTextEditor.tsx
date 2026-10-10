@@ -55,6 +55,12 @@ interface Props {
   onChange: (text: string) => void
   className?: string
   spellcheck: boolean
+  /** view-only: the text can be read, selected and searched but no input, paste or undo changes it */
+  readOnly?: boolean
+}
+
+function readOnlyExtensions(readOnly: boolean) {
+  return readOnly ? [EditorState.readOnly.of(true), EditorView.editable.of(false)] : []
 }
 
 /** Colors come from the app's own tokens so the source view follows the light/dark theme */
@@ -115,12 +121,15 @@ function extensionsFor(mode: Props['mode']) {
 }
 
 export const PlainTextEditor = forwardRef<PlainTextEditorHandle, Props>(function PlainTextEditor(
-  { initialText, mode, onChange, className, spellcheck },
+  { initialText, mode, onChange, className, spellcheck, readOnly = false },
   ref,
 ) {
   const hostRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const spellRef = useRef<Compartment | null>(null)
+  const readOnlyRef = useRef<Compartment | null>(null)
+  const readOnlyNow = useRef(readOnly)
+  readOnlyNow.current = readOnly
   const findTargetRef = useRef<FindTarget | null>(null)
   const onChangeRef = useRef(onChange)
   onChangeRef.current = onChange
@@ -132,6 +141,7 @@ export const PlainTextEditor = forwardRef<PlainTextEditorHandle, Props>(function
     // spellcheck is a live preference, so it lives in a compartment rather
     // than in the extension set that identifies this editor
     const spellCompartment = new Compartment()
+    const readOnlyCompartment = new Compartment()
     const view = new EditorView({
       parent: host,
       state: EditorState.create({
@@ -139,6 +149,7 @@ export const PlainTextEditor = forwardRef<PlainTextEditorHandle, Props>(function
         extensions: [
           ...extensionsFor(mode),
           spellCompartment.of(EditorView.contentAttributes.of({ spellcheck: String(spellcheck) })),
+          readOnlyCompartment.of(readOnlyExtensions(readOnlyNow.current)),
           EditorView.updateListener.of((update) => {
             // the load dispatch must not read back as a user edit
             if (update.transactions.some((tr) => tr.annotation(Loaded))) return
@@ -151,6 +162,7 @@ export const PlainTextEditor = forwardRef<PlainTextEditorHandle, Props>(function
     })
     viewRef.current = view
     spellRef.current = spellCompartment
+    readOnlyRef.current = readOnlyCompartment
     findTargetRef.current = buildFindTarget(view, (listener) => {
       listeners.add(listener)
       return () => listeners.delete(listener)
@@ -159,6 +171,7 @@ export const PlainTextEditor = forwardRef<PlainTextEditorHandle, Props>(function
       view.destroy()
       viewRef.current = null
       spellRef.current = null
+      readOnlyRef.current = null
       findTargetRef.current = null
     }
     // the buffer is seeded once; later external replacements go through setDoc
@@ -175,6 +188,13 @@ export const PlainTextEditor = forwardRef<PlainTextEditorHandle, Props>(function
       ),
     })
   }, [spellcheck])
+
+  useEffect(() => {
+    const view = viewRef.current
+    const compartment = readOnlyRef.current
+    if (!view || !compartment) return
+    view.dispatch({ effects: compartment.reconfigure(readOnlyExtensions(readOnly)) })
+  }, [readOnly])
 
   useImperativeHandle(ref, () => ({
     setDoc(text) {

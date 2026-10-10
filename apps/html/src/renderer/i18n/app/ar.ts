@@ -7,6 +7,11 @@ export const ar = {
   saveFailed: 'فشل الحفظ: {error}',
   saveFailedStatus: 'فشل الحفظ',
   exportFailed: 'فشل التصدير',
+  exportHtmlEntry: 'تصدير كملف HTML واحد',
+  previewLimitNote:
+    'تطلب هذه الصفحة بيانات عبر الشبكة أو تضمّن صفحات أخرى، وهذا ما تحظره المعاينة على الويب.',
+  useInAppMessage: 'افتح في تطبيق UniWork Office لاستخدام هذه الميزة',
+  openInApp: 'افتح في التطبيق',
   printFailed: 'فشل الطباعة: {error}',
   exportHtmlSkipped: 'تم التصدير، لكن تعذّر تضمين {count} من الأصول (مثل {first})',
   viewPreview: 'معاينة',

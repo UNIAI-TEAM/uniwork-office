@@ -7,6 +7,11 @@ export const pl = {
   saveFailed: 'Zapis nie powiódł się: {error}',
   saveFailedStatus: 'Zapis nie powiódł się',
   exportFailed: 'Eksport nie powiódł się',
+  exportHtmlEntry: 'Eksportuj jako pojedynczy plik HTML',
+  previewLimitNote:
+    'Ta strona pobiera dane z sieci lub osadza inne strony, co podgląd w przeglądarce blokuje.',
+  useInAppMessage: 'Otwórz w aplikacji UniWork Office, aby użyć tej funkcji',
+  openInApp: 'Otwórz w aplikacji',
   printFailed: 'Drukowanie nie powiodło się: {error}',
   exportHtmlSkipped: 'Wyeksportowano, ale nie udało się osadzić {count} zasobów (np. {first})',
   viewPreview: 'Podgląd',

@@ -7,6 +7,11 @@ export const es = {
   saveFailed: 'Error al guardar: {error}',
   saveFailedStatus: 'Error al guardar',
   exportFailed: 'Error al exportar',
+  exportHtmlEntry: 'Exportar como HTML de archivo único',
+  previewLimitNote:
+    'Esta página pide datos a la red o incrusta otras páginas, algo que la vista previa web bloquea.',
+  useInAppMessage: 'Ábrelo en la aplicación UniWork Office para usar esta función',
+  openInApp: 'Abrir en la aplicación',
   printFailed: 'Error al imprimir: {error}',
   exportHtmlSkipped: 'Exportado, pero {count} recurso(s) no se pudieron incrustar (p. ej. {first})',
   viewPreview: 'Vista previa',

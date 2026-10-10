@@ -7,6 +7,11 @@ export const th = {
   saveFailed: 'บันทึกไม่สำเร็จ: {error}',
   saveFailedStatus: 'บันทึกไม่สำเร็จ',
   exportFailed: 'ส่งออกไม่สำเร็จ',
+  exportHtmlEntry: 'ส่งออกเป็น HTML ไฟล์เดียว',
+  previewLimitNote:
+    'หน้านี้ขอข้อมูลผ่านเครือข่ายหรือฝังหน้าอื่น ซึ่งการแสดงตัวอย่างบนเว็บจะบล็อกไว้',
+  useInAppMessage: 'เปิดในแอป UniWork Office เพื่อใช้ฟีเจอร์นี้',
+  openInApp: 'เปิดในแอป',
   printFailed: 'พิมพ์ไม่สำเร็จ: {error}',
   exportHtmlSkipped: 'ส่งออกแล้ว แต่ฝังทรัพยากรไม่ได้ {count} รายการ (เช่น {first})',
   viewPreview: 'ตัวอย่าง',

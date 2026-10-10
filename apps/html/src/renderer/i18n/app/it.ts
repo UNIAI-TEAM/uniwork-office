@@ -7,6 +7,11 @@ export const it = {
   saveFailed: 'Salvataggio non riuscito: {error}',
   saveFailedStatus: 'Salvataggio non riuscito',
   exportFailed: 'Esportazione non riuscita',
+  exportHtmlEntry: 'Esporta come HTML a file singolo',
+  previewLimitNote:
+    "Questa pagina richiede dati alla rete o incorpora altre pagine, cosa che l'anteprima web blocca.",
+  useInAppMessage: "Apri nell'app UniWork Office per usare questa funzione",
+  openInApp: "Apri nell'app",
   printFailed: 'Stampa non riuscita: {error}',
   exportHtmlSkipped:
     'Esportato, ma {count} risorsa/e non è stato possibile incorporarle (es. {first})',

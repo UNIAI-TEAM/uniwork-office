@@ -7,10 +7,12 @@ interface Props {
   onChange: (value: string) => void
   /** fired on both focus edges so the caller can flush and re-sync */
   onFocusChange: () => void
+  /** view-only: the text can be read and selected but not edited */
+  readOnly?: boolean
 }
 
 /** Raw Markdown surface: a bare textarea (native undo, no highlighting) over the exact file text. */
-export function SourcePane({ value, onChange, onFocusChange }: Props) {
+export function SourcePane({ value, onChange, onFocusChange, readOnly = false }: Props) {
   const { t } = useI18n()
   const ref = useRef<HTMLTextAreaElement>(null)
 
@@ -30,9 +32,12 @@ export function SourcePane({ value, onChange, onFocusChange }: Props) {
         value={value}
         spellCheck={false}
         wrap="off"
+        readOnly={readOnly}
         onFocus={onFocusChange}
         onBlur={onFocusChange}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => {
+          if (!readOnly) onChange(e.target.value)
+        }}
       />
     </div>
   )

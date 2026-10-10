@@ -206,7 +206,8 @@ export type PrintResult = { ok: true } | { ok: true; canceled: true } | { ok: fa
 
 export interface ImageData {
   base64: string
-  mime: 'image/png' | 'image/jpeg' | 'image/gif'
+  /** the desktop reads PNG/JPEG/GIF; the web frame also serves WebP and SVG pictures (UNI-1232 A1) */
+  mime: 'image/png' | 'image/jpeg' | 'image/gif' | 'image/webp' | 'image/svg+xml'
 }
 
 /** API exposed by preload to the renderer (window.htmlApi) */
@@ -347,6 +348,11 @@ export interface HtmlApi {
     target: Window,
     handlers: { onMessage: (data: unknown) => void; onFailed: () => void },
   ): { post(msg: unknown): void; close(): void }
+  /**
+   * Web frame only (absent on desktop): the host's "Open in desktop app" flow, for the use-the-app
+   * messages. Resolves to the host's outcome; `unavailable` = the host already showed its own alert.
+   */
+  openInDesktopApp?(feature?: string): Promise<'launched' | 'installer' | 'unavailable'>
   /** AI image generation via the configured media provider (html-owned channel) */
   aiGenerateImage(op: { prompt: string; aspectRatio?: string }): Promise<{
     url?: string

@@ -39,6 +39,10 @@ interface Props {
   dirty: boolean
   onSave: () => void
   onSaveAs: () => void
+  /** absent = no Export Word entry (desktop: the shell File menu owns it; web frame: the entry) */
+  onExport?: () => void
+  /** the document is not ready (a view-only copy can still be exported: that only reads it) */
+  exportDisabled?: boolean
   onFind: () => void
   autoSave: boolean
   onToggleAutoSave: (on: boolean) => void
@@ -185,6 +189,8 @@ export function Ribbon({
   dirty,
   onSave,
   onSaveAs,
+  onExport,
+  exportDisabled = false,
   onFind,
   autoSave,
   onToggleAutoSave,
@@ -323,6 +329,19 @@ export function Ribbon({
         >
           {t('saveAs')}
         </button>
+        {onExport && (
+          <button
+            type="button"
+            className="qa-btn qa-save-as qa-export"
+            data-tip={t('exportWord')}
+            aria-label={t('exportWord')}
+            disabled={exportDisabled || sourceMode}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={onExport}
+          >
+            {t('exportWord')}
+          </button>
+        )}
         <button
           type="button"
           className="qa-btn"

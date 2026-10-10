@@ -7,6 +7,11 @@ export const he = {
   saveFailed: 'השמירה נכשלה: {error}',
   saveFailedStatus: 'השמירה נכשלה',
   exportFailed: 'הייצוא נכשל',
+  exportHtmlEntry: 'ייצוא כ-HTML בקובץ יחיד',
+  previewLimitNote:
+    'דף זה מבקש נתונים מהרשת או מטמיע דפים אחרים, והתצוגה המקדימה באינטרנט חוסמת זאת.',
+  useInAppMessage: 'פתחו באפליקציית UniWork Office כדי להשתמש בתכונה זו',
+  openInApp: 'פתח באפליקציה',
   printFailed: 'הדפסה נכשלה: {error}',
   exportHtmlSkipped: 'יוצא, אך לא ניתן היה להטמיע {count} משאבים (למשל {first})',
   viewPreview: 'תצוגה מקדימה',

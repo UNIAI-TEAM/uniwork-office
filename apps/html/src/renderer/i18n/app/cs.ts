@@ -7,6 +7,11 @@ export const cs = {
   saveFailed: 'Uložení se nezdařilo: {error}',
   saveFailedStatus: 'Uložení se nezdařilo',
   exportFailed: 'Export se nezdařil',
+  exportHtmlEntry: 'Exportovat jako samostatné HTML',
+  previewLimitNote:
+    'Tato stránka si vyžádá data ze sítě nebo vkládá jiné stránky, což webový náhled blokuje.',
+  useInAppMessage: 'Otevřete v aplikaci UniWork Office, abyste mohli tuto funkci použít',
+  openInApp: 'Otevřít v aplikaci',
   printFailed: 'Tisk se nezdařil: {error}',
   exportHtmlSkipped: 'Exportováno, ale {count} zdrojů se nepodařilo vložit (např. {first})',
   viewPreview: 'Náhled',

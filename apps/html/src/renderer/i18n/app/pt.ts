@@ -7,6 +7,11 @@ export const pt = {
   saveFailed: 'Falha ao salvar: {error}',
   saveFailedStatus: 'Falha ao salvar',
   exportFailed: 'Falha na exportação',
+  exportHtmlEntry: 'Exportar como HTML de arquivo único',
+  previewLimitNote:
+    'Esta página pede dados à rede ou incorpora outras páginas, o que a visualização web bloqueia.',
+  useInAppMessage: 'Abra no aplicativo UniWork Office para usar este recurso',
+  openInApp: 'Abrir no aplicativo',
   printFailed: 'Falha ao imprimir: {error}',
   exportHtmlSkipped:
     'Exportado, mas {count} recurso(s) não puderam ser incorporados (ex.: {first})',

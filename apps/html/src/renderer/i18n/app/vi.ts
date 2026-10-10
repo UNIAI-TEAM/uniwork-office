@@ -7,6 +7,11 @@ export const vi = {
   saveFailed: 'Lưu thất bại: {error}',
   saveFailedStatus: 'Lưu thất bại',
   exportFailed: 'Xuất thất bại',
+  exportHtmlEntry: 'Xuất HTML',
+  previewLimitNote:
+    'Trang này gọi dữ liệu qua mạng hoặc nhúng trang khác; bản xem trước trên web chặn những thứ đó.',
+  useInAppMessage: 'Mở trong ứng dụng UniWork Office để dùng tính năng này',
+  openInApp: 'Mở trong ứng dụng',
   printFailed: 'In thất bại: {error}',
   exportHtmlSkipped: 'Đã xuất, nhưng {count} tài nguyên không thể nhúng (ví dụ {first})',
   viewPreview: 'Xem trước',

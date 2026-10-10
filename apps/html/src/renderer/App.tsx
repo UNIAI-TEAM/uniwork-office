@@ -15,10 +15,13 @@ import {
   runHeadlessRendererExport,
 } from '@genoffice/electron-utils/headless-export'
 import { useI18n } from './i18n/locale'
-import { cap } from './capabilities'
+import { cap, platform } from './capabilities'
 import { parseDocText, serializeDocText, type Envelope } from './document/envelope'
+import { textWithPendingStyles } from './document/pending-draft'
 import { SourceEditor, type CursorInfo, type SourceEditorHandle } from './source/SourceEditor'
 import { PreviewFrame, type PreviewFrameHandle } from './preview/PreviewFrame'
+import { PreviewLimitNote } from './preview/PreviewLimitNote'
+import { usesBlockedPreviewFeatures } from './preview/preview-limits'
 import { instrumentForPreview } from './preview/instrument'
 import type { ComputedSnapshot, ElementRect, FromInspector } from './preview/inspector-protocol'
 import inspectorSource from './preview/inspector.js?raw'
@@ -248,6 +251,11 @@ export default function App() {
   // web frame (capabilities.ts): AI, autosave and visual edit off, view only without `save`
   const aiEnabled = cap('ai')
   const canEdit = cap('save')
+  // web preview: fetch/XHR and nested frames are blocked there, so a page using them gets one note
+  const previewLimited = useMemo(
+    () => !cap('htmlPreviewNetwork') && usesBlockedPreviewFeatures(text),
+    [text],
+  )
   const visualEdit = cap('htmlVisualEdit')
 
   const getMap = useCallback((): ParseMap => {
@@ -299,16 +307,22 @@ export default function App() {
   }, [getMap])
 
   // web bridge: the text a save would write now, read by the draft writer without saving.
-  // Reads the committed source only: flushing live style pokes would mutate the editor state.
-  useEffect(
-    () =>
-      window.htmlApi.provideText?.(() =>
-        statusRef.current === 'ready'
-          ? serializeDocText({ text: textRef.current, envelope: envelopeRef.current })
-          : null,
-      ),
-    [],
-  )
+  // Live style edits not yet committed (inspector / style panel) are applied to the copy only:
+  // committing them here would mutate the editor under the user's hands (see pending-draft.ts)
+  const draftTextRef = useRef<() => string | null>(() => null)
+  draftTextRef.current = () => {
+    if (statusRef.current !== 'ready') return null
+    // an open panel field lands in the pending styles first, exactly like leaving the field
+    flushDraftsRef.current?.()
+    const text = textWithPendingStyles(
+      textRef.current,
+      getMap(),
+      selectedSidRef.current,
+      pendingStylesRef.current,
+    )
+    return serializeDocText({ text, envelope: envelopeRef.current })
+  }
+  useEffect(() => window.htmlApi.provideText?.(() => draftTextRef.current()), [])
 
   // mirror dirtiness to the main process (close prompt) — untitled blank docs never count
   useEffect(() => {
@@ -1540,6 +1554,8 @@ export default function App() {
         dirty={dirty}
         onSave={() => void doSave('save')}
         onSaveAs={() => void doSave('saveAs')}
+        onExport={platform() === 'web' ? () => void runExport('html') : undefined}
+        exportDisabled={status !== 'ready'}
         onFind={() => openFind(false)}
         canUndo={historyState.undo}
         canRedo={historyState.redo}
@@ -1633,6 +1649,7 @@ export default function App() {
                   if (e.target === e.currentTarget) selectSid(null)
                 }}
               >
+                {previewLimited && canvasMode === 'edit' && <PreviewLimitNote />}
                 <PreviewFrame
                   ref={previewRef}
                   url={previewUrl}

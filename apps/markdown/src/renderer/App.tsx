@@ -63,7 +63,7 @@ import { diagramSvgToPng, renderDiagram } from './editor/diagrams'
 import type { DiagramLanguage } from './editor/diagrams'
 import type { ExportFormat, SaveMode, UniworkViewState } from '../shared/ipc'
 import { uiOp } from './editor/ops'
-import { cap } from './capabilities'
+import { cap, platform } from './capabilities'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 type SaveState = 'idle' | 'saving' | 'saved' | 'failed'
@@ -527,6 +527,8 @@ export default function App() {
   // re-parse is debounced; the pane itself updates immediately.
   const onSourceChange = useCallback(
     (text: string) => {
+      // a view-only copy never takes source edits (the pane is read-only; this is the backstop)
+      if (uniworkRef.current.readOnly || !cap('save')) return
       setSourceText(text)
       pendingSourceRef.current = text
       markDirty()
@@ -740,6 +742,16 @@ export default function App() {
     },
     [sourceMode],
   )
+
+  /**
+   * The web frame's Export Word entry (the desktop owns it in the shell File menu): builds the .docx
+   * in the renderer and the bridge downloads it. A failure is announced; the desktop's silent
+   * console error stays for the menu route.
+   */
+  const exportWordFromRibbon = useCallback(async () => {
+    if (!(await runExport('docx'))) showToast(t('exportFailed'), 'error')
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- t is not referentially stable
+  }, [runExport])
 
   // Headless export mode (--headless-export): this renderer lives in a hidden
   // window whose only job is to run the File menu's PDF export against a path
@@ -1139,6 +1151,8 @@ export default function App() {
         dirty={dirty}
         onSave={() => void doSave('save')}
         onSaveAs={() => void doSave('saveAs')}
+        onExport={platform() === 'web' ? () => void exportWordFromRibbon() : undefined}
+        exportDisabled={status !== 'ready'}
         onFind={() => openFind(false)}
         autoSave={autoSave}
         onToggleAutoSave={setAutoSave}
@@ -1228,7 +1242,9 @@ export default function App() {
                 initialText={sourceTextRef.current}
                 mode={textMode === 'json' ? 'json' : 'plain'}
                 spellcheck={spellcheck}
+                readOnly={!canEdit || uniwork.readOnly}
                 onChange={(text) => {
+                  if (uniworkRef.current.readOnly || !cap('save')) return
                   sourceTextRef.current = text
                   setSourceRev((n) => n + 1)
                   markDirty()
@@ -1257,6 +1273,7 @@ export default function App() {
                   value={sourceText}
                   onChange={onSourceChange}
                   onFocusChange={onSourceFocusChange}
+                  readOnly={!canEdit || uniwork.readOnly}
                 />
               )}
             </>

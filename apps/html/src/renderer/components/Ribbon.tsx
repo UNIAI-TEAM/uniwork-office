@@ -69,6 +69,10 @@ interface Props {
   dirty: boolean
   onSave: () => void
   onSaveAs: () => void
+  /** absent = no Export HTML entry (desktop: the shell File menu owns it; web frame: the entry) */
+  onExport?: () => void
+  /** the document is not ready (a view-only copy can still be exported: that only reads it) */
+  exportDisabled?: boolean
   onFind: () => void
   canUndo: boolean
   canRedo: boolean
@@ -249,6 +253,19 @@ export function Ribbon(p: Props) {
         >
           {t('saveAs')}
         </button>
+        {p.onExport && (
+          <button
+            type="button"
+            className="qa-btn qa-save-as qa-export"
+            data-tip={t('exportHtmlEntry')}
+            aria-label={t('exportHtmlEntry')}
+            disabled={p.exportDisabled}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={p.onExport}
+          >
+            {t('exportHtmlEntry')}
+          </button>
+        )}
         <button
           type="button"
           className="qa-btn"
