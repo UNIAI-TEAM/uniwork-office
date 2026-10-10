@@ -232,7 +232,13 @@ export default function App() {
   const canEdit = cap('save')
 
   const markDirty = useCallback(() => {
-    if (statusRef.current !== 'ready' || dirtyRef.current || !cap('save')) return
+    if (statusRef.current !== 'ready' || !cap('save')) return
+    if (dirtyRef.current) {
+      // already dirty: the host dedupes an unchanged flag, but a web host that last saw a failed
+      // save needs this edit to move its header from "could not be confirmed" back to unsaved
+      window.markdownApi.setDirty(true)
+      return
+    }
     dirtyRef.current = true
     setDirty(true)
     setSaveState('idle')

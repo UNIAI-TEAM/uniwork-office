@@ -324,11 +324,14 @@ export default function App() {
   }
   useEffect(() => window.htmlApi.provideText?.(() => draftTextRef.current()), [])
 
-  // mirror dirtiness to the main process (close prompt) — untitled blank docs never count
+  // mirror dirtiness to the main process (close prompt) — untitled blank docs never count. `text`
+  // is a dependency on purpose: every edit re-reports, because a web host that last saw a failed
+  // save needs the next edit to move its header from "could not be confirmed" back to unsaved
+  // (the frame client dedupes an unchanged flag, text-webapi sends the first one after a failure)
   useEffect(() => {
     if (status !== 'ready') return
     window.htmlApi.setDirty(canEdit && (dirty || pendingCount > 0))
-  }, [dirty, pendingCount, status, canEdit])
+  }, [dirty, pendingCount, status, canEdit, text])
 
   /**
    * Serve the current source to html-preview://. `reload` = false for a commit the frame already
