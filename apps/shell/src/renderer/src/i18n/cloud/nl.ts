@@ -36,4 +36,6 @@ export const nl = {
   aiTestErrNetwork: 'Geen verbinding. Controleer je netwerk',
   aiTestErrLimit: 'Limiet van de aanbieder bereikt. Probeer het later opnieuw',
   aiTestErrUnavailable: 'Service reageert niet. Probeer het later opnieuw',
+  aiTestErrMisconfigured:
+    'Instellingen onvolledig: controleer het serviceadres en de accountvelden',
 } satisfies Record<keyof typeof zh, string>

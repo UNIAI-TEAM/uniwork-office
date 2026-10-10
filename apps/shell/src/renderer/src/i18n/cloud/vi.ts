@@ -36,4 +36,6 @@ export const vi = {
   aiTestErrNetwork: 'Không kết nối được. Hãy kiểm tra mạng',
   aiTestErrLimit: 'Đã chạm giới hạn của nhà cung cấp, thử lại sau',
   aiTestErrUnavailable: 'Dịch vụ chưa phản hồi, thử lại sau',
+  aiTestErrMisconfigured:
+    'Cài đặt chưa đầy đủ: hãy kiểm tra địa chỉ dịch vụ và các trường tài khoản',
 } satisfies Record<keyof typeof zh, string>

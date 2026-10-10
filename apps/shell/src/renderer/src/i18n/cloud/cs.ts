@@ -37,4 +37,5 @@ export const cs = {
   aiTestErrNetwork: 'Nelze se připojit. Zkontrolujte síť',
   aiTestErrLimit: 'Dosažen limit poskytovatele. Zkuste to později',
   aiTestErrUnavailable: 'Služba neodpovídá. Zkuste to později',
+  aiTestErrMisconfigured: 'Nastavení je neúplné: zkontrolujte adresu služby a pole účtu',
 } satisfies Record<keyof typeof zh, string>

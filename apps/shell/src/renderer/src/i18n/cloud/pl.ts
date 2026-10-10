@@ -36,4 +36,5 @@ export const pl = {
   aiTestErrNetwork: 'Nie można się połączyć. Sprawdź sieć',
   aiTestErrLimit: 'Osiągnięto limit dostawcy. Spróbuj później',
   aiTestErrUnavailable: 'Usługa nie odpowiada. Spróbuj później',
+  aiTestErrMisconfigured: 'Ustawienia niekompletne: sprawdź adres usługi i pola konta',
 } satisfies Record<keyof typeof zh, string>

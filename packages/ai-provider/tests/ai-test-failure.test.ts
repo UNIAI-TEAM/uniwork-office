@@ -66,6 +66,7 @@ describe('settings test failure kinds', () => {
 
   it('reads an unknown IPC kind as the generic failure', () => {
     expect(normalizeAiTestFailureKind('network')).toBe('network')
+    expect(normalizeAiTestFailureKind('misconfigured')).toBe('misconfigured')
     expect(normalizeAiTestFailureKind('<script>')).toBe('failed')
     expect(normalizeAiTestFailureKind(undefined)).toBe('failed')
   })

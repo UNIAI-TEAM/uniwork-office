@@ -89,6 +89,27 @@ describe('testMediaProvider connection test', () => {
     })
   })
 
+  it('tags a custom provider without a Base URL as misconfigured, without a request', async () => {
+    const fetchMock = vi.fn(async () => errorResponse({ data: [] }, 200))
+    vi.stubGlobal('fetch', fetchMock)
+    expect(await testMediaProvider('custom', config)).toMatchObject({
+      ok: false,
+      errorKind: 'misconfigured',
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('tags a Base URL that does not parse as misconfigured, not network', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => errorResponse({ data: [] }, 200)),
+    )
+    expect(await testMediaProvider('custom', { ...config, baseUrl: 'not a url' })).toMatchObject({
+      ok: false,
+      errorKind: 'misconfigured',
+    })
+  })
+
   it('appends /models on the path of an OpenAI-shaped base that carries a query', async () => {
     const fetchMock = vi.fn(async () => errorResponse({ data: [] }, 404))
     vi.stubGlobal('fetch', fetchMock)

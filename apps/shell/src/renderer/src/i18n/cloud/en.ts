@@ -36,4 +36,5 @@ export const en = {
   aiTestErrNetwork: 'Can’t connect. Check your connection',
   aiTestErrLimit: 'Provider limit reached. Try again later',
   aiTestErrUnavailable: 'Service not answering. Try again later',
+  aiTestErrMisconfigured: 'Settings incomplete: check the service address and account fields',
 } satisfies Record<keyof typeof zh, string>

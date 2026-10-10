@@ -192,6 +192,12 @@ function probeErrorKind(code: string): AiTestFailureKind {
   switch (code) {
     case 'missing-key':
       return 'invalid_key'
+    case 'missing-url':
+    case 'bad-url':
+    case 'insecure-url':
+    case 'missing-account':
+    case 'unsupported-model':
+      return 'misconfigured'
     case 'rate-limit':
       return 'limit'
     case 'cancelled':

@@ -35,4 +35,5 @@ export const hi = {
   aiTestErrNetwork: 'कनेक्ट नहीं हो सका। अपना नेटवर्क जाँचें',
   aiTestErrLimit: 'प्रदाता की सीमा पूरी हो गई। बाद में फिर कोशिश करें',
   aiTestErrUnavailable: 'सेवा जवाब नहीं दे रही। बाद में फिर कोशिश करें',
+  aiTestErrMisconfigured: 'सेटिंग अधूरी हैं: सेवा का पता और खाते के फ़ील्ड जाँचें',
 } satisfies Record<keyof typeof zh, string>

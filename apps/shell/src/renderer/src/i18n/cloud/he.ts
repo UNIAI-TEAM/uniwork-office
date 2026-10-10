@@ -36,4 +36,5 @@ export const he = {
   aiTestErrNetwork: 'אין חיבור. בדקו את הרשת',
   aiTestErrLimit: 'הגעתם למגבלת הספק. נסו שוב מאוחר יותר',
   aiTestErrUnavailable: 'השירות אינו מגיב. נסו שוב מאוחר יותר',
+  aiTestErrMisconfigured: 'ההגדרות חסרות. בדקו את כתובת השירות ואת שדות החשבון',
 } satisfies Record<keyof typeof zh, string>

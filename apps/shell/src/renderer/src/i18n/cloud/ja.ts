@@ -36,4 +36,6 @@ export const ja = {
   aiTestErrNetwork: '接続できません。ネットワークを確認してください',
   aiTestErrLimit: 'プロバイダーの上限に達しました。後でもう一度お試しください',
   aiTestErrUnavailable: 'サービスが応答しません。後でもう一度お試しください',
+  aiTestErrMisconfigured:
+    '設定が不足しています。サービスのアドレスとアカウント欄を確認してください',
 } satisfies Record<keyof typeof zh, string>

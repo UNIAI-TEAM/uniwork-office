@@ -36,4 +36,5 @@ export const ko = {
   aiTestErrNetwork: '연결할 수 없습니다. 네트워크를 확인하세요',
   aiTestErrLimit: '제공업체 한도에 도달했습니다. 나중에 다시 시도하세요',
   aiTestErrUnavailable: '서비스가 응답하지 않습니다. 나중에 다시 시도하세요',
+  aiTestErrMisconfigured: '설정이 완전하지 않습니다. 서비스 주소와 계정 항목을 확인하세요',
 } satisfies Record<keyof typeof zh, string>

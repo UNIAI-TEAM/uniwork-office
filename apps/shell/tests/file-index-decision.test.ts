@@ -420,7 +420,7 @@ describe('probeDecision', () => {
       expect(await probeDecision(normalizeFileSearchSettings(raw), ok(answer([2, 0])))).toEqual({
         ok: false,
         error,
-        errorKind: 'failed',
+        errorKind: 'misconfigured',
       })
     }
   })

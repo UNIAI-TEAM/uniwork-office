@@ -31,4 +31,5 @@ export const zh = {
   aiTestErrNetwork: '无法连接，请检查网络',
   aiTestErrLimit: '已达服务商的用量或频率限制，请稍后重试',
   aiTestErrUnavailable: '服务暂无响应，请稍后重试',
+  aiTestErrMisconfigured: '设置不完整，请检查服务地址和账号字段',
 }

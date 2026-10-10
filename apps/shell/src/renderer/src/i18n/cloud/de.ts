@@ -36,4 +36,5 @@ export const de = {
   aiTestErrNetwork: 'Keine Verbindung. Prüfen Sie Ihr Netzwerk',
   aiTestErrLimit: 'Limit des Anbieters erreicht. Später erneut versuchen',
   aiTestErrUnavailable: 'Dienst antwortet nicht. Später erneut versuchen',
+  aiTestErrMisconfigured: 'Einstellungen unvollständig: Dienstadresse und Kontofelder prüfen',
 } satisfies Record<keyof typeof zh, string>
