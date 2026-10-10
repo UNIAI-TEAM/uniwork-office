@@ -525,4 +525,11 @@ export const en = {
   appSaving: 'Saving…',
   appSavingAs: 'Saving as…',
   appPdfPrintFallback: 'PDF export is unavailable here; the browser print dialog was used instead',
+  appFileExportPdf: 'Export as PDF…',
+  appFilePrint: 'Print…',
+  appPrintNoPrinter:
+    'No printer is available on this computer. You can save the document as a PDF instead.',
+  appPrintFailedPdfHint:
+    'Printing did not work: {error}. You can save the document as a PDF instead.',
+  appPrintSaveAsPdf: 'Save as PDF…',
 } satisfies Record<keyof typeof zh, string>

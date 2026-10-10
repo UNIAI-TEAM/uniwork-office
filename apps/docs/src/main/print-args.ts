@@ -34,3 +34,21 @@ export function printScaleOption(scale: unknown): { scale: number } | Record<str
     ? { scale }
     : {}
 }
+
+/**
+ * True when the machine reports no printers at all (a fresh Linux VM without
+ * CUPS, macOS "No printers available"). Chromium's print() then neither shows
+ * a dialog nor calls back, so docs:print asks first and the renderer offers
+ * Save as PDF instead. A failed query reads as "unknown", not "none": print()
+ * is still allowed to try.
+ */
+export async function hasNoPrinter(sender: {
+  getPrintersAsync?: () => Promise<unknown[]>
+}): Promise<boolean> {
+  if (typeof sender.getPrintersAsync !== 'function') return false
+  try {
+    return (await sender.getPrintersAsync()).length === 0
+  } catch {
+    return false
+  }
+}

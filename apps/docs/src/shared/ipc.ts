@@ -514,7 +514,8 @@ export interface DesktopApi {
   openAiModelSettings(): Promise<void>
   /** system print dialog for the current window; ok=false without error = canceled.
    *  scale: print scale inverting the preview's print zoom (print-zoom.ts) */
-  print(scale?: number): Promise<{ ok: boolean; error?: string }>
+  /** noPrinter: the machine has no printer, so nothing was sent (offer Save as PDF instead) */
+  print(scale?: number): Promise<{ ok: boolean; error?: string; noPrinter?: boolean }>
   /** render the document to PDF and ask where to save; size in twips.
    *  outPath is only honored when a previous export dialog chose that exact path */
   exportPdf(

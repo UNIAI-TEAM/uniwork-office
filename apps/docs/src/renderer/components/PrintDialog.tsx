@@ -23,9 +23,12 @@ const pvPages = (): HTMLElement[] => [
 export function PrintDialog({
   onClose,
   setStatus,
+  onSavePdf,
 }: {
   onClose: () => void
   setStatus: (s: string) => void
+  /** Save as PDF fallback when printing is impossible; resolves true once a file was written */
+  onSavePdf: () => Promise<boolean>
 }) {
   const { t } = useI18n()
   const [pageCount, setPageCount] = useState(0)
@@ -33,6 +36,8 @@ export function PrintDialog({
   const [rangeMode, setRangeMode] = useState<RangeMode>('all')
   const [customRange, setCustomRange] = useState('')
   const [printing, setPrinting] = useState(false)
+  /** why printing did not happen, when Save as PDF is the way forward (no printer / print failure) */
+  const [printProblem, setPrintProblem] = useState<{ error?: string } | null>(null)
   const paneRef = useRef<HTMLDivElement | null>(null)
   const hostRef = useRef<HTMLDivElement | null>(null)
 
@@ -119,17 +124,32 @@ export function PrintDialog({
     // (hidden) preview keeps its layout while unselected sheets don't print.
     els.forEach((el, i) => el.classList.toggle('pv-print-skip', !sel.has(i)))
     const scale = setPrintZoom()
+    setPrintProblem(null)
     try {
       const r = await window.desktop.print(scale)
       if (r.ok) {
         onClose()
         return
       }
-      if (r.error) setStatus(t('appPrintFailed', { error: r.error }))
+      if (r.noPrinter) setPrintProblem({})
+      else if (r.error) {
+        setStatus(t('appPrintFailed', { error: r.error }))
+        setPrintProblem({ error: r.error })
+      }
       // not ok without an error = canceled in the system dialog: keep the dialog open
     } finally {
       clearPrintZoom()
       els.forEach((el) => el.classList.remove('pv-print-skip'))
+      setPrinting(false)
+    }
+  }
+
+  const savePdf = async () => {
+    if (printing) return
+    setPrinting(true)
+    try {
+      if (await onSavePdf()) onClose()
+    } finally {
       setPrinting(false)
     }
   }
@@ -218,6 +238,18 @@ export function PrintDialog({
             </div>
           </div>
         </div>
+        {printProblem && (
+          <div className="print-problem" role="alert">
+            <span>
+              {printProblem.error
+                ? t('appPrintFailedPdfHint', { error: printProblem.error })
+                : t('appPrintNoPrinter')}
+            </span>
+            <button className="primary" disabled={printing} onClick={() => void savePdf()}>
+              {t('appPrintSaveAsPdf')}
+            </button>
+          </div>
+        )}
         <div className="modal-actions">
           <button onClick={onClose}>{t('appCancel')}</button>
           <button

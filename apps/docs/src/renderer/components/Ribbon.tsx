@@ -274,6 +274,9 @@ interface RibbonProps {
   onOpen: () => void
   onSave: () => void
   onSaveAs: () => void
+  /** File ▸ Export as PDF: a local file export through printToPDF, no system printer needed */
+  onExportPdf?: () => void
+  onPrint?: () => void
   showAi: boolean
   onToggleAi: () => void
   section: SectionSettings | null
@@ -726,6 +729,8 @@ function RibbonInner({
   onOpen,
   onSave,
   onSaveAs,
+  onExportPdf,
+  onPrint,
   showAi,
   onToggleAi,
   section,
@@ -2032,6 +2037,28 @@ function RibbonInner({
                 >
                   {t('ribbonSaveAs')} <span className="file-menu-key">Ctrl+Shift+S</span>
                 </button>
+                {onExportPdf && (
+                  <button
+                    disabled={!hasDoc}
+                    onClick={() => {
+                      setDropdown(null)
+                      onExportPdf()
+                    }}
+                  >
+                    {t('appFileExportPdf')}
+                  </button>
+                )}
+                {onPrint && (
+                  <button
+                    disabled={!hasDoc}
+                    onClick={() => {
+                      setDropdown(null)
+                      onPrint()
+                    }}
+                  >
+                    {t('appFilePrint')} <span className="file-menu-key">Ctrl+P</span>
+                  </button>
+                )}
               </div>
             )}
           </div>

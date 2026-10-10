@@ -537,4 +537,11 @@ export const ru = {
   appSavingAs: 'Сохранение как…',
   appPdfPrintFallback:
     'Экспорт в PDF здесь недоступен; вместо него использовано окно печати браузера',
+  appFileExportPdf: 'Экспорт в PDF…',
+  appFilePrint: 'Печать…',
+  appPrintNoPrinter:
+    'На этом компьютере нет доступного принтера. Вместо этого можно сохранить документ в PDF.',
+  appPrintFailedPdfHint:
+    'Не удалось напечатать: {error}. Вместо этого можно сохранить документ в PDF.',
+  appPrintSaveAsPdf: 'Сохранить как PDF…',
 } satisfies Record<keyof typeof zh, string>

@@ -533,4 +533,10 @@ export const pt = {
   appSavingAs: 'Salvando como…',
   appPdfPrintFallback:
     'A exportação para PDF não está disponível aqui; foi usada a caixa de impressão do navegador',
+  appFileExportPdf: 'Exportar como PDF…',
+  appFilePrint: 'Imprimir…',
+  appPrintNoPrinter:
+    'Não há nenhuma impressora disponível neste computador. Você pode salvar o documento como PDF.',
+  appPrintFailedPdfHint: 'A impressão falhou: {error}. Você pode salvar o documento como PDF.',
+  appPrintSaveAsPdf: 'Salvar como PDF…',
 } satisfies Record<keyof typeof zh, string>

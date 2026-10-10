@@ -557,4 +557,11 @@ export const ja = {
   appSavingAs: '名前を付けて保存しています…',
   appPdfPrintFallback:
     'PDF を直接エクスポートできないため、ブラウザーの印刷ダイアログを使用しました',
+  appFileExportPdf: 'PDF としてエクスポート…',
+  appFilePrint: '印刷…',
+  appPrintNoPrinter:
+    'このコンピューターで使えるプリンターがありません。代わりにドキュメントを PDF として保存できます。',
+  appPrintFailedPdfHint:
+    '印刷できませんでした: {error}。代わりにドキュメントを PDF として保存できます。',
+  appPrintSaveAsPdf: 'PDF として保存…',
 } satisfies Record<keyof typeof zh, string>

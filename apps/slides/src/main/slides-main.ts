@@ -1857,8 +1857,9 @@ export function buildSlidesMenu(): Menu {
         { type: 'separator' },
         closeActiveTabHook
           ? {
-              label: isMac ? tm('menuClose') : tm('menuQuit'),
-              accelerator: isMac ? 'CmdOrCtrl+W' : 'CmdOrCtrl+Q',
+              // closes the tab on every platform (the hook only exists in tab mode)
+              label: tm('menuClose'),
+              accelerator: 'CmdOrCtrl+W',
               click: () => closeActiveTabHook?.(),
             }
           : isMac

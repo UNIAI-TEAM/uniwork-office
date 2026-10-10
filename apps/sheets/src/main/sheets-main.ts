@@ -4663,8 +4663,9 @@ function installApplicationMenu(): void {
           { type: 'separator' },
           closeActiveTabHook
             ? {
-                label: process.platform === 'darwin' ? tm('menuClose') : tm('menuQuit'),
-                accelerator: process.platform === 'darwin' ? 'CmdOrCtrl+W' : 'CmdOrCtrl+Q',
+                // closes the tab on every platform (the hook only exists in tab mode)
+                label: tm('menuClose'),
+                accelerator: 'CmdOrCtrl+W',
                 click: () => closeActiveTabHook?.(),
               }
             : process.platform === 'darwin'

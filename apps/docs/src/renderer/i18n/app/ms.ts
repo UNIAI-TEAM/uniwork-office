@@ -535,4 +535,11 @@ export const ms = {
   appSavingAs: 'Menyimpan sebagai…',
   appPdfPrintFallback:
     'Eksport PDF tidak tersedia di sini; dialog cetak pelayar digunakan sebagai ganti',
+  appFileExportPdf: 'Eksport sebagai PDF…',
+  appFilePrint: 'Cetak…',
+  appPrintNoPrinter:
+    'Tiada pencetak tersedia pada komputer ini. Anda boleh menyimpan dokumen sebagai PDF sebagai ganti.',
+  appPrintFailedPdfHint:
+    'Pencetakan gagal: {error}. Anda boleh menyimpan dokumen sebagai PDF sebagai ganti.',
+  appPrintSaveAsPdf: 'Simpan sebagai PDF…',
 } satisfies Record<keyof typeof zh, string>

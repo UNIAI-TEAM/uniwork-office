@@ -528,4 +528,11 @@ export const vi = {
   appSavingAs: 'Đang lưu thành…',
   appPdfPrintFallback:
     'Không xuất được PDF trực tiếp; đã dùng hộp thoại in của trình duyệt thay thế',
+  appFileExportPdf: 'Xuất dưới dạng PDF…',
+  appFilePrint: 'In…',
+  appPrintNoPrinter:
+    'Máy tính này không có máy in. Bạn có thể lưu tài liệu thành tệp PDF thay thế.',
+  appPrintFailedPdfHint:
+    'In không thành công: {error}. Bạn có thể lưu tài liệu thành tệp PDF thay thế.',
+  appPrintSaveAsPdf: 'Lưu thành PDF…',
 } satisfies Record<keyof typeof zh, string>

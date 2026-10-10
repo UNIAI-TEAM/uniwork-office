@@ -530,4 +530,10 @@ export const cs = {
   appSavingAs: 'Ukládání jako…',
   appPdfPrintFallback:
     'Export do PDF zde není k dispozici; místo něj byl použit tiskový dialog prohlížeče',
+  appFileExportPdf: 'Exportovat jako PDF…',
+  appFilePrint: 'Tisk…',
+  appPrintNoPrinter:
+    'Na tomto počítači není dostupná žádná tiskárna. Dokument můžete místo toho uložit jako PDF.',
+  appPrintFailedPdfHint: 'Tisk se nepodařil: {error}. Dokument můžete místo toho uložit jako PDF.',
+  appPrintSaveAsPdf: 'Uložit jako PDF…',
 } satisfies Record<keyof typeof zh, string>

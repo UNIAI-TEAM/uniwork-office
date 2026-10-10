@@ -542,4 +542,11 @@ export const nl = {
   appSavingAs: 'Opslaan als…',
   appPdfPrintFallback:
     'PDF-export is hier niet beschikbaar; in plaats daarvan is het afdrukvenster van de browser gebruikt',
+  appFileExportPdf: 'Exporteren als PDF…',
+  appFilePrint: 'Afdrukken…',
+  appPrintNoPrinter:
+    'Op deze computer is geen printer beschikbaar. U kunt het document in plaats daarvan als PDF opslaan.',
+  appPrintFailedPdfHint:
+    'Afdrukken is mislukt: {error}. U kunt het document in plaats daarvan als PDF opslaan.',
+  appPrintSaveAsPdf: 'Opslaan als PDF…',
 } satisfies Record<keyof typeof zh, string>

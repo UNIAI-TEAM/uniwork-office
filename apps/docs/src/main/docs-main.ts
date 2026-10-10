@@ -188,7 +188,7 @@ import {
 } from './docx-encryption'
 import { isExternallyModified, type DiskFileState } from './external-change'
 import { copyImageDisplaySize, validCopyImageDataUrl } from './copy-image-guard'
-import { printScaleOption, validPrintGeometry } from './print-args'
+import { hasNoPrinter, printScaleOption, validPrintGeometry } from './print-args'
 import { initDocsAutoUpdater } from './updater'
 import { registerZoteroIpc, teardownZoteroIpc } from './zotero-ipc'
 
@@ -5222,8 +5222,11 @@ export function registerDocsIpc(): void {
   ipcMain.handle('docs:print', async (event, scale?: number) => {
     // print the calling tab's own content; zero margins — the docx page padding provides them.
     // Resolves when the system dialog is dismissed; the print dialog stays open on cancel
-    // (ok=false without error) and surfaces real failures.
-    return new Promise<{ ok: boolean; error?: string }>((resolve) => {
+    // (ok=false without error) and surfaces real failures. With no printer installed
+    // print() would do nothing at all, so that case is reported up front (noPrinter) and
+    // the renderer offers Save as PDF.
+    if (await hasNoPrinter(event.sender)) return { ok: false, noPrinter: true }
+    return new Promise<{ ok: boolean; error?: string; noPrinter?: boolean }>((resolve) => {
       event.sender.print(
         { margins: { marginType: 'none' }, ...printScale(scale) },
         (success, failureReason) => {
@@ -5265,7 +5268,9 @@ export function registerDocsIpc(): void {
           filters: [{ name: 'PDF', extensions: ['pdf'] }],
         })
         if (result.canceled || !result.filePath) return { ok: false }
-        filePath = result.filePath
+        // a local export only: never lands on the open .docx (a UniWork working copy) even
+        // if the user typed its name, and never goes through the user-save hook
+        filePath = /\.pdf$/i.test(result.filePath) ? result.filePath : `${result.filePath}.pdf`
         allowPdfWrite(event.sender.id, filePath)
       }
       try {

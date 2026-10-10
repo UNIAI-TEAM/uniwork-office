@@ -538,4 +538,11 @@ export const es = {
   appSavingAs: 'Guardando como…',
   appPdfPrintFallback:
     'La exportación a PDF no está disponible aquí; se usó el cuadro de impresión del navegador',
+  appFileExportPdf: 'Exportar como PDF…',
+  appFilePrint: 'Imprimir…',
+  appPrintNoPrinter:
+    'No hay ninguna impresora disponible en este equipo. Puedes guardar el documento como PDF en su lugar.',
+  appPrintFailedPdfHint:
+    'No se pudo imprimir: {error}. Puedes guardar el documento como PDF en su lugar.',
+  appPrintSaveAsPdf: 'Guardar como PDF…',
 } satisfies Record<keyof typeof zh, string>

@@ -531,4 +531,11 @@ export const hi = {
   appSavingAs: 'इस रूप में सहेजा जा रहा है…',
   appPdfPrintFallback:
     'यहाँ PDF निर्यात उपलब्ध नहीं है; इसके बजाय ब्राउज़र का प्रिंट डायलॉग इस्तेमाल किया गया',
+  appFileExportPdf: 'PDF के रूप में निर्यात करें…',
+  appFilePrint: 'प्रिंट करें…',
+  appPrintNoPrinter:
+    'इस कंप्यूटर पर कोई प्रिंटर उपलब्ध नहीं है। आप इसके बजाय दस्तावेज़ को PDF के रूप में सहेज सकते हैं।',
+  appPrintFailedPdfHint:
+    'प्रिंट नहीं हो सका: {error}। आप इसके बजाय दस्तावेज़ को PDF के रूप में सहेज सकते हैं।',
+  appPrintSaveAsPdf: 'PDF के रूप में सहेजें…',
 } satisfies Record<keyof typeof zh, string>

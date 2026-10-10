@@ -554,4 +554,10 @@ export const ko = {
   appSaving: '저장 중…',
   appSavingAs: '다른 이름으로 저장 중…',
   appPdfPrintFallback: 'PDF를 직접 내보낼 수 없어 브라우저 인쇄 대화 상자를 대신 사용했습니다',
+  appFileExportPdf: 'PDF로 내보내기…',
+  appFilePrint: '인쇄…',
+  appPrintNoPrinter:
+    '이 컴퓨터에서 사용할 수 있는 프린터가 없습니다. 대신 문서를 PDF로 저장할 수 있습니다.',
+  appPrintFailedPdfHint: '인쇄하지 못했습니다: {error}. 대신 문서를 PDF로 저장할 수 있습니다.',
+  appPrintSaveAsPdf: 'PDF로 저장…',
 } satisfies Record<keyof typeof zh, string>

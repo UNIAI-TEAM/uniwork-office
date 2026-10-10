@@ -537,4 +537,10 @@ export const it = {
   appSavingAs: 'Salvataggio con nome…',
   appPdfPrintFallback:
     "L'esportazione PDF non è disponibile qui; è stata usata la finestra di stampa del browser",
+  appFileExportPdf: 'Esporta come PDF…',
+  appFilePrint: 'Stampa…',
+  appPrintNoPrinter:
+    'Nessuna stampante disponibile su questo computer. Puoi salvare il documento come PDF.',
+  appPrintFailedPdfHint: 'Stampa non riuscita: {error}. Puoi salvare il documento come PDF.',
+  appPrintSaveAsPdf: 'Salva come PDF…',
 } satisfies Record<keyof typeof zh, string>

@@ -519,4 +519,9 @@ export const he = {
   appSaving: 'שומר…',
   appSavingAs: 'שומר בשם…',
   appPdfPrintFallback: 'ייצוא PDF אינו זמין כאן; נעשה שימוש בתיבת ההדפסה של הדפדפן במקום',
+  appFileExportPdf: 'ייצוא כ-PDF…',
+  appFilePrint: 'הדפסה…',
+  appPrintNoPrinter: 'אין מדפסת זמינה במחשב זה. אפשר לשמור את המסמך כקובץ PDF במקום.',
+  appPrintFailedPdfHint: 'ההדפסה נכשלה: {error}. אפשר לשמור את המסמך כקובץ PDF במקום.',
+  appPrintSaveAsPdf: 'שמירה כ-PDF…',
 } satisfies Record<keyof typeof zh, string>

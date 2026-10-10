@@ -526,4 +526,9 @@ export const th = {
   appSaving: 'กำลังบันทึก…',
   appSavingAs: 'กำลังบันทึกเป็น…',
   appPdfPrintFallback: 'ส่งออก PDF โดยตรงไม่ได้ จึงใช้กล่องโต้ตอบการพิมพ์ของเบราว์เซอร์แทน',
+  appFileExportPdf: 'ส่งออกเป็น PDF…',
+  appFilePrint: 'พิมพ์…',
+  appPrintNoPrinter: 'ไม่มีเครื่องพิมพ์ในคอมพิวเตอร์เครื่องนี้ คุณบันทึกเอกสารเป็น PDF แทนได้',
+  appPrintFailedPdfHint: 'พิมพ์ไม่สำเร็จ: {error} คุณบันทึกเอกสารเป็น PDF แทนได้',
+  appPrintSaveAsPdf: 'บันทึกเป็น PDF…',
 } satisfies Record<keyof typeof zh, string>
