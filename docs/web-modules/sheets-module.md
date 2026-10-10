@@ -97,20 +97,35 @@ the reopen; view-only did not lock the grid; a Rust panic lost the open sessions
 
 | item                   | what changed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Cached formula values  | `engine/cached-values.ts` + `serialize` in `engine/wasm-transport.ts`. At save time the transport sends the save's pending cell edits (formulas verbatim, as the renderer's `toRecalcUserInput`) to the engine's `recalc_cells` (IronCalc) and reads back the typed formula cells; the results go to the gateway as `formulaValues`, which writes `<v>` next to the untouched `<f>`. Only on an explicit save (C10); the UI recalc fallback stays hidden (C11, `features.recalcFallback` false).                                                                                                                                                                                                       |
+| Cached formula values  | `engine/cached-values.ts` + `serialize` in `engine/wasm-transport.ts`. At save time the transport sends the save's pending cell edits (formulas verbatim, as the renderer's `toRecalcUserInput`) to the engine's `recalc_cells` (IronCalc) and reads back every formula cell of the file; the results are written as `<v>` next to the untouched `<f>` (all worksheet parts, dependents included), or dropped when the engine cannot replay the save (A2 notes below). Only on an explicit save (C10); the UI recalc fallback stays hidden (C11, `features.recalcFallback` false).                                                                                                                     |
 | View-only grid lock    | `apps/sheets/src/renderer/view-only-guard.ts`: a `BeforeCommandExecute` guard that cancels every command the sheet-protection guard knows (edits, formats, rows/columns, sort/filter) and the sheet-tab commands (insert, remove, copy, rename, reorder, tab colour). Loader writes run under `journalSuppression` and pass, so streamed rows still land. The user gets the `appWebViewOnly` toast (at most every 3 s). **Not `FWorkbook.setEditable(false)`**: Univer enforces that permission on every SetRangeValues command, the loader's own streamed-row writes included, and answers each refused edit with its own modal "no permission" dialog (the e2e hit it: the dialog covered the page). |
 | Wasm panic recovery    | `createWasmTransport` keeps each session's last opened/saved bytes. An `engine_crashed` call disposes the Worker, starts a fresh engine and reopens every session from those bytes under the **same renderer-facing session id** (the engine's own id is swapped inside `call`); reads are repeated once, other commands report the crash and the next one works. `onRecovered` -> `notifyEngineRecovered` -> a toast (`appWebEngineRestarted`, 21 locales).                                                                                                                                                                                                                                           |
 | Carlito `?url` imports | `woff2FontsPlugin.resolveId` maps `@genoffice/ui/fonts/<Face>.ttf?url` to the WOFF2 twin in `web/docs/fonts/`; `fontBuildOptions` then emits it under `fonts/` and never inlines it.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 
 Notes:
 
-- The recalc covers the cells the user typed, not their dependents: a formula elsewhere in the file that depends on an
-  edited value keeps its old cached `<v>` until the next engine/Univer evaluation (as before this change).
-- The save skips the recalc, and saves the formulas without cached values, when: a structural or sheet-tab change is
-  pending (file coordinates no longer match), a sheet added this session is referenced, the file is above 64 MB, more
-  than 10 000 edits are pending, or IronCalc cannot import the workbook (its importer is strict; the engine answers
-  `workbook_error`). A panic inside that recalc (no unwinding on wasip1) triggers the recovery above, the save goes on, and
-  that session never asks the formula engine again.
+- **No stale cached values (UNI-1232, A2; `engine/stale-values.ts`, `engine/cached-values.ts`).** A save never writes a
+  cached `<v>` that was not recomputed in that same save. The safe rule, two branches:
+  1. _Refresh_ when the engine can replay the save (no structural shift, sheet add/remove, bulk fill, pivot output or
+     defined-name change; file <= 64 MB; <= 10 000 edits; <= 200 000 formulas; IronCalc imports the workbook): every
+     formula cell of the file (found by scanning the worksheet parts, shared followers included) is recalculated by
+     `recalc_cells` with the save's edits (reads in batches of 20 000) and written with its new result, so
+     `A1` edited, `B1 = A1*2` and `Report!C1 = Data!B1+1` are all saved with the new numbers. The gateway only writes
+     cached values into worksheets it edits, so `save-plan.ts` `rewriteCachedValues` applies them to every worksheet part
+     (a dependent on another sheet is reached). A formula the user did not type whose result is an error is written with
+     no value (IronCalc may lack a function Excel has), the error of a formula the user typed is written.
+  2. _Sweep_ in every other case (structural change pending, a sheet added or removed this session, bulk fills, pivot
+     output, defined names changed, > 64 MB, > 10 000 edits, > 200 000 formulas, strict importer failure, engine crash):
+     the cached `<v>` of every formula cell of every worksheet part is dropped. The formulas stay verbatim; Excel and the
+     desktop recalculate on open (the gateway sets `fullCalcOnLoad` and drops `calcChain` on every save), Univer
+     recomputes what its closure covers.
+     A save that cannot change a value (formatting, widths, tab colours, notes, renames, reorder) leaves every cached value
+     alone. Known limits: values spilled by a dynamic array are plain `<v>` cells (not recognised), and SUBTOTAL over rows
+     hidden by a filter is not treated as a value change (Excel recalculates on open).
+- The save skips cached values only through the sweep above, never by writing the old ones: the cases of the previous
+  paragraph (structural or sheet-tab change pending, sheet added this session, file above 64 MB, more than 10 000 edits,
+  IronCalc cannot import the workbook) all end with no stale `<v>`. A panic inside the recalc (no unwinding on wasip1)
+  triggers the recovery below, the save goes on swept, and that session never asks the formula engine again.
 - Recovery keeps the renderer's unsaved edits: the edit journal lives in the renderer, not in the engine, and the next
   save applies it over the reopened session. The toast says so. Draft recovery (DR1) remains the safety net for the page
   itself.
@@ -223,8 +238,7 @@ edit, and scrolling still streams rows.
 
 ## Open items
 
-- Cached values cover the formulas the user typed; dependents of an edited value keep their old cached `<v>` until the
-  next evaluation (see SH3 notes).
+- Cached values: see "No stale cached values" in the SH3 notes (refresh or sweep; no stale `<v>` is written).
 - Recovery from a panic keeps the renderer's unsaved edits, but a panic inside IronCalc's importer for the cached-value
   recalc means that session saves without cached values from then on (and one toast).
 - Host side (dev-uniwork, GD): decide what the host does with the frame's non-fatal `unsupported` error while

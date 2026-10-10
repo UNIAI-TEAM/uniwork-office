@@ -14,8 +14,8 @@
  * Frame-side size gate (C11): after `archive_manifest`, more than MAX_WORKSHEET_XML_BYTES of
  * uncompressed worksheet XML refuses the open with `too_large` (the host opens G3 instead).
  * Recalc fallback stays off on the web (C11) as a UI operation, so `features.recalcFallback` is false;
- * the engine's `recalc_cells` still runs inside a save, to write cached values for the formulas the
- * user typed (./cached-values.ts).
+ * the engine's `recalc_cells` still runs inside a save, so no formula is saved with a stale cached
+ * value (./stale-values.ts, ./cached-values.ts).
  * Crash recovery (SH3): a Rust panic aborts the wasm instance and every session in it. The
  * transport keeps each session's last saved bytes, starts a fresh engine and reopens the sessions
  * from those bytes under the same renderer-facing session ids, then tells the host through
@@ -41,7 +41,14 @@ import { blankWorkbook } from './blank'
 import { WORK_DIR } from './host'
 // the save planner (the gateway, most of this module's weight) loads on the first save
 import type { ArchiveEngine } from './save-plan'
-import { planCachedValues, toFormulaValues } from './cached-values'
+import { planRefresh, refreshFormulaValues } from './cached-values'
+import {
+  engineCanReplaySave,
+  type CachedValue,
+  formulaCells,
+  savedValuesMayChange,
+  worksheetPartsByName,
+} from './stale-values'
 import type { EngineOpenInput, SheetsEngineTransport } from './transport'
 
 /**
@@ -310,34 +317,66 @@ export function createWasmTransport(options: WasmTransportOptions): SheetsEngine
   }
 
   /**
-   * The save request with a cached value for every formula the user typed (SH3): the engine's
-   * `recalc_cells` evaluates the session's pending edits and the typed cells' results go in as
-   * `formulaValues`, so the reopened workbook shows them before Univer's closure covers the
-   * cell. Fail-soft: a recalc that cannot run saves the formulas without cached values.
+   * The cached values this save may write (stale-values.ts): when the save can change a value the
+   * engine's `recalc_cells` evaluates the session's pending edits and EVERY formula cell of the
+   * file gets its new result (typed formulas show on reopen before Univer's closure covers them,
+   * dependents are never written with their old result). When the engine cannot, the map is empty
+   * and the save drops every cached value instead. `undefined`: the save cannot change a value,
+   * nothing is touched. Fail-soft: a recalc that cannot run never blocks the save.
    */
-  async function withCachedValues(
+  async function cachedValuesFor(
     request: WorkbookSaveRequest,
     s: Session,
-  ): Promise<WorkbookSaveRequest> {
-    if (s.recalcCrashed) return request
-    const planned = planCachedValues(request, s.sheetNames, s.bytes.byteLength)
-    if (!planned) return request
+    bytesEntrySource: typeof import('./save-plan').bytesEntrySource,
+  ): Promise<ReadonlyMap<string, ReadonlyMap<string, CachedValue>> | undefined> {
+    if (!savedValuesMayChange(request)) return undefined
+    if (s.recalcCrashed || !engineCanReplaySave(request)) return new Map()
     try {
-      const result = (await call('recalc_cells', {
-        path: s.path,
-        edits: planned.edits,
-        reads: planned.reads,
-      })) as { cells: Parameters<typeof toFormulaValues>[0] }
-      const values = toFormulaValues(result.cells, s.sheetNames)
-      return values.length === 0
-        ? request
-        : { ...request, formulaValues: [...request.formulaValues, ...values] }
+      const source = bytesEntrySource(s.bytes, await archive.manifest(s.path))
+      const parts = worksheetPartsByName(
+        await source.readText('xl/workbook.xml'),
+        await source.readText('xl/_rels/workbook.xml.rels'),
+      )
+      const fileFormulas = new Map<string, { row: number; column: number }[]>()
+      for (const name of s.sheetNames.values()) {
+        const path = parts.get(name)
+        if (path === undefined) return new Map()
+        fileFormulas.set(name, formulaCells(await source.readText(path)))
+        source.releaseText?.(path)
+      }
+      const planned = planRefresh(request, s.sheetNames, s.bytes.byteLength, fileFormulas)
+      if (!planned) return new Map()
+      const cells: Parameters<typeof refreshFormulaValues>[1][number][] = []
+      for (const reads of planned.batches) {
+        const result = (await call('recalc_cells', {
+          path: s.path,
+          edits: planned.edits,
+          reads,
+        })) as { cells: typeof cells }
+        cells.push(...result.cells)
+      }
+      // by worksheet part; a value the renderer sent for a cell wins (it comes later)
+      const keep = new Map<string, Map<string, CachedValue>>()
+      const partOf = new Map<string, string>()
+      for (const [id, name] of s.sheetNames) {
+        const path = parts.get(name)!
+        partOf.set(id, path)
+        keep.set(path, new Map())
+      }
+      for (const value of [
+        ...refreshFormulaValues(planned, cells, s.sheetNames),
+        ...request.formulaValues,
+      ]) {
+        const path = partOf.get(value.sheetId)
+        if (path !== undefined) keep.get(path)!.set(`${value.row}:${value.column}`, value.value)
+      }
+      return keep
     } catch (err) {
       // IronCalc's strict importer can panic on a workbook from a non-Excel producer, and a panic
       // aborts the wasm instance (no unwinding). `call` already reopened the sessions; the save
-      // goes on without cached values, and this session never asks the formula engine again
+      // goes on without any cached value, and this session never asks the formula engine again
       if ((err as { code?: string }).code === 'engine_crashed') s.recalcCrashed = true
-      return request
+      return new Map()
     }
   }
 
@@ -387,13 +426,16 @@ export function createWasmTransport(options: WasmTransportOptions): SheetsEngine
     recalc: () => Promise.reject(new Error('recalculation fallback is not available on the web')),
     async serialize(request) {
       const s = session(request.sessionId)
-      const { resolveSaveRequest, saveWorkbookBytes } = await import('./save-plan')
+      const { resolveSaveRequest, saveWorkbookBytes, bytesEntrySource } =
+        await import('./save-plan')
+      const cachedValues = await cachedValuesFor(request, s, bytesEntrySource)
       const { data, plan } = await saveWorkbookBytes({
         engine: archive,
         sourcePath: s.path,
         sourceBytes: s.bytes,
         workDir: `${WORK_DIR}/save-${uid()}`,
-        save: resolveSaveRequest(s.sheetNames, await withCachedValues(request, s)),
+        save: resolveSaveRequest(s.sheetNames, request),
+        ...(cachedValues ? { cachedValues } : {}),
       })
       return {
         data: data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer,
