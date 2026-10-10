@@ -164,7 +164,7 @@ describe('Ribbon entries', () => {
     expect(hasOpen(fileMenu())).toBe(true)
   })
 
-  it('References: the Zotero group is hidden on the web', () => {
+  it('References: the Zotero group stays on the web as a "use the app" entry', () => {
     useCapabilities(undefined)
     expect(openTab(t('ribbonTabReferences')).groups).toContain(t('zoteroGroup'))
     act(() => root.unmount())
@@ -172,9 +172,37 @@ describe('Ribbon entries', () => {
 
     useCapabilities(WEB)
     const { labels, groups } = openTab(t('ribbonTabReferences'))
-    expect(groups).not.toContain(t('zoteroGroup'))
+    // the group stays, but none of the Zotero commands run on the web
+    expect(groups).toContain(t('zoteroGroup'))
+    expect(labels).toContain(t('zoteroGroup'))
     expect(labels).not.toContain(t('zoteroCitation'))
-    expect(groups.length).toBeGreaterThan(0)
+    const entry = [...container.querySelectorAll<HTMLButtonElement>('button.rb-big')].find(
+      (b) => b.textContent === t('zoteroGroup'),
+    )!
+    act(() => entry.click())
+    const note = container.querySelector('[data-testid="docs-zotero-app-only"]')
+    expect(note?.textContent).toContain(t('appOnlyZotero'))
+    expect(note?.textContent).toContain(t('appOnlyHint'))
+    // no Open-in-app action unless the host granted desktopOpen
+    expect(note?.querySelector('button')).toBeNull()
+  })
+
+  it('References: the Zotero entry offers Open in app when the host granted desktopOpen', () => {
+    Object.assign(window, {
+      desktop: {
+        onLanguageChanged: () => () => undefined,
+        capabilities: { ...WEB, desktopOpen: true },
+        openInApp: () => undefined,
+      },
+    })
+    resetCapabilitiesForTest()
+    openTab(t('ribbonTabReferences'))
+    const entry = [...container.querySelectorAll<HTMLButtonElement>('button.rb-big')].find(
+      (b) => b.textContent === t('zoteroGroup'),
+    )!
+    act(() => entry.click())
+    const open = container.querySelector('[data-testid="docs-zotero-app-only"] button')
+    expect(open?.textContent).toBe(t('appOnlyOpen'))
   })
 
   it('Review: Editor, Translate, AI comments and AI revisions are hidden; spellcheck stays', () => {
