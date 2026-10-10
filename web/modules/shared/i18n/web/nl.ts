@@ -27,4 +27,13 @@ export const nl = {
   webDraftDiscard: 'Verwijderen',
   webSaveNetwork: 'UniWork is niet bereikbaar. Controleer je verbinding en probeer het opnieuw.',
   webSaveTimeout: 'Opslaan duurde te lang. Controleer je verbinding en probeer het opnieuw.',
+  webClose: 'Sluiten',
+  webSaveUnauthorized:
+    'Je UniWork-sessie is verlopen. Meld je opnieuw aan en probeer opnieuw op te slaan.',
+  webSaveForbidden: 'Je hebt geen toestemming om dit document op te slaan.',
+  webSaveNotFound: 'Dit document bestaat niet meer of is verplaatst.',
+  webSaveTooLarge: 'Het document is te groot om op te slaan.',
+  webSaveRateLimited: 'Te veel verzoeken. Wacht even en probeer het opnieuw.',
+  webSaveServer: 'UniWork had een probleem bij het opslaan. Probeer het zo opnieuw.',
+  webSaveFailedGeneric: 'Het document kon niet worden opgeslagen. Probeer het opnieuw.',
 } satisfies Record<keyof typeof zh, string>

@@ -72,6 +72,7 @@ import { ask, hideFatal, onModalChange, showFatal, text } from './notice'
 import { createSession, type SessionOptions } from './session'
 import type { DraftHost, DraftRecovery } from './draft-recovery'
 import { bridgeDraftRecovery } from '../../modules/shared/recovery-prompt'
+import { saveFailureText } from '../../modules/shared/save-failure'
 import { projectApi } from './project-memory'
 import { mintDocHandoff, releaseDocHandoff } from './doc-handoff'
 
@@ -648,11 +649,8 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
       }
       return {
         ok: false,
-        // a raw browser error ("Failed to fetch") is English whatever the UI language
-        error:
-          res.error.code === 'timeout' || res.error.code === 'network'
-            ? text('appWebSaveOffline')
-            : res.error.message,
+        // a raw browser error ("Failed to fetch") or status line is English whatever the UI language
+        error: saveFailureText(res.error, () => text('appWebSaveOffline')),
       }
     },
 
@@ -688,7 +686,7 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
       pending?.settle(res)
       // cancelled dialog: {ok:false} without error, like the desktop
       if (res.error.code === 'cancelled') return { ok: false }
-      return { ok: false, error: res.error.message }
+      return { ok: false, error: saveFailureText(res.error, () => text('appWebSaveOffline')) }
     },
 
     async saveDocxNew(defaultName: string, data: ArrayBuffer) {
@@ -710,7 +708,7 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
       )
       if (!res.ok) {
         if (hostSave) hostSave.error = res.error
-        return { ok: false, error: res.error.message }
+        return { ok: false, error: saveFailureText(res.error, () => text('appWebSaveOffline')) }
       }
       return { ok: true, path: pathFor(landed(res)) }
     },

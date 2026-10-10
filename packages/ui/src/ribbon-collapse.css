@@ -38,3 +38,54 @@
 .ribbon-expand-btn {
   margin-left: 4px;
 }
+
+/* Overflow cue (ribbon-collapse.tsx mountRibbonOverflowCue): a chevron over the clipped edge of a
+ * band that scrolls sideways. Placed by the hook (top / height of the band); under the collapse
+ * button (z 61) so that stays clickable. Chrome only, theme tokens only. */
+.ribbon-overflow-cue {
+  position: absolute;
+  z-index: 60;
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  width: 28px;
+  padding: 0;
+  border: 0;
+  color: var(--text-secondary);
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+.ribbon-overflow-cue[hidden] {
+  display: none;
+}
+.ribbon-overflow-cue[data-edge='start'] {
+  inset-inline-start: 0;
+  justify-content: flex-start;
+  padding-inline-start: 4px;
+  background: linear-gradient(to right, var(--chrome-bg, var(--surface)) 55%, transparent);
+}
+.ribbon-overflow-cue[data-edge='end'] {
+  inset-inline-end: 0;
+  justify-content: flex-end;
+  padding-inline-end: 4px;
+  background: linear-gradient(to left, var(--chrome-bg, var(--surface)) 55%, transparent);
+}
+[dir='rtl'] .ribbon-overflow-cue[data-edge='start'] {
+  background: linear-gradient(to left, var(--chrome-bg, var(--surface)) 55%, transparent);
+}
+[dir='rtl'] .ribbon-overflow-cue[data-edge='end'] {
+  background: linear-gradient(to right, var(--chrome-bg, var(--surface)) 55%, transparent);
+}
+/* the chevron points the way the band will scroll */
+.ribbon-overflow-cue[data-edge='start'] svg {
+  transform: scaleX(-1);
+}
+[dir='rtl'] .ribbon-overflow-cue[data-edge='start'] svg {
+  transform: none;
+}
+[dir='rtl'] .ribbon-overflow-cue[data-edge='end'] svg {
+  transform: scaleX(-1);
+}
+.ribbon-overflow-cue:hover {
+  color: var(--text);
+}

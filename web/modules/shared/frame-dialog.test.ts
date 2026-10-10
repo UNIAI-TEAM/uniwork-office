@@ -50,11 +50,65 @@ describe('frameAsk', () => {
     expect(document.querySelector('.ow-dlg-mask')).toBeNull()
   })
 
-  it('first focus is the safe way out, never the destructive choice', async () => {
+  it('first focus is the safe primary (Reload latest), never the destructive choice', async () => {
     const done = conflict()
-    expect(document.activeElement).toBe(btn('cancel'))
+    expect(document.activeElement).toBe(btn('reload'))
+    expect(document.activeElement).not.toBe(btn('overwrite'))
     btn('overwrite').click()
     expect(await done).toBe('overwrite')
+  })
+
+  it('a dialog with no primary lifts its first neutral choice to the filled primary', () => {
+    void conflict()
+    expect(order()).toEqual(['Reload latest', 'Overwrite', 'Cancel'])
+    expect(btn('reload').className).toBe('ow-dlg-btn primary')
+    expect(btn('overwrite').className).toBe('ow-dlg-btn danger')
+    expect(btn('cancel').className).toBe('ow-dlg-btn ghost')
+  })
+
+  it('an explicit primary is never replaced by the lifted one', () => {
+    void frameAsk({
+      title: 't',
+      body: 'b',
+      choices: [
+        { id: 'cancel', label: 'Cancel' },
+        { id: 'reload', label: 'Reload' },
+        { id: 'keep', label: 'Keep both', primary: true },
+      ],
+      cancelId: 'cancel',
+      marker: 'x',
+    })
+    expect(btn('keep').className).toBe('ow-dlg-btn primary')
+    expect(btn('reload').className).toBe('ow-dlg-btn')
+    expect(document.activeElement).toBe(btn('keep'))
+  })
+
+  it('every dialog has a close X (labelled) that answers like Escape', async () => {
+    const done = conflict()
+    const x = document.querySelector<HTMLButtonElement>('.ow-dlg-close')!
+    expect(x).not.toBeNull()
+    expect(x.getAttribute('aria-label')).toBe('Close')
+    expect(x.hasAttribute('data-choice')).toBe(false)
+    x.click()
+    expect(await done).toBe('cancel')
+    expect(document.querySelector('.ow-dlg-mask')).toBeNull()
+  })
+
+  it('the close X joins the Tab loop after the choices, and a custom label wins', () => {
+    void frameAsk({
+      title: 't',
+      body: 'b',
+      choices: [{ id: 'ok', label: 'OK', primary: true }],
+      cancelId: 'ok',
+      closeLabel: 'Đóng',
+      marker: 'x',
+    })
+    const x = document.querySelector<HTMLButtonElement>('.ow-dlg-close')!
+    expect(x.getAttribute('aria-label')).toBe('Đóng')
+    keydown('Tab')
+    expect(document.activeElement).toBe(x)
+    keydown('Tab')
+    expect(document.activeElement).toBe(btn('ok'))
   })
 
   it('without a cancel button the primary takes the focus (draft prompt), danger never', async () => {
@@ -70,6 +124,18 @@ describe('frameAsk', () => {
     })
     expect(order()).toEqual(['Restore', 'Discard'])
     expect(document.activeElement).toBe(btn('restore'))
+    document.querySelector<HTMLButtonElement>('.ow-dlg-close')!.click()
+    expect(await done).toBe('dismiss')
+  })
+
+  it('Escape on the draft prompt answers the dismiss id too', async () => {
+    const done = frameAsk({
+      title: 'Restore?',
+      body: 'b',
+      choices: [{ id: 'restore', label: 'Restore', primary: true }],
+      cancelId: 'dismiss',
+      marker: 'draft-recovery',
+    })
     keydown('Escape')
     expect(await done).toBe('dismiss')
   })
@@ -110,14 +176,17 @@ describe('frameAsk', () => {
     document.body.append(opener)
     opener.focus()
     const done = conflict()
-    keydown('Tab')
-    expect(document.activeElement).toBe(btn('reload'))
+    // order: Reload latest, Overwrite, Cancel, then the close X; the loop wraps both ways
     keydown('Tab')
     expect(document.activeElement).toBe(btn('overwrite'))
     keydown('Tab')
     expect(document.activeElement).toBe(btn('cancel'))
+    keydown('Tab')
+    expect(document.activeElement).toBe(document.querySelector('.ow-dlg-close'))
+    keydown('Tab')
+    expect(document.activeElement).toBe(btn('reload'))
     keydown('Tab', true)
-    expect(document.activeElement).toBe(btn('overwrite'))
+    expect(document.activeElement).toBe(document.querySelector('.ow-dlg-close'))
     keydown('Escape')
     expect(await done).toBe('cancel')
     expect(document.activeElement).toBe(opener)
@@ -170,6 +239,7 @@ describe('blocking notice', () => {
     showFrameNotice({ title: 'Could not open', body: 'Try again.', marker: 'fatal' })
     const mask = document.querySelector('[data-office-web="fatal"]')!
     expect(mask.querySelector('button')).toBeNull()
+    expect(mask.querySelector('.ow-dlg-close')).toBeNull()
     expect(mask.querySelector('[role="alertdialog"]')).not.toBeNull()
     hideFrameNotices('fatal')
     expect(document.querySelector('[data-office-web="fatal"]')).toBeNull()

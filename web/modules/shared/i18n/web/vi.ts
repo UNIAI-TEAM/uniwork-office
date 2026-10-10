@@ -26,4 +26,12 @@ export const vi = {
   webDraftDiscard: 'Bỏ',
   webSaveNetwork: 'Không kết nối được tới UniWork. Hãy kiểm tra mạng rồi thử lại.',
   webSaveTimeout: 'Việc lưu mất quá nhiều thời gian. Hãy kiểm tra mạng rồi thử lại.',
+  webClose: 'Đóng',
+  webSaveUnauthorized: 'Phiên UniWork của bạn đã hết hạn. Hãy đăng nhập lại rồi thử lưu lần nữa.',
+  webSaveForbidden: 'Bạn không có quyền lưu tài liệu này.',
+  webSaveNotFound: 'Tài liệu này không còn tồn tại hoặc đã được di chuyển.',
+  webSaveTooLarge: 'Tài liệu quá lớn để lưu.',
+  webSaveRateLimited: 'Quá nhiều yêu cầu. Hãy chờ một lát rồi thử lại.',
+  webSaveServer: 'UniWork gặp sự cố khi lưu. Hãy thử lại sau ít phút.',
+  webSaveFailedGeneric: 'Không lưu được tài liệu. Hãy thử lại.',
 } satisfies Record<keyof typeof zh, string>

@@ -17,7 +17,10 @@
  *   - aiGskLogin / openAiSettings: the in-frame AI settings dialog (./ui.ts): UniWork credentials
  *     (GET / PUT / DELETE, masked `key_hint`), provider + model choice, cloud credits.
  * Every typed failure (402/403/404/424/429/502/503, 401 after a refresh) is returned in the
- * member's own error shape with its translated text and raises the in-frame state card.
+ * member's own error shape with its translated text. A failed chat turn shows that text once, as
+ * the panel's inline error; a failed one-shot chat or tool call (search, image, media) also raises
+ * the in-frame state card, because no transcript would tell the user. The model chip's "manage" row opens the
+ * AI settings (`openAiModelSettings`), so every panel can reach them from the error it shows.
  */
 import { AI_PROVIDERS, defaultAiSettings } from '../../../../packages/ai-provider/src/providers'
 import type {
@@ -307,8 +310,10 @@ export function createWebAi(opts: {
       },
     },
     protocolOf,
+    // a failed chat turn is announced once, by the panel's inline error (the typed text below);
+    // only the calls with no transcript (one-shot chat here, the tool members below) raise the card
     describe: (err, provider) => describeAiError(err, providerLabel(provider)),
-    onTypedError: (err, provider) => showAiState(err, providerLabel(provider), { openSettings }),
+    onChatFailure: (err, provider) => showAiState(err, providerLabel(provider), { openSettings }),
   })
 
   return {
@@ -361,6 +366,7 @@ export const WEB_AI_MEMBERS = [
   'generateImage',
   'analyzeMedia',
   'openAiSettings',
+  'openAiModelSettings',
 ] as const
 
 type Fn = (...args: unknown[]) => unknown
@@ -511,6 +517,8 @@ export function withWebAi(base: BridgeObject, ai: WebAi): BridgeObject {
     }
   })
   members.openAiSettings = when('openAiSettings', () => ai.openSettings())
+  // the model chip's "manage" row (every panel's AiModelPicker bridge) is the keys' way in
+  members.openAiModelSettings = when('openAiModelSettings', () => ai.openSettings())
 
   return { ...base, ...members }
 }

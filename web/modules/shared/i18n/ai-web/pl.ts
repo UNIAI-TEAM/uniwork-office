@@ -29,10 +29,9 @@ export const pl = {
   aiWebStateEntitlementTitle: 'AI nie ma w Twoim planie',
   aiWebStateEntitlementBody:
     'Plan UniWork Twojej organizacji nie obejmuje tej funkcji AI. Skontaktuj się z administratorem.',
-  aiWebStateKeyMissingTitle: 'Brak klucza {provider}',
-  aiWebStateKeyMissingBody:
-    'Dodaj swój klucz API {provider} w ustawieniach AI, aby korzystać z asystenta.',
-  aiWebStateKeyRejectedTitle: '{provider} odrzucił klucz',
+  aiWebStateKeyMissingTitle: 'Brak klucza AI',
+  aiWebStateKeyMissingBody: 'Dodaj klucz API w ustawieniach AI, aby korzystać z asystenta.',
+  aiWebStateKeyRejectedTitle: 'Klucz AI został odrzucony',
   aiWebStateKeyRejectedBody: 'Dostawca odrzucił zapisany klucz. Zastąp go w ustawieniach AI.',
   aiWebStateRateTitle: 'Zbyt wiele żądań AI',
   aiWebStateRateBody: 'Odczekaj {seconds} s i spróbuj ponownie.',

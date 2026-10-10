@@ -29,10 +29,9 @@ export const ru = {
   aiWebStateEntitlementTitle: 'ИИ не входит в тариф',
   aiWebStateEntitlementBody:
     'Тариф UniWork вашей организации не включает эту функцию ИИ. Обратитесь к администратору.',
-  aiWebStateKeyMissingTitle: 'Нет ключа {provider}',
-  aiWebStateKeyMissingBody:
-    'Добавьте свой API-ключ {provider} в настройках ИИ, чтобы пользоваться ассистентом.',
-  aiWebStateKeyRejectedTitle: '{provider} отклонил ключ',
+  aiWebStateKeyMissingTitle: 'Ключа ИИ пока нет',
+  aiWebStateKeyMissingBody: 'Добавьте ключ API в настройках ИИ, чтобы пользоваться помощником.',
+  aiWebStateKeyRejectedTitle: 'Ключ ИИ отклонён',
   aiWebStateKeyRejectedBody: 'Провайдер отклонил сохранённый ключ. Замените его в настройках ИИ.',
   aiWebStateRateTitle: 'Слишком много запросов к ИИ',
   aiWebStateRateBody: 'Подождите {seconds} с и повторите попытку.',

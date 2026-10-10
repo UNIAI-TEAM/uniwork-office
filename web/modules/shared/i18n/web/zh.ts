@@ -21,4 +21,12 @@ export const zh = {
   webDraftDiscard: '放弃',
   webSaveNetwork: '无法连接到 UniWork。请检查网络后重试。',
   webSaveTimeout: '保存耗时过长。请检查网络后重试。',
+  webClose: '关闭',
+  webSaveUnauthorized: '你的 UniWork 登录已失效。请重新登录后再保存。',
+  webSaveForbidden: '你没有保存此文档的权限。',
+  webSaveNotFound: '此文档已不存在或已被移动。',
+  webSaveTooLarge: '文档太大,无法保存。',
+  webSaveRateLimited: '请求过于频繁。请稍等片刻后重试。',
+  webSaveServer: 'UniWork 保存时出了问题。请稍后重试。',
+  webSaveFailedGeneric: '无法保存文档。请重试。',
 }

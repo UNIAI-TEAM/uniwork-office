@@ -28,8 +28,8 @@ const OPENAI_KEY = [{ provider: 'openai', api_key: 'sk-test-openai-abcd' }]
 const KEY_CODES = [
   { status: 402, code: 'credits_exhausted', title: 'AI credits used up' },
   { status: 403, code: 'entitlement_required', title: 'AI is not in your plan' },
-  { status: 404, code: 'credential_missing', title: 'No OpenAI key' },
-  { status: 424, code: 'provider_auth_failed', title: 'OpenAI refused the key' },
+  { status: 404, code: 'credential_missing', title: 'No AI key yet' },
+  { status: 424, code: 'provider_auth_failed', title: 'The AI key was refused' },
   { status: 429, code: 'rate_limited', title: 'Too many AI requests', retryAfter: 7 },
   { status: 502, code: 'provider_unreachable', title: 'AI provider unreachable' },
 ] as const
@@ -288,11 +288,11 @@ test.describe('sheets: web AI', () => {
       const { frame } = await open(page, { lang: 'en', ai: '1' })
       await expect(panel(frame)).toBeVisible({ timeout: 30_000 })
       await ask(frame, 'Say hello')
-      const card = frame.locator(`.ow-ai-state[data-ai-state="${s.code}"]`)
-      await expect(card).toBeVisible({ timeout: 30_000 })
-      await expect(card).toContainText(s.title)
-      if (s.status === 429) await expect(card).toContainText('7 s')
-      await expect(frame.locator('.ai-msg-assistant').last()).toContainText(s.title)
+      // one surface: the panel's inline error; no floating card beside it
+      const inline = frame.locator('.ai-msg-assistant').last()
+      await expect(inline).toContainText(s.title, { timeout: 30_000 })
+      if (s.status === 429) await expect(inline).toContainText('7 s')
+      await expect(frame.locator('.ow-ai-state')).toHaveCount(0)
       await expectClean(page, frame, problems, true)
     })
   }
@@ -362,9 +362,11 @@ test.describe('sheets: web AI', () => {
           fail: [{ status: 402, code: 'credits_exhausted', path: '/byok/' }],
         })
         await ask(frame, 'Again')
-        await expect(frame.locator('.ow-ai-state[data-ai-state="credits_exhausted"]')).toBeVisible({
-          timeout: 30_000,
-        })
+        await expect(frame.locator('.ai-msg-assistant').last()).toContainText(
+          'AI credits used up',
+          { timeout: 30_000 },
+        )
+        await expect(frame.locator('.ow-ai-state')).toHaveCount(0)
         await page.screenshot({ path: screenshotPath('ai', `sheets-state-${theme}-${lang}`) })
       })
     }

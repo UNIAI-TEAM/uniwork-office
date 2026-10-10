@@ -26,4 +26,12 @@ export const ko = {
   webDraftDiscard: '삭제',
   webSaveNetwork: 'UniWork에 연결할 수 없습니다. 연결을 확인한 후 다시 시도하세요.',
   webSaveTimeout: '저장에 너무 오래 걸렸습니다. 연결을 확인한 후 다시 시도하세요.',
+  webClose: '닫기',
+  webSaveUnauthorized: 'UniWork 세션이 종료되었습니다. 다시 로그인한 뒤 저장해 주세요.',
+  webSaveForbidden: '이 문서를 저장할 권한이 없습니다.',
+  webSaveNotFound: '이 문서가 더 이상 없거나 이동되었습니다.',
+  webSaveTooLarge: '문서가 너무 커서 저장할 수 없습니다.',
+  webSaveRateLimited: '요청이 너무 많습니다. 잠시 기다린 후 다시 시도해 주세요.',
+  webSaveServer: 'UniWork에서 저장하는 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.',
+  webSaveFailedGeneric: '문서를 저장할 수 없습니다. 다시 시도해 주세요.',
 } satisfies Record<keyof typeof zh, string>

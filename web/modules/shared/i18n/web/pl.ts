@@ -27,4 +27,12 @@ export const pl = {
   webDraftDiscard: 'Odrzuć',
   webSaveNetwork: 'Nie można połączyć się z UniWork. Sprawdź połączenie i spróbuj ponownie.',
   webSaveTimeout: 'Zapisywanie trwało zbyt długo. Sprawdź połączenie i spróbuj ponownie.',
+  webClose: 'Zamknij',
+  webSaveUnauthorized: 'Sesja UniWork wygasła. Zaloguj się ponownie i spróbuj zapisać jeszcze raz.',
+  webSaveForbidden: 'Nie masz uprawnień do zapisania tego dokumentu.',
+  webSaveNotFound: 'Ten dokument już nie istnieje lub został przeniesiony.',
+  webSaveTooLarge: 'Dokument jest zbyt duży, aby go zapisać.',
+  webSaveRateLimited: 'Zbyt wiele żądań. Poczekaj chwilę i spróbuj ponownie.',
+  webSaveServer: 'UniWork napotkał problem podczas zapisu. Spróbuj ponownie za chwilę.',
+  webSaveFailedGeneric: 'Nie udało się zapisać dokumentu. Spróbuj ponownie.',
 } satisfies Record<keyof typeof zh, string>

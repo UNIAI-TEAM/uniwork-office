@@ -23,4 +23,12 @@ export const zhTW = {
   webDraftDiscard: '捨棄',
   webSaveNetwork: '無法連線到 UniWork。請檢查網路後再試一次。',
   webSaveTimeout: '儲存耗時過長。請檢查網路後再試一次。',
+  webClose: '關閉',
+  webSaveUnauthorized: '你的 UniWork 登入已失效。請重新登入後再儲存。',
+  webSaveForbidden: '你沒有儲存此文件的權限。',
+  webSaveNotFound: '此文件已不存在或已被移動。',
+  webSaveTooLarge: '文件太大,無法儲存。',
+  webSaveRateLimited: '請求過於頻繁。請稍候片刻後再試。',
+  webSaveServer: 'UniWork 儲存時發生問題。請稍後再試。',
+  webSaveFailedGeneric: '無法儲存文件。請再試一次。',
 } satisfies Record<keyof typeof zh, string>

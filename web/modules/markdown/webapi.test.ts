@@ -145,13 +145,25 @@ describe('markdownApi: open and save', () => {
       ok: false,
       error: 'Saving took too long. Check your connection and try again.',
     })
-    // any other failure keeps the host's message
+    // any other failure shows the shared sentence of its code, not the host's English message
     mock.override('api.save', () => ({
       ok: false,
       error: { code: 'forbidden', message: 'You can only view this document.' },
     }))
     const denied = await api.save({ text, imageSources: [], mode: 'save' })
-    expect(denied).toEqual({ ok: false, error: 'You can only view this document.' })
+    expect(denied).toEqual({
+      ok: false,
+      error: 'You do not have permission to save this document.',
+    })
+    mock.override('api.save', () => ({
+      ok: false,
+      error: { code: 'internal', message: 'Internal Server Error', status: 500 },
+    }))
+    const server = await api.save({ text, imageSources: [], mode: 'save' })
+    expect(server).toEqual({
+      ok: false,
+      error: 'UniWork had a problem saving. Try again in a moment.',
+    })
   })
 
   it('the next edit after a failed save tells the host the document is dirty again', async () => {
@@ -199,15 +211,18 @@ describe('markdownApi: save conflicts', () => {
     return { ...s, text, pending, click }
   }
 
-  it('shows Reload latest / Overwrite / Cancel in the UI language, Overwrite destructive, Cancel focused', async () => {
+  it('shows Reload latest / Overwrite / Cancel in the UI language, Overwrite destructive, Reload latest primary and focused', async () => {
     const { pending, click, mock } = await conflicted()
     const labels = [...document.querySelectorAll('[data-choice]')].map((b) => b.textContent)
     expect(labels).toEqual(['Reload latest', 'Overwrite', 'Cancel'])
     expect(document.querySelector('.ow-dlg-btn.danger')?.getAttribute('data-choice')).toBe(
       'overwrite',
     )
-    expect(document.querySelector('.ow-dlg-btn.primary')).toBeNull()
-    expect((document.activeElement as HTMLElement).dataset.choice).toBe('cancel')
+    expect(document.querySelector('.ow-dlg-btn.primary')?.getAttribute('data-choice')).toBe(
+      'reload',
+    )
+    expect((document.activeElement as HTMLElement).dataset.choice).toBe('reload')
+    expect(document.querySelector('.ow-dlg-close')).not.toBeNull()
     expect(mock.errors.at(-1)).toMatchObject({ fatal: false })
     click('cancel')
     expect((await pending).ok).toBe(false)

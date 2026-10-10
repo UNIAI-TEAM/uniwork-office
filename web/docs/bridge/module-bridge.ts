@@ -105,6 +105,11 @@ export const MODULE_WEB_CAPABILITIES: Readonly<Record<string, unknown>> = Object
   recents: false,
   autoSave: false,
   autoSaveToDisk: false,
+  // one announcement per state: the host header owns the save state (Unsaved / Saving / Saved /
+  // Save could not be confirmed) and one host banner owns "view only", so the renderers hide their
+  // own labels for both (ribbon-row status, status-bar chip, toast duplicates of the save state)
+  saveStatus: false,
+  viewOnlyChip: false,
 })
 
 /** NO_AUTO_SAVE_DEFAULT of @genoffice/ui auto-save-pref.ts: autosave off, never set */
