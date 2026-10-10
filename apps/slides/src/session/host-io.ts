@@ -77,6 +77,21 @@ export interface HostIO {
    * recovery copies, attached windows).
    */
   saved(event: SaveEvent): Promise<void>
+  /**
+   * Desktop UniWork seam (absent elsewhere = always write, no hook): may this save write
+   * `targetPath`, and does it count as the user's explicit Save of the open document?
+   */
+  saveGate?(input: SaveGateInput): { write: boolean; fireHook: boolean }
+  /** Desktop UniWork seam: an explicit user Save wrote the open document's own path */
+  userSaved?(path: string): void
+}
+
+export interface SaveGateInput {
+  kind: 'save' | 'save-as'
+  /** 'auto' = AutoSave pass; 'user' = explicit Save */
+  origin: 'user' | 'auto'
+  currentPath: string | null
+  targetPath: string
 }
 
 export interface SaveEvent {

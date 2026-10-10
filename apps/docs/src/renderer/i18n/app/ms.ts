@@ -207,6 +207,8 @@ export const ms = {
   appFootnotePlaceholder: 'Teks nota kaki…',
   appEndnotePlaceholder: 'Teks nota hujung…',
   appAutoSave: 'Autosimpan',
+  appAutoSaveUniworkTip:
+    'Simpan automatik dimatikan untuk dokumen UniWork. Gunakan Simpan untuk menyimpan versi baharu.',
   appAutoSaveTip: 'Autosimpan (setiap 30 saat dan apabila tetingkap hilang fokus)',
   appSaveShortcutTip: 'Simpan (⌘S)',
   appUndo: 'Buat asal',
@@ -529,6 +531,7 @@ export const ms = {
   appWebNoHost: 'Editor ini berjalan di dalam UniWork. Buka dokumen daripada UniWork.',
   appSaveStateUnsaved: 'Perubahan belum disimpan',
   appSaveStateSaved: 'Semua perubahan disimpan',
+  appSaveStateViewOnly: 'Lihat sahaja',
   appSaving: 'Menyimpan…',
   appSavingAs: 'Menyimpan sebagai…',
   appPdfPrintFallback:

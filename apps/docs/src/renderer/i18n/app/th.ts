@@ -201,6 +201,8 @@ export const th = {
   appFootnotePlaceholder: 'ข้อความเชิงอรรถ…',
   appEndnotePlaceholder: 'ข้อความอ้างอิงท้ายเรื่อง…',
   appAutoSave: 'บันทึกอัตโนมัติ',
+  appAutoSaveUniworkTip:
+    'การบันทึกอัตโนมัติปิดอยู่สำหรับเอกสาร UniWork ใช้ “บันทึก” เพื่อบันทึกเวอร์ชันใหม่',
   appAutoSaveTip: 'บันทึกอัตโนมัติ (ทุก 30 วินาทีและเมื่อหน้าต่างไม่ได้โฟกัส)',
   appSaveShortcutTip: 'บันทึก (⌘S)',
   appUndo: 'เลิกทำ',
@@ -521,6 +523,7 @@ export const th = {
   appWebNoHost: 'ตัวแก้ไขนี้ทำงานภายใน UniWork โปรดเปิดเอกสารจาก UniWork',
   appSaveStateUnsaved: 'มีการเปลี่ยนแปลงที่ยังไม่บันทึก',
   appSaveStateSaved: 'บันทึกการเปลี่ยนแปลงทั้งหมดแล้ว',
+  appSaveStateViewOnly: 'ดูได้อย่างเดียว',
   appSaving: 'กำลังบันทึก…',
   appSavingAs: 'กำลังบันทึกเป็น…',
   appPdfPrintFallback: 'ส่งออก PDF โดยตรงไม่ได้ จึงใช้กล่องโต้ตอบการพิมพ์ของเบราว์เซอร์แทน',

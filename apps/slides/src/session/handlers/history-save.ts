@@ -70,9 +70,21 @@ export const historySaveHandlers = {
     return sessionDirty(session)
   },
 
-  'slides:save': async (ctx: HandlerContext) => {
+  'slides:save': async (ctx: HandlerContext, rawOrigin?: unknown) => {
     const session = sessions.get(ctx.clientId)
     if (!session) return { ok: false, error: 'no file open' }
+    const pathBefore = session.path || null
+    const gate =
+      pathBefore && ctx.host.saveGate
+        ? ctx.host.saveGate({
+            kind: 'save',
+            origin: rawOrigin === 'auto' ? 'auto' : 'user',
+            currentPath: pathBefore,
+            targetPath: pathBefore,
+          })
+        : { write: true, fireHook: false }
+    // view-only UniWork document, or an AutoSave pass on one: no write, cancel shape
+    if (!gate.write) return { ok: false }
     // Untitled (new blank file): the first save goes to the host's untitled target
     // without a dialog (the desktop lands it in the drafts folder; Save As keeps its dialog)
     if (!session.path) {
@@ -89,6 +101,7 @@ export const historySaveHandlers = {
       // but the renderer still expects the render tree in the response.
       commitSaved(session.opened)
       if ((session.metaRev ?? 0) === metaRevAtSave) session.metaDirty = false
+      if (gate.fireHook) ctx.host.userSaved?.(session.path)
       return {
         ok: true,
         path: session.path,
@@ -104,6 +117,16 @@ export const historySaveHandlers = {
     if (!session) return { ok: false, error: 'no file open' }
     const target = await ctx.host.saveTarget.saveAs(session.path, defaultName)
     if (!target) return { ok: false }
+    // A view-only UniWork path is refused (cancel shape); picking the deck's own
+    // file is an explicit Save of it and reports a user save, any other target is
+    // a plain local copy
+    const gate = ctx.host.saveGate?.({
+      kind: 'save-as',
+      origin: 'user',
+      currentPath: session.path || null,
+      targetPath: target,
+    }) ?? { write: true, fireHook: false }
+    if (!gate.write) return { ok: false }
     try {
       const metaRevAtSave = session.metaRev ?? 0
       await ctx.host.writeDeck(session.opened, target)
@@ -111,6 +134,7 @@ export const historySaveHandlers = {
       await ctx.host.saved({ kind: 'saveAs', session, path: target })
       commitSaved(session.opened)
       if ((session.metaRev ?? 0) === metaRevAtSave) session.metaDirty = false
+      if (gate.fireHook) ctx.host.userSaved?.(target)
       return {
         ok: true,
         path: target,

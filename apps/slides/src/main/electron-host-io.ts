@@ -32,6 +32,8 @@ export interface ElectronFileHooks {
   untitledTarget(): string
   saveAsTarget(currentPath: string, defaultName: string): Promise<string | null>
   saved(event: SaveEvent): Promise<void>
+  saveGate: HostIO['saveGate']
+  userSaved: HostIO['userSaved']
 }
 
 async function pickFile(options: {
@@ -149,5 +151,7 @@ export function createElectronHostIO(files: ElectronFileHooks): HostIO {
     },
     writeDeck: (opened, target) => savePptxToFile(opened, target),
     saved: (event) => files.saved(event),
+    saveGate: files.saveGate,
+    userSaved: files.userSaved,
   }
 }

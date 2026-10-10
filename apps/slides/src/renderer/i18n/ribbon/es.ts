@@ -40,6 +40,8 @@ export const es = {
   ribbonSaveTip: 'Guardar (⌘S)',
   ribbonAutoSave: 'Autoguardado',
   ribbonAutoSaveTip: 'Guarda en el archivo cada 30 segundos',
+  ribbonAutoSaveUniworkTip:
+    'El autoguardado está desactivado para los documentos de UniWork. Usa Guardar para guardar una versión nueva.',
   ribbonUndo: 'Deshacer',
   ribbonRedo: 'Rehacer',
   ribbonGroupClipboard: 'Portapapeles',

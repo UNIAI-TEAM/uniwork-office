@@ -127,6 +127,7 @@ export const strings = {
     ribbonCollapse: '折叠功能区',
     ribbonExpand: '展开功能区',
     autoSaveTip: '自动保存(每 30 秒及窗口失焦时)',
+    autoSaveUniworkOff: 'UniWork 文档不使用自动保存。请用“保存”来保存新版本。',
     bold: '加粗',
     italic: '斜体',
     strike: '删除线',
@@ -361,6 +362,7 @@ export const strings = {
     ribbonCollapse: 'Collapse the Ribbon',
     ribbonExpand: 'Expand the Ribbon',
     autoSaveTip: 'AutoSave (every 30 seconds and when the window loses focus)',
+    autoSaveUniworkOff: 'AutoSave is off for UniWork documents. Use Save to save a new version.',
     bold: 'Bold',
     italic: 'Italic',
     strike: 'Strikethrough',
@@ -596,6 +598,8 @@ export const strings = {
     ribbonCollapse: 'Thu gọn Ribbon',
     ribbonExpand: 'Mở rộng Ribbon',
     autoSaveTip: 'Tự động lưu (mỗi 30 giây và khi cửa sổ mất tiêu điểm)',
+    autoSaveUniworkOff:
+      'Tự động lưu đã tắt cho tài liệu UniWork. Hãy dùng Lưu để lưu phiên bản mới.',
     bold: 'In đậm',
     italic: 'In nghiêng',
     strike: 'Gạch ngang',
@@ -829,6 +833,8 @@ export const strings = {
     ribbonCollapse: 'リボンを折りたたむ',
     ribbonExpand: 'リボンを展開する',
     autoSaveTip: '自動保存(30 秒ごと、およびウィンドウのフォーカスが外れたとき)',
+    autoSaveUniworkOff:
+      'UniWork のドキュメントでは自動保存はオフです。新しいバージョンを保存するには「保存」を使ってください。',
     bold: '太字',
     italic: '斜体',
     strike: '取り消し線',
@@ -1064,6 +1070,8 @@ export const strings = {
     ribbonCollapse: '리본 축소',
     ribbonExpand: '리본 확장',
     autoSaveTip: '자동 저장(30초마다, 창 포커스가 해제될 때)',
+    autoSaveUniworkOff:
+      'UniWork 문서에서는 자동 저장이 꺼져 있습니다. 새 버전을 저장하려면 ‘저장’을 사용하세요.',
     bold: '굵게',
     italic: '기울임꼴',
     strike: '취소선',
@@ -1302,6 +1310,8 @@ export const strings = {
     ribbonExpand: 'Développer le ruban',
     autoSaveTip:
       'Enregistrement automatique (toutes les 30 secondes et lorsque la fenêtre perd le focus)',
+    autoSaveUniworkOff:
+      'L’enregistrement automatique est désactivé pour les documents UniWork. Utilisez Enregistrer pour enregistrer une nouvelle version.',
     bold: 'Gras',
     italic: 'Italique',
     strike: 'Barré',
@@ -1543,6 +1553,8 @@ export const strings = {
     ribbonExpand: 'Menüband erweitern',
     autoSaveTip:
       'Automatisches Speichern (alle 30 Sekunden und wenn das Fenster den Fokus verliert)',
+    autoSaveUniworkOff:
+      'Automatisches Speichern ist für UniWork-Dokumente ausgeschaltet. Verwenden Sie „Speichern“, um eine neue Version zu speichern.',
     bold: 'Fett',
     italic: 'Kursiv',
     strike: 'Durchgestrichen',
@@ -1781,6 +1793,8 @@ export const strings = {
     ribbonCollapse: 'Contraer la cinta de opciones',
     ribbonExpand: 'Expandir la cinta de opciones',
     autoSaveTip: 'Autoguardado (cada 30 segundos y cuando la ventana pierde el foco)',
+    autoSaveUniworkOff:
+      'El autoguardado está desactivado para los documentos de UniWork. Usa Guardar para guardar una versión nueva.',
     bold: 'Negrita',
     italic: 'Cursiva',
     strike: 'Tachado',
@@ -2016,6 +2030,8 @@ export const strings = {
     ribbonCollapse: 'ยุบ Ribbon',
     ribbonExpand: 'ขยาย Ribbon',
     autoSaveTip: 'บันทึกอัตโนมัติ (ทุก 30 วินาทีและเมื่อหน้าต่างไม่ได้โฟกัส)',
+    autoSaveUniworkOff:
+      'การบันทึกอัตโนมัติปิดอยู่สำหรับเอกสาร UniWork ใช้ “บันทึก” เพื่อบันทึกเวอร์ชันใหม่',
     bold: 'ตัวหนา',
     italic: 'ตัวเอียง',
     strike: 'ขีดฆ่า',
@@ -2251,6 +2267,8 @@ export const strings = {
     ribbonCollapse: 'Ciutkan Pita',
     ribbonExpand: 'Perluas Pita',
     autoSaveTip: 'Simpan otomatis (setiap 30 detik dan saat jendela kehilangan fokus)',
+    autoSaveUniworkOff:
+      'Simpan otomatis dinonaktifkan untuk dokumen UniWork. Gunakan Simpan untuk menyimpan versi baru.',
     bold: 'Tebal',
     italic: 'Miring',
     strike: 'Coret',
@@ -2487,6 +2505,8 @@ export const strings = {
     ribbonCollapse: 'Свернуть ленту',
     ribbonExpand: 'Развернуть ленту',
     autoSaveTip: 'Автосохранение (каждые 30 секунд и при потере фокуса окном)',
+    autoSaveUniworkOff:
+      'Автосохранение отключено для документов UniWork. Нажмите «Сохранить», чтобы сохранить новую версию.',
     bold: 'Полужирный',
     italic: 'Курсив',
     strike: 'Зачёркнутый',
@@ -2719,6 +2739,7 @@ export const strings = {
     ribbonCollapse: 'طي الشريط',
     ribbonExpand: 'توسيع الشريط',
     autoSaveTip: 'حفظ تلقائي (كل 30 ثانية وعند فقدان النافذة للتركيز)',
+    autoSaveUniworkOff: 'الحفظ التلقائي متوقف لمستندات UniWork. استخدم «حفظ» لحفظ إصدار جديد.',
     bold: 'غامق',
     italic: 'مائل',
     strike: 'يتوسطه خط',
@@ -2956,6 +2977,8 @@ export const strings = {
     ribbonCollapse: 'Recolher a Faixa de Opções',
     ribbonExpand: 'Expandir a Faixa de Opções',
     autoSaveTip: 'Salvamento automático (a cada 30 segundos e quando a janela perde o foco)',
+    autoSaveUniworkOff:
+      'O salvamento automático está desativado para documentos do UniWork. Use Salvar para salvar uma nova versão.',
     bold: 'Negrito',
     italic: 'Itálico',
     strike: 'Tachado',
@@ -3194,6 +3217,8 @@ export const strings = {
     ribbonCollapse: 'Riduci a icona la barra multifunzione',
     ribbonExpand: 'Espandi la barra multifunzione',
     autoSaveTip: 'Salvataggio automatico (ogni 30 secondi e quando la finestra perde il focus)',
+    autoSaveUniworkOff:
+      'Il salvataggio automatico è disattivato per i documenti UniWork. Usa Salva per salvare una nuova versione.',
     bold: 'Grassetto',
     italic: 'Corsivo',
     strike: 'Barrato',
@@ -3431,6 +3456,8 @@ export const strings = {
     ribbonCollapse: 'Zwiń Wstążkę',
     ribbonExpand: 'Rozwiń Wstążkę',
     autoSaveTip: 'Autozapis (co 30 sekund oraz gdy okno traci fokus)',
+    autoSaveUniworkOff:
+      'Autozapis jest wyłączony dla dokumentów UniWork. Użyj opcji Zapisz, aby zapisać nową wersję.',
     bold: 'Pogrubienie',
     italic: 'Kursywa',
     strike: 'Przekreślenie',
@@ -3655,6 +3682,8 @@ export const strings = {
     ribbonCollapse: 'Sbalit pás karet',
     ribbonExpand: 'Rozbalit pás karet',
     autoSaveTip: 'Automatické ukládání (každých 30 sekund a při ztrátě fokusu okna)',
+    autoSaveUniworkOff:
+      'Automatické ukládání je pro dokumenty UniWork vypnuté. Novou verzi uložíte příkazem Uložit.',
     bold: 'Tučné',
     italic: 'Kurzíva',
     strike: 'Přeškrtnuté',
@@ -3903,6 +3932,8 @@ export const strings = {
     ribbonCollapse: 'Het lint samenvouwen',
     ribbonExpand: 'Het lint uitvouwen',
     autoSaveTip: 'Automatisch opslaan (elke 30 seconden en wanneer het venster de focus verliest)',
+    autoSaveUniworkOff:
+      'Automatisch opslaan staat uit voor UniWork-documenten. Gebruik Opslaan om een nieuwe versie op te slaan.',
     bold: 'Vet',
     italic: 'Cursief',
     strike: 'Doorhalen',
@@ -4138,6 +4169,8 @@ export const strings = {
     ribbonCollapse: 'Runtuhkan Reben',
     ribbonExpand: 'Kembangkan Reben',
     autoSaveTip: 'Autosimpan (setiap 30 saat dan apabila tetingkap hilang fokus)',
+    autoSaveUniworkOff:
+      'Simpan automatik dimatikan untuk dokumen UniWork. Gunakan Simpan untuk menyimpan versi baharu.',
     bold: 'Tebal',
     italic: 'Condong',
     strike: 'Garis lorek',
@@ -4369,6 +4402,8 @@ export const strings = {
     ribbonCollapse: 'כווץ את רצועת הכלים',
     ribbonExpand: 'הרחב את רצועת הכלים',
     autoSaveTip: 'שמירה אוטומטית (כל 30 שניות וכאשר החלון מאבד מיקוד)',
+    autoSaveUniworkOff:
+      'השמירה האוטומטית כבויה עבור מסמכי UniWork. השתמשו ב״שמירה״ כדי לשמור גרסה חדשה.',
     bold: 'מודגש',
     italic: 'נטוי',
     strike: 'קו חוצה',
@@ -4603,6 +4638,8 @@ export const strings = {
     ribbonCollapse: 'रिबन संक्षिप्त करें',
     ribbonExpand: 'रिबन विस्तृत करें',
     autoSaveTip: 'स्वतः सहेजना (हर 30 सेकंड में और विंडो का फ़ोकस हटने पर)',
+    autoSaveUniworkOff:
+      'UniWork दस्तावेज़ों के लिए ऑटो सेव बंद है। नया संस्करण सहेजने के लिए ‘सहेजें’ का उपयोग करें।',
     bold: 'बोल्ड',
     italic: 'इटैलिक',
     strike: 'स्ट्राइकथ्रू',
@@ -4834,6 +4871,7 @@ export const strings = {
     ribbonCollapse: '摺疊功能區',
     ribbonExpand: '展開功能區',
     autoSaveTip: '自動儲存(每 30 秒及視窗失去焦點時)',
+    autoSaveUniworkOff: 'UniWork 文件已關閉自動儲存。請使用「儲存」儲存新版本。',
     bold: '粗體',
     italic: '斜體',
     strike: '刪除線',

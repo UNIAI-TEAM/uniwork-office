@@ -1574,4 +1574,6 @@ export const pt = {
     'O motor da pasta de trabalho parou inesperadamente e foi reiniciado. A pasta de trabalho foi reaberta a partir da última versão salva; as alterações não salvas foram mantidas, salve em breve.',
   appWebSavedReopenFailed:
     'Suas alterações foram salvas no UniWork, mas não foi possível reabrir a pasta de trabalho aqui. Recarregue o editor para continuar.',
+  appAutoSaveUniworkOff:
+    'O salvamento automático está desativado para documentos do UniWork. Use Salvar para salvar uma nova versão.',
 } satisfies Record<keyof typeof zh, string>

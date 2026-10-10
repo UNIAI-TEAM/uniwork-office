@@ -791,6 +791,8 @@ export function createWebSlidesApi(
       noteResult(r)
       return r as Awaited<ReturnType<SlidesApi['save']>>
     },
+    // the frame is the UniWork document: no desktop working-copy state, view-only comes from the host grant
+    uniworkState: async () => ({ bound: false, readOnly: false }),
     saveAs: async (defaultName) => {
       const pending = hostSaveAs
       pending?.started()

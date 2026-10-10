@@ -1577,4 +1577,6 @@ export const es = {
     'El motor del libro se detuvo de forma inesperada y se reinició. El libro se volvió a abrir desde su última versión guardada; los cambios sin guardar se conservan, guarde pronto.',
   appWebSavedReopenFailed:
     'Tus cambios se guardaron en UniWork, pero no se pudo volver a abrir el libro aquí. Recarga el editor para seguir trabajando.',
+  appAutoSaveUniworkOff:
+    'El autoguardado está desactivado para los documentos de UniWork. Usa Guardar para guardar una versión nueva.',
 } satisfies Record<keyof typeof zh, string>

@@ -1580,4 +1580,6 @@ export const ja = {
     'ブックのエンジンが予期せず停止し、再起動しました。ブックは最後に保存した状態から開き直しました。未保存の変更は保持されているので、早めに保存してください。',
   appWebSavedReopenFailed:
     '変更は UniWork に保存されましたが、ここでブックを開き直せませんでした。エディターを再読み込みして作業を続けてください。',
+  appAutoSaveUniworkOff:
+    'UniWork のドキュメントでは自動保存はオフです。新しいバージョンを保存するには「保存」を使ってください。',
 } satisfies Record<keyof typeof zh, string>

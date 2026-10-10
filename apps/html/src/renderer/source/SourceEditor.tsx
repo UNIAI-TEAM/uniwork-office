@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
-import { Compartment, EditorState } from '@codemirror/state'
+import { Compartment, EditorState, type Extension } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import { redo, redoDepth, undo, undoDepth } from '@codemirror/commands'
 import { External, buildExtensions } from './cm-setup'
@@ -41,7 +41,7 @@ interface Props {
   onBeforeReplace?: () => void
   /** only the editor's own transactions report changes; External-annotated ones are already known to the caller */
   className?: string
-  /** view only (web frame without the host's save grant): no edits, selection and find still work */
+  /** a view-only document: typing is refused, programmatic replacements still apply */
   readOnly?: boolean
 }
 
@@ -51,15 +51,15 @@ export const SourceEditor = forwardRef<SourceEditorHandle, Props>(function Sourc
 ) {
   const hostRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
+  const readOnlyCompartment = useRef(new Compartment())
+  const readOnlyRef = useRef(readOnly)
+  readOnlyRef.current = readOnly
   const findTargetRef = useRef<FindTarget | null>(null)
   const docListeners = useRef(new Set<() => void>())
   const onChangeRef = useRef(onChange)
   const onCursorRef = useRef(onCursor)
   onChangeRef.current = onChange
   onCursorRef.current = onCursor
-  const editableRef = useRef(new Compartment())
-  const readOnlyRef = useRef(readOnly)
-  readOnlyRef.current = readOnly
 
   useEffect(() => {
     const host = hostRef.current
@@ -74,7 +74,7 @@ export const SourceEditor = forwardRef<SourceEditorHandle, Props>(function Sourc
             const line = v.state.doc.lineAt(head)
             onCursorRef.current({ line: line.number, col: head - line.from + 1, pos: head })
           }),
-          editableRef.current.of(readOnlyExtensions(readOnlyRef.current)),
+          readOnlyCompartment.current.of(readOnlyExtensions(readOnlyRef.current)),
         ],
       }),
       dispatchTransactions: (trs, v) => {
@@ -105,7 +105,7 @@ export const SourceEditor = forwardRef<SourceEditorHandle, Props>(function Sourc
 
   useEffect(() => {
     viewRef.current?.dispatch({
-      effects: editableRef.current.reconfigure(readOnlyExtensions(readOnly)),
+      effects: readOnlyCompartment.current.reconfigure(readOnlyExtensions(readOnly)),
     })
   }, [readOnly])
 
@@ -174,6 +174,6 @@ export const SourceEditor = forwardRef<SourceEditorHandle, Props>(function Sourc
   return <div ref={hostRef} className={className} />
 })
 
-function readOnlyExtensions(readOnly: boolean) {
-  return readOnly ? [EditorState.readOnly.of(true)] : []
+function readOnlyExtensions(readOnly: boolean): Extension {
+  return readOnly ? [EditorState.readOnly.of(true), EditorView.editable.of(false)] : []
 }

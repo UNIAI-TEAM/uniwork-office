@@ -203,6 +203,8 @@ export const cs = {
   appFootnotePlaceholder: 'Text poznámky pod čarou…',
   appEndnotePlaceholder: 'Text vysvětlivky…',
   appAutoSave: 'Automatické ukládání',
+  appAutoSaveUniworkTip:
+    'Automatické ukládání je pro dokumenty UniWork vypnuté. Novou verzi uložíte příkazem Uložit.',
   appAutoSaveTip: 'Automatické ukládání (každých 30 sekund a při ztrátě fokusu okna)',
   appSaveShortcutTip: 'Uložit (⌘S)',
   appUndo: 'Zpět',
@@ -524,6 +526,7 @@ export const cs = {
   appWebNoHost: 'Tento editor běží v UniWork. Otevřete dokument z UniWork.',
   appSaveStateUnsaved: 'Neuložené změny',
   appSaveStateSaved: 'Všechny změny uloženy',
+  appSaveStateViewOnly: 'Pouze pro čtení',
   appSaving: 'Ukládání…',
   appSavingAs: 'Ukládání jako…',
   appPdfPrintFallback:

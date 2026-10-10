@@ -66,7 +66,7 @@ import { applyPatches } from './document/patch'
 import { adoptImageRewrites } from './document/image-rewrites'
 import { deriveAutoFileName, deriveNameFromPrompt, derivePageTitleName } from './document/auto-name'
 import { runGuardedPrint } from './print-guard'
-import type { ExportFormat, SaveMode } from '../shared/ipc'
+import type { ExportFormat, SaveMode, UniworkViewState } from '../shared/ipc'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 type SaveState = 'idle' | 'saving' | 'saved' | 'failed'
@@ -132,6 +132,10 @@ export default function App() {
   const [presentFull, setPresentFull] = useState(false)
   const [zoom, setZoom] = useState(100)
   const [autoSave, setAutoSave] = useAutoSavePref('htmlapp.autoSave', window.htmlApi)
+  // a UniWork copy never autosaves; a view-only one refuses every edit
+  const [uniwork, setUniwork] = useState<UniworkViewState>({ bound: false, readOnly: false })
+  const uniworkRef = useRef(uniwork)
+  uniworkRef.current = uniwork
   const [findTarget, setFindTarget] = useState<FindTarget | null>(null)
   const [findFocus, setFindFocus] = useState<FindFocusRequest>({ field: 'find', nonce: 0 })
   const [cursor, setCursor] = useState<CursorInfo>({ line: 1, col: 1, pos: 0 })
@@ -408,6 +412,16 @@ export default function App() {
   /** every text change goes through here so the version counter and the map cache stay coherent */
   const commitText = useCallback(
     (next: string, manual: boolean, preservePending = false) => {
+      if (uniworkRef.current.readOnly && next !== textRef.current) {
+        // a view-only UniWork copy: put the source and the preview back as they were
+        editorRef.current?.setDoc(textRef.current)
+        if (styleTimerRef.current !== null) window.clearTimeout(styleTimerRef.current)
+        styleTimerRef.current = null
+        pendingStylesRef.current = {}
+        setPendingCount(0)
+        setPreviewNonce((n) => n + 1)
+        return
+      }
       textRef.current = next
       versionRef.current += 1
       if (manual) lastManualVersionRef.current = versionRef.current
@@ -1116,7 +1130,7 @@ export default function App() {
   }
 
   const doSave = useCallback(
-    async (mode: SaveMode, suggestedName?: string): Promise<boolean> => {
+    async (mode: SaveMode, suggestedName?: string, origin?: 'auto'): Promise<boolean> => {
       if (statusRef.current !== 'ready' || !cap('save')) return false
       // uncommitted live style pokes belong to the document being saved
       flushPending()
@@ -1134,6 +1148,7 @@ export default function App() {
           mode,
           suggestedName,
           defaultName: provisionalNameRef.current ?? undefined,
+          ...(origin ? { origin } : {}),
         })
         if (result.ok && 'path' in result) {
           const adopted = adoptImageRewrites(textAtSave, textRef.current, result.imageRewrites)
@@ -1379,16 +1394,37 @@ export default function App() {
     return () => window.removeEventListener('wheel', onWheel)
   }, [])
 
+  // a UniWork copy: ask main again whenever the document lands on a new path (open, Save As, rename)
+  useEffect(() => {
+    let live = true
+    if (!path) {
+      setUniwork({ bound: false, readOnly: false })
+      return
+    }
+    // the browser harness may not expose the method: a missing or failed answer is a plain local file
+    void Promise.resolve(window.htmlApi.uniworkState?.())
+      .then((state) => {
+        if (live) setUniwork({ bound: state?.bound === true, readOnly: state?.readOnly === true })
+      })
+      .catch((err) => {
+        console.warn('[html] UniWork state query failed:', err)
+        if (live) setUniwork({ bound: false, readOnly: false })
+      })
+    return () => {
+      live = false
+    }
+  }, [path])
+
   // autosave: every 30s and on window blur; untitled documents wait for an explicit first save
   useEffect(() => {
-    if (!autoSave || !path || !cap('autoSave')) return
+    if (!autoSave || !path || !cap('autoSave') || uniwork.bound) return
     const tick = () => {
       // a native Save As dialog blurs the window: autosave must not queue a write behind
       // a user-driven save, only explicit saves do
       if (savingRef.current) return
       flushPending()
       if (textRef.current === savedTextRef.current) return
-      void doSave('save')
+      void doSave('save', undefined, 'auto')
     }
     const id = window.setInterval(tick, 30_000)
     window.addEventListener('blur', tick)
@@ -1396,7 +1432,7 @@ export default function App() {
       window.clearInterval(id)
       window.removeEventListener('blur', tick)
     }
-  }, [autoSave, path, doSave, flushPending])
+  }, [autoSave, path, uniwork.bound, doSave, flushPending])
 
   const aiDeps: HtmlAiDeps = {
     access: {
@@ -1510,6 +1546,8 @@ export default function App() {
         showAutoSave={cap('autoSave')}
         showAi={aiEnabled}
         presentNewTab={cap('presentNewTab')}
+        uniworkBound={uniwork.bound}
+        readOnly={uniwork.readOnly}
         view={view}
         onView={setView}
         aiOpen={aiOpen}
@@ -1674,7 +1712,7 @@ export default function App() {
                 ref={editorRef}
                 className="source-editor"
                 initialText={text}
-                readOnly={!canEdit}
+                readOnly={!canEdit || uniwork.readOnly}
                 onChange={onEditorChange}
                 onCursor={onCursor}
                 onBeforeReplace={flushPending}

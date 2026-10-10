@@ -22,6 +22,7 @@ const api: PdfApi = {
   requestRedactionCopy: (path) => ipcRenderer.invoke(PDF_CHANNELS.requestRedactionCopy, path),
   autoRename: (path, baseName) => ipcRenderer.invoke(PDF_CHANNELS.autoRename, path, baseName),
   isUntitled: (path) => ipcRenderer.invoke(PDF_CHANNELS.isUntitled, path),
+  uniworkState: (path) => ipcRenderer.invoke(PDF_CHANNELS.uniworkState, path),
   validateTextEdits: (request) => ipcRenderer.invoke(PDF_CHANNELS.validateTextEdits, request),
   listEditFonts: () => ipcRenderer.invoke(PDF_CHANNELS.listEditFonts),
   canDrawText: (text, font, bold, italic) =>
@@ -54,7 +55,8 @@ const api: PdfApi = {
   getUsername: () => ipcRenderer.invoke(PDF_CHANNELS.getUsername),
   setDirty: (dirty) => ipcRenderer.send(PDF_CHANNELS.dirtyChanged, dirty),
   onCloseSaveRequest: (handler) => {
-    const listener = () => handler()
+    const listener = (_e: Electron.IpcRendererEvent, request?: { origin?: unknown }) =>
+      handler({ origin: request?.origin === 'internal' ? 'internal' : 'user' })
     ipcRenderer.on(PDF_CHANNELS.closeSaveRequest, listener)
     return () => ipcRenderer.removeListener(PDF_CHANNELS.closeSaveRequest, listener)
   },

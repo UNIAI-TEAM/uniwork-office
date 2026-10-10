@@ -98,6 +98,7 @@ function fakeManager(dirty: Partial<Record<DirtyKinds, TabStub[]>> = {}) {
     dirtyHtmlTabs: () => dirty.html ?? [],
     dirtySlidesTabs: () => dirty.slides ?? [],
     docsTabs: () => dirty.docs ?? [],
+    uniworkGuardedTabs: () => [],
   }
 }
 

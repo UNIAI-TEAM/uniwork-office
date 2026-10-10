@@ -1,12 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { DragEvent as ReactDragEvent, ReactElement } from 'react'
 import appIcon from './assets/app-icon.png'
-import iconDocx from './assets/file-docx.svg'
-import iconXlsx from './assets/file-xlsx.svg'
-import iconPptx from './assets/file-pptx.svg'
-import iconPdf from './assets/file-pdf.svg'
-import iconMd from './assets/file-md.svg'
-import iconHtml from './assets/file-html.svg'
 import type {
   AccountStatus,
   FolderEntry,
@@ -38,6 +32,16 @@ import { PracticeHome } from './PracticeHome'
 import { TeacherHome } from './TeacherHome'
 import { hydrateWorkbenchStore, wbStoreGetRaw, wbStoreSetRaw } from './workbench-store-client'
 import { onFilesChanged } from './file-events'
+import { FileBadge } from './FileBadge'
+import { UniworkOpenCard } from './UniworkOpenCard'
+import { openRecentEntry } from './uniwork-open'
+import { subscribeUniworkOpened } from './uniwork-recents-refresh'
+import {
+  recentOpenAction,
+  recentRowIsMissing,
+  recentRowModifiedMs,
+  recentRowPolicy,
+} from './uniwork-docs-model'
 
 declare global {
   interface Window {
@@ -60,18 +64,6 @@ const GREET_ASK_KEYS = [
   'greetAsk6',
 ] as const satisfies readonly StringKey[]
 
-const FILE_ICONS: Record<string, string> = {
-  docx: iconDocx,
-  xlsx: iconXlsx,
-  xlsm: iconXlsx,
-  pptx: iconPptx,
-  pdf: iconPdf,
-  md: iconMd,
-  markdown: iconMd,
-  html: iconHtml,
-  htm: iconHtml,
-}
-
 /* Formats the open-local card advertises. Too long for the card at any window
    width, so it ellipsizes and a hover ScreenTip carries the full list. Keep in
    sync with the main-process open-dialog filter (OPEN_DIALOG_EXTENSIONS). */
@@ -84,31 +76,6 @@ const DRAG_PATHS_MIME = 'application/x-genoffice-paths'
 const DRAG_EXPAND_DELAY_MS = 600
 /** expanded folders survive a home reload; the selection is per session */
 const TREE_STATE_KEY = 'home.folderTree'
-
-function FileBadge({ ext, size }: { ext: string; size: number }) {
-  const icon = FILE_ICONS[ext]
-  if (icon) {
-    return <img src={icon} width={size} height={size} alt="" aria-hidden="true" />
-  }
-  const label = ext ? ext[0].toUpperCase() : '?'
-  return (
-    <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden="true">
-      <rect width="32" height="32" rx="7.5" fill="#98a2b3" />
-      <text
-        x="16"
-        y="16.5"
-        textAnchor="middle"
-        dominantBaseline="central"
-        fill="#fff"
-        fontSize={17}
-        fontWeight="700"
-        fontFamily="system-ui, -apple-system, 'Segoe UI', sans-serif"
-      >
-        {label}
-      </text>
-    </svg>
-  )
-}
 
 function FolderIcon({ size = 16, open = false }: { size?: number; open?: boolean }) {
   return (
@@ -1529,6 +1496,9 @@ export function Home() {
   // a rename from the tab strip happens while this renderer already has focus
   useEffect(() => onFilesChanged(() => refreshRef.current()), [])
 
+  // so does opening a UniWork document: its recents entry is already written
+  useEffect(() => subscribeUniworkOpened(window.aiOffice, () => refreshRef.current()), [])
+
   const hasMore = entries.length < listTotal
 
   // unified dismissal: outside press, window blur, chrome press (tab strip / window drag)
@@ -1664,7 +1634,10 @@ export function Home() {
 
   // ── Plain view (no folder selected): filtering runs in the main process; entries is the visible list ──
   const selectedPaths = entries.filter((e) => selected.has(e.path)).map((e) => e.path)
-  const allSelected = entries.length > 0 && selectedPaths.length === entries.length
+  // UniWork documents have no local file to move or delete: they are never selectable
+  const selectableEntries = entries.filter((e) => recentRowPolicy(e).selectable)
+  const allSelected =
+    selectableEntries.length > 0 && selectedPaths.length === selectableEntries.length
 
   // folder view: files of the selected folder under the type filter; shares the same `selected` set
   const folderListing = selectedFolder ? listings.get(selectedFolder) : undefined
@@ -1810,7 +1783,7 @@ export function Home() {
   }
 
   const toggleSelectAll = () => {
-    setSelected(allSelected ? new Set() : new Set(entries.map((e) => e.path)))
+    setSelected(allSelected ? new Set() : new Set(selectableEntries.map((e) => e.path)))
   }
 
   const toggleSelectAllFolder = () => {
@@ -2076,7 +2049,9 @@ export function Home() {
                 <span className="quick-title">{item.title}</span>
                 <span className="ai-chip">AI</span>
               </span>
-              <span className="quick-sub">{item.sub}</span>
+              <span className="quick-sub" title={item.sub}>
+                {item.sub}
+              </span>
             </span>
           </button>
         ))}
@@ -2092,9 +2067,12 @@ export function Home() {
             <span className="quick-title-row">
               <span className="quick-title">{t('openLocal')}</span>
             </span>
-            <span className="quick-sub">{OPEN_LOCAL_EXTENSIONS}</span>
+            <span className="quick-sub" title={OPEN_LOCAL_EXTENSIONS}>
+              {OPEN_LOCAL_EXTENSIONS}
+            </span>
           </span>
         </button>
+        <UniworkOpenCard onOpenSettings={() => setSettingsRequest({ section: 'account' })} />
       </div>
     )
   }
@@ -2426,7 +2404,11 @@ export function Home() {
 
   function renderFileRow(entry: RecentEntry, context: 'global' | 'folder') {
     const isRenaming = renaming?.path === entry.path
-    const editable = editableAt(entry.path)
+    // a UniWork document's working copy is managed by the app: no rename, move or file delete
+    const policy = recentRowPolicy(entry)
+    const missing = recentRowIsMissing(entry)
+    const modifiedMs = recentRowModifiedMs(entry)
+    const editable = editableAt(entry.path) && policy.fileActions
     const canDelete =
       context === 'folder' ? folderSelectedPaths.length === 0 : selectedPaths.length === 0
     // inside a project the file's own project is not a target; elsewhere its project is unknown
@@ -2436,31 +2418,33 @@ export function Home() {
     return (
       <li className="recent-row" key={entry.path}>
         <div
-          className={`recent-item${entry.missing ? ' missing' : ''}`}
+          className={`recent-item${missing ? ' missing' : ''}`}
           role="button"
           tabIndex={0}
-          draggable={!isRenaming && !entry.missing}
+          draggable={!isRenaming && !missing && policy.draggable}
           onDragStart={(e) => onRowDragStart(e, dragPathsFor(entry.path, context))}
           onClick={() => {
             if (isRenaming) return
-            if (entry.missing) setConfirmMissing(entry)
-            else void window.aiOffice.openPath(entry.path)
+            if (recentOpenAction(entry) === 'confirm-missing') setConfirmMissing(entry)
+            else void openRecentEntry(entry, window.aiOffice)
           }}
           onKeyDown={(event) => {
             if (event.key === 'Enter' && event.target === event.currentTarget) {
-              if (entry.missing) setConfirmMissing(entry)
-              else void window.aiOffice.openPath(entry.path)
+              if (recentOpenAction(entry) === 'confirm-missing') setConfirmMissing(entry)
+              else void openRecentEntry(entry, window.aiOffice)
             }
           }}
         >
           <span className="col-check" onClick={(event) => event.stopPropagation()}>
-            <input
-              type="checkbox"
-              className="row-check"
-              checked={selected.has(entry.path)}
-              onChange={(event) => toggleSelect(entry.path, event.target.checked)}
-              aria-label={t('selectFile', { name: entry.name })}
-            />
+            {policy.selectable && (
+              <input
+                type="checkbox"
+                className="row-check"
+                checked={selected.has(entry.path)}
+                onChange={(event) => toggleSelect(entry.path, event.target.checked)}
+                aria-label={t('selectFile', { name: entry.name })}
+              />
+            )}
           </span>
           <span className="recent-icon">
             <FileBadge ext={entry.ext} size={24} />
@@ -2484,13 +2468,21 @@ export function Home() {
           ) : (
             <span className="recent-name">{entry.name}</span>
           )}
-          <span className="recent-path" title={dirOf(entry.path)}>
-            {locationLabel(entry.path, roots)}
-          </span>
+          {policy.badge ? (
+            <span className="recent-path">
+              <span className="uw-recent-badge" title={t('uwRecentBadgeTip')}>
+                {t('uwRecentBadge')}
+              </span>
+            </span>
+          ) : (
+            <span className="recent-path" title={dirOf(entry.path)}>
+              {locationLabel(entry.path, roots)}
+            </span>
+          )}
           <span className="recent-time">
-            {entry.missing ? '—' : formatModified(entry.mtimeMs, i18n)}
+            {modifiedMs === null ? '—' : formatModified(modifiedMs, i18n)}
           </span>
-          <span className="recent-size">{entry.missing ? '—' : formatSize(entry.sizeBytes)}</span>
+          <span className="recent-size">{missing ? '—' : formatSize(entry.sizeBytes)}</span>
           <button
             className={`star-btn${entry.starred ? ' starred' : ''}`}
             aria-label={entry.starred ? t('unstar') : t('star')}
@@ -2532,29 +2524,33 @@ export function Home() {
                   role="menuitem"
                   onClick={() => {
                     setRowMenu(null)
-                    void window.aiOffice.openPath(entry.path)
+                    void openRecentEntry(entry, window.aiOffice)
                   }}
                 >
                   {t('open')}
                 </button>
-                <button
-                  role="menuitem"
-                  onClick={() => {
-                    setRowMenu(null)
-                    void window.aiOffice.revealPath(entry.path)
-                  }}
-                >
-                  {t('revealInFolder')}
-                </button>
-                <button
-                  role="menuitem"
-                  onClick={() => {
-                    setRowMenu(null)
-                    void navigator.clipboard.writeText(entry.path)
-                  }}
-                >
-                  {t('copyPath')}
-                </button>
+                {policy.showLocation && (
+                  <>
+                    <button
+                      role="menuitem"
+                      onClick={() => {
+                        setRowMenu(null)
+                        void window.aiOffice.revealPath(entry.path)
+                      }}
+                    >
+                      {t('revealInFolder')}
+                    </button>
+                    <button
+                      role="menuitem"
+                      onClick={() => {
+                        setRowMenu(null)
+                        void navigator.clipboard.writeText(entry.path)
+                      }}
+                    >
+                      {t('copyPath')}
+                    </button>
+                  </>
+                )}
                 {canMove && editable && !entry.missing && (
                   <>
                     <div className="row-menu-divider" />
@@ -2563,7 +2559,7 @@ export function Home() {
                     </button>
                   </>
                 )}
-                {otherProjects.length > 0 && (
+                {otherProjects.length > 0 && policy.fileActions && (
                   <>
                     {!(canMove && editable && !entry.missing) && (
                       <div className="row-menu-divider" />

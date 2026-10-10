@@ -481,8 +481,30 @@ export function App() {
     window.addEventListener('pointerup', onUp)
   }
   const [autoSavePref, setAutoSave] = useAutoSavePref('ai-slides-auto-save', window.slidesApi)
+  // UniWork working copy: AutoSave is forced off (UniWork only takes explicit saves) and a
+  // view-only document opens in Reading view with Save disabled. Re-queried per path
+  // (open, Save As, rename); the stored AutoSave preference itself is left untouched.
+  const [uniwork, setUniwork] = useState({ bound: false, readOnly: false })
+  const uniworkRef = useRef(uniwork)
+  uniworkRef.current = uniwork
+  useEffect(() => {
+    let live = true
+    if (!path) {
+      setUniwork({ bound: false, readOnly: false })
+      return
+    }
+    void window.slidesApi
+      .uniworkState?.()
+      .then((s) => {
+        if (live && s) setUniwork({ bound: !!s.bound, readOnly: !!s.readOnly })
+      })
+      .catch(() => {})
+    return () => {
+      live = false
+    }
+  }, [path])
   // web frame: explicit saves only (CONTRACT C10), whatever a stored preference says
-  const autoSave = cap('autoSave') && autoSavePref
+  const autoSave = cap('autoSave') && autoSavePref && !uniwork.bound
   useEffect(() => {
     window.slidesApi.setAutoSavePref?.(autoSave)
   }, [autoSave])
@@ -943,14 +965,18 @@ export function App() {
   const askOpenRef = useRef(false)
 
   const save = useCallback(
-    (quiet = false): Promise<boolean> => fileActions.save(() => ctxRef.current, quiet),
+    (quiet = false, origin: 'user' | 'auto' = 'user'): Promise<boolean> =>
+      // a view-only UniWork document has no Save (the main process refuses it too)
+      uniworkRef.current.readOnly
+        ? Promise.resolve(false)
+        : fileActions.save(() => ctxRef.current, quiet, origin),
     [],
   )
 
   // Close guard (closing tab/window) chose "Save": run the full save flow and report the result
   useEffect(() => {
-    return window.slidesApi.onCloseSaveRequest?.(() => {
-      void save().then(
+    return window.slidesApi.onCloseSaveRequest?.((origin) => {
+      void save(false, origin === 'auto' ? 'auto' : 'user').then(
         (ok) => window.slidesApi.reportCloseSaveResult(ok),
         () => window.slidesApi.reportCloseSaveResult(false),
       )
@@ -1001,7 +1027,7 @@ export function App() {
       void window.slidesApi.isDirty().then((d) => {
         if (!d || saving) return
         saving = true
-        void save(true).finally(() => {
+        void save(true, 'auto').finally(() => {
           saving = false
         })
       })
@@ -2076,11 +2102,21 @@ export function App() {
 
   // ── View modes ──────────────────────────────────────────────────────────
   const onViewMode = useCallback((mode: SlidesViewMode) => {
+    // a view-only UniWork document stays in Reading view (no editing surface)
+    if (uniworkRef.current.readOnly && mode !== 'reading') return
     setViewMode(mode)
     setEditing(null)
     setSelectedIds([])
     setCtxMenu(null)
   }, [])
+  useEffect(() => {
+    if (!uniwork.readOnly) return
+    setViewMode('reading')
+    setEditing(null)
+    setEditingCell(null)
+    setSelectedIds([])
+    setCtxMenu(null)
+  }, [uniwork.readOnly])
 
   // ── Master editing view (full-screen overlay; edits go through slides:master-* IPC) ────────────
   const enterMasterView = useCallback(async () => {
@@ -2116,7 +2152,7 @@ export function App() {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault()
-        setViewMode('normal')
+        if (!uniworkRef.current.readOnly) setViewMode('normal')
       } else if (
         e.key === 'ArrowRight' ||
         e.key === 'ArrowDown' ||
@@ -3248,6 +3284,8 @@ export function App() {
         editing={!!editing || !!editingCell}
         autoSave={autoSave}
         onAutoSaveChange={setAutoSave}
+        uniworkBound={uniwork.bound}
+        uniworkReadOnly={uniwork.readOnly}
         onOpen={() => void openDialog()}
         onSave={() => void save()}
         onUndo={() => void undo()}
@@ -3681,9 +3719,11 @@ export function App() {
                       >
                         {t('appReadingNext')}
                       </button>
-                      <button className="reading-exit" onClick={() => onViewMode('normal')}>
-                        {t('appReadingExit')}
-                      </button>
+                      {!uniwork.readOnly && (
+                        <button className="reading-exit" onClick={() => onViewMode('normal')}>
+                          {t('appReadingExit')}
+                        </button>
+                      )}
                     </div>
                   </div>
                 )

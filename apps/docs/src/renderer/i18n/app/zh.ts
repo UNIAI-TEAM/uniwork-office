@@ -203,6 +203,7 @@ export const zh = {
   appEndnotePlaceholder: '尾注内容…',
   // Quick actions bar
   appAutoSave: '自动保存',
+  appAutoSaveUniworkTip: 'UniWork 文档已关闭自动保存。请使用“保存”保存新版本。',
   appAutoSaveTip: '自动保存(每 30 秒及窗口失焦时)',
   appSaveShortcutTip: '保存 (⌘S)',
   appUndo: '撤销',
@@ -535,6 +536,7 @@ export const zh = {
   appWebNoHost: '此编辑器需在 UniWork 中运行。请从 UniWork 打开文档。',
   appSaveStateUnsaved: '有未保存的更改',
   appSaveStateSaved: '所有更改已保存',
+  appSaveStateViewOnly: '仅查看',
   appSaving: '正在保存…',
   appSavingAs: '正在另存为…',
   appPdfPrintFallback: '无法直接导出 PDF,已改用浏览器打印对话框',

@@ -1533,4 +1533,6 @@ export const ms = {
     'Enjin buku kerja berhenti secara tidak dijangka dan telah dimulakan semula. Buku kerja dibuka semula daripada versi terakhir yang disimpan; perubahan yang belum disimpan dikekalkan, sila simpan segera.',
   appWebSavedReopenFailed:
     'Perubahan anda telah disimpan ke UniWork, tetapi buku kerja tidak dapat dibuka semula di sini. Muat semula editor untuk teruskan.',
+  appAutoSaveUniworkOff:
+    'Simpan automatik dimatikan untuk dokumen UniWork. Gunakan Simpan untuk menyimpan versi baharu.',
 } satisfies Record<keyof typeof zh, string>

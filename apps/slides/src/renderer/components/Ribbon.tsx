@@ -1112,6 +1112,8 @@ export function Ribbon({
   editing,
   autoSave,
   onAutoSaveChange,
+  uniworkBound = false,
+  uniworkReadOnly = false,
   onOpen,
   onSave,
   onUndo,
@@ -1771,7 +1773,7 @@ export function Ribbon({
                 )}
                 {cap('save') && (
                   <button
-                    disabled={!hasDoc}
+                    disabled={!hasDoc || uniworkReadOnly}
                     onClick={() => {
                       setFileOpen(false)
                       onSave()
@@ -1827,7 +1829,7 @@ export function Ribbon({
             className="qa-btn"
             data-tip={t('ribbonSaveTip')}
             aria-label={t('ribbonSaveTip')}
-            disabled={!dirty}
+            disabled={uniworkReadOnly || (!dirty && !uniworkBound)}
             onClick={onSave}
           >
             <IconSave size={16} />
@@ -1867,14 +1869,16 @@ export function Ribbon({
         </button>
         {cap('autoSave') && (
           <label
-            className={`autosave-toggle ${autoSave ? 'on' : ''}`}
-            data-tip={t('ribbonAutoSaveTip')}
+            className={`autosave-toggle ${autoSave ? 'on' : ''}${uniworkBound ? ' disabled' : ''}`}
+            data-tip={t(uniworkBound ? 'ribbonAutoSaveUniworkTip' : 'ribbonAutoSaveTip')}
+            aria-disabled={uniworkBound || undefined}
           >
             <span className="autosave-knob" />
             <span className="autosave-text">{t('ribbonAutoSave')}</span>
             <input
               type="checkbox"
               checked={autoSave}
+              disabled={uniworkBound}
               onChange={(e) => onAutoSaveChange(e.target.checked)}
             />
           </label>

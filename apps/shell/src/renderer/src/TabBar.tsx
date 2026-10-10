@@ -4,6 +4,12 @@ import type { TabsApi, TabSummary } from '../../shared/tabs-api'
 import { TEAR_OFF_SLACK, insertionIndexForX, isBeyondBand } from '../../shared/tab-drag-geometry'
 import { notifyFilesChanged } from './file-events'
 import { useI18n } from './locale'
+import {
+  UniworkNotice,
+  UniworkStatusChip,
+  UniworkTabMarker,
+  useUniworkStatuses,
+} from './UniworkChrome'
 
 declare global {
   interface Window {
@@ -156,6 +162,9 @@ export function TabBar() {
   const { t } = useI18n()
   const [tabs, setTabs] = useState<TabSummary[]>([])
   const stripRef = useRef<HTMLDivElement>(null)
+  // save state of the UniWork documents among the tabs (plain local files have none)
+  const uniwork = useUniworkStatuses(tabs)
+  const activeStatus = uniwork.statusOf(tabs.find((tab) => tab.active)?.filePath)
 
   // Double-click a file tab to rename the underlying file inline (Home's row
   // rename, one tab over): the input prefills the base name, Enter/blur commits
@@ -484,6 +493,8 @@ export function TabBar() {
                 // click count either, so read it off the compat mousedown
                 if (event.button !== 0 || event.detail !== 2) return
                 if (tab.id === 'home' || !tab.filePath) return
+                // a UniWork document's working copy keeps its name: the binding follows the path
+                if (uniwork.statusOf(tab.filePath)) return
                 if ((event.target as HTMLElement).closest('.tab-close')) return
                 if ((event.target as HTMLElement).closest('.tab-rename-input')) return
                 // the input mounts and autofocuses inside this dispatch; the
@@ -523,7 +534,13 @@ export function TabBar() {
             >
               {/* highlight plate behind the content — hover capsule / active white body */}
               <span className="tab-plate" aria-hidden="true" />
-              <span className="tab-icon">{KIND_ICON[tab.kind]}</span>
+              <span className="tab-icon">
+                {KIND_ICON[tab.kind]}
+                {(() => {
+                  const bound = uniwork.statusOf(tab.filePath)
+                  return bound ? <UniworkTabMarker status={bound} /> : null
+                })()}
+              </span>
               {renaming?.id === tab.id ? (
                 <input
                   className="tab-rename-input"
@@ -585,6 +602,10 @@ export function TabBar() {
             />
           </svg>
         </button>
+      </div>
+      <div className="uw-chrome">
+        <UniworkNotice />
+        {activeStatus && <UniworkStatusChip status={activeStatus} onStatus={uniwork.apply} />}
       </div>
       <button
         className="tab-overflow-btn"

@@ -1510,4 +1510,5 @@ export const en = {
     'The workbook engine stopped unexpectedly and was restarted. The workbook was reopened from its last saved version; your unsaved changes are kept, so save soon.',
   appWebSavedReopenFailed:
     'Your changes were saved to UniWork, but the workbook could not be reopened here. Reload the editor to keep working.',
+  appAutoSaveUniworkOff: 'AutoSave is off for UniWork documents. Use Save to save a new version.',
 } satisfies Record<keyof typeof zh, string>

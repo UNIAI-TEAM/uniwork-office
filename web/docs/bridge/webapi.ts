@@ -753,6 +753,11 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
         return null
       }
     },
+
+    // the frame is the UniWork document: no desktop working-copy state, view-only comes from the host grant
+    async uniworkState(_path: string): Promise<{ bound: boolean; readOnly: boolean }> {
+      return { bound: false, readOnly: false }
+    },
   } satisfies Partial<DesktopApi>
 
   // install.ts merges this into window.desktop and assigns `.projectApi` to window.projectApi

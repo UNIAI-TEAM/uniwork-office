@@ -355,10 +355,12 @@ const api: SlidesApi = {
   savePicture: (op: SavePictureOp) => ipcRenderer.invoke('slides:save-picture', op),
   exportPdf: (op: ExportPdfOp) => ipcRenderer.invoke('slides:export-pdf', op),
   printSlides: (op: PrintSlidesOp) => ipcRenderer.invoke('slides:print', op),
-  save: () => ipcRenderer.invoke('slides:save'),
+  save: (origin?: 'user' | 'auto') => ipcRenderer.invoke('slides:save', origin),
+  uniworkState: () => ipcRenderer.invoke('slides:uniwork-state'),
   saveAs: (defaultName: string) => ipcRenderer.invoke('slides:save-as', defaultName),
-  onCloseSaveRequest: (handler: () => void) => {
-    const listener = () => handler()
+  onCloseSaveRequest: (handler: (origin?: 'user' | 'auto') => void) => {
+    const listener = (_event: IpcRendererEvent, origin?: 'user' | 'auto') =>
+      handler(origin === 'auto' ? 'auto' : 'user')
     ipcRenderer.on('slides:close-save-request', listener)
     return () => ipcRenderer.removeListener('slides:close-save-request', listener)
   },

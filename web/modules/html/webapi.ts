@@ -87,6 +87,8 @@ export function createHtmlWebApi(ctx: ModuleBridgeContext, opts: TextWebApiOptio
     presentInNewTab: async () => false,
 
     save: web.save,
+    // the frame is the UniWork document: no desktop working-copy state, view-only comes from the host grant
+    uniworkState: async () => ({ bound: false, readOnly: false }),
     setDirty: web.setDirty,
     onSaveRequest: web.onSaveRequest,
     sendSaveRequestAck: web.sendSaveRequestAck,

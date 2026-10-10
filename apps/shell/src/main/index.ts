@@ -97,6 +97,10 @@ import {
   startUniworkCloud,
   stopUniworkAccount,
 } from './uniwork-auth'
+import { createUniworkDocs, type UniworkDocsHandle } from './uniwork-docs/wiring'
+import { installUniworkModuleSeams } from './uniwork-docs/modules'
+import { createModuleSaveRequester } from './uniwork-docs/module-save'
+import { IPC_CHANNELS as SHEETS_IPC_CHANNELS } from '../../../sheets/src/shared/ipc-channels'
 import { isAgentIntentUrl, parseAgentIntentUrl } from './agent-intent-host'
 import { extractLaunchUrlFromArgv, isOfficeAppUrl, parseOfficeAppUrl } from '@uniwork/office-bridge'
 import { OFFICE_APP_KINDS } from '@uniwork/office-bridge-contracts'
@@ -272,12 +276,14 @@ import {
 import type { TabKind } from '../shared/tabs-api'
 import { TABS_CHANNELS } from '../shared/tabs-api'
 import { showErrorDialog } from './error-dialog'
+import { flushPdfForExport } from './pdf-flush'
 import { startRendererWatchdog } from './renderer-watchdog'
 import {
   capStatPaths,
-  matchesExtFamily,
-  normalizeRecentQuery,
+  enrichWithUniwork,
   pageRecentPaths,
+  pageStarredPaths,
+  type RecentUniworkLookup,
   statPathEntries,
 } from './recent-files'
 import { isMoveSource, isUserVisibleFile, type FileTargetSources } from './file-targets'
@@ -3266,6 +3272,12 @@ function createShellWindow(): void {
     () => {
       win.webContents.send(TABS_CHANNELS.changed, manager.list())
       publishOpenDocumentsIfOwner([...manager.openFilePaths(), ...detachedFilePaths()])
+      // a UniWork copy written outside the save hook shows as dirty once its tab is active
+      const active = manager.activeFilePath()
+      if (active !== lastActiveDocPath) {
+        lastActiveDocPath = active
+        void uniworkDocs?.service.refreshPath(active).catch(() => undefined)
+      }
     },
     applyMenuFor,
     // no extension: these tabs have no file on disk yet; the title becomes the
@@ -3665,6 +3677,50 @@ const droppedFilesDeps = () => ({
   unsupportedMessage: (exts: string[]) => tm('errUnsupportedExt', { ext: exts.join(', ') }),
 })
 
+let uniworkDocs: UniworkDocsHandle | null = null
+/** the active tab's file at the last tab change (UniWork re-checks it on activation) */
+let lastActiveDocPath: string | undefined
+
+/** the tab or detached window showing a path (UniWork documents: Save, reload) */
+function webContentsForPath(
+  path: string,
+): { tabId?: string; kind: TabKind; webContents: WebContents } | undefined {
+  const tab = tabManager?.findTabByPath(path)
+  if (tab) return { tabId: tab.id, kind: tab.kind, webContents: tab.webContents }
+  const detached = findDetachedTabByPath(path)
+  return detached ? { kind: detached.kind, webContents: detached.webContents } : undefined
+}
+
+/** each module's explicit Save, exactly what its File > Save runs */
+const requestUniworkModuleSave = createModuleSaveRequester({
+  targetForPath: webContentsForPath,
+  sheetsMenuChannel: SHEETS_IPC_CHANNELS.menuAction,
+  requestMarkdownSave,
+  requestHtmlSave,
+  flushPdfSave,
+})
+
+function uniworkDocsWiring() {
+  return {
+    shellWindow: () => (shellWindow && !shellWindow.isDestroyed() ? shellWindow : null),
+    shellContents: () =>
+      shellWindow && !shellWindow.isDestroyed() ? shellWindow.webContents : null,
+    openPath: (path: string) => openDocumentPath(path),
+    isPathOpen: (path: string) => webContentsForPath(path) !== undefined,
+    // the module's own Save (same path as the menu), which ends in the user-save hook
+    requestModuleSave: requestUniworkModuleSave,
+    reloadPath: (path: string) => {
+      const target = webContentsForPath(path)
+      if (target?.tabId && tabManager) tabManager.reloadTab(target.tabId)
+      else if (target && !target.webContents.isDestroyed()) target.webContents.reload()
+    },
+    activePath: () => tabManager?.activeFilePath(),
+    reveal: revealShellWindow,
+    lang: () => currentLang(),
+    defaultSaveDir: () => defaultSaveDir(),
+  }
+}
+
 function registerDroppedFilesIpc(): void {
   ipcMain.on(DROP_OPEN_CHANNEL, (_event, raw: unknown) =>
     handleDroppedFiles(raw, droppedFilesDeps()),
@@ -4025,6 +4081,10 @@ function statEntries(paths: string[]): RecentEntry[] {
   return statPathEntries(paths, new Set(readStarredFiles()))
 }
 
+/** recents, starred and search share one rule for UniWork working copies */
+const uniworkRecentLookup: RecentUniworkLookup = (path) =>
+  uniworkDocs ? uniworkDocs.service.recentSource(path) : null
+
 function registerHomeIpc(): void {
   // UniWork account (desktop PKCE sign-in): the manager in ./uniwork-auth owns
   // tokens and state; the renderer only gets AccountStatus pushes.
@@ -4032,6 +4092,9 @@ function registerHomeIpc(): void {
   registerAccountIpc(ipcMain, () =>
     shellWindow && !shellWindow.isDestroyed() ? shellWindow.webContents : null,
   )
+  // UniWork documents (open from UniWork, launch links, Save to UniWork); logic in ./uniwork-docs
+  uniworkDocs = createUniworkDocs(ipcMain, uniworkDocsWiring())
+  installUniworkModuleSeams(uniworkDocs.service)
 
   // Reserved for the Hub result channel; the ack is not reported anywhere today.
   ipcMain.handle(HOME_CHANNELS.agentIntentAck, () => undefined)
@@ -4072,7 +4135,7 @@ function registerHomeIpc(): void {
   )
 
   ipcMain.handle(HOME_CHANNELS.recents, (_event, query: unknown): RecentPage =>
-    pageRecentPaths(readRecentFiles(), query, new Set(readStarredFiles())),
+    pageRecentPaths(readRecentFiles(), query, new Set(readStarredFiles()), uniworkRecentLookup),
   )
 
   ipcMain.handle(HOME_CHANNELS.searchFiles, (_event, raw: unknown): FileSearchPage => {
@@ -4090,9 +4153,14 @@ function registerHomeIpc(): void {
     const limit = Number.isFinite(query.limit) ? Math.max(0, Math.floor(query.limit!)) : 50
     const starred = new Set(readStarredFiles())
     const result = q ? fileIndexStore.search(q, { exts, offset, limit }) : { hits: [], total: 0 }
+    const hits = enrichWithUniwork(
+      result.hits.map((h) => ({ ...h, starred: starred.has(h.path) })),
+      uniworkRecentLookup,
+    )
     return {
-      hits: result.hits.map((h) => ({ ...h, starred: starred.has(h.path) })),
-      total: result.total,
+      hits,
+      // another account's copies are dropped from the page, so the count follows
+      total: Math.max(hits.length, result.total - (result.hits.length - hits.length)),
       index: indexer.progress(),
     }
   })
@@ -4136,17 +4204,9 @@ function registerHomeIpc(): void {
     probeDecision(normalizeFileSearchSettings(input)),
   )
 
-  // Starred files sort by mtime, which requires stat-ing them all first; they are hand-picked and few, so this is fine
-  ipcMain.handle(HOME_CHANNELS.starred, (_event, query: unknown): RecentPage => {
-    const { offset, limit, ext } = normalizeRecentQuery(query)
-    const all = statEntries(readStarredFiles()).sort((a, b) => b.mtimeMs - a.mtimeMs)
-    const filtered = ext ? all.filter((entry) => matchesExtFamily(entry.ext, ext)) : all
-    return {
-      entries: limit === 0 ? [] : filtered.slice(offset, offset + limit),
-      total: filtered.length,
-      totalAll: all.length,
-    }
-  })
+  ipcMain.handle(HOME_CHANNELS.starred, (_event, query: unknown): RecentPage =>
+    pageStarredPaths(readStarredFiles(), query, uniworkRecentLookup),
+  )
 
   ipcMain.handle(HOME_CHANNELS.statPaths, (_event, paths: unknown): RecentEntry[] =>
     statEntries(capStatPaths(stringPaths(paths))),
@@ -5496,7 +5556,7 @@ async function exportPdfAsDocxLocal(): Promise<void> {
   }
   exportingPdfDocx = true
   try {
-    if (!(await flushPdfSave(tab.webContents))) return
+    if (!(await flushPdfForExport(flushPdfSave, tab.webContents))) return
     const picked = await showSaveDialogWithMemory(dialog, host, {
       defaultPath: tab.filePath.replace(/\.pdf$/i, '.docx'),
       filters: [{ name: tm('filterWord'), extensions: ['docx'] }],
@@ -5636,7 +5696,7 @@ async function exportPdfAsPptxLocal(): Promise<void> {
   }
   exportingPdfDocx = true
   try {
-    if (!(await flushPdfSave(tab.webContents))) return
+    if (!(await flushPdfForExport(flushPdfSave, tab.webContents))) return
     const picked = await showSaveDialogWithMemory(dialog, host, {
       defaultPath: tab.filePath.replace(/\.pdf$/i, '.pptx'),
       filters: [{ name: tm('filterPpt'), extensions: ['pptx'] }],
@@ -5747,7 +5807,7 @@ async function exportPdfAsXlsxLocal(): Promise<void> {
   }
   exportingPdfDocx = true
   try {
-    if (!(await flushPdfSave(tab.webContents))) return
+    if (!(await flushPdfForExport(flushPdfSave, tab.webContents))) return
     const picked = await showSaveDialogWithMemory(dialog, host, {
       defaultPath: tab.filePath.replace(/\.pdf$/i, '.xlsx'),
       filters: [{ name: tm('filterExcel'), extensions: ['xlsx'] }],
@@ -6098,11 +6158,13 @@ app.whenReady().then(async () => {
   const lockData = () =>
     authCallbacks.pending()
       ? { authCallbackUrl: authCallbacks.pending() }
-      : pendingLaunchUrl
-        ? { launchUrl: pendingLaunchUrl }
-        : pendingLaunchPaths.length > 0
-          ? { launchPath: pendingLaunchPaths[0], launchPaths: pendingLaunchPaths }
-          : {}
+      : authCallbacks.pendingLaunch()
+        ? { officeLaunchUrl: authCallbacks.pendingLaunch() }
+        : pendingLaunchUrl
+          ? { launchUrl: pendingLaunchUrl }
+          : pendingLaunchPaths.length > 0
+            ? { launchPath: pendingLaunchPaths[0], launchPaths: pendingLaunchPaths }
+            : {}
   let hasLock = app.requestSingleInstanceLock(lockData())
   if (!hasLock && !app.isPackaged) {
     // Dev watch restart: electron-vite SIGTERMs the previous instance and spawns this
@@ -6270,6 +6332,8 @@ app.whenReady().then(async () => {
   startUniworkAccount(mainProxyReady)
   startUniworkCloud()
   authCallbacks.start(routeAuthCallback)
+  // UniWork document launch links (held since startup) route from here on
+  uniworkDocs?.activate((route) => authCallbacks.startLaunch(route))
 
   // resource watchdog: a renderer that stays hot for minutes gets diagnostics
   // recorded and the user an offer to close the document (headless exports

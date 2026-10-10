@@ -10,6 +10,7 @@ export const PDF_CHANNELS = {
   requestRedactionCopy: 'pdf:request-redaction-copy',
   autoRename: 'pdf:auto-rename',
   isUntitled: 'pdf:is-untitled',
+  uniworkState: 'pdf:uniwork-state',
   validateTextEdits: 'pdf:validate-text-edits',
   listEditFonts: 'pdf:list-edit-fonts',
   canDrawText: 'pdf:can-draw-text',
@@ -511,6 +512,24 @@ export interface SavePdfRequest {
   /** New page order (array of original page indices, excluding deleted); omitted if unreordered */
   pageOrder?: number[]
   metadata?: MetadataInput
+  /** Who asked: explicit Save (`user`), autosave (`auto`) or an app-internal flush
+      (`internal`). Absent behaves as before (Save As never sets it). */
+  origin?: 'user' | 'auto' | 'internal'
+}
+
+/** UniWork document state of the open file: bound working copy and/or view only */
+/**
+ * What main asks the renderer to save on closeSaveRequest. `user`: the close
+ * prompt's Save or the menu Save. `internal`: an app-driven flush before an
+ * export, which is never the user's Save (it must not report to UniWork).
+ */
+export interface PdfCloseSaveRequest {
+  origin: 'user' | 'internal'
+}
+
+export interface PdfUniworkState {
+  bound: boolean
+  readOnly: boolean
 }
 
 /** A text edit that could not be matched to the document at save time and was skipped */
@@ -723,6 +742,8 @@ export interface PdfApi {
   /** Whether the file is a shell-created blank still carrying its untitled name
       (gates the after-AI-run silent save; a PDF the user merely opened must never auto-write) */
   isUntitled(path: string): Promise<boolean>
+  /** UniWork state of a path granted to this view (all false for plain local files); absent where the renderer runs without the desktop shell (browser harness), then a plain local file */
+  uniworkState?(path: string): Promise<PdfUniworkState>
   /** Dry-run match of pending text edits against the file: reason null = would apply */
   validateTextEdits(request: ValidateTextEditsRequest): Promise<TextEditValidation[]>
   /** EDIT_FONTS ids whose font file exists on this machine */
@@ -783,8 +804,8 @@ export interface PdfApi {
   getUsername(): Promise<string>
   /** Mirror unsaved-changes state to the main process; drives the save prompt before closing a tab/window */
   setDirty(dirty: boolean): void
-  /** Main process picked "Save" in the close prompt → renderer saves and replies via sendCloseSaveResult */
-  onCloseSaveRequest(handler: () => void): () => void
+  /** Main process picked "Save" in the close prompt, or flushes before an export → renderer saves with that origin and replies via sendCloseSaveResult */
+  onCloseSaveRequest(handler: (request: PdfCloseSaveRequest) => void): () => void
   sendCloseSaveResult(ok: boolean): void
   /** Shell menu Save As → renderer writes pending edits to targetPath only (original untouched) and replies via sendSaveAsResult */
   onSaveAsRequest(handler: (targetPath: string) => void): () => void

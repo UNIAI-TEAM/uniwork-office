@@ -38,8 +38,14 @@ import type {
   FileSearchPage,
   FileSearchRerank,
   FileSearchSettings,
+  UniworkDocErrorCode,
+  UniworkDocListPage,
+  UniworkDocStatus,
+  UniworkLaunchEvent,
+  UniworkResult,
+  UniworkWorkspaceRef,
 } from '../shared/home-api'
-import { HOME_CHANNELS, PROJECT_CHANNELS } from '../shared/home-api'
+import { HOME_CHANNELS, PROJECT_CHANNELS, UNIWORK_DOC_CHANNELS } from '../shared/home-api'
 import { INTEGRATIONS_CHANNELS } from '../shared/integrations-api'
 import type {
   IntegrationsApi,
@@ -48,6 +54,15 @@ import type {
 } from '../shared/integrations-api'
 import type { TabsApi, TabSummary } from '../shared/tabs-api'
 import { TABS_CHANNELS } from '../shared/tabs-api'
+import { createLaunchReplay } from './launch-replay'
+
+// subscribed at preload time: a cold-start launch event can arrive before the
+// renderer subscribes, and is then held for the first subscriber
+const uniworkLaunches = createLaunchReplay<UniworkLaunchEvent>()
+ipcRenderer.on(
+  UNIWORK_DOC_CHANNELS.launchEvent,
+  (_event: IpcRendererEvent, event: UniworkLaunchEvent) => uniworkLaunches.deliver(event),
+)
 
 const UI_LANGUAGES: readonly UiLanguage[] = [
   'zh',
@@ -107,6 +122,26 @@ function normalizeDefaultAppStatus(result: unknown): DefaultAppStatus {
     others: Array.isArray(r.others) ? r.others.filter((x) => typeof x === 'string') : [],
     manualOnly: r.manualOnly === true,
   }
+}
+
+/** main answers every UniWork call with a result; anything else is a broken reply */
+function asUniworkResult<T>(result: unknown): UniworkResult<T> {
+  if (
+    result &&
+    typeof result === 'object' &&
+    typeof (result as { ok?: unknown }).ok === 'boolean'
+  ) {
+    return result as UniworkResult<T>
+  }
+  return { ok: false, error: 'malformed_response' satisfies UniworkDocErrorCode }
+}
+
+function asUniworkStatus(result: unknown): UniworkDocStatus | null {
+  return result &&
+    typeof result === 'object' &&
+    typeof (result as UniworkDocStatus).path === 'string'
+    ? (result as UniworkDocStatus)
+    : null
 }
 
 const homeApi: HomeApi = {
@@ -723,6 +758,41 @@ const homeApi: HomeApi = {
         canceled?: boolean
       }
     },
+  },
+  async uniworkListWorkspaces() {
+    return asUniworkResult<UniworkWorkspaceRef[]>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.listWorkspaces),
+    )
+  },
+  async uniworkListDocuments(query) {
+    return asUniworkResult<UniworkDocListPage>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.listDocuments, query),
+    )
+  },
+  async uniworkOpenDocument(documentId) {
+    return asUniworkResult<{ path: string }>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.openDocument, documentId),
+    )
+  },
+  async uniworkDocStatus(path) {
+    return asUniworkStatus(await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.docStatus, path))
+  },
+  async uniworkActiveDocStatus() {
+    return asUniworkStatus(await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.activeDocStatus))
+  },
+  onUniworkDocStatus(cb) {
+    const listener = (_event: IpcRendererEvent, status: UniworkDocStatus) => cb(status)
+    ipcRenderer.on(UNIWORK_DOC_CHANNELS.docStatusEvent, listener)
+    return () => ipcRenderer.removeListener(UNIWORK_DOC_CHANNELS.docStatusEvent, listener)
+  },
+  async uniworkSave(path) {
+    return asUniworkStatus(await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.save, path))
+  },
+  async uniworkResolveConflict(path) {
+    return asUniworkStatus(await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.resolveConflict, path))
+  },
+  onUniworkLaunch(cb) {
+    return uniworkLaunches.subscribe(cb)
   },
 }
 

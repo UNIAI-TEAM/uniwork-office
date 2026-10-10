@@ -88,7 +88,16 @@ async function runSerialized<T>(pass: () => Promise<T>): Promise<T> {
   return current
 }
 
-export async function save(getCtx: () => ActionCtx, quiet = false): Promise<boolean> {
+/**
+ * `origin` 'auto' marks an AutoSave pass so the main process can keep it off a
+ * UniWork document and out of the UniWork user-save hook; every explicit Save
+ * (button, menu, shortcut, close-guard Save) leaves it at 'user'.
+ */
+export async function save(
+  getCtx: () => ActionCtx,
+  quiet = false,
+  origin: 'user' | 'auto' = 'user',
+): Promise<boolean> {
   // web frame without the host's save grant: the deck is view-only
   if (isViewOnly()) return false
   return runSerialized(async () => {
@@ -96,7 +105,7 @@ export async function save(getCtx: () => ActionCtx, quiet = false): Promise<bool
     const ctx = getCtx()
     await flushActiveEdit(ctx)
     await ctx.flushNotes()
-    const r = await window.slidesApi.save()
+    const r = await window.slidesApi.save(origin)
     if (r.ok) {
       if (r.slides) adoptSavedSlides(ctx, r.slides)
       if (r.path) ctx.setPath(r.path)

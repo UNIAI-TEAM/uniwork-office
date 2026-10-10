@@ -215,6 +215,8 @@ export const ko = {
   appEndnotePlaceholder: '미주 내용…',
   // Quick actions bar
   appAutoSave: '자동 저장',
+  appAutoSaveUniworkTip:
+    'UniWork 문서에서는 자동 저장이 꺼져 있습니다. 새 버전을 저장하려면 ‘저장’을 사용하세요.',
   appAutoSaveTip: '자동 저장(30초마다, 창 포커스가 해제될 때)',
   appSaveShortcutTip: '저장 (⌘S)',
   appUndo: '실행 취소',
@@ -549,6 +551,7 @@ export const ko = {
   appWebNoHost: '이 편집기는 UniWork 안에서 실행됩니다. UniWork에서 문서를 여세요.',
   appSaveStateUnsaved: '저장되지 않은 변경 내용',
   appSaveStateSaved: '모든 변경 내용이 저장됨',
+  appSaveStateViewOnly: '보기 전용',
   appSaving: '저장 중…',
   appSavingAs: '다른 이름으로 저장 중…',
   appPdfPrintFallback: 'PDF를 직접 내보낼 수 없어 브라우저 인쇄 대화 상자를 대신 사용했습니다',

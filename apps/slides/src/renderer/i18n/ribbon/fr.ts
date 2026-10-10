@@ -40,6 +40,8 @@ export const fr = {
   ribbonSaveTip: 'Enregistrer (⌘S)',
   ribbonAutoSave: 'Enreg. auto',
   ribbonAutoSaveTip: 'Enregistre dans le fichier toutes les 30 secondes',
+  ribbonAutoSaveUniworkTip:
+    'L’enregistrement automatique est désactivé pour les documents UniWork. Utilisez Enregistrer pour enregistrer une nouvelle version.',
   ribbonUndo: 'Annuler',
   ribbonRedo: 'Rétablir',
   ribbonGroupClipboard: 'Presse-papiers',

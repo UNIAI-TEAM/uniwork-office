@@ -51,6 +51,7 @@
  */
 import type {
   PdfApi,
+  PdfCloseSaveRequest,
   SavePdfRequest,
   SavePdfResult,
   TextEditFailure,
@@ -284,7 +285,7 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
   // ------------------------------------------------------------ renderer hooks
 
   const reloadListeners = new Set<(path: string) => void>()
-  const closeSaveHandlers = new Set<() => void>()
+  const closeSaveHandlers = new Set<(request: PdfCloseSaveRequest) => void>()
   let closeSaveWaiters: Array<(ok: boolean) => void> = []
   const saveAsHandlers = new Set<(target: string) => void>()
   const printHandlers = new Set<() => void>()
@@ -307,7 +308,8 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
       }
       const t = setTimeout(() => finish(false), deps.saveTimeoutMs ?? 180_000)
       closeSaveWaiters.push(finish)
-      for (const h of closeSaveHandlers) h()
+      // a host save request is the user's explicit Save
+      for (const h of closeSaveHandlers) h({ origin: 'user' })
     })
   }
 
@@ -979,6 +981,8 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
     onAiPreset: () => () => {},
     autoRename: async () => ({ renamed: false }),
     isUntitled: async () => false,
+    // the frame is the UniWork document: no desktop working-copy state, view-only comes from the host grant
+    uniworkState: async () => ({ bound: false, readOnly: false }),
     // null = "no OCR engine on this platform": the viewer stops trying
     ocrPage: async () => null,
     convertOffice: async () => {},

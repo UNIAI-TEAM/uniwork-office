@@ -28,6 +28,8 @@ export const ko = {
   replaceAll: '모두 바꾸기',
   findTip: '찾기 및 바꾸기 (⌘F)',
   autoSaveTip: '30초마다 및 창이 포커스를 잃을 때 자동 저장',
+  autoSaveUniworkOff:
+    'UniWork 문서에서는 자동 저장이 꺼져 있습니다. 새 버전을 저장하려면 ‘저장’을 사용하세요.',
   zoom: '확대·축소',
   zoomIn: '확대',
   zoomOut: '축소',

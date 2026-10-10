@@ -88,6 +88,23 @@ export interface SaveOutcome {
   error?: string
 }
 
+/** UniWork seam: a quiet save is AutoSave (timer, blur, AI-run); anything else is the user's Save. */
+export function saveOrigin(quiet: boolean): 'user' | 'auto' {
+  return quiet ? 'auto' : 'user'
+}
+
+/** UniWork seam: a bound, editable workbook's explicit Save writes even when nothing is pending. */
+export function uniworkForcesWrite(file: Pick<WorkbookFile, 'uniworkBound' | 'readOnly'>): boolean {
+  return file.uniworkBound === true && !file.readOnly
+}
+
+/** UniWork seam: the module's own AutoSave never runs on a UniWork document (bound or view-only). */
+export function uniworkAutoSaveLocked(
+  file: Pick<WorkbookFile, 'uniworkBound' | 'readOnly'> | null | undefined,
+): boolean {
+  return file?.uniworkBound === true || file?.readOnly === true
+}
+
 /**
  * mode 'recovery': assemble the very same payload but hand it to the
  * crash-recovery writer instead of the save pipeline — no dialogs, no status
@@ -307,7 +324,10 @@ export async function handleSave(
   // An unsaved new workbook's Save is its first Save As, journal or not: a
   // quiet AutoSave may already have moved the work into the backing file.
   const firstSaveAs = mode === 'save' && state.file.unsavedNew === true && !quiet
-  if (total === 0 && mode !== 'save-as' && !restoreWriteBack && !firstSaveAs) {
+  // An explicit Save of a UniWork-bound workbook always writes, pending edits
+  // or not: the shell uploads what the Save wrote (Retry after a failed upload).
+  const forceWrite = mode === 'save' && !quiet && uniworkForcesWrite(state.file)
+  if (total === 0 && mode !== 'save-as' && !restoreWriteBack && !firstSaveAs && !forceWrite) {
     if (mode !== 'recovery') ctx.setMessage(t('appNoEditsToSave'))
     return { ok: false }
   }
@@ -434,6 +454,9 @@ export async function handleSave(
       mode,
       ...(restoreWriteBack ? { restoreWriteBack: true } : {}),
       ...(quiet ? { quiet: true } : {}),
+      // MCP saves (explicitTarget) carry no origin: they never count as a user Save
+      ...(explicitTarget ? {} : { origin: saveOrigin(quiet) }),
+      ...(forceWrite ? { forceWrite: true } : {}),
       ...(csvContent === undefined ? {} : { csvContent }),
       // MCP explicit-path save: main skips the Save-As dialog for these
       ...(explicitTarget
