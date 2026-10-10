@@ -6,6 +6,7 @@ import {
   useRibbonCollapse,
 } from '@genoffice/ui'
 import { useI18n } from '../i18n/locale'
+import { useRibbonFit } from './ribbon-fit'
 import type { StringKey } from '../i18n/locale'
 import { GensparkMark } from '../ai/AiPanel'
 import type { InsertKind, InsertOptions } from '../document/insert-presets'
@@ -142,7 +143,12 @@ const TABLE_PICKER_COLS = 10
 const ICON = 20
 
 export function Ribbon(p: Props) {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
+  const bodyRef = useRef<HTMLDivElement>(null)
+  const fit = useRibbonFit(
+    bodyRef,
+    `${lang}|${p.showAi !== false}|${p.presentNewTab !== false}|${p.readOnly ?? false}`,
+  )
   const collapse = useRibbonCollapse('htmlapp.ribbonCollapsed', {
     collapse: t('ribbonCollapse'),
     expand: t('ribbonExpand'),
@@ -292,7 +298,7 @@ export function Ribbon(p: Props) {
         <RibbonExpandButton state={collapse} label={t('ribbonExpand')} />
       </div>
 
-      <div className="ribbon-body" data-ribbon-body="">
+      <div className="ribbon-body" data-ribbon-body="" data-fit={fit} ref={bodyRef}>
         {p.showAi !== false && (
           <>
             <div className="ribbon-group">
@@ -385,7 +391,7 @@ export function Ribbon(p: Props) {
           </>
         )}
 
-        <div className="ribbon-group">
+        <div className="ribbon-group ribbon-insert">
           <div className="ribbon-group-items">
             {/* the ribbon has no Insert tab: the row itself says what these buttons do */}
             <span className="rb-group-lead" aria-hidden="true">

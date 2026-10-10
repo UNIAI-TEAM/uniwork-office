@@ -301,6 +301,20 @@ html.genoffice-popover-open .ribbon-tabs {
   flex-shrink: 0;
 }
 
+/* fit levels (components/ribbon-fit.ts): shed labels instead of cutting commands off. The label is
+   clipped, not removed, so each command keeps its accessible name (and its tooltip). */
+.ribbon-body[data-fit='1'] .ribbon-insert .rb-btn > span,
+.ribbon-body[data-fit='1'] .ribbon-insert .rb-group-lead,
+.ribbon-body[data-fit='2'] .rb-view > span,
+.ribbon-body[data-fit='2'] .rb-group-lead {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 .ribbon-group-items {
   display: flex;
   align-items: center;
