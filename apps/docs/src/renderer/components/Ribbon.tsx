@@ -2475,6 +2475,7 @@ function RibbonInner({
                 <button
                   className="table-style-card"
                   data-tip={t('ribbonRemoveTableStyleTip')}
+                  aria-label={t('ribbonNoStyle')}
                   onClick={() => chain().updateAttributes('docTable', { tblStyleId: null }).run()}
                 >
                   <span className="table-style-card-grid plain" />
@@ -2485,6 +2486,7 @@ function RibbonInner({
                     key={preset.label}
                     className="table-style-card"
                     data-tip={t(preset.label)}
+                    aria-label={t(preset.label)}
                     onClick={() => runTableCommand(applyTablePreset(preset))}
                   >
                     <span
@@ -2509,6 +2511,7 @@ function RibbonInner({
                           : 'table-style-card'
                       }
                       data-tip={t('ribbonApplyTableStyleTip', { name: info.name })}
+                      aria-label={info.name}
                       onClick={() =>
                         chain().updateAttributes('docTable', { tblStyleId: info.styleId }).run()
                       }

@@ -536,6 +536,10 @@ for (const [lang, theme] of [
     )
     expect(fatal).toHaveLength(1)
     expect(fatal[0]!.payload.fatal).toBe(true)
+    // the sizes the host needs for its one sentence (visual r2 S-07)
+    const details = (fatal[0]!.payload.error as { details?: Record<string, number> }).details
+    expect(details?.limitBytes).toBe(80 * 1024 * 1024)
+    expect(details?.worksheetXmlBytes).toBeGreaterThan(80 * 1024 * 1024)
     await page.screenshot({ path: resolve(shots, `too-large-${lang}-${theme}.png`) })
     expect({ csp: await cspViolations(page, frame), ...problems }).toEqual({
       csp: [],
@@ -549,8 +553,15 @@ for (const [lang, theme] of [
 test('a blank new workbook opens and edits save (en, dark)', async ({ page }) => {
   test.skip(!built(), 'no dist-web/sheets build: npm run build:web -- --module sheets')
   const problems = await watch(page)
+  // visual r2 S-09: Univer warned "Component UI_PLUGIN_SHEETS_MENU_ITEM_INPUT_COMPONENT already exists."
+  const warnings: string[] = []
+  page.on('console', (m) => {
+    if (m.type() === 'warning') warnings.push(m.text())
+  })
   const frame = await openFrame(page, 'lang=en&theme=dark')
   await shown(frame)
+  await page.waitForTimeout(1500) // the Enter wrapper installs by polling for the component
+  expect(warnings.filter((w) => /already exists/.test(w))).toEqual([])
   await typeIntoGrid(page, frame, [{ cell: 'A1', text: 'hello' }])
   await page.keyboard.press('Control+s')
   await expect.poll(() => lastSaved(page), { timeout: 60_000 }).not.toBeNull()

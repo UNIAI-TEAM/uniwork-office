@@ -565,7 +565,11 @@ describe('too large (frame size gate)', () => {
     const tooLarge = {
       ...fake.transport,
       open: async () => {
-        throw Object.assign(new Error('too_large: 42 MB of worksheet XML'), { code: 'too_large' })
+        throw Object.assign(new Error('too_large: 42 MB of worksheet XML'), {
+          code: 'too_large',
+          worksheetXmlBytes: 42 * 1048576,
+          limitBytes: 80 * 1048576,
+        })
       },
     }
     const t = setup({ transport: tooLarge })
@@ -576,6 +580,10 @@ describe('too large (frame size gate)', () => {
     const fatal = t.mock.errors.filter((e) => (e.error as { code?: string }).code === 'too_large')
     expect(fatal).toHaveLength(1)
     expect(fatal[0]!.fatal).toBe(true)
+    // the sizes the host needs for its one-sentence reason (visual round 2, S-07)
+    expect(fatal[0]!.error).toMatchObject({
+      details: { worksheetXmlBytes: 42 * 1048576, limitBytes: 80 * 1048576 },
+    })
   })
 })
 

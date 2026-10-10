@@ -119,6 +119,7 @@ import {
   aiPanelInitiallyOpen,
   rememberAiPanelOpen,
   useDismissablePopover,
+  mountRibbonOverflowCue,
   useRibbonCollapse,
 } from '@genoffice/ui'
 import { useI18n } from './i18n/locale'
@@ -310,6 +311,14 @@ export default function App() {
   const [status, setStatus] = useState<'loading' | 'error' | 'empty' | 'password' | 'ready'>(
     'loading',
   )
+  // The hook mounts the ribbon's overflow cue once, at App mount; this ribbon only renders after the
+  // file has loaded, so mount the cue again when it appears (the hook's own mount found no root).
+  const ribbonRootRef = collapse.rootRef
+  useEffect(() => {
+    const root = ribbonRootRef.current
+    if (!root || root.querySelector('.ribbon-overflow-cue')) return undefined
+    return mountRibbonOverflowCue(root)
+  }, [ribbonRootRef, status, doc])
   const [sizes, setSizes] = useState<PageSize[]>([])
   const [pageOrigins, setPageOrigins] = useState<[number, number][]>([])
   const [pageUserUnits, setPageUserUnits] = useState<number[]>([])
@@ -6397,22 +6406,27 @@ export default function App() {
             </button>
           )}
           <span className="ribbon-tabs-spacer" />
-          {(viewOnly || encryptedReadOnly) && (
+          {/* On the web the host header owns the save state and one host banner the view-only
+              notice (`saveStatus` / `viewOnlyChip` off): the ribbon row repeats neither. */}
+          {((viewOnly && cap('viewOnlyChip')) || encryptedReadOnly) && (
             <span className="tb-readonly">{t(viewOnly ? 'webViewOnly' : 'roEncrypted')}</span>
           )}
           {/* The file on disk is only touched by an explicit save until then. */}
-          {saveState === 'saving' ? (
-            <span className="tb-save-pending">{t('saving')}</span>
-          ) : (
-            dirty &&
-            saveState !== 'error' && <span className="tb-save-pending">{t('unsaved')}</span>
-          )}
-          {saveState === 'error' && (
+          {cap('saveStatus') &&
+            (saveState === 'saving' ? (
+              <span className="tb-save-pending">{t('saving')}</span>
+            ) : (
+              dirty &&
+              saveState !== 'error' && <span className="tb-save-pending">{t('unsaved')}</span>
+            ))}
+          {cap('saveStatus') && saveState === 'error' && (
             <span className="tb-save-error" data-tip={saveError}>
               {t('saveFailed')}
             </span>
           )}
-          {saveState === 'saved' && <span className="tb-save-ok">{t('savedOk')}</span>}
+          {cap('saveStatus') && saveState === 'saved' && (
+            <span className="tb-save-ok">{t('savedOk')}</span>
+          )}
           {formHasXfa && (
             <span className="tb-form-warning" data-tip={t('formXfaWarning')}>
               XFA

@@ -43,6 +43,7 @@ import { mergeModules, safeApi, type BridgeObject } from './safe-api'
 import ai from './ai'
 import hide, { hostGrants, webCapabilities } from './hide'
 import { createHeadless, isTopLevel, parseHeadlessEntry } from './headless'
+import { installFocusReturn } from './focus-return'
 import {
   AI_FRAME_CAPABILITIES,
   aiHostGrants,
@@ -99,6 +100,8 @@ export function installBridge(): void {
   win.desktop = safeApi(desktop)
   win.projectApi = (webapi.projectApi as BridgeObject) ?? {}
   win.__docsWebBridge = true
+  // the host leave dialog hands the focus back to the frame window: put it in the editor again
+  if (!headless) installFocusReturn()
 }
 
 installBridge()

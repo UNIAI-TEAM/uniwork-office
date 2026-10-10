@@ -81,7 +81,18 @@ for (const width of [768, 390]) {
     await expect(ed.locator('.ai-dock.collapsed')).toHaveCount(1)
     const page1 = await ed.locator('.doc-zoom').first().boundingBox()
     expect(page1!.width).toBeGreaterThan(width * 0.6)
-    expect(page1!.x + page1!.width).toBeLessThanOrEqual(width + 1)
+    // a phone pane keeps a readable zoom (the page scrolls sideways inside the editor scroller);
+    // from 768 up the page fits the pane
+    if (width <= 600) {
+      const zoomPct = await ed.evaluate(() => {
+        const el = document.querySelector('.doc-zoom') as HTMLElement
+        const z = Number.parseFloat(getComputedStyle(el).zoom)
+        return Number.isFinite(z) ? z * 100 : 100
+      })
+      expect(zoomPct).toBeGreaterThanOrEqual(59)
+    } else {
+      expect(page1!.x + page1!.width).toBeLessThanOrEqual(width + 1)
+    }
     // opened, the panel overlays the page: the page does not shrink or move
     await ed.locator('.ai-dock .ai-rail').click()
     await expect(ed.locator('.ai-dock:not(.collapsed)')).toHaveCount(1)
@@ -99,6 +110,11 @@ for (const width of [768, 390]) {
       return { sw: t.scrollWidth, cw: t.clientWidth }
     })
     if (width <= 700) expect(tabs.sw).toBeGreaterThanOrEqual(tabs.cw)
+    // the command band is wider than a phone frame: it scrolls and says so (shared overflow cue)
+    if (width <= 600) {
+      await expect(ed.locator('.ribbon')).toHaveAttribute('data-ribbon-overflow', /start|end|both/)
+      await expect(ed.locator('.ribbon-overflow-cue:not([hidden])').first()).toBeVisible()
+    }
   })
 }
 
@@ -129,4 +145,34 @@ test('docs-web: Table Design tab is Vietnamese in vi', async ({ page }) => {
     'Blue Header',
   ])
     expect(labels).not.toContain(word)
+})
+
+// DP (UNI-1232, visual r2 F-12): the host leave dialog takes the keyboard focus and hands it back to
+// the frame window; the caret must be in the editor again (typing and Ctrl+S work without a click)
+test('docs-web: keyboard focus returns to the editor after a host dialog closes', async ({
+  page,
+}) => {
+  const ed = await openDoc(page, '&lang=en')
+  const editor = ed.locator('.ProseMirror').first()
+  await editor.getByText(TEXT, { exact: false }).first().click()
+  const hostTakesFocus = () =>
+    page.evaluate(() => {
+      const b = document.createElement('button')
+      document.body.append(b)
+      b.focus()
+    })
+  const hostHandsFocusBack = () =>
+    page.evaluate(() => {
+      const f = document.querySelector('#frame') as HTMLIFrameElement
+      f.focus()
+      f.contentWindow?.focus()
+    })
+  await hostTakesFocus()
+  await hostHandsFocusBack()
+  await expect
+    .poll(() => ed.evaluate(() => !!document.activeElement?.closest('.ProseMirror')))
+    .toBe(true)
+  // typing lands in the document
+  await page.keyboard.type('zq')
+  await expect(editor).toContainText('zq')
 })

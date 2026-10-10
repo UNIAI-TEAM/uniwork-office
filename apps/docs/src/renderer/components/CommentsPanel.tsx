@@ -171,7 +171,9 @@ export const CommentsPanel = memo(function CommentsPanel({
     const head = (
       <div className="comment-card-head">
         <span className="comment-avatar">{(c.initials || c.author || '?').slice(0, 2)}</span>
-        <span className="comment-author">{c.author || t('appUnknownAuthor')}</span>
+        <span className="comment-author" title={c.author || undefined}>
+          {c.author || t('appUnknownAuthor')}
+        </span>
         <span className="comment-date">{formatDate(c.date)}</span>
         {c.done && <span className="comment-resolved-badge">{t('appResolved')}</span>}
         <span
@@ -254,7 +256,9 @@ export const CommentsPanel = memo(function CommentsPanel({
           <div key={r.id} className="comment-reply">
             <div className="comment-card-head">
               <span className="comment-avatar">{(r.initials || r.author || '?').slice(0, 2)}</span>
-              <span className="comment-author">{r.author || t('appUnknownAuthor')}</span>
+              <span className="comment-author" title={r.author || undefined}>
+                {r.author || t('appUnknownAuthor')}
+              </span>
               <span className="comment-date">{formatDate(r.date)}</span>
               <span
                 className="comment-card-edit"

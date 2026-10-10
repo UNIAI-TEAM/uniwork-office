@@ -231,6 +231,9 @@ function shapeTextStateOf(
   }
 }
 
+/** the face a page paints in when neither the styles nor docDefaults name one (the .docx-page CSS default) */
+export const DEFAULT_DOC_FONT = 'Calibri'
+
 export function computeFormatState(
   editor: Editor | null,
   styles?: Map<string, StyleInfo>,
@@ -288,7 +291,9 @@ export function computeFormatState(
         ? fonts.fontLatin
         : fonts.fontEastAsia
       : fonts.fontLatin
-    return slot ?? ''
+    // null = mixed values (empty box); '' = the document declares no face anywhere, so the
+    // page paints in its CSS default: name that face instead of showing an empty box
+    return slot === '' ? DEFAULT_DOC_FONT : (slot ?? '')
   }
   const paraAttrs = sub ? ed.getAttributes('docParagraph') : paraAttrsOf(editor)
   const mainPara = paraAttrsOf(editor)

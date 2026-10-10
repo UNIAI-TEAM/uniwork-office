@@ -78,7 +78,7 @@ import {
   type InkAnnotation,
   type InkTool,
 } from './editor/ink'
-import { t, getLang } from './i18n/locale'
+import { t, getLang, type StatusLine } from './i18n/locale'
 import { isBlankDocument, parseHtmlFragment, replaceBlockRange } from './ai/protocol'
 import { carryDocSeen } from './ai/tools'
 import { isDocDirty, resetCrossDocEditState } from './doc-dirty'
@@ -112,7 +112,7 @@ export interface FileActionContext {
   /** the print dialog auto-opened the pagination preview: closing the dialog closes it again */
   printAutoOpenedPreviewRef: { current: boolean }
   setShowPrintDialog: (show: boolean) => void
-  setStatus: (status: string) => void
+  setStatus: (status: StatusLine) => void
   setRecent: (paths: string[]) => void
   setShowAi: (show: boolean) => void
   setDoc: Dispatch<SetStateAction<DocState | null>>
@@ -531,7 +531,7 @@ export async function loadFile(
         .join(', ')
       ctx.setStatus(t('appFontsMissing', { names: missing.length > 3 ? `${names}…` : names }))
     } else {
-      ctx.setStatus(t('appOpenedFile', { name: result.name }))
+      ctx.setStatus({ key: 'appOpenedFile', params: { name: result.name } })
     }
     if (cap('recents')) void window.desktop.getRecentFiles().then(ctx.setRecent)
     return 'ok'
@@ -1481,7 +1481,7 @@ export async function exportImages(ctx: FileActionContext): Promise<boolean> {
   const staged: FileActionContext = {
     ...ctx,
     setStatus: (s) => {
-      if (!pdfDone.some((re) => re.test(s))) ctx.setStatus(s)
+      if (typeof s !== 'string' || !pdfDone.some((re) => re.test(s))) ctx.setStatus(s)
     },
   }
   if (!(await exportPdf(staged, target.pdfPath))) {

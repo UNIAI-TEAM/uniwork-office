@@ -101,6 +101,7 @@ describe('handshake', () => {
         webSearch: false,
         imageSearch: false,
         imageGeneration: false,
+        desktopOpen: false,
       },
     })
     expect(session).toMatchObject({
@@ -593,6 +594,44 @@ describe('request/response correlation', () => {
     )
     await flush()
     expect(hostWin.sent.at(-1)).toMatchObject({ id: 'f77', error: { code: 'unknown_type' } })
+  })
+})
+
+describe('app.open (A7 contract)', () => {
+  it('round-trips through the host api handler; the capability defaults to false', async () => {
+    const handler = vi.fn(async () => ({ outcome: 'installer' as const }))
+    const { host, client } = setup(
+      {
+        getInit: vi.fn(async () => baseInit({ capabilities: { save: true, desktopOpen: true } })),
+        api: { 'app.open': handler },
+      },
+      { capabilities: { save: true, desktopOpen: true } },
+    )
+    await host.whenReady()
+    await client.whenInitialized()
+    expect(client.session?.capabilities.desktopOpen).toBe(true)
+    await expect(client.request('app.open', { feature: 'pdf.ocr' })).resolves.toEqual({
+      outcome: 'installer',
+    })
+    expect(handler).toHaveBeenCalledWith({ feature: 'pdf.ocr' }, expect.anything())
+  })
+
+  it('an old host without a handler answers unsupported; no grant means capability false', async () => {
+    const { host, client } = setup({}, { capabilities: { save: true, desktopOpen: true } })
+    await host.whenReady()
+    await client.whenInitialized()
+    expect(client.session?.capabilities.desktopOpen).toBe(false)
+    await expect(client.request('app.open', {})).rejects.toMatchObject({ code: 'unsupported' })
+  })
+
+  it('the host rejects a bad payload before the handler runs', async () => {
+    const handler = vi.fn(async () => ({ outcome: 'launched' as const }))
+    const { host, client } = setup({ api: { 'app.open': handler } })
+    await host.whenReady()
+    await expect(
+      client.request('app.open', { feature: 3 } as unknown as { feature: string }),
+    ).rejects.toMatchObject({ code: 'malformed' })
+    expect(handler).not.toHaveBeenCalled()
   })
 })
 

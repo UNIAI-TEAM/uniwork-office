@@ -20,6 +20,9 @@ import { createCapabilityReader } from '@genoffice/ui/capabilities'
  * | insertPages      | import / replace pages from another PDF (host file picker)              |
  * | savedSignatures  | the reusable signature library                                          |
  * | redaction        | the Redact tool (applies into a working copy of the file)               |
+ * | saveStatus       | the ribbon-row Saving / Unsaved / Saved / Save failed text (the web     |
+ * |                  | host header owns the save state)                                        |
+ * | viewOnlyChip     | the ribbon-row "View only" text (one host banner owns it on the web)    |
  */
 export type PdfCapability =
   | 'edit'
@@ -34,6 +37,8 @@ export type PdfCapability =
   | 'insertPages'
   | 'savedSignatures'
   | 'redaction'
+  | 'saveStatus'
+  | 'viewOnlyChip'
 
 export const { cap, platform, resetForTest } = createCapabilityReader<PdfCapability>(
   () => window.pdfApi?.capabilities,

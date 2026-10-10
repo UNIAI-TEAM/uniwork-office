@@ -17,6 +17,7 @@ import {
   type DraftRecord,
   type DraftRecovery,
 } from '../../docs/bridge/draft-recovery'
+import { setWebLanguage } from '../../docs/bridge/browser'
 import { createFakeIdb } from '../../docs/bridge/testing/fake-idb'
 import type { PdfCore } from './core'
 import { createSignatureStore } from './signatures'
@@ -248,6 +249,25 @@ describe('save', () => {
       ok: false,
       error: 'Saving took too long. Check your connection and try again.',
     })
+  })
+
+  it('a server error reads in the UI language, never the host status line', async () => {
+    setWebLanguage('vi', { host: true })
+    const s = await setup()
+    const path = (await s.api.consumePending())!
+    for (const [code, status, raw] of [
+      ['internal', 500, 'Internal Server Error'],
+      ['forbidden', 403, 'Forbidden'],
+      ['not_found', 404, 'Not Found'],
+      ['too_large', 413, 'Payload Too Large'],
+    ] as const) {
+      s.mock.override('api.save', () => ({ ok: false, error: { code, message: raw, status } }))
+      const r = await s.api.save(req(path, { markups: [{} as never] }))
+      expect(r.ok).toBe(false)
+      expect((r as { error: string }).error).not.toContain(raw)
+      expect((r as { error: string }).error).toMatch(/UniWork|Bạn|tài liệu|lưu/i)
+    }
+    setWebLanguage('en', { host: true })
   })
 
   it('text edits fetch the bundled fonts first', async () => {

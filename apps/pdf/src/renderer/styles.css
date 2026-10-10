@@ -218,6 +218,34 @@ button {
   flex: 1;
 }
 
+/* phone width: the tab row is a single strip that scrolls sideways (the quick-access buttons and the
+   tabs keep their size), no scrollbar chrome */
+@media (max-width: 640px) {
+  .ribbon-tabs {
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    /* edge cue: a soft shadow on the side that still hides tabs (the 'local' cover hides it at the ends) */
+    background:
+      linear-gradient(to right, var(--chrome-bg) 40%, transparent) left center / 24px 100% no-repeat
+        local,
+      linear-gradient(to left, var(--chrome-bg) 40%, transparent) right center / 24px 100% no-repeat
+        local,
+      linear-gradient(to right, var(--border-strong), transparent) left center / 12px 100% no-repeat
+        scroll,
+      linear-gradient(to left, var(--border-strong), transparent) right center / 12px 100% no-repeat
+        scroll;
+  }
+
+  .ribbon-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .ribbon-tabs > * {
+    flex-shrink: 0;
+  }
+}
+
 .qa-btn {
   width: 30px;
   height: 28px;
@@ -254,6 +282,9 @@ button {
 /* ── ribbon tab strip (docs/Word-style: semibold labels, accent underline on the active tab) ── */
 .ribbon-tab {
   position: relative;
+  /* one line: a two-word label ("Fill Form") never wraps the tab row onto a second line */
+  flex-shrink: 0;
+  white-space: nowrap;
   border: none;
   background: none;
   padding: 7px 9px 6px;
@@ -1499,6 +1530,20 @@ button {
   border-color: var(--color-btn-primary-hover);
   background: var(--color-btn-primary-hover);
   color: var(--color-btn-primary-text);
+}
+
+/* on the web the host's dialogs and the frame dialogs use the brand-blue primary: Sign, Add text and the
+   other in-app dialogs follow it (the desktop keeps the Genspark DS black above) */
+html[data-web-frame] .pdf-modal-btn.primary {
+  border-color: var(--color-dialog-primary);
+  background: var(--color-dialog-primary);
+  color: var(--color-dialog-primary-text);
+}
+
+html[data-web-frame] .pdf-modal-btn.primary:hover:not(:disabled) {
+  border-color: var(--color-dialog-primary-hover);
+  background: var(--color-dialog-primary-hover);
+  color: var(--color-dialog-primary-text);
 }
 
 /* ── Full-text search ── */

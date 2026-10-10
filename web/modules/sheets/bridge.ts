@@ -319,7 +319,22 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
       if (isEngineUnavailable(err)) reportEngineUnavailable()
       // above the frame's size gate: fatal, so the host opens the G3 editor instead (C11)
       else if ((err as { code?: unknown })?.code === 'too_large') {
-        port.reportError({ code: 'too_large', message: describe(err) }, true)
+        // `details` lets the host say why in one sentence ("this workbook holds about N MB of
+        // sheet data, above the N MB the web editor opens"): sizes in bytes, JSON-safe numbers
+        const { worksheetXmlBytes, limitBytes } = err as {
+          worksheetXmlBytes?: unknown
+          limitBytes?: unknown
+        }
+        port.reportError(
+          {
+            code: 'too_large',
+            message: describe(err),
+            ...(typeof worksheetXmlBytes === 'number' && typeof limitBytes === 'number'
+              ? { details: { worksheetXmlBytes, limitBytes } }
+              : {}),
+          },
+          true,
+        )
       }
       throw err
     }

@@ -65,6 +65,7 @@ interface OpenOptions {
   theme?: 'light' | 'dark'
   readonly?: boolean
   pick?: boolean
+  ai?: boolean
 }
 
 async function openPdf(page: Page, o: OpenOptions = {}): Promise<Frame> {
@@ -75,6 +76,7 @@ async function openPdf(page: Page, o: OpenOptions = {}): Promise<Frame> {
     theme: o.theme ?? 'light',
     ...(o.readonly ? { readonly: '1' } : {}),
     ...(o.pick ? { pick: '1' } : {}),
+    ...(o.ai ? { ai: '1' } : {}),
   })
   await page.goto(`/test-host/?${q}`)
   await expect(page.locator('#status')).toHaveText(/^initialised/, { timeout: 30_000 })
@@ -348,7 +350,9 @@ test.describe('pdf module on the web', () => {
     const problems = await watch(page)
     const frame = await openPdf(page, { readonly: true })
     await waitRendered(frame)
-    await expect(frame.locator('.tb-readonly')).toHaveText('View only')
+    // the host header owns the view-only notice: the ribbon row carries no second one
+    await expect(frame.locator('.tb-readonly')).toHaveCount(0)
+    await expect(frame.locator('.tb-save-pending, .tb-save-ok, .tb-save-error')).toHaveCount(0)
     await expect(frame.locator('button.rb-highlight-main')).toBeDisabled()
     await expect(frame.locator('.ribbon-tab', { hasText: 'Fill Form' })).toHaveCount(0)
     await expect(frame.locator('input.pdf-form-input[title="name"]')).toBeDisabled()
@@ -365,6 +369,62 @@ test.describe('pdf module on the web', () => {
     await expect
       .poll(() => frame.evaluate(() => (window as unknown as { __printed: number }).__printed))
       .toBe(1)
+    await noProblems(page, frame, problems)
+  })
+
+  test('phone width: the tab row stays on one line and scrolls', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 800 })
+    const problems = await watch(page)
+    const frame = await openPdf(page, { lang: 'vi' })
+    await waitRendered(frame)
+    const row = await frame.evaluate(() => {
+      const tabs = [...document.querySelectorAll('.ribbon-tabs > .ribbon-tab')] as HTMLElement[]
+      const strip = document.querySelector('.ribbon-tabs') as HTMLElement
+      return {
+        tops: [...new Set(tabs.map((t) => Math.round(t.getBoundingClientRect().top)))],
+        heights: tabs.map((t) => Math.round(t.getBoundingClientRect().height)),
+        scrolls: strip.scrollWidth > strip.clientWidth,
+        overflowX: getComputedStyle(strip).overflowX,
+      }
+    })
+    // every tab shares one top (no second line) and none is taller than a one-line label
+    expect(row.tops).toHaveLength(1)
+    expect(Math.max(...row.heights)).toBeLessThan(40)
+    expect(row.scrolls).toBe(true)
+    expect(row.overflowX).toBe('auto')
+    await noProblems(page, frame, problems)
+  })
+
+  test('vi ribbon with the AI panel open: the clipped band shows an overflow cue', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1176, height: 800 })
+    const problems = await watch(page)
+    const frame = await openPdf(page, { lang: 'vi', ai: true })
+    await waitRendered(frame)
+    const band = await frame.evaluate(() => {
+      const b = document.querySelector('[data-ribbon-body]') as HTMLElement
+      return { clipped: b.scrollWidth > b.clientWidth + 1 }
+    })
+    expect(band.clipped, 'the vi Home band is wider than the frame with the AI panel open').toBe(
+      true,
+    )
+    await expect(frame.locator('.ribbon')).toHaveAttribute('data-ribbon-overflow', 'end')
+    await expect(frame.locator('.ribbon-overflow-cue[data-edge="end"]')).toBeVisible()
+    await noProblems(page, frame, problems)
+  })
+
+  test('Sign dialog: the primary button is the brand blue, not black', async ({ page }) => {
+    const problems = await watch(page)
+    const frame = await openPdf(page)
+    await waitRendered(frame)
+    await tab(frame, 'Annotate')
+    await ribbonButton(frame, 'Sign').click()
+    const confirm = frame.locator('.pdf-modal-actions .primary').first()
+    await expect(confirm).toBeVisible()
+    const bg = await confirm.evaluate((el) => getComputedStyle(el).backgroundColor)
+    // --color-dialog-primary (light): #0a52e6
+    expect(bg).toBe('rgb(10, 82, 230)')
     await noProblems(page, frame, problems)
   })
 

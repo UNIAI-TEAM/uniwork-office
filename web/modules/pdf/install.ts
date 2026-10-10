@@ -16,6 +16,8 @@
  * |   pdfAnnotDelete             |   module CSP carries 'wasm-unsafe-eval' for it)                     |
  * | savedSignatures              | on, encrypted per-user store (./signatures.ts)                      |
  * | redaction                    | off (the desktop redacts into a working copy file next to the PDF)   |
+ * | saveStatus, viewOnlyChip     | off, from MODULE_WEB_CAPABILITIES (the host header owns the save    |
+ * |                              |   state, one host banner owns "view only")                          |
  * | ai, autoSave(ToDisk), auto-  | off (AI stays desktop-only; no autosave on the web, CONTRACT C10;   |
  * |   Rename, convertOffice, ocr,|   the rest need the desktop shell or an OS engine)                  |
  * |   webSearch, imageSearch,    |                                                                     |
@@ -64,6 +66,9 @@ function webEnv(): Promise<WebPdfEnv> {
   web ??= installWebPdfEnv({ pdfiumWasmUrl, hbSubsetWasmUrl, fontUrls })
   return web
 }
+
+// lets the renderer's stylesheet tell the web frame from the desktop window (dialog primary colour)
+document.documentElement.dataset.webFrame = 'pdf'
 
 export const bridge = installModuleBridge({
   module: 'pdf',

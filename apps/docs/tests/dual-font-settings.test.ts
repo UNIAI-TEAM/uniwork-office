@@ -2,7 +2,10 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { Editor } from '@tiptap/core'
 import type { StyleInfo } from '@genoffice/docx-engine'
 import { editorExtensions } from '../src/renderer/editor/extensions'
-import { computeFormatState } from '../src/renderer/components/ribbon-format-state'
+import {
+  computeFormatState,
+  DEFAULT_DOC_FONT,
+} from '../src/renderer/components/ribbon-format-state'
 
 const editors: Editor[] = []
 afterEach(() => editors.splice(0).forEach((e) => e.destroy()))
@@ -230,4 +233,16 @@ it('does not pin CJK to a Latin-only run font from an HTML chain', () => {
   const run = editor.view.dom.querySelector('span[style*="font-family"]') as HTMLElement
   expect(run.style.getPropertyValue('--doc-east-asian-font')).toBe('')
   expect(computeFormatState(editor).fontEastAsia).toBe('')
+})
+
+describe('font box for a document that declares no font', () => {
+  it('names the page default instead of an empty box', () => {
+    const state = computeFormatState(editorWith([{}]))
+    expect(state.fontLatin).toBe('')
+    expect(state.fontFamily).toBe(DEFAULT_DOC_FONT)
+  })
+  it('prefers the font docDefaults declares', () => {
+    const state = computeFormatState(editorWith([{}]), undefined, { asciiFont: 'Aptos' })
+    expect(state.fontFamily).toBe('Aptos')
+  })
 })
