@@ -729,8 +729,10 @@ export function App() {
         stageViewportSize.w ||
         window.innerWidth - (showThumbs ? thumbsW : 0) - (showAi ? 360 : aiEnabled ? 34 : 0)
       const viewportH = el?.clientHeight || stageViewportSize.h || window.innerHeight - 150
-      // 56 = the stage's 2 x 32 padding minus slack; a narrow stage pads 12 px a side
-      const availW = viewportW - (viewportW < NARROW_FRAME_PX ? 28 : 56)
+      // 56 = the stage's 2 x 32 padding minus slack; a phone-width WINDOW pads 12 px a side (the
+      // styles.css media query keys off the window, not the stage, so this must too: a narrow stage
+      // in a wide window, e.g. next to the thumbnails and the AI dock, still pads 32)
+      const availW = viewportW - (window.innerWidth < NARROW_FRAME_PX ? 28 : 56)
       // -72: vertical padding is 48 (AI-bar headroom) + 32, minus the same 8px slack as width
       const availH = viewportH - 72
       return Math.min(availW / s.widthPx, availH / s.heightPx)
