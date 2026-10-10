@@ -27,6 +27,13 @@ Capabilities: `installModuleBridge()` puts one mutable object on each global as 
 `MODULE_WEB_CAPABILITIES`: `ai`, `aiCredentials`, `open`, `recents`, `autoSave`, `autoSaveToDisk` false; host grants
 assigned on `init`).
 
+Dialogs: every in-frame dialog (save conflict, discard unsaved changes, draft recovery, merge prompt, open failure) is
+the one component `shared/frame-dialog.ts` (+ `frame-dialog.css`, theme tokens only), called by each module's notice file
+(`shared/notice.ts`, `pdf/notice.ts`, `slides/dialogs.ts`, `sheets/notice.ts`, `web/docs/bridge/notice.ts`). Same look as the
+UniWork host's leave dialog: centred card, stacked full-width actions ordered primary, neutral, destructive, then the way
+out; `danger` marks Overwrite / Discard (soft red, never the first focus); the first focus is the safe action (Cancel);
+Tab stays inside, Escape = the cancel id, focus returns to where it was.
+
 AI (CONTRACT C16): `shared/ai/` is the `ai` web bridge of every frame (Docs too, through web/docs/bridge/install.ts).
 `installModuleBridge()` wraps each global that has AI members (`withWebAi`): while the host grants `ai` they call the
 frame-token AI routes (BYOK proxy for aiStream/aiChat with ai-provider's native wire format, UniWork cloud tools,

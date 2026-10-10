@@ -82,8 +82,20 @@ text-module bridge. Contract: lane CONTRACT C1-C13, protocol `web/docs/protocol`
   schema on the first save), and Mermaid diagrams render as `<img src="data:image/svg+xml,...">` instead of injected
   markup. A desktop document that relied on rendered raw HTML or inline diagram DOM looks different there. Listed in
   `docs/upstream/UPSTREAM_SYNC.md` so an upstream sync keeps it.
-- **Hidden on both.** The AI family (`ai`, `webSearch`, `imageSearch`, `imageGeneration`), `autoSave`
-  (toggle + timer), Markdown `openInDocs`.
+- **AI follows the host grant.** The AI family (`ai`, `aiCredentials`, `webSearch`, `imageSearch`, `imageGeneration`)
+  is **shown with the host's `ai` grant** (organization entitlement + the frame-token AI routes live, AI1/AI2) and
+  **hidden without it**: the panel, the ribbon AI group (HTML: AI, Restyle, Theme, Summarize) and every AI tool
+  disappear and the page takes the width. The panels call the document's AI routes directly (shared web AI bridge,
+  `web/modules/shared/ai/`, CONTRACT C16: same origin, frame token, no cookies, SSE native). Failures are typed,
+  translated state cards, never the server's JSON: the `{ "error": { code, message } }` envelope and a vendor
+  adapter's own failure text (e.g. "Claude HTTP 404: {...}" for a missing key) map to missing / refused key (with an
+  "AI settings" action), credits used up, not in the plan, rate limit, provider or cloud unavailable, session
+  expired. Below 900 px the panel starts closed unless the user opened it before.
+- **Hidden on both.** `autoSave` (toggle + timer), Markdown `openInDocs`, `createDocument`, `billing`.
+- **Pictures the host has no copy of.** A relative picture in a single uploaded `.md` (no sibling `assets/`) shows a
+  labelled placeholder with its path instead of a broken-image icon; the saved Markdown keeps `![](path)`.
+- **Failed saves** read in the UI language ("UniWork could not be reached...", "Saving took too long..."), never the
+  browser's raw "Failed to fetch".
 
 ## Gaps (v1)
 

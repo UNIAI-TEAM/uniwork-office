@@ -49,14 +49,32 @@ copy and its etag (`saved` event); the renderer then reloads from it exactly as 
 
 ## 2. Capabilities (`window.pdfApi.capabilities`)
 
-| Key                                                                                                                                                  | Web                                                                                                                                                                                                  |
-| ---------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `edit`                                                                                                                                               | host grant `save`. Absent = **view-only**: joins the renderer's read-only mode (all edit entries disabled, Fill Form tab hidden, "View only" badge); `save` and every write path refuse; print works |
-| `insertPages`                                                                                                                                        | host grant `filePick` (Import pages, Replace pages, Merge PDF)                                                                                                                                       |
-| `pdfTextEdit`, `pdfImageEdit`, `pdfAnnotDelete`                                                                                                      | on; switched off when pdfium cannot be compiled in the frame (checked once after `init` when `edit` is granted)                                                                                      |
-| `savedSignatures`                                                                                                                                    | on (encrypted per-user library)                                                                                                                                                                      |
-| `ai`, `autoSave`, `autoSaveToDisk`, `autoRename`, `convertOffice`, `ocr`, `webSearch`, `imageSearch`, `imageGeneration`, `createDocument`, `billing` | off: AI is desktop-only (as Docs), no autosave on the web, the rest need the desktop shell or an OS engine (OCR answers "no engine")                                                                 |
-| `open`, `recents`                                                                                                                                    | from `filePick` / `recents` like Docs (the PDF renderer has no File > Open of its own)                                                                                                               |
+| Key                                                                                             | Web                                                                                                                                                                                                                                                                                                         |
+| ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `edit`                                                                                          | host grant `save`. Absent = **view-only**: joins the renderer's read-only mode (all edit entries disabled, Fill Form tab hidden, "View only" badge); `save` and every write path refuse; print works                                                                                                        |
+| `insertPages`                                                                                   | host grant `filePick` (Import pages, Replace pages, Merge PDF)                                                                                                                                                                                                                                              |
+| `pdfTextEdit`, `pdfImageEdit`, `pdfAnnotDelete`                                                 | on; switched off when pdfium cannot be compiled in the frame (checked once after `init` when `edit` is granted)                                                                                                                                                                                             |
+| `savedSignatures`                                                                               | on (encrypted per-user library)                                                                                                                                                                                                                                                                             |
+| `ai`, `aiCredentials`, `webSearch`, `imageSearch`, `imageGeneration`                            | follow the host grant: **shown with the host's `ai` grant** (organization entitlement + the frame-token AI routes live; the three cloud keys also need their own grant), **hidden without it** (AI panel, ribbon AI group, ask-AI popover and AI tools all disappear and the page reflows). See section 2.1 |
+| `autoSave`, `autoSaveToDisk`, `autoRename`, `convertOffice`, `ocr`, `createDocument`, `billing` | off: no autosave on the web, the rest need the desktop shell or an OS engine (OCR answers "no engine")                                                                                                                                                                                                      |
+| `open`, `recents`                                                                               | from `filePick` / `recents` like Docs (the PDF renderer has no File > Open of its own)                                                                                                                                                                                                                      |
+
+### 2.1 AI on the web
+
+AI is built by the shared web AI bridge (`web/modules/shared/ai/`, CONTRACT C16), the same one Docs, Markdown, HTML,
+Slides and Sheets use; the PDF frame adds nothing of its own.
+
+- **Grant.** The host grants `ai` only when the organization has the entitlement and the frame-token AI mount is live
+  (AI1/AI2). With the grant the panel and every AI entry show; without it they stay hidden, exactly as before.
+- **Calls.** The frame talks to the AI routes of its own document directly (same origin, `connect-src 'self'`,
+  `Authorization: Bearer <frame token>`, no cookies, SSE streaming native); keys are stored by the server and the
+  frame never sees one.
+- **Failures.** The server's error envelope (`{ "error": { code, message } }`) and a vendor adapter's own failure
+  text ("... HTTP 502: {...}") never reach the panel as raw text: they become a typed, translated state card
+  (missing or refused key with an "AI settings" action, credits used up, not in the plan, rate limit, provider or
+  cloud unavailable, session expired, generic failure).
+- **Narrow windows.** Below 900 px the AI panel starts closed unless the user opened it before, so the page keeps
+  its width on a phone.
 
 Every hidden `pdfApi` member still exists with a typed safe answer; `PdfWebApi` is a mapped type over `PdfApi`, so a new
 preload method is a compile error in `webapi.ts`.
@@ -113,7 +131,7 @@ ghostscript cannot write them) - pdf.js decodes both with its wasm codecs, which
 - The save core runs on the frame's main thread (no worker yet): large files freeze the UI while saving (inventory 3.2).
 - Every save uploads the whole rewritten file as a new version (same as G3).
 - The size gate is the host's (`too_large` on `api.open`); the frame shows its open-failure notice.
-- OCR and Convert to Office are hidden (desktop engines); AI is hidden (ADR GO-C2).
+- OCR and Convert to Office are hidden (desktop engines). AI is shown with the host's `ai` grant and hidden without it (section 2.1).
 
 ## 6. Evidence
 
