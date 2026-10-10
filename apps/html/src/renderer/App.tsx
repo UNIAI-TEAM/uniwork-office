@@ -1727,9 +1727,7 @@ export default function App() {
               ) : (
                 !path && <span className="status-item status-hint">{t('previewNeedsSave')}</span>
               )}
-              {!canEdit && status === 'ready' && (
-                <span className="status-item status-view-only">{t('viewOnly')}</span>
-              )}
+              {/* view-only is announced once, by the host (banner + live region); no third copy here */}
             </div>
             <div className="status-right">
               {statusText && (

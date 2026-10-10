@@ -873,7 +873,9 @@ html.genoffice-popover-open .ribbon-tabs {
   padding: 1px 6px;
   background: var(--color-bg-subtle);
   color: var(--color-text-secondary);
-  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Noto Sans Mono', 'Liberation Mono', monospace;
+  font-family:
+    ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Noto Sans Mono', 'Liberation Mono',
+    monospace;
   font-size: 14px;
 }
 
@@ -1105,7 +1107,8 @@ html.genoffice-popover-open .ribbon-tabs {
   border: none;
   border-radius: 12px;
   font-family:
-    ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Noto Sans Mono', 'Liberation Mono', monospace;
+    ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Noto Sans Mono', 'Liberation Mono',
+    monospace;
   font-size: 14px;
   color: var(--text-primary);
   max-height: 300px;
@@ -3649,13 +3652,4 @@ html.genoffice-popover-open .ribbon-tabs {
   width: 100%;
   min-width: 0;
   box-sizing: border-box;
-}
-
-/* web frame, host withheld the save grant (capabilities.ts `save`) */
-.status-view-only {
-  padding: 1px 8px;
-  border: 1px solid var(--border-strong);
-  border-radius: 10px;
-  color: var(--text-secondary);
-  font-weight: 500;
 }

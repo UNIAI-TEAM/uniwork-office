@@ -154,6 +154,25 @@ describe('markdownApi: open and save', () => {
     expect(denied).toEqual({ ok: false, error: 'You can only view this document.' })
   })
 
+  it('the next edit after a failed save tells the host the document is dirty again', async () => {
+    const { api, mock } = setup()
+    const { text } = await open(api)
+    api.setDirty(true)
+    mock.override('api.save', () => ({
+      ok: false,
+      error: { code: 'network', message: 'Failed to fetch' },
+    }))
+    expect((await api.save({ text, imageSources: [], mode: 'save' })).ok).toBe(false)
+    // the host's header sits in its "could not be confirmed" state; the client dedupes an
+    // unchanged dirty flag, so this edit must be sent explicitly or the header never moves on
+    const before = mock.dirtySent
+    api.setDirty(true)
+    expect(mock.dirtySent).toBe(before + 1)
+    // only that first edit: further edits stay deduplicated
+    api.setDirty(true)
+    expect(mock.dirtySent).toBe(before + 1)
+  })
+
   it('a cancelled host dialog is a quiet cancel', async () => {
     const { api, mock } = setup()
     const { text } = await open(api)

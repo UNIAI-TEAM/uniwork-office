@@ -125,7 +125,8 @@ test('markdown: view only without the save grant', async ({ page }) => {
     readonly: '1',
   })
   const ed = await editor(frame)
-  await expect(frame.locator('.status-view-only')).toHaveText('View only')
+  // the host announces view-only (banner + live region); the frame adds no third copy
+  await expect(frame.locator('.status-view-only')).toHaveCount(0)
   await expect(ed).toHaveAttribute('contenteditable', 'false')
   await ed.click()
   await page.keyboard.type('x')

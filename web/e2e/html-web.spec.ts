@@ -307,7 +307,8 @@ test('html: view only without the save grant', async ({ page }) => {
   await serveFixture(page, PAGE_PATH, FIXTURE, 'text/html')
   const frame = await openModule(page, 'html', { open: PAGE_PATH, lang: 'en', readonly: '1' })
   await ready(page, frame, /UniWork HTML web fixture/)
-  await expect(frame.locator('.status-view-only')).toHaveText('View only')
+  // the host announces view-only (banner + live region); the frame adds no third copy
+  await expect(frame.locator('.status-view-only')).toHaveCount(0)
   await view(frame, /^Source$/, 'source')
   await frame.locator('.cm-line', { hasText: 'A paragraph with' }).click()
   await page.keyboard.type('typed')

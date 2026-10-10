@@ -1269,9 +1269,7 @@ export default function App() {
                 </span>
               )}
               {fileName && <span className="status-item status-file">{fileName}</span>}
-              {!canEdit && status === 'ready' && (
-                <span className="status-item status-view-only">{t('viewOnly')}</span>
-              )}
+              {/* view-only is announced once, by the host (banner + live region); no third copy here */}
             </div>
             <div className="status-right">
               {statusText && (
