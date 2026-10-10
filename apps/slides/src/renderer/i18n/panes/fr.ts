@@ -256,6 +256,16 @@ export const fr = {
   panePresenterUseShowTip: 'Basculer vers un diaporama normal sur cet écran',
   panePresenterSingleHint:
     'Mode écran unique (connectez un deuxième écran pour un diaporama automatique en plein écran)',
+  panePresenterOpenAudience: 'Fenêtre du public',
+  panePresenterOpenAudienceTip:
+    'Ouvrir le diaporama dans une fenêtre séparée à faire glisser vers le projecteur',
+  panePresenterCloseAudience: 'Fermer la fenêtre du public',
+  panePresenterCloseAudienceTip: 'Fermer la fenêtre du public ; le mode Présentateur continue',
+  panePresenterWebHint:
+    'Ouvrez la fenêtre du public, faites-la glisser vers le projecteur, puis cliquez dessus pour le plein écran',
+  panePresenterPopupBlocked:
+    'Le navigateur a bloqué la fenêtre. Autorisez les fenêtres contextuelles pour ce site, puis réessayez.',
+  paneAudienceFullscreenHint: 'Cliquez pour afficher en plein écran',
   panePresenterElapsed: 'Temps écoulé',
   panePresenterPause: 'Suspendre le minuteur',
   panePresenterResume: 'Reprendre le minuteur',

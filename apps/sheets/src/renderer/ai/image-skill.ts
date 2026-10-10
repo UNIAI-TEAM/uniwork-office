@@ -15,6 +15,10 @@ const IMAGES_SYSTEM_PROMPT = `## Images
 - image_search finds real web images (returns direct imageUrl entries); generate_image creates an illustration with AI when no suitable real image exists or the user explicitly wants generated art.
 ${PLACEMENT_PROMPT}`
 
+const IMAGES_SYSTEM_PROMPT_GEN_ONLY = `## Images
+- generate_image creates an illustration with AI (no web image search is available).
+${PLACEMENT_PROMPT}`
+
 const IMAGES_SYSTEM_PROMPT_NO_GEN = `## Images
 - image_search finds real web images (returns direct imageUrl entries).
 ${PLACEMENT_PROMPT}`
@@ -25,7 +29,10 @@ ${PLACEMENT_PROMPT}`
  * before every request, so generate_image appears and disappears without
  * rebuilding the loop.
  */
-export function createImageSkill(imageGen: () => boolean = () => true): AgentSkill {
+export function createImageSkill(
+  imageGen: () => boolean = () => true,
+  imageSearch: () => boolean = () => true,
+): AgentSkill {
   const allTools = [
     {
       name: 'image_search',
@@ -65,10 +72,11 @@ export function createImageSkill(imageGen: () => boolean = () => true): AgentSki
   return {
     id: 'images',
     get systemPrompt() {
+      if (!imageSearch()) return imageGen() ? IMAGES_SYSTEM_PROMPT_GEN_ONLY : ''
       return imageGen() ? IMAGES_SYSTEM_PROMPT : IMAGES_SYSTEM_PROMPT_NO_GEN
     },
     get tools() {
-      return imageGen() ? allTools : allTools.filter((t) => t.name !== 'generate_image')
+      return allTools.filter((t) => (t.name === 'generate_image' ? imageGen() : imageSearch()))
     },
     executeTool: async (call) => {
       if (call.name === 'image_search') {

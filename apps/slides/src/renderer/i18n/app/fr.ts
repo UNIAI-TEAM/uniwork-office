@@ -5,6 +5,7 @@ export const fr = {
   appPhPromptSubtitle: 'Cliquez pour ajouter un sous-titre',
   appPhPromptBody: 'Cliquez pour ajouter du texte',
   appStatusOpened: '{name} ouvert ({count} diapositives)',
+  appStatusOpenedOne: '{name} ouvert (1 diapositive)',
   appStatusNewBlank: 'Nouvelle présentation vierge créée',
   appStatusSaved: 'Enregistré',
   appStatusSaveFailed: 'Échec de l’enregistrement : {error}',

@@ -254,6 +254,16 @@ export const en = {
   panePresenterUseShowTip: 'Switch to a normal slide show on this display',
   panePresenterSingleHint:
     'Single display mode (connect a second display to show full screen automatically)',
+  panePresenterOpenAudience: 'Audience Window',
+  panePresenterOpenAudienceTip:
+    'Open the slide show in a separate window you can drag to the projector',
+  panePresenterCloseAudience: 'Close Audience Window',
+  panePresenterCloseAudienceTip: 'Close the audience window; the presenter view keeps running',
+  panePresenterWebHint:
+    'Open the audience window, drag it to the projector, then click it for full screen',
+  panePresenterPopupBlocked:
+    'The browser blocked the window. Allow pop-ups for this site and try again.',
+  paneAudienceFullscreenHint: 'Click to show full screen',
   panePresenterElapsed: 'Elapsed time',
   panePresenterPause: 'Pause timer',
   panePresenterResume: 'Resume timer',

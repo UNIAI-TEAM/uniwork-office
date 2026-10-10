@@ -9,6 +9,9 @@ import {
   parseDocx,
   saveDocx,
 } from '@genoffice/docx-engine'
+import { MarkdownManager } from '@tiptap/markdown'
+import { buildExtensions } from '../editor/extensions'
+import { degradeRawHtml } from '../editor/rawHtml'
 import type {
   GeneratedBlock,
   NewImage,
@@ -301,6 +304,24 @@ function walkBlock(ctx: WalkContext, node: JSONContent, base?: ParaFormat): void
   }
 }
 
+let degradeManager: MarkdownManager | null = null
+
+/** Schema-only manager for degrading preserved raw HTML (built once, never attached to a view) */
+function rawHtmlDegrader(): MarkdownManager {
+  degradeManager ??= new MarkdownManager({
+    extensions: buildExtensions({
+      slashController: {
+        onOpen: () => {},
+        onUpdate: () => {},
+        onKeyDown: () => false,
+        onClose: () => {},
+      },
+      slashItems: () => [],
+    }),
+  })
+  return degradeManager
+}
+
 /** Map a ProseMirror document to docx-engine SaveBlocks (pure except image loading) */
 export async function mapDocToSaveBlocks(
   doc: JSONContent,
@@ -316,7 +337,9 @@ export async function mapDocToSaveBlocks(
     pendingImages: [],
     pendingDiagrams: [],
   }
-  for (const node of doc.content ?? []) walkBlock(ctx, node)
+  // raw HTML kept verbatim in the .md degrades like before: text and semantic
+  // tags carry over, styling and comments do not
+  for (const node of degradeRawHtml(doc, rawHtmlDegrader()).content ?? []) walkBlock(ctx, node)
 
   for (const pending of ctx.pendingDiagrams) {
     const image = await ctx.renderDiagram!(pending.source, pending.language).catch(() => null)

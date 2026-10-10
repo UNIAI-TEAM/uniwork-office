@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent, PointerEvent as ReactPointerEvent, ReactElement } from 'react'
+import { cap } from './capabilities'
 import { cssRgb } from './DrawLayer'
 import type { TFunc } from './i18n/locale'
 import type { SavedSignature, SignatureData, SignatureStrokes } from '../shared/ipc'
@@ -163,7 +164,11 @@ export function SignatureDialog({
   const pathsRef = useRef<number[][]>([])
   const curRef = useRef<number[] | null>(null)
 
+  /** the platform keeps a signature library (web: browser-local, see web/modules/pdf/signatures.ts) */
+  const library = cap('savedSignatures')
+
   useEffect(() => {
+    if (!library) return
     let alive = true
     window.pdfApi
       .listSavedSignatures()
@@ -174,7 +179,7 @@ export function SignatureDialog({
     return () => {
       alive = false
     }
-  }, [])
+  }, [library])
 
   const removeSaved = (id: string) => {
     setSaved((prev) => prev.filter((s) => s.id !== id))
@@ -242,7 +247,7 @@ export function SignatureDialog({
 
   /** New signature confirmed: persist it for reuse (unless opted out), then hand off to placement */
   const finish = (sig: SignatureData) => {
-    if (saveForReuse) window.pdfApi.addSavedSignature(sig).catch(() => {})
+    if (library && saveForReuse) window.pdfApi.addSavedSignature(sig).catch(() => {})
     onConfirm(sig)
   }
 
@@ -411,14 +416,16 @@ export function SignatureDialog({
             </label>
           </>
         )}
-        <label className="pdf-sign-bw">
-          <input
-            type="checkbox"
-            checked={saveForReuse}
-            onChange={(e) => setSaveForReuse(e.target.checked)}
-          />
-          {t('signSave')}
-        </label>
+        {library && (
+          <label className="pdf-sign-bw">
+            <input
+              type="checkbox"
+              checked={saveForReuse}
+              onChange={(e) => setSaveForReuse(e.target.checked)}
+            />
+            {t('signSave')}
+          </label>
+        )}
         <div className="pdf-modal-actions">
           {mode === 'draw' && (
             <button className="pdf-modal-btn" onClick={clear}>

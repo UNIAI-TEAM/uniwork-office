@@ -1471,6 +1471,30 @@ export const th = {
   appVisualFlipV: 'พลิกแนวตั้ง',
   appVisualFlipH: 'พลิกแนวนอน',
   appCtxPasteVisual: 'วางรูปภาพหรือรูปร่าง',
+  // web frame (UNI-1016): engine-unavailable screen, view-only, save conflicts
+  appWebEngineTitle: 'ยังเปิดเวิร์กบุ๊กนี้บนเว็บไม่ได้',
+  appWebEngineBody:
+    'UniWork Sheets เวอร์ชันเว็บกำลังเตรียมเอนจินสเปรดชีต ระหว่างนี้โปรดเปิดเวิร์กบุ๊กนี้ในแอป UniWork บนเดสก์ท็อป',
+  appWebEngineHint: 'ไฟล์ของคุณไม่มีการเปลี่ยนแปลง',
+  appWebViewOnly: 'ดูอย่างเดียว: คุณไม่สามารถบันทึกการเปลี่ยนแปลงในเวิร์กบุ๊กนี้ได้',
+  appWebConflictTitle: 'เวิร์กบุ๊กนี้ถูกแก้ไขจากที่อื่น',
+  appWebConflictBody:
+    'มีผู้บันทึกเวอร์ชันที่ใหม่กว่าระหว่างที่คุณแก้ไข เขียนทับด้วยเวอร์ชันของคุณ หรือโหลดเวอร์ชันล่าสุดใหม่ (การเปลี่ยนแปลงที่ยังไม่บันทึกจะถูกละทิ้ง)',
+  appWebConflictOverwrite: 'เขียนทับ',
+  appWebConflictReload: 'โหลดเวอร์ชันล่าสุด',
+  appWebConflictNotSaved: 'ยังไม่ได้บันทึก: มีเวอร์ชันที่ใหม่กว่า',
+  appWebDiscardTitle: 'ละทิ้งการเปลี่ยนแปลงที่ยังไม่บันทึกหรือไม่',
+  appWebDiscardBody: 'การเปิดเวิร์กบุ๊กอื่นจะละทิ้งการเปลี่ยนแปลงที่ยังไม่ได้บันทึก',
+  appWebDiscard: 'ละทิ้ง',
+  appWebCancel: 'ยกเลิก',
+  appWebSaveFailed: 'บันทึกไปยัง UniWork ไม่สำเร็จ',
+  appWebTooLargeTitle: 'เวิร์กบุ๊กนี้ใหญ่เกินกว่าจะเปิดบนเว็บ',
+  appWebTooLargeBody:
+    'มีขนาดเกินกว่าที่สเปรดชีตบนเว็บรองรับ จึงเปิดในตัวแก้ไขสเปรดชีตแบบคลาสสิกแทน',
+  appWebEngineRestarted:
+    'เอนจินของสมุดงานหยุดทำงานโดยไม่คาดคิดและถูกเริ่มใหม่ สมุดงานถูกเปิดใหม่จากเวอร์ชันที่บันทึกล่าสุด การเปลี่ยนแปลงที่ยังไม่ได้บันทึกยังอยู่ โปรดบันทึกโดยเร็ว',
+  appWebSavedReopenFailed:
+    'บันทึกการเปลี่ยนแปลงของคุณไปยัง UniWork แล้ว แต่เปิดสมุดงานนี้ซ้ำที่นี่ไม่ได้ โปรดโหลดตัวแก้ไขใหม่เพื่อทำงานต่อ',
   appAutoSaveUniworkOff:
     'การบันทึกอัตโนมัติปิดอยู่สำหรับเอกสาร UniWork ใช้ “บันทึก” เพื่อบันทึกเวอร์ชันใหม่',
 } satisfies Record<keyof typeof zh, string>

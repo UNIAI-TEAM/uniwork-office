@@ -1471,5 +1471,29 @@ export const ar = {
   appVisualFlipV: 'قلب رأسي',
   appVisualFlipH: 'قلب أفقي',
   appCtxPasteVisual: 'لصق صورة أو شكل',
+  // web frame (UNI-1016): engine-unavailable screen, view-only, save conflicts
+  appWebEngineTitle: 'لا يمكن فتح هذا المصنف على الويب بعد',
+  appWebEngineBody:
+    'لا يزال إصدار الويب من UniWork Sheets بانتظار محرك جداول البيانات. حتى ذلك الحين، افتح هذا المصنف في تطبيق UniWork لسطح المكتب.',
+  appWebEngineHint: 'لم يتغير ملفك.',
+  appWebViewOnly: 'عرض فقط: لا يمكنك حفظ التغييرات على هذا المصنف.',
+  appWebConflictTitle: 'تم تغيير هذا المصنف في مكان آخر',
+  appWebConflictBody:
+    'قام شخص ما بحفظ إصدار أحدث أثناء التحرير. استبدله بإصدارك، أو أعد تحميل أحدث إصدار (سيتم تجاهل التغييرات غير المحفوظة).',
+  appWebConflictOverwrite: 'استبدال',
+  appWebConflictReload: 'إعادة تحميل أحدث إصدار',
+  appWebConflictNotSaved: 'لم يتم الحفظ: يوجد إصدار أحدث.',
+  appWebDiscardTitle: 'تجاهل التغييرات غير المحفوظة؟',
+  appWebDiscardBody: 'يؤدي فتح مصنف آخر إلى تجاهل التغييرات غير المحفوظة.',
+  appWebDiscard: 'تجاهل',
+  appWebCancel: 'إلغاء',
+  appWebSaveFailed: 'فشل الحفظ في UniWork.',
+  appWebTooLargeTitle: 'هذا المصنف كبير جدًا بالنسبة للويب',
+  appWebTooLargeBody:
+    'حجمه يتجاوز ما يتعامل معه جدول البيانات على الويب، لذلك يُفتح في محرر جداول البيانات الكلاسيكي بدلًا من ذلك.',
+  appWebEngineRestarted:
+    'توقف محرك المصنف بشكل غير متوقع وتمت إعادة تشغيله. أُعيد فتح المصنف من آخر نسخة محفوظة؛ تم الاحتفاظ بتغييراتك غير المحفوظة، لذا احفظ قريبًا.',
+  appWebSavedReopenFailed:
+    'تم حفظ تغييراتك في UniWork، لكن تعذّرت إعادة فتح المصنف هنا. أعد تحميل المحرر لمتابعة العمل.',
   appAutoSaveUniworkOff: 'الحفظ التلقائي متوقف لمستندات UniWork. استخدم «حفظ» لحفظ إصدار جديد.',
 } satisfies Record<keyof typeof zh, string>

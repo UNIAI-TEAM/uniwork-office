@@ -5,6 +5,7 @@ export const hi = {
   appPhPromptSubtitle: 'उपशीर्षक जोड़ने के लिए क्लिक करें',
   appPhPromptBody: 'टेक्स्ट जोड़ने के लिए क्लिक करें',
   appStatusOpened: '{name} खोला गया ({count} स्लाइड)',
+  appStatusOpenedOne: '{name} खोला गया (1 स्लाइड)',
   appStatusNewBlank: 'रिक्त प्रस्तुति बनाई गई',
   appStatusSaved: 'सहेजा गया',
   appStatusSaveFailed: 'सहेजना विफल: {error}',

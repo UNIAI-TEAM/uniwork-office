@@ -1,0 +1,56 @@
+# Project notes
+
+Intro paragraph with **bold**, *italic*, ~~strike~~, `inline code` and a [link](https://example.com "title").
+A second line in the same paragraph, an autolink [https://example.com](https://example.com) and an email [team@example.com](mailto:team@example.com).
+
+## Lists
+
+- first item
+- second item with `code`
+  - nested item
+    - deeper item
+
+- [ ] open task
+- [x] done task
+
+1. one
+2. two
+   1. two-a
+3. three
+
+> A quote
+>
+> spanning two paragraphs
+
+### Code
+
+```ts
+const a = 1 < 2 && 3 > 2
+```
+
+```mermaid
+flowchart LR
+    A --> B
+```
+
+| Name | Value |
+| ---- | -----: |
+| a    | 1     |
+| b    | 2     |
+
+Inline math $x^2$ and a price of $5.
+
+$$
+E = mc^2
+$$
+
+![diagram](assets/diagram.png)
+
+Escapes: \*not italic\*, 1 &lt; 2, a\_b\_c, and &amp; ampersand.
+
+Hard break here  
+next line.
+
+---
+
+Final paragraph.

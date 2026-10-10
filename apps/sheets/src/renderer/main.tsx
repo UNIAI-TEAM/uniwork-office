@@ -13,7 +13,8 @@ import '@genoffice/ui/ai-panel-prefs.css'
 import '@genoffice/ui/ai-scope-quote.css'
 import '@univerjs/preset-sheets-core/lib/index.css'
 
-import { App } from './App'
+import { cap } from './capabilities'
+import { EngineUnavailableScreen } from './EngineUnavailableScreen'
 import { installCanvasFontFallback, registerCellFontAliases } from './cell-font-fallback'
 import { LocaleProvider, setModuleLang } from './i18n/locale'
 import type { DocTheme, UiTheme } from '../shared/desktop-api'
@@ -80,10 +81,25 @@ async function bootstrap(): Promise<void> {
   document.documentElement.dir = htmlDir(lang)
   applyTheme(theme)
   applyDocumentTheme(docTheme ?? 'follow')
+  // Web frame without a workbook engine (UNI-1016): show the styled state
+  // instead of booting the grid; the desktop never sets the capability.
+  if (!cap('xlsxEngine')) {
+    window.desktopApi?.onThemeChanged(applyTheme)
+    ReactDOM.createRoot(root!).render(
+      <LocaleProvider initial={lang}>
+        <EngineUnavailableScreen />
+      </LocaleProvider>,
+    )
+    return
+  }
+  // The grid (App + Univer, most of the bundle) is its own chunk: it downloads
+  // in parallel with the cell fonts, and the screen above never fetches it.
+  const appModule = import('./App')
   await loadCellFonts()
   // A spare view can receive a file while its renderer is still booting.
   // Check the queued path before the first React paint so it never looks Ready.
   const queuedWorkbookAtBoot = await window.desktopApi?.hasQueuedWorkbook?.().catch(() => false)
+  const { App } = await appModule
   window.desktopApi?.onThemeChanged(applyTheme)
   window.desktopApi?.onDocumentThemeChanged?.(applyDocumentTheme)
   await window.desktopApi

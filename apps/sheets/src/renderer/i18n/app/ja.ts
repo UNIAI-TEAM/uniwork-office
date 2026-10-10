@@ -1558,6 +1558,30 @@ export const ja = {
   appVisualFlipV: '上下反転',
   appVisualFlipH: '左右反転',
   appCtxPasteVisual: '図または図形を貼り付け',
+  // web frame (UNI-1016): engine-unavailable screen, view-only, save conflicts
+  appWebEngineTitle: 'このブックはまだ Web で開けません',
+  appWebEngineBody:
+    'Web 版 UniWork Sheets の計算エンジンは準備中です。それまでは UniWork デスクトップ アプリでこのブックを開いてください。',
+  appWebEngineHint: 'ファイルは変更されていません。',
+  appWebViewOnly: '表示のみ: このブックの変更は保存できません。',
+  appWebConflictTitle: 'このブックは別の場所で変更されました',
+  appWebConflictBody:
+    '編集中に新しいバージョンが保存されました。自分のバージョンで上書きするか、最新バージョンを再読み込みしてください（未保存の変更は破棄されます）。',
+  appWebConflictOverwrite: '上書き',
+  appWebConflictReload: '最新版を再読み込み',
+  appWebConflictNotSaved: '保存されていません: 新しいバージョンがあります。',
+  appWebDiscardTitle: '保存されていない変更を破棄しますか?',
+  appWebDiscardBody: '別のブックを開くと、保存されていない変更は破棄されます。',
+  appWebDiscard: '破棄',
+  appWebCancel: 'キャンセル',
+  appWebSaveFailed: 'UniWork への保存に失敗しました。',
+  appWebTooLargeTitle: 'このブックは大きすぎて Web では開けません',
+  appWebTooLargeBody:
+    'Web 版スプレッドシートで扱えるサイズを超えているため、クラシック スプレッドシート エディターで開きます。',
+  appWebEngineRestarted:
+    'ブックのエンジンが予期せず停止し、再起動しました。ブックは最後に保存した状態から開き直しました。未保存の変更は保持されているので、早めに保存してください。',
+  appWebSavedReopenFailed:
+    '変更は UniWork に保存されましたが、ここでブックを開き直せませんでした。エディターを再読み込みして作業を続けてください。',
   appAutoSaveUniworkOff:
     'UniWork のドキュメントでは自動保存はオフです。新しいバージョンを保存するには「保存」を使ってください。',
 } satisfies Record<keyof typeof zh, string>

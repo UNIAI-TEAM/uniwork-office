@@ -49,7 +49,8 @@ interface Props {
   imageEnabled: boolean
   onInsertImage: () => void
   /** open the image host configuration (genoffice#388) */
-  onImageHost: () => void
+  /** absent = no image host settings (web frame, cap 'imageHost') */
+  onImageHost?: () => void
   frontmatterOpen: boolean
   onToggleFrontmatter: () => void
   /** the markdown source view, distinct from the .txt/.json `sourceMode` */
@@ -60,6 +61,10 @@ interface Props {
   hasOutline: boolean
   spellcheck: boolean
   onToggleSpellcheck: () => void
+  /** false on the web (cap 'autoSave'): no AutoSave toggle */
+  showAutoSave?: boolean
+  /** false on the web (cap 'ai'): no AI group */
+  showAi?: boolean
   aiOpen: boolean
   onToggleAi: () => void
   onAiPreset: (instruction: string) => void
@@ -197,6 +202,8 @@ export function Ribbon({
   hasOutline,
   spellcheck,
   onToggleSpellcheck,
+  showAutoSave = true,
+  showAi = true,
   aiOpen,
   onToggleAi,
   onAiPreset,
@@ -353,60 +360,66 @@ export function Ribbon({
         >
           <IconSearch size={16} />
         </button>
-        <label
-          className={`autosave-toggle${autoSave && !uniworkBound ? ' on' : ''}`}
-          data-tip={t(uniworkBound ? 'autoSaveUniworkOff' : 'autoSaveTip')}
-        >
-          <span className="autosave-knob" />
-          <span className="autosave-text">{t('autoSave')}</span>
-          <input
-            type="checkbox"
-            checked={autoSave && !uniworkBound}
-            disabled={uniworkBound}
-            onChange={(e) => onToggleAutoSave(e.target.checked)}
-          />
-        </label>
+        {showAutoSave && (
+          <label
+            className={`autosave-toggle${autoSave && !uniworkBound ? ' on' : ''}`}
+            data-tip={t(uniworkBound ? 'autoSaveUniworkOff' : 'autoSaveTip')}
+          >
+            <span className="autosave-knob" />
+            <span className="autosave-text">{t('autoSave')}</span>
+            <input
+              type="checkbox"
+              checked={autoSave && !uniworkBound}
+              disabled={uniworkBound}
+              onChange={(e) => onToggleAutoSave(e.target.checked)}
+            />
+          </label>
+        )}
         <RibbonExpandButton state={collapse} label={t('ribbonExpand')} />
       </div>
 
       <div className="ribbon-body" data-ribbon-body="">
-        <div className="ribbon-group">
-          <div className="ribbon-group-items">
-            <button
-              type="button"
-              className={`rb-big ai-entry${aiOpen ? ' active' : ''}`}
-              data-tip={t('aiOpenAssistant')}
-              disabled={disabled}
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={onToggleAi}
-            >
-              <span className="rb-big-icon">
-                <GensparkMark size={26} />
-              </span>
-              <span>AI</span>
-            </button>
-            {aiPresets.map(({ kind, btn, prompt }) => (
-              <button
-                key={kind}
-                type="button"
-                className="rb-big ai-entry"
-                data-tip={t(btn)}
-                disabled={off || state?.empty}
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => onAiPreset(prompt())}
-              >
-                <span className="rb-big-icon">
-                  <span className="ai-feature-icon" aria-hidden="true">
-                    <AiFeatureIcon kind={kind} />
+        {showAi && (
+          <>
+            <div className="ribbon-group">
+              <div className="ribbon-group-items">
+                <button
+                  type="button"
+                  className={`rb-big ai-entry${aiOpen ? ' active' : ''}`}
+                  data-tip={t('aiOpenAssistant')}
+                  disabled={disabled}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={onToggleAi}
+                >
+                  <span className="rb-big-icon">
+                    <GensparkMark size={26} />
                   </span>
-                </span>
-                <span>{t(btn)}</span>
-              </button>
-            ))}
-          </div>
-        </div>
+                  <span>AI</span>
+                </button>
+                {aiPresets.map(({ kind, btn, prompt }) => (
+                  <button
+                    key={kind}
+                    type="button"
+                    className="rb-big ai-entry"
+                    data-tip={t(btn)}
+                    disabled={off || state?.empty}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => onAiPreset(prompt())}
+                  >
+                    <span className="rb-big-icon">
+                      <span className="ai-feature-icon" aria-hidden="true">
+                        <AiFeatureIcon kind={kind} />
+                      </span>
+                    </span>
+                    <span>{t(btn)}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
 
-        <div className="rb-sep" />
+            <div className="rb-sep" />
+          </>
+        )}
 
         {!sourceMode && (
           <div className="ribbon-group">
@@ -540,9 +553,11 @@ export function Ribbon({
               >
                 <IconPicture size={ICON} />
               </IconBtn>
-              <IconBtn title={t('imageHostTitle')} onClick={onImageHost}>
-                <IconCloudUpload size={ICON} />
-              </IconBtn>
+              {onImageHost && (
+                <IconBtn title={t('imageHostTitle')} onClick={onImageHost}>
+                  <IconCloudUpload size={ICON} />
+                </IconBtn>
+              )}
               <IconBtn
                 title={t('insertHr')}
                 disabled={off}

@@ -6,6 +6,7 @@ import {
   useRibbonCollapse,
 } from '@genoffice/ui'
 import { useI18n } from '../i18n/locale'
+import { useRibbonFit } from './ribbon-fit'
 import type { StringKey } from '../i18n/locale'
 import { GensparkMark } from '../ai/AiPanel'
 import type { InsertKind, InsertOptions } from '../document/insert-presets'
@@ -75,6 +76,12 @@ interface Props {
   onRedo: () => void
   autoSave: boolean
   onToggleAutoSave: (on: boolean) => void
+  /** false on the web (cap 'autoSave'): no AutoSave toggle */
+  showAutoSave?: boolean
+  /** false on the web (cap 'ai'): no AI group */
+  showAi?: boolean
+  /** false on the web (cap 'presentNewTab'): Present > New tab hidden */
+  presentNewTab?: boolean
   view: ViewMode
   onView: (view: ViewMode) => void
   aiOpen: boolean
@@ -136,7 +143,12 @@ const TABLE_PICKER_COLS = 10
 const ICON = 20
 
 export function Ribbon(p: Props) {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
+  const bodyRef = useRef<HTMLDivElement>(null)
+  const fit = useRibbonFit(
+    bodyRef,
+    `${lang}|${p.showAi !== false}|${p.presentNewTab !== false}|${p.readOnly ?? false}`,
+  )
   const collapse = useRibbonCollapse('htmlapp.ribbonCollapsed', {
     collapse: t('ribbonCollapse'),
     expand: t('ribbonExpand'),
@@ -268,112 +280,118 @@ export function Ribbon(p: Props) {
         >
           <IconSearch size={16} />
         </button>
-        <label
-          className={`autosave-toggle${p.autoSave && !p.uniworkBound ? ' on' : ''}`}
-          data-tip={t(p.uniworkBound ? 'autoSaveUniworkOff' : 'autoSaveTip')}
-        >
-          <span className="autosave-knob" />
-          <span className="autosave-text">{t('autoSave')}</span>
-          <input
-            type="checkbox"
-            checked={p.autoSave && !p.uniworkBound}
-            disabled={p.uniworkBound}
-            onChange={(e) => p.onToggleAutoSave(e.target.checked)}
-          />
-        </label>
+        {p.showAutoSave !== false && (
+          <label
+            className={`autosave-toggle${p.autoSave && !p.uniworkBound ? ' on' : ''}`}
+            data-tip={t(p.uniworkBound ? 'autoSaveUniworkOff' : 'autoSaveTip')}
+          >
+            <span className="autosave-knob" />
+            <span className="autosave-text">{t('autoSave')}</span>
+            <input
+              type="checkbox"
+              checked={p.autoSave && !p.uniworkBound}
+              disabled={p.uniworkBound}
+              onChange={(e) => p.onToggleAutoSave(e.target.checked)}
+            />
+          </label>
+        )}
         <RibbonExpandButton state={collapse} label={t('ribbonExpand')} />
       </div>
 
-      <div className="ribbon-body" data-ribbon-body="">
-        <div className="ribbon-group">
-          <div className="ribbon-group-items">
-            <button
-              type="button"
-              className={`rb-big ai-entry${p.aiOpen ? ' active' : ''}`}
-              data-tip={t('aiOpenAssistant')}
-              aria-pressed={p.aiOpen}
-              disabled={off}
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={p.onToggleAi}
-            >
-              <span className="rb-big-icon">
-                <GensparkMark size={26} />
-              </span>
-              <span>AI</span>
-            </button>
-            <button
-              type="button"
-              className="rb-big ai-entry"
-              data-tip={t('aiRestyleBtn')}
-              disabled={off}
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => p.onAiPreset(t('aiRestylePrompt'))}
-            >
-              <span className="rb-big-icon">
-                <span className="ai-feature-icon" aria-hidden="true">
-                  <IconWand size={24} />
-                </span>
-              </span>
-              <span>{t('aiRestyleBtn')}</span>
-            </button>
-            <div className="rb-menu-wrap" ref={themeRef}>
-              <button
-                type="button"
-                className={`rb-big ai-entry${themeOpen ? ' active' : ''}`}
-                data-tip={t('aiThemeBtn')}
-                aria-haspopup="menu"
-                aria-expanded={themeOpen}
-                disabled={off}
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => setThemeOpen((v) => !v)}
-              >
-                <span className="rb-big-icon">
-                  <span className="ai-feature-icon" aria-hidden="true">
-                    <IconPalette size={24} />
+      <div className="ribbon-body" data-ribbon-body="" data-fit={fit} ref={bodyRef}>
+        {p.showAi !== false && (
+          <>
+            <div className="ribbon-group">
+              <div className="ribbon-group-items">
+                <button
+                  type="button"
+                  className={`rb-big ai-entry${p.aiOpen ? ' active' : ''}`}
+                  data-tip={t('aiOpenAssistant')}
+                  aria-pressed={p.aiOpen}
+                  disabled={off}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={p.onToggleAi}
+                >
+                  <span className="rb-big-icon">
+                    <GensparkMark size={26} />
                   </span>
-                </span>
-                <span>{t('aiThemeBtn')}</span>
-              </button>
-              {themeOpen && (
-                <div className="rb-menu" role="menu">
-                  {THEME_DIRECTIONS.map((key) => (
-                    <button
-                      key={key}
-                      type="button"
-                      role="menuitem"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => {
-                        setThemeOpen(false)
-                        p.onAiPreset(t('aiThemePrompt', { direction: t(key) }))
-                      }}
-                    >
-                      {t(key)}
-                    </button>
-                  ))}
+                  <span>AI</span>
+                </button>
+                <button
+                  type="button"
+                  className="rb-big ai-entry"
+                  data-tip={t('aiRestyleBtn')}
+                  disabled={off}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => p.onAiPreset(t('aiRestylePrompt'))}
+                >
+                  <span className="rb-big-icon">
+                    <span className="ai-feature-icon" aria-hidden="true">
+                      <IconWand size={24} />
+                    </span>
+                  </span>
+                  <span>{t('aiRestyleBtn')}</span>
+                </button>
+                <div className="rb-menu-wrap" ref={themeRef}>
+                  <button
+                    type="button"
+                    className={`rb-big ai-entry${themeOpen ? ' active' : ''}`}
+                    data-tip={t('aiThemeBtn')}
+                    aria-haspopup="menu"
+                    aria-expanded={themeOpen}
+                    disabled={off}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => setThemeOpen((v) => !v)}
+                  >
+                    <span className="rb-big-icon">
+                      <span className="ai-feature-icon" aria-hidden="true">
+                        <IconPalette size={24} />
+                      </span>
+                    </span>
+                    <span>{t('aiThemeBtn')}</span>
+                  </button>
+                  {themeOpen && (
+                    <div className="rb-menu" role="menu">
+                      {THEME_DIRECTIONS.map((key) => (
+                        <button
+                          key={key}
+                          type="button"
+                          role="menuitem"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => {
+                            setThemeOpen(false)
+                            p.onAiPreset(t('aiThemePrompt', { direction: t(key) }))
+                          }}
+                        >
+                          {t(key)}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              )}
+                <button
+                  type="button"
+                  className="rb-big ai-entry"
+                  data-tip={t('aiSummarizeBtn')}
+                  disabled={off}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => p.onAiPreset(t('aiSummarizePrompt'))}
+                >
+                  <span className="rb-big-icon">
+                    <span className="ai-feature-icon" aria-hidden="true">
+                      <IconSummarize size={24} />
+                    </span>
+                  </span>
+                  <span>{t('aiSummarizeBtn')}</span>
+                </button>
+              </div>
             </div>
-            <button
-              type="button"
-              className="rb-big ai-entry"
-              data-tip={t('aiSummarizeBtn')}
-              disabled={off}
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => p.onAiPreset(t('aiSummarizePrompt'))}
-            >
-              <span className="rb-big-icon">
-                <span className="ai-feature-icon" aria-hidden="true">
-                  <IconSummarize size={24} />
-                </span>
-              </span>
-              <span>{t('aiSummarizeBtn')}</span>
-            </button>
-          </div>
-        </div>
 
-        <div className="rb-sep" />
+            <div className="rb-sep" />
+          </>
+        )}
 
-        <div className="ribbon-group">
+        <div className="ribbon-group ribbon-insert">
           <div className="ribbon-group-items">
             {/* the ribbon has no Insert tab: the row itself says what these buttons do */}
             <span className="rb-group-lead" aria-hidden="true">
@@ -586,7 +604,9 @@ export function Ribbon(p: Props) {
               </button>
               {presentOpen && (
                 <div className="rb-menu" role="menu">
-                  {PRESENT_ITEMS.map(({ kind, label, Icon }) => (
+                  {PRESENT_ITEMS.filter(
+                    ({ kind }) => kind !== 'newTab' || p.presentNewTab !== false,
+                  ).map(({ kind, label, Icon }) => (
                     <button
                       key={kind}
                       type="button"

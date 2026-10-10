@@ -253,6 +253,14 @@ export const ko = {
   panePresenterUseShowTip: '이 화면에서 일반 슬라이드 쇼로 전환',
   panePresenterSingleHint:
     '단일 디스플레이 모드(두 번째 디스플레이를 연결하면 자동으로 전체 화면 쇼 시작)',
+  panePresenterOpenAudience: '청중 창',
+  panePresenterOpenAudienceTip: '슬라이드 쇼를 별도 창으로 열어 프로젝터로 끌어다 놓을 수 있습니다',
+  panePresenterCloseAudience: '청중 창 닫기',
+  panePresenterCloseAudienceTip: '청중 창을 닫습니다. 발표자 보기는 계속 실행됩니다',
+  panePresenterWebHint: '청중 창을 열어 프로젝터로 끌어다 놓은 다음 클릭하면 전체 화면이 됩니다',
+  panePresenterPopupBlocked:
+    '브라우저가 창을 차단했습니다. 이 사이트의 팝업을 허용한 후 다시 시도하세요.',
+  paneAudienceFullscreenHint: '클릭하여 전체 화면으로 표시',
   panePresenterElapsed: '경과 시간',
   panePresenterPause: '타이머 일시 중지',
   panePresenterResume: '타이머 계속',

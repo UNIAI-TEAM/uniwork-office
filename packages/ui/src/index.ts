@@ -119,6 +119,11 @@ export {
   type AutoSaveDefaultApi,
 } from './auto-save-pref'
 export {
+  createCapabilityReader,
+  type CapabilityObject,
+  type CapabilityReader,
+} from './capabilities'
+export {
   NOTCH,
   clampZoom,
   createWheelPager,

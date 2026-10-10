@@ -1551,6 +1551,30 @@ export const it = {
   appVisualFlipV: 'Capovolgi verticalmente',
   appVisualFlipH: 'Capovolgi orizzontalmente',
   appCtxPasteVisual: 'Incolla immagine o forma',
+  // web frame (UNI-1016): engine-unavailable screen, view-only, save conflicts
+  appWebEngineTitle: 'Questa cartella di lavoro non può ancora essere aperta sul web',
+  appWebEngineBody:
+    "La versione web di UniWork Sheets sta ancora ricevendo il suo motore di calcolo. Nel frattempo, apri questa cartella di lavoro nell'app desktop di UniWork.",
+  appWebEngineHint: 'Il file non è stato modificato.',
+  appWebViewOnly: 'Sola lettura: non puoi salvare le modifiche a questa cartella di lavoro.',
+  appWebConflictTitle: 'Questa cartella di lavoro è stata modificata altrove',
+  appWebConflictBody:
+    "Qualcuno ha salvato una versione più recente mentre modificavi. Sovrascrivila con la tua versione oppure ricarica l'ultima versione (le modifiche non salvate andranno perse).",
+  appWebConflictOverwrite: 'Sovrascrivi',
+  appWebConflictReload: "Ricarica l'ultima versione",
+  appWebConflictNotSaved: 'Non salvato: esiste una versione più recente.',
+  appWebDiscardTitle: 'Annullare le modifiche non salvate?',
+  appWebDiscardBody: "Aprendo un'altra cartella di lavoro le modifiche non salvate andranno perse.",
+  appWebDiscard: 'Annulla modifiche',
+  appWebCancel: 'Annulla',
+  appWebSaveFailed: 'Salvataggio in UniWork non riuscito.',
+  appWebTooLargeTitle: 'Questa cartella di lavoro è troppo grande per il web',
+  appWebTooLargeBody:
+    "Supera le dimensioni gestite dal foglio di calcolo web, quindi si apre nell'editor classico.",
+  appWebEngineRestarted:
+    "Il motore della cartella di lavoro si è arrestato in modo imprevisto ed è stato riavviato. La cartella è stata riaperta dall'ultima versione salvata; le modifiche non salvate sono conservate, salva presto.",
+  appWebSavedReopenFailed:
+    "Le modifiche sono state salvate in UniWork, ma non è stato possibile riaprire qui la cartella di lavoro. Ricarica l'editor per continuare.",
   appAutoSaveUniworkOff:
     'Il salvataggio automatico è disattivato per i documenti UniWork. Usa Salva per salvare una nuova versione.',
 } satisfies Record<keyof typeof zh, string>

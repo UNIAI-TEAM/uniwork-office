@@ -142,4 +142,5 @@ export const zh = {
   presentInTab: '在当前标签页',
   presentFullscreen: '全屏',
   presentNewTab: '新标签页',
+  viewOnly: '仅查看',
 }

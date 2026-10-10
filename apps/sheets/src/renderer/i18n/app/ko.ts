@@ -1530,6 +1530,30 @@ export const ko = {
   appVisualFlipV: '상하 대칭',
   appVisualFlipH: '좌우 대칭',
   appCtxPasteVisual: '그림/도형 붙여넣기',
+  // web frame (UNI-1016): engine-unavailable screen, view-only, save conflicts
+  appWebEngineTitle: '이 통합 문서는 아직 웹에서 열 수 없습니다',
+  appWebEngineBody:
+    '웹용 UniWork Sheets의 계산 엔진을 준비 중입니다. 그때까지는 UniWork 데스크톱 앱에서 이 통합 문서를 여세요.',
+  appWebEngineHint: '파일은 변경되지 않았습니다.',
+  appWebViewOnly: '보기 전용: 이 통합 문서의 변경 내용을 저장할 수 없습니다.',
+  appWebConflictTitle: '이 통합 문서가 다른 곳에서 변경되었습니다',
+  appWebConflictBody:
+    '편집하는 동안 다른 사람이 새 버전을 저장했습니다. 내 버전으로 덮어쓰거나 최신 버전을 다시 불러오세요(저장하지 않은 변경 내용은 삭제됨).',
+  appWebConflictOverwrite: '덮어쓰기',
+  appWebConflictReload: '최신 버전 다시 불러오기',
+  appWebConflictNotSaved: '저장되지 않음: 더 새로운 버전이 있습니다.',
+  appWebDiscardTitle: '저장하지 않은 변경 내용을 삭제할까요?',
+  appWebDiscardBody: '다른 통합 문서를 열면 저장하지 않은 변경 내용이 삭제됩니다.',
+  appWebDiscard: '삭제',
+  appWebCancel: '취소',
+  appWebSaveFailed: 'UniWork에 저장하지 못했습니다.',
+  appWebTooLargeTitle: '이 통합 문서는 너무 커서 웹에서 열 수 없습니다',
+  appWebTooLargeBody:
+    '웹 스프레드시트가 처리할 수 있는 크기를 넘으므로 클래식 스프레드시트 편집기에서 엽니다.',
+  appWebEngineRestarted:
+    '통합 문서 엔진이 예기치 않게 중지되어 다시 시작되었습니다. 통합 문서를 마지막으로 저장한 버전에서 다시 열었습니다. 저장하지 않은 변경 내용은 유지되므로 곧 저장하세요.',
+  appWebSavedReopenFailed:
+    '변경 사항은 UniWork에 저장되었지만 여기서 통합 문서를 다시 열 수 없습니다. 편집기를 새로 고쳐 계속 작업하세요.',
   appAutoSaveUniworkOff:
     'UniWork 문서에서는 자동 저장이 꺼져 있습니다. 새 버전을 저장하려면 ‘저장’을 사용하세요.',
 } satisfies Record<keyof typeof zh, string>

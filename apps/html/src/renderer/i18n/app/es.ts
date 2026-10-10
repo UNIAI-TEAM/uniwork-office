@@ -149,4 +149,5 @@ export const es = {
   presentInTab: 'En esta pestaña',
   presentFullscreen: 'Pantalla completa',
   presentNewTab: 'Nueva pestaña',
+  viewOnly: 'Solo lectura',
 } satisfies Record<keyof typeof zh, string>

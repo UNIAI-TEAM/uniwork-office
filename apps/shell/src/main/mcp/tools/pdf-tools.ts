@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { basename, extname, isAbsolute } from 'node:path'
 import { z } from 'zod'
 import { readPdfText } from '../../../../../pdf/src/main/read-text'
+import { installNodePdfEnv } from '../../../../../pdf/src/main/node-env'
 import type { McpToolDefinition } from '../mcp-server'
 
 /**
@@ -65,6 +66,10 @@ export function createPdfTools(): McpToolDefinition[] {
         if (!existsSync(filePath)) throw new Error(`file not found: ${filePath}`)
 
         const bytes = new Uint8Array(await readFile(filePath))
+        // pdfium's wasm and fonts come through the pdf core's platform seams; the pdf app installs
+        // them when its IPC registers, which an MCP call can precede (setPdfCoreEnv merges, so an
+        // already installed image codec stays)
+        installNodePdfEnv()
         // Probe with a zero budget: it opens the document (which is also what
         // surfaces an encrypted or corrupt file as a clean tool error), reports
         // the page count, and extracts no page text — the old probe read page 1

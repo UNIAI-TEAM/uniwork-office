@@ -1,4 +1,5 @@
 import type { AgentSkill } from '@genoffice/agent-core'
+import { cap } from '../capabilities'
 import basePrompt from './prompts/base.md?raw'
 import { verifySheetsResponse } from './response-verify'
 import {
@@ -7,6 +8,16 @@ import {
   executeWorkbookTool,
   type SheetsSkillDeps,
 } from './tools'
+
+/** the base prompt's bullet about the create_document tool (hidden with the tool) */
+const CREATE_DOCUMENT_LINE = /^- \*\*New standalone files\*\*.*\n?/m
+
+/** create_document writes files to a desktop folder: not offered without the `createDocument` capability */
+export const basePromptFor = (createDocument: boolean): string =>
+  createDocument ? basePrompt : basePrompt.replace(CREATE_DOCUMENT_LINE, '')
+
+export const workbookToolsFor = (createDocument: boolean): typeof WORKBOOK_TOOLS =>
+  createDocument ? WORKBOOK_TOOLS : WORKBOOK_TOOLS.filter((tool) => tool.name !== 'create_document')
 
 /**
  * The workbook DSL as an AgentSkill: mirrors createDocsSkill's shape
@@ -21,8 +32,13 @@ import {
 export function createWorkbookSkill(deps: SheetsSkillDeps): AgentSkill {
   return {
     id: 'sheets',
-    systemPrompt: basePrompt,
-    tools: WORKBOOK_TOOLS,
+    // live: the loop re-reads both before every request
+    get systemPrompt() {
+      return basePromptFor(cap('createDocument'))
+    },
+    get tools() {
+      return workbookToolsFor(cap('createDocument'))
+    },
     buildContext: () => buildWorkbookContext(deps),
     executeTool: (call) => executeWorkbookTool(call, deps),
     verifyResponse: verifySheetsResponse,

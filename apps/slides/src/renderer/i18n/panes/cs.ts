@@ -253,6 +253,16 @@ export const cs = {
   panePresenterUseShowTip: 'Přepnout na běžnou prezentaci na tomto displeji',
   panePresenterSingleHint:
     'Režim jednoho displeje (připojte druhý displej a prezentace se automaticky zobrazí na celou obrazovku)',
+  panePresenterOpenAudience: 'Okno pro publikum',
+  panePresenterOpenAudienceTip:
+    'Otevřít prezentaci v samostatném okně, které můžete přetáhnout na projektor',
+  panePresenterCloseAudience: 'Zavřít okno pro publikum',
+  panePresenterCloseAudienceTip: 'Zavřít okno pro publikum; zobrazení prezentujícího běží dál',
+  panePresenterWebHint:
+    'Otevřete okno pro publikum, přetáhněte ho na projektor a klikněte na něj pro celou obrazovku',
+  panePresenterPopupBlocked:
+    'Prohlížeč okno zablokoval. Povolte pro tento web vyskakovací okna a zkuste to znovu.',
+  paneAudienceFullscreenHint: 'Klikněte pro zobrazení na celou obrazovku',
   panePresenterElapsed: 'Uplynulý čas',
   panePresenterPause: 'Pozastavit časovač',
   panePresenterResume: 'Pokračovat v časovači',

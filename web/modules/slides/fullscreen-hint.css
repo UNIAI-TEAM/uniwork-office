@@ -1,0 +1,22 @@
+/* "Click or press a key to go full screen": shown over the slide show when the browser refused the
+ * Fullscreen request (no user activation). Playback chrome: the black show tokens hold in both
+ * themes (apps/slides styles.css). */
+.ow-fs-hint {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  z-index: 100000;
+  max-width: calc(100vw - 32px);
+  box-sizing: border-box;
+  padding: 8px 14px;
+  transform: translateX(-50%);
+  border: 1px solid var(--slides-show-ink-45);
+  border-radius: 8px;
+  background: var(--slides-show-black);
+  color: var(--slides-show-ink);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.4;
+  text-align: center;
+  pointer-events: none;
+}

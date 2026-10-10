@@ -20,11 +20,46 @@
  *  - frame-ancestors 'self' only the same-origin UniWork page may embed the frame
  */
 
+/**
+ * Sources a module adds on top of the Docs policy (GO-B4/B5/B6), each with the reason it needs
+ * them (registry: web/docs/build/modules.ts). A directive listed here gets these sources appended
+ * (an `'none'` it had is dropped); a directive the base policy lacks is created.
+ */
+export interface CspExtra {
+  directives: CspDirectives
+  /**
+   * more build-relative paths (headers.json sources: exact or `/dir/**`) that must carry the
+   * policy besides index.html, e.g. `/assets/**` when the module starts a worker: a worker's CSP
+   * comes from its own script response, not from the page
+   */
+  alsoOn?: string[]
+  /** one line per addition, copied into csp.json `notes` */
+  why: string[]
+  /**
+   * documents of the bundle served with their OWN policy instead of the module's (csp.json
+   * `documents`, headers.json rules). Only for a document that the module embeds sandboxed into an
+   * opaque origin (e.g. the html preview, html: preview.html): the policy must carry a `sandbox`
+   * directive that keeps it opaque even when the file is opened directly.
+   */
+  documents?: CspDocument[]
+}
+
+export interface CspDocument {
+  /** build-relative exact path, e.g. `/preview.html` */
+  path: string
+  /** the complete policy (frame-ancestors is added: same embedders as the frame) */
+  directives: CspDirectives
+  /** one line per directive, copied into csp.json `notes` */
+  why: string[]
+}
+
 export interface CspOptions {
   /** extra connect-src origins (e.g. a separate API origin). Default: none, same-origin only. */
   connectSrc?: string[]
   /** extra frame-ancestors origins (e.g. when the frame moves to its own subdomain). Default: 'self' only. */
   frameAncestors?: string[]
+  /** module-specific additions (never frame-ancestors / connect-src: those stay deployment knobs) */
+  extra?: CspExtra
 }
 
 export type CspDirectives = Record<string, string[]>
@@ -44,7 +79,77 @@ function assertSource(src: string): string {
   return src
 }
 
+const KEYWORD_SOURCES = new Set(["'self'", "'none'", "'unsafe-inline'", "'wasm-unsafe-eval'"])
+const SCHEME_SOURCES = new Set(['data:', 'blob:', 'mediastream:'])
+const DIRECTIVE_NAME = /^[a-z]+(-[a-z]+)*$/
+/** directives a module may not widen: who embeds the frame and where it connects are deployment decisions */
+const LOCKED_DIRECTIVES = new Set([
+  'frame-ancestors',
+  'connect-src',
+  'default-src',
+  'base-uri',
+  'form-action',
+])
+
+/** a module's extra source: a known keyword, a scheme, or a plain source token */
+function assertExtraSource(src: string): string {
+  if (KEYWORD_SOURCES.has(src) || SCHEME_SOURCES.has(src)) return src
+  return assertSource(src)
+}
+
+function applyExtra(base: CspDirectives, extra: CspExtra | undefined): CspDirectives {
+  if (!extra) return base
+  const out: CspDirectives = { ...base }
+  for (const [name, sources] of Object.entries(extra.directives)) {
+    if (!DIRECTIVE_NAME.test(name)) throw new Error(`invalid CSP directive "${name}"`)
+    if (LOCKED_DIRECTIVES.has(name)) throw new Error(`a module cannot widen ${name}`)
+    const add = sources.map(assertExtraSource)
+    const current = (out[name] ?? []).filter((s) => s !== "'none'")
+    out[name] = [...current, ...add.filter((s) => !current.includes(s))]
+  }
+  return out
+}
+
+/** sources a sandboxed document policy may use on top of the frame's (never 'self': see documentDirectives) */
+const DOCUMENT_SOURCES = new Set(["'unsafe-inline'", "'unsafe-eval'", 'https:'])
+/** sandbox flags that would give a document back an origin, top navigation or an unsandboxed popup */
+const FORBIDDEN_SANDBOX_FLAGS =
+  /^allow-(same-origin|top-navigation.*|popups-to-escape-sandbox|storage-access-by-user-activation)$/
+
+/**
+ * A sandboxed document's own policy. Rules: it must sandbox itself into an opaque origin (a
+ * `sandbox` directive without allow-same-origin / top navigation / escaping popups), it never
+ * names 'self' (an opaque document must not reach the frame's origin by URL), connect-src and
+ * form-action are 'none', and frame-ancestors is the frame's own list.
+ */
+function documentDirectives(doc: CspDocument, opts: CspOptions): CspDirectives {
+  const out: CspDirectives = {}
+  for (const [name, sources] of Object.entries(doc.directives)) {
+    if (!DIRECTIVE_NAME.test(name)) throw new Error(`invalid CSP directive "${name}"`)
+    if (name === 'frame-ancestors') throw new Error("frame-ancestors of a document is the frame's")
+    out[name] = sources.map((src) => {
+      if (name === 'sandbox') {
+        if (!/^allow-[a-z-]+$/.test(src) || FORBIDDEN_SANDBOX_FLAGS.test(src))
+          throw new Error(`sandbox flag "${src}" is not allowed in a document policy`)
+        return src
+      }
+      if (src === "'self'") throw new Error(`a document policy cannot name 'self' (${name})`)
+      return DOCUMENT_SOURCES.has(src) ? src : assertExtraSource(src)
+    })
+  }
+  if (!out.sandbox) throw new Error(`document ${doc.path} must carry a sandbox directive`)
+  for (const name of ['default-src', 'connect-src', 'form-action'])
+    if (out[name]?.join(' ') !== "'none'")
+      throw new Error(`document ${doc.path}: ${name} must be 'none'`)
+  out['frame-ancestors'] = baseDirectives(opts)['frame-ancestors']
+  return out
+}
+
 export function buildCspDirectives(opts: CspOptions = {}): CspDirectives {
+  return applyExtra(baseDirectives(opts), opts.extra)
+}
+
+function baseDirectives(opts: CspOptions): CspDirectives {
   const connect = (opts.connectSrc ?? []).map(assertSource)
   const ancestors = (opts.frameAncestors ?? []).map(assertSource)
   return {
@@ -78,6 +183,8 @@ export interface CspManifest {
   /** build-relative paths the header must be sent with (documents; assets do not need it) */
   appliesTo: string[]
   notes: string[]
+  /** documents served with their own (sandboxed) policy instead of `value`; absent = none */
+  documents?: Array<{ path: string; value: string; directives: CspDirectives }>
 }
 
 export function buildCspManifest(opts: CspOptions = {}): CspManifest {
@@ -87,12 +194,25 @@ export function buildCspManifest(opts: CspOptions = {}): CspManifest {
     header: 'Content-Security-Policy',
     value: serializeCsp(directives),
     directives,
-    appliesTo: ['/index.html'],
+    appliesTo: ['/index.html', ...(opts.extra?.alsoOn ?? []).map(assertHeaderSource)],
     notes: [
       'Send as an HTTP response header on index.html. index.html deliberately has no <meta> CSP.',
       "frame-ancestors 'self': the frame is embedded by a same-origin UniWork page. Moving the frame to its own origin only needs WEB_DOCS_CSP_FRAME_ANCESTORS=<host origin> at build time.",
       "connect-src has no data:/blob:. If the host's API lives on another origin, add it with WEB_DOCS_CSP_CONNECT_SRC.",
+      ...(opts.extra?.why ?? []),
+      ...(opts.extra?.documents ?? []).flatMap((d) => d.why),
     ],
+    ...(opts.extra?.documents?.length
+      ? {
+          documents: opts.extra.documents.map((d) => {
+            const path = assertHeaderSource(d.path)
+            if (path.endsWith('/**') || path === '/index.html')
+              throw new Error(`document path "${path}" must be one file other than index.html`)
+            const directives = documentDirectives(d, opts)
+            return { path, value: serializeCsp(directives), directives }
+          }),
+        }
+      : {}),
   }
 }
 
@@ -108,17 +228,47 @@ export interface HeadersManifest {
   rules: HeaderRule[]
 }
 
+function assertHeaderSource(source: string): string {
+  if (!/^\/[0-9A-Za-z._-]+(\/[0-9A-Za-z._-]+)*(\/\*\*)?$/.test(source) || source.includes('..'))
+    throw new Error(`invalid headers.json source "${source}"`)
+  return source
+}
+
+export interface HeadersOptions {
+  /**
+   * more top-level directories (besides assets/ and fonts/) whose files never change within a
+   * version directory, e.g. pdf's `pdfjs` (CMaps, standard fonts, wasm: fixed names, but the
+   * version directory itself is immutable)
+   */
+  immutableDirs?: string[]
+}
+
+const IMMUTABLE = 'public, max-age=31536000, immutable'
+
 /** First matching rule wins per header name (specific rules first). Paths are relative to the version directory. */
-export function buildHeadersManifest(csp: CspManifest): HeadersManifest {
+export function buildHeadersManifest(csp: CspManifest, opts: HeadersOptions = {}): HeadersManifest {
+  const extraDirs = (opts.immutableDirs ?? []).map((d) => {
+    if (!/^[0-9A-Za-z._-]+$/.test(d) || d.startsWith('.')) throw new Error(`invalid dir "${d}"`)
+    return d
+  })
   return {
     schemaVersion: 1,
     rules: [
+      // a document with its own policy: listed first so the module policy never reaches it
+      ...(csp.documents ?? []).map((d) => ({
+        source: d.path,
+        headers: { [csp.header]: d.value, 'Cache-Control': 'no-cache' },
+      })),
       {
         source: '/index.html',
         headers: { [csp.header]: csp.value, 'Cache-Control': 'no-cache' },
       },
-      { source: '/assets/**', headers: { 'Cache-Control': 'public, max-age=31536000, immutable' } },
-      { source: '/fonts/**', headers: { 'Cache-Control': 'public, max-age=31536000, immutable' } },
+      ...csp.appliesTo
+        .filter((source) => source !== '/index.html')
+        .map((source) => ({ source, headers: { [csp.header]: csp.value } })),
+      { source: '/assets/**', headers: { 'Cache-Control': IMMUTABLE } },
+      { source: '/fonts/**', headers: { 'Cache-Control': IMMUTABLE } },
+      ...extraDirs.map((d) => ({ source: `/${d}/**`, headers: { 'Cache-Control': IMMUTABLE } })),
       {
         source: '/**',
         headers: { 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer' },

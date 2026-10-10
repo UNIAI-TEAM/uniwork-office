@@ -1536,6 +1536,30 @@ export const pl = {
   appVisualFlipV: 'Odbij w pionie',
   appVisualFlipH: 'Odbij w poziomie',
   appCtxPasteVisual: 'Wklej obraz lub kształt',
+  // web frame (UNI-1016): engine-unavailable screen, view-only, save conflicts
+  appWebEngineTitle: 'Tego skoroszytu nie można jeszcze otworzyć w sieci',
+  appWebEngineBody:
+    'Wersja internetowa UniWork Sheets wciąż czeka na swój silnik arkuszy. Do tego czasu otwórz ten skoroszyt w aplikacji UniWork na komputer.',
+  appWebEngineHint: 'Twój plik nie został zmieniony.',
+  appWebViewOnly: 'Tylko do odczytu: nie możesz zapisać zmian w tym skoroszycie.',
+  appWebConflictTitle: 'Ten skoroszyt został zmieniony w innym miejscu',
+  appWebConflictBody:
+    'Ktoś zapisał nowszą wersję podczas Twojej edycji. Zastąp ją swoją wersją lub wczytaj najnowszą wersję (niezapisane zmiany zostaną odrzucone).',
+  appWebConflictOverwrite: 'Zastąp',
+  appWebConflictReload: 'Wczytaj najnowszą wersję',
+  appWebConflictNotSaved: 'Nie zapisano: istnieje nowsza wersja.',
+  appWebDiscardTitle: 'Odrzucić niezapisane zmiany?',
+  appWebDiscardBody: 'Otwarcie innego skoroszytu odrzuca niezapisane zmiany.',
+  appWebDiscard: 'Odrzuć',
+  appWebCancel: 'Anuluj',
+  appWebSaveFailed: 'Nie udało się zapisać w UniWork.',
+  appWebTooLargeTitle: 'Ten skoroszyt jest za duży dla wersji internetowej',
+  appWebTooLargeBody:
+    'Przekracza rozmiar obsługiwany przez arkusz internetowy, więc otworzy się w klasycznym edytorze arkuszy.',
+  appWebEngineRestarted:
+    'Silnik skoroszytu nieoczekiwanie się zatrzymał i został uruchomiony ponownie. Skoroszyt otwarto ponownie z ostatnio zapisanej wersji; niezapisane zmiany zostały zachowane — zapisz je wkrótce.',
+  appWebSavedReopenFailed:
+    'Twoje zmiany zapisano w UniWork, ale nie udało się ponownie otworzyć skoroszytu tutaj. Załaduj edytor ponownie, aby kontynuować.',
   appAutoSaveUniworkOff:
     'Autozapis jest wyłączony dla dokumentów UniWork. Użyj opcji Zapisz, aby zapisać nową wersję.',
 } satisfies Record<keyof typeof zh, string>

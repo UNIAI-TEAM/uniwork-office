@@ -10,6 +10,8 @@ import {
   type FrameRequestType,
   type FrameRequests,
   type HostRequests,
+  type InitRecovery,
+  type InitUser,
   type ProtocolErrorCode,
   type ProtocolErrorShape,
   type SavedPayload,
@@ -31,6 +33,12 @@ export interface PortSession {
   locale?: string
   /** effective capabilities (frame ∩ host grant); absent in unit-test sessions */
   capabilities?: Capabilities
+  /** the viewer's display data from `init.user` (additive, GO-B4: PDF note author) */
+  user?: InitUser
+  /** the host's draft-recovery grant from `init.recovery` (CONTRACT C18); absent = recovery off */
+  recovery?: InitRecovery
+  /** `init.apiBase` (additive, C16: the frame-token AI routes live under it); absent in tests */
+  apiBase?: string
 }
 
 type HostHandler<K extends keyof HostRequests> = (
@@ -60,6 +68,12 @@ export interface FramePort {
   setModal?(open: boolean): void
   reportSaved(payload: SavedPayload): void
   reportError(error: ProtocolErrorShape | unknown, fatal?: boolean): void
+  /**
+   * The frame token for the direct AI calls (C16; the real client has both). Absent on ports with
+   * no token (headless entry, unit tests): AI then stays off.
+   */
+  getToken?(): Promise<string>
+  refreshToken?(reason: 'expiring' | 'unauthorized'): Promise<string>
 }
 
 export function errorCode(err: unknown): ProtocolErrorCode {

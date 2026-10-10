@@ -1,3 +1,5 @@
+import { webStrings } from './strings-web'
+
 const fillFormStrings = {
   ribbonTabFillForm: 'Fill Form',
   formPreviousField: 'Previous field',
@@ -199,6 +201,7 @@ const fillFormStringsFor = (lang: string) => ({
 export const strings = {
   zh: {
     ...fillFormStringsFor('zh'),
+    ...webStrings.zh,
     ribbonTabHome: '开始',
     ribbonTabAnnotate: '注释',
     ribbonTabEdit: '编辑',
@@ -530,6 +533,7 @@ export const strings = {
   },
   en: {
     ...fillFormStringsFor('en'),
+    ...webStrings.en,
     ribbonTabHome: 'Home',
     ribbonTabAnnotate: 'Annotate',
     ribbonTabEdit: 'Edit',
@@ -870,6 +874,7 @@ export const strings = {
   },
   vi: {
     ...fillFormStringsFor('vi'),
+    ...webStrings.vi,
     ribbonTabHome: 'Trang chủ',
     ribbonTabAnnotate: 'Chú thích',
     ribbonTabEdit: 'Chỉnh sửa',
@@ -1213,6 +1218,7 @@ export const strings = {
   },
   ja: {
     ...fillFormStringsFor('ja'),
+    ...webStrings.ja,
     ribbonTabHome: 'ホーム',
     ribbonTabAnnotate: '注釈',
     ribbonTabEdit: '編集',
@@ -1552,6 +1558,7 @@ export const strings = {
   },
   ko: {
     ...fillFormStringsFor('ko'),
+    ...webStrings.ko,
     ribbonTabHome: '홈',
     ribbonTabAnnotate: '주석',
     ribbonTabEdit: '편집',
@@ -1890,6 +1897,7 @@ export const strings = {
   },
   fr: {
     ...fillFormStringsFor('fr'),
+    ...webStrings.fr,
     ribbonTabHome: 'Accueil',
     ribbonTabAnnotate: 'Annoter',
     ribbonTabEdit: 'Édition',
@@ -2238,6 +2246,7 @@ export const strings = {
   },
   de: {
     ...fillFormStringsFor('de'),
+    ...webStrings.de,
     ribbonTabHome: 'Start',
     ribbonTabAnnotate: 'Anmerken',
     ribbonTabEdit: 'Bearbeiten',
@@ -2584,6 +2593,7 @@ export const strings = {
   },
   es: {
     ...fillFormStringsFor('es'),
+    ...webStrings.es,
     ribbonTabHome: 'Inicio',
     ribbonTabAnnotate: 'Anotar',
     ribbonTabEdit: 'Editar',
@@ -2930,6 +2940,7 @@ export const strings = {
   },
   th: {
     ...fillFormStringsFor('th'),
+    ...webStrings.th,
     ribbonTabHome: 'หน้าแรก',
     ribbonTabAnnotate: 'คำอธิบายประกอบ',
     ribbonTabEdit: 'แก้ไข',
@@ -3268,6 +3279,7 @@ export const strings = {
   },
   id: {
     ...fillFormStringsFor('id'),
+    ...webStrings.id,
     ribbonTabHome: 'Beranda',
     ribbonTabAnnotate: 'Anotasi',
     ribbonTabEdit: 'Edit',
@@ -3611,6 +3623,7 @@ export const strings = {
   },
   ru: {
     ...fillFormStringsFor('ru'),
+    ...webStrings.ru,
     ribbonTabHome: 'Главная',
     ribbonTabAnnotate: 'Аннотирование',
     ribbonTabEdit: 'Правка',
@@ -3955,6 +3968,7 @@ export const strings = {
   },
   ar: {
     ...fillFormStringsFor('ar'),
+    ...webStrings.ar,
     ribbonTabHome: 'الشريط الرئيسي',
     ribbonTabAnnotate: 'تعليق توضيحي',
     ribbonTabEdit: 'تحرير',
@@ -4292,6 +4306,7 @@ export const strings = {
   },
   pt: {
     ...fillFormStringsFor('pt'),
+    ...webStrings.pt,
     ribbonTabHome: 'Página Inicial',
     ribbonTabAnnotate: 'Anotar',
     ribbonTabEdit: 'Editar',
@@ -4637,6 +4652,7 @@ export const strings = {
   },
   it: {
     ...fillFormStringsFor('it'),
+    ...webStrings.it,
     ribbonTabHome: 'Home',
     ribbonTabAnnotate: 'Annota',
     ribbonTabEdit: 'Modifica',
@@ -4985,6 +5001,7 @@ export const strings = {
   },
   pl: {
     ...fillFormStringsFor('pl'),
+    ...webStrings.pl,
     ribbonTabHome: 'Narzędzia główne',
     ribbonTabAnnotate: 'Adnotacje',
     ribbonTabEdit: 'Edycja',
@@ -5328,6 +5345,7 @@ export const strings = {
   },
   cs: {
     ...fillFormStringsFor('cs'),
+    ...webStrings.cs,
     ribbonTabHome: 'Domů',
     ribbonTabAnnotate: 'Anotace',
     ribbonTabEdit: 'Úpravy',
@@ -5669,6 +5687,7 @@ export const strings = {
   },
   nl: {
     ...fillFormStringsFor('nl'),
+    ...webStrings.nl,
     ribbonTabHome: 'Start',
     ribbonTabAnnotate: 'Annoteren',
     ribbonTabEdit: 'Bewerken',
@@ -6012,6 +6031,7 @@ export const strings = {
   },
   ms: {
     ...fillFormStringsFor('ms'),
+    ...webStrings.ms,
     ribbonTabHome: 'Laman Utama',
     ribbonTabAnnotate: 'Anotasi',
     ribbonTabEdit: 'Edit',
@@ -6354,6 +6374,7 @@ export const strings = {
   },
   he: {
     ...fillFormStringsFor('he'),
+    ...webStrings.he,
     ribbonTabHome: 'בית',
     ribbonTabAnnotate: 'הערות',
     ribbonTabEdit: 'עריכה',
@@ -6687,6 +6708,7 @@ export const strings = {
   },
   hi: {
     ...fillFormStringsFor('hi'),
+    ...webStrings.hi,
     ribbonTabHome: 'होम',
     ribbonTabAnnotate: 'एनोटेट',
     ribbonTabEdit: 'संपादन',
@@ -7026,6 +7048,7 @@ export const strings = {
   },
   'zh-TW': {
     ...fillFormStringsFor('zh-TW'),
+    ...webStrings['zh-TW'],
     ribbonTabHome: '常用',
     ribbonTabAnnotate: '註解',
     ribbonTabEdit: '編輯',

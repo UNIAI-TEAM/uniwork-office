@@ -5,6 +5,7 @@ export const zhTW = {
   appPhPromptSubtitle: '按一下此處新增副標題',
   appPhPromptBody: '按一下此處新增文字',
   appStatusOpened: '已開啟 {name}（{count} 頁）',
+  appStatusOpenedOne: '已開啟 {name}（1 頁）',
   appStatusNewBlank: '已建立空白簡報',
   appStatusSaved: '已儲存',
   appStatusSaveFailed: '儲存失敗：{error}',

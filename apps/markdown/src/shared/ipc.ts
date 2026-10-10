@@ -219,6 +219,16 @@ export interface MarkdownApi {
   /** Read the file as UTF-8 text. Only paths granted to this view are allowed */
   readFile(path: string): Promise<string>
   /**
+   * Web bridge only (draft recovery): the server text a restored draft replaced, read once right
+   * after the initial load; null = not a restored draft. The renderer opens the document dirty.
+   */
+  consumeRecovered?(): string | null
+  /**
+   * Web bridge only (draft recovery): register how to read the text a save would write now,
+   * without saving (null = not ready). Returns the unregister function.
+   */
+  provideText?(provider: () => string | null): () => void
+  /**
    * Write the document text. With a granted file path the write is atomic
    * (tmp + rename); untitled documents and mode 'saveAs' go through a main-process
    * save dialog first. The resolved path is granted to the view and returned.
@@ -326,6 +336,15 @@ export interface MarkdownApi {
   imageSearch(query: string, maxResults?: number): Promise<ImageSearchResult>
   /** Download an image URL in the main process (CORS-free, scheme/target validated) */
   fetchImage(url: string): Promise<{ base64: string; mime: string } | null>
+  /**
+   * Web frame only (absent on desktop): display URL of a document-relative picture from the
+   * host's asset map; null when the path is not mapped.
+   */
+  resolveAssetUrl?(src: string): string | null
+  /** Web frame only: the authored path of a display URL from resolveAssetUrl; null otherwise */
+  unresolveAssetUrl?(url: string): string | null
+  /** Web frame only (absent on desktop): the in-frame AI settings (keys stored in UniWork) */
+  openAiSettings?(): Promise<void>
   /** AI image generation via the configured media provider (markdown-owned channel) */
   aiGenerateImage(op: { prompt: string; aspectRatio?: string }): Promise<{
     url?: string

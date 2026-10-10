@@ -1,0 +1,6 @@
+{"fixture":"xlsx-kitchen-sink.xlsx","fileBytes":5046,"jsOpenMs":40,"jsOpenCells":24,"rssAfterOpenKb":91580,"jsSaveMs":58.7,"jsSaveOutputBytes":5059,"maxRssKb":97648}
+{"fixture":"xlsx-pivot.xlsx","fileBytes":6880,"jsOpenMs":41.1,"jsOpenCells":8,"rssAfterOpenKb":81332,"jsSaveMs":68.2,"jsSaveOutputBytes":6886,"maxRssKb":87712}
+{"fixture":"xlsx-vietnamese.xlsx","fileBytes":4953,"jsOpenMs":36.8,"jsOpenCells":19,"rssAfterOpenKb":76508,"jsSaveMs":60,"jsSaveOutputBytes":4964,"maxRssKb":82552}
+{"fixture":"large-20000.xlsx","fileBytes":2044263,"jsOpenMs":2412.2,"jsOpenCells":440000,"rssAfterOpenKb":212560,"jsSaveMs":2811.6,"jsSaveOutputBytes":2043940,"maxRssKb":276180}
+{"fixture":"large-100000.xlsx","fileBytes":10303584,"jsOpenMs":11039.2,"jsOpenCells":2200000,"rssAfterOpenKb":518708,"jsSaveMs":16640.8,"jsSaveOutputBytes":10303265,"maxRssKb":850592}
+{"fixture":"large-300000.xlsx","fileBytes":30712582,"jsOpenMs":46730.1,"jsOpenCells":6600000,"rssAfterOpenKb":1754700,"jsSaveMs":59488.6,"jsSaveOutputBytes":30712210,"maxRssKb":2516776}

@@ -1,8 +1,13 @@
 use std::collections::VecDeque;
-use std::io::{self, BufRead, BufReader, BufWriter, Write};
+use std::io::{self, BufWriter, Write};
+#[cfg(not(target_os = "wasi"))]
+use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, mpsc};
+#[cfg(not(target_os = "wasi"))]
+use std::sync::mpsc;
+use std::sync::{Arc, Mutex};
+#[cfg(not(target_os = "wasi"))]
 use std::thread;
 
 use serde::{Deserialize, Serialize};
@@ -256,28 +261,40 @@ impl RecalcWorker {
             pending_purges: Arc::clone(&self.pending_purges),
             busy: Arc::clone(&self.busy),
         };
-        let output = Arc::clone(output);
-        let reply_id = request_id.clone();
-        let spawned = thread::Builder::new()
-            .name("xlsx-recalc".into())
-            .spawn(move || {
-                let reset = BusyReset(Arc::clone(&worker.busy));
-                let response = worker.run(request_id, &path, &edits, &reads);
-                // Clear busy before replying: a sequential caller issues its
-                // next recalc the moment the response lands, and hitting the
-                // still-set flag bounced it with recalc_busy.
-                drop(reset);
-                let _ = write_response(&output, &response);
-            });
-        match spawned {
-            Ok(_) => None,
-            Err(error) => {
-                self.busy.store(false, Ordering::Release);
-                Some(Response::failure(
-                    reply_id,
-                    "io_error",
-                    format!("Unable to start the recalc worker: {error}"),
-                ))
+        // wasm32-wasip1 has no threads: recalculate inline, same reply path
+        #[cfg(target_os = "wasi")]
+        {
+            let reset = BusyReset(Arc::clone(&worker.busy));
+            let response = worker.run(request_id, &path, &edits, &reads);
+            drop(reset);
+            let _ = write_response(output, &response);
+            None
+        }
+        #[cfg(not(target_os = "wasi"))]
+        {
+            let output = Arc::clone(output);
+            let reply_id = request_id.clone();
+            let spawned = thread::Builder::new()
+                .name("xlsx-recalc".into())
+                .spawn(move || {
+                    let reset = BusyReset(Arc::clone(&worker.busy));
+                    let response = worker.run(request_id, &path, &edits, &reads);
+                    // Clear busy before replying: a sequential caller issues its
+                    // next recalc the moment the response lands, and hitting the
+                    // still-set flag bounced it with recalc_busy.
+                    drop(reset);
+                    let _ = write_response(&output, &response);
+                });
+            match spawned {
+                Ok(_) => None,
+                Err(error) => {
+                    self.busy.store(false, Ordering::Release);
+                    Some(Response::failure(
+                        reply_id,
+                        "io_error",
+                        format!("Unable to start the recalc worker: {error}"),
+                    ))
+                }
             }
         }
     }
@@ -380,6 +397,100 @@ impl InFlightRequest {
     }
 }
 
+/// The wasm32-wasip1 build is a reactor driven by the web frame's Worker
+/// (web/modules/sheets/engine): no stdin loop and no threads. The host writes
+/// one NDJSON request line into wasm memory and calls `xlsx_sidecar_handle`;
+/// the response line is written to stdout (fd 1) before the call returns,
+/// exactly as the desktop process answers on its stdout. Between requests the
+/// host calls `xlsx_sidecar_index_step` to continue worksheet indexes.
+#[cfg(target_os = "wasi")]
+pub mod wasm_reactor {
+    use super::*;
+    use std::cell::RefCell;
+
+    struct State {
+        sessions: WorkbookSessions,
+        recalc: RecalcWorker,
+        cancelled: CancelledRequests,
+        in_flight: InFlightRequest,
+        output: SharedOutput,
+    }
+
+    thread_local! {
+        static STATE: RefCell<Option<State>> = const { RefCell::new(None) };
+    }
+
+    fn with_state<T>(f: impl FnOnce(&mut State) -> T) -> T {
+        STATE.with(|cell| {
+            let mut slot = cell.borrow_mut();
+            let state = slot.get_or_insert_with(|| State {
+                sessions: WorkbookSessions::new(),
+                recalc: RecalcWorker::new(),
+                cancelled: CancelledRequests::new(),
+                in_flight: InFlightRequest::new(),
+                output: Arc::new(Mutex::new(BufWriter::new(io::stdout()))),
+            });
+            f(state)
+        })
+    }
+
+    /// A buffer of `len` bytes in wasm memory for the next request line.
+    #[unsafe(no_mangle)]
+    pub extern "C" fn xlsx_sidecar_alloc(len: usize) -> *mut u8 {
+        let mut buffer = Vec::<u8>::with_capacity(len.max(1));
+        let pointer = buffer.as_mut_ptr();
+        std::mem::forget(buffer);
+        pointer
+    }
+
+    /// Handle one request line (takes ownership of the `xlsx_sidecar_alloc`
+    /// buffer); the response is written to stdout before this returns.
+    ///
+    /// # Safety
+    /// `pointer` must come from `xlsx_sidecar_alloc(len)` and hold `len` bytes.
+    #[unsafe(no_mangle)]
+    pub unsafe extern "C" fn xlsx_sidecar_handle(pointer: *mut u8, len: usize) {
+        // SAFETY: the host passes back the buffer xlsx_sidecar_alloc(len) returned
+        let bytes = unsafe { Vec::from_raw_parts(pointer, len, len.max(1)) };
+        with_state(|state| {
+            let response = match serde_json::from_slice::<Request>(&bytes) {
+                Ok(request) => {
+                    // single-threaded: a cancel is its own request, so the flag only resets here
+                    state.in_flight.begin(&request.request_id);
+                    handle_request(
+                        request,
+                        &mut state.sessions,
+                        &state.recalc,
+                        &state.cancelled,
+                        &state.in_flight,
+                        &state.output,
+                    )
+                }
+                Err(error) => Some(Response::failure(
+                    String::new(),
+                    "invalid_json",
+                    format!("Invalid sidecar request: {error}"),
+                )),
+            };
+            if let Some(response) = response {
+                let _ = write_response(&state.output, &response);
+            }
+        });
+    }
+
+    /// Continue one pending worksheet index by one pass; 1 while more remains.
+    #[unsafe(no_mangle)]
+    pub extern "C" fn xlsx_sidecar_index_step() -> u32 {
+        with_state(|state| u32::from(state.sessions.index_step().unwrap_or(false)))
+    }
+}
+
+/// The bin target on wasm32-wasip1 does nothing: the frame loads the reactor
+/// (apps/sheets/native/xlsx-engine/wasm), not this command module.
+#[cfg(target_os = "wasi")]
+fn main() {}
+
+#[cfg(not(target_os = "wasi"))]
 fn main() {
     let stdin = io::stdin();
     let output: SharedOutput = Arc::new(Mutex::new(BufWriter::new(io::stdout())));

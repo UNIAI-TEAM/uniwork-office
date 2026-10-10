@@ -40,9 +40,10 @@
     "dev:docs": "npm run dev -w @genoffice/docs",
     "build": "npm run build -w @genoffice/docs",
     "build:all": "npm run build -w @genoffice/docs && npm run build -w @genoffice/sheets && npm run build -w @genoffice/slides && npm run build -w @genoffice/pdf && npm run build -w @genoffice/markdown && npm run build -w @genoffice/html && npm run build -w @genoffice/cli && npm run build -w @genoffice/shell",
-    "build:web": "vite build --config web/docs/vite.config.ts",
-    "test:web": "vitest run --root web/docs/protocol && vitest run --root web/docs/bridge --environment jsdom && vitest run --root web/docs/build",
-    "typecheck:web": "tsc -p web/docs/protocol/tsconfig.json && tsc -p web/docs/bridge/tsconfig.json",
+    "build:web": "node web/scripts/build-web.mjs",
+    "build:web:all": "node web/scripts/build-web.mjs --all",
+    "test:web": "vitest run --root web/docs/protocol && vitest run --root web/docs/bridge --environment jsdom && vitest run --root web/docs/build && vitest run --root web/modules && vitest run --root web/modules/slides && vitest run --root web/modules/pdf",
+    "typecheck:web": "tsc -p web/docs/protocol/tsconfig.json && tsc -p web/docs/bridge/tsconfig.json && tsc -p web/docs/build/tsconfig.json && tsc -p web/modules/tsconfig.json",
     "test:e2e:web": "playwright test -c web/e2e",
     "shell": "npm run build:all && electron apps/shell",
     "test:e2e": "playwright test --config e2e/playwright.config.ts",
@@ -60,6 +61,7 @@
     "nanoid@5": "^5.1.16"
   },
   "devDependencies": {
+    "@bjorn3/browser_wasi_shim": "0.4.2",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.61.1",
     "concurrently": "^9.2.4",

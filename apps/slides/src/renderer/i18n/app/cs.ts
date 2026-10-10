@@ -5,6 +5,7 @@ export const cs = {
   appPhPromptSubtitle: 'Klikněte a přidejte podnadpis',
   appPhPromptBody: 'Klikněte a přidejte text',
   appStatusOpened: 'Otevřeno {name} ({count} snímků)',
+  appStatusOpenedOne: 'Otevřeno {name} (1 snímek)',
   appStatusNewBlank: 'Vytvořena prázdná prezentace',
   appStatusSaved: 'Uloženo',
   appStatusSaveFailed: 'Uložení se nezdařilo: {error}',

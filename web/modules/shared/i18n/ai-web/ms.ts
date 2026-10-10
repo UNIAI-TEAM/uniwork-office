@@ -1,0 +1,53 @@
+import type { zh } from './zh'
+
+export const ms = {
+  aiWebSettingsTitle: 'Tetapan AI',
+  aiWebSettingsIntro:
+    'Pembantu menggunakan kunci API pembekal anda sendiri. UniWork menyimpannya secara tersulit; kunci tidak pernah dihantar ke halaman ini.',
+  aiWebProvider: 'Pembekal',
+  aiWebModel: 'Model',
+  aiWebKeySaved: 'Kunci disimpan {hint}',
+  aiWebNoKey: 'Tiada kunci disimpan',
+  aiWebApiKey: 'Kunci API',
+  aiWebApiKeyKeep: 'Kunci API baharu (biarkan kosong untuk mengekalkan yang disimpan)',
+  aiWebBaseUrl: 'URL asas',
+  aiWebSaveKey: 'Simpan kunci',
+  aiWebRemoveKey: 'Buang kunci',
+  aiWebDone: 'Selesai',
+  aiWebLoading: 'Memuatkan…',
+  aiWebLoadFailed: 'Tetapan AI tidak dapat dimuatkan. Cuba lagi kemudian.',
+  aiWebCloudTitle: 'Alat awan UniWork AI',
+  aiWebCloudOff: 'Tidak termasuk dalam pelan organisasi anda',
+  aiWebCredits: 'Baki kredit: {remaining} daripada {limit}',
+  aiWebCreditsUnlimited: 'Kredit: tanpa had',
+  aiWebCreditsRenew: 'Diperbaharui pada {date}',
+  aiWebOpenSettings: 'Tetapan AI',
+  aiWebClose: 'Tutup',
+  aiWebStateCreditsTitle: 'Kredit AI telah habis',
+  aiWebStateCreditsBody:
+    'Organisasi anda telah menggunakan semua kredit UniWork AI bagi tempoh ini. Hubungi pentadbir atau tunggu sehingga diperbaharui.',
+  aiWebStateEntitlementTitle: 'AI tiada dalam pelan anda',
+  aiWebStateEntitlementBody:
+    'Pelan UniWork organisasi anda tidak merangkumi ciri AI ini. Hubungi pentadbir.',
+  aiWebStateKeyMissingTitle: 'Tiada kunci {provider}',
+  aiWebStateKeyMissingBody:
+    'Tambah kunci API {provider} anda dalam Tetapan AI untuk menggunakan pembantu.',
+  aiWebStateKeyRejectedTitle: '{provider} menolak kunci',
+  aiWebStateKeyRejectedBody: 'Pembekal menolak kunci yang disimpan. Gantikannya dalam Tetapan AI.',
+  aiWebStateRateTitle: 'Terlalu banyak permintaan AI',
+  aiWebStateRateBody: 'Tunggu {seconds} saat dan cuba lagi.',
+  aiWebStateRateBodyNow: 'Tunggu sebentar dan cuba lagi.',
+  aiWebStateUnreachableTitle: 'Pembekal AI tidak dapat dihubungi',
+  aiWebStateUnreachableBody:
+    'UniWork tidak dapat menghubungi pembekal AI. Cuba lagi sebentar nanti.',
+  aiWebStateCloudTitle: 'Alat awan tidak tersedia',
+  aiWebStateCloudBody: 'Alat UniWork AI ini belum disediakan pada pelayan.',
+  aiWebStateSessionTitle: 'Sesi tamat tempoh',
+  aiWebStateSessionBody: 'Buka semula dokumen daripada UniWork untuk meneruskan.',
+  aiWebStateRefusedTitle: 'Permintaan ditolak',
+  aiWebStateRefusedBody: 'Pelayan menolak permintaan AI.',
+  aiWebStateBaseUrlBody: 'URL asas ini tidak dibenarkan. Gunakan alamat https:// awam.',
+  aiWebStateProviderBody: 'Pembekal ini tidak disokong.',
+  aiWebStateUnknownTitle: 'Permintaan AI gagal',
+  aiWebStateUnknownBody: 'Sesuatu tidak kena. Cuba lagi.',
+} satisfies Record<keyof typeof zh, string>

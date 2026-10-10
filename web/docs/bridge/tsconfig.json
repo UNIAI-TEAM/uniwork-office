@@ -23,6 +23,13 @@
     "project-memory.ts",
     "webapi.test.ts",
     "notice.ts",
+    "safe-api.ts",
+    "capability-object.ts",
+    "frame-boot.ts",
+    "module-bridge.ts",
+    "module-bridge.test.ts",
+    "draft-recovery.ts",
+    "draft-recovery.test.ts",
     "testing/*.ts"
   ]
 }

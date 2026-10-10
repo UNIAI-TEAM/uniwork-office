@@ -1,0 +1,57 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="referrer" content="no-referrer" />
+    <!--
+      HTML module preview document (GO-B4, UNI-1014, CONTRACT C15(1)). Copied verbatim into the
+      bundle (Vite public dir). The host serves it with its OWN Content-Security-Policy header
+      (csp.json `documents`, headers.json: sandbox without allow-same-origin, connect-src 'none',
+      form-action 'none', no 'self'); the html frame embeds it with
+      sandbox="allow-scripts allow-forms allow-popups allow-modals" + credentialless, so the
+      document runs in an opaque origin without cookies or the app's storage.
+
+      Handshake (web/modules/html/preview-channel.ts): the frame posts ONE message
+      {ns, type: 'init', html} with a MessagePort to this window; it is accepted only from the
+      parent, only once, and only with exactly one port. The port is the inspector's only channel to
+      the frame (window.__gxPreviewPort); then the document replaces this page via document.write.
+
+      Reload: when the page reloads itself (location.reload(), meta refresh) this document loads
+      again and nobody would send it the copy. It therefore says {ns, type: 'hello', k} to its
+      parent, k being the per-load key from its own URL (?k=); the frame answers only a hello
+      with the key of the src it set, from the iframe it set it on, by sending the init again.
+    -->
+    <script>
+      ;(() => {
+        'use strict'
+        const NS = 'uniwork.office.html.preview'
+        const parentWindow = window.parent
+        // opened on its own (not embedded): nothing to show, nobody to talk to
+        if (parentWindow === window) return
+        const onMessage = (event) => {
+          if (event.source !== parentWindow) return
+          const data = event.data
+          if (
+            !data ||
+            data.ns !== NS ||
+            data.type !== 'init' ||
+            typeof data.html !== 'string' ||
+            event.ports.length !== 1
+          )
+            return
+          window.removeEventListener('message', onMessage)
+          const port = event.ports[0]
+          Object.defineProperty(window, '__gxPreviewPort', { value: port })
+          port.postMessage({ ns: NS, type: 'booted' })
+          document.open()
+          document.write(data.html)
+          document.close()
+        }
+        window.addEventListener('message', onMessage)
+        const key = new URL(location.href).searchParams.get('k')
+        if (key) parentWindow.postMessage({ ns: NS, type: 'hello', k: key }, '*')
+      })()
+    </script>
+  </head>
+  <body></body>
+</html>

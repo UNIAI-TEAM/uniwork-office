@@ -305,6 +305,7 @@ export const id = {
   appTabDecimal: 'Desimal',
   appTabBar: 'Batang',
   appTabClear: 'Hapus',
+  appAiSettings: 'Pengaturan AI',
   appCut: 'Potong',
   appCopy: 'Salin',
   appPaste: 'Tempel',
@@ -526,6 +527,7 @@ export const id = {
   appWebFatalTitle: 'Dokumen tidak dapat dibuka',
   appWebFatalBody:
     'Pengeditan dan penyimpanan dinonaktifkan. Muat ulang halaman atau buka kembali dokumen dari UniWork.',
+  appWebSaveOffline: 'Tidak dapat terhubung ke UniWork. Periksa koneksi Anda lalu coba lagi.',
   appWebNoHost: 'Editor ini berjalan di dalam UniWork. Buka dokumen dari UniWork.',
   appSaveStateUnsaved: 'Ada perubahan yang belum disimpan',
   appSaveStateSaved: 'Semua perubahan tersimpan',

@@ -1,0 +1,54 @@
+import type { zh } from './zh'
+
+export const es = {
+  aiWebSettingsTitle: 'Configuración de IA',
+  aiWebSettingsIntro:
+    'El asistente usa tu propia clave API del proveedor. UniWork la guarda cifrada; la clave nunca se envía a esta página.',
+  aiWebProvider: 'Proveedor',
+  aiWebModel: 'Modelo',
+  aiWebKeySaved: 'Clave guardada {hint}',
+  aiWebNoKey: 'No hay ninguna clave guardada',
+  aiWebApiKey: 'Clave API',
+  aiWebApiKeyKeep: 'Nueva clave API (déjalo vacío para conservar la guardada)',
+  aiWebBaseUrl: 'URL base',
+  aiWebSaveKey: 'Guardar clave',
+  aiWebRemoveKey: 'Eliminar clave',
+  aiWebDone: 'Listo',
+  aiWebLoading: 'Cargando…',
+  aiWebLoadFailed: 'No se pudo cargar la configuración de IA. Inténtalo más tarde.',
+  aiWebCloudTitle: 'Herramientas en la nube de UniWork AI',
+  aiWebCloudOff: 'No está incluido en el plan de tu organización',
+  aiWebCredits: 'Créditos restantes: {remaining} de {limit}',
+  aiWebCreditsUnlimited: 'Créditos: sin límite',
+  aiWebCreditsRenew: 'Se renueva el {date}',
+  aiWebOpenSettings: 'Configuración de IA',
+  aiWebClose: 'Cerrar',
+  aiWebStateCreditsTitle: 'Créditos de IA agotados',
+  aiWebStateCreditsBody:
+    'Tu organización ha usado todos los créditos de UniWork AI de este periodo. Consulta a tu administrador o espera a la renovación.',
+  aiWebStateEntitlementTitle: 'La IA no está en tu plan',
+  aiWebStateEntitlementBody:
+    'El plan de UniWork de tu organización no incluye esta función de IA. Consulta a tu administrador.',
+  aiWebStateKeyMissingTitle: 'Falta la clave de {provider}',
+  aiWebStateKeyMissingBody:
+    'Añade tu clave API de {provider} en la configuración de IA para usar el asistente.',
+  aiWebStateKeyRejectedTitle: '{provider} rechazó la clave',
+  aiWebStateKeyRejectedBody:
+    'El proveedor rechazó la clave guardada. Sustitúyela en la configuración de IA.',
+  aiWebStateRateTitle: 'Demasiadas solicitudes de IA',
+  aiWebStateRateBody: 'Espera {seconds} s y vuelve a intentarlo.',
+  aiWebStateRateBodyNow: 'Espera un momento y vuelve a intentarlo.',
+  aiWebStateUnreachableTitle: 'No se puede contactar con el proveedor de IA',
+  aiWebStateUnreachableBody:
+    'UniWork no pudo contactar con el proveedor de IA. Inténtalo de nuevo en un momento.',
+  aiWebStateCloudTitle: 'Herramienta en la nube no disponible',
+  aiWebStateCloudBody: 'Esta herramienta de UniWork AI aún no está configurada en el servidor.',
+  aiWebStateSessionTitle: 'Sesión caducada',
+  aiWebStateSessionBody: 'Vuelve a abrir el documento desde UniWork para continuar.',
+  aiWebStateRefusedTitle: 'Solicitud rechazada',
+  aiWebStateRefusedBody: 'El servidor rechazó la solicitud de IA.',
+  aiWebStateBaseUrlBody: 'Esta URL base no está permitida. Usa una dirección https:// pública.',
+  aiWebStateProviderBody: 'Este proveedor no es compatible.',
+  aiWebStateUnknownTitle: 'Error en la solicitud de IA',
+  aiWebStateUnknownBody: 'Algo salió mal. Inténtalo de nuevo.',
+} satisfies Record<keyof typeof zh, string>

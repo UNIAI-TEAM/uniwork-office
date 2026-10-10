@@ -1548,6 +1548,30 @@ export const nl = {
   appVisualFlipV: 'Verticaal spiegelen',
   appVisualFlipH: 'Horizontaal spiegelen',
   appCtxPasteVisual: 'Afbeelding of vorm plakken',
+  // web frame (UNI-1016): engine-unavailable screen, view-only, save conflicts
+  appWebEngineTitle: 'Deze werkmap kan nog niet op het web worden geopend',
+  appWebEngineBody:
+    'De webversie van UniWork Sheets krijgt zijn rekenmachine nog. Open deze werkmap tot die tijd in de UniWork-desktopapp.',
+  appWebEngineHint: 'Je bestand is niet gewijzigd.',
+  appWebViewOnly: 'Alleen-lezen: je kunt wijzigingen in deze werkmap niet opslaan.',
+  appWebConflictTitle: 'Deze werkmap is ergens anders gewijzigd',
+  appWebConflictBody:
+    'Iemand heeft een nieuwere versie opgeslagen terwijl je bewerkte. Overschrijf die met jouw versie of laad de nieuwste versie opnieuw (niet-opgeslagen wijzigingen gaan verloren).',
+  appWebConflictOverwrite: 'Overschrijven',
+  appWebConflictReload: 'Nieuwste versie laden',
+  appWebConflictNotSaved: 'Niet opgeslagen: er is een nieuwere versie.',
+  appWebDiscardTitle: 'Niet-opgeslagen wijzigingen verwerpen?',
+  appWebDiscardBody: 'Als je een andere werkmap opent, gaan niet-opgeslagen wijzigingen verloren.',
+  appWebDiscard: 'Verwerpen',
+  appWebCancel: 'Annuleren',
+  appWebSaveFailed: 'Opslaan in UniWork is mislukt.',
+  appWebTooLargeTitle: 'Deze werkmap is te groot voor het web',
+  appWebTooLargeBody:
+    'Hij is groter dan de webspreadsheet aankan en wordt daarom geopend in de klassieke spreadsheet-editor.',
+  appWebEngineRestarted:
+    'De werkmap-engine is onverwacht gestopt en opnieuw gestart. De werkmap is opnieuw geopend vanaf de laatst opgeslagen versie; uw niet-opgeslagen wijzigingen blijven behouden, sla snel op.',
+  appWebSavedReopenFailed:
+    'Je wijzigingen zijn opgeslagen in UniWork, maar de werkmap kon hier niet opnieuw worden geopend. Laad de editor opnieuw om verder te werken.',
   appAutoSaveUniworkOff:
     'Automatisch opslaan staat uit voor UniWork-documenten. Gebruik Opslaan om een nieuwe versie op te slaan.',
 } satisfies Record<keyof typeof zh, string>

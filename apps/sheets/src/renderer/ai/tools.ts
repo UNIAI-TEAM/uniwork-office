@@ -19,6 +19,7 @@ import type {
   CellScalar,
   ChangePlan,
 } from '@genoffice/xlsx-gateway/domain/workbook.types'
+import { cap } from '../capabilities'
 import { t } from '../i18n/locale'
 import { formatRangeAggregate, type RangeAggregate } from './aggregate'
 import { guideCatalogSummary, loadGuides } from './guides'
@@ -1385,7 +1386,10 @@ export function executeWorkbookTool(
     case 'create_document': {
       const summary = t('aiToolCreateDocument')
       const create = deps.createDocument
-      if (!create) return fail(summary, 'create_document is not available in this context.')
+      // the tool is not offered without the `createDocument` capability (web); a stray call fails typed
+      if (!create || !cap('createDocument')) {
+        return fail(summary, 'create_document is not available in this context.')
+      }
       const typeRaw = call.input.type === undefined ? 'xlsx' : String(call.input.type)
       if (
         typeRaw !== 'xlsx' &&

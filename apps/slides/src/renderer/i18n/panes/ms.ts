@@ -255,6 +255,16 @@ export const ms = {
   panePresenterUseShowTip: 'Beralih kepada persembahan slaid biasa pada paparan ini',
   panePresenterSingleHint:
     'Mod paparan tunggal (sambungkan paparan kedua untuk persembahan skrin penuh secara automatik)',
+  panePresenterOpenAudience: 'Tetingkap Penonton',
+  panePresenterOpenAudienceTip:
+    'Buka tayangan slaid dalam tetingkap berasingan yang boleh diseret ke projektor',
+  panePresenterCloseAudience: 'Tutup Tetingkap Penonton',
+  panePresenterCloseAudienceTip: 'Tutup tetingkap penonton; paparan penyampai terus berjalan',
+  panePresenterWebHint:
+    'Buka tetingkap penonton, seret ke projektor, kemudian klik untuk skrin penuh',
+  panePresenterPopupBlocked:
+    'Pelayar menyekat tetingkap. Benarkan tetingkap timbul untuk laman ini dan cuba lagi.',
+  paneAudienceFullscreenHint: 'Klik untuk paparan skrin penuh',
   panePresenterElapsed: 'Masa berlalu',
   panePresenterPause: 'Jeda pemasa',
   panePresenterResume: 'Sambung semula pemasa',

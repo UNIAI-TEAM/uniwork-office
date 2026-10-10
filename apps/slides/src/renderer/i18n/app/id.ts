@@ -5,6 +5,7 @@ export const id = {
   appPhPromptSubtitle: 'Klik untuk menambahkan subjudul',
   appPhPromptBody: 'Klik untuk menambahkan teks',
   appStatusOpened: 'Membuka {name} ({count} slide)',
+  appStatusOpenedOne: 'Membuka {name} (1 slide)',
   appStatusNewBlank: 'Presentasi kosong telah dibuat',
   appStatusSaved: 'Disimpan',
   appStatusSaveFailed: 'Gagal menyimpan: {error}',

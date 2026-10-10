@@ -1,4 +1,17 @@
 // Usage: /test-host/?open=<docx url>[&frame=/office-frame/docs/<v>/index.html][&lang=en][&theme=dark]
+//        /test-host/?module=<pdf|markdown|html|slides|sheets>[&open=<url>][&version=<v>][&readonly=1] (GO-B4/B5/B6)
+//        e.g. ?module=pdf&open=/fixtures/sample.pdf (web/fixtures: sample.pdf, sample.md, sample.html)
+//        &recovery=1: draft recovery on (CONTRACT C18 / C18a): `init.recovery` carries a non-extractable
+//        AES-GCM key and the scope "test-user:<documentId>". Like the real host, the key is persisted
+//        (structured clone, never exported) in IndexedDB "uniwork-office-frame-drafts", store "keys",
+//        key "test-user": a frame reload, a host page reload and a second tab all get the same key
+//        &ai=1 grants `ai` + webSearch/imageSearch/imageGeneration (fake AI routes, web/server/fake-ai.mjs)
+//
+// module (default docs): the frame defaults to /office-frame/<module>/<version|latest>/index.html (docs keeps
+// the site root, as before), `init.module` names the module, and the host refuses a frame whose
+// `ready.module` (absent = docs) differs, like createDocsFrameHost({ module }) (status "module mismatch").
+// Module runs also send `init.user` ({displayName: 'Test User'}); readonly=1 withholds the `save` grant
+// (view-only, protocol README "Read-only documents"). No autosave is ever requested (CONTRACT C10).
 //
 // Test host for the Docs frame (GO-B3 e2e): a minimal, dependency-free
 // implementation of the host side of the W2 protocol (web/docs/protocol/types.ts)
@@ -12,6 +25,13 @@
 //   send(type, p)    -> send a host->frame event (theme / language / ...)
 //   bumpRemote(id)   -> simulate a concurrent server-side save (next frame save conflicts)
 //   lastExport()     -> {fileId, name, dataBytes: number[] | null} of the last api.export | null
+//   addFile(url)     -> fetch a fixture into the store, resolves with its meta (GO-B4)
+//   queuePick(id)    -> the next file.pick answers this file (nothing queued = the user cancelled);
+//                       file.pick is granted with ?pick=1
+//   newSessionKey()  -> replace the persisted recovery key by a new one (the old drafts stay but cannot be
+//                       read any more); the next init carries it
+//   signOut()        -> delete the whole frame-drafts database (what the real host does on sign-out)
+//   documentId       -> the init document's file id
 
 const NS = 'uniwork.office.docs'
 const V = 1
@@ -24,6 +44,7 @@ let seq = 0
 let lastSaved = null
 let lastExport = null
 const events = []
+const picks = [] // fileIds the next file.pick requests answer, in order
 const pending = new Map() // id -> {resolve, reject}
 let reqSeq = 0
 
@@ -83,6 +104,14 @@ const handlers = {
       .reverse()
       .slice(0, limit ?? 20),
   }),
+  'file.pick': () => {
+    const f = files.get(picks.shift())
+    return {
+      file: f
+        ? { file: { ...f.meta }, source: { kind: 'bytes', data: f.bytes.slice().buffer } }
+        : null,
+    }
+  },
   // no server render in the harness: record what the frame sent, answer a stub PDF
   'api.export': ({ fileId, name, data }) => {
     lastExport = {
@@ -105,6 +134,11 @@ window.addEventListener('message', async (e) => {
   if (m.kind === 'event') {
     events.push({ type: m.type, payload: m.payload })
     if (m.type === 'ready') {
+      const frameModule = m.payload?.module ?? 'docs'
+      if (frameModule !== MODULE) {
+        statusEl.textContent = `module mismatch: frame ${frameModule}, document ${MODULE}`
+        return
+      }
       statusEl.textContent = 'frame ready, sending init'
       try {
         await request('init', initPayload)
@@ -136,6 +170,15 @@ window.addEventListener('message', async (e) => {
 })
 
 const params = new URLSearchParams(location.search)
+const MODULE = params.get('module') || 'docs'
+const DEFAULT_NAME = {
+  docs: 'Untitled.docx',
+  pdf: 'Untitled.pdf',
+  markdown: 'Untitled.md',
+  html: 'Untitled.html',
+  slides: 'Untitled.pptx',
+  sheets: 'Untitled.xlsx',
+}
 const initPayload = {
   protocolVersion: V,
   token: 'test-token',
@@ -154,6 +197,83 @@ const initPayload = {
     exportPdf: true,
     exportHtml: true,
   },
+  // absent = docs: a docs run sends exactly the pre-module init
+  ...(MODULE !== 'docs' ? { module: MODULE, user: { displayName: 'Test User' } } : {}),
+}
+if (params.get('readonly') === '1') delete initPayload.capabilities.save
+// ai=1: grant the web AI (CONTRACT C16) and its cloud tools; the frame then calls the fake
+// frame-token AI routes of web/server/fake-ai.mjs. Absent = no AI grant (AI hidden, as before).
+if (params.get('ai') === '1') {
+  Object.assign(initPayload.capabilities, {
+    ai: true,
+    webSearch: true,
+    imageSearch: true,
+    imageGeneration: true,
+  })
+}
+if (params.get('pick') === '1') initPayload.capabilities.filePick = true
+
+const KEY_DB = 'uniwork-office-frame-drafts'
+const KEY_USER = 'test-user'
+
+/** the shared frame database, as the real host opens it: version 1, both stores created if absent */
+function openKeyDb() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(KEY_DB, 1)
+    req.onupgradeneeded = () => {
+      for (const name of ['drafts', 'keys']) {
+        if (!req.result.objectStoreNames.contains(name)) req.result.createObjectStore(name)
+      }
+    }
+    req.onsuccess = () => {
+      const db = req.result
+      db.onversionchange = () => db.close()
+      resolve(db)
+    }
+    req.onerror = () => reject(req.error)
+  })
+}
+
+async function keyStore(mode, run) {
+  const db = await openKeyDb()
+  try {
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction('keys', mode)
+      const result = run(tx.objectStore('keys'))
+      tx.oncomplete = () => resolve(result.result)
+      tx.onerror = () => reject(tx.error)
+      tx.onabort = () => reject(tx.error)
+    })
+  } finally {
+    db.close()
+  }
+}
+
+function newKey() {
+  return crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt'])
+}
+
+/** the persisted per-user key, created on first need (what the real host does) */
+async function persistedKey(replace) {
+  const existing = replace ? undefined : await keyStore('readonly', (s) => s.get(KEY_USER))
+  if (existing) return existing
+  const key = await newKey()
+  await keyStore('readwrite', (s) => s.put(key, KEY_USER))
+  return key
+}
+
+async function useKey(replace) {
+  const key = await persistedKey(replace)
+  initPayload.recovery = { key, scope: `${KEY_USER}:${initPayload.documentId}` }
+}
+
+const newSessionKey = () => useKey(true)
+
+function signOut() {
+  return new Promise((resolve) => {
+    const req = indexedDB.deleteDatabase(KEY_DB)
+    req.onsuccess = req.onerror = req.onblocked = () => resolve()
+  })
 }
 
 async function boot() {
@@ -166,9 +286,14 @@ async function boot() {
     )
     initPayload.documentId = put(name, new Uint8Array(await res.arrayBuffer())).fileId
   } else {
-    initPayload.documentId = put('Untitled.docx', new Uint8Array()).fileId
+    initPayload.documentId = put(DEFAULT_NAME[MODULE] ?? 'Untitled', new Uint8Array()).fileId
   }
+  if (params.get('recovery') === '1') await useKey(false)
   window.__host = {
+    module: MODULE,
+    documentId: initPayload.documentId,
+    newSessionKey,
+    signOut,
     lastSaved: () => (lastSaved ? { ...lastSaved, bytes: Array.from(lastSaved.bytes) } : null),
     lastExport: () => lastExport,
     events,
@@ -176,13 +301,25 @@ async function boot() {
     request,
     // host -> frame event, e.g. send('theme', {theme: 'dark'}), send('language', {locale: 'vi'})
     send: (type, payload) => post({ id: `h${++reqSeq}`, kind: 'event', type, payload }),
+    addFile: async (url) => {
+      const res = await fetch(url)
+      if (!res.ok) throw new Error(`GET ${url} -> ${res.status}`)
+      const name = decodeURIComponent(new URL(url, location.href).pathname.split('/').pop())
+      return put(name, new Uint8Array(await res.arrayBuffer()))
+    },
+    queuePick: (fileId) => picks.push(fileId),
     bumpRemote: (fileId) => {
       const f = files.get(fileId)
       return f ? put(f.meta.name, f.bytes, fileId) : null
     },
   }
-  // the frame is the web/docs build: site root by default, ?frame=<path> for a MOUNT prefix
-  frame.src = new URL(params.get('frame') || '/index.html', location.origin).pathname
+  // docs: the web/docs build at the site root by default; other modules: their /office-frame/ path.
+  // ?frame=<path> overrides (MOUNT prefix, a pinned version dir)
+  const defaultFrame =
+    MODULE === 'docs'
+      ? '/index.html'
+      : `/office-frame/${MODULE}/${params.get('version') || 'latest'}/index.html`
+  frame.src = new URL(params.get('frame') || defaultFrame, location.origin).pathname
 }
 
 boot().catch((err) => {

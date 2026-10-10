@@ -303,6 +303,7 @@ export const cs = {
   appTabDecimal: 'Desetinný',
   appTabBar: 'Svislá čára',
   appTabClear: 'Vymazat',
+  appAiSettings: 'Nastavení AI',
   appCut: 'Vyjmout',
   appCopy: 'Kopírovat',
   appPaste: 'Vložit',
@@ -522,6 +523,7 @@ export const cs = {
   appWebFatalTitle: 'Dokument nelze otevřít',
   appWebFatalBody:
     'Úpravy a ukládání jsou vypnuté. Obnovte stránku nebo dokument znovu otevřete z UniWork.',
+  appWebSaveOffline: 'Nelze se spojit s UniWork. Zkontrolujte připojení a zkuste to znovu.',
   appWebNoHost: 'Tento editor běží v UniWork. Otevřete dokument z UniWork.',
   appSaveStateUnsaved: 'Neuložené změny',
   appSaveStateSaved: 'Všechny změny uloženy',

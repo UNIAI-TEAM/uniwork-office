@@ -26,6 +26,7 @@ import {
   toSaveVisualAdds,
   toSaveVisualEdits,
 } from './edit-journal'
+import { cap, isViewOnly } from './capabilities'
 import { activeCsvSheet, handleExportCsv, serializeActiveSheetCsv } from './csv-export'
 import type { CellState } from '@genoffice/xlsx-gateway/domain/workbook.types'
 import { verifiedFormulaValues } from './formula-values'
@@ -119,6 +120,14 @@ export async function handleSave(
   quiet = false,
   explicitTarget?: { path: string; overwrite: boolean },
 ): Promise<SaveOutcome> {
+  // web frame without the host's save grant: the workbook is view-only
+  if (isViewOnly() || (mode === 'save-as' && !cap('saveAs'))) {
+    if (mode !== 'recovery') {
+      ctx.setMessage(t('appWebViewOnly'))
+      if (!quiet) showToast(t('appWebViewOnly'), 'error')
+    }
+    return { ok: false, error: t('appWebViewOnly') }
+  }
   const state = ctx.lazyWorkbookRef.current
   // Captured at save start (the Ctrl+S moment): the post-save session swap
   // reinstalls the workbook and would otherwise bounce the view to A1.

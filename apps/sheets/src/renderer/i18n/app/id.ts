@@ -1512,6 +1512,30 @@ export const id = {
   appVisualFlipV: 'Balik Vertikal',
   appVisualFlipH: 'Balik Horizontal',
   appCtxPasteVisual: 'Tempel Gambar atau Bentuk',
+  // web frame (UNI-1016): engine-unavailable screen, view-only, save conflicts
+  appWebEngineTitle: 'Buku kerja ini belum dapat dibuka di web',
+  appWebEngineBody:
+    'Versi web UniWork Sheets masih menunggu mesin spreadsheet-nya. Sementara itu, buka buku kerja ini di aplikasi desktop UniWork.',
+  appWebEngineHint: 'File Anda tidak berubah.',
+  appWebViewOnly: 'Hanya lihat: Anda tidak dapat menyimpan perubahan pada buku kerja ini.',
+  appWebConflictTitle: 'Buku kerja ini diubah di tempat lain',
+  appWebConflictBody:
+    'Seseorang menyimpan versi yang lebih baru saat Anda mengedit. Timpa dengan versi Anda, atau muat ulang versi terbaru (perubahan yang belum disimpan akan dibuang).',
+  appWebConflictOverwrite: 'Timpa',
+  appWebConflictReload: 'Muat ulang versi terbaru',
+  appWebConflictNotSaved: 'Tidak disimpan: ada versi yang lebih baru.',
+  appWebDiscardTitle: 'Buang perubahan yang belum disimpan?',
+  appWebDiscardBody: 'Membuka buku kerja lain akan membuang perubahan yang belum disimpan.',
+  appWebDiscard: 'Buang',
+  appWebCancel: 'Batal',
+  appWebSaveFailed: 'Gagal menyimpan ke UniWork.',
+  appWebTooLargeTitle: 'Buku kerja ini terlalu besar untuk web',
+  appWebTooLargeBody:
+    'Ukurannya melebihi batas spreadsheet web, jadi dibuka di editor spreadsheet klasik.',
+  appWebEngineRestarted:
+    'Mesin buku kerja berhenti secara tak terduga dan telah dimulai ulang. Buku kerja dibuka kembali dari versi terakhir yang disimpan; perubahan yang belum disimpan tetap ada, segera simpan.',
+  appWebSavedReopenFailed:
+    'Perubahan Anda sudah disimpan ke UniWork, tetapi buku kerja tidak dapat dibuka ulang di sini. Muat ulang editor untuk melanjutkan.',
   appAutoSaveUniworkOff:
     'Simpan otomatis dinonaktifkan untuk dokumen UniWork. Gunakan Simpan untuk menyimpan versi baru.',
 } satisfies Record<keyof typeof zh, string>

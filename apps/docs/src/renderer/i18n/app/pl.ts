@@ -308,6 +308,7 @@ export const pl = {
   appTabDecimal: 'Dziesiętny',
   appTabBar: 'Paskowy',
   appTabClear: 'Wyczyść',
+  appAiSettings: 'Ustawienia AI',
   appCut: 'Wytnij',
   appCopy: 'Kopiuj',
   appPaste: 'Wklej',
@@ -529,6 +530,7 @@ export const pl = {
   appWebFatalTitle: 'Nie można otworzyć dokumentu',
   appWebFatalBody:
     'Edycja i zapisywanie są wyłączone. Odśwież stronę lub otwórz dokument ponownie z UniWork.',
+  appWebSaveOffline: 'Nie można połączyć się z UniWork. Sprawdź połączenie i spróbuj ponownie.',
   appWebNoHost: 'Ten edytor działa w UniWork. Otwórz dokument z UniWork.',
   appSaveStateUnsaved: 'Niezapisane zmiany',
   appSaveStateSaved: 'Wszystkie zmiany zapisane',

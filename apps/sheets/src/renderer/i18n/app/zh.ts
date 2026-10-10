@@ -1444,5 +1444,28 @@ export const zh = {
   appVisualFlipV: '垂直翻转',
   appVisualFlipH: '水平翻转',
   appCtxPasteVisual: '粘贴图片/形状',
+  // web frame (UNI-1016): engine-unavailable screen, view-only, save conflicts
+  appWebEngineTitle: '此工作簿暂时无法在网页端打开',
+  appWebEngineBody:
+    '网页版 UniWork 表格的计算引擎正在准备中。在此之前，请在 UniWork 桌面应用中打开此工作簿。',
+  appWebEngineHint: '您的文件未被更改。',
+  appWebViewOnly: '仅查看：您无法保存对此工作簿的更改。',
+  appWebConflictTitle: '此工作簿已在别处被修改',
+  appWebConflictBody:
+    '您编辑期间，有人保存了更新的版本。可以用您的版本覆盖它，或重新加载最新版本（未保存的更改将被丢弃）。',
+  appWebConflictOverwrite: '覆盖',
+  appWebConflictReload: '重新加载最新版本',
+  appWebConflictNotSaved: '未保存：已有更新的版本。',
+  appWebDiscardTitle: '放弃未保存的更改？',
+  appWebDiscardBody: '打开其他工作簿会丢弃尚未保存的更改。',
+  appWebDiscard: '放弃',
+  appWebCancel: '取消',
+  appWebSaveFailed: '保存到 UniWork 失败。',
+  appWebTooLargeTitle: '此工作簿太大，无法在网页端打开',
+  appWebTooLargeBody: '它超出了网页版表格的大小上限，正在改用经典表格编辑器打开。',
+  appWebEngineRestarted:
+    '工作簿引擎意外停止并已重新启动。工作簿已从上次保存的版本重新打开；您未保存的更改仍然保留，请尽快保存。',
+  appWebSavedReopenFailed:
+    '您的更改已保存到 UniWork，但此处无法重新打开工作簿。请重新加载编辑器后继续。',
   appAutoSaveUniworkOff: 'UniWork 文档已关闭自动保存。请使用“保存”保存新版本。',
 }

@@ -307,6 +307,7 @@ export const ru = {
   appTabDecimal: 'По разделителю',
   appTabBar: 'С чертой',
   appTabClear: 'Очистить',
+  appAiSettings: 'Настройки ИИ',
   appCut: 'Вырезать',
   appCopy: 'Копировать',
   appPaste: 'Вставить',
@@ -529,6 +530,7 @@ export const ru = {
   appWebFatalTitle: 'Не удалось открыть документ',
   appWebFatalBody:
     'Редактирование и сохранение отключены. Обновите страницу или снова откройте документ из UniWork.',
+  appWebSaveOffline: 'Не удаётся связаться с UniWork. Проверьте подключение и повторите попытку.',
   appWebNoHost: 'Этот редактор работает внутри UniWork. Откройте документ из UniWork.',
   appSaveStateUnsaved: 'Есть несохранённые изменения',
   appSaveStateSaved: 'Все изменения сохранены',

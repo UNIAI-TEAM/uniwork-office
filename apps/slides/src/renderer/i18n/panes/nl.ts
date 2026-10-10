@@ -256,6 +256,17 @@ export const nl = {
   panePresenterUseShowTip: 'Overschakelen naar een normale diavoorstelling op dit scherm',
   panePresenterSingleHint:
     'Modus met één scherm (sluit een tweede scherm aan om automatisch op volledig scherm te presenteren)',
+  panePresenterOpenAudience: 'Publieksvenster',
+  panePresenterOpenAudienceTip:
+    'De diavoorstelling openen in een apart venster dat u naar de projector kunt slepen',
+  panePresenterCloseAudience: 'Publieksvenster sluiten',
+  panePresenterCloseAudienceTip:
+    'Het publieksvenster sluiten; de presentatieweergave blijft actief',
+  panePresenterWebHint:
+    'Open het publieksvenster, sleep het naar de projector en klik erop voor volledig scherm',
+  panePresenterPopupBlocked:
+    'De browser heeft het venster geblokkeerd. Sta pop-ups toe voor deze site en probeer het opnieuw.',
+  paneAudienceFullscreenHint: 'Klik voor volledig scherm',
   panePresenterElapsed: 'Verstreken tijd',
   panePresenterPause: 'Timer pauzeren',
   panePresenterResume: 'Timer hervatten',

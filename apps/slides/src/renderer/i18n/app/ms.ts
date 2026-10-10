@@ -5,6 +5,7 @@ export const ms = {
   appPhPromptSubtitle: 'Klik untuk menambah subtajuk',
   appPhPromptBody: 'Klik untuk menambah teks',
   appStatusOpened: '{name} dibuka ({count} slaid)',
+  appStatusOpenedOne: '{name} dibuka (1 slaid)',
   appStatusNewBlank: 'Persembahan kosong telah dibuat',
   appStatusSaved: 'Disimpan',
   appStatusSaveFailed: 'Gagal menyimpan: {error}',

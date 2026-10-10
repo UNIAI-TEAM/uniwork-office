@@ -44,6 +44,9 @@ async function mount(
     get(target, prop: string) {
       // the browser harness mocks the API without the method
       if (prop === 'uniworkState' && uniwork === 'missing') return undefined
+      // web-frame-only members (capabilities, draft recovery, text provider) are absent on the desktop preload
+      if (prop === 'capabilities' || prop === 'consumeRecovered' || prop === 'provideText')
+        return undefined
       if (prop in target) return target[prop]
       if (/^on[A-Z]/.test(prop)) {
         target[prop] = vi.fn((cb: (...args: never[]) => void) => {

@@ -1488,5 +1488,29 @@ export const en = {
   appVisualFlipV: 'Flip Vertical',
   appVisualFlipH: 'Flip Horizontal',
   appCtxPasteVisual: 'Paste Picture or Shape',
+  // web frame (UNI-1016): engine-unavailable screen, view-only, save conflicts
+  appWebEngineTitle: "This workbook can't be opened on the web yet",
+  appWebEngineBody:
+    'The web version of UniWork Sheets is still getting its spreadsheet engine. Until then, open this workbook in the UniWork desktop app.',
+  appWebEngineHint: 'Your file is unchanged.',
+  appWebViewOnly: "View only: you can't save changes to this workbook.",
+  appWebConflictTitle: 'This workbook was changed elsewhere',
+  appWebConflictBody:
+    'Someone saved a newer version while you were editing. Overwrite it with your version, or reload the latest version (your unsaved changes are discarded).',
+  appWebConflictOverwrite: 'Overwrite',
+  appWebConflictReload: 'Reload latest',
+  appWebConflictNotSaved: 'Not saved: a newer version exists.',
+  appWebDiscardTitle: 'Discard unsaved changes?',
+  appWebDiscardBody: 'Opening another workbook discards the changes you have not saved.',
+  appWebDiscard: 'Discard',
+  appWebCancel: 'Cancel',
+  appWebSaveFailed: 'Saving to UniWork failed.',
+  appWebTooLargeTitle: 'This workbook is too large for the web',
+  appWebTooLargeBody:
+    'It is above the size the web spreadsheet handles, so it opens in the classic spreadsheet editor instead.',
+  appWebEngineRestarted:
+    'The workbook engine stopped unexpectedly and was restarted. The workbook was reopened from its last saved version; your unsaved changes are kept, so save soon.',
+  appWebSavedReopenFailed:
+    'Your changes were saved to UniWork, but the workbook could not be reopened here. Reload the editor to keep working.',
   appAutoSaveUniworkOff: 'AutoSave is off for UniWork documents. Use Save to save a new version.',
 } satisfies Record<keyof typeof zh, string>

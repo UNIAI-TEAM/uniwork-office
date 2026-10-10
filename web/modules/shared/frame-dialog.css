@@ -1,0 +1,138 @@
+/* One dialog skin for every web frame (Docs, PDF, Markdown, HTML, Slides, Sheets): the same layout as
+ * the UniWork host's leave dialog (centred card, 16 px title, muted body, stacked full-width
+ * actions on a raised footer band, brand-blue primary, soft destructive) in the editors' own
+ * typeface. Chrome only, theme tokens only (CLAUDE.md theming rules); the document is never touched. */
+
+.ow-dlg-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: 16px;
+  background: var(--color-bg-overlay);
+  backdrop-filter: blur(4px);
+}
+
+.ow-dlg {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 448px;
+  max-height: calc(100vh - 32px);
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow-modal-strong);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-small);
+  line-height: 1.5;
+}
+
+.ow-dlg-head {
+  min-height: 0;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.ow-dlg-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text);
+}
+
+.ow-dlg-body {
+  margin: 8px 0 0;
+  color: var(--text-dim);
+  overflow-wrap: anywhere;
+}
+
+.ow-dlg-detail {
+  margin: 8px 0 0;
+  font-size: var(--text-caption);
+  color: var(--text-dim);
+  overflow-wrap: anywhere;
+}
+
+.ow-dlg-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-subtle);
+}
+
+.ow-dlg-btn {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 36px;
+  padding: 6px 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-small);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.ow-dlg-btn:hover {
+  background: var(--hover);
+}
+
+.ow-dlg-btn:focus-visible {
+  outline: 2px solid var(--color-dialog-primary);
+  outline-offset: 2px;
+}
+
+.ow-dlg-btn.primary {
+  border-color: var(--color-dialog-primary);
+  background: var(--color-dialog-primary);
+  color: var(--color-dialog-primary-text);
+}
+
+.ow-dlg-btn.primary:hover {
+  border-color: var(--color-dialog-primary-hover);
+  background: var(--color-dialog-primary-hover);
+}
+
+.ow-dlg-btn.danger {
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+
+.ow-dlg-btn.danger:hover {
+  border-color: var(--danger);
+  background: var(--danger-bg);
+}
+
+/* the way out (Cancel / Stay): quiet, last */
+.ow-dlg-btn.ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-dim);
+}
+
+.ow-dlg-btn.ghost:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+@media (min-width: 480px) {
+  .ow-dlg-actions {
+    align-items: stretch;
+  }
+}

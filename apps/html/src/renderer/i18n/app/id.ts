@@ -147,4 +147,5 @@ export const id = {
   presentInTab: 'Di tab ini',
   presentFullscreen: 'Layar penuh',
   presentNewTab: 'Tab baru',
+  viewOnly: 'Hanya lihat',
 } satisfies Record<keyof typeof zh, string>

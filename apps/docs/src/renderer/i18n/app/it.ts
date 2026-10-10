@@ -309,6 +309,7 @@ export const it = {
   appTabDecimal: 'Decimale',
   appTabBar: 'Barra',
   appTabClear: 'Cancella',
+  appAiSettings: 'Impostazioni IA',
   appCut: 'Taglia',
   appCopy: 'Copia',
   appPaste: 'Incolla',
@@ -529,6 +530,7 @@ export const it = {
   appWebFatalTitle: 'Impossibile aprire il documento',
   appWebFatalBody:
     'Modifica e salvataggio sono disattivati. Ricarica la pagina o riapri il documento da UniWork.',
+  appWebSaveOffline: 'Impossibile raggiungere UniWork. Controlla la connessione e riprova.',
   appWebNoHost: 'Questo editor funziona all’interno di UniWork. Apri il documento da UniWork.',
   appSaveStateUnsaved: 'Modifiche non salvate',
   appSaveStateSaved: 'Tutte le modifiche salvate',

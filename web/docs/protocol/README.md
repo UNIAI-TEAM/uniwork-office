@@ -39,25 +39,25 @@ gets no `init` within its retry budget (40 × 500 ms), or is opened top-level (`
 
 ### Host → frame
 
-| type             | kind    | payload → result                                                                                                                                                                                             |
-| ---------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `init`           | request | `InitPayload` {protocolVersion, token, tokenExpiresAt, documentId, workspaceId, apiBase, apiMode, locale, theme, capabilities, open?} → `InitAck` {protocolVersion, frameVersion?, capabilities (effective)} |
-| `open`           | request | `OpenPayload` {file: FileMeta, source: {kind:'url', url} \| {kind:'bytes', data}} → {opened, title?}                                                                                                         |
-| `save`           | request | {reason: 'user' \| 'navigate' \| 'autosave'} → `SaveResult`                                                                                                                                                  |
-| `saveAs`         | request | {name?} → `SaveResult`                                                                                                                                                                                       |
-| `print`          | request | {mode?: 'dialog' \| 'pdf'} → {printed}                                                                                                                                                                       |
-| `doc.closeCheck` | request | {} → {dirty, autoSave}                                                                                                                                                                                       |
-| `token.update`   | event   | {token, tokenExpiresAt} — proactive rotation                                                                                                                                                                 |
-| `theme`          | event   | {theme: 'light' \| 'dark'} (host resolves "system")                                                                                                                                                          |
-| `language`       | event   | {locale}                                                                                                                                                                                                     |
-| `file.renamed`   | event   | {file: FileMeta}                                                                                                                                                                                             |
-| `cancel`         | event   | {id} — abort a host→frame request                                                                                                                                                                            |
+| type             | kind    | payload → result                                                                                                                                                                                                                        |
+| ---------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `init`           | request | `InitPayload` {protocolVersion, token, tokenExpiresAt, documentId, workspaceId, apiBase, apiMode, locale, theme, capabilities, open?, module?, user?, recovery?} → `InitAck` {protocolVersion, frameVersion?, capabilities (effective)} |
+| `open`           | request | `OpenPayload` {file: FileMeta, source: {kind:'url', url} \| {kind:'bytes', data}, assets?} → {opened, title?}                                                                                                                           |
+| `save`           | request | {reason: 'user' \| 'navigate' \| 'autosave'} → `SaveResult`                                                                                                                                                                             |
+| `saveAs`         | request | {name?} → `SaveResult`                                                                                                                                                                                                                  |
+| `print`          | request | {mode?: 'dialog' \| 'pdf'} → {printed}                                                                                                                                                                                                  |
+| `doc.closeCheck` | request | {} → {dirty, autoSave}                                                                                                                                                                                                                  |
+| `token.update`   | event   | {token, tokenExpiresAt} — proactive rotation                                                                                                                                                                                            |
+| `theme`          | event   | {theme: 'light' \| 'dark'} (host resolves "system")                                                                                                                                                                                     |
+| `language`       | event   | {locale}                                                                                                                                                                                                                                |
+| `file.renamed`   | event   | {file: FileMeta}                                                                                                                                                                                                                        |
+| `cancel`         | event   | {id} — abort a host→frame request                                                                                                                                                                                                       |
 
 ### Frame → host
 
 | type                   | kind    | payload → result                                                                      |
 | ---------------------- | ------- | ------------------------------------------------------------------------------------- |
-| `ready`                | event   | {protocolVersion, frameVersion?, capabilities, instanceId?}                           |
+| `ready`                | event   | {protocolVersion, frameVersion?, capabilities, instanceId?, module?}                  |
 | `token.refresh`        | request | {reason: 'expiring' \| 'unauthorized'} → {token, tokenExpiresAt}                      |
 | `api.open`             | request | {fileId} → `OpenPayload`                                                              |
 | `api.save`             | request | {fileId, data, etag?, auto?} → `SaveResult` (etag mismatch → `conflict`)              |
@@ -81,7 +81,8 @@ gets no `init` within its retry budget (40 × 500 ms), or is opened top-level (`
 without a handler answers `unsupported` (e.g. AI-adjacent calls stay unavailable on the web).
 
 Capabilities: `save`, `saveAs`, `recents`, `filePick`, `print`, `exportPdf`, `exportHtml`, `attachments`, `images`,
-`ai`. The effective set is the frame's ∩ the host's grant. The frame hides File > Open / Ctrl+O unless `filePick`
+`ai`, and (additive, CONTRACT C16) `webSearch`, `imageSearch`, `imageGeneration`. The effective set is the frame's ∩
+the host's grant. The three cloud-tool keys only count together with `ai`; see "AI (web)" below. The frame hides File > Open / Ctrl+O unless `filePick`
 is granted (grant it only with an `api` handler for `file.pick`) and stops asking for recents without `recents`.
 
 `FileSource {kind:'url'}` (in `init.open`, `open`, `api.open`, `file.pick`) must be **same-origin** with the frame,
@@ -99,6 +100,96 @@ server"; `busy` means the same operation is already running (e.g. a host `save` 
 host should retry later rather than open its conflict UI. `errorFromHttpStatus()` maps UniWork API statuses
 (401/403/404/409+412/413/429/5xx); anything else thrown by a handler becomes `internal` (or `network` /
 `cancelled` for fetch failures / aborts). UIs translate `code`, never `message`.
+
+## Modules
+
+One protocol serves every genoffice editor on the web (lane GO-B4/B5/B6, UNI-1014/1015/1016): `ns` stays
+`uniwork.office.docs` and `PROTOCOL_VERSION` stays `1`. The additions are optional fields:
+
+- `type OfficeModule = 'docs' | 'pdf' | 'markdown' | 'html' | 'slides' | 'sheets'` (`OFFICE_MODULES`,
+  `isOfficeModule()`).
+- `ready.module`: the editor the frame bundle runs. `init.module`: the module of the document the host opens.
+  **Absent = `'docs'`** on both (`moduleOf()`), so a pre-module Docs frame and a pre-module host keep working
+  unchanged. The Docs bridge still sends no `module`.
+- Validation: an unknown module value is `malformed` on the wire (`parseEnvelope`).
+- Host check (`checkFrameModule(ready, expected)` in `types.ts`, so it is vendored with the rest): returns
+  `null` on a match, otherwise a `DocsProtocolError` `malformed` with `details: {frameModule, expectedModule}`.
+  `createDocsFrameHost({ module })` runs it on every `ready` **before** `getInit()` (no token is minted for the
+  wrong editor), fails the handshake through `onHandshakeError`, and puts `module` into `init`. Without the
+  option, a `module` returned by `getInit()` is checked the same way after the call.
+- Frame check: `createDocsFrameClient({ module })` sends `module` in `ready` and refuses an `init` for another
+  module (`malformed`, `whenInitialized()` rejects); `FrameSession.module` reports the module.
+- `init.user?: {displayName}`: who is signed in, as editors display it (PDF note author, comment author). Display
+  data only; the frame never authorises anything with it. `FrameSession.user` carries a copy.
+- `OpenPayload.assets?: Record<path, url>` (in `init.open`, `open`, `api.open`, `file.pick`): relative resources of a
+  text document (Markdown/HTML `assets/x.png`) mapped to URLs the frame loads them from. Same rules as
+  `FileSource {kind:'url'}`: same-origin (frame CSP), fetched with `credentials: 'omit'`. Empty keys/values are
+  `malformed`.
+- New capability keys for a module are optional `Capabilities` fields (absent = false on the host grant side);
+  receivers already ignore unknown keys. New message types are added only when a module truly needs one, as
+  optional/additive entries documented here.
+
+## Read-only documents and saving
+
+- **View-only** is the host withholding the `save` grant: when the effective capabilities (`InitAck` /
+  `FrameSession.capabilities`) have `save !== true`, the frame is a viewer. A frame then hides or disables its save
+  entries (Ctrl+S, File > Save, close-guard "Save"), never sends `api.save`, and answers a host `save` with
+  `ok:false` / `unsupported`. `FileMeta.writable === false` means the same for that file. No extra field is needed.
+  `saveAs` is a separate grant (a host may allow "save a copy" of a document the user cannot overwrite).
+  The module bridges (`web/modules/<module>/`) implement this. The Docs bridge answers `uniworkState` with
+  `readOnly: true` (the renderer's view-only seam: read-only editor and ribbon, never dirty, no save entries),
+  refuses `api.save` and a host `save` (`unsupported`), and refuses Save As unless `saveAs` is granted.
+- **No autosave on the web** (lane decision C10, 2026-10-09): Docs and every module save only on an explicit user
+  save. Hosts never send `save {reason: 'autosave'}`; web bridges never set `api.save.auto`; every module's
+  autosave capability is false on the web and its UI hidden. The `autosave` / `auto` values stay in the types for
+  wire compatibility only.
+
+### Draft recovery (`init.recovery`, CONTRACT C18)
+
+- `init.recovery?: {key: CryptoKey, scope: string}` (`InitRecovery`, `isInitRecovery()`): the host's grant for
+  local draft copies. `key` is an AES-GCM 256 key the host generates with `extractable: false` and **persists per
+  user** (structured clone, never exported) in IndexedDB database `uniwork-office-frame-drafts`, store `keys`, so it
+  survives page reloads and is shared by the user's tabs (C18a); it reaches the frame by structured clone (again in a
+  later `init` after a frame reload). `scope` is `"<userId>:<documentId>"`, opaque to the frame (the per-user stores
+  use the part before the last `:`). Absent = recovery off: the frame writes nothing and shows nothing.
+  `FrameSession.recovery` carries a copy.
+- Frame side (`web/docs/bridge/draft-recovery.ts`, used by Docs and every module bridge): while the document is
+  dirty, every 30 s and on `pagehide`, the frame writes `{iv, ciphertext, baseEtag, savedAt, module, name}`
+  (ciphertext = AES-GCM of the document's current bytes) into the same database, store `drafts`, key
+  `scope + ":" + baseEtag + ":" + tabId` (`tabId` random per frame load). A successful save deletes this load's
+  records; Discard deletes the record it offered. On open, the newest decryptable record of the scope (labelled as
+  based on an older version when its etag differs) is offered as Restore / Discard; Restore loads the bytes as a
+  dirty document (the user must save) and deletes the restored record. **A record that does not decrypt is skipped,
+  never deleted** (it may belong to a live tab or a later sign-in).
+- The database is shared by host and frame: stores `keys` (host) and `drafts` (frame; also the PDF saved-signature
+  list under `~signatures:<user>`), both created at version 1 by whichever side opens first, the version never bumped;
+  see `docs/web-modules/draft-recovery.md`.
+- Drafts never leave the browser: no `api.save` (and never `auto`), no version, no host message (C10 holds).
+  The host deletes the whole database on sign-out / session switch (keys, drafts and saved PDF signatures with it).
+
+## AI (web, CONTRACT C16)
+
+The frame calls the GO-A7 web AI routes itself; there is **no postMessage relay** for AI. The host only decides
+whether AI exists for this document (grants) and keeps answering `token.refresh`.
+
+- **Grants.** `ai` (the AI panels and every AI entry) and, each only together with `ai`, `webSearch`, `imageSearch`,
+  `imageGeneration` (UniWork cloud tools; image generation also covers media analysis). Grant `ai` only when the
+  organization has the entitlement **and** the frame-token AI mount below is live; without it every AI entry stays
+  hidden exactly as before. Every frame (Docs and all modules) declares the four keys in `ready`.
+- **Routes** (same origin as the frame: the bundle CSP is `connect-src 'self'`): the path of `init.apiBase`
+  (`/api` or `/api/v1`) on the frame's origin + `/v1/office-frame/documents/{documentId}/ai/...`:
+  `credentials` GET, `credentials/{provider}` PUT / DELETE (masked `key_hint` only, the key is write-only),
+  `byok/{provider}/chat/completions` | `/messages` | `/generate` POST and `/models` GET (the vendor's own wire
+  format; SSE stays SSE; no key from the frame), `cloud` GET, `cloud/search` | `/images` | `/media/analyze` |
+  `/transcribe` POST.
+- **Auth.** `Authorization: Bearer <frame token>`, `credentials: 'omit'`, `mode: 'same-origin'`; one retry with a
+  refreshed token after a 401 (a second 401 is the "session expired" state).
+- **Errors** (`{error: {code, message}}`, the UniWork envelope; the flat `{code, message}` is read too; the UI picks a typed state from the status, never the message): 400
+  `provider_not_supported` / `base_url_refused`, 402 `credits_exhausted`, 403 `entitlement_required`, 404
+  `credential_missing`, 424 `provider_auth_failed`, 429 (+ `retry-after`), 502 `provider_unreachable`, 503
+  `cloud_unavailable`. A provider's own 400/404 passes through to the genoffice ai-provider unchanged.
+- Frame side: `web/modules/shared/ai/` (client, ai-provider proxy transport, streams, in-frame AI settings + state
+  card). Test host: `?ai=1` grants all four; `web/server/fake-ai.mjs` fakes the routes (`/__fake-ai/*` drives it).
 
 ## Origin model
 

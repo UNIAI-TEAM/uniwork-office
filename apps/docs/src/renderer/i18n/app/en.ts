@@ -297,6 +297,7 @@ export const en = {
   appTabDecimal: 'Decimal',
   appTabBar: 'Bar',
   appTabClear: 'Clear',
+  appAiSettings: 'AI Settings',
   appCut: 'Cut',
   appCopy: 'Copy',
   appPaste: 'Paste',
@@ -517,6 +518,7 @@ export const en = {
   appWebFatalTitle: 'The document could not be opened',
   appWebFatalBody:
     'Editing and saving are disabled. Reload the page or open the document again from UniWork.',
+  appWebSaveOffline: "Can't reach UniWork. Check your connection and try again.",
   appWebNoHost: 'This editor runs inside UniWork. Open the document from UniWork.',
   appSaveStateUnsaved: 'Unsaved changes',
   appSaveStateSaved: 'All changes saved',

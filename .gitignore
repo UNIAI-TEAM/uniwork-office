@@ -52,3 +52,6 @@ _scratch-*
 
 # web docs build output (npm run build:web)
 /dist-web/
+
+# Playwright output of web/e2e (screenshots, traces)
+/web/e2e/.results/

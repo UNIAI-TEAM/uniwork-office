@@ -15,6 +15,7 @@ import { AiQueueAnchors } from './aiQueueAnchors'
 import { InactiveSelection } from './inactiveSelection'
 import { SearchHighlight } from './searchHighlight'
 import { buildMathExtensions } from './math'
+import { RawHtmlBlock, RawHtmlInline } from './rawHtml'
 import {
   BlockStartEscapedParagraph,
   SelectiveEscapeMarkdown,
@@ -117,6 +118,9 @@ export function buildExtensions(options: BuildExtensionsOptions): AnyExtension[]
     StyledTaskItem.configure({ nested: true }),
     // KaTeX-rendered $...$ / $$...$$ formulas (issue #100)
     ...buildMathExtensions(),
+    // raw HTML / comments survive open → save byte-identically
+    RawHtmlBlock,
+    RawHtmlInline,
     LocalImage,
     // links open externally via main-process guard
     ImageAwareLink.configure({ openOnClick: false }),

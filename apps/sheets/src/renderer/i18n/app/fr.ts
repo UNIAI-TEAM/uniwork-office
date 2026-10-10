@@ -1578,6 +1578,31 @@ export const fr = {
   appVisualFlipV: 'Retourner verticalement',
   appVisualFlipH: 'Retourner horizontalement',
   appCtxPasteVisual: "Coller l'image ou la forme",
+  // web frame (UNI-1016): engine-unavailable screen, view-only, save conflicts
+  appWebEngineTitle: 'Ce classeur ne peut pas encore être ouvert sur le web',
+  appWebEngineBody:
+    "La version web de UniWork Sheets attend encore son moteur de calcul. D'ici là, ouvrez ce classeur dans l'application de bureau UniWork.",
+  appWebEngineHint: "Votre fichier n'a pas été modifié.",
+  appWebViewOnly:
+    'Lecture seule : vous ne pouvez pas enregistrer les modifications de ce classeur.',
+  appWebConflictTitle: 'Ce classeur a été modifié ailleurs',
+  appWebConflictBody:
+    "Quelqu'un a enregistré une version plus récente pendant votre modification. Remplacez-la par votre version ou rechargez la dernière version (vos modifications non enregistrées seront perdues).",
+  appWebConflictOverwrite: 'Remplacer',
+  appWebConflictReload: 'Recharger la dernière version',
+  appWebConflictNotSaved: 'Non enregistré : une version plus récente existe.',
+  appWebDiscardTitle: 'Abandonner les modifications non enregistrées ?',
+  appWebDiscardBody: 'Ouvrir un autre classeur abandonne les modifications non enregistrées.',
+  appWebDiscard: 'Abandonner',
+  appWebCancel: 'Annuler',
+  appWebSaveFailed: "L'enregistrement dans UniWork a échoué.",
+  appWebTooLargeTitle: 'Ce classeur est trop volumineux pour le web',
+  appWebTooLargeBody:
+    "Il dépasse la taille que le tableur web prend en charge ; il s'ouvre donc dans l'éditeur de tableur classique.",
+  appWebEngineRestarted:
+    "Le moteur du classeur s'est arrêté de façon inattendue et a redémarré. Le classeur a été rouvert à partir de sa dernière version enregistrée ; vos modifications non enregistrées sont conservées, pensez à enregistrer rapidement.",
+  appWebSavedReopenFailed:
+    "Vos modifications ont été enregistrées dans UniWork, mais le classeur n'a pas pu être rouvert ici. Rechargez l'éditeur pour continuer.",
   appAutoSaveUniworkOff:
     'L’enregistrement automatique est désactivé pour les documents UniWork. Utilisez Enregistrer pour enregistrer une nouvelle version.',
 } satisfies Record<keyof typeof zh, string>

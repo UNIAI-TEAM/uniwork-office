@@ -1,7 +1,7 @@
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Plugin } from 'vite'
-import { buildCspManifest, buildHeadersManifest, type CspOptions } from './csp'
+import { buildCspManifest, buildHeadersManifest, type CspOptions, type HeadersOptions } from './csp'
 import { buildManifest, MANIFEST_FILE } from './manifest'
 import type { VersionInfo } from './version'
 
@@ -27,13 +27,21 @@ export const fontBuildOptions = {
 export interface WebDocsPluginOptions {
   version: VersionInfo
   csp?: CspOptions
+  /** written to manifest.json `module` (default 'docs') */
+  module?: string
+  headers?: HeadersOptions
 }
 
 /**
  * After the bundle is written: stamp the version into index.html, then emit csp.json, headers.json and
  * manifest.json next to it (manifest last: it lists and hashes everything else).
  */
-export function webDocsManifestPlugin({ version, csp }: WebDocsPluginOptions): Plugin {
+export function webDocsManifestPlugin({
+  version,
+  csp,
+  module = 'docs',
+  headers,
+}: WebDocsPluginOptions): Plugin {
   let outDir = ''
   return {
     name: 'web-docs-manifest',
@@ -58,13 +66,13 @@ export function webDocsManifestPlugin({ version, csp }: WebDocsPluginOptions): P
         writeFileSync(join(outDir, 'csp.json'), JSON.stringify(cspManifest, null, 2) + '\n')
         writeFileSync(
           join(outDir, 'headers.json'),
-          JSON.stringify(buildHeadersManifest(cspManifest), null, 2) + '\n',
+          JSON.stringify(buildHeadersManifest(cspManifest, headers), null, 2) + '\n',
         )
-        const manifest = buildManifest({ dir: outDir, version })
+        const manifest = buildManifest({ dir: outDir, version, module })
         writeFileSync(join(outDir, MANIFEST_FILE), JSON.stringify(manifest, null, 2) + '\n')
         const mib = (n: number) => (n / 1024 / 1024).toFixed(2)
         console.log(
-          `\nweb-docs ${manifest.version}: ${manifest.files.length} files, ${mib(manifest.totalBytes)} MiB (gzip ${mib(manifest.gzipBytes)}); ` +
+          `\nweb-${module} ${manifest.version}: ${manifest.files.length} files, ${mib(manifest.totalBytes)} MiB (gzip ${mib(manifest.gzipBytes)}); ` +
             `initial ${mib(manifest.initial.bytes)} MiB (gzip ${mib(manifest.initial.gzipBytes)}), deferred ${mib(manifest.deferred.bytes)} MiB\n  -> ${outDir}`,
         )
       },

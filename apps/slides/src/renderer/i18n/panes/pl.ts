@@ -254,6 +254,16 @@ export const pl = {
   panePresenterUseShowTip: 'Przełącz na zwykły pokaz slajdów na tym ekranie',
   panePresenterSingleHint:
     'Tryb jednego ekranu (podłącz drugi ekran, aby automatycznie wyświetlić pokaz na pełnym ekranie)',
+  panePresenterOpenAudience: 'Okno widowni',
+  panePresenterOpenAudienceTip:
+    'Otwórz pokaz w osobnym oknie, które możesz przeciągnąć na projektor',
+  panePresenterCloseAudience: 'Zamknij okno widowni',
+  panePresenterCloseAudienceTip: 'Zamknij okno widowni; widok prezentera działa dalej',
+  panePresenterWebHint:
+    'Otwórz okno widowni, przeciągnij je na projektor i kliknij, aby przejść do pełnego ekranu',
+  panePresenterPopupBlocked:
+    'Przeglądarka zablokowała okno. Zezwól na wyskakujące okna dla tej witryny i spróbuj ponownie.',
+  paneAudienceFullscreenHint: 'Kliknij, aby wyświetlić na pełnym ekranie',
   panePresenterElapsed: 'Czas, który upłynął',
   panePresenterPause: 'Wstrzymaj czasomierz',
   panePresenterResume: 'Wznów czasomierz',

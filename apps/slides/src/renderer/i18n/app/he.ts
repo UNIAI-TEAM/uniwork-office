@@ -5,6 +5,7 @@ export const he = {
   appPhPromptSubtitle: 'לחץ כדי להוסיף כותרת משנה',
   appPhPromptBody: 'לחץ כדי להוסיף טקסט',
   appStatusOpened: '{name} נפתח ({count} שקופיות)',
+  appStatusOpenedOne: '{name} נפתח (שקופית אחת)',
   appStatusNewBlank: 'נוצרה מצגת ריקה',
   appStatusSaved: 'נשמר',
   appStatusSaveFailed: 'השמירה נכשלה: {error}',

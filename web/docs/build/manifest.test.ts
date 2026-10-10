@@ -108,6 +108,13 @@ describe('buildManifest', () => {
     )
   })
 
+  it('records the module (default docs)', () => {
+    expect(buildManifest({ dir, version: VERSION, builtAt: BUILT_AT }).module).toBe('docs')
+    expect(buildManifest({ dir, version: VERSION, builtAt: BUILT_AT, module: 'pdf' }).module).toBe(
+      'pdf',
+    )
+  })
+
   it('records a dirty tree', () => {
     const m = buildManifest({
       dir,
