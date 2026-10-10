@@ -53,11 +53,15 @@ export {
   isRibbonToggleShortcut,
   readRibbonCollapsed,
   readRibbonDensity,
+  mountRibbonOverflowCue,
+  ribbonOverflowOf,
   RIBBON_COMPACT_SHORTCUT,
   RIBBON_TOGGLE_SHORTCUT,
   type RibbonCollapse,
   type RibbonCollapseLabels,
   type RibbonDensity,
+  type RibbonOverflow,
+  type RibbonScrollMetrics,
 } from './ribbon-collapse'
 export { AiTypingIndicator } from './AiTypingIndicator'
 export { IconSend, IconStop, type IconProps } from './icons'

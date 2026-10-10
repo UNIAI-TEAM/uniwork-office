@@ -11,6 +11,12 @@
  * original two-state behaviour and stay byte-for-byte compatible. ⌥⌘K
  * (Ctrl+Alt+K) cycles full ↔ compact. See #362.
  *
+ * Overflow cue: a band wider than its frame (AI panel open, phone width) scrolls
+ * sideways. While it does, the hook marks the root `data-ribbon-overflow="start|end|both"`
+ * and shows a chevron button at each clipped edge (fade + click-to-scroll), so no
+ * label is cut mid-word without a hint that more is there. The buttons are a visual
+ * aid (aria-hidden, no tab stop): every control is already reachable by Tab.
+ *
  * Markup contract: the ribbon root carries `rootRef` + `rootClass`, the band
  * element carries `data-ribbon-body`, tabs render `tabClass` / `tabTip` and
  * call `onTabPress`. Ribbons without tabs use `RibbonCollapseButton` +
@@ -82,6 +88,142 @@ export function isRibbonCompactShortcut(e: KeyboardEvent): boolean {
   if (e.repeat || e.shiftKey) return false
   if (IS_MAC) return e.metaKey && e.altKey && !e.ctrlKey && e.code === 'KeyK'
   return e.ctrlKey && e.altKey && !e.metaKey && e.code === 'KeyK'
+}
+
+/** which edges of a horizontally scrolling band still hide something */
+export type RibbonOverflow = '' | 'start' | 'end' | 'both'
+
+export interface RibbonScrollMetrics {
+  readonly scrollLeft: number
+  readonly clientWidth: number
+  readonly scrollWidth: number
+  /** the band lays out right to left: `scrollLeft` is <= 0 (Chromium) */
+  readonly rtl: boolean
+}
+
+/** the clipped edges of a band, in logical (start / end) terms; pure, for tests */
+export function ribbonOverflowOf(m: RibbonScrollMetrics): RibbonOverflow {
+  // a 1 px slack absorbs sub-pixel layout rounding
+  if (m.scrollWidth - m.clientWidth <= 1) return ''
+  const position = Math.abs(m.scrollLeft)
+  const start = position > 1
+  const end = position + m.clientWidth < m.scrollWidth - 1
+  return start && end ? 'both' : start ? 'start' : end ? 'end' : ''
+}
+
+const CUE_ICON =
+  '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true" focusable="false">' +
+  '<path d="M4.5 2.5 8 6l-3.5 3.5" stroke="currentColor" stroke-width="1.4" ' +
+  'stroke-linecap="round" stroke-linejoin="round"/></svg>'
+
+/**
+ * Watch the band inside `root` and keep the overflow cue in step with it: two chevron buttons
+ * appended to the root (the band is a scroll container, so the cue cannot live inside it) and the
+ * `data-ribbon-overflow` marker. Returns the cleanup.
+ */
+export function mountRibbonOverflowCue(root: HTMLElement): () => void {
+  const make = (edge: 'start' | 'end'): HTMLButtonElement => {
+    const b = document.createElement('button')
+    b.type = 'button'
+    b.className = 'ribbon-overflow-cue'
+    b.dataset.edge = edge
+    b.hidden = true
+    b.tabIndex = -1
+    b.setAttribute('aria-hidden', 'true')
+    b.innerHTML = CUE_ICON
+    // the band keeps its scroll position: a click on the cue must not steal focus from a control
+    b.addEventListener('mousedown', (e) => e.preventDefault())
+    return b
+  }
+  const startCue = make('start')
+  const endCue = make('end')
+  root.append(startCue, endCue)
+
+  let band: HTMLElement | null = null
+  let queued = false
+  let frame = 0
+
+  const bandOf = (): HTMLElement | null => {
+    const el = root.querySelector<HTMLElement>('[data-ribbon-body]')
+    // a collapsed ribbon hides the band (display: none): no client rects, no cue
+    return el && el.getClientRects().length > 0 ? el : null
+  }
+
+  const update = (): void => {
+    queued = false
+    const el = bandOf()
+    if (el !== band) {
+      if (band) resizeObserver?.unobserve(band)
+      band = el
+      if (band) resizeObserver?.observe(band)
+    }
+    let state: RibbonOverflow = ''
+    if (band) {
+      state = ribbonOverflowOf({
+        scrollLeft: band.scrollLeft,
+        clientWidth: band.clientWidth,
+        scrollWidth: band.scrollWidth,
+        rtl: getComputedStyle(band).direction === 'rtl',
+      })
+      // the cue covers the band's own box (not the tab row, not the scrollbar lane)
+      const r = root.getBoundingClientRect()
+      const b = band.getBoundingClientRect()
+      for (const c of [startCue, endCue]) {
+        c.style.top = `${b.top - r.top}px`
+        c.style.height = `${band.clientHeight}px`
+      }
+    }
+    startCue.hidden = !(state === 'start' || state === 'both')
+    endCue.hidden = !(state === 'end' || state === 'both')
+    if (state) root.dataset.ribbonOverflow = state
+    else delete root.dataset.ribbonOverflow
+  }
+
+  const schedule = (): void => {
+    if (queued) return
+    queued = true
+    frame = requestAnimationFrame(update)
+  }
+
+  const scrollBand = (dir: 1 | -1) => (): void => {
+    const el = bandOf()
+    if (!el) return
+    const rtl = getComputedStyle(el).direction === 'rtl'
+    const reduce =
+      typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
+    el.scrollBy({
+      left: dir * (rtl ? -1 : 1) * Math.max(120, el.clientWidth * 0.6),
+      behavior: reduce ? 'auto' : 'smooth',
+    })
+  }
+  startCue.addEventListener('click', scrollBand(-1))
+  endCue.addEventListener('click', scrollBand(1))
+
+  // scroll does not bubble: listen in the capture phase for whichever band is showing
+  root.addEventListener('scroll', schedule, true)
+  const resizeObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(schedule)
+  resizeObserver?.observe(root)
+  // tab switches swap the band's content (and collapse hides it): re-measure after any of that
+  const mutationObserver =
+    typeof MutationObserver === 'undefined' ? null : new MutationObserver(schedule)
+  // (class only: the cue's own writes are style / hidden / data attributes, so it cannot re-trigger itself)
+  mutationObserver?.observe(root, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['class'],
+  })
+  schedule()
+
+  return () => {
+    cancelAnimationFrame(frame)
+    root.removeEventListener('scroll', schedule, true)
+    resizeObserver?.disconnect()
+    mutationObserver?.disconnect()
+    startCue.remove()
+    endCue.remove()
+    delete root.dataset.ribbonOverflow
+  }
 }
 
 export interface RibbonCollapseLabels {
@@ -186,6 +328,12 @@ export function useRibbonCollapse(
     },
     [toggle],
   )
+
+  // the overflow cue of the band (see the header comment); the root ref is the call site's
+  useEffect(() => {
+    const root = rootRef.current
+    return root ? mountRibbonOverflowCue(root) : undefined
+  }, [])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
