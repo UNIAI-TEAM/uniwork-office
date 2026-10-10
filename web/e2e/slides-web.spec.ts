@@ -403,6 +403,80 @@ test.describe('slides web module', () => {
     })
   })
 
+  // visual r2 N-02: a frame without the save grant (token can_edit false) is read-only: Reading
+  // view, no text editor on a double click or typing, never dirty, nothing to save
+  test('view-only frame refuses typing: no editor, never dirty', async ({ page }) => {
+    const problems = await watch(page)
+    await page.goto(HOST + '&readonly=1&lang=en')
+    await expect(page.locator('#status')).toHaveText(/^initialised/, { timeout: 30_000 })
+    const frame = (await (await page.waitForSelector('#frame')).contentFrame())!
+    await expect(frame.locator('.reading-view')).toBeVisible({ timeout: 30_000 })
+    await expect(frame.locator('.stage-zoom-box')).toHaveCount(0)
+    const box = (await frame.locator('.reading-slide').boundingBox())!
+    await page.mouse.dblclick(box.x + box.width / 2, box.y + box.height / 2)
+    await page.keyboard.type('must not land')
+    await page.keyboard.press('Control+S')
+    await page.waitForTimeout(600)
+    await expect(frame.locator('.slide-text-editor, [contenteditable=true]')).toHaveCount(0)
+    expect(await frame.evaluate(() => window.slidesApi.isDirty())).toBe(false)
+    expect(await titleText(frame)).not.toContain('must not land')
+    expect(await hostSaved(page)).toBeNull()
+    expect({ csp: await cspViolations(page, frame), ...problems }).toEqual({
+      csp: [],
+      console: [],
+      page: [],
+      http: [],
+    })
+  })
+
+  // visual r2 N-03: at 390 px the slide takes the width (was 14 %), the thumbnail column starts
+  // hidden and the ribbon tabs scroll sideways with an edge fade as the cue
+  test('390 px: the slide fits the width, tabs scroll with a cue', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto(HOST + '&lang=en')
+    await expect(page.locator('#status')).toHaveText(/^initialised/, { timeout: 30_000 })
+    const frame = (await (await page.waitForSelector('#frame')).contentFrame())!
+    await expect(frame.locator('.stage-zoom-box')).toBeVisible({ timeout: 30_000 })
+    await expect(frame.locator('.slide-list')).toHaveCount(0)
+    const stage = (await frame.locator('.stage-zoom-box').boundingBox())!
+    expect(stage.width).toBeGreaterThan(390 * 0.8)
+    const scroll = frame.locator('.ribbon-tab-scroll')
+    await expect(scroll).toHaveAttribute('data-fade-end', /.*/)
+    const m = await scroll.evaluate((el) => ({ sw: el.scrollWidth, cw: el.clientWidth }))
+    expect(m.sw).toBeGreaterThan(m.cw)
+    // the page itself never scrolls sideways
+    expect(await frame.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    )
+  })
+
+  // visual r2 S-07: Presenter View chrome is readable (>= 14 px controls, 44 px round tools)
+  test('presenter view chrome: readable sizes', async ({ page }) => {
+    const frame = await openDeck(page)
+    await frame.getByRole('button', { name: 'Slide Show', exact: true }).click()
+    await frame.getByRole('button', { name: 'Presenter View' }).first().click()
+    await expect(frame.locator('.presenter')).toBeVisible()
+    const sizes = await frame.evaluate(() => {
+      const px = (s: string, prop: 'fontSize' | 'width' | 'height') =>
+        parseFloat(getComputedStyle(document.querySelector(s)!)[prop])
+      return {
+        topBtn: px('.pv-top-btn', 'fontSize'),
+        hint: px('.pv-top-hint', 'fontSize'),
+        label: px('.pv-nav-label', 'fontSize'),
+        section: px('.pv-section-label', 'fontSize'),
+        toolW: px('.pv-tool-btn', 'width'),
+        toolH: px('.pv-tool-btn', 'height'),
+        roundW: px('.pv-round', 'width'),
+      }
+    })
+    expect(sizes.topBtn).toBeGreaterThanOrEqual(14)
+    expect(sizes.hint).toBeGreaterThanOrEqual(14)
+    expect(sizes.label).toBeGreaterThanOrEqual(14)
+    expect(sizes.section).toBeGreaterThanOrEqual(14)
+    expect(Math.min(sizes.toolW, sizes.toolH, sizes.roundW)).toBeGreaterThanOrEqual(44)
+    await page.keyboard.press('Escape')
+  })
+
   test('screenshots: light + dark, vi + en', async ({ page }) => {
     mkdirSync(SHOTS, { recursive: true })
     const problems = await watch(page)
