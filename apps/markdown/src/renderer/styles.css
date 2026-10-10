@@ -2339,10 +2339,23 @@ html.genoffice-popover-open .ribbon-tabs {
   cursor: default;
 }
 
+/* the label is out of flow in a fixed 22 px band: a late font swap must not move the blocks below it
+   (it did, and a click aimed at the next paragraph landed on this node instead) */
+.doc-editor .md-raw-html {
+  position: relative;
+  padding-top: 24px;
+}
+
 .doc-editor .md-raw-html::before {
   content: attr(data-md-label);
-  display: block;
-  margin-bottom: 4px;
+  position: absolute;
+  top: 5px;
+  left: 10px;
+  right: 10px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  line-height: 14px;
   font-family: var(--font-ui, inherit);
   font-size: 11px;
   font-style: normal;

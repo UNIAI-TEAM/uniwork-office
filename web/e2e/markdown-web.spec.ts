@@ -47,6 +47,12 @@ async function editor(frame: Frame) {
   return el
 }
 
+// the editor drops the previous node selection a frame after a click on text; keys sent inside that
+// frame (only a script is that fast) would replace the still-selected raw HTML block
+async function selectionSettled(frame: Frame) {
+  await expect(frame.locator('.doc-editor .ProseMirror-selectednode')).toHaveCount(0)
+}
+
 async function save(page: Page) {
   await page.keyboard.press('Control+s')
 }
@@ -77,6 +83,7 @@ test('markdown: open -> save byte-identical -> type -> save -> reopen -> conflic
 
   // 2. type into the nearby paragraph and save: only that line changes
   await frame.locator('.doc-editor p', { hasText: 'Nearby paragraph to edit.' }).click()
+  await selectionSettled(frame)
   await page.keyboard.press('End')
   await page.keyboard.type(' Edited on the web.')
   // the host header owns the save state: the frame draws none, but tells the host it is dirty
@@ -113,6 +120,7 @@ test('markdown: open -> save byte-identical -> type -> save -> reopen -> conflic
   // 4. conflict: someone else saved meanwhile
   await bumpRemote(page, fileId)
   await frame.locator('.doc-editor p', { hasText: 'Tail paragraph' }).click()
+  await selectionSettled(frame)
   await page.keyboard.press('End')
   await page.keyboard.type(' Mine.')
   await save(page)
