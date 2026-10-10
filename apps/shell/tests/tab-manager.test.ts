@@ -157,7 +157,12 @@ const WINDOW_HEIGHT = 600
 
 interface FakeShellWindow {
   on: ReturnType<typeof vi.fn>
-  webContents: { once: ReturnType<typeof vi.fn>; focus: ReturnType<typeof vi.fn> }
+  webContents: {
+    on: ReturnType<typeof vi.fn>
+    once: ReturnType<typeof vi.fn>
+    focus: ReturnType<typeof vi.fn>
+    listeners: Map<string, () => void>
+  }
   isDestroyed: ReturnType<typeof vi.fn>
   isFocused: ReturnType<typeof vi.fn>
   getContentBounds: () => { x: number; y: number; width: number; height: number }
@@ -168,9 +173,17 @@ interface FakeShellWindow {
 }
 
 function makeShellWindow(): FakeShellWindow {
+  const listeners = new Map<string, () => void>()
   return {
     on: vi.fn(),
-    webContents: { once: vi.fn(), focus: vi.fn() },
+    webContents: {
+      on: vi.fn((event: string, handler: () => void) => {
+        listeners.set(event, handler)
+      }),
+      once: vi.fn(),
+      focus: vi.fn(),
+      listeners,
+    },
     isDestroyed: vi.fn(() => false),
     isFocused: vi.fn(() => true),
     getContentBounds: () => ({ x: 0, y: 0, width: WINDOW_WIDTH, height: WINDOW_HEIGHT }),
@@ -532,7 +545,7 @@ describe('closing tabs', () => {
     expect(manager.list()).toHaveLength(1)
   })
 
-  describe('Ctrl/Cmd+W key event on a sheets view', () => {
+  describe('Ctrl/Cmd+W key event', () => {
     type InputHandler = (event: { preventDefault: () => void }, input: unknown) => void
     const chord = (over: Record<string, unknown> = {}) => ({
       type: 'keyDown',
@@ -543,11 +556,9 @@ describe('closing tabs', () => {
       shift: false,
       ...over,
     })
-    const press = (view: FakeView, input: unknown) => {
+    const press = (wc: { listeners: Map<string, () => void> }, input: unknown) => {
       const preventDefault = vi.fn()
-      const handler = view.webContents.listeners.get(
-        'before-input-event',
-      ) as unknown as InputHandler
+      const handler = wc.listeners.get('before-input-event') as unknown as InputHandler
       handler({ preventDefault }, input)
       return preventDefault
     }
@@ -555,15 +566,18 @@ describe('closing tabs', () => {
     it('closes the active sheets tab without the menu accelerator', async () => {
       manager.openSheetsTab('/tmp/fresh.xlsx')
       const view = lastCreatedView(createSheetsView)
-      const preventDefault = press(view, chord())
+      const preventDefault = press(view.webContents, chord())
       expect(preventDefault).toHaveBeenCalledTimes(1)
       await vi.waitFor(() => expect(manager.list().map((t) => t.id)).toEqual(['home']))
     })
 
-    it('also takes Cmd+W', async () => {
+    it('also takes Cmd+W, and Ctrl+W under a non-Latin layout', async () => {
       manager.openSheetsTab()
-      const view = lastCreatedView(createSheetsView)
-      press(view, chord({ control: false, meta: true }))
+      manager.openSheetsTab()
+      press(lastCreatedView(createSheetsView).webContents, chord({ control: false, meta: true }))
+      await vi.waitFor(() => expect(manager.list()).toHaveLength(2))
+      const first = createSheetsView.mock.results[0]!.value as FakeView
+      press(first.webContents, chord({ key: 'ц', code: 'KeyW' }))
       await vi.waitFor(() => expect(manager.list()).toHaveLength(1))
     })
 
@@ -578,19 +592,69 @@ describe('closing tabs', () => {
         chord({ isAutoRepeat: true }),
         chord({ type: 'keyUp' }),
       ]) {
-        expect(press(view, input)).not.toHaveBeenCalled()
+        expect(press(view.webContents, input)).not.toHaveBeenCalled()
       }
       expect(manager.list()).toHaveLength(2)
     })
 
-    it('does nothing from a sheets view that is not the active tab', async () => {
+    it('closes the active tab when the shell chrome holds keyboard focus', async () => {
+      manager.openSheetsTab('/tmp/fresh.xlsx')
+      const preventDefault = press(shellWindow.webContents, chord())
+      expect(preventDefault).toHaveBeenCalledTimes(1)
+      await vi.waitFor(() => expect(manager.list().map((t) => t.id)).toEqual(['home']))
+    })
+
+    it('closes the active tab of any kind, whichever view of the window has focus', async () => {
       manager.openSheetsTab()
       const sheetsView = lastCreatedView(createSheetsView)
+      manager.openDocsTab('/tmp/report.docx')
+      // a hidden view holding focus still closes the tab the user sees
+      press(sheetsView.webContents, chord())
+      await vi.waitFor(() => expect(manager.list().map((t) => t.kind)).toEqual(['home', 'sheets']))
+    })
+
+    it('leaves the chord alone on Home', () => {
+      manager.openSheetsTab()
+      manager.openHomeTab()
+      expect(press(shellWindow.webContents, chord())).not.toHaveBeenCalled()
+      expect(manager.list()).toHaveLength(2)
+    })
+
+    it('does nothing from a view that moved to a detached window', async () => {
+      const id = manager.openSheetsTab()
+      const view = lastCreatedView(createSheetsView)
       manager.openSlidesTab()
-      const preventDefault = press(sheetsView, chord())
+      manager.detachTab(id)
+      const preventDefault = press(view.webContents, chord())
       await Promise.resolve()
       expect(preventDefault).not.toHaveBeenCalled()
-      expect(manager.list()).toHaveLength(3)
+      expect(manager.list().map((t) => t.kind)).toEqual(['home', 'slides'])
+    })
+
+    it('closes a workbook opened by a launch link while the window was in the background', async () => {
+      vi.useFakeTimers()
+      try {
+        // a launch link opens the copy before the window is brought forward
+        shellWindow.isFocused.mockReturnValue(false)
+        manager.openSheetsTab('/tmp/uniwork/Budget.xlsx')
+        const tab = lastCreatedView(createSheetsView)
+        shellWindow.isFocused.mockReturnValue(true)
+        manager.focusActiveView()
+        expect(tab.webContents.focus).toHaveBeenCalled()
+        // seconds later the next spare mounts and its first load takes focus
+        vi.advanceTimersByTime(3000)
+        const spare = lastCreatedView(createSheetsView)
+        expect(spare).not.toBe(tab)
+        tab.webContents.focus.mockClear()
+        spare.webContents.listeners.get('focus')!()
+        expect(tab.webContents.focus).toHaveBeenCalledTimes(1)
+        // a key that reached the hidden spare anyway still closes the visible tab
+        const preventDefault = press(spare.webContents, chord())
+        expect(preventDefault).toHaveBeenCalledTimes(1)
+        await vi.waitFor(() => expect(manager.list().map((t) => t.id)).toEqual(['home']))
+      } finally {
+        vi.useRealTimers()
+      }
     })
   })
 
