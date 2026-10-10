@@ -6639,6 +6639,8 @@ export function App() {
     onOpen: () => void openFile(),
     onSave: () => void save(false),
     onSaveAs: () => void save(true),
+    onExportPdf: () => void exportPdf(),
+    onPrint: () => void printDoc(),
     onToggleAi: () => setShowAi((v) => !v),
     onSection: (next: SectionSettings) => {
       // layout applies to the cursor's section; the final section's sectPr goes through SaveOptions.section (also drives canvas geometry)
@@ -7831,7 +7833,9 @@ export function App() {
         />
       )}
 
-      {doc && showPrintDialog && <PrintDialog onClose={closePrintDialog} setStatus={setStatus} />}
+      {doc && showPrintDialog && (
+        <PrintDialog onClose={closePrintDialog} setStatus={setStatus} onSavePdf={exportPdf} />
+      )}
 
       {stats && <WordCountDialog stats={stats} onClose={() => setStats(null)} />}
 

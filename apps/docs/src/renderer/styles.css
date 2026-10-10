@@ -10076,6 +10076,23 @@ body.docs-crop-active
   border-color: var(--danger);
 }
 
+.print-problem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--hover);
+  font-size: 13px;
+  color: var(--text);
+}
+
+.print-problem span {
+  flex: 1;
+}
+
 .print-page-count {
   margin-top: auto;
   padding: 2px 2px 0;

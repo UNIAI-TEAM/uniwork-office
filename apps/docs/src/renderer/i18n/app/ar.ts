@@ -522,4 +522,9 @@ export const ar = {
   appSaving: 'جارٍ الحفظ…',
   appSavingAs: 'جارٍ الحفظ باسم…',
   appPdfPrintFallback: 'تصدير PDF غير متاح هنا؛ تم استخدام مربع حوار الطباعة في المتصفح بدلاً منه',
+  appFileExportPdf: 'تصدير بتنسيق PDF…',
+  appFilePrint: 'طباعة…',
+  appPrintNoPrinter: 'لا تتوفر طابعة على هذا الكمبيوتر. يمكنك حفظ المستند كملف PDF بدلاً من ذلك.',
+  appPrintFailedPdfHint: 'تعذّرت الطباعة: {error}. يمكنك حفظ المستند كملف PDF بدلاً من ذلك.',
+  appPrintSaveAsPdf: 'حفظ بتنسيق PDF…',
 } satisfies Record<keyof typeof zh, string>

@@ -537,4 +537,11 @@ export const pl = {
   appSavingAs: 'Zapisywanie jako…',
   appPdfPrintFallback:
     'Eksport do PDF nie jest tu dostępny; zamiast tego użyto okna drukowania przeglądarki',
+  appFileExportPdf: 'Eksportuj jako PDF…',
+  appFilePrint: 'Drukuj…',
+  appPrintNoPrinter:
+    'Na tym komputerze nie ma dostępnej drukarki. Możesz zamiast tego zapisać dokument jako PDF.',
+  appPrintFailedPdfHint:
+    'Drukowanie nie powiodło się: {error}. Możesz zamiast tego zapisać dokument jako PDF.',
+  appPrintSaveAsPdf: 'Zapisz jako PDF…',
 } satisfies Record<keyof typeof zh, string>

@@ -542,4 +542,11 @@ export const fr = {
   appSavingAs: 'Enregistrement sous…',
   appPdfPrintFallback:
     "L'export PDF n'est pas disponible ici ; la boîte de dialogue d'impression du navigateur a été utilisée à la place",
+  appFileExportPdf: 'Exporter en PDF…',
+  appFilePrint: 'Imprimer…',
+  appPrintNoPrinter:
+    "Aucune imprimante n'est disponible sur cet ordinateur. Vous pouvez enregistrer le document au format PDF à la place.",
+  appPrintFailedPdfHint:
+    "L'impression a échoué : {error}. Vous pouvez enregistrer le document au format PDF à la place.",
+  appPrintSaveAsPdf: 'Enregistrer en PDF…',
 } satisfies Record<keyof typeof zh, string>

@@ -540,4 +540,9 @@ export const zh = {
   appSaving: '正在保存…',
   appSavingAs: '正在另存为…',
   appPdfPrintFallback: '无法直接导出 PDF,已改用浏览器打印对话框',
+  appFileExportPdf: '导出为 PDF…',
+  appFilePrint: '打印…',
+  appPrintNoPrinter: '此电脑没有可用的打印机。可以改为将文档保存为 PDF。',
+  appPrintFailedPdfHint: '打印没有成功:{error}。可以改为将文档保存为 PDF。',
+  appPrintSaveAsPdf: '另存为 PDF…',
 }

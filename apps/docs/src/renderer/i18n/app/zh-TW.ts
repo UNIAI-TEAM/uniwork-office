@@ -514,4 +514,9 @@ export const zhTW = {
   appSaving: '正在儲存…',
   appSavingAs: '正在另存新檔…',
   appPdfPrintFallback: '無法直接匯出 PDF,已改用瀏覽器列印對話方塊',
+  appFileExportPdf: '匯出為 PDF…',
+  appFilePrint: '列印…',
+  appPrintNoPrinter: '這台電腦沒有可用的印表機。可以改為將文件儲存為 PDF。',
+  appPrintFailedPdfHint: '列印沒有成功:{error}。可以改為將文件儲存為 PDF。',
+  appPrintSaveAsPdf: '另存為 PDF…',
 } satisfies Record<keyof typeof zh, string>

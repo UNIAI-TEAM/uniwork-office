@@ -546,4 +546,11 @@ export const de = {
   appSavingAs: 'Wird gespeichert unter…',
   appPdfPrintFallback:
     'PDF-Export ist hier nicht verfügbar; stattdessen wurde der Druckdialog des Browsers verwendet',
+  appFileExportPdf: 'Als PDF exportieren…',
+  appFilePrint: 'Drucken…',
+  appPrintNoPrinter:
+    'Auf diesem Computer ist kein Drucker verfügbar. Sie können das Dokument stattdessen als PDF speichern.',
+  appPrintFailedPdfHint:
+    'Drucken ist fehlgeschlagen: {error}. Sie können das Dokument stattdessen als PDF speichern.',
+  appPrintSaveAsPdf: 'Als PDF speichern…',
 } satisfies Record<keyof typeof zh, string>
