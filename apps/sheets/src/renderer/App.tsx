@@ -64,7 +64,7 @@ import {
 } from './plan-operations'
 import { isNumericIdentifierText } from './cell-warning'
 import { consumePendingUndoCarry, undoStackDepth } from './undo-carry'
-import { createSaveGate, shouldRunSaveTick } from './save-scheduler'
+import { createSaveGate, recoveryCopyBacksSession, shouldRunSaveTick } from './save-scheduler'
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { useAutoSavePref, type AiScopeQuoteData } from '@genoffice/ui'
 
@@ -509,7 +509,7 @@ import {
   isEditableShape,
 } from './WorkbookVisuals'
 import { ChartFormatPane, SelectDataDialog } from './ChartPanels'
-import { cap, isViewOnly } from './capabilities'
+import { cap, isViewOnly, platform } from './capabilities'
 import { EngineUnavailableScreen } from './EngineUnavailableScreen'
 import { WorkbookOpeningScreen } from './WorkbookOpeningScreen'
 import { isEngineUnavailableError, isTooLargeError } from './web-engine'
@@ -698,7 +698,10 @@ export function App({
           needsSaveAsNotUnsavedNew: Boolean(state.file.needsSaveAs) && !state.file.unsavedNew,
           isCsv: state.file.csvPath !== undefined,
           kind: 'recovery',
-          restoredFromRecovery: state.file.restoredFromRecovery === true,
+          restoredFromRecovery: recoveryCopyBacksSession(
+            state.file.restoredFromRecovery === true,
+            platform(),
+          ),
           automaticRecoveryDisabled: state.file.automaticRecoveryDisabled === true,
         })
       )

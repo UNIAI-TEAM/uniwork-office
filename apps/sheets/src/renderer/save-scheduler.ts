@@ -49,6 +49,20 @@ export interface SaveTickState {
   automaticRecoveryDisabled: boolean
 }
 
+/**
+ * Does the restored-from-recovery flag stand the recovery tick down? On the desktop a restored
+ * session is backed by the recovery copy itself, so writing it again would overwrite what it
+ * reads. On the web the draft is an encrypted record in the browser store (the host re-keys it
+ * on Restore), so the edits made after a Restore must be drafted again at the next tick, not only
+ * once the user saves.
+ */
+export function recoveryCopyBacksSession(
+  restoredFromRecovery: boolean,
+  platformName: string | undefined,
+): boolean {
+  return restoredFromRecovery && platformName !== 'web'
+}
+
 export function shouldRunSaveTick(s: SaveTickState): boolean {
   if (s.saveInFlight || !s.hasWorkbook || s.journalEmpty) return false
   if (s.editingCell || s.needsSaveAsNotUnsavedNew || s.isCsv) return false

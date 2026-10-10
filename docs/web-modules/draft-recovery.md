@@ -59,16 +59,21 @@ draft and the saved PDF signatures.
 
 Known gaps: a record nobody restores or discards (e.g. a crashed tab whose user never reopens that document) stays
 until sign-out; the offer shows the newest first. The `pagehide` write is asynchronous and may not finish; HTML style edits not yet committed and PDF editor
-boxes still open are not in the copy until committed; Sheets (like the desktop) does not re-draft edits made after a
-Restore until the next save.
+boxes still open are not in the copy until committed.
+
+Edits made after a Restore are drafted again (UNI-1232): the desktop's restored session is backed by the recovery copy
+on disk, so its 30 s tick stands down (`recoveryCopyBacksSession` in `apps/sheets/src/renderer/save-scheduler.ts`),
+but a web restore is backed only by the encrypted IndexedDB record, so there the tick keeps running and the next 30 s
+checkpoint carries the new edits without a save.
 
 ## Tests
 
 - Unit: `web/docs/bridge/draft-recovery.test.ts`, the draft blocks in `web/docs/bridge/webapi.test.ts`,
   `web/modules/{markdown,html}/webapi.test.ts`, `web/modules/pdf/webapi.test.ts`,
   `web/modules/slides/web-slides-api.test.ts`, `web/modules/sheets/bridge.test.ts`.
-- e2e (production builds, test host `?recovery=1`, page clock): `web/e2e/draft-recovery.spec.ts` for Docs, Markdown
-  and Sheets: edit → 30 s → record (encrypted, no save) → frame reload → Restore → edit back + dirty → save → record
+- e2e (production builds, test host `?recovery=1`, page clock): `web/e2e/draft-recovery.spec.ts` for Docs, Markdown,
+  Sheets (also: an edit made after Restore is in the next 30 s record) and Slides (edit → reload → Restore brings the
+  edit back; Discard clears it): edit → 30 s → record (encrypted, no save) → frame reload → Restore → edit back + dirty → save → record
   gone, also after a reload of the whole host page (persisted key); Discard; a new key → the old record is skipped, not
   deleted, no prompt; a second tab neither deletes nor overwrites the first tab's record; sign-out → database gone.
   Prompt screenshots: `docs/web-modules/screenshots/draft-recovery/`.
