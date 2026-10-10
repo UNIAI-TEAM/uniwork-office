@@ -16,6 +16,7 @@ export const zh = {
   webDraftBody: '此浏览器保留了此文档未保存更改的副本。要恢复还是放弃这些更改？',
   webDraftOlder: '此副本基于文档的旧版本。保存后将替换较新的版本。',
   webDraftSavedAt: '副本保存于',
+  webDraftKept: '此浏览器会保留该副本，直到你退出登录。',
   webDraftRestore: '恢复',
   webDraftDiscard: '放弃',
 }

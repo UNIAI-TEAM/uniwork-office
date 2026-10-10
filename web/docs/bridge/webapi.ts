@@ -65,6 +65,7 @@ import {
   type SaveResult,
 } from '../protocol/types'
 import { TIMEOUTS, errorCode, type FramePort } from './frame-port'
+import { ownHeadAfterUnknown } from './head-match'
 import { downloadBlob, printFrame } from './browser'
 import { ask, hideFatal, onModalChange, showFatal, text } from './notice'
 import { createSession, type SessionOptions } from './session'
@@ -377,15 +378,14 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
 
   /**
    * After a save whose outcome is unknown (timeout / network; the request was cancelled but
-   * the host may have committed it): when the head moved on and has exactly the size we sent,
-   * it is taken to be our own write and its etag becomes the base of the next save. Anything
-   * else keeps the old etag, so a real concurrent edit still surfaces as a conflict prompt.
+   * the host may have committed it): when the head moved on and holds exactly the bytes we sent,
+   * it is our own write and its etag becomes the base of the next save. Anything else (also a
+   * same-size foreign version) keeps the old etag, so a real concurrent edit still surfaces as a
+   * conflict prompt (./head-match.ts).
    */
-  async function reconcileAfterUnknown(fileId: string, sentBytes: number): Promise<void> {
-    const before = files.get(fileId)
-    const head = await headMeta(fileId)
-    if (!head || !before?.etag || head.etag === before.etag) return
-    if (head.sizeBytes === sentBytes) remember(head)
+  async function reconcileAfterUnknown(fileId: string, sent: ArrayBuffer): Promise<void> {
+    const head = await ownHeadAfterUnknown(port, fileId, files.get(fileId)?.etag, sent)
+    if (head) remember(head)
   }
 
   /** the user chose for a frame-initiated save that hit `conflict` */
@@ -626,7 +626,7 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
         return resolveConflict(path, fileId, data)
       }
       if (code === 'timeout' || code === 'network') {
-        await reconcileAfterUnknown(fileId, data.byteLength)
+        await reconcileAfterUnknown(fileId, data)
       }
       return {
         ok: false,

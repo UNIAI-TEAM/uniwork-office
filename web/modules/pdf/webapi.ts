@@ -25,7 +25,7 @@
  * |   TextEdits, listEditFonts,       |                                                                          |
  * |   canDrawText, listPageImages,    |                                                                          |
  * |   pageImagePng, pagePreviewPng    |                                                                          |
- * | list/add/removeSavedSignature     | browser-local store (./signatures.ts, risk R6)                          |
+ * | list/add/removeSavedSignature     | encrypted per-user store (./signatures.ts)                              |
  * | getUsername                       | init.user.displayName ('' when absent)                                   |
  * | setDirty                          | frame event `dirty`                                                      |
  * | onCloseSaveRequest / send...      | host `save` request runs the renderer's save flow                        |
@@ -71,9 +71,10 @@ import aiStub from '../../docs/bridge/ai'
 import browser, { downloadBlob } from '../../docs/bridge/browser'
 import { capEnabled } from '../../docs/bridge/capability-object'
 import { TIMEOUTS, errorCode } from '../../docs/bridge/frame-port'
+import { ownHeadAfterUnknown } from '../../docs/bridge/head-match'
 import type { ModuleBridgePort } from '../../docs/bridge/module-bridge'
 import type { DraftHost, DraftRecovery } from '../../docs/bridge/draft-recovery'
-import { bridgeDraftRecovery } from '../shared/recovery-prompt'
+import { bridgeDraftRecovery, bridgeRecoveryGrant } from '../shared/recovery-prompt'
 import type { PdfCore } from './core'
 import { ask, hideFatal, showFatal, text } from './notice'
 import { createSignatureStore } from './signatures'
@@ -183,7 +184,12 @@ export type PdfWebApi = { [K in Exclude<keyof PdfApi, 'capabilities'>]-?: NonNul
 export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
   const download = deps.download ?? downloadBlob
   const zip = deps.zip ?? jszip
-  const signatures = deps.signatures ?? createSignatureStore()
+  const signatures =
+    deps.signatures ??
+    createSignatureStore({
+      recovery: bridgeRecoveryGrant(port),
+      ready: () => port.whenInitialized(),
+    })
   const can = (key: string) => capEnabled(deps.capabilities, key)
 
   /** the working copy: the version this frame last opened or saved */
@@ -366,14 +372,10 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
     }
   }
 
-  /** after a timed-out / network-failed save: adopt the head when it looks like our own write */
+  /** after a timed-out / network-failed save: adopt the head when its bytes are our own write */
   async function reconcileAfterUnknown(fileId: string, sent: Uint8Array): Promise<void> {
-    const before = doc?.file
-    const head = await headMeta(fileId)
-    if (!head || !before?.etag || head.etag === before.etag) return
-    if (head.sizeBytes === sent.byteLength && doc?.file.fileId === fileId) {
-      doc = { file: { ...doc.file, ...head }, bytes: sent }
-    }
+    const head = await ownHeadAfterUnknown(port, fileId, doc?.file.etag, sent)
+    if (head && doc?.file.fileId === fileId) doc = { file: { ...doc.file, ...head }, bytes: sent }
   }
 
   async function resolveConflict(fileId: string, bytes: Uint8Array): Promise<{ ok: true } | Fail> {
@@ -959,7 +961,7 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
       }
     },
 
-    // ---- saved signatures (browser-local v1)
+    // ---- saved signatures (encrypted with the recovery key, per user)
     listSavedSignatures: () => signatures.list(),
     addSavedSignature: (data) => signatures.add(data),
     removeSavedSignature: (id) => signatures.remove(id),

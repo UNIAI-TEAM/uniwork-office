@@ -51,12 +51,19 @@ describe('module registry', () => {
 
   it('every CSP addition is valid, explained, and leaves the locked directives alone', () => {
     const base = buildCspManifest()
-    for (const spec of Object.values(WEB_MODULES)) {
+    for (const [name, spec] of Object.entries(WEB_MODULES)) {
       const m = buildCspManifest({ extra: spec.csp })
       expect(m.directives['frame-ancestors']).toEqual(["'self'"])
       expect(m.directives['connect-src']).toEqual(["'self'"])
       expect(m.directives['default-src']).toEqual(["'none'"])
       expect(Object.values(m.directives).flat()).not.toContain("'unsafe-eval'")
+      // C11: WebAssembly compilation is allowed in the pdf and sheets frames only
+      expect(Object.values(m.directives).flat().includes("'wasm-unsafe-eval'")).toBe(
+        name === 'pdf' || name === 'sheets',
+      )
+      for (const d of m.documents ?? []) {
+        expect(Object.values(d.directives).flat()).not.toContain("'wasm-unsafe-eval'")
+      }
       if (spec.csp) {
         expect(spec.csp.why.length).toBeGreaterThanOrEqual(Object.keys(spec.csp.directives).length)
         const docs = spec.csp.documents ?? []

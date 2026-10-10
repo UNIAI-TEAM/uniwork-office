@@ -24,6 +24,7 @@
  */
 import { AiWebError, aiErrorFromResponse, isContractFailure } from './errors'
 import type { AiWebClient } from './client'
+import { isInsideAiMount } from './mount'
 
 const DROPPED_HEADERS = new Set(['authorization', 'x-api-key', 'x-goog-api-key', 'user-agent'])
 
@@ -43,13 +44,17 @@ export interface ProxyRequest {
 /** vendor-shaped request -> the proxy request (pure; throws AiWebError for a foreign URL) */
 export function toProxyRequest(aiBase: string, url: string, init: RequestInit = {}): ProxyRequest {
   const byok = `${aiBase}/byok/`
-  if (!url.startsWith(byok)) {
+  // a parsed, normalised path check (a raw string prefix lets `byok/../../x` through)
+  if (!url.startsWith(byok) || !isInsideAiMount(url, `${aiBase}/byok`)) {
     throw new AiWebError({ code: 'bad_request', status: 0, message: 'not an AI proxy URL' })
   }
   const parsed = new URL(url)
   const rest = parsed.pathname.slice(new URL(byok).pathname.length)
   const slash = rest.indexOf('/')
   const provider = slash < 0 ? rest : rest.slice(0, slash)
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(provider)) {
+    throw new AiWebError({ code: 'bad_request', status: 0, message: 'not an AI proxy URL' })
+  }
   const tail = slash < 0 ? '' : rest.slice(slash)
   const providerBase = `${aiBase}/byok/${provider}`
   const headers = plainHeaders(init.headers)

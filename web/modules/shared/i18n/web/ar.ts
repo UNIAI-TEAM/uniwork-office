@@ -19,6 +19,7 @@ export const ar = {
     'احتفظ هذا المتصفح بنسخة من تغييرات غير محفوظة على هذا المستند. هل تريد استعادتها أم تجاهلها؟',
   webDraftOlder: 'تستند هذه النسخة إلى إصدار أقدم من المستند. حفظها يستبدل الإصدار الأحدث.',
   webDraftSavedAt: 'حُفظت النسخة في',
+  webDraftKept: 'يحتفظ هذا المتصفح بالنسخة حتى تسجّل الخروج.',
   webDraftRestore: 'استعادة',
   webDraftDiscard: 'تجاهل',
 } satisfies Record<keyof typeof zh, string>

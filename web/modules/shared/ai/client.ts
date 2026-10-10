@@ -20,6 +20,7 @@
  *
  * A key is never read back: `key_hint` is "…" + the last four characters.
  */
+import { isInsideAiMount } from './mount'
 import { AiWebError, aiErrorFromResponse } from './errors'
 
 export interface AiCredential {
@@ -207,7 +208,7 @@ export function createAiWebClient(options: AiWebClientOptions): AiWebClient {
   async function authorised(path: string, init: RequestInit = {}): Promise<Response> {
     const url = /^https?:\/\//.test(path) ? path : `${base}/${path.replace(/^\/+/, '')}`
     // the frame token never leaves the AI mount
-    if (!url.startsWith(`${base}/`) && url !== base) {
+    if (!isInsideAiMount(url, base)) {
       throw new AiWebError({ code: 'bad_request', status: 0, message: 'outside the AI routes' })
     }
     const attempt = (bearer: string): Promise<Response> => {

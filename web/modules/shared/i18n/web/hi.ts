@@ -22,6 +22,7 @@ export const hi = {
   webDraftOlder:
     'यह प्रति दस्तावेज़ के पुराने संस्करण पर आधारित है। इसे सहेजने से नया संस्करण बदल जाएगा।',
   webDraftSavedAt: 'प्रति रखी गई',
+  webDraftKept: 'यह ब्राउज़र प्रतिलिपि को तब तक रखता है जब तक आप साइन आउट नहीं करते।',
   webDraftRestore: 'पुनर्स्थापित करें',
   webDraftDiscard: 'हटाएँ',
 } satisfies Record<keyof typeof zh, string>

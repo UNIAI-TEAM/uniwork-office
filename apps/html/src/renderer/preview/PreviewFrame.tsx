@@ -5,6 +5,15 @@ import { DraftPreview } from './DraftPreview'
 import { useI18n } from '../i18n/locale'
 import { cap } from '../capabilities'
 
+/** keep in sync with web/modules/html/public/preview.html */
+const PREVIEW_HELLO_NS = 'uniwork.office.html.preview'
+
+function randomKey(): string {
+  const bytes = new Uint8Array(12)
+  crypto.getRandomValues(bytes)
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
+}
+
 export interface PreviewFrameHandle {
   post(msg: ToInspector): void
 }
@@ -32,7 +41,11 @@ interface Props {
  * `credentialless`; `url` is the bundle's preview.html, served with a policy of its own
  * (opaque even when opened directly, no network to any API, no form posts). On each load of a
  * new src the bridge hands the copy to that document with a MessagePort; inspector traffic uses
- * only that port, never window messages, so a page posting to its parent reaches nothing.
+ * only that port. The one window message read is `hello` from the preview document itself: a
+ * page that reloads itself (location.reload(), meta refresh) loads preview.html again with the
+ * same per-src key (`k` in its URL) and says hello, and only then gets a fresh copy and port. A
+ * page can read its own URL, so it can say hello too; that only re-sends it the copy it already
+ * holds and a new port (it can drop its own preview to the static fallback, nothing more).
  *
  * Web frame, static (cap 'htmlPreviewScripts' off, or preview.html never answered): the bridge
  * hands over a copy without scripts, handlers or remote loads (`onStaticPreview`), shown through
@@ -50,8 +63,13 @@ export const PreviewFrame = forwardRef<PreviewFrameHandle, Props>(function Previ
   const { t } = useI18n()
   const onMessageRef = useRef(onMessage)
   onMessageRef.current = onMessage
-  const src = useMemo(() => (url ? `${url}?v=${nonce}` : 'about:blank'), [url, nonce])
   const connectPreview = window.htmlApi?.connectPreview
+  // `k`: random per src, read back by preview.html to prove a hello comes from this frame's load
+  const key = useMemo(() => randomKey(), [url, nonce])
+  const src = useMemo(
+    () => (url ? `${url}?v=${nonce}${connectPreview ? `&k=${key}` : ''}` : 'about:blank'),
+    [url, nonce, key, connectPreview],
+  )
   // preview.html did not boot (host without its policy): static from then on
   const [fallback, setFallback] = useState(false)
   const staticMode = !cap('htmlPreviewScripts') || fallback
@@ -65,8 +83,42 @@ export const PreviewFrame = forwardRef<PreviewFrameHandle, Props>(function Previ
     return window.htmlApi.onStaticPreview?.(setStaticDoc)
   }, [staticMode])
 
+  const connect = () => {
+    channelRef.current?.close()
+    const win = frameRef.current?.contentWindow
+    channelRef.current = win
+      ? connectPreview!(win, {
+          onMessage: (data) => {
+            const msg = parseFromInspector(data)
+            if (msg) onMessageRef.current(msg)
+          },
+          onFailed: () => {
+            console.warn('[html] the preview did not start; showing the static preview')
+            setFallback(true)
+          },
+        })
+      : null
+  }
+  const connectRef = useRef(connect)
+  connectRef.current = connect
+
   useEffect(() => {
-    // web: the port is the only channel (connectPreview); window messages are never read
+    // web, scripts on: the port carries the inspector traffic; the only window message read is the
+    // preview document's `hello` after it loaded again (a page-initiated reload), see above
+    if (!connectPreview || !portMode) return
+    const listener = (event: MessageEvent) => {
+      if (event.source !== frameRef.current?.contentWindow) return
+      const data = event.data as { ns?: unknown; type?: unknown; k?: unknown } | null
+      if (!data || data.ns !== PREVIEW_HELLO_NS || data.type !== 'hello' || data.k !== key) return
+      // the first document of this src is connected by its load event (below)
+      if (connectedSrcRef.current !== src) return
+      connectRef.current()
+    }
+    window.addEventListener('message', listener)
+    return () => window.removeEventListener('message', listener)
+  }, [connectPreview, portMode, key, src])
+
+  useEffect(() => {
     if (connectPreview) return
     const listener = (event: MessageEvent) => {
       if (event.source !== frameRef.current?.contentWindow) return
@@ -86,23 +138,11 @@ export const PreviewFrame = forwardRef<PreviewFrameHandle, Props>(function Previ
   )
 
   const handleLoad = () => {
-    // once per src: a later load is the page navigating itself, which must not get the copy
+    // once per src: a later load is the page navigating itself; it gets the copy only when its
+    // preview document says hello with this src's key (a reload), never after a link navigation
     if (portMode && url && connectedSrcRef.current !== src) {
       connectedSrcRef.current = src
-      channelRef.current?.close()
-      const win = frameRef.current?.contentWindow
-      channelRef.current = win
-        ? connectPreview!(win, {
-            onMessage: (data) => {
-              const msg = parseFromInspector(data)
-              if (msg) onMessageRef.current(msg)
-            },
-            onFailed: () => {
-              console.warn('[html] the preview did not start; showing the static preview')
-              setFallback(true)
-            },
-          })
-        : null
+      connect()
     }
     onLoad?.()
   }

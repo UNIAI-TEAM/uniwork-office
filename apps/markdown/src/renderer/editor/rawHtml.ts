@@ -218,7 +218,8 @@ export const RawHtmlInline = Mark.create({
 
 // ── Save As image rebasing ──
 
-const IMG_SRC_RE = /(<img\b[^>]*?\ssrc\s*=\s*)(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/gi
+// the attribute run before `src` is bounded: an unclosed `<img ` followed by a long tail must not go quadratic
+const IMG_SRC_RE = /(<img\b[^>]{0,2048}?\ssrc\s*=\s*)(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/gi
 
 /** `raw` with every <img src> listed in `rewrites` replaced (same quoting, attribute-encoded) */
 export function rewriteRawHtmlImageSources(

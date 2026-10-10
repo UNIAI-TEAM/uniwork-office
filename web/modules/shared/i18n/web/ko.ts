@@ -21,6 +21,7 @@ export const ko = {
     '이 브라우저에 이 문서의 저장하지 않은 변경 내용 사본이 남아 있습니다. 복원하거나 삭제하시겠습니까?',
   webDraftOlder: '이 사본은 문서의 이전 버전을 기반으로 합니다. 저장하면 최신 버전이 대체됩니다.',
   webDraftSavedAt: '사본 저장 시각',
+  webDraftKept: '이 사본은 로그아웃할 때까지 이 브라우저에 보관됩니다.',
   webDraftRestore: '복원',
   webDraftDiscard: '삭제',
 } satisfies Record<keyof typeof zh, string>

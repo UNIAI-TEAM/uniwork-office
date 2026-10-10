@@ -62,7 +62,9 @@ function decodeDataImage(src: string): ImageBytes | null {
 /** `assets/image-20261009-101530-k3f9.png`: unique per insert, like the desktop's pasted names */
 export function newAssetName(ext: string, now = new Date()): string {
   const stamp = now.toISOString().slice(0, 19).replace(/[-:]/g, '').replace('T', '-')
-  const rand = Math.random().toString(36).slice(2, 6)
+  const rand = Array.from(crypto.getRandomValues(new Uint8Array(3)), (b) =>
+    b.toString(36).padStart(2, '0'),
+  ).join('')
   return `image-${stamp}-${rand}.${ext}`
 }
 

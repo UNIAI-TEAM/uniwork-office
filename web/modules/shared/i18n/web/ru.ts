@@ -22,6 +22,7 @@ export const ru = {
   webDraftOlder:
     'Копия основана на более старой версии документа. При сохранении она заменит более новую версию.',
   webDraftSavedAt: 'Копия сохранена в',
+  webDraftKept: 'Браузер хранит копию, пока вы не выйдете из аккаунта.',
   webDraftRestore: 'Восстановить',
   webDraftDiscard: 'Удалить',
 } satisfies Record<keyof typeof zh, string>

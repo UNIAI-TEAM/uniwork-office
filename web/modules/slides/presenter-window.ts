@@ -24,6 +24,7 @@ import type {
   SlidesApi,
 } from '../../../apps/slides/src/shared/ipc'
 import {
+  audienceArgsValid,
   audienceUrl,
   handshake,
   newShowId,
@@ -121,6 +122,7 @@ export function createPresenterWindow(opts: PresenterWindowOptions) {
   async function serve(port: MessagePort, id: number, method: AudienceMethod, args: unknown[]) {
     let reply: ToAudience
     try {
+      if (!audienceArgsValid(method, args)) throw new Error('bad arguments')
       const value =
         method === 'audienceReady'
           ? lastSync

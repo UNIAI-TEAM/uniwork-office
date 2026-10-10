@@ -22,6 +22,7 @@ export const pl = {
   webDraftOlder:
     'Kopia opiera się na starszej wersji dokumentu. Zapisanie jej zastąpi nowszą wersję.',
   webDraftSavedAt: 'Kopia zachowana o',
+  webDraftKept: 'Ta przeglądarka przechowuje kopię do czasu wylogowania.',
   webDraftRestore: 'Przywróć',
   webDraftDiscard: 'Odrzuć',
 } satisfies Record<keyof typeof zh, string>

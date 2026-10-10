@@ -1599,4 +1599,6 @@ export const fr = {
     "Il dépasse la taille que le tableur web prend en charge ; il s'ouvre donc dans l'éditeur de tableur classique.",
   appWebEngineRestarted:
     "Le moteur du classeur s'est arrêté de façon inattendue et a redémarré. Le classeur a été rouvert à partir de sa dernière version enregistrée ; vos modifications non enregistrées sont conservées, pensez à enregistrer rapidement.",
+  appWebSavedReopenFailed:
+    "Vos modifications ont été enregistrées dans UniWork, mais le classeur n'a pas pu être rouvert ici. Rechargez l'éditeur pour continuer.",
 } satisfies Record<keyof typeof zh, string>

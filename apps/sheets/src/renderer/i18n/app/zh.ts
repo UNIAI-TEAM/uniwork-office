@@ -1463,4 +1463,6 @@ export const zh = {
   appWebTooLargeBody: '它超出了网页版表格的大小上限，正在改用经典表格编辑器打开。',
   appWebEngineRestarted:
     '工作簿引擎意外停止并已重新启动。工作簿已从上次保存的版本重新打开；您未保存的更改仍然保留，请尽快保存。',
+  appWebSavedReopenFailed:
+    '您的更改已保存到 UniWork，但此处无法重新打开工作簿。请重新加载编辑器后继续。',
 }

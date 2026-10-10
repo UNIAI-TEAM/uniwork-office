@@ -200,7 +200,7 @@ test('html preview: a hostile document with scripts reaches neither frame, host 
     'allow-scripts allow-forms allow-popups allow-modals',
   )
   await expect(iframe).toHaveAttribute('credentialless', '')
-  await expect(iframe).toHaveAttribute('src', /\/preview\.html\?v=\d+$/)
+  await expect(iframe).toHaveAttribute('src', /\/preview\.html\?v=\d+&k=[0-9a-f]{24}$/)
   await expect
     .poll(() => previewFrame(page)?.evaluate(() => document.title))
     .toBe('Hostile scripts')
@@ -307,4 +307,37 @@ test('html preview: a hostile document with scripts reaches neither frame, host 
   await page.keyboard.press('Control+s')
   await expect.poll(async () => (await hostState(page)).lastSaved?.versionId).toBe('v2')
   expect((await hostState(page)).lastSaved!.bytes).toEqual(Array.from(encode(HOSTILE)))
+})
+
+const RELOAD_PATH = '/e2e-fixtures/SelfReload.html'
+const RELOAD_PAGE = `<!doctype html>
+<html><head><meta charset="utf-8"><title>Self reload</title></head>
+<body><h1 id="h">Self reload fixture</h1>
+<script>window.__loadedWithPort = !!window.__gxPreviewPort</script></body></html>
+`
+
+test('html preview: a page that reloads itself still gets its copy and port', async ({ page }) => {
+  const problems = await watch(page)
+  await serveFixture(page, RELOAD_PATH, encode(RELOAD_PAGE), 'text/html')
+  const frame = await openModule(page, 'html', { open: RELOAD_PATH, lang: 'en' })
+  await expect(frame.locator('.workspace')).toBeVisible({ timeout: 30_000 })
+  await expect.poll(() => previewFrame(page)?.evaluate(() => document.title)).toBe('Self reload')
+  // a marker on the first document: gone after the reload, so the check below sees a new one
+  await previewFrame(page)!.evaluate(() => {
+    ;(window as unknown as { __first: boolean }).__first = true
+  })
+  await previewFrame(page)!.evaluate(() => location.reload())
+  await expect
+    .poll(
+      () =>
+        previewFrame(page)?.evaluate(() => {
+          const w = window as unknown as { __first?: boolean; __loadedWithPort?: boolean }
+          return document.title === 'Self reload' && w.__first !== true && w.__loadedWithPort
+        }),
+      { timeout: 30_000 },
+    )
+    .toBe(true)
+  // the frame did not drop to the static preview (it would lose the scripts and the port)
+  await expect(frame.locator('iframe.preview-frame')).toHaveAttribute('sandbox', /allow-scripts/)
+  expect(problems.page).toEqual([])
 })

@@ -45,6 +45,7 @@ import {
 } from '../../docs/protocol/types'
 import { downloadBlob, pickFiles } from '../../docs/bridge/browser'
 import { TIMEOUTS, errorCode } from '../../docs/bridge/frame-port'
+import { ownHeadAfterUnknown } from '../../docs/bridge/head-match'
 import type { ModuleBridgePort } from '../../docs/bridge/module-bridge'
 import type { DraftHost, DraftRecovery } from '../../docs/bridge/draft-recovery'
 import { createAssetStore } from './assets'
@@ -451,18 +452,18 @@ export function createTextWebApi(
     }
   }
 
-  /** a timed-out / network-failed save may still have landed: adopt the head when it is ours */
-  async function reconcileAfterUnknown(fileId: string, sentBytes: number): Promise<void> {
-    const before = files.get(fileId)
-    const head = await headMeta(fileId)
-    if (!head || !before?.etag || head.etag === before.etag) return
-    if (head.sizeBytes === sentBytes) remember(head)
+  /** a timed-out / network-failed save may still have landed: adopt the head when its bytes are ours */
+  async function reconcileAfterUnknown(
+    fileId: string,
+    sent: ArrayBuffer | Uint8Array,
+  ): Promise<void> {
+    const head = await ownHeadAfterUnknown(port, fileId, files.get(fileId)?.etag, sent)
+    if (head) remember(head)
   }
 
   async function saveExisting(fileId: string, data: string): Promise<TextSaveResult> {
     const etag = files.get(fileId)?.etag
     const bytes = encodeText(data)
-    const size = bytes.byteLength
     const res = await sendSave(() =>
       port.request(
         'api.save',
@@ -486,7 +487,8 @@ export function createTextWebApi(
       return resolveConflict(fileId, data)
     }
     if (res.error.code === 'timeout' || res.error.code === 'network') {
-      await reconcileAfterUnknown(fileId, size)
+      // `bytes` was transferred to the host (detached): encoding is deterministic, so rebuild them
+      await reconcileAfterUnknown(fileId, encodeText(data))
     }
     host?.settle(res)
     return { ok: false, error: res.error.code === 'timeout' ? 'save timed out' : res.error.message }

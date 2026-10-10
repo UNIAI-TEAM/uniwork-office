@@ -390,6 +390,67 @@ describe('save', () => {
   })
 })
 
+describe('engine crash and failed session swap', () => {
+  it('an engine crash during a save keeps the edits saveable under the same session id (RF 2)', async () => {
+    const fake = fakeTransport()
+    const crashes = { left: 1 }
+    const inner = fake.transport.serialize
+    // what createWasmTransport does after a trap: the call fails once, the session is reopened
+    // from its retained bytes under the same renderer-facing id, the next call works
+    const transport: SheetsEngineTransport = {
+      ...fake.transport,
+      async serialize(request) {
+        if (crashes.left-- > 0) {
+          throw Object.assign(new Error('engine_crashed: injected'), { code: 'engine_crashed' })
+        }
+        return inner(request)
+      },
+    }
+    const t = setup({ transport })
+    const wb = await t.boot()
+    t.desktop.notifyPendingEdits(1)
+    const edits = saveRequest(wb.sessionId, [[0, 0, 42]])
+    await expect(t.desktop.saveWorkbookEdits(edits)).rejects.toThrow(/engine_crashed/)
+    // nothing reached the host, the workbook is still dirty and its session is still valid
+    expect(t.mock.calls.some((c) => c.type === 'api.save')).toBe(false)
+    expect(t.mock.dirty.at(-1)).toBe(true)
+    const retry = await t.desktop.saveWorkbookEdits(edits)
+    expect(retry.canceled).toBe(false)
+    expect(dec(t.mock.bytesOf(t.file.fileId))).toBe('v1|0:0=42')
+    expect(t.mock.dirty.at(-1)).toBe(false)
+  })
+
+  it('the host accepted the bytes but the engine cannot reopen them: dirty and drafts clear, the error surfaces (RF 8)', async () => {
+    const fake = fakeTransport()
+    const transport: SheetsEngineTransport = {
+      ...fake.transport,
+      replaceSession: vi.fn(async () => {
+        throw new Error('out of memory')
+      }),
+    }
+    const saved = vi.fn(async () => {})
+    const t = setup({
+      transport,
+      drafts: () => ({
+        opened: async () => {},
+        saved,
+        flush: async () => {},
+        dispose: () => {},
+      }),
+    })
+    const wb = await t.boot()
+    t.desktop.notifyPendingEdits(1)
+    await expect(
+      t.desktop.saveWorkbookEdits(saveRequest(wb.sessionId, [[0, 0, 9]])),
+    ).rejects.toThrow(/out of memory/)
+    // the version exists on the server
+    expect(dec(t.mock.bytesOf(t.file.fileId))).toBe('v1|0:0=9')
+    expect(t.mock.saved).toHaveLength(1)
+    expect(t.mock.dirty.at(-1)).toBe(false)
+    expect(saved).toHaveBeenCalledOnce()
+  })
+})
+
 describe('save conflicts', () => {
   it('Overwrite re-reads the head etag and saves again', async () => {
     const ask = vi.fn(async () => 'overwrite') as unknown as AskFn
@@ -691,7 +752,7 @@ describe('draft recovery (C18)', () => {
     // the session was not swapped
     expect(d.t.fake.sessions.get(wb.sessionId)).toBe('v1')
     const [[recordKey, record]] = [...d.records()]
-    expect(recordKey).toBe(`u1:${SCOPE_DOC}:${d.t.file.etag}`)
+    expect(recordKey).toMatch(new RegExp(`^u1:${SCOPE_DOC}:${d.t.file.etag}:[0-9a-f]{16}$`))
     expect(record!.module).toBe('sheets')
     expect(dec(record!.ciphertext)).not.toContain('0:0=5')
     expect(await d.decrypted()).toEqual(['v1|0:0=5'])

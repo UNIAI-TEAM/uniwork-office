@@ -1,9 +1,10 @@
 // Usage: /test-host/?open=<docx url>[&frame=/office-frame/docs/<v>/index.html][&lang=en][&theme=dark]
 //        /test-host/?module=<pdf|markdown|html|slides|sheets>[&open=<url>][&version=<v>][&readonly=1] (GO-B4/B5/B6)
 //        e.g. ?module=pdf&open=/fixtures/sample.pdf (web/fixtures: sample.pdf, sample.md, sample.html)
-//        &recovery=1: draft recovery on (CONTRACT C18): `init.recovery` carries a non-extractable
-//        AES-GCM key generated once per host page (= one signed-in session) and the scope
-//        "test-user:<documentId>"; a frame reload gets the same key again
+//        &recovery=1: draft recovery on (CONTRACT C18 / C18a): `init.recovery` carries a non-extractable
+//        AES-GCM key and the scope "test-user:<documentId>". Like the real host, the key is persisted
+//        (structured clone, never exported) in IndexedDB "uniwork-office-frame-drafts", store "keys",
+//        key "test-user": a frame reload, a host page reload and a second tab all get the same key
 //        &ai=1 grants `ai` + webSearch/imageSearch/imageGeneration (fake AI routes, web/server/fake-ai.mjs)
 //
 // module (default docs): the frame defaults to /office-frame/<module>/<version|latest>/index.html (docs keeps
@@ -27,7 +28,9 @@
 //   addFile(url)     -> fetch a fixture into the store, resolves with its meta (GO-B4)
 //   queuePick(id)    -> the next file.pick answers this file (nothing queued = the user cancelled);
 //                       file.pick is granted with ?pick=1
-//   newSessionKey()  -> replace the recovery key (a new sign-in); the next init carries it
+//   newSessionKey()  -> replace the persisted recovery key by a new one (the old drafts stay but cannot be
+//                       read any more); the next init carries it
+//   signOut()        -> delete the whole frame-drafts database (what the real host does on sign-out)
 //   documentId       -> the init document's file id
 
 const NS = 'uniwork.office.docs'
@@ -210,12 +213,67 @@ if (params.get('ai') === '1') {
 }
 if (params.get('pick') === '1') initPayload.capabilities.filePick = true
 
-async function newSessionKey() {
-  const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, [
-    'encrypt',
-    'decrypt',
-  ])
-  initPayload.recovery = { key, scope: `test-user:${initPayload.documentId}` }
+const KEY_DB = 'uniwork-office-frame-drafts'
+const KEY_USER = 'test-user'
+
+/** the shared frame database, as the real host opens it: version 1, both stores created if absent */
+function openKeyDb() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(KEY_DB, 1)
+    req.onupgradeneeded = () => {
+      for (const name of ['drafts', 'keys']) {
+        if (!req.result.objectStoreNames.contains(name)) req.result.createObjectStore(name)
+      }
+    }
+    req.onsuccess = () => {
+      const db = req.result
+      db.onversionchange = () => db.close()
+      resolve(db)
+    }
+    req.onerror = () => reject(req.error)
+  })
+}
+
+async function keyStore(mode, run) {
+  const db = await openKeyDb()
+  try {
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction('keys', mode)
+      const result = run(tx.objectStore('keys'))
+      tx.oncomplete = () => resolve(result.result)
+      tx.onerror = () => reject(tx.error)
+      tx.onabort = () => reject(tx.error)
+    })
+  } finally {
+    db.close()
+  }
+}
+
+function newKey() {
+  return crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt'])
+}
+
+/** the persisted per-user key, created on first need (what the real host does) */
+async function persistedKey(replace) {
+  const existing = replace ? undefined : await keyStore('readonly', (s) => s.get(KEY_USER))
+  if (existing) return existing
+  const key = await newKey()
+  await keyStore('readwrite', (s) => s.put(key, KEY_USER))
+  return key
+}
+
+async function useKey(replace) {
+  const key = await persistedKey(replace)
+  initPayload.recovery = { key, scope: `${KEY_USER}:${initPayload.documentId}` }
+}
+
+const newSessionKey = () => useKey(true)
+
+function signOut() {
+  return new Promise((resolve) => {
+    const req = indexedDB.deleteDatabase(KEY_DB)
+    req.onsuccess = req.onerror = req.onblocked = () => resolve()
+  })
 }
 
 async function boot() {
@@ -230,11 +288,12 @@ async function boot() {
   } else {
     initPayload.documentId = put(DEFAULT_NAME[MODULE] ?? 'Untitled', new Uint8Array()).fileId
   }
-  if (params.get('recovery') === '1') await newSessionKey()
+  if (params.get('recovery') === '1') await useKey(false)
   window.__host = {
     module: MODULE,
     documentId: initPayload.documentId,
     newSessionKey,
+    signOut,
     lastSaved: () => (lastSaved ? { ...lastSaved, bytes: Array.from(lastSaved.bytes) } : null),
     lastExport: () => lastExport,
     events,

@@ -55,6 +55,7 @@ import {
 import aiStubs from '../../docs/bridge/ai'
 import { downloadBlob, openExternal as guardedExternal } from '../../docs/bridge/browser'
 import { TIMEOUTS, errorCode } from '../../docs/bridge/frame-port'
+import { ownHeadAfterUnknown } from '../../docs/bridge/head-match'
 import type { ModuleBridgePort } from '../../docs/bridge/module-bridge'
 import { decodeDataUrl, idFromPath, pathFor } from '../../docs/bridge/webapi'
 import type { DraftHost, DraftRecovery } from '../../docs/bridge/draft-recovery'
@@ -70,7 +71,7 @@ import type {
   WorkbookSaveRequest,
   WorkbookSaveResult,
 } from '../../../apps/sheets/src/shared/desktop-api'
-import { ask as domAsk, text, type AskFn } from './notice'
+import { ask as domAsk, notifySavedReopenFailed, text, type AskFn } from './notice'
 import { isEngineUnavailable, type SheetsEngineTransport } from './engine/transport'
 
 export { pathFor, idFromPath }
@@ -550,12 +551,9 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
       return resolveConflict(fileId, data)
     }
     if (res.error.code === 'timeout' || res.error.code === 'network') {
-      // the save may have landed: adopt the head when it looks like our own write
-      const before = files.get(fileId)
-      const head = await headMeta(fileId)
-      if (head && before?.etag && head.etag !== before.etag && head.sizeBytes === data.byteLength) {
-        remember(head)
-      }
+      // the save may have landed: adopt the head when it holds exactly our bytes
+      const head = await ownHeadAfterUnknown(port, fileId, files.get(fileId)?.etag, data)
+      if (head) remember(head)
     }
     throw new Error(`${text('appWebSaveFailed')} (${res.error.message})`)
   }
@@ -696,20 +694,34 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
         ...(meta.versionId ? { versionId: meta.versionId } : {}),
         initiatedByFrame: hostSave === null && hostSaveAs === null,
       })
-      const swapped = await transport.replaceSession({
-        sessionId: request.sessionId,
-        name: meta.name,
-        data: kept,
-        locale: locale(),
-      })
-      sessions.delete(request.sessionId)
-      sessions.set(swapped.sessionId, { fileId: meta.fileId, name: meta.name })
+      let swapped: WorkbookFile | null = null
+      let swapFailure: unknown = null
+      try {
+        swapped = await transport.replaceSession({
+          sessionId: request.sessionId,
+          name: meta.name,
+          data: kept,
+          locale: locale(),
+        })
+      } catch (err) {
+        swapFailure = err
+      }
+      // the version exists whether or not the engine could reopen it: the edits landed
       dirty = false
       restored = false
       latest = null
       port.setDirty(false)
-      // the edits landed: the scope's drafts are obsolete
+      // the scope's drafts are obsolete
       void drafts.saved()
+      if (!swapped) {
+        // the host has the bytes, so a retry would only write the same version again: say so
+        notifySavedReopenFailed()
+        throw swapFailure instanceof Error
+          ? swapFailure
+          : new Error(text('appWebSavedReopenFailed'))
+      }
+      sessions.delete(request.sessionId)
+      sessions.set(swapped.sessionId, { fileId: meta.fileId, name: meta.name })
       return { canceled: false, file: decorate(swapped, meta), touchedEntries }
     },
 

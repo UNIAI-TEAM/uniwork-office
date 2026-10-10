@@ -240,4 +240,11 @@ describe('Save As image rebasing reaches raw HTML', () => {
       '<details>\n<img src="assets/new.png" width="3"><img src=\'assets/new.png\'><img src="assets/new.png"><img src="x.png">\n</details>',
     )
   })
+
+  it('a crafted block of unclosed <img tags does not hang Save As (bounded match)', () => {
+    const hostile = '<img '.repeat(60_000)
+    const t0 = Date.now()
+    expect(rewriteRawHtmlImageSources(hostile, new Map([['a', 'b']]))).toBe(hostile)
+    expect(Date.now() - t0).toBeLessThan(2_000)
+  })
 })

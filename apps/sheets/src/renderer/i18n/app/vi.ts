@@ -1519,4 +1519,6 @@ export const vi = {
     'Kích thước vượt giới hạn của bảng tính web, nên sổ sẽ được mở bằng trình chỉnh sửa bảng tính cổ điển.',
   appWebEngineRestarted:
     'Công cụ xử lý sổ làm việc đã dừng bất ngờ và đã được khởi động lại. Sổ làm việc được mở lại từ bản lưu gần nhất; các thay đổi chưa lưu vẫn được giữ, hãy lưu sớm.',
+  appWebSavedReopenFailed:
+    'Các thay đổi của bạn đã được lưu vào UniWork, nhưng không thể mở lại sổ làm việc tại đây. Hãy tải lại trình soạn thảo để tiếp tục.',
 } satisfies Record<keyof typeof zh, string>

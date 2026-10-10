@@ -108,7 +108,7 @@ async function setup(
     capabilities: caps,
     core: async () => core,
     ensureFonts,
-    signatures: createSignatureStore(() => null),
+    signatures: createSignatureStore({ idb: () => null, legacy: () => null }),
     download: (name, data) => downloads.push({ name, data }),
     zip: async (files) => {
       zips.push(files)
@@ -472,7 +472,8 @@ describe('draft recovery (C18)', () => {
       ]),
       scope: `u1:${meta.fileId}`,
     }
-    const recordKey = `${grant.scope}:${meta.etag}`
+    // a draft left by an earlier frame load (another tab id)
+    const recordKey = `${grant.scope}:${meta.etag}:oldtab`
     if (opts.draft !== undefined) {
       const { iv, ciphertext } = await encryptDraft(grant.key, recordKey, PDF(opts.draft))
       await store.put(recordKey, {
@@ -491,7 +492,7 @@ describe('draft recovery (C18)', () => {
       capabilities: { edit: true },
       core: async () => core,
       ensureFonts: async () => {},
-      signatures: createSignatureStore(() => null),
+      signatures: createSignatureStore({ idb: () => null, legacy: () => null }),
       drafts: (host) => {
         recovery = createDraftRecovery({
           module: 'pdf',
@@ -507,8 +508,10 @@ describe('draft recovery (C18)', () => {
     mock.init({ documentId: meta.fileId })
     const records = () => fake.store(DRAFTS_DB, DRAFTS_STORE) ?? new Map<string, unknown>()
     const decrypted = async () => {
-      const record = records().get(recordKey) as DraftRecord | undefined
-      return record ? str((await decryptDraft(grant.key, recordKey, record))!) : null
+      const [entry] = [...records()]
+      if (!entry) return null
+      const [key, record] = entry as [string, DraftRecord]
+      return str((await decryptDraft(grant.key, key, record))!)
     }
     return { mock, api, core, meta, prompt, recovery: () => recovery, records, decrypted }
   }

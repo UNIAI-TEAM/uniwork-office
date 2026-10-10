@@ -253,6 +253,30 @@ describe('client', () => {
     expect(fetch).not.toHaveBeenCalled()
   })
 
+  it('refuses path traversal, encoded slashes and other origins that still start with the mount string', async () => {
+    const { fetch } = recorder(() => jsonResponse(200, {}))
+    const client = createAiWebClient({
+      documentId: 'doc-1',
+      apiBase: '/api',
+      tokens: tokens(),
+      origin: ORIGIN,
+      fetch,
+    })
+    for (const path of [
+      `${BASE}/../../../me`,
+      `${BASE}/%2e%2e/%2e%2e/x`,
+      `${BASE}/credentials%2f..%2f..%2fx`,
+      `${BASE}\\..\\x`,
+      `${BASE.replace('app.test', 'app.test.evil.test')}/credentials`,
+    ]) {
+      await expect(client.fetch(path), path).rejects.toBeInstanceOf(AiWebError)
+    }
+    expect(fetch).not.toHaveBeenCalled()
+    // a normal route below the mount still goes out
+    await client.fetch(`${BASE}/credentials`)
+    expect(fetch).toHaveBeenCalledTimes(1)
+  })
+
   it('reads a sparse cloud status leniently', () => {
     expect(readCloudStatus({ enabled: false, reason: 'entitlement_required' })).toMatchObject({
       enabled: false,
@@ -313,6 +337,17 @@ describe('proxy transport (ai-provider wire format -> BYOK routes)', () => {
     expect(() => toProxyRequest(BASE, 'https://api.openai.com/v1/chat/completions')).toThrow(
       AiWebError,
     )
+  })
+
+  it('refuses a proxy URL that leaves the byok mount after normalisation', () => {
+    for (const url of [
+      `${BASE}/byok/../../x`,
+      `${BASE}/byok/openai/../../../me`,
+      `${BASE}/byok/%2e%2e/credentials`,
+      `${BASE}/byok/open%2fai/models`,
+    ]) {
+      expect(() => toProxyRequest(BASE, url), url).toThrow(AiWebError)
+    }
   })
 
   it('throws contract failures, passes a provider 404 / 400 through to ai-provider', async () => {

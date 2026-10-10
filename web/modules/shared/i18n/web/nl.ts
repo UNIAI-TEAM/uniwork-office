@@ -22,6 +22,7 @@ export const nl = {
   webDraftOlder:
     'De kopie is gebaseerd op een oudere versie van het document. Opslaan vervangt de nieuwere versie.',
   webDraftSavedAt: 'Kopie bewaard om',
+  webDraftKept: 'Deze browser bewaart de kopie totdat je uitlogt.',
   webDraftRestore: 'Herstellen',
   webDraftDiscard: 'Verwijderen',
 } satisfies Record<keyof typeof zh, string>

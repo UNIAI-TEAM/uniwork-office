@@ -31,6 +31,7 @@ import { sessions } from '../../../apps/slides/src/session/state'
 import type { FileMeta, ProtocolErrorShape, SaveResult } from '../../docs/protocol/types'
 import { pickFiles } from '../../docs/bridge/browser'
 import { TIMEOUTS, errorCode, type FramePort } from '../../docs/bridge/frame-port'
+import { ownHeadAfterUnknown } from '../../docs/bridge/head-match'
 import { idFromPath, pathFor } from '../../docs/bridge/webapi'
 import { tm } from '../../../apps/slides/src/main/i18n-main'
 import { ask, choose, text } from './dialogs'
@@ -244,16 +245,14 @@ export function createWebHostIO(deps: WebHostDeps): HostIO {
     }
     if (res.error.code !== 'conflict') {
       if (res.error.code === 'timeout' || res.error.code === 'network') {
-        // the write may have landed: adopt the head when it looks like our own bytes
-        const head = await headMeta(fileId)
-        const before = deps.state.files.get(fileId)
-        if (
-          head &&
-          before?.etag &&
-          head.etag !== before.etag &&
-          head.sizeBytes === bytes.byteLength
+        // the write may have landed: adopt the head when it holds exactly our bytes
+        const head = await ownHeadAfterUnknown(
+          deps.port,
+          fileId,
+          deps.state.files.get(fileId)?.etag,
+          bytes,
         )
-          deps.state.remember(head)
+        if (head) deps.state.remember(head)
       }
       throw saveFailure(res)
     }

@@ -1556,4 +1556,6 @@ export const pl = {
     'Przekracza rozmiar obsługiwany przez arkusz internetowy, więc otworzy się w klasycznym edytorze arkuszy.',
   appWebEngineRestarted:
     'Silnik skoroszytu nieoczekiwanie się zatrzymał i został uruchomiony ponownie. Skoroszyt otwarto ponownie z ostatnio zapisanej wersji; niezapisane zmiany zostały zachowane — zapisz je wkrótce.',
+  appWebSavedReopenFailed:
+    'Twoje zmiany zapisano w UniWork, ale nie udało się ponownie otworzyć skoroszytu tutaj. Załaduj edytor ponownie, aby kontynuować.',
 } satisfies Record<keyof typeof zh, string>

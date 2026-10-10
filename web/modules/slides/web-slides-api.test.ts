@@ -347,11 +347,12 @@ describe('draft recovery (C18)', () => {
     document.body.innerHTML = ''
   }
 
-  it('writes an encrypted pptx while dirty, keyed by scope and etag', async () => {
+  it('writes an encrypted pptx while dirty, keyed by scope, etag and tab', async () => {
     profile = await browserProfile()
     await crashedTab(profile)
     const records = await profile.store.list('u1:f1:')
-    expect(records.map((r) => r.key)).toEqual(['u1:f1:"f1-v1"'])
+    expect(records).toHaveLength(1)
+    expect(records[0]!.key).toMatch(/^u1:f1:"f1-v1":[0-9a-f]{16}$/)
     const { record } = records[0]!
     expect(record).toMatchObject({ module: 'slides', name: 'deck.pptx', baseEtag: '"f1-v1"' })
     // stored as ciphertext, not as a zip

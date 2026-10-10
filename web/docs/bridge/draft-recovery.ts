@@ -2,22 +2,27 @@
  * Web draft recovery (CONTRACT C15(3) / C18), shared by the Docs bridge and every module bridge.
  *
  * While the document is dirty the frame keeps an encrypted copy of its current bytes in this
- * browser so a crashed or closed tab does not lose the edits:
+ * browser so a crashed, closed or reloaded tab does not lose the edits:
  *   - every 30 s (and on `pagehide`) the bridge's "current bytes" are encrypted with the host's
- *     per-session AES-GCM key (`init.recovery.key`, non-extractable) and written to IndexedDB
- *     database "uniwork-office-frame-drafts", store "drafts", key `scope + ":" + baseEtag`;
- *   - a successful save or an explicit Discard deletes the scope's records;
- *   - on open, a record for the scope (same etag, or an older one, labelled as such) is decrypted
- *     and offered as Restore / Discard; Restore loads the bytes as a dirty document;
- *   - a record that does not decrypt (another session's key) is deleted silently.
+ *     AES-GCM key (`init.recovery.key`, non-extractable, persisted by the host per user so it
+ *     survives reloads, C18a) and written to IndexedDB database "uniwork-office-frame-drafts",
+ *     store "drafts", key `scope + ":" + baseEtag + ":" + tabId` (tabId = random per frame load,
+ *     so two tabs of the same document never overwrite each other);
+ *   - a successful save deletes this tab's records of the scope; an explicit Discard deletes the
+ *     record it offered;
+ *   - on open, the newest decryptable record of the scope (labelled older when its etag differs)
+ *     is offered as Restore / Discard; Restore loads the bytes as a dirty document and deletes
+ *     the record it restored;
+ *   - a record that does not decrypt (another key) or is damaged is skipped and NEVER deleted:
+ *     it may belong to a live tab or a later sign-in; the host's sign-out deletes the database.
  * Never sent to the host or the server, never `api.save`, never a version (C10 holds). Without
- * `init.recovery` nothing is written and nothing is shown. The host deletes the whole database on
- * sign-out, so every connection here is short-lived and closes on `versionchange`.
+ * `init.recovery` nothing is written and nothing is shown.
  */
 import type { InitRecovery, OfficeModule } from '../protocol/types'
+import { FRAME_DB, STORE_DRAFTS, settle, withStore } from './frame-idb'
 
-export const DRAFTS_DB = 'uniwork-office-frame-drafts'
-export const DRAFTS_STORE = 'drafts'
+export const DRAFTS_DB = FRAME_DB
+export const DRAFTS_STORE = STORE_DRAFTS
 /** write interval while dirty (C18) */
 export const DRAFT_INTERVAL_MS = 30_000
 
@@ -40,61 +45,13 @@ export interface DraftStore {
 
 // ---------------------------------------------------------------- IndexedDB store
 
-function settle<T>(req: IDBRequest<T>): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    req.onsuccess = () => resolve(req.result)
-    req.onerror = () => reject(req.error)
-  })
-}
-
-function openDb(idb: IDBFactory): Promise<IDBDatabase> {
-  return new Promise<IDBDatabase>((resolve, reject) => {
-    const req = idb.open(DRAFTS_DB, 1)
-    req.onupgradeneeded = () => {
-      if (!req.result.objectStoreNames.contains(DRAFTS_STORE)) {
-        req.result.createObjectStore(DRAFTS_STORE)
-      }
-    }
-    req.onsuccess = () => {
-      const db = req.result
-      // the host's sign-out deleteDatabase must never wait on this frame
-      db.onversionchange = () => db.close()
-      resolve(db)
-    }
-    req.onerror = () => reject(req.error)
-    req.onblocked = () => reject(new Error('draft database blocked'))
-  })
-}
-
-/** one short transaction per call; the connection closes right after */
-async function withStore<T>(
-  idb: IDBFactory,
-  mode: IDBTransactionMode,
-  run: (store: IDBObjectStore) => Promise<T>,
-): Promise<T> {
-  const db = await openDb(idb)
-  try {
-    const tx = db.transaction(DRAFTS_STORE, mode)
-    const done = new Promise<void>((resolve, reject) => {
-      tx.oncomplete = () => resolve()
-      tx.onabort = () => reject(tx.error ?? new Error('draft transaction aborted'))
-      tx.onerror = () => reject(tx.error)
-    })
-    const result = await run(tx.objectStore(DRAFTS_STORE))
-    await done
-    return result
-  } finally {
-    db.close()
-  }
-}
-
 export function createIdbDraftStore(idb: IDBFactory = indexedDB): DraftStore {
   return {
     async put(key, record) {
-      await withStore(idb, 'readwrite', (s) => settle(s.put(record, key)))
+      await withStore(idb, DRAFTS_STORE, 'readwrite', (s) => settle(s.put(record, key)))
     },
     list(prefix) {
-      return withStore(idb, 'readonly', async (s) => {
+      return withStore(idb, DRAFTS_STORE, 'readonly', async (s) => {
         // few records per origin: filter the keys here instead of an IDBKeyRange
         const keys = (await settle(s.getAllKeys())).map(String).filter((k) => k.startsWith(prefix))
         const out: Array<{ key: string; record: DraftRecord }> = []
@@ -103,7 +60,7 @@ export function createIdbDraftStore(idb: IDBFactory = indexedDB): DraftStore {
       })
     },
     async delete(key) {
-      await withStore(idb, 'readwrite', (s) => settle(s.delete(key)))
+      await withStore(idb, DRAFTS_STORE, 'readwrite', (s) => settle(s.delete(key)))
     },
   }
 }
@@ -129,7 +86,7 @@ export async function encryptDraft(
   return { iv, ciphertext }
 }
 
-/** null when the record is not ours (another session's key) or damaged */
+/** null when the record is not ours (another key) or damaged */
 export async function decryptDraft(
   key: CryptoKey,
   recordKey: string,
@@ -192,6 +149,8 @@ export interface DraftRecoveryOptions {
   prompt: (draft: DraftInfo) => Promise<DraftChoice>
   /** default: IndexedDB of this window */
   store?: DraftStore
+  /** default: random per call (= per frame load) */
+  tabId?: string
   intervalMs?: number
   /** where `pagehide` is observed (default: window) */
   target?: Pick<Window, 'addEventListener' | 'removeEventListener'>
@@ -201,25 +160,32 @@ export interface DraftRecoveryOptions {
 export interface DraftRecovery {
   /** a document was opened: offer its draft, if any (resolves once the prompt is answered) */
   opened(): Promise<void>
-  /** a save landed: the scope's drafts are obsolete */
+  /** a save landed: this frame load's drafts of the scope are obsolete */
   saved(): Promise<void>
   /** write the current bytes now if dirty (the timer and `pagehide` call this) */
   flush(): Promise<void>
   dispose(): void
 }
 
-function recordKey(scope: string, etag: string | undefined): string {
-  return `${scope}:${etag ?? ''}`
+function randomTabId(): string {
+  return Array.from(crypto.getRandomValues(new Uint8Array(8)), (b) =>
+    b.toString(16).padStart(2, '0'),
+  ).join('')
 }
 
 export function createDraftRecovery(opts: DraftRecoveryOptions): DraftRecovery {
   const now = opts.now ?? Date.now
+  // random per frame load: two tabs (or a reload and the tab it replaced) never share a record key
+  const tabId = opts.tabId ?? randomTabId()
   let store: DraftStore | null = opts.store ?? null
   const target = opts.target ?? (typeof window !== 'undefined' ? window : undefined)
   // every store operation runs in order: a save that lands while a write is in flight
   // deletes after that write, and nothing is written while the prompt is open
   let queue: Promise<unknown> = Promise.resolve()
   let disposed = false
+
+  const keyOf = (scope: string, etag: string | undefined) => `${scope}:${etag ?? ''}:${tabId}`
+  const isOwn = (key: string) => key.endsWith(`:${tabId}`)
 
   function getStore(): DraftStore | null {
     if (!store && typeof indexedDB !== 'undefined') store = createIdbDraftStore(indexedDB)
@@ -235,8 +201,11 @@ export function createDraftRecovery(opts: DraftRecoveryOptions): DraftRecovery {
     return run
   }
 
-  async function deleteScope(s: DraftStore, scope: string, keep?: string): Promise<void> {
-    for (const { key } of await s.list(`${scope}:`)) if (key !== keep) await s.delete(key)
+  /** this frame load's records of the scope: nothing else is ever deleted behind the user's back */
+  async function deleteOwn(s: DraftStore, scope: string, keep?: string): Promise<void> {
+    for (const { key } of await s.list(`${scope}:`)) {
+      if (isOwn(key) && key !== keep) await s.delete(key)
+    }
   }
 
   async function write(): Promise<void> {
@@ -246,7 +215,7 @@ export function createDraftRecovery(opts: DraftRecoveryOptions): DraftRecovery {
     if (disposed || !grant || !s || !file || !opts.host.isDirty()) return
     const bytes = await opts.host.bytes()
     if (!bytes || !opts.host.isDirty()) return
-    const key = recordKey(grant.scope, file.etag)
+    const key = keyOf(grant.scope, file.etag)
     const { iv, ciphertext } = await encryptDraft(grant.key, key, bytes)
     await s.put(key, {
       iv,
@@ -263,41 +232,34 @@ export function createDraftRecovery(opts: DraftRecoveryOptions): DraftRecovery {
     const s = getStore()
     const file = opts.host.file()
     if (disposed || !grant || !s || !file) return
-    const current = recordKey(grant.scope, file.etag)
+    // the newest record of the scope this key can read; this load's own records are never offered
     let best: { key: string; record: DraftRecord; bytes: ArrayBuffer } | null = null
     for (const { key, record } of await s.list(`${grant.scope}:`)) {
-      const bytes = isRecord(record) ? await decryptDraft(grant.key, key, record) : null
-      if (!bytes) {
-        await s.delete(key) // another session's key or damaged: unusable
-        continue
-      }
-      // the draft of the version open now wins; else the newest older one
-      const better =
-        !best ||
-        (key === current && best.key !== current) ||
-        (best.key !== current && record.savedAt > best.record.savedAt)
-      if (better) best = { key, record, bytes }
+      if (isOwn(key) || !isRecord(record)) continue
+      const bytes = await decryptDraft(grant.key, key, record)
+      if (!bytes) continue // another key or damaged: skipped, left for the sign-out cleanup
+      if (!best || record.savedAt > best.record.savedAt) best = { key, record, bytes }
     }
     if (!best) return
     const info: DraftInfo = {
       name: best.record.name,
       savedAt: best.record.savedAt,
       baseEtag: best.record.baseEtag,
-      older: best.key !== current,
+      older: best.record.baseEtag !== (file.etag ?? ''),
     }
     const choice = await opts.prompt(info)
     if (choice === 'discard') {
-      await deleteScope(s, grant.scope)
+      await s.delete(best.key)
       return
     }
     if (choice !== 'restore') return
     await opts.host.restore(best.bytes, info)
-    // the restored edits now belong to the version open now: keep one copy under its key
-    if (best.key !== current) {
-      const { iv, ciphertext } = await encryptDraft(grant.key, current, best.bytes)
-      await s.put(current, { ...best.record, iv, ciphertext, baseEtag: file.etag ?? '' })
-    }
-    await deleteScope(s, grant.scope, current)
+    // the restored edits now belong to the version open now: keep a copy under this load's key
+    // (a crash right after the restore must not lose them), then drop the record that was restored
+    const own = keyOf(grant.scope, file.etag)
+    const { iv, ciphertext } = await encryptDraft(grant.key, own, best.bytes)
+    await s.put(own, { ...best.record, iv, ciphertext, baseEtag: file.etag ?? '' })
+    await s.delete(best.key)
   }
 
   const timer = setInterval(() => void enqueue(write), opts.intervalMs ?? DRAFT_INTERVAL_MS)
@@ -312,7 +274,7 @@ export function createDraftRecovery(opts: DraftRecoveryOptions): DraftRecovery {
       await enqueue(async () => {
         const grant = opts.recovery()
         const s = getStore()
-        if (grant && s) await deleteScope(s, grant.scope)
+        if (grant && s) await deleteOwn(s, grant.scope)
       })
     },
     flush: async () => {

@@ -146,19 +146,25 @@ One protocol serves every genoffice editor on the web (lane GO-B4/B5/B6, UNI-101
 ### Draft recovery (`init.recovery`, CONTRACT C18)
 
 - `init.recovery?: {key: CryptoKey, scope: string}` (`InitRecovery`, `isInitRecovery()`): the host's grant for
-  local draft copies. `key` is an AES-GCM 256 key the host generates per signed-in session with
-  `extractable: false` and holds in memory only; it reaches the frame by structured clone (again in a later
-  `init` after a frame reload). `scope` is `"<userId>:<documentId>"`, opaque to the frame. Absent = recovery off:
-  the frame writes nothing and shows nothing. `FrameSession.recovery` carries a copy.
+  local draft copies. `key` is an AES-GCM 256 key the host generates with `extractable: false` and **persists per
+  user** (structured clone, never exported) in IndexedDB database `uniwork-office-frame-drafts`, store `keys`, so it
+  survives page reloads and is shared by the user's tabs (C18a); it reaches the frame by structured clone (again in a
+  later `init` after a frame reload). `scope` is `"<userId>:<documentId>"`, opaque to the frame (the per-user stores
+  use the part before the last `:`). Absent = recovery off: the frame writes nothing and shows nothing.
+  `FrameSession.recovery` carries a copy.
 - Frame side (`web/docs/bridge/draft-recovery.ts`, used by Docs and every module bridge): while the document is
   dirty, every 30 s and on `pagehide`, the frame writes `{iv, ciphertext, baseEtag, savedAt, module, name}`
-  (ciphertext = AES-GCM of the document's current bytes) into IndexedDB database `uniwork-office-frame-drafts`,
-  store `drafts`, key `scope + ":" + baseEtag` (overwrite). A successful save or an explicit Discard deletes the
-  record. On open, a record for the same scope (same etag, or an older etag labelled as based on an older
-  version) is decrypted and offered as Restore / Discard; Restore loads the bytes as a dirty document (the user
-  must save). A record that does not decrypt (another session's key) is deleted silently.
+  (ciphertext = AES-GCM of the document's current bytes) into the same database, store `drafts`, key
+  `scope + ":" + baseEtag + ":" + tabId` (`tabId` random per frame load). A successful save deletes this load's
+  records; Discard deletes the record it offered. On open, the newest decryptable record of the scope (labelled as
+  based on an older version when its etag differs) is offered as Restore / Discard; Restore loads the bytes as a
+  dirty document (the user must save) and deletes the restored record. **A record that does not decrypt is skipped,
+  never deleted** (it may belong to a live tab or a later sign-in).
+- The database is shared by host and frame: stores `keys` (host) and `drafts` (frame; also the PDF saved-signature
+  list under `~signatures:<user>`), both created at version 1 by whichever side opens first, the version never bumped;
+  see `docs/web-modules/draft-recovery.md`.
 - Drafts never leave the browser: no `api.save` (and never `auto`), no version, no host message (C10 holds).
-  The host deletes the whole database on sign-out / session switch.
+  The host deletes the whole database on sign-out / session switch (keys, drafts and saved PDF signatures with it).
 
 ## AI (web, CONTRACT C16)
 

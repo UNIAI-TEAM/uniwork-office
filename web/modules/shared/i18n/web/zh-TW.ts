@@ -18,6 +18,7 @@ export const zhTW = {
   webDraftBody: '此瀏覽器保留了此文件未儲存變更的副本。要還原還是捨棄這些變更？',
   webDraftOlder: '此副本以文件的舊版本為基礎。儲存後將取代較新的版本。',
   webDraftSavedAt: '副本保存於',
+  webDraftKept: '此瀏覽器會保留該副本，直到你登出。',
   webDraftRestore: '還原',
   webDraftDiscard: '捨棄',
 } satisfies Record<keyof typeof zh, string>

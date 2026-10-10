@@ -1508,4 +1508,6 @@ export const en = {
     'It is above the size the web spreadsheet handles, so it opens in the classic spreadsheet editor instead.',
   appWebEngineRestarted:
     'The workbook engine stopped unexpectedly and was restarted. The workbook was reopened from its last saved version; your unsaved changes are kept, so save soon.',
+  appWebSavedReopenFailed:
+    'Your changes were saved to UniWork, but the workbook could not be reopened here. Reload the editor to keep working.',
 } satisfies Record<keyof typeof zh, string>
