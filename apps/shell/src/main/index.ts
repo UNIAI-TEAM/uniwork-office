@@ -333,6 +333,8 @@ import { installShellCloseGuard } from './window-close-guard'
 import {
   activateDetached,
   closeDetachedByPath,
+  closeDetachedByPathNow,
+  confirmCloseDetachedByPath,
   closeDetachedWithoutPrompt,
   createDetachedEditorWindow,
   detachedFilePaths,
@@ -3759,6 +3761,13 @@ function uniworkDocsWiring() {
     closePath: async (path: string) => {
       const tabsClosed = tabManager ? await tabManager.closeTabsShowing(path) : true
       return (await closeDetachedByPath(path)) && tabsClosed
+    },
+    confirmClosePath: async (path: string) =>
+      (tabManager ? await tabManager.confirmCloseTabsShowing(path) : true) &&
+      (await confirmCloseDetachedByPath(path)),
+    closePathNow: (path: string) => {
+      tabManager?.closeTabsShowingNow(path)
+      closeDetachedByPathNow(path)
     },
     aiHistoryPaths: () => projectFilePaths(),
     forgetAiHistory: (paths: string[]) => projectForgetFiles(paths),

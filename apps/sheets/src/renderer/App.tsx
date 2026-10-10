@@ -66,7 +66,7 @@ import { isNumericIdentifierText } from './cell-warning'
 import { consumePendingUndoCarry, undoStackDepth } from './undo-carry'
 import { createSaveGate, shouldRunSaveTick } from './save-scheduler'
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { useAutoSavePref, type AiScopeQuoteData } from '@genoffice/ui'
+import { useAutoSavePref, useCloudSignedIn, type AiScopeQuoteData } from '@genoffice/ui'
 
 import {
   CellValueType,
@@ -1074,24 +1074,9 @@ export function App({
   aiSettingsRef.current = aiSettings
 
   /** UniWork cloud sign-in state for the cloud-tools gate (signed in to UniWork + plan includes cloud AI) */
-  const gskLoggedInRef = useRef(false)
-  useEffect(() => {
-    let alive = true
-    const refresh = () => {
-      void window.desktopApi
-        ?.aiGskStatus()
-        .then((s) => {
-          if (alive) gskLoggedInRef.current = !!s?.loggedIn
-        })
-        .catch(() => {})
-    }
-    refresh()
-    window.addEventListener('focus', refresh)
-    return () => {
-      alive = false
-      window.removeEventListener('focus', refresh)
-    }
-  }, [])
+  const { loggedInRef: gskLoggedInRef, refresh: refreshGskStatus } = useCloudSignedIn(() =>
+    window.desktopApi?.aiGskStatus(),
+  )
   const [aiBusy, setAiBusy] = useState(false)
   // Display history survives restarts via localStorage; the AgentLoop's model
   // context does not, so restored turns are read-only transcript.
@@ -5100,6 +5085,7 @@ export function App({
         />
       )}
       <ExcelShell
+        onAiPanelOpen={refreshGskStatus}
         openingWorkbook={openingWorkbook}
         prompt={prompt}
         aiPreset={aiPreset}

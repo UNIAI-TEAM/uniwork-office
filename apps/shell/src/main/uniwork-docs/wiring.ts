@@ -48,6 +48,10 @@ export interface UniworkDocsWiring {
   openPaths(): string[]
   /** the normal close of the tab or window showing `path` (prompts included); true = closed */
   closePath(path: string): Promise<boolean>
+  /** only the close prompts for the tab or window showing `path`; nothing closes; true = go ahead */
+  confirmClosePath(path: string): Promise<boolean>
+  /** closes the tab or window showing `path` with no prompt */
+  closePathNow(path: string): void
   /** every file path the AI chat store knows */
   aiHistoryPaths(): string[]
   /** deletes the AI chat history and project entries of these paths */
@@ -222,6 +226,8 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     root: service.store.root,
     openPaths: () => wiring.openPaths(),
     closeDocument: (path) => wiring.closePath(path),
+    confirmClose: (path) => wiring.confirmClosePath(path),
+    closeNow: (path) => wiring.closePathNow(path),
     aiHistoryPaths: () => wiring.aiHistoryPaths(),
     forgetAiHistory: (paths) => wiring.forgetAiHistory(paths),
     closeConflictPrompt: () => service.closeConflictPrompt(),

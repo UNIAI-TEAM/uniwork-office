@@ -53,6 +53,12 @@ function harness(open: string[], history: string[], refuse: ReadonlySet<string> 
       shown.splice(shown.indexOf(path), 1)
       return true
     }),
+    // the prompts of a close alone: a refused one is the user pressing Cancel
+    confirmClose: vi.fn(async (path: string) => !refuse.has(path)),
+    closeNow: vi.fn((path: string) => {
+      closed.push(path)
+      shown.splice(shown.indexOf(path), 1)
+    }),
     aiHistoryPaths: () => [...known],
     forgetAiHistory: vi.fn((paths: string[]) => {
       forgotten.push(...paths)
@@ -82,10 +88,35 @@ describe('Sign out', () => {
     expect(h.forgotten).toEqual([aSheet, aDoc])
   })
 
-  it('a cancelled unsaved-changes prompt keeps the tab and reports false', async () => {
+  it('a cancelled unsaved-changes prompt closes nothing, not even the clean tabs (GOA9-r4-02)', async () => {
+    // the clean sheet is listed first, the dirty doc after it: Cancel on the doc
+    // must not leave the sheet already closed
     const h = harness([aSheet, aDoc], [aSheet], new Set([aDoc]))
     expect(await h.boundary.beforeSignOut()).toBe(false)
-    expect(h.shown).toEqual([aDoc])
+    expect(h.closed).toEqual([])
+    expect(h.shown).toEqual([aSheet, aDoc])
+    expect(h.deps.closeNow).not.toHaveBeenCalled()
+  })
+
+  it('asks every prompt before it closes the first tab', async () => {
+    const order: string[] = []
+    const h = harness([aSheet, aDoc], [])
+    h.deps.confirmClose.mockImplementation(async (path: string) => {
+      order.push(`confirm ${path}`)
+      return true
+    })
+    h.deps.closeNow.mockImplementation((path: string) => {
+      order.push(`close ${path}`)
+    })
+    expect(await h.boundary.beforeSignOut()).toBe(true)
+    expect(order).toEqual([
+      `confirm ${aSheet}`,
+      `confirm ${aDoc}`,
+      `close ${aSheet}`,
+      `close ${aDoc}`,
+    ])
+    // the prompt-free close is the only one used, so no prompt shows twice
+    expect(h.deps.closeDocument).not.toHaveBeenCalled()
   })
 
   it('signOutUniwork logs out only after every document closed, then clears', async () => {

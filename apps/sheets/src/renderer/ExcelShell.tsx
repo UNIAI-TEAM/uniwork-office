@@ -254,6 +254,8 @@ interface ExcelShellProps {
    *  resends that message's original attachments and passes the failed bubble's
    *  chat index so the send replaces it in place) */
   readonly aiPreset?: { text: string; nonce: number; autoRun?: boolean } | null
+  /** the AI dock was opened (or starts open): the app re-reads the UniWork cloud plan */
+  readonly onAiPanelOpen?: () => void
   readonly onSend: (
     instruction?: string,
     attachments?: readonly AttachmentMeta[],
@@ -451,6 +453,7 @@ const PIVOT_MODEL_ERRORS: Record<PivotModelError, StringKey> = {
 }
 
 export function ExcelShell({
+  onAiPanelOpen,
   prompt,
   preview,
   selectionFormat,
@@ -574,6 +577,12 @@ export function ExcelShell({
       autoCollapsedRef.current = false
     }
     rememberAiPanelOpen('ai-sheets-show-ai', isCopilotOpen)
+  }, [isCopilotOpen])
+  // every time the dock opens, so a plan changed while it was collapsed shows
+  const onAiPanelOpenRef = useRef(onAiPanelOpen)
+  onAiPanelOpenRef.current = onAiPanelOpen
+  useEffect(() => {
+    if (isCopilotOpen) onAiPanelOpenRef.current?.()
   }, [isCopilotOpen])
   useEffect(() => {
     if (!aiPreset?.text) return

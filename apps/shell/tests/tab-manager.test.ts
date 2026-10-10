@@ -55,6 +55,7 @@ function makeFakeView(): FakeView {
       }),
       once: vi.fn(),
       close: vi.fn(),
+      loadURL: vi.fn(async () => undefined),
       reload: vi.fn(),
       focus: vi.fn(),
       isDestroyed: vi.fn(() => false),
@@ -693,6 +694,8 @@ describe('closing tabs', () => {
     expect(view.webContents.close).not.toHaveBeenCalled()
     // the orphaned renderer must be told to go inert (recovery-copy resurrection guard)
     expect(teardownDocsRenderer).toHaveBeenCalledWith(view.webContents)
+    // GOA9-r4-03: the orphan no longer holds the closed document and its AI chat
+    expect(view.webContents.loadURL).toHaveBeenCalledWith('about:blank')
   })
 
   it('closes a clean docs tab after the async dirty query says clean', async () => {
@@ -710,6 +713,28 @@ describe('closing tabs', () => {
     await manager.closeTab(id)
     expect(requestDocsClose).toHaveBeenCalledTimes(1)
     expect(manager.list().map((t) => t.id)).toEqual(['home', id])
+  })
+
+  it('confirmCloseTabsShowing runs the prompts and removes nothing; closeTabsShowingNow then closes without asking (GOA9-r4-02)', async () => {
+    docsQueryDirty.mockImplementation(() => Promise.resolve(true))
+    requestDocsClose.mockImplementation(() => Promise.resolve(true))
+    manager.openSheetsTab('/tmp/clean.xlsx')
+    const docsId = manager.openDocsTab('/tmp/dirty.docx')
+    expect(await manager.confirmCloseTabsShowing('/tmp/dirty.docx')).toBe(true)
+    expect(requestDocsClose).toHaveBeenCalledTimes(1)
+    expect(manager.list().map((t) => t.id)).toContain(docsId)
+    manager.closeTabsShowingNow('/tmp/dirty.docx')
+    manager.closeTabsShowingNow('/tmp/clean.xlsx')
+    expect(requestDocsClose).toHaveBeenCalledTimes(1)
+    expect(manager.list().map((t) => t.id)).toEqual(['home'])
+  })
+
+  it('confirmCloseTabsShowing is false when the user cancels, and the tab stays', async () => {
+    docsQueryDirty.mockImplementation(() => Promise.resolve(true))
+    requestDocsClose.mockImplementation(() => Promise.resolve(false))
+    const docsId = manager.openDocsTab('/tmp/dirty.docx')
+    expect(await manager.confirmCloseTabsShowing('/tmp/dirty.docx')).toBe(false)
+    expect(manager.list().map((t) => t.id)).toEqual(['home', docsId])
   })
 
   it('activates a dirty background tab before showing its close guard', async () => {

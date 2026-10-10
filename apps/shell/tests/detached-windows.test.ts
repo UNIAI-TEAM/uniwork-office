@@ -131,6 +131,7 @@ function fakeView(id: number) {
       isDestroyed: () => false,
       focus: vi.fn(),
       close: vi.fn(),
+      loadURL: vi.fn(async () => undefined),
     },
     setBounds: vi.fn(),
     setVisible: vi.fn(),
@@ -262,8 +263,37 @@ describe('close guard', () => {
     })
     expect(detached.closeDetachedWithoutPrompt('detached:7')).toBe(true)
     expect(teardownDocsRenderer).toHaveBeenCalledWith(view.webContents)
+    expect(view.webContents.loadURL).toHaveBeenCalledWith('about:blank')
     expect(view.webContents.close).not.toHaveBeenCalled()
     expect(detached.isDetachedTabId('detached:7')).toBe(false)
+  })
+})
+
+describe('close by path in two steps (GOA9-r4-02)', () => {
+  it('the prompt step closes nothing; the second step closes without asking', async () => {
+    const { requestHtmlClose } = await import('../../html/src/main/html-main')
+    const { htmlIsDirty } = await import('../../html/src/main/html-main')
+    const view = fakeView(21)
+    detached.createDetachedEditorWindow({
+      view: view as never,
+      kind: 'html',
+      title: 'a.html',
+      filePath: '/w/a.html',
+      applyMenuFor: () => {},
+    })
+    vi.mocked(htmlIsDirty).mockReturnValue(true)
+    vi.mocked(requestHtmlClose).mockResolvedValueOnce(false)
+    expect(await detached.confirmCloseDetachedByPath('/w/a.html')).toBe(false)
+    expect(detached.isDetachedTabId('detached:21')).toBe(true)
+
+    vi.mocked(requestHtmlClose).mockResolvedValueOnce(true)
+    expect(await detached.confirmCloseDetachedByPath('/w/a.html')).toBe(true)
+    expect(detached.isDetachedTabId('detached:21')).toBe(true)
+    vi.mocked(requestHtmlClose).mockClear()
+    detached.closeDetachedByPathNow('/w/a.html')
+    expect(requestHtmlClose).not.toHaveBeenCalled()
+    expect(detached.isDetachedTabId('detached:21')).toBe(false)
+    vi.mocked(htmlIsDirty).mockReturnValue(false)
   })
 })
 

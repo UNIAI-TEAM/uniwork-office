@@ -2,6 +2,7 @@ import {
   aiPanelWidthAtPointer,
   AiPanelSideButton,
   AiModelPicker,
+  useCloudSignedIn,
   type AiModelPickerBridge,
 } from '@genoffice/ui'
 import React, { useEffect, useRef, useState, useCallback } from 'react'
@@ -529,24 +530,10 @@ export function AiPanel({
   settingsRef.current = settings
 
   /** gsk login state for the cloud-tools gate (refreshed on mount and window focus) */
-  const gskLoggedInRef = useRef(false)
-  useEffect(() => {
-    let alive = true
-    const refresh = () => {
-      void window.slidesApi
-        ?.aiGskStatus()
-        .then((s) => {
-          if (alive) gskLoggedInRef.current = !!s?.loggedIn
-        })
-        .catch(() => {})
-    }
-    refresh()
-    window.addEventListener('focus', refresh)
-    return () => {
-      alive = false
-      window.removeEventListener('focus', refresh)
-    }
-  }, [])
+  const { loggedInRef: gskLoggedInRef } = useCloudSignedIn(
+    () => window.slidesApi?.aiGskStatus(),
+    open,
+  )
   const imagesRef = useRef(images)
   imagesRef.current = images
   const attachmentsRef = useRef(attachments)
