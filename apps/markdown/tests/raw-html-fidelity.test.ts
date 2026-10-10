@@ -8,7 +8,8 @@ import { Editor } from '@tiptap/core'
 import { buildExtensions } from '../src/renderer/editor/extensions'
 import { matchInlineHtml, rewriteRawHtmlImageSources } from '../src/renderer/editor/rawHtml'
 import { parseMarkdownToNodes } from '../src/renderer/editor/ops'
-import { DiagramPreview } from '../src/renderer/editor/CodeBlockView'
+import { DiagramError, DiagramPreview } from '../src/renderer/editor/CodeBlockView'
+import { strings } from '../src/renderer/i18n/strings'
 import { diagramSvgDataUrl } from '../src/renderer/editor/diagrams'
 import { parseDocText, serializeDocText } from '../src/renderer/markdown/docText'
 import { buildSourceMap, spliceMarkdown } from '../src/renderer/markdown/sourceSplice'
@@ -246,5 +247,48 @@ describe('Save As image rebasing reaches raw HTML', () => {
     const t0 = Date.now()
     expect(rewriteRawHtmlImageSources(hostile, new Map([['a', 'b']]))).toBe(hostile)
     expect(Date.now() - t0).toBeLessThan(2_000)
+  })
+})
+
+describe('raw HTML block label', () => {
+  it('a block says it is kept as written and not rendered, outside its source text', () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const editor = createEditor(host)
+    editor.commands.setContent('<div class="x">hi</div>\n\n<!-- note -->\n', {
+      contentType: 'markdown',
+    })
+    const blocks = [...editor.view.dom.querySelectorAll<HTMLElement>('.md-raw-html')]
+    expect(blocks).toHaveLength(2)
+    for (const block of blocks) {
+      // painted by CSS from data-md-label and named for assistive tech
+      expect(block.dataset.mdLabel).toBe(strings.zh.rawHtmlLabel)
+      expect(block.getAttribute('aria-label')).toBe(strings.zh.rawHtmlLabel)
+      // the label is not part of the source text the file saves
+      expect(block.textContent).not.toContain(strings.zh.rawHtmlLabel)
+    }
+    expect(editor.getMarkdown().trimEnd()).toBe('<div class="x">hi</div>\n\n<!-- note -->')
+    host.remove()
+  })
+})
+
+describe('diagram syntax error', () => {
+  it('leads with the localised sentence and keeps the parser text as collapsed detail', () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    flushSync(() =>
+      root.render(createElement(DiagramError, { error: 'Parse error on line 2: Expecting SEMI' })),
+    )
+    const box = host.querySelector('.md-diagram-error')!
+    expect(box.querySelector('.md-diagram-error-lead')?.textContent).toBe(strings.zh.mermaidError)
+    const details = box.querySelector('details')!
+    expect(details.open).toBe(false)
+    expect(details.querySelector('summary')?.textContent).toBe(strings.zh.mermaidErrorDetails)
+    expect(details.querySelector('pre')?.textContent).toBe('Parse error on line 2: Expecting SEMI')
+    // the English parser sentence is not the visible lead
+    expect(box.querySelector('.md-diagram-error-lead')?.textContent).not.toContain('Parse error')
+    root.unmount()
+    host.remove()
   })
 })

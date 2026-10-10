@@ -158,6 +158,12 @@ export const RawHtmlBlock = Node.create({
       dom.className = 'md-raw-html'
       dom.contentEditable = 'false'
       dom.title = t('rawHtmlKept')
+      // the visible "kept as-is, not rendered" label is painted by CSS from this attribute, so the
+      // source text (textContent) stays exactly what the file saves
+      const label = t('rawHtmlLabel')
+      dom.dataset.mdLabel = label
+      dom.setAttribute('role', 'group')
+      dom.setAttribute('aria-label', label)
       const code = document.createElement('code')
       const apply = (raw: string) => {
         // textContent only: the source is shown, never parsed as markup

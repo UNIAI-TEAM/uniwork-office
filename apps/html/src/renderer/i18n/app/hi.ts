@@ -148,5 +148,6 @@ export const hi = {
   presentInTab: 'इसी टैब में',
   presentFullscreen: 'पूर्ण स्क्रीन',
   presentNewTab: 'नया टैब',
+  aiNotEnabled: 'आपके वर्कस्पेस में AI चालू नहीं है',
   viewOnly: 'केवल देखें',
 } satisfies Record<keyof typeof zh, string>

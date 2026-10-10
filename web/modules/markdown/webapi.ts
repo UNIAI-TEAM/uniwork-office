@@ -15,7 +15,7 @@ import aiStubs from '../../docs/bridge/ai'
 import { safeFileName } from '../../docs/bridge/browser'
 import type { ModuleBridgeContext } from '../../docs/bridge/module-bridge'
 import { createTextWebApi, type TextWebApiOptions } from '../shared/text-webapi'
-import { missingImageUrl, unresolveMissingImage } from './missing-image'
+import { isMissingImageUrl, missingImageUrl, unresolveMissingImage } from './missing-image'
 
 /** keys the Markdown renderer hides on the web besides the shared text-module ones */
 export const MARKDOWN_WEB_CAPABILITIES = Object.freeze({
@@ -144,8 +144,10 @@ export function createMarkdownWebApi(ctx: ModuleBridgeContext, opts: TextWebApiO
   return Object.assign(api, {
     // web-only (renderer: editor/localImage.ts): relative pictures through OpenPayload.assets
     // a picture the host has no copy of shows a labelled placeholder, not a broken-image icon
-    resolveAssetUrl: (src: string): string | null =>
-      web.resolveAssetUrl(src) ?? missingImageUrl(src),
+    // `missingNote` is the renderer's localised "why it is not shown" sentence, drawn into the placeholder
+    resolveAssetUrl: (src: string, missingNote?: string): string | null =>
+      web.resolveAssetUrl(src) ?? missingImageUrl(src, missingNote),
+    isMissingAsset: (url: string): boolean => isMissingImageUrl(url),
     unresolveAssetUrl: (url: string): string | null =>
       web.unresolveAssetUrl(url) ?? unresolveMissingImage(url),
   })

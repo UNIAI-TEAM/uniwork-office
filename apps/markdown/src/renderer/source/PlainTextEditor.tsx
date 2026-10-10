@@ -72,7 +72,7 @@ const highlight = HighlightStyle.define([
 const theme = EditorView.theme({
   '&': { height: '100%', backgroundColor: 'var(--surface)', color: 'var(--text)' },
   '.cm-scroller': {
-    fontFamily: "'SF Mono', Menlo, Consolas, monospace",
+    fontFamily: "'SF Mono', Menlo, Consolas, 'Noto Sans Mono', 'Liberation Mono', monospace",
     fontSize: '13px',
     lineHeight: '1.6',
   },

@@ -146,5 +146,6 @@ export const pl = {
   presentInTab: 'W tej karcie',
   presentFullscreen: 'Pełny ekran',
   presentNewTab: 'Nowa karta',
+  aiNotEnabled: 'AI nie jest włączone w Twojej przestrzeni roboczej',
   viewOnly: 'Tylko do odczytu',
 } satisfies Record<keyof typeof zh, string>

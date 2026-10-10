@@ -150,5 +150,6 @@ export const nl = {
   presentInTab: 'In dit tabblad',
   presentFullscreen: 'Volledig scherm',
   presentNewTab: 'Nieuw tabblad',
+  aiNotEnabled: 'AI is niet ingeschakeld voor je werkruimte',
   viewOnly: 'Alleen-lezen',
 } satisfies Record<keyof typeof zh, string>

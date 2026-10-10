@@ -36,7 +36,7 @@ export function aiModelPickerGroups(
     // list them only once the settings page holds a model or a path
     const usable =
       meta.id === 'genspark'
-        ? gskLoggedIn || uniAiOpenRouterKey(settings) !== ''
+        ? settings.uniAiAvailable !== false && (gskLoggedIn || uniAiOpenRouterKey(settings) !== '')
         : meta.needsCliPath
           ? Boolean(stored || config?.cliPath?.trim())
           : activeProvider({ ...settings, provider: meta.id }) === meta.id

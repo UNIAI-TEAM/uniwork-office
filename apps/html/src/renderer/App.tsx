@@ -52,7 +52,7 @@ import { isDocEmpty } from './document/blank'
 import { documentSkeleton } from './document/skeleton'
 import { moveTarget } from './document/move-target'
 import { StylePanel } from './components/StylePanel'
-import { floatPosition, parseDeclarations } from './document/float-position'
+import { PANEL_RESERVE, floatPosition, parseDeclarations } from './document/float-position'
 import {
   buildParseMap,
   childrenOf,
@@ -1492,6 +1492,15 @@ export default function App() {
   const hasElement = !!selectedEntry && !STRUCTURAL.has(selectedEntry.tag)
   const panelShown = panelOpen && selectedEntry?.sid !== panelDismissedSid
 
+  /** stage width the open style panel covers on the right (0 when it is closed) */
+  const panelReserve = (stage: DOMRect | undefined): number => {
+    if (!panelShown || !hasElement) return 0
+    const panel = stageRef.current?.querySelector('.hx-panel')?.getBoundingClientRect()
+    return stage && panel && panel.width > 0
+      ? Math.max(0, stage.right - panel.left) + 6
+      : PANEL_RESERVE
+  }
+
   /** stage geometry for the floating toolbar: frame coordinates scale with the CSS zoom and shift by the centred device host */
   const floatLayout = () => {
     void stageTick
@@ -1501,8 +1510,9 @@ export default function App() {
       zoom,
       offsetX: stage && host ? host.left - stage.left : 0,
       offsetY: stage && host ? host.top - stage.top : 0,
-      // the style panel floats over the right edge of the stage
-      stageWidth: Math.max(0, (stage?.width ?? 0) - (panelShown && hasElement ? 280 : 0)),
+      // the style panel floats over the right edge of the stage: reserve its measured box (the
+      // fallback is the CSS box, used on the render that mounts it)
+      stageWidth: Math.max(0, (stage?.width ?? 0) - panelReserve(stage)),
       barWidth: barSize.w,
       barHeight: barSize.h,
     }
@@ -1545,6 +1555,7 @@ export default function App() {
         onToggleAutoSave={setAutoSave}
         showAutoSave={cap('autoSave')}
         showAi={aiEnabled}
+        aiOffHint={aiEnabled ? undefined : t('aiNotEnabled')}
         presentNewTab={cap('presentNewTab')}
         uniworkBound={uniwork.bound}
         readOnly={uniwork.readOnly}
@@ -1727,16 +1738,17 @@ export default function App() {
               ) : (
                 !path && <span className="status-item status-hint">{t('previewNeedsSave')}</span>
               )}
-              {!canEdit && status === 'ready' && (
+              {/* on the web the host announces view-only (banner + live region): cap viewOnlyChip is off there */}
+              {!canEdit && cap('viewOnlyChip') && status === 'ready' && (
                 <span className="status-item status-view-only">{t('viewOnly')}</span>
               )}
             </div>
             <div className="status-right">
-              {statusText && (
+              {statusText && cap('saveStatus') && (
                 <span className={`status-save status-${saveState}`}>{statusText}</span>
               )}
               {view !== 'preview' && (
-                <span className="status-item">
+                <span className="status-item status-cursor">
                   {t('cursorPos', { line: cursor.line, col: cursor.col })}
                 </span>
               )}

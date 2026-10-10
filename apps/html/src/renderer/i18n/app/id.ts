@@ -147,5 +147,6 @@ export const id = {
   presentInTab: 'Di tab ini',
   presentFullscreen: 'Layar penuh',
   presentNewTab: 'Tab baru',
+  aiNotEnabled: 'AI belum diaktifkan untuk ruang kerja Anda',
   viewOnly: 'Hanya lihat',
 } satisfies Record<keyof typeof zh, string>
