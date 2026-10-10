@@ -102,7 +102,7 @@ ghostscript cannot write them) - pdf.js decodes both with its wasm codecs, which
 - **R6 saved signatures are encrypted and per user** (`web/modules/pdf/signatures.ts`, finding RF-3). The frame is
   same-origin with the UniWork app and its storage is shared by every user of the browser profile, so the list is
   never plaintext and never user-agnostic: with the host's recovery grant it is one AES-GCM record in the frame
-  database (`uniwork-office-frame-drafts`, store `signatures`, key = the user part of the recovery scope), encrypted
+  database (`uniwork-office-frame-drafts`, store `drafts`, key `~signatures:<user>` with the user part of the recovery scope), encrypted
   with the host's per-user key, so another user cannot read it and the host's sign-out deletes it with the database.
   Without a grant (host without recovery) the list lives in memory for the page load only. The first call deletes
   the plaintext `localStorage` key of the first build (`uniwork.office.pdf.savedSignatures`) and, when a grant

@@ -324,9 +324,19 @@ describe('offer on open', () => {
 })
 
 describe('shared database', () => {
-  it('upgrades a database the host created with only its keys store', async () => {
+  it('a fresh database gets the drafts and keys stores at version 1', async () => {
     const fake = createFakeIdb()
-    fake.seed(DRAFTS_DB, 1, ['keys'])
+    const store = createIdbDraftStore(fake.idb)
+    await store.list('u1:')
+    expect(fake.version(DRAFTS_DB)).toBe(1)
+    expect(fake.store(DRAFTS_DB, 'drafts')).toBeDefined()
+    expect(fake.store(DRAFTS_DB, 'keys')).toBeDefined()
+    expect(fake.openConnections()).toBe(0)
+  })
+
+  it('uses a database the host created first as it is: no version bump, keys untouched', async () => {
+    const fake = createFakeIdb()
+    fake.seed(DRAFTS_DB, 1, ['drafts', 'keys'])
     const store = createIdbDraftStore(fake.idb)
     await store.put('u1:d1:e1:t', {
       iv: new Uint8Array(12),
@@ -336,9 +346,8 @@ describe('shared database', () => {
       module: 'pdf',
       name: 'n',
     })
-    expect(fake.version(DRAFTS_DB)).toBe(2)
-    expect(fake.store(DRAFTS_DB, 'keys')).toBeDefined()
+    expect(fake.version(DRAFTS_DB)).toBe(1)
+    expect(fake.store(DRAFTS_DB, 'keys')?.size).toBe(0)
     expect(fake.store(DRAFTS_DB, DRAFTS_STORE)?.size).toBe(1)
-    expect(fake.openConnections()).toBe(0)
   })
 })

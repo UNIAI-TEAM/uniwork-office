@@ -160,9 +160,9 @@ One protocol serves every genoffice editor on the web (lane GO-B4/B5/B6, UNI-101
   based on an older version when its etag differs) is offered as Restore / Discard; Restore loads the bytes as a
   dirty document (the user must save) and deletes the restored record. **A record that does not decrypt is skipped,
   never deleted** (it may belong to a live tab or a later sign-in).
-- The database is shared by host and frame (stores `keys` host, `drafts` and `signatures` frame): each side opens it
-  **without a version** and, if a store is missing, reopens at `version + 1` to add it; see
-  `docs/web-modules/draft-recovery.md`.
+- The database is shared by host and frame: stores `keys` (host) and `drafts` (frame; also the PDF saved-signature
+  list under `~signatures:<user>`), both created at version 1 by whichever side opens first, the version never bumped;
+  see `docs/web-modules/draft-recovery.md`.
 - Drafts never leave the browser: no `api.save` (and never `auto`), no version, no host message (C10 holds).
   The host deletes the whole database on sign-out / session switch (keys, drafts and saved PDF signatures with it).
 

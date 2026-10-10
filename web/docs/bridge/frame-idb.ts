@@ -1,19 +1,25 @@
 /**
  * The frame-side IndexedDB database "uniwork-office-frame-drafts" (CONTRACT C18 / C18a), shared by
- * draft recovery and the PDF saved-signature store. Three object stores live in it:
- *   - `drafts`      encrypted draft copies (frame writes, ./draft-recovery.ts)
- *   - `signatures`  the user's encrypted saved PDF signatures (frame writes, web/modules/pdf)
- *   - `keys`        the host's persisted non-extractable session keys (the HOST owns it; the frame
- *                   only makes sure the store exists so either side can open the database first)
- * The host deletes the whole database on sign-out / session switch, so every connection here is
- * short-lived and closes on `versionchange`.
+ * draft recovery and the PDF saved-signature store. Two object stores, both with out-of-line keys,
+ * both created at version 1 by whichever side opens the database first (the host creates the same
+ * two, dev-uniwork draft-session-key.ts):
+ *   - `drafts`  the frame's encrypted records: draft copies `scope:baseEtag:tabId`, and the PDF
+ *               saved-signature list under the reserved key `~signatures:<user>`
+ *   - `keys`    the host's persisted non-extractable session keys (key = user id); the frame never
+ *               touches it: its key always comes from `init.recovery`
+ * The version is never bumped from here (the host opens version 1; a higher version would make that
+ * open fail): both sides open without a version and rely on the stores above. The host deletes the
+ * whole database on sign-out / session switch, so every connection is short-lived and closes on
+ * `versionchange`.
  */
 
 export const FRAME_DB = 'uniwork-office-frame-drafts'
 export const STORE_DRAFTS = 'drafts'
-export const STORE_SIGNATURES = 'signatures'
 export const STORE_KEYS = 'keys'
-const ALL_STORES = [STORE_DRAFTS, STORE_SIGNATURES, STORE_KEYS]
+const STORES = [STORE_DRAFTS, STORE_KEYS]
+
+/** the saved-signature record of one user, in the `drafts` store; `~` never starts a user id */
+export const signatureRecordKey = (user: string) => `~signatures:${user}`
 
 export function settle<T>(req: IDBRequest<T>): Promise<T> {
   return new Promise<T>((resolve, reject) => {
@@ -23,29 +29,21 @@ export function settle<T>(req: IDBRequest<T>): Promise<T> {
 }
 
 function ensureStores(db: IDBDatabase): void {
-  for (const name of ALL_STORES) {
+  for (const name of STORES) {
     if (!db.objectStoreNames.contains(name)) db.createObjectStore(name)
   }
 }
 
-/**
- * Open the database with every store present. Whichever side (frame or host) opens first creates
- * all three; if the host created the database with only its own store, the frame upgrades it.
- */
-export function openFrameDb(idb: IDBFactory, version?: number): Promise<IDBDatabase> {
+/** Open the database; a new one gets both stores at version 1, an existing one is used as it is. */
+export function openFrameDb(idb: IDBFactory): Promise<IDBDatabase> {
   return new Promise<IDBDatabase>((resolve, reject) => {
-    const req = version === undefined ? idb.open(FRAME_DB) : idb.open(FRAME_DB, version)
+    const req = idb.open(FRAME_DB)
     req.onupgradeneeded = () => ensureStores(req.result)
     req.onsuccess = () => {
       const db = req.result
       // the host's sign-out deleteDatabase must never wait on this frame
       db.onversionchange = () => db.close()
-      if (ALL_STORES.every((name) => db.objectStoreNames.contains(name))) {
-        resolve(db)
-        return
-      }
-      db.close()
-      openFrameDb(idb, db.version + 1).then(resolve, reject)
+      resolve(db)
     }
     req.onerror = () => reject(req.error)
     req.onblocked = () => reject(new Error('frame database blocked'))

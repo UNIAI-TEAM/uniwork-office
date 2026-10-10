@@ -216,19 +216,19 @@ if (params.get('pick') === '1') initPayload.capabilities.filePick = true
 const KEY_DB = 'uniwork-office-frame-drafts'
 const KEY_USER = 'test-user'
 
-/** the shared frame database: open without a version, add the host's `keys` store if it is missing */
-function openKeyDb(version) {
+/** the shared frame database, as the real host opens it: version 1, both stores created if absent */
+function openKeyDb() {
   return new Promise((resolve, reject) => {
-    const req = version === undefined ? indexedDB.open(KEY_DB) : indexedDB.open(KEY_DB, version)
+    const req = indexedDB.open(KEY_DB, 1)
     req.onupgradeneeded = () => {
-      if (!req.result.objectStoreNames.contains('keys')) req.result.createObjectStore('keys')
+      for (const name of ['drafts', 'keys']) {
+        if (!req.result.objectStoreNames.contains(name)) req.result.createObjectStore(name)
+      }
     }
     req.onsuccess = () => {
       const db = req.result
       db.onversionchange = () => db.close()
-      if (db.objectStoreNames.contains('keys')) return resolve(db)
-      db.close()
-      openKeyDb(db.version + 1).then(resolve, reject)
+      resolve(db)
     }
     req.onerror = () => reject(req.error)
   })

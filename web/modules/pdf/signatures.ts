@@ -5,8 +5,8 @@
  * the OS user. The frame is same-origin with the UniWork app and its storage is shared by every
  * user of the browser profile, so the list is never stored as plaintext and never user-agnostic:
  *   - with the host's recovery grant (`init.recovery`) the whole list is one AES-GCM record in the
- *     frame's IndexedDB database (store `signatures`, key = the user part of the grant's scope,
- *     additional data = that key), encrypted with the host's per-user key. Another user cannot
+ *     frame's IndexedDB database (store `drafts`, key `~signatures:<user>` with the user part of the
+ *     grant's scope, additional data = that key), encrypted with the host's per-user key. Another user cannot
  *     read it (other key) and the host's sign-out deletes the database with it;
  *   - without a grant the list lives in memory for this page load only.
  * The pre-fix build wrote plaintext into localStorage (LEGACY_KEY): the first call deletes it, and
@@ -22,7 +22,13 @@ import {
   sanitizeSignatures,
 } from '../../../apps/pdf/src/shared/signature-list'
 import { decryptDraft, encryptDraft } from '../../docs/bridge/draft-recovery'
-import { STORE_SIGNATURES, settle, userOfScope, withStore } from '../../docs/bridge/frame-idb'
+import {
+  STORE_DRAFTS,
+  settle,
+  signatureRecordKey,
+  userOfScope,
+  withStore,
+} from '../../docs/bridge/frame-idb'
 import type { InitRecovery } from '../../docs/protocol/types'
 
 /** the plaintext, user-agnostic key of the first build: only ever read to migrate and delete */
@@ -76,19 +82,17 @@ export function createSignatureStore(opts: SignatureStoreOptions = {}) {
     return run
   }
 
-  const recordKey = (user: string) => `signatures:${user}`
-
   async function readEncrypted(g: InitRecovery): Promise<SavedSignature[]> {
     const factory = idb()
     if (!factory) return []
     const user = userOfScope(g.scope)
     try {
-      const record = await withStore(factory, STORE_SIGNATURES, 'readonly', (s) =>
-        settle(s.get(user)),
+      const record = await withStore(factory, STORE_DRAFTS, 'readonly', (s) =>
+        settle(s.get(signatureRecordKey(user))),
       )
       if (!record) return []
       const r = record as SignatureRecord
-      const bytes = await decryptDraft(g.key, recordKey(user), {
+      const bytes = await decryptDraft(g.key, signatureRecordKey(user), {
         iv: r.iv,
         ciphertext: r.ciphertext,
         baseEtag: '',
@@ -110,11 +114,13 @@ export function createSignatureStore(opts: SignatureStoreOptions = {}) {
     try {
       const { iv, ciphertext } = await encryptDraft(
         g.key,
-        recordKey(user),
+        signatureRecordKey(user),
         utf8(JSON.stringify(list)),
       )
       const record: SignatureRecord = { iv, ciphertext, savedAt: Date.now() }
-      await withStore(factory, STORE_SIGNATURES, 'readwrite', (s) => settle(s.put(record, user)))
+      await withStore(factory, STORE_DRAFTS, 'readwrite', (s) =>
+        settle(s.put(record, signatureRecordKey(user))),
+      )
       return true
     } catch {
       return false

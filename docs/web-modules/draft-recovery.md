@@ -24,11 +24,13 @@ draft and the saved PDF signatures.
 | Restore / Discard prompt, default wiring | `web/modules/shared/recovery-prompt.ts` (shared dialog chrome, `webDraft*` strings in every shard) |
 | test IndexedDB                           | `web/docs/bridge/testing/fake-idb.ts`                                                              |
 
-- **The database is shared** with the host: stores `drafts` (frame), `signatures` (frame, PDF) and `keys` (host).
-  Whoever opens first creates all three; every party opens **without a version**, and a party that finds a store
-  missing reopens at `version + 1` to add it (`openFrameDb`). Opening with a fixed version would fail with a
-  `VersionError` once the other side upgraded. Connections are short-lived and close on `versionchange` (the host's
-  `deleteDatabase` is never blocked).
+- **The database is shared** with the host and has exactly two stores, both with out-of-line keys, both created at
+  **version 1** by whichever side opens first: `drafts` (the frame's records) and `keys` (the host's persisted
+  session keys, key = user id; the frame never touches it). The version is **never bumped** from the frame: the host
+  opens version 1, and a higher version would make that open fail. Both sides open without relying on a bump; the
+  frame opens without a version number. The PDF saved-signature list (below) lives in `drafts` under the reserved key
+  `~signatures:<user>` (a `~` never starts a user id, so it cannot match a scope prefix). Connections are short-lived
+  and close on `versionchange` (the host's `deleteDatabase` is never blocked).
 - Record key `scope + ":" + baseEtag + ":" + tabId`; value `{iv, ciphertext, baseEtag, savedAt, module, name}`.
   `tabId` is random per frame load, so a second tab (or a reload racing the tab it replaces) never overwrites another
   load's record. The full record key is the AES-GCM additional data, so a record cannot be replayed under another key.

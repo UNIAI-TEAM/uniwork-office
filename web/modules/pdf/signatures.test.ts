@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest'
 import { MAX_SAVED_SIGNATURES } from '../../../apps/pdf/src/shared/signature-list'
-import { FRAME_DB, STORE_SIGNATURES } from '../../docs/bridge/frame-idb'
+import { FRAME_DB, STORE_DRAFTS } from '../../docs/bridge/frame-idb'
 import { createFakeIdb } from '../../docs/bridge/testing/fake-idb'
 import { LEGACY_SIGNATURES_KEY, createSignatureStore } from './signatures'
 
@@ -25,7 +25,7 @@ async function setup(scope = 'u1:doc-1') {
     setGrant: (g: typeof grant) => {
       grant = g
     },
-    rows: () => fake.store(FRAME_DB, STORE_SIGNATURES) ?? new Map<string, unknown>(),
+    rows: () => fake.store(FRAME_DB, STORE_DRAFTS) ?? new Map<string, unknown>(),
   }
 }
 
@@ -47,11 +47,11 @@ describe('encrypted per-user saved signatures', () => {
     expect(t.fake.openConnections()).toBe(0)
   })
 
-  it('stores ciphertext only, keyed by the user part of the scope, nothing in localStorage', async () => {
+  it('stores ciphertext only, under the reserved ~signatures:<user> key, nothing in localStorage', async () => {
     const t = await setup('u1:doc-9')
     await t.open().add(sig(7))
-    expect([...t.rows().keys()]).toEqual(['u1'])
-    const row = t.rows().get('u1') as { ciphertext: ArrayBuffer }
+    expect([...t.rows().keys()]).toEqual(['~signatures:u1'])
+    const row = t.rows().get('~signatures:u1') as { ciphertext: ArrayBuffer }
     const text = new TextDecoder('latin1').decode(row.ciphertext)
     expect(text).not.toContain('img7')
     expect(localStorage.length).toBe(0)
