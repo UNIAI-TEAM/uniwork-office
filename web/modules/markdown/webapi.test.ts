@@ -124,6 +124,36 @@ describe('markdownApi: open and save', () => {
     expect(call.payload).toMatchObject({ name: 'Notes.md', sourceFileId: file.fileId })
   })
 
+  it('a failed save reads in the UI language, never the raw browser error', async () => {
+    const { api, mock } = setup()
+    const { text } = await open(api)
+    mock.override('api.save', () => ({
+      ok: false,
+      error: { code: 'network', message: 'Failed to fetch' },
+    }))
+    const net = await api.save({ text, imageSources: [], mode: 'save' })
+    expect(net).toEqual({
+      ok: false,
+      error: 'UniWork could not be reached. Check your connection and try again.',
+    })
+    mock.override('api.save', () => ({
+      ok: false,
+      error: { code: 'timeout', message: 'save timed out' },
+    }))
+    const slow = await api.save({ text, imageSources: [], mode: 'save' })
+    expect(slow).toEqual({
+      ok: false,
+      error: 'Saving took too long. Check your connection and try again.',
+    })
+    // any other failure keeps the host's message
+    mock.override('api.save', () => ({
+      ok: false,
+      error: { code: 'forbidden', message: 'You can only view this document.' },
+    }))
+    const denied = await api.save({ text, imageSources: [], mode: 'save' })
+    expect(denied).toEqual({ ok: false, error: 'You can only view this document.' })
+  })
+
   it('a cancelled host dialog is a quiet cancel', async () => {
     const { api, mock } = setup()
     const { text } = await open(api)

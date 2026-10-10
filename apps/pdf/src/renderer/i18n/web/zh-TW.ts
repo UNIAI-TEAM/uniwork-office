@@ -18,4 +18,6 @@ export const zhTW = {
   webMergeBody: '已選擇 {count} 個 PDF。繼續新增 PDF 還是立即合併?',
   webMergeAdd: '再新增一個 PDF',
   webMergeNow: '立即合併',
+  webSaveNetwork: '無法連線到 UniWork。請檢查網路後再試一次。',
+  webSaveTimeout: '儲存耗時過長。請檢查網路後再試一次。',
 } satisfies Record<keyof typeof zh, string>

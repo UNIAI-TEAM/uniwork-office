@@ -19,4 +19,6 @@ export const pl = {
   webMergeBody: 'Wybrano pliki PDF: {count}. Dodać kolejny PDF czy scalić teraz?',
   webMergeAdd: 'Dodaj kolejny PDF',
   webMergeNow: 'Scal teraz',
+  webSaveNetwork: 'Nie można połączyć się z UniWork. Sprawdź połączenie i spróbuj ponownie.',
+  webSaveTimeout: 'Zapisywanie trwało zbyt długo. Sprawdź połączenie i spróbuj ponownie.',
 } satisfies Record<keyof typeof zh, string>

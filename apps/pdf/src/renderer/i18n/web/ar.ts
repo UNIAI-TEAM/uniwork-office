@@ -18,4 +18,6 @@ export const ar = {
   webMergeBody: 'تم تحديد {count} من ملفات PDF. هل تريد إضافة ملف PDF آخر أم الدمج الآن؟',
   webMergeAdd: 'إضافة ملف PDF آخر',
   webMergeNow: 'الدمج الآن',
+  webSaveNetwork: 'تعذّر الوصول إلى UniWork. تحقق من اتصالك وحاول مرة أخرى.',
+  webSaveTimeout: 'استغرق الحفظ وقتًا طويلًا. تحقق من اتصالك وحاول مرة أخرى.',
 } satisfies Record<keyof typeof zh, string>

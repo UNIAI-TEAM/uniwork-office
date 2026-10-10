@@ -24,4 +24,6 @@ export const vi = {
   webDraftKept: 'Trình duyệt này giữ bản sao cho đến khi bạn đăng xuất.',
   webDraftRestore: 'Khôi phục',
   webDraftDiscard: 'Bỏ',
+  webSaveNetwork: 'Không kết nối được tới UniWork. Hãy kiểm tra mạng rồi thử lại.',
+  webSaveTimeout: 'Việc lưu mất quá nhiều thời gian. Hãy kiểm tra mạng rồi thử lại.',
 } satisfies Record<keyof typeof zh, string>

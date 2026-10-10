@@ -18,4 +18,6 @@ export const vi = {
   webMergeBody: 'Đã chọn {count} tệp PDF. Thêm PDF khác hay gộp ngay?',
   webMergeAdd: 'Thêm PDF khác',
   webMergeNow: 'Gộp ngay',
+  webSaveNetwork: 'Không kết nối được tới UniWork. Hãy kiểm tra mạng rồi thử lại.',
+  webSaveTimeout: 'Việc lưu mất quá nhiều thời gian. Hãy kiểm tra mạng rồi thử lại.',
 } satisfies Record<keyof typeof zh, string>

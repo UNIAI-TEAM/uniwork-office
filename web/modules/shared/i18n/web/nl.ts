@@ -25,4 +25,6 @@ export const nl = {
   webDraftKept: 'Deze browser bewaart de kopie totdat je uitlogt.',
   webDraftRestore: 'Herstellen',
   webDraftDiscard: 'Verwijderen',
+  webSaveNetwork: 'UniWork is niet bereikbaar. Controleer je verbinding en probeer het opnieuw.',
+  webSaveTimeout: 'Opslaan duurde te lang. Controleer je verbinding en probeer het opnieuw.',
 } satisfies Record<keyof typeof zh, string>

@@ -76,6 +76,7 @@ import { ownHeadAfterUnknown } from '../../docs/bridge/head-match'
 import type { ModuleBridgePort } from '../../docs/bridge/module-bridge'
 import type { DraftHost, DraftRecovery } from '../../docs/bridge/draft-recovery'
 import { bridgeDraftRecovery, bridgeRecoveryGrant } from '../shared/recovery-prompt'
+import { saveFailureText } from '../shared/save-failure'
 import type { PdfCore } from './core'
 import { ask, hideFatal, showFatal, text } from './notice'
 import { createSignatureStore } from './signatures'
@@ -445,7 +446,7 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
     if (res.error.code === 'timeout' || res.error.code === 'network') {
       await reconcileAfterUnknown(fileId, bytes)
     }
-    return fail(res.error.code === 'timeout' ? 'save timed out' : res.error.message)
+    return fail(saveFailureText(res.error, text))
   }
 
   /** refusals shared by every write path */
@@ -510,7 +511,7 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
     }
     // a cancelled host dialog wrote nothing: no error, like the desktop's cancelled dialog
     if (res.error.code === 'cancelled') return { ok: true }
-    return fail(res.error.message)
+    return fail(saveFailureText(res.error, text))
   }
 
   /** the user picks one more PDF in the host (purpose insert); null = cancelled */

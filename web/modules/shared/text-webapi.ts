@@ -52,6 +52,7 @@ import { createAssetStore } from './assets'
 import { ask, hideFatal, showFatal, text } from './notice'
 import { printHtmlDocument } from './print'
 import { bridgeDraftRecovery } from './recovery-prompt'
+import { saveFailureText } from './save-failure'
 import { decodeText, encodeText } from './text-codec'
 
 // ---------------------------------------------------------------- paths
@@ -491,7 +492,7 @@ export function createTextWebApi(
       await reconcileAfterUnknown(fileId, encodeText(data))
     }
     host?.settle(res)
-    return { ok: false, error: res.error.code === 'timeout' ? 'save timed out' : res.error.message }
+    return { ok: false, error: saveFailureText(res.error, text) }
   }
 
   async function resolveConflict(fileId: string, data: string): Promise<TextSaveResult> {
@@ -561,7 +562,7 @@ export function createTextWebApi(
     host?.settle(res)
     // a cancelled host dialog: nothing saved, no error (like the desktop's dialog cancel)
     if (res.error.code === 'cancelled') return { ok: true, canceled: true }
-    return { ok: false, error: res.error.message }
+    return { ok: false, error: saveFailureText(res.error, text) }
   }
 
   // ------------------------------------------------------------ exports

@@ -24,4 +24,6 @@ export const en = {
   webDraftKept: 'This browser keeps the copy until you sign out.',
   webDraftRestore: 'Restore',
   webDraftDiscard: 'Discard',
+  webSaveNetwork: 'UniWork could not be reached. Check your connection and try again.',
+  webSaveTimeout: 'Saving took too long. Check your connection and try again.',
 } satisfies Record<keyof typeof zh, string>

@@ -25,4 +25,6 @@ export const id = {
   webDraftKept: 'Peramban ini menyimpan salinan sampai Anda keluar.',
   webDraftRestore: 'Pulihkan',
   webDraftDiscard: 'Buang',
+  webSaveNetwork: 'UniWork tidak dapat dijangkau. Periksa koneksi Anda lalu coba lagi.',
+  webSaveTimeout: 'Penyimpanan memakan waktu terlalu lama. Periksa koneksi Anda lalu coba lagi.',
 } satisfies Record<keyof typeof zh, string>

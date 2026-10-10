@@ -25,4 +25,6 @@ export const cs = {
   webDraftKept: 'Tento prohlížeč uchová kopii, dokud se neodhlásíte.',
   webDraftRestore: 'Obnovit',
   webDraftDiscard: 'Zahodit',
+  webSaveNetwork: 'K UniWork se nepodařilo připojit. Zkontrolujte připojení a zkuste to znovu.',
+  webSaveTimeout: 'Ukládání trvalo příliš dlouho. Zkontrolujte připojení a zkuste to znovu.',
 } satisfies Record<keyof typeof zh, string>

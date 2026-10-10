@@ -23,4 +23,6 @@ export const th = {
   webDraftKept: 'เบราว์เซอร์นี้จะเก็บสำเนาไว้จนกว่าคุณจะออกจากระบบ',
   webDraftRestore: 'กู้คืน',
   webDraftDiscard: 'ทิ้ง',
+  webSaveNetwork: 'เชื่อมต่อ UniWork ไม่ได้ โปรดตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง',
+  webSaveTimeout: 'การบันทึกใช้เวลานานเกินไป โปรดตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง',
 } satisfies Record<keyof typeof zh, string>

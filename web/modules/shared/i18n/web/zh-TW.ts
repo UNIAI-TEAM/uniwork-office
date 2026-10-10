@@ -21,4 +21,6 @@ export const zhTW = {
   webDraftKept: '此瀏覽器會保留該副本，直到你登出。',
   webDraftRestore: '還原',
   webDraftDiscard: '捨棄',
+  webSaveNetwork: '無法連線到 UniWork。請檢查網路後再試一次。',
+  webSaveTimeout: '儲存耗時過長。請檢查網路後再試一次。',
 } satisfies Record<keyof typeof zh, string>

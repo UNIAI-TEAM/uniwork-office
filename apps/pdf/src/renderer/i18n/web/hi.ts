@@ -19,4 +19,6 @@ export const hi = {
   webMergeBody: '{count} PDF चुनी गईं। एक और PDF जोड़ें या अभी मर्ज करें?',
   webMergeAdd: 'एक और PDF जोड़ें',
   webMergeNow: 'अभी मर्ज करें',
+  webSaveNetwork: 'UniWork से संपर्क नहीं हो सका। अपना कनेक्शन जाँचें और फिर से प्रयास करें।',
+  webSaveTimeout: 'सहेजने में बहुत अधिक समय लगा। अपना कनेक्शन जाँचें और फिर से प्रयास करें।',
 } satisfies Record<keyof typeof zh, string>

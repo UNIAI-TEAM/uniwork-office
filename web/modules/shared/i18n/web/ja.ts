@@ -25,4 +25,6 @@ export const ja = {
   webDraftKept: 'このコピーは、サインアウトするまでこのブラウザーに保存されます。',
   webDraftRestore: '復元',
   webDraftDiscard: '破棄',
+  webSaveNetwork: 'UniWork に接続できませんでした。接続を確認してもう一度お試しください。',
+  webSaveTimeout: '保存に時間がかかりすぎました。接続を確認してもう一度お試しください。',
 } satisfies Record<keyof typeof zh, string>

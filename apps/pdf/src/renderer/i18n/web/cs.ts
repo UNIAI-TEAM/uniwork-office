@@ -19,4 +19,6 @@ export const cs = {
   webMergeBody: 'Vybráno PDF: {count}. Přidat další PDF, nebo sloučit hned?',
   webMergeAdd: 'Přidat další PDF',
   webMergeNow: 'Sloučit hned',
+  webSaveNetwork: 'K UniWork se nepodařilo připojit. Zkontrolujte připojení a zkuste to znovu.',
+  webSaveTimeout: 'Ukládání trvalo příliš dlouho. Zkontrolujte připojení a zkuste to znovu.',
 } satisfies Record<keyof typeof zh, string>

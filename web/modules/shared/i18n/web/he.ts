@@ -21,4 +21,6 @@ export const he = {
   webDraftKept: 'הדפדפן הזה שומר את ההעתק עד שתתנתק.',
   webDraftRestore: 'שחזור',
   webDraftDiscard: 'מחיקה',
+  webSaveNetwork: 'לא ניתן להתחבר ל-UniWork. בדקו את החיבור ונסו שוב.',
+  webSaveTimeout: 'השמירה ארכה זמן רב מדי. בדקו את החיבור ונסו שוב.',
 } satisfies Record<keyof typeof zh, string>

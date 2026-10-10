@@ -25,4 +25,6 @@ export const hi = {
   webDraftKept: 'यह ब्राउज़र प्रतिलिपि को तब तक रखता है जब तक आप साइन आउट नहीं करते।',
   webDraftRestore: 'पुनर्स्थापित करें',
   webDraftDiscard: 'हटाएँ',
+  webSaveNetwork: 'UniWork से संपर्क नहीं हो सका। अपना कनेक्शन जाँचें और फिर से प्रयास करें।',
+  webSaveTimeout: 'सहेजने में बहुत अधिक समय लगा। अपना कनेक्शन जाँचें और फिर से प्रयास करें।',
 } satisfies Record<keyof typeof zh, string>

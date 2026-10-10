@@ -20,4 +20,6 @@ export const ja = {
     '{count} 個の PDF を選択しました。さらに PDF を追加しますか、それとも今すぐ結合しますか?',
   webMergeAdd: 'PDF をさらに追加',
   webMergeNow: '今すぐ結合',
+  webSaveNetwork: 'UniWork に接続できませんでした。接続を確認してもう一度お試しください。',
+  webSaveTimeout: '保存に時間がかかりすぎました。接続を確認してもう一度お試しください。',
 } satisfies Record<keyof typeof zh, string>

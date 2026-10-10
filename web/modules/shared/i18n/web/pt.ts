@@ -25,4 +25,6 @@ export const pt = {
   webDraftKept: 'Este navegador mantém a cópia até você sair da conta.',
   webDraftRestore: 'Restaurar',
   webDraftDiscard: 'Descartar',
+  webSaveNetwork: 'Não foi possível acessar o UniWork. Verifique sua conexão e tente novamente.',
+  webSaveTimeout: 'Salvar demorou demais. Verifique sua conexão e tente novamente.',
 } satisfies Record<keyof typeof zh, string>

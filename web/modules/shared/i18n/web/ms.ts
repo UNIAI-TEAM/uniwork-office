@@ -25,4 +25,6 @@ export const ms = {
   webDraftKept: 'Pelayar ini menyimpan salinan sehingga anda log keluar.',
   webDraftRestore: 'Pulihkan',
   webDraftDiscard: 'Buang',
+  webSaveNetwork: 'UniWork tidak dapat dicapai. Semak sambungan anda dan cuba lagi.',
+  webSaveTimeout: 'Penyimpanan mengambil masa terlalu lama. Semak sambungan anda dan cuba lagi.',
 } satisfies Record<keyof typeof zh, string>

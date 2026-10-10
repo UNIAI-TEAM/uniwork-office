@@ -18,4 +18,6 @@ export const he = {
   webMergeBody: 'נבחרו {count} קובצי PDF. להוסיף קובץ PDF נוסף או למזג עכשיו?',
   webMergeAdd: 'הוספת קובץ PDF נוסף',
   webMergeNow: 'מיזוג עכשיו',
+  webSaveNetwork: 'לא ניתן להתחבר ל-UniWork. בדקו את החיבור ונסו שוב.',
+  webSaveTimeout: 'השמירה ארכה זמן רב מדי. בדקו את החיבור ונסו שוב.',
 } satisfies Record<keyof typeof zh, string>

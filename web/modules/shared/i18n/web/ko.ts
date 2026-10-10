@@ -24,4 +24,6 @@ export const ko = {
   webDraftKept: '이 사본은 로그아웃할 때까지 이 브라우저에 보관됩니다.',
   webDraftRestore: '복원',
   webDraftDiscard: '삭제',
+  webSaveNetwork: 'UniWork에 연결할 수 없습니다. 연결을 확인한 후 다시 시도하세요.',
+  webSaveTimeout: '저장에 너무 오래 걸렸습니다. 연결을 확인한 후 다시 시도하세요.',
 } satisfies Record<keyof typeof zh, string>

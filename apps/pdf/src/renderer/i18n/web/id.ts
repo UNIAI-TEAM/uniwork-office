@@ -19,4 +19,6 @@ export const id = {
   webMergeBody: '{count} PDF dipilih. Tambah PDF lain atau gabungkan sekarang?',
   webMergeAdd: 'Tambah PDF lain',
   webMergeNow: 'Gabungkan sekarang',
+  webSaveNetwork: 'UniWork tidak dapat dijangkau. Periksa koneksi Anda lalu coba lagi.',
+  webSaveTimeout: 'Penyimpanan memakan waktu terlalu lama. Periksa koneksi Anda lalu coba lagi.',
 } satisfies Record<keyof typeof zh, string>

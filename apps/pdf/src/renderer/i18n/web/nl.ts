@@ -19,4 +19,6 @@ export const nl = {
   webMergeBody: "{count} pdf('s) geselecteerd. Nog een pdf toevoegen of nu samenvoegen?",
   webMergeAdd: 'Nog een pdf toevoegen',
   webMergeNow: 'Nu samenvoegen',
+  webSaveNetwork: 'UniWork is niet bereikbaar. Controleer je verbinding en probeer het opnieuw.',
+  webSaveTimeout: 'Opslaan duurde te lang. Controleer je verbinding en probeer het opnieuw.',
 } satisfies Record<keyof typeof zh, string>

@@ -19,4 +19,6 @@ export const pt = {
   webMergeBody: '{count} PDF(s) selecionado(s). Adicionar outro PDF ou mesclar agora?',
   webMergeAdd: 'Adicionar outro PDF',
   webMergeNow: 'Mesclar agora',
+  webSaveNetwork: 'Não foi possível acessar o UniWork. Verifique sua conexão e tente novamente.',
+  webSaveTimeout: 'Salvar demorou demais. Verifique sua conexão e tente novamente.',
 } satisfies Record<keyof typeof zh, string>

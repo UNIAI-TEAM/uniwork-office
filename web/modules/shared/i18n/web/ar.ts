@@ -22,4 +22,6 @@ export const ar = {
   webDraftKept: 'يحتفظ هذا المتصفح بالنسخة حتى تسجّل الخروج.',
   webDraftRestore: 'استعادة',
   webDraftDiscard: 'تجاهل',
+  webSaveNetwork: 'تعذّر الوصول إلى UniWork. تحقق من اتصالك وحاول مرة أخرى.',
+  webSaveTimeout: 'استغرق الحفظ وقتًا طويلًا. تحقق من اتصالك وحاول مرة أخرى.',
 } satisfies Record<keyof typeof zh, string>

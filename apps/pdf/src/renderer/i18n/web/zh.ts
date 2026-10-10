@@ -17,4 +17,6 @@ export const zh = {
   webMergeBody: '已选择 {count} 个 PDF。继续添加 PDF 还是立即合并?',
   webMergeAdd: '再添加一个 PDF',
   webMergeNow: '立即合并',
+  webSaveNetwork: '无法连接到 UniWork。请检查网络后重试。',
+  webSaveTimeout: '保存耗时过长。请检查网络后重试。',
 }

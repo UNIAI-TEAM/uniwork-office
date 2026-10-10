@@ -19,4 +19,6 @@ export const ko = {
   webMergeBody: 'PDF {count}개를 선택했습니다. PDF를 더 추가할까요, 아니면 지금 병합할까요?',
   webMergeAdd: 'PDF 더 추가',
   webMergeNow: '지금 병합',
+  webSaveNetwork: 'UniWork에 연결할 수 없습니다. 연결을 확인한 후 다시 시도하세요.',
+  webSaveTimeout: '저장에 너무 오래 걸렸습니다. 연결을 확인한 후 다시 시도하세요.',
 } satisfies Record<keyof typeof zh, string>

@@ -19,4 +19,6 @@ export const zh = {
   webDraftKept: '此浏览器会保留该副本，直到你退出登录。',
   webDraftRestore: '恢复',
   webDraftDiscard: '放弃',
+  webSaveNetwork: '无法连接到 UniWork。请检查网络后重试。',
+  webSaveTimeout: '保存耗时过长。请检查网络后重试。',
 }

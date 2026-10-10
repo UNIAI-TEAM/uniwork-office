@@ -25,4 +25,6 @@ export const fr = {
   webDraftKept: "Ce navigateur conserve la copie jusqu'à votre déconnexion.",
   webDraftRestore: 'Restaurer',
   webDraftDiscard: 'Ignorer',
+  webSaveNetwork: 'Impossible de joindre UniWork. Vérifiez votre connexion et réessayez.',
+  webSaveTimeout: "L'enregistrement a pris trop de temps. Vérifiez votre connexion et réessayez.",
 } satisfies Record<keyof typeof zh, string>

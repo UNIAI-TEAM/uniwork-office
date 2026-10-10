@@ -25,4 +25,7 @@ export const ru = {
   webDraftKept: 'Браузер хранит копию, пока вы не выйдете из аккаунта.',
   webDraftRestore: 'Восстановить',
   webDraftDiscard: 'Удалить',
+  webSaveNetwork: 'Не удалось связаться с UniWork. Проверьте подключение и повторите попытку.',
+  webSaveTimeout:
+    'Сохранение заняло слишком много времени. Проверьте подключение и повторите попытку.',
 } satisfies Record<keyof typeof zh, string>

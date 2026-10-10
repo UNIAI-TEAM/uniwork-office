@@ -229,6 +229,27 @@ describe('save', () => {
     expect(second.etag).toBe(`"${s.fileId}-v2"`)
   })
 
+  it('a failed save reads in the UI language, never the raw browser error', async () => {
+    const s = await setup()
+    const path = (await s.api.consumePending())!
+    s.mock.override('api.save', () => ({
+      ok: false,
+      error: { code: 'network', message: 'Failed to fetch' },
+    }))
+    expect(await s.api.save(req(path, { markups: [{} as never] }))).toEqual({
+      ok: false,
+      error: 'UniWork could not be reached. Check your connection and try again.',
+    })
+    s.mock.override('api.save', () => ({
+      ok: false,
+      error: { code: 'timeout', message: 'save timed out' },
+    }))
+    expect(await s.api.save(req(path, { markups: [{} as never] }))).toEqual({
+      ok: false,
+      error: 'Saving took too long. Check your connection and try again.',
+    })
+  })
+
   it('text edits fetch the bundled fonts first', async () => {
     const s = await setup()
     const path = (await s.api.consumePending())!
