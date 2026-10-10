@@ -223,4 +223,5 @@ export const he = {
   aiSumTemplatesEmpty: 'תבניות סגנון (ריק)',
   aiSumListTemplates: 'הוצגו {count} תבניות סגנון',
   aiPageCloudToLocal: 'הענן לא זמין — נוצר מקומית',
+  aiViewOnlyNotice: 'מסמך לצפייה בלבד: ה-AI יכול לקרוא אותו ולענות על שאלות, אך לא לערוך אותו.',
 } satisfies Record<keyof typeof zh, string>

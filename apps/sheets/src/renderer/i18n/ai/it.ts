@@ -99,4 +99,6 @@ export const it = {
   aiScopeRangeTip:
     "L'IA interpreta «questa colonna / queste righe / la parte selezionata» come questo intervallo, che all'invio resta fisso per tutta l'esecuzione",
   aiScopeClearTitle: "Rimuovi l'ambito dell'intervallo e usa tutto il foglio",
+  aiViewOnlyNotice:
+    'Documento di sola lettura: l’IA può leggerlo e rispondere a domande, ma non può modificarlo.',
 } satisfies Record<keyof typeof zh, string>

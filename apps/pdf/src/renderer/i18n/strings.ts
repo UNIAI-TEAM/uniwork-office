@@ -202,6 +202,7 @@ export const strings = {
   zh: {
     ...fillFormStringsFor('zh'),
     ...webStrings.zh,
+    aiViewOnlyNotice: '仅查看文档:AI 可以阅读并回答问题,但无法编辑。',
     ribbonTabHome: '开始',
     ribbonTabAnnotate: '注释',
     ribbonTabEdit: '编辑',
@@ -534,6 +535,8 @@ export const strings = {
   en: {
     ...fillFormStringsFor('en'),
     ...webStrings.en,
+    aiViewOnlyNotice:
+      'View-only document: AI can read it and answer questions, but editing is turned off.',
     ribbonTabHome: 'Home',
     ribbonTabAnnotate: 'Annotate',
     ribbonTabEdit: 'Edit',
@@ -875,6 +878,8 @@ export const strings = {
   vi: {
     ...fillFormStringsFor('vi'),
     ...webStrings.vi,
+    aiViewOnlyNotice:
+      'Tài liệu chỉ xem: AI có thể đọc và trả lời câu hỏi, nhưng không thể chỉnh sửa.',
     ribbonTabHome: 'Trang chủ',
     ribbonTabAnnotate: 'Chú thích',
     ribbonTabEdit: 'Chỉnh sửa',
@@ -1219,6 +1224,8 @@ export const strings = {
   ja: {
     ...fillFormStringsFor('ja'),
     ...webStrings.ja,
+    aiViewOnlyNotice:
+      '閲覧専用のドキュメント: AI は内容の読み取りと質問への回答はできますが、編集はできません。',
     ribbonTabHome: 'ホーム',
     ribbonTabAnnotate: '注釈',
     ribbonTabEdit: '編集',
@@ -1559,6 +1566,8 @@ export const strings = {
   ko: {
     ...fillFormStringsFor('ko'),
     ...webStrings.ko,
+    aiViewOnlyNotice:
+      '보기 전용 문서: AI는 내용을 읽고 질문에 답할 수 있지만 편집할 수는 없습니다.',
     ribbonTabHome: '홈',
     ribbonTabAnnotate: '주석',
     ribbonTabEdit: '편집',
@@ -1898,6 +1907,8 @@ export const strings = {
   fr: {
     ...fillFormStringsFor('fr'),
     ...webStrings.fr,
+    aiViewOnlyNotice:
+      'Document en lecture seule : l’IA peut le lire et répondre à des questions, mais ne peut pas le modifier.',
     ribbonTabHome: 'Accueil',
     ribbonTabAnnotate: 'Annoter',
     ribbonTabEdit: 'Édition',
@@ -2247,6 +2258,8 @@ export const strings = {
   de: {
     ...fillFormStringsFor('de'),
     ...webStrings.de,
+    aiViewOnlyNotice:
+      'Schreibgeschütztes Dokument: Die KI kann es lesen und Fragen beantworten, aber nicht bearbeiten.',
     ribbonTabHome: 'Start',
     ribbonTabAnnotate: 'Anmerken',
     ribbonTabEdit: 'Bearbeiten',
@@ -2594,6 +2607,8 @@ export const strings = {
   es: {
     ...fillFormStringsFor('es'),
     ...webStrings.es,
+    aiViewOnlyNotice:
+      'Documento de solo lectura: la IA puede leerlo y responder preguntas, pero no puede editarlo.',
     ribbonTabHome: 'Inicio',
     ribbonTabAnnotate: 'Anotar',
     ribbonTabEdit: 'Editar',
@@ -2941,6 +2956,7 @@ export const strings = {
   th: {
     ...fillFormStringsFor('th'),
     ...webStrings.th,
+    aiViewOnlyNotice: 'เอกสารแบบดูอย่างเดียว: AI อ่านและตอบคำถามได้ แต่แก้ไขไม่ได้',
     ribbonTabHome: 'หน้าแรก',
     ribbonTabAnnotate: 'คำอธิบายประกอบ',
     ribbonTabEdit: 'แก้ไข',
@@ -3280,6 +3296,8 @@ export const strings = {
   id: {
     ...fillFormStringsFor('id'),
     ...webStrings.id,
+    aiViewOnlyNotice:
+      'Dokumen hanya-lihat: AI dapat membaca dan menjawab pertanyaan, tetapi tidak dapat mengedit.',
     ribbonTabHome: 'Beranda',
     ribbonTabAnnotate: 'Anotasi',
     ribbonTabEdit: 'Edit',
@@ -3624,6 +3642,8 @@ export const strings = {
   ru: {
     ...fillFormStringsFor('ru'),
     ...webStrings.ru,
+    aiViewOnlyNotice:
+      'Документ только для просмотра: ИИ может читать его и отвечать на вопросы, но не может редактировать.',
     ribbonTabHome: 'Главная',
     ribbonTabAnnotate: 'Аннотирование',
     ribbonTabEdit: 'Правка',
@@ -3969,6 +3989,8 @@ export const strings = {
   ar: {
     ...fillFormStringsFor('ar'),
     ...webStrings.ar,
+    aiViewOnlyNotice:
+      'مستند للعرض فقط: يمكن للذكاء الاصطناعي قراءته والإجابة عن الأسئلة، لكنه لا يستطيع تعديله.',
     ribbonTabHome: 'الشريط الرئيسي',
     ribbonTabAnnotate: 'تعليق توضيحي',
     ribbonTabEdit: 'تحرير',
@@ -4307,6 +4329,8 @@ export const strings = {
   pt: {
     ...fillFormStringsFor('pt'),
     ...webStrings.pt,
+    aiViewOnlyNotice:
+      'Documento somente leitura: a IA pode lê-lo e responder a perguntas, mas não pode editá-lo.',
     ribbonTabHome: 'Página Inicial',
     ribbonTabAnnotate: 'Anotar',
     ribbonTabEdit: 'Editar',
@@ -4653,6 +4677,8 @@ export const strings = {
   it: {
     ...fillFormStringsFor('it'),
     ...webStrings.it,
+    aiViewOnlyNotice:
+      'Documento di sola lettura: l’IA può leggerlo e rispondere a domande, ma non può modificarlo.',
     ribbonTabHome: 'Home',
     ribbonTabAnnotate: 'Annota',
     ribbonTabEdit: 'Modifica',
@@ -5002,6 +5028,8 @@ export const strings = {
   pl: {
     ...fillFormStringsFor('pl'),
     ...webStrings.pl,
+    aiViewOnlyNotice:
+      'Dokument tylko do odczytu: AI może go czytać i odpowiadać na pytania, ale nie może go edytować.',
     ribbonTabHome: 'Narzędzia główne',
     ribbonTabAnnotate: 'Adnotacje',
     ribbonTabEdit: 'Edycja',
@@ -5346,6 +5374,8 @@ export const strings = {
   cs: {
     ...fillFormStringsFor('cs'),
     ...webStrings.cs,
+    aiViewOnlyNotice:
+      'Dokument jen pro čtení: AI jej může číst a odpovídat na otázky, ale nemůže jej upravovat.',
     ribbonTabHome: 'Domů',
     ribbonTabAnnotate: 'Anotace',
     ribbonTabEdit: 'Úpravy',
@@ -5688,6 +5718,8 @@ export const strings = {
   nl: {
     ...fillFormStringsFor('nl'),
     ...webStrings.nl,
+    aiViewOnlyNotice:
+      'Alleen-lezen document: AI kan het lezen en vragen beantwoorden, maar niet bewerken.',
     ribbonTabHome: 'Start',
     ribbonTabAnnotate: 'Annoteren',
     ribbonTabEdit: 'Bewerken',
@@ -6032,6 +6064,8 @@ export const strings = {
   ms: {
     ...fillFormStringsFor('ms'),
     ...webStrings.ms,
+    aiViewOnlyNotice:
+      'Dokumen lihat sahaja: AI boleh membaca dan menjawab soalan, tetapi tidak boleh mengedit.',
     ribbonTabHome: 'Laman Utama',
     ribbonTabAnnotate: 'Anotasi',
     ribbonTabEdit: 'Edit',
@@ -6375,6 +6409,7 @@ export const strings = {
   he: {
     ...fillFormStringsFor('he'),
     ...webStrings.he,
+    aiViewOnlyNotice: 'מסמך לצפייה בלבד: ה-AI יכול לקרוא אותו ולענות על שאלות, אך לא לערוך אותו.',
     ribbonTabHome: 'בית',
     ribbonTabAnnotate: 'הערות',
     ribbonTabEdit: 'עריכה',
@@ -6709,6 +6744,8 @@ export const strings = {
   hi: {
     ...fillFormStringsFor('hi'),
     ...webStrings.hi,
+    aiViewOnlyNotice:
+      'केवल-देखने योग्य दस्तावेज़: AI इसे पढ़ सकता है और प्रश्नों के उत्तर दे सकता है, लेकिन संपादित नहीं कर सकता।',
     ribbonTabHome: 'होम',
     ribbonTabAnnotate: 'एनोटेट',
     ribbonTabEdit: 'संपादन',
@@ -7049,6 +7086,7 @@ export const strings = {
   'zh-TW': {
     ...fillFormStringsFor('zh-TW'),
     ...webStrings['zh-TW'],
+    aiViewOnlyNotice: '唯讀文件:AI 可以閱讀並回答問題,但無法編輯。',
     ribbonTabHome: '常用',
     ribbonTabAnnotate: '註解',
     ribbonTabEdit: '編輯',

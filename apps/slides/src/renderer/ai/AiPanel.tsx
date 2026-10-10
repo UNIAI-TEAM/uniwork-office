@@ -300,6 +300,8 @@ interface AiPanelProps {
   onQueueFocus?: (key: string) => void
   /** Drop the items a submission finished with (successful and unrunnable alike) */
   onQueueConsume?: (keys: string[]) => void
+  /** view-only UniWork deck: the agent only gets read-only tools, edit-only composer affordances are gone */
+  readOnly?: boolean
 }
 
 /** Some locales already end the label with an ellipsis — normalize to exactly one. */
@@ -393,6 +395,7 @@ export function AiPanel({
   onQueueClear,
   onQueueFocus,
   onQueueConsume,
+  readOnly = false,
 }: AiPanelProps) {
   const { t, lang } = useI18n()
   // Panel chrome follows the UI language; message text follows its own content (dir=auto below)
@@ -506,6 +509,8 @@ export function AiPanel({
   // The loop instance survives across renders; closures read refs for the latest state
   const slidesRef = useRef(slides)
   slidesRef.current = slides
+  const readOnlyRef = useRef(readOnly)
+  readOnlyRef.current = readOnly
   const currentRef = useRef(current)
   currentRef.current = current
   const selectedRef = useRef(selectedIds)
@@ -925,6 +930,7 @@ export function AiPanel({
     }
 
     const access: DeckAccess = {
+      readOnly: () => readOnlyRef.current,
       getSlides: () => slidesRef.current,
       getCurrent: () => currentRef.current,
       // A queue run names its targets explicitly; whatever is selected on the
@@ -2158,7 +2164,7 @@ export function AiPanel({
               <br />
               {t(deckEmpty ? 'aiEmptyGenBody2' : 'aiEmptyBody2')}
             </div>
-            {deckEmpty ? (
+            {deckEmpty && !readOnly ? (
               <div className="ai-tpl-gallery" role="list" aria-label={t('aiTplGalleryTitle')}>
                 <div className="ai-tpl-gallery-head">{t('aiTplGalleryTitle')}</div>
                 <div className="ai-tpl-gallery-hint">{t('aiTplGalleryHint')}</div>
@@ -2193,8 +2199,9 @@ export function AiPanel({
                 ) : null}
               </div>
             ) : null}
+            {/* the starters all edit or generate slides: a view-only deck offers none */}
             <div className="ai-starter-list">
-              {starterPrompts(t, deckEmpty ?? false).map((p) => (
+              {(readOnly ? [] : starterPrompts(t, deckEmpty ?? false)).map((p) => (
                 <button
                   key={p}
                   className="ai-starter"
@@ -2380,7 +2387,12 @@ export function AiPanel({
         </div>
       ) : (
         <div className="ai-composer">
-          {editQueue && editQueue.length > 0 && (
+          {readOnly && (
+            <div className="ai-attach-notice" role="note">
+              {t('aiViewOnlyNotice')}
+            </div>
+          )}
+          {!readOnly && editQueue && editQueue.length > 0 && (
             <EditQueueCard
               items={editQueue}
               slides={slides}
@@ -2461,9 +2473,9 @@ export function AiPanel({
               data-slides-ai-input="true"
               data-deck-undo-ready={!busy && !inputEditedSinceRunRef.current ? 'true' : 'false'}
               placeholder={t(
-                deckEmpty && galleryTemplateId
+                !readOnly && deckEmpty && galleryTemplateId
                   ? 'aiTplTopicPlaceholder'
-                  : deckEmpty
+                  : !readOnly && deckEmpty
                     ? 'aiInputPlaceholderGen'
                     : 'aiInputPlaceholder',
               )}

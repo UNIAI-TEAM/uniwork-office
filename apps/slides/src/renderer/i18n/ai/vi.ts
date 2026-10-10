@@ -228,4 +228,6 @@ export const vi = {
   aiTplTopicPlaceholder: 'Nhập chủ đề, vd: Báo cáo Q3 / Ra mắt sản phẩm…',
   aiTplTopicHint: 'Đã chọn mẫu — nhập chủ đề bên dưới rồi gửi để tạo',
   aiTplPages: '{n} trang',
+  aiViewOnlyNotice:
+    'Tài liệu chỉ xem: AI có thể đọc và trả lời câu hỏi, nhưng không thể chỉnh sửa.',
 } satisfies Record<keyof typeof zh, string>

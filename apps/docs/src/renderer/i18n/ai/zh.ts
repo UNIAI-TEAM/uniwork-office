@@ -172,4 +172,5 @@ export const zh = {
   aiCmdImages: '已更新 {count} 张图片',
   aiCmdToc: '已插入目录({count} 个条目)',
   aiCmdSkipped: '(跳过 {count} 个受保护块)',
+  aiViewOnlyNotice: '仅查看文档:AI 可以阅读并回答问题,但无法编辑。',
 }

@@ -178,4 +178,6 @@ export const vi = {
     'Soạn thảo giúp tôi một thông báo sản phẩm. Sản phẩm và các điểm chính: ',
   aiStarterGuide: 'Viết hướng dẫn từng bước',
   aiStarterGuidePrompt: 'Viết giúp tôi một hướng dẫn từng bước. Quy trình cần giải thích: ',
+  aiViewOnlyNotice:
+    'Tài liệu chỉ xem: AI có thể đọc và trả lời câu hỏi, nhưng không thể chỉnh sửa.',
 } satisfies Record<keyof typeof zh, string>

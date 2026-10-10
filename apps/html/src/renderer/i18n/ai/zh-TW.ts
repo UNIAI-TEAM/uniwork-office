@@ -166,4 +166,5 @@ export const zhTW = {
   aiStarterAnnouncementPrompt: '幫我起草一則產品公告。產品和要點：',
   aiStarterGuide: '寫一份操作指南',
   aiStarterGuidePrompt: '幫我寫一份操作指南。要說明的流程是：',
+  aiViewOnlyNotice: '唯讀文件:AI 可以閱讀並回答問題,但無法編輯。',
 } satisfies Record<keyof typeof zh, string>

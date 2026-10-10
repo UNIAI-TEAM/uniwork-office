@@ -201,8 +201,6 @@ export const vi = {
   appFootnotePlaceholder: 'Văn bản chú thích cuối trang…',
   appEndnotePlaceholder: 'Văn bản chú thích cuối tài liệu…',
   appAutoSave: 'Tự động lưu',
-  appAutoSaveUniworkTip:
-    'Tự động lưu đã tắt cho tài liệu UniWork. Hãy dùng Lưu để lưu phiên bản mới.',
   appAutoSaveTip: 'Tự động lưu (mỗi 30 giây và khi cửa sổ mất tiêu điểm)',
   appSaveShortcutTip: 'Lưu (⌘S)',
   appUndo: 'Hoàn tác',

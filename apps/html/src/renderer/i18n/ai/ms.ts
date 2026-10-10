@@ -177,4 +177,6 @@ export const ms = {
   aiStarterAnnouncementPrompt: 'Rangka pengumuman produk untuk saya. Produk dan perkara utama: ',
   aiStarterGuide: 'Tulis panduan cara',
   aiStarterGuidePrompt: 'Tulis panduan cara untuk saya. Proses yang perlu dijelaskan: ',
+  aiViewOnlyNotice:
+    'Dokumen lihat sahaja: AI boleh membaca dan menjawab soalan, tetapi tidak boleh mengedit.',
 } satisfies Record<keyof typeof zh, string>

@@ -241,6 +241,7 @@ export function AiChatPanel({
   onStop,
   onNewChat,
   onUndo,
+  viewOnly = false,
   scopeRange,
   scopeColumns,
   scopeLocked,
@@ -279,6 +280,8 @@ export function AiChatPanel({
   readonly onStop: () => void
   readonly onNewChat: () => void
   readonly onUndo: (steps: number) => void
+  /** UniWork view-only workbook: the AI reads and answers but cannot edit */
+  readonly viewOnly?: boolean
   /** A1 notation of the range this run is scoped to, or null when there is no
    *  scope — a resting single-cell selection carries no intent worth showing,
    *  and dismissing the chip clears it until the next selection change */
@@ -714,6 +717,11 @@ export function AiChatPanel({
 
       <div className="ai-composer">
         {attachNotice && <div className="ai-attach-notice">{attachNotice}</div>}
+        {viewOnly && (
+          <div className="ai-view-only-notice" role="status">
+            {t('aiViewOnlyNotice')}
+          </div>
+        )}
         <AiComposer
           header={
             <>

@@ -228,4 +228,6 @@ export const pl = {
   aiSumTemplatesEmpty: 'Szablony stylu (pusto)',
   aiSumListTemplates: 'Wyświetlono szablony stylu: {count}',
   aiPageCloudToLocal: 'Chmura niedostępna — wygenerowano lokalnie',
+  aiViewOnlyNotice:
+    'Dokument tylko do odczytu: AI może go czytać i odpowiadać na pytania, ale nie może go edytować.',
 } satisfies Record<keyof typeof zh, string>

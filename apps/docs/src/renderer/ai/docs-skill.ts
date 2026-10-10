@@ -18,6 +18,7 @@ import {
   type AiHeaderFooterAccess,
   type FrozenSelection,
   type AiDocExtras,
+  type ToolExecution,
 } from './tools'
 import type { AiNotesAccess } from './note-ops'
 
@@ -28,6 +29,34 @@ const CAPABILITY_TOOLS: ReadonlyArray<readonly [tool: string, capability: Capabi
   ['generate_image', 'imageGeneration'],
   ['create_document', 'createDocument'],
 ]
+
+/**
+ * The only tools a view-only UniWork document keeps: reading the document and
+ * looking things up. Everything else writes into the document.
+ */
+export const READ_ONLY_TOOLS: ReadonlySet<string> = new Set([
+  'get_document_context',
+  'read_blocks',
+  'read_revisions',
+  'read_comments',
+  'read_notes',
+  'web_search',
+  'image_search',
+  'analyze_media',
+])
+
+const VIEW_ONLY_NOTE =
+  '\n\nNote: this document is view-only. You can read it and answer questions about it, but you must not change it: no editing tool is available, so tell the user it cannot be edited instead of attempting it.'
+
+/** what a refused edit call returns: an error the model reads, nothing touches the document */
+function refuseViewOnly(tool: string): ToolExecution {
+  return {
+    output: `${tool} is unavailable: this document is view-only and cannot be edited.`,
+    isError: true,
+    mutated: false,
+    summary: tool.replace(/[_-]+/g, ' '),
+  }
+}
 
 const IMAGE_GEN_OFF_NOTE =
   '\n\nNote: generate_image is currently unavailable (no image model is configured under Settings → AI media). Do not call or promise it; use image_search for imagery.'
@@ -56,6 +85,8 @@ export function createDocsSkill(
   getNotes?: () => AiNotesAccess | undefined,
   /** same as imageGenAvailable, for analyze_media (seeing pictures that are in the document) */
   mediaAnalysisAvailable?: () => boolean,
+  /** live predicate: a view-only UniWork document, where the agent may only read */
+  isReadOnly?: () => boolean,
 ): AgentSkill {
   // Selection frozen per run: tools act on the range the prompt described,
   // not on wherever the user's live selection has wandered mid-run. The doc
@@ -76,12 +107,16 @@ export function createDocsSkill(
     id: 'docx',
     // live: the predicate is re-read before every model request
     get systemPrompt() {
-      return AGENT_SYSTEM_PROMPT + mediaOffNote()
+      return AGENT_SYSTEM_PROMPT + mediaOffNote() + (isReadOnly?.() ? VIEW_ONLY_NOTE : '')
     },
     get tools() {
       const hidden = mediaToolsOff()
       for (const [tool, c] of CAPABILITY_TOOLS) if (!cap(c)) hidden.add(tool)
-      return hidden.size === 0 ? AGENT_TOOLS : AGENT_TOOLS.filter((t) => !hidden.has(t.name))
+      const readOnly = isReadOnly?.() === true
+      if (!readOnly && hidden.size === 0) return AGENT_TOOLS
+      return AGENT_TOOLS.filter(
+        (t) => !hidden.has(t.name) && (!readOnly || READ_ONLY_TOOLS.has(t.name)),
+      )
     },
     buildContext: () => {
       const editor = getEditor()
@@ -96,19 +131,21 @@ export function createDocsSkill(
       )
     },
     executeTool: (call, signal) =>
-      executeTool(
-        getEditor(),
-        call,
-        getNumIds(),
-        getTrack?.(),
-        signal,
-        frozen,
-        getComments?.(),
-        getHf?.(),
-        getWriter?.(),
-        getPageSetup?.(),
-        getExtras?.(),
-        getNotes?.(),
-      ),
+      isReadOnly?.() && !READ_ONLY_TOOLS.has(call.name)
+        ? refuseViewOnly(call.name)
+        : executeTool(
+            getEditor(),
+            call,
+            getNumIds(),
+            getTrack?.(),
+            signal,
+            frozen,
+            getComments?.(),
+            getHf?.(),
+            getWriter?.(),
+            getPageSetup?.(),
+            getExtras?.(),
+            getNotes?.(),
+          ),
   }
 }

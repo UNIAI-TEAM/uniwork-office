@@ -98,4 +98,6 @@ export const id = {
   aiScopeRangeTip:
     'AI membaca "kolom ini / baris ini / bagian yang dipilih" sebagai rentang ini, dan dikunci selama proses berjalan setelah Anda mengirim',
   aiScopeClearTitle: 'Hapus cakupan rentang dan gunakan seluruh lembar',
+  aiViewOnlyNotice:
+    'Dokumen hanya-lihat: AI dapat membaca dan menjawab pertanyaan, tetapi tidak dapat mengedit.',
 } satisfies Record<keyof typeof zh, string>

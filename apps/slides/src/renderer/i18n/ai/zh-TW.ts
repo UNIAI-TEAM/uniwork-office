@@ -221,4 +221,5 @@ export const zhTW = {
   aiSumTemplatesEmpty: '風格範本清單（空）',
   aiSumListTemplates: '列出 {count} 個風格範本',
   aiPageCloudToLocal: '雲端不可用,已本地生成',
+  aiViewOnlyNotice: '唯讀文件:AI 可以閱讀並回答問題,但無法編輯。',
 } satisfies Record<keyof typeof zh, string>

@@ -175,4 +175,6 @@ export const id = {
   aiStarterAnnouncementPrompt: 'Susun pengumuman produk untuk saya. Produk dan poin utama: ',
   aiStarterGuide: 'Tulis panduan cara',
   aiStarterGuidePrompt: 'Tuliskan panduan cara untuk saya. Proses yang perlu dijelaskan: ',
+  aiViewOnlyNotice:
+    'Dokumen hanya-lihat: AI dapat membaca dan menjawab pertanyaan, tetapi tidak dapat mengedit.',
 } satisfies Record<keyof typeof zh, string>

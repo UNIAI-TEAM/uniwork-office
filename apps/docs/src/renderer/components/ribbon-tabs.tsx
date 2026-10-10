@@ -765,6 +765,8 @@ export type { RevisionDisplayMode }
 
 interface ReviewTabProps extends TabProps {
   onAiPreset: (instruction: string) => void
+  /** view-only UniWork document: Editor / Translate / AI comments edit it, so they are off */
+  aiEditLocked?: boolean
   commentCount: number
   /** unresolved root comments; 0 disables the AI resolve-comments action */
   openCommentCount: number
@@ -807,6 +809,7 @@ export function ReviewTab({
   dropdown,
   setDropdown,
   onAiPreset,
+  aiEditLocked = false,
   commentCount,
   openCommentCount,
   resolvedCommentCount,
@@ -854,8 +857,12 @@ export function ReviewTab({
           {cap('ai') && (
             <button
               className="rb-big"
-              disabled={!hasDoc}
-              data-tip={`${t('ribbonEditorTip')} — ${t('ribbonAiCreditNote')}`}
+              disabled={!hasDoc || aiEditLocked}
+              data-tip={
+                aiEditLocked
+                  ? t('aiViewOnlyNotice')
+                  : `${t('ribbonEditorTip')} — ${t('ribbonAiCreditNote')}`
+              }
               onClick={() => {
                 if (hasRangeSelection()) onAiPreset(t('ribbonEditorSelectionPrompt'))
                 else if (confirmAiRewrite()) onAiPreset(t('ribbonEditorPrompt'))
@@ -893,8 +900,12 @@ export function ReviewTab({
               <div className="rb-split-wrap">
                 <button
                   className="rb-big"
-                  disabled={!hasDoc}
-                  data-tip={`${t('ribbonTranslateTip')} — ${t('ribbonAiCreditNote')}`}
+                  disabled={!hasDoc || aiEditLocked}
+                  data-tip={
+                    aiEditLocked
+                      ? t('aiViewOnlyNotice')
+                      : `${t('ribbonTranslateTip')} — ${t('ribbonAiCreditNote')}`
+                  }
                   onClick={() => toggleDropdown(setDropdown, 'translate')}
                 >
                   <span className="rb-big-icon">
@@ -1028,8 +1039,12 @@ export function ReviewTab({
           {cap('ai') && (
             <button
               className="rb-big"
-              disabled={!hasDoc || openCommentCount === 0}
-              data-tip={`${t('ribbonAiCommentsTip', { count: openCommentCount })} — ${t('ribbonAiCreditNote')}`}
+              disabled={!hasDoc || openCommentCount === 0 || aiEditLocked}
+              data-tip={
+                aiEditLocked
+                  ? t('aiViewOnlyNotice')
+                  : `${t('ribbonAiCommentsTip', { count: openCommentCount })} — ${t('ribbonAiCreditNote')}`
+              }
               onClick={() => onAiPreset(t('ribbonAiCommentsPrompt'))}
             >
               <span className="rb-big-icon">

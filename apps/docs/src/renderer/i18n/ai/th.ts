@@ -179,4 +179,5 @@ export const th = {
   aiCmdImages: 'อัปเดตรูปภาพ {count} รูปแล้ว',
   aiCmdToc: 'แทรกสารบัญแล้ว ({count} รายการ)',
   aiCmdSkipped: ' (ข้ามบล็อกที่ได้รับการป้องกัน {count} บล็อก)',
+  aiViewOnlyNotice: 'เอกสารแบบดูอย่างเดียว: AI อ่านและตอบคำถามได้ แต่แก้ไขไม่ได้',
 } satisfies Record<keyof typeof zh, string>

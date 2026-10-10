@@ -1195,6 +1195,7 @@ export default function App() {
                 onQueueClear={queueClear}
                 onQueueFocus={queueFocus}
                 onQueueConsume={queueConsume}
+                readOnly={uniwork.readOnly}
               />
             )}
           </div>
@@ -1335,7 +1336,7 @@ export default function App() {
         />
       )}
       {!sourceMode && <TableMenu editor={editor} scrollRef={scrollRef} zoom={zoom} />}
-      {editor && !sourceMode && status === 'ready' && aiEnabled && canEdit && (
+      {editor && !sourceMode && status === 'ready' && aiEnabled && canEdit && !uniwork.readOnly && (
         <AiAskPopover
           editor={editor}
           queueFull={editQueue.length >= EDIT_QUEUE_MAX}

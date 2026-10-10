@@ -228,4 +228,6 @@ export const ms = {
   aiSumTemplatesEmpty: 'Templat gaya (kosong)',
   aiSumListTemplates: 'Menyenaraikan {count} templat gaya',
   aiPageCloudToLocal: 'Awan tidak tersedia — dijana secara setempat',
+  aiViewOnlyNotice:
+    'Dokumen lihat sahaja: AI boleh membaca dan menjawab soalan, tetapi tidak boleh mengedit.',
 } satisfies Record<keyof typeof zh, string>

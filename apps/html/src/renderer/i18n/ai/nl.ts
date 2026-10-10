@@ -177,4 +177,6 @@ export const nl = {
   aiStarterAnnouncementPrompt: 'Stel een productaankondiging voor mij op. Product en kernpunten: ',
   aiStarterGuide: 'Een handleiding schrijven',
   aiStarterGuidePrompt: 'Schrijf een handleiding voor mij. Het proces dat uitgelegd moet worden: ',
+  aiViewOnlyNotice:
+    'Alleen-lezen document: AI kan het lezen en vragen beantwoorden, maar niet bewerken.',
 } satisfies Record<keyof typeof zh, string>

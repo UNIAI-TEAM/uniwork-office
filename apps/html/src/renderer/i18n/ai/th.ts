@@ -173,4 +173,5 @@ export const th = {
   aiStarterAnnouncementPrompt: 'ช่วยร่างประกาศผลิตภัณฑ์ให้ฉัน ผลิตภัณฑ์และประเด็นสำคัญ: ',
   aiStarterGuide: 'เขียนคู่มือการใช้งาน',
   aiStarterGuidePrompt: 'ช่วยเขียนคู่มือการใช้งานให้ฉัน ขั้นตอนที่ต้องอธิบาย: ',
+  aiViewOnlyNotice: 'เอกสารแบบดูอย่างเดียว: AI อ่านและตอบคำถามได้ แต่แก้ไขไม่ได้',
 } satisfies Record<keyof typeof zh, string>

@@ -198,7 +198,6 @@ export const en = {
   appFootnotePlaceholder: 'Footnote text…',
   appEndnotePlaceholder: 'Endnote text…',
   appAutoSave: 'AutoSave',
-  appAutoSaveUniworkTip: 'AutoSave is off for UniWork documents. Use Save to save a new version.',
   appAutoSaveTip: 'AutoSave (every 30 seconds and when the window loses focus)',
   appSaveShortcutTip: 'Save (⌘S)',
   appUndo: 'Undo',

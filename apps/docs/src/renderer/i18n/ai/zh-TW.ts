@@ -174,4 +174,5 @@ export const zhTW = {
   aiCmdImages: '已更新 {count} 張圖片',
   aiCmdToc: '已插入目錄({count} 個項目)',
   aiCmdSkipped: '(略過 {count} 個受保護區塊)',
+  aiViewOnlyNotice: '唯讀文件:AI 可以閱讀並回答問題,但無法編輯。',
 } satisfies Record<keyof typeof zh, string>

@@ -28,8 +28,6 @@ export const es = {
   replaceAll: 'Reemplazar todo',
   findTip: 'Buscar y reemplazar (⌘F)',
   autoSaveTip: 'Guarda cada 30 segundos y al perder el foco la ventana',
-  autoSaveUniworkOff:
-    'El autoguardado está desactivado para los documentos de UniWork. Usa Guardar para guardar una versión nueva.',
   zoom: 'Zoom',
   zoomIn: 'Acercar',
   zoomOut: 'Alejar',

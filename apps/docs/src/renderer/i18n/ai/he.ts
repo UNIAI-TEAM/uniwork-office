@@ -176,4 +176,5 @@ export const he = {
   aiCmdImages: 'עודכנו {count} תמונות',
   aiCmdToc: 'הוסף תוכן עניינים ({count} ערכים)',
   aiCmdSkipped: ' (דולגו {count} בלוקים מוגנים)',
+  aiViewOnlyNotice: 'מסמך לצפייה בלבד: ה-AI יכול לקרוא אותו ולענות על שאלות, אך לא לערוך אותו.',
 } satisfies Record<keyof typeof zh, string>

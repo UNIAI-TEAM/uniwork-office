@@ -9083,6 +9083,12 @@ body.docs-crop-active
   color: var(--text);
 }
 
+.ai-viewonly-notice {
+  margin-bottom: 7px;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+}
+
 .ai-attach-notice {
   margin-bottom: 7px;
   font-size: 11.5px;

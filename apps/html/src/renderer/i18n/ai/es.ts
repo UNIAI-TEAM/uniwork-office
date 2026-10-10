@@ -178,4 +178,6 @@ export const es = {
   aiStarterAnnouncementPrompt: 'Redacta un anuncio de producto para mí. Producto y puntos clave: ',
   aiStarterGuide: 'Escribir una guía práctica',
   aiStarterGuidePrompt: 'Escribe una guía práctica para mí. El proceso a explicar: ',
+  aiViewOnlyNotice:
+    'Documento de solo lectura: la IA puede leerlo y responder preguntas, pero no puede editarlo.',
 } satisfies Record<keyof typeof zh, string>

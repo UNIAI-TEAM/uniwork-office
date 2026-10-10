@@ -170,4 +170,5 @@ export const he = {
   aiStarterAnnouncementPrompt: 'נסח לי הודעה על מוצר. המוצר והנקודות העיקריות: ',
   aiStarterGuide: 'לכתוב מדריך',
   aiStarterGuidePrompt: 'כתוב לי מדריך. התהליך שיש להסביר: ',
+  aiViewOnlyNotice: 'מסמך לצפייה בלבד: ה-AI יכול לקרוא אותו ולענות על שאלות, אך לא לערוך אותו.',
 } satisfies Record<keyof typeof zh, string>

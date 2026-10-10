@@ -181,4 +181,6 @@ export const hi = {
   aiCmdImages: '{count} चित्र अपडेट किए गए',
   aiCmdToc: 'विषय-सूची सम्मिलित की गई ({count} प्रविष्टियाँ)',
   aiCmdSkipped: ' ({count} सुरक्षित ब्लॉक छोड़े गए)',
+  aiViewOnlyNotice:
+    'केवल-देखने योग्य दस्तावेज़: AI इसे पढ़ सकता है और प्रश्नों के उत्तर दे सकता है, लेकिन संपादित नहीं कर सकता।',
 } satisfies Record<keyof typeof zh, string>

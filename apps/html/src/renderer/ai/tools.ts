@@ -915,13 +915,38 @@ export function createHtmlSkillCore(access: HtmlDocAccess): {
   }
 }
 
-export function createHtmlSkill(access: HtmlDocAccess, systemPrompt: string): AgentSkill {
+/** the only tools a view-only UniWork document keeps: they read the page, none writes it */
+export const READ_ONLY_TOOLS: ReadonlySet<string> = new Set(['get_outline', 'read_source'])
+
+const VIEW_ONLY_NOTE =
+  '\n\nNote: this document is view-only. You can read it and answer questions about it, but you cannot edit it: no edit tools are available. If the user asks for a change, explain that the document is view-only and that they can save a copy to edit it.'
+
+export function createHtmlSkill(
+  access: HtmlDocAccess,
+  systemPrompt: string,
+  /** live predicate: a view-only UniWork document, where the assistant may read but never edit */
+  isReadOnly?: () => boolean,
+): AgentSkill {
   const core = createHtmlSkillCore(access)
   return {
     id: 'html',
-    systemPrompt,
-    tools: AGENT_TOOLS,
+    // live: the predicate is re-read before every model request
+    get systemPrompt() {
+      return isReadOnly?.() ? systemPrompt + VIEW_ONLY_NOTE : systemPrompt
+    },
+    get tools() {
+      return isReadOnly?.() ? AGENT_TOOLS.filter((t) => READ_ONLY_TOOLS.has(t.name)) : AGENT_TOOLS
+    },
     buildContext: () => core.buildContext(),
-    executeTool: (call, signal) => core.executeTool(call, signal),
+    executeTool: (call, signal) => {
+      if (isReadOnly?.() && !READ_ONLY_TOOLS.has(call.name)) {
+        return {
+          output: 'This document is view-only; it cannot be edited.',
+          isError: true,
+          summary: call.name,
+        }
+      }
+      return core.executeTool(call, signal)
+    },
   }
 }

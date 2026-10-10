@@ -197,7 +197,6 @@ export const ar = {
   appFootnotePlaceholder: 'نص الحاشية السفلية…',
   appEndnotePlaceholder: 'نص التعليق الختامي…',
   appAutoSave: 'حفظ تلقائي',
-  appAutoSaveUniworkTip: 'الحفظ التلقائي متوقف لمستندات UniWork. استخدم «حفظ» لحفظ إصدار جديد.',
   appAutoSaveTip: 'حفظ تلقائي (كل 30 ثانية وعند فقدان النافذة للتركيز)',
   appSaveShortcutTip: 'حفظ (⌘S)',
   appUndo: 'تراجع',

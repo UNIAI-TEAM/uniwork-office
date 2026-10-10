@@ -98,6 +98,7 @@ export function AiPanel({
   onRunDone,
   onClearSelection,
   open = true,
+  readOnly = false,
 }: {
   api: PdfAppDeps
   /** Absolute path of the open PDF (chat history is keyed to it) */
@@ -111,6 +112,8 @@ export function AiPanel({
   onClearSelection?: () => void
   /** false keeps the instance mounted (chat state) but skips panel render work */
   open?: boolean
+  /** a view-only document: the assistant reads and answers, it never edits */
+  readOnly?: boolean
 }): ReactElement | null {
   const { lang, t } = useI18n()
   const [chat, setChat] = useState<ChatEntry[]>([])
@@ -776,6 +779,11 @@ export function AiPanel({
       </div>
 
       <div className="ai-composer">
+        {readOnly && (
+          <div className="ai-readonly-notice" role="note">
+            {t('aiViewOnlyNotice')}
+          </div>
+        )}
         <AiComposer
           value={prompt}
           busy={busy}

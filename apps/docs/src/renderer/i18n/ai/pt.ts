@@ -186,4 +186,6 @@ export const pt = {
   aiCmdImages: '{count} imagem(ns) atualizada(s)',
   aiCmdToc: 'Sumário inserido ({count} entradas)',
   aiCmdSkipped: ' ({count} bloco(s) protegido(s) ignorado(s))',
+  aiViewOnlyNotice:
+    'Documento somente leitura: a IA pode lê-lo e responder a perguntas, mas não pode editá-lo.',
 } satisfies Record<keyof typeof zh, string>

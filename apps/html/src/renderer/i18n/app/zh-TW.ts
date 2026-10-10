@@ -28,7 +28,6 @@ export const zhTW = {
   replaceAll: '全部取代',
   findTip: '尋找與取代 (⌘F)',
   autoSaveTip: '每 30 秒及視窗失焦時自動儲存',
-  autoSaveUniworkOff: 'UniWork 文件不使用自動儲存。請用「儲存」來儲存新版本。',
   zoom: '縮放',
   zoomIn: '放大',
   zoomOut: '縮小',

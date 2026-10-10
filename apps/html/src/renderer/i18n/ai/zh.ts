@@ -165,4 +165,5 @@ export const zh = {
   aiStarterAnnouncementPrompt: '帮我起草一则产品公告。产品和要点：',
   aiStarterGuide: '写一份操作指南',
   aiStarterGuidePrompt: '帮我写一份操作指南。要讲清的流程是：',
+  aiViewOnlyNotice: '仅查看文档:AI 可以阅读并回答问题,但无法编辑。',
 }

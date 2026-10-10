@@ -229,4 +229,6 @@ export const cs = {
   aiSumTemplatesEmpty: 'Šablony stylu (prázdné)',
   aiSumListTemplates: 'Vypsáno šablon stylu: {count}',
   aiPageCloudToLocal: 'Cloud není dostupný — vygenerováno lokálně',
+  aiViewOnlyNotice:
+    'Dokument jen pro čtení: AI jej může číst a odpovídat na otázky, ale nemůže jej upravovat.',
 } satisfies Record<keyof typeof zh, string>

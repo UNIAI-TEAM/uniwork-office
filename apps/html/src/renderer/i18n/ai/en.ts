@@ -174,4 +174,6 @@ export const en = {
   aiStarterAnnouncementPrompt: 'Draft a product announcement for me. Product and key points: ',
   aiStarterGuide: 'Write a how-to guide',
   aiStarterGuidePrompt: 'Write a how-to guide for me. The process to explain: ',
+  aiViewOnlyNotice:
+    'View-only document: AI can read it and answer questions, but editing is turned off.',
 } satisfies Record<keyof typeof zh, string>

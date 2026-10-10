@@ -190,7 +190,6 @@ export const zhTW = {
   appFootnotePlaceholder: '註腳內容…',
   appEndnotePlaceholder: '章節附註內容…',
   appAutoSave: '自動儲存',
-  appAutoSaveUniworkTip: 'UniWork 文件已關閉自動儲存。請使用「儲存」儲存新版本。',
   appAutoSaveTip: '自動儲存(每 30 秒及視窗失去焦點時)',
   appSaveShortcutTip: '儲存 (⌘S)',
   appUndo: '復原',

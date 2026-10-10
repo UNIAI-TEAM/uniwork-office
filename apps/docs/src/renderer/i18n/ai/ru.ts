@@ -183,4 +183,6 @@ export const ru = {
   aiCmdImages: 'Обновлено изображений: {count}',
   aiCmdToc: 'Вставлено оглавление (элементов: {count})',
   aiCmdSkipped: ' (пропущено защищенных блоков: {count})',
+  aiViewOnlyNotice:
+    'Документ только для просмотра: ИИ может читать его и отвечать на вопросы, но не может редактировать.',
 } satisfies Record<keyof typeof zh, string>

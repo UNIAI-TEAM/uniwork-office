@@ -230,4 +230,6 @@ export const nl = {
   aiSumTemplatesEmpty: 'Stijlsjablonen (leeg)',
   aiSumListTemplates: '{count} stijlsjablonen weergegeven',
   aiPageCloudToLocal: 'Cloud niet beschikbaar — lokaal gegenereerd',
+  aiViewOnlyNotice:
+    'Alleen-lezen document: AI kan het lezen en vragen beantwoorden, maar niet bewerken.',
 } satisfies Record<keyof typeof zh, string>
