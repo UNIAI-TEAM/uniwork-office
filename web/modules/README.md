@@ -19,7 +19,7 @@ Each `<module>/` has:
   theme/locale, `window.open` guard, capability object, safe no-op Proxy, in-memory `projectApi`) is shared; the module's
   file APIs (open/save/export over `api.*` requests) are added here by the module's worker.
 
-Text modules (`markdown`, `html`): `shared/` holds their common bridge (UTF-8 codec keeping BOM/EOL, open/save/
+Text modules (`markdown`, `html`): see also `docs/web-modules/markdown-html.md` (pictures and sibling files, export entries, use-the-app messages). `shared/` holds their common bridge (UTF-8 codec keeping BOM/EOL, open/save/
 conflict/view-only/print, pictures, static HTML copy for the sandboxed preview); see
 `docs/web-modules/markdown-html.md`. Tests: `npx vitest run --root web/modules` (part of `npm run test:web`).
 

@@ -181,6 +181,7 @@ export function createTextWebApi(
     canUpload: () => imagesGranted,
   })
   let imagesGranted = false
+  let desktopOpenGranted = false
 
   const viewOnly = (): boolean => !saveGranted || inexact
 
@@ -240,6 +241,8 @@ export function createTextWebApi(
     const decoded = decodeText(await readSource(open.source))
     remember(open.file)
     assets.reset(open.assets)
+    // a mapped picture the host refuses (revoked share, expired signature) is missing, not broken
+    await assets.verify()
     inexact = !decoded.exact
     if (inexact) {
       console.warn(`[office-web] ${open.file.name} is not valid UTF-8: opened view only`)
@@ -265,6 +268,7 @@ export function createTextWebApi(
     .then((s) => {
       saveGranted = s.capabilities?.save === true
       imagesGranted = s.capabilities?.images === true
+      desktopOpenGranted = s.capabilities?.desktopOpen === true
       initDocumentId = s.documentId
       return s.open ? accept(s.open) : openById(s.documentId)
     })
@@ -753,7 +757,10 @@ export function createTextWebApi(
     decodeBase64: base64ToBytes,
 
     async pickImage(): Promise<string | null> {
-      const [file] = await pickFiles('image/png,image/jpeg,image/gif,.png,.jpg,.jpeg,.gif', false)
+      const [file] = await pickFiles(
+        'image/png,image/jpeg,image/gif,image/webp,.png,.jpg,.jpeg,.gif,.webp',
+        false,
+      )
       if (!file) return null
       const ext = (file.name.split('.').pop() ?? '').toLowerCase()
       return assets.store(new Uint8Array(await file.arrayBuffer()), ext)
@@ -765,6 +772,28 @@ export function createTextWebApi(
     },
 
     readImage: (src: string) => assets.read(src),
+
+    /**
+     * web-only (use-the-app messages): the host's "Open in desktop app" flow (CONTRACT A7). Sends
+     * nothing unless the host granted `desktopOpen`; no request timeout (the host may wait on its
+     * own unsaved-changes dialog for as long as the user takes). `unavailable` means the host
+     * already showed its own alert: the frame shows no second error.
+     */
+    async openInDesktopApp(feature?: string): Promise<'launched' | 'installer' | 'unavailable'> {
+      if (!desktopOpenGranted) return 'unavailable'
+      try {
+        const res = await port.request('app.open', feature ? { feature } : {}, {
+          timeoutMs: TIMEOUTS.dialog,
+        })
+        return res.outcome
+      } catch (err) {
+        console.warn('[office-web] app.open failed:', err)
+        return 'unavailable'
+      }
+    },
+
+    /** web-only (HTML preview): text of a mapped sibling file (a stylesheet or script next to the page) */
+    readAssetText: (src: string): Promise<string | null> => assets.readText(src),
 
     /** web-only: display URL of a relative document picture (null = not mapped) */
     resolveAssetUrl: (src: string): string | null => assets.resolve(src),

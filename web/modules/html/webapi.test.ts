@@ -31,7 +31,11 @@ const FULL: Capabilities = {
   images: true,
 }
 
-function setup(caps: Capabilities = FULL, drafts?: TextWebApiOptions['drafts']) {
+function setup(
+  caps: Capabilities = FULL,
+  drafts?: TextWebApiOptions['drafts'],
+  assets: Record<string, string> = { 'assets/p.png': '/files/p' },
+) {
   const mock = createMockPort()
   const file = mock.seed('Page.html', enc(PAGE))
   const print = vi.fn(async (_html: string) => ({ ok: true }))
@@ -51,7 +55,7 @@ function setup(caps: Capabilities = FULL, drafts?: TextWebApiOptions['drafts']) 
   mock.init({
     documentId: file.fileId,
     capabilities: caps,
-    open: { ...mock.openPayload(file.fileId), assets: { 'assets/p.png': '/files/p' } },
+    open: { ...mock.openPayload(file.fileId), assets },
   })
   return { mock, file, api, print }
 }
@@ -157,6 +161,68 @@ describe('htmlApi', () => {
     vi.useRealTimers()
     channel.close()
     ports[0]!.close()
+  })
+
+  it('the scripts preview inlines mapped stylesheets, scripts and pictures (UNI-1232 A1)', async () => {
+    const { api } = setup(FULL, undefined, {
+      'assets/p.png': '/files/p',
+      'style.css': '/files/css',
+      'app.js': '/files/js',
+    })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) =>
+        url === '/files/css'
+          ? new Response('p{color:red}', { headers: { 'content-type': 'text/css' } })
+          : url === '/files/js'
+            ? new Response('window.__x=1', { headers: { 'content-type': 'text/javascript' } })
+            : new Response(new Uint8Array([1, 2, 3]), {
+                headers: { 'content-type': 'image/webp' },
+              }),
+      ),
+    )
+    await api.consumePending()
+    api.updatePreview(
+      '<html><head><link rel="stylesheet" href="style.css"><script src="app.js"></script></head><body><img src="assets/p.png"></body></html>',
+    )
+    let sent: { html: string } | null = null
+    const target = {
+      postMessage: (data: { html: string }) => (sent = data),
+    } as unknown as Window
+    const channel = api.connectPreview(target, { onMessage: vi.fn(), onFailed: vi.fn() })
+    await vi.waitFor(() => expect(sent).not.toBeNull())
+    expect(sent!.html).toBe(
+      '<html><head><style>p{color:red}</style><script>window.__x=1</script></head><body><img src="data:image/webp;base64,AQID"></body></html>',
+    )
+    channel.close()
+    vi.unstubAllGlobals()
+  })
+
+  it('openInDesktopApp sends app.open only with the desktopOpen grant, without a request timeout', async () => {
+    const granted = setup({ ...FULL, desktopOpen: true })
+    granted.mock.override('app.open', () => ({ outcome: 'launched' }))
+    await granted.api.consumePending()
+    expect(await granted.api.openInDesktopApp('html.preview')).toBe('launched')
+    const call = granted.mock.calls.find((c) => c.type === 'app.open')!
+    expect(call.payload).toEqual({ feature: 'html.preview' })
+    // 0 = wait for the host's own unsaved-changes dialog as long as the user takes
+    expect(call.opts?.timeoutMs).toBe(0)
+    expect(granted.api.capabilities.desktopOpen).toBe(true)
+
+    const plain = setup()
+    await plain.api.consumePending()
+    expect(await plain.api.openInDesktopApp('html.preview')).toBe('unavailable')
+    expect(plain.mock.calls.some((c) => c.type === 'app.open')).toBe(false)
+    expect(plain.api.capabilities.desktopOpen).toBe(false)
+  })
+
+  it('a failed app.open is quiet: the host shows its own alert', async () => {
+    const { api, mock } = setup({ ...FULL, desktopOpen: true })
+    mock.override('app.open', () => Promise.reject(new Error('host gone')))
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    await api.consumePending()
+    expect(await api.openInDesktopApp()).toBe('unavailable')
+    warn.mockRestore()
   })
 
   it('print / export PDF prints the static copy of the document', async () => {

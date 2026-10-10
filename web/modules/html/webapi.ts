@@ -31,6 +31,8 @@ import { inlineAssetsForPreview } from './preview-copy'
 export const HTML_WEB_CAPABILITIES = Object.freeze({
   // scripts run in the sandboxed preview.html (opaque origin, credentialless)
   htmlPreviewScripts: true,
+  // the preview's policy blocks fetch/XHR and nested frames (the renderer shows one note)
+  htmlPreviewNetwork: false,
   // visual edit writes the source: on with the host's `save` grant (./install.ts)
   htmlVisualEdit: false,
   // a chrome-free shell tab; the in-frame present mode stays
@@ -62,6 +64,8 @@ export function createHtmlWebApi(ctx: ModuleBridgeContext, opts: TextWebApiOptio
   let preview = ''
   const previewListeners = new Set<(html: string) => void>()
   const inlined = new Map<string, string>()
+  /** mapped sibling stylesheets / scripts (src -> text), kept per frame like the picture cache */
+  const inlinedText = new Map<string, string>()
 
   const api = {
     consumePending: web.consumePending,
@@ -169,11 +173,16 @@ export function createHtmlWebApi(ctx: ModuleBridgeContext, opts: TextWebApiOptio
       handlers: { onMessage: (data: unknown) => void; onFailed: () => void },
     ) {
       return openPreviewChannel(target, {
-        html: () => inlineAssetsForPreview(source, web.resolveAssetUrl, web.readImage, inlined),
+        html: () =>
+          inlineAssetsForPreview(source, web.resolveAssetUrl, web.readImage, inlined, {
+            read: web.readAssetText,
+            cache: inlinedText,
+          }),
         ...handlers,
       })
     },
     resolveAssetUrl: web.resolveAssetUrl,
     unresolveAssetUrl: web.unresolveAssetUrl,
+    openInDesktopApp: web.openInDesktopApp,
   })
 }

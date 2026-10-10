@@ -6,6 +6,11 @@
 //        (structured clone, never exported) in IndexedDB "uniwork-office-frame-drafts", store "keys",
 //        key "test-user": a frame reload, a host page reload and a second tab all get the same key
 //        &ai=1 grants `ai` + webSearch/imageSearch/imageGeneration (fake AI routes, web/server/fake-ai.mjs)
+//        &images=1 grants `images`: api.images.upload keeps the bytes (__host.uploads()) and answers
+//        {imageId, url: /e2e-assets/<name>}; the spec serves that URL with page.route (UNI-1232 A1)
+//        &assets=<json> puts {path as written: same-origin URL} into api.open's OpenPayload.assets
+//        &desktopOpen=1 grants `desktopOpen`: app.open requests are kept (__host.appOpens()) and answered with
+//        &appOpen=<launched|installer|unavailable> (default launched) (UNI-1232 A7)
 //
 // module (default docs): the frame defaults to /office-frame/<module>/<version|latest>/index.html (docs keeps
 // the site root, as before), `init.module` names the module, and the host refuses a frame whose
@@ -25,6 +30,8 @@
 //   send(type, p)    -> send a host->frame event (theme / language / ...)
 //   bumpRemote(id)   -> simulate a concurrent server-side save (next frame save conflicts)
 //   lastExport()     -> {fileId, name, dataBytes: number[] | null} of the last api.export | null
+//   uploads()        -> the api.images.upload requests so far ({fileId, name, mimeType, bytes: number[]})
+//   appOpens()       -> the app.open requests so far ({feature})
 //   addFile(url)     -> fetch a fixture into the store, resolves with its meta (GO-B4)
 //   queuePick(id)    -> the next file.pick answers this file (nothing queued = the user cancelled);
 //                       file.pick is granted with ?pick=1
@@ -44,6 +51,8 @@ let seq = 0
 let lastSaved = null
 let lastExport = null
 const events = []
+const uploads = [] // api.images.upload requests: {fileId, name, mimeType, bytes}
+const appOpens = [] // app.open requests: {feature}
 const picks = [] // fileIds the next file.pick requests answer, in order
 const pending = new Map() // id -> {resolve, reject}
 let reqSeq = 0
@@ -81,7 +90,11 @@ const handlers = {
   'api.open': ({ fileId }) => {
     const f = files.get(fileId)
     if (!f) throw apiError('not_found', `no file ${fileId}`, 404)
-    return { file: { ...f.meta }, source: { kind: 'bytes', data: f.bytes.slice().buffer } }
+    return {
+      file: { ...f.meta },
+      source: { kind: 'bytes', data: f.bytes.slice().buffer },
+      ...(ASSETS ? { assets: ASSETS } : {}),
+    }
   },
   'api.save': ({ fileId, data, etag }) => {
     const f = files.get(fileId)
@@ -111,6 +124,14 @@ const handlers = {
         ? { file: { ...f.meta }, source: { kind: 'bytes', data: f.bytes.slice().buffer } }
         : null,
     }
+  },
+  'api.images.upload': ({ fileId, name, mimeType, data }) => {
+    uploads.push({ fileId, name, mimeType, bytes: Array.from(new Uint8Array(data)) })
+    return { imageId: `img-${uploads.length}`, url: `/e2e-assets/${name}` }
+  },
+  'app.open': (payload) => {
+    appOpens.push({ feature: payload?.feature })
+    return { outcome: params.get('appOpen') || 'launched' }
   },
   // no server render in the harness: record what the frame sent, answer a stub PDF
   'api.export': ({ fileId, name, data }) => {
@@ -212,6 +233,9 @@ if (params.get('ai') === '1') {
   })
 }
 if (params.get('pick') === '1') initPayload.capabilities.filePick = true
+if (params.get('images') === '1') initPayload.capabilities.images = true
+if (params.get('desktopOpen') === '1') initPayload.capabilities.desktopOpen = true
+const ASSETS = params.get('assets') ? JSON.parse(params.get('assets')) : null
 
 const KEY_DB = 'uniwork-office-frame-drafts'
 const KEY_USER = 'test-user'
@@ -296,6 +320,8 @@ async function boot() {
     signOut,
     lastSaved: () => (lastSaved ? { ...lastSaved, bytes: Array.from(lastSaved.bytes) } : null),
     lastExport: () => lastExport,
+    uploads: () => uploads.map((u) => ({ ...u })),
+    appOpens: () => appOpens.map((a) => ({ ...a })),
     events,
     files: () => [...files.values()].map((f) => ({ ...f.meta, size: f.bytes.byteLength })),
     request,

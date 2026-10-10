@@ -20,6 +20,8 @@ export const TEXT_MODULE_WEB_CAPABILITIES: Readonly<Record<string, unknown>> = O
   save: false,
   // pictures go to the asset store only with the host's `images` grant (else embedded)
   images: false,
+  // "Open in the UniWork Office app" action of the use-the-app messages: on with the host's `desktopOpen` grant
+  desktopOpen: false,
 })
 
 /**
@@ -32,5 +34,6 @@ export function textModuleGrants(granted: Capabilities | undefined): Record<stri
     recents: granted?.recents === true,
     save: granted?.save === true,
     images: granted?.images === true,
+    desktopOpen: granted?.desktopOpen === true,
   }
 }

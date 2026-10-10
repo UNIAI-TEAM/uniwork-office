@@ -408,6 +408,54 @@ describe('markdownApi: pictures and exports', () => {
     expect(noGrant.mock.calls.some((c) => c.type === 'api.images.upload')).toBe(false)
   })
 
+  it('WebP pastes upload as assets, an SVG stays a data: URI (UNI-1232 A1)', async () => {
+    const { api, mock } = setup()
+    await open(api)
+    const webp = await api.saveImage({ base64: 'UklGRg==', ext: 'webp' })
+    expect(webp).toMatch(/^assets\/image-\d{8}-\d{6}-[a-z0-9]+\.webp$/)
+    const upload = mock.calls.find((c) => c.type === 'api.images.upload')!
+    expect(upload.payload).toMatchObject({ mimeType: 'image/webp' })
+    expect(api.resolveAssetUrl(webp!)).toBe('/img/i1')
+    expect(await api.saveImage({ base64: 'PHN2Zy8+', ext: 'svg' })).toBe(
+      'data:image/svg+xml;base64,PHN2Zy8+',
+    )
+    expect(mock.calls.filter((c) => c.type === 'api.images.upload')).toHaveLength(1)
+  })
+
+  it('a mapped URL the host answers 401/403 to shows the missing-picture placeholder, not a broken icon', async () => {
+    const mock = createMockPort()
+    const file = mock.seed('Pics.md', enc('![a](assets/a.png) ![b](assets/b.webp) ![c](c.svg)\n'))
+    const target: Record<string, unknown> = {}
+    installModuleBridge({
+      module: 'markdown',
+      frameCapabilities: FULL,
+      globals: { markdownApi: (ctx) => createMarkdownWebApi(ctx) },
+      client: mock.port,
+      target,
+    })
+    const api = target.markdownApi as Api
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => new Response(null, { status: url === '/files/a' ? 200 : 403 })),
+    )
+    mock.init({
+      documentId: file.fileId,
+      capabilities: FULL,
+      open: {
+        ...mock.openPayload(file.fileId),
+        assets: { 'assets/a.png': '/files/a', 'assets/b.webp': '/files/b', 'c.svg': '/files/c' },
+      },
+    })
+    await open(api)
+    expect(api.resolveAssetUrl('assets/a.png')).toBe('/files/a')
+    for (const src of ['assets/b.webp', 'c.svg']) {
+      const url = api.resolveAssetUrl(src, 'not available')!
+      expect(api.isMissingAsset(url)).toBe(true)
+      expect(api.unresolveAssetUrl(url)).toBe(src)
+    }
+    vi.unstubAllGlobals()
+  })
+
   it('exportDocx downloads the renderer-built bytes; open-in-Docs is refused', async () => {
     const { api } = setup()
     const create = vi.fn(() => 'blob:x')

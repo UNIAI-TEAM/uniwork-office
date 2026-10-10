@@ -21,6 +21,7 @@ export const bridge = installModuleBridge({
     exportPdf: true,
     exportHtml: true,
     images: true,
+    desktopOpen: true,
   },
   capabilities: {
     defaults: { ...TEXT_MODULE_WEB_CAPABILITIES, ...HTML_WEB_CAPABILITIES },

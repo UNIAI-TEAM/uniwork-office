@@ -117,7 +117,8 @@ describe('asset store', () => {
     const store = createAssetStore(mock.port, { fileId: () => 'f1', canUpload: () => false })
     store.reset({ './assets/a.png': '/u/a' })
     expect(store.resolve('assets/a.png')).toBe('/u/a')
-    expect(store.unresolve('/u/a')).toBe('assets/a.png')
+    // the document's own spelling comes back (a copy/paste inside the editor must not rewrite it)
+    expect(store.unresolve('/u/a')).toBe('./assets/a.png')
     expect(store.resolve('assets/b.png')).toBeNull()
     expect(await store.read('data:image/png;base64,iVBORw0KGgo=')).toEqual({
       mime: 'image/png',

@@ -34,18 +34,29 @@ text-module bridge. Contract: lane CONTRACT C1-C13, protocol `web/docs/protocol`
   (these renderers load one document per frame load).
 - **View only.** Without the host's `save` grant: `cap('save')` is false, the editor / source pane is read-only, the
   ribbon is disabled, the status bar shows "View only", every write is refused in the bridge too.
-- **Pictures.** With the `images` grant pasted / inserted pictures go to `api.images.upload` and the document gets
-  `assets/<name>`; without it (or when the upload fails) they are embedded as data: URIs. `OpenPayload.assets` maps
-  relative paths to same-origin URLs (Markdown: `localImage.ts` asks `markdownApi.resolveAssetUrl`; HTML: the static
-  preview copy). Mermaid diagrams render through `<img src="data:image/svg+xml,...">` (M0).
+- **Pictures (CONTRACT A1, UNI-1232).** With the `images` grant pasted / dropped / inserted PNG, JPEG, GIF and WebP
+  pictures go to `api.images.upload` and the document gets `assets/<name>`; a pasted SVG, a picture without the grant
+  and a failed upload are embedded as data: URIs. `OpenPayload.assets` maps relative paths **as written in the
+  document** to same-origin URLs: `assets.resolve` tries the exact key, then without `./`, then percent-decoded and
+  without `?query` / `#fragment`; `unresolve` hands the editor back the document's own spelling. WebP and SVG display
+  and read like the raster formats (`assets.read`: DOCX export, single-file HTML). A mapped URL the host answers
+  401/403/404/410 to (revoked share, expired signature) counts as missing: `assets.verify()` runs one bounded HEAD
+  probe per distinct URL (6 at a time, 4 s in all, same origin, no cookies) when a document opens and drops the
+  refused ones, so the renderer draws its missing-picture placeholder with the localised explanation instead of a
+  broken-image icon (a network error or a host without HEAD keeps the URL). Markdown: `localImage.ts` asks
+  `markdownApi.resolveAssetUrl`; HTML: the preview copy (below). Mermaid diagrams render through
+  `<img src="data:image/svg+xml,...">` (M0).
 - **HTML preview with scripts (H2, CONTRACT C15(1), like the app).** `getPreviewInfo` names the bundle's
   `preview.html`; `PreviewFrame` loads it with `sandbox="allow-scripts allow-forms allow-popups allow-modals"` (no
   `allow-same-origin`: opaque origin), `credentialless` and `referrerpolicy="no-referrer"`. The host serves it with a
   policy of its own (`web/docs/build/README.md`, "Documents with their own policy"): `sandbox` repeated in the header,
   `connect-src 'none'`, `form-action 'none'`, no `'self'`, `https:` + inline scripts / styles / pictures / fonts. The
   frame's own policy only gains `frame-src 'self'`. Handshake (`web/modules/html/preview-channel.ts`): on the first
-  load of each `?v=<n>&k=<random>`, the frame posts ONE `init` (page source, document pictures inlined as data: URIs by
-  `preview-copy.ts`) with a `MessagePort`; `preview.html` accepts it only from its parent, once, with exactly one port,
+  load of each `?v=<n>&k=<random>`, the frame posts ONE `init` (page source; what `preview-copy.ts` brings in from the
+  document's own folder, because the preview policy names no `'self'`: pictures as data: URIs, a mapped
+  `<link rel="stylesheet">` as an inline `<style>` and a mapped `<script src>` as an inline `<script>`, `</style` /
+  `</script` escaped, a classic `defer` script moved to the end of the body, `media` and the other attributes kept; a
+  file the host refuses keeps its tag as written; text files up to 2 MiB, read once per document) with a `MessagePort`; `preview.html` accepts it only from its parent, once, with exactly one port,
   acknowledges on the port and `document.write`s the page. The inspector (`inspector.js`) talks only over that port
   (`window.__gxPreviewPort`). The only window message the frame reads in this mode is the preview document's `hello`
   `{ns, type: 'hello', k}`: a page that reloads itself (`location.reload()`, `<meta refresh>`) loads `preview.html`
@@ -91,6 +102,25 @@ text-module bridge. Contract: lane CONTRACT C1-C13, protocol `web/docs/protocol`
   adapter's own failure text (e.g. "Claude HTTP 404: {...}" for a missing key) map to missing / refused key (with an
   "AI settings" action), credits used up, not in the plan, rate limit, provider or cloud unavailable, session
   expired. Below 900 px the panel starts closed unless the user opened it before.
+- **Export entries (UNI-1232 A5).** On the desktop Word and single-file HTML come from the shell File menu; the web
+  frame has no menu, so the ribbon's quick-access row carries one entry each, shown when the platform is `web`:
+  Markdown **Export Word** (the renderer builds the .docx, `exportDocx` downloads it) and HTML **Export HTML**
+  (`exportHtml` downloads the single file with mapped pictures inlined). A reader can export (it only reads); a
+  failed export is announced (Markdown toast, HTML status notice). A `.txt` / `.json` source file has no rendered
+  document, so its entry is off. No host route is needed: the bridge builds a blob download.
+- **Source panes follow view-only (UNI-1232 A3).** The `.txt` / `.json` source editor (CodeMirror) takes a read-only
+  compartment and the Markdown source view's textarea is `readOnly`; neither marks the document dirty nor reaches a
+  save, and the change handlers refuse an edit as a backstop.
+- **Draft copy and visual edit (UNI-1232 A6).** A style poke from the inspector or the style panel reaches the source
+  600 ms later. The text the draft writer reads (`provideText`) applies the pending `set_style` to the copy
+  (`document/pending-draft.ts`) and lands an open panel field first, without committing anything in the editor, so a
+  checkpoint inside that window (or a `pagehide`) keeps the user's last change.
+- **Use-the-app messages (UNI-1232 B).** `desktopOpen` is granted by the host and `openInDesktopApp(feature)` sends
+  the single `app.open` request (no request timeout: the host may wait on its unsaved-changes dialog; `unavailable`
+  = the host already showed its own alert). HTML preview: a page that uses `fetch` / XHR or nested frames gets one
+  note above the preview, in the preview chrome and never inside the document ("... Open in the UniWork Office app to
+  use this feature", with **Open in app** while `desktopOpen` is on); capability `htmlPreviewNetwork` is off on the
+  web, so the desktop shows nothing.
 - **Hidden on both.** `autoSave` (toggle + timer), Markdown `openInDocs`, `createDocument`, `billing`.
 - **Pictures the host has no copy of.** A relative picture in a single uploaded `.md` (no sibling `assets/`) shows a
   labelled placeholder with its path instead of a broken-image icon; the saved Markdown keeps `![](path)`.
@@ -99,13 +129,11 @@ text-module bridge. Contract: lane CONTRACT C1-C13, protocol `web/docs/protocol`
 
 ## Gaps (v1)
 
-- No Source mode in the Markdown frame (lane decision 3): raw HTML / comments are preserved byte-identically (M0) and
-  shown as text, but cannot be edited as source.
-- Export entries: on the desktop Markdown "Export Word" and HTML "Export HTML" come from the shell menu; the
-  protocol has no host request for them, so on the web only print / PDF (host `print`) is reachable. The bridge
-  implements `exportDocx` (download) and `exportHtml` (single file, mapped pictures inlined) for when a ribbon entry
-  or a host request is added.
-- HTML preview: pages that `fetch` / XHR data cannot get it (`connect-src 'none'`); nested frames (e.g. video embeds)
-  are blocked (`frame-src 'none'`); document pictures other than PNG / JPEG / GIF (`assets.read`) and sibling files
-  (`style.css` next to the page) are not served to the preview. The UniWork host (dev-uniwork `frame-headers.mjs`)
-  must serve `preview.html` with `csp.json` `documents[0].value`; until it does, the web shows the static preview.
+- Markdown: the source view works on the web (the ribbon's source toggle); what stays out of reach is rendering raw
+  HTML (kept byte-identically and shown as text, never executed).
+- HTML preview: `fetch` / XHR data and nested frames stay blocked by the preview policy (`connect-src 'none'`,
+  `frame-src 'none'`); the note above says so and offers the app. A path typed into a document after it opened (a new
+  `![](x.png)`) resolves on the next open; there is no resolve request yet. The URLs live one hour: a document left
+  open for longer shows its pictures as missing until it is reopened (a re-sign request is the host's to add).
+- The UniWork host (dev-uniwork `frame-headers.mjs`) must serve `preview.html` with `csp.json` `documents[0].value`;
+  until it does, the web shows the static preview.
