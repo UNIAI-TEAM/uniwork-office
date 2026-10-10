@@ -14,6 +14,7 @@ import {
 } from '@genoffice/agent-core'
 import type { RenderSlide } from '@genoffice/pptx-render'
 import {
+  aiNoticeBody,
   aiNoticeKind,
   cloudToolsEnabled,
   imageGenerationAvailable,
@@ -2257,7 +2258,7 @@ export function AiPanel({
                 (aiNoticeKind(entry.error) ? (
                   // "nothing to chat with" is a setup / plan state: a plain notice, not a red error
                   <div className="ai-msg-notice" role="status">
-                    {entry.error}
+                    {aiNoticeBody(entry.error)}
                   </div>
                 ) : (
                   <div className="ai-msg-error">{t('aiMsgError', { error: entry.error })}</div>

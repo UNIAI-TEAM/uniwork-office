@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent, ReactElement } from 'react'
 import { AgentLoop } from '@genoffice/agent-core'
 import {
+  aiNoticeBody,
   aiNoticeKind,
   imageGenerationAvailable,
   type AiSettings,
@@ -738,7 +739,7 @@ export function AiPanel({
               {hasTools && <ToolChipList tools={entry.tools!} />}
               {entry.text && (
                 <div dir="auto">
-                  <Markdown text={entry.text} nav={pdfNav} />
+                  <Markdown text={aiNoticeBody(entry.text)} nav={pdfNav} />
                 </div>
               )}
             </div>

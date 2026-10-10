@@ -43,6 +43,6 @@ export type {
   UniworkCloudStatus,
   UniworkCloudTool,
 } from './uniwork-cloud'
-export { aiNoticeKind, aiNoticeKindForCloud, aiNoticeText } from './ai-notice'
+export { aiNoticeBody, aiNoticeKind, aiNoticeKindForCloud, aiNoticeText } from './ai-notice'
 export type { AiNoticeKind } from './ai-notice'
 export { AI_SEARCH_PROVIDERS } from './search-settings'
