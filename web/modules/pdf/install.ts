@@ -19,7 +19,10 @@
  * | saveStatus, viewOnlyChip     | off, from MODULE_WEB_CAPABILITIES (the host header owns the save    |
  * |                              |   state, one host banner owns "view only")                          |
  * | ai, autoSave(ToDisk), auto-  | off (AI stays desktop-only; no autosave on the web, CONTRACT C10;   |
- * |   Rename, convertOffice, ocr,|   the rest need the desktop shell or an OS engine)                  |
+ * |   Rename, convertOffice, ocr,|   the rest need the desktop shell or an OS engine). Convert to      |
+ * |                              |   Office and the OCR notice stay visible and say "use the app"      |
+ * | desktopOpen                  | host grant `desktopOpen` (module-bridge.ts); the "Open in app"      |
+ * |                              |   action of those messages (pdfApi.openInApp -> app.open)          |
  * |   webSearch, imageSearch,    |                                                                     |
  * |   imageGeneration, create-   |                                                                     |
  * |   Document, billing          |                                                                     |

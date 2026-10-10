@@ -6460,7 +6460,7 @@ export default function App() {
             data-tip={`${t('save')} (${platformShortcuts('⌘S')})`}
             aria-label={t('save')}
             disabled={
-              (!dirty && !(uniwork.bound && !uniwork.readOnly)) ||
+              (!dirty && !openBoxesDirty && !(uniwork.bound && !uniwork.readOnly)) ||
               uniwork.readOnly ||
               saveState === 'saving'
             }
