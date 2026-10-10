@@ -37,6 +37,7 @@ import { readSourceText, writeSourceText, type SourceTextFormat } from '../share
 import { PlainTextEditor, type PlainTextEditorHandle } from './source/PlainTextEditor'
 import { buildExtensions } from './editor/extensions'
 import { tiptapFindTarget } from './editor/findTarget'
+import { syncEditorEditable } from './editor/editable-sync'
 import { collectOutline, type OutlineItem } from './editor/outline'
 import { buildSlashItems } from './editor/slashCommand'
 import type { SlashController, SlashMenuState } from './editor/slashCommand'
@@ -307,7 +308,7 @@ export default function App() {
   }, [filePath])
 
   useEffect(() => {
-    editor?.setEditable(!uniwork.readOnly)
+    if (editor) syncEditorEditable(editor, uniwork.readOnly)
   }, [editor, uniwork.readOnly])
 
   /**
