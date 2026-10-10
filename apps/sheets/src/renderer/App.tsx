@@ -508,7 +508,7 @@ import {
   isEditableShape,
 } from './WorkbookVisuals'
 import { ChartFormatPane, SelectDataDialog } from './ChartPanels'
-import { cap } from './capabilities'
+import { cap, isViewOnly } from './capabilities'
 import { EngineUnavailableScreen } from './EngineUnavailableScreen'
 import { isEngineUnavailableError, isTooLargeError } from './web-engine'
 import { handleSheetsControl, type ControlRequest } from './control'
@@ -4401,7 +4401,9 @@ export function App({
         // View-only UniWork document: Univer's workbook permission blocks
         // editing commands (the main process refuses a Save regardless). The
         // lock opens around the loader's own installs so the data still renders.
-        viewOnlyLock.set(selected.readOnly ? workbook : null)
+        // A web frame without the save grant is locked by the view-only command
+        // guard instead (view-only-guard.ts: no Univer permission dialog, its own toast).
+        viewOnlyLock.set(selected.readOnly && !isViewOnly() ? workbook : null)
         // Register existing file tables under their displayName so Univer
         // renders filter dropdowns and resolves structured references. The
         // journal stays empty for file tables, so failures are swallowed —
