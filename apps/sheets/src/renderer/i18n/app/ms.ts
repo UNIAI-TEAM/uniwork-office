@@ -1529,4 +1529,6 @@ export const ms = {
   appWebTooLargeTitle: 'Buku kerja ini terlalu besar untuk web',
   appWebTooLargeBody:
     'Saiznya melebihi had hamparan web, jadi ia dibuka dalam editor hamparan klasik.',
+  appWebEngineRestarted:
+    'Enjin buku kerja berhenti secara tidak dijangka dan telah dimulakan semula. Buku kerja dibuka semula daripada versi terakhir yang disimpan; perubahan yang belum disimpan dikekalkan, sila simpan segera.',
 } satisfies Record<keyof typeof zh, string>

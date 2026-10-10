@@ -1576,4 +1576,6 @@ export const ja = {
   appWebTooLargeTitle: 'このブックは大きすぎて Web では開けません',
   appWebTooLargeBody:
     'Web 版スプレッドシートで扱えるサイズを超えているため、クラシック スプレッドシート エディターで開きます。',
+  appWebEngineRestarted:
+    'ブックのエンジンが予期せず停止し、再起動しました。ブックは最後に保存した状態から開き直しました。未保存の変更は保持されているので、早めに保存してください。',
 } satisfies Record<keyof typeof zh, string>

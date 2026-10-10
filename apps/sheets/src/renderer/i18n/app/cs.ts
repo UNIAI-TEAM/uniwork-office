@@ -1528,4 +1528,6 @@ export const cs = {
   appWebTooLargeTitle: 'Tento sešit je pro web příliš velký',
   appWebTooLargeBody:
     'Překračuje velikost, kterou webová tabulka zvládne, proto se otevře v klasickém tabulkovém editoru.',
+  appWebEngineRestarted:
+    'Modul sešitu se neočekávaně zastavil a byl restartován. Sešit byl znovu otevřen z poslední uložené verze; neuložené změny zůstaly zachovány, brzy je uložte.',
 } satisfies Record<keyof typeof zh, string>

@@ -1554,4 +1554,6 @@ export const pl = {
   appWebTooLargeTitle: 'Ten skoroszyt jest za duży dla wersji internetowej',
   appWebTooLargeBody:
     'Przekracza rozmiar obsługiwany przez arkusz internetowy, więc otworzy się w klasycznym edytorze arkuszy.',
+  appWebEngineRestarted:
+    'Silnik skoroszytu nieoczekiwanie się zatrzymał i został uruchomiony ponownie. Skoroszyt otwarto ponownie z ostatnio zapisanej wersji; niezapisane zmiany zostały zachowane — zapisz je wkrótce.',
 } satisfies Record<keyof typeof zh, string>
