@@ -101,6 +101,8 @@ export const MODULE_WEB_CAPABILITIES: Readonly<Record<string, unknown>> = Object
   ai: false,
   // web only: the AI settings entry (UniWork-stored keys), on with the `ai` grant
   aiCredentials: false,
+  // the host's own "Open in desktop app" action (A7): on only with the `desktopOpen` grant
+  desktopOpen: false,
   open: false,
   recents: false,
   autoSave: false,
@@ -135,14 +137,21 @@ export function installModuleBridge(spec: ModuleBridgeSpec): InstalledModuleBrid
     spec.client ??
     createFrameClient({
       module: spec.module,
-      capabilities: { ...AI_FRAME_CAPABILITIES, ...spec.frameCapabilities },
+      // desktopOpen: every module frame can ask the host for its "Open in desktop app" flow (A7)
+      capabilities: { ...AI_FRAME_CAPABILITIES, desktopOpen: true, ...spec.frameCapabilities },
       frameVersion: frameVersionFromDocument(),
     })
   const grants = spec.capabilities?.grants ?? hostGrants
   const capabilities = createCapabilityObject<Record<string, unknown>>(
     { platform: 'web', ...(spec.capabilities?.defaults ?? MODULE_WEB_CAPABILITIES) },
     client,
-    (granted) => ({ ...aiHostGrants(granted), ...grants(granted) }),
+    (granted) => ({
+      ...aiHostGrants(granted),
+      ...grants(granted),
+      // every module frame can ask the host for its "Open in desktop app" flow (A7); the module's own
+      // grants function does not have to know about it
+      desktopOpen: granted?.desktopOpen === true,
+    }),
   )
   bindHostAppearance(client)
   const ai = createWebAi({ port: client, capabilities })

@@ -5,6 +5,8 @@
 //        AES-GCM key and the scope "test-user:<documentId>". Like the real host, the key is persisted
 //        (structured clone, never exported) in IndexedDB "uniwork-office-frame-drafts", store "keys",
 //        key "test-user": a frame reload, a host page reload and a second tab all get the same key
+//        &desktopopen=1 grants `desktopOpen` (A7): the frame's "Open in app" sends `app.open`, recorded in
+//        __host.appOpens and answered `launched`
 //        &ai=1 grants `ai` + webSearch/imageSearch/imageGeneration (fake AI routes, web/server/fake-ai.mjs)
 //
 // module (default docs): the frame defaults to /office-frame/<module>/<version|latest>/index.html (docs keeps
@@ -31,6 +33,7 @@
 //   newSessionKey()  -> replace the persisted recovery key by a new one (the old drafts stay but cannot be
 //                       read any more); the next init carries it
 //   signOut()        -> delete the whole frame-drafts database (what the real host does on sign-out)
+//   appOpens()       -> the `app.open` payloads received ({feature?}), in order (granted with ?desktopopen=1)
 //   documentId       -> the init document's file id
 
 const NS = 'uniwork.office.docs'
@@ -45,6 +48,7 @@ let lastSaved = null
 let lastExport = null
 const events = []
 const picks = [] // fileIds the next file.pick requests answer, in order
+const appOpens = [] // payloads of the frame's app.open requests
 const pending = new Map() // id -> {resolve, reject}
 let reqSeq = 0
 
@@ -104,6 +108,10 @@ const handlers = {
       .reverse()
       .slice(0, limit ?? 20),
   }),
+  'app.open': (payload) => {
+    appOpens.push(payload)
+    return { outcome: 'launched' }
+  },
   'file.pick': () => {
     const f = files.get(picks.shift())
     return {
@@ -212,6 +220,7 @@ if (params.get('ai') === '1') {
   })
 }
 if (params.get('pick') === '1') initPayload.capabilities.filePick = true
+if (params.get('desktopopen') === '1') initPayload.capabilities.desktopOpen = true
 
 const KEY_DB = 'uniwork-office-frame-drafts'
 const KEY_USER = 'test-user'
@@ -296,6 +305,7 @@ async function boot() {
     signOut,
     lastSaved: () => (lastSaved ? { ...lastSaved, bytes: Array.from(lastSaved.bytes) } : null),
     lastExport: () => lastExport,
+    appOpens: () => appOpens.slice(),
     events,
     files: () => [...files.values()].map((f) => ({ ...f.meta, size: f.bytes.byteLength })),
     request,
