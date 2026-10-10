@@ -12,7 +12,8 @@
 //     cloud                            GET            { enabled, reason?, tools, credits }
 //     cloud/search|images|media/analyze|transcribe  POST
 // Every route wants `Authorization: Bearer <token>` (401 otherwise) and refuses a request that
-// carries a Cookie (the frame must send credentials: 'omit'). Errors are `{ code, message }`:
+// carries a Cookie (the frame must send credentials: 'omit'). Errors use the UniWork envelope
+// `{ error: { code, message } }`:
 // 400 provider_not_supported / base_url_refused, 402 credits_exhausted, 403 entitlement_required,
 // 404 credential_missing, 424 provider_auth_failed (a stored key starting with "bad-"), 429 (+
 // retry-after), 502 provider_unreachable, 503 cloud_unavailable.
@@ -119,7 +120,7 @@ function json(res, status, body, headers = {}) {
 }
 
 const fail = (res, status, code, message, headers) =>
-  json(res, status, { code, message: message ?? code }, headers)
+  json(res, status, { error: { code, message: message ?? code } }, headers)
 
 async function readBody(req) {
   const chunks = []

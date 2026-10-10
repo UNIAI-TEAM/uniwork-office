@@ -22,7 +22,7 @@
  * before ai-provider reads the body, so the UI shows a typed state; a provider's own 4xx (bad
  * model, output-cap rejection) reaches ai-provider unchanged.
  */
-import { AiWebError, aiErrorFromResponse, isContractFailure } from './errors'
+import { AiWebError, aiErrorFromResponse, errorBodyFields, isContractFailure } from './errors'
 import type { AiWebClient } from './client'
 import { isInsideAiMount } from './mount'
 
@@ -91,8 +91,7 @@ async function proxyAnswered(res: Response): Promise<boolean> {
   if (!isContractFailure(res.status)) return false
   if (res.status !== 404) return true
   try {
-    const body = (await res.clone().json()) as { code?: unknown }
-    return body?.code === 'credential_missing'
+    return errorBodyFields(await res.clone().json()).code === 'credential_missing'
   } catch {
     return false
   }

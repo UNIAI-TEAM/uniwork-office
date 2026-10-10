@@ -7,7 +7,14 @@ import {
   setUniworkCloudStatus,
 } from '../../../../packages/ai-provider/src/uniwork-cloud'
 import { aiRouteBase, createAiWebClient, readCloudStatus } from './client'
-import { AiWebError, aiErrorCodeFor, retryAfterSeconds } from './errors'
+import {
+  AiWebError,
+  aiErrorCodeFor,
+  aiErrorFromResponse,
+  errorBodyFields,
+  rawFailureAsTyped,
+  retryAfterSeconds,
+} from './errors'
 import { createProxyFetch, toProxyRequest } from './transport'
 import { createWebAiStreams } from './stream'
 import { aiHostGrants, createWebAi, mediaFromUrl, withWebAi } from './web-ai'
@@ -357,6 +364,14 @@ describe('proxy transport (ai-provider wire format -> BYOK routes)', () => {
     await expect(proxied(`${p}/openai/chat/completions`, { body: '{}' })).rejects.toMatchObject({
       code: 'credential_missing',
     })
+    // the UniWork API's own envelope: { error: { code, message } }
+    answer = jsonResponse(404, {
+      error: { code: 'credential_missing', message: 'chưa lưu khóa cho nhà cung cấp này' },
+    })
+    await expect(proxied(`${p}/openai/chat/completions`, { body: '{}' })).rejects.toMatchObject({
+      code: 'credential_missing',
+      serverCode: 'credential_missing',
+    })
     answer = jsonResponse(404, { error: { message: 'model not found' } })
     expect((await proxied(`${p}/openai/chat/completions`, { body: '{}' })).status).toBe(404)
     answer = jsonResponse(400, { error: { message: 'max_tokens too large' } })
@@ -462,7 +477,7 @@ describe('streams', () => {
     ),
   )('%s: a proxy %i ends the turn with the typed %s state', async (provider, status, code) => {
     const { s, chunks, onTypedError } = streams(() =>
-      jsonResponse(status, status === 429 ? { message: 'x' } : { code }),
+      jsonResponse(status, status === 429 ? { message: 'x' } : { error: { code, message: 'm' } }),
     )
     await s.aiStream({
       requestId: 'r3',
@@ -472,6 +487,42 @@ describe('streams', () => {
     } as never)
     expect(chunks.at(-1)).toMatchObject({ type: 'error', error: `typed:${code}` })
     expect(onTypedError.mock.calls[0]![0].code).toBe(code)
+  })
+
+  it('reads the code and message from the wrapped and the flat error body', async () => {
+    expect(errorBodyFields({ error: { code: 'a', message: 'b' } })).toEqual({ code: 'a', message: 'b' })
+    expect(errorBodyFields({ code: 'a', message: 'b' })).toEqual({ code: 'a', message: 'b' })
+    expect(errorBodyFields({ error: { message: 'only' } })).toEqual({})
+    expect(errorBodyFields('x')).toEqual({})
+    const err = await aiErrorFromResponse(
+      jsonResponse(400, { error: { code: 'base_url_refused', message: 'm' } }),
+    )
+    expect(err).toMatchObject({ code: 'base_url_refused', serverCode: 'base_url_refused' })
+  })
+
+  it('maps a vendor adapter failure text to a typed state, never the raw payload', async () => {
+    expect(
+      rawFailureAsTyped(new Error('Claude HTTP 404: {"error":{"code":"x"}}')),
+    ).toMatchObject({ code: 'credential_missing', status: 404 })
+    expect(rawFailureAsTyped(new Error('OpenAI HTTP 401: bad key'))).toMatchObject({
+      code: 'provider_auth_failed',
+    })
+    expect(rawFailureAsTyped(new Error('Gemini HTTP 500: boom'))).toMatchObject({ code: 'unknown' })
+    expect(rawFailureAsTyped(new Error('{"detail":"nope"}'))).toMatchObject({ code: 'unknown' })
+    expect(rawFailureAsTyped(new Error('The model returned no text'))).toBeUndefined()
+    const { s, chunks, onTypedError } = streams(() =>
+      jsonResponse(500, { error: { type: 'api_error', message: 'upstream exploded' } }),
+    )
+    await s.aiStream({
+      requestId: 'r5',
+      settings: settings('openai'),
+      system: 's',
+      messages: [{ role: 'user', content: 'hi' }],
+    } as never)
+    const last = chunks.at(-1) as { type: string; error: string }
+    expect(last.type).toBe('error')
+    expect(last.error).toBe('typed:unknown')
+    expect(onTypedError).toHaveBeenCalledTimes(1)
   })
 
   it('a provider without a server route is credential_missing (no request sent)', async () => {

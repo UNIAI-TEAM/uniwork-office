@@ -183,7 +183,7 @@ whether AI exists for this document (grants) and keeps answering `token.refresh`
   `/transcribe` POST.
 - **Auth.** `Authorization: Bearer <frame token>`, `credentials: 'omit'`, `mode: 'same-origin'`; one retry with a
   refreshed token after a 401 (a second 401 is the "session expired" state).
-- **Errors** (`{code, message}`; the UI picks a typed state from the status, never the message): 400
+- **Errors** (`{error: {code, message}}`, the UniWork envelope; the flat `{code, message}` is read too; the UI picks a typed state from the status, never the message): 400
   `provider_not_supported` / `base_url_refused`, 402 `credits_exhausted`, 403 `entitlement_required`, 404
   `credential_missing`, 424 `provider_auth_failed`, 429 (+ `retry-after`), 502 `provider_unreachable`, 503
   `cloud_unavailable`. A provider's own 400/404 passes through to the genoffice ai-provider unchanged.

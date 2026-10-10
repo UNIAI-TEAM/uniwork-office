@@ -123,14 +123,30 @@ export function retryAfterSeconds(value: string | null, now = Date.now()): numbe
   return Number.isFinite(at) ? Math.max(0, Math.ceil((at - now) / 1000)) : undefined
 }
 
+/**
+ * `code` / `message` of a server error body. The UniWork API wraps them as `{ "error": { code,
+ * message } }` (sdo.NewErrorSDO); the flat `{ code, message }` shape is read too, so a typed state
+ * never depends on which of the two a route answers.
+ */
+export function errorBodyFields(body: unknown): { code?: string; message?: string } {
+  const read = (v: unknown): { code?: string; message?: string } => {
+    if (!v || typeof v !== 'object') return {}
+    const { code, message } = v as { code?: unknown; message?: unknown }
+    return {
+      ...(typeof code === 'string' ? { code } : {}),
+      ...(typeof message === 'string' ? { message } : {}),
+    }
+  }
+  const wrapped = read((body as { error?: unknown } | null | undefined)?.error)
+  return wrapped.code !== undefined ? wrapped : read(body)
+}
+
 /** read a failed response once into an AiWebError (the body is consumed) */
 export async function aiErrorFromResponse(res: Response): Promise<AiWebError> {
   let serverCode: string | undefined
   let message: string | undefined
   try {
-    const body = (await res.json()) as { code?: unknown; message?: unknown }
-    if (typeof body?.code === 'string') serverCode = body.code
-    if (typeof body?.message === 'string') message = body.message
+    ;({ code: serverCode, message } = errorBodyFields(await res.json()))
   } catch {
     // not JSON (a provider 429 page, a proxy error): the status alone decides
   }
@@ -143,6 +159,24 @@ export async function aiErrorFromResponse(res: Response): Promise<AiWebError> {
       ? { retryAfterSec: retryAfterSeconds(res.headers.get('retry-after')) }
       : {}),
   })
+}
+
+const RAW_HTTP = /\bHTTP (\d{3})\b/
+const RAW_PAYLOAD = /[{[]\s*"/
+
+/**
+ * A vendor adapter's own failure text ("Claude HTTP 502: {...}", a JSON body) as a typed failure,
+ * so the panel shows a translated state instead of the raw payload. undefined for a message that
+ * carries no status or payload (those keep their own readable text). A provider's 401 is a key
+ * problem here, never a UniWork session problem (the proxy maps provider auth failures to 424).
+ */
+export function rawFailureAsTyped(err: unknown): AiWebError | undefined {
+  const message = err instanceof Error ? err.message : typeof err === 'string' ? err : ''
+  const status = RAW_HTTP.exec(message)?.[1]
+  if (!status && !RAW_PAYLOAD.test(message)) return undefined
+  const http = status ? Number(status) : 0
+  const code = http === 401 ? 'provider_auth_failed' : aiErrorCodeFor(http)
+  return new AiWebError({ code, status: http })
 }
 
 /**
