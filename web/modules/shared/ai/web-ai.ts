@@ -85,7 +85,10 @@ function readChoice(): AiChoice {
     const raw = JSON.parse(localStorage.getItem(CHOICE_KEY) ?? 'null') as AiChoice | null
     if (raw && typeof raw === 'object') {
       return {
-        ...(typeof raw.provider === 'string' ? { provider: raw.provider } : {}),
+        // only a provider the web can run: the value comes from localStorage and ends up in a URL
+        ...(typeof raw.provider === 'string' && WEB_PROVIDER_IDS.has(raw.provider)
+          ? { provider: raw.provider }
+          : {}),
         models: raw.models && typeof raw.models === 'object' ? raw.models : {},
       }
     }
