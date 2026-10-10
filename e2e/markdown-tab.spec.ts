@@ -122,37 +122,40 @@ test.describe('markdown editor', () => {
       await expect(editor.locator('h1')).toHaveText('Hello')
       await expect(editor.locator('strong')).toHaveText('bold')
 
-      // The editor autofocuses (caret at the start) inside a requestAnimationFrame that TipTap queues
-      // when the editor is created; ProseMirror's view.focus() there rewrites the DOM selection from
-      // its own state. A window that paints late (a busy or backgrounded runner) runs that callback
-      // after the caret was moved below and sends the typed text to the start of the heading. Frames
-      // run in order, so two frames from now the autofocus has settled; the timeout only bounds a
-      // window that never paints.
-      await editorPage.evaluate(
-        () =>
-          new Promise<void>((resolve) => {
-            const bound = window.setTimeout(resolve, 5_000)
-            requestAnimationFrame(() =>
-              requestAnimationFrame(() => {
-                window.clearTimeout(bound)
-                resolve()
-              }),
-            )
-          }),
-      )
-
       // type at the end of the document, save with ⌘/Ctrl+S
       await editor.focus()
-      await editor.evaluate((element) => {
-        const last = element.lastElementChild
-        const selection = window.getSelection()
-        if (!last || !selection) throw new Error('Markdown editor has no final block')
-        const range = document.createRange()
-        range.selectNodeContents(last)
-        range.collapse(false)
-        selection.removeAllRanges()
-        selection.addRange(range)
-      })
+      // ProseMirror's focus handler re-syncs the DOM selection from its own state ~20 ms after the
+      // editor gains focus (it only skips that when the DOM selection already matches what it last
+      // read). A caret set inside that window is overwritten with the document start before the
+      // Enter below, and the typed text lands at the start of the heading. So the caret counts only
+      // once ProseMirror has read it: its own selectionchange listener runs before ours, so when our
+      // listener fires the state holds the caret too. If the focus handler won the race, the event
+      // we get is its rewrite, the caret is no longer in the last block, and we set it again.
+      await expect(async () => {
+        const landed = await editor.evaluate(
+          (element) =>
+            new Promise<boolean>((resolve) => {
+              const last = element.lastElementChild
+              const selection = window.getSelection()
+              if (!last || !selection) throw new Error('Markdown editor has no final block')
+              const bound = window.setTimeout(() => resolve(false), 2_000)
+              document.addEventListener(
+                'selectionchange',
+                () => {
+                  window.clearTimeout(bound)
+                  resolve(last.contains(selection.anchorNode))
+                },
+                { once: true },
+              )
+              const range = document.createRange()
+              range.selectNodeContents(last)
+              range.collapse(false)
+              selection.removeAllRanges()
+              selection.addRange(range)
+            }),
+        )
+        expect(landed).toBe(true)
+      }).toPass({ timeout: 10_000 })
       await editorPage.keyboard.press('Enter')
       await editorPage.keyboard.type('Appended line.')
       await editorPage.keyboard.press('ControlOrMeta+s')
