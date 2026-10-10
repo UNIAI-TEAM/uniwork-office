@@ -9,6 +9,7 @@ import type { ShowSyncState } from '../../../apps/slides/src/shared/ipc'
 import { createAudienceBridge } from './audience-bridge'
 import {
   AUDIENCE_METHODS,
+  audienceArgsValid,
   audienceShowId,
   audienceUrl,
   handshake,
@@ -382,6 +383,33 @@ describe('presenter window', () => {
     expect(r.src.getEmbeddedFonts).toHaveBeenCalledTimes(1)
     // anything else is a no-op on the audience side, never a presenter call
     await expect(api.editText({} as never)).resolves.toBeUndefined()
+  })
+
+  it('answers ok:false to arguments of the wrong type without calling the engine getter', async () => {
+    const r = rig()
+    await r.presenter.api.presenterStart()
+    await r.presenter.api.presenterOpenAudience!()
+    await until(() => r.audience != null)
+    const api = r.audience!.slidesApi
+    await expect(api.getTransition('1' as never)).rejects.toThrow('bad arguments')
+    await expect(api.getAnimations(-1)).rejects.toThrow('bad arguments')
+    await expect(api.getShapeKeys(1.5)).rejects.toThrow('bad arguments')
+    expect(r.src.getTransition).not.toHaveBeenCalled()
+  })
+
+  it('validates the argument shape of every audience method', () => {
+    expect(audienceArgsValid('getTransition', [3])).toBe(true)
+    expect(audienceArgsValid('getTransition', [])).toBe(false)
+    expect(audienceArgsValid('getTransition', [3, 4])).toBe(false)
+    expect(audienceArgsValid('getTransition', [NaN])).toBe(false)
+    expect(audienceArgsValid('getTransition', [-1])).toBe(false)
+    expect(audienceArgsValid('getMediaBytes', [0, 'rId3'])).toBe(true)
+    expect(audienceArgsValid('getMediaBytes', [0, 5])).toBe(false)
+    expect(audienceArgsValid('getMediaBytes', [0, ''])).toBe(false)
+    expect(audienceArgsValid('getMediaBytes', [0, 'x'.repeat(300)])).toBe(false)
+    expect(audienceArgsValid('getRenderSlides', [])).toBe(true)
+    expect(audienceArgsValid('getLanguage', [1])).toBe(false)
+    expect(audienceArgsValid('audienceReady', [{}])).toBe(false)
   })
 
   it('turns a failing query into a rejection', async () => {

@@ -73,6 +73,35 @@ export const AUDIENCE_METHODS: readonly AudienceMethod[] = [
   'audienceReady',
 ]
 
+/** argument shapes of the audience methods: [] or a slide index (+ a media source id), nothing else */
+const ARG_SHAPES: Record<AudienceMethod, Array<'index' | 'id'>> = {
+  getRenderSlides: [],
+  getTransition: ['index'],
+  getAnimations: ['index'],
+  getShapeKeys: ['index'],
+  getMediaBytes: ['index', 'id'],
+  getEmbeddedFonts: [],
+  getLanguage: [],
+  audienceReady: [],
+}
+
+/**
+ * The arguments of an audience request are untrusted (the audience window is same-origin and runs
+ * the same bundle, but its messages are still input): a non-negative integer slide index and a
+ * bounded string source id where the method takes them, no extra arguments. The presenter answers
+ * `res ok:false` instead of calling the engine getter.
+ */
+export function audienceArgsValid(method: AudienceMethod, args: readonly unknown[]): boolean {
+  const shape = ARG_SHAPES[method]
+  if (args.length !== shape.length) return false
+  return shape.every((kind, i) => {
+    const v = args[i]
+    return kind === 'index'
+      ? typeof v === 'number' && Number.isInteger(v) && v >= 0 && v < 100_000
+      : typeof v === 'string' && v.length > 0 && v.length <= 256
+  })
+}
+
 /** window.postMessage handshake */
 export type HandshakeMessage =
   | { ns: typeof AUDIENCE_NS; v: typeof AUDIENCE_V; t: 'hello'; show: string }
