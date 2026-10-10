@@ -1601,6 +1601,17 @@ button.check-item:hover {
   font-size: 14px;
 }
 
+.workbook-opening-failed {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  text-align: center;
+}
+
+.workbook-opening-failed p {
+  margin: 0;
+}
+
 .csv-empty-notice {
   position: absolute;
   z-index: 20;

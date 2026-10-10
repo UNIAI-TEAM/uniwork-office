@@ -2059,13 +2059,20 @@ let forcedWorkbookPath = app.isPackaged ? undefined : process.env.XLSX_OPEN_PATH
  * (a single global would be overwritten by the next iteration). One-shot, unlike
  * the sticky dev env/capture-server path above. */
 const queuedWorkbookPaths = new Map<number, string>()
+/** the last shell-queued path per tab, kept after the open consumed it: the
+ * opening screen's Retry queues it again */
+const lastQueuedWorkbookPaths = new Map<number, string>()
 
 /** queue a workbook this tab's first selectWorkbook call opens without a dialog (shell routing) */
 export function queueWorkbookForView(contents: WebContents, path: string): void {
   queuedWorkbookPaths.set(contents.id, path)
-  contents.once('destroyed', () => {
-    queuedWorkbookPaths.delete(contents.id)
-  })
+  if (!lastQueuedWorkbookPaths.has(contents.id)) {
+    contents.once('destroyed', () => {
+      queuedWorkbookPaths.delete(contents.id)
+      lastQueuedWorkbookPaths.delete(contents.id)
+    })
+  }
+  lastQueuedWorkbookPaths.set(contents.id, path)
 }
 
 /** is the active tab still waiting for the renderer to consume a shell-queued workbook? */
@@ -2636,6 +2643,14 @@ export function registerSheetsIpc(): void {
    * this once it is ready and triggers the open itself.
    */
   ipcMain.handle('sheets:has-queued-workbook', (event) => queuedWorkbookPaths.has(event.sender.id))
+
+  /** Retry on a stalled opening screen: queue this tab's workbook again (false: none known) */
+  ipcMain.handle('sheets:requeue-workbook', (event) => {
+    const path = lastQueuedWorkbookPaths.get(event.sender.id)
+    if (path === undefined) return false
+    queuedWorkbookPaths.set(event.sender.id, path)
+    return true
+  })
 
   // ---- headless export mode (--headless-export) ----
 

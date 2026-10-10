@@ -527,6 +527,8 @@ export const it = {
   appBridgeUnavailable: "Il bridge dei file desktop non è disponibile. Riavvia l'app Electron.",
   appOpenCanceled: 'Selezione della cartella di lavoro annullata.',
   appOpeningWorkbook: 'Apertura della cartella di lavoro…',
+  appOpenStalled: 'Impossibile aprire la cartella di lavoro.',
+  appOpenRetry: 'Riprova',
   appOpened: '{name} aperto — le modifiche alle celle si salvano nel file con ⌘S.',
   appOpenFailed: 'Impossibile aprire la cartella di lavoro.',
   appPageSetupNeedsFile:

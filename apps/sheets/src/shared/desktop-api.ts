@@ -2987,6 +2987,9 @@ export interface DesktopApi {
   /// Is a shell-queued workbook path still waiting to be opened? (The shell's
   /// 'open' nudge loop can time out on slow cold starts; the renderer pulls.)
   hasQueuedWorkbook(): Promise<boolean>
+  /// Queue this tab's last shell-queued workbook again (Retry on a stalled
+  /// opening screen); false when the tab never had one.
+  requeueWorkbook(): Promise<boolean>
   /// Headless export mode (--headless-export): the PDF path this hidden
   /// renderer must export to; null in a normal session.
   consumeHeadlessExport(): Promise<string | null>
