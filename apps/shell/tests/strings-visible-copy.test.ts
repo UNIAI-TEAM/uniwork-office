@@ -92,10 +92,7 @@ describe('Settings > Integrations prose', () => {
 })
 
 describe('uniAI (PWA) pane and the AI probe copy (en, vi)', () => {
-  const SOURCES = [
-    '../src/renderer/src/UniAiPwaPane.tsx',
-    '../src/main/edu-commercial.ts',
-  ] as const
+  const SOURCES = ['../src/renderer/src/UniAiPwaPane.tsx', '../src/main/edu-commercial.ts'] as const
 
   it('names no internal provider or wallet product', () => {
     for (const file of SOURCES) {

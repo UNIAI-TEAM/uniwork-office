@@ -779,13 +779,13 @@ describe('signing in again after the device was revoked', () => {
   it('a callback delivered by a second instance (Windows argv) completes the new sign-in', async () => {
     const ctx = setup()
     await revoked(ctx)
-    const router = createAuthCallbackRouter(['C:\UniWork Office\UniWork Office.exe'])
+    const router = createAuthCallbackRouter(['C:\\UniWork Office\\UniWork Office.exe'])
     router.start((url) => ctx.manager.handleCallbackUrl(url))
     expect(await ctx.manager.login()).toBe(true)
     const state = (ctx.transport.start.mock.calls.at(-1)?.[0] as { state: string }).state
     const routed = router.secondInstance(
       [
-        'C:\UniWork Office\UniWork Office.exe',
+        'C:\\UniWork Office\\UniWork Office.exe',
         `uniwork-office://auth/callback?code=c2&state=${encodeURIComponent(state)}`,
       ],
       {},
@@ -827,4 +827,3 @@ describe('signing in again after the device was revoked', () => {
     expect(ctx.transport.start).toHaveBeenCalledTimes(2)
   })
 })
-

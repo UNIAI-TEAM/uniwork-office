@@ -76,7 +76,9 @@ export function UniAiPwaPane({ lang }: Props): ReactElement {
         </button>
       </div>
 
-      <h4 className="set-backup-h">{L(lang, 'Cách cài trên máy', 'How to install on your device')}</h4>
+      <h4 className="set-backup-h">
+        {L(lang, 'Cách cài trên máy', 'How to install on your device')}
+      </h4>
       <ol className="set-uniai-steps">
         <li>
           {L(

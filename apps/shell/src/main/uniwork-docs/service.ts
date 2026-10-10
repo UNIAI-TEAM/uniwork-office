@@ -733,7 +733,8 @@ export class UniworkDocsService {
       if (open) return this.focusOpen(open.path, open.title)
     }
     const viewRequested = !!launch && launch.version === 0 && launch.operation === 'view'
-    const access: UniworkDocAccess = viewTicket || viewRequested ? 'view' : accessFor(detail.myLevel)
+    const access: UniworkDocAccess =
+      viewTicket || viewRequested ? 'view' : accessFor(detail.myLevel)
     const key = viewTicket ? `${documentId}@v${launch.version}` : documentId
     const dir = this.store.dirFor(identity.deploymentId, identity.accountId, key)
     const existing = await this.store.readDir(dir)
