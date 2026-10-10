@@ -527,6 +527,16 @@ const config = {
       mimeType: 'text/html',
     },
   ],
+  // URL schemes the packaged app handles: `uniwork://` opens documents from
+  // UniWork, `uniwork-office://auth/callback` completes the desktop sign-in.
+  // Declared here so macOS (Info.plist CFBundleURLTypes) and Linux (.desktop
+  // MimeType) route them; Windows also registers them at runtime. The dev
+  // sign-in scheme (`uniwork-office-dev`) is added only for dev / beta release
+  // builds (release block below); unpackaged dev runs register it at runtime.
+  protocols: [
+    { name: 'UniWork', schemes: ['uniwork'] },
+    { name: 'UniWork Office sign-in', schemes: ['uniwork-office'] },
+  ],
   npmRebuild: false,
   mac: {
     // Two separate arch packages (NOT universal): arm64 keeps the exact
@@ -581,10 +591,9 @@ const config = {
   linux: {
     // AppImage (self-contained, any distro) + deb (apt install, pulls in the
     // GTK/NSS runtime deps) + rpm (dnf/zypper install on Fedora / RHEL /
-    // openSUSE). Default artifact names are kept on purpose —
-    // UniWork Office-<v>.AppImage / genoffice_<v>_amd64.deb — because the public
-    // README download links and the already-published linux-v0.5.149 release
-    // use them.
+    // openSUSE). Plain local packaging keeps electron-builder's AppImage name
+    // (UniWork Office-<v>.AppImage) and the deb / rpm names below; dev / beta
+    // release builds rename all of them (release block at the end).
     target: [
       { target: 'AppImage', arch: ['x64'] },
       { target: 'deb', arch: ['x64'] },
@@ -604,17 +613,17 @@ const config = {
     // (genspark-ai/genoffice#90). The set ships every standard raster size.
     icon: 'build/icons',
     // mac and win name the binary from productName; linux instead derives it
-    // from package.json "name", and "@genoffice/shell" sanitizes to the
-    // invalid "@genofficeshell". Setting it explicitly also makes the
-    // generated genoffice.desktop match the WM_CLASS Electron reports (it
-    // takes that from the executable basename), so the running window links
-    // back to its launcher entry.
+    // from package.json "name", and the scoped workspace name sanitizes to an
+    // invalid one. Setting it explicitly also makes the generated
+    // uniwork-office.desktop match the WM_CLASS Electron reports (it takes
+    // that from the executable basename), so the running window links back to
+    // its launcher entry.
     executableName: 'uniwork-office',
     // Electron takes its X11 app_id from package.json "desktopName"
-    // (genoffice.desktop); syncDesktopName makes electron-builder name the
+    // (uniwork-office.desktop); syncDesktopName makes electron-builder name the
     // .desktop file and its StartupWMClass from the same value. Without it
     // StartupWMClass falls back to productName ("UniWork Office"), which does not
-    // match the "genoffice" WM_CLASS the window actually reports — and X11
+    // match the "uniwork-office" WM_CLASS the window actually reports — and X11
     // compares case-sensitively, so the taskbar shows an unlinked window.
     syncDesktopName: true,
     extraResources: [
@@ -624,22 +633,22 @@ const config = {
       },
     ],
   },
-  // Same "@genoffice/shell" problem as executableName above: the default deb
+  // Same scoped-name problem as executableName above: the default deb
   // artifact name derives from package.json "name", and the scope's "/" makes
-  // fpm treat "@genoffice" as a directory. Spell the published name out
-  // (genoffice_<version>_amd64.deb, matching the linux-v0.5.149 release).
-  // packageName pins the control Package field to the same value the 0.5.149
-  // deb shipped with — apt treats a different Package name as an unrelated
-  // install, breaking upgrades. Without it, fpm receives productName
-  // "UniWork Office" and only happens to downcase it to the right value.
+  // fpm treat the scope as a directory, so the name is spelled out.
+  // packageName pins the control Package field: apt treats a different Package
+  // name as an unrelated install, breaking upgrades. Without it, fpm receives
+  // productName "UniWork Office" and only happens to downcase it.
   deb: {
     artifactName: 'UniWork-Office_${version}_${arch}.deb',
     packageName: 'uniwork-office',
-    // expose the genoffice command line shipped inside the app
+    // These replace electron-builder's default scripts entirely, so they also
+    // carry its steps (/usr/bin link, chrome-sandbox mode, AppArmor profile,
+    // desktop / mime database refresh) besides the genoffice command line.
     afterInstall: 'build/linux-after-install.sh',
     afterRemove: 'build/linux-after-remove.sh',
   },
-  // Same "@genoffice/shell" naming problem as deb: spell the artifact name
+  // Same scoped-name problem as deb: spell the artifact name
   // out (${arch} expands to the rpm arch string, x86_64) and pin the rpm
   // Package name so dnf/zypper treat successive releases as upgrades of the
   // same package. Like deb, rpm installs run no in-app updater — users
@@ -732,6 +741,7 @@ if (winSignMode) {
 // once one is configured), then the platform and arch:
 //   UniWork-Office_0.11.0-dev.1_unsigned_win32_x64-setup.exe
 //   UniWork-Office_0.11.0-dev.1_unsigned_darwin_arm64.dmg
+//   UniWork-Office_0.11.0-dev.1_unsigned_linux_x64.deb / .AppImage
 // Only dev and beta exist; stable waits for signed builds.
 const RELEASE_CHANNELS = ['dev', 'beta']
 const RELEASE_SIGNING_ENV = [
@@ -788,6 +798,20 @@ if (releaseChannel) {
     config.mac.notarize = false
     config.dmg.sign = false
   }
+  // Linux packages are never signed, so they always carry the label. x64 is
+  // spelled out: ${arch} expands to amd64 (deb) / x86_64 (AppImage), and the
+  // linux targets are x64-only. The rpm is not released: the download server
+  // has no rpm platform key.
+  config.linux.target = config.linux.target.filter((entry) => entry.target !== 'rpm')
+  config.appImage = { artifactName: 'UniWork-Office_${version}_unsigned_linux_x64.${ext}' }
+  config.deb.artifactName = 'UniWork-Office_${version}_unsigned_linux_x64.${ext}'
+  // A dev / beta build signs in with the scheme of its deployment profile's
+  // channel (uniwork-office-dev for dev profiles), so it declares that scheme
+  // too: on Linux the .desktop MimeType is what routes the callback.
+  config.protocols = [
+    ...config.protocols,
+    { name: 'UniWork Office sign-in (dev)', schemes: ['uniwork-office-dev'] },
+  ]
 }
 
 /** A release build must ship `<apps/shell version>-<channel>.<n>` (-c.extraMetadata.version). */

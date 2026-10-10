@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 
 import { generateImageTool, analyzeMediaTool, MEDIA_NOT_CONFIGURED_ERROR } from '../src/media-tools'
 
-// nonexistent settings file → defaults: no BYOK media provider, and no cloud route while the seam is off
+// nonexistent settings file → defaults: no BYOK media provider, and no cloud route while signed out
 const SETTINGS = '/nonexistent/ai-settings.json'
 
 describe('media tools without a BYOK provider', () => {

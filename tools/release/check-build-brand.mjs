@@ -5,12 +5,13 @@
 // (BUILD_DIR) after packaging:
 //
 //   node tools/release/check-build-brand.mjs --dir apps/shell/release
-//     [--expect win-unpacked | --expect mac-arm64,mac] [--json]
+//     [--expect win-unpacked | --expect mac-arm64,mac | --expect linux-unpacked] [--json]
 //
 // The unpacked app directories are required, never optional: the ones named
 // with --expect, and the ones the installers imply (a Windows setup .exe needs
-// win-unpacked, an arm64 dmg mac-arm64, an x64 dmg mac). A missing one is a
-// problem, so a wrong --dir cannot pass on file names alone.
+// win-unpacked, an arm64 dmg mac-arm64, an x64 dmg mac, an x64 deb / AppImage
+// linux-unpacked). A missing one is a problem, so a wrong --dir cannot pass on
+// file names alone.
 //
 // Checked, when present in the directory:
 //   - every top-level artifact file name (installers, dmg / zip, blockmaps)
@@ -20,6 +21,11 @@
 //   - macOS: Info.plist of each .app (bundle id must be com.uniwork.office;
 //     CFBundleName, CFBundleDisplayName, CFBundleExecutable, document type
 //     names) and the helper app names under Contents/Frameworks
+//   - Linux: the file names in linux-unpacked (the executable must be
+//     uniwork-office); for each .deb (needs dpkg-deb) the control fields
+//     (Package must be uniwork-office), the desktop entry and icon file
+//     names, and the desktop entry's MimeType must route the uniwork,
+//     uniwork-office and uniwork-office-dev URL schemes (the sign-in callback)
 //   - the packaged package.json inside app.asar (productName, author,
 //     homepage, description)
 //   - no app-update.yml in the app resources and no latest*.yml next to the
@@ -38,6 +44,8 @@ import { fileURLToPath } from 'node:url'
 export const BRAND = /gen[\s._-]?office|gen[\s._-]?spark/i
 export const EXPECTED_BUNDLE_ID = 'com.uniwork.office'
 export const EXPECTED_PRODUCT_NAME = 'UniWork Office'
+export const EXPECTED_LINUX_NAME = 'uniwork-office'
+export const LINUX_URL_SCHEMES = ['uniwork', 'uniwork-office', 'uniwork-office-dev']
 
 const UNPACKED_DIR = /^(?:win|mac|linux)(?:-[a-z0-9]+)?(?:-unpacked)?$/
 const VERSION_INFO_KEYS = [
@@ -331,9 +339,117 @@ function checkMacApp(appDir, report) {
   checkNoUpdateFeed(where, resources, report)
 }
 
+function checkLinuxUnpacked(dir, report) {
+  const where = basename(dir)
+  for (const name of readdirSync(dir)) report.problem(brandProblem(`${where} file name`, name))
+  if (!existsSync(join(dir, EXPECTED_LINUX_NAME))) {
+    report.problem(`${where}: no "${EXPECTED_LINUX_NAME}" executable`)
+  }
+  checkAsar(where, join(dir, 'resources', 'app.asar'), report)
+  checkNoUpdateFeed(where, join(dir, 'resources'), report)
+}
+
+/** Parses `dpkg-deb -f` output (RFC 822 style, continuation lines folded in). */
+export function parseControl(text) {
+  const fields = {}
+  let last = null
+  for (const line of text.split(/\r?\n/)) {
+    if (/^\s/.test(line) && last) {
+      fields[last] += `\n${line.trim()}`
+      continue
+    }
+    const match = /^([A-Za-z0-9-]+):\s*(.*)$/.exec(line)
+    if (match) {
+      last = match[1]
+      fields[last] = match[2]
+    }
+  }
+  return fields
+}
+
+/** Brand / identity problems in a deb's control fields. */
+export function checkDebControl(where, fields, report) {
+  report.checked(`${where} control`)
+  if (fields.Package !== EXPECTED_LINUX_NAME) {
+    report.problem(`${where} Package is "${fields.Package}", expected "${EXPECTED_LINUX_NAME}"`)
+  }
+  for (const key of ['Package', 'Maintainer', 'Vendor', 'Homepage', 'Description']) {
+    report.problem(brandProblem(`${where} ${key}`, fields[key]))
+  }
+}
+
+/** Parses the [Desktop Entry] group of a .desktop file. */
+export function parseDesktopEntry(text) {
+  const entry = {}
+  let inMain = false
+  for (const line of text.split(/\r?\n/)) {
+    const trimmed = line.trim()
+    if (/^\[.*\]$/.test(trimmed)) {
+      inMain = trimmed === '[Desktop Entry]'
+      continue
+    }
+    const at = line.indexOf('=')
+    if (inMain && at > 0) entry[line.slice(0, at).trim()] = line.slice(at + 1).trim()
+  }
+  return entry
+}
+
+/** Brand problems in a desktop entry, and the URL schemes it must route. */
+export function checkDesktopEntry(where, entry, report) {
+  report.checked(`${where} desktop entry`)
+  for (const key of ['Name', 'GenericName', 'Comment', 'Exec', 'Icon', 'StartupWMClass']) {
+    report.problem(brandProblem(`${where} ${key}`, entry[key]))
+  }
+  const mimeTypes = (entry.MimeType ?? '').split(';').filter(Boolean)
+  for (const scheme of LINUX_URL_SCHEMES) {
+    if (!mimeTypes.includes(`x-scheme-handler/${scheme}`)) {
+      report.problem(`${where}: MimeType does not route ${scheme}:// (x-scheme-handler/${scheme})`)
+    }
+  }
+}
+
+/**
+ * Package members a user sees by name: the desktop entries and the theme
+ * icons (`dpkg-deb -c` lines end with the member path).
+ */
+export function visibleDebMembers(listing) {
+  return listing
+    .split(/\r?\n/)
+    .map((line) => /\s(\.\/\S.*?)(?: -> .*)?$/.exec(line)?.[1])
+    .filter((member) => member && /^\.\/usr\/share\/(?:applications|icons)\/.*[^/]$/.test(member))
+}
+
+function checkDeb(name, path, report) {
+  const run = (command, args) =>
+    execFileSync(command, args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+  let members
+  try {
+    checkDebControl(name, parseControl(run('dpkg-deb', ['-f', path])), report)
+    members = visibleDebMembers(run('dpkg-deb', ['-c', path]))
+  } catch (error) {
+    report.problem(`${name}: dpkg-deb cannot read it (${error.message ?? error})`)
+    return
+  }
+  for (const member of members) report.problem(brandProblem(`${name} file`, member))
+  const desktop = members.filter((member) => member.endsWith('.desktop'))
+  if (desktop.length !== 1) {
+    report.problem(`${name}: expected one desktop entry, found ${desktop.length}`)
+    return
+  }
+  const text = run('sh', [
+    '-c',
+    'dpkg-deb --fsys-tarfile "$1" | tar -xOf - "$2"',
+    'sh',
+    path,
+    desktop[0],
+  ])
+  checkDesktopEntry(`${name} ${desktop[0]}`, parseDesktopEntry(text), report)
+}
+
 /**
  * The unpacked directories an installer implies: a Windows setup exe its
- * win[-arch]-unpacked, a dmg its mac[-arch] (x64 is plain `mac`). Null when the
+ * win[-arch]-unpacked, a dmg its mac[-arch] (x64 is plain `mac`), a deb or
+ * AppImage its linux[-arch]-unpacked (x64 is plain linux-unpacked). Null when the
  * arch is not in the name; then any directory of that platform satisfies it.
  */
 export function impliedUnpackedDir(name) {
@@ -346,6 +462,12 @@ export function impliedUnpackedDir(name) {
     const arch = /(?:^|[_-])(arm64|x64|universal)\.dmg$/i.exec(name)?.[1]?.toLowerCase()
     if (!arch) return { platform: 'mac', dir: null }
     return { platform: 'mac', dir: arch === 'x64' ? 'mac' : `mac-${arch}` }
+  }
+  if (/\.(?:deb|AppImage)$/i.test(name)) {
+    const arch = /[_-](arm64|x64|amd64|x86_64)\.(?:deb|AppImage)$/i.exec(name)?.[1]?.toLowerCase()
+    if (!arch) return { platform: 'linux', dir: null }
+    const x64 = arch === 'x64' || arch === 'amd64' || arch === 'x86_64'
+    return { platform: 'linux', dir: x64 ? 'linux-unpacked' : `linux-${arch}-unpacked` }
   }
   return null
 }
@@ -373,8 +495,7 @@ export function checkBuildDir(dir, { expect = [] } = {}) {
         if (apps.length === 0) report.problem(`${name}: no .app bundle`)
         for (const app of apps) checkMacApp(join(path, app), report)
       } else {
-        checkAsar(name, join(path, 'resources', 'app.asar'), report)
-        checkNoUpdateFeed(name, join(path, 'resources'), report)
+        checkLinuxUnpacked(path, report)
       }
       continue
     }
@@ -386,6 +507,7 @@ export function checkBuildDir(dir, { expect = [] } = {}) {
     if (/\.exe$/i.test(name)) {
       checkVersionInfo(name, parseVersionInfo(readFileSync(path)), report, { requireKeys: true })
     }
+    if (/\.deb$/i.test(name)) checkDeb(name, path, report)
     const implied = impliedUnpackedDir(name)
     if (implied?.dir) required.set(implied.dir, name)
     else if (implied) requiredPlatforms.set(implied.platform, name)

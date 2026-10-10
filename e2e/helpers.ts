@@ -7,11 +7,12 @@
  * Build first: `npm run build:all`.
  */
 import { _electron as electron, type ElectronApplication, type Page } from '@playwright/test'
-import { mkdtemp, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { createRequire } from 'node:module'
+import { spawn } from 'node:child_process'
 
 export const SHELL_DIR = resolve(__dirname, '../apps/shell')
 export const ARTIFACTS_DIR = resolve(__dirname, 'artifacts')
@@ -41,6 +42,12 @@ interface LaunchOptions {
   homeView?: 'files' | 'chat'
   /** extra environment variables for the launched app */
   env?: Record<string, string>
+  /**
+   * An installed (packaged) app executable to launch instead of the built shell.
+   * A packaged app ignores GENOFFICE_USER_DATA, so on Linux its userData is
+   * moved into the scratch dir through XDG_CONFIG_HOME.
+   */
+  packagedApp?: string
 }
 
 export interface LaunchedApp {
@@ -50,10 +57,12 @@ export interface LaunchedApp {
 }
 
 export async function launchShell(options: LaunchOptions): Promise<LaunchedApp> {
-  if (!existsSync(SHELL_MAIN)) {
+  if (!options.packagedApp && !existsSync(SHELL_MAIN)) {
     throw new Error(`Missing build output at ${SHELL_MAIN} — run \`npm run build:all\` first`)
   }
-  const userDataDir = options.userDataDir ?? (await mkdtemp(join(tmpdir(), 'genoffice-e2e-')))
+  const scratchDir = options.userDataDir ?? (await mkdtemp(join(tmpdir(), 'genoffice-e2e-')))
+  const userDataDir = options.packagedApp ? join(scratchDir, 'UniWork Office') : scratchDir
+  if (options.packagedApp) await mkdir(userDataDir, { recursive: true })
   if (options.onboardingSeen || options.settings) {
     await writeFile(
       join(userDataDir, 'app-settings.json'),
@@ -64,7 +73,7 @@ export async function launchShell(options: LaunchOptions): Promise<LaunchedApp> 
     )
   }
   const require = createRequire(join(SHELL_DIR, 'package.json'))
-  const executablePath = require('electron') as unknown as string
+  const executablePath = options.packagedApp ?? (require('electron') as unknown as string)
   // ELECTRON_RUN_AS_NODE (set by VS Code/CI hosts) would boot Electron as
   // plain Node with no windows — strip it so the app always starts as an app
   const { ELECTRON_RUN_AS_NODE: _electronRunAsNode, ...hostEnv } = process.env
@@ -73,9 +82,13 @@ export async function launchShell(options: LaunchOptions): Promise<LaunchedApp> 
   // but the renderer never loads. The suite drives trusted local builds only.
   // Switches go before the app path so Chromium is guaranteed to consume them
   // and they never leak into the argv the app parses for documents to open.
+  // An installed app keeps its sandbox: its package set that up (chrome-sandbox
+  // mode, AppArmor profile), and the packaged smoke test is what proves it.
+  const noSandbox = process.platform === 'linux' && !options.packagedApp
   const args: string[] = []
-  if (process.platform === 'linux') args.push('--no-sandbox', '--disable-gpu')
-  args.push(SHELL_DIR)
+  if (noSandbox) args.push('--no-sandbox')
+  if (process.platform === 'linux') args.push('--disable-gpu')
+  if (!options.packagedApp) args.push(SHELL_DIR)
   if (options.openFile) args.push(options.openFile)
   if (options.openUrl) args.push(options.openUrl)
   const app = await electron.launch({
@@ -87,7 +100,8 @@ export async function launchShell(options: LaunchOptions): Promise<LaunchedApp> 
       GENOFFICE_NO_SPARE_VIEW: '1',
       GENOFFICE_LANG: options.lang ?? 'en',
       ...(options.env ?? {}),
-      ...(process.platform === 'linux' ? { ELECTRON_DISABLE_SANDBOX: '1' } : {}),
+      ...(options.packagedApp ? { XDG_CONFIG_HOME: scratchDir } : {}),
+      ...(noSandbox ? { ELECTRON_DISABLE_SANDBOX: '1' } : {}),
     },
     // Playwright's Electron screencast wedges the page CDP session on Linux
     // (page.url() stays empty, no lifecycle events, evaluate hangs) — record
@@ -117,6 +131,49 @@ export async function launchShell(options: LaunchOptions): Promise<LaunchedApp> 
 export async function openHomeFiles(page: Page): Promise<void> {
   await page.locator('.nav-item[data-nav="recent"]').click({ timeout: 30_000 })
   await page.locator('.home-hero').waitFor({ timeout: 15_000 })
+}
+
+/**
+ * Simulates the OS handing a protocol URL to an already-running app on
+ * Windows/Linux: a second process started with the URL in argv hits the
+ * single-instance lock, forwards its argv to the running instance and exits.
+ * Resolves with the second process's exit code.
+ */
+export async function handoffUrlToRunningApp(
+  userDataDir: string,
+  url: string,
+  env: Record<string, string> = {},
+): Promise<number | null> {
+  const require = createRequire(join(SHELL_DIR, 'package.json'))
+  const executablePath = require('electron') as unknown as string
+  const { ELECTRON_RUN_AS_NODE: _electronRunAsNode, ...hostEnv } = process.env
+  const args: string[] = []
+  if (process.platform === 'linux') args.push('--no-sandbox', '--disable-gpu')
+  args.push(SHELL_DIR, url)
+  const child = spawn(executablePath, args, {
+    env: {
+      ...hostEnv,
+      GENOFFICE_USER_DATA: userDataDir,
+      GENOFFICE_NO_SPARE_VIEW: '1',
+      ...env,
+      ...(process.platform === 'linux' ? { ELECTRON_DISABLE_SANDBOX: '1' } : {}),
+    },
+    stdio: 'ignore',
+  })
+  return new Promise((resolveExit, reject) => {
+    const timer = setTimeout(() => {
+      child.kill('SIGKILL')
+      reject(new Error('second instance did not exit after the single-instance handoff'))
+    }, 30_000)
+    child.once('error', (err) => {
+      clearTimeout(timer)
+      reject(err)
+    })
+    child.once('exit', (code) => {
+      clearTimeout(timer)
+      resolveExit(code)
+    })
+  })
 }
 
 /**

@@ -4,7 +4,7 @@ import {
   imageGenerationAvailable,
   mediaAnalysisAvailable,
 } from '@genoffice/ai-provider'
-import { hasGskAuth, readAiSettingsFile } from '@genoffice/ai-search'
+import { readAiSettingsFile } from '@genoffice/ai-search'
 import { aiSettingsPath, prepareCloud } from '../cloud'
 import type { CommandDef } from '../registry'
 import { appLaunch } from '../resources'
@@ -12,7 +12,8 @@ import { appLaunch } from '../resources'
 /**
  * What the cloud commands can do on this machine, decided from UniWork Office's
  * own settings without a network call: a BYOK key, or explicitly selected free
- * Parallel search. The UniWork cloud is off, and unkeyed fallbacks in the default
+ * Parallel search. The UniWork cloud is not counted: its calls need the app's
+ * signed-in session, which this separate CLI process never holds; unkeyed fallbacks in the default
  * `auto` chain (free Parallel MCP, DuckDuckGo) do not count as configured. Agents
  * check this once before planning work that needs photos or web facts.
  */
@@ -27,9 +28,10 @@ export const capabilitiesCommand: CommandDef = {
     const searchProvider = activeSearchProvider(settings)
     const search = searchProvider !== 'auto'
     const imageSearch = searchProvider === 'serper' || searchProvider === 'serply'
-    const imageGeneration = imageGenerationAvailable(settings, hasGskAuth())
-    const mediaAnalysis = mediaAnalysisAvailable(settings, hasGskAuth())
-    // only BYOK providers are reported; the UniWork cloud route is off
+    // no UniWork session in this process: the cloud route never counts here
+    const imageGeneration = imageGenerationAvailable(settings, false)
+    const mediaAnalysis = mediaAnalysisAvailable(settings, false)
+    // only BYOK providers are reported
     const via = (provider: string) => (provider === 'genspark' ? null : provider)
     const detail = {
       search: {

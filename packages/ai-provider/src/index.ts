@@ -39,6 +39,7 @@ export {
   GEMINI_MEDIA_BASE_URL,
   OPENAI_IMAGES_BASE_URL,
   activeMediaConfig,
+  cloudToolFor,
   activeMediaProvider,
   defaultAiMediaSettings,
   getMediaProviderMeta,
@@ -47,12 +48,15 @@ export {
   mediaConfigUsable,
   providerHasCapability,
   resolveAiMediaSettings,
+  offeredMediaProviders,
+  setMediaProviderChoice,
+  shownMediaProvider,
   updateMediaProviderConfig,
   videoAnalysisAvailable,
   visibleMediaProviders,
 } from './media'
 export type { MediaCapability } from './media'
-export { UNIWORK_CLOUD_ENABLED, uniworkCloudEnabled } from './uniwork-cloud'
+export * from './uniwork-cloud'
 export {
   AI_SEARCH_PROVIDERS,
   activeSearchProvider,

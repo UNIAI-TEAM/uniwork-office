@@ -163,12 +163,16 @@ describe('resumable installer download', () => {
     const dest = destOf()
     const { executor } = makeUpdater()
     // a body stream that errors halfway through
-    // a real socket hang-up errors the stream after the prefix was delivered
-    // (a synchronous error would void the queued chunk — Node web streams)
+    // a real socket hang-up errors the stream after the prefix was delivered.
+    // The error is armed on the second pull (after the first chunk is out of
+    // the source), not at construction: a timer started at construction raced
+    // fetch/stream setup on a loaded CI runner and voided the queued chunk.
+    let pulls = 0
     const stream = new ReadableStream<Uint8Array>({
-      start(controller) {
-        controller.enqueue(new Uint8Array(FULL.subarray(0, 4)))
-        setTimeout(() => controller.error(new Error('socket hang up')), 5)
+      pull(controller) {
+        pulls += 1
+        if (pulls === 1) controller.enqueue(new Uint8Array(FULL.subarray(0, 4)))
+        else setTimeout(() => controller.error(new Error('socket hang up')), 20)
       },
     })
     globalThis.fetch = vi.fn(

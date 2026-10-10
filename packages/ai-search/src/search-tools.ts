@@ -1,12 +1,15 @@
 /**
  * ai:web-search / ai:image-search for the editors' main processes: reads
  * ai-settings.json live and turns the search provider choice into
- * SearchOptions — `auto` keeps the keyless chain (env keys, then free Parallel
- * MCP, then DuckDuckGo); a selected custom provider runs first.
+ * SearchOptions — `auto` tries the UniWork cloud first while it is on (signed
+ * in, entitled, cloud tools not switched off), then the keyless chain (env
+ * keys, then free Parallel MCP, then DuckDuckGo); a selected custom provider
+ * runs first and never spends UniWork credits.
  */
 
 import {
   activeSearchProvider,
+  cloudToolsEnabled,
   type AiSearchProviderId,
   type AiSettings,
 } from '@genoffice/ai-provider'
@@ -15,7 +18,7 @@ import { readAiSettingsFile } from './media-tools'
 
 export function searchOptionsFromSettings(settings: AiSettings): SearchOptions {
   const provider = activeSearchProvider(settings)
-  if (provider === 'auto') return { useGsk: false }
+  if (provider === 'auto') return { useGsk: cloudToolsEnabled(settings) }
   const key = settings.search!.providers?.[provider]?.apiKey?.trim() ?? ''
   if (provider === 'parallel') return { useGsk: false, parallelKey: key, prefer: 'parallel' }
   if (provider === 'serply') return { useGsk: false, serplyKey: key, prefer: 'serply' }

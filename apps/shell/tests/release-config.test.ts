@@ -25,6 +25,10 @@ interface BuilderConfig {
   mac: Record<string, unknown> & { target: { target: string; arch: string[] }[] }
   dmg: Record<string, unknown>
   win: { extraResources: { from: string; to: string }[] }
+  linux: { target: { target: string; arch: string[] }[]; maintainer: string; vendor: string }
+  deb: Record<string, unknown>
+  appImage?: Record<string, unknown>
+  protocols: { name: string; schemes: string[] }[]
   beforePack: (context: { electronPlatformName: string }) => Promise<void>
 }
 
@@ -112,6 +116,33 @@ describe('dev / beta release builds', () => {
       'UniWork-Office_${version}_unsigned_win32_${arch}-setup.${ext}',
     )
     expect(config.mac.artifactName).toBe('UniWork-Office_${version}_unsigned_darwin_${arch}.${ext}')
+  })
+
+  it('name the Linux packages for the download server and drop the rpm', () => {
+    const config = loadConfig({ UNIWORK_RELEASE_CHANNEL: 'beta', CSC_LINK: 'file:///cert.p12' })
+    // never signed, and x64 spelled out (${arch} would be amd64 / x86_64)
+    expect(config.deb.artifactName).toBe('UniWork-Office_${version}_unsigned_linux_x64.${ext}')
+    expect(config.appImage?.artifactName).toBe(
+      'UniWork-Office_${version}_unsigned_linux_x64.${ext}',
+    )
+    expect(config.linux.target.map((entry) => entry.target)).toEqual(['AppImage', 'deb'])
+    expect(config.deb.packageName).toBe('uniwork-office')
+    expect(`${config.linux.maintainer} ${config.linux.vendor}`).not.toMatch(BRAND)
+    expect(loadConfig({}).linux.target.map((entry) => entry.target)).toEqual([
+      'AppImage',
+      'deb',
+      'rpm',
+    ])
+  })
+
+  it('declare every sign-in callback scheme for the Linux desktop entry', () => {
+    const schemes = (config: BuilderConfig) => config.protocols.flatMap((entry) => entry.schemes)
+    expect(schemes(loadConfig({ UNIWORK_RELEASE_CHANNEL: 'dev' }))).toEqual([
+      'uniwork',
+      'uniwork-office',
+      'uniwork-office-dev',
+    ])
+    expect(schemes(loadConfig({}))).toEqual(['uniwork', 'uniwork-office'])
   })
 
   it('publish nothing and build only the mac dmgs', () => {

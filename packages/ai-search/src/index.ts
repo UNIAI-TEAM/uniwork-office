@@ -1,5 +1,5 @@
 /**
- * Search utilities (main process) — the UniWork cloud (off until it is wired, see ./gsk.ts),
+ * Search utilities (main process) — the UniWork cloud (signed in + entitled, see ./gsk.ts),
  * then Serper Google API,
  * then Serply, Tavily, Parallel (whose free Search MCP answers keyless), Exa and Firecrawl,
  * before the DuckDuckGo last resort. Runs in the main process
@@ -389,7 +389,7 @@ export async function webSearch(
   const { query: q, max } = normalizeSearchArgs(query, maxResults, 6)
   // useGsk=false: the user turned UniWork cloud tools off or picked their own
   // search key — skip straight to the keyed/free backends
-  if (o.useGsk && hasGskAuth()) {
+  if (o.useGsk && hasGskAuth('web_search')) {
     try {
       const r = await gskWebSearch(q, max)
       if (r.results.length) return { ...r, method: 'gsk' }
@@ -436,7 +436,7 @@ export async function imageSearch(
 }> {
   const o = normalizeOptions(options)
   const { query: q, max } = normalizeSearchArgs(query, maxResults, 8)
-  if (o.useGsk && hasGskAuth()) {
+  if (o.useGsk && hasGskAuth('image_search')) {
     try {
       const images = filterUsableImages(await gskImageSearch(q, max))
       if (images.length) return { images, method: 'gsk' }
