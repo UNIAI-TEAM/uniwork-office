@@ -7,6 +7,8 @@
   --tabstrip-text: #454746;
   --tabstrip-text-active: #1f1f1f;
   --tab-separator: rgba(0, 0, 0, 0.22);
+  /* clear space between the UniWork chip / notice and the divider that follows it */
+  --uw-divider-gap: 12px;
   position: fixed;
   top: 0;
   left: 0;
@@ -413,6 +415,10 @@ body.overlay-title-bar .tab-bar-drag-spacer {
   min-width: 0;
   max-width: 55%;
   margin-left: 6px;
+  /* the divider before the overflow button is drawn 4px inside this box's right
+     edge (left: -6px on a button with a 2px margin), so the margin is the gap
+     plus those 4px: every pill state ends --uw-divider-gap before the divider */
+  margin-right: calc(var(--uw-divider-gap) + 4px);
 }
 
 .uw-chrome:empty {
