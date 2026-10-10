@@ -159,6 +159,7 @@ import {
   type WorkbookSaveRequest,
 } from '../shared/desktop-api'
 import { IPC_CHANNELS } from '../shared/ipc-channels'
+import { createOpenRetryPaths } from './open-retry-paths'
 import { atomicWriteFile } from './atomic-write'
 import { closeGuardDecision, ShutdownLatch } from './close-guard'
 import { SaveEditsTransferStore } from './save-edits-transfer'
@@ -2063,20 +2064,24 @@ let forcedWorkbookPath = app.isPackaged ? undefined : process.env.XLSX_OPEN_PATH
  * (a single global would be overwritten by the next iteration). One-shot, unlike
  * the sticky dev env/capture-server path above. */
 const queuedWorkbookPaths = new Map<number, string>()
-/** the last shell-queued path per tab, kept after the open consumed it: the
- * opening screen's Retry queues it again */
-const lastQueuedWorkbookPaths = new Map<number, string>()
+/** the last opened path per tab (shell-queued or picked), kept after the open
+ * consumed it: the opening screen's Retry queues it again */
+const lastOpenedWorkbookPaths = createOpenRetryPaths()
+
+/** remember the workbook a tab opens (shell queue or picker) for Retry */
+function rememberOpenedWorkbook(contents: WebContents, path: string): void {
+  lastOpenedWorkbookPaths.remember(contents.id, path, () =>
+    contents.once('destroyed', () => {
+      queuedWorkbookPaths.delete(contents.id)
+      lastOpenedWorkbookPaths.forget(contents.id)
+    }),
+  )
+}
 
 /** queue a workbook this tab's first selectWorkbook call opens without a dialog (shell routing) */
 export function queueWorkbookForView(contents: WebContents, path: string): void {
   queuedWorkbookPaths.set(contents.id, path)
-  if (!lastQueuedWorkbookPaths.has(contents.id)) {
-    contents.once('destroyed', () => {
-      queuedWorkbookPaths.delete(contents.id)
-      lastQueuedWorkbookPaths.delete(contents.id)
-    })
-  }
-  lastQueuedWorkbookPaths.set(contents.id, path)
+  rememberOpenedWorkbook(contents, path)
 }
 
 /** is the active tab still waiting for the renderer to consume a shell-queued workbook? */
@@ -2650,7 +2655,7 @@ export function registerSheetsIpc(): void {
 
   /** Retry on a stalled opening screen: queue this tab's workbook again (false: none known) */
   ipcMain.handle('sheets:requeue-workbook', (event) => {
-    const path = lastQueuedWorkbookPaths.get(event.sender.id)
+    const path = lastOpenedWorkbookPaths.get(event.sender.id)
     if (path === undefined) return false
     queuedWorkbookPaths.set(event.sender.id, path)
     return true
@@ -2695,6 +2700,8 @@ export function registerSheetsIpc(): void {
       })
       if (selection.canceled || !selection.filePaths[0]) return null
       path = selection.filePaths[0]
+      // Retry on a stalled open restarts this pick, not an earlier shell open
+      rememberOpenedWorkbook(event.sender, path)
     }
     const prepared = await prepareWorkbookForOpen(
       entry.client,
