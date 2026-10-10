@@ -255,6 +255,25 @@ describe('markdownApi: save conflicts', () => {
   })
 })
 
+describe('markdownApi: host save conflict copy', () => {
+  it('the renderer save result says the document changed elsewhere, no retry hint', async () => {
+    const { api, mock, file } = setup()
+    const { text } = await open(api)
+    let failure = ''
+    api.onSaveRequest(() => {
+      void api.save({ text: `${text}x`, imageSources: [], mode: 'save' }).then((r) => {
+        failure = r.ok ? '' : String(r.error)
+      })
+    })
+    api.setDirty(true)
+    mock.bumpRemote(file.fileId)
+    await mock.host.save({ reason: 'user' })
+    await vi.waitFor(() => expect(failure).not.toBe(''))
+    expect(failure).toBe('the document was changed elsewhere')
+    expect(failure).not.toMatch(/try again|stale etag|409/i)
+  })
+})
+
 describe('markdownApi: host requests', () => {
   it('host save runs the renderer save flow; clean documents answer at once', async () => {
     const { api, mock } = setup()

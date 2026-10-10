@@ -740,6 +740,25 @@ describe('host save / saveAs requests (editor flows)', () => {
     expect(mock.errors).toHaveLength(0)
   })
 
+  it('save conflict: the editor result carries the localized conflict sentence, not the server message', async () => {
+    const doc = await bootWith()
+    let seen: { ok: boolean; error?: string; reason?: string } | null = null
+    wireRenderer(
+      () => doc.path,
+      async () => {
+        seen = await api.saveDocx(doc.path, buf([4]))
+        return seen
+      },
+    )
+    mock.override('api.save', () =>
+      Promise.reject(protocolError('conflict', 'stale etag (HTTP 409)')),
+    )
+    await mock.host.save({ reason: 'navigate' })
+    expect(seen).toMatchObject({ ok: false, reason: 'external-modified' })
+    expect(seen!.error).toBe(text('appWebConflictNotSaved'))
+    expect(seen!.error).not.toMatch(/stale etag|409|try again/i)
+  })
+
   it('save while a save runs: busy, not conflict', async () => {
     const doc = await bootWith()
     let release!: () => void

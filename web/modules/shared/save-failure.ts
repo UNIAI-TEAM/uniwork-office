@@ -17,6 +17,8 @@ interface SaveError {
 /** the shared sentence of a save failure that came back with a status (never network / timeout) */
 export function saveFailureKey(error: SaveError): WebStringKey {
   const status = error.status ?? 0
+  // someone saved a newer version: a retry conflicts again, so no "try again" sentence
+  if (error.code === 'conflict' || status === 409 || status === 412) return 'webConflictNotSaved'
   if (error.code === 'unauthorized') return 'webSaveUnauthorized'
   if (error.code === 'forbidden') return 'webSaveForbidden'
   if (error.code === 'not_found' || status === 404 || status === 410) return 'webSaveNotFound'

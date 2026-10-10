@@ -638,7 +638,10 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
       const code = res.error.code
       if (code === 'conflict') {
         // a host `save` request gets the conflict in its result and owns the UI
-        if (hostSave) return { ok: false, reason: 'external-modified', error: res.error.message }
+        if (hostSave) {
+          // the server's own message is in the account language: say it in the page language
+          return { ok: false, reason: 'external-modified', error: text('appWebConflictNotSaved') }
+        }
         port.reportError(res.error, false)
         // an autosave never prompts: it stays dirty and the next manual save asks
         if (auto === true) return { ok: false, reason: 'external-modified' }

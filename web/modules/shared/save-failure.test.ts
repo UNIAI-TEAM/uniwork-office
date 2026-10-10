@@ -19,6 +19,10 @@ describe('saveFailureKey', () => {
     ['not_found', 404, 'webSaveNotFound'],
     ['too_large', 413, 'webSaveTooLarge'],
     ['rate_limited', 429, 'webSaveRateLimited'],
+    ['conflict', undefined, 'webConflictNotSaved'],
+    ['conflict', 409, 'webConflictNotSaved'],
+    ['internal', 409, 'webConflictNotSaved'],
+    ['internal', 412, 'webConflictNotSaved'],
     ['internal', 500, 'webSaveServer'],
     ['internal', 503, 'webSaveServer'],
     ['internal', 410, 'webSaveNotFound'],
@@ -59,6 +63,14 @@ describe('saveFailureText', () => {
     for (const message of ['Forbidden', 'Not Found', 'Payload Too Large', 'Unauthorized', 'Gone']) {
       expect(saveFailureText({ code: 'internal', message }, translate)).not.toContain(message)
     }
+  })
+
+  it('a conflict says the document changed elsewhere, in the page language, with no retry hint', () => {
+    const conflict = { code: 'conflict', message: 'stale etag (HTTP 409)', status: 409 } as const
+    expect(saveFailureText(conflict, translate)).toBe('the document was changed elsewhere')
+    expect(saveFailureText(conflict, translate)).not.toMatch(/try again|stale etag|409/i)
+    setWebLanguage('vi', { host: true })
+    expect(saveFailureText(conflict, translate)).toBe('tài liệu đã được thay đổi ở nơi khác')
   })
 
   it('maps each status family to its own sentence in vi', () => {

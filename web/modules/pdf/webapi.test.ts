@@ -356,6 +356,23 @@ describe('save', () => {
     expect(document.querySelector('[data-pdf-web="conflict"]')).toBeNull()
   })
 
+  it('a host `save` conflict reads as a conflict in the viewer, never the server message or "try again"', async () => {
+    const s = await setup()
+    const path = (await s.api.consumePending())!
+    let failure = ''
+    s.api.onCloseSaveRequest(() => {
+      void s.api.save(req(path)).then((r) => {
+        failure = r.ok ? '' : String(r.error)
+        s.api.sendCloseSaveResult(r.ok)
+      })
+    })
+    s.mock.bumpRemote(s.fileId)
+    await s.mock.host.save({ reason: 'user' })
+    await vi.waitFor(() => expect(failure).not.toBe(''))
+    expect(failure).toBe('the document was changed elsewhere')
+    expect(failure).not.toMatch(/try again|stale etag|409/i)
+  })
+
   it('doc.closeCheck mirrors the viewer dirty flag; autosave is never claimed', async () => {
     const s = await setup()
     await s.api.consumePending()
