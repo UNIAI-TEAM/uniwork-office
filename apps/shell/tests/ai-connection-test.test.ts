@@ -49,6 +49,9 @@ describe('settings test connection: product messages', () => {
     expect(testFailureText('network', tEn)).toBe('Can’t connect. Check your connection')
     expect(testFailureText('limit', tEn)).toBe('Provider limit reached. Try again later')
     expect(testFailureText('unavailable', tEn)).toBe('Service not answering. Try again later')
+    expect(testFailureText('misconfigured', tEn)).toBe(
+      'Settings incomplete: check the service address and account fields',
+    )
     expect(testFailureText('failed', tEn)).toBe('Connection failed')
     expect(testFailureText(undefined, tEn)).toBe('Connection failed')
   })
@@ -61,10 +64,14 @@ describe('settings test connection: product messages', () => {
       'network',
       'limit',
       'unavailable',
+      'misconfigured',
     ] as const) {
       expect(testFailureText(kind, tVi)).not.toBe(testFailureText(kind, tEn))
     }
     expect(testFailureText('invalid_key', tVi)).toBe('Khóa API thiếu hoặc bị từ chối')
+    expect(testFailureText('misconfigured', tVi)).toBe(
+      'Cài đặt chưa đầy đủ: hãy kiểm tra địa chỉ dịch vụ và các trường tài khoản',
+    )
   })
 
   it('never lets a raw provider error or an HTTP status into the pill', () => {
@@ -89,6 +96,38 @@ describe('settings test connection: product messages', () => {
       'Can’t connect. Check your connection',
     )
     expect(connectionTestResult({ ok: true }, tEn)).toEqual({ ok: true })
+  })
+
+  it('shows a missing rerank key as the key message, not the generic failure', async () => {
+    const api = apiOf({
+      testFileSearchRerank: vi.fn(async () => ({
+        ok: false,
+        errorKind: 'invalid_key',
+      })),
+    })
+    const settings = { endpoint: 'direct' } as never
+    const results = await runConnectionTests(
+      [{ block: 'rerank', kind: 'rerank', settings }],
+      api,
+      tEn,
+    )
+    expect(results.rerank).toEqual({ ok: false, error: 'API key missing or rejected' })
+  })
+
+  it('shows a misconfigured rerank or media block as a settings message, not the generic failure', async () => {
+    const api = apiOf({
+      testFileSearchRerank: vi.fn(async () => ({ ok: false, errorKind: 'misconfigured' })),
+      testAiMediaSettings: vi.fn(async () => ({ ok: false, errorKind: 'misconfigured' })),
+    })
+    const settings = { endpoint: 'custom' } as never
+    const results = await runConnectionTests(
+      [{ block: 'rerank', kind: 'rerank', settings }, media('image', 'custom')],
+      api,
+      tEn,
+    )
+    const message = 'Settings incomplete: check the service address and account fields'
+    expect(results.rerank).toEqual({ ok: false, error: message })
+    expect(results.image).toEqual({ ok: false, error: message })
   })
 
   it('shows a thrown IPC error as the generic failure, not its text', async () => {

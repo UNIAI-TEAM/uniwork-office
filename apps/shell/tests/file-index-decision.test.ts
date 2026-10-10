@@ -366,13 +366,17 @@ describe('probeDecision', () => {
         normalizeFileSearchSettings({ endpoint: 'openrouter', keys: { openrouter: 'k' } }),
         unauthorized,
       ),
-    ).toEqual({ ok: false, error: 'HTTP 401' })
+    ).toEqual({ ok: false, error: 'HTTP 401', errorKind: 'invalid_key' })
     expect(
       await probeDecision(
         normalizeFileSearchSettings({ endpoint: 'direct', keys: { direct: 'k' } }),
         ok(answer([2, 0], 'other')),
       ),
-    ).toEqual({ ok: false, error: 'The endpoint answered with a different model' })
+    ).toEqual({
+      ok: false,
+      error: 'The endpoint answered with a different model',
+      errorKind: 'failed',
+    })
     let sent = 0
     const spy: JevTransport = async () => {
       sent++
@@ -383,7 +387,7 @@ describe('probeDecision', () => {
         normalizeFileSearchSettings({ endpoint: 'openrouter', keys: { openrouter: '  ' } }),
         spy,
       ),
-    ).toEqual({ ok: false, error: 'Enter an API key' })
+    ).toEqual({ ok: false, error: 'Enter an API key', errorKind: 'invalid_key' })
     expect(sent).toBe(0)
   })
 
@@ -416,7 +420,26 @@ describe('probeDecision', () => {
       expect(await probeDecision(normalizeFileSearchSettings(raw), ok(answer([2, 0])))).toEqual({
         ok: false,
         error,
+        errorKind: 'misconfigured',
       })
     }
+  })
+
+  it('maps a decision-client code to its product kind from the code, not the sentence', async () => {
+    const status =
+      (code: number): JevTransport =>
+      async () => ({ status: code, body: '' })
+    const settings = normalizeFileSearchSettings({
+      endpoint: 'openrouter',
+      keys: { openrouter: 'k' },
+    })
+    expect((await probeDecision(settings, status(403))).errorKind).toBe('invalid_key')
+    expect((await probeDecision(settings, status(429))).errorKind).toBe('limit')
+    expect((await probeDecision(settings, status(503))).errorKind).toBe('unavailable')
+    const blank = normalizeFileSearchSettings({ endpoint: 'openrouter', keys: { openrouter: '' } })
+    expect(await probeDecision(blank, ok(answer([2, 0])))).toMatchObject({
+      ok: false,
+      errorKind: 'invalid_key',
+    })
   })
 })

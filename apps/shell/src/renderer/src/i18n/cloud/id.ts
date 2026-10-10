@@ -36,4 +36,5 @@ export const id = {
   aiTestErrNetwork: 'Tidak dapat terhubung. Periksa koneksi Anda',
   aiTestErrLimit: 'Batas penyedia tercapai. Coba lagi nanti',
   aiTestErrUnavailable: 'Layanan tidak merespons. Coba lagi nanti',
+  aiTestErrMisconfigured: 'Pengaturan belum lengkap: periksa alamat layanan dan kolom akun',
 } satisfies Record<keyof typeof zh, string>

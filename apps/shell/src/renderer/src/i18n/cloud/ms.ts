@@ -36,4 +36,5 @@ export const ms = {
   aiTestErrNetwork: 'Tidak dapat bersambung. Semak rangkaian anda',
   aiTestErrLimit: 'Had pembekal dicapai. Cuba lagi nanti',
   aiTestErrUnavailable: 'Perkhidmatan tidak memberi respons. Cuba lagi nanti',
+  aiTestErrMisconfigured: 'Tetapan belum lengkap: semak alamat perkhidmatan dan medan akaun',
 } satisfies Record<keyof typeof zh, string>

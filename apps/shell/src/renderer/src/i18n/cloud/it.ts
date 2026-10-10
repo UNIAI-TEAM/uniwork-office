@@ -36,4 +36,6 @@ export const it = {
   aiTestErrNetwork: 'Impossibile connettersi. Controlla la rete',
   aiTestErrLimit: 'Limite del fornitore raggiunto. Riprova più tardi',
   aiTestErrUnavailable: 'Il servizio non risponde. Riprova più tardi',
+  aiTestErrMisconfigured:
+    'Impostazioni incomplete: controlla l’indirizzo del servizio e i campi dell’account',
 } satisfies Record<keyof typeof zh, string>

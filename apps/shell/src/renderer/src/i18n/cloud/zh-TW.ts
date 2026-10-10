@@ -32,4 +32,5 @@ export const zhTW = {
   aiTestErrNetwork: '無法連線，請檢查網路',
   aiTestErrLimit: '已達服務商的用量或頻率限制，請稍後再試',
   aiTestErrUnavailable: '服務暫無回應，請稍後再試',
+  aiTestErrMisconfigured: '設定不完整，請檢查服務位址與帳號欄位',
 } satisfies Record<keyof typeof zh, string>

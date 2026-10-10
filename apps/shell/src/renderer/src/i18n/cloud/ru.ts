@@ -36,4 +36,5 @@ export const ru = {
   aiTestErrNetwork: 'Не удаётся подключиться. Проверьте сеть',
   aiTestErrLimit: 'Достигнут лимит провайдера. Повторите позже',
   aiTestErrUnavailable: 'Сервис не отвечает. Повторите позже',
+  aiTestErrMisconfigured: 'Настройки неполные: проверьте адрес сервиса и поля учётной записи',
 } satisfies Record<keyof typeof zh, string>

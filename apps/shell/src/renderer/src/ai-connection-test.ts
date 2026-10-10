@@ -44,6 +44,7 @@ const FAILURE_KEYS: Record<AiTestFailureKind, StringKey> = {
   network: 'aiTestErrNetwork',
   limit: 'aiTestErrLimit',
   unavailable: 'aiTestErrUnavailable',
+  misconfigured: 'aiTestErrMisconfigured',
   failed: 'setAiTestFail',
 }
 

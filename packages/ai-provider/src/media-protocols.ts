@@ -702,10 +702,15 @@ function modelOf(
   return model
 }
 
+function baseUrlMissing(meta: AiMediaProviderMeta, config: AiMediaProviderConfig): string | null {
+  return meta.needsBaseUrl && !config.baseUrl
+    ? `The ${meta.label} media provider requires a Base URL`
+    : null
+}
+
 function requireBaseUrl(meta: AiMediaProviderMeta, config: AiMediaProviderConfig): void {
-  if (meta.needsBaseUrl && !config.baseUrl) {
-    throw new Error(`The ${meta.label} media provider requires a Base URL`)
-  }
+  const missing = baseUrlMissing(meta, config)
+  if (missing) throw new Error(missing)
 }
 
 export async function generateImageWithProvider(
@@ -763,7 +768,8 @@ export async function testMediaProvider(
 ): Promise<AiTestResult> {
   try {
     const meta = metaOf(provider)
-    requireBaseUrl(meta, config)
+    const missing = baseUrlMissing(meta, config)
+    if (missing) return aiTestFailure('misconfigured', missing)
     const guard = withTimeout(signal, TEST_TIMEOUT_MS)
     const resp =
       provider === 'gemini'
@@ -799,8 +805,10 @@ export async function testMediaProvider(
     }
     return aiTestFailure(kind, `HTTP ${resp.status}: ${detail}`)
   } catch (e) {
+    // a Base URL that does not parse is a settings problem, not a network one
+    const badUrl = (e as { code?: unknown } | null)?.code === 'ERR_INVALID_URL'
     return aiTestFailure(
-      aiTestFailureKindForText('', e),
+      badUrl ? 'misconfigured' : aiTestFailureKindForText('', e),
       e instanceof Error ? e.message : String(e),
     )
   }

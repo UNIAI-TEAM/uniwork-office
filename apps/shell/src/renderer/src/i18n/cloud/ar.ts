@@ -35,4 +35,5 @@ export const ar = {
   aiTestErrNetwork: 'تعذّر الاتصال. تحقّق من الشبكة',
   aiTestErrLimit: 'تم بلوغ حد المزوّد. حاول لاحقًا',
   aiTestErrUnavailable: 'الخدمة لا تستجيب. حاول لاحقًا',
+  aiTestErrMisconfigured: 'الإعدادات غير مكتملة. تحقق من عنوان الخدمة وحقول الحساب',
 } satisfies Record<keyof typeof zh, string>

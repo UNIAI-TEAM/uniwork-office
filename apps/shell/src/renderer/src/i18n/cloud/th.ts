@@ -36,4 +36,5 @@ export const th = {
   aiTestErrNetwork: 'เชื่อมต่อไม่ได้ โปรดตรวจสอบเครือข่าย',
   aiTestErrLimit: 'ถึงขีดจำกัดของผู้ให้บริการแล้ว โปรดลองใหม่ภายหลัง',
   aiTestErrUnavailable: 'บริการไม่ตอบสนอง โปรดลองใหม่ภายหลัง',
+  aiTestErrMisconfigured: 'การตั้งค่าไม่ครบ: ตรวจสอบที่อยู่บริการและช่องบัญชี',
 } satisfies Record<keyof typeof zh, string>
