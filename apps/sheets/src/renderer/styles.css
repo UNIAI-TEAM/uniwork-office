@@ -49,6 +49,7 @@
   --sheets-paper: #ffffff;
   --sheets-on-accent: #ffffff;
   --sheets-knob-dot: #ffffff;
+  --sheets-mask-opaque: #000; /* mask-image stops: only the alpha matters */
   --sheets-chart-border: #c9cdd1;
   --sheets-chart-ink: #333;
   --sheets-chart-label: #555;
@@ -470,7 +471,7 @@ html.genoffice-popover-open .ribbon-tabs {
   padding-right: 150px;
 }
 
-.ribbon-tabs > button:not(.qa-btn) {
+.ribbon-tabs button:not(.qa-btn) {
   -webkit-app-region: no-drag;
   position: relative;
   border: 0;
@@ -490,6 +491,45 @@ html.genoffice-popover-open .ribbon-tabs {
 
 .ribbon-tabs-spacer {
   flex: 1;
+}
+
+/* the tab buttons: scroll sideways when the frame is too narrow (the quick buttons sit outside);
+ * an edge fade (data-fade-*, set by RibbonTabScroller) is the cue, as in the slides ribbon */
+.ribbon-tab-scroll {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.ribbon-tab-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.ribbon-tab-scroll .ribbon-tab {
+  flex: none;
+  white-space: nowrap;
+}
+
+.ribbon-tab-scroll[data-fade-end] {
+  mask-image: linear-gradient(to right, var(--sheets-mask-opaque) calc(100% - 28px), transparent);
+}
+
+.ribbon-tab-scroll[data-fade-start] {
+  mask-image: linear-gradient(to left, var(--sheets-mask-opaque) calc(100% - 28px), transparent);
+}
+
+.ribbon-tab-scroll[data-fade-start][data-fade-end] {
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    var(--sheets-mask-opaque) 28px,
+    var(--sheets-mask-opaque) calc(100% - 28px),
+    transparent
+  );
 }
 
 .qa-sep {
@@ -609,18 +649,18 @@ html.genoffice-popover-open .ribbon-tabs {
 }
 
 /* Hovering a tab tints the label, it doesn't paint a box */
-.ribbon-tabs > button:not(.qa-btn):hover {
+.ribbon-tabs button:not(.qa-btn):hover {
   color: var(--accent-dark);
 }
 
-.ribbon-tabs > button:not(.qa-btn).active {
+.ribbon-tabs button:not(.qa-btn).active {
   color: var(--accent-dark);
   font-weight: 600;
 }
 
 /* active underline: about the label's width (insets past the tab padding),
  * ends slightly rounded — same as the slides ribbon */
-.ribbon-tabs > button:not(.qa-btn).active::after {
+.ribbon-tabs button:not(.qa-btn).active::after {
   position: absolute;
   right: 13px;
   bottom: -2.5px;
@@ -633,7 +673,7 @@ html.genoffice-popover-open .ribbon-tabs {
 
 /* Contextual tabs (Chart Design) stand out even while inactive, with a
    colored caption. */
-.ribbon-tabs > button:not(.qa-btn).contextual {
+.ribbon-tabs button:not(.qa-btn).contextual {
   color: var(--accent-dark);
   font-weight: 600;
 }
@@ -1898,6 +1938,30 @@ button.check-item:hover {
 @media (max-width: 719px) {
   body {
     min-width: 0;
+  }
+
+  /* the tab row: the tabs take the width the quick buttons leave and scroll (RibbonTabScroller);
+   * a status message gets its own line below instead of squeezing the tabs */
+  .ribbon-tabs {
+    flex-wrap: wrap;
+  }
+
+  .ribbon-tabs .ribbon-tab-scroll {
+    flex: 1 1 0;
+  }
+
+  .ribbon-tabs .ribbon-tabs-spacer {
+    display: none;
+  }
+
+  .ribbon-tabs .workbook-status {
+    flex: 1 0 100%;
+    max-width: none;
+    padding-bottom: 2px;
+  }
+
+  .ribbon-tabs .workbook-status:empty {
+    display: none;
   }
 
   .app-shell:not(.copilot-collapsed):not(.no-copilot) .sheet-body {

@@ -226,8 +226,8 @@ edit, and scrolling still streams rows.
   at W15000 of the 20k workbook, saved with Ctrl+S, reopened by the host: `<v>1705</v>` in the file and the cell shown
   in the grid (`formula-cached-reopen-en-light.png`); the view-only frame types into the grid, the host hears no
   pending edit, the user gets the toast, scrolling still streams rows (`view-only-scrolled-vi-light.png`). The e2e
-  helper now finds Univer's Name Box by `[data-u-comp="defined-name"] input` (its input has no accessible label on this
-  Univer) and goes through another cell first (a jump to the already active cell leaves the focus in the box).
+  helper finds Univer's Name Box by `[data-u-comp="defined-name"] input` (its input has no accessible label on this
+  Univer).
 - `web/e2e/sheets.spec.ts` (5, Playwright, test host `?module=sheets`):
   - the engine-unavailable screen in en/vi × light/dark: styled card, theme-legible text, the host gets one non-fatal
     `unsupported`, no grid chunk fetched;
@@ -246,3 +246,21 @@ edit, and scrolling still streams rows.
 - Build framework (GF): a per-locale string split for every module's initial chunk.
 - `apps/sheets` `tsc --noEmit` reported 3 errors that predate this lane (`src/main/sheets-main.ts` AiSettings
   `provider` typing, `packages/ai-provider/src/openrouter.ts`). This branch does not touch those files.
+
+## Name Box jump in a streamed workbook (UNI-1232)
+
+Univer's own Name Box selects the typed cell but does not scroll to it or stream its rows in when the selection does
+not change (a jump back to the already active cell, e.g. A1 after scrolling away). The grid stayed where it was, the
+typed text went into an editor on rows that were not loaded, and the edit was refused ("That area is still streaming
+in") instead of landing. `ExcelShell` now takes Enter in the Name Box first (a native keydown listener on the input
+runs before React's delegated one) and, when the text resolves (A1 address, range or defined name), runs it through
+`goToReference` - the Go To dialog's path: reveal below the freeze panes, focus handed to the grid, explicit
+`loadVisibleRange` around the target. Text it cannot resolve (a new name to define) still goes to Univer. The e2e
+helper no longer goes through another cell first (`web/e2e/sheets.spec.ts`, 20k workbook: scroll down, jump to A1, edit).
+
+## Phone width (390 px, UNI-1232)
+
+The ribbon tab row keeps the quick buttons fixed and puts the tabs in `RibbonTabScroller` (same behaviour as the Slides
+ribbon): the row scrolls sideways, an edge fade (`data-fade-start` / `data-fade-end`) is the cue and the selected tab is
+scrolled into view. The grid keeps the full width and the page never scrolls sideways (`web/e2e/sheets.spec.ts`,
+`apps/sheets/tests/ribbon-tab-scroller.test.ts`).

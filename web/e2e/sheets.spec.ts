@@ -196,13 +196,9 @@ async function typeIntoGrid(
 ) {
   for (const entry of entries) {
     const nameBox = nameBoxOf(frame)
-    // a jump to the cell that is already active leaves the focus in the Name Box (the typed text
-    // would land there): go through another cell first
-    for (const target of [entry.cell === 'AA1' ? 'AB1' : 'AA1', entry.cell]) {
-      await nameBox.click()
-      await nameBox.fill(target)
-      await nameBox.press('Enter')
-    }
+    await nameBox.click()
+    await nameBox.fill(entry.cell)
+    await nameBox.press('Enter')
     // the jump leaves the grid focused: typing starts the in-cell editor (a long jump scrolls
     // first, so give the selection a moment to land before the keys arrive)
     await page.waitForTimeout(500)
@@ -306,11 +302,8 @@ test('20k x 22: open, scroll, edit a value + a formula, save, reopen shows the e
   expect(deep.cells[0]?.value).toBe('row 15001')
   await page.screenshot({ path: resolve(shots, 'synthetic-20k-scrolled-en-light.png') })
 
-  // back to the top, edit A1 and B1 (= a formula), save with Ctrl+S (the bridge's accelerator).
-  // Click into the grid first, as a user does: on this streamed workbook the first in-cell edit
-  // after nothing but a Name Box jump never reached the save request (observed after the main
-  // sync replaced the frame's own Name Box with Univer's; open item for the Sheets owner)
-  await grid.click({ position: { x: 300, y: 300 } })
+  // back to the top (the Name Box jump scrolls there), edit A1 and B1 (= a formula), save with
+  // Ctrl+S (the bridge's accelerator)
   await typeIntoGrid(page, frame, [
     { cell: 'A1', text: '4242' },
     { cell: 'B1', text: '=A1*2' },
@@ -567,6 +560,49 @@ test('a blank new workbook opens and edits save (en, dark)', async ({ page }) =>
   await expect.poll(() => lastSaved(page), { timeout: 60_000 }).not.toBeNull()
   expect(await savedSheetXml(page)).toContain('hello')
   await page.screenshot({ path: resolve(shots, 'blank-en-dark.png') })
+  expect({ csp: await cspViolations(page, frame), ...problems }).toEqual({
+    csp: [],
+    console: [],
+    page: [],
+    http: [],
+  })
+})
+
+// UNI-1232 (item 6): at 390 px the grid keeps the width, the ribbon tabs scroll sideways with an
+// edge fade as the cue and no header control is clipped by the frame edge
+test('390 px: grid usable, ribbon tabs scroll with a cue, no clipped header controls', async ({
+  page,
+}) => {
+  test.skip(!built(), 'no dist-web/sheets build: npm run build:web -- --module sheets')
+  await page.setViewportSize({ width: 390, height: 844 })
+  const problems = await watch(page)
+  const frame = await openFrame(page, 'lang=en&theme=light')
+  await shown(frame)
+  const scroll = frame.locator('.ribbon-tab-scroll')
+  await expect(scroll).toHaveAttribute('data-fade-end', /.*/)
+  const m = await scroll.evaluate((el) => ({ sw: el.scrollWidth, cw: el.clientWidth }))
+  expect(m.sw).toBeGreaterThan(m.cw)
+  // the status message does not squeeze the tabs: at least two tab buttons' worth stays visible
+  expect(m.cw).toBeGreaterThan(150)
+  // the row scrolls: the last tab can be reached and the cue flips to the start edge
+  await scroll.evaluate((el) => (el.scrollLeft = el.scrollWidth))
+  await expect(scroll).toHaveAttribute('data-fade-start', /.*/)
+  await scroll.evaluate((el) => (el.scrollLeft = 0))
+  // every quick-access control sits fully inside the frame
+  const buttons = frame.locator('.ribbon-tabs > .qa-btn')
+  for (let i = 0; i < (await buttons.count()); i += 1) {
+    const box = (await buttons.nth(i).boundingBox())!
+    expect(box.x).toBeGreaterThanOrEqual(0)
+    expect(box.x + box.width).toBeLessThanOrEqual(390)
+  }
+  // the grid keeps (nearly) the whole width and the page never scrolls sideways
+  const grid = (await frame
+    .locator('canvas[id^="univer-sheet-main-canvas"]')
+    .first()
+    .boundingBox())!
+  expect(grid.width).toBeGreaterThan(300)
+  expect(await frame.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  await page.screenshot({ path: resolve(shots, 'blank-390-en-light.png') })
   expect({ csp: await cspViolations(page, frame), ...problems }).toEqual({
     csp: [],
     console: [],
