@@ -10,7 +10,9 @@
  * | key              | hides on the web                                                                 |
  * |------------------|----------------------------------------------------------------------------------|
  * | ai               | AI panel/dock + toggle, AI ribbon entries, ask-AI popover, AI presets            |
+ * | aiCredentials    | the AI panel's settings entry (web: UniWork-stored provider keys; on with `ai`)  |
  * | webSearch / imageSearch / imageGeneration / createDocument | the matching AI tools         |
+ * | attachments      | the AI composer's attach button (no web attachment store in this frame)           |
  * | autoRename       | post-AI rename of untitled workbooks                                             |
  * | screenshot       | Insert > Screenshot                                                              |
  * | autoSave         | AutoSave pill and its 30 s / blur timer (CONTRACT C10: explicit save only)        |
@@ -28,6 +30,8 @@ import { createCapabilityReader } from '@genoffice/ui/capabilities'
 
 export type SheetsCapability =
   | 'ai'
+  | 'aiCredentials'
+  | 'attachments'
   | 'webSearch'
   | 'imageSearch'
   | 'imageGeneration'

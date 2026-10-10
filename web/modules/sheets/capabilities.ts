@@ -5,6 +5,7 @@
  */
 import type { Capabilities } from '../../docs/protocol/types'
 import { MODULE_WEB_CAPABILITIES } from '../../docs/bridge/module-bridge'
+import { aiHostGrants } from '../shared/ai/web-ai'
 import type { SheetsCapability } from '../../../apps/sheets/src/renderer/capabilities'
 import type { SheetsEngineTransport } from './engine/transport'
 
@@ -14,13 +15,22 @@ export function sheetsWebCapabilities(
   transport: Pick<SheetsEngineTransport, 'kind' | 'features'>,
 ): Readonly<Omit<SheetsCapabilities, 'platform'>> {
   return Object.freeze({
-    ...(MODULE_WEB_CAPABILITIES as Record<'ai' | 'open' | 'recents' | 'autoSave', boolean>),
-    // AI family (hidden as in Docs)
+    ...(MODULE_WEB_CAPABILITIES as Record<
+      'ai' | 'aiCredentials' | 'open' | 'recents' | 'autoSave',
+      boolean
+    >),
+    // AI family: off until the host grants it (sheetsHostGrants, CONTRACT C16); the cloud tools also
+    // need the server's tool switch (modules/shared/ai/web-ai.ts applyCloud)
     webSearch: false,
     imageSearch: false,
     imageGeneration: false,
+    // the AI members that write local files / rename a desktop file stay hidden whatever the host
+    // grants: the bridge answers them with typed "unavailable" results (bridge.ts)
     createDocument: false,
     autoRename: false,
+    // chat attachments need a web attachment store this frame does not have (the attach button
+    // would do nothing)
+    attachments: false,
     billing: false,
     // desktop-only inputs and stores
     screenshot: false,
@@ -45,8 +55,19 @@ export function sheetsWebCapabilities(
 /** effective (frame ∩ host) protocol capabilities -> the renderer keys they turn on */
 export function sheetsHostGrants(
   granted: Capabilities | undefined,
-): Pick<SheetsCapabilities, 'open' | 'recents' | 'save' | 'saveAs'> {
+): Pick<
+  SheetsCapabilities,
+  'open' | 'recents' | 'save' | 'saveAs' | 'ai' | 'webSearch' | 'imageSearch' | 'imageGeneration'
+> & { aiCredentials: boolean } {
+  const ai = aiHostGrants(granted)
   return {
+    // `ai` family (with the AI settings entry): the shared web AI bridge's mapping; each cloud
+    // tool needs `ai` too
+    ai: ai.ai!,
+    aiCredentials: ai.aiCredentials!,
+    webSearch: ai.webSearch!,
+    imageSearch: ai.imageSearch!,
+    imageGeneration: ai.imageGeneration!,
     open: granted?.filePick === true,
     recents: granted?.recents === true,
     save: granted?.save === true,

@@ -7,6 +7,7 @@ import {
 import React, { useEffect, useRef, useState } from 'react'
 import { AiComposer, AiScopeQuote, AiTypingIndicator, type AiScopeQuoteData } from '@genoffice/ui'
 import { GensparkMark } from '../ribbon-icons'
+import { cap } from '../capabilities'
 import type { ChangePlan } from '@genoffice/xlsx-gateway/domain/workbook.types'
 import { ATTACHMENT_IMAGE_EXTS, type AttachmentMeta } from '../../shared/desktop-api'
 import { useI18n, type TFunc } from '../i18n/locale'
@@ -543,6 +544,16 @@ export function AiChatPanel({
               <IconNewChat size={15} />
             </button>
           )}
+          {cap('aiCredentials') && window.desktopApi?.openAiSettings && (
+            <button
+              className="ai-header-btn"
+              onClick={() => void window.desktopApi.openAiSettings?.()}
+              data-tip={t('aiSettingsTitle')}
+              aria-label={t('aiSettingsTitle')}
+            >
+              <IconGear size={15} />
+            </button>
+          )}
           <button
             className="ai-header-btn ai-panel-collapse"
             onClick={onCollapse}
@@ -822,14 +833,16 @@ export function AiChatPanel({
           footerStart={
             <>
               <AiModelPicker bridge={MODEL_BRIDGE} lang={lang} />
-              <button
-                className="ai-attach-btn"
-                onClick={onPickAttachments}
-                data-tip={t('aiAttachTitle')}
-                aria-label={t('aiAttachTitle')}
-              >
-                <img src={attachIcon} alt="" aria-hidden />
-              </button>
+              {cap('attachments') && (
+                <button
+                  className="ai-attach-btn"
+                  onClick={onPickAttachments}
+                  data-tip={t('aiAttachTitle')}
+                  aria-label={t('aiAttachTitle')}
+                >
+                  <img src={attachIcon} alt="" aria-hidden />
+                </button>
+              )}
             </>
           }
           textareaRef={inputRef}
@@ -879,6 +892,15 @@ function IconNewChat({ size }: { size: number }): React.JSX.Element {
         strokeLinejoin="round"
       />
       <path d="M12.2 9.4v4M10.2 11.4h4" />
+    </Svg>
+  )
+}
+
+function IconGear({ size }: { size: number }): React.JSX.Element {
+  return (
+    <Svg size={size}>
+      <circle cx="8" cy="8" r="1.78" />
+      <path d="M8 2.98v1.62M8 11.4v1.62M13.02 8h-1.62M4.6 8H2.98M11.56 4.44l-1.13 1.13M5.57 10.43l-1.13 1.13M11.56 11.56l-1.13-1.13M5.57 5.57 4.44 4.44" />
     </Svg>
   )
 }

@@ -193,8 +193,9 @@ export async function prefetchOpImages(
     if (op.op !== 'add_image' || imageData.has(op.path)) continue
     let dataUrl: string
     let mediaType: string
-    // file:// = a BYOK-generated image in the local store (fetchImage resolves it)
-    if (/^(https?|file):\/\//i.test(op.path)) {
+    // file:// = a BYOK-generated image in the local store (fetchImage resolves it); data: = a
+    // cloud-generated image on the web (fetchImage decodes it in place)
+    if (/^(https?|file):\/\//i.test(op.path) || /^data:image\//i.test(op.path)) {
       const fetched = await window.desktopApi.fetchImage(op.path)
       if (!fetched) throw new Error(t('appCannotReadImage'))
       // Trust the bytes, not the Content-Type header the handler echoed

@@ -127,7 +127,7 @@ async function readSource(source: FileSource): Promise<ArrayBuffer> {
   return res.arrayBuffer()
 }
 
-function decodeDataUrl(url: string): { base64: string; mime: string } | null {
+export function decodeDataUrl(url: string): { base64: string; mime: string } | null {
   const m = /^data:([^;,]*)((?:;[^;,]*)*?)(;base64)?,(.*)$/s.exec(url)
   if (!m) return null
   const mime = m[1] || 'text/plain'

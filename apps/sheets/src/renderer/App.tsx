@@ -197,6 +197,7 @@ import { createMergeSkill } from './ai/merge-skill'
 import { mergeAttachedWorkbooks } from './merge-workbooks'
 import { createSearchSkill } from './ai/search-skill'
 import { createImageSkill } from './ai/image-skill'
+import { gateSkill } from './ai/skill-gate'
 import { ATTACHMENT_IMAGE_EXTS } from '../shared/desktop-api'
 import type {
   AttachmentAddResult,
@@ -1368,18 +1369,26 @@ export function App({
       systemSuffix: aiLangDirective,
       skill: composeSkills('sheets+files', '', [
         createWorkbookSkill(sheetsSkillDeps()),
-        createFilesSkill(availableAttachments),
-        createMergeSkill({
-          getAttachments: availableAttachments,
-          mergePaths: (paths) => {
-            const runtime = univerRef.current
-            if (!runtime) throw new Error(t('appMergeWorkbooksFailed'))
-            return mergeAttachedWorkbooks({ runtime, lazyWorkbookRef, setMessage }, paths)
-          },
-        }),
-        createSearchSkill(),
-        createImageSkill(() =>
-          imageGenerationAvailable(aiSettingsRef.current, gskLoggedInRef.current),
+        gateSkill(createFilesSkill(availableAttachments), () => cap('attachments')),
+        // the web frame offers only what the host grants (ai/skill-gate.ts): no workbook merge
+        // (C11), web search / image search / generation per grant
+        gateSkill(
+          createMergeSkill({
+            getAttachments: availableAttachments,
+            mergePaths: (paths) => {
+              const runtime = univerRef.current
+              if (!runtime) throw new Error(t('appMergeWorkbooksFailed'))
+              return mergeAttachedWorkbooks({ runtime, lazyWorkbookRef, setMessage }, paths)
+            },
+          }),
+          () => cap('mergeWorkbooks'),
+        ),
+        gateSkill(createSearchSkill(), () => cap('webSearch')),
+        createImageSkill(
+          () =>
+            cap('imageGeneration') &&
+            imageGenerationAvailable(aiSettingsRef.current, gskLoggedInRef.current),
+          () => cap('imageSearch'),
         ),
       ]),
       events: {
@@ -1528,6 +1537,9 @@ export function App({
     if (!settings) return false
     const config = settings.providers[settings.provider]
     if (!config?.model) return false
+    // web: the keys live in UniWork and never reach the frame (`apiKey` is always ''); a missing
+    // or refused key comes back as a typed state card (credential_missing, provider_auth_failed)
+    if (cap('aiCredentials')) return true
     // the built-in uniAI provider's key never lands in the settings file; the
     // main process injects it. Missing access surfaces as a request error.
     return settings.provider === 'genspark' || !!config.apiKey
@@ -3511,7 +3523,7 @@ export function App({
       const candidate = after.file.sheets
         .map((sheet) => sheet.name.trim())
         .find((name) => name.length > 0 && !DEFAULT_SHEET_NAME_RE.test(name))
-      if (candidate) {
+      if (candidate && cap('autoRename')) {
         try {
           await window.desktopApi.autoRenameWorkbook(after.file.sessionId, candidate)
         } catch {

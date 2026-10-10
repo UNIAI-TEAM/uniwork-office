@@ -30,7 +30,13 @@
  * |                                             | The boot document's draft is offered (shared prompt) before it opens;     |
  * |                                             | Restore opens the draft bytes `restoredFromRecovery`, dirty until saved   |
  * | onRecoveryPrompt / replyRecoveryPrompt      | no-ops: the shared draft prompt is the only recovery UI on the web        |
- * | everything else (AI, screenshot, merge,     | typed stubs, hidden by capability keys (../capabilities.ts)               |
+ * | AI (aiStream, aiChat, getAiSettings,        | the stubs below answer while AI is off; installModuleBridge swaps in the  |
+ * | webSearch, imageSearch, generateImage, ...) | shared web AI bridge (modules/shared/ai withWebAi) while the host grants  |
+ * |                                             | `ai` (CONTRACT C16): frame-token AI routes, streamed in the frame         |
+ * | fetchImage                                  | data: URLs decoded locally; else image.fetch (host proxy, SSRF-guarded)   |
+ * | createDocument, readLocalImage,             | desktop-only, never granted: typed "unavailable" answers, so the AI tools |
+ * | openWorkbooksForMerge, autoRenameWorkbook   | that need them are not offered (renderer ai/skill-gate.ts)                |
+ * | everything else (screenshot, merge,         | typed stubs, hidden by capability keys (../capabilities.ts)               |
  * | autosave, headless, attachments)            |                                                                           |
  *
  * View-only: without the host's `save` grant every save is refused (the renderer hides Save, see
@@ -50,7 +56,7 @@ import aiStubs from '../../docs/bridge/ai'
 import { downloadBlob, openExternal as guardedExternal } from '../../docs/bridge/browser'
 import { TIMEOUTS, errorCode } from '../../docs/bridge/frame-port'
 import type { ModuleBridgePort } from '../../docs/bridge/module-bridge'
-import { idFromPath, pathFor } from '../../docs/bridge/webapi'
+import { decodeDataUrl, idFromPath, pathFor } from '../../docs/bridge/webapi'
 import type { DraftHost, DraftRecovery } from '../../docs/bridge/draft-recovery'
 import { bridgeDraftRecovery } from '../shared/recovery-prompt'
 import type {
@@ -630,7 +636,8 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
       }
     },
 
-    // merge sources need multi-pick + extra sessions: hidden on the web (C11, mergeWorkbooks)
+    // merge sources need multi-pick + extra sessions: hidden on the web (C11, mergeWorkbooks); the
+    // AI's merge tool (chat attachments) is not offered either (renderer ai/skill-gate.ts)
     selectWorkbooksForMerge: async () => null,
     openWorkbooksForMerge: async () => null,
 
@@ -744,6 +751,7 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
     // the desktop recovery dialog never shows: the shared draft prompt is the web's only UI
     onRecoveryPrompt: noopDisposer,
     replyRecoveryPrompt: () => {},
+    // post-AI rename of a desktop file: the web document keeps the name the user chose
     autoRenameWorkbook: async (_sessionId: string, _baseName: string) => ({ renamed: false }),
 
     // ---- export / print ----------------------------------------------------
@@ -811,7 +819,19 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
     readLocalImage: unavailable('local image'),
     captureScreenSources: async () => ({ status: 'denied' as const, sources: [] }),
     captureScreenSource: async () => null,
-    fetchImage: async () => null,
+    // AI image tools hand over data: URLs (generation) or https URLs (search): the host proxy
+    // fetches the latter (a page cannot: connect-src 'self')
+    async fetchImage(url: string): Promise<{ base64: string; mime: string } | null> {
+      if (typeof url !== 'string' || !url) return null
+      if (url.startsWith('data:')) return decodeDataUrl(url)
+      if (!/^https?:\/\//i.test(url)) return null
+      try {
+        const res = await port.request('image.fetch', { url }, { timeoutMs: TIMEOUTS.short })
+        return res?.image ?? null
+      } catch {
+        return null
+      }
+    },
     generateImage: async () => ({ error: NOT_AVAILABLE }),
     pickAttachments: async () => null,
     addAttachmentPaths: async () => ({ accepted: [], rejected: [] }),

@@ -209,19 +209,16 @@ describe('capabilities', () => {
     expect(caps.xlsImport).toBe(true)
   })
 
-  it('host grants switch open / recents / save / saveAs on', () => {
-    expect(sheetsHostGrants(undefined)).toEqual({
+  it('host grants switch open / recents / save / saveAs on (AI family: ./ai.test.ts)', () => {
+    expect(sheetsHostGrants(undefined)).toMatchObject({
       open: false,
       recents: false,
       save: false,
       saveAs: false,
     })
-    expect(sheetsHostGrants({ filePick: true, save: true, saveAs: true, recents: true })).toEqual({
-      open: true,
-      recents: true,
-      save: true,
-      saveAs: true,
-    })
+    expect(
+      sheetsHostGrants({ filePick: true, save: true, saveAs: true, recents: true }),
+    ).toMatchObject({ open: true, recents: true, save: true, saveAs: true })
   })
 })
 
