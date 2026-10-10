@@ -9338,17 +9338,8 @@ body.show-curtain::after {
   pointer-events: none;
 }
 
-/* "Use the app" notes of the web frame (use-app.ts): the dialog and the note over a media poster */
-.use-app-modal {
-  max-width: calc(100vw - 32px);
-}
-
-.use-app-message {
-  margin: 0;
-  font-size: 14px;
-  line-height: 1.5;
-  color: var(--text);
-}
+/* "Use the app" notes of the web frame (use-app.ts): the dialog is the shared frame dialog
+   (UseAppDialog.tsx); this is the note over a media poster */
 
 .use-app-note {
   position: absolute;

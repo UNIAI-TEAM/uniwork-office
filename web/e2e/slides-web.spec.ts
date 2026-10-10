@@ -444,7 +444,13 @@ test.describe('slides web module', () => {
       const dialog = frame.locator('[data-use-app="dialog"]')
       await expect(dialog).toBeVisible()
       await expect(dialog).toContainText(message)
-      await expect(dialog.locator('button.primary')).toHaveCount(0)
+      // the frame dialog family: a close X, and Close is the one filled action when the host
+      // offers no Open in app
+      await expect(dialog.locator('.ow-dlg-close')).toBeVisible()
+      await expect(dialog.locator('.ow-dlg-btn.primary')).toHaveCount(1)
+      await expect(dialog.locator('.ow-dlg-btn.primary')).toHaveText(/Close|Đóng/)
+      if (lang === 'en')
+        await page.screenshot({ path: resolve(SHOTS, 'use-app-dialog-light-en.png') })
       await page.keyboard.press('Escape')
       await expect(dialog).toHaveCount(0)
     })
