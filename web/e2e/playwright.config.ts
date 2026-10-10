@@ -11,8 +11,14 @@ const PORT =
   Number(process.env.E2E_PORT) ||
   4300 + (createHash('sha1').update(repoRoot).digest().readUInt16BE(0) % 600)
 
+// CI sets WEB_E2E_REQUIRE_BUILD=1: a missing dist-web bundle fails the run, a skipped test fails it
+// (./require-builds.ts, ./fail-on-skip-reporter.ts); without it a missing bundle skips its specs.
+const requireBuild =
+  !!process.env.WEB_E2E_REQUIRE_BUILD && process.env.WEB_E2E_REQUIRE_BUILD !== '0'
+
 export default defineConfig({
   testDir: __dirname,
+  globalSetup: requireBuild ? resolve(__dirname, 'require-builds.ts') : undefined,
   testMatch: /.*\.spec\.ts/,
   outputDir: resolve(repoRoot, 'web/e2e/.results'),
   timeout: 240_000,
@@ -20,7 +26,9 @@ export default defineConfig({
   workers: 1,
   fullyParallel: false,
   retries: 0,
-  reporter: [['list']],
+  reporter: requireBuild
+    ? [['list'], [resolve(__dirname, 'fail-on-skip-reporter.ts')]]
+    : [['list']],
   // always start our own server: reusing whatever answers on PORT would test an unknown build
   webServer: {
     command: 'node web/server/server.mjs',
