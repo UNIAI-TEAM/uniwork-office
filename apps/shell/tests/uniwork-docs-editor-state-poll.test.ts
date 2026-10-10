@@ -14,10 +14,11 @@ describe('UniWork editor state poll', () => {
     const pass = createEditorStatePoll({
       editorDirtyStates,
       isBound: (path) => path !== 'b.xlsx',
+      saveMark: () => 7,
       noteEditorDirty,
     })
     await pass()
-    expect(noteEditorDirty.mock.calls).toEqual([['a.docx', true]])
+    expect(noteEditorDirty.mock.calls).toEqual([['a.docx', true, 7]])
   })
 
   it('never overlaps a pass that waits on a busy editor, and survives a failing read', async () => {
@@ -33,7 +34,12 @@ describe('UniWork editor state poll', () => {
       .mockRejectedValueOnce(new Error('tab closed'))
       .mockResolvedValue([{ path: 'a.md', dirty: false }])
     const noteEditorDirty = vi.fn()
-    const pass = createEditorStatePoll({ editorDirtyStates, isBound: () => true, noteEditorDirty })
+    const pass = createEditorStatePoll({
+      editorDirtyStates,
+      isBound: () => true,
+      saveMark: () => 0,
+      noteEditorDirty,
+    })
     const first = pass()
     await pass()
     expect(editorDirtyStates).toHaveBeenCalledTimes(1)
@@ -42,8 +48,28 @@ describe('UniWork editor state poll', () => {
     await pass()
     await pass()
     expect(noteEditorDirty.mock.calls).toEqual([
-      ['a.md', true],
-      ['a.md', false],
+      ['a.md', true, 0],
+      ['a.md', false, 0],
     ])
+  })
+
+  it('reads the save mark before it asks the editors', async () => {
+    let mark = 1
+    const order: string[] = []
+    const pass = createEditorStatePoll({
+      editorDirtyStates: async () => {
+        order.push('ask')
+        mark = 2 // a Save lands while the editors answer
+        return [{ path: 'a.md', dirty: true }]
+      },
+      isBound: () => true,
+      saveMark: () => {
+        order.push('mark')
+        return mark
+      },
+      noteEditorDirty: (_path, _dirty, m) => order.push(`note@${m}`),
+    })
+    await pass()
+    expect(order).toEqual(['mark', 'ask', 'note@1'])
   })
 })

@@ -150,6 +150,9 @@ export class UniworkDocsService {
   private readonly hashMemo = new Map<string, { mtimeMs: number; size: number; checksum: string }>()
   /** working copies whose editor holds edits not written to the file yet */
   private readonly editorDirty = new Set<string>()
+  /** per path, the saveMark of its last user Save */
+  private readonly lastUserSave = new Map<string, number>()
+  private saveCounter = 0
 
   constructor(deps: UniworkDocsServiceDeps) {
     this.deps = deps
@@ -227,9 +230,12 @@ export class UniworkDocsService {
    * The editor showing `path` has (or no longer has) unsaved edits. Pushes the
    * chip only when that changes what it shows; never writes the binding.
    */
-  noteEditorDirty(path: string, dirty: boolean): void {
+  noteEditorDirty(path: string, dirty: boolean, mark?: number): void {
     const doc = typeof path === 'string' ? this.store.lookup(path) : null
     if (!doc || !this.ownsLocally(doc) || doc.binding.access !== 'edit') return
+    // a poll pass that began before the last Save still sees the pre-Save
+    // edits: the next pass reads the editor again
+    if (dirty && mark !== undefined && (this.lastUserSave.get(doc.path) ?? 0) > mark) return
     if (dirty === this.editorDirty.has(doc.path)) return
     const before = this.statusOf(doc).state
     if (dirty) this.editorDirty.add(doc.path)
@@ -305,10 +311,16 @@ export class UniworkDocsService {
     return !!doc && (doc.binding.access === 'view' || !this.ownsLocally(doc))
   }
 
+  /** moves on every user Save; see noteEditorDirty */
+  saveMark(): number {
+    return this.saveCounter
+  }
+
   /** a module's successful explicit user Save of `path` */
   onUserSave(path: string): void {
     const doc = this.store.lookup(path)
     if (!doc || !this.ownsLocally(doc)) return
+    this.lastUserSave.set(doc.path, ++this.saveCounter)
     // the module just wrote what its editor held
     this.editorDirty.delete(doc.path)
     void this.coordinator.save(path)
@@ -709,16 +721,20 @@ export class UniworkDocsService {
       formatForName(detail.file.filename) ??
       formatForName(detail.title)
     if (!format) throw new UniworkDocError('unsupported_format')
-    // the web hands off the version it shows, and the server reduces any
-    // ticket naming a version to view. While that version is still the
-    // current one the launch opens the document itself: the same working
-    // copy (and tab) as the picker, with the live ACL. Only an older version
-    // is its own view-only copy.
-    const historical = !!launch && launch.version > 0 && launch.version !== detail.file.version
+    // a ticket naming a version is a view ticket (the launch contract: the
+    // client never upgrades a ticket to edit): a read-only copy of that
+    // version. The one exception is a version that is still the current one
+    // while a tab of the document is open: that tab is focused, neither
+    // duplicated, downgraded nor upgraded. A ticket without a version takes
+    // the live ACL (view only when the descriptor says view).
+    const viewTicket = !!launch && launch.version > 0
+    if (viewTicket && launch.version === detail.file.version) {
+      const open = await this.openTabCopy(identity, documentId)
+      if (open) return this.focusOpen(open.path, open.title)
+    }
     const viewRequested = !!launch && launch.version === 0 && launch.operation === 'view'
-    const access: UniworkDocAccess =
-      historical || viewRequested ? 'view' : accessFor(detail.myLevel)
-    const key = historical ? `${documentId}@v${launch.version}` : documentId
+    const access: UniworkDocAccess = viewTicket || viewRequested ? 'view' : accessFor(detail.myLevel)
+    const key = viewTicket ? `${documentId}@v${launch.version}` : documentId
     const dir = this.store.dirFor(identity.deploymentId, identity.accountId, key)
     const existing = await this.store.readDir(dir)
     const workspaceId = launch?.workspaceId ?? detail.workspaceId
@@ -735,7 +751,7 @@ export class UniworkDocsService {
           KEEP_LOCAL_STATES.has(existing.state) ||
           localChecksum !== existing.baseChecksum ||
           this.deps.isPathOpen(local)
-        const current = historical || existing.baseRevision === detail.revision
+        const current = viewTicket || existing.baseRevision === detail.revision
         if (keepLocal || current) {
           // permissions come from the server: a save refused with 403 left the
           // copy view-only; once the server grants edit again, its local work
@@ -763,7 +779,7 @@ export class UniworkDocsService {
 
     let bytes: Uint8Array
     let base = detail
-    if (historical) {
+    if (viewTicket) {
       bytes = (await this.api().download(documentId, launch.version)).bytes
     } else {
       const latest = await this.fetchLatest(documentId, detail)
@@ -786,14 +802,32 @@ export class UniworkDocsService {
       filename,
       format,
       access,
-      baseRevision: historical ? launch.revision : base.revision,
-      baseVersion: historical ? launch.version : base.file.version,
+      baseRevision: viewTicket ? launch.revision : base.revision,
+      baseVersion: viewTicket ? launch.version : base.file.version,
       baseChecksum: sha256Hex(bytes),
       state: 'ready',
       ...(existing?.lastSavedAt ? { lastSavedAt: existing.lastSavedAt } : {}),
     }
     await this.store.write(dir, binding)
     return this.show(path, binding)
+  }
+
+  /** the document's own working copy when a tab shows it */
+  private async openTabCopy(
+    identity: SessionIdentity,
+    documentId: string,
+  ): Promise<{ path: string; title: string } | null> {
+    const dir = this.store.dirFor(identity.deploymentId, identity.accountId, documentId)
+    const existing = await this.store.readDir(dir)
+    if (!existing || existing.documentId !== documentId) return null
+    const local = join(dir, existing.filename)
+    if (!this.store.exists(local) || !this.deps.isPathOpen(local)) return null
+    return { path: local, title: existing.title }
+  }
+
+  private focusOpen(path: string, title: string): { path: string; title: string } {
+    if (!this.deps.openPath(path)) throw new UniworkDocError('unsupported_format')
+    return { path, title }
   }
 
   private show(path: string, binding: Binding): { path: string; title: string } {
