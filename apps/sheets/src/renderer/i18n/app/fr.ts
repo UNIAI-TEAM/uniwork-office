@@ -1597,4 +1597,6 @@ export const fr = {
   appWebTooLargeTitle: 'Ce classeur est trop volumineux pour le web',
   appWebTooLargeBody:
     "Il dépasse la taille que le tableur web prend en charge ; il s'ouvre donc dans l'éditeur de tableur classique.",
+  appWebEngineRestarted:
+    "Le moteur du classeur s'est arrêté de façon inattendue et a redémarré. Le classeur a été rouvert à partir de sa dernière version enregistrée ; vos modifications non enregistrées sont conservées, pensez à enregistrer rapidement.",
 } satisfies Record<keyof typeof zh, string>

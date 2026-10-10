@@ -33,6 +33,22 @@ export function rewriteTtfUrls(
   })
 }
 
+// JS imports of a font file as a URL: `import url from '@genoffice/ui/fonts/Carlito-Regular.ttf?url'`
+const TTF_URL_IMPORT =
+  /^(?:@genoffice\/ui\/fonts\/|\.{1,2}\/(?:[^?]*\/)?)([A-Za-z0-9-]+)\.ttf\?url$/
+
+/**
+ * The WOFF2 twin (with `?url`) a `<name>.ttf?url` import resolves to, or null when the import is not a
+ * TTF URL import or has no twin. The canvas FontFace API the Sheets cell-font fallback uses reads WOFF2
+ * like @font-face does, and the twin is a fraction of the TTF (fonts-woff2 README, make-woff2.py).
+ */
+export function woff2UrlImport(source: string, woff2Dir = WOFF2_DIR): string | null {
+  const name = TTF_URL_IMPORT.exec(source)?.[1]
+  if (!name) return null
+  const twin = resolve(woff2Dir, `${name}.woff2`)
+  return existsSync(twin) ? `${twin}?url` : null
+}
+
 const SRC_DECL = /(\bsrc\s*:\s*)([^;}]*)/g
 const WOFF2_URL = /url\(\s*(['"]?)[^'")]*\.woff2(?:[?#][^'")]*)?\1\s*\)/i
 
@@ -55,6 +71,10 @@ export function woff2FontsPlugin(): Plugin {
   return {
     name: 'web-docs-woff2-fonts',
     enforce: 'pre',
+    // `?url` TTF imports from JS (Sheets cell-font-fallback.ts): same twin, same never-inline rule
+    resolveId(source) {
+      return woff2UrlImport(source)
+    },
     transform(code, id) {
       const file = id.split('?')[0]
       if (!file.endsWith('.css') || !/\.(ttf|woff)\b/.test(code)) return null

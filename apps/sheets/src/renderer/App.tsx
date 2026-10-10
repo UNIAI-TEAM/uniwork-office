@@ -330,6 +330,7 @@ import { installCfFormulaFold } from './cf-formula-fold'
 import { installSheetRenameFix } from './sheet-rename-fix'
 import { installArrowCollapse } from './arrow-collapse-fix'
 import { effectiveSheetProtection, installSheetProtectionGuard } from './sheet-protection'
+import { installViewOnlyGuard } from './view-only-guard'
 import type { SheetProtectionAllow } from '@genoffice/xlsx-gateway/gateway/xlsx-protection'
 import { installCtrlDragFill } from './ctrl-drag-fill'
 import { installContextSubmenuReopenFix } from './context-submenu-reopen-fix'
@@ -1970,6 +1971,11 @@ export function App({
         showToast(message, 'error')
       },
     })
+    // web frame without the save grant: the grid refuses edits (no-op on the desktop)
+    const viewOnlyGuardDisposable = installViewOnlyGuard(runtime, (message) => {
+      setMessage(message)
+      showToast(message, 'error')
+    })
     const ctrlDragFillDisposable = installCtrlDragFill(runtime)
     // A context-menu submenu re-hovered within Univer's close delay stays
     // invisible; re-trigger its positioning (genoffice#337).
@@ -3280,6 +3286,7 @@ export function App({
       selectionWrapGuardDisposable.dispose()
       arrowCollapseDisposable.dispose()
       sheetProtectionDisposable.dispose()
+      viewOnlyGuardDisposable.dispose()
       ctrlDragFillDisposable.dispose()
       contextSubmenuReopenDisposable.dispose()
       multiRowAutofitDisposable.dispose()

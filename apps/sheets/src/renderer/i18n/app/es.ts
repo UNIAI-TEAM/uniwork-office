@@ -1573,4 +1573,6 @@ export const es = {
   appWebTooLargeTitle: 'Este libro es demasiado grande para la web',
   appWebTooLargeBody:
     'Supera el tamaño que admite la hoja de cálculo web, así que se abre en el editor de hojas de cálculo clásico.',
+  appWebEngineRestarted:
+    'El motor del libro se detuvo de forma inesperada y se reinició. El libro se volvió a abrir desde su última versión guardada; los cambios sin guardar se conservan, guarde pronto.',
 } satisfies Record<keyof typeof zh, string>

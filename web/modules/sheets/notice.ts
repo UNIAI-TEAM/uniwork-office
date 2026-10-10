@@ -11,6 +11,7 @@
  */
 import { createI18n } from '@genoffice/i18n'
 import { appStrings } from '../../../apps/sheets/src/renderer/i18n/strings-app'
+import { showToast } from '../../../apps/sheets/src/renderer/toast-bus'
 import { webLanguage } from '../../docs/bridge/browser'
 
 export type SheetsAppKey = keyof (typeof appStrings)['zh']
@@ -86,3 +87,13 @@ export const ask: AskFn = <T extends string>(opts: AskOptions<T>) =>
     document.body.append(root)
     ;(primary ?? actions.querySelector('button'))?.focus()
   })
+
+/**
+ * The engine stopped and was restarted (a Rust panic aborts the wasm instance, SH3): the open
+ * workbook was reopened from its last saved bytes, so the user hears about it as a toast in the
+ * Sheets renderer's own toast host. Nothing is said when no workbook was open.
+ */
+export function notifyEngineRecovered(recovery: { sessions: number }): void {
+  if (recovery.sessions === 0) return
+  showToast(text('appWebEngineRestarted'), 'error')
+}

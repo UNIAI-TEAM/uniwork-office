@@ -1570,4 +1570,6 @@ export const pt = {
   appWebTooLargeTitle: 'Esta pasta de trabalho é grande demais para a web',
   appWebTooLargeBody:
     'Ela excede o tamanho que a planilha web suporta, por isso abre no editor de planilhas clássico.',
+  appWebEngineRestarted:
+    'O motor da pasta de trabalho parou inesperadamente e foi reiniciado. A pasta de trabalho foi reaberta a partir da última versão salva; as alterações não salvas foram mantidas, salve em breve.',
 } satisfies Record<keyof typeof zh, string>

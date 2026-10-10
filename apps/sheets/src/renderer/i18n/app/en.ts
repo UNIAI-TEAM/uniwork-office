@@ -1506,4 +1506,6 @@ export const en = {
   appWebTooLargeTitle: 'This workbook is too large for the web',
   appWebTooLargeBody:
     'It is above the size the web spreadsheet handles, so it opens in the classic spreadsheet editor instead.',
+  appWebEngineRestarted:
+    'The workbook engine stopped unexpectedly and was restarted. The workbook was reopened from its last saved version; your unsaved changes are kept, so save soon.',
 } satisfies Record<keyof typeof zh, string>

@@ -10,6 +10,7 @@ import JSZip from 'jszip'
 import { describe, expect, it } from 'vitest'
 import type { WorkbookSaveRequest } from '../../../../apps/sheets/src/shared/desktop-api'
 import { buildEditFixture } from '../../../../apps/sheets/tests/fixture-builder'
+import { planCachedValues, toFormulaValues } from './cached-values'
 import { createDirectChannel, type EngineChannel, type EngineResponse } from './channel'
 import { EngineHost } from './host'
 import {
@@ -17,6 +18,7 @@ import {
   SheetsTooLargeError,
   createWasmTransport,
   worksheetXmlBytes,
+  type EngineRecovery,
 } from './wasm-transport'
 
 const repoRoot = resolve(__dirname, '../../../..')
@@ -79,7 +81,7 @@ async function syntheticWorkbook(rows: number): Promise<Uint8Array> {
   const zip = new JSZip()
   zip.file(
     '[Content_Types].xml',
-    '<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>',
+    '<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>',
   )
   zip.file(
     '_rels/.rels',
@@ -91,7 +93,11 @@ async function syntheticWorkbook(rows: number): Promise<Uint8Array> {
   )
   zip.file(
     'xl/_rels/workbook.xml.rels',
-    '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>',
+    '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>',
+  )
+  zip.file(
+    'xl/styles.xml',
+    '<?xml version="1.0" encoding="UTF-8"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="1"><font><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>',
   )
   zip.file(
     'xl/worksheets/sheet1.xml',
@@ -99,6 +105,101 @@ async function syntheticWorkbook(rows: number): Promise<Uint8Array> {
   )
   return zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' })
 }
+
+describe('cached values plan (SH3)', () => {
+  const names = new Map([['sheet-1', 'Data']])
+  const edit = (over: Record<string, unknown>) => ({
+    sheetId: 'sheet-1',
+    row: 0,
+    column: 0,
+    writeValue: true,
+    value: 1,
+    ...over,
+  })
+  const request = (edits: unknown[], over: Record<string, unknown> = {}) =>
+    ({
+      ...saveRequest('s', []),
+      edits,
+      ...over,
+    }) as unknown as WorkbookSaveRequest
+
+  it('sends every pending edit as input and reads only the typed formula cells', () => {
+    const plan = planCachedValues(
+      request([
+        edit({ row: 1, column: 1, value: 0, formula: '=SUM(A1:A3)' }),
+        edit({ row: 2, column: 0, value: '=not a formula' }),
+        edit({ row: 3, column: 0, writeValue: false, value: null }),
+        edit({ row: 4, column: 0, value: true }),
+      ]),
+      names,
+      1000,
+    )
+    expect(plan?.edits).toEqual([
+      { sheet: 'Data', row: 1, column: 1, input: '=SUM(A1:A3)' },
+      { sheet: 'Data', row: 2, column: 0, input: "'=not a formula" },
+      { sheet: 'Data', row: 4, column: 0, input: 'TRUE' },
+    ])
+    expect(plan?.reads).toEqual([
+      {
+        sheet: 'Data',
+        range: { startRow: 1, endRow: 1, startColumn: 1, endColumn: 1 },
+      },
+    ])
+  })
+
+  it('skips saves with nothing to compute or that the file coordinates cannot represent', () => {
+    const formula = edit({ formula: '=A2' })
+    expect(planCachedValues(request([edit({})]), names, 10)).toBeNull()
+    expect(planCachedValues(request([formula], { structuralOps: [{}] }), names, 10)).toBeNull()
+    expect(
+      planCachedValues(request([formula], { sheetOps: [{ kind: 'add' }] }), names, 10),
+    ).toBeNull()
+    // a sheet added this session has no file part
+    expect(
+      planCachedValues(request([edit({ sheetId: 'new', formula: '=A2' })]), names, 10),
+    ).toBeNull()
+    // too big for a cold IronCalc import
+    expect(planCachedValues(request([formula]), names, 65 * 1024 * 1024)).toBeNull()
+    // a value the renderer already computed is not asked twice
+    expect(
+      planCachedValues(
+        request([formula], {
+          formulaValues: [{ sheetId: 'sheet-1', row: 0, column: 0, value: 3 }],
+        }),
+        names,
+        10,
+      ),
+    ).toBeNull()
+  })
+
+  it('maps the recalc cells to formula values (numbers, text, errors; not IronCalc failures)', () => {
+    const cell = (over: Record<string, unknown>) => ({
+      sheet: 'Data',
+      row: 0,
+      column: 0,
+      formatted: '',
+      isFormula: true,
+      ...over,
+    })
+    expect(
+      toFormulaValues(
+        [
+          cell({ formatted: '55', number: 55 }),
+          cell({ row: 1, formatted: 'abc' }),
+          cell({ row: 2, formatted: '#DIV/0!', isError: true }),
+          cell({ row: 3, formatted: '#ERROR!', isError: true }),
+          cell({ row: 4, formatted: '7', number: 7, isFormula: false }),
+          cell({ row: 5, sheet: 'Gone', formatted: '1', number: 1 }),
+        ],
+        names,
+      ),
+    ).toEqual([
+      { sheetId: 'sheet-1', row: 0, column: 0, value: 55 },
+      { sheetId: 'sheet-1', row: 1, column: 0, value: 'abc' },
+      { sheetId: 'sheet-1', row: 2, column: 0, value: { error: '#DIV/0!' } },
+    ])
+  })
+})
 
 describe('size gate', () => {
   it('sums only the uncompressed worksheet parts', () => {
@@ -379,5 +480,214 @@ describe.skipIf(!hasWasm)('with the real wasm engine (Node + browser WASI shim)'
       range: { startRow: 5_000, endRow: 5_009, startColumn: 0, endColumn: 0 },
     })
     expect(range.cells.map((c) => c.value)).toEqual(Array.from({ length: 10 }, (_, i) => 5_001 + i))
+  })
+
+  it('SH3: a formula typed far down a 20k-row workbook is saved with its cached value', async () => {
+    const { transport } = await engine()
+    const rows = 20_000
+    const wb = await transport.open({
+      name: 'Big.xlsx',
+      data: toArrayBuffer(await syntheticWorkbook(rows)),
+      locale: 'en',
+    })
+    const sheetId = wb.sheets[0]!.id
+    const saved = await transport.serialize(
+      saveRequest(wb.sessionId, [
+        // A1:A10 = 1..10, then the typed formula far below (column G)
+        { sheetId, row: 19_989, column: 6, value: 0, formula: '=SUM(A1:A10)' },
+        // a pending value edit the formula depends on goes in with it
+        { sheetId, row: 0, column: 0, value: 101 },
+        { sheetId, row: 19_990, column: 6, value: 0, formula: '=A1+1' },
+      ]),
+    )
+    const xml = await (
+      await JSZip.loadAsync(saved.data)
+    )
+      .file('xl/worksheets/sheet1.xml')!
+      .async('text')
+    // A1 = 101 now: 101 + 2..10 = 155
+    expect(xml).toMatch(/<c r="G19990"[^>]*><f>SUM\(A1:A10\)<\/f><v>155<\/v>/)
+    expect(xml).toMatch(/<c r="G19991"[^>]*><f>A1\+1<\/f><v>102<\/v>/)
+
+    const reopened = await transport.replaceSession({
+      sessionId: wb.sessionId,
+      name: 'Big.xlsx',
+      data: saved.data.slice(0),
+      locale: 'en',
+    })
+    const read = await transport.readRange({
+      sessionId: reopened.sessionId,
+      sheetId,
+      range: { startRow: 19_989, endRow: 19_990, startColumn: 6, endColumn: 6 },
+    })
+    expect(read.cells.map((c) => [c.row, c.value, c.formula])).toEqual([
+      [19_989, 155, '=SUM(A1:A10)'],
+      [19_990, 102, '=A1+1'],
+    ])
+  })
+
+  describe('crash recovery (SH3, injected panics)', () => {
+    /** a transport over fresh engines; `arm` makes the next matching command panic */
+    async function faulty(opts: { crashOpenAfterFirstConnect?: boolean } = {}) {
+      const hosts = await Promise.all([1, 2, 3].map(() => EngineHost.create(module)))
+      let connects = 0
+      let armed: string | null = null
+      const seen: string[] = []
+      const recoveries: EngineRecovery[] = []
+      const transport = createWasmTransport({
+        onRecovered: (r) => recoveries.push(r),
+        connect: () => {
+          const index = connects++
+          const inner = createDirectChannel(hosts[index]!)
+          return {
+            ...inner,
+            request: async (line, requestId) => {
+              const command = JSON.parse(line).command as string
+              seen.push(`${index}:${command}`)
+              if (
+                armed === command ||
+                (opts.crashOpenAfterFirstConnect && index > 0 && command === 'open')
+              ) {
+                armed = null
+                throw Object.assign(new Error('engine_crashed: injected panic'), {
+                  code: 'engine_crashed',
+                })
+              }
+              return inner.request(line, requestId)
+            },
+          } satisfies EngineChannel
+        },
+      })
+      return {
+        transport,
+        recoveries,
+        seen,
+        connects: () => connects,
+        arm: (command: string) => {
+          armed = command
+        },
+      }
+    }
+
+    it('a panic in a read reconnects, reopens the workbook from its saved bytes and repeats the read', async () => {
+      const t = await faulty()
+      const wb = await t.transport.open({
+        name: 'Edit.xlsx',
+        data: toArrayBuffer(new Uint8Array(await buildEditFixture())),
+        locale: 'en',
+      })
+      const sheet = wb.sheets[0]!
+      const range = { startRow: 0, endRow: 2, startColumn: 0, endColumn: 2 }
+      const before = await t.transport.readRange({
+        sessionId: wb.sessionId,
+        sheetId: sheet.id,
+        range,
+      })
+      t.arm('read_range')
+      const after = await t.transport.readRange({
+        sessionId: wb.sessionId,
+        sheetId: sheet.id,
+        range,
+      })
+      expect(after.cells).toEqual(before.cells)
+      expect(t.connects()).toBe(2)
+      expect(t.recoveries).toEqual([
+        { type: 'engine-recovered', command: 'read_range', sessions: 1, reopened: 1 },
+      ])
+
+      // the renderer keeps its session id and its unsaved edits: the save lands on the reopened session
+      const saved = await t.transport.serialize(
+        saveRequest(wb.sessionId, [{ sheetId: sheet.id, row: 0, column: 2, value: 4242 }]),
+      )
+      const xml = await (
+        await JSZip.loadAsync(saved.data)
+      )
+        .file('xl/worksheets/sheet1.xml')!
+        .async('text')
+      expect(xml).toContain('<v>4242</v>')
+      const swapped = await t.transport.replaceSession({
+        sessionId: wb.sessionId,
+        name: 'Edit.xlsx',
+        data: saved.data.slice(0),
+        locale: 'en',
+      })
+      await expect(t.transport.close(swapped.sessionId)).resolves.toBeUndefined()
+    })
+
+    it('a panic while saving: the session comes back, the failed save reports the crash, the next one works', async () => {
+      const t = await faulty()
+      const wb = await t.transport.open({
+        name: 'Edit.xlsx',
+        data: toArrayBuffer(new Uint8Array(await buildEditFixture())),
+        locale: 'en',
+      })
+      const sheet = wb.sheets[0]!
+      const request = saveRequest(wb.sessionId, [
+        { sheetId: sheet.id, row: 0, column: 2, value: 7 },
+      ])
+      t.arm('save_archive')
+      await expect(t.transport.serialize(request)).rejects.toThrow(/engine_crashed/)
+      expect(t.recoveries).toHaveLength(1)
+      expect(t.recoveries[0]).toMatchObject({ command: 'save_archive', sessions: 1, reopened: 1 })
+      const saved = await t.transport.serialize(request)
+      const xml = await (
+        await JSZip.loadAsync(saved.data)
+      )
+        .file('xl/worksheets/sheet1.xml')!
+        .async('text')
+      expect(xml).toContain('<v>7</v>')
+    })
+
+    it('a panic in the cached-value recalc still saves the formulas, and that session never recalcs again', async () => {
+      const t = await faulty()
+      const wb = await t.transport.open({
+        name: 'Edit.xlsx',
+        data: toArrayBuffer(new Uint8Array(await buildEditFixture())),
+        locale: 'en',
+      })
+      const sheet = wb.sheets[0]!
+      const request = saveRequest(wb.sessionId, [
+        { sheetId: sheet.id, row: 2, column: 1, value: 0, formula: '=C1*2' },
+      ])
+      t.arm('recalc_cells')
+      const saved = await t.transport.serialize(request)
+      const xml = await (
+        await JSZip.loadAsync(saved.data)
+      )
+        .file('xl/worksheets/sheet1.xml')!
+        .async('text')
+      expect(xml).toMatch(/<f>C1\*2<\/f>/)
+      expect(t.recoveries).toHaveLength(1)
+      expect(t.recoveries[0]).toMatchObject({ command: 'recalc_cells', reopened: 1 })
+      await t.transport.serialize(request)
+      expect(t.seen.filter((c) => c.endsWith(':recalc_cells'))).toHaveLength(1)
+    })
+
+    it('a workbook that crashes the engine again on reopen is dropped (no loop)', async () => {
+      const t = await faulty({ crashOpenAfterFirstConnect: true })
+      const wb = await t.transport.open({
+        name: 'Edit.xlsx',
+        data: toArrayBuffer(new Uint8Array(await buildEditFixture())),
+        locale: 'en',
+      })
+      t.arm('read_range')
+      await expect(
+        t.transport.readRange({
+          sessionId: wb.sessionId,
+          sheetId: wb.sheets[0]!.id,
+          range: { startRow: 0, endRow: 0, startColumn: 0, endColumn: 0 },
+        }),
+      ).rejects.toThrow()
+      expect(t.recoveries).toEqual([
+        { type: 'engine-recovered', command: 'read_range', sessions: 1, reopened: 0 },
+      ])
+      await expect(
+        t.transport.readRange({
+          sessionId: wb.sessionId,
+          sheetId: wb.sheets[0]!.id,
+          range: { startRow: 0, endRow: 0, startColumn: 0, endColumn: 0 },
+        }),
+      ).rejects.toThrow(/Unknown workbook session/)
+    })
   })
 })

@@ -19,8 +19,11 @@ import { createSheetsWebApi } from './bridge'
 import { sheetsHostGrants, sheetsWebCapabilities } from './capabilities'
 import { createWorkerChannel } from './engine/channel'
 import { createWasmTransport } from './engine/wasm-transport'
+import { notifyEngineRecovered } from './notice'
 
 const transport = createWasmTransport({
+  // a panic aborts the engine; the transport reopens the workbook from its last saved bytes
+  onRecovered: notifyEngineRecovered,
   connect: () =>
     createWorkerChannel(
       new Worker(new URL('./engine/engine.worker.ts', import.meta.url), {

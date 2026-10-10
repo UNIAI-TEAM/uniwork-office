@@ -1517,4 +1517,6 @@ export const vi = {
   appWebTooLargeTitle: 'Sổ làm việc này quá lớn để mở trên web',
   appWebTooLargeBody:
     'Kích thước vượt giới hạn của bảng tính web, nên sổ sẽ được mở bằng trình chỉnh sửa bảng tính cổ điển.',
+  appWebEngineRestarted:
+    'Công cụ xử lý sổ làm việc đã dừng bất ngờ và đã được khởi động lại. Sổ làm việc được mở lại từ bản lưu gần nhất; các thay đổi chưa lưu vẫn được giữ, hãy lưu sớm.',
 } satisfies Record<keyof typeof zh, string>

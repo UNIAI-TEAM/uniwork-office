@@ -1548,4 +1548,6 @@ export const ko = {
   appWebTooLargeTitle: '이 통합 문서는 너무 커서 웹에서 열 수 없습니다',
   appWebTooLargeBody:
     '웹 스프레드시트가 처리할 수 있는 크기를 넘으므로 클래식 스프레드시트 편집기에서 엽니다.',
+  appWebEngineRestarted:
+    '통합 문서 엔진이 예기치 않게 중지되어 다시 시작되었습니다. 통합 문서를 마지막으로 저장한 버전에서 다시 열었습니다. 저장하지 않은 변경 내용은 유지되므로 곧 저장하세요.',
 } satisfies Record<keyof typeof zh, string>

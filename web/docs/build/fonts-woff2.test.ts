@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { keepWoff2Only, rewriteTtfUrls, WOFF2_DIR } from './fonts-woff2'
+import { keepWoff2Only, rewriteTtfUrls, WOFF2_DIR, woff2UrlImport } from './fonts-woff2'
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
 const FONTS_CSS = join(repoRoot, 'apps/docs/src/renderer/fonts/fonts.css')
@@ -37,6 +37,22 @@ describe('rewriteTtfUrls', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
+  })
+})
+
+describe('woff2UrlImport', () => {
+  it('maps a TTF ?url import to the WOFF2 twin, leaves everything else to Vite', () => {
+    expect(woff2UrlImport('@genoffice/ui/fonts/Carlito-Regular.ttf?url')).toBe(
+      `${join(WOFF2_DIR, 'Carlito-Regular.woff2')}?url`,
+    )
+    expect(woff2UrlImport('../fonts/Carlito-Bold.ttf?url')).toBe(
+      `${join(WOFF2_DIR, 'Carlito-Bold.woff2')}?url`,
+    )
+    // no twin, not a URL import, not a TTF: untouched
+    expect(woff2UrlImport('@genoffice/ui/fonts/Unknown-Face.ttf?url')).toBeNull()
+    expect(woff2UrlImport('@genoffice/ui/fonts/Carlito-Regular.ttf')).toBeNull()
+    expect(woff2UrlImport('@genoffice/ui/fonts/Carlito-Regular.woff2?url')).toBeNull()
+    expect(woff2UrlImport('react')).toBeNull()
   })
 })
 
