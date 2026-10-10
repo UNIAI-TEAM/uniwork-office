@@ -774,6 +774,19 @@ export class TabManager {
   }
 
   /**
+   * Closes every tab showing `path` through the normal close (prompts
+   * included). True when no tab shows it any more; false when a prompt was
+   * cancelled and the tab stays.
+   */
+  async closeTabsShowing(path: string): Promise<boolean> {
+    const wanted = canonicalPath(path)
+    const showing = () =>
+      this.tabs.filter((t) => t.filePath && canonicalPath(t.filePath) === wanted).map((t) => t.id)
+    for (const id of showing()) await this.closeTab(id)
+    return showing().length === 0
+  }
+
+  /**
    * tabs showing an editable UniWork copy of ours whose close would show the
    * UniWork prompt (shell-close guard); clean copies are not listed, so a
    * window with only clean documents keeps the "nothing to protect" path

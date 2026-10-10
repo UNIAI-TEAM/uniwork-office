@@ -38,6 +38,34 @@ let settingsPath: (() => string) | null = null
 const entitlementListeners = new Set<(entitlements: AccountEntitlements | null) => void>()
 /** set by registerAccountIpc: delivers a push to the account renderers */
 let push: ((channel: string, payload: unknown) => void) | null = null
+let signOutHooks: UniworkSignOutHooks | null = null
+
+/**
+ * What an explicit Sign out does around the account itself: `before` closes
+ * the account's documents (false = the user cancelled a prompt, so the
+ * sign-out does not happen), `after` clears what the next person must not see.
+ */
+export interface UniworkSignOutHooks {
+  before(): Promise<boolean>
+  after(): void
+}
+
+export function setUniworkSignOutHooks(hooks: UniworkSignOutHooks | null): void {
+  signOutHooks = hooks
+}
+
+/** Sign out from the account UI: the hooks around AccountManager.logout. */
+export async function signOutUniwork(account: AccountManager): Promise<AccountStatus> {
+  const hooks = signOutHooks
+  if (hooks && !(await hooks.before())) return account.status()
+  const status = await account.logout()
+  try {
+    hooks?.after()
+  } catch (error) {
+    console.warn('[uniwork-auth] sign-out cleanup failed:', error)
+  }
+  return status
+}
 
 /** Opens the authorization URL: https only, http just for loopback on the dev channel. */
 export async function openAuthorizationUrl(url: string, profile: DeploymentProfile): Promise<void> {
@@ -262,7 +290,7 @@ export function registerAccountIpc(
   ipcMain.handle(HOME_CHANNELS.accountLogin, (event) => account(event.sender).login())
   ipcMain.handle(HOME_CHANNELS.accountLoginOpenUrl, (event) => account(event.sender).openLoginUrl())
   ipcMain.handle(HOME_CHANNELS.accountLogout, async (event) => {
-    await account(event.sender).logout()
+    await signOutUniwork(account(event.sender))
   })
   ipcMain.handle(HOME_CHANNELS.accountCancelLogin, (event) => {
     account(event.sender).cancelLogin()

@@ -136,6 +136,7 @@ import {
   createAiDocument,
   projectFilePaths,
   projectFileRenamed,
+  projectForgetFiles,
   setDocsHostWindowHook,
   setDocsShellWindow,
   setDocsFileSavedHook,
@@ -331,6 +332,7 @@ import { TabManager } from './tab-manager'
 import { installShellCloseGuard } from './window-close-guard'
 import {
   activateDetached,
+  closeDetachedByPath,
   closeDetachedWithoutPrompt,
   createDetachedEditorWindow,
   detachedFilePaths,
@@ -3753,6 +3755,13 @@ function uniworkDocsWiring() {
     reveal: revealShellWindow,
     lang: () => currentLang(),
     defaultSaveDir: () => defaultSaveDir(),
+    openPaths: () => [...(tabManager?.openFilePaths() ?? []), ...detachedFilePaths()],
+    closePath: async (path: string) => {
+      const tabsClosed = tabManager ? await tabManager.closeTabsShowing(path) : true
+      return (await closeDetachedByPath(path)) && tabsClosed
+    },
+    aiHistoryPaths: () => projectFilePaths(),
+    forgetAiHistory: (paths: string[]) => projectForgetFiles(paths),
   }
 }
 
