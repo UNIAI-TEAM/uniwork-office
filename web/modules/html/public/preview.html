@@ -15,6 +15,11 @@
       {ns, type: 'init', html} with a MessagePort to this window; it is accepted only from the
       parent, only once, and only with exactly one port. The port is the inspector's only channel to
       the frame (window.__gxPreviewPort); then the document replaces this page via document.write.
+
+      Reload: when the page reloads itself (location.reload(), meta refresh) this document loads
+      again and nobody would send it the copy. It therefore says {ns, type: 'hello', k} to its
+      parent, k being the per-load key from its own URL (?k=); the frame answers only a hello
+      with the key of the src it set, from the iframe it set it on, by sending the init again.
     -->
     <script>
       ;(() => {
@@ -43,6 +48,8 @@
           document.close()
         }
         window.addEventListener('message', onMessage)
+        const key = new URL(location.href).searchParams.get('k')
+        if (key) parentWindow.postMessage({ ns: NS, type: 'hello', k: key }, '*')
       })()
     </script>
   </head>

@@ -44,10 +44,16 @@ text-module bridge. Contract: lane CONTRACT C1-C13, protocol `web/docs/protocol`
   policy of its own (`web/docs/build/README.md`, "Documents with their own policy"): `sandbox` repeated in the header,
   `connect-src 'none'`, `form-action 'none'`, no `'self'`, `https:` + inline scripts / styles / pictures / fonts. The
   frame's own policy only gains `frame-src 'self'`. Handshake (`web/modules/html/preview-channel.ts`): on the first
-  load of each `?v=<n>`, the frame posts ONE `init` (page source, document pictures inlined as data: URIs by
+  load of each `?v=<n>&k=<random>`, the frame posts ONE `init` (page source, document pictures inlined as data: URIs by
   `preview-copy.ts`) with a `MessagePort`; `preview.html` accepts it only from its parent, once, with exactly one port,
   acknowledges on the port and `document.write`s the page. The inspector (`inspector.js`) talks only over that port
-  (`window.__gxPreviewPort`); the frame never reads window messages in this mode, and every message from the port goes
+  (`window.__gxPreviewPort`). The only window message the frame reads in this mode is the preview document's `hello`
+  `{ns, type: 'hello', k}`: a page that reloads itself (`location.reload()`, `<meta refresh>`) loads `preview.html`
+  again, which says hello with the `k` of its URL, and the frame (checking source = its iframe window, ns, type and
+  `k` of the current src; a link navigation or an old src never matches) sends the copy and a fresh port again, so the
+  preview does not go blank (e2e: `html-preview-security.spec.ts`, "reloads itself"). A page can read its own URL
+  and say hello too; that only re-sends it the copy it holds and a new port, and at worst drops its own preview to
+  the static fallback. Every message from the port goes
   through the strict typed parser `apps/html/src/renderer/preview/inspector-validate.ts` (fresh objects, sizes, enums;
   the desktop listener uses it too). Nothing coming back is evaluated: edits become the renderer's own source ops.
 - **Visual edit** (`htmlVisualEdit`: inspector click-to-select, float toolbar, style panel, inline text edit,
@@ -66,7 +72,16 @@ text-module bridge. Contract: lane CONTRACT C1-C13, protocol `web/docs/protocol`
   scripts share the inspector's realm and may send well-formed inspector messages over the port, i.e. drive visual
   edits of their own document (the user sees them as unsaved changes; nothing is saved without the user). On a host
   served over `https:`, `https:` subresource GETs to the app origin (pictures, scripts) are possible but carry no
-  credentials (opaque + credentialless) and their responses are not readable.
+  credentials (opaque + credentialless) and their responses are not readable. `base-uri https:` stays in the preview
+  policy on purpose: a `<base href="https://...">` in the page is honoured as in the app (relative pictures / scripts
+  then resolve against it), and it can only name an `https:` origin, so it cannot point the page at the app origin
+  with credentials either.
+- **Intentional desktop-visible changes (RF-11).** Two Markdown behaviours changed on the desktop too, on purpose
+  (same renderer code): raw HTML is kept verbatim (`apps/markdown/src/renderer/editor/rawHtml.ts`, option C: the exact
+  source is saved back and shown as escaped text, never rendered, where the desktop used to degrade it through the
+  schema on the first save), and Mermaid diagrams render as `<img src="data:image/svg+xml,...">` instead of injected
+  markup. A desktop document that relied on rendered raw HTML or inline diagram DOM looks different there. Listed in
+  `docs/upstream/UPSTREAM_SYNC.md` so an upstream sync keeps it.
 - **Hidden on both.** The AI family (`ai`, `webSearch`, `imageSearch`, `imageGeneration`), `autoSave`
   (toggle + timer), Markdown `openInDocs`.
 
