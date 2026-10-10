@@ -440,7 +440,7 @@ test.describe('slides web module', () => {
           void frame.evaluate(() => window.slidesApi.save())
           await expect(frame.locator('[data-slides-web="conflict"]')).toBeVisible()
           await page.screenshot({ path: resolve(SHOTS, 'conflict-vi-dark.png') })
-          await frame.locator('[data-slides-web="conflict"]').locator('button').first().click()
+          await frame.locator('[data-slides-web="conflict"] [data-choice="cancel"]').click()
         }
       }
     }
