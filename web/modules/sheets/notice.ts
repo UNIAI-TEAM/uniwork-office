@@ -97,3 +97,11 @@ export function notifyEngineRecovered(recovery: { sessions: number }): void {
   if (recovery.sessions === 0) return
   showToast(text('appWebEngineRestarted'), 'error')
 }
+
+/**
+ * The host stored a save, but the engine could not reopen the saved bytes (the session swap
+ * failed, e.g. out of memory): nothing is lost, the editor just has to be reloaded.
+ */
+export function notifySavedReopenFailed(): void {
+  showToast(text('appWebSavedReopenFailed'), 'error')
+}

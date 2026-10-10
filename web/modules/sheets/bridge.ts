@@ -64,7 +64,7 @@ import type {
   WorkbookSaveRequest,
   WorkbookSaveResult,
 } from '../../../apps/sheets/src/shared/desktop-api'
-import { ask as domAsk, text, type AskFn } from './notice'
+import { ask as domAsk, notifySavedReopenFailed, text, type AskFn } from './notice'
 import { isEngineUnavailable, type SheetsEngineTransport } from './engine/transport'
 
 export { pathFor, idFromPath }
@@ -689,20 +689,34 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
         ...(meta.versionId ? { versionId: meta.versionId } : {}),
         initiatedByFrame: hostSave === null && hostSaveAs === null,
       })
-      const swapped = await transport.replaceSession({
-        sessionId: request.sessionId,
-        name: meta.name,
-        data: kept,
-        locale: locale(),
-      })
-      sessions.delete(request.sessionId)
-      sessions.set(swapped.sessionId, { fileId: meta.fileId, name: meta.name })
+      let swapped: WorkbookFile | null = null
+      let swapFailure: unknown = null
+      try {
+        swapped = await transport.replaceSession({
+          sessionId: request.sessionId,
+          name: meta.name,
+          data: kept,
+          locale: locale(),
+        })
+      } catch (err) {
+        swapFailure = err
+      }
+      // the version exists whether or not the engine could reopen it: the edits landed
       dirty = false
       restored = false
       latest = null
       port.setDirty(false)
-      // the edits landed: the scope's drafts are obsolete
+      // the scope's drafts are obsolete
       void drafts.saved()
+      if (!swapped) {
+        // the host has the bytes, so a retry would only write the same version again: say so
+        notifySavedReopenFailed()
+        throw swapFailure instanceof Error
+          ? swapFailure
+          : new Error(text('appWebSavedReopenFailed'))
+      }
+      sessions.delete(request.sessionId)
+      sessions.set(swapped.sessionId, { fileId: meta.fileId, name: meta.name })
       return { canceled: false, file: decorate(swapped, meta), touchedEntries }
     },
 

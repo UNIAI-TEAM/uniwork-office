@@ -1587,4 +1587,6 @@ export const de = {
     'Sie überschreitet die Größe, die die Web-Tabellenkalkulation verarbeitet, und wird stattdessen im klassischen Tabelleneditor geöffnet.',
   appWebEngineRestarted:
     'Die Arbeitsmappen-Engine wurde unerwartet beendet und neu gestartet. Die Arbeitsmappe wurde aus der zuletzt gespeicherten Version erneut geöffnet; Ihre nicht gespeicherten Änderungen bleiben erhalten – speichern Sie bald.',
+  appWebSavedReopenFailed:
+    'Ihre Änderungen wurden in UniWork gespeichert, aber die Arbeitsmappe konnte hier nicht erneut geöffnet werden. Laden Sie den Editor neu, um weiterzuarbeiten.',
 } satisfies Record<keyof typeof zh, string>

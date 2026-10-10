@@ -1568,4 +1568,6 @@ export const nl = {
     'Hij is groter dan de webspreadsheet aankan en wordt daarom geopend in de klassieke spreadsheet-editor.',
   appWebEngineRestarted:
     'De werkmap-engine is onverwacht gestopt en opnieuw gestart. De werkmap is opnieuw geopend vanaf de laatst opgeslagen versie; uw niet-opgeslagen wijzigingen blijven behouden, sla snel op.',
+  appWebSavedReopenFailed:
+    'Je wijzigingen zijn opgeslagen in UniWork, maar de werkmap kon hier niet opnieuw worden geopend. Laad de editor opnieuw om verder te werken.',
 } satisfies Record<keyof typeof zh, string>
