@@ -32,4 +32,8 @@ export const vi = {
   cloudMediaLabel: 'Đám mây UniWork',
   cloudMediaDesc: 'Dùng tín dụng AI UniWork của tổ chức, không cần khóa API.',
   cloudSearchAutoHint: 'Ưu tiên đám mây UniWork (trừ tín dụng AI), sau đó đến tìm kiếm miễn phí.',
+  aiTestErrInvalidKey: 'Khóa API thiếu hoặc bị từ chối',
+  aiTestErrNetwork: 'Không kết nối được. Hãy kiểm tra mạng',
+  aiTestErrLimit: 'Đã chạm giới hạn của nhà cung cấp, thử lại sau',
+  aiTestErrUnavailable: 'Dịch vụ chưa phản hồi, thử lại sau',
 } satisfies Record<keyof typeof zh, string>

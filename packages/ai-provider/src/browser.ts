@@ -45,4 +45,6 @@ export type {
 } from './uniwork-cloud'
 export { aiNoticeBody, aiNoticeKind, aiNoticeKindForCloud, aiNoticeText } from './ai-notice'
 export type { AiNoticeKind } from './ai-notice'
+export { normalizeAiTestFailureKind } from './ai-test-failure'
+export type { AiTestFailureKind } from './ai-test-failure'
 export { AI_SEARCH_PROVIDERS } from './search-settings'

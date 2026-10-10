@@ -107,6 +107,7 @@ import {
   sanitizeAiSettings,
   sanitizeCliPath,
   aiNoticeBody,
+  aiTestFailure,
   noModelMessage,
   setAiUserAgent,
   setRescueFetch,
@@ -116,6 +117,7 @@ import {
   type AiSettings,
   type AiStreamChunk,
   type AiStreamRequest,
+  type AiTestResult,
   type GenSparkAccountStatus,
   type LegacyAiSettings,
 } from '@genoffice/ai-provider'
@@ -3984,24 +3986,38 @@ export function registerAiIpc(): void {
       ),
   )
 
-  ipcMain.handle('ai:search-test', (_event, input: unknown) => {
+  // a failed settings test keeps its raw detail here (the log); the renderer only gets the kind
+  const logAiTest = (what: string, provider: string, result: AiTestResult): AiTestResult => {
+    if (!result.ok) console.warn(`[ai] ${what} test failed (${provider}):`, result.error)
+    return result
+  }
+
+  ipcMain.handle('ai:search-test', async (_event, input: unknown) => {
     const { provider, apiKey } = (input ?? {}) as { provider?: AiSearchProviderId; apiKey?: string }
     // `auto` is the keyless free chain: nothing to test
     if (!provider || provider === 'auto') return { ok: true }
-    return testSearchProvider(provider, String(apiKey ?? ''))
+    return logAiTest('search', provider, await testSearchProvider(provider, String(apiKey ?? '')))
   })
 
   // settings-UI connection test for the media provider (the UniWork cloud entry shows only while signed in + entitled)
-  ipcMain.handle('ai:media-test', (_event, input: unknown) => {
+  ipcMain.handle('ai:media-test', async (_event, input: unknown) => {
     const { provider, config } = (input ?? {}) as {
       provider?: AiMediaProviderId
       config?: AiMediaProviderConfig
     }
     if (!provider || provider === 'genspark') {
-      return hasGskAuth() ? { ok: true } : { ok: false, error: 'No media provider configuration' }
+      return hasGskAuth()
+        ? { ok: true }
+        : logAiTest('media', 'cloud', aiTestFailure('failed', 'No media provider configuration'))
     }
-    if (!config) return { ok: false, error: 'No media provider configuration' }
-    return testMediaProvider(provider, config)
+    if (!config) {
+      return logAiTest(
+        'media',
+        provider,
+        aiTestFailure('failed', 'No media provider configuration'),
+      )
+    }
+    return logAiTest('media', provider, await testMediaProvider(provider, config))
   })
 
   ipcMain.handle('ai:chat', async (_event, request: AiChatRequest) => {

@@ -42,6 +42,7 @@ describe('testMediaProvider connection test', () => {
     expect(result.ok).toBe(false)
     expect(result.error).toMatch(/429/)
     expect(result.error).toMatch(/rate limit/i)
+    expect(result.errorKind).toBe('limit')
   })
 
   it('surfaces 500 server errors as ok:false with status and server-error wording', async () => {
@@ -53,6 +54,39 @@ describe('testMediaProvider connection test', () => {
     expect(result.ok).toBe(false)
     expect(result.error).toMatch(/500/)
     expect(result.error).toMatch(/server error/i)
+    expect(result.errorKind).toBe('unavailable')
+  })
+
+  it('tags a rejected key (401 and 403) as invalid_key', async () => {
+    for (const status of [401, 403]) {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () =>
+          errorResponse({ error: { message: 'Missing bearer authentication in header' } }, status),
+        ),
+      )
+      const result = await testMediaProvider('openai', config)
+      expect(result).toMatchObject({ ok: false, errorKind: 'invalid_key' })
+      expect(result.error).toMatch(new RegExp(`HTTP ${status}`))
+    }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => errorResponse({ error: { code: 403 } }, 403)),
+    )
+    expect((await testMediaProvider('gemini', config)).errorKind).toBe('invalid_key')
+  })
+
+  it('tags a provider that cannot be reached as network', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new TypeError('fetch failed', { cause: { code: 'ENOTFOUND' } })
+      }),
+    )
+    expect(await testMediaProvider('openai', config)).toMatchObject({
+      ok: false,
+      errorKind: 'network',
+    })
   })
 
   it('appends /models on the path of an OpenAI-shaped base that carries a query', async () => {

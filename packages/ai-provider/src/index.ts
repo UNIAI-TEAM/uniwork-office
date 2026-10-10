@@ -58,6 +58,7 @@ export {
 export type { MediaCapability } from './media'
 export * from './uniwork-cloud'
 export * from './ai-notice'
+export * from './ai-test-failure'
 export {
   AI_SEARCH_PROVIDERS,
   activeSearchProvider,

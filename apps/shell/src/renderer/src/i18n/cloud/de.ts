@@ -32,4 +32,8 @@ export const de = {
   cloudMediaLabel: 'UniWork Cloud',
   cloudMediaDesc: 'Nutzt das UniWork KI-Guthaben Ihrer Organisation; kein Schlüssel nötig.',
   cloudSearchAutoHint: 'Zuerst UniWork Cloud (verbraucht KI-Guthaben), dann kostenlose Suche.',
+  aiTestErrInvalidKey: 'API-Schlüssel fehlt oder wurde abgelehnt',
+  aiTestErrNetwork: 'Keine Verbindung. Prüfen Sie Ihr Netzwerk',
+  aiTestErrLimit: 'Limit des Anbieters erreicht. Später erneut versuchen',
+  aiTestErrUnavailable: 'Dienst antwortet nicht. Später erneut versuchen',
 } satisfies Record<keyof typeof zh, string>

@@ -32,4 +32,8 @@ export const he = {
   cloudMediaLabel: 'הענן של UniWork',
   cloudMediaDesc: 'משתמש בקרדיטי ה-AI של UniWork של הארגון; אין צורך במפתח.',
   cloudSearchAutoHint: 'קודם הענן של UniWork (צורך קרדיטי AI), אחר כך חיפוש חינמי.',
+  aiTestErrInvalidKey: 'מפתח ה-API חסר או נדחה',
+  aiTestErrNetwork: 'אין חיבור. בדקו את הרשת',
+  aiTestErrLimit: 'הגעתם למגבלת הספק. נסו שוב מאוחר יותר',
+  aiTestErrUnavailable: 'השירות אינו מגיב. נסו שוב מאוחר יותר',
 } satisfies Record<keyof typeof zh, string>

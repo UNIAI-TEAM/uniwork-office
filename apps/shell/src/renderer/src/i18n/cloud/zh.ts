@@ -27,4 +27,8 @@ export const zh = {
   cloudMediaLabel: 'UniWork 云端',
   cloudMediaDesc: '使用组织的 UniWork AI 额度，无需密钥。',
   cloudSearchAutoHint: '先用 UniWork 云端（消耗 AI 额度），再用免费搜索。',
+  aiTestErrInvalidKey: 'API 密钥缺失或被拒绝',
+  aiTestErrNetwork: '无法连接，请检查网络',
+  aiTestErrLimit: '已达服务商的用量或频率限制，请稍后重试',
+  aiTestErrUnavailable: '服务暂无响应，请稍后重试',
 }

@@ -4,6 +4,7 @@ import {
   AI_PROVIDERS,
   AI_SEARCH_PROVIDERS,
   getProviderAdapter,
+  normalizeAiTestFailureKind,
   normalizeUniworkCloudStatus,
   setUniworkCloudStatus,
   visibleMediaProviders,
@@ -19,6 +20,7 @@ import type { UpdateUiState } from '../shared/update-api'
 import { normalizeAiPanelPrefs } from '@genoffice/ui/ai-panel-prefs'
 import type {
   AccountLoginEvent,
+  AiConnectionTestResult,
   AccountStatus,
   AttachmentAddResult,
   AttachmentImageResult,
@@ -144,6 +146,14 @@ function asUniworkStatus(result: unknown): UniworkDocStatus | null {
     : null
 }
 
+/** a connection test answer for the renderer: the failure kind only, never the provider's raw text (that stays in the main process log) */
+function testResultOf(raw: unknown): AiConnectionTestResult {
+  const r = (raw ?? {}) as { ok?: unknown; errorKind?: unknown }
+  return r.ok === true
+    ? { ok: true }
+    : { ok: false, errorKind: normalizeAiTestFailureKind(r.errorKind) }
+}
+
 const homeApi: HomeApi = {
   async recents(query) {
     return asRecentPage(await ipcRenderer.invoke(HOME_CHANNELS.recents, query))
@@ -167,13 +177,7 @@ const homeApi: HomeApi = {
     )) as FileSearchSettings
   },
   async testFileSearchRerank(input) {
-    const raw = ((await ipcRenderer.invoke(HOME_CHANNELS.testFileSearchRerank, input)) ?? {}) as {
-      ok?: unknown
-      error?: unknown
-    }
-    return raw.ok === true
-      ? { ok: true }
-      : { ok: false, error: typeof raw.error === 'string' ? raw.error : 'Connection failed' }
+    return testResultOf(await ipcRenderer.invoke(HOME_CHANNELS.testFileSearchRerank, input))
   },
   async starred(query) {
     return asRecentPage(await ipcRenderer.invoke(HOME_CHANNELS.starred, query))
@@ -687,22 +691,10 @@ const homeApi: HomeApi = {
     return AI_SEARCH_PROVIDERS
   },
   async testAiSearchSettings(input) {
-    const raw = ((await ipcRenderer.invoke('ai:search-test', input)) ?? {}) as {
-      ok?: unknown
-      error?: unknown
-    }
-    return raw.ok === true
-      ? { ok: true }
-      : { ok: false, error: typeof raw.error === 'string' ? raw.error : 'Connection failed' }
+    return testResultOf(await ipcRenderer.invoke('ai:search-test', input))
   },
   async testAiMediaSettings(input) {
-    const raw = ((await ipcRenderer.invoke('ai:media-test', input)) ?? {}) as {
-      ok?: unknown
-      error?: unknown
-    }
-    return raw.ok === true
-      ? { ok: true }
-      : { ok: false, error: typeof raw.error === 'string' ? raw.error : 'Connection failed' }
+    return testResultOf(await ipcRenderer.invoke('ai:media-test', input))
   },
   wb: {
     async loadAll() {

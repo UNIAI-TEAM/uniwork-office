@@ -32,4 +32,8 @@ export const id = {
   cloudMediaLabel: 'Cloud UniWork',
   cloudMediaDesc: 'Memakai kredit AI UniWork organisasi Anda; tanpa kunci.',
   cloudSearchAutoHint: 'Cloud UniWork dulu (memakai kredit AI), lalu pencarian gratis.',
+  aiTestErrInvalidKey: 'Kunci API tidak ada atau ditolak',
+  aiTestErrNetwork: 'Tidak dapat terhubung. Periksa koneksi Anda',
+  aiTestErrLimit: 'Batas penyedia tercapai. Coba lagi nanti',
+  aiTestErrUnavailable: 'Layanan tidak merespons. Coba lagi nanti',
 } satisfies Record<keyof typeof zh, string>

@@ -9,6 +9,7 @@ import type {
   AiSettings,
   AiStreamChunk,
   AiStreamRequest,
+  AiTestFailureKind,
   CodexModelCatalog,
   OpenRouterKeyStatus,
   UniworkCloudStatus,
@@ -310,6 +311,12 @@ export interface DefaultAppStatus {
   manualOnly: boolean
 }
 
+/** Settings "Test connection" answer: a failure carries its kind, never the provider's raw text */
+export interface AiConnectionTestResult {
+  ok: boolean
+  errorKind?: AiTestFailureKind
+}
+
 export interface HomeApi {
   /** unified recents across document types, newest first (paged) */
   recents(query?: RecentQuery): Promise<RecentPage>
@@ -320,7 +327,7 @@ export interface HomeApi {
   getFileSearchSettings(): Promise<FileSearchSettings>
   setFileSearchSettings(patch: Partial<FileSearchSettings>): Promise<FileSearchSettings>
   /** one two-document judgement against the (possibly unsaved) settings */
-  testFileSearchRerank(settings: FileSearchSettings): Promise<{ ok: boolean; error?: string }>
+  testFileSearchRerank(settings: FileSearchSettings): Promise<AiConnectionTestResult>
   /** starred files (independent of the recent list), newest first (paged) */
   starred(query?: RecentQuery): Promise<RecentPage>
   /** stat a specific set of paths (project view); unstat-able files come back flagged `missing` */
@@ -542,14 +549,14 @@ export interface HomeApi {
   testAiMediaSettings(input: {
     provider: AiMediaProviderId
     config: AiMediaProviderConfig
-  }): Promise<{ ok: boolean; error?: string }>
+  }): Promise<AiConnectionTestResult>
   /** web search provider catalog */
   getAiSearchProviders(): AiSearchProviderMeta[]
   /** one minimal query against the given key (the keyless auto entry needs none) */
   testAiSearchSettings(input: {
     provider: AiSearchProviderId
     apiKey: string
-  }): Promise<{ ok: boolean; error?: string }>
+  }): Promise<AiConnectionTestResult>
   /** Local Workbench SQLite store (main-process source of truth) */
   wb: WorkbenchStoreApi
   uniworkListWorkspaces(): Promise<UniworkResult<UniworkWorkspaceRef[]>>

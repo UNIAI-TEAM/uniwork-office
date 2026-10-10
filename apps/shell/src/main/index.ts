@@ -322,6 +322,7 @@ import {
 import extractWorkerPath from './file-index/extract-worker?modulePath'
 import { FileIndexer } from './file-index/indexer'
 import { FileIndexStore } from './file-index/store'
+import { withAiTestFailureKind } from '@genoffice/ai-provider'
 import { normalizeFileSearchSettings, probeDecision, SearchReranker } from './file-index/rerank'
 import { runHeadlessExport, type HeadlessExporters } from './headless-export'
 import { TabManager } from './tab-manager'
@@ -4209,9 +4210,11 @@ function registerHomeIpc(): void {
     },
   )
 
-  ipcMain.handle(HOME_CHANNELS.testFileSearchRerank, (_event, input: unknown) =>
-    probeDecision(normalizeFileSearchSettings(input)),
-  )
+  ipcMain.handle(HOME_CHANNELS.testFileSearchRerank, async (_event, input: unknown) => {
+    const result = withAiTestFailureKind(await probeDecision(normalizeFileSearchSettings(input)))
+    if (!result.ok) console.warn('[file-index] rerank test failed:', result.error)
+    return result
+  })
 
   ipcMain.handle(HOME_CHANNELS.starred, (_event, query: unknown): RecentPage =>
     pageStarredPaths(readStarredFiles(), query, uniworkRecentLookup),

@@ -32,4 +32,8 @@ export const ms = {
   cloudMediaLabel: 'Awan UniWork',
   cloudMediaDesc: 'Menggunakan kredit AI UniWork organisasi anda; tiada kunci diperlukan.',
   cloudSearchAutoHint: 'Awan UniWork dahulu (menggunakan kredit AI), kemudian carian percuma.',
+  aiTestErrInvalidKey: 'Kunci API tiada atau ditolak',
+  aiTestErrNetwork: 'Tidak dapat bersambung. Semak rangkaian anda',
+  aiTestErrLimit: 'Had pembekal dicapai. Cuba lagi nanti',
+  aiTestErrUnavailable: 'Perkhidmatan tidak memberi respons. Cuba lagi nanti',
 } satisfies Record<keyof typeof zh, string>
