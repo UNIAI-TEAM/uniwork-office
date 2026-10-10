@@ -166,7 +166,7 @@ export function createPresenterWindow(opts: PresenterWindowOptions) {
     // both inside the click: the screen-details request (may prompt) and the popup itself
     const details = screens.request()
     const show = newShowId()
-    let win: Window | null = null
+    let win: Window | null
     try {
       win = opts.open(
         audienceUrl(w.location.href, show),

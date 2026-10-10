@@ -1311,10 +1311,10 @@ export function AiPanel({
               <IconNewChat size={16} />
             </button>
           )}
-          {cap('aiCredentials') && window.desktop.openAiSettings && (
+          {cap('aiCredentials') && window.desktop?.openAiSettings && (
             <button
               className="ai-header-btn"
-              onClick={() => void window.desktop.openAiSettings?.()}
+              onClick={() => void window.desktop?.openAiSettings?.()}
               data-tip={t('appAiSettings')}
               aria-label={t('appAiSettings')}
             >

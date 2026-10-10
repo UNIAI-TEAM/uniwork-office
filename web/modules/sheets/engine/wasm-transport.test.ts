@@ -230,7 +230,9 @@ describe.skipIf(!hasWasm)('with the real wasm engine (Node + browser WASI shim)'
     const restored = await transport.open({ name: 'Edit.xlsx', data: draft.data, locale: 'en' })
     const request = { ...saveRequest(restored.sessionId, []), restoreWriteBack: true }
     const saved = await transport.serialize(request as WorkbookSaveRequest)
-    const xml = await (await JSZip.loadAsync(saved.data))
+    const xml = await (
+      await JSZip.loadAsync(saved.data)
+    )
       .file('xl/worksheets/sheet1.xml')!
       .async('text')
     expect(xml).toContain('Mark')
