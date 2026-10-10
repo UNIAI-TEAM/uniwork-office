@@ -45,6 +45,8 @@ export const vi = {
   aiWebStateSessionBody: 'Hãy mở lại tài liệu từ UniWork để tiếp tục.',
   aiWebStateRefusedTitle: 'Yêu cầu bị từ chối',
   aiWebStateRefusedBody: 'Máy chủ đã từ chối yêu cầu AI.',
+  aiWebStateModelTitle: 'Hãy chọn mô hình',
+  aiWebStateModelBody: 'Chọn một mô hình trong menu mô hình cạnh ô nhập tin nhắn, rồi gửi lại.',
   aiWebStateBaseUrlBody: 'Không cho phép Base URL này. Hãy dùng một địa chỉ https:// công khai.',
   aiWebStateProviderBody: 'Nhà cung cấp này không được hỗ trợ.',
   aiWebStateUnknownTitle: 'Yêu cầu AI thất bại',

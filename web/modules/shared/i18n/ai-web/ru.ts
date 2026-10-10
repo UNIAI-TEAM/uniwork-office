@@ -45,6 +45,8 @@ export const ru = {
   aiWebStateSessionBody: 'Чтобы продолжить, откройте документ заново из UniWork.',
   aiWebStateRefusedTitle: 'Запрос отклонён',
   aiWebStateRefusedBody: 'Сервер отклонил запрос к ИИ.',
+  aiWebStateModelTitle: 'Выберите модель',
+  aiWebStateModelBody: 'Выберите модель в меню моделей рядом с полем сообщения и отправьте снова.',
   aiWebStateBaseUrlBody: 'Этот базовый URL не разрешён. Используйте публичный адрес https://.',
   aiWebStateProviderBody: 'Этот провайдер не поддерживается.',
   aiWebStateUnknownTitle: 'Ошибка запроса к ИИ',

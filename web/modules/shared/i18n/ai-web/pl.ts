@@ -45,6 +45,9 @@ export const pl = {
   aiWebStateSessionBody: 'Otwórz dokument ponownie z UniWork, aby kontynuować.',
   aiWebStateRefusedTitle: 'Żądanie odrzucone',
   aiWebStateRefusedBody: 'Serwer odrzucił żądanie AI.',
+  aiWebStateModelTitle: 'Wybierz model',
+  aiWebStateModelBody:
+    'Wybierz model w menu modeli obok pola wiadomości, a następnie wyślij ponownie.',
   aiWebStateBaseUrlBody: 'Ten bazowy URL jest niedozwolony. Użyj publicznego adresu https://.',
   aiWebStateProviderBody: 'Ten dostawca nie jest obsługiwany.',
   aiWebStateUnknownTitle: 'Żądanie AI nie powiodło się',

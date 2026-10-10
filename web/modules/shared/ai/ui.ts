@@ -61,6 +61,7 @@ const STATES: Record<AiWebErrorCode, StateText> = {
     settings: true,
   },
   bad_request: { title: 'aiWebStateRefusedTitle', body: 'aiWebStateRefusedBody' },
+  model_required: { title: 'aiWebStateModelTitle', body: 'aiWebStateModelBody' },
   unknown: { title: 'aiWebStateUnknownTitle', body: 'aiWebStateUnknownBody' },
 }
 

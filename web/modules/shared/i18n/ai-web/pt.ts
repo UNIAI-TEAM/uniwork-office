@@ -47,6 +47,9 @@ export const pt = {
   aiWebStateSessionBody: 'Reabra o documento pelo UniWork para continuar.',
   aiWebStateRefusedTitle: 'Solicitação recusada',
   aiWebStateRefusedBody: 'O servidor recusou a solicitação de IA.',
+  aiWebStateModelTitle: 'Escolha um modelo',
+  aiWebStateModelBody:
+    'Escolha um modelo no menu de modelos ao lado da caixa de mensagem e envie novamente.',
   aiWebStateBaseUrlBody: 'Esta URL base não é permitida. Use um endereço https:// público.',
   aiWebStateProviderBody: 'Este provedor não é compatível.',
   aiWebStateUnknownTitle: 'Falha na solicitação de IA',

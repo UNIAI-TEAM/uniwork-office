@@ -44,6 +44,8 @@ export const he = {
   aiWebStateSessionBody: 'פתח שוב את המסמך מ-UniWork כדי להמשיך.',
   aiWebStateRefusedTitle: 'הבקשה נדחתה',
   aiWebStateRefusedBody: 'השרת דחה את בקשת ה-AI.',
+  aiWebStateModelTitle: 'בחרו מודל',
+  aiWebStateModelBody: 'בחרו מודל בתפריט המודלים לצד תיבת ההודעה ושלחו שוב.',
   aiWebStateBaseUrlBody: 'כתובת URL בסיסית זו אינה מותרת. השתמש בכתובת https:// ציבורית.',
   aiWebStateProviderBody: 'ספק זה אינו נתמך.',
   aiWebStateUnknownTitle: 'בקשת ה-AI נכשלה',

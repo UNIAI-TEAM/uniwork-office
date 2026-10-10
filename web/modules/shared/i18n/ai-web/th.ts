@@ -44,6 +44,8 @@ export const th = {
   aiWebStateSessionBody: 'เปิดเอกสารอีกครั้งจาก UniWork เพื่อดำเนินการต่อ',
   aiWebStateRefusedTitle: 'คำขอถูกปฏิเสธ',
   aiWebStateRefusedBody: 'เซิร์ฟเวอร์ปฏิเสธคำขอ AI',
+  aiWebStateModelTitle: 'เลือกโมเดล',
+  aiWebStateModelBody: 'เลือกโมเดลจากเมนูโมเดลข้างช่องข้อความ แล้วส่งอีกครั้ง',
   aiWebStateBaseUrlBody: 'ไม่อนุญาต Base URL นี้ โปรดใช้ที่อยู่ https:// สาธารณะ',
   aiWebStateProviderBody: 'ไม่รองรับผู้ให้บริการนี้',
   aiWebStateUnknownTitle: 'คำขอ AI ล้มเหลว',

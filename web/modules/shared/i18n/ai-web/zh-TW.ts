@@ -42,6 +42,8 @@ export const zhTW = {
   aiWebStateSessionBody: '請從 UniWork 重新開啟文件以繼續。',
   aiWebStateRefusedTitle: '請求遭拒',
   aiWebStateRefusedBody: 'AI 請求遭伺服器拒絕。',
+  aiWebStateModelTitle: '請選擇模型',
+  aiWebStateModelBody: '在訊息框旁的模型選單中選擇一個模型，然後再次傳送。',
   aiWebStateBaseUrlBody: '不允許使用此 Base URL。請使用公開的 https:// 位址。',
   aiWebStateProviderBody: '不支援此服務商。',
   aiWebStateUnknownTitle: 'AI 請求失敗',

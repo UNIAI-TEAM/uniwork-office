@@ -9,6 +9,7 @@ import type { PointerEvent as ReactPointerEvent, ReactElement, ReactNode } from 
 import { AgentLoop, composeSkills } from '@genoffice/agent-core'
 import type { AgentImage } from '@genoffice/agent-core'
 import type { AiSettings } from '@genoffice/ai-provider'
+import { platform } from '../capabilities'
 import { ATTACHMENT_IMAGE_EXTS } from '../../shared/ipc'
 import type { AttachmentAddResult, AttachmentMeta } from '../../shared/ipc'
 import {
@@ -273,6 +274,10 @@ const MODEL_BRIDGE: AiModelPickerBridge = {
   onSettingsChanged: (handler) => window.htmlApi.onAiSettingsChanged(handler),
   gskLoggedIn: () => window.htmlApi.aiGskStatus().then((s) => !!s?.loggedIn),
   openModelSettings: () => window.htmlApi.openAiModelSettings().catch(() => {}),
+  // web frames: a stored key without a model keeps send off with a hint (see AiModelPicker)
+  get requireModel() {
+    return platform() === 'web'
+  },
 }
 
 export function AiPanel({

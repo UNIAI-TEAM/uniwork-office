@@ -44,6 +44,8 @@ export const id = {
   aiWebStateSessionBody: 'Buka kembali dokumen dari UniWork untuk melanjutkan.',
   aiWebStateRefusedTitle: 'Permintaan ditolak',
   aiWebStateRefusedBody: 'Server menolak permintaan AI.',
+  aiWebStateModelTitle: 'Pilih model',
+  aiWebStateModelBody: 'Pilih model di menu model di samping kotak pesan, lalu kirim lagi.',
   aiWebStateBaseUrlBody: 'URL dasar ini tidak diizinkan. Gunakan alamat https:// publik.',
   aiWebStateProviderBody: 'Penyedia ini tidak didukung.',
   aiWebStateUnknownTitle: 'Permintaan AI gagal',

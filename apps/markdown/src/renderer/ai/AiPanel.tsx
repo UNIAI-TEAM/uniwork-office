@@ -17,7 +17,7 @@ import {
 } from '@genoffice/ui'
 import type { Editor } from '@tiptap/core'
 import { aiLangDirective, t as tGlobal, useI18n } from '../i18n/locale'
-import { cap } from '../capabilities'
+import { cap, platform } from '../capabilities'
 import sendEnterOn from '../assets/send-enter-on.png'
 import sendEnterOff from '../assets/send-enter-off.png'
 import sendStop from '../assets/send-stop.png'
@@ -142,6 +142,10 @@ const MODEL_BRIDGE: AiModelPickerBridge = {
   onSettingsChanged: (handler) => window.markdownApi.onAiSettingsChanged(handler),
   gskLoggedIn: () => window.markdownApi.aiGskStatus().then((s) => !!s?.loggedIn),
   openModelSettings: () => window.markdownApi.openAiModelSettings().catch(() => {}),
+  // web frames: a stored key without a model keeps send off with a hint (see AiModelPicker)
+  get requireModel() {
+    return platform() === 'web'
+  },
 }
 
 export function AiPanel({

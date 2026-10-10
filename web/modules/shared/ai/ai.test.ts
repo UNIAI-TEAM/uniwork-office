@@ -17,7 +17,14 @@ import {
 } from './errors'
 import { createProxyFetch, toProxyRequest } from './transport'
 import { createWebAiStreams } from './stream'
-import { CREDENTIALS_TTL_MS, aiHostGrants, createWebAi, mediaFromUrl, withWebAi } from './web-ai'
+import {
+  CREDENTIALS_TTL_MS,
+  aiHostGrants,
+  createWebAi,
+  mediaFromUrl,
+  modelIdsOf,
+  withWebAi,
+} from './web-ai'
 import { describeAiError, hideAiState, openAiSettingsDialog, showAiState } from './ui'
 import { aiWebStrings, aiWebText } from '../i18n/strings-ai-web'
 import type { Lang } from '@genoffice/i18n'
@@ -437,6 +444,23 @@ describe('streams', () => {
     expect(body.model).toBe('m-1')
     expect(body.stream).toBe(true)
     expect(JSON.stringify(calls[0]!.init)).not.toContain('never-sent')
+  })
+
+  it('a provider with no model sends nothing and says to choose one (never the generic refusal)', async () => {
+    const { s, calls, chunks, onChatFailure } = streams(() => jsonResponse(400, {}))
+    const noModel = { provider: 'openai', providers: { openai: { apiKey: 'k', model: '  ' } } }
+    await s.aiStream({
+      requestId: 'r0',
+      settings: noModel,
+      system: 's',
+      messages: [{ role: 'user', content: 'hi' }],
+    } as never)
+    expect(calls).toHaveLength(0)
+    expect(chunks).toEqual([{ requestId: 'r0', type: 'error', error: 'typed:model_required' }])
+    const chat = await s.aiChat({ settings: noModel as never, system: 's', user: 'hi' })
+    expect(chat).toEqual({ ok: false, error: 'typed:model_required' })
+    expect(calls).toHaveLength(0)
+    expect(onChatFailure).toHaveBeenCalledTimes(1)
   })
 
   it('streams an Anthropic turn on /messages', async () => {
@@ -862,11 +886,16 @@ describe('in-frame UI', () => {
       'base_url_refused',
       'provider_not_supported',
       'bad_request',
+      'model_required',
       'unknown',
     ] as const
     const texts = codes.map((code) => describeAiError(new AiWebError({ code, status: 0 }), 'X'))
     expect(new Set(texts).size).toBe(texts.length)
     for (const t of texts) expect(t).not.toMatch(/aiWeb/)
+    // the no-model hint tells the person what to do, not that the server refused
+    const model = describeAiError(new AiWebError({ code: 'model_required', status: 0 }), 'X')
+    expect(model).toMatch(/Choose a model/)
+    expect(model).not.toMatch(/refused/i)
   })
 
   it('settings dialog: masked hint, write-only key, save + remove through the client', async () => {
@@ -1108,5 +1137,94 @@ describe('model chip source and credential refresh (UNI-1232 A4)', () => {
     // the refresh fails: settings() answers from the last good list instead of going blank
     const s = await ai.settings()
     expect(s.providers.openai.model).toBe('gpt-x')
+  })
+})
+
+describe('the model of a provider with a key (UNI-1232 FX2: N3-01 / G-N1)', () => {
+  const port = {
+    whenInitialized: async () => ({
+      documentId: 'doc-1',
+      apiBase: 'https://app.test/api/v1',
+      capabilities: { ai: true },
+    }),
+    ...tokens(),
+  }
+  const stored = (provider: string) => ({
+    ...CREDENTIALS.items[0]!,
+    provider,
+    key_hint: '…wxyz',
+    base_url: provider === 'custom' ? 'https://router.example/v1' : '',
+  })
+
+  function aiWith(provider: string, models: unknown, opts: { choose?: string } = {}) {
+    const { calls, fetch } = recorder((c) =>
+      c.url.endsWith('/credentials')
+        ? jsonResponse(200, { items: [stored(provider)], providers: CREDENTIALS.providers })
+        : c.url.endsWith('/models')
+          ? jsonResponse(200, models)
+          : jsonResponse(200, CLOUD),
+    )
+    const ai = createWebAi({
+      port,
+      capabilities: { ai: true },
+      fetch,
+      origin: ORIGIN,
+      now: () => 0,
+    })
+    if (opts.choose) ai.choose(provider, opts.choose)
+    return { ai, calls }
+  }
+
+  it('a provider with a default model runs on it with nothing picked in this browser', async () => {
+    const { ai, calls } = aiWith('openai', { data: [] })
+    const s = await ai.settings()
+    expect(s.provider).toBe('openai')
+    expect(s.providers.openai.model).toBeTruthy()
+    expect(calls.some((c) => c.url.endsWith('/models'))).toBe(false)
+  })
+
+  it('a model-less provider that lists exactly one model runs on it', async () => {
+    const { ai } = aiWith('custom', { data: [{ id: 'router-one' }] })
+    await ai.settings()
+    await vi.waitFor(async () =>
+      expect((await ai.settings()).providers.custom.model).toBe('router-one'),
+    )
+  })
+
+  it('a model-less provider that lists several keeps the model empty (the panel asks for a pick)', async () => {
+    const { ai, calls } = aiWith('custom', { data: [{ id: 'a' }, { id: 'b' }] })
+    await ai.settings()
+    await vi.waitFor(() => expect(calls.some((c) => c.url.endsWith('/models'))).toBe(true))
+    await new Promise((r) => setTimeout(r, 0))
+    expect((await ai.settings()).providers.custom.model).toBe('')
+  })
+
+  it('a pick made in this browser wins over the listing', async () => {
+    const { ai } = aiWith('custom', { data: [{ id: 'router-one' }] }, { choose: 'mine' })
+    expect((await ai.settings()).providers.custom.model).toBe('mine')
+  })
+
+  it('a failed listing is silent', async () => {
+    const { fetch } = recorder((c) =>
+      c.url.endsWith('/credentials')
+        ? jsonResponse(200, { items: [stored('custom')], providers: CREDENTIALS.providers })
+        : c.url.endsWith('/models')
+          ? jsonResponse(502, { code: 'provider_unreachable' })
+          : jsonResponse(200, CLOUD),
+    )
+    const ai = createWebAi({
+      port,
+      capabilities: { ai: true },
+      fetch,
+      origin: ORIGIN,
+      now: () => 0,
+    })
+    expect((await ai.settings()).providers.custom.model).toBe('')
+  })
+
+  it('reads the model ids of the three wire formats', () => {
+    expect(modelIdsOf({ data: [{ id: 'gpt-x' }, { id: 'gpt-x' }, {}] })).toEqual(['gpt-x'])
+    expect(modelIdsOf({ models: [{ name: 'models/gemini-x' }] })).toEqual(['gemini-x'])
+    expect(modelIdsOf(null)).toEqual([])
   })
 })

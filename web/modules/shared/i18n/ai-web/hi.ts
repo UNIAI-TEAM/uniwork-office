@@ -44,6 +44,8 @@ export const hi = {
   aiWebStateSessionBody: 'जारी रखने के लिए UniWork से दस्तावेज़ फिर से खोलें।',
   aiWebStateRefusedTitle: 'अनुरोध अस्वीकृत',
   aiWebStateRefusedBody: 'सर्वर ने AI अनुरोध अस्वीकार कर दिया।',
+  aiWebStateModelTitle: 'कोई मॉडल चुनें',
+  aiWebStateModelBody: 'संदेश बॉक्स के पास मॉडल मेनू से कोई मॉडल चुनें, फिर दोबारा भेजें।',
   aiWebStateBaseUrlBody: 'यह बेस URL अनुमत नहीं है। सार्वजनिक https:// पता उपयोग करें।',
   aiWebStateProviderBody: 'यह प्रदाता समर्थित नहीं है।',
   aiWebStateUnknownTitle: 'AI अनुरोध विफल',
