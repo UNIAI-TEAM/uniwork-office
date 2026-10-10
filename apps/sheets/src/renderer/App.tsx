@@ -179,6 +179,7 @@ import {
   type SheetsSkillDeps,
 } from './ai/tools'
 import { scopeLabel, type AiChatMessage } from './ai/AiChatPanel'
+import { markRunFailed } from './ai/run-error'
 import { pruneFailedExchange } from './ai/retry-prune'
 import { parseSheetNavHref } from './ai/sheet-nav'
 import {
@@ -510,6 +511,7 @@ import {
 import { ChartFormatPane, SelectDataDialog } from './ChartPanels'
 import { cap, isViewOnly } from './capabilities'
 import { EngineUnavailableScreen } from './EngineUnavailableScreen'
+import { WorkbookOpeningScreen } from './WorkbookOpeningScreen'
 import { isEngineUnavailableError, isTooLargeError } from './web-engine'
 import { handleSheetsControl, type ControlRequest } from './control'
 
@@ -1513,29 +1515,10 @@ export function App({
           void autoSaveCompletedAiRun().finally(() => setAiBusy(false))
         },
         onError: (error) => {
-          setMessage(error)
-          setChat((previous) => {
-            const next = [...previous]
-            // the loop rolled this run's user message out of the model context — surface that
-            for (let i = next.length - 1; i >= 0; i--) {
-              const entry = next[i]!
-              if (entry.role === 'user') {
-                next[i] = { ...entry, undelivered: true }
-                break
-              }
-            }
-            const last = next.at(-1)
-            if (last?.role === 'assistant') {
-              next[next.length - 1] = {
-                ...last,
-                text: error,
-                isError: true,
-                streaming: false,
-                tools: last.tools.filter((tl) => !tl.running),
-              }
-            }
-            return next
-          })
+          // the chat bubble is the only place the failure is shown; the status line only drops
+          // the "AI is working" state (the same text also sat in the ribbon row and the status bar)
+          setMessage('')
+          setChat((previous) => markRunFailed(previous, error))
           setAiRunScope(undefined)
           void autoSaveCompletedAiRun().finally(() => setAiBusy(false))
         },
@@ -5178,11 +5161,7 @@ export function App({
         onGetConsolidateDefault={() => consolidateDefaultReferenceImpl(dataToolsContext())}
         onApplyHeaderFooter={(result) => handleApplyHeaderFooterImpl(pageLayoutContext(), result)}
       />
-      {openingWorkbook && (
-        <div className="workbook-opening-screen" role="status" aria-live="polite">
-          {t('appOpeningWorkbook')}
-        </div>
-      )}
+      {openingWorkbook && <WorkbookOpeningScreen />}
       <ThreadedCommentsPane getRuntime={getRuntime} />
       <ThreadHoverCard hover={threadHover} />
       {findReplaceService && (
