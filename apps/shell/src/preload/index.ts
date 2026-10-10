@@ -25,6 +25,7 @@ import type {
   AttachmentAddResult,
   AttachmentImageResult,
   AttachmentReadResult,
+  CliLinkState,
   DefaultAppStatus,
   FolderListing,
   FolderRoot,
@@ -123,6 +124,18 @@ function normalizeDefaultAppStatus(result: unknown): DefaultAppStatus {
     state: state === 'default' || state === 'other' || state === 'unknown' ? state : 'unsupported',
     others: Array.isArray(r.others) ? r.others.filter((x) => typeof x === 'string') : [],
     manualOnly: r.manualOnly === true,
+  }
+}
+
+function normalizeCliLinkState(result: unknown): CliLinkState {
+  const r = (result ?? {}) as Partial<CliLinkState>
+  const state = r.state
+  const str = (v: unknown): string | undefined => (typeof v === 'string' && v ? v : undefined)
+  return {
+    state: state === 'absent' || state === 'present' || state === 'blocked' ? state : 'unsupported',
+    ...(str(r.location) ? { location: str(r.location) } : {}),
+    ...(str(r.pathHint) ? { pathHint: str(r.pathHint) } : {}),
+    ...(str(r.manual) ? { manual: str(r.manual) } : {}),
   }
 }
 
@@ -566,6 +579,12 @@ const homeApi: HomeApi = {
   },
   async setDefaultApp() {
     return normalizeDefaultAppStatus(await ipcRenderer.invoke(HOME_CHANNELS.setDefaultApp))
+  },
+  async getCliLinkStatus() {
+    return normalizeCliLinkState(await ipcRenderer.invoke(HOME_CHANNELS.getCliLinkStatus))
+  },
+  async installCliLink() {
+    return normalizeCliLinkState(await ipcRenderer.invoke(HOME_CHANNELS.installCliLink))
   },
   async pickDefaultSaveDir() {
     const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.pickDefaultSaveDir)

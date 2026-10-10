@@ -155,6 +155,62 @@ describe('clean fast path', () => {
   })
 })
 
+describe('quit in flight (macOS ⌘Q keeps the app running when the close path is async)', () => {
+  const quitFlight = (inFlight: boolean) => ({
+    inFlight: vi.fn(() => inFlight),
+    clear: vi.fn(),
+    resume: vi.fn(),
+  })
+
+  it('a clean docs tab under ⌘Q re-issues the quit instead of only closing the window', async () => {
+    const win = new FakeWindow()
+    const quit = quitFlight(true)
+    install(
+      win as never,
+      fakeManager({ docs: [{ id: 'd', webContents: { id: 1 } }] }) as never,
+      quit,
+    )
+    expect(win.requestClose()).toBe(true)
+    await flush()
+    expect(quit.resume).toHaveBeenCalledTimes(1)
+    expect(win.closeCalls).toBe(0)
+    // the resumed quit closes the window again: this time the guard lets it through
+    expect(win.requestClose()).toBe(false)
+    expect(win.destroyed).toBe(true)
+  })
+
+  it('a plain window close (no quit) still closes the window itself', async () => {
+    const win = new FakeWindow()
+    const quit = quitFlight(false)
+    install(
+      win as never,
+      fakeManager({ docs: [{ id: 'd', webContents: { id: 1 } }] }) as never,
+      quit,
+    )
+    expect(win.requestClose()).toBe(true)
+    await flush()
+    expect(quit.resume).not.toHaveBeenCalled()
+    expect(win.closeCalls).toBe(1)
+    expect(win.destroyed).toBe(true)
+  })
+
+  it('a cancelled save prompt vetoes the quit and keeps the window', async () => {
+    requestSheetsClose.mockResolvedValueOnce(false)
+    const win = new FakeWindow()
+    const quit = quitFlight(true)
+    install(
+      win as never,
+      fakeManager({ sheets: [{ id: 's', webContents: { id: 7 } }] }) as never,
+      quit,
+    )
+    expect(win.requestClose()).toBe(true)
+    await flush()
+    expect(quit.clear).toHaveBeenCalled()
+    expect(quit.resume).not.toHaveBeenCalled()
+    expect(win.destroyed).toBe(false)
+  })
+})
+
 describe('dirty close', () => {
   it('cancels the close and asks the owning family, keeping the window on cancel', async () => {
     requestSheetsClose.mockResolvedValueOnce(false)

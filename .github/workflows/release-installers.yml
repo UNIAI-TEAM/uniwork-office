@@ -619,8 +619,25 @@ jobs:
         run: |
           set -euo pipefail
           if ! gh release view "$TAG" >/dev/null 2>&1; then
+            # the body is the install note people read before the first launch
+            NOTES="$(cat <<'NOTES_END'
+          Unsigned CHANNEL_PLACEHOLDER build of UniWork Office for Windows x64, macOS (Apple Silicon and Intel) and Linux x64 (deb, AppImage). No auto-update. SHA-256 sums are attached.
+
+          Install and first launch
+
+          Windows: SmartScreen > More info > Run anyway.
+
+          macOS: a .dmg downloaded in a browser can show "is damaged and can't be opened. You should move it to the Trash." The file is fine; macOS blocks it because the build is not signed yet. Open Terminal and run:
+
+              xattr -d com.apple.quarantine <path to the .dmg>
+
+          (for example xattr -d com.apple.quarantine ~/Downloads/<file>.dmg), then open the .dmg again and drag UniWork Office to Applications. If macOS then says it could not verify the app, right-click the app > Open, or on macOS 15 and later open it once, then System Settings > Privacy & Security > scroll to the UniWork Office message > Open Anyway, and enter your password.
+
+          Linux: sudo apt install ./<file>.deb, or chmod +x the AppImage and run it.
+          NOTES_END
+            )"
             gh release create "$TAG" --verify-tag --prerelease --latest=false \
               --title "UniWork Office $TAG ($CHANNEL, unsigned)" \
-              --notes "Unsigned $CHANNEL build of UniWork Office for Windows x64, macOS (Apple Silicon and Intel) and Linux x64 (deb, AppImage). No auto-update. SHA-256 sums are attached. First launch: Windows SmartScreen > More info > Run anyway; macOS right-click the app > Open, or on macOS 15 and later System Settings > Privacy & Security > Open Anyway; Linux: sudo apt install ./<file>.deb, or chmod +x the AppImage and run it."
+              --notes "${NOTES//CHANNEL_PLACEHOLDER/$CHANNEL}"
           fi
           gh release upload "$TAG" release-files/* --clobber

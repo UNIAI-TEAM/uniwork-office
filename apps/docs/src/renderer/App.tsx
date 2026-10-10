@@ -14,6 +14,7 @@ import type { CSSProperties, MouseEvent as ReactMouseEvent, SetStateAction } fro
 import { EditorContent, useEditor } from '@tiptap/react'
 import type { Editor } from '@tiptap/core'
 import { handleDocsControl, type ControlRequest } from './control'
+import { useClearStatusOnLangChange } from './status-line'
 import { DOMParser as PmDOMParser, type Mark as PmMark, Slice as PmSlice } from '@tiptap/pm/model'
 import { NodeSelection, TextSelection, type Command, type Transaction } from '@tiptap/pm/state'
 import {
@@ -808,6 +809,7 @@ export function App() {
     null,
   )
   const [status, setStatus] = useState('')
+  useClearStatusOnLangChange(lang, setStatus)
   const [zoom, setZoom] = useState(100)
   const scrollContainerRef = useRef<HTMLElement>(null)
   // Word-style dark page (editor/dark-page.ts): the shell's document-page-theme

@@ -437,12 +437,17 @@ const config = {
   // bare UniWork Office logo instead of a per-type document icon. The icns/ico
   // pairs are generated from the shell renderer's file-type tiles by
   // tools/gen-file-association-icons.mjs.
+  //
+  // `rank: 'Alternate'` (LSHandlerRank, macOS): the app is listed under "Open
+  // With" but never claims the default by itself; Settings → General has the
+  // opt-in "Make default" action.
   fileAssociations: [
     {
       ext: 'docx',
       name: 'Word Document',
       description: 'Word Document',
       role: 'Editor',
+      rank: 'Alternate',
       icon: 'docx',
       mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     },
@@ -451,6 +456,7 @@ const config = {
       name: 'Excel Workbook',
       description: 'Excel Workbook',
       role: 'Editor',
+      rank: 'Alternate',
       icon: 'xlsx',
       mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     },
@@ -458,6 +464,7 @@ const config = {
       ext: 'xlsm',
       name: 'Excel Macro-Enabled Workbook',
       role: 'Editor',
+      rank: 'Alternate',
       icon: 'xlsx',
       mimeType: 'application/vnd.ms-excel.sheet.macroEnabled.12',
     },
@@ -466,6 +473,7 @@ const config = {
       name: 'PowerPoint Presentation',
       description: 'PowerPoint Presentation',
       role: 'Editor',
+      rank: 'Alternate',
       icon: 'pptx',
       mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
     },
@@ -473,6 +481,7 @@ const config = {
       ext: 'xls',
       name: 'Excel 97-2003 Workbook',
       role: 'Editor',
+      rank: 'Alternate',
       icon: 'xlsx',
       mimeType: 'application/vnd.ms-excel',
     },
@@ -480,6 +489,7 @@ const config = {
       ext: 'csv',
       name: 'CSV Document',
       role: 'Editor',
+      rank: 'Alternate',
       icon: 'xlsx',
       mimeType: 'text/csv',
     },
@@ -488,6 +498,7 @@ const config = {
       ext: 'tsv',
       name: 'TSV Document',
       role: 'Editor',
+      rank: 'Alternate',
       icon: 'xlsx',
       mimeType: 'text/tab-separated-values',
     },
@@ -495,6 +506,7 @@ const config = {
       ext: 'pdf',
       name: 'PDF Document',
       role: 'Editor',
+      rank: 'Alternate',
       icon: 'pdf',
       mimeType: 'application/pdf',
     },
@@ -502,6 +514,7 @@ const config = {
       ext: 'md',
       name: 'Markdown Document',
       role: 'Editor',
+      rank: 'Alternate',
       icon: 'md',
       mimeType: 'text/markdown',
     },
@@ -509,6 +522,7 @@ const config = {
       ext: 'markdown',
       name: 'Markdown Document',
       role: 'Editor',
+      rank: 'Alternate',
       icon: 'md',
       mimeType: 'text/markdown',
     },
@@ -516,6 +530,7 @@ const config = {
       ext: 'html',
       name: 'HTML Document',
       role: 'Editor',
+      rank: 'Alternate',
       icon: 'html',
       mimeType: 'text/html',
     },
@@ -523,6 +538,7 @@ const config = {
       ext: 'htm',
       name: 'HTML Document',
       role: 'Editor',
+      rank: 'Alternate',
       icon: 'html',
       mimeType: 'text/html',
     },

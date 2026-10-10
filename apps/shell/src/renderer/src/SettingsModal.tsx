@@ -11,6 +11,7 @@ import {
 import type { AiFontSize, AiPanelPrefs, AiPanelSide } from '@genoffice/ui'
 import type {
   DecisionEndpoint,
+  CliLinkState,
   DefaultAppStatus,
   FileSearchSettings,
   LegalDoc,
@@ -1512,6 +1513,8 @@ export function SettingsModal({
   const [defaultApp, setDefaultApp] = useState<DefaultAppStatus | null>(null)
   const [defaultAppBusy, setDefaultAppBusy] = useState(false)
   const [defaultAppFailed, setDefaultAppFailed] = useState(false)
+  const [cliLink, setCliLink] = useState<CliLinkState | null>(null)
+  const [cliLinkBusy, setCliLinkBusy] = useState(false)
   const [aiPrefs, setAiPrefs] = useState<AiPanelPrefs>(DEFAULT_AI_PANEL_PREFS)
   const [channel, setChannel] = useState<'stable' | 'beta'>('stable')
   const [appVersion, setAppVersion] = useState('')
@@ -1550,6 +1553,9 @@ export function SettingsModal({
     })
     void window.aiOffice.getDefaultAppStatus?.().then((st) => {
       if (alive) setDefaultApp(st)
+    })
+    void window.aiOffice.getCliLinkStatus?.().then((st) => {
+      if (alive) setCliLink(st)
     })
     void window.aiOffice.getAiPanelPrefs?.().then((prefs) => {
       if (alive) setAiPrefs(prefs)
@@ -1633,6 +1639,25 @@ export function SettingsModal({
       .catch(() => setDefaultAppFailed(true))
       .finally(() => setDefaultAppBusy(false))
   }
+
+  // the `genoffice` PATH command is never set up behind the user's back: only this button does it
+  const addCliLink = () => {
+    setCliLinkBusy(true)
+    void window.aiOffice
+      .installCliLink()
+      .then(setCliLink)
+      .catch(() => undefined)
+      .finally(() => setCliLinkBusy(false))
+  }
+
+  const cliLinkDesc = (() => {
+    if (!cliLink) return ''
+    if (cliLink.state === 'present' && cliLink.location)
+      return t('setCliLinkDone', { path: cliLink.location })
+    if (cliLink.state === 'blocked' && cliLink.manual)
+      return t('setCliLinkBlocked', { cmd: cliLink.manual })
+    return t('setCliLinkDesc')
+  })()
 
   const defaultAppDesc = (() => {
     if (!defaultApp) return ''
@@ -1863,6 +1888,26 @@ export function SettingsModal({
                       {defaultApp.manualOnly
                         ? t('setDefaultAppOpenSettings')
                         : t('setDefaultAppSet')}
+                    </button>
+                  </div>
+                )}
+                {cliLink && cliLink.state !== 'unsupported' && (
+                  <div className="set-field">
+                    <div className="set-field-text">
+                      <div className="set-field-stack">
+                        <div className="set-field-label">{t('setCliLink')}</div>
+                        <div className="set-field-desc">{cliLinkDesc}</div>
+                        {cliLink.state === 'present' && cliLink.pathHint && (
+                          <code className="set-field-desc">{cliLink.pathHint}</code>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      className="set-btn"
+                      disabled={cliLinkBusy || cliLink.state === 'present'}
+                      onClick={addCliLink}
+                    >
+                      {t('setCliLinkInstall')}
                     </button>
                   </div>
                 )}

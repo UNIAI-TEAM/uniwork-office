@@ -359,6 +359,12 @@ describe('helpers', () => {
     })
   })
 
+  it('describeRoot with create:false leaves a missing root alone and reports it usable', () => {
+    const fresh = join(root, 'NotYet')
+    expect(describeRoot(fresh, { create: false })).toMatchObject({ path: fresh, usable: true })
+    expect(existsSync(fresh)).toBe(false)
+  })
+
   it('describeRoot reports a path blocked by a file as unusable', () => {
     const blocked = touch('blocked')
     expect(describeRoot(blocked).usable).toBe(false)

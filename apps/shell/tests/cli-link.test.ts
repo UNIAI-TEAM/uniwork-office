@@ -37,3 +37,69 @@ describe('genoffice launcher file', () => {
     expect(isEphemeralInstall('/Applications/GenOffice.app/Contents/Resources', {})).toBe(false)
   })
 })
+
+describe('genoffice command on the PATH: only on request', () => {
+  const installCliLink = vi.fn()
+  const inspectCliLink = vi.fn()
+
+  async function load() {
+    vi.resetModules()
+    installCliLink.mockReset()
+    inspectCliLink.mockReset()
+    vi.doMock('electron', () => ({ app: { isPackaged: true, getVersion: () => '1.2.3' } }))
+    vi.doMock('@genoffice/cli/install', () => ({ installCliLink, inspectCliLink }))
+    const dir = mkdtempSync(join(tmpdir(), 'genoffice-cli-req-'))
+    process.env.GENOFFICE_AUTH_DIR = join(dir, 'auth')
+    Object.defineProperty(process, 'resourcesPath', {
+      value: '/Applications/UniWork Office.app/Contents/Resources',
+      configurable: true,
+    })
+    return { dir, mod: await import('../src/main/cli-link') }
+  }
+
+  it('a launch records the launcher folder but never creates the link', async () => {
+    const { dir, mod } = await load()
+    mod.recordCliLauncher()
+    expect(installCliLink).not.toHaveBeenCalled()
+    expect(readFileSync(join(dir, 'auth', 'launcher'), 'utf-8')).toBe(
+      `${join('/Applications/UniWork Office.app/Contents/Resources', 'cli')}\n`,
+    )
+  })
+
+  it('the status read never writes a link either', async () => {
+    const { mod } = await load()
+    inspectCliLink.mockReturnValue({ status: 'missing', location: '/usr/local/bin/genoffice' })
+    expect(mod.cliLinkStatus()).toEqual({
+      state: 'absent',
+      location: '/usr/local/bin/genoffice',
+    })
+    expect(installCliLink).not.toHaveBeenCalled()
+  })
+
+  it('the Settings request creates the link and reports where', async () => {
+    const { dir, mod } = await load()
+    installCliLink.mockReturnValue({ status: 'linked', location: '/opt/homebrew/bin/genoffice' })
+    const state = mod.installCliLinkOnRequest(join(dir, 'app-settings.json'))
+    expect(installCliLink).toHaveBeenCalledTimes(1)
+    expect(state).toEqual({ state: 'present', location: '/opt/homebrew/bin/genoffice' })
+    expect(JSON.parse(readFileSync(join(dir, 'app-settings.json'), 'utf-8')).cliLink).toMatchObject(
+      {
+        status: 'linked',
+        location: '/opt/homebrew/bin/genoffice',
+      },
+    )
+  })
+
+  it('maps blocked outcomes to the manual command', async () => {
+    const { mod } = await load()
+    expect(
+      mod.toCliLinkState({
+        status: 'unwritable',
+        location: '/usr/local/bin/genoffice',
+        manual: 'sudo ln -s a b',
+      }),
+    ).toEqual({ state: 'blocked', location: '/usr/local/bin/genoffice', manual: 'sudo ln -s a b' })
+    expect(mod.toCliLinkState({ status: 'occupied' }).state).toBe('blocked')
+    expect(mod.toCliLinkState({ status: 'unsupported' }).state).toBe('unsupported')
+  })
+})
