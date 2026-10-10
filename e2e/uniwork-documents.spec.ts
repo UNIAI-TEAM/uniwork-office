@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test'
 import JSZip from 'jszip'
 import { createHash } from 'node:crypto'
 import { existsSync } from 'node:fs'
-import { appendFile, copyFile, mkdtemp, readdir, readFile, writeFile } from 'node:fs/promises'
+import { appendFile, copyFile, mkdtemp, readdir, readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import {
@@ -246,11 +246,6 @@ async function sendToView(
     },
     [urlPart, channel, arg],
   )
-}
-
-async function workingCopyText(shell: Page, entry: string): Promise<string> {
-  const status = await activeStatus(shell)
-  return zipEntry(await readFile(status!.path), entry)
 }
 
 // ── scenarios ───────────────────────────────────────────────────────────────

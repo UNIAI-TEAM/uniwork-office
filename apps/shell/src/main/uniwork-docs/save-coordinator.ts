@@ -219,7 +219,7 @@ export class SaveCoordinator {
     intent: PendingIntent,
     landed: { revision: string; version: number },
   ): Promise<BoundDocument> {
-    let current: string | null = null
+    let current: string | null
     try {
       current = sha256Hex(await this.readBytes(doc.path))
     } catch {

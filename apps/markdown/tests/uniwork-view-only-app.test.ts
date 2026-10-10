@@ -23,16 +23,24 @@ interface Harness {
   unmount: () => void
 }
 
-async function mount(uniwork: { bound: boolean; readOnly: boolean }): Promise<Harness> {
+/** how the browser harness may differ from the desktop preload */
+type StateApi = { bound: boolean; readOnly: boolean } | 'missing' | 'rejects'
+
+async function mount(uniwork: StateApi): Promise<Harness> {
   const handlers: Record<string, (...args: never[]) => void> = {}
   const stubs: Record<string, ReturnType<typeof vi.fn>> = {
     consumePending: vi.fn(async () => PATH),
     readFile: vi.fn(async () => RAW),
-    uniworkState: vi.fn(async () => uniwork),
+    uniworkState: vi.fn(async () => {
+      if (uniwork === 'rejects') throw new Error('no handler')
+      return uniwork as { bound: boolean; readOnly: boolean }
+    }),
     save: vi.fn(async () => ({ ok: true, canceled: true })),
   }
   const api = new Proxy(stubs, {
     get(target, prop: string) {
+      // the browser harness mocks the API without the method
+      if (prop === 'uniworkState' && uniwork === 'missing') return undefined
       if (prop in target) return target[prop]
       if (/^on[A-Z]/.test(prop)) {
         target[prop] = vi.fn((cb: (...args: never[]) => void) => {
@@ -115,6 +123,19 @@ describe('markdown App on a UniWork copy', () => {
     )
     expect(h.api.setDirty!.mock.calls.at(-1)).toEqual([true])
   })
+
+  it.each(['missing', 'rejects'] as const)(
+    'renders an editable, unbound copy when the UniWork state query is %s',
+    async (kind) => {
+      const h = await mount(kind)
+      open.push(h)
+      const textarea = h.container.querySelector<HTMLTextAreaElement>('.fm-textarea')!
+      expect(textarea).not.toBeNull()
+      expect(textarea.readOnly).toBe(false)
+      await typeInto(textarea, 'title: Changed')
+      expect(h.api.setDirty!.mock.calls.at(-1)).toEqual([true])
+    },
+  )
 
   it('hands every save request to main, even for a view-only copy', async () => {
     const h = await mount({ bound: true, readOnly: true })

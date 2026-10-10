@@ -123,6 +123,7 @@ import {
 import { useI18n } from './i18n/locale'
 import { useAutosave } from './useAutosave'
 import { drainedOrigin, forcesBoundSave, type SaveOrigin } from './uniwork-save'
+import { queryPdfUniworkState } from './uniwork-state'
 import { isUniworkRefusal } from '../shared/uniwork-refusal'
 import type {
   AnnotDeleteInput,
@@ -137,7 +138,6 @@ import type {
   PageImageRef,
   PdfConvertFormat,
   PdfUniworkState,
-  SavePdfRequest,
   StaticFormFillRecord,
   StampInput,
   TextEditFailure,
@@ -276,7 +276,6 @@ import {
   IconAiSummarize,
   IconAiKeyPoints,
 } from './icons'
-
 
 GlobalWorkerOptions.workerSrc = workerUrl
 
@@ -1366,14 +1365,10 @@ export default function App() {
     // Re-queried whenever the open path changes (open, rename, redaction copy). The
     // previous answer stays until the new one arrives: a view-only copy must not turn
     // editable, nor a bound one autosave, in the gap.
-    window.pdfApi
-      .uniworkState(filePath)
-      .then((state) => {
-        if (live) setUniwork({ bound: state.bound === true, readOnly: state.readOnly === true })
-      })
-      .catch(() => {
-        /* no answer = plain local file */
-      })
+    // A missing method or a failed query reads as a plain local file.
+    void queryPdfUniworkState(window.pdfApi, filePath).then((state) => {
+      if (live) setUniwork(state)
+    })
     return () => {
       live = false
     }

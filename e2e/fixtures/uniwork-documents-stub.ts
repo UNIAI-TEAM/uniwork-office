@@ -476,7 +476,7 @@ export async function startUniworkDocumentsStub(): Promise<UniworkDocumentsStub>
 
     if (method === 'POST' && route === '/office/sessions/exchange') {
       const raw = await ctx.readBody()
-      let body: Record<string, unknown> = {}
+      let body: Record<string, unknown>
       try {
         body = JSON.parse(raw.toString('utf8')) as Record<string, unknown>
       } catch {

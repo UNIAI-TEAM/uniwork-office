@@ -16,17 +16,25 @@ vi.mock('../src/renderer/ai/AiPanel', () => ({
 const PATH = 'C:/u/uniwork-documents/dep/user/doc1/page.html'
 const RAW = '<!doctype html><html><head><title>t</title></head><body><p>Hello</p></body></html>'
 
-async function mount(uniwork: { bound: boolean; readOnly: boolean }) {
+/** how the browser harness may differ from the desktop preload */
+type StateApi = { bound: boolean; readOnly: boolean } | 'missing' | 'rejects'
+
+async function mount(uniwork: StateApi) {
   const handlers: Record<string, (...args: never[]) => void> = {}
   const stubs: Record<string, ReturnType<typeof vi.fn>> = {
     consumePending: vi.fn(async () => PATH),
     getPreviewInfo: vi.fn(async () => ({ url: 'about:blank' })),
     readFile: vi.fn(async () => RAW),
-    uniworkState: vi.fn(async () => uniwork),
+    uniworkState: vi.fn(async () => {
+      if (uniwork === 'rejects') throw new Error('no handler')
+      return uniwork as { bound: boolean; readOnly: boolean }
+    }),
     save: vi.fn(async () => ({ ok: true, canceled: true })),
   }
   const api = new Proxy(stubs, {
     get(target, prop: string) {
+      // the browser harness mocks the API without the method
+      if (prop === 'uniworkState' && uniwork === 'missing') return undefined
       if (prop in target) return target[prop]
       if (/^on[A-Z]/.test(prop)) {
         target[prop] = vi.fn((cb: (...args: never[]) => void) => {
@@ -80,6 +88,21 @@ afterEach(() => {
 })
 
 describe('html App on a view-only UniWork copy', () => {
+  it.each(['missing', 'rejects'] as const)(
+    'still renders and saves as a plain local file when the UniWork state query is %s',
+    async (kind) => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const h = await mount(kind)
+      open.push(h)
+      expect(h.container.childElementCount).toBeGreaterThan(0)
+      await act(async () => {
+        h.saveRequest()('save')
+        await new Promise((r) => setTimeout(r, 20))
+      })
+      expect(h.api.save).toHaveBeenCalledTimes(1)
+    },
+  )
+
   it('hands a save request to main instead of refusing it in the renderer', async () => {
     const h = await mount({ bound: true, readOnly: true })
     open.push(h)

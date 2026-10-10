@@ -293,12 +293,14 @@ export default function App() {
       setUniwork({ bound: false, readOnly: false })
       return
     }
-    void window.markdownApi
-      .uniworkState()
+    // the browser harness may not expose the method: a missing or failed answer is a plain local file
+    void Promise.resolve(window.markdownApi.uniworkState?.())
       .then((state) => {
-        if (live) setUniwork(state)
+        if (live) setUniwork({ bound: state?.bound === true, readOnly: state?.readOnly === true })
       })
-      .catch(() => {})
+      .catch(() => {
+        if (live) setUniwork({ bound: false, readOnly: false })
+      })
     return () => {
       live = false
     }

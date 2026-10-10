@@ -224,8 +224,8 @@ export interface MarkdownApi {
    * save dialog first. The resolved path is granted to the view and returned.
    */
   save(request: SaveMarkdownRequest): Promise<SaveMarkdownResult>
-  /** Whether this view's document is a UniWork copy (AutoSave off) and whether it is view only */
-  uniworkState(): Promise<UniworkViewState>
+  /** Whether this view's document is a UniWork copy (AutoSave off) and whether it is view only; absent where the renderer runs without the desktop shell (browser harness), then a plain local file */
+  uniworkState?(): Promise<UniworkViewState>
   /** Mirror unsaved-changes state to the main process; drives the save prompt before closing a tab/window */
   setDirty(dirty: boolean): void
   /** Shell menu Save / Save As → renderer serializes and calls save() with the given mode */

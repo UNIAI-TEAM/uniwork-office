@@ -179,7 +179,7 @@ export class BindingStore {
     const [deploymentId, userId, key, filename] = parts as [string, string, string, string]
     if (![deploymentId, userId, key].every((part) => SEGMENT.test(part))) return null
     const dir = dirname(full)
-    let binding: Binding | null = null
+    let binding: Binding | null
     try {
       binding = parseBinding(JSON.parse(readFileSync(join(dir, BINDING_FILE), 'utf8')))
     } catch {

@@ -47,6 +47,12 @@ export function mimeForFormat(format: UniworkDocFormat): string {
 }
 
 const RESERVED_WINDOWS_NAMES = /^(con|prn|aux|nul|com\d|lpt\d)$/i
+// C0 controls and DEL, then the characters Windows reserves in a file name.
+// Built from the code points so the class carries no literal control escapes.
+const UNSAFE_FILENAME_CHAR = new RegExp(
+  `[${String.fromCharCode(0)}-${String.fromCharCode(0x1f)}${String.fromCharCode(0x7f)}<>:"/\\\\|?*]`,
+  'g',
+)
 const MAX_BASENAME = 120
 
 /**
@@ -58,7 +64,7 @@ export function sanitizeFilename(name: string, format: UniworkDocFormat): string
   let base = name.trim()
   if (formatForName(base) === format) base = base.slice(0, base.length - extname(base).length)
   base = base
-    .replace(/[\u0000-\u001f\u007f<>:"/\\|?*]/g, '_')
+    .replace(UNSAFE_FILENAME_CHAR, '_')
     .replace(/[. ]+$/g, '')
     .replace(/^[. ]+/g, '')
     .slice(0, MAX_BASENAME)

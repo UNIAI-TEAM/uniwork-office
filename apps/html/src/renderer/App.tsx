@@ -1382,12 +1382,15 @@ export default function App() {
       setUniwork({ bound: false, readOnly: false })
       return
     }
-    void window.htmlApi
-      .uniworkState()
+    // the browser harness may not expose the method: a missing or failed answer is a plain local file
+    void Promise.resolve(window.htmlApi.uniworkState?.())
       .then((state) => {
-        if (live) setUniwork(state)
+        if (live) setUniwork({ bound: state?.bound === true, readOnly: state?.readOnly === true })
       })
-      .catch((err) => console.warn('[html] UniWork state query failed:', err))
+      .catch((err) => {
+        console.warn('[html] UniWork state query failed:', err)
+        if (live) setUniwork({ bound: false, readOnly: false })
+      })
     return () => {
       live = false
     }

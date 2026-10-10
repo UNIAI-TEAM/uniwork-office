@@ -10,7 +10,6 @@ import {
   STUB_ORG,
   STUB_PLAN,
   startUniworkAuthStub,
-  type UniworkAuthStub,
 } from './fixtures/uniwork-auth-stub'
 import {
   NO_KEYRING_SKIP,

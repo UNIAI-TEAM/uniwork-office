@@ -586,7 +586,7 @@ describe('recents refresh after a UniWork document opens', () => {
 
   it('refreshes when the picker or a recents row reports an opened document', () => {
     const { refresh, off } = setup()
-    publishUniworkNotice({ phase: 'opened', path: 'C:\w\Plan.docx', title: 'Plan' })
+    publishUniworkNotice({ phase: 'opened', path: 'C:\\w\\Plan.docx', title: 'Plan' })
     expect(refresh).toHaveBeenCalledTimes(1)
     off()
   })

@@ -742,8 +742,8 @@ export interface PdfApi {
   /** Whether the file is a shell-created blank still carrying its untitled name
       (gates the after-AI-run silent save; a PDF the user merely opened must never auto-write) */
   isUntitled(path: string): Promise<boolean>
-  /** UniWork state of a path granted to this view (all false for plain local files) */
-  uniworkState(path: string): Promise<PdfUniworkState>
+  /** UniWork state of a path granted to this view (all false for plain local files); absent where the renderer runs without the desktop shell (browser harness), then a plain local file */
+  uniworkState?(path: string): Promise<PdfUniworkState>
   /** Dry-run match of pending text edits against the file: reason null = would apply */
   validateTextEdits(request: ValidateTextEditsRequest): Promise<TextEditValidation[]>
   /** EDIT_FONTS ids whose font file exists on this machine */
