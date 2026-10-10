@@ -108,6 +108,8 @@ export function createMockPort(session: Partial<PortSession> = {}) {
     },
     'image.fetch': () => ({ image: { base64: 'iVBORw0KGgo=', mime: 'image/png' } }),
     'convert.altChunkHtml': () => ({ data: new Uint8Array([0x50, 0x4b]).buffer }),
+    // the host's "Open in desktop app" flow (A7 contract): the mock "launches" it
+    'app.open': () => ({ outcome: 'launched' }),
   }
 
   const initSession: PortSession = { documentId: session.documentId ?? 'missing', ...session }
