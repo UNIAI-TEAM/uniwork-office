@@ -47,10 +47,12 @@ export function mimeForFormat(format: UniworkDocFormat): string {
 }
 
 const RESERVED_WINDOWS_NAMES = /^(con|prn|aux|nul|com\d|lpt\d)$/i
+// U+FFFD marks bytes some earlier hop failed to decode as UTF-8; it is never a
+// real character of a name, so it is replaced like the reserved characters.
 // C0 controls and DEL, then the characters Windows reserves in a file name.
 // Built from the code points so the class carries no literal control escapes.
 const UNSAFE_FILENAME_CHAR = new RegExp(
-  `[${String.fromCharCode(0)}-${String.fromCharCode(0x1f)}${String.fromCharCode(0x7f)}<>:"/\\\\|?*]`,
+  `[${String.fromCharCode(0)}-${String.fromCharCode(0x1f)}${String.fromCharCode(0x7f)}\uFFFD<>:"/\\\\|?*]`,
   'g',
 )
 const MAX_BASENAME = 120
@@ -71,6 +73,29 @@ export function sanitizeFilename(name: string, format: UniworkDocFormat): string
     .trim()
   if (!base || RESERVED_WINDOWS_NAMES.test(base)) base = base ? `_${base}` : 'document'
   return `${base}.${format}`
+}
+
+/** the text carries U+FFFD: it was decoded from bytes that were not UTF-8 */
+export function hasReplacementChar(text: string): boolean {
+  return text.includes('\uFFFD')
+}
+
+/**
+ * The working-copy file name, which is also the tab title (the tab shows the
+ * path's basename). The document title is the name UniWork shows everywhere
+ * (web list, picker, recents) and the only one that can be renamed;
+ * file.filename is the name of the first upload and never changes. So the
+ * title names the copy, and the stored upload name is the fallback when the
+ * title is empty or was corrupted on the way in.
+ */
+export function workingCopyName(
+  title: string,
+  uploadName: string,
+  format: UniworkDocFormat,
+): string {
+  const usable = (name: string) => name.trim() !== '' && !hasReplacementChar(name)
+  const source = [title, uploadName].find(usable) ?? (title.trim() || uploadName)
+  return sanitizeFilename(source, format)
 }
 
 /** sha256 hex of the bytes: the form the server reports as checksum_sha256 */

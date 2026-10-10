@@ -19,7 +19,13 @@ import { callbackSchemeForChannel } from '../uniwork-auth/deployment'
 import { type Binding, BindingStore, type BoundDocument, type LastOwner } from './binding-store'
 import { type FetchLike, type UniworkDocsClient, createUniworkDocsClient } from './client'
 import { UniworkDocError } from './errors'
-import { formatForMime, formatForName, sanitizeFilename, sha256Hex } from './formats'
+import {
+  formatForMime,
+  formatForName,
+  hasReplacementChar,
+  sha256Hex,
+  workingCopyName,
+} from './formats'
 import { LaunchController } from './launch'
 import type { DocumentDetail, LaunchDescriptor } from './parse'
 import { SaveCoordinator, toStatus } from './save-coordinator'
@@ -764,9 +770,13 @@ export class UniworkDocsService {
       bytes = latest.bytes
       base = latest.detail
     }
+    // a copy keeps its name, unless an earlier build named it from a corrupt
+    // upload name (U+FFFD): that one is renamed with this fresh download
+    const stale = existing && hasReplacementChar(existing.filename) ? existing.filename : null
     const filename =
-      existing?.filename ?? sanitizeFilename(detail.file.filename || detail.title, format)
+      (stale ? null : existing?.filename) ?? workingCopyName(base.title, base.file.filename, format)
     const path = await this.store.writeWorkingCopy(dir, filename, bytes)
+    if (stale && stale !== filename) await this.store.removeWorkingCopy(dir, stale)
     const binding: Binding = {
       schema: 1,
       documentId,
