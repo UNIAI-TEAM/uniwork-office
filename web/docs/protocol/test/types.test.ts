@@ -177,3 +177,39 @@ describe('additive fields (PROTOCOL_VERSION stays 1)', () => {
     expect(ready({ capabilities: { filePick: true, recents: false } }).ok).toBe(true)
   })
 })
+
+describe('app.open + desktopOpen (A7 contract, additive)', () => {
+  const req = (payload: unknown) =>
+    parseEnvelope(env({ kind: 'request', type: 'app.open', payload }))
+  const res = (payload: unknown) =>
+    parseEnvelope(env({ kind: 'response', type: 'app.open', payload }))
+
+  it('accepts a request with or without the opaque feature tag', () => {
+    expect(req({}).ok).toBe(true)
+    expect(req({ feature: 'pdf.ocr' }).ok).toBe(true)
+  })
+
+  it('rejects a malformed request payload', () => {
+    expect(req({ feature: 7 })).toMatchObject({ ok: false, reason: 'malformed' })
+    expect(req({ feature: null })).toMatchObject({ ok: false, reason: 'malformed' })
+    expect(req('pdf.ocr')).toMatchObject({ ok: false, reason: 'malformed' })
+    expect(req([])).toMatchObject({ ok: false, reason: 'malformed' })
+  })
+
+  it('accepts the three outcomes and rejects anything else', () => {
+    for (const outcome of ['launched', 'installer', 'unavailable']) {
+      expect(res({ outcome }).ok).toBe(true)
+    }
+    expect(res({ outcome: 'opened' })).toMatchObject({ ok: false, reason: 'malformed' })
+    expect(res({ outcome: true })).toMatchObject({ ok: false, reason: 'malformed' })
+    expect(res({})).toMatchObject({ ok: false, reason: 'malformed' })
+    expect(res(null)).toMatchObject({ ok: false, reason: 'malformed' })
+  })
+
+  it('desktopOpen is a boolean capability on the wire', () => {
+    const ready = (capabilities: unknown) =>
+      parseEnvelope(env({ type: 'ready', payload: { protocolVersion: 1, capabilities } }))
+    expect(ready({ desktopOpen: true }).ok).toBe(true)
+    expect(ready({ desktopOpen: 'yes' }).ok).toBe(false)
+  })
+})

@@ -259,6 +259,12 @@ export type Capability =
   | 'imageSearch'
   /** additive (C16): UniWork cloud image generation (and media analysis); effective only with `ai` */
   | 'imageGeneration'
+  /**
+   * additive (A7 contract): the host can run its own "Open in desktop app" flow for the frame's
+   * `app.open` request. Default false; granted only when the host's own action is available. Without
+   * it the frame shows the "use the app" message only.
+   */
+  | 'desktopOpen'
 
 export type Capabilities = Partial<Record<Capability, boolean>>
 
@@ -276,6 +282,7 @@ export const CAPABILITY_KEYS: readonly Capability[] = [
   'webSearch',
   'imageSearch',
   'imageGeneration',
+  'desktopOpen',
 ]
 
 /**
@@ -609,6 +616,20 @@ export interface ImageFetchResult {
   image: { base64: string; mime: string } | null
 }
 
+export interface AppOpenPayload {
+  /** short opaque tag (e.g. "pdf.ocr") for the host's own dev diagnostics; never shown, never sent to a server */
+  feature?: string
+}
+
+/** launched = the browser tab hid after the deep link; installer = the install prompt opened; unavailable = no launch possible (the host shows its own alert) */
+export type AppOpenOutcome = 'launched' | 'installer' | 'unavailable'
+
+export const APP_OPEN_OUTCOMES: readonly AppOpenOutcome[] = ['launched', 'installer', 'unavailable']
+
+export interface AppOpenResult {
+  outcome: AppOpenOutcome
+}
+
 export interface ConvertAltChunkHtmlPayload {
   html: string
 }
@@ -679,6 +700,8 @@ export interface FrameRequests {
   'image.fetch': Rpc<ImageFetchPayload, ImageFetchResult>
   /** HTML altChunk -> docx bytes (desktop: main-process converter) */
   'convert.altChunkHtml': Rpc<ConvertAltChunkHtmlPayload, ConvertAltChunkHtmlResult>
+  /** additive (A7): run the host's "Open in desktop app" flow; send only with the `desktopOpen` capability */
+  'app.open': Rpc<AppOpenPayload, AppOpenResult>
 }
 
 /** Events the frame sends to the host. */
@@ -743,6 +766,7 @@ const FRAME_REQUESTS: Record<FrameRequestType, true> = {
   'file.pick': true,
   'image.fetch': true,
   'convert.altChunkHtml': true,
+  'app.open': true,
 }
 const FRAME_EVENTS: Record<FrameEventType, true> = {
   ready: true,
@@ -963,6 +987,7 @@ const PAYLOAD_VALIDATORS: Record<string, (x: unknown) => boolean> = {
     (x.accept === undefined || (Array.isArray(x.accept) && x.accept.every(isStr))),
   'request:image.fetch': (x) => isObj(x) && isNonEmptyStr(x.url) && /^https?:\/\//i.test(x.url),
   'request:convert.altChunkHtml': (x) => isObj(x) && isStr(x.html),
+  'request:app.open': (x) => isObj(x) && isOpt(x.feature, isStr),
   // frame -> host events
   'event:ready': isReadyPayload,
   'event:dirty': (x) => isObj(x) && isBool(x.dirty),
@@ -997,6 +1022,8 @@ const PAYLOAD_VALIDATORS: Record<string, (x: unknown) => boolean> = {
   'response:image.fetch': (x) =>
     isObj(x) &&
     (x.image === null || (isObj(x.image) && isStr(x.image.base64) && isStr(x.image.mime))),
+  'response:app.open': (x) =>
+    isObj(x) && isStr(x.outcome) && (APP_OPEN_OUTCOMES as readonly string[]).includes(x.outcome),
   'response:convert.altChunkHtml': (x) => isObj(x) && (x.data === null || isBuffer(x.data)),
 }
 

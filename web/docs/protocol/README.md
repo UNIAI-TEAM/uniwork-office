@@ -55,40 +55,58 @@ gets no `init` within its retry budget (40 × 500 ms), or is opened top-level (`
 
 ### Frame → host
 
-| type                   | kind    | payload → result                                                                      |
-| ---------------------- | ------- | ------------------------------------------------------------------------------------- |
-| `ready`                | event   | {protocolVersion, frameVersion?, capabilities, instanceId?, module?}                  |
-| `token.refresh`        | request | {reason: 'expiring' \| 'unauthorized'} → {token, tokenExpiresAt}                      |
-| `api.open`             | request | {fileId} → `OpenPayload`                                                              |
-| `api.save`             | request | {fileId, data, etag?, auto?} → `SaveResult` (etag mismatch → `conflict`)              |
-| `api.saveAs`           | request | {name, data, sourceFileId?, folderId?, silent?} → `SaveResult`                        |
-| `api.recents`          | request | {limit?} → {files: FileMeta[]}                                                        |
-| `api.export`           | request | {format: 'pdf' \| 'html', fileId?, data?, html?, geometry?} → {data, mimeType, name?} |
-| `api.attachments.add`  | request | {files: UploadItem[]} → {accepted, rejected}                                          |
-| `api.images.upload`    | request | UploadItem + {fileId?} → {imageId, url}                                               |
-| `file.pick`            | request | {purpose: 'open' \| 'insert', accept?} → {file: OpenPayload \| null}                  |
-| `image.fetch`          | request | {url (http/s)} → {image: {base64, mime} \| null}                                      |
-| `convert.altChunkHtml` | request | {html} → {data: ArrayBuffer \| null}                                                  |
-| `dirty`                | event   | {dirty} (client de-duplicates)                                                        |
-| `title`                | event   | {title}                                                                               |
-| `modal`                | event   | {open} — a frame dialog is open; the host may dim its own chrome (advisory, additive) |
-| `resize`               | event   | {height} (CSS px, content height)                                                     |
-| `saved`                | event   | {file, versionId?, initiatedByFrame}                                                  |
-| `error`                | event   | {error: ProtocolErrorShape, fatal}                                                    |
-| `cancel`               | event   | {id} — abort a frame→host request                                                     |
+| type                   | kind    | payload → result                                                                       |
+| ---------------------- | ------- | -------------------------------------------------------------------------------------- |
+| `ready`                | event   | {protocolVersion, frameVersion?, capabilities, instanceId?, module?}                   |
+| `token.refresh`        | request | {reason: 'expiring' \| 'unauthorized'} → {token, tokenExpiresAt}                       |
+| `api.open`             | request | {fileId} → `OpenPayload`                                                               |
+| `api.save`             | request | {fileId, data, etag?, auto?} → `SaveResult` (etag mismatch → `conflict`)               |
+| `api.saveAs`           | request | {name, data, sourceFileId?, folderId?, silent?} → `SaveResult`                         |
+| `api.recents`          | request | {limit?} → {files: FileMeta[]}                                                         |
+| `api.export`           | request | {format: 'pdf' \| 'html', fileId?, data?, html?, geometry?} → {data, mimeType, name?}  |
+| `api.attachments.add`  | request | {files: UploadItem[]} → {accepted, rejected}                                           |
+| `api.images.upload`    | request | UploadItem + {fileId?} → {imageId, url}                                                |
+| `file.pick`            | request | {purpose: 'open' \| 'insert', accept?} → {file: OpenPayload \| null}                   |
+| `image.fetch`          | request | {url (http/s)} → {image: {base64, mime} \| null}                                       |
+| `convert.altChunkHtml` | request | {html} → {data: ArrayBuffer \| null}                                                   |
+| `app.open`             | request | {feature?} → {outcome: 'launched' \| 'installer' \| 'unavailable'} (cap `desktopOpen`) |
+| `dirty`                | event   | {dirty} (client de-duplicates)                                                         |
+| `title`                | event   | {title}                                                                                |
+| `modal`                | event   | {open} — a frame dialog is open; the host may dim its own chrome (advisory, additive)  |
+| `resize`               | event   | {height} (CSS px, content height)                                                      |
+| `saved`                | event   | {file, versionId?, initiatedByFrame}                                                   |
+| `error`                | event   | {error: ProtocolErrorShape, fatal}                                                     |
+| `cancel`               | event   | {id} — abort a frame→host request                                                      |
 
 `api.*`, `file.pick`, `image.fetch` and `convert.altChunkHtml` are proxied by the host's `api` handlers; a type
 without a handler answers `unsupported` (e.g. AI-adjacent calls stay unavailable on the web).
 
 Capabilities: `save`, `saveAs`, `recents`, `filePick`, `print`, `exportPdf`, `exportHtml`, `attachments`, `images`,
 `ai`, and (additive, CONTRACT C16) `webSearch`, `imageSearch`, `imageGeneration`. The effective set is the frame's ∩
-the host's grant. The three cloud-tool keys only count together with `ai`; see "AI (web)" below. The frame hides File > Open / Ctrl+O unless `filePick`
+the host's grant. `desktopOpen` (additive, default false) is the "Open in desktop app" grant, see "Open in desktop app (`app.open`)" below. The three cloud-tool keys only count together with `ai`; see "AI (web)" below. The frame hides File > Open / Ctrl+O unless `filePick`
 is granted (grant it only with an `api` handler for `file.pick`) and stops asking for recents without `recents`.
 
 `FileSource {kind:'url'}` (in `init.open`, `open`, `api.open`, `file.pick`) must be **same-origin** with the frame,
 or the host must send `{kind:'bytes'}`: the frame bundle's CSP is `connect-src 'self'` (baked in at build time,
 `web/docs/build/csp.ts`), so a presigned URL on another origin (S3/MinIO) is blocked. A host that needs a foreign
 URL must widen `connect-src` in the CSP it serves (`csp.json`) for that origin.
+
+### Open in desktop app (`app.open`, additive)
+
+A frame that cannot do something on the web (PDF OCR, Slides print-quality PDF, ...) shows the message "Open in the
+UniWork Office app to use this feature" and, only when the effective capability `desktopOpen` is true, an action that
+sends ONE request: `app.open` with `{feature?: string}` (a short opaque tag such as `pdf.ocr`, for the host's own
+diagnostics; never shown, never sent to a server) and result `{outcome}`:
+
+- `launched`: the host ran its "Open in desktop app" flow and the browser tab hid after the deep link;
+- `installer`: the app did not answer, the install prompt was opened;
+- `unavailable`: nothing could be launched (no deployment id / no committed version / the action is busy); the host
+  shows its own alert.
+
+The frame never builds a deep link. The host grants `desktopOpen` only while its own action is available (editor open,
+user may edit). A frame declares `desktopOpen: true` in its `createFrameClient` capabilities to use it. Old hosts
+answer `unknown_type` / `unsupported` (the capability stays false, so the frame sends nothing and keeps the message
+only); an old frame never sends it.
 
 ### Errors
 
