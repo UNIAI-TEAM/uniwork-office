@@ -873,7 +873,7 @@ html.genoffice-popover-open .ribbon-tabs {
   padding: 1px 6px;
   background: var(--color-bg-subtle);
   color: var(--color-text-secondary);
-  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Noto Sans Mono', 'Liberation Mono', monospace;
   font-size: 14px;
 }
 
@@ -1105,7 +1105,7 @@ html.genoffice-popover-open .ribbon-tabs {
   border: none;
   border-radius: 12px;
   font-family:
-    ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+    ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Noto Sans Mono', 'Liberation Mono', monospace;
   font-size: 14px;
   color: var(--text-primary);
   max-height: 300px;
@@ -2265,6 +2265,8 @@ html.genoffice-popover-open .ribbon-tabs {
     12px/1.4 'SF Mono',
     Menlo,
     Consolas,
+    'Noto Sans Mono',
+    'Liberation Mono',
     monospace;
   color: var(--text-muted);
   overflow: hidden;
@@ -3256,7 +3258,7 @@ html.genoffice-popover-open .ribbon-tabs {
 
 .hx-panel-tag {
   flex: 1;
-  font-family: 'SF Mono', Menlo, Consolas, monospace;
+  font-family: 'SF Mono', Menlo, Consolas, 'Noto Sans Mono', 'Liberation Mono', monospace;
   font-size: 12px;
   color: var(--text-dim);
 }

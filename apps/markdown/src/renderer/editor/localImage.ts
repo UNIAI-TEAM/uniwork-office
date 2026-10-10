@@ -39,7 +39,7 @@ export const VIEW_IMAGE_EVENT = 'markdown-view-image'
 export function resolveImageSrc(src: string, baseDir: string | null = imageBaseDir): string {
   if (!src) return src
   // web frame: relative pictures are served from the document's asset store (host-mapped URLs)
-  const mapped = window.markdownApi?.resolveAssetUrl?.(src)
+  const mapped = window.markdownApi?.resolveAssetUrl?.(src, t('imageMissingWeb'))
   if (mapped) return mapped
   // ':' is legal in URL path segments (RFC 3986) — restore it after encoding so
   // Windows drive prefixes stay `C:` instead of the `C%3A` Chromium rejects
@@ -181,7 +181,17 @@ export const LocalImage = Image.extend({
       src: {
         default: null,
         parseHTML: (element) => unresolveImageSrc(element.getAttribute('src') ?? ''),
-        renderHTML: (attrs) => ({ src: resolveImageSrc(String(attrs.src ?? '')) }),
+        renderHTML: (attrs) => {
+          const display = resolveImageSrc(String(attrs.src ?? ''))
+          // a placeholder (web: the host has no copy of the picture) is named for assistive tech;
+          // the DOM-only label is never parsed back (parseHTML reads src/alt/title)
+          if (!window.markdownApi?.isMissingAsset?.(display)) return { src: display }
+          const name = String(attrs.alt ?? '').trim() || String(attrs.src ?? '')
+          return {
+            src: display,
+            'aria-label': `${t('imageMissingName', { path: name })}. ${t('imageMissingWeb')}`,
+          }
+        },
       },
     }
   },
