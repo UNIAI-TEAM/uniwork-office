@@ -1,7 +1,15 @@
 import { createHash } from 'node:crypto'
-import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import {
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
   UniworkConflictChoice,
@@ -46,13 +54,20 @@ type Fault = {
 }
 
 /** a small UniWork documents server: idempotent uploads and commits, revisions, ACL level */
-function fakeServer(initial: { bytes: Uint8Array; myLevel?: string; title?: string }) {
+function fakeServer(initial: {
+  bytes: Uint8Array
+  myLevel?: string
+  title?: string
+  /** the stored upload name (file.filename); defaults to the title */
+  filename?: string
+}) {
   const state = {
     revision: 41,
     version: 3,
     bytes: initial.bytes,
     myLevel: initial.myLevel ?? 'edit',
     title: initial.title ?? 'Q4 plan.docx',
+    filename: initial.filename ?? initial.title ?? 'Q4 plan.docx',
   }
   const calls: Call[] = []
   const faults: Fault[] = []
@@ -73,7 +88,7 @@ function fakeServer(initial: { bytes: Uint8Array; myLevel?: string; title?: stri
       file_id: 'f',
       version_id: `v${state.version}`,
       version: state.version,
-      filename: state.title,
+      filename: state.filename,
       mime_type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       size_bytes: state.bytes.byteLength,
       checksum_sha256: hex(state.bytes),
@@ -113,7 +128,7 @@ function fakeServer(initial: { bytes: Uint8Array; myLevel?: string; title?: stri
     if (u.pathname === `/api/v1/documents/${DOC}/uploads`) {
       const file = (init.body as FormData).get('file') as Blob
       const bytes = new Uint8Array(await file.arrayBuffer())
-      call.body = { bytes }
+      call.body = { bytes, name: (file as File).name }
       const fault = takeFault('upload')
       if (fault?.kind === 'network') throw new TypeError('fetch failed')
       if (typeof fault?.kind === 'number') return error(fault.kind, fault.code ?? 'x')
@@ -280,6 +295,56 @@ describe('open flow', () => {
       state: 'ready',
     })
     expect(ctx.deps.openPath).toHaveBeenCalledWith(path)
+  })
+
+  it('names the working copy and the tab after the Vietnamese title, byte for byte', async () => {
+    const title = 'GO-A9 Báo cáo Trình chiếu.docx'
+    const server = fakeServer({ bytes: enc('v3'), title })
+    const ctx = setup(server)
+    const opened = await ctx.service.openDocument(DOC)
+    if (!opened.ok) throw new Error(opened.error)
+    // the tab is basename(path): it must read the title, not a stand-in
+    expect(basename(opened.value.path)).toBe(title)
+    expect(binding(opened.value.path)).toMatchObject({ title, filename: title })
+    expect(readdirSync(join(opened.value.path, '..'))).toContain(title)
+    // saving uploads under the same name as UTF-8 (a File name, not a byte-mangled header)
+    writeFileSync(opened.value.path, 'edited')
+    await ctx.service.save(opened.value.path)
+    expect((uploads(server)[0]?.body as { name: string }).name).toBe(title)
+  })
+
+  it('a stored upload name with U+FFFD never reaches the tab: the title names the copy', async () => {
+    const title = 'GO-A9 Báo cáo.docx'
+    const server = fakeServer({ bytes: enc('v3'), title, filename: 'GO-A9 B\uFFFDo c\uFFFDo.docx' })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    expect(basename(path)).toBe(title)
+    expect(binding(path).filename).toBe(title)
+  })
+
+  it('a renamed document names the copy after its title, not the original upload name', async () => {
+    const title = 'Bảng tính quý 4'
+    const server = fakeServer({ bytes: enc('v3'), title, filename: 'upload-1.docx' })
+    const ctx = setup(server)
+    expect(basename(await openDoc(ctx))).toBe(title + '.docx')
+  })
+
+  it('a copy named from a corrupt upload name is renamed when it is downloaded again', async () => {
+    const title = 'Báo cáo.docx'
+    const server = fakeServer({ bytes: enc('v3'), title })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    const bad = join(path, '..', 'B\uFFFDo c\uFFFDo.docx')
+    renameSync(path, bad)
+    const b = binding(path)
+    writeFileSync(
+      join(path, '..', BINDING_FILE),
+      JSON.stringify({ ...b, filename: 'B\uFFFDo c\uFFFDo.docx' }),
+    )
+    server.state.revision = 50
+    const again = await openDoc(ctx)
+    expect(basename(again)).toBe(title)
+    expect(readdirSync(join(again, '..')).filter((n) => n.endsWith('.docx'))).toEqual([title])
   })
 
   it('view level opens read-only and a pending save reopens the local copy without downloading', async () => {
