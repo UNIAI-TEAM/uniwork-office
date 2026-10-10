@@ -153,6 +153,7 @@ export const he = {
   ribbonStyleIntenseReference: 'הפניה חזקה',
   ribbonStyleBookTitle: 'שם ספר',
   ribbonStyleListParagraph: 'פיסקת רשימה',
+  ribbonTableStyleGrid: 'רשת טבלה',
   ribbonStylesPane: 'חלונית סגנונות',
   ribbonStylesPaneTip: 'פתיחת חלונית הסגנונות להצגה, החלה ושינוי של כל הסגנונות במסמך',
   ribbonStylesSearch: 'חיפוש סגנונות',

@@ -153,6 +153,7 @@ export const vi = {
   ribbonStyleIntenseReference: 'Tham chiếu nổi bật',
   ribbonStyleBookTitle: 'Tên sách',
   ribbonStyleListParagraph: 'Đoạn danh sách',
+  ribbonTableStyleGrid: 'Lưới bảng',
   ribbonStylesPane: 'Ngăn kiểu',
   ribbonStylesPaneTip: 'Mở ngăn Kiểu để xem, áp dụng và sửa mọi kiểu trong tài liệu',
   ribbonStylesSearch: 'Tìm kiểu',

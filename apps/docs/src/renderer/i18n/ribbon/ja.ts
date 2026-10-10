@@ -160,6 +160,7 @@ export const ja = {
   ribbonStyleIntenseReference: '参照 2',
   ribbonStyleBookTitle: '書籍の表題',
   ribbonStyleListParagraph: 'リスト段落',
+  ribbonTableStyleGrid: '表 (格子)',
   ribbonStylesPane: 'スタイル ウィンドウ',
   ribbonStylesPaneTip:
     'スタイル ウィンドウを開いて、文書内のすべてのスタイルを表示・適用・変更します',

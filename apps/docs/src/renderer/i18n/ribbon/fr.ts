@@ -155,6 +155,7 @@ export const fr = {
   ribbonStyleIntenseReference: 'Référence intense',
   ribbonStyleBookTitle: 'Titre du livre',
   ribbonStyleListParagraph: 'Paragraphe de liste',
+  ribbonTableStyleGrid: 'Grille du tableau',
   ribbonStylesPane: 'Volet Styles',
   ribbonStylesPaneTip:
     'Ouvrir le volet Styles pour afficher, appliquer et modifier tous les styles du document',

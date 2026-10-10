@@ -153,6 +153,7 @@ export const th = {
   ribbonStyleIntenseReference: 'การอ้างอิงเด่น',
   ribbonStyleBookTitle: 'ชื่อหนังสือ',
   ribbonStyleListParagraph: 'ย่อหน้ารายการ',
+  ribbonTableStyleGrid: 'เส้นตาราง',
   ribbonStylesPane: 'บานหน้าต่างสไตล์',
   ribbonStylesPaneTip: 'เปิดบานหน้าต่างสไตล์เพื่อดู ใช้ และแก้ไขสไตล์ทั้งหมดในเอกสาร',
   ribbonStylesSearch: 'ค้นหาสไตล์',

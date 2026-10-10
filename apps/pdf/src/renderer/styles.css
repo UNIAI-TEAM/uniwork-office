@@ -68,6 +68,7 @@
 
   /* black translucent masks/shadows hold in both themes */
   --pdf-mask-bg: rgb(0 0 0 / 50%);
+  --pdf-mask-opaque: #000; /* mask-image stops: only the alpha matters */
   --pdf-shadow-menu: 0 8px 24px rgb(0 0 0 / 18%);
   --pdf-shadow-popup: 0 4px 16px rgb(0 0 0 / 15%);
   --pdf-shadow-toast: 0 4px 16px rgb(0 0 0 / 25%);
@@ -218,31 +219,104 @@ button {
   flex: 1;
 }
 
-/* phone width: the tab row is a single strip that scrolls sideways (the quick-access buttons and the
-   tabs keep their size), no scrollbar chrome */
+/* the tab buttons: scroll sideways when the frame is too narrow (the quick-access buttons and the
+   status chips sit outside); an edge fade plus a chevron (RibbonTabScroller) is the cue */
+.ribbon-tab-scroll-wrap {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  align-items: center;
+}
+
+.ribbon-tab-scroll {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.ribbon-tab-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* the chevron sits over the clipped edge; the pointer stays on the tab it covers */
+.ribbon-tab-cue {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  width: 20px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.ribbon-tab-cue[data-edge='start'] {
+  inset-inline-start: 0;
+  justify-content: flex-start;
+}
+
+.ribbon-tab-cue[data-edge='end'] {
+  inset-inline-end: 0;
+  justify-content: flex-end;
+}
+
+/* the chevron points the way the row will scroll */
+.ribbon-tab-cue[data-edge='start'] svg {
+  transform: scaleX(-1);
+}
+
+[dir='rtl'] .ribbon-tab-cue[data-edge='start'] svg {
+  transform: none;
+}
+
+[dir='rtl'] .ribbon-tab-cue[data-edge='end'] svg {
+  transform: scaleX(-1);
+}
+
+.ribbon-tab-cue:hover {
+  color: var(--text);
+}
+
+.ribbon-tab-scroll[data-fade-end] {
+  mask-image: linear-gradient(to right, var(--pdf-mask-opaque) calc(100% - 28px), transparent);
+}
+
+.ribbon-tab-scroll[data-fade-start] {
+  mask-image: linear-gradient(to left, var(--pdf-mask-opaque) calc(100% - 28px), transparent);
+}
+
+.ribbon-tab-scroll[data-fade-start][data-fade-end] {
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    var(--pdf-mask-opaque) 28px,
+    var(--pdf-mask-opaque) calc(100% - 28px),
+    transparent
+  );
+}
+
+/* phone width: the quick-access buttons and chips keep their size, the tabs reach the 44 px touch target */
 @media (max-width: 640px) {
-  .ribbon-tabs {
-    overflow-x: auto;
-    overflow-y: hidden;
-    scrollbar-width: none;
-    /* edge cue: a soft shadow on the side that still hides tabs (the 'local' cover hides it at the ends) */
-    background:
-      linear-gradient(to right, var(--chrome-bg) 40%, transparent) left center / 24px 100% no-repeat
-        local,
-      linear-gradient(to left, var(--chrome-bg) 40%, transparent) right center / 24px 100% no-repeat
-        local,
-      linear-gradient(to right, var(--border-strong), transparent) left center / 12px 100% no-repeat
-        scroll,
-      linear-gradient(to left, var(--border-strong), transparent) right center / 12px 100% no-repeat
-        scroll;
-  }
-
-  .ribbon-tabs::-webkit-scrollbar {
-    display: none;
-  }
-
   .ribbon-tabs > * {
     flex-shrink: 0;
+  }
+
+  .ribbon-tabs > .ribbon-tab-scroll-wrap {
+    flex-shrink: 1;
+  }
+
+  .ribbon-tab-scroll .ribbon-tab {
+    min-height: 44px;
+    padding-inline: 12px;
   }
 }
 
@@ -806,9 +880,12 @@ button {
 }
 
 .pdf-toast button {
+  flex-shrink: 0;
   border: none;
   background: none;
   padding: 0;
+  /* an action ("Open in app") stays on one line however long the message is */
+  white-space: nowrap;
   color: var(--pdf-toast-action);
   font-size: 13px;
   font-weight: 600;
@@ -824,6 +901,16 @@ button {
 .pdf-toast-notice {
   bottom: 64px;
   max-width: min(70vw, 560px);
+}
+
+/* with the AI panel open the toasts centre on the document area: centred on the window they
+   covered the panel's composer */
+.app-main:has(.ai-dock:not(.collapsed)) .pdf-toast {
+  left: calc(50% + var(--ai-panel-width, 360px) / 2);
+}
+
+.app-main:has(.ai-dock:not(.collapsed)) .pdf-toast-notice {
+  max-width: min(560px, calc((100vw - var(--ai-panel-width, 360px)) * 0.9));
 }
 
 /* ── AcroForm form overlay ── */

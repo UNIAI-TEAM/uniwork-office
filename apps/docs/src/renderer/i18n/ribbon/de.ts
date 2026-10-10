@@ -155,6 +155,7 @@ export const de = {
   ribbonStyleIntenseReference: 'Intensiver Verweis',
   ribbonStyleBookTitle: 'Buchtitel',
   ribbonStyleListParagraph: 'Listenabsatz',
+  ribbonTableStyleGrid: 'Tabellenraster',
   ribbonStylesPane: 'Formatvorlagenbereich',
   ribbonStylesPaneTip:
     'Formatvorlagenbereich öffnen: alle Formatvorlagen des Dokuments anzeigen, anwenden und ändern',

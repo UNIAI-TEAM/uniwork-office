@@ -154,6 +154,7 @@ export const ru = {
   ribbonStyleIntenseReference: 'Сильная ссылка',
   ribbonStyleBookTitle: 'Название книги',
   ribbonStyleListParagraph: 'Абзац списка',
+  ribbonTableStyleGrid: 'Сетка таблицы',
   ribbonStylesPane: 'Область стилей',
   ribbonStylesPaneTip:
     'Открыть область стилей: просмотр, применение и изменение всех стилей документа',

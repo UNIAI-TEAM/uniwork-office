@@ -158,6 +158,7 @@ export const zh = {
   ribbonStyleIntenseReference: '明显参考',
   ribbonStyleBookTitle: '书籍标题',
   ribbonStyleListParagraph: '列表段落',
+  ribbonTableStyleGrid: '网格型',
   ribbonStylesPane: '样式窗格',
   ribbonStylesPaneTip: '打开样式窗格：查看、应用和修改文档中的全部样式',
   ribbonStylesSearch: '搜索样式',

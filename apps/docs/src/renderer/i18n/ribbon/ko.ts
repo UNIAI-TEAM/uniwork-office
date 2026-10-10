@@ -159,6 +159,7 @@ export const ko = {
   ribbonStyleIntenseReference: '강한 참조',
   ribbonStyleBookTitle: '책 제목',
   ribbonStyleListParagraph: '목록 단락',
+  ribbonTableStyleGrid: '표 눈금',
   ribbonStylesPane: '스타일 창',
   ribbonStylesPaneTip: '스타일 창을 열어 문서의 모든 스타일을 보고 적용하고 수정합니다',
   ribbonStylesSearch: '스타일 검색',

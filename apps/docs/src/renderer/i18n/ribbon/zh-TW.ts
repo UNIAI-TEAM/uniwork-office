@@ -151,6 +151,7 @@ export const zhTW = {
   ribbonStyleIntenseReference: '明顯參考',
   ribbonStyleBookTitle: '書名',
   ribbonStyleListParagraph: '清單段落',
+  ribbonTableStyleGrid: '表格格線',
   ribbonStylesPane: '樣式窗格',
   ribbonStylesPaneTip: '開啟樣式窗格：檢視、套用和修改文件中的全部樣式',
   ribbonStylesSearch: '搜尋樣式',

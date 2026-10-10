@@ -264,10 +264,11 @@ export function AiPanel({
   const asideRef = useRef<HTMLElement>(null)
 
   // The .ai-dock wrapper owns the animated width (docs-style 180ms slide);
-  // it tracks the resizable panel width through this variable
+  // it tracks the resizable panel width through this variable, set one level up (.app-main) so the
+  // toasts, which sit beside the dock, can centre on the document area instead of the window
   useEffect(() => {
-    const dock = asideRef.current?.closest('.ai-dock') as HTMLElement | null
-    dock?.style.setProperty('--ai-panel-width', `${panelWidth}px`)
+    const main = asideRef.current?.closest('.app-main') as HTMLElement | null
+    main?.style.setProperty('--ai-panel-width', `${panelWidth}px`)
   }, [panelWidth])
   const settingsRef = useRef<AiSettings | null>(null)
 
