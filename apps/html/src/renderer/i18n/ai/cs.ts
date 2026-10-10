@@ -175,4 +175,6 @@ export const cs = {
   aiStarterAnnouncementPrompt: 'Sepiš mi oznámení o produktu. Produkt a klíčové body: ',
   aiStarterGuide: 'Napsat návod',
   aiStarterGuidePrompt: 'Napiš mi návod krok za krokem. Postup, který má vysvětlit: ',
+  aiViewOnlyNotice:
+    'Dokument jen pro čtení: AI jej může číst a odpovídat na otázky, ale nemůže jej upravovat.',
 } satisfies Record<keyof typeof zh, string>

@@ -232,4 +232,6 @@ export const de = {
   aiSumTemplatesEmpty: 'Stilvorlagen (leer)',
   aiSumListTemplates: '{count} Stilvorlagen aufgelistet',
   aiPageCloudToLocal: 'Cloud nicht verfügbar — lokal generiert',
+  aiViewOnlyNotice:
+    'Schreibgeschütztes Dokument: Die KI kann es lesen und Fragen beantworten, aber nicht bearbeiten.',
 } satisfies Record<keyof typeof zh, string>

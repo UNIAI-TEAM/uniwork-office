@@ -98,4 +98,6 @@ export const ja = {
   aiScopeRangeTip:
     'AI は「この列 / これらの行 / 選択部分」をこの範囲として解釈します。送信すると今回の実行中は固定されます',
   aiScopeClearTitle: '範囲指定を解除してシート全体を対象にする',
+  aiViewOnlyNotice:
+    '閲覧専用のドキュメント: AI は内容の読み取りと質問への回答はできますが、編集はできません。',
 } satisfies Record<keyof typeof zh, string>

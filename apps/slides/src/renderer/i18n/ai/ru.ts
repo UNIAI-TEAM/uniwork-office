@@ -229,4 +229,6 @@ export const ru = {
   aiSumTemplatesEmpty: 'Шаблоны стиля (пусто)',
   aiSumListTemplates: 'Показано шаблонов стиля: {count}',
   aiPageCloudToLocal: 'Облако недоступно — создано локально',
+  aiViewOnlyNotice:
+    'Документ только для просмотра: ИИ может читать его и отвечать на вопросы, но не может редактировать.',
 } satisfies Record<keyof typeof zh, string>

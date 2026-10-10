@@ -285,9 +285,9 @@ export interface Props {
   editing: boolean
   autoSave: boolean
   onAutoSaveChange: (on: boolean) => void
-  /** UniWork working copy: AutoSave toggle disabled (with a tooltip) and Save stays enabled while clean */
+  /** UniWork working copy: no AutoSave toggle, and Save stays enabled while clean */
   uniworkBound?: boolean
-  /** View-only UniWork document: Save disabled (Save As stays available) */
+  /** View-only UniWork document: Save and the AI actions that edit the deck are disabled (Save As stays available) */
   uniworkReadOnly?: boolean
   onOpen: () => void
   onSave: () => void
@@ -602,6 +602,7 @@ export interface RibbonTabCtx extends Pick<
   | 'onAddSlide'
   | 'onAddSlideWithLayout'
   | 'onAiPreset'
+  | 'uniworkReadOnly'
   | 'onAlign'
   | 'onDirection'
   | 'onArrange'

@@ -179,4 +179,6 @@ export const pt = {
     'Redija um comunicado de produto para mim. Produto e pontos principais: ',
   aiStarterGuide: 'Escrever um guia prático',
   aiStarterGuidePrompt: 'Escreva um guia prático para mim. O processo a explicar: ',
+  aiViewOnlyNotice:
+    'Documento somente leitura: a IA pode lê-lo e responder a perguntas, mas não pode editá-lo.',
 } satisfies Record<keyof typeof zh, string>

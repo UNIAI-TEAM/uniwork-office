@@ -229,4 +229,6 @@ export const id = {
   aiSumTemplatesEmpty: 'Daftar templat gaya (kosong)',
   aiSumListTemplates: 'Menampilkan {count} templat gaya',
   aiPageCloudToLocal: 'Awan tidak tersedia — dibuat secara lokal',
+  aiViewOnlyNotice:
+    'Dokumen hanya-lihat: AI dapat membaca dan menjawab pertanyaan, tetapi tidak dapat mengedit.',
 } satisfies Record<keyof typeof zh, string>

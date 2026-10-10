@@ -185,4 +185,6 @@ export const nl = {
   aiCmdImages: '{count} afbeelding(en) bijgewerkt',
   aiCmdToc: 'Inhoudsopgave ingevoegd ({count} vermeldingen)',
   aiCmdSkipped: ' ({count} beveiligde blok(ken) overgeslagen)',
+  aiViewOnlyNotice:
+    'Alleen-lezen document: AI kan het lezen en vragen beantwoorden, maar niet bewerken.',
 } satisfies Record<keyof typeof zh, string>

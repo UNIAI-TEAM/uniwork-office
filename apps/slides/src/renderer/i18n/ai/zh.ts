@@ -220,4 +220,5 @@ export const zh = {
   aiSumTemplatesEmpty: '风格模板列表（空）',
   aiSumListTemplates: '列出 {count} 个风格模板',
   aiPageCloudToLocal: '云端不可用,已本地生成',
+  aiViewOnlyNotice: '仅查看文档:AI 可以阅读并回答问题,但无法编辑。',
 }

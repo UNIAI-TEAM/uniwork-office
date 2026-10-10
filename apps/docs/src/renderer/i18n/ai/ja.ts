@@ -183,4 +183,6 @@ export const ja = {
   aiCmdImages: '{count} 枚の画像を更新しました',
   aiCmdToc: '目次を挿入しました({count} 項目)',
   aiCmdSkipped: '({count} 個の保護されたブロックをスキップ)',
+  aiViewOnlyNotice:
+    '閲覧専用のドキュメント: AI は内容の読み取りと質問への回答はできますが、編集はできません。',
 } satisfies Record<keyof typeof zh, string>

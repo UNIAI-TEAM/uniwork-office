@@ -323,6 +323,8 @@ interface RibbonProps {
   darkPage: boolean
   onDarkPage: (v: boolean) => void
   onAiPreset: (instruction: string) => void
+  /** view-only UniWork document: the AI actions that edit it are off (read-only ones stay) */
+  aiEditLocked?: boolean
   /** external request (e.g. native menu Page Setup) to switch to a specific tab */
   tabRequest?: { tab: string; nonce: number } | null
   header: HeaderFooter | null
@@ -760,6 +762,7 @@ function RibbonInner({
   darkPage,
   onDarkPage,
   onAiPreset,
+  aiEditLocked = false,
   tabRequest,
   header,
   onHeader,
@@ -3068,8 +3071,8 @@ function RibbonInner({
                     </button>
                     <button
                       className="rb-big ai-entry"
-                      disabled={docEmpty}
-                      data-tip={t('aiPolishBtn')}
+                      disabled={docEmpty || aiEditLocked}
+                      data-tip={aiEditLocked ? t('aiViewOnlyNotice') : t('aiPolishBtn')}
                       onClick={() =>
                         onAiPreset(
                           t(
@@ -3106,8 +3109,8 @@ function RibbonInner({
                     </button>
                     <button
                       className="rb-big ai-entry"
-                      disabled={docEmpty}
-                      data-tip={t('aiTidyBtn')}
+                      disabled={docEmpty || aiEditLocked}
+                      data-tip={aiEditLocked ? t('aiViewOnlyNotice') : t('aiTidyBtn')}
                       onClick={() => onAiPreset(t('aiTidyPrompt'))}
                     >
                       <span className="rb-big-icon">
@@ -4143,6 +4146,7 @@ function RibbonInner({
             dropdown={dropdown}
             setDropdown={setDropdown}
             onAiPreset={onAiPreset}
+            aiEditLocked={aiEditLocked}
             commentCount={commentCount}
             openCommentCount={openCommentCount}
             resolvedCommentCount={resolvedCommentCount}

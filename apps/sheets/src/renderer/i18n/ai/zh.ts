@@ -92,4 +92,5 @@ export const zh = {
   aiScopeColumns: '已选中 {names} 共 {count} 列',
   aiScopeRangeTip: 'AI 会把"这一列 / 这些行 / 选中部分"理解为该区域；发送后本轮固定不变',
   aiScopeClearTitle: '取消该区域范围，本次针对整张表',
+  aiViewOnlyNotice: '仅查看文档:AI 可以阅读并回答问题,但无法编辑。',
 }

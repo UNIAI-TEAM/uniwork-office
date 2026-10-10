@@ -260,6 +260,8 @@ export function Ribbon({
   // editor-shaped commands stand down while the pane hides the selection;
   // Save As never does, and Find only while the source view hides its target
   const off = disabled || sourceMode || sourceViewOpen || !editor || !state
+  // read-only AI (summarize) stays available on a view-only copy; the editing presets do not
+  const offUnlessReadOnly = notReady || sourceMode || sourceViewOpen || !editor || !state
   // a view-only copy can still be read: Find, the outline, spellcheck and the
   // (read-only) properties stay on; everything that edits or saves goes off
   const findOff = notReady || sourceViewOpen
@@ -360,17 +362,14 @@ export function Ribbon({
         >
           <IconSearch size={16} />
         </button>
-        {showAutoSave && (
-          <label
-            className={`autosave-toggle${autoSave && !uniworkBound ? ' on' : ''}`}
-            data-tip={t(uniworkBound ? 'autoSaveUniworkOff' : 'autoSaveTip')}
-          >
+        {/* product rule: a UniWork document is only written by an explicit Save, so it has no AutoSave switch */}
+        {showAutoSave && !uniworkBound && (
+          <label className={`autosave-toggle${autoSave ? ' on' : ''}`} data-tip={t('autoSaveTip')}>
             <span className="autosave-knob" />
             <span className="autosave-text">{t('autoSave')}</span>
             <input
               type="checkbox"
-              checked={autoSave && !uniworkBound}
-              disabled={uniworkBound}
+              checked={autoSave}
               onChange={(e) => onToggleAutoSave(e.target.checked)}
             />
           </label>
@@ -387,7 +386,7 @@ export function Ribbon({
                   type="button"
                   className={`rb-big ai-entry${aiOpen ? ' active' : ''}`}
                   data-tip={t('aiOpenAssistant')}
-                  disabled={disabled}
+                  disabled={notReady}
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={onToggleAi}
                 >
@@ -401,8 +400,8 @@ export function Ribbon({
                     key={kind}
                     type="button"
                     className="rb-big ai-entry"
-                    data-tip={t(btn)}
-                    disabled={off || state?.empty}
+                    data-tip={readOnly && kind !== 'summarize' ? t('aiViewOnlyNotice') : t(btn)}
+                    disabled={(kind === 'summarize' ? offUnlessReadOnly : off) || state?.empty}
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => onAiPreset(prompt())}
                   >

@@ -228,4 +228,5 @@ export const ko = {
   aiSumTemplatesEmpty: '스타일 템플릿 목록(비어 있음)',
   aiSumListTemplates: '스타일 템플릿 {count}개 나열',
   aiPageCloudToLocal: '클라우드 생성 불가 — 로컬로 생성',
+  aiViewOnlyNotice: '보기 전용 문서: AI는 내용을 읽고 질문에 답할 수 있지만 편집할 수는 없습니다.',
 } satisfies Record<keyof typeof zh, string>

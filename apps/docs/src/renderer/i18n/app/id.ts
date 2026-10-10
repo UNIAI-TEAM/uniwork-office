@@ -205,8 +205,6 @@ export const id = {
   appFootnotePlaceholder: 'Teks catatan kaki…',
   appEndnotePlaceholder: 'Teks catatan akhir…',
   appAutoSave: 'Simpan Otomatis',
-  appAutoSaveUniworkTip:
-    'Simpan otomatis dinonaktifkan untuk dokumen UniWork. Gunakan Simpan untuk menyimpan versi baru.',
   appAutoSaveTip: 'Simpan otomatis (setiap 30 detik dan saat jendela kehilangan fokus)',
   appSaveShortcutTip: 'Simpan (⌘S)',
   appUndo: 'Urungkan',

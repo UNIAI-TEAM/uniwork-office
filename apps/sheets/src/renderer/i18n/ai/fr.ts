@@ -100,4 +100,6 @@ export const fr = {
   aiScopeRangeTip:
     "L'IA interprète « cette colonne / ces lignes / la partie sélectionnée » comme cette plage, figée pendant toute l'exécution dès l'envoi",
   aiScopeClearTitle: 'Retirer la portée de la plage et viser toute la feuille',
+  aiViewOnlyNotice:
+    'Document en lecture seule : l’IA peut le lire et répondre à des questions, mais ne peut pas le modifier.',
 } satisfies Record<keyof typeof zh, string>

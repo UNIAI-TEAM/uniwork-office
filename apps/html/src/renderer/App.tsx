@@ -1589,6 +1589,7 @@ export default function App() {
               onQueueClear={() => setEditQueue([])}
               onQueueFocus={queueFocus}
               onQueueConsume={queueConsume}
+              readOnly={uniwork.readOnly}
               onCollapse={() => setAiOpen(false)}
             />
           </div>
@@ -1663,7 +1664,7 @@ export default function App() {
                       onReplaceImage={replaceImage}
                       onCropImage={() => void openPictureDialog('crop')}
                       onCutoutImage={() => void openPictureDialog('cutout')}
-                      canAskAi={askTarget !== null}
+                      canAskAi={askTarget !== null && !uniwork.readOnly}
                       onAskAi={askAi}
                       tag={selectedEntry.tag}
                       onMove={moveSelected}
@@ -1787,7 +1788,7 @@ export default function App() {
           </footer>
         </div>
       </div>
-      {aiEnabled && askTarget && askMode && canvasMode !== 'present' && (
+      {aiEnabled && askTarget && askMode && canvasMode !== 'present' && !uniwork.readOnly && (
         <AiAskPopover
           key={askMode.kind === 'edit' ? askMode.qid : 'new'}
           target={askTarget}

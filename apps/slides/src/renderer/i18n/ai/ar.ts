@@ -226,4 +226,6 @@ export const ar = {
   aiSumTemplatesEmpty: 'قوالب الأنماط (فارغ)',
   aiSumListTemplates: 'سرد {count} من قوالب الأنماط',
   aiPageCloudToLocal: 'السحابة غير متاحة — تم التوليد محليًا',
+  aiViewOnlyNotice:
+    'مستند للعرض فقط: يمكن للذكاء الاصطناعي قراءته والإجابة عن الأسئلة، لكنه لا يستطيع تعديله.',
 } satisfies Record<keyof typeof zh, string>

@@ -182,4 +182,6 @@ export const en = {
   aiCmdImages: 'Updated {count} image(s)',
   aiCmdToc: 'Inserted a table of contents ({count} entries)',
   aiCmdSkipped: ' ({count} protected block(s) skipped)',
+  aiViewOnlyNotice:
+    'View-only document: AI can read it and answer questions, but editing is turned off.',
 } satisfies Record<keyof typeof zh, string>

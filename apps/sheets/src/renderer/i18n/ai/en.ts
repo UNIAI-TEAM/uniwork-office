@@ -99,4 +99,6 @@ export const en = {
   aiScopeRangeTip:
     'AI reads "this column / these rows / the selected part" as this range, and it stays fixed for the run once you send',
   aiScopeClearTitle: 'Drop the range scope and target the whole sheet',
+  aiViewOnlyNotice:
+    'View-only document: AI can read it and answer questions, but editing is turned off.',
 } satisfies Record<keyof typeof zh, string>

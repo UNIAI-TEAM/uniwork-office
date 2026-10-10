@@ -6581,7 +6581,7 @@ export default function App() {
                     <button
                       className="rb-big ai-entry"
                       disabled={readOnly}
-                      data-tip={t('aiProcessNotesBtn')}
+                      data-tip={readOnly ? t('aiViewOnlyNotice') : t('aiProcessNotesBtn')}
                       onClick={() => runAiPreset(t('aiProcessNotesPrompt'))}
                     >
                       <span className="rb-big-icon">
@@ -6771,7 +6771,7 @@ export default function App() {
                     <button
                       className="rb-big ai-entry"
                       disabled={readOnly}
-                      data-tip={t('aiFillFormBtn')}
+                      data-tip={readOnly ? t('aiViewOnlyNotice') : t('aiFillFormBtn')}
                       onClick={() => runAiPreset(t('aiFillFormPrompt'))}
                     >
                       <span className="rb-big-icon">
@@ -7120,6 +7120,7 @@ export default function App() {
               preset={aiPreset}
               open={!aiCollapsed}
               onCollapse={() => setAiCollapsed(true)}
+              readOnly={readOnly}
               onRunDone={() => void autoSaveAfterAiRun()}
               onClearSelection={() => setAiSelection(null)}
             />

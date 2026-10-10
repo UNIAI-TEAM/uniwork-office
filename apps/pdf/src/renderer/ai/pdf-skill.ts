@@ -44,6 +44,22 @@ const SYSTEM_PROMPT = `You are UniWork PDF's assistant, helping the user read, a
 /** Selection text cap in the per-message context (the context is resent every run) */
 const SELECTION_CONTEXT_CHARS = 12_000
 
+/** the only tools a view-only document keeps: they read, search or navigate, none writes the document */
+export const READ_ONLY_TOOLS: ReadonlySet<string> = new Set([
+  'read_pages',
+  'search_text',
+  'goto_page',
+  'read_annotations',
+  'list_inserted_text',
+  'list_page_images',
+  'list_form_fields',
+  'get_outline',
+  'image_search',
+])
+
+const VIEW_ONLY_NOTE =
+  '\n\nNote: this document is view-only. You can read it, search it and answer questions about it, but you cannot change it: no editing tools are available. If the user asks for a change, explain that the document is view-only and that they can save a copy to edit it.'
+
 const IMAGE_GEN_OFF_NOTE =
   '\n\nNote: generate_image is currently unavailable (no image model is configured under Settings → AI media). Do not call or promise it; use image_search for imagery.'
 
@@ -52,12 +68,14 @@ export function createPdfSkill(deps: PdfAiDeps): AgentSkill {
     id: 'pdf',
     // live like tools: the off-note overrides the prose that still mentions generate_image
     get systemPrompt() {
+      if (deps.readOnly()) return SYSTEM_PROMPT + VIEW_ONLY_NOTE
       return deps.imageGenAvailable?.() === false
         ? SYSTEM_PROMPT + IMAGE_GEN_OFF_NOTE
         : SYSTEM_PROMPT
     },
     // live view: the predicate is re-read before every model request
     get tools() {
+      if (deps.readOnly()) return AGENT_TOOLS.filter((t) => READ_ONLY_TOOLS.has(t.name))
       return deps.imageGenAvailable?.() === false
         ? AGENT_TOOLS.filter((t) => t.name !== 'generate_image')
         : AGENT_TOOLS
@@ -97,6 +115,16 @@ export function createPdfSkill(deps: PdfAiDeps): AgentSkill {
       }
       return parts.join('\n')
     },
-    executeTool: (call, signal) => executePdfTool(deps, call, signal),
+    executeTool: (call, signal) => {
+      if (deps.readOnly() && !READ_ONLY_TOOLS.has(call.name)) {
+        return {
+          output: 'This document is view-only; it cannot be edited.',
+          isError: true,
+          mutated: false,
+          summary: call.name,
+        }
+      }
+      return executePdfTool(deps, call, signal)
+    },
   }
 }

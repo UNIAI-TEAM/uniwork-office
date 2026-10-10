@@ -187,4 +187,6 @@ export const it = {
   aiCmdImages: '{count} immagine/i aggiornata/e',
   aiCmdToc: 'Sommario inserito ({count} voci)',
   aiCmdSkipped: ' ({count} blocco/i protetto/i ignorato/i)',
+  aiViewOnlyNotice:
+    'Documento di sola lettura: l’IA può leggerlo e rispondere a domande, ma non può modificarlo.',
 } satisfies Record<keyof typeof zh, string>

@@ -1,5 +1,6 @@
 export const strings = {
   zh: {
+    aiViewOnlyNotice: '仅查看文档:AI 可以阅读并回答问题,但无法编辑。',
     renameNeedsSave: '先保存或放弃改动，再改文件后缀',
     appExportingImages: '正在导出图片…',
     appExportImagesProgress: '正在导出 {count} 张图片…',
@@ -127,7 +128,6 @@ export const strings = {
     ribbonCollapse: '折叠功能区',
     ribbonExpand: '展开功能区',
     autoSaveTip: '自动保存(每 30 秒及窗口失焦时)',
-    autoSaveUniworkOff: 'UniWork 文档不使用自动保存。请用“保存”来保存新版本。',
     bold: '加粗',
     italic: '斜体',
     strike: '删除线',
@@ -230,6 +230,8 @@ export const strings = {
     zoomOut: '缩小',
   },
   en: {
+    aiViewOnlyNotice:
+      'View-only document: AI can read it and answer questions, but editing is turned off.',
     renameNeedsSave: 'Save or discard your changes before changing the extension',
     appExportingImages: 'Exporting images…',
     appExportImagesProgress: 'Exporting {count} images…',
@@ -362,7 +364,6 @@ export const strings = {
     ribbonCollapse: 'Collapse the Ribbon',
     ribbonExpand: 'Expand the Ribbon',
     autoSaveTip: 'AutoSave (every 30 seconds and when the window loses focus)',
-    autoSaveUniworkOff: 'AutoSave is off for UniWork documents. Use Save to save a new version.',
     bold: 'Bold',
     italic: 'Italic',
     strike: 'Strikethrough',
@@ -467,6 +468,8 @@ export const strings = {
     zoomOut: 'Zoom out',
   },
   vi: {
+    aiViewOnlyNotice:
+      'Tài liệu chỉ xem: AI có thể đọc và trả lời câu hỏi, nhưng không thể chỉnh sửa.',
     renameNeedsSave: 'Hãy lưu hoặc hủy thay đổi trước khi đổi phần mở rộng',
     appExportingImages: 'Đang xuất hình ảnh…',
     appExportImagesProgress: 'Đang xuất {count} hình ảnh…',
@@ -598,8 +601,6 @@ export const strings = {
     ribbonCollapse: 'Thu gọn Ribbon',
     ribbonExpand: 'Mở rộng Ribbon',
     autoSaveTip: 'Tự động lưu (mỗi 30 giây và khi cửa sổ mất tiêu điểm)',
-    autoSaveUniworkOff:
-      'Tự động lưu đã tắt cho tài liệu UniWork. Hãy dùng Lưu để lưu phiên bản mới.',
     bold: 'In đậm',
     italic: 'In nghiêng',
     strike: 'Gạch ngang',
@@ -703,6 +704,8 @@ export const strings = {
     zoomOut: 'Thu nhỏ',
   },
   ja: {
+    aiViewOnlyNotice:
+      '閲覧専用のドキュメント: AI は内容の読み取りと質問への回答はできますが、編集はできません。',
     renameNeedsSave: '拡張子を変更する前に変更を保存または破棄してください',
     appExportingImages: '画像をエクスポート中…',
     appExportImagesProgress: '{count} 枚の画像をエクスポート中…',
@@ -833,8 +836,6 @@ export const strings = {
     ribbonCollapse: 'リボンを折りたたむ',
     ribbonExpand: 'リボンを展開する',
     autoSaveTip: '自動保存(30 秒ごと、およびウィンドウのフォーカスが外れたとき)',
-    autoSaveUniworkOff:
-      'UniWork のドキュメントでは自動保存はオフです。新しいバージョンを保存するには「保存」を使ってください。',
     bold: '太字',
     italic: '斜体',
     strike: '取り消し線',
@@ -939,6 +940,8 @@ export const strings = {
     zoomOut: '縮小',
   },
   ko: {
+    aiViewOnlyNotice:
+      '보기 전용 문서: AI는 내용을 읽고 질문에 답할 수 있지만 편집할 수는 없습니다.',
     renameNeedsSave: '확장자를 바꾸기 전에 변경 사항을 저장하거나 버리세요',
     appExportingImages: '이미지 내보내는 중…',
     appExportImagesProgress: '이미지 {count}장 내보내는 중…',
@@ -1070,8 +1073,6 @@ export const strings = {
     ribbonCollapse: '리본 축소',
     ribbonExpand: '리본 확장',
     autoSaveTip: '자동 저장(30초마다, 창 포커스가 해제될 때)',
-    autoSaveUniworkOff:
-      'UniWork 문서에서는 자동 저장이 꺼져 있습니다. 새 버전을 저장하려면 ‘저장’을 사용하세요.',
     bold: '굵게',
     italic: '기울임꼴',
     strike: '취소선',
@@ -1176,6 +1177,8 @@ export const strings = {
     zoomOut: '축소',
   },
   fr: {
+    aiViewOnlyNotice:
+      'Document en lecture seule : l’IA peut le lire et répondre à des questions, mais ne peut pas le modifier.',
     renameNeedsSave: "Enregistrez ou annulez vos modifications avant de changer l'extension",
     appExportingImages: 'Exportation des images…',
     appExportImagesProgress: 'Exportation de {count} images…',
@@ -1310,8 +1313,6 @@ export const strings = {
     ribbonExpand: 'Développer le ruban',
     autoSaveTip:
       'Enregistrement automatique (toutes les 30 secondes et lorsque la fenêtre perd le focus)',
-    autoSaveUniworkOff:
-      'L’enregistrement automatique est désactivé pour les documents UniWork. Utilisez Enregistrer pour enregistrer une nouvelle version.',
     bold: 'Gras',
     italic: 'Italique',
     strike: 'Barré',
@@ -1418,6 +1419,8 @@ export const strings = {
     zoomOut: 'Zoom arrière',
   },
   de: {
+    aiViewOnlyNotice:
+      'Schreibgeschütztes Dokument: Die KI kann es lesen und Fragen beantworten, aber nicht bearbeiten.',
     renameNeedsSave:
       'Speichern oder verwerfen Sie Ihre Änderungen, bevor Sie die Erweiterung ändern',
     appExportingImages: 'Bilder werden exportiert…',
@@ -1553,8 +1556,6 @@ export const strings = {
     ribbonExpand: 'Menüband erweitern',
     autoSaveTip:
       'Automatisches Speichern (alle 30 Sekunden und wenn das Fenster den Fokus verliert)',
-    autoSaveUniworkOff:
-      'Automatisches Speichern ist für UniWork-Dokumente ausgeschaltet. Verwenden Sie „Speichern“, um eine neue Version zu speichern.',
     bold: 'Fett',
     italic: 'Kursiv',
     strike: 'Durchgestrichen',
@@ -1660,6 +1661,8 @@ export const strings = {
     zoomOut: 'Verkleinern',
   },
   es: {
+    aiViewOnlyNotice:
+      'Documento de solo lectura: la IA puede leerlo y responder preguntas, pero no puede editarlo.',
     renameNeedsSave: 'Guarda o descarta los cambios antes de cambiar la extensión',
     appExportingImages: 'Exportando imágenes…',
     appExportImagesProgress: 'Exportando {count} imágenes…',
@@ -1793,8 +1796,6 @@ export const strings = {
     ribbonCollapse: 'Contraer la cinta de opciones',
     ribbonExpand: 'Expandir la cinta de opciones',
     autoSaveTip: 'Autoguardado (cada 30 segundos y cuando la ventana pierde el foco)',
-    autoSaveUniworkOff:
-      'El autoguardado está desactivado para los documentos de UniWork. Usa Guardar para guardar una versión nueva.',
     bold: 'Negrita',
     italic: 'Cursiva',
     strike: 'Tachado',
@@ -1902,6 +1903,7 @@ export const strings = {
     zoomOut: 'Alejar',
   },
   th: {
+    aiViewOnlyNotice: 'เอกสารแบบดูอย่างเดียว: AI อ่านและตอบคำถามได้ แต่แก้ไขไม่ได้',
     renameNeedsSave: 'บันทึกหรือยกเลิกการเปลี่ยนแปลงก่อนเปลี่ยนนามสกุลไฟล์',
     appExportingImages: 'กำลังส่งออกรูปภาพ…',
     appExportImagesProgress: 'กำลังส่งออกรูปภาพ {count} รูป…',
@@ -2030,8 +2032,6 @@ export const strings = {
     ribbonCollapse: 'ยุบ Ribbon',
     ribbonExpand: 'ขยาย Ribbon',
     autoSaveTip: 'บันทึกอัตโนมัติ (ทุก 30 วินาทีและเมื่อหน้าต่างไม่ได้โฟกัส)',
-    autoSaveUniworkOff:
-      'การบันทึกอัตโนมัติปิดอยู่สำหรับเอกสาร UniWork ใช้ “บันทึก” เพื่อบันทึกเวอร์ชันใหม่',
     bold: 'ตัวหนา',
     italic: 'ตัวเอียง',
     strike: 'ขีดฆ่า',
@@ -2136,6 +2136,8 @@ export const strings = {
     zoomOut: 'ย่อ',
   },
   id: {
+    aiViewOnlyNotice:
+      'Dokumen hanya-lihat: AI dapat membaca dan menjawab pertanyaan, tetapi tidak dapat mengedit.',
     renameNeedsSave: 'Simpan atau batalkan perubahan Anda sebelum mengubah ekstensi',
     appExportingImages: 'Mengekspor gambar…',
     appExportImagesProgress: 'Mengekspor {count} gambar…',
@@ -2267,8 +2269,6 @@ export const strings = {
     ribbonCollapse: 'Ciutkan Pita',
     ribbonExpand: 'Perluas Pita',
     autoSaveTip: 'Simpan otomatis (setiap 30 detik dan saat jendela kehilangan fokus)',
-    autoSaveUniworkOff:
-      'Simpan otomatis dinonaktifkan untuk dokumen UniWork. Gunakan Simpan untuk menyimpan versi baru.',
     bold: 'Tebal',
     italic: 'Miring',
     strike: 'Coret',
@@ -2373,6 +2373,8 @@ export const strings = {
     zoomOut: 'Perkecil',
   },
   ru: {
+    aiViewOnlyNotice:
+      'Документ только для просмотра: ИИ может читать его и отвечать на вопросы, но не может редактировать.',
     renameNeedsSave: 'Сохраните или отмените изменения перед сменой расширения',
     appExportingImages: 'Экспорт изображений…',
     appExportImagesProgress: 'Экспорт {count} изображений…',
@@ -2505,8 +2507,6 @@ export const strings = {
     ribbonCollapse: 'Свернуть ленту',
     ribbonExpand: 'Развернуть ленту',
     autoSaveTip: 'Автосохранение (каждые 30 секунд и при потере фокуса окном)',
-    autoSaveUniworkOff:
-      'Автосохранение отключено для документов UniWork. Нажмите «Сохранить», чтобы сохранить новую версию.',
     bold: 'Полужирный',
     italic: 'Курсив',
     strike: 'Зачёркнутый',
@@ -2611,6 +2611,8 @@ export const strings = {
     zoomOut: 'Уменьшить',
   },
   ar: {
+    aiViewOnlyNotice:
+      'مستند للعرض فقط: يمكن للذكاء الاصطناعي قراءته والإجابة عن الأسئلة، لكنه لا يستطيع تعديله.',
     renameNeedsSave: 'احفظ تغييراتك أو تجاهلها قبل تغيير الامتداد',
     appExportingImages: 'جارٍ تصدير الصور…',
     appExportImagesProgress: 'جارٍ تصدير {count} صورة…',
@@ -2739,7 +2741,6 @@ export const strings = {
     ribbonCollapse: 'طي الشريط',
     ribbonExpand: 'توسيع الشريط',
     autoSaveTip: 'حفظ تلقائي (كل 30 ثانية وعند فقدان النافذة للتركيز)',
-    autoSaveUniworkOff: 'الحفظ التلقائي متوقف لمستندات UniWork. استخدم «حفظ» لحفظ إصدار جديد.',
     bold: 'غامق',
     italic: 'مائل',
     strike: 'يتوسطه خط',
@@ -2844,6 +2845,8 @@ export const strings = {
     zoomOut: 'تصغير',
   },
   pt: {
+    aiViewOnlyNotice:
+      'Documento somente leitura: a IA pode lê-lo e responder a perguntas, mas não pode editá-lo.',
     renameNeedsSave: 'Salve ou descarte as alterações antes de mudar a extensão',
     appExportingImages: 'Exportando imagens…',
     appExportImagesProgress: 'Exportando {count} imagens…',
@@ -2977,8 +2980,6 @@ export const strings = {
     ribbonCollapse: 'Recolher a Faixa de Opções',
     ribbonExpand: 'Expandir a Faixa de Opções',
     autoSaveTip: 'Salvamento automático (a cada 30 segundos e quando a janela perde o foco)',
-    autoSaveUniworkOff:
-      'O salvamento automático está desativado para documentos do UniWork. Use Salvar para salvar uma nova versão.',
     bold: 'Negrito',
     italic: 'Itálico',
     strike: 'Tachado',
@@ -3084,6 +3085,8 @@ export const strings = {
     zoomOut: 'Reduzir',
   },
   it: {
+    aiViewOnlyNotice:
+      'Documento di sola lettura: l’IA può leggerlo e rispondere a domande, ma non può modificarlo.',
     renameNeedsSave: "Salva o annulla le modifiche prima di cambiare l'estensione",
     appExportingImages: 'Esportazione delle immagini…',
     appExportImagesProgress: 'Esportazione di {count} immagini…',
@@ -3217,8 +3220,6 @@ export const strings = {
     ribbonCollapse: 'Riduci a icona la barra multifunzione',
     ribbonExpand: 'Espandi la barra multifunzione',
     autoSaveTip: 'Salvataggio automatico (ogni 30 secondi e quando la finestra perde il focus)',
-    autoSaveUniworkOff:
-      'Il salvataggio automatico è disattivato per i documenti UniWork. Usa Salva per salvare una nuova versione.',
     bold: 'Grassetto',
     italic: 'Corsivo',
     strike: 'Barrato',
@@ -3324,6 +3325,8 @@ export const strings = {
     zoomOut: 'Riduci',
   },
   pl: {
+    aiViewOnlyNotice:
+      'Dokument tylko do odczytu: AI może go czytać i odpowiadać na pytania, ale nie może go edytować.',
     renameNeedsSave: 'Zapisz lub odrzuć zmiany przed zmianą rozszerzenia',
     appExportingImages: 'Eksportowanie obrazów…',
     appExportImagesProgress: 'Eksportowanie {count} obrazów…',
@@ -3456,8 +3459,6 @@ export const strings = {
     ribbonCollapse: 'Zwiń Wstążkę',
     ribbonExpand: 'Rozwiń Wstążkę',
     autoSaveTip: 'Autozapis (co 30 sekund oraz gdy okno traci fokus)',
-    autoSaveUniworkOff:
-      'Autozapis jest wyłączony dla dokumentów UniWork. Użyj opcji Zapisz, aby zapisać nową wersję.',
     bold: 'Pogrubienie',
     italic: 'Kursywa',
     strike: 'Przekreślenie',
@@ -3562,6 +3563,8 @@ export const strings = {
     zoomOut: 'Pomniejsz',
   },
   cs: {
+    aiViewOnlyNotice:
+      'Dokument jen pro čtení: AI jej může číst a odpovídat na otázky, ale nemůže jej upravovat.',
     renameNeedsSave: 'Před změnou přípony uložte nebo zrušte změny',
     appExportingImages: 'Exportují se obrázky…',
     appExportImagesProgress: 'Exportuje se {count} obrázků…',
@@ -3682,8 +3685,6 @@ export const strings = {
     ribbonCollapse: 'Sbalit pás karet',
     ribbonExpand: 'Rozbalit pás karet',
     autoSaveTip: 'Automatické ukládání (každých 30 sekund a při ztrátě fokusu okna)',
-    autoSaveUniworkOff:
-      'Automatické ukládání je pro dokumenty UniWork vypnuté. Novou verzi uložíte příkazem Uložit.',
     bold: 'Tučné',
     italic: 'Kurzíva',
     strike: 'Přeškrtnuté',
@@ -3799,6 +3800,8 @@ export const strings = {
     viewOnly: 'Pouze pro čtení',
   },
   nl: {
+    aiViewOnlyNotice:
+      'Alleen-lezen document: AI kan het lezen en vragen beantwoorden, maar niet bewerken.',
     renameNeedsSave: 'Sla uw wijzigingen op of verwerp ze voordat u de extensie wijzigt',
     appExportingImages: 'Afbeeldingen exporteren…',
     appExportImagesProgress: '{count} afbeeldingen exporteren…',
@@ -3932,8 +3935,6 @@ export const strings = {
     ribbonCollapse: 'Het lint samenvouwen',
     ribbonExpand: 'Het lint uitvouwen',
     autoSaveTip: 'Automatisch opslaan (elke 30 seconden en wanneer het venster de focus verliest)',
-    autoSaveUniworkOff:
-      'Automatisch opslaan staat uit voor UniWork-documenten. Gebruik Opslaan om een nieuwe versie op te slaan.',
     bold: 'Vet',
     italic: 'Cursief',
     strike: 'Doorhalen',
@@ -4038,6 +4039,8 @@ export const strings = {
     zoomOut: 'Uitzoomen',
   },
   ms: {
+    aiViewOnlyNotice:
+      'Dokumen lihat sahaja: AI boleh membaca dan menjawab soalan, tetapi tidak boleh mengedit.',
     renameNeedsSave: 'Simpan atau buang perubahan anda sebelum menukar sambungan',
     appExportingImages: 'Mengeksport imej…',
     appExportImagesProgress: 'Mengeksport {count} imej…',
@@ -4169,8 +4172,6 @@ export const strings = {
     ribbonCollapse: 'Runtuhkan Reben',
     ribbonExpand: 'Kembangkan Reben',
     autoSaveTip: 'Autosimpan (setiap 30 saat dan apabila tetingkap hilang fokus)',
-    autoSaveUniworkOff:
-      'Simpan automatik dimatikan untuk dokumen UniWork. Gunakan Simpan untuk menyimpan versi baharu.',
     bold: 'Tebal',
     italic: 'Condong',
     strike: 'Garis lorek',
@@ -4275,6 +4276,7 @@ export const strings = {
     zoomOut: 'Zum keluar',
   },
   he: {
+    aiViewOnlyNotice: 'מסמך לצפייה בלבד: ה-AI יכול לקרוא אותו ולענות על שאלות, אך לא לערוך אותו.',
     renameNeedsSave: 'שמור או בטל את השינויים לפני שינוי הסיומת',
     appExportingImages: 'מייצא תמונות…',
     appExportImagesProgress: 'מייצא {count} תמונות…',
@@ -4402,8 +4404,6 @@ export const strings = {
     ribbonCollapse: 'כווץ את רצועת הכלים',
     ribbonExpand: 'הרחב את רצועת הכלים',
     autoSaveTip: 'שמירה אוטומטית (כל 30 שניות וכאשר החלון מאבד מיקוד)',
-    autoSaveUniworkOff:
-      'השמירה האוטומטית כבויה עבור מסמכי UniWork. השתמשו ב״שמירה״ כדי לשמור גרסה חדשה.',
     bold: 'מודגש',
     italic: 'נטוי',
     strike: 'קו חוצה',
@@ -4507,6 +4507,8 @@ export const strings = {
     zoomOut: 'הקטנה',
   },
   hi: {
+    aiViewOnlyNotice:
+      'केवल-देखने योग्य दस्तावेज़: AI इसे पढ़ सकता है और प्रश्नों के उत्तर दे सकता है, लेकिन संपादित नहीं कर सकता।',
     renameNeedsSave: 'एक्सटेंशन बदलने से पहले अपने बदलाव सहेजें या छोड़ें',
     appExportingImages: 'छवियाँ निर्यात की जा रही हैं…',
     appExportImagesProgress: '{count} छवियाँ निर्यात की जा रही हैं…',
@@ -4638,8 +4640,6 @@ export const strings = {
     ribbonCollapse: 'रिबन संक्षिप्त करें',
     ribbonExpand: 'रिबन विस्तृत करें',
     autoSaveTip: 'स्वतः सहेजना (हर 30 सेकंड में और विंडो का फ़ोकस हटने पर)',
-    autoSaveUniworkOff:
-      'UniWork दस्तावेज़ों के लिए ऑटो सेव बंद है। नया संस्करण सहेजने के लिए ‘सहेजें’ का उपयोग करें।',
     bold: 'बोल्ड',
     italic: 'इटैलिक',
     strike: 'स्ट्राइकथ्रू',
@@ -4744,6 +4744,7 @@ export const strings = {
     zoomOut: 'ज़ूम आउट',
   },
   'zh-TW': {
+    aiViewOnlyNotice: '唯讀文件:AI 可以閱讀並回答問題,但無法編輯。',
     renameNeedsSave: '先儲存或捨棄變更，再更改副檔名',
     appExportingImages: '正在匯出圖片…',
     appExportImagesProgress: '正在匯出 {count} 張圖片…',
@@ -4871,7 +4872,6 @@ export const strings = {
     ribbonCollapse: '摺疊功能區',
     ribbonExpand: '展開功能區',
     autoSaveTip: '自動儲存(每 30 秒及視窗失去焦點時)',
-    autoSaveUniworkOff: 'UniWork 文件已關閉自動儲存。請使用「儲存」儲存新版本。',
     bold: '粗體',
     italic: '斜體',
     strike: '刪除線',

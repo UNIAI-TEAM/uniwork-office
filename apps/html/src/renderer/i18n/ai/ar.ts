@@ -173,4 +173,6 @@ export const ar = {
   aiStarterAnnouncementPrompt: 'صِغ لي إعلانًا عن منتج. المنتج والنقاط الرئيسية: ',
   aiStarterGuide: 'كتابة دليل إرشادي',
   aiStarterGuidePrompt: 'اكتب لي دليلًا إرشاديًا. العملية المطلوب شرحها: ',
+  aiViewOnlyNotice:
+    'مستند للعرض فقط: يمكن للذكاء الاصطناعي قراءته والإجابة عن الأسئلة، لكنه لا يستطيع تعديله.',
 } satisfies Record<keyof typeof zh, string>

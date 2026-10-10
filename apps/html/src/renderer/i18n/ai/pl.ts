@@ -176,4 +176,6 @@ export const pl = {
     'Przygotuj dla mnie ogłoszenie o produkcie. Produkt i kluczowe punkty: ',
   aiStarterGuide: 'Napisz poradnik',
   aiStarterGuidePrompt: 'Napisz dla mnie poradnik. Proces do wyjaśnienia: ',
+  aiViewOnlyNotice:
+    'Dokument tylko do odczytu: AI może go czytać i odpowiadać na pytania, ale nie może go edytować.',
 } satisfies Record<keyof typeof zh, string>

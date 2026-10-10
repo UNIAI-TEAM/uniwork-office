@@ -247,6 +247,7 @@ import {
 } from './line-metrics'
 import { saveUntilPersisted } from './save-until-persisted'
 import {
+  autoSaveToggleVisible,
   saveStateLabel,
   setEditorEditable,
   uniworkAllowsSave,
@@ -6839,17 +6840,17 @@ export function App() {
         >
           <IconRedo size={16} />
         </button>
-        {autoSaveToDisk && (
+        {/* product rule: a UniWork document is only written by an explicit Save, so it has no AutoSave switch */}
+        {autoSaveToggleVisible(autoSaveToDisk, uniwork.bound) && (
           <label
-            className={`autosave-toggle ${autoSaveActive ? 'on' : ''}${uniwork.bound ? ' disabled' : ''}`}
-            data-tip={t(uniwork.bound ? 'appAutoSaveUniworkTip' : 'appAutoSaveTip')}
+            className={`autosave-toggle ${autoSaveActive ? 'on' : ''}`}
+            data-tip={t('appAutoSaveTip')}
           >
             <span className="autosave-knob" />
             <span className="autosave-text">{t('appAutoSave')}</span>
             <input
               type="checkbox"
               checked={autoSaveActive}
-              disabled={uniwork.bound}
               onChange={(e) => setAutoSave(e.target.checked)}
             />
           </label>
@@ -7004,6 +7005,7 @@ export function App() {
 .editor-scroll .doc-page.measuring-columns { column-count: auto; width: ${colFlow.colWidthPx + twipsToPx(canvasSection?.marginLeft ?? section?.marginLeft ?? 0) + twipsToPx(canvasSection?.marginRight ?? section?.marginRight ?? 0)}px; }`}</style>
       )}
       <Ribbon
+        aiEditLocked={uniwork.readOnly}
         actionsRef={ribbonActionsRef}
         quickActions={quickActions}
         editor={editor}
@@ -7102,6 +7104,7 @@ export function App() {
               pageSetupAccess={aiPageSetupAccess}
               docExtras={aiDocExtras}
               notesAccess={aiNotesAccess}
+              readOnly={uniwork.readOnly}
             />
           </div>
         )}
@@ -7132,7 +7135,8 @@ export function App() {
                 onClose={closeNav}
               />
             )}
-            {doc && aiEnabled && (
+            {/* the selection popover queues edit instructions: none on a view-only document */}
+            {doc && aiEnabled && !uniwork.readOnly && (
               <AiAskPopover
                 editor={editor}
                 queueFull={editQueue.length >= EDIT_QUEUE_MAX}

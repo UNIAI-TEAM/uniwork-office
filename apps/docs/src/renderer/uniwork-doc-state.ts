@@ -41,6 +41,16 @@ export function uniworkAllowsSave(
   return true
 }
 
+/**
+ * Whether the AutoSave switch is shown. A UniWork document is written only by
+ * an explicit Save (product rule), so it has no AutoSave switch at all, not
+ * even a disabled one. A plain local file keeps it where the platform has a
+ * local path to write.
+ */
+export function autoSaveToggleVisible(platformAutoSave: boolean, bound: boolean): boolean {
+  return platformAutoSave && !bound
+}
+
 /** Query main for the document at `path`; re-queried whenever the path changes. */
 export function useUniworkDocState(path: string | null | undefined): UniworkDocState {
   const [state, setState] = useState<UniworkDocState>(NO_UNIWORK_STATE)

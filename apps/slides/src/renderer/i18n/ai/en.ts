@@ -228,4 +228,6 @@ export const en = {
   aiSumTemplatesEmpty: 'Style templates (empty)',
   aiSumListTemplates: 'Listed {count} style templates',
   aiPageCloudToLocal: 'cloud unavailable — generated locally',
+  aiViewOnlyNotice:
+    'View-only document: AI can read it and answer questions, but editing is turned off.',
 } satisfies Record<keyof typeof zh, string>

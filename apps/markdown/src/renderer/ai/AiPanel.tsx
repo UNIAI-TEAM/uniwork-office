@@ -160,6 +160,7 @@ export function AiPanel({
   onQueueClear,
   onQueueFocus,
   onQueueConsume,
+  readOnly = false,
 }: {
   deps: MarkdownAiDeps
   filePath: string | null
@@ -172,8 +173,12 @@ export function AiPanel({
   onQueueClear?: () => void
   onQueueFocus?: (qid: string) => void
   onQueueConsume?: (qids: string[]) => void
+  /** a view-only UniWork document: the assistant reads and answers, it never edits */
+  readOnly?: boolean
 }): ReactElement {
   const { lang, t } = useI18n()
+  const readOnlyRef = useRef(readOnly)
+  readOnlyRef.current = readOnly
   const [chat, setChat] = useState<ChatEntry[]>([])
   /** a streamed write stopped early: the draft stays in the document until the user keeps or discards it */
   const [activePartial, setActivePartial] = useState<{ blocks: number } | null>(null)
@@ -389,6 +394,7 @@ export function AiPanel({
           () => ({
             write: (spec, onProgress, signal) => runDocWriterRef.current(spec, onProgress, signal),
           }),
+          () => readOnlyRef.current,
         ),
         createSearchSkill(),
       ]),
@@ -985,6 +991,11 @@ export function AiPanel({
       )}
 
       <div className="ai-composer">
+        {readOnly && (
+          <div className="ai-readonly-notice" role="note">
+            {t('aiViewOnlyNotice')}
+          </div>
+        )}
         {activePartial && (
           <div className="ai-queue ai-partial-card" role="group" aria-label={t('aiPartialTitle')}>
             <div className="ai-queue-head">
@@ -1007,7 +1018,7 @@ export function AiPanel({
             </div>
           </div>
         )}
-        {editor && editQueue.length > 0 && (
+        {editor && !readOnly && editQueue.length > 0 && (
           <EditQueueCard
             items={editQueue}
             editor={editor}

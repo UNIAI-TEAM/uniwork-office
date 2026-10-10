@@ -185,4 +185,6 @@ export const fr = {
   aiCmdImages: '{count} image(s) mise(s) à jour',
   aiCmdToc: 'Table des matières insérée ({count} entrées)',
   aiCmdSkipped: ' ({count} bloc(s) protégé(s) ignoré(s))',
+  aiViewOnlyNotice:
+    'Document en lecture seule : l’IA peut le lire et répondre à des questions, mais ne peut pas le modifier.',
 } satisfies Record<keyof typeof zh, string>

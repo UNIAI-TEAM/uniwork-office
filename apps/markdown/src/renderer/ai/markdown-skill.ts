@@ -64,6 +64,16 @@ const AGENT_SYSTEM_PROMPT = [
   '- Keep replies short; the edits themselves are the deliverable. Summarize what you changed in one or two sentences.',
 ].join('\n')
 
+/** the only tools a view-only UniWork document keeps: they read the document, none writes it */
+export const READ_ONLY_TOOLS: ReadonlySet<string> = new Set([
+  'get_document_context',
+  'read_blocks',
+  'read_frontmatter',
+])
+
+const VIEW_ONLY_NOTE =
+  '\n\nNote: this document is view-only. You can read it and answer questions about it, but you cannot edit it: no edit tools are available. If the user asks for a change, explain that the document is view-only and that they can save a copy to edit it.'
+
 const IMAGE_GEN_OFF_NOTE =
   '\n\nNote: generate_image is currently unavailable (no image model is configured under Settings → AI media). Do not call or promise it; use image_search for imagery.'
 
@@ -74,16 +84,20 @@ export function createMarkdownSkill(
   imageGenAvailable?: () => boolean,
   /** streaming long-form writer behind write_document (panel-owned: progress chip, partial keep/discard) */
   getWriter?: () => AiDocWriter | undefined,
+  /** live predicate: a view-only UniWork document, where the assistant may read but never edit */
+  isReadOnly?: () => boolean,
 ): AgentSkill {
   return {
     id: 'markdown',
-    // live: the predicate is re-read before every model request
+    // live: the predicates are re-read before every model request
     get systemPrompt() {
+      if (isReadOnly?.()) return AGENT_SYSTEM_PROMPT + VIEW_ONLY_NOTE
       return imageGenAvailable?.() === false
         ? AGENT_SYSTEM_PROMPT + IMAGE_GEN_OFF_NOTE
         : AGENT_SYSTEM_PROMPT
     },
     get tools() {
+      if (isReadOnly?.()) return AGENT_TOOLS.filter((t) => READ_ONLY_TOOLS.has(t.name))
       return imageGenAvailable?.() === false
         ? AGENT_TOOLS.filter((t) => t.name !== 'generate_image')
         : AGENT_TOOLS
@@ -95,6 +109,13 @@ export function createMarkdownSkill(
       return buildDocContext(editor)
     },
     executeTool: (call, signal) => {
+      if (isReadOnly?.() && !READ_ONLY_TOOLS.has(call.name)) {
+        return {
+          output: 'This document is view-only; it cannot be edited.',
+          isError: true,
+          summary: call.name,
+        }
+      }
       const editor = getEditor()
       if (!editor) {
         return { output: 'editor not ready', isError: true, summary: call.name }

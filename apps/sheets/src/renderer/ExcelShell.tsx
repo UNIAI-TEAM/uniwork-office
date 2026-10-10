@@ -306,9 +306,12 @@ interface ExcelShellProps {
   /// AutoSave toggle in the tab row (docs/slides parity).
   readonly autoSave: boolean
   readonly onAutoSaveChange: (on: boolean) => void
-  /// Non-null: AutoSave is forced off (UniWork document) — the toggle is
-  /// disabled and shows this tooltip instead.
-  readonly autoSaveLockedTip?: string | null
+  /// True for a UniWork document: it is written only by an explicit Save, so the
+  /// AutoSave toggle is not shown at all.
+  readonly autoSaveHidden?: boolean
+  /// UniWork view-only workbook: the AI reads and answers but never edits, so the
+  /// edit-capable AI actions are off (with the reason as tooltip).
+  readonly aiViewOnly?: boolean
   /// Non-null while a floating chart is selected in the grid.
   readonly selectedChart: SelectedChartRibbon | null
   /// Non-null while an editable shape is selected (Shape Format tab).
@@ -530,7 +533,8 @@ export function ExcelShell({
   canRedo,
   autoSave,
   onAutoSaveChange,
-  autoSaveLockedTip = null,
+  autoSaveHidden = false,
+  aiViewOnly = false,
   selectedChart,
   selectedShape,
   selectedTable,
@@ -904,17 +908,16 @@ export function ExcelShell({
           >
             <RedoIcon />
           </button>
-          {cap('autoSave') && (
+          {cap('autoSave') && !autoSaveHidden && (
             <label
-              className={`autosave-toggle ${autoSave ? 'on' : ''} ${autoSaveLockedTip ? 'disabled' : ''}`}
-              data-tip={autoSaveLockedTip ?? t('appAutoSaveTip')}
+              className={`autosave-toggle ${autoSave ? 'on' : ''}`}
+              data-tip={t('appAutoSaveTip')}
             >
               <span className="autosave-knob" />
               <span className="autosave-text">{t('appAutoSave')}</span>
               <input
                 type="checkbox"
                 checked={autoSave}
-                disabled={autoSaveLockedTip !== null}
                 onChange={(e) => onAutoSaveChange(e.target.checked)}
               />
             </label>
@@ -971,6 +974,7 @@ export function ExcelShell({
             setIsCopilotOpen(true)
             onSend(nextPrompt)
           }}
+          aiViewOnly={aiViewOnly}
           aiOpen={isCopilotOpen}
           onAiToggle={() => setIsCopilotOpen((open) => !open)}
         />
@@ -1005,6 +1009,7 @@ export function ExcelShell({
             onCitation={onAiCitation}
             onExpand={() => setIsCopilotOpen(true)}
             onCollapse={() => setIsCopilotOpen(false)}
+            viewOnly={aiViewOnly}
           />
         )}
         <div className="sheet-main">
@@ -1897,6 +1902,7 @@ function Ribbon({
   outlineSummary,
   onCommand,
   onAiRun,
+  aiViewOnly,
   aiOpen,
   onAiToggle,
   onListNames,
@@ -1925,6 +1931,8 @@ function Ribbon({
   readonly calcManual: boolean
   /** Open the AI panel and immediately send the given prompt */
   readonly onAiRun: (prompt: string) => void
+  /** UniWork view-only workbook: the AI actions that edit are disabled */
+  readonly aiViewOnly: boolean
   /** AI side panel visibility (docs/slides parity: the entry button toggles it) */
   readonly aiOpen: boolean
   readonly onAiToggle: () => void
@@ -3251,24 +3259,42 @@ function Ribbon({
           />
         </RibbonGroup>
         <RibbonGroup label={t('appGroupLanguage')}>
-          <div className="ribbon-tool large" data-tip={t('appTranslateTitle')}>
-            <span className="tool-icon-row">
-              <ToolSymbol symbol="文" />
-              <CaretIcon />
-            </span>
-            <span>
-              <strong>{t('appTranslate')}</strong>
-            </span>
-            <MenuSelect
-              cover
-              label={t('appTranslate')}
-              options={TRANSLATE_LANGUAGES.map((language) => ({
-                value: language,
-                label: language,
-              }))}
-              onPick={(language) => onAiRun(t('appTranslatePrompt', { language }))}
-            />
-          </div>
+          {aiViewOnly ? (
+            // translating rewrites the cells: off for a view-only workbook
+            <button
+              type="button"
+              className="ribbon-tool as-button large"
+              disabled
+              data-tip={t('aiViewOnlyNotice')}
+            >
+              <span className="tool-icon-row">
+                <ToolSymbol symbol="文" />
+                <CaretIcon />
+              </span>
+              <span>
+                <strong>{t('appTranslate')}</strong>
+              </span>
+            </button>
+          ) : (
+            <div className="ribbon-tool large" data-tip={t('appTranslateTitle')}>
+              <span className="tool-icon-row">
+                <ToolSymbol symbol="文" />
+                <CaretIcon />
+              </span>
+              <span>
+                <strong>{t('appTranslate')}</strong>
+              </span>
+              <MenuSelect
+                cover
+                label={t('appTranslate')}
+                options={TRANSLATE_LANGUAGES.map((language) => ({
+                  value: language,
+                  label: language,
+                }))}
+                onPick={(language) => onAiRun(t('appTranslatePrompt', { language }))}
+              />
+            </div>
+          )}
         </RibbonGroup>
         <RibbonGroup label={t('appGroupComments')}>
           <RibbonButton

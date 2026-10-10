@@ -5408,6 +5408,12 @@ textarea:focus {
   color: var(--sheets-ai-error);
 }
 
+.ai-view-only-notice {
+  margin-bottom: 7px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
 /* whole-panel drop target highlight */
 .ai-panel-dragover {
   outline: 2px dashed var(--accent);

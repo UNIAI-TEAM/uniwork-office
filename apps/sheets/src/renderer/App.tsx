@@ -199,6 +199,7 @@ import { mergeAttachedWorkbooks } from './merge-workbooks'
 import { createSearchSkill } from './ai/search-skill'
 import { createImageSkill } from './ai/image-skill'
 import { gateSkill } from './ai/skill-gate'
+import { isUniworkViewOnly, restrictToReading } from './ai/view-only-skill'
 import { ATTACHMENT_IMAGE_EXTS } from '../shared/desktop-api'
 import type {
   AttachmentAddResult,
@@ -632,6 +633,10 @@ export function App({
   // A UniWork document saves only on an explicit Save: AutoSave is forced off
   // for it (the stored preference is left alone for local files).
   const autoSaveLocked = uniworkAutoSaveLocked(workbookFile)
+  // UniWork view-only workbook: the AI may read and answer, never edit
+  const aiViewOnly = isUniworkViewOnly(workbookFile)
+  const aiViewOnlyRef = useRef(aiViewOnly)
+  aiViewOnlyRef.current = aiViewOnly
   const autoSaveOn = autoSave && !autoSaveLocked
   // Ref mirror for callbacks captured when an AI run starts
   const autoSaveRef = useRef(autoSaveOn)
@@ -1406,30 +1411,34 @@ export function App({
     agentLoopRef.current = new AgentLoop({
       transport: createElectronTransport(() => aiSettingsRef.current!),
       systemSuffix: aiLangDirective,
-      skill: composeSkills('sheets+files', '', [
-        createWorkbookSkill(sheetsSkillDeps()),
-        gateSkill(createFilesSkill(availableAttachments), () => cap('attachments')),
-        // the web frame offers only what the host grants (ai/skill-gate.ts): no workbook merge
-        // (C11), web search / image search / generation per grant
-        gateSkill(
-          createMergeSkill({
-            getAttachments: availableAttachments,
-            mergePaths: (paths) => {
-              const runtime = univerRef.current
-              if (!runtime) throw new Error(t('appMergeWorkbooksFailed'))
-              return mergeAttachedWorkbooks({ runtime, lazyWorkbookRef, setMessage }, paths)
-            },
-          }),
-          () => cap('mergeWorkbooks'),
-        ),
-        gateSkill(createSearchSkill(), () => cap('webSearch')),
-        createImageSkill(
-          () =>
-            cap('imageGeneration') &&
-            imageGenerationAvailable(aiSettingsRef.current, gskLoggedInRef.current),
-          () => cap('imageSearch'),
-        ),
-      ]),
+      skill: composeSkills(
+        'sheets+files',
+        '',
+        [
+          createWorkbookSkill(sheetsSkillDeps()),
+          gateSkill(createFilesSkill(availableAttachments), () => cap('attachments')),
+          // the web frame offers only what the host grants (ai/skill-gate.ts): no workbook merge
+          // (C11), web search / image search / generation per grant
+          gateSkill(
+            createMergeSkill({
+              getAttachments: availableAttachments,
+              mergePaths: (paths) => {
+                const runtime = univerRef.current
+                if (!runtime) throw new Error(t('appMergeWorkbooksFailed'))
+                return mergeAttachedWorkbooks({ runtime, lazyWorkbookRef, setMessage }, paths)
+              },
+            }),
+            () => cap('mergeWorkbooks'),
+          ),
+          gateSkill(createSearchSkill(), () => cap('webSearch')),
+          createImageSkill(
+            () =>
+              cap('imageGeneration') &&
+              imageGenerationAvailable(aiSettingsRef.current, gskLoggedInRef.current),
+            () => cap('imageSearch'),
+          ),
+        ].map((skill) => restrictToReading(skill, () => aiViewOnlyRef.current)),
+      ),
       events: {
         onText: (text) => {
           if (text) runLastTextRef.current = text
@@ -3597,6 +3606,8 @@ export function App({
    * When apply fails, the preview card stays up as a manual fallback.
    */
   async function autoApplySafePlan(plan: ChangePlan): Promise<ApplyOutcome> {
+    // belt and braces: the view-only skill offers no edit tool, so no plan should arrive
+    if (aiViewOnlyRef.current) return { ok: false, reason: t('aiViewOnlyNotice') }
     if (!(await commitActiveEditor())) {
       return { ok: false, reason: t('appApplyTxFailed') }
     }
@@ -5160,7 +5171,8 @@ export function App({
         onRedo={handleRedo}
         autoSave={autoSaveOn}
         onAutoSaveChange={setAutoSave}
-        autoSaveLockedTip={autoSaveLocked ? t('appAutoSaveUniworkOff') : null}
+        autoSaveHidden={autoSaveLocked}
+        aiViewOnly={aiViewOnly}
         selectedChart={selectedChart}
         selectedShape={selectedShape}
         selectedVisualKind={

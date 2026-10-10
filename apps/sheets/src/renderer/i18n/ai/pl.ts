@@ -98,4 +98,6 @@ export const pl = {
   aiScopeRangeTip:
     'AI rozumie „tę kolumnę / te wiersze / zaznaczoną część” jako ten zakres; po wysłaniu pozostaje on stały przez cały przebieg',
   aiScopeClearTitle: 'Usuń zakres zaznaczenia i obejmij cały arkusz',
+  aiViewOnlyNotice:
+    'Dokument tylko do odczytu: AI może go czytać i odpowiadać na pytania, ale nie może go edytować.',
 } satisfies Record<keyof typeof zh, string>

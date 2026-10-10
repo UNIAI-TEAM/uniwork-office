@@ -39,8 +39,6 @@ export const ru = {
   ribbonSaveTip: 'Сохранить (⌘S)',
   ribbonAutoSave: 'Автосохранение',
   ribbonAutoSaveTip: 'Сохраняет в файл каждые 30 секунд',
-  ribbonAutoSaveUniworkTip:
-    'Автосохранение отключено для документов UniWork. Нажмите «Сохранить», чтобы сохранить новую версию.',
   ribbonUndo: 'Отменить',
   ribbonRedo: 'Вернуть',
   ribbonGroupClipboard: 'Буфер обмена',

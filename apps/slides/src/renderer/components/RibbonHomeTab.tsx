@@ -100,6 +100,7 @@ export function RibbonHomeTab({ rb }: { rb: RibbonTabCtx }) {
     onAddSlide,
     onAddSlideWithLayout,
     onAiPreset,
+    uniworkReadOnly,
     onAlign,
     onDirection,
     onArrange,
@@ -242,8 +243,8 @@ export function RibbonHomeTab({ rb }: { rb: RibbonTabCtx }) {
             </button>
             <button
               className="rb-big ai-entry"
-              disabled={!hasDoc || deckEmpty}
-              data-tip={t('aiBeautifyBtn')}
+              disabled={!hasDoc || deckEmpty || uniworkReadOnly}
+              data-tip={uniworkReadOnly ? t('aiViewOnlyNotice') : t('aiBeautifyBtn')}
               onClick={() => onAiPreset(t('aiBeautifyPrompt'), { slideShot: true })}
             >
               <span className="rb-big-icon">
@@ -255,8 +256,8 @@ export function RibbonHomeTab({ rb }: { rb: RibbonTabCtx }) {
             </button>
             <button
               className="rb-big ai-entry"
-              disabled={!hasDoc || deckEmpty}
-              data-tip={t('aiFactCheckBtn')}
+              disabled={!hasDoc || deckEmpty || uniworkReadOnly}
+              data-tip={uniworkReadOnly ? t('aiViewOnlyNotice') : t('aiFactCheckBtn')}
               onClick={() => onAiPreset(t('aiFactCheckPrompt'))}
             >
               <span className="rb-big-icon">
@@ -268,8 +269,8 @@ export function RibbonHomeTab({ rb }: { rb: RibbonTabCtx }) {
             </button>
             <button
               className="rb-big ai-entry"
-              disabled={!hasDoc || deckEmpty}
-              data-tip={t('aiImageBtn')}
+              disabled={!hasDoc || deckEmpty || uniworkReadOnly}
+              data-tip={uniworkReadOnly ? t('aiViewOnlyNotice') : t('aiImageBtn')}
               onClick={() => onAiPreset(t('aiImagePrompt'))}
             >
               <span className="rb-big-icon">

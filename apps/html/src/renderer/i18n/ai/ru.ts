@@ -175,4 +175,6 @@ export const ru = {
   aiStarterAnnouncementPrompt: 'Набросай для меня анонс продукта. Продукт и ключевые пункты: ',
   aiStarterGuide: 'Написать инструкцию',
   aiStarterGuidePrompt: 'Напиши для меня инструкцию. Процесс, который нужно объяснить: ',
+  aiViewOnlyNotice:
+    'Документ только для просмотра: ИИ может читать его и отвечать на вопросы, но не может редактировать.',
 } satisfies Record<keyof typeof zh, string>

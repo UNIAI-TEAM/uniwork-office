@@ -215,8 +215,6 @@ export const ja = {
   appEndnotePlaceholder: '文末脚注の内容…',
   // Quick actions bar
   appAutoSave: '自動保存',
-  appAutoSaveUniworkTip:
-    'UniWork のドキュメントでは自動保存はオフです。新しいバージョンを保存するには「保存」を使ってください。',
   appAutoSaveTip: '自動保存(30 秒ごと、およびウィンドウのフォーカスが外れたとき)',
   appSaveShortcutTip: '上書き保存 (⌘S)',
   appUndo: '元に戻す',
