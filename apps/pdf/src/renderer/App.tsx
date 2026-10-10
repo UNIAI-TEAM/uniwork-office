@@ -6397,22 +6397,27 @@ export default function App() {
             </button>
           )}
           <span className="ribbon-tabs-spacer" />
-          {(viewOnly || encryptedReadOnly) && (
+          {/* On the web the host header owns the save state and the one view-only notice
+              (`ribbonSaveState` off): the ribbon row repeats neither. */}
+          {((viewOnly && cap('ribbonSaveState')) || encryptedReadOnly) && (
             <span className="tb-readonly">{t(viewOnly ? 'webViewOnly' : 'roEncrypted')}</span>
           )}
           {/* The file on disk is only touched by an explicit save until then. */}
-          {saveState === 'saving' ? (
-            <span className="tb-save-pending">{t('saving')}</span>
-          ) : (
-            dirty &&
-            saveState !== 'error' && <span className="tb-save-pending">{t('unsaved')}</span>
-          )}
-          {saveState === 'error' && (
+          {cap('ribbonSaveState') &&
+            (saveState === 'saving' ? (
+              <span className="tb-save-pending">{t('saving')}</span>
+            ) : (
+              dirty &&
+              saveState !== 'error' && <span className="tb-save-pending">{t('unsaved')}</span>
+            ))}
+          {cap('ribbonSaveState') && saveState === 'error' && (
             <span className="tb-save-error" data-tip={saveError}>
               {t('saveFailed')}
             </span>
           )}
-          {saveState === 'saved' && <span className="tb-save-ok">{t('savedOk')}</span>}
+          {cap('ribbonSaveState') && saveState === 'saved' && (
+            <span className="tb-save-ok">{t('savedOk')}</span>
+          )}
           {formHasXfa && (
             <span className="tb-form-warning" data-tip={t('formXfaWarning')}>
               XFA
