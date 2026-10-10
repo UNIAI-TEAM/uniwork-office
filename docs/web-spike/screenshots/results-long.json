@@ -1,0 +1,57 @@
+[
+  {
+    "doc": "long",
+    "step": "open",
+    "ok": true,
+    "ms": 2370,
+    "detail": "text visible in 2370ms; fully loaded (460 blocks, editable) after 1218ms; tables=5"
+  },
+  {
+    "doc": "long",
+    "step": "editable",
+    "ok": true,
+    "ms": 56
+  },
+  {
+    "doc": "long",
+    "step": "type-marker",
+    "ok": true,
+    "ms": 1253,
+    "detail": "461 blocks; last: docParagraph:\"Lorem ipsum dolor sit amet, co\" / docTable:\"T5 R1C1T5 R1C2T5 R1C3T5 R2C1T5\" / docParagraph:\"\" / docParagraph:\"E2EMARKLONGMUZLKED0\" sel=139259-139259 hasMarker=true"
+  },
+  {
+    "doc": "long",
+    "step": "bold",
+    "ok": true,
+    "ms": 149,
+    "detail": "Ctrl+B: {\"inStrong\":true,\"weight\":\"700\",\"tag\":\"STRONG\"}"
+  },
+  {
+    "doc": "long",
+    "step": "insert-table",
+    "ok": true,
+    "ms": 829,
+    "detail": "tables 5 -> 6"
+  },
+  {
+    "doc": "long",
+    "step": "save",
+    "ok": true,
+    "ms": 377,
+    "detail": "4845 bytes"
+  },
+  {
+    "doc": "long",
+    "step": "saved-xml",
+    "ok": true,
+    "ms": 14,
+    "detail": "run=<w:r><w:rPr><w:b/><w:bCs/></w:rPr><w:t xml:space=\"preserve\">E2EMARKLONGMUZLKED0</w:t></w:r> | w:tbl=6"
+  },
+  {
+    "doc": "long",
+    "step": "reopen",
+    "ok": true,
+    "ms": 1586,
+    "detail": "marker bold={\"inStrong\":true,\"weight\":\"700\"}; tables 5 -> 6"
+  }
+]

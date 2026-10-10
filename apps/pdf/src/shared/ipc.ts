@@ -833,7 +833,7 @@ export interface PdfApi {
   onAiSettingsChanged(handler: () => void): () => void
   /** shell only: switch to Home and open Settings › AI Model (rejects in standalone) */
   openAiModelSettings(): Promise<void>
-  /** UniWork cloud sign-in state (internal gsk name; stub, always signed out while the seam is off) */
+  /** UniWork cloud sign-in state (internal gsk name; loggedIn = signed in + entitled) */
   gskStatus(): Promise<{ loggedIn: boolean }>
   aiStream(request: AiStreamRequest): Promise<void>
   aiStreamCancel(requestId: string): Promise<void>

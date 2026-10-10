@@ -11,6 +11,7 @@ import type {
   AiStreamRequest,
   CodexModelCatalog,
   OpenRouterKeyStatus,
+  UniworkCloudStatus,
 } from '@genoffice/ai-provider'
 import type { UpdateChannel, UpdateUiState } from './update-api'
 
@@ -440,6 +441,12 @@ export interface HomeApi {
   accountRetry(): Promise<AccountStatus>
   /** choose the active organization (persists uniworkOrgId, reloads entitlements) */
   accountSelectOrg(orgId: string): Promise<AccountStatus>
+  /** UniWork cloud AI: signed in + entitled, per-tool availability and credits (never a token) */
+  uniworkCloudStatus?(): Promise<UniworkCloudStatus>
+  /** re-reads the cloud status (credits) from the server */
+  uniworkCloudRefresh?(): Promise<UniworkCloudStatus>
+  /** cloud status pushes; returns an unsubscribe */
+  onUniworkCloudStatus?(handler: (status: UniworkCloudStatus) => void): () => void
   /** Editor AI “Buy AI plan” → open Settings section (e.g. account); unsubscribe returned */
   onOpenSettingsEvent?(handler: (section: string) => void): () => void
   /** app version (from package.json / electron app.getVersion) */
@@ -1019,6 +1026,10 @@ export const HOME_CHANNELS = {
   accountCancelLogin: 'home:account-cancel-login',
   accountRetry: 'home:account-retry',
   accountSelectOrg: 'home:account-select-org',
+  /** UniWork cloud AI status (token-free UniworkCloudStatus); refresh re-reads credits */
+  uniworkCloudStatus: 'home:uniwork-cloud-status',
+  uniworkCloudRefresh: 'home:uniwork-cloud-refresh',
+  uniworkCloudStatusEvent: 'home:uniwork-cloud-status-event',
   /** Main → shell renderer: open Settings to a section (from editor AI billing CTA). */
   openSettingsEvent: 'home:open-settings-event',
   getAppVersion: 'home:get-app-version',

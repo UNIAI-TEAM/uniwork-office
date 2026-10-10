@@ -139,6 +139,8 @@ export const vi = {
   appProtectSecurity: 'Bảo mật',
   appProtectDesc:
     'Thiết lập mật khẩu mở và sửa đổi, hạn chế chỉnh sửa và tùy chọn quyền riêng tư; thay đổi sẽ có hiệu lực khi lưu tài liệu',
+  appProtectDescWeb:
+    'Thiết lập mật khẩu sửa đổi, hạn chế chỉnh sửa và tùy chọn quyền riêng tư; thay đổi sẽ có hiệu lực khi lưu tài liệu',
   appOptional: '(tùy chọn)',
   appOptionalBlank: '(có thể để trống)',
   appProtectOpenPwd: 'Mật khẩu mở tài liệu này',
@@ -506,4 +508,23 @@ export const vi = {
   appUpdateStyleTip: 'Cập nhật kiểu này từ vùng chọn hiện tại (ghi lại vào styles.xml)',
   appNewStyleFromSelection: 'Tạo kiểu mới từ vùng chọn hiện tại',
   appStyleNamePlaceholder: 'Tên kiểu',
+  appWebConflictTitle: 'Tài liệu này đã được thay đổi ở nơi khác',
+  appWebConflictBody:
+    'Một phiên bản mới hơn đã được lưu trong khi bạn chỉnh sửa. Ghi đè bằng phiên bản của bạn, hay tải lại phiên bản mới nhất và bỏ các thay đổi của bạn?',
+  appWebConflictOverwrite: 'Ghi đè',
+  appWebConflictReload: 'Tải lại bản mới nhất',
+  appWebConflictNotSaved: 'tài liệu đã được thay đổi ở nơi khác',
+  appWebDiscardTitle: 'Bỏ các thay đổi chưa lưu?',
+  appWebDiscardBody:
+    'Mở tài liệu khác sẽ thay thế tài liệu này và các thay đổi chưa lưu sẽ bị mất.',
+  appWebDiscard: 'Bỏ và mở',
+  appWebFatalTitle: 'Không thể mở tài liệu',
+  appWebFatalBody: 'Đã tắt chỉnh sửa và lưu. Hãy tải lại trang hoặc mở lại tài liệu từ UniWork.',
+  appWebNoHost: 'Trình soạn thảo này chạy bên trong UniWork. Hãy mở tài liệu từ UniWork.',
+  appSaveStateUnsaved: 'Có thay đổi chưa lưu',
+  appSaveStateSaved: 'Đã lưu mọi thay đổi',
+  appSaving: 'Đang lưu…',
+  appSavingAs: 'Đang lưu thành…',
+  appPdfPrintFallback:
+    'Không xuất được PDF trực tiếp; đã dùng hộp thoại in của trình duyệt thay thế',
 } satisfies Record<keyof typeof zh, string>

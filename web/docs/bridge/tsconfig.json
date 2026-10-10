@@ -1,0 +1,28 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["node"],
+    "noEmit": true,
+    "jsx": "react-jsx"
+  },
+  "include": [
+    "install.ts",
+    "webapi.ts",
+    "doc-handoff.ts",
+    "doc-handoff.test.ts",
+    "session.ts",
+    "frame-port.ts",
+    "host-appearance.ts",
+    "browser.ts",
+    "hide.ts",
+    "headless.ts",
+    "headless.test.ts",
+    "ai.ts",
+    "host-appearance.test.ts",
+    "project-memory.ts",
+    "webapi.test.ts",
+    "notice.ts",
+    "testing/*.ts"
+  ]
+}

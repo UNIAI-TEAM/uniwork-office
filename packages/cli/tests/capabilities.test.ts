@@ -92,7 +92,7 @@ describe('genoffice capabilities', () => {
     expect(d.image_search.available).toBe(false)
   })
 
-  it('reports the UniWork cloud off even when a stale cloud sign-in is claimed', async () => {
+  it('never counts the UniWork cloud (no app session in the CLI process), even when one is claimed', async () => {
     vi.spyOn(aiSearch, 'hasGskAuth').mockReturnValue(true)
     const settings = settingsFile(tempDir(), {
       search: { provider: 'genspark', providers: {} },

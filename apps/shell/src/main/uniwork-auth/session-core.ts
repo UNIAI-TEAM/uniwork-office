@@ -314,6 +314,18 @@ export class SessionCore {
     return this.authorized(call)
   }
 
+  /**
+   * Runs one main-process cloud call with the access token (refreshed first
+   * when near expiry). A call that throws TransportError `unauthorized` gets
+   * one refresh and one retry. Signed-in states only; the token stays in main.
+   */
+  async withAccessToken<T>(call: (token: string) => Promise<T>): Promise<T> {
+    if (!(this.state === 'signed-in' || this.state === 'refreshing')) {
+      throw new TransportError('unauthorized')
+    }
+    return this.authorized(call)
+  }
+
   /** who the session belongs to (never a token); null without a session */
   sessionIdentity(): { accountId: string; deviceSessionId: string; deploymentId: string } | null {
     if (!this.session || !this.profile) return null

@@ -27,7 +27,7 @@ export type AiProviderId =
   | 'opencode-go'
   | 'custom'
 
-/** UniWork cloud account status (internal name kept; always signed out while the cloud seam is off) */
+/** UniWork cloud account status (internal name kept): loggedIn = signed in to UniWork + plan includes cloud AI */
 export interface GenSparkAccountStatus {
   loggedIn: boolean
   email?: string
@@ -115,6 +115,12 @@ export interface AiMediaSettings {
   /** provider behind analyze_media when the input has video/audio (only video-capable vendors qualify) */
   videoAnalysisProvider: AiMediaProviderId
   providers: Record<AiMediaProviderId, AiMediaProviderConfig>
+  /**
+   * Capabilities where the user picked the UniWork cloud entry themselves. A
+   * stored `genspark` without this mark is only the default and yields to a
+   * BYOK vendor with a usable config.
+   */
+  cloudPicked?: { image?: boolean; analysis?: boolean; video?: boolean } | undefined
   /** pre-catalog shape (one provider for both); migrated by resolveAiMediaSettings */
   provider?: AiMediaProviderId | undefined
 }
@@ -141,7 +147,7 @@ export interface AiSettings {
   providers: Record<AiProviderId, AiProviderConfig>
   /**
    * Provider for generate_image / analyze_media. Absent (pre-media settings
-   * files) means the UniWork cloud route, i.e. the cloud seam + gskToolsEnabled gate.
+   * files) means the UniWork cloud route, i.e. signed in + entitled + the gskToolsEnabled gate.
    */
   media?: AiMediaSettings | undefined
   /** web/image search backend; absent means `auto` (the keyless free chain) */
@@ -150,7 +156,7 @@ export interface AiSettings {
    * UniWork cloud tools (web/image search, image generation, media
    * analysis). Default true; false makes tools skip the cloud backend entirely
    * (search falls back to free sources, cloud-only tools are unavailable).
-   * Only meaningful while the cloud seam is on (see uniwork-cloud.ts).
+   * Only meaningful while signed in + entitled (see uniwork-cloud.ts).
    */
   gskToolsEnabled?: boolean
   /**

@@ -3762,8 +3762,8 @@ export function registerAiIpc(): void {
     return settings
   })
 
-  // UniWork cloud account state (internal gsk name kept): stub-backed and always signed out while the
-  // cloud seam is off; editors feed it into the generate_image / analyze_media availability gates
+  // UniWork cloud account state (internal gsk name kept): loggedIn = signed in to UniWork and the
+  // plan includes cloud AI (shell main status); editors feed it into the generate_image / analyze_media availability gates
   ipcMain.handle(
     'ai:gsk-status',
     async (_event, withEmail?: boolean): Promise<GenSparkAccountStatus> => {
@@ -3916,7 +3916,7 @@ export function registerAiIpc(): void {
   })
 
   // media understanding (pictures in the document, attachments, local files): BYOK media
-  // provider when one is configured, otherwise the UniWork cloud route (off while the seam is off).
+  // provider when one is configured, otherwise the UniWork cloud route (signed in + entitled).
   // docs-prefixed: slides registers its own ai:analyze-media in the same shell process.
   ipcMain.handle(
     'docs:analyze-media',
@@ -3987,7 +3987,7 @@ export function registerAiIpc(): void {
     return testSearchProvider(provider, String(apiKey ?? ''))
   })
 
-  // settings-UI connection test for the media provider (the UniWork cloud entry is hidden while the seam is off)
+  // settings-UI connection test for the media provider (the UniWork cloud entry shows only while signed in + entitled)
   ipcMain.handle('ai:media-test', (_event, input: unknown) => {
     const { provider, config } = (input ?? {}) as {
       provider?: AiMediaProviderId

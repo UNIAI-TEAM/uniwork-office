@@ -141,6 +141,8 @@ export const cs = {
   appProtectSecurity: 'Zabezpečení',
   appProtectDesc:
     'Nastavte hesla pro otevření a úpravy, omezení úprav a možnosti ochrany osobních údajů; změny se použijí při uložení dokumentu',
+  appProtectDescWeb:
+    'Nastavte heslo pro úpravy, omezení úprav a možnosti ochrany osobních údajů; změny se použijí při uložení dokumentu',
   appOptional: '(nepovinné)',
   appOptionalBlank: '(nepovinné)',
   appProtectOpenPwd: 'Heslo pro otevření tohoto dokumentu',
@@ -508,4 +510,23 @@ export const cs = {
   appUpdateStyleTip: 'Aktualizovat tento styl podle aktuálního výběru (zapíše se do styles.xml)',
   appNewStyleFromSelection: 'Nový styl z aktuálního výběru',
   appStyleNamePlaceholder: 'Název stylu',
+  appWebConflictTitle: 'Tento dokument byl změněn jinde',
+  appWebConflictBody:
+    'Během úprav byla uložena novější verze. Chcete ji přepsat svou verzí, nebo načíst nejnovější verzi a zahodit své změny?',
+  appWebConflictOverwrite: 'Přepsat',
+  appWebConflictReload: 'Načíst nejnovější verzi',
+  appWebConflictNotSaved: 'dokument byl změněn jinde',
+  appWebDiscardTitle: 'Zahodit neuložené změny?',
+  appWebDiscardBody: 'Otevřením jiného dokumentu nahradíte tento a neuložené změny budou ztraceny.',
+  appWebDiscard: 'Zahodit a otevřít',
+  appWebFatalTitle: 'Dokument nelze otevřít',
+  appWebFatalBody:
+    'Úpravy a ukládání jsou vypnuté. Obnovte stránku nebo dokument znovu otevřete z UniWork.',
+  appWebNoHost: 'Tento editor běží v UniWork. Otevřete dokument z UniWork.',
+  appSaveStateUnsaved: 'Neuložené změny',
+  appSaveStateSaved: 'Všechny změny uloženy',
+  appSaving: 'Ukládání…',
+  appSavingAs: 'Ukládání jako…',
+  appPdfPrintFallback:
+    'Export do PDF zde není k dispozici; místo něj byl použit tiskový dialog prohlížeče',
 } satisfies Record<keyof typeof zh, string>

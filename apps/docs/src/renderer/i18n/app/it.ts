@@ -143,6 +143,8 @@ export const it = {
   appProtectSecurity: 'Sicurezza',
   appProtectDesc:
     'Imposta le password di apertura e modifica, le limitazioni di modifica e le opzioni di privacy; applicato al salvataggio',
+  appProtectDescWeb:
+    'Imposta la password di modifica, le limitazioni di modifica e le opzioni di privacy; applicato al salvataggio',
   appOptional: '(facoltativa)',
   appOptionalBlank: '(facoltativa)',
   appProtectOpenPwd: 'Password per aprire questo documento',
@@ -514,4 +516,24 @@ export const it = {
   appUpdateStyleTip: 'Aggiorna questo stile con la selezione corrente (riscritto in styles.xml)',
   appNewStyleFromSelection: 'Nuovo stile dalla selezione corrente',
   appStyleNamePlaceholder: 'Nome dello stile',
+  appWebConflictTitle: 'Questo documento è stato modificato altrove',
+  appWebConflictBody:
+    'Mentre modificavi è stata salvata una versione più recente. Vuoi sovrascriverla con la tua versione o ricaricare l’ultima versione e scartare le modifiche?',
+  appWebConflictOverwrite: 'Sovrascrivi',
+  appWebConflictReload: 'Ricarica l’ultima versione',
+  appWebConflictNotSaved: 'il documento è stato modificato altrove',
+  appWebDiscardTitle: 'Scartare le modifiche non salvate?',
+  appWebDiscardBody:
+    'Aprire un altro documento sostituisce questo e le modifiche non salvate andranno perse.',
+  appWebDiscard: 'Scarta e apri',
+  appWebFatalTitle: 'Impossibile aprire il documento',
+  appWebFatalBody:
+    'Modifica e salvataggio sono disattivati. Ricarica la pagina o riapri il documento da UniWork.',
+  appWebNoHost: 'Questo editor funziona all’interno di UniWork. Apri il documento da UniWork.',
+  appSaveStateUnsaved: 'Modifiche non salvate',
+  appSaveStateSaved: 'Tutte le modifiche salvate',
+  appSaving: 'Salvataggio…',
+  appSavingAs: 'Salvataggio con nome…',
+  appPdfPrintFallback:
+    "L'esportazione PDF non è disponibile qui; è stata usata la finestra di stampa del browser",
 } satisfies Record<keyof typeof zh, string>

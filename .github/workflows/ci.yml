@@ -182,6 +182,11 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      # web/docs (the Docs frame for UniWork) is not an npm workspace: the
+      # protocol + bridge tsconfigs and vitest suites run through root scripts.
+      - name: Typecheck (web Docs frame)
+        run: npm run typecheck:web
+
       - name: Regenerate test fixtures
         run: npm run fixtures
 
@@ -198,6 +203,10 @@ jobs:
 
       - name: Test
         run: npm test
+
+      # postMessage protocol, web bridge (jsdom) and build (CSP, manifest, fonts)
+      - name: Test (web Docs frame)
+        run: npm run test:web
 
       # Preservation gate: a no-op-adjacent edit through the OOXML gateway must
       # leave every untouched package entry byte-identical (fails closed otherwise).

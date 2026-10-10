@@ -43,6 +43,7 @@ import {
 } from '../editor/table-ops'
 import type { TableDialogKind } from './TableDialogs'
 import { IconSparkle } from './icons'
+import { cap } from '../capabilities'
 import { spellcheckEnabled } from '../spellcheck-pref'
 import { applySpellingSuggestion } from '../editor/spell-replace'
 import { linkRangeAt, linkTarget, removeLink } from '../editor/link-actions'
@@ -645,37 +646,45 @@ export function EditorContextMenu({
           </div>
         </>
       )}
-      <div className="ctx-sep" />
-      {item(t('appSynonyms'), {
-        disabled: !synonymText,
-        ai: true,
-        onClick: run(() => onAiPreset(t('appSynonymsPrompt', { text: synonymText }))),
-      })}
-      <div className="ctx-item-wrap" onMouseLeave={() => setSubmenu(null)}>
-        {item(t('appTranslate'), { disabled: !hasSelection, submenuKey: 'translate', ai: true })}
-        {submenu === 'translate' && hasSelection && (
-          <div className="ctx-submenu">
-            {TRANSLATE_LANGS.map(({ code }) => (
-              <button
-                key={code}
-                className="ctx-item"
-                onClick={run(() =>
-                  onAiPreset(
-                    t('appTranslateSelectionPrompt', {
-                      lang: t(appLangKey(code)),
-                      text: selectedText,
-                    }),
-                  ),
-                )}
-              >
-                <span className="ctx-label">
-                  {t('appTranslateTo', { lang: t(appLangKey(code)) })}
-                </span>
-              </button>
-            ))}
+      {cap('ai') && (
+        <>
+          <div className="ctx-sep" />
+          {item(t('appSynonyms'), {
+            disabled: !synonymText,
+            ai: true,
+            onClick: run(() => onAiPreset(t('appSynonymsPrompt', { text: synonymText }))),
+          })}
+          <div className="ctx-item-wrap" onMouseLeave={() => setSubmenu(null)}>
+            {item(t('appTranslate'), {
+              disabled: !hasSelection,
+              submenuKey: 'translate',
+              ai: true,
+            })}
+            {submenu === 'translate' && hasSelection && (
+              <div className="ctx-submenu">
+                {TRANSLATE_LANGS.map(({ code }) => (
+                  <button
+                    key={code}
+                    className="ctx-item"
+                    onClick={run(() =>
+                      onAiPreset(
+                        t('appTranslateSelectionPrompt', {
+                          lang: t(appLangKey(code)),
+                          text: selectedText,
+                        }),
+                      ),
+                    )}
+                  >
+                    <span className="ctx-label">
+                      {t('appTranslateTo', { lang: t(appLangKey(code)) })}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </>
+      )}
       {isFloating && (
         <>
           <div className="ctx-sep" />

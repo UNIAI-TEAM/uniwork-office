@@ -1,0 +1,639 @@
+/**
+ * BROWSER class shim (W4 - UNI-1011): DesktopApi methods that map onto plain
+ * browser features. Merged last into `window.desktop` (see ./install.ts), so
+ * only methods that truly belong to this class are exported here.
+ *
+ * method               | browser implementation                         | deviation from desktop
+ * ---------------------|------------------------------------------------|------------------------------------------------
+ * getTheme             | host `init.theme` / `theme` event when the page  | desktop reads shell app-settings.json. In a
+ *                      | is a hosted frame; standalone: localStorage     | hosted frame the host is authoritative and
+ *                      | `genoffice.web.theme`, else 'system'            | localStorage is ignored (it is shared with the
+ *                      |                                                | UniWork page, same origin). Waits (<= 3 s) for
+ *                      |                                                | the host's init so boot has the right theme.
+ * onThemeChanged       | setWebTheme() (host events / standalone) +      | desktop pushes from the shell home page.
+ *                      | `storage` event (other tabs, standalone)        |
+ * getLanguage          | hosted: host `init.locale` / `language` event.  | desktop reads app-settings.json. Returns the
+ *                      | Standalone: ?lang= > localStorage               | full 21-locale Lang like getUiLang() does — the
+ *                      | `genoffice.web.lang` > navigator.languages,     | DesktopApi type only lists 11 (stale type).
+ *                      | via @genoffice/i18n normalizeLang               |
+ * onLanguageChanged    | in-tab setWebLanguage() + `storage` event      | same as onThemeChanged.
+ * print                | window.print() of THIS frame (an iframe prints   | no scaleFactor: the print-zoom is neutralised
+ *                      | only its own document) with a temporary         | in CSS instead. Paper size comes from the
+ *                      | print sheet + data-theme pinned to light; resolves | print dialog. No cancel/failure signal →
+ *                      | on `afterprint`                                 | always { ok: true }.
+ * pickImage            | <input type=file accept=png/jpeg/gif>          | same shape ({ base64, mime, name }); cancel is
+ *                      |                                                | detected via the `cancel` event (+ focus fallback).
+ * pickAttachments      | <input type=file multiple>                     | paths are in-memory ids `web-file://<n>/<name>`
+ *                      |                                                | backed by the picked File (lost on reload).
+ * getPathForFile       | registers the File, returns its web-file:// id | desktop returns a real absolute path (or '' for
+ *                      |                                                | pasted bitmaps); web always returns an id.
+ * addAttachmentPaths   | validates registered ids (ext/size rules       | unknown / non-web-file paths are rejected;
+ *                      | copied from docs-main.ts)                      | messages are English, not tm() translated.
+ * addPastedImage       | wraps bytes in a File and registers it         | no temp file on disk.
+ * readAttachment       | File.text() for plain-text extensions          | doc/docx/pdf/pptx/xlsx text extraction
+ *                      |                                                | (@genoffice/file-parse, Node-only) is not
+ *                      |                                                | available → { ok: false, error }.
+ * readAttachmentImage  | FileReader → base64 (5 MB cap)                 | none.
+ * copyImageToClipboard | navigator.clipboard.write(ClipboardItem        | browsers only accept image/png: non-PNG data
+ *                      | image/png + text/html)                         | URLs are re-encoded through a canvas. Needs a
+ *                      |                                                | secure context + user activation, else false.
+ * fontMetrics          | null                                           | desktop parses installed font files; the web
+ *                      |                                                | cannot read font tables → callers use their
+ *                      |                                                | documented "family missing" fallback.
+ *
+ * Also exported for the other bridge modules (W3 export / save-copy):
+ *   downloadBlob / downloadBytes  Blob + <a download> "save to disk"
+ *   openExternal                  window.open(url, '_blank', 'noopener,noreferrer'), http(s) only
+ *   pickFiles                     <input type=file>, [] on cancel
+ * and installed at load: a `window.open` guard (see `guardedOpen`) so the renderer's
+ * Ctrl/Cmd-click on a document hyperlink (`window.open(href)`, App.tsx) can never
+ * hand the new tab a `window.opener` to the host page or open a javascript:/data: URL.
+ *
+ * Not here (decided from the main handlers):
+ * - exportPdf / printPdfBuffer / saveMergedPdf use webContents.printToPDF (page
+ *   size + PDF bytes), not window.print(): W5. exportHtml is a pure blob
+ *   download (W5 may reuse `downloadBlob` below).
+ * - System font listing: no DesktopApi method; the renderer already calls
+ *   queryLocalFonts() itself (apps/docs/src/renderer/system-fonts.ts).
+ * - openExternal / zoom / fullscreen: not part of the Docs DesktopApi.
+ */
+import { isLang, normalizeLang, type Lang } from '@genoffice/i18n'
+import type {
+  AttachmentAddResult,
+  AttachmentImageResult,
+  AttachmentMeta,
+  AttachmentReadResult,
+  DesktopApi,
+  PickImageResult,
+  UiTheme,
+} from '../../../apps/docs/src/shared/ipc'
+
+type DesktopLang = Awaited<ReturnType<DesktopApi['getLanguage']>>
+
+// ---- shared storage helpers ----
+
+const THEME_KEY = 'genoffice.web.theme'
+const LANG_KEY = 'genoffice.web.lang'
+
+function readStorage(key: string): string | null {
+  try {
+    return window.localStorage.getItem(key)
+  } catch {
+    return null
+  }
+}
+
+function writeStorage(key: string, value: string | null): void {
+  try {
+    if (value === null) window.localStorage.removeItem(key)
+    else window.localStorage.setItem(key, value)
+  } catch {
+    // private mode / blocked storage: the in-tab change still applies
+  }
+}
+
+/** subscribe to in-tab changes (custom event) and other-tab changes (storage event) */
+function subscribe<T>(key: string, read: () => T, handler: (value: T) => void): () => void {
+  const onLocal = () => handler(read())
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === key || event.key === null) handler(read())
+  }
+  window.addEventListener(`${key}:changed`, onLocal)
+  window.addEventListener('storage', onStorage)
+  return () => {
+    window.removeEventListener(`${key}:changed`, onLocal)
+    window.removeEventListener('storage', onStorage)
+  }
+}
+
+// ---- theme ----
+
+/** a page embedded in a host (the UniWork page) gets its theme/language from the host */
+const hosted = (() => {
+  try {
+    return window.parent !== window
+  } catch {
+    return true
+  }
+})()
+
+/** set by the host's init / theme / language messages (memory only: never touches localStorage) */
+let hostTheme: UiTheme | null = null
+let hostLang: Lang | null = null
+/** settles when the host's init has been applied (or the wait timed out) */
+let hostReady: Promise<void> | null = null
+
+/** how long boot waits for the host's `init` before using the fallback appearance */
+const HOST_INIT_WAIT_MS = 3_000
+
+/**
+ * Register the host handshake: getTheme/getLanguage wait for it (bounded), so the
+ * renderer boots with the host's theme and language instead of flashing the fallback.
+ */
+export function awaitHostAppearance(init: Promise<unknown>): void {
+  hostReady = new Promise<void>((resolve) => {
+    const timer = window.setTimeout(resolve, HOST_INIT_WAIT_MS)
+    const done = () => {
+      window.clearTimeout(timer)
+      resolve()
+    }
+    init.then(done, done)
+  })
+}
+
+function currentTheme(): UiTheme {
+  if (hostTheme) return hostTheme
+  if (hosted) return 'system'
+  const saved = readStorage(THEME_KEY)
+  return saved === 'light' || saved === 'dark' ? saved : 'system'
+}
+
+/** same mapping as apps/docs/src/renderer/main.tsx applyTheme */
+function applyTheme(theme: UiTheme): void {
+  if (theme === 'system') document.documentElement.removeAttribute('data-theme')
+  else document.documentElement.setAttribute('data-theme', theme)
+}
+
+/**
+ * Switch the UI theme. `{ host: true }` = the host said so (init / `theme` event): kept in
+ * memory only and authoritative from then on. Without it (standalone / dev) the choice is
+ * persisted in localStorage and ignored while a host theme is in force.
+ */
+export function setWebTheme(theme: UiTheme, opts: { host?: boolean } = {}): void {
+  if (opts.host) hostTheme = theme
+  else writeStorage(THEME_KEY, theme === 'system' ? null : theme)
+  applyTheme(currentTheme())
+  window.dispatchEvent(new Event(`${THEME_KEY}:changed`))
+}
+
+// ---- language ----
+
+function currentLanguage(): Lang {
+  if (hostLang) return hostLang
+  const param = new URLSearchParams(window.location.search).get('lang')
+  if (param) return isLang(param) ? param : normalizeLang(param)
+  const saved = hosted ? null : readStorage(LANG_KEY)
+  if (isLang(saved)) return saved
+  for (const raw of navigator.languages ?? [navigator.language]) {
+    const lang = normalizeLang(raw)
+    // normalizeLang falls back to 'en'; only accept 'en' when it was asked for
+    if (lang !== 'en' || /^en\b/i.test(raw)) return lang
+  }
+  return 'en'
+}
+
+/** the UI language in force (host > ?lang= > stored > browser), for bridge-owned strings */
+export function webLanguage(): Lang {
+  return currentLanguage()
+}
+
+/**
+ * Switch the UI language (the renderer's LocaleProvider re-renders live). `{ host: true }`
+ * takes a host locale such as 'vi' or 'vi-VN' (memory only, authoritative); without it the
+ * choice is persisted for the standalone case. null clears the stored choice.
+ */
+export function setWebLanguage(lang: Lang | string | null, opts: { host?: boolean } = {}): void {
+  if (opts.host && lang) hostLang = isLang(lang) ? lang : normalizeLang(lang)
+  else writeStorage(LANG_KEY, lang)
+  window.dispatchEvent(new Event(`${LANG_KEY}:changed`))
+}
+
+// ---- downloads ----
+
+// eslint-disable-next-line no-control-regex
+const RESERVED_FILE_CHARS = /[\\/:*?"<>|\u0000-\u001f]/g
+
+/** a file name the browser will not mangle: no path separators / reserved characters */
+export function safeFileName(name: string, fallback = 'document'): string {
+  const cleaned = name.replace(RESERVED_FILE_CHARS, '_').trim().replace(/^\.+$/, '')
+  return cleaned || fallback
+}
+
+/** save a Blob through <a download> (pure browser "save to disk") */
+export function downloadBlob(name: string, data: Blob): void {
+  const url = URL.createObjectURL(data)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = safeFileName(name)
+  a.style.display = 'none'
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  // revoke after the download has been handed to the browser
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+}
+
+/** save raw bytes (docx / pdf / html export, save-a-copy) through <a download> */
+export function downloadBytes(name: string, bytes: BlobPart, mime: string): void {
+  downloadBlob(name, new Blob([bytes], { type: mime }))
+}
+
+// ---- external links ----
+
+/** http(s) only, same allowlist as the desktop shell's safeExternalUrl */
+function safeHttpUrl(url: unknown): string | null {
+  const text = url instanceof URL ? url.href : typeof url === 'string' ? url.trim() : ''
+  try {
+    const { protocol } = new URL(text)
+    return protocol === 'http:' || protocol === 'https:' ? text : null
+  } catch {
+    return null
+  }
+}
+
+type WindowOpen = typeof window.open
+
+/**
+ * `window.open` for untrusted (document-authored) URLs: http(s) only, always a new
+ * tab, never with an opener (the frame is same-origin with the UniWork page, so an
+ * opener would hand the target page a handle to it). Blocked URLs return null, like
+ * a popup blocker.
+ */
+export function guardedOpen(nativeOpen: WindowOpen): WindowOpen {
+  return (url, _target, _features) => {
+    const safe = safeHttpUrl(url)
+    return safe ? nativeOpen(safe, '_blank', 'noopener,noreferrer') : null
+  }
+}
+
+/** open a link outside the frame; false when the URL is not an allowed http(s) URL */
+export function openExternal(url: unknown): boolean {
+  if (!safeHttpUrl(url)) return false
+  window.open(String(url), '_blank', 'noopener,noreferrer')
+  return true
+}
+
+let externalGuardInstalled = false
+
+function installExternalLinkGuard(): void {
+  if (externalGuardInstalled) return
+  externalGuardInstalled = true
+  window.open = guardedOpen(window.open.bind(window))
+}
+
+// ---- file pickers ----
+
+/** <input type=file>; resolves [] on cancel */
+export function pickFiles(accept: string, multiple: boolean): Promise<File[]> {
+  return new Promise((resolve) => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = accept
+    input.multiple = multiple
+    input.style.display = 'none'
+    let settled = false
+    const finish = (files: File[]) => {
+      if (settled) return
+      settled = true
+      window.removeEventListener('focus', onFocus)
+      input.remove()
+      resolve(files)
+    }
+    // browsers without the `cancel` event: the window regains focus after the
+    // dialog closes; give `change` a moment to fire first
+    const onFocus = () => window.setTimeout(() => finish(Array.from(input.files ?? [])), 500)
+    input.addEventListener('change', () => finish(Array.from(input.files ?? [])))
+    input.addEventListener('cancel', () => finish([]))
+    window.addEventListener('focus', onFocus, { once: true })
+    document.body.appendChild(input)
+    input.click()
+  })
+}
+
+function readAsBase64(file: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const url = String(reader.result)
+      resolve(url.slice(url.indexOf(',') + 1))
+    }
+    reader.onerror = () => reject(reader.error)
+    reader.readAsDataURL(file)
+  })
+}
+
+function extOf(name: string): string {
+  return name.split('.').pop()?.toLowerCase() ?? ''
+}
+
+const IMAGE_MIME: Record<string, PickImageResult['mime']> = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+}
+
+// ---- attachments (rules mirror apps/docs/src/main/docs-main.ts) ----
+
+const ATTACHMENT_MAX_BYTES = 50 * 1024 * 1024
+const ATTACHMENT_IMAGE_MAX_BYTES = 5 * 1024 * 1024
+const TEXT_EXTS = new Set([
+  'txt',
+  'md',
+  'markdown',
+  'csv',
+  'tsv',
+  'json',
+  'yaml',
+  'yml',
+  'xml',
+  'html',
+  'htm',
+  'log',
+  'js',
+  'ts',
+  'tsx',
+  'jsx',
+  'py',
+  'java',
+  'c',
+  'h',
+  'cpp',
+  'go',
+  'rs',
+  'rb',
+  'sh',
+  'sql',
+  'css',
+])
+const ATTACHMENT_IMAGE_MIME: Record<string, string> = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+  webp: 'image/webp',
+}
+const ATTACHMENT_EXTS = new Set([
+  ...TEXT_EXTS,
+  'doc',
+  'docx',
+  'pdf',
+  'pptx',
+  'ppt',
+  'xlsx',
+  'xlsm',
+  'xls',
+  ...Object.keys(ATTACHMENT_IMAGE_MIME),
+])
+const READ_MAX_CHARS = 48_000
+
+/** in-memory stand-in for local paths: `web-file://<n>/<name>` → File */
+const WEB_FILE_PREFIX = 'web-file://'
+const webFiles = new Map<string, File>()
+let webFileSeq = 0
+
+function registerFile(file: File): string {
+  for (const [path, known] of webFiles) if (known === file) return path
+  const path = `${WEB_FILE_PREFIX}${++webFileSeq}/${file.name}`
+  webFiles.set(path, file)
+  return path
+}
+
+function statAttachment(path: string): { meta?: AttachmentMeta; error?: string } {
+  const file = webFiles.get(path)
+  const name = file?.name ?? path.split('/').pop() ?? path
+  if (!file) return { error: `${name}: file is not available in this browser session` }
+  const ext = extOf(name)
+  if (!ATTACHMENT_EXTS.has(ext)) return { error: `${name}: unsupported file type .${ext}` }
+  if (file.size > ATTACHMENT_MAX_BYTES) {
+    return { error: `${name}: file is larger than ${ATTACHMENT_MAX_BYTES / 1024 / 1024} MB` }
+  }
+  if (ext in ATTACHMENT_IMAGE_MIME && file.size > ATTACHMENT_IMAGE_MAX_BYTES) {
+    return { error: `${name}: image is larger than 5 MB` }
+  }
+  return { meta: { path, name, ext, sizeBytes: file.size } }
+}
+
+function collectAttachments(paths: string[]): AttachmentAddResult {
+  const accepted: AttachmentMeta[] = []
+  const rejected: string[] = []
+  for (const p of paths) {
+    const { meta, error } = statAttachment(p)
+    if (meta) accepted.push(meta)
+    else if (error) rejected.push(error)
+  }
+  return { accepted, rejected }
+}
+
+// ---- clipboard ----
+
+// Decoded by hand: the page CSP's connect-src has no `data:`, so fetch(dataUrl) is refused.
+function dataUrlToBlob(dataUrl: string): Blob {
+  const comma = dataUrl.indexOf(',')
+  const header = dataUrl.slice(5, comma)
+  const body = dataUrl.slice(comma + 1)
+  const type = header.split(';')[0] || 'application/octet-stream'
+  if (!header.endsWith(';base64')) return new Blob([decodeURIComponent(body)], { type })
+  const bin = atob(body)
+  const bytes = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+  return new Blob([bytes], { type })
+}
+
+async function toPngBlob(dataUrl: string): Promise<Blob | null> {
+  const blob = dataUrl.startsWith('data:')
+    ? dataUrlToBlob(dataUrl)
+    : await (await fetch(dataUrl)).blob()
+  if (blob.type === 'image/png') return blob
+  const bitmap = await createImageBitmap(blob)
+  const canvas = document.createElement('canvas')
+  canvas.width = bitmap.width
+  canvas.height = bitmap.height
+  canvas.getContext('2d')?.drawImage(bitmap, 0, 0)
+  bitmap.close()
+  return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'))
+}
+
+function escapeAttr(value: string): string {
+  return value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')
+}
+
+// ---- print ----
+
+const PRINT_STYLE_ID = 'web-bridge-print-page'
+/** a print dialog can stay open for a long time; this only bounds a missing `afterprint` */
+const PRINT_TIMEOUT_MS = 10 * 60_000
+
+/**
+ * Print-only sheet (document data, see CLAUDE.md rule 4: never theme tokens).
+ * The renderer's own `@media print` block already hides the chrome and unwraps
+ * the page; this adds what a browser needs on top of Electron's
+ * `webContents.print({ printBackground: true, margins: none })`.
+ */
+function printCss(scale?: number): string {
+  const rules = [
+    // the docx page padding provides the margins
+    '@page { margin: 0; }',
+    'html, body { background: none !important; }',
+    // cell fills, highlights, shading: Electron prints backgrounds, browsers do not by default
+    '.doc-page, .doc-page *, .pv-page, .pv-page * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }',
+  ]
+  // The renderer zooms the preview sheets by the screen scale and asks the host to
+  // print at the inverse (print-zoom.ts). A browser cannot set a print scale, so a
+  // non-1 zoom would print the sheets oversized: print them unzoomed instead.
+  if (scale !== undefined && scale > 0 && Math.abs(scale - 1) > 1e-3) {
+    rules.push('.pagination-preview { zoom: 1 !important; }')
+  }
+  return `@media print { ${rules.join(' ')} }`
+}
+
+// An iframe's own window.print() prints only that frame's document, which is what
+// we want. The UI theme is pinned to light for the job so the output is the same
+// in both themes (the dark page is screen-only in styles.css; this also covers any
+// chrome token that could leak into print). Resolves on `afterprint`: Chromium blocks
+// inside print(), Firefox/Safari return at once, and the renderer clears its
+// print-only state (selected pages, zoom) when this promise settles.
+export function printFrame(scale?: number): Promise<{ ok: boolean; error?: string }> {
+  return new Promise<{ ok: boolean; error?: string }>((resolve) => {
+    document.getElementById(PRINT_STYLE_ID)?.remove()
+    const style = document.createElement('style')
+    style.id = PRINT_STYLE_ID
+    style.textContent = printCss(scale)
+    document.head.appendChild(style)
+    document.documentElement.setAttribute('data-theme', 'light')
+
+    let timer = 0
+    const finish = (result: { ok: boolean; error?: string }) => {
+      window.clearTimeout(timer)
+      window.removeEventListener('afterprint', onAfterPrint)
+      style.remove()
+      applyTheme(currentTheme())
+      resolve(result)
+    }
+    const onAfterPrint = () => finish({ ok: true })
+    window.addEventListener('afterprint', onAfterPrint)
+    timer = window.setTimeout(() => finish({ ok: true }), PRINT_TIMEOUT_MS)
+    try {
+      window.focus()
+      window.print()
+    } catch (err) {
+      finish({ ok: false, error: String(err) })
+    }
+  })
+}
+
+const browser = {
+  getTheme: () => (hostReady ?? Promise.resolve()).then(currentTheme),
+  onThemeChanged: (handler) => subscribe(THEME_KEY, currentTheme, handler),
+
+  getLanguage: () => (hostReady ?? Promise.resolve()).then(() => currentLanguage() as DesktopLang),
+  onLanguageChanged: (handler) =>
+    subscribe(LANG_KEY, currentLanguage, (lang) => handler(lang as DesktopLang)),
+
+  print: printFrame,
+
+  pickImage: async () => {
+    const [file] = await pickFiles('image/png,image/jpeg,image/gif,.png,.jpg,.jpeg,.gif', false)
+    if (!file) return null
+    const mime = IMAGE_MIME[extOf(file.name)]
+    if (!mime) return null
+    return { base64: await readAsBase64(file), mime, name: file.name }
+  },
+
+  pickAttachments: async () => {
+    const files = await pickFiles([...ATTACHMENT_EXTS].map((e) => `.${e}`).join(','), true)
+    if (files.length === 0) return null
+    return collectAttachments(files.map(registerFile))
+  },
+
+  getPathForFile: (file) => registerFile(file),
+
+  addAttachmentPaths: (paths) => Promise.resolve(collectAttachments(paths)),
+
+  addPastedImage: (data, ext) => {
+    const cleanExt = typeof ext === 'string' ? ext.toLowerCase() : ''
+    const mime = ATTACHMENT_IMAGE_MIME[cleanExt]
+    if (!mime || !data || data.byteLength === 0) {
+      return Promise.resolve({ accepted: [], rejected: ['pasted content is not an image'] })
+    }
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[-:]/g, '').replace('T', '-')
+    const file = new File([data], `pasted-${stamp}-${webFileSeq + 1}.${cleanExt}`, { type: mime })
+    return Promise.resolve(collectAttachments([registerFile(file)]))
+  },
+
+  readAttachment: async (path, offset, maxChars): Promise<AttachmentReadResult> => {
+    const file = webFiles.get(path)
+    const name = file?.name ?? path.split('/').pop() ?? path
+    const ext = extOf(name)
+    if (!ATTACHMENT_EXTS.has(ext)) return { ok: false, error: `unsupported file type .${ext}` }
+    if (ext in ATTACHMENT_IMAGE_MIME) {
+      return { ok: false, error: 'images have no text; they are sent to the model as images' }
+    }
+    if (!file) return { ok: false, error: `${name}: file is not available in this browser session` }
+    if (!TEXT_EXTS.has(ext)) {
+      return { ok: false, error: `${name}: .${ext} text extraction is not available on the web` }
+    }
+    try {
+      const text = await file.text()
+      const start = Math.max(0, Math.floor(offset) || 0)
+      const size = Math.min(Math.max(1, Math.floor(maxChars) || 1), READ_MAX_CHARS)
+      return {
+        ok: true,
+        name,
+        totalChars: text.length,
+        offset: start,
+        text: text.slice(start, start + size),
+      }
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : String(e) }
+    }
+  },
+
+  readAttachmentImage: async (path): Promise<AttachmentImageResult> => {
+    const file = webFiles.get(path)
+    const name = file?.name ?? path.split('/').pop() ?? path
+    const mime = ATTACHMENT_IMAGE_MIME[extOf(name)]
+    if (!mime) return { ok: false, error: `${name}: not an image` }
+    if (!file) return { ok: false, error: `${name}: file is not available in this browser session` }
+    if (file.size > ATTACHMENT_IMAGE_MAX_BYTES) {
+      return { ok: false, error: `${name}: image is larger than 5 MB` }
+    }
+    try {
+      return { ok: true, base64: await readAsBase64(file), mime }
+    } catch {
+      return { ok: false, error: `${name}: unreadable` }
+    }
+  },
+
+  copyImageToClipboard: async (dataUrl, metaJson) => {
+    if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/')) return false
+    if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') return false
+    try {
+      const png = await toPngBlob(dataUrl)
+      if (!png) return false
+      // html flavor carries the display size + layout meta (see docs-main.ts r136)
+      let size = ''
+      let metaAttr = ''
+      if (typeof metaJson === 'string' && metaJson.length <= 2048) {
+        try {
+          const parsed = JSON.parse(metaJson) as Record<string, unknown>
+          const w = parsed.imageWidthPx
+          const h = parsed.imageHeightPx
+          if (typeof w === 'number' && w > 0) size += ` width="${Math.round(w)}"`
+          if (typeof h === 'number' && h > 0) size += ` height="${Math.round(h)}"`
+          metaAttr = ` data-image-meta="${escapeAttr(metaJson)}"`
+        } catch {
+          /* malformed payload: plain img */
+        }
+      }
+      const html = `<img src="${dataUrl}"${size}${metaAttr}>`
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          'image/png': png,
+          'text/html': new Blob([html], { type: 'text/html' }),
+        }),
+      ])
+      return true
+    } catch {
+      return false
+    }
+  },
+
+  fontMetrics: () => Promise.resolve(null),
+} satisfies Partial<DesktopApi>
+
+// apply the stored theme before the renderer mounts (main.tsx re-applies it identically)
+applyTheme(currentTheme())
+installExternalLinkGuard()
+
+export default browser

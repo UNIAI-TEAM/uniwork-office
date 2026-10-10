@@ -77,6 +77,11 @@ export function parseDeploymentProfile(raw: unknown): DeploymentProfile | null {
 export interface ResolveDeploymentOptions {
   /** process.resourcesPath of a packaged build (installer-provided profile) */
   resourcesDir?: string
+  /**
+   * The folder holding a Linux AppImage. Its resources are read-only, so a
+   * download bundle's profile is read from beside the AppImage instead.
+   */
+  appImageDir?: string
   userDataDir: string
   isPackaged: boolean
   env?: NodeJS.ProcessEnv
@@ -94,7 +99,8 @@ function readProfileFile(path: string, read: (path: string) => string): unknown 
 }
 
 /**
- * Resolution order: installed profile in resources, then a userData profile,
+ * Resolution order: installed profile in resources, then one beside an
+ * AppImage, then a userData profile,
  * then the UNIWORK_API_ORIGIN environment, then the `uniworkApiOrigin` app
  * setting. A profile file that exists but is invalid fails closed (null)
  * instead of silently falling through to a weaker source.
@@ -105,6 +111,7 @@ export function resolveDeploymentProfile(
   const read = options.readFile ?? ((path: string) => readFileSync(path, 'utf8'))
   const files = [
     options.resourcesDir ? join(options.resourcesDir, PROFILE_FILE) : undefined,
+    options.appImageDir ? join(options.appImageDir, PROFILE_FILE) : undefined,
     join(options.userDataDir, PROFILE_FILE),
   ].filter((path): path is string => Boolean(path))
   for (const file of files) {

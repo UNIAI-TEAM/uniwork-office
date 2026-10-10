@@ -1,0 +1,2365 @@
+{
+  "generatedAt": "2026-10-08T16:10:24.253Z",
+  "beforeDescription": "lane tip 425edd9 built with the previous pipeline (output in web/docs/dist, TTF faces, fonts inlined below 4 KiB, meta CSP, no manifest)",
+  "host": {
+    "cpus": 4,
+    "node": "v22.23.2",
+    "platform": "linux arm64",
+    "chromium": "151.0.7922.34",
+    "loadAvgBefore": [8.1, 9.63, 9.03],
+    "loadAvgAfter": [2.33, 5.47, 7.43]
+  },
+  "runsPerDoc": 5,
+  "before": {
+    "label": "before",
+    "dist": "../../../../../../tmp/claude-1001/-home-ubuntu-orca-workspaces-uniwork-office-uni-1013-w1-bundle/68868d2d-b533-433a-9883-e3f4eb54f125/scratchpad/lane-tip-dist",
+    "bundle": {
+      "generatedAt": "2026-10-08T16:03:11.644Z",
+      "dist": "../../../../../../tmp/claude-1001/-home-ubuntu-orca-workspaces-uniwork-office-uni-1013-w1-bundle/68868d2d-b533-433a-9883-e3f4eb54f125/scratchpad/lane-tip-dist",
+      "total": {
+        "files": 37,
+        "raw": 18739450,
+        "gzip": 12226079,
+        "brotli": 11248574
+      },
+      "initial": {
+        "note": "index.html + <script>/<link> targets + static JS imports (no dynamic import(), no CSS url() fonts)",
+        "files": ["index.html", "assets/index-DCr7_JdZ.js", "assets/index-BdX_MuC4.css"],
+        "total": {
+          "files": 3,
+          "raw": 4041071,
+          "gzip": 1202974,
+          "brotli": 947731
+        }
+      },
+      "sourcemapBytes": 12338709,
+      "byType": {
+        "js": {
+          "files": 1,
+          "raw": 3838843,
+          "gzip": 1168297,
+          "brotli": 918505
+        },
+        "font": {
+          "files": 33,
+          "raw": 14694132,
+          "gzip": 11018867,
+          "brotli": 10296631
+        },
+        "css": {
+          "files": 1,
+          "raw": 201051,
+          "gzip": 34113,
+          "brotli": 28807
+        },
+        "other": {
+          "files": 1,
+          "raw": 4247,
+          "gzip": 4238,
+          "brotli": 4212
+        },
+        "html": {
+          "files": 1,
+          "raw": 1177,
+          "gzip": 564,
+          "brotli": 419
+        }
+      },
+      "top15": [
+        {
+          "file": "assets/index-DCr7_JdZ.js",
+          "type": "js",
+          "raw": 3838843,
+          "gzip": 1168297,
+          "brotli": 918505
+        },
+        {
+          "file": "assets/NotoSerifCJKsc-Regular-subset-CLPB6QGT.woff2",
+          "type": "font",
+          "raw": 3495928,
+          "gzip": 3495814,
+          "brotli": 3495940
+        },
+        {
+          "file": "assets/NotoSansCJKsc-Regular-subset-BuHGXxnc.woff2",
+          "type": "font",
+          "raw": 2533160,
+          "gzip": 2533871,
+          "brotli": 2533169
+        },
+        {
+          "file": "assets/Carlito-BoldItalic-0dXjwGA0.ttf",
+          "type": "font",
+          "raw": 812344,
+          "gzip": 324624,
+          "brotli": 245119
+        },
+        {
+          "file": "assets/Carlito-Bold-BhbXr__n.ttf",
+          "type": "font",
+          "raw": 686240,
+          "gzip": 281928,
+          "brotli": 220989
+        },
+        {
+          "file": "assets/Carlito-Regular-Cbe9FLjp.ttf",
+          "type": "font",
+          "raw": 631712,
+          "gzip": 270501,
+          "brotli": 212809
+        },
+        {
+          "file": "assets/Carlito-Italic-KkZUqxJW.ttf",
+          "type": "font",
+          "raw": 619052,
+          "gzip": 284113,
+          "brotli": 227947
+        },
+        {
+          "file": "assets/GenOfficeSerifKR-Regular-subset-BkQyd75u.woff2",
+          "type": "font",
+          "raw": 512436,
+          "gzip": 512597,
+          "brotli": 512441
+        },
+        {
+          "file": "assets/LiberationSans-Italic-D6GtLuAT.ttf",
+          "type": "font",
+          "raw": 415816,
+          "gzip": 219784,
+          "brotli": 176566
+        },
+        {
+          "file": "assets/LiberationSans-Bold-CAnzDFU4.ttf",
+          "type": "font",
+          "raw": 414456,
+          "gzip": 214613,
+          "brotli": 170316
+        },
+        {
+          "file": "assets/LiberationSans-Regular-CqxnOoBp.ttf",
+          "type": "font",
+          "raw": 410712,
+          "gzip": 213267,
+          "brotli": 169061
+        },
+        {
+          "file": "assets/LiberationSans-BoldItalic-BC07J_j6.ttf",
+          "type": "font",
+          "raw": 408996,
+          "gzip": 216399,
+          "brotli": 174207
+        },
+        {
+          "file": "assets/LiberationSerif-Regular-DREh6cMU.ttf",
+          "type": "font",
+          "raw": 393576,
+          "gzip": 214018,
+          "brotli": 173370
+        },
+        {
+          "file": "assets/LiberationSerif-BoldItalic-DHf5skZ4.ttf",
+          "type": "font",
+          "raw": 376772,
+          "gzip": 214014,
+          "brotli": 175277
+        },
+        {
+          "file": "assets/LiberationSerif-Italic-Bwtmn-ni.ttf",
+          "type": "font",
+          "raw": 375632,
+          "gzip": 212549,
+          "brotli": 175187
+        }
+      ],
+      "files": [
+        {
+          "file": "assets/index-DCr7_JdZ.js",
+          "type": "js",
+          "raw": 3838843,
+          "gzip": 1168297,
+          "brotli": 918505
+        },
+        {
+          "file": "assets/NotoSerifCJKsc-Regular-subset-CLPB6QGT.woff2",
+          "type": "font",
+          "raw": 3495928,
+          "gzip": 3495814,
+          "brotli": 3495940
+        },
+        {
+          "file": "assets/NotoSansCJKsc-Regular-subset-BuHGXxnc.woff2",
+          "type": "font",
+          "raw": 2533160,
+          "gzip": 2533871,
+          "brotli": 2533169
+        },
+        {
+          "file": "assets/Carlito-BoldItalic-0dXjwGA0.ttf",
+          "type": "font",
+          "raw": 812344,
+          "gzip": 324624,
+          "brotli": 245119
+        },
+        {
+          "file": "assets/Carlito-Bold-BhbXr__n.ttf",
+          "type": "font",
+          "raw": 686240,
+          "gzip": 281928,
+          "brotli": 220989
+        },
+        {
+          "file": "assets/Carlito-Regular-Cbe9FLjp.ttf",
+          "type": "font",
+          "raw": 631712,
+          "gzip": 270501,
+          "brotli": 212809
+        },
+        {
+          "file": "assets/Carlito-Italic-KkZUqxJW.ttf",
+          "type": "font",
+          "raw": 619052,
+          "gzip": 284113,
+          "brotli": 227947
+        },
+        {
+          "file": "assets/GenOfficeSerifKR-Regular-subset-BkQyd75u.woff2",
+          "type": "font",
+          "raw": 512436,
+          "gzip": 512597,
+          "brotli": 512441
+        },
+        {
+          "file": "assets/LiberationSans-Italic-D6GtLuAT.ttf",
+          "type": "font",
+          "raw": 415816,
+          "gzip": 219784,
+          "brotli": 176566
+        },
+        {
+          "file": "assets/LiberationSans-Bold-CAnzDFU4.ttf",
+          "type": "font",
+          "raw": 414456,
+          "gzip": 214613,
+          "brotli": 170316
+        },
+        {
+          "file": "assets/LiberationSans-Regular-CqxnOoBp.ttf",
+          "type": "font",
+          "raw": 410712,
+          "gzip": 213267,
+          "brotli": 169061
+        },
+        {
+          "file": "assets/LiberationSans-BoldItalic-BC07J_j6.ttf",
+          "type": "font",
+          "raw": 408996,
+          "gzip": 216399,
+          "brotli": 174207
+        },
+        {
+          "file": "assets/LiberationSerif-Regular-DREh6cMU.ttf",
+          "type": "font",
+          "raw": 393576,
+          "gzip": 214018,
+          "brotli": 173370
+        },
+        {
+          "file": "assets/LiberationSerif-BoldItalic-DHf5skZ4.ttf",
+          "type": "font",
+          "raw": 376772,
+          "gzip": 214014,
+          "brotli": 175277
+        },
+        {
+          "file": "assets/LiberationSerif-Italic-Bwtmn-ni.ttf",
+          "type": "font",
+          "raw": 375632,
+          "gzip": 212549,
+          "brotli": 175187
+        },
+        {
+          "file": "assets/LiberationSerif-Bold-CT7WGLoV.ttf",
+          "type": "font",
+          "raw": 370096,
+          "gzip": 203918,
+          "brotli": 166862
+        },
+        {
+          "file": "assets/LiberationMono-Regular-CscJ8ftk.ttf",
+          "type": "font",
+          "raw": 319508,
+          "gzip": 180494,
+          "brotli": 147255
+        },
+        {
+          "file": "assets/LiberationMono-Bold-JpIqZVyK.ttf",
+          "type": "font",
+          "raw": 307996,
+          "gzip": 175797,
+          "brotli": 144696
+        },
+        {
+          "file": "assets/LiberationMono-BoldItalic-CW50-m9W.ttf",
+          "type": "font",
+          "raw": 284068,
+          "gzip": 167996,
+          "brotli": 139423
+        },
+        {
+          "file": "assets/GenOfficeGothicKR-Regular-subset-Bkvj_MFZ.woff2",
+          "type": "font",
+          "raw": 281980,
+          "gzip": 281687,
+          "brotli": 281985
+        },
+        {
+          "file": "assets/LiberationMono-Italic-BaW6sbi8.ttf",
+          "type": "font",
+          "raw": 281536,
+          "gzip": 165789,
+          "brotli": 137044
+        },
+        {
+          "file": "assets/GenOfficeSansKR-Regular-subset-CVxxonE8.woff2",
+          "type": "font",
+          "raw": 266128,
+          "gzip": 266063,
+          "brotli": 266133
+        },
+        {
+          "file": "assets/index-BdX_MuC4.css",
+          "type": "css",
+          "raw": 201051,
+          "gzip": 34113,
+          "brotli": 28807
+        },
+        {
+          "file": "assets/NotoNaskhArabic-Regular-subset-DQSqx2ZA.woff2",
+          "type": "font",
+          "raw": 69624,
+          "gzip": 69667,
+          "brotli": 69629
+        },
+        {
+          "file": "assets/NotoSansArabic-Regular-subset-D207GVuU.woff2",
+          "type": "font",
+          "raw": 63672,
+          "gzip": 63710,
+          "brotli": 63676
+        },
+        {
+          "file": "assets/Caladea-Italic-B_Jy4Zu6.ttf",
+          "type": "font",
+          "raw": 61860,
+          "gzip": 29279,
+          "brotli": 24767
+        },
+        {
+          "file": "assets/Caladea-BoldItalic-wZEKqfeH.ttf",
+          "type": "font",
+          "raw": 61828,
+          "gzip": 28992,
+          "brotli": 24298
+        },
+        {
+          "file": "assets/Caladea-Regular-BTbwo_Qo.ttf",
+          "type": "font",
+          "raw": 58964,
+          "gzip": 28194,
+          "brotli": 23876
+        },
+        {
+          "file": "assets/Caladea-Bold-D8qQyaGr.ttf",
+          "type": "font",
+          "raw": 58892,
+          "gzip": 27883,
+          "brotli": 23417
+        },
+        {
+          "file": "assets/GenOfficeTamil-Regular-DLISHPmH.woff2",
+          "type": "font",
+          "raw": 33072,
+          "gzip": 33105,
+          "brotli": 33076
+        },
+        {
+          "file": "assets/GenOfficeUIKanaJP-Bold-DbcaglVT.woff2",
+          "type": "font",
+          "raw": 26204,
+          "gzip": 26232,
+          "brotli": 26208
+        },
+        {
+          "file": "assets/GenOfficeUIKanaJP-Regular-Bj_7JzTT.woff2",
+          "type": "font",
+          "raw": 25288,
+          "gzip": 25316,
+          "brotli": 25292
+        },
+        {
+          "file": "assets/GenOfficePoppins-Regular-subset-RElVmxhA.woff2",
+          "type": "font",
+          "raw": 14160,
+          "gzip": 14183,
+          "brotli": 14164
+        },
+        {
+          "file": "assets/GenOfficePoppins-Bold-subset-CLJyStaw.woff2",
+          "type": "font",
+          "raw": 14128,
+          "gzip": 14151,
+          "brotli": 14132
+        },
+        {
+          "file": "assets/GenOfficeCheLatinKR-CFVfemg_.woff2",
+          "type": "font",
+          "raw": 8296,
+          "gzip": 8319,
+          "brotli": 8300
+        },
+        {
+          "file": "assets/send-enter-off-B0IfWMyy.png",
+          "type": "other",
+          "raw": 4247,
+          "gzip": 4238,
+          "brotli": 4212
+        },
+        {
+          "file": "index.html",
+          "type": "html",
+          "raw": 1177,
+          "gzip": 564,
+          "brotli": 419
+        }
+      ],
+      "biggestJsComposition": {
+        "file": "assets/index-DCr7_JdZ.js",
+        "method": "sourcemap VLQ decode: generated bytes attributed to originating source by segment span, grouped by top-level npm package / workspace dir (source-map-explorer is not installed; not run)",
+        "attributedBytes": 3838402,
+        "top": [
+          {
+            "name": "apps/docs/src/renderer/i18n",
+            "bytes": 1340425,
+            "pct": 34.9
+          },
+          {
+            "name": "packages/docx-engine",
+            "bytes": 463724,
+            "pct": 12.1
+          },
+          {
+            "name": "apps/docs/src/renderer/editor",
+            "bytes": 348060,
+            "pct": 9.1
+          },
+          {
+            "name": "apps/docs/src/renderer/components",
+            "bytes": 296195,
+            "pct": 7.7
+          },
+          {
+            "name": "apps/docs/src/renderer",
+            "bytes": 237259,
+            "pct": 6.2
+          },
+          {
+            "name": "react-dom",
+            "bytes": 182705,
+            "pct": 4.8
+          },
+          {
+            "name": "apps/docs/src/renderer/ai",
+            "bytes": 137380,
+            "pct": 3.6
+          },
+          {
+            "name": "prosemirror-view",
+            "bytes": 98111,
+            "pct": 2.6
+          },
+          {
+            "name": "jszip",
+            "bytes": 98078,
+            "pct": 2.6
+          },
+          {
+            "name": "@tiptap/core",
+            "bytes": 77205,
+            "pct": 2
+          },
+          {
+            "name": "utif2",
+            "bytes": 62730,
+            "pct": 1.6
+          },
+          {
+            "name": "pako",
+            "bytes": 48196,
+            "pct": 1.3
+          },
+          {
+            "name": "prosemirror-model",
+            "bytes": 45002,
+            "pct": 1.2
+          },
+          {
+            "name": "marked",
+            "bytes": 41270,
+            "pct": 1.1
+          },
+          {
+            "name": "prosemirror-tables",
+            "bytes": 35274,
+            "pct": 0.9
+          },
+          {
+            "name": "prosemirror-transform",
+            "bytes": 31342,
+            "pct": 0.8
+          },
+          {
+            "name": "packages/ui",
+            "bytes": 29180,
+            "pct": 0.8
+          },
+          {
+            "name": "fast-xml-parser",
+            "bytes": 27252,
+            "pct": 0.7
+          },
+          {
+            "name": "apps/docs/src/renderer/assets",
+            "bytes": 23272,
+            "pct": 0.6
+          },
+          {
+            "name": "(other) bridge",
+            "bytes": 21511,
+            "pct": 0.6
+          },
+          {
+            "name": "packages/pptx-render",
+            "bytes": 20581,
+            "pct": 0.5
+          },
+          {
+            "name": "is-unsafe",
+            "bytes": 16638,
+            "pct": 0.4
+          },
+          {
+            "name": "(other) protocol",
+            "bytes": 14684,
+            "pct": 0.4
+          },
+          {
+            "name": "packages/agent-core",
+            "bytes": 14602,
+            "pct": 0.4
+          },
+          {
+            "name": "prosemirror-state",
+            "bytes": 11886,
+            "pct": 0.3
+          },
+          {
+            "name": "apps/docs/src/renderer/zotero",
+            "bytes": 11569,
+            "pct": 0.3
+          },
+          {
+            "name": "prosemirror-commands",
+            "bytes": 9056,
+            "pct": 0.2
+          },
+          {
+            "name": "@tiptap/extensions",
+            "bytes": 9028,
+            "pct": 0.2
+          },
+          {
+            "name": "@tiptap/react",
+            "bytes": 8926,
+            "pct": 0.2
+          },
+          {
+            "name": "path-expression-matcher",
+            "bytes": 8650,
+            "pct": 0.2
+          }
+        ]
+      }
+    },
+    "picker": {
+      "simple": {
+        "generatedAt": "2026-10-08T16:03:19.868Z",
+        "dist": "/tmp/claude-1001/-home-ubuntu-orca-workspaces-uniwork-office-uni-1013-w1-bundle/68868d2d-b533-433a-9883-e3f4eb54f125/scratchpad/lane-tip-dist",
+        "compress": true,
+        "doc": "simple",
+        "onLoad": {
+          "files": 3,
+          "wireBytes": 3086214,
+          "list": [
+            {
+              "phase": "load",
+              "file": "Carlito-Bold-BhbXr__n.ttf",
+              "wire": 282151
+            },
+            {
+              "phase": "load",
+              "file": "Carlito-Regular-Cbe9FLjp.ttf",
+              "wire": 270724
+            },
+            {
+              "phase": "load",
+              "file": "NotoSansCJKsc-Regular-subset-BuHGXxnc.woff2",
+              "wire": 2533339
+            }
+          ]
+        },
+        "onPickerOpen": {
+          "menuItems": 32,
+          "files": 6,
+          "wireBytes": 4697650,
+          "list": [
+            {
+              "phase": "picker",
+              "file": "Caladea-Regular-BTbwo_Qo.ttf",
+              "wire": 28416
+            },
+            {
+              "phase": "picker",
+              "file": "LiberationSans-Regular-CqxnOoBp.ttf",
+              "wire": 213490
+            },
+            {
+              "phase": "picker",
+              "file": "LiberationMono-Regular-CscJ8ftk.ttf",
+              "wire": 180717
+            },
+            {
+              "phase": "picker",
+              "file": "GenOfficeSansKR-Regular-subset-CVxxonE8.woff2",
+              "wire": 266306
+            },
+            {
+              "phase": "picker",
+              "file": "GenOfficeSerifKR-Regular-subset-BkQyd75u.woff2",
+              "wire": 512614
+            },
+            {
+              "phase": "picker",
+              "file": "NotoSerifCJKsc-Regular-subset-CLPB6QGT.woff2",
+              "wire": 3496107
+            }
+          ]
+        }
+      },
+      "long": {
+        "generatedAt": "2026-10-08T16:03:37.028Z",
+        "dist": "/tmp/claude-1001/-home-ubuntu-orca-workspaces-uniwork-office-uni-1013-w1-bundle/68868d2d-b533-433a-9883-e3f4eb54f125/scratchpad/lane-tip-dist",
+        "compress": true,
+        "doc": "long",
+        "onLoad": {
+          "files": 2,
+          "wireBytes": 552875,
+          "list": [
+            {
+              "phase": "load",
+              "file": "Carlito-Bold-BhbXr__n.ttf",
+              "wire": 282151
+            },
+            {
+              "phase": "load",
+              "file": "Carlito-Regular-Cbe9FLjp.ttf",
+              "wire": 270724
+            }
+          ]
+        },
+        "onPickerOpen": {
+          "menuItems": 32,
+          "files": 7,
+          "wireBytes": 7230989,
+          "list": [
+            {
+              "phase": "picker",
+              "file": "Caladea-Regular-BTbwo_Qo.ttf",
+              "wire": 28416
+            },
+            {
+              "phase": "picker",
+              "file": "LiberationSans-Regular-CqxnOoBp.ttf",
+              "wire": 213490
+            },
+            {
+              "phase": "picker",
+              "file": "LiberationMono-Regular-CscJ8ftk.ttf",
+              "wire": 180717
+            },
+            {
+              "phase": "picker",
+              "file": "GenOfficeSansKR-Regular-subset-CVxxonE8.woff2",
+              "wire": 266306
+            },
+            {
+              "phase": "picker",
+              "file": "GenOfficeSerifKR-Regular-subset-BkQyd75u.woff2",
+              "wire": 512614
+            },
+            {
+              "phase": "picker",
+              "file": "NotoSansCJKsc-Regular-subset-BuHGXxnc.woff2",
+              "wire": 2533339
+            },
+            {
+              "phase": "picker",
+              "file": "NotoSerifCJKsc-Regular-subset-CLPB6QGT.woff2",
+              "wire": 3496107
+            }
+          ]
+        }
+      }
+    },
+    "load": {
+      "gzip": {
+        "docs": {
+          "simple.docx": {
+            "okRuns": 5,
+            "timeToEditableMs": {
+              "median": 1079,
+              "min": 790.900146484375,
+              "max": 1732.5,
+              "n": 5
+            },
+            "transferredAtEditableBytes": {
+              "median": 1491780,
+              "min": 1491780,
+              "max": 1491780,
+              "n": 5
+            },
+            "transferredBytes": {
+              "median": 4295843,
+              "min": 4295843,
+              "max": 4295843,
+              "n": 5
+            },
+            "requests": {
+              "median": 9,
+              "min": 9,
+              "max": 9,
+              "n": 5
+            },
+            "failedRequests": 0,
+            "firstRunRequests": [
+              {
+                "url": "/test-host/host.js",
+                "type": "Script",
+                "wire": 2800,
+                "afterEditable": false
+              },
+              {
+                "url": "/test-host/?open=%2Ffixtures%2Fsimple.docx&frame=%2Findex.html",
+                "type": "Document",
+                "wire": 743,
+                "afterEditable": false
+              },
+              {
+                "url": "/fixtures/simple.docx",
+                "type": "Fetch",
+                "wire": 2393,
+                "afterEditable": false
+              },
+              {
+                "url": "/index.html",
+                "type": "Document",
+                "wire": 800,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/index-BdX_MuC4.css",
+                "type": "Stylesheet",
+                "wire": 34350,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/index-DCr7_JdZ.js",
+                "type": "Script",
+                "wire": 1168543,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/Carlito-Bold-BhbXr__n.ttf",
+                "type": "Font",
+                "wire": 282151,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/Carlito-Regular-Cbe9FLjp.ttf",
+                "type": "Font",
+                "wire": 270724,
+                "afterEditable": true
+              },
+              {
+                "url": "/assets/NotoSansCJKsc-Regular-subset-BuHGXxnc.woff2",
+                "type": "Font",
+                "wire": 2533339,
+                "afterEditable": true
+              }
+            ]
+          },
+          "kitchen-sink.docx": {
+            "okRuns": 5,
+            "timeToEditableMs": {
+              "median": 999.89990234375,
+              "min": 667.5,
+              "max": 1738.199951171875,
+              "n": 5
+            },
+            "transferredAtEditableBytes": {
+              "median": 2048099,
+              "min": 2048099,
+              "max": 2048099,
+              "n": 5
+            },
+            "transferredBytes": {
+              "median": 4581438,
+              "min": 4581438,
+              "max": 4581438,
+              "n": 5
+            },
+            "requests": {
+              "median": 11,
+              "min": 11,
+              "max": 11,
+              "n": 5
+            },
+            "failedRequests": 0,
+            "firstRunRequests": [
+              {
+                "url": "/test-host/?open=%2Ffixtures%2Fkitchen-sink.docx&frame=%2Findex.html",
+                "type": "Document",
+                "wire": 743,
+                "afterEditable": false
+              },
+              {
+                "url": "/test-host/host.js",
+                "type": "Script",
+                "wire": 2800,
+                "afterEditable": false
+              },
+              {
+                "url": "/fixtures/kitchen-sink.docx",
+                "type": "Fetch",
+                "wire": 3652,
+                "afterEditable": false
+              },
+              {
+                "url": "/index.html",
+                "type": "Document",
+                "wire": 800,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/index-BdX_MuC4.css",
+                "type": "Stylesheet",
+                "wire": 34350,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/index-DCr7_JdZ.js",
+                "type": "Script",
+                "wire": 1168543,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/Carlito-Bold-BhbXr__n.ttf",
+                "type": "Font",
+                "wire": 282151,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/Carlito-Regular-Cbe9FLjp.ttf",
+                "type": "Font",
+                "wire": 270724,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/Carlito-Italic-KkZUqxJW.ttf",
+                "type": "Font",
+                "wire": 284336,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/NotoSansCJKsc-Regular-subset-BuHGXxnc.woff2",
+                "type": "Font",
+                "wire": 2533339,
+                "afterEditable": true
+              }
+            ]
+          },
+          "long.docx": {
+            "okRuns": 5,
+            "timeToEditableMs": {
+              "median": 1513.7001953125,
+              "min": 1205.89990234375,
+              "max": 2331.699951171875,
+              "n": 5
+            },
+            "transferredAtEditableBytes": {
+              "median": 1764852,
+              "min": 1764852,
+              "max": 1764852,
+              "n": 5
+            },
+            "transferredBytes": {
+              "median": 1764852,
+              "min": 1764852,
+              "max": 1764852,
+              "n": 5
+            },
+            "requests": {
+              "median": 8,
+              "min": 8,
+              "max": 8,
+              "n": 5
+            },
+            "failedRequests": 0,
+            "firstRunRequests": [
+              {
+                "url": "/test-host/?open=%2Ffixtures%2Flong.docx&frame=%2Findex.html",
+                "type": "Document",
+                "wire": 743,
+                "afterEditable": false
+              },
+              {
+                "url": "/test-host/host.js",
+                "type": "Script",
+                "wire": 2800,
+                "afterEditable": false
+              },
+              {
+                "url": "/fixtures/long.docx",
+                "type": "Fetch",
+                "wire": 4741,
+                "afterEditable": false
+              },
+              {
+                "url": "/index.html",
+                "type": "Document",
+                "wire": 800,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/index-BdX_MuC4.css",
+                "type": "Stylesheet",
+                "wire": 34350,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/index-DCr7_JdZ.js",
+                "type": "Script",
+                "wire": 1168543,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/Carlito-Bold-BhbXr__n.ttf",
+                "type": "Font",
+                "wire": 282151,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/Carlito-Regular-Cbe9FLjp.ttf",
+                "type": "Font",
+                "wire": 270724,
+                "afterEditable": false
+              }
+            ]
+          }
+        }
+      },
+      "raw": {
+        "docs": {
+          "simple.docx": {
+            "okRuns": 5,
+            "timeToEditableMs": {
+              "median": 834.39990234375,
+              "min": 694.099853515625,
+              "max": 854.400146484375,
+              "n": 5
+            },
+            "transferredAtEditableBytes": {
+              "median": 5370169,
+              "min": 5370169,
+              "max": 5370169,
+              "n": 5
+            },
+            "transferredBytes": {
+              "median": 7903508,
+              "min": 7903508,
+              "max": 7903508,
+              "n": 5
+            },
+            "requests": {
+              "median": 9,
+              "min": 9,
+              "max": 9,
+              "n": 5
+            },
+            "failedRequests": 0,
+            "firstRunRequests": [
+              {
+                "url": "/test-host/?open=%2Ffixtures%2Fsimple.docx&frame=%2Findex.html",
+                "type": "Document",
+                "wire": 1135,
+                "afterEditable": false
+              },
+              {
+                "url": "/test-host/host.js",
+                "type": "Script",
+                "wire": 6686,
+                "afterEditable": false
+              },
+              {
+                "url": "/fixtures/simple.docx",
+                "type": "Fetch",
+                "wire": 2393,
+                "afterEditable": false
+              },
+              {
+                "url": "/index.html",
+                "type": "Document",
+                "wire": 1367,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/index-BdX_MuC4.css",
+                "type": "Stylesheet",
+                "wire": 201242,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/index-DCr7_JdZ.js",
+                "type": "Script",
+                "wire": 3839042,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/Carlito-Bold-BhbXr__n.ttf",
+                "type": "Font",
+                "wire": 686416,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/Carlito-Regular-Cbe9FLjp.ttf",
+                "type": "Font",
+                "wire": 631888,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/NotoSansCJKsc-Regular-subset-BuHGXxnc.woff2",
+                "type": "Font",
+                "wire": 2533339,
+                "afterEditable": true
+              }
+            ]
+          },
+          "kitchen-sink.docx": {
+            "okRuns": 5,
+            "timeToEditableMs": {
+              "median": 859.999755859375,
+              "min": 798.60009765625,
+              "max": 974.900146484375,
+              "n": 5
+            },
+            "transferredAtEditableBytes": {
+              "median": 5990656,
+              "min": 5990656,
+              "max": 5990656,
+              "n": 5
+            },
+            "transferredBytes": {
+              "median": 8523995,
+              "min": 8523995,
+              "max": 8523995,
+              "n": 5
+            },
+            "requests": {
+              "median": 11,
+              "min": 11,
+              "max": 11,
+              "n": 5
+            },
+            "failedRequests": 0,
+            "firstRunRequests": [
+              {
+                "url": "/test-host/host.js",
+                "type": "Script",
+                "wire": 6686,
+                "afterEditable": false
+              },
+              {
+                "url": "/test-host/?open=%2Ffixtures%2Fkitchen-sink.docx&frame=%2Findex.html",
+                "type": "Document",
+                "wire": 1135,
+                "afterEditable": false
+              },
+              {
+                "url": "/fixtures/kitchen-sink.docx",
+                "type": "Fetch",
+                "wire": 3652,
+                "afterEditable": false
+              },
+              {
+                "url": "/index.html",
+                "type": "Document",
+                "wire": 1367,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/index-BdX_MuC4.css",
+                "type": "Stylesheet",
+                "wire": 201242,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/index-DCr7_JdZ.js",
+                "type": "Script",
+                "wire": 3839042,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/Carlito-Bold-BhbXr__n.ttf",
+                "type": "Font",
+                "wire": 686416,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/Carlito-Regular-Cbe9FLjp.ttf",
+                "type": "Font",
+                "wire": 631888,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/Carlito-Italic-KkZUqxJW.ttf",
+                "type": "Font",
+                "wire": 619228,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/NotoSansCJKsc-Regular-subset-BuHGXxnc.woff2",
+                "type": "Font",
+                "wire": 2533339,
+                "afterEditable": true
+              }
+            ]
+          },
+          "long.docx": {
+            "okRuns": 5,
+            "timeToEditableMs": {
+              "median": 1254.400146484375,
+              "min": 1142.099853515625,
+              "max": 1348.10009765625,
+              "n": 5
+            },
+            "transferredAtEditableBytes": {
+              "median": 5372517,
+              "min": 5372517,
+              "max": 5372517,
+              "n": 5
+            },
+            "transferredBytes": {
+              "median": 5372517,
+              "min": 5372517,
+              "max": 5372517,
+              "n": 5
+            },
+            "requests": {
+              "median": 8,
+              "min": 8,
+              "max": 8,
+              "n": 5
+            },
+            "failedRequests": 0,
+            "firstRunRequests": [
+              {
+                "url": "/test-host/?open=%2Ffixtures%2Flong.docx&frame=%2Findex.html",
+                "type": "Document",
+                "wire": 1135,
+                "afterEditable": false
+              },
+              {
+                "url": "/test-host/host.js",
+                "type": "Script",
+                "wire": 6686,
+                "afterEditable": false
+              },
+              {
+                "url": "/fixtures/long.docx",
+                "type": "Fetch",
+                "wire": 4741,
+                "afterEditable": false
+              },
+              {
+                "url": "/index.html",
+                "type": "Document",
+                "wire": 1367,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/index-BdX_MuC4.css",
+                "type": "Stylesheet",
+                "wire": 201242,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/index-DCr7_JdZ.js",
+                "type": "Script",
+                "wire": 3839042,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/Carlito-Bold-BhbXr__n.ttf",
+                "type": "Font",
+                "wire": 686416,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/Carlito-Regular-Cbe9FLjp.ttf",
+                "type": "Font",
+                "wire": 631888,
+                "afterEditable": false
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "after": {
+    "label": "after",
+    "dist": "dist-web/docs/0.1.0-97ea1ea",
+    "bundle": {
+      "generatedAt": "2026-10-08T16:04:19.043Z",
+      "dist": "dist-web/docs/0.1.0-97ea1ea",
+      "total": {
+        "files": 41,
+        "raw": 13940208,
+        "gzip": 11083010,
+        "brotli": 10827266
+      },
+      "initial": {
+        "note": "index.html + <script>/<link> targets + static JS imports (no dynamic import(), no CSS url() fonts)",
+        "files": ["index.html", "assets/index-DxyHwTVl.js", "assets/index-CGJNJzuU.css"],
+        "total": {
+          "files": 3,
+          "raw": 4041317,
+          "gzip": 1202547,
+          "brotli": 947107
+        }
+      },
+      "sourcemapBytes": 0,
+      "byType": {
+        "js": {
+          "files": 1,
+          "raw": 3838800,
+          "gzip": 1168264,
+          "brotli": 918242
+        },
+        "font": {
+          "files": 34,
+          "raw": 9882008,
+          "gzip": 9872415,
+          "brotli": 9872588
+        },
+        "css": {
+          "files": 1,
+          "raw": 201665,
+          "gzip": 33765,
+          "brotli": 28504
+        },
+        "other": {
+          "files": 4,
+          "raw": 16883,
+          "gzip": 8048,
+          "brotli": 7571
+        },
+        "html": {
+          "files": 1,
+          "raw": 852,
+          "gzip": 518,
+          "brotli": 361
+        }
+      },
+      "top15": [
+        {
+          "file": "assets/index-DxyHwTVl.js",
+          "type": "js",
+          "raw": 3838800,
+          "gzip": 1168264,
+          "brotli": 918242
+        },
+        {
+          "file": "fonts/NotoSerifCJKsc-Regular-subset-CLPB6QGT.woff2",
+          "type": "font",
+          "raw": 3495928,
+          "gzip": 3495814,
+          "brotli": 3495940
+        },
+        {
+          "file": "fonts/NotoSansCJKsc-Regular-subset-BuHGXxnc.woff2",
+          "type": "font",
+          "raw": 2533160,
+          "gzip": 2533871,
+          "brotli": 2533169
+        },
+        {
+          "file": "fonts/GenOfficeSerifKR-Regular-subset-BkQyd75u.woff2",
+          "type": "font",
+          "raw": 512436,
+          "gzip": 512597,
+          "brotli": 512441
+        },
+        {
+          "file": "fonts/GenOfficeGothicKR-Regular-subset-Bkvj_MFZ.woff2",
+          "type": "font",
+          "raw": 281980,
+          "gzip": 281687,
+          "brotli": 281985
+        },
+        {
+          "file": "fonts/GenOfficeSansKR-Regular-subset-CVxxonE8.woff2",
+          "type": "font",
+          "raw": 266128,
+          "gzip": 266063,
+          "brotli": 266133
+        },
+        {
+          "file": "fonts/Carlito-BoldItalic-BqaEwLjh.woff2",
+          "type": "font",
+          "raw": 207116,
+          "gzip": 207199,
+          "brotli": 207121
+        },
+        {
+          "file": "fonts/Carlito-Italic-CcV9hCBk.woff2",
+          "type": "font",
+          "raw": 202000,
+          "gzip": 202083,
+          "brotli": 202005
+        },
+        {
+          "file": "assets/index-CGJNJzuU.css",
+          "type": "css",
+          "raw": 201665,
+          "gzip": 33765,
+          "brotli": 28504
+        },
+        {
+          "file": "fonts/Carlito-Bold-DN11iCUU.woff2",
+          "type": "font",
+          "raw": 198468,
+          "gzip": 198551,
+          "brotli": 198473
+        },
+        {
+          "file": "fonts/Carlito-Regular-fal-2WfU.woff2",
+          "type": "font",
+          "raw": 190604,
+          "gzip": 190682,
+          "brotli": 190609
+        },
+        {
+          "file": "fonts/LiberationSans-Italic-B67WhyiB.woff2",
+          "type": "font",
+          "raw": 153144,
+          "gzip": 152071,
+          "brotli": 151765
+        },
+        {
+          "file": "fonts/LiberationSans-BoldItalic-BYHlqTuw.woff2",
+          "type": "font",
+          "raw": 150908,
+          "gzip": 149615,
+          "brotli": 149336
+        },
+        {
+          "file": "fonts/LiberationSans-Bold-BlSkeIb-.woff2",
+          "type": "font",
+          "raw": 148756,
+          "gzip": 147718,
+          "brotli": 147450
+        },
+        {
+          "file": "fonts/LiberationSerif-Italic-BdGY3XA4.woff2",
+          "type": "font",
+          "raw": 147536,
+          "gzip": 146726,
+          "brotli": 147541
+        }
+      ],
+      "files": [
+        {
+          "file": "assets/index-DxyHwTVl.js",
+          "type": "js",
+          "raw": 3838800,
+          "gzip": 1168264,
+          "brotli": 918242
+        },
+        {
+          "file": "fonts/NotoSerifCJKsc-Regular-subset-CLPB6QGT.woff2",
+          "type": "font",
+          "raw": 3495928,
+          "gzip": 3495814,
+          "brotli": 3495940
+        },
+        {
+          "file": "fonts/NotoSansCJKsc-Regular-subset-BuHGXxnc.woff2",
+          "type": "font",
+          "raw": 2533160,
+          "gzip": 2533871,
+          "brotli": 2533169
+        },
+        {
+          "file": "fonts/GenOfficeSerifKR-Regular-subset-BkQyd75u.woff2",
+          "type": "font",
+          "raw": 512436,
+          "gzip": 512597,
+          "brotli": 512441
+        },
+        {
+          "file": "fonts/GenOfficeGothicKR-Regular-subset-Bkvj_MFZ.woff2",
+          "type": "font",
+          "raw": 281980,
+          "gzip": 281687,
+          "brotli": 281985
+        },
+        {
+          "file": "fonts/GenOfficeSansKR-Regular-subset-CVxxonE8.woff2",
+          "type": "font",
+          "raw": 266128,
+          "gzip": 266063,
+          "brotli": 266133
+        },
+        {
+          "file": "fonts/Carlito-BoldItalic-BqaEwLjh.woff2",
+          "type": "font",
+          "raw": 207116,
+          "gzip": 207199,
+          "brotli": 207121
+        },
+        {
+          "file": "fonts/Carlito-Italic-CcV9hCBk.woff2",
+          "type": "font",
+          "raw": 202000,
+          "gzip": 202083,
+          "brotli": 202005
+        },
+        {
+          "file": "assets/index-CGJNJzuU.css",
+          "type": "css",
+          "raw": 201665,
+          "gzip": 33765,
+          "brotli": 28504
+        },
+        {
+          "file": "fonts/Carlito-Bold-DN11iCUU.woff2",
+          "type": "font",
+          "raw": 198468,
+          "gzip": 198551,
+          "brotli": 198473
+        },
+        {
+          "file": "fonts/Carlito-Regular-fal-2WfU.woff2",
+          "type": "font",
+          "raw": 190604,
+          "gzip": 190682,
+          "brotli": 190609
+        },
+        {
+          "file": "fonts/LiberationSans-Italic-B67WhyiB.woff2",
+          "type": "font",
+          "raw": 153144,
+          "gzip": 152071,
+          "brotli": 151765
+        },
+        {
+          "file": "fonts/LiberationSans-BoldItalic-BYHlqTuw.woff2",
+          "type": "font",
+          "raw": 150908,
+          "gzip": 149615,
+          "brotli": 149336
+        },
+        {
+          "file": "fonts/LiberationSans-Bold-BlSkeIb-.woff2",
+          "type": "font",
+          "raw": 148756,
+          "gzip": 147718,
+          "brotli": 147450
+        },
+        {
+          "file": "fonts/LiberationSerif-Italic-BdGY3XA4.woff2",
+          "type": "font",
+          "raw": 147536,
+          "gzip": 146726,
+          "brotli": 147541
+        },
+        {
+          "file": "fonts/LiberationSerif-BoldItalic-DqILcGx7.woff2",
+          "type": "font",
+          "raw": 147132,
+          "gzip": 146291,
+          "brotli": 147137
+        },
+        {
+          "file": "fonts/LiberationSans-Regular-r-gFvyde.woff2",
+          "type": "font",
+          "raw": 147108,
+          "gzip": 146149,
+          "brotli": 145920
+        },
+        {
+          "file": "fonts/LiberationSerif-Regular-Bm6iK1hG.woff2",
+          "type": "font",
+          "raw": 146880,
+          "gzip": 145920,
+          "brotli": 145761
+        },
+        {
+          "file": "fonts/LiberationSerif-Bold-DS5JG3CL.woff2",
+          "type": "font",
+          "raw": 141068,
+          "gzip": 140249,
+          "brotli": 140089
+        },
+        {
+          "file": "fonts/LiberationMono-Regular-Bv_fWIHn.woff2",
+          "type": "font",
+          "raw": 125996,
+          "gzip": 125111,
+          "brotli": 124973
+        },
+        {
+          "file": "fonts/LiberationMono-Bold-BZxqunF8.woff2",
+          "type": "font",
+          "raw": 122928,
+          "gzip": 122211,
+          "brotli": 122027
+        },
+        {
+          "file": "fonts/LiberationMono-BoldItalic-BTDQyQp_.woff2",
+          "type": "font",
+          "raw": 117028,
+          "gzip": 116453,
+          "brotli": 117033
+        },
+        {
+          "file": "fonts/LiberationMono-Italic-Bprp0jhy.woff2",
+          "type": "font",
+          "raw": 114728,
+          "gzip": 114055,
+          "brotli": 114733
+        },
+        {
+          "file": "fonts/NotoNaskhArabic-Regular-subset-DQSqx2ZA.woff2",
+          "type": "font",
+          "raw": 69624,
+          "gzip": 69667,
+          "brotli": 69629
+        },
+        {
+          "file": "fonts/NotoSansArabic-Regular-subset-D207GVuU.woff2",
+          "type": "font",
+          "raw": 63672,
+          "gzip": 63710,
+          "brotli": 63676
+        },
+        {
+          "file": "fonts/GenOfficeTamil-Regular-DLISHPmH.woff2",
+          "type": "font",
+          "raw": 33072,
+          "gzip": 33105,
+          "brotli": 33076
+        },
+        {
+          "file": "fonts/GenOfficeUIKanaJP-Bold-DbcaglVT.woff2",
+          "type": "font",
+          "raw": 26204,
+          "gzip": 26232,
+          "brotli": 26208
+        },
+        {
+          "file": "fonts/GenOfficeUIKanaJP-Regular-Bj_7JzTT.woff2",
+          "type": "font",
+          "raw": 25288,
+          "gzip": 25316,
+          "brotli": 25292
+        },
+        {
+          "file": "fonts/Caladea-Italic-BlypM-0H.woff2",
+          "type": "font",
+          "raw": 19616,
+          "gzip": 19639,
+          "brotli": 19603
+        },
+        {
+          "file": "fonts/Caladea-BoldItalic-Ba27xK_q.woff2",
+          "type": "font",
+          "raw": 19328,
+          "gzip": 19351,
+          "brotli": 19321
+        },
+        {
+          "file": "fonts/Caladea-Regular-DaybilA1.woff2",
+          "type": "font",
+          "raw": 18848,
+          "gzip": 18862,
+          "brotli": 18830
+        },
+        {
+          "file": "fonts/Caladea-Bold-CZKSWaR4.woff2",
+          "type": "font",
+          "raw": 18428,
+          "gzip": 18443,
+          "brotli": 18411
+        },
+        {
+          "file": "fonts/GenOfficePoppins-Regular-subset-RElVmxhA.woff2",
+          "type": "font",
+          "raw": 14160,
+          "gzip": 14183,
+          "brotli": 14164
+        },
+        {
+          "file": "fonts/GenOfficePoppins-Bold-subset-CLJyStaw.woff2",
+          "type": "font",
+          "raw": 14128,
+          "gzip": 14151,
+          "brotli": 14132
+        },
+        {
+          "file": "manifest.json",
+          "type": "other",
+          "raw": 10407,
+          "gzip": 2910,
+          "brotli": 2603
+        },
+        {
+          "file": "fonts/GenOfficeCheLatinKR-CFVfemg_.woff2",
+          "type": "font",
+          "raw": 8296,
+          "gzip": 8319,
+          "brotli": 8300
+        },
+        {
+          "file": "assets/send-enter-off-B0IfWMyy.png",
+          "type": "other",
+          "raw": 4247,
+          "gzip": 4238,
+          "brotli": 4212
+        },
+        {
+          "file": "csp.json",
+          "type": "other",
+          "raw": 1374,
+          "gzip": 551,
+          "brotli": 467
+        },
+        {
+          "file": "headers.json",
+          "type": "other",
+          "raw": 855,
+          "gzip": 349,
+          "brotli": 289
+        },
+        {
+          "file": "index.html",
+          "type": "html",
+          "raw": 852,
+          "gzip": 518,
+          "brotli": 361
+        },
+        {
+          "file": "fonts/GenOfficePUABlank-DhfF4Y_f.woff2",
+          "type": "font",
+          "raw": 312,
+          "gzip": 321,
+          "brotli": 305
+        }
+      ],
+      "biggestJsComposition": null
+    },
+    "picker": {
+      "simple": {
+        "generatedAt": "2026-10-08T16:04:26.991Z",
+        "dist": "/home/ubuntu/orca/workspaces/uniwork-office/uni-1013-w1-bundle/dist-web/docs/0.1.0-97ea1ea",
+        "compress": true,
+        "doc": "simple",
+        "onLoad": {
+          "files": 3,
+          "wireBytes": 2923037,
+          "list": [
+            {
+              "phase": "load",
+              "file": "Carlito-Bold-DN11iCUU.woff2",
+              "wire": 198736
+            },
+            {
+              "phase": "load",
+              "file": "Carlito-Regular-fal-2WfU.woff2",
+              "wire": 190872
+            },
+            {
+              "phase": "load",
+              "file": "NotoSansCJKsc-Regular-subset-BuHGXxnc.woff2",
+              "wire": 2533429
+            }
+          ]
+        },
+        "onPickerOpen": {
+          "menuItems": 32,
+          "files": 6,
+          "wireBytes": 4568052,
+          "list": [
+            {
+              "phase": "picker",
+              "file": "Caladea-Regular-DaybilA1.woff2",
+              "wire": 19115
+            },
+            {
+              "phase": "picker",
+              "file": "LiberationSans-Regular-r-gFvyde.woff2",
+              "wire": 147376
+            },
+            {
+              "phase": "picker",
+              "file": "LiberationMono-Regular-Bv_fWIHn.woff2",
+              "wire": 126264
+            },
+            {
+              "phase": "picker",
+              "file": "GenOfficeSansKR-Regular-subset-CVxxonE8.woff2",
+              "wire": 266396
+            },
+            {
+              "phase": "picker",
+              "file": "GenOfficeSerifKR-Regular-subset-BkQyd75u.woff2",
+              "wire": 512704
+            },
+            {
+              "phase": "picker",
+              "file": "NotoSerifCJKsc-Regular-subset-CLPB6QGT.woff2",
+              "wire": 3496197
+            }
+          ]
+        }
+      },
+      "long": {
+        "generatedAt": "2026-10-08T16:04:44.305Z",
+        "dist": "/home/ubuntu/orca/workspaces/uniwork-office/uni-1013-w1-bundle/dist-web/docs/0.1.0-97ea1ea",
+        "compress": true,
+        "doc": "long",
+        "onLoad": {
+          "files": 2,
+          "wireBytes": 389608,
+          "list": [
+            {
+              "phase": "load",
+              "file": "Carlito-Regular-fal-2WfU.woff2",
+              "wire": 190872
+            },
+            {
+              "phase": "load",
+              "file": "Carlito-Bold-DN11iCUU.woff2",
+              "wire": 198736
+            }
+          ]
+        },
+        "onPickerOpen": {
+          "menuItems": 32,
+          "files": 7,
+          "wireBytes": 7101481,
+          "list": [
+            {
+              "phase": "picker",
+              "file": "Caladea-Regular-DaybilA1.woff2",
+              "wire": 19115
+            },
+            {
+              "phase": "picker",
+              "file": "LiberationMono-Regular-Bv_fWIHn.woff2",
+              "wire": 126264
+            },
+            {
+              "phase": "picker",
+              "file": "LiberationSans-Regular-r-gFvyde.woff2",
+              "wire": 147376
+            },
+            {
+              "phase": "picker",
+              "file": "GenOfficeSansKR-Regular-subset-CVxxonE8.woff2",
+              "wire": 266396
+            },
+            {
+              "phase": "picker",
+              "file": "GenOfficeSerifKR-Regular-subset-BkQyd75u.woff2",
+              "wire": 512704
+            },
+            {
+              "phase": "picker",
+              "file": "NotoSerifCJKsc-Regular-subset-CLPB6QGT.woff2",
+              "wire": 3496197
+            },
+            {
+              "phase": "picker",
+              "file": "NotoSansCJKsc-Regular-subset-BuHGXxnc.woff2",
+              "wire": 2533429
+            }
+          ]
+        }
+      }
+    },
+    "manifest": {
+      "version": "0.1.0-97ea1ea",
+      "gitSha": "97ea1ea",
+      "dirty": false,
+      "totalBytes": 13929801,
+      "gzipBytes": 11080100,
+      "initial": {
+        "files": 3,
+        "bytes": 4041317,
+        "gzipBytes": 1202547
+      },
+      "deferred": {
+        "files": 35,
+        "bytes": 9886255,
+        "gzipBytes": 9876653
+      },
+      "files": 40
+    },
+    "load": {
+      "gzip": {
+        "docs": {
+          "simple.docx": {
+            "okRuns": 5,
+            "timeToEditableMs": {
+              "median": 983.400146484375,
+              "min": 921.300048828125,
+              "max": 1751.5,
+              "n": 5
+            },
+            "transferredAtEditableBytes": {
+              "median": 1599522,
+              "min": 1599522,
+              "max": 1599522,
+              "n": 5
+            },
+            "transferredBytes": {
+              "median": 4132951,
+              "min": 4132951,
+              "max": 4132951,
+              "n": 5
+            },
+            "requests": {
+              "median": 9,
+              "min": 9,
+              "max": 9,
+              "n": 5
+            },
+            "failedRequests": 0,
+            "firstRunRequests": [
+              {
+                "url": "/test-host/?open=%2Ffixtures%2Fsimple.docx&frame=%2Findex.html",
+                "type": "Document",
+                "wire": 806,
+                "afterEditable": false
+              },
+              {
+                "url": "/test-host/host.js",
+                "type": "Script",
+                "wire": 2863,
+                "afterEditable": false
+              },
+              {
+                "url": "/fixtures/simple.docx",
+                "type": "Fetch",
+                "wire": 2456,
+                "afterEditable": false
+              },
+              {
+                "url": "/index.html",
+                "type": "Document",
+                "wire": 1097,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/index-CGJNJzuU.css",
+                "type": "Stylesheet",
+                "wire": 34092,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/index-DxyHwTVl.js",
+                "type": "Script",
+                "wire": 1168600,
+                "afterEditable": false
+              },
+              {
+                "url": "/fonts/Carlito-Bold-DN11iCUU.woff2",
+                "type": "Font",
+                "wire": 198736,
+                "afterEditable": false
+              },
+              {
+                "url": "/fonts/Carlito-Regular-fal-2WfU.woff2",
+                "type": "Font",
+                "wire": 190872,
+                "afterEditable": false
+              },
+              {
+                "url": "/fonts/NotoSansCJKsc-Regular-subset-BuHGXxnc.woff2",
+                "type": "Font",
+                "wire": 2533429,
+                "afterEditable": true
+              }
+            ]
+          },
+          "kitchen-sink.docx": {
+            "okRuns": 5,
+            "timeToEditableMs": {
+              "median": 1029.39990234375,
+              "min": 815.10009765625,
+              "max": 1606.900146484375,
+              "n": 5
+            },
+            "transferredAtEditableBytes": {
+              "median": 1803049,
+              "min": 1803049,
+              "max": 1803049,
+              "n": 5
+            },
+            "transferredBytes": {
+              "median": 4336478,
+              "min": 4336478,
+              "max": 4336478,
+              "n": 5
+            },
+            "requests": {
+              "median": 11,
+              "min": 11,
+              "max": 11,
+              "n": 5
+            },
+            "failedRequests": 0,
+            "firstRunRequests": [
+              {
+                "url": "/test-host/?open=%2Ffixtures%2Fkitchen-sink.docx&frame=%2Findex.html",
+                "type": "Document",
+                "wire": 806,
+                "afterEditable": false
+              },
+              {
+                "url": "/test-host/host.js",
+                "type": "Script",
+                "wire": 2863,
+                "afterEditable": false
+              },
+              {
+                "url": "/fixtures/kitchen-sink.docx",
+                "type": "Fetch",
+                "wire": 3715,
+                "afterEditable": false
+              },
+              {
+                "url": "/index.html",
+                "type": "Document",
+                "wire": 1097,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/index-CGJNJzuU.css",
+                "type": "Stylesheet",
+                "wire": 34092,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/index-DxyHwTVl.js",
+                "type": "Script",
+                "wire": 1168600,
+                "afterEditable": false
+              },
+              {
+                "url": "/fonts/Carlito-Bold-DN11iCUU.woff2",
+                "type": "Font",
+                "wire": 198736,
+                "afterEditable": false
+              },
+              {
+                "url": "/fonts/Carlito-Regular-fal-2WfU.woff2",
+                "type": "Font",
+                "wire": 190872,
+                "afterEditable": false
+              },
+              {
+                "url": "/fonts/Carlito-Italic-CcV9hCBk.woff2",
+                "type": "Font",
+                "wire": 202268,
+                "afterEditable": false
+              },
+              {
+                "url": "/fonts/NotoSansCJKsc-Regular-subset-BuHGXxnc.woff2",
+                "type": "Font",
+                "wire": 2533429,
+                "afterEditable": true
+              }
+            ]
+          },
+          "long.docx": {
+            "okRuns": 5,
+            "timeToEditableMs": {
+              "median": 1552.5,
+              "min": 1335.900146484375,
+              "max": 2535.199951171875,
+              "n": 5
+            },
+            "transferredAtEditableBytes": {
+              "median": 1601807,
+              "min": 1601807,
+              "max": 1601807,
+              "n": 5
+            },
+            "transferredBytes": {
+              "median": 1601807,
+              "min": 1601807,
+              "max": 1601807,
+              "n": 5
+            },
+            "requests": {
+              "median": 8,
+              "min": 8,
+              "max": 8,
+              "n": 5
+            },
+            "failedRequests": 0,
+            "firstRunRequests": [
+              {
+                "url": "/test-host/?open=%2Ffixtures%2Flong.docx&frame=%2Findex.html",
+                "type": "Document",
+                "wire": 806,
+                "afterEditable": false
+              },
+              {
+                "url": "/test-host/host.js",
+                "type": "Script",
+                "wire": 2863,
+                "afterEditable": false
+              },
+              {
+                "url": "/fixtures/long.docx",
+                "type": "Fetch",
+                "wire": 4741,
+                "afterEditable": false
+              },
+              {
+                "url": "/index.html",
+                "type": "Document",
+                "wire": 1097,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/index-CGJNJzuU.css",
+                "type": "Stylesheet",
+                "wire": 34092,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/index-DxyHwTVl.js",
+                "type": "Script",
+                "wire": 1168600,
+                "afterEditable": false
+              },
+              {
+                "url": "/fonts/Carlito-Regular-fal-2WfU.woff2",
+                "type": "Font",
+                "wire": 190872,
+                "afterEditable": false
+              },
+              {
+                "url": "/fonts/Carlito-Bold-DN11iCUU.woff2",
+                "type": "Font",
+                "wire": 198736,
+                "afterEditable": false
+              }
+            ]
+          }
+        }
+      },
+      "raw": {
+        "docs": {
+          "simple.docx": {
+            "okRuns": 5,
+            "timeToEditableMs": {
+              "median": 782.10009765625,
+              "min": 687.10009765625,
+              "max": 1178.199951171875,
+              "n": 5
+            },
+            "transferredAtEditableBytes": {
+              "median": 4442430,
+              "min": 4442430,
+              "max": 4442430,
+              "n": 5
+            },
+            "transferredBytes": {
+              "median": 6975859,
+              "min": 6975859,
+              "max": 6975859,
+              "n": 5
+            },
+            "requests": {
+              "median": 9,
+              "min": 9,
+              "max": 9,
+              "n": 5
+            },
+            "failedRequests": 0,
+            "firstRunRequests": [
+              {
+                "url": "/test-host/host.js",
+                "type": "Script",
+                "wire": 6749,
+                "afterEditable": false
+              },
+              {
+                "url": "/test-host/?open=%2Ffixtures%2Fsimple.docx&frame=%2Findex.html",
+                "type": "Document",
+                "wire": 1198,
+                "afterEditable": false
+              },
+              {
+                "url": "/fixtures/simple.docx",
+                "type": "Fetch",
+                "wire": 2456,
+                "afterEditable": false
+              },
+              {
+                "url": "/index.html",
+                "type": "Document",
+                "wire": 1384,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/index-CGJNJzuU.css",
+                "type": "Stylesheet",
+                "wire": 201946,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/index-DxyHwTVl.js",
+                "type": "Script",
+                "wire": 3839089,
+                "afterEditable": false
+              },
+              {
+                "url": "/fonts/Carlito-Bold-DN11iCUU.woff2",
+                "type": "Font",
+                "wire": 198736,
+                "afterEditable": false
+              },
+              {
+                "url": "/fonts/Carlito-Regular-fal-2WfU.woff2",
+                "type": "Font",
+                "wire": 190872,
+                "afterEditable": false
+              },
+              {
+                "url": "/fonts/NotoSansCJKsc-Regular-subset-BuHGXxnc.woff2",
+                "type": "Font",
+                "wire": 2533429,
+                "afterEditable": true
+              }
+            ]
+          },
+          "kitchen-sink.docx": {
+            "okRuns": 5,
+            "timeToEditableMs": {
+              "median": 900.900146484375,
+              "min": 827.900146484375,
+              "max": 1498.800048828125,
+              "n": 5
+            },
+            "transferredAtEditableBytes": {
+              "median": 4645957,
+              "min": 4645957,
+              "max": 4645957,
+              "n": 5
+            },
+            "transferredBytes": {
+              "median": 7179386,
+              "min": 7179386,
+              "max": 7179386,
+              "n": 5
+            },
+            "requests": {
+              "median": 11,
+              "min": 11,
+              "max": 11,
+              "n": 5
+            },
+            "failedRequests": 0,
+            "firstRunRequests": [
+              {
+                "url": "/test-host/host.js",
+                "type": "Script",
+                "wire": 6749,
+                "afterEditable": false
+              },
+              {
+                "url": "/test-host/?open=%2Ffixtures%2Fkitchen-sink.docx&frame=%2Findex.html",
+                "type": "Document",
+                "wire": 1198,
+                "afterEditable": false
+              },
+              {
+                "url": "/fixtures/kitchen-sink.docx",
+                "type": "Fetch",
+                "wire": 3715,
+                "afterEditable": false
+              },
+              {
+                "url": "/index.html",
+                "type": "Document",
+                "wire": 1384,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/index-CGJNJzuU.css",
+                "type": "Stylesheet",
+                "wire": 201946,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/index-DxyHwTVl.js",
+                "type": "Script",
+                "wire": 3839089,
+                "afterEditable": false
+              },
+              {
+                "url": "/fonts/Carlito-Bold-DN11iCUU.woff2",
+                "type": "Font",
+                "wire": 198736,
+                "afterEditable": false
+              },
+              {
+                "url": "/fonts/Carlito-Regular-fal-2WfU.woff2",
+                "type": "Font",
+                "wire": 190872,
+                "afterEditable": false
+              },
+              {
+                "url": "/fonts/Carlito-Italic-CcV9hCBk.woff2",
+                "type": "Font",
+                "wire": 202268,
+                "afterEditable": false
+              },
+              {
+                "url": "/fonts/NotoSansCJKsc-Regular-subset-BuHGXxnc.woff2",
+                "type": "Font",
+                "wire": 2533429,
+                "afterEditable": true
+              }
+            ]
+          },
+          "long.docx": {
+            "okRuns": 5,
+            "timeToEditableMs": {
+              "median": 1188.300048828125,
+              "min": 1167.5,
+              "max": 1476.10009765625,
+              "n": 5
+            },
+            "transferredAtEditableBytes": {
+              "median": 4444715,
+              "min": 4444715,
+              "max": 4444715,
+              "n": 5
+            },
+            "transferredBytes": {
+              "median": 4444715,
+              "min": 4444715,
+              "max": 4444715,
+              "n": 5
+            },
+            "requests": {
+              "median": 8,
+              "min": 8,
+              "max": 8,
+              "n": 5
+            },
+            "failedRequests": 0,
+            "firstRunRequests": [
+              {
+                "url": "/test-host/?open=%2Ffixtures%2Flong.docx&frame=%2Findex.html",
+                "type": "Document",
+                "wire": 1198,
+                "afterEditable": false
+              },
+              {
+                "url": "/test-host/host.js",
+                "type": "Script",
+                "wire": 6749,
+                "afterEditable": false
+              },
+              {
+                "url": "/fixtures/long.docx",
+                "type": "Fetch",
+                "wire": 4741,
+                "afterEditable": false
+              },
+              {
+                "url": "/index.html",
+                "type": "Document",
+                "wire": 1384,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/index-CGJNJzuU.css",
+                "type": "Stylesheet",
+                "wire": 201946,
+                "afterEditable": false
+              },
+              {
+                "url": "/assets/index-DxyHwTVl.js",
+                "type": "Script",
+                "wire": 3839089,
+                "afterEditable": false
+              },
+              {
+                "url": "/fonts/Carlito-Bold-DN11iCUU.woff2",
+                "type": "Font",
+                "wire": 198736,
+                "afterEditable": false
+              },
+              {
+                "url": "/fonts/Carlito-Regular-fal-2WfU.woff2",
+                "type": "Font",
+                "wire": 190872,
+                "afterEditable": false
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "subpath": {
+    "mount": "/office-frame/docs/0.1.0-97ea1ea/",
+    "allEditable": true,
+    "failedRequests": 0,
+    "timeToEditableMs": {
+      "simple.docx": 881,
+      "kitchen-sink.docx": 846,
+      "long.docx": 1141
+    }
+  }
+}

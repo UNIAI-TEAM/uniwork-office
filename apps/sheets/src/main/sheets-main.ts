@@ -3680,8 +3680,8 @@ export function registerSheetsAiIpc(): void {
     return settings
   })
 
-  // UniWork cloud sign-in state (stub-backed: always signed out while the
-  // cloud seam is off); renderers feed it into the media-tool gates
+  // UniWork cloud sign-in state (loggedIn = signed in to UniWork + plan
+  // includes cloud AI); renderers feed it into the media-tool gates
   ipcMain.handle(
     IPC_CHANNELS.aiGskStatus,
     async (_event, withEmail?: unknown): Promise<GenSparkAccountStatus> => {

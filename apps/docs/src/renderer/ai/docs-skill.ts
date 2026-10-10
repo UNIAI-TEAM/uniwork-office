@@ -8,6 +8,7 @@ import {
   type NumIds,
 } from './protocol'
 import type { AiDocWriter } from './doc-writer'
+import { cap, type Capability } from '../capabilities'
 import type { AiPageSetupAccess } from './page-setup'
 import {
   AGENT_TOOLS,
@@ -19,6 +20,14 @@ import {
   type AiDocExtras,
 } from './tools'
 import type { AiNotesAccess } from './note-ops'
+
+/** tools that only exist while their platform capability does (hidden on the web build) */
+const CAPABILITY_TOOLS: ReadonlyArray<readonly [tool: string, capability: Capability]> = [
+  ['web_search', 'webSearch'],
+  ['image_search', 'imageSearch'],
+  ['generate_image', 'imageGeneration'],
+  ['create_document', 'createDocument'],
+]
 
 const IMAGE_GEN_OFF_NOTE =
   '\n\nNote: generate_image is currently unavailable (no image model is configured under Settings → AI media). Do not call or promise it; use image_search for imagery.'
@@ -71,6 +80,7 @@ export function createDocsSkill(
     },
     get tools() {
       const hidden = mediaToolsOff()
+      for (const [tool, c] of CAPABILITY_TOOLS) if (!cap(c)) hidden.add(tool)
       return hidden.size === 0 ? AGENT_TOOLS : AGENT_TOOLS.filter((t) => !hidden.has(t.name))
     },
     buildContext: () => {

@@ -127,7 +127,7 @@ export function registerAiIpc(): void {
     return settings
   })
 
-  // UniWork cloud account state (internal gsk name; stub-backed, signed out while the cloud seam is off)
+  // UniWork cloud account state (internal gsk name; signed in to UniWork + plan includes cloud AI)
   ipcMain.handle(
     'ai:gsk-status',
     async (_event, withEmail?: boolean): Promise<GenSparkAccountStatus> => {

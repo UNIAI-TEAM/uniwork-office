@@ -144,6 +144,8 @@ export const ms = {
   appProtectSecurity: 'Keselamatan',
   appProtectDesc:
     'Tetapkan kata laluan buka/ubah suai, sekatan pengeditan dan pilihan privasi; berkuat kuasa semasa menyimpan',
+  appProtectDescWeb:
+    'Tetapkan kata laluan ubah suai, sekatan pengeditan dan pilihan privasi; berkuat kuasa semasa menyimpan',
   appOptional: '(pilihan)',
   appOptionalBlank: '(pilihan)',
   appProtectOpenPwd: 'Kata laluan untuk membuka dokumen ini',
@@ -512,4 +514,24 @@ export const ms = {
   appUpdateStyleTip: 'Kemas kini gaya ini dengan pilihan semasa (ditulis semula ke styles.xml)',
   appNewStyleFromSelection: 'Gaya baharu daripada pilihan semasa',
   appStyleNamePlaceholder: 'Nama gaya',
+  appWebConflictTitle: 'Dokumen ini telah diubah di tempat lain',
+  appWebConflictBody:
+    'Versi yang lebih baharu telah disimpan semasa anda menyunting. Tulis ganti dengan versi anda, atau muat semula versi terkini dan buang perubahan anda?',
+  appWebConflictOverwrite: 'Tulis ganti',
+  appWebConflictReload: 'Muat semula versi terkini',
+  appWebConflictNotSaved: 'dokumen telah diubah di tempat lain',
+  appWebDiscardTitle: 'Buang perubahan yang belum disimpan?',
+  appWebDiscardBody:
+    'Membuka dokumen lain akan menggantikan dokumen ini, dan perubahan yang belum disimpan akan hilang.',
+  appWebDiscard: 'Buang dan buka',
+  appWebFatalTitle: 'Dokumen tidak dapat dibuka',
+  appWebFatalBody:
+    'Penyuntingan dan penyimpanan dilumpuhkan. Muat semula halaman atau buka semula dokumen daripada UniWork.',
+  appWebNoHost: 'Editor ini berjalan di dalam UniWork. Buka dokumen daripada UniWork.',
+  appSaveStateUnsaved: 'Perubahan belum disimpan',
+  appSaveStateSaved: 'Semua perubahan disimpan',
+  appSaving: 'Menyimpan…',
+  appSavingAs: 'Menyimpan sebagai…',
+  appPdfPrintFallback:
+    'Eksport PDF tidak tersedia di sini; dialog cetak pelayar digunakan sebagai ganti',
 } satisfies Record<keyof typeof zh, string>

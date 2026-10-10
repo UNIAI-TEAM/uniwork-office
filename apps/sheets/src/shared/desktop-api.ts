@@ -2521,6 +2521,15 @@ export const aiSettingsInputSchema = z
         imageProvider: z.string().min(1).optional(),
         analysisProvider: z.string().min(1).optional(),
         videoAnalysisProvider: z.string().min(1).optional(),
+        // capabilities where the user picked the UniWork cloud entry explicitly
+        cloudPicked: z
+          .object({
+            image: z.boolean().optional(),
+            analysis: z.boolean().optional(),
+            video: z.boolean().optional(),
+          })
+          .strict()
+          .optional(),
         // pre-catalog single choice, still accepted on read
         provider: z.string().min(1).optional(),
         providers: z.record(z.string(), aiMediaProviderConfigSchema),
@@ -2995,7 +3004,7 @@ export interface DesktopApi {
   /// start a streaming AI call; deltas arrive via onAiStream with the same requestId
   aiStream(request: AiStreamRequest): Promise<void>
   aiStreamCancel(requestId: string): Promise<void>
-  /// UniWork cloud sign-in state (always signed out while the cloud seam is off);
+  /// UniWork cloud sign-in state (signed in to UniWork + plan includes cloud AI);
   /// withEmail also returns the email
   aiGskStatus(withEmail?: boolean): Promise<GenSparkAccountStatus>
   /// Web search (main-process Serper/DuckDuckGo, shared with docs/slides)

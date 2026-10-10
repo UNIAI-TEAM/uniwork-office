@@ -94,6 +94,7 @@ import {
   registerAccountIpc,
   routeAuthCallbackUrl,
   startUniworkAccount,
+  startUniworkCloud,
   stopUniworkAccount,
 } from './uniwork-auth'
 import { createUniworkDocs, type UniworkDocsHandle } from './uniwork-docs/wiring'
@@ -6329,6 +6330,7 @@ app.whenReady().then(async () => {
   // UniWork account: register the active channel's sign-in scheme, restore the
   // session in the background (after the proxy install), then route held callbacks
   startUniworkAccount(mainProxyReady)
+  startUniworkCloud()
   authCallbacks.start(routeAuthCallback)
   // UniWork document launch links (held since startup) route from here on
   uniworkDocs?.activate((route) => authCallbacks.startLaunch(route))

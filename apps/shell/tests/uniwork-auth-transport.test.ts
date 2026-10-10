@@ -415,6 +415,23 @@ describe('deployment profile', () => {
     ).toBeNull()
   })
 
+  it('reads a profile beside an AppImage after resources and before userData', () => {
+    const bundle = { deploymentId: 'acme', apiOrigin: 'https://acme.example', channel: 'dev' }
+    const user = { deploymentId: 'other', apiOrigin: 'https://other.example', channel: 'beta' }
+    expect(
+      resolveDeploymentProfile({
+        resourcesDir: '/res',
+        appImageDir: '/home/u/Downloads',
+        userDataDir: '/ud',
+        isPackaged: true,
+        readFile: files({
+          '/home/u/Downloads/deployment-profile.json': bundle,
+          '/ud/deployment-profile.json': user,
+        }),
+      }),
+    ).toEqual({ ...bundle, clientId: 'uniwork-office-dev' })
+  })
+
   it('fails closed on an invalid profile file and http outside dev loopback', () => {
     expect(
       resolveDeploymentProfile({

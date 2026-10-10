@@ -54,6 +54,14 @@ describe('updateMediaProviderConfig', () => {
     expect(next.imageProvider).toBe('gemini')
   })
 
+  it('keeps editing the vendor that already serves the capability (key cleared stays pinned)', () => {
+    const served = updateMediaProviderConfig(fresh(), 'image', 'openai', { apiKey: 'k' })
+    const media = { ...served, imageProvider: 'genspark' as const }
+    const cleared = updateMediaProviderConfig(media, 'image', 'openai', { apiKey: '' })
+    expect(cleared.imageProvider).toBe('openai')
+    expect(cleared.cloudPicked).toBeUndefined()
+  })
+
   it('treats a stored choice the block does not offer as hidden (openai has no video analysis)', () => {
     const media = { ...fresh(), videoAnalysisProvider: 'openai' as const }
     const next = updateMediaProviderConfig(media, 'video', 'gemini', { apiKey: 'k' })

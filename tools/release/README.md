@@ -4,11 +4,12 @@ UniWork Office ships desktop installers on two channels, `dev` and `beta`, built
 `.github/workflows/release-installers.yml`. Builds are **unsigned** until the company has
 code-signing certificates; `stable` is refused until then. Auto-update is off in these builds.
 
-| File                    | Role                                                                               |
-| ----------------------- | ---------------------------------------------------------------------------------- |
-| `installer-urls.mjs`    | Builds the `OFFICE_INSTALLER_<CHANNEL>_URLS` value for the UniWork server          |
-| `check-build-brand.mjs` | Brand / update-feed gate on the packaged output (installer, exe, Info.plist, asar) |
-| `*.test.mjs`            | Unit tests (`node --test tools/release/*.test.mjs`)                                |
+| File                     | Role                                                                                    |
+| ------------------------ | --------------------------------------------------------------------------------------- |
+| `installer-urls.mjs`     | Builds the `OFFICE_INSTALLER_<CHANNEL>_URLS` value for the UniWork server               |
+| `check-build-brand.mjs`  | Brand / update-feed gate on the packaged output (installer, exe, Info.plist, asar, deb) |
+| `linux-install-check.sh` | Installs a deb, checks launcher, URL handlers, deployment profile, uninstall            |
+| `*.test.mjs`             | Unit tests (`node --test tools/release/*.test.mjs`)                                     |
 
 The packaging config itself is `apps/shell/electron-builder.cjs` (release block near the
 end); `apps/shell/tests/release-config.test.ts` covers it.
@@ -21,7 +22,7 @@ The version is `<apps/shell/package.json version>-<channel>.<n>`, for example `0
   `v0.11.0-beta.2`, on a commit that is on `main`. Nobody else pushes release tags. The
   workflow checks that the tag's base version equals `apps/shell/package.json`, that the
   channel is `dev` or `beta` and that the tagged commit is an ancestor of `main`, builds
-  Windows and macOS, then creates a **pre-release** for the tag (never marked latest; not a
+  Windows, macOS and Linux, then creates a **pre-release** for the tag (never marked latest; not a
   draft, because the server downloads the installer without credentials) with the installers
   and their `SHA256SUMS-<platform>.txt`.
 - **Test build (not published):** run the workflow by hand (`workflow_dispatch`, input
@@ -43,19 +44,29 @@ out no code; it only downloads the built files and runs `gh release create` / `u
 ## Artifact names
 
 Only release builds (`UNIWORK_RELEASE_CHANNEL` set by the workflow) use these names; a
-plain local `npm run dist:win` / `dist:mac` keeps `UniWork-Office-<version>-<arch>.<ext>`.
+plain local `npm run dist:win` / `dist:mac` keeps `UniWork-Office-<version>-<arch>.<ext>`
+(Linux: `UniWork Office-<version>.AppImage`, `UniWork-Office_<version>_amd64.deb`, an rpm).
 
-| Platform            | File                                                    |
-| ------------------- | ------------------------------------------------------- |
-| Windows x64 (NSIS)  | `UniWork-Office_<version>_unsigned_win32_x64-setup.exe` |
-| macOS Apple Silicon | `UniWork-Office_<version>_unsigned_darwin_arm64.dmg`    |
-| macOS Intel         | `UniWork-Office_<version>_unsigned_darwin_x64.dmg`      |
-| Checksums           | `SHA256SUMS-win32-x64.txt`, `SHA256SUMS-darwin.txt`     |
+| Platform            | File                                                                            |
+| ------------------- | ------------------------------------------------------------------------------- |
+| Windows x64 (NSIS)  | `UniWork-Office_<version>_unsigned_win32_x64-setup.exe`                         |
+| macOS Apple Silicon | `UniWork-Office_<version>_unsigned_darwin_arm64.dmg`                            |
+| macOS Intel         | `UniWork-Office_<version>_unsigned_darwin_x64.dmg`                              |
+| Linux x64 (deb)     | `UniWork-Office_<version>_unsigned_linux_x64.deb`                               |
+| Linux x64 AppImage  | `UniWork-Office_<version>_unsigned_linux_x64.AppImage`                          |
+| Checksums           | `SHA256SUMS-win32-x64.txt`, `SHA256SUMS-darwin.txt`, `SHA256SUMS-linux-x64.txt` |
 
 The server reads the version from `_<version>_` and the `unsigned` flag from the name. The
 `_unsigned` token disappears by itself once a signing identity is configured for that
 platform (see "Signing hooks"). Release builds produce no mac zips (they only feed an
 updater, which is off); plain local `dist:mac` still builds them.
+
+Linux packages are never signed, so their names always carry `_unsigned`, and the arch is
+spelled `x64` (electron-builder's own `${arch}` would say `amd64` / `x86_64`). The deb's
+`Package` is `uniwork-office`, its `Maintainer` / `Vendor` / `Homepage` come from
+`apps/shell/src/shared/legal.json`. Release builds **do not build the rpm**: the download
+server has no rpm platform key, and nothing on the release pipeline could test it. A local
+`npm run dist:linux` still builds one.
 
 ## Putting the links on the server
 
@@ -69,7 +80,8 @@ OFFICE_INSTALLER_DEV_URLS={"win32-x64":"https://github.com/UNIAI-TEAM/uniwork-of
 Everything after the `=` is the value: `dev` fills `OFFICE_INSTALLER_DEV_URLS`, `beta` fills
 `OFFICE_INSTALLER_BETA_URLS`, `OFFICE_INSTALLER_STABLE_URLS` stays empty. The keys and their
 order are the server's (`win32-x64`, `win32-x64-zip`, `darwin-arm64`, `darwin-x64`,
-`linux-x64-deb`, `linux-x64-appimage`); this pipeline fills the first, third and fourth.
+`linux-x64-deb`, `linux-x64-appimage`); this pipeline fills all of them except
+`win32-x64-zip`.
 
 Release download URLs answer with a redirect to the file host. If a server route refuses
 redirects, mirror the files to a host that serves them directly and regenerate the value:
@@ -91,6 +103,10 @@ version, two installers for one platform, mixed versions and a non-HTTPS base UR
   Applications > **Open** > **Open**, or on macOS 15 and later open it once, then
   **System Settings** > **Privacy & Security** > **Open Anyway**. From a terminal:
   `xattr -dr com.apple.quarantine "/Applications/UniWork Office.app"`.
+- **Linux:** `sudo apt install ./UniWork-Office_<version>_unsigned_linux_x64.deb` (Debian,
+  Ubuntu), or `chmod +x` the AppImage and run it (needs FUSE 2, `libfuse2` /
+  `libfuse2t64` on Ubuntu). Nothing is signed on Linux, so no prompt appears. The deb
+  installs an AppArmor profile on Ubuntu 24.04 and later, where the sandbox needs it.
 
 The mac job checks every app with `codesign --verify --deep --strict` and `codesign -dv`
 (expects `Signature=adhoc` while unsigned) and checks each app's architecture with `lipo`.
@@ -117,6 +133,19 @@ switching a per-user install to per-machine copies its profile from the user-wri
 Extract the downloaded bundle before running the installer. Opening the installer straight
 from the zip in Explorer extracts only the installer to a temporary folder, so no profile is
 found next to it.
+
+### Linux
+
+- **deb:** a package script cannot see the folder the deb was opened from, so the profile
+  is copied by hand after the install:
+  `sudo install -m 644 deployment-profile.json "/opt/UniWork Office/resources/"`. dpkg
+  leaves that file alone on an upgrade (it is not a package file), and the package's
+  post-remove script deletes it on a real uninstall, like the Windows uninstaller.
+- **AppImage:** its resources are read-only, so the app reads `deployment-profile.json`
+  from the folder holding the AppImage (after `resources/`, before the userData copy).
+  Extracting the bundle zip and running the AppImage from there is enough.
+- Either way, `~/.config/UniWork Office/deployment-profile.json` also works (the userData
+  fallback every platform has).
 
 ## Auto-update is off
 
@@ -171,9 +200,18 @@ cd ../.. && node tools/release/check-build-brand.mjs --dir apps/shell/release-lo
 MinGW cross-compile path. macOS uses `npm run native:build:universal -w @genoffice/sheets`
 and `GENOFFICE_MAC_X64=1 UNIWORK_RELEASE_CHANNEL=dev npx electron-builder --mac --publish never ...`.
 
+Linux (x64 Debian / Ubuntu host; `npm run build:all` builds the sidecar natively):
+
+```sh
+npm run notices && npm run build:all
+cd apps/shell && UNIWORK_RELEASE_CHANNEL=dev BUILD_DIR=release-local \n  npx electron-builder --linux --x64 --publish never -c.extraMetadata.version=0.11.0-dev.0
+cd ../.. && node tools/release/check-build-brand.mjs --dir apps/shell/release-local --expect linux-unpacked
+bash tools/release/linux-install-check.sh apps/shell/release-local/UniWork-Office_0.11.0-dev.0_unsigned_linux_x64.deb --smoke
+```
+
 ## Not covered
 
-- Linux packages: the `packaging/` recipes (flatpak, nix, docker) are untouched and still
-  point at the upstream builds; Linux installers are backlog.
+- Linux: arm64 packages, the rpm, and the `packaging/` recipes (flatpak, nix, docker), which
+  are untouched and still point at the upstream builds.
 - Windows ARM64 and the Windows zip (`win32-x64-zip`).
 - Signed / notarized builds and the stable channel.
