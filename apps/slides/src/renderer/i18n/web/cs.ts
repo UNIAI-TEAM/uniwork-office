@@ -22,4 +22,6 @@ export const cs = {
   webCommentAuthor: 'Uživatel',
   webExternalMedia: 'Propojená externí média se přehrávají jen v desktopové aplikaci.',
   webReadOnly: 'Tato prezentace je jen pro čtení.',
+  webSaveNetwork: 'K UniWork se nepodařilo připojit. Zkontrolujte připojení a zkuste to znovu.',
+  webSaveTimeout: 'Ukládání trvalo příliš dlouho. Zkontrolujte připojení a zkuste to znovu.',
 } satisfies Record<keyof typeof zh, string>

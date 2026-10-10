@@ -535,6 +535,7 @@ export const nl = {
   appWebFatalTitle: 'Het document kan niet worden geopend',
   appWebFatalBody:
     'Bewerken en opslaan zijn uitgeschakeld. Laad de pagina opnieuw of open het document opnieuw vanuit UniWork.',
+  appWebSaveOffline: 'UniWork is niet bereikbaar. Controleer je verbinding en probeer het opnieuw.',
   appWebNoHost: 'Deze editor werkt binnen UniWork. Open het document vanuit UniWork.',
   appSaveStateUnsaved: 'Niet-opgeslagen wijzigingen',
   appSaveStateSaved: 'Alle wijzigingen opgeslagen',

@@ -24,4 +24,6 @@ export const es = {
   webExternalMedia:
     'Los medios externos vinculados solo se reproducen en la aplicación de escritorio.',
   webReadOnly: 'Esta presentación es de solo lectura.',
+  webSaveNetwork: 'No se pudo conectar con UniWork. Revisa tu conexión e inténtalo de nuevo.',
+  webSaveTimeout: 'Guardar tardó demasiado. Revisa tu conexión e inténtalo de nuevo.',
 } satisfies Record<keyof typeof zh, string>

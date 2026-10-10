@@ -19,4 +19,6 @@ export const zh = {
   webCommentAuthor: '用户',
   webExternalMedia: '链接的外部媒体只能在桌面应用中播放。',
   webReadOnly: '此演示文稿是只读的。',
+  webSaveNetwork: '无法连接到 UniWork。请检查网络后重试。',
+  webSaveTimeout: '保存耗时过长。请检查网络后重试。',
 }

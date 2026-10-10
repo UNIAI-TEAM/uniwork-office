@@ -520,6 +520,7 @@ export const th = {
   appWebDiscard: 'ละทิ้งและเปิด',
   appWebFatalTitle: 'ไม่สามารถเปิดเอกสารได้',
   appWebFatalBody: 'ปิดการแก้ไขและการบันทึกแล้ว โปรดโหลดหน้าใหม่หรือเปิดเอกสารอีกครั้งจาก UniWork',
+  appWebSaveOffline: 'เชื่อมต่อ UniWork ไม่ได้ โปรดตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง',
   appWebNoHost: 'ตัวแก้ไขนี้ทำงานภายใน UniWork โปรดเปิดเอกสารจาก UniWork',
   appSaveStateUnsaved: 'มีการเปลี่ยนแปลงที่ยังไม่บันทึก',
   appSaveStateSaved: 'บันทึกการเปลี่ยนแปลงทั้งหมดแล้ว',

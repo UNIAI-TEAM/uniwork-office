@@ -204,6 +204,29 @@ describe('save', () => {
     expect(await api.isDirty()).toBe(false)
   })
 
+  it('conflict dialog focuses the safe Cancel, not the destructive Overwrite', async () => {
+    const { mock, api, fileId } = await setup()
+    await api.consumePendingOpen(FIT)
+    await api.setNotes({ slideIndex: 0, text: 'mine' })
+    mock.bumpRemote(fileId)
+    const pending = api.save()
+    await waitFor(() => document.querySelector('[data-slides-web="conflict"]'))
+    expect((document.activeElement as HTMLElement | null)?.textContent).toBe('Cancel')
+    clickChoice('conflict', 'Cancel')
+    await pending
+  })
+
+  it('a network failure on save reads as localised text, without the raw browser error', async () => {
+    const { mock, api } = await setup()
+    await api.consumePendingOpen(FIT)
+    await api.setNotes({ slideIndex: 0, text: 'mine' })
+    mock.override('api.save', () => Promise.reject(protocolError('network', 'Failed to fetch')))
+    const res = (await api.save()) as { ok: boolean; error?: string }
+    expect(res.ok).toBe(false)
+    expect(res.error).toBe('UniWork could not be reached. Check your connection and try again.')
+    expect(res.error).not.toMatch(/Failed to fetch|^Error:/)
+  })
+
   it('conflict -> Overwrite re-reads the head etag and saves again', async () => {
     const { mock, api, fileId } = await setup()
     await api.consumePendingOpen(FIT)
@@ -282,6 +305,89 @@ describe('save', () => {
     })
     await api.setNotes({ slideIndex: 0, text: 'x' })
     expect(await mock.host['doc.closeCheck']({} as never)).toEqual({ dirty: true, autoSave: false })
+  })
+
+  // S-01 (visual test): text typed on the canvas is not in the session until the box commits,
+  // yet the leave dialog and the header chip must already see it
+  it('typing in the on-canvas editor or the notes pane is dirty before it is committed', async () => {
+    const { mock, api, web } = await setup()
+    await api.consumePendingOpen(FIT)
+    const editor = document.createElement('div')
+    editor.className = 'slide-text-editor'
+    editor.contentEditable = 'true'
+    document.body.append(editor)
+    try {
+      expect(web.isDirty()).toBe(false)
+      editor.dispatchEvent(new Event('input', { bubbles: true }))
+      expect(mock.dirty.at(-1)).toBe(true)
+      expect(web.isDirty()).toBe(true)
+      expect(await mock.host['doc.closeCheck']({} as never)).toEqual({
+        dirty: true,
+        autoSave: false,
+      })
+      // cancelled (Escape removes the box, nothing was committed): clean again
+      editor.remove()
+      await new Promise((r) => setTimeout(r, 800)) // the watcher notices the removed editor
+      expect(mock.dirty.at(-1)).toBe(false)
+      expect(web.isDirty()).toBe(false)
+
+      const notes = document.createElement('div')
+      notes.className = 'notes-pane'
+      const area = document.createElement('textarea')
+      notes.append(area)
+      document.body.append(notes)
+      area.dispatchEvent(new Event('input', { bubbles: true }))
+      expect(web.isDirty()).toBe(true)
+      // blur: the page commits the notes to the session, which carries the edit from here on
+      await api.setNotes({ slideIndex: 0, text: 'typed' })
+      area.dispatchEvent(new Event('focusout', { bubbles: true }))
+      await new Promise((r) => setTimeout(r, 400))
+      expect(web.isDirty()).toBe(true) // still dirty, now through the session
+      notes.remove()
+    } finally {
+      editor.remove()
+    }
+  })
+
+  it('text typed outside the slide editors (dialogs, search boxes) does not mark the deck dirty', async () => {
+    const { api, web } = await setup()
+    await api.consumePendingOpen(FIT)
+    const field = document.createElement('input')
+    document.body.append(field)
+    field.dispatchEvent(new Event('input', { bubbles: true }))
+    expect(web.isDirty()).toBe(false)
+    field.remove()
+  })
+
+  // S-02 (visual test): "Deck Vietnamese Notes.pptx" keeps the note in a plain shape named
+  // "Notes Placeholder" with no <p:ph>; the editor pane and the Presenter View read it with getNotes
+  it('getNotes reads notes held in a plain "Notes" shape without a placeholder', async () => {
+    const zip = await JSZip.loadAsync(FIXTURE)
+    const slide1Rels = await zip.file('ppt/slides/_rels/slide1.xml.rels')!.async('string')
+    expect(slide1Rels).not.toContain('notesSlide')
+    zip.file(
+      'ppt/slides/_rels/slide1.xml.rels',
+      slide1Rels.replace(
+        '</Relationships>',
+        '<Relationship Id="rIdN1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide" Target="../notesSlides/notesSlide1.xml"/></Relationships>',
+      ),
+    )
+    zip.file(
+      'ppt/notesSlides/notesSlide1.xml',
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:notes xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="Notes Placeholder"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr/><p:txBody><a:bodyPr wrap="square"/><a:lstStyle/><a:p><a:r><a:rPr lang="vi-VN" sz="2400"/><a:t>Ghi chú trình bày cho buổi họp tuần.</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld></p:notes>',
+    )
+    const ct = await zip.file('[Content_Types].xml')!.async('string')
+    zip.file(
+      '[Content_Types].xml',
+      ct.replace(
+        '</Types>',
+        '<Override PartName="/ppt/notesSlides/notesSlide1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.notesSlide+xml"/></Types>',
+      ),
+    )
+    const bytes = await zip.generateAsync({ type: 'uint8array' })
+    const { api } = await setup({ bytes })
+    await api.consumePendingOpen(FIT)
+    expect(await api.getNotes(0)).toBe('Ghi chú trình bày cho buổi họp tuần.')
   })
 })
 

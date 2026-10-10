@@ -524,6 +524,7 @@ export const hi = {
   appWebFatalTitle: 'दस्तावेज़ नहीं खोला जा सका',
   appWebFatalBody:
     'संपादन और सहेजना बंद हैं। पेज फिर से लोड करें या UniWork से दस्तावेज़ दोबारा खोलें।',
+  appWebSaveOffline: 'UniWork से कनेक्ट नहीं हो पा रहा। अपना कनेक्शन जाँचें और फिर कोशिश करें।',
   appWebNoHost: 'यह संपादक UniWork के अंदर चलता है। UniWork से दस्तावेज़ खोलें।',
   appSaveStateUnsaved: 'बिना सहेजे गए बदलाव',
   appSaveStateSaved: 'सभी बदलाव सहेजे गए',

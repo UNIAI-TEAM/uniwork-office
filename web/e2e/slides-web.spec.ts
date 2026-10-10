@@ -318,6 +318,91 @@ test.describe('slides web module', () => {
     })
   })
 
+  // visual test S-01: text typed in the on-canvas editor is dirty before the box commits, so the
+  // host's header chip and its leave check (doc.closeCheck) see it
+  test('typing on the canvas marks the document dirty before the box is committed', async ({
+    page,
+  }) => {
+    const problems = await watch(page)
+    const frame = await openDeck(page)
+    const dirtyNow = () =>
+      page.evaluate(
+        () =>
+          (
+            window as unknown as {
+              __host: { events: Array<{ type: string; payload: { dirty: boolean } }> }
+            }
+          ).__host.events
+            .filter((e) => e.type === 'dirty')
+            .at(-1)?.payload.dirty ?? false,
+      )
+    const closeCheck = () =>
+      page.evaluate(() =>
+        (
+          window as unknown as {
+            __host: { request(t: string, p: unknown): Promise<{ dirty: boolean }> }
+          }
+        ).__host.request('doc.closeCheck', {}),
+      )
+    expect(await dirtyNow()).toBe(false)
+    expect((await closeCheck()).dirty).toBe(false)
+
+    const p = await titlePoint(page, frame)
+    await page.mouse.dblclick(p.x, p.y)
+    await expect(frame.locator('[contenteditable=true]')).toBeVisible()
+    await page.keyboard.press('Control+A')
+    await page.keyboard.type('Typed, not committed')
+    // still in the editor (nothing committed to the deck yet) and already dirty for the host
+    await expect(frame.locator('[contenteditable=true]')).toBeVisible()
+    await expect.poll(dirtyNow).toBe(true)
+    expect((await closeCheck()).dirty).toBe(true)
+
+    // Escape commits the text: still dirty, now through the deck
+    await page.keyboard.press('Escape')
+    await expect.poll(() => titleText(frame)).toBe('Typed, not committed')
+    await page.waitForTimeout(800)
+    expect(await dirtyNow()).toBe(true)
+    expect((await closeCheck()).dirty).toBe(true)
+
+    // the notes pane: typing counts at once, on a fresh deck as well
+    const notes = frame.locator('.notes-pane textarea')
+    await notes.click()
+    await page.keyboard.type(' plus a note')
+    expect((await closeCheck()).dirty).toBe(true)
+
+    expect({ csp: await cspViolations(page, frame), ...problems }).toEqual({
+      csp: [],
+      console: [],
+      page: [],
+      http: [],
+    })
+  })
+
+  // visual test S-02: a deck whose speaker note sits in a plain "Notes Placeholder" shape (no
+  // <p:ph>) shows the note in the editor's notes pane and in the Presenter View
+  test('speaker notes load in the notes pane and the presenter view', async ({ page }) => {
+    const problems = await watch(page)
+    await page.goto('/test-host/?module=slides&open=/fixtures/notes-plain-shape.pptx&lang=en')
+    await expect(page.locator('#status')).toHaveText(/^initialised/, { timeout: 30_000 })
+    const frame = (await (await page.waitForSelector('#frame')).contentFrame())!
+    await expect(frame.locator('.thumb').first()).toBeVisible({ timeout: 30_000 })
+    const note = 'Ghi chú trình bày cho buổi họp tuần.'
+    await expect(frame.locator('.notes-pane textarea')).toHaveValue(note)
+
+    await frame.getByRole('button', { name: 'Slide Show', exact: true }).click()
+    await frame.getByRole('button', { name: 'Presenter View' }).first().click()
+    await expect(frame.locator('.presenter')).toBeVisible()
+    await expect(frame.locator('.presenter .pv-notes')).toHaveText(note)
+    await page.keyboard.press('Escape')
+
+    expect({ csp: await cspViolations(page, frame), ...problems }).toEqual({
+      csp: [],
+      console: [],
+      page: [],
+      http: [],
+    })
+  })
+
   test('screenshots: light + dark, vi + en', async ({ page }) => {
     mkdirSync(SHOTS, { recursive: true })
     const problems = await watch(page)

@@ -21,4 +21,6 @@ export const th = {
   webCommentAuthor: 'ผู้ใช้',
   webExternalMedia: 'สื่อภายนอกที่ลิงก์ไว้เล่นได้เฉพาะในแอปเดสก์ท็อป',
   webReadOnly: 'งานนำเสนอนี้เป็นแบบอ่านอย่างเดียว',
+  webSaveNetwork: 'เชื่อมต่อ UniWork ไม่ได้ โปรดตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง',
+  webSaveTimeout: 'การบันทึกใช้เวลานานเกินไป โปรดตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง',
 } satisfies Record<keyof typeof zh, string>

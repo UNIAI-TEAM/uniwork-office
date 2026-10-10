@@ -22,4 +22,6 @@ export const id = {
   webCommentAuthor: 'Pengguna',
   webExternalMedia: 'Media eksternal yang ditautkan hanya diputar di aplikasi desktop.',
   webReadOnly: 'Presentasi ini hanya-baca.',
+  webSaveNetwork: 'UniWork tidak dapat dijangkau. Periksa koneksi Anda lalu coba lagi.',
+  webSaveTimeout: 'Penyimpanan memakan waktu terlalu lama. Periksa koneksi Anda lalu coba lagi.',
 } satisfies Record<keyof typeof zh, string>

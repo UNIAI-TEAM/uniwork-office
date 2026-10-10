@@ -112,6 +112,7 @@ import { textColorValue } from './editor/text-color'
 import { textOutlineCssValue } from './editor/text-outline'
 import { AiAskPopover } from './components/AiAskPopover'
 import { cap } from './capabilities'
+import { isNarrowViewport } from './narrow-viewport'
 import { EDIT_QUEUE_MAX, selectionForAnchor, type DocsEditQueueItem } from './ai/edit-queue'
 import { addQueueAnchor, clearQueueAnchors, removeQueueAnchors } from './editor/ai-queue-anchors'
 import {
@@ -789,7 +790,10 @@ export function App() {
   // capability-gated: when the platform has no AI the dock never shows, whatever
   // the stored preference or a stray setShowAi(true) says
   const aiEnabled = cap('ai')
-  const [showAiPref, setShowAi] = useState(() => aiPanelInitiallyOpen('aidocs.showAi'))
+  // a narrow viewport (the web frame on a phone) starts with the panel collapsed: it would cover the page
+  const [showAiPref, setShowAi] = useState(
+    () => aiPanelInitiallyOpen('aidocs.showAi') && !isNarrowViewport(),
+  )
   const showAi = aiEnabled && showAiPref
   const [spellcheck, setSpellcheck] = useState(spellcheckEnabled)
   const [largeDocSpellOff, setLargeDocSpellOff] = useState(false)
@@ -1557,7 +1561,8 @@ export function App() {
   }, [])
 
   useEffect(() => {
-    if (aiEnabled) rememberAiPanelOpen('aidocs.showAi', showAi)
+    // the collapsed state of a narrow viewport is not the user's preference for wide ones
+    if (aiEnabled && !isNarrowViewport()) rememberAiPanelOpen('aidocs.showAi', showAi)
   }, [aiEnabled, showAi])
 
   useEffect(() => {

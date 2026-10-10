@@ -507,6 +507,7 @@ export const zhTW = {
   appWebDiscard: '捨棄並開啟',
   appWebFatalTitle: '無法開啟文件',
   appWebFatalBody: '編輯與儲存已停用。請重新整理頁面,或從 UniWork 重新開啟文件。',
+  appWebSaveOffline: '無法連線到 UniWork。請檢查網路後再試一次。',
   appWebNoHost: '此編輯器需在 UniWork 中執行。請從 UniWork 開啟文件。',
   appSaveStateUnsaved: '有未儲存的變更',
   appSaveStateSaved: '所有變更已儲存',

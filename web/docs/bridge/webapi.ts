@@ -58,6 +58,7 @@ import type {
 } from '../../../apps/docs/src/shared/ipc'
 import {
   toProtocolError,
+  type Capabilities,
   type FileMeta,
   type FileSource,
   type OpenPayload,
@@ -156,6 +157,8 @@ function saveError(err: unknown): ProtocolErrorShape {
   return { code: errorCode(err), message: describe(err) }
 }
 
+const READ_ONLY = 'read-only document'
+
 /** printPdfBuffer has no bytes on web; saveMergedPdf recognises this marker */
 export const WEB_PRINT_PART = 'web-print-deferred'
 
@@ -174,6 +177,17 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
   const files = new Map<string, FileMeta>()
   /** the document this frame shows (save / export target) */
   let current: string | null = null
+  /** the host's effective grants from `init` (undefined until the handshake, and in unit-test sessions) */
+  let grants: Capabilities | undefined
+
+  /**
+   * View-only (protocol README "Read-only documents"): the host withheld the `save` grant, or the
+   * file is not writable. Without a grants object (unit-test sessions) nothing is withheld.
+   */
+  function isViewOnly(fileId?: string | null): boolean {
+    if (grants !== undefined && grants.save !== true) return true
+    return fileId ? files.get(fileId)?.writable === false : false
+  }
   const session = createSession(port, opts.session)
   // the frame dialogs only dim the iframe: tell the host so it can dim its own chrome
   onModalChange((open) => port.setModal?.(open))
@@ -295,6 +309,7 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
   let pendingOpen: Promise<OpenDocxResult> | null = port
     .whenInitialized()
     .then((s) => {
+      grants = s.capabilities
       initDocumentId = s.documentId
       return s.open ? toOpenResult(s.open) : openById(s.documentId)
     })
@@ -322,6 +337,7 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
   port.handleSave(async () => {
     if (fatal) return { ok: false, error: fatal }
     if (!current) return failure('not_ready', 'no document is open')
+    if (isViewOnly(current)) return failure('unsupported', READ_ONLY)
     if (hostSave) return failure('busy', 'a save is already running')
     hostSave = { error: null }
     try {
@@ -598,6 +614,8 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
       }
       const fileId = idFromPath(path)
       if (!fileId) return { ok: false, error: `not a UniWork document: ${basename(String(path))}` }
+      // the editor is read-only here (uniworkState); this refuses a save that still gets through
+      if (isViewOnly(fileId)) return { ok: false, error: READ_ONLY }
       const etag = files.get(fileId)?.etag
       const payload = {
         fileId,
@@ -630,7 +648,11 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
       }
       return {
         ok: false,
-        error: res.error.code === 'timeout' ? 'save timed out' : res.error.message,
+        // a raw browser error ("Failed to fetch") is English whatever the UI language
+        error:
+          res.error.code === 'timeout' || res.error.code === 'network'
+            ? text('appWebSaveOffline')
+            : res.error.message,
       }
     },
 
@@ -640,6 +662,11 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
       if (fatal) {
         pending?.settle({ ok: false, error: fatal })
         return fatalSave()
+      }
+      // "save a copy" of a document the user cannot overwrite is its own grant (`saveAs`)
+      if (isViewOnly(idFromPath(sourcePath)) && grants?.saveAs !== true) {
+        pending?.settle(failure('unsupported', READ_ONLY))
+        return { ok: false, error: READ_ONLY }
       }
       const sourceFileId = idFromPath(sourcePath)
       const payload = {
@@ -754,9 +781,17 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
       }
     },
 
-    // the frame is the UniWork document: no desktop working-copy state, view-only comes from the host grant
-    async uniworkState(_path: string): Promise<{ bound: boolean; readOnly: boolean }> {
-      return { bound: false, readOnly: false }
+    // the frame is the UniWork document: no desktop working-copy state. View-only comes from the host
+    // grant (no `save`) or the file (`writable: false`); the renderer then turns the editor, the ribbon
+    // and the save entries read-only (the same seam the desktop uses for a view-only working copy).
+    async uniworkState(path: string): Promise<{ bound: boolean; readOnly: boolean }> {
+      try {
+        const session = await port.whenInitialized()
+        grants = session.capabilities
+      } catch {
+        return { bound: false, readOnly: false }
+      }
+      return { bound: false, readOnly: isViewOnly(idFromPath(path)) }
     },
   } satisfies Partial<DesktopApi>
 

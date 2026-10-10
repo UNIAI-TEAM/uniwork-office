@@ -21,4 +21,6 @@ export const en = {
   webCommentAuthor: 'User',
   webExternalMedia: 'Linked external media play only in the desktop app.',
   webReadOnly: 'This presentation is read-only.',
+  webSaveNetwork: 'UniWork could not be reached. Check your connection and try again.',
+  webSaveTimeout: 'Saving took too long. Check your connection and try again.',
 } satisfies Record<keyof typeof zh, string>

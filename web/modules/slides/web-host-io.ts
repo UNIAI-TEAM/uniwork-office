@@ -81,6 +81,11 @@ export class WebSaveError extends Error {
   ) {
     super(message)
   }
+
+  // the session reports `String(err)` to the status bar and toast: no "Error: " prefix there
+  override toString(): string {
+    return this.message
+  }
 }
 
 export interface WebHostDeps {
@@ -180,7 +185,12 @@ export function createWebHostIO(deps: WebHostDeps): HostIO {
     deps.state.lastFailure = result.error
     const code = result.error.code
     return new WebSaveError(
-      code === 'timeout' ? 'save timed out' : result.error.message,
+      // the protocol message is developer English: the user gets the localised text
+      code === 'timeout'
+        ? text('webSaveTimeout')
+        : code === 'network'
+          ? text('webSaveNetwork')
+          : result.error.message,
       code === 'conflict' ? 'conflict' : code === 'cancelled' ? 'cancelled' : 'failed',
     )
   }
@@ -263,9 +273,10 @@ export function createWebHostIO(deps: WebHostDeps): HostIO {
       title: 'webConflictTitle',
       body: 'webConflictBody',
       choices: [
-        { id: 'cancel', label: 'webCancel' },
+        // the safe choice takes the focus: Overwrite replaces someone else's version
+        { id: 'cancel', label: 'webCancel', primary: true },
         { id: 'reload', label: 'webConflictReload' },
-        { id: 'overwrite', label: 'webConflictOverwrite', primary: true },
+        { id: 'overwrite', label: 'webConflictOverwrite' },
       ],
       cancelId: 'cancel',
       marker: 'conflict',

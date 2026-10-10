@@ -237,9 +237,56 @@ export function createWebSlidesApi(
     },
   })
 
-  function isDirty(): boolean {
+  /** the committed deck differs from the saved file (what a draft copy and a save carry) */
+  function sessionIsDirty(): boolean {
     const s = sessions.get(WEB_CLIENT_ID)
     return !!s && sessionDirty(s)
+  }
+
+  // Text typed in the on-canvas editor or the notes pane lives in the DOM until it is committed
+  // (blur / Escape / Enter), so the session cannot see it. The host asks `isDirty` for its
+  // header chip, the leave dialog and the replace guard: typing counts as dirty at once. The
+  // Save of the leave dialog runs the renderer's save flow, which commits the open editor first.
+  let typingIn: Element | null = null
+  let typingWatch: ReturnType<typeof setInterval> | undefined
+  const TYPING_SELECTOR = '.slide-text-editor, .notes-pane textarea'
+
+  function setTyping(target: Element | null): void {
+    if (target === typingIn) return
+    typingIn = target
+    if (typingWatch) clearInterval(typingWatch)
+    typingWatch = undefined
+    if (target) {
+      // an Escape / cancel removes the editor without a blur the page can rely on
+      typingWatch = setInterval(() => {
+        if (typingIn && !typingIn.isConnected) setTyping(null)
+      }, 500)
+    }
+    pushDirty()
+  }
+
+  if (typeof document !== 'undefined') {
+    document.addEventListener(
+      'input',
+      (ev) => {
+        const t = ev.target
+        if (t instanceof Element && !viewOnly() && t.matches(TYPING_SELECTOR)) setTyping(t)
+      },
+      true,
+    )
+    document.addEventListener(
+      'focusout',
+      (ev) => {
+        const t = ev.target
+        // let the blur commit land in the session first: it carries the edit from here on
+        if (t === typingIn && t) setTimeout(() => t === typingIn && setTyping(null), 300)
+      },
+      true,
+    )
+  }
+
+  function isDirty(): boolean {
+    return sessionIsDirty() || typingIn !== null
   }
 
   function pushDirty(): void {
@@ -260,7 +307,7 @@ export function createWebSlidesApi(
       const file = offering ?? (current !== null ? state.files.get(current) : undefined)
       return file && file.fileId === initDocumentId ? { etag: file.etag, name: file.name } : null
     },
-    isDirty: () => isDirty(),
+    isDirty: () => sessionIsDirty(),
     bytes: async () => {
       const session = sessions.get(WEB_CLIENT_ID)
       // master view writes only its part back on save: no draft until it is closed
@@ -305,6 +352,7 @@ export function createWebSlidesApi(
     onSaved: ({ file, previousPath, kind }) => {
       current = file.fileId
       if (kind === 'save' || kind === 'saveAs') void drafts.saved()
+      if (kind === 'save' || kind === 'saveAs') setTyping(null)
       const path = pathFor(file)
       port.setTitle(file.name)
       setTimeout(pushDirty, 0)
