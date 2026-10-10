@@ -380,7 +380,7 @@ export const rules = [
   },
   {
     id: 'vi-no-api-key',
-    why: 'Main-process vi errNoApiKey keeps the UniWork wording (no active AI plan), matching the en entry; the upstream "no API key configured for {provider}" text comes back with every merge of these three dictionaries',
+    why: 'Main-process vi errNoApiKey keeps the UniWork wording (no AI model set up yet; chat runs on the user own key), matching the en entry; the upstream "no API key configured for {provider}" text comes back with every merge of these three dictionaries',
     files: [
       'apps/docs/src/main/docs-main.ts',
       'apps/sheets/src/main/sheets-main.ts',
@@ -389,13 +389,13 @@ export const rules = [
     replace: [
       [
         /errNoApiKey: 'Chưa cấu hình khóa API cho \{provider\}'/g,
-        "errNoApiKey: 'Chưa kích hoạt / mua gói AI. Hãy mua gói để dùng Trợ lý AI.'",
+        "errNoApiKey: 'Chưa thiết lập mô hình AI. Hãy thêm khóa AI của riêng bạn trong Cài đặt > Mô hình AI để dùng Trợ lý AI.'",
       ],
     ],
   },
   {
     id: 'en-no-api-key',
-    why: 'Main-process en errNoApiKey keeps the UniWork wording (no active AI plan), like vi-no-api-key; the upstream "No API key configured for {provider}" text comes back with every merge of these three dictionaries',
+    why: 'Main-process en errNoApiKey keeps the UniWork wording (no AI model set up yet; chat runs on the user own key), like vi-no-api-key; the upstream "No API key configured for {provider}" text comes back with every merge of these three dictionaries',
     files: [
       'apps/docs/src/main/docs-main.ts',
       'apps/sheets/src/main/sheets-main.ts',
@@ -404,7 +404,7 @@ export const rules = [
     replace: [
       [
         /errNoApiKey: 'No API key configured for \{provider\}'/g,
-        "errNoApiKey: 'AI is not activated. Purchase a plan to use the AI assistant.'",
+        "errNoApiKey: 'No AI model is set up yet. Add your own AI key in Settings > AI Model to use the assistant.'",
       ],
     ],
   },

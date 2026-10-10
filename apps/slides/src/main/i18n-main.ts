@@ -110,7 +110,7 @@ export const tMain = createI18n({
     menuZoomOut: '缩小',
     menuActualSize: '实际大小',
   },
-  // en and vi are ours (UniWork wording, e.g. errNoApiKey: no active AI plan); the other locales keep
+  // en and vi are ours (UniWork wording, e.g. errNoApiKey: no AI model set up yet); the other locales keep
   // upstream's wording. tools/rebrand re-applies the vi errNoApiKey (rule vi-no-api-key).
   en: {
     dlgInsertImage: 'Insert Image',
@@ -181,7 +181,8 @@ export const tMain = createI18n({
     errParseFailed: 'Failed to parse file',
     errImageNoText: 'Image attachments have no text; the image is sent along with the user message',
     errNotImage: 'not a supported image type',
-    errNoApiKey: 'AI is not activated. Purchase a plan to use the AI assistant.',
+    errNoApiKey:
+      'No AI model is set up yet. Add your own AI key in Settings > AI Model to use the assistant.',
     errNoModel: 'No model name configured',
     errMediaNotConfigured:
       'No image/media model configured: set one up in Settings → AI media, then retry',
@@ -292,7 +293,8 @@ export const tMain = createI18n({
     errImageNoText:
       'Tệp đính kèm hình ảnh không có văn bản; hình ảnh được gửi cùng với tin nhắn của người dùng',
     errNotImage: 'loại hình ảnh không được hỗ trợ',
-    errNoApiKey: 'Chưa kích hoạt / mua gói AI. Hãy mua gói để dùng Trợ lý AI.',
+    errNoApiKey:
+      'Chưa thiết lập mô hình AI. Hãy thêm khóa AI của riêng bạn trong Cài đặt > Mô hình AI để dùng Trợ lý AI.',
     errNoModel: 'Chưa cấu hình tên mô hình',
     errMediaNotConfigured:
       'Chưa cấu hình mô hình hình ảnh/đa phương tiện: hãy thiết lập trong Cài đặt → AI Media & Tìm kiếm rồi thử lại',

@@ -8,7 +8,11 @@ import { useEffect, useRef, useState } from 'react'
 import type { Editor } from '@tiptap/core'
 import type { Block } from '@genoffice/docx-engine'
 import { AgentLoop, composeSkills, streamText, type AgentImage } from '@genoffice/agent-core'
-import { imageGenerationAvailable, mediaAnalysisAvailable } from '@genoffice/ai-provider/browser'
+import {
+  aiNoticeKind,
+  imageGenerationAvailable,
+  mediaAnalysisAvailable,
+} from '@genoffice/ai-provider/browser'
 import type { AiSettings, AttachmentAddResult, AttachmentMeta } from '../../shared/ipc'
 import { ATTACHMENT_IMAGE_EXTS } from '../../shared/ipc'
 import type { PmNode } from '../editor/convert'
@@ -1415,23 +1419,25 @@ export function AiPanel({
                 <span dir="auto">{entry.text}</span>
               )}
               {entry.tools && entry.tools.length > 0 && <ToolChipList tools={entry.tools} />}
-              {entry.error && (
-                <div className="ai-msg-error">{t('aiErrorPrefix', { error: entry.error })}</div>
-              )}
-              {cap('billing') &&
-                entry.error &&
-                /API\s*[Kk]ey|api key|khóa API|kích hoạt|mua gói AI|not activated|purchase an AI|未配置|未設定/i.test(
-                  entry.error,
-                ) && (
-                  <div className="ai-msg-actions">
-                    <button
-                      className="ai-login-btn"
-                      onClick={() => void window.desktop.aiOpenBilling?.()}
-                    >
-                      {t('aiBuyPlanBtn')}
-                    </button>
+              {entry.error &&
+                (aiNoticeKind(entry.error) ? (
+                  // "nothing to chat with" is a setup / plan state: a plain notice, not a red error
+                  <div className="ai-msg-notice" role="status">
+                    {entry.error}
                   </div>
-                )}
+                ) : (
+                  <div className="ai-msg-error">{t('aiErrorPrefix', { error: entry.error })}</div>
+                ))}
+              {cap('billing') && entry.error && aiNoticeKind(entry.error) && (
+                <div className="ai-msg-actions">
+                  <button
+                    className="ai-login-btn"
+                    onClick={() => void window.desktop.aiOpenBilling?.()}
+                  >
+                    {t('aiOpenSettingsBtn')}
+                  </button>
+                </div>
+              )}
               {showToolbar && (
                 <div className="ai-msg-toolbar">
                   {entry.text && (

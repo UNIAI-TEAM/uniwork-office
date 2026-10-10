@@ -8243,6 +8243,13 @@ body.docs-crop-active
   font-size: 13px;
 }
 
+/* a setup / plan state (no model yet, plan or credits), not a failure */
+.ai-msg-notice {
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 .ai-msg-actions {
   margin-top: 8px;
   display: flex;

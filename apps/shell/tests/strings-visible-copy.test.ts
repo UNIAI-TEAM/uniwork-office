@@ -28,9 +28,27 @@ describe('Settings > AI Model OpenRouter copy', () => {
   })
 
   it('has the Vietnamese row title, check and top-up labels', () => {
-    expect(strings.vi.setAiOpenRouterHub).toBe('Token Hub OpenRouter')
+    expect(strings.vi.setAiOpenRouterHub).toBe('Mức dùng của khóa')
     expect(strings.vi.setAiOpenRouterHubCheck).toBe('Kiểm tra tín dụng')
     expect(strings.vi.setAiOpenRouterCredits).toBe('Nạp thêm / quản lý')
+  })
+})
+
+describe('Settings > AI Model copy (en, vi)', () => {
+  it('names no internal provider or wallet product', () => {
+    for (const lang of ['en', 'vi'] as const) {
+      for (const key of [
+        'setAiGensparkHint',
+        'setAiOpenRouterHub',
+        'setAiOpenRouterHubHint',
+        'setAiOpenRouterHubCheck',
+        'setAiOpenRouterHubFail',
+      ] as const) {
+        expect(strings[lang][key], `${lang}.${key}`).not.toMatch(
+          /token hub|genspark|credit wallet/i,
+        )
+      }
+    }
   })
 })
 
