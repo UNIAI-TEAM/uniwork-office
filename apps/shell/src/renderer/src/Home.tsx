@@ -1208,9 +1208,12 @@ export function Home() {
   const [confirmMissing, setConfirmMissing] = useState<RecentEntry | null>(null)
   // name in the greeting; omitted when logged out
   const [accountName, setAccountName] = useState('')
+  // whose UniWork documents recents may list ('' = nobody): a change re-reads them
+  const [recentsAccount, setRecentsAccount] = useState('')
   // single source of account state: AccountEntry reports every change (initial
   // load, login, logout), keeping the greeting name in sync
   const handleAccountStatus = useCallback((s: AccountStatus | null) => {
+    setRecentsAccount(s?.loggedIn ? (s.profile?.accountId ?? s.email ?? '') : '')
     // the cached profile still names the user while UniWork is unreachable
     if (!s?.loggedIn && !(s?.state === 'server-unreachable' && s.profile)) {
       setAccountName('')
@@ -1498,6 +1501,14 @@ export function Home() {
 
   // so does opening a UniWork document: its recents entry is already written
   useEffect(() => subscribeUniworkOpened(window.aiOffice, () => refreshRef.current()), [])
+  // sign-out or another account: the previous account's documents leave recents now,
+  // not at the next window focus
+  const recentsAccountSeen = useRef(recentsAccount)
+  useEffect(() => {
+    if (recentsAccountSeen.current === recentsAccount) return
+    recentsAccountSeen.current = recentsAccount
+    refreshRef.current()
+  }, [recentsAccount])
 
   const hasMore = entries.length < listTotal
 

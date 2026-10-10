@@ -4139,6 +4139,15 @@ export function projectFilePaths(): string[] {
   }
 }
 
+/** Deletes the AI history and project entries of these files (another account's documents). */
+export function projectForgetFiles(filePaths: readonly string[]): void {
+  try {
+    getProjectStore().forgetFiles(filePaths)
+  } catch (err) {
+    console.warn('[project-store] forgetFiles failed:', err)
+  }
+}
+
 export function projectFileRenamed(oldPath: string, newPath: string): void {
   try {
     getProjectStore().fileRenamed(oldPath, newPath)

@@ -9,10 +9,12 @@ import {
 import {
   authorizedRequest,
   onUniworkAccountStatus,
+  setUniworkSignOutHooks,
   uniworkAccount,
   uniworkDeploymentProfile,
   uniworkSessionIdentity,
 } from '../uniwork-auth'
+import { AccountBoundary } from './account-boundary'
 import { setUniworkCloseGuard } from './close-guard'
 import { createLaunchPusher } from './launch'
 import {
@@ -42,6 +44,14 @@ export interface UniworkDocsWiring {
   reveal(): void
   lang(): string
   defaultSaveDir(): string
+  /** every file path a tab or detached editor window shows */
+  openPaths(): string[]
+  /** the normal close of the tab or window showing `path` (prompts included); true = closed */
+  closePath(path: string): Promise<boolean>
+  /** every file path the AI chat store knows */
+  aiHistoryPaths(): string[]
+  /** deletes the AI chat history and project entries of these paths */
+  forgetAiHistory(paths: string[]): void
 }
 
 const CHOICES: readonly UniworkConflictChoice[] = [
@@ -159,6 +169,7 @@ function blockedReasonKey(reason: string | undefined): Parameters<typeof tUniwor
 
 export interface UniworkDocsHandle {
   service: UniworkDocsService
+  boundary: AccountBoundary
   /**
    * At app ready, after the account started: redeems a held launch ticket
    * once sign-in completes, and routes launch links from now on.
@@ -205,14 +216,31 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     service.resolveConflict(path as string),
   )
   setUniworkCloseGuard(service)
+  // Sign out and a sign-in as someone else close the previous account's
+  // documents and delete their AI history (see account-boundary.ts)
+  const boundary = new AccountBoundary({
+    root: service.store.root,
+    openPaths: () => wiring.openPaths(),
+    closeDocument: (path) => wiring.closePath(path),
+    aiHistoryPaths: () => wiring.aiHistoryPaths(),
+    forgetAiHistory: (paths) => wiring.forgetAiHistory(paths),
+    closeConflictPrompt: () => service.closeConflictPrompt(),
+  })
+  setUniworkSignOutHooks({
+    before: () => boundary.beforeSignOut(),
+    after: () => boundary.afterSignOut(),
+  })
 
   return {
     service,
+    boundary,
     activate(startLaunch) {
       let signedIn = uniworkAccount().status().state === 'signed-in'
       onUniworkAccountStatus((status) => {
         // the session's account may have changed: it becomes the last owner
         service.noteSessionIdentity()
+        const identity = uniworkSessionIdentity()
+        if (identity) void boundary.enforce(identity).catch(() => undefined)
         const now = status.state === 'signed-in'
         if (now && !signedIn) void service.launch.onSignedIn()
         signedIn = now

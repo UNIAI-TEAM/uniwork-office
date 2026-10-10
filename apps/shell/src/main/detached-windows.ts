@@ -208,6 +208,25 @@ export function closeDetachedWithoutPrompt(id: string): boolean {
   return true
 }
 
+/**
+ * Closes the detached editors showing `path` through the same prompts as their
+ * window close. True when none shows it any more; false when a prompt was
+ * cancelled and the window stays.
+ */
+export async function closeDetachedByPath(path: string): Promise<boolean> {
+  const wanted = canonicalPath(path)
+  const showing = () =>
+    [...detached.values()].filter(
+      (rec) => rec.filePath && canonicalPath(rec.filePath) === wanted && !rec.window.isDestroyed(),
+    )
+  for (const rec of showing()) {
+    if (rec.released) continue
+    if (await confirmDetachedClose(rec)) rec.closeWithoutPrompt()
+    else resetSheetsShuttingDown()
+  }
+  return showing().length === 0
+}
+
 /** unsaved-changes state of one detached document, whichever family owns it */
 async function detachedIsDirty(rec: DetachedRecord): Promise<boolean> {
   const wc = rec.view.webContents
