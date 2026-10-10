@@ -464,7 +464,6 @@ export function createTextWebApi(
   async function saveExisting(fileId: string, data: string): Promise<TextSaveResult> {
     const etag = files.get(fileId)?.etag
     const bytes = encodeText(data)
-    const size = bytes.byteLength
     const res = await sendSave(() =>
       port.request(
         'api.save',
