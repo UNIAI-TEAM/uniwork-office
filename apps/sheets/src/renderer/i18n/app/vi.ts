@@ -490,6 +490,8 @@ export const vi = {
     'Cầu nối tệp trên máy tính để bàn không khả dụng. Khởi động lại ứng dụng Electron.',
   appOpenCanceled: 'Đã hủy chọn sổ làm việc.',
   appOpeningWorkbook: 'Đang mở sổ làm việc…',
+  appOpenStalled: 'Không mở được sổ làm việc.',
+  appOpenRetry: 'Thử lại',
   appOpened: 'Đã mở {name} — các chỉnh sửa ô được lưu lại bằng ⌘S.',
   appOpenFailed: 'Không thể mở sổ làm việc.',
   appPageSetupNeedsFile: 'Trước tiên hãy mở tệp XLSX — thiết lập trang sẽ lưu vào tệp.',

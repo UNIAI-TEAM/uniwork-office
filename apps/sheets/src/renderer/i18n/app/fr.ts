@@ -550,6 +550,8 @@ export const fr = {
     "Le pont de fichiers du bureau est indisponible. Redémarrez l'application Electron.",
   appOpenCanceled: 'Sélection du classeur annulée.',
   appOpeningWorkbook: 'Ouverture du classeur…',
+  appOpenStalled: "Impossible d'ouvrir le classeur.",
+  appOpenRetry: 'Réessayer',
   appOpened: '{name} ouvert — les modifications de cellules se réenregistrent avec ⌘S.',
   appOpenFailed: "Impossible d'ouvrir le classeur.",
   appPageSetupNeedsFile:

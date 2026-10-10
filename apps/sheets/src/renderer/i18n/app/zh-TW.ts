@@ -435,6 +435,8 @@ export const zhTW = {
   appBridgeUnavailable: '桌面檔案橋接不可用。請重新啟動 Electron 應用程式。',
   appOpenCanceled: '已取消選擇活頁簿。',
   appOpeningWorkbook: '正在開啟活頁簿…',
+  appOpenStalled: '無法開啟活頁簿。',
+  appOpenRetry: '重試',
   appOpened: '已開啟 {name}——儲存格編輯用 ⌘S 儲存回檔案。',
   appOpenFailed: '無法開啟活頁簿。',
   appPageSetupNeedsFile: '請先開啟 XLSX 檔案——版面設定會儲存進檔案。',

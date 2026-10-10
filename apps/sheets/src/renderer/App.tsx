@@ -507,6 +507,7 @@ import {
 } from './WorkbookVisuals'
 import { ChartFormatPane, SelectDataDialog } from './ChartPanels'
 import { handleSheetsControl, type ControlRequest } from './control'
+import { bootOpenAction, createOpenStallTimer } from './workbook-open-stall'
 
 // Source sheet id of an in-flight copy-sheet command; the next insert-sheet
 // mutation is that copy and must journal as a duplicate, not a blank add.
@@ -1103,6 +1104,33 @@ export function App({
   /** The shell can repeat its queued-open nudge while the renderer starts.
    * Only one picker/open request may own the workbook session at a time. */
   const workbookOpeningRef = useRef(false)
+  // the opening screen is bounded: a stalled open turns into a failure notice with Retry
+  const [openStalled, setOpenStalled] = useState(false)
+  const openingWorkbookRef = useRef(openingWorkbook)
+  openingWorkbookRef.current = openingWorkbook
+  const openStallTimer = useMemo(() => createOpenStallTimer(() => setOpenStalled(true)), [])
+  useEffect(() => {
+    if (openingWorkbook) {
+      openStallTimer.start()
+      return openStallTimer.done
+    }
+    setOpenStalled(false)
+    return undefined
+  }, [openingWorkbook, openStallTimer])
+  /// Retry: queue the tab's workbook again and start the tab over (a stalled
+  /// open may never settle, so its pending state is not reused)
+  const retryWorkbookOpen = (): void => {
+    void (window.desktopApi?.requeueWorkbook?.() ?? Promise.resolve(false))
+      .catch(() => false)
+      .then((queued) => {
+        if (queued) {
+          window.location.reload()
+          return
+        }
+        setOpeningWorkbook(false)
+        setMessage(t('appOpenFailed'))
+      })
+  }
   /** Current session's projectId/chatId (resolved when the workbook opens) */
   const chatRefIdsRef = useRef<{ projectId: string; chatId: string } | null>(null)
 
@@ -1862,7 +1890,14 @@ export function App({
     // that — the tab would strand as a blank in-memory workbook (no save, no
     // shapes) with the queued file silently never opened.
     void window.desktopApi?.hasQueuedWorkbook?.().then((queued) => {
-      if (queued) void handleInspectWorkbook()
+      const action = bootOpenAction({
+        queued,
+        opening: openingWorkbookRef.current,
+        inFlight: workbookOpeningRef.current,
+      })
+      if (action === 'open') void handleInspectWorkbook()
+      // a reloaded tab whose path is gone: say so now instead of waiting
+      else if (action === 'stalled') setOpenStalled(true)
     })
     void window.desktopApi?.consumeAiPreset?.().then((preset) => {
       if (!preset?.text) return
@@ -5140,11 +5175,21 @@ export function App({
         onGetConsolidateDefault={() => consolidateDefaultReferenceImpl(dataToolsContext())}
         onApplyHeaderFooter={(result) => handleApplyHeaderFooterImpl(pageLayoutContext(), result)}
       />
-      {openingWorkbook && (
-        <div className="workbook-opening-screen" role="status" aria-live="polite">
-          {t('appOpeningWorkbook')}
-        </div>
-      )}
+      {openingWorkbook &&
+        (openStalled ? (
+          <div className="workbook-opening-screen" role="alert">
+            <div className="workbook-opening-failed">
+              <p>{t('appOpenStalled')}</p>
+              <button type="button" className="primary-action" onClick={retryWorkbookOpen}>
+                {t('appOpenRetry')}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="workbook-opening-screen" role="status" aria-live="polite">
+            {t('appOpeningWorkbook')}
+          </div>
+        ))}
       <ThreadedCommentsPane getRuntime={getRuntime} />
       <ThreadHoverCard hover={threadHover} />
       {findReplaceService && (

@@ -518,6 +518,8 @@ export const pl = {
     'Most plików aplikacji desktopowej jest niedostępny. Uruchom ponownie aplikację Electron.',
   appOpenCanceled: 'Anulowano wybór skoroszytu.',
   appOpeningWorkbook: 'Otwieranie skoroszytu…',
+  appOpenStalled: 'Nie udało się otworzyć skoroszytu.',
+  appOpenRetry: 'Ponów',
   appOpened: 'Otwarto {name} — zmiany w komórkach zapisujesz z powrotem za pomocą ⌘S.',
   appOpenFailed: 'Nie można otworzyć skoroszytu.',
   appPageSetupNeedsFile: 'Najpierw otwórz plik XLSX — ustawienia strony są zapisywane w pliku.',

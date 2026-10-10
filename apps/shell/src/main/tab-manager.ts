@@ -481,6 +481,9 @@ export class TabManager {
     const wc = tab?.view?.webContents
     if (!wc || wc.isDestroyed()) return
     if (tab.kind === 'pdf') clearPdfDirty(wc.id)
+    // a sheets renderer gets its file only through the one-shot queue, which
+    // the first open consumed: without it the reloaded tab waits forever
+    if (tab.kind === 'sheets' && tab.filePath) queueWorkbookForView(wc, tab.filePath)
     wc.reload()
   }
 

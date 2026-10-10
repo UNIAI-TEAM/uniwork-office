@@ -527,6 +527,8 @@ export const ja = {
     'デスクトップファイルブリッジが利用できません。Electron アプリを再起動してください。',
   appOpenCanceled: 'ブックの選択をキャンセルしました。',
   appOpeningWorkbook: 'ブックを開いています…',
+  appOpenStalled: 'ブックを開けませんでした。',
+  appOpenRetry: '再試行',
   appOpened: '{name} を開きました — セルの編集は ⌘S でファイルに保存されます。',
   appOpenFailed: 'ブックを開けません。',
   appPageSetupNeedsFile: '先に XLSX ファイルを開いてください。ページ設定はファイルに保存されます。',

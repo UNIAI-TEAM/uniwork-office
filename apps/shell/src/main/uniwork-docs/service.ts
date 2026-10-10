@@ -666,9 +666,15 @@ export class UniworkDocsService {
       formatForName(detail.file.filename) ??
       formatForName(detail.title)
     if (!format) throw new UniworkDocError('unsupported_format')
-    const historical = !!launch && launch.version > 0
+    // the web hands off the version it shows, and the server reduces any
+    // ticket naming a version to view. While that version is still the
+    // current one the launch opens the document itself: the same working
+    // copy (and tab) as the picker, with the live ACL. Only an older version
+    // is its own view-only copy.
+    const historical = !!launch && launch.version > 0 && launch.version !== detail.file.version
+    const viewRequested = !!launch && launch.version === 0 && launch.operation === 'view'
     const access: UniworkDocAccess =
-      launch && (launch.operation === 'view' || historical) ? 'view' : accessFor(detail.myLevel)
+      historical || viewRequested ? 'view' : accessFor(detail.myLevel)
     const key = historical ? `${documentId}@v${launch.version}` : documentId
     const dir = this.store.dirFor(identity.deploymentId, identity.accountId, key)
     const existing = await this.store.readDir(dir)

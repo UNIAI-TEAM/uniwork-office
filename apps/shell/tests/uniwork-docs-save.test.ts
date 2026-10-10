@@ -349,6 +349,52 @@ describe('launch descriptor', () => {
     expect(binding(old.path)).toMatchObject({ access: 'view', baseVersion: 2 })
     expect(server.calls.some((c) => c.url.endsWith('/download?version=2'))).toBe(true)
   })
+
+  it('a launch naming the current version opens the document itself: live access, the open tab', async () => {
+    // the web hands off the version it just showed (version 3, the current
+    // one); the server reduces such a ticket to view, but it is no older copy
+    const server = fakeServer({ bytes: enc('v3'), myLevel: 'manage' })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    ctx.deps.isPathOpen.mockImplementation((p: string) => p === path)
+    const launch = {
+      receiptId: 'r',
+      redeemedAt: '2026-09-30T10:01:02Z',
+      id: DOC,
+      organizationId: 'org_a',
+      workspaceId: 'ws_1',
+      title: 'Q4 plan',
+      operation: 'view' as const,
+      version: 3,
+      revision: '41',
+      downloadPath: `/api/v1/documents/${DOC}/download?version=3`,
+    }
+    const opened = await ctx.service.openFromServer(DOC, launch)
+    expect(opened.path).toBe(path)
+    expect(opened.path).not.toContain('@v')
+    expect(binding(path)).toMatchObject({ access: 'edit', baseVersion: 3 })
+    expect(ctx.deps.openPath).toHaveBeenLastCalledWith(path)
+    expect(ctx.statuses.at(-1)).toMatchObject({ access: 'edit' })
+  })
+
+  it('a current-version launch of a view-only document stays view only', async () => {
+    const server = fakeServer({ bytes: enc('v3'), myLevel: 'view' })
+    const ctx = setup(server)
+    const opened = await ctx.service.openFromServer(DOC, {
+      receiptId: 'r',
+      redeemedAt: '2026-09-30T10:01:02Z',
+      id: DOC,
+      organizationId: 'org_a',
+      workspaceId: 'ws_1',
+      title: 'Q4 plan',
+      operation: 'view',
+      version: 3,
+      revision: '41',
+      downloadPath: `/api/v1/documents/${DOC}/download?version=3`,
+    })
+    expect(opened.path).not.toContain('@v')
+    expect(binding(opened.path)).toMatchObject({ access: 'view' })
+  })
 })
 
 describe('save pipeline', () => {

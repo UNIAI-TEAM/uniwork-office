@@ -496,6 +496,8 @@ export const id = {
   appBridgeUnavailable: 'Jembatan file desktop tidak tersedia. Mulai ulang aplikasi Electron.',
   appOpenCanceled: 'Pemilihan buku kerja dibatalkan.',
   appOpeningWorkbook: 'Membuka buku kerja…',
+  appOpenStalled: 'Buku kerja tidak dapat dibuka.',
+  appOpenRetry: 'Coba lagi',
   appOpened: '{name} dibuka — pengeditan sel disimpan kembali dengan ⌘S.',
   appOpenFailed: 'Tidak dapat membuka buku kerja.',
   appPageSetupNeedsFile: 'Buka file XLSX dahulu — pengaturan halaman disimpan ke file.',

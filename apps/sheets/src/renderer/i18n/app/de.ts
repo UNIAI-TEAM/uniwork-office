@@ -538,6 +538,8 @@ export const de = {
     'Die Desktop-Dateibrücke ist nicht verfügbar. Starten Sie die Electron-App neu.',
   appOpenCanceled: 'Arbeitsmappenauswahl abgebrochen.',
   appOpeningWorkbook: 'Arbeitsmappe wird geöffnet…',
+  appOpenStalled: 'Die Arbeitsmappe konnte nicht geöffnet werden.',
+  appOpenRetry: 'Erneut versuchen',
   appOpened: '{name} geöffnet — Zellbearbeitungen werden mit ⌘S zurückgespeichert.',
   appOpenFailed: 'Die Arbeitsmappe kann nicht geöffnet werden.',
   appPageSetupNeedsFile:

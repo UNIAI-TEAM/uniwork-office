@@ -496,6 +496,8 @@ export const ms = {
   appBridgeUnavailable: 'Jambatan fail desktop tidak tersedia. Mulakan semula aplikasi Electron.',
   appOpenCanceled: 'Pemilihan buku kerja dibatalkan.',
   appOpeningWorkbook: 'Membuka buku kerja…',
+  appOpenStalled: 'Buku kerja tidak dapat dibuka.',
+  appOpenRetry: 'Cuba lagi',
   appOpened: '{name} dibuka — suntingan sel disimpan semula dengan ⌘S.',
   appOpenFailed: 'Tidak dapat membuka buku kerja.',
   appPageSetupNeedsFile: 'Buka fail XLSX dahulu — persediaan halaman disimpan ke dalam fail.',

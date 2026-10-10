@@ -480,6 +480,8 @@ export const en = {
   appBridgeUnavailable: 'Desktop file bridge is unavailable. Restart the Electron app.',
   appOpenCanceled: 'Workbook selection canceled.',
   appOpeningWorkbook: 'Opening workbook…',
+  appOpenStalled: 'The workbook could not be opened.',
+  appOpenRetry: 'Retry',
   appOpened: 'Opened {name} — cell edits save back with ⌘S.',
   appOpenFailed: 'Unable to open the workbook.',
   appPageSetupNeedsFile: 'Open an XLSX file first — page setup saves into the file.',

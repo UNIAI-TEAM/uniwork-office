@@ -633,6 +633,10 @@ const desktopApi: DesktopApi = {
     const result: unknown = await ipcRenderer.invoke('sheets:has-queued-workbook')
     return result === true
   },
+  async requeueWorkbook() {
+    const result: unknown = await ipcRenderer.invoke('sheets:requeue-workbook')
+    return result === true
+  },
   async consumeHeadlessExport() {
     const result: unknown = await ipcRenderer.invoke('sheets:consume-headless-export')
     return typeof result === 'string' ? result : null

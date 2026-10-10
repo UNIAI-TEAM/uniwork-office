@@ -818,6 +818,25 @@ describe('file path bookkeeping', () => {
     expect(view.webContents.reload).toHaveBeenCalledTimes(1)
   })
 
+  it('reloading a sheets tab queues its workbook again (the reloaded renderer opens it)', () => {
+    const id = manager.openSheetsTab('/tmp/book.xlsx')
+    const view = lastCreatedView(createSheetsView)
+    queueWorkbookForView.mockClear()
+    manager.reloadTab(id)
+    expect(queueWorkbookForView).toHaveBeenCalledWith(view.webContents, '/tmp/book.xlsx')
+    expect(queueWorkbookForView.mock.invocationCallOrder[0]).toBeLessThan(
+      view.webContents.reload.mock.invocationCallOrder[0]!,
+    )
+    expect(view.webContents.reload).toHaveBeenCalledTimes(1)
+  })
+
+  it('reloading an untitled sheets tab queues nothing', () => {
+    const id = manager.openSheetsTab()
+    queueWorkbookForView.mockClear()
+    manager.reloadTab(id)
+    expect(queueWorkbookForView).not.toHaveBeenCalled()
+  })
+
   it('reports the active pdf tab with its id (so callers can re-activate it)', () => {
     const pdfId = manager.openPdfTab('/tmp/c.pdf')
     const active = manager.activePdfTab()
