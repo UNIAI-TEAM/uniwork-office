@@ -6,7 +6,7 @@
 # its tests are unchanged. Build with ./build-wasm.mjs (pinned toolchain, reproducible,
 # checksum-verified); never with the parent crate's Cargo.lock.
 #
-# Upstream-sync note: docs/upstream-sync.md "Sheets wasm engine".
+# Upstream-sync note: docs/upstream/UPSTREAM_SYNC.md "Sheets wasm engine".
 [package]
 name = "xlsx-sidecar-wasm"
 version = "0.1.0"
