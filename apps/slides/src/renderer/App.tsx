@@ -120,7 +120,7 @@ import { GensparkMark, IconAiBeautify, IconAiFactCheck, IconAiImage } from './co
 import { ToastHost } from './components/toast'
 import { showToast } from './components/toast-bus'
 import { t, useI18n } from './i18n/locale'
-import { cap } from './capabilities'
+import { cap, isViewOnly } from './capabilities'
 import { ChartDataDialog } from './components/ChartDataDialog'
 import type { BrushFormat } from './format-brush'
 import { isTextUndoTarget, shouldRouteHistoryToDeck } from './undo-routing'
@@ -140,7 +140,7 @@ import type {
 } from './action-context'
 import type { PathCmd } from './edit-points'
 import { createPreviewTracker, type EditPointsCommit } from './edit-points-actions'
-import { FIT_WIDTH } from './app-constants'
+import { FIT_WIDTH, NARROW_FRAME_PX } from './app-constants'
 import { StageRuler } from './components/StageRuler'
 import { formatRulerValue, type RulerUnit } from './ruler-ticks'
 import * as fileActions from './file-actions'
@@ -440,7 +440,9 @@ export function App() {
     const t = window.setTimeout(() => setStatus(''), 4000)
     return () => window.clearTimeout(t)
   }, [status])
-  const [showThumbs, setShowThumbs] = useState(true)
+  // a phone-width frame has no room for the thumbnail column next to the slide: it starts hidden
+  // (View > Thumbnails brings it back) so the canvas fits the width instead of shrinking to ~14 %
+  const [showThumbs, setShowThumbs] = useState(() => window.innerWidth >= NARROW_FRAME_PX)
   // ── Thumbnail sidebar width (drag the divider to resize; persisted) ─────────
   const [thumbsW, setThumbsW] = useState(loadThumbsW)
   const thumbsListRef = useRef<HTMLDivElement | null>(null)
@@ -726,7 +728,8 @@ export function App() {
         stageViewportSize.w ||
         window.innerWidth - (showThumbs ? thumbsW : 0) - (showAi ? 360 : aiEnabled ? 34 : 0)
       const viewportH = el?.clientHeight || stageViewportSize.h || window.innerHeight - 150
-      const availW = viewportW - 56
+      // 56 = the stage's 2 x 32 padding minus slack; a narrow stage pads 12 px a side
+      const availW = viewportW - (viewportW < NARROW_FRAME_PX ? 28 : 56)
       // -72: vertical padding is 48 (AI-bar headroom) + 32, minus the same 8px slack as width
       const availH = viewportH - 72
       return Math.min(availW / s.widthPx, availH / s.heightPx)
@@ -2493,6 +2496,7 @@ export function App() {
   const startEdit = useCallback(
     (sourceId: string, caret?: EditCaret) => {
       if (brushMode) return // the click already applied the format brush
+      if (isViewOnly()) return // a view-only frame never opens a text editor
       const isChild = enteredGroupNode?.children.some((c) => c.sourceId === sourceId)
       setEditing({ sourceId, caret, ...(isChild ? { groupId: enteredGroupNode!.sourceId } : {}) })
     },
@@ -2530,6 +2534,7 @@ export function App() {
   const overlayOpen = useEscOverlayOpen()
 
   const startEditCell = useCallback((sourceId: string, row: number, col: number) => {
+    if (isViewOnly()) return // a view-only frame never opens a cell editor
     setEditing(null)
     setEditingCell({ sourceId, row, col })
   }, [])
