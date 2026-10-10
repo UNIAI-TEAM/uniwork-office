@@ -26,10 +26,37 @@ const en = {
   ribbonCellMargins: 'Default cell margins',
 }
 
+/** Vietnamese is reviewed for the UniWork web (the Table Design tab was English in vi). */
+const vi: Record<keyof typeof en, string> = {
+  ribbonTableStyleOptions: 'Tùy chọn kiểu bảng',
+  ribbonTableFirstRow: 'Hàng tiêu đề',
+  ribbonTableLastRow: 'Hàng tổng',
+  ribbonTableBandedRows: 'Hàng xen kẽ',
+  ribbonTableFirstColumn: 'Cột đầu',
+  ribbonTableLastColumn: 'Cột cuối',
+  ribbonTableBandedColumns: 'Cột xen kẽ',
+  ribbonTablePresetGrid: 'Lưới đơn giản',
+  ribbonTablePresetBlueHeader: 'Tiêu đề xanh dương',
+  ribbonTablePresetBlueBanded: 'Xen kẽ xanh dương',
+  ribbonTablePresetGrayBanded: 'Xen kẽ xám',
+  ribbonTablePresetGreenHeader: 'Tiêu đề xanh lá',
+  ribbonAutoFit: 'Tự khớp',
+  ribbonAutoFitContents: 'Tự khớp theo nội dung',
+  ribbonAutoFitWindow: 'Tự khớp theo cửa sổ',
+  ribbonFixedColumnWidth: 'Độ rộng cột cố định',
+  ribbonRepeatHeaderRows: 'Lặp lại hàng tiêu đề',
+  ribbonTableProperties: 'Thuộc tính bảng',
+  ribbonTableData: 'Bảng',
+  ribbonHorizontalPosition: 'Vị trí ngang',
+  ribbonVerticalPosition: 'Vị trí dọc',
+  ribbonDistanceFromText: 'Khoảng cách đến văn bản',
+  ribbonCellMargins: 'Lề ô mặc định',
+}
+
 /**
  * New table controls deliberately fall back to English until each locale has
- * reviewed terminology. Keeping one complete key set prevents partially
- * translated dialogs and lets language packs override the shard incrementally.
+ * reviewed terminology (vi is reviewed). Keeping one complete key set prevents
+ * partially translated dialogs and lets language packs override the shard incrementally.
  */
 export const tableStrings = defineStrings({
   zh: en,
@@ -52,5 +79,5 @@ export const tableStrings = defineStrings({
   he: en,
   hi: en,
   'zh-TW': en,
-  vi: en,
+  vi,
 })

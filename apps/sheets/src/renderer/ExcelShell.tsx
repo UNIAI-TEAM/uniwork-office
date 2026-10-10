@@ -108,6 +108,7 @@ import type { PrintPreviewHost } from './page-layout-actions'
 import { PrintDialog } from './PrintDialog'
 import type { HeaderFooterParts } from './edit-journal'
 import { cap } from './capabilities'
+import { isNarrowViewport } from './narrow-layout'
 import { useModalDialog } from './modal-dialog'
 import type { SelectedTableRibbon } from './table-design-actions'
 import type { TableOptionKey } from './table-design'
@@ -550,14 +551,24 @@ export function ExcelShell({
     expand: t('appRibbonExpand'),
   })
   // Persisted so a closed AI panel stays closed on next launch (docs/slides parity)
-  const [isCopilotOpen, setIsCopilotOpenState] = useState(
-    () => cap('ai') && aiPanelInitiallyOpen('ai-sheets-show-ai'),
-  )
+  // A narrow viewport starts with the dock collapsed (it would squeeze the grid to a sliver); that
+  // automatic collapse is not the user's choice, so it is not remembered.
+  const autoCollapsedRef = useRef(false)
+  const [isCopilotOpen, setIsCopilotOpenState] = useState(() => {
+    if (!cap('ai') || !aiPanelInitiallyOpen('ai-sheets-show-ai')) return false
+    if (!isNarrowViewport()) return true
+    autoCollapsedRef.current = true
+    return false
+  })
   // without the `ai` capability (web frame) the dock never opens
   const setIsCopilotOpen: typeof setIsCopilotOpenState = (next) => {
     if (cap('ai')) setIsCopilotOpenState(next)
   }
   useEffect(() => {
+    if (autoCollapsedRef.current) {
+      if (!isCopilotOpen) return
+      autoCollapsedRef.current = false
+    }
     rememberAiPanelOpen('ai-sheets-show-ai', isCopilotOpen)
   }, [isCopilotOpen])
   useEffect(() => {

@@ -136,8 +136,9 @@ One protocol serves every genoffice editor on the web (lane GO-B4/B5/B6, UNI-101
   entries (Ctrl+S, File > Save, close-guard "Save"), never sends `api.save`, and answers a host `save` with
   `ok:false` / `unsupported`. `FileMeta.writable === false` means the same for that file. No extra field is needed.
   `saveAs` is a separate grant (a host may allow "save a copy" of a document the user cannot overwrite).
-  The module bridges (`web/modules/<module>/`) implement this; the Docs bridge does not wire it yet (open item
-  from GO-B4: the Docs host always grants `save` today).
+  The module bridges (`web/modules/<module>/`) implement this. The Docs bridge answers `uniworkState` with
+  `readOnly: true` (the renderer's view-only seam: read-only editor and ribbon, never dirty, no save entries),
+  refuses `api.save` and a host `save` (`unsupported`), and refuses Save As unless `saveAs` is granted.
 - **No autosave on the web** (lane decision C10, 2026-10-09): Docs and every module save only on an explicit user
   save. Hosts never send `save {reason: 'autosave'}`; web bridges never set `api.save.auto`; every module's
   autosave capability is false on the web and its UI hidden. The `autosave` / `auto` values stay in the types for

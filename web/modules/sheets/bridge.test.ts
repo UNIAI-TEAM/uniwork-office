@@ -264,6 +264,15 @@ describe('open', () => {
     expect(t.mock.calls.some((c) => c.type === 'file.pick')).toBe(false)
   })
 
+  it('a view-only frame (no save grant) never reports dirty, whatever the renderer counts', async () => {
+    const t = setup({ grants: { open: true } })
+    await t.boot()
+    t.desktop.notifyPendingEdits(1)
+    t.desktop.notifyPendingEdits(3)
+    expect(t.mock.dirty.some((d) => d === true)).toBe(false)
+    expect(await t.mock.host['doc.closeCheck']({})).toEqual({ dirty: false, autoSave: false })
+  })
+
   it('a host `open` request queues the document and drives the renderer open action', async () => {
     const t = setup()
     await t.boot()
@@ -448,6 +457,30 @@ describe('engine crash and failed session swap', () => {
     expect(t.mock.saved).toHaveLength(1)
     expect(t.mock.dirty.at(-1)).toBe(false)
     expect(saved).toHaveBeenCalledOnce()
+  })
+})
+
+describe('save failures', () => {
+  it('a network failure surfaces the localized sentence without the browser jargon', async () => {
+    const t = setup()
+    const wb = await t.boot()
+    t.desktop.notifyPendingEdits(1)
+    t.mock.override('api.save', () => ({
+      ok: false,
+      error: { code: 'network', message: 'Failed to fetch' },
+    }))
+    await expect(
+      t.desktop.saveWorkbookEdits(saveRequest(wb.sessionId, [[0, 0, 5]])),
+    ).rejects.toThrow(/^Saving to UniWork failed\.$/)
+    // a server-side failure keeps its detail
+    t.mock.override('api.save', () => ({
+      ok: false,
+      error: { code: 'internal', message: 'disk full' },
+    }))
+    await expect(
+      t.desktop.saveWorkbookEdits(saveRequest(wb.sessionId, [[0, 0, 5]])),
+    ).rejects.toThrow('Saving to UniWork failed. (disk full)')
+    expect(t.mock.dirty.at(-1)).toBe(true)
   })
 })
 

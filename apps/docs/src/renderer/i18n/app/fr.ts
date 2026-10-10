@@ -535,6 +535,7 @@ export const fr = {
   appWebFatalTitle: 'Impossible d’ouvrir le document',
   appWebFatalBody:
     'La modification et l’enregistrement sont désactivés. Rechargez la page ou rouvrez le document depuis UniWork.',
+  appWebSaveOffline: 'Impossible de joindre UniWork. Vérifiez votre connexion et réessayez.',
   appWebNoHost: 'Cet éditeur fonctionne dans UniWork. Ouvrez le document depuis UniWork.',
   appSaveStateUnsaved: 'Modifications non enregistrées',
   appSaveStateSaved: 'Toutes les modifications sont enregistrées',

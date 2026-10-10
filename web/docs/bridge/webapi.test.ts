@@ -330,8 +330,20 @@ describe('saveDocx', () => {
   it('timeout: reports a timed-out save', async () => {
     const doc = await bootWith()
     mock.override('api.save', timeoutAfter)
-    expect(await api.saveDocx(doc.path, buf([5]))).toEqual({ ok: false, error: 'save timed out' })
+    expect(await api.saveDocx(doc.path, buf([5]))).toEqual({
+      ok: false,
+      error: text('appWebSaveOffline'),
+    })
     expect(mock.calls.find((c) => c.type === 'api.save')!.opts?.timeoutMs).toBe(120_000)
+  })
+
+  it('network failure: a translated message, not the raw browser error', async () => {
+    const doc = await bootWith()
+    mock.override('api.save', () => Promise.reject(protocolError('network', 'Failed to fetch')))
+    expect(await api.saveDocx(doc.path, buf([5]))).toEqual({
+      ok: false,
+      error: text('appWebSaveOffline'),
+    })
   })
 
   it('timeout after the host committed: the next save is based on that version, no conflict', async () => {
@@ -344,7 +356,7 @@ describe('saveDocx', () => {
     })
     expect(await api.saveDocx(doc.path, buf([5, 5]))).toEqual({
       ok: false,
-      error: 'save timed out',
+      error: text('appWebSaveOffline'),
     })
     mock.clearOverrides()
     expect(await api.saveDocx(doc.path, buf([5, 5, 5]))).toEqual({ ok: true })
@@ -1004,5 +1016,68 @@ describe('draft recovery (C18)', () => {
     await api.openDocxPath(pathFor(other))
     await editAndKeep([1])
     expect(await store.list('u1:f1:')).toEqual([])
+  })
+})
+
+describe('view-only (host withholds the save grant)', () => {
+  const GRANTS = { save: true, saveAs: true, recents: true }
+
+  async function boot(
+    capabilities: Record<string, boolean> | undefined,
+    writable?: boolean,
+  ): Promise<OpenFileResult> {
+    const meta = mock.seed('Report.docx', DOCX)
+    if (writable === false)
+      mock.override('api.open', () => ({
+        file: { ...meta, writable: false },
+        source: { kind: 'bytes', data: DOCX.slice().buffer },
+      }))
+    mock.init({ documentId: meta.fileId, ...(capabilities ? { capabilities } : {}) })
+    return (await api.consumePendingOpenDocx()) as OpenFileResult
+  }
+
+  it('answers uniworkState readOnly so the renderer makes the editor read-only', async () => {
+    const doc = await boot({ ...GRANTS, save: false })
+    expect(await api.uniworkState(doc.path)).toEqual({ bound: false, readOnly: true })
+  })
+
+  it('answers readOnly for a file the host marks writable:false even with the save grant', async () => {
+    const doc = await boot(GRANTS, false)
+    expect(await api.uniworkState(doc.path)).toEqual({ bound: false, readOnly: true })
+  })
+
+  it('stays editable with the save grant', async () => {
+    const doc = await boot(GRANTS)
+    expect(await api.uniworkState(doc.path)).toEqual({ bound: false, readOnly: false })
+  })
+
+  it('refuses saveDocx without calling api.save', async () => {
+    const doc = await boot({ ...GRANTS, save: false })
+    const res = await api.saveDocx(doc.path, buf([5]), false)
+    expect(res).toEqual({ ok: false, error: 'read-only document' })
+    expect(mock.calls.some((c) => c.type === 'api.save')).toBe(false)
+    expect(mock.saved).toEqual([])
+  })
+
+  it('answers a host save request unsupported and never starts the editor flow', async () => {
+    await boot({ ...GRANTS, save: false })
+    const res = await mock.host.save({ reason: 'user' })
+    expect(res).toMatchObject({ ok: false, error: { code: 'unsupported' } })
+  })
+
+  it('refuses Save As too unless the host grants saveAs separately', async () => {
+    const doc = await boot({ ...GRANTS, save: false, saveAs: false })
+    expect(await api.saveDocxAs('Copy', buf([5]), doc.path)).toEqual({
+      ok: false,
+      error: 'read-only document',
+    })
+    expect(mock.calls.some((c) => c.type === 'api.saveAs')).toBe(false)
+  })
+
+  it('allows a saved copy when the host grants saveAs', async () => {
+    const doc = await boot({ ...GRANTS, save: false })
+    const res = await api.saveDocxAs('Copy', buf([5]), doc.path)
+    expect(res.ok).toBe(true)
+    expect(mock.calls.some((c) => c.type === 'api.saveAs')).toBe(true)
   })
 })

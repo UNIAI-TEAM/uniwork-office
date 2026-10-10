@@ -144,6 +144,37 @@ test.describe('sheets: web AI', () => {
     await expectClean(page, frame, problems)
   })
 
+  test('grant on at 390 px: the dock starts collapsed and opens as an overlay, the grid keeps its width (S-03)', async ({
+    page,
+    request,
+  }) => {
+    await fake(request)
+    await page.setViewportSize({ width: 390, height: 844 })
+    const problems = await watch(page)
+    const { frame } = await open(page, { lang: 'en', ai: '1' })
+    const grid = frame.locator('canvas[id^="univer-sheet-main-canvas"]').first()
+    const gridWidth = async () => (await grid.boundingBox())?.width ?? 0
+    // collapsed rail, no chat panel, the grid is not squeezed
+    await expect(frame.locator('.copilot.collapsed .expand-copilot')).toBeVisible()
+    await expect(panel(frame)).toHaveCount(0)
+    const closedWidth = await gridWidth()
+    expect(closedWidth).toBeGreaterThan(300)
+    // opening it overlays the grid: it covers the sheet from the edge but the grid keeps its width
+    await frame.locator('.expand-copilot').click()
+    await expect(panel(frame)).toBeVisible()
+    const dock = (await frame.locator('.copilot:not(.collapsed)').boundingBox())!
+    expect(dock.width).toBeLessThanOrEqual(390 - 34)
+    expect(await gridWidth()).toBeGreaterThanOrEqual(closedWidth - 1)
+    // no horizontal page scroll
+    const shell = (await frame.locator('.sheet-body').boundingBox())!
+    expect(shell.x + shell.width).toBeLessThanOrEqual(390)
+    await page.screenshot({ path: screenshotPath('ai', 'sheets-390-open-en-light') })
+    // the dock collapses back to its rail
+    await frame.locator('.ai-panel-collapse').first().click()
+    await expect(frame.locator('.copilot.collapsed')).toBeVisible()
+    await expectClean(page, frame, problems)
+  })
+
   test('grant on: panel, reply streams with the frame token, the model is offered only web-safe tools', async ({
     page,
     request,

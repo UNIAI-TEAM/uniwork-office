@@ -22,23 +22,34 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
+type FakeEvent = { id?: string; params?: unknown; cancel?: boolean }
+
 function fakeRuntime() {
-  let listener: ((event: { id: string; params?: unknown; cancel?: boolean }) => void) | null = null
+  const listeners = new Map<string, (event: FakeEvent) => void>()
   const runtime = {
     univerAPI: {
-      Event: { BeforeCommandExecute: 'BeforeCommandExecute' },
-      addEvent: (_name: string, fn: typeof listener) => {
-        listener = fn
-        return { dispose: () => {} }
+      Event: {
+        BeforeCommandExecute: 'BeforeCommandExecute',
+        BeforeSheetEditStart: 'BeforeSheetEditStart',
+      },
+      addEvent: (name: string, fn: (event: FakeEvent) => void) => {
+        listeners.set(name, fn)
+        return { dispose: () => listeners.delete(name) }
       },
     },
   } as unknown as UniverRuntime
   const run = (id: string, params?: unknown) => {
-    const event: { id: string; params?: unknown; cancel?: boolean } = { id, params }
-    listener?.(event)
+    const event: FakeEvent = { id, params }
+    listeners.get('BeforeCommandExecute')?.(event)
     return event.cancel === true
   }
-  return { runtime, run }
+  /** the formula bar / F2 / double click: an editor start that is not a known command */
+  const startEdit = () => {
+    const event: FakeEvent = {}
+    listeners.get('BeforeSheetEditStart')?.(event)
+    return event.cancel === true
+  }
+  return { runtime, run, startEdit, listeners }
 }
 
 describe('isViewOnlyBlocked', () => {
@@ -92,14 +103,32 @@ describe('installViewOnlyGuard', () => {
     expect(run('sheet.operation.set-cell-edit-visible', { visible: false })).toBe(false)
   })
 
+  it('refuses to open any cell editor (formula bar, F2, double click), so nothing turns dirty', () => {
+    frame({ platform: 'web', save: false })
+    const { runtime, startEdit } = fakeRuntime()
+    const notify = vi.fn()
+    installViewOnlyGuard(runtime, notify)
+    expect(startEdit()).toBe(true)
+    expect(notify).toHaveBeenCalledTimes(1)
+  })
+
   it('does nothing on the desktop or with the save grant', () => {
-    const { runtime, run } = fakeRuntime()
+    const { runtime, run, startEdit } = fakeRuntime()
     const notify = vi.fn()
     installViewOnlyGuard(runtime, notify)
     frame() // desktop
     expect(run('sheet.command.set-range-values')).toBe(false)
+    expect(startEdit()).toBe(false)
     frame({ platform: 'web', save: true })
     expect(run('sheet.command.set-range-values')).toBe(false)
+    expect(startEdit()).toBe(false)
     expect(notify).not.toHaveBeenCalled()
+  })
+
+  it('dispose removes both listeners', () => {
+    frame({ platform: 'web', save: false })
+    const { runtime, listeners } = fakeRuntime()
+    installViewOnlyGuard(runtime, vi.fn()).dispose()
+    expect(listeners.size).toBe(0)
   })
 })

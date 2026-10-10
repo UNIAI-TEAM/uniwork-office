@@ -548,6 +548,7 @@ export const ko = {
   appWebFatalTitle: '문서를 열 수 없습니다',
   appWebFatalBody:
     '편집과 저장이 비활성화되었습니다. 페이지를 새로 고치거나 UniWork에서 문서를 다시 여세요.',
+  appWebSaveOffline: 'UniWork에 연결할 수 없습니다. 연결을 확인하고 다시 시도하세요.',
   appWebNoHost: '이 편집기는 UniWork 안에서 실행됩니다. UniWork에서 문서를 여세요.',
   appSaveStateUnsaved: '저장되지 않은 변경 내용',
   appSaveStateSaved: '모든 변경 내용이 저장됨',
