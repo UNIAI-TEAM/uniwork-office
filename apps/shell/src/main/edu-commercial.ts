@@ -21,7 +21,7 @@ import { showSaveDialogWithMemory } from '@genoffice/electron-utils'
 export async function probeAiHub(baseUrl: string, apiKey: string): Promise<HubProbeResult> {
   const modelsUrl = hubModelsUrl(baseUrl)
   if (!modelsUrl || !apiKey.trim()) {
-    return { ok: false, message: 'Cần Base URL và Token Hub.' }
+    return { ok: false, message: 'Cần Base URL và khóa API.' }
   }
   const openRouter = isOpenRouterHubUrl(baseUrl)
   try {

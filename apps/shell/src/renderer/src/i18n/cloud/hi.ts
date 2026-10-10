@@ -6,6 +6,7 @@ export const hi = {
   cloudStateNotEntitled: 'आपके प्लान में शामिल नहीं',
   cloudStateExhausted: 'AI क्रेडिट खत्म',
   cloudStateUnavailable: 'अभी उपलब्ध नहीं',
+  cloudStateSignedOut: 'साइन इन नहीं है',
   cloudStateInactive: 'सदस्यता सक्रिय नहीं है',
   cloudCredits: 'AI क्रेडिट',
   cloudCreditsLeft: '{remaining} / {limit} शेष',

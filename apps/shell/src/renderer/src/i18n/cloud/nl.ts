@@ -6,6 +6,7 @@ export const nl = {
   cloudStateNotEntitled: 'Niet in je abonnement',
   cloudStateExhausted: 'AI-tegoed op',
   cloudStateUnavailable: 'Niet beschikbaar',
+  cloudStateSignedOut: 'Niet aangemeld',
   cloudStateInactive: 'Abonnement inactief',
   cloudCredits: 'AI-tegoed',
   cloudCreditsLeft: '{remaining} / {limit} over',

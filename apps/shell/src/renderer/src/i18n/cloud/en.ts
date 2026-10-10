@@ -6,6 +6,7 @@ export const en = {
   cloudStateNotEntitled: 'Not in your plan',
   cloudStateExhausted: 'Out of AI credits',
   cloudStateUnavailable: 'Unavailable',
+  cloudStateSignedOut: 'Not signed in',
   cloudStateInactive: 'Subscription inactive',
   cloudCredits: 'AI credits',
   cloudCreditsLeft: '{remaining} / {limit} left',

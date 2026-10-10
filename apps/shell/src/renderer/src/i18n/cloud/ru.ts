@@ -6,6 +6,7 @@ export const ru = {
   cloudStateNotEntitled: 'Не входит в ваш тариф',
   cloudStateExhausted: 'Кредиты ИИ закончились',
   cloudStateUnavailable: 'Недоступен',
+  cloudStateSignedOut: 'Вход не выполнен',
   cloudStateInactive: 'Подписка неактивна',
   cloudCredits: 'Кредиты ИИ',
   cloudCreditsLeft: 'Осталось {remaining} / {limit}',

@@ -14,10 +14,17 @@ const statusOf = (state: UniworkCloudState): UniworkCloudStatus => ({
 })
 
 describe('settings test connection for the UniWork cloud blocks', () => {
-  it('passes when the server says the cloud is ready, and when there is no session or no status', () => {
+  it('passes only when the server says the cloud is ready', () => {
     expect(cloudTestVerdict(statusOf('ready'), tOf(en))).toEqual({ ok: true })
-    expect(cloudTestVerdict(statusOf('signed-out'), tOf(en))).toEqual({ ok: true })
-    expect(cloudTestVerdict(null, tOf(en))).toEqual({ ok: true })
+  })
+
+  it('never shows a green OK without a server answer: signed out or an unreadable status', () => {
+    expect(cloudTestVerdict(statusOf('signed-out'), tOf(en))).toEqual({
+      ok: false,
+      error: 'Not signed in',
+    })
+    expect(cloudTestVerdict(statusOf('signed-out'), tOf(vi)).error).toBe(vi.cloudStateSignedOut)
+    expect(cloudTestVerdict(null, tOf(en))).toEqual({ ok: false, error: 'Unavailable' })
   })
 
   it('names the plan, credits or availability problem in English', () => {
