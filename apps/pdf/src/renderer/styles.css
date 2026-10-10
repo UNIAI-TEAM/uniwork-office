@@ -225,6 +225,16 @@ button {
     overflow-x: auto;
     overflow-y: hidden;
     scrollbar-width: none;
+    /* edge cue: a soft shadow on the side that still hides tabs (the 'local' cover hides it at the ends) */
+    background:
+      linear-gradient(to right, var(--chrome-bg) 40%, transparent) left center / 24px 100% no-repeat
+        local,
+      linear-gradient(to left, var(--chrome-bg) 40%, transparent) right center / 24px 100% no-repeat
+        local,
+      linear-gradient(to right, var(--border-strong), transparent) left center / 12px 100% no-repeat
+        scroll,
+      linear-gradient(to left, var(--border-strong), transparent) right center / 12px 100% no-repeat
+        scroll;
   }
 
   .ribbon-tabs::-webkit-scrollbar {

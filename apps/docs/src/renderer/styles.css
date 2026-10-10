@@ -3917,10 +3917,11 @@ th.cell-rev-del {
 .comment-author {
   font-weight: 600;
   font-size: 12px;
-  /* shows the whole name: it takes the free width and wraps (at spaces, else anywhere) */
-  flex: 1 1 5em;
+  /* shows the whole name: it takes the free width and wraps at spaces; when less than 9em is left
+     the date and the edit / delete icons drop to a second line instead of squeezing it */
+  flex: 1 1 9em;
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 .comment-date {
@@ -12678,6 +12679,16 @@ tr > .page-gap-cut {
   .ribbon-tabs {
     overflow-x: auto;
     scrollbar-width: none;
+    /* edge cue: a soft shadow on the side that still hides tabs (the 'local' cover hides it at the ends) */
+    background:
+      linear-gradient(to right, var(--chrome-bg) 40%, transparent) left center / 24px 100% no-repeat
+        local,
+      linear-gradient(to left, var(--chrome-bg) 40%, transparent) right center / 24px 100% no-repeat
+        local,
+      linear-gradient(to right, var(--border-strong), transparent) left center / 12px 100% no-repeat
+        scroll,
+      linear-gradient(to left, var(--border-strong), transparent) right center / 12px 100% no-repeat
+        scroll;
   }
 
   .ribbon-tabs::-webkit-scrollbar {

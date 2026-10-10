@@ -65,6 +65,7 @@ interface OpenOptions {
   theme?: 'light' | 'dark'
   readonly?: boolean
   pick?: boolean
+  ai?: boolean
 }
 
 async function openPdf(page: Page, o: OpenOptions = {}): Promise<Frame> {
@@ -75,6 +76,7 @@ async function openPdf(page: Page, o: OpenOptions = {}): Promise<Frame> {
     theme: o.theme ?? 'light',
     ...(o.readonly ? { readonly: '1' } : {}),
     ...(o.pick ? { pick: '1' } : {}),
+    ...(o.ai ? { ai: '1' } : {}),
   })
   await page.goto(`/test-host/?${q}`)
   await expect(page.locator('#status')).toHaveText(/^initialised/, { timeout: 30_000 })
@@ -390,6 +392,25 @@ test.describe('pdf module on the web', () => {
     expect(Math.max(...row.heights)).toBeLessThan(40)
     expect(row.scrolls).toBe(true)
     expect(row.overflowX).toBe('auto')
+    await noProblems(page, frame, problems)
+  })
+
+  test('vi ribbon with the AI panel open: the clipped band shows an overflow cue', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1176, height: 800 })
+    const problems = await watch(page)
+    const frame = await openPdf(page, { lang: 'vi', ai: true })
+    await waitRendered(frame)
+    const band = await frame.evaluate(() => {
+      const b = document.querySelector('[data-ribbon-body]') as HTMLElement
+      return { clipped: b.scrollWidth > b.clientWidth + 1 }
+    })
+    expect(band.clipped, 'the vi Home band is wider than the frame with the AI panel open').toBe(
+      true,
+    )
+    await expect(frame.locator('.ribbon')).toHaveAttribute('data-ribbon-overflow', 'end')
+    await expect(frame.locator('.ribbon-overflow-cue[data-edge="end"]')).toBeVisible()
     await noProblems(page, frame, problems)
   })
 

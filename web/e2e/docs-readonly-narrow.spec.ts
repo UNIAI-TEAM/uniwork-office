@@ -110,6 +110,11 @@ for (const width of [768, 390]) {
       return { sw: t.scrollWidth, cw: t.clientWidth }
     })
     if (width <= 700) expect(tabs.sw).toBeGreaterThanOrEqual(tabs.cw)
+    // the command band is wider than a phone frame: it scrolls and says so (shared overflow cue)
+    if (width <= 600) {
+      await expect(ed.locator('.ribbon')).toHaveAttribute('data-ribbon-overflow', /start|end|both/)
+      await expect(ed.locator('.ribbon-overflow-cue:not([hidden])').first()).toBeVisible()
+    }
   })
 }
 

@@ -16,7 +16,8 @@
  * |   pdfAnnotDelete             |   module CSP carries 'wasm-unsafe-eval' for it)                     |
  * | savedSignatures              | on, encrypted per-user store (./signatures.ts)                      |
  * | redaction                    | off (the desktop redacts into a working copy file next to the PDF)   |
- * | ribbonSaveState              | off (the host header owns the save state and the view-only notice)   |
+ * | saveStatus, viewOnlyChip     | off, from MODULE_WEB_CAPABILITIES (the host header owns the save    |
+ * |                              |   state, one host banner owns "view only")                          |
  * | ai, autoSave(ToDisk), auto-  | off (AI stays desktop-only; no autosave on the web, CONTRACT C10;   |
  * |   Rename, convertOffice, ocr,|   the rest need the desktop shell or an OS engine)                  |
  * |   webSearch, imageSearch,    |                                                                     |
@@ -42,8 +43,6 @@ export const PDF_WEB_CAPABILITIES: Readonly<Record<string, unknown>> = Object.fr
   savedSignatures: true,
   // redaction writes a working copy next to the file (desktop only)
   redaction: false,
-  // the host header shows Saving / Unsaved / Saved / save failed and the one view-only notice
-  ribbonSaveState: false,
   autoRename: false,
   convertOffice: false,
   ocr: false,

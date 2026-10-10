@@ -18,7 +18,7 @@ const EDITOR_SELECTOR = '.ProseMirror[contenteditable="true"], td[contenteditabl
 const POINTER_GRACE_MS = 250
 
 export interface FocusReturnOptions {
-  window?: Window
+  window?: Window & typeof globalThis
   /** overrides the editing-surface lookup (tests) */
   findEditor?: (doc: Document) => HTMLElement | null
 }
