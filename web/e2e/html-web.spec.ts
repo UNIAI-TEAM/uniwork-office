@@ -149,7 +149,7 @@ test('html: views, edit, save, reopen', async ({ page }) => {
     'allow-scripts allow-forms allow-popups allow-modals',
   )
   await expect(iframe).toHaveAttribute('credentialless', '')
-  await expect(iframe).toHaveAttribute('src', /\/preview\.html\?v=\d+$/)
+  await expect(iframe).toHaveAttribute('src', /\/preview\.html\?v=\d+&k=[0-9a-f]{24}$/)
 
   await view(frame, /^Source$/, 'source')
   await expect(frame.locator('.cm-content')).toBeVisible()
