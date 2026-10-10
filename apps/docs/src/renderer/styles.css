@@ -12599,6 +12599,86 @@ tr > .page-gap-cut {
   }
 }
 
+/* Narrow viewports (the web frame on a tablet / phone, or a small window): the AI dock and the
+   side panes no longer squeeze the page into a thumbnail. The dock keeps its 34px rail slot in
+   the row and its expanded panel overlays the document; the comments / styles panes overlay the
+   workspace from the right. The page keeps the full width (zoom-to-width follows the scroller). */
+@media (max-width: 900px) {
+  .app-main {
+    position: relative;
+  }
+
+  .app-main:has(> .ai-dock) {
+    padding-left: 34px;
+  }
+
+  html[data-ai-panel-side='right'] .app-main:has(> .ai-dock) {
+    padding-left: 0;
+    padding-right: 34px;
+  }
+
+  .ai-dock {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 40;
+    width: min(var(--ai-panel-width, 360px), 100%);
+    background: var(--surface);
+  }
+
+  .ai-dock.collapsed {
+    width: 34px;
+  }
+
+  .ai-dock:not(.collapsed) {
+    box-shadow: var(--docs-shadow-menu);
+  }
+
+  html[data-ai-panel-side='right'] .ai-dock {
+    left: auto;
+    right: 0;
+  }
+
+  .ai-dock .ai-panel-resizer {
+    display: none;
+  }
+
+  .comments-pane,
+  .styles-pane {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 30;
+    width: min(300px, 100%);
+    box-shadow: var(--docs-shadow-menu);
+  }
+}
+
+/* phones: an open AI panel takes the whole row (the rail stays reachable to collapse it) */
+@media (max-width: 520px) {
+  .ai-dock:not(.collapsed) {
+    width: 100%;
+  }
+}
+
+/* the tab row scrolls sideways instead of stretching the whole document */
+@media (max-width: 700px) {
+  .ribbon-tabs {
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .ribbon-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .ribbon-tabs > * {
+    flex-shrink: 0;
+  }
+}
+
 .ai-msg-actions {
   display: flex;
   flex-wrap: wrap;
