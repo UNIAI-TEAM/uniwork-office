@@ -6,6 +6,7 @@ import {
   uniworkRequestOrigin,
   uniworkSaveDecision,
 } from './uniwork-policy'
+import { workbookDisplayName } from './workbook-name'
 import { createHash, randomUUID } from 'node:crypto'
 import {
   createReadStream,
@@ -4398,6 +4399,9 @@ async function openWorkbookSession(
       // The renderer-facing path is what the user opened: for a restored
       // recovery copy that is the original file, not the copy under userData.
       path: restoreTarget ?? path,
+      // The engine names the session after the temp snapshot it opened (a
+      // random uuid); every status text must show the file the user opened.
+      name: workbookDisplayName({ path, restoreTarget, csvSourcePath }),
       sha256: digest,
       fileBytes: snapshotStat.size,
       // UniWork seam: re-asked on every (re)open, so a Save As to a plain

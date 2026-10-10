@@ -52,6 +52,7 @@ import {
   type UniverRuntime,
   type UniverWorksheet,
 } from './univer-state'
+import { viewOnlyLock } from './view-only-lock'
 import { applyChangePlan, planFromOps, type OpExecutorContext } from './op-executor'
 import { installSheetsMcpBridge, type McpSheetHandlers } from './mcp-bridge'
 import { renameChartRefsForSheet } from './workbook-ops'
@@ -4369,14 +4370,9 @@ export function App({
           return
         }
         // View-only UniWork document: Univer's workbook permission blocks
-        // editing commands (the main process refuses a Save regardless).
-        if (selected.readOnly) {
-          try {
-            workbook.setEditable(false)
-          } catch {
-            // best effort: Save stays refused in main
-          }
-        }
+        // editing commands (the main process refuses a Save regardless). The
+        // lock opens around the loader's own installs so the data still renders.
+        viewOnlyLock.set(selected.readOnly ? workbook : null)
         // Register existing file tables under their displayName so Univer
         // renders filter dropdowns and resolves structured references. The
         // journal stays empty for file tables, so failures are swallowed —
