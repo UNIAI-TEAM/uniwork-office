@@ -1569,4 +1569,6 @@ export const it = {
   appWebTooLargeTitle: 'Questa cartella di lavoro è troppo grande per il web',
   appWebTooLargeBody:
     "Supera le dimensioni gestite dal foglio di calcolo web, quindi si apre nell'editor classico.",
+  appWebEngineRestarted:
+    "Il motore della cartella di lavoro si è arrestato in modo imprevisto ed è stato riavviato. La cartella è stata riaperta dall'ultima versione salvata; le modifiche non salvate sono conservate, salva presto.",
 } satisfies Record<keyof typeof zh, string>

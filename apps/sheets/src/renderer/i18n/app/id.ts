@@ -1530,4 +1530,6 @@ export const id = {
   appWebTooLargeTitle: 'Buku kerja ini terlalu besar untuk web',
   appWebTooLargeBody:
     'Ukurannya melebihi batas spreadsheet web, jadi dibuka di editor spreadsheet klasik.',
+  appWebEngineRestarted:
+    'Mesin buku kerja berhenti secara tak terduga dan telah dimulai ulang. Buku kerja dibuka kembali dari versi terakhir yang disimpan; perubahan yang belum disimpan tetap ada, segera simpan.',
 } satisfies Record<keyof typeof zh, string>

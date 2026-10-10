@@ -185,6 +185,9 @@ async function savedSheetXml(page: Page): Promise<string> {
   return zip.file('xl/worksheets/sheet1.xml')!.async('text')
 }
 
+/** Univer's formula-bar Name Box (the defined-name selector): its input carries no accessible label */
+const nameBoxOf = (frame: Frame) => frame.locator('[data-u-comp="defined-name"] input').first()
+
 /** select each cell through the Name Box, then type its input and press Enter */
 async function typeIntoGrid(
   page: Page,
@@ -192,15 +195,41 @@ async function typeIntoGrid(
   entries: Array<{ cell: string; text: string }>,
 ) {
   for (const entry of entries) {
-    const nameBox = frame.getByLabel('Name Box')
-    await nameBox.click()
-    await nameBox.fill(entry.cell)
-    await nameBox.press('Enter')
+    const nameBox = nameBoxOf(frame)
+    // a jump to the cell that is already active leaves the focus in the Name Box (the typed text
+    // would land there): go through another cell first
+    for (const target of [entry.cell === 'AA1' ? 'AB1' : 'AA1', entry.cell]) {
+      await nameBox.click()
+      await nameBox.fill(target)
+      await nameBox.press('Enter')
+    }
     // the jump leaves the grid focused: typing starts the in-cell editor
     await page.keyboard.type(entry.text)
     await page.keyboard.press('Enter')
     await page.waitForTimeout(300)
   }
+}
+
+/** the host reopens the frame's saved bytes (api.open of the head version), like opening the file again */
+async function reopenSaved(page: Page): Promise<void> {
+  const res = await page.evaluate(async () => {
+    const h = (
+      window as unknown as {
+        __host: {
+          lastSaved: () => { fileId: string; bytes: number[] } | null
+          files: () => Array<{ fileId: string; name: string; versionId: string; etag: string }>
+          request: (t: string, p: unknown) => Promise<unknown>
+        }
+      }
+    ).__host
+    const saved = h.lastSaved()!
+    const meta = h.files().find((f) => f.fileId === saved.fileId)!
+    return h.request('open', {
+      file: { fileId: meta.fileId, name: meta.name, versionId: meta.versionId, etag: meta.etag },
+      source: { kind: 'bytes', data: new Uint8Array(saved.bytes).buffer },
+    })
+  })
+  expect(res).toMatchObject({ opened: true })
 }
 
 test.beforeAll(async () => {
@@ -314,6 +343,51 @@ test('20k x 22: open, scroll, edit a value + a formula, save, reopen shows the e
   })
 })
 
+test('20k x 22: a formula typed far down is saved with its cached value and shows after reopen (SH3)', async ({
+  page,
+}) => {
+  test.skip(!built(), 'no dist-web/sheets build: npm run build:web -- --module sheets')
+  const problems = await watch(page)
+  const frame = await openFrame(page, 'lang=en&theme=light&open=/fixtures/Synthetic-20k.xlsx')
+  const wb = await shown(frame)
+  // A1:A10 = (r * 31) % 10007 -> 31, 62, ... 310: the sum is 1705
+  await typeIntoGrid(page, frame, [{ cell: 'W15000', text: '=SUM(A1:A10)' }])
+  await page.waitForTimeout(500)
+  // an explicit save only: never an autosave (CONTRACT C10)
+  await page.keyboard.press('Control+s')
+  await expect.poll(() => lastSaved(page), { timeout: 60_000 }).not.toBeNull()
+  const xml = await savedSheetXml(page)
+  expect(xml).toMatch(/<c r="W15000"[^>]*><f>SUM\(A1:A10\)<\/f><v>1705<\/v>/)
+  const saves = (await hostEvents(page)).filter((e) => e.type === 'saved')
+  expect(saves.some((e) => (e.payload as { reason?: string }).reason === 'autosave')).toBe(false)
+
+  // reopen the saved bytes: the engine serves the cached value, and the grid shows it
+  await reopenSaved(page)
+  await expect
+    .poll(async () => (await shown(frame)).sessionId, { timeout: 60_000 })
+    .not.toBe(wb.sessionId)
+  const reopened = await shown(frame)
+  const cell = await readRange(frame, reopened, {
+    startRow: 14_999,
+    endRow: 14_999,
+    startColumn: 22,
+    endColumn: 22,
+  })
+  expect(cell.cells[0]).toMatchObject({ value: 1705, formula: '=SUM(A1:A10)' })
+  const nameBox = nameBoxOf(frame)
+  await nameBox.click()
+  await nameBox.fill('W15000')
+  await nameBox.press('Enter')
+  await page.waitForTimeout(1_500)
+  await page.screenshot({ path: resolve(shots, 'formula-cached-reopen-en-light.png') })
+  expect({ csp: await cspViolations(page, frame), ...problems }).toEqual({
+    csp: [],
+    console: [],
+    page: [],
+    http: [],
+  })
+})
+
 for (const rows of [20_000, 50_000, 100_000]) {
   test(`Chromium timing: ${rows / 1000}k x 22 open and first viewport`, async ({ page }) => {
     test.skip(!built(), 'no dist-web/sheets build: npm run build:web -- --module sheets')
@@ -396,10 +470,27 @@ test('view-only without the save grant (vi, light)', async ({ page }) => {
   await expect(frame.locator('.qa-btn').first()).toBeVisible()
   // no Save / Save As in the quick-access bar; Ctrl+S saves nothing
   expect(await frame.locator('button.qa-btn[aria-label*="⌘S"]').count()).toBe(0)
+  // the grid itself is locked (SH3): typing starts no editor and changes nothing, so the host never
+  // hears of pending edits; the user is told once that the workbook is view-only
   await typeIntoGrid(page, frame, [{ cell: 'A1', text: '1' }])
+  await expect(
+    frame
+      .locator('.app-toast')
+      .filter({ hasText: /chỉ xem/i })
+      .first(),
+  ).toBeVisible()
   await page.keyboard.press('Control+s')
   await page.waitForTimeout(1_500)
   expect(await lastSaved(page)).toBeNull()
+  expect(
+    (await hostEvents(page)).filter((e) => e.type === 'dirty' && e.payload.dirty === true),
+  ).toEqual([])
+  // loading still works behind the lock: scrolling far down streams rows from the engine
+  const lockedGrid = frame.locator('canvas[id^="univer-sheet-main-canvas"]').first()
+  await lockedGrid.hover({ position: { x: 300, y: 300 } })
+  for (let i = 0; i < 15; i += 1) await page.mouse.wheel(0, 4_000)
+  await page.waitForTimeout(1_500)
+  await page.screenshot({ path: resolve(shots, 'view-only-scrolled-vi-light.png') })
   await page.screenshot({ path: resolve(shots, 'view-only-vi-light.png') })
   expect({ csp: await cspViolations(page, frame), ...problems }).toEqual({
     csp: [],

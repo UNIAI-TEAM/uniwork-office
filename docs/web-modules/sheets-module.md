@@ -88,16 +88,32 @@ after 4.1 / 4.3 / 5.1 s (`sheets-sidecar.md` 4.5.3).
 
   Screenshots are in `docs/web-modules/screenshots/sheets/`.
 
-**Open (SH2):**
+**Open at the end of SH2 (all three closed by SH3, below):** a formula typed into a streamed workbook showed blank after
+the reopen; view-only did not lock the grid; a Rust panic lost the open sessions.
 
-- A formula typed into a _streamed_ workbook (the 20k sheet) is saved correctly, but after the save/reopen its cell
-  shows blank until Univer's formula closure covers it. The saved file carries no cached `<v>` for the new formula,
-  and the IronCalc fallback that fills it on the desktop is hidden on the web (C11). Small workbooks
-  (`formulaMode`) compute live.
-- The view-only grid lock (`FWorkbook.setEditable(false)`) is still save-layer only. Typing in a view-only frame edits
-  the in-memory grid, but nothing can be saved.
-- A Rust panic aborts the wasm instance (no unwinding on wasip1): the transport reconnects, and the open sessions are
-  lost (the renderer shows the error for the next read).
+## SH3: follow-ups
+
+| item                   | what changed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Cached formula values  | `engine/cached-values.ts` + `serialize` in `engine/wasm-transport.ts`. At save time the transport sends the save's pending cell edits (formulas verbatim, as the renderer's `toRecalcUserInput`) to the engine's `recalc_cells` (IronCalc) and reads back the typed formula cells; the results go to the gateway as `formulaValues`, which writes `<v>` next to the untouched `<f>`. Only on an explicit save (C10); the UI recalc fallback stays hidden (C11, `features.recalcFallback` false).                                                                                                                                                                                                       |
+| View-only grid lock    | `apps/sheets/src/renderer/view-only-guard.ts`: a `BeforeCommandExecute` guard that cancels every command the sheet-protection guard knows (edits, formats, rows/columns, sort/filter) and the sheet-tab commands (insert, remove, copy, rename, reorder, tab colour). Loader writes run under `journalSuppression` and pass, so streamed rows still land. The user gets the `appWebViewOnly` toast (at most every 3 s). **Not `FWorkbook.setEditable(false)`**: Univer enforces that permission on every SetRangeValues command, the loader's own streamed-row writes included, and answers each refused edit with its own modal "no permission" dialog (the e2e hit it: the dialog covered the page). |
+| Wasm panic recovery    | `createWasmTransport` keeps each session's last opened/saved bytes. An `engine_crashed` call disposes the Worker, starts a fresh engine and reopens every session from those bytes under the **same renderer-facing session id** (the engine's own id is swapped inside `call`); reads are repeated once, other commands report the crash and the next one works. `onRecovered` -> `notifyEngineRecovered` -> a toast (`appWebEngineRestarted`, 21 locales).                                                                                                                                                                                                                                           |
+| Carlito `?url` imports | `woff2FontsPlugin.resolveId` maps `@genoffice/ui/fonts/<Face>.ttf?url` to the WOFF2 twin in `web/docs/fonts/`; `fontBuildOptions` then emits it under `fonts/` and never inlines it.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+
+Notes:
+
+- The recalc covers the cells the user typed, not their dependents: a formula elsewhere in the file that depends on an
+  edited value keeps its old cached `<v>` until the next engine/Univer evaluation (as before this change).
+- The save skips the recalc, and saves the formulas without cached values, when: a structural or sheet-tab change is
+  pending (file coordinates no longer match), a sheet added this session is referenced, the file is above 64 MB, more
+  than 10 000 edits are pending, or IronCalc cannot import the workbook (its importer is strict; the engine answers
+  `workbook_error`). A panic inside that recalc (no unwinding on wasip1) triggers the recovery above, the save goes on, and
+  that session never asks the formula engine again.
+- Recovery keeps the renderer's unsaved edits: the edit journal lives in the renderer, not in the engine, and the next
+  save applies it over the reopened session. The toast says so. Draft recovery (DR1) remains the safety net for the page
+  itself.
+- A workbook that crashes the engine again while it is being reopened is dropped (no loop): the next read answers
+  `Unknown workbook session`.
 
 ## Bridge mapping (`window.desktopApi`, 64 methods)
 
@@ -142,8 +158,8 @@ Web defaults: `sheetsWebCapabilities()`. Grants: `sheetsHostGrants()`.
 | `xlsImport`, `pivotRefresh`                                                                    | from the transport's `features` | `.xls` in the picker; PivotTable Refresh + Refresh All, and the eager pivot reads                                                    |
 | `recalcFallback`, `mergeWorkbooks`                                                             | false (C11)                     | IronCalc recalc fallback; Data > Merge workbooks                                                                                     |
 
-View-only does not yet lock the grid (`FWorkbook.setEditable(false)`). No workbook can load in this build, so the lock
-cannot be verified. It belongs to SH2 together with an e2e on a real workbook.
+View-only locks the grid too (SH3, `view-only-guard.ts`): the e2e types into a view-only frame, the host hears of no pending
+edit, and scrolling still streams rows.
 
 ## Sizes (`npm run build:web -- --module sheets`)
 
@@ -156,10 +172,11 @@ cannot be verified. It belongs to SH2 together with an e2e on a real workbook.
   cell fonts. A frame without an engine never downloads it (the e2e asserts this).
 - What is left in the initial chunk is essentially the 21-locale string tables (`i18n/`, about 2.4 MB of source).
   Splitting them per locale needs an async `t()` bootstrap. That is the next cut, not done here.
-- Fonts: the CSS faces come out as WOFF2. `cell-font-fallback.ts` imports `Carlito-{Regular,Bold}.ttf?url` for the
-  canvas FontFace API, which the CSS-only `woff2FontsPlugin` does not rewrite, so two TTFs (1.3 MB) are still emitted.
-  They load only once the grid boots. Proposed fix (build framework, not this lane): map `@genoffice/ui/fonts/*.ttf?url`
-  to the WOFF2 twins in the plugin's `resolveId`.
+- Fonts: the CSS faces come out as WOFF2, and since SH3 so do the two Carlito `?url` imports of
+  `cell-font-fallback.ts` (canvas FontFace API): `woff2FontsPlugin.resolveId` maps `@genoffice/ui/fonts/<Face>.ttf?url`
+  to the twin in `web/docs/fonts/`, so no TTF is emitted any more (the CSS faces and the JS imports share the same hashed
+  files). Carlito Regular + Bold: 1 317 952 bytes of TTF -> 389 072 bytes of WOFF2 (-928 880 bytes, -70 %); the sheets bundle
+  is 219 files, 26.63 MiB raw / 7.59 gzip, initial 3.13 MiB / 0.84 gzip (unchanged), and `manifest.json` lists no `.ttf`.
 - Web-readiness blockers from `sheets-sidecar.md` section 8: the meta CSP, the absolute `/assets/` base and the TTF
   CSS faces are handled by the module build (header-only CSP, `base: './'`, WOFF2). The missing bridge and the missing
   capability mechanism are added here. The large main chunk is split.
@@ -184,6 +201,16 @@ cannot be verified. It belongs to SH2 together with an e2e on a real workbook.
   seen), and the engine-unavailable detector.
 - Affected existing renderer tests, run locally: `save-recovery-mode`, `csv-save-streamed`, `save-error-localization`,
   `recalc-size-gate`, `read-sheet-range-batching`, `univer-range-loading` (52 passed).
+- SH3 (`engine/wasm-transport.test.ts`, 16 tests incl. the real engine): the cached-value plan and mapping; a formula
+  typed at row 19 990 of a 20k-row workbook saved with its `<v>` and read back after the session swap; injected panics
+  (a read repeated after the recovery, a panic while saving, a panic in the cached-value recalc, a workbook that crashes
+  again on reopen); `notice.test.ts` (the recovery toast); `apps/sheets/tests/view-only-guard.test.ts` (the lock);
+  `web/docs/build/fonts-woff2.test.ts` (the `?url` twin). e2e (14 passed on the production build): a formula typed
+  at W15000 of the 20k workbook, saved with Ctrl+S, reopened by the host: `<v>1705</v>` in the file and the cell shown
+  in the grid (`formula-cached-reopen-en-light.png`); the view-only frame types into the grid, the host hears no
+  pending edit, the user gets the toast, scrolling still streams rows (`view-only-scrolled-vi-light.png`). The e2e
+  helper now finds Univer's Name Box by `[data-u-comp="defined-name"] input` (its input has no accessible label on this
+  Univer) and goes through another cell first (a jump to the already active cell leaves the focus in the box).
 - `web/e2e/sheets.spec.ts` (5, Playwright, test host `?module=sheets`):
   - the engine-unavailable screen in en/vi × light/dark: styled card, theme-legible text, the host gets one non-fatal
     `unsupported`, no grid chunk fetched;
@@ -194,11 +221,12 @@ cannot be verified. It belongs to SH2 together with an e2e on a real workbook.
 
 ## Open items
 
-- SH2: the WASM transport (see above), the grid lock for view-only, an e2e on a real workbook (open → edit → save
-  through the engine), the incremental index, the two shim fixes, and the size gates (host and frame).
+- Cached values cover the formulas the user typed; dependents of an edited value keep their old cached `<v>` until the
+  next evaluation (see SH3 notes).
+- Recovery from a panic keeps the renderer's unsaved edits, but a panic inside IronCalc's importer for the cached-value
+  recalc means that session saves without cached values from then on (and one toast).
 - Host side (dev-uniwork, GD): decide what the host does with the frame's non-fatal `unsupported` error while
   `xlsxEngine` is off. Contract C4 already keeps G3 while `office_sheets_web` is off.
-- Build framework (GF): the WOFF2 rewrite for JS `?url` font imports; a per-locale string split for every module's
-  initial chunk.
-- `apps/sheets` `tsc --noEmit` reports 3 errors that predate this lane (`src/main/sheets-main.ts` AiSettings
+- Build framework (GF): a per-locale string split for every module's initial chunk.
+- `apps/sheets` `tsc --noEmit` reported 3 errors that predate this lane (`src/main/sheets-main.ts` AiSettings
   `provider` typing, `packages/ai-provider/src/openrouter.ts`). This branch does not touch those files.
