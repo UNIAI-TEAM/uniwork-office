@@ -149,5 +149,5 @@ export const pt = {
   presentInTab: 'Nesta guia',
   presentFullscreen: 'Tela cheia',
   presentNewTab: 'Nova guia',
-  viewOnly: 'Somente leitura',
+  aiNotEnabled: 'A IA não está ativada no seu espaço de trabalho',
 } satisfies Record<keyof typeof zh, string>

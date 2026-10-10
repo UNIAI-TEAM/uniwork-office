@@ -149,5 +149,5 @@ export const de = {
   presentInTab: 'In diesem Tab',
   presentFullscreen: 'Vollbild',
   presentNewTab: 'Neuer Tab',
-  viewOnly: 'Nur Ansicht',
+  aiNotEnabled: 'KI ist für Ihren Arbeitsbereich nicht aktiviert',
 } satisfies Record<keyof typeof zh, string>

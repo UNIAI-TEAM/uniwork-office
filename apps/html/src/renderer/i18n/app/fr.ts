@@ -149,5 +149,5 @@ export const fr = {
   presentInTab: 'Dans cet onglet',
   presentFullscreen: 'Plein écran',
   presentNewTab: 'Nouvel onglet',
-  viewOnly: 'Lecture seule',
+  aiNotEnabled: 'L’IA n’est pas activée pour votre espace de travail',
 } satisfies Record<keyof typeof zh, string>

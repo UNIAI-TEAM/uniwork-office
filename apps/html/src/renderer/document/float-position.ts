@@ -5,6 +5,8 @@ export interface FloatPosition {
   top: number
   /** the bar sits under the element because there is no room above it */
   below: boolean
+  /** widest the bar may be: the usable stage width, so a bar that does not fit wraps instead of running under the style panel */
+  maxWidth: number
 }
 
 export interface FloatLayout {
@@ -13,6 +15,7 @@ export interface FloatLayout {
   /** preview host origin relative to the stage the bar is positioned in */
   offsetX: number
   offsetY: number
+  /** stage width left of the style panel (the panel is not part of it) */
   stageWidth: number
   barWidth: number
   barHeight: number
@@ -20,6 +23,12 @@ export interface FloatLayout {
 
 const GAP = 6
 const EDGE = 4
+
+/**
+ * Stage width the style panel takes when its own box is not measurable yet: 250 content + 2 x 12
+ * padding + 2 border + 10 inset from the stage edge (styles.css .hx-panel), plus a gap to the bar.
+ */
+export const PANEL_RESERVE = 292
 
 /** Frame-supplied numbers can be NaN/Infinity from a compromised preview frame. */
 function finite(n: unknown, fallback: number): number {
@@ -41,8 +50,9 @@ export function floatPosition(rect: ElementRect, layout: FloatLayout): FloatPosi
   const maxLeft = Math.max(EDGE, stageWidth - barWidth - EDGE)
   const left = Math.min(maxLeft, Math.max(EDGE, offsetX + rx * z))
   const above = offsetY + ry * z - barHeight - GAP
-  if (above >= EDGE) return { left, top: above, below: false }
-  return { left, top: offsetY + (ry + rh) * z + GAP, below: true }
+  const maxWidth = Math.max(0, stageWidth - EDGE * 2)
+  if (above >= EDGE) return { left, top: above, below: false, maxWidth }
+  return { left, top: offsetY + (ry + rh) * z + GAP, below: true, maxWidth }
 }
 
 /** `a: b; c: d` → declarations for a set_style op (invalid pieces dropped) */

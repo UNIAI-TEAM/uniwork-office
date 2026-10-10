@@ -139,8 +139,12 @@ test('html: views, edit, save, reopen', async ({ page }) => {
   await serveFixture(page, PAGE_PATH, FIXTURE, 'text/html')
   let frame = await openModule(page, 'html', { open: PAGE_PATH, lang: 'en' })
   await ready(page, frame, /UniWork HTML web fixture/)
-  // web: no AI, no AutoSave toggle
-  expect(await frame.locator('.ai-dock, .ai-entry, .autosave-toggle').count()).toBe(0)
+  // web: no AI panel or AI actions (one disabled entry says why), no AutoSave toggle
+  expect(await frame.locator('.ai-dock, .ai-entry:not(.ai-off), .autosave-toggle').count()).toBe(0)
+  const aiOff = frame.locator('.ai-entry.ai-off')
+  await expect(aiOff).toHaveCount(1)
+  await expect(aiOff).toHaveAttribute('aria-disabled', 'true')
+  await expect(aiOff).toHaveAttribute('data-tip', 'AI is not turned on for your workspace')
 
   // the preview runs scripts in preview.html: sandboxed without allow-same-origin, credentialless
   const iframe = frame.locator('iframe.preview-frame')
@@ -339,3 +343,85 @@ for (const theme of ['light', 'dark'] as const) {
     })
   }
 }
+
+// visual r2 polish (UNI-1232): the style panel never covers the floating toolbar, and a phone keeps
+// a usable preview with the AI panel open
+const FAR_RIGHT = [
+  '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Far right</title></head>',
+  '<body style="margin:0"><h1 style="margin:20px">Title</h1>',
+  '<p id="r" style="width:110px;margin:200px 20px 20px auto">Far right</p></body></html>',
+].join('')
+const FAR_RIGHT_PATH = '/e2e-fixtures/FarRight.html'
+
+for (const [lang, width] of [
+  ['en', 1440],
+  ['vi', 1100],
+  ['vi', 800],
+] as const) {
+  test(`html: the floating toolbar stays clear of the style panel (${lang}, ${width} px)`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 900 })
+    await serveFixture(page, FAR_RIGHT_PATH, encode(FAR_RIGHT), 'text/html')
+    const frame = await openModule(page, 'html', { open: FAR_RIGHT_PATH, lang })
+    await ready(page, frame, /Far right/)
+    await frame.locator('iframe.preview-frame').contentFrame().locator('#r').click()
+    const bar = frame.locator('.hx-float')
+    await expect(bar).toBeVisible()
+    await expect(frame.locator('.hx-panel')).toBeVisible()
+    await expect
+      .poll(async () =>
+        frame.locator('body').evaluate(() => {
+          const b = document.querySelector('.hx-float')!.getBoundingClientRect()
+          const p = document.querySelector('.hx-panel')!.getBoundingClientRect()
+          return Math.round(p.left - b.right)
+        }),
+      )
+      .toBeGreaterThanOrEqual(0)
+  })
+}
+
+test('html: a phone shows the AI panel over the page and keeps the save state', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await serveFixture(page, PAGE_PATH, FIXTURE, 'text/html')
+  const frame = await openModule(page, 'html', { open: PAGE_PATH, lang: 'en', ai: '1' })
+  await ready(page, frame, /UniWork HTML web fixture/)
+  // the dock keeps its 34 px rail; the page keeps its width and does not scroll sideways
+  const box = (sel: string) =>
+    frame
+      .locator(sel)
+      .first()
+      .evaluate((el) => {
+        const r = el.getBoundingClientRect()
+        return { w: Math.round(r.width), h: Math.round(r.height) }
+      })
+  expect((await box('.ai-dock')).w).toBe(34)
+  expect((await box('.app-content')).w).toBe(390 - 34)
+  await frame.locator('.ai-rail').click()
+  // open: the panel floats over the page (full row), the page underneath is not squeezed
+  await expect.poll(async () => (await box('.ai-dock')).w).toBe(390)
+  expect((await box('.app-content')).w).toBe(390 - 34)
+  // the panel's own collapse button puts it back on the rail
+  await frame.locator('.ai-panel-collapse').click()
+  await expect.poll(async () => (await box('.ai-dock')).w).toBe(34)
+  // split stacks: each pane keeps a usable height
+  await view(frame, /^Split$/, 'split')
+  const heights = await frame
+    .locator('.workspace.view-split .pane')
+    .evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().height)))
+  expect(Math.min(...heights)).toBeGreaterThanOrEqual(200)
+  // the save state stays visible on a phone: the first thing in the status bar's right group
+  await view(frame, /^Source$/, 'source')
+  await frame.locator('.cm-content').click()
+  await page.keyboard.type('x')
+  await expect(frame.locator('.status-save')).toHaveText('Unsaved')
+  expect(await frame.locator('.status-save').isVisible()).toBe(true)
+  const clipped = await frame.locator('.status-save').evaluate((el) => {
+    const r = el.getBoundingClientRect()
+    return r.left < 0 || r.right > innerWidth
+  })
+  expect(clipped).toBe(false)
+  await page.screenshot({ path: screenshotPath('html', 'narrow-390-light-en') })
+})

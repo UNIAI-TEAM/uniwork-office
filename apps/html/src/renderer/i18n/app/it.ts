@@ -150,5 +150,5 @@ export const it = {
   presentInTab: 'In questa scheda',
   presentFullscreen: 'Schermo intero',
   presentNewTab: 'Nuova scheda',
-  viewOnly: 'Sola lettura',
+  aiNotEnabled: 'L’IA non è attiva per il tuo spazio di lavoro',
 } satisfies Record<keyof typeof zh, string>

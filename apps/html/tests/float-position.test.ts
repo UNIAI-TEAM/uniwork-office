@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { floatPosition, parseDeclarations } from '../src/renderer/document/float-position'
+import {
+  PANEL_RESERVE,
+  floatPosition,
+  parseDeclarations,
+} from '../src/renderer/document/float-position'
 
 const layout = { zoom: 100, offsetX: 0, offsetY: 0, stageWidth: 1000, barWidth: 300, barHeight: 32 }
 
@@ -9,6 +13,7 @@ describe('floatPosition', () => {
       left: 100,
       top: 162,
       below: false,
+      maxWidth: 992,
     })
   })
 
@@ -17,6 +22,7 @@ describe('floatPosition', () => {
       left: 10,
       top: 36,
       below: true,
+      maxWidth: 992,
     })
   })
 
@@ -25,7 +31,7 @@ describe('floatPosition', () => {
       { x: 100, y: 200, width: 50, height: 20 },
       { ...layout, zoom: 50, offsetX: 40, offsetY: 8 },
     )
-    expect(pos).toEqual({ left: 90, top: 70, below: false })
+    expect(pos).toEqual({ left: 90, top: 70, below: false, maxWidth: 992 })
   })
 
   it('keeps the bar inside the stage', () => {
@@ -49,6 +55,29 @@ describe('floatPosition', () => {
     expect(Number.isFinite(pos.left)).toBe(true)
     expect(Number.isFinite(pos.top)).toBe(true)
     expect(pos.left).toBeGreaterThanOrEqual(4)
+  })
+})
+
+describe('floatPosition next to the style panel', () => {
+  // 1440 wide stage, panel box 276 + 10 inset: the bar must end left of the panel's edge
+  const stageWidth = 1440 - PANEL_RESERVE
+  const wide = { ...layout, stageWidth, barWidth: 560 }
+
+  it('the panel reserve covers the whole panel box, not just its width', () => {
+    // .hx-panel: width 250 + padding 2 x 12 + border 2, right: 10  ->  286, plus the bar gap
+    expect(PANEL_RESERVE).toBeGreaterThanOrEqual(250 + 24 + 2 + 10)
+  })
+
+  it('an element at the far right keeps the bar entirely left of the panel', () => {
+    const pos = floatPosition({ x: 1300, y: 300, width: 110, height: 20 }, wide)
+    expect(pos.left + wide.barWidth).toBeLessThanOrEqual(1440 - (250 + 24 + 2 + 10))
+  })
+
+  it('a bar wider than the room left of the panel may wrap instead of running under it', () => {
+    const narrow = { ...layout, stageWidth: 520, barWidth: 622 }
+    const pos = floatPosition({ x: 400, y: 300, width: 110, height: 20 }, narrow)
+    expect(pos.left).toBe(4)
+    expect(pos.maxWidth).toBe(512)
   })
 })
 

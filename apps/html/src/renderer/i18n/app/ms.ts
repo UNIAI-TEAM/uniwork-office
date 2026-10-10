@@ -146,5 +146,5 @@ export const ms = {
   presentInTab: 'Dalam tab ini',
   presentFullscreen: 'Skrin penuh',
   presentNewTab: 'Tab baharu',
-  viewOnly: 'Lihat sahaja',
+  aiNotEnabled: 'AI belum dihidupkan untuk ruang kerja anda',
 } satisfies Record<keyof typeof zh, string>

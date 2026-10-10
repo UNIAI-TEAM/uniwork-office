@@ -145,5 +145,5 @@ export const he = {
   presentInTab: 'בכרטיסייה זו',
   presentFullscreen: 'מסך מלא',
   presentNewTab: 'כרטיסייה חדשה',
-  viewOnly: 'צפייה בלבד',
+  aiNotEnabled: 'ה-AI אינו מופעל במרחב העבודה שלך',
 } satisfies Record<keyof typeof zh, string>

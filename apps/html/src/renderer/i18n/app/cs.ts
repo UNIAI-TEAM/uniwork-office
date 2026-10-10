@@ -146,5 +146,5 @@ export const cs = {
   replace: 'Nahradit',
   replaceAll: 'Nahradit vše',
   findTip: 'Najít a nahradit (⌘F)',
-  viewOnly: 'Pouze pro čtení',
+  aiNotEnabled: 'AI není pro váš pracovní prostor zapnuta',
 } satisfies Record<keyof typeof zh, string>

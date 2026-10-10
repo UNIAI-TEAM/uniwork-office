@@ -145,5 +145,5 @@ export const ar = {
   presentInTab: 'في هذه العلامة',
   presentFullscreen: 'ملء الشاشة',
   presentNewTab: 'علامة تبويب جديدة',
-  viewOnly: 'عرض فقط',
+  aiNotEnabled: 'الذكاء الاصطناعي غير مفعّل لمساحة عملك',
 } satisfies Record<keyof typeof zh, string>

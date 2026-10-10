@@ -368,6 +368,15 @@ html.genoffice-popover-open .ribbon-tabs {
   background: var(--hover);
 }
 
+.rb-big.ai-entry.ai-off {
+  opacity: 0.55;
+  cursor: help;
+}
+
+.rb-big.ai-entry.ai-off:hover {
+  background: none;
+}
+
 .rb-big.ai-entry.active {
   background: var(--active-bg);
   color: var(--text-primary);
@@ -430,6 +439,23 @@ html.genoffice-popover-open .ribbon-tabs {
 .view-preview .pane-preview,
 .view-source .pane-source {
   flex: 1 1 100%;
+}
+
+/* a phone cannot hold two side-by-side panes (~190 px each): split stacks, each pane keeps a usable height */
+@media (max-width: 700px) {
+  .workspace.view-split {
+    flex-direction: column;
+  }
+
+  .view-split .pane {
+    flex: 1 1 50%;
+    min-height: 200px;
+  }
+
+  .view-split .pane-source {
+    border-left: none;
+    border-top: 1px solid var(--border);
+  }
 }
 
 /* hidden, not unmounted: the CodeMirror instance (and its undo history) must survive view switches */
@@ -513,6 +539,36 @@ html.genoffice-popover-open .ribbon-tabs {
 
 .status-failed {
   color: var(--danger);
+}
+
+.status-save,
+.status-item {
+  white-space: nowrap;
+}
+
+/* a phone: the right group wraps under the file hint instead of squeezing every item into a
+   few letters per line; the save state leads it and the cursor position (least needed) drops out */
+@media (max-width: 520px) {
+  .status-bar {
+    flex-wrap: wrap;
+    gap: 2px 12px;
+  }
+
+  .status-right {
+    flex-wrap: wrap;
+    row-gap: 2px;
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .status-save {
+    order: -1;
+    font-weight: 600;
+  }
+
+  .status-cursor {
+    display: none;
+  }
 }
 
 .zoom-btn {
@@ -603,6 +659,58 @@ html.genoffice-popover-open .ribbon-tabs {
 @media (prefers-reduced-motion: reduce) {
   .ai-dock {
     transition: none;
+  }
+}
+
+/* Narrow viewports (the web frame on a phone or tablet): the open AI dock overlays the page instead
+   of squeezing it. It keeps its 34 px rail slot in the row, the expanded panel floats over the
+   workspace, and on a phone it takes the whole row (the rail stays reachable to collapse it) -
+   the same behaviour as the Docs frame. */
+@media (max-width: 900px) {
+  .app-main {
+    position: relative;
+  }
+
+  .app-main:has(> .ai-dock) {
+    padding-left: 34px;
+  }
+
+  html[data-ai-panel-side='right'] .app-main:has(> .ai-dock) {
+    padding-left: 0;
+    padding-right: 34px;
+  }
+
+  .ai-dock {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 40;
+    width: min(var(--ai-panel-width, 360px), 100%);
+    background: var(--surface);
+  }
+
+  .ai-dock.collapsed {
+    width: 34px;
+  }
+
+  .ai-dock:not(.collapsed) {
+    box-shadow: var(--shadow-menu);
+  }
+
+  html[data-ai-panel-side='right'] .ai-dock {
+    left: auto;
+    right: 0;
+  }
+
+  .ai-dock .ai-panel-resizer {
+    display: none;
+  }
+}
+
+@media (max-width: 520px) {
+  .ai-dock:not(.collapsed) {
+    width: 100%;
   }
 }
 
@@ -3077,6 +3185,8 @@ html.genoffice-popover-open .ribbon-tabs {
   position: absolute;
   z-index: 5;
   display: flex;
+  /* a bar wider than the room beside the style panel wraps to a second row rather than slide under it */
+  flex-wrap: wrap;
   align-items: center;
   gap: 2px;
   padding: 3px;
