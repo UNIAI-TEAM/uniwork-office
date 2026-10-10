@@ -1221,17 +1221,18 @@ body.vib .home {
   font-weight: 500;
 }
 
+/* eight cards: two rows of four, so every title and subtitle has room to read in
+   full (one row of eight cut "Open from UniWork" to "Open fro…") */
 .quick-cards {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 280px));
   align-items: stretch;
   gap: 10px;
 }
 
 .quick-card {
   position: relative;
-  flex: 1;
   min-width: 0;
-  max-width: 280px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -1279,23 +1280,27 @@ body.vib .home {
   gap: 2px 6px;
 }
 
+/* a long title wraps instead of being cut */
 .quick-title {
   min-width: 0;
-  overflow: hidden;
   font-size: 14px;
   font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
+/* up to two lines; the card's title attribute carries the full text */
 .quick-sub {
-  display: block;
+  display: -webkit-box;
   width: 100%;
   overflow: hidden;
   font-size: 12px;
+  line-height: 1.4;
   color: var(--text-muted);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow-wrap: anywhere;
 }
 
 .quick-folder {
@@ -1321,12 +1326,7 @@ body.vib .home {
 
 @media (max-width: 1100px) {
   .quick-cards {
-    flex-wrap: wrap;
-  }
-
-  .quick-card {
-    flex: 1 1 calc(50% - 5px);
-    max-width: none;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

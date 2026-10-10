@@ -617,6 +617,56 @@ describe('chip truncation and hover text', () => {
     // buttons never get squeezed off
     expect(css).toMatch(/\.uw-pill-action,\n\.uw-pill-close \{[^}]*flex: 0 0 auto/)
   })
+
+  it('the chrome holder takes the width the pill needs before the tab strip gives any up', () => {
+    const css = readFileSync(resolve(__dirname, '../src/renderer/src/tabbar.css'), 'utf8').replace(
+      /\r\n/g,
+      '\n',
+    )
+    const start = css.indexOf('\n.uw-chrome {')
+    expect(start).toBeGreaterThanOrEqual(0)
+    const chrome = css.slice(start, css.indexOf('}', start))
+    expect(chrome).toMatch(/flex: 0 0 auto/)
+    expect(chrome).toMatch(/max-width: 55%/)
+  })
+})
+
+describe('Home quick cards fit', () => {
+  const css = readFileSync(resolve(__dirname, '../src/renderer/src/home.css'), 'utf8').replace(
+    /\r\n/g,
+    '\n',
+  )
+  const body = (selector: string): string => {
+    const start = css.indexOf(`\n${selector} {`)
+    expect(start, selector).toBeGreaterThanOrEqual(0)
+    return css.slice(start, css.indexOf('}', start))
+  }
+
+  it('lays the eight cards out as two rows of four, two columns below 1100px', () => {
+    expect(body('.quick-cards')).toMatch(/display: grid/)
+    expect(body('.quick-cards')).toMatch(/grid-template-columns: repeat\(4, minmax\(0, 280px\)\)/)
+    expect(css).toMatch(
+      /@media \(max-width: 1100px\) \{\n {2}\.quick-cards \{\n {4}grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/,
+    )
+  })
+
+  it('a card title wraps instead of being clipped', () => {
+    const title = body('.quick-title')
+    expect(title).toMatch(/overflow-wrap: anywhere/)
+    expect(title).not.toMatch(/white-space: nowrap/)
+    expect(title).not.toMatch(/text-overflow/)
+    expect(title).not.toMatch(/overflow: hidden/)
+  })
+
+  it('a subtitle clamps to two lines and the card carries it in the tooltip', async () => {
+    const sub = body('.quick-sub')
+    expect(sub).toMatch(/-webkit-line-clamp: 2/)
+    expect(sub).not.toMatch(/white-space: nowrap/)
+    await mount(createElement(UniworkOpenCard, { onOpenSettings: vi.fn() }), 'vi')
+    const subtitle = cardButton().querySelector<HTMLElement>('.quick-sub')!
+    expect(subtitle.textContent).toBeTruthy()
+    expect(subtitle.getAttribute('title')).toBe(subtitle.textContent)
+  })
 })
 
 describe('useUniworkStatuses', () => {

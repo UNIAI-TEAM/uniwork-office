@@ -406,7 +406,9 @@ body.overlay-title-bar .tab-bar-drag-spacer {
   align-self: center;
   display: flex;
   align-items: center;
-  flex: 0 1 auto;
+  /* takes the width its pill needs (up to max-width) before the tab strip does:
+     the strip scrolls, so the notice and chip must not ellipsize while it has room */
+  flex: 0 0 auto;
   gap: 6px;
   min-width: 0;
   max-width: 55%;

@@ -51,7 +51,9 @@ export function UniworkOpenCard({ onOpenSettings }: { onOpenSettings: () => void
           <span className="quick-title-row">
             <span className="quick-title">{t('uwOpenCardTitle')}</span>
           </span>
-          <span className={`quick-sub${card.attention ? ' attention' : ''}`}>{t(card.subKey)}</span>
+          <span className={`quick-sub${card.attention ? ' attention' : ''}`} title={t(card.subKey)}>
+            {t(card.subKey)}
+          </span>
         </span>
       </button>
       {open && (

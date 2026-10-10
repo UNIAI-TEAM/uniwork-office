@@ -54,7 +54,7 @@ export const en = {
   uwChipSaving: 'Saving…',
   uwChipViewOnly: 'View only',
   uwChipOffline: 'Not saved: offline',
-  uwChipUnreachable: "Not saved: can't reach UniWork",
+  uwChipUnreachable: "Can't reach UniWork · not saved",
   uwChipSignedOut: 'Sign in again to save',
   uwChipConflict: 'Version conflict',
   uwChipBlocked: 'Blocked: {reason}',

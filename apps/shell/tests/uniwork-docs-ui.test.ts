@@ -121,7 +121,7 @@ describe('chipModelOf: save state -> chip', () => {
     'a %s while the network is fine reads as UniWork being unreachable, not offline',
     (error) => {
       const chip = labelOf({ state: 'offline', error })
-      expect(chip.label).toBe("Not saved: can't reach UniWork")
+      expect(chip.label).toBe("Can't reach UniWork · not saved")
       expect(chip.tip).toBe('Your changes are safe on this computer. Retry in a moment.')
       expect(chip.tone).toBe('warn')
       expect(chip.action?.kind).toBe('retry')
