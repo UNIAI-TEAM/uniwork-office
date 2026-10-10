@@ -485,6 +485,20 @@ test('view-only without the save grant (vi, light)', async ({ page }) => {
       .filter({ hasText: /chỉ xem/i })
       .first(),
   ).toBeVisible()
+  // the formula bar, F2 and a double click open an editor too: none of them may start one, so the
+  // frame never turns dirty (no Save leave dialog for a workbook that can never be saved)
+  const formulaBar = frame.locator(
+    '[data-u-comp="formula-bar"] canvas[data-u-comp="render-canvas"]',
+  )
+  await formulaBar.click()
+  await page.keyboard.type('x')
+  await page.keyboard.press('F2')
+  await page.keyboard.type('y')
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(500)
+  expect(
+    (await hostEvents(page)).filter((e) => e.type === 'dirty' && e.payload.dirty === true),
+  ).toEqual([])
   await page.keyboard.press('Control+s')
   await page.waitForTimeout(1_500)
   expect(await lastSaved(page)).toBeNull()

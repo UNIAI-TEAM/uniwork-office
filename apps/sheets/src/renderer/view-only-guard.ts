@@ -43,13 +43,35 @@ export function installViewOnlyGuard(
   notify: (message: string) => void,
 ): { dispose(): void } {
   let lastNotice = 0
-  return runtime.univerAPI.addEvent(runtime.univerAPI.Event.BeforeCommandExecute, (event) => {
-    if (!isViewOnly() || journalSuppression.active) return
-    if (!isViewOnlyBlocked(event.id, (event.params ?? {}) as Record<string, unknown>)) return
+  const refuse = (event: { cancel?: boolean }): void => {
     event.cancel = true
     const now = Date.now()
     if (now - lastNotice < NOTIFY_INTERVAL_MS) return
     lastNotice = now
     notify(t('appWebViewOnly'))
-  })
+  }
+  const commands = runtime.univerAPI.addEvent(
+    runtime.univerAPI.Event.BeforeCommandExecute,
+    (event) => {
+      if (!isViewOnly() || journalSuppression.active) return
+      if (!isViewOnlyBlocked(event.id, (event.params ?? {}) as Record<string, unknown>)) return
+      refuse(event)
+    },
+  )
+  // The formula bar (and F2 / a double click) opens an editor without going through a command the
+  // list above knows: an open editor counts as a pending edit, which would turn the frame dirty
+  // and open the host's Save leave dialog for a workbook that can never be saved.
+  const editStart = runtime.univerAPI.addEvent(
+    runtime.univerAPI.Event.BeforeSheetEditStart,
+    (event) => {
+      if (!isViewOnly()) return
+      refuse(event)
+    },
+  )
+  return {
+    dispose() {
+      commands.dispose()
+      editStart.dispose()
+    },
+  }
 }

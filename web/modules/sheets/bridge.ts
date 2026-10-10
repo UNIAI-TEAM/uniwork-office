@@ -555,7 +555,15 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
       const head = await ownHeadAfterUnknown(port, fileId, files.get(fileId)?.etag, data)
       if (head) remember(head)
     }
-    throw new Error(`${text('appWebSaveFailed')} (${res.error.message})`)
+    throw saveFailure(res.error)
+  }
+
+  /** a transport failure ("Failed to fetch") is browser jargon: the localized sentence alone says it */
+  function saveFailure(error: { code: string; message: string }): Error {
+    const raw = error.code === 'network' || error.code === 'timeout'
+    return new Error(
+      raw ? text('appWebSaveFailed') : `${text('appWebSaveFailed')} (${error.message})`,
+    )
   }
 
   async function saveAsNew(
@@ -576,7 +584,7 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
     pending?.settle(res)
     if (res.ok) return { file: res.file }
     if (res.error.code === 'cancelled') return { canceled: true }
-    throw new Error(`${text('appWebSaveFailed')} (${res.error.message})`)
+    throw saveFailure(res.error)
   }
 
   // ------------------------------------------------------------ chunked edit transfers
@@ -805,8 +813,9 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
       }
     },
     notifyPendingEdits(count: number): void {
-      // a restored draft has an empty journal but unsaved content
-      dirty = count > 0 || restored
+      // a restored draft has an empty journal but unsaved content; a view-only frame (no save
+      // grant) can never hold unsaved work, so it never tells the host it is dirty
+      dirty = canSave() && (count > 0 || restored)
       port.setDirty(dirty)
     },
     onCloseSaveRequest(callback: () => void): () => void {
