@@ -228,4 +228,8 @@ export const zh = {
   appStatusSummaryZoomInserted: '已插入摘要缩放页（{count} 个缩略图）',
   appSectionSummary: '摘要节',
   appSectionN: '第 {n} 节',
+  appUseAppTitle: '应用中可用',
+  appUseAppMessage: '在 UniWork Office 应用中打开以使用此功能',
+  appUseAppAction: '在应用中打开',
+  appUseAppClose: '关闭',
 }

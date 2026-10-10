@@ -772,4 +772,5 @@ export const id = {
   ribbonZoomSectionItem: 'Slide {n} Bagian {k}: {name}',
   ribbonZoomSelectedSlides: '{n} slide dipilih',
   ribbonZoomSelectedSections: '{n} bagian dipilih',
+  ribbonFileExportPdfPrint: 'PDF kualitas cetak…',
 } satisfies Record<keyof typeof zh, string>

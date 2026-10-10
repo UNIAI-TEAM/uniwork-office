@@ -9337,3 +9337,50 @@ body.show-curtain::after {
   user-select: none;
   pointer-events: none;
 }
+
+/* "Use the app" notes of the web frame (use-app.ts): the dialog and the note over a media poster */
+.use-app-modal {
+  max-width: calc(100vw - 32px);
+}
+
+.use-app-message {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.use-app-note {
+  position: absolute;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: calc(100% - 16px);
+  padding: 8px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.4;
+  box-shadow: var(--slides-shadow-modal);
+  transform: translate(-50%, -50%);
+}
+
+.use-app-note button {
+  flex: none;
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.use-app-note button:hover {
+  border-color: var(--accent);
+}

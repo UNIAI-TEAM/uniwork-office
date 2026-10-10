@@ -240,4 +240,8 @@ export const ar = {
   appStatusSummaryZoomInserted: 'تم إدراج شريحة تكبير/تصغير الملخص مع {count} مربعات',
   appSectionSummary: 'مقطع الملخص',
   appSectionN: 'المقطع {n}',
+  appUseAppTitle: 'متاح في التطبيق',
+  appUseAppMessage: 'افتح في تطبيق UniWork Office لاستخدام هذه الميزة',
+  appUseAppAction: 'فتح في التطبيق',
+  appUseAppClose: 'إغلاق',
 } satisfies Record<keyof typeof zh, string>

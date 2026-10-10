@@ -970,6 +970,14 @@ export function createWebSlidesApi(
     insertMedia: engine('slides:insert-media'),
     addMediaBytes: engine('slides:add-media-bytes'),
     getMediaData: mediaData,
+    // the host's own "Open in desktop app" flow (A7 contract); an old host answers `unsupported`
+    openInDesktopApp: async (feature) => {
+      try {
+        return await port.request('app.open', { feature }, { timeoutMs: TIMEOUTS.dialog })
+      } catch {
+        return { outcome: 'unavailable' as const }
+      }
+    },
     insertModel3d: engine('slides:insert-model3d'),
     copySlides: engine('slides:copy-slides'),
     pasteSlide: engine('slides:paste-slide'),

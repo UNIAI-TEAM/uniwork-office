@@ -119,8 +119,9 @@ describe('slidesApi contract', () => {
     const keys = preloadKeys()
     expect(keys.length).toBeGreaterThanOrEqual(181)
     expect(keys.filter((k) => !(k in api))).toEqual([])
-    // the web-only optional presenter members (SlidesApi: the desktop never sets them)
+    // the web-only optional members (SlidesApi: the desktop never sets them)
     expect(Object.keys(api).filter((k) => !keys.includes(k))).toEqual([
+      'openInDesktopApp',
       'presenterOpenAudience',
       'presenterCloseAudience',
       'onPresenterAudience',
@@ -559,12 +560,38 @@ describe('view-only (no host save grant)', () => {
       saveAs: true,
       open: true,
       recents: true,
+      desktopOpen: false,
     })
+    expect(slidesHostGrants({ desktopOpen: true }).desktopOpen).toBe(true)
     expect(slidesHostGrants({})).toEqual({
       save: false,
       saveAs: false,
       open: false,
       recents: false,
+      desktopOpen: false,
+    })
+  })
+})
+
+describe('open in the desktop app (A7 contract, app.open)', () => {
+  it('asks the host to run its flow with the opaque feature tag and relays the outcome', async () => {
+    const { api, mock } = await setup()
+    mock.override('app.open', () => ({ outcome: 'installer' }))
+    await expect(api.openInDesktopApp!('slides.linkedMedia')).resolves.toEqual({
+      outcome: 'installer',
+    })
+    expect(mock.calls.filter((c) => c.type === 'app.open').map((c) => c.payload)).toEqual([
+      { feature: 'slides.linkedMedia' },
+    ])
+  })
+
+  it('an old host without app.open (unsupported) or a failing flow answers unavailable', async () => {
+    const { api, mock } = await setup()
+    mock.override('app.open', () => {
+      throw Object.assign(new Error('nope'), { code: 'unsupported' })
+    })
+    await expect(api.openInDesktopApp!('slides.printPdf')).resolves.toEqual({
+      outcome: 'unavailable',
     })
   })
 })

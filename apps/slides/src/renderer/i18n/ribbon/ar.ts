@@ -756,4 +756,5 @@ export const ar = {
   ribbonZoomSectionItem: 'الشريحة {n} المقطع {k}: {name}',
   ribbonZoomSelectedSlides: 'تم تحديد {n} شرائح',
   ribbonZoomSelectedSections: 'تم تحديد {n} مقاطع',
+  ribbonFileExportPdfPrint: 'ملف PDF بجودة الطباعة…',
 } satisfies Record<keyof typeof zh, string>

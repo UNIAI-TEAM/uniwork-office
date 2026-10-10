@@ -224,7 +224,7 @@ test.describe('slides web module', () => {
         return r
       }
     })
-    await fileMenu(frame, /^Print/)
+    await fileMenu(frame, /^Print… /)
     await frame.locator('.print-dialog .modal-actions button.primary').click()
     await expect
       .poll(() => frame.evaluate(() => (window as unknown as { __printed: unknown[] }).__printed))
@@ -428,6 +428,27 @@ test.describe('slides web module', () => {
       http: [],
     })
   })
+
+  // UNI-1232 (item 5): print-quality PDF is not a web feature: the File menu entry says so (en + vi)
+  // instead of failing; the test host grants no desktopOpen, so the message stands alone
+  for (const [lang, message] of [
+    ['en', 'Open in the UniWork Office app to use this feature'],
+    ['vi', 'Mở trong ứng dụng UniWork Office để dùng tính năng này'],
+  ] as const) {
+    test(`print-quality PDF: the use-the-app message, no Open button without the capability (${lang})`, async ({
+      page,
+    }) => {
+      const frame = await openDeck(page, `&lang=${lang}`)
+      await frame.getByText(lang === 'en' ? 'File' : 'Tệp', { exact: true }).click()
+      await frame.locator('[data-use-app="print-pdf"]').click()
+      const dialog = frame.locator('[data-use-app="dialog"]')
+      await expect(dialog).toBeVisible()
+      await expect(dialog).toContainText(message)
+      await expect(dialog.locator('button.primary')).toHaveCount(0)
+      await page.keyboard.press('Escape')
+      await expect(dialog).toHaveCount(0)
+    })
+  }
 
   // visual r2 N-03: at 390 px the slide takes the width (was 14 %), the thumbnail column starts
   // hidden and the ribbon tabs scroll sideways with an edge fade as the cue

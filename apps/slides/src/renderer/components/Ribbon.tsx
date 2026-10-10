@@ -1121,6 +1121,7 @@ export function Ribbon({
   onRedo,
   onSaveAs,
   onExportPdf,
+  onUseApp,
   onPrint,
   onExportImages,
   onFormat,
@@ -1803,6 +1804,18 @@ export function Ribbon({
                 >
                   {t('ribbonFileExportPdf')}
                 </button>
+                {isWeb() && (
+                  <button
+                    disabled={!hasDoc}
+                    data-use-app="print-pdf"
+                    onClick={() => {
+                      setFileOpen(false)
+                      onUseApp('slides.printPdf')
+                    }}
+                  >
+                    {t('ribbonFileExportPdfPrint')}
+                  </button>
+                )}
                 <button
                   disabled={!hasDoc}
                   onClick={() => {

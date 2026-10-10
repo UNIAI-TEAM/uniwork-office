@@ -749,4 +749,5 @@ export const he = {
   ribbonZoomSectionItem: 'שקופית {n} מקטע {k}: {name}',
   ribbonZoomSelectedSlides: 'נבחרו {n} שקופיות',
   ribbonZoomSelectedSections: 'נבחרו {n} מקטעים',
+  ribbonFileExportPdfPrint: 'PDF באיכות הדפסה…',
 } satisfies Record<keyof typeof zh, string>

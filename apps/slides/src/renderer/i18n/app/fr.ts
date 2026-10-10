@@ -255,4 +255,8 @@ export const fr = {
   appStatusSummaryZoomInserted: 'Diapositive de zoom de synthèse insérée avec {count} vignettes',
   appSectionSummary: 'Section de synthèse',
   appSectionN: 'Section {n}',
+  appUseAppTitle: 'Disponible dans l’application',
+  appUseAppMessage: 'Ouvrez dans l’application UniWork Office pour utiliser cette fonctionnalité',
+  appUseAppAction: 'Ouvrir dans l’application',
+  appUseAppClose: 'Fermer',
 } satisfies Record<keyof typeof zh, string>

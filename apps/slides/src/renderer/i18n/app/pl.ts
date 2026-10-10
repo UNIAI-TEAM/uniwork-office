@@ -253,4 +253,8 @@ export const pl = {
   appStatusSummaryZoomInserted: 'Wstawiono slajd powiększenia podsumowania z {count} kafelkami',
   appSectionSummary: 'Sekcja podsumowania',
   appSectionN: 'Sekcja {n}',
+  appUseAppTitle: 'Dostępne w aplikacji',
+  appUseAppMessage: 'Otwórz w aplikacji UniWork Office, aby użyć tej funkcji',
+  appUseAppAction: 'Otwórz w aplikacji',
+  appUseAppClose: 'Zamknij',
 } satisfies Record<keyof typeof zh, string>

@@ -740,4 +740,5 @@ export const zhTW = {
   ribbonZoomSectionItem: '第 {n} 頁　第 {k} 節：{name}',
   ribbonZoomSelectedSlides: '已選取 {n} 張投影片',
   ribbonZoomSelectedSections: '已選取 {n} 個節',
+  ribbonFileExportPdfPrint: '高品質列印 PDF…',
 } satisfies Record<keyof typeof zh, string>

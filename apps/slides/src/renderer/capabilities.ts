@@ -17,6 +17,7 @@
  * | fontInstallLocal | install a local font file                                                        |
  * | model3d          | Insert > 3D model                                                                |
  * | presenterWindow  | the presenter view's second-screen audience window and swap button               |
+ * | desktopOpen      | the Open-in-app action of the "use the app" notes (on with the host's grant)     |
  * `platform()` is 'web' in the frame: no native window chrome (traffic lights, caption buttons,
  * vibrancy), the File tab always present, HTML fullscreen for the show on every OS.
  */
@@ -33,6 +34,7 @@ export type SlidesCapability =
   | 'fontInstallLocal'
   | 'model3d'
   | 'presenterWindow'
+  | 'desktopOpen'
 
 // structural read: the web module typechecks this file without the renderer's Window augmentation
 type CapabilityHolder = { slidesApi?: { capabilities?: Readonly<Record<string, unknown>> } }

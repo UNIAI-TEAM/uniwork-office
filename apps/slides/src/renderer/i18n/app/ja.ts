@@ -243,4 +243,8 @@ export const ja = {
   appStatusSummaryZoomInserted: 'サマリー ズーム スライドを挿入しました（タイル {count} 個）',
   appSectionSummary: 'サマリー セクション',
   appSectionN: 'セクション {n}',
+  appUseAppTitle: 'アプリで利用できます',
+  appUseAppMessage: 'UniWork Office アプリで開いてこの機能を使用します',
+  appUseAppAction: 'アプリで開く',
+  appUseAppClose: '閉じる',
 } satisfies Record<keyof typeof zh, string>

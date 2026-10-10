@@ -253,4 +253,8 @@ export const es = {
   appStatusSummaryZoomInserted: 'Diapositiva de zoom de resumen insertada con {count} mosaicos',
   appSectionSummary: 'Sección de resumen',
   appSectionN: 'Sección {n}',
+  appUseAppTitle: 'Disponible en la aplicación',
+  appUseAppMessage: 'Ábrelo en la aplicación UniWork Office para usar esta función',
+  appUseAppAction: 'Abrir en la aplicación',
+  appUseAppClose: 'Cerrar',
 } satisfies Record<keyof typeof zh, string>

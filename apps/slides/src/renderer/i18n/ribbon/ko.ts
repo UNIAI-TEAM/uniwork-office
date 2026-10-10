@@ -776,4 +776,5 @@ export const ko = {
   ribbonZoomSectionItem: '슬라이드 {n} 구역 {k}: {name}',
   ribbonZoomSelectedSlides: '슬라이드 {n}개 선택됨',
   ribbonZoomSelectedSections: '구역 {n}개 선택됨',
+  ribbonFileExportPdfPrint: '인쇄용 고품질 PDF…',
 } satisfies Record<keyof typeof zh, string>

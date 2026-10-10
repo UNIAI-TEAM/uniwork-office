@@ -254,4 +254,8 @@ export const pt = {
   appStatusSummaryZoomInserted: 'Slide de zoom de resumo inserido com {count} blocos',
   appSectionSummary: 'Seção de resumo',
   appSectionN: 'Seção {n}',
+  appUseAppTitle: 'Disponível no aplicativo',
+  appUseAppMessage: 'Abra no aplicativo UniWork Office para usar este recurso',
+  appUseAppAction: 'Abrir no aplicativo',
+  appUseAppClose: 'Fechar',
 } satisfies Record<keyof typeof zh, string>

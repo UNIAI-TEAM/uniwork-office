@@ -247,4 +247,8 @@ export const id = {
   appStatusSummaryZoomInserted: 'Slide Zoom Ringkasan disisipkan dengan {count} ubin',
   appSectionSummary: 'Bagian Ringkasan',
   appSectionN: 'Bagian {n}',
+  appUseAppTitle: 'Tersedia di aplikasi',
+  appUseAppMessage: 'Buka di aplikasi UniWork Office untuk menggunakan fitur ini',
+  appUseAppAction: 'Buka di aplikasi',
+  appUseAppClose: 'Tutup',
 } satisfies Record<keyof typeof zh, string>

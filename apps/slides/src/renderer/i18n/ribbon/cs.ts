@@ -765,4 +765,5 @@ export const cs = {
   ribbonZoomSectionItem: 'Snímek {n} Oddíl {k}: {name}',
   ribbonZoomSelectedSlides: 'Vybráno snímků: {n}',
   ribbonZoomSelectedSections: 'Vybráno oddílů: {n}',
+  ribbonFileExportPdfPrint: 'PDF v tiskové kvalitě…',
 } satisfies Record<keyof typeof zh, string>

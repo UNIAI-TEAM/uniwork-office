@@ -770,4 +770,5 @@ export const hi = {
   ribbonZoomSectionItem: 'स्लाइड {n} अनुभाग {k}: {name}',
   ribbonZoomSelectedSlides: '{n} स्लाइड चयनित',
   ribbonZoomSelectedSections: '{n} अनुभाग चयनित',
+  ribbonFileExportPdfPrint: 'प्रिंट-गुणवत्ता PDF…',
 } satisfies Record<keyof typeof zh, string>
