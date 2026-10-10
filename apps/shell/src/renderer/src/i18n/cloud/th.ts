@@ -6,6 +6,7 @@ export const th = {
   cloudStateNotEntitled: 'ไม่รวมในแพ็กเกจของคุณ',
   cloudStateExhausted: 'เครดิต AI หมดแล้ว',
   cloudStateUnavailable: 'ใช้งานไม่ได้ในขณะนี้',
+  cloudStateSignedOut: 'ยังไม่ได้ลงชื่อเข้าใช้',
   cloudStateInactive: 'การสมัครสมาชิกไม่ใช้งาน',
   cloudCredits: 'เครดิต AI',
   cloudCreditsLeft: 'เหลือ {remaining} / {limit}',

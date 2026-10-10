@@ -415,49 +415,73 @@ describe('launch descriptor', () => {
     expect(server.calls.some((c) => c.url.endsWith('/download?version=2'))).toBe(true)
   })
 
-  it('a launch naming the current version opens the document itself: live access, the open tab', async () => {
-    // the web hands off the version it just showed (version 3, the current
-    // one); the server reduces such a ticket to view, but it is no older copy
+  const viewTicket = (version: number) => ({
+    receiptId: 'r',
+    redeemedAt: '2026-09-30T10:01:02Z',
+    id: DOC,
+    organizationId: 'org_a',
+    workspaceId: 'ws_1',
+    title: 'Q4 plan',
+    operation: 'view' as const,
+    version,
+    revision: '41',
+    downloadPath: `/api/v1/documents/${DOC}/download?version=${version}`,
+  })
+
+  it('a version ticket naming the current version is read-only even for an editor', async () => {
+    // a ticket is never upgraded to edit by the client: the web omits
+    // `version` for an "edit the current version" handoff
+    const server = fakeServer({ bytes: enc('v3'), myLevel: 'manage' })
+    const ctx = setup(server)
+    const opened = await ctx.service.openFromServer(DOC, viewTicket(3))
+    expect(binding(opened.path)).toMatchObject({ access: 'view', baseVersion: 3 })
+    expect(ctx.deps.openPath).toHaveBeenLastCalledWith(opened.path)
+    expect(ctx.statuses.at(-1)).toMatchObject({ access: 'view' })
+  })
+
+  it('a current-version view ticket focuses the open tab of the document instead of a duplicate', async () => {
     const server = fakeServer({ bytes: enc('v3'), myLevel: 'manage' })
     const ctx = setup(server)
     const path = await openDoc(ctx)
     ctx.deps.isPathOpen.mockImplementation((p: string) => p === path)
-    const launch = {
-      receiptId: 'r',
-      redeemedAt: '2026-09-30T10:01:02Z',
-      id: DOC,
-      organizationId: 'org_a',
-      workspaceId: 'ws_1',
-      title: 'Q4 plan',
-      operation: 'view' as const,
-      version: 3,
-      revision: '41',
-      downloadPath: `/api/v1/documents/${DOC}/download?version=3`,
-    }
-    const opened = await ctx.service.openFromServer(DOC, launch)
+    ctx.deps.openPath.mockClear()
+    const downloads = () => server.calls.filter((c) => c.url.includes('/download')).length
+    const before = downloads()
+    const opened = await ctx.service.openFromServer(DOC, viewTicket(3))
     expect(opened.path).toBe(path)
     expect(opened.path).not.toContain('@v')
+    expect(ctx.deps.openPath).toHaveBeenCalledTimes(1)
+    expect(ctx.deps.openPath).toHaveBeenCalledWith(path)
+    // the open tab is neither downgraded nor reloaded
     expect(binding(path)).toMatchObject({ access: 'edit', baseVersion: 3 })
-    expect(ctx.deps.openPath).toHaveBeenLastCalledWith(path)
-    expect(ctx.statuses.at(-1)).toMatchObject({ access: 'edit' })
+    expect(downloads()).toBe(before)
   })
 
-  it('a current-version launch of a view-only document stays view only', async () => {
+  it('a current-version view ticket opens a read-only copy when no tab shows the document', async () => {
+    const server = fakeServer({ bytes: enc('v3'), myLevel: 'manage' })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    const opened = await ctx.service.openFromServer(DOC, viewTicket(3))
+    expect(opened.path).not.toBe(path)
+    expect(opened.path).toContain(`${DOC}@v3`)
+    expect(binding(opened.path)).toMatchObject({ access: 'view', baseVersion: 3 })
+    expect(binding(path)).toMatchObject({ access: 'edit' })
+  })
+
+  it('a ticket without version keeps the live access; operation view is read-only', async () => {
+    const server = fakeServer({ bytes: enc('v3'), myLevel: 'manage' })
+    const ctx = setup(server)
+    const edit = await ctx.service.openFromServer(DOC, { ...viewTicket(0), operation: 'edit' })
+    expect(edit.path).not.toContain('@v')
+    expect(binding(edit.path)).toMatchObject({ access: 'edit' })
+    const view = await ctx.service.openFromServer(DOC, viewTicket(0))
+    expect(binding(view.path)).toMatchObject({ access: 'view' })
+  })
+
+  it('a current-version view ticket of a view-only document is read-only', async () => {
     const server = fakeServer({ bytes: enc('v3'), myLevel: 'view' })
     const ctx = setup(server)
-    const opened = await ctx.service.openFromServer(DOC, {
-      receiptId: 'r',
-      redeemedAt: '2026-09-30T10:01:02Z',
-      id: DOC,
-      organizationId: 'org_a',
-      workspaceId: 'ws_1',
-      title: 'Q4 plan',
-      operation: 'view',
-      version: 3,
-      revision: '41',
-      downloadPath: `/api/v1/documents/${DOC}/download?version=3`,
-    })
-    expect(opened.path).not.toContain('@v')
+    const opened = await ctx.service.openFromServer(DOC, viewTicket(3))
     expect(binding(opened.path)).toMatchObject({ access: 'view' })
   })
 })
@@ -1218,6 +1242,24 @@ describe('editor state on the chip (one state source)', () => {
     // the editor's clean report after the save changes nothing
     ctx.service.noteEditorDirty(path, false)
     expect(ctx.statuses.map((s) => s.state)).toEqual(['saving', 'saved'])
+  })
+
+  it('a poll answer from a pass that began before the Save does not flash dirty again', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    ctx.service.noteEditorDirty(path, true)
+    const mark = ctx.service.saveMark() // a pass starts here, still sees the edits
+    writeFileSync(path, 'v4')
+    ctx.service.onUserSave(path)
+    await vi.waitFor(() => expect(last(ctx)).toMatchObject({ state: 'saved' }))
+    ctx.statuses.length = 0
+    ctx.service.noteEditorDirty(path, true, mark) // the stale answer arrives
+    expect(ctx.statuses).toHaveLength(0)
+    expect(await ctx.service.docStatus(path)).toMatchObject({ state: 'saved' })
+    // a pass that began after the Save is believed
+    ctx.service.noteEditorDirty(path, true, ctx.service.saveMark())
+    expect(last(ctx)).toMatchObject({ state: 'dirty' })
   })
 
   it('reports only changes, and never hides a conflict, offline or signed-out state', async () => {

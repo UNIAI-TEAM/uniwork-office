@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent, ReactElement, ReactNode } from 'react'
 import { AgentLoop, composeSkills, streamText } from '@genoffice/agent-core'
 import {
+  aiNoticeBody,
   aiNoticeKind,
   imageGenerationAvailable,
   type AiSettings,
@@ -887,7 +888,7 @@ export function AiPanel({
               ) : (
                 entry.text && (
                   <div dir="auto">
-                    <Markdown text={entry.text} nav={docNav} />
+                    <Markdown text={aiNoticeBody(entry.text)} nav={docNav} />
                   </div>
                 )
               )}

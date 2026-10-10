@@ -41,8 +41,8 @@ export function UniAiPwaPane({ lang }: Props): ReactElement {
       <p className="set-backup-lead">
         {L(
           lang,
-          'Ứng dụng AI độc lập kiểu chat — đăng nhập UniWork / Token Hub trên web. Không bắt buộc cài Desktop Office.',
-          'Standalone ChatGPT-style AI app — sign in to UniWork / Token Hub on the web. Desktop Office is optional.',
+          'Ứng dụng AI độc lập kiểu chat — đăng nhập UniWork trên web. Không bắt buộc cài Desktop Office.',
+          'Standalone ChatGPT-style AI app — sign in to UniWork on the web. Desktop Office is optional.',
         )}
       </p>
 
@@ -116,8 +116,8 @@ export function UniAiPwaPane({ lang }: Props): ReactElement {
         <li>
           {L(
             lang,
-            'Chat + lịch sử trên trình duyệt / app đã cài; Token Hub trừ token trên UniWork.',
-            'Chat + history in the browser / installed app; Token Hub bills on UniWork.',
+            'Chat + lịch sử trên trình duyệt / app đã cài; mức dùng AI được tính trên UniWork.',
+            'Chat + history in the browser / installed app; AI usage is counted on UniWork.',
           )}
         </li>
         <li>

@@ -5,6 +5,7 @@ export const zh = {
   cloudStateNotEntitled: '套餐不含此功能',
   cloudStateExhausted: 'AI 额度已用完',
   cloudStateUnavailable: '暂不可用',
+  cloudStateSignedOut: '未登录',
   cloudStateInactive: '订阅未生效',
   cloudCredits: 'AI 额度',
   cloudCreditsLeft: '剩余 {remaining} / {limit}',

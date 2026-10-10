@@ -6,6 +6,7 @@ export const zhTW = {
   cloudStateNotEntitled: '方案未包含此功能',
   cloudStateExhausted: 'AI 額度已用完',
   cloudStateUnavailable: '暫時無法使用',
+  cloudStateSignedOut: '尚未登入',
   cloudStateInactive: '訂閱未生效',
   cloudCredits: 'AI 額度',
   cloudCreditsLeft: '剩餘 {remaining} / {limit}',

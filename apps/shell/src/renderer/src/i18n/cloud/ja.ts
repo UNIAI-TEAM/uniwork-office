@@ -6,6 +6,7 @@ export const ja = {
   cloudStateNotEntitled: 'プランに含まれていません',
   cloudStateExhausted: 'AI クレジットを使い切りました',
   cloudStateUnavailable: '現在利用できません',
+  cloudStateSignedOut: 'サインインしていません',
   cloudStateInactive: 'サブスクリプション無効',
   cloudCredits: 'AI クレジット',
   cloudCreditsLeft: '残り {remaining} / {limit}',

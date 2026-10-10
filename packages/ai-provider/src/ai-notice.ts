@@ -8,9 +8,11 @@ import { getUniworkCloudStatus, type UniworkCloudState } from './uniwork-cloud'
  * plan says about cloud AI, but never mentions an account of this app or a
  * purchase inside it: plans belong to the organization.
  *
- * The main process picks the notice text; renderers recognize it again with
- * `aiNoticeKind` (exact match against this table) to draw it as a notice with an
- * "open settings" action instead of a red error line.
+ * The main process picks the notice text and tags it with a code (`[[ai-notice:<kind>]]`
+ * in front of the text); renderers read the code back with `aiNoticeKind`, draw the
+ * message without the tag (`aiNoticeBody`) as a notice with an "open settings"
+ * action instead of a red error line. The code, not the wording, marks a notice, so
+ * every UI language gets it. The exact en/vi texts are still recognized untagged.
  */
 export type AiNoticeKind = 'no_model' | 'not_entitled' | 'credits_exhausted'
 
@@ -37,15 +39,30 @@ const AI_NOTICE_TEXT: Record<AiNoticeLang, Record<AiNoticeKind, string>> = {
 
 const NOTICE_KINDS: readonly AiNoticeKind[] = ['no_model', 'not_entitled', 'credits_exhausted']
 
+const CODE_PREFIX = '[[ai-notice:'
+const CODE_PATTERN = /^\[\[ai-notice:(no_model|not_entitled|credits_exhausted)\]\]\s*/
+
+/** a notice text tagged with its code (the form the main process sends) */
+export function aiNoticeTagged(kind: AiNoticeKind, text: string): string {
+  return `${CODE_PREFIX}${kind}]] ${text}`
+}
+
+/** the message as the user reads it: without the notice code */
+export function aiNoticeBody(message: string): string {
+  return message.replace(CODE_PATTERN, '')
+}
+
 /** the notice text for one language; only en and vi are ours */
 export function aiNoticeText(kind: AiNoticeKind, lang: AiNoticeLang): string {
   return AI_NOTICE_TEXT[lang][kind]
 }
 
-/** which notice a message is (exact text in any of our languages), or null for a real error */
+/** which notice a message is (its code, or the exact en/vi text), or null for a real error */
 export function aiNoticeKind(message: string | null | undefined): AiNoticeKind | null {
   const text = message?.trim()
   if (!text) return null
+  const tagged = CODE_PATTERN.exec(text)
+  if (tagged) return tagged[1] as AiNoticeKind
   for (const lang of Object.keys(AI_NOTICE_TEXT) as AiNoticeLang[]) {
     for (const kind of NOTICE_KINDS) {
       if (AI_NOTICE_TEXT[lang][kind] === text) return kind
@@ -68,17 +85,19 @@ export function aiNoticeKindForCloud(state: UniworkCloudState): AiNoticeKind {
 }
 
 /**
- * The message for a chat request that has no key. en and vi get the state-aware
- * notice; the other locales keep their own "no API key configured" text, which is
- * already neutral.
+ * The message for a chat request that has no key, tagged as a notice in every
+ * language. en and vi get the state-aware notice in their language; other locales
+ * keep their own neutral "no API key configured" text for the plain no-model case
+ * and fall back to the English notice for the plan states.
  */
 export function noModelMessageFor(
   lang: string,
   cloudState: UniworkCloudState,
   fallback: string,
 ): string {
-  if (lang !== 'en' && lang !== 'vi') return fallback
-  return aiNoticeText(aiNoticeKindForCloud(cloudState), lang)
+  const kind = aiNoticeKindForCloud(cloudState)
+  if (lang === 'en' || lang === 'vi') return aiNoticeTagged(kind, aiNoticeText(kind, lang))
+  return aiNoticeTagged(kind, kind === 'no_model' ? fallback : aiNoticeText(kind, 'en'))
 }
 
 /** `noModelMessageFor` with the cloud state this process currently holds (the shell main process keeps it live) */

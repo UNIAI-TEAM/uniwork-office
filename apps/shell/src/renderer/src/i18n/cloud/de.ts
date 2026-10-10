@@ -6,6 +6,7 @@ export const de = {
   cloudStateNotEntitled: 'Nicht in Ihrem Tarif',
   cloudStateExhausted: 'KI-Guthaben aufgebraucht',
   cloudStateUnavailable: 'Nicht verfügbar',
+  cloudStateSignedOut: 'Nicht angemeldet',
   cloudStateInactive: 'Abonnement inaktiv',
   cloudCredits: 'KI-Guthaben',
   cloudCreditsLeft: '{remaining} / {limit} übrig',

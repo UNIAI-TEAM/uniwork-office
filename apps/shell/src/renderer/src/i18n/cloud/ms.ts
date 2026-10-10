@@ -6,6 +6,7 @@ export const ms = {
   cloudStateNotEntitled: 'Tiada dalam pelan anda',
   cloudStateExhausted: 'Kredit AI habis',
   cloudStateUnavailable: 'Tidak tersedia',
+  cloudStateSignedOut: 'Belum log masuk',
   cloudStateInactive: 'Langganan tidak aktif',
   cloudCredits: 'Kredit AI',
   cloudCreditsLeft: 'Baki {remaining} / {limit}',

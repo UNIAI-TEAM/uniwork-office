@@ -9,6 +9,7 @@ import type { Editor } from '@tiptap/core'
 import type { Block } from '@genoffice/docx-engine'
 import { AgentLoop, composeSkills, streamText, type AgentImage } from '@genoffice/agent-core'
 import {
+  aiNoticeBody,
   aiNoticeKind,
   imageGenerationAvailable,
   mediaAnalysisAvailable,
@@ -1423,7 +1424,7 @@ export function AiPanel({
                 (aiNoticeKind(entry.error) ? (
                   // "nothing to chat with" is a setup / plan state: a plain notice, not a red error
                   <div className="ai-msg-notice" role="status">
-                    {entry.error}
+                    {aiNoticeBody(entry.error)}
                   </div>
                 ) : (
                   <div className="ai-msg-error">{t('aiErrorPrefix', { error: entry.error })}</div>

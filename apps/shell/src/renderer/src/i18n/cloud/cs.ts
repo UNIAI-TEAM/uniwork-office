@@ -6,6 +6,7 @@ export const cs = {
   cloudStateNotEntitled: 'Není ve vašem tarifu',
   cloudStateExhausted: 'Kredity AI vyčerpány',
   cloudStateUnavailable: 'Nedostupné',
+  cloudStateSignedOut: 'Nepřihlášeno',
   cloudStateInactive: 'Předplatné není aktivní',
   cloudCredits: 'Kredity AI',
   cloudCreditsLeft: 'Zbývá {remaining} / {limit}',

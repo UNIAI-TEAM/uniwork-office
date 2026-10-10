@@ -9,7 +9,7 @@ import type { PointerEvent as ReactPointerEvent, ReactElement, ReactNode } from 
 import { AgentLoop, composeSkills } from '@genoffice/agent-core'
 import type { AgentImage } from '@genoffice/agent-core'
 import type { AiSettings } from '@genoffice/ai-provider'
-import { aiNoticeKind } from '@genoffice/ai-provider/browser'
+import { aiNoticeBody, aiNoticeKind } from '@genoffice/ai-provider/browser'
 import { ATTACHMENT_IMAGE_EXTS } from '../../shared/ipc'
 import type { AttachmentAddResult, AttachmentMeta } from '../../shared/ipc'
 import {
@@ -1290,7 +1290,7 @@ export function AiPanel({
               ) : (
                 entry.text && (
                   <div dir="auto">
-                    <Markdown text={entry.text} nav={docNav} />
+                    <Markdown text={aiNoticeBody(entry.text)} nav={docNav} />
                   </div>
                 )
               )}

@@ -6,6 +6,7 @@ export const he = {
   cloudStateNotEntitled: 'לא כלול בתוכנית שלך',
   cloudStateExhausted: 'נגמרו קרדיטי ה-AI',
   cloudStateUnavailable: 'לא זמין',
+  cloudStateSignedOut: 'לא מחובר',
   cloudStateInactive: 'המנוי אינו פעיל',
   cloudCredits: 'קרדיטי AI',
   cloudCreditsLeft: 'נותרו {remaining} / {limit}',

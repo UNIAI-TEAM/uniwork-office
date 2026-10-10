@@ -6,6 +6,7 @@ export const ar = {
   cloudStateNotEntitled: 'غير مضمّن في خطتك',
   cloudStateExhausted: 'نفدت أرصدة الذكاء الاصطناعي',
   cloudStateUnavailable: 'غير متاح',
+  cloudStateSignedOut: 'غير مسجّل الدخول',
   cloudStateInactive: 'الاشتراك غير نشط',
   cloudCredits: 'أرصدة الذكاء الاصطناعي',
   cloudCreditsLeft: 'متبقٍ {remaining} / {limit}',

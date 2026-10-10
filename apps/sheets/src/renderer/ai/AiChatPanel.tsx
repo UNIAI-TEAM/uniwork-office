@@ -6,7 +6,7 @@ import {
 } from '@genoffice/ui'
 import React, { useEffect, useRef, useState } from 'react'
 import { AiComposer, AiScopeQuote, AiTypingIndicator, type AiScopeQuoteData } from '@genoffice/ui'
-import { aiNoticeKind } from '@genoffice/ai-provider/browser'
+import { aiNoticeBody, aiNoticeKind } from '@genoffice/ai-provider/browser'
 import { GensparkMark } from '../ribbon-icons'
 import type { ChangePlan } from '@genoffice/xlsx-gateway/domain/workbook.types'
 import { ATTACHMENT_IMAGE_EXTS, type AttachmentMeta } from '../../shared/desktop-api'
@@ -568,7 +568,7 @@ export function AiChatPanel({
                 {entry.tools.length > 0 && <ToolChipList tools={entry.tools} />}
                 {entry.text && (
                   <div dir="auto">
-                    <Markdown text={entry.text} nav={citationNav} />
+                    <Markdown text={aiNoticeBody(entry.text)} nav={citationNav} />
                   </div>
                 )}
               </div>
@@ -617,7 +617,7 @@ export function AiChatPanel({
                 {entry.tools.length > 0 && <ToolChipList tools={entry.tools} />}
                 {entry.text ? (
                   <div dir="auto">
-                    <Markdown text={entry.text} nav={citationNav} />
+                    <Markdown text={aiNoticeBody(entry.text)} nav={citationNav} />
                   </div>
                 ) : (
                   entry.streaming && (

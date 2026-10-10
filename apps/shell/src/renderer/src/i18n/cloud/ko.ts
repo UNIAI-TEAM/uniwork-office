@@ -6,6 +6,7 @@ export const ko = {
   cloudStateNotEntitled: '플랜에 포함되지 않음',
   cloudStateExhausted: 'AI 크레딧 소진',
   cloudStateUnavailable: '현재 사용할 수 없음',
+  cloudStateSignedOut: '로그인하지 않음',
   cloudStateInactive: '구독이 활성 상태가 아님',
   cloudCredits: 'AI 크레딧',
   cloudCreditsLeft: '{remaining} / {limit} 남음',

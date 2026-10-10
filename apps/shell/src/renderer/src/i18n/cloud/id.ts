@@ -6,6 +6,7 @@ export const id = {
   cloudStateNotEntitled: 'Tidak termasuk dalam paket Anda',
   cloudStateExhausted: 'Kredit AI habis',
   cloudStateUnavailable: 'Tidak tersedia',
+  cloudStateSignedOut: 'Belum masuk',
   cloudStateInactive: 'Langganan tidak aktif',
   cloudCredits: 'Kredit AI',
   cloudCreditsLeft: 'Sisa {remaining} / {limit}',

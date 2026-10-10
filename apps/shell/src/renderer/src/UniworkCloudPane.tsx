@@ -60,13 +60,16 @@ export function cloudNoticeFor(state: UniworkCloudState, toolsEnabled = true): C
 /**
  * The verdict of the settings "Test connection" for the blocks that run on the
  * UniWork cloud: the status the server just answered, in the same short labels as
- * the Account rows. A signed-out session never offers the cloud, so it passes.
+ * the Account rows. Only a server answer of "ready" passes: a signed-out session
+ * or a status that could not be read says so instead of showing a green OK.
  */
 export function cloudTestVerdict(
   status: UniworkCloudStatus | null,
   t: TFunc,
 ): { ok: boolean; error?: string } {
-  if (!status || status.state === 'ready' || status.state === 'signed-out') return { ok: true }
+  if (!status) return { ok: false, error: t('cloudStateUnavailable') }
+  if (status.state === 'ready') return { ok: true }
+  if (status.state === 'signed-out') return { ok: false, error: t('cloudStateSignedOut') }
   return { ok: false, error: t(CLOUD_STATE_KEYS[status.state]) }
 }
 

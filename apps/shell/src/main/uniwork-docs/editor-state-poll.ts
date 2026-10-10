@@ -15,7 +15,10 @@ export interface EditorStatePollDeps {
     wanted: (path: string) => boolean,
   ): Promise<Array<{ path: string; dirty: boolean | null }>>
   isBound(path: string): boolean
-  noteEditorDirty(path: string, dirty: boolean): void
+  /** a counter that moves on every user Save: read before a pass asks the editors */
+  saveMark(): number
+  /** `mark` is the saveMark read before the pass that produced this answer */
+  noteEditorDirty(path: string, dirty: boolean, mark: number): void
 }
 
 /** One pass; a pass still waiting on a busy editor is never overlapped. */
@@ -25,9 +28,11 @@ export function createEditorStatePoll(deps: EditorStatePollDeps): () => Promise<
     if (running) return
     running = true
     try {
+      // a Save that lands while the editors are asked makes the answer stale
+      const mark = deps.saveMark()
       const states = await deps.editorDirtyStates((path) => deps.isBound(path))
       for (const { path, dirty } of states) {
-        if (dirty !== null) deps.noteEditorDirty(path, dirty)
+        if (dirty !== null) deps.noteEditorDirty(path, dirty, mark)
       }
     } catch {
       // a tab closing mid-pass: the next pass reads the tabs again

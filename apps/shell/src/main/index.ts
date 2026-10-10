@@ -4101,7 +4101,8 @@ function registerHomeIpc(): void {
   startEditorStatePoll({
     editorDirtyStates: async (wanted) => (await tabManager?.editorDirtyStates(wanted)) ?? [],
     isBound: (path) => uniworkService.isBound(path),
-    noteEditorDirty: (path, dirty) => uniworkService.noteEditorDirty(path, dirty),
+    saveMark: () => uniworkService.saveMark(),
+    noteEditorDirty: (path, dirty, mark) => uniworkService.noteEditorDirty(path, dirty, mark),
   })
 
   // Reserved for the Hub result channel; the ack is not reported anywhere today.

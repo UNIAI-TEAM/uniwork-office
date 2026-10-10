@@ -6,6 +6,7 @@ export const vi = {
   cloudStateNotEntitled: 'Gói hiện tại chưa bao gồm',
   cloudStateExhausted: 'Đã hết tín dụng AI',
   cloudStateUnavailable: 'Tạm thời không dùng được',
+  cloudStateSignedOut: 'Chưa đăng nhập',
   cloudStateInactive: 'Gói đăng ký không hoạt động',
   cloudCredits: 'Tín dụng AI',
   cloudCreditsLeft: 'Còn {remaining} / {limit}',
