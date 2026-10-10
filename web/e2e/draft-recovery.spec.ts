@@ -254,10 +254,12 @@ const sheetsCase: ModuleCase = {
       .click({ position: { x: 400, y: 300 } })
   },
   async edit(page, frame, marker) {
-    const nameBox = frame.getByLabel('Name Box')
+    // Univer's formula-bar defined-name box since the main sync (as web/e2e/sheets.spec.ts)
+    const nameBox = frame.locator('[data-u-comp="defined-name"] input')
     await nameBox.click()
     await nameBox.fill('A1')
     await nameBox.press('Enter')
+    await page.waitForTimeout(500)
     await page.keyboard.type(marker)
     await page.keyboard.press('Enter')
     await page.waitForTimeout(500)
