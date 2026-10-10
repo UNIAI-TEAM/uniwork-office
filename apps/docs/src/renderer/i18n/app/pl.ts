@@ -306,6 +306,7 @@ export const pl = {
   appTabDecimal: 'Dziesiętny',
   appTabBar: 'Paskowy',
   appTabClear: 'Wyczyść',
+  appAiSettings: 'Ustawienia AI',
   appCut: 'Wytnij',
   appCopy: 'Kopiuj',
   appPaste: 'Wklej',

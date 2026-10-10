@@ -292,6 +292,7 @@ export const he = {
   appTabDecimal: 'עשרוני',
   appTabBar: 'קו',
   appTabClear: 'נקה',
+  appAiSettings: 'הגדרות AI',
   appCut: 'גזירה',
   appCopy: 'העתקה',
   appPaste: 'הדבקה',

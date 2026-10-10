@@ -318,6 +318,7 @@ export const ja = {
   appTabDecimal: '小数点揃え',
   appTabBar: '縦棒',
   appTabClear: 'クリア',
+  appAiSettings: 'AI 設定',
   // AI settings
   // Context menu
   appCut: '切り取り',

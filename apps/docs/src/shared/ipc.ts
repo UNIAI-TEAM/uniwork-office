@@ -296,6 +296,8 @@ export interface DesktopCapabilities {
   createDocument?: boolean
   /** AI panel "Buy plan" button */
   billing?: boolean
+  /** web only: AI panel "AI settings" button (provider keys stored in UniWork, CONTRACT C16) */
+  aiCredentials?: boolean
   /** File > Open / Ctrl+O (web: only when the host grants its document picker, `filePick`) */
   open?: boolean
   /** recent-files lookups (web: only when the host grants `recents`) */
@@ -557,6 +559,8 @@ export interface DesktopApi {
   aiGskStatus(withEmail?: boolean): Promise<GenSparkAccountStatus>
   /** Focus Home → Settings → Account (AI plan purchase UI) */
   aiOpenBilling(): Promise<void>
+  /** web frame only (absent on desktop): the in-frame AI settings (keys stored in UniWork) */
+  openAiSettings?(): Promise<void>
   webSearch(
     query: string,
     maxResults?: number,

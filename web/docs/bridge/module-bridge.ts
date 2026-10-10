@@ -10,7 +10,10 @@
  *                         (on import) the window.open guard: http(s) only, no opener
  *   ./capability-object   one mutable capability object, host grants assigned on `init`
  *   ./safe-api            safe no-op Proxy: a member nobody implements never throws
- *   ./project-memory      in-memory projectApi (AI-only; AI is hidden on the web)
+ *   ./project-memory      in-memory projectApi (AI-only)
+ *   modules/shared/ai     the web AI bridge (CONTRACT C16): every global with AI members gets them
+ *                         from it while the host grants `ai`; without the grant they stay the
+ *                         module's own "unavailable" stubs and every AI key stays false
  *
  * Every global starts with the shared members (`sharedMembers`: getTheme, onThemeChanged,
  * getLanguage, onLanguageChanged, and the autosave preference pinned off, CONTRACT C10) and then
@@ -25,6 +28,12 @@ import type { FramePort } from './frame-port'
 import { hostGrants } from './hide'
 import { projectApi } from './project-memory'
 import { mergeModules, safeApi, type BridgeObject } from './safe-api'
+import {
+  AI_FRAME_CAPABILITIES,
+  aiHostGrants,
+  createWebAi,
+  withWebAi,
+} from '../../modules/shared/ai/web-ai'
 
 /** what the installer hands each global's factory */
 export interface ModuleBridgeContext {
@@ -51,6 +60,8 @@ export type ModuleBridgePort = Pick<
   | 'setTitle'
   | 'reportSaved'
   | 'reportError'
+  | 'getToken'
+  | 'refreshToken'
 >
 
 export interface ModuleBridgeSpec {
@@ -82,12 +93,14 @@ export interface InstalledModuleBridge {
 }
 
 /**
- * What every module starts with on the web: AI hidden (as Docs), File > Open / recents until
+ * What every module starts with on the web: AI hidden until the host grants `ai` (as Docs), File > Open / recents until
  * granted, and no autosave of any kind (CONTRACT C10: explicit user save only; the renderers'
  * autosave toggles, timers and crash-recovery copies are hidden behind these keys).
  */
 export const MODULE_WEB_CAPABILITIES: Readonly<Record<string, unknown>> = Object.freeze({
   ai: false,
+  // web only: the AI settings entry (UniWork-stored keys), on with the `ai` grant
+  aiCredentials: false,
   open: false,
   recents: false,
   autoSave: false,
@@ -117,22 +130,25 @@ export function installModuleBridge(spec: ModuleBridgeSpec): InstalledModuleBrid
     spec.client ??
     createFrameClient({
       module: spec.module,
-      capabilities: spec.frameCapabilities,
+      capabilities: { ...AI_FRAME_CAPABILITIES, ...spec.frameCapabilities },
       frameVersion: frameVersionFromDocument(),
     })
+  const grants = spec.capabilities?.grants ?? hostGrants
   const capabilities = createCapabilityObject<Record<string, unknown>>(
     { platform: 'web', ...(spec.capabilities?.defaults ?? MODULE_WEB_CAPABILITIES) },
     client,
-    spec.capabilities?.grants ?? hostGrants,
+    (granted) => ({ ...aiHostGrants(granted), ...grants(granted) }),
   )
   bindHostAppearance(client)
+  const ai = createWebAi({ port: client, capabilities })
 
   const ctx: ModuleBridgeContext = { module: spec.module, client, capabilities }
   const target = spec.target ?? (window as unknown as Record<string, unknown>)
   const capsOn = spec.capabilities?.on ?? Object.keys(spec.globals)
   const globals: Record<string, BridgeObject> = {}
   for (const [name, factory] of Object.entries(spec.globals)) {
-    const api = mergeModules([sharedMembers(), factory(ctx)])
+    const merged = mergeModules([sharedMembers(), factory(ctx)])
+    const api = 'aiStream' in merged || 'getAiSettings' in merged ? withWebAi(merged, ai) : merged
     if (capsOn.includes(name)) api.capabilities = capabilities
     globals[name] = safeApi(api)
     target[name] = globals[name]

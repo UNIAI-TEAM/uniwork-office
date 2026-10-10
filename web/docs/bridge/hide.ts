@@ -56,6 +56,7 @@ import type { Capabilities } from '../protocol/types'
  * | imageGeneration | AI tool generate_image                                              |
  * | createDocument  | AI tool create_document                                             |
  * | billing         | AI panel "Buy plan" button                                          |
+ * | aiCredentials   | AI panel "AI settings" button (web only, UniWork-stored keys)       |
  * | open            | File > Open, Ctrl+O (on only with the host's `filePick` grant)      |
  * | recents         | recent-files lookups (on only with the host's `recents` grant)      |
  */
@@ -71,6 +72,7 @@ export const webCapabilities: Readonly<Required<DesktopCapabilities>> = Object.f
   imageGeneration: false,
   createDocument: false,
   billing: false,
+  aiCredentials: false,
   open: false,
   recents: false,
 })

@@ -306,6 +306,7 @@ export const zh = {
   appTabDecimal: '小数点',
   appTabBar: '竖线',
   appTabClear: '清除',
+  appAiSettings: 'AI 设置',
   // AI settings
   // Context menu
   appCut: '剪切',

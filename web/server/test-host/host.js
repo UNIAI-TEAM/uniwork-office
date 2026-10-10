@@ -4,6 +4,7 @@
 //        &recovery=1: draft recovery on (CONTRACT C18): `init.recovery` carries a non-extractable
 //        AES-GCM key generated once per host page (= one signed-in session) and the scope
 //        "test-user:<documentId>"; a frame reload gets the same key again
+//        &ai=1 grants `ai` + webSearch/imageSearch/imageGeneration (fake AI routes, web/server/fake-ai.mjs)
 //
 // module (default docs): the frame defaults to /office-frame/<module>/<version|latest>/index.html (docs keeps
 // the site root, as before), `init.module` names the module, and the host refuses a frame whose
@@ -197,6 +198,16 @@ const initPayload = {
   ...(MODULE !== 'docs' ? { module: MODULE, user: { displayName: 'Test User' } } : {}),
 }
 if (params.get('readonly') === '1') delete initPayload.capabilities.save
+// ai=1: grant the web AI (CONTRACT C16) and its cloud tools; the frame then calls the fake
+// frame-token AI routes of web/server/fake-ai.mjs. Absent = no AI grant (AI hidden, as before).
+if (params.get('ai') === '1') {
+  Object.assign(initPayload.capabilities, {
+    ai: true,
+    webSearch: true,
+    imageSearch: true,
+    imageGeneration: true,
+  })
+}
 if (params.get('pick') === '1') initPayload.capabilities.filePick = true
 
 async function newSessionKey() {

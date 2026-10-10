@@ -301,6 +301,7 @@ export const cs = {
   appTabDecimal: 'Desetinný',
   appTabBar: 'Svislá čára',
   appTabClear: 'Vymazat',
+  appAiSettings: 'Nastavení AI',
   appCut: 'Vyjmout',
   appCopy: 'Kopírovat',
   appPaste: 'Vložit',

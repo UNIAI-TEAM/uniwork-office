@@ -307,6 +307,7 @@ export const it = {
   appTabDecimal: 'Decimale',
   appTabBar: 'Barra',
   appTabClear: 'Cancella',
+  appAiSettings: 'Impostazioni IA',
   appCut: 'Taglia',
   appCopy: 'Copia',
   appPaste: 'Incolla',

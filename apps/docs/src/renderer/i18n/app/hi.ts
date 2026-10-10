@@ -301,6 +301,7 @@ export const hi = {
   appTabDecimal: 'दशमलव',
   appTabBar: 'बार',
   appTabClear: 'साफ़ करें',
+  appAiSettings: 'AI सेटिंग्स',
   appCut: 'काटें',
   appCopy: 'कॉपी करें',
   appPaste: 'चिपकाएँ',

@@ -296,6 +296,7 @@ export const en = {
   appTabDecimal: 'Decimal',
   appTabBar: 'Bar',
   appTabClear: 'Clear',
+  appAiSettings: 'AI Settings',
   appCut: 'Cut',
   appCopy: 'Copy',
   appPaste: 'Paste',

@@ -307,6 +307,7 @@ export const es = {
   appTabDecimal: 'Decimal',
   appTabBar: 'Barra',
   appTabClear: 'Borrar',
+  appAiSettings: 'Configuración de IA',
   appCut: 'Cortar',
   appCopy: 'Copiar',
   appPaste: 'Pegar',

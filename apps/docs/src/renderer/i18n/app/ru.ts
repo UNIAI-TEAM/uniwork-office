@@ -305,6 +305,7 @@ export const ru = {
   appTabDecimal: 'По разделителю',
   appTabBar: 'С чертой',
   appTabClear: 'Очистить',
+  appAiSettings: 'Настройки ИИ',
   appCut: 'Вырезать',
   appCopy: 'Копировать',
   appPaste: 'Вставить',

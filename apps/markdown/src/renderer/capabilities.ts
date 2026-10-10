@@ -5,6 +5,7 @@ import { createCapabilityReader, type CapabilityObject } from '@genoffice/ui/cap
  * every entry stays on; the web bridge (web/modules/markdown) sets one object and assigns the
  * host grants into it:
  *   ai, webSearch, imageSearch, imageGeneration  AI panel, AI ribbon group, ask-AI popover
+ *   aiCredentials                                AI panel "AI settings" (web: UniWork-stored keys)
  *   autoSave                                     AutoSave toggle + 30 s / blur autosave timer
  *   openInDocs                                   "export .docx and open in Docs"
  *   imageHost                                    bring-your-own image host settings (Insert ribbon)
@@ -12,6 +13,7 @@ import { createCapabilityReader, type CapabilityObject } from '@genoffice/ui/cap
  */
 export type MarkdownCapability =
   | 'ai'
+  | 'aiCredentials'
   | 'webSearch'
   | 'imageSearch'
   | 'imageGeneration'

@@ -333,6 +333,8 @@ export interface MarkdownApi {
   resolveAssetUrl?(src: string): string | null
   /** Web frame only: the authored path of a display URL from resolveAssetUrl; null otherwise */
   unresolveAssetUrl?(url: string): string | null
+  /** Web frame only (absent on desktop): the in-frame AI settings (keys stored in UniWork) */
+  openAiSettings?(): Promise<void>
   /** AI image generation via the configured media provider (markdown-owned channel) */
   aiGenerateImage(op: { prompt: string; aspectRatio?: string }): Promise<{
     url?: string

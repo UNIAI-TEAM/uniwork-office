@@ -17,6 +17,7 @@ import {
 } from '@genoffice/ui'
 import type { Editor } from '@tiptap/core'
 import { aiLangDirective, t as tGlobal, useI18n } from '../i18n/locale'
+import { cap } from '../capabilities'
 import sendEnterOn from '../assets/send-enter-on.png'
 import sendEnterOff from '../assets/send-enter-off.png'
 import sendStop from '../assets/send-stop.png'
@@ -803,6 +804,16 @@ export function AiPanel({
               <IconNewChat />
             </button>
           )}
+          {cap('aiCredentials') && window.markdownApi.openAiSettings && (
+            <button
+              className="ai-header-btn"
+              onClick={() => void window.markdownApi.openAiSettings?.()}
+              data-tip={t('aiSettings')}
+              aria-label={t('aiSettings')}
+            >
+              <IconGear />
+            </button>
+          )}
           <button
             className="ai-header-btn ai-panel-collapse"
             onClick={onCollapse}
@@ -1240,6 +1251,24 @@ function IconCollapse(): ReactElement {
       <rect x="1.5" y="2.5" width="13" height="11" rx="1" />
       <path d="M5.5 2.5v11" />
       <path d="M12.5 8H8.1M9.8 5.9 7.7 8l2.1 2.1" strokeWidth="1.3" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function IconGear(): ReactElement {
+  return (
+    <svg
+      width={15}
+      height={15}
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.2"
+      strokeLinecap="round"
+      aria-hidden
+    >
+      <circle cx="8" cy="8" r="1.78" />
+      <path d="M8 2.98v1.62M8 11.4v1.62M13.02 8H11.4M4.6 8H2.98M11.56 4.44l-1.13 1.13M5.57 10.43l-1.13 1.13M11.56 11.56l-1.13-1.13M5.57 5.57 4.44 4.44" />
     </svg>
   )
 }

@@ -311,6 +311,7 @@ export const nl = {
   appTabDecimal: 'Decimaal',
   appTabBar: 'Balk',
   appTabClear: 'Wissen',
+  appAiSettings: 'AI-instellingen',
   appCut: 'Knippen',
   appCopy: 'Kopiëren',
   appPaste: 'Plakken',

@@ -311,6 +311,7 @@ export const fr = {
   appTabDecimal: 'Décimal',
   appTabBar: 'Barre',
   appTabClear: 'Effacer',
+  appAiSettings: 'Paramètres IA',
   appCut: 'Couper',
   appCopy: 'Copier',
   appPaste: 'Coller',

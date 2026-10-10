@@ -302,6 +302,7 @@ export const pt = {
   appTabDecimal: 'Decimal',
   appTabBar: 'Barra',
   appTabClear: 'Limpar',
+  appAiSettings: 'Configurações de IA',
   appCut: 'Recortar',
   appCopy: 'Copiar',
   appPaste: 'Colar',
