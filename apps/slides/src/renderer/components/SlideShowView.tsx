@@ -40,6 +40,7 @@ import {
 } from '../slideshow-utils'
 import { liftShowCurtain } from '../show-actions'
 import { isWeb } from '../capabilities'
+import { requestShowFullscreen } from '../fullscreen-request'
 
 const ANIMATED = [
   'fade',
@@ -215,7 +216,7 @@ export function SlideShowView({
     void snapped
       .catch(() => {})
       .then(() => {
-        if (!IS_MAC) void document.documentElement.requestFullscreen?.().catch(() => {})
+        requestShowFullscreen(IS_MAC)
         // Covered = the viewport spans the WHOLE screen, width and height (the
         // bleed-only intermediate differs in height, a full-width window in
         // height too — no partial state passes both). window.screen tracks the

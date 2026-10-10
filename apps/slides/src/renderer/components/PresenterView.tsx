@@ -36,6 +36,7 @@ import {
 } from '../show-keys'
 import { liftShowCurtain } from '../show-actions'
 import { cap, isWeb } from '../capabilities'
+import { requestShowFullscreen } from '../fullscreen-request'
 
 /** Layout constants (aligned with styles.css) */
 // macOS Electron snaps the native window instead of HTML fullscreen; a browser always uses HTML fullscreen
@@ -218,7 +219,7 @@ export function PresenterView({
     void snapped
       .catch(() => {})
       .then(() => {
-        if (!IS_MAC) void document.documentElement.requestFullscreen?.().catch(() => {})
+        requestShowFullscreen(IS_MAC)
         // Same settle condition as SlideShowView: viewport spans the whole
         // screen in BOTH dimensions — no bleed-only or full-width-only
         // intermediate passes. Deadline covers stale preloads that never snap.
