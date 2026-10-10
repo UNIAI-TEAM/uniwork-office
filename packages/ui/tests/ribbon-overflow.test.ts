@@ -34,6 +34,22 @@ describe('ribbonOverflowOf', () => {
   })
 })
 
+/** a ribbon that renders only once `ready` is true, like PDF's (after the file has loaded) */
+function LateRibbon({ ready }: { ready: boolean }) {
+  const collapse = useRibbonCollapse('t.overflow.late', { collapse: 'Collapse', expand: 'Expand' })
+  return createElement(
+    'div',
+    null,
+    ready
+      ? createElement(
+          'div',
+          { className: collapse.rootClass, ref: collapse.rootRef },
+          createElement('div', { 'data-ribbon-body': '', className: 'ribbon-body' }),
+        )
+      : null,
+  )
+}
+
 function Ribbon() {
   const collapse = useRibbonCollapse('t.overflow', { collapse: 'Collapse', expand: 'Expand' })
   return createElement(
@@ -154,5 +170,39 @@ describe('the overflow cue of a ribbon', () => {
     act(() => root.unmount())
     expect(document.querySelector('.ribbon-overflow-cue')).toBeNull()
     root = createRoot(host)
+  })
+})
+
+describe('a ribbon that renders after the hook mounted', () => {
+  it('gets the cue once it appears (no second mount call in the app)', () => {
+    act(() => root.render(createElement(LateRibbon, { ready: false })))
+    expect(host.querySelector('.ribbon-overflow-cue')).toBeNull()
+    act(() => root.render(createElement(LateRibbon, { ready: true })))
+    expect(host.querySelectorAll('.ribbon-overflow-cue')).toHaveLength(2)
+    metrics(band(), { clientWidth: 400, scrollWidth: 900, scrollLeft: 0 })
+    band().dispatchEvent(new Event('scroll'))
+    flush()
+    expect(cue('end')!.hidden).toBe(false)
+    expect(host.querySelector('[data-ribbon-overflow]')!.getAttribute('data-ribbon-overflow')).toBe(
+      'end',
+    )
+  })
+
+  it('mounts the cue once per ribbon node, not once per render', () => {
+    act(() => root.render(createElement(LateRibbon, { ready: true })))
+    act(() => root.render(createElement(LateRibbon, { ready: true })))
+    act(() => root.render(createElement(LateRibbon, { ready: true })))
+    expect(host.querySelectorAll('.ribbon-overflow-cue')).toHaveLength(2)
+  })
+
+  it('moves to a replaced ribbon node and cleans up when it goes away', () => {
+    act(() => root.render(createElement(LateRibbon, { ready: true })))
+    const first = host.querySelector('.ribbon-overflow-cue')
+    act(() => root.render(createElement(LateRibbon, { ready: false })))
+    expect(host.querySelector('.ribbon-overflow-cue')).toBeNull()
+    act(() => root.render(createElement(LateRibbon, { ready: true })))
+    const again = host.querySelectorAll('.ribbon-overflow-cue')
+    expect(again).toHaveLength(2)
+    expect(again[0]).not.toBe(first)
   })
 })

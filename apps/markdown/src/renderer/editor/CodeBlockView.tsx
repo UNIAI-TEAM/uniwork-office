@@ -165,13 +165,25 @@ export function CodeBlockView({ node, updateAttributes, editor, getPos }: NodeVi
       <pre>
         <NodeViewContent<'code'> as="code" />
       </pre>
-      {error && (
-        <div className="md-diagram-error" contentEditable={false}>
-          {t('mermaidError')}: {error}
-        </div>
-      )}
+      {error && <DiagramError error={error} />}
       {diagram?.ok && <DiagramPreview svg={diagram.svg} onClick={editSource} />}
     </NodeViewWrapper>
+  )
+}
+
+/**
+ * A diagram that does not parse: the localised sentence leads, the parser's own (English) message
+ * stays one click away as technical detail.
+ */
+export function DiagramError({ error }: { error: string }) {
+  return (
+    <div className="md-diagram-error" contentEditable={false}>
+      <p className="md-diagram-error-lead">{t('mermaidError')}</p>
+      <details className="md-diagram-error-details">
+        <summary>{t('mermaidErrorDetails')}</summary>
+        <pre>{error}</pre>
+      </details>
+    </div>
   )
 }
 

@@ -27,7 +27,36 @@
 //                                                      the next streamed turns answer one each; the
 //                                                      turn after them is the plain `reply`
 //     credentials?: [{ provider, api_key, base_url? }] seed stored keys }
+// Real vendor for local verification only (env, no defaults; nothing is read from or written to a
+// file): with FAKE_AI_UPSTREAM_URL (an OpenAI-compatible base, e.g. http://host:port/v1) and
+// FAKE_AI_UPSTREAM_KEY set, an openai-compatible chat/completions call for a seeded provider is
+// forwarded there with that key (FAKE_AI_UPSTREAM_MODEL replaces the request's model when set), and
+// the answer is piped back, SSE included. The key never reaches the frame or the request log.
 // GET /__fake-ai/log -> [{ method, path, authorization, cookie, body }] of the AI requests.
+
+const upstream = () => {
+  const url = process.env.FAKE_AI_UPSTREAM_URL
+  const key = process.env.FAKE_AI_UPSTREAM_KEY
+  return url && key
+    ? { url: url.replace(/\/+$/, ''), key, model: process.env.FAKE_AI_UPSTREAM_MODEL || '' }
+    : null
+}
+
+/** forward an openai-compatible chat call to the env-configured vendor; pipes status + body back */
+async function forward(res, up, body) {
+  const r = await fetch(`${up.url}/chat/completions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${up.key}` },
+    body: JSON.stringify(up.model ? { ...body, model: up.model } : body),
+  })
+  res.writeHead(r.status, {
+    'Content-Type': r.headers.get('content-type') ?? 'application/json',
+    'Cache-Control': 'no-store',
+  })
+  if (!r.body) return res.end()
+  for await (const chunk of r.body) res.write(chunk)
+  res.end()
+}
 
 const MOUNT = /^\/api\/v1\/office-frame\/documents\/([^/]+)\/ai(\/.*)?$/
 
@@ -169,6 +198,8 @@ async function byok(req, res, provider, tail, body) {
   if (body.__invalid) return fail(res, 400, 'invalid_json')
 
   if (tail === '/chat/completions' && row.protocol === 'openai-compatible') {
+    const up = upstream()
+    if (up) return forward(res, up, body)
     if (!body.stream) {
       return json(res, 200, {
         choices: [

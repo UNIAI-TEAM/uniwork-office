@@ -129,7 +129,6 @@ import {
   aiPanelInitiallyOpen,
   rememberAiPanelOpen,
   useDismissablePopover,
-  mountRibbonOverflowCue,
   useRibbonCollapse,
 } from '@genoffice/ui'
 import { useI18n } from './i18n/locale'
@@ -321,14 +320,6 @@ export default function App() {
   const [status, setStatus] = useState<'loading' | 'error' | 'empty' | 'password' | 'ready'>(
     'loading',
   )
-  // The hook mounts the ribbon's overflow cue once, at App mount; this ribbon only renders after the
-  // file has loaded, so mount the cue again when it appears (the hook's own mount found no root).
-  const ribbonRootRef = collapse.rootRef
-  useEffect(() => {
-    const root = ribbonRootRef.current
-    if (!root || root.querySelector('.ribbon-overflow-cue')) return undefined
-    return mountRibbonOverflowCue(root)
-  }, [ribbonRootRef, status, doc])
   const [sizes, setSizes] = useState<PageSize[]>([])
   const [pageOrigins, setPageOrigins] = useState<[number, number][]>([])
   const [pageUserUnits, setPageUserUnits] = useState<number[]>([])

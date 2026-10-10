@@ -188,7 +188,8 @@ describe('with the ai grant', () => {
     await t.boot()
     const settings = await t.desktop.getAiSettings()
     expect(settings.provider).toBe('openai')
-    expect(settings.providers.openai.apiKey).toBe('')
+    // never the key: the masked hint of the stored credential, which the proxy transport drops
+    expect(settings.providers.openai.apiKey).toBe('…abcd')
     const r = await t.desktop.aiChat({ settings, system: 's', user: 'hello' })
     expect(r).toMatchObject({ ok: true, content: 'ok' })
     expect(t.urls.some((u) => u.endsWith('/documents/doc-1/ai/byok/openai/chat/completions'))).toBe(

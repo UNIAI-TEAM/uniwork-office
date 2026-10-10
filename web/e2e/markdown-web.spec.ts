@@ -47,6 +47,12 @@ async function editor(frame: Frame) {
   return el
 }
 
+// the editor drops the previous node selection a frame after a click on text; keys sent inside that
+// frame (only a script is that fast) would replace the still-selected raw HTML block
+async function selectionSettled(frame: Frame) {
+  await expect(frame.locator('.doc-editor .ProseMirror-selectednode')).toHaveCount(0)
+}
+
 async function save(page: Page) {
   await page.keyboard.press('Control+s')
 }
@@ -77,9 +83,25 @@ test('markdown: open -> save byte-identical -> type -> save -> reopen -> conflic
 
   // 2. type into the nearby paragraph and save: only that line changes
   await frame.locator('.doc-editor p', { hasText: 'Nearby paragraph to edit.' }).click()
+  await selectionSettled(frame)
   await page.keyboard.press('End')
   await page.keyboard.type(' Edited on the web.')
-  await expect(frame.locator('.status-save')).toHaveText(/unsaved/i)
+  // the host header owns the save state: the frame draws none, but tells the host it is dirty
+  await expect(frame.locator('.status-save')).toHaveCount(0)
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (
+            window as unknown as {
+              __host: { events: Array<{ type: string; payload: { dirty?: boolean } }> }
+            }
+          ).__host.events
+            .filter((e) => e.type === 'dirty')
+            .at(-1)?.payload.dirty,
+      ),
+    )
+    .toBe(true)
   await save(page)
   await expect.poll(async () => (await hostState(page)).lastSaved?.versionId).toBe('v3')
   expect((await hostState(page)).lastSaved!.bytes).toEqual(Array.from(EDITED))
@@ -98,6 +120,7 @@ test('markdown: open -> save byte-identical -> type -> save -> reopen -> conflic
   // 4. conflict: someone else saved meanwhile
   await bumpRemote(page, fileId)
   await frame.locator('.doc-editor p', { hasText: 'Tail paragraph' }).click()
+  await selectionSettled(frame)
   await page.keyboard.press('End')
   await page.keyboard.type(' Mine.')
   await save(page)
@@ -125,7 +148,8 @@ test('markdown: view only without the save grant', async ({ page }) => {
     readonly: '1',
   })
   const ed = await editor(frame)
-  await expect(frame.locator('.status-view-only')).toHaveText('View only')
+  // the host announces view-only (banner + live region): cap viewOnlyChip is off on the web
+  await expect(frame.locator('.status-view-only')).toHaveCount(0)
   await expect(ed).toHaveAttribute('contenteditable', 'false')
   await ed.click()
   await page.keyboard.type('x')
@@ -153,3 +177,71 @@ for (const theme of ['light', 'dark'] as const) {
     })
   }
 }
+
+// visual r2 polish (UNI-1232): the placeholder explains itself, raw HTML says it is inert, a broken
+// diagram leads with the UI-language sentence, and the page keeps phone-sized gutters
+const POLISH = [
+  '# Polish fixture',
+  '',
+  '![sơ đồ](assets/missing.png)',
+  '',
+  '<div class="x">raw</div>',
+  '',
+  '```mermaid',
+  'graph TD',
+  '  A -->',
+  '```',
+  '',
+  'thư tiếng Việt',
+  '',
+].join('\n')
+const POLISH_PATH = '/e2e-fixtures/Polish.md'
+
+test('markdown: placeholder, raw HTML label and a broken diagram speak the UI language', async ({
+  page,
+}) => {
+  await serveFixture(page, POLISH_PATH, encode(POLISH), 'text/markdown')
+  const frame = await openModule(page, 'markdown', { open: POLISH_PATH, lang: 'vi' })
+  await expect(frame.locator('.doc-editor')).toContainText('Polish fixture', { timeout: 30_000 })
+
+  // a relative picture without an asset: named for assistive tech, explained inside the picture
+  const img = frame.locator('.doc-editor img[src^="data:image/svg+xml"]')
+  await expect(img).toHaveAttribute('aria-label', /Ảnh không khả dụng: sơ đồ\. .*chưa được tải lên/)
+  const svg = decodeURIComponent((await img.getAttribute('src'))!.split('#')[0]!.slice(33))
+  expect(svg).toContain('assets/missing.png')
+  expect(svg.replace(/<[^>]+>/g, '')).toContain('Chưa hiển thị')
+
+  // raw HTML is kept as written and says so
+  const label = await frame
+    .locator('.doc-editor .md-raw-html')
+    .first()
+    .evaluate((el) => getComputedStyle(el, '::before').content)
+  expect(label).toContain('HTML giữ nguyên, không hiển thị')
+
+  // the parser's own English message is detail, behind the UI-language sentence
+  const error = frame.locator('.md-diagram-error')
+  await expect(error).toBeVisible({ timeout: 45_000 })
+  await expect(error.locator('.md-diagram-error-lead')).toHaveText('Lỗi cú pháp sơ đồ')
+  await expect(error.locator('details')).not.toHaveAttribute('open', '')
+  await expect(error.locator('summary')).toHaveText('Chi tiết kỹ thuật')
+  await page.screenshot({ path: screenshotPath('markdown', 'polish-light-vi') })
+})
+
+test('markdown: a phone keeps small page gutters (no 72 px margins), no sideways page scroll', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await serveFixture(page, POLISH_PATH, encode(POLISH), 'text/markdown')
+  const frame = await openModule(page, 'markdown', { open: POLISH_PATH, lang: 'en' })
+  await expect(frame.locator('.doc-editor')).toContainText('Polish fixture', { timeout: 30_000 })
+  const { pad, scroll, text } = await frame.locator('.doc-page').evaluate((el) => ({
+    pad: parseFloat(getComputedStyle(el).paddingLeft),
+    scroll: document.documentElement.scrollWidth,
+    text: el.querySelector('p')!.getBoundingClientRect().width,
+  }))
+  expect(pad).toBeLessThanOrEqual(16)
+  expect(scroll).toBeLessThanOrEqual(390)
+  // 390 minus two 16 px gutters (the old 72 px gutters left ~212 px)
+  expect(text).toBeGreaterThan(300)
+  await page.screenshot({ path: screenshotPath('markdown', 'narrow-390-light-en') })
+})

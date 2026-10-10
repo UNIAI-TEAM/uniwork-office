@@ -62,7 +62,8 @@ export interface FramePort {
   /** host `theme` / `language` events (the host is authoritative for both) */
   onTheme(listener: (theme: Theme) => void): () => void
   onLanguage(listener: (locale: string) => void): () => void
-  setDirty(dirty: boolean): void
+  /** `force` re-sends an unchanged flag: the host left its dirty state (e.g. a failed save) and must hear the next edit */
+  setDirty(dirty: boolean, opts?: { force?: boolean }): void
   setTitle(title: string): void
   /** a bridge dialog opened / closed (protocol `modal` event; optional for older clients) */
   setModal?(open: boolean): void

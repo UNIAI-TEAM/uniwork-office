@@ -329,11 +329,24 @@ export function useRibbonCollapse(
     [toggle],
   )
 
-  // the overflow cue of the band (see the header comment); the root ref is the call site's
+  // The overflow cue of the band (see the header comment); the root ref is the call site's. The
+  // ref is a plain object (no callback when a node lands in it), and a ribbon may render long after
+  // the hook's owner mounted (PDF shows it only once the file has loaded): check on every render
+  // which node the ref holds and mount the cue on a new one, so a late or replaced ribbon gets it.
+  const cue = useRef<{ root: HTMLElement; dispose: () => void } | null>(null)
   useEffect(() => {
     const root = rootRef.current
-    return root ? mountRibbonOverflowCue(root) : undefined
-  }, [])
+    if (cue.current?.root === root) return
+    cue.current?.dispose()
+    cue.current = root ? { root, dispose: mountRibbonOverflowCue(root) } : null
+  })
+  useEffect(
+    () => () => {
+      cue.current?.dispose()
+      cue.current = null
+    },
+    [],
+  )
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

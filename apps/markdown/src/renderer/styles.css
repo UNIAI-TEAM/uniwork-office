@@ -188,6 +188,8 @@ button {
   direction: ltr;
   flex: 1;
   overflow-y: auto;
+  /* the page gutters follow the room the page actually gets (AI panel open or not), not the window */
+  container: md-page / inline-size;
   /* same canvas backdrop as the slides workspace; .doc-page follows the theme surface */
   background: var(--canvas);
 }
@@ -204,6 +206,19 @@ button {
 /* Document page theme (genoffice#1811): an explicit Light under the dark UI
    theme re-scopes the paper's ink to the light values, so body copy, code,
    tables and links read as on the light theme. Dark behaves as Follow. */
+/* narrow page: the 72 px gutters leave ~210 px of text at 390 px, so they shrink in steps */
+@container md-page (max-width: 760px) {
+  .doc-page {
+    padding: 32px 40px 96px;
+  }
+}
+
+@container md-page (max-width: 520px) {
+  .doc-page {
+    padding: 24px 16px 80px;
+  }
+}
+
 html[data-doc-theme='light'] .doc-page {
   --accent: #185abd;
   --accent-dark: #124a9e;
@@ -337,7 +352,7 @@ html[data-doc-theme='light'] .doc-page {
 }
 
 .doc-editor code {
-  font-family: 'SF Mono', Menlo, Consolas, monospace;
+  font-family: 'SF Mono', Menlo, Consolas, 'Noto Sans Mono', 'Liberation Mono', monospace;
   font-size: 0.875em;
   background: var(--md-code-inline-bg);
   border-radius: 4px;
@@ -677,7 +692,7 @@ html.genoffice-popover-open .ribbon-tabs {
 
 /* typographic letterform glyphs (B/I/U/S): 15px/600 like the docs inline row */
 .rb-mono {
-  font-family: 'SF Mono', Menlo, Consolas, monospace;
+  font-family: 'SF Mono', Menlo, Consolas, 'Noto Sans Mono', 'Liberation Mono', monospace;
   font-size: 11.5px;
 }
 
@@ -892,7 +907,7 @@ html.genoffice-popover-open .ribbon-tabs {
   background: transparent;
   resize: vertical;
   padding: 6px 12px 10px;
-  font-family: 'SF Mono', Menlo, Consolas, monospace;
+  font-family: 'SF Mono', Menlo, Consolas, 'Noto Sans Mono', 'Liberation Mono', monospace;
   font-size: 12.5px;
   line-height: 1.6;
   color: var(--text);
@@ -910,6 +925,7 @@ html.genoffice-popover-open .ribbon-tabs {
   flex-direction: column;
   flex: 1;
   min-height: 0;
+  container: md-source / inline-size;
   background: var(--canvas);
 }
 
@@ -947,7 +963,7 @@ html.genoffice-popover-open .ribbon-tabs {
   border: none;
   background: var(--surface);
   color: var(--text);
-  font-family: 'SF Mono', Menlo, Consolas, monospace;
+  font-family: 'SF Mono', Menlo, Consolas, 'Noto Sans Mono', 'Liberation Mono', monospace;
   font-size: 12.5px;
   line-height: 1.65;
   outline: none;
@@ -956,6 +972,26 @@ html.genoffice-popover-open .ribbon-tabs {
   white-space: pre;
   overflow: auto;
   tab-size: 2;
+}
+
+@container md-source (max-width: 760px) {
+  .source-head {
+    padding-inline: 40px;
+  }
+
+  .source-textarea {
+    padding-inline: 40px;
+  }
+}
+
+@container md-source (max-width: 520px) {
+  .source-head {
+    padding-inline: 16px;
+  }
+
+  .source-textarea {
+    padding-inline: 16px;
+  }
 }
 
 /* ---- editor drop cursor / node selection ---- */
@@ -1271,7 +1307,9 @@ html.genoffice-popover-open .ribbon-tabs {
   padding: 1px 6px;
   background: var(--color-bg-subtle);
   color: var(--color-text-secondary);
-  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+  font-family:
+    ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Noto Sans Mono', 'Liberation Mono',
+    monospace;
   font-size: 14px;
 }
 
@@ -1564,7 +1602,8 @@ html.genoffice-popover-open .ribbon-tabs {
   border: none;
   border-radius: 12px;
   font-family:
-    ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+    ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Noto Sans Mono', 'Liberation Mono',
+    monospace;
   font-size: 14px;
   color: var(--text-primary);
   max-height: 300px;
@@ -2300,6 +2339,32 @@ html.genoffice-popover-open .ribbon-tabs {
   cursor: default;
 }
 
+/* the label is out of flow in a fixed 22 px band: a late font swap must not move the blocks below it
+   (it did, and a click aimed at the next paragraph landed on this node instead) */
+.doc-editor .md-raw-html {
+  position: relative;
+  padding-top: 24px;
+}
+
+.doc-editor .md-raw-html::before {
+  content: attr(data-md-label);
+  position: absolute;
+  top: 5px;
+  left: 10px;
+  right: 10px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  line-height: 14px;
+  font-family: var(--font-ui, inherit);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  color: var(--text-tertiary);
+  user-select: none;
+}
+
 .doc-editor .md-raw-html code {
   display: block;
   background: none;
@@ -2320,7 +2385,7 @@ html.genoffice-popover-open .ribbon-tabs {
 }
 
 .doc-editor .md-raw-html-inline {
-  font-family: 'SF Mono', Menlo, Consolas, monospace;
+  font-family: 'SF Mono', Menlo, Consolas, 'Noto Sans Mono', 'Liberation Mono', monospace;
   font-size: 0.8em;
   color: var(--text-secondary);
   background: var(--md-code-inline-bg);
@@ -2336,7 +2401,31 @@ html.genoffice-popover-open .ribbon-tabs {
   background: var(--md-error-bg);
   color: var(--md-error);
   font-size: 12.5px;
+}
+
+.md-diagram-error p {
+  margin: 0;
+  font-weight: 600;
+}
+
+.md-diagram-error-details summary {
+  margin-top: 4px;
+  cursor: pointer;
+  font-size: 11.5px;
+  opacity: 0.85;
+}
+
+.md-diagram-error-details pre {
+  margin: 4px 0 0;
+  padding: 0;
+  background: none;
+  border: none;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 11.5px;
+  /* the parser message is English; keep it left-to-right under an RTL UI */
+  direction: ltr;
+  text-align: left;
 }
 
 /* ---- floating table menu ---- */
@@ -2493,7 +2582,7 @@ div.tiptap-mathematics-render {
 .tiptap-mathematics-render.block-math-error,
 .tiptap-mathematics-render.inline-math-error {
   color: var(--danger);
-  font-family: 'SF Mono', Menlo, Consolas, monospace;
+  font-family: 'SF Mono', Menlo, Consolas, 'Noto Sans Mono', 'Liberation Mono', monospace;
   font-size: 0.85em;
   white-space: pre-wrap;
 }
@@ -2519,7 +2608,7 @@ div.tiptap-mathematics-render {
   background: var(--surface);
   color: var(--text);
   padding: 6px 8px;
-  font-family: 'SF Mono', Menlo, Consolas, monospace;
+  font-family: 'SF Mono', Menlo, Consolas, 'Noto Sans Mono', 'Liberation Mono', monospace;
   font-size: 12.5px;
   line-height: 1.5;
   outline: none;
@@ -3191,7 +3280,7 @@ div.tiptap-mathematics-render {
   cursor: default;
 }
 
-/* web frame, host withheld the save grant (capabilities.ts `save`) */
+/* the renderer's own chip when the host does not announce view-only (capabilities.ts `viewOnlyChip`) */
 .status-view-only {
   padding: 1px 8px;
   border: 1px solid var(--border-strong);
