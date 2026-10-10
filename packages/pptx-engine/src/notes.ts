@@ -57,9 +57,21 @@ export function notesPathForSlide(archive: PackageArchive, slidePath: string): s
 
 /** Find the body placeholder sp block in the notesSlide xml. */
 function findBodySp(xml: string): { xml: string; start: number; end: number } | null {
-  for (const m of xml.matchAll(/<p:sp>[\s\S]*?<\/p:sp>/g)) {
+  const sps = [...xml.matchAll(/<p:sp>[\s\S]*?<\/p:sp>/g)]
+  for (const m of sps) {
     // quote-agnostic: a deck written with type='body' is still a body placeholder
     if (/<p:ph\b[^>]*\btype=["']body["']/.test(m[0])) {
+      return { xml: m[0], start: m.index!, end: m.index! + m[0].length }
+    }
+  }
+  // Generated decks (not PowerPoint) may carry the notes text in a plain shape named
+  // "Notes ..." that has no <p:ph> at all; PowerPoint itself always writes the placeholder.
+  for (const m of sps) {
+    if (
+      !/<p:ph\b/.test(m[0]) &&
+      /<p:cNvPr\b[^>]*\bname=["'][^"']*notes[^"']*["']/i.test(m[0]) &&
+      /<p:txBody>/.test(m[0])
+    ) {
       return { xml: m[0], start: m.index!, end: m.index! + m[0].length }
     }
   }

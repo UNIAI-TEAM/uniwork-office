@@ -21,4 +21,6 @@ export const hi = {
   webCommentAuthor: 'उपयोगकर्ता',
   webExternalMedia: 'लिंक किया गया बाहरी मीडिया केवल डेस्कटॉप ऐप में चलता है।',
   webReadOnly: 'यह प्रस्तुति केवल पढ़ने के लिए है।',
+  webSaveNetwork: 'UniWork से संपर्क नहीं हो सका। अपना कनेक्शन जाँचें और फिर से प्रयास करें।',
+  webSaveTimeout: 'सहेजने में बहुत अधिक समय लगा। अपना कनेक्शन जाँचें और फिर से प्रयास करें।',
 } satisfies Record<keyof typeof zh, string>

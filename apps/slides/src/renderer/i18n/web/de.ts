@@ -24,4 +24,8 @@ export const de = {
   webCommentAuthor: 'Benutzer',
   webExternalMedia: 'Verknüpfte externe Medien werden nur in der Desktop-App abgespielt.',
   webReadOnly: 'Diese Präsentation ist schreibgeschützt.',
+  webSaveNetwork:
+    'UniWork ist nicht erreichbar. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.',
+  webSaveTimeout:
+    'Das Speichern hat zu lange gedauert. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.',
 } satisfies Record<keyof typeof zh, string>

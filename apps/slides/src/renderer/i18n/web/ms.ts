@@ -22,4 +22,6 @@ export const ms = {
   webCommentAuthor: 'Pengguna',
   webExternalMedia: 'Media luaran yang dipautkan hanya dimainkan dalam aplikasi desktop.',
   webReadOnly: 'Persembahan ini baca sahaja.',
+  webSaveNetwork: 'UniWork tidak dapat dicapai. Semak sambungan anda dan cuba lagi.',
+  webSaveTimeout: 'Penyimpanan mengambil masa terlalu lama. Semak sambungan anda dan cuba lagi.',
 } satisfies Record<keyof typeof zh, string>

@@ -21,4 +21,6 @@ export const ar = {
   webCommentAuthor: 'مستخدم',
   webExternalMedia: 'لا يتم تشغيل الوسائط الخارجية المرتبطة إلا في تطبيق سطح المكتب.',
   webReadOnly: 'هذا العرض التقديمي للقراءة فقط.',
+  webSaveNetwork: 'تعذّر الوصول إلى UniWork. تحقق من اتصالك وحاول مرة أخرى.',
+  webSaveTimeout: 'استغرق الحفظ وقتًا طويلًا. تحقق من اتصالك وحاول مرة أخرى.',
 } satisfies Record<keyof typeof zh, string>

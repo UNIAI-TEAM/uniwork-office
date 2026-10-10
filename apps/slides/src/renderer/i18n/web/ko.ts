@@ -22,4 +22,6 @@ export const ko = {
   webCommentAuthor: '사용자',
   webExternalMedia: '연결된 외부 미디어는 데스크톱 앱에서만 재생됩니다.',
   webReadOnly: '이 프레젠테이션은 읽기 전용입니다.',
+  webSaveNetwork: 'UniWork에 연결할 수 없습니다. 연결을 확인한 후 다시 시도하세요.',
+  webSaveTimeout: '저장에 너무 오래 걸렸습니다. 연결을 확인한 후 다시 시도하세요.',
 } satisfies Record<keyof typeof zh, string>
