@@ -133,7 +133,8 @@ ghostscript cannot write them) - pdf.js decodes both with its wasm codecs, which
 - The size gate is the host's (`too_large` on `api.open`); the frame shows its open-failure notice.
 - OCR and Convert to Office have no web engine (desktop engines) but are not hidden: the Convert entry stays in the ribbon and its
   menu says "Open in the UniWork Office app to use this feature", and a scanned document gets a one-time notice of the same kind.
-  Both offer Open in app when the host grants `desktopOpen` (`pdfApi.openInApp` -> `app.open`, protocol README). The "no installed
+  The Redact entry (Annotate tab; it writes a working copy next to the file) stays too and opens the same note. All three offer
+  Open in app when the host grants `desktopOpen` (`pdfApi.openInApp` -> `app.open`, protocol README). The "no installed
   font" message adds the same hint on the web unless the text has emoji (the app draws with installed system fonts: CJK and most
   symbols, never emoji). AI is shown with the host's `ai` grant and hidden without it (section 2.1).
 - Width-fit never goes below 60 % in a pane of 600 px or less (the page then scrolls sideways), as in Docs.

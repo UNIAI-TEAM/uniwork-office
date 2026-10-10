@@ -25,4 +25,5 @@ export const hi = {
   webAppOnlyOpen: 'ऐप में खोलें',
   webAppOnlyOcr: 'इस PDF में स्कैन किए गए पृष्ठ हैं। यहाँ टेक्स्ट पहचान (OCR) उपलब्ध नहीं है।',
   webAppOnlyConvert: 'PDF को Word, Excel या PowerPoint में बदलना यहाँ उपलब्ध नहीं है।',
+  webAppOnlyRedact: 'रीडैक्शन (चिह्नित सामग्री को स्थायी रूप से हटाना) यहाँ उपलब्ध नहीं है।',
 } satisfies Record<keyof typeof zh, string>

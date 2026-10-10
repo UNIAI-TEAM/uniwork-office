@@ -26,4 +26,5 @@ export const pl = {
   webAppOnlyOcr:
     'Ten PDF zawiera zeskanowane strony. Rozpoznawanie tekstu (OCR) nie jest tu dostępne.',
   webAppOnlyConvert: 'Konwersja PDF do Worda, Excela lub PowerPointa nie jest tu dostępna.',
+  webAppOnlyRedact: 'Redagowanie (trwałe usuwanie zaznaczonej treści) nie jest tutaj dostępne.',
 } satisfies Record<keyof typeof zh, string>

@@ -24,4 +24,5 @@ export const th = {
   webAppOnlyOpen: 'เปิดในแอป',
   webAppOnlyOcr: 'PDF นี้มีหน้าที่สแกน ไม่สามารถใช้การรู้จำข้อความ (OCR) ที่นี่ได้',
   webAppOnlyConvert: 'ไม่สามารถแปลง PDF เป็น Word, Excel หรือ PowerPoint ที่นี่ได้',
+  webAppOnlyRedact: 'การปกปิดข้อมูล (ลบเนื้อหาที่ทำเครื่องหมายอย่างถาวร) ใช้ที่นี่ไม่ได้',
 } satisfies Record<keyof typeof zh, string>

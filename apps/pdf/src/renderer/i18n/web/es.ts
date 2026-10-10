@@ -26,4 +26,5 @@ export const es = {
   webAppOnlyOcr:
     'Este PDF tiene páginas escaneadas. El reconocimiento de texto (OCR) no está disponible aquí.',
   webAppOnlyConvert: 'La conversión de un PDF a Word, Excel o PowerPoint no está disponible aquí.',
+  webAppOnlyRedact: 'La redacción (eliminar de forma permanente el contenido marcado) no está disponible aquí.',
 } satisfies Record<keyof typeof zh, string>

@@ -25,4 +25,5 @@ export const en = {
   webAppOnlyOpen: 'Open in app',
   webAppOnlyOcr: 'This PDF has scanned pages. Text recognition (OCR) is not available here.',
   webAppOnlyConvert: 'Converting a PDF to Word, Excel or PowerPoint is not available here.',
+  webAppOnlyRedact: 'Redaction (permanently removing marked content) is not available here.',
 } satisfies Record<keyof typeof zh, string>

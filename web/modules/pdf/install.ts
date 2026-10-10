@@ -15,7 +15,8 @@
  * | pdfTextEdit, pdfImageEdit,   | on; turned off when pdfium cannot be compiled in this frame (the    |
  * |   pdfAnnotDelete             |   module CSP carries 'wasm-unsafe-eval' for it)                     |
  * | savedSignatures              | on, encrypted per-user store (./signatures.ts)                      |
- * | redaction                    | off (the desktop redacts into a working copy file next to the PDF)   |
+ * | redaction                    | off (the desktop redacts into a working copy file next to the PDF); |
+ * |                              |   the Redact entry stays with the 'use the app' message             |
  * | saveStatus, viewOnlyChip     | off, from MODULE_WEB_CAPABILITIES (the host header owns the save    |
  * |                              |   state, one host banner owns "view only")                          |
  * | ai, autoSave(ToDisk), auto-  | off (AI stays desktop-only; no autosave on the web, CONTRACT C10;   |

@@ -24,4 +24,5 @@ export const vi = {
   webAppOnlyOpen: 'Mở trong ứng dụng',
   webAppOnlyOcr: 'PDF này có trang quét. Tính năng nhận dạng văn bản (OCR) không có ở đây.',
   webAppOnlyConvert: 'Chuyển PDF sang Word, Excel hoặc PowerPoint không có ở đây.',
+  webAppOnlyRedact: 'Che nội dung (xóa vĩnh viễn phần đã đánh dấu) không có ở đây.',
 } satisfies Record<keyof typeof zh, string>

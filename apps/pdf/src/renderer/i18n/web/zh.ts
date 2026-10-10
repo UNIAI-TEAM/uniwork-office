@@ -23,4 +23,5 @@ export const zh = {
   webAppOnlyOpen: '在应用中打开',
   webAppOnlyOcr: '此 PDF 含有扫描页。此处不提供文字识别（OCR）。',
   webAppOnlyConvert: '此处不提供将 PDF 转换为 Word、Excel 或 PowerPoint。',
+  webAppOnlyRedact: '此处不提供涂黑（永久移除已标记内容）。',
 }

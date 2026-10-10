@@ -26,4 +26,5 @@ export const cs = {
   webAppOnlyOcr:
     'Toto PDF obsahuje naskenované stránky. Rozpoznávání textu (OCR) tu není k dispozici.',
   webAppOnlyConvert: 'Převod PDF do Wordu, Excelu nebo PowerPointu tu není k dispozici.',
+  webAppOnlyRedact: 'Začernění (trvalé odstranění označeného obsahu) tu není k dispozici.',
 } satisfies Record<keyof typeof zh, string>

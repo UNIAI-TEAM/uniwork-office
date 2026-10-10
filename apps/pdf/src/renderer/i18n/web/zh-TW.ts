@@ -24,4 +24,5 @@ export const zhTW = {
   webAppOnlyOpen: '在應用程式中開啟',
   webAppOnlyOcr: '此 PDF 含有掃描頁。此處不提供文字辨識（OCR）。',
   webAppOnlyConvert: '此處不提供將 PDF 轉換為 Word、Excel 或 PowerPoint。',
+  webAppOnlyRedact: '此處不提供塗黑（永久移除已標記內容）。',
 } satisfies Record<keyof typeof zh, string>

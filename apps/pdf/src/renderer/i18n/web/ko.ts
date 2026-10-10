@@ -26,4 +26,5 @@ export const ko = {
   webAppOnlyOcr:
     '이 PDF에는 스캔한 페이지가 있습니다. 여기서는 텍스트 인식(OCR)을 사용할 수 없습니다.',
   webAppOnlyConvert: '여기서는 PDF를 Word, Excel, PowerPoint로 변환할 수 없습니다.',
+  webAppOnlyRedact: '여기서는 가리기(표시한 내용을 영구 삭제)를 사용할 수 없습니다.',
 } satisfies Record<keyof typeof zh, string>

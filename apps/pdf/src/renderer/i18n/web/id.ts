@@ -26,4 +26,5 @@ export const id = {
   webAppOnlyOcr:
     'PDF ini memiliki halaman hasil pindai. Pengenalan teks (OCR) tidak tersedia di sini.',
   webAppOnlyConvert: 'Konversi PDF ke Word, Excel, atau PowerPoint tidak tersedia di sini.',
+  webAppOnlyRedact: 'Penyamaran (menghapus permanen konten yang ditandai) tidak tersedia di sini.',
 } satisfies Record<keyof typeof zh, string>

@@ -24,4 +24,5 @@ export const he = {
   webAppOnlyOpen: 'פתח באפליקציה',
   webAppOnlyOcr: 'ב-PDF זה יש עמודים סרוקים. זיהוי טקסט (OCR) אינו זמין כאן.',
   webAppOnlyConvert: 'המרת PDF ל-Word, Excel או PowerPoint אינה זמינה כאן.',
+  webAppOnlyRedact: 'הסתרת תוכן (הסרה לצמיתות של תוכן מסומן) אינה זמינה כאן.',
 } satisfies Record<keyof typeof zh, string>

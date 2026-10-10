@@ -24,4 +24,5 @@ export const ar = {
   webAppOnlyOpen: 'فتح في التطبيق',
   webAppOnlyOcr: 'يحتوي هذا الملف على صفحات ممسوحة ضوئيًا. التعرّف على النص (OCR) غير متاح هنا.',
   webAppOnlyConvert: 'تحويل PDF إلى Word أو Excel أو PowerPoint غير متاح هنا.',
+  webAppOnlyRedact: 'التنقيح (الإزالة الدائمة للمحتوى المحدد) غير متاح هنا.',
 } satisfies Record<keyof typeof zh, string>

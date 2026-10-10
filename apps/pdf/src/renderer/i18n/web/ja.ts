@@ -26,4 +26,5 @@ export const ja = {
   webAppOnlyOpen: 'アプリで開く',
   webAppOnlyOcr: 'この PDF にはスキャンしたページがあります。ここでは文字認識（OCR）は使えません。',
   webAppOnlyConvert: 'ここでは PDF を Word・Excel・PowerPoint に変換できません。',
+  webAppOnlyRedact: 'ここでは墨消し（マークした内容の完全な削除）は使えません。',
 } satisfies Record<keyof typeof zh, string>

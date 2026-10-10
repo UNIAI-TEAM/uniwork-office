@@ -410,6 +410,9 @@ export default function App() {
   )
   const [highlightColorOpen, setHighlightColorOpen] = useState(false)
   const [convertOpen, setConvertOpen] = useState(false)
+  // web: the Redact entry explains it is an app feature (cap 'redaction' off)
+  const [redactAppOpen, setRedactAppOpen] = useState(false)
+  const redactWrapRef = useRef<HTMLDivElement | null>(null)
   const [convertBusy, setConvertBusy] = useState(false)
   const [drawings, setDrawings] = useState<LocalDrawing[]>([])
   const drawingsRef = useRef(drawings)
@@ -5941,6 +5944,10 @@ export default function App() {
     inside: () => [convertWrapRef.current],
   })
 
+  useDismissablePopover(redactAppOpen, () => setRedactAppOpen(false), {
+    inside: () => [redactWrapRef.current],
+  })
+
   // Main process picked "Save" in the close prompt → save and report the result
   useEffect(() => {
     return window.pdfApi.onCloseSaveRequest((request) => {
@@ -6745,7 +6752,36 @@ export default function App() {
                       {t(key)}
                     </button>
                   ))}
-                  {/* redaction writes a working copy next to the file: desktop only (cap 'redaction') */}
+                  {/* redaction writes a working copy next to the file: desktop only (cap 'redaction');
+                      the web keeps the entry and says to use the app */}
+                  {!cap('redaction') && (
+                    <div className="rb-drop-wrap" ref={redactWrapRef}>
+                      <button
+                        className={`rb-big${redactAppOpen ? ' active' : ''}`}
+                        data-tip={t('webAppOnlyHint')}
+                        onClick={() => setRedactAppOpen((v) => !v)}
+                      >
+                        <span className="rb-big-icon">
+                          <IconRect />
+                          <RbCaret />
+                        </span>
+                        {t('redact')}
+                      </button>
+                      {redactAppOpen && (
+                        <div className="rb-drop">
+                          <AppOnlyNote
+                            testId="pdf-redact-app-only"
+                            lead={t('webAppOnlyRedact')}
+                            hint={t('webAppOnlyHint')}
+                            openLabel={t('webAppOnlyOpen')}
+                            {...(appOpenAvailable()
+                              ? { onOpen: () => openInApp('pdf.redact') }
+                              : {})}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
                   {cap('redaction') && (
                     <>
                       <button

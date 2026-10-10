@@ -524,6 +524,41 @@ test.describe('pdf module on the web: use-the-app messages and narrow zoom', () 
     })
   }
 
+  for (const lang of ['en', 'vi'] as const) {
+    test(`Redact stays visible and explains (${lang}); no app button without the grant`, async ({
+      page,
+    }) => {
+      const problems = await watch(page)
+      const frame = await openPdf(page, { lang })
+      await waitRendered(frame)
+      await tab(frame, lang === 'en' ? 'Annotate' : 'Chú thích')
+      const redact = frame.locator('.rb-big', {
+        hasText: lang === 'en' ? 'Redact area' : 'Che vùng nội dung',
+      })
+      await expect(redact.first()).toBeVisible()
+      await redact.first().click()
+      const note = frame.locator('[data-testid="pdf-redact-app-only"]')
+      await expect(note).toContainText(HINT[lang])
+      await expect(note.locator('button')).toHaveCount(0)
+      expect(await host<unknown[]>(page, 'appOpens')).toEqual([])
+      await noProblems(page, frame, problems)
+    })
+  }
+
+  test('Redact: Open in app sends one app.open when the host grants desktopOpen', async ({
+    page,
+  }) => {
+    const problems = await watch(page)
+    const frame = await openPdf(page, { desktopOpen: true })
+    await waitRendered(frame)
+    await tab(frame, 'Annotate')
+    await frame.locator('.rb-big', { hasText: 'Redact area' }).first().click()
+    const note = frame.locator('[data-testid="pdf-redact-app-only"]')
+    await note.getByRole('button', { name: 'Open in app' }).click()
+    await expect.poll(() => host<unknown[]>(page, 'appOpens')).toEqual([{ feature: 'pdf.redact' }])
+    await noProblems(page, frame, problems)
+  })
+
   test('Convert to Office: Open in app sends one app.open when the host grants desktopOpen', async ({
     page,
   }) => {
