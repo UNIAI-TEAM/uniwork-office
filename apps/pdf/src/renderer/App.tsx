@@ -9,7 +9,7 @@ import workerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url'
 import { AiPanel, GensparkMark } from './ai/AiPanel'
 import { AiAskPopover, type AskAnchorRect } from './AiAskPopover'
 import { AppOnlyNote } from './AppOnlyNote'
-import { widthFitScale } from './fit-scale'
+import { narrowPane, widthFitScale } from './fit-scale'
 import { appMayDrawText } from './font-notice'
 import { appOpenAvailable, cap, platform } from './capabilities'
 import {
@@ -327,7 +327,10 @@ export default function App() {
   const [scale, setScale] = useState(1)
   const [currentPage, setCurrentPage] = useState(1)
   const [pageInput, setPageInput] = useState('1')
-  const [sidebar, setSidebar] = useState<'thumbs' | 'outline' | null>('thumbs')
+  // a narrow pane (a phone-width frame) keeps its width for the page: the strip is one tap away
+  const [sidebar, setSidebar] = useState<'thumbs' | 'outline' | null>(() =>
+    narrowPane(window.innerWidth) ? null : 'thumbs',
+  )
   const [sidebarW, setSidebarW] = useState(loadSidebarW)
   /** raster width for thumbnails — only updated when a drag ends (re-rastering every frame would jank) */
   const [thumbRasterW, setThumbRasterW] = useState(() => loadSidebarW() - SIDEBAR_CHROME)

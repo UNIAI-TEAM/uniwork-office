@@ -1073,6 +1073,29 @@ button {
   background: var(--canvas);
 }
 
+/* A narrow pane (phone width, = NARROW_FIT_PANE_PX): the 60 % floor page nearly fills it, so the
+   scroll padding shrinks to let it sit inside the slot, and what still overflows (the thumbnail
+   strip opened by hand) pans inside this area with a visible scrollbar, never page-wide. */
+@media (max-width: 600px) {
+  .pdf-scroll {
+    padding: 0 8px;
+  }
+
+  .pdf-scroll::-webkit-scrollbar {
+    height: 8px;
+    width: 8px;
+  }
+
+  .pdf-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .pdf-scroll::-webkit-scrollbar-thumb {
+    border-radius: 4px;
+    background: var(--pdf-scroll-thumb);
+  }
+}
+
 /* One row: one page in single-page mode, two side by side in two-page mode.
    `safe` keeps the row left-anchored (scrollable) instead of clipping the page's
    left edge when the comments margin makes the row wider than the viewport. */
