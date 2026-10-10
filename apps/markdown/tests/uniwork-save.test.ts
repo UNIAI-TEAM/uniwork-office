@@ -235,4 +235,33 @@ describe('markdown bound and view-only UniWork copies', () => {
     bindPolicy(path, true)
     expect(state({ sender: contents })).toEqual({ bound: true, readOnly: true })
   })
+
+  it('every Save of a bound copy (toolbar, menu, Ctrl+S) writes in place with no dialog and reports a user save', async () => {
+    const { path, contents } = await openDocument()
+    bindPolicy(path)
+    const hook = vi.fn()
+    setMarkdownUserSaveHook(hook)
+    await expect(save(contents, {})).resolves.toMatchObject({ ok: true, path })
+    expect(showSaveDialogWithMemory).not.toHaveBeenCalled()
+    expect(await readFile(path, 'utf8')).toBe('new')
+    expect(hook).toHaveBeenCalledWith(path)
+    // the shell's File > Save / Ctrl+S accelerator asks the renderer for a plain Save
+    void requestMarkdownSave(contents as never, 'save')
+    expect(contents.send).toHaveBeenLastCalledWith(MARKDOWN_CHANNELS.saveRequest, 'save')
+  })
+
+  it('Save As of a bound copy starts from the file name, not the hidden working-copy folder', async () => {
+    const { path, contents } = await openDocument()
+    bindPolicy(path)
+    showSaveDialogWithMemory.mockResolvedValue({ canceled: true })
+    await expect(save(contents, { mode: 'saveAs' })).resolves.toMatchObject({ canceled: true })
+    expect(showSaveDialogWithMemory.mock.calls[0]?.[2]).toMatchObject({ defaultPath: 'note.md' })
+  })
+
+  it('Save As of a plain local file still starts next to it', async () => {
+    const { path, contents } = await openDocument()
+    showSaveDialogWithMemory.mockResolvedValue({ canceled: true })
+    await save(contents, { mode: 'saveAs' })
+    expect(showSaveDialogWithMemory.mock.calls[0]?.[2]).toMatchObject({ defaultPath: path })
+  })
 })

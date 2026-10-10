@@ -4841,10 +4841,11 @@ export function registerDocsIpc(): void {
       if (tornDownWcIds.has(event.sender.id)) return { ok: false }
       const result = await saveDialog(event, {
         title: tm('dlgSaveAs'),
-        defaultPath: saveAsSuggestion(
-          typeof sourcePath === 'string' ? sourcePath : null,
-          defaultName,
-        ),
+        // a UniWork working copy's Save As starts outside its hidden folder
+        defaultPath:
+          typeof sourcePath === 'string' && uniworkIsBound(sourcePath)
+            ? defaultName
+            : saveAsSuggestion(typeof sourcePath === 'string' ? sourcePath : null, defaultName),
         filters: [{ name: tm('filterWord'), extensions: ['docx'] }],
       })
       if (result.canceled || !result.filePath) return { ok: false }

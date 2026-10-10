@@ -5,7 +5,7 @@
  * app, or the shell before sign-in wiring) every path is a plain local file
  * and nothing here changes behaviour.
  */
-import { resolve } from 'node:path'
+import { basename, resolve } from 'node:path'
 
 export interface UniworkDocumentPolicy {
   isBound(path: string): boolean
@@ -40,6 +40,15 @@ export function uniworkIsReadOnly(path: string | null | undefined): boolean {
   } catch {
     return false
   }
+}
+
+/**
+ * Where Save As starts for `path`. A UniWork working copy sits in a hidden
+ * per-document folder next to its binding, so its Save As offers just the file
+ * name (the remembered or default save folder); a local file starts next to itself.
+ */
+export function uniworkSaveAsDefault(path: string): string {
+  return uniworkIsBound(path) ? basename(path) : path
 }
 
 /** Same file, ignoring separators and (on Windows) letter case, so a dialog pick of the open file matches. */

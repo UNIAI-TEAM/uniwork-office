@@ -159,6 +159,18 @@ describe('docs real handlers on a UniWork copy', () => {
     expect(hook).not.toHaveBeenCalled()
   })
 
+  it('docs:save-as of a bound copy starts from the file name, not the hidden working-copy folder', async () => {
+    const { path, wc } = openDoc()
+    showSaveDialog.mockResolvedValue({ canceled: true })
+    await call('docs:save-as', wc, 'report.docx', bytes('x'), path)
+    expect(showSaveDialog.mock.calls.at(-1)?.at(-1)).toMatchObject({ defaultPath: path })
+    bound.add(path)
+    await call('docs:save-as', wc, 'report.docx', bytes('x'), path)
+    const options = showSaveDialog.mock.calls.at(-1)?.at(-1) as { defaultPath: string }
+    expect(options.defaultPath.endsWith('report.docx')).toBe(true)
+    expect(options.defaultPath.startsWith(dir)).toBe(false)
+  })
+
   it('docs:save-as onto the open file itself is an explicit Save and fires once', async () => {
     const { path, wc } = openDoc()
     bound.add(path)

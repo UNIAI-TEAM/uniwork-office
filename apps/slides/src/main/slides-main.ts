@@ -4526,7 +4526,10 @@ export function registerSlidesIpc(): void {
     if (!session) return { ok: false, error: 'no file open' }
     const parent = dialogParent()
     const options = {
-      defaultPath: saveAsSuggestion(session.path, defaultName),
+      // a UniWork working copy's Save As starts outside its hidden folder
+      defaultPath: uniworkIsBound(session.path)
+        ? defaultName
+        : saveAsSuggestion(session.path, defaultName),
       filters: [{ name: 'PowerPoint', extensions: ['pptx'] }],
     }
     const r = await showSaveDialogWithMemory(dialog, parent, options, getDraftsDir())
