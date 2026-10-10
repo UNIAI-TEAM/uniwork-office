@@ -5,6 +5,7 @@ export const vi = {
   appPhPromptSubtitle: 'Bấm để thêm phụ đề',
   appPhPromptBody: 'Bấm để thêm văn bản',
   appStatusOpened: 'Đã mở {name} ({count} trang chiếu)',
+  appStatusOpenedOne: 'Đã mở {name} (1 trang chiếu)',
   appStatusNewBlank: 'Đã tạo bản trình bày trống',
   appStatusSaved: 'Đã lưu',
   appStatusSaveFailed: 'Lưu thất bại: {error}',

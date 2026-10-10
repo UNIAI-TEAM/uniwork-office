@@ -42,6 +42,7 @@ import type {
   TransitionKind,
 } from '../shared/ipc'
 import { baseName } from '../shared/base-name'
+import { openedStatusKey } from '../shared/opened-status'
 import { SlideCanvas, selectionChromeColor, type SlideCanvasHandle } from './SlideCanvas'
 import { tableCellOverlayBox } from './table-hit'
 import { ZOOM_PREVIEW_EVENT } from './zoom-preview'
@@ -907,7 +908,7 @@ export function App() {
       needsFitRef.current = true
       setStatus(
         result.path
-          ? t('appStatusOpened', {
+          ? t(openedStatusKey(result.slides.length), {
               name: baseName(result.path),
               count: result.slides.length,
             })

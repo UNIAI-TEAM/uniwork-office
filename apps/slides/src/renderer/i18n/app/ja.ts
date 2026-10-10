@@ -5,6 +5,7 @@ export const ja = {
   appPhPromptSubtitle: 'クリックしてサブタイトルを追加',
   appPhPromptBody: 'クリックしてテキストを追加',
   appStatusOpened: '{name} を開きました（{count} ページ）',
+  appStatusOpenedOne: '{name} を開きました（1 ページ）',
   appStatusNewBlank: '空白のプレゼンテーションを作成しました',
   appStatusSaved: '保存しました',
   appStatusSaveFailed: '保存に失敗しました：{error}',

@@ -5,6 +5,7 @@ export const ar = {
   appPhPromptSubtitle: 'انقر لإضافة عنوان فرعي',
   appPhPromptBody: 'انقر لإضافة نص',
   appStatusOpened: 'تم فتح {name} ({count} شريحة)',
+  appStatusOpenedOne: 'تم فتح {name} (شريحة واحدة)',
   appStatusNewBlank: 'تم إنشاء عرض تقديمي فارغ',
   appStatusSaved: 'تم الحفظ',
   appStatusSaveFailed: 'فشل الحفظ: {error}',

@@ -23,4 +23,5 @@ export const hi = {
   webReadOnly: 'यह प्रस्तुति केवल पढ़ने के लिए है।',
   webSaveNetwork: 'UniWork से संपर्क नहीं हो सका। अपना कनेक्शन जाँचें और फिर से प्रयास करें।',
   webSaveTimeout: 'सहेजने में बहुत अधिक समय लगा। अपना कनेक्शन जाँचें और फिर से प्रयास करें।',
+  webFullscreenHint: 'पूर्ण स्क्रीन में जाने के लिए क्लिक करें या कोई भी कुंजी दबाएँ',
 } satisfies Record<keyof typeof zh, string>

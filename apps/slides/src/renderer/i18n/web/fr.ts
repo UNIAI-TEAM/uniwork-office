@@ -25,4 +25,5 @@ export const fr = {
   webReadOnly: 'Cette présentation est en lecture seule.',
   webSaveNetwork: 'Impossible de joindre UniWork. Vérifiez votre connexion et réessayez.',
   webSaveTimeout: "L'enregistrement a pris trop de temps. Vérifiez votre connexion et réessayez.",
+  webFullscreenHint: 'Cliquez ou appuyez sur une touche pour passer en plein écran',
 } satisfies Record<keyof typeof zh, string>

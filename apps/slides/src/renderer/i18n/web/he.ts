@@ -23,4 +23,5 @@ export const he = {
   webReadOnly: 'מצגת זו לקריאה בלבד.',
   webSaveNetwork: 'לא ניתן להתחבר ל-UniWork. בדקו את החיבור ונסו שוב.',
   webSaveTimeout: 'השמירה ארכה זמן רב מדי. בדקו את החיבור ונסו שוב.',
+  webFullscreenHint: 'לחצו או הקישו על מקש כלשהו כדי לעבור למסך מלא',
 } satisfies Record<keyof typeof zh, string>

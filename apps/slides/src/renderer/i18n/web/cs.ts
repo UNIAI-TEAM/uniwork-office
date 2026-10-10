@@ -24,4 +24,5 @@ export const cs = {
   webReadOnly: 'Tato prezentace je jen pro čtení.',
   webSaveNetwork: 'K UniWork se nepodařilo připojit. Zkontrolujte připojení a zkuste to znovu.',
   webSaveTimeout: 'Ukládání trvalo příliš dlouho. Zkontrolujte připojení a zkuste to znovu.',
+  webFullscreenHint: 'Kliknutím nebo stisknutím libovolné klávesy přejdete na celou obrazovku',
 } satisfies Record<keyof typeof zh, string>

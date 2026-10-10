@@ -26,4 +26,5 @@ export const nl = {
   webReadOnly: 'Deze presentatie is alleen-lezen.',
   webSaveNetwork: 'UniWork is niet bereikbaar. Controleer je verbinding en probeer het opnieuw.',
   webSaveTimeout: 'Opslaan duurde te lang. Controleer je verbinding en probeer het opnieuw.',
+  webFullscreenHint: 'Klik of druk op een toets om naar volledig scherm te gaan',
 } satisfies Record<keyof typeof zh, string>

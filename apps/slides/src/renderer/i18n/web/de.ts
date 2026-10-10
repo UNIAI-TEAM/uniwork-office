@@ -28,4 +28,5 @@ export const de = {
     'UniWork ist nicht erreichbar. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.',
   webSaveTimeout:
     'Das Speichern hat zu lange gedauert. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.',
+  webFullscreenHint: 'Klicken oder eine beliebige Taste drücken, um den Vollbildmodus zu starten',
 } satisfies Record<keyof typeof zh, string>

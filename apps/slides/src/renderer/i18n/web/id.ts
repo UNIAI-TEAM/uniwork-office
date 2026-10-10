@@ -24,4 +24,5 @@ export const id = {
   webReadOnly: 'Presentasi ini hanya-baca.',
   webSaveNetwork: 'UniWork tidak dapat dijangkau. Periksa koneksi Anda lalu coba lagi.',
   webSaveTimeout: 'Penyimpanan memakan waktu terlalu lama. Periksa koneksi Anda lalu coba lagi.',
+  webFullscreenHint: 'Klik atau tekan tombol apa saja untuk masuk ke layar penuh',
 } satisfies Record<keyof typeof zh, string>

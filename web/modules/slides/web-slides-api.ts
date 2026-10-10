@@ -67,6 +67,7 @@ import type { ModuleBridgePort } from '../../docs/bridge/module-bridge'
 import { idFromPath, pathFor } from '../../docs/bridge/webapi'
 import { bridgeDraftRecovery } from '../shared/recovery-prompt'
 import { ask, hideFatal, showFatal, text, type WebKey } from './dialogs'
+import { createFullscreenControl } from './fullscreen-hint'
 import { exportPagesToPngs, printDocument, printHtml, slidesPdf, zipImages } from './exports'
 import {
   createWebFontMetrics,
@@ -747,6 +748,7 @@ export function createWebSlidesApi(
 
   // ------------------------------------------------------------ the api
 
+  const fullscreen = createFullscreenControl(() => text('webFullscreenHint'))
   const slidesApi: SlidesApi = {
     // appearance (host-authoritative, shared with Docs)
     getLanguage: () => browser.getLanguage() as ReturnType<SlidesApi['getLanguage']>,
@@ -762,14 +764,8 @@ export function createWebSlidesApi(
     onChromePressed: disposer,
 
     // show: the Fullscreen API on the frame (the desktop snaps the native window)
-    setShowFullScreen: async (on) => {
-      try {
-        if (on && !document.fullscreenElement) await document.documentElement.requestFullscreen()
-        else if (!on && document.fullscreenElement) await document.exitFullscreen()
-      } catch {
-        /* no user activation / not allowed: the show stays in the frame */
-      }
-    },
+    // a refused request (no user activation) shows a hint and goes full screen on the next click
+    setShowFullScreen: (on) => (on ? fullscreen.enter() : fullscreen.leave()),
 
     // fonts: no catalog download / local install on the web (hidden); embedded faces are
     // registered by the bridge itself, so the renderer has no private faces to load

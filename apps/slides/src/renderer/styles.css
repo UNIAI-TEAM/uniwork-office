@@ -6985,7 +6985,7 @@ body.show-curtain::after {
 }
 
 .presenter .pv-top-btn:disabled {
-  opacity: 0.35;
+  opacity: 0.55;
   cursor: default;
 }
 
@@ -6998,8 +6998,9 @@ body.show-curtain::after {
 }
 
 .presenter .pv-top-hint {
-  font-size: 12px;
-  color: var(--slides-show-ink-40);
+  font-size: 13px;
+  /* white at 75% on the black chrome: 9.4:1 (the old 40% was 3.7:1) */
+  color: var(--slides-show-ink-75);
 }
 
 .presenter .pv-body {
@@ -7110,8 +7111,8 @@ body.show-curtain::after {
 }
 
 .presenter .pv-tool-btn {
-  width: 34px;
-  height: 34px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   background: var(--slides-show-fill-8);
   border: 1px solid var(--slides-show-line-18);
@@ -7129,7 +7130,7 @@ body.show-curtain::after {
 }
 
 .presenter .pv-tool-btn:disabled {
-  opacity: 0.35;
+  opacity: 0.55;
   cursor: default;
 }
 
@@ -7146,8 +7147,8 @@ body.show-curtain::after {
 }
 
 .presenter .pv-round {
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   background: var(--slides-show-fill-8);
   border: 1px solid var(--slides-show-line-25);
@@ -7166,7 +7167,7 @@ body.show-curtain::after {
 }
 
 .presenter .pv-round:disabled {
-  opacity: 0.35;
+  opacity: 0.55;
   cursor: default;
 }
 
@@ -7211,9 +7212,9 @@ body.show-curtain::after {
 }
 
 .presenter .pv-section-label {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
-  color: var(--slides-show-ink-55);
+  color: var(--slides-show-ink-75);
   margin: 6px 0 6px;
 }
 
@@ -7227,8 +7228,8 @@ body.show-curtain::after {
 
 .presenter .pv-next-none {
   line-height: 1.4;
-  font-size: 12px;
-  color: var(--slides-show-ink-45);
+  font-size: 13px;
+  color: var(--slides-show-ink-60);
   padding: 18px 12px;
 }
 

@@ -5,6 +5,7 @@ export const en = {
   appPhPromptSubtitle: 'Click to add subtitle',
   appPhPromptBody: 'Click to add text',
   appStatusOpened: 'Opened {name} ({count} slides)',
+  appStatusOpenedOne: 'Opened {name} (1 slide)',
   appStatusNewBlank: 'Created a blank presentation',
   appStatusSaved: 'Saved',
   appStatusSaveFailed: 'Save failed: {error}',

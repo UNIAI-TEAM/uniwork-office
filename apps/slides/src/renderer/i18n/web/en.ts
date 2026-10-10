@@ -23,4 +23,5 @@ export const en = {
   webReadOnly: 'This presentation is read-only.',
   webSaveNetwork: 'UniWork could not be reached. Check your connection and try again.',
   webSaveTimeout: 'Saving took too long. Check your connection and try again.',
+  webFullscreenHint: 'Click or press any key to enter full screen',
 } satisfies Record<keyof typeof zh, string>

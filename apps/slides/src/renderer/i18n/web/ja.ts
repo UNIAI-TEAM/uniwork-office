@@ -26,4 +26,5 @@ export const ja = {
   webReadOnly: 'このプレゼンテーションは読み取り専用です。',
   webSaveNetwork: 'UniWork に接続できませんでした。接続を確認してもう一度お試しください。',
   webSaveTimeout: '保存に時間がかかりすぎました。接続を確認してもう一度お試しください。',
+  webFullscreenHint: 'クリックまたは任意のキーで全画面表示にします',
 } satisfies Record<keyof typeof zh, string>

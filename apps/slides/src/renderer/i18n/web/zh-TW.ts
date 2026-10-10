@@ -22,4 +22,5 @@ export const zhTW = {
   webReadOnly: '此簡報為唯讀。',
   webSaveNetwork: '無法連線到 UniWork。請檢查網路後再試一次。',
   webSaveTimeout: '儲存耗時過長。請檢查網路後再試一次。',
+  webFullscreenHint: '點擊或按任意鍵進入全螢幕',
 } satisfies Record<keyof typeof zh, string>

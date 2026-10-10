@@ -21,4 +21,5 @@ export const zh = {
   webReadOnly: '此演示文稿是只读的。',
   webSaveNetwork: '无法连接到 UniWork。请检查网络后重试。',
   webSaveTimeout: '保存耗时过长。请检查网络后重试。',
+  webFullscreenHint: '点击或按任意键进入全屏',
 }

@@ -24,4 +24,5 @@ export const vi = {
   webReadOnly: 'Bản trình bày này chỉ đọc.',
   webSaveNetwork: 'Không kết nối được tới UniWork. Hãy kiểm tra mạng rồi thử lại.',
   webSaveTimeout: 'Việc lưu mất quá nhiều thời gian. Hãy kiểm tra mạng rồi thử lại.',
+  webFullscreenHint: 'Nhấp chuột hoặc nhấn phím bất kỳ để vào chế độ toàn màn hình',
 } satisfies Record<keyof typeof zh, string>

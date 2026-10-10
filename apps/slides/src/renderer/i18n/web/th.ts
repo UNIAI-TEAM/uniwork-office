@@ -23,4 +23,5 @@ export const th = {
   webReadOnly: 'งานนำเสนอนี้เป็นแบบอ่านอย่างเดียว',
   webSaveNetwork: 'เชื่อมต่อ UniWork ไม่ได้ โปรดตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง',
   webSaveTimeout: 'การบันทึกใช้เวลานานเกินไป โปรดตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง',
+  webFullscreenHint: 'คลิกหรือกดปุ่มใดก็ได้เพื่อเข้าสู่โหมดเต็มหน้าจอ',
 } satisfies Record<keyof typeof zh, string>

@@ -25,4 +25,5 @@ export const ru = {
   webSaveNetwork: 'Не удалось связаться с UniWork. Проверьте подключение и повторите попытку.',
   webSaveTimeout:
     'Сохранение заняло слишком много времени. Проверьте подключение и повторите попытку.',
+  webFullscreenHint: 'Щёлкните или нажмите любую клавишу, чтобы перейти в полноэкранный режим',
 } satisfies Record<keyof typeof zh, string>

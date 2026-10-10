@@ -4,6 +4,7 @@ export const zh = {
   appPhPromptSubtitle: '单击此处添加副标题',
   appPhPromptBody: '单击此处添加文本',
   appStatusOpened: '已打开 {name}（{count} 页）',
+  appStatusOpenedOne: '已打开 {name}（1 页）',
   appStatusNewBlank: '已新建空白演示文稿',
   appStatusSaved: '已保存',
   appStatusSaveFailed: '保存失败：{error}',

@@ -24,4 +24,5 @@ export const ms = {
   webReadOnly: 'Persembahan ini baca sahaja.',
   webSaveNetwork: 'UniWork tidak dapat dicapai. Semak sambungan anda dan cuba lagi.',
   webSaveTimeout: 'Penyimpanan mengambil masa terlalu lama. Semak sambungan anda dan cuba lagi.',
+  webFullscreenHint: 'Klik atau tekan mana-mana kekunci untuk masuk ke skrin penuh',
 } satisfies Record<keyof typeof zh, string>

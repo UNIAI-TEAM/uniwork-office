@@ -24,4 +24,5 @@ export const ko = {
   webReadOnly: '이 프레젠테이션은 읽기 전용입니다.',
   webSaveNetwork: 'UniWork에 연결할 수 없습니다. 연결을 확인한 후 다시 시도하세요.',
   webSaveTimeout: '저장에 너무 오래 걸렸습니다. 연결을 확인한 후 다시 시도하세요.',
+  webFullscreenHint: '클릭하거나 아무 키나 눌러 전체 화면으로 전환하세요',
 } satisfies Record<keyof typeof zh, string>

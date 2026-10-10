@@ -23,4 +23,5 @@ export const ar = {
   webReadOnly: 'هذا العرض التقديمي للقراءة فقط.',
   webSaveNetwork: 'تعذّر الوصول إلى UniWork. تحقق من اتصالك وحاول مرة أخرى.',
   webSaveTimeout: 'استغرق الحفظ وقتًا طويلًا. تحقق من اتصالك وحاول مرة أخرى.',
+  webFullscreenHint: 'انقر أو اضغط أي مفتاح للدخول إلى وضع ملء الشاشة',
 } satisfies Record<keyof typeof zh, string>

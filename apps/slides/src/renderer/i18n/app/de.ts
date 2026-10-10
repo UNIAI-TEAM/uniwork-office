@@ -5,6 +5,7 @@ export const de = {
   appPhPromptSubtitle: 'Untertitel durch Klicken hinzufügen',
   appPhPromptBody: 'Text durch Klicken hinzufügen',
   appStatusOpened: '{name} geöffnet ({count} Folien)',
+  appStatusOpenedOne: '{name} geöffnet (1 Folie)',
   appStatusNewBlank: 'Leere Präsentation erstellt',
   appStatusSaved: 'Gespeichert',
   appStatusSaveFailed: 'Speichern fehlgeschlagen: {error}',
