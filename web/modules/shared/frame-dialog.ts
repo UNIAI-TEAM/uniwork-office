@@ -11,7 +11,8 @@
  *   so no dialog is a row of outlined buttons), a soft destructive style (`danger`, never the
  *   first focus), a quiet style for the way out;
  * - close X: top right of every choice dialog, answers like Escape (`cancelId`), last in the Tab loop;
- * - focus: the safe primary first (never a destructive one; without a primary the cancel choice),
+ * - focus: the safe primary the caller named first (never a destructive one; without one, e.g. the
+ *   save conflict, the cancel choice, so Enter never discards edits),
  *   Tab stays inside, Escape = `cancelId`, focus returns to where it was when it closes.
  */
 import { webLanguage } from '../../docs/bridge/browser'
@@ -36,7 +37,7 @@ export interface FrameDialogOptions<T extends string> {
   choices: readonly FrameChoice<T>[]
   /** resolved on Escape; when it names one of `choices`, that button is the quiet way out */
   cancelId: T
-  /** the button that takes the first focus (default: the safe primary, else the cancel choice) */
+  /** the button that takes the first focus (default: the named safe primary, else the cancel choice) */
   focusId?: T
   /** accessible name of the close X (already translated; default: the shared "Close") */
   closeLabel?: string
@@ -166,12 +167,12 @@ export function frameAsk<T extends string>(opts: FrameDialogOptions<T>): Promise
     const ordered = opts.choices
       .map((c, i) => ({ c, i, tone: tones[i]! }))
       .sort((a, b) => RANK[a.tone] - RANK[b.tone] || a.i - b.i)
-    // the first focus: the caller's pick, else the safe primary, else the way out, else any
-    // non-destructive button
+    // the first focus: the caller's pick, else the primary the caller named (never destructive),
+    // else the way out. A primary that was only lifted for looks (the save conflict's Reload
+    // latest) never takes the focus: Enter on it would discard edits, so the non-destructive
+    // way out is the default there, the same safe default as the leave and draft dialogs.
     const safeId =
-      opts.focusId ??
-      ordered.find(({ c, tone }) => tone === 'primary' && !c.danger)?.c.id ??
-      opts.cancelId
+      opts.focusId ?? opts.choices.find((c) => c.primary && !c.danger)?.id ?? opts.cancelId
     let initial: HTMLButtonElement | null = null
     let fallback: HTMLButtonElement | null = null
     for (const { c, tone } of ordered) {

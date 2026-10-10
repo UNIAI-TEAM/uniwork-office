@@ -44,6 +44,8 @@ export const ar = {
   aiWebStateSessionBody: 'أعد فتح المستند من UniWork للمتابعة.',
   aiWebStateRefusedTitle: 'رُفض الطلب',
   aiWebStateRefusedBody: 'رفض الخادم طلب الذكاء الاصطناعي.',
+  aiWebStateModelTitle: 'اختر نموذجًا',
+  aiWebStateModelBody: 'اختر نموذجًا من قائمة النماذج بجانب مربع الرسالة ثم أرسل مرة أخرى.',
   aiWebStateBaseUrlBody: 'عنوان URL الأساسي هذا غير مسموح به. استخدم عنوان https:// عامًا.',
   aiWebStateProviderBody: 'هذا المزوّد غير مدعوم.',
   aiWebStateUnknownTitle: 'فشل طلب الذكاء الاصطناعي',

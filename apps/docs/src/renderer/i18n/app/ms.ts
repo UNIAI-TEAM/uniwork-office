@@ -123,6 +123,7 @@ export const ms = {
   appCommentResolvedMsg: 'Komen diselesaikan',
   appCommentReopenedMsg: 'Komen dibuka semula',
   appCommentsTitle: 'Komen ({n})',
+  appCommentsTitleDoc: 'Komen dalam dokumen ({n})',
   appCommentPlaceholder: 'Taip komen…',
   appCommentBtn: 'Komen',
   appUnknownAuthor: '(Pengarang tidak dikenali)',

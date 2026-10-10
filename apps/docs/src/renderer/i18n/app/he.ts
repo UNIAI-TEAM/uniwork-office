@@ -115,6 +115,7 @@ export const he = {
   appCommentResolvedMsg: 'ההערה נפתרה',
   appCommentReopenedMsg: 'ההערה נפתחה מחדש',
   appCommentsTitle: 'הערות ({n})',
+  appCommentsTitleDoc: 'הערות במסמך ({n})',
   appCommentPlaceholder: 'הקלידו הערה…',
   appCommentBtn: 'הערה',
   appUnknownAuthor: '(מחבר לא ידוע)',

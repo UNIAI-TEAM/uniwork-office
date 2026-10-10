@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Lang } from '@genoffice/i18n'
-import type { AiSettings } from '@genoffice/ai-provider/browser'
+import { AI_PROVIDERS, type AiSettings } from '@genoffice/ai-provider/browser'
 import {
   aiModelPickerGroups,
   aiModelPickerSelection,
   withAiModelSelection,
   type AiModelPickerSelection,
 } from './ai-model-picker-options'
+import { setAiModelNeedHint } from './ai-model-need'
 import { ProviderLogo } from './provider-logos'
 import { useDismissablePopover } from './popover-dismiss'
 import { AI_MODEL_PICKER_STRINGS } from './strings-ai-model-picker'
@@ -20,6 +21,11 @@ export interface AiModelPickerBridge {
   readonly gskLoggedIn?: (() => Promise<boolean>) | undefined
   /** shell: switch to Home and open Settings › AI Model */
   readonly openModelSettings?: (() => Promise<void> | void) | undefined
+  /**
+   * web frames: a provider with a stored key but no known model keeps the composer's send off
+   * with a hint (the server would only answer a bare 400); other hosts leave it undefined
+   */
+  readonly requireModel?: boolean | undefined
 }
 
 /**
@@ -79,6 +85,19 @@ export function AiModelPicker({
   )
   const current = settings ? aiModelPickerSelection(settings) : null
   const currentUsable = groups.some((g) => g.id === current?.provider)
+  // `activeProvider` drops a provider without a model back to uniAI, so the wanted provider is read raw
+  const wanted = settings?.provider
+  const wantedConfig = wanted ? settings?.providers?.[wanted] : undefined
+  const needsModel =
+    bridge.requireModel === true &&
+    wanted !== undefined &&
+    (wantedConfig?.apiKey ?? '') !== '' &&
+    !(wantedConfig?.model?.trim() || AI_PROVIDERS.find((meta) => meta.id === wanted)?.defaultModel)
+  const needHint = needsModel ? strings.needModel : null
+  useEffect(() => {
+    setAiModelNeedHint(needHint)
+    return () => setAiModelNeedHint(null)
+  }, [needHint])
 
   const toggle = () => {
     if (!open) {

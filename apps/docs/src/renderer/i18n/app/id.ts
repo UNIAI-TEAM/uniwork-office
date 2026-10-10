@@ -122,6 +122,7 @@ export const id = {
   appCommentResolvedMsg: 'Komentar diselesaikan',
   appCommentReopenedMsg: 'Komentar dibuka kembali',
   appCommentsTitle: 'Komentar ({n})',
+  appCommentsTitleDoc: 'Komentar dalam dokumen ({n})',
   appCommentPlaceholder: 'Ketik komentar…',
   appCommentBtn: 'Komentar',
   appUnknownAuthor: '(Penulis tidak dikenal)',

@@ -18,6 +18,7 @@ import {
   imageGenerationAvailable,
   mediaAnalysisAvailable,
 } from '@genoffice/ai-provider/browser'
+import { platform } from '../capabilities'
 import type { AiSettings, AttachmentAddResult, AttachmentMeta } from '../../shared/ipc'
 import { ATTACHMENT_IMAGE_EXTS } from '../../shared/ipc'
 import {
@@ -366,6 +367,10 @@ const MODEL_BRIDGE: AiModelPickerBridge = {
   onSettingsChanged: (handler) => window.slidesApi.onAiSettingsChanged(handler),
   gskLoggedIn: () => window.slidesApi.aiGskStatus().then((s) => !!s?.loggedIn),
   openModelSettings: () => window.slidesApi.openAiModelSettings().catch(() => {}),
+  // web frames: a stored key without a model keeps send off with a hint (see AiModelPicker)
+  get requireModel() {
+    return platform() === 'web'
+  },
 }
 
 export function AiPanel({

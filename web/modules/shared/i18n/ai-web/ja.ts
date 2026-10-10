@@ -46,6 +46,9 @@ export const ja = {
   aiWebStateSessionBody: '続行するには UniWork からドキュメントを開き直してください。',
   aiWebStateRefusedTitle: 'リクエストが拒否されました',
   aiWebStateRefusedBody: 'サーバーが AI リクエストを拒否しました。',
+  aiWebStateModelTitle: 'モデルを選択してください',
+  aiWebStateModelBody:
+    'メッセージ欄の横にあるモデルメニューでモデルを選び、もう一度送信してください。',
   aiWebStateBaseUrlBody:
     'この Base URL は使用できません。公開された https:// アドレスを使用してください。',
   aiWebStateProviderBody: 'このプロバイダーはサポートされていません。',

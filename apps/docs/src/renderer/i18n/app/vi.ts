@@ -118,6 +118,7 @@ export const vi = {
   appCommentResolvedMsg: 'Đã giải quyết bình luận',
   appCommentReopenedMsg: 'Đã mở lại bình luận',
   appCommentsTitle: 'Bình luận ({n})',
+  appCommentsTitleDoc: 'Bình luận trong tài liệu ({n})',
   appCommentPlaceholder: 'Nhập bình luận…',
   appCommentBtn: 'Bình luận',
   appUnknownAuthor: '(Tác giả không xác định)',

@@ -122,6 +122,7 @@ export const ru = {
   appCommentResolvedMsg: 'Примечание помечено как решенное',
   appCommentReopenedMsg: 'Примечание снова открыто',
   appCommentsTitle: 'Примечания ({n})',
+  appCommentsTitleDoc: 'Примечания в документе ({n})',
   appCommentPlaceholder: 'Введите примечание…',
   appCommentBtn: 'Примечание',
   appUnknownAuthor: '(Неизвестный автор)',

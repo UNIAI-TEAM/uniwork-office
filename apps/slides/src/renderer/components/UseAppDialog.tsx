@@ -18,24 +18,59 @@ export function UseAppDialog({ feature, onClose }: { feature: string; onClose: (
     setBusy(false)
     if (handled) onClose()
   }
+  // The frame dialog family (web/modules/shared/frame-dialog.css, bundled with the web frame, which
+  // is the only place this note shows): blur scrim, close X, filled primary, token colours. Open in
+  // app is the primary when the host offers it; otherwise Close is the one action and fills.
+  const canOpen = canOpenInApp()
   return (
-    <div className="modal-backdrop" onClick={onClose}>
+    <div className="ow-dlg-mask" onClick={onClose}>
       <div
-        className="modal use-app-modal"
+        className="ow-dlg"
         data-use-app="dialog"
         {...dialogProps}
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 id={titleId}>{t('appUseAppTitle')}</h2>
-        <p className="use-app-message">{t('appUseAppMessage')}</p>
-        <div className="modal-actions">
-          <button onClick={onClose}>{t('appUseAppClose')}</button>
-          {canOpenInApp() && (
-            <button className="primary" disabled={busy} onClick={() => void open()}>
+        <div className="ow-dlg-head">
+          <h2 className="ow-dlg-title" id={titleId}>
+            {t('appUseAppTitle')}
+          </h2>
+          <p className="ow-dlg-body">{t('appUseAppMessage')}</p>
+        </div>
+        <div className="ow-dlg-actions">
+          {canOpen && (
+            <button
+              type="button"
+              className="ow-dlg-btn primary"
+              disabled={busy}
+              onClick={() => void open()}
+            >
               {t('appUseAppAction')}
             </button>
           )}
+          <button
+            type="button"
+            className={canOpen ? 'ow-dlg-btn ghost' : 'ow-dlg-btn primary'}
+            onClick={onClose}
+          >
+            {t('appUseAppClose')}
+          </button>
         </div>
+        <button
+          type="button"
+          className="ow-dlg-close"
+          aria-label={t('appUseAppClose')}
+          onClick={onClose}
+        >
+          <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" focusable="false">
+            <path
+              d="M3 3l8 8M11 3l-8 8"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+            />
+          </svg>
+        </button>
       </div>
     </div>
   )

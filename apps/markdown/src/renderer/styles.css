@@ -388,6 +388,10 @@ html[data-doc-theme='light'] .doc-page {
 .doc-editor img {
   max-width: 100%;
   height: auto;
+  /* a picture inside a sentence (or the missing-picture placeholder) is centred on the text line,
+     not hung on its baseline with the sentence at the bottom of a tall line box; the saved
+     Markdown does not change */
+  vertical-align: middle;
 }
 
 /* ---- tables ---- */

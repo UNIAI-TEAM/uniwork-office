@@ -140,6 +140,54 @@ test('markdown: relative PNG, WebP and SVG pictures display; a refused URL shows
   }).toEqual({ csp: [], console: [], page: [], http: [], external: [] })
 })
 
+// UNI-1232 FX2 (N3-05): a picture inside a sentence sat on the text baseline, so the sentence hung at
+// the bottom of a tall line box. It is centred on the text now; the saved Markdown is untouched.
+test('markdown: an inline picture or placeholder is centred on its sentence, not hung on the baseline', async ({
+  page,
+}) => {
+  const doc = [
+    '# Inline',
+    '',
+    'A picture that does not exist: ![gone](assets/gone.png) and the sentence goes on.',
+    '',
+    'Tail paragraph.',
+    '',
+  ].join('\n')
+  await serveFixture(page, DOC_PATH, encode(doc), 'text/markdown')
+  await serveAssets(page)
+  const frame = await openModule(page, 'markdown', {
+    open: DOC_PATH,
+    lang: 'en',
+    assets: JSON.stringify(ASSETS),
+  })
+  await shown(frame)
+  await expect.poll(() => loaded(frame, 'gone')).toBe(true)
+  const geometry = await frame.evaluate(() => {
+    const img = document.querySelector('.doc-editor img[alt="gone"]') as HTMLImageElement
+    const para = img.closest('p') as HTMLElement
+    const text = para.firstChild as Text
+    const range = document.createRange()
+    range.setStart(text, 0)
+    range.setEnd(text, text.length)
+    const t = range.getClientRects()[0]!
+    const i = img.getBoundingClientRect()
+    return {
+      verticalAlign: getComputedStyle(img).verticalAlign,
+      imageHeight: i.height,
+      offCentre: Math.abs(t.top + t.height / 2 - (i.top + i.height / 2)),
+    }
+  })
+  expect(geometry.imageHeight).toBeGreaterThan(40)
+  expect(geometry.verticalAlign).toBe('middle')
+  expect(geometry.offCentre).toBeLessThanOrEqual(10)
+  await page.screenshot({ path: screenshotPath('markdown', 'inline-picture-light-en') })
+  // the document text is untouched
+  await frame.locator('.doc-editor p', { hasText: 'Tail paragraph' }).click()
+  await page.keyboard.press('Control+s')
+  const saved = (await hostState(page)).lastSaved
+  if (saved) expect(new TextDecoder().decode(new Uint8Array(saved.bytes))).toBe(doc)
+})
+
 test('markdown: pasted PNG and WebP upload as document assets, an SVG stays a data: URI', async ({
   page,
 }) => {

@@ -113,6 +113,11 @@ function missing(provider: string): AiWebError {
   return new AiWebError({ code: 'credential_missing', status: 404, message: provider })
 }
 
+/** a provider with a key but no model: the server would answer a bare 400, so nothing is sent */
+function modelRequired(provider: string): AiWebError {
+  return new AiWebError({ code: 'model_required', status: 0, message: provider })
+}
+
 export function errorCodeOf(err: unknown): AiStreamChunk['errorCode'] | undefined {
   if (err instanceof AiTimeoutError) return 'timeout'
   if (err instanceof AiCreditsError) return 'credits'
@@ -156,8 +161,12 @@ export function createWebAiStreams(deps: StreamDeps): WebAiStreams {
       emit({ requestId, type: 'error', error: typed(missing(provider), provider) })
       return
     }
-    installProxyTransport(deps.client)
     const config = proxyConfig(deps.client, provider, settings)
+    if (!config.model.trim()) {
+      emit({ requestId, type: 'error', error: typed(modelRequired(provider), provider) })
+      return
+    }
+    installProxyTransport(deps.client)
     const endpoint = resolveWebEndpoint(provider, config, protocol)
     const tools: AgentToolDef[] = request.tools ?? []
     const maxTokens = request.maxTokens ?? maxOutputTokensOf(settings)
@@ -220,8 +229,10 @@ export function createWebAiStreams(deps: StreamDeps): WebAiStreams {
     const provider = request.settings.provider
     const protocol = deps.protocolOf(provider)
     if (!protocol) return { ok: false, error: chatTyped(missing(provider), provider) }
-    installProxyTransport(deps.client)
     const config = proxyConfig(deps.client, provider, request.settings)
+    if (!config.model.trim())
+      return { ok: false, error: chatTyped(modelRequired(provider), provider) }
+    installProxyTransport(deps.client)
     const endpoint = resolveWebEndpoint(provider, config, protocol)
     const wd = createStreamWatchdog(undefined, AI_CHAT_RESPONSE_TIMEOUT_MS)
     try {

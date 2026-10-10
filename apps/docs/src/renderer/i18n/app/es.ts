@@ -124,6 +124,7 @@ export const es = {
   appCommentResolvedMsg: 'Comentario resuelto',
   appCommentReopenedMsg: 'Comentario reabierto',
   appCommentsTitle: 'Comentarios ({n})',
+  appCommentsTitleDoc: 'Comentarios del documento ({n})',
   appCommentPlaceholder: 'Escriba un comentario…',
   appCommentBtn: 'Comentar',
   appUnknownAuthor: '(Autor desconocido)',

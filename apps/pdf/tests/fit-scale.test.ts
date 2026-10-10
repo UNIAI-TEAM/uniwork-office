@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { NARROW_FIT_MIN_SCALE, NARROW_FIT_PANE_PX, widthFitScale } from '../src/renderer/fit-scale'
+import {
+  NARROW_FIT_MIN_SCALE,
+  NARROW_FIT_PANE_PX,
+  narrowPane,
+  widthFitScale,
+} from '../src/renderer/fit-scale'
 
 describe('width-fit scale floor', () => {
   it('a 390 px pane never opens below the readable floor (was 26 %)', () => {
@@ -16,5 +21,13 @@ describe('width-fit scale floor', () => {
   it('the floor applies up to and including the 600 px boundary only', () => {
     expect(widthFitScale(0.4, NARROW_FIT_PANE_PX)).toBe(NARROW_FIT_MIN_SCALE)
     expect(widthFitScale(0.4, NARROW_FIT_PANE_PX + 1)).toBe(0.4)
+  })
+})
+
+describe('narrow pane', () => {
+  it('is the same boundary as the width-fit floor', () => {
+    expect(narrowPane(390)).toBe(true)
+    expect(narrowPane(NARROW_FIT_PANE_PX)).toBe(true)
+    expect(narrowPane(NARROW_FIT_PANE_PX + 1)).toBe(false)
   })
 })

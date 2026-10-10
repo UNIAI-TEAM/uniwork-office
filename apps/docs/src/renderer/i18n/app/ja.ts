@@ -128,6 +128,7 @@ export const ja = {
   appCommentResolvedMsg: 'コメントを解決済みにしました',
   appCommentReopenedMsg: 'コメントを再開しました',
   appCommentsTitle: 'コメント ({n})',
+  appCommentsTitleDoc: 'この文書のコメント ({n})',
   appCommentPlaceholder: 'コメントを入力…',
   appCommentBtn: 'コメント',
   appUnknownAuthor: '(作成者不明)',

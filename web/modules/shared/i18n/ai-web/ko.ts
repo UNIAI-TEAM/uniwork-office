@@ -44,6 +44,8 @@ export const ko = {
   aiWebStateSessionBody: '계속하려면 UniWork에서 문서를 다시 여세요.',
   aiWebStateRefusedTitle: '요청 거부됨',
   aiWebStateRefusedBody: '서버가 AI 요청을 거부했습니다.',
+  aiWebStateModelTitle: '모델을 선택하세요',
+  aiWebStateModelBody: '메시지 입력란 옆의 모델 메뉴에서 모델을 선택한 뒤 다시 보내세요.',
   aiWebStateBaseUrlBody: '이 Base URL은 허용되지 않습니다. 공개 https:// 주소를 사용하세요.',
   aiWebStateProviderBody: '지원되지 않는 공급자입니다.',
   aiWebStateUnknownTitle: 'AI 요청 실패',

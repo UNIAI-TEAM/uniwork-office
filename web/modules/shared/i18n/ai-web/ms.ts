@@ -45,6 +45,9 @@ export const ms = {
   aiWebStateSessionBody: 'Buka semula dokumen daripada UniWork untuk meneruskan.',
   aiWebStateRefusedTitle: 'Permintaan ditolak',
   aiWebStateRefusedBody: 'Pelayan menolak permintaan AI.',
+  aiWebStateModelTitle: 'Pilih model',
+  aiWebStateModelBody:
+    'Pilih model dalam menu model di sebelah kotak mesej, kemudian hantar semula.',
   aiWebStateBaseUrlBody: 'URL asas ini tidak dibenarkan. Gunakan alamat https:// awam.',
   aiWebStateProviderBody: 'Pembekal ini tidak disokong.',
   aiWebStateUnknownTitle: 'Permintaan AI gagal',

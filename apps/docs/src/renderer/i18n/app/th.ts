@@ -119,6 +119,7 @@ export const th = {
   appCommentResolvedMsg: 'แก้ไขข้อคิดเห็นแล้ว',
   appCommentReopenedMsg: 'เปิดข้อคิดเห็นอีกครั้งแล้ว',
   appCommentsTitle: 'ข้อคิดเห็น ({n})',
+  appCommentsTitleDoc: 'ข้อคิดเห็นในเอกสาร ({n})',
   appCommentPlaceholder: 'พิมพ์ข้อคิดเห็น…',
   appCommentBtn: 'ข้อคิดเห็น',
   appUnknownAuthor: '(ไม่ทราบผู้เขียน)',

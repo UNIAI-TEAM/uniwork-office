@@ -18,6 +18,13 @@ import { ask, text } from './notice'
 
 export const DRAFT_PROMPT_MARKER = 'draft-recovery'
 
+/**
+ * The prompt opens during the document's open: the renderer has no document to paint yet, so the
+ * scrim would blur an empty frame. This class draws a faint page behind the card (frame-dialog.css)
+ * so the prompt reads like the leave and conflict dialogs, which sit over a live page.
+ */
+export const DRAFT_PROMPT_MASK_CLASS = 'ow-dlg-mask-page'
+
 function when(savedAt: number): string {
   try {
     return new Intl.DateTimeFormat(webLanguage(), {
@@ -42,6 +49,7 @@ export function promptDraftRestore(draft: DraftInfo): Promise<DraftChoice> {
     ],
     cancelId: 'dismiss',
     marker: DRAFT_PROMPT_MARKER,
+    maskClass: DRAFT_PROMPT_MASK_CLASS,
   })
 }
 

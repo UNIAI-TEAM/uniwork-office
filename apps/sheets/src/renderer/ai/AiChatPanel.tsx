@@ -7,7 +7,7 @@ import {
 import React, { useEffect, useRef, useState } from 'react'
 import { AiComposer, AiScopeQuote, AiTypingIndicator, type AiScopeQuoteData } from '@genoffice/ui'
 import { GensparkMark } from '../ribbon-icons'
-import { cap } from '../capabilities'
+import { cap, platform } from '../capabilities'
 import type { ChangePlan } from '@genoffice/xlsx-gateway/domain/workbook.types'
 import { ATTACHMENT_IMAGE_EXTS, type AttachmentMeta } from '../../shared/desktop-api'
 import { useI18n, type TFunc } from '../i18n/locale'
@@ -219,6 +219,10 @@ const MODEL_BRIDGE: AiModelPickerBridge = {
   onSettingsChanged: (handler) => window.desktopApi.onAiSettingsChanged(handler),
   gskLoggedIn: () => window.desktopApi.aiGskStatus().then((s) => !!s?.loggedIn),
   openModelSettings: () => window.desktopApi.openAiModelSettings().catch(() => {}),
+  // web frames: a stored key without a model keeps send off with a hint (see AiModelPicker)
+  get requireModel() {
+    return platform() === 'web'
+  },
 }
 
 export function AiChatPanel({

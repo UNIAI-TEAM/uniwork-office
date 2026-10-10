@@ -47,6 +47,9 @@ export const de = {
   aiWebStateSessionBody: 'Öffnen Sie das Dokument erneut aus UniWork, um fortzufahren.',
   aiWebStateRefusedTitle: 'Anfrage abgelehnt',
   aiWebStateRefusedBody: 'Der Server hat die KI-Anfrage abgelehnt.',
+  aiWebStateModelTitle: 'Modell auswählen',
+  aiWebStateModelBody:
+    'Wählen Sie im Modellmenü neben dem Nachrichtenfeld ein Modell aus und senden Sie erneut.',
   aiWebStateBaseUrlBody:
     'Diese Basis-URL ist nicht erlaubt. Verwenden Sie eine öffentliche https://-Adresse.',
   aiWebStateProviderBody: 'Dieser Anbieter wird nicht unterstützt.',

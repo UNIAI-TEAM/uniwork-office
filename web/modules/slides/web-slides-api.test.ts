@@ -206,14 +206,14 @@ describe('save', () => {
     expect(await api.isDirty()).toBe(false)
   })
 
-  it('conflict dialog focuses the safe primary (Reload latest), not the destructive Overwrite', async () => {
+  it('conflict dialog focuses Cancel, not Reload latest (discards edits) or the destructive Overwrite', async () => {
     const { mock, api, fileId } = await setup()
     await api.consumePendingOpen(FIT)
     await api.setNotes({ slideIndex: 0, text: 'mine' })
     mock.bumpRemote(fileId)
     const pending = api.save()
     await waitFor(() => document.querySelector('[data-slides-web="conflict"]'))
-    expect((document.activeElement as HTMLElement | null)?.textContent).toBe('Reload latest')
+    expect((document.activeElement as HTMLElement | null)?.textContent).toBe('Cancel')
     expect(document.querySelector('[data-slides-web="conflict"] .ow-dlg-close')).not.toBeNull()
     clickChoice('conflict', 'Cancel')
     await pending

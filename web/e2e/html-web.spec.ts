@@ -252,6 +252,57 @@ test('html: scripts run in the preview; visual edit changes a style; save and re
   await expectClean(page, frame, problems)
 })
 
+// UNI-1232 FX2 (N3-04): at phone width the style panel and the floating toolbar must not stack over
+// the selected element and most of the preview: the panel starts closed, opens as a bottom sheet,
+// and the toolbar steps aside while it is open (its panel button is the way back)
+test('html: at 390 px the style panel is a bottom sheet and the toolbar steps aside', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 800 })
+  const problems = await watch(page)
+  await serveFixture(page, COUNTER_PATH, encode(COUNTER), 'text/html')
+  const frame = await openModule(page, 'html', { open: COUNTER_PATH, lang: 'en' })
+  await ready(page, frame, /Counter page/)
+  const preview = frame.locator('iframe.preview-frame').contentFrame()
+  await preview.locator('#lead').click()
+  const toolbar = frame.getByRole('toolbar', { name: 'Element toolbar' })
+  const panel = frame.locator('.hx-panel')
+  // closed by default in a narrow frame: only the toolbar sits over the preview
+  await expect(toolbar).toBeVisible()
+  await expect(panel).toHaveCount(0)
+
+  await frame.getByRole('button', { name: 'Style panel' }).click()
+  await expect(panel).toBeVisible()
+  await expect(toolbar).toHaveCount(0)
+  const geometry = await frame.evaluate(() => {
+    const sheet = document.querySelector('.hx-panel') as HTMLElement
+    const stage = sheet.parentElement as HTMLElement
+    const s = sheet.getBoundingClientRect()
+    const st = stage.getBoundingClientRect()
+    const iframe = document.querySelector('iframe.preview-frame') as HTMLIFrameElement
+    const lead = iframe.contentDocument?.getElementById('lead')?.getBoundingClientRect()
+    const f = iframe.getBoundingClientRect()
+    return {
+      docked:
+        Math.abs(s.bottom - st.bottom) <= 1 && s.left <= st.left + 1 && s.right >= st.right - 1,
+      sheetShare: s.height / st.height,
+      sheetTop: s.top,
+      // null: the preview is cross-origin to this frame, the check below uses the host geometry
+      leadBottom: lead ? f.top + lead.bottom : null,
+    }
+  })
+  expect(geometry.docked).toBe(true)
+  expect(geometry.sheetShare).toBeLessThanOrEqual(0.5)
+  if (geometry.leadBottom !== null)
+    expect(geometry.leadBottom).toBeLessThanOrEqual(geometry.sheetTop)
+
+  // closing the sheet brings the toolbar back
+  await frame.locator('.hx-panel-close').click()
+  await expect(panel).toHaveCount(0)
+  await expect(toolbar).toBeVisible()
+  await expectClean(page, frame, problems)
+})
+
 test('html: preview.html served without its own policy -> static preview, nothing runs', async ({
   page,
 }) => {

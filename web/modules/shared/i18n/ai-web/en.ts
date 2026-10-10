@@ -44,6 +44,8 @@ export const en = {
   aiWebStateSessionBody: 'Reopen the document from UniWork to continue.',
   aiWebStateRefusedTitle: 'Request refused',
   aiWebStateRefusedBody: 'The server refused the AI request.',
+  aiWebStateModelTitle: 'Choose a model',
+  aiWebStateModelBody: 'Pick a model in the model menu next to the message box, then send again.',
   aiWebStateBaseUrlBody: 'This base URL is not allowed. Use a public https:// address.',
   aiWebStateProviderBody: 'This provider is not supported.',
   aiWebStateUnknownTitle: 'AI request failed',

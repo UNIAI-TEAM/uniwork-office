@@ -34,6 +34,8 @@ export type AiWebErrorCode =
   | 'provider_not_supported'
   | 'base_url_refused'
   | 'bad_request'
+  /** raised in the frame, never by the server: no model is known for the provider, nothing was sent */
+  | 'model_required'
   | 'unknown'
 
 export const AI_WEB_ERROR_CODES: readonly AiWebErrorCode[] = [
@@ -48,6 +50,7 @@ export const AI_WEB_ERROR_CODES: readonly AiWebErrorCode[] = [
   'provider_not_supported',
   'base_url_refused',
   'bad_request',
+  'model_required',
   'unknown',
 ]
 

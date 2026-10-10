@@ -118,6 +118,51 @@ for (const width of [768, 390]) {
   })
 }
 
+// UNI-1232 FX2 (D-N1): at phone width the status bar keeps what matters (page, save state, zoom)
+// and drops the rest instead of clipping a word count under the view buttons
+for (const lang of ['en', 'vi']) {
+  test(`docs-web: 390px status bar clips nothing (${lang})`, async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 800 })
+    const ed = await openDoc(page, `&lang=${lang}`)
+    await page.waitForTimeout(1_000)
+    const bar = await ed.evaluate(() => {
+      const el = document.querySelector('.status-bar') as HTMLElement
+      const box = el.getBoundingClientRect()
+      const clipped: string[] = []
+      for (const child of el.querySelectorAll<HTMLElement>('*')) {
+        const r = child.getBoundingClientRect()
+        if (r.width === 0 || r.height === 0 || getComputedStyle(child).display === 'none') continue
+        if (r.left < box.left - 0.5 || r.right > box.right + 0.5) {
+          clipped.push(
+            `${child.className || child.tagName} ${Math.round(r.right)}>${Math.round(box.right)}`,
+          )
+        }
+      }
+      const left = el.querySelector('.status-left') as HTMLElement
+      const right = el.querySelector('.status-right') as HTMLElement
+      const lr = left.getBoundingClientRect()
+      const rr = right.getBoundingClientRect()
+      return {
+        clipped,
+        leftOverflow: left.scrollWidth - left.clientWidth,
+        overlap: lr.right - rr.left,
+        text: left.innerText,
+      }
+    })
+    expect(bar.clipped).toEqual([])
+    expect(bar.leftOverflow).toBeLessThanOrEqual(0)
+    expect(bar.overlap).toBeLessThanOrEqual(0)
+    // the page counter and the zoom survive
+    await expect(ed.locator('.status-page')).toBeVisible()
+    await expect(ed.locator('.zoom-value')).toBeVisible()
+    // a wide frame still has everything
+    await page.setViewportSize({ width: 1280, height: 800 })
+    await page.waitForTimeout(300)
+    await expect(ed.locator('.status-wordcount')).toBeVisible()
+    await expect(ed.locator('.status-views')).toBeVisible()
+  })
+}
+
 test('docs-web: Table Design tab is Vietnamese in vi', async ({ page }) => {
   const ed = await openDoc(page, '&lang=vi')
   await ed.locator('.ProseMirror').first().getByText(TEXT, { exact: false }).first().click()

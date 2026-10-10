@@ -9,6 +9,7 @@ import type { PointerEvent as ReactPointerEvent, ReactElement } from 'react'
 import { AgentLoop } from '@genoffice/agent-core'
 import { imageGenerationAvailable, type AiSettings } from '@genoffice/ai-provider/browser'
 import { AiComposer, AiScopeQuote, AiTypingIndicator, type AiScopeQuoteData } from '@genoffice/ui'
+import { platform } from '../capabilities'
 import { aiLangDirective, t as tGlobal, useI18n } from '../i18n/locale'
 import { Markdown } from '@genoffice/ui'
 import sendEnterOn from '../assets/send-enter-on.png'
@@ -83,6 +84,10 @@ const MODEL_BRIDGE: AiModelPickerBridge = {
   onSettingsChanged: (handler) => window.pdfApi.onAiSettingsChanged(handler),
   gskLoggedIn: () => window.pdfApi.gskStatus().then((s) => !!s?.loggedIn),
   openModelSettings: () => window.pdfApi.openAiModelSettings().catch(() => {}),
+  // web frames: a stored key without a model keeps send off with a hint (see AiModelPicker)
+  get requireModel() {
+    return platform() === 'web'
+  },
 }
 
 export function AiPanel({

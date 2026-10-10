@@ -31,6 +31,8 @@
 //   request(type, p) -> send a host->frame request (open/save/saveAs/print), resolves with the response
 //   send(type, p)    -> send a host->frame event (theme / language / ...)
 //   bumpRemote(id)   -> simulate a concurrent server-side save (next frame save conflicts)
+//   saveCalls()      -> how many api.save requests arrived (the refused ones too)
+//   failNextSave()   -> the next api.save answers a 500 (the save-failure state of the host header)
 //   lastExport()     -> {fileId, name, dataBytes: number[] | null} of the last api.export | null
 //   uploads()        -> the api.images.upload requests so far ({fileId, name, mimeType, bytes: number[]})
 //   resolves()       -> the api.assets.resolve requests so far ({fileId, paths})
@@ -53,6 +55,8 @@ const files = new Map() // fileId -> {meta, bytes: Uint8Array}
 let seq = 0
 let lastSaved = null
 let lastExport = null
+let saveCalls = 0 // api.save requests received, failed ones included
+let failSaves = 0 // api.save calls still to refuse with a 500 (__host.failNextSave)
 const events = []
 const uploads = [] // api.images.upload requests: {fileId, name, mimeType, bytes}
 const appOpens = [] // app.open requests: {feature}
@@ -101,6 +105,11 @@ const handlers = {
     }
   },
   'api.save': ({ fileId, data, etag }) => {
+    saveCalls += 1
+    if (failSaves > 0) {
+      failSaves -= 1
+      return { ok: false, error: apiError('internal', 'Internal Server Error', 500) }
+    }
     const f = files.get(fileId)
     if (!f) throw apiError('not_found', `no file ${fileId}`, 404)
     if (etag !== undefined && etag !== f.meta.etag) {
@@ -352,6 +361,10 @@ async function boot() {
       return put(name, new Uint8Array(await res.arrayBuffer()))
     },
     queuePick: (fileId) => picks.push(fileId),
+    saveCalls: () => saveCalls,
+    failNextSave: () => {
+      failSaves += 1
+    },
     bumpRemote: (fileId) => {
       const f = files.get(fileId)
       return f ? put(f.meta.name, f.bytes, fileId) : null

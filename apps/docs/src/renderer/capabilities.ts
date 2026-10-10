@@ -28,6 +28,11 @@ export function appOpenAvailable(): boolean {
   return caps.platform === 'web' && caps.desktopOpen === true
 }
 
+/** the editor runs in a web frame (the host around it has its own chrome, e.g. a Comments drawer) */
+export function isWebFrame(): boolean {
+  return capabilities().platform === 'web'
+}
+
 /** test hook: forget the cached capabilities so the next `cap()` re-reads `window.desktop` */
 export function resetCapabilitiesForTest(): void {
   resolved = null

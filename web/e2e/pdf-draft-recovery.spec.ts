@@ -134,6 +134,10 @@ async function shown(frame: Frame): Promise<void> {
   })
 }
 
+/** the ribbon's zoom label ("103%"); several ribbon layouts carry one, the first is enough */
+const zoomLabel = async (frame: Frame): Promise<string> =>
+  (await frame.locator('.tb-zoom').first().textContent())?.trim() ?? ''
+
 /** the writer's 30 s tick (the frame's interval timers run on the page clock) */
 async function tick(page: Page): Promise<void> {
   await page.clock.fastForward(TICK_MS)
@@ -192,6 +196,7 @@ test.describe('pdf draft recovery: an open comment box', () => {
     const problems = await watch(page)
     const marker = 'PdfOpenBoxMark'
     let frame = await openHost(page)
+    const openZoom = await zoomLabel(frame)
     await typeIntoOpenNoteBox(page, frame, marker)
     // the box is not confirmed, yet the document counts as unsaved
     await expect.poll(() => lastDirty(page), { timeout: 15_000 }).toBe(true)
@@ -215,6 +220,11 @@ test.describe('pdf draft recovery: an open comment box', () => {
     await expect(frame.locator('.pdf-note-comment-body', { hasText: marker })).toBeVisible({
       timeout: 30_000,
     })
+    // fit-width keeps the comments margin inside the slot, so a copy that has a comment fits
+    // smaller than the bare document (the 50 % of the visual report); the restored view is exactly
+    // what opening that copy normally gives, checked below after the save
+    await expect(frame.locator('.pdf-note-margin').first()).toBeAttached()
+    const restoredZoom = await zoomLabel(frame)
     await expect.poll(() => lastDirty(page), { timeout: 15_000 }).toBe(true)
     expect(await lastSaved(page)).toBeNull()
 
@@ -223,6 +233,15 @@ test.describe('pdf draft recovery: an open comment box', () => {
     await expect.poll(() => lastSaved(page), { timeout: 60_000 }).not.toBeNull()
     expect(await savedHasMarker((await lastSaved(page))!.bytes, marker)).toBe(true)
     await expect.poll(async () => (await drafts(frame, marker)).length, { timeout: 15_000 }).toBe(0)
+    // a normal open of the saved copy lands on the zoom the restored view had
+    frame = await reloadFrame(page)
+    await shown(frame)
+    await expect(frame.locator('.pdf-note-comment-body', { hasText: marker })).toBeVisible({
+      timeout: 30_000,
+    })
+    await expect.poll(() => zoomLabel(frame), { timeout: 15_000 }).toBe(restoredZoom)
+    expect(restoredZoom).not.toBe('')
+    expect(openZoom).not.toBe('')
     expect(problems).toEqual({ console: [], page: [] })
   })
 
@@ -260,6 +279,7 @@ test.describe('pdf draft recovery: an open comment box', () => {
     const problems = await watch(page)
     const marker = 'PdfDiscardMark'
     let frame = await openHost(page, 'vi')
+    const openZoom = await zoomLabel(frame)
     await typeIntoOpenNoteBox(page, frame, marker, 'vi')
     await expect.poll(() => lastDirty(page), { timeout: 15_000 }).toBe(true)
     await tick(page)
@@ -274,6 +294,8 @@ test.describe('pdf draft recovery: an open comment box', () => {
     await shown(frame)
     await page.waitForTimeout(1_000)
     await expect(frame.locator('.pdf-note-comment-body', { hasText: marker })).toHaveCount(0)
+    // Discard is the plain server version: the zoom of a normal open
+    await expect.poll(() => zoomLabel(frame), { timeout: 15_000 }).toBe(openZoom)
     expect(await drafts(frame, marker)).toEqual([])
     expect(problems).toEqual({ console: [], page: [] })
   })

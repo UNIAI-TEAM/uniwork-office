@@ -109,6 +109,18 @@ function writeChoice(choice: AiChoice): void {
   }
 }
 
+/** the model ids of a provider's own `/models` answer (OpenAI/Anthropic `data[].id`, Gemini `models[].name`) */
+export function modelIdsOf(body: unknown): string[] {
+  const b = (body ?? {}) as { data?: unknown; models?: unknown }
+  const rows = Array.isArray(b.data) ? b.data : Array.isArray(b.models) ? b.models : []
+  const ids = rows.map((row) => {
+    const r = (row ?? {}) as { id?: unknown; name?: unknown }
+    const raw = typeof r.id === 'string' ? r.id : typeof r.name === 'string' ? r.name : ''
+    return raw.replace(/^models\//, '').trim()
+  })
+  return [...new Set(ids.filter(Boolean))]
+}
+
 export interface WebAiState {
   credentials: AiCredentialList
   cloud: AiCloudStatus | null
@@ -162,6 +174,9 @@ export function createWebAi(opts: {
   let loadedAt = 0
   let everLoaded = false
   let choice = readChoice()
+  /** provider -> model ids its own `/models` route listed (only asked for a provider with no default model) */
+  const listed = new Map<string, string[]>()
+  const listing = new Map<string, string>()
   const changeListeners = new Set<() => void>()
   const now = opts.now ?? Date.now
 
@@ -216,6 +231,7 @@ export function createWebAi(opts: {
       loadedAt = now()
       everLoaded = true
       applyCloud(cloud)
+      void discoverModels()
       if (changed) notifyChanged()
       return state
     })()
@@ -226,6 +242,32 @@ export function createWebAi(opts: {
       // a failed refresh keeps the last answer but makes the next call try again
       if (loading === run) loading = null
       throw err
+    }
+  }
+
+  /**
+   * A provider with a key but no default model (a custom endpoint) has no model the frame could
+   * name. Ask its own `/models` route once per stored key; a provider that lists exactly one model
+   * runs on it, otherwise the listing only feeds the AI settings dialog's suggestions.
+   */
+  async function discoverModels(): Promise<void> {
+    const client = clientRef
+    if (!client) return
+    for (const credential of state.credentials.items) {
+      const id = credential.provider
+      if (!WEB_PROVIDER_IDS.has(id) || !protocolOf(id)) continue
+      if (defaultModelOf(id)) continue
+      const stamp = `${credential.key_hint}:${credential.base_url}:${credential.updated_at}`
+      if (listing.get(id) === stamp) continue
+      listing.set(id, stamp)
+      try {
+        const ids = modelIdsOf(await client.json(`byok/${encodeURIComponent(id)}/models`))
+        if (ids.join('|') === (listed.get(id) ?? []).join('|')) continue
+        listed.set(id, ids)
+        notifyChanged()
+      } catch {
+        // the listing is a convenience: without it the person picks a model in the AI settings
+      }
     }
   }
 
@@ -292,6 +334,10 @@ export function createWebAi(opts: {
     return state.credentials.providers.find((p) => p.id === provider)?.default_base_url ?? ''
   }
 
+  function defaultModelOf(provider: string): string {
+    return AI_PROVIDERS.find((p) => p.id === provider)?.defaultModel ?? ''
+  }
+
   /** usable = has a stored key, the server knows its protocol, genoffice can drive it */
   function usableProviders(): string[] {
     return state.credentials.items
@@ -312,7 +358,10 @@ export function createWebAi(opts: {
     ) as AiProviderId
     const providers = { ...base.providers }
     for (const id of Object.keys(providers) as AiProviderId[]) {
-      const model = choice.models[id]
+      // this browser's pick, else the provider's default; a model-less provider that lists exactly one
+      // model runs on it (the chip shows it), otherwise it stays empty: the panel asks for a pick
+      const only = listed.get(id)?.length === 1 ? listed.get(id)![0] : ''
+      const model = choice.models[id] || (defaultModelOf(id) ? '' : only)
       const stored = state.credentials.items.find((c) => c.provider === id)
       const usableHere = usable.includes(id)
       providers[id] = {
@@ -366,7 +415,12 @@ export function createWebAi(opts: {
       choose,
       supported: (id) => WEB_PROVIDER_IDS.has(id),
       label: providerLabel,
-      models: (id) => AI_PROVIDERS.find((p) => p.id === id)?.models ?? [],
+      models: (id) => [
+        ...new Set([
+          ...(AI_PROVIDERS.find((p) => p.id === id)?.models ?? []),
+          ...(listed.get(id) ?? []),
+        ]),
+      ],
     })
     // keys saved or removed in the dialog, a model picked: every panel's chip re-reads
     notifyChanged()

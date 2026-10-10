@@ -24,6 +24,8 @@ interface Props {
   pending: boolean
   onRevert: () => void
   onClose: () => void
+  /** phone-width frame: docked along the bottom of the stage instead of floating at the right */
+  sheet?: boolean
 }
 
 type NumberField = 'fontSize' | 'width' | 'height' | 'borderRadius' | 'padding'
@@ -211,7 +213,10 @@ export function StylePanel(p: Props) {
   )
 
   return (
-    <aside className="hx-panel" aria-label={t('stylePanel')}>
+    <aside
+      className={p.sheet ? 'hx-panel hx-panel-sheet' : 'hx-panel'}
+      aria-label={t('stylePanel')}
+    >
       <div className="hx-panel-head">
         <span className="hx-panel-tag">&lt;{p.tag}&gt;</span>
         {p.pending && (

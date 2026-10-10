@@ -612,6 +612,66 @@ test.describe('pdf module on the web: use-the-app messages and narrow zoom', () 
   })
 })
 
+// UNI-1232 FX2 (P-N4): the 60 % floor stays, but the page must not be cut at the right edge with
+// no way to tell: the narrow pane opens without the thumbnail strip (it took 150 px), the page
+// sits inside the slot, and what still overflows (the strip opened by hand) pans inside the page
+// area with a visible scrollbar, never as a page-level horizontal scroll.
+test.describe('pdf module on the web: narrow slot', () => {
+  test.skip(!built(), 'no dist-web/pdf build: npm run build:web -- --module pdf')
+
+  test('at 390 px the 60 % page is inside the slot and any overflow pans inside the page area', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 800 })
+    const problems = await watch(page)
+    const frame = await openPdf(page, { fixture: 'sample.pdf' })
+    await waitRendered(frame)
+    await expect
+      .poll(async () => Number(await frame.locator('.zoom-slider').inputValue()), {
+        timeout: 15_000,
+      })
+      .toBeGreaterThanOrEqual(60)
+    // no thumbnail strip by default in a narrow slot
+    await expect(frame.locator('.pdf-thumbs')).toHaveCount(0)
+    const fit = await frame.evaluate(() => {
+      const scroller = document.querySelector('.pdf-scroll') as HTMLElement
+      const pageEl = document.querySelector('.pdf-page') as HTMLElement
+      const box = pageEl.getBoundingClientRect()
+      const area = scroller.getBoundingClientRect()
+      return {
+        pageRight: box.right,
+        areaRight: area.right,
+        pageLeft: box.left,
+        areaLeft: area.left,
+        docOverflow: document.documentElement.scrollWidth - window.innerWidth,
+      }
+    })
+    expect(fit.pageRight).toBeLessThanOrEqual(fit.areaRight)
+    expect(fit.pageLeft).toBeGreaterThanOrEqual(fit.areaLeft)
+    expect(fit.docOverflow).toBeLessThanOrEqual(0)
+
+    // the strip opened by hand narrows the page area: the page pans inside it, with a scrollbar
+    await frame.locator('.ribbon-tab', { hasText: 'View' }).first().click()
+    await frame.locator('.rb-big', { hasText: 'Thumbnails' }).first().click()
+    await expect(frame.locator('.pdf-thumbs')).toHaveCount(1)
+    const pan = await frame.evaluate(() => {
+      const scroller = document.querySelector('.pdf-scroll') as HTMLElement
+      const bar = getComputedStyle(scroller, '::-webkit-scrollbar')
+      return {
+        scrollable: scroller.scrollWidth > scroller.clientWidth,
+        overflowX: getComputedStyle(scroller).overflowX,
+        barHeight: bar.height,
+        docOverflow: document.documentElement.scrollWidth - window.innerWidth,
+      }
+    })
+    expect(pan.scrollable).toBe(true)
+    expect(pan.overflowX).toMatch(/auto|scroll/)
+    expect(Number.parseFloat(pan.barHeight)).toBeGreaterThanOrEqual(6)
+    expect(pan.docOverflow).toBeLessThanOrEqual(0)
+    await noProblems(page, frame, problems)
+  })
+})
+
 /** host `open` with the head version from the host store */
 async function reopenHead(page: Page, fileId: string): Promise<void> {
   const res = await page.evaluate(async (id) => {

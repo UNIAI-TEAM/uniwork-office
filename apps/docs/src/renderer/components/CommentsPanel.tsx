@@ -1,6 +1,7 @@
 import { memo, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import type { Node as PmNode } from '@tiptap/pm/model'
 import type { CommentInfo } from '@genoffice/docx-engine'
+import { isWebFrame } from '../capabilities'
 import { useI18n } from '../i18n/locale'
 import { IconComment, IconPencil, IconTrash } from './icons'
 
@@ -359,7 +360,9 @@ export const CommentsPanel = memo(function CommentsPanel({
     <aside className="comments-pane">
       <div className="comments-pane-head">
         <span className="comments-pane-title">
-          <IconComment size={14} /> {t('appCommentsTitle', { n: comments.length })}
+          <IconComment size={14} />{' '}
+          {/* on the web the host has its own Comments drawer: this pane is the document's */}
+          {t(isWebFrame() ? 'appCommentsTitleDoc' : 'appCommentsTitle', { n: comments.length })}
         </span>
         <button
           className="comments-pane-close"

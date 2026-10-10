@@ -45,6 +45,8 @@ export const cs = {
   aiWebStateSessionBody: 'Pokračujte opětovným otevřením dokumentu z UniWork.',
   aiWebStateRefusedTitle: 'Požadavek odmítnut',
   aiWebStateRefusedBody: 'Server odmítl požadavek AI.',
+  aiWebStateModelTitle: 'Vyberte model',
+  aiWebStateModelBody: 'Vyberte model v nabídce modelů vedle pole zprávy a odešlete znovu.',
   aiWebStateBaseUrlBody: 'Tato základní URL není povolena. Použijte veřejnou adresu https://.',
   aiWebStateProviderBody: 'Tento poskytovatel není podporován.',
   aiWebStateUnknownTitle: 'Požadavek AI selhal',

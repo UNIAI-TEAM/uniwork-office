@@ -9194,6 +9194,7 @@ body.docs-crop-active
 .status-left {
   display: flex;
   align-items: center;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -9330,6 +9331,31 @@ body.docs-crop-active
 
 .zoom-value:disabled {
   cursor: default;
+}
+
+/* A phone-width frame: keep the page counter, the save state and the zoom, drop the parts that
+   only repeat a ribbon entry (Track Changes, the layout switcher) or are long (the word count,
+   the status message), so nothing sits half-clipped under the view buttons. */
+@media (max-width: 640px) {
+  .status-track,
+  .status-msg {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .status-bar {
+    padding: 0 8px;
+  }
+
+  .status-item {
+    margin-right: 10px;
+  }
+
+  .status-wordcount,
+  .status-right .status-views {
+    display: none;
+  }
 }
 
 /* Word's status bar view switcher, left of the zoom slider */

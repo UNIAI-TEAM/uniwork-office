@@ -46,6 +46,8 @@ export const nl = {
   aiWebStateSessionBody: 'Open het document opnieuw vanuit UniWork om verder te gaan.',
   aiWebStateRefusedTitle: 'Verzoek geweigerd',
   aiWebStateRefusedBody: 'De server weigerde het AI-verzoek.',
+  aiWebStateModelTitle: 'Kies een model',
+  aiWebStateModelBody: 'Kies een model in het modelmenu naast het berichtvak en verstuur opnieuw.',
   aiWebStateBaseUrlBody: 'Deze basis-URL is niet toegestaan. Gebruik een openbaar https://-adres.',
   aiWebStateProviderBody: 'Deze aanbieder wordt niet ondersteund.',
   aiWebStateUnknownTitle: 'AI-verzoek mislukt',
