@@ -90,10 +90,9 @@ import { parseFileToText } from '@genoffice/file-parse'
 import { convertHtmlToDocx } from '../../../../packages/html2docx/src'
 import { ElectronBrowserDriver } from '../../../../packages/html2docx/src/drivers/electron'
 import {
-  AiCreditsError,
-  AiTimeoutError,
-  isAiNetworkError,
-  isAiOverloadedError,
+  aiChatFailure,
+  aiChatFailureFromError,
+  aiStreamErrorFields,
   chatForProvider,
   defaultAiSettings,
   activeProvider,
@@ -102,21 +101,24 @@ import {
   type AiMediaProviderConfig,
   type AiMediaProviderId,
   type AiSearchProviderId,
+  refreshUniworkCloudStatus,
   resolveAiSettings,
   maxOutputTokensOf,
   sanitizeAiSettings,
   sanitizeCliPath,
   aiNoticeBody,
   aiTestFailure,
-  aiTestFailureKindForChat,
-  aiTestFailureKindForText,
+  testChatConnection,
   noModelMessage,
   setAiUserAgent,
   setRescueFetch,
   streamForProvider,
   withUniAiOpenRouterAuth,
+  type AiChatFailure,
   type AiChatRequest,
   type AiChatResponse,
+  type AiProviderConfig,
+  type AiProviderId,
   type AiSettings,
   type AiStreamChunk,
   type AiStreamRequest,
@@ -3777,6 +3779,8 @@ export function registerAiIpc(): void {
   ipcMain.handle(
     'ai:gsk-status',
     async (_event, withEmail?: boolean): Promise<GenSparkAccountStatus> => {
+      // an AI panel asks when it opens: re-read the plan so a change made since shows at once
+      await refreshUniworkCloudStatus()
       if (!hasGskAuth()) return { loggedIn: false }
       if (!withEmail) return { loggedIn: true }
       const info = await gskLoginInfo()
@@ -3876,20 +3880,10 @@ export function registerAiIpc(): void {
       if (controller.signal.aborted) {
         send({ requestId, type: 'done' })
       } else {
-        send({
-          requestId,
-          type: 'error',
-          error: err instanceof Error ? err.message : String(err),
-          ...(err instanceof AiTimeoutError
-            ? { errorCode: 'timeout' as const }
-            : err instanceof AiCreditsError
-              ? { errorCode: 'credits' as const }
-              : isAiNetworkError(err)
-                ? { errorCode: 'network' as const }
-                : isAiOverloadedError(err)
-                  ? { errorCode: 'overloaded' as const }
-                  : {}),
-        })
+        const { raw, ...fields } = aiStreamErrorFields(err, getUiLang())
+        // the panel gets the product message; the provider's own text stays in the log
+        console.warn(`[ai-stream] ${requestId} (${provider}/${config.model}) failed:`, raw)
+        send({ requestId, type: 'error', ...fields })
       }
     } finally {
       unwatchSender()
@@ -4024,15 +4018,26 @@ export function registerAiIpc(): void {
     return logAiTest('media', provider, await testMediaProvider(provider, config))
   })
 
-  // one-shot chat; `errorKind` says why a failure failed for the settings test (other callers ignore it)
-  const runAiChat = async (
+  // one-shot chat; `errorKind` says why a failure failed for the settings test (other callers ignore it).
+  // `error` is a product message in the UI language; the provider's raw text is `rawError` and goes to the log
+  type AiChatOutcome = AiChatResponse & { errorKind?: AiTestFailureKind; rawError?: string }
+  const failedChat = (failure: AiChatFailure): AiChatOutcome => {
+    console.warn('[ai] chat failed:', failure.raw)
+    return {
+      ok: false,
+      error: failure.error,
+      errorKind: failure.errorKind,
+      rawError: failure.raw,
+    }
+  }
+  // the request's provider config, or the reason there is none
+  const chatConfigOf = (
     request: AiChatRequest,
-  ): Promise<AiChatResponse & { errorKind?: AiTestFailureKind }> => {
+  ): { config: AiProviderConfig; provider: AiProviderId } | AiChatOutcome => {
     // same schema check as ai:stream: one-shot requests would otherwise act on
     // the renderer's settings copy verbatim
     const settings = sanitizeAiSettings(request.settings)
     if (!settings) return { ok: false, error: 'invalid AI settings payload', errorKind: 'failed' }
-    const { system, user } = request
     const provider = settings.provider
     const config = withUniAiOpenRouterAuth(settings, provider, settings.providers?.[provider])
     if (!config || (provider !== 'codex' && !config.apiKey)) {
@@ -4046,31 +4051,44 @@ export function registerAiIpc(): void {
     if (provider !== 'codex' && !config.model) {
       return { ok: false, error: tm('errNoModel'), errorKind: 'failed' }
     }
+    return { config, provider }
+  }
+
+  const runAiChat = async (request: AiChatRequest): Promise<AiChatOutcome> => {
+    const target = chatConfigOf(request)
+    if (!('config' in target)) return target
     try {
-      const result = await chatForProvider(provider, config, system, user)
-      // the one-shot path reports HTTP failures as ok:false with the raw body —
-      // replace capacity/rate-limit dumps with the localized "busy" message
-      if (!result.ok && isAiOverloadedError(result.error)) {
-        return { ok: false, error: tm('errAiBusy'), errorKind: 'unavailable' }
-      }
-      return result.ok ? result : { ...result, errorKind: aiTestFailureKindForChat(result) }
+      const result = await chatForProvider(
+        target.provider,
+        target.config,
+        request.system,
+        request.user,
+      )
+      // the one-shot path reports HTTP failures as ok:false with the raw body
+      return result.ok ? result : failedChat(aiChatFailure(result, getUiLang(), tm('errAiBusy')))
     } catch (err) {
-      return isAiOverloadedError(err)
-        ? { ok: false, error: tm('errAiBusy'), errorKind: 'unavailable' }
-        : { ok: false, error: String(err), errorKind: aiTestFailureKindForText(String(err), err) }
+      return failedChat(aiChatFailureFromError(err, getUiLang(), tm('errAiBusy')))
     }
   }
 
   ipcMain.handle('ai:chat', (_event, request: AiChatRequest) => runAiChat(request))
 
-  // settings > AI model "Test": the chat model answers one ping; a failure keeps its raw text in the log
+  // settings > AI model "Test": one streamed ping through the same endpoint and wire as the chat panel;
+  // a failure keeps its raw text in the log
   ipcMain.handle('ai:settings-test', async (_event, request: AiChatRequest) => {
-    const result = await runAiChat(request)
+    const target = chatConfigOf(request)
+    let result: AiChatOutcome
+    if ('config' in target) {
+      const test = await testChatConnection(target.provider, target.config)
+      result = test.ok ? test : failedChat(aiChatFailure(test, getUiLang(), tm('errAiBusy')))
+    } else {
+      result = target
+    }
     if (result.ok) return { ok: true }
     return logAiTest(
       'model',
       String(request?.settings?.provider ?? ''),
-      aiTestFailure(result.errorKind ?? 'failed', result.error ?? ''),
+      aiTestFailure(result.errorKind ?? 'failed', result.rawError ?? result.error ?? ''),
     )
   })
 }

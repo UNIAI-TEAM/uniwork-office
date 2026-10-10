@@ -1,6 +1,10 @@
 import { app, safeStorage, shell, type IpcMain, type WebContents } from 'electron'
 import { dirname } from 'node:path'
-import { setUniworkCloudStatus, setUniworkCloudTransport } from '@genoffice/ai-provider'
+import {
+  setUniworkCloudRefresher,
+  setUniworkCloudStatus,
+  setUniworkCloudTransport,
+} from '@genoffice/ai-provider'
 import { safeExternalUrl } from '@genoffice/electron-utils'
 import { getUiLang } from '@genoffice/i18n'
 import { HOME_CHANNELS, type AccountEntitlements, type AccountStatus } from '../../shared/home-api'
@@ -169,6 +173,8 @@ export function uniworkCloud(): UniworkCloudController {
 export function startUniworkCloud(): void {
   const controller = uniworkCloud()
   setUniworkCloudTransport(controller.transport())
+  // a cloud tool or an AI panel that finds the cloud off re-reads it first (the plan may have changed since)
+  setUniworkCloudRefresher(() => controller.refresh())
   onAccountEntitlementsChanged(() => void controller.refresh().catch(() => undefined))
   void controller.refresh().catch(() => undefined)
 }

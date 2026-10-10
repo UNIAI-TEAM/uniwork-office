@@ -27,6 +27,7 @@ export {
   updateMediaProviderConfig,
   visibleMediaProviders,
 } from './media'
+export { aiChatFailureText } from './ai-chat-error-text'
 export {
   UNIWORK_CLOUD_SIGNED_OUT,
   UNIWORK_CLOUD_TOOLS,

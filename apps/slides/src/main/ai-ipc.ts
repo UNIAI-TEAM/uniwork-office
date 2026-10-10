@@ -16,13 +16,11 @@ import {
 } from 'node:fs'
 import { join } from 'node:path'
 import {
-  AiCreditsError,
-  AiTimeoutError,
-  isAiNetworkError,
-  isAiOverloadedError,
+  aiStreamErrorFields,
   defaultAiSettings,
   activeProvider,
   maxOutputTokensOf,
+  refreshUniworkCloudStatus,
   resolveAiSettings,
   sanitizeAiSettings,
   noModelMessage,
@@ -133,6 +131,8 @@ export function registerAiIpc(): void {
   ipcMain.handle(
     'ai:gsk-status',
     async (_event, withEmail?: boolean): Promise<GenSparkAccountStatus> => {
+      // an AI panel asks when it opens: re-read the plan so a change made since shows at once
+      await refreshUniworkCloudStatus()
       if (!hasGskAuth()) return { loggedIn: false }
       if (!withEmail) return { loggedIn: true }
       const info = await gskLoginInfo()
@@ -224,22 +224,10 @@ export function registerAiIpc(): void {
       if (controller.signal.aborted) {
         send({ requestId, type: 'done' })
       } else {
-        const msg = err instanceof Error ? err.message : String(err)
-        console.error(`[ai-stream] ${requestId} (${provider}/${config.model}) failed:`, msg)
-        send({
-          requestId,
-          type: 'error',
-          error: msg,
-          ...(err instanceof AiTimeoutError
-            ? { errorCode: 'timeout' as const }
-            : err instanceof AiCreditsError
-              ? { errorCode: 'credits' as const }
-              : isAiNetworkError(err)
-                ? { errorCode: 'network' as const }
-                : isAiOverloadedError(err)
-                  ? { errorCode: 'overloaded' as const }
-                  : {}),
-        })
+        const { raw, ...fields } = aiStreamErrorFields(err, getUiLang())
+        // the panel gets the product message; the provider's own text stays in the log
+        console.error(`[ai-stream] ${requestId} (${provider}/${config.model}) failed:`, raw)
+        send({ requestId, type: 'error', ...fields })
       }
     } finally {
       unwatchSender()

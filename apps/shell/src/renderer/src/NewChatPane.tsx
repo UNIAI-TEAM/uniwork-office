@@ -485,6 +485,7 @@ export function NewChatPane({ practiceId, ensureWorkbench }: Props): ReactElemen
         user: opts.user,
         images: opts.images,
         settings,
+        lang,
         onDelta: (text) => {
           if (msgId) patchMessage(msgId, { text, streaming: true })
         },

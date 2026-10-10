@@ -105,7 +105,7 @@ export function renewsText(
 
 /**
  * Live cloud status from the shell main process: read once (re-reading the
- * credits) and then kept current by pushes. null until the first answer, or
+ * credits), kept current by pushes, and re-read when the window regains focus. null until the first answer, or
  * when the preload has no cloud API.
  */
 export function useUniworkCloudStatus(): UniworkCloudStatus | null {
@@ -129,9 +129,24 @@ export function useUniworkCloudStatus(): UniworkCloudStatus | null {
         if (alive) setStatus(fresh)
       })
       .catch(() => undefined)
+    // the plan can change on the server at any time (the main process rate-limits the
+    // re-read): coming back to the window re-reads it, so no pane waits for a reopen
+    const reread = () => {
+      if (document.visibilityState === 'hidden') return
+      void api
+        .uniworkCloudRefresh?.()
+        .then((fresh) => {
+          if (alive) setStatus(fresh)
+        })
+        .catch(() => undefined)
+    }
+    window.addEventListener('focus', reread)
+    document.addEventListener('visibilitychange', reread)
     return () => {
       alive = false
       off?.()
+      window.removeEventListener('focus', reread)
+      document.removeEventListener('visibilitychange', reread)
     }
   }, [])
   return status
