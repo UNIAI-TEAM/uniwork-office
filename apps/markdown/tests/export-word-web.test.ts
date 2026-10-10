@@ -65,6 +65,13 @@ async function mountApp(
   return { container, exportDocx }
 }
 
+/** the .docx build is async work in the renderer: poll until the bridge call arrives */
+async function until(done: () => boolean, ms = 8000) {
+  const end = Date.now() + ms
+  while (!done() && Date.now() < end)
+    await act(async () => await new Promise((r) => setTimeout(r, 25)))
+}
+
 const entry = (c: HTMLElement) => c.querySelector<HTMLButtonElement>('.qa-export')
 
 describe('Export Word ribbon entry', () => {
@@ -78,10 +85,8 @@ describe('Export Word ribbon entry', () => {
     const button = entry(container)!
     expect(button.textContent).toBe('Export Word')
     expect(button.disabled).toBe(false)
-    await act(async () => {
-      button.click()
-      await new Promise((r) => setTimeout(r, 200))
-    })
+    await act(async () => button.click())
+    await until(() => exportDocx.mock.calls.length > 0)
     expect(exportDocx).toHaveBeenCalledTimes(1)
     const request = exportDocx.mock.calls[0]![0] as {
       base64: string
@@ -101,10 +106,8 @@ describe('Export Word ribbon entry', () => {
     })
     const button = entry(container)!
     expect(button.disabled).toBe(false)
-    await act(async () => {
-      button.click()
-      await new Promise((r) => setTimeout(r, 200))
-    })
+    await act(async () => button.click())
+    await until(() => exportDocx.mock.calls.length > 0)
     expect(exportDocx).toHaveBeenCalledTimes(1)
   })
 
@@ -112,10 +115,8 @@ describe('Export Word ribbon entry', () => {
     const failing = vi.fn(async () => ({ ok: false, error: 'boom' }))
     const err = vi.spyOn(console, 'error').mockImplementation(() => {})
     const { container } = await mountApp('/u/notes.md', { platform: 'web' }, failing)
-    await act(async () => {
-      entry(container)!.click()
-      await new Promise((r) => setTimeout(r, 200))
-    })
+    await act(async () => entry(container)!.click())
+    await until(() => document.body.textContent!.includes('Export failed'))
     expect(document.body.textContent).toContain('Export failed')
     err.mockRestore()
   })

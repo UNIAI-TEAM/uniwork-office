@@ -508,3 +508,64 @@ for (const c of [docsCase, markdownCase, sheetsCase]) {
     })
   })
 }
+
+// ---------------------------------------------------------------- html: style edits in progress (UNI-1232 A6)
+
+const HTML_PAGE = [
+  '<!doctype html>',
+  '<html lang="en">',
+  '  <head><meta charset="utf-8" /><title>Draft page</title></head>',
+  '  <body>',
+  '    <h1 id="title">Draft page</h1>',
+  '    <p id="lead">Visual edit target paragraph.</p>',
+  '  </body>',
+  '</html>',
+  '',
+].join('\n')
+const HTML_PATH = '/e2e-fixtures/Draft.html'
+
+test.describe('html: style edits in progress', () => {
+  test.skip(!built('html'), 'no dist-web/html build')
+
+  test('a visual style edit that is not committed to the source yet is in the draft copy', async ({
+    page,
+  }) => {
+    await page.route(`**${HTML_PATH}`, (route) =>
+      route.fulfill({ status: 200, body: HTML_PAGE, headers: { 'content-type': 'text/html' } }),
+    )
+    const problems = await watch(page)
+    let frame = await openHost(page, { module: 'html', open: HTML_PATH, lang: 'en' })
+    await expect(frame.locator('.workspace')).toBeVisible({ timeout: 30_000 })
+    const preview = frame.locator('iframe.preview-frame').contentFrame()
+    await preview.locator('#lead').click()
+    await expect(frame.getByRole('toolbar', { name: 'Element toolbar' })).toBeVisible()
+
+    // freeze the page clock: the style timer that commits the poke into the source (600 ms) cannot
+    // fire, so the edit is exactly "uncommitted" while the checkpoint is taken
+    await page.clock.pauseAt(Date.now() + 1_000)
+    await frame.getByRole('button', { name: 'Increase font size' }).click()
+    await expect.poll(() => lastDirty(page), { timeout: 15_000 }).toBe(true)
+    // the checkpoint of a closing tab (pagehide), not the 30 s tick
+    await frame.evaluate(() => window.dispatchEvent(new Event('pagehide')))
+    await expect
+      .poll(async () => (await drafts(frame, 'font-size')).length, { timeout: 15_000 })
+      .toBe(1)
+    expect(await lastSaved(page)).toBeNull()
+    await page.clock.resume()
+
+    frame = await reloadFrame(page)
+    const prompt = frame.locator(PROMPT)
+    await expect(prompt).toBeVisible({ timeout: 30_000 })
+    await prompt.locator('[data-choice="restore"]').click()
+    await expect(prompt).toBeHidden()
+    await expect(frame.locator('.workspace')).toBeVisible({ timeout: 30_000 })
+    // the restored source carries the style the user was still adjusting
+    await frame.getByRole('tab', { name: /^Split$/ }).click()
+    await expect(frame.locator('.cm-content')).toContainText(
+      /id="lead" style="font-size: ?\d+px;?"/,
+      { timeout: 30_000 },
+    )
+    await expect.poll(() => lastDirty(page), { timeout: 15_000 }).toBe(true)
+    expect(problems).toEqual({ console: [], page: [] })
+  })
+})
