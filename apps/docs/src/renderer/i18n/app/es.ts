@@ -530,7 +530,8 @@ export const es = {
   appWebFatalTitle: 'No se pudo abrir el documento',
   appWebFatalBody:
     'La edición y el guardado están desactivados. Recarga la página o vuelve a abrir el documento desde UniWork.',
-  appWebSaveOffline: 'No se puede conectar con UniWork. Comprueba tu conexión e inténtalo de nuevo.',
+  appWebSaveOffline:
+    'No se puede conectar con UniWork. Comprueba tu conexión e inténtalo de nuevo.',
   appWebNoHost: 'Este editor funciona dentro de UniWork. Abre el documento desde UniWork.',
   appSaveStateUnsaved: 'Cambios sin guardar',
   appSaveStateSaved: 'Todos los cambios guardados',

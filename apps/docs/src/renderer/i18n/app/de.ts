@@ -538,7 +538,8 @@ export const de = {
   appWebFatalTitle: 'Das Dokument konnte nicht geöffnet werden',
   appWebFatalBody:
     'Bearbeiten und Speichern sind deaktiviert. Laden Sie die Seite neu oder öffnen Sie das Dokument erneut in UniWork.',
-  appWebSaveOffline: 'UniWork ist nicht erreichbar. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.',
+  appWebSaveOffline:
+    'UniWork ist nicht erreichbar. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.',
   appWebNoHost: 'Dieser Editor läuft in UniWork. Öffnen Sie das Dokument in UniWork.',
   appSaveStateUnsaved: 'Ungespeicherte Änderungen',
   appSaveStateSaved: 'Alle Änderungen gespeichert',
