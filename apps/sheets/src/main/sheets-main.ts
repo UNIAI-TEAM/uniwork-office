@@ -82,6 +82,7 @@ import {
   activeProvider,
   maxOutputTokensOf,
   resolveAiSettings,
+  aiNoticeBody,
   noModelMessage,
   setAiUserAgent,
   setRescueFetch,
@@ -3739,7 +3740,8 @@ export function registerSheetsAiIpc(): void {
     if (!config || (provider !== 'codex' && !config.apiKey)) {
       return {
         ok: false,
-        error: noModelMessage(getUiLang(), tm('errNoApiKey', { provider })),
+        // one-shot callers (settings test, email, one-click actions) print the string as is, so no notice code
+        error: aiNoticeBody(noModelMessage(getUiLang(), tm('errNoApiKey', { provider }))),
       }
     }
     if (provider !== 'codex' && !config.model) return { ok: false, error: tm('errNoModel') }

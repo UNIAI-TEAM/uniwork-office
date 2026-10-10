@@ -21,6 +21,36 @@ describe('sanitizeFilename', () => {
     expect(sanitizeFilename('CON', 'docx')).toBe('_CON.docx')
     expect(sanitizeFilename('...', 'docx')).toBe('document.docx')
   })
+
+  it('tests the part before the first dot for Windows device names, superscript ports included', () => {
+    expect(sanitizeFilename('Nul.report', 'docx')).toBe('_Nul.report.docx')
+    expect(sanitizeFilename('aux.v2', 'docx')).toBe('_aux.v2.docx')
+    expect(sanitizeFilename('LPT1.txt', 'docx')).toBe('_LPT1.txt.docx')
+    expect(sanitizeFilename('COM¹', 'docx')).toBe('_COM¹.docx')
+    expect(sanitizeFilename('lpt³.log', 'docx')).toBe('_lpt³.log.docx')
+    expect(sanitizeFilename('COM²', 'docx')).toBe('_COM².docx')
+    // not a device name: more than the bare stem
+    expect(sanitizeFilename('console.log', 'docx')).toBe('console.log.docx')
+    expect(sanitizeFilename('Nulla', 'docx')).toBe('Nulla.docx')
+  })
+
+  it('cuts a long title by code points, so an emoji on the limit stays whole', () => {
+    const emoji = '\u{1F600}'
+    const straddle = `${'a'.repeat(119)}${emoji}tail`
+    const cut = sanitizeFilename(straddle, 'docx')
+    expect(cut).toBe(`${'a'.repeat(119)}${emoji}.docx`)
+    expect(cut.isWellFormed()).toBe(true)
+    const manyEmoji = sanitizeFilename(emoji.repeat(130), 'docx')
+    expect(Array.from(manyEmoji)).toHaveLength(120 + '.docx'.length)
+    expect(manyEmoji.isWellFormed()).toBe(true)
+  })
+
+  it('replaces a lone surrogate with an underscore instead of leaving it to the file system', () => {
+    expect(sanitizeFilename('a\ud800b', 'docx')).toBe('a_b.docx')
+    expect(sanitizeFilename('x\udc00', 'docx')).toBe('x_.docx')
+    expect(sanitizeFilename('ok \u{1F600} fine\ud83d', 'docx')).toBe('ok \u{1F600} fine_.docx')
+    expect(sanitizeFilename('a\ud800b', 'docx').isWellFormed()).toBe(true)
+  })
 })
 
 describe('workingCopyName', () => {
