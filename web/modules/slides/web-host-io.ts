@@ -186,8 +186,9 @@ export function createWebHostIO(deps: WebHostDeps): HostIO {
     deps.state.lastFailure = result.error
     const code = result.error.code
     return new WebSaveError(
-      // the protocol message is developer English: the user gets the localised text
-      saveFailureText(result.error, text),
+      // the protocol message is developer English: the user gets the localised text. A conflict
+      // is not "try again" (a retry conflicts again): it says the deck changed elsewhere
+      code === 'conflict' ? text('webConflictNotSaved') : saveFailureText(result.error, text),
       code === 'conflict' ? 'conflict' : code === 'cancelled' ? 'cancelled' : 'failed',
     )
   }

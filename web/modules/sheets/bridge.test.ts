@@ -541,6 +541,29 @@ describe('save conflicts', () => {
   })
 })
 
+describe('host-initiated save conflict copy', () => {
+  it('fails the renderer save with the localized conflict sentence, never the server message', async () => {
+    const t = setup()
+    const wb = await t.boot()
+    t.mock.bumpRemote(t.file.fileId)
+    let failure = ''
+    t.desktop.onCloseSaveRequest(() => {
+      void t.desktop.saveWorkbookEdits(saveRequest(wb.sessionId, [[0, 0, 1]])).then(
+        () => t.desktop.reportCloseSaveResult(true),
+        (err: Error) => {
+          failure = err.message
+          t.desktop.reportCloseSaveResult(false)
+        },
+      )
+    })
+    await t.mock.host.save({ reason: 'user' })
+    expect(failure).not.toBe('')
+    expect(failure).not.toMatch(/stale etag/)
+    expect(failure).toMatch(/newer version/)
+    expect(failure).not.toMatch(/try again/i)
+  })
+})
+
 describe('view-only (no save grant)', () => {
   it('the workbook opens read-only and every save is refused before the engine runs', async () => {
     const t = setup({ grants: { filePick: true } })

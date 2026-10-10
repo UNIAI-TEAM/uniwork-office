@@ -283,6 +283,23 @@ describe('save', () => {
     expect(document.querySelector('[data-slides-web="conflict"]')).toBeNull()
   })
 
+  it('a host `save` conflict reads as a conflict, not as "try again" (a retry conflicts again)', async () => {
+    const { mock, api, fileId } = await setup()
+    await api.consumePendingOpen(FIT)
+    let failure = ''
+    api.onCloseSaveRequest(() => {
+      void api.save().then((r) => {
+        failure = r.ok ? '' : String(r.error)
+        api.reportCloseSaveResult(r.ok)
+      })
+    })
+    await api.setNotes({ slideIndex: 0, text: 'again' })
+    mock.bumpRemote(fileId)
+    await mock.host.save({ reason: 'navigate' } as never)
+    expect(failure).toMatch(/changed elsewhere/)
+    expect(failure).not.toMatch(/try again/i)
+  })
+
   it('save as: the renderer flow under a host `saveAs` uses the host name; cancel -> ok:false', async () => {
     const { mock, api } = await setup()
     await api.consumePendingOpen(FIT)
