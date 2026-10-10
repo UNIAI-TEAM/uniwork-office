@@ -556,4 +556,9 @@ export const ko = {
   appSaving: '저장 중…',
   appSavingAs: '다른 이름으로 저장 중…',
   appPdfPrintFallback: 'PDF를 직접 내보낼 수 없어 브라우저 인쇄 대화 상자를 대신 사용했습니다',
+  appOnlyHint: '이 기능을 사용하려면 UniWork Office 앱에서 여세요',
+  appOnlyOpen: '앱에서 열기',
+  appOnlyZotero: '여기서는 Zotero 인용을 사용할 수 없습니다.',
+  appOnlyOpenPassword: '여기서는 문서를 여는 암호를 설정할 수 없습니다.',
+  appOnlyEncrypted: '"{name}" 문서는 암호로 보호되어 있어 여기서는 열 수 없습니다.',
 } satisfies Record<keyof typeof zh, string>

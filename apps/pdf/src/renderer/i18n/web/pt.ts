@@ -21,4 +21,10 @@ export const pt = {
   webMergeNow: 'Mesclar agora',
   webSaveNetwork: 'Não foi possível acessar o UniWork. Verifique sua conexão e tente novamente.',
   webSaveTimeout: 'Salvar demorou demais. Verifique sua conexão e tente novamente.',
+  webAppOnlyHint: 'Abra no aplicativo UniWork Office para usar este recurso',
+  webAppOnlyOpen: 'Abrir no aplicativo',
+  webAppOnlyOcr:
+    'Este PDF tem páginas digitalizadas. O reconhecimento de texto (OCR) não está disponível aqui.',
+  webAppOnlyConvert: 'A conversão de PDF para Word, Excel ou PowerPoint não está disponível aqui.',
+  webAppOnlyRedact: 'A redação (remoção permanente do conteúdo marcado) não está disponível aqui.',
 } satisfies Record<keyof typeof zh, string>

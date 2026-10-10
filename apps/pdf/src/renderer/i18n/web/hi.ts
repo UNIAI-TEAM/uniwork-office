@@ -21,4 +21,9 @@ export const hi = {
   webMergeNow: 'अभी मर्ज करें',
   webSaveNetwork: 'UniWork से संपर्क नहीं हो सका। अपना कनेक्शन जाँचें और फिर से प्रयास करें।',
   webSaveTimeout: 'सहेजने में बहुत अधिक समय लगा। अपना कनेक्शन जाँचें और फिर से प्रयास करें।',
+  webAppOnlyHint: 'इस सुविधा का उपयोग करने के लिए UniWork Office ऐप में खोलें',
+  webAppOnlyOpen: 'ऐप में खोलें',
+  webAppOnlyOcr: 'इस PDF में स्कैन किए गए पृष्ठ हैं। यहाँ टेक्स्ट पहचान (OCR) उपलब्ध नहीं है।',
+  webAppOnlyConvert: 'PDF को Word, Excel या PowerPoint में बदलना यहाँ उपलब्ध नहीं है।',
+  webAppOnlyRedact: 'रीडैक्शन (चिह्नित सामग्री को स्थायी रूप से हटाना) यहाँ उपलब्ध नहीं है।',
 } satisfies Record<keyof typeof zh, string>

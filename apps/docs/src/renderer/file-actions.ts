@@ -93,6 +93,7 @@ import { hasPrintableHeaderFooter } from './pagination'
 import { clearPrintZoom, setPrintZoom } from './print-zoom'
 import { showToast } from './components/toast-bus'
 import { cap } from './capabilities'
+import { isEncryptedPackage } from './encrypted-package'
 import { buildStandaloneHtml } from './html-export'
 import { aiPanelInitiallyOpen } from '@genoffice/ui'
 
@@ -244,6 +245,8 @@ export interface FileActionContext {
   setCompareResult: (value: { otherName: string; entries: CompareEntry[] } | null) => void
   /** password-protected docx: open the password prompt (decrypt-retry loop lives in App) */
   promptDocxPassword: (info: { path: string; name: string }) => void
+  /** web: the document is a password-protected package the web build cannot decrypt ("use the app") */
+  promptAppOnlyEncrypted: (info: { name: string }) => void
 }
 
 /** Drop the undo stack: undo across an open/reparse boundary resurrects stale
@@ -398,6 +401,11 @@ export async function loadFile(
   const generation = ++openGeneration
   try {
     const bytes = await fetchDocBytes(result.dataUrl)
+    // web: no decrypt engine here; say so instead of failing in the zip parser with a raw error
+    if (!cap('docPassword') && isEncryptedPackage(bytes)) {
+      ctx.promptAppOnlyEncrypted({ name: result.name })
+      return 'canceled'
+    }
     // a 0-byte .docx (touch, failed download) is not a corrupt archive but an
     // empty document: open the blank template under the file's own path
     const parsed = await parseDocxOffThread(

@@ -160,6 +160,12 @@ export interface AiSettings {
    */
   gskToolsEnabled?: boolean
   /**
+   * false = this host runs only the viewer's own providers, so the UniAI pool (`genspark`) is not
+   * offered in the model picker even while the cloud sign-in is reported (the web frames).
+   * Absent means offered.
+   */
+  uniAiAvailable?: boolean
+  /**
    * Output-token cap for ONE model turn of agent runs (default
    * DEFAULT_MAX_OUTPUT_TOKENS). Reasoning models bill their thinking against
    * this same budget, so a heavy edit turn can consume all of it and close with

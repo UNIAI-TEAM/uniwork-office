@@ -526,4 +526,9 @@ export const en = {
   appSaving: 'Saving…',
   appSavingAs: 'Saving as…',
   appPdfPrintFallback: 'PDF export is unavailable here; the browser print dialog was used instead',
+  appOnlyHint: 'Open in the UniWork Office app to use this feature',
+  appOnlyOpen: 'Open in app',
+  appOnlyZotero: 'Zotero citations are not available here.',
+  appOnlyOpenPassword: 'A password to open the document cannot be set here.',
+  appOnlyEncrypted: '"{name}" is password protected and cannot be opened here.',
 } satisfies Record<keyof typeof zh, string>

@@ -21,4 +21,10 @@ export const cs = {
   webMergeNow: 'Sloučit hned',
   webSaveNetwork: 'K UniWork se nepodařilo připojit. Zkontrolujte připojení a zkuste to znovu.',
   webSaveTimeout: 'Ukládání trvalo příliš dlouho. Zkontrolujte připojení a zkuste to znovu.',
+  webAppOnlyHint: 'Otevřete v aplikaci UniWork Office a tuto funkci použijte',
+  webAppOnlyOpen: 'Otevřít v aplikaci',
+  webAppOnlyOcr:
+    'Toto PDF obsahuje naskenované stránky. Rozpoznávání textu (OCR) tu není k dispozici.',
+  webAppOnlyConvert: 'Převod PDF do Wordu, Excelu nebo PowerPointu tu není k dispozici.',
+  webAppOnlyRedact: 'Začernění (trvalé odstranění označeného obsahu) tu není k dispozici.',
 } satisfies Record<keyof typeof zh, string>

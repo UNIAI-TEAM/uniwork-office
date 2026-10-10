@@ -18,15 +18,23 @@ const EDITOR = '.ProseMirror[contenteditable="true"]'
 const consoleErrors: string[] = []
 
 /** open the docx through the test host and return the editor iframe */
-async function openDoc(page: Page, theme?: 'light' | 'dark', lang: string = 'en'): Promise<Frame> {
+async function openDoc(
+  page: Page,
+  theme?: 'light' | 'dark',
+  lang: string = 'en',
+  extra: Record<string, string> = {},
+): Promise<Frame> {
   page.on('console', (m) => {
     if (m.type() === 'error') consoleErrors.push(`console.error: ${m.text()} @ ${m.location().url}`)
   })
   page.on('pageerror', (e) => consoleErrors.push(`pageerror: ${e.message}`))
   // the host is authoritative for the theme and language (init.theme / init.locale)
   const themeParam = theme ? `theme=${theme}&` : ''
+  const extraParams = Object.entries(extra)
+    .map(([k, v]) => `&${k}=${encodeURIComponent(v)}`)
+    .join('')
   await page.goto(
-    `/test-host/?${themeParam}lang=${lang}&open=${encodeURIComponent('/fixtures/kitchen-sink.docx')}`,
+    `/test-host/?${themeParam}lang=${lang}&open=${encodeURIComponent('/fixtures/kitchen-sink.docx')}${extraParams}`,
   )
   await page.waitForFunction(() =>
     /index\.html/.test((document.getElementById('frame') as HTMLIFrameElement)?.src ?? ''),
@@ -79,13 +87,45 @@ test.describe('web capabilities hide entries', () => {
     await shot(page, '01-home-no-ai')
   })
 
-  test('References: no Zotero group', async ({ page }) => {
+  test('References: no Zotero actions; the Zotero entry stays and says to use the app (A7 / B)', async ({
+    page,
+  }) => {
     const ed = await openDoc(page)
     await tab(ed, 'References').click()
-    const labels = (await controls(ed)).join('|')
-    expect(labels).not.toMatch(/Zotero/i)
-    expect(labels).toMatch(/Table of Contents|Footnote/i)
-    await shot(page, '02-references-no-zotero')
+    const labels = await controls(ed)
+    // none of the four desktop actions, one entry that explains
+    expect(labels.join('|')).not.toMatch(/Zotero (Citation|Bibliography|Refresh|Document)/i)
+    expect(labels.filter((l) => l === 'Zotero').length).toBeGreaterThan(0)
+    expect(labels.join('|')).toMatch(/Table of Contents|Footnote/i)
+    await ed.locator('button.rb-big', { hasText: 'Zotero' }).first().click()
+    const note = ed.locator('[data-testid="docs-zotero-app-only"]')
+    await expect(note).toContainText('Zotero citations are not available here.')
+    await expect(note).toContainText('Open in the UniWork Office app to use this feature')
+    // no grant: no action, nothing sent
+    await expect(note.locator('button')).toHaveCount(0)
+    await shot(page, '02-references-zotero-use-the-app')
+  })
+
+  test('References: Open in app sends one app.open when the host grants desktopOpen', async ({
+    page,
+  }) => {
+    const ed = await openDoc(page, undefined, 'en', { desktopopen: '1' })
+    await tab(ed, 'References').click()
+    await ed.locator('button.rb-big', { hasText: 'Zotero' }).first().click()
+    const note = ed.locator('[data-testid="docs-zotero-app-only"]')
+    await note.getByRole('button', { name: 'Open in app' }).click()
+    await expect
+      .poll(() => page.evaluate(() => (window as any).__host.appOpens()))
+      .toEqual([{ feature: 'docs.zotero' }])
+  })
+
+  test('References in Vietnamese: the exact hint wording', async ({ page }) => {
+    const ed = await openDoc(page, undefined, 'vi')
+    await ed.locator('.ribbon-tab', { hasText: 'Tham khảo' }).first().click()
+    await ed.locator('button.rb-big', { hasText: 'Zotero' }).first().click()
+    await expect(ed.locator('[data-testid="docs-zotero-app-only"]')).toContainText(
+      'Mở trong ứng dụng UniWork Office để dùng tính năng này',
+    )
   })
 
   test('Review: no Editor / Translate / AI comments / AI revisions', async ({ page }) => {
@@ -109,7 +149,7 @@ test.describe('web capabilities hide entries', () => {
     await shot(page, '04-view-no-tabs-no-ai')
   })
 
-  test('Protect dialog: no open-password fields', async ({ page }) => {
+  test('Protect dialog: no open-password fields, a note says to use the app', async ({ page }) => {
     const ed = await openDoc(page)
     await tab(ed, 'Review').click()
     await ed.locator('button.rb-big', { hasText: 'Protect' }).first().click()
@@ -118,6 +158,9 @@ test.describe('web capabilities hide entries', () => {
     await expect(dialog).not.toContainText('Password to open this document')
     await expect(dialog).toContainText('Password to modify this document')
     await expect(dialog.locator('.modal-desc')).not.toContainText(/open/i)
+    await expect(dialog.locator('[data-testid="docs-open-password-app-only"]')).toContainText(
+      'Open in the UniWork Office app to use this feature',
+    )
     await shot(page, '05-protect-dialog-no-open-password')
   })
 
@@ -138,6 +181,67 @@ test.describe('web capabilities hide entries', () => {
     await shot(page, '07-home-dark-no-ai')
     await tab(ed, 'View').click()
     await shot(page, '08-view-dark-no-tabs-no-ai')
+  })
+})
+
+test.describe('password-protected document (A7 / B)', () => {
+  /** a compound file whose directory names an EncryptedPackage stream: what Word writes for "encrypt with password" */
+  const LOCKED = (() => {
+    const bytes = new Uint8Array(4096)
+    bytes.set([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1], 0)
+    const name = 'EncryptedPackage'
+    for (let i = 0; i < name.length; i += 1) bytes[1024 + i * 2] = name.charCodeAt(i)
+    return Buffer.from(bytes)
+  })()
+
+  async function openLocked(page: Page, lang: string, extra = ''): Promise<Frame> {
+    const errors: string[] = []
+    page.on('pageerror', (e) => errors.push(e.message))
+    await page.route('**/e2e-fixtures/Locked.docx', (route) =>
+      route.fulfill({
+        status: 200,
+        body: LOCKED,
+        headers: {
+          'content-type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        },
+      }),
+    )
+    await page.goto(
+      `/test-host/?lang=${lang}&open=${encodeURIComponent('/e2e-fixtures/Locked.docx')}${extra}`,
+    )
+    await page.waitForFunction(() =>
+      /index\.html/.test((document.getElementById('frame') as HTMLIFrameElement)?.src ?? ''),
+    )
+    return (await (await page.waitForSelector('#frame')).contentFrame())!
+  }
+
+  test('says so with the hint instead of a raw error; OK closes it', async ({ page }) => {
+    const ed = await openLocked(page, 'en')
+    const note = ed.locator('[data-testid="docs-encrypted-app-only"]')
+    await expect(note).toBeVisible({ timeout: 30_000 })
+    await expect(note).toContainText(
+      '"Locked.docx" is password protected and cannot be opened here.',
+    )
+    await expect(note).toContainText('Open in the UniWork Office app to use this feature')
+    await expect(note.locator('button')).toHaveCount(0)
+    // not the password prompt (the web build cannot decrypt) and not a raw open-failure toast
+    await expect(ed.locator('.pwd-dialog')).toHaveCount(0)
+    await expect(ed.getByText(/Open failed/)).toHaveCount(0)
+    await shot(page, '09-encrypted-docx-use-the-app')
+    await ed.locator('.modal-actions').getByRole('button', { name: 'OK', exact: true }).click()
+    await expect(note).toHaveCount(0)
+  })
+
+  test('Open in app with the desktopOpen grant (vi)', async ({ page }) => {
+    const ed = await openLocked(page, 'vi', '&desktopopen=1')
+    const note = ed.locator('[data-testid="docs-encrypted-app-only"]')
+    await expect(note).toContainText('Mở trong ứng dụng UniWork Office để dùng tính năng này', {
+      timeout: 30_000,
+    })
+    await note.getByRole('button', { name: 'Mở trong ứng dụng' }).click()
+    await expect
+      .poll(() => page.evaluate(() => (window as any).__host.appOpens()))
+      .toEqual([{ feature: 'docs.encrypted' }])
   })
 })
 

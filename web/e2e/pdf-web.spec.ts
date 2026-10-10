@@ -66,6 +66,8 @@ interface OpenOptions {
   readonly?: boolean
   pick?: boolean
   ai?: boolean
+  /** the host grants `desktopOpen` and records the frame's `app.open` requests */
+  desktopOpen?: boolean
 }
 
 async function openPdf(page: Page, o: OpenOptions = {}): Promise<Frame> {
@@ -77,6 +79,7 @@ async function openPdf(page: Page, o: OpenOptions = {}): Promise<Frame> {
     ...(o.readonly ? { readonly: '1' } : {}),
     ...(o.pick ? { pick: '1' } : {}),
     ...(o.ai ? { ai: '1' } : {}),
+    ...(o.desktopOpen ? { desktopopen: '1' } : {}),
   })
   await page.goto(`/test-host/?${q}`)
   await expect(page.locator('#status')).toHaveText(/^initialised/, { timeout: 30_000 })
@@ -488,6 +491,124 @@ test.describe('pdf module on the web', () => {
         await noProblems(page, frame, problems)
       }
     }
+  })
+})
+
+// A7 / B: what the web build does not have says so (never hidden), and the zoom floor at 390 px
+test.describe('pdf module on the web: use-the-app messages and narrow zoom', () => {
+  test.skip(!built(), 'no dist-web/pdf build: npm run build:web -- --module pdf')
+
+  const HINT = {
+    en: 'Open in the UniWork Office app to use this feature',
+    vi: 'Mở trong ứng dụng UniWork Office để dùng tính năng này',
+  } as const
+
+  for (const lang of ['en', 'vi'] as const) {
+    test(`Convert to Office stays visible and explains (${lang}); no app button without the grant`, async ({
+      page,
+    }) => {
+      const problems = await watch(page)
+      const frame = await openPdf(page, { lang })
+      await waitRendered(frame)
+      const convert = frame.locator('.rb-big', {
+        hasText: lang === 'en' ? 'PDF Converter' : 'Chuyển',
+      })
+      await expect(convert.first()).toBeVisible()
+      await convert.first().click()
+      const note = frame.locator('[data-testid="pdf-convert-app-only"]')
+      await expect(note).toContainText(HINT[lang])
+      // not a raw error, and no dead menu entries
+      await expect(note.locator('button')).toHaveCount(0)
+      expect(await host<unknown[]>(page, 'appOpens')).toEqual([])
+      await noProblems(page, frame, problems)
+    })
+  }
+
+  for (const lang of ['en', 'vi'] as const) {
+    test(`Redact stays visible and explains (${lang}); no app button without the grant`, async ({
+      page,
+    }) => {
+      const problems = await watch(page)
+      const frame = await openPdf(page, { lang })
+      await waitRendered(frame)
+      await tab(frame, lang === 'en' ? 'Annotate' : 'Chú thích')
+      const redact = frame.locator('.rb-big', {
+        hasText: lang === 'en' ? 'Redact area' : 'Che vùng nội dung',
+      })
+      await expect(redact.first()).toBeVisible()
+      await redact.first().click()
+      const note = frame.locator('[data-testid="pdf-redact-app-only"]')
+      await expect(note).toContainText(HINT[lang])
+      await expect(note.locator('button')).toHaveCount(0)
+      expect(await host<unknown[]>(page, 'appOpens')).toEqual([])
+      await noProblems(page, frame, problems)
+    })
+  }
+
+  test('Redact: Open in app sends one app.open when the host grants desktopOpen', async ({
+    page,
+  }) => {
+    const problems = await watch(page)
+    const frame = await openPdf(page, { desktopOpen: true })
+    await waitRendered(frame)
+    await tab(frame, 'Annotate')
+    await frame.locator('.rb-big', { hasText: 'Redact area' }).first().click()
+    const note = frame.locator('[data-testid="pdf-redact-app-only"]')
+    await note.getByRole('button', { name: 'Open in app' }).click()
+    await expect.poll(() => host<unknown[]>(page, 'appOpens')).toEqual([{ feature: 'pdf.redact' }])
+    await noProblems(page, frame, problems)
+  })
+
+  test('Convert to Office: Open in app sends one app.open when the host grants desktopOpen', async ({
+    page,
+  }) => {
+    const problems = await watch(page)
+    const frame = await openPdf(page, { desktopOpen: true })
+    await waitRendered(frame)
+    await frame.locator('.rb-big', { hasText: 'PDF Converter' }).first().click()
+    const note = frame.locator('[data-testid="pdf-convert-app-only"]')
+    await expect(note).toContainText(HINT.en)
+    await note.getByRole('button', { name: 'Open in app' }).click()
+    await expect.poll(() => host<unknown[]>(page, 'appOpens')).toEqual([{ feature: 'pdf.convert' }])
+    await noProblems(page, frame, problems)
+  })
+
+  test('a scanned document says OCR is an app feature, once, and OK dismisses it', async ({
+    page,
+  }) => {
+    const problems = await watch(page)
+    const frame = await openPdf(page, { fixture: 'pdf-scanned.pdf', desktopOpen: true })
+    await waitRendered(frame)
+    const toast = frame.locator('[data-testid="pdf-ocr-app-only"]')
+    await expect(toast).toContainText('Text recognition (OCR) is not available here', {
+      timeout: 30_000,
+    })
+    await expect(toast).toContainText(HINT.en)
+    await toast.getByRole('button', { name: 'Open in app' }).click()
+    await expect.poll(() => host<unknown[]>(page, 'appOpens')).toEqual([{ feature: 'pdf.ocr' }])
+    await toast.getByRole('button', { name: 'OK' }).click()
+    await expect(toast).toHaveCount(0)
+    await noProblems(page, frame, problems)
+  })
+
+  test('a text document shows no OCR notice', async ({ page }) => {
+    const frame = await openPdf(page, { fixture: 'sample.pdf' })
+    await waitRendered(frame)
+    await frame.waitForTimeout(1_500)
+    await expect(frame.locator('[data-testid="pdf-ocr-app-only"]')).toHaveCount(0)
+  })
+
+  test('at 390 px the page opens at the 60 % floor, not 26 %', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 800 })
+    const problems = await watch(page)
+    const frame = await openPdf(page, { fixture: 'sample.pdf' })
+    await waitRendered(frame)
+    await expect
+      .poll(async () => Number(await frame.locator('.zoom-slider').inputValue()), {
+        timeout: 15_000,
+      })
+      .toBeGreaterThanOrEqual(60)
+    await noProblems(page, frame, problems)
   })
 })
 

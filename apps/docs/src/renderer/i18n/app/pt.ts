@@ -535,4 +535,9 @@ export const pt = {
   appSavingAs: 'Salvando como…',
   appPdfPrintFallback:
     'A exportação para PDF não está disponível aqui; foi usada a caixa de impressão do navegador',
+  appOnlyHint: 'Abra no aplicativo UniWork Office para usar este recurso',
+  appOnlyOpen: 'Abrir no aplicativo',
+  appOnlyZotero: 'As citações do Zotero não estão disponíveis aqui.',
+  appOnlyOpenPassword: 'Não é possível definir aqui uma senha para abrir o documento.',
+  appOnlyEncrypted: '"{name}" está protegido por senha e não pode ser aberto aqui.',
 } satisfies Record<keyof typeof zh, string>

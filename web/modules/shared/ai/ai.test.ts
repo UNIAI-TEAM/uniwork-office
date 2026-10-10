@@ -17,7 +17,7 @@ import {
 } from './errors'
 import { createProxyFetch, toProxyRequest } from './transport'
 import { createWebAiStreams } from './stream'
-import { aiHostGrants, createWebAi, mediaFromUrl, withWebAi } from './web-ai'
+import { CREDENTIALS_TTL_MS, aiHostGrants, createWebAi, mediaFromUrl, withWebAi } from './web-ai'
 import { describeAiError, hideAiState, openAiSettingsDialog, showAiState } from './ui'
 import { aiWebStrings, aiWebText } from '../i18n/strings-ai-web'
 import type { Lang } from '@genoffice/i18n'
@@ -672,7 +672,12 @@ describe('members (off = as today, on = UniWork routes)', () => {
       gskToolsEnabled: boolean
     }
     expect(settings.provider).toBe('openai')
-    expect(Object.values(settings.providers).every((p) => p.apiKey === '')).toBe(true)
+    // never the key: only the masked hint of a provider that has one stored, '' for the rest
+    expect(
+      Object.entries(settings.providers).every(([id, p]) =>
+        id === 'openai' ? p.apiKey === '…abcd' : p.apiKey === '',
+      ),
+    ).toBe(true)
     expect(settings.gskToolsEnabled).toBe(true)
     // GET cloud says image_search is not available: its capability goes off
     expect(capabilities.imageSearch).toBe(false)
@@ -964,5 +969,144 @@ describe('installModuleBridge wiring', () => {
       imageGeneration: false,
     })
     vi.unstubAllGlobals()
+  })
+})
+
+describe('model chip source and credential refresh (UNI-1232 A4)', () => {
+  const port = {
+    whenInitialized: async () => ({
+      documentId: 'doc-1',
+      apiBase: 'https://app.test/api/v1',
+      capabilities: { ai: true },
+    }),
+    ...tokens(),
+  }
+
+  /** a credential list that tests can change between calls */
+  function liveCredentials(initial: typeof CREDENTIALS.items) {
+    const live = { items: initial }
+    const { calls, fetch } = recorder((c) =>
+      c.url.endsWith('/credentials')
+        ? jsonResponse(200, { items: live.items, providers: CREDENTIALS.providers })
+        : jsonResponse(200, CLOUD),
+    )
+    return {
+      live,
+      calls,
+      fetch,
+      credentialCalls: () => calls.filter((c) => c.url.endsWith('/credentials')).length,
+    }
+  }
+
+  const anthropicCred = { ...CREDENTIALS.items[0]!, provider: 'anthropic', key_hint: '…wxyz' }
+
+  function createAi(fetch: typeof globalThis.fetch, now: () => number, win?: EventTarget) {
+    return createWebAi({
+      port,
+      capabilities: { ai: true },
+      fetch,
+      origin: ORIGIN,
+      now,
+      ...(win ? { win: win as never } : {}),
+    })
+  }
+
+  it('the settings the chip reads carry the viewer provider with a masked key and no UniAI', async () => {
+    const { fetch } = liveCredentials(CREDENTIALS.items)
+    const ai = createAi(fetch, () => 0)
+    const s = await ai.settings()
+    expect(s.provider).toBe('openai')
+    expect(s.providers.openai.apiKey).toBe('…abcd')
+    expect(s.providers.openai.apiKey).not.toMatch(/^sk-/)
+    expect(s.providers.anthropic.apiKey).toBe('')
+    expect(s.uniAiAvailable).toBe(false)
+  })
+
+  it('no stored key: no provider carries a key, so the chip has nothing to name', async () => {
+    const { fetch } = liveCredentials([])
+    const ai = createAi(fetch, () => 0)
+    const s = await ai.settings()
+    expect(Object.values(s.providers).every((p) => p.apiKey === '')).toBe(true)
+    expect(s.uniAiAvailable).toBe(false)
+  })
+
+  it('a key added after the frame booted is picked up after the TTL, without a dialog save', async () => {
+    let t = 1000
+    const { live, fetch, credentialCalls } = liveCredentials([])
+    const ai = createAi(fetch, () => t)
+    const api = withWebAi({}, ai)
+    expect((await ai.settings()).providers.anthropic.apiKey).toBe('')
+    const before = credentialCalls()
+    // still fresh: no new request
+    live.items = [anthropicCred]
+    await ai.settings()
+    expect(credentialCalls()).toBe(before)
+    // stale: the next settings read (and so the next AI call) sees the new key
+    t += CREDENTIALS_TTL_MS + 1
+    const s = await (
+      api.getAiSettings as () => Promise<{
+        provider: string
+        providers: Record<string, { apiKey: string }>
+      }>
+    )()
+    expect(credentialCalls()).toBe(before + 1)
+    expect(s.provider).toBe('anthropic')
+    expect(s.providers.anthropic.apiKey).toBe('…wxyz')
+  })
+
+  it('a key removed in UniWork stops being offered on the next read after the TTL', async () => {
+    let t = 0
+    const { live, fetch } = liveCredentials(CREDENTIALS.items)
+    const ai = createAi(fetch, () => t)
+    expect((await ai.settings()).providers.openai.apiKey).toBe('…abcd')
+    live.items = []
+    t += CREDENTIALS_TTL_MS + 1
+    expect((await ai.settings()).providers.openai.apiKey).toBe('')
+  })
+
+  it('window focus re-fetches at once and tells the chips (onAiSettingsChanged) about a change', async () => {
+    const t = 0
+    const { live, fetch } = liveCredentials([])
+    const win = new EventTarget() as EventTarget & { document?: EventTarget }
+    const ai = createAi(fetch, () => t, win)
+    const api = withWebAi({}, ai)
+    await ai.settings()
+    const changed = vi.fn()
+    const off = (api.onAiSettingsChanged as (h: () => void) => () => void)(changed)
+    live.items = [anthropicCred]
+    win.dispatchEvent(new Event('focus'))
+    await vi.waitFor(() => expect(changed).toHaveBeenCalledTimes(1))
+    expect((await ai.settings()).providers.anthropic.apiKey).toBe('…wxyz')
+    // an unchanged list is not a change
+    win.dispatchEvent(new Event('focus'))
+    await new Promise((r) => setTimeout(r, 0))
+    expect(changed).toHaveBeenCalledTimes(1)
+    off()
+    live.items = []
+    win.dispatchEvent(new Event('focus'))
+    await new Promise((r) => setTimeout(r, 0))
+    expect(changed).toHaveBeenCalledTimes(1)
+  })
+
+  it('choosing a model notifies the chips and a failed refresh keeps the last answer', async () => {
+    let t = 0
+    let fail = false
+    const { fetch: inner } = liveCredentials(CREDENTIALS.items)
+    const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
+      fail
+        ? jsonResponse(503, { code: 'cloud_unavailable' })
+        : (inner as typeof globalThis.fetch)(input, init),
+    ) as unknown as typeof globalThis.fetch
+    const ai = createAi(fetch, () => t)
+    expect((await ai.settings()).providers.openai.apiKey).toBe('…abcd')
+    const changed = vi.fn()
+    ai.onChanged(changed)
+    ai.choose('openai', 'gpt-x')
+    expect(changed).toHaveBeenCalledTimes(1)
+    fail = true
+    t += CREDENTIALS_TTL_MS + 1
+    // the refresh fails: settings() answers from the last good list instead of going blank
+    const s = await ai.settings()
+    expect(s.providers.openai.model).toBe('gpt-x')
   })
 })

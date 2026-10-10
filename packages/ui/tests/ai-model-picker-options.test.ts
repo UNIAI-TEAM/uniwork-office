@@ -44,6 +44,39 @@ describe('aiModelPickerGroups', () => {
   })
 })
 
+describe('hosts without the UniAI pool (web frames)', () => {
+  it('never lists uniAI nor names openrouter/auto, even while the cloud sign-in is reported', () => {
+    const settings = { ...defaultAiSettings(), uniAiAvailable: false }
+    expect(aiModelPickerGroups(settings, true)).toEqual([])
+    settings.providers.genspark = { ...settings.providers.genspark, apiKey: 'sk-or-1' }
+    expect(aiModelPickerGroups(settings, true)).toEqual([])
+  })
+
+  it('lists the viewer provider that carries a (masked) key and selects its model', () => {
+    const settings = {
+      ...defaultAiSettings(),
+      uniAiAvailable: false,
+      provider: 'anthropic' as const,
+    }
+    settings.providers.anthropic = { apiKey: '…wxyz', model: anthropicModels[1]! }
+    expect(aiModelPickerGroups(settings, true).map((g) => g.id)).toEqual(['anthropic'])
+    expect(aiModelPickerSelection(settings)).toEqual({
+      provider: 'anthropic',
+      model: anthropicModels[1],
+    })
+  })
+
+  it('no stored key: the selection falls to uniAI but nothing is listed, so the chip says Choose model', () => {
+    const settings = { ...defaultAiSettings(), uniAiAvailable: false, provider: 'openai' as const }
+    expect(aiModelPickerGroups(settings, true)).toEqual([])
+    expect(
+      aiModelPickerGroups(settings, true).some(
+        (g) => g.id === aiModelPickerSelection(settings).provider,
+      ),
+    ).toBe(false)
+  })
+})
+
 describe('selection round trip', () => {
   it('switches provider and model in one write and reads back', () => {
     const settings = defaultAiSettings()

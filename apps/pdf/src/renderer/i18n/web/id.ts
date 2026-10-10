@@ -21,4 +21,10 @@ export const id = {
   webMergeNow: 'Gabungkan sekarang',
   webSaveNetwork: 'UniWork tidak dapat dijangkau. Periksa koneksi Anda lalu coba lagi.',
   webSaveTimeout: 'Penyimpanan memakan waktu terlalu lama. Periksa koneksi Anda lalu coba lagi.',
+  webAppOnlyHint: 'Buka di aplikasi UniWork Office untuk menggunakan fitur ini',
+  webAppOnlyOpen: 'Buka di aplikasi',
+  webAppOnlyOcr:
+    'PDF ini memiliki halaman hasil pindai. Pengenalan teks (OCR) tidak tersedia di sini.',
+  webAppOnlyConvert: 'Konversi PDF ke Word, Excel, atau PowerPoint tidak tersedia di sini.',
+  webAppOnlyRedact: 'Penyamaran (menghapus permanen konten yang ditandai) tidak tersedia di sini.',
 } satisfies Record<keyof typeof zh, string>

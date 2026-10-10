@@ -131,7 +131,15 @@ ghostscript cannot write them) - pdf.js decodes both with its wasm codecs, which
 - The save core runs on the frame's main thread (no worker yet): large files freeze the UI while saving (inventory 3.2).
 - Every save uploads the whole rewritten file as a new version (same as G3).
 - The size gate is the host's (`too_large` on `api.open`); the frame shows its open-failure notice.
-- OCR and Convert to Office are hidden (desktop engines). AI is shown with the host's `ai` grant and hidden without it (section 2.1).
+- OCR and Convert to Office have no web engine (desktop engines) but are not hidden: the Convert entry stays in the ribbon and its
+  menu says "Open in the UniWork Office app to use this feature", and a scanned document gets a one-time notice of the same kind.
+  The Redact entry (Annotate tab; it writes a working copy next to the file) stays too and opens the same note. All three offer
+  Open in app when the host grants `desktopOpen` (`pdfApi.openInApp` -> `app.open`, protocol README). The "no installed
+  font" message adds the same hint on the web unless the text has emoji (the app draws with installed system fonts: CJK and most
+  symbols, never emoji). AI is shown with the host's `ai` grant and hidden without it (section 2.1).
+- Width-fit never goes below 60 % in a pane of 600 px or less (the page then scrolls sideways), as in Docs.
+- Draft recovery (`draft-recovery.md`) includes the editor boxes that are open: a comment typed into the margin card, a comment
+  being rewritten and the floating text editor. They make the document unsaved and are in the draft copy and in Save.
 
 ## 6. Evidence
 

@@ -532,4 +532,9 @@ export const cs = {
   appSavingAs: 'Ukládání jako…',
   appPdfPrintFallback:
     'Export do PDF zde není k dispozici; místo něj byl použit tiskový dialog prohlížeče',
+  appOnlyHint: 'Otevřete v aplikaci UniWork Office a tuto funkci použijte',
+  appOnlyOpen: 'Otevřít v aplikaci',
+  appOnlyZotero: 'Citace Zotero tu nejsou k dispozici.',
+  appOnlyOpenPassword: 'Heslo pro otevření dokumentu tu nelze nastavit.',
+  appOnlyEncrypted: 'Dokument „{name}“ je chráněn heslem a nelze jej zde otevřít.',
 } satisfies Record<keyof typeof zh, string>

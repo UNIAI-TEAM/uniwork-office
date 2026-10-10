@@ -11,8 +11,8 @@
 //        &assets=<json> puts {path as written: same-origin URL} into api.open's OpenPayload.assets
 //        &resolve=1 offers api.assets.resolve: every path answers /e2e-assets/<last segment>?r=<call number>, a
 //        name starting with "gone" is left out; the requests are kept (__host.resolves()) (UNI-1232 A1b)
-//        &desktopOpen=1 grants `desktopOpen`: app.open requests are kept (__host.appOpens()) and answered with
-//        &appOpen=<launched|installer|unavailable> (default launched) (UNI-1232 A7)
+//        &desktopopen=1 (or &desktopOpen=1) grants `desktopOpen` (A7): the frame's "Open in app" sends `app.open`,
+//        kept in __host.appOpens() and answered &appOpen=<launched|installer|unavailable> (default launched)
 //
 // module (default docs): the frame defaults to /office-frame/<module>/<version|latest>/index.html (docs keeps
 // the site root, as before), `init.module` names the module, and the host refuses a frame whose
@@ -33,7 +33,6 @@
 //   bumpRemote(id)   -> simulate a concurrent server-side save (next frame save conflicts)
 //   lastExport()     -> {fileId, name, dataBytes: number[] | null} of the last api.export | null
 //   uploads()        -> the api.images.upload requests so far ({fileId, name, mimeType, bytes: number[]})
-//   appOpens()       -> the app.open requests so far ({feature})
 //   resolves()       -> the api.assets.resolve requests so far ({fileId, paths})
 //   addFile(url)     -> fetch a fixture into the store, resolves with its meta (GO-B4)
 //   queuePick(id)    -> the next file.pick answers this file (nothing queued = the user cancelled);
@@ -41,6 +40,7 @@
 //   newSessionKey()  -> replace the persisted recovery key by a new one (the old drafts stay but cannot be
 //                       read any more); the next init carries it
 //   signOut()        -> delete the whole frame-drafts database (what the real host does on sign-out)
+//   appOpens()       -> the `app.open` payloads received ({feature?}), in order (granted with ?desktopopen=1)
 //   documentId       -> the init document's file id
 
 const NS = 'uniwork.office.docs'
@@ -249,7 +249,9 @@ if (params.get('ai') === '1') {
 }
 if (params.get('pick') === '1') initPayload.capabilities.filePick = true
 if (params.get('images') === '1') initPayload.capabilities.images = true
-if (params.get('desktopOpen') === '1') initPayload.capabilities.desktopOpen = true
+// both spellings: ?desktopopen=1 (the Docs/PDF specs) and ?desktopOpen=1 (the Markdown/HTML specs)
+if (params.get('desktopopen') === '1' || params.get('desktopOpen') === '1')
+  initPayload.capabilities.desktopOpen = true
 const ASSETS = params.get('assets') ? JSON.parse(params.get('assets')) : null
 
 const KEY_DB = 'uniwork-office-frame-drafts'

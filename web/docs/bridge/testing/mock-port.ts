@@ -109,10 +109,10 @@ export function createMockPort(session: Partial<PortSession> = {}) {
     },
     'image.fetch': () => ({ image: { base64: 'iVBORw0KGgo=', mime: 'image/png' } }),
     'convert.altChunkHtml': () => ({ data: new Uint8Array([0x50, 0x4b]).buffer }),
+    // the host's "Open in desktop app" flow (A7 contract): the mock "launches" it; a test of an old host
+    // overrides it to reject with `unsupported`
+    'app.open': () => ({ outcome: 'launched' }),
     // not offered by the default mock host (an old host): the frame keeps the URLs it has
-    'app.open': () => {
-      throw protocolError('unsupported', 'app.open')
-    },
     'api.assets.resolve': () => {
       throw protocolError('unsupported', 'api.assets.resolve')
     },

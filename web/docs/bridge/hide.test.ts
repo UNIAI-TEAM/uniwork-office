@@ -15,6 +15,7 @@ describe('webCapabilities (the single web capability source)', () => {
         'autoSaveToDisk',
         'billing',
         'createDocument',
+        'desktopOpen',
         'docPassword',
         'imageGeneration',
         'imageSearch',
@@ -41,13 +42,24 @@ describe('webCapabilities (the single web capability source)', () => {
   })
 
   it('File > Open and recents turn on only with the negotiated host grants', () => {
-    expect(hostGrants(undefined)).toEqual({ open: false, recents: false })
+    expect(hostGrants(undefined)).toEqual({ open: false, recents: false, desktopOpen: false })
     // the dev-uniwork host: no document picker (file.pick answers unsupported)
     expect(hostGrants({ save: true, recents: true, filePick: false })).toEqual({
       open: false,
       recents: true,
+      desktopOpen: false,
     })
-    expect(hostGrants({ filePick: true, recents: false })).toEqual({ open: true, recents: false })
+    expect(hostGrants({ filePick: true, recents: false })).toEqual({
+      open: true,
+      recents: false,
+      desktopOpen: false,
+    })
+    // "Open in the app" is an explicit host grant, never implied by the others
+    expect(hostGrants({ desktopOpen: true })).toEqual({
+      open: false,
+      recents: false,
+      desktopOpen: true,
+    })
   })
 })
 

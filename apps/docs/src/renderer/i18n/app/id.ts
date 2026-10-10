@@ -536,4 +536,9 @@ export const id = {
   appSavingAs: 'Menyimpan sebagai…',
   appPdfPrintFallback:
     'Ekspor PDF tidak tersedia di sini; dialog cetak browser digunakan sebagai gantinya',
+  appOnlyHint: 'Buka di aplikasi UniWork Office untuk menggunakan fitur ini',
+  appOnlyOpen: 'Buka di aplikasi',
+  appOnlyZotero: 'Kutipan Zotero tidak tersedia di sini.',
+  appOnlyOpenPassword: 'Kata sandi untuk membuka dokumen tidak dapat diatur di sini.',
+  appOnlyEncrypted: '"{name}" dilindungi kata sandi dan tidak dapat dibuka di sini.',
 } satisfies Record<keyof typeof zh, string>
