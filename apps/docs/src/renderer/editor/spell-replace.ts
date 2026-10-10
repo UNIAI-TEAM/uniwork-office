@@ -1,5 +1,6 @@
 import type { Editor } from '@tiptap/core'
 import type { Node as PMNode } from '@tiptap/pm/model'
+import { afterRespellKick } from './respell-kick-gate'
 
 const WORD_CHAR = /[\p{L}\p{N}\p{M}'’_-]/u
 
@@ -78,6 +79,18 @@ export function applySpellingSuggestion(
   replacement: string,
   blinkReplace?: (replacement: string) => Promise<void>,
 ): void {
+  // after Add to Dictionary the respell kick may still own the caret text node
+  afterRespellKick(() => applyNow(editor, pos, word, replacement, blinkReplace))
+}
+
+function applyNow(
+  editor: Editor,
+  pos: number | null,
+  word: string,
+  replacement: string,
+  blinkReplace?: (replacement: string) => Promise<void>,
+): void {
+  if (editor.isDestroyed) return
   const range = pos != null ? misspelledRangeAt(editor.state.doc, pos, word) : null
   const fallback = () => {
     if (range) replaceMisspelledWord(editor, range.from, word, replacement)

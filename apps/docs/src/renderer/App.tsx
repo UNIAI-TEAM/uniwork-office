@@ -25,6 +25,7 @@ import {
   useAutoSavePref,
 } from '@genoffice/ui'
 import { wordRangeAtCaret } from './editor/comments'
+import { beginRespellKick } from './editor/respell-kick-gate'
 import { setFieldInstr, toggleAllFieldCodes, type FieldRange } from './editor/field-codes'
 import { linkTarget } from './editor/link-actions'
 import { FieldDialog } from './components/FieldDialog'
@@ -1643,6 +1644,7 @@ export function App() {
           return
         }
         respellKickBusy.current = true
+        const endKick = beginRespellKick()
         spellDiag('kick start')
         const sub = getActiveSubEditor()
         const prev = document.activeElement as HTMLElement | null
@@ -1772,6 +1774,8 @@ export function App() {
               }
               // always drop the pin listener, even on a torn-down round trip
               scroller?.removeEventListener('scroll', pinScroll, true)
+              // a spelling suggestion picked meanwhile applies now, on the scrubbed text
+              endKick()
             }
           })
       }

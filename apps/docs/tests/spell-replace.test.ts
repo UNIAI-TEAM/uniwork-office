@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Editor } from '@tiptap/core'
 import { editorExtensions } from '../src/renderer/editor/extensions'
 import { applySpellingSuggestion, misspelledRangeAt } from '../src/renderer/editor/spell-replace'
+import { beginRespellKick } from '../src/renderer/editor/respell-kick-gate'
 
 const liveEditors: Editor[] = []
 afterEach(() => {
@@ -133,6 +134,23 @@ describe('applySpellingSuggestion', () => {
     const editor = makeEditor('a mison b')
     applySpellingSuggestion(editor, 1 + 4, 'mison', 'maison', () => Promise.reject(new Error('x')))
     await settle()
+    expect(editor.state.doc.textContent).toBe('a maison b')
+  })
+
+  it('waits for an in-flight respell kick before touching the document', async () => {
+    vi.useFakeTimers()
+    const editor = makeEditor('a mison b')
+    const blink = blinkStandIn(editor)
+    // the kick's scrub restores its text-node snapshot: a replace landing
+    // inside its round trip would be reverted on screen behind ProseMirror
+    const endKick = beginRespellKick()
+    applySpellingSuggestion(editor, 1 + 4, 'mison', 'maison', blink)
+    await settle()
+    expect(blink).not.toHaveBeenCalled()
+    expect(editor.state.doc.textContent).toBe('a mison b')
+    endKick()
+    await settle()
+    expect(blink).toHaveBeenCalledWith('maison')
     expect(editor.state.doc.textContent).toBe('a maison b')
   })
 
