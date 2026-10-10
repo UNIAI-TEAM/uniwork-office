@@ -20,4 +20,9 @@ export const vi = {
   webMergeNow: 'Gộp ngay',
   webSaveNetwork: 'Không kết nối được tới UniWork. Hãy kiểm tra mạng rồi thử lại.',
   webSaveTimeout: 'Việc lưu mất quá nhiều thời gian. Hãy kiểm tra mạng rồi thử lại.',
+  webAppOnlyHint: 'Mở trong ứng dụng UniWork Office để dùng tính năng này',
+  webAppOnlyOpen: 'Mở trong ứng dụng',
+  webAppOnlyOcr: 'PDF này có trang quét. Tính năng nhận dạng văn bản (OCR) không có ở đây.',
+  webAppOnlyConvert: 'Chuyển PDF sang Word, Excel hoặc PowerPoint không có ở đây.',
+  webAppOnlyRedact: 'Che nội dung (xóa vĩnh viễn phần đã đánh dấu) không có ở đây.',
 } satisfies Record<keyof typeof zh, string>

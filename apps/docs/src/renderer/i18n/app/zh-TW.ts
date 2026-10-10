@@ -515,4 +515,9 @@ export const zhTW = {
   appSaving: '正在儲存…',
   appSavingAs: '正在另存新檔…',
   appPdfPrintFallback: '無法直接匯出 PDF,已改用瀏覽器列印對話方塊',
+  appOnlyHint: '在 UniWork Office 應用程式中開啟，即可使用此功能',
+  appOnlyOpen: '在應用程式中開啟',
+  appOnlyZotero: '此處不提供 Zotero 引文。',
+  appOnlyOpenPassword: '此處無法設定開啟文件的密碼。',
+  appOnlyEncrypted: '「{name}」受密碼保護，無法在此處開啟。',
 } satisfies Record<keyof typeof zh, string>

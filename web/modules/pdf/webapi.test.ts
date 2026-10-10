@@ -615,3 +615,27 @@ describe('draft recovery (C18)', () => {
     await vi.waitFor(() => expect(s.records().size).toBe(0))
   })
 })
+
+describe('openInApp (A7: the "use the app" action)', () => {
+  it('asks the host once, with the feature tag and no timeout, only with the desktopOpen grant', async () => {
+    const t = await setup({ caps: { desktopOpen: true } })
+    t.mock.override('app.open', () => ({ outcome: 'launched' }))
+    expect(await t.api.openInApp('pdf.ocr')).toEqual({ outcome: 'launched' })
+    const calls = t.mock.calls.filter((c) => c.type === 'app.open')
+    expect(calls).toHaveLength(1)
+    expect(calls[0]!.payload).toEqual({ feature: 'pdf.ocr' })
+    expect(calls[0]!.opts?.timeoutMs).toBe(0)
+  })
+
+  it('without the grant nothing is sent', async () => {
+    const t = await setup({ caps: { desktopOpen: false } })
+    expect(await t.api.openInApp('pdf.convert')).toEqual({ outcome: 'unavailable' })
+    expect(t.mock.calls.filter((c) => c.type === 'app.open')).toHaveLength(0)
+  })
+
+  it('the grant is read at call time (init lands after the api is built)', async () => {
+    const t = await setup({ caps: { desktopOpen: false } })
+    t.caps.desktopOpen = true
+    expect(await t.api.openInApp()).toEqual({ outcome: 'launched' })
+  })
+})

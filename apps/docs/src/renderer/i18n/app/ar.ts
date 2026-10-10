@@ -523,4 +523,9 @@ export const ar = {
   appSaving: 'جارٍ الحفظ…',
   appSavingAs: 'جارٍ الحفظ باسم…',
   appPdfPrintFallback: 'تصدير PDF غير متاح هنا؛ تم استخدام مربع حوار الطباعة في المتصفح بدلاً منه',
+  appOnlyHint: 'افتح في تطبيق UniWork Office لاستخدام هذه الميزة',
+  appOnlyOpen: 'فتح في التطبيق',
+  appOnlyZotero: 'اقتباسات Zotero غير متاحة هنا.',
+  appOnlyOpenPassword: 'لا يمكن تعيين كلمة مرور لفتح المستند هنا.',
+  appOnlyEncrypted: 'المستند "{name}" محمي بكلمة مرور ولا يمكن فتحه هنا.',
 } satisfies Record<keyof typeof zh, string>

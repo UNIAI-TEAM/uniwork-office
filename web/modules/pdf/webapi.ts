@@ -35,8 +35,10 @@
  * | provideSaveRequest (web only)     | draft recovery (C18): the renderer's pending edits, applied to the       |
  * |                                   |   working copy every 30 s while dirty -> encrypted IndexedDB copy        |
  * | consumeRecovered (web only)       | the open bytes are a restored draft: the renderer starts dirty           |
- * | AI, OCR, convert, auto-rename,    | typed stubs; their entries are hidden by capabilities (./install.ts)     |
- * |   createDocument, image search    |                                                                          |
+ * | AI, OCR, convert, auto-rename,    | typed stubs; AI / auto-rename / image search entries are hidden by       |
+ * |   createDocument, image search    |   capabilities (./install.ts); OCR and Convert to Office stay visible    |
+ * |                                   |   and say "use the app" (renderer AppOnlyNote)                           |
+ * | openInApp (web only)              | host `app.open` (A7), only with the `desktopOpen` grant; else quiet      |
  *
  * Save conflicts (api.save answers `conflict`): a host `save` request gets the conflict in its
  * SaveResult and owns the UI. Otherwise the frame asks like Docs (./notice.ts): Overwrite (re-read
@@ -69,6 +71,7 @@ import {
   type SaveResult,
 } from '../../docs/protocol/types'
 import aiStub from '../../docs/bridge/ai'
+import { createAppOpen } from '../../docs/bridge/app-open'
 import browser, { downloadBlob } from '../../docs/bridge/browser'
 import { capEnabled } from '../../docs/bridge/capability-object'
 import { TIMEOUTS, errorCode } from '../../docs/bridge/frame-port'
@@ -652,6 +655,8 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
       recoveredFlag = false
       return flag
     },
+    /** the "use the app" action (A7); the grant is read at call time */
+    openInApp: createAppOpen(port, deps.capabilities),
 
     // ---- save
     async save(request: SavePdfRequest): Promise<SavePdfResult> {

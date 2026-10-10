@@ -332,6 +332,7 @@ import { AutoCorrectDialog } from './components/AutoCorrectDialog'
 import { PreferencesDialog } from './components/PreferencesDialog'
 import { applyCase, nextCaseMode, selectionText } from './editor/case-transform'
 import { stepHangingIndent, stepParagraphIndent } from './editor/indent'
+import { AppOnlyDialog } from './components/AppOnlyDialog'
 import { PasswordDialog } from './components/PasswordDialog'
 import { ProtectDialog, type ProtectDialogResult } from './components/ProtectDialog'
 import { t, statusText, useI18n, type StatusLine } from './i18n/locale'
@@ -778,6 +779,8 @@ export function App() {
     errorKey: '' | 'appDocPwdWrong' | 'appDocPwdUnsupported'
     busy: boolean
   } | null>(null)
+  /** web: a password-protected package the frame cannot decrypt ("use the app" dialog) */
+  const [appOnlyEncrypted, setAppOnlyEncrypted] = useState<{ name: string } | null>(null)
   /** Review > Protect: the combined Word-style Protect Document dialog */
   const [showProtectDialog, setShowProtectDialog] = useState(false)
   /** prompt for a document with a password to modify (w:writeProtection): enter it or open read-only */
@@ -2144,6 +2147,7 @@ export function App() {
     setCompareResult,
     promptDocxPassword: (info) =>
       setDocPwdPrompt({ path: info.path, name: info.name, value: '', errorKey: '', busy: false }),
+    promptAppOnlyEncrypted: (info) => setAppOnlyEncrypted({ name: info.name }),
   }
 
   const loadFile = useCallback(async (result: OpenDocxResult) => {
@@ -7837,6 +7841,10 @@ export function App() {
 
       {showAutoCorrect && <AutoCorrectDialog onClose={() => setShowAutoCorrect(false)} />}
       {showPreferences && <PreferencesDialog onClose={() => setShowPreferences(false)} />}
+
+      {appOnlyEncrypted && (
+        <AppOnlyDialog name={appOnlyEncrypted.name} onClose={() => setAppOnlyEncrypted(null)} />
+      )}
 
       {docPwdPrompt && (
         <PasswordDialog

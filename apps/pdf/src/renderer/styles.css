@@ -2875,6 +2875,28 @@ html[data-web-frame] .pdf-modal-btn.primary:hover:not(:disabled) {
   cursor: default;
 }
 
+/* "Use the app" note of the web frame (Convert to Office): feature line, the shared hint and the
+   Open-in-app action, inside a ribbon dropdown */
+.pdf-app-only {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  width: 260px;
+  max-width: 100%;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--text);
+}
+
+.pdf-app-only p {
+  margin: 0;
+}
+
+.pdf-app-only-hint {
+  font-weight: 600;
+}
+
 /* Dialog color well (stamp dialog): swatch trigger + the shared picker popover.
    The popover is fixed + anchored so it escapes the modal's overflow-y clip. */
 .pdf-color-well-wrap {

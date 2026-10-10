@@ -548,4 +548,9 @@ export const de = {
   appSavingAs: 'Wird gespeichert unter…',
   appPdfPrintFallback:
     'PDF-Export ist hier nicht verfügbar; stattdessen wurde der Druckdialog des Browsers verwendet',
+  appOnlyHint: 'Zum Verwenden dieser Funktion in der UniWork Office-App öffnen',
+  appOnlyOpen: 'In der App öffnen',
+  appOnlyZotero: 'Zotero-Zitate sind hier nicht verfügbar.',
+  appOnlyOpenPassword: 'Ein Kennwort zum Öffnen kann hier nicht festgelegt werden.',
+  appOnlyEncrypted: '„{name}“ ist kennwortgeschützt und kann hier nicht geöffnet werden.',
 } satisfies Record<keyof typeof zh, string>

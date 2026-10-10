@@ -12,6 +12,7 @@ import {
   type TocEntry,
 } from '@genoffice/docx-engine'
 import { Dropdown } from '@genoffice/ui'
+import { AppOnlyNote } from './AppOnlyNote'
 import { PromptModal } from './PromptModal'
 import { cap } from '../capabilities'
 import { collectHeadings } from '../editor/headings'
@@ -494,6 +495,40 @@ export function ReferencesTab({
 
   return (
     <>
+      {!cap('zotero') && (
+        <>
+          {/* the web build has no Zotero connector: the group stays and explains */}
+          <div className="ribbon-group">
+            <div className="ribbon-group-items">
+              <div className="rb-split-wrap">
+                <button
+                  className="rb-big"
+                  data-tip={t('appOnlyHint')}
+                  onClick={() => toggleDropdown(setDropdown, 'zotero-app-only')}
+                >
+                  <span className="rb-big-icon">
+                    <IconCitation size={BIG} />
+                    <IconCaret />
+                  </span>
+                  <span>{t('zoteroGroup')}</span>
+                </button>
+                {dropdown === 'zotero-app-only' && (
+                  <div data-rb-panel="" className="layout-menu">
+                    <AppOnlyNote
+                      testId="docs-zotero-app-only"
+                      lead="appOnlyZotero"
+                      feature="docs.zotero"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="ribbon-group-label">{t('zoteroGroup')}</div>
+          </div>
+
+          <div className="ribbon-sep" />
+        </>
+      )}
       {cap('zotero') && (
         <>
           <div className="ribbon-group">

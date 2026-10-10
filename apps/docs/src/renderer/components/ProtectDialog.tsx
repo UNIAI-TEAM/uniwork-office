@@ -19,6 +19,7 @@ import {
   type WriteProtection,
 } from '@genoffice/docx-engine'
 import { useI18n } from '../i18n/locale'
+import { AppOnlyNote } from './AppOnlyNote'
 import { FieldError, PasswordInput } from './PasswordInput'
 import { cap } from '../capabilities'
 
@@ -166,6 +167,14 @@ export function ProtectDialog({
         </p>
 
         <h3 className="protect-section-title">{t('appProtectSecurity')}</h3>
+        {!openPasswordAvailable && (
+          // the web build has no document encryption: say so instead of leaving the row out
+          <AppOnlyNote
+            testId="docs-open-password-app-only"
+            lead="appOnlyOpenPassword"
+            feature="docs.openPassword"
+          />
+        )}
         {openPasswordAvailable && (
           <div className="fld-row">
             <label className="fld">

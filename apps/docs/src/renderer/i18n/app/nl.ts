@@ -544,4 +544,9 @@ export const nl = {
   appSavingAs: 'Opslaan als…',
   appPdfPrintFallback:
     'PDF-export is hier niet beschikbaar; in plaats daarvan is het afdrukvenster van de browser gebruikt',
+  appOnlyHint: 'Open in de UniWork Office-app om deze functie te gebruiken',
+  appOnlyOpen: 'Openen in de app',
+  appOnlyZotero: 'Zotero-citaten zijn hier niet beschikbaar.',
+  appOnlyOpenPassword: 'Een wachtwoord om het document te openen kan hier niet worden ingesteld.',
+  appOnlyEncrypted: '"{name}" is met een wachtwoord beveiligd en kan hier niet worden geopend.',
 } satisfies Record<keyof typeof zh, string>

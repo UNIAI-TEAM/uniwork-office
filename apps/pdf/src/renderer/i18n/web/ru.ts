@@ -22,4 +22,10 @@ export const ru = {
   webSaveNetwork: 'Не удалось связаться с UniWork. Проверьте подключение и повторите попытку.',
   webSaveTimeout:
     'Сохранение заняло слишком много времени. Проверьте подключение и повторите попытку.',
+  webAppOnlyHint: 'Откройте в приложении UniWork Office, чтобы использовать эту функцию',
+  webAppOnlyOpen: 'Открыть в приложении',
+  webAppOnlyOcr:
+    'В этом PDF есть отсканированные страницы. Распознавание текста (OCR) здесь недоступно.',
+  webAppOnlyConvert: 'Преобразование PDF в Word, Excel или PowerPoint здесь недоступно.',
+  webAppOnlyRedact: 'Редактирование с удалением (безвозвратное удаление отмеченного содержимого) здесь недоступно.',
 } satisfies Record<keyof typeof zh, string>

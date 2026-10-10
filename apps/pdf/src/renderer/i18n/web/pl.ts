@@ -21,4 +21,10 @@ export const pl = {
   webMergeNow: 'Scal teraz',
   webSaveNetwork: 'Nie można połączyć się z UniWork. Sprawdź połączenie i spróbuj ponownie.',
   webSaveTimeout: 'Zapisywanie trwało zbyt długo. Sprawdź połączenie i spróbuj ponownie.',
+  webAppOnlyHint: 'Otwórz w aplikacji UniWork Office, aby użyć tej funkcji',
+  webAppOnlyOpen: 'Otwórz w aplikacji',
+  webAppOnlyOcr:
+    'Ten PDF zawiera zeskanowane strony. Rozpoznawanie tekstu (OCR) nie jest tu dostępne.',
+  webAppOnlyConvert: 'Konwersja PDF do Worda, Excela lub PowerPointa nie jest tu dostępna.',
+  webAppOnlyRedact: 'Redagowanie (trwałe usuwanie zaznaczonej treści) nie jest tutaj dostępne.',
 } satisfies Record<keyof typeof zh, string>

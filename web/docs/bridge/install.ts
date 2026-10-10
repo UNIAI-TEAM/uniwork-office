@@ -41,6 +41,7 @@ import { bindHostAppearance, createFrameClient } from './frame-boot'
 import { createCapabilityObject } from './capability-object'
 import { mergeModules, safeApi, type BridgeObject } from './safe-api'
 import ai from './ai'
+import { createAppOpen } from './app-open'
 import hide, { hostGrants, webCapabilities } from './hide'
 import { createHeadless, isTopLevel, parseHeadlessEntry } from './headless'
 import { installFocusReturn } from './focus-return'
@@ -68,6 +69,8 @@ const client =
       exportPdf: true,
       exportHtml: true,
       filePick: true,
+      // the frame's "Open in app" action (A7); effective only when the host grants it
+      desktopOpen: true,
     },
   })
 /** read by the renderer's cap(); boot waits (bounded) for init, so the grants land before the first render */
@@ -83,7 +86,14 @@ const webapi = createWebApi(client)
 export function installBridge(): void {
   // later modules win: webapi's real fetchImage / convertAltChunkHtml / close
   // guard replace the ai.ts and hide.ts stubs
-  const modules: BridgeObject[] = [hide, ai, webapi, browser]
+  const modules: BridgeObject[] = [
+    hide,
+    ai,
+    webapi,
+    browser,
+    // the "use the app" action (A7): one host request, only with the `desktopOpen` grant
+    { openInApp: createAppOpen(client, capabilities as Record<string, unknown>) },
+  ]
   if (headless) modules.push(headless.desktopFor(webapi))
   // the headless entry has no frame token: AI stays off there
   const desktop = withWebAi(

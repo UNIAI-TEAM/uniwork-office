@@ -530,4 +530,9 @@ export const vi = {
   appSavingAs: 'Đang lưu thành…',
   appPdfPrintFallback:
     'Không xuất được PDF trực tiếp; đã dùng hộp thoại in của trình duyệt thay thế',
+  appOnlyHint: 'Mở trong ứng dụng UniWork Office để dùng tính năng này',
+  appOnlyOpen: 'Mở trong ứng dụng',
+  appOnlyZotero: 'Trích dẫn Zotero không có ở đây.',
+  appOnlyOpenPassword: 'Không thể đặt mật khẩu mở tài liệu ở đây.',
+  appOnlyEncrypted: '"{name}" được bảo vệ bằng mật khẩu và không thể mở ở đây.',
 } satisfies Record<keyof typeof zh, string>

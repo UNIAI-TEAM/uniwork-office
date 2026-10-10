@@ -540,4 +540,9 @@ export const es = {
   appSavingAs: 'Guardando como…',
   appPdfPrintFallback:
     'La exportación a PDF no está disponible aquí; se usó el cuadro de impresión del navegador',
+  appOnlyHint: 'Abre en la aplicación UniWork Office para usar esta función',
+  appOnlyOpen: 'Abrir en la aplicación',
+  appOnlyZotero: 'Las citas de Zotero no están disponibles aquí.',
+  appOnlyOpenPassword: 'Aquí no se puede establecer una contraseña de apertura.',
+  appOnlyEncrypted: '«{name}» está protegido con contraseña y no se puede abrir aquí.',
 } satisfies Record<keyof typeof zh, string>

@@ -539,4 +539,9 @@ export const ru = {
   appSavingAs: 'Сохранение как…',
   appPdfPrintFallback:
     'Экспорт в PDF здесь недоступен; вместо него использовано окно печати браузера',
+  appOnlyHint: 'Откройте в приложении UniWork Office, чтобы использовать эту функцию',
+  appOnlyOpen: 'Открыть в приложении',
+  appOnlyZotero: 'Цитаты Zotero здесь недоступны.',
+  appOnlyOpenPassword: 'Здесь нельзя задать пароль для открытия документа.',
+  appOnlyEncrypted: '«{name}» защищён паролем и не может быть открыт здесь.',
 } satisfies Record<keyof typeof zh, string>

@@ -533,4 +533,9 @@ export const hi = {
   appSavingAs: 'इस रूप में सहेजा जा रहा है…',
   appPdfPrintFallback:
     'यहाँ PDF निर्यात उपलब्ध नहीं है; इसके बजाय ब्राउज़र का प्रिंट डायलॉग इस्तेमाल किया गया',
+  appOnlyHint: 'इस सुविधा का उपयोग करने के लिए UniWork Office ऐप में खोलें',
+  appOnlyOpen: 'ऐप में खोलें',
+  appOnlyZotero: 'Zotero उद्धरण यहाँ उपलब्ध नहीं हैं।',
+  appOnlyOpenPassword: 'दस्तावेज़ खोलने का पासवर्ड यहाँ सेट नहीं किया जा सकता।',
+  appOnlyEncrypted: '"{name}" पासवर्ड से सुरक्षित है और यहाँ नहीं खोला जा सकता।',
 } satisfies Record<keyof typeof zh, string>

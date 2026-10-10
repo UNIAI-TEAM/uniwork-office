@@ -852,4 +852,9 @@ export interface PdfApi {
       consumePending / reload is a restored draft: the viewer starts dirty with no pending
       edits and its Save writes the bytes as they are. Absent on desktop */
   consumeRecovered?(): boolean
+  /** Web frame only (A7): ask the host to run its "Open in the UniWork Office app" flow. Resolves
+      `unavailable` when the host cannot (no `desktopOpen` grant, old host, nothing to launch; the
+      host already showed its own alert), so callers show nothing more. `feature` is an opaque
+      diagnostics tag, never shown. Absent on desktop */
+  openInApp?(feature?: string): Promise<{ outcome: 'launched' | 'installer' | 'unavailable' }>
 }

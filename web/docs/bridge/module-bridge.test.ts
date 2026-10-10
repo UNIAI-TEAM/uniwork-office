@@ -113,6 +113,24 @@ describe('installModuleBridge', () => {
     expect(document.documentElement.getAttribute('data-theme')).toBe('dark')
   })
 
+  it.each([
+    ['is off until the host grants it', { filePick: true }, false],
+    ['follows an explicit host grant', { desktopOpen: true }, true],
+  ])('desktopOpen %s (A7)', async (_name, granted, expected) => {
+    const mock = createMockPort()
+    const { capabilities } = installModuleBridge({
+      module: 'pdf',
+      frameCapabilities: {},
+      client: mock.port,
+      globals: { pdfApi: () => ({}) },
+      target: {},
+    })
+    expect(capabilities.desktopOpen).toBe(false)
+    mock.init({ capabilities: granted })
+    await flush()
+    expect(capabilities.desktopOpen).toBe(expected)
+  })
+
   it('several globals; `capabilities.on` limits which ones carry the object', () => {
     const mock = createMockPort()
     const target: Record<string, unknown> = {}

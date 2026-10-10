@@ -7350,6 +7350,34 @@ body.docs-crop-active
   cursor: pointer;
 }
 
+/* "Use the app" note of the web frame: feature line, the shared hint, the Open-in-app action */
+.app-only-note {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  max-width: 280px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text);
+}
+
+.app-only-note p {
+  margin: 0;
+}
+
+.app-only-note .app-only-hint {
+  font-weight: 600;
+}
+
+.app-only-note .app-only-open {
+  margin-top: 2px;
+}
+
+.protect-dialog .app-only-note {
+  max-width: none;
+}
+
 .btn-primary:hover:not(:disabled) {
   background: var(--docs-accent-fill-hover);
 }

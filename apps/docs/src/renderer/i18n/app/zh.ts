@@ -541,4 +541,9 @@ export const zh = {
   appSaving: '正在保存…',
   appSavingAs: '正在另存为…',
   appPdfPrintFallback: '无法直接导出 PDF,已改用浏览器打印对话框',
+  appOnlyHint: '在 UniWork Office 应用中打开，即可使用此功能',
+  appOnlyOpen: '在应用中打开',
+  appOnlyZotero: '此处不提供 Zotero 引文。',
+  appOnlyOpenPassword: '此处无法设置打开文档的密码。',
+  appOnlyEncrypted: '“{name}”受密码保护，无法在此处打开。',
 }

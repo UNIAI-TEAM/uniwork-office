@@ -19,4 +19,9 @@ export const zh = {
   webMergeNow: '立即合并',
   webSaveNetwork: '无法连接到 UniWork。请检查网络后重试。',
   webSaveTimeout: '保存耗时过长。请检查网络后重试。',
+  webAppOnlyHint: '在 UniWork Office 应用中打开，即可使用此功能',
+  webAppOnlyOpen: '在应用中打开',
+  webAppOnlyOcr: '此 PDF 含有扫描页。此处不提供文字识别（OCR）。',
+  webAppOnlyConvert: '此处不提供将 PDF 转换为 Word、Excel 或 PowerPoint。',
+  webAppOnlyRedact: '此处不提供涂黑（永久移除已标记内容）。',
 }
