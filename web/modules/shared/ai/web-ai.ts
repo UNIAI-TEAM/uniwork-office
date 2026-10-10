@@ -9,7 +9,7 @@
  * On: the members talk to the frame-token AI routes (./client.ts):
  *   - aiStream / aiChat: ai-provider's native wire format on the BYOK proxy (./stream.ts),
  *   - getAiSettings: the provider/model choice of this viewer over the providers that have a key
- *     stored in UniWork (never a key: `apiKey` is always ''), setAiSettings keeps only the choice,
+ *     stored in UniWork (never a key: `apiKey` is the masked hint or ''), setAiSettings keeps only the choice,
  *   - webSearch / imageSearch / aiGenerateImage (generateImage) / analyzeMedia: the UniWork cloud
  *     tools, each behind its capability (`webSearch`, `imageSearch`, `imageGeneration`) AND the
  *     server's `GET cloud` tool switch,
@@ -121,6 +121,8 @@ export interface WebAi {
   state(refresh?: boolean): Promise<WebAiState | null>
   settings(): Promise<AiSettings>
   choose(provider: string, model?: string): void
+  /** the credentials or the choice changed (a key added / removed, a model picked); returns the unsubscribe */
+  onChanged(handler: () => void): () => void
   streams: WebAiStreams
   openSettings(): Promise<void>
   /** the typed failure -> its card + its text */
@@ -129,17 +131,49 @@ export interface WebAi {
 
 const EMPTY: WebAiState = { credentials: { items: [], providers: [] }, cloud: null }
 
+/**
+ * How long a loaded credential list is trusted. A key may be added in UniWork settings (another
+ * tab) or removed there at any time; every AI call and every settings read re-fetches once the
+ * answer is older than this, and window focus / tab visibility mark it stale at once.
+ */
+export const CREDENTIALS_TTL_MS = 4000
+
+/** what a change of the credential list looks like to a subscriber (never a key) */
+function credentialSignature(list: AiCredentialList): string {
+  return list.items
+    .map((c) => `${c.provider}:${c.key_hint}:${c.base_url}:${c.updated_at}`)
+    .sort()
+    .join('|')
+}
+
 export function createWebAi(opts: {
   port: Pick<FramePort, 'whenInitialized' | 'getToken' | 'refreshToken'>
   capabilities: Record<string, unknown>
   /** test seams */
   fetch?: typeof fetch
   origin?: string
+  now?: () => number
+  /** the window whose focus / visibility refresh the credentials (default: the frame's) */
+  win?: Pick<Window, 'addEventListener'> & { document?: Pick<Document, 'addEventListener'> }
 }): WebAi {
   let clientRef: AiWebClient | null = null
   let state: WebAiState = EMPTY
   let loading: Promise<WebAiState> | null = null
+  let loadedAt = 0
+  let everLoaded = false
   let choice = readChoice()
+  const changeListeners = new Set<() => void>()
+  const now = opts.now ?? Date.now
+
+  function notifyChanged(): void {
+    for (const listener of [...changeListeners]) {
+      try {
+        listener()
+      } catch (err) {
+        console.error('[web-bridge] onAiSettingsChanged listener threw', err)
+      }
+    }
+  }
 
   const activation = opts.port
     .whenInitialized()
@@ -162,6 +196,7 @@ export function createWebAi(opts: {
       })
       // early: the cloud tool switches land before the first AI run; a failure is retried on use
       void load(true).catch(() => {})
+      watchForeground()
       return true
     })
     .catch(() => false)
@@ -169,22 +204,40 @@ export function createWebAi(opts: {
   async function load(refresh = false): Promise<WebAiState> {
     const client = clientRef
     if (!client) return EMPTY
-    if (loading && !refresh) return loading
-    loading = (async () => {
+    if (loading && !refresh && now() - loadedAt < CREDENTIALS_TTL_MS) return loading
+    const run = (async () => {
       const [credentials, cloud] = await Promise.all([
         client.listCredentials(),
         client.cloudStatus().catch(() => null),
       ])
+      const changed =
+        everLoaded && credentialSignature(credentials) !== credentialSignature(state.credentials)
       state = { credentials, cloud }
+      loadedAt = now()
+      everLoaded = true
       applyCloud(cloud)
+      if (changed) notifyChanged()
       return state
     })()
+    loading = run
     try {
-      return await loading
+      return await run
     } catch (err) {
-      loading = null
+      // a failed refresh keeps the last answer but makes the next call try again
+      if (loading === run) loading = null
       throw err
     }
+  }
+
+  /** back in the tab / window: a key may have been added in UniWork settings meanwhile */
+  function watchForeground(): void {
+    const win = opts.win ?? (typeof window === 'undefined' ? undefined : window)
+    if (!win) return
+    const refreshNow = (): void => void load(true).catch(() => {})
+    win.addEventListener('focus', refreshNow)
+    win.document?.addEventListener('visibilitychange', () => {
+      if ((win.document as Document | undefined)?.visibilityState !== 'hidden') refreshNow()
+    })
   }
 
   /** the server switches a cloud tool off (not configured, no entitlement): its entries hide */
@@ -235,6 +288,10 @@ export function createWebAi(opts: {
     return p === 'openai-compatible' || p === 'anthropic' || p === 'gemini' ? p : null
   }
 
+  function protocolBaseOf(provider: string): string {
+    return state.credentials.providers.find((p) => p.id === provider)?.default_base_url ?? ''
+  }
+
   /** usable = has a stored key, the server knows its protocol, genoffice can drive it */
   function usableProviders(): string[] {
     return state.credentials.items
@@ -256,10 +313,23 @@ export function createWebAi(opts: {
     const providers = { ...base.providers }
     for (const id of Object.keys(providers) as AiProviderId[]) {
       const model = choice.models[id]
-      providers[id] = { ...providers[id], apiKey: '', ...(model ? { model } : {}) }
+      const stored = state.credentials.items.find((c) => c.provider === id)
+      const usableHere = usable.includes(id)
+      providers[id] = {
+        ...providers[id],
+        // The real key never reaches the frame. A provider with a key stored in UniWork carries
+        // its masked hint (non-empty, never sent: ./stream.ts drops it) so the shared picker and
+        // `activeProvider` see it as configured; one without stays empty and is not listed.
+        apiKey: usableHere ? stored?.key_hint || '…' : '',
+        ...(usableHere && providers[id].baseUrl !== undefined
+          ? { baseUrl: stored?.base_url || protocolBaseOf(id) || providerLabel(id) }
+          : {}),
+        ...(model ? { model } : {}),
+      }
     }
     const cloudOn = opts.capabilities.imageGeneration === true
-    return { ...base, provider, providers, gskToolsEnabled: cloudOn }
+    // UniAI is the desktop's pool of cloud models: the web runs only the viewer's own providers
+    return { ...base, provider, providers, gskToolsEnabled: cloudOn, uniAiAvailable: false }
   }
 
   function choose(provider: string, model?: string): void {
@@ -268,6 +338,7 @@ export function createWebAi(opts: {
       models: { ...choice.models, ...(model ? { [provider]: model } : {}) },
     }
     writeChoice(choice)
+    notifyChanged()
   }
 
   function fail(err: unknown, provider = ''): string {
@@ -297,6 +368,8 @@ export function createWebAi(opts: {
       label: providerLabel,
       models: (id) => AI_PROVIDERS.find((p) => p.id === id)?.models ?? [],
     })
+    // keys saved or removed in the dialog, a model picked: every panel's chip re-reads
+    notifyChanged()
   }
 
   const streams = createWebAiStreams({
@@ -322,6 +395,12 @@ export function createWebAi(opts: {
     state: async (refresh) => ((await activation) ? load(refresh) : null),
     settings,
     choose,
+    onChanged: (handler) => {
+      changeListeners.add(handler)
+      return () => {
+        changeListeners.delete(handler)
+      }
+    },
     streams,
     openSettings,
     fail,
@@ -367,6 +446,7 @@ export const WEB_AI_MEMBERS = [
   'analyzeMedia',
   'openAiSettings',
   'openAiModelSettings',
+  'onAiSettingsChanged',
 ] as const
 
 type Fn = (...args: unknown[]) => unknown
@@ -428,6 +508,16 @@ export function withWebAi(base: BridgeObject, ai: WebAi): BridgeObject {
       return ai.streams.aiChat({ ...r, settings: await current(r.settings) })
     }),
     aiGskStatus: when('aiGskStatus', async () => ({ loggedIn: true })),
+    // sync subscriber like onAiStream: the model chip re-reads after a key or a model change
+    onAiSettingsChanged: (handler: unknown) => {
+      const h = handler as () => void
+      const offOwn = own('onAiSettingsChanged')?.(h) as (() => void) | undefined
+      const offWeb = ai.onChanged(h)
+      return () => {
+        offOwn?.()
+        offWeb()
+      }
+    },
     aiGskLogin: when('aiGskLogin', () => ai.openSettings()),
     gskStatus: when('gskStatus', async () => {
       const st = await ai.state().catch(() => null)
