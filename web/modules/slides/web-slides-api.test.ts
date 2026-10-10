@@ -21,6 +21,7 @@ import {
 } from '../../docs/bridge/draft-recovery'
 import { createFakeIdb } from '../../docs/bridge/testing/fake-idb'
 import { createMockPort, protocolError, type MockPort } from '../../docs/bridge/testing/mock-port'
+import { setPendingTextEditProbe } from '../../../apps/slides/src/renderer/pending-text-edit'
 import { encodePng } from './tiff'
 import { cfbKind, createWebSlidesApi, type WebSlidesOptions } from './web-slides-api'
 import { SLIDES_WEB_CAPABILITIES, slidesHostGrants } from './capabilities'
@@ -518,6 +519,39 @@ describe('draft recovery (C18)', () => {
     expect(await api.isDirty()).toBe(false)
     expect(mock.dirty.at(-1) ?? false).toBe(false)
     expect(await profile.store.list('u1:f1:')).toEqual([])
+  })
+
+  // N3-02 (visual round 3): text typed in a box still in edit mode never reached the draft
+  it('a text box still in edit mode is in the draft, and the edit stays open', async () => {
+    profile = await browserProfile()
+    const first = await profile.tab()
+    await first.api.consumePendingOpen(FIT)
+    const sourceId = await titleId(first.api)
+    setPendingTextEditProbe(() => ({
+      slideIndex: 0,
+      sourceId,
+      paragraphs: [{ runs: [{ text: 'typed, not yet committed' }] }],
+    }))
+    const before = await first.api.isDirty()
+    await first.recovery.flush()
+    setPendingTextEditProbe(null)
+    first.recovery.dispose()
+    // the draft copy did not touch the session: still the committed deck
+    expect(before).toBe(false)
+    expect(await first.api.isDirty()).toBe(false)
+    sessions.clear()
+    document.body.innerHTML = ''
+    const records = await profile.store.list('u1:f1:')
+    expect(records).toHaveLength(1)
+    profile.answer('restore')
+    const second = await profile.tab()
+    await second.api.consumePendingOpen(FIT)
+    const slides = await second.api.getRenderSlides()
+    const node = slides![0]!.nodes.find((n) => 'placeholder' in n && n.placeholder === 'ctrTitle')!
+    const lines = 'text' in node && node.text ? node.text.lines : []
+    expect(lines.map((l) => l.runs.map((r) => r.text).join('')).join('')).toBe(
+      'typed, not yet committed',
+    )
   })
 
   it('another document (not the init one) gets no draft written', async () => {

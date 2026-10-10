@@ -21,8 +21,10 @@
  *
  * Typed as the full SlidesApi (no Partial): a new preload method is a build error here.
  */
-import { createBlankPptx, savePptx } from '@genoffice/pptx-engine'
+import { createBlankPptx, savePptx, type OpenedPptx } from '@genoffice/pptx-engine'
+import { runTxn } from '@genoffice/pptx-ops'
 import type { AiPanelPrefs } from '@genoffice/ui'
+import { readPendingTextEdit } from '../../../apps/slides/src/renderer/pending-text-edit'
 import { base64ToBytes, bytesToBase64 } from '../../../apps/slides/src/session/bytes'
 import {
   appClipboard,
@@ -298,6 +300,42 @@ export function createWebSlidesApi(
 
   // ------------------------------------------------------------ draft recovery (C18)
 
+  /**
+   * The deck a draft is serialised from: the committed one, plus the text of an on-canvas text
+   * box that is still in edit mode (it lives in the editor's DOM until the box commits). The
+   * edit lands on a throwaway copy, so the open editor and the session are not disturbed.
+   */
+  function draftOpened(opened: OpenedPptx): OpenedPptx {
+    const pending = readPendingTextEdit()
+    if (!pending) return opened
+    const archive = Object.assign(
+      Object.create(Object.getPrototypeOf(opened.archive)),
+      opened.archive,
+      {
+        entries: new Map(opened.archive.entries),
+      },
+    ) as OpenedPptx['archive']
+    const copy: OpenedPptx = {
+      archive,
+      deck: {
+        ...opened.deck,
+        size: { ...opened.deck.size },
+        slides: structuredClone(opened.deck.slides),
+      },
+    }
+    const r = runTxn(copy, {
+      ops: [
+        {
+          op: 'setText',
+          target: { slide: pending.slideIndex, el: pending.sourceId },
+          paragraphs: pending.paragraphs,
+          ...(pending.groupId ? { group: pending.groupId } : {}),
+        },
+      ],
+    })
+    return r.applied ? copy : opened
+  }
+
   /** the document `init` names: the only one the host's draft scope ("<user>:<document>") covers */
   let initDocumentId: string | null = null
   /** the file an open is offering the draft of (the session still holds the previous deck) */
@@ -308,13 +346,14 @@ export function createWebSlidesApi(
       const file = offering ?? (current !== null ? state.files.get(current) : undefined)
       return file && file.fileId === initDocumentId ? { etag: file.etag, name: file.name } : null
     },
-    isDirty: () => sessionIsDirty(),
+    // a text box still in edit mode counts: its text is in the draft too (draftOpened)
+    isDirty: () => sessionIsDirty() || readPendingTextEdit() !== null,
     bytes: async () => {
       const session = sessions.get(WEB_CLIENT_ID)
       // master view writes only its part back on save: no draft until it is closed
       if (!session || session.masterEdit) return null
       try {
-        return await savePptx(session.opened)
+        return await savePptx(draftOpened(session.opened))
       } catch (err) {
         console.warn('[slides-web] draft bytes skipped:', err)
         return null

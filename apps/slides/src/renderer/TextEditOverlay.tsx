@@ -47,6 +47,8 @@ interface Props {
   onContextMenu?: (x: number, y: number, collapsed: boolean) => void
   /** Left press on the frame around the text (not on a line box) commits the edit and hands the press over as a shape drag */
   onFrameDrag?: (ev: MouseEvent) => void
+  /** Filled with a reader of the uncommitted content (null = unchanged) while the editor is mounted */
+  probeRef?: React.MutableRefObject<(() => EditParagraph[] | null) | null>
 }
 
 /**
@@ -646,6 +648,7 @@ export function TextEditOverlay({
   zoom = 1,
   onFrameDrag,
   onContextMenu,
+  probeRef,
 }: Props) {
   const ref = useRef<HTMLDivElement>(null)
   const frameRef = useRef<HTMLDivElement>(null)
@@ -780,6 +783,16 @@ export function TextEditOverlay({
     const paras = extractParagraphs(div, norm)
     return JSON.stringify(paras) === initialRef.current ? null : paras
   }
+
+  const changedRef = useRef(changedParagraphs)
+  changedRef.current = changedParagraphs
+  useEffect(() => {
+    if (!probeRef) return
+    probeRef.current = () => changedRef.current() ?? null
+    return () => {
+      probeRef.current = null
+    }
+  }, [probeRef])
 
   // Targeted layout release (native listeners: React's onBeforeInput synthetic event does
   // not map to the real `beforeinput`). beforeinput sees the pre-mutation target ranges
