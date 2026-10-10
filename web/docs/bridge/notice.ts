@@ -4,12 +4,12 @@
  *   - `ask()`: a choice (save conflict, discard unsaved changes before opening another document),
  *   - `showFatal()`: a blocking notice when the document could not be opened.
  *
- * Built from the renderer's own dialog classes (`.modal-backdrop` / `.modal` / `.modal-actions`
- * / `.btn-primary` in apps/docs/src/renderer/styles.css), so they follow the theme tokens with no
- * CSS of their own. Strings come from the renderer's app i18n shards in the current UI language.
+ * The box is the shared frame dialog (web/modules/shared/frame-dialog.ts), the same in every
+ * module. Strings come from the renderer's app i18n shards in the current UI language.
  */
 import { createI18n } from '@genoffice/i18n'
 import { appStrings } from '../../../apps/docs/src/renderer/i18n/strings-app'
+import { frameAsk, hideFrameNotices, showFrameNotice } from '../../modules/shared/frame-dialog'
 import { webLanguage } from './browser'
 
 type AppKey = keyof (typeof appStrings)['zh']
@@ -28,6 +28,9 @@ export interface Choice<T extends string> {
   danger?: boolean
 }
 
+const MARKER_ATTR = 'data-docs-web'
+const MASK_CLASS = 'docs-web-backdrop'
+
 // ------------------------------------------------------------ open-dialog tracking
 
 type ModalListener = (open: boolean) => void
@@ -44,39 +47,10 @@ export function onModalChange(listener: ModalListener | null): void {
 /** read from the DOM, so a dialog removed by anyone (or a reset body) still reports closed */
 function syncModal(): void {
   if (typeof document === 'undefined') return
-  const open = document.querySelector('.docs-web-backdrop') !== null
+  const open = document.querySelector(`.${MASK_CLASS}`) !== null
   if (open === reportedOpen) return
   reportedOpen = open
   modalListener?.(open)
-}
-
-let dialogSeq = 0
-
-function dialog(
-  title: AppKey,
-  body: AppKey,
-  marker: string,
-): { root: HTMLElement; box: HTMLElement } {
-  const id = `docs-web-dialog-${++dialogSeq}`
-  const root = document.createElement('div')
-  root.className = 'modal-backdrop docs-web-backdrop'
-  root.dataset.docsWeb = marker
-  const box = document.createElement('div')
-  box.className = 'modal gs-form'
-  box.setAttribute('role', 'alertdialog')
-  box.setAttribute('aria-modal', 'true')
-  box.setAttribute('aria-labelledby', `${id}-title`)
-  box.setAttribute('aria-describedby', `${id}-desc`)
-  const h = document.createElement('h2')
-  h.id = `${id}-title`
-  h.textContent = text(title)
-  const p = document.createElement('p')
-  p.className = 'modal-desc'
-  p.id = `${id}-desc`
-  p.textContent = text(body)
-  box.append(h, p)
-  root.append(box)
-  return { root, box }
 }
 
 /**
@@ -91,52 +65,20 @@ export function ask<T extends string>(opts: {
   cancelId: T
   marker: string
 }): Promise<T> {
-  return new Promise<T>((resolve) => {
-    const { root, box } = dialog(opts.title, opts.body, opts.marker)
-    const actions = document.createElement('div')
-    actions.className = 'modal-actions'
-    const buttons: HTMLButtonElement[] = []
-    const finish = (id: T): void => {
-      document.removeEventListener('keydown', onKey, true)
-      root.remove()
-      syncModal()
-      resolve(id)
-    }
-    const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        e.stopPropagation()
-        finish(opts.cancelId)
-        return
-      }
-      if (e.key !== 'Tab' || buttons.length === 0) return
-      // focus trap: cycle through the dialog's buttons only
-      e.preventDefault()
-      e.stopPropagation()
-      const at = buttons.indexOf(document.activeElement as HTMLButtonElement)
-      const step = e.shiftKey ? -1 : 1
-      const next = at < 0 ? 0 : (at + step + buttons.length) % buttons.length
-      buttons[next].focus()
-    }
-    let focus: HTMLButtonElement | null = null
-    for (const c of opts.choices) {
-      const b = document.createElement('button')
-      b.type = 'button'
-      b.dataset.choice = c.id
-      b.textContent = text(c.label)
-      if (c.danger) b.className = 'danger'
-      else if (c.primary) b.className = 'btn-primary'
-      if (c.id === opts.cancelId) focus = b
-      b.addEventListener('click', () => finish(c.id))
-      actions.append(b)
-      buttons.push(b)
-    }
-    box.append(actions)
-    document.addEventListener('keydown', onKey, true)
-    document.body.append(root)
-    syncModal()
-    const initial = focus ?? buttons.find((b) => !b.classList.contains('danger'))
-    initial?.focus()
+  return frameAsk<T>({
+    title: text(opts.title),
+    body: text(opts.body),
+    choices: opts.choices.map((c) => ({
+      id: c.id,
+      label: text(c.label),
+      ...(c.primary ? { primary: true } : {}),
+      ...(c.danger ? { danger: true } : {}),
+    })),
+    cancelId: opts.cancelId,
+    marker: opts.marker,
+    markerAttr: MARKER_ATTR,
+    maskClass: MASK_CLASS,
+    onChange: syncModal,
   })
 }
 
@@ -145,12 +87,17 @@ const FATAL = 'fatal'
 /** blocking notice over the editor (no buttons: the host decides what happens next) */
 export function showFatal(body: AppKey): void {
   hideFatal()
-  const { root } = dialog('appWebFatalTitle', body, FATAL)
-  document.body.append(root)
+  showFrameNotice({
+    title: text('appWebFatalTitle'),
+    body: text(body),
+    marker: FATAL,
+    markerAttr: MARKER_ATTR,
+    maskClass: MASK_CLASS,
+  })
   syncModal()
 }
 
 export function hideFatal(): void {
-  for (const el of document.querySelectorAll(`[data-docs-web="${FATAL}"]`)) el.remove()
+  hideFrameNotices(FATAL, MARKER_ATTR)
   syncModal()
 }

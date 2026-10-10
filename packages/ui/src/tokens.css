@@ -70,6 +70,9 @@
   --color-border-default: #eaeaea;
   --color-border-strong: #d0d3d8;
   --color-border-brand: #0f7fff;
+  --color-dialog-primary: #0a52e6;
+  --color-dialog-primary-hover: #0843bd;
+  --color-dialog-primary-text: #ffffff;
   --color-error: #ef4444;
   --color-error-hover: #dc2626;
 
@@ -146,6 +149,9 @@
   --color-border-default: #3a3a3a;
   --color-border-strong: #555;
   --color-border-brand: #4a9eff;
+  --color-dialog-primary: #5a96ff;
+  --color-dialog-primary-hover: #7aabff;
+  --color-dialog-primary-text: #0d1220;
 
   color-scheme: dark;
 }
@@ -210,6 +216,9 @@
     --color-border-default: #3a3a3a;
     --color-border-strong: #555;
     --color-border-brand: #4a9eff;
+    --color-dialog-primary: #5a96ff;
+    --color-dialog-primary-hover: #7aabff;
+    --color-dialog-primary-text: #0d1220;
 
     color-scheme: dark;
   }

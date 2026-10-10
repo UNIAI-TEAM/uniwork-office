@@ -431,7 +431,7 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
       body: 'appWebDiscardBody',
       choices: [
         { id: 'cancel', label: 'appCancel', primary: true },
-        { id: 'discard', label: 'appWebDiscard' },
+        { id: 'discard', label: 'appWebDiscard', danger: true },
       ],
       cancelId: 'cancel',
       marker: 'discard',

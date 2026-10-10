@@ -387,7 +387,7 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
       choices: [
         { id: 'cancel', label: 'webCancel' },
         { id: 'reload', label: 'webConflictReload' },
-        { id: 'overwrite', label: 'webConflictOverwrite', primary: true },
+        { id: 'overwrite', label: 'webConflictOverwrite', danger: true },
       ],
       cancelId: 'cancel',
       marker: 'conflict',

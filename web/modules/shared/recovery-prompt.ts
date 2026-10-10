@@ -37,7 +37,7 @@ export function promptDraftRestore(draft: DraftInfo): Promise<DraftChoice> {
     body: 'webDraftBody',
     details,
     choices: [
-      { id: 'discard', label: 'webDraftDiscard' },
+      { id: 'discard', label: 'webDraftDiscard', danger: true },
       { id: 'restore', label: 'webDraftRestore', primary: true },
     ],
     cancelId: 'dismiss',

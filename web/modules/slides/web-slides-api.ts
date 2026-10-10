@@ -491,7 +491,7 @@ export function createWebSlidesApi(
       body: 'webDiscardBody',
       choices: [
         { id: 'cancel', label: 'webCancel', primary: true },
-        { id: 'discard', label: 'webDiscard' },
+        { id: 'discard', label: 'webDiscard', danger: true },
       ],
       cancelId: 'cancel',
       marker: 'discard',

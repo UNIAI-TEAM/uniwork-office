@@ -245,15 +245,15 @@ describe('saveDocx', () => {
     const btn = (id: string) => dlg.querySelector<HTMLButtonElement>(`[data-choice="${id}"]`)!
     // a stray Enter must not overwrite the other writer's version
     expect(document.activeElement).toBe(btn('cancel'))
-    expect(btn('overwrite').className).toBe('danger')
-    expect(btn('overwrite').classList.contains('btn-primary')).toBe(false)
+    expect(btn('overwrite').className).toBe('ow-dlg-btn danger')
+    expect(btn('overwrite').classList.contains('primary')).toBe(false)
     const box = dlg.querySelector('[role="alertdialog"]')!
     expect(document.getElementById(box.getAttribute('aria-labelledby')!)!.textContent).toBe(
       text('appWebConflictTitle'),
     )
     // the host learns that a frame modal is open (protocol `modal`)
     expect(mock.modals).toEqual([true])
-    // Tab cycles inside the dialog: cancel -> reload -> overwrite -> cancel; Shift+Tab goes back
+    // Tab cycles inside the dialog (reload, overwrite, then the way out last): cancel -> reload -> overwrite -> cancel; Shift+Tab goes back
     const tab = (shiftKey = false) =>
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey, bubbles: true }))
     tab()

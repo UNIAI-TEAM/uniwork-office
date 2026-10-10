@@ -274,9 +274,9 @@ export function createWebHostIO(deps: WebHostDeps): HostIO {
       body: 'webConflictBody',
       choices: [
         // the safe choice takes the focus: Overwrite replaces someone else's version
-        { id: 'cancel', label: 'webCancel', primary: true },
+        { id: 'cancel', label: 'webCancel' },
         { id: 'reload', label: 'webConflictReload' },
-        { id: 'overwrite', label: 'webConflictOverwrite' },
+        { id: 'overwrite', label: 'webConflictOverwrite', danger: true },
       ],
       cancelId: 'cancel',
       marker: 'conflict',

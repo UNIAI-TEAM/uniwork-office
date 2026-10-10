@@ -339,7 +339,7 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
       body: 'appWebDiscardBody',
       choices: [
         { id: 'cancel', label: 'appWebCancel', primary: true },
-        { id: 'discard', label: 'appWebDiscard' },
+        { id: 'discard', label: 'appWebDiscard', danger: true },
       ],
       cancelId: 'cancel',
       marker: 'discard',
@@ -514,7 +514,7 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
       choices: [
         { id: 'cancel', label: 'appWebCancel' },
         { id: 'reload', label: 'appWebConflictReload' },
-        { id: 'overwrite', label: 'appWebConflictOverwrite', primary: true },
+        { id: 'overwrite', label: 'appWebConflictOverwrite', danger: true },
       ],
       cancelId: 'cancel',
       marker: 'conflict',
