@@ -10,6 +10,7 @@ import {
   rmSync,
   statSync,
   writeFileSync,
+  writeSync,
 } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { basename, dirname, extname, join, resolve } from 'node:path'
@@ -324,6 +325,7 @@ import { FileIndexer } from './file-index/indexer'
 import { FileIndexStore } from './file-index/store'
 import { normalizeFileSearchSettings, probeDecision, SearchReranker } from './file-index/rerank'
 import { runHeadlessExport, type HeadlessExporters } from './headless-export'
+import { isVersionRequest } from './version-flag'
 import { TabManager } from './tab-manager'
 import { installShellCloseGuard } from './window-close-guard'
 import {
@@ -384,6 +386,20 @@ const headlessArgv = parseHeadlessExportArgv(process.argv)
 if (headlessArgv.kind !== 'none') {
   setHeadlessMode(true)
   app.dock?.hide()
+}
+
+// `--version`: print and exit before anything else starts (no window, no instance lock)
+if (isVersionRequest(process.argv)) {
+  try {
+    writeSync(
+      1,
+      `${app.getVersion()}
+`,
+    )
+  } catch {
+    // a closed stdout must not turn --version into a launch
+  }
+  process.exit(0)
 }
 
 // The product rename from "AI Office" to UniWork Office changed the userData path; migrate old user data once
