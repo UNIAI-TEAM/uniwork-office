@@ -1652,8 +1652,7 @@ export function SettingsModal({
 
   const cliLinkDesc = (() => {
     if (!cliLink) return ''
-    if (cliLink.state === 'present' && cliLink.location)
-      return t('setCliLinkDone', { path: cliLink.location })
+    if (cliLink.state === 'present') return t('setCliLinkReady')
     if (cliLink.state === 'blocked' && cliLink.manual)
       return t('setCliLinkBlocked', { cmd: cliLink.manual })
     return t('setCliLinkDesc')
@@ -1926,6 +1925,7 @@ export function SettingsModal({
                     <div className="set-field-stack">
                       <div className="set-field-label">{t('setAutoSave')}</div>
                       <div className="set-field-desc">{t('setAutoSaveDesc')}</div>
+                      <div className="set-field-desc">{t('setAutoSaveUniworkNote')}</div>
                     </div>
                   </div>
                   <button

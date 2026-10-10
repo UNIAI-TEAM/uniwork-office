@@ -90,4 +90,7 @@ export const it = {
 
   uwRecentBadge: 'UniWork',
   uwRecentBadgeTip: 'Documento salvato in UniWork',
+
+  setCliLinkReady: 'Lo strumento da riga di comando è disponibile.',
+  setAutoSaveUniworkNote: 'Non si applica ai documenti UniWork.',
 } satisfies Record<keyof typeof zh, string>

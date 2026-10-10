@@ -172,6 +172,8 @@ function onboardingCopy(text) {
 /**
  * Shell string keys of features UniWork Office does not ship: the GitHub star prompt / About row /
  * welcome card, the GenTeam credits offer and the Google Analytics usage-statistics consent.
+ * (And setCliLinkDone, the upstream 'genoffice is available at {path}' line: Settings > General now
+ * shows setCliLinkReady, with no product name and no local path.)
  * No UI references them any more; an upstream sync brings them back in every locale block, and
  * the brand scan (which flags "GitHub" in user-visible strings) would fail on them.
  */
@@ -189,6 +191,7 @@ export const DROPPED_SHELL_STRING_KEYS = [
   'setAnalyticsDesc',
   'onbCredits',
   'onbJoinGenTeam',
+  'setCliLinkDone',
 ]
 
 /**

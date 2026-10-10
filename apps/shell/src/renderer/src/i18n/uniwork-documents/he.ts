@@ -89,4 +89,7 @@ export const he = {
 
   uwRecentBadge: 'UniWork',
   uwRecentBadgeTip: 'מסמך השמור ב-UniWork',
+
+  setCliLinkReady: 'כלי שורת הפקודה זמין.',
+  setAutoSaveUniworkNote: 'לא חל על מסמכי UniWork.',
 } satisfies Record<keyof typeof zh, string>

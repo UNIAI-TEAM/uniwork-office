@@ -155,7 +155,7 @@ describe('docs:export-pdf on a DOCX', () => {
     })
   })
 
-  it('a picked name without .pdf gets the extension, so it can never replace the .docx', async () => {
+  it('a typed .docx name becomes .pdf next to it (not .docx.pdf), so it can never replace the .docx', async () => {
     const wc = fakeWc([])
     const docx = openBoundDoc(wc)
     showSaveDialog.mockResolvedValue({ canceled: false, filePath: docx })
@@ -166,9 +166,10 @@ describe('docs:export-pdf on a DOCX', () => {
       LETTER_W,
       LETTER_H,
     )
-    expect(r).toMatchObject({ ok: true, path: `${docx}.pdf` })
+    const pdf = docx.replace(/\.docx$/, '.pdf')
+    expect(r).toMatchObject({ ok: true, path: pdf })
     expect(readFileSync(docx, 'utf8')).toBe('docx-bytes')
-    expect(readFileSync(`${docx}.pdf`)).toEqual(PDF_BYTES)
+    expect(readFileSync(pdf)).toEqual(PDF_BYTES)
     expect(hook).not.toHaveBeenCalled()
   })
 

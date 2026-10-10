@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  pdfExportPath,
   printScaleOption,
   validPrintDim,
   validPrintGeometry,
@@ -45,5 +46,20 @@ describe('print arg validators', () => {
     expect(validPrintGeometry(12240, Infinity)).toBe(false)
     expect(validPrintGeometry('12240', 15840)).toBe(false)
     expect(validPrintGeometry(12240, 15840, 99)).toBe(false)
+  })
+})
+
+describe('pdfExportPath', () => {
+  it('replaces a typed .docx extension instead of appending to it', () => {
+    expect(pdfExportPath('C:\\out\\GO-A9 Simple.docx')).toBe('C:\\out\\GO-A9 Simple.pdf')
+    expect(pdfExportPath('/tmp/report.DOCX')).toBe('/tmp/report.pdf')
+  })
+
+  it('keeps a .pdf name and appends to anything else', () => {
+    expect(pdfExportPath('/tmp/report.pdf')).toBe('/tmp/report.pdf')
+    expect(pdfExportPath('/tmp/report.PDF')).toBe('/tmp/report.PDF')
+    expect(pdfExportPath('/tmp/report')).toBe('/tmp/report.pdf')
+    expect(pdfExportPath('/tmp/report.v2')).toBe('/tmp/report.v2.pdf')
+    expect(pdfExportPath('/tmp/report.docx.bak')).toBe('/tmp/report.docx.bak.pdf')
   })
 })

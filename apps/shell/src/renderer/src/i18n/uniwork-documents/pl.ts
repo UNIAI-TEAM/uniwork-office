@@ -90,4 +90,7 @@ export const pl = {
 
   uwRecentBadge: 'UniWork',
   uwRecentBadgeTip: 'Dokument zapisany w UniWork',
+
+  setCliLinkReady: 'Narzędzie wiersza poleceń jest dostępne.',
+  setAutoSaveUniworkNote: 'Nie dotyczy dokumentów UniWork.',
 } satisfies Record<keyof typeof zh, string>

@@ -89,4 +89,7 @@ export const zhTW = {
 
   uwRecentBadge: 'UniWork',
   uwRecentBadgeTip: '儲存在 UniWork 的文件',
+
+  setCliLinkReady: '命令列工具已可使用。',
+  setAutoSaveUniworkNote: '不適用於 UniWork 文件。',
 } satisfies Record<keyof typeof zh, string>

@@ -96,4 +96,7 @@ export const de = {
 
   uwRecentBadge: 'UniWork',
   uwRecentBadgeTip: 'In UniWork gespeichertes Dokument',
+
+  setCliLinkReady: 'Das Befehlszeilenwerkzeug ist verfügbar.',
+  setAutoSaveUniworkNote: 'Gilt nicht für UniWork-Dokumente.',
 } satisfies Record<keyof typeof zh, string>

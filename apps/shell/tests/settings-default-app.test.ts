@@ -139,6 +139,16 @@ describe('Settings default-app row', () => {
   })
 })
 
+describe('Settings auto-save row', () => {
+  it('says the global setting does not apply to UniWork documents', async () => {
+    await openGeneral({})
+    const row = Array.from(host.querySelectorAll<HTMLElement>('.set-field')).find((el) =>
+      el.textContent?.includes('Auto-save all documents'),
+    )
+    expect(row?.textContent).toContain('Does not apply to UniWork documents.')
+  })
+})
+
 describe('Settings command line tool row', () => {
   const cliRow = (): HTMLElement | null =>
     Array.from(host.querySelectorAll<HTMLElement>('.set-field')).find((el) =>
@@ -150,7 +160,7 @@ describe('Settings command line tool row', () => {
     expect(cliRow()).toBeNull()
   })
 
-  it('only the button creates the link, then shows where it landed', async () => {
+  it('only the button creates the link, then says it is available (no product name, no local path)', async () => {
     const install = vi.fn(async () => ({
       state: 'present' as const,
       location: '/opt/homebrew/bin/genoffice',
@@ -164,9 +174,9 @@ describe('Settings command line tool row', () => {
     expect(button.textContent).toBe('Add to terminal')
     await click(button)
     expect(install).toHaveBeenCalledTimes(1)
-    expect(cliRow()?.textContent).toContain(
-      'genoffice is available at /opt/homebrew/bin/genoffice.',
-    )
+    expect(cliRow()?.textContent).toContain('Command line tool is available.')
+    expect(cliRow()?.textContent).not.toContain('/opt/homebrew')
+    expect(cliRow()?.textContent).not.toMatch(/genoffice is available/i)
     expect(cliRow()!.querySelector<HTMLButtonElement>('button')!.disabled).toBe(true)
   })
 

@@ -88,4 +88,7 @@ export const zh = {
 
   uwRecentBadge: 'UniWork',
   uwRecentBadgeTip: '保存在 UniWork 的文档',
+
+  setCliLinkReady: '命令行工具已可用。',
+  setAutoSaveUniworkNote: '不适用于 UniWork 文档。',
 }
