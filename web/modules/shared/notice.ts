@@ -32,6 +32,8 @@ export function ask<T extends string>(opts: {
   marker: string
   /** extra lines under the body (already translated: names, times) */
   details?: readonly string[]
+  /** extra class on the backdrop (see frame-dialog.css) */
+  maskClass?: string
 }): Promise<T> {
   return frameAsk<T>({
     title: text(opts.title),
@@ -45,6 +47,7 @@ export function ask<T extends string>(opts: {
     })),
     cancelId: opts.cancelId,
     marker: opts.marker,
+    ...(opts.maskClass ? { maskClass: opts.maskClass } : {}),
   })
 }
 

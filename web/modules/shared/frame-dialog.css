@@ -18,6 +18,26 @@
   backdrop-filter: blur(4px);
 }
 
+/* a dialog that opens before the page has anything to show (the draft prompt runs during the open):
+ * a blurred, empty page sheet behind the card, so the scrim sits over a page like the other dialogs.
+ * Chrome only, tokens only; the document is never drawn or recoloured. */
+.ow-dlg-mask-page::before {
+  content: '';
+  position: absolute;
+  inset-block: 22% 6%;
+  inset-inline: max(16px, calc(50% - 360px));
+  box-sizing: border-box;
+  padding: 32px 40px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background:
+    repeating-linear-gradient(to bottom, var(--border) 0 8px, transparent 8px 26px) content-box,
+    var(--surface);
+  filter: blur(4px);
+  opacity: 0.7;
+  pointer-events: none;
+}
+
 .ow-dlg {
   position: relative;
   box-sizing: border-box;
