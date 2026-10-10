@@ -73,6 +73,9 @@ describe('insert-text fallback without any fallback font file (Windows shape)', 
     // cmap format 13, which the coverage reader deliberately does not treat as real
     // coverage), so the insert must skip with the no-font reason instead of embedding
     // .notdef boxes
+    // (GNU Unifont, installed on some Linux machines, draws a box glyph for every codepoint,
+    // unassigned ones included: with it present no text is ever "uncovered", so nothing to assert)
+    if (fallbackFontFor('\u0378') !== null) return
     const result = await applyTextInserts(await blankPage(), [insert('bad \u0378 char')])
     expect(result.skipped).toHaveLength(1)
     expect(result.skipped[0]!.reason).toContain('no available font')
