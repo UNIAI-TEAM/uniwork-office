@@ -143,4 +143,5 @@ export const zh = {
   presentFullscreen: '全屏',
   presentNewTab: '新标签页',
   aiNotEnabled: '你的工作区尚未开启 AI',
+  viewOnly: '仅查看',
 }

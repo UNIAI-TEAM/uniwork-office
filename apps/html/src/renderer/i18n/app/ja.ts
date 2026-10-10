@@ -149,4 +149,5 @@ export const ja = {
   presentFullscreen: '全画面',
   presentNewTab: '新しいタブ',
   aiNotEnabled: 'AI はこのワークスペースでオンになっていません',
+  viewOnly: '表示のみ',
 } satisfies Record<keyof typeof zh, string>

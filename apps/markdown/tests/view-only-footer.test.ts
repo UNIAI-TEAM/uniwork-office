@@ -94,12 +94,34 @@ afterEach(() => {
 })
 
 describe('markdown footer on a view-only web document', () => {
-  it('has no "View only" chip of its own (the host announces it)', async () => {
-    const h = await mount({ bound: false, readOnly: false }, { save: false })
+  it('has no "View only" chip of its own when the host announces it (web: viewOnlyChip off)', async () => {
+    const h = await mount({ bound: false, readOnly: false }, { save: false, viewOnlyChip: false })
     open.push(h)
     // the editor opened (file name in the footer) and is view-only (the grant is off)
     expect(h.container.querySelector('.status-file')).not.toBeNull()
     expect(h.container.querySelector('.status-view-only')).toBeNull()
     expect(h.container.querySelector('.status-bar')!.textContent).not.toMatch(/view only|chỉ xem/i)
+  })
+
+  it('draws the chip itself when no host announces view-only', async () => {
+    const h = await mount({ bound: false, readOnly: false }, { save: false })
+    open.push(h)
+    expect(h.container.querySelector('.status-view-only')?.textContent).toBe('View only')
+  })
+
+  it.each([
+    ['the web (saveStatus off): none, the host header owns it', { saveStatus: false }, false],
+    ['no host announcing it: the renderer shows it', undefined, true],
+  ])('a failed save on %s', async (_name, caps, shown) => {
+    const h = await mount({ bound: false, readOnly: false }, caps)
+    open.push(h)
+    h.api.save!.mockResolvedValueOnce({ ok: false, error: 'x' })
+    await act(async () => {
+      h.saveRequest()('save')
+      await new Promise((r) => setTimeout(r, 30))
+    })
+    const label = h.container.querySelector('.status-save')
+    expect(label !== null).toBe(shown)
+    if (label) expect(label.textContent).toBe('Save failed')
   })
 })

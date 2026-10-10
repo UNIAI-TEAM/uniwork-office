@@ -1738,10 +1738,13 @@ export default function App() {
               ) : (
                 !path && <span className="status-item status-hint">{t('previewNeedsSave')}</span>
               )}
-              {/* view-only is announced once, by the host (banner + live region); no third copy here */}
+              {/* on the web the host announces view-only (banner + live region): cap viewOnlyChip is off there */}
+              {!canEdit && cap('viewOnlyChip') && status === 'ready' && (
+                <span className="status-item status-view-only">{t('viewOnly')}</span>
+              )}
             </div>
             <div className="status-right">
-              {statusText && (
+              {statusText && cap('saveStatus') && (
                 <span className={`status-save status-${saveState}`}>{statusText}</span>
               )}
               {view !== 'preview' && (

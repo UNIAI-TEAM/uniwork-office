@@ -148,4 +148,5 @@ export const ru = {
   presentFullscreen: 'Во весь экран',
   presentNewTab: 'Новая вкладка',
   aiNotEnabled: 'ИИ не включён для вашего рабочего пространства',
+  viewOnly: 'Только просмотр',
 } satisfies Record<keyof typeof zh, string>

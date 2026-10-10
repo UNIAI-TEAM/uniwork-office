@@ -311,7 +311,7 @@ test('html: view only without the save grant', async ({ page }) => {
   await serveFixture(page, PAGE_PATH, FIXTURE, 'text/html')
   const frame = await openModule(page, 'html', { open: PAGE_PATH, lang: 'en', readonly: '1' })
   await ready(page, frame, /UniWork HTML web fixture/)
-  // the host announces view-only (banner + live region); the frame adds no third copy
+  // the host announces view-only (banner + live region): cap viewOnlyChip is off on the web
   await expect(frame.locator('.status-view-only')).toHaveCount(0)
   await view(frame, /^Source$/, 'source')
   await frame.locator('.cm-line', { hasText: 'A paragraph with' }).click()
@@ -381,7 +381,7 @@ for (const [lang, width] of [
   })
 }
 
-test('html: a phone shows the AI panel over the page and keeps the save state', async ({
+test('html: a phone shows the AI panel over the page and a status bar that fits', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 })
@@ -412,16 +412,17 @@ test('html: a phone shows the AI panel over the page and keeps the save state', 
     .locator('.workspace.view-split .pane')
     .evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().height)))
   expect(Math.min(...heights)).toBeGreaterThanOrEqual(200)
-  // the save state stays visible on a phone: the first thing in the status bar's right group
+  // the host header owns the save state: the frame draws none, and its status bar fits the phone
   await view(frame, /^Source$/, 'source')
   await frame.locator('.cm-content').click()
   await page.keyboard.type('x')
-  await expect(frame.locator('.status-save')).toHaveText('Unsaved')
-  expect(await frame.locator('.status-save').isVisible()).toBe(true)
-  const clipped = await frame.locator('.status-save').evaluate((el) => {
-    const r = el.getBoundingClientRect()
-    return r.left < 0 || r.right > innerWidth
-  })
+  await expect(frame.locator('.status-save')).toHaveCount(0)
+  const clipped = await frame.locator('.status-right > *').evaluateAll((els) =>
+    els.some((el) => {
+      const r = el.getBoundingClientRect()
+      return r.width > 0 && (r.left < 0 || r.right > innerWidth)
+    }),
+  )
   expect(clipped).toBe(false)
   await page.screenshot({ path: screenshotPath('html', 'narrow-390-light-en') })
 })

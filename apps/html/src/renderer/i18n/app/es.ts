@@ -150,4 +150,5 @@ export const es = {
   presentFullscreen: 'Pantalla completa',
   presentNewTab: 'Nueva pestaña',
   aiNotEnabled: 'La IA no está activada en tu espacio de trabajo',
+  viewOnly: 'Solo lectura',
 } satisfies Record<keyof typeof zh, string>

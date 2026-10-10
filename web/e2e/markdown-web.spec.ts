@@ -79,7 +79,22 @@ test('markdown: open -> save byte-identical -> type -> save -> reopen -> conflic
   await frame.locator('.doc-editor p', { hasText: 'Nearby paragraph to edit.' }).click()
   await page.keyboard.press('End')
   await page.keyboard.type(' Edited on the web.')
-  await expect(frame.locator('.status-save')).toHaveText(/unsaved/i)
+  // the host header owns the save state: the frame draws none, but tells the host it is dirty
+  await expect(frame.locator('.status-save')).toHaveCount(0)
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (
+            window as unknown as {
+              __host: { events: Array<{ type: string; payload: { dirty?: boolean } }> }
+            }
+          ).__host.events
+            .filter((e) => e.type === 'dirty')
+            .at(-1)?.payload.dirty,
+      ),
+    )
+    .toBe(true)
   await save(page)
   await expect.poll(async () => (await hostState(page)).lastSaved?.versionId).toBe('v3')
   expect((await hostState(page)).lastSaved!.bytes).toEqual(Array.from(EDITED))
@@ -125,7 +140,7 @@ test('markdown: view only without the save grant', async ({ page }) => {
     readonly: '1',
   })
   const ed = await editor(frame)
-  // the host announces view-only (banner + live region); the frame adds no third copy
+  // the host announces view-only (banner + live region): cap viewOnlyChip is off on the web
   await expect(frame.locator('.status-view-only')).toHaveCount(0)
   await expect(ed).toHaveAttribute('contenteditable', 'false')
   await ed.click()

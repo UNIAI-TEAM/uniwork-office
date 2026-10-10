@@ -147,4 +147,5 @@ export const ko = {
   presentFullscreen: '전체 화면',
   presentNewTab: '새 탭',
   aiNotEnabled: '작업 공간에서 AI가 켜져 있지 않습니다',
+  viewOnly: '보기 전용',
 } satisfies Record<keyof typeof zh, string>

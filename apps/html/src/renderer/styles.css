@@ -537,6 +537,14 @@ html.genoffice-popover-open .ribbon-tabs {
   white-space: nowrap;
 }
 
+.status-view-only {
+  padding: 1px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
 .status-failed {
   color: var(--danger);
 }
