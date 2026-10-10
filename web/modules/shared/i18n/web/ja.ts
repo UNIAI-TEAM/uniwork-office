@@ -22,6 +22,7 @@ export const ja = {
   webDraftOlder:
     'このコピーは文書の古いバージョンに基づいています。保存すると新しいバージョンが置き換えられます。',
   webDraftSavedAt: 'コピーの保存時刻',
+  webDraftKept: 'このコピーは、サインアウトするまでこのブラウザーに保存されます。',
   webDraftRestore: '復元',
   webDraftDiscard: '破棄',
 } satisfies Record<keyof typeof zh, string>

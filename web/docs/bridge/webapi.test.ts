@@ -968,7 +968,7 @@ describe('draft recovery (C18)', () => {
     expect(await store.list('u1:f1:')).toEqual([])
   })
 
-  it('a copy under another session key is removed without a prompt', async () => {
+  it('a copy under another key is skipped without a prompt and never deleted', async () => {
     await load()
     await editAndKeep([5])
     drafts.dispose()
@@ -979,7 +979,8 @@ describe('draft recovery (C18)', () => {
     const reopened = await load()
     expect(prompt).not.toHaveBeenCalled()
     expect(reopened.recovered).toBeUndefined()
-    expect(await store.list('u1:f1:')).toEqual([])
+    // another key (a later sign-in) or another tab: the record stays for the sign-out cleanup
+    expect(await store.list('u1:f1:')).toHaveLength(1)
   })
 
   it('a document opened in the frame other than the init document is never drafted', async () => {

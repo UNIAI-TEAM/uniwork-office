@@ -21,6 +21,7 @@ export const vi = {
   webDraftOlder:
     'Bản sao dựa trên một phiên bản cũ hơn của tài liệu. Lưu bản sao sẽ thay thế phiên bản mới hơn.',
   webDraftSavedAt: 'Bản sao được giữ lúc',
+  webDraftKept: 'Trình duyệt này giữ bản sao cho đến khi bạn đăng xuất.',
   webDraftRestore: 'Khôi phục',
   webDraftDiscard: 'Bỏ',
 } satisfies Record<keyof typeof zh, string>

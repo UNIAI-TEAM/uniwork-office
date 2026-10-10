@@ -22,6 +22,7 @@ export const ms = {
   webDraftOlder:
     'Salinan ini berdasarkan versi dokumen yang lebih lama. Menyimpannya akan menggantikan versi yang lebih baharu.',
   webDraftSavedAt: 'Salinan disimpan pada',
+  webDraftKept: 'Pelayar ini menyimpan salinan sehingga anda log keluar.',
   webDraftRestore: 'Pulihkan',
   webDraftDiscard: 'Buang',
 } satisfies Record<keyof typeof zh, string>

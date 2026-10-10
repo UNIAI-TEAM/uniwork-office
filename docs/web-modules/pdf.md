@@ -12,7 +12,7 @@ Inventory and decisions this implements: `docs/web-modules/inventory-b4.md` (1.1
 | `web/modules/pdf/webapi.ts`                 | `window.pdfApi` over the protocol: working copy, save / Save As / conflicts, host `save` / `saveAs` / `print` / `doc.closeCheck` / `open`, page operations, downloads, typed stubs                |
 | `web/modules/pdf/core.ts`                   | the save core of `apps/pdf/src/main` (`save-pdf.ts`, `text-edit.ts`, `image-edit.ts`), loaded on first use                                                                                        |
 | `web/modules/pdf/core-env-web.ts`           | the web seams of the core: fetched `pdfium.wasm` / `hb-subset.wasm`, bundled Liberation TTFs, canvas image codec, Buffer shim                                                                     |
-| `web/modules/pdf/signatures.ts`             | saved signatures in `localStorage` (risk R6 below)                                                                                                                                                |
+| `web/modules/pdf/signatures.ts`             | saved signatures, encrypted per user (risk R6 below)                                                                                                                                              |
 | `web/modules/pdf/notice.ts`                 | in-frame dialogs (save conflict, merge prompt, open failure) on the renderer's modal classes and web strings                                                                                      |
 | `apps/pdf/src/main/core-env.ts`             | the platform seams (wasm bytes, font files / font index, image codec). Desktop installs `node-env.ts` + `electron-image.ts` (unchanged behaviour); `save-pdf-file.ts` keeps the atomic file write |
 | `apps/pdf/src/renderer/capabilities.ts`     | `cap(key)` over `window.pdfApi.capabilities` (`@genoffice/ui/capabilities`); Electron sets nothing, so the desktop keeps everything                                                               |
@@ -54,7 +54,7 @@ copy and its etag (`saved` event); the renderer then reloads from it exactly as 
 | `edit`                                                                                                                                               | host grant `save`. Absent = **view-only**: joins the renderer's read-only mode (all edit entries disabled, Fill Form tab hidden, "View only" badge); `save` and every write path refuse; print works |
 | `insertPages`                                                                                                                                        | host grant `filePick` (Import pages, Replace pages, Merge PDF)                                                                                                                                       |
 | `pdfTextEdit`, `pdfImageEdit`, `pdfAnnotDelete`                                                                                                      | on; switched off when pdfium cannot be compiled in the frame (checked once after `init` when `edit` is granted)                                                                                      |
-| `savedSignatures`                                                                                                                                    | on (browser-local library)                                                                                                                                                                           |
+| `savedSignatures`                                                                                                                                    | on (encrypted per-user library)                                                                                                                                                                      |
 | `ai`, `autoSave`, `autoSaveToDisk`, `autoRename`, `convertOffice`, `ocr`, `webSearch`, `imageSearch`, `imageGeneration`, `createDocument`, `billing` | off: AI is desktop-only (as Docs), no autosave on the web, the rest need the desktop shell or an OS engine (OCR answers "no engine")                                                                 |
 | `open`, `recents`                                                                                                                                    | from `filePick` / `recents` like Docs (the PDF renderer has no File > Open of its own)                                                                                                               |
 
@@ -99,10 +99,15 @@ ghostscript cannot write them) - pdf.js decodes both with its wasm codecs, which
 
 ## 5. Gaps and risks
 
-- **R6 saved signatures are browser-local** (`localStorage`, key `uniwork.office.pdf.savedSignatures`). The frame is
-  same-origin with the UniWork app, so any script on that origin can read them, and they do not follow the user to
-  another browser. A host user-preferences store (new optional protocol request) is the replacement; until then the
-  library can be turned off for the web build with `savedSignatures: false` (`install.ts`).
+- **R6 saved signatures are encrypted and per user** (`web/modules/pdf/signatures.ts`, finding RF-3). The frame is
+  same-origin with the UniWork app and its storage is shared by every user of the browser profile, so the list is
+  never plaintext and never user-agnostic: with the host's recovery grant it is one AES-GCM record in the frame
+  database (`uniwork-office-frame-drafts`, store `signatures`, key = the user part of the recovery scope), encrypted
+  with the host's per-user key, so another user cannot read it and the host's sign-out deletes it with the database.
+  Without a grant (host without recovery) the list lives in memory for the page load only. The first call deletes
+  the plaintext `localStorage` key of the first build (`uniwork.office.pdf.savedSignatures`) and, when a grant
+  exists, adopts its entries into the encrypted store. The library follows the user to no other browser; a host
+  user-preferences store (new optional protocol request) is the later replacement.
 - Text insert / edit on the web uses Liberation only: text no Liberation face covers (CJK, emoji, most symbols) is
   rejected at confirm time with the existing "no installed font" message.
 - The save core runs on the frame's main thread (no worker yet): large files freeze the UI while saving (inventory 3.2).

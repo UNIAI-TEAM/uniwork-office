@@ -22,6 +22,7 @@ export const cs = {
   webDraftOlder:
     'Kopie vychází ze starší verze dokumentu. Jejím uložením se nahradí novější verze.',
   webDraftSavedAt: 'Kopie uložena v',
+  webDraftKept: 'Tento prohlížeč uchová kopii, dokud se neodhlásíte.',
   webDraftRestore: 'Obnovit',
   webDraftDiscard: 'Zahodit',
 } satisfies Record<keyof typeof zh, string>

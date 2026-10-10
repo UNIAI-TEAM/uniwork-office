@@ -22,6 +22,7 @@ export const pt = {
   webDraftOlder:
     'A cópia se baseia em uma versão mais antiga do documento. Salvá-la substitui a versão mais recente.',
   webDraftSavedAt: 'Cópia guardada às',
+  webDraftKept: 'Este navegador mantém a cópia até você sair da conta.',
   webDraftRestore: 'Restaurar',
   webDraftDiscard: 'Descartar',
 } satisfies Record<keyof typeof zh, string>

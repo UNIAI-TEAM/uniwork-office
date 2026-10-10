@@ -407,7 +407,7 @@ describe('markdownApi: draft recovery (C18)', () => {
     f.api.setDirty(true)
     await f.flush()
     const [[key, record]] = [...p.records()]
-    expect(key).toBe(`${SCOPE}:${f.file.etag}`)
+    expect(key).toMatch(new RegExp(`^${SCOPE}:${f.file.etag}:[0-9a-f]{16}$`))
     expect(record).toMatchObject({ module: 'markdown', name: 'Notes.md', baseEtag: f.file.etag })
     expect(dec(record.ciphertext)).not.toContain('draft line')
     // the BOM is part of the saved bytes: keep it while decoding

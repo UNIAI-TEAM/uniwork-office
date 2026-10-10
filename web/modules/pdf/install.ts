@@ -14,7 +14,7 @@
  * | insertPages                  | host grant `filePick` (import / replace / merge pick a PDF there)   |
  * | pdfTextEdit, pdfImageEdit,   | on; turned off when pdfium cannot be compiled in this frame (the    |
  * |   pdfAnnotDelete             |   module CSP carries 'wasm-unsafe-eval' for it)                     |
- * | savedSignatures              | on, browser-local store (./signatures.ts)                           |
+ * | savedSignatures              | on, encrypted per-user store (./signatures.ts)                      |
  * | redaction                    | off (the desktop redacts into a working copy file next to the PDF)   |
  * | ai, autoSave(ToDisk), auto-  | off (AI stays desktop-only; no autosave on the web, CONTRACT C10;   |
  * |   Rename, convertOffice, ocr,|   the rest need the desktop shell or an OS engine)                  |

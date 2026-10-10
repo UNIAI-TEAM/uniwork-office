@@ -13,7 +13,7 @@ import {
   type DraftRecoveryOptions,
 } from '../../docs/bridge/draft-recovery'
 import type { FramePort, PortSession } from '../../docs/bridge/frame-port'
-import type { OfficeModule } from '../../docs/protocol/types'
+import type { InitRecovery, OfficeModule } from '../../docs/protocol/types'
 import { ask, text } from './notice'
 
 export const DRAFT_PROMPT_MARKER = 'draft-recovery'
@@ -30,7 +30,7 @@ function when(savedAt: number): string {
 }
 
 export function promptDraftRestore(draft: DraftInfo): Promise<DraftChoice> {
-  const details = [`${text('webDraftSavedAt')} ${when(draft.savedAt)}`]
+  const details = [`${text('webDraftSavedAt')} ${when(draft.savedAt)}`, text('webDraftKept')]
   if (draft.older) details.push(text('webDraftOlder'))
   return ask<DraftChoice>({
     title: 'webDraftTitle',
@@ -46,15 +46,12 @@ export function promptDraftRestore(draft: DraftInfo): Promise<DraftChoice> {
 }
 
 /**
- * The draft recovery of one bridge: the grant comes from the protocol session (a later `init`
- * after a frame reload updates the same session object), the prompt is the shared one above.
+ * The host's recovery grant as the protocol session holds it (a later `init` after a frame reload
+ * updates the same session object): read at every use, undefined until `init` or when absent.
  */
-export function bridgeDraftRecovery(
+export function bridgeRecoveryGrant(
   port: Pick<FramePort, 'whenInitialized'>,
-  module: OfficeModule,
-  host: DraftHost,
-  overrides: Partial<Omit<DraftRecoveryOptions, 'module' | 'host'>> = {},
-): DraftRecovery {
+): () => InitRecovery | undefined {
   let session: PortSession | null = null
   port.whenInitialized().then(
     (s) => {
@@ -62,11 +59,24 @@ export function bridgeDraftRecovery(
     },
     () => {},
   )
+  return () => session?.recovery
+}
+
+/**
+ * The draft recovery of one bridge: the grant comes from the protocol session, the prompt is the
+ * shared one above.
+ */
+export function bridgeDraftRecovery(
+  port: Pick<FramePort, 'whenInitialized'>,
+  module: OfficeModule,
+  host: DraftHost,
+  overrides: Partial<Omit<DraftRecoveryOptions, 'module' | 'host'>> = {},
+): DraftRecovery {
   return createDraftRecovery({
     module,
     host,
     prompt: promptDraftRestore,
-    recovery: () => session?.recovery,
+    recovery: bridgeRecoveryGrant(port),
     ...overrides,
   })
 }

@@ -18,6 +18,7 @@ export const he = {
   webDraftBody: 'הדפדפן שמר עותק של שינויים במסמך זה שלא נשמרו. לשחזר אותם או למחוק?',
   webDraftOlder: 'העותק מבוסס על גרסה ישנה יותר של המסמך. שמירתו תחליף את הגרסה החדשה יותר.',
   webDraftSavedAt: 'העותק נשמר ב-',
+  webDraftKept: 'הדפדפן הזה שומר את ההעתק עד שתתנתק.',
   webDraftRestore: 'שחזור',
   webDraftDiscard: 'מחיקה',
 } satisfies Record<keyof typeof zh, string>

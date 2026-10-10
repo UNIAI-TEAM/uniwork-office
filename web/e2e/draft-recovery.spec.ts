@@ -1,12 +1,14 @@
 // Web draft recovery (UNI-1014 DR1, CONTRACT C15(3) / C18) on the production builds of Docs,
 // Markdown and Sheets in the protocol test host (`?recovery=1`: the host sends `init.recovery`
-// with a non-extractable AES-GCM key generated once per host page = one signed-in session).
+// with a non-extractable AES-GCM key it persists in IndexedDB "keys", as the real host does).
 // Per module, with the browser clock under test control:
 //   edit -> 30 s -> an encrypted record in IndexedDB "uniwork-office-frame-drafts" (nothing saved)
-//   -> reload the frame (same key) -> Restore -> the edit is back and the document is dirty
+//   -> reload the frame (same persisted key) -> Restore -> the edit is back and the document is dirty
 //   -> save -> the record is gone;
+//   the same after a reload of the whole host page (the key is persisted by the host, C18a);
 //   Discard -> the server version, record gone;
-//   a new session key -> the old record is removed silently, no prompt.
+//   a new key (or a second tab) -> the old record is skipped and never deleted, no prompt;
+//   sign-out -> the database is gone.
 // Screenshots of the prompt (light/dark, en/vi) go to docs/web-modules/screenshots/draft-recovery/.
 // Builds: npm run build:web && npm run build:web -- --module markdown && ... --module sheets
 // Run: npx playwright test -c web/e2e draft-recovery
@@ -321,7 +323,7 @@ for (const c of [docsCase, markdownCase, sheetsCase]) {
         .toBe(1)
       const [record] = await drafts(frame, marker)
       expect(record.module).toBe(c.module)
-      expect(record.key).toMatch(/^test-user:f1:"f1-v1"$/)
+      expect(record.key).toMatch(/^test-user:f1:"f1-v1":[0-9a-f]{16}$/)
       expect(record.leaks).toBe(false)
       // a draft is never a save
       expect(await lastSaved(page)).toBeNull()
@@ -377,7 +379,9 @@ for (const c of [docsCase, markdownCase, sheetsCase]) {
       expect(problems).toEqual({ console: [], page: [] })
     })
 
-    test(`${c.module}: a draft under another session key is removed silently`, async ({ page }) => {
+    test(`${c.module}: a draft under another key is skipped, never deleted, no prompt`, async ({
+      page,
+    }) => {
       const problems = await watch(page)
       const marker = `OtherKey${c.module}`
       let frame = await openHost(page, { ...c.query, lang: 'en' })
@@ -389,7 +393,7 @@ for (const c of [docsCase, markdownCase, sheetsCase]) {
         .poll(async () => (await drafts(frame, marker)).length, { timeout: 15_000 })
         .toBe(1)
 
-      // a new sign-in: the host holds a new key, the old copy cannot be read
+      // another key (a later sign-in on this profile): the old copy cannot be read
       await page.evaluate(() =>
         (
           window as unknown as { __host: { newSessionKey(): Promise<void> } }
@@ -397,12 +401,110 @@ for (const c of [docsCase, markdownCase, sheetsCase]) {
       )
       frame = await reloadFrame(page)
       await c.shown(frame)
-      await expect
-        .poll(async () => (await drafts(frame, marker)).length, { timeout: 15_000 })
-        .toBe(0)
+      await page.waitForTimeout(1_000)
       expect(await frame.locator(PROMPT).count()).toBe(0)
       expect(await c.showsMarker(frame, marker)).toBe(false)
+      // never deleted behind the user's back: the sign-out cleanup owns it
+      expect(await drafts(frame, marker)).toHaveLength(1)
       expect(problems).toEqual({ console: [], page: [] })
+    })
+
+    test(`${c.module}: a reload of the whole host page restores with the persisted key`, async ({
+      page,
+    }) => {
+      const problems = await watch(page)
+      const marker = `HostReload${c.module}`
+      let frame = await openHost(page, { ...c.query, lang: 'en' })
+      await c.shown(frame)
+      await c.edit(page, frame, marker)
+      await expect.poll(() => lastDirty(page), { timeout: 15_000 }).toBe(true)
+      await tick(page)
+      await expect
+        .poll(async () => (await drafts(frame, marker)).length, { timeout: 15_000 })
+        .toBe(1)
+
+      // the browser tab reloads (crash / close + reopen stand-in): a new host page, same profile
+      await page.reload()
+      await expect(page.locator('#status')).toHaveText(/^initialised/, { timeout: 30_000 })
+      frame = (await (await page.waitForSelector('#frame')).contentFrame())!
+      const prompt = frame.locator(PROMPT)
+      await expect(prompt).toBeVisible({ timeout: 30_000 })
+      await prompt.locator('[data-choice="restore"]').click()
+      await expect(prompt).toBeHidden()
+      await c.shown(frame)
+      await expect.poll(() => c.showsMarker(frame, marker), { timeout: 30_000 }).toBe(true)
+      await expect.poll(() => lastDirty(page), { timeout: 15_000 }).toBe(true)
+      expect(await lastSaved(page)).toBeNull()
+      expect(problems).toEqual({ console: [], page: [] })
+    })
+
+    test(`${c.module}: a second tab neither deletes nor overwrites the first tab's draft`, async ({
+      page,
+      context,
+    }) => {
+      const marker = `TwoTabs${c.module}`
+      const frameA = await openHost(page, { ...c.query, lang: 'en' })
+      await c.shown(frameA)
+      await c.edit(page, frameA, marker)
+      await expect.poll(() => lastDirty(page), { timeout: 15_000 }).toBe(true)
+      await tick(page)
+      await expect
+        .poll(async () => (await drafts(frameA, marker)).length, { timeout: 15_000 })
+        .toBe(1)
+      const [first] = await drafts(frameA, marker)
+
+      // tab B: same profile (same persisted key), same document; it is offered A's draft and declines
+      const pageB = await context.newPage()
+      await pageB.route(`**${MD_PATH}`, (route) =>
+        route.fulfill({ status: 200, body: MD, headers: { 'content-type': 'text/markdown' } }),
+      )
+      await pageB.route('**/e2e-fixtures/Edit.xlsx', (route) =>
+        route.fulfill({
+          status: 200,
+          path: resolve(fixtures, 'Edit.xlsx'),
+          headers: {
+            'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          },
+        }),
+      )
+      await pageB.clock.install()
+      const frameB = await openHost(pageB, { ...c.query, lang: 'en' })
+      const prompt = frameB.locator(PROMPT)
+      await expect(prompt).toBeVisible({ timeout: 30_000 })
+      await prompt.locator('[data-choice="restore"]').focus()
+      await pageB.keyboard.press('Escape') // dismiss keeps the copy
+      await expect(prompt).toBeHidden()
+      await c.shown(frameB)
+      expect(await drafts(frameB, marker)).toEqual([first])
+
+      // B edits and its writer ticks: a second record next to A's, A's untouched
+      await c.edit(pageB, frameB, `${marker}B`)
+      await tick(pageB)
+      await expect
+        .poll(async () => (await drafts(frameB, marker)).length, { timeout: 15_000 })
+        .toBe(2)
+      expect((await drafts(frameB, marker)).map((d) => d.key)).toContain(first.key)
+
+      // A keeps writing under its own key: still exactly two records
+      await tick(page)
+      expect(await drafts(frameA, marker)).toHaveLength(2)
+      await pageB.close()
+    })
+
+    test(`${c.module}: sign-out deletes the database with every draft`, async ({ page }) => {
+      const marker = `SignOut${c.module}`
+      const frame = await openHost(page, { ...c.query, lang: 'en' })
+      await c.shown(frame)
+      await c.edit(page, frame, marker)
+      await expect.poll(() => lastDirty(page), { timeout: 15_000 }).toBe(true)
+      await tick(page)
+      await expect
+        .poll(async () => (await drafts(frame, marker)).length, { timeout: 15_000 })
+        .toBe(1)
+      await page.evaluate(() =>
+        (window as unknown as { __host: { signOut(): Promise<void> } }).__host.signOut(),
+      )
+      expect(await drafts(frame, marker)).toEqual([])
     })
   })
 }

@@ -25,7 +25,7 @@
  * |   TextEdits, listEditFonts,       |                                                                          |
  * |   canDrawText, listPageImages,    |                                                                          |
  * |   pageImagePng, pagePreviewPng    |                                                                          |
- * | list/add/removeSavedSignature     | browser-local store (./signatures.ts, risk R6)                          |
+ * | list/add/removeSavedSignature     | encrypted per-user store (./signatures.ts)                              |
  * | getUsername                       | init.user.displayName ('' when absent)                                   |
  * | setDirty                          | frame event `dirty`                                                      |
  * | onCloseSaveRequest / send...      | host `save` request runs the renderer's save flow                        |
@@ -73,7 +73,7 @@ import { capEnabled } from '../../docs/bridge/capability-object'
 import { TIMEOUTS, errorCode } from '../../docs/bridge/frame-port'
 import type { ModuleBridgePort } from '../../docs/bridge/module-bridge'
 import type { DraftHost, DraftRecovery } from '../../docs/bridge/draft-recovery'
-import { bridgeDraftRecovery } from '../shared/recovery-prompt'
+import { bridgeDraftRecovery, bridgeRecoveryGrant } from '../shared/recovery-prompt'
 import type { PdfCore } from './core'
 import { ask, hideFatal, showFatal, text } from './notice'
 import { createSignatureStore } from './signatures'
@@ -183,7 +183,12 @@ export type PdfWebApi = { [K in Exclude<keyof PdfApi, 'capabilities'>]-?: NonNul
 export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
   const download = deps.download ?? downloadBlob
   const zip = deps.zip ?? jszip
-  const signatures = deps.signatures ?? createSignatureStore()
+  const signatures =
+    deps.signatures ??
+    createSignatureStore({
+      recovery: bridgeRecoveryGrant(port),
+      ready: () => port.whenInitialized(),
+    })
   const can = (key: string) => capEnabled(deps.capabilities, key)
 
   /** the working copy: the version this frame last opened or saved */
@@ -959,7 +964,7 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
       }
     },
 
-    // ---- saved signatures (browser-local v1)
+    // ---- saved signatures (encrypted with the recovery key, per user)
     listSavedSignatures: () => signatures.list(),
     addSavedSignature: (data) => signatures.add(data),
     removeSavedSignature: (id) => signatures.remove(id),
