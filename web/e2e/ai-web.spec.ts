@@ -15,8 +15,8 @@ const REPLY = 'Hello from the UniWork AI proxy.'
 const KEY_CODES = [
   { status: 402, code: 'credits_exhausted', title: 'AI credits used up' },
   { status: 403, code: 'entitlement_required', title: 'AI is not in your plan' },
-  { status: 404, code: 'credential_missing', title: 'No OpenAI key' },
-  { status: 424, code: 'provider_auth_failed', title: 'OpenAI refused the key' },
+  { status: 404, code: 'credential_missing', title: 'No AI key yet' },
+  { status: 424, code: 'provider_auth_failed', title: 'The AI key was refused' },
   { status: 429, code: 'rate_limited', title: 'Too many AI requests', retryAfter: 7 },
   { status: 502, code: 'provider_unreachable', title: 'AI provider unreachable' },
 ] as const
@@ -161,15 +161,15 @@ for (const module of ['docs', 'markdown'] as const) {
         const frame = await open(page, module, { lang: 'en', ai: '1' })
         await expect(panel(frame)).toBeVisible({ timeout: 30_000 })
         await ask(frame, 'Say hello')
-        const card = frame.locator(`.ow-ai-state[data-ai-state="${s.code}"]`)
-        await expect(card).toBeVisible({ timeout: 30_000 })
-        await expect(card).toContainText(s.title)
-        if (s.status === 429) await expect(card).toContainText('7 s')
-        await expect(frame.locator('.ai-msg-assistant').last()).toContainText(s.title)
-        const settingsButton = card.getByRole('button', { name: 'AI settings' })
-        await expect(settingsButton).toHaveCount(
-          s.code === 'credential_missing' || s.code === 'provider_auth_failed' ? 1 : 0,
-        )
+        // one surface: the panel's inline error carries the whole typed text; no card beside it
+        const inline = frame.locator('.ai-msg-assistant').last()
+        await expect(inline).toContainText(s.title, { timeout: 30_000 })
+        if (s.status === 429) await expect(inline).toContainText('7 s')
+        await expect(frame.locator('.ow-ai-state')).toHaveCount(0)
+        // the way to the keys stays in reach: the panel's own AI settings entry
+        await expect(
+          frame.locator('.ai-panel-header').getByRole('button', { name: 'AI settings' }),
+        ).toBeVisible()
         await expectClean(page, frame, problems, true)
       })
     }
@@ -221,11 +221,13 @@ for (const module of ['docs', 'markdown'] as const) {
       const problems = await watch(page)
       const frame = await open(page, module, { lang: 'en', ai: '1' })
       await expect(panel(frame)).toBeVisible({ timeout: 30_000 })
-      // no key stored yet: the turn ends in the credential_missing state
+      // no key stored yet: the turn ends in the credential_missing state, shown once inline
       await ask(frame, 'Say hello')
-      const card = frame.locator('.ow-ai-state[data-ai-state="credential_missing"]')
-      await expect(card).toBeVisible({ timeout: 30_000 })
-      await card.getByRole('button', { name: 'AI settings' }).click()
+      await expect(frame.locator('.ai-msg-assistant').last()).toContainText('No AI key yet', {
+        timeout: 30_000,
+      })
+      await expect(frame.locator('.ow-ai-state')).toHaveCount(0)
+      await frame.locator('.ai-panel-header').getByRole('button', { name: 'AI settings' }).click()
       const dialog = frame.locator('.ow-ai-dialog')
       await expect(dialog).toBeVisible()
       await expect(dialog).toContainText('No key saved')
@@ -271,10 +273,15 @@ for (const theme of ['light', 'dark'] as const) {
       const frame = await open(page, 'docs', { lang, theme, ai: '1' })
       await expect(panel(frame)).toBeVisible({ timeout: 30_000 })
       await ask(frame, 'Hello')
-      const card = frame.locator('.ow-ai-state[data-ai-state="provider_auth_failed"]')
-      await expect(card).toBeVisible({ timeout: 30_000 })
+      await expect(frame.locator('.ai-msg-assistant').last()).toBeVisible({ timeout: 30_000 })
+      await expect(frame.locator('.ow-ai-state')).toHaveCount(0)
       await page.screenshot({ path: screenshotPath('ai', `docs-state-${theme}-${lang}`) })
-      await card.locator('button.primary').click()
+      // the header gear is localized: open the same dialog through the member it calls
+      void frame.evaluate(() =>
+        (
+          window as unknown as { desktop: { openAiSettings(): Promise<void> } }
+        ).desktop.openAiSettings(),
+      )
       await expect(frame.locator('.ow-ai-dialog select[name="provider"]')).toBeVisible()
       await page.screenshot({ path: screenshotPath('ai', `docs-settings-${theme}-${lang}`) })
     })
