@@ -21,4 +21,6 @@ export const he = {
   webCommentAuthor: 'משתמש',
   webExternalMedia: 'מדיה חיצונית מקושרת מופעלת רק באפליקציית שולחן העבודה.',
   webReadOnly: 'מצגת זו לקריאה בלבד.',
+  webSaveNetwork: 'לא ניתן להתחבר ל-UniWork. בדקו את החיבור ונסו שוב.',
+  webSaveTimeout: 'השמירה ארכה זמן רב מדי. בדקו את החיבור ונסו שוב.',
 } satisfies Record<keyof typeof zh, string>

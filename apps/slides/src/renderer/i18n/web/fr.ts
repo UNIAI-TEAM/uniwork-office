@@ -23,4 +23,6 @@ export const fr = {
   webCommentAuthor: 'Utilisateur',
   webExternalMedia: 'Les médias externes liés ne sont lus que dans l’application de bureau.',
   webReadOnly: 'Cette présentation est en lecture seule.',
+  webSaveNetwork: 'Impossible de joindre UniWork. Vérifiez votre connexion et réessayez.',
+  webSaveTimeout: "L'enregistrement a pris trop de temps. Vérifiez votre connexion et réessayez.",
 } satisfies Record<keyof typeof zh, string>

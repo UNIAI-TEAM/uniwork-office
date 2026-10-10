@@ -24,4 +24,6 @@ export const ja = {
   webCommentAuthor: 'ユーザー',
   webExternalMedia: 'リンクされた外部メディアはデスクトップ アプリでのみ再生できます。',
   webReadOnly: 'このプレゼンテーションは読み取り専用です。',
+  webSaveNetwork: 'UniWork に接続できませんでした。接続を確認してもう一度お試しください。',
+  webSaveTimeout: '保存に時間がかかりすぎました。接続を確認してもう一度お試しください。',
 } satisfies Record<keyof typeof zh, string>

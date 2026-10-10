@@ -22,4 +22,6 @@ export const pl = {
   webCommentAuthor: 'Użytkownik',
   webExternalMedia: 'Połączone zewnętrzne multimedia są odtwarzane tylko w aplikacji klasycznej.',
   webReadOnly: 'Ta prezentacja jest tylko do odczytu.',
+  webSaveNetwork: 'Nie można połączyć się z UniWork. Sprawdź połączenie i spróbuj ponownie.',
+  webSaveTimeout: 'Zapisywanie trwało zbyt długo. Sprawdź połączenie i spróbuj ponownie.',
 } satisfies Record<keyof typeof zh, string>

@@ -24,4 +24,6 @@ export const nl = {
   webCommentAuthor: 'Gebruiker',
   webExternalMedia: 'Gekoppelde externe media worden alleen in de desktop-app afgespeeld.',
   webReadOnly: 'Deze presentatie is alleen-lezen.',
+  webSaveNetwork: 'UniWork is niet bereikbaar. Controleer je verbinding en probeer het opnieuw.',
+  webSaveTimeout: 'Opslaan duurde te lang. Controleer je verbinding en probeer het opnieuw.',
 } satisfies Record<keyof typeof zh, string>

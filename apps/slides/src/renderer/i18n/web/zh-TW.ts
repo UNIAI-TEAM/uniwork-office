@@ -20,4 +20,6 @@ export const zhTW = {
   webCommentAuthor: '使用者',
   webExternalMedia: '連結的外部媒體只能在桌面應用程式中播放。',
   webReadOnly: '此簡報為唯讀。',
+  webSaveNetwork: '無法連線到 UniWork。請檢查網路後再試一次。',
+  webSaveTimeout: '儲存耗時過長。請檢查網路後再試一次。',
 } satisfies Record<keyof typeof zh, string>

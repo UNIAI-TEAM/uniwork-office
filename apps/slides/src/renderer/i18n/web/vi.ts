@@ -22,4 +22,6 @@ export const vi = {
   webCommentAuthor: 'Người dùng',
   webExternalMedia: 'Phương tiện liên kết bên ngoài chỉ phát được trong ứng dụng máy tính.',
   webReadOnly: 'Bản trình bày này chỉ đọc.',
+  webSaveNetwork: 'Không kết nối được tới UniWork. Hãy kiểm tra mạng rồi thử lại.',
+  webSaveTimeout: 'Việc lưu mất quá nhiều thời gian. Hãy kiểm tra mạng rồi thử lại.',
 } satisfies Record<keyof typeof zh, string>
