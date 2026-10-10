@@ -16,6 +16,7 @@ import {
 } from '@genoffice/electron-utils/headless-export'
 import { useI18n } from './i18n/locale'
 import { cap, platform } from './capabilities'
+import { useNarrowFrame } from './narrow-frame'
 import { parseDocText, serializeDocText, type Envelope } from './document/envelope'
 import { textWithPendingStyles } from './document/pending-draft'
 import { SourceEditor, type CursorInfo, type SourceEditorHandle } from './source/SourceEditor'
@@ -175,9 +176,14 @@ export default function App() {
     const stored = localStorage.getItem('htmlapp.device')
     return DEVICES.includes(stored as Device) ? (stored as Device) : 'desktop'
   })
-  const [panelOpen, setPanelOpen] = useState(
-    () => localStorage.getItem('htmlapp.stylePanel') !== '0',
-  )
+  /** a phone-width frame: the style panel is a bottom sheet and the floating toolbar steps aside */
+  const narrow = useNarrowFrame()
+  // open by default, except in a narrow frame (a sheet over the preview the moment something is
+  // selected hides the selection); an explicit choice made at any width is kept
+  const [panelOpen, setPanelOpen] = useState(() => {
+    const stored = localStorage.getItem('htmlapp.stylePanel')
+    return stored === null ? !narrow : stored !== '0'
+  })
   const [panelDismissedSid, setPanelDismissedSid] = useState<number | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   /** a resize / reorder drag is in progress inside the frame: the floating chrome would only get in the way */
@@ -394,9 +400,10 @@ export default function App() {
     localStorage.setItem('htmlapp.device', device)
   }, [device])
 
+  // the sheet at phone width is not a choice about the desktop layout: only a wide frame remembers it
   useEffect(() => {
-    localStorage.setItem('htmlapp.stylePanel', panelOpen ? '1' : '0')
-  }, [panelOpen])
+    if (!narrow) localStorage.setItem('htmlapp.stylePanel', panelOpen ? '1' : '0')
+  }, [panelOpen, narrow])
 
   // the device host is centred in the stage: any stage resize (split view, AI dock, device) moves it
   useEffect(() => {
@@ -1677,6 +1684,7 @@ export default function App() {
                 {visualEdit &&
                   canvasMode === 'edit' &&
                   !dragging &&
+                  !(narrow && panelShown) &&
                   hasElement &&
                   selectedEntry &&
                   selRect &&
@@ -1723,6 +1731,7 @@ export default function App() {
                   panelShown && (
                     <StylePanel
                       key={selectedEntry.sid}
+                      sheet={narrow}
                       tag={selectedEntry.tag}
                       computed={selComputed}
                       textRun={selText.run}
