@@ -21,4 +21,9 @@ export const ko = {
   webMergeNow: '지금 병합',
   webSaveNetwork: 'UniWork에 연결할 수 없습니다. 연결을 확인한 후 다시 시도하세요.',
   webSaveTimeout: '저장에 너무 오래 걸렸습니다. 연결을 확인한 후 다시 시도하세요.',
+  webAppOnlyHint: '이 기능을 사용하려면 UniWork Office 앱에서 여세요',
+  webAppOnlyOpen: '앱에서 열기',
+  webAppOnlyOcr:
+    '이 PDF에는 스캔한 페이지가 있습니다. 여기서는 텍스트 인식(OCR)을 사용할 수 없습니다.',
+  webAppOnlyConvert: '여기서는 PDF를 Word, Excel, PowerPoint로 변환할 수 없습니다.',
 } satisfies Record<keyof typeof zh, string>

@@ -273,6 +273,7 @@ function NoteDraftCard({
   setEl,
   onConfirm,
   onCancel,
+  onChange,
 }: {
   author: string
   color: [number, number, number]
@@ -282,6 +283,8 @@ function NoteDraftCard({
   setEl: (el: HTMLDivElement | null) => void
   onConfirm: (text: string) => void
   onCancel: () => void
+  /** every keystroke: the App holds the typed text so a save / draft copy can fold it in */
+  onChange?: (text: string) => void
 }): ReactElement {
   const [text, setText] = useState('')
   const [createdMs] = useState(() => Date.now())
@@ -308,7 +311,10 @@ function NoteDraftCard({
           value={text}
           placeholder={t('notePlaceholder')}
           autoFocus
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e) => {
+            setText(e.target.value)
+            onChange?.(e.target.value)
+          }}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submit()
             else if (e.key === 'Escape') {
@@ -362,6 +368,7 @@ export function NoteMarginColumn({
   onClose,
   onDraftConfirm,
   onDraftCancel,
+  onDraftChange,
 }: {
   width: number
   threads: NoteMarginThread[]
@@ -386,6 +393,8 @@ export function NoteMarginColumn({
   onClose: () => void
   onDraftConfirm: (text: string) => void
   onDraftCancel: () => void
+  /** typed text of the draft card, reported per keystroke (optional) */
+  onDraftChange?: (text: string) => void
 }): ReactElement {
   const [heights, setHeights] = useState<Map<string, number>>(new Map())
   const timeFmt = useMemo(
@@ -486,6 +495,7 @@ export function NoteMarginColumn({
           setEl={setEl(DRAFT_KEY)}
           onConfirm={onDraftConfirm}
           onCancel={onDraftCancel}
+          {...(onDraftChange ? { onChange: onDraftChange } : {})}
         />
       )}
     </div>

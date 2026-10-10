@@ -296,3 +296,25 @@ export function findThreadRoot(roots: NoteThreadItem[], key: string): NoteThread
   }
   return null
 }
+
+/** The pending note a margin draft card becomes when committed (typed text trimmed; null = nothing
+    typed). One builder for the OK button, a save that folds the open card in, and the web draft copy. */
+export function newNoteInput(
+  draft: { origIdx: number; at: [number, number] },
+  typed: string,
+  color: [number, number, number],
+  author: string,
+  createdMs: number,
+): NoteInput | null {
+  const contents = typed.trim()
+  if (!contents) return null
+  return {
+    kind: 'note',
+    pageIndex: draft.origIdx,
+    color,
+    at: draft.at,
+    contents,
+    author: author || undefined,
+    createdMs,
+  }
+}

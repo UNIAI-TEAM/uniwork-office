@@ -20,4 +20,8 @@ export const th = {
   webMergeNow: 'รวมเลย',
   webSaveNetwork: 'เชื่อมต่อ UniWork ไม่ได้ โปรดตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง',
   webSaveTimeout: 'การบันทึกใช้เวลานานเกินไป โปรดตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง',
+  webAppOnlyHint: 'เปิดในแอป UniWork Office เพื่อใช้ฟีเจอร์นี้',
+  webAppOnlyOpen: 'เปิดในแอป',
+  webAppOnlyOcr: 'PDF นี้มีหน้าที่สแกน ไม่สามารถใช้การรู้จำข้อความ (OCR) ที่นี่ได้',
+  webAppOnlyConvert: 'ไม่สามารถแปลง PDF เป็น Word, Excel หรือ PowerPoint ที่นี่ได้',
 } satisfies Record<keyof typeof zh, string>

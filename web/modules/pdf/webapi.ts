@@ -69,6 +69,7 @@ import {
   type SaveResult,
 } from '../../docs/protocol/types'
 import aiStub from '../../docs/bridge/ai'
+import { createAppOpen } from '../../docs/bridge/app-open'
 import browser, { downloadBlob } from '../../docs/bridge/browser'
 import { capEnabled } from '../../docs/bridge/capability-object'
 import { TIMEOUTS, errorCode } from '../../docs/bridge/frame-port'
@@ -652,6 +653,8 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
       recoveredFlag = false
       return flag
     },
+    /** the "use the app" action (A7); the grant is read at call time */
+    openInApp: createAppOpen(port, deps.capabilities),
 
     // ---- save
     async save(request: SavePdfRequest): Promise<SavePdfResult> {

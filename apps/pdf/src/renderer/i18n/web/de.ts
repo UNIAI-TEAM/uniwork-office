@@ -23,4 +23,10 @@ export const de = {
     'UniWork ist nicht erreichbar. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.',
   webSaveTimeout:
     'Das Speichern hat zu lange gedauert. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.',
+  webAppOnlyHint: 'Zum Verwenden dieser Funktion in der UniWork Office-App öffnen',
+  webAppOnlyOpen: 'In der App öffnen',
+  webAppOnlyOcr:
+    'Dieses PDF enthält gescannte Seiten. Die Texterkennung (OCR) ist hier nicht verfügbar.',
+  webAppOnlyConvert:
+    'Die Umwandlung eines PDFs in Word, Excel oder PowerPoint ist hier nicht verfügbar.',
 } satisfies Record<keyof typeof zh, string>

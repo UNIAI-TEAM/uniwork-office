@@ -21,4 +21,9 @@ export const nl = {
   webMergeNow: 'Nu samenvoegen',
   webSaveNetwork: 'UniWork is niet bereikbaar. Controleer je verbinding en probeer het opnieuw.',
   webSaveTimeout: 'Opslaan duurde te lang. Controleer je verbinding en probeer het opnieuw.',
+  webAppOnlyHint: 'Open in de UniWork Office-app om deze functie te gebruiken',
+  webAppOnlyOpen: 'Openen in de app',
+  webAppOnlyOcr:
+    "Deze pdf bevat gescande pagina's. Tekstherkenning (OCR) is hier niet beschikbaar.",
+  webAppOnlyConvert: 'PDF omzetten naar Word, Excel of PowerPoint is hier niet beschikbaar.',
 } satisfies Record<keyof typeof zh, string>

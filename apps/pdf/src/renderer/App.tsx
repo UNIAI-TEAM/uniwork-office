@@ -8,7 +8,10 @@ import type { PDFDocumentProxy } from 'pdfjs-dist'
 import workerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url'
 import { AiPanel, GensparkMark } from './ai/AiPanel'
 import { AiAskPopover, type AskAnchorRect } from './AiAskPopover'
-import { cap } from './capabilities'
+import { AppOnlyNote } from './AppOnlyNote'
+import { widthFitScale } from './fit-scale'
+import { appMayDrawText } from './font-notice'
+import { appOpenAvailable, cap, platform } from './capabilities'
 import {
   createSavedAnnotCountsLoader,
   loadSavedAnnots,
@@ -17,6 +20,7 @@ import {
 import {
   AUTO_OCR_PAGE_CAP,
   OcrTextLayer,
+  isScannedEntry,
   renderPageForOcr,
   runAutoOcr,
   type AutoOcrResult,
@@ -41,7 +45,13 @@ import { ColorPickerPopover } from './ColorPicker'
 import type { DrawTool, LocalDrawing, SavedNotePin } from './DrawLayer'
 import { NoteMarginColumn } from './NoteMargin'
 import type { NoteMarginDraft, NoteMarginThread } from './NoteMargin'
-import { flattenThread, pendingNoteKey, threadSubtree, visibleNoteThreads } from './note-threads'
+import {
+  flattenThread,
+  newNoteInput,
+  pendingNoteKey,
+  threadSubtree,
+  visibleNoteThreads,
+} from './note-threads'
 import type { NoteInput, NoteThreadItem, SavedNoteAnnot } from './note-threads'
 import { FormLayer } from './FormLayer'
 import {
@@ -704,6 +714,9 @@ export default function App() {
   const [colorOpen, setColorOpen] = useState(false)
   /** Note just placed with the note tool; its content is typed into a margin draft card */
   const [noteDraft, setNoteDraft] = useState<{ origIdx: number; at: [number, number] } | null>(null)
+  /** What is typed into the margin draft card so far (the card reports it per keystroke) */
+  const [noteDraftText, setNoteDraftText] = useState('')
+  useEffect(() => setNoteDraftText(''), [noteDraft])
   /** In-progress rewrite of an existing comment. Hoisted out of the margin card so a
       save can fold it in before the post-save reload tears the edit box down. */
   const [noteEditDraft, setNoteEditDraft] = useState<{
@@ -888,6 +901,10 @@ export default function App() {
   const [searchIndexCache] = useState(createSearchIndexCache)
   /** In-flight auto-OCR pass, so its toast can stop it */
   const ocrAbortRef = useRef<AbortController | null>(null)
+  /** Web frame: the document has scanned pages and the web build has no OCR engine, so a "use the
+      app" notice is up. `ocrAppHintPathRef` keeps it to once per file (a save reloads `doc`) */
+  const [ocrAppHint, setOcrAppHint] = useState(false)
+  const ocrAppHintPathRef = useRef('')
   /** Auto-OCR progress: `stop: null` while the pass runs (the toast offers Stop),
       then the reason it ended, for the cap and a user cancel alike. `pending` is
       the queue a capped pass can be continued over. */
@@ -1508,7 +1525,7 @@ export default function App() {
     const availW = el.clientWidth - SCROLL_PAD * 2 - (noteMarginOn ? NOTE_MARGIN_W + PAGE_GAP : 0)
     const next =
       mode === 'width'
-        ? clampScale(availW / maxW)
+        ? clampScale(widthFitScale(availW / maxW, el.clientWidth))
         : clampScale(
             Math.min(
               availW / maxW,
@@ -1761,11 +1778,6 @@ export default function App() {
     metadata !== null ||
     recovered
   const dirty = redactions.length > 0 || ordinaryDirty
-
-  // Mirror dirty state to the main process (close-tab/close-window guard)
-  useEffect(() => {
-    window.pdfApi.setDirty(dirty)
-  }, [dirty])
 
   // Existing images are listed while edit-image mode is on; `doc` in the deps refreshes
   // the list after a post-save reload (object rects may have changed on disk)
@@ -2076,14 +2088,33 @@ export default function App() {
   useEffect(() => {
     setOcrPages(new Map())
     setOcrRun(null)
-    if (!doc || sizes.length !== doc.numPages || !cap('ocr')) return
+    setOcrAppHint(false)
+    if (!doc || sizes.length !== doc.numPages) return
+    if (!cap('ocr')) {
+      // no OCR engine on the web: say so once per file when it has scanned pages
+      if (!filePath || ocrAppHintPathRef.current === filePath) return
+      let live = true
+      void searchIndexCache
+        .get(doc)
+        .then((index) => {
+          if (!live || !index.some(isScannedEntry)) return
+          ocrAppHintPathRef.current = filePath
+          setOcrAppHint(true)
+        })
+        .catch(() => {
+          // the text index failed: search reports it; no hint without proof of a scan
+        })
+      return () => {
+        live = false
+      }
+    }
     startOcrPass(null)
     return () => {
       // tears down the pass this effect started, so its teardown still cancels
       ocrAbortRef.current?.abort()
       ocrAbortRef.current = null
     }
-  }, [doc, sizes.length, searchIndexCache, startOcrPass])
+  }, [doc, sizes.length, searchIndexCache, startOcrPass, filePath])
 
   /** Paragraph boxes are keyed to the loaded doc; drop them on save-reload */
   useEffect(() => {
@@ -3458,6 +3489,12 @@ export default function App() {
     noticeTimerRef.current = window.setTimeout(() => setNotice(null), 8000)
   }
 
+  /** the "Open in app" action of the web "use the app" messages; the host owns every dialog and
+      alert, so the result needs no handling here */
+  const openInApp = (feature: string) => {
+    void window.pdfApi.openInApp?.(feature)
+  }
+
   useEffect(() => {
     if (!formHasXfa || !filePath || warnedXfaPathRef.current === filePath) return
     warnedXfaPathRef.current = filePath
@@ -3508,6 +3545,7 @@ export default function App() {
   const editsPayload = (
     edits: LocalTextEdit[] = textEdits,
     noteFlush?: { drawings: LocalDrawing[]; noteEdits: LocalNoteEdit[] },
+    extraDrawings: LocalDrawing[] = [],
   ) => ({
     markups: markups.map(({ id: _id, ...rest }) => rest),
     annotDeletes: annotDeletes.map((d): AnnotDeleteInput => ({
@@ -3525,7 +3563,7 @@ export default function App() {
       oldContents: e.annot.contents,
       contents: e.contents,
     })),
-    drawings: (noteFlush?.drawings ?? drawings).map((d) => d.input),
+    drawings: [...(noteFlush?.drawings ?? drawings), ...extraDrawings].map((d) => d.input),
     textEdits: edits.map((e) => e.input),
     textInserts: textInserts.map((insert) => insert.input),
     imageEdits: imageEdits.map((e) => e.input),
@@ -3538,11 +3576,15 @@ export default function App() {
     ...(metadata ? { metadata } : {}),
   })
 
-  // Web draft recovery: what a Save would send right now (no commitTextDraft / commitNoteEdit:
-  // the provider must not touch state; an open editor's draft joins on the next write)
+  // Web draft recovery: what a Save would send right now, open editor boxes included (A6). It
+  // folds them like save() does (commitTextDraft / commitNoteEdit / confirmNoteDraft) but through
+  // pendingOpenBoxes(), which never touches state: the provider runs on a timer and on pagehide
   const saveRequestRef = useRef<() => SavePdfRequest | null>(() => null)
-  saveRequestRef.current = () =>
-    filePath && status === 'ready' ? { path: filePath, ...editsPayload() } : null
+  saveRequestRef.current = () => {
+    if (!filePath || status !== 'ready') return null
+    const boxes = pendingOpenBoxes()
+    return { path: filePath, ...editsPayload(boxes.textEdits, boxes.noteFlush, boxes.newNotes) }
+  }
   useEffect(() => window.pdfApi.provideSaveRequest?.(() => saveRequestRef.current()), [])
 
   /** Resolved when the running save() lands; queued saves and Save As serialize behind it */
@@ -4081,6 +4123,14 @@ export default function App() {
   const patchTextInsert = (id: string, patch: Partial<TextInsertInput>) =>
     applyEditOpsRef.current([{ op: 'patchTextInsert', id, input: patch }])
 
+  /** "No installed font" message. The web build embeds only the bundled Liberation faces; the app
+      draws with the installed system fonts, which cover CJK and most symbols (not emoji), so the
+      "use the app" hint is added on the web for everything but emoji */
+  const noFontNotice = (text: string): string =>
+    platform() === 'web' && appMayDrawText(text)
+      ? `${t('textInsertNoFont')} — ${t('webAppOnlyHint')}`
+      : t('textInsertNoFont')
+
   /** Re-entry guard: the dialog stays open (and its OK stays clickable) while the
       canDrawText round-trip runs — a second click must not run the confirm again
       (double undo step / duplicate insert) */
@@ -4098,7 +4148,7 @@ export default function App() {
       // An IPC error must not block inserting — the save path re-checks anyway.
       const drawable = await window.pdfApi.canDrawText(text).catch(() => true)
       if (!drawable) {
-        showNotice(t('textInsertNoFont'))
+        showNotice(noFontNotice(text))
         return
       }
       const config = textInsertConfig(
@@ -4991,22 +5041,10 @@ export default function App() {
     const target = noteDraft
     setNoteDraft(null)
     if (!target || !text) return
+    const drawing = newNoteInput(target, text, drawColor, noteAuthor, Date.now())
+    if (!drawing) return
     const id = newId()
-    applyEditOps([
-      {
-        op: 'addDrawing',
-        id,
-        drawing: {
-          kind: 'note',
-          pageIndex: target.origIdx,
-          color: drawColor,
-          at: target.at,
-          contents: text,
-          author: noteAuthor || undefined,
-          createdMs: Date.now(),
-        },
-      },
-    ])
+    applyEditOps([{ op: 'addDrawing', id, drawing }])
     setActiveNote({ origIdx: target.origIdx, rootKey: pendingNoteKey(id) })
   }
 
@@ -5114,7 +5152,13 @@ export default function App() {
       typed text). Returns the arrays the save must write — the setState calls here
       won't be visible to the caller's closure. */
   const commitNoteEdit = (): { drawings: LocalDrawing[]; noteEdits: LocalNoteEdit[] } => {
-    const unchanged = { drawings, noteEdits }
+    // A new comment typed into the margin card folds in the same way (the draft copy keeps it too)
+    const typed = noteDraftText.trim()
+    const foldedNew = noteDraft !== null && typed !== ''
+    if (foldedNew) confirmNoteDraft(typed)
+    const unchanged = foldedNew
+      ? { drawings: drawingsRef.current, noteEdits: noteEditsRef.current }
+      : { drawings, noteEdits }
     const draft = noteEditDraft
     if (!draft) return unchanged
     setNoteEditDraft(null)
@@ -5128,6 +5172,69 @@ export default function App() {
     if (plan.failures.length > 0) return unchanged
     return { drawings: drawingsRef.current, noteEdits: noteEditsRef.current }
   }
+
+  /** The editor boxes that are open right now, folded into what a save would write: the floating
+      text editor, a comment being rewritten, and a new comment typed into the margin card. The
+      pure twin of commitTextDraft + commitNoteEdit + confirmNoteDraft (no setState, no undo
+      step), so the web draft copy keeps typed-but-uncommitted work (A6) and the frame reports the
+      document as unsaved while such a box holds changes. `open` = at least one box changes the
+      file when committed. */
+  const pendingOpenBoxes = (): {
+    textEdits: LocalTextEdit[]
+    noteFlush: { drawings: LocalDrawing[]; noteEdits: LocalNoteEdit[] }
+    newNotes: LocalDrawing[]
+    open: boolean
+  } => {
+    let open = false
+    let edits = textEdits
+    if (textDraft) {
+      const merged = mergeTextDraft(textEdits, textDraft)
+      if (merged && merged !== 'overflow') {
+        edits = merged
+        open = true
+      }
+    }
+    let noteFlush = { drawings, noteEdits }
+    if (noteEditDraft) {
+      const item = noteThreadsOn(noteEditDraft.origIdx)
+        .flatMap((root) => flattenThread(root))
+        .map(({ item: it }) => it)
+        .find((it) => it.key === noteEditDraft.itemKey)
+      const ops = item ? noteEditOps(item, noteEditDraft.text.trim()) : null
+      if (ops) {
+        const plan = planEditOps(ops, editOpContext(), newId)
+        if (plan.failures.length === 0 && plan.ops.length > 0) {
+          const base = snapshot()
+          noteFlush = {
+            drawings: plan.touched.has('drawings')
+              ? reduceBucket('drawings', drawingsRef.current, plan.ops, base)
+              : drawings,
+            noteEdits: plan.touched.has('noteEdits')
+              ? reduceBucket('noteEdits', noteEditsRef.current, plan.ops, base)
+              : noteEdits,
+          }
+          open = true
+        }
+      }
+    }
+    const newNotes: LocalDrawing[] = []
+    const typed = noteDraft
+      ? newNoteInput(noteDraft, noteDraftText, drawColor, noteAuthor, Date.now())
+      : null
+    if (typed) {
+      newNotes.push({ id: 'open-note-box', input: typed })
+      open = true
+    }
+    return { textEdits: edits, noteFlush, newNotes, open }
+  }
+  const openBoxesDirty =
+    !readOnly && (textDraft || noteEditDraft || noteDraft) ? pendingOpenBoxes().open : false
+
+  // Mirror dirty state to the main process (close-tab/close-window guard). An open editor box with
+  // typed changes counts: Save folds it in, and the web draft copy needs the frame to be dirty
+  useEffect(() => {
+    window.pdfApi.setDirty(dirty || openBoxesDirty)
+  }, [dirty, openBoxesDirty])
 
   /** Delete a comment and everything under it (saved → pending annotDeletes; pending → dropped) */
   const deleteNoteItem = (item: NoteThreadItem) => {
@@ -6500,23 +6607,23 @@ export default function App() {
                   <div className="ribbon-sep" />
                 </>
               )}
-              {cap('convertOffice') && (
-                <div className="ribbon-group">
-                  <div className="ribbon-group-items">
-                    <div className="rb-drop-wrap" ref={convertWrapRef}>
-                      <button
-                        className={`rb-big${convertOpen ? ' active' : ''}`}
-                        data-tip={t('convertPdfTip')}
-                        disabled={convertBusy}
-                        onClick={() => setConvertOpen((v) => !v)}
-                      >
-                        <span className="rb-big-icon">
-                          <IconConvertPdf />
-                          <RbCaret />
-                        </span>
-                        {t('convertPdf')}
-                      </button>
-                      {convertOpen && (
+              <div className="ribbon-group">
+                <div className="ribbon-group-items">
+                  <div className="rb-drop-wrap" ref={convertWrapRef}>
+                    <button
+                      className={`rb-big${convertOpen ? ' active' : ''}`}
+                      data-tip={cap('convertOffice') ? t('convertPdfTip') : t('webAppOnlyHint')}
+                      disabled={convertBusy}
+                      onClick={() => setConvertOpen((v) => !v)}
+                    >
+                      <span className="rb-big-icon">
+                        <IconConvertPdf />
+                        <RbCaret />
+                      </span>
+                      {t('convertPdf')}
+                    </button>
+                    {convertOpen &&
+                      (cap('convertOffice') ? (
                         <div className="rb-drop rb-menu">
                           <button onClick={() => void convertTo('docx')}>
                             {t('convertToWord')}
@@ -6528,12 +6635,25 @@ export default function App() {
                             {t('convertToPpt')}
                           </button>
                         </div>
-                      )}
-                    </div>
+                      ) : (
+                        // the web build has no converter: say so and offer the app instead of
+                        // hiding the entry
+                        <div className="rb-drop">
+                          <AppOnlyNote
+                            testId="pdf-convert-app-only"
+                            lead={t('webAppOnlyConvert')}
+                            hint={t('webAppOnlyHint')}
+                            openLabel={t('webAppOnlyOpen')}
+                            {...(appOpenAvailable()
+                              ? { onOpen: () => openInApp('pdf.convert') }
+                              : {})}
+                          />
+                        </div>
+                      ))}
                   </div>
                 </div>
-              )}
-              {cap('convertOffice') && <div className="ribbon-sep" />}
+              </div>
+              <div className="ribbon-sep" />
               {pageZoomGroup}
               <div className="ribbon-sep" />
               <div className="ribbon-group">
@@ -8492,6 +8612,7 @@ export default function App() {
                         onClose={() => setActiveNote(null)}
                         onDraftConfirm={confirmNoteDraft}
                         onDraftCancel={() => setNoteDraft(null)}
+                        onDraftChange={setNoteDraftText}
                       />
                     )}
                   </div>
@@ -8775,6 +8896,25 @@ export default function App() {
               <div className="pdf-toast pdf-toast-notice" role="status">
                 <span>{notice}</span>
                 <button type="button" onClick={() => setNotice(null)}>
+                  {t('ok')}
+                </button>
+              </div>
+            )}
+            {ocrAppHint && (
+              <div
+                className="pdf-toast pdf-toast-notice"
+                role="status"
+                data-testid="pdf-ocr-app-only"
+              >
+                <span>
+                  {t('webAppOnlyOcr')} {t('webAppOnlyHint')}
+                </span>
+                {appOpenAvailable() && (
+                  <button type="button" onClick={() => openInApp('pdf.ocr')}>
+                    {t('webAppOnlyOpen')}
+                  </button>
+                )}
+                <button type="button" onClick={() => setOcrAppHint(false)}>
                   {t('ok')}
                 </button>
               </div>

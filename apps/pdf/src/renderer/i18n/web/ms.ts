@@ -21,4 +21,8 @@ export const ms = {
   webMergeNow: 'Gabungkan sekarang',
   webSaveNetwork: 'UniWork tidak dapat dicapai. Semak sambungan anda dan cuba lagi.',
   webSaveTimeout: 'Penyimpanan mengambil masa terlalu lama. Semak sambungan anda dan cuba lagi.',
+  webAppOnlyHint: 'Buka dalam aplikasi UniWork Office untuk menggunakan ciri ini',
+  webAppOnlyOpen: 'Buka dalam aplikasi',
+  webAppOnlyOcr: 'PDF ini mempunyai halaman imbasan. Pengecaman teks (OCR) tidak tersedia di sini.',
+  webAppOnlyConvert: 'Penukaran PDF kepada Word, Excel atau PowerPoint tidak tersedia di sini.',
 } satisfies Record<keyof typeof zh, string>

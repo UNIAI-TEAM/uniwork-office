@@ -20,4 +20,8 @@ export const zhTW = {
   webMergeNow: '立即合併',
   webSaveNetwork: '無法連線到 UniWork。請檢查網路後再試一次。',
   webSaveTimeout: '儲存耗時過長。請檢查網路後再試一次。',
+  webAppOnlyHint: '在 UniWork Office 應用程式中開啟，即可使用此功能',
+  webAppOnlyOpen: '在應用程式中開啟',
+  webAppOnlyOcr: '此 PDF 含有掃描頁。此處不提供文字辨識（OCR）。',
+  webAppOnlyConvert: '此處不提供將 PDF 轉換為 Word、Excel 或 PowerPoint。',
 } satisfies Record<keyof typeof zh, string>

@@ -20,4 +20,8 @@ export const ar = {
   webMergeNow: 'الدمج الآن',
   webSaveNetwork: 'تعذّر الوصول إلى UniWork. تحقق من اتصالك وحاول مرة أخرى.',
   webSaveTimeout: 'استغرق الحفظ وقتًا طويلًا. تحقق من اتصالك وحاول مرة أخرى.',
+  webAppOnlyHint: 'افتح في تطبيق UniWork Office لاستخدام هذه الميزة',
+  webAppOnlyOpen: 'فتح في التطبيق',
+  webAppOnlyOcr: 'يحتوي هذا الملف على صفحات ممسوحة ضوئيًا. التعرّف على النص (OCR) غير متاح هنا.',
+  webAppOnlyConvert: 'تحويل PDF إلى Word أو Excel أو PowerPoint غير متاح هنا.',
 } satisfies Record<keyof typeof zh, string>
