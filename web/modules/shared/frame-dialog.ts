@@ -7,12 +7,16 @@
  * - layout: centred card, stacked full-width actions (./frame-dialog.css, theme tokens only);
  * - action order: primary, neutral, destructive, then the way out (Cancel / Stay) last, whatever
  *   order the caller lists them in;
- * - styles: the brand-blue primary, a soft destructive style (`danger`, never the first focus),
- *   a quiet style for the way out;
- * - focus: the safe action first (the cancel choice; without one, the primary; never a destructive
- *   one), Tab stays inside, Escape = `cancelId`, focus returns to where it was when it closes.
+ * - styles: the brand-blue primary (the caller's `primary`; without one the first neutral choice,
+ *   so no dialog is a row of outlined buttons), a soft destructive style (`danger`, never the
+ *   first focus), a quiet style for the way out;
+ * - close X: top right of every choice dialog, answers like Escape (`cancelId`), last in the Tab loop;
+ * - focus: the safe primary first (never a destructive one; without a primary the cancel choice),
+ *   Tab stays inside, Escape = `cancelId`, focus returns to where it was when it closes.
  */
+import { webLanguage } from '../../docs/bridge/browser'
 import './frame-dialog.css'
+import { webText } from './i18n/strings-web'
 
 export interface FrameChoice<T extends string> {
   id: T
@@ -32,8 +36,10 @@ export interface FrameDialogOptions<T extends string> {
   choices: readonly FrameChoice<T>[]
   /** resolved on Escape; when it names one of `choices`, that button is the quiet way out */
   cancelId: T
-  /** the button that takes the first focus (default: the cancel choice, else the primary) */
+  /** the button that takes the first focus (default: the safe primary, else the cancel choice) */
   focusId?: T
+  /** accessible name of the close X (already translated; default: the shared "Close") */
+  closeLabel?: string
   /** the dialog's marker value (tests and e2e) */
   marker: string
   /** attribute that carries the marker (default `data-office-web`) */
@@ -99,6 +105,34 @@ export function toneOf<T extends string>(choice: FrameChoice<T>, cancelId: T): T
   return choice.id === cancelId ? 'ghost' : 'neutral'
 }
 
+/**
+ * The tone of every choice. A dialog whose caller names no primary (the save conflict lists Reload
+ * latest, Overwrite, Cancel) gets its first neutral choice lifted to the filled primary, so the
+ * recommended action reads the same as in the host's leave dialog.
+ */
+export function tonesOf<T extends string>(choices: readonly FrameChoice<T>[], cancelId: T): Tone[] {
+  const tones = choices.map((c) => toneOf(c, cancelId))
+  if (!tones.includes('primary')) {
+    const first = tones.indexOf('neutral')
+    if (first >= 0) tones[first] = 'primary'
+  }
+  return tones
+}
+
+const CLOSE_ICON =
+  '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" focusable="false">' +
+  '<path d="M3 3l8 8M11 3l-8 8" fill="none" stroke="currentColor" stroke-width="1.6" ' +
+  'stroke-linecap="round"/></svg>'
+
+function closeButton(label: string): HTMLButtonElement {
+  const b = document.createElement('button')
+  b.type = 'button'
+  b.className = 'ow-dlg-close'
+  b.setAttribute('aria-label', label)
+  b.innerHTML = CLOSE_ICON
+  return b
+}
+
 /** modal choice; resolves with the chosen id, or `cancelId` on Escape */
 export function frameAsk<T extends string>(opts: FrameDialogOptions<T>): Promise<T> {
   return new Promise<T>((resolve) => {
@@ -128,9 +162,16 @@ export function frameAsk<T extends string>(opts: FrameDialogOptions<T>): Promise
       const step = e.shiftKey ? -1 : 1
       buttons[at < 0 ? 0 : (at + step + buttons.length) % buttons.length]!.focus()
     }
+    const tones = tonesOf(opts.choices, opts.cancelId)
     const ordered = opts.choices
-      .map((c, i) => ({ c, i, tone: toneOf(c, opts.cancelId) }))
+      .map((c, i) => ({ c, i, tone: tones[i]! }))
       .sort((a, b) => RANK[a.tone] - RANK[b.tone] || a.i - b.i)
+    // the first focus: the caller's pick, else the safe primary, else the way out, else any
+    // non-destructive button
+    const safeId =
+      opts.focusId ??
+      ordered.find(({ c, tone }) => tone === 'primary' && !c.danger)?.c.id ??
+      opts.cancelId
     let initial: HTMLButtonElement | null = null
     let fallback: HTMLButtonElement | null = null
     for (const { c, tone } of ordered) {
@@ -142,10 +183,13 @@ export function frameAsk<T extends string>(opts: FrameDialogOptions<T>): Promise
       b.addEventListener('click', () => finish(c.id))
       actions.append(b)
       buttons.push(b)
-      if (c.id === (opts.focusId ?? opts.cancelId)) initial = b
+      if (c.id === safeId) initial = b
       else if (!fallback && tone !== 'danger') fallback = b
     }
-    card.append(actions)
+    const x = closeButton(opts.closeLabel ?? webText(webLanguage(), 'webClose'))
+    x.addEventListener('click', () => finish(opts.cancelId))
+    buttons.push(x)
+    card.append(actions, x)
     document.addEventListener('keydown', onKey, true)
     document.body.append(mask)
     opts.onChange?.()

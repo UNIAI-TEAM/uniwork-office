@@ -29,10 +29,10 @@ export const de = {
   aiWebStateEntitlementTitle: 'KI ist nicht im Tarif',
   aiWebStateEntitlementBody:
     'Der UniWork-Tarif Ihrer Organisation enthält diese KI-Funktion nicht. Wenden Sie sich an Ihre Administration.',
-  aiWebStateKeyMissingTitle: 'Kein {provider}-Schlüssel',
+  aiWebStateKeyMissingTitle: 'Noch kein KI-Schlüssel',
   aiWebStateKeyMissingBody:
-    'Fügen Sie in den KI-Einstellungen Ihren {provider}-API-Schlüssel hinzu, um den Assistenten zu nutzen.',
-  aiWebStateKeyRejectedTitle: '{provider} hat den Schlüssel abgelehnt',
+    'Fügen Sie in den KI-Einstellungen einen API-Schlüssel hinzu, um den Assistenten zu nutzen.',
+  aiWebStateKeyRejectedTitle: 'Der KI-Schlüssel wurde abgelehnt',
   aiWebStateKeyRejectedBody:
     'Der Anbieter hat den gespeicherten Schlüssel abgelehnt. Ersetzen Sie ihn in den KI-Einstellungen.',
   aiWebStateRateTitle: 'Zu viele KI-Anfragen',

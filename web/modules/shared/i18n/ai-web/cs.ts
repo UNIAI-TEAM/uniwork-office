@@ -29,10 +29,9 @@ export const cs = {
   aiWebStateEntitlementTitle: 'AI není ve vašem tarifu',
   aiWebStateEntitlementBody:
     'Tarif UniWork vaší organizace tuto funkci AI nezahrnuje. Obraťte se na správce.',
-  aiWebStateKeyMissingTitle: 'Chybí klíč {provider}',
-  aiWebStateKeyMissingBody:
-    'Pro použití asistenta přidejte v nastavení AI svůj klíč API {provider}.',
-  aiWebStateKeyRejectedTitle: '{provider} klíč odmítl',
+  aiWebStateKeyMissingTitle: 'Zatím žádný klíč AI',
+  aiWebStateKeyMissingBody: 'Pro použití asistenta přidejte v nastavení AI klíč API.',
+  aiWebStateKeyRejectedTitle: 'Klíč AI byl odmítnut',
   aiWebStateKeyRejectedBody: 'Poskytovatel odmítl uložený klíč. Nahraďte jej v nastavení AI.',
   aiWebStateRateTitle: 'Příliš mnoho požadavků AI',
   aiWebStateRateBody: 'Počkejte {seconds} s a zkuste to znovu.',

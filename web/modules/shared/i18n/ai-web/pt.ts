@@ -29,10 +29,10 @@ export const pt = {
   aiWebStateEntitlementTitle: 'A IA não está no seu plano',
   aiWebStateEntitlementBody:
     'O plano UniWork da sua organização não inclui este recurso de IA. Fale com o administrador.',
-  aiWebStateKeyMissingTitle: 'Sem chave de {provider}',
+  aiWebStateKeyMissingTitle: 'Ainda não há chave de IA',
   aiWebStateKeyMissingBody:
-    'Adicione sua chave de API de {provider} nas configurações de IA para usar o assistente.',
-  aiWebStateKeyRejectedTitle: '{provider} recusou a chave',
+    'Adicione uma chave de API nas configurações de IA para usar o assistente.',
+  aiWebStateKeyRejectedTitle: 'A chave de IA foi recusada',
   aiWebStateKeyRejectedBody:
     'O provedor recusou a chave salva. Substitua-a nas configurações de IA.',
   aiWebStateRateTitle: 'Muitas solicitações de IA',

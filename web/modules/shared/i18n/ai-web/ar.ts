@@ -29,10 +29,9 @@ export const ar = {
   aiWebStateEntitlementTitle: 'الذكاء الاصطناعي غير مضمّن في خطتك',
   aiWebStateEntitlementBody:
     'لا تتضمن خطة UniWork لمؤسستك ميزة الذكاء الاصطناعي هذه. تواصل مع المسؤول.',
-  aiWebStateKeyMissingTitle: 'لا يوجد مفتاح {provider}',
-  aiWebStateKeyMissingBody:
-    'أضف مفتاح API الخاص بـ {provider} في إعدادات الذكاء الاصطناعي لاستخدام المساعد.',
-  aiWebStateKeyRejectedTitle: 'رفض {provider} المفتاح',
+  aiWebStateKeyMissingTitle: 'لا يوجد مفتاح ذكاء اصطناعي بعد',
+  aiWebStateKeyMissingBody: 'أضف مفتاح API في إعدادات الذكاء الاصطناعي لاستخدام المساعد.',
+  aiWebStateKeyRejectedTitle: 'تم رفض مفتاح الذكاء الاصطناعي',
   aiWebStateKeyRejectedBody: 'رفض المزوّد المفتاح المحفوظ. استبدله في إعدادات الذكاء الاصطناعي.',
   aiWebStateRateTitle: 'طلبات ذكاء اصطناعي كثيرة جدًا',
   aiWebStateRateBody: 'انتظر {seconds} ثانية ثم حاول مرة أخرى.',

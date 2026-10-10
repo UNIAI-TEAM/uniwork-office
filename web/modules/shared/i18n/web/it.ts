@@ -27,4 +27,12 @@ export const it = {
   webDraftDiscard: 'Elimina',
   webSaveNetwork: 'Impossibile raggiungere UniWork. Controlla la connessione e riprova.',
   webSaveTimeout: 'Il salvataggio ha richiesto troppo tempo. Controlla la connessione e riprova.',
+  webClose: 'Chiudi',
+  webSaveUnauthorized: 'La sessione UniWork è scaduta. Accedi di nuovo e riprova a salvare.',
+  webSaveForbidden: 'Non hai l’autorizzazione per salvare questo documento.',
+  webSaveNotFound: 'Questo documento non esiste più o è stato spostato.',
+  webSaveTooLarge: 'Il documento è troppo grande per essere salvato.',
+  webSaveRateLimited: 'Troppe richieste. Attendi un momento e riprova.',
+  webSaveServer: 'UniWork ha avuto un problema durante il salvataggio. Riprova tra un momento.',
+  webSaveFailedGeneric: 'Impossibile salvare il documento. Riprova.',
 } satisfies Record<keyof typeof zh, string>

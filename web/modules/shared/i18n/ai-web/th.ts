@@ -29,9 +29,9 @@ export const th = {
   aiWebStateEntitlementTitle: 'แพ็กเกจไม่มี AI',
   aiWebStateEntitlementBody:
     'แพ็กเกจ UniWork ขององค์กรคุณไม่รวมฟีเจอร์ AI นี้ โปรดติดต่อผู้ดูแลระบบ',
-  aiWebStateKeyMissingTitle: 'ไม่มีคีย์ {provider}',
-  aiWebStateKeyMissingBody: 'เพิ่มคีย์ API ของ {provider} ในการตั้งค่า AI เพื่อใช้ผู้ช่วย',
-  aiWebStateKeyRejectedTitle: '{provider} ปฏิเสธคีย์',
+  aiWebStateKeyMissingTitle: 'ยังไม่มีคีย์ AI',
+  aiWebStateKeyMissingBody: 'เพิ่มคีย์ API ในการตั้งค่า AI เพื่อใช้ผู้ช่วย',
+  aiWebStateKeyRejectedTitle: 'คีย์ AI ถูกปฏิเสธ',
   aiWebStateKeyRejectedBody: 'ผู้ให้บริการปฏิเสธคีย์ที่บันทึกไว้ โปรดเปลี่ยนคีย์ในการตั้งค่า AI',
   aiWebStateRateTitle: 'คำขอ AI มากเกินไป',
   aiWebStateRateBody: 'โปรดรอ {seconds} วินาทีแล้วลองอีกครั้ง',

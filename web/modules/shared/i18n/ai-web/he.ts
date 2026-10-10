@@ -29,9 +29,9 @@ export const he = {
   aiWebStateEntitlementTitle: 'AI לא כלול בתוכנית שלך',
   aiWebStateEntitlementBody:
     'תוכנית UniWork של הארגון שלך אינה כוללת את תכונת ה-AI הזו. פנה למנהל המערכת.',
-  aiWebStateKeyMissingTitle: 'אין מפתח {provider}',
-  aiWebStateKeyMissingBody: 'הוסף את מפתח ה-API של {provider} בהגדרות ה-AI כדי להשתמש בעוזר.',
-  aiWebStateKeyRejectedTitle: '{provider} דחה את המפתח',
+  aiWebStateKeyMissingTitle: 'עדיין אין מפתח AI',
+  aiWebStateKeyMissingBody: 'הוסף מפתח API בהגדרות ה-AI כדי להשתמש בעוזר.',
+  aiWebStateKeyRejectedTitle: 'מפתח ה-AI נדחה',
   aiWebStateKeyRejectedBody: 'הספק דחה את המפתח השמור. החלף אותו בהגדרות ה-AI.',
   aiWebStateRateTitle: 'יותר מדי בקשות AI',
   aiWebStateRateBody: 'המתן {seconds} שניות ונסה שוב.',

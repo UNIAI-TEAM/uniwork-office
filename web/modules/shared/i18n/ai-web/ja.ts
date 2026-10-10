@@ -29,10 +29,9 @@ export const ja = {
   aiWebStateEntitlementTitle: 'プランに AI が含まれていません',
   aiWebStateEntitlementBody:
     '組織の UniWork プランにはこの AI 機能が含まれていません。管理者にお問い合わせください。',
-  aiWebStateKeyMissingTitle: '{provider} のキーがありません',
-  aiWebStateKeyMissingBody:
-    'アシスタントを使うには、AI 設定で {provider} の API キーを追加してください。',
-  aiWebStateKeyRejectedTitle: '{provider} がキーを拒否しました',
+  aiWebStateKeyMissingTitle: 'AI キーがまだありません',
+  aiWebStateKeyMissingBody: 'アシスタントを使うには、AI 設定で API キーを追加してください。',
+  aiWebStateKeyRejectedTitle: 'AI キーが拒否されました',
   aiWebStateKeyRejectedBody:
     'プロバイダーが保存済みのキーを拒否しました。AI 設定でキーを置き換えてください。',
   aiWebStateRateTitle: 'AI リクエストが多すぎます',

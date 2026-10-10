@@ -25,4 +25,12 @@ export const th = {
   webDraftDiscard: 'ทิ้ง',
   webSaveNetwork: 'เชื่อมต่อ UniWork ไม่ได้ โปรดตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง',
   webSaveTimeout: 'การบันทึกใช้เวลานานเกินไป โปรดตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง',
+  webClose: 'ปิด',
+  webSaveUnauthorized: 'เซสชัน UniWork ของคุณสิ้นสุดแล้ว กรุณาเข้าสู่ระบบอีกครั้งแล้วลองบันทึกใหม่',
+  webSaveForbidden: 'คุณไม่มีสิทธิ์บันทึกเอกสารนี้',
+  webSaveNotFound: 'ไม่พบเอกสารนี้แล้ว หรือถูกย้ายไปที่อื่น',
+  webSaveTooLarge: 'เอกสารมีขนาดใหญ่เกินกว่าจะบันทึกได้',
+  webSaveRateLimited: 'มีคำขอมากเกินไป กรุณารอสักครู่แล้วลองใหม่',
+  webSaveServer: 'UniWork เกิดปัญหาขณะบันทึก กรุณาลองใหม่อีกครั้งในอีกสักครู่',
+  webSaveFailedGeneric: 'ไม่สามารถบันทึกเอกสารได้ กรุณาลองใหม่',
 } satisfies Record<keyof typeof zh, string>

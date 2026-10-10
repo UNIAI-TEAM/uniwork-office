@@ -31,8 +31,12 @@ Dialogs: every in-frame dialog (save conflict, discard unsaved changes, draft re
 the one component `shared/frame-dialog.ts` (+ `frame-dialog.css`, theme tokens only), called by each module's notice file
 (`shared/notice.ts`, `pdf/notice.ts`, `slides/dialogs.ts`, `sheets/notice.ts`, `web/docs/bridge/notice.ts`). Same look as the
 UniWork host's leave dialog: centred card, stacked full-width actions ordered primary, neutral, destructive, then the way
-out; `danger` marks Overwrite / Discard (soft red, never the first focus); the first focus is the safe action (Cancel);
-Tab stays inside, Escape = the cancel id, focus returns to where it was.
+out; the filled primary is the caller's `primary` (none given: the first neutral choice, e.g. Reload latest in a
+conflict); `danger` marks Overwrite / Discard (soft red, never the first focus); the first focus is the safe primary
+(the way out, Cancel, when the dialog has no primary); every choice dialog has a close X (same answer as Escape, the
+cancel id) and a host-like scrim (`--color-dialog-scrim`, blurred); Tab stays inside (choices, then the X), focus
+returns to where it was. Tested for contrast (>= 4.5:1 in light, dark and system-dark) in
+`shared/frame-dialog-contrast.test.ts`.
 
 AI (CONTRACT C16): `shared/ai/` is the `ai` web bridge of every frame (Docs too, through web/docs/bridge/install.ts).
 `installModuleBridge()` wraps each global that has AI members (`withWebAi`): while the host grants `ai` they call the

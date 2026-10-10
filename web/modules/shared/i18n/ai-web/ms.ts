@@ -29,10 +29,9 @@ export const ms = {
   aiWebStateEntitlementTitle: 'AI tiada dalam pelan anda',
   aiWebStateEntitlementBody:
     'Pelan UniWork organisasi anda tidak merangkumi ciri AI ini. Hubungi pentadbir.',
-  aiWebStateKeyMissingTitle: 'Tiada kunci {provider}',
-  aiWebStateKeyMissingBody:
-    'Tambah kunci API {provider} anda dalam Tetapan AI untuk menggunakan pembantu.',
-  aiWebStateKeyRejectedTitle: '{provider} menolak kunci',
+  aiWebStateKeyMissingTitle: 'Belum ada kunci AI',
+  aiWebStateKeyMissingBody: 'Tambah kunci API dalam tetapan AI untuk menggunakan pembantu.',
+  aiWebStateKeyRejectedTitle: 'Kunci AI ditolak',
   aiWebStateKeyRejectedBody: 'Pembekal menolak kunci yang disimpan. Gantikannya dalam Tetapan AI.',
   aiWebStateRateTitle: 'Terlalu banyak permintaan AI',
   aiWebStateRateBody: 'Tunggu {seconds} saat dan cuba lagi.',

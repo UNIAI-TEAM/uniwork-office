@@ -29,10 +29,10 @@ export const nl = {
   aiWebStateEntitlementTitle: 'AI zit niet in je abonnement',
   aiWebStateEntitlementBody:
     'Het UniWork-abonnement van je organisatie bevat deze AI-functie niet. Vraag je beheerder.',
-  aiWebStateKeyMissingTitle: 'Geen {provider}-sleutel',
+  aiWebStateKeyMissingTitle: 'Nog geen AI-sleutel',
   aiWebStateKeyMissingBody:
-    'Voeg je {provider}-API-sleutel toe in de AI-instellingen om de assistent te gebruiken.',
-  aiWebStateKeyRejectedTitle: '{provider} weigerde de sleutel',
+    'Voeg een API-sleutel toe in de AI-instellingen om de assistent te gebruiken.',
+  aiWebStateKeyRejectedTitle: 'De AI-sleutel is geweigerd',
   aiWebStateKeyRejectedBody:
     'De aanbieder weigerde de opgeslagen sleutel. Vervang hem in de AI-instellingen.',
   aiWebStateRateTitle: 'Te veel AI-verzoeken',
