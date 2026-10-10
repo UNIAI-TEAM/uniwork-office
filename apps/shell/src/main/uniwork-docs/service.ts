@@ -1,6 +1,6 @@
 import { readFileSync, statSync } from 'node:fs'
 import { copyFile, readFile } from 'node:fs/promises'
-import { extname, join } from 'node:path'
+import { extname, join, resolve } from 'node:path'
 import type {
   RecentUniworkSource,
   UniworkConflictChoice,
@@ -46,8 +46,10 @@ export interface SessionIdentity {
 
 /** the native conflict choice (rule 3); the strings live with the dialog */
 export interface ConflictUi {
-  chooseConflict(title: string): Promise<UniworkConflictChoice>
-  confirmDiscard(title: string): Promise<boolean>
+  /** `signal` closes the dialog as "Decide later" */
+  chooseConflict(title: string, signal?: AbortSignal): Promise<UniworkConflictChoice>
+  /** `signal` closes the dialog as Cancel */
+  confirmDiscard(title: string, signal?: AbortSignal): Promise<boolean>
   /** Save As for "Save a copy on this computer" (default `<stem> (my copy).<ext>`); null when cancelled */
   pickCopyPath(stem: string, format: UniworkDocFormat): Promise<string | null>
   showOpenLatestFailed(): void
@@ -133,6 +135,13 @@ async function result<T>(run: () => Promise<T>): Promise<UniworkResult<T>> {
   }
 }
 
+/** one file (Windows paths compare case-insensitively) */
+function samePath(a: string, b: string): boolean {
+  const ra = resolve(a)
+  const rb = resolve(b)
+  return process.platform === 'win32' ? ra.toLowerCase() === rb.toLowerCase() : ra === rb
+}
+
 function accessFor(level: string | null): UniworkDocAccess {
   return level === 'edit' || level === 'manage' ? 'edit' : 'view'
 }
@@ -153,6 +162,16 @@ export class UniworkDocsService {
   /** per path, the saveMark of its last user Save */
   private readonly lastUserSave = new Map<string, number>()
   private saveCounter = 0
+  /**
+   * The one conflict dialog open (native dialogs are window-wide, not per
+   * tab). `fromClose` = opened by the close prompt of that document's tab.
+   */
+  private conflictPrompt: {
+    path: string
+    controller: AbortController
+    fromClose: boolean
+    done: Promise<unknown>
+  } | null = null
 
   constructor(deps: UniworkDocsServiceDeps) {
     this.deps = deps
@@ -534,7 +553,7 @@ export class UniworkDocsService {
     const notWritten = () => {
       if (!this.coordinator.isSaving(path)) wait.cancel()
     }
-    await this.resolveConflict(path, notWritten)
+    await this.resolveConflict(path, notWritten, { fromClose: true })
     const after = this.store.lookup(path)
     if (!after || after.binding.state === 'saved') {
       wait.cancel()
@@ -584,40 +603,112 @@ export class UniworkDocsService {
     return { promise, cancel: () => finish(null) }
   }
 
-  async resolveConflict(path: string, onNotWritten?: () => void): Promise<UniworkDocStatus | null> {
+  /**
+   * The conflict dialog for the document at `path`, and only that document:
+   * every step reads its binding again and acts on it only while it is still
+   * the same document in conflict, so a choice never lands on another tab's
+   * document, revision or format. One dialog at a time: a dialog for another
+   * document closes as "Decide later" first.
+   */
+  async resolveConflict(
+    path: string,
+    onNotWritten?: () => void,
+    opts: { fromClose?: boolean } = {},
+  ): Promise<UniworkDocStatus | null> {
     const doc = typeof path === 'string' ? this.store.lookup(path) : null
     if (!doc || !this.ownsLocally(doc)) return null
     if (doc.binding.state !== 'conflict') return this.statusOf(doc)
-    const choice = await this.deps.ui.chooseConflict(doc.binding.title)
-    if (choice === 'overwrite') return this.overwrite(doc, onNotWritten)
+    const open = this.conflictPrompt
+    if (open && samePath(open.path, doc.path)) return this.statusOf(doc)
+    if (open) {
+      open.controller.abort()
+      await open.done
+    }
+    const controller = new AbortController()
+    const done = this.runConflict(doc, controller.signal, onNotWritten)
+    const prompt = { path: doc.path, controller, fromClose: !!opts.fromClose, done }
+    this.conflictPrompt = prompt
+    try {
+      return await done
+    } finally {
+      if (this.conflictPrompt === prompt) this.conflictPrompt = null
+    }
+  }
+
+  /**
+   * The active document changed (tab switch, the home tab, a language
+   * switch): a conflict dialog opened for another document from its chip
+   * closes as "Decide later", so it never sits over a tab it does not name.
+   */
+  noteActivePath(path: string | undefined): void {
+    const open = this.conflictPrompt
+    if (open && !open.fromClose && !(path && samePath(open.path, path))) open.controller.abort()
+  }
+
+  /** closes an open conflict dialog as "Decide later" (its text is in the old UI language) */
+  closeConflictPrompt(): void {
+    this.conflictPrompt?.controller.abort()
+  }
+
+  private async runConflict(
+    doc: BoundDocument,
+    signal: AbortSignal,
+    onNotWritten?: () => void,
+  ): Promise<UniworkDocStatus | null> {
+    const choice = signal.aborted
+      ? 'later'
+      : await this.deps.ui.chooseConflict(doc.binding.title, signal)
+    if (signal.aborted || choice === 'later') return this.currentStatus(doc)
+    const chosen = this.stillInConflict(doc)
+    if (!chosen) return this.currentStatus(doc)
+    if (choice === 'overwrite') return this.overwrite(chosen, onNotWritten)
     if (choice === 'save-local-copy') {
-      const titleExt = extname(doc.binding.title)
-      const stem =
-        (titleExt ? doc.binding.title.slice(0, -titleExt.length) : doc.binding.title) || 'document'
-      const target = await this.deps.ui.pickCopyPath(stem, doc.binding.format)
+      const b = chosen.binding
+      const titleExt = extname(b.title)
+      const stem = (titleExt ? b.title.slice(0, -titleExt.length) : b.title) || 'document'
+      const target = await this.deps.ui.pickCopyPath(stem, b.format)
       // a plain local file; the document itself stays in conflict. A target
       // inside the working-copy folders would not be one (or is the copy itself)
       if (target) {
         const copied =
           !this.store.isInside(target) &&
-          (await copyFile(doc.path, target).then(
+          (await copyFile(chosen.path, target).then(
             () => true,
             () => false,
           ))
         if (!copied) this.deps.ui.showCopyFailed()
       }
-      return this.statusOf(doc)
+      return this.currentStatus(chosen)
     }
     if (choice === 'open-latest') {
-      if (!(await this.deps.ui.confirmDiscard(doc.binding.title))) return this.statusOf(doc)
+      const confirmed = await this.deps.ui.confirmDiscard(chosen.binding.title, signal)
+      const latest = confirmed && !signal.aborted ? this.stillInConflict(chosen) : null
+      if (!latest) return this.currentStatus(chosen)
       try {
-        return this.statusOf(await this.replaceWithLatest(doc))
+        return this.statusOf(await this.replaceWithLatest(latest))
       } catch {
         this.deps.ui.showOpenLatestFailed()
-        return this.statusOf(doc)
+        return this.currentStatus(latest)
       }
     }
-    return this.statusOf(doc)
+    return this.currentStatus(doc)
+  }
+
+  /** the binding at `doc.path` now, if it is still that document and still in conflict */
+  private stillInConflict(doc: BoundDocument): BoundDocument | null {
+    const now = this.store.lookup(doc.path)
+    return now &&
+      now.binding.documentId === doc.binding.documentId &&
+      now.binding.state === 'conflict' &&
+      this.ownsLocally(now)
+      ? now
+      : null
+  }
+
+  /** the status of the document at `doc.path` as it is now (null once it is gone) */
+  private currentStatus(doc: BoundDocument): UniworkDocStatus | null {
+    const now = this.store.lookup(doc.path)
+    return now ? this.statusOf(now) : null
   }
 
   /** recents: null = not a UniWork copy, 'hidden' = another account/deployment */
