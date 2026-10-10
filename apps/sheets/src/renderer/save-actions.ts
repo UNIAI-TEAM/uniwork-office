@@ -123,8 +123,9 @@ export async function handleSave(
   // web frame without the host's save grant: the workbook is view-only
   if (isViewOnly() || (mode === 'save-as' && !cap('saveAs'))) {
     if (mode !== 'recovery') {
-      ctx.setMessage(t('appWebViewOnly'))
-      if (!quiet) showToast(t('appWebViewOnly'), 'error')
+      // the web host's banner says view only (viewOnlyChip off): no message or toast of our own
+      if (cap('viewOnlyChip')) ctx.setMessage(t('appWebViewOnly'))
+      if (!quiet && cap('viewOnlyChip')) showToast(t('appWebViewOnly'), 'error')
     }
     return { ok: false, error: t('appWebViewOnly') }
   }
