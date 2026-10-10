@@ -68,6 +68,7 @@ vi.mock('electron', () => ({ BrowserWindow: class {} }))
 
 const createDocsView = vi.fn(() => makeFakeView())
 const docsQueryDirty = vi.fn(() => Promise.resolve(false))
+const docsQueryEditorDirty = vi.fn((): Promise<boolean | null> => Promise.resolve(false))
 const markDocsNewBlank = vi.fn()
 const requestDocsClose = vi.fn(() => Promise.resolve(true))
 const setActiveDocsResolver = vi.fn()
@@ -76,6 +77,7 @@ const teardownDocsRenderer = vi.fn()
 vi.mock('../../docs/src/main/docs-main', () => ({
   createDocsView: (...args: unknown[]) => createDocsView(...(args as [])),
   docsQueryDirty: (...args: unknown[]) => docsQueryDirty(...(args as [])),
+  docsQueryEditorDirty: (...args: unknown[]) => docsQueryEditorDirty(...(args as [])),
   markDocsNewBlank: (...args: unknown[]) => markDocsNewBlank(...args),
   requestDocsClose: (...args: unknown[]) => requestDocsClose(...(args as [])),
   setActiveDocsResolver: (...args: unknown[]) => setActiveDocsResolver(...args),
@@ -869,6 +871,23 @@ describe('dirty-tab queries (shell close guard)', () => {
     slidesIsDirty.mockImplementation(() => true)
     expect(manager.dirtyPdfTabs().map((t) => t.id)).toEqual([pdfId])
     expect(manager.dirtySlidesTabs().map((t) => t.id)).toEqual([slidesId])
+  })
+
+  it('reports the editor state of the tabs showing wanted files (the UniWork chip)', async () => {
+    manager.openDocsTab('/uw/a.docx')
+    manager.openMarkdownTab('/uw/b.md')
+    manager.openPdfTab('/local/c.pdf')
+    manager.openDocsTab()
+    docsQueryEditorDirty.mockImplementation(() => Promise.resolve(null))
+    markdownIsDirty.mockImplementation(() => true)
+    const states = await manager.editorDirtyStates((path) => path.startsWith('/uw/'))
+    expect(states).toEqual([
+      { path: '/uw/a.docx', dirty: null },
+      { path: '/uw/b.md', dirty: true },
+    ])
+    expect(pdfIsDirty).not.toHaveBeenCalled()
+    markdownIsDirty.mockImplementation(() => false)
+    docsQueryEditorDirty.mockImplementation(() => Promise.resolve(false))
   })
 
   it('lists every live docs tab for the async dirtiness sweep', () => {

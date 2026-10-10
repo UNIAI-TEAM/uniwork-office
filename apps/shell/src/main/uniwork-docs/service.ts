@@ -142,6 +142,8 @@ export class UniworkDocsService {
   private readonly statusListeners = new Set<(status: UniworkDocStatus) => void>()
   /** path -> checksum of the file as of its mtime/size (the sync close check) */
   private readonly hashMemo = new Map<string, { mtimeMs: number; size: number; checksum: string }>()
+  /** working copies whose editor holds edits not written to the file yet */
+  private readonly editorDirty = new Set<string>()
 
   constructor(deps: UniworkDocsServiceDeps) {
     this.deps = deps
@@ -195,8 +197,39 @@ export class UniworkDocsService {
 
   /** every status push: the shell window, then in-process waiters (close prompt) */
   private publish(status: UniworkDocStatus): void {
-    this.deps.pushStatus(status)
+    this.deps.pushStatus(this.present(status))
     for (const listener of [...this.statusListeners]) listener(status)
+  }
+
+  /**
+   * What the chip shows: the binding's state, except that a clean copy whose
+   * editor holds unsaved edits reads dirty. Conflict, offline, signed-out and
+   * the rest are never hidden by the editor state.
+   */
+  private present(status: UniworkDocStatus): UniworkDocStatus {
+    const quiet = status.state === 'ready' || status.state === 'saved'
+    return quiet && status.access === 'edit' && this.editorDirty.has(status.path)
+      ? { ...status, state: 'dirty' }
+      : status
+  }
+
+  private statusOf(doc: BoundDocument): UniworkDocStatus {
+    return this.present(toStatus(doc))
+  }
+
+  /**
+   * The editor showing `path` has (or no longer has) unsaved edits. Pushes the
+   * chip only when that changes what it shows; never writes the binding.
+   */
+  noteEditorDirty(path: string, dirty: boolean): void {
+    const doc = typeof path === 'string' ? this.store.lookup(path) : null
+    if (!doc || !this.ownsLocally(doc) || doc.binding.access !== 'edit') return
+    if (dirty === this.editorDirty.has(doc.path)) return
+    const before = this.statusOf(doc).state
+    if (dirty) this.editorDirty.add(doc.path)
+    else this.editorDirty.delete(doc.path)
+    const status = this.statusOf(doc)
+    if (status.state !== before) this.deps.pushStatus(status)
   }
 
   /** the live session's identity; remembered (on disk) as the last owner */
@@ -269,7 +302,10 @@ export class UniworkDocsService {
   /** a module's successful explicit user Save of `path` */
   onUserSave(path: string): void {
     const doc = this.store.lookup(path)
-    if (doc && this.ownsLocally(doc)) void this.coordinator.save(path)
+    if (!doc || !this.ownsLocally(doc)) return
+    // the module just wrote what its editor held
+    this.editorDirty.delete(doc.path)
+    void this.coordinator.save(path)
   }
 
   // ---- renderer API ----------------------------------------------------------
@@ -306,7 +342,7 @@ export class UniworkDocsService {
   async docStatus(path: string): Promise<UniworkDocStatus | null> {
     if (typeof path !== 'string') return null
     const doc = this.store.lookup(path)
-    return doc && this.ownsLocally(doc) ? toStatus(await this.refreshDirty(doc)) : null
+    return doc && this.ownsLocally(doc) ? this.statusOf(await this.refreshDirty(doc)) : null
   }
 
   activeDocStatus(): Promise<UniworkDocStatus | null> {
@@ -362,11 +398,12 @@ export class UniworkDocsService {
   async save(path: string): Promise<UniworkDocStatus | null> {
     const doc = typeof path === 'string' ? this.store.lookup(path) : null
     if (!doc || !this.ownsLocally(doc)) return null
-    if (!this.canSave(doc)) return toStatus(doc)
-    if (!doc.binding.pendingIntent && this.deps.requestModuleSave(doc.path)) return toStatus(doc)
+    if (!this.canSave(doc)) return this.statusOf(doc)
+    if (!doc.binding.pendingIntent && this.deps.requestModuleSave(doc.path))
+      return this.statusOf(doc)
     // a pending intent, or no tab shows it: the file on disk is the user's last saved bytes
     const saved = await this.coordinator.save(doc.path)
-    return saved ? toStatus(saved) : null
+    return saved ? this.statusOf(saved) : null
   }
 
   /** a Save that can reach the UniWork step (not view, conflict, saving or blocked) */
@@ -532,7 +569,7 @@ export class UniworkDocsService {
   async resolveConflict(path: string, onNotWritten?: () => void): Promise<UniworkDocStatus | null> {
     const doc = typeof path === 'string' ? this.store.lookup(path) : null
     if (!doc || !this.ownsLocally(doc)) return null
-    if (doc.binding.state !== 'conflict') return toStatus(doc)
+    if (doc.binding.state !== 'conflict') return this.statusOf(doc)
     const choice = await this.deps.ui.chooseConflict(doc.binding.title)
     if (choice === 'overwrite') return this.overwrite(doc, onNotWritten)
     if (choice === 'save-local-copy') {
@@ -551,18 +588,18 @@ export class UniworkDocsService {
           ))
         if (!copied) this.deps.ui.showCopyFailed()
       }
-      return toStatus(doc)
+      return this.statusOf(doc)
     }
     if (choice === 'open-latest') {
-      if (!(await this.deps.ui.confirmDiscard(doc.binding.title))) return toStatus(doc)
+      if (!(await this.deps.ui.confirmDiscard(doc.binding.title))) return this.statusOf(doc)
       try {
-        return toStatus(await this.replaceWithLatest(doc))
+        return this.statusOf(await this.replaceWithLatest(doc))
       } catch {
         this.deps.ui.showOpenLatestFailed()
-        return toStatus(doc)
+        return this.statusOf(doc)
       }
     }
-    return toStatus(doc)
+    return this.statusOf(doc)
   }
 
   /** recents: null = not a UniWork copy, 'hidden' = another account/deployment */
@@ -593,7 +630,7 @@ export class UniworkDocsService {
       } catch (error) {
         const code = error instanceof UniworkDocError ? error.code : 'server_error'
         await this.coordinator.commitState(doc, { ...doc.binding, error: code })
-        return toStatus(doc)
+        return this.statusOf(doc)
       }
     }
     const next: Binding = {
@@ -607,9 +644,9 @@ export class UniworkDocsService {
     delete next.serverRevision
     delete next.pendingIntent
     const ready = await this.coordinator.commitState(doc, next)
-    if (this.deps.requestModuleSave(ready.path, onNotWritten)) return toStatus(ready)
+    if (this.deps.requestModuleSave(ready.path, onNotWritten)) return this.statusOf(ready)
     const saved = await this.coordinator.save(ready.path)
-    return saved ? toStatus(saved) : toStatus(ready)
+    return saved ? this.statusOf(saved) : this.statusOf(ready)
   }
 
   /** "Discard my changes and open the latest": download, replace, reload the tab */

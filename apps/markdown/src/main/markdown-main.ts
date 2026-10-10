@@ -3,11 +3,12 @@ import {
   setUniworkUserSaveHook,
   uniworkIsBound,
   uniworkIsReadOnly,
+  uniworkSaveAsDefault,
   uniworkSaveDecision,
 } from './uniwork-policy'
 import { existsSync } from 'node:fs'
 import { readFile, writeFile } from 'node:fs/promises'
-import { basename, dirname, extname, join, relative, resolve } from 'node:path'
+import { dirname, extname, join, relative, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import {
   BrowserWindow,
@@ -673,7 +674,7 @@ async function resolveSaveTarget(
   const win =
     BrowserWindow.fromWebContents(e.sender) ?? BrowserWindow.getFocusedWindow() ?? undefined
   const defaultPath = current
-    ? join(dirname(current), basename(current))
+    ? uniworkSaveAsDefault(current)
     : join(configuredDefaultSaveDir(app), `${tm('untitledFile')}.md`)
   const picked = await showSaveDialogWithMemory(dialog, win, {
     title: tm('dlgSaveTitle'),

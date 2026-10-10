@@ -4,6 +4,7 @@ import {
   uniworkIsBound,
   uniworkIsReadOnly,
   uniworkRequestOrigin,
+  uniworkSaveAsDefault,
   uniworkSaveDecision,
 } from './uniwork-policy'
 import { workbookDisplayName } from './workbook-name'
@@ -3294,7 +3295,7 @@ export function registerSheetsIpc(): void {
           session.suggestSaveAs ??
           session.csvSourcePath?.replace(/\.[^.]+$/, '.xlsx') ??
           session.restoreTarget ??
-          session.path,
+          uniworkSaveAsDefault(session.path),
         filters: macroEnabled
           ? [{ name: tm('filterXlsm'), extensions: ['xlsm'] }]
           : [

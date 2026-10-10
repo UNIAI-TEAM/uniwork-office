@@ -100,6 +100,7 @@ import {
 import { createUniworkDocs, type UniworkDocsHandle } from './uniwork-docs/wiring'
 import { installUniworkModuleSeams } from './uniwork-docs/modules'
 import { createModuleSaveRequester } from './uniwork-docs/module-save'
+import { startEditorStatePoll } from './uniwork-docs/editor-state-poll'
 import { IPC_CHANNELS as SHEETS_IPC_CHANNELS } from '../../../sheets/src/shared/ipc-channels'
 import { isAgentIntentUrl, parseAgentIntentUrl } from './agent-intent-host'
 import { extractLaunchUrlFromArgv, isOfficeAppUrl, parseOfficeAppUrl } from '@uniwork/office-bridge'
@@ -4095,6 +4096,13 @@ function registerHomeIpc(): void {
   // UniWork documents (open from UniWork, launch links, Save to UniWork); logic in ./uniwork-docs
   uniworkDocs = createUniworkDocs(ipcMain, uniworkDocsWiring())
   installUniworkModuleSeams(uniworkDocs.service)
+  const uniworkService = uniworkDocs.service
+  // the chip reads "Unsaved changes" while an editor holds edits not saved yet
+  startEditorStatePoll({
+    editorDirtyStates: async (wanted) => (await tabManager?.editorDirtyStates(wanted)) ?? [],
+    isBound: (path) => uniworkService.isBound(path),
+    noteEditorDirty: (path, dirty) => uniworkService.noteEditorDirty(path, dirty),
+  })
 
   // Reserved for the Hub result channel; the ack is not reported anywhere today.
   ipcMain.handle(HOME_CHANNELS.agentIntentAck, () => undefined)

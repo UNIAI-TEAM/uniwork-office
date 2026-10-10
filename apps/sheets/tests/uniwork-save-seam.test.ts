@@ -8,6 +8,7 @@ import {
   setUniworkDocumentPolicy,
   setUniworkUserSaveHook,
   uniworkRequestOrigin,
+  uniworkSaveAsDefault,
   uniworkSaveDecision,
   type UniworkSaveInput,
 } from '../src/main/uniwork-policy'
@@ -46,6 +47,15 @@ function decide(over: Partial<UniworkSaveInput>) {
 afterEach(() => {
   setUniworkDocumentPolicy(null)
   setUniworkUserSaveHook(null)
+})
+
+describe('uniworkSaveAsDefault', () => {
+  it('starts Save As of a bound workbook from its name, outside the hidden working-copy folder', () => {
+    expect(uniworkSaveAsDefault(DOC)).toBe(DOC)
+    installPolicy()
+    expect(uniworkSaveAsDefault(DOC)).toBe('Budget.xlsx')
+    expect(uniworkSaveAsDefault(LOCAL)).toBe(LOCAL)
+  })
 })
 
 describe('uniworkSaveDecision (main workbook:save gate)', () => {

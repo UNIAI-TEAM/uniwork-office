@@ -7449,7 +7449,12 @@ export function App() {
                 !docLoading &&
                 (hasUnsavedChanges || doc.filePath) &&
                 (() => {
-                  const saveState = saveStateLabel(hasUnsavedChanges, uniwork.readOnly)
+                  const saveState = saveStateLabel(
+                    hasUnsavedChanges,
+                    uniwork.readOnly,
+                    uniwork.bound,
+                  )
+                  if (!saveState) return null
                   return (
                     <span
                       className={`status-item status-save-state${saveState.unsaved ? ' unsaved' : ''}`}
