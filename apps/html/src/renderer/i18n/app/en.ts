@@ -146,5 +146,6 @@ export const en = {
   presentInTab: 'In this tab',
   presentFullscreen: 'Fullscreen',
   presentNewTab: 'New tab',
+  aiNotEnabled: 'AI is not turned on for your workspace',
   viewOnly: 'View only',
 } satisfies Record<keyof typeof zh, string>

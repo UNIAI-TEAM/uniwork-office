@@ -340,7 +340,9 @@ export interface MarkdownApi {
    * Web frame only (absent on desktop): display URL of a document-relative picture from the
    * host's asset map; null when the path is not mapped.
    */
-  resolveAssetUrl?(src: string): string | null
+  resolveAssetUrl?(src: string, missingNote?: string): string | null
+  /** Web frame only: the URL is the placeholder of a picture the host has no copy of */
+  isMissingAsset?(url: string): boolean
   /** Web frame only: the authored path of a display URL from resolveAssetUrl; null otherwise */
   unresolveAssetUrl?(url: string): string | null
   /** Web frame only (absent on desktop): the in-frame AI settings (keys stored in UniWork) */

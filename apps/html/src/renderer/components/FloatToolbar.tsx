@@ -38,6 +38,8 @@ interface Props {
   barRef?: Ref<HTMLDivElement>
   left: number
   top: number
+  /** the bar wraps beyond this width (never under the style panel) */
+  maxWidth?: number
   computed: ComputedSnapshot
   /** live pokes not yet written to the source; newer than the snapshot, which round-trips through the frame */
   pending: Record<string, string | null>
@@ -301,7 +303,7 @@ export function FloatToolbar(p: Props) {
     <div
       ref={p.barRef}
       className="hx-float"
-      style={{ left: p.left, top: p.top }}
+      style={{ left: p.left, top: p.top, maxWidth: p.maxWidth }}
       role="toolbar"
       aria-label={t('elementToolbar')}
       onMouseDown={(e) => e.stopPropagation()}

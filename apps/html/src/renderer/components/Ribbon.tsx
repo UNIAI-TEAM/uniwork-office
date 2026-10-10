@@ -80,6 +80,8 @@ interface Props {
   showAutoSave?: boolean
   /** false on the web (cap 'ai'): no AI group */
   showAi?: boolean
+  /** why the AI group is missing (host did not grant AI): shown as a disabled AI entry with this hint */
+  aiOffHint?: string
   /** false on the web (cap 'presentNewTab'): Present > New tab hidden */
   presentNewTab?: boolean
   view: ViewMode
@@ -299,6 +301,30 @@ export function Ribbon(p: Props) {
       </div>
 
       <div className="ribbon-body" data-ribbon-body="" data-fit={fit} ref={bodyRef}>
+        {p.showAi === false && p.aiOffHint && (
+          <>
+            <div className="ribbon-group">
+              <div className="ribbon-group-items">
+                {/* aria-disabled, not disabled: a disabled button gets no hover or focus, so the reason would never show */}
+                <button
+                  type="button"
+                  className="rb-big ai-entry ai-off"
+                  data-tip={p.aiOffHint}
+                  aria-disabled="true"
+                  aria-label={`AI. ${p.aiOffHint}`}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={(e) => e.preventDefault()}
+                >
+                  <span className="rb-big-icon">
+                    <GensparkMark size={26} />
+                  </span>
+                  <span>AI</span>
+                </button>
+              </div>
+            </div>
+            <div className="rb-sep" />
+          </>
+        )}
         {p.showAi !== false && (
           <>
             <div className="ribbon-group">

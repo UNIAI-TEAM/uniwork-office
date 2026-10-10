@@ -128,7 +128,8 @@ export interface DocsFrameClient {
   onFileRenamed(listener: (file: FileMeta) => void): () => void
   onTheme(listener: (theme: Theme) => void): () => void
   onLanguage(listener: (locale: string) => void): () => void
-  setDirty(dirty: boolean): void
+  /** de-duplicated; `force` re-sends an unchanged flag (the host's header left "unsaved" after a failed save) */
+  setDirty(dirty: boolean, opts?: { force?: boolean }): void
   setTitle(title: string): void
   /** a frame modal opened / closed (de-duplicated) */
   setModal(open: boolean): void
@@ -377,8 +378,8 @@ export function createDocsFrameClient(options: DocsFrameClientOptions): DocsFram
     onFileRenamed: (l) => ep.on('file.renamed', (p) => l((p as HostEvents['file.renamed']).file)),
     onTheme: (l) => ep.on('theme', (p) => l((p as HostEvents['theme']).theme)),
     onLanguage: (l) => ep.on('language', (p) => l((p as HostEvents['language']).locale)),
-    setDirty(dirty) {
-      if (dirty === lastDirty) return
+    setDirty(dirty, opts) {
+      if (dirty === lastDirty && opts?.force !== true) return
       lastDirty = dirty
       guarded(() => ep.emit('dirty', { dirty }))
     },

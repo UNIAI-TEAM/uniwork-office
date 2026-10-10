@@ -10,6 +10,8 @@ import { createCapabilityReader, type CapabilityObject } from '@genoffice/ui/cap
  *   htmlVisualEdit       inspector click-to-select, float toolbar, style panel, picture dialogs
  *   presentNewTab        Present > New tab
  *   exportDocx           Word export (needs a headless browser)
+ *   saveStatus, viewOnlyChip                     the renderer's own save-state label (status bar) and "view only" chip;
+ *                                                false on the web: the host header + one banner announce them
  *   save                 false = view only (host withheld `save`)
  */
 export type HtmlCapability =
@@ -23,6 +25,8 @@ export type HtmlCapability =
   | 'presentNewTab'
   | 'exportDocx'
   | 'save'
+  | 'saveStatus'
+  | 'viewOnlyChip'
 
 export const { cap, platform, resetForTest } = createCapabilityReader<HtmlCapability>(
   () => (window.htmlApi as { capabilities?: CapabilityObject } | undefined)?.capabilities,

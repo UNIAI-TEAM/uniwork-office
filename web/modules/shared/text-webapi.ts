@@ -167,6 +167,8 @@ export function createTextWebApi(
   const texts = new Map<string, string>()
   let current: string | null = null
   let dirty = false
+  /** the last save attempt failed and no edit has been reported since (see setDirty) */
+  let saveFailed = false
   /** host withheld `save` */
   let saveGranted = false
   /** the open document is not valid UTF-8 */
@@ -419,6 +421,12 @@ export function createTextWebApi(
 
   /** api.save / api.saveAs: a rejection and an ok:false result are both failures */
   async function sendSave(send: () => Promise<SaveResult>): Promise<SaveResult> {
+    const res = await attemptSave(send)
+    saveFailed = !res.ok
+    return res
+  }
+
+  async function attemptSave(send: () => Promise<SaveResult>): Promise<SaveResult> {
     try {
       const res = await send()
       if (res?.ok === true && res.file) return res
@@ -662,7 +670,12 @@ export function createTextWebApi(
 
     setDirty(next: boolean): void {
       dirty = next === true
-      port.setDirty(dirty && !viewOnly())
+      // after a failed save the host's header shows "could not be confirmed" while the dirty flag
+      // never changed (the client dedupes): the first edit since then is sent again so the header
+      // goes back to "unsaved" instead of staying on the stale failure until the next save
+      const force = dirty && saveFailed
+      if (dirty) saveFailed = false
+      port.setDirty(dirty && !viewOnly(), force ? { force: true } : undefined)
     },
 
     onSaveRequest(handler: (mode: SaveMode) => void): () => void {

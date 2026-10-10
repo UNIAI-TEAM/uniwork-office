@@ -865,6 +865,19 @@ describe('events', () => {
     ])
   })
 
+  it('frame -> host: an unchanged dirty flag is sent again only when forced', async () => {
+    const { host, client } = setup()
+    await host.whenReady()
+    const seen: unknown[] = []
+    host.on('dirty', (p) => seen.push(p))
+    client.setDirty(true)
+    client.setDirty(true)
+    client.setDirty(true, { force: true })
+    client.setDirty(true)
+    await flush()
+    expect(seen).toEqual([{ dirty: true }, { dirty: true }])
+  })
+
   it('frame -> host: modal open/close (deduplicated, starts closed)', async () => {
     const { host, client } = setup()
     await host.whenReady()

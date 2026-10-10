@@ -42,6 +42,7 @@ export function createMockPort(session: Partial<PortSession> = {}) {
   const handlers: HostHandlers = {}
   const calls: Array<{ type: string; payload: unknown; opts?: PortRequestOptions }> = []
   const dirty: boolean[] = []
+  const sent = { dirty: 0 }
   const titles: string[] = []
   const modals: boolean[] = []
   const saved: SavedPayload[] = []
@@ -130,8 +131,12 @@ export function createMockPort(session: Partial<PortSession> = {}) {
     onFileRenamed: (l) => (renameListeners.push(l), () => {}),
     onTheme: (l) => (themeListeners.push(l), () => {}),
     onLanguage: (l) => (languageListeners.push(l), () => {}),
-    setDirty: (d) => {
-      if (dirty[dirty.length - 1] !== d) dirty.push(d)
+    setDirty: (d, opts) => {
+      // the real client dedupes an unchanged flag unless the caller forces it (after a failed save)
+      if (opts?.force || dirty[dirty.length - 1] !== d) {
+        dirty.push(d)
+        sent.dirty++
+      }
     },
     setTitle: (t) => titles.push(t),
     setModal: (open) => modals.push(open),
@@ -177,6 +182,10 @@ export function createMockPort(session: Partial<PortSession> = {}) {
     host: handlers as Required<HostHandlers>,
     calls,
     dirty,
+    /** dirty events that reached the host, duplicates included (a forced re-send) */
+    get dirtySent() {
+      return sent.dirty
+    },
     titles,
     modals,
     saved,
