@@ -25,6 +25,7 @@ import {
   maxOutputTokensOf,
   resolveAiSettings,
   sanitizeAiSettings,
+  noModelMessage,
   setAiUserAgent,
   setRescueFetch,
   streamForProvider,
@@ -36,6 +37,7 @@ import {
   type LegacyAiSettings,
 } from '@genoffice/ai-provider'
 import { shutdownCodexAppServers } from '@genoffice/ai-provider/codex-app-server'
+import { getUiLang } from '@genoffice/i18n'
 import {
   abortOnDestroyed,
   MAX_REMOTE_IMAGE_BYTES,
@@ -181,7 +183,7 @@ export function registerAiIpc(): void {
       send({
         requestId,
         type: 'error',
-        error: tm('errNoApiKey', { provider }),
+        error: noModelMessage(getUiLang(), tm('errNoApiKey', { provider })),
       })
       return
     }

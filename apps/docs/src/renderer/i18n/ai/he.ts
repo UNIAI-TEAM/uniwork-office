@@ -8,7 +8,7 @@ export const he = {
   aiStarterPolishAll: 'לטש את כל המסמך לטון מקצועי יותר',
   aiStarterContinue: 'המשך לכתוב מהנקודה שבה המסמך נעצר',
   aiStarterFillTemplate: 'מצא ומלא את מצייני המיקום במסמך',
-  aiBuyPlanBtn: 'Buy AI plan',
+  aiOpenSettingsBtn: 'Open AI settings',
   aiPanelTitle: 'uniAI',
   aiOpenAssistant: 'פתיחת עוזר ה-AI',
   aiSummarizeBtn: 'סיכום AI',

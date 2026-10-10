@@ -199,7 +199,7 @@ test('en and vi errNoApiKey keep the UniWork wording after an upstream merge', (
     withFiles({ [file]: upstreamEn }, (get) => {
       assert.equal(
         get(file),
-        "    errNoApiKey: 'AI is not activated. Purchase a plan to use the AI assistant.',\n",
+        "    errNoApiKey: 'No AI model is set up yet. Add your own AI key in Settings > AI Model to use the assistant.',\n",
       )
     })
   }
@@ -210,7 +210,7 @@ test('vi errNoApiKey keeps the UniWork wording after an upstream merge', () => {
   withFiles({ 'apps/docs/src/main/docs-main.ts': upstreamVi }, (get) => {
     assert.equal(
       get('apps/docs/src/main/docs-main.ts'),
-      "    errNoApiKey: 'Chưa kích hoạt / mua gói AI. Hãy mua gói để dùng Trợ lý AI.',\n",
+      "    errNoApiKey: 'Chưa thiết lập mô hình AI. Hãy thêm khóa AI của riêng bạn trong Cài đặt > Mô hình AI để dùng Trợ lý AI.',\n",
     )
   })
 })

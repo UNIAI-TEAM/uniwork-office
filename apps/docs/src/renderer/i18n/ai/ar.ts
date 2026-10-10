@@ -8,7 +8,7 @@ export const ar = {
   aiStarterPolishAll: 'حسّن صياغة المستند كاملًا بنبرة أكثر احترافية',
   aiStarterContinue: 'تابع الكتابة من حيث انتهى المستند',
   aiStarterFillTemplate: 'اعثر على العناصر النائبة في المستند واملأها',
-  aiBuyPlanBtn: 'Buy AI plan',
+  aiOpenSettingsBtn: 'Open AI settings',
   aiPanelTitle: 'uniAI',
   aiOpenAssistant: 'فتح مساعد الذكاء الاصطناعي',
   aiSummarizeBtn: 'تلخيص AI',

@@ -88,5 +88,5 @@ export function creditWalletFromOpenRouter(
   }
 }
 
-export const CREDIT_RATE_NOTE_VI = '1 USD Token Hub = 1.000 Credit'
-export const CREDIT_RATE_NOTE_EN = '1 USD Token Hub = 1,000 Credits'
+export const CREDIT_RATE_NOTE_VI = '1 USD số dư khóa = 1.000 tín dụng AI'
+export const CREDIT_RATE_NOTE_EN = '1 USD of key balance = 1,000 AI credits'

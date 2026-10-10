@@ -55,6 +55,7 @@ import { UniAiPwaPane } from './UniAiPwaPane'
 import {
   UniworkCloudAccountRows,
   UniworkCloudNotice,
+  cloudTestVerdict,
   useUniworkCloudStatus,
 } from './UniworkCloudPane'
 import type { UniworkCloudStatus } from '@genoffice/ai-provider/browser'
@@ -1003,8 +1004,18 @@ function AiMediaPane({
     setTestResults(null)
     const results: Partial<Record<TestedBlock, TestResult>> = {}
     const fallback: TestResult = { ok: true }
+    // the cloud blocks read the status from the server once (not the local sign-in flag), so
+    // the verdict names a plan, credits or availability problem instead of passing silently
+    let cloudPending: Promise<TestResult> | undefined
+    const cloudCheck = () => {
+      cloudPending ??= (window.aiOffice.uniworkCloudRefresh?.() ?? Promise.resolve(null))
+        .then((status) => cloudTestVerdict(status, t))
+        .catch((): TestResult => ({ ok: false, error: t('cloudStateUnavailable') }))
+      return cloudPending
+    }
     const vendorChecks = new Map<AiMediaProviderId, Promise<TestResult>>()
     const vendorCheck = (id: AiMediaProviderId) => {
+      if (id === 'genspark') return cloudCheck()
       let pending = vendorChecks.get(id)
       if (!pending) {
         pending =
@@ -1018,11 +1029,15 @@ function AiMediaPane({
       [
         'search',
         () =>
-          window.aiOffice.testAiSearchSettings?.({
-            provider: search.provider,
-            apiKey:
-              search.provider === 'auto' ? '' : (search.providers[search.provider]?.apiKey ?? ''),
-          }) ?? Promise.resolve(fallback),
+          search.provider === 'auto' && cloudToolsOn
+            ? cloudCheck()
+            : (window.aiOffice.testAiSearchSettings?.({
+                provider: search.provider,
+                apiKey:
+                  search.provider === 'auto'
+                    ? ''
+                    : (search.providers[search.provider]?.apiKey ?? ''),
+              }) ?? Promise.resolve(fallback)),
       ],
       ['image', () => vendorCheck(mediaProviderOf('image'))],
       ['analysis', () => vendorCheck(mediaProviderOf('analysis'))],

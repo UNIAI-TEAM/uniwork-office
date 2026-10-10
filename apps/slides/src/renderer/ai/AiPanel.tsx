@@ -14,6 +14,7 @@ import {
 } from '@genoffice/agent-core'
 import type { RenderSlide } from '@genoffice/pptx-render'
 import {
+  aiNoticeKind,
   cloudToolsEnabled,
   imageGenerationAvailable,
   mediaAnalysisAvailable,
@@ -2252,9 +2253,15 @@ export function AiPanel({
                 <span dir="auto">{entry.text}</span>
               )}
               {entry.tools && entry.tools.length > 0 && <ToolChipList tools={entry.tools} />}
-              {entry.error && (
-                <div className="ai-msg-error">{t('aiMsgError', { error: entry.error })}</div>
-              )}
+              {entry.error &&
+                (aiNoticeKind(entry.error) ? (
+                  // "nothing to chat with" is a setup / plan state: a plain notice, not a red error
+                  <div className="ai-msg-notice" role="status">
+                    {entry.error}
+                  </div>
+                ) : (
+                  <div className="ai-msg-error">{t('aiMsgError', { error: entry.error })}</div>
+                ))}
               {entry.deckProgress && <DeckProgressCard progress={entry.deckProgress} />}
               {showToolbar && (
                 <div className="ai-msg-toolbar">

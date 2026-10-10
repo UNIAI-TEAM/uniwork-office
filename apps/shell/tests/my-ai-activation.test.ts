@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   aiSettingsReady,
-  buyAiPlanLabel,
   looksLikeMissingAiActivation,
+  openAiSettingsLabel,
   softAiActivationMessage,
 } from '../src/renderer/src/my-ai-activation'
 import { defaultAiSettings } from '@genoffice/ai-provider'
@@ -24,18 +24,28 @@ describe('my-ai-activation', () => {
     expect(aiSettingsReady(s)).toBe(true)
   })
 
-  it('matches soft / legacy no-key errors', () => {
+  it('matches soft / legacy no-key errors and the product notices', () => {
     expect(looksLikeMissingAiActivation('No API key configured for genspark')).toBe(true)
-    expect(
-      looksLikeMissingAiActivation('Chưa kích hoạt / mua gói AI. Hãy mua gói để dùng Trợ lý AI.'),
-    ).toBe(true)
+    for (const vi of [true, false]) {
+      for (const state of ['signed-out', 'not-entitled', 'credits-exhausted'] as const) {
+        expect(looksLikeMissingAiActivation(softAiActivationMessage(vi, state))).toBe(true)
+      }
+    }
     expect(looksLikeMissingAiActivation('Network timeout')).toBe(false)
   })
 
-  it('returns soft copy + CTA labels', () => {
-    expect(softAiActivationMessage(true)).toContain('Chưa kích hoạt')
-    expect(softAiActivationMessage(false)).toContain('not activated')
-    expect(buyAiPlanLabel(true)).toBe('Mua gói AI')
-    expect(buyAiPlanLabel(false)).toBe('Buy AI plan')
+  it('returns soft copy that follows the organization plan, with no purchase wording', () => {
+    expect(softAiActivationMessage(true)).toContain('Chưa thiết lập mô hình AI')
+    expect(softAiActivationMessage(false)).toContain('No AI model is set up')
+    expect(softAiActivationMessage(false, 'ready')).toContain('No AI model is set up')
+    expect(softAiActivationMessage(false, 'not-entitled')).toContain("organization's plan")
+    expect(softAiActivationMessage(true, 'not-entitled')).toContain('Gói của tổ chức')
+    expect(softAiActivationMessage(false, 'credits-exhausted')).toContain('AI credits')
+    expect(softAiActivationMessage(true, 'credits-exhausted')).toContain('tín dụng AI')
+    for (const vi of [true, false]) {
+      expect(softAiActivationMessage(vi, 'not-entitled')).not.toMatch(/purchase|buy|mua gói/i)
+    }
+    expect(openAiSettingsLabel(true)).toBe('Mở cài đặt AI')
+    expect(openAiSettingsLabel(false)).toBe('Open AI settings')
   })
 })

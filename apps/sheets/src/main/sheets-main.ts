@@ -82,6 +82,7 @@ import {
   activeProvider,
   maxOutputTokensOf,
   resolveAiSettings,
+  noModelMessage,
   setAiUserAgent,
   setRescueFetch,
   streamForProvider,
@@ -240,7 +241,7 @@ const tMain = createI18n({
     csvKeepFormatDetail:
       'CSV 只保留单张工作表的纯文本值——公式、格式和其他工作表不会存入 .csv 文件。',
   },
-  // en and vi are ours (UniWork wording, e.g. errNoApiKey: no active AI plan); the other locales keep
+  // en and vi are ours (UniWork wording, e.g. errNoApiKey: no AI model set up yet); the other locales keep
   // upstream's wording. tools/rebrand re-applies the vi errNoApiKey (rule vi-no-api-key).
   en: {
     filterSpreadsheets: 'Spreadsheets',
@@ -258,7 +259,8 @@ const tMain = createI18n({
     errParseFailed: 'Failed to parse file',
     errImageNoText: 'Image attachments have no text; the image is sent along with the user message',
     errNotImage: 'not a supported image type',
-    errNoApiKey: 'AI is not activated. Purchase a plan to use the AI assistant.',
+    errNoApiKey:
+      'No AI model is set up yet. Add your own AI key in Settings > AI Model to use the assistant.',
     errAiBusy: 'The AI service is busy right now — please try again in a moment',
     errNoModel: 'No model name configured',
     errImgAbsPath: 'Image path must be absolute.',
@@ -317,7 +319,8 @@ const tMain = createI18n({
     errImageNoText:
       'Tệp đính kèm hình ảnh không có văn bản; hình ảnh được gửi cùng với tin nhắn của người dùng',
     errNotImage: 'loại hình ảnh không được hỗ trợ',
-    errNoApiKey: 'Chưa kích hoạt / mua gói AI. Hãy mua gói để dùng Trợ lý AI.',
+    errNoApiKey:
+      'Chưa thiết lập mô hình AI. Hãy thêm khóa AI của riêng bạn trong Cài đặt > Mô hình AI để dùng Trợ lý AI.',
     errAiBusy: 'Dịch vụ AI hiện đang bận — vui lòng thử lại sau giây lát',
     errNoModel: 'Chưa cấu hình tên mô hình',
     errImgAbsPath: 'Đường dẫn hình ảnh phải là đường dẫn tuyệt đối.',
@@ -3729,7 +3732,7 @@ export function registerSheetsAiIpc(): void {
     if (!config || (provider !== 'codex' && !config.apiKey)) {
       return {
         ok: false,
-        error: tm('errNoApiKey', { provider }),
+        error: noModelMessage(getUiLang(), tm('errNoApiKey', { provider })),
       }
     }
     if (provider !== 'codex' && !config.model) return { ok: false, error: tm('errNoModel') }
@@ -3765,7 +3768,7 @@ export function registerSheetsAiIpc(): void {
       send({
         requestId,
         type: 'error',
-        error: tm('errNoApiKey', { provider }),
+        error: noModelMessage(getUiLang(), tm('errNoApiKey', { provider })),
       })
       return
     }

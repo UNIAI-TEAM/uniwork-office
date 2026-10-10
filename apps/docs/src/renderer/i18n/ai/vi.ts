@@ -181,5 +181,5 @@ export const vi = {
   aiCmdImages: 'Đã cập nhật {count} hình ảnh',
   aiCmdToc: 'Đã chèn mục lục ({count} mục)',
   aiCmdSkipped: ' (đã bỏ qua {count} khối được bảo vệ)',
-  aiBuyPlanBtn: 'Mua gói AI',
+  aiOpenSettingsBtn: 'Mở cài đặt AI',
 } satisfies Record<keyof typeof zh, string>

@@ -447,7 +447,7 @@ export interface HomeApi {
   uniworkCloudRefresh?(): Promise<UniworkCloudStatus>
   /** cloud status pushes; returns an unsubscribe */
   onUniworkCloudStatus?(handler: (status: UniworkCloudStatus) => void): () => void
-  /** Editor AI “Buy AI plan” → open Settings section (e.g. account); unsubscribe returned */
+  /** Editor AI “Open AI settings” → open a Settings section (e.g. aiModel); unsubscribe returned */
   onOpenSettingsEvent?(handler: (section: string) => void): () => void
   /** app version (from package.json / electron app.getVersion) */
   getAppVersion(): Promise<string>

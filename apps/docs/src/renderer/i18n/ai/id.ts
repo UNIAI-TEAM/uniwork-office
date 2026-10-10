@@ -8,7 +8,7 @@ export const id = {
   aiStarterPolishAll: 'Perhalus seluruh dokumen agar nadanya lebih profesional',
   aiStarterContinue: 'Lanjutkan menulis dari bagian akhir dokumen',
   aiStarterFillTemplate: 'Temukan dan isi placeholder di dokumen ini',
-  aiBuyPlanBtn: 'Buy AI plan',
+  aiOpenSettingsBtn: 'Open AI settings',
   aiPanelTitle: 'uniAI',
   aiOpenAssistant: 'Buka asisten AI',
   aiSummarizeBtn: 'Ringkasan AI',

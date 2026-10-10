@@ -8,7 +8,7 @@ export const ms = {
   aiStarterPolishAll: 'Perhalusi keseluruhan dokumen dengan nada lebih profesional',
   aiStarterContinue: 'Teruskan menulis dari bahagian akhir dokumen',
   aiStarterFillTemplate: 'Cari dan isi ruang letak dalam dokumen ini',
-  aiBuyPlanBtn: 'Buy AI plan',
+  aiOpenSettingsBtn: 'Open AI settings',
   aiPanelTitle: 'uniAI',
   aiOpenAssistant: 'Buka pembantu AI',
   aiSummarizeBtn: 'Ringkasan AI',

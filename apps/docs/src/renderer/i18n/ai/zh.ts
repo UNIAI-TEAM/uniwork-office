@@ -7,7 +7,7 @@ export const zh = {
   aiStarterPolishAll: '润色全文,使语气更专业',
   aiStarterContinue: '接着现有内容往下写',
   aiStarterFillTemplate: '找出并填写文档里的占位符',
-  aiBuyPlanBtn: '购买 AI 套餐',
+  aiOpenSettingsBtn: '打开 AI 设置',
   aiPanelTitle: 'uniAI',
   aiOpenAssistant: '打开 AI 助手',
   aiSummarizeBtn: 'AI 总结',

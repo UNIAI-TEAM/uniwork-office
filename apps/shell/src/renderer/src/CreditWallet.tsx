@@ -108,15 +108,15 @@ export function CreditWallet({ onOpenAiSettings }: Props): ReactElement {
   let title: string
   let sub: string
   if (snap.missingKey) {
-    title = label('Ví Credit', 'Credit wallet')
-    sub = label('Chưa gắn Token Hub', 'No Token Hub key')
+    title = label('Tín dụng AI', 'AI credits')
+    sub = label('Chưa có khóa AI', 'No AI key yet')
   } else if (!snap.ok) {
-    title = label('Ví Credit', 'Credit wallet')
+    title = label('Tín dụng AI', 'AI credits')
     sub = busy
       ? label('Đang cập nhật…', 'Updating…')
       : label('Không đọc được số dư', 'Couldn’t load balance')
   } else if (snap.unlimited || snap.remaining == null) {
-    title = label('Ví Credit', 'Credit wallet')
+    title = label('Tín dụng AI', 'AI credits')
     sub = label(`Đã dùng ${fmt(snap.used)}`, `Used ${fmt(snap.used)}`)
   } else {
     title = label(`Còn ${fmt(snap.remaining)} Credit`, `${fmt(snap.remaining)} Credits left`)
@@ -216,16 +216,12 @@ export function CreditWallet({ onOpenAiSettings }: Props): ReactElement {
             <ul className="credit-wallet-log-list">
               {recent.map((e) => (
                 <li key={e.id} className={!e.ok ? 'is-fail' : undefined}>
-                  <span className="credit-wallet-log-time">
-                    {formatTime(e.at, dateLocale)}
-                  </span>
+                  <span className="credit-wallet-log-time">{formatTime(e.at, dateLocale)}</span>
                   <span className="credit-wallet-log-sum" title={e.summary}>
                     {e.summary || e.source}
                   </span>
                   <span className="credit-wallet-log-cred">
-                    {e.ok && !e.cancelled
-                      ? `≈ ${fmtEst(e.estCredits)}`
-                      : label('—', '—')}
+                    {e.ok && !e.cancelled ? `≈ ${fmtEst(e.estCredits)}` : label('—', '—')}
                   </span>
                 </li>
               ))}
