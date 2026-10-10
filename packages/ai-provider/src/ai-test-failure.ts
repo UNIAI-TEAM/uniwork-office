@@ -83,6 +83,24 @@ export function aiTestFailureKindForText(text: string, error?: unknown): AiTestF
   return 'failed'
 }
 
+/** a one-shot chat failure: its machine-readable cause first (the same codes the chat UI localizes), then its text */
+export function aiTestFailureKindForChat(result: {
+  error?: string
+  errorCode?: 'timeout' | 'credits' | 'network' | 'overloaded'
+}): AiTestFailureKind {
+  switch (result.errorCode) {
+    case 'timeout':
+    case 'network':
+      return 'network'
+    case 'credits':
+      return 'limit'
+    case 'overloaded':
+      return 'unavailable'
+    default:
+      return aiTestFailureKindForText(result.error ?? '')
+  }
+}
+
 export function aiTestFailure(kind: AiTestFailureKind, detail: string): AiTestResult {
   return { ok: false, error: detail, errorKind: kind }
 }

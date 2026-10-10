@@ -79,6 +79,18 @@ describe('settings test connection: product messages', () => {
     expect(connectionTestResult({ ok: false }, tEn).error).toBe('Connection failed')
   })
 
+  it('draws the AI Model test failure from its kind, never its text', () => {
+    const chat = { ok: false, errorKind: 'invalid_key' } as never
+    expect(connectionTestResult(chat, tVi)).toEqual({
+      ok: false,
+      error: 'Khóa API thiếu hoặc bị từ chối',
+    })
+    expect(connectionTestResult({ ok: false, errorKind: 'network' } as never, tEn).error).toBe(
+      'Can’t connect. Check your connection',
+    )
+    expect(connectionTestResult({ ok: true }, tEn)).toEqual({ ok: true })
+  })
+
   it('shows a thrown IPC error as the generic failure, not its text', async () => {
     const api = apiOf({
       testAiMediaSettings: vi.fn(async () => {

@@ -527,7 +527,7 @@ export interface HomeApi {
   /** live model list advertised by a user-hosted OpenAI-compatible endpoint; empty when it cannot answer */
   getCustomModels(baseUrl: string, apiKey?: string): Promise<CodexModelCatalog>
   /** one-shot round trip against the given (possibly unsaved) settings — the settings-UI connection test */
-  testAiSettings(settings: AiSettings): Promise<AiChatResponse>
+  testAiSettings(settings: AiSettings): Promise<AiConnectionTestResult>
   /** OpenRouter Token Hub: GET /api/v1/key for the given (possibly unsaved) API key */
   probeOpenRouterKey(apiKey: string): Promise<OpenRouterKeyStatus>
   /** one-shot non-streaming chat using saved (or provided) AI settings — Workbench helpers */

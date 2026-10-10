@@ -40,7 +40,7 @@ import type { AiCatalogEntry, DocTheme, UiTheme } from '../../shared/home-api'
 import appIcon from './assets/app-icon.png'
 import legal from '../../shared/legal.json'
 import { ProviderLogo } from './provider-logos'
-import { runConnectionTests } from './ai-connection-test'
+import { connectionTestResult, runConnectionTests, testFailureText } from './ai-connection-test'
 import type { BlockCheck, TestedBlock, TestResult } from './ai-connection-test'
 import { AccountPane } from './AccountPane'
 import type { AccountController } from './account-model'
@@ -558,7 +558,7 @@ function AiModelPane({ t, cloud }: { t: TFunc; cloud: UniworkCloudStatus | null 
       .testAiSettings?.(settings)
       .then((r) => {
         if (seq !== testSeqRef.current) return
-        setTestResult(r ?? { ok: false })
+        setTestResult(connectionTestResult(r ?? { ok: false }, t))
         if (r?.ok && isCodex) {
           void refreshCodexModels(config.cliPath ?? '', config.model).catch(() => undefined)
         }
@@ -566,9 +566,9 @@ function AiModelPane({ t, cloud }: { t: TFunc; cloud: UniworkCloudStatus | null 
           void checkOpenRouterHub(config.apiKey)
         }
       })
-      .catch((error) => {
+      .catch(() => {
         if (seq !== testSeqRef.current) return
-        setTestResult({ ok: false, error: error instanceof Error ? error.message : String(error) })
+        setTestResult({ ok: false, error: testFailureText('failed', t) })
       })
       .finally(() => {
         if (seq === testSeqRef.current) setTesting(false)

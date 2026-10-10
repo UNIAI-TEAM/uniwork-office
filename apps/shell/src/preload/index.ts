@@ -620,15 +620,13 @@ const homeApi: HomeApi = {
     return (await ipcRenderer.invoke('ai:custom-models', { baseUrl, apiKey })) as CodexModelCatalog
   },
   async testAiSettings(settings) {
-    const result: unknown = await ipcRenderer.invoke('ai:chat', {
-      settings,
-      system: 'You are a connectivity test. Reply with the single word OK.',
-      user: 'ping',
-    })
-    const raw = (result ?? {}) as { ok?: unknown; error?: unknown }
-    return raw.ok === true
-      ? { ok: true }
-      : { ok: false, error: typeof raw.error === 'string' ? raw.error : 'Connection failed' }
+    return testResultOf(
+      await ipcRenderer.invoke('ai:settings-test', {
+        settings,
+        system: 'You are a connectivity test. Reply with the single word OK.',
+        user: 'ping',
+      }),
+    )
   },
   async probeOpenRouterKey(apiKey) {
     return (await ipcRenderer.invoke(

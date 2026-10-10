@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  aiTestFailureKindForChat,
   aiTestFailureKindForCloudCode,
   aiTestFailureKindForStatus,
   aiTestFailureKindForText,
@@ -36,6 +37,20 @@ describe('settings test failure kinds', () => {
     abort.name = 'TimeoutError'
     expect(aiTestFailureKindForText('', abort)).toBe('network')
     expect(aiTestFailureKindForText('Something odd')).toBe('failed')
+  })
+
+  it('classifies a one-shot chat failure by its code, then by the status in its text', () => {
+    expect(aiTestFailureKindForChat({ errorCode: 'timeout', error: 'x' })).toBe('network')
+    expect(aiTestFailureKindForChat({ errorCode: 'network' })).toBe('network')
+    expect(aiTestFailureKindForChat({ errorCode: 'credits', error: 'HTTP 402: no credit' })).toBe(
+      'limit',
+    )
+    expect(aiTestFailureKindForChat({ errorCode: 'overloaded' })).toBe('unavailable')
+    expect(
+      aiTestFailureKindForChat({ error: 'Claude HTTP 401: {"error":"invalid x-api-key"}' }),
+    ).toBe('invalid_key')
+    expect(aiTestFailureKindForChat({ error: 'HTTP 404: model not found' })).toBe('failed')
+    expect(aiTestFailureKindForChat({ error: 'codex exited with code 1' })).toBe('failed')
   })
 
   it('fills a missing kind on a failure and leaves passes and tagged failures alone', () => {
