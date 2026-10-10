@@ -209,6 +209,10 @@ describe('Serply settings wiring', () => {
     const bad = await testSearchProvider('serply', 'wrong')
     expect(bad.ok).toBe(false)
     expect(bad.error).toMatch(/serply/)
-    expect(await testSearchProvider('serply', '')).toEqual({ ok: false, error: 'API key is empty' })
+    expect(await testSearchProvider('serply', '')).toEqual({
+      ok: false,
+      error: 'API key is empty',
+      errorKind: 'invalid_key',
+    })
   })
 })

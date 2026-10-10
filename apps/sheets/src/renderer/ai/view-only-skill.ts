@@ -1,4 +1,5 @@
 import type { AgentSkill } from '@genoffice/agent-core'
+import type { WorkbookFile } from '../../shared/desktop-api'
 
 /**
  * Tools that only read the workbook (or the web / attachments); everything else
@@ -27,7 +28,7 @@ const VIEW_ONLY_NOTE =
 
 /** the same product rule everywhere: a UniWork workbook the user may only view */
 export function isUniworkViewOnly(
-  file: { uniworkBound?: boolean; readOnly: boolean } | null | undefined,
+  file: Pick<WorkbookFile, 'uniworkBound' | 'readOnly'> | null | undefined,
 ): boolean {
   return file?.uniworkBound === true && file.readOnly === true
 }

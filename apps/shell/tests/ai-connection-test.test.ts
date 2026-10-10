@@ -91,6 +91,22 @@ describe('settings test connection: product messages', () => {
     expect(connectionTestResult({ ok: true }, tEn)).toEqual({ ok: true })
   })
 
+  it('shows a missing rerank key as the key message, not the generic failure', async () => {
+    const api = apiOf({
+      testFileSearchRerank: vi.fn(async () => ({
+        ok: false,
+        errorKind: 'invalid_key',
+      })),
+    })
+    const settings = { endpoint: 'direct' } as never
+    const results = await runConnectionTests(
+      [{ block: 'rerank', kind: 'rerank', settings }],
+      api,
+      tEn,
+    )
+    expect(results.rerank).toEqual({ ok: false, error: 'API key missing or rejected' })
+  })
+
   it('shows a thrown IPC error as the generic failure, not its text', async () => {
     const api = apiOf({
       testAiMediaSettings: vi.fn(async () => {
