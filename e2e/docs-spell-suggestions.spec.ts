@@ -195,12 +195,34 @@ test('context menu offers spelling suggestions and applies one', async () => {
         (e) => w.__spellLog.push(`${at()} beforeinput ${(e as InputEvent).inputType}`),
         true,
       )
+      const tail = (t: string | null | undefined) =>
+        Array.from((t ?? '').slice(-3), (c) => c.charCodeAt(0).toString(16)).join(',')
       new MutationObserver((records) => {
         for (const r of records)
           w.__spellLog.push(
-            `${at()} ${r.type} ${r.type === 'characterData' ? JSON.stringify(r.target.textContent) : `+${r.addedNodes.length}/-${r.removedNodes.length}`}`,
+            `${at()} ${r.type} ${r.type === 'characterData' ? `${JSON.stringify(r.target.textContent)} tail=${tail(r.target.textContent)}` : `+${r.addedNodes.length}/-${r.removedNodes.length}`}`,
           )
       }).observe(root, { characterData: true, childList: true, subtree: true })
+      type Ed = {
+        state: { doc: { textContent: string } }
+        on(e: 'transaction', f: (p: { transaction: TrLike }) => void): void
+      }
+      type TrLike = {
+        docChanged: boolean
+        selectionSet: boolean
+        getMeta(k: string): unknown
+        doc: { textContent: string }
+        selection: { from: number; to: number }
+      }
+      const ed = (window as unknown as { __aidocs?: { editor?: Ed } }).__aidocs?.editor
+      w.__spellLog.push(
+        `0 state tail=${tail(ed?.state.doc.textContent)} dom tail=${tail(root.textContent)}`,
+      )
+      ed?.on('transaction', ({ transaction: tr }) =>
+        w.__spellLog.push(
+          `${at()} tr doc=${tr.docChanged} sel=${tr.selectionSet}@${tr.selection.from}-${tr.selection.to} ui=${String(tr.getMeta('uiEvent') ?? '')} text=${JSON.stringify(tr.doc.textContent)} tail=${tail(tr.doc.textContent)}`,
+        ),
+      )
     })
     await editor.locator('.ctx-menu .ctx-item-strong').first().click()
     await expect.poll(() => pageText(editor), POLL).toContain(`fox ${suggestion} over`)
