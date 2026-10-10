@@ -83,6 +83,7 @@ import {
 import type { PdfViewState, ZoomAnchor } from './view-state'
 import { LinkLayer } from './LinkLayer'
 import { OutlinePanel } from './OutlinePanel'
+import { RibbonTabScroller } from './RibbonTabScroller'
 import type { OutlineNode } from './OutlinePanel'
 import { buildHeadingOutline, remapOutlinePages } from './heading-outline'
 import { printPdf } from './print'
@@ -6488,31 +6489,33 @@ export default function App() {
             <IconRedo />
           </button>
           <span className="qa-sep" />
-          {RIBBON_TABS.map(({ id, labelKey }) => (
-            <button
-              key={id}
-              className={`ribbon-tab ${collapse.tabClass(ribbonTab === id)}`}
-              data-tip={collapse.tabTip(ribbonTab === id)}
-              onClick={() => {
-                collapse.onTabPress(ribbonTab === id)
-                setRibbonTab(id)
-              }}
-            >
-              {t(labelKey)}
-            </button>
-          ))}
-          {!readOnly && (
-            <button
-              className={`ribbon-tab ribbon-tab-context ${collapse.tabClass(ribbonTab === 'fillForm')}`}
-              data-tip={collapse.tabTip(ribbonTab === 'fillForm')}
-              onClick={() => {
-                collapse.onTabPress(ribbonTab === 'fillForm')
-                setRibbonTab('fillForm')
-              }}
-            >
-              {t('ribbonTabFillForm')}
-            </button>
-          )}
+          <RibbonTabScroller activeKey={ribbonTab}>
+            {RIBBON_TABS.map(({ id, labelKey }) => (
+              <button
+                key={id}
+                className={`ribbon-tab ${collapse.tabClass(ribbonTab === id)}`}
+                data-tip={collapse.tabTip(ribbonTab === id)}
+                onClick={() => {
+                  collapse.onTabPress(ribbonTab === id)
+                  setRibbonTab(id)
+                }}
+              >
+                {t(labelKey)}
+              </button>
+            ))}
+            {!readOnly && (
+              <button
+                className={`ribbon-tab ribbon-tab-context ${collapse.tabClass(ribbonTab === 'fillForm')}`}
+                data-tip={collapse.tabTip(ribbonTab === 'fillForm')}
+                onClick={() => {
+                  collapse.onTabPress(ribbonTab === 'fillForm')
+                  setRibbonTab('fillForm')
+                }}
+              >
+                {t('ribbonTabFillForm')}
+              </button>
+            )}
+          </RibbonTabScroller>
           <span className="ribbon-tabs-spacer" />
           {/* On the web the host header owns the save state and one host banner the view-only
               notice (`saveStatus` / `viewOnlyChip` off): the ribbon row repeats neither. */}
