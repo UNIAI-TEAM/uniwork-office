@@ -43,18 +43,36 @@ export function aiPanelWidthAtPointer(clientX: number): number {
 }
 
 /**
+ * Below this window width the panel would take most of the screen and leave the document a sliver
+ * (a phone, a narrow browser tab), so it starts closed until the user opens it.
+ */
+export const AI_PANEL_NARROW_PX = 900
+
+function openByDefault(): boolean {
+  return typeof window === 'undefined' || window.innerWidth >= AI_PANEL_NARROW_PX
+}
+
+/**
  * Initial open state of an app's AI panel: the app's remembered last state,
- * unless the user turned off "open the AI panel in new documents". Call after
- * the shell prefs have been applied (the apps await them before first render).
+ * unless the user turned off "open the AI panel in new documents". Nothing
+ * remembered yet: open, except in a narrow window (AI_PANEL_NARROW_PX). Call
+ * after the shell prefs have been applied (the apps await them before first
+ * render).
  */
 export function aiPanelInitiallyOpen(storageKey: string): boolean {
   if (!current.openInNewDocs) return false
-  return localStorage.getItem(storageKey) !== '0'
+  const remembered = localStorage.getItem(storageKey)
+  return remembered === null ? openByDefault() : remembered !== '0'
 }
 
-/** Persist the panel state for `aiPanelInitiallyOpen`; a no-op while the setting is off so the memory survives */
+/**
+ * Persist the panel state for `aiPanelInitiallyOpen`; a no-op while the setting is off so the
+ * memory survives, and while nothing is remembered and the state is just the width-based default
+ * (a narrow first run must not turn into a "closed" memory for later wide windows).
+ */
 export function rememberAiPanelOpen(storageKey: string, open: boolean): void {
   if (!current.openInNewDocs) return
+  if (localStorage.getItem(storageKey) === null && open === openByDefault()) return
   localStorage.setItem(storageKey, open ? '1' : '0')
 }
 
