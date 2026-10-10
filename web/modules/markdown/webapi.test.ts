@@ -350,7 +350,15 @@ describe('markdownApi: pictures and exports', () => {
     expect(api.resolveAssetUrl('assets/a.png')).toBe('/files/a')
     expect(api.resolveAssetUrl('./assets/a.png')).toBe('/files/a')
     expect(api.unresolveAssetUrl('/files/a')).toBe('assets/a.png')
-    expect(api.resolveAssetUrl('assets/none.png')).toBeNull()
+    // a relative picture the host has no copy of gets a placeholder that maps back to its path
+    const missing = api.resolveAssetUrl('assets/none.png')!
+    expect(missing.startsWith('data:image/svg+xml')).toBe(true)
+    expect(decodeURIComponent(missing)).toContain('assets/none.png')
+    expect(api.unresolveAssetUrl(missing)).toBe('assets/none.png')
+    // anything that is not a relative document path is left to the renderer
+    expect(api.resolveAssetUrl('https://example.com/a.png')).toBeNull()
+    expect(api.resolveAssetUrl('data:image/png;base64,AA==')).toBeNull()
+    expect(api.resolveAssetUrl('/abs/a.png')).toBeNull()
   })
 
   it('pasted pictures upload with the images grant, else embed as data: URIs', async () => {
