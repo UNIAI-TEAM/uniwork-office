@@ -255,6 +255,15 @@ export const id = {
   panePresenterUseShowTip: 'Beralih ke peragaan slide normal di layar ini',
   panePresenterSingleHint:
     'Mode satu layar (sambungkan layar kedua untuk menampilkan layar penuh secara otomatis)',
+  panePresenterOpenAudience: 'Jendela Audiens',
+  panePresenterOpenAudienceTip:
+    'Buka tayangan slide di jendela terpisah yang bisa Anda seret ke proyektor',
+  panePresenterCloseAudience: 'Tutup Jendela Audiens',
+  panePresenterCloseAudienceTip: 'Tutup jendela audiens; tampilan penyaji tetap berjalan',
+  panePresenterWebHint: 'Buka jendela audiens, seret ke proyektor, lalu klik untuk layar penuh',
+  panePresenterPopupBlocked:
+    'Browser memblokir jendela. Izinkan pop-up untuk situs ini lalu coba lagi.',
+  paneAudienceFullscreenHint: 'Klik untuk menampilkan layar penuh',
   panePresenterElapsed: 'Waktu berlalu',
   panePresenterPause: 'Jeda pengatur waktu',
   panePresenterResume: 'Lanjutkan pengatur waktu',

@@ -111,6 +111,21 @@ const WEIGHT: Record<string, { weight: string; style: string }> = {
 
 /** registered embedded faces, `family|style` -> face (a reopened deck does not register twice) */
 const embedded = new Map<string, FontFace>()
+/** their bytes, for the presenter's audience window (its own document needs the same faces) */
+const embeddedSources = new Map<
+  string,
+  { family: string; weight: string; style: string; bytes: ArrayBuffer }
+>()
+
+/** the embedded faces registered so far (copies: the audience window gets them by structured clone) */
+export function embeddedFontSources(): Array<{
+  family: string
+  weight: string
+  style: string
+  bytes: ArrayBuffer
+}> {
+  return [...embeddedSources.values()].map((f) => ({ ...f, bytes: f.bytes.slice(0) }))
+}
 
 /**
  * Register a deck's usable embedded fonts as FontFaces; resolves once they are loaded (a bad
@@ -133,6 +148,7 @@ export async function registerEmbeddedFonts(opened: OpenedPptx): Promise<boolean
     const bytes = new Uint8Array(f.sfnt)
     const face = new FontFace(f.typeface, bytes.buffer, desc)
     embedded.set(key, face)
+    embeddedSources.set(key, { family: f.typeface, ...desc, bytes: bytes.buffer.slice(0) })
     document.fonts.add(face)
     added.push(face)
   }

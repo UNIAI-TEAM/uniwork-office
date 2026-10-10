@@ -255,6 +255,17 @@ export const es = {
   panePresenterUseShowTip: 'Cambiar a una presentación normal en esta pantalla',
   panePresenterSingleHint:
     'Modo de pantalla única (conecte una segunda pantalla para presentar automáticamente a pantalla completa)',
+  panePresenterOpenAudience: 'Ventana del público',
+  panePresenterOpenAudienceTip:
+    'Abrir la presentación en una ventana aparte que puede arrastrar al proyector',
+  panePresenterCloseAudience: 'Cerrar ventana del público',
+  panePresenterCloseAudienceTip:
+    'Cerrar la ventana del público; la vista del moderador sigue en marcha',
+  panePresenterWebHint:
+    'Abra la ventana del público, arrástrela al proyector y haga clic en ella para verla a pantalla completa',
+  panePresenterPopupBlocked:
+    'El navegador bloqueó la ventana. Permita las ventanas emergentes para este sitio y vuelva a intentarlo.',
+  paneAudienceFullscreenHint: 'Haga clic para ver a pantalla completa',
   panePresenterElapsed: 'Tiempo transcurrido',
   panePresenterPause: 'Pausar el temporizador',
   panePresenterResume: 'Reanudar el temporizador',

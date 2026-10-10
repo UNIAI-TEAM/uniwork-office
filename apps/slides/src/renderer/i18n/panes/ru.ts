@@ -253,6 +253,16 @@ export const ru = {
   panePresenterUseShowTip: 'Переключиться на обычное слайд-шоу на этом экране',
   panePresenterSingleHint:
     'Режим одного экрана (подключите второй экран для автоматического показа во весь экран)',
+  panePresenterOpenAudience: 'Окно для зрителей',
+  panePresenterOpenAudienceTip:
+    'Открыть показ в отдельном окне, которое можно перетащить на проектор',
+  panePresenterCloseAudience: 'Закрыть окно для зрителей',
+  panePresenterCloseAudienceTip: 'Закрыть окно для зрителей; режим докладчика продолжает работать',
+  panePresenterWebHint:
+    'Откройте окно для зрителей, перетащите его на проектор и щёлкните по нему для полноэкранного режима',
+  panePresenterPopupBlocked:
+    'Браузер заблокировал окно. Разрешите всплывающие окна для этого сайта и повторите попытку.',
+  paneAudienceFullscreenHint: 'Щёлкните для полноэкранного режима',
   panePresenterElapsed: 'Прошло времени',
   panePresenterPause: 'Приостановить таймер',
   panePresenterResume: 'Возобновить таймер',

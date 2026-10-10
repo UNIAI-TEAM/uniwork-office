@@ -257,6 +257,17 @@ export const it = {
   panePresenterUseShowTip: 'Passa a una presentazione normale su questo schermo',
   panePresenterSingleHint:
     'Modalità schermo singolo (collega un secondo schermo per la presentazione automatica a schermo intero)',
+  panePresenterOpenAudience: 'Finestra del pubblico',
+  panePresenterOpenAudienceTip:
+    'Apri la presentazione in una finestra separata da trascinare sul proiettore',
+  panePresenterCloseAudience: 'Chiudi finestra del pubblico',
+  panePresenterCloseAudienceTip:
+    'Chiudi la finestra del pubblico; la visualizzazione Relatore continua',
+  panePresenterWebHint:
+    'Apri la finestra del pubblico, trascinala sul proiettore e fai clic per lo schermo intero',
+  panePresenterPopupBlocked:
+    'Il browser ha bloccato la finestra. Consenti i popup per questo sito e riprova.',
+  paneAudienceFullscreenHint: 'Fai clic per lo schermo intero',
   panePresenterElapsed: 'Tempo trascorso',
   panePresenterPause: 'Sospendi il timer',
   panePresenterResume: 'Riprendi il timer',
