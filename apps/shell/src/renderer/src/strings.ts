@@ -160,6 +160,11 @@ export const strings = {
     setDefaultAppSet: '设为默认',
     setDefaultAppOpenSettings: '打开系统设置',
     setDefaultAppFailed: '设置失败，请在系统设置中手动更改。',
+    setCliLink: '命令行工具',
+    setCliLinkDesc: '把 genoffice 命令添加到终端，供脚本和 AI 助手调用 UniWork Office。',
+    setCliLinkInstall: '添加到终端',
+    setCliLinkDone: 'genoffice 已可用：{path}。',
+    setCliLinkBlocked: '无法自动添加。请在终端中运行：{cmd}',
     setAiSpellcheckDesc: '在 AI 对话输入框中输入时标出拼写错误的单词。',
     setAiOpenInNewDocs: '新文档中打开 AI 面板',
     setAiOpenInNewDocsDesc: '关闭后，新打开的文档默认收起 AI 面板；需要时点一下即可展开。',
@@ -522,6 +527,12 @@ export const strings = {
     setDefaultAppSet: 'Make default',
     setDefaultAppOpenSettings: 'Open system settings',
     setDefaultAppFailed: 'Could not change it. Please set it in the system settings.',
+    setCliLink: 'Command line tool',
+    setCliLinkDesc:
+      'Adds the genoffice command to your terminal so scripts and AI agents can use UniWork Office.',
+    setCliLinkInstall: 'Add to terminal',
+    setCliLinkDone: 'genoffice is available at {path}.',
+    setCliLinkBlocked: 'Could not add it automatically. Run this in a terminal: {cmd}',
     setAiSpellcheckDesc: 'Underline misspelled words while typing in the AI chat input.',
     setAiOpenInNewDocs: 'Open the AI panel in new documents',
     setAiOpenInNewDocsDesc:
@@ -906,6 +917,12 @@ export const strings = {
     setDefaultAppSet: '既定にする',
     setDefaultAppOpenSettings: 'システム設定を開く',
     setDefaultAppFailed: '変更できませんでした。システム設定で設定してください。',
+    setCliLink: 'コマンドラインツール',
+    setCliLinkDesc:
+      'genoffice コマンドをターミナルに追加し、スクリプトや AI エージェントから UniWork Office を使えるようにします。',
+    setCliLinkInstall: 'ターミナルに追加',
+    setCliLinkDone: 'genoffice を {path} で利用できます。',
+    setCliLinkBlocked: '自動で追加できませんでした。ターミナルで次を実行してください：{cmd}',
     setAiSpellcheckDesc: 'AI チャットの入力欄で入力中にスペルミスの単語に下線を表示します。',
     setAiOpenInNewDocs: '新しいドキュメントで AI パネルを開く',
     setAiOpenInNewDocsDesc:
@@ -1295,6 +1312,12 @@ export const strings = {
     setDefaultAppSet: '기본으로 설정',
     setDefaultAppOpenSettings: '시스템 설정 열기',
     setDefaultAppFailed: '변경할 수 없습니다. 시스템 설정에서 직접 설정해 주세요.',
+    setCliLink: '명령줄 도구',
+    setCliLinkDesc:
+      'genoffice 명령을 터미널에 추가하여 스크립트와 AI 에이전트가 UniWork Office를 사용할 수 있게 합니다.',
+    setCliLinkInstall: '터미널에 추가',
+    setCliLinkDone: 'genoffice를 {path}에서 사용할 수 있습니다.',
+    setCliLinkBlocked: '자동으로 추가하지 못했습니다. 터미널에서 다음을 실행하세요: {cmd}',
     setAiSpellcheckDesc: 'AI 채팅 입력란에 입력할 때 잘못된 단어에 밑줄을 표시합니다.',
     setAiOpenInNewDocs: '새 문서에서 AI 패널 열기',
     setAiOpenInNewDocsDesc:
@@ -1683,6 +1706,12 @@ export const strings = {
     setDefaultAppSet: 'Définir par défaut',
     setDefaultAppOpenSettings: 'Ouvrir les réglages système',
     setDefaultAppFailed: 'Modification impossible. Définissez-la dans les réglages système.',
+    setCliLink: 'Outil en ligne de commande',
+    setCliLinkDesc:
+      'Ajoute la commande genoffice à votre terminal pour que des scripts et des agents IA puissent utiliser UniWork Office.',
+    setCliLinkInstall: 'Ajouter au terminal',
+    setCliLinkDone: 'genoffice est disponible ici : {path}.',
+    setCliLinkBlocked: 'Ajout automatique impossible. Exécutez ceci dans un terminal : {cmd}',
     setAiSpellcheckDesc: 'Souligne les mots mal orthographiés pendant la saisie dans le chat IA.',
     setAiOpenInNewDocs: 'Ouvrir le panneau IA dans les nouveaux documents',
     setAiOpenInNewDocsDesc:
@@ -2083,6 +2112,12 @@ export const strings = {
     setDefaultAppSet: 'Als Standard festlegen',
     setDefaultAppOpenSettings: 'Systemeinstellungen öffnen',
     setDefaultAppFailed: 'Änderung nicht möglich. Bitte in den Systemeinstellungen festlegen.',
+    setCliLink: 'Kommandozeilen-Tool',
+    setCliLinkDesc:
+      'Fügt den Befehl genoffice zu Ihrem Terminal hinzu, damit Skripte und KI-Agenten UniWork Office nutzen können.',
+    setCliLinkInstall: 'Zum Terminal hinzufügen',
+    setCliLinkDone: 'genoffice ist verfügbar unter {path}.',
+    setCliLinkBlocked: 'Automatisches Hinzufügen nicht möglich. Führen Sie im Terminal aus: {cmd}',
     setAiSpellcheckDesc:
       'Unterstreicht falsch geschriebene Wörter beim Tippen im KI-Chat-Eingabefeld.',
     setAiOpenInNewDocs: 'KI-Panel in neuen Dokumenten öffnen',
@@ -2479,6 +2514,12 @@ export const strings = {
     setDefaultAppSet: 'Establecer como predeterminada',
     setDefaultAppOpenSettings: 'Abrir ajustes del sistema',
     setDefaultAppFailed: 'No se pudo cambiar. Configúralo en los ajustes del sistema.',
+    setCliLink: 'Herramienta de línea de comandos',
+    setCliLinkDesc:
+      'Añade el comando genoffice a tu terminal para que scripts y agentes de IA puedan usar UniWork Office.',
+    setCliLinkInstall: 'Añadir al terminal',
+    setCliLinkDone: 'genoffice está disponible en {path}.',
+    setCliLinkBlocked: 'No se pudo añadir automáticamente. Ejecuta esto en un terminal: {cmd}',
     setAiSpellcheckDesc:
       'Subraya las palabras mal escritas al escribir en el cuadro del chat de IA.',
     setAiOpenInNewDocs: 'Abrir el panel de IA en documentos nuevos',
@@ -2870,6 +2911,12 @@ export const strings = {
     setDefaultAppSet: 'ตั้งเป็นค่าเริ่มต้น',
     setDefaultAppOpenSettings: 'เปิดการตั้งค่าระบบ',
     setDefaultAppFailed: 'เปลี่ยนไม่สำเร็จ โปรดตั้งค่าในการตั้งค่าระบบ',
+    setCliLink: 'เครื่องมือบรรทัดคำสั่ง',
+    setCliLinkDesc:
+      'เพิ่มคำสั่ง genoffice ลงในเทอร์มินัล เพื่อให้สคริปต์และเอเจนต์ AI ใช้ UniWork Office ได้',
+    setCliLinkInstall: 'เพิ่มลงในเทอร์มินัล',
+    setCliLinkDone: 'ใช้ genoffice ได้ที่ {path}',
+    setCliLinkBlocked: 'เพิ่มโดยอัตโนมัติไม่สำเร็จ โปรดรันคำสั่งนี้ในเทอร์มินัล: {cmd}',
     setAiSpellcheckDesc: 'ขีดเส้นใต้คำที่สะกดผิดขณะพิมพ์ในช่องแชท AI',
     setAiOpenInNewDocs: 'เปิดแผง AI ในเอกสารใหม่',
     setAiOpenInNewDocsDesc:
@@ -3254,6 +3301,13 @@ export const strings = {
     setDefaultAppSet: 'Jadikan default',
     setDefaultAppOpenSettings: 'Buka pengaturan sistem',
     setDefaultAppFailed: 'Tidak dapat mengubahnya. Atur di pengaturan sistem.',
+    setCliLink: 'Alat baris perintah',
+    setCliLinkDesc:
+      'Menambahkan perintah genoffice ke terminal agar skrip dan agen AI dapat memakai UniWork Office.',
+    setCliLinkInstall: 'Tambahkan ke terminal',
+    setCliLinkDone: 'genoffice tersedia di {path}.',
+    setCliLinkBlocked:
+      'Tidak dapat menambahkannya secara otomatis. Jalankan ini di terminal: {cmd}',
     setAiSpellcheckDesc: 'Garis bawahi kata yang salah eja saat mengetik di kotak obrolan AI.',
     setAiOpenInNewDocs: 'Buka panel AI di dokumen baru',
     setAiOpenInNewDocsDesc:
@@ -3642,6 +3696,12 @@ export const strings = {
     setDefaultAppSet: 'Сделать по умолчанию',
     setDefaultAppOpenSettings: 'Открыть системные настройки',
     setDefaultAppFailed: 'Не удалось изменить. Задайте в системных настройках.',
+    setCliLink: 'Инструмент командной строки',
+    setCliLinkDesc:
+      'Добавляет команду genoffice в терминал, чтобы скрипты и ИИ-агенты могли работать с UniWork Office.',
+    setCliLinkInstall: 'Добавить в терминал',
+    setCliLinkDone: 'genoffice доступен здесь: {path}.',
+    setCliLinkBlocked: 'Не удалось добавить автоматически. Выполните в терминале: {cmd}',
     setAiSpellcheckDesc: 'Подчёркивать слова с ошибками при вводе в поле чата ИИ.',
     setAiOpenInNewDocs: 'Открывать панель ИИ в новых документах',
     setAiOpenInNewDocsDesc:
@@ -4032,6 +4092,12 @@ export const strings = {
     setDefaultAppSet: 'تعيين كافتراضي',
     setDefaultAppOpenSettings: 'فتح إعدادات النظام',
     setDefaultAppFailed: 'تعذّر التغيير. يرجى تعيينه من إعدادات النظام.',
+    setCliLink: 'أداة سطر الأوامر',
+    setCliLinkDesc:
+      'تضيف الأمر genoffice إلى الطرفية ليتمكن النصوص البرمجية ووكلاء الذكاء الاصطناعي من استخدام UniWork Office.',
+    setCliLinkInstall: 'إضافة إلى الطرفية',
+    setCliLinkDone: 'genoffice متاح في {path}.',
+    setCliLinkBlocked: 'تعذّرت الإضافة تلقائيًا. شغّل هذا في الطرفية: {cmd}',
     setAiSpellcheckDesc:
       'وضع خط تحت الكلمات الخاطئة إملائيًا أثناء الكتابة في حقل محادثة الذكاء الاصطناعي.',
     setAiOpenInNewDocs: 'فتح لوحة الذكاء الاصطناعي في المستندات الجديدة',
@@ -4413,6 +4479,12 @@ export const strings = {
     setDefaultAppSet: 'Definir como padrão',
     setDefaultAppOpenSettings: 'Abrir configurações do sistema',
     setDefaultAppFailed: 'Não foi possível alterar. Defina nas configurações do sistema.',
+    setCliLink: 'Ferramenta de linha de comando',
+    setCliLinkDesc:
+      'Adiciona o comando genoffice ao terminal para que scripts e agentes de IA possam usar o UniWork Office.',
+    setCliLinkInstall: 'Adicionar ao terminal',
+    setCliLinkDone: 'genoffice está disponível em {path}.',
+    setCliLinkBlocked: 'Não foi possível adicionar automaticamente. Execute no terminal: {cmd}',
     setAiSpellcheckDesc:
       'Sublinha palavras com erros ortográficos ao digitar na caixa do chat de IA.',
     setAiOpenInNewDocs: 'Abrir o painel de IA em novos documentos',
@@ -4798,6 +4870,12 @@ export const strings = {
     setDefaultAppSet: 'Imposta come predefinita',
     setDefaultAppOpenSettings: 'Apri impostazioni di sistema',
     setDefaultAppFailed: 'Impossibile modificare. Impostala nelle impostazioni di sistema.',
+    setCliLink: 'Strumento da riga di comando',
+    setCliLinkDesc:
+      'Aggiunge il comando genoffice al terminale così script e agenti IA possono usare UniWork Office.',
+    setCliLinkInstall: 'Aggiungi al terminale',
+    setCliLinkDone: 'genoffice è disponibile in {path}.',
+    setCliLinkBlocked: 'Impossibile aggiungerlo automaticamente. Esegui nel terminale: {cmd}',
     setAiSpellcheckDesc: 'Sottolinea le parole errate durante la digitazione nella chat IA.',
     setAiOpenInNewDocs: 'Apri il pannello IA nei nuovi documenti',
     setAiOpenInNewDocsDesc:
@@ -5182,6 +5260,12 @@ export const strings = {
     setDefaultAppSet: 'Ustaw jako domyślną',
     setDefaultAppOpenSettings: 'Otwórz ustawienia systemu',
     setDefaultAppFailed: 'Nie udało się zmienić. Ustaw w ustawieniach systemu.',
+    setCliLink: 'Narzędzie wiersza poleceń',
+    setCliLinkDesc:
+      'Dodaje polecenie genoffice do terminala, aby skrypty i agenci AI mogły korzystać z UniWork Office.',
+    setCliLinkInstall: 'Dodaj do terminala',
+    setCliLinkDone: 'genoffice jest dostępne w {path}.',
+    setCliLinkBlocked: 'Nie udało się dodać automatycznie. Uruchom w terminalu: {cmd}',
     setAiSpellcheckDesc: 'Podkreśla błędnie napisane słowa podczas pisania w polu czatu AI.',
     setAiOpenInNewDocs: 'Otwieraj panel AI w nowych dokumentach',
     setAiOpenInNewDocsDesc:
@@ -5765,6 +5849,12 @@ export const strings = {
     setDefaultAppSet: 'Nastavit jako výchozí',
     setDefaultAppOpenSettings: 'Otevřít nastavení systému',
     setDefaultAppFailed: 'Změna se nezdařila. Nastavte ji v nastavení systému.',
+    setCliLink: 'Nástroj příkazové řádky',
+    setCliLinkDesc:
+      'Přidá příkaz genoffice do terminálu, aby skripty a agenti AI mohli používat UniWork Office.',
+    setCliLinkInstall: 'Přidat do terminálu',
+    setCliLinkDone: 'genoffice je k dispozici v {path}.',
+    setCliLinkBlocked: 'Automatické přidání se nezdařilo. Spusťte v terminálu: {cmd}',
     setAiSpellcheckDesc: 'Podtrhávat překlepy při psaní do vstupního pole chatu AI.',
     setAiOpenInNewDocs: 'Otevírat panel AI v nových dokumentech',
     setAiOpenInNewDocsDesc:
@@ -5944,6 +6034,12 @@ export const strings = {
     setDefaultAppSet: 'Als standaard instellen',
     setDefaultAppOpenSettings: 'Systeeminstellingen openen',
     setDefaultAppFailed: 'Wijzigen is niet gelukt. Stel dit in via de systeeminstellingen.',
+    setCliLink: 'Opdrachtregelprogramma',
+    setCliLinkDesc:
+      'Voegt het commando genoffice toe aan je terminal, zodat scripts en AI-agents UniWork Office kunnen gebruiken.',
+    setCliLinkInstall: 'Toevoegen aan terminal',
+    setCliLinkDone: 'genoffice is beschikbaar op {path}.',
+    setCliLinkBlocked: 'Automatisch toevoegen is niet gelukt. Voer dit uit in een terminal: {cmd}',
     setAiSpellcheckDesc:
       'Onderstreept verkeerd gespelde woorden tijdens het typen in het AI-chatveld.',
     setAiOpenInNewDocs: 'AI-paneel openen in nieuwe documenten',
@@ -6328,6 +6424,13 @@ export const strings = {
     setDefaultAppSet: 'Jadikan lalai',
     setDefaultAppOpenSettings: 'Buka tetapan sistem',
     setDefaultAppFailed: 'Tidak dapat mengubahnya. Tetapkan dalam tetapan sistem.',
+    setCliLink: 'Alat baris perintah',
+    setCliLinkDesc:
+      'Menambah perintah genoffice ke terminal supaya skrip dan ejen AI boleh menggunakan UniWork Office.',
+    setCliLinkInstall: 'Tambah ke terminal',
+    setCliLinkDone: 'genoffice tersedia di {path}.',
+    setCliLinkBlocked:
+      'Tidak dapat menambahnya secara automatik. Jalankan ini dalam terminal: {cmd}',
     setAiSpellcheckDesc:
       'Gariskan perkataan yang salah ejaan semasa menaip dalam kotak sembang AI.',
     setAiOpenInNewDocs: 'Buka panel AI dalam dokumen baharu',
@@ -6710,6 +6813,12 @@ export const strings = {
     setDefaultAppSet: 'הגדרה כברירת מחדל',
     setDefaultAppOpenSettings: 'פתיחת הגדרות המערכת',
     setDefaultAppFailed: 'לא ניתן לשנות. יש להגדיר בהגדרות המערכת.',
+    setCliLink: 'כלי שורת פקודה',
+    setCliLinkDesc:
+      'מוסיף את הפקודה genoffice לטרמינל כדי שסקריפטים וסוכני בינה מלאכותית יוכלו להשתמש ב-UniWork Office.',
+    setCliLinkInstall: 'הוספה לטרמינל',
+    setCliLinkDone: 'genoffice זמין ב-{path}.',
+    setCliLinkBlocked: 'לא ניתן להוסיף אוטומטית. הריצו בטרמינל: {cmd}',
     setAiSpellcheckDesc: 'סימון מילים עם שגיאות כתיב בעת הקלדה בתיבת הצ׳אט של ה-AI.',
     setAiOpenInNewDocs: 'פתיחת לוח ה-AI במסמכים חדשים',
     setAiOpenInNewDocsDesc:
@@ -7083,6 +7192,12 @@ export const strings = {
     setDefaultAppSet: 'डिफ़ॉल्ट बनाएँ',
     setDefaultAppOpenSettings: 'सिस्टम सेटिंग खोलें',
     setDefaultAppFailed: 'बदला नहीं जा सका। कृपया सिस्टम सेटिंग में सेट करें।',
+    setCliLink: 'कमांड लाइन टूल',
+    setCliLinkDesc:
+      'टर्मिनल में genoffice कमांड जोड़ता है, ताकि स्क्रिप्ट और AI एजेंट UniWork Office का उपयोग कर सकें।',
+    setCliLinkInstall: 'टर्मिनल में जोड़ें',
+    setCliLinkDone: 'genoffice यहाँ उपलब्ध है: {path}।',
+    setCliLinkBlocked: 'अपने आप नहीं जोड़ा जा सका। टर्मिनल में यह चलाएँ: {cmd}',
     setAiSpellcheckDesc: 'AI चैट इनपुट में टाइप करते समय गलत वर्तनी वाले शब्दों को रेखांकित करें।',
     setAiOpenInNewDocs: 'नए दस्तावेज़ों में AI पैनल खोलें',
     setAiOpenInNewDocsDesc:
@@ -7623,6 +7738,12 @@ export const strings = {
     setDefaultAppSet: 'Đặt làm mặc định',
     setDefaultAppOpenSettings: 'Mở cài đặt hệ thống',
     setDefaultAppFailed: 'Không thể thay đổi. Vui lòng đặt trong cài đặt hệ thống.',
+    setCliLink: 'Công cụ dòng lệnh',
+    setCliLinkDesc:
+      'Thêm lệnh genoffice vào terminal để tập lệnh và trợ lý AI có thể dùng UniWork Office.',
+    setCliLinkInstall: 'Thêm vào terminal',
+    setCliLinkDone: 'genoffice có sẵn tại {path}.',
+    setCliLinkBlocked: 'Không thể tự động thêm. Hãy chạy lệnh này trong terminal: {cmd}',
     setAiOpenInNewDocs: 'Mở bảng AI trong tài liệu mới',
     setAiOpenInNewDocsDesc:
       'Khi tắt, tài liệu mới mở sẽ thu gọn bảng AI; chỉ cần một lần bấm để mở lại khi cần.',
@@ -7831,6 +7952,11 @@ export const strings = {
     setDefaultAppSet: '設為預設',
     setDefaultAppOpenSettings: '開啟系統設定',
     setDefaultAppFailed: '設定失敗，請在系統設定中手動更改。',
+    setCliLink: '命令列工具',
+    setCliLinkDesc: '將 genoffice 指令加入終端機，讓指令碼與 AI 助理可以使用 UniWork Office。',
+    setCliLinkInstall: '加入終端機',
+    setCliLinkDone: 'genoffice 已可使用：{path}。',
+    setCliLinkBlocked: '無法自動加入。請在終端機執行：{cmd}',
     setAiSpellcheckDesc: '在 AI 對話輸入框中輸入時標示拼錯的單字。',
     setAiOpenInNewDocs: '在新文件中開啟 AI 面板',
     setAiOpenInNewDocsDesc: '關閉後，新開啟的文件預設收合 AI 面板；需要時點一下即可展開。',

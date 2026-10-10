@@ -311,6 +311,20 @@ export interface DefaultAppStatus {
   manualOnly: boolean
 }
 
+/**
+ * The `genoffice` command line tool on the PATH. Created only when the user
+ * asks for it in Settings: `absent` (not set up), `present`, `blocked` (no
+ * writable folder, or another `genoffice` is in the way; `manual` is the
+ * command to finish by hand), `unsupported` (dev run, temporary mount).
+ */
+export interface CliLinkState {
+  state: 'unsupported' | 'absent' | 'present' | 'blocked'
+  location?: string
+  /** shell line that adds the link's folder to the PATH when the shell does not search it */
+  pathHint?: string
+  manual?: string
+}
+
 /** Settings "Test connection" answer: a failure carries its kind, never the provider's raw text */
 export interface AiConnectionTestResult {
   ok: boolean
@@ -508,6 +522,10 @@ export interface HomeApi {
   getDefaultAppStatus(): Promise<DefaultAppStatus>
   /** claim the Office types (mac/linux) or open the system Default Apps page (win); resolves to the refreshed status */
   setDefaultApp(): Promise<DefaultAppStatus>
+  /** where the `genoffice` command stands (Settings → General); nothing is written */
+  getCliLinkStatus(): Promise<CliLinkState>
+  /** put `genoffice` on the PATH (the Settings button); resolves to the refreshed state */
+  installCliLink(): Promise<CliLinkState>
   /** theme switched anywhere (broadcast from the main process) */
   onThemeChanged(handler: (theme: UiTheme) => void): () => void
   /** document page theme switched anywhere (broadcast from the main process) */
@@ -1059,6 +1077,8 @@ export const HOME_CHANNELS = {
   getDefaultSaveDir: 'home:get-default-save-dir',
   getDefaultAppStatus: 'home:get-default-app-status',
   setDefaultApp: 'home:set-default-app',
+  getCliLinkStatus: 'home:get-cli-link-status',
+  installCliLink: 'home:install-cli-link',
   pickDefaultSaveDir: 'home:pick-default-save-dir',
   openCreditUsage: 'home:open-credit-usage',
   probeAiHub: 'home:probe-ai-hub',

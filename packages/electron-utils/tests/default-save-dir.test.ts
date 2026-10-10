@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import {
   configuredDefaultSaveDir,
+  peekDefaultSaveDir,
   readDefaultSaveDirSetting,
   resolveDefaultSaveDir,
 } from '../src/index'
@@ -99,5 +100,39 @@ describe('configuredDefaultSaveDir', () => {
     }
     expect(configuredDefaultSaveDir(app)).toBe(join(documents, 'UniWork Office'))
     expect(existsSync(join(documents, 'UniWork Office'))).toBe(true)
+  })
+})
+
+describe('peekDefaultSaveDir', () => {
+  const makeApp = (userData: string, documents: string) => ({
+    getPath: (name: 'userData' | 'documents') => (name === 'userData' ? userData : documents),
+  })
+
+  it('names the fallback without creating it', () => {
+    const userData = join(root, 'userData')
+    const documents = join(root, 'Documents')
+    mkdirSync(userData, { recursive: true })
+    expect(peekDefaultSaveDir(makeApp(userData, documents))).toBe(join(documents, 'UniWork Office'))
+    expect(existsSync(documents)).toBe(false)
+  })
+
+  it('returns a configured folder, also one that does not exist yet, without creating it', () => {
+    const userData = join(root, 'userData')
+    mkdirSync(userData, { recursive: true })
+    const custom = join(root, 'my-files')
+    writeFileSync(join(userData, 'app-settings.json'), JSON.stringify({ defaultSaveDir: custom }))
+    expect(peekDefaultSaveDir(makeApp(userData, join(root, 'Documents')))).toBe(custom)
+    expect(existsSync(custom)).toBe(false)
+  })
+
+  it('degrades to the fallback when the configured path is a file', () => {
+    const userData = join(root, 'userData')
+    mkdirSync(userData, { recursive: true })
+    const blocker = join(root, 'blocker')
+    writeFileSync(blocker, 'x')
+    writeFileSync(join(userData, 'app-settings.json'), JSON.stringify({ defaultSaveDir: blocker }))
+    expect(peekDefaultSaveDir(makeApp(userData, join(root, 'Documents')))).toBe(
+      join(root, 'Documents', 'UniWork Office'),
+    )
   })
 })

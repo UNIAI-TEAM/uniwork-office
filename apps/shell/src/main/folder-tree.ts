@@ -96,12 +96,20 @@ export function isInsideRoot(root: string, path: string): boolean {
   return real === realRoot || real.startsWith(withTrailingSep(realRoot))
 }
 
-export function describeRoot(root: string): FolderRoot {
+/**
+ * `create: false` leaves a missing root alone and reports it usable (the first
+ * save creates it): the default save folder must not appear before it is used.
+ */
+export function describeRoot(root: string, opts: { create?: boolean } = {}): FolderRoot {
   let usable: boolean
   try {
-    mkdirSync(root, { recursive: true })
-    accessSync(root, constants.W_OK)
-    usable = statSync(root).isDirectory()
+    if (opts.create === false && !existsSync(root)) {
+      usable = true
+    } else {
+      mkdirSync(root, { recursive: true })
+      accessSync(root, constants.W_OK)
+      usable = statSync(root).isDirectory()
+    }
   } catch {
     usable = false
   }
