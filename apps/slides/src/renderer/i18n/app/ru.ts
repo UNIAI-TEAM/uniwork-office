@@ -5,6 +5,7 @@ export const ru = {
   appPhPromptSubtitle: 'Щелкните, чтобы добавить подзаголовок',
   appPhPromptBody: 'Щелкните, чтобы добавить текст',
   appStatusOpened: 'Открыт файл {name} ({count} слайдов)',
+  appStatusOpenedOne: 'Открыт файл {name} (1 слайд)',
   appStatusNewBlank: 'Создана пустая презентация',
   appStatusSaved: 'Сохранено',
   appStatusSaveFailed: 'Не удалось сохранить: {error}',

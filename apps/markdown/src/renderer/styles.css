@@ -2279,9 +2279,53 @@ html.genoffice-popover-open .ribbon-tabs {
   box-shadow: 0 0 0 3px var(--md-focus-ring-blue);
 }
 
-.md-diagram-preview svg {
+.md-diagram-preview img {
+  display: inline-block;
   max-width: 100%;
   height: auto;
+  vertical-align: middle;
+}
+
+/* ---- raw HTML kept verbatim (rawHtml.ts): source shown as text, never rendered ---- */
+
+.doc-editor .md-raw-html {
+  margin: 0.8em 0;
+  padding: 6px 10px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 6px;
+  background: var(--md-code-bg);
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  cursor: default;
+}
+
+.doc-editor .md-raw-html code {
+  display: block;
+  background: none;
+  padding: 0;
+  white-space: pre-wrap;
+  font-size: 0.8em;
+  line-height: 1.6;
+}
+
+.doc-editor .md-raw-html-comment {
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+.doc-editor .md-raw-html.ProseMirror-selectednode {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.doc-editor .md-raw-html-inline {
+  font-family: 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 0.8em;
+  color: var(--text-secondary);
+  background: var(--md-code-inline-bg);
+  border-radius: 4px;
+  padding: 0.1em 0.25em;
 }
 
 .md-diagram-error {
@@ -3145,4 +3189,13 @@ div.tiptap-mathematics-render {
 .image-host-btn:disabled {
   opacity: 0.6;
   cursor: default;
+}
+
+/* web frame, host withheld the save grant (capabilities.ts `save`) */
+.status-view-only {
+  padding: 1px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  color: var(--text-secondary);
+  font-weight: 500;
 }

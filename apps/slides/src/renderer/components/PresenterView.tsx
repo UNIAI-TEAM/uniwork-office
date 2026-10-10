@@ -6,6 +6,9 @@
  * number/animation cursor/blackout/ink are all broadcast over IPC (absolute state, the audience
  * side seeks idempotently), and audience clicks/keys are sent back here for arbitration.
  * Single screen: this window only.
+ * Web: a browser opens a window only from a click, so the top bar offers "audience window"
+ * (slidesApi.presenterOpenAudience); the user drags it to the projector (or the Window
+ * Management API places it) and closing it leaves this view running single-screen.
  *
  * Layout: top bar (end show/swap displays/switch to normal show),
  * left column timer (pause/reset) + clock → big frame → toolbar (pen/laser/clear ink/blackout)
@@ -32,9 +35,11 @@ import {
   type ShowScreen,
 } from '../show-keys'
 import { liftShowCurtain } from '../show-actions'
+import { cap, isWeb } from '../capabilities'
 
 /** Layout constants (aligned with styles.css) */
-const IS_MAC = navigator.platform.toLowerCase().includes('mac')
+// macOS Electron snaps the native window instead of HTML fullscreen; a browser always uses HTML fullscreen
+const IS_MAC = navigator.platform.toLowerCase().includes('mac') && !isWeb()
 const SIDE_W = 340
 const TOP_H = 44
 const TIMER_H = 40
@@ -94,6 +99,9 @@ export function PresenterView({
   const navModeRef = useRef<'fresh' | 'all'>('fresh')
   /** Whether an external audience window was opened (swap-displays button availability) */
   const [hasAudience, setHasAudience] = useState(false)
+  /** web: the browser refused the audience popup (the hint says how to allow it) */
+  const [popupBlocked, setPopupBlocked] = useState(false)
+  const openAudience = window.slidesApi.presenterOpenAudience
 
   // ── Timer (pausable/resettable) and clock ──────────────────────────────────
   const [elapsed, setElapsed] = useState(0)
@@ -150,11 +158,27 @@ export function PresenterView({
     void window.slidesApi.presenterStart().then((r) => {
       if (!disposed) setHasAudience(r.audience)
     })
+    // web: the audience window opens from the button and may be closed by the user at any time
+    const offAudience = window.slidesApi.onPresenterAudience?.((open) => {
+      if (disposed) return
+      setHasAudience(open)
+      if (open) setPopupBlocked(false)
+    })
     return () => {
       disposed = true
+      offAudience?.()
       void window.slidesApi.presenterEnd()
     }
   }, [])
+
+  const toggleAudience = () => {
+    if (hasAudience) {
+      void window.slidesApi.presenterCloseAudience?.()
+      return
+    }
+    // no await before the call: the browser opens the window only inside this click
+    void openAudience?.().then((r) => setPopupBlocked(r.blocked === true))
+  }
 
   // Broadcast show state: epoch change = the new page's animations are loaded and loadedRef matches the player cursor
   useEffect(() => {
@@ -413,21 +437,45 @@ export function PresenterView({
         >
           ⊗ {t('panePresenterEndShow')}
         </button>
-        <button
-          className="pv-top-btn"
-          disabled={!hasAudience}
-          onClick={() => void window.slidesApi.presenterSwap()}
-          data-tip={hasAudience ? t('panePresenterSwapTip') : t('panePresenterNoSecond')}
-        >
-          ⇄ {t('panePresenterSwap')}
-        </button>
+        {cap('presenterWindow') && openAudience && (
+          <button
+            className={`pv-top-btn${hasAudience ? ' pv-top-on' : ''}`}
+            onClick={toggleAudience}
+            data-tip={t(
+              hasAudience ? 'panePresenterCloseAudienceTip' : 'panePresenterOpenAudienceTip',
+            )}
+          >
+            <span aria-hidden>▣ </span>
+            {t(hasAudience ? 'panePresenterCloseAudience' : 'panePresenterOpenAudience')}
+          </button>
+        )}
+        {cap('presenterWindow') && (
+          <button
+            className="pv-top-btn"
+            disabled={!hasAudience}
+            onClick={() => void window.slidesApi.presenterSwap()}
+            data-tip={hasAudience ? t('panePresenterSwapTip') : t('panePresenterNoSecond')}
+          >
+            ⇄ {t('panePresenterSwap')}
+          </button>
+        )}
         {onUseSlideShow && (
           <button className="pv-top-btn" onClick={useShow} data-tip={t('panePresenterUseShowTip')}>
             ▤ {t('panePresenterUseShow')}
           </button>
         )}
         <div className="pv-top-spacer" />
-        {!hasAudience && <span className="pv-top-hint">{t('panePresenterSingleHint')}</span>}
+        {!hasAudience && (
+          <span className="pv-top-hint" role={popupBlocked ? 'alert' : undefined}>
+            {t(
+              popupBlocked
+                ? 'panePresenterPopupBlocked'
+                : openAudience
+                  ? 'panePresenterWebHint'
+                  : 'panePresenterSingleHint',
+            )}
+          </span>
+        )}
       </div>
       <div className="pv-body">
         <div className="pv-left">

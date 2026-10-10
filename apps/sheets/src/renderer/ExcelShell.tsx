@@ -107,6 +107,8 @@ import { HeaderFooterDialog, type HeaderFooterResult } from './HeaderFooterDialo
 import type { PrintPreviewHost } from './page-layout-actions'
 import { PrintDialog } from './PrintDialog'
 import type { HeaderFooterParts } from './edit-journal'
+import { cap } from './capabilities'
+import { isNarrowViewport } from './narrow-layout'
 import { useModalDialog } from './modal-dialog'
 import type { SelectedTableRibbon } from './table-design-actions'
 import type { TableOptionKey } from './table-design'
@@ -549,10 +551,24 @@ export function ExcelShell({
     expand: t('appRibbonExpand'),
   })
   // Persisted so a closed AI panel stays closed on next launch (docs/slides parity)
-  const [isCopilotOpen, setIsCopilotOpen] = useState(() =>
-    aiPanelInitiallyOpen('ai-sheets-show-ai'),
-  )
+  // A narrow viewport starts with the dock collapsed (it would squeeze the grid to a sliver); that
+  // automatic collapse is not the user's choice, so it is not remembered.
+  const autoCollapsedRef = useRef(false)
+  const [isCopilotOpen, setIsCopilotOpenState] = useState(() => {
+    if (!cap('ai') || !aiPanelInitiallyOpen('ai-sheets-show-ai')) return false
+    if (!isNarrowViewport()) return true
+    autoCollapsedRef.current = true
+    return false
+  })
+  // without the `ai` capability (web frame) the dock never opens
+  const setIsCopilotOpen: typeof setIsCopilotOpenState = (next) => {
+    if (cap('ai')) setIsCopilotOpenState(next)
+  }
   useEffect(() => {
+    if (autoCollapsedRef.current) {
+      if (!isCopilotOpen) return
+      autoCollapsedRef.current = false
+    }
     rememberAiPanelOpen('ai-sheets-show-ai', isCopilotOpen)
   }, [isCopilotOpen])
   useEffect(() => {
@@ -834,7 +850,7 @@ export function ExcelShell({
 
   return (
     <main
-      className={`app-shell ${isCopilotOpen ? '' : 'copilot-collapsed'}`}
+      className={`app-shell ${!cap('ai') ? 'no-copilot' : isCopilotOpen ? '' : 'copilot-collapsed'}`}
       inert={openingWorkbook}
       aria-busy={openingWorkbook}
     >
@@ -844,26 +860,30 @@ export function ExcelShell({
           aria-label={t('appScopeWorkbook')}
           onDoubleClick={collapse.onTabsDoubleClick}
         >
-          <button
-            type="button"
-            className="qa-btn"
-            data-tip={t('appSaveTitle')}
-            aria-label={t('appSaveTitle')}
-            disabled={!canSave}
-            onClick={onSave}
-          >
-            <SaveIcon />
-          </button>
-          <button
-            type="button"
-            className="qa-btn"
-            data-tip={saveAsTitle}
-            aria-label={saveAsTitle}
-            disabled={!canSaveAs}
-            onClick={onSaveAs}
-          >
-            <SaveAsIcon />
-          </button>
+          {cap('save') && (
+            <button
+              type="button"
+              className="qa-btn"
+              data-tip={t('appSaveTitle')}
+              aria-label={t('appSaveTitle')}
+              disabled={!canSave}
+              onClick={onSave}
+            >
+              <SaveIcon />
+            </button>
+          )}
+          {cap('saveAs') && (
+            <button
+              type="button"
+              className="qa-btn"
+              data-tip={saveAsTitle}
+              aria-label={saveAsTitle}
+              disabled={!canSaveAs}
+              onClick={onSaveAs}
+            >
+              <SaveAsIcon />
+            </button>
+          )}
           <button
             type="button"
             className="qa-btn"
@@ -884,19 +904,21 @@ export function ExcelShell({
           >
             <RedoIcon />
           </button>
-          <label
-            className={`autosave-toggle ${autoSave ? 'on' : ''} ${autoSaveLockedTip ? 'disabled' : ''}`}
-            data-tip={autoSaveLockedTip ?? t('appAutoSaveTip')}
-          >
-            <span className="autosave-knob" />
-            <span className="autosave-text">{t('appAutoSave')}</span>
-            <input
-              type="checkbox"
-              checked={autoSave}
-              disabled={autoSaveLockedTip !== null}
-              onChange={(e) => onAutoSaveChange(e.target.checked)}
-            />
-          </label>
+          {cap('autoSave') && (
+            <label
+              className={`autosave-toggle ${autoSave ? 'on' : ''} ${autoSaveLockedTip ? 'disabled' : ''}`}
+              data-tip={autoSaveLockedTip ?? t('appAutoSaveTip')}
+            >
+              <span className="autosave-knob" />
+              <span className="autosave-text">{t('appAutoSave')}</span>
+              <input
+                type="checkbox"
+                checked={autoSave}
+                disabled={autoSaveLockedTip !== null}
+                onChange={(e) => onAutoSaveChange(e.target.checked)}
+              />
+            </label>
+          )}
           <span className="qa-sep" aria-hidden="true" />
           {visibleTabs.map((tab) => (
             <button
@@ -956,33 +978,35 @@ export function ExcelShell({
 
       {/* AI panel docks on the left, full height under the ribbon (unified with docs) */}
       <div className="sheet-body">
-        <AiChatPanel
-          isOpen={isCopilotOpen}
-          hasContent={sheetHasContent}
-          chat={chat}
-          {...(historicChat !== undefined ? { historicChat } : {})}
-          attachments={attachments}
-          attachNotice={attachNotice}
-          onPickAttachments={onPickAttachments}
-          onAddAttachmentPaths={onAddAttachmentPaths}
-          onAddPastedImage={onAddPastedImage}
-          onRemoveAttachment={onRemoveAttachment}
-          prompt={prompt}
-          preview={preview}
-          aiBusy={aiBusy}
-          onPromptChange={onPromptChange}
-          onSend={onSend}
-          onStop={onStop}
-          onNewChat={onNewChat}
-          onUndo={onUndo}
-          scopeRange={aiScopeRange}
-          scopeColumns={aiScopeColumns}
-          scopeLocked={aiScopeLocked}
-          onScopeDismiss={onAiScopeDismiss}
-          onCitation={onAiCitation}
-          onExpand={() => setIsCopilotOpen(true)}
-          onCollapse={() => setIsCopilotOpen(false)}
-        />
+        {cap('ai') && (
+          <AiChatPanel
+            isOpen={isCopilotOpen}
+            hasContent={sheetHasContent}
+            chat={chat}
+            {...(historicChat !== undefined ? { historicChat } : {})}
+            attachments={attachments}
+            attachNotice={attachNotice}
+            onPickAttachments={onPickAttachments}
+            onAddAttachmentPaths={onAddAttachmentPaths}
+            onAddPastedImage={onAddPastedImage}
+            onRemoveAttachment={onRemoveAttachment}
+            prompt={prompt}
+            preview={preview}
+            aiBusy={aiBusy}
+            onPromptChange={onPromptChange}
+            onSend={onSend}
+            onStop={onStop}
+            onNewChat={onNewChat}
+            onUndo={onUndo}
+            scopeRange={aiScopeRange}
+            scopeColumns={aiScopeColumns}
+            scopeLocked={aiScopeLocked}
+            onScopeDismiss={onAiScopeDismiss}
+            onCitation={onAiCitation}
+            onExpand={() => setIsCopilotOpen(true)}
+            onCollapse={() => setIsCopilotOpen(false)}
+          />
+        )}
         <div className="sheet-main">
           <section className="workbook-area">
             <div id="univer-container" className="spreadsheet" />
@@ -1003,7 +1027,7 @@ export function ExcelShell({
               </div>
             )}
           </section>
-          {aiSelectionAskAnchor && aiScopeRange && !aiBusy && (
+          {cap('ai') && aiSelectionAskAnchor && aiScopeRange && !aiBusy && (
             <AiSelectionAsk
               anchor={aiSelectionAskAnchor}
               range={aiScopeRange}
@@ -2380,14 +2404,16 @@ function Ribbon({
               <ToolSymbol symbol="✧" />
               {t('appIcons')}
             </button>
-            <button
-              className="styles-row as-button"
-              data-tip={t('appScreenshot')}
-              onClick={() => onCommand('insert-screenshot')}
-            >
-              <ToolSymbol symbol="⧉" />
-              {t('appScreenshot')}
-            </button>
+            {cap('screenshot') && (
+              <button
+                className="styles-row as-button"
+                data-tip={t('appScreenshot')}
+                onClick={() => onCommand('insert-screenshot')}
+              >
+                <ToolSymbol symbol="⧉" />
+                {t('appScreenshot')}
+              </button>
+            )}
           </div>
         </RibbonGroup>
         <RibbonGroup label={t('appGroupCheckbox')}>
@@ -2954,16 +2980,18 @@ function Ribbon({
             symbol="⊞"
             onClick={() => onCommand('pivot-open')}
           />
-          <RibbonButton
-            large
-            label={t('appRefresh')}
-            detail={onIsSelectionInPivot() ? t('appRefreshHintIn') : t('appRefreshHintOut')}
-            symbol="⟳"
-            onClick={() => {
-              const err = onRefreshPivot()
-              if (err) onCommand(`error:${err}`)
-            }}
-          />
+          {cap('pivotRefresh') && (
+            <RibbonButton
+              large
+              label={t('appRefresh')}
+              detail={onIsSelectionInPivot() ? t('appRefreshHintIn') : t('appRefreshHintOut')}
+              symbol="⟳"
+              onClick={() => {
+                const err = onRefreshPivot()
+                if (err) onCommand(`error:${err}`)
+              }}
+            />
+          )}
         </RibbonGroup>
         <RibbonGroup label={t('appGroupGetData')}>
           <div className="row-stack">
@@ -2975,22 +3003,26 @@ function Ribbon({
               <ToolSymbol symbol="🗎" />
               {t('appFromTextCsv')}
             </button>
-            <button
-              className="styles-row as-button"
-              data-tip={t('appMergeWorkbooksTip')}
-              onClick={() => onCommand('merge-workbooks')}
-            >
-              <ToolSymbol symbol="⧉" />
-              {t('appMergeWorkbooks')}
-            </button>
-            <button
-              className="styles-row as-button"
-              data-tip={t('appRefreshAllTitle')}
-              onClick={() => onCommand('refresh-all')}
-            >
-              <ToolSymbol symbol="⟳" />
-              {t('appRefreshAll')}
-            </button>
+            {cap('mergeWorkbooks') && (
+              <button
+                className="styles-row as-button"
+                data-tip={t('appMergeWorkbooksTip')}
+                onClick={() => onCommand('merge-workbooks')}
+              >
+                <ToolSymbol symbol="⧉" />
+                {t('appMergeWorkbooks')}
+              </button>
+            )}
+            {cap('pivotRefresh') && (
+              <button
+                className="styles-row as-button"
+                data-tip={t('appRefreshAllTitle')}
+                onClick={() => onCommand('refresh-all')}
+              >
+                <ToolSymbol symbol="⟳" />
+                {t('appRefreshAll')}
+              </button>
+            )}
           </div>
         </RibbonGroup>
         <RibbonGroup label={t('appGroupSortFilter')}>
@@ -3332,77 +3364,79 @@ function Ribbon({
     : [...fontSizes, echoSize].sort((a, b) => a - b)
   return (
     <div className="ribbon" data-ribbon-body="">
-      <RibbonGroup label={t('appGroupAiAssistant')}>
-        <button
-          className={`ribbon-tool as-button large ai-entry ${aiOpen ? 'active' : ''}`}
-          data-tip={t('aiOpenAssistant')}
-          onClick={onAiToggle}
-        >
-          <span className="tool-icon-row">
-            <GensparkMark size={26} />
-          </span>
-          <span>
-            <strong>AI</strong>
-          </span>
-        </button>
-        <button
-          className="ribbon-tool as-button large ai-entry"
-          disabled={!sheetHasContent}
-          data-tip={t('aiCheckBtn')}
-          onClick={() => onAiRun(t('aiCheckPrompt'))}
-        >
-          <span className="tool-icon-row">
-            <span className="ai-feature-icon" aria-hidden="true">
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M11 3.25C15.2802 3.25 18.75 6.71979 18.75 11C18.75 15.2802 15.2802 18.75 11 18.75C6.71979 18.75 3.25 15.2802 3.25 11C3.25 6.71979 6.71979 3.25 11 3.25Z" />
-                <path
-                  d="M7.5 10.8235L9.64097 12.9645C9.93755 13.2611 10.4177 13.2634 10.7171 12.9697L14.7647 9"
+      {cap('ai') && (
+        <RibbonGroup label={t('appGroupAiAssistant')}>
+          <button
+            className={`ribbon-tool as-button large ai-entry ${aiOpen ? 'active' : ''}`}
+            data-tip={t('aiOpenAssistant')}
+            onClick={onAiToggle}
+          >
+            <span className="tool-icon-row">
+              <GensparkMark size={26} />
+            </span>
+            <span>
+              <strong>AI</strong>
+            </span>
+          </button>
+          <button
+            className="ribbon-tool as-button large ai-entry"
+            disabled={!sheetHasContent}
+            data-tip={t('aiCheckBtn')}
+            onClick={() => onAiRun(t('aiCheckPrompt'))}
+          >
+            <span className="tool-icon-row">
+              <span className="ai-feature-icon" aria-hidden="true">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
                   strokeLinecap="round"
-                />
-                <path d="M20 20.5L16.5 17" strokeLinecap="round" />
-              </svg>
+                  strokeLinejoin="round"
+                >
+                  <path d="M11 3.25C15.2802 3.25 18.75 6.71979 18.75 11C18.75 15.2802 15.2802 18.75 11 18.75C6.71979 18.75 3.25 15.2802 3.25 11C3.25 6.71979 6.71979 3.25 11 3.25Z" />
+                  <path
+                    d="M7.5 10.8235L9.64097 12.9645C9.93755 13.2611 10.4177 13.2634 10.7171 12.9697L14.7647 9"
+                    strokeLinecap="round"
+                  />
+                  <path d="M20 20.5L16.5 17" strokeLinecap="round" />
+                </svg>
+              </span>
             </span>
-          </span>
-          <span>
-            <strong>{t('aiCheckBtn')}</strong>
-          </span>
-        </button>
-        <button
-          className="ribbon-tool as-button large ai-entry"
-          disabled={!sheetHasContent}
-          data-tip={t('aiAnalyzeBtn')}
-          onClick={() => onAiRun(t('aiAnalyzePrompt'))}
-        >
-          <span className="tool-icon-row">
-            <span className="ai-feature-icon" aria-hidden="true">
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M3.88589 14.2073H8.48682" strokeLinecap="round" />
-                <path d="M3.88589 19.0112H8.48682" strokeLinecap="round" />
-                <path d="M3.88589 9.40369H11.692" strokeLinecap="round" />
-                <path d="M3.88589 4.59998H19.1645" strokeLinecap="round" />
-                <path d="M15.1995 10.5445C15.3784 10.0908 16.0206 10.0908 16.1996 10.5445L16.706 11.8286C17.0338 12.6598 17.6918 13.3178 18.523 13.6456L19.8071 14.1521C20.2608 14.331 20.2608 14.9732 19.8071 15.1522L18.523 15.6586C17.6918 15.9864 17.0338 16.6444 16.706 17.4756L16.1996 18.7597C16.0206 19.2134 15.3784 19.2134 15.1995 18.7597L14.693 17.4756C14.3652 16.6444 13.7072 15.9864 12.876 15.6586L11.592 15.1522C11.1382 14.9732 11.1382 14.331 11.592 14.1521L12.876 13.6456C13.7072 13.3178 14.3652 12.6598 14.693 11.8286L15.1995 10.5445Z" />
-              </svg>
+            <span>
+              <strong>{t('aiCheckBtn')}</strong>
             </span>
-          </span>
-          <span>
-            <strong>{t('aiAnalyzeBtn')}</strong>
-          </span>
-        </button>
-      </RibbonGroup>
+          </button>
+          <button
+            className="ribbon-tool as-button large ai-entry"
+            disabled={!sheetHasContent}
+            data-tip={t('aiAnalyzeBtn')}
+            onClick={() => onAiRun(t('aiAnalyzePrompt'))}
+          >
+            <span className="tool-icon-row">
+              <span className="ai-feature-icon" aria-hidden="true">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M3.88589 14.2073H8.48682" strokeLinecap="round" />
+                  <path d="M3.88589 19.0112H8.48682" strokeLinecap="round" />
+                  <path d="M3.88589 9.40369H11.692" strokeLinecap="round" />
+                  <path d="M3.88589 4.59998H19.1645" strokeLinecap="round" />
+                  <path d="M15.1995 10.5445C15.3784 10.0908 16.0206 10.0908 16.1996 10.5445L16.706 11.8286C17.0338 12.6598 17.6918 13.3178 18.523 13.6456L19.8071 14.1521C20.2608 14.331 20.2608 14.9732 19.8071 15.1522L18.523 15.6586C17.6918 15.9864 17.0338 16.6444 16.706 17.4756L16.1996 18.7597C16.0206 19.2134 15.3784 19.2134 15.1995 18.7597L14.693 17.4756C14.3652 16.6444 13.7072 15.9864 12.876 15.6586L11.592 15.1522C11.1382 14.9732 11.1382 14.331 11.592 14.1521L12.876 13.6456C13.7072 13.3178 14.3652 12.6598 14.693 11.8286L15.1995 10.5445Z" />
+                </svg>
+              </span>
+            </span>
+            <span>
+              <strong>{t('aiAnalyzeBtn')}</strong>
+            </span>
+          </button>
+        </RibbonGroup>
+      )}
       <RibbonGroup label={t('appGroupClipboard')}>
         <button
           className="ribbon-tool as-button large"

@@ -183,6 +183,7 @@ import {
 } from './univer-state'
 import type { SheetOutlineState } from './outline-model'
 import { isManualCalculation } from './calc-options'
+import { cap } from './capabilities'
 import { noteFormulaStreamChunk, requestFullRecalcAfterStream } from './formula-stream-hold'
 import { SharedFormulaLookup, indexedFormulas } from './shared-formula-index'
 import { threadStore } from './threaded-comments'
@@ -2509,6 +2510,8 @@ export function queueFormulaRecalc(
 ): void {
   const state = lazyWorkbookRef.current
   if (!state || state.formulaMode || state.closure.status !== 'unavailable') return
+  // web frame: the IronCalc fallback is hidden (CONTRACT C11); cached values stand
+  if (!cap('recalcFallback')) return
   // minimal states (tests, partial teardown) may carry no recalc slot
   if (!state.recalc || state.recalc.failures >= RECALC_MAX_FAILURES) return
   if (state.recalc.engineOverBudget) return

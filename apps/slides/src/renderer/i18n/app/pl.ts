@@ -5,6 +5,7 @@ export const pl = {
   appPhPromptSubtitle: 'Kliknij, aby dodać podtytuł',
   appPhPromptBody: 'Kliknij, aby dodać tekst',
   appStatusOpened: 'Otwarto {name} ({count} slajdów)',
+  appStatusOpenedOne: 'Otwarto {name} (1 slajd)',
   appStatusNewBlank: 'Utworzono pustą prezentację',
   appStatusSaved: 'Zapisano',
   appStatusSaveFailed: 'Zapisywanie nie powiodło się: {error}',

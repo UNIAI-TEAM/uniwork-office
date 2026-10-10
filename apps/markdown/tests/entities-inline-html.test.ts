@@ -121,20 +121,24 @@ describe('HTML entities', () => {
 })
 
 describe('inline HTML tags', () => {
-  it('drops inert tags and parses the markdown inside them', () => {
+  // Tags without a schema mapping stay raw HTML (rawHtml.ts): shown as their source and
+  // saved byte-identically even when their block is edited, instead of being dropped
+  it('keeps inert tags as raw HTML source', () => {
     const out = html(VUE_SPAN)
-    expect(out).not.toContain('`')
-    expect(out).toBe('<p><code>this.$emitemit</code> の呼び出し</p>')
+    expect(out).toContain('&lt;span class="options-api"&gt;`this.$emit`&lt;/span&gt;')
+    expect(out).toContain('</span> の呼び出し</p>')
   })
 
-  it('keeps the content of tags without a schema mapping', () => {
-    expect(
-      html(
-        'A <font color="red">**bold**</font> <center>*c*</center> <abbr title="t">ab</abbr> <small>sm</small> <big>bg</big> <mark>mk</mark> <kbd>**k**</kbd> <sub>s</sub> <sup>p</sup> <div>*dv*</div> <span/> <!-- c -->',
-      ),
-    ).toBe(
-      '<p>A <strong>bold</strong> <em>c</em> ab sm bg mk <strong>k</strong> s p <em>dv</em>  </p>',
-    )
+  it('keeps tags without a schema mapping as raw HTML source', () => {
+    const out = html('A <font color="red">**bold**</font> <kbd>k</kbd> <span/> <!-- c -->')
+    for (const raw of [
+      '&lt;font color="red"&gt;**bold**&lt;/font&gt;',
+      '&lt;kbd&gt;k&lt;/kbd&gt;',
+      '&lt;span/&gt;',
+      '&lt;!-- c --&gt;',
+    ])
+      expect(out).toContain(raw)
+    expect(out).not.toContain('<strong>')
   })
 
   it('leaves names marked accepts but CommonMark does not as literal text', () => {

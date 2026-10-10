@@ -1566,6 +1566,31 @@ export const de = {
   appVisualFlipV: 'Vertikal spiegeln',
   appVisualFlipH: 'Horizontal spiegeln',
   appCtxPasteVisual: 'Bild oder Form einfügen',
+  // web frame (UNI-1016): engine-unavailable screen, view-only, save conflicts
+  appWebEngineTitle: 'Diese Arbeitsmappe kann noch nicht im Web geöffnet werden',
+  appWebEngineBody:
+    'Die Webversion von UniWork Sheets erhält ihre Tabellen-Engine erst noch. Öffnen Sie diese Arbeitsmappe bis dahin in der UniWork-Desktop-App.',
+  appWebEngineHint: 'Ihre Datei wurde nicht verändert.',
+  appWebViewOnly: 'Nur Ansicht: Sie können Änderungen an dieser Arbeitsmappe nicht speichern.',
+  appWebConflictTitle: 'Diese Arbeitsmappe wurde an anderer Stelle geändert',
+  appWebConflictBody:
+    'Während Sie bearbeitet haben, wurde eine neuere Version gespeichert. Überschreiben Sie sie mit Ihrer Version oder laden Sie die neueste Version neu (nicht gespeicherte Änderungen gehen verloren).',
+  appWebConflictOverwrite: 'Überschreiben',
+  appWebConflictReload: 'Neueste Version laden',
+  appWebConflictNotSaved: 'Nicht gespeichert: Es gibt eine neuere Version.',
+  appWebDiscardTitle: 'Nicht gespeicherte Änderungen verwerfen?',
+  appWebDiscardBody:
+    'Beim Öffnen einer anderen Arbeitsmappe gehen nicht gespeicherte Änderungen verloren.',
+  appWebDiscard: 'Verwerfen',
+  appWebCancel: 'Abbrechen',
+  appWebSaveFailed: 'Speichern in UniWork fehlgeschlagen.',
+  appWebTooLargeTitle: 'Diese Arbeitsmappe ist zu groß für das Web',
+  appWebTooLargeBody:
+    'Sie überschreitet die Größe, die die Web-Tabellenkalkulation verarbeitet, und wird stattdessen im klassischen Tabelleneditor geöffnet.',
+  appWebEngineRestarted:
+    'Die Arbeitsmappen-Engine wurde unerwartet beendet und neu gestartet. Die Arbeitsmappe wurde aus der zuletzt gespeicherten Version erneut geöffnet; Ihre nicht gespeicherten Änderungen bleiben erhalten – speichern Sie bald.',
+  appWebSavedReopenFailed:
+    'Ihre Änderungen wurden in UniWork gespeichert, aber die Arbeitsmappe konnte hier nicht erneut geöffnet werden. Laden Sie den Editor neu, um weiterzuarbeiten.',
   appAutoSaveUniworkOff:
     'Automatisches Speichern ist für UniWork-Dokumente ausgeschaltet. Verwenden Sie „Speichern“, um eine neue Version zu speichern.',
 } satisfies Record<keyof typeof zh, string>

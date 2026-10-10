@@ -198,6 +198,7 @@ import { createMergeSkill } from './ai/merge-skill'
 import { mergeAttachedWorkbooks } from './merge-workbooks'
 import { createSearchSkill } from './ai/search-skill'
 import { createImageSkill } from './ai/image-skill'
+import { gateSkill } from './ai/skill-gate'
 import { ATTACHMENT_IMAGE_EXTS } from '../shared/desktop-api'
 import type {
   AttachmentAddResult,
@@ -330,6 +331,7 @@ import { installCfFormulaFold } from './cf-formula-fold'
 import { installSheetRenameFix } from './sheet-rename-fix'
 import { installArrowCollapse } from './arrow-collapse-fix'
 import { effectiveSheetProtection, installSheetProtectionGuard } from './sheet-protection'
+import { installViewOnlyGuard } from './view-only-guard'
 import type { SheetProtectionAllow } from '@genoffice/xlsx-gateway/gateway/xlsx-protection'
 import { installCtrlDragFill } from './ctrl-drag-fill'
 import { installContextSubmenuReopenFix } from './context-submenu-reopen-fix'
@@ -506,6 +508,9 @@ import {
   isEditableShape,
 } from './WorkbookVisuals'
 import { ChartFormatPane, SelectDataDialog } from './ChartPanels'
+import { cap, isViewOnly } from './capabilities'
+import { EngineUnavailableScreen } from './EngineUnavailableScreen'
+import { isEngineUnavailableError, isTooLargeError } from './web-engine'
 import { handleSheetsControl, type ControlRequest } from './control'
 import { bootOpenAction, createOpenStallTimer } from './workbook-open-stall'
 
@@ -636,7 +641,8 @@ export function App({
   // pending edits of the open workbook. The journal is read at tick time so
   // the interval stays stable; demo mode has no backing file and is skipped.
   useEffect(() => {
-    if (!autoSaveOn) return
+    // web frame: explicit save only (CONTRACT C10)
+    if (!autoSaveOn || !cap('autoSave')) return
     const tick = () => {
       const state = lazyWorkbookRef.current
       // Never while the in-cell editor is open (saving reloads the workbook
@@ -674,6 +680,8 @@ export function App({
   // renderer crash no longer costs everything since the last manual save. A normal
   // save removes the copy; reopening a file whose copy is newer offers Restore.
   useEffect(() => {
+    // web frame: no crash-recovery copy (C10, C11)
+    if (!cap('recoveryCopy')) return
     const tick = () => {
       const state = lazyWorkbookRef.current
       // The in-cell editor's pending text is not in the journal yet, a
@@ -711,6 +719,9 @@ export function App({
   const [fullLoadPrompt, setFullLoadPrompt] = useState<'ask' | 'tooLarge' | null>(null)
   const fullLoadRunning = useRef(false)
   const [message, setMessage] = useState(t('appReadyInitial'))
+  /// Web frame: the open failed because no workbook engine is installed
+  /// (web-engine.ts); the whole window shows EngineUnavailableScreen.
+  const [engineUnavailable, setEngineUnavailable] = useState<'engine' | 'too-large' | null>(null)
   // a language switch re-renders the static status texts ("Workbook fully loaded ...")
   const { lang: uiLang } = useI18n()
   useEffect(() => setMessage((prev) => retranslateStatus(prev, uiLang)), [uiLang])
@@ -1397,18 +1408,26 @@ export function App({
       systemSuffix: aiLangDirective,
       skill: composeSkills('sheets+files', '', [
         createWorkbookSkill(sheetsSkillDeps()),
-        createFilesSkill(availableAttachments),
-        createMergeSkill({
-          getAttachments: availableAttachments,
-          mergePaths: (paths) => {
-            const runtime = univerRef.current
-            if (!runtime) throw new Error(t('appMergeWorkbooksFailed'))
-            return mergeAttachedWorkbooks({ runtime, lazyWorkbookRef, setMessage }, paths)
-          },
-        }),
-        createSearchSkill(),
-        createImageSkill(() =>
-          imageGenerationAvailable(aiSettingsRef.current, gskLoggedInRef.current),
+        gateSkill(createFilesSkill(availableAttachments), () => cap('attachments')),
+        // the web frame offers only what the host grants (ai/skill-gate.ts): no workbook merge
+        // (C11), web search / image search / generation per grant
+        gateSkill(
+          createMergeSkill({
+            getAttachments: availableAttachments,
+            mergePaths: (paths) => {
+              const runtime = univerRef.current
+              if (!runtime) throw new Error(t('appMergeWorkbooksFailed'))
+              return mergeAttachedWorkbooks({ runtime, lazyWorkbookRef, setMessage }, paths)
+            },
+          }),
+          () => cap('mergeWorkbooks'),
+        ),
+        gateSkill(createSearchSkill(), () => cap('webSearch')),
+        createImageSkill(
+          () =>
+            cap('imageGeneration') &&
+            imageGenerationAvailable(aiSettingsRef.current, gskLoggedInRef.current),
+          () => cap('imageSearch'),
         ),
       ]),
       events: {
@@ -1557,6 +1576,9 @@ export function App({
     if (!settings) return false
     const config = settings.providers[settings.provider]
     if (!config?.model) return false
+    // web: the keys live in UniWork and never reach the frame (`apiKey` is always ''); a missing
+    // or refused key comes back as a typed state card (credential_missing, provider_auth_failed)
+    if (cap('aiCredentials')) return true
     // the built-in uniAI provider's key never lands in the settings file; the
     // main process injects it. Missing access surfaces as a request error.
     return settings.provider === 'genspark' || !!config.apiKey
@@ -1993,6 +2015,11 @@ export function App({
         setMessage(message)
         showToast(message, 'error')
       },
+    })
+    // web frame without the save grant: the grid refuses edits (no-op on the desktop)
+    const viewOnlyGuardDisposable = installViewOnlyGuard(runtime, (message) => {
+      setMessage(message)
+      showToast(message, 'error')
     })
     const ctrlDragFillDisposable = installCtrlDragFill(runtime)
     // A context-menu submenu re-hovered within Univer's close delay stays
@@ -3304,6 +3331,7 @@ export function App({
       selectionWrapGuardDisposable.dispose()
       arrowCollapseDisposable.dispose()
       sheetProtectionDisposable.dispose()
+      viewOnlyGuardDisposable.dispose()
       ctrlDragFillDisposable.dispose()
       contextSubmenuReopenDisposable.dispose()
       multiRowAutofitDisposable.dispose()
@@ -3547,7 +3575,7 @@ export function App({
       const candidate = after.file.sheets
         .map((sheet) => sheet.name.trim())
         .find((name) => name.length > 0 && !DEFAULT_SHEET_NAME_RE.test(name))
-      if (candidate) {
+      if (candidate && cap('autoRename')) {
         try {
           await window.desktopApi.autoRenameWorkbook(after.file.sessionId, candidate)
         } catch {
@@ -4325,7 +4353,8 @@ export function App({
     void loadRowOutlines(state, lazyWorkbookRef)
     // Pivot definitions load eagerly so refresh (a synchronous apply step)
     // never waits on IPC. Best effort: a failed parse just disables refresh.
-    for (const sheet of selected.sheets) {
+    // web frame without pivot support in the engine: no definitions, refresh stays hidden
+    for (const sheet of cap('pivotRefresh') ? selected.sheets : []) {
       for (const pivot of sheet.pivotTables) {
         if (pivot.cachePath === null) continue
         void window.desktopApi
@@ -4407,7 +4436,9 @@ export function App({
         // View-only UniWork document: Univer's workbook permission blocks
         // editing commands (the main process refuses a Save regardless). The
         // lock opens around the loader's own installs so the data still renders.
-        viewOnlyLock.set(selected.readOnly ? workbook : null)
+        // A web frame without the save grant is locked by the view-only command
+        // guard instead (view-only-guard.ts: no Univer permission dialog, its own toast).
+        viewOnlyLock.set(selected.readOnly && !isViewOnly() ? workbook : null)
         // Register existing file tables under their displayName so Univer
         // renders filter dropdowns and resolves structured references. The
         // journal stays empty for file tables, so failures are swallowed —
@@ -4595,6 +4626,10 @@ export function App({
       setEmptyCsvNotice(selected.emptyCsv === true)
       setMessage(selected.emptyCsv ? '' : t('appOpened', { name: selected.name }))
     } catch (error: unknown) {
+      if (isEngineUnavailableError(error) || isTooLargeError(error)) {
+        setEngineUnavailable(isTooLargeError(error) ? 'too-large' : 'engine')
+        return
+      }
       setMessage(error instanceof Error ? error.message : t('appOpenFailed'))
       finishOpening()
     }
@@ -4951,6 +4986,8 @@ export function App({
 
   return (
     <>
+      {/* an overlay, not a replacement: the grid stays mounted (Univer must not lose its container) */}
+      {engineUnavailable && <EngineUnavailableScreen reason={engineUnavailable} overlay />}
       <ToastHost />
       {recoveryPrompt && (
         <RecoveryDialog
@@ -5114,6 +5151,7 @@ export function App({
           workbookFile?.readOnly !== true &&
           (pendingEdits > 0 ||
             workbookFile?.unsavedNew === true ||
+            workbookFile?.restoredFromRecovery === true ||
             workbookFile?.uniworkBound === true)
         }
         onSave={() => void handleSave('save')}

@@ -38,6 +38,9 @@ export const VIEW_IMAGE_EVENT = 'markdown-view-image'
 
 export function resolveImageSrc(src: string, baseDir: string | null = imageBaseDir): string {
   if (!src) return src
+  // web frame: relative pictures are served from the document's asset store (host-mapped URLs)
+  const mapped = window.markdownApi?.resolveAssetUrl?.(src)
+  if (mapped) return mapped
   // ':' is legal in URL path segments (RFC 3986) — restore it after encoding so
   // Windows drive prefixes stay `C:` instead of the `C%3A` Chromium rejects
   const encodeSegment = (seg: string) => encodeURIComponent(seg).replace(/%3A/gi, ':')
@@ -56,6 +59,8 @@ export function resolveImageSrc(src: string, baseDir: string | null = imageBaseD
  * bakes display URLs into the stored document / serialized markdown.
  */
 export function unresolveImageSrc(src: string, baseDir: string | null = imageBaseDir): string {
+  const authored = window.markdownApi?.unresolveAssetUrl?.(src)
+  if (authored) return authored
   if (!src.startsWith('md-asset://')) return src
   let path = decodeURIComponent(src.slice('md-asset://'.length))
   // Windows drive paths were prefixed with '/' to form a valid URL path

@@ -256,6 +256,16 @@ export const pt = {
   panePresenterUseShowTip: 'Mudar para uma apresentação de slides normal nesta tela',
   panePresenterSingleHint:
     'Modo de tela única (conecte uma segunda tela para apresentar em tela cheia automaticamente)',
+  panePresenterOpenAudience: 'Janela do público',
+  panePresenterOpenAudienceTip:
+    'Abrir a apresentação numa janela separada que pode arrastar para o projetor',
+  panePresenterCloseAudience: 'Fechar janela do público',
+  panePresenterCloseAudienceTip: 'Fechar a janela do público; o modo de apresentador continua',
+  panePresenterWebHint:
+    'Abra a janela do público, arraste-a para o projetor e clique nela para ecrã inteiro',
+  panePresenterPopupBlocked:
+    'O navegador bloqueou a janela. Permita pop-ups para este site e tente novamente.',
+  paneAudienceFullscreenHint: 'Clique para mostrar em ecrã inteiro',
   panePresenterElapsed: 'Tempo decorrido',
   panePresenterPause: 'Pausar o cronômetro',
   panePresenterResume: 'Retomar o cronômetro',

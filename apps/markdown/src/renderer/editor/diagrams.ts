@@ -100,6 +100,18 @@ export function pinSvgIntrinsicSize(svg: string, width: number, height: number):
 }
 
 /**
+ * Editor preview source for a rendered diagram. The SVG is shown through an
+ * <img> (never injected into the editor DOM): an image document runs no
+ * scripts or event handlers and loads nothing external, so even an SVG that
+ * slipped past the renderer's own sanitizer cannot act in the (same-origin) frame.
+ */
+export function diagramSvgDataUrl(svg: string): string {
+  const box = parseSvgViewBox(svg)
+  const sized = box ? pinSvgIntrinsicSize(svg, box.width, box.height) : svg
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(sized)}`
+}
+
+/**
  * Rasterize a rendered diagram for the docx export.
  * Returns null when it cannot be drawn (missing/invalid viewBox, invalid size,
  * undecodable SVG, or no 2d context); callers fall back to the diagram source

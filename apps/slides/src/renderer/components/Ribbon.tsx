@@ -124,10 +124,12 @@ import { RibbonHomeTab } from './RibbonHomeTab'
 import { RibbonInsertTab } from './RibbonInsertTab'
 import { ShapeGalleryContent } from './ShapeGalleryPopover'
 import { autoContextTabForElement, contextTabForElement, type ContextTab } from './context-tabs'
+import { cap, isViewOnly, isWeb } from '../capabilities'
 
-const IS_MAC = navigator.platform.toLowerCase().includes('mac')
-/** shell tab mode: the tab strip above owns traffic lights / caption buttons */
-const IN_TAB = new URLSearchParams(window.location.search).get('mode') === 'tab'
+/** Electron on macOS: file commands live in the native menu bar, traffic lights sit in the tab row */
+const IS_MAC = navigator.platform.toLowerCase().includes('mac') && !isWeb()
+/** shell tab mode (the tab strip above owns traffic lights / caption buttons) or the web frame (no window chrome) */
+const IN_TAB = new URLSearchParams(window.location.search).get('mode') === 'tab' || isWeb()
 
 type MainTab =
   | 'file'
@@ -141,8 +143,8 @@ type MainTab =
   | 'review'
   | 'view'
 
-// Mac has no "File" tab (file operations go through the native menu), Windows does
-const TABS: readonly MainTab[] = IS_MAC
+// Mac has no "File" tab (file operations go through the native menu), Windows and the web do
+const ALL_TABS: readonly MainTab[] = IS_MAC
   ? ['home', 'insert', 'draw', 'design', 'transitions', 'animations', 'slideShow', 'review', 'view']
   : [
       'file',
@@ -156,6 +158,13 @@ const TABS: readonly MainTab[] = IS_MAC
       'review',
       'view',
     ]
+/** a view-only web frame (no save grant) keeps only the tabs that do not edit the deck */
+const VIEW_ONLY_TABS: readonly MainTab[] = ['file', 'slideShow', 'view']
+
+/** read at render time: the host's save grant lands after the module loads */
+function mainTabs(): readonly MainTab[] {
+  return isViewOnly() ? VIEW_ONLY_TABS : ALL_TABS
+}
 
 const TAB_LABEL: Record<MainTab | ContextTab, StringKey> = {
   file: 'ribbonTabFile',
@@ -1256,10 +1265,12 @@ export function Ribbon({
   canDistribute,
 }: Props) {
   const { t } = useI18n()
-  const contextTab = contextTabForElement(contextElementType ?? null)
-  const autoContextTab = autoContextTabForElement(contextElementType ?? null)
+  // view-only web frame: no format tabs (they only edit) and the show tab first
+  const viewOnly = isViewOnly()
+  const contextTab = viewOnly ? null : contextTabForElement(contextElementType ?? null)
+  const autoContextTab = viewOnly ? null : autoContextTabForElement(contextElementType ?? null)
 
-  const [tab, setTab] = useState<MainTab | ContextTab>('home')
+  const [tab, setTab] = useState<MainTab | ContextTab>(() => (viewOnly ? 'slideShow' : 'home'))
   const [fileOpen, setFileOpen] = useState(false)
   const [colorOpen, setColorOpen] = useState(false)
   const [fontOpen, setFontOpen] = useState(false)
@@ -1750,32 +1761,38 @@ export function Ribbon({
             </button>
             {fileOpen && (
               <div className="file-menu">
-                <button
-                  onClick={() => {
-                    setFileOpen(false)
-                    onOpen()
-                  }}
-                >
-                  {t('ribbonFileOpen')} <span className="file-menu-key">Ctrl+O</span>
-                </button>
-                <button
-                  disabled={!hasDoc || uniworkReadOnly}
-                  onClick={() => {
-                    setFileOpen(false)
-                    onSave()
-                  }}
-                >
-                  {t('ribbonFileSave')} <span className="file-menu-key">Ctrl+S</span>
-                </button>
-                <button
-                  disabled={!hasDoc}
-                  onClick={() => {
-                    setFileOpen(false)
-                    onSaveAs()
-                  }}
-                >
-                  {t('ribbonFileSaveAs')} <span className="file-menu-key">Ctrl+Shift+S</span>
-                </button>
+                {cap('open') && (
+                  <button
+                    onClick={() => {
+                      setFileOpen(false)
+                      onOpen()
+                    }}
+                  >
+                    {t('ribbonFileOpen')} <span className="file-menu-key">Ctrl+O</span>
+                  </button>
+                )}
+                {cap('save') && (
+                  <button
+                    disabled={!hasDoc || uniworkReadOnly}
+                    onClick={() => {
+                      setFileOpen(false)
+                      onSave()
+                    }}
+                  >
+                    {t('ribbonFileSave')} <span className="file-menu-key">Ctrl+S</span>
+                  </button>
+                )}
+                {cap('saveAs') && (
+                  <button
+                    disabled={!hasDoc}
+                    onClick={() => {
+                      setFileOpen(false)
+                      onSaveAs()
+                    }}
+                  >
+                    {t('ribbonFileSaveAs')} <span className="file-menu-key">Ctrl+Shift+S</span>
+                  </button>
+                )}
                 <button
                   disabled={!hasDoc}
                   onClick={() => {
@@ -1807,15 +1824,17 @@ export function Ribbon({
             )}
           </div>
         )}
-        <button
-          className="qa-btn"
-          data-tip={t('ribbonSaveTip')}
-          aria-label={t('ribbonSaveTip')}
-          disabled={uniworkReadOnly || (!dirty && !uniworkBound)}
-          onClick={onSave}
-        >
-          <IconSave size={16} />
-        </button>
+        {cap('save') && (
+          <button
+            className="qa-btn"
+            data-tip={t('ribbonSaveTip')}
+            aria-label={t('ribbonSaveTip')}
+            disabled={uniworkReadOnly || (!dirty && !uniworkBound)}
+            onClick={onSave}
+          >
+            <IconSave size={16} />
+          </button>
+        )}
         {/* onMouseDown+preventDefault like the format buttons: keep contentEditable focus so undo/redo reaches
             the active text edit. onClick with detail===0 covers keyboard activation (Enter/Space emit only click). */}
         <button
@@ -1848,35 +1867,39 @@ export function Ribbon({
         >
           <IconRedo size={16} />
         </button>
-        <label
-          className={`autosave-toggle ${autoSave ? 'on' : ''}${uniworkBound ? ' disabled' : ''}`}
-          data-tip={t(uniworkBound ? 'ribbonAutoSaveUniworkTip' : 'ribbonAutoSaveTip')}
-          aria-disabled={uniworkBound || undefined}
-        >
-          <span className="autosave-knob" />
-          <span className="autosave-text">{t('ribbonAutoSave')}</span>
-          <input
-            type="checkbox"
-            checked={autoSave}
-            disabled={uniworkBound}
-            onChange={(e) => onAutoSaveChange(e.target.checked)}
-          />
-        </label>
-        <span className="qa-sep" aria-hidden="true" />
-        {TABS.filter((tb) => tb !== 'file').map((tb) => (
-          <button
-            key={tb}
-            className={`ribbon-tab ${collapse.tabClass(tab === tb)}`}
-            data-tip={collapse.tabTip(tab === tb)}
-            onClick={() => {
-              collapse.onTabPress(tab === tb)
-              setTab(tb)
-              setFileOpen(false)
-            }}
+        {cap('autoSave') && (
+          <label
+            className={`autosave-toggle ${autoSave ? 'on' : ''}${uniworkBound ? ' disabled' : ''}`}
+            data-tip={t(uniworkBound ? 'ribbonAutoSaveUniworkTip' : 'ribbonAutoSaveTip')}
+            aria-disabled={uniworkBound || undefined}
           >
-            {t(TAB_LABEL[tb])}
-          </button>
-        ))}
+            <span className="autosave-knob" />
+            <span className="autosave-text">{t('ribbonAutoSave')}</span>
+            <input
+              type="checkbox"
+              checked={autoSave}
+              disabled={uniworkBound}
+              onChange={(e) => onAutoSaveChange(e.target.checked)}
+            />
+          </label>
+        )}
+        <span className="qa-sep" aria-hidden="true" />
+        {mainTabs()
+          .filter((tb) => tb !== 'file')
+          .map((tb) => (
+            <button
+              key={tb}
+              className={`ribbon-tab ${collapse.tabClass(tab === tb)}`}
+              data-tip={collapse.tabTip(tab === tb)}
+              onClick={() => {
+                collapse.onTabPress(tab === tb)
+                setTab(tb)
+                setFileOpen(false)
+              }}
+            >
+              {t(TAB_LABEL[tb])}
+            </button>
+          ))}
         {contextTab && (
           <button
             key={contextTab}
@@ -2501,61 +2524,65 @@ export function Ribbon({
           </>
         ) : tab === 'review' ? (
           <>
-            <Group label={t('ribbonGroupProofing')}>
-              <button
-                className="rb-big"
-                disabled={!hasDoc}
-                data-tip={`${t('ribbonSpellCheckTip')} — ${t('ribbonAiCreditNote')}`}
-                onClick={() => {
-                  if (confirmAiRewrite()) onAiPreset(t('ribbonSpellCheckPrompt'))
-                }}
-              >
-                <span className="rb-big-icon">
-                  <span className="ai-feature-icon" aria-hidden="true">
-                    <img src={iconSpelling} width={22} height={22} alt="" />
-                  </span>
-                </span>
-                <span>{t('ribbonSpellCheck')}</span>
-              </button>
-              <div className="rb-drop-wrap">
-                <button
-                  className={`rb-big ${translateOpen ? 'active' : ''}`}
-                  disabled={!hasDoc}
-                  data-tip={`${t('ribbonTranslateTip')} — ${t('ribbonAiCreditNote')}`}
-                  onMouseDown={(e) => {
-                    e.stopPropagation()
-                    closeSiblingPanels(e, closePanels, 'translate')
-                  }}
-                  onClick={() => setTranslateOpen((v) => !v)}
-                >
-                  <span className="rb-big-icon">
-                    <span className="ai-feature-icon" aria-hidden="true">
-                      <img src={iconTranslate} width={22} height={22} alt="" />
+            {cap('ai') && (
+              <>
+                <Group label={t('ribbonGroupProofing')}>
+                  <button
+                    className="rb-big"
+                    disabled={!hasDoc}
+                    data-tip={`${t('ribbonSpellCheckTip')} — ${t('ribbonAiCreditNote')}`}
+                    onClick={() => {
+                      if (confirmAiRewrite()) onAiPreset(t('ribbonSpellCheckPrompt'))
+                    }}
+                  >
+                    <span className="rb-big-icon">
+                      <span className="ai-feature-icon" aria-hidden="true">
+                        <img src={iconSpelling} width={22} height={22} alt="" />
+                      </span>
                     </span>
-                    <RbCaret />
-                  </span>
-                  <span>{t('ribbonTranslate')}</span>
-                </button>
-                {translateOpen && (
-                  <div className="rb-drop rb-menu" onMouseDown={(e) => e.stopPropagation()}>
-                    {TRANSLATE_TARGETS.map((lang) => (
-                      <button
-                        key={lang}
-                        onClick={() => {
-                          setTranslateOpen(false)
-                          if (confirmAiRewrite()) {
-                            onAiPreset(t('ribbonTranslatePrompt', { lang: t(lang) }))
-                          }
-                        }}
-                      >
-                        {t(lang)}
-                      </button>
-                    ))}
+                    <span>{t('ribbonSpellCheck')}</span>
+                  </button>
+                  <div className="rb-drop-wrap">
+                    <button
+                      className={`rb-big ${translateOpen ? 'active' : ''}`}
+                      disabled={!hasDoc}
+                      data-tip={`${t('ribbonTranslateTip')} — ${t('ribbonAiCreditNote')}`}
+                      onMouseDown={(e) => {
+                        e.stopPropagation()
+                        closeSiblingPanels(e, closePanels, 'translate')
+                      }}
+                      onClick={() => setTranslateOpen((v) => !v)}
+                    >
+                      <span className="rb-big-icon">
+                        <span className="ai-feature-icon" aria-hidden="true">
+                          <img src={iconTranslate} width={22} height={22} alt="" />
+                        </span>
+                        <RbCaret />
+                      </span>
+                      <span>{t('ribbonTranslate')}</span>
+                    </button>
+                    {translateOpen && (
+                      <div className="rb-drop rb-menu" onMouseDown={(e) => e.stopPropagation()}>
+                        {TRANSLATE_TARGETS.map((lang) => (
+                          <button
+                            key={lang}
+                            onClick={() => {
+                              setTranslateOpen(false)
+                              if (confirmAiRewrite()) {
+                                onAiPreset(t('ribbonTranslatePrompt', { lang: t(lang) }))
+                              }
+                            }}
+                          >
+                            {t(lang)}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            </Group>
-            <div className="ribbon-sep" />
+                </Group>
+                <div className="ribbon-sep" />
+              </>
+            )}
             <Group label={t('ribbonGroupComments')}>
               <button
                 className="rb-big"

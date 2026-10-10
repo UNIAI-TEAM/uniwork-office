@@ -44,6 +44,8 @@ function renderRibbon(sourceMode: boolean, sourceViewOpen = false) {
         onToggleAutoSave: vi.fn(),
         imageEnabled: true,
         onInsertImage: vi.fn(),
+        // the desktop always passes it; absent = the web frame's hidden image-host button
+        onImageHost: vi.fn(),
         frontmatterOpen: false,
         onToggleFrontmatter: vi.fn(),
         outlineOpen: false,

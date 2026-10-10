@@ -187,7 +187,10 @@ describe('only pure markdown syntax is ever produced', () => {
   })
 })
 
-describe('legacy HTML content degrades to plain markdown, keeping the text', () => {
+describe('legacy HTML content is kept verbatim in the saved file', () => {
+  // earlier versions degraded this HTML to plain markdown on the first save;
+  // it is now preserved byte-for-byte (no silent rewrite of the file).
+  // Conversions (docx export, AI input) still degrade it — see their tests.
   const editor = createEditor()
 
   function parseAndSerialize(md: string): string {
@@ -195,33 +198,14 @@ describe('legacy HTML content degrades to plain markdown, keeping the text', () 
     return manager.serialize(manager.parse(md))
   }
 
-  it('a styled span drops the styling but keeps the text', () => {
-    const out = parseAndSerialize('a <span style="color: #ff0000">red text</span> b')
-    expect(out).not.toContain('<span')
-    expect(out).toContain('red text')
-  })
-
-  it('an aligned paragraph becomes a plain paragraph with marks intact', () => {
-    const out = parseAndSerialize(
-      '<p style="text-align: center">centered <strong>text</strong></p>',
-    )
-    expect(out).not.toContain('<p')
-    expect(out).toContain('centered **text**')
-  })
-
-  it('an aligned heading becomes a plain heading', () => {
-    const out = parseAndSerialize('<h2 style="text-align: right">title</h2>')
-    expect(out).toBe('## title')
-  })
-
-  it('a sized image keeps its size as an img tag, dropping other attributes', () => {
-    const out = parseAndSerialize('<img src="assets/d.png" alt="d" width="300" align="center">')
-    expect(out).toBe('<img src="assets/d.png" alt="d" width="300" />')
-  })
-
-  it('u and mark tags drop the tag but keep the text', () => {
-    const out = parseAndSerialize('a <u>underlined</u> and <mark>marked</mark> b')
-    expect(out).toBe('a underlined and marked b')
+  it.each([
+    ['a styled span', 'a <span style="color: #ff0000">red text</span> b'],
+    ['an aligned paragraph', '<p style="text-align: center">centered <strong>text</strong></p>'],
+    ['an aligned heading', '<h2 style="text-align: right">title</h2>'],
+    ['a resized image', '<img src="assets/d.png" alt="d" width="300" align="center">'],
+    ['u and mark tags', 'a <u>underlined</u> and <mark>marked</mark> b'],
+  ])('%s', (_name, md) => {
+    expect(parseAndSerialize(md)).toBe(md)
   })
 })
 

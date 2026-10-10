@@ -253,6 +253,16 @@ export const ja = {
   panePresenterUseShowTip: 'この画面で通常のスライドショーを表示',
   panePresenterSingleHint:
     'シングル ディスプレイ モード（2 台目のディスプレイを接続すると自動的に全画面で放映）',
+  panePresenterOpenAudience: '聴衆用ウィンドウ',
+  panePresenterOpenAudienceTip:
+    'スライドショーを別ウィンドウで開き、プロジェクターにドラッグできます',
+  panePresenterCloseAudience: '聴衆用ウィンドウを閉じる',
+  panePresenterCloseAudienceTip: '聴衆用ウィンドウを閉じます（発表者ツールは続行）',
+  panePresenterWebHint:
+    '聴衆用ウィンドウを開き、プロジェクターにドラッグしてからクリックすると全画面になります',
+  panePresenterPopupBlocked:
+    'ブラウザーがウィンドウをブロックしました。このサイトのポップアップを許可してもう一度お試しください。',
+  paneAudienceFullscreenHint: 'クリックして全画面表示',
   panePresenterElapsed: '経過時間',
   panePresenterPause: 'タイマーを一時停止',
   panePresenterResume: 'タイマーを再開',

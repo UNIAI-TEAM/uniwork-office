@@ -1,0 +1,22 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["node"],
+    "noEmit": true,
+    "jsx": "react-jsx"
+  },
+  "include": [
+    "*/install.ts",
+    "*.ts",
+    "sheets/**/*.ts",
+    "shared/**/*.ts",
+    "markdown/*.ts",
+    "html/*.ts",
+    "slides/env.d.ts",
+    "slides/*.test.ts",
+    "slides/testing/*.ts",
+    "slides/vitest.config.ts",
+    "../../packages/pptx-render/src/bidi-js.d.ts"
+  ]
+}

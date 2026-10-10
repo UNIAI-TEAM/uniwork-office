@@ -1555,6 +1555,30 @@ export const es = {
   appVisualFlipV: 'Voltear verticalmente',
   appVisualFlipH: 'Voltear horizontalmente',
   appCtxPasteVisual: 'Pegar imagen o forma',
+  // web frame (UNI-1016): engine-unavailable screen, view-only, save conflicts
+  appWebEngineTitle: 'Este libro aún no se puede abrir en la web',
+  appWebEngineBody:
+    'La versión web de UniWork Sheets todavía está recibiendo su motor de hojas de cálculo. Mientras tanto, abre este libro en la aplicación de escritorio de UniWork.',
+  appWebEngineHint: 'Tu archivo no ha cambiado.',
+  appWebViewOnly: 'Solo lectura: no puedes guardar cambios en este libro.',
+  appWebConflictTitle: 'Este libro se modificó en otro lugar',
+  appWebConflictBody:
+    'Alguien guardó una versión más reciente mientras editabas. Sobrescríbela con tu versión o vuelve a cargar la última versión (se descartarán los cambios sin guardar).',
+  appWebConflictOverwrite: 'Sobrescribir',
+  appWebConflictReload: 'Cargar la última versión',
+  appWebConflictNotSaved: 'No guardado: existe una versión más reciente.',
+  appWebDiscardTitle: '¿Descartar los cambios sin guardar?',
+  appWebDiscardBody: 'Abrir otro libro descarta los cambios que no has guardado.',
+  appWebDiscard: 'Descartar',
+  appWebCancel: 'Cancelar',
+  appWebSaveFailed: 'No se pudo guardar en UniWork.',
+  appWebTooLargeTitle: 'Este libro es demasiado grande para la web',
+  appWebTooLargeBody:
+    'Supera el tamaño que admite la hoja de cálculo web, así que se abre en el editor de hojas de cálculo clásico.',
+  appWebEngineRestarted:
+    'El motor del libro se detuvo de forma inesperada y se reinició. El libro se volvió a abrir desde su última versión guardada; los cambios sin guardar se conservan, guarde pronto.',
+  appWebSavedReopenFailed:
+    'Tus cambios se guardaron en UniWork, pero no se pudo volver a abrir el libro aquí. Recarga el editor para seguir trabajando.',
   appAutoSaveUniworkOff:
     'El autoguardado está desactivado para los documentos de UniWork. Usa Guardar para guardar una versión nueva.',
 } satisfies Record<keyof typeof zh, string>

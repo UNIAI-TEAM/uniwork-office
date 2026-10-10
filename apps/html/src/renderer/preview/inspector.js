@@ -9,7 +9,12 @@
   const MARK = 'data-gx-inspector'
   // replaced by instrumentForPreview with the parse-map version this copy was built from
   const VERSION = Number('__GX_VERSION__')
-  const post = (msg) => window.parent.postMessage({ ...msg, version: VERSION }, '*')
+  // web preview (web/modules/html/public/preview.html): a MessagePort to the frame is the only
+  // channel; the desktop talks to the app through window.parent
+  const port = window.__gxPreviewPort
+  const post = port
+    ? (msg) => port.postMessage({ ...msg, version: VERSION })
+    : (msg) => window.parent.postMessage({ ...msg, version: VERSION }, '*')
   const TEXT_TAGS = new Set([
     'p',
     'h1',
@@ -1060,7 +1065,7 @@
     if (editing && e.target === editing.el) finishEdit(true)
   })
 
-  window.addEventListener('message', (e) => {
+  ;(port || window).addEventListener('message', (e) => {
     const msg = e.data
     if (!msg || typeof msg.type !== 'string') return
     switch (msg.type) {
@@ -1142,6 +1147,7 @@
     }
   })
 
+  if (port) port.start()
   post({
     type: 'gx:ready',
     title: document.title,

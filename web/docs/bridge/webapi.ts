@@ -25,6 +25,8 @@
  * | convertAltChunkHtml       | convert.altChunkHtml; failure -> null (altChunk skipped, as on a failed convert) |
  * | onCloseCheck & co, onMenuCommand | ./session.ts: `dirty` / `title` events, host `doc.closeCheck` / `save` / `saveAs` |
  * | projectApi.*              | ./project-memory.ts (AI-only; AI is hidden on the web)                           |
+ * | draft recovery (C18)      | ./draft-recovery.ts: encrypted IndexedDB copy of provideDocBytes every 30 s while |
+ * |                           | dirty; offered before the renderer loads (Restore = `recovered`, starts dirty)    |
  * Every successful save emits `saved` {file, versionId, initiatedByFrame}.
  *
  * Save conflicts (the host answers `conflict`: someone saved a newer version). A host `save`
@@ -56,6 +58,7 @@ import type {
 } from '../../../apps/docs/src/shared/ipc'
 import {
   toProtocolError,
+  type Capabilities,
   type FileMeta,
   type FileSource,
   type OpenPayload,
@@ -63,11 +66,14 @@ import {
   type SaveResult,
 } from '../protocol/types'
 import { TIMEOUTS, errorCode, type FramePort } from './frame-port'
+import { ownHeadAfterUnknown } from './head-match'
 import { downloadBlob, printFrame } from './browser'
 import { ask, hideFatal, onModalChange, showFatal, text } from './notice'
 import { createSession, type SessionOptions } from './session'
+import type { DraftHost, DraftRecovery } from './draft-recovery'
+import { bridgeDraftRecovery } from '../../modules/shared/recovery-prompt'
 import { projectApi } from './project-memory'
-import { mintDocHandoff } from './doc-handoff'
+import { mintDocHandoff, releaseDocHandoff } from './doc-handoff'
 
 // ---------------------------------------------------------------- paths
 
@@ -123,7 +129,7 @@ async function readSource(source: FileSource): Promise<ArrayBuffer> {
   return res.arrayBuffer()
 }
 
-function decodeDataUrl(url: string): { base64: string; mime: string } | null {
+export function decodeDataUrl(url: string): { base64: string; mime: string } | null {
   const m = /^data:([^;,]*)((?:;[^;,]*)*?)(;base64)?,(.*)$/s.exec(url)
   if (!m) return null
   const mime = m[1] || 'text/plain'
@@ -151,6 +157,8 @@ function saveError(err: unknown): ProtocolErrorShape {
   return { code: errorCode(err), message: describe(err) }
 }
 
+const READ_ONLY = 'read-only document'
+
 /** printPdfBuffer has no bytes on web; saveMergedPdf recognises this marker */
 export const WEB_PRINT_PART = 'web-print-deferred'
 
@@ -158,6 +166,8 @@ export interface WebApiOptions {
   session?: SessionOptions
   /** the in-frame print (default: browser.ts printFrame); injectable for tests */
   print?: (scale?: number) => Promise<{ ok: boolean; error?: string }>
+  /** draft recovery (C18; default: IndexedDB + the shared prompt); injectable for tests */
+  drafts?: (host: DraftHost) => DraftRecovery
 }
 
 // ---------------------------------------------------------------- factory
@@ -167,9 +177,52 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
   const files = new Map<string, FileMeta>()
   /** the document this frame shows (save / export target) */
   let current: string | null = null
+  /** the host's effective grants from `init` (undefined until the handshake, and in unit-test sessions) */
+  let grants: Capabilities | undefined
+
+  /**
+   * View-only (protocol README "Read-only documents"): the host withheld the `save` grant, or the
+   * file is not writable. Without a grants object (unit-test sessions) nothing is withheld.
+   */
+  function isViewOnly(fileId?: string | null): boolean {
+    if (grants !== undefined && grants.save !== true) return true
+    return fileId ? files.get(fileId)?.writable === false : false
+  }
   const session = createSession(port, opts.session)
   // the frame dialogs only dim the iframe: tell the host so it can dim its own chrome
   onModalChange((open) => port.setModal?.(open))
+
+  // ------------------------------------------------------------ draft recovery (C18)
+
+  /** the document `init` names: the only one the host's draft scope ("<user>:<document>") covers */
+  let initDocumentId: string | null = null
+  let restoredDraft: ArrayBuffer | null = null
+  const drafts = (opts.drafts ?? ((host) => bridgeDraftRecovery(port, 'docs', host)))({
+    file: () => {
+      const file = current !== null && current === initDocumentId ? files.get(current) : undefined
+      return file ? { etag: file.etag, name: file.name } : null
+    },
+    isDirty: () => session.isDirty(),
+    bytes: () => liveDocBytes(),
+    restore: (bytes) => {
+      restoredDraft = bytes
+    },
+  })
+
+  /**
+   * Offer the document's draft before the renderer loads it (like the desktop's recovery copy):
+   * Restore opens the draft bytes as `recovered` (the renderer starts dirty, the user saves).
+   */
+  async function withDraft(result: OpenFileResult): Promise<OpenFileResult> {
+    restoredDraft = null
+    await drafts.opened()
+    const data = restoredDraft
+    restoredDraft = null
+    if (!data) return result
+    // the server bytes' handle is never read now: the renderer gets the draft instead
+    releaseDocHandoff(result.dataUrl)
+    return { ...result, dataUrl: mintDocHandoff(data), recovered: true }
+  }
 
   function remember(file: FileMeta): void {
     files.set(file.fileId, { ...files.get(file.fileId), ...file })
@@ -225,6 +278,7 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
     const file = { ...result.file }
     if (result.versionId && !file.versionId) file.versionId = result.versionId
     remember(file)
+    void drafts.saved()
     port.reportSaved({
       file: files.get(file.fileId)!,
       ...(result.versionId ? { versionId: result.versionId } : {}),
@@ -254,7 +308,12 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
   let booted = false
   let pendingOpen: Promise<OpenDocxResult> | null = port
     .whenInitialized()
-    .then((s) => (s.open ? toOpenResult(s.open) : openById(s.documentId)))
+    .then((s) => {
+      grants = s.capabilities
+      initDocumentId = s.documentId
+      return s.open ? toOpenResult(s.open) : openById(s.documentId)
+    })
+    .then(withDraft)
     .catch((err: unknown) => {
       console.error('[docs-web] initial open failed:', err)
       port.reportError(err, true)
@@ -268,7 +327,7 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
   }
 
   port.handleOpen(async (payload) => {
-    const result = await toOpenResult(payload)
+    const result = await withDraft(await toOpenResult(payload))
     fatal = null
     hideFatal()
     deliver(result)
@@ -278,6 +337,7 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
   port.handleSave(async () => {
     if (fatal) return { ok: false, error: fatal }
     if (!current) return failure('not_ready', 'no document is open')
+    if (isViewOnly(current)) return failure('unsupported', READ_ONLY)
     if (hostSave) return failure('busy', 'a save is already running')
     hostSave = { error: null }
     try {
@@ -334,15 +394,14 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
 
   /**
    * After a save whose outcome is unknown (timeout / network; the request was cancelled but
-   * the host may have committed it): when the head moved on and has exactly the size we sent,
-   * it is taken to be our own write and its etag becomes the base of the next save. Anything
-   * else keeps the old etag, so a real concurrent edit still surfaces as a conflict prompt.
+   * the host may have committed it): when the head moved on and holds exactly the bytes we sent,
+   * it is our own write and its etag becomes the base of the next save. Anything else (also a
+   * same-size foreign version) keeps the old etag, so a real concurrent edit still surfaces as a
+   * conflict prompt (./head-match.ts).
    */
-  async function reconcileAfterUnknown(fileId: string, sentBytes: number): Promise<void> {
-    const before = files.get(fileId)
-    const head = await headMeta(fileId)
-    if (!head || !before?.etag || head.etag === before.etag) return
-    if (head.sizeBytes === sentBytes) remember(head)
+  async function reconcileAfterUnknown(fileId: string, sent: ArrayBuffer): Promise<void> {
+    const head = await ownHeadAfterUnknown(port, fileId, files.get(fileId)?.etag, sent)
+    if (head) remember(head)
   }
 
   /** the user chose for a frame-initiated save that hit `conflict` */
@@ -388,7 +447,7 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
       body: 'appWebDiscardBody',
       choices: [
         { id: 'cancel', label: 'appCancel', primary: true },
-        { id: 'discard', label: 'appWebDiscard' },
+        { id: 'discard', label: 'appWebDiscard', danger: true },
       ],
       cancelId: 'cancel',
       marker: 'discard',
@@ -555,6 +614,8 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
       }
       const fileId = idFromPath(path)
       if (!fileId) return { ok: false, error: `not a UniWork document: ${basename(String(path))}` }
+      // the editor is read-only here (uniworkState); this refuses a save that still gets through
+      if (isViewOnly(fileId)) return { ok: false, error: READ_ONLY }
       const etag = files.get(fileId)?.etag
       const payload = {
         fileId,
@@ -583,11 +644,15 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
         return resolveConflict(path, fileId, data)
       }
       if (code === 'timeout' || code === 'network') {
-        await reconcileAfterUnknown(fileId, data.byteLength)
+        await reconcileAfterUnknown(fileId, data)
       }
       return {
         ok: false,
-        error: res.error.code === 'timeout' ? 'save timed out' : res.error.message,
+        // a raw browser error ("Failed to fetch") is English whatever the UI language
+        error:
+          res.error.code === 'timeout' || res.error.code === 'network'
+            ? text('appWebSaveOffline')
+            : res.error.message,
       }
     },
 
@@ -597,6 +662,11 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
       if (fatal) {
         pending?.settle({ ok: false, error: fatal })
         return fatalSave()
+      }
+      // "save a copy" of a document the user cannot overwrite is its own grant (`saveAs`)
+      if (isViewOnly(idFromPath(sourcePath)) && grants?.saveAs !== true) {
+        pending?.settle(failure('unsupported', READ_ONLY))
+        return { ok: false, error: READ_ONLY }
       }
       const sourceFileId = idFromPath(sourcePath)
       const payload = {
@@ -709,6 +779,19 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
       } catch {
         return null
       }
+    },
+
+    // the frame is the UniWork document: no desktop working-copy state. View-only comes from the host
+    // grant (no `save`) or the file (`writable: false`); the renderer then turns the editor, the ribbon
+    // and the save entries read-only (the same seam the desktop uses for a view-only working copy).
+    async uniworkState(path: string): Promise<{ bound: boolean; readOnly: boolean }> {
+      try {
+        const session = await port.whenInitialized()
+        grants = session.capabilities
+      } catch {
+        return { bound: false, readOnly: false }
+      }
+      return { bound: false, readOnly: isViewOnly(idFromPath(path)) }
     },
   } satisfies Partial<DesktopApi>
 

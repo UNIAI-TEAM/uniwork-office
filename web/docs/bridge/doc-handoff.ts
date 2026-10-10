@@ -41,6 +41,14 @@ export function mintDocHandoff(data: ArrayBuffer): string {
   return url
 }
 
+/** drop a handle the renderer will never read (e.g. replaced by a restored draft) */
+export function releaseDocHandoff(url: string): void {
+  const entry = pending.get(url)
+  if (!entry) return
+  clearTimeout(entry.timer)
+  pending.delete(url)
+}
+
 /** handles still waiting for the renderer (tests) */
 export function pendingDocHandoffs(): number {
   return pending.size

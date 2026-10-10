@@ -182,9 +182,10 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      # web/docs (the Docs frame for UniWork) is not an npm workspace: the
-      # protocol + bridge tsconfigs and vitest suites run through root scripts.
-      - name: Typecheck (web Docs frame)
+      # web/ (the Docs frame and the other module frames for UniWork) is not an
+      # npm workspace: the protocol, bridge, build and web/modules tsconfigs and
+      # the vitest suites run through root scripts.
+      - name: Typecheck (web frames)
         run: npm run typecheck:web
 
       - name: Regenerate test fixtures
@@ -204,8 +205,9 @@ jobs:
       - name: Test
         run: npm test
 
-      # postMessage protocol, web bridge (jsdom) and build (CSP, manifest, fonts)
-      - name: Test (web Docs frame)
+      # postMessage protocol, web bridge incl. module bridge (jsdom) and build
+      # (CSP, manifest, fonts, module registry)
+      - name: Test (web frames)
         run: npm run test:web
 
       # Preservation gate: a no-op-adjacent edit through the OOXML gateway must
@@ -214,6 +216,60 @@ jobs:
         run: |
           npm run fixtures -w @genoffice/sheets
           npm run compat -w @genoffice/sheets
+
+  web-e2e:
+    # The browser proofs of the web module frames on production bundles: the html preview sandbox
+    # (hostile scripts reach neither frame, host nor API), draft recovery, the slides presenter,
+    # the web AI client, the all-module smoke and the Docs frame. WEB_E2E_REQUIRE_BUILD makes a
+    # missing dist-web bundle or a skipped test a failure (web/e2e/require-builds.ts,
+    # fail-on-skip-reporter.ts); a green run therefore means these specs really ran.
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      WEB_E2E_REQUIRE_BUILD: '1'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable branch, 2026-07
+        with:
+          toolchain: stable
+
+      # The Sheets frame's engine is the xlsx-sidecar built for wasm32-wasip1 with the toolchain pinned
+      # in apps/sheets/native/xlsx-engine/wasm/rust-toolchain.toml (the build checks the module's
+      # sha256). Keep the version here in step with that file.
+      - name: Install pinned Rust toolchain (xlsx-sidecar wasm)
+        run: rustup toolchain install 1.90.0 --profile minimal --target wasm32-wasip1
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build every web module bundle
+        run: npm run build:web -- --all
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Web e2e
+        run: >
+          npx playwright test -c web/e2e
+          html-preview-security draft-recovery slides-presenter ai-web modules-smoke docs-web
+
+      - name: Upload web e2e artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: web-e2e-artifacts
+          path: web/e2e/.results
+          retention-days: 7
 
   e2e:
     # 22.04, not -latest: 24.04's AppArmor hardening blocks Electron renderer

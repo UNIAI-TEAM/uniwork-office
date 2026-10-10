@@ -1,0 +1,38 @@
+# xlsx-sidecar as a WebAssembly reactor for the Sheets web frame (UNI-1016, CONTRACT C11).
+#
+# Same sources as the desktop sidecar: the library is the parent crate (path dependency) and
+# the request handling is ../src/main.rs compiled as a module (src/lib.rs). Everything
+# wasm-specific in those sources is behind cfg(target_os = "wasi"), so the desktop build and
+# its tests are unchanged. Build with ./build-wasm.mjs (pinned toolchain, reproducible,
+# checksum-verified); never with the parent crate's Cargo.lock.
+#
+# Upstream-sync note: docs/upstream-sync.md "Sheets wasm engine".
+[package]
+name = "xlsx-sidecar-wasm"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+path = "src/lib.rs"
+
+[dependencies]
+xlsx-sidecar = { path = ".." }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = "debuginfo"
+
+# ironcalc 0.7.1 depends on zip 0.6 with its default features, which pull the C libraries
+# bzip2-sys and zstd-sys (they need a C toolchain for wasm). IronCalc only reads deflate
+# xlsx parts, so build-wasm.mjs vendors the registry's zip 0.6.6 into .vendor/ with
+# `default = ["deflate"]` (the only change) and this patch points at it.
+[patch.crates-io]
+zip_06 = { package = "zip", path = ".vendor/zip-0.6.6" }

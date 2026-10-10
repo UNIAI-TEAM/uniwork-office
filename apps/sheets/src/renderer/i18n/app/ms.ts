@@ -1511,6 +1511,30 @@ export const ms = {
   appVisualFlipV: 'Balikkan Menegak',
   appVisualFlipH: 'Balikkan Mendatar',
   appCtxPasteVisual: 'Tampal Gambar atau Bentuk',
+  // web frame (UNI-1016): engine-unavailable screen, view-only, save conflicts
+  appWebEngineTitle: 'Buku kerja ini belum boleh dibuka di web',
+  appWebEngineBody:
+    'Versi web UniWork Sheets masih menunggu enjin hamparannya. Sementara itu, buka buku kerja ini dalam apl desktop UniWork.',
+  appWebEngineHint: 'Fail anda tidak berubah.',
+  appWebViewOnly: 'Lihat sahaja: anda tidak boleh menyimpan perubahan pada buku kerja ini.',
+  appWebConflictTitle: 'Buku kerja ini telah diubah di tempat lain',
+  appWebConflictBody:
+    'Seseorang telah menyimpan versi yang lebih baharu semasa anda menyunting. Tulis gantinya dengan versi anda, atau muat semula versi terkini (perubahan yang belum disimpan akan dibuang).',
+  appWebConflictOverwrite: 'Tulis ganti',
+  appWebConflictReload: 'Muat semula versi terkini',
+  appWebConflictNotSaved: 'Tidak disimpan: terdapat versi yang lebih baharu.',
+  appWebDiscardTitle: 'Buang perubahan yang belum disimpan?',
+  appWebDiscardBody: 'Membuka buku kerja lain akan membuang perubahan yang belum disimpan.',
+  appWebDiscard: 'Buang',
+  appWebCancel: 'Batal',
+  appWebSaveFailed: 'Gagal menyimpan ke UniWork.',
+  appWebTooLargeTitle: 'Buku kerja ini terlalu besar untuk web',
+  appWebTooLargeBody:
+    'Saiznya melebihi had hamparan web, jadi ia dibuka dalam editor hamparan klasik.',
+  appWebEngineRestarted:
+    'Enjin buku kerja berhenti secara tidak dijangka dan telah dimulakan semula. Buku kerja dibuka semula daripada versi terakhir yang disimpan; perubahan yang belum disimpan dikekalkan, sila simpan segera.',
+  appWebSavedReopenFailed:
+    'Perubahan anda telah disimpan ke UniWork, tetapi buku kerja tidak dapat dibuka semula di sini. Muat semula editor untuk teruskan.',
   appAutoSaveUniworkOff:
     'Simpan automatik dimatikan untuk dokumen UniWork. Gunakan Simpan untuk menyimpan versi baharu.',
 } satisfies Record<keyof typeof zh, string>

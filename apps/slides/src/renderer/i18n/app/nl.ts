@@ -5,6 +5,7 @@ export const nl = {
   appPhPromptSubtitle: 'Klik om een ondertitel toe te voegen',
   appPhPromptBody: 'Klik om tekst toe te voegen',
   appStatusOpened: "{name} geopend ({count} dia's)",
+  appStatusOpenedOne: '{name} geopend (1 dia)',
   appStatusNewBlank: 'Lege presentatie gemaakt',
   appStatusSaved: 'Opgeslagen',
   appStatusSaveFailed: 'Opslaan mislukt: {error}',

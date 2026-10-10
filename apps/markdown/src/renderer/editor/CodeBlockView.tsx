@@ -3,7 +3,7 @@ import { NodeViewContent, NodeViewWrapper } from '@tiptap/react'
 import type { NodeViewProps } from '@tiptap/react'
 import { Dropdown } from '@genoffice/ui'
 import { t } from '../i18n/locale'
-import { DIAGRAM_LANGUAGES, diagramLanguage, renderDiagram } from './diagrams'
+import { DIAGRAM_LANGUAGES, diagramLanguage, diagramSvgDataUrl, renderDiagram } from './diagrams'
 import type { DiagramLanguage, DiagramResult } from './diagrams'
 
 const LANGUAGES = [
@@ -170,22 +170,28 @@ export function CodeBlockView({ node, updateAttributes, editor, getPos }: NodeVi
           {t('mermaidError')}: {error}
         </div>
       )}
-      {diagram?.ok && (
-        <div
-          className="md-diagram-preview"
-          contentEditable={false}
-          onClick={editSource}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault()
-              editSource()
-            }
-          }}
-          role="button"
-          tabIndex={0}
-          dangerouslySetInnerHTML={{ __html: diagram.svg }}
-        />
-      )}
+      {diagram?.ok && <DiagramPreview svg={diagram.svg} onClick={editSource} />}
     </NodeViewWrapper>
+  )
+}
+
+/** Rendered diagram as an <img>: the SVG markup never enters the editor DOM */
+export function DiagramPreview({ svg, onClick }: { svg: string; onClick?: () => void }) {
+  return (
+    <div
+      className="md-diagram-preview"
+      contentEditable={false}
+      onClick={onClick}
+      onKeyDown={(e) => {
+        if (onClick && (e.key === 'Enter' || e.key === ' ')) {
+          e.preventDefault()
+          onClick()
+        }
+      }}
+      role="button"
+      tabIndex={0}
+    >
+      <img src={diagramSvgDataUrl(svg)} alt={t('insertDiagram')} draggable={false} />
+    </div>
   )
 }

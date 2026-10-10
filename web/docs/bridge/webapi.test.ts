@@ -6,6 +6,15 @@ import { createMockPort, protocolError, timeoutAfter, type MockPort } from './te
 import { text } from './notice'
 // the renderer's own reader: resolves the bridge's in-page handoff without fetch()
 import { fetchDocBytes as bytesAt } from '../../../apps/docs/src/renderer/doc-bytes'
+import {
+  createIdbDraftStore,
+  type DraftChoice,
+  type DraftInfo,
+  type DraftRecovery,
+  type DraftStore,
+} from './draft-recovery'
+import { createFakeIdb } from './testing/fake-idb'
+import { bridgeDraftRecovery } from '../../modules/shared/recovery-prompt'
 
 const DOCX = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 1, 2, 3])
 const flush = () => new Promise((r) => setTimeout(r, 0))
@@ -236,15 +245,15 @@ describe('saveDocx', () => {
     const btn = (id: string) => dlg.querySelector<HTMLButtonElement>(`[data-choice="${id}"]`)!
     // a stray Enter must not overwrite the other writer's version
     expect(document.activeElement).toBe(btn('cancel'))
-    expect(btn('overwrite').className).toBe('danger')
-    expect(btn('overwrite').classList.contains('btn-primary')).toBe(false)
+    expect(btn('overwrite').className).toBe('ow-dlg-btn danger')
+    expect(btn('overwrite').classList.contains('primary')).toBe(false)
     const box = dlg.querySelector('[role="alertdialog"]')!
     expect(document.getElementById(box.getAttribute('aria-labelledby')!)!.textContent).toBe(
       text('appWebConflictTitle'),
     )
     // the host learns that a frame modal is open (protocol `modal`)
     expect(mock.modals).toEqual([true])
-    // Tab cycles inside the dialog: cancel -> reload -> overwrite -> cancel; Shift+Tab goes back
+    // Tab cycles inside the dialog (reload, overwrite, then the way out last): cancel -> reload -> overwrite -> cancel; Shift+Tab goes back
     const tab = (shiftKey = false) =>
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey, bubbles: true }))
     tab()
@@ -321,8 +330,20 @@ describe('saveDocx', () => {
   it('timeout: reports a timed-out save', async () => {
     const doc = await bootWith()
     mock.override('api.save', timeoutAfter)
-    expect(await api.saveDocx(doc.path, buf([5]))).toEqual({ ok: false, error: 'save timed out' })
+    expect(await api.saveDocx(doc.path, buf([5]))).toEqual({
+      ok: false,
+      error: text('appWebSaveOffline'),
+    })
     expect(mock.calls.find((c) => c.type === 'api.save')!.opts?.timeoutMs).toBe(120_000)
+  })
+
+  it('network failure: a translated message, not the raw browser error', async () => {
+    const doc = await bootWith()
+    mock.override('api.save', () => Promise.reject(protocolError('network', 'Failed to fetch')))
+    expect(await api.saveDocx(doc.path, buf([5]))).toEqual({
+      ok: false,
+      error: text('appWebSaveOffline'),
+    })
   })
 
   it('timeout after the host committed: the next save is based on that version, no conflict', async () => {
@@ -335,7 +356,7 @@ describe('saveDocx', () => {
     })
     expect(await api.saveDocx(doc.path, buf([5, 5]))).toEqual({
       ok: false,
-      error: 'save timed out',
+      error: text('appWebSaveOffline'),
     })
     mock.clearOverrides()
     expect(await api.saveDocx(doc.path, buf([5, 5, 5]))).toEqual({ ok: true })
@@ -346,6 +367,21 @@ describe('saveDocx', () => {
     const doc = await bootWith()
     mock.override('api.save', (payload) => {
       mock.bumpRemote('f1') // concurrent writer, original size
+      return timeoutAfter(payload, { timeoutMs: 120_000 })
+    })
+    await api.saveDocx(doc.path, buf([5, 5]))
+    mock.clearOverrides()
+    const pending = api.saveDocx(doc.path, buf([5, 5, 5]))
+    await choose('conflict', 'cancel')
+    expect((await pending).ok).toBe(false)
+  })
+
+  it('timeout while someone else committed a same-size version: not adopted, the conflict is asked (RF-7)', async () => {
+    const doc = await bootWith()
+    mock.override('api.save', (payload) => {
+      const { fileId } = payload as { fileId: string }
+      // a foreign writer: same length as ours, other content
+      mock.commit(fileId, new Uint8Array([9, 9]))
       return timeoutAfter(payload, { timeoutMs: 120_000 })
     })
     await api.saveDocx(doc.path, buf([5, 5]))
@@ -882,5 +918,166 @@ describe('projectApi (in-memory, AI-only)', () => {
     })
     expect(await p.resolveChat({ filePath: 'uniwork://files/x/doc.docx' })).toEqual(bound)
     expect((await p.loadChat(bound)).map((m) => m.text)).toEqual(['hello\nworld'])
+  })
+})
+
+describe('draft recovery (C18)', () => {
+  let store: DraftStore
+  let key: CryptoKey
+  let answer: DraftChoice
+  let prompt: ReturnType<typeof vi.fn<(d: DraftInfo) => Promise<DraftChoice>>>
+  let drafts: DraftRecovery
+
+  /** a frame load: a fresh bridge on the same store, the init carrying the session's grant */
+  async function load(): Promise<OpenFileResult> {
+    mock = createMockPort()
+    api = createWebApi(mock.port, {
+      session: { pollMs: 0 },
+      drafts: (host) =>
+        (drafts = bridgeDraftRecovery(mock.port, 'docs', host, {
+          store,
+          prompt,
+          target: new EventTarget() as unknown as Window,
+        })),
+    })
+    const meta = mock.seed('Report.docx', DOCX)
+    mock.init({ documentId: meta.fileId, recovery: { key, scope: `u1:${meta.fileId}` } })
+    return (await api.consumePendingOpenDocx()) as OpenFileResult
+  }
+
+  async function editAndKeep(bytes: number[]): Promise<void> {
+    api.onCloseCheck(() => api.reportCloseCheck({ dirty: true, autoSave: false }))
+    api.provideDocBytes(async () => buf(bytes))
+    await drafts.flush()
+  }
+
+  beforeEach(async () => {
+    store = createIdbDraftStore(createFakeIdb().idb)
+    key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, [
+      'encrypt',
+      'decrypt',
+    ])
+    answer = 'restore'
+    prompt = vi.fn(async (_d: DraftInfo) => answer)
+  })
+  afterEach(() => drafts?.dispose())
+
+  it('keeps an encrypted copy while dirty and offers it on the next load: Restore = recovered', async () => {
+    await load()
+    await editAndKeep([9, 9, 9])
+    expect(mock.calls.some((c) => c.type === 'api.save')).toBe(false)
+    drafts.dispose()
+
+    const reopened = await load()
+    expect(prompt).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Report.docx', older: false }),
+    )
+    expect(reopened.recovered).toBe(true)
+    expect(await bytesAt(reopened.dataUrl)).toEqual(new Uint8Array([9, 9, 9]))
+    expect(reopened.path).toBe(pathFor({ fileId: 'f1', name: 'Report.docx' }))
+    expect((await store.list('u1:f1:')).length).toBe(1)
+
+    // the user's save lands: the copy is gone
+    expect((await api.saveDocx(reopened.path, buf([9, 9, 9]))).ok).toBe(true)
+    api.onCloseCheck(() => api.reportCloseCheck({ dirty: false, autoSave: false }))
+    await drafts.flush()
+    expect(await store.list('u1:f1:')).toEqual([])
+  })
+
+  it('Discard opens the server version and deletes the copy', async () => {
+    await load()
+    await editAndKeep([5])
+    drafts.dispose()
+    answer = 'discard'
+    const reopened = await load()
+    expect(reopened.recovered).toBeUndefined()
+    expect(await bytesAt(reopened.dataUrl)).toEqual(DOCX)
+    expect(await store.list('u1:f1:')).toEqual([])
+  })
+
+  it('a copy under another key is skipped without a prompt and never deleted', async () => {
+    await load()
+    await editAndKeep([5])
+    drafts.dispose()
+    key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, [
+      'encrypt',
+      'decrypt',
+    ])
+    const reopened = await load()
+    expect(prompt).not.toHaveBeenCalled()
+    expect(reopened.recovered).toBeUndefined()
+    // another key (a later sign-in) or another tab: the record stays for the sign-out cleanup
+    expect(await store.list('u1:f1:')).toHaveLength(1)
+  })
+
+  it('a document opened in the frame other than the init document is never drafted', async () => {
+    await load()
+    const other = mock.seed('Other.docx', DOCX)
+    await api.openDocxPath(pathFor(other))
+    await editAndKeep([1])
+    expect(await store.list('u1:f1:')).toEqual([])
+  })
+})
+
+describe('view-only (host withholds the save grant)', () => {
+  const GRANTS = { save: true, saveAs: true, recents: true }
+
+  async function boot(
+    capabilities: Record<string, boolean> | undefined,
+    writable?: boolean,
+  ): Promise<OpenFileResult> {
+    const meta = mock.seed('Report.docx', DOCX)
+    if (writable === false)
+      mock.override('api.open', () => ({
+        file: { ...meta, writable: false },
+        source: { kind: 'bytes', data: DOCX.slice().buffer },
+      }))
+    mock.init({ documentId: meta.fileId, ...(capabilities ? { capabilities } : {}) })
+    return (await api.consumePendingOpenDocx()) as OpenFileResult
+  }
+
+  it('answers uniworkState readOnly so the renderer makes the editor read-only', async () => {
+    const doc = await boot({ ...GRANTS, save: false })
+    expect(await api.uniworkState(doc.path)).toEqual({ bound: false, readOnly: true })
+  })
+
+  it('answers readOnly for a file the host marks writable:false even with the save grant', async () => {
+    const doc = await boot(GRANTS, false)
+    expect(await api.uniworkState(doc.path)).toEqual({ bound: false, readOnly: true })
+  })
+
+  it('stays editable with the save grant', async () => {
+    const doc = await boot(GRANTS)
+    expect(await api.uniworkState(doc.path)).toEqual({ bound: false, readOnly: false })
+  })
+
+  it('refuses saveDocx without calling api.save', async () => {
+    const doc = await boot({ ...GRANTS, save: false })
+    const res = await api.saveDocx(doc.path, buf([5]), false)
+    expect(res).toEqual({ ok: false, error: 'read-only document' })
+    expect(mock.calls.some((c) => c.type === 'api.save')).toBe(false)
+    expect(mock.saved).toEqual([])
+  })
+
+  it('answers a host save request unsupported and never starts the editor flow', async () => {
+    await boot({ ...GRANTS, save: false })
+    const res = await mock.host.save({ reason: 'user' })
+    expect(res).toMatchObject({ ok: false, error: { code: 'unsupported' } })
+  })
+
+  it('refuses Save As too unless the host grants saveAs separately', async () => {
+    const doc = await boot({ ...GRANTS, save: false, saveAs: false })
+    expect(await api.saveDocxAs('Copy', buf([5]), doc.path)).toEqual({
+      ok: false,
+      error: 'read-only document',
+    })
+    expect(mock.calls.some((c) => c.type === 'api.saveAs')).toBe(false)
+  })
+
+  it('allows a saved copy when the host grants saveAs', async () => {
+    const doc = await boot({ ...GRANTS, save: false })
+    const res = await api.saveDocxAs('Copy', buf([5]), doc.path)
+    expect(res.ok).toBe(true)
+    expect(mock.calls.some((c) => c.type === 'api.saveAs')).toBe(true)
   })
 })

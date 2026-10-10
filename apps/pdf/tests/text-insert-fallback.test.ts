@@ -17,7 +17,17 @@ vi.mock('node:fs', async (importOriginal) => {
 })
 
 import { PDFDocument } from 'pdf-lib'
+import { setPdfCoreEnv } from '../src/main/core-env'
+import { nodePdfEnv } from '../src/main/node-env'
 import { applyTextInserts, fallbackFontFor } from '../src/main/text-edit'
+
+// The fallback paths are read through the save core's font seam (core-env.ts), installed by the
+// test setup before this file's node:fs mock exists: hide the same files there too
+const GONE = ['Arial Unicode.ttf', 'arialuni.ttf', 'DejaVuSans.ttf']
+setPdfCoreEnv({
+  readFontFile: (path) =>
+    GONE.some((g) => path.endsWith(g)) ? null : nodePdfEnv.readFontFile(path),
+})
 import type { TextInsertInput } from '../src/shared/ipc'
 
 async function blankPage(): Promise<Uint8Array> {

@@ -1552,6 +1552,30 @@ export const pt = {
   appVisualFlipV: 'Inverter verticalmente',
   appVisualFlipH: 'Inverter horizontalmente',
   appCtxPasteVisual: 'Colar imagem ou forma',
+  // web frame (UNI-1016): engine-unavailable screen, view-only, save conflicts
+  appWebEngineTitle: 'Esta pasta de trabalho ainda não pode ser aberta na web',
+  appWebEngineBody:
+    'A versão web do UniWork Sheets ainda está recebendo seu mecanismo de planilhas. Até lá, abra esta pasta de trabalho no aplicativo UniWork para desktop.',
+  appWebEngineHint: 'Seu arquivo não foi alterado.',
+  appWebViewOnly: 'Somente leitura: você não pode salvar alterações nesta pasta de trabalho.',
+  appWebConflictTitle: 'Esta pasta de trabalho foi alterada em outro lugar',
+  appWebConflictBody:
+    'Alguém salvou uma versão mais recente enquanto você editava. Substitua-a pela sua versão ou recarregue a versão mais recente (as alterações não salvas serão descartadas).',
+  appWebConflictOverwrite: 'Substituir',
+  appWebConflictReload: 'Recarregar a versão mais recente',
+  appWebConflictNotSaved: 'Não salvo: existe uma versão mais recente.',
+  appWebDiscardTitle: 'Descartar alterações não salvas?',
+  appWebDiscardBody: 'Abrir outra pasta de trabalho descarta as alterações não salvas.',
+  appWebDiscard: 'Descartar',
+  appWebCancel: 'Cancelar',
+  appWebSaveFailed: 'Falha ao salvar no UniWork.',
+  appWebTooLargeTitle: 'Esta pasta de trabalho é grande demais para a web',
+  appWebTooLargeBody:
+    'Ela excede o tamanho que a planilha web suporta, por isso abre no editor de planilhas clássico.',
+  appWebEngineRestarted:
+    'O motor da pasta de trabalho parou inesperadamente e foi reiniciado. A pasta de trabalho foi reaberta a partir da última versão salva; as alterações não salvas foram mantidas, salve em breve.',
+  appWebSavedReopenFailed:
+    'Suas alterações foram salvas no UniWork, mas não foi possível reabrir a pasta de trabalho aqui. Recarregue o editor para continuar.',
   appAutoSaveUniworkOff:
     'O salvamento automático está desativado para documentos do UniWork. Use Salvar para salvar uma nova versão.',
 } satisfies Record<keyof typeof zh, string>

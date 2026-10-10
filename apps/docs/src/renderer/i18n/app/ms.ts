@@ -307,6 +307,7 @@ export const ms = {
   appTabDecimal: 'Perpuluhan',
   appTabBar: 'Bar',
   appTabClear: 'Padam',
+  appAiSettings: 'Tetapan AI',
   appCut: 'Potong',
   appCopy: 'Salin',
   appPaste: 'Tampal',
@@ -527,6 +528,7 @@ export const ms = {
   appWebFatalTitle: 'Dokumen tidak dapat dibuka',
   appWebFatalBody:
     'Penyuntingan dan penyimpanan dilumpuhkan. Muat semula halaman atau buka semula dokumen daripada UniWork.',
+  appWebSaveOffline: 'Tidak dapat menghubungi UniWork. Semak sambungan anda dan cuba lagi.',
   appWebNoHost: 'Editor ini berjalan di dalam UniWork. Buka dokumen daripada UniWork.',
   appSaveStateUnsaved: 'Perubahan belum disimpan',
   appSaveStateSaved: 'Semua perubahan disimpan',

@@ -1579,6 +1579,9 @@ button.check-item:hover {
   display: grid;
   /* workbook / status bar */
   grid-template-rows: minmax(0, 1fr) auto;
+  /* one shrinkable column: an implicit `auto` track would grow to the content's min-width (the
+   * status bar / formula bar rows) and push the grid past the frame on a narrow web viewport */
+  grid-template-columns: minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
 }
@@ -1807,12 +1810,45 @@ button.check-item:hover {
   margin-left: 6px;
 }
 
+/* web frame without AI (cap('ai') off): no dock column at all */
+.app-shell.no-copilot .sheet-body {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .app-shell.copilot-collapsed .sheet-body {
   grid-template-columns: 34px minmax(0, 1fr);
 }
 
 .sheet-main {
   position: relative;
+}
+
+/* Narrow viewport (phone-width web frame, NARROW_VIEWPORT_MAX_PX in narrow-layout.ts; the desktop
+ * window never gets this narrow): the page no longer insists on the 720px desktop minimum, and an
+ * open AI dock overlays the grid from its edge instead of taking a column, so the workbook keeps the
+ * full width. The collapsed rail keeps its 34px column. */
+@media (max-width: 719px) {
+  body {
+    min-width: 0;
+  }
+
+  .app-shell:not(.copilot-collapsed):not(.no-copilot) .sheet-body {
+    position: relative;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sheet-body > .copilot:not(.collapsed) {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: 0;
+    z-index: 30;
+    width: min(var(--copilot-width, 360px), calc(100% - 34px));
+  }
+
+  html[data-ai-panel-side='right'] .sheet-body > .copilot:not(.collapsed) {
+    inset-inline-start: auto;
+    inset-inline-end: 0;
+  }
 }
 
 /* the grid stays ltr under an RTL UI: Univer inherits this through ctx.direction */
@@ -6983,4 +7019,70 @@ body > div:has([data-u-comp='find-replace-dialog']) {
 
 .visual-dialog-remove {
   align-self: flex-start;
+}
+
+/* ---- web frame: no workbook engine yet (UNI-1016, EngineUnavailableScreen.tsx) ---- */
+.engine-unavailable {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  padding: 32px 16px;
+  background: var(--canvas);
+  color: var(--text);
+  font-family: var(--gs-font-sans, system-ui, sans-serif);
+}
+
+.engine-unavailable-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+}
+
+.engine-unavailable-card {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  max-width: 480px;
+  padding: 36px 32px 32px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-16, 16px);
+  background: var(--surface);
+  box-shadow: var(--shadow-menu);
+  text-align: center;
+}
+
+.engine-unavailable-icon {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-16, 16px);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.engine-unavailable-icon svg {
+  width: 36px;
+  height: 36px;
+}
+
+.engine-unavailable-title {
+  margin: 4px 0 0;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text-primary);
+}
+
+.engine-unavailable-body {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+.engine-unavailable-hint {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--text-tertiary);
 }

@@ -5,6 +5,7 @@ export const th = {
   appPhPromptSubtitle: 'คลิกเพื่อเพิ่มชื่อเรื่องรอง',
   appPhPromptBody: 'คลิกเพื่อเพิ่มข้อความ',
   appStatusOpened: 'เปิด {name} แล้ว ({count} สไลด์)',
+  appStatusOpenedOne: 'เปิด {name} แล้ว (1 สไลด์)',
   appStatusNewBlank: 'สร้างงานนำเสนอเปล่าแล้ว',
   appStatusSaved: 'บันทึกแล้ว',
   appStatusSaveFailed: 'บันทึกไม่สำเร็จ: {error}',

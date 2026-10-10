@@ -175,7 +175,7 @@ pub fn save_archive(
     removals: &[String],
     additions: &[EntryContent],
 ) -> Result<SaveArchiveResult, SidecarError> {
-    if source_path.canonicalize()? == target_path.canonicalize().unwrap_or_default() {
+    if same_file(source_path, target_path)? {
         return Err(SidecarError::InvalidRequest(
             "Save target must differ from the source archive.".into(),
         ));
@@ -441,6 +441,19 @@ fn manifest_of(archive: &mut ZipArchive<File>) -> Result<Vec<ArchiveEntry>, Side
     }
     entries.sort_by(|left, right| left.name.cmp(&right.name));
     Ok(entries)
+}
+
+/// Whether two paths name the same file. wasm32-wasip1 has no realpath, and its
+/// in-memory FS paths are already canonical, so it compares them as given.
+fn same_file(source_path: &Path, target_path: &Path) -> Result<bool, SidecarError> {
+    #[cfg(not(target_os = "wasi"))]
+    {
+        Ok(source_path.canonicalize()? == target_path.canonicalize().unwrap_or_default())
+    }
+    #[cfg(target_os = "wasi")]
+    {
+        Ok(source_path == target_path)
+    }
 }
 
 #[cfg(test)]

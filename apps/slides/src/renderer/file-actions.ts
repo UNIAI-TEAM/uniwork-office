@@ -12,6 +12,7 @@ import { renderSlidesToPdfPages } from './export-pages'
 import { renderSlidesToPngBase64 } from './export-render'
 import { t } from './i18n/locale'
 import { showToast } from './components/toast-bus'
+import { cap, isViewOnly } from './capabilities'
 
 /**
  * If a text box/table is still being edited on ⌘S/close-save, blur first so the
@@ -97,6 +98,8 @@ export async function save(
   quiet = false,
   origin: 'user' | 'auto' = 'user',
 ): Promise<boolean> {
+  // web frame without the host's save grant: the deck is view-only
+  if (isViewOnly()) return false
   return runSerialized(async () => {
     // resolved only now: a queued pass must remap selection against the tree the prior save adopted
     const ctx = getCtx()
@@ -122,6 +125,7 @@ export async function save(
 }
 
 export async function saveAs(getCtx: () => ActionCtx): Promise<void> {
+  if (!cap('saveAs')) return
   // Same queue as save(): Save + Save As (or double Save As) write through
   // the same main-process pipe and would interleave without it.
   await runSerialized(async () => {

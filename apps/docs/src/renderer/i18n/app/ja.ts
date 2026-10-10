@@ -320,6 +320,7 @@ export const ja = {
   appTabDecimal: '小数点揃え',
   appTabBar: '縦棒',
   appTabClear: 'クリア',
+  appAiSettings: 'AI 設定',
   // AI settings
   // Context menu
   appCut: '切り取り',
@@ -548,6 +549,7 @@ export const ja = {
   appWebFatalTitle: 'ドキュメントを開けませんでした',
   appWebFatalBody:
     '編集と保存は無効になっています。ページを再読み込みするか、UniWork からドキュメントを開き直してください。',
+  appWebSaveOffline: 'UniWork に接続できません。接続を確認してもう一度お試しください。',
   appWebNoHost:
     'このエディターは UniWork 内で動作します。UniWork からドキュメントを開いてください。',
   appSaveStateUnsaved: '未保存の変更があります',

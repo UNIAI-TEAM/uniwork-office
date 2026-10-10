@@ -1854,6 +1854,14 @@ export interface SlidesApi {
   onShowInk: (handler: (ev: ShowInkEvent) => void) => () => void
   /** Presenter: subscribe to navigation actions sent back by the audience window */
   onAudienceNav: (handler: (action: AudienceNavAction) => void) => () => void
+  // Web frame only (the desktop opens the audience window in presenterStart and never sets these):
+  // a browser opens a window only from a click, so the presenter view offers an explicit button.
+  /** Open the audience window (call from a click); `blocked` = the browser refused the popup */
+  presenterOpenAudience?: () => Promise<{ audience: boolean; blocked?: boolean }>
+  /** Close the audience window; the presenter view keeps running */
+  presenterCloseAudience?: () => Promise<void>
+  /** Presenter: the audience window opened (true) or went away (false, also when the user closed it) */
+  onPresenterAudience?: (handler: (open: boolean) => void) => () => void
 }
 
 declare global {

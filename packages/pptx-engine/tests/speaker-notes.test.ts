@@ -209,12 +209,39 @@ describe('notes body placeholder matching', () => {
     setSlideNotes(opened, 0, 'first')
     const notesPath = notesPathOf(opened)
 
-    const stripped = opened.archive.readText(notesPath)!.replace(/<p:ph\b[^>]*\/>/g, '')
+    const stripped = opened.archive
+      .readText(notesPath)!
+      .replace(/<p:ph\b[^>]*\/>/g, '')
+      .replace('name="Notes Placeholder"', 'name="Shape 3"')
     opened.archive.entries.set(notesPath, Buffer.from(stripped))
     expect(getSlideNotes(opened.archive, slidePath)).toBe('')
 
     expect(setSlideNotes(opened, 0, 'added')).toBe(true)
     expect(opened.archive.readText(notesPath)!.match(/type=["']body["']/g)).toHaveLength(1)
     expect(getSlideNotes(opened.archive, slidePath)).toBe('added')
+  })
+
+  // A generated deck (the visual-host fixture "Deck Vietnamese Notes") keeps the notes in a
+  // plain shape named "Notes Placeholder" with an empty <p:nvPr/>: no <p:ph> at all.
+  it('reads and rewrites notes held in a plain shape named Notes without a placeholder', async () => {
+    const opened = await openPptx(await createBlankPptx())
+    const slidePath = opened.deck.slides[0]!.path
+    setSlideNotes(opened, 0, 'x')
+    const notesPath = notesPathOf(opened)
+    const plain = opened.archive
+      .readText(notesPath)!
+      .replace(/<p:ph\b[^>]*\/>/g, '')
+      .replace(/<a:t>x<\/a:t>/, '<a:t>Ghi chú trình bày cho buổi họp tuần.</a:t>')
+    expect(plain).not.toMatch(/<p:ph\b/)
+    opened.archive.entries.set(notesPath, Buffer.from(plain))
+
+    expect(getSlideNotes(opened.archive, slidePath)).toBe('Ghi chú trình bày cho buổi họp tuần.')
+    expect(setSlideNotes(opened, 0, 'Đã sửa')).toBe(true)
+    // patched in place, no second shape appended
+    expect(opened.archive.readText(notesPath)!.match(/name="Notes Placeholder"/g)).toHaveLength(1)
+    expect(getSlideNotes(opened.archive, slidePath)).toBe('Đã sửa')
+
+    const reopened = await openPptx(await savePptx(opened))
+    expect(getSlideNotes(reopened.archive, reopened.deck.slides[0]!.path)).toBe('Đã sửa')
   })
 })

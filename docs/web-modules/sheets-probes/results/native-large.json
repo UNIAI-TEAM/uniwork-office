@@ -1,0 +1,224 @@
+{
+  "node": "v22.23.2",
+  "platform": "linux-arm64",
+  "results": [
+    {
+      "fixture": "large-20000.xlsx",
+      "fileBytes": 2044290,
+      "open": {
+        "coldMsInclSpawn": 174.9,
+        "resultBytes": 826,
+        "warmMs": 190.4
+      },
+      "sheets": [
+        {
+          "name": "Data",
+          "rows": 20000,
+          "cols": 22
+        }
+      ],
+      "visuals": 0,
+      "readRangeFirstViewport": {
+        "ms": 26,
+        "cells": 2200,
+        "resultBytes": 113703
+      },
+      "fullIndex": {
+        "ms": 577.7
+      },
+      "readRange90kBatch": {
+        "ms": 255.2,
+        "cells": 89980,
+        "resultBytes": 4844519
+      },
+      "readFormulaCells": {
+        "ms": 201.3,
+        "cells": 20000,
+        "resultBytes": 1595649
+      },
+      "archiveManifest": {
+        "ms": 0.6,
+        "entries": 6,
+        "resultBytes": 580
+      },
+      "recalcCells": {
+        "coldMs": 1446.1,
+        "warmMs": 96.4,
+        "readCells": 20000,
+        "resultBytes": 1826752
+      },
+      "saveViaSidecar": {
+        "ms": 548.3,
+        "edits": 1000,
+        "requestBytes": 82949,
+        "outputBytes": 2095597,
+        "touchedEntries": 2
+      },
+      "closeMs": 20.4,
+      "sidecarPeakRssKb": 218360
+    },
+    {
+      "fixture": "large-90000.xlsx",
+      "fileBytes": 9271087,
+      "open": {
+        "coldMsInclSpawn": 716.2,
+        "resultBytes": 826,
+        "warmMs": 708.3
+      },
+      "sheets": [
+        {
+          "name": "Data",
+          "rows": 90000,
+          "cols": 22
+        }
+      ],
+      "visuals": 0,
+      "readRangeFirstViewport": {
+        "ms": 15.9,
+        "cells": 2200,
+        "resultBytes": 113703
+      },
+      "fullIndex": {
+        "ms": 2020
+      },
+      "readRange90kBatch": {
+        "ms": 199.7,
+        "cells": 89980,
+        "resultBytes": 4844519
+      },
+      "readFormulaCells": {
+        "ms": 237,
+        "cells": 90000,
+        "resultBytes": 7296848
+      },
+      "archiveManifest": {
+        "ms": 12.4,
+        "entries": 6,
+        "resultBytes": 580
+      },
+      "recalcCells": {
+        "coldMs": 28541.3,
+        "warmMs": 87.6,
+        "readCells": 20000,
+        "resultBytes": 1826752
+      },
+      "saveViaSidecar": {
+        "ms": 1837.8,
+        "edits": 1000,
+        "requestBytes": 82949,
+        "outputBytes": 9525022,
+        "touchedEntries": 2
+      },
+      "closeMs": 95.2,
+      "sidecarPeakRssKb": 866192
+    },
+    {
+      "fixture": "large-100000.xlsx",
+      "fileBytes": 10303611,
+      "open": {
+        "coldMsInclSpawn": 804.8,
+        "resultBytes": 828,
+        "warmMs": 791.3
+      },
+      "sheets": [
+        {
+          "name": "Data",
+          "rows": 100000,
+          "cols": 22
+        }
+      ],
+      "visuals": 0,
+      "readRangeFirstViewport": {
+        "ms": 14.8,
+        "cells": 2200,
+        "resultBytes": 113703
+      },
+      "fullIndex": {
+        "ms": 2267.7
+      },
+      "readRange90kBatch": {
+        "ms": 214.2,
+        "cells": 89980,
+        "resultBytes": 4844519
+      },
+      "readFormulaCells": {
+        "ms": 270.2,
+        "cells": 100000,
+        "resultBytes": 8111307
+      },
+      "archiveManifest": {
+        "ms": 0.5,
+        "entries": 6,
+        "resultBytes": 581
+      },
+      "recalcCells": {
+        "coldMs": 38471.2,
+        "warmMs": 93.4,
+        "readCells": 20000,
+        "resultBytes": 1826752
+      },
+      "saveViaSidecar": {
+        "ms": 2176.5,
+        "edits": 1000,
+        "requestBytes": 82949,
+        "outputBytes": 10586029,
+        "touchedEntries": 2
+      },
+      "closeMs": 104.2,
+      "sidecarPeakRssKb": 961496
+    },
+    {
+      "fixture": "large-300000.xlsx",
+      "fileBytes": 30712609,
+      "open": {
+        "coldMsInclSpawn": 2375.5,
+        "resultBytes": 829,
+        "warmMs": 2588.5
+      },
+      "sheets": [
+        {
+          "name": "Data",
+          "rows": 300000,
+          "cols": 22
+        }
+      ],
+      "visuals": 0,
+      "readRangeFirstViewport": {
+        "ms": 15.5,
+        "cells": 2200,
+        "resultBytes": 113703
+      },
+      "fullIndex": {
+        "ms": 7113.9
+      },
+      "readRange90kBatch": {
+        "ms": 229.7,
+        "cells": 89980,
+        "resultBytes": 4844520
+      },
+      "readFormulaCells": {
+        "ms": 251.9,
+        "cells": 100000,
+        "resultBytes": 8111306
+      },
+      "archiveManifest": {
+        "ms": 0.5,
+        "entries": 6,
+        "resultBytes": 582
+      },
+      "recalcCells": {
+        "error": "Error: XLSX sidecar request timed out."
+      },
+      "saveViaSidecar": {
+        "ms": 7528.7,
+        "edits": 1000,
+        "requestBytes": 82949,
+        "outputBytes": 31662080,
+        "touchedEntries": 2
+      },
+      "closeMs": 102.9,
+      "sidecarPeakRssKb": 3020580
+    }
+  ],
+  "convert": null
+}

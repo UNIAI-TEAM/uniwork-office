@@ -1499,6 +1499,30 @@ export const vi = {
   appVisualFlipV: 'Lật dọc',
   appVisualFlipH: 'Lật ngang',
   appCtxPasteVisual: 'Dán ảnh hoặc hình',
+  // web frame (UNI-1016): engine-unavailable screen, view-only, save conflicts
+  appWebEngineTitle: 'Chưa thể mở sổ làm việc này trên web',
+  appWebEngineBody:
+    'Phiên bản web của UniWork Sheets đang được bổ sung bộ máy bảng tính. Trong thời gian này, hãy mở sổ làm việc trong ứng dụng UniWork trên máy tính.',
+  appWebEngineHint: 'Tệp của bạn không bị thay đổi.',
+  appWebViewOnly: 'Chỉ xem: bạn không thể lưu thay đổi cho sổ làm việc này.',
+  appWebConflictTitle: 'Sổ làm việc này đã được thay đổi ở nơi khác',
+  appWebConflictBody:
+    'Có người đã lưu phiên bản mới hơn trong lúc bạn chỉnh sửa. Ghi đè bằng phiên bản của bạn, hoặc tải lại phiên bản mới nhất (các thay đổi chưa lưu sẽ bị bỏ).',
+  appWebConflictOverwrite: 'Ghi đè',
+  appWebConflictReload: 'Tải lại bản mới nhất',
+  appWebConflictNotSaved: 'Chưa lưu: đã có phiên bản mới hơn.',
+  appWebDiscardTitle: 'Bỏ các thay đổi chưa lưu?',
+  appWebDiscardBody: 'Mở sổ làm việc khác sẽ bỏ các thay đổi chưa lưu.',
+  appWebDiscard: 'Bỏ thay đổi',
+  appWebCancel: 'Hủy',
+  appWebSaveFailed: 'Lưu vào UniWork thất bại.',
+  appWebTooLargeTitle: 'Sổ làm việc này quá lớn để mở trên web',
+  appWebTooLargeBody:
+    'Kích thước vượt giới hạn của bảng tính web, nên sổ sẽ được mở bằng trình chỉnh sửa bảng tính cổ điển.',
+  appWebEngineRestarted:
+    'Công cụ xử lý sổ làm việc đã dừng bất ngờ và đã được khởi động lại. Sổ làm việc được mở lại từ bản lưu gần nhất; các thay đổi chưa lưu vẫn được giữ, hãy lưu sớm.',
+  appWebSavedReopenFailed:
+    'Các thay đổi của bạn đã được lưu vào UniWork, nhưng không thể mở lại sổ làm việc tại đây. Hãy tải lại trình soạn thảo để tiếp tục.',
   appAutoSaveUniworkOff:
     'Tự động lưu đã tắt cho tài liệu UniWork. Hãy dùng Lưu để lưu phiên bản mới.',
 } satisfies Record<keyof typeof zh, string>

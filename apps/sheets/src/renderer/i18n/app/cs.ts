@@ -1510,6 +1510,30 @@ export const cs = {
   appVisualFlipV: 'Převrátit svisle',
   appVisualFlipH: 'Převrátit vodorovně',
   appCtxPasteVisual: 'Vložit obrázek nebo obrazec',
+  // web frame (UNI-1016): engine-unavailable screen, view-only, save conflicts
+  appWebEngineTitle: 'Tento sešit zatím nelze otevřít na webu',
+  appWebEngineBody:
+    'Webová verze UniWork Sheets teprve dostává svůj tabulkový engine. Do té doby otevřete tento sešit v desktopové aplikaci UniWork.',
+  appWebEngineHint: 'Váš soubor nebyl změněn.',
+  appWebViewOnly: 'Pouze ke čtení: změny v tomto sešitu nelze uložit.',
+  appWebConflictTitle: 'Tento sešit byl změněn jinde',
+  appWebConflictBody:
+    'Během vašich úprav někdo uložil novější verzi. Přepište ji svou verzí, nebo načtěte nejnovější verzi (neuložené změny budou zahozeny).',
+  appWebConflictOverwrite: 'Přepsat',
+  appWebConflictReload: 'Načíst nejnovější verzi',
+  appWebConflictNotSaved: 'Neuloženo: existuje novější verze.',
+  appWebDiscardTitle: 'Zahodit neuložené změny?',
+  appWebDiscardBody: 'Otevřením jiného sešitu se neuložené změny zahodí.',
+  appWebDiscard: 'Zahodit',
+  appWebCancel: 'Zrušit',
+  appWebSaveFailed: 'Uložení do UniWork se nezdařilo.',
+  appWebTooLargeTitle: 'Tento sešit je pro web příliš velký',
+  appWebTooLargeBody:
+    'Překračuje velikost, kterou webová tabulka zvládne, proto se otevře v klasickém tabulkovém editoru.',
+  appWebEngineRestarted:
+    'Modul sešitu se neočekávaně zastavil a byl restartován. Sešit byl znovu otevřen z poslední uložené verze; neuložené změny zůstaly zachovány, brzy je uložte.',
+  appWebSavedReopenFailed:
+    'Vaše změny byly uloženy do UniWork, ale sešit se zde nepodařilo znovu otevřít. Chcete-li pokračovat, načtěte editor znovu.',
   appAutoSaveUniworkOff:
     'Automatické ukládání je pro dokumenty UniWork vypnuté. Novou verzi uložíte příkazem Uložit.',
 } satisfies Record<keyof typeof zh, string>

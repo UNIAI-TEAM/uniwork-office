@@ -1,8 +1,11 @@
 import type { ImageDpi } from '@genoffice/pptx-render'
 import type { Size } from './video-size'
 
-/** PowerPoint for Mac lays untagged bitmaps out at 2 px per point; Windows at 96 dpi. */
-export const DEFAULT_PICTURE_DPI = process.platform === 'darwin' ? 144 : 96
+/**
+ * PowerPoint for Mac lays untagged bitmaps out at 2 px per point; Windows at 96 dpi.
+ * The host decides (SessionPlatform.defaultPictureDpi), this file stays platform-free.
+ */
+export const pictureDpiFor = (mac: boolean): number => (mac ? 144 : 96)
 
 const EMU_PER_PT = 12700
 /** Measured cap: every oversize landscape picture came in exactly 8.5 in wide. */
@@ -32,7 +35,7 @@ export function pictureFrame(
   slide: Size,
   naturalPx: Size | null,
   dpi: ImageDpi | undefined,
-  fallbackDpi = DEFAULT_PICTURE_DPI,
+  fallbackDpi: number,
   { center, minEmu = 0 }: PictureFrameOptions = {},
 ): Frame {
   const boxW = Math.min(slide.width, OVERSIZE_FIT_WIDTH_EMU)

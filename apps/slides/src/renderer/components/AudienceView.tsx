@@ -9,6 +9,9 @@
  * effect (including morph tweens), ink/laser mirror the presenter.
  * Navigation input (clicks/→ etc.) is sent back for presenter arbitration (audienceNav); Esc ends
  * the whole show.
+ * Web: the presenter frame opens this page as a browser window; a browser grants fullscreen only
+ * to a gesture in this window, so until it is fullscreen a click enters fullscreen (and does not
+ * advance) and a hint says so.
  */
 import React, { useEffect, useRef, useState } from 'react'
 import type { RenderFill, RenderNode, RenderSlide } from '@genoffice/pptx-render'
@@ -18,6 +21,7 @@ import { ShowMediaLayer } from './ShowMediaLayer'
 import { useI18n } from '../i18n/locale'
 import { MorphStage } from './MorphStage'
 import { InkLayer, type InkStroke } from './ShowInk'
+import { isWeb } from '../capabilities'
 
 const ANIMATED = ['fade', 'push', 'wipe', 'split', 'circle'] as const
 
@@ -73,8 +77,21 @@ function useSlideImages(slides: RenderSlide[] | null): Map<string, HTMLImageElem
   return images
 }
 
+/** web: whether this window is fullscreen (the desktop window always is) */
+function useWebFullscreen(): boolean {
+  const [fs, setFs] = useState(() => !isWeb() || document.fullscreenElement != null)
+  useEffect(() => {
+    if (!isWeb()) return
+    const on = () => setFs(document.fullscreenElement != null)
+    document.addEventListener('fullscreenchange', on)
+    return () => document.removeEventListener('fullscreenchange', on)
+  }, [])
+  return fs
+}
+
 export function AudienceView() {
   const { t } = useI18n()
+  const fullscreen = useWebFullscreen()
   const [slides, setSlides] = useState<RenderSlide[] | null>(null)
   const [size, setSize] = useState({ w: window.innerWidth, h: window.innerHeight })
   const images = useSlideImages(slides)
@@ -238,8 +255,24 @@ export function AudienceView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sync, slides, allAnims])
 
+  const fsHint = fullscreen ? null : (
+    <div className="ss-fs-hint" role="status">
+      {t('paneAudienceFullscreenHint')}
+    </div>
+  )
+  /** web, not fullscreen yet: the click is the fullscreen gesture, not a navigation */
+  const enterFullscreen = (): boolean => {
+    if (fullscreen) return false
+    void document.documentElement.requestFullscreen?.().catch(() => {})
+    return true
+  }
+
   if (!slide || !sync) {
-    return <div className="slideshow" />
+    return (
+      <div className="slideshow" onClick={() => enterFullscreen()}>
+        {fsHint}
+      </div>
+    )
   }
 
   const fitW = Math.round(Math.min(size.w, (size.h * slide.widthPx) / slide.heightPx))
@@ -248,7 +281,9 @@ export function AudienceView() {
   return (
     <div
       className="slideshow"
-      onClick={() => window.slidesApi.audienceNav('next')}
+      onClick={() => {
+        if (!enterFullscreen()) window.slidesApi.audienceNav('next')
+      }}
       onContextMenu={(e) => {
         e.preventDefault()
         window.slidesApi.audienceNav('prev')
@@ -301,6 +336,7 @@ export function AudienceView() {
       {!sync.ended && (sync.black || sync.white) && (
         <div className={sync.black ? 'ss-black' : 'ss-white'} />
       )}
+      {fsHint}
     </div>
   )
 }

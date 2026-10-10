@@ -254,6 +254,16 @@ export const hi = {
   panePresenterUseShowTip: 'इस डिस्प्ले पर सामान्य स्लाइड शो पर जाएँ',
   panePresenterSingleHint:
     'एकल डिस्प्ले मोड (दूसरा डिस्प्ले जोड़ने पर स्वतः पूर्ण स्क्रीन शो होगा)',
+  panePresenterOpenAudience: 'दर्शक विंडो',
+  panePresenterOpenAudienceTip:
+    'स्लाइड शो को अलग विंडो में खोलें जिसे आप प्रोजेक्टर पर खींच सकते हैं',
+  panePresenterCloseAudience: 'दर्शक विंडो बंद करें',
+  panePresenterCloseAudienceTip: 'दर्शक विंडो बंद करें; प्रस्तुतकर्ता दृश्य चलता रहता है',
+  panePresenterWebHint:
+    'दर्शक विंडो खोलें, उसे प्रोजेक्टर पर खींचें, फिर पूर्ण स्क्रीन के लिए उस पर क्लिक करें',
+  panePresenterPopupBlocked:
+    'ब्राउज़र ने विंडो ब्लॉक कर दी। इस साइट के लिए पॉप-अप की अनुमति दें और फिर से प्रयास करें।',
+  paneAudienceFullscreenHint: 'पूर्ण स्क्रीन के लिए क्लिक करें',
   panePresenterElapsed: 'बीता समय',
   panePresenterPause: 'टाइमर रोकें',
   panePresenterResume: 'टाइमर जारी रखें',

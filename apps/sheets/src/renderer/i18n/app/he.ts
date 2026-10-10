@@ -1448,6 +1448,30 @@ export const he = {
   appVisualFlipV: 'הפוך אנכית',
   appVisualFlipH: 'הפוך אופקית',
   appCtxPasteVisual: 'הדבק תמונה או צורה',
+  // web frame (UNI-1016): engine-unavailable screen, view-only, save conflicts
+  appWebEngineTitle: 'עדיין לא ניתן לפתוח את חוברת העבודה הזו באינטרנט',
+  appWebEngineBody:
+    'גרסת האינטרנט של UniWork Sheets עדיין מקבלת את מנוע הגיליונות שלה. עד אז, פתחו את חוברת העבודה באפליקציית UniWork למחשב.',
+  appWebEngineHint: 'הקובץ שלך לא השתנה.',
+  appWebViewOnly: 'צפייה בלבד: לא ניתן לשמור שינויים בחוברת העבודה הזו.',
+  appWebConflictTitle: 'חוברת העבודה שונתה במקום אחר',
+  appWebConflictBody:
+    'מישהו שמר גרסה חדשה יותר בזמן שערכת. החלף אותה בגרסה שלך, או טען מחדש את הגרסה האחרונה (שינויים שלא נשמרו יימחקו).',
+  appWebConflictOverwrite: 'החלף',
+  appWebConflictReload: 'טען את הגרסה האחרונה',
+  appWebConflictNotSaved: 'לא נשמר: קיימת גרסה חדשה יותר.',
+  appWebDiscardTitle: 'לבטל שינויים שלא נשמרו?',
+  appWebDiscardBody: 'פתיחת חוברת עבודה אחרת מבטלת שינויים שלא נשמרו.',
+  appWebDiscard: 'בטל שינויים',
+  appWebCancel: 'ביטול',
+  appWebSaveFailed: 'השמירה ב-UniWork נכשלה.',
+  appWebTooLargeTitle: 'חוברת העבודה גדולה מדי לאינטרנט',
+  appWebTooLargeBody:
+    'היא חורגת מהגודל שגיליון האינטרנט מטפל בו, ולכן תיפתח בעורך הגיליונות הקלאסי.',
+  appWebEngineRestarted:
+    'מנוע חוברת העבודה נעצר באופן בלתי צפוי והופעל מחדש. חוברת העבודה נפתחה מחדש מהגרסה האחרונה ששמרתם; השינויים שלא נשמרו נשמרו, כדאי לשמור בקרוב.',
+  appWebSavedReopenFailed:
+    'השינויים שלך נשמרו ב-UniWork, אך לא ניתן היה לפתוח את החוברת מחדש כאן. טען מחדש את העורך כדי להמשיך.',
   appAutoSaveUniworkOff:
     'השמירה האוטומטית כבויה עבור מסמכי UniWork. השתמשו ב״שמירה״ כדי לשמור גרסה חדשה.',
 } satisfies Record<keyof typeof zh, string>

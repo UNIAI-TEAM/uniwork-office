@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { rewriteTtfUrls, WOFF2_DIR } from './fonts-woff2'
+import { keepWoff2Only, rewriteTtfUrls, WOFF2_DIR, woff2UrlImport } from './fonts-woff2'
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
 const FONTS_CSS = join(repoRoot, 'apps/docs/src/renderer/fonts/fonts.css')
@@ -40,6 +40,22 @@ describe('rewriteTtfUrls', () => {
   })
 })
 
+describe('woff2UrlImport', () => {
+  it('maps a TTF ?url import to the WOFF2 twin, leaves everything else to Vite', () => {
+    expect(woff2UrlImport('@genoffice/ui/fonts/Carlito-Regular.ttf?url')).toBe(
+      `${join(WOFF2_DIR, 'Carlito-Regular.woff2')}?url`,
+    )
+    expect(woff2UrlImport('../fonts/Carlito-Bold.ttf?url')).toBe(
+      `${join(WOFF2_DIR, 'Carlito-Bold.woff2')}?url`,
+    )
+    // no twin, not a URL import, not a TTF: untouched
+    expect(woff2UrlImport('@genoffice/ui/fonts/Unknown-Face.ttf?url')).toBeNull()
+    expect(woff2UrlImport('@genoffice/ui/fonts/Carlito-Regular.ttf')).toBeNull()
+    expect(woff2UrlImport('@genoffice/ui/fonts/Carlito-Regular.woff2?url')).toBeNull()
+    expect(woff2UrlImport('react')).toBeNull()
+  })
+})
+
 describe('web/docs/fonts is in sync with fonts.css', () => {
   const sources = JSON.parse(readFileSync(join(WOFF2_DIR, 'woff2-sources.json'), 'utf8')) as Record<
     string,
@@ -63,5 +79,29 @@ describe('web/docs/fonts is in sync with fonts.css', () => {
       )
       expect(readFileSync(join(WOFF2_DIR, twin)).length).toBe(info.woff2Bytes)
     }
+  })
+})
+
+describe('keepWoff2Only (KaTeX)', () => {
+  it('drops woff/ttf alternatives when a woff2 is offered', () => {
+    const katex =
+      '@font-face{font-family:KaTeX_AMS;src:url(fonts/KaTeX_AMS-Regular.woff2) format("woff2"),url(fonts/KaTeX_AMS-Regular.woff) format("woff"),url(fonts/KaTeX_AMS-Regular.ttf) format("truetype");font-weight:400}'
+    expect(keepWoff2Only(katex)).toBe(
+      '@font-face{font-family:KaTeX_AMS;src:url(fonts/KaTeX_AMS-Regular.woff2) format("woff2");font-weight:400}',
+    )
+  })
+
+  it('leaves single-url and woff2-less lists alone', () => {
+    const css = [
+      "src: url('./A.woff2') format('woff2');",
+      "src: url('./B.woff') format('woff'), url('./B.ttf') format('truetype');",
+      "src: url('./C.ttf');",
+    ].join('\n')
+    expect(keepWoff2Only(css)).toBe(css)
+  })
+
+  it('is a no-op on the Docs fonts.css (its build stays unchanged)', () => {
+    const css = readFileSync(FONTS_CSS, 'utf8')
+    expect(keepWoff2Only(css)).toBe(css)
   })
 })

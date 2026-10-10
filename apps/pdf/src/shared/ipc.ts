@@ -838,4 +838,18 @@ export interface PdfApi {
   aiStream(request: AiStreamRequest): Promise<void>
   aiStreamCancel(requestId: string): Promise<void>
   onAiStream(handler: (chunk: AiStreamChunk) => void): () => void
+  /** Web frame only (GO-B4): what the platform offers, read through renderer/capabilities.ts
+      `cap()`. Electron never sets it, so the desktop keeps every entry */
+  capabilities?: Readonly<Record<string, unknown>>
+  /** Web frame only: the document at `path` was replaced from outside (Reload latest after a
+      save conflict); reopen it, dropping pending edits. Absent on desktop */
+  onReloadRequest?(handler: (path: string) => void): () => void
+  /** Web frame only (draft recovery): register what a Save would send right now (pending edits
+      of the open file, no side effects; null = nothing open). The frame applies it to keep an
+      encrypted local copy of unsaved work. Returns the unregister function. Absent on desktop */
+  provideSaveRequest?(provider: () => SavePdfRequest | null): () => void
+  /** Web frame only (draft recovery): true once when the document handed out by the last
+      consumePending / reload is a restored draft: the viewer starts dirty with no pending
+      edits and its Save writes the bytes as they are. Absent on desktop */
+  consumeRecovered?(): boolean
 }

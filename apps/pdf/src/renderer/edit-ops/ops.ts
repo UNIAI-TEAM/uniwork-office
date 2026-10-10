@@ -6,6 +6,7 @@
  * a saved note voids its pending content edit, removing a static-form-fill image
  * edit turns into a delete of the underlying image.
  */
+import { cap } from '../capabilities'
 import type {
   DrawingInput,
   FormValueInput,
@@ -103,6 +104,9 @@ register({
     const a = obj<SavedMarkupAnnot | SavedNoteAnnot>(op.annot, 'annot')
     pageIndex(a.pageIndex, ctx, 'annot.pageIndex')
     if (typeof a.objNum !== 'number') throw new GuidedError('annot.objNum must be a number')
+    // removing an annotation already in the file is a pdfium rewrite (web: pdfAnnotDelete)
+    if (!cap('pdfAnnotDelete'))
+      throw new GuidedError('Deleting annotations saved in the file is not available here')
   },
   apply(op, s) {
     const annot = op.annot as SavedMarkupAnnot | SavedNoteAnnot

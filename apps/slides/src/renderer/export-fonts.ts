@@ -54,8 +54,11 @@ async function bundledFaces(names: Set<string>): Promise<string[]> {
         .trim()
         .replace(/^['"]|['"]$/g, '')
       if (!names.has(family.normalize('NFKC').toLowerCase())) continue
-      const url = /url\(\s*['"]?([^'")]+)['"]?\s*\)/.exec(style.getPropertyValue('src'))?.[1]
-      if (!url) continue
+      const src = /url\(\s*['"]?([^'")]+)['"]?\s*\)/.exec(style.getPropertyValue('src'))?.[1]
+      if (!src) continue
+      // a relative url() is relative to its stylesheet, not the document (the web
+      // frame serves CSS from assets/ and the faces from fonts/)
+      const url = new URL(src, sheet.href ?? document.baseURI).href
       const weight = style.getPropertyValue('font-weight') || 'normal'
       const fontStyle = style.getPropertyValue('font-style') || 'normal'
       let data = bundledCache.get(url)

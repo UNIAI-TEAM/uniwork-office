@@ -219,6 +219,16 @@ export interface HtmlApi {
   headlessExportDone(result: { ok: boolean; error?: string }): void
   /** Read the file as UTF-8 text. Only paths granted to this view are allowed */
   readFile(path: string): Promise<string>
+  /**
+   * Web bridge only (draft recovery): the server text a restored draft replaced, read once right
+   * after the initial load; null = not a restored draft. The renderer opens the document dirty.
+   */
+  consumeRecovered?(): string | null
+  /**
+   * Web bridge only (draft recovery): register how to read the text a save would write now,
+   * without saving (null = not ready). Returns the unregister function.
+   */
+  provideText?(provider: () => string | null): () => void
   /** Push the current buffer so html-preview:// serves it to the preview iframe */
   updatePreview(text: string): void
   /** The html-preview:// URL bound to this view (a present tab gets its owner's URL) */
@@ -321,6 +331,22 @@ export interface HtmlApi {
   imageSearch(query: string, maxResults?: number): Promise<ImageSearchResult>
   /** Download an image URL in the main process (CORS-free, scheme/target validated) */
   fetchImage(url: string): Promise<ImageData | null>
+  /**
+   * Web frame only (absent on desktop): the static preview copy of the document (no scripts,
+   * handlers or remote loads), now and after every updatePreview; returns the unsubscribe.
+   */
+  onStaticPreview?(handler: (html: string) => void): () => void
+  /**
+   * Web frame only (absent on desktop): hand the latest preview copy to the preview document
+   * that just loaded in `target` (web/modules/html/public/preview.html, opaque origin) together
+   * with a MessagePort, the inspector's only channel. Messages arrive unvalidated in `onMessage`
+   * (the caller parses them); `onFailed` = the preview document never answered (a host serving it
+   * without its own policy), the caller falls back to the static preview.
+   */
+  connectPreview?(
+    target: Window,
+    handlers: { onMessage: (data: unknown) => void; onFailed: () => void },
+  ): { post(msg: unknown): void; close(): void }
   /** AI image generation via the configured media provider (html-owned channel) */
   aiGenerateImage(op: { prompt: string; aspectRatio?: string }): Promise<{
     url?: string

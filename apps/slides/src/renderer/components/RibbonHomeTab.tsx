@@ -7,6 +7,7 @@ import { armColorInput } from '../color-input'
 import { displayFontFamily } from '../konva-adapter'
 import { useSystemFontFamilies } from '../system-fonts'
 import { useFontCatalog } from '../font-manager'
+import { cap } from '../capabilities'
 import {
   GensparkMark,
   IconAiBeautify,
@@ -226,58 +227,62 @@ export function RibbonHomeTab({ rb }: { rb: RibbonTabCtx }) {
   }
   return (
     <>
-      <Group label="AI">
-        <button
-          className={`rb-big ai-entry${aiOpen ? ' active' : ''}`}
-          data-tip={t('aiOpenAssistant')}
-          onClick={onToggleAi}
-        >
-          <span className="rb-big-icon">
-            <GensparkMark size={26} />
-          </span>
-          <span>AI</span>
-        </button>
-        <button
-          className="rb-big ai-entry"
-          disabled={!hasDoc || deckEmpty}
-          data-tip={t('aiBeautifyBtn')}
-          onClick={() => onAiPreset(t('aiBeautifyPrompt'), { slideShot: true })}
-        >
-          <span className="rb-big-icon">
-            <span className="ai-feature-icon" aria-hidden="true">
-              <IconAiBeautify />
-            </span>
-          </span>
-          <span>{t('aiBeautifyBtn')}</span>
-        </button>
-        <button
-          className="rb-big ai-entry"
-          disabled={!hasDoc || deckEmpty}
-          data-tip={t('aiFactCheckBtn')}
-          onClick={() => onAiPreset(t('aiFactCheckPrompt'))}
-        >
-          <span className="rb-big-icon">
-            <span className="ai-feature-icon" aria-hidden="true">
-              <IconAiFactCheck />
-            </span>
-          </span>
-          <span>{t('aiFactCheckBtn')}</span>
-        </button>
-        <button
-          className="rb-big ai-entry"
-          disabled={!hasDoc || deckEmpty}
-          data-tip={t('aiImageBtn')}
-          onClick={() => onAiPreset(t('aiImagePrompt'))}
-        >
-          <span className="rb-big-icon">
-            <span className="ai-feature-icon" aria-hidden="true">
-              <IconAiImage />
-            </span>
-          </span>
-          <span>{t('aiImageBtn')}</span>
-        </button>
-      </Group>
-      <div className="ribbon-sep" />
+      {cap('ai') && (
+        <>
+          <Group label="AI">
+            <button
+              className={`rb-big ai-entry${aiOpen ? ' active' : ''}`}
+              data-tip={t('aiOpenAssistant')}
+              onClick={onToggleAi}
+            >
+              <span className="rb-big-icon">
+                <GensparkMark size={26} />
+              </span>
+              <span>AI</span>
+            </button>
+            <button
+              className="rb-big ai-entry"
+              disabled={!hasDoc || deckEmpty}
+              data-tip={t('aiBeautifyBtn')}
+              onClick={() => onAiPreset(t('aiBeautifyPrompt'), { slideShot: true })}
+            >
+              <span className="rb-big-icon">
+                <span className="ai-feature-icon" aria-hidden="true">
+                  <IconAiBeautify />
+                </span>
+              </span>
+              <span>{t('aiBeautifyBtn')}</span>
+            </button>
+            <button
+              className="rb-big ai-entry"
+              disabled={!hasDoc || deckEmpty}
+              data-tip={t('aiFactCheckBtn')}
+              onClick={() => onAiPreset(t('aiFactCheckPrompt'))}
+            >
+              <span className="rb-big-icon">
+                <span className="ai-feature-icon" aria-hidden="true">
+                  <IconAiFactCheck />
+                </span>
+              </span>
+              <span>{t('aiFactCheckBtn')}</span>
+            </button>
+            <button
+              className="rb-big ai-entry"
+              disabled={!hasDoc || deckEmpty}
+              data-tip={t('aiImageBtn')}
+              onClick={() => onAiPreset(t('aiImagePrompt'))}
+            >
+              <span className="rb-big-icon">
+                <span className="ai-feature-icon" aria-hidden="true">
+                  <IconAiImage />
+                </span>
+              </span>
+              <span>{t('aiImageBtn')}</span>
+            </button>
+          </Group>
+          <div className="ribbon-sep" />
+        </>
+      )}
       <Group label={t('ribbonGroupClipboard')}>
         <button
           className="rb-big"
@@ -646,7 +651,7 @@ export function RibbonHomeTab({ rb }: { rb: RibbonTabCtx }) {
                       ))}
                     </>
                   )}
-                  {catalogFonts.some((c) => matchesFontFilter(c.family)) && (
+                  {cap('fontDownload') && catalogFonts.some((c) => matchesFontFilter(c.family)) && (
                     <>
                       <div className="rb-menu-group-label">{t('ribbonFontsDownloadable')}</div>
                       {catalogFonts
@@ -693,18 +698,20 @@ export function RibbonHomeTab({ rb }: { rb: RibbonTabCtx }) {
                         )}
                     </>
                   )}
-                  <button
-                    className="rb-font-install-local"
-                    onMouseDown={(e) => {
-                      e.preventDefault()
-                      void installLocalFonts().then((families) => {
-                        if (families.length === 1) onFontFamily(families[0]!)
-                        if (families.length) setFontOpen(false)
-                      })
-                    }}
-                  >
-                    {t('ribbonFontInstallLocal')}
-                  </button>
+                  {cap('fontInstallLocal') && (
+                    <button
+                      className="rb-font-install-local"
+                      onMouseDown={(e) => {
+                        e.preventDefault()
+                        void installLocalFonts().then((families) => {
+                          if (families.length === 1) onFontFamily(families[0]!)
+                          if (families.length) setFontOpen(false)
+                        })
+                      }}
+                    >
+                      {t('ribbonFontInstallLocal')}
+                    </button>
+                  )}
                 </div>
               )}
             </div>

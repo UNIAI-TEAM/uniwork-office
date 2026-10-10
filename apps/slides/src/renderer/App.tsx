@@ -1,4 +1,13 @@
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import React, {
+  Suspense,
+  lazy,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import type {
   GroupRenderNode,
   RenderFill,
@@ -33,6 +42,7 @@ import type {
   TransitionKind,
 } from '../shared/ipc'
 import { baseName } from '../shared/base-name'
+import { openedStatusKey } from '../shared/opened-status'
 import { SlideCanvas, selectionChromeColor, type SlideCanvasHandle } from './SlideCanvas'
 import { tableCellOverlayBox } from './table-hit'
 import { ZOOM_PREVIEW_EVENT } from './zoom-preview'
@@ -110,7 +120,7 @@ import { GensparkMark, IconAiBeautify, IconAiFactCheck, IconAiImage } from './co
 import { ToastHost } from './components/toast'
 import { showToast } from './components/toast-bus'
 import { t, useI18n } from './i18n/locale'
-import { AiPanel } from './ai/AiPanel'
+import { cap } from './capabilities'
 import { ChartDataDialog } from './components/ChartDataDialog'
 import type { BrushFormat } from './format-brush'
 import { isTextUndoTarget, shouldRouteHistoryToDeck } from './undo-routing'
@@ -159,6 +169,9 @@ import {
 } from '../shared/notes-draft'
 import { useEscOverlay, useEscOverlayOpen } from './esc-overlay'
 import { buildCtxItems } from './context-menu-items'
+
+// The AI panel (agent, providers, skills) is its own chunk: the web frame (cap 'ai' off) never loads it
+const AiPanel = lazy(() => import('./ai/AiPanel').then((m) => ({ default: m.AiPanel })))
 import { isMac, nextSelection } from './platform-modifiers'
 import * as placeholderNav from './placeholder-nav'
 
@@ -491,11 +504,14 @@ export function App() {
       live = false
     }
   }, [path])
-  const autoSave = autoSavePref && !uniwork.bound
+  // web frame: explicit saves only (CONTRACT C10), whatever a stored preference says
+  const autoSave = cap('autoSave') && autoSavePref && !uniwork.bound
   useEffect(() => {
     window.slidesApi.setAutoSavePref?.(autoSave)
   }, [autoSave])
-  const [showAi, setShowAi] = useState(() => aiPanelInitiallyOpen('ai-slides-show-ai'))
+  const aiEnabled = cap('ai')
+  const [showAiPref, setShowAi] = useState(() => aiPanelInitiallyOpen('ai-slides-show-ai'))
+  const showAi = aiEnabled && showAiPref
   const [showFormat, setShowFormat] = useState(false)
   const [showBgFormat, setShowBgFormat] = useState(false)
   const [aiSettings, setAiSettings] = useState<AiSettings | null>(null)
@@ -708,14 +724,14 @@ export function App() {
       const viewportW =
         el?.clientWidth ||
         stageViewportSize.w ||
-        window.innerWidth - (showThumbs ? thumbsW : 0) - (showAi ? 360 : 34)
+        window.innerWidth - (showThumbs ? thumbsW : 0) - (showAi ? 360 : aiEnabled ? 34 : 0)
       const viewportH = el?.clientHeight || stageViewportSize.h || window.innerHeight - 150
       const availW = viewportW - 56
       // -72: vertical padding is 48 (AI-bar headroom) + 32, minus the same 8px slack as width
       const availH = viewportH - 72
       return Math.min(availW / s.widthPx, availH / s.heightPx)
     },
-    [showThumbs, showAi, stageViewportSize.h, stageViewportSize.w, thumbsW],
+    [showThumbs, showAi, aiEnabled, stageViewportSize.h, stageViewportSize.w, thumbsW],
   )
   /** Fit zoom for display: rawFit clamped to the 0.1–1.5 auto-fit range */
   const fitZoom = useCallback(
@@ -892,7 +908,7 @@ export function App() {
       needsFitRef.current = true
       setStatus(
         result.path
-          ? t('appStatusOpened', {
+          ? t(openedStatusKey(result.slides.length), {
               name: baseName(result.path),
               count: result.slides.length,
             })
@@ -1271,7 +1287,7 @@ export function App() {
         bootHandledRef.current = true
         if (r) applyOpen(r)
         else await bootBlank()
-        const preset = await window.slidesApi.consumeAiPreset()
+        const preset = aiEnabled ? await window.slidesApi.consumeAiPreset() : null
         if (preset?.text) {
           setShowAi(() => {
             localStorage.setItem('ai-slides-show-ai', '1')
@@ -1293,7 +1309,7 @@ export function App() {
         void bootBlank()
       })
     const offAiPreset = window.slidesApi.onAiPreset?.((preset) => {
-      if (!preset?.text) return
+      if (!preset?.text || !aiEnabled) return
       setShowAi(() => {
         localStorage.setItem('ai-slides-show-ai', '1')
         return true
@@ -1309,7 +1325,7 @@ export function App() {
       off()
       offAiPreset?.()
     }
-  }, [applyOpen, newBlank])
+  }, [aiEnabled, applyOpen, newBlank])
 
   // Path changed outside this renderer (shell Home list rename, or an MCP save that
   // wrote the session to disk) → sync the title-bar path and ask the session
@@ -1324,14 +1340,16 @@ export function App() {
   )
 
   useEffect(() => {
+    if (!aiEnabled) return
     const loadSettings = () => void window.slidesApi.getAiSettings().then(setAiSettings)
     loadSettings()
     return window.slidesApi.onAiSettingsChanged?.(loadSettings)
-  }, [])
+  }, [aiEnabled])
 
   // Recent files for the start screen
   useEffect(() => {
-    if (slides.length === 0) void window.slidesApi.getRecentFiles().then(setRecent)
+    if (slides.length === 0 && cap('recents'))
+      void window.slidesApi.getRecentFiles().then(setRecent)
   }, [slides.length])
 
   const toggleAi = useCallback(() => {
@@ -1457,14 +1475,14 @@ export function App() {
   )
 
   const openAskPopover = useCallback(() => {
-    if (editing || editingCell || selectedIds.length === 0) return
+    if (!aiEnabled || editing || editingCell || selectedIds.length === 0) return
     // Clicking the trigger while the popover is open dismisses it through
     // the capture-phase outside-click handler before onClick runs.
     if (Date.now() - askClosedAtRef.current < 250) return
     // A full queue only disables "Add to queue" inside the popover; "Send now"
     // never touches the queue, so the popover still opens
     setAskState({ ids: selectedIds })
-  }, [editing, editingCell, selectedIds])
+  }, [aiEnabled, editing, editingCell, selectedIds])
 
   const commitAsk = useCallback(
     (instruction: string) => {
@@ -3586,45 +3604,49 @@ export function App() {
       />
 
       <div className="app-main">
-        {slide && viewMode !== 'reading' && viewMode !== 'sorter' && (
+        {aiEnabled && slide && viewMode !== 'reading' && viewMode !== 'sorter' && (
           <div className={`ai-dock${showAi && aiSettings ? '' : ' collapsed'}`}>
             {/* always mounted once settings load: collapse must not drop state or in-flight runs */}
             {aiSettings ? (
-              <AiPanel
-                key={aiPanelKey}
-                slides={slides}
-                current={current}
-                selectedIds={selectedIds}
-                deckEmpty={deckEmpty}
-                images={images}
-                applySlide={applySlide}
-                applyDeck={applyDeck}
-                fitWidthPx={FIT_WIDTH}
-                settings={aiSettings}
-                preset={aiPreset}
-                open={showAi}
-                onExpand={toggleAi}
-                onCollapse={toggleAi}
-                onUndo={() => void undo()}
-                onPathChange={(p) => {
-                  setPath(p)
-                  setDirty(false)
-                }}
-                onBeforeRun={flushNotes}
-                currentFilePath={path}
-                editQueue={editQueue}
-                onQueueEditInstruction={(key, instruction) =>
-                  setEditQueue((prev) =>
-                    prev.map((it) => (it.key === key ? { ...it, instruction } : it)),
-                  )
-                }
-                onQueueRemove={(key) => setEditQueue((prev) => prev.filter((it) => it.key !== key))}
-                onQueueClear={() => setEditQueue([])}
-                onQueueFocus={focusQueueItem}
-                onQueueConsume={(keys) =>
-                  setEditQueue((prev) => prev.filter((it) => !keys.includes(it.key)))
-                }
-              />
+              <Suspense fallback={null}>
+                <AiPanel
+                  key={aiPanelKey}
+                  slides={slides}
+                  current={current}
+                  selectedIds={selectedIds}
+                  deckEmpty={deckEmpty}
+                  images={images}
+                  applySlide={applySlide}
+                  applyDeck={applyDeck}
+                  fitWidthPx={FIT_WIDTH}
+                  settings={aiSettings}
+                  preset={aiPreset}
+                  open={showAi}
+                  onExpand={toggleAi}
+                  onCollapse={toggleAi}
+                  onUndo={() => void undo()}
+                  onPathChange={(p) => {
+                    setPath(p)
+                    setDirty(false)
+                  }}
+                  onBeforeRun={flushNotes}
+                  currentFilePath={path}
+                  editQueue={editQueue}
+                  onQueueEditInstruction={(key, instruction) =>
+                    setEditQueue((prev) =>
+                      prev.map((it) => (it.key === key ? { ...it, instruction } : it)),
+                    )
+                  }
+                  onQueueRemove={(key) =>
+                    setEditQueue((prev) => prev.filter((it) => it.key !== key))
+                  }
+                  onQueueClear={() => setEditQueue([])}
+                  onQueueFocus={focusQueueItem}
+                  onQueueConsume={(keys) =>
+                    setEditQueue((prev) => prev.filter((it) => !keys.includes(it.key)))
+                  }
+                />
+              </Suspense>
             ) : (
               <button
                 className="ai-rail"
@@ -3638,7 +3660,7 @@ export function App() {
           </div>
         )}
         <div className="app-content">
-          {missingFonts.length > 0 && (
+          {cap('fontDownload') && missingFonts.length > 0 && (
             <div className="font-missing-banner">
               <span className="fmb-text">
                 {t('fontMissingBanner')}
@@ -3970,57 +3992,59 @@ export function App() {
                             : undefined
                         }
                       >
-                        <div className="stage-ai-bar">
-                          <div className="stage-ai-group">
-                            <button
-                              className={`stage-ai-btn${showAi ? ' active' : ''}`}
-                              data-tip={t('aiOpenAssistant')}
-                              onClick={toggleAi}
-                            >
-                              <GensparkMark size={14} />
-                              <span>AI</span>
-                            </button>
-                            {/* Same one-click presets as the Home tab; hidden instead of
+                        {aiEnabled && (
+                          <div className="stage-ai-bar">
+                            <div className="stage-ai-group">
+                              <button
+                                className={`stage-ai-btn${showAi ? ' active' : ''}`}
+                                data-tip={t('aiOpenAssistant')}
+                                onClick={toggleAi}
+                              >
+                                <GensparkMark size={14} />
+                                <span>AI</span>
+                              </button>
+                              {/* Same one-click presets as the Home tab; hidden instead of
                         disabled while the deck has no real content */}
-                            {!deckEmpty && (
-                              <>
-                                <span className="stage-ai-divider" aria-hidden="true" />
-                                <button
-                                  className="stage-ai-btn"
-                                  data-tip={t('aiBeautifyBtn')}
-                                  onClick={() =>
-                                    pushAiPreset(
-                                      t('aiBeautifyPrompt'),
-                                      true,
-                                      undefined,
-                                      undefined,
-                                      true,
-                                    )
-                                  }
-                                >
-                                  <IconAiBeautify size={14} />
-                                  <span>{t('aiBeautifyBtn')}</span>
-                                </button>
-                                <button
-                                  className="stage-ai-btn"
-                                  data-tip={t('aiFactCheckBtn')}
-                                  onClick={() => pushAiPreset(t('aiFactCheckPrompt'))}
-                                >
-                                  <IconAiFactCheck size={14} />
-                                  <span>{t('aiFactCheckBtn')}</span>
-                                </button>
-                                <button
-                                  className="stage-ai-btn"
-                                  data-tip={t('aiImageBtn')}
-                                  onClick={() => pushAiPreset(t('aiImagePrompt'))}
-                                >
-                                  <IconAiImage size={14} />
-                                  <span>{t('aiImageBtn')}</span>
-                                </button>
-                              </>
-                            )}
+                              {!deckEmpty && (
+                                <>
+                                  <span className="stage-ai-divider" aria-hidden="true" />
+                                  <button
+                                    className="stage-ai-btn"
+                                    data-tip={t('aiBeautifyBtn')}
+                                    onClick={() =>
+                                      pushAiPreset(
+                                        t('aiBeautifyPrompt'),
+                                        true,
+                                        undefined,
+                                        undefined,
+                                        true,
+                                      )
+                                    }
+                                  >
+                                    <IconAiBeautify size={14} />
+                                    <span>{t('aiBeautifyBtn')}</span>
+                                  </button>
+                                  <button
+                                    className="stage-ai-btn"
+                                    data-tip={t('aiFactCheckBtn')}
+                                    onClick={() => pushAiPreset(t('aiFactCheckPrompt'))}
+                                  >
+                                    <IconAiFactCheck size={14} />
+                                    <span>{t('aiFactCheckBtn')}</span>
+                                  </button>
+                                  <button
+                                    className="stage-ai-btn"
+                                    data-tip={t('aiImageBtn')}
+                                    onClick={() => pushAiPreset(t('aiImagePrompt'))}
+                                  >
+                                    <IconAiImage size={14} />
+                                    <span>{t('aiImageBtn')}</span>
+                                  </button>
+                                </>
+                              )}
+                            </div>
                           </div>
-                        </div>
+                        )}
                         <div
                           ref={stageScaleRef}
                           className="stage-scale"
@@ -4617,7 +4641,8 @@ export function App() {
         </div>
       )}
 
-      {!askState &&
+      {aiEnabled &&
+        !askState &&
         !editing &&
         !editingCell &&
         !cropTarget &&
@@ -4627,7 +4652,7 @@ export function App() {
           <AiAskTrigger getAnchorRect={getAskTriggerRect} onOpen={openAskPopover} />
         )}
 
-      {askState && askTargets.length > 0 && (
+      {aiEnabled && askState && askTargets.length > 0 && (
         <AiAskPopover
           targets={askTargets}
           getAnchorRect={getAskAnchorRect}

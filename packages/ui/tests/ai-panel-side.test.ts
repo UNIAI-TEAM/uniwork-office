@@ -56,4 +56,37 @@ describe('AI panel initial open state', () => {
     rememberAiPanelOpen('k', false)
     expect(aiPanelInitiallyOpen('k')).toBe(false)
   })
+
+  it('starts collapsed in a narrow window when nothing is remembered, and does not remember that', () => {
+    vi.stubGlobal('innerWidth', 390)
+    localStorage.removeItem('narrow')
+    applyAiPanelPrefs({ openInNewDocs: true })
+    expect(aiPanelInitiallyOpen('narrow')).toBe(false)
+    // the app's effect reports the implicit default: nothing is stored
+    rememberAiPanelOpen('narrow', false)
+    expect(localStorage.getItem('narrow')).toBeNull()
+    // a later wide window still opens by default
+    vi.stubGlobal('innerWidth', 1440)
+    expect(aiPanelInitiallyOpen('narrow')).toBe(true)
+  })
+
+  it('a deliberate choice in a narrow window is remembered and wins over the width', () => {
+    vi.stubGlobal('innerWidth', 390)
+    localStorage.removeItem('narrow2')
+    applyAiPanelPrefs({ openInNewDocs: true })
+    rememberAiPanelOpen('narrow2', true)
+    expect(localStorage.getItem('narrow2')).toBe('1')
+    expect(aiPanelInitiallyOpen('narrow2')).toBe(true)
+  })
+
+  it('a wide window still opens by default and remembers an explicit close', () => {
+    vi.stubGlobal('innerWidth', 1440)
+    localStorage.removeItem('wide')
+    applyAiPanelPrefs({ openInNewDocs: true })
+    expect(aiPanelInitiallyOpen('wide')).toBe(true)
+    rememberAiPanelOpen('wide', true)
+    expect(localStorage.getItem('wide')).toBeNull()
+    rememberAiPanelOpen('wide', false)
+    expect(aiPanelInitiallyOpen('wide')).toBe(false)
+  })
 })
