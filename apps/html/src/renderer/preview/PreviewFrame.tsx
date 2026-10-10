@@ -51,7 +51,7 @@ export const PreviewFrame = forwardRef<PreviewFrameHandle, Props>(function Previ
   const onMessageRef = useRef(onMessage)
   onMessageRef.current = onMessage
   const src = useMemo(() => (url ? `${url}?v=${nonce}` : 'about:blank'), [url, nonce])
-  const connectPreview = window.htmlApi.connectPreview
+  const connectPreview = window.htmlApi?.connectPreview
   // preview.html did not boot (host without its policy): static from then on
   const [fallback, setFallback] = useState(false)
   const staticMode = !cap('htmlPreviewScripts') || fallback
