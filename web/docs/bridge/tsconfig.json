@@ -28,6 +28,8 @@
     "frame-boot.ts",
     "module-bridge.ts",
     "module-bridge.test.ts",
+    "draft-recovery.ts",
+    "draft-recovery.test.ts",
     "testing/*.ts"
   ]
 }

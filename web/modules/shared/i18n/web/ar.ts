@@ -14,4 +14,11 @@ export const ar = {
   webViewOnly: 'عرض فقط',
   webViewOnlyNotSaved: 'هذا المستند للعرض فقط ولا يمكن حفظه',
   webNotUtf8: 'هذا الملف ليس نص UTF-8. يُفتح للعرض فقط حتى لا يغيّر الحفظ محتواه',
+  webDraftTitle: 'هل تريد استعادة التغييرات غير المحفوظة؟',
+  webDraftBody:
+    'احتفظ هذا المتصفح بنسخة من تغييرات غير محفوظة على هذا المستند. هل تريد استعادتها أم تجاهلها؟',
+  webDraftOlder: 'تستند هذه النسخة إلى إصدار أقدم من المستند. حفظها يستبدل الإصدار الأحدث.',
+  webDraftSavedAt: 'حُفظت النسخة في',
+  webDraftRestore: 'استعادة',
+  webDraftDiscard: 'تجاهل',
 } satisfies Record<keyof typeof zh, string>

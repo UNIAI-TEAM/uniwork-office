@@ -16,4 +16,12 @@ export const es = {
   webViewOnlyNotSaved: 'Este documento es de solo lectura y no se puede guardar',
   webNotUtf8:
     'Este archivo no es texto UTF-8. Se abre en solo lectura para que guardar no cambie sus bytes',
+  webDraftTitle: '¿Restaurar los cambios no guardados?',
+  webDraftBody:
+    'Este navegador conservó una copia de cambios no guardados de este documento. ¿Restaurarlos o descartarlos?',
+  webDraftOlder:
+    'La copia se basa en una versión anterior del documento. Al guardarla se reemplaza la versión más reciente.',
+  webDraftSavedAt: 'Copia guardada a las',
+  webDraftRestore: 'Restaurar',
+  webDraftDiscard: 'Descartar',
 } satisfies Record<keyof typeof zh, string>

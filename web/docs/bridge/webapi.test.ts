@@ -6,6 +6,15 @@ import { createMockPort, protocolError, timeoutAfter, type MockPort } from './te
 import { text } from './notice'
 // the renderer's own reader: resolves the bridge's in-page handoff without fetch()
 import { fetchDocBytes as bytesAt } from '../../../apps/docs/src/renderer/doc-bytes'
+import {
+  createIdbDraftStore,
+  type DraftChoice,
+  type DraftInfo,
+  type DraftRecovery,
+  type DraftStore,
+} from './draft-recovery'
+import { createFakeIdb } from './testing/fake-idb'
+import { bridgeDraftRecovery } from '../../modules/shared/recovery-prompt'
 
 const DOCX = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 1, 2, 3])
 const flush = () => new Promise((r) => setTimeout(r, 0))
@@ -882,5 +891,102 @@ describe('projectApi (in-memory, AI-only)', () => {
     })
     expect(await p.resolveChat({ filePath: 'uniwork://files/x/doc.docx' })).toEqual(bound)
     expect((await p.loadChat(bound)).map((m) => m.text)).toEqual(['hello\nworld'])
+  })
+})
+
+describe('draft recovery (C18)', () => {
+  let store: DraftStore
+  let key: CryptoKey
+  let answer: DraftChoice
+  let prompt: ReturnType<typeof vi.fn<(d: DraftInfo) => Promise<DraftChoice>>>
+  let drafts: DraftRecovery
+
+  /** a frame load: a fresh bridge on the same store, the init carrying the session's grant */
+  async function load(): Promise<OpenFileResult> {
+    mock = createMockPort()
+    api = createWebApi(mock.port, {
+      session: { pollMs: 0 },
+      drafts: (host) =>
+        (drafts = bridgeDraftRecovery(mock.port, 'docs', host, {
+          store,
+          prompt,
+          target: new EventTarget() as unknown as Window,
+        })),
+    })
+    const meta = mock.seed('Report.docx', DOCX)
+    mock.init({ documentId: meta.fileId, recovery: { key, scope: `u1:${meta.fileId}` } })
+    return (await api.consumePendingOpenDocx()) as OpenFileResult
+  }
+
+  async function editAndKeep(bytes: number[]): Promise<void> {
+    api.onCloseCheck(() => api.reportCloseCheck({ dirty: true, autoSave: false }))
+    api.provideDocBytes(async () => buf(bytes))
+    await drafts.flush()
+  }
+
+  beforeEach(async () => {
+    store = createIdbDraftStore(createFakeIdb().idb)
+    key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, [
+      'encrypt',
+      'decrypt',
+    ])
+    answer = 'restore'
+    prompt = vi.fn(async (_d: DraftInfo) => answer)
+  })
+  afterEach(() => drafts?.dispose())
+
+  it('keeps an encrypted copy while dirty and offers it on the next load: Restore = recovered', async () => {
+    await load()
+    await editAndKeep([9, 9, 9])
+    expect(mock.calls.some((c) => c.type === 'api.save')).toBe(false)
+    drafts.dispose()
+
+    const reopened = await load()
+    expect(prompt).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Report.docx', older: false }),
+    )
+    expect(reopened.recovered).toBe(true)
+    expect(await bytesAt(reopened.dataUrl)).toEqual(new Uint8Array([9, 9, 9]))
+    expect(reopened.path).toBe(pathFor({ fileId: 'f1', name: 'Report.docx' }))
+    expect((await store.list('u1:f1:')).length).toBe(1)
+
+    // the user's save lands: the copy is gone
+    expect((await api.saveDocx(reopened.path, buf([9, 9, 9]))).ok).toBe(true)
+    api.onCloseCheck(() => api.reportCloseCheck({ dirty: false, autoSave: false }))
+    await drafts.flush()
+    expect(await store.list('u1:f1:')).toEqual([])
+  })
+
+  it('Discard opens the server version and deletes the copy', async () => {
+    await load()
+    await editAndKeep([5])
+    drafts.dispose()
+    answer = 'discard'
+    const reopened = await load()
+    expect(reopened.recovered).toBeUndefined()
+    expect(await bytesAt(reopened.dataUrl)).toEqual(DOCX)
+    expect(await store.list('u1:f1:')).toEqual([])
+  })
+
+  it('a copy under another session key is removed without a prompt', async () => {
+    await load()
+    await editAndKeep([5])
+    drafts.dispose()
+    key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, [
+      'encrypt',
+      'decrypt',
+    ])
+    const reopened = await load()
+    expect(prompt).not.toHaveBeenCalled()
+    expect(reopened.recovered).toBeUndefined()
+    expect(await store.list('u1:f1:')).toEqual([])
+  })
+
+  it('a document opened in the frame other than the init document is never drafted', async () => {
+    await load()
+    const other = mock.seed('Other.docx', DOCX)
+    await api.openDocxPath(pathFor(other))
+    await editAndKeep([1])
+    expect(await store.list('u1:f1:')).toEqual([])
   })
 })

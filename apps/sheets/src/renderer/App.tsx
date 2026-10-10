@@ -5075,7 +5075,11 @@ export function App({
         zoomPercent={zoomPercent}
         statusBarFuncs={statusBarFuncs}
         onToggleStatusBarFunc={toggleStatusBarStat}
-        canSave={pendingEdits > 0 || workbookFile?.unsavedNew === true}
+        canSave={
+          pendingEdits > 0 ||
+          workbookFile?.unsavedNew === true ||
+          workbookFile?.restoredFromRecovery === true
+        }
         onSave={() => void handleSave('save')}
         canSaveAs={workbookFile !== null}
         onSaveAs={() => void handleSave('save-as')}

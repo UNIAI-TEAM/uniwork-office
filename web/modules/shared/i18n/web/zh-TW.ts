@@ -14,4 +14,10 @@ export const zhTW = {
   webViewOnly: '僅檢視',
   webViewOnlyNotSaved: '此文件僅供檢視，無法儲存',
   webNotUtf8: '此檔案不是 UTF-8 文字，已以僅檢視方式開啟，以免儲存時變更其內容',
+  webDraftTitle: '還原未儲存的變更？',
+  webDraftBody: '此瀏覽器保留了此文件未儲存變更的副本。要還原還是捨棄這些變更？',
+  webDraftOlder: '此副本以文件的舊版本為基礎。儲存後將取代較新的版本。',
+  webDraftSavedAt: '副本保存於',
+  webDraftRestore: '還原',
+  webDraftDiscard: '捨棄',
 } satisfies Record<keyof typeof zh, string>

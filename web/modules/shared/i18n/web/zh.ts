@@ -12,4 +12,10 @@ export const zh = {
   webViewOnly: '仅查看',
   webViewOnlyNotSaved: '此文档为仅查看，无法保存',
   webNotUtf8: '此文件不是 UTF-8 文本，已以仅查看方式打开，以免保存时改动其内容',
+  webDraftTitle: '恢复未保存的更改？',
+  webDraftBody: '此浏览器保留了此文档未保存更改的副本。要恢复还是放弃这些更改？',
+  webDraftOlder: '此副本基于文档的旧版本。保存后将替换较新的版本。',
+  webDraftSavedAt: '副本保存于',
+  webDraftRestore: '恢复',
+  webDraftDiscard: '放弃',
 }

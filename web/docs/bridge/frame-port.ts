@@ -10,6 +10,7 @@ import {
   type FrameRequestType,
   type FrameRequests,
   type HostRequests,
+  type InitRecovery,
   type InitUser,
   type ProtocolErrorCode,
   type ProtocolErrorShape,
@@ -34,6 +35,8 @@ export interface PortSession {
   capabilities?: Capabilities
   /** the viewer's display data from `init.user` (additive, GO-B4: PDF note author) */
   user?: InitUser
+  /** the host's draft-recovery grant from `init.recovery` (CONTRACT C18); absent = recovery off */
+  recovery?: InitRecovery
 }
 
 type HostHandler<K extends keyof HostRequests> = (

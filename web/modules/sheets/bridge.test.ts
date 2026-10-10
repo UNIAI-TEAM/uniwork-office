@@ -1,7 +1,11 @@
 // @vitest-environment jsdom
 // UNI-1016: the Sheets web bridge over a fake engine transport and the mocked protocol port.
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { WorkbookFile, WorkbookSaveRequest } from '../../../apps/sheets/src/shared/desktop-api'
+import type {
+  DesktopApi,
+  WorkbookFile,
+  WorkbookSaveRequest,
+} from '../../../apps/sheets/src/shared/desktop-api'
 import { createMockPort, protocolError, type MockPort } from '../../docs/bridge/testing/mock-port'
 import { installModuleBridge } from '../../docs/bridge/module-bridge'
 import { createSheetsWebApi, pathFor, withExt } from './bridge'
@@ -15,6 +19,17 @@ import {
 } from './engine/transport'
 import { createUnavailableTransport } from './engine/unavailable'
 import type { AskFn } from './notice'
+import {
+  DRAFTS_DB,
+  DRAFTS_STORE,
+  createDraftRecovery,
+  createIdbDraftStore,
+  decryptDraft,
+  type DraftChoice,
+  type DraftRecord,
+  type DraftRecovery,
+} from '../../docs/bridge/draft-recovery'
+import { createFakeIdb } from '../../docs/bridge/testing/fake-idb'
 
 const flush = async () => {
   for (let i = 0; i < 10; i++) await Promise.resolve()
@@ -96,6 +111,7 @@ function setup(
     ask?: AskFn
     transport?: SheetsEngineTransport
     features?: Partial<SheetsEngineTransport['features']>
+    drafts?: (host: import('../../docs/bridge/draft-recovery').DraftHost) => DraftRecovery
   } = {},
 ) {
   const mock = createMockPort({ documentId: 'pending' })
@@ -123,6 +139,7 @@ function setup(
           locale: () => 'en',
           editorStartMs: 200,
           saveTimeoutMs: 500,
+          ...(opts.drafts ? { drafts: opts.drafts } : {}),
         })
         return api.desktopApi
       },
@@ -155,12 +172,13 @@ afterEach(() => {
 })
 
 describe('capabilities', () => {
-  it('web defaults: AI, autosave, recovery and the C11 sidecar-only keys are off', () => {
+  it('web defaults: AI, autosave and the C11 sidecar-only keys are off; the recovery tick is on', () => {
     const caps = sheetsWebCapabilities(fakeTransport().transport)
+    // the renderer's 30 s recovery tick feeds draft recovery (C18), never a save
+    expect(caps.recoveryCopy).toBe(true)
     for (const key of [
       'ai',
       'autoSave',
-      'recoveryCopy',
       'screenshot',
       'recalcFallback',
       'mergeWorkbooks',
@@ -582,10 +600,17 @@ describe('hidden and browser features', () => {
     expect(t.print).toHaveBeenCalledTimes(2)
   })
 
-  it('recovery copy, merge and AI-only entries answer typed no-ops', async () => {
+  it('merge and AI-only entries answer typed no-ops; the desktop recovery dialog never opens', async () => {
     t = setup()
     await t.boot()
-    expect(await t.desktop.writeWorkbookRecovery({} as never)).toEqual({ ok: false })
+    const prompts: unknown[] = []
+    const recovery = t.desktop as unknown as Pick<
+      DesktopApi,
+      'onRecoveryPrompt' | 'replyRecoveryPrompt'
+    >
+    recovery.onRecoveryPrompt((p) => prompts.push(p))
+    recovery.replyRecoveryPrompt(true)
+    expect(prompts).toEqual([])
     expect(await t.desktop.selectWorkbooksForMerge()).toBeNull()
     expect(await t.desktop.autoRenameWorkbook('s', 'x')).toEqual({ renamed: false })
     expect(await t.desktop.consumeAiPreset()).toBeNull()
@@ -607,6 +632,170 @@ describe('hidden and browser features', () => {
     await t.boot()
     t.desktop.notifyPendingEdits(1)
     expect(await t.mock.host['doc.closeCheck']({})).toEqual({ dirty: true, autoSave: false })
+  })
+})
+
+describe('draft recovery (C18)', () => {
+  const SCOPE_DOC = 'f1'
+
+  async function draftSetup(answer: DraftChoice = 'restore', grants?: Record<string, boolean>) {
+    const fake = createFakeIdb()
+    const store = createIdbDraftStore(fake.idb)
+    const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, [
+      'encrypt',
+      'decrypt',
+    ])
+    const grant = { key, scope: `u1:${SCOPE_DOC}` }
+    const prompt = vi.fn(async () => answer)
+    const t = setup({
+      ...(grants ? { grants } : {}),
+      drafts: (host) =>
+        createDraftRecovery({
+          module: 'sheets',
+          host,
+          prompt,
+          store,
+          recovery: () => grant,
+          intervalMs: 3_600_000,
+          target: new EventTarget() as unknown as Window,
+        }),
+    })
+    expect(t.file.fileId).toBe(SCOPE_DOC)
+    const records = () =>
+      (fake.store(DRAFTS_DB, DRAFTS_STORE) ?? new Map<string, unknown>()) as Map<
+        string,
+        DraftRecord
+      >
+    const decrypted = async () => {
+      const out: string[] = []
+      for (const [k, r] of records()) out.push(dec((await decryptDraft(key, k, r)) ?? undefined))
+      return out
+    }
+    return { t, prompt, records, decrypted, key, store }
+  }
+
+  /** a dirty session whose recovery tick stored the draft "v1|0:0=5" */
+  async function writeDraft(d: Awaited<ReturnType<typeof draftSetup>>) {
+    const wb = await d.t.boot()
+    d.t.desktop.notifyPendingEdits(1)
+    expect(await d.t.desktop.writeWorkbookRecovery(saveRequest(wb.sessionId, [[0, 0, 5]]))).toEqual(
+      { ok: true },
+    )
+    return wb
+  }
+
+  it('the recovery tick stores an encrypted xlsx draft without any save', async () => {
+    const d = await draftSetup()
+    const wb = await writeDraft(d)
+    expect(d.prompt).not.toHaveBeenCalled() // nothing stored at boot
+    expect(d.t.fake.serialized).toHaveLength(1)
+    expect(d.t.mock.calls.some((c) => c.type === 'api.save' || c.type === 'api.saveAs')).toBe(false)
+    expect(d.t.mock.saved).toHaveLength(0)
+    // the session was not swapped
+    expect(d.t.fake.sessions.get(wb.sessionId)).toBe('v1')
+    const [[recordKey, record]] = [...d.records()]
+    expect(recordKey).toBe(`u1:${SCOPE_DOC}:${d.t.file.etag}`)
+    expect(record!.module).toBe('sheets')
+    expect(dec(record!.ciphertext)).not.toContain('0:0=5')
+    expect(await d.decrypted()).toEqual(['v1|0:0=5'])
+  })
+
+  it('a clean, view-only or other document writes nothing', async () => {
+    const d = await draftSetup()
+    const wb = await d.t.boot()
+    // not dirty
+    expect(await d.t.desktop.writeWorkbookRecovery(saveRequest(wb.sessionId, [[0, 0, 1]]))).toEqual(
+      { ok: false },
+    )
+    expect(d.records().size).toBe(0)
+
+    const v = await draftSetup('restore', { filePick: true })
+    const vw = await v.t.boot()
+    v.t.desktop.notifyPendingEdits(1)
+    expect(await v.t.desktop.writeWorkbookRecovery(saveRequest(vw.sessionId, [[0, 0, 1]]))).toEqual(
+      { ok: false },
+    )
+    expect(v.t.fake.serialized).toHaveLength(0)
+  })
+
+  it('Restore opens the draft bytes as restoredFromRecovery and keeps the workbook dirty', async () => {
+    const first = await draftSetup()
+    await writeDraft(first)
+    // a new frame (the tab crashed) over the same browser store and session key
+    const prompt = vi.fn(async () => 'restore' as DraftChoice)
+    const t = setup({
+      drafts: (host) =>
+        createDraftRecovery({
+          module: 'sheets',
+          host,
+          prompt,
+          store: first.store,
+          recovery: () => ({ key: first.key, scope: `u1:${SCOPE_DOC}` }),
+          intervalMs: 3_600_000,
+          target: new EventTarget() as unknown as Window,
+        }),
+    })
+    const wb = await t.boot()
+    expect(prompt).toHaveBeenCalledOnce()
+    expect(dec(t.fake.opened.at(-1)!.data)).toBe('v1|0:0=5')
+    expect(wb.restoredFromRecovery).toBe(true)
+    expect(t.api.state.isDirty()).toBe(true)
+    expect(t.mock.dirty.at(-1)).toBe(true)
+    // the restored journal is empty: the renderer's 0 must not clear dirty
+    t.desktop.notifyPendingEdits(0)
+    expect(t.api.state.isDirty()).toBe(true)
+    expect(await t.mock.host['doc.closeCheck']({})).toEqual({ dirty: true, autoSave: false })
+
+    // Save (restoreWriteBack, no edits) goes to the same file with the current etag
+    const result = await t.desktop.saveWorkbookEdits({
+      ...saveRequest(wb.sessionId, []),
+      restoreWriteBack: true,
+    } as WorkbookSaveRequest)
+    const save = t.mock.calls.find((c) => c.type === 'api.save')!
+    expect(save.payload).toMatchObject({ fileId: t.file.fileId, etag: t.file.etag })
+    expect(dec(t.mock.bytesOf(t.file.fileId))).toBe('v1|0:0=5|')
+    expect(result.canceled).toBe(false)
+    if (!result.canceled) expect(result.file.restoredFromRecovery).not.toBe(true)
+    expect(t.api.state.isDirty()).toBe(false)
+    t.desktop.notifyPendingEdits(0)
+    expect(t.api.state.isDirty()).toBe(false)
+    await flush()
+    await new Promise((r) => setTimeout(r, 0))
+    expect(first.records().size).toBe(0)
+  })
+
+  it('Discard opens the server bytes and deletes the draft', async () => {
+    const first = await draftSetup()
+    await writeDraft(first)
+    const prompt = vi.fn(async () => 'discard' as DraftChoice)
+    const t = setup({
+      drafts: (host) =>
+        createDraftRecovery({
+          module: 'sheets',
+          host,
+          prompt,
+          store: first.store,
+          recovery: () => ({ key: first.key, scope: `u1:${SCOPE_DOC}` }),
+          intervalMs: 3_600_000,
+          target: new EventTarget() as unknown as Window,
+        }),
+    })
+    const wb = await t.boot()
+    expect(prompt).toHaveBeenCalledOnce()
+    expect(dec(t.fake.opened.at(-1)!.data)).toBe('v1')
+    expect(wb.restoredFromRecovery).not.toBe(true)
+    expect(t.api.state.isDirty()).toBe(false)
+    expect(first.records().size).toBe(0)
+  })
+
+  it('a successful save deletes the draft', async () => {
+    const d = await draftSetup()
+    const wb = await writeDraft(d)
+    expect(d.records().size).toBe(1)
+    await d.t.desktop.saveWorkbookEdits(saveRequest(wb.sessionId, [[0, 0, 5]]))
+    await flush()
+    await new Promise((r) => setTimeout(r, 0))
+    expect(d.records().size).toBe(0)
   })
 })
 

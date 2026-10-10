@@ -14,7 +14,7 @@
  * | autoRename       | post-AI rename of untitled workbooks                                             |
  * | screenshot       | Insert > Screenshot                                                              |
  * | autoSave         | AutoSave pill and its 30 s / blur timer (CONTRACT C10: explicit save only)        |
- * | recoveryCopy     | 30 s crash-recovery copy + restore prompt (C10, C11)                             |
+ * | recoveryCopy     | on: the 30 s recovery tick feeds web draft recovery (C18, encrypted in-browser)  |
  * | open             | File > Open / Ctrl+O (on with the host's `filePick` grant)                        |
  * | save / saveAs    | Save, Ctrl+S / Save As (on with the host's grants; no `save` = view-only)        |
  * | exportCsv        | CSV export                                                                       |

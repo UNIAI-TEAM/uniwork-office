@@ -16,4 +16,12 @@ export const nl = {
   webViewOnlyNotSaved: 'Dit document is alleen-lezen en kan niet worden opgeslagen',
   webNotUtf8:
     'Dit bestand is geen UTF-8-tekst. Het opent alleen-lezen zodat opslaan de bytes niet wijzigt',
+  webDraftTitle: 'Niet-opgeslagen wijzigingen herstellen?',
+  webDraftBody:
+    'Deze browser heeft een kopie bewaard van niet-opgeslagen wijzigingen in dit document. Herstellen of verwijderen?',
+  webDraftOlder:
+    'De kopie is gebaseerd op een oudere versie van het document. Opslaan vervangt de nieuwere versie.',
+  webDraftSavedAt: 'Kopie bewaard om',
+  webDraftRestore: 'Herstellen',
+  webDraftDiscard: 'Verwijderen',
 } satisfies Record<keyof typeof zh, string>

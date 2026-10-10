@@ -15,4 +15,12 @@ export const vi = {
   webViewOnlyNotSaved: 'Tài liệu này chỉ xem, không thể lưu',
   webNotUtf8:
     'Tệp này không phải văn bản UTF-8. Tệp được mở ở chế độ chỉ xem để việc lưu không làm thay đổi nội dung',
+  webDraftTitle: 'Khôi phục các thay đổi chưa lưu?',
+  webDraftBody:
+    'Trình duyệt này đã giữ một bản sao các thay đổi chưa lưu của tài liệu này. Khôi phục hay bỏ các thay đổi đó?',
+  webDraftOlder:
+    'Bản sao dựa trên một phiên bản cũ hơn của tài liệu. Lưu bản sao sẽ thay thế phiên bản mới hơn.',
+  webDraftSavedAt: 'Bản sao được giữ lúc',
+  webDraftRestore: 'Khôi phục',
+  webDraftDiscard: 'Bỏ',
 } satisfies Record<keyof typeof zh, string>

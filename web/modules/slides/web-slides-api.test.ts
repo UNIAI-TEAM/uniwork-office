@@ -10,6 +10,16 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import JSZip from 'jszip'
 import { appClipboard, sessions } from '../../../apps/slides/src/session'
+import {
+  createDraftRecovery,
+  createIdbDraftStore,
+  decryptDraft,
+  type DraftChoice,
+  type DraftHost,
+  type DraftRecovery,
+  type DraftStore,
+} from '../../docs/bridge/draft-recovery'
+import { createFakeIdb } from '../../docs/bridge/testing/fake-idb'
 import { createMockPort, protocolError, type MockPort } from '../../docs/bridge/testing/mock-port'
 import { encodePng } from './tiff'
 import { cfbKind, createWebSlidesApi, type WebSlidesOptions } from './web-slides-api'
@@ -272,6 +282,127 @@ describe('save', () => {
     })
     await api.setNotes({ slideIndex: 0, text: 'x' })
     expect(await mock.host['doc.closeCheck']({} as never)).toEqual({ dirty: true, autoSave: false })
+  })
+})
+
+describe('draft recovery (C18)', () => {
+  /** one browser profile: the IndexedDB store and the host's session key outlive the tabs */
+  async function browserProfile() {
+    const store: DraftStore = createIdbDraftStore(createFakeIdb().idb)
+    const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, [
+      'encrypt',
+      'decrypt',
+    ])
+    const grant = { key, scope: 'u1:f1' }
+    const live: DraftRecovery[] = []
+    let answer: DraftChoice = 'restore'
+    const prompt = vi.fn(async () => answer)
+    /** one frame (tab) of the Slides module in this profile */
+    const tab = async () => {
+      let recovery!: DraftRecovery
+      const s = await setup({
+        drafts: (host: DraftHost) => {
+          recovery = createDraftRecovery({
+            module: 'slides',
+            host,
+            prompt,
+            store,
+            recovery: () => grant,
+            target: new EventTarget() as unknown as Window,
+          })
+          live.push(recovery)
+          return recovery
+        },
+      })
+      return { ...s, recovery }
+    }
+    return {
+      store,
+      grant,
+      prompt,
+      tab,
+      answer: (c: DraftChoice) => {
+        answer = c
+      },
+      dispose: () => live.forEach((r) => r.dispose()),
+    }
+  }
+
+  let profile: Awaited<ReturnType<typeof browserProfile>> | null = null
+  afterEach(() => {
+    profile?.dispose()
+    profile = null
+  })
+
+  /** tab 1 edits the notes and keeps a draft, then "crashes" (its session is gone) */
+  async function crashedTab(p: NonNullable<typeof profile>) {
+    const first = await p.tab()
+    await first.api.consumePendingOpen(FIT)
+    await first.recovery.flush()
+    expect(await p.store.list('u1:f1:')).toEqual([]) // clean: nothing is written
+    await first.api.setNotes({ slideIndex: 0, text: 'draft notes' })
+    await first.recovery.flush()
+    first.recovery.dispose()
+    sessions.clear()
+    document.body.innerHTML = ''
+  }
+
+  it('writes an encrypted pptx while dirty, keyed by scope and etag', async () => {
+    profile = await browserProfile()
+    await crashedTab(profile)
+    const records = await profile.store.list('u1:f1:')
+    expect(records.map((r) => r.key)).toEqual(['u1:f1:"f1-v1"'])
+    const { record } = records[0]!
+    expect(record).toMatchObject({ module: 'slides', name: 'deck.pptx', baseEtag: '"f1-v1"' })
+    // stored as ciphertext, not as a zip
+    expect([...new Uint8Array(record.ciphertext, 0, 2)]).not.toEqual([0x50, 0x4b])
+    const plain = await decryptDraft(profile.grant.key, records[0]!.key, record)
+    expect([...new Uint8Array(plain!, 0, 2)]).toEqual([0x50, 0x4b])
+  })
+
+  it('Restore opens the draft bytes as a dirty deck; a save deletes the draft', async () => {
+    profile = await browserProfile()
+    await crashedTab(profile)
+    profile.answer('restore')
+    const { mock, api, fileId } = await profile.tab()
+    const opened = await api.consumePendingOpen(FIT)
+    expect(opened?.path).toBe(`uniwork://files/${fileId}/deck.pptx`)
+    expect(profile.prompt).toHaveBeenCalledTimes(1)
+    expect(await api.getNotes(0)).toBe('draft notes')
+    expect(await api.isDirty()).toBe(true)
+    await flush()
+    expect(mock.dirty.at(-1)).toBe(true)
+    // the save goes to the same file with the etag the draft was opened against
+    expect(await api.save()).toMatchObject({ ok: true })
+    const call = mock.calls.find((c) => c.type === 'api.save')!
+    expect(call.payload).toMatchObject({ fileId, etag: `"${fileId}-v1"` })
+    await flush()
+    expect(await profile.store.list('u1:f1:')).toEqual([])
+    expect(await api.isDirty()).toBe(false)
+  })
+
+  it('Discard opens the server bytes clean and deletes the draft', async () => {
+    profile = await browserProfile()
+    await crashedTab(profile)
+    profile.answer('discard')
+    const { mock, api } = await profile.tab()
+    await api.consumePendingOpen(FIT)
+    expect(profile.prompt).toHaveBeenCalledTimes(1)
+    expect(await api.getNotes(0)).not.toBe('draft notes')
+    expect(await api.isDirty()).toBe(false)
+    expect(mock.dirty.at(-1) ?? false).toBe(false)
+    expect(await profile.store.list('u1:f1:')).toEqual([])
+  })
+
+  it('another document (not the init one) gets no draft written', async () => {
+    profile = await browserProfile()
+    const { mock, api, recovery } = await profile.tab()
+    await api.consumePendingOpen(FIT)
+    const other = mock.seed('other.pptx', FIXTURE)
+    await mock.host.open(mock.openPayload(other.fileId))
+    await api.setNotes({ slideIndex: 0, text: 'other edits' })
+    await recovery.flush()
+    expect(await profile.store.list('u1:')).toEqual([])
   })
 })
 

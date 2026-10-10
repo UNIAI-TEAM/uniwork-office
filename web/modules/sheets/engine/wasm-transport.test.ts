@@ -215,6 +215,27 @@ describe.skipIf(!hasWasm)('with the real wasm engine (Node + browser WASI shim)'
     return { host, transport }
   }
 
+  it('a save with nothing to write (restored draft write-back, Save As) still writes the workbook', async () => {
+    const { transport } = await engine()
+    const source = new Uint8Array(await buildEditFixture())
+    const wb = await transport.open({
+      name: 'Edit.xlsx',
+      data: toArrayBuffer(source),
+      locale: 'en',
+    })
+    // the draft: what a save with an edit would write
+    const draft = await transport.serialize(
+      saveRequest(wb.sessionId, [{ sheetId: wb.sheets[0]!.id, row: 0, column: 0, value: 'Mark' }]),
+    )
+    const restored = await transport.open({ name: 'Edit.xlsx', data: draft.data, locale: 'en' })
+    const request = { ...saveRequest(restored.sessionId, []), restoreWriteBack: true }
+    const saved = await transport.serialize(request as WorkbookSaveRequest)
+    const xml = await (await JSZip.loadAsync(saved.data))
+      .file('xl/worksheets/sheet1.xml')!
+      .async('text')
+    expect(xml).toContain('Mark')
+  })
+
   it('open -> read -> edit a value and a formula -> save -> the reopened bytes carry both', async () => {
     const { transport } = await engine()
     const source = new Uint8Array(await buildEditFixture())

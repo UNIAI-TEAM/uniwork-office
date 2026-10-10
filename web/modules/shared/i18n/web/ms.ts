@@ -16,4 +16,12 @@ export const ms = {
   webViewOnlyNotSaved: 'Dokumen ini untuk dilihat sahaja dan tidak boleh disimpan',
   webNotUtf8:
     'Fail ini bukan teks UTF-8. Ia dibuka untuk dilihat sahaja supaya simpanan tidak mengubah kandungannya',
+  webDraftTitle: 'Pulihkan perubahan yang belum disimpan?',
+  webDraftBody:
+    'Pelayar ini menyimpan salinan perubahan pada dokumen ini yang belum disimpan. Pulihkan atau buang?',
+  webDraftOlder:
+    'Salinan ini berdasarkan versi dokumen yang lebih lama. Menyimpannya akan menggantikan versi yang lebih baharu.',
+  webDraftSavedAt: 'Salinan disimpan pada',
+  webDraftRestore: 'Pulihkan',
+  webDraftDiscard: 'Buang',
 } satisfies Record<keyof typeof zh, string>

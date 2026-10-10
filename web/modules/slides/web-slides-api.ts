@@ -17,10 +17,11 @@
  * | browser          | exports (zip / PDF downloads), printSlides (srcdoc frame), clipboard, fullscreen, media blob: URLs |
  * | presenter        | presenter* / onAudienceNav: the audience window (./presenter-window.ts, SP1)              |
  * | hidden (stubs)   | AI (27), fonts download/install, headless export, autosave (C10)                         |
+ * | draft recovery   | C18: encrypted IndexedDB copy of savePptx(session) every 30 s while dirty; offered before the init / host `open` deck is built (Restore = `recovered`, starts dirty) |
  *
  * Typed as the full SlidesApi (no Partial): a new preload method is a build error here.
  */
-import { createBlankPptx } from '@genoffice/pptx-engine'
+import { createBlankPptx, savePptx } from '@genoffice/pptx-engine'
 import type { AiPanelPrefs } from '@genoffice/ui'
 import { base64ToBytes, bytesToBase64 } from '../../../apps/slides/src/session/bytes'
 import {
@@ -60,9 +61,11 @@ import {
 } from '../../docs/protocol/types'
 import aiStubs, { aiUnavailableMessage } from '../../docs/bridge/ai'
 import browser, { downloadBlob, safeFileName } from '../../docs/bridge/browser'
+import type { DraftHost, DraftRecovery } from '../../docs/bridge/draft-recovery'
 import { TIMEOUTS, errorCode } from '../../docs/bridge/frame-port'
 import type { ModuleBridgePort } from '../../docs/bridge/module-bridge'
 import { idFromPath, pathFor } from '../../docs/bridge/webapi'
+import { bridgeDraftRecovery } from '../shared/recovery-prompt'
 import { ask, hideFatal, showFatal, text, type WebKey } from './dialogs'
 import { exportPagesToPngs, printDocument, printHtml, slidesPdf, zipImages } from './exports'
 import {
@@ -125,6 +128,8 @@ export interface WebSlidesOptions {
   /** the presenter's audience window: window.open and screen placement */
   openWindow?: typeof window.open | null
   screens?: ScreenPlacer
+  /** draft recovery (C18; default: IndexedDB + the shared prompt); injectable for tests */
+  drafts?: (host: DraftHost) => DraftRecovery
 }
 
 type Listener<T> = (value: T) => void
@@ -243,6 +248,49 @@ export function createWebSlidesApi(
 
   let current: string | null = null
 
+  // ------------------------------------------------------------ draft recovery (C18)
+
+  /** the document `init` names: the only one the host's draft scope ("<user>:<document>") covers */
+  let initDocumentId: string | null = null
+  /** the file an open is offering the draft of (the session still holds the previous deck) */
+  let offering: FileMeta | null = null
+  let restoredDraft: ArrayBuffer | null = null
+  const drafts = (opts.drafts ?? ((h) => bridgeDraftRecovery(port, 'slides', h)))({
+    file: () => {
+      const file = offering ?? (current !== null ? state.files.get(current) : undefined)
+      return file && file.fileId === initDocumentId ? { etag: file.etag, name: file.name } : null
+    },
+    isDirty: () => isDirty(),
+    bytes: async () => {
+      const session = sessions.get(WEB_CLIENT_ID)
+      // master view writes only its part back on save: no draft until it is closed
+      if (!session || session.masterEdit) return null
+      try {
+        return await savePptx(session.opened)
+      } catch (err) {
+        console.warn('[slides-web] draft bytes skipped:', err)
+        return null
+      }
+    },
+    restore: (bytes) => {
+      restoredDraft = bytes
+    },
+  })
+
+  /** offer the stored draft of `file` (resolves once answered); the draft bytes on Restore */
+  async function offerDraft(file: FileMeta): Promise<Uint8Array | null> {
+    restoredDraft = null
+    offering = file
+    try {
+      await drafts.opened()
+    } finally {
+      offering = null
+    }
+    const data = restoredDraft
+    restoredDraft = null
+    return data ? new Uint8Array(data) : null
+  }
+
   const host: HostIO = createWebHostIO({
     port,
     clientId: WEB_CLIENT_ID,
@@ -256,6 +304,7 @@ export function createWebSlidesApi(
     },
     onSaved: ({ file, previousPath, kind }) => {
       current = file.fileId
+      if (kind === 'save' || kind === 'saveAs') void drafts.saved()
       const path = pathFor(file)
       port.setTitle(file.name)
       setTimeout(pushDirty, 0)
@@ -297,8 +346,16 @@ export function createWebSlidesApi(
     showFatal(body)
   }
 
-  /** bytes of an OpenPayload -> the client's session; null after a fatal notice */
-  async function openPayload(open: OpenPayload, fitWidthPx: number): Promise<OpenResult | null> {
+  /**
+   * bytes of an OpenPayload -> the client's session; null after a fatal notice. `withDraft`
+   * (the init and host `open` documents) offers the stored draft first: Restore opens the draft
+   * bytes as a recovered, dirty deck bound to the same file (the next save uses its etag).
+   */
+  async function openPayload(
+    open: OpenPayload,
+    fitWidthPx: number,
+    withDraft = false,
+  ): Promise<OpenResult | null> {
     let bytes = await readSource(open.source)
     // a new, still empty presentation file: start it as a blank deck bound to that file
     if (bytes.length === 0) bytes = await createBlankPptx()
@@ -310,6 +367,8 @@ export function createWebSlidesApi(
       )
       return null
     }
+    const draft = withDraft ? await offerDraft(open.file) : null
+    if (draft) bytes = draft
     state.remember(open.file)
     current = open.file.fileId
     revokeMedia()
@@ -318,13 +377,14 @@ export function createWebSlidesApi(
       path: pathFor(open.file),
       bytes,
       fitWidthPx,
+      ...(draft ? { recovered: true } : {}),
     })
     fontsRelaid = false
     await fontsPending
     state.fatal = null
     hideFatal()
     port.setTitle(open.file.name)
-    port.setDirty(false)
+    port.setDirty(!!draft)
     // embedded faces registered while opening re-lay the text out with their real metrics
     return fontsRelaid ? openResultFor(session, fitWidthPx) : result
   }
@@ -334,6 +394,7 @@ export function createWebSlidesApi(
     .whenInitialized()
     .then(async (s) => {
       userName = (s as { user?: { displayName?: string } }).user?.displayName || undefined
+      initDocumentId = s.documentId
       return (
         s.open ??
         (await port.request('api.open', { fileId: s.documentId }, { timeoutMs: TIMEOUTS.transfer }))
@@ -357,7 +418,7 @@ export function createWebSlidesApi(
       queuedOpen = payload
       return { opened: true, title: payload.file.name }
     }
-    const result = await openPayload(payload, sessions.get(WEB_CLIENT_ID)?.fitWidthPx ?? 1280)
+    const result = await openPayload(payload, sessions.get(WEB_CLIENT_ID)?.fitWidthPx ?? 1280, true)
     if (!result) throw new Error('the document cannot be opened in the browser')
     openedEvents.emit(result)
     return { opened: true, title: payload.file.name }
@@ -707,7 +768,7 @@ export function createWebSlidesApi(
       const open = queued ?? (pending ? await pending : null)
       if (open) {
         try {
-          return await openPayload(open, fitWidthPx)
+          return await openPayload(open, fitWidthPx, true)
         } catch (err) {
           console.error('[slides-web] opening the document failed:', err)
           fatal(err, 'webFatalBody')
@@ -995,6 +1056,7 @@ export function createWebSlidesApi(
     isDirty,
     revokeMedia,
     presenter: presenterWindow,
+    drafts,
   }
 }
 

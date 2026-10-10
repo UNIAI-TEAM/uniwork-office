@@ -24,8 +24,14 @@
  * |                                             | server HTML->PDF route in v1, lane decision B4-5)                         |
  * | exportCsv                                   | browser download (UTF-8 BOM, like the desktop write)                      |
  * | openExternal                                | guarded window.open (http/s, noopener)                                    |
- * | everything else (AI, recovery, screenshot,  | typed stubs, hidden by capability keys (../capabilities.ts)               |
- * | merge, autosave, headless, attachments)     |                                                                           |
+ * | writeWorkbookRecovery                       | draft recovery (C18): transport.serialize of the renderer's 30 s recovery |
+ * |                                             | payload, kept in memory and written encrypted to IndexedDB at once        |
+ * |                                             | (../../docs/bridge/draft-recovery.ts); never api.save, no session swap.   |
+ * |                                             | The boot document's draft is offered (shared prompt) before it opens;     |
+ * |                                             | Restore opens the draft bytes `restoredFromRecovery`, dirty until saved   |
+ * | onRecoveryPrompt / replyRecoveryPrompt      | no-ops: the shared draft prompt is the only recovery UI on the web        |
+ * | everything else (AI, screenshot, merge,     | typed stubs, hidden by capability keys (../capabilities.ts)               |
+ * | autosave, headless, attachments)            |                                                                           |
  *
  * View-only: without the host's `save` grant every save is refused (the renderer hides Save, see
  * apps/sheets/src/renderer/capabilities.ts). An engine that is not installed answers
@@ -45,6 +51,8 @@ import { downloadBlob, openExternal as guardedExternal } from '../../docs/bridge
 import { TIMEOUTS, errorCode } from '../../docs/bridge/frame-port'
 import type { ModuleBridgePort } from '../../docs/bridge/module-bridge'
 import { idFromPath, pathFor } from '../../docs/bridge/webapi'
+import type { DraftHost, DraftRecovery } from '../../docs/bridge/draft-recovery'
+import { bridgeDraftRecovery } from '../shared/recovery-prompt'
 import type {
   DesktopApi,
   MenuAction,
@@ -141,6 +149,8 @@ export interface SheetsWebApiOptions {
   editorStartMs?: number
   /** how long a host-requested save may run (ms) */
   saveTimeoutMs?: number
+  /** draft recovery (C18; default: IndexedDB + the shared prompt); injectable for tests */
+  drafts?: (host: DraftHost) => DraftRecovery
 }
 
 interface Session {
@@ -168,6 +178,60 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
   const sessions = new Map<string, Session>()
   let current: string | null = null
   let dirty = false
+
+  // ------------------------------------------------------------ draft recovery (C18)
+
+  /** the document `init` names: the only one the host's draft scope ("<user>:<document>") covers */
+  let initDocumentId: string | null = null
+  port
+    .whenInitialized()
+    .then((s) => {
+      initDocumentId = s.documentId
+    })
+    .catch(() => {})
+  /** the document whose draft is being offered (before it is opened) */
+  let offering: FileMeta | null = null
+  /** the latest recovery bytes the renderer's 30 s timer produced, per session */
+  let latest: { sessionId: string; data: ArrayBuffer } | null = null
+  /** set by the prompt's Restore while `offering` */
+  let restoredDraft: ArrayBuffer | null = null
+  /**
+   * The open workbook came from a draft: its edits live in the session bytes, not in the
+   * renderer's journal, so it stays dirty (whatever notifyPendingEdits says) until a save lands.
+   */
+  let restored = false
+
+  const drafts = (opts.drafts ?? ((host) => bridgeDraftRecovery(port, 'sheets', host)))({
+    file: () => {
+      const meta = offering ?? (current !== null ? files.get(current) : undefined)
+      return meta && meta.fileId === initDocumentId
+        ? { ...(meta.etag ? { etag: meta.etag } : {}), name: meta.name }
+        : null
+    },
+    isDirty: () => dirty,
+    bytes: async () => {
+      const session = latest ? sessions.get(latest.sessionId) : undefined
+      return latest && session && session.fileId === current ? latest.data : null
+    },
+    restore: (bytes) => {
+      restoredDraft = bytes
+    },
+  })
+
+  /** the draft of `file` the user chose to restore, or null (no draft, Discard, not ours) */
+  async function offerDraft(file: FileMeta): Promise<ArrayBuffer | null> {
+    if (file.fileId !== initDocumentId || !canSave()) return null
+    restoredDraft = null
+    offering = file
+    try {
+      await drafts.opened()
+    } finally {
+      offering = null
+    }
+    const data = restoredDraft
+    restoredDraft = null
+    return data
+  }
 
   function remember(file: FileMeta): void {
     files.set(file.fileId, { ...files.get(file.fileId), ...file })
@@ -198,6 +262,8 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
 
   // ------------------------------------------------------------ open plumbing
 
+  /** the queued workbook is the conflict "Reload latest": no draft offer */
+  let reloadWithoutDraft = false
   /** the next workbook selectWorkbook() delivers (boot document, host `open`, conflict reload) */
   let queued: (() => Promise<OpenPayload>) | null = async () => {
     const session = await port.whenInitialized()
@@ -220,13 +286,24 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
   /** the workbook the renderer shows last (inspection hook for e2e / diagnostics) */
   let shown: WorkbookFile | null = null
 
-  function decorate(file: WorkbookFile, meta: FileMeta): WorkbookFile {
-    shown = { ...file, name: meta.name, path: pathFor(meta), readOnly: !canSave() }
+  function decorate(file: WorkbookFile, meta: FileMeta, fromDraft = false): WorkbookFile {
+    shown = {
+      ...file,
+      name: meta.name,
+      path: pathFor(meta),
+      readOnly: !canSave(),
+      // the renderer then sends restoreWriteBack on Save and stands its recovery timer down
+      ...(fromDraft ? { restoredFromRecovery: true } : {}),
+    }
     return shown
   }
 
-  async function openPayload(payload: OpenPayload): Promise<WorkbookFile> {
-    const data = await readSource(payload.source)
+  /** `offer`: false for the conflict "Reload latest" (the user just discarded the edits) */
+  async function openPayload(payload: OpenPayload, offer = true): Promise<WorkbookFile> {
+    const server = await readSource(payload.source)
+    const draft = offer ? await offerDraft(payload.file) : null
+    // the engine may take ownership of the buffer: open a copy of the draft
+    const data = draft ? copyBuffer(draft) : server
     let opened: WorkbookFile
     try {
       opened = await transport.open({ name: payload.file.name, data, locale: locale() })
@@ -240,7 +317,11 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
     }
     remember(payload.file)
     sessions.set(opened.sessionId, { fileId: payload.file.fileId, name: payload.file.name })
-    return decorate(opened, payload.file)
+    restored = draft !== null
+    latest = draft ? { sessionId: opened.sessionId, data: draft } : null
+    dirty = restored
+    port.setDirty(dirty)
+    return decorate(opened, payload.file, restored)
   }
 
   /** before another workbook replaces this one: unsaved edits need an explicit discard */
@@ -291,6 +372,7 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
 
   port.handleOpen(async (payload) => {
     queued = async () => payload
+    reloadWithoutDraft = false
     runMenu('open')
     return { opened: true, title: payload.file.name }
   })
@@ -438,9 +520,13 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
         if (again.ok) return { file: again.file }
       }
     } else if (choice === 'reload') {
-      // the latest version replaces the workbook; the renderer re-runs its open flow
+      // the latest version replaces the workbook; the renderer re-runs its open flow. The edits
+      // are discarded on purpose, so their draft goes too and the reopen offers nothing.
       queued = () => port.request('api.open', { fileId }, { timeoutMs: TIMEOUTS.transfer })
+      reloadWithoutDraft = true
+      void drafts.saved()
       dirty = false
+      restored = false
       runMenu('open')
       return { canceled: true }
     }
@@ -524,8 +610,10 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
 
     async selectWorkbook(): Promise<WorkbookFile | null> {
       const next = queued
+      const offer = !reloadWithoutDraft
       queued = null
-      if (next) return openPayload(await next())
+      reloadWithoutDraft = false
+      if (next) return openPayload(await next(), offer)
       if (!granted('open')) return null
       try {
         const res = await port.request(
@@ -610,7 +698,11 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
       sessions.delete(request.sessionId)
       sessions.set(swapped.sessionId, { fileId: meta.fileId, name: meta.name })
       dirty = false
+      restored = false
+      latest = null
       port.setDirty(false)
+      // the edits landed: the scope's drafts are obsolete
+      void drafts.saved()
       return { canceled: false, file: decorate(swapped, meta), touchedEntries }
     },
 
@@ -630,8 +722,26 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
       transfers.delete(request.transferId)
     },
 
-    // no crash-recovery copy and no autosave on the web (CONTRACT C10)
-    writeWorkbookRecovery: async (_request: WorkbookSaveRequest) => ({ ok: false }),
+    /**
+     * The renderer's 30 s recovery tick (cap 'recoveryCopy'): the bytes a save would write, kept
+     * in this frame and stored as an encrypted draft (C18). Never api.save, never a version
+     * (C10), no session swap: the open session keeps its bytes. Only the boot document has a
+     * draft scope; anything else answers ok:false (the renderer skips the tick).
+     */
+    async writeWorkbookRecovery(input: WorkbookSaveRequest): Promise<{ ok: boolean }> {
+      // consume a chunked transfer first: it must not linger whatever happens next
+      const request = resolveTransfer(input)
+      const session = sessions.get(request.sessionId)
+      if (!canSave() || !session || session.fileId === null || session.fileId !== initDocumentId)
+        return { ok: false }
+      const { data } = await transport.serialize(request)
+      // a save or another open landed meanwhile: these bytes are stale
+      if (!sessions.has(request.sessionId) || !dirty) return { ok: false }
+      latest = { sessionId: request.sessionId, data }
+      await drafts.flush()
+      return { ok: true }
+    },
+    // the desktop recovery dialog never shows: the shared draft prompt is the web's only UI
     onRecoveryPrompt: noopDisposer,
     replyRecoveryPrompt: () => {},
     autoRenameWorkbook: async (_sessionId: string, _baseName: string) => ({ renamed: false }),
@@ -675,7 +785,8 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
       }
     },
     notifyPendingEdits(count: number): void {
-      dirty = count > 0
+      // a restored draft has an empty journal but unsaved content
+      dirty = count > 0 || restored
       port.setDirty(dirty)
     },
     onCloseSaveRequest(callback: () => void): () => void {

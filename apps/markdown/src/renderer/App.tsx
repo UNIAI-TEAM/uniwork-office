@@ -361,6 +361,8 @@ export default function App() {
         }
         statusRef.current = 'ready'
         setStatus('ready')
+        // web: a restored draft (not the saved file) was loaded, so the document starts dirty
+        if (path && window.markdownApi.consumeRecovered?.() != null) markDirty()
       } catch (err) {
         console.error('[markdown] load failed:', err)
         if (!cancelled) {
@@ -372,7 +374,7 @@ export default function App() {
     return () => {
       cancelled = true
     }
-  }, [editor, roundTripEnabled, loadFromPath])
+  }, [editor, roundTripEnabled, loadFromPath, markDirty])
 
   const onFrontmatterChange = useCallback(
     (inner: string) => {
@@ -438,6 +440,20 @@ export default function App() {
       originalSourceRef.current,
     )
   }, [])
+
+  // web bridge: the text a save would write now, read by the draft writer without saving
+  const sourceModeRef = useRef(sourceMode)
+  sourceModeRef.current = sourceMode
+  useEffect(
+    () =>
+      window.markdownApi.provideText?.(() => {
+        if (statusRef.current !== 'ready') return null
+        if (sourceModeRef.current)
+          return writeSourceText(sourceTextRef.current, sourceFormatRef.current)
+        return currentFileText()
+      }),
+    [currentFileText],
+  )
 
   const openSource = useCallback(() => {
     const text = currentFileText()

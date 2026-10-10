@@ -48,11 +48,18 @@ function saveImageLink(src: string): void {
 export function createMarkdownWebApi(ctx: ModuleBridgeContext, opts: TextWebApiOptions = {}) {
   const web = createTextWebApi(
     ctx.client,
-    { ext: '.md', extPattern: /\.(md|markdown|mdown|mkd)$/i, mimeType: 'text/markdown' },
+    {
+      module: 'markdown',
+      ext: '.md',
+      extPattern: /\.(md|markdown|mdown|mkd)$/i,
+      mimeType: 'text/markdown',
+    },
     { capabilities: ctx.capabilities, ...opts },
   )
   const api = {
     consumePending: web.consumePending,
+    consumeRecovered: web.consumeRecovered,
+    provideText: web.provideText,
     consumeHeadlessExport: web.consumeHeadlessExport,
     headlessExportDone: web.headlessExportDone,
     readFile: web.readFile,

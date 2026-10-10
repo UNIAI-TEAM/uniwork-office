@@ -16,4 +16,12 @@ export const fr = {
   webViewOnlyNotSaved: 'Ce document est en lecture seule et ne peut pas être enregistré',
   webNotUtf8:
     'Ce fichier n’est pas du texte UTF-8. Il s’ouvre en lecture seule pour qu’un enregistrement ne modifie pas ses octets',
+  webDraftTitle: 'Restaurer les modifications non enregistrées ?',
+  webDraftBody:
+    'Ce navigateur a conservé une copie de modifications non enregistrées de ce document. Les restaurer ou les ignorer ?',
+  webDraftOlder:
+    'Cette copie repose sur une version plus ancienne du document. L’enregistrer remplace la version plus récente.',
+  webDraftSavedAt: 'Copie conservée à',
+  webDraftRestore: 'Restaurer',
+  webDraftDiscard: 'Ignorer',
 } satisfies Record<keyof typeof zh, string>

@@ -36,6 +36,7 @@ import {
   type HostRequests,
   type InitAck,
   type InitPayload,
+  type InitRecovery,
   type InitUser,
   type OfficeModule,
   type OpenPayload,
@@ -90,6 +91,8 @@ export interface FrameSession {
   open?: OpenPayload
   /** the signed-in user's display data, if the host sent it */
   user?: InitUser
+  /** draft-recovery grant (CONTRACT C18), if the host sent one; absent = recovery off */
+  recovery?: InitRecovery
 }
 
 type HostRequestHandler<K extends keyof HostRequests> = (
@@ -229,10 +232,12 @@ export function createDocsFrameClient(options: DocsFrameClientOptions): DocsFram
     }
     if (p.open) next.open = p.open
     if (p.user) next.user = { displayName: p.user.displayName }
+    if (p.recovery) next.recovery = { key: p.recovery.key, scope: p.recovery.scope }
     // a repeated init (host re-handshake) updates the object callers already hold
     if (session) {
       delete session.open
       delete session.user
+      delete session.recovery
       Object.assign(session, next)
     } else session = next
     resolveInit(session)
