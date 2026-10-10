@@ -24,8 +24,12 @@ conflict/view-only/print, pictures, static HTML copy for the sandboxed preview);
 `docs/web-modules/markdown-html.md`. Tests: `npx vitest run --root web/modules` (part of `npm run test:web`).
 
 Capabilities: `installModuleBridge()` puts one mutable object on each global as `.capabilities` (web defaults
-`MODULE_WEB_CAPABILITIES`: `ai`, `aiCredentials`, `open`, `recents`, `autoSave`, `autoSaveToDisk` false; host grants
-assigned on `init`).
+`MODULE_WEB_CAPABILITIES`: `ai`, `aiCredentials`, `open`, `recents`, `autoSave`, `autoSaveToDisk`, `saveStatus`,
+`viewOnlyChip` false; host grants assigned on `init`). `saveStatus` / `viewOnlyChip` (GO-B8): the host header owns
+the save state and one host banner owns "view only", so a renderer shows its own Unsaved / Saved / Save failed label
+and its own "View only" chip only while `cap('saveStatus')` / `cap('viewOnlyChip')` is on (desktop: no object, on).
+A failed save's text is the module's own network / timeout sentence or the shared one of its code / HTTP status
+(`shared/save-failure.ts`), never the host's raw English status line.
 
 Dialogs: every in-frame dialog (save conflict, discard unsaved changes, draft recovery, merge prompt, open failure) is
 the one component `shared/frame-dialog.ts` (+ `frame-dialog.css`, theme tokens only), called by each module's notice file
@@ -43,7 +47,10 @@ AI (CONTRACT C16): `shared/ai/` is the `ai` web bridge of every frame (Docs too,
 frame-token AI routes (BYOK proxy for aiStream/aiChat with ai-provider's native wire format, UniWork cloud tools,
 in-frame AI settings over the UniWork credentials, typed state card per error code); without the grant every member is
 the module's own "unavailable" stub and every AI key stays false. Routes and grants: web/docs/protocol/README.md
-"AI (web)". Tests: `shared/ai/ai.test.ts`, e2e `web/e2e/ai-web.spec.ts` (Docs + Markdown).
+"AI (web)". A failed chat turn (`aiStream`) is announced once: its typed, vendor-neutral text is the panel's inline error, no
+floating card beside it (the card, `.ow-ai-state`, stays for the one-shot `aiChat` and the tool members, which have no
+transcript); the model chip's "manage" row (`openAiModelSettings`) opens the AI settings in every panel.
+Tests: `shared/ai/ai.test.ts`, e2e `web/e2e/ai-web.spec.ts` (Docs + Markdown), `web/e2e/sheets-ai.spec.ts`.
 A renderer reads it with `createCapabilityReader()` from `@genoffice/ui/capabilities` (`cap(key)`: on unless explicitly
 false, so desktop keeps everything). No autosave on the web (CONTRACT C10): the shared `getAutoSaveDefault` answers
 "off" and the bridges never send `api.save` with `auto`.
