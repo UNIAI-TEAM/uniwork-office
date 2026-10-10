@@ -541,7 +541,7 @@ Proposed Sheets capability keys (renderer-local; host protocol grants stay `save
 
 | key               | hides                                                                                                                                                | kind                     |
 | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
-| `ai`              | AI panel/dock, AI ribbon entries, AI presets, op-executor image ops, chat attachments                                                                | general                  |
+| `ai`              | AI panel/dock, AI ribbon entries, AI presets, op-executor image ops (on with the host's `ai` grant, section 7.4)                                     | general                  |
 | `webSearch`       | AI tool web_search                                                                                                                                   | general                  |
 | `imageSearch`     | AI tool image_search                                                                                                                                 | general                  |
 | `imageGeneration` | AI tool generate_image                                                                                                                               | general                  |
@@ -558,6 +558,26 @@ Proposed Sheets capability keys (renderer-local; host protocol grants stay `save
 | `xlsImport`       | `.xls` open (S9)                                                                                                                                     | **sidecar-only (GO-D3)** |
 | `pivotRefresh`    | PivotTable refresh (S10)                                                                                                                             | **sidecar-only (GO-D3)** |
 | `mergeWorkbooks`  | Data > Merge workbooks, AI attachment merge (S11)                                                                                                    | **sidecar-only (GO-D3)** |
+
+### 7.4 Web AI (SH4, UNI-1016, CONTRACT C16)
+
+The "HIDE `ai`" rows above are the GO-D2 default (AI off for the whole web). Sheets now follows the other
+modules: the frame builds on the shared web AI bridge (`web/modules/shared/ai`, installed by
+`installModuleBridge` through `withWebAi`), which calls the frame-token AI routes directly from the frame.
+
+- **Grants.** `sheetsHostGrants` maps the host's `ai` (+ the AI settings entry `aiCredentials`), `webSearch`,
+  `imageSearch` and `imageGeneration` (each cloud tool needs `ai` too); the server's cloud tool switches can narrow
+  them after the first paint. Without the `ai` grant every key stays `false`: no panel, no AI request.
+- **What runs.** Chat, plan operations (`propose_operations`), range aggregate (`read_range`) and formula audit
+  (`read_formula_cells`) run on the WASM engine; `fetchImage` decodes `data:` URLs locally and proxies https URLs
+  through the host's `image.fetch`.
+- **Stays hidden (typed answers, tools not offered).** `createDocument`, `readLocalImage`, `openWorkbooksForMerge`
+  (C11), `autoRenameWorkbook` keep their typed "unavailable" answers, and the renderer does not offer the tools that
+  need them (`ai/skill-gate.ts`, `ai/workbook-skill.ts`: no `create_document`, no `merge_attached_workbooks`; the
+  search / image skills follow `webSearch` / `imageSearch` / `imageGeneration`). The attach button follows the new
+  `attachments` key (off on the web: no attachment store in the frame).
+- **New keys.** `aiCredentials` (AI panel settings gear -> in-frame dialog, UniWork-stored provider keys) and
+  `attachments`.
 
 ## 8. Standalone renderer web build
 
