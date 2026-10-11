@@ -351,7 +351,9 @@ describe('wbLoadAll: the first read waits for the first account status', () => {
       activeDb: () => ({
         dbPath: '',
         loadAll: () => {
-          throw new Error('disk error')
+          throw Object.assign(new Error('disk error at C:\\Users\\someone\\wb.sqlite'), {
+            code: 'ERR_SQLITE_ERROR',
+          })
         },
       }),
     }
@@ -362,6 +364,9 @@ describe('wbLoadAll: the first read waits for the first account status', () => {
         legacyPending: false,
         unavailable: true,
       })
+      // the error code is logged; the message (with its path) and the error object are not
+      expect(error).toHaveBeenCalledTimes(1)
+      expect(error.mock.calls[0]).toEqual(['[workbench-db] loadAll failed: ERR_SQLITE_ERROR'])
     } finally {
       error.mockRestore()
     }

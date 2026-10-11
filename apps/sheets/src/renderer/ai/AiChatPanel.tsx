@@ -722,7 +722,7 @@ export function AiChatPanel({
       <div className="ai-composer">
         {attachNotice && <div className="ai-attach-notice">{attachNotice}</div>}
         {viewOnly && (
-          <div className="ai-view-only-notice" role="status">
+          <div className="ai-readonly-notice" role="status">
             {t('aiViewOnlyNotice')}
           </div>
         )}

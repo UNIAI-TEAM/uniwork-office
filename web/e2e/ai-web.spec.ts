@@ -44,7 +44,7 @@ async function aiLog(request: APIRequestContext): Promise<LogEntry[]> {
 const OPENAI_KEY = [{ provider: 'openai', api_key: 'sk-test-openai-abcd' }]
 /** the composer's one-line view-only notice: each panel kept its own class name */
 const VIEW_ONLY_NOTICE = {
-  docs: '.ai-viewonly-notice',
+  docs: '.ai-readonly-notice',
   markdown: '.ai-readonly-notice',
   html: '.ai-readonly-notice',
 } as const

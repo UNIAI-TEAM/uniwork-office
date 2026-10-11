@@ -158,7 +158,7 @@ describe('AI panel on a view-only document', () => {
   it('shows the reason, drops the track-changes toggle and the edit starters', () => {
     const editor = createEditor()
     const { container, cleanup } = renderPanel(editor, true)
-    expect(container.querySelector('.ai-viewonly-notice')).not.toBeNull()
+    expect(container.querySelector('.ai-readonly-notice')).not.toBeNull()
     expect(container.querySelector('.ai-track-btn')).toBeNull()
     expect(container.querySelectorAll('.ai-starter').length).toBe(1)
     cleanup()
@@ -168,7 +168,7 @@ describe('AI panel on a view-only document', () => {
   it('keeps the edit affordances on an editable document', () => {
     const editor = createEditor()
     const { container, cleanup } = renderPanel(editor, false)
-    expect(container.querySelector('.ai-viewonly-notice')).toBeNull()
+    expect(container.querySelector('.ai-readonly-notice')).toBeNull()
     expect(container.querySelector('.ai-track-btn')).not.toBeNull()
     expect(container.querySelectorAll('.ai-starter').length).toBeGreaterThan(1)
     cleanup()

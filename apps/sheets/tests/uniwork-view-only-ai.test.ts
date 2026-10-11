@@ -122,7 +122,7 @@ describe('view-only wiring', () => {
   it('disables the editing ribbon AI action and shows the composer notice', () => {
     expect(shellSrc).toMatch(/aiViewOnly \?[\s\S]*?disabled[\s\S]*?t\('aiViewOnlyNotice'\)/)
     expect(shellSrc).toContain('viewOnly={aiViewOnly}')
-    expect(panelSrc).toMatch(/viewOnly && \(\s*<div className="ai-view-only-notice"/)
+    expect(panelSrc).toMatch(/viewOnly && \(\s*<div className="ai-readonly-notice"/)
   })
 })
 

@@ -2393,7 +2393,7 @@ export function AiPanel({
       ) : (
         <div className="ai-composer">
           {readOnly && (
-            <div className="ai-attach-notice" role="note">
+            <div className="ai-readonly-notice" role="note">
               {t('aiViewOnlyNotice')}
             </div>
           )}

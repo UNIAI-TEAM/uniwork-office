@@ -7967,20 +7967,27 @@ html[dir='rtl'] .quick-title-row {
 }
 
 /* the My AI / workbench data of this account could not be loaded (see WorkbenchAccountGate) */
+.wb-gate-failed {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 40px);
+}
+
+.wb-gate-failed > .home {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+}
+
+/* a bar in the flow above Home: Home gives it room instead of sitting under it */
 .wb-load-failed {
-  position: fixed;
-  bottom: 16px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 90;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 12px;
-  max-width: min(560px, calc(100vw - 32px));
-  padding: 10px 12px;
-  border-radius: 10px;
-  border: 1px solid var(--danger-border);
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--danger-border);
   background: var(--danger-bg);
   color: var(--text-primary);
-  box-shadow: var(--shadow-menu);
 }

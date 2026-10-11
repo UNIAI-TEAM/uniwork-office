@@ -63,6 +63,8 @@ class FakeMain {
   /** buckets the renderer actually loaded (after the gate) */
   loaded: string[] = []
   failLoad = false
+  /** the account database cannot be opened: main answers `unavailable` instead of throwing */
+  unavailableLoad = false
   /** the next n loads fail, then they work */
   loadFailures = 0
   failLegacyDone = false
@@ -99,6 +101,16 @@ class FakeMain {
         if (this.loadFailures > 0) {
           this.loadFailures--
           throw new Error('load failed')
+        }
+        if (this.unavailableLoad) {
+          return {
+            keys: {},
+            keyCount: 0,
+            dbPath: '',
+            bucket: this.active,
+            legacyPending: this.legacyTo === this.active && !this.legacyDone,
+            unavailable: true,
+          }
         }
         this.loaded.push(this.active)
         const keys = Object.fromEntries(this.buckets.get(this.active)!)
@@ -541,5 +553,37 @@ describe('a load that fails', () => {
     await flush()
     expect(alert()).toBeNull()
     expect(chatText()).toBe('member history')
+  })
+
+  it('an account database that cannot be opened is a failed load, not a silent localStorage fallback', async () => {
+    vi.useFakeTimers()
+    main.signIn('member')
+    // a fallback copy under the member's own bucket name and the pre-upgrade shared copy
+    ls.set(`uniwork.wbacct.a-member.${CHAT}`, '[{"id":"1","role":"user","text":"stale copy"}]')
+    ls.set(CHAT, '[{"id":"2","role":"user","text":"before upgrade"}]')
+    main.unavailableLoad = true
+    await renderGate()
+    for (const delay of LOAD_RETRY_DELAYS_MS) {
+      expect(host.textContent).toBe('')
+      await advance(delay)
+    }
+    expect(alert()).not.toBeNull()
+    expect(isWorkbenchLoadFailed()).toBe(true)
+    // nothing is read from or written to localStorage; the pre-upgrade copy is not moved
+    expect(chatText()).toBe('')
+    expect(wbStoreGetRaw(CHAT)).toBeNull()
+    wbStoreSetRaw(CHAT, 'x')
+    expect(ls.get(CHAT)).toContain('before upgrade')
+    expect([...ls.keys()].sort()).toEqual([`uniwork.wbacct.a-member.${CHAT}`, CHAT].sort())
+    expect(main.legacyDone).toBe(false)
+
+    // once the database opens, Retry loads the account data and the move happens
+    main.unavailableLoad = false
+    act(() => alert()!.querySelector('button')!.click())
+    await flush()
+    expect(alert()).toBeNull()
+    expect(isWorkbenchLoadFailed()).toBe(false)
+    expect(chatText()).toBe('before upgrade')
+    expect(main.legacyDone).toBe(true)
   })
 })
