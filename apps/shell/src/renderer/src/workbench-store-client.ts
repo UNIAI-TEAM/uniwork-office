@@ -7,7 +7,11 @@
  * is unavailable, and then under a per-bucket prefix.
  */
 import type { WorkbenchIdbMediaDump, WorkbenchStoreApi } from '../../shared/home-api'
-import { currentWorkbenchBucket, setCurrentWorkbenchBucket } from './workbench-bucket'
+import {
+  clearCurrentWorkbenchBucket,
+  currentWorkbenchBucket,
+  setCurrentWorkbenchBucket,
+} from './workbench-bucket'
 import {
   collectWorkbenchIdbMedia,
   isWbIdbMediaDump,
@@ -41,6 +45,8 @@ function wbApi(): WorkbenchStoreApi | null {
 let cache = new Map<string, string>()
 let hydrated = false
 let usingSqlite = false
+/** a load failed: nothing is readable or writable until the next reset + load (no fallback to another bucket's copy) */
+let failed = false
 /** bumped by every reset: a hydrate that started before it does not apply */
 let generation = 0
 
@@ -58,7 +64,7 @@ export function isWorkbenchUsingSqlite(): boolean {
  * account. Without one (tests) localStorage is used as is.
  */
 function storeClosed(): boolean {
-  return !hydrated && wbApi() !== null
+  return failed || (!hydrated && wbApi() !== null)
 }
 
 /** localStorage name of a key: prefixed with the bucket when one is known */
@@ -95,13 +101,16 @@ function removeLocalStorageKeys(keys: Iterable<string>): void {
 
 /**
  * Drops everything held for the previous account at once (the account
- * changed); reads return nothing until the next hydrate.
+ * changed), including its bucket name; reads return nothing until the next
+ * hydrate names the new one.
  */
 export function resetWorkbenchStore(): void {
   generation++
   cache = new Map()
   hydrated = false
   usingSqlite = false
+  failed = false
+  clearCurrentWorkbenchBucket()
 }
 
 /**
@@ -146,8 +155,11 @@ export async function hydrateWorkbenchStore(): Promise<void> {
     usingSqlite = true
   } catch {
     if (mine !== generation) return
+    // closed, not a localStorage fallback: no bucket was named, so the only
+    // copy such a fallback could reach is another account's
     usingSqlite = false
     cache = new Map()
+    failed = true
   }
   hydrated = true
 }
@@ -169,12 +181,15 @@ async function moveLegacyMediaAndFinish(
   bucket: string,
   legacyKeys: string[],
 ): Promise<void> {
-  try {
-    await moveLegacyWorkbenchIdbMedia()
-  } catch {
-    /* media best-effort: the keys moved */
-  }
+  // the keys are in the account store (or the bucket's fallback copy) by now
   removeLocalStorageKeys(legacyKeys)
+  try {
+    await moveLegacyWorkbenchIdbMedia(bucket)
+  } catch {
+    // not confirmed: the shared media databases stay and the move is tried
+    // again on the next load (a repeated copy keeps what is already there)
+    return
+  }
   await api.legacyDone(bucket)
 }
 
@@ -196,6 +211,32 @@ export function wbStoreGetRaw(key: string): string | null {
   } catch {
     return null
   }
+}
+
+/**
+ * Keys held for the current bucket (the cache, or the bucket's localStorage
+ * fallback copy), unprefixed. Nothing while no bucket is loaded.
+ */
+export function wbStoreKeys(): string[] {
+  if (usingSqlite) return [...cache.keys()]
+  if (storeClosed()) return []
+  const bucket = currentWorkbenchBucket()
+  const prefix = bucket ? `uniwork.wbacct.${bucket}.` : ''
+  const keys: string[] = []
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i)
+      if (!k) continue
+      if (prefix) {
+        if (k.startsWith(prefix)) keys.push(k.slice(prefix.length))
+      } else if (allowedKey(k)) {
+        keys.push(k)
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  return keys
 }
 
 export function wbStoreSetRaw(key: string, value: string): void {

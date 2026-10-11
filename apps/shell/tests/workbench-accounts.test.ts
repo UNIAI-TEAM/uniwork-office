@@ -205,4 +205,69 @@ describeSqlite('workbench data per UniWork account', () => {
     store.activeDb()
     expect(readdirSync(join(dir, 'workbench', 'accounts'))).toEqual([workbenchBucketOf(OWNER)])
   })
+
+  it('a fresh install logs no move: nothing was there to move', () => {
+    const dir = userData()
+    const log: string[] = []
+    const store = open(dir, log)
+    store.setOwner(OWNER)
+    store.activeDb()
+    // the marker still records the first account (the renderer may hold copies)
+    expect(store.legacyPending()).toBe(true)
+    expect(log).toEqual([])
+  })
+
+  it('logs a shared pre-upgrade file that could not be removed', () => {
+    const dir = userData()
+    seedLegacy(dir, { [CHAT]: '[]' })
+    const log: string[] = []
+    const store = new WorkbenchAccounts({
+      userDataDir: dir,
+      log: (line) => log.push(line),
+      unlink: (path) => {
+        // the -wal / -shm side files may simply not exist
+        if (path.endsWith('workbench.sqlite')) throw new Error('EBUSY: resource busy')
+        const err = new Error('ENOENT') as NodeJS.ErrnoException
+        err.code = 'ENOENT'
+        throw err
+      },
+    })
+    stores.push(store)
+    store.setOwner(OWNER)
+    expect(store.activeDb()!.get(CHAT)).toBe('[]')
+    expect(log).toHaveLength(2)
+    expect(log[0]).toMatch(/could not remove the pre-upgrade database file workbench\.sqlite: EBUSY/)
+    expect(log[0]).not.toContain(dir)
+    expect(log[1]).toMatch(/moved to account acc-owner$/)
+  })
+})
+
+describe('first account status after start', () => {
+  it('holds loads until the first owner is applied, so a signed-in launch never opens the signed-out bucket', async () => {
+    const store = new WorkbenchAccounts({ userDataDir: join(tmpdir(), 'uw-wb-settle-unused') })
+    let released = false
+    const waiting = store.whenSettled().then(() => (released = true))
+    await Promise.resolve()
+    expect(released).toBe(false)
+    expect(store.bucket()).toBe(LOCAL_BUCKET)
+
+    // the restore applied the stored session's account
+    store.setOwner(OWNER)
+    await waiting
+    expect(store.bucket()).toBe(workbenchBucketOf(OWNER))
+    // later calls do not wait
+    await store.whenSettled()
+  })
+
+  it('a signed-out first owner settles too, and a stuck start is not waited for forever', async () => {
+    const signedOut = new WorkbenchAccounts({ userDataDir: join(tmpdir(), 'uw-wb-settle-unused') })
+    signedOut.setOwner(null)
+    await signedOut.whenSettled(60_000)
+
+    const stuck = new WorkbenchAccounts({ userDataDir: join(tmpdir(), 'uw-wb-settle-unused') })
+    const started = Date.now()
+    await stuck.whenSettled(20)
+    expect(Date.now() - started).toBeLessThan(5_000)
+    expect(stuck.bucket()).toBe(LOCAL_BUCKET)
+  })
 })

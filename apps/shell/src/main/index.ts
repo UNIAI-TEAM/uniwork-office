@@ -4314,8 +4314,12 @@ function registerHomeIpc(): void {
     extractAllowedFileExcerpts(paths, tabManager?.openFilePaths() ?? []),
   )
 
-  ipcMain.handle(HOME_CHANNELS.wbLoadAll, () => {
+  ipcMain.handle(HOME_CHANNELS.wbLoadAll, async () => {
     const store = workbenchAccounts()
+    // held until the first account status after start has been applied (the
+    // restore has read the stored session): a signed-in launch never loads or
+    // writes the signed-out bucket on the way
+    await store.whenSettled()
     syncWorkbenchOwner()
     const bucket = store.bucket()
     try {

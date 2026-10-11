@@ -3,7 +3,7 @@
  * Stores: tasks attachments (Blob), pets photos (data URL), health body (data URL).
  */
 
-import { wbMediaDbName } from './workbench-bucket'
+import { isWorkbenchBucketCleared, wbMediaDbName } from './workbench-bucket'
 
 export interface WbIdbMediaDump {
   version: 1
@@ -125,6 +125,8 @@ async function restoreStore(
 
 export async function collectWorkbenchIdbMedia(): Promise<WbIdbMediaDump> {
   const dump: WbIdbMediaDump = { version: 1, tasks: {}, pets: {}, health: {} }
+  // no bucket (the account just changed): nothing of any account to read
+  if (isWorkbenchBucketCleared()) return dump
   for (const s of STORES) {
     dump[s.slot] = await dumpStore(wbMediaDbName(s.db), s.store, s.kind)
   }
@@ -132,7 +134,7 @@ export async function collectWorkbenchIdbMedia(): Promise<WbIdbMediaDump> {
 }
 
 export async function restoreWorkbenchIdbMedia(dump: WbIdbMediaDump | null | undefined): Promise<void> {
-  if (!dump || dump.version !== 1) return
+  if (!dump || dump.version !== 1 || isWorkbenchBucketCleared()) return
   for (const s of STORES) {
     const entries = dump[s.slot]
     if (entries && typeof entries === 'object') {
@@ -160,12 +162,15 @@ function readAllRows(db: IDBDatabase, storeName: string): Promise<Array<[IDBVali
 
 /**
  * One time, for the account that received the pre-upgrade data: the shared
- * media databases move into the current bucket's (values copied as they are,
- * existing entries kept), then the shared ones are deleted.
+ * media databases move into the given bucket's (values copied as they are,
+ * existing entries kept), then the shared ones are deleted. The bucket is the
+ * one the caller loaded, not whatever is current when an await returns.
+ * Rejects when a copy or a delete failed: the caller retries on the next load
+ * (a repeated copy keeps what is already there).
  */
-export async function moveLegacyWorkbenchIdbMedia(): Promise<void> {
+export async function moveLegacyWorkbenchIdbMedia(bucket: string): Promise<void> {
   for (const s of STORES) {
-    const target = wbMediaDbName(s.db)
+    const target = wbMediaDbName(s.db, bucket)
     if (target === s.db) return
     const legacy = await openDb(s.db, s.store)
     let rows: Array<[IDBValidKey, unknown]>
@@ -189,11 +194,11 @@ export async function moveLegacyWorkbenchIdbMedia(): Promise<void> {
         db.close()
       }
     }
-    await new Promise<void>((resolve) => {
+    await new Promise<void>((resolve, reject) => {
       const req = indexedDB.deleteDatabase(s.db)
       req.onsuccess = () => resolve()
-      req.onerror = () => resolve()
-      req.onblocked = () => resolve()
+      req.onerror = () => reject(req.error ?? new Error(`idb_delete_failed:${s.db}`))
+      req.onblocked = () => reject(new Error(`idb_delete_blocked:${s.db}`))
     })
   }
 }
