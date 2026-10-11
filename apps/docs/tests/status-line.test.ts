@@ -82,9 +82,7 @@ describe('language switch with a key + params line (App wiring)', () => {
     let set: ((s: Line) => void) | null = null
     function KeyProbe({ lang }: { lang: string }) {
       const [line, setLine] = useState<Line>('')
-      useClearStatusOnLangChange(lang, () =>
-        setLine((cur) => (typeof cur === 'string' ? '' : cur)),
-      )
+      useClearStatusOnLangChange(lang, () => setLine((cur) => (typeof cur === 'string' ? '' : cur)))
       set = setLine
       return createElement('span', null, statusText(line, t))
     }
