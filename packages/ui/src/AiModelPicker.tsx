@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Lang } from '@genoffice/i18n'
-import { AI_PROVIDERS, type AiSettings } from '@genoffice/ai-provider/browser'
+import type { AiSettings } from '@genoffice/ai-provider/browser'
 import {
   aiModelPickerGroups,
   aiModelPickerSelection,
@@ -22,8 +22,8 @@ export interface AiModelPickerBridge {
   /** shell: switch to Home and open Settings › AI Model */
   readonly openModelSettings?: (() => Promise<void> | void) | undefined
   /**
-   * web frames: a provider with a stored key but no known model keeps the composer's send off
-   * with a hint (the server would only answer a bare 400); other hosts leave it undefined
+   * web frames: while the chip reads "Choose model" (no key, or a key without a known model) the
+   * composer's send stays off with a hint saying which; other hosts leave it undefined
    */
   readonly requireModel?: boolean | undefined
 }
@@ -85,19 +85,26 @@ export function AiModelPicker({
   )
   const current = settings ? aiModelPickerSelection(settings) : null
   const currentUsable = groups.some((g) => g.id === current?.provider)
-  // `activeProvider` drops a provider without a model back to uniAI, so the wanted provider is read raw
+  // the wanted provider is read raw: the active one falls back to uniAI once it has no model
   const wanted = settings?.provider
   const wantedConfig = wanted ? settings?.providers?.[wanted] : undefined
-  const needsModel =
-    bridge.requireModel === true &&
-    wanted !== undefined &&
-    (wantedConfig?.apiKey ?? '') !== '' &&
-    !(wantedConfig?.model?.trim() || AI_PROVIDERS.find((meta) => meta.id === wanted)?.defaultModel)
-  const needHint = needsModel ? strings.needModel : null
+  const hasKey = (wantedConfig?.apiKey ?? '') !== ''
+  // web frames: the chip reads "Choose model" (nothing usable) -> send is off for everyone in the
+  // frame, viewer or editor, and the hint says what is missing: a model (a key is stored) or a key
+  const needHint =
+    bridge.requireModel === true && settings !== null && !currentUsable
+      ? hasKey
+        ? strings.needModel
+        : strings.needKey
+      : null
+  const openSettings = bridge.openModelSettings
+  const openSettingsOnce = useCallback(() => {
+    void openSettings?.()
+  }, [openSettings])
   useEffect(() => {
-    setAiModelNeedHint(needHint)
+    setAiModelNeedHint(needHint, openSettings ? openSettingsOnce : null)
     return () => setAiModelNeedHint(null)
-  }, [needHint])
+  }, [needHint, openSettings, openSettingsOnce])
 
   const toggle = () => {
     if (!open) {

@@ -231,16 +231,18 @@ for (const module of ['docs', 'markdown'] as const) {
       const problems = await watch(page)
       const frame = await open(page, module, { lang: 'en', ai: '1' })
       await expect(panel(frame)).toBeVisible({ timeout: 30_000 })
-      // no key stored yet: the turn ends in the credential_missing state, shown once inline
-      await ask(frame, 'Say hello')
-      await expect(frame.locator('.ai-msg-assistant').last()).toContainText('No AI key yet', {
-        timeout: 30_000,
-      })
-      await expect(frame.locator('.ow-ai-state')).toHaveCount(0)
-      // a setup state, not a failure: no error styling, no "Error:" prefix, no "not sent" retry pill
+      // no key stored yet: the chip reads "Choose model", Send is off (as in a viewer) and the hint above
+      // the footer says what to do; it opens the AI settings
+      const box = frame.locator('.ai-input-box textarea').first()
+      await expect(box).toBeVisible({ timeout: 30_000 })
+      await box.fill('Say hello')
+      await expect(frame.locator('.ai-send-btn')).toBeDisabled()
+      await box.press('Enter')
+      await expect(frame.locator('.ai-msg-assistant')).toHaveCount(0)
+      const need = frame.locator('.ai-input-need')
+      await expect(need).toContainText('Add an API key in AI settings')
       await expect(frame.locator('.ai-msg-error, .ai-msg-undelivered')).toHaveCount(0)
-      await expect(frame.locator('.ai-msg-assistant').last()).not.toContainText('Error:')
-      await frame.locator('.ai-panel-header').getByRole('button', { name: 'AI settings' }).click()
+      await need.getByRole('button').click()
       const dialog = frame.locator('.ow-ai-dialog')
       await expect(dialog).toBeVisible()
       await expect(dialog).toContainText('No key saved')

@@ -146,3 +146,26 @@
 .ai-send-btn:disabled img {
   filter: var(--ai-send-off-filter, none);
 }
+
+/* icon-only composer: the no-key / no-model hint above the footer (send is off meanwhile) */
+.ai-input-need {
+  padding: 0 4px 4px;
+  font-size: var(--text-caption);
+  color: var(--text-secondary);
+  user-select: none;
+}
+
+.ai-input-need-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: start;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.ai-input-need-link:hover {
+  color: var(--text);
+}

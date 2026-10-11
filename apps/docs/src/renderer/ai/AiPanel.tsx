@@ -342,7 +342,7 @@ const MODEL_BRIDGE: AiModelPickerBridge = {
   onSettingsChanged: (handler) => window.desktop.onAiSettingsChanged(handler),
   gskLoggedIn: () => window.desktop.aiGskStatus().then((s) => !!s?.loggedIn),
   openModelSettings: () => window.desktop.openAiModelSettings().catch(() => {}),
-  // web frames: a stored key without a model keeps send off with a hint (see AiModelPicker)
+  // web frames: no key or no model keeps send off with a hint (see AiModelPicker)
   get requireModel() {
     return window.desktop?.capabilities?.platform === 'web'
   },

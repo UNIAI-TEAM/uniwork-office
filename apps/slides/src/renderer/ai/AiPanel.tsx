@@ -378,7 +378,7 @@ const MODEL_BRIDGE: AiModelPickerBridge = {
   onSettingsChanged: (handler) => window.slidesApi.onAiSettingsChanged(handler),
   gskLoggedIn: () => window.slidesApi.aiGskStatus().then((s) => !!s?.loggedIn),
   openModelSettings: () => window.slidesApi.openAiModelSettings().catch(() => {}),
-  // web frames: a stored key without a model keeps send off with a hint (see AiModelPicker)
+  // web frames: no key or no model keeps send off with a hint (see AiModelPicker)
   get requireModel() {
     return platform() === 'web'
   },
@@ -419,7 +419,7 @@ export function AiPanel({
   // Shared AI panel pref (Settings → General): the bespoke slides composer
   // must honor it like the shared AiComposer does.
   const { spellcheck } = useAiPanelPrefs()
-  // a stored key without a known model (web): send stays off and the hint says why, as in AiComposer
+  // no key or no known model (web): send stays off and the hint says why, as in AiComposer
   const needModelHint = useAiModelNeedHint()
   const [busy, setBusy] = useState(false)
   const [chat, setChat] = useState<ChatEntry[]>([])

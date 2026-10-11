@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react'
 import { IconEnter, IconSend, IconStop } from './icons'
 import { useAiPanelPrefs } from './ai-panel-prefs-store'
-import { useAiModelNeedHint } from './ai-model-need'
+import { useAiModelNeedAction, useAiModelNeedHint } from './ai-model-need'
 
 // Keep in sync with the CSS `max-height` on `.ai-input-box textarea` (7 lines à 24px)
 const MAX_TEXTAREA_HEIGHT = 168
@@ -67,8 +67,9 @@ export function AiComposer({
 }): React.JSX.Element {
   const innerRef = useRef<HTMLTextAreaElement | null>(null)
   const ref = textareaRef ?? innerRef
-  // a stored key without a known model (web): send stays off and the hint says why
+  // no key or no known model (web): send stays off and the hint says why
   const needModelHint = useAiModelNeedHint()
+  const needModelAction = useAiModelNeedAction()
   const canSend = value.trim().length > 0 && !busy && needModelHint === null
   const { spellcheck } = useAiPanelPrefs()
 
@@ -118,6 +119,18 @@ export function AiComposer({
           if (text && onPasteText?.(text)) e.preventDefault()
         }}
       />
+      {iconOnly && needModelHint !== null && !busy && (
+        // the icon-only footer has no room for the hint line: it sits above it, and opens the AI settings
+        <div className="ai-input-need" role="status">
+          {needModelAction ? (
+            <button type="button" className="ai-input-need-link" onClick={needModelAction}>
+              {needModelHint}
+            </button>
+          ) : (
+            needModelHint
+          )}
+        </div>
+      )}
       <div className="ai-input-footer">
         {footerStart}
         {!iconOnly && (

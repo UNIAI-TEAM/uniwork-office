@@ -1,6 +1,7 @@
 /** @vitest-environment jsdom */
-// UNI-1232 FX2 (N3-01 / G-N1): in a web frame a stored key without a known model keeps the
-// composer's send off and says why; with a model, with no key at all, or on desktop it is untouched.
+// UNI-1232 FX2 (N3-01 / G-N1) + UNI-1240 (final3 F3-N2): in a web frame, while the chip reads
+// "Choose model" (a key without a known model, or no key at all) the composer's send is off and says
+// why, the same for a viewer and an editor; with a model, or on desktop, it is untouched.
 import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
@@ -30,11 +31,16 @@ function settingsWith(provider: 'custom' | 'openai', apiKey: string, model: stri
   return settings
 }
 
-async function mount(settings: AiSettings, requireModel: boolean) {
+async function mount(
+  settings: AiSettings,
+  requireModel: boolean,
+  opts: { iconOnly?: boolean; openModelSettings?: () => void } = {},
+) {
   const bridge: AiModelPickerBridge = {
     getSettings: async () => settings,
     setSettings: async () => {},
     requireModel,
+    ...(opts.openModelSettings ? { openModelSettings: opts.openModelSettings } : {}),
   }
   await act(async () => {
     root.render(
@@ -47,6 +53,7 @@ async function mount(settings: AiSettings, requireModel: boolean) {
         sendLabel: 'Send',
         stopLabel: 'Stop',
         footerStart: createElement(AiModelPicker, { bridge, lang: 'en' }),
+        ...(opts.iconOnly ? { iconOnly: true } : {}),
         onChange: () => {},
         onSend: () => {},
         onStop: () => {},
@@ -56,7 +63,7 @@ async function mount(settings: AiSettings, requireModel: boolean) {
   await act(async () => {})
   return {
     send: host.querySelector('.ai-send-btn') as HTMLButtonElement,
-    hint: host.querySelector('.ai-input-hint')!.textContent,
+    hint: host.querySelector('.ai-input-hint')?.textContent ?? null,
     chip: host.querySelector('.ai-model-chip-text')!.textContent,
   }
 }
@@ -75,9 +82,31 @@ it('a known model keeps send on', async () => {
   expect(hint).toBe('Enter to send')
 })
 
-it('no key at all is not this state: send stays on and the turn answers with the no-key copy', async () => {
-  const { send } = await mount(settingsWith('custom', '', ''), true)
+it('no key at all: send is off too, and the hint is the add-a-key copy (viewer and editor alike)', async () => {
+  const { send, hint, chip } = await mount(settingsWith('custom', '', ''), true)
+  expect(chip).toBe(AI_MODEL_PICKER_STRINGS.en.choose)
+  expect(send.disabled).toBe(true)
+  expect(hint).toBe('Add an API key in AI settings to use the assistant.')
+  expect(send.title).toBe(hint)
+})
+
+it('the icon-only composer shows the hint above the footer and it opens the AI settings', async () => {
+  const open = vi.fn()
+  const { send } = await mount(settingsWith('custom', '', ''), true, {
+    iconOnly: true,
+    openModelSettings: open,
+  })
+  expect(send.disabled).toBe(true)
+  const link = host.querySelector('.ai-input-need button') as HTMLButtonElement
+  expect(link.textContent).toBe('Add an API key in AI settings to use the assistant.')
+  act(() => link.click())
+  expect(open).toHaveBeenCalledTimes(1)
+})
+
+it('the hint goes away once a key and a model are known', async () => {
+  const { send } = await mount(settingsWith('openai', '…abcd', 'gpt-x'), true, { iconOnly: true })
   expect(send.disabled).toBe(false)
+  expect(host.querySelector('.ai-input-need')).toBeNull()
 })
 
 it('a host that did not ask for the rule (desktop) is untouched', async () => {
@@ -86,8 +115,9 @@ it('a host that did not ask for the rule (desktop) is untouched', async () => {
   expect(hint).toBe('Enter to send')
 })
 
-it('every locale has the hint', () => {
+it('every locale has both hints', () => {
   for (const [lang, strings] of Object.entries(AI_MODEL_PICKER_STRINGS)) {
     expect(strings.needModel, lang).toBeTruthy()
+    expect(strings.needKey, lang).toBeTruthy()
   }
 })

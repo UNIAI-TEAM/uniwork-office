@@ -148,7 +148,8 @@ describe('client', () => {
       fetch,
     })
     const list = await client.listCredentials()
-    expect(list.items[0]).toEqual(CREDENTIALS.items[0])
+    // an older server omits model / model_updated_at: read as ""
+    expect(list.items[0]).toEqual({ ...CREDENTIALS.items[0], model: '', model_updated_at: '' })
     expect(list.providers.map((p) => p.id)).toContain('anthropic')
     const cloud = await client.cloudStatus()
     expect(cloud.tools.image_search).toBe(false)
@@ -1172,6 +1173,212 @@ describe('model chip source and credential refresh (UNI-1232 A4)', () => {
     // the refresh fails: settings() answers from the last good list instead of going blank
     const s = await ai.settings()
     expect(s.providers.openai.model).toBe('gpt-x')
+  })
+})
+
+describe('the chosen model is saved on the server (UNI-1240 4b)', () => {
+  const port = {
+    whenInitialized: async () => ({
+      documentId: 'doc-1',
+      apiBase: 'https://app.test/api/v1',
+      capabilities: { ai: true },
+    }),
+    ...tokens(),
+  }
+  const CHOICE_KEY = 'uniwork.office.web.ai.choice'
+  // an in-memory Storage: the cache under test must not depend on the runner's own localStorage
+  beforeEach(() => {
+    const data = new Map<string, string>()
+    vi.stubGlobal('localStorage', {
+      getItem: (k: string) => data.get(k) ?? null,
+      setItem: (k: string, v: string) => void data.set(k, String(v)),
+      removeItem: (k: string) => void data.delete(k),
+      clear: () => data.clear(),
+    })
+  })
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+  const cred = (provider: string, model?: string, at = '') => ({
+    ...CREDENTIALS.items[0]!,
+    provider,
+    key_hint: '…wxyz',
+    ...(model === undefined ? {} : { model, model_updated_at: at }),
+  })
+
+  /** the credential list + a recorder for the model PUTs (`put` answers them, default: echo + a new time) */
+  function create(items: Array<{ provider: string }>, put?: (call: Call) => Response) {
+    const { calls, fetch } = recorder((c) =>
+      c.init.method === 'PUT'
+        ? put
+          ? put(c)
+          : jsonResponse(200, {
+              ...items.find((i) => c.url.endsWith(`/${i.provider}`)),
+              ...(JSON.parse(String(c.init.body)) as object),
+              model_updated_at: '2026-10-11T09:00:00Z',
+            })
+        : c.url.endsWith('/credentials')
+          ? jsonResponse(200, { items, providers: CREDENTIALS.providers })
+          : jsonResponse(200, CLOUD),
+    )
+    const ai = createWebAi({
+      port,
+      capabilities: { ai: true },
+      fetch,
+      origin: ORIGIN,
+      now: () => 0,
+    })
+    const puts = () => calls.filter((c) => c.init.method === 'PUT')
+    return { ai, puts }
+  }
+
+  it('reads model and model_updated_at leniently: an older server omits both', async () => {
+    const { fetch } = recorder((c) =>
+      c.url.endsWith('/credentials')
+        ? jsonResponse(200, {
+            items: [CREDENTIALS.items[0], { ...cred('anthropic'), model: 7 }],
+            providers: [],
+          })
+        : jsonResponse(200, CLOUD),
+    )
+    const client = createAiWebClient({
+      documentId: 'doc-1',
+      apiBase: '/api',
+      tokens: tokens(),
+      origin: ORIGIN,
+      fetch,
+    })
+    const list = await client.listCredentials()
+    expect(list.items.map((i) => [i.model, i.model_updated_at])).toEqual([
+      ['', ''],
+      ['', ''],
+    ])
+  })
+
+  it('a model-only PUT sends exactly {"model"} and reads the model back', async () => {
+    const { calls, fetch } = recorder(() =>
+      jsonResponse(200, cred('openai', 'gpt-4.1-mini', '2026-10-11T08:00:00Z')),
+    )
+    const client = createAiWebClient({
+      documentId: 'doc-1',
+      apiBase: '/api',
+      tokens: tokens(),
+      origin: ORIGIN,
+      fetch,
+    })
+    const saved = await client.saveCredential('openai', { model: 'gpt-4.1-mini' })
+    expect(calls[0]!.init.method).toBe('PUT')
+    expect(calls[0]!.url).toBe(`${BASE}/credentials/openai`)
+    expect(JSON.parse(String(calls[0]!.init.body))).toEqual({ model: 'gpt-4.1-mini' })
+    expect(saved).toMatchObject({ model: 'gpt-4.1-mini', model_updated_at: '2026-10-11T08:00:00Z' })
+  })
+
+  it('no choice in this browser: the server default (latest model_updated_at) is the provider and model', async () => {
+    const { ai } = create([
+      cred('openai', 'gpt-4.1-mini', '2026-10-10T08:00:00Z'),
+      cred('anthropic', 'claude-sonnet-4-5', '2026-10-11T08:00:00Z'),
+    ])
+    const s = await ai.settings()
+    expect(s.provider).toBe('anthropic')
+    expect(s.providers.anthropic.model).toBe('claude-sonnet-4-5')
+    expect(s.providers.openai.model).toBe('gpt-4.1-mini')
+  })
+
+  it('a tie on model_updated_at goes to the provider id order', async () => {
+    const at = '2026-10-11T08:00:00Z'
+    const { ai } = create([cred('openai', 'gpt-4.1-mini', at), cred('anthropic', 'claude-x', at)])
+    expect((await ai.settings()).provider).toBe('anthropic')
+  })
+
+  it('a provider with a key but no saved model is not the default', async () => {
+    const { ai } = create([
+      cred('anthropic', ''),
+      cred('openai', 'gpt-4.1-mini', '2026-10-10T08:00:00Z'),
+    ])
+    expect((await ai.settings()).provider).toBe('openai')
+  })
+
+  it('this browser has a provider that no longer has a key: the server default is used', async () => {
+    localStorage.setItem(
+      CHOICE_KEY,
+      JSON.stringify({ provider: 'gemini', models: { gemini: 'g-1' } }),
+    )
+    const { ai } = create([cred('openai', 'gpt-4.1-mini', '2026-10-10T08:00:00Z')])
+    const s = await ai.settings()
+    expect(s.provider).toBe('openai')
+    expect(s.providers.openai.model).toBe('gpt-4.1-mini')
+  })
+
+  it('the local cache wins while its provider has a key', async () => {
+    localStorage.setItem(
+      CHOICE_KEY,
+      JSON.stringify({ provider: 'openai', models: { openai: 'local-model' } }),
+    )
+    const { ai } = create([
+      cred('openai', 'gpt-4.1-mini', '2026-10-10T08:00:00Z'),
+      cred('anthropic', 'claude-sonnet-4-5', '2026-10-11T08:00:00Z'),
+    ])
+    const s = await ai.settings()
+    expect(s.provider).toBe('openai')
+    expect(s.providers.openai.model).toBe('local-model')
+    // a provider the cache has no model for still shows the server's
+    expect(s.providers.anthropic.model).toBe('claude-sonnet-4-5')
+  })
+
+  it('an older server (no model field): nothing changes, the provider default model runs', async () => {
+    const { ai, puts } = create([CREDENTIALS.items[0]!])
+    const s = await ai.settings()
+    expect(s.provider).toBe('openai')
+    expect(s.providers.openai.model).toBeTruthy()
+    expect(puts()).toEqual([])
+  })
+
+  it('choosing a model sends PUT {"model"} to that provider and updates the cache', async () => {
+    const { ai, puts } = create([
+      cred('openai', 'gpt-4.1-mini', '2026-10-10T08:00:00Z'),
+      cred('anthropic', ''),
+    ])
+    await ai.settings()
+    const changed = vi.fn()
+    ai.onChanged(changed)
+    ai.choose('anthropic', 'claude-sonnet-4-5')
+    expect(JSON.parse(localStorage.getItem(CHOICE_KEY)!)).toEqual({
+      provider: 'anthropic',
+      models: { anthropic: 'claude-sonnet-4-5' },
+    })
+    await vi.waitFor(() => expect(puts()).toHaveLength(1))
+    expect(puts()[0]!.url).toBe(`${BASE}/credentials/anthropic`)
+    expect(JSON.parse(String(puts()[0]!.init.body))).toEqual({ model: 'claude-sonnet-4-5' })
+    // the answer replaces the cached item: the chips hear about it again
+    await vi.waitFor(() => expect(changed).toHaveBeenCalledTimes(2))
+    expect((await ai.settings()).providers.anthropic.model).toBe('claude-sonnet-4-5')
+  })
+
+  it('a failed PUT keeps the local choice, shows nothing and does not block chatting', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { ai, puts } = create([cred('openai', 'gpt-4.1-mini', '2026-10-10T08:00:00Z')], () =>
+      jsonResponse(503, { code: 'cloud_unavailable' }),
+    )
+    await ai.settings()
+    ai.choose('openai', 'gpt-4.1')
+    await vi.waitFor(() => expect(puts()).toHaveLength(1))
+    await new Promise((r) => setTimeout(r, 0))
+    const s = await ai.settings()
+    expect(s.provider).toBe('openai')
+    expect(s.providers.openai.model).toBe('gpt-4.1')
+    expect(document.querySelector('.ow-ai-state')).toBeNull()
+    expect(errors).not.toHaveBeenCalled()
+    errors.mockRestore()
+  })
+
+  it('nothing is sent for a provider without a stored key, or for the model the server already holds', async () => {
+    const { ai, puts } = create([cred('openai', 'gpt-4.1-mini', '2026-10-10T08:00:00Z')])
+    await ai.settings()
+    ai.choose('gemini', 'gemini-2.5-pro')
+    ai.choose('openai', 'gpt-4.1-mini')
+    ai.choose('openai')
+    await new Promise((r) => setTimeout(r, 0))
+    expect(puts()).toEqual([])
   })
 })
 
