@@ -4,7 +4,7 @@
 //
 //   /api/v1/office-frame/documents/{documentID}/ai/
 //     credentials                      GET            { items, providers }
-//     credentials/{provider}           PUT / DELETE   201 create / 200 update / 204 delete, key_hint only
+//     credentials/{provider}           PUT / DELETE   201 create / 200 update / 204 delete, key_hint only; model kept with it
 //     byok/{provider}/chat/completions POST           openai-compatible, SSE when stream: true
 //     byok/{provider}/messages         POST           Anthropic Messages, SSE when stream: true
 //     byok/{provider}/generate         POST           { model, stream, request } -> Gemini (SSE when stream)
@@ -127,6 +127,8 @@ function credentialView(provider, c) {
     label: c.label ?? '',
     base_url: c.base_url ?? '',
     key_hint: hint(c.api_key),
+    model: c.model ?? '',
+    model_updated_at: c.model_updated_at ?? '',
     created_at: c.created_at,
     updated_at: c.updated_at,
   }
@@ -360,7 +362,11 @@ async function credentials(req, res, provider, body) {
     label: typeof body.label === 'string' ? body.label : (existing?.label ?? ''),
     created_at: existing?.created_at ?? t,
     updated_at: t,
+    // the chosen model is part of the credential: left out keeps it, '' clears it (UNI-1240)
+    model: typeof body.model === 'string' ? body.model.trim() : (existing?.model ?? ''),
+    model_updated_at: existing?.model_updated_at ?? '',
   }
+  if (typeof body.model === 'string') next.model_updated_at = next.model ? t : ''
   state.credentials.set(provider, next)
   return json(res, existing ? 200 : 201, credentialView(provider, next))
 }

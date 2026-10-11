@@ -7,7 +7,7 @@
  *
  *   <same-origin api prefix>/v1/office-frame/documents/{documentID}/ai/
  *     credentials                      GET            { items: [Credential], providers: [...] }
- *     credentials/{provider}           PUT / DELETE   { api_key?, base_url?, label? } -> Credential
+ *     credentials/{provider}           PUT / DELETE   { api_key?, base_url?, label?, model? } -> Credential
  *     byok/{provider}/chat/completions POST           openai-compatible wire format (SSE stays SSE)
  *     byok/{provider}/messages         POST           Anthropic Messages wire format
  *     byok/{provider}/generate         POST           { model, stream, request: <Gemini body> }
@@ -18,7 +18,8 @@
  *     cloud/media/analyze              POST           { requirements, media: [...] } -> { text }
  *     cloud/transcribe                 POST           { prompt?, audio } -> { text }
  *
- * A key is never read back: `key_hint` is "…" + the last four characters.
+ * A key is never read back: `key_hint` is "…" + the last four characters. `model` is the model the
+ * person chose for that provider, saved with the credential (an older server omits it: read as "").
  */
 import { isInsideAiMount } from './mount'
 import { AiWebError, aiErrorFromResponse } from './errors'
@@ -28,6 +29,10 @@ export interface AiCredential {
   label: string
   base_url: string
   key_hint: string
+  /** the model chosen for this provider, saved on the server ("" = none yet / an older server) */
+  model: string
+  /** RFC 3339; the credential with the latest one (and a model) is the default provider */
+  model_updated_at: string
   created_at: string
   updated_at: string
 }
@@ -49,6 +54,8 @@ export interface AiCredentialInput {
   api_key?: string
   base_url?: string
   label?: string
+  /** left out keeps the stored model; "" clears it. A model-only body needs a stored key. */
+  model?: string
 }
 
 export interface AiCloudTools {
@@ -178,6 +185,8 @@ function readCredential(raw: unknown, fallbackProvider = ''): AiCredential {
     label: s(r.label),
     base_url: s(r.base_url),
     key_hint: s(r.key_hint),
+    model: s(r.model).trim(),
+    model_updated_at: s(r.model_updated_at),
     created_at: s(r.created_at),
     updated_at: s(r.updated_at),
   }

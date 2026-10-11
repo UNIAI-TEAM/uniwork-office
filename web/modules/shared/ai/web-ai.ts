@@ -76,7 +76,11 @@ export function providerLabel(id: string): string {
   return AI_PROVIDERS.find((p) => p.id === id)?.label ?? id
 }
 
-/** the viewer's provider/model choice (not a secret; a per-viewer convenience) */
+/**
+ * This browser's provider/model choice (not a secret). The model is saved with the person's
+ * credential on the server; this is only the cache that wins on this browser and keeps working
+ * when the server is older or a save failed.
+ */
 interface AiChoice {
   provider?: string
   models: Record<string, string>
@@ -154,7 +158,10 @@ export const CREDENTIALS_TTL_MS = 4000
 /** what a change of the credential list looks like to a subscriber (never a key) */
 function credentialSignature(list: AiCredentialList): string {
   return list.items
-    .map((c) => `${c.provider}:${c.key_hint}:${c.base_url}:${c.updated_at}`)
+    .map(
+      (c) =>
+        `${c.provider}:${c.key_hint}:${c.base_url}:${c.updated_at}:${c.model}:${c.model_updated_at}`,
+    )
     .sort()
     .join('|')
 }
@@ -355,18 +362,22 @@ export function createWebAi(opts: {
     await load().catch(() => EMPTY)
     const usable = usableProviders()
     const fallback = state.credentials.providers.find((p) => WEB_PROVIDER_IDS.has(p.id))?.id
+    // this browser's pick when its provider still has a key, else the server's default (the provider
+    // whose model was set last), else the first usable one
+    const serverDefault = serverDefaultProvider(usable)
     const provider = (
       choice.provider && usable.includes(choice.provider)
         ? choice.provider
-        : (usable[0] ?? choice.provider ?? fallback ?? 'openai')
+        : (serverDefault ?? usable[0] ?? choice.provider ?? fallback ?? 'openai')
     ) as AiProviderId
     const providers = { ...base.providers }
     for (const id of Object.keys(providers) as AiProviderId[]) {
-      // this browser's pick, else the provider's default; a model-less provider that lists exactly one
-      // model runs on it (the chip shows it), otherwise it stays empty: the panel asks for a pick
+      // this browser's pick, else the model saved on the server, else the provider's default; a
+      // model-less provider that lists exactly one model runs on it (the chip shows it), otherwise it
+      // stays empty: the panel asks for a pick
       const only = listed.get(id)?.length === 1 ? listed.get(id)![0] : ''
-      const model = choice.models[id] || (defaultModelOf(id) ? '' : only)
       const stored = state.credentials.items.find((c) => c.provider === id)
+      const model = choice.models[id] || stored?.model || (defaultModelOf(id) ? '' : only)
       const usableHere = usable.includes(id)
       providers[id] = {
         ...providers[id],
@@ -385,6 +396,49 @@ export function createWebAi(opts: {
     return { ...base, provider, providers, gskToolsEnabled: cloudOn, uniAiAvailable: false }
   }
 
+  /**
+   * The provider whose model was set last (the contract's default provider for a browser with no
+   * choice): a usable item with a model and the latest `model_updated_at`; ties go to the provider id
+   * order. Null while no usable provider has a model saved (older server, nothing chosen yet).
+   */
+  function serverDefaultProvider(usable: string[]): string | null {
+    let best: { provider: string; at: number } | null = null
+    for (const c of state.credentials.items) {
+      if (!c.model || !usable.includes(c.provider)) continue
+      const at = Date.parse(c.model_updated_at)
+      const when = Number.isFinite(at) ? at : 0
+      if (!best || when > best.at || (when === best.at && c.provider < best.provider)) {
+        best = { provider: c.provider, at: when }
+      }
+    }
+    return best?.provider ?? null
+  }
+
+  /**
+   * Saves a chosen model with the person's credential, so another browser opens on it. Quiet by
+   * design: a failed save (offline, an older server, a stale token) keeps this browser's choice and
+   * never blocks chatting; the next pick tries again. Nothing is sent for a provider without a stored
+   * key (the server would refuse a model-only body) or when the server already holds that model.
+   */
+  async function saveModel(provider: string, model: string): Promise<void> {
+    const client = clientRef
+    const stored = state.credentials.items.find((c) => c.provider === provider)
+    if (!client || !stored || stored.model === model) return
+    try {
+      const saved = await client.saveCredential(provider, { model })
+      state = {
+        ...state,
+        credentials: {
+          ...state.credentials,
+          items: state.credentials.items.map((c) => (c.provider === provider ? saved : c)),
+        },
+      }
+      notifyChanged()
+    } catch {
+      // kept in this browser's cache only
+    }
+  }
+
   function choose(provider: string, model?: string): void {
     choice = {
       provider,
@@ -392,6 +446,7 @@ export function createWebAi(opts: {
     }
     writeChoice(choice)
     notifyChanged()
+    if (model) void saveModel(provider, model)
   }
 
   function fail(err: unknown, provider = ''): string {
