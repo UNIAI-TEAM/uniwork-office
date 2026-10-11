@@ -3,7 +3,7 @@ import { parseDocx } from '@genoffice/docx-engine'
 import { describe, expect, it } from 'vitest'
 import { buildDocx } from '../../../packages/docx-engine/tests/helpers/build-docx'
 import { blocksToPmDoc, pmDocToSavePlan, type PmNode } from '../src/renderer/editor/convert'
-import { hasUnanchoredComments } from '../src/renderer/file-actions'
+import { commentsPaneOpensOnLoad, hasUnanchoredComments } from '../src/renderer/file-actions'
 import { editorExtensions } from '../src/renderer/editor/extensions'
 
 const XML_DECL = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n'
@@ -108,5 +108,23 @@ describe('unanchored comments open the panel on load', () => {
   it('false for a ranged comment', async () => {
     const parsed = await parseDocx(await withComments(COMMENTED_P))
     expect(hasUnanchoredComments(parsed.comments, parsed.blocks)).toBe(false)
+  })
+
+  it('opens the pane for unanchored comments on a wide viewport only (UNI-1232 F-4)', async () => {
+    const unanchored = await parseDocx(await withComments('<w:p><w:r><w:t>hi</w:t></w:r></w:p>'))
+    const ranged = await parseDocx(await withComments(COMMENTED_P))
+    expect(commentsPaneOpensOnLoad(unanchored.comments, unanchored.blocks, false)).toBe(true)
+    expect(commentsPaneOpensOnLoad(unanchored.comments, unanchored.blocks, true)).toBe(false)
+    expect(commentsPaneOpensOnLoad(ranged.comments, ranged.blocks, false)).toBe(false)
+    // default: the live viewport (jsdom is 1024 wide; the phone frame is 390)
+    const widthBefore = window.innerWidth
+    try {
+      window.innerWidth = 390
+      expect(commentsPaneOpensOnLoad(unanchored.comments, unanchored.blocks)).toBe(false)
+      window.innerWidth = 1280
+      expect(commentsPaneOpensOnLoad(unanchored.comments, unanchored.blocks)).toBe(true)
+    } finally {
+      window.innerWidth = widthBefore
+    }
   })
 })

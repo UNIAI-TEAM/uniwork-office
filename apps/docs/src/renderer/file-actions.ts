@@ -96,6 +96,7 @@ import { cap } from './capabilities'
 import { isEncryptedPackage } from './encrypted-package'
 import { buildStandaloneHtml } from './html-export'
 import { aiPanelInitiallyOpen } from '@genoffice/ui'
+import { isNarrowViewport } from './narrow-viewport'
 
 /** An export waiting for the pagination preview to mount; resolve settles the caller's exportPdf promise. */
 export type PendingPdfExport = { outPath?: string; resolve: (ok: boolean) => void }
@@ -278,6 +279,19 @@ export function hasUnanchoredComments(comments: CommentInfo[], blocks: Block[]):
   return comments.some(
     (c) => !c.done && !anchored.has(c.id) && !(c.parentId && anchored.has(c.parentId)),
   )
+}
+
+/**
+ * Does the Comments pane start open for a document just opened? Only for comments that would
+ * otherwise be invisible, and never on a narrow viewport: there the pane overlays the page (a phone
+ * showed about 60 px of the document), so it stays closed until the user opens it from the ribbon.
+ */
+export function commentsPaneOpensOnLoad(
+  comments: CommentInfo[],
+  blocks: Block[],
+  narrow: boolean = isNarrowViewport(),
+): boolean {
+  return !narrow && hasUnanchoredComments(comments, blocks)
 }
 
 function resetEditorHistory(editor: Editor): void {
@@ -490,7 +504,7 @@ export async function loadFile(
     ctx.setEvenOddHfDirty(false)
     ctx.setMirrorMargins(parsed.mirrorMargins ?? false)
     ctx.setMirrorMarginsDirty(false)
-    ctx.setShowComments(hasUnanchoredComments(parsed.comments, parsed.blocks))
+    ctx.setShowComments(commentsPaneOpensOnLoad(parsed.comments, parsed.blocks))
     ctx.setReadMode(tier === 'readOnly')
     ctx.setLargeDocSpellOff(tier !== 'normal')
     ctx.setComments(parsed.comments)
