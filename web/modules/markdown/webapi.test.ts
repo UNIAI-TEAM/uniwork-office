@@ -634,6 +634,16 @@ describe('markdownApi: draft recovery (C18)', () => {
     expect(p.records().size).toBe(0)
   })
 
+  // M-01 (post-A9 sweep): the AI panel's view-only mode keys off uniworkState().readOnly
+  it('uniworkState reports readOnly for a frame without the save grant, editable otherwise', async () => {
+    const view = setup({ caps: { ...FULL, save: false } })
+    await open(view.api)
+    expect(await view.api.uniworkState()).toEqual({ bound: false, readOnly: true })
+    const edit = setup()
+    await open(edit.api)
+    expect(await edit.api.uniworkState()).toEqual({ bound: false, readOnly: false })
+  })
+
   it('a view-only document is never drafted', async () => {
     const p = await profile()
     const f = p.frame('restore', { print: true })

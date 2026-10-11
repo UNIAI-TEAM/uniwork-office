@@ -137,6 +137,7 @@ export {
   type ZoomWheelIntent,
 } from './wheel-zoom'
 export { AiModelPicker, type AiModelPickerBridge } from './AiModelPicker'
+export { setAiModelNeedHint, useAiModelNeedHint } from './ai-model-need'
 export {
   aiModelPickerGroups,
   aiModelPickerSelection,

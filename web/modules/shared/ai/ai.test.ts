@@ -15,6 +15,7 @@ import {
   rawFailureAsTyped,
   retryAfterSeconds,
 } from './errors'
+import { aiNoticeBody, aiNoticeKind } from '../../../../packages/ai-provider/src/ai-notice'
 import { createProxyFetch, toProxyRequest } from './transport'
 import { createWebAiStreams } from './stream'
 import {
@@ -1254,6 +1255,17 @@ describe('the model of a provider with a key (UNI-1232 FX2: N3-01 / G-N1)', () =
       now: () => 0,
     })
     expect((await ai.settings()).providers.custom.model).toBe('')
+  })
+
+  // N-01 (post-A9 sweep): the panel draws a setup state as a plain notice, never in error red
+  it('a send without a model answers with a tagged notice, the typed text intact', async () => {
+    const { ai } = aiWith('custom', { data: [{ id: 'a' }, { id: 'b' }] })
+    const settings = await ai.settings()
+    const chat = await ai.streams.aiChat({ settings, system: 's', user: 'hi' })
+    expect(chat.ok).toBe(false)
+    const error = (chat as { error: string }).error
+    expect(aiNoticeKind(error)).toBe('no_model')
+    expect(aiNoticeBody(error)).toMatch(/^Choose a model\. Pick a model in the model menu/)
   })
 
   it('reads the model ids of the three wire formats', () => {

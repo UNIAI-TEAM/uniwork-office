@@ -66,7 +66,7 @@ export function createMarkdownWebApi(ctx: ModuleBridgeContext, opts: TextWebApiO
     readFile: web.readFile,
     save: web.save,
     // the frame is the UniWork document: no desktop working-copy state, view-only comes from the host grant
-    uniworkState: async () => ({ bound: false, readOnly: false }),
+    uniworkState: async () => ({ bound: false, readOnly: web.isViewOnly() }),
     setDirty: web.setDirty,
     onSaveRequest: web.onSaveRequest,
     sendSaveRequestAck: web.sendSaveRequestAck,

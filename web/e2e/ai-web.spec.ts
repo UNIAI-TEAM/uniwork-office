@@ -4,7 +4,7 @@
 //                no cookies, 401 -> token refresh) -> AI settings = UniWork credentials (PUT/DELETE,
 //                masked key_hint) -> every typed error state renders (402/403/404/424/429/502/503)
 //   grant off -> no AI UI anywhere and no AI request.
-// Docs (`npm run build:web`) and Markdown (`npm run build:web -- --module markdown`). Zero console
+// Docs (`npm run build:web`), Markdown and HTML (`npm run build:web -- --module markdown|html`). Zero console
 // errors and CSP violations; the only HTTP errors are the ones a test injects on the AI routes.
 // Screenshots (settings dialog + a state card, light/dark, en/vi): docs/web-modules/screenshots/ai/.
 // Run: npx playwright test -c web/e2e ai-web
@@ -42,11 +42,14 @@ async function aiLog(request: APIRequestContext): Promise<LogEntry[]> {
 }
 
 const OPENAI_KEY = [{ provider: 'openai', api_key: 'sk-test-openai-abcd' }]
+/** tool names that change the document, across docs / markdown / html (the read-only set is read_*, get_*, web_search, ...) */
+const EDIT_TOOLS =
+  /^(apply_ops|write_document|plan_page|insert_|replace_|generate_image|edit_|add_|delete_|accept_|reject_|reply_|resolve_|set_|create_|propose_)/
 
 /** open a module in the test host (docs: the site-root build) and wait for the renderer */
 async function open(
   page: Page,
-  module: 'docs' | 'markdown',
+  module: 'docs' | 'markdown' | 'html',
   query: Record<string, string>,
 ): Promise<Frame> {
   const qs = new URLSearchParams(
@@ -259,6 +262,53 @@ for (const module of ['docs', 'markdown'] as const) {
         true,
       )
       await expectClean(page, frame, problems, true)
+    })
+  })
+}
+
+// M-01 (post-A9 sweep): a frame without the save grant (?readonly=1) gets the view-only AI -- the
+// one-line notice in the composer and a model request that offers no editing tool -- in every
+// module that has the web AI panel (Sheets: sheets-ai.spec.ts)
+for (const module of ['docs', 'markdown', 'html'] as const) {
+  test.describe(`${module}: view-only AI`, () => {
+    test.skip(
+      !built(module),
+      `no dist-web/${module} build: npm run build:web${module === 'docs' ? '' : ` -- --module ${module}`}`,
+    )
+
+    test('no save grant: the composer carries the view-only notice and the model gets no edit tool', async ({
+      page,
+      request,
+    }) => {
+      await fake(request)
+      await fake(request, { credentials: OPENAI_KEY })
+      const problems = await watch(page)
+      const frame = await open(page, module, { lang: 'en', ai: '1', readonly: '1' })
+      await expect(panel(frame)).toBeVisible({ timeout: 30_000 })
+      await expect(frame.locator('.ai-readonly-notice')).toBeVisible()
+      await expect(frame.locator('.ai-readonly-notice')).toContainText('View-only document')
+      // it still answers questions
+      await ask(frame, 'Say hello')
+      await expect(frame.locator('.ai-msg-assistant').last()).toContainText(REPLY, {
+        timeout: 60_000,
+      })
+      const chat = (await aiLog(request)).find((l) =>
+        l.path.endsWith('/byok/openai/chat/completions'),
+      )!
+      expect(chat).toBeTruthy()
+      const tools = ((chat.body.tools ?? []) as Array<{ function: { name: string } }>).map(
+        (t) => t.function.name,
+      )
+      expect(tools.filter((n) => EDIT_TOOLS.test(n))).toEqual([])
+      await expectClean(page, frame, problems)
+    })
+
+    test('with the save grant there is no view-only notice', async ({ page, request }) => {
+      await fake(request)
+      await fake(request, { credentials: OPENAI_KEY })
+      const frame = await open(page, module, { lang: 'en', ai: '1' })
+      await expect(panel(frame)).toBeVisible({ timeout: 30_000 })
+      await expect(frame.locator('.ai-readonly-notice')).toHaveCount(0)
     })
   })
 }

@@ -298,6 +298,16 @@ describe('save', () => {
     expect(s.core.calls).toEqual([])
   })
 
+  // M-01 (post-A9 sweep): the same view-only answer the other modules give the AI panel
+  it('uniworkState reports readOnly when the frame grants no edit', async () => {
+    const view = await setup({ caps: { edit: false } })
+    await view.api.consumePending()
+    expect(await view.api.uniworkState('x.pdf')).toEqual({ bound: false, readOnly: true })
+    const edit = await setup()
+    await edit.api.consumePending()
+    expect(await edit.api.uniworkState('x.pdf')).toEqual({ bound: false, readOnly: false })
+  })
+
   it('conflict -> Overwrite re-reads the head etag and saves again', async () => {
     const s = await setup()
     const path = (await s.api.consumePending())!

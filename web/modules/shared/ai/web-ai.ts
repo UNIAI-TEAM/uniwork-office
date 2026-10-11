@@ -22,6 +22,7 @@
  * the in-frame state card, because no transcript would tell the user. The model chip's "manage" row opens the
  * AI settings (`openAiModelSettings`), so every panel can reach them from the error it shows.
  */
+import { aiNoticeTagged } from '../../../../packages/ai-provider/src/ai-notice'
 import { AI_PROVIDERS, defaultAiSettings } from '../../../../packages/ai-provider/src/providers'
 import type {
   AiProviderId,
@@ -439,7 +440,12 @@ export function createWebAi(opts: {
     protocolOf,
     // a failed chat turn is announced once, by the panel's inline error (the typed text below);
     // only the calls with no transcript (one-shot chat here, the tool members below) raise the card
-    describe: (err, provider) => describeAiError(err, providerLabel(provider)),
+    // "pick a model" is a setup state, not a failure: the code marks it so the panels draw a notice
+    // in every language (the same tag as the desktop no-key notice), not a red error line
+    describe: (err, provider) => {
+      const text = describeAiError(err, providerLabel(provider))
+      return err.code === 'model_required' ? aiNoticeTagged('no_model', text) : text
+    },
     onChatFailure: (err, provider) => showAiState(err, providerLabel(provider), { openSettings }),
   })
 

@@ -58,7 +58,13 @@ import {
   settingsSupportVision,
 } from './slide-qc'
 import { useI18n, t as tGlobal, aiLangDirective, type TFunc } from '../i18n/locale'
-import { AiScopeQuote, Markdown, useAiPanelPrefs, type AiScopeQuoteData } from '@genoffice/ui'
+import {
+  AiScopeQuote,
+  Markdown,
+  useAiModelNeedHint,
+  useAiPanelPrefs,
+  type AiScopeQuoteData,
+} from '@genoffice/ui'
 import { GensparkMark } from '../components/icons'
 import sendEnterOn from '../assets/send-enter-on.png'
 import sendEnterOff from '../assets/send-enter-off.png'
@@ -413,6 +419,8 @@ export function AiPanel({
   // Shared AI panel pref (Settings → General): the bespoke slides composer
   // must honor it like the shared AiComposer does.
   const { spellcheck } = useAiPanelPrefs()
+  // a stored key without a known model (web): send stays off and the hint says why, as in AiComposer
+  const needModelHint = useAiModelNeedHint()
   const [busy, setBusy] = useState(false)
   const [chat, setChat] = useState<ChatEntry[]>([])
   /** Past conversation restored from JSONL (read-only transcript, not fed to the model) */
@@ -1568,7 +1576,7 @@ export function AiPanel({
 
   const run = () => {
     const topic = input.trim()
-    if (!topic) return
+    if (!topic || needModelHint !== null) return
     if (deckEmpty && galleryTemplateId) {
       const msgs = buildGalleryGenerateMessages(galleryTemplateId, topic, lang)
       if (msgs) {
@@ -1631,6 +1639,8 @@ export function AiPanel({
       retry?: boolean
     },
   ) => {
+    // starters and retry too: nothing runs until a model is chosen (the hint beside Send says so)
+    if (needModelHint !== null) return
     const loop = loopRef.current
     // runStartingRef: loop.run is called only after attachments are read asynchronously, during which loop.busy is still false,
     // so duplicate triggers must be blocked synchronously (e.g. StrictMode double-running the preset autoRun effect),
@@ -2497,6 +2507,9 @@ export function AiPanel({
             />
             <div className="ai-input-footer">
               <AiModelPicker bridge={MODEL_BRIDGE} lang={lang} />
+              {needModelHint !== null && !busy && (
+                <span className="ai-input-hint">{needModelHint}</span>
+              )}
               <button
                 className="ai-attach-btn"
                 onClick={pickAttachments}
@@ -2518,11 +2531,15 @@ export function AiPanel({
                 <button
                   className="ai-send-btn"
                   onClick={run}
-                  disabled={!input.trim()}
-                  data-tip={t('aiSend')}
+                  disabled={!input.trim() || needModelHint !== null}
+                  data-tip={needModelHint ?? t('aiSend')}
                   aria-label={t('aiSend')}
                 >
-                  <img src={input.trim() ? sendEnterOn : sendEnterOff} alt="" aria-hidden />
+                  <img
+                    src={input.trim() && needModelHint === null ? sendEnterOn : sendEnterOff}
+                    alt=""
+                    aria-hidden
+                  />
                 </button>
               )}
             </div>

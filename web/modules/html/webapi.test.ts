@@ -73,6 +73,16 @@ describe('htmlApi', () => {
     expect(Array.from(mock.bytesOf(file.fileId)!)).toEqual(Array.from(enc(PAGE)))
   })
 
+  // M-01 (post-A9 sweep): the AI panel's view-only mode keys off uniworkState().readOnly
+  it('uniworkState reports readOnly for a frame without the save grant, editable otherwise', async () => {
+    const view = setup({ ...FULL, save: false })
+    await view.api.consumePending()
+    expect(await view.api.uniworkState()).toEqual({ bound: false, readOnly: true })
+    const edit = setup()
+    await edit.api.consumePending()
+    expect(await edit.api.uniworkState()).toEqual({ bound: false, readOnly: false })
+  })
+
   it('the preview is a static copy: no script, mapped pictures, pushed to the renderer', async () => {
     const { api } = setup()
     await api.consumePending()

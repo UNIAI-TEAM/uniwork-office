@@ -300,6 +300,9 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
       name: meta.name,
       path: pathFor(meta),
       readOnly: !canSave(),
+      // a view-only frame is a UniWork view-only workbook: the AI then reads and answers but never
+      // edits (isUniworkViewOnly). An editing frame stays unbound: Save keeps following pending edits
+      ...(canSave() ? {} : { uniworkBound: true }),
       // the renderer then sends restoreWriteBack on Save and stands its recovery timer down
       ...(fromDraft ? { restoredFromRecovery: true } : {}),
     }

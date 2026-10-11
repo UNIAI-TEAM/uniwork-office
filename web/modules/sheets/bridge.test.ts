@@ -6,6 +6,7 @@ import type {
   WorkbookFile,
   WorkbookSaveRequest,
 } from '../../../apps/sheets/src/shared/desktop-api'
+import { isUniworkViewOnly } from '../../../apps/sheets/src/renderer/ai/view-only-skill'
 import { createMockPort, protocolError, type MockPort } from '../../docs/bridge/testing/mock-port'
 import { installModuleBridge } from '../../docs/bridge/module-bridge'
 import { createSheetsWebApi, pathFor, withExt } from './bridge'
@@ -565,6 +566,16 @@ describe('host-initiated save conflict copy', () => {
 })
 
 describe('view-only (no save grant)', () => {
+  it('view-only: the workbook counts as UniWork view-only for the AI (read tools only)', async () => {
+    const t = setup({ grants: { filePick: true } })
+    const wb = await t.boot()
+    expect(isUniworkViewOnly(wb)).toBe(true)
+    const edit = await setup().boot()
+    expect(isUniworkViewOnly(edit)).toBe(false)
+    // an editing workbook keeps its desktop-equivalent flags: Save stays tied to pending edits
+    expect(edit.uniworkBound).toBeUndefined()
+  })
+
   it('the workbook opens read-only and every save is refused before the engine runs', async () => {
     const t = setup({ grants: { filePick: true } })
     const wb = await t.boot()

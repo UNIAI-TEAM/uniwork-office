@@ -212,6 +212,43 @@ test.describe('sheets: web AI', () => {
     await expectClean(page, frame, problems)
   })
 
+  // M-01 (post-A9 sweep): a frame without the save grant gets the view-only AI
+  test('view-only (no save grant): the composer carries the notice, the model gets read tools only', async ({
+    page,
+    request,
+  }) => {
+    await fake(request)
+    await fake(request, { credentials: OPENAI_KEY })
+    const problems = await watch(page)
+    const { frame } = await open(page, { lang: 'en', ai: '1', readonly: '1' })
+    await expect(panel(frame)).toBeVisible({ timeout: 30_000 })
+    await expect(frame.locator('.ai-readonly-notice')).toBeVisible()
+    await expect(frame.locator('.ai-readonly-notice')).toContainText('View-only document')
+    await ask(frame, 'Say hello')
+    await expect(frame.locator('.ai-msg-assistant').last()).toContainText(REPLY, {
+      timeout: 60_000,
+    })
+    const chat = (await aiLog(request)).find((l) =>
+      l.path.endsWith('/byok/openai/chat/completions'),
+    )!
+    expect(chat).toBeTruthy()
+    const tools = (chat.body.tools as Array<{ function: { name: string } }>).map(
+      (t) => t.function.name,
+    )
+    expect(tools).toEqual(expect.arrayContaining(['read_range', 'web_search']))
+    expect(tools).not.toContain('propose_operations')
+    await page.screenshot({ path: screenshotPath('ai', 'sheets-view-only-light-en') })
+    await expectClean(page, frame, problems)
+  })
+
+  test('an editing frame has no view-only notice', async ({ page, request }) => {
+    await fake(request)
+    await fake(request, { credentials: OPENAI_KEY })
+    const { frame } = await open(page, { lang: 'en', ai: '1' })
+    await expect(panel(frame)).toBeVisible({ timeout: 30_000 })
+    await expect(frame.locator('.ai-readonly-notice')).toHaveCount(0)
+  })
+
   test('grant on: a plan operation edits a cell and the save carries it', async ({
     page,
     request,
