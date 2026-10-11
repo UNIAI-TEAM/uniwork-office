@@ -211,7 +211,9 @@ export function IntegrationsPane({
           {t('intgCliPartTitle')}
           <span className="set-intg-version">{t('intgSkillVersion', { v: bundled })}</span>
         </h4>
-        <div className="set-field-desc set-intg-lead">{t('intgCliPartDesc')}</div>
+        <div className="set-field-desc set-intg-lead">
+          {t('intgCliPartDesc', { cmd: status.cli.command })}
+        </div>
 
         <h5 className="set-intg-sub">{t('intgStep1Title')}</h5>
         <div className="set-field-desc set-intg-lead">
@@ -340,7 +342,9 @@ export function IntegrationsPane({
           {anyInstalled ? t('intgStep2Desc') : t('intgStep2DescBefore')}
         </div>
         {examples}
-        <div className="set-field-desc set-intg-lead">{t('intgStep2Note')}</div>
+        <div className="set-field-desc set-intg-lead">
+          {t('intgStep2Note', { cmd: status.cli.command })}
+        </div>
 
         <details className="set-intg-details set-intg-cli">
           <summary>{t('intgCliTitle')}</summary>
@@ -393,7 +397,9 @@ export function IntegrationsPane({
             <span className="set-intg-option-letter">A</span>
             {t('intgMcpStdioTitle')}
           </h5>
-          <div className="set-field-desc set-intg-lead">{t('intgMcpStdioDesc')}</div>
+          <div className="set-field-desc set-intg-lead">
+            {t('intgMcpStdioDesc', { cmd: status.cli.command })}
+          </div>
           {status.cli.ephemeral ? (
             <div className="set-field-desc set-intg-lead">{t('intgCliEphemeral')}</div>
           ) : (

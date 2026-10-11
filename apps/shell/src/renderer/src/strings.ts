@@ -232,16 +232,16 @@ export const strings = {
     intgExample1: '把 ~/Downloads/report.md 转成 Word 文档',
     intgExample2: '做一份 6 页的幻灯片，介绍我们第三季度的业绩',
     intgExample3: '把 budget.xlsx 转成 PDF，并在 UniWork Office 里打开',
-    intgStep2Note: '助手会自己调用 UniWork Office (uniwork-office) 命令行，你不需要输入任何命令。',
+    intgStep2Note: '助手会自己调用 UniWork Office ({cmd}) 命令行，你不需要输入任何命令。',
     intgCliPartTitle: 'CLI · 命令行 + skill',
     intgCliPartDesc:
-      '适合能运行终端命令的助手（Claude Code、Codex、Cursor 等）。安装 skill 后，助手会自己调用 UniWork Office (uniwork-office) 命令行创建、转换、读取和编辑文件，你不需要输入任何命令。',
+      '适合能运行终端命令的助手（Claude Code、Codex、Cursor 等）。安装 skill 后，助手会自己调用 UniWork Office ({cmd}) 命令行创建、转换、读取和编辑文件，你不需要输入任何命令。',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP 是 AI 助手调用外部工具的通用协议。助手不能运行命令（如 Claude Desktop），或你想让它直接操作 UniWork Office 窗口时用这条路。下面两种接法任选一种。',
     intgMcpStdioTitle: '由助手启动（推荐）',
     intgMcpStdioDesc:
-      '助手自己拉起 UniWork Office (uniwork-office mcp)，不需要在这里开任何开关，UniWork Office 也不用开着。功能与 CLI 完全相同。',
+      '助手自己拉起 UniWork Office ({cmd} mcp)，不需要在这里开任何开关，UniWork Office 也不用开着。功能与 CLI 完全相同。',
     intgMcpHttpTitle: '本地 HTTP 服务',
     intgMcpHttpDesc:
       '在 UniWork Office 内运行，助手通过网址连接，可以看着它在 Word 编辑器里逐步生成。需要 UniWork Office 保持打开；目前只支持 Word。',
@@ -607,16 +607,16 @@ export const strings = {
     intgExample2: 'Make a 6-slide deck about our Q3 results',
     intgExample3: 'Convert budget.xlsx to PDF and open it in UniWork Office',
     intgStep2Note:
-      'The assistant runs the UniWork Office (uniwork-office) command line itself; you never have to type it.',
+      'The assistant runs the UniWork Office ({cmd}) command line itself; you never have to type it.',
     intgCliPartTitle: 'CLI · command line + skill',
     intgCliPartDesc:
-      'For assistants that can run terminal commands (Claude Code, Codex, Cursor and others). Once the skill is installed, the assistant calls the UniWork Office (uniwork-office) command line itself to create, convert, read and edit files; you never type a command.',
+      'For assistants that can run terminal commands (Claude Code, Codex, Cursor and others). Once the skill is installed, the assistant calls the UniWork Office ({cmd}) command line itself to create, convert, read and edit files; you never type a command.',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP is the common protocol AI assistants use to call external tools. Use it when your assistant cannot run commands (Claude Desktop, for example) or when you want it to drive the UniWork Office window directly. Pick either of the two ways below.',
     intgMcpStdioTitle: 'Started by the assistant (recommended)',
     intgMcpStdioDesc:
-      'The assistant launches UniWork Office (uniwork-office mcp) itself: nothing to switch on here, and UniWork Office does not need to be open. Same features as the CLI.',
+      'The assistant launches UniWork Office ({cmd} mcp) itself: nothing to switch on here, and UniWork Office does not need to be open. Same features as the CLI.',
     intgMcpHttpTitle: 'Local HTTP server',
     intgMcpHttpDesc:
       'Runs inside UniWork Office; the assistant connects to a URL and you can watch it build the document step by step in the Word editor. UniWork Office must stay open; Word documents only for now.',
@@ -997,16 +997,16 @@ export const strings = {
     intgExample2: '第 3 四半期の業績について 6 枚のスライドを作って',
     intgExample3: 'budget.xlsx を PDF に変換して UniWork Office で開いて',
     intgStep2Note:
-      'UniWork Office (uniwork-office) コマンドラインはアシスタントが自分で実行します。あなたが入力する必要はありません。',
+      'UniWork Office ({cmd}) コマンドラインはアシスタントが自分で実行します。あなたが入力する必要はありません。',
     intgCliPartTitle: 'CLI · コマンドライン + skill',
     intgCliPartDesc:
-      'ターミナルコマンドを実行できるアシスタント（Claude Code、Codex、Cursor など）向け。skill をインストールすると、アシスタントが自分で UniWork Office (uniwork-office) コマンドラインを呼び出してファイルを作成・変換・読み取り・編集します。コマンドを入力する必要はありません。',
+      'ターミナルコマンドを実行できるアシスタント（Claude Code、Codex、Cursor など）向け。skill をインストールすると、アシスタントが自分で UniWork Office ({cmd}) コマンドラインを呼び出してファイルを作成・変換・読み取り・編集します。コマンドを入力する必要はありません。',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP は AI アシスタントが外部ツールを呼び出すための共通プロトコルです。アシスタントがコマンドを実行できない場合（Claude Desktop など）や、UniWork Office のウィンドウを直接操作させたい場合に使います。下の 2 つの方法からどちらか 1 つを選んでください。',
     intgMcpStdioTitle: 'アシスタントが起動する（推奨）',
     intgMcpStdioDesc:
-      'アシスタントが UniWork Office (uniwork-office mcp) を自分で起動します。ここで何かをオンにする必要はなく、UniWork Office を開いておく必要もありません。機能は CLI と同じです。',
+      'アシスタントが UniWork Office ({cmd} mcp) を自分で起動します。ここで何かをオンにする必要はなく、UniWork Office を開いておく必要もありません。機能は CLI と同じです。',
     intgMcpHttpTitle: 'ローカル HTTP サーバー',
     intgMcpHttpDesc:
       'UniWork Office 内で動作し、アシスタントは URL で接続します。Word エディター上で文書が段階的に生成される様子を見られます。UniWork Office を開いたままにする必要があり、現時点では Word のみ対応です。',
@@ -1388,16 +1388,16 @@ export const strings = {
     intgExample2: '3분기 실적을 소개하는 6장짜리 슬라이드를 만들어 줘',
     intgExample3: 'budget.xlsx를 PDF로 변환해서 UniWork Office에서 열어 줘',
     intgStep2Note:
-      'UniWork Office (uniwork-office) 명령줄은 어시스턴트가 직접 실행하므로 여러분이 입력할 필요가 없습니다.',
+      'UniWork Office ({cmd}) 명령줄은 어시스턴트가 직접 실행하므로 여러분이 입력할 필요가 없습니다.',
     intgCliPartTitle: 'CLI · 명령줄 + skill',
     intgCliPartDesc:
-      '터미널 명령을 실행할 수 있는 어시스턴트(Claude Code, Codex, Cursor 등)용입니다. skill을 설치하면 어시스턴트가 스스로 UniWork Office (uniwork-office) 명령줄을 호출해 파일을 만들고 변환하고 읽고 편집합니다. 명령을 직접 입력할 필요가 없습니다.',
+      '터미널 명령을 실행할 수 있는 어시스턴트(Claude Code, Codex, Cursor 등)용입니다. skill을 설치하면 어시스턴트가 스스로 UniWork Office ({cmd}) 명령줄을 호출해 파일을 만들고 변환하고 읽고 편집합니다. 명령을 직접 입력할 필요가 없습니다.',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP는 AI 어시스턴트가 외부 도구를 호출하는 공통 프로토콜입니다. 어시스턴트가 명령을 실행할 수 없거나(예: Claude Desktop) UniWork Office 창을 직접 조작하게 하려면 이 방식을 사용하세요. 아래 두 방법 중 하나를 선택하면 됩니다.',
     intgMcpStdioTitle: '어시스턴트가 실행(권장)',
     intgMcpStdioDesc:
-      '어시스턴트가 UniWork Office (uniwork-office mcp)를 직접 실행합니다. 여기서 켤 것이 없고 UniWork Office가 열려 있을 필요도 없습니다. 기능은 CLI와 같습니다.',
+      '어시스턴트가 UniWork Office ({cmd} mcp)를 직접 실행합니다. 여기서 켤 것이 없고 UniWork Office가 열려 있을 필요도 없습니다. 기능은 CLI와 같습니다.',
     intgMcpHttpTitle: '로컬 HTTP 서버',
     intgMcpHttpDesc:
       'UniWork Office 안에서 실행되며 어시스턴트가 URL로 연결합니다. Word 편집기에서 문서가 단계별로 만들어지는 과정을 볼 수 있습니다. UniWork Office를 열어 두어야 하며 현재는 Word만 지원합니다.',
@@ -1785,16 +1785,16 @@ export const strings = {
     intgExample2: 'Prépare une présentation de 6 diapositives sur nos résultats du T3',
     intgExample3: 'Convertis budget.xlsx en PDF et ouvre-le dans UniWork Office',
     intgStep2Note:
-      "L'assistant lance lui-même la ligne de commande UniWork Office (uniwork-office) ; vous n'avez jamais à la saisir.",
+      "L'assistant lance lui-même la ligne de commande UniWork Office ({cmd}) ; vous n'avez jamais à la saisir.",
     intgCliPartTitle: 'CLI · ligne de commande + skill',
     intgCliPartDesc:
-      'Pour les assistants capables de lancer des commandes dans le terminal (Claude Code, Codex, Cursor, etc.). Une fois le skill installé, l’assistant appelle lui-même la ligne de commande UniWork Office (uniwork-office) pour créer, convertir, lire et modifier les fichiers ; vous ne tapez jamais de commande.',
+      'Pour les assistants capables de lancer des commandes dans le terminal (Claude Code, Codex, Cursor, etc.). Une fois le skill installé, l’assistant appelle lui-même la ligne de commande UniWork Office ({cmd}) pour créer, convertir, lire et modifier les fichiers ; vous ne tapez jamais de commande.',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP est le protocole commun que les assistants IA utilisent pour appeler des outils externes. Utilisez-le si votre assistant ne peut pas lancer de commandes (Claude Desktop, par exemple) ou si vous voulez qu’il pilote directement la fenêtre UniWork Office. Choisissez l’une des deux méthodes ci-dessous.',
     intgMcpStdioTitle: 'Lancé par l’assistant (recommandé)',
     intgMcpStdioDesc:
-      'L’assistant lance lui-même UniWork Office (uniwork-office mcp) : rien à activer ici, et UniWork Office n’a pas besoin d’être ouvert. Mêmes fonctions que la CLI.',
+      'L’assistant lance lui-même UniWork Office ({cmd} mcp) : rien à activer ici, et UniWork Office n’a pas besoin d’être ouvert. Mêmes fonctions que la CLI.',
     intgMcpHttpTitle: 'Serveur HTTP local',
     intgMcpHttpDesc:
       'Tourne dans UniWork Office ; l’assistant se connecte à une URL et vous voyez le document se construire pas à pas dans l’éditeur Word. UniWork Office doit rester ouvert ; documents Word uniquement pour l’instant.',
@@ -2200,7 +2200,7 @@ export const strings = {
       'MCP ist das gemeinsame Protokoll, über das KI-Assistenten externe Werkzeuge aufrufen. Nutzen Sie es, wenn der Assistent keine Befehle ausführen kann (z. B. Claude Desktop) oder wenn er das UniWork Office-Fenster direkt steuern soll. Wählen Sie einen der beiden Wege unten.',
     intgMcpStdioTitle: 'Vom Assistenten gestartet (empfohlen)',
     intgMcpStdioDesc:
-      'Der Assistent startet UniWork Office (uniwork-office mcp) selbst: hier ist nichts einzuschalten, und UniWork Office muss nicht geöffnet sein. Gleicher Funktionsumfang wie die CLI.',
+      'Der Assistent startet UniWork Office ({cmd} mcp) selbst: hier ist nichts einzuschalten, und UniWork Office muss nicht geöffnet sein. Gleicher Funktionsumfang wie die CLI.',
     intgMcpHttpTitle: 'Lokaler HTTP-Server',
     intgMcpHttpDesc:
       'Läuft in UniWork Office; der Assistent verbindet sich über eine URL, und Sie sehen im Word-Editor zu, wie das Dokument Schritt für Schritt entsteht. UniWork Office muss geöffnet bleiben; derzeit nur Word-Dokumente.',
@@ -2591,16 +2591,16 @@ export const strings = {
     intgExample2: 'Haz una presentación de 6 diapositivas sobre nuestros resultados del T3',
     intgExample3: 'Convierte budget.xlsx a PDF y ábrelo en UniWork Office',
     intgStep2Note:
-      'El asistente ejecuta la línea de comandos UniWork Office (uniwork-office) por sí mismo; nunca tienes que escribirla.',
+      'El asistente ejecuta la línea de comandos UniWork Office ({cmd}) por sí mismo; nunca tienes que escribirla.',
     intgCliPartTitle: 'CLI · línea de comandos + skill',
     intgCliPartDesc:
-      'Para asistentes que pueden ejecutar comandos de terminal (Claude Code, Codex, Cursor y otros). Con el skill instalado, el asistente llama por sí mismo a la línea de comandos UniWork Office (uniwork-office) para crear, convertir, leer y editar archivos; nunca escribes un comando.',
+      'Para asistentes que pueden ejecutar comandos de terminal (Claude Code, Codex, Cursor y otros). Con el skill instalado, el asistente llama por sí mismo a la línea de comandos UniWork Office ({cmd}) para crear, convertir, leer y editar archivos; nunca escribes un comando.',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP es el protocolo común con el que los asistentes de IA llaman a herramientas externas. Úsalo cuando tu asistente no pueda ejecutar comandos (Claude Desktop, por ejemplo) o cuando quieras que controle directamente la ventana de UniWork Office. Elige una de las dos formas de abajo.',
     intgMcpStdioTitle: 'Iniciado por el asistente (recomendado)',
     intgMcpStdioDesc:
-      'El asistente lanza UniWork Office (uniwork-office mcp) por sí mismo: nada que activar aquí, y UniWork Office no necesita estar abierto. Mismas funciones que la CLI.',
+      'El asistente lanza UniWork Office ({cmd} mcp) por sí mismo: nada que activar aquí, y UniWork Office no necesita estar abierto. Mismas funciones que la CLI.',
     intgMcpHttpTitle: 'Servidor HTTP local',
     intgMcpHttpDesc:
       'Se ejecuta dentro de UniWork Office; el asistente se conecta a una URL y puedes ver cómo construye el documento paso a paso en el editor de Word. UniWork Office debe permanecer abierto; por ahora solo documentos Word.',
@@ -2982,16 +2982,16 @@ export const strings = {
     intgExample2: 'ทำสไลด์ 6 หน้าเกี่ยวกับผลประกอบการไตรมาส 3 ของเรา',
     intgExample3: 'แปลง budget.xlsx เป็น PDF แล้วเปิดใน UniWork Office',
     intgStep2Note:
-      'ผู้ช่วยจะเรียกใช้บรรทัดคำสั่ง UniWork Office (uniwork-office) เอง คุณไม่ต้องพิมพ์คำสั่งใด ๆ',
+      'ผู้ช่วยจะเรียกใช้บรรทัดคำสั่ง UniWork Office ({cmd}) เอง คุณไม่ต้องพิมพ์คำสั่งใด ๆ',
     intgCliPartTitle: 'CLI · บรรทัดคำสั่ง + skill',
     intgCliPartDesc:
-      'สำหรับผู้ช่วยที่รันคำสั่งเทอร์มินัลได้ (Claude Code, Codex, Cursor และอื่น ๆ) เมื่อติดตั้ง skill แล้ว ผู้ช่วยจะเรียกบรรทัดคำสั่ง UniWork Office (uniwork-office) เองเพื่อสร้าง แปลง อ่าน และแก้ไขไฟล์ คุณไม่ต้องพิมพ์คำสั่งใด ๆ',
+      'สำหรับผู้ช่วยที่รันคำสั่งเทอร์มินัลได้ (Claude Code, Codex, Cursor และอื่น ๆ) เมื่อติดตั้ง skill แล้ว ผู้ช่วยจะเรียกบรรทัดคำสั่ง UniWork Office ({cmd}) เองเพื่อสร้าง แปลง อ่าน และแก้ไขไฟล์ คุณไม่ต้องพิมพ์คำสั่งใด ๆ',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP คือโปรโตคอลกลางที่ผู้ช่วย AI ใช้เรียกเครื่องมือภายนอก ใช้เมื่อผู้ช่วยรันคำสั่งไม่ได้ (เช่น Claude Desktop) หรือเมื่อต้องการให้มันควบคุมหน้าต่าง UniWork Office โดยตรง เลือกวิธีใดวิธีหนึ่งจากสองวิธีด้านล่าง',
     intgMcpStdioTitle: 'ให้ผู้ช่วยเป็นผู้เริ่ม (แนะนำ)',
     intgMcpStdioDesc:
-      'ผู้ช่วยจะเรียก UniWork Office (uniwork-office mcp) ขึ้นมาเอง ไม่ต้องเปิดสวิตช์ใดที่นี่ และไม่ต้องเปิด UniWork Office ไว้ ความสามารถเหมือน CLI ทุกประการ',
+      'ผู้ช่วยจะเรียก UniWork Office ({cmd} mcp) ขึ้นมาเอง ไม่ต้องเปิดสวิตช์ใดที่นี่ และไม่ต้องเปิด UniWork Office ไว้ ความสามารถเหมือน CLI ทุกประการ',
     intgMcpHttpTitle: 'เซิร์ฟเวอร์ HTTP ในเครื่อง',
     intgMcpHttpDesc:
       'ทำงานอยู่ใน UniWork Office ผู้ช่วยเชื่อมต่อผ่าน URL และคุณจะเห็นเอกสารค่อย ๆ ถูกสร้างขึ้นในตัวแก้ไข Word ต้องเปิด UniWork Office ไว้ตลอด ปัจจุบันรองรับเฉพาะ Word',
@@ -3375,16 +3375,16 @@ export const strings = {
     intgExample2: 'Buat presentasi 6 slide tentang hasil Q3 kami',
     intgExample3: 'Konversi budget.xlsx ke PDF dan buka di UniWork Office',
     intgStep2Note:
-      'Asisten menjalankan baris perintah UniWork Office (uniwork-office) sendiri; Anda tidak perlu mengetiknya.',
+      'Asisten menjalankan baris perintah UniWork Office ({cmd}) sendiri; Anda tidak perlu mengetiknya.',
     intgCliPartTitle: 'CLI · baris perintah + skill',
     intgCliPartDesc:
-      'Untuk asisten yang bisa menjalankan perintah terminal (Claude Code, Codex, Cursor, dan lainnya). Setelah skill terpasang, asisten memanggil baris perintah UniWork Office (uniwork-office) sendiri untuk membuat, mengonversi, membaca, dan mengedit file; Anda tidak pernah mengetik perintah.',
+      'Untuk asisten yang bisa menjalankan perintah terminal (Claude Code, Codex, Cursor, dan lainnya). Setelah skill terpasang, asisten memanggil baris perintah UniWork Office ({cmd}) sendiri untuk membuat, mengonversi, membaca, dan mengedit file; Anda tidak pernah mengetik perintah.',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP adalah protokol umum yang dipakai asisten AI untuk memanggil alat eksternal. Gunakan saat asisten Anda tidak bisa menjalankan perintah (misalnya Claude Desktop) atau saat Anda ingin ia mengendalikan jendela UniWork Office secara langsung. Pilih salah satu dari dua cara di bawah.',
     intgMcpStdioTitle: 'Dijalankan oleh asisten (disarankan)',
     intgMcpStdioDesc:
-      'Asisten menjalankan UniWork Office (uniwork-office mcp) sendiri: tidak ada yang perlu dinyalakan di sini, dan UniWork Office tidak perlu terbuka. Fitur sama dengan CLI.',
+      'Asisten menjalankan UniWork Office ({cmd} mcp) sendiri: tidak ada yang perlu dinyalakan di sini, dan UniWork Office tidak perlu terbuka. Fitur sama dengan CLI.',
     intgMcpHttpTitle: 'Server HTTP lokal',
     intgMcpHttpDesc:
       'Berjalan di dalam UniWork Office; asisten terhubung lewat URL dan Anda bisa melihat dokumen dibangun langkah demi langkah di editor Word. UniWork Office harus tetap terbuka; untuk saat ini hanya dokumen Word.',
@@ -3768,16 +3768,16 @@ export const strings = {
     intgExample2: 'Сделай презентацию из 6 слайдов о наших результатах за 3-й квартал',
     intgExample3: 'Конвертируй budget.xlsx в PDF и открой в UniWork Office',
     intgStep2Note:
-      'Ассистент сам запускает командную строку UniWork Office (uniwork-office); вводить её вам не придётся.',
+      'Ассистент сам запускает командную строку UniWork Office ({cmd}); вводить её вам не придётся.',
     intgCliPartTitle: 'CLI · командная строка + skill',
     intgCliPartDesc:
-      'Для ассистентов, умеющих выполнять команды терминала (Claude Code, Codex, Cursor и другие). После установки skill ассистент сам вызывает командную строку UniWork Office (uniwork-office), чтобы создавать, конвертировать, читать и редактировать файлы; вам не нужно вводить команды.',
+      'Для ассистентов, умеющих выполнять команды терминала (Claude Code, Codex, Cursor и другие). После установки skill ассистент сам вызывает командную строку UniWork Office ({cmd}), чтобы создавать, конвертировать, читать и редактировать файлы; вам не нужно вводить команды.',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP — общий протокол, через который ИИ-ассистенты вызывают внешние инструменты. Используйте его, если ассистент не умеет выполнять команды (например, Claude Desktop) или если хотите, чтобы он напрямую управлял окном UniWork Office. Выберите один из двух способов ниже.',
     intgMcpStdioTitle: 'Запускает ассистент (рекомендуется)',
     intgMcpStdioDesc:
-      'Ассистент сам запускает UniWork Office (uniwork-office mcp): здесь ничего включать не нужно, и UniWork Office не обязан быть открыт. Те же возможности, что у CLI.',
+      'Ассистент сам запускает UniWork Office ({cmd} mcp): здесь ничего включать не нужно, и UniWork Office не обязан быть открыт. Те же возможности, что у CLI.',
     intgMcpHttpTitle: 'Локальный HTTP-сервер',
     intgMcpHttpDesc:
       'Работает внутри UniWork Office; ассистент подключается по URL, и вы видите, как документ шаг за шагом собирается в редакторе Word. UniWork Office должен оставаться открытым; пока только документы Word.',
@@ -4162,16 +4162,16 @@ export const strings = {
     intgExample2: 'أنشئ عرضاً من 6 شرائح عن نتائج الربع الثالث',
     intgExample3: 'حوّل budget.xlsx إلى PDF وافتحه في UniWork Office',
     intgStep2Note:
-      'المساعد يشغّل سطر أوامر UniWork Office (uniwork-office) بنفسه؛ لن تحتاج إلى كتابته أبداً.',
+      'المساعد يشغّل سطر أوامر UniWork Office ({cmd}) بنفسه؛ لن تحتاج إلى كتابته أبداً.',
     intgCliPartTitle: 'CLI · سطر الأوامر + skill',
     intgCliPartDesc:
-      'للمساعدين الذين يستطيعون تنفيذ أوامر الطرفية (Claude Code وCodex وCursor وغيرها). بعد تثبيت skill، يستدعي المساعد سطر أوامر UniWork Office (uniwork-office) بنفسه لإنشاء الملفات وتحويلها وقراءتها وتحريرها؛ لن تكتب أي أمر.',
+      'للمساعدين الذين يستطيعون تنفيذ أوامر الطرفية (Claude Code وCodex وCursor وغيرها). بعد تثبيت skill، يستدعي المساعد سطر أوامر UniWork Office ({cmd}) بنفسه لإنشاء الملفات وتحويلها وقراءتها وتحريرها؛ لن تكتب أي أمر.',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP هو البروتوكول المشترك الذي يستخدمه مساعدو الذكاء الاصطناعي لاستدعاء أدوات خارجية. استخدمه إذا كان مساعدك لا يستطيع تنفيذ الأوامر (مثل Claude Desktop) أو إذا أردت أن يتحكم في نافذة UniWork Office مباشرة. اختر إحدى الطريقتين أدناه.',
     intgMcpStdioTitle: 'يشغّله المساعد (موصى به)',
     intgMcpStdioDesc:
-      'يشغّل المساعد UniWork Office (uniwork-office mcp) بنفسه: لا شيء لتفعيله هنا، ولا يلزم أن يكون UniWork Office مفتوحًا. نفس إمكانات CLI.',
+      'يشغّل المساعد UniWork Office ({cmd} mcp) بنفسه: لا شيء لتفعيله هنا، ولا يلزم أن يكون UniWork Office مفتوحًا. نفس إمكانات CLI.',
     intgMcpHttpTitle: 'خادم HTTP محلي',
     intgMcpHttpDesc:
       'يعمل داخل UniWork Office؛ يتصل المساعد عبر عنوان URL ويمكنك مشاهدة المستند يُبنى خطوة بخطوة في محرر Word. يجب أن يبقى UniWork Office مفتوحًا؛ مستندات Word فقط حاليًا.',
@@ -4551,16 +4551,16 @@ export const strings = {
     intgExample2: 'Monte uma apresentação de 6 slides sobre nossos resultados do 3º trimestre',
     intgExample3: 'Converta budget.xlsx para PDF e abra no UniWork Office',
     intgStep2Note:
-      'O assistente executa a linha de comando UniWork Office (uniwork-office) sozinho; você nunca precisa digitá-la.',
+      'O assistente executa a linha de comando UniWork Office ({cmd}) sozinho; você nunca precisa digitá-la.',
     intgCliPartTitle: 'CLI · linha de comando + skill',
     intgCliPartDesc:
-      'Para assistentes que executam comandos de terminal (Claude Code, Codex, Cursor e outros). Com o skill instalado, o assistente chama a linha de comando UniWork Office (uniwork-office) sozinho para criar, converter, ler e editar arquivos; você nunca digita um comando.',
+      'Para assistentes que executam comandos de terminal (Claude Code, Codex, Cursor e outros). Com o skill instalado, o assistente chama a linha de comando UniWork Office ({cmd}) sozinho para criar, converter, ler e editar arquivos; você nunca digita um comando.',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP é o protocolo comum que assistentes de IA usam para chamar ferramentas externas. Use-o quando o assistente não puder executar comandos (Claude Desktop, por exemplo) ou quando quiser que ele controle a janela do UniWork Office diretamente. Escolha uma das duas formas abaixo.',
     intgMcpStdioTitle: 'Iniciado pelo assistente (recomendado)',
     intgMcpStdioDesc:
-      'O assistente inicia o UniWork Office (uniwork-office mcp) sozinho: nada para ligar aqui, e o UniWork Office não precisa estar aberto. Mesmos recursos da CLI.',
+      'O assistente inicia o UniWork Office ({cmd} mcp) sozinho: nada para ligar aqui, e o UniWork Office não precisa estar aberto. Mesmos recursos da CLI.',
     intgMcpHttpTitle: 'Servidor HTTP local',
     intgMcpHttpDesc:
       'Roda dentro do UniWork Office; o assistente conecta por URL e você acompanha o documento sendo montado passo a passo no editor Word. O UniWork Office precisa ficar aberto; por enquanto só documentos Word.',
@@ -4941,16 +4941,16 @@ export const strings = {
     intgExample2: 'Prepara una presentazione di 6 slide sui nostri risultati del terzo trimestre',
     intgExample3: 'Converti budget.xlsx in PDF e aprilo in UniWork Office',
     intgStep2Note:
-      "L'assistente esegue da solo la riga di comando UniWork Office (uniwork-office); non dovrai mai digitarla.",
+      "L'assistente esegue da solo la riga di comando UniWork Office ({cmd}); non dovrai mai digitarla.",
     intgCliPartTitle: 'CLI · riga di comando + skill',
     intgCliPartDesc:
-      'Per assistenti che possono eseguire comandi da terminale (Claude Code, Codex, Cursor e altri). Installato lo skill, l’assistente richiama da sé la riga di comando UniWork Office (uniwork-office) per creare, convertire, leggere e modificare file; non digiti mai un comando.',
+      'Per assistenti che possono eseguire comandi da terminale (Claude Code, Codex, Cursor e altri). Installato lo skill, l’assistente richiama da sé la riga di comando UniWork Office ({cmd}) per creare, convertire, leggere e modificare file; non digiti mai un comando.',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP è il protocollo comune con cui gli assistenti IA richiamano strumenti esterni. Usalo quando l’assistente non può eseguire comandi (Claude Desktop, ad esempio) o quando vuoi che controlli direttamente la finestra di UniWork Office. Scegli uno dei due modi qui sotto.',
     intgMcpStdioTitle: 'Avviato dall’assistente (consigliato)',
     intgMcpStdioDesc:
-      'L’assistente avvia UniWork Office (uniwork-office mcp) da sé: niente da attivare qui, e UniWork Office non deve essere aperto. Stesse funzioni della CLI.',
+      'L’assistente avvia UniWork Office ({cmd} mcp) da sé: niente da attivare qui, e UniWork Office non deve essere aperto. Stesse funzioni della CLI.',
     intgMcpHttpTitle: 'Server HTTP locale',
     intgMcpHttpDesc:
       'Gira dentro UniWork Office; l’assistente si collega a un URL e puoi vedere il documento prendere forma passo dopo passo nell’editor Word. UniWork Office deve restare aperto; per ora solo documenti Word.',
@@ -5328,16 +5328,16 @@ export const strings = {
     intgExample2: 'Zrób prezentację z 6 slajdów o naszych wynikach za III kwartał',
     intgExample3: 'Przekonwertuj budget.xlsx do PDF i otwórz w UniWork Office',
     intgStep2Note:
-      'Asystent sam uruchamia wiersz poleceń UniWork Office (uniwork-office); nigdy nie musisz go wpisywać.',
+      'Asystent sam uruchamia wiersz poleceń UniWork Office ({cmd}); nigdy nie musisz go wpisywać.',
     intgCliPartTitle: 'CLI · wiersz poleceń + skill',
     intgCliPartDesc:
-      'Dla asystentów, które potrafią uruchamiać polecenia terminala (Claude Code, Codex, Cursor i inne). Po zainstalowaniu skilla asystent sam wywołuje wiersz poleceń UniWork Office (uniwork-office), aby tworzyć, konwertować, czytać i edytować pliki; nigdy nie wpisujesz polecenia.',
+      'Dla asystentów, które potrafią uruchamiać polecenia terminala (Claude Code, Codex, Cursor i inne). Po zainstalowaniu skilla asystent sam wywołuje wiersz poleceń UniWork Office ({cmd}), aby tworzyć, konwertować, czytać i edytować pliki; nigdy nie wpisujesz polecenia.',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP to wspólny protokół, którym asystenci AI wywołują zewnętrzne narzędzia. Użyj go, gdy asystent nie potrafi uruchamiać poleceń (np. Claude Desktop) lub gdy chcesz, aby bezpośrednio sterował oknem UniWork Office. Wybierz jeden z dwóch sposobów poniżej.',
     intgMcpStdioTitle: 'Uruchamiany przez asystenta (zalecane)',
     intgMcpStdioDesc:
-      'Asystent sam uruchamia UniWork Office (uniwork-office mcp): nic tu nie trzeba włączać, a UniWork Office nie musi być otwarty. Te same funkcje co CLI.',
+      'Asystent sam uruchamia UniWork Office ({cmd} mcp): nic tu nie trzeba włączać, a UniWork Office nie musi być otwarty. Te same funkcje co CLI.',
     intgMcpHttpTitle: 'Lokalny serwer HTTP',
     intgMcpHttpDesc:
       'Działa wewnątrz UniWork Office; asystent łączy się przez URL, a Ty widzisz, jak dokument powstaje krok po kroku w edytorze Word. UniWork Office musi pozostać otwarty; na razie tylko dokumenty Word.',
@@ -5674,16 +5674,16 @@ export const strings = {
     intgExample2: 'Udělej prezentaci o 6 snímcích o našich výsledcích za 3. čtvrtletí',
     intgExample3: 'Převeď budget.xlsx do PDF a otevři ho v UniWork Office',
     intgStep2Note:
-      'Asistent spouští příkazový řádek UniWork Office (uniwork-office) sám; nikdy ho nemusíte psát.',
+      'Asistent spouští příkazový řádek UniWork Office ({cmd}) sám; nikdy ho nemusíte psát.',
     intgCliPartTitle: 'CLI · příkazový řádek + skill',
     intgCliPartDesc:
-      'Pro asistenty, kteří umí spouštět příkazy terminálu (Claude Code, Codex, Cursor a další). Po instalaci skillu asistent sám volá příkazový řádek UniWork Office (uniwork-office) k vytváření, převodu, čtení a úpravám souborů; žádný příkaz nepíšete.',
+      'Pro asistenty, kteří umí spouštět příkazy terminálu (Claude Code, Codex, Cursor a další). Po instalaci skillu asistent sám volá příkazový řádek UniWork Office ({cmd}) k vytváření, převodu, čtení a úpravám souborů; žádný příkaz nepíšete.',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP je společný protokol, kterým AI asistenti volají externí nástroje. Použijte ho, když asistent neumí spouštět příkazy (např. Claude Desktop) nebo když chcete, aby přímo ovládal okno UniWork Office. Vyberte jeden ze dvou způsobů níže.',
     intgMcpStdioTitle: 'Spouští asistent (doporučeno)',
     intgMcpStdioDesc:
-      'Asistent spustí UniWork Office (uniwork-office mcp) sám: tady není co zapínat a UniWork Office nemusí být otevřený. Stejné funkce jako CLI.',
+      'Asistent spustí UniWork Office ({cmd} mcp) sám: tady není co zapínat a UniWork Office nemusí být otevřený. Stejné funkce jako CLI.',
     intgMcpHttpTitle: 'Místní HTTP server',
     intgMcpHttpDesc:
       'Běží uvnitř UniWork Office; asistent se připojí přes URL a v editoru Word sledujete, jak dokument krok za krokem vzniká. UniWork Office musí zůstat otevřený; zatím jen dokumenty Word.',
@@ -6111,7 +6111,7 @@ export const strings = {
       'MCP is het gemeenschappelijke protocol waarmee AI-assistenten externe tools aanroepen. Gebruik het als je assistent geen opdrachten kan uitvoeren (bijvoorbeeld Claude Desktop) of als je wilt dat hij het UniWork Office-venster rechtstreeks bestuurt. Kies een van de twee manieren hieronder.',
     intgMcpStdioTitle: 'Gestart door de assistent (aanbevolen)',
     intgMcpStdioDesc:
-      'De assistent start UniWork Office (uniwork-office mcp) zelf: hier hoeft niets aan, en UniWork Office hoeft niet open te staan. Dezelfde functies als de CLI.',
+      'De assistent start UniWork Office ({cmd} mcp) zelf: hier hoeft niets aan, en UniWork Office hoeft niet open te staan. Dezelfde functies als de CLI.',
     intgMcpHttpTitle: 'Lokale HTTP-server',
     intgMcpHttpDesc:
       'Draait in UniWork Office; de assistent verbindt via een URL en je ziet het document stap voor stap ontstaan in de Word-editor. UniWork Office moet open blijven; voorlopig alleen Word-documenten.',
@@ -6493,16 +6493,16 @@ export const strings = {
     intgExample2: 'Buat pembentangan 6 slaid tentang hasil S3 kami',
     intgExample3: 'Tukar budget.xlsx kepada PDF dan buka dalam UniWork Office',
     intgStep2Note:
-      'Pembantu menjalankan baris arahan UniWork Office (uniwork-office) sendiri; anda tidak perlu menaipnya.',
+      'Pembantu menjalankan baris arahan UniWork Office ({cmd}) sendiri; anda tidak perlu menaipnya.',
     intgCliPartTitle: 'CLI · baris arahan + skill',
     intgCliPartDesc:
-      'Untuk pembantu yang boleh menjalankan arahan terminal (Claude Code, Codex, Cursor dan lain-lain). Setelah skill dipasang, pembantu memanggil baris arahan UniWork Office (uniwork-office) sendiri untuk mencipta, menukar, membaca dan mengedit fail; anda tidak perlu menaip sebarang arahan.',
+      'Untuk pembantu yang boleh menjalankan arahan terminal (Claude Code, Codex, Cursor dan lain-lain). Setelah skill dipasang, pembantu memanggil baris arahan UniWork Office ({cmd}) sendiri untuk mencipta, menukar, membaca dan mengedit fail; anda tidak perlu menaip sebarang arahan.',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP ialah protokol umum yang digunakan pembantu AI untuk memanggil alat luaran. Gunakannya apabila pembantu anda tidak boleh menjalankan arahan (contohnya Claude Desktop) atau apabila anda mahu ia mengawal tetingkap UniWork Office secara langsung. Pilih salah satu daripada dua cara di bawah.',
     intgMcpStdioTitle: 'Dimulakan oleh pembantu (disyorkan)',
     intgMcpStdioDesc:
-      'Pembantu melancarkan UniWork Office (uniwork-office mcp) sendiri: tiada apa yang perlu dihidupkan di sini, dan UniWork Office tidak perlu dibuka. Ciri sama seperti CLI.',
+      'Pembantu melancarkan UniWork Office ({cmd} mcp) sendiri: tiada apa yang perlu dihidupkan di sini, dan UniWork Office tidak perlu dibuka. Ciri sama seperti CLI.',
     intgMcpHttpTitle: 'Pelayan HTTP tempatan',
     intgMcpHttpDesc:
       'Berjalan di dalam UniWork Office; pembantu menyambung melalui URL dan anda boleh melihat dokumen dibina langkah demi langkah dalam editor Word. UniWork Office mesti kekal dibuka; buat masa ini dokumen Word sahaja.',
@@ -6875,16 +6875,16 @@ export const strings = {
     intgExample2: 'הכן מצגת של 6 שקופיות על תוצאות הרבעון השלישי שלנו',
     intgExample3: 'המר את budget.xlsx ל-PDF ופתח אותו ב-UniWork Office',
     intgStep2Note:
-      'העוזר מריץ בעצמו את שורת הפקודה UniWork Office (uniwork-office); לעולם לא תצטרכו להקליד אותה.',
+      'העוזר מריץ בעצמו את שורת הפקודה UniWork Office ({cmd}); לעולם לא תצטרכו להקליד אותה.',
     intgCliPartTitle: 'CLI · שורת פקודה + skill',
     intgCliPartDesc:
-      'לעוזרים שיכולים להריץ פקודות טרמינל (Claude Code‏, Codex‏, Cursor ואחרים). לאחר התקנת ה‑skill העוזר קורא בעצמו לשורת הפקודה UniWork Office (uniwork-office) כדי ליצור, להמיר, לקרוא ולערוך קבצים; אתם לא מקלידים שום פקודה.',
+      'לעוזרים שיכולים להריץ פקודות טרמינל (Claude Code‏, Codex‏, Cursor ואחרים). לאחר התקנת ה‑skill העוזר קורא בעצמו לשורת הפקודה UniWork Office ({cmd}) כדי ליצור, להמיר, לקרוא ולערוך קבצים; אתם לא מקלידים שום פקודה.',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP הוא הפרוטוקול המשותף שבו עוזרי AI קוראים לכלים חיצוניים. השתמשו בו כשהעוזר אינו יכול להריץ פקודות (למשל Claude Desktop) או כשאתם רוצים שהוא ישלוט ישירות בחלון UniWork Office. בחרו אחת משתי הדרכים למטה.',
     intgMcpStdioTitle: 'מופעל על ידי העוזר (מומלץ)',
     intgMcpStdioDesc:
-      'העוזר מפעיל את UniWork Office (uniwork-office mcp) בעצמו: אין מה להפעיל כאן, ו‑UniWork Office לא חייב להיות פתוח. אותן יכולות כמו ב‑CLI.',
+      'העוזר מפעיל את UniWork Office ({cmd} mcp) בעצמו: אין מה להפעיל כאן, ו‑UniWork Office לא חייב להיות פתוח. אותן יכולות כמו ב‑CLI.',
     intgMcpHttpTitle: 'שרת HTTP מקומי',
     intgMcpHttpDesc:
       'פועל בתוך UniWork Office; העוזר מתחבר דרך כתובת URL ואפשר לראות את המסמך נבנה צעד אחר צעד בעורך Word. UniWork Office חייב להישאר פתוח; בשלב זה מסמכי Word בלבד.',
@@ -7254,16 +7254,16 @@ export const strings = {
     intgExample2: 'हमारे Q3 नतीजों पर 6 स्लाइड का प्रेज़ेंटेशन बनाओ',
     intgExample3: 'budget.xlsx को PDF में बदलो और UniWork Office में खोलो',
     intgStep2Note:
-      'UniWork Office (uniwork-office) कमांड लाइन असिस्टेंट खुद चलाता है; आपको कभी टाइप नहीं करना पड़ता।',
+      'UniWork Office ({cmd}) कमांड लाइन असिस्टेंट खुद चलाता है; आपको कभी टाइप नहीं करना पड़ता।',
     intgCliPartTitle: 'CLI · कमांड लाइन + skill',
     intgCliPartDesc:
-      'उन सहायकों के लिए जो टर्मिनल कमांड चला सकते हैं (Claude Code, Codex, Cursor आदि)। skill इंस्टॉल होने के बाद सहायक फ़ाइलें बनाने, बदलने, पढ़ने और संपादित करने के लिए खुद UniWork Office (uniwork-office) कमांड लाइन चलाता है; आपको कोई कमांड टाइप नहीं करना पड़ता।',
+      'उन सहायकों के लिए जो टर्मिनल कमांड चला सकते हैं (Claude Code, Codex, Cursor आदि)। skill इंस्टॉल होने के बाद सहायक फ़ाइलें बनाने, बदलने, पढ़ने और संपादित करने के लिए खुद UniWork Office ({cmd}) कमांड लाइन चलाता है; आपको कोई कमांड टाइप नहीं करना पड़ता।',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP वह साझा प्रोटोकॉल है जिससे AI सहायक बाहरी टूल बुलाते हैं। इसे तब चुनें जब सहायक कमांड न चला सके (जैसे Claude Desktop) या आप चाहें कि वह UniWork Office की विंडो को सीधे चलाए। नीचे दिए दो तरीकों में से कोई एक चुनें।',
     intgMcpStdioTitle: 'सहायक द्वारा शुरू (अनुशंसित)',
     intgMcpStdioDesc:
-      'सहायक खुद UniWork Office (uniwork-office mcp) चलाता है: यहाँ कुछ चालू करने की ज़रूरत नहीं, और UniWork Office खुला होना भी ज़रूरी नहीं। सुविधाएँ CLI जैसी ही।',
+      'सहायक खुद UniWork Office ({cmd} mcp) चलाता है: यहाँ कुछ चालू करने की ज़रूरत नहीं, और UniWork Office खुला होना भी ज़रूरी नहीं। सुविधाएँ CLI जैसी ही।',
     intgMcpHttpTitle: 'स्थानीय HTTP सर्वर',
     intgMcpHttpDesc:
       'UniWork Office के अंदर चलता है; सहायक URL से जुड़ता है और आप Word संपादक में दस्तावेज़ को चरण-दर-चरण बनते देख सकते हैं। UniWork Office खुला रहना चाहिए; अभी केवल Word दस्तावेज़।',
@@ -7557,7 +7557,7 @@ export const strings = {
     intgExample1: 'Chuyển ~/Downloads/report.md thành tài liệu Word',
     intgExample2: 'Tạo bài trình chiếu 6 slide về kết quả Q3 của chúng ta',
     intgExample3: 'Chuyển budget.xlsx sang PDF và mở trong UniWork Office',
-    intgStep2Note: 'Trợ lý tự chạy dòng lệnh UniWork Office (uniwork-office); bạn không cần gõ gì.',
+    intgStep2Note: 'Trợ lý tự chạy dòng lệnh UniWork Office ({cmd}); bạn không cần gõ gì.',
     intgCliTitle: 'Nâng cao: dòng lệnh UniWork Office',
     intgCliReady: 'UniWork Office ({cmd}) {v} · sẵn sàng trong terminal ({path})',
     intgCliNotOnPath:
@@ -7754,13 +7754,13 @@ export const strings = {
     setMcpLogEmpty: 'Chưa có mục nhật ký nào',
     intgCliPartTitle: 'CLI · dòng lệnh + kỹ năng',
     intgCliPartDesc:
-      'Dành cho các trợ lý có thể chạy lệnh terminal (Claude Code, Codex, Cursor và các trợ lý khác). Khi kỹ năng đã được cài đặt, trợ lý sẽ tự gọi dòng lệnh UniWork Office (uniwork-office) để tạo, chuyển đổi, đọc và chỉnh sửa tệp; bạn không cần nhập lệnh.',
+      'Dành cho các trợ lý có thể chạy lệnh terminal (Claude Code, Codex, Cursor và các trợ lý khác). Khi kỹ năng đã được cài đặt, trợ lý sẽ tự gọi dòng lệnh UniWork Office ({cmd}) để tạo, chuyển đổi, đọc và chỉnh sửa tệp; bạn không cần nhập lệnh.',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP là giao thức tiêu chuẩn mà các trợ lý AI dùng để gọi công cụ bên ngoài. Sử dụng khi trợ lý của bạn không thể chạy lệnh (ví dụ Claude Desktop) hoặc khi bạn muốn trợ lý điều khiển trực tiếp cửa sổ UniWork Office. Chọn một trong hai cách bên dưới.',
     intgMcpStdioTitle: 'Được khởi động bởi trợ lý (khuyến nghị)',
     intgMcpStdioDesc:
-      'Trợ lý sẽ tự khởi chạy UniWork Office (uniwork-office mcp): không cần bật gì ở đây và UniWork Office không cần phải mở. Có đầy đủ tính năng tương tự CLI.',
+      'Trợ lý sẽ tự khởi chạy UniWork Office ({cmd} mcp): không cần bật gì ở đây và UniWork Office không cần phải mở. Có đầy đủ tính năng tương tự CLI.',
     intgMcpHttpTitle: 'Máy chủ HTTP cục bộ',
     intgMcpHttpDesc:
       'Chạy bên trong UniWork Office; trợ lý kết nối với một URL và bạn có thể theo dõi nó tạo tài liệu từng bước trong trình chỉnh sửa Word. UniWork Office phải luôn mở; hiện tại chỉ hỗ trợ tài liệu Word.',
@@ -8004,16 +8004,16 @@ export const strings = {
     intgExample1: '把 ~/Downloads/report.md 轉成 Word 文件',
     intgExample2: '做一份 6 頁的簡報，介紹我們第三季的業績',
     intgExample3: '把 budget.xlsx 轉成 PDF，並在 UniWork Office 中開啟',
-    intgStep2Note: '助理會自行呼叫 UniWork Office (uniwork-office) 命令列，你不需要輸入任何指令。',
+    intgStep2Note: '助理會自行呼叫 UniWork Office ({cmd}) 命令列，你不需要輸入任何指令。',
     intgCliPartTitle: 'CLI · 命令列 + skill',
     intgCliPartDesc:
-      '適合能執行終端機指令的助理（Claude Code、Codex、Cursor 等）。安裝 skill 後，助理會自己呼叫 UniWork Office (uniwork-office) 命令列建立、轉換、讀取和編輯檔案，你不需要輸入任何指令。',
+      '適合能執行終端機指令的助理（Claude Code、Codex、Cursor 等）。安裝 skill 後，助理會自己呼叫 UniWork Office ({cmd}) 命令列建立、轉換、讀取和編輯檔案，你不需要輸入任何指令。',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP 是 AI 助理呼叫外部工具的通用協定。助理不能執行指令（如 Claude Desktop），或你想讓它直接操作 UniWork Office 視窗時用這條路。下面兩種接法任選一種。',
     intgMcpStdioTitle: '由助理啟動（建議）',
     intgMcpStdioDesc:
-      '助理自己啟動 UniWork Office (uniwork-office mcp)，不需要在這裡開任何開關，UniWork Office 也不用開著。功能與 CLI 完全相同。',
+      '助理自己啟動 UniWork Office ({cmd} mcp)，不需要在這裡開任何開關，UniWork Office 也不用開著。功能與 CLI 完全相同。',
     intgMcpHttpTitle: '本機 HTTP 服務',
     intgMcpHttpDesc:
       '在 UniWork Office 內執行，助理透過網址連線，可以看著它在 Word 編輯器裡逐步產生。需要 UniWork Office 保持開啟；目前只支援 Word。',

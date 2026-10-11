@@ -166,6 +166,12 @@ export interface AiSettings {
    */
   uniAiAvailable?: boolean
   /**
+   * true = the host could not read which keys are stored (a network or sign-in failure on the
+   * list). Nothing is known about the keys, so the model chip must not claim "no key" and send
+   * stays available (the server decides); the next read retries. Absent means the keys are known.
+   */
+  credentialsUnavailable?: boolean
+  /**
    * Output-token cap for ONE model turn of agent runs (default
    * DEFAULT_MAX_OUTPUT_TOKENS). Reasoning models bill their thinking against
    * this same budget, so a heavy edit turn can consume all of it and close with

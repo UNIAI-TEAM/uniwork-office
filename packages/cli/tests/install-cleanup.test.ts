@@ -222,7 +222,38 @@ describe('cleanupCliLinks: launch-time housekeeping (a)', () => {
     )
   })
 
-  it('moves a link at an old install to the current launcher, and a versioned path to the stable one', () => {
+  it('moves a link at a versioned path of this install to the stable launcher', () => {
+    // (b) for an existing link: the versioned /opt path becomes the package's stable launcher
+    const p = packageRoot()
+    const opts = {
+      launcher: p.packageLauncher,
+      platform: 'linux' as const,
+      candidateDirs: [p.userBin],
+      env: { PATH: p.userBin },
+    }
+    symlinkSync(p.launcher, join(p.userBin, CLI_COMMAND))
+    expect(cleanupCliLinks(opts)).toEqual({
+      removed: [],
+      migrated: [],
+      relinked: [join(p.userBin, CLI_COMMAND)],
+    })
+    expect(readlinkSync(join(p.userBin, CLI_COMMAND))).toBe(p.packageLauncher)
+    // settled: the next launch has nothing to do
+    expect(cleanupCliLinks(opts)).toEqual({ removed: [], migrated: [], relinked: [] })
+
+    const legacy = packageRoot()
+    symlinkSync(legacy.launcher, join(legacy.userBin, LEGACY))
+    const late = cleanupCliLinks({
+      launcher: legacy.packageLauncher,
+      platform: 'linux',
+      candidateDirs: [legacy.userBin],
+      env: { PATH: legacy.userBin },
+    })
+    expect(late.migrated).toEqual([join(legacy.userBin, LEGACY)])
+    expect(readlinkSync(join(legacy.userBin, CLI_COMMAND))).toBe(legacy.packageLauncher)
+  })
+
+  it('leaves a live link into another install root alone, even one of this app in another place', () => {
     const dir = tempDir()
     const bin = join(dir, 'bin')
     mkdirSync(bin)
@@ -230,23 +261,71 @@ describe('cleanupCliLinks: launch-time housekeeping (a)', () => {
     const launcher = shipLauncher(dir, 'app')
     symlinkSync(old, join(bin, CLI_COMMAND))
     symlinkSync(old, join(bin, LEGACY))
-    const report = cleanupCliLinks({ launcher, platform: 'linux', candidateDirs: [bin], env: {} })
-    expect(report.relinked).toEqual([join(bin, CLI_COMMAND)])
-    expect(report.migrated).toEqual([join(bin, LEGACY)])
-    expect(readlinkSync(join(bin, CLI_COMMAND))).toBe(launcher)
-    expect(existsSync(join(bin, LEGACY))).toBe(false)
+    expect(cleanupCliLinks({ launcher, platform: 'linux', candidateDirs: [bin], env: {} })).toEqual(
+      { removed: [], migrated: [], relinked: [] },
+    )
+    expect(readlinkSync(join(bin, CLI_COMMAND))).toBe(old)
+    expect(readlinkSync(join(bin, LEGACY))).toBe(old)
+  })
 
-    // (b) for an existing link: the versioned /opt path becomes the package's stable launcher
-    const p = packageRoot()
-    symlinkSync(p.launcher, join(p.userBin, LEGACY))
-    const late = cleanupCliLinks({
-      launcher: p.packageLauncher,
-      platform: 'linux',
-      candidateDirs: [p.userBin],
-      env: { PATH: p.userBin },
-    })
-    expect(late.migrated).toEqual([join(p.userBin, LEGACY)])
-    expect(readlinkSync(join(p.userBin, CLI_COMMAND))).toBe(p.packageLauncher)
+  it('never takes a live launcher of the upstream app, which has the same layout (Linux and macOS)', () => {
+    const dir = tempDir()
+    const ours = shipLauncher(dir, 'opt/UniWork Office')
+    const upstream = shipLauncher(dir, 'opt/Genoffice')
+    const mac = join(
+      dir,
+      'Applications',
+      'Genoffice.app',
+      'Contents',
+      'Resources',
+      'cli',
+      'genoffice',
+    )
+    mkdirSync(join(mac, '..'), { recursive: true })
+    writeFileSync(mac, '#!/bin/sh\n')
+    writeFileSync(join(mac, '..', 'genoffice.cjs'), '')
+    const macOurs = join(
+      dir,
+      'Applications',
+      'UniWork Office.app',
+      'Contents',
+      'Resources',
+      'cli',
+      'genoffice',
+    )
+    mkdirSync(join(macOurs, '..'), { recursive: true })
+    writeFileSync(macOurs, '#!/bin/sh\n')
+    writeFileSync(join(macOurs, '..', 'genoffice.cjs'), '')
+
+    for (const [platform, theirs, launcher] of [
+      ['linux', upstream, ours],
+      ['darwin', mac, macOurs],
+    ] as const) {
+      const bin = join(dir, `bin-${platform}`)
+      mkdirSync(bin)
+      // the upstream app's own command, and a uniwork-office name that points at it
+      symlinkSync(theirs, join(bin, LEGACY))
+      symlinkSync(theirs, join(bin, CLI_COMMAND))
+      const report = cleanupCliLinks({ launcher, platform, candidateDirs: [bin], env: {} })
+      expect(report, platform).toEqual({ removed: [], migrated: [], relinked: [] })
+      expect(readlinkSync(join(bin, LEGACY)), platform).toBe(theirs)
+      expect(readlinkSync(join(bin, CLI_COMMAND)), platform).toBe(theirs)
+    }
+  })
+
+  it('two installed channels do not repoint the shared link back and forth', () => {
+    const dir = tempDir()
+    const bin = join(dir, 'bin')
+    mkdirSync(bin)
+    const stable = shipLauncher(dir, 'opt/UniWork Office')
+    const dev = shipLauncher(dir, 'opt/UniWork Office Dev')
+    const run = (launcher: string) =>
+      cleanupCliLinks({ launcher, platform: 'linux', candidateDirs: [bin], env: {} })
+    symlinkSync(stable, join(bin, CLI_COMMAND))
+    for (const launcher of [dev, stable, dev, stable]) {
+      expect(run(launcher)).toEqual({ removed: [], migrated: [], relinked: [] })
+      expect(readlinkSync(join(bin, CLI_COMMAND))).toBe(stable)
+    }
   })
 
   it('never touches a link or file it did not create', () => {
