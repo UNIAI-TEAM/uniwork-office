@@ -42,6 +42,13 @@ async function aiLog(request: APIRequestContext): Promise<LogEntry[]> {
 }
 
 const OPENAI_KEY = [{ provider: 'openai', api_key: 'sk-test-openai-abcd' }]
+/** the composer's one-line view-only notice: each panel kept its own class name */
+const VIEW_ONLY_NOTICE = {
+  docs: '.ai-viewonly-notice',
+  markdown: '.ai-readonly-notice',
+  html: '.ai-readonly-notice',
+} as const
+
 /** tool names that change the document, across docs / markdown / html (the read-only set is read_*, get_*, web_search, ...) */
 const EDIT_TOOLS =
   /^(apply_ops|write_document|plan_page|insert_|replace_|generate_image|edit_|add_|delete_|accept_|reject_|reply_|resolve_|set_|create_|propose_)/
@@ -285,8 +292,9 @@ for (const module of ['docs', 'markdown', 'html'] as const) {
       const problems = await watch(page)
       const frame = await open(page, module, { lang: 'en', ai: '1', readonly: '1' })
       await expect(panel(frame)).toBeVisible({ timeout: 30_000 })
-      await expect(frame.locator('.ai-readonly-notice')).toBeVisible()
-      await expect(frame.locator('.ai-readonly-notice')).toContainText('View-only document')
+      const notice = frame.locator(VIEW_ONLY_NOTICE[module])
+      await expect(notice).toBeVisible()
+      await expect(notice).toContainText('View-only document')
       // it still answers questions
       await ask(frame, 'Say hello')
       await expect(frame.locator('.ai-msg-assistant').last()).toContainText(REPLY, {
@@ -308,7 +316,7 @@ for (const module of ['docs', 'markdown', 'html'] as const) {
       await fake(request, { credentials: OPENAI_KEY })
       const frame = await open(page, module, { lang: 'en', ai: '1' })
       await expect(panel(frame)).toBeVisible({ timeout: 30_000 })
-      await expect(frame.locator('.ai-readonly-notice')).toHaveCount(0)
+      await expect(frame.locator(VIEW_ONLY_NOTICE[module])).toHaveCount(0)
     })
   })
 }

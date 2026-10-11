@@ -222,8 +222,8 @@ test.describe('sheets: web AI', () => {
     const problems = await watch(page)
     const { frame } = await open(page, { lang: 'en', ai: '1', readonly: '1' })
     await expect(panel(frame)).toBeVisible({ timeout: 30_000 })
-    await expect(frame.locator('.ai-readonly-notice')).toBeVisible()
-    await expect(frame.locator('.ai-readonly-notice')).toContainText('View-only document')
+    await expect(frame.locator('.ai-view-only-notice')).toBeVisible()
+    await expect(frame.locator('.ai-view-only-notice')).toContainText('View-only document')
     await ask(frame, 'Say hello')
     await expect(frame.locator('.ai-msg-assistant').last()).toContainText(REPLY, {
       timeout: 60_000,
@@ -246,7 +246,7 @@ test.describe('sheets: web AI', () => {
     await fake(request, { credentials: OPENAI_KEY })
     const { frame } = await open(page, { lang: 'en', ai: '1' })
     await expect(panel(frame)).toBeVisible({ timeout: 30_000 })
-    await expect(frame.locator('.ai-readonly-notice')).toHaveCount(0)
+    await expect(frame.locator('.ai-view-only-notice')).toHaveCount(0)
   })
 
   test('grant on: a plan operation edits a cell and the save carries it', async ({
@@ -400,7 +400,7 @@ test.describe('sheets: web AI', () => {
         })
         await ask(frame, 'Again')
         await expect(frame.locator('.ai-msg-assistant').last()).toContainText(
-          'AI credits used up',
+          lang === 'vi' ? 'Đã hết tín dụng AI' : 'AI credits used up',
           { timeout: 30_000 },
         )
         await expect(frame.locator('.ow-ai-state')).toHaveCount(0)
