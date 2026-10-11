@@ -14,7 +14,7 @@ import {
   type BundledSkill,
   type SkillLedger,
 } from '@genoffice/cli/agent-skills'
-import { inspectCliLink } from '@genoffice/cli/install'
+import { commandName, inspectCliLink, linkTarget } from '@genoffice/cli/install'
 import { readAppSettings, writeAppSetting } from './app-settings'
 import { isEphemeralInstall } from './cli-link'
 import { isInstallableSkillDir } from './skill-target'
@@ -55,9 +55,11 @@ export function registerIntegrationsIpc(deps: IntegrationsDeps): void {
     const skill = bundled()
     const l = ledger()
     const launcher = join(deps.cliDir, process.platform === 'win32' ? 'genoffice.cmd' : 'genoffice')
+    const outcome = inspectCliLink(linkTarget(launcher))
     return {
       cli: {
-        ...inspectCliLink({ launcher }),
+        ...outcome,
+        command: commandName(outcome, process.platform),
         launcherDir: deps.cliDir,
         ephemeral: app.isPackaged && isEphemeralInstall(process.resourcesPath, process.env),
         version: cliVersion(deps.cliPackageJson),

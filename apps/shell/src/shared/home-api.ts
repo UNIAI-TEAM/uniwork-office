@@ -312,13 +312,16 @@ export interface DefaultAppStatus {
 }
 
 /**
- * The `genoffice` command line tool on the PATH. Created only when the user
+ * The command line tool on the PATH (`command`: the name to type, `uniwork-office`
+ * unless a package launcher answers to another). Created only when the user
  * asks for it in Settings: `absent` (not set up), `present`, `blocked` (no
- * writable folder, or another `genoffice` is in the way; `manual` is the
+ * writable folder, or another program of that name is in the way; `manual` is the
  * command to finish by hand), `unsupported` (dev run, temporary mount).
  */
 export interface CliLinkState {
   state: 'unsupported' | 'absent' | 'present' | 'blocked'
+  /** the name to type in a terminal */
+  command?: string
   location?: string
   /** shell line that adds the link's folder to the PATH when the shell does not search it */
   pathHint?: string

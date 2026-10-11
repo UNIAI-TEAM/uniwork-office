@@ -50,7 +50,7 @@ genoffice guide docs                                                   # op sign
 genoffice selection report.docx --json   # what the user has selected in the editor showing the file
 genoffice skill list   # coding agents found on this machine and the skill version each has
 genoffice skill install --dir ./skills --force   # copy the bundled skill into a skills directory
-genoffice install-cli   # put genoffice on the PATH
+genoffice install-cli   # put the command (uniwork-office) on the PATH
 genoffice mcp --http 3000 [--host 127.0.0.1] [--token secret]   # Streamable HTTP for clients on other machines; omit --http for stdio
 genoffice mcp --compact-schemas   # advertise ops/cells/data as plain arrays instead of the per-op schema (smaller tools/list; also GENOFFICE_MCP_COMPACT_SCHEMAS=1)
 genoffice mcp install all   # register the stdio server with every coding agent found (or one: claude-code, codex, cursor, gemini, copilot, opencode, windsurf)
@@ -175,11 +175,16 @@ are not registered;
 with `GENOFFICE_ALLOWED_ROOTS` unset the tools are confined to the server's
 file store.
 
-## Putting genoffice on the PATH
+## Putting the command on the PATH
 
-- **macOS**: the app tries to symlink `/usr/local/bin/genoffice` (or `/opt/homebrew/bin/genoffice`) on every launch until one succeeds. If neither directory is writable it stays silent; run `genoffice install-cli` from the launcher, or `sudo mkdir -p /usr/local/bin && sudo ln -sf "/Applications/UniWork Office.app/Contents/Resources/cli/genoffice" /usr/local/bin/genoffice`.
-- **Windows**: the installer appends `<install dir>\resources\cli` to the user PATH (`apps/shell/build/installer.nsh`, REG_EXPAND_SZ preserved, removed on uninstall) and the app re-checks once per version; new terminals see `genoffice`. The directory holds `genoffice.cmd` for cmd / PowerShell and the extension-less `genoffice` for Git Bash.
-- **Linux**: the deb/rpm post-install links `/usr/bin/genoffice`; the AppImage relies on the first-launch symlink into `/usr/local/bin` when it is writable.
+The command a person types is `uniwork-office` (`CLI_COMMAND` in `src/cli-command.ts`, one constant); the launcher file inside the app keeps its upstream name `genoffice` (`docs/upstream/UPSTREAM_SYNC.md`). The link is created only when the user asks (Settings → General, or `install-cli`).
+
+- **macOS**: a symlink `/usr/local/bin/uniwork-office` (or `/opt/homebrew/bin/uniwork-office`, then `~/.local/bin`) to `Resources/cli/genoffice`. If no directory is writable the pane shows the manual command: `sudo mkdir -p /usr/local/bin && sudo ln -sf "/Applications/UniWork Office.app/Contents/Resources/cli/genoffice" /usr/local/bin/uniwork-office`.
+- **Windows**: the installer appends `<install dir>\resources\cli` to the user PATH (`apps/shell/build/installer.nsh`, REG_EXPAND_SZ preserved, removed on uninstall) and the app re-checks once per version; new terminals see `genoffice` (Windows keeps the launcher's own name; the link logic below does not apply). The directory holds `genoffice.cmd` for cmd / PowerShell and the extension-less `genoffice` for Git Bash.
+- **Linux deb/rpm**: the post-install links `/usr/bin/genoffice` to `/opt/<product>/resources/cli/genoffice`; that is the stable launcher a user link points at (`linkTarget` in `src/install.ts`), never the versioned `/opt` path or an AppImage mount. `/usr/bin/uniwork-office` is the GUI executable, so a `uniwork-office` link is never created in a directory that comes before `/usr/bin` on the PATH (`shadowsGui`); the pane then reports `genoffice` as the command that is ready.
+- **Linux AppImage**: runs from a temporary mount, so no link is offered; links from earlier versions are cleaned as below, and deleting the AppImage leaves a manual cleanup (`docs/user/command-line.*.md`).
+
+At every launch the app runs `cleanupCliLinks` over the known bin dirs (`/usr/local/bin`, `/opt/homebrew/bin`, `$XDG_BIN_HOME`, `~/.local/bin`; macOS and Linux only): a link named `uniwork-office` or the old `genoffice` whose target is gone is removed; one that points at an older copy of the app is repointed at the current launcher; an old `genoffice` link becomes `uniwork-office`. Only a symlink whose target is one of our launchers counts (a resolvable path with the bundle beside it, or, when dead, the `resources/cli/genoffice` / `/usr/bin/genoffice` shape); regular files, npm's link and another vendor's launcher are never touched. On Linux the app also drops a `uniwork://` entry in `~/.config/mimeapps.list` whose desktop file no longer exists.
 
 `genoffice install-cli` repeats the attempt and prints the manual command when it cannot finish. jsdom (for Word/Markdown) ships beside the bundle as `Resources/cli/node_modules`, collected by `collect-deps.mjs` at build time.
 

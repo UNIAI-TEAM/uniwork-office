@@ -51,7 +51,11 @@ fi
 
 # The genoffice command line. Only an absent name, a dead link or a link into
 # our own install dir is taken over; anything else at /usr/bin/genoffice
-# belongs to another program (genoffice#893).
+# belongs to another program (genoffice#893). This link is also the stable
+# launcher the app's own per-user "uniwork-office" link points at (never the
+# versioned /opt path): removing the package leaves at most a dead link to a
+# file the package owned, which the app removes at its next launch. The name
+# stays genoffice because /usr/bin/uniwork-office is the app itself.
 app_dir='/opt/${sanitizedProductName}'
 launcher="$app_dir/resources/cli/genoffice"
 link=/usr/bin/genoffice

@@ -78,7 +78,7 @@ import {
 import { OPEN_DOCUMENTS_FILE, clearOpenDocuments, publishOpenDocuments } from './open-documents'
 import { startControlServer, type ControlServer } from './control-server'
 import { controlHandler } from './control-handlers'
-import { cliLinkStatus, installCliLinkOnRequest, recordCliLauncher } from './cli-link'
+import { cliLinkStatus, healCliLinks, installCliLinkOnRequest, recordCliLauncher } from './cli-link'
 import { createDefaultAppService, execFileRunner } from './default-app'
 import { registerIntegrationsIpc } from './integrations-ipc'
 import { exportLessonPackZip, probeAiHub } from './edu-commercial'
@@ -6290,8 +6290,12 @@ app.whenReady().then(async () => {
   currentLang()
   // native menus/dialogs/scrollbars follow the persisted theme from first paint
   nativeTheme.themeSource = currentTheme()
-  // off the startup path: one line in ~/.genoffice; the PATH command itself waits for Settings
-  setTimeout(() => recordCliLauncher(), 3000)
+  // off the startup path: one line in ~/.genoffice; the PATH command itself waits for Settings.
+  // The cleanup only removes, repoints or renames links an earlier run created; it never adds one.
+  setTimeout(() => {
+    recordCliLauncher()
+    healCliLinks()
+  }, 3000)
   startSheetsCaptureServer()
   // Register the docs renderer bridge listeners before the MCP server can take
   // a visible-editing request.

@@ -54,6 +54,7 @@ Treat these as **expected conflict areas**. Prefer UniWork display strings and i
 - Do not `git merge -X theirs upstream/main`
 - After every sync, `npm run check:brand` must be clean (the script runs it and lists violations in its report)
 - Keep `@genoffice/*` package names and `GENOFFICE_*` env vars unless a future phase has a migration plan
+- The command line launcher file keeps its upstream name `genoffice` (`Resources/cli/genoffice`, `/usr/bin/genoffice`, `~/.genoffice/`); only the command a person types on the PATH is `uniwork-office` (`packages/cli/src/cli-command.ts`)
 - Keep `docs/go1/` and `docs/upstream/` as UniWork-owned documentation
 
 ## Sheets wasm engine (fork delta, UNI-1016)

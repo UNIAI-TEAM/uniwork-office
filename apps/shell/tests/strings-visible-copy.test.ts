@@ -68,15 +68,12 @@ describe('Settings > Integrations prose', () => {
     for (const [lang, table] of Object.entries(strings)) {
       for (const key of PROSE_KEYS) {
         const text = table[key]
-        // the only bare "genoffice" words left are the command in parentheses, a ~/.genoffice
-        // path and the command the user is told to type
-        const stripped = text
-          .replace(/\(genoffice(?: mcp)?\)/g, '')
-          .replace(/~\/\.genoffice\/\w+/g, '')
-        if (key === 'intgCliNotOnPath') {
-          expect(text, `${lang}.${key}`).toContain('UniWork Office (genoffice) {v}')
-        } else {
-          expect(stripped, `${lang}.${key}`).not.toMatch(/genoffice/i)
+        // the command is the renamed one (or the {cmd} the app fills in); the only bare
+        // "genoffice" left is the ~/.genoffice path
+        const stripped = text.replace(/~\/\.genoffice\/\w+/g, '')
+        expect(stripped, `${lang}.${key}`).not.toMatch(/genoffice/i)
+        if (key === 'intgCliNotOnPath' || key === 'intgCliReady') {
+          expect(text, `${lang}.${key}`).toContain('UniWork Office ({cmd}) {v}')
         }
       }
       expect(table.intgCliTitle, lang).toContain('UniWork Office')
@@ -86,8 +83,8 @@ describe('Settings > Integrations prose', () => {
   it('reads naturally in English and Vietnamese', () => {
     expect(strings.en.intgCliTitle).toBe('Advanced: UniWork Office command line')
     expect(strings.vi.intgCliTitle).toBe('Nâng cao: dòng lệnh UniWork Office')
-    expect(strings.en.intgStep2Note).toContain('UniWork Office (genoffice) command line')
-    expect(strings.vi.intgStep2Note).toContain('dòng lệnh UniWork Office (genoffice)')
+    expect(strings.en.intgStep2Note).toContain('UniWork Office (uniwork-office) command line')
+    expect(strings.vi.intgStep2Note).toContain('dòng lệnh UniWork Office (uniwork-office)')
   })
 })
 

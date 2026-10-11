@@ -1640,7 +1640,7 @@ export function SettingsModal({
       .finally(() => setDefaultAppBusy(false))
   }
 
-  // the `genoffice` PATH command is never set up behind the user's back: only this button does it
+  // the PATH command is never set up behind the user's back: only this button does it
   const addCliLink = () => {
     setCliLinkBusy(true)
     void window.aiOffice
@@ -1655,7 +1655,7 @@ export function SettingsModal({
     if (cliLink.state === 'present') return t('setCliLinkReady')
     if (cliLink.state === 'blocked' && cliLink.manual)
       return t('setCliLinkBlocked', { cmd: cliLink.manual })
-    return t('setCliLinkDesc')
+    return t('setCliLinkDesc', { cmd: cliLink.command ?? '' })
   })()
 
   const defaultAppDesc = (() => {
