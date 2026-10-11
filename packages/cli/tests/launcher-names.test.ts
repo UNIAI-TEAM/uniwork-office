@@ -10,6 +10,7 @@ const builder = readFileSync(join(repo, 'apps', 'shell', 'electron-builder.cjs')
 const sh = readFileSync(join(__dirname, '..', 'bin', 'genoffice'), 'utf8')
 const cmd = readFileSync(join(__dirname, '..', 'bin', 'genoffice.cmd'), 'utf8')
 const cliSh = readFileSync(join(__dirname, '..', 'bin', 'uniwork-office-cli'), 'utf8')
+const launcherCmd = readFileSync(join(__dirname, '..', 'bin', 'genoffice.cmd'), 'utf8')
 const cliCmd = readFileSync(join(__dirname, '..', 'bin', 'uniwork-office-cli.cmd'), 'utf8')
 
 /** `key: 'value'` at the top level (two-space indent) of the electron-builder config. */
@@ -75,8 +76,11 @@ describe('CLI launcher binary names', () => {
 describe('the command-name shims next to the launchers', () => {
   it('are named after CLI_COMMAND and hand over to the launchers beside them', () => {
     expect(CLI_COMMAND).toBe('uniwork-office-cli')
-    expect(cliCmd).toContain('call "%~dp0genoffice.cmd" %*')
-    expect(cliCmd).toContain('exit /b %errorlevel%')
+    // no `call`: it re-parses the line and alters % and ^ in the arguments
+    expect(cliCmd).not.toMatch(/^\s*call\b/im)
+    expect(cliCmd).toContain('"%~dp0..\\..\\UniWork Office.exe" "%~dp0genoffice.cjs" %*')
+    expect(cliCmd.trimEnd().endsWith('endlocal & exit /b %errorlevel%')).toBe(true)
+    expect(launcherCmd.trimEnd().endsWith('endlocal & exit /b %errorlevel%')).toBe(true)
     expect(cliSh).toContain('exec "$here/genoffice" "$@"')
   })
 

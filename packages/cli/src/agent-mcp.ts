@@ -2,6 +2,7 @@ import { existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync } from 'no
 import { basename, dirname, isAbsolute, join } from 'node:path'
 import { agentConfigDir, type AgentId } from './agent-skills'
 import { realizedPath, writeOutput } from './fs'
+import { CLI_COMMAND } from './cli-command'
 import type { McpLaunch } from './mcp-launch'
 
 /**
@@ -226,7 +227,7 @@ export function removeMcpEntry(id: AgentId, file: string): boolean {
   return true
 }
 
-const LAUNCHER_NAMES = new Set(['genoffice', 'genoffice.cmd', 'genoffice.exe'])
+const LAUNCHER_NAMES = new Set(['genoffice', 'genoffice.cmd', 'genoffice.exe', CLI_COMMAND])
 
 /**
  * Any genoffice launcher, whatever install it came from (an older app path is
