@@ -596,20 +596,43 @@ export interface WorkbenchIdbMediaDump {
   health: Record<string, string>
 }
 
-/** Renderer ↔ main bridge for Workbench key/value persistence. */
+/** Workbench data of one bucket: a UniWork account, or signed-out use */
+export interface WorkbenchSnapshot {
+  keys: Record<string, string>
+  keyCount: number
+  dbPath: string
+  /** opaque id of the bucket these keys belong to; every later call names it */
+  bucket: string
+  /** this account received the pre-upgrade data: the renderer moves its own copies once */
+  legacyPending: boolean
+  unavailable?: boolean
+}
+
+/**
+ * Renderer ↔ main bridge for Workbench key/value persistence. Writes name the
+ * bucket of the snapshot they were made from; main ignores them once the
+ * account changed (see apps/shell/src/main/workbench-accounts.ts).
+ */
 export interface WorkbenchStoreApi {
-  loadAll(): Promise<{ keys: Record<string, string>; keyCount: number; dbPath: string }>
-  getKey(key: string): Promise<string | null>
-  setKey(key: string, value: string): Promise<void>
-  removeKey(key: string): Promise<void>
-  importKeys(keys: Record<string, string>): Promise<{ imported: number }>
-  exportBackup(media?: WorkbenchIdbMediaDump | null): Promise<{
+  loadAll(): Promise<WorkbenchSnapshot>
+  getKey(key: string, bucket: string): Promise<string | null>
+  setKey(key: string, value: string, bucket: string): Promise<void>
+  removeKey(key: string, bucket: string): Promise<void>
+  importKeys(keys: Record<string, string>, bucket: string): Promise<{ imported: number }>
+  /** the renderer moved its pre-upgrade localStorage / IndexedDB copies into `bucket` */
+  legacyDone(bucket: string): Promise<void>
+  /** the signed-in account changed: reload (the payload is the new bucket) */
+  onBucketChanged(cb: (bucket: string) => void): () => void
+  exportBackup(
+    media: WorkbenchIdbMediaDump | null | undefined,
+    bucket: string,
+  ): Promise<{
     ok: boolean
     path?: string
     error?: string
     canceled?: boolean
   }>
-  importBackup(): Promise<{
+  importBackup(bucket: string): Promise<{
     ok: boolean
     keyCount?: number
     keys?: Record<string, string>
@@ -1097,6 +1120,9 @@ export const HOME_CHANNELS = {
   wbImportKeys: 'home:wb-import-keys',
   wbExportBackup: 'home:wb-export-backup',
   wbImportBackup: 'home:wb-import-backup',
+  wbLegacyDone: 'home:wb-legacy-done',
+  /** push: the signed-in account changed, the workbench data shown changes with it */
+  wbBucketChanged: 'home:wb-bucket-changed',
 } as const
 
 /** UniWork documents (open/save against UniWork); handlers live in main/uniwork-docs */

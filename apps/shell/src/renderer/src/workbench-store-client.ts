@@ -1,11 +1,17 @@
 /**
  * Renderer-side cache for Workbench SQLite (main process).
- * After hydrate(), read/write go through memory + IPC; falls back to localStorage.
+ * After hydrate(), read/write go through memory + IPC, scoped to the bucket of
+ * the signed-in UniWork account (or signed-out use); see
+ * apps/shell/src/main/workbench-accounts.ts. localStorage is shared by every
+ * account on the computer, so it only holds data when the main-process store
+ * is unavailable, and then under a per-bucket prefix.
  */
-import type { WorkbenchIdbMediaDump } from '../../shared/home-api'
+import type { WorkbenchIdbMediaDump, WorkbenchStoreApi } from '../../shared/home-api'
+import { currentWorkbenchBucket, setCurrentWorkbenchBucket } from './workbench-bucket'
 import {
   collectWorkbenchIdbMedia,
   isWbIdbMediaDump,
+  moveLegacyWorkbenchIdbMedia,
   restoreWorkbenchIdbMedia,
 } from './workbench-media-backup'
 
@@ -24,31 +30,7 @@ function allowedKey(key: string): boolean {
   )
 }
 
-type WbApi = {
-  loadAll: () => Promise<{
-    keys: WbKvMap
-    keyCount: number
-    dbPath: string
-    unavailable?: boolean
-  }>
-  getKey: (key: string) => Promise<string | null>
-  setKey: (key: string, value: string) => Promise<void>
-  removeKey: (key: string) => Promise<void>
-  importKeys: (keys: WbKvMap) => Promise<{ imported: number }>
-  exportBackup: (
-    media?: WorkbenchIdbMediaDump | null,
-  ) => Promise<{ ok: boolean; path?: string; error?: string; canceled?: boolean }>
-  importBackup: () => Promise<{
-    ok: boolean
-    keyCount?: number
-    keys?: WbKvMap
-    media?: WorkbenchIdbMediaDump
-    error?: string
-    canceled?: boolean
-  }>
-}
-
-function wbApi(): WbApi | null {
+function wbApi(): WorkbenchStoreApi | null {
   try {
     return window.aiOffice?.wb ?? null
   } catch {
@@ -59,6 +41,8 @@ function wbApi(): WbApi | null {
 let cache = new Map<string, string>()
 let hydrated = false
 let usingSqlite = false
+/** bumped by every reset: a hydrate that started before it does not apply */
+let generation = 0
 
 export function isWorkbenchStoreReady(): boolean {
   return hydrated
@@ -68,7 +52,23 @@ export function isWorkbenchUsingSqlite(): boolean {
   return usingSqlite
 }
 
-function collectLocalStorageKeys(): WbKvMap {
+/**
+ * With a main-process store, nothing is read or written before a hydrate has
+ * named the bucket (and after a reset): a write then would land outside any
+ * account. Without one (tests) localStorage is used as is.
+ */
+function storeClosed(): boolean {
+  return !hydrated && wbApi() !== null
+}
+
+/** localStorage name of a key: prefixed with the bucket when one is known */
+function lsKey(key: string): string {
+  const bucket = currentWorkbenchBucket()
+  return bucket ? `uniwork.wbacct.${bucket}.${key}` : key
+}
+
+/** pre-upgrade copies: unprefixed allowlisted keys */
+function collectLegacyLocalStorageKeys(): WbKvMap {
   const keys: WbKvMap = {}
   try {
     for (let i = 0; i < localStorage.length; i++) {
@@ -83,41 +83,99 @@ function collectLocalStorageKeys(): WbKvMap {
   return keys
 }
 
-/** Call once on Home mount. Migrates localStorage → SQLite when DB is empty. */
+function removeLocalStorageKeys(keys: Iterable<string>): void {
+  for (const k of keys) {
+    try {
+      localStorage.removeItem(k)
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+/**
+ * Drops everything held for the previous account at once (the account
+ * changed); reads return nothing until the next hydrate.
+ */
+export function resetWorkbenchStore(): void {
+  generation++
+  cache = new Map()
+  hydrated = false
+  usingSqlite = false
+}
+
+/**
+ * Loads the current bucket. Once, for the account that received the
+ * pre-upgrade data, the old shared localStorage and IndexedDB copies move into
+ * it (keys already there win) and are deleted.
+ */
 export async function hydrateWorkbenchStore(): Promise<void> {
   const api = wbApi()
+  resetWorkbenchStore()
+  const mine = generation
   if (!api) {
+    setCurrentWorkbenchBucket('')
     hydrated = true
-    usingSqlite = false
     return
   }
   try {
     const snap = await api.loadAll()
+    if (mine !== generation) return
+    setCurrentWorkbenchBucket(snap.bucket)
     if (snap.unavailable) {
-      usingSqlite = false
+      if (snap.legacyPending) await moveLegacyIntoLocalStorage(api, snap.bucket)
+      if (mine !== generation) return
       hydrated = true
       return
     }
-    cache = new Map(Object.entries(snap.keys ?? {}))
-    // Merge any allowlisted localStorage keys still missing from SQLite
-    // (e.g. desk layout / My AI that previously bypassed wbStore).
-    const fromLs = collectLocalStorageKeys()
-    const missing: WbKvMap = {}
-    for (const [k, v] of Object.entries(fromLs)) {
-      if (!cache.has(k)) {
-        missing[k] = v
-        cache.set(k, v)
+    const next = new Map(Object.entries(snap.keys ?? {}))
+    if (snap.legacyPending) {
+      const legacy = collectLegacyLocalStorageKeys()
+      const missing: WbKvMap = {}
+      for (const [k, v] of Object.entries(legacy)) {
+        if (!next.has(k)) {
+          missing[k] = v
+          next.set(k, v)
+        }
       }
+      if (Object.keys(missing).length > 0) await api.importKeys(missing, snap.bucket)
+      await moveLegacyMediaAndFinish(api, snap.bucket, Object.keys(legacy))
     }
-    if (Object.keys(missing).length > 0) {
-      await api.importKeys(missing)
-    }
+    if (mine !== generation) return
+    cache = next
     usingSqlite = true
   } catch {
+    if (mine !== generation) return
     usingSqlite = false
     cache = new Map()
   }
   hydrated = true
+}
+
+async function moveLegacyIntoLocalStorage(api: WorkbenchStoreApi, bucket: string): Promise<void> {
+  const legacy = collectLegacyLocalStorageKeys()
+  for (const [k, v] of Object.entries(legacy)) {
+    try {
+      if (localStorage.getItem(lsKey(k)) == null) localStorage.setItem(lsKey(k), v)
+    } catch {
+      /* quota */
+    }
+  }
+  await moveLegacyMediaAndFinish(api, bucket, Object.keys(legacy))
+}
+
+async function moveLegacyMediaAndFinish(
+  api: WorkbenchStoreApi,
+  bucket: string,
+  legacyKeys: string[],
+): Promise<void> {
+  try {
+    await moveLegacyWorkbenchIdbMedia()
+  } catch {
+    /* media best-effort: the keys moved */
+  }
+  removeLocalStorageKeys(legacyKeys)
+  await api.legacyDone(bucket)
 }
 
 /** Replace cache after import backup. */
@@ -132,8 +190,9 @@ export function wbStoreGetRaw(key: string): string | null {
   if (usingSqlite) {
     return cache.has(key) ? (cache.get(key) ?? null) : null
   }
+  if (storeClosed()) return null
   try {
-    return localStorage.getItem(key)
+    return localStorage.getItem(lsKey(key))
   } catch {
     return null
   }
@@ -143,16 +202,12 @@ export function wbStoreSetRaw(key: string, value: string): void {
   if (usingSqlite) {
     cache.set(key, value)
     const api = wbApi()
-    if (api) void api.setKey(key, value).catch(() => undefined)
-    try {
-      localStorage.setItem(key, value)
-    } catch {
-      /* ignore */
-    }
+    if (api) void api.setKey(key, value, currentWorkbenchBucket()).catch(() => undefined)
     return
   }
+  if (storeClosed()) return
   try {
-    localStorage.setItem(key, value)
+    localStorage.setItem(lsKey(key), value)
   } catch {
     /* ignore */
   }
@@ -182,10 +237,12 @@ export function wbStoreRemove(key: string): void {
   if (usingSqlite) {
     cache.delete(key)
     const api = wbApi()
-    if (api) void api.removeKey(key).catch(() => undefined)
+    if (api) void api.removeKey(key, currentWorkbenchBucket()).catch(() => undefined)
+    return
   }
+  if (storeClosed()) return
   try {
-    localStorage.removeItem(key)
+    localStorage.removeItem(lsKey(key))
   } catch {
     /* ignore */
   }
@@ -202,7 +259,7 @@ export async function exportWorkbenchBackupUi(): Promise<
   } catch {
     media = null
   }
-  const r = await api.exportBackup(media)
+  const r = await api.exportBackup(media, currentWorkbenchBucket())
   if (r.ok && r.path) return { ok: true, path: r.path }
   return { ok: false, error: r.error ?? 'export-failed', canceled: r.canceled }
 }
@@ -212,8 +269,11 @@ export async function importWorkbenchBackupUi(): Promise<
 > {
   const api = wbApi()
   if (!api) return { ok: false, error: 'unavailable' }
-  const r = await api.importBackup()
+  const bucket = currentWorkbenchBucket()
+  const r = await api.importBackup(bucket)
   if (!r.ok) return { ok: false, error: r.error ?? 'import-failed', canceled: r.canceled }
+  // the account changed while the dialog was open: its data is not this cache's
+  if (bucket !== currentWorkbenchBucket()) return { ok: false, error: 'account-changed' }
   if (r.keys) replaceWorkbenchCache(r.keys)
   if (isWbIdbMediaDump(r.media)) {
     try {

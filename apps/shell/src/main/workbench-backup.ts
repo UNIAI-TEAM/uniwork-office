@@ -1,13 +1,16 @@
 /**
  * Local Workbench backup: ZIP containing SQLite DB (+ optional IndexedDB media).
+ * Both directions work on the signed-in account's database only: `resolveDb`
+ * returns null once the account changed (see workbench-accounts.ts), and it
+ * is asked again after the file dialog, so a backup never crosses accounts.
  */
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { app, BrowserWindow, dialog } from 'electron'
+import { BrowserWindow, dialog } from 'electron'
 import JSZip from 'jszip'
 import type { WorkbenchIdbMediaDump } from '../shared/home-api'
-import { getWorkbenchDb, type WbKvMap } from './workbench-db'
+import type { WbKvMap, WorkbenchDb } from './workbench-db'
 
 export interface WorkbenchBackupManifest {
   version: 1
@@ -35,10 +38,12 @@ function isMediaDump(value: unknown): value is WorkbenchIdbMediaDump {
 
 export async function exportWorkbenchBackup(
   parent: BrowserWindow | null,
+  resolveDb: () => WorkbenchDb | null,
   media?: WorkbenchIdbMediaDump | null,
 ): Promise<{ ok: true; path: string } | { ok: false; error: string; canceled?: boolean }> {
   try {
-    const db = getWorkbenchDb(app.getPath('userData'))
+    const db = resolveDb()
+    if (!db) return { ok: false, error: 'account-changed' }
     const keys = db.loadAll()
     const hasMedia = isMediaDump(media)
     const zip = new JSZip()
@@ -73,6 +78,8 @@ export async function exportWorkbenchBackup(
     if (result.canceled || !result.filePath) {
       return { ok: false, error: 'canceled', canceled: true }
     }
+    // signed out or switched while the dialog was open: nothing is written
+    if (resolveDb() !== db) return { ok: false, error: 'account-changed' }
     writeFileSync(result.filePath, buffer)
     return { ok: true, path: result.filePath }
   } catch (err) {
@@ -82,6 +89,7 @@ export async function exportWorkbenchBackup(
 
 export async function importWorkbenchBackup(
   parent: BrowserWindow | null,
+  resolveDb: () => WorkbenchDb | null,
 ): Promise<
   | { ok: true; keyCount: number; keys: WbKvMap; media?: WorkbenchIdbMediaDump }
   | { ok: false; error: string; canceled?: boolean }
@@ -100,7 +108,9 @@ export async function importWorkbenchBackup(
       return { ok: false, error: 'canceled', canceled: true }
     }
     const filePath = picked.filePaths[0]
-    const db = getWorkbenchDb(app.getPath('userData'))
+    // the account may have changed while the dialog was open
+    const db = resolveDb()
+    if (!db) return { ok: false, error: 'account-changed' }
 
     if (filePath.endsWith('.json')) {
       // Legacy localStorage snapshot from backup-addons.ts

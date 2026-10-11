@@ -30,7 +30,7 @@ import { AgentIntentBanner } from './AgentIntentBanner'
 import { NewChatPane } from './NewChatPane'
 import { PracticeHome } from './PracticeHome'
 import { TeacherHome } from './TeacherHome'
-import { hydrateWorkbenchStore, wbStoreGetRaw, wbStoreSetRaw } from './workbench-store-client'
+import { wbStoreGetRaw, wbStoreSetRaw } from './workbench-store-client'
 import { onFilesChanged } from './file-events'
 import { FileBadge } from './FileBadge'
 import { UniworkOpenCard } from './UniworkOpenCard'
@@ -1160,13 +1160,8 @@ export function Home() {
     wbStoreSetRaw('uniwork.activePracticeId', id)
   }, [])
 
-  // Hydrate Workbench SQLite (migrate localStorage → DB when empty).
-  useEffect(() => {
-    void hydrateWorkbenchStore().then(() => {
-      const raw = wbStoreGetRaw('uniwork.activePracticeId')
-      if (isPracticeId(raw)) setActivePracticeId(raw)
-    })
-  }, [])
+  // the workbench store is already loaded for the signed-in account
+  // (WorkbenchAccountGate mounts Home after it, and again on an account change)
   // ── Project state ──
   const [projects, setProjects] = useState<ProjectSummaryEntry[]>([])
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
