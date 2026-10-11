@@ -1,4 +1,6 @@
 @echo off
-rem uniwork-office-cli: the command name on Windows; hands over to genoffice.cmd beside it
-call "%~dp0genoffice.cmd" %*
-exit /b %errorlevel%
+rem uniwork-office-cli: the command name on Windows; same body as genoffice.cmd (no call: it would alter % and ^ in arguments)
+setlocal
+set ELECTRON_RUN_AS_NODE=1
+"%~dp0..\..\UniWork Office.exe" "%~dp0genoffice.cjs" %*
+endlocal & exit /b %errorlevel%

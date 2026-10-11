@@ -73,6 +73,7 @@ describe('mcp launch entry', () => {
       isGenofficeLauncher('node', ['C:\\src\\packages\\cli\\dist\\genoffice.cjs', 'mcp']),
     ).toBe(true)
     expect(isGenofficeLauncher('npx', ['-y', 'other-mcp'])).toBe(false)
+    expect(isGenofficeLauncher('uniwork-office-cli')).toBe(true)
     expect(isGenofficeLauncher(null)).toBe(false)
   })
 
