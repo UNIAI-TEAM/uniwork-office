@@ -16,9 +16,10 @@ import { CLI_COMMAND, LAUNCHER_NAME, LEGACY_CLI_COMMANDS } from './cli-command'
 export { CLI_COMMAND, LEGACY_CLI_COMMANDS }
 
 /**
- * Making the command (`CLI_COMMAND`, `uniwork-office`) reachable from a terminal. The
+ * Making the command (`CLI_COMMAND`, `uniwork-office-cli`) reachable from a terminal. The
  * launcher ships inside the app (Resources/cli/genoffice, or genoffice.cmd on Windows) and
- * keeps its upstream name; the link on the PATH carries the command's name. Nothing at install
+ * keeps its upstream name; the link on the PATH carries the command's name (on Windows the
+ * `uniwork-office-cli.cmd` shim beside the launcher does). Nothing at install
  * time puts it on PATH for the dmg, so it is created when the user asks (Settings, or
  * `install-cli`). Best effort everywhere: no prompts, no elevation, never an error on the
  * app's startup path. `inspectCliLink` reports the same states without writing anything;
@@ -33,12 +34,6 @@ export interface InstallOptions {
   env?: NodeJS.ProcessEnv
   /** test seam for the Windows registry edit */
   runPowerShell?: (script: string) => { ok: boolean; stdout: string }
-  /**
-   * deb/rpm only: the package's own GUI executable (`/usr/bin/uniwork-office`). A link named
-   * like the command must not sit before it on the PATH, or typing the name in a terminal would
-   * start the command line instead of the app; see `shadowsGui`.
-   */
-  guiExecutable?: string
 }
 
 export type InstallStatus =
@@ -52,13 +47,6 @@ export interface InstallOutcome {
   manual?: string
   /** the link landed in a directory the current shell does not search; this line adds it */
   pathHint?: string
-  /** the name to type when it is not `CLI_COMMAND` (the package launcher on deb/rpm) */
-  command?: string
-}
-
-/** What a person types: the outcome's own name, else the Windows launcher's (`genoffice`), else the command. */
-export function commandName(outcome: { command?: string }, platform: NodeJS.Platform): string {
-  return outcome.command ?? (platform === 'win32' ? LAUNCHER_NAME : CLI_COMMAND)
 }
 
 /**
@@ -100,16 +88,13 @@ export function installCliLink(opts: InstallOptions): InstallOutcome {
   if (platform === 'win32') return installWindowsPath(opts)
   if (platform !== 'darwin' && platform !== 'linux') return { status: 'unsupported' }
   const env = opts.env ?? process.env
+  const answering = packageLinkOnPath(opts.launcher, env)
+  if (answering) return { status: 'present', location: answering }
   const dirs = opts.candidateDirs ?? defaultCandidateDirs(platform, env)
   const userDirs = new Set(userBinDirs(env))
   const manual = manualCommand(opts.launcher)
   let occupied: string | undefined
-  let shadowed = false
   for (const dir of dirs) {
-    if (shadowsGui(dir, opts.guiExecutable, env)) {
-      shadowed = true
-      continue
-    }
     const link = join(dir, CLI_COMMAND)
     const state = linkState(link, opts.launcher)
     if (state === 'ours' && readlinkSync(link) === opts.launcher) {
@@ -137,8 +122,6 @@ export function installCliLink(opts: InstallOptions): InstallOutcome {
       continue
     }
   }
-  const system = shadowed ? packageLauncherOnPath(opts, env) : undefined
-  if (system) return system
   if (occupied) return { status: 'occupied', location: occupied, manual }
   return { status: 'unwritable', location: join(dirs[0] ?? '/usr/local/bin', CLI_COMMAND), manual }
 }
@@ -149,17 +132,14 @@ export function inspectCliLink(opts: InstallOptions): InstallOutcome {
   if (platform === 'win32') return inspectWindowsPath(opts)
   if (platform !== 'darwin' && platform !== 'linux') return { status: 'unsupported' }
   const env = opts.env ?? process.env
+  const answering = packageLinkOnPath(opts.launcher, env)
+  if (answering) return { status: 'present', location: answering }
   const dirs = opts.candidateDirs ?? defaultCandidateDirs(platform, env)
   const userDirs = new Set(userBinDirs(env))
   const manual = manualCommand(opts.launcher)
   let occupied: string | undefined
-  let shadowed = false
   // same walk installCliLink does: an occupied name is skipped, the first free writable dir wins
   for (const dir of dirs) {
-    if (shadowsGui(dir, opts.guiExecutable, env)) {
-      shadowed = true
-      continue
-    }
     const link = join(dir, CLI_COMMAND)
     const state = linkState(link, opts.launcher)
     if (state === 'ours' && readlinkSync(link) === opts.launcher) {
@@ -173,28 +153,27 @@ export function inspectCliLink(opts: InstallOptions): InstallOutcome {
       return withPathHint({ status: 'missing', location: link, manual }, dir, userDirs, env)
     }
   }
-  const system = shadowed ? packageLauncherOnPath(opts, env) : undefined
-  if (system) return system
   if (occupied) return { status: 'occupied', location: occupied, manual }
   return { status: 'unwritable', location: join(dirs[0] ?? '/usr/local/bin', CLI_COMMAND), manual }
 }
 
-/** The deb/rpm after-install script links the app's launcher here (and the GUI as `uniwork-office`). */
-export const PACKAGE_LAUNCHER = '/usr/bin/genoffice'
-export const PACKAGE_GUI = '/usr/bin/uniwork-office'
+/**
+ * The deb/rpm after-install script links the app's launcher here, under the command's own name
+ * (the GUI keeps `/usr/bin/uniwork-office`, so the two never clash).
+ */
+export const PACKAGE_LAUNCHER = `/usr/bin/${CLI_COMMAND}`
 
 export interface LinkTarget {
   launcher: string
-  guiExecutable?: string
 }
 
 /**
  * What the command's link should point at. On a deb/rpm install the package's own `/usr/bin`
- * launcher is the stable name: a link at the versioned `/opt/<product>/resources/cli/genoffice`
+ * link is the stable name: a link at the versioned `/opt/<product>/resources/cli/genoffice`
  * or at an AppImage mount breaks with the install, while removing the package leaves at most a
  * dead link to a file the package owned. It counts as the package's launcher only when it
- * resolves to the very file the app ships (another program's `/usr/bin/genoffice` does not), and
- * never for an AppImage run. Elsewhere the shipped launcher is the target, as before.
+ * resolves to the very file the app ships (another program's `/usr/bin/uniwork-office-cli` does
+ * not), and never for an AppImage run. Elsewhere the shipped launcher is the target, as before.
  */
 export function linkTarget(
   launcher: string,
@@ -202,25 +181,18 @@ export function linkTarget(
     platform?: NodeJS.Platform
     env?: NodeJS.ProcessEnv
     packageLauncher?: string
-    packageGui?: string
   } = {},
 ): LinkTarget {
   const platform = opts.platform ?? process.platform
   const env = opts.env ?? process.env
   const packageLauncher = opts.packageLauncher ?? PACKAGE_LAUNCHER
-  // An AppImage run offers no `guiExecutable`, so the shadow guard is off for it. That cannot
-  // put a `uniwork-office` link in front of a deb's GUI: an AppImage is a temporary mount that
-  // never gets a launcher to link (the app passes none), it only sweeps dead links.
   if (platform !== 'linux' || env.APPIMAGE) return { launcher }
   try {
     if (realpathSync(packageLauncher) !== realpathSync(launcher)) return { launcher }
   } catch {
     return { launcher }
   }
-  const gui = opts.packageGui ?? PACKAGE_GUI
-  return lstatSync(gui, { throwIfNoEntry: false })
-    ? { launcher: packageLauncher, guiExecutable: gui }
-    : { launcher: packageLauncher }
+  return { launcher: packageLauncher }
 }
 
 export interface CleanupOptions {
@@ -233,12 +205,10 @@ export interface CleanupOptions {
   /** directories to sweep (defaults per platform, the same list the install walks) */
   candidateDirs?: string[]
   env?: NodeJS.ProcessEnv
-  /** see `InstallOptions.guiExecutable` */
-  guiExecutable?: string
 }
 
 export interface CleanupReport {
-  /** links deleted: the target is gone, or a legacy name that only the package launcher replaces */
+  /** links deleted: the target is gone, or the package's own `/usr/bin` link already answers for it */
   removed: string[]
   /** legacy-name links replaced by a `CLI_COMMAND` link at the current launcher */
   migrated: string[]
@@ -259,9 +229,13 @@ export interface CleanupReport {
  *     package launcher is now known): repointed at `launcher`. A link into another install root
  *     stays where it is, so two channels installed side by side do not take the link from each
  *     other at every launch;
- *   - a legacy name: replaced by a `CLI_COMMAND` link at `launcher`. Where the new name would
- *     shadow the GUI executable (`shadowsGui`) the legacy link is only dropped, because the
- *     package launcher already answers to its own name.
+ *   - a legacy name (`genoffice`, or the `uniwork-office` an earlier version used for the
+ *     command): replaced by a `CLI_COMMAND` link at `launcher`. `uniwork-office` is also the
+ *     desktop program's name, so such a link is ours only as a symlink to one of our launchers;
+ *     the GUI binary is not a launcher and is never touched;
+ *   - when `launcher` is itself the package's `/usr/bin/uniwork-office-cli` and that directory is
+ *     on the PATH, a user link adds nothing and would dangle once the package is removed (the app
+ *     is not there to sweep it): ours are dropped, not migrated or repointed.
  *
  * macOS and Linux only: the Windows PATH entry is a registry value, not a link.
  */
@@ -272,6 +246,7 @@ export function cleanupCliLinks(opts: CleanupOptions = {}): CleanupReport {
   const env = opts.env ?? process.env
   const dirs = opts.candidateDirs ?? defaultCandidateDirs(platform, env)
   const launcher = opts.launcher
+  const packageAnswers = launcher !== undefined && packageLinkOnPath(launcher, env) !== undefined
   for (const dir of dirs) {
     for (const name of [CLI_COMMAND, ...LEGACY_CLI_COMMANDS]) {
       const link = join(dir, name)
@@ -293,7 +268,7 @@ export function cleanupCliLinks(opts: CleanupOptions = {}): CleanupReport {
       // two packaged channels (stable + dev) never repoint each other's link
       if (!launcher || !isSameInstall(resolved, launcher)) continue
       if (!legacy && target === launcher) continue
-      if (shadowsGui(dir, opts.guiExecutable, env)) {
+      if (packageAnswers) {
         if (tryUnlink(link)) report.removed.push(link)
         continue
       }
@@ -346,12 +321,17 @@ function installRoot(launcher: string): string | undefined {
 /**
  * The shape of a launcher path this app installs: `<...>/resources/cli/genoffice` (Linux,
  * Windows, an AppImage mount, macOS' `Contents/Resources/cli/genoffice`) or the package's
- * `/usr/bin/genoffice`. It is the only evidence of ownership left for a link whose target is
- * gone; a vendor's `/opt/vendor/cli/genoffice` does not match.
+ * `/usr/bin/uniwork-office-cli` (and `/usr/bin/genoffice`, which earlier packages created). It is
+ * the only evidence of ownership left for a link whose target is gone; a vendor's
+ * `/opt/vendor/cli/genoffice` does not match, and neither does the GUI `/usr/bin/uniwork-office`.
  */
 export function looksLikeAppLauncher(target: string): boolean {
   const p = target.replace(/\\/g, '/')
-  return p === '/usr/bin/genoffice' || /(^|\/)resources\/cli\/genoffice$/i.test(p)
+  return (
+    p === PACKAGE_LAUNCHER ||
+    p === '/usr/bin/genoffice' ||
+    /(^|\/)resources\/cli\/genoffice$/i.test(p)
+  )
 }
 
 function tryUnlink(path: string): boolean {
@@ -387,37 +367,14 @@ function pathEntries(env: NodeJS.ProcessEnv): string[] {
 }
 
 /**
- * Would a `CLI_COMMAND` link in `dir` win over the app's GUI executable of the same name when
- * a terminal looks the name up? Only a dir that comes strictly after the GUI's dir on the PATH is
- * safe. A dir that is not on the PATH at all counts as shadowing too: the PATH hint we print puts
- * it in front. With no GUI executable (every platform but deb/rpm) nothing shadows.
+ * `launcher` itself when it already is a link named like the command (the deb/rpm package's
+ * `/usr/bin/uniwork-office-cli`) in a directory on the PATH: the command is ready under its own
+ * name and no second link is made.
  */
-export function shadowsGui(
-  dir: string,
-  guiExecutable: string | undefined,
-  env: NodeJS.ProcessEnv,
-): boolean {
-  if (!guiExecutable) return false
-  const entries = pathEntries(env)
-  const guiAt = entries.indexOf(trimSlash(dirname(guiExecutable)))
-  if (guiAt < 0) return false
-  const at = entries.indexOf(trimSlash(dir))
-  return at < 0 || at <= guiAt
-}
-
-/**
- * deb/rpm when every user-reachable dir would shadow the GUI: the package's own launcher
- * (`/usr/bin/genoffice`) is already on the PATH, so the command is ready under that name and
- * no link is made.
- */
-function packageLauncherOnPath(
-  opts: InstallOptions,
-  env: NodeJS.ProcessEnv,
-): InstallOutcome | undefined {
-  if (!opts.guiExecutable) return undefined
-  if (!pathEntries(env).includes(trimSlash(dirname(opts.launcher)))) return undefined
-  if (!existsSync(opts.launcher)) return undefined
-  return { status: 'present', location: opts.launcher, command: basename(opts.launcher) }
+function packageLinkOnPath(launcher: string, env: NodeJS.ProcessEnv): string | undefined {
+  if (basename(launcher) !== CLI_COMMAND) return undefined
+  if (!pathEntries(env).includes(trimSlash(dirname(launcher)))) return undefined
+  return existsSync(launcher) ? launcher : undefined
 }
 
 function linkState(

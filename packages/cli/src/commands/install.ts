@@ -1,5 +1,5 @@
 import { dirname, join } from 'node:path'
-import { CLI_COMMAND, commandName, installCliLink, linkTarget } from '../install'
+import { CLI_COMMAND, installCliLink, linkTarget } from '../install'
 import type { CommandDef } from '../registry'
 import { packagedResourcesDir, repoRoot } from '../resources'
 import { CliError, EXIT } from '../result'
@@ -21,18 +21,17 @@ export const installCommand: CommandDef = {
     const launcher = launcherPath()
     if (!launcher) throw new CliError(EXIT.app, 'cannot locate the command line launcher')
     const r = installCliLink({ ...linkTarget(launcher) })
-    const command = commandName(r, process.platform)
     const detail = {
       status: r.status,
       launcher,
-      command,
+      command: CLI_COMMAND,
       ...(r.location ? { location: r.location } : {}),
       ...(r.pathHint ? { pathHint: r.pathHint } : {}),
     }
     const onPath = (verb: string) =>
       r.pathHint
-        ? `${command} is ${verb} linked at ${r.location}, but ${dirname(r.location ?? '')} is not on your PATH; add it with: ${r.pathHint}`
-        : `${command} is ${verb} on the PATH (${r.location})`
+        ? `${CLI_COMMAND} is ${verb} linked at ${r.location}, but ${dirname(r.location ?? '')} is not on your PATH; add it with: ${r.pathHint}`
+        : `${CLI_COMMAND} is ${verb} on the PATH (${r.location})`
     switch (r.status) {
       case 'linked':
         return { summary: onPath('now'), detail }

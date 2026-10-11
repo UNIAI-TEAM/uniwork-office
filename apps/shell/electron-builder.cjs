@@ -409,6 +409,16 @@ const config = {
       from: '../../packages/cli/bin/genoffice.cmd',
       to: 'cli/genoffice.cmd',
     },
+    // the command's own name on Windows (the PATH entry is this folder): cmd / PowerShell
+    // and Git Bash shims that hand over to the launchers above
+    {
+      from: '../../packages/cli/bin/uniwork-office-cli.cmd',
+      to: 'cli/uniwork-office-cli.cmd',
+    },
+    {
+      from: '../../packages/cli/bin/uniwork-office-cli',
+      to: 'cli/uniwork-office-cli',
+    },
     // the CLI's version (Settings → Integrations shows it) and the agent skill
     // the same pane installs into Claude Code / Codex / …; bytes identical to the repo file
     {

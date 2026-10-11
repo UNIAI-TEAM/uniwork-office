@@ -2,8 +2,8 @@
 # deb/rpm post-install. electron-builder runs this INSTEAD of its default
 # after-install template (templates/linux/after-install.tpl), so the first part
 # repeats that template's steps; ${executable} and ${sanitizedProductName} are
-# its macros, filled in at packaging time. The last part exposes the genoffice
-# command line shipped inside the app.
+# its macros, filled in at packaging time. The last part exposes the command line
+# (uniwork-office-cli) shipped inside the app.
 
 # The /usr/bin/<executable> launcher link.
 if type update-alternatives >/dev/null 2>&1; then
@@ -49,24 +49,32 @@ if apparmor_status --enabled >/dev/null 2>&1; then
   fi
 fi
 
-# The genoffice command line. Only an absent name, a dead link or a link into
-# our own install dir is taken over; anything else at /usr/bin/genoffice
+# The command line, /usr/bin/uniwork-office-cli. Only an absent name, a dead link
+# or a link into our own install dir is taken over; anything else at that name
 # belongs to another program (genoffice#893). This link is also the stable
-# launcher the app's own per-user "uniwork-office" link points at (never the
-# versioned /opt path): removing the package leaves at most a dead link to a
-# file the package owned, which the app removes at its next launch. The name
-# stays genoffice because /usr/bin/uniwork-office is the app itself.
+# launcher the app's own per-user link points at (never the versioned /opt
+# path): removing the package leaves at most a dead link to a file the package
+# owned, which the app removes at its next launch. The command has its own name
+# because /usr/bin/uniwork-office is the desktop app itself. Earlier packages
+# also linked /usr/bin/genoffice; that name is no longer created, and a leftover
+# link of ours is dropped here (another program's genoffice stays untouched).
 app_dir='/opt/${sanitizedProductName}'
 launcher="$app_dir/resources/cli/genoffice"
-link=/usr/bin/genoffice
+link=/usr/bin/uniwork-office-cli
+old_link=/usr/bin/genoffice
+if [ -L "$old_link" ]; then
+  case "$(readlink "$old_link")" in
+    "$app_dir/"*) rm -f "$old_link" ;;
+  esac
+fi
 [ -x "$launcher" ] || exit 0
 if [ -L "$link" ]; then
   case "$(readlink "$link")" in
     "$app_dir/"*) ;;
-    *) [ -e "$link" ] && { echo "genoffice: $link is another program, left as is; run: ln -s \"$launcher\" \"$link\"" >&2; exit 0; } ;;
+    *) [ -e "$link" ] && { echo "uniwork-office-cli: $link is another program, left as is; run: ln -s \"$launcher\" \"$link\"" >&2; exit 0; } ;;
   esac
 elif [ -e "$link" ]; then
-  echo "genoffice: $link is another program, left as is; run: ln -s \"$launcher\" \"$link\"" >&2
+  echo "uniwork-office-cli: $link is another program, left as is; run: ln -s \"$launcher\" \"$link\"" >&2
   exit 0
 fi
 ln -sfn "$launcher" "$link"

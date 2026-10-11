@@ -16,8 +16,8 @@ export interface McpLaunch {
 const isWindowsPath = (p: string) => p.includes('\\')
 
 /**
- * The app's snippet: the bare command name once it is on the PATH (`cli.command`
- * when the app reports another name, e.g. the package launcher), else the launcher itself.
+ * The app's snippet: the bare command name once it is on the PATH (`cli.command` when the
+ * app reports one), else the launcher itself.
  */
 export function mcpLaunch(cli: {
   status: string

@@ -39,8 +39,8 @@ describe('genoffice launcher file', () => {
 })
 
 describe('the command on the PATH: only on request', () => {
-  // Windows keeps the launcher's own name on the PATH; macOS and Linux get the renamed command
-  const typed = process.platform === 'win32' ? 'genoffice' : 'uniwork-office'
+  // one name on every OS (the desktop program keeps `uniwork-office`)
+  const typed = 'uniwork-office-cli'
   const installCliLink = vi.fn()
   const inspectCliLink = vi.fn()
   const cleanupCliLinks = vi.fn()
@@ -78,11 +78,14 @@ describe('the command on the PATH: only on request', () => {
 
   it('the status read never writes a link either', async () => {
     const { mod } = await load()
-    inspectCliLink.mockReturnValue({ status: 'missing', location: '/usr/local/bin/uniwork-office' })
+    inspectCliLink.mockReturnValue({
+      status: 'missing',
+      location: '/usr/local/bin/uniwork-office-cli',
+    })
     expect(mod.cliLinkStatus()).toEqual({
       state: 'absent',
       command: typed,
-      location: '/usr/local/bin/uniwork-office',
+      location: '/usr/local/bin/uniwork-office-cli',
     })
     expect(installCliLink).not.toHaveBeenCalled()
   })
@@ -91,19 +94,19 @@ describe('the command on the PATH: only on request', () => {
     const { dir, mod } = await load()
     installCliLink.mockReturnValue({
       status: 'linked',
-      location: '/opt/homebrew/bin/uniwork-office',
+      location: '/opt/homebrew/bin/uniwork-office-cli',
     })
     const state = mod.installCliLinkOnRequest(join(dir, 'app-settings.json'))
     expect(installCliLink).toHaveBeenCalledTimes(1)
     expect(state).toEqual({
       state: 'present',
       command: typed,
-      location: '/opt/homebrew/bin/uniwork-office',
+      location: '/opt/homebrew/bin/uniwork-office-cli',
     })
     expect(JSON.parse(readFileSync(join(dir, 'app-settings.json'), 'utf-8')).cliLink).toMatchObject(
       {
         status: 'linked',
-        location: '/opt/homebrew/bin/uniwork-office',
+        location: '/opt/homebrew/bin/uniwork-office-cli',
       },
     )
   })
@@ -111,40 +114,30 @@ describe('the command on the PATH: only on request', () => {
   it('maps blocked outcomes to the manual command', async () => {
     const { mod } = await load()
     expect(
-      mod.toCliLinkState(
-        {
-          status: 'unwritable',
-          location: '/usr/local/bin/uniwork-office',
-          manual: 'sudo ln -s a b',
-        },
-        'linux',
-      ),
+      mod.toCliLinkState({
+        status: 'unwritable',
+        location: '/usr/local/bin/uniwork-office-cli',
+        manual: 'sudo ln -s a b',
+      }),
     ).toEqual({
       state: 'blocked',
-      command: 'uniwork-office',
-      location: '/usr/local/bin/uniwork-office',
+      command: 'uniwork-office-cli',
+      location: '/usr/local/bin/uniwork-office-cli',
       manual: 'sudo ln -s a b',
     })
-    expect(mod.toCliLinkState({ status: 'occupied' }, 'linux').state).toBe('blocked')
-    expect(mod.toCliLinkState({ status: 'unsupported' }, 'linux').state).toBe('unsupported')
+    expect(mod.toCliLinkState({ status: 'occupied' }).state).toBe('blocked')
+    expect(mod.toCliLinkState({ status: 'unsupported' }).state).toBe('unsupported')
   })
 
-  it('names the command a person types: the package launcher on deb/rpm, genoffice on Windows', async () => {
+  it('names the same command on every OS, including Windows and deb/rpm', async () => {
     const { mod } = await load()
-    expect(
-      mod.toCliLinkState(
-        { status: 'present', location: '/usr/bin/genoffice', command: 'genoffice' },
-        'linux',
-      ),
-    ).toEqual({ state: 'present', command: 'genoffice', location: '/usr/bin/genoffice' })
-    expect(mod.toCliLinkState({ status: 'present', location: 'C:\\app\\cli' }, 'win32')).toEqual({
-      state: 'present',
-      command: 'genoffice',
-      location: 'C:\\app\\cli',
-    })
-    expect(mod.toCliLinkState({ status: 'present', location: '/a' }, 'darwin').command).toBe(
-      'uniwork-office',
-    )
+    for (const location of ['/usr/bin/uniwork-office-cli', 'C:\\app\\cli', '/a']) {
+      expect(mod.toCliLinkState({ status: 'present', location })).toEqual({
+        state: 'present',
+        command: 'uniwork-office-cli',
+        location,
+      })
+    }
   })
 })
 

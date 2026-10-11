@@ -3,8 +3,8 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { app } from 'electron'
 import {
+  CLI_COMMAND,
   cleanupCliLinks,
-  commandName,
   inspectCliLink,
   installCliLink,
   linkTarget,
@@ -32,10 +32,10 @@ function launcherPath(): string {
 }
 
 /**
- * What the command's link points at and the GUI name it must not shadow: the package's stable
- * `/usr/bin` launcher on deb/rpm, the shipped launcher everywhere else (see `linkTarget`).
+ * What the command's link points at: the package's stable `/usr/bin/uniwork-office-cli` on
+ * deb/rpm, the shipped launcher everywhere else (see `linkTarget`).
  */
-function linkOptions(): Pick<InstallOptions, 'launcher' | 'guiExecutable'> {
+function linkOptions(): Pick<InstallOptions, 'launcher'> {
   return linkTarget(launcherPath())
 }
 
@@ -73,7 +73,7 @@ export function recordCliLauncher(): void {
 /**
  * Every launch, after the launcher record: housekeeping for what an earlier run left behind.
  * Removes command links this app created (known names, known bin dirs) whose target is gone,
- * repoints ones at an old install, migrates the pre-rename `genoffice` link, and on Linux
+ * repoints ones at an old install, migrates the pre-rename `genoffice` / `uniwork-office` links, and on Linux
  * drops a `uniwork://` handler entry whose desktop file an uninstall removed. It never creates
  * a link the user did not ask for before (a migration only replaces one that already existed)
  * and never touches a link it did not create. From a temporary mount (AppImage, dmg) only
@@ -126,12 +126,9 @@ export function installCliLinkOnRequest(settingsPath: string): CliLinkState {
   }
 }
 
-export function toCliLinkState(
-  outcome: InstallOutcome,
-  platform: NodeJS.Platform = process.platform,
-): CliLinkState {
+export function toCliLinkState(outcome: InstallOutcome): CliLinkState {
   const detail = {
-    command: commandName(outcome, platform),
+    command: CLI_COMMAND,
     ...(outcome.location ? { location: outcome.location } : {}),
     ...(outcome.pathHint ? { pathHint: outcome.pathHint } : {}),
     ...(outcome.manual ? { manual: outcome.manual } : {}),

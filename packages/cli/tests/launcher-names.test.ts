@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { CLI_COMMAND } from '../src/cli-command'
 import { mcpLaunch } from '../src/mcp-launch'
 import { appBinaryForResources } from '../src/resources'
 
@@ -8,6 +9,8 @@ const repo = join(__dirname, '..', '..', '..')
 const builder = readFileSync(join(repo, 'apps', 'shell', 'electron-builder.cjs'), 'utf8')
 const sh = readFileSync(join(__dirname, '..', 'bin', 'genoffice'), 'utf8')
 const cmd = readFileSync(join(__dirname, '..', 'bin', 'genoffice.cmd'), 'utf8')
+const cliSh = readFileSync(join(__dirname, '..', 'bin', 'uniwork-office-cli'), 'utf8')
+const cliCmd = readFileSync(join(__dirname, '..', 'bin', 'uniwork-office-cli.cmd'), 'utf8')
 
 /** `key: 'value'` at the top level (two-space indent) of the electron-builder config. */
 function topLevel(key: string): string {
@@ -65,5 +68,22 @@ describe('CLI launcher binary names', () => {
     expect(mcpLaunch({ status: 'present', launcherDir: 'C:\\X\\resources\\cli' }).command).toBe(
       `C:\\X\\resources\\cli\\..\\..\\${productName}.exe`,
     )
+  })
+})
+
+// Windows has no symlinks to name: the folder on the PATH carries shims named like the command.
+describe('the command-name shims next to the launchers', () => {
+  it('are named after CLI_COMMAND and hand over to the launchers beside them', () => {
+    expect(CLI_COMMAND).toBe('uniwork-office-cli')
+    expect(cliCmd).toContain('call "%~dp0genoffice.cmd" %*')
+    expect(cliCmd).toContain('exit /b %errorlevel%')
+    expect(cliSh).toContain('exec "$here/genoffice" "$@"')
+  })
+
+  it('ship in resources/cli with the launchers', () => {
+    for (const name of [CLI_COMMAND, `${CLI_COMMAND}.cmd`]) {
+      expect(builder).toContain(`from: '../../packages/cli/bin/${name}'`)
+      expect(builder).toContain(`to: 'cli/${name}'`)
+    }
   })
 })
