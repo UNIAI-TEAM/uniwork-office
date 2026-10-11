@@ -103,6 +103,11 @@ version, two installers for one platform, mixed versions and a non-HTTPS base UR
   Applications > **Open** > **Open**, or on macOS 15 and later open it once, then
   **System Settings** > **Privacy & Security** > **Open Anyway**. From a terminal:
   `xattr -dr com.apple.quarantine "/Applications/UniWork Office.app"`.
+  A `.dmg` downloaded in a browser is rejected earlier, with "is damaged and can't be
+  opened. You should move it to the Trash." (quarantine on an unsigned image; right-click
+  Open does not help). Run `xattr -d com.apple.quarantine <path to the .dmg>` and open the
+  image again. The release body (the `--notes` text in `release-installers.yml`) carries this
+  note and the Open Anyway path; keep the two in step with this section.
 - **Linux:** `sudo apt install ./UniWork-Office_<version>_unsigned_linux_x64.deb` (Debian,
   Ubuntu), or `chmod +x` the AppImage and run it (needs FUSE 2, `libfuse2` /
   `libfuse2t64` on Ubuntu). Nothing is signed on Linux, so no prompt appears. The deb

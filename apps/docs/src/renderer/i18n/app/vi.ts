@@ -202,8 +202,6 @@ export const vi = {
   appFootnotePlaceholder: 'Văn bản chú thích cuối trang…',
   appEndnotePlaceholder: 'Văn bản chú thích cuối tài liệu…',
   appAutoSave: 'Tự động lưu',
-  appAutoSaveUniworkTip:
-    'Tự động lưu đã tắt cho tài liệu UniWork. Hãy dùng Lưu để lưu phiên bản mới.',
   appAutoSaveTip: 'Tự động lưu (mỗi 30 giây và khi cửa sổ mất tiêu điểm)',
   appSaveShortcutTip: 'Lưu (⌘S)',
   appUndo: 'Hoàn tác',
@@ -536,4 +534,11 @@ export const vi = {
   appOnlyZotero: 'Trích dẫn Zotero không có ở đây.',
   appOnlyOpenPassword: 'Không thể đặt mật khẩu mở tài liệu ở đây.',
   appOnlyEncrypted: '"{name}" được bảo vệ bằng mật khẩu và không thể mở ở đây.',
+  appFileExportPdf: 'Xuất dưới dạng PDF…',
+  appFilePrint: 'In…',
+  appPrintNoPrinter:
+    'Máy tính này không có máy in. Bạn có thể lưu tài liệu thành tệp PDF thay thế.',
+  appPrintFailedPdfHint:
+    'In không thành công: {error}. Bạn có thể lưu tài liệu thành tệp PDF thay thế.',
+  appPrintSaveAsPdf: 'Lưu thành PDF…',
 } satisfies Record<keyof typeof zh, string>

@@ -531,6 +531,8 @@ export const pt = {
     'A ponte de arquivos do desktop está indisponível. Reinicie o aplicativo Electron.',
   appOpenCanceled: 'Seleção de pasta de trabalho cancelada.',
   appOpeningWorkbook: 'Abrindo pasta de trabalho…',
+  appOpenStalled: 'Não foi possível abrir a pasta de trabalho.',
+  appOpenRetry: 'Tentar novamente',
   appOpened: '{name} aberto — edições de células são salvas de volta com ⌘S.',
   appOpenFailed: 'Não foi possível abrir a pasta de trabalho.',
   appPageSetupNeedsFile:
@@ -1574,6 +1576,4 @@ export const pt = {
     'O motor da pasta de trabalho parou inesperadamente e foi reiniciado. A pasta de trabalho foi reaberta a partir da última versão salva; as alterações não salvas foram mantidas, salve em breve.',
   appWebSavedReopenFailed:
     'Suas alterações foram salvas no UniWork, mas não foi possível reabrir a pasta de trabalho aqui. Recarregue o editor para continuar.',
-  appAutoSaveUniworkOff:
-    'O salvamento automático está desativado para documentos do UniWork. Use Salvar para salvar uma nova versão.',
 } satisfies Record<keyof typeof zh, string>

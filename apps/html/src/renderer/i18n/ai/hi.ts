@@ -175,4 +175,6 @@ export const hi = {
   aiStarterAnnouncementPrompt: 'मेरे लिए उत्पाद घोषणा का मसौदा लिखें। उत्पाद और मुख्य बातें: ',
   aiStarterGuide: 'एक हाउ-टू गाइड लिखें',
   aiStarterGuidePrompt: 'मेरे लिए एक हाउ-टू गाइड लिखें। समझाने वाली प्रक्रिया: ',
+  aiViewOnlyNotice:
+    'केवल-देखने योग्य दस्तावेज़: AI इसे पढ़ सकता है और प्रश्नों के उत्तर दे सकता है, लेकिन संपादित नहीं कर सकता।',
 } satisfies Record<keyof typeof zh, string>

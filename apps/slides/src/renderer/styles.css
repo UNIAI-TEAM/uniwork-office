@@ -2638,6 +2638,13 @@ body.vib .slide-list {
   font-size: 13px;
 }
 
+/* a setup / plan state (no model yet, plan or credits), not a failure */
+.ai-msg-notice {
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 .ai-composer {
   padding: 8px 12px 12px;
   background: var(--surface);

@@ -191,7 +191,6 @@ export const zhTW = {
   appFootnotePlaceholder: '註腳內容…',
   appEndnotePlaceholder: '章節附註內容…',
   appAutoSave: '自動儲存',
-  appAutoSaveUniworkTip: 'UniWork 文件已關閉自動儲存。請使用「儲存」儲存新版本。',
   appAutoSaveTip: '自動儲存(每 30 秒及視窗失去焦點時)',
   appSaveShortcutTip: '儲存 (⌘S)',
   appUndo: '復原',
@@ -521,4 +520,9 @@ export const zhTW = {
   appOnlyZotero: '此處不提供 Zotero 引文。',
   appOnlyOpenPassword: '此處無法設定開啟文件的密碼。',
   appOnlyEncrypted: '「{name}」受密碼保護，無法在此處開啟。',
+  appFileExportPdf: '匯出為 PDF…',
+  appFilePrint: '列印…',
+  appPrintNoPrinter: '這台電腦沒有可用的印表機。可以改為將文件儲存為 PDF。',
+  appPrintFailedPdfHint: '列印沒有成功:{error}。可以改為將文件儲存為 PDF。',
+  appPrintSaveAsPdf: '另存為 PDF…',
 } satisfies Record<keyof typeof zh, string>

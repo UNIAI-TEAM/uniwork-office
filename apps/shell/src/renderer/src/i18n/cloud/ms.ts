@@ -6,6 +6,7 @@ export const ms = {
   cloudStateNotEntitled: 'Tiada dalam pelan anda',
   cloudStateExhausted: 'Kredit AI habis',
   cloudStateUnavailable: 'Tidak tersedia',
+  cloudStateSignedOut: 'Belum log masuk',
   cloudStateInactive: 'Langganan tidak aktif',
   cloudCredits: 'Kredit AI',
   cloudCreditsLeft: 'Baki {remaining} / {limit}',
@@ -31,4 +32,9 @@ export const ms = {
   cloudMediaLabel: 'Awan UniWork',
   cloudMediaDesc: 'Menggunakan kredit AI UniWork organisasi anda; tiada kunci diperlukan.',
   cloudSearchAutoHint: 'Awan UniWork dahulu (menggunakan kredit AI), kemudian carian percuma.',
+  aiTestErrInvalidKey: 'Kunci API tiada atau ditolak',
+  aiTestErrNetwork: 'Tidak dapat bersambung. Semak rangkaian anda',
+  aiTestErrLimit: 'Had pembekal dicapai. Cuba lagi nanti',
+  aiTestErrUnavailable: 'Perkhidmatan tidak memberi respons. Cuba lagi nanti',
+  aiTestErrMisconfigured: 'Tetapan belum lengkap: semak alamat perkhidmatan dan medan akaun',
 } satisfies Record<keyof typeof zh, string>

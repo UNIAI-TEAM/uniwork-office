@@ -14,6 +14,7 @@ import type { CSSProperties, MouseEvent as ReactMouseEvent, SetStateAction } fro
 import { EditorContent, useEditor } from '@tiptap/react'
 import type { Editor } from '@tiptap/core'
 import { handleDocsControl, type ControlRequest } from './control'
+import { useClearStatusOnLangChange } from './status-line'
 import { DOMParser as PmDOMParser, type Mark as PmMark, Slice as PmSlice } from '@tiptap/pm/model'
 import { NodeSelection, TextSelection, type Command, type Transaction } from '@tiptap/pm/state'
 import {
@@ -25,6 +26,11 @@ import {
   useAutoSavePref,
 } from '@genoffice/ui'
 import { wordRangeAtCaret } from './editor/comments'
+import {
+  beginRespellKick,
+  requestRespellKick,
+  spellingEditInFlight,
+} from './editor/respell-kick-gate'
 import { setFieldInstr, toggleAllFieldCodes, type FieldRange } from './editor/field-codes'
 import { linkTarget } from './editor/link-actions'
 import { FieldDialog } from './components/FieldDialog'
@@ -246,6 +252,7 @@ import {
 } from './line-metrics'
 import { saveUntilPersisted } from './save-until-persisted'
 import {
+  autoSaveToggleVisible,
   saveStateLabel,
   setEditorEditable,
   uniworkAllowsSave,
@@ -809,6 +816,13 @@ export function App() {
     null,
   )
   const [status, setStatus] = useState<StatusLine>('')
+  // A key + params line re-translates at render time, so only a ready
+  // (already translated) string goes stale on a UI language switch.
+  const clearStaleStatus = useCallback(
+    () => setStatus((line) => (typeof line === 'string' ? '' : line)),
+    [],
+  )
+  useClearStatusOnLangChange(lang, clearStaleStatus)
   const [zoom, setZoom] = useState(100)
   const scrollContainerRef = useRef<HTMLElement>(null)
   // Word-style dark page (editor/dark-page.ts): the shell's document-page-theme
@@ -1642,15 +1656,22 @@ export function App() {
         // kick used to make the re-enable return silently, so existing typos
         // were never re-marked (one "the toggle worked only once" path).
         // Retry for a few seconds instead of dropping the kick.
-        if (view.composing || respellKickBusy.current) {
+        // a spelling suggestion still landing (Blink round trip + grace) must
+        // not be snapshotted mid-edit: the scrub would restore the old text
+        const editing = spellingEditInFlight()
+        if (view.composing || respellKickBusy.current || editing) {
           spellDiag(
-            `kick deferred composing=${view.composing} busy=${respellKickBusy.current} attempt=${attempts}`,
+            `kick deferred composing=${view.composing} busy=${respellKickBusy.current} editing=${editing} attempt=${attempts}`,
           )
-          if (attempts++ < 8) retryTimer = setTimeout(runKick, 600)
-          else spellDiag('kick gave up after retries')
+          if (attempts++ < 8) {
+            // keep later suggestions held while this kick waits its turn
+            if (respellRequested) requestRespellKick()
+            retryTimer = setTimeout(runKick, 600)
+          } else spellDiag('kick gave up after retries')
           return
         }
         respellKickBusy.current = true
+        const endKick = beginRespellKick()
         spellDiag('kick start')
         const sub = getActiveSubEditor()
         const prev = document.activeElement as HTMLElement | null
@@ -1780,6 +1801,8 @@ export function App() {
               }
               // always drop the pin listener, even on a torn-down round trip
               scroller?.removeEventListener('scroll', pinScroll, true)
+              // a spelling suggestion picked meanwhile applies now, on the scrubbed text
+              endKick()
             }
           })
       }
@@ -6646,6 +6669,8 @@ export function App() {
     onOpen: () => void openFile(),
     onSave: () => void save(false),
     onSaveAs: () => void save(true),
+    onExportPdf: () => void exportPdf(),
+    onPrint: () => void printDoc(),
     onToggleAi: () => setShowAi((v) => !v),
     onSection: (next: SectionSettings) => {
       // layout applies to the cursor's section; the final section's sectPr goes through SaveOptions.section (also drives canvas geometry)
@@ -6847,17 +6872,17 @@ export function App() {
         >
           <IconRedo size={16} />
         </button>
-        {autoSaveToDisk && (
+        {/* product rule: a UniWork document is only written by an explicit Save, so it has no AutoSave switch */}
+        {autoSaveToggleVisible(autoSaveToDisk, uniwork.bound) && (
           <label
-            className={`autosave-toggle ${autoSaveActive ? 'on' : ''}${uniwork.bound ? ' disabled' : ''}`}
-            data-tip={t(uniwork.bound ? 'appAutoSaveUniworkTip' : 'appAutoSaveTip')}
+            className={`autosave-toggle ${autoSaveActive ? 'on' : ''}`}
+            data-tip={t('appAutoSaveTip')}
           >
             <span className="autosave-knob" />
             <span className="autosave-text">{t('appAutoSave')}</span>
             <input
               type="checkbox"
               checked={autoSaveActive}
-              disabled={uniwork.bound}
               onChange={(e) => setAutoSave(e.target.checked)}
             />
           </label>
@@ -7012,6 +7037,7 @@ export function App() {
 .editor-scroll .doc-page.measuring-columns { column-count: auto; width: ${colFlow.colWidthPx + twipsToPx(canvasSection?.marginLeft ?? section?.marginLeft ?? 0) + twipsToPx(canvasSection?.marginRight ?? section?.marginRight ?? 0)}px; }`}</style>
       )}
       <Ribbon
+        aiEditLocked={uniwork.readOnly}
         actionsRef={ribbonActionsRef}
         quickActions={quickActions}
         editor={editor}
@@ -7110,6 +7136,7 @@ export function App() {
               pageSetupAccess={aiPageSetupAccess}
               docExtras={aiDocExtras}
               notesAccess={aiNotesAccess}
+              readOnly={uniwork.readOnly}
             />
           </div>
         )}
@@ -7140,7 +7167,8 @@ export function App() {
                 onClose={closeNav}
               />
             )}
-            {doc && aiEnabled && (
+            {/* the selection popover queues edit instructions: none on a view-only document */}
+            {doc && aiEnabled && !uniwork.readOnly && (
               <AiAskPopover
                 editor={editor}
                 queueFull={editQueue.length >= EDIT_QUEUE_MAX}
@@ -7466,7 +7494,12 @@ export function App() {
                 !docLoading &&
                 (hasUnsavedChanges || doc.filePath) &&
                 (() => {
-                  const saveState = saveStateLabel(hasUnsavedChanges, uniwork.readOnly)
+                  const saveState = saveStateLabel(
+                    hasUnsavedChanges,
+                    uniwork.readOnly,
+                    uniwork.bound,
+                  )
+                  if (!saveState) return null
                   return (
                     <span
                       className={`status-item status-save-state${saveState.unsaved ? ' unsaved' : ''}`}
@@ -7835,7 +7868,9 @@ export function App() {
         />
       )}
 
-      {doc && showPrintDialog && <PrintDialog onClose={closePrintDialog} setStatus={setStatus} />}
+      {doc && showPrintDialog && (
+        <PrintDialog onClose={closePrintDialog} setStatus={setStatus} onSavePdf={exportPdf} />
+      )}
 
       {stats && <WordCountDialog stats={stats} onClose={() => setStats(null)} />}
 

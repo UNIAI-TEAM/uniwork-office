@@ -2,6 +2,7 @@ import {
   aiPanelWidthAtPointer,
   AiPanelSideButton,
   AiModelPicker,
+  useCloudSignedIn,
   type AiModelPickerBridge,
 } from '@genoffice/ui'
 import React, { useEffect, useRef, useState, useCallback } from 'react'
@@ -14,6 +15,8 @@ import {
 } from '@genoffice/agent-core'
 import type { RenderSlide } from '@genoffice/pptx-render'
 import {
+  aiNoticeBody,
+  aiNoticeKind,
   cloudToolsEnabled,
   imageGenerationAvailable,
   mediaAnalysisAvailable,
@@ -300,6 +303,8 @@ interface AiPanelProps {
   onQueueFocus?: (key: string) => void
   /** Drop the items a submission finished with (successful and unrunnable alike) */
   onQueueConsume?: (keys: string[]) => void
+  /** view-only UniWork deck: the agent only gets read-only tools, edit-only composer affordances are gone */
+  readOnly?: boolean
 }
 
 /** Some locales already end the label with an ellipsis — normalize to exactly one. */
@@ -397,6 +402,7 @@ export function AiPanel({
   onQueueClear,
   onQueueFocus,
   onQueueConsume,
+  readOnly = false,
 }: AiPanelProps) {
   const { t, lang } = useI18n()
   // Panel chrome follows the UI language; message text follows its own content (dir=auto below)
@@ -510,6 +516,8 @@ export function AiPanel({
   // The loop instance survives across renders; closures read refs for the latest state
   const slidesRef = useRef(slides)
   slidesRef.current = slides
+  const readOnlyRef = useRef(readOnly)
+  readOnlyRef.current = readOnly
   const currentRef = useRef(current)
   currentRef.current = current
   const selectedRef = useRef(selectedIds)
@@ -528,24 +536,10 @@ export function AiPanel({
   settingsRef.current = settings
 
   /** gsk login state for the cloud-tools gate (refreshed on mount and window focus) */
-  const gskLoggedInRef = useRef(false)
-  useEffect(() => {
-    let alive = true
-    const refresh = () => {
-      void window.slidesApi
-        ?.aiGskStatus()
-        .then((s) => {
-          if (alive) gskLoggedInRef.current = !!s?.loggedIn
-        })
-        .catch(() => {})
-    }
-    refresh()
-    window.addEventListener('focus', refresh)
-    return () => {
-      alive = false
-      window.removeEventListener('focus', refresh)
-    }
-  }, [])
+  const { loggedInRef: gskLoggedInRef } = useCloudSignedIn(
+    () => window.slidesApi?.aiGskStatus(),
+    open,
+  )
   const imagesRef = useRef(images)
   imagesRef.current = images
   const attachmentsRef = useRef(attachments)
@@ -929,6 +923,7 @@ export function AiPanel({
     }
 
     const access: DeckAccess = {
+      readOnly: () => readOnlyRef.current,
       getSlides: () => slidesRef.current,
       getCurrent: () => currentRef.current,
       // A queue run names its targets explicitly; whatever is selected on the
@@ -2162,7 +2157,7 @@ export function AiPanel({
               <br />
               {t(deckEmpty ? 'aiEmptyGenBody2' : 'aiEmptyBody2')}
             </div>
-            {deckEmpty ? (
+            {deckEmpty && !readOnly ? (
               <div className="ai-tpl-gallery" role="list" aria-label={t('aiTplGalleryTitle')}>
                 <div className="ai-tpl-gallery-head">{t('aiTplGalleryTitle')}</div>
                 <div className="ai-tpl-gallery-hint">{t('aiTplGalleryHint')}</div>
@@ -2197,8 +2192,9 @@ export function AiPanel({
                 ) : null}
               </div>
             ) : null}
+            {/* the starters all edit or generate slides: a view-only deck offers none */}
             <div className="ai-starter-list">
-              {starterPrompts(t, deckEmpty ?? false).map((p) => (
+              {(readOnly ? [] : starterPrompts(t, deckEmpty ?? false)).map((p) => (
                 <button
                   key={p}
                   className="ai-starter"
@@ -2258,11 +2254,17 @@ export function AiPanel({
                 <span dir="auto">{entry.text}</span>
               )}
               {entry.tools && entry.tools.length > 0 && <ToolChipList tools={entry.tools} />}
-              {entry.error && (
-                <div className="ai-msg-error">
-                  {cap('errorLabel') ? t('aiMsgError', { error: entry.error }) : entry.error}
-                </div>
-              )}
+              {entry.error &&
+                (aiNoticeKind(entry.error) ? (
+                  // "nothing to chat with" is a setup / plan state: a plain notice, not a red error
+                  <div className="ai-msg-notice" role="status">
+                    {aiNoticeBody(entry.error)}
+                  </div>
+                ) : (
+                  <div className="ai-msg-error">
+                    {cap('errorLabel') ? t('aiMsgError', { error: entry.error }) : entry.error}
+                  </div>
+                ))}
               {entry.deckProgress && <DeckProgressCard progress={entry.deckProgress} />}
               {showToolbar && (
                 <div className="ai-msg-toolbar">
@@ -2380,7 +2382,12 @@ export function AiPanel({
         </div>
       ) : (
         <div className="ai-composer">
-          {editQueue && editQueue.length > 0 && (
+          {readOnly && (
+            <div className="ai-attach-notice" role="note">
+              {t('aiViewOnlyNotice')}
+            </div>
+          )}
+          {!readOnly && editQueue && editQueue.length > 0 && (
             <EditQueueCard
               items={editQueue}
               slides={slides}
@@ -2461,9 +2468,9 @@ export function AiPanel({
               data-slides-ai-input="true"
               data-deck-undo-ready={!busy && !inputEditedSinceRunRef.current ? 'true' : 'false'}
               placeholder={t(
-                deckEmpty && galleryTemplateId
+                !readOnly && deckEmpty && galleryTemplateId
                   ? 'aiTplTopicPlaceholder'
-                  : deckEmpty
+                  : !readOnly && deckEmpty
                     ? 'aiInputPlaceholderGen'
                     : 'aiInputPlaceholder',
               )}

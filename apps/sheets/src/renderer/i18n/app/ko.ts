@@ -504,6 +504,8 @@ export const ko = {
     '데스크톱 파일 브리지를 사용할 수 없습니다. Electron 앱을 다시 시작하십시오.',
   appOpenCanceled: '통합 문서 선택을 취소했습니다.',
   appOpeningWorkbook: '통합 문서를 여는 중…',
+  appOpenStalled: '통합 문서를 열 수 없습니다.',
+  appOpenRetry: '다시 시도',
   appOpened: '{name}을(를) 열었습니다 — 셀 편집은 ⌘S로 파일에 저장합니다.',
   appOpenFailed: '통합 문서를 열 수 없습니다.',
   appPageSetupNeedsFile: '먼저 XLSX 파일을 여십시오. 페이지 설정은 파일에 저장됩니다.',
@@ -1552,6 +1554,4 @@ export const ko = {
     '통합 문서 엔진이 예기치 않게 중지되어 다시 시작되었습니다. 통합 문서를 마지막으로 저장한 버전에서 다시 열었습니다. 저장하지 않은 변경 내용은 유지되므로 곧 저장하세요.',
   appWebSavedReopenFailed:
     '변경 사항은 UniWork에 저장되었지만 여기서 통합 문서를 다시 열 수 없습니다. 편집기를 새로 고쳐 계속 작업하세요.',
-  appAutoSaveUniworkOff:
-    'UniWork 문서에서는 자동 저장이 꺼져 있습니다. 새 버전을 저장하려면 ‘저장’을 사용하세요.',
 } satisfies Record<keyof typeof zh, string>

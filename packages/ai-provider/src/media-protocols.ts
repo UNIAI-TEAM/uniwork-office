@@ -12,6 +12,12 @@
 import { aiFetch } from './fetch'
 import { endpointUrl } from './protocols/shared'
 import { httpBodyDetail } from './http-error'
+import {
+  aiTestFailure,
+  aiTestFailureKindForStatus,
+  aiTestFailureKindForText,
+  type AiTestResult,
+} from './ai-test-failure'
 import { openAiContentText, readCappedResponseText } from './protocols/shared'
 import {
   DASHSCOPE_BASE_URL,
@@ -696,10 +702,15 @@ function modelOf(
   return model
 }
 
+function baseUrlMissing(meta: AiMediaProviderMeta, config: AiMediaProviderConfig): string | null {
+  return meta.needsBaseUrl && !config.baseUrl
+    ? `The ${meta.label} media provider requires a Base URL`
+    : null
+}
+
 function requireBaseUrl(meta: AiMediaProviderMeta, config: AiMediaProviderConfig): void {
-  if (meta.needsBaseUrl && !config.baseUrl) {
-    throw new Error(`The ${meta.label} media provider requires a Base URL`)
-  }
+  const missing = baseUrlMissing(meta, config)
+  if (missing) throw new Error(missing)
 }
 
 export async function generateImageWithProvider(
@@ -747,16 +758,18 @@ export async function analyzeMediaWithProvider(
  * without a model-listing endpoint answer 404/405 even for a valid key, so
  * only those two statuses count as a pass when the response is not ok.
  * Every other non-ok status (auth failures, rate limits, server errors)
- * is surfaced as a failure with the status code included.
+ * is a failure: `error` keeps the status and detail for the log, `errorKind`
+ * is what the settings UI shows in the user's language.
  */
 export async function testMediaProvider(
   provider: ByokMediaProviderId,
   config: AiMediaProviderConfig,
   signal?: AbortSignal,
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<AiTestResult> {
   try {
     const meta = metaOf(provider)
-    requireBaseUrl(meta, config)
+    const missing = baseUrlMissing(meta, config)
+    if (missing) return aiTestFailure('misconfigured', missing)
     const guard = withTimeout(signal, TEST_TIMEOUT_MS)
     const resp =
       provider === 'gemini'
@@ -777,20 +790,26 @@ export async function testMediaProvider(
       onOverflow: 'truncate',
     })
     const detail = httpBodyDetail(body)
+    const kind = aiTestFailureKindForStatus(resp.status)
     if (resp.status === 429) {
-      return {
-        ok: false,
-        error: `HTTP 429: rate limit exceeded, retry later${detail ? ` (${detail})` : ''}`,
-      }
+      return aiTestFailure(
+        kind,
+        `HTTP 429: rate limit exceeded, retry later${detail ? ` (${detail})` : ''}`,
+      )
     }
     if (resp.status >= 500) {
-      return {
-        ok: false,
-        error: `HTTP ${resp.status}: server error, retry later${detail ? ` (${detail})` : ''}`,
-      }
+      return aiTestFailure(
+        kind,
+        `HTTP ${resp.status}: server error, retry later${detail ? ` (${detail})` : ''}`,
+      )
     }
-    return { ok: false, error: `HTTP ${resp.status}: ${detail}` }
+    return aiTestFailure(kind, `HTTP ${resp.status}: ${detail}`)
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : String(e) }
+    // a Base URL that does not parse is a settings problem, not a network one
+    const badUrl = (e as { code?: unknown } | null)?.code === 'ERR_INVALID_URL'
+    return aiTestFailure(
+      badUrl ? 'misconfigured' : aiTestFailureKindForText('', e),
+      e instanceof Error ? e.message : String(e),
+    )
   }
 }

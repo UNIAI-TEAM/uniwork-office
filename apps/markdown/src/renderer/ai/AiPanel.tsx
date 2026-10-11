@@ -2,12 +2,18 @@ import {
   aiPanelWidthAtPointer,
   AiPanelSideButton,
   AiModelPicker,
+  useCloudSignedIn,
   type AiModelPickerBridge,
 } from '@genoffice/ui'
 import { useEffect, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent, ReactElement, ReactNode } from 'react'
 import { AgentLoop, composeSkills, streamText } from '@genoffice/agent-core'
-import { imageGenerationAvailable, type AiSettings } from '@genoffice/ai-provider/browser'
+import {
+  aiNoticeBody,
+  aiNoticeKind,
+  imageGenerationAvailable,
+  type AiSettings,
+} from '@genoffice/ai-provider/browser'
 import {
   AiComposer,
   AiScopeQuote,
@@ -159,6 +165,8 @@ export function AiPanel({
   onQueueClear,
   onQueueFocus,
   onQueueConsume,
+  readOnly = false,
+  open,
 }: {
   deps: MarkdownAiDeps
   filePath: string | null
@@ -171,8 +179,14 @@ export function AiPanel({
   onQueueClear?: () => void
   onQueueFocus?: (qid: string) => void
   onQueueConsume?: (qids: string[]) => void
+  /** a view-only UniWork document: the assistant reads and answers, it never edits */
+  readOnly?: boolean
+  /** false while the dock is collapsed (the panel stays mounted); reopening re-reads the cloud plan */
+  open?: boolean
 }): ReactElement {
   const { lang, t } = useI18n()
+  const readOnlyRef = useRef(readOnly)
+  readOnlyRef.current = readOnly
   const [chat, setChat] = useState<ChatEntry[]>([])
   /** a streamed write stopped early: the draft stays in the document until the user keeps or discards it */
   const [activePartial, setActivePartial] = useState<{ blocks: number } | null>(null)
@@ -206,24 +220,10 @@ export function AiPanel({
 
   const settingsRef = useRef<AiSettings | null>(null)
   /** UniWork cloud sign-in state (signed in + entitled, from the shell main status) for the media tool gates */
-  const gskLoggedInRef = useRef(false)
-  useEffect(() => {
-    let alive = true
-    const refresh = () => {
-      void window.markdownApi
-        .aiGskStatus?.()
-        .then((s) => {
-          if (alive) gskLoggedInRef.current = !!s?.loggedIn
-        })
-        .catch(() => {})
-    }
-    refresh()
-    window.addEventListener('focus', refresh)
-    return () => {
-      alive = false
-      window.removeEventListener('focus', refresh)
-    }
-  }, [])
+  const { loggedInRef: gskLoggedInRef } = useCloudSignedIn(
+    () => window.markdownApi.aiGskStatus?.(),
+    open,
+  )
   const langRef = useRef(lang)
   langRef.current = lang
   const depsRef = useRef(deps)
@@ -388,6 +388,7 @@ export function AiPanel({
           () => ({
             write: (spec, onProgress, signal) => runDocWriterRef.current(spec, onProgress, signal),
           }),
+          () => readOnlyRef.current,
         ),
         createSearchSkill(),
       ]),
@@ -889,7 +890,7 @@ export function AiPanel({
           return (
             <div
               key={i}
-              className={`ai-msg ai-msg-assistant${entry.isError ? ' ai-msg-error' : ''}${entry.streaming ? ' ai-msg-streaming' : ''}`}
+              className={`ai-msg ai-msg-assistant${entry.isError && !aiNoticeKind(entry.text) ? ' ai-msg-error' : ''}${entry.streaming ? ' ai-msg-streaming' : ''}`}
             >
               {!entry.text && entry.streaming ? (
                 <span className="ai-typing-row">
@@ -898,7 +899,7 @@ export function AiPanel({
               ) : (
                 entry.text && (
                   <div dir="auto">
-                    <Markdown text={entry.text} nav={docNav} />
+                    <Markdown text={aiNoticeBody(entry.text)} nav={docNav} />
                   </div>
                 )
               )}
@@ -984,6 +985,11 @@ export function AiPanel({
       )}
 
       <div className="ai-composer">
+        {readOnly && (
+          <div className="ai-readonly-notice" role="note">
+            {t('aiViewOnlyNotice')}
+          </div>
+        )}
         {activePartial && (
           <div className="ai-queue ai-partial-card" role="group" aria-label={t('aiPartialTitle')}>
             <div className="ai-queue-head">
@@ -1006,7 +1012,7 @@ export function AiPanel({
             </div>
           </div>
         )}
-        {editor && editQueue.length > 0 && (
+        {editor && !readOnly && editQueue.length > 0 && (
           <EditQueueCard
             items={editQueue}
             editor={editor}

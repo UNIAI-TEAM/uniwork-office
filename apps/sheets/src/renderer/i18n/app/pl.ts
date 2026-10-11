@@ -518,6 +518,8 @@ export const pl = {
     'Most plików aplikacji desktopowej jest niedostępny. Uruchom ponownie aplikację Electron.',
   appOpenCanceled: 'Anulowano wybór skoroszytu.',
   appOpeningWorkbook: 'Otwieranie skoroszytu…',
+  appOpenStalled: 'Nie udało się otworzyć skoroszytu.',
+  appOpenRetry: 'Ponów',
   appOpened: 'Otwarto {name} — zmiany w komórkach zapisujesz z powrotem za pomocą ⌘S.',
   appOpenFailed: 'Nie można otworzyć skoroszytu.',
   appPageSetupNeedsFile: 'Najpierw otwórz plik XLSX — ustawienia strony są zapisywane w pliku.',
@@ -1558,6 +1560,4 @@ export const pl = {
     'Silnik skoroszytu nieoczekiwanie się zatrzymał i został uruchomiony ponownie. Skoroszyt otwarto ponownie z ostatnio zapisanej wersji; niezapisane zmiany zostały zachowane — zapisz je wkrótce.',
   appWebSavedReopenFailed:
     'Twoje zmiany zapisano w UniWork, ale nie udało się ponownie otworzyć skoroszytu tutaj. Załaduj edytor ponownie, aby kontynuować.',
-  appAutoSaveUniworkOff:
-    'Autozapis jest wyłączony dla dokumentów UniWork. Użyj opcji Zapisz, aby zapisać nową wersję.',
 } satisfies Record<keyof typeof zh, string>

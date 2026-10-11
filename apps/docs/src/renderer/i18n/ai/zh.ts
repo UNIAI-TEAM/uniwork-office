@@ -7,7 +7,7 @@ export const zh = {
   aiStarterPolishAll: '润色全文,使语气更专业',
   aiStarterContinue: '接着现有内容往下写',
   aiStarterFillTemplate: '找出并填写文档里的占位符',
-  aiBuyPlanBtn: '购买 AI 套餐',
+  aiOpenSettingsBtn: '打开 AI 设置',
   aiPanelTitle: 'uniAI',
   aiOpenAssistant: '打开 AI 助手',
   aiSummarizeBtn: 'AI 总结',
@@ -172,4 +172,5 @@ export const zh = {
   aiCmdImages: '已更新 {count} 张图片',
   aiCmdToc: '已插入目录({count} 个条目)',
   aiCmdSkipped: '(跳过 {count} 个受保护块)',
+  aiViewOnlyNotice: '仅查看文档:AI 可以阅读并回答问题,但无法编辑。',
 }

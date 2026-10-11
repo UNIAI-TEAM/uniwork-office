@@ -11,6 +11,7 @@ import {
 import type { AiFontSize, AiPanelPrefs, AiPanelSide } from '@genoffice/ui'
 import type {
   DecisionEndpoint,
+  CliLinkState,
   DefaultAppStatus,
   FileSearchSettings,
   LegalDoc,
@@ -40,6 +41,8 @@ import type { AiCatalogEntry, DocTheme, UiTheme } from '../../shared/home-api'
 import appIcon from './assets/app-icon.png'
 import legal from '../../shared/legal.json'
 import { ProviderLogo } from './provider-logos'
+import { connectionTestResult, runConnectionTests, testFailureText } from './ai-connection-test'
+import type { BlockCheck, TestedBlock, TestResult } from './ai-connection-test'
 import { AccountPane } from './AccountPane'
 import type { AccountController } from './account-model'
 import { BackupStoragePane } from './BackupStoragePane'
@@ -556,7 +559,7 @@ function AiModelPane({ t, cloud }: { t: TFunc; cloud: UniworkCloudStatus | null 
       .testAiSettings?.(settings)
       .then((r) => {
         if (seq !== testSeqRef.current) return
-        setTestResult(r ?? { ok: false })
+        setTestResult(connectionTestResult(r ?? { ok: false }, t))
         if (r?.ok && isCodex) {
           void refreshCodexModels(config.cliPath ?? '', config.model).catch(() => undefined)
         }
@@ -564,9 +567,9 @@ function AiModelPane({ t, cloud }: { t: TFunc; cloud: UniworkCloudStatus | null 
           void checkOpenRouterHub(config.apiKey)
         }
       })
-      .catch((error) => {
+      .catch(() => {
         if (seq !== testSeqRef.current) return
-        setTestResult({ ok: false, error: error instanceof Error ? error.message : String(error) })
+        setTestResult({ ok: false, error: testFailureText('failed', t) })
       })
       .finally(() => {
         if (seq === testSeqRef.current) setTesting(false)
@@ -836,14 +839,11 @@ function AiModelPane({ t, cloud }: { t: TFunc; cloud: UniworkCloudStatus | null 
 }
 
 type Capability = 'image' | 'analysis' | 'video' | 'search'
-/** a tested block: the four capabilities plus the decision-model reranker of the local file search */
-type TestedBlock = Capability | 'rerank'
 /** where an outside entry point (e.g. the home list's rerank button) lands when it opens the modal */
 export interface SettingsTarget {
   section: SectionId
   block?: TestedBlock
 }
-type TestResult = { ok: boolean; error?: string }
 
 /** Jev routes first (OpenRouter is the default), then the other decision-model servers */
 const DECISION_ENDPOINTS: { value: DecisionEndpoint; label: string }[] = [
@@ -926,6 +926,9 @@ function AiMediaPane({
     void window.aiOffice.getFileSearchSettings?.().then((v) => {
       if (alive && v) setFileSearchState(v)
     })
+    // the plan notice follows the entitlement: opening the pane re-reads it (the main process
+    // pushes the answer to the status the notice draws), not only opening Settings
+    void window.aiOffice.uniworkCloudRefresh?.().catch(() => undefined)
     // this pane saves the whole file too: follow chip switches while clean
     const off = window.aiOffice.onAiSettingsChanged?.(() => {
       if (!dirtyRef.current) load()
@@ -1001,51 +1004,29 @@ function AiMediaPane({
     const seq = ++testSeqRef.current
     setTesting(true)
     setTestResults(null)
-    const results: Partial<Record<TestedBlock, TestResult>> = {}
-    const fallback: TestResult = { ok: true }
-    const vendorChecks = new Map<AiMediaProviderId, Promise<TestResult>>()
-    const vendorCheck = (id: AiMediaProviderId) => {
-      let pending = vendorChecks.get(id)
-      if (!pending) {
-        pending =
-          window.aiOffice.testAiMediaSettings?.({ provider: id, config: mediaConfigOf(id) }) ??
-          Promise.resolve(fallback)
-        vendorChecks.set(id, pending)
-      }
-      return pending
-    }
-    const blocks: [TestedBlock, () => Promise<TestResult>][] = [
-      [
-        'search',
-        () =>
-          window.aiOffice.testAiSearchSettings?.({
+    // a block on the cloud reads the status from the server (not the local sign-in flag), so
+    // the verdict names a plan, credits or availability problem instead of passing silently
+    const checks: BlockCheck[] = [
+      search.provider === 'auto' && cloudToolsOn
+        ? { block: 'search', kind: 'cloud' }
+        : {
+            block: 'search',
+            kind: 'search',
             provider: search.provider,
             apiKey:
               search.provider === 'auto' ? '' : (search.providers[search.provider]?.apiKey ?? ''),
-          }) ?? Promise.resolve(fallback),
-      ],
-      ['image', () => vendorCheck(mediaProviderOf('image'))],
-      ['analysis', () => vendorCheck(mediaProviderOf('analysis'))],
-      ['video', () => vendorCheck(mediaProviderOf('video'))],
+          },
     ]
-    if (fileSearch?.rerank) {
-      blocks.push([
-        'rerank',
-        () => window.aiOffice.testFileSearchRerank?.(fileSearch) ?? Promise.resolve(fallback),
-      ])
+    for (const block of ['image', 'analysis', 'video'] as const) {
+      const provider = mediaProviderOf(block)
+      checks.push(
+        provider === 'genspark'
+          ? { block, kind: 'cloud' }
+          : { block, kind: 'media', provider, config: mediaConfigOf(provider) },
+      )
     }
-    await Promise.all(
-      blocks.map(async ([block, run]) => {
-        try {
-          results[block] = await run()
-        } catch (error) {
-          results[block] = {
-            ok: false,
-            error: error instanceof Error ? error.message : String(error),
-          }
-        }
-      }),
-    )
+    if (fileSearch?.rerank) checks.push({ block: 'rerank', kind: 'rerank', settings: fileSearch })
+    const results = await runConnectionTests(checks, window.aiOffice, t)
     if (seq !== testSeqRef.current) return
     setTestResults(results)
     setTesting(false)
@@ -1532,6 +1513,8 @@ export function SettingsModal({
   const [defaultApp, setDefaultApp] = useState<DefaultAppStatus | null>(null)
   const [defaultAppBusy, setDefaultAppBusy] = useState(false)
   const [defaultAppFailed, setDefaultAppFailed] = useState(false)
+  const [cliLink, setCliLink] = useState<CliLinkState | null>(null)
+  const [cliLinkBusy, setCliLinkBusy] = useState(false)
   const [aiPrefs, setAiPrefs] = useState<AiPanelPrefs>(DEFAULT_AI_PANEL_PREFS)
   const [channel, setChannel] = useState<'stable' | 'beta'>('stable')
   const [appVersion, setAppVersion] = useState('')
@@ -1570,6 +1553,9 @@ export function SettingsModal({
     })
     void window.aiOffice.getDefaultAppStatus?.().then((st) => {
       if (alive) setDefaultApp(st)
+    })
+    void window.aiOffice.getCliLinkStatus?.().then((st) => {
+      if (alive) setCliLink(st)
     })
     void window.aiOffice.getAiPanelPrefs?.().then((prefs) => {
       if (alive) setAiPrefs(prefs)
@@ -1653,6 +1639,24 @@ export function SettingsModal({
       .catch(() => setDefaultAppFailed(true))
       .finally(() => setDefaultAppBusy(false))
   }
+
+  // the `genoffice` PATH command is never set up behind the user's back: only this button does it
+  const addCliLink = () => {
+    setCliLinkBusy(true)
+    void window.aiOffice
+      .installCliLink()
+      .then(setCliLink)
+      .catch(() => undefined)
+      .finally(() => setCliLinkBusy(false))
+  }
+
+  const cliLinkDesc = (() => {
+    if (!cliLink) return ''
+    if (cliLink.state === 'present') return t('setCliLinkReady')
+    if (cliLink.state === 'blocked' && cliLink.manual)
+      return t('setCliLinkBlocked', { cmd: cliLink.manual })
+    return t('setCliLinkDesc')
+  })()
 
   const defaultAppDesc = (() => {
     if (!defaultApp) return ''
@@ -1886,6 +1890,26 @@ export function SettingsModal({
                     </button>
                   </div>
                 )}
+                {cliLink && cliLink.state !== 'unsupported' && (
+                  <div className="set-field">
+                    <div className="set-field-text">
+                      <div className="set-field-stack">
+                        <div className="set-field-label">{t('setCliLink')}</div>
+                        <div className="set-field-desc">{cliLinkDesc}</div>
+                        {cliLink.state === 'present' && cliLink.pathHint && (
+                          <code className="set-field-desc">{cliLink.pathHint}</code>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      className="set-btn"
+                      disabled={cliLinkBusy || cliLink.state === 'present'}
+                      onClick={addCliLink}
+                    >
+                      {t('setCliLinkInstall')}
+                    </button>
+                  </div>
+                )}
                 <Field
                   label={t('saveLocation')}
                   value={saveDir || '—'}
@@ -1901,6 +1925,7 @@ export function SettingsModal({
                     <div className="set-field-stack">
                       <div className="set-field-label">{t('setAutoSave')}</div>
                       <div className="set-field-desc">{t('setAutoSaveDesc')}</div>
+                      <div className="set-field-desc">{t('setAutoSaveUniworkNote')}</div>
                     </div>
                   </div>
                   <button

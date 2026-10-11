@@ -8,7 +8,7 @@ export const ja = {
   aiStarterPolishAll: '全文を推敲してよりプロフェッショナルな文体に',
   aiStarterContinue: '今の内容の続きを書いて',
   aiStarterFillTemplate: '文書内のプレースホルダーを見つけて埋めて',
-  aiBuyPlanBtn: 'AIプランを購入',
+  aiOpenSettingsBtn: 'AI 設定を開く',
   aiPanelTitle: 'uniAI',
   aiOpenAssistant: 'AI アシスタントを開く',
   aiSummarizeBtn: 'AI 要約',
@@ -183,4 +183,6 @@ export const ja = {
   aiCmdImages: '{count} 枚の画像を更新しました',
   aiCmdToc: '目次を挿入しました({count} 項目)',
   aiCmdSkipped: '({count} 個の保護されたブロックをスキップ)',
+  aiViewOnlyNotice:
+    '閲覧専用のドキュメント: AI は内容の読み取りと質問への回答はできますが、編集はできません。',
 } satisfies Record<keyof typeof zh, string>

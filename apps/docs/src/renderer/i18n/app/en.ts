@@ -199,7 +199,6 @@ export const en = {
   appFootnotePlaceholder: 'Footnote text…',
   appEndnotePlaceholder: 'Endnote text…',
   appAutoSave: 'AutoSave',
-  appAutoSaveUniworkTip: 'AutoSave is off for UniWork documents. Use Save to save a new version.',
   appAutoSaveTip: 'AutoSave (every 30 seconds and when the window loses focus)',
   appSaveShortcutTip: 'Save (⌘S)',
   appUndo: 'Undo',
@@ -532,4 +531,11 @@ export const en = {
   appOnlyZotero: 'Zotero citations are not available here.',
   appOnlyOpenPassword: 'A password to open the document cannot be set here.',
   appOnlyEncrypted: '"{name}" is password protected and cannot be opened here.',
+  appFileExportPdf: 'Export as PDF…',
+  appFilePrint: 'Print…',
+  appPrintNoPrinter:
+    'No printer is available on this computer. You can save the document as a PDF instead.',
+  appPrintFailedPdfHint:
+    'Printing did not work: {error}. You can save the document as a PDF instead.',
+  appPrintSaveAsPdf: 'Save as PDF…',
 } satisfies Record<keyof typeof zh, string>

@@ -89,4 +89,7 @@ export const vi = {
 
   uwRecentBadge: 'UniWork',
   uwRecentBadgeTip: 'Tài liệu lưu trong UniWork',
+
+  setCliLinkReady: 'Công cụ dòng lệnh đã sẵn sàng.',
+  setAutoSaveUniworkNote: 'Không áp dụng cho tài liệu UniWork.',
 } satisfies Record<keyof typeof zh, string>

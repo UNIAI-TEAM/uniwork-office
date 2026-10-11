@@ -8,7 +8,7 @@ export const ko = {
   aiStarterPolishAll: '전체 문서를 더 전문적인 어조로 다듬어 줘',
   aiStarterContinue: '지금 내용에 이어서 계속 써 줘',
   aiStarterFillTemplate: '문서의 자리 표시자를 찾아 채워 줘',
-  aiBuyPlanBtn: 'AI 요금제 구매',
+  aiOpenSettingsBtn: 'AI 설정 열기',
   aiPanelTitle: 'uniAI',
   aiOpenAssistant: 'AI 도우미 열기',
   aiSummarizeBtn: 'AI 요약',
@@ -179,4 +179,5 @@ export const ko = {
   aiCmdImages: '이미지 {count}장을 업데이트했습니다',
   aiCmdToc: '목차를 삽입했습니다({count}개 항목)',
   aiCmdSkipped: ' (보호된 블록 {count}개 건너뜀)',
+  aiViewOnlyNotice: '보기 전용 문서: AI는 내용을 읽고 질문에 답할 수 있지만 편집할 수는 없습니다.',
 } satisfies Record<keyof typeof zh, string>

@@ -445,6 +445,8 @@ export const zh = {
   appBridgeUnavailable: '桌面文件桥不可用。请重启 Electron 应用。',
   appOpenCanceled: '已取消选择工作簿。',
   appOpeningWorkbook: '正在打开工作簿…',
+  appOpenStalled: '工作簿未能打开。',
+  appOpenRetry: '重试',
   appOpened: '已打开 {name}——单元格编辑用 ⌘S 保存回文件。',
   appOpenFailed: '无法打开工作簿。',
   appPageSetupNeedsFile: '请先打开 XLSX 文件——页面设置会保存进文件。',
@@ -1465,5 +1467,4 @@ export const zh = {
     '工作簿引擎意外停止并已重新启动。工作簿已从上次保存的版本重新打开；您未保存的更改仍然保留，请尽快保存。',
   appWebSavedReopenFailed:
     '您的更改已保存到 UniWork，但此处无法重新打开工作簿。请重新加载编辑器后继续。',
-  appAutoSaveUniworkOff: 'UniWork 文档已关闭自动保存。请使用“保存”保存新版本。',
 }

@@ -176,4 +176,6 @@ export const ja = {
   aiStarterAnnouncementPrompt: '製品のお知らせを起草してください。製品と要点：',
   aiStarterGuide: '手順ガイドを書く',
   aiStarterGuidePrompt: '手順ガイドを書いてください。説明する手順：',
+  aiViewOnlyNotice:
+    '閲覧専用のドキュメント: AI は内容の読み取りと質問への回答はできますが、編集はできません。',
 } satisfies Record<keyof typeof zh, string>

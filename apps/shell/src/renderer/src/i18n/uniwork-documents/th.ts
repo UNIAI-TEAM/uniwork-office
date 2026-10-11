@@ -93,4 +93,7 @@ export const th = {
 
   uwRecentBadge: 'UniWork',
   uwRecentBadgeTip: 'เอกสารที่จัดเก็บใน UniWork',
+
+  setCliLinkReady: 'ใช้เครื่องมือบรรทัดคำสั่งได้แล้ว',
+  setAutoSaveUniworkNote: 'ไม่มีผลกับเอกสาร UniWork',
 } satisfies Record<keyof typeof zh, string>

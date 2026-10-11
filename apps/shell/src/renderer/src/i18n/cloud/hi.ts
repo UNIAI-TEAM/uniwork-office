@@ -6,6 +6,7 @@ export const hi = {
   cloudStateNotEntitled: 'आपके प्लान में शामिल नहीं',
   cloudStateExhausted: 'AI क्रेडिट खत्म',
   cloudStateUnavailable: 'अभी उपलब्ध नहीं',
+  cloudStateSignedOut: 'साइन इन नहीं है',
   cloudStateInactive: 'सदस्यता सक्रिय नहीं है',
   cloudCredits: 'AI क्रेडिट',
   cloudCreditsLeft: '{remaining} / {limit} शेष',
@@ -30,4 +31,9 @@ export const hi = {
   cloudMediaLabel: 'UniWork क्लाउड',
   cloudMediaDesc: 'आपके संगठन के UniWork AI क्रेडिट इस्तेमाल करता है; कुंजी की ज़रूरत नहीं।',
   cloudSearchAutoHint: 'पहले UniWork क्लाउड (AI क्रेडिट खर्च), फिर मुफ़्त सर्च।',
+  aiTestErrInvalidKey: 'API कुंजी नहीं है या अस्वीकार हुई',
+  aiTestErrNetwork: 'कनेक्ट नहीं हो सका। अपना नेटवर्क जाँचें',
+  aiTestErrLimit: 'प्रदाता की सीमा पूरी हो गई। बाद में फिर कोशिश करें',
+  aiTestErrUnavailable: 'सेवा जवाब नहीं दे रही। बाद में फिर कोशिश करें',
+  aiTestErrMisconfigured: 'सेटिंग अधूरी हैं: सेवा का पता और खाते के फ़ील्ड जाँचें',
 } satisfies Record<keyof typeof zh, string>

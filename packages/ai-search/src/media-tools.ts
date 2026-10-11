@@ -14,6 +14,7 @@ import {
   activeMediaConfig,
   analyzeMediaWithProvider,
   cloudToolsEnabled,
+  refreshUniworkCloudStatusIfNotReady,
   defaultAiSettings,
   generateImageWithProvider,
   resolveAiSettings,
@@ -326,6 +327,8 @@ export async function generateImageTool(
   const byok = activeMediaConfig(settings, 'image')
   try {
     if (!byok) {
+      // the snapshot may predate a plan change: re-read before saying the cloud is off
+      await refreshUniworkCloudStatusIfNotReady()
       if (!cloudToolsEnabled(settings) || !hasGskAuth('image_generate')) {
         return { error: options.notLoggedInError ?? MEDIA_NOT_CONFIGURED_ERROR }
       }
@@ -375,6 +378,7 @@ export async function analyzeMediaTool(
   const videoByok = activeMediaConfig(settings, 'video')
   try {
     const notConfigured = { error: options.notLoggedInError ?? MEDIA_NOT_CONFIGURED_ERROR }
+    if (!imageByok || !videoByok) await refreshUniworkCloudStatusIfNotReady()
     const cloud = cloudToolsEnabled(settings) && hasGskAuth('media_analyze')
     const viaCloud = async () => ({
       text: await gskAnalyzeMedia({ mediaUrls, requirements }, undefined, { mediaRoots }),

@@ -178,4 +178,6 @@ export const de = {
   aiStarterAnnouncementPrompt: 'Entwirf mir eine Produktankündigung. Produkt und Kernpunkte: ',
   aiStarterGuide: 'Eine Anleitung schreiben',
   aiStarterGuidePrompt: 'Schreib mir eine Anleitung. Der zu erklärende Ablauf: ',
+  aiViewOnlyNotice:
+    'Schreibgeschütztes Dokument: Die KI kann es lesen und Fragen beantworten, aber nicht bearbeiten.',
 } satisfies Record<keyof typeof zh, string>

@@ -66,7 +66,7 @@ import { isNumericIdentifierText } from './cell-warning'
 import { consumePendingUndoCarry, undoStackDepth } from './undo-carry'
 import { createSaveGate, recoveryCopyBacksSession, shouldRunSaveTick } from './save-scheduler'
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { useAutoSavePref, type AiScopeQuoteData } from '@genoffice/ui'
+import { useAutoSavePref, useCloudSignedIn, type AiScopeQuoteData } from '@genoffice/ui'
 
 import {
   CellValueType,
@@ -200,6 +200,7 @@ import { mergeAttachedWorkbooks } from './merge-workbooks'
 import { createSearchSkill } from './ai/search-skill'
 import { createImageSkill } from './ai/image-skill'
 import { gateSkill } from './ai/skill-gate'
+import { isUniworkViewOnly, restrictToReading } from './ai/view-only-skill'
 import { ATTACHMENT_IMAGE_EXTS } from '../shared/desktop-api'
 import type {
   AttachmentAddResult,
@@ -514,6 +515,7 @@ import { EngineUnavailableScreen } from './EngineUnavailableScreen'
 import { WorkbookOpeningScreen } from './WorkbookOpeningScreen'
 import { isEngineUnavailableError, isTooLargeError } from './web-engine'
 import { handleSheetsControl, type ControlRequest } from './control'
+import { bootOpenAction, createOpenStallTimer } from './workbook-open-stall'
 
 // Source sheet id of an in-flight copy-sheet command; the next insert-sheet
 // mutation is that copy and must journal as a duplicate, not a blank add.
@@ -633,6 +635,10 @@ export function App({
   // A UniWork document saves only on an explicit Save: AutoSave is forced off
   // for it (the stored preference is left alone for local files).
   const autoSaveLocked = uniworkAutoSaveLocked(workbookFile)
+  // UniWork view-only workbook: the AI may read and answer, never edit
+  const aiViewOnly = isUniworkViewOnly(workbookFile)
+  const aiViewOnlyRef = useRef(aiViewOnly)
+  aiViewOnlyRef.current = aiViewOnly
   const autoSaveOn = autoSave && !autoSaveLocked
   // Ref mirror for callbacks captured when an AI run starts
   const autoSaveRef = useRef(autoSaveOn)
@@ -1073,24 +1079,9 @@ export function App({
   aiSettingsRef.current = aiSettings
 
   /** UniWork cloud sign-in state for the cloud-tools gate (signed in to UniWork + plan includes cloud AI) */
-  const gskLoggedInRef = useRef(false)
-  useEffect(() => {
-    let alive = true
-    const refresh = () => {
-      void window.desktopApi
-        ?.aiGskStatus()
-        .then((s) => {
-          if (alive) gskLoggedInRef.current = !!s?.loggedIn
-        })
-        .catch(() => {})
-    }
-    refresh()
-    window.addEventListener('focus', refresh)
-    return () => {
-      alive = false
-      window.removeEventListener('focus', refresh)
-    }
-  }, [])
+  const { loggedInRef: gskLoggedInRef, refresh: refreshGskStatus } = useCloudSignedIn(() =>
+    window.desktopApi?.aiGskStatus(),
+  )
   const [aiBusy, setAiBusy] = useState(false)
   // Display history survives restarts via localStorage; the AgentLoop's model
   // context does not, so restored turns are read-only transcript.
@@ -1119,6 +1110,33 @@ export function App({
   /** The shell can repeat its queued-open nudge while the renderer starts.
    * Only one picker/open request may own the workbook session at a time. */
   const workbookOpeningRef = useRef(false)
+  // the opening screen is bounded: a stalled open turns into a failure notice with Retry
+  const [openStalled, setOpenStalled] = useState(false)
+  const openingWorkbookRef = useRef(openingWorkbook)
+  openingWorkbookRef.current = openingWorkbook
+  const openStallTimer = useMemo(() => createOpenStallTimer(() => setOpenStalled(true)), [])
+  useEffect(() => {
+    if (openingWorkbook) {
+      openStallTimer.start()
+      return openStallTimer.done
+    }
+    setOpenStalled(false)
+    return undefined
+  }, [openingWorkbook, openStallTimer])
+  /// Retry: queue the tab's workbook again and start the tab over (a stalled
+  /// open may never settle, so its pending state is not reused)
+  const retryWorkbookOpen = (): void => {
+    void (window.desktopApi?.requeueWorkbook?.() ?? Promise.resolve(false))
+      .catch(() => false)
+      .then((queued) => {
+        if (queued) {
+          window.location.reload()
+          return
+        }
+        setOpeningWorkbook(false)
+        setMessage(t('appOpenFailed'))
+      })
+  }
   /** Current session's projectId/chatId (resolved when the workbook opens) */
   const chatRefIdsRef = useRef<{ projectId: string; chatId: string } | null>(null)
 
@@ -1383,30 +1401,34 @@ export function App({
     agentLoopRef.current = new AgentLoop({
       transport: createElectronTransport(() => aiSettingsRef.current!),
       systemSuffix: aiLangDirective,
-      skill: composeSkills('sheets+files', '', [
-        createWorkbookSkill(sheetsSkillDeps()),
-        gateSkill(createFilesSkill(availableAttachments), () => cap('attachments')),
-        // the web frame offers only what the host grants (ai/skill-gate.ts): no workbook merge
-        // (C11), web search / image search / generation per grant
-        gateSkill(
-          createMergeSkill({
-            getAttachments: availableAttachments,
-            mergePaths: (paths) => {
-              const runtime = univerRef.current
-              if (!runtime) throw new Error(t('appMergeWorkbooksFailed'))
-              return mergeAttachedWorkbooks({ runtime, lazyWorkbookRef, setMessage }, paths)
-            },
-          }),
-          () => cap('mergeWorkbooks'),
-        ),
-        gateSkill(createSearchSkill(), () => cap('webSearch')),
-        createImageSkill(
-          () =>
-            cap('imageGeneration') &&
-            imageGenerationAvailable(aiSettingsRef.current, gskLoggedInRef.current),
-          () => cap('imageSearch'),
-        ),
-      ]),
+      skill: composeSkills(
+        'sheets+files',
+        '',
+        [
+          createWorkbookSkill(sheetsSkillDeps()),
+          gateSkill(createFilesSkill(availableAttachments), () => cap('attachments')),
+          // the web frame offers only what the host grants (ai/skill-gate.ts): no workbook merge
+          // (C11), web search / image search / generation per grant
+          gateSkill(
+            createMergeSkill({
+              getAttachments: availableAttachments,
+              mergePaths: (paths) => {
+                const runtime = univerRef.current
+                if (!runtime) throw new Error(t('appMergeWorkbooksFailed'))
+                return mergeAttachedWorkbooks({ runtime, lazyWorkbookRef, setMessage }, paths)
+              },
+            }),
+            () => cap('mergeWorkbooks'),
+          ),
+          gateSkill(createSearchSkill(), () => cap('webSearch')),
+          createImageSkill(
+            () =>
+              cap('imageGeneration') &&
+              imageGenerationAvailable(aiSettingsRef.current, gskLoggedInRef.current),
+            () => cap('imageSearch'),
+          ),
+        ].map((skill) => restrictToReading(skill, () => aiViewOnlyRef.current)),
+      ),
       events: {
         onText: (text) => {
           if (text) runLastTextRef.current = text
@@ -1870,7 +1892,14 @@ export function App({
     // that — the tab would strand as a blank in-memory workbook (no save, no
     // shapes) with the queued file silently never opened.
     void window.desktopApi?.hasQueuedWorkbook?.().then((queued) => {
-      if (queued) void handleInspectWorkbook()
+      const action = bootOpenAction({
+        queued,
+        opening: openingWorkbookRef.current,
+        inFlight: workbookOpeningRef.current,
+      })
+      if (action === 'open') void handleInspectWorkbook()
+      // a reloaded tab whose path is gone: say so now instead of waiting
+      else if (action === 'stalled') setOpenStalled(true)
     })
     void window.desktopApi?.consumeAiPreset?.().then((preset) => {
       if (!preset?.text) return
@@ -3548,6 +3577,8 @@ export function App({
    * When apply fails, the preview card stays up as a manual fallback.
    */
   async function autoApplySafePlan(plan: ChangePlan): Promise<ApplyOutcome> {
+    // belt and braces: the view-only skill offers no edit tool, so no plan should arrive
+    if (aiViewOnlyRef.current) return { ok: false, reason: t('aiViewOnlyNotice') }
     if (!(await commitActiveEditor())) {
       return { ok: false, reason: t('appApplyTxFailed') }
     }
@@ -5040,6 +5071,7 @@ export function App({
         />
       )}
       <ExcelShell
+        onAiPanelOpen={refreshGskStatus}
         openingWorkbook={openingWorkbook}
         prompt={prompt}
         aiPreset={aiPreset}
@@ -5111,7 +5143,8 @@ export function App({
         onRedo={handleRedo}
         autoSave={autoSaveOn}
         onAutoSaveChange={setAutoSave}
-        autoSaveLockedTip={autoSaveLocked ? t('appAutoSaveUniworkOff') : null}
+        autoSaveHidden={autoSaveLocked}
+        aiViewOnly={aiViewOnly}
         selectedChart={selectedChart}
         selectedShape={selectedShape}
         selectedVisualKind={
@@ -5164,7 +5197,19 @@ export function App({
         onGetConsolidateDefault={() => consolidateDefaultReferenceImpl(dataToolsContext())}
         onApplyHeaderFooter={(result) => handleApplyHeaderFooterImpl(pageLayoutContext(), result)}
       />
-      {openingWorkbook && <WorkbookOpeningScreen />}
+      {openingWorkbook &&
+        (openStalled ? (
+          <div className="workbook-opening-screen" role="alert">
+            <div className="workbook-opening-card workbook-opening-failed">
+              <p>{t('appOpenStalled')}</p>
+              <button type="button" className="primary-action" onClick={retryWorkbookOpen}>
+                {t('appOpenRetry')}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <WorkbookOpeningScreen />
+        ))}
       <ThreadedCommentsPane getRuntime={getRuntime} />
       <ThreadHoverCard hover={threadHover} />
       {findReplaceService && (

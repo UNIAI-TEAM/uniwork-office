@@ -92,4 +92,7 @@ export const nl = {
 
   uwRecentBadge: 'UniWork',
   uwRecentBadgeTip: 'Document opgeslagen in UniWork',
+
+  setCliLinkReady: 'De opdrachtregeltool is beschikbaar.',
+  setAutoSaveUniworkNote: 'Geldt niet voor UniWork-documenten.',
 } satisfies Record<keyof typeof zh, string>

@@ -195,8 +195,6 @@ export const he = {
   appFootnotePlaceholder: 'טקסט הערת שוליים…',
   appEndnotePlaceholder: 'טקסט הערת סיום…',
   appAutoSave: 'שמירה אוטומטית',
-  appAutoSaveUniworkTip:
-    'השמירה האוטומטית כבויה עבור מסמכי UniWork. השתמשו ב״שמירה״ כדי לשמור גרסה חדשה.',
   appAutoSaveTip: 'שמירה אוטומטית (כל 30 שניות וכאשר החלון מאבד מיקוד)',
   appSaveShortcutTip: 'שמירה (⌘S)',
   appUndo: 'ביטול פעולה',
@@ -527,4 +525,9 @@ export const he = {
   appOnlyZotero: 'ציטוטי Zotero אינם זמינים כאן.',
   appOnlyOpenPassword: 'לא ניתן להגדיר כאן סיסמה לפתיחת המסמך.',
   appOnlyEncrypted: 'המסמך "{name}" מוגן בסיסמה ולא ניתן לפתוח אותו כאן.',
+  appFileExportPdf: 'ייצוא כ-PDF…',
+  appFilePrint: 'הדפסה…',
+  appPrintNoPrinter: 'אין מדפסת זמינה במחשב זה. אפשר לשמור את המסמך כקובץ PDF במקום.',
+  appPrintFailedPdfHint: 'ההדפסה נכשלה: {error}. אפשר לשמור את המסמך כקובץ PDF במקום.',
+  appPrintSaveAsPdf: 'שמירה כ-PDF…',
 } satisfies Record<keyof typeof zh, string>

@@ -6,6 +6,7 @@ export const en = {
   cloudStateNotEntitled: 'Not in your plan',
   cloudStateExhausted: 'Out of AI credits',
   cloudStateUnavailable: 'Unavailable',
+  cloudStateSignedOut: 'Not signed in',
   cloudStateInactive: 'Subscription inactive',
   cloudCredits: 'AI credits',
   cloudCreditsLeft: '{remaining} / {limit} left',
@@ -31,4 +32,9 @@ export const en = {
   cloudMediaLabel: 'UniWork cloud',
   cloudMediaDesc: 'Uses your organization’s UniWork AI credits; no key needed.',
   cloudSearchAutoHint: 'UniWork cloud first (spends AI credits), then free search.',
+  aiTestErrInvalidKey: 'API key missing or rejected',
+  aiTestErrNetwork: 'Can’t connect. Check your connection',
+  aiTestErrLimit: 'Provider limit reached. Try again later',
+  aiTestErrUnavailable: 'Service not answering. Try again later',
+  aiTestErrMisconfigured: 'Settings incomplete: check the service address and account fields',
 } satisfies Record<keyof typeof zh, string>

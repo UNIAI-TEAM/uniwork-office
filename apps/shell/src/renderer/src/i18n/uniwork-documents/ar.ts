@@ -89,4 +89,7 @@ export const ar = {
 
   uwRecentBadge: 'UniWork',
   uwRecentBadgeTip: 'مستند محفوظ في UniWork',
+
+  setCliLinkReady: 'أداة سطر الأوامر متاحة.',
+  setAutoSaveUniworkNote: 'لا ينطبق على مستندات UniWork.',
 } satisfies Record<keyof typeof zh, string>

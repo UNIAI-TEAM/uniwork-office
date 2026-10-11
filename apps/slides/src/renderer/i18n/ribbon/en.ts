@@ -38,8 +38,6 @@ export const en = {
   ribbonSaveTip: 'Save (⌘S)',
   ribbonAutoSave: 'AutoSave',
   ribbonAutoSaveTip: 'When on, saves to the file every 30 seconds',
-  ribbonAutoSaveUniworkTip:
-    'AutoSave is off for UniWork documents. Use Save to save a new version.',
   ribbonUndo: 'Undo',
   ribbonRedo: 'Redo',
   ribbonGroupClipboard: 'Clipboard',

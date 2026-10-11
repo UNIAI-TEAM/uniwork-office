@@ -224,6 +224,8 @@ export function Ribbon(p: Props) {
 
   const notReady = p.disabled
   const off = notReady || !!p.readOnly
+  // read-only AI (open the panel, summarize) stays available on a view-only copy; the editing presets do not
+  const viewOnlyTip = p.readOnly ? t('aiViewOnlyNotice') : undefined
   // a view-only copy can still be searched (the find panel itself stays read-only)
   const findOff = notReady
   const insertOff = off || !p.canInsert
@@ -299,17 +301,17 @@ export function Ribbon(p: Props) {
         >
           <IconSearch size={16} />
         </button>
-        {p.showAutoSave !== false && (
+        {/* product rule: a UniWork document is only written by an explicit Save, so it has no AutoSave switch */}
+        {p.showAutoSave !== false && !p.uniworkBound && (
           <label
-            className={`autosave-toggle${p.autoSave && !p.uniworkBound ? ' on' : ''}`}
-            data-tip={t(p.uniworkBound ? 'autoSaveUniworkOff' : 'autoSaveTip')}
+            className={`autosave-toggle${p.autoSave ? ' on' : ''}`}
+            data-tip={t('autoSaveTip')}
           >
             <span className="autosave-knob" />
             <span className="autosave-text">{t('autoSave')}</span>
             <input
               type="checkbox"
-              checked={p.autoSave && !p.uniworkBound}
-              disabled={p.uniworkBound}
+              checked={p.autoSave}
               onChange={(e) => p.onToggleAutoSave(e.target.checked)}
             />
           </label>
@@ -351,7 +353,7 @@ export function Ribbon(p: Props) {
                   className={`rb-big ai-entry${p.aiOpen ? ' active' : ''}`}
                   data-tip={t('aiOpenAssistant')}
                   aria-pressed={p.aiOpen}
-                  disabled={off}
+                  disabled={notReady}
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={p.onToggleAi}
                 >
@@ -363,7 +365,7 @@ export function Ribbon(p: Props) {
                 <button
                   type="button"
                   className="rb-big ai-entry"
-                  data-tip={t('aiRestyleBtn')}
+                  data-tip={viewOnlyTip ?? t('aiRestyleBtn')}
                   disabled={off}
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => p.onAiPreset(t('aiRestylePrompt'))}
@@ -379,7 +381,7 @@ export function Ribbon(p: Props) {
                   <button
                     type="button"
                     className={`rb-big ai-entry${themeOpen ? ' active' : ''}`}
-                    data-tip={t('aiThemeBtn')}
+                    data-tip={viewOnlyTip ?? t('aiThemeBtn')}
                     aria-haspopup="menu"
                     aria-expanded={themeOpen}
                     disabled={off}
@@ -416,7 +418,7 @@ export function Ribbon(p: Props) {
                   type="button"
                   className="rb-big ai-entry"
                   data-tip={t('aiSummarizeBtn')}
-                  disabled={off}
+                  disabled={notReady}
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => p.onAiPreset(t('aiSummarizePrompt'))}
                 >

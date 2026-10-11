@@ -32,6 +32,7 @@ interface FakeWebContents {
   close: ReturnType<typeof vi.fn>
   reload: ReturnType<typeof vi.fn>
   focus: ReturnType<typeof vi.fn>
+  isFocused: ReturnType<typeof vi.fn>
   isDestroyed: ReturnType<typeof vi.fn>
   listeners: Map<string, () => void>
 }
@@ -55,8 +56,10 @@ function makeFakeView(): FakeView {
       }),
       once: vi.fn(),
       close: vi.fn(),
+      loadURL: vi.fn(async () => undefined),
       reload: vi.fn(),
       focus: vi.fn(),
+      isFocused: vi.fn(() => false),
       isDestroyed: vi.fn(() => false),
     },
     setVisible: vi.fn(),
@@ -68,6 +71,7 @@ vi.mock('electron', () => ({ BrowserWindow: class {} }))
 
 const createDocsView = vi.fn(() => makeFakeView())
 const docsQueryDirty = vi.fn(() => Promise.resolve(false))
+const docsQueryEditorDirty = vi.fn((): Promise<boolean | null> => Promise.resolve(false))
 const markDocsNewBlank = vi.fn()
 const requestDocsClose = vi.fn(() => Promise.resolve(true))
 const setActiveDocsResolver = vi.fn()
@@ -76,6 +80,7 @@ const teardownDocsRenderer = vi.fn()
 vi.mock('../../docs/src/main/docs-main', () => ({
   createDocsView: (...args: unknown[]) => createDocsView(...(args as [])),
   docsQueryDirty: (...args: unknown[]) => docsQueryDirty(...(args as [])),
+  docsQueryEditorDirty: (...args: unknown[]) => docsQueryEditorDirty(...(args as [])),
   markDocsNewBlank: (...args: unknown[]) => markDocsNewBlank(...args),
   requestDocsClose: (...args: unknown[]) => requestDocsClose(...(args as [])),
   setActiveDocsResolver: (...args: unknown[]) => setActiveDocsResolver(...args),
@@ -155,7 +160,12 @@ const WINDOW_HEIGHT = 600
 
 interface FakeShellWindow {
   on: ReturnType<typeof vi.fn>
-  webContents: { once: ReturnType<typeof vi.fn>; focus: ReturnType<typeof vi.fn> }
+  webContents: {
+    on: ReturnType<typeof vi.fn>
+    once: ReturnType<typeof vi.fn>
+    focus: ReturnType<typeof vi.fn>
+    listeners: Map<string, () => void>
+  }
   isDestroyed: ReturnType<typeof vi.fn>
   isFocused: ReturnType<typeof vi.fn>
   getContentBounds: () => { x: number; y: number; width: number; height: number }
@@ -166,9 +176,17 @@ interface FakeShellWindow {
 }
 
 function makeShellWindow(): FakeShellWindow {
+  const listeners = new Map<string, () => void>()
   return {
     on: vi.fn(),
-    webContents: { once: vi.fn(), focus: vi.fn() },
+    webContents: {
+      on: vi.fn((event: string, handler: () => void) => {
+        listeners.set(event, handler)
+      }),
+      once: vi.fn(),
+      focus: vi.fn(),
+      listeners,
+    },
     isDestroyed: vi.fn(() => false),
     isFocused: vi.fn(() => true),
     getContentBounds: () => ({ x: 0, y: 0, width: WINDOW_WIDTH, height: WINDOW_HEIGHT }),
@@ -530,6 +548,174 @@ describe('closing tabs', () => {
     expect(manager.list()).toHaveLength(1)
   })
 
+  describe('Ctrl/Cmd+W key event', () => {
+    type InputHandler = (event: { preventDefault: () => void }, input: unknown) => void
+    const chord = (over: Record<string, unknown> = {}) => ({
+      type: 'keyDown',
+      key: 'w',
+      control: true,
+      meta: false,
+      alt: false,
+      shift: false,
+      ...over,
+    })
+    const press = (wc: { listeners: Map<string, () => void> }, input: unknown) => {
+      const preventDefault = vi.fn()
+      const handler = wc.listeners.get('before-input-event') as unknown as InputHandler
+      handler({ preventDefault }, input)
+      return preventDefault
+    }
+
+    it('closes the active sheets tab without the menu accelerator', async () => {
+      manager.openSheetsTab('/tmp/fresh.xlsx')
+      const view = lastCreatedView(createSheetsView)
+      const preventDefault = press(view.webContents, chord())
+      expect(preventDefault).toHaveBeenCalledTimes(1)
+      await vi.waitFor(() => expect(manager.list().map((t) => t.id)).toEqual(['home']))
+    })
+
+    it('also takes Cmd+W, and Ctrl+W under a non-Latin layout', async () => {
+      manager.openSheetsTab()
+      manager.openSheetsTab()
+      press(lastCreatedView(createSheetsView).webContents, chord({ control: false, meta: true }))
+      await vi.waitFor(() => expect(manager.list()).toHaveLength(2))
+      const first = createSheetsView.mock.results[0]!.value as FakeView
+      press(first.webContents, chord({ key: 'ц', code: 'KeyW' }))
+      await vi.waitFor(() => expect(manager.list()).toHaveLength(1))
+    })
+
+    it('ignores other chords, key repeat and key-up', () => {
+      manager.openSheetsTab()
+      const view = lastCreatedView(createSheetsView)
+      for (const input of [
+        chord({ key: 'q' }),
+        chord({ control: false }),
+        chord({ shift: true }),
+        chord({ alt: true }),
+        chord({ isAutoRepeat: true }),
+        chord({ type: 'keyUp' }),
+      ]) {
+        expect(press(view.webContents, input)).not.toHaveBeenCalled()
+      }
+      expect(manager.list()).toHaveLength(2)
+    })
+
+    it('closes the active tab when the shell chrome holds keyboard focus', async () => {
+      manager.openSheetsTab('/tmp/fresh.xlsx')
+      const preventDefault = press(shellWindow.webContents, chord())
+      expect(preventDefault).toHaveBeenCalledTimes(1)
+      await vi.waitFor(() => expect(manager.list().map((t) => t.id)).toEqual(['home']))
+    })
+
+    it('closes the active tab of any kind, whichever view of the window has focus', async () => {
+      manager.openSheetsTab()
+      const sheetsView = lastCreatedView(createSheetsView)
+      manager.openDocsTab('/tmp/report.docx')
+      // a hidden view holding focus still closes the tab the user sees
+      press(sheetsView.webContents, chord())
+      await vi.waitFor(() => expect(manager.list().map((t) => t.kind)).toEqual(['home', 'sheets']))
+    })
+
+    it('leaves the chord alone on Home', () => {
+      manager.openSheetsTab()
+      manager.openHomeTab()
+      expect(press(shellWindow.webContents, chord())).not.toHaveBeenCalled()
+      expect(manager.list()).toHaveLength(2)
+    })
+
+    it('does nothing from a view that moved to a detached window', async () => {
+      const id = manager.openSheetsTab()
+      const view = lastCreatedView(createSheetsView)
+      manager.openSlidesTab()
+      manager.detachTab(id)
+      const preventDefault = press(view.webContents, chord())
+      await Promise.resolve()
+      expect(preventDefault).not.toHaveBeenCalled()
+      expect(manager.list().map((t) => t.kind)).toEqual(['home', 'slides'])
+    })
+
+    it('closes a workbook opened by a launch link while the window was in the background', async () => {
+      vi.useFakeTimers()
+      try {
+        // a launch link opens the copy before the window is brought forward
+        shellWindow.isFocused.mockReturnValue(false)
+        manager.openSheetsTab('/tmp/uniwork/Budget.xlsx')
+        const tab = lastCreatedView(createSheetsView)
+        shellWindow.isFocused.mockReturnValue(true)
+        manager.focusActiveView()
+        expect(tab.webContents.focus).toHaveBeenCalled()
+        // seconds later the next spare mounts; Chromium focuses it inside
+        // createSheetsView (loadURL), before any `focus` listener exists, and
+        // OS keys sent to a hidden view reach no webContents at all
+        tab.webContents.focus.mockClear()
+        createSheetsView.mockImplementationOnce(() => {
+          const view = makeFakeView()
+          view.webContents.isFocused.mockReturnValue(true)
+          return view
+        })
+        vi.advanceTimersByTime(3000)
+        const spare = lastCreatedView(createSheetsView)
+        expect(spare).not.toBe(tab)
+        expect(tab.webContents.focus).toHaveBeenCalledTimes(1)
+        // a key that reached the hidden spare anyway still closes the visible tab
+        const preventDefault = press(spare.webContents, chord())
+        expect(preventDefault).toHaveBeenCalledTimes(1)
+        await vi.waitFor(() => expect(manager.list().map((t) => t.id)).toEqual(['home']))
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('takes focus back from a spare that grabs it on its first load', () => {
+      vi.useFakeTimers()
+      try {
+        manager.openSheetsTab('/tmp/uniwork/Budget.xlsx')
+        const tab = lastCreatedView(createSheetsView)
+        vi.advanceTimersByTime(3000)
+        const spare = lastCreatedView(createSheetsView)
+        tab.webContents.focus.mockClear()
+        const loaded = spare.webContents.once.mock.calls.find(
+          ([event]) => event === 'did-finish-load',
+        )?.[1] as () => void
+        spare.webContents.isFocused.mockReturnValue(true)
+        loaded()
+        expect(tab.webContents.focus).toHaveBeenCalledTimes(1)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('never leaves keyboard focus on a hidden tab view', () => {
+      vi.useFakeTimers()
+      try {
+        manager.openSheetsTab()
+        const hidden = lastCreatedView(createSheetsView)
+        manager.openDocsTab('/tmp/report.docx')
+        const active = lastCreatedView(createDocsView)
+        active.webContents.focus.mockClear()
+        hidden.webContents.isFocused.mockReturnValue(true)
+        hidden.webContents.listeners.get('focus')!()
+        // a focus() made inside Chromium's own focus change does not stick
+        expect(active.webContents.focus).not.toHaveBeenCalled()
+        vi.runOnlyPendingTimers()
+        expect(active.webContents.focus).toHaveBeenCalledTimes(1)
+        // the active view and the chrome keep the focus they take
+        active.webContents.isFocused.mockReturnValue(true)
+        active.webContents.listeners.get('focus')!()
+        vi.runOnlyPendingTimers()
+        expect(active.webContents.focus).toHaveBeenCalledTimes(1)
+        expect(shellWindow.webContents.listeners.has('focus')).toBe(false)
+        // a background window does not pull OS focus; its `focus` handler re-runs it
+        shellWindow.isFocused.mockReturnValue(false)
+        hidden.webContents.listeners.get('focus')!()
+        vi.runOnlyPendingTimers()
+        expect(active.webContents.focus).toHaveBeenCalledTimes(1)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+  })
+
   it('removes a clean tab and falls back to the previous tab', async () => {
     manager.openSheetsTab()
     const sheetsView = lastCreatedView(createSheetsView)
@@ -565,6 +751,8 @@ describe('closing tabs', () => {
     expect(view.webContents.close).not.toHaveBeenCalled()
     // the orphaned renderer must be told to go inert (recovery-copy resurrection guard)
     expect(teardownDocsRenderer).toHaveBeenCalledWith(view.webContents)
+    // GOA9-r4-03: the orphan no longer holds the closed document and its AI chat
+    expect(view.webContents.loadURL).toHaveBeenCalledWith('about:blank')
   })
 
   it('closes a clean docs tab after the async dirty query says clean', async () => {
@@ -582,6 +770,28 @@ describe('closing tabs', () => {
     await manager.closeTab(id)
     expect(requestDocsClose).toHaveBeenCalledTimes(1)
     expect(manager.list().map((t) => t.id)).toEqual(['home', id])
+  })
+
+  it('confirmCloseTabsShowing runs the prompts and removes nothing; closeTabsShowingNow then closes without asking (GOA9-r4-02)', async () => {
+    docsQueryDirty.mockImplementation(() => Promise.resolve(true))
+    requestDocsClose.mockImplementation(() => Promise.resolve(true))
+    manager.openSheetsTab('/tmp/clean.xlsx')
+    const docsId = manager.openDocsTab('/tmp/dirty.docx')
+    expect(await manager.confirmCloseTabsShowing('/tmp/dirty.docx')).toBe(true)
+    expect(requestDocsClose).toHaveBeenCalledTimes(1)
+    expect(manager.list().map((t) => t.id)).toContain(docsId)
+    manager.closeTabsShowingNow('/tmp/dirty.docx')
+    manager.closeTabsShowingNow('/tmp/clean.xlsx')
+    expect(requestDocsClose).toHaveBeenCalledTimes(1)
+    expect(manager.list().map((t) => t.id)).toEqual(['home'])
+  })
+
+  it('confirmCloseTabsShowing is false when the user cancels, and the tab stays', async () => {
+    docsQueryDirty.mockImplementation(() => Promise.resolve(true))
+    requestDocsClose.mockImplementation(() => Promise.resolve(false))
+    const docsId = manager.openDocsTab('/tmp/dirty.docx')
+    expect(await manager.confirmCloseTabsShowing('/tmp/dirty.docx')).toBe(false)
+    expect(manager.list().map((t) => t.id)).toEqual(['home', docsId])
   })
 
   it('activates a dirty background tab before showing its close guard', async () => {
@@ -818,6 +1028,25 @@ describe('file path bookkeeping', () => {
     expect(view.webContents.reload).toHaveBeenCalledTimes(1)
   })
 
+  it('reloading a sheets tab queues its workbook again (the reloaded renderer opens it)', () => {
+    const id = manager.openSheetsTab('/tmp/book.xlsx')
+    const view = lastCreatedView(createSheetsView)
+    queueWorkbookForView.mockClear()
+    manager.reloadTab(id)
+    expect(queueWorkbookForView).toHaveBeenCalledWith(view.webContents, '/tmp/book.xlsx')
+    expect(queueWorkbookForView.mock.invocationCallOrder[0]).toBeLessThan(
+      view.webContents.reload.mock.invocationCallOrder[0]!,
+    )
+    expect(view.webContents.reload).toHaveBeenCalledTimes(1)
+  })
+
+  it('reloading an untitled sheets tab queues nothing', () => {
+    const id = manager.openSheetsTab()
+    queueWorkbookForView.mockClear()
+    manager.reloadTab(id)
+    expect(queueWorkbookForView).not.toHaveBeenCalled()
+  })
+
   it('reports the active pdf tab with its id (so callers can re-activate it)', () => {
     const pdfId = manager.openPdfTab('/tmp/c.pdf')
     const active = manager.activePdfTab()
@@ -850,6 +1079,23 @@ describe('dirty-tab queries (shell close guard)', () => {
     slidesIsDirty.mockImplementation(() => true)
     expect(manager.dirtyPdfTabs().map((t) => t.id)).toEqual([pdfId])
     expect(manager.dirtySlidesTabs().map((t) => t.id)).toEqual([slidesId])
+  })
+
+  it('reports the editor state of the tabs showing wanted files (the UniWork chip)', async () => {
+    manager.openDocsTab('/uw/a.docx')
+    manager.openMarkdownTab('/uw/b.md')
+    manager.openPdfTab('/local/c.pdf')
+    manager.openDocsTab()
+    docsQueryEditorDirty.mockImplementation(() => Promise.resolve(null))
+    markdownIsDirty.mockImplementation(() => true)
+    const states = await manager.editorDirtyStates((path) => path.startsWith('/uw/'))
+    expect(states).toEqual([
+      { path: '/uw/a.docx', dirty: null },
+      { path: '/uw/b.md', dirty: true },
+    ])
+    expect(pdfIsDirty).not.toHaveBeenCalled()
+    markdownIsDirty.mockImplementation(() => false)
+    docsQueryEditorDirty.mockImplementation(() => Promise.resolve(false))
   })
 
   it('lists every live docs tab for the async dirtiness sweep', () => {

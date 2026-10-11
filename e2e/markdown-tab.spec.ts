@@ -122,40 +122,46 @@ test.describe('markdown editor', () => {
       await expect(editor.locator('h1')).toHaveText('Hello')
       await expect(editor.locator('strong')).toHaveText('bold')
 
-      // type at the end of the document, save with ⌘/Ctrl+S
-      await editor.focus()
-      // ProseMirror's focus handler re-syncs the DOM selection from its own state ~20 ms after the
-      // editor gains focus (it only skips that when the DOM selection already matches what it last
-      // read). A caret set inside that window is overwritten with the document start before the
-      // Enter below, and the typed text lands at the start of the heading. So the caret counts only
-      // once ProseMirror has read it: its own selectionchange listener runs before ours, so when our
-      // listener fires the state holds the caret too. If the focus handler won the race, the event
-      // we get is its rewrite, the caret is no longer in the last block, and we set it again.
-      await expect(async () => {
-        const landed = await editor.evaluate(
-          (element) =>
-            new Promise<boolean>((resolve) => {
-              const last = element.lastElementChild
-              const selection = window.getSelection()
-              if (!last || !selection) throw new Error('Markdown editor has no final block')
-              const bound = window.setTimeout(() => resolve(false), 2_000)
-              document.addEventListener(
-                'selectionchange',
-                () => {
-                  window.clearTimeout(bound)
-                  resolve(last.contains(selection.anchorNode))
-                },
-                { once: true },
-              )
-              const range = document.createRange()
-              range.selectNodeContents(last)
-              range.collapse(false)
-              selection.removeAllRanges()
-              selection.addRange(range)
-            }),
+      // type at the end of the document, save with ⌘/Ctrl+S. The caret goes
+      // through the editor state, not a scripted DOM range: ProseMirror's focus
+      // handling (and Tiptap's autofocus frame) write the state selection back
+      // to the DOM, so a DOM-only range read late snaps back to the title
+      await editor.evaluate((element) => {
+        const tiptap = (
+          element as HTMLElement & { editor?: { commands: { focus(p: 'end'): boolean } } }
+        ).editor
+        if (!tiptap) throw new Error('Markdown editor has no Tiptap instance')
+        tiptap.commands.focus('end')
+      })
+      await expect
+        .poll(() =>
+          editor.evaluate((element) => {
+            type Pos = { parent: unknown; parentOffset: number }
+            const tiptap = (
+              element as HTMLElement & {
+                editor?: {
+                  state: {
+                    doc: { lastChild: { content: { size: number } } | null }
+                    selection: { empty: boolean; $head: Pos }
+                  }
+                }
+              }
+            ).editor
+            const last = tiptap?.state.doc.lastChild
+            const { empty, $head } = tiptap?.state.selection ?? {}
+            const dom = window.getSelection()
+            return (
+              document.activeElement === element &&
+              !!last &&
+              !!empty &&
+              $head?.parent === last &&
+              $head.parentOffset === last.content.size &&
+              !!dom?.focusNode &&
+              !!element.lastElementChild?.contains(dom.focusNode)
+            )
+          }),
         )
-        expect(landed).toBe(true)
-      }).toPass({ timeout: 10_000 })
+        .toBe(true)
       await editorPage.keyboard.press('Enter')
       await editorPage.keyboard.type('Appended line.')
       await editorPage.keyboard.press('ControlOrMeta+s')

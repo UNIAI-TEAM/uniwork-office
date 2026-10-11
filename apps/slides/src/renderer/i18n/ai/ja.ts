@@ -227,4 +227,6 @@ export const ja = {
   aiSumTemplatesEmpty: 'スタイル テンプレート一覧（空）',
   aiSumListTemplates: '{count} 個のスタイル テンプレートを一覧表示',
   aiPageCloudToLocal: 'クラウド生成不可効 — ローカルで生成',
+  aiViewOnlyNotice:
+    '閲覧専用のドキュメント: AI は内容の読み取りと質問への回答はできますが、編集はできません。',
 } satisfies Record<keyof typeof zh, string>

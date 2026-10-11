@@ -6,6 +6,7 @@ import {
 } from '@genoffice/ui'
 import React, { useEffect, useRef, useState } from 'react'
 import { AiComposer, AiScopeQuote, AiTypingIndicator, type AiScopeQuoteData } from '@genoffice/ui'
+import { aiNoticeBody, aiNoticeKind } from '@genoffice/ai-provider/browser'
 import { GensparkMark } from '../ribbon-icons'
 import { cap, platform } from '../capabilities'
 import type { ChangePlan } from '@genoffice/xlsx-gateway/domain/workbook.types'
@@ -244,6 +245,7 @@ export function AiChatPanel({
   onStop,
   onNewChat,
   onUndo,
+  viewOnly = false,
   scopeRange,
   scopeColumns,
   scopeLocked,
@@ -282,6 +284,8 @@ export function AiChatPanel({
   readonly onStop: () => void
   readonly onNewChat: () => void
   readonly onUndo: (steps: number) => void
+  /** UniWork view-only workbook: the AI reads and answers but cannot edit */
+  readonly viewOnly?: boolean
   /** A1 notation of the range this run is scoped to, or null when there is no
    *  scope — a resting single-cell selection carries no intent worth showing,
    *  and dismissing the chip clears it until the next selection change */
@@ -582,7 +586,7 @@ export function AiChatPanel({
                 {entry.tools.length > 0 && <ToolChipList tools={entry.tools} />}
                 {entry.text && (
                   <div dir="auto">
-                    <Markdown text={entry.text} nav={citationNav} />
+                    <Markdown text={aiNoticeBody(entry.text)} nav={citationNav} />
                   </div>
                 )}
               </div>
@@ -603,7 +607,7 @@ export function AiChatPanel({
         {chat.map((entry, index) => (
           <div
             key={index}
-            className={`ai-msg ai-msg-${entry.role}${entry.isError ? ' ai-msg-error' : ''}${entry.role === 'assistant' && entry.streaming ? ' ai-msg-streaming' : ''}`}
+            className={`ai-msg ai-msg-${entry.role}${entry.isError && !aiNoticeKind(entry.text) ? ' ai-msg-error' : ''}${entry.role === 'assistant' && entry.streaming ? ' ai-msg-streaming' : ''}`}
           >
             {entry.role === 'user' ? (
               <>
@@ -631,7 +635,7 @@ export function AiChatPanel({
                 {entry.tools.length > 0 && <ToolChipList tools={entry.tools} />}
                 {entry.text ? (
                   <div dir="auto">
-                    <Markdown text={entry.text} nav={citationNav} />
+                    <Markdown text={aiNoticeBody(entry.text)} nav={citationNav} />
                   </div>
                 ) : (
                   entry.streaming && (
@@ -717,6 +721,11 @@ export function AiChatPanel({
 
       <div className="ai-composer">
         {attachNotice && <div className="ai-attach-notice">{attachNotice}</div>}
+        {viewOnly && (
+          <div className="ai-view-only-notice" role="status">
+            {t('aiViewOnlyNotice')}
+          </div>
+        )}
         <AiComposer
           header={
             <>

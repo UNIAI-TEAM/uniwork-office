@@ -204,7 +204,6 @@ export const zh = {
   appEndnotePlaceholder: '尾注内容…',
   // Quick actions bar
   appAutoSave: '自动保存',
-  appAutoSaveUniworkTip: 'UniWork 文档已关闭自动保存。请使用“保存”保存新版本。',
   appAutoSaveTip: '自动保存(每 30 秒及窗口失焦时)',
   appSaveShortcutTip: '保存 (⌘S)',
   appUndo: '撤销',
@@ -547,4 +546,9 @@ export const zh = {
   appOnlyZotero: '此处不提供 Zotero 引文。',
   appOnlyOpenPassword: '此处无法设置打开文档的密码。',
   appOnlyEncrypted: '“{name}”受密码保护，无法在此处打开。',
+  appFileExportPdf: '导出为 PDF…',
+  appFilePrint: '打印…',
+  appPrintNoPrinter: '此电脑没有可用的打印机。可以改为将文档保存为 PDF。',
+  appPrintFailedPdfHint: '打印没有成功:{error}。可以改为将文档保存为 PDF。',
+  appPrintSaveAsPdf: '另存为 PDF…',
 }

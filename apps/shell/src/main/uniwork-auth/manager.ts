@@ -3,7 +3,7 @@ import { isAuthCallbackUrl, validateCallback } from './callback'
 import type { StoredCredential } from './credentials'
 import { redirectUriForProfile, type DeploymentProfile } from './deployment'
 import { pickOrg, toAccountOrg, toEntitlements, toProfile } from './mapping'
-import { LoginAttemptStore } from './pkce'
+import { LoginAttemptStore, type PendingLoginAttempt } from './pkce'
 import {
   ACCESS_TOKEN_SKEW_MS,
   SessionCore,
@@ -137,6 +137,11 @@ export class AccountManager extends SessionCore {
       return false
     }
     const profile = this.profile as DeploymentProfile
+    // a click while the browser sign-in is open (the chip and the account
+    // entry still offer Sign in) re-opens that page: a new attempt would turn
+    // the open tab's callback into a state mismatch and the sign-in would be lost
+    const live = this.state === 'signing-in' ? this.attempts.current(this.now()) : undefined
+    if (live) return this.reopenAttempt(live, profile)
     const transport = this.transport as UniworkTransport
     const generation = ++this.generation
     this.clearAttemptTimer()
@@ -177,6 +182,28 @@ export class AccountManager extends SessionCore {
       await this.deps.openBrowser(url, profile)
     } catch {
       // the attempt stays live: the renderer offers openLoginUrl() as a rescue
+      return false
+    }
+    if (generation !== this.generation) return false
+    this.emitLogin({
+      phase: 'launched',
+      expiresInSec: Math.round((attempt.expiresAt - this.now()) / 1000),
+    })
+    return true
+  }
+
+  /** login() during a live attempt: same attempt, same page; true once the browser opened */
+  private async reopenAttempt(
+    attempt: PendingLoginAttempt,
+    profile: DeploymentProfile,
+  ): Promise<boolean> {
+    // still starting: the first login() call opens the browser itself
+    if (!attempt.authorizationUrl) return true
+    const generation = this.generation
+    this.emitLogin({ phase: 'url', url: attempt.authorizationUrl })
+    try {
+      await this.deps.openBrowser(attempt.authorizationUrl, profile)
+    } catch {
       return false
     }
     if (generation !== this.generation) return false

@@ -1,4 +1,5 @@
 export { AiPanelSideButton } from './AiPanelSideButton'
+export { useCloudSignedIn } from './use-cloud-signed-in'
 export { AiComposer } from './AiComposer'
 export { AiScopeQuote, type AiScopeQuoteData } from './AiScopeQuote'
 export {

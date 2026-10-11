@@ -230,4 +230,6 @@ export const it = {
   aiSumTemplatesEmpty: 'Modelli di stile (vuoto)',
   aiSumListTemplates: '{count} modelli di stile elencati',
   aiPageCloudToLocal: 'Cloud non disponibile — generato localmente',
+  aiViewOnlyNotice:
+    'Documento di sola lettura: l’IA può leggerlo e rispondere a domande, ma non può modificarlo.',
 } satisfies Record<keyof typeof zh, string>

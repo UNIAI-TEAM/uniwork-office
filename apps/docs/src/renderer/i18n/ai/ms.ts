@@ -8,7 +8,7 @@ export const ms = {
   aiStarterPolishAll: 'Perhalusi keseluruhan dokumen dengan nada lebih profesional',
   aiStarterContinue: 'Teruskan menulis dari bahagian akhir dokumen',
   aiStarterFillTemplate: 'Cari dan isi ruang letak dalam dokumen ini',
-  aiBuyPlanBtn: 'Buy AI plan',
+  aiOpenSettingsBtn: 'Open AI settings',
   aiPanelTitle: 'uniAI',
   aiOpenAssistant: 'Buka pembantu AI',
   aiSummarizeBtn: 'Ringkasan AI',
@@ -182,4 +182,6 @@ export const ms = {
   aiCmdImages: '{count} imej dikemas kini',
   aiCmdToc: 'Jadual kandungan disisipkan ({count} entri)',
   aiCmdSkipped: ' ({count} blok dilindungi dilangkau)',
+  aiViewOnlyNotice:
+    'Dokumen lihat sahaja: AI boleh membaca dan menjawab soalan, tetapi tidak boleh mengedit.',
 } satisfies Record<keyof typeof zh, string>

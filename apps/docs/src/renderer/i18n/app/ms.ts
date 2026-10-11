@@ -208,8 +208,6 @@ export const ms = {
   appFootnotePlaceholder: 'Teks nota kaki…',
   appEndnotePlaceholder: 'Teks nota hujung…',
   appAutoSave: 'Autosimpan',
-  appAutoSaveUniworkTip:
-    'Simpan automatik dimatikan untuk dokumen UniWork. Gunakan Simpan untuk menyimpan versi baharu.',
   appAutoSaveTip: 'Autosimpan (setiap 30 saat dan apabila tetingkap hilang fokus)',
   appSaveShortcutTip: 'Simpan (⌘S)',
   appUndo: 'Buat asal',
@@ -543,4 +541,11 @@ export const ms = {
   appOnlyZotero: 'Petikan Zotero tidak tersedia di sini.',
   appOnlyOpenPassword: 'Kata laluan untuk membuka dokumen tidak boleh ditetapkan di sini.',
   appOnlyEncrypted: '"{name}" dilindungi kata laluan dan tidak boleh dibuka di sini.',
+  appFileExportPdf: 'Eksport sebagai PDF…',
+  appFilePrint: 'Cetak…',
+  appPrintNoPrinter:
+    'Tiada pencetak tersedia pada komputer ini. Anda boleh menyimpan dokumen sebagai PDF sebagai ganti.',
+  appPrintFailedPdfHint:
+    'Pencetakan gagal: {error}. Anda boleh menyimpan dokumen sebagai PDF sebagai ganti.',
+  appPrintSaveAsPdf: 'Simpan sebagai PDF…',
 } satisfies Record<keyof typeof zh, string>

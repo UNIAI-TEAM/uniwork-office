@@ -6,6 +6,7 @@ export const vi = {
   cloudStateNotEntitled: 'Gói hiện tại chưa bao gồm',
   cloudStateExhausted: 'Đã hết tín dụng AI',
   cloudStateUnavailable: 'Tạm thời không dùng được',
+  cloudStateSignedOut: 'Chưa đăng nhập',
   cloudStateInactive: 'Gói đăng ký không hoạt động',
   cloudCredits: 'Tín dụng AI',
   cloudCreditsLeft: 'Còn {remaining} / {limit}',
@@ -31,4 +32,10 @@ export const vi = {
   cloudMediaLabel: 'Đám mây UniWork',
   cloudMediaDesc: 'Dùng tín dụng AI UniWork của tổ chức, không cần khóa API.',
   cloudSearchAutoHint: 'Ưu tiên đám mây UniWork (trừ tín dụng AI), sau đó đến tìm kiếm miễn phí.',
+  aiTestErrInvalidKey: 'Khóa API thiếu hoặc bị từ chối',
+  aiTestErrNetwork: 'Không kết nối được. Hãy kiểm tra mạng',
+  aiTestErrLimit: 'Đã chạm giới hạn của nhà cung cấp, thử lại sau',
+  aiTestErrUnavailable: 'Dịch vụ chưa phản hồi, thử lại sau',
+  aiTestErrMisconfigured:
+    'Cài đặt chưa đầy đủ: hãy kiểm tra địa chỉ dịch vụ và các trường tài khoản',
 } satisfies Record<keyof typeof zh, string>

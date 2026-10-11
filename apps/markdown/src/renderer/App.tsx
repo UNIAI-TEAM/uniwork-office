@@ -1123,6 +1123,7 @@ export default function App() {
   }
 
   const fileName = filePath ? filePath.replace(/^.*[/\\]/, '') : null
+  // no local "Saved" on a UniWork copy: the title-bar chip says whether the Save reached UniWork
   const statusText =
     saveState === 'saving'
       ? t('saving')
@@ -1130,7 +1131,7 @@ export default function App() {
         ? t('saveFailed')
         : dirty
           ? t('unsaved')
-          : saveState === 'saved'
+          : saveState === 'saved' && !uniwork.bound
             ? t('savedOk')
             : ''
 
@@ -1220,6 +1221,8 @@ export default function App() {
                 onQueueClear={queueClear}
                 onQueueFocus={queueFocus}
                 onQueueConsume={queueConsume}
+                readOnly={uniwork.readOnly}
+                open={aiOpen}
               />
             )}
           </div>
@@ -1364,7 +1367,7 @@ export default function App() {
         />
       )}
       {!sourceMode && <TableMenu editor={editor} scrollRef={scrollRef} zoom={zoom} />}
-      {editor && !sourceMode && status === 'ready' && aiEnabled && canEdit && (
+      {editor && !sourceMode && status === 'ready' && aiEnabled && canEdit && !uniwork.readOnly && (
         <AiAskPopover
           editor={editor}
           queueFull={editQueue.length >= EDIT_QUEUE_MAX}

@@ -38,8 +38,6 @@ export const vi = {
   ribbonSaveTip: 'Lưu (⌘S)',
   ribbonAutoSave: 'Tự động lưu',
   ribbonAutoSaveTip: 'Khi bật, sẽ tự động lưu vào tệp sau mỗi 30 giây',
-  ribbonAutoSaveUniworkTip:
-    'Tự động lưu đã tắt cho tài liệu UniWork. Hãy dùng Lưu để lưu phiên bản mới.',
   ribbonUndo: 'Hoàn tác',
   ribbonRedo: 'Làm lại',
   ribbonGroupClipboard: 'Bảng tạm',

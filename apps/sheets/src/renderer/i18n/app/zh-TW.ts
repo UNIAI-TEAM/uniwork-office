@@ -435,6 +435,8 @@ export const zhTW = {
   appBridgeUnavailable: '桌面檔案橋接不可用。請重新啟動 Electron 應用程式。',
   appOpenCanceled: '已取消選擇活頁簿。',
   appOpeningWorkbook: '正在開啟活頁簿…',
+  appOpenStalled: '無法開啟活頁簿。',
+  appOpenRetry: '重試',
   appOpened: '已開啟 {name}——儲存格編輯用 ⌘S 儲存回檔案。',
   appOpenFailed: '無法開啟活頁簿。',
   appPageSetupNeedsFile: '請先開啟 XLSX 檔案——版面設定會儲存進檔案。',
@@ -1437,5 +1439,4 @@ export const zhTW = {
     '活頁簿引擎意外停止並已重新啟動。活頁簿已從上次儲存的版本重新開啟；您尚未儲存的變更仍然保留，請盡快儲存。',
   appWebSavedReopenFailed:
     '您的變更已儲存到 UniWork，但此處無法重新開啟活頁簿。請重新載入編輯器後繼續。',
-  appAutoSaveUniworkOff: 'UniWork 文件已關閉自動儲存。請使用「儲存」儲存新版本。',
 } satisfies Record<keyof typeof zh, string>

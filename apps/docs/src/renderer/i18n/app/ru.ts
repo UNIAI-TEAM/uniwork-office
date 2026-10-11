@@ -208,8 +208,6 @@ export const ru = {
   appFootnotePlaceholder: 'Текст сноски…',
   appEndnotePlaceholder: 'Текст концевой сноски…',
   appAutoSave: 'Автосохранение',
-  appAutoSaveUniworkTip:
-    'Автосохранение отключено для документов UniWork. Нажмите «Сохранить», чтобы сохранить новую версию.',
   appAutoSaveTip: 'Автосохранение (каждые 30 секунд и при потере фокуса окном)',
   appSaveShortcutTip: 'Сохранить (⌘S)',
   appUndo: 'Отменить',
@@ -545,4 +543,11 @@ export const ru = {
   appOnlyZotero: 'Цитаты Zotero здесь недоступны.',
   appOnlyOpenPassword: 'Здесь нельзя задать пароль для открытия документа.',
   appOnlyEncrypted: '«{name}» защищён паролем и не может быть открыт здесь.',
+  appFileExportPdf: 'Экспорт в PDF…',
+  appFilePrint: 'Печать…',
+  appPrintNoPrinter:
+    'На этом компьютере нет доступного принтера. Вместо этого можно сохранить документ в PDF.',
+  appPrintFailedPdfHint:
+    'Не удалось напечатать: {error}. Вместо этого можно сохранить документ в PDF.',
+  appPrintSaveAsPdf: 'Сохранить как PDF…',
 } satisfies Record<keyof typeof zh, string>

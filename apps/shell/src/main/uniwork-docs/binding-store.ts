@@ -213,6 +213,10 @@ export class BindingStore {
     return path
   }
 
+  async removeWorkingCopy(dir: string, filename: string): Promise<void> {
+    await unlink(join(dir, basename(filename))).catch(() => undefined)
+  }
+
   async writeIntentPayload(dir: string, bytes: Uint8Array): Promise<void> {
     await atomicWriteFile(join(dir, INTENT_PAYLOAD_FILE), bytes)
   }

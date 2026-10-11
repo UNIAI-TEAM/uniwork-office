@@ -57,6 +57,8 @@ export {
 } from './media'
 export type { MediaCapability } from './media'
 export * from './uniwork-cloud'
+export * from './ai-notice'
+export * from './ai-test-failure'
 export {
   AI_SEARCH_PROVIDERS,
   activeSearchProvider,
@@ -89,6 +91,10 @@ export type {
 } from './registry'
 export { sanitizeAiSettings, sanitizeCliPath, validCliPath } from './ai-settings-guard'
 export { chatForProvider } from './chat'
+export { aiChatFailure, aiChatFailureFromError, aiStreamErrorFields } from './ai-chat-error'
+export { aiChatFailureText } from './ai-chat-error-text'
+export type { AiChatFailure, AiStreamErrorCode, AiStreamErrorFields } from './ai-chat-error'
+export { AI_CHAT_TEST_TIMEOUT_MS, testChatConnection } from './ai-chat-test'
 export { setAiUserAgent, setPrimaryFetch, setRescueFetch } from './fetch'
 export { isAiNetworkError } from './network-error'
 export { isAiOverloadedError } from './overload-error'

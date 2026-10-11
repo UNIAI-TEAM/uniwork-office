@@ -52,6 +52,6 @@ const SYSTEM_PROMPT = [
   '- Keep replies short; the edits are the deliverable. Summarize what you changed in one or two sentences.',
 ].join('\n')
 
-export function createDocumentSkill(access: HtmlDocAccess): AgentSkill {
-  return createHtmlSkill(access, SYSTEM_PROMPT)
+export function createDocumentSkill(access: HtmlDocAccess, isReadOnly?: () => boolean): AgentSkill {
+  return createHtmlSkill(access, SYSTEM_PROMPT, isReadOnly)
 }

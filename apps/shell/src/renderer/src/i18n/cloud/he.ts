@@ -6,6 +6,7 @@ export const he = {
   cloudStateNotEntitled: 'לא כלול בתוכנית שלך',
   cloudStateExhausted: 'נגמרו קרדיטי ה-AI',
   cloudStateUnavailable: 'לא זמין',
+  cloudStateSignedOut: 'לא מחובר',
   cloudStateInactive: 'המנוי אינו פעיל',
   cloudCredits: 'קרדיטי AI',
   cloudCreditsLeft: 'נותרו {remaining} / {limit}',
@@ -31,4 +32,9 @@ export const he = {
   cloudMediaLabel: 'הענן של UniWork',
   cloudMediaDesc: 'משתמש בקרדיטי ה-AI של UniWork של הארגון; אין צורך במפתח.',
   cloudSearchAutoHint: 'קודם הענן של UniWork (צורך קרדיטי AI), אחר כך חיפוש חינמי.',
+  aiTestErrInvalidKey: 'מפתח ה-API חסר או נדחה',
+  aiTestErrNetwork: 'אין חיבור. בדקו את הרשת',
+  aiTestErrLimit: 'הגעתם למגבלת הספק. נסו שוב מאוחר יותר',
+  aiTestErrUnavailable: 'השירות אינו מגיב. נסו שוב מאוחר יותר',
+  aiTestErrMisconfigured: 'ההגדרות חסרות. בדקו את כתובת השירות ואת שדות החשבון',
 } satisfies Record<keyof typeof zh, string>

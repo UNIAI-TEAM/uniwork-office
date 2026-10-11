@@ -8,7 +8,7 @@ export const zhTW = {
   aiStarterPolishAll: '潤飾全文,使語氣更專業',
   aiStarterContinue: '接著現有內容往下寫',
   aiStarterFillTemplate: '找出並填寫文件裡的佔位符',
-  aiBuyPlanBtn: '購買 AI 方案',
+  aiOpenSettingsBtn: '開啟 AI 設定',
   aiPanelTitle: 'uniAI',
   aiOpenAssistant: '開啟 AI 助手',
   aiSummarizeBtn: 'AI 總結',
@@ -174,4 +174,5 @@ export const zhTW = {
   aiCmdImages: '已更新 {count} 張圖片',
   aiCmdToc: '已插入目錄({count} 個項目)',
   aiCmdSkipped: '(略過 {count} 個受保護區塊)',
+  aiViewOnlyNotice: '唯讀文件:AI 可以閱讀並回答問題,但無法編輯。',
 } satisfies Record<keyof typeof zh, string>

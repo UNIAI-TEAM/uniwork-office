@@ -6,6 +6,7 @@ export const de = {
   cloudStateNotEntitled: 'Nicht in Ihrem Tarif',
   cloudStateExhausted: 'KI-Guthaben aufgebraucht',
   cloudStateUnavailable: 'Nicht verfügbar',
+  cloudStateSignedOut: 'Nicht angemeldet',
   cloudStateInactive: 'Abonnement inaktiv',
   cloudCredits: 'KI-Guthaben',
   cloudCreditsLeft: '{remaining} / {limit} übrig',
@@ -31,4 +32,9 @@ export const de = {
   cloudMediaLabel: 'UniWork Cloud',
   cloudMediaDesc: 'Nutzt das UniWork KI-Guthaben Ihrer Organisation; kein Schlüssel nötig.',
   cloudSearchAutoHint: 'Zuerst UniWork Cloud (verbraucht KI-Guthaben), dann kostenlose Suche.',
+  aiTestErrInvalidKey: 'API-Schlüssel fehlt oder wurde abgelehnt',
+  aiTestErrNetwork: 'Keine Verbindung. Prüfen Sie Ihr Netzwerk',
+  aiTestErrLimit: 'Limit des Anbieters erreicht. Später erneut versuchen',
+  aiTestErrUnavailable: 'Dienst antwortet nicht. Später erneut versuchen',
+  aiTestErrMisconfigured: 'Einstellungen unvollständig: Dienstadresse und Kontofelder prüfen',
 } satisfies Record<keyof typeof zh, string>

@@ -274,6 +274,9 @@ interface RibbonProps {
   onOpen: () => void
   onSave: () => void
   onSaveAs: () => void
+  /** File ▸ Export as PDF: a local file export through printToPDF, no system printer needed */
+  onExportPdf?: () => void
+  onPrint?: () => void
   showAi: boolean
   onToggleAi: () => void
   section: SectionSettings | null
@@ -323,6 +326,8 @@ interface RibbonProps {
   darkPage: boolean
   onDarkPage: (v: boolean) => void
   onAiPreset: (instruction: string) => void
+  /** view-only UniWork document: the AI actions that edit it are off (read-only ones stay) */
+  aiEditLocked?: boolean
   /** external request (e.g. native menu Page Setup) to switch to a specific tab */
   tabRequest?: { tab: string; nonce: number } | null
   header: HeaderFooter | null
@@ -724,6 +729,8 @@ function RibbonInner({
   onOpen,
   onSave,
   onSaveAs,
+  onExportPdf,
+  onPrint,
   showAi,
   onToggleAi,
   section,
@@ -760,6 +767,7 @@ function RibbonInner({
   darkPage,
   onDarkPage,
   onAiPreset,
+  aiEditLocked = false,
   tabRequest,
   header,
   onHeader,
@@ -2029,6 +2037,28 @@ function RibbonInner({
                 >
                   {t('ribbonSaveAs')} <span className="file-menu-key">Ctrl+Shift+S</span>
                 </button>
+                {onExportPdf && (
+                  <button
+                    disabled={!hasDoc}
+                    onClick={() => {
+                      setDropdown(null)
+                      onExportPdf()
+                    }}
+                  >
+                    {t('appFileExportPdf')}
+                  </button>
+                )}
+                {onPrint && (
+                  <button
+                    disabled={!hasDoc}
+                    onClick={() => {
+                      setDropdown(null)
+                      onPrint()
+                    }}
+                  >
+                    {t('appFilePrint')} <span className="file-menu-key">Ctrl+P</span>
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -3071,8 +3101,8 @@ function RibbonInner({
                     </button>
                     <button
                       className="rb-big ai-entry"
-                      disabled={docEmpty}
-                      data-tip={t('aiPolishBtn')}
+                      disabled={docEmpty || aiEditLocked}
+                      data-tip={aiEditLocked ? t('aiViewOnlyNotice') : t('aiPolishBtn')}
                       onClick={() =>
                         onAiPreset(
                           t(
@@ -3109,8 +3139,8 @@ function RibbonInner({
                     </button>
                     <button
                       className="rb-big ai-entry"
-                      disabled={docEmpty}
-                      data-tip={t('aiTidyBtn')}
+                      disabled={docEmpty || aiEditLocked}
+                      data-tip={aiEditLocked ? t('aiViewOnlyNotice') : t('aiTidyBtn')}
                       onClick={() => onAiPreset(t('aiTidyPrompt'))}
                     >
                       <span className="rb-big-icon">
@@ -4146,6 +4176,7 @@ function RibbonInner({
             dropdown={dropdown}
             setDropdown={setDropdown}
             onAiPreset={onAiPreset}
+            aiEditLocked={aiEditLocked}
             commentCount={commentCount}
             openCommentCount={openCommentCount}
             resolvedCommentCount={resolvedCommentCount}

@@ -1,7 +1,15 @@
 import { createHash } from 'node:crypto'
-import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import {
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
   UniworkConflictChoice,
@@ -46,13 +54,20 @@ type Fault = {
 }
 
 /** a small UniWork documents server: idempotent uploads and commits, revisions, ACL level */
-function fakeServer(initial: { bytes: Uint8Array; myLevel?: string; title?: string }) {
+function fakeServer(initial: {
+  bytes: Uint8Array
+  myLevel?: string
+  title?: string
+  /** the stored upload name (file.filename); defaults to the title */
+  filename?: string
+}) {
   const state = {
     revision: 41,
     version: 3,
     bytes: initial.bytes,
     myLevel: initial.myLevel ?? 'edit',
     title: initial.title ?? 'Q4 plan.docx',
+    filename: initial.filename ?? initial.title ?? 'Q4 plan.docx',
   }
   const calls: Call[] = []
   const faults: Fault[] = []
@@ -73,7 +88,7 @@ function fakeServer(initial: { bytes: Uint8Array; myLevel?: string; title?: stri
       file_id: 'f',
       version_id: `v${state.version}`,
       version: state.version,
-      filename: state.title,
+      filename: state.filename,
       mime_type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       size_bytes: state.bytes.byteLength,
       checksum_sha256: hex(state.bytes),
@@ -113,7 +128,7 @@ function fakeServer(initial: { bytes: Uint8Array; myLevel?: string; title?: stri
     if (u.pathname === `/api/v1/documents/${DOC}/uploads`) {
       const file = (init.body as FormData).get('file') as Blob
       const bytes = new Uint8Array(await file.arrayBuffer())
-      call.body = { bytes }
+      call.body = { bytes, name: (file as File).name }
       const fault = takeFault('upload')
       if (fault?.kind === 'network') throw new TypeError('fetch failed')
       if (typeof fault?.kind === 'number') return error(fault.kind, fault.code ?? 'x')
@@ -282,6 +297,56 @@ describe('open flow', () => {
     expect(ctx.deps.openPath).toHaveBeenCalledWith(path)
   })
 
+  it('names the working copy and the tab after the Vietnamese title, byte for byte', async () => {
+    const title = 'GO-A9 Báo cáo Trình chiếu.docx'
+    const server = fakeServer({ bytes: enc('v3'), title })
+    const ctx = setup(server)
+    const opened = await ctx.service.openDocument(DOC)
+    if (!opened.ok) throw new Error(opened.error)
+    // the tab is basename(path): it must read the title, not a stand-in
+    expect(basename(opened.value.path)).toBe(title)
+    expect(binding(opened.value.path)).toMatchObject({ title, filename: title })
+    expect(readdirSync(join(opened.value.path, '..'))).toContain(title)
+    // saving uploads under the same name as UTF-8 (a File name, not a byte-mangled header)
+    writeFileSync(opened.value.path, 'edited')
+    await ctx.service.save(opened.value.path)
+    expect((uploads(server)[0]?.body as { name: string }).name).toBe(title)
+  })
+
+  it('a stored upload name with U+FFFD never reaches the tab: the title names the copy', async () => {
+    const title = 'GO-A9 Báo cáo.docx'
+    const server = fakeServer({ bytes: enc('v3'), title, filename: 'GO-A9 B\uFFFDo c\uFFFDo.docx' })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    expect(basename(path)).toBe(title)
+    expect(binding(path).filename).toBe(title)
+  })
+
+  it('a renamed document names the copy after its title, not the original upload name', async () => {
+    const title = 'Bảng tính quý 4'
+    const server = fakeServer({ bytes: enc('v3'), title, filename: 'upload-1.docx' })
+    const ctx = setup(server)
+    expect(basename(await openDoc(ctx))).toBe(title + '.docx')
+  })
+
+  it('a copy named from a corrupt upload name is renamed when it is downloaded again', async () => {
+    const title = 'Báo cáo.docx'
+    const server = fakeServer({ bytes: enc('v3'), title })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    const bad = join(path, '..', 'B\uFFFDo c\uFFFDo.docx')
+    renameSync(path, bad)
+    const b = binding(path)
+    writeFileSync(
+      join(path, '..', BINDING_FILE),
+      JSON.stringify({ ...b, filename: 'B\uFFFDo c\uFFFDo.docx' }),
+    )
+    server.state.revision = 50
+    const again = await openDoc(ctx)
+    expect(basename(again)).toBe(title)
+    expect(readdirSync(join(again, '..')).filter((n) => n.endsWith('.docx'))).toEqual([title])
+  })
+
   it('view level opens read-only and a pending save reopens the local copy without downloading', async () => {
     const server = fakeServer({ bytes: enc('v3'), myLevel: 'view' })
     const ctx = setup(server)
@@ -348,6 +413,76 @@ describe('launch descriptor', () => {
     expect(old.path).toContain(`${DOC}@v2`)
     expect(binding(old.path)).toMatchObject({ access: 'view', baseVersion: 2 })
     expect(server.calls.some((c) => c.url.endsWith('/download?version=2'))).toBe(true)
+  })
+
+  const viewTicket = (version: number) => ({
+    receiptId: 'r',
+    redeemedAt: '2026-09-30T10:01:02Z',
+    id: DOC,
+    organizationId: 'org_a',
+    workspaceId: 'ws_1',
+    title: 'Q4 plan',
+    operation: 'view' as const,
+    version,
+    revision: '41',
+    downloadPath: `/api/v1/documents/${DOC}/download?version=${version}`,
+  })
+
+  it('a version ticket naming the current version is read-only even for an editor', async () => {
+    // a ticket is never upgraded to edit by the client: the web omits
+    // `version` for an "edit the current version" handoff
+    const server = fakeServer({ bytes: enc('v3'), myLevel: 'manage' })
+    const ctx = setup(server)
+    const opened = await ctx.service.openFromServer(DOC, viewTicket(3))
+    expect(binding(opened.path)).toMatchObject({ access: 'view', baseVersion: 3 })
+    expect(ctx.deps.openPath).toHaveBeenLastCalledWith(opened.path)
+    expect(ctx.statuses.at(-1)).toMatchObject({ access: 'view' })
+  })
+
+  it('a current-version view ticket focuses the open tab of the document instead of a duplicate', async () => {
+    const server = fakeServer({ bytes: enc('v3'), myLevel: 'manage' })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    ctx.deps.isPathOpen.mockImplementation((p: string) => p === path)
+    ctx.deps.openPath.mockClear()
+    const downloads = () => server.calls.filter((c) => c.url.includes('/download')).length
+    const before = downloads()
+    const opened = await ctx.service.openFromServer(DOC, viewTicket(3))
+    expect(opened.path).toBe(path)
+    expect(opened.path).not.toContain('@v')
+    expect(ctx.deps.openPath).toHaveBeenCalledTimes(1)
+    expect(ctx.deps.openPath).toHaveBeenCalledWith(path)
+    // the open tab is neither downgraded nor reloaded
+    expect(binding(path)).toMatchObject({ access: 'edit', baseVersion: 3 })
+    expect(downloads()).toBe(before)
+  })
+
+  it('a current-version view ticket opens a read-only copy when no tab shows the document', async () => {
+    const server = fakeServer({ bytes: enc('v3'), myLevel: 'manage' })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    const opened = await ctx.service.openFromServer(DOC, viewTicket(3))
+    expect(opened.path).not.toBe(path)
+    expect(opened.path).toContain(`${DOC}@v3`)
+    expect(binding(opened.path)).toMatchObject({ access: 'view', baseVersion: 3 })
+    expect(binding(path)).toMatchObject({ access: 'edit' })
+  })
+
+  it('a ticket without version keeps the live access; operation view is read-only', async () => {
+    const server = fakeServer({ bytes: enc('v3'), myLevel: 'manage' })
+    const ctx = setup(server)
+    const edit = await ctx.service.openFromServer(DOC, { ...viewTicket(0), operation: 'edit' })
+    expect(edit.path).not.toContain('@v')
+    expect(binding(edit.path)).toMatchObject({ access: 'edit' })
+    const view = await ctx.service.openFromServer(DOC, viewTicket(0))
+    expect(binding(view.path)).toMatchObject({ access: 'view' })
+  })
+
+  it('a current-version view ticket of a view-only document is read-only', async () => {
+    const server = fakeServer({ bytes: enc('v3'), myLevel: 'view' })
+    const ctx = setup(server)
+    const opened = await ctx.service.openFromServer(DOC, viewTicket(3))
+    expect(binding(opened.path)).toMatchObject({ access: 'view' })
   })
 })
 
@@ -633,6 +768,35 @@ describe('local saves never depend on a live session (review r1 BE-1)', () => {
     // signed in again, Retry sends it
     ctx.signInAs('acc_1')
     expect(await ctx.service.save(path)).toMatchObject({ state: 'saved' })
+  })
+
+  it('reopening a copy left in signed-out by an earlier session reads ready/dirty, not "Sign in again"', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    // an earlier session ended while the copy was saved locally
+    ctx.signOut()
+    writeFileSync(path, 'v4 while signed out')
+    ctx.service.onUserSave(path)
+    await flushSaves()
+    expect(binding(path)).toMatchObject({ state: 'signed-out' })
+    // the session is valid again and the document is opened (the web launch)
+    ctx.signInAs('acc_1')
+    await ctx.service.openFromServer(DOC)
+    expect(binding(path)).toMatchObject({ state: 'dirty' })
+    expect(binding(path).error).toBeUndefined()
+    expect(ctx.statuses.at(-1)).toMatchObject({ state: 'dirty' })
+    expect(await ctx.service.save(path)).toMatchObject({ state: 'saved' })
+
+    // a copy whose bytes match UniWork has nothing to send: it reads ready
+    ctx.signOut()
+    ctx.service.onUserSave(path)
+    await flushSaves()
+    expect(binding(path)).toMatchObject({ state: 'signed-out' })
+    ctx.signInAs('acc_1')
+    await ctx.service.openFromServer(DOC)
+    expect(binding(path)).toMatchObject({ state: 'ready' })
+    expect(ctx.statuses.at(-1)).toMatchObject({ state: 'ready' })
   })
 
   it('a fresh start with no session yet (restoring) keeps the last account editable; another live account is read-only', async () => {
@@ -1080,5 +1244,245 @@ describe('Retry replays a pending intent, it does not rewrite the file (F8)', ()
     reserializingModule(ctx)
     expect(await ctx.service.confirmClose(path)).toBe(true)
     expect(ctx.deps.requestModuleSave).toHaveBeenCalledWith(path, expect.any(Function))
+  })
+})
+
+describe('editor state on the chip (one state source)', () => {
+  const last = (ctx: ReturnType<typeof setup>) => ctx.statuses[ctx.statuses.length - 1]
+
+  it('an unsaved edit in the editor reads dirty; the explicit Save then shows saving and saved', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    expect(await ctx.service.docStatus(path)).toMatchObject({ state: 'ready' })
+
+    ctx.service.noteEditorDirty(path, true)
+    expect(last(ctx)).toMatchObject({ path, state: 'dirty' })
+    expect(await ctx.service.docStatus(path)).toMatchObject({ state: 'dirty' })
+    expect(await ctx.service.activeDocStatus()).toBeNull()
+
+    // the module's Save writes the editor's bytes, then reports the user save
+    ctx.statuses.length = 0
+    writeFileSync(path, 'v4')
+    ctx.service.onUserSave(path)
+    await vi.waitFor(() => expect(last(ctx)).toMatchObject({ state: 'saved' }))
+    expect(ctx.statuses.map((s) => s.state)).toEqual(['saving', 'saved'])
+    expect(commits(server)).toHaveLength(1)
+    // the editor's clean report after the save changes nothing
+    ctx.service.noteEditorDirty(path, false)
+    expect(ctx.statuses.map((s) => s.state)).toEqual(['saving', 'saved'])
+  })
+
+  it('a poll answer from a pass that began before the Save does not flash dirty again', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    ctx.service.noteEditorDirty(path, true)
+    const mark = ctx.service.saveMark() // a pass starts here, still sees the edits
+    writeFileSync(path, 'v4')
+    ctx.service.onUserSave(path)
+    await vi.waitFor(() => expect(last(ctx)).toMatchObject({ state: 'saved' }))
+    ctx.statuses.length = 0
+    ctx.service.noteEditorDirty(path, true, mark) // the stale answer arrives
+    expect(ctx.statuses).toHaveLength(0)
+    expect(await ctx.service.docStatus(path)).toMatchObject({ state: 'saved' })
+    // a pass that began after the Save is believed
+    ctx.service.noteEditorDirty(path, true, ctx.service.saveMark())
+    expect(last(ctx)).toMatchObject({ state: 'dirty' })
+  })
+
+  it('reports only changes, and never hides a conflict, offline or signed-out state', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    ctx.statuses.length = 0
+    ctx.service.noteEditorDirty(path, false)
+    expect(ctx.statuses).toHaveLength(0)
+    ctx.service.noteEditorDirty(path, true)
+    ctx.service.noteEditorDirty(path, true)
+    expect(ctx.statuses.map((s) => s.state)).toEqual(['dirty'])
+
+    writeFileSync(path, 'v4')
+    server.faults.push({ route: 'upload', kind: 'network' })
+    expect(await ctx.service.save(path)).toMatchObject({ state: 'offline' })
+    ctx.service.noteEditorDirty(path, true)
+    expect(last(ctx)).toMatchObject({ state: 'offline' })
+    expect(await ctx.service.docStatus(path)).toMatchObject({ state: 'offline' })
+  })
+
+  it('a view-only copy and a plain local file ignore editor reports', async () => {
+    const server = fakeServer({ bytes: enc('v3'), myLevel: 'view' })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    ctx.statuses.length = 0
+    ctx.service.noteEditorDirty(path, true)
+    ctx.service.noteEditorDirty(join(dir, 'plain.docx'), true)
+    expect(ctx.statuses).toHaveLength(0)
+    expect(await ctx.service.docStatus(path)).toMatchObject({ state: 'ready', access: 'view' })
+  })
+
+  it('offline Retry that lands is pushed as saved', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'v4')
+    server.faults.push({ route: 'upload', kind: 'network' })
+    expect(await ctx.service.save(path)).toMatchObject({ state: 'offline' })
+    ctx.statuses.length = 0
+    expect(await ctx.service.save(path)).toMatchObject({ state: 'saved' })
+    expect(ctx.statuses.map((s) => s.state)).toEqual(['saving', 'saved'])
+  })
+})
+
+describe('the conflict dialog belongs to the document that hit the conflict (GOA9-r2-01/07)', () => {
+  const SHEET = '01J8X4SHEET1P2Q3R4S5T6U7V'
+
+  /** a docx and an xlsx of the same account, both in conflict */
+  async function twoConflicts(opts: Parameters<typeof setup>[1] = {}) {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server, opts)
+    const docx = await openDoc(ctx)
+    server.state.revision = 45
+    writeFileSync(docx, 'my docx')
+    await ctx.service.save(docx)
+    expect(binding(docx)).toMatchObject({ state: 'conflict' })
+    const sheetDir = join(docx, '..', '..', SHEET)
+    const xlsx = join(sheetDir, 'Budget.xlsx')
+    await ctx.service.store.writeWorkingCopy(sheetDir, 'Budget.xlsx', enc('my xlsx'))
+    await ctx.service.store.write(sheetDir, {
+      schema: 1,
+      documentId: SHEET,
+      workspaceId: 'ws_1',
+      orgId: 'org_a',
+      title: 'Budget.xlsx',
+      filename: 'Budget.xlsx',
+      format: 'xlsx',
+      access: 'edit',
+      baseRevision: '7',
+      baseVersion: 2,
+      baseChecksum: hex(enc('base xlsx')),
+      state: 'conflict',
+      error: 'conflict',
+      serverRevision: '8',
+    })
+    return { server, ctx, docx, xlsx }
+  }
+
+  /** a native dialog that stays open until it is answered or closed by its signal */
+  function heldDialog(ctx: ReturnType<typeof setup>, onAbort: UniworkConflictChoice = 'later') {
+    let answer: (choice: UniworkConflictChoice) => void = () => undefined
+    let seen: AbortSignal | undefined
+    vi.mocked(ctx.ui.chooseConflict).mockImplementationOnce(
+      (_title, signal) =>
+        new Promise((resolveChoice) => {
+          seen = signal
+          answer = resolveChoice
+          signal?.addEventListener('abort', () => resolveChoice(onAbort))
+        }),
+    )
+    return { answer: (choice: UniworkConflictChoice) => answer(choice), signal: () => seen }
+  }
+
+  it('a conflict on the non-focused xlsx names the xlsx and copies the xlsx', async () => {
+    const { ctx, xlsx } = await twoConflicts({ choice: 'save-local-copy' })
+    expect(await ctx.service.resolveConflict(xlsx)).toMatchObject({
+      path: xlsx,
+      state: 'conflict',
+    })
+    expect(ctx.ui.chooseConflict).toHaveBeenCalledWith('Budget.xlsx', expect.any(AbortSignal))
+    expect(ctx.ui.pickCopyPath).toHaveBeenCalledWith('Budget', 'xlsx')
+    expect(readFileSync(join(dir, 'Budget (my copy).xlsx'), 'utf8')).toBe('my xlsx')
+  })
+
+  it('a docx dialog still open closes as "Decide later" before the xlsx dialog opens', async () => {
+    const { ctx, docx, xlsx } = await twoConflicts()
+    // the docx dialog answers "Save a copy" only after it was closed: too late to count
+    const held = heldDialog(ctx, 'save-local-copy')
+    const docxFlow = ctx.service.resolveConflict(docx)
+    await vi.waitFor(() => expect(held.signal()).toBeDefined())
+    vi.mocked(ctx.ui.chooseConflict).mockResolvedValueOnce('save-local-copy')
+    const xlsxStatus = await ctx.service.resolveConflict(xlsx)
+    expect(held.signal()?.aborted).toBe(true)
+    expect(await docxFlow).toMatchObject({ path: docx, state: 'conflict' })
+    expect(xlsxStatus).toMatchObject({ path: xlsx, state: 'conflict' })
+    expect(vi.mocked(ctx.ui.chooseConflict).mock.calls.map(([title]) => title)).toEqual([
+      'Q4 plan.docx',
+      'Budget.xlsx',
+    ])
+    // exactly one copy, of the xlsx, typed xlsx
+    expect(vi.mocked(ctx.ui.pickCopyPath).mock.calls).toEqual([['Budget', 'xlsx']])
+    expect(readdirSync(dir).filter((name) => name.includes('(my copy)'))).toEqual([
+      'Budget (my copy).xlsx',
+    ])
+  })
+
+  it('leaving the tab closes its chip dialog; the close prompt dialog stays', async () => {
+    const { ctx, docx } = await twoConflicts({ choice: 'overwrite' })
+    const held = heldDialog(ctx)
+    const flow = ctx.service.resolveConflict(docx)
+    await vi.waitFor(() => expect(held.signal()).toBeDefined())
+    ctx.service.noteActivePath(docx.toUpperCase())
+    if (process.platform === 'win32') expect(held.signal()?.aborted).toBe(false)
+    ctx.service.noteActivePath(undefined)
+    expect(held.signal()?.aborted).toBe(true)
+    expect(await flow).toMatchObject({ state: 'conflict' })
+    expect(binding(docx)).toMatchObject({ state: 'conflict' })
+
+    const fromClose = heldDialog(ctx)
+    vi.mocked(ctx.ui.chooseUnsavedClose).mockResolvedValueOnce('resolve').mockResolvedValue('close')
+    const closing = ctx.service.confirmClose(docx)
+    await vi.waitFor(() => expect(fromClose.signal()).toBeDefined())
+    ctx.service.noteActivePath(undefined)
+    expect(fromClose.signal()?.aborted).toBe(false)
+    fromClose.answer('later')
+    expect(await closing).toBe(true)
+  })
+
+  it('a second Resolve of the same document does not open a second dialog', async () => {
+    const { ctx, xlsx } = await twoConflicts()
+    const held = heldDialog(ctx)
+    const first = ctx.service.resolveConflict(xlsx)
+    await vi.waitFor(() => expect(held.signal()).toBeDefined())
+    expect(await ctx.service.resolveConflict(xlsx)).toMatchObject({ state: 'conflict' })
+    expect(ctx.ui.chooseConflict).toHaveBeenCalledTimes(1)
+    held.answer('later')
+    await first
+  })
+
+  it('a choice made after the document left conflict is not applied', async () => {
+    const { server, ctx, docx } = await twoConflicts()
+    const held = heldDialog(ctx)
+    const flow = ctx.service.resolveConflict(docx)
+    await vi.waitFor(() => expect(held.signal()).toBeDefined())
+    // resolved elsewhere meanwhile (e.g. the close prompt's discard)
+    writeFileSync(
+      join(docx, '..', BINDING_FILE),
+      JSON.stringify({ ...binding(docx), state: 'saved', error: undefined }),
+    )
+    const before = commits(server).length
+    const moduleSaves = ctx.deps.requestModuleSave.mock.calls.length
+    held.answer('overwrite')
+    expect(await flow).toMatchObject({ state: 'saved' })
+    expect(commits(server).length).toBe(before)
+    expect(ctx.deps.requestModuleSave).toHaveBeenCalledTimes(moduleSaves)
+  })
+
+  it('the discard confirmation is closed with its conflict dialog', async () => {
+    const { ctx, xlsx } = await twoConflicts({ choice: 'open-latest' })
+    let discardSignal: AbortSignal | undefined
+    vi.mocked(ctx.ui.confirmDiscard).mockImplementationOnce(
+      (_title, signal) =>
+        new Promise((resolveConfirm) => {
+          discardSignal = signal
+          signal?.addEventListener('abort', () => resolveConfirm(false))
+        }),
+    )
+    const flow = ctx.service.resolveConflict(xlsx)
+    await vi.waitFor(() => expect(discardSignal).toBeDefined())
+    expect(ctx.ui.confirmDiscard).toHaveBeenCalledWith('Budget.xlsx', expect.any(AbortSignal))
+    ctx.service.closeConflictPrompt()
+    expect(await flow).toMatchObject({ path: xlsx, state: 'conflict' })
+    expect(readFileSync(xlsx, 'utf8')).toBe('my xlsx')
+    expect(ctx.deps.reloadPath).not.toHaveBeenCalled()
   })
 })

@@ -3664,6 +3664,7 @@ export function App() {
                   onBeforeRun={flushNotes}
                   currentFilePath={path}
                   editQueue={editQueue}
+                  readOnly={uniwork.readOnly}
                   onQueueEditInstruction={(key, instruction) =>
                     setEditQueue((prev) =>
                       prev.map((it) => (it.key === key ? { ...it, instruction } : it)),

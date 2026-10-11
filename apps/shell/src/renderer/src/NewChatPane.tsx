@@ -6,6 +6,7 @@ import { applyAgentIntent, undoAgentAddItem } from './agent-intent-apply'
 import { emitAgentIntentNavigate } from './agent-intent-bus'
 import { buildMyAiContextPack, type MyAiContextPack } from './context-manager'
 import { useI18n } from './locale'
+import { useUniworkCloudStatus } from './UniworkCloudPane'
 import { recordAiTurnUsage } from './ai-usage-ledger'
 import { appendMyAiAudit } from './my-ai-audit'
 import {
@@ -50,7 +51,7 @@ import {
 import { streamMyAiReply } from './my-ai-stream'
 import {
   aiSettingsReady,
-  buyAiPlanLabel,
+  openAiSettingsLabel,
   looksLikeMissingAiActivation,
   softAiActivationMessage,
 } from './my-ai-activation'
@@ -240,6 +241,7 @@ interface Props {
 export function NewChatPane({ practiceId, ensureWorkbench }: Props): ReactElement {
   const { lang } = useI18n()
   const vi = lang === 'vi'
+  const cloud = useUniworkCloudStatus()
   const label = (a: string, b: string) => (vi ? a : b)
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
@@ -388,31 +390,31 @@ export function NewChatPane({ practiceId, ensureWorkbench }: Props): ReactElemen
     setAttachments((prev) => prev.filter((a) => a.path !== path))
   }
 
-  const buyAiChoice = (): ChatChoice => ({
-    id: 'buy-ai-plan',
-    label: buyAiPlanLabel(vi),
+  const openAiSettingsChoice = (): ChatChoice => ({
+    id: 'open-ai-settings',
+    label: openAiSettingsLabel(vi),
     kind: 'open_settings',
-    value: 'account',
+    value: 'aiModel',
   })
 
   const activationFailure = (
     msgId: string | undefined,
     showBubble: boolean,
   ): { ok: false; error: string; messageId?: string } => {
-    const error = softAiActivationMessage(vi)
+    const error = softAiActivationMessage(vi, cloud?.state)
     if (showBubble && msgId) {
       patchMessage(msgId, {
         text: error,
         streaming: false,
         role: 'system',
-        choices: [buyAiChoice()],
+        choices: [openAiSettingsChoice()],
         choicesResolved: false,
       })
     } else if (showBubble) {
       const id = push({
         role: 'system',
         text: error,
-        choices: [buyAiChoice()],
+        choices: [openAiSettingsChoice()],
       })
       return { ok: false, error, messageId: id }
     }
@@ -483,6 +485,7 @@ export function NewChatPane({ practiceId, ensureWorkbench }: Props): ReactElemen
         user: opts.user,
         images: opts.images,
         settings,
+        lang,
         onDelta: (text) => {
           if (msgId) patchMessage(msgId, { text, streaming: true })
         },

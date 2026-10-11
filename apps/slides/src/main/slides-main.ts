@@ -556,7 +556,10 @@ function hostFor(wc: WebContents): HostIO {
     },
     saveAsTarget: async (currentPath, defaultName) => {
       const options = {
-        defaultPath: saveAsSuggestion(currentPath, defaultName),
+        // a UniWork working copy's Save As starts outside its hidden folder
+        defaultPath: uniworkIsBound(currentPath)
+          ? defaultName
+          : saveAsSuggestion(currentPath, defaultName),
         filters: [{ name: 'PowerPoint', extensions: ['pptx'] }],
       }
       const r = await showSaveDialogWithMemory(dialog, dialogParent(), options, getDraftsDir())
@@ -1854,8 +1857,9 @@ export function buildSlidesMenu(): Menu {
         { type: 'separator' },
         closeActiveTabHook
           ? {
-              label: isMac ? tm('menuClose') : tm('menuQuit'),
-              accelerator: isMac ? 'CmdOrCtrl+W' : 'CmdOrCtrl+Q',
+              // closes the tab on every platform (the hook only exists in tab mode)
+              label: tm('menuClose'),
+              accelerator: 'CmdOrCtrl+W',
               click: () => closeActiveTabHook?.(),
             }
           : isMac

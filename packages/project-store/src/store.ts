@@ -673,6 +673,67 @@ export class ProjectStore {
     this.writeIndex(index)
   }
 
+  /**
+   * Forgets files for good: their project membership, their chat mapping and
+   * their transcripts, which are deleted rather than moved to `.trash` (the
+   * caller decided the next person on this computer must not read them, e.g.
+   * the AI history of another account's documents). Unknown paths are ignored.
+   */
+  forgetFiles(filePaths: readonly string[]): void {
+    if (filePaths.length === 0) return
+    const index = this.readIndex()
+    let indexChanged = false
+    const touchedProjects = new Set<string>()
+    for (const filePath of filePaths) {
+      const pidKey = this.findMapKey(index.fileMap, filePath)
+      const projectId = pidKey !== undefined ? index.fileMap[pidKey] : undefined
+      if (pidKey !== undefined) {
+        delete index.fileMap[pidKey]
+        indexChanged = true
+      }
+      const chatKey = this.findMapKey(index.chatIdByPath, filePath)
+      const chatIds = new Set<string>([
+        ProjectStore.chatIdForFile(filePath),
+        ...ProjectStore.legacyChatIdsForFile(filePath),
+      ])
+      if (chatKey !== undefined) {
+        chatIds.add(index.chatIdByPath![chatKey]!)
+        delete index.chatIdByPath![chatKey]
+        indexChanged = true
+      }
+      const owners = new Set(['default', ...(projectId ? [projectId] : [])])
+      for (const owner of owners) {
+        for (const chatId of chatIds) this.deleteChat(owner, chatId)
+        touchedProjects.add(owner)
+      }
+    }
+    if (indexChanged) this.writeIndex(index)
+    const forgotten = new Set(filePaths.map((f) => canonicalPathKey(f)))
+    for (const projectId of touchedProjects) {
+      const proj = this.readProject(projectId)
+      if (!proj) continue
+      const files = proj.files.filter((f) => !forgotten.has(canonicalPathKey(f)))
+      if (files.length === proj.files.length) continue
+      proj.files = files
+      proj.updatedAt = nowIso()
+      this.writeProject(proj)
+    }
+  }
+
+  /** Deletes one transcript (and its unwritten opening messages); a missing one is fine. */
+  private deleteChat(projectId: string, chatId: string): void {
+    const key = this.seqKey(projectId, chatId)
+    this.pendingFirstWrite.delete(key)
+    this.seqCounters.delete(key)
+    try {
+      unlinkSync(this.chatPath(projectId, chatId))
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
+        console.warn('[project-store] forgetFiles could not delete a chat:', err)
+      }
+    }
+  }
+
   /** Soft-deletes a transcript the way deleteProject does with a project directory. */
   private trashChat(projectId: string, chatId: string): void {
     const src = this.chatPath(projectId, chatId)

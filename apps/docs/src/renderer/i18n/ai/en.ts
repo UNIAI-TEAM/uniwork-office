@@ -8,7 +8,7 @@ export const en = {
   aiStarterPolishAll: 'Polish the whole document for a more professional tone',
   aiStarterContinue: 'Continue writing from where the document leaves off',
   aiStarterFillTemplate: 'Find and fill in the placeholders in this document',
-  aiBuyPlanBtn: 'Buy AI plan',
+  aiOpenSettingsBtn: 'Open AI settings',
   aiPanelTitle: 'uniAI',
   aiOpenAssistant: 'Open AI assistant',
   aiSummarizeBtn: 'AI Summarize',
@@ -182,4 +182,6 @@ export const en = {
   aiCmdImages: 'Updated {count} image(s)',
   aiCmdToc: 'Inserted a table of contents ({count} entries)',
   aiCmdSkipped: ' ({count} protected block(s) skipped)',
+  aiViewOnlyNotice:
+    'View-only document: AI can read it and answer questions, but editing is turned off.',
 } satisfies Record<keyof typeof zh, string>

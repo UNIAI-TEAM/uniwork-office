@@ -527,6 +527,8 @@ export const ja = {
     'デスクトップファイルブリッジが利用できません。Electron アプリを再起動してください。',
   appOpenCanceled: 'ブックの選択をキャンセルしました。',
   appOpeningWorkbook: 'ブックを開いています…',
+  appOpenStalled: 'ブックを開けませんでした。',
+  appOpenRetry: '再試行',
   appOpened: '{name} を開きました — セルの編集は ⌘S でファイルに保存されます。',
   appOpenFailed: 'ブックを開けません。',
   appPageSetupNeedsFile: '先に XLSX ファイルを開いてください。ページ設定はファイルに保存されます。',
@@ -1580,6 +1582,4 @@ export const ja = {
     'ブックのエンジンが予期せず停止し、再起動しました。ブックは最後に保存した状態から開き直しました。未保存の変更は保持されているので、早めに保存してください。',
   appWebSavedReopenFailed:
     '変更は UniWork に保存されましたが、ここでブックを開き直せませんでした。エディターを再読み込みして作業を続けてください。',
-  appAutoSaveUniworkOff:
-    'UniWork のドキュメントでは自動保存はオフです。新しいバージョンを保存するには「保存」を使ってください。',
 } satisfies Record<keyof typeof zh, string>

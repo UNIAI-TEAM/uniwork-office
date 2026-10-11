@@ -8298,6 +8298,13 @@ body.docs-crop-active
   font-size: 13px;
 }
 
+/* a setup / plan state (no model yet, plan or credits), not a failure */
+.ai-msg-notice {
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 .ai-msg-actions {
   margin-top: 8px;
   display: flex;
@@ -9129,6 +9136,12 @@ body.docs-crop-active
 .ai-attachment-remove:hover {
   background: var(--hover);
   color: var(--text);
+}
+
+.ai-viewonly-notice {
+  margin-bottom: 7px;
+  font-size: 11.5px;
+  color: var(--text-secondary);
 }
 
 .ai-attach-notice {
@@ -10152,6 +10165,23 @@ body.docs-crop-active
 
 .print-options .print-range-input.invalid {
   border-color: var(--danger);
+}
+
+.print-problem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--hover);
+  font-size: 13px;
+  color: var(--text);
+}
+
+.print-problem span {
+  flex: 1;
 }
 
 .print-page-count {

@@ -89,4 +89,7 @@ export const hi = {
 
   uwRecentBadge: 'UniWork',
   uwRecentBadgeTip: 'UniWork में संग्रहीत दस्तावेज़',
+
+  setCliLinkReady: 'कमांड लाइन टूल उपलब्ध है।',
+  setAutoSaveUniworkNote: 'UniWork दस्तावेज़ों पर लागू नहीं होता।',
 } satisfies Record<keyof typeof zh, string>

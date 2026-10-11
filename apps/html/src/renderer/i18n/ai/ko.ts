@@ -173,4 +173,5 @@ export const ko = {
   aiStarterAnnouncementPrompt: '제품 공지 초안을 써 주세요. 제품과 핵심 내용: ',
   aiStarterGuide: '사용 가이드 쓰기',
   aiStarterGuidePrompt: '사용 가이드를 써 주세요. 설명할 절차: ',
+  aiViewOnlyNotice: '보기 전용 문서: AI는 내용을 읽고 질문에 답할 수 있지만 편집할 수는 없습니다.',
 } satisfies Record<keyof typeof zh, string>

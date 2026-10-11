@@ -6,6 +6,7 @@ export const ar = {
   cloudStateNotEntitled: 'غير مضمّن في خطتك',
   cloudStateExhausted: 'نفدت أرصدة الذكاء الاصطناعي',
   cloudStateUnavailable: 'غير متاح',
+  cloudStateSignedOut: 'غير مسجّل الدخول',
   cloudStateInactive: 'الاشتراك غير نشط',
   cloudCredits: 'أرصدة الذكاء الاصطناعي',
   cloudCreditsLeft: 'متبقٍ {remaining} / {limit}',
@@ -30,4 +31,9 @@ export const ar = {
   cloudMediaLabel: 'سحابة UniWork',
   cloudMediaDesc: 'يستخدم أرصدة الذكاء الاصطناعي من UniWork لمؤسستك؛ لا يلزم مفتاح.',
   cloudSearchAutoHint: 'سحابة UniWork أولًا (تستهلك أرصدة الذكاء الاصطناعي)، ثم البحث المجاني.',
+  aiTestErrInvalidKey: 'مفتاح API مفقود أو مرفوض',
+  aiTestErrNetwork: 'تعذّر الاتصال. تحقّق من الشبكة',
+  aiTestErrLimit: 'تم بلوغ حد المزوّد. حاول لاحقًا',
+  aiTestErrUnavailable: 'الخدمة لا تستجيب. حاول لاحقًا',
+  aiTestErrMisconfigured: 'الإعدادات غير مكتملة. تحقق من عنوان الخدمة وحقول الحساب',
 } satisfies Record<keyof typeof zh, string>

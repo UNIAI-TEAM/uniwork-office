@@ -475,6 +475,8 @@ export const ar = {
   appBridgeUnavailable: 'جسر ملفات سطح المكتب غير متوفر. أعد تشغيل تطبيق Electron.',
   appOpenCanceled: 'أُلغي اختيار المصنف.',
   appOpeningWorkbook: 'جارٍ فتح المصنف…',
+  appOpenStalled: 'تعذّر فتح المصنف.',
+  appOpenRetry: 'إعادة المحاولة',
   appOpened: 'فُتح {name} — تُحفظ تعديلات الخلايا في الملف بـ ⌘S.',
   appOpenFailed: 'يتعذر فتح المصنف.',
   appPageSetupNeedsFile: 'افتح ملف XLSX أولاً — تُحفظ إعدادات الصفحة في الملف.',
@@ -1493,5 +1495,4 @@ export const ar = {
     'توقف محرك المصنف بشكل غير متوقع وتمت إعادة تشغيله. أُعيد فتح المصنف من آخر نسخة محفوظة؛ تم الاحتفاظ بتغييراتك غير المحفوظة، لذا احفظ قريبًا.',
   appWebSavedReopenFailed:
     'تم حفظ تغييراتك في UniWork، لكن تعذّرت إعادة فتح المصنف هنا. أعد تحميل المحرر لمتابعة العمل.',
-  appAutoSaveUniworkOff: 'الحفظ التلقائي متوقف لمستندات UniWork. استخدم «حفظ» لحفظ إصدار جديد.',
 } satisfies Record<keyof typeof zh, string>

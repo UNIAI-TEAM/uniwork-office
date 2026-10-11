@@ -2,12 +2,18 @@ import {
   aiPanelWidthAtPointer,
   AiPanelSideButton,
   AiModelPicker,
+  useCloudSignedIn,
   type AiModelPickerBridge,
 } from '@genoffice/ui'
 import { useEffect, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent, ReactElement } from 'react'
 import { AgentLoop } from '@genoffice/agent-core'
-import { imageGenerationAvailable, type AiSettings } from '@genoffice/ai-provider/browser'
+import {
+  aiNoticeBody,
+  aiNoticeKind,
+  imageGenerationAvailable,
+  type AiSettings,
+} from '@genoffice/ai-provider/browser'
 import { AiComposer, AiScopeQuote, AiTypingIndicator, type AiScopeQuoteData } from '@genoffice/ui'
 import { platform } from '../capabilities'
 import { aiLangDirective, t as tGlobal, useI18n } from '../i18n/locale'
@@ -98,6 +104,7 @@ export function AiPanel({
   onRunDone,
   onClearSelection,
   open = true,
+  readOnly = false,
 }: {
   api: PdfAppDeps
   /** Absolute path of the open PDF (chat history is keyed to it) */
@@ -111,6 +118,8 @@ export function AiPanel({
   onClearSelection?: () => void
   /** false keeps the instance mounted (chat state) but skips panel render work */
   open?: boolean
+  /** a view-only document: the assistant reads and answers, it never edits */
+  readOnly?: boolean
 }): ReactElement | null {
   const { lang, t } = useI18n()
   const [chat, setChat] = useState<ChatEntry[]>([])
@@ -273,24 +282,7 @@ export function AiPanel({
   const settingsRef = useRef<AiSettings | null>(null)
 
   /** UniWork cloud sign-in state (signed in + entitled, from the shell main status) for the media tool gates */
-  const gskLoggedInRef = useRef(false)
-  useEffect(() => {
-    let alive = true
-    const refresh = () => {
-      void window.pdfApi
-        ?.gskStatus()
-        .then((s) => {
-          if (alive) gskLoggedInRef.current = !!s?.loggedIn
-        })
-        .catch(() => {})
-    }
-    refresh()
-    window.addEventListener('focus', refresh)
-    return () => {
-      alive = false
-      window.removeEventListener('focus', refresh)
-    }
-  }, [])
+  const { loggedInRef: gskLoggedInRef } = useCloudSignedIn(() => window.pdfApi?.gskStatus(), open)
   const langRef = useRef(lang)
   langRef.current = lang
   const apiRef = useRef(api)
@@ -735,12 +727,12 @@ export function AiPanel({
           return (
             <div
               key={i}
-              className={`ai-msg ai-msg-assistant${entry.isError ? ' ai-msg-error' : ''}`}
+              className={`ai-msg ai-msg-assistant${entry.isError && !aiNoticeKind(entry.text) ? ' ai-msg-error' : ''}`}
             >
               {hasTools && <ToolChipList tools={entry.tools!} />}
               {entry.text && (
                 <div dir="auto">
-                  <Markdown text={entry.text} nav={pdfNav} />
+                  <Markdown text={aiNoticeBody(entry.text)} nav={pdfNav} />
                 </div>
               )}
             </div>
@@ -777,6 +769,11 @@ export function AiPanel({
       </div>
 
       <div className="ai-composer">
+        {readOnly && (
+          <div className="ai-readonly-notice" role="note">
+            {t('aiViewOnlyNotice')}
+          </div>
+        )}
         <AiComposer
           value={prompt}
           busy={busy}

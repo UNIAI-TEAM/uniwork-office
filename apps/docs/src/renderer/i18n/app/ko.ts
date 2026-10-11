@@ -216,8 +216,6 @@ export const ko = {
   appEndnotePlaceholder: '미주 내용…',
   // Quick actions bar
   appAutoSave: '자동 저장',
-  appAutoSaveUniworkTip:
-    'UniWork 문서에서는 자동 저장이 꺼져 있습니다. 새 버전을 저장하려면 ‘저장’을 사용하세요.',
   appAutoSaveTip: '자동 저장(30초마다, 창 포커스가 해제될 때)',
   appSaveShortcutTip: '저장 (⌘S)',
   appUndo: '실행 취소',
@@ -562,4 +560,10 @@ export const ko = {
   appOnlyZotero: '여기서는 Zotero 인용을 사용할 수 없습니다.',
   appOnlyOpenPassword: '여기서는 문서를 여는 암호를 설정할 수 없습니다.',
   appOnlyEncrypted: '"{name}" 문서는 암호로 보호되어 있어 여기서는 열 수 없습니다.',
+  appFileExportPdf: 'PDF로 내보내기…',
+  appFilePrint: '인쇄…',
+  appPrintNoPrinter:
+    '이 컴퓨터에서 사용할 수 있는 프린터가 없습니다. 대신 문서를 PDF로 저장할 수 있습니다.',
+  appPrintFailedPdfHint: '인쇄하지 못했습니다: {error}. 대신 문서를 PDF로 저장할 수 있습니다.',
+  appPrintSaveAsPdf: 'PDF로 저장…',
 } satisfies Record<keyof typeof zh, string>

@@ -4,6 +4,7 @@ import {
   AI_PROVIDERS,
   AI_SEARCH_PROVIDERS,
   getProviderAdapter,
+  normalizeAiTestFailureKind,
   normalizeUniworkCloudStatus,
   setUniworkCloudStatus,
   visibleMediaProviders,
@@ -19,10 +20,12 @@ import type { UpdateUiState } from '../shared/update-api'
 import { normalizeAiPanelPrefs } from '@genoffice/ui/ai-panel-prefs'
 import type {
   AccountLoginEvent,
+  AiConnectionTestResult,
   AccountStatus,
   AttachmentAddResult,
   AttachmentImageResult,
   AttachmentReadResult,
+  CliLinkState,
   DefaultAppStatus,
   FolderListing,
   FolderRoot,
@@ -124,6 +127,18 @@ function normalizeDefaultAppStatus(result: unknown): DefaultAppStatus {
   }
 }
 
+function normalizeCliLinkState(result: unknown): CliLinkState {
+  const r = (result ?? {}) as Partial<CliLinkState>
+  const state = r.state
+  const str = (v: unknown): string | undefined => (typeof v === 'string' && v ? v : undefined)
+  return {
+    state: state === 'absent' || state === 'present' || state === 'blocked' ? state : 'unsupported',
+    ...(str(r.location) ? { location: str(r.location) } : {}),
+    ...(str(r.pathHint) ? { pathHint: str(r.pathHint) } : {}),
+    ...(str(r.manual) ? { manual: str(r.manual) } : {}),
+  }
+}
+
 /** main answers every UniWork call with a result; anything else is a broken reply */
 function asUniworkResult<T>(result: unknown): UniworkResult<T> {
   if (
@@ -142,6 +157,14 @@ function asUniworkStatus(result: unknown): UniworkDocStatus | null {
     typeof (result as UniworkDocStatus).path === 'string'
     ? (result as UniworkDocStatus)
     : null
+}
+
+/** a connection test answer for the renderer: the failure kind only, never the provider's raw text (that stays in the main process log) */
+function testResultOf(raw: unknown): AiConnectionTestResult {
+  const r = (raw ?? {}) as { ok?: unknown; errorKind?: unknown }
+  return r.ok === true
+    ? { ok: true }
+    : { ok: false, errorKind: normalizeAiTestFailureKind(r.errorKind) }
 }
 
 const homeApi: HomeApi = {
@@ -167,13 +190,7 @@ const homeApi: HomeApi = {
     )) as FileSearchSettings
   },
   async testFileSearchRerank(input) {
-    const raw = ((await ipcRenderer.invoke(HOME_CHANNELS.testFileSearchRerank, input)) ?? {}) as {
-      ok?: unknown
-      error?: unknown
-    }
-    return raw.ok === true
-      ? { ok: true }
-      : { ok: false, error: typeof raw.error === 'string' ? raw.error : 'Connection failed' }
+    return testResultOf(await ipcRenderer.invoke(HOME_CHANNELS.testFileSearchRerank, input))
   },
   async starred(query) {
     return asRecentPage(await ipcRenderer.invoke(HOME_CHANNELS.starred, query))
@@ -563,6 +580,12 @@ const homeApi: HomeApi = {
   async setDefaultApp() {
     return normalizeDefaultAppStatus(await ipcRenderer.invoke(HOME_CHANNELS.setDefaultApp))
   },
+  async getCliLinkStatus() {
+    return normalizeCliLinkState(await ipcRenderer.invoke(HOME_CHANNELS.getCliLinkStatus))
+  },
+  async installCliLink() {
+    return normalizeCliLinkState(await ipcRenderer.invoke(HOME_CHANNELS.installCliLink))
+  },
   async pickDefaultSaveDir() {
     const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.pickDefaultSaveDir)
     return typeof result === 'string' && result ? result : null
@@ -616,15 +639,13 @@ const homeApi: HomeApi = {
     return (await ipcRenderer.invoke('ai:custom-models', { baseUrl, apiKey })) as CodexModelCatalog
   },
   async testAiSettings(settings) {
-    const result: unknown = await ipcRenderer.invoke('ai:chat', {
-      settings,
-      system: 'You are a connectivity test. Reply with the single word OK.',
-      user: 'ping',
-    })
-    const raw = (result ?? {}) as { ok?: unknown; error?: unknown }
-    return raw.ok === true
-      ? { ok: true }
-      : { ok: false, error: typeof raw.error === 'string' ? raw.error : 'Connection failed' }
+    return testResultOf(
+      await ipcRenderer.invoke('ai:settings-test', {
+        settings,
+        system: 'You are a connectivity test. Reply with the single word OK.',
+        user: 'ping',
+      }),
+    )
   },
   async probeOpenRouterKey(apiKey) {
     return (await ipcRenderer.invoke(
@@ -687,22 +708,10 @@ const homeApi: HomeApi = {
     return AI_SEARCH_PROVIDERS
   },
   async testAiSearchSettings(input) {
-    const raw = ((await ipcRenderer.invoke('ai:search-test', input)) ?? {}) as {
-      ok?: unknown
-      error?: unknown
-    }
-    return raw.ok === true
-      ? { ok: true }
-      : { ok: false, error: typeof raw.error === 'string' ? raw.error : 'Connection failed' }
+    return testResultOf(await ipcRenderer.invoke('ai:search-test', input))
   },
   async testAiMediaSettings(input) {
-    const raw = ((await ipcRenderer.invoke('ai:media-test', input)) ?? {}) as {
-      ok?: unknown
-      error?: unknown
-    }
-    return raw.ok === true
-      ? { ok: true }
-      : { ok: false, error: typeof raw.error === 'string' ? raw.error : 'Connection failed' }
+    return testResultOf(await ipcRenderer.invoke('ai:media-test', input))
   },
   wb: {
     async loadAll() {

@@ -1,4 +1,9 @@
 import { basename, dirname } from 'node:path'
+import {
+  aiTestFailureKindForStatus,
+  type AiTestFailureKind,
+  type AiTestResult,
+} from '@genoffice/ai-provider'
 import type { DecisionEndpoint, FileSearchRerank, FileSearchSettings } from '../../shared/home-api'
 import {
   evaluate,
@@ -180,20 +185,50 @@ const PROBE_ERRORS: Record<string, string> = {
   cancelled: 'The call timed out',
 }
 
+/** the product failure kind of a decision-client code, from the code (the sentence above is only the log detail) */
+function probeErrorKind(code: string): AiTestFailureKind {
+  const http = /^http-(\d+)$/.exec(code)
+  if (http) return aiTestFailureKindForStatus(Number(http[1]))
+  switch (code) {
+    case 'missing-key':
+      return 'invalid_key'
+    case 'missing-url':
+    case 'bad-url':
+    case 'insecure-url':
+    case 'missing-account':
+    case 'unsupported-model':
+      return 'misconfigured'
+    case 'rate-limit':
+      return 'limit'
+    case 'cancelled':
+      return 'network'
+    default:
+      return 'failed'
+  }
+}
+
 /** the settings-UI connection test: one two-document judgement against the given settings */
 export async function probeDecision(
   settings: FileSearchSettings,
   send?: JevTransport,
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<AiTestResult> {
   const opts = callOptions(settings)
   if (!isLocalEndpoint(settings.endpoint) && !opts.key.trim())
-    return { ok: false, error: PROBE_ERRORS['missing-key'] }
+    return {
+      ok: false,
+      error: PROBE_ERRORS['missing-key'],
+      errorKind: probeErrorKind('missing-key'),
+    }
   try {
     await evaluate('connection test', PROBE_DOCS, opts, send)
     return { ok: true }
   } catch (e) {
     const code = e instanceof Error ? e.message : String(e)
     const http = /^http-(\d+)$/.exec(code)
-    return { ok: false, error: PROBE_ERRORS[code] ?? (http ? `HTTP ${http[1]}` : code) }
+    return {
+      ok: false,
+      error: PROBE_ERRORS[code] ?? (http ? `HTTP ${http[1]}` : code),
+      errorKind: probeErrorKind(code),
+    }
   }
 }

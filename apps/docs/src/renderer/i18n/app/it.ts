@@ -210,8 +210,6 @@ export const it = {
   appFootnotePlaceholder: 'Testo della nota a piè di pagina…',
   appEndnotePlaceholder: 'Testo della nota di chiusura…',
   appAutoSave: 'Salvataggio automatico',
-  appAutoSaveUniworkTip:
-    'Il salvataggio automatico è disattivato per i documenti UniWork. Usa Salva per salvare una nuova versione.',
   appAutoSaveTip: 'Salvataggio automatico (ogni 30 secondi e quando la finestra perde il focus)',
   appSaveShortcutTip: 'Salva (⌘S)',
   appUndo: 'Annulla',
@@ -545,4 +543,10 @@ export const it = {
   appOnlyZotero: 'Le citazioni di Zotero non sono disponibili qui.',
   appOnlyOpenPassword: 'Qui non è possibile impostare una password di apertura.',
   appOnlyEncrypted: '"{name}" è protetto da password e non può essere aperto qui.',
+  appFileExportPdf: 'Esporta come PDF…',
+  appFilePrint: 'Stampa…',
+  appPrintNoPrinter:
+    'Nessuna stampante disponibile su questo computer. Puoi salvare il documento come PDF.',
+  appPrintFailedPdfHint: 'Stampa non riuscita: {error}. Puoi salvare il documento come PDF.',
+  appPrintSaveAsPdf: 'Salva come PDF…',
 } satisfies Record<keyof typeof zh, string>

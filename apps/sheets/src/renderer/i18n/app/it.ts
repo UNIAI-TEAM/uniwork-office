@@ -527,6 +527,8 @@ export const it = {
   appBridgeUnavailable: "Il bridge dei file desktop non è disponibile. Riavvia l'app Electron.",
   appOpenCanceled: 'Selezione della cartella di lavoro annullata.',
   appOpeningWorkbook: 'Apertura della cartella di lavoro…',
+  appOpenStalled: 'Impossibile aprire la cartella di lavoro.',
+  appOpenRetry: 'Riprova',
   appOpened: '{name} aperto — le modifiche alle celle si salvano nel file con ⌘S.',
   appOpenFailed: 'Impossibile aprire la cartella di lavoro.',
   appPageSetupNeedsFile:
@@ -1573,6 +1575,4 @@ export const it = {
     "Il motore della cartella di lavoro si è arrestato in modo imprevisto ed è stato riavviato. La cartella è stata riaperta dall'ultima versione salvata; le modifiche non salvate sono conservate, salva presto.",
   appWebSavedReopenFailed:
     "Le modifiche sono state salvate in UniWork, ma non è stato possibile riaprire qui la cartella di lavoro. Ricarica l'editor per continuare.",
-  appAutoSaveUniworkOff:
-    'Il salvataggio automatico è disattivato per i documenti UniWork. Usa Salva per salvare una nuova versione.',
 } satisfies Record<keyof typeof zh, string>

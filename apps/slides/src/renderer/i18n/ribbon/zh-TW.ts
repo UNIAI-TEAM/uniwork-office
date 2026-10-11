@@ -37,7 +37,6 @@ export const zhTW = {
   ribbonSaveTip: '儲存 (⌘S)',
   ribbonAutoSave: '自動儲存',
   ribbonAutoSaveTip: '開啟後每 30 秒自動儲存到原檔案',
-  ribbonAutoSaveUniworkTip: 'UniWork 文件已關閉自動儲存。請使用儲存來儲存新版本。',
   ribbonUndo: '復原',
   ribbonRedo: '重做',
   ribbonGroupClipboard: '剪貼簿',

@@ -499,6 +499,8 @@ export const cs = {
     'Souborové rozhraní počítače není k dispozici. Restartujte aplikaci Electron.',
   appOpenCanceled: 'Výběr sešitu zrušen.',
   appOpeningWorkbook: 'Otevírání sešitu…',
+  appOpenStalled: 'Sešit se nepodařilo otevřít.',
+  appOpenRetry: 'Zkusit znovu',
   appOpened: 'Otevřeno {name} — úpravy buněk se uloží zpět pomocí ⌘S.',
   appOpenFailed: 'Sešit nelze otevřít.',
   appPageSetupNeedsFile: 'Nejprve otevřete soubor XLSX — vzhled stránky se ukládá do souboru.',
@@ -1532,6 +1534,4 @@ export const cs = {
     'Modul sešitu se neočekávaně zastavil a byl restartován. Sešit byl znovu otevřen z poslední uložené verze; neuložené změny zůstaly zachovány, brzy je uložte.',
   appWebSavedReopenFailed:
     'Vaše změny byly uloženy do UniWork, ale sešit se zde nepodařilo znovu otevřít. Chcete-li pokračovat, načtěte editor znovu.',
-  appAutoSaveUniworkOff:
-    'Automatické ukládání je pro dokumenty UniWork vypnuté. Novou verzi uložíte příkazem Uložit.',
 } satisfies Record<keyof typeof zh, string>

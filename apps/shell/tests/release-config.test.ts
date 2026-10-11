@@ -20,7 +20,7 @@ interface BuilderConfig {
   copyright: string
   publish?: unknown
   extraMetadata?: { version?: string }
-  fileAssociations: { ext: string; name: string; description?: string }[]
+  fileAssociations: { ext: string; name: string; description?: string; rank?: string }[]
   nsis: Record<string, unknown>
   mac: Record<string, unknown> & { target: { target: string; arch: string[] }[] }
   dmg: Record<string, unknown>
@@ -95,6 +95,13 @@ describe('installer identity', () => {
     for (const association of config.fileAssociations) {
       expect(association.name).not.toMatch(BRAND)
       expect(association.description ?? '').not.toMatch(BRAND)
+    }
+  })
+
+  it('offers every type as an alternate handler: macOS must not make the app the default silently', () => {
+    expect(config.fileAssociations.length).toBeGreaterThan(0)
+    for (const association of config.fileAssociations) {
+      expect(association.rank, association.ext).toBe('Alternate')
     }
   })
 

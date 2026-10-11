@@ -204,8 +204,6 @@ export const cs = {
   appFootnotePlaceholder: 'Text poznámky pod čarou…',
   appEndnotePlaceholder: 'Text vysvětlivky…',
   appAutoSave: 'Automatické ukládání',
-  appAutoSaveUniworkTip:
-    'Automatické ukládání je pro dokumenty UniWork vypnuté. Novou verzi uložíte příkazem Uložit.',
   appAutoSaveTip: 'Automatické ukládání (každých 30 sekund a při ztrátě fokusu okna)',
   appSaveShortcutTip: 'Uložit (⌘S)',
   appUndo: 'Zpět',
@@ -538,4 +536,10 @@ export const cs = {
   appOnlyZotero: 'Citace Zotero tu nejsou k dispozici.',
   appOnlyOpenPassword: 'Heslo pro otevření dokumentu tu nelze nastavit.',
   appOnlyEncrypted: 'Dokument „{name}“ je chráněn heslem a nelze jej zde otevřít.',
+  appFileExportPdf: 'Exportovat jako PDF…',
+  appFilePrint: 'Tisk…',
+  appPrintNoPrinter:
+    'Na tomto počítači není dostupná žádná tiskárna. Dokument můžete místo toho uložit jako PDF.',
+  appPrintFailedPdfHint: 'Tisk se nepodařil: {error}. Dokument můžete místo toho uložit jako PDF.',
+  appPrintSaveAsPdf: 'Uložit jako PDF…',
 } satisfies Record<keyof typeof zh, string>

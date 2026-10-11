@@ -8,7 +8,7 @@ export const cs = {
   aiStarterPolishAll: 'Vylepšit celý dokument pro profesionálnější tón',
   aiStarterContinue: 'Pokračovat v psaní tam, kde dokument končí',
   aiStarterFillTemplate: 'Najít a vyplnit zástupné texty v tomto dokumentu',
-  aiBuyPlanBtn: 'Buy AI plan',
+  aiOpenSettingsBtn: 'Open AI settings',
   aiPanelTitle: 'uniAI',
   aiOpenAssistant: 'Otevřít asistenta AI',
   aiSummarizeBtn: 'Shrnutí AI',
@@ -183,4 +183,6 @@ export const cs = {
   aiCmdImages: 'Aktualizováno obrázků: {count}',
   aiCmdToc: 'Vložen obsah ({count} položek)',
   aiCmdSkipped: ' (přeskočeno {count} chráněných bloků)',
+  aiViewOnlyNotice:
+    'Dokument jen pro čtení: AI jej může číst a odpovídat na otázky, ale nemůže jej upravovat.',
 } satisfies Record<keyof typeof zh, string>

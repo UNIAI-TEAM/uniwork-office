@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { strings } from '../src/renderer/src/strings'
 
@@ -28,9 +30,27 @@ describe('Settings > AI Model OpenRouter copy', () => {
   })
 
   it('has the Vietnamese row title, check and top-up labels', () => {
-    expect(strings.vi.setAiOpenRouterHub).toBe('Token Hub OpenRouter')
+    expect(strings.vi.setAiOpenRouterHub).toBe('Mức dùng của khóa')
     expect(strings.vi.setAiOpenRouterHubCheck).toBe('Kiểm tra tín dụng')
     expect(strings.vi.setAiOpenRouterCredits).toBe('Nạp thêm / quản lý')
+  })
+})
+
+describe('Settings > AI Model copy (en, vi)', () => {
+  it('names no internal provider or wallet product', () => {
+    for (const lang of ['en', 'vi'] as const) {
+      for (const key of [
+        'setAiGensparkHint',
+        'setAiOpenRouterHub',
+        'setAiOpenRouterHubHint',
+        'setAiOpenRouterHubCheck',
+        'setAiOpenRouterHubFail',
+      ] as const) {
+        expect(strings[lang][key], `${lang}.${key}`).not.toMatch(
+          /token hub|genspark|credit wallet/i,
+        )
+      }
+    }
   })
 })
 
@@ -68,5 +88,16 @@ describe('Settings > Integrations prose', () => {
     expect(strings.vi.intgCliTitle).toBe('Nâng cao: dòng lệnh UniWork Office')
     expect(strings.en.intgStep2Note).toContain('UniWork Office (genoffice) command line')
     expect(strings.vi.intgStep2Note).toContain('dòng lệnh UniWork Office (genoffice)')
+  })
+})
+
+describe('uniAI (PWA) pane and the AI probe copy (en, vi)', () => {
+  const SOURCES = ['../src/renderer/src/UniAiPwaPane.tsx', '../src/main/edu-commercial.ts'] as const
+
+  it('names no internal provider or wallet product', () => {
+    for (const file of SOURCES) {
+      const source = readFileSync(join(__dirname, file), 'utf8')
+      expect(source, file).not.toMatch(/token hub|genspark|credit wallet/i)
+    }
   })
 })

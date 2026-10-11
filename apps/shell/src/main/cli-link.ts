@@ -2,8 +2,9 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { app } from 'electron'
-import { installCliLink } from '@genoffice/cli/install'
-import { readAppSettings, writeAppSetting } from './app-settings'
+import { inspectCliLink, installCliLink, type InstallOutcome } from '@genoffice/cli/install'
+import type { CliLinkState } from '../shared/home-api'
+import { writeAppSetting } from './app-settings'
 
 const SETTING_KEY = 'cliLink'
 
@@ -13,39 +14,92 @@ interface CliLinkRecord {
   location?: string
 }
 
+function launcherDir(): string {
+  return join(process.resourcesPath, 'cli')
+}
+
+function launcherPath(): string {
+  return join(launcherDir(), process.platform === 'win32' ? 'genoffice.cmd' : 'genoffice')
+}
+
+/** the CLI can be exposed only from a packaged, permanent install */
+function cliLinkSupported(): boolean {
+  return app.isPackaged && !isEphemeralInstall(process.resourcesPath, process.env)
+}
+
 /**
  * Every launch: record where the genoffice launcher lives so agents can find it
- * without a PATH (the `genoffice` skill reads `~/.genoffice/launcher`), then
- * try to expose it on the PATH. The dmg has no installer step to do that, so
- * macOS retries on each start until a writable directory turns up; Windows
- * gets its PATH entry from the installer and only re-checks once per version
- * (the check spawns PowerShell). Silent and best effort.
+ * without a PATH (the `genoffice` skill reads `~/.genoffice/launcher`). That is
+ * one line in the app's own ~/.genoffice folder and nothing else: the `genoffice`
+ * command on the PATH (a symlink in a bin folder, a Windows PATH entry) is only
+ * created when the user asks for it in Settings (installCliLinkOnRequest).
+ * Silent and best effort.
  */
-export function installCliLinkBestEffort(settingsPath: string): void {
+export function recordCliLauncher(): void {
   if (!app.isPackaged) return
   try {
-    if (isEphemeralInstall(process.resourcesPath, process.env)) {
-      // a DMG under /Volumes or an AppImage FUSE mount vanishes on exit; linking
-      // to it would leave a dead command, so wait for a real install
-      console.log('[genoffice] cli link skipped: app runs from a temporary mount')
+    if (!cliLinkSupported()) {
+      // a DMG under /Volumes or an AppImage FUSE mount vanishes on exit; a path
+      // into it would leave agents with a dead launcher, so wait for a real install
+      console.log('[genoffice] cli launcher not recorded: app runs from a temporary mount')
       return
     }
-    const dir = join(process.resourcesPath, 'cli')
-    writeLauncherFile(launcherFilePath(process.env), dir)
-    const version = app.getVersion()
-    const previous = readAppSettings(settingsPath)[SETTING_KEY] as CliLinkRecord | undefined
-    if (process.platform === 'win32' && previous?.version === version) return
-    const launcher = join(dir, process.platform === 'win32' ? 'genoffice.cmd' : 'genoffice')
-    const outcome = installCliLink({ launcher })
+    writeLauncherFile(launcherFilePath(process.env), launcherDir())
+  } catch (err) {
+    console.warn(
+      '[genoffice] cli launcher record failed:',
+      err instanceof Error ? err.message : err,
+    )
+  }
+}
+
+/** Settings row: where the `genoffice` command stands today; nothing is written */
+export function cliLinkStatus(): CliLinkState {
+  if (!cliLinkSupported()) return { state: 'unsupported' }
+  try {
+    return toCliLinkState(inspectCliLink({ launcher: launcherPath() }))
+  } catch {
+    return { state: 'unsupported' }
+  }
+}
+
+/** Settings button: expose `genoffice` on the PATH now, then remember the outcome */
+export function installCliLinkOnRequest(settingsPath: string): CliLinkState {
+  if (!cliLinkSupported()) return { state: 'unsupported' }
+  try {
+    writeLauncherFile(launcherFilePath(process.env), launcherDir())
+    const outcome = installCliLink({ launcher: launcherPath() })
     console.log(
       `[genoffice] cli link: ${outcome.status}${outcome.location ? ` (${outcome.location})` : ''}` +
         (outcome.pathHint ? `; not on PATH, add it with: ${outcome.pathHint}` : ''),
     )
-    const record: CliLinkRecord = { version, status: outcome.status }
+    const record: CliLinkRecord = { version: app.getVersion(), status: outcome.status }
     if (outcome.location) record.location = outcome.location
     writeAppSetting(settingsPath, SETTING_KEY, record)
+    return toCliLinkState(outcome)
   } catch (err) {
     console.warn('[genoffice] cli link failed:', err instanceof Error ? err.message : err)
+    return { state: 'unsupported' }
+  }
+}
+
+export function toCliLinkState(outcome: InstallOutcome): CliLinkState {
+  const detail = {
+    ...(outcome.location ? { location: outcome.location } : {}),
+    ...(outcome.pathHint ? { pathHint: outcome.pathHint } : {}),
+    ...(outcome.manual ? { manual: outcome.manual } : {}),
+  }
+  switch (outcome.status) {
+    case 'linked':
+    case 'present':
+      return { state: 'present', ...detail }
+    case 'missing':
+      return { state: 'absent', ...detail }
+    case 'unwritable':
+    case 'occupied':
+      return { state: 'blocked', ...detail }
+    default:
+      return { state: 'unsupported' }
   }
 }
 

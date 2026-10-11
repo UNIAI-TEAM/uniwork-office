@@ -213,8 +213,6 @@ export const nl = {
   appFootnotePlaceholder: 'Voetnoottekst…',
   appEndnotePlaceholder: 'Eindnoottekst…',
   appAutoSave: 'Automatisch opslaan',
-  appAutoSaveUniworkTip:
-    'Automatisch opslaan staat uit voor UniWork-documenten. Gebruik Opslaan om een nieuwe versie op te slaan.',
   appAutoSaveTip: 'Automatisch opslaan (elke 30 seconden en wanneer het venster de focus verliest)',
   appSaveShortcutTip: 'Opslaan (⌘S)',
   appUndo: 'Ongedaan maken',
@@ -550,4 +548,11 @@ export const nl = {
   appOnlyZotero: 'Zotero-citaten zijn hier niet beschikbaar.',
   appOnlyOpenPassword: 'Een wachtwoord om het document te openen kan hier niet worden ingesteld.',
   appOnlyEncrypted: '"{name}" is met een wachtwoord beveiligd en kan hier niet worden geopend.',
+  appFileExportPdf: 'Exporteren als PDF…',
+  appFilePrint: 'Afdrukken…',
+  appPrintNoPrinter:
+    'Op deze computer is geen printer beschikbaar. U kunt het document in plaats daarvan als PDF opslaan.',
+  appPrintFailedPdfHint:
+    'Afdrukken is mislukt: {error}. U kunt het document in plaats daarvan als PDF opslaan.',
+  appPrintSaveAsPdf: 'Opslaan als PDF…',
 } satisfies Record<keyof typeof zh, string>

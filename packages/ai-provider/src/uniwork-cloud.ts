@@ -104,6 +104,65 @@ export function onUniworkCloudStatus(listener: (status: UniworkCloudStatus) => v
   return () => listeners.delete(listener)
 }
 
+// ── Re-reading the status (shell main process only) ────────────────
+
+let refresher: (() => Promise<unknown>) | null = null
+let lastRefreshAt = 0
+let refreshing: Promise<void> | null = null
+
+/** the server can change a plan without telling us: a re-read no sooner than this after the last one */
+export const UNIWORK_CLOUD_REFRESH_MIN_GAP_MS = 3_000
+/** a status read that stalls must not hold the tool that asked for it */
+export const UNIWORK_CLOUD_REFRESH_WAIT_MS = 5_000
+
+/** Shell main only: installs (or clears) the function that re-reads the status from the server. */
+export function setUniworkCloudRefresher(next: (() => Promise<unknown>) | null): void {
+  refresher = next
+  lastRefreshAt = 0
+  refreshing = null
+}
+
+/**
+ * Re-reads the cloud status now so a plan change made on the server (the
+ * entitlement turned on or off, credits added) shows up without reopening
+ * Settings. Single-flight and rate-limited (`minGapMs` since the last read),
+ * bounded by `UNIWORK_CLOUD_REFRESH_WAIT_MS`, and it never throws; it does
+ * nothing where no refresher is installed (renderers, the CLI).
+ */
+export function refreshUniworkCloudStatus(
+  minGapMs = UNIWORK_CLOUD_REFRESH_MIN_GAP_MS,
+): Promise<void> {
+  const read = refresher
+  if (!read) return Promise.resolve()
+  if (refreshing) return refreshing
+  if (Date.now() - lastRefreshAt < minGapMs) return Promise.resolve()
+  lastRefreshAt = Date.now()
+  const run = new Promise<void>((resolve) => {
+    const timer = setTimeout(resolve, UNIWORK_CLOUD_REFRESH_WAIT_MS)
+    timer.unref?.()
+    void Promise.resolve()
+      .then(read)
+      .catch(() => undefined)
+      .finally(() => {
+        clearTimeout(timer)
+        resolve()
+      })
+  })
+  refreshing = run
+  void run.then(() => {
+    if (refreshing === run) refreshing = null
+  })
+  return run
+}
+
+/**
+ * Before a cloud tool is refused for the snapshot's state: anything but `ready`
+ * may be stale (the plan changed since the last read), so read it once more.
+ */
+export function refreshUniworkCloudStatusIfNotReady(): Promise<void> {
+  return current.state === 'ready' ? Promise.resolve() : refreshUniworkCloudStatus()
+}
+
 /** Signed in and entitled: the cloud route is offered (each tool still needs its flag). */
 export function uniworkCloudEnabled(): boolean {
   return current.enabled
@@ -172,13 +231,13 @@ const ERROR_TEXT: Record<UniworkCloudErrorCode, string> = {
   signed_out:
     'UniWork cloud AI needs a UniWork sign-in; ask the user to sign in under Settings (Account)',
   entitlement_required:
-    "The organization's UniWork plan does not include UniWork cloud AI; ask the user to upgrade the plan or set up their own provider under Settings (AI Media)",
+    "The organization's UniWork plan does not include UniWork cloud AI; tell the user to ask an organization admin about the plan, or to set up their own provider under Settings (AI Media); never offer a purchase",
   subscription_inactive:
-    "The organization's UniWork subscription is not active; ask the user to renew it or set up their own provider under Settings (AI Media)",
+    "The organization's UniWork subscription is not active; tell the user to ask an organization admin to renew it, or to set up their own provider under Settings (AI Media)",
   no_access:
     'The user no longer has access to the selected UniWork organization; ask them to check the organization under Settings (Account) or set up their own provider under Settings (AI Media)',
   credits_exhausted:
-    'The UniWork AI credits for this billing period are used up; tell the user they are out of credits (they can add credits or use their own provider under Settings (AI Media))',
+    'The UniWork AI credits for this billing period are used up; tell the user their organization is out of credits (an organization admin can add credits, or they can use their own provider under Settings (AI Media))',
   cloud_unavailable: 'This UniWork cloud AI tool is unavailable right now; try again later',
   rate_limited: 'Too many UniWork cloud AI requests; wait a minute and try again',
   invalid_request: 'UniWork cloud AI rejected the request (check the input size and content)',

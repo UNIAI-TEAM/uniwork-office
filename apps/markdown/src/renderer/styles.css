@@ -1882,6 +1882,17 @@ html.genoffice-popover-open .ribbon-tabs {
   font-family: var(--gs-font-sans);
 }
 
+/* view-only document: the assistant reads and answers, it never edits */
+.ai-readonly-notice {
+  margin: 0 0 8px;
+  padding: 6px 10px;
+  border-radius: var(--radius-16);
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-dim);
+  background: var(--hover);
+}
+
 /* composer card — 16px radius, default border, production float shadow */
 .ai-input-box {
   border: 1px solid var(--color-border-default);

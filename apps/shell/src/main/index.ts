@@ -10,6 +10,7 @@ import {
   rmSync,
   statSync,
   writeFileSync,
+  writeSync,
 } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { basename, dirname, extname, join, resolve } from 'node:path'
@@ -53,6 +54,7 @@ import {
   installContextMenu,
   installNavigationGuard,
   isUsableSaveDir,
+  peekDefaultSaveDir,
   HEADLESS_EXIT,
   formatHeadlessEnvelope,
   headlessExitCode,
@@ -76,7 +78,7 @@ import {
 import { OPEN_DOCUMENTS_FILE, clearOpenDocuments, publishOpenDocuments } from './open-documents'
 import { startControlServer, type ControlServer } from './control-server'
 import { controlHandler } from './control-handlers'
-import { installCliLinkBestEffort } from './cli-link'
+import { cliLinkStatus, installCliLinkOnRequest, recordCliLauncher } from './cli-link'
 import { createDefaultAppService, execFileRunner } from './default-app'
 import { registerIntegrationsIpc } from './integrations-ipc'
 import { exportLessonPackZip, probeAiHub } from './edu-commercial'
@@ -100,6 +102,7 @@ import {
 import { createUniworkDocs, type UniworkDocsHandle } from './uniwork-docs/wiring'
 import { installUniworkModuleSeams } from './uniwork-docs/modules'
 import { createModuleSaveRequester } from './uniwork-docs/module-save'
+import { startEditorStatePoll } from './uniwork-docs/editor-state-poll'
 import { IPC_CHANNELS as SHEETS_IPC_CHANNELS } from '../../../sheets/src/shared/ipc-channels'
 import { isAgentIntentUrl, parseAgentIntentUrl } from './agent-intent-host'
 import { extractLaunchUrlFromArgv, isOfficeAppUrl, parseOfficeAppUrl } from '@uniwork/office-bridge'
@@ -133,6 +136,7 @@ import {
   createAiDocument,
   projectFilePaths,
   projectFileRenamed,
+  projectForgetFiles,
   setDocsHostWindowHook,
   setDocsShellWindow,
   setDocsFileSavedHook,
@@ -323,10 +327,14 @@ import { FileIndexer } from './file-index/indexer'
 import { FileIndexStore } from './file-index/store'
 import { normalizeFileSearchSettings, probeDecision, SearchReranker } from './file-index/rerank'
 import { runHeadlessExport, type HeadlessExporters } from './headless-export'
+import { isVersionRequest } from './version-flag'
 import { TabManager } from './tab-manager'
 import { installShellCloseGuard } from './window-close-guard'
 import {
   activateDetached,
+  closeDetachedByPath,
+  closeDetachedByPathNow,
+  confirmCloseDetachedByPath,
   closeDetachedWithoutPrompt,
   createDetachedEditorWindow,
   detachedFilePaths,
@@ -383,6 +391,20 @@ const headlessArgv = parseHeadlessExportArgv(process.argv)
 if (headlessArgv.kind !== 'none') {
   setHeadlessMode(true)
   app.dock?.hide()
+}
+
+// `--version`: print and exit before anything else starts (no window, no instance lock)
+if (isVersionRequest(process.argv)) {
+  try {
+    writeSync(
+      1,
+      `${app.getVersion()}
+`,
+    )
+  } catch {
+    // a closed stdout must not turn --version into a launch
+  }
+  process.exit(0)
 }
 
 // The product rename from "AI Office" to UniWork Office changed the userData path; migrate old user data once
@@ -2958,13 +2980,22 @@ function normalizeAiPreset(
  * created, and the tab's first save moves the fresh file there.
  * key: 'doc' | 'sheet' | 'slide' | 'markdown' | 'html' | 'pdf'
  */
+/**
+ * The default save folder for read-only views (home tree, Settings label):
+ * never creates <Documents>/UniWork Office, which only appears once a file is
+ * saved into it. Writers keep using defaultSaveDir().
+ */
+function viewSaveDir(): string {
+  return peekDefaultSaveDir(app)
+}
+
 /** folders the user added to the home tree beside the default save folder */
 function extraFolderRoots(): string[] {
-  return readExtraRoots(readAppSettings(APP_SETTINGS_PATH()), defaultSaveDir())
+  return readExtraRoots(readAppSettings(APP_SETTINGS_PATH()), viewSaveDir())
 }
 
 function folderRootPaths(): string[] {
-  return [defaultSaveDir(), ...extraFolderRoots()]
+  return [viewSaveDir(), ...extraFolderRoots()]
 }
 
 function insideAnyRoot(path: string): boolean {
@@ -2984,7 +3015,7 @@ const PENDING_DIR_TTL_MS = 30 * 60 * 1000
 
 function rememberPendingDir(kind: string, opts?: NewFileOpts): void {
   const dir = opts?.dir
-  if (!dir || resolve(dir) === resolve(defaultSaveDir()) || !insideAnyRoot(dir)) {
+  if (!dir || resolve(dir) === resolve(viewSaveDir()) || !insideAnyRoot(dir)) {
     pendingNewFileDir.delete(kind)
     return
   }
@@ -3276,6 +3307,8 @@ function createShellWindow(): void {
       const active = manager.activeFilePath()
       if (active !== lastActiveDocPath) {
         lastActiveDocPath = active
+        // a conflict dialog names one document: it closes when that tab is left
+        uniworkDocs?.service.noteActivePath(active)
         void uniworkDocs?.service.refreshPath(active).catch(() => undefined)
       }
     },
@@ -3466,7 +3499,13 @@ function createShellWindow(): void {
   // Closing the whole window walks every dirty sheets/pdf/slides/docs tab through
   // the same save/don't-save/cancel prompt; any cancel aborts the close. An
   // all-clean close is left untouched, so ⌘Q keeps quitting the app.
-  installShellCloseGuard(win, manager)
+  installShellCloseGuard(win, manager, {
+    inFlight: () => appQuitInFlight,
+    clear: () => {
+      appQuitInFlight = false
+    },
+    resume: () => app.quit(),
+  })
 
   win.on('closed', () => {
     if (shellWindow === win) shellWindow = null
@@ -3718,6 +3757,20 @@ function uniworkDocsWiring() {
     reveal: revealShellWindow,
     lang: () => currentLang(),
     defaultSaveDir: () => defaultSaveDir(),
+    openPaths: () => [...(tabManager?.openFilePaths() ?? []), ...detachedFilePaths()],
+    closePath: async (path: string) => {
+      const tabsClosed = tabManager ? await tabManager.closeTabsShowing(path) : true
+      return (await closeDetachedByPath(path)) && tabsClosed
+    },
+    confirmClosePath: async (path: string) =>
+      (tabManager ? await tabManager.confirmCloseTabsShowing(path) : true) &&
+      (await confirmCloseDetachedByPath(path)),
+    closePathNow: (path: string) => {
+      tabManager?.closeTabsShowingNow(path)
+      closeDetachedByPathNow(path)
+    },
+    aiHistoryPaths: () => projectFilePaths(),
+    forgetAiHistory: (paths: string[]) => projectForgetFiles(paths),
   }
 }
 
@@ -4095,6 +4148,14 @@ function registerHomeIpc(): void {
   // UniWork documents (open from UniWork, launch links, Save to UniWork); logic in ./uniwork-docs
   uniworkDocs = createUniworkDocs(ipcMain, uniworkDocsWiring())
   installUniworkModuleSeams(uniworkDocs.service)
+  const uniworkService = uniworkDocs.service
+  // the chip reads "Unsaved changes" while an editor holds edits not saved yet
+  startEditorStatePoll({
+    editorDirtyStates: async (wanted) => (await tabManager?.editorDirtyStates(wanted)) ?? [],
+    isBound: (path) => uniworkService.isBound(path),
+    saveMark: () => uniworkService.saveMark(),
+    noteEditorDirty: (path, dirty, mark) => uniworkService.noteEditorDirty(path, dirty, mark),
+  })
 
   // Reserved for the Hub result channel; the ack is not reported anywhere today.
   ipcMain.handle(HOME_CHANNELS.agentIntentAck, () => undefined)
@@ -4200,9 +4261,11 @@ function registerHomeIpc(): void {
     },
   )
 
-  ipcMain.handle(HOME_CHANNELS.testFileSearchRerank, (_event, input: unknown) =>
-    probeDecision(normalizeFileSearchSettings(input)),
-  )
+  ipcMain.handle(HOME_CHANNELS.testFileSearchRerank, async (_event, input: unknown) => {
+    const result = await probeDecision(normalizeFileSearchSettings(input))
+    if (!result.ok) console.warn('[file-index] rerank test failed:', result.error)
+    return result
+  })
 
   ipcMain.handle(HOME_CHANNELS.starred, (_event, query: unknown): RecentPage =>
     pageStarredPaths(readStarredFiles(), query, uniworkRecentLookup),
@@ -4537,6 +4600,8 @@ function registerHomeIpc(): void {
   ipcMain.handle(HOME_CHANNELS.setLanguage, (_event, lang: unknown) => {
     if (!isLang(lang) || lang === currentLang()) return
     persistLang(lang)
+    // an open conflict dialog keeps the old language: it closes as "Decide later"
+    uniworkDocs?.service.closeConflictPrompt()
     // the switcher lives on the home page, so the home menu is the active one
     buildHomeMenu()
     installDockMenu()
@@ -4702,15 +4767,18 @@ function registerHomeIpc(): void {
   const isRoot = (path: string) => isAnyRoot(path)
 
   ipcMain.handle(HOME_CHANNELS.folderRoots, (): FolderRoot[] => {
-    // describeRoot creates a missing save folder, so its watcher has something to attach to
-    const roots = [describeRoot(defaultSaveDir()), ...extraFolderRoots().map(describeExtraRoot)]
+    // a missing default folder stays missing until the first save; the tree lists it as empty
+    const roots = [
+      describeRoot(viewSaveDir(), { create: false }),
+      ...extraFolderRoots().map(describeExtraRoot),
+    ]
     ensureFolderWatchers()
     return roots
   })
 
   // an added folder joins the tree where it is: nothing on disk is created, copied or moved
   const addFolderRoot = (path: string): FolderRoot | null => {
-    const extras = withExtraRoot(extraFolderRoots(), defaultSaveDir(), path)
+    const extras = withExtraRoot(extraFolderRoots(), viewSaveDir(), path)
     if (!extras) return null
     writeAppSetting(APP_SETTINGS_PATH(), FOLDER_ROOTS_KEY, extras)
     ensureFolderWatchers()
@@ -4852,7 +4920,7 @@ function registerHomeIpc(): void {
     removeStarredFiles(files)
   })
 
-  ipcMain.handle(HOME_CHANNELS.getDefaultSaveDir, (): string => defaultSaveDir())
+  ipcMain.handle(HOME_CHANNELS.getDefaultSaveDir, (): string => viewSaveDir())
 
   const defaultApp = createDefaultAppService({
     platform: process.platform,
@@ -4863,11 +4931,13 @@ function registerHomeIpc(): void {
   })
   ipcMain.handle(HOME_CHANNELS.getDefaultAppStatus, () => defaultApp.status())
   ipcMain.handle(HOME_CHANNELS.setDefaultApp, () => defaultApp.set())
+  ipcMain.handle(HOME_CHANNELS.getCliLinkStatus, () => cliLinkStatus())
+  ipcMain.handle(HOME_CHANNELS.installCliLink, () => installCliLinkOnRequest(APP_SETTINGS_PATH()))
 
   ipcMain.handle(HOME_CHANNELS.pickDefaultSaveDir, async (): Promise<string | null> => {
     const result = await showOpenDialogWithMemory(dialog, shellWindow, {
       title: tm('dlgPickSaveDir'),
-      defaultPath: defaultSaveDir(),
+      defaultPath: viewSaveDir(),
       properties: ['openDirectory', 'createDirectory'],
     })
     const picked = result.filePaths[0]
@@ -6220,8 +6290,8 @@ app.whenReady().then(async () => {
   currentLang()
   // native menus/dialogs/scrollbars follow the persisted theme from first paint
   nativeTheme.themeSource = currentTheme()
-  // off the startup path: a symlink / registry write nobody is waiting for
-  setTimeout(() => installCliLinkBestEffort(APP_SETTINGS_PATH()), 3000)
+  // off the startup path: one line in ~/.genoffice; the PATH command itself waits for Settings
+  setTimeout(() => recordCliLauncher(), 3000)
   startSheetsCaptureServer()
   // Register the docs renderer bridge listeners before the MCP server can take
   // a visible-editing request.
@@ -6389,7 +6459,11 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })
 
+/** set by before-quit, cleared when a close prompt vetoes the quit: lets the shell close guard resume a quit its async prompt path cancelled */
+let appQuitInFlight = false
+
 app.on('before-quit', () => {
+  appQuitInFlight = true
   // No close prompt may fall through to "Save" during shutdown
   markSheetsShuttingDown()
   stopSheetsSidecar()

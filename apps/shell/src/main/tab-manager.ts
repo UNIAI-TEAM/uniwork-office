@@ -11,6 +11,7 @@ import {
 import {
   createDocsView,
   docsQueryDirty,
+  docsQueryEditorDirty,
   markDocsNewBlank,
   queueDocsAiContent,
   queueDocsAiPreset,
@@ -59,6 +60,8 @@ import {
 } from '../../../slides/src/main/slides-main'
 import type { DocumentTabKind, OpenDocumentTab, TabKind, TabSummary } from '../shared/tabs-api'
 import { TAB_STRIP_HEIGHT } from '../shared/tab-drag-geometry'
+import { isCloseTabChord } from './close-tab-chord'
+import { blankRetiredPage } from './retire-page'
 
 /** a tab lifted out of the strip with its live view: what "Open in New Window",
  *  tear-off and dock hand back and forth between the shell and a detached window */
@@ -107,6 +110,7 @@ export class TabManager {
   /** views whose HTML-fullscreen listeners are installed: a view that leaves
    *  for a detached window and docks back must not get a second pair */
   private readonly fullScreenTracked = new WeakSet<WebContentsView>()
+  private readonly closeChordTracked = new WeakSet<WebContents>()
   /** Sheets renderer mounted ahead of the next open: parsing its bundle and
    *  booting Univer is the bulk of a workbook's open time, and the shell hands
    *  the path over after mount anyway. */
@@ -129,6 +133,8 @@ export class TabManager {
       this.layout()
       setImmediate(() => this.layout())
     })
+    // the chrome (tab strip, Home, a dialog) can hold keyboard focus while a tab is active
+    this.trackCloseChord(shellWindow.webContents)
   }
 
   private scheduleSpareSheetsView(delayMs: number): void {
@@ -142,15 +148,23 @@ export class TabManager {
       const view = createSheetsView({ includeAiHandlers: false })
       // registering the session made the spare the menu-action target
       setActiveSheetsWebContents(active.view?.webContents ?? null)
+      this.spareSheetsView = view
+      this.trackCloseChord(view.webContents)
       this.shellWindow.contentView.addChildView(view)
       view.setVisible(false)
       view.setBounds(this.contentBounds())
+      // Chromium focuses a new webContents inside createSheetsView (its loadURL),
+      // before any `focus` listener exists, and OS keys sent to a hidden view
+      // reach no webContents at all (no before-input-event, no menu
+      // accelerator): Ctrl+W and typing died until a click in the grid.
+      // Hand focus back now and again once the first load is done.
+      this.refocusIfHidden(view.webContents)
+      view.webContents.once('did-finish-load', () => this.refocusIfHidden(view.webContents))
       view.webContents.once('render-process-gone', () => {
         if (this.spareSheetsView !== view) return
         this.spareSheetsView = null
         view.webContents.close()
       })
-      this.spareSheetsView = view
     }, delayMs)
   }
 
@@ -214,6 +228,49 @@ export class TabManager {
       if (id !== undefined && this.htmlFullScreenId === id) this.htmlFullScreenId = null
       this.layout()
     })
+  }
+
+  /**
+   * Ctrl/Cmd+W closes the active tab straight from the key event, whichever
+   * webContents of this window has keyboard focus: the active tab's view, the
+   * shell chrome, a hidden view (the spare sheets view mounted after an open
+   * can take focus), so the chord never depends on the menu accelerator
+   * receiving the page's unhandled key. A view that moved to a detached window
+   * keeps this listener but is no longer ours, so its own window handles it.
+   * Home and chrome-free Present tabs keep the default path.
+   */
+  private trackCloseChord(wc: WebContents): void {
+    if (this.closeChordTracked.has(wc)) return
+    this.closeChordTracked.add(wc)
+    wc.on('before-input-event', (event, input) => {
+      if (!isCloseTabChord(input)) return
+      if (!this.ownsWebContents(wc)) return
+      const active = this.tabs.find((t) => t.id === this.activeId)
+      if (!active?.view || active.present) return
+      event.preventDefault()
+      this.closeActiveTab()
+    })
+    // the chrome takes focus legitimately (tab strip, Home, dialogs); a hidden view
+    // must not keep it. Deferred: a focus() call made inside Chromium's own focus
+    // change does not stick (seen live: the spare kept focus until its load ended).
+    if (wc !== this.shellWindow.webContents) {
+      wc.on('focus', () => setImmediate(() => this.refocusIfHidden(wc)))
+    }
+  }
+
+  /** A hidden view of this window holding keyboard focus swallows every OS key
+   *  (they reach no webContents), so focus goes back to the active tab. */
+  private refocusIfHidden(wc: WebContents): void {
+    if (wc.isDestroyed() || !wc.isFocused() || !this.ownsWebContents(wc)) return
+    if (this.tabs.find((t) => t.id === this.activeId)?.view?.webContents === wc) return
+    this.focusActiveView()
+  }
+
+  /** the shell's own webContents, a tab view's or the spare's (not a detached window's) */
+  private ownsWebContents(wc: WebContents): boolean {
+    if (wc === this.shellWindow.webContents) return true
+    if (this.spareSheetsView?.webContents === wc) return true
+    return this.tabs.some((t) => t.view?.webContents === wc)
   }
 
   /** re-fit the active tab's view after a window resize */
@@ -385,6 +442,26 @@ export class TabManager {
     }
   }
 
+  /**
+   * Unsaved edits in the editor of every tab showing a file `wanted` accepts
+   * (the UniWork chip's dirty state). null: the editor did not answer (docs
+   * busy saving), so the caller keeps what it last knew.
+   */
+  async editorDirtyStates(
+    wanted: (path: string) => boolean,
+  ): Promise<Array<{ path: string; dirty: boolean | null }>> {
+    const tabs = this.tabs.filter((t) => t.view && t.filePath && !t.present && wanted(t.filePath))
+    return Promise.all(
+      tabs.map(async (tab) => ({
+        path: tab.filePath!,
+        dirty:
+          tab.kind === 'docs' && tab.view && !tab.view.webContents.isDestroyed()
+            ? await docsQueryEditorDirty(tab.view.webContents)
+            : await this.tabIsDirty(tab),
+      })),
+    )
+  }
+
   openHomeTab(): void {
     this.activateTab(HOME_ID)
   }
@@ -401,6 +478,7 @@ export class TabManager {
     this.shellWindow.contentView.addChildView(view)
     view.setVisible(false)
     this.trackHtmlFullScreen(view)
+    this.trackCloseChord(view.webContents)
     this.tabs.push({
       id,
       kind: 'docs',
@@ -434,6 +512,7 @@ export class TabManager {
       view.setVisible(false)
     }
     this.trackHtmlFullScreen(view)
+    this.trackCloseChord(view.webContents)
     this.tabs.push({
       id,
       kind: 'sheets',
@@ -452,6 +531,7 @@ export class TabManager {
     this.shellWindow.contentView.addChildView(view)
     view.setVisible(false)
     this.trackHtmlFullScreen(view)
+    this.trackCloseChord(view.webContents)
     this.tabs.push({
       id,
       kind: 'slides',
@@ -470,6 +550,7 @@ export class TabManager {
     this.shellWindow.contentView.addChildView(view)
     view.setVisible(false)
     this.trackHtmlFullScreen(view)
+    this.trackCloseChord(view.webContents)
     this.tabs.push({ id, kind: 'pdf', view, title: basename(openPath), filePath: openPath })
     this.activateTab(id)
     return id
@@ -481,6 +562,9 @@ export class TabManager {
     const wc = tab?.view?.webContents
     if (!wc || wc.isDestroyed()) return
     if (tab.kind === 'pdf') clearPdfDirty(wc.id)
+    // a sheets renderer gets its file only through the one-shot queue, which
+    // the first open consumed: without it the reloaded tab waits forever
+    if (tab.kind === 'sheets' && tab.filePath) queueWorkbookForView(wc, tab.filePath)
     wc.reload()
   }
 
@@ -490,6 +574,7 @@ export class TabManager {
     this.shellWindow.contentView.addChildView(view)
     view.setVisible(false)
     this.trackHtmlFullScreen(view)
+    this.trackCloseChord(view.webContents)
     this.tabs.push({
       id,
       kind: 'markdown',
@@ -507,6 +592,7 @@ export class TabManager {
     this.shellWindow.contentView.addChildView(view)
     view.setVisible(false)
     this.trackHtmlFullScreen(view)
+    this.trackCloseChord(view.webContents)
     this.tabs.push({
       id,
       kind: 'html',
@@ -525,6 +611,7 @@ export class TabManager {
     this.shellWindow.contentView.addChildView(view)
     view.setVisible(false)
     this.trackHtmlFullScreen(view)
+    this.trackCloseChord(view.webContents)
     this.tabs.push({
       id,
       kind: 'html',
@@ -705,6 +792,17 @@ export class TabManager {
     if (id === HOME_ID) return
     const tab = this.tabs.find((t) => t.id === id)
     if (!tab || this.closingIds.has(id)) return
+    if (!(await this.confirmTabClose(tab))) return
+    this.removeTab(id)
+  }
+
+  /**
+   * The prompts of a close, with nothing removed: the module's unsaved-changes
+   * prompt, then the UniWork prompt. False when the user cancelled one (or one
+   * is already open on the tab) and the tab must stay.
+   */
+  private async confirmTabClose(tab: TabRecord): Promise<boolean> {
+    const id = tab.id
     let closeGuard =
       tab.view &&
       (tab.kind === 'sheets' && sheetsPendingEditCount(tab.view.webContents.id) > 0
@@ -732,7 +830,7 @@ export class TabManager {
       if (this.activeId !== id) this.activateTab(id)
       this.closingIds.add(id)
       try {
-        if (!(await closeGuard(tab.view.webContents, this.shellWindow))) return
+        if (!(await closeGuard(tab.view.webContents, this.shellWindow))) return false
       } finally {
         this.closingIds.delete(id)
       }
@@ -741,12 +839,47 @@ export class TabManager {
     if (tab.view && !tab.present && isUniworkCloseGuarded(tab.filePath)) {
       this.closingIds.add(id)
       try {
-        if (!(await confirmUniworkClose(tab.filePath))) return
+        if (!(await confirmUniworkClose(tab.filePath))) return false
       } finally {
         this.closingIds.delete(id)
       }
     }
-    this.removeTab(id)
+    return true
+  }
+
+  /**
+   * Closes every tab showing `path` through the normal close (prompts
+   * included). True when no tab shows it any more; false when a prompt was
+   * cancelled and the tab stays.
+   */
+  async closeTabsShowing(path: string): Promise<boolean> {
+    const wanted = canonicalPath(path)
+    const showing = () =>
+      this.tabs.filter((t) => t.filePath && canonicalPath(t.filePath) === wanted).map((t) => t.id)
+    for (const id of showing()) await this.closeTab(id)
+    return showing().length === 0
+  }
+
+  /**
+   * Runs the close prompts of every tab showing `path` and removes nothing
+   * (the first half of an all-or-nothing close, see closeTabsShowingNow).
+   * False when a prompt was cancelled.
+   */
+  async confirmCloseTabsShowing(path: string): Promise<boolean> {
+    const wanted = canonicalPath(path)
+    const showing = this.tabs.filter((t) => t.filePath && canonicalPath(t.filePath) === wanted)
+    for (const tab of showing) {
+      if (this.closingIds.has(tab.id)) return false
+      if (!(await this.confirmTabClose(tab))) return false
+    }
+    return true
+  }
+
+  /** Removes every tab showing `path` with no prompt: its prompts were answered already. */
+  closeTabsShowingNow(path: string): void {
+    const wanted = canonicalPath(path)
+    for (const tab of this.tabs.filter((t) => t.filePath && canonicalPath(t.filePath) === wanted))
+      this.closeTabWithoutPrompt(tab.id)
   }
 
   /**
@@ -798,6 +931,7 @@ export class TabManager {
         // issue, not something fixable from here). Detaching without destroying
         // avoids the freeze; the orphaned webContents is reclaimed when the app quits.
         teardownDocsRenderer(removed.view.webContents)
+        blankRetiredPage(removed.view.webContents)
       } else {
         removed.view.webContents.close()
       }
@@ -847,6 +981,7 @@ export class TabManager {
     this.shellWindow.contentView.addChildView(view)
     view.setVisible(false)
     this.trackHtmlFullScreen(view)
+    this.trackCloseChord(view.webContents)
     const slot =
       index === undefined || !Number.isFinite(index)
         ? this.tabs.length

@@ -98,4 +98,6 @@ export const vi = {
   aiScopeRangeTip:
     'AI sẽ hiểu "cột này / các hàng này / phần đã chọn" là dải ô này và vùng này sẽ được cố định cho lượt chạy sau khi bạn gửi',
   aiScopeClearTitle: 'Bỏ phạm vi dải ô và áp dụng cho toàn bộ trang tính',
+  aiViewOnlyNotice:
+    'Tài liệu chỉ xem: AI có thể đọc và trả lời câu hỏi, nhưng không thể chỉnh sửa.',
 } satisfies Record<keyof typeof zh, string>

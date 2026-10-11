@@ -202,8 +202,6 @@ export const th = {
   appFootnotePlaceholder: 'ข้อความเชิงอรรถ…',
   appEndnotePlaceholder: 'ข้อความอ้างอิงท้ายเรื่อง…',
   appAutoSave: 'บันทึกอัตโนมัติ',
-  appAutoSaveUniworkTip:
-    'การบันทึกอัตโนมัติปิดอยู่สำหรับเอกสาร UniWork ใช้ “บันทึก” เพื่อบันทึกเวอร์ชันใหม่',
   appAutoSaveTip: 'บันทึกอัตโนมัติ (ทุก 30 วินาทีและเมื่อหน้าต่างไม่ได้โฟกัส)',
   appSaveShortcutTip: 'บันทึก (⌘S)',
   appUndo: 'เลิกทำ',
@@ -534,4 +532,9 @@ export const th = {
   appOnlyZotero: 'ไม่สามารถใช้การอ้างอิง Zotero ที่นี่ได้',
   appOnlyOpenPassword: 'ไม่สามารถตั้งรหัสผ่านสำหรับเปิดเอกสารที่นี่ได้',
   appOnlyEncrypted: '"{name}" ถูกป้องกันด้วยรหัสผ่านและไม่สามารถเปิดที่นี่ได้',
+  appFileExportPdf: 'ส่งออกเป็น PDF…',
+  appFilePrint: 'พิมพ์…',
+  appPrintNoPrinter: 'ไม่มีเครื่องพิมพ์ในคอมพิวเตอร์เครื่องนี้ คุณบันทึกเอกสารเป็น PDF แทนได้',
+  appPrintFailedPdfHint: 'พิมพ์ไม่สำเร็จ: {error} คุณบันทึกเอกสารเป็น PDF แทนได้',
+  appPrintSaveAsPdf: 'บันทึกเป็น PDF…',
 } satisfies Record<keyof typeof zh, string>

@@ -6,6 +6,7 @@ export const th = {
   cloudStateNotEntitled: 'ไม่รวมในแพ็กเกจของคุณ',
   cloudStateExhausted: 'เครดิต AI หมดแล้ว',
   cloudStateUnavailable: 'ใช้งานไม่ได้ในขณะนี้',
+  cloudStateSignedOut: 'ยังไม่ได้ลงชื่อเข้าใช้',
   cloudStateInactive: 'การสมัครสมาชิกไม่ใช้งาน',
   cloudCredits: 'เครดิต AI',
   cloudCreditsLeft: 'เหลือ {remaining} / {limit}',
@@ -31,4 +32,9 @@ export const th = {
   cloudMediaLabel: 'คลาวด์ของ UniWork',
   cloudMediaDesc: 'ใช้เครดิต AI ของ UniWork ขององค์กร ไม่ต้องใช้คีย์',
   cloudSearchAutoHint: 'ใช้คลาวด์ของ UniWork ก่อน (ใช้เครดิต AI) แล้วจึงใช้การค้นหาฟรี',
+  aiTestErrInvalidKey: 'ไม่มีคีย์ API หรือคีย์ถูกปฏิเสธ',
+  aiTestErrNetwork: 'เชื่อมต่อไม่ได้ โปรดตรวจสอบเครือข่าย',
+  aiTestErrLimit: 'ถึงขีดจำกัดของผู้ให้บริการแล้ว โปรดลองใหม่ภายหลัง',
+  aiTestErrUnavailable: 'บริการไม่ตอบสนอง โปรดลองใหม่ภายหลัง',
+  aiTestErrMisconfigured: 'การตั้งค่าไม่ครบ: ตรวจสอบที่อยู่บริการและช่องบัญชี',
 } satisfies Record<keyof typeof zh, string>

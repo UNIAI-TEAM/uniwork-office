@@ -46,11 +46,18 @@ export function mimeForFormat(format: UniworkDocFormat): string {
   return MIME[format]
 }
 
-const RESERVED_WINDOWS_NAMES = /^(con|prn|aux|nul|com\d|lpt\d)$/i
+// Windows treats NUL.txt like NUL, so the part before the first dot decides;
+// the superscript digits count as port numbers too.
+const RESERVED_WINDOWS_NAMES = /^(con|prn|aux|nul|com[\d¹²³]|lpt[\d¹²³])$/i
+// A surrogate unit with no partner: the file system turns it into U+FFFD, so it
+// is replaced up front and the tab title matches the file on disk.
+const LONE_SURROGATE = /[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/g
+// U+FFFD marks bytes some earlier hop failed to decode as UTF-8; it is never a
+// real character of a name, so it is replaced like the reserved characters.
 // C0 controls and DEL, then the characters Windows reserves in a file name.
 // Built from the code points so the class carries no literal control escapes.
 const UNSAFE_FILENAME_CHAR = new RegExp(
-  `[${String.fromCharCode(0)}-${String.fromCharCode(0x1f)}${String.fromCharCode(0x7f)}<>:"/\\\\|?*]`,
+  `[${String.fromCharCode(0)}-${String.fromCharCode(0x1f)}${String.fromCharCode(0x7f)}\uFFFD<>:"/\\\\|?*]`,
   'g',
 )
 const MAX_BASENAME = 120
@@ -61,16 +68,44 @@ const MAX_BASENAME = 120
  * Windows device names, bounded length, and always the format's extension.
  */
 export function sanitizeFilename(name: string, format: UniworkDocFormat): string {
-  let base = name.trim()
+  let base = name.replace(LONE_SURROGATE, '_').trim()
   if (formatForName(base) === format) base = base.slice(0, base.length - extname(base).length)
-  base = base
-    .replace(UNSAFE_FILENAME_CHAR, '_')
-    .replace(/[. ]+$/g, '')
-    .replace(/^[. ]+/g, '')
+  // cut by code points so an astral character is never split in half
+  base = Array.from(
+    base
+      .replace(UNSAFE_FILENAME_CHAR, '_')
+      .replace(/[. ]+$/g, '')
+      .replace(/^[. ]+/g, ''),
+  )
     .slice(0, MAX_BASENAME)
+    .join('')
     .trim()
-  if (!base || RESERVED_WINDOWS_NAMES.test(base)) base = base ? `_${base}` : 'document'
+  const stem = base.split('.', 1)[0]?.trim() ?? ''
+  if (!base || RESERVED_WINDOWS_NAMES.test(stem)) base = base ? `_${base}` : 'document'
   return `${base}.${format}`
+}
+
+/** the text carries U+FFFD: it was decoded from bytes that were not UTF-8 */
+export function hasReplacementChar(text: string): boolean {
+  return text.includes('\uFFFD')
+}
+
+/**
+ * The working-copy file name, which is also the tab title (the tab shows the
+ * path's basename). The document title is the name UniWork shows everywhere
+ * (web list, picker, recents) and the only one that can be renamed;
+ * file.filename is the name of the first upload and never changes. So the
+ * title names the copy, and the stored upload name is the fallback when the
+ * title is empty or was corrupted on the way in.
+ */
+export function workingCopyName(
+  title: string,
+  uploadName: string,
+  format: UniworkDocFormat,
+): string {
+  const usable = (name: string) => name.trim() !== '' && !hasReplacementChar(name)
+  const source = [title, uploadName].find(usable) ?? (title.trim() || uploadName)
+  return sanitizeFilename(source, format)
 }
 
 /** sha256 hex of the bytes: the form the server reports as checksum_sha256 */

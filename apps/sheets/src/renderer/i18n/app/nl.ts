@@ -525,6 +525,8 @@ export const nl = {
     'De bestandsbridge van de desktop is niet beschikbaar. Start de Electron-app opnieuw.',
   appOpenCanceled: 'Werkmapselectie geannuleerd.',
   appOpeningWorkbook: 'Werkmap openen…',
+  appOpenStalled: 'De werkmap kon niet worden geopend.',
+  appOpenRetry: 'Opnieuw proberen',
   appOpened: '{name} geopend — celbewerkingen slaat u terug op met ⌘S.',
   appOpenFailed: 'Kan de werkmap niet openen.',
   appPageSetupNeedsFile:
@@ -1570,6 +1572,4 @@ export const nl = {
     'De werkmap-engine is onverwacht gestopt en opnieuw gestart. De werkmap is opnieuw geopend vanaf de laatst opgeslagen versie; uw niet-opgeslagen wijzigingen blijven behouden, sla snel op.',
   appWebSavedReopenFailed:
     'Je wijzigingen zijn opgeslagen in UniWork, maar de werkmap kon hier niet opnieuw worden geopend. Laad de editor opnieuw om verder te werken.',
-  appAutoSaveUniworkOff:
-    'Automatisch opslaan staat uit voor UniWork-documenten. Gebruik Opslaan om een nieuwe versie op te slaan.',
 } satisfies Record<keyof typeof zh, string>

@@ -8,7 +8,7 @@ export const th = {
   aiStarterPolishAll: 'ขัดเกลาทั้งเอกสารให้น้ำเสียงเป็นมืออาชีพยิ่งขึ้น',
   aiStarterContinue: 'เขียนต่อจากเนื้อหาที่มีอยู่',
   aiStarterFillTemplate: 'ค้นหาและกรอกตัวยึดตำแหน่งในเอกสาร',
-  aiBuyPlanBtn: 'Buy AI plan',
+  aiOpenSettingsBtn: 'Open AI settings',
   aiPanelTitle: 'uniAI',
   aiOpenAssistant: 'เปิดผู้ช่วย AI',
   aiSummarizeBtn: 'สรุปด้วย AI',
@@ -179,4 +179,5 @@ export const th = {
   aiCmdImages: 'อัปเดตรูปภาพ {count} รูปแล้ว',
   aiCmdToc: 'แทรกสารบัญแล้ว ({count} รายการ)',
   aiCmdSkipped: ' (ข้ามบล็อกที่ได้รับการป้องกัน {count} บล็อก)',
+  aiViewOnlyNotice: 'เอกสารแบบดูอย่างเดียว: AI อ่านและตอบคำถามได้ แต่แก้ไขไม่ได้',
 } satisfies Record<keyof typeof zh, string>

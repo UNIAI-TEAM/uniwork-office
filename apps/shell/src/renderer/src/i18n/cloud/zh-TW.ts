@@ -6,6 +6,7 @@ export const zhTW = {
   cloudStateNotEntitled: '方案未包含此功能',
   cloudStateExhausted: 'AI 額度已用完',
   cloudStateUnavailable: '暫時無法使用',
+  cloudStateSignedOut: '尚未登入',
   cloudStateInactive: '訂閱未生效',
   cloudCredits: 'AI 額度',
   cloudCreditsLeft: '剩餘 {remaining} / {limit}',
@@ -27,4 +28,9 @@ export const zhTW = {
   cloudMediaLabel: 'UniWork 雲端',
   cloudMediaDesc: '使用組織的 UniWork AI 額度，無需金鑰。',
   cloudSearchAutoHint: '先用 UniWork 雲端（消耗 AI 額度），再用免費搜尋。',
+  aiTestErrInvalidKey: 'API 金鑰遺失或遭拒絕',
+  aiTestErrNetwork: '無法連線，請檢查網路',
+  aiTestErrLimit: '已達服務商的用量或頻率限制，請稍後再試',
+  aiTestErrUnavailable: '服務暫無回應，請稍後再試',
+  aiTestErrMisconfigured: '設定不完整，請檢查服務位址與帳號欄位',
 } satisfies Record<keyof typeof zh, string>

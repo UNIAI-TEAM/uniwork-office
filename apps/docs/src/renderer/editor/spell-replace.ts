@@ -1,5 +1,7 @@
 import type { Editor } from '@tiptap/core'
 import type { Node as PMNode } from '@tiptap/pm/model'
+import type { Transaction } from '@tiptap/pm/state'
+import { afterRespellKick, beginSpellingEdit } from './respell-kick-gate'
 
 const WORD_CHAR = /[\p{L}\p{N}\p{M}'’_-]/u
 
@@ -78,6 +80,28 @@ export function applySpellingSuggestion(
   replacement: string,
   blinkReplace?: (replacement: string) => Promise<void>,
 ): void {
+  // the right-click position goes stale if the document changes while the
+  // edit waits: follow it through every transaction until the edit runs
+  let at = pos
+  const follow = ({ transaction }: { transaction: Transaction }) => {
+    if (at != null) at = transaction.mapping.map(at)
+  }
+  editor.on('transaction', follow)
+  // after Add to Dictionary the respell kick may still own the caret text node
+  afterRespellKick(() => {
+    editor.off('transaction', follow)
+    applyNow(editor, at, word, replacement, blinkReplace)
+  })
+}
+
+function applyNow(
+  editor: Editor,
+  pos: number | null,
+  word: string,
+  replacement: string,
+  blinkReplace?: (replacement: string) => Promise<void>,
+): void {
+  if (editor.isDestroyed) return
   const range = pos != null ? misspelledRangeAt(editor.state.doc, pos, word) : null
   const fallback = () => {
     if (range) replaceMisspelledWord(editor, range.from, word, replacement)
@@ -88,12 +112,19 @@ export function applySpellingSuggestion(
   if (range) editor.commands.setTextSelection(range)
   else if (!editor.state.selection.empty) return
   const before = editor.state.doc
+  // a respell kick must not snapshot the caret text node until Blink's edit
+  // (or the fallback) has landed: its scrub would restore the pre-edit text
+  const endEdit = beginSpellingEdit()
   editor.view.focus()
   void blinkReplace(replacement)
     .catch(() => undefined)
     .then(() => {
       setTimeout(() => {
-        if (!editor.isDestroyed && editor.state.doc === before) fallback()
+        try {
+          if (!editor.isDestroyed && editor.state.doc === before) fallback()
+        } finally {
+          endEdit()
+        }
       }, BLINK_REPLACE_GRACE_MS)
     })
 }

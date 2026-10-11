@@ -138,3 +138,55 @@ describe('Settings default-app row', () => {
     expect(row()?.textContent).not.toContain('Could not change it.')
   })
 })
+
+describe('Settings auto-save row', () => {
+  it('says the global setting does not apply to UniWork documents', async () => {
+    await openGeneral({})
+    const row = Array.from(host.querySelectorAll<HTMLElement>('.set-field')).find((el) =>
+      el.textContent?.includes('Auto-save all documents'),
+    )
+    expect(row?.textContent).toContain('Does not apply to UniWork documents.')
+  })
+})
+
+describe('Settings command line tool row', () => {
+  const cliRow = (): HTMLElement | null =>
+    Array.from(host.querySelectorAll<HTMLElement>('.set-field')).find((el) =>
+      el.textContent?.includes('Command line tool'),
+    ) ?? null
+
+  it('is hidden when the build cannot expose the command', async () => {
+    await openGeneral({ getCliLinkStatus: async () => ({ state: 'unsupported' }) })
+    expect(cliRow()).toBeNull()
+  })
+
+  it('only the button creates the link, then says it is available (no product name, no local path)', async () => {
+    const install = vi.fn(async () => ({
+      state: 'present' as const,
+      location: '/opt/homebrew/bin/genoffice',
+    }))
+    await openGeneral({
+      getCliLinkStatus: async () => ({ state: 'absent' }),
+      installCliLink: install,
+    })
+    expect(install).not.toHaveBeenCalled()
+    const button = cliRow()!.querySelector<HTMLButtonElement>('button')!
+    expect(button.textContent).toBe('Add to terminal')
+    await click(button)
+    expect(install).toHaveBeenCalledTimes(1)
+    expect(cliRow()?.textContent).toContain('Command line tool is available.')
+    expect(cliRow()?.textContent).not.toContain('/opt/homebrew')
+    expect(cliRow()?.textContent).not.toMatch(/genoffice is available/i)
+    expect(cliRow()!.querySelector<HTMLButtonElement>('button')!.disabled).toBe(true)
+  })
+
+  it('shows the manual command when no folder was writable', async () => {
+    await openGeneral({
+      getCliLinkStatus: async () => ({
+        state: 'blocked',
+        manual: 'sudo ln -s /a /usr/local/bin/genoffice',
+      }),
+    })
+    expect(cliRow()?.textContent).toContain('sudo ln -s /a /usr/local/bin/genoffice')
+  })
+})

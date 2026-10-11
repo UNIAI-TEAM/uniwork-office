@@ -490,6 +490,8 @@ export const vi = {
     'Cầu nối tệp trên máy tính để bàn không khả dụng. Khởi động lại ứng dụng Electron.',
   appOpenCanceled: 'Đã hủy chọn sổ làm việc.',
   appOpeningWorkbook: 'Đang mở sổ làm việc…',
+  appOpenStalled: 'Không mở được sổ làm việc.',
+  appOpenRetry: 'Thử lại',
   appOpened: 'Đã mở {name} — các chỉnh sửa ô được lưu lại bằng ⌘S.',
   appOpenFailed: 'Không thể mở sổ làm việc.',
   appPageSetupNeedsFile: 'Trước tiên hãy mở tệp XLSX — thiết lập trang sẽ lưu vào tệp.',
@@ -1521,6 +1523,4 @@ export const vi = {
     'Công cụ xử lý sổ làm việc đã dừng bất ngờ và đã được khởi động lại. Sổ làm việc được mở lại từ bản lưu gần nhất; các thay đổi chưa lưu vẫn được giữ, hãy lưu sớm.',
   appWebSavedReopenFailed:
     'Các thay đổi của bạn đã được lưu vào UniWork, nhưng không thể mở lại sổ làm việc tại đây. Hãy tải lại trình soạn thảo để tiếp tục.',
-  appAutoSaveUniworkOff:
-    'Tự động lưu đã tắt cho tài liệu UniWork. Hãy dùng Lưu để lưu phiên bản mới.',
 } satisfies Record<keyof typeof zh, string>

@@ -93,4 +93,7 @@ export const ja = {
 
   uwRecentBadge: 'UniWork',
   uwRecentBadgeTip: 'UniWork に保存されたドキュメント',
+
+  setCliLinkReady: 'コマンドラインツールを利用できます。',
+  setAutoSaveUniworkNote: 'UniWork のドキュメントには適用されません。',
 } satisfies Record<keyof typeof zh, string>

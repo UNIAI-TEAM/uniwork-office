@@ -231,4 +231,6 @@ export const es = {
   aiSumTemplatesEmpty: 'Plantillas de estilo (vacío)',
   aiSumListTemplates: 'Se enumeraron {count} plantillas de estilo',
   aiPageCloudToLocal: 'Nube no disponible — generado localmente',
+  aiViewOnlyNotice:
+    'Documento de solo lectura: la IA puede leerlo y responder preguntas, pero no puede editarlo.',
 } satisfies Record<keyof typeof zh, string>

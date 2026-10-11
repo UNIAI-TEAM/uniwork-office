@@ -212,8 +212,6 @@ export const fr = {
   appFootnotePlaceholder: 'Texte de la note de bas de page…',
   appEndnotePlaceholder: 'Texte de la note de fin…',
   appAutoSave: 'Enregistrement automatique',
-  appAutoSaveUniworkTip:
-    'L’enregistrement automatique est désactivé pour les documents UniWork. Utilisez Enregistrer pour enregistrer une nouvelle version.',
   appAutoSaveTip:
     'Enregistrement automatique (toutes les 30 secondes et lorsque la fenêtre perd le focus)',
   appSaveShortcutTip: 'Enregistrer (⌘S)',
@@ -550,4 +548,11 @@ export const fr = {
   appOnlyZotero: 'Les citations Zotero ne sont pas disponibles ici.',
   appOnlyOpenPassword: "Il n'est pas possible de définir ici un mot de passe d'ouverture.",
   appOnlyEncrypted: '« {name} » est protégé par un mot de passe et ne peut pas être ouvert ici.',
+  appFileExportPdf: 'Exporter en PDF…',
+  appFilePrint: 'Imprimer…',
+  appPrintNoPrinter:
+    "Aucune imprimante n'est disponible sur cet ordinateur. Vous pouvez enregistrer le document au format PDF à la place.",
+  appPrintFailedPdfHint:
+    "L'impression a échoué : {error}. Vous pouvez enregistrer le document au format PDF à la place.",
+  appPrintSaveAsPdf: 'Enregistrer en PDF…',
 } satisfies Record<keyof typeof zh, string>

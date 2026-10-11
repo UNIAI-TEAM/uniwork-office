@@ -1650,6 +1650,7 @@ export function Ribbon({
     onAddSlide,
     onAddSlideWithLayout,
     onAiPreset,
+    uniworkReadOnly,
     onAlign,
     onDirection,
     onArrange,
@@ -1881,18 +1882,17 @@ export function Ribbon({
         >
           <IconRedo size={16} />
         </button>
-        {cap('autoSave') && (
+        {/* product rule: a UniWork document is only written by an explicit Save, so it has no AutoSave switch */}
+        {cap('autoSave') && !uniworkBound && (
           <label
-            className={`autosave-toggle ${autoSave ? 'on' : ''}${uniworkBound ? ' disabled' : ''}`}
-            data-tip={t(uniworkBound ? 'ribbonAutoSaveUniworkTip' : 'ribbonAutoSaveTip')}
-            aria-disabled={uniworkBound || undefined}
+            className={`autosave-toggle ${autoSave ? 'on' : ''}`}
+            data-tip={t('ribbonAutoSaveTip')}
           >
             <span className="autosave-knob" />
             <span className="autosave-text">{t('ribbonAutoSave')}</span>
             <input
               type="checkbox"
               checked={autoSave}
-              disabled={uniworkBound}
               onChange={(e) => onAutoSaveChange(e.target.checked)}
             />
           </label>
@@ -2545,8 +2545,12 @@ export function Ribbon({
                 <Group label={t('ribbonGroupProofing')}>
                   <button
                     className="rb-big"
-                    disabled={!hasDoc}
-                    data-tip={`${t('ribbonSpellCheckTip')} — ${t('ribbonAiCreditNote')}`}
+                    disabled={!hasDoc || uniworkReadOnly}
+                    data-tip={
+                      uniworkReadOnly
+                        ? t('aiViewOnlyNotice')
+                        : `${t('ribbonSpellCheckTip')} — ${t('ribbonAiCreditNote')}`
+                    }
                     onClick={() => {
                       if (confirmAiRewrite()) onAiPreset(t('ribbonSpellCheckPrompt'))
                     }}
@@ -2561,8 +2565,12 @@ export function Ribbon({
                   <div className="rb-drop-wrap">
                     <button
                       className={`rb-big ${translateOpen ? 'active' : ''}`}
-                      disabled={!hasDoc}
-                      data-tip={`${t('ribbonTranslateTip')} — ${t('ribbonAiCreditNote')}`}
+                      disabled={!hasDoc || uniworkReadOnly}
+                      data-tip={
+                        uniworkReadOnly
+                          ? t('aiViewOnlyNotice')
+                          : `${t('ribbonTranslateTip')} — ${t('ribbonAiCreditNote')}`
+                      }
                       onMouseDown={(e) => {
                         e.stopPropagation()
                         closeSiblingPanels(e, closePanels, 'translate')

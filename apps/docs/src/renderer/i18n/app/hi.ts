@@ -204,8 +204,6 @@ export const hi = {
   appFootnotePlaceholder: 'पाद टिप्पणी का टेक्स्ट…',
   appEndnotePlaceholder: 'अंत टिप्पणी का टेक्स्ट…',
   appAutoSave: 'स्वतः सहेजना',
-  appAutoSaveUniworkTip:
-    'UniWork दस्तावेज़ों के लिए ऑटो सेव बंद है। नया संस्करण सहेजने के लिए ‘सहेजें’ का उपयोग करें।',
   appAutoSaveTip: 'स्वतः सहेजना (हर 30 सेकंड में और विंडो का फ़ोकस हटने पर)',
   appSaveShortcutTip: 'सहेजें (⌘S)',
   appUndo: 'पूर्ववत करें',
@@ -539,4 +537,11 @@ export const hi = {
   appOnlyZotero: 'Zotero उद्धरण यहाँ उपलब्ध नहीं हैं।',
   appOnlyOpenPassword: 'दस्तावेज़ खोलने का पासवर्ड यहाँ सेट नहीं किया जा सकता।',
   appOnlyEncrypted: '"{name}" पासवर्ड से सुरक्षित है और यहाँ नहीं खोला जा सकता।',
+  appFileExportPdf: 'PDF के रूप में निर्यात करें…',
+  appFilePrint: 'प्रिंट करें…',
+  appPrintNoPrinter:
+    'इस कंप्यूटर पर कोई प्रिंटर उपलब्ध नहीं है। आप इसके बजाय दस्तावेज़ को PDF के रूप में सहेज सकते हैं।',
+  appPrintFailedPdfHint:
+    'प्रिंट नहीं हो सका: {error}। आप इसके बजाय दस्तावेज़ को PDF के रूप में सहेज सकते हैं।',
+  appPrintSaveAsPdf: 'PDF के रूप में सहेजें…',
 } satisfies Record<keyof typeof zh, string>

@@ -9,6 +9,7 @@ import type { PointerEvent as ReactPointerEvent, ReactElement, ReactNode } from 
 import { AgentLoop, composeSkills } from '@genoffice/agent-core'
 import type { AgentImage } from '@genoffice/agent-core'
 import type { AiSettings } from '@genoffice/ai-provider'
+import { aiNoticeBody, aiNoticeKind } from '@genoffice/ai-provider/browser'
 import { platform } from '../capabilities'
 import { ATTACHMENT_IMAGE_EXTS } from '../../shared/ipc'
 import type { AttachmentAddResult, AttachmentMeta } from '../../shared/ipc'
@@ -291,6 +292,7 @@ export function AiPanel({
   onQueueClear,
   onQueueFocus,
   onQueueConsume,
+  readOnly = false,
   onCollapse,
 }: {
   deps: HtmlAiDeps
@@ -303,6 +305,8 @@ export function AiPanel({
   onQueueClear: () => void
   onQueueFocus: (qid: string) => void
   onQueueConsume: (qids: string[]) => void
+  /** a view-only UniWork document: the assistant reads and answers, it never edits */
+  readOnly?: boolean
   onCollapse: () => void
 }): ReactElement {
   const { lang, t } = useI18n()
@@ -657,37 +661,42 @@ export function AiPanel({
   const runBriefWriterRef = useRef(runBriefWriter)
   runBriefWriterRef.current = runBriefWriter
 
+  const readOnlyRef = useRef(readOnly)
+  readOnlyRef.current = readOnly
   const loopRef = useRef<AgentLoop<DocSnapshot> | null>(null)
   if (!loopRef.current) {
     loopRef.current = new AgentLoop<DocSnapshot>({
       transport: transportRef.current,
       skill: composeSkills('html+search', '', [
-        createDocumentSkill({
-          getText: () => depsRef.current.access.getText(),
-          getVersion: () => depsRef.current.access.getVersion(),
-          getMap: () => depsRef.current.access.getMap(),
-          getLastManualVersion: () => depsRef.current.access.getLastManualVersion(),
-          getFilePath: () => depsRef.current.access.getFilePath(),
-          getSelectedSid: () =>
-            queueRunRef.current ? null : depsRef.current.access.getSelectedSid(),
-          applyOps: (ops, label) => depsRef.current.access.applyOps(ops, label),
-          replaceAll: (html, label) => depsRef.current.access.replaceAll(html, label),
-          askClarification: (questions) =>
-            new Promise((resolve) => {
-              clarifyResolverRef.current = resolve
-              setActiveClarify(questions)
-            }),
-          confirmBrief: (brief) =>
-            new Promise((resolve) => {
-              briefResolverRef.current = resolve
-              setActiveBrief(brief)
-            }),
-          writePage: (spec, signal) => runPageWriterRef.current(spec, signal),
-          planBrief: (spec, signal) => runBriefWriterRef.current(spec, signal),
-          getInstruction: () => runInstructionRef.current,
-          resolveAttachmentSrc: (ref) => resolveAttachmentSrc(ref),
-          listAttachmentNames: () => availableAttachments().map((a) => a.name),
-        }),
+        createDocumentSkill(
+          {
+            getText: () => depsRef.current.access.getText(),
+            getVersion: () => depsRef.current.access.getVersion(),
+            getMap: () => depsRef.current.access.getMap(),
+            getLastManualVersion: () => depsRef.current.access.getLastManualVersion(),
+            getFilePath: () => depsRef.current.access.getFilePath(),
+            getSelectedSid: () =>
+              queueRunRef.current ? null : depsRef.current.access.getSelectedSid(),
+            applyOps: (ops, label) => depsRef.current.access.applyOps(ops, label),
+            replaceAll: (html, label) => depsRef.current.access.replaceAll(html, label),
+            askClarification: (questions) =>
+              new Promise((resolve) => {
+                clarifyResolverRef.current = resolve
+                setActiveClarify(questions)
+              }),
+            confirmBrief: (brief) =>
+              new Promise((resolve) => {
+                briefResolverRef.current = resolve
+                setActiveBrief(brief)
+              }),
+            writePage: (spec, signal) => runPageWriterRef.current(spec, signal),
+            planBrief: (spec, signal) => runBriefWriterRef.current(spec, signal),
+            getInstruction: () => runInstructionRef.current,
+            resolveAttachmentSrc: (ref) => resolveAttachmentSrc(ref),
+            listAttachmentNames: () => availableAttachments().map((a) => a.name),
+          },
+          () => readOnlyRef.current,
+        ),
         createSearchSkill(),
         createFilesSkill(availableAttachments),
         createIntentSkill(
@@ -1285,7 +1294,7 @@ export function AiPanel({
           return (
             <div
               key={i}
-              className={`ai-msg ai-msg-assistant${entry.isError ? ' ai-msg-error' : ''}${entry.streaming ? ' ai-msg-streaming' : ''}`}
+              className={`ai-msg ai-msg-assistant${entry.isError && !aiNoticeKind(entry.text) ? ' ai-msg-error' : ''}${entry.streaming ? ' ai-msg-streaming' : ''}`}
             >
               {!entry.text && entry.streaming ? (
                 <span className="ai-typing-row">
@@ -1294,7 +1303,7 @@ export function AiPanel({
               ) : (
                 entry.text && (
                   <div dir="auto">
-                    <Markdown text={entry.text} nav={docNav} />
+                    <Markdown text={aiNoticeBody(entry.text)} nav={docNav} />
                   </div>
                 )
               )}
@@ -1442,7 +1451,12 @@ export function AiPanel({
         className="ai-composer"
         style={activeClarify || activeBrief || activePartial ? { display: 'none' } : undefined}
       >
-        {chat.length === 0 && docEmpty && (
+        {readOnly && (
+          <div className="ai-readonly-notice" role="note">
+            {t('aiViewOnlyNotice')}
+          </div>
+        )}
+        {chat.length === 0 && docEmpty && !readOnly && (
           <div className="ai-intent-bar">
             <div className="ai-intent-label">{t('aiIntentLabel')}</div>
             <div className="ai-intent-cards" role="radiogroup" aria-label={t('aiIntentLabel')}>
@@ -1489,7 +1503,7 @@ export function AiPanel({
             </div>
           </div>
         )}
-        {editQueue.length > 0 && (
+        {!readOnly && editQueue.length > 0 && (
           <EditQueueCard
             items={editQueue}
             text={deps.access.getText()}

@@ -6,6 +6,7 @@ export const pt = {
   cloudStateNotEntitled: 'Não incluído no seu plano',
   cloudStateExhausted: 'Créditos de IA esgotados',
   cloudStateUnavailable: 'Indisponível',
+  cloudStateSignedOut: 'Sessão não iniciada',
   cloudStateInactive: 'Assinatura inativa',
   cloudCredits: 'Créditos de IA',
   cloudCreditsLeft: 'Restam {remaining} / {limit}',
@@ -32,4 +33,10 @@ export const pt = {
   cloudMediaDesc: 'Usa os créditos de IA UniWork da sua organização; sem chave.',
   cloudSearchAutoHint:
     'Primeiro a nuvem UniWork (consome créditos de IA), depois a pesquisa gratuita.',
+  aiTestErrInvalidKey: 'Chave de API ausente ou recusada',
+  aiTestErrNetwork: 'Não foi possível conectar. Verifique sua rede',
+  aiTestErrLimit: 'Limite do provedor atingido. Tente mais tarde',
+  aiTestErrUnavailable: 'O serviço não responde. Tente mais tarde',
+  aiTestErrMisconfigured:
+    'Definições incompletas: verifique o endereço do serviço e os campos da conta',
 } satisfies Record<keyof typeof zh, string>

@@ -8,7 +8,7 @@ export const ru = {
   aiStarterPolishAll: 'Отшлифуй весь документ, сделав тон более профессиональным',
   aiStarterContinue: 'Продолжи текст с того места, где он обрывается',
   aiStarterFillTemplate: 'Найди и заполни местозаполнители в документе',
-  aiBuyPlanBtn: 'Buy AI plan',
+  aiOpenSettingsBtn: 'Open AI settings',
   aiPanelTitle: 'uniAI',
   aiOpenAssistant: 'Открыть ИИ-помощника',
   aiSummarizeBtn: 'ИИ-резюме',
@@ -183,4 +183,6 @@ export const ru = {
   aiCmdImages: 'Обновлено изображений: {count}',
   aiCmdToc: 'Вставлено оглавление (элементов: {count})',
   aiCmdSkipped: ' (пропущено защищенных блоков: {count})',
+  aiViewOnlyNotice:
+    'Документ только для просмотра: ИИ может читать его и отвечать на вопросы, но не может редактировать.',
 } satisfies Record<keyof typeof zh, string>

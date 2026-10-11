@@ -8,7 +8,7 @@ export const de = {
   aiStarterPolishAll: 'Das ganze Dokument für einen professionelleren Ton überarbeiten',
   aiStarterContinue: 'Dort weiterschreiben, wo das Dokument aufhört',
   aiStarterFillTemplate: 'Platzhalter im Dokument finden und ausfüllen',
-  aiBuyPlanBtn: 'Buy AI plan',
+  aiOpenSettingsBtn: 'Open AI settings',
   aiPanelTitle: 'uniAI',
   aiOpenAssistant: 'KI-Assistenten öffnen',
   aiSummarizeBtn: 'KI-Zusammenfassung',
@@ -187,4 +187,6 @@ export const de = {
   aiCmdImages: '{count} Bild(er) aktualisiert',
   aiCmdToc: 'Inhaltsverzeichnis eingefügt ({count} Einträge)',
   aiCmdSkipped: ' ({count} geschützte Blöcke übersprungen)',
+  aiViewOnlyNotice:
+    'Schreibgeschütztes Dokument: Die KI kann es lesen und Fragen beantworten, aber nicht bearbeiten.',
 } satisfies Record<keyof typeof zh, string>

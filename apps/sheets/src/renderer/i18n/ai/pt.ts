@@ -100,4 +100,6 @@ export const pt = {
   aiScopeRangeTip:
     'A IA interpreta "esta coluna / estas linhas / a parte selecionada" como este intervalo, que fica fixo durante toda a execução ao enviar',
   aiScopeClearTitle: 'Remover o escopo do intervalo e usar a planilha inteira',
+  aiViewOnlyNotice:
+    'Documento somente leitura: a IA pode lê-lo e responder a perguntas, mas não pode editá-lo.',
 } satisfies Record<keyof typeof zh, string>

@@ -33,8 +33,6 @@ export const he = {
   replaceAll: 'החלפת הכול',
   findTip: 'חיפוש והחלפה (⌘F)',
   autoSaveTip: 'שומר כל 30 שניות וכאשר החלון מאבד פוקוס',
-  autoSaveUniworkOff:
-    'השמירה האוטומטית כבויה עבור מסמכי UniWork. השתמשו ב״שמירה״ כדי לשמור גרסה חדשה.',
   zoom: 'זום',
   zoomIn: 'הגדל',
   zoomOut: 'הקטן',

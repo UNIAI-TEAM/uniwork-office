@@ -209,8 +209,6 @@ export const pl = {
   appFootnotePlaceholder: 'Treść przypisu dolnego…',
   appEndnotePlaceholder: 'Treść przypisu końcowego…',
   appAutoSave: 'Autozapis',
-  appAutoSaveUniworkTip:
-    'Autozapis jest wyłączony dla dokumentów UniWork. Użyj opcji Zapisz, aby zapisać nową wersję.',
   appAutoSaveTip: 'Autozapis (co 30 sekund oraz gdy okno traci fokus)',
   appSaveShortcutTip: 'Zapisz (⌘S)',
   appUndo: 'Cofnij',
@@ -545,4 +543,11 @@ export const pl = {
   appOnlyZotero: 'Cytaty Zotero nie są tu dostępne.',
   appOnlyOpenPassword: 'Nie można tu ustawić hasła do otwierania dokumentu.',
   appOnlyEncrypted: 'Dokument „{name}” jest chroniony hasłem i nie można go tu otworzyć.',
+  appFileExportPdf: 'Eksportuj jako PDF…',
+  appFilePrint: 'Drukuj…',
+  appPrintNoPrinter:
+    'Na tym komputerze nie ma dostępnej drukarki. Możesz zamiast tego zapisać dokument jako PDF.',
+  appPrintFailedPdfHint:
+    'Drukowanie nie powiodło się: {error}. Możesz zamiast tego zapisać dokument jako PDF.',
+  appPrintSaveAsPdf: 'Zapisz jako PDF…',
 } satisfies Record<keyof typeof zh, string>

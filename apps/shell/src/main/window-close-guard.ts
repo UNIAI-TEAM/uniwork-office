@@ -10,6 +10,22 @@ import type { TabManager } from './tab-manager'
 import { confirmUniworkClose } from './uniwork-docs/close-guard'
 
 /**
+ * The app-quit side of the guard. Cancelling a window's close event also
+ * cancels an in-flight app.quit(); on macOS, where closing the last window does
+ * not quit, ⌘Q from a tab that needs the async prompt path (any docs tab) would
+ * then close the window and leave the app running. With this wired in, a
+ * confirmed close re-issues the quit instead of just the window close.
+ */
+export interface QuitFlight {
+  /** an app quit (⌘Q, Dock / app menu Quit) is in progress */
+  inFlight(): boolean
+  /** the quit was vetoed (a prompt was cancelled or failed) */
+  clear(): void
+  /** re-issue the quit once every prompt has been answered */
+  resume(): void
+}
+
+/**
  * Unsaved-changes guard for the shell window: closing the whole window walks
  * every dirty sheets/pdf/slides/docs tab through the same
  * save/don't-save/cancel prompt the tab close path uses, and any cancel
@@ -21,7 +37,11 @@ import { confirmUniworkClose } from './uniwork-docs/close-guard'
  * guard) so the handler itself stays unit-testable: it takes the window and
  * the tab manager as arguments and therefore needs no Electron to run.
  */
-export function installShellCloseGuard(win: BrowserWindow, manager: TabManager): void {
+export function installShellCloseGuard(
+  win: BrowserWindow,
+  manager: TabManager,
+  quit?: QuitFlight,
+): void {
   let closeConfirmed = false
   // a second close event while the save prompts are still open (double ⌘Q, an
   // OS retry) must not re-enter the whole prompt chain
@@ -97,16 +117,22 @@ export function installShellCloseGuard(win: BrowserWindow, manager: TabManager):
         })()
         // a denied close vetoes any quit that was in flight: the sheets close
         // guard must prompt again on later closes instead of silently proceeding
-        if (denied) resetSheetsShuttingDown()
-        else {
+        if (denied) {
+          resetSheetsShuttingDown()
+          quit?.clear()
+        } else {
           closeConfirmed = true
-          if (!win.isDestroyed()) win.close()
+          // the cancelled close took the in-flight quit down with it: ask for it
+          // again, or on macOS only the window goes and the app keeps running
+          if (quit?.inFlight()) quit.resume()
+          else if (!win.isDestroyed()) win.close()
         }
       } catch (err) {
         // a throw aborts the close like a denial: the window stays open, so the
         // quit that may have latched sheets as shutting down is vetoed too
         console.error('[shell] window close prompt failed:', err)
         resetSheetsShuttingDown()
+        quit?.clear()
       } finally {
         closePromptInFlight = false
       }

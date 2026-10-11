@@ -176,4 +176,6 @@ export const fr = {
   aiStarterAnnouncementPrompt: 'Rédige une annonce produit pour moi. Produit et points clés : ',
   aiStarterGuide: 'Rédiger un guide pratique',
   aiStarterGuidePrompt: 'Rédige un guide pratique pour moi. Le processus à expliquer : ',
+  aiViewOnlyNotice:
+    'Document en lecture seule : l’IA peut le lire et répondre à des questions, mais ne peut pas le modifier.',
 } satisfies Record<keyof typeof zh, string>

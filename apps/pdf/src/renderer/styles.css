@@ -4100,6 +4100,17 @@ html[data-web-frame] .pdf-modal-btn.primary:hover:not(:disabled) {
 }
 
 /* Composer floats over the chat scroll area — no top border (agent-shell §4.6) */
+/* view-only document: the assistant reads and answers, it never edits */
+.ai-readonly-notice {
+  margin: 0 0 8px;
+  padding: 6px 10px;
+  border-radius: var(--radius-16);
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-dim);
+  background: var(--hover);
+}
+
 .ai-composer {
   border-top: none;
   padding: 8px 12px 12px;

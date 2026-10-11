@@ -198,7 +198,6 @@ export const ar = {
   appFootnotePlaceholder: 'نص الحاشية السفلية…',
   appEndnotePlaceholder: 'نص التعليق الختامي…',
   appAutoSave: 'حفظ تلقائي',
-  appAutoSaveUniworkTip: 'الحفظ التلقائي متوقف لمستندات UniWork. استخدم «حفظ» لحفظ إصدار جديد.',
   appAutoSaveTip: 'حفظ تلقائي (كل 30 ثانية وعند فقدان النافذة للتركيز)',
   appSaveShortcutTip: 'حفظ (⌘S)',
   appUndo: 'تراجع',
@@ -529,4 +528,9 @@ export const ar = {
   appOnlyZotero: 'اقتباسات Zotero غير متاحة هنا.',
   appOnlyOpenPassword: 'لا يمكن تعيين كلمة مرور لفتح المستند هنا.',
   appOnlyEncrypted: 'المستند "{name}" محمي بكلمة مرور ولا يمكن فتحه هنا.',
+  appFileExportPdf: 'تصدير بتنسيق PDF…',
+  appFilePrint: 'طباعة…',
+  appPrintNoPrinter: 'لا تتوفر طابعة على هذا الكمبيوتر. يمكنك حفظ المستند كملف PDF بدلاً من ذلك.',
+  appPrintFailedPdfHint: 'تعذّرت الطباعة: {error}. يمكنك حفظ المستند كملف PDF بدلاً من ذلك.',
+  appPrintSaveAsPdf: 'حفظ بتنسيق PDF…',
 } satisfies Record<keyof typeof zh, string>

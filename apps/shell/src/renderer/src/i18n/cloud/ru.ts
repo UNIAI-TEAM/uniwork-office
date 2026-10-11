@@ -6,6 +6,7 @@ export const ru = {
   cloudStateNotEntitled: 'Не входит в ваш тариф',
   cloudStateExhausted: 'Кредиты ИИ закончились',
   cloudStateUnavailable: 'Недоступен',
+  cloudStateSignedOut: 'Вход не выполнен',
   cloudStateInactive: 'Подписка неактивна',
   cloudCredits: 'Кредиты ИИ',
   cloudCreditsLeft: 'Осталось {remaining} / {limit}',
@@ -31,4 +32,9 @@ export const ru = {
   cloudMediaLabel: 'Облако UniWork',
   cloudMediaDesc: 'Использует кредиты ИИ UniWork вашей организации; ключ не нужен.',
   cloudSearchAutoHint: 'Сначала облако UniWork (расходует кредиты ИИ), затем бесплатный поиск.',
+  aiTestErrInvalidKey: 'Ключ API отсутствует или отклонён',
+  aiTestErrNetwork: 'Не удаётся подключиться. Проверьте сеть',
+  aiTestErrLimit: 'Достигнут лимит провайдера. Повторите позже',
+  aiTestErrUnavailable: 'Сервис не отвечает. Повторите позже',
+  aiTestErrMisconfigured: 'Настройки неполные: проверьте адрес сервиса и поля учётной записи',
 } satisfies Record<keyof typeof zh, string>

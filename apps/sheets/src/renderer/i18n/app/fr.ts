@@ -550,6 +550,8 @@ export const fr = {
     "Le pont de fichiers du bureau est indisponible. Redémarrez l'application Electron.",
   appOpenCanceled: 'Sélection du classeur annulée.',
   appOpeningWorkbook: 'Ouverture du classeur…',
+  appOpenStalled: "Impossible d'ouvrir le classeur.",
+  appOpenRetry: 'Réessayer',
   appOpened: '{name} ouvert — les modifications de cellules se réenregistrent avec ⌘S.',
   appOpenFailed: "Impossible d'ouvrir le classeur.",
   appPageSetupNeedsFile:
@@ -1601,6 +1603,4 @@ export const fr = {
     "Le moteur du classeur s'est arrêté de façon inattendue et a redémarré. Le classeur a été rouvert à partir de sa dernière version enregistrée ; vos modifications non enregistrées sont conservées, pensez à enregistrer rapidement.",
   appWebSavedReopenFailed:
     "Vos modifications ont été enregistrées dans UniWork, mais le classeur n'a pas pu être rouvert ici. Rechargez l'éditeur pour continuer.",
-  appAutoSaveUniworkOff:
-    'L’enregistrement automatique est désactivé pour les documents UniWork. Utilisez Enregistrer pour enregistrer une nouvelle version.',
 } satisfies Record<keyof typeof zh, string>

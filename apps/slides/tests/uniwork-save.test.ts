@@ -1,5 +1,6 @@
 import {
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
@@ -8,7 +9,7 @@ import {
   writeFileSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // The crash-recovery tick is a module-level setInterval: fake only that timer
@@ -19,6 +20,7 @@ const env = vi.hoisted(() => {
     dir: '',
     handlers: new Map<string, (...args: never[]) => unknown>(),
     saveDialogPath: '' as string,
+    saveDialogOptions: [] as Array<{ defaultPath?: string }>,
   }
 })
 
@@ -30,7 +32,10 @@ vi.mock('electron', () => ({
     whenReady: () => Promise.resolve(),
   },
   dialog: {
-    showSaveDialog: async () => ({ canceled: false, filePath: env.saveDialogPath }),
+    showSaveDialog: async (...args: unknown[]) => {
+      env.saveDialogOptions.push(args.at(-1) as { defaultPath?: string })
+      return { canceled: false, filePath: env.saveDialogPath }
+    },
   },
   clipboard: { writeBuffer: () => {} },
   ipcMain: {
@@ -244,6 +249,20 @@ describe('slides:save-as and MCP save UniWork seam', () => {
     expect(written(env.saveDialogPath)).toBe(true)
     expect(readFileSync(deckPath, 'utf8')).toBe(ORIGINAL)
     expect(hook).not.toHaveBeenCalled()
+  })
+
+  it('Save As of a bound deck starts from its name in the remembered folder, not next to the copy', async () => {
+    const elsewhere = join(env.dir, 'elsewhere')
+    mkdirSync(elsewhere, { recursive: true })
+    env.saveDialogPath = join(elsewhere, 'copy.pptx')
+    await call('slides:save-as', 'deck.pptx')
+    // a local deck: Word parity, next to the file
+    expect(env.saveDialogOptions.at(-1)?.defaultPath).toBe(join(dirname(deckPath), 'deck.pptx'))
+    // that Save As moved the session onto the copy: back to the working copy
+    session.path = deckPath
+    bindPolicy({ bound: [deckPath] })
+    await call('slides:save-as', 'deck.pptx')
+    expect(env.saveDialogOptions.at(-1)?.defaultPath).toBe(join(elsewhere, 'deck.pptx'))
   })
 
   it('Save As onto the open deck itself is an explicit Save: it writes and fires once', async () => {

@@ -172,6 +172,8 @@ function onboardingCopy(text) {
 /**
  * Shell string keys of features UniWork Office does not ship: the GitHub star prompt / About row /
  * welcome card, the GenTeam credits offer and the Google Analytics usage-statistics consent.
+ * (And setCliLinkDone, the upstream 'genoffice is available at {path}' line: Settings > General now
+ * shows setCliLinkReady, with no product name and no local path.)
  * No UI references them any more; an upstream sync brings them back in every locale block, and
  * the brand scan (which flags "GitHub" in user-visible strings) would fail on them.
  */
@@ -189,6 +191,7 @@ export const DROPPED_SHELL_STRING_KEYS = [
   'setAnalyticsDesc',
   'onbCredits',
   'onbJoinGenTeam',
+  'setCliLinkDone',
 ]
 
 /**
@@ -380,7 +383,7 @@ export const rules = [
   },
   {
     id: 'vi-no-api-key',
-    why: 'Main-process vi errNoApiKey keeps the UniWork wording (no active AI plan), matching the en entry; the upstream "no API key configured for {provider}" text comes back with every merge of these three dictionaries',
+    why: 'Main-process vi errNoApiKey keeps the UniWork wording (no AI model set up yet; chat runs on the user own key), matching the en entry; the upstream "no API key configured for {provider}" text comes back with every merge of these three dictionaries',
     files: [
       'apps/docs/src/main/docs-main.ts',
       'apps/sheets/src/main/sheets-main.ts',
@@ -389,13 +392,13 @@ export const rules = [
     replace: [
       [
         /errNoApiKey: 'Chưa cấu hình khóa API cho \{provider\}'/g,
-        "errNoApiKey: 'Chưa kích hoạt / mua gói AI. Hãy mua gói để dùng Trợ lý AI.'",
+        "errNoApiKey: 'Chưa thiết lập mô hình AI. Hãy thêm khóa AI của riêng bạn trong Cài đặt > Mô hình AI để dùng Trợ lý AI.'",
       ],
     ],
   },
   {
     id: 'en-no-api-key',
-    why: 'Main-process en errNoApiKey keeps the UniWork wording (no active AI plan), like vi-no-api-key; the upstream "No API key configured for {provider}" text comes back with every merge of these three dictionaries',
+    why: 'Main-process en errNoApiKey keeps the UniWork wording (no AI model set up yet; chat runs on the user own key), like vi-no-api-key; the upstream "No API key configured for {provider}" text comes back with every merge of these three dictionaries',
     files: [
       'apps/docs/src/main/docs-main.ts',
       'apps/sheets/src/main/sheets-main.ts',
@@ -404,7 +407,7 @@ export const rules = [
     replace: [
       [
         /errNoApiKey: 'No API key configured for \{provider\}'/g,
-        "errNoApiKey: 'AI is not activated. Purchase a plan to use the AI assistant.'",
+        "errNoApiKey: 'No AI model is set up yet. Add your own AI key in Settings > AI Model to use the assistant.'",
       ],
     ],
   },

@@ -455,6 +455,8 @@ export const he = {
   appBridgeUnavailable: 'גשר הקבצים של שולחן העבודה אינו זמין. הפעל מחדש את אפליקציית Electron.',
   appOpenCanceled: 'בחירת חוברת העבודה בוטלה.',
   appOpeningWorkbook: 'פותח חוברת עבודה…',
+  appOpenStalled: 'לא ניתן היה לפתוח את חוברת העבודה.',
+  appOpenRetry: 'נסה שוב',
   appOpened: '{name} נפתח — עריכות תאים נשמרות חזרה עם ⌘S.',
   appOpenFailed: 'לא ניתן לפתוח את חוברת העבודה.',
   appPageSetupNeedsFile: 'פתח תחילה קובץ XLSX — הגדרת העמוד נשמרת לקובץ.',
@@ -1470,6 +1472,4 @@ export const he = {
     'מנוע חוברת העבודה נעצר באופן בלתי צפוי והופעל מחדש. חוברת העבודה נפתחה מחדש מהגרסה האחרונה ששמרתם; השינויים שלא נשמרו נשמרו, כדאי לשמור בקרוב.',
   appWebSavedReopenFailed:
     'השינויים שלך נשמרו ב-UniWork, אך לא ניתן היה לפתוח את החוברת מחדש כאן. טען מחדש את העורך כדי להמשיך.',
-  appAutoSaveUniworkOff:
-    'השמירה האוטומטית כבויה עבור מסמכי UniWork. השתמשו ב״שמירה״ כדי לשמור גרסה חדשה.',
 } satisfies Record<keyof typeof zh, string>

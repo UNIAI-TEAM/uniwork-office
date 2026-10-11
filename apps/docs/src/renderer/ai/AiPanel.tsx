@@ -2,13 +2,19 @@ import {
   aiPanelWidthAtPointer,
   AiPanelSideButton,
   AiModelPicker,
+  useCloudSignedIn,
   type AiModelPickerBridge,
 } from '@genoffice/ui'
 import { useEffect, useRef, useState } from 'react'
 import type { Editor } from '@tiptap/core'
 import type { Block } from '@genoffice/docx-engine'
 import { AgentLoop, composeSkills, streamText, type AgentImage } from '@genoffice/agent-core'
-import { imageGenerationAvailable, mediaAnalysisAvailable } from '@genoffice/ai-provider/browser'
+import {
+  aiNoticeBody,
+  aiNoticeKind,
+  imageGenerationAvailable,
+  mediaAnalysisAvailable,
+} from '@genoffice/ai-provider/browser'
 import type { AiSettings, AttachmentAddResult, AttachmentMeta } from '../../shared/ipc'
 import { ATTACHMENT_IMAGE_EXTS } from '../../shared/ipc'
 import type { PmNode } from '../editor/convert'
@@ -129,6 +135,9 @@ const EDIT_STARTER_PROMPTS: StringKey[] = [
   'aiStarterContinue',
   'aiStarterFillTemplate',
 ]
+
+/** a view-only document keeps only the starter that does not edit it */
+const READ_ONLY_STARTER_PROMPTS: StringKey[] = ['aiStarterSummarize']
 
 /** resizable panel width: persisted, clamped so neither pane collapses */
 const PANEL_WIDTH_KEY = 'docs-ai-panel-width'
@@ -323,6 +332,8 @@ interface AiPanelProps {
   docExtras?: AiDocExtras
   /** footnote / endnote lists for insert_footnote, insert_endnote, delete_note, read_notes */
   notesAccess?: AiNotesAccess
+  /** view-only UniWork document: the agent only reads, nothing here may edit the document */
+  readOnly?: boolean
 }
 
 const MODEL_BRIDGE: AiModelPickerBridge = {
@@ -359,6 +370,7 @@ export function AiPanel({
   pageSetupAccess,
   docExtras,
   notesAccess,
+  readOnly = false,
 }: AiPanelProps) {
   const { t, lang } = useI18n()
   // Panel chrome follows the UI language; message text follows its own content (dir=auto below)
@@ -491,25 +503,10 @@ export function AiPanel({
   const settingsRef = useRef(settings)
   settingsRef.current = settings
   /** UniWork cloud sign-in state (signed in + entitled, from the shell main status) for the media tool gates */
-  const gskLoggedInRef = useRef(false)
-  useEffect(() => {
-    let alive = true
-    const refresh = () => {
-      // tests render the panel without a preload bridge
-      void window.desktop
-        ?.aiGskStatus?.()
-        .then((s) => {
-          if (alive) gskLoggedInRef.current = !!s?.loggedIn
-        })
-        .catch(() => {})
-    }
-    refresh()
-    window.addEventListener('focus', refresh)
-    return () => {
-      alive = false
-      window.removeEventListener('focus', refresh)
-    }
-  }, [])
+  const { loggedInRef: gskLoggedInRef } = useCloudSignedIn(
+    () => window.desktop?.aiGskStatus?.(),
+    open,
+  )
   const blocksRef = useRef(blocks)
   blocksRef.current = blocks
   const numIdFallbackRef = useRef(numIdFallback)
@@ -527,6 +524,8 @@ export function AiPanel({
       seen.has(a.path) ? false : (seen.add(a.path), true),
     )
   }
+  const readOnlyRef = useRef(readOnly)
+  readOnlyRef.current = readOnly
   const trackChangesRef = useRef(trackChanges)
   trackChangesRef.current = trackChanges
   const commentsAccessRef = useRef(commentsAccess)
@@ -784,6 +783,7 @@ export function AiPanel({
           () => docExtrasRef.current,
           () => notesAccessRef.current,
           () => mediaAnalysisAvailable(settingsRef.current, gskLoggedInRef.current),
+          () => readOnlyRef.current,
         ),
         createFilesSkill(availableAttachments),
       ]),
@@ -1370,7 +1370,14 @@ export function AiPanel({
               {t(docEmpty ? 'aiEmptyDraftBody2' : 'aiEmptyBody2')}
             </div>
             <div className="ai-starter-list">
-              {(docEmpty ? DRAFT_STARTER_PROMPTS : EDIT_STARTER_PROMPTS).map((p) => (
+              {(readOnly
+                ? docEmpty
+                  ? []
+                  : READ_ONLY_STARTER_PROMPTS
+                : docEmpty
+                  ? DRAFT_STARTER_PROMPTS
+                  : EDIT_STARTER_PROMPTS
+              ).map((p) => (
                 <button
                   key={p}
                   className="ai-starter"
@@ -1429,23 +1436,25 @@ export function AiPanel({
                 <span dir="auto">{entry.text}</span>
               )}
               {entry.tools && entry.tools.length > 0 && <ToolChipList tools={entry.tools} />}
-              {entry.error && (
-                <div className="ai-msg-error">{t('aiErrorPrefix', { error: entry.error })}</div>
-              )}
-              {cap('billing') &&
-                entry.error &&
-                /API\s*[Kk]ey|api key|khóa API|kích hoạt|mua gói AI|not activated|purchase an AI|未配置|未設定/i.test(
-                  entry.error,
-                ) && (
-                  <div className="ai-msg-actions">
-                    <button
-                      className="ai-login-btn"
-                      onClick={() => void window.desktop.aiOpenBilling?.()}
-                    >
-                      {t('aiBuyPlanBtn')}
-                    </button>
+              {entry.error &&
+                (aiNoticeKind(entry.error) ? (
+                  // "nothing to chat with" is a setup / plan state: a plain notice, not a red error
+                  <div className="ai-msg-notice" role="status">
+                    {aiNoticeBody(entry.error)}
                   </div>
-                )}
+                ) : (
+                  <div className="ai-msg-error">{t('aiErrorPrefix', { error: entry.error })}</div>
+                ))}
+              {cap('billing') && entry.error && aiNoticeKind(entry.error) && (
+                <div className="ai-msg-actions">
+                  <button
+                    className="ai-login-btn"
+                    onClick={() => void window.desktop.aiOpenBilling?.()}
+                  >
+                    {t('aiOpenSettingsBtn')}
+                  </button>
+                </div>
+              )}
               {showToolbar && (
                 <div className="ai-msg-toolbar">
                   {entry.text && (
@@ -1528,6 +1537,11 @@ export function AiPanel({
       </div>
 
       <div className="ai-composer">
+        {readOnly && (
+          <div className="ai-viewonly-notice" role="status">
+            {t('aiViewOnlyNotice')}
+          </div>
+        )}
         {attachNotice && <div className="ai-attach-notice">{attachNotice}</div>}
         {activePartial && (
           <div className="ai-queue ai-partial-card" role="group" aria-label={t('aiPartialTitle')}>
@@ -1693,14 +1707,16 @@ export function AiPanel({
               >
                 <img src={attachIcon} alt="" aria-hidden />
               </button>
-              <button
-                className={`ai-track-btn${trackChanges ? ' on' : ''}`}
-                onClick={toggleTrackChanges}
-                data-tip={trackChanges ? t('aiTrackOnTitle') : t('aiTrackOffTitle')}
-              >
-                <span className="ai-track-dot" aria-hidden />
-                {t('aiTrackChanges')}
-              </button>
+              {!readOnly && (
+                <button
+                  className={`ai-track-btn${trackChanges ? ' on' : ''}`}
+                  onClick={toggleTrackChanges}
+                  data-tip={trackChanges ? t('aiTrackOnTitle') : t('aiTrackOffTitle')}
+                >
+                  <span className="ai-track-dot" aria-hidden />
+                  {t('aiTrackChanges')}
+                </button>
+              )}
             </>
           }
         />

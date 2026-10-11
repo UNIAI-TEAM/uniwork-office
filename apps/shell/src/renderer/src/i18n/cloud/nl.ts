@@ -6,6 +6,7 @@ export const nl = {
   cloudStateNotEntitled: 'Niet in je abonnement',
   cloudStateExhausted: 'AI-tegoed op',
   cloudStateUnavailable: 'Niet beschikbaar',
+  cloudStateSignedOut: 'Niet aangemeld',
   cloudStateInactive: 'Abonnement inactief',
   cloudCredits: 'AI-tegoed',
   cloudCreditsLeft: '{remaining} / {limit} over',
@@ -31,4 +32,10 @@ export const nl = {
   cloudMediaLabel: 'UniWork cloud',
   cloudMediaDesc: 'Gebruikt het UniWork AI-tegoed van je organisatie; geen sleutel nodig.',
   cloudSearchAutoHint: 'Eerst UniWork cloud (kost AI-tegoed), daarna gratis zoeken.',
+  aiTestErrInvalidKey: 'API-sleutel ontbreekt of is geweigerd',
+  aiTestErrNetwork: 'Geen verbinding. Controleer je netwerk',
+  aiTestErrLimit: 'Limiet van de aanbieder bereikt. Probeer het later opnieuw',
+  aiTestErrUnavailable: 'Service reageert niet. Probeer het later opnieuw',
+  aiTestErrMisconfigured:
+    'Instellingen onvolledig: controleer het serviceadres en de accountvelden',
 } satisfies Record<keyof typeof zh, string>

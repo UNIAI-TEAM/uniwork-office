@@ -84,13 +84,9 @@ describe('Ribbon on a UniWork copy', () => {
     expect(saveButton(container).disabled).toBe(true)
   })
 
-  it('a bound copy shows AutoSave off and disabled, and Save works while clean', () => {
+  it('a bound copy has no AutoSave toggle at all, and Save works while clean', () => {
     const { container } = renderRibbon({ autoSave: true, uniworkBound: true })
-    expect(autoSaveInput(container).disabled).toBe(true)
-    expect(autoSaveInput(container).checked).toBe(false)
-    expect(container.querySelector('.autosave-toggle')!.getAttribute('data-tip')).toContain(
-      'UniWork',
-    )
+    expect(container.querySelector('.autosave-toggle')).toBeNull()
     expect(saveButton(container).disabled).toBe(false)
   })
 

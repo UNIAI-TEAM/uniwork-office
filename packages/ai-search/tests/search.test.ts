@@ -575,12 +575,17 @@ describe('search-tools', () => {
     const bad = await testSearchProvider('serper', 'wrong')
     expect(bad.ok).toBe(false)
     expect(bad.error).toMatch(/serper/)
+    expect(bad.errorKind).toBe('unavailable')
     mockFetch(() => ({
       ok: true,
       json: { organic: [{ title: 'A', link: 'https://a.com', snippet: 's' }] },
     }))
     expect(await testSearchProvider('serper', 'right')).toEqual({ ok: true })
-    expect(await testSearchProvider('tavily', '')).toEqual({ ok: false, error: 'API key is empty' })
+    expect(await testSearchProvider('tavily', '')).toEqual({
+      ok: false,
+      error: 'API key is empty',
+      errorKind: 'invalid_key',
+    })
     mockFetch((url) =>
       url.includes('exa.ai')
         ? { ok: true, json: { results: [{ title: 'A', url: 'https://a.com', text: 't' }] } }

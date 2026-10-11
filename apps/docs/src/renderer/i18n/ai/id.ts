@@ -8,7 +8,7 @@ export const id = {
   aiStarterPolishAll: 'Perhalus seluruh dokumen agar nadanya lebih profesional',
   aiStarterContinue: 'Lanjutkan menulis dari bagian akhir dokumen',
   aiStarterFillTemplate: 'Temukan dan isi placeholder di dokumen ini',
-  aiBuyPlanBtn: 'Buy AI plan',
+  aiOpenSettingsBtn: 'Open AI settings',
   aiPanelTitle: 'uniAI',
   aiOpenAssistant: 'Buka asisten AI',
   aiSummarizeBtn: 'Ringkasan AI',
@@ -181,4 +181,6 @@ export const id = {
   aiCmdImages: '{count} gambar diperbarui',
   aiCmdToc: 'Daftar isi disisipkan ({count} entri)',
   aiCmdSkipped: ' ({count} blok terlindungi dilewati)',
+  aiViewOnlyNotice:
+    'Dokumen hanya-lihat: AI dapat membaca dan menjawab pertanyaan, tetapi tidak dapat mengedit.',
 } satisfies Record<keyof typeof zh, string>

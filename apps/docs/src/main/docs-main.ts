@@ -90,10 +90,9 @@ import { parseFileToText } from '@genoffice/file-parse'
 import { convertHtmlToDocx } from '../../../../packages/html2docx/src'
 import { ElectronBrowserDriver } from '../../../../packages/html2docx/src/drivers/electron'
 import {
-  AiCreditsError,
-  AiTimeoutError,
-  isAiNetworkError,
-  isAiOverloadedError,
+  aiChatFailure,
+  aiChatFailureFromError,
+  aiStreamErrorFields,
   chatForProvider,
   defaultAiSettings,
   activeProvider,
@@ -102,18 +101,29 @@ import {
   type AiMediaProviderConfig,
   type AiMediaProviderId,
   type AiSearchProviderId,
+  refreshUniworkCloudStatus,
   resolveAiSettings,
   maxOutputTokensOf,
   sanitizeAiSettings,
   sanitizeCliPath,
+  aiNoticeBody,
+  aiTestFailure,
+  testChatConnection,
+  noModelMessage,
   setAiUserAgent,
   setRescueFetch,
   streamForProvider,
   withUniAiOpenRouterAuth,
+  type AiChatFailure,
   type AiChatRequest,
+  type AiChatResponse,
+  type AiProviderConfig,
+  type AiProviderId,
   type AiSettings,
   type AiStreamChunk,
   type AiStreamRequest,
+  type AiTestFailureKind,
+  type AiTestResult,
   type GenSparkAccountStatus,
   type LegacyAiSettings,
 } from '@genoffice/ai-provider'
@@ -180,7 +190,7 @@ import {
 } from './docx-encryption'
 import { isExternallyModified, type DiskFileState } from './external-change'
 import { copyImageDisplaySize, validCopyImageDataUrl } from './copy-image-guard'
-import { printScaleOption, validPrintGeometry } from './print-args'
+import { hasNoPrinter, pdfExportPath, printScaleOption, validPrintGeometry } from './print-args'
 import { initDocsAutoUpdater } from './updater'
 import { registerZoteroIpc, teardownZoteroIpc } from './zotero-ipc'
 
@@ -323,7 +333,7 @@ const tMain = createI18n({
     menuShortcuts: '键盘快捷键',
     menuDocsHelp: 'UniWork Docs 帮助',
   },
-  // en and vi are ours (UniWork wording, e.g. errNoApiKey: no active AI plan); the other locales keep
+  // en and vi are ours (UniWork wording, e.g. errNoApiKey: no AI model set up yet); the other locales keep
   // upstream's wording. tools/rebrand re-applies the vi errNoApiKey (rule vi-no-api-key).
   en: {
     dlgOpenDoc: 'Open Document',
@@ -361,7 +371,8 @@ const tMain = createI18n({
     errParseFailed: 'Failed to parse file',
     errImageNoText: 'Image attachments have no text; the image is sent along with the user message',
     errNotImage: 'not a supported image type',
-    errNoApiKey: 'AI is not activated. Purchase a plan to use the AI assistant.',
+    errNoApiKey:
+      'No AI model is set up yet. Add your own AI key in Settings > AI Model to use the assistant.',
     errAiBusy: 'The AI service is busy right now — please try again in a moment',
     errNoModel: 'No model name configured',
     menuFile: 'File',
@@ -492,7 +503,8 @@ const tMain = createI18n({
     errImageNoText:
       'Tệp đính kèm hình ảnh không có văn bản; hình ảnh được gửi cùng với tin nhắn của người dùng',
     errNotImage: 'loại hình ảnh không được hỗ trợ',
-    errNoApiKey: 'Chưa kích hoạt / mua gói AI. Hãy mua gói để dùng Trợ lý AI.',
+    errNoApiKey:
+      'Chưa thiết lập mô hình AI. Hãy thêm khóa AI của riêng bạn trong Cài đặt > Mô hình AI để dùng Trợ lý AI.',
     errAiBusy: 'Dịch vụ AI hiện đang bận — vui lòng thử lại sau giây lát',
     errNoModel: 'Chưa cấu hình tên mô hình',
     menuFile: 'Tệp',
@@ -3767,6 +3779,8 @@ export function registerAiIpc(): void {
   ipcMain.handle(
     'ai:gsk-status',
     async (_event, withEmail?: boolean): Promise<GenSparkAccountStatus> => {
+      // an AI panel asks when it opens: re-read the plan so a change made since shows at once
+      await refreshUniworkCloudStatus()
       if (!hasGskAuth()) return { loggedIn: false }
       if (!withEmail) return { loggedIn: true }
       const info = await gskLoginInfo()
@@ -3774,9 +3788,9 @@ export function registerAiIpc(): void {
     },
   )
 
-  /** Editor AI panels: jump to Home → Settings → Account (buy AI plan). */
+  /** Editor AI panels: jump to Home → Settings → AI Model (where the user adds their own key). */
   ipcMain.handle('ai:open-billing', () => {
-    shellHooks?.openSettings?.('account')
+    shellHooks?.openSettings?.('aiModel')
   })
 
   ipcMain.handle('ai:set-settings', (_event, settings: AiSettings) => {
@@ -3829,7 +3843,7 @@ export function registerAiIpc(): void {
       send({
         requestId,
         type: 'error',
-        error: tm('errNoApiKey', { provider }),
+        error: noModelMessage(getUiLang(), tm('errNoApiKey', { provider })),
       })
       return
     }
@@ -3866,20 +3880,10 @@ export function registerAiIpc(): void {
       if (controller.signal.aborted) {
         send({ requestId, type: 'done' })
       } else {
-        send({
-          requestId,
-          type: 'error',
-          error: err instanceof Error ? err.message : String(err),
-          ...(err instanceof AiTimeoutError
-            ? { errorCode: 'timeout' as const }
-            : err instanceof AiCreditsError
-              ? { errorCode: 'credits' as const }
-              : isAiNetworkError(err)
-                ? { errorCode: 'network' as const }
-                : isAiOverloadedError(err)
-                  ? { errorCode: 'overloaded' as const }
-                  : {}),
-        })
+        const { raw, ...fields } = aiStreamErrorFields(err, getUiLang())
+        // the panel gets the product message; the provider's own text stays in the log
+        console.warn(`[ai-stream] ${requestId} (${provider}/${config.model}) failed:`, raw)
+        send({ requestId, type: 'error', ...fields })
       }
     } finally {
       unwatchSender()
@@ -3980,52 +3984,112 @@ export function registerAiIpc(): void {
       ),
   )
 
-  ipcMain.handle('ai:search-test', (_event, input: unknown) => {
+  // a failed settings test keeps its raw detail here (the log); the renderer only gets the kind
+  const logAiTest = (what: string, provider: string, result: AiTestResult): AiTestResult => {
+    if (!result.ok) console.warn(`[ai] ${what} test failed (${provider}):`, result.error)
+    return result
+  }
+
+  ipcMain.handle('ai:search-test', async (_event, input: unknown) => {
     const { provider, apiKey } = (input ?? {}) as { provider?: AiSearchProviderId; apiKey?: string }
     // `auto` is the keyless free chain: nothing to test
     if (!provider || provider === 'auto') return { ok: true }
-    return testSearchProvider(provider, String(apiKey ?? ''))
+    return logAiTest('search', provider, await testSearchProvider(provider, String(apiKey ?? '')))
   })
 
   // settings-UI connection test for the media provider (the UniWork cloud entry shows only while signed in + entitled)
-  ipcMain.handle('ai:media-test', (_event, input: unknown) => {
+  ipcMain.handle('ai:media-test', async (_event, input: unknown) => {
     const { provider, config } = (input ?? {}) as {
       provider?: AiMediaProviderId
       config?: AiMediaProviderConfig
     }
     if (!provider || provider === 'genspark') {
-      return hasGskAuth() ? { ok: true } : { ok: false, error: 'No media provider configuration' }
+      return hasGskAuth()
+        ? { ok: true }
+        : logAiTest('media', 'cloud', aiTestFailure('failed', 'No media provider configuration'))
     }
-    if (!config) return { ok: false, error: 'No media provider configuration' }
-    return testMediaProvider(provider, config)
+    if (!config) {
+      return logAiTest(
+        'media',
+        provider,
+        aiTestFailure('failed', 'No media provider configuration'),
+      )
+    }
+    return logAiTest('media', provider, await testMediaProvider(provider, config))
   })
 
-  ipcMain.handle('ai:chat', async (_event, request: AiChatRequest) => {
+  // one-shot chat; `errorKind` says why a failure failed for the settings test (other callers ignore it).
+  // `error` is a product message in the UI language; the provider's raw text is `rawError` and goes to the log
+  type AiChatOutcome = AiChatResponse & { errorKind?: AiTestFailureKind; rawError?: string }
+  const failedChat = (failure: AiChatFailure): AiChatOutcome => {
+    console.warn('[ai] chat failed:', failure.raw)
+    return {
+      ok: false,
+      error: failure.error,
+      errorKind: failure.errorKind,
+      rawError: failure.raw,
+    }
+  }
+  // the request's provider config, or the reason there is none
+  const chatConfigOf = (
+    request: AiChatRequest,
+  ): { config: AiProviderConfig; provider: AiProviderId } | AiChatOutcome => {
     // same schema check as ai:stream: one-shot requests would otherwise act on
     // the renderer's settings copy verbatim
     const settings = sanitizeAiSettings(request.settings)
-    if (!settings) return { ok: false, error: 'invalid AI settings payload' }
-    const { system, user } = request
+    if (!settings) return { ok: false, error: 'invalid AI settings payload', errorKind: 'failed' }
     const provider = settings.provider
     const config = withUniAiOpenRouterAuth(settings, provider, settings.providers?.[provider])
     if (!config || (provider !== 'codex' && !config.apiKey)) {
       return {
         ok: false,
-        error: tm('errNoApiKey', { provider }),
+        // one-shot callers (settings test, email, one-click actions) print the string as is, so no notice code
+        error: aiNoticeBody(noModelMessage(getUiLang(), tm('errNoApiKey', { provider }))),
+        errorKind: 'invalid_key',
       }
     }
-    if (provider !== 'codex' && !config.model) return { ok: false, error: tm('errNoModel') }
+    if (provider !== 'codex' && !config.model) {
+      return { ok: false, error: tm('errNoModel'), errorKind: 'failed' }
+    }
+    return { config, provider }
+  }
+
+  const runAiChat = async (request: AiChatRequest): Promise<AiChatOutcome> => {
+    const target = chatConfigOf(request)
+    if (!('config' in target)) return target
     try {
-      const result = await chatForProvider(provider, config, system, user)
-      // the one-shot path reports HTTP failures as ok:false with the raw body —
-      // replace capacity/rate-limit dumps with the localized "busy" message
-      if (!result.ok && isAiOverloadedError(result.error)) {
-        return { ok: false, error: tm('errAiBusy') }
-      }
-      return result
+      const result = await chatForProvider(
+        target.provider,
+        target.config,
+        request.system,
+        request.user,
+      )
+      // the one-shot path reports HTTP failures as ok:false with the raw body
+      return result.ok ? result : failedChat(aiChatFailure(result, getUiLang(), tm('errAiBusy')))
     } catch (err) {
-      return { ok: false, error: isAiOverloadedError(err) ? tm('errAiBusy') : String(err) }
+      return failedChat(aiChatFailureFromError(err, getUiLang(), tm('errAiBusy')))
     }
+  }
+
+  ipcMain.handle('ai:chat', (_event, request: AiChatRequest) => runAiChat(request))
+
+  // settings > AI model "Test": one streamed ping through the same endpoint and wire as the chat panel;
+  // a failure keeps its raw text in the log
+  ipcMain.handle('ai:settings-test', async (_event, request: AiChatRequest) => {
+    const target = chatConfigOf(request)
+    let result: AiChatOutcome
+    if ('config' in target) {
+      const test = await testChatConnection(target.provider, target.config)
+      result = test.ok ? test : failedChat(aiChatFailure(test, getUiLang(), tm('errAiBusy')))
+    } else {
+      result = target
+    }
+    if (result.ok) return { ok: true }
+    return logAiTest(
+      'model',
+      String(request?.settings?.provider ?? ''),
+      aiTestFailure(result.errorKind ?? 'failed', result.rawError ?? result.error ?? ''),
+    )
   })
 }
 
@@ -4090,6 +4154,15 @@ export function projectFilePaths(): string[] {
     return getProjectStore().knownFilePaths()
   } catch {
     return []
+  }
+}
+
+/** Deletes the AI history and project entries of these files (another account's documents). */
+export function projectForgetFiles(filePaths: readonly string[]): void {
+  try {
+    getProjectStore().forgetFiles(filePaths)
+  } catch (err) {
+    console.warn('[project-store] forgetFiles failed:', err)
   }
 }
 
@@ -4841,10 +4914,11 @@ export function registerDocsIpc(): void {
       if (tornDownWcIds.has(event.sender.id)) return { ok: false }
       const result = await saveDialog(event, {
         title: tm('dlgSaveAs'),
-        defaultPath: saveAsSuggestion(
-          typeof sourcePath === 'string' ? sourcePath : null,
-          defaultName,
-        ),
+        // a UniWork working copy's Save As starts outside its hidden folder
+        defaultPath:
+          typeof sourcePath === 'string' && uniworkIsBound(sourcePath)
+            ? defaultName
+            : saveAsSuggestion(typeof sourcePath === 'string' ? sourcePath : null, defaultName),
         filters: [{ name: tm('filterWord'), extensions: ['docx'] }],
       })
       if (result.canceled || !result.filePath) return { ok: false }
@@ -5175,8 +5249,11 @@ export function registerDocsIpc(): void {
   ipcMain.handle('docs:print', async (event, scale?: number) => {
     // print the calling tab's own content; zero margins — the docx page padding provides them.
     // Resolves when the system dialog is dismissed; the print dialog stays open on cancel
-    // (ok=false without error) and surfaces real failures.
-    return new Promise<{ ok: boolean; error?: string }>((resolve) => {
+    // (ok=false without error) and surfaces real failures. With no printer installed
+    // print() would do nothing at all, so that case is reported up front (noPrinter) and
+    // the renderer offers Save as PDF.
+    if (await hasNoPrinter(event.sender)) return { ok: false, noPrinter: true }
+    return new Promise<{ ok: boolean; error?: string; noPrinter?: boolean }>((resolve) => {
       event.sender.print(
         { margins: { marginType: 'none' }, ...printScale(scale) },
         (success, failureReason) => {
@@ -5218,7 +5295,9 @@ export function registerDocsIpc(): void {
           filters: [{ name: 'PDF', extensions: ['pdf'] }],
         })
         if (result.canceled || !result.filePath) return { ok: false }
-        filePath = result.filePath
+        // a local export only: never lands on the open .docx (a UniWork working copy) even
+        // if the user typed its name, and never goes through the user-save hook
+        filePath = pdfExportPath(result.filePath)
         allowPdfWrite(event.sender.id, filePath)
       }
       try {
@@ -5322,7 +5401,8 @@ export function registerDocsIpc(): void {
           filters: [{ name: 'HTML', extensions: ['html'] }],
         })
         if (result.canceled || !result.filePath) return { ok: false }
-        filePath = result.filePath
+        // same rule as docs:export-pdf: a merged export never lands on the open .docx either
+        filePath = pdfExportPath(result.filePath)
         allowPdfWrite(event.sender.id, filePath)
       }
       try {
@@ -6120,6 +6200,12 @@ function queryCloseState(contents: WebContents): Promise<DocsCloseState> {
 
 export async function docsQueryDirty(contents: WebContents): Promise<boolean> {
   return (await queryCloseState(contents)).dirty
+}
+
+/** Same answer for a status display: null when the renderer did not answer (busy saving), never a guessed "dirty". */
+export async function docsQueryEditorDirty(contents: WebContents): Promise<boolean | null> {
+  const state = await queryCloseState(contents)
+  return state.unresponsive ? null : state.dirty
 }
 
 /** Ask the renderer to run the full save flow and await the result (failure/timeout = false). */

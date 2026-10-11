@@ -4,7 +4,7 @@
 /// in userData/app-settings.json (set from the home screen's account menu).
 /// Every editor main module resolves through here so they all honor the same
 /// setting.
-import { accessSync, constants, mkdirSync, readFileSync } from 'node:fs'
+import { accessSync, constants, mkdirSync, readFileSync, statSync } from 'node:fs'
 import { isAbsolute, join } from 'node:path'
 
 /** the subset of Electron's `app` needed here (kept structural: this package has no Electron dependency) */
@@ -54,4 +54,29 @@ export function configuredDefaultSaveDir(app: PathProvider): string {
   const settingsPath = join(app.getPath('userData'), 'app-settings.json')
   const fallback = join(app.getPath('documents'), 'UniWork Office')
   return resolveDefaultSaveDir(readDefaultSaveDirSetting(settingsPath), fallback)
+}
+
+/**
+ * Same answer as configuredDefaultSaveDir, minus the side effect: nothing is
+ * created. For read-only views (the home folder tree, the Settings label) so
+ * the default <Documents>/UniWork Office folder only appears once a file is
+ * actually saved into it. A configured folder that is missing or read-only
+ * still degrades to the fallback, like the creating variant.
+ */
+export function peekDefaultSaveDir(app: PathProvider): string {
+  const settingsPath = join(app.getPath('userData'), 'app-settings.json')
+  const configured = readDefaultSaveDirSetting(settingsPath)
+  if (configured && isUsableOrAbsent(configured)) return configured
+  return join(app.getPath('documents'), 'UniWork Office')
+}
+
+/** a configured folder the creating variant would accept: writable, or not there yet (it would be created) */
+function isUsableOrAbsent(dir: string): boolean {
+  try {
+    if (!statSync(dir).isDirectory()) return false
+    accessSync(dir, constants.W_OK)
+    return true
+  } catch (err) {
+    return (err as NodeJS.ErrnoException).code === 'ENOENT'
+  }
 }

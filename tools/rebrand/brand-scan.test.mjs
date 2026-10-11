@@ -319,3 +319,26 @@ test('analytics endpoints and GA4 credentials in product code or packaging confi
   assert.equal(hits("const k = 'analytics'", 'apps/shell/src/main/a.ts'), 0)
   assert.equal(hits('// google-analytics.com was removed', 'apps/shell/src/main/a.ts'), 0)
 })
+
+test('catalog: the CLI command tied to a local-path placeholder is a violation, the command alone is not', () => {
+  const tied = [
+    "    setCliLinkDone: 'genoffice is available at {path}.',",
+    "    setCliLinkDone: 'genoffice を {path} で利用できます。',",
+    "    setCliLinkDone: '{path} contains genoffice',",
+  ]
+  for (const line of tied) {
+    const { violations } = run({ 'apps/shell/src/renderer/src/strings.ts': line })
+    assert.equal(violations.length, 1, line)
+  }
+  for (const line of [
+    "    setCliLinkDesc: 'Adds the genoffice command to your terminal.',",
+    "    setCliLinkBlocked: 'Could not add it automatically. Run this in a terminal: {cmd}',",
+    "    setCliLinkReady: 'Command line tool is available.',",
+    "    docSaved: 'Saved to {path}.',",
+  ]) {
+    const { violations } = run({ 'apps/shell/src/renderer/src/strings.ts': line })
+    assert.equal(violations.length, 0, line)
+  }
+  // source files keep the existing behaviour: only catalogs carry user-visible prose here
+  assert.deepEqual(brandMatches("log('genoffice at {path}')", 'source'), [])
+})

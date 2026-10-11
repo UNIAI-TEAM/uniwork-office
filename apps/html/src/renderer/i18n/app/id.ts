@@ -33,8 +33,6 @@ export const id = {
   replaceAll: 'Ganti Semua',
   findTip: 'Temukan dan Ganti (⌘F)',
   autoSaveTip: 'Menyimpan setiap 30 detik dan saat jendela kehilangan fokus',
-  autoSaveUniworkOff:
-    'Simpan otomatis dinonaktifkan untuk dokumen UniWork. Gunakan Simpan untuk menyimpan versi baru.',
   zoom: 'Zoom',
   zoomIn: 'Perbesar',
   zoomOut: 'Perkecil',

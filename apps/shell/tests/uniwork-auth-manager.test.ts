@@ -13,6 +13,7 @@ import {
   type TransportErrorCode,
   type UniworkTransport,
 } from '../src/main/uniwork-auth/transport'
+import { createAuthCallbackRouter } from '../src/main/uniwork-auth/routing'
 import { createMemoryCredentialStore } from './uniwork-auth-fakes'
 
 const profile: DeploymentProfile = {
@@ -760,5 +761,69 @@ describe('logout', () => {
     await restoring
     expect(ctx.manager.status().state).toBe('signed-out')
     expect(ctx.credentials.load()).toBeNull()
+  })
+})
+
+describe('signing in again after the device was revoked', () => {
+  /** signed in, then the server revokes the device: a 401 call, then the refresh says so */
+  async function revoked(ctx: ReturnType<typeof setup>) {
+    await signIn(ctx)
+    ctx.transport.refresh.mockImplementationOnce(fail('device_revoked'))
+    await expect(
+      ctx.manager.authorizedRequest(() => Promise.reject(new TransportError('unauthorized'))),
+    ).rejects.toBeTruthy()
+    expect(ctx.manager.status().state).toBe('session-revoked')
+    expect(ctx.credentials.load()).toBeNull()
+  }
+
+  it('a callback delivered by a second instance (Windows argv) completes the new sign-in', async () => {
+    const ctx = setup()
+    await revoked(ctx)
+    const router = createAuthCallbackRouter(['C:\\UniWork Office\\UniWork Office.exe'])
+    router.start((url) => ctx.manager.handleCallbackUrl(url))
+    expect(await ctx.manager.login()).toBe(true)
+    const state = (ctx.transport.start.mock.calls.at(-1)?.[0] as { state: string }).state
+    const routed = router.secondInstance(
+      [
+        'C:\\UniWork Office\\UniWork Office.exe',
+        `uniwork-office://auth/callback?code=c2&state=${encodeURIComponent(state)}`,
+      ],
+      {},
+    )
+    expect(routed).toBe(true)
+    await vi.waitFor(() => expect(ctx.manager.status().state).toBe('signed-in'))
+    expect(ctx.transport.exchange).toHaveBeenCalledTimes(2)
+    expect(ctx.transport.exchange.mock.calls.at(-1)?.[0]).toMatchObject({ code: 'c2' })
+    expect(ctx.credentials.load()?.refreshToken).toMatch(/^rt_/)
+  })
+
+  it('a second Sign in click keeps the attempt the open browser tab belongs to', async () => {
+    const ctx = setup()
+    await revoked(ctx)
+    expect(await ctx.manager.login()).toBe(true)
+    const first = (ctx.transport.start.mock.calls.at(-1)?.[0] as { state: string }).state
+    const starts = ctx.transport.start.mock.calls.length
+    // the chip still offers Sign in while the browser is open: a second click
+    // re-opens the same page instead of starting an attempt that would turn
+    // the first tab's callback into a state mismatch
+    expect(await ctx.manager.login()).toBe(true)
+    expect(ctx.transport.start).toHaveBeenCalledTimes(starts)
+    expect(ctx.openBrowser).toHaveBeenCalledTimes(3)
+    expect(ctx.openBrowser.mock.calls.at(-1)?.[0]).toBe(ctx.openBrowser.mock.calls.at(-2)?.[0])
+    await ctx.manager.completeCallback(
+      `uniwork-office://auth/callback?code=c2&state=${encodeURIComponent(first)}`,
+    )
+    expect(ctx.transport.exchange).toHaveBeenCalledTimes(2)
+    expect(ctx.manager.status().state).toBe('signed-in')
+    expect(ctx.events.some((e) => e.phase === 'error' && e.error === 'state_mismatch')).toBe(false)
+  })
+
+  it('a click after the attempt expired starts a fresh one', async () => {
+    const ctx = setup()
+    expect(await ctx.manager.login()).toBe(true)
+    await vi.advanceTimersByTimeAsync(10 * 60 * 1000)
+    expect(ctx.manager.status().state).toBe('signed-out')
+    expect(await ctx.manager.login()).toBe(true)
+    expect(ctx.transport.start).toHaveBeenCalledTimes(2)
   })
 })

@@ -33,7 +33,6 @@ export const vi = {
   replaceAll: 'Thay thế tất cả',
   findTip: 'Tìm kiếm và thay thế (⌘F)',
   autoSaveTip: 'Tự động lưu mỗi 30 giây và khi cửa sổ mất tiêu điểm',
-  autoSaveUniworkOff: 'Tự động lưu đã tắt cho tài liệu UniWork. Hãy dùng Lưu để lưu phiên bản mới.',
   zoom: 'Thu phóng',
   zoomIn: 'Phóng to',
   zoomOut: 'Thu nhỏ',

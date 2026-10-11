@@ -9,6 +9,7 @@ import type {
   AiSettings,
   AiStreamChunk,
   AiStreamRequest,
+  AiTestFailureKind,
   CodexModelCatalog,
   OpenRouterKeyStatus,
   UniworkCloudStatus,
@@ -310,6 +311,26 @@ export interface DefaultAppStatus {
   manualOnly: boolean
 }
 
+/**
+ * The `genoffice` command line tool on the PATH. Created only when the user
+ * asks for it in Settings: `absent` (not set up), `present`, `blocked` (no
+ * writable folder, or another `genoffice` is in the way; `manual` is the
+ * command to finish by hand), `unsupported` (dev run, temporary mount).
+ */
+export interface CliLinkState {
+  state: 'unsupported' | 'absent' | 'present' | 'blocked'
+  location?: string
+  /** shell line that adds the link's folder to the PATH when the shell does not search it */
+  pathHint?: string
+  manual?: string
+}
+
+/** Settings "Test connection" answer: a failure carries its kind, never the provider's raw text */
+export interface AiConnectionTestResult {
+  ok: boolean
+  errorKind?: AiTestFailureKind
+}
+
 export interface HomeApi {
   /** unified recents across document types, newest first (paged) */
   recents(query?: RecentQuery): Promise<RecentPage>
@@ -320,7 +341,7 @@ export interface HomeApi {
   getFileSearchSettings(): Promise<FileSearchSettings>
   setFileSearchSettings(patch: Partial<FileSearchSettings>): Promise<FileSearchSettings>
   /** one two-document judgement against the (possibly unsaved) settings */
-  testFileSearchRerank(settings: FileSearchSettings): Promise<{ ok: boolean; error?: string }>
+  testFileSearchRerank(settings: FileSearchSettings): Promise<AiConnectionTestResult>
   /** starred files (independent of the recent list), newest first (paged) */
   starred(query?: RecentQuery): Promise<RecentPage>
   /** stat a specific set of paths (project view); unstat-able files come back flagged `missing` */
@@ -447,7 +468,7 @@ export interface HomeApi {
   uniworkCloudRefresh?(): Promise<UniworkCloudStatus>
   /** cloud status pushes; returns an unsubscribe */
   onUniworkCloudStatus?(handler: (status: UniworkCloudStatus) => void): () => void
-  /** Editor AI “Buy AI plan” → open Settings section (e.g. account); unsubscribe returned */
+  /** Editor AI “Open AI settings” → open a Settings section (e.g. aiModel); unsubscribe returned */
   onOpenSettingsEvent?(handler: (section: string) => void): () => void
   /** app version (from package.json / electron app.getVersion) */
   getAppVersion(): Promise<string>
@@ -501,6 +522,10 @@ export interface HomeApi {
   getDefaultAppStatus(): Promise<DefaultAppStatus>
   /** claim the Office types (mac/linux) or open the system Default Apps page (win); resolves to the refreshed status */
   setDefaultApp(): Promise<DefaultAppStatus>
+  /** where the `genoffice` command stands (Settings → General); nothing is written */
+  getCliLinkStatus(): Promise<CliLinkState>
+  /** put `genoffice` on the PATH (the Settings button); resolves to the refreshed state */
+  installCliLink(): Promise<CliLinkState>
   /** theme switched anywhere (broadcast from the main process) */
   onThemeChanged(handler: (theme: UiTheme) => void): () => void
   /** document page theme switched anywhere (broadcast from the main process) */
@@ -520,7 +545,7 @@ export interface HomeApi {
   /** live model list advertised by a user-hosted OpenAI-compatible endpoint; empty when it cannot answer */
   getCustomModels(baseUrl: string, apiKey?: string): Promise<CodexModelCatalog>
   /** one-shot round trip against the given (possibly unsaved) settings — the settings-UI connection test */
-  testAiSettings(settings: AiSettings): Promise<AiChatResponse>
+  testAiSettings(settings: AiSettings): Promise<AiConnectionTestResult>
   /** OpenRouter Token Hub: GET /api/v1/key for the given (possibly unsaved) API key */
   probeOpenRouterKey(apiKey: string): Promise<OpenRouterKeyStatus>
   /** one-shot non-streaming chat using saved (or provided) AI settings — Workbench helpers */
@@ -542,14 +567,14 @@ export interface HomeApi {
   testAiMediaSettings(input: {
     provider: AiMediaProviderId
     config: AiMediaProviderConfig
-  }): Promise<{ ok: boolean; error?: string }>
+  }): Promise<AiConnectionTestResult>
   /** web search provider catalog */
   getAiSearchProviders(): AiSearchProviderMeta[]
   /** one minimal query against the given key (the keyless auto entry needs none) */
   testAiSearchSettings(input: {
     provider: AiSearchProviderId
     apiKey: string
-  }): Promise<{ ok: boolean; error?: string }>
+  }): Promise<AiConnectionTestResult>
   /** Local Workbench SQLite store (main-process source of truth) */
   wb: WorkbenchStoreApi
   uniworkListWorkspaces(): Promise<UniworkResult<UniworkWorkspaceRef[]>>
@@ -1052,6 +1077,8 @@ export const HOME_CHANNELS = {
   getDefaultSaveDir: 'home:get-default-save-dir',
   getDefaultAppStatus: 'home:get-default-app-status',
   setDefaultApp: 'home:set-default-app',
+  getCliLinkStatus: 'home:get-cli-link-status',
+  installCliLink: 'home:install-cli-link',
   pickDefaultSaveDir: 'home:pick-default-save-dir',
   openCreditUsage: 'home:open-credit-usage',
   probeAiHub: 'home:probe-ai-hub',

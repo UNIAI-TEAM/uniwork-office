@@ -532,6 +532,8 @@ export const es = {
     'El puente de archivos de escritorio no está disponible. Reinicie la aplicación Electron.',
   appOpenCanceled: 'Selección de libro cancelada.',
   appOpeningWorkbook: 'Abriendo libro…',
+  appOpenStalled: 'No se pudo abrir el libro.',
+  appOpenRetry: 'Reintentar',
   appOpened: 'Se abrió {name} — las ediciones de celdas se vuelven a guardar con ⌘S.',
   appOpenFailed: 'No se puede abrir el libro.',
   appPageSetupNeedsFile:
@@ -1577,6 +1579,4 @@ export const es = {
     'El motor del libro se detuvo de forma inesperada y se reinició. El libro se volvió a abrir desde su última versión guardada; los cambios sin guardar se conservan, guarde pronto.',
   appWebSavedReopenFailed:
     'Tus cambios se guardaron en UniWork, pero no se pudo volver a abrir el libro aquí. Recarga el editor para seguir trabajando.',
-  appAutoSaveUniworkOff:
-    'El autoguardado está desactivado para los documentos de UniWork. Usa Guardar para guardar una versión nueva.',
 } satisfies Record<keyof typeof zh, string>

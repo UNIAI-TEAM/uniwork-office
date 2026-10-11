@@ -629,6 +629,28 @@ describe('chip truncation and hover text', () => {
     expect(chrome).toMatch(/flex: 0 0 auto/)
     expect(chrome).toMatch(/max-width: 55%/)
   })
+
+  it('the chrome holder keeps a fixed gap before the divider that follows it', () => {
+    const css = readFileSync(resolve(__dirname, '../src/renderer/src/tabbar.css'), 'utf8').replace(
+      /\r\n/g,
+      '\n',
+    )
+    const rule = (selector: string): string => {
+      const start = css.indexOf(`\n${selector} {`)
+      expect(start, selector).toBeGreaterThanOrEqual(0)
+      return css.slice(start, css.indexOf('}', start))
+    }
+    expect(rule('.tab-bar')).toMatch(/--uw-divider-gap: \d+px/)
+    // the divider is drawn `left` px before the overflow button, which has its own margin-left,
+    // so without a margin it sits that far inside the holder's right edge
+    const dividerLeft = Number(/left: -(\d+)px/.exec(rule('.tab-overflow-btn::before'))![1])
+    const buttonMargin = Number(/margin: 0 \d+px 0 (\d+)px/.exec(rule('.tab-overflow-btn'))![1])
+    const chromeMargin = /margin-right: calc\(var\(--uw-divider-gap\) \+ (\d+)px\)/.exec(
+      rule('.uw-chrome'),
+    )
+    expect(chromeMargin, 'margin-right = gap + the divider offset').not.toBeNull()
+    expect(Number(chromeMargin![1])).toBe(dividerLeft - buttonMargin)
+  })
 })
 
 describe('Home quick cards fit', () => {

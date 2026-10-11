@@ -27,6 +27,7 @@ export {
   updateMediaProviderConfig,
   visibleMediaProviders,
 } from './media'
+export { aiChatFailureText } from './ai-chat-error-text'
 export {
   UNIWORK_CLOUD_SIGNED_OUT,
   UNIWORK_CLOUD_TOOLS,
@@ -43,4 +44,8 @@ export type {
   UniworkCloudStatus,
   UniworkCloudTool,
 } from './uniwork-cloud'
+export { aiNoticeBody, aiNoticeKind, aiNoticeKindForCloud, aiNoticeText } from './ai-notice'
+export type { AiNoticeKind } from './ai-notice'
+export { normalizeAiTestFailureKind } from './ai-test-failure'
+export type { AiTestFailureKind } from './ai-test-failure'
 export { AI_SEARCH_PROVIDERS } from './search-settings'

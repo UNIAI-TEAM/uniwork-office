@@ -98,4 +98,5 @@ export const th = {
   aiScopeRangeTip:
     'AI จะตีความ "คอลัมน์นี้ / แถวเหล่านี้ / ส่วนที่เลือก" เป็นช่วงนี้ และจะถูกตรึงไว้ตลอดการทำงานเมื่อคุณส่ง',
   aiScopeClearTitle: 'ยกเลิกขอบเขตช่วงนี้และใช้ทั้งแผ่นงาน',
+  aiViewOnlyNotice: 'เอกสารแบบดูอย่างเดียว: AI อ่านและตอบคำถามได้ แต่แก้ไขไม่ได้',
 } satisfies Record<keyof typeof zh, string>

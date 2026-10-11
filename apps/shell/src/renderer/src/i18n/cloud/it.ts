@@ -6,6 +6,7 @@ export const it = {
   cloudStateNotEntitled: 'Non incluso nel tuo piano',
   cloudStateExhausted: 'Crediti IA esauriti',
   cloudStateUnavailable: 'Non disponibile',
+  cloudStateSignedOut: 'Accesso non effettuato',
   cloudStateInactive: 'Abbonamento inattivo',
   cloudCredits: 'Crediti IA',
   cloudCreditsLeft: '{remaining} / {limit} rimasti',
@@ -31,4 +32,10 @@ export const it = {
   cloudMediaLabel: 'Cloud UniWork',
   cloudMediaDesc: 'Usa i crediti IA UniWork della tua organizzazione; nessuna chiave richiesta.',
   cloudSearchAutoHint: 'Prima il cloud UniWork (consuma crediti IA), poi la ricerca gratuita.',
+  aiTestErrInvalidKey: 'Chiave API mancante o rifiutata',
+  aiTestErrNetwork: 'Impossibile connettersi. Controlla la rete',
+  aiTestErrLimit: 'Limite del fornitore raggiunto. Riprova più tardi',
+  aiTestErrUnavailable: 'Il servizio non risponde. Riprova più tardi',
+  aiTestErrMisconfigured:
+    'Impostazioni incomplete: controlla l’indirizzo del servizio e i campi dell’account',
 } satisfies Record<keyof typeof zh, string>

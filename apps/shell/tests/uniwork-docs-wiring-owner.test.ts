@@ -22,6 +22,7 @@ vi.mock('electron', () => ({
 
 vi.mock('../src/main/uniwork-auth', () => ({
   authorizedRequest: vi.fn(),
+  setUniworkSignOutHooks: vi.fn(),
   onUniworkAccountStatus: (listener: (status: { state: string }) => void) => {
     statusListener = listener
     return () => undefined
@@ -57,6 +58,12 @@ describe('last owner follows the session identity (R2-5)', () => {
       reveal: () => undefined,
       lang: () => 'en',
       defaultSaveDir: () => dir,
+      openPaths: () => [],
+      closePath: async () => true,
+      confirmClosePath: async () => true,
+      closePathNow: () => undefined,
+      aiHistoryPaths: () => [],
+      forgetAiHistory: () => undefined,
     })
     handle.activate(() => undefined)
     const note = vi.spyOn(handle.service, 'noteSessionIdentity')
@@ -73,5 +80,47 @@ describe('last owner follows the session identity (R2-5)', () => {
     expect(handle.service.ownsLocally({ deploymentId: 'default', userId: 'acc_1' } as never)).toBe(
       false,
     )
+  })
+})
+
+describe('a sign-in as another account (GOA9-r3-04)', () => {
+  it("closes the previous account's open documents and deletes their AI history", async () => {
+    const { createUniworkDocs } = await import('../src/main/uniwork-docs/wiring')
+    const root = join(dir, 'uniwork-documents')
+    const previous = join(root, 'default', 'acc_a', 'doc_1', 'Sheet.xlsx')
+    const own = join(root, 'default', 'acc_b', 'doc_2', 'Plan.docx')
+    const local = join(dir, 'local.docx')
+    const open = [local, previous, own]
+    const closePath = vi.fn(async (path: string) => {
+      open.splice(open.indexOf(path), 1)
+      return true
+    })
+    const forgetAiHistory = vi.fn()
+    const handle = createUniworkDocs({ handle: vi.fn() } as never, {
+      shellWindow: () => null,
+      shellContents: () => null,
+      openPath: () => true,
+      isPathOpen: () => false,
+      requestModuleSave: () => false,
+      reloadPath: () => undefined,
+      activePath: () => undefined,
+      reveal: () => undefined,
+      lang: () => 'en',
+      defaultSaveDir: () => dir,
+      openPaths: () => [...open],
+      closePath,
+      confirmClosePath: async () => true,
+      closePathNow: () => undefined,
+      aiHistoryPaths: () => [previous, own, local],
+      forgetAiHistory,
+    })
+    handle.activate(() => undefined)
+    identity = { accountId: 'acc_b', deviceSessionId: 'dev_2', deploymentId: 'default' }
+    statusListener?.({ state: 'signed-in' })
+    await vi.waitFor(() => expect(forgetAiHistory).toHaveBeenCalled())
+    expect(closePath).toHaveBeenCalledTimes(1)
+    expect(closePath).toHaveBeenCalledWith(previous)
+    expect(open).toEqual([local, own])
+    expect(forgetAiHistory).toHaveBeenCalledWith([previous])
   })
 })

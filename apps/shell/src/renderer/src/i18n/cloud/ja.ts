@@ -6,6 +6,7 @@ export const ja = {
   cloudStateNotEntitled: 'プランに含まれていません',
   cloudStateExhausted: 'AI クレジットを使い切りました',
   cloudStateUnavailable: '現在利用できません',
+  cloudStateSignedOut: 'サインインしていません',
   cloudStateInactive: 'サブスクリプション無効',
   cloudCredits: 'AI クレジット',
   cloudCreditsLeft: '残り {remaining} / {limit}',
@@ -31,4 +32,10 @@ export const ja = {
   cloudMediaLabel: 'UniWork クラウド',
   cloudMediaDesc: '組織の UniWork AI クレジットを使用します。キーは不要です。',
   cloudSearchAutoHint: 'まず UniWork クラウド（AI クレジットを消費）、次に無料検索を使います。',
+  aiTestErrInvalidKey: 'API キーがないか、拒否されました',
+  aiTestErrNetwork: '接続できません。ネットワークを確認してください',
+  aiTestErrLimit: 'プロバイダーの上限に達しました。後でもう一度お試しください',
+  aiTestErrUnavailable: 'サービスが応答しません。後でもう一度お試しください',
+  aiTestErrMisconfigured:
+    '設定が不足しています。サービスのアドレスとアカウント欄を確認してください',
 } satisfies Record<keyof typeof zh, string>

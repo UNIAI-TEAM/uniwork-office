@@ -496,6 +496,8 @@ export const ms = {
   appBridgeUnavailable: 'Jambatan fail desktop tidak tersedia. Mulakan semula aplikasi Electron.',
   appOpenCanceled: 'Pemilihan buku kerja dibatalkan.',
   appOpeningWorkbook: 'Membuka buku kerja…',
+  appOpenStalled: 'Buku kerja tidak dapat dibuka.',
+  appOpenRetry: 'Cuba lagi',
   appOpened: '{name} dibuka — suntingan sel disimpan semula dengan ⌘S.',
   appOpenFailed: 'Tidak dapat membuka buku kerja.',
   appPageSetupNeedsFile: 'Buka fail XLSX dahulu — persediaan halaman disimpan ke dalam fail.',
@@ -1533,6 +1535,4 @@ export const ms = {
     'Enjin buku kerja berhenti secara tidak dijangka dan telah dimulakan semula. Buku kerja dibuka semula daripada versi terakhir yang disimpan; perubahan yang belum disimpan dikekalkan, sila simpan segera.',
   appWebSavedReopenFailed:
     'Perubahan anda telah disimpan ke UniWork, tetapi buku kerja tidak dapat dibuka semula di sini. Muat semula editor untuk teruskan.',
-  appAutoSaveUniworkOff:
-    'Simpan automatik dimatikan untuk dokumen UniWork. Gunakan Simpan untuk menyimpan versi baharu.',
 } satisfies Record<keyof typeof zh, string>

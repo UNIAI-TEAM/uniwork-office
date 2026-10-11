@@ -1,6 +1,6 @@
 import { readFileSync, statSync } from 'node:fs'
 import { copyFile, readFile } from 'node:fs/promises'
-import { extname, join } from 'node:path'
+import { extname, join, resolve } from 'node:path'
 import type {
   RecentUniworkSource,
   UniworkConflictChoice,
@@ -19,7 +19,13 @@ import { callbackSchemeForChannel } from '../uniwork-auth/deployment'
 import { type Binding, BindingStore, type BoundDocument, type LastOwner } from './binding-store'
 import { type FetchLike, type UniworkDocsClient, createUniworkDocsClient } from './client'
 import { UniworkDocError } from './errors'
-import { formatForMime, formatForName, sanitizeFilename, sha256Hex } from './formats'
+import {
+  formatForMime,
+  formatForName,
+  hasReplacementChar,
+  sha256Hex,
+  workingCopyName,
+} from './formats'
 import { LaunchController } from './launch'
 import type { DocumentDetail, LaunchDescriptor } from './parse'
 import { SaveCoordinator, toStatus } from './save-coordinator'
@@ -40,8 +46,10 @@ export interface SessionIdentity {
 
 /** the native conflict choice (rule 3); the strings live with the dialog */
 export interface ConflictUi {
-  chooseConflict(title: string): Promise<UniworkConflictChoice>
-  confirmDiscard(title: string): Promise<boolean>
+  /** `signal` closes the dialog as "Decide later" */
+  chooseConflict(title: string, signal?: AbortSignal): Promise<UniworkConflictChoice>
+  /** `signal` closes the dialog as Cancel */
+  confirmDiscard(title: string, signal?: AbortSignal): Promise<boolean>
   /** Save As for "Save a copy on this computer" (default `<stem> (my copy).<ext>`); null when cancelled */
   pickCopyPath(stem: string, format: UniworkDocFormat): Promise<string | null>
   showOpenLatestFailed(): void
@@ -127,6 +135,13 @@ async function result<T>(run: () => Promise<T>): Promise<UniworkResult<T>> {
   }
 }
 
+/** one file (Windows paths compare case-insensitively) */
+function samePath(a: string, b: string): boolean {
+  const ra = resolve(a)
+  const rb = resolve(b)
+  return process.platform === 'win32' ? ra.toLowerCase() === rb.toLowerCase() : ra === rb
+}
+
 function accessFor(level: string | null): UniworkDocAccess {
   return level === 'edit' || level === 'manage' ? 'edit' : 'view'
 }
@@ -142,6 +157,21 @@ export class UniworkDocsService {
   private readonly statusListeners = new Set<(status: UniworkDocStatus) => void>()
   /** path -> checksum of the file as of its mtime/size (the sync close check) */
   private readonly hashMemo = new Map<string, { mtimeMs: number; size: number; checksum: string }>()
+  /** working copies whose editor holds edits not written to the file yet */
+  private readonly editorDirty = new Set<string>()
+  /** per path, the saveMark of its last user Save */
+  private readonly lastUserSave = new Map<string, number>()
+  private saveCounter = 0
+  /**
+   * The one conflict dialog open (native dialogs are window-wide, not per
+   * tab). `fromClose` = opened by the close prompt of that document's tab.
+   */
+  private conflictPrompt: {
+    path: string
+    controller: AbortController
+    fromClose: boolean
+    done: Promise<unknown>
+  } | null = null
 
   constructor(deps: UniworkDocsServiceDeps) {
     this.deps = deps
@@ -195,8 +225,42 @@ export class UniworkDocsService {
 
   /** every status push: the shell window, then in-process waiters (close prompt) */
   private publish(status: UniworkDocStatus): void {
-    this.deps.pushStatus(status)
+    this.deps.pushStatus(this.present(status))
     for (const listener of [...this.statusListeners]) listener(status)
+  }
+
+  /**
+   * What the chip shows: the binding's state, except that a clean copy whose
+   * editor holds unsaved edits reads dirty. Conflict, offline, signed-out and
+   * the rest are never hidden by the editor state.
+   */
+  private present(status: UniworkDocStatus): UniworkDocStatus {
+    const quiet = status.state === 'ready' || status.state === 'saved'
+    return quiet && status.access === 'edit' && this.editorDirty.has(status.path)
+      ? { ...status, state: 'dirty' }
+      : status
+  }
+
+  private statusOf(doc: BoundDocument): UniworkDocStatus {
+    return this.present(toStatus(doc))
+  }
+
+  /**
+   * The editor showing `path` has (or no longer has) unsaved edits. Pushes the
+   * chip only when that changes what it shows; never writes the binding.
+   */
+  noteEditorDirty(path: string, dirty: boolean, mark?: number): void {
+    const doc = typeof path === 'string' ? this.store.lookup(path) : null
+    if (!doc || !this.ownsLocally(doc) || doc.binding.access !== 'edit') return
+    // a poll pass that began before the last Save still sees the pre-Save
+    // edits: the next pass reads the editor again
+    if (dirty && mark !== undefined && (this.lastUserSave.get(doc.path) ?? 0) > mark) return
+    if (dirty === this.editorDirty.has(doc.path)) return
+    const before = this.statusOf(doc).state
+    if (dirty) this.editorDirty.add(doc.path)
+    else this.editorDirty.delete(doc.path)
+    const status = this.statusOf(doc)
+    if (status.state !== before) this.deps.pushStatus(status)
   }
 
   /** the live session's identity; remembered (on disk) as the last owner */
@@ -266,10 +330,19 @@ export class UniworkDocsService {
     return !!doc && (doc.binding.access === 'view' || !this.ownsLocally(doc))
   }
 
+  /** moves on every user Save; see noteEditorDirty */
+  saveMark(): number {
+    return this.saveCounter
+  }
+
   /** a module's successful explicit user Save of `path` */
   onUserSave(path: string): void {
     const doc = this.store.lookup(path)
-    if (doc && this.ownsLocally(doc)) void this.coordinator.save(path)
+    if (!doc || !this.ownsLocally(doc)) return
+    this.lastUserSave.set(doc.path, ++this.saveCounter)
+    // the module just wrote what its editor held
+    this.editorDirty.delete(doc.path)
+    void this.coordinator.save(path)
   }
 
   // ---- renderer API ----------------------------------------------------------
@@ -306,7 +379,7 @@ export class UniworkDocsService {
   async docStatus(path: string): Promise<UniworkDocStatus | null> {
     if (typeof path !== 'string') return null
     const doc = this.store.lookup(path)
-    return doc && this.ownsLocally(doc) ? toStatus(await this.refreshDirty(doc)) : null
+    return doc && this.ownsLocally(doc) ? this.statusOf(await this.refreshDirty(doc)) : null
   }
 
   activeDocStatus(): Promise<UniworkDocStatus | null> {
@@ -362,11 +435,12 @@ export class UniworkDocsService {
   async save(path: string): Promise<UniworkDocStatus | null> {
     const doc = typeof path === 'string' ? this.store.lookup(path) : null
     if (!doc || !this.ownsLocally(doc)) return null
-    if (!this.canSave(doc)) return toStatus(doc)
-    if (!doc.binding.pendingIntent && this.deps.requestModuleSave(doc.path)) return toStatus(doc)
+    if (!this.canSave(doc)) return this.statusOf(doc)
+    if (!doc.binding.pendingIntent && this.deps.requestModuleSave(doc.path))
+      return this.statusOf(doc)
     // a pending intent, or no tab shows it: the file on disk is the user's last saved bytes
     const saved = await this.coordinator.save(doc.path)
-    return saved ? toStatus(saved) : null
+    return saved ? this.statusOf(saved) : null
   }
 
   /** a Save that can reach the UniWork step (not view, conflict, saving or blocked) */
@@ -479,7 +553,7 @@ export class UniworkDocsService {
     const notWritten = () => {
       if (!this.coordinator.isSaving(path)) wait.cancel()
     }
-    await this.resolveConflict(path, notWritten)
+    await this.resolveConflict(path, notWritten, { fromClose: true })
     const after = this.store.lookup(path)
     if (!after || after.binding.state === 'saved') {
       wait.cancel()
@@ -529,40 +603,112 @@ export class UniworkDocsService {
     return { promise, cancel: () => finish(null) }
   }
 
-  async resolveConflict(path: string, onNotWritten?: () => void): Promise<UniworkDocStatus | null> {
+  /**
+   * The conflict dialog for the document at `path`, and only that document:
+   * every step reads its binding again and acts on it only while it is still
+   * the same document in conflict, so a choice never lands on another tab's
+   * document, revision or format. One dialog at a time: a dialog for another
+   * document closes as "Decide later" first.
+   */
+  async resolveConflict(
+    path: string,
+    onNotWritten?: () => void,
+    opts: { fromClose?: boolean } = {},
+  ): Promise<UniworkDocStatus | null> {
     const doc = typeof path === 'string' ? this.store.lookup(path) : null
     if (!doc || !this.ownsLocally(doc)) return null
-    if (doc.binding.state !== 'conflict') return toStatus(doc)
-    const choice = await this.deps.ui.chooseConflict(doc.binding.title)
-    if (choice === 'overwrite') return this.overwrite(doc, onNotWritten)
+    if (doc.binding.state !== 'conflict') return this.statusOf(doc)
+    const open = this.conflictPrompt
+    if (open && samePath(open.path, doc.path)) return this.statusOf(doc)
+    if (open) {
+      open.controller.abort()
+      await open.done
+    }
+    const controller = new AbortController()
+    const done = this.runConflict(doc, controller.signal, onNotWritten)
+    const prompt = { path: doc.path, controller, fromClose: !!opts.fromClose, done }
+    this.conflictPrompt = prompt
+    try {
+      return await done
+    } finally {
+      if (this.conflictPrompt === prompt) this.conflictPrompt = null
+    }
+  }
+
+  /**
+   * The active document changed (tab switch, the home tab, a language
+   * switch): a conflict dialog opened for another document from its chip
+   * closes as "Decide later", so it never sits over a tab it does not name.
+   */
+  noteActivePath(path: string | undefined): void {
+    const open = this.conflictPrompt
+    if (open && !open.fromClose && !(path && samePath(open.path, path))) open.controller.abort()
+  }
+
+  /** closes an open conflict dialog as "Decide later" (its text is in the old UI language) */
+  closeConflictPrompt(): void {
+    this.conflictPrompt?.controller.abort()
+  }
+
+  private async runConflict(
+    doc: BoundDocument,
+    signal: AbortSignal,
+    onNotWritten?: () => void,
+  ): Promise<UniworkDocStatus | null> {
+    const choice = signal.aborted
+      ? 'later'
+      : await this.deps.ui.chooseConflict(doc.binding.title, signal)
+    if (signal.aborted || choice === 'later') return this.currentStatus(doc)
+    const chosen = this.stillInConflict(doc)
+    if (!chosen) return this.currentStatus(doc)
+    if (choice === 'overwrite') return this.overwrite(chosen, onNotWritten)
     if (choice === 'save-local-copy') {
-      const titleExt = extname(doc.binding.title)
-      const stem =
-        (titleExt ? doc.binding.title.slice(0, -titleExt.length) : doc.binding.title) || 'document'
-      const target = await this.deps.ui.pickCopyPath(stem, doc.binding.format)
+      const b = chosen.binding
+      const titleExt = extname(b.title)
+      const stem = (titleExt ? b.title.slice(0, -titleExt.length) : b.title) || 'document'
+      const target = await this.deps.ui.pickCopyPath(stem, b.format)
       // a plain local file; the document itself stays in conflict. A target
       // inside the working-copy folders would not be one (or is the copy itself)
       if (target) {
         const copied =
           !this.store.isInside(target) &&
-          (await copyFile(doc.path, target).then(
+          (await copyFile(chosen.path, target).then(
             () => true,
             () => false,
           ))
         if (!copied) this.deps.ui.showCopyFailed()
       }
-      return toStatus(doc)
+      return this.currentStatus(chosen)
     }
     if (choice === 'open-latest') {
-      if (!(await this.deps.ui.confirmDiscard(doc.binding.title))) return toStatus(doc)
+      const confirmed = await this.deps.ui.confirmDiscard(chosen.binding.title, signal)
+      const latest = confirmed && !signal.aborted ? this.stillInConflict(chosen) : null
+      if (!latest) return this.currentStatus(chosen)
       try {
-        return toStatus(await this.replaceWithLatest(doc))
+        return this.statusOf(await this.replaceWithLatest(latest))
       } catch {
         this.deps.ui.showOpenLatestFailed()
-        return toStatus(doc)
+        return this.currentStatus(latest)
       }
     }
-    return toStatus(doc)
+    return this.currentStatus(doc)
+  }
+
+  /** the binding at `doc.path` now, if it is still that document and still in conflict */
+  private stillInConflict(doc: BoundDocument): BoundDocument | null {
+    const now = this.store.lookup(doc.path)
+    return now &&
+      now.binding.documentId === doc.binding.documentId &&
+      now.binding.state === 'conflict' &&
+      this.ownsLocally(now)
+      ? now
+      : null
+  }
+
+  /** the status of the document at `doc.path` as it is now (null once it is gone) */
+  private currentStatus(doc: BoundDocument): UniworkDocStatus | null {
+    const now = this.store.lookup(doc.path)
+    return now ? this.statusOf(now) : null
   }
 
   /** recents: null = not a UniWork copy, 'hidden' = another account/deployment */
@@ -593,7 +739,7 @@ export class UniworkDocsService {
       } catch (error) {
         const code = error instanceof UniworkDocError ? error.code : 'server_error'
         await this.coordinator.commitState(doc, { ...doc.binding, error: code })
-        return toStatus(doc)
+        return this.statusOf(doc)
       }
     }
     const next: Binding = {
@@ -607,9 +753,9 @@ export class UniworkDocsService {
     delete next.serverRevision
     delete next.pendingIntent
     const ready = await this.coordinator.commitState(doc, next)
-    if (this.deps.requestModuleSave(ready.path, onNotWritten)) return toStatus(ready)
+    if (this.deps.requestModuleSave(ready.path, onNotWritten)) return this.statusOf(ready)
     const saved = await this.coordinator.save(ready.path)
-    return saved ? toStatus(saved) : toStatus(ready)
+    return saved ? this.statusOf(saved) : this.statusOf(ready)
   }
 
   /** "Discard my changes and open the latest": download, replace, reload the tab */
@@ -666,10 +812,21 @@ export class UniworkDocsService {
       formatForName(detail.file.filename) ??
       formatForName(detail.title)
     if (!format) throw new UniworkDocError('unsupported_format')
-    const historical = !!launch && launch.version > 0
+    // a ticket naming a version is a view ticket (the launch contract: the
+    // client never upgrades a ticket to edit): a read-only copy of that
+    // version. The one exception is a version that is still the current one
+    // while a tab of the document is open: that tab is focused, neither
+    // duplicated, downgraded nor upgraded. A ticket without a version takes
+    // the live ACL (view only when the descriptor says view).
+    const viewTicket = !!launch && launch.version > 0
+    if (viewTicket && launch.version === detail.file.version) {
+      const open = await this.openTabCopy(identity, documentId)
+      if (open) return this.focusOpen(open.path, open.title)
+    }
+    const viewRequested = !!launch && launch.version === 0 && launch.operation === 'view'
     const access: UniworkDocAccess =
-      launch && (launch.operation === 'view' || historical) ? 'view' : accessFor(detail.myLevel)
-    const key = historical ? `${documentId}@v${launch.version}` : documentId
+      viewTicket || viewRequested ? 'view' : accessFor(detail.myLevel)
+    const key = viewTicket ? `${documentId}@v${launch.version}` : documentId
     const dir = this.store.dirFor(identity.deploymentId, identity.accountId, key)
     const existing = await this.store.readDir(dir)
     const workspaceId = launch?.workspaceId ?? detail.workspaceId
@@ -686,7 +843,7 @@ export class UniworkDocsService {
           KEEP_LOCAL_STATES.has(existing.state) ||
           localChecksum !== existing.baseChecksum ||
           this.deps.isPathOpen(local)
-        const current = historical || existing.baseRevision === detail.revision
+        const current = viewTicket || existing.baseRevision === detail.revision
         if (keepLocal || current) {
           // permissions come from the server: a save refused with 403 left the
           // copy view-only; once the server grants edit again, its local work
@@ -694,6 +851,14 @@ export class UniworkDocsService {
           const binding: Binding = { ...existing, title: detail.title, access }
           if (existing.state === 'blocked' && existing.error === 'forbidden' && access === 'edit') {
             binding.state = 'dirty'
+            delete binding.error
+          }
+          // a reopen has a live session (the identity check above): a "sign in
+          // again" left by an earlier session is stale, so the copy reads as what
+          // it holds now (its local work can be saved, or it matches UniWork)
+          if (existing.state === 'signed-out') {
+            binding.state =
+              !existing.pendingIntent && localChecksum === existing.baseChecksum ? 'ready' : 'dirty'
             delete binding.error
           }
           // the document answers again (restored from the trash, a transient
@@ -714,16 +879,20 @@ export class UniworkDocsService {
 
     let bytes: Uint8Array
     let base = detail
-    if (historical) {
+    if (viewTicket) {
       bytes = (await this.api().download(documentId, launch.version)).bytes
     } else {
       const latest = await this.fetchLatest(documentId, detail)
       bytes = latest.bytes
       base = latest.detail
     }
+    // a copy keeps its name, unless an earlier build named it from a corrupt
+    // upload name (U+FFFD): that one is renamed with this fresh download
+    const stale = existing && hasReplacementChar(existing.filename) ? existing.filename : null
     const filename =
-      existing?.filename ?? sanitizeFilename(detail.file.filename || detail.title, format)
+      (stale ? null : existing?.filename) ?? workingCopyName(base.title, base.file.filename, format)
     const path = await this.store.writeWorkingCopy(dir, filename, bytes)
+    if (stale && stale !== filename) await this.store.removeWorkingCopy(dir, stale)
     const binding: Binding = {
       schema: 1,
       documentId,
@@ -733,14 +902,32 @@ export class UniworkDocsService {
       filename,
       format,
       access,
-      baseRevision: historical ? launch.revision : base.revision,
-      baseVersion: historical ? launch.version : base.file.version,
+      baseRevision: viewTicket ? launch.revision : base.revision,
+      baseVersion: viewTicket ? launch.version : base.file.version,
       baseChecksum: sha256Hex(bytes),
       state: 'ready',
       ...(existing?.lastSavedAt ? { lastSavedAt: existing.lastSavedAt } : {}),
     }
     await this.store.write(dir, binding)
     return this.show(path, binding)
+  }
+
+  /** the document's own working copy when a tab shows it */
+  private async openTabCopy(
+    identity: SessionIdentity,
+    documentId: string,
+  ): Promise<{ path: string; title: string } | null> {
+    const dir = this.store.dirFor(identity.deploymentId, identity.accountId, documentId)
+    const existing = await this.store.readDir(dir)
+    if (!existing || existing.documentId !== documentId) return null
+    const local = join(dir, existing.filename)
+    if (!this.store.exists(local) || !this.deps.isPathOpen(local)) return null
+    return { path: local, title: existing.title }
+  }
+
+  private focusOpen(path: string, title: string): { path: string; title: string } {
+    if (!this.deps.openPath(path)) throw new UniworkDocError('unsupported_format')
+    return { path, title }
   }
 
   private show(path: string, binding: Binding): { path: string; title: string } {

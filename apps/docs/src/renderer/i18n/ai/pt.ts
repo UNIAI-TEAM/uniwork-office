@@ -8,7 +8,7 @@ export const pt = {
   aiStarterPolishAll: 'Aprimore o documento inteiro com um tom mais profissional',
   aiStarterContinue: 'Continue escrevendo de onde o documento parou',
   aiStarterFillTemplate: 'Encontre e preencha os espaços reservados do documento',
-  aiBuyPlanBtn: 'Buy AI plan',
+  aiOpenSettingsBtn: 'Open AI settings',
   aiPanelTitle: 'uniAI',
   aiOpenAssistant: 'Abrir assistente de IA',
   aiSummarizeBtn: 'Resumo IA',
@@ -186,4 +186,6 @@ export const pt = {
   aiCmdImages: '{count} imagem(ns) atualizada(s)',
   aiCmdToc: 'Sumário inserido ({count} entradas)',
   aiCmdSkipped: ' ({count} bloco(s) protegido(s) ignorado(s))',
+  aiViewOnlyNotice:
+    'Documento somente leitura: a IA pode lê-lo e responder a perguntas, mas não pode editá-lo.',
 } satisfies Record<keyof typeof zh, string>

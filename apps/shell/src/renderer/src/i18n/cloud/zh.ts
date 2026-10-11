@@ -5,6 +5,7 @@ export const zh = {
   cloudStateNotEntitled: '套餐不含此功能',
   cloudStateExhausted: 'AI 额度已用完',
   cloudStateUnavailable: '暂不可用',
+  cloudStateSignedOut: '未登录',
   cloudStateInactive: '订阅未生效',
   cloudCredits: 'AI 额度',
   cloudCreditsLeft: '剩余 {remaining} / {limit}',
@@ -26,4 +27,9 @@ export const zh = {
   cloudMediaLabel: 'UniWork 云端',
   cloudMediaDesc: '使用组织的 UniWork AI 额度，无需密钥。',
   cloudSearchAutoHint: '先用 UniWork 云端（消耗 AI 额度），再用免费搜索。',
+  aiTestErrInvalidKey: 'API 密钥缺失或被拒绝',
+  aiTestErrNetwork: '无法连接，请检查网络',
+  aiTestErrLimit: '已达服务商的用量或频率限制，请稍后重试',
+  aiTestErrUnavailable: '服务暂无响应，请稍后重试',
+  aiTestErrMisconfigured: '设置不完整，请检查服务地址和账号字段',
 }

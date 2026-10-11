@@ -131,6 +131,8 @@ export interface DeckAccess {
   imageGenAvailable?(): boolean
   /** same for analyze_media */
   mediaAnalysisAvailable?(): boolean
+  /** live predicate: the deck is a view-only UniWork document, so only the read-only tools run */
+  readOnly?(): boolean
   /**
    * Cloud single-page generation (gsk slide_generate), used by generate_deck's self-driven
    * pipeline: given the unified style + this page's brief/layout/images, the cloud service
@@ -1088,6 +1090,20 @@ function mediaToolsOffNote(hidden: Set<string>): string {
   return `\n\nNote: ${[...hidden].join(' and ')} ${plural ? 'are' : 'is'} currently unavailable (no image/media provider: signed out of UniWork or cloud tools off, and no media API key in Settings). Do not call or promise ${plural ? 'them' : 'it'}; for imagery use image_search + insert_web_image instead.`
 }
 
+/** the only tools a view-only deck may run: none of them changes the deck */
+export const READ_ONLY_TOOLS: ReadonlySet<string> = new Set([
+  'read_slide',
+  'web_search',
+  'image_search',
+  'analyze_media',
+  'ask_clarification',
+  'list_style_templates',
+  'load_guide',
+])
+
+const VIEW_ONLY_NOTE =
+  '\n\nNote: this deck is a view-only document. Do not edit, add, delete or regenerate any slide; only read it, search, and answer questions. If the user asks for a change, say the deck is view-only and nothing was changed.'
+
 export function createSlidesSkill(access: DeckAccess): AgentSkill {
   // The HTML pipeline was already used in this conversation → later calls without an explicit mode default to append.
   // Safety net for when the AI ignores the "pass all pages at once" constraint: separate calls no longer overwrite each other (P0-1).
@@ -1096,12 +1112,18 @@ export function createSlidesSkill(access: DeckAccess): AgentSkill {
     id: 'slides',
     // live like tools: the off-note overrides the prose that still mentions the hidden tools
     get systemPrompt() {
-      return systemPrompt + mediaToolsOffNote(hiddenMediaTools(access))
+      return (
+        systemPrompt +
+        mediaToolsOffNote(hiddenMediaTools(access)) +
+        (access.readOnly?.() ? VIEW_ONLY_NOTE : '')
+      )
     },
     // live view: the predicates are re-read before every model request
     get tools() {
       const hidden = hiddenMediaTools(access)
-      return hidden.size ? TOOLS.filter((t) => !hidden.has(t.name)) : TOOLS
+      const readOnly = access.readOnly?.() === true
+      if (!readOnly && hidden.size === 0) return TOOLS
+      return TOOLS.filter((t) => !hidden.has(t.name) && (!readOnly || READ_ONLY_TOOLS.has(t.name)))
     },
     buildContext: () => {
       const outline = `<deck outline>\n${buildDeckOutline(access.getSlides(), access.getCurrent(), access.getSelectedIds())}\n</deck outline>`
@@ -1391,6 +1413,9 @@ async function executeTool(
   state?: SkillState,
   signal?: AbortSignal,
 ) {
+  // defense in depth: a view-only deck refuses every tool outside the read-only set
+  if (access.readOnly?.() && !READ_ONLY_TOOLS.has(call.name))
+    return fail(t('aiViewOnlyNotice'), `${call.name} is not available: the deck is view-only`)
   const slides = access.getSlides()
   switch (call.name) {
     case 'read_slide': {

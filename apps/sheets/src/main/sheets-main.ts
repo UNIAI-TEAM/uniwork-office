@@ -4,6 +4,7 @@ import {
   uniworkIsBound,
   uniworkIsReadOnly,
   uniworkRequestOrigin,
+  uniworkSaveAsDefault,
   uniworkSaveDecision,
 } from './uniwork-policy'
 import { workbookDisplayName } from './workbook-name'
@@ -72,19 +73,22 @@ import { createI18n, getUiLang, type Lang, normalizeLang, setUiLang } from '@gen
 import { ProjectStore } from '@genoffice/project-store'
 
 import {
-  AiCreditsError,
-  AiTimeoutError,
-  isAiNetworkError,
-  isAiOverloadedError,
+  aiChatFailure,
+  aiChatFailureFromError,
+  aiStreamErrorFields,
   chatForProvider,
   defaultAiSettings,
   activeProvider,
   maxOutputTokensOf,
+  refreshUniworkCloudStatus,
   resolveAiSettings,
+  aiNoticeBody,
+  noModelMessage,
   setAiUserAgent,
   setRescueFetch,
   streamForProvider,
   withUniAiOpenRouterAuth,
+  type AiChatFailure,
   type AiProviderId,
   type AiSettings,
   type AiStreamChunk,
@@ -157,6 +161,7 @@ import {
   type WorkbookSaveRequest,
 } from '../shared/desktop-api'
 import { IPC_CHANNELS } from '../shared/ipc-channels'
+import { createOpenRetryPaths } from './open-retry-paths'
 import { atomicWriteFile } from './atomic-write'
 import { closeGuardDecision, ShutdownLatch } from './close-guard'
 import { SaveEditsTransferStore } from './save-edits-transfer'
@@ -239,7 +244,7 @@ const tMain = createI18n({
     csvKeepFormatDetail:
       'CSV 只保留单张工作表的纯文本值——公式、格式和其他工作表不会存入 .csv 文件。',
   },
-  // en and vi are ours (UniWork wording, e.g. errNoApiKey: no active AI plan); the other locales keep
+  // en and vi are ours (UniWork wording, e.g. errNoApiKey: no AI model set up yet); the other locales keep
   // upstream's wording. tools/rebrand re-applies the vi errNoApiKey (rule vi-no-api-key).
   en: {
     filterSpreadsheets: 'Spreadsheets',
@@ -257,7 +262,8 @@ const tMain = createI18n({
     errParseFailed: 'Failed to parse file',
     errImageNoText: 'Image attachments have no text; the image is sent along with the user message',
     errNotImage: 'not a supported image type',
-    errNoApiKey: 'AI is not activated. Purchase a plan to use the AI assistant.',
+    errNoApiKey:
+      'No AI model is set up yet. Add your own AI key in Settings > AI Model to use the assistant.',
     errAiBusy: 'The AI service is busy right now — please try again in a moment',
     errNoModel: 'No model name configured',
     errImgAbsPath: 'Image path must be absolute.',
@@ -316,7 +322,8 @@ const tMain = createI18n({
     errImageNoText:
       'Tệp đính kèm hình ảnh không có văn bản; hình ảnh được gửi cùng với tin nhắn của người dùng',
     errNotImage: 'loại hình ảnh không được hỗ trợ',
-    errNoApiKey: 'Chưa kích hoạt / mua gói AI. Hãy mua gói để dùng Trợ lý AI.',
+    errNoApiKey:
+      'Chưa thiết lập mô hình AI. Hãy thêm khóa AI của riêng bạn trong Cài đặt > Mô hình AI để dùng Trợ lý AI.',
     errAiBusy: 'Dịch vụ AI hiện đang bận — vui lòng thử lại sau giây lát',
     errNoModel: 'Chưa cấu hình tên mô hình',
     errImgAbsPath: 'Đường dẫn hình ảnh phải là đường dẫn tuyệt đối.',
@@ -2059,13 +2066,24 @@ let forcedWorkbookPath = app.isPackaged ? undefined : process.env.XLSX_OPEN_PATH
  * (a single global would be overwritten by the next iteration). One-shot, unlike
  * the sticky dev env/capture-server path above. */
 const queuedWorkbookPaths = new Map<number, string>()
+/** the last opened path per tab (shell-queued or picked), kept after the open
+ * consumed it: the opening screen's Retry queues it again */
+const lastOpenedWorkbookPaths = createOpenRetryPaths()
+
+/** remember the workbook a tab opens (shell queue or picker) for Retry */
+function rememberOpenedWorkbook(contents: WebContents, path: string): void {
+  lastOpenedWorkbookPaths.remember(contents.id, path, () =>
+    contents.once('destroyed', () => {
+      queuedWorkbookPaths.delete(contents.id)
+      lastOpenedWorkbookPaths.forget(contents.id)
+    }),
+  )
+}
 
 /** queue a workbook this tab's first selectWorkbook call opens without a dialog (shell routing) */
 export function queueWorkbookForView(contents: WebContents, path: string): void {
   queuedWorkbookPaths.set(contents.id, path)
-  contents.once('destroyed', () => {
-    queuedWorkbookPaths.delete(contents.id)
-  })
+  rememberOpenedWorkbook(contents, path)
 }
 
 /** is the active tab still waiting for the renderer to consume a shell-queued workbook? */
@@ -2637,6 +2655,14 @@ export function registerSheetsIpc(): void {
    */
   ipcMain.handle('sheets:has-queued-workbook', (event) => queuedWorkbookPaths.has(event.sender.id))
 
+  /** Retry on a stalled opening screen: queue this tab's workbook again (false: none known) */
+  ipcMain.handle('sheets:requeue-workbook', (event) => {
+    const path = lastOpenedWorkbookPaths.get(event.sender.id)
+    if (path === undefined) return false
+    queuedWorkbookPaths.set(event.sender.id, path)
+    return true
+  })
+
   // ---- headless export mode (--headless-export) ----
 
   ipcMain.handle('sheets:consume-headless-export', (event): string | null => {
@@ -2676,6 +2702,8 @@ export function registerSheetsIpc(): void {
       })
       if (selection.canceled || !selection.filePaths[0]) return null
       path = selection.filePaths[0]
+      // Retry on a stalled open restarts this pick, not an earlier shell open
+      rememberOpenedWorkbook(event.sender, path)
     }
     const prepared = await prepareWorkbookForOpen(
       entry.client,
@@ -3279,7 +3307,7 @@ export function registerSheetsIpc(): void {
           session.suggestSaveAs ??
           session.csvSourcePath?.replace(/\.[^.]+$/, '.xlsx') ??
           session.restoreTarget ??
-          session.path,
+          uniworkSaveAsDefault(session.path),
         filters: macroEnabled
           ? [{ name: tm('filterXlsm'), extensions: ['xlsm'] }]
           : [
@@ -3686,6 +3714,8 @@ export function registerSheetsAiIpc(): void {
   ipcMain.handle(
     IPC_CHANNELS.aiGskStatus,
     async (_event, withEmail?: unknown): Promise<GenSparkAccountStatus> => {
+      // an AI panel asks when it opens: re-read the plan so a change made since shows at once
+      await refreshUniworkCloudStatus()
       if (!hasGskAuth()) return { loggedIn: false }
       if (!withEmail) return { loggedIn: true }
       const info = await gskLoginInfo()
@@ -3713,20 +3743,21 @@ export function registerSheetsAiIpc(): void {
     if (!config || (provider !== 'codex' && !config.apiKey)) {
       return {
         ok: false,
-        error: tm('errNoApiKey', { provider }),
+        // one-shot callers (settings test, email, one-click actions) print the string as is, so no notice code
+        error: aiNoticeBody(noModelMessage(getUiLang(), tm('errNoApiKey', { provider }))),
       }
     }
     if (provider !== 'codex' && !config.model) return { ok: false, error: tm('errNoModel') }
+    const failed = (failure: AiChatFailure) => {
+      console.warn('[ai] chat failed:', failure.raw)
+      return { ok: false, error: failure.error, errorKind: failure.errorKind }
+    }
     try {
       const result = await chatForProvider(provider, config, request.system, request.user)
-      // the one-shot path reports HTTP failures as ok:false with the raw body —
-      // replace capacity/rate-limit dumps with the localized "busy" message
-      if (!result.ok && isAiOverloadedError(result.error)) {
-        return { ok: false, error: tm('errAiBusy') }
-      }
-      return result
+      // the one-shot path reports HTTP failures as ok:false with the raw body
+      return result.ok ? result : failed(aiChatFailure(result, getUiLang(), tm('errAiBusy')))
     } catch (err) {
-      return { ok: false, error: isAiOverloadedError(err) ? tm('errAiBusy') : String(err) }
+      return failed(aiChatFailureFromError(err, getUiLang(), tm('errAiBusy')))
     }
   })
 
@@ -3749,7 +3780,7 @@ export function registerSheetsAiIpc(): void {
       send({
         requestId,
         type: 'error',
-        error: tm('errNoApiKey', { provider }),
+        error: noModelMessage(getUiLang(), tm('errNoApiKey', { provider })),
       })
       return
     }
@@ -3793,20 +3824,10 @@ export function registerSheetsAiIpc(): void {
       if (controller.signal.aborted) {
         send({ requestId, type: 'done' })
       } else {
-        send({
-          requestId,
-          type: 'error',
-          error: err instanceof Error ? err.message : String(err),
-          ...(err instanceof AiTimeoutError
-            ? { errorCode: 'timeout' as const }
-            : err instanceof AiCreditsError
-              ? { errorCode: 'credits' as const }
-              : isAiNetworkError(err)
-                ? { errorCode: 'network' as const }
-                : isAiOverloadedError(err)
-                  ? { errorCode: 'overloaded' as const }
-                  : {}),
-        })
+        const { raw, ...fields } = aiStreamErrorFields(err, getUiLang())
+        // the panel gets the product message; the provider's own text stays in the log
+        console.warn(`[ai-stream] ${requestId} (${provider}/${config.model}) failed:`, raw)
+        send({ requestId, type: 'error', ...fields })
       }
     } finally {
       unwatchSender()
@@ -4635,8 +4656,9 @@ function installApplicationMenu(): void {
           { type: 'separator' },
           closeActiveTabHook
             ? {
-                label: process.platform === 'darwin' ? tm('menuClose') : tm('menuQuit'),
-                accelerator: process.platform === 'darwin' ? 'CmdOrCtrl+W' : 'CmdOrCtrl+Q',
+                // closes the tab on every platform (the hook only exists in tab mode)
+                label: tm('menuClose'),
+                accelerator: 'CmdOrCtrl+W',
                 click: () => closeActiveTabHook?.(),
               }
             : process.platform === 'darwin'

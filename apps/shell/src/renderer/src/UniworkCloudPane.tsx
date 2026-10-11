@@ -57,6 +57,22 @@ export function cloudNoticeFor(state: UniworkCloudState, toolsEnabled = true): C
   }
 }
 
+/**
+ * The verdict of the settings "Test connection" for the blocks that run on the
+ * UniWork cloud: the status the server just answered, in the same short labels as
+ * the Account rows. Only a server answer of "ready" passes: a signed-out session
+ * or a status that could not be read says so instead of showing a green OK.
+ */
+export function cloudTestVerdict(
+  status: UniworkCloudStatus | null,
+  t: TFunc,
+): { ok: boolean; error?: string } {
+  if (!status) return { ok: false, error: t('cloudStateUnavailable') }
+  if (status.state === 'ready') return { ok: true }
+  if (status.state === 'signed-out') return { ok: false, error: t('cloudStateSignedOut') }
+  return { ok: false, error: t(CLOUD_STATE_KEYS[status.state]) }
+}
+
 /** "remaining / limit left", "Unlimited", or null when the server sent no credits */
 export function creditsText(
   credits: UniworkCloudCredits | null,
@@ -89,7 +105,7 @@ export function renewsText(
 
 /**
  * Live cloud status from the shell main process: read once (re-reading the
- * credits) and then kept current by pushes. null until the first answer, or
+ * credits), kept current by pushes, and re-read when the window regains focus. null until the first answer, or
  * when the preload has no cloud API.
  */
 export function useUniworkCloudStatus(): UniworkCloudStatus | null {
@@ -113,9 +129,24 @@ export function useUniworkCloudStatus(): UniworkCloudStatus | null {
         if (alive) setStatus(fresh)
       })
       .catch(() => undefined)
+    // the plan can change on the server at any time (the main process rate-limits the
+    // re-read): coming back to the window re-reads it, so no pane waits for a reopen
+    const reread = () => {
+      if (document.visibilityState === 'hidden') return
+      void api
+        .uniworkCloudRefresh?.()
+        .then((fresh) => {
+          if (alive) setStatus(fresh)
+        })
+        .catch(() => undefined)
+    }
+    window.addEventListener('focus', reread)
+    document.addEventListener('visibilitychange', reread)
     return () => {
       alive = false
       off?.()
+      window.removeEventListener('focus', reread)
+      document.removeEventListener('visibilitychange', reread)
     }
   }, [])
   return status

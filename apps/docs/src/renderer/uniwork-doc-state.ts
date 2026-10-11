@@ -41,6 +41,16 @@ export function uniworkAllowsSave(
   return true
 }
 
+/**
+ * Whether the AutoSave switch is shown. A UniWork document is written only by
+ * an explicit Save (product rule), so it has no AutoSave switch at all, not
+ * even a disabled one. A plain local file keeps it where the platform has a
+ * local path to write.
+ */
+export function autoSaveToggleVisible(platformAutoSave: boolean, bound: boolean): boolean {
+  return platformAutoSave && !bound
+}
+
 /** Query main for the document at `path`; re-queried whenever the path changes. */
 export function useUniworkDocState(path: string | null | undefined): UniworkDocState {
   const [state, setState] = useState<UniworkDocState>(NO_UNIWORK_STATE)
@@ -81,13 +91,21 @@ export function setEditorEditable(
   editor.setEditable(editable, false)
 }
 
-/** Footer save-state label: a view-only document is never "unsaved", it has no save state. */
+/**
+ * Footer save-state label: a view-only document is never "unsaved", it has no
+ * save state. A clean UniWork copy shows none: whether its last Save reached
+ * UniWork (saved, conflict, offline, signed out) is the title-bar chip's to
+ * say, and a local "All changes saved" would contradict it.
+ */
 export function saveStateLabel(
   hasUnsavedChanges: boolean,
   readOnly: boolean,
-): { key: 'appSaveStateViewOnly' | 'appSaveStateUnsaved' | 'appSaveStateSaved'; unsaved: boolean } {
+  bound = false,
+): {
+  key: 'appSaveStateViewOnly' | 'appSaveStateUnsaved' | 'appSaveStateSaved'
+  unsaved: boolean
+} | null {
   if (readOnly) return { key: 'appSaveStateViewOnly', unsaved: false }
-  return hasUnsavedChanges
-    ? { key: 'appSaveStateUnsaved', unsaved: true }
-    : { key: 'appSaveStateSaved', unsaved: false }
+  if (hasUnsavedChanges) return { key: 'appSaveStateUnsaved', unsaved: true }
+  return bound ? null : { key: 'appSaveStateSaved', unsaved: false }
 }
