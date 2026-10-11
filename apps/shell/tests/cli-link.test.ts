@@ -38,16 +38,26 @@ describe('genoffice launcher file', () => {
   })
 })
 
-describe('genoffice command on the PATH: only on request', () => {
+describe('the command on the PATH: only on request', () => {
+  // Windows keeps the launcher's own name on the PATH; macOS and Linux get the renamed command
+  const typed = process.platform === 'win32' ? 'genoffice' : 'uniwork-office'
   const installCliLink = vi.fn()
   const inspectCliLink = vi.fn()
+  const cleanupCliLinks = vi.fn()
 
   async function load() {
     vi.resetModules()
     installCliLink.mockReset()
     inspectCliLink.mockReset()
+    cleanupCliLinks.mockReset()
+    cleanupCliLinks.mockReturnValue({ removed: [], migrated: [], relinked: [] })
     vi.doMock('electron', () => ({ app: { isPackaged: true, getVersion: () => '1.2.3' } }))
-    vi.doMock('@genoffice/cli/install', () => ({ installCliLink, inspectCliLink }))
+    vi.doMock('@genoffice/cli/install', async (importOriginal) => ({
+      ...(await importOriginal<typeof import('@genoffice/cli/install')>()),
+      installCliLink,
+      inspectCliLink,
+      cleanupCliLinks,
+    }))
     const dir = mkdtempSync(join(tmpdir(), 'genoffice-cli-req-'))
     process.env.GENOFFICE_AUTH_DIR = join(dir, 'auth')
     Object.defineProperty(process, 'resourcesPath', {
@@ -68,24 +78,32 @@ describe('genoffice command on the PATH: only on request', () => {
 
   it('the status read never writes a link either', async () => {
     const { mod } = await load()
-    inspectCliLink.mockReturnValue({ status: 'missing', location: '/usr/local/bin/genoffice' })
+    inspectCliLink.mockReturnValue({ status: 'missing', location: '/usr/local/bin/uniwork-office' })
     expect(mod.cliLinkStatus()).toEqual({
       state: 'absent',
-      location: '/usr/local/bin/genoffice',
+      command: typed,
+      location: '/usr/local/bin/uniwork-office',
     })
     expect(installCliLink).not.toHaveBeenCalled()
   })
 
   it('the Settings request creates the link and reports where', async () => {
     const { dir, mod } = await load()
-    installCliLink.mockReturnValue({ status: 'linked', location: '/opt/homebrew/bin/genoffice' })
+    installCliLink.mockReturnValue({
+      status: 'linked',
+      location: '/opt/homebrew/bin/uniwork-office',
+    })
     const state = mod.installCliLinkOnRequest(join(dir, 'app-settings.json'))
     expect(installCliLink).toHaveBeenCalledTimes(1)
-    expect(state).toEqual({ state: 'present', location: '/opt/homebrew/bin/genoffice' })
+    expect(state).toEqual({
+      state: 'present',
+      command: typed,
+      location: '/opt/homebrew/bin/uniwork-office',
+    })
     expect(JSON.parse(readFileSync(join(dir, 'app-settings.json'), 'utf-8')).cliLink).toMatchObject(
       {
         status: 'linked',
-        location: '/opt/homebrew/bin/genoffice',
+        location: '/opt/homebrew/bin/uniwork-office',
       },
     )
   })
@@ -93,13 +111,87 @@ describe('genoffice command on the PATH: only on request', () => {
   it('maps blocked outcomes to the manual command', async () => {
     const { mod } = await load()
     expect(
-      mod.toCliLinkState({
-        status: 'unwritable',
-        location: '/usr/local/bin/genoffice',
-        manual: 'sudo ln -s a b',
-      }),
-    ).toEqual({ state: 'blocked', location: '/usr/local/bin/genoffice', manual: 'sudo ln -s a b' })
-    expect(mod.toCliLinkState({ status: 'occupied' }).state).toBe('blocked')
-    expect(mod.toCliLinkState({ status: 'unsupported' }).state).toBe('unsupported')
+      mod.toCliLinkState(
+        {
+          status: 'unwritable',
+          location: '/usr/local/bin/uniwork-office',
+          manual: 'sudo ln -s a b',
+        },
+        'linux',
+      ),
+    ).toEqual({
+      state: 'blocked',
+      command: 'uniwork-office',
+      location: '/usr/local/bin/uniwork-office',
+      manual: 'sudo ln -s a b',
+    })
+    expect(mod.toCliLinkState({ status: 'occupied' }, 'linux').state).toBe('blocked')
+    expect(mod.toCliLinkState({ status: 'unsupported' }, 'linux').state).toBe('unsupported')
+  })
+
+  it('names the command a person types: the package launcher on deb/rpm, genoffice on Windows', async () => {
+    const { mod } = await load()
+    expect(
+      mod.toCliLinkState(
+        { status: 'present', location: '/usr/bin/genoffice', command: 'genoffice' },
+        'linux',
+      ),
+    ).toEqual({ state: 'present', command: 'genoffice', location: '/usr/bin/genoffice' })
+    expect(mod.toCliLinkState({ status: 'present', location: 'C:\\app\\cli' }, 'win32')).toEqual({
+      state: 'present',
+      command: 'genoffice',
+      location: 'C:\\app\\cli',
+    })
+    expect(mod.toCliLinkState({ status: 'present', location: '/a' }, 'darwin').command).toBe(
+      'uniwork-office',
+    )
+  })
+})
+
+describe('launch-time cleanup of the links an earlier run created', () => {
+  async function load(opts: { packaged: boolean; appImage?: boolean }) {
+    vi.resetModules()
+    const cleanupCliLinks = vi.fn(() => ({
+      removed: ['/home/u/.local/bin/genoffice'],
+      migrated: [],
+      relinked: [],
+    }))
+    vi.doMock('electron', () => ({
+      app: { isPackaged: opts.packaged, getVersion: () => '1.2.3' },
+    }))
+    vi.doMock('@genoffice/cli/install', async (importOriginal) => ({
+      ...(await importOriginal<typeof import('@genoffice/cli/install')>()),
+      cleanupCliLinks,
+    }))
+    if (opts.appImage) process.env.APPIMAGE = '/home/u/UniWork-Office.AppImage'
+    else delete process.env.APPIMAGE
+    Object.defineProperty(process, 'resourcesPath', {
+      value: '/opt/UniWork Office/resources',
+      configurable: true,
+    })
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
+    return { cleanupCliLinks, log, mod: await import('../src/main/cli-link') }
+  }
+
+  it('sweeps with the shipped launcher from a permanent install, and logs what it removed', async () => {
+    const { cleanupCliLinks, log, mod } = await load({ packaged: true })
+    mod.healCliLinks()
+    expect(cleanupCliLinks).toHaveBeenCalledTimes(1)
+    const [opts] = cleanupCliLinks.mock.calls[0] as unknown as [{ launcher?: string }]
+    expect(opts.launcher).toContain('genoffice')
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('/home/u/.local/bin/genoffice'))
+  })
+
+  it('from an AppImage only removes dead links: no launcher is offered, so nothing is created', async () => {
+    const { cleanupCliLinks, mod } = await load({ packaged: true, appImage: true })
+    mod.healCliLinks()
+    expect(cleanupCliLinks).toHaveBeenCalledWith({})
+    delete process.env.APPIMAGE
+  })
+
+  it('does nothing in a dev run', async () => {
+    const { cleanupCliLinks, mod } = await load({ packaged: false })
+    mod.healCliLinks()
+    expect(cleanupCliLinks).not.toHaveBeenCalled()
   })
 })

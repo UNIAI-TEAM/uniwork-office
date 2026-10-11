@@ -348,8 +348,12 @@ export function IntegrationsPane({
             {status.cli.ephemeral
               ? t('intgCliEphemeral')
               : cliOnPath
-                ? t('intgCliReady', { v: status.cli.version, path: status.cli.location ?? '' })
-                : t('intgCliNotOnPath', { v: status.cli.version })}
+                ? t('intgCliReady', {
+                    v: status.cli.version,
+                    cmd: status.cli.command,
+                    path: status.cli.location ?? '',
+                  })
+                : t('intgCliNotOnPath', { v: status.cli.version, cmd: status.cli.command })}
           </div>
           {!cliOnPath && cliFix && !status.cli.ephemeral && (
             <div className="set-intg-code">

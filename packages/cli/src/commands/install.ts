@@ -1,5 +1,5 @@
 import { dirname, join } from 'node:path'
-import { installCliLink } from '../install'
+import { CLI_COMMAND, commandName, installCliLink, linkTarget } from '../install'
 import type { CommandDef } from '../registry'
 import { packagedResourcesDir, repoRoot } from '../resources'
 import { CliError, EXIT } from '../result'
@@ -15,23 +15,24 @@ export function launcherPath(): string | null {
 
 export const installCommand: CommandDef = {
   name: 'install-cli',
-  summary:
-    'Put genoffice on the PATH (symlink into /usr/local/bin or ~/.local/bin, or the user PATH on Windows).',
+  summary: `Put ${CLI_COMMAND} on the PATH (symlink into /usr/local/bin or ~/.local/bin, or the user PATH on Windows).`,
   usage: 'install-cli',
   async run() {
     const launcher = launcherPath()
-    if (!launcher) throw new CliError(EXIT.app, 'cannot locate the genoffice launcher')
-    const r = installCliLink({ launcher })
+    if (!launcher) throw new CliError(EXIT.app, 'cannot locate the command line launcher')
+    const r = installCliLink({ ...linkTarget(launcher) })
+    const command = commandName(r, process.platform)
     const detail = {
       status: r.status,
       launcher,
+      command,
       ...(r.location ? { location: r.location } : {}),
       ...(r.pathHint ? { pathHint: r.pathHint } : {}),
     }
     const onPath = (verb: string) =>
       r.pathHint
-        ? `genoffice is ${verb} linked at ${r.location}, but ${dirname(r.location ?? '')} is not on your PATH; add it with: ${r.pathHint}`
-        : `genoffice is ${verb} on the PATH (${r.location})`
+        ? `${command} is ${verb} linked at ${r.location}, but ${dirname(r.location ?? '')} is not on your PATH; add it with: ${r.pathHint}`
+        : `${command} is ${verb} on the PATH (${r.location})`
     switch (r.status) {
       case 'linked':
         return { summary: onPath('now'), detail }

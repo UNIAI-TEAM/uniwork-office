@@ -161,7 +161,7 @@ export const strings = {
     setDefaultAppOpenSettings: '打开系统设置',
     setDefaultAppFailed: '设置失败，请在系统设置中手动更改。',
     setCliLink: '命令行工具',
-    setCliLinkDesc: '把 genoffice 命令添加到终端，供脚本和 AI 助手调用 UniWork Office。',
+    setCliLinkDesc: '把 {cmd} 命令添加到终端，供脚本和 AI 助手调用 UniWork Office。',
     setCliLinkInstall: '添加到终端',
     setCliLinkBlocked: '无法自动添加。请在终端中运行：{cmd}',
     setAiSpellcheckDesc: '在 AI 对话输入框中输入时标出拼写错误的单词。',
@@ -232,16 +232,16 @@ export const strings = {
     intgExample1: '把 ~/Downloads/report.md 转成 Word 文档',
     intgExample2: '做一份 6 页的幻灯片，介绍我们第三季度的业绩',
     intgExample3: '把 budget.xlsx 转成 PDF，并在 UniWork Office 里打开',
-    intgStep2Note: '助手会自己调用 UniWork Office (genoffice) 命令行，你不需要输入任何命令。',
+    intgStep2Note: '助手会自己调用 UniWork Office (uniwork-office) 命令行，你不需要输入任何命令。',
     intgCliPartTitle: 'CLI · 命令行 + skill',
     intgCliPartDesc:
-      '适合能运行终端命令的助手（Claude Code、Codex、Cursor 等）。安装 skill 后，助手会自己调用 UniWork Office (genoffice) 命令行创建、转换、读取和编辑文件，你不需要输入任何命令。',
+      '适合能运行终端命令的助手（Claude Code、Codex、Cursor 等）。安装 skill 后，助手会自己调用 UniWork Office (uniwork-office) 命令行创建、转换、读取和编辑文件，你不需要输入任何命令。',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP 是 AI 助手调用外部工具的通用协议。助手不能运行命令（如 Claude Desktop），或你想让它直接操作 UniWork Office 窗口时用这条路。下面两种接法任选一种。',
     intgMcpStdioTitle: '由助手启动（推荐）',
     intgMcpStdioDesc:
-      '助手自己拉起 UniWork Office (genoffice mcp)，不需要在这里开任何开关，UniWork Office 也不用开着。功能与 CLI 完全相同。',
+      '助手自己拉起 UniWork Office (uniwork-office mcp)，不需要在这里开任何开关，UniWork Office 也不用开着。功能与 CLI 完全相同。',
     intgMcpHttpTitle: '本地 HTTP 服务',
     intgMcpHttpDesc:
       '在 UniWork Office 内运行，助手通过网址连接，可以看着它在 Word 编辑器里逐步生成。需要 UniWork Office 保持打开；目前只支持 Word。',
@@ -254,9 +254,9 @@ export const strings = {
       '把这段加进它的 MCP 服务器配置（一个 JSON 文件，或设置里的「添加 MCP 服务器」）：',
     intgMcpNote: 'skill 和 MCP 可以同时存在，助手会自己选用；两者做的事完全一样。',
     intgCliTitle: '高级：命令行 UniWork Office',
-    intgCliReady: 'UniWork Office (genoffice) {v} · 已可在终端直接使用（{path}）',
+    intgCliReady: 'UniWork Office ({cmd}) {v} · 已可在终端直接使用（{path}）',
     intgCliNotOnPath:
-      'UniWork Office (genoffice) {v} · 尚未加入终端 PATH。助手仍能通过 ~/.genoffice/launcher 找到它，skill 不受影响。若想自己在终端输入 genoffice，运行一次：',
+      'UniWork Office ({cmd}) {v} · 尚未加入终端 PATH。助手仍能通过 ~/.genoffice/launcher 找到它，skill 不受影响。若想自己在终端输入 {cmd}，运行一次：',
     intgCliLauncher: '启动器目录',
     intgStateOutdated: '已安装 {v}，可更新到 {next}',
     intgStateModified: '已安装 {v}（已被修改）',
@@ -528,7 +528,7 @@ export const strings = {
     setDefaultAppFailed: 'Could not change it. Please set it in the system settings.',
     setCliLink: 'Command line tool',
     setCliLinkDesc:
-      'Adds the genoffice command to your terminal so scripts and AI agents can use UniWork Office.',
+      'Adds the {cmd} command to your terminal so scripts and AI agents can use UniWork Office.',
     setCliLinkInstall: 'Add to terminal',
     setCliLinkBlocked: 'Could not add it automatically. Run this in a terminal: {cmd}',
     setAiSpellcheckDesc: 'Underline misspelled words while typing in the AI chat input.',
@@ -607,16 +607,16 @@ export const strings = {
     intgExample2: 'Make a 6-slide deck about our Q3 results',
     intgExample3: 'Convert budget.xlsx to PDF and open it in UniWork Office',
     intgStep2Note:
-      'The assistant runs the UniWork Office (genoffice) command line itself; you never have to type it.',
+      'The assistant runs the UniWork Office (uniwork-office) command line itself; you never have to type it.',
     intgCliPartTitle: 'CLI · command line + skill',
     intgCliPartDesc:
-      'For assistants that can run terminal commands (Claude Code, Codex, Cursor and others). Once the skill is installed, the assistant calls the UniWork Office (genoffice) command line itself to create, convert, read and edit files; you never type a command.',
+      'For assistants that can run terminal commands (Claude Code, Codex, Cursor and others). Once the skill is installed, the assistant calls the UniWork Office (uniwork-office) command line itself to create, convert, read and edit files; you never type a command.',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP is the common protocol AI assistants use to call external tools. Use it when your assistant cannot run commands (Claude Desktop, for example) or when you want it to drive the UniWork Office window directly. Pick either of the two ways below.',
     intgMcpStdioTitle: 'Started by the assistant (recommended)',
     intgMcpStdioDesc:
-      'The assistant launches UniWork Office (genoffice mcp) itself: nothing to switch on here, and UniWork Office does not need to be open. Same features as the CLI.',
+      'The assistant launches UniWork Office (uniwork-office mcp) itself: nothing to switch on here, and UniWork Office does not need to be open. Same features as the CLI.',
     intgMcpHttpTitle: 'Local HTTP server',
     intgMcpHttpDesc:
       'Runs inside UniWork Office; the assistant connects to a URL and you can watch it build the document step by step in the Word editor. UniWork Office must stay open; Word documents only for now.',
@@ -630,9 +630,9 @@ export const strings = {
     intgMcpNote:
       'The skill and MCP can be set up side by side; the assistant picks one. They do exactly the same things.',
     intgCliTitle: 'Advanced: UniWork Office command line',
-    intgCliReady: 'UniWork Office (genoffice) {v} · ready in your terminal ({path})',
+    intgCliReady: 'UniWork Office ({cmd}) {v} · ready in your terminal ({path})',
     intgCliNotOnPath:
-      "UniWork Office (genoffice) {v} · not on your terminal's PATH. Assistants still find it through ~/.genoffice/launcher, so the skill works. To type genoffice yourself, run this once:",
+      "UniWork Office ({cmd}) {v} · not on your terminal's PATH. Assistants still find it through ~/.genoffice/launcher, so the skill works. To type {cmd} yourself, run this once:",
     intgCliLauncher: 'Launcher folder',
     intgStateOutdated: 'Installed {v}, update to {next} available',
     intgStateModified: 'Installed {v} (modified)',
@@ -917,7 +917,7 @@ export const strings = {
     setDefaultAppFailed: '変更できませんでした。システム設定で設定してください。',
     setCliLink: 'コマンドラインツール',
     setCliLinkDesc:
-      'genoffice コマンドをターミナルに追加し、スクリプトや AI エージェントから UniWork Office を使えるようにします。',
+      '{cmd} コマンドをターミナルに追加し、スクリプトや AI エージェントから UniWork Office を使えるようにします。',
     setCliLinkInstall: 'ターミナルに追加',
     setCliLinkBlocked: '自動で追加できませんでした。ターミナルで次を実行してください：{cmd}',
     setAiSpellcheckDesc: 'AI チャットの入力欄で入力中にスペルミスの単語に下線を表示します。',
@@ -997,16 +997,16 @@ export const strings = {
     intgExample2: '第 3 四半期の業績について 6 枚のスライドを作って',
     intgExample3: 'budget.xlsx を PDF に変換して UniWork Office で開いて',
     intgStep2Note:
-      'UniWork Office (genoffice) コマンドラインはアシスタントが自分で実行します。あなたが入力する必要はありません。',
+      'UniWork Office (uniwork-office) コマンドラインはアシスタントが自分で実行します。あなたが入力する必要はありません。',
     intgCliPartTitle: 'CLI · コマンドライン + skill',
     intgCliPartDesc:
-      'ターミナルコマンドを実行できるアシスタント（Claude Code、Codex、Cursor など）向け。skill をインストールすると、アシスタントが自分で UniWork Office (genoffice) コマンドラインを呼び出してファイルを作成・変換・読み取り・編集します。コマンドを入力する必要はありません。',
+      'ターミナルコマンドを実行できるアシスタント（Claude Code、Codex、Cursor など）向け。skill をインストールすると、アシスタントが自分で UniWork Office (uniwork-office) コマンドラインを呼び出してファイルを作成・変換・読み取り・編集します。コマンドを入力する必要はありません。',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP は AI アシスタントが外部ツールを呼び出すための共通プロトコルです。アシスタントがコマンドを実行できない場合（Claude Desktop など）や、UniWork Office のウィンドウを直接操作させたい場合に使います。下の 2 つの方法からどちらか 1 つを選んでください。',
     intgMcpStdioTitle: 'アシスタントが起動する（推奨）',
     intgMcpStdioDesc:
-      'アシスタントが UniWork Office (genoffice mcp) を自分で起動します。ここで何かをオンにする必要はなく、UniWork Office を開いておく必要もありません。機能は CLI と同じです。',
+      'アシスタントが UniWork Office (uniwork-office mcp) を自分で起動します。ここで何かをオンにする必要はなく、UniWork Office を開いておく必要もありません。機能は CLI と同じです。',
     intgMcpHttpTitle: 'ローカル HTTP サーバー',
     intgMcpHttpDesc:
       'UniWork Office 内で動作し、アシスタントは URL で接続します。Word エディター上で文書が段階的に生成される様子を見られます。UniWork Office を開いたままにする必要があり、現時点では Word のみ対応です。',
@@ -1021,9 +1021,9 @@ export const strings = {
     intgMcpNote:
       'スキルと MCP は併用できます。アシスタントがどちらかを選びます。両者の機能はまったく同じです。',
     intgCliTitle: '上級：コマンドライン UniWork Office',
-    intgCliReady: 'UniWork Office (genoffice) {v} · ターミナルで使えます（{path}）',
+    intgCliReady: 'UniWork Office ({cmd}) {v} · ターミナルで使えます（{path}）',
     intgCliNotOnPath:
-      'UniWork Office (genoffice) {v} · ターミナルの PATH にありません。アシスタントは ~/.genoffice/launcher 経由で見つけられるため、スキルは動作します。自分で genoffice を入力したい場合は一度だけ次を実行：',
+      'UniWork Office ({cmd}) {v} · ターミナルの PATH にありません。アシスタントは ~/.genoffice/launcher 経由で見つけられるため、スキルは動作します。自分で {cmd} を入力したい場合は一度だけ次を実行：',
     intgCliLauncher: 'ランチャーフォルダー',
     intgStateOutdated: 'インストール済み {v}、{next} に更新できます',
     intgStateModified: 'インストール済み {v}（変更されています）',
@@ -1311,7 +1311,7 @@ export const strings = {
     setDefaultAppFailed: '변경할 수 없습니다. 시스템 설정에서 직접 설정해 주세요.',
     setCliLink: '명령줄 도구',
     setCliLinkDesc:
-      'genoffice 명령을 터미널에 추가하여 스크립트와 AI 에이전트가 UniWork Office를 사용할 수 있게 합니다.',
+      '{cmd} 명령을 터미널에 추가하여 스크립트와 AI 에이전트가 UniWork Office를 사용할 수 있게 합니다.',
     setCliLinkInstall: '터미널에 추가',
     setCliLinkBlocked: '자동으로 추가하지 못했습니다. 터미널에서 다음을 실행하세요: {cmd}',
     setAiSpellcheckDesc: 'AI 채팅 입력란에 입력할 때 잘못된 단어에 밑줄을 표시합니다.',
@@ -1388,16 +1388,16 @@ export const strings = {
     intgExample2: '3분기 실적을 소개하는 6장짜리 슬라이드를 만들어 줘',
     intgExample3: 'budget.xlsx를 PDF로 변환해서 UniWork Office에서 열어 줘',
     intgStep2Note:
-      'UniWork Office (genoffice) 명령줄은 어시스턴트가 직접 실행하므로 여러분이 입력할 필요가 없습니다.',
+      'UniWork Office (uniwork-office) 명령줄은 어시스턴트가 직접 실행하므로 여러분이 입력할 필요가 없습니다.',
     intgCliPartTitle: 'CLI · 명령줄 + skill',
     intgCliPartDesc:
-      '터미널 명령을 실행할 수 있는 어시스턴트(Claude Code, Codex, Cursor 등)용입니다. skill을 설치하면 어시스턴트가 스스로 UniWork Office (genoffice) 명령줄을 호출해 파일을 만들고 변환하고 읽고 편집합니다. 명령을 직접 입력할 필요가 없습니다.',
+      '터미널 명령을 실행할 수 있는 어시스턴트(Claude Code, Codex, Cursor 등)용입니다. skill을 설치하면 어시스턴트가 스스로 UniWork Office (uniwork-office) 명령줄을 호출해 파일을 만들고 변환하고 읽고 편집합니다. 명령을 직접 입력할 필요가 없습니다.',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP는 AI 어시스턴트가 외부 도구를 호출하는 공통 프로토콜입니다. 어시스턴트가 명령을 실행할 수 없거나(예: Claude Desktop) UniWork Office 창을 직접 조작하게 하려면 이 방식을 사용하세요. 아래 두 방법 중 하나를 선택하면 됩니다.',
     intgMcpStdioTitle: '어시스턴트가 실행(권장)',
     intgMcpStdioDesc:
-      '어시스턴트가 UniWork Office (genoffice mcp)를 직접 실행합니다. 여기서 켤 것이 없고 UniWork Office가 열려 있을 필요도 없습니다. 기능은 CLI와 같습니다.',
+      '어시스턴트가 UniWork Office (uniwork-office mcp)를 직접 실행합니다. 여기서 켤 것이 없고 UniWork Office가 열려 있을 필요도 없습니다. 기능은 CLI와 같습니다.',
     intgMcpHttpTitle: '로컬 HTTP 서버',
     intgMcpHttpDesc:
       'UniWork Office 안에서 실행되며 어시스턴트가 URL로 연결합니다. Word 편집기에서 문서가 단계별로 만들어지는 과정을 볼 수 있습니다. UniWork Office를 열어 두어야 하며 현재는 Word만 지원합니다.',
@@ -1412,9 +1412,9 @@ export const strings = {
     intgMcpNote:
       '스킬과 MCP는 함께 설정할 수 있으며 어시스턴트가 하나를 선택합니다. 두 방식이 하는 일은 완전히 같습니다.',
     intgCliTitle: '고급: 명령줄 UniWork Office',
-    intgCliReady: 'UniWork Office (genoffice) {v} · 터미널에서 바로 사용 가능({path})',
+    intgCliReady: 'UniWork Office ({cmd}) {v} · 터미널에서 바로 사용 가능({path})',
     intgCliNotOnPath:
-      'UniWork Office (genoffice) {v} · 터미널 PATH에 없습니다. 어시스턴트는 ~/.genoffice/launcher로 찾을 수 있어 스킬은 정상 작동합니다. 직접 genoffice를 입력하려면 한 번만 실행:',
+      'UniWork Office ({cmd}) {v} · 터미널 PATH에 없습니다. 어시스턴트는 ~/.genoffice/launcher로 찾을 수 있어 스킬은 정상 작동합니다. 직접 {cmd}를 입력하려면 한 번만 실행:',
     intgCliLauncher: '런처 폴더',
     intgStateOutdated: '설치됨 {v}, {next}(으)로 업데이트 가능',
     intgStateModified: '설치됨 {v} (수정됨)',
@@ -1704,7 +1704,7 @@ export const strings = {
     setDefaultAppFailed: 'Modification impossible. Définissez-la dans les réglages système.',
     setCliLink: 'Outil en ligne de commande',
     setCliLinkDesc:
-      'Ajoute la commande genoffice à votre terminal pour que des scripts et des agents IA puissent utiliser UniWork Office.',
+      'Ajoute la commande {cmd} à votre terminal pour que des scripts et des agents IA puissent utiliser UniWork Office.',
     setCliLinkInstall: 'Ajouter au terminal',
     setCliLinkBlocked: 'Ajout automatique impossible. Exécutez ceci dans un terminal : {cmd}',
     setAiSpellcheckDesc: 'Souligne les mots mal orthographiés pendant la saisie dans le chat IA.',
@@ -1785,16 +1785,16 @@ export const strings = {
     intgExample2: 'Prépare une présentation de 6 diapositives sur nos résultats du T3',
     intgExample3: 'Convertis budget.xlsx en PDF et ouvre-le dans UniWork Office',
     intgStep2Note:
-      "L'assistant lance lui-même la ligne de commande UniWork Office (genoffice) ; vous n'avez jamais à la saisir.",
+      "L'assistant lance lui-même la ligne de commande UniWork Office (uniwork-office) ; vous n'avez jamais à la saisir.",
     intgCliPartTitle: 'CLI · ligne de commande + skill',
     intgCliPartDesc:
-      'Pour les assistants capables de lancer des commandes dans le terminal (Claude Code, Codex, Cursor, etc.). Une fois le skill installé, l’assistant appelle lui-même la ligne de commande UniWork Office (genoffice) pour créer, convertir, lire et modifier les fichiers ; vous ne tapez jamais de commande.',
+      'Pour les assistants capables de lancer des commandes dans le terminal (Claude Code, Codex, Cursor, etc.). Une fois le skill installé, l’assistant appelle lui-même la ligne de commande UniWork Office (uniwork-office) pour créer, convertir, lire et modifier les fichiers ; vous ne tapez jamais de commande.',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP est le protocole commun que les assistants IA utilisent pour appeler des outils externes. Utilisez-le si votre assistant ne peut pas lancer de commandes (Claude Desktop, par exemple) ou si vous voulez qu’il pilote directement la fenêtre UniWork Office. Choisissez l’une des deux méthodes ci-dessous.',
     intgMcpStdioTitle: 'Lancé par l’assistant (recommandé)',
     intgMcpStdioDesc:
-      'L’assistant lance lui-même UniWork Office (genoffice mcp) : rien à activer ici, et UniWork Office n’a pas besoin d’être ouvert. Mêmes fonctions que la CLI.',
+      'L’assistant lance lui-même UniWork Office (uniwork-office mcp) : rien à activer ici, et UniWork Office n’a pas besoin d’être ouvert. Mêmes fonctions que la CLI.',
     intgMcpHttpTitle: 'Serveur HTTP local',
     intgMcpHttpDesc:
       'Tourne dans UniWork Office ; l’assistant se connecte à une URL et vous voyez le document se construire pas à pas dans l’éditeur Word. UniWork Office doit rester ouvert ; documents Word uniquement pour l’instant.',
@@ -1809,9 +1809,9 @@ export const strings = {
     intgMcpNote:
       "Le skill et MCP peuvent coexister ; l'assistant choisit l'un des deux. Ils font exactement la même chose.",
     intgCliTitle: 'Avancé : ligne de commande UniWork Office',
-    intgCliReady: 'UniWork Office (genoffice) {v} · prêt dans votre terminal ({path})',
+    intgCliReady: 'UniWork Office ({cmd}) {v} · prêt dans votre terminal ({path})',
     intgCliNotOnPath:
-      'UniWork Office (genoffice) {v} · absent du PATH de votre terminal. Les assistants le trouvent quand même via ~/.genoffice/launcher, le skill fonctionne donc. Pour taper genoffice vous-même, exécutez ceci une fois :',
+      'UniWork Office ({cmd}) {v} · absent du PATH de votre terminal. Les assistants le trouvent quand même via ~/.genoffice/launcher, le skill fonctionne donc. Pour taper {cmd} vous-même, exécutez ceci une fois :',
     intgCliLauncher: 'Dossier du lanceur',
     intgStateOutdated: 'Installé {v}, mise à jour {next} disponible',
     intgStateModified: 'Installé {v} (modifié)',
@@ -2109,7 +2109,7 @@ export const strings = {
     setDefaultAppFailed: 'Änderung nicht möglich. Bitte in den Systemeinstellungen festlegen.',
     setCliLink: 'Kommandozeilen-Tool',
     setCliLinkDesc:
-      'Fügt den Befehl genoffice zu Ihrem Terminal hinzu, damit Skripte und KI-Agenten UniWork Office nutzen können.',
+      'Fügt den Befehl {cmd} zu Ihrem Terminal hinzu, damit Skripte und KI-Agenten UniWork Office nutzen können.',
     setCliLinkInstall: 'Zum Terminal hinzufügen',
     setCliLinkBlocked: 'Automatisches Hinzufügen nicht möglich. Führen Sie im Terminal aus: {cmd}',
     setAiSpellcheckDesc:
@@ -2200,7 +2200,7 @@ export const strings = {
       'MCP ist das gemeinsame Protokoll, über das KI-Assistenten externe Werkzeuge aufrufen. Nutzen Sie es, wenn der Assistent keine Befehle ausführen kann (z. B. Claude Desktop) oder wenn er das UniWork Office-Fenster direkt steuern soll. Wählen Sie einen der beiden Wege unten.',
     intgMcpStdioTitle: 'Vom Assistenten gestartet (empfohlen)',
     intgMcpStdioDesc:
-      'Der Assistent startet UniWork Office (genoffice mcp) selbst: hier ist nichts einzuschalten, und UniWork Office muss nicht geöffnet sein. Gleicher Funktionsumfang wie die CLI.',
+      'Der Assistent startet UniWork Office (uniwork-office mcp) selbst: hier ist nichts einzuschalten, und UniWork Office muss nicht geöffnet sein. Gleicher Funktionsumfang wie die CLI.',
     intgMcpHttpTitle: 'Lokaler HTTP-Server',
     intgMcpHttpDesc:
       'Läuft in UniWork Office; der Assistent verbindet sich über eine URL, und Sie sehen im Word-Editor zu, wie das Dokument Schritt für Schritt entsteht. UniWork Office muss geöffnet bleiben; derzeit nur Word-Dokumente.',
@@ -2214,9 +2214,9 @@ export const strings = {
     intgMcpNote:
       'Skill und MCP können nebeneinander eingerichtet sein; der Assistent wählt eines. Beide tun genau dasselbe.',
     intgCliTitle: 'Erweitert: Befehlszeile UniWork Office',
-    intgCliReady: 'UniWork Office (genoffice) {v} · im Terminal verfügbar ({path})',
+    intgCliReady: 'UniWork Office ({cmd}) {v} · im Terminal verfügbar ({path})',
     intgCliNotOnPath:
-      'UniWork Office (genoffice) {v} · nicht im PATH Ihres Terminals. Assistenten finden es trotzdem über ~/.genoffice/launcher, der Skill funktioniert also. Um genoffice selbst einzugeben, führen Sie dies einmal aus:',
+      'UniWork Office ({cmd}) {v} · nicht im PATH Ihres Terminals. Assistenten finden es trotzdem über ~/.genoffice/launcher, der Skill funktioniert also. Um {cmd} selbst einzugeben, führen Sie dies einmal aus:',
     intgCliLauncher: 'Launcher-Ordner',
     intgStateOutdated: 'Installiert {v}, Update auf {next} verfügbar',
     intgStateModified: 'Installiert {v} (geändert)',
@@ -2510,7 +2510,7 @@ export const strings = {
     setDefaultAppFailed: 'No se pudo cambiar. Configúralo en los ajustes del sistema.',
     setCliLink: 'Herramienta de línea de comandos',
     setCliLinkDesc:
-      'Añade el comando genoffice a tu terminal para que scripts y agentes de IA puedan usar UniWork Office.',
+      'Añade el comando {cmd} a tu terminal para que scripts y agentes de IA puedan usar UniWork Office.',
     setCliLinkInstall: 'Añadir al terminal',
     setCliLinkBlocked: 'No se pudo añadir automáticamente. Ejecuta esto en un terminal: {cmd}',
     setAiSpellcheckDesc:
@@ -2591,16 +2591,16 @@ export const strings = {
     intgExample2: 'Haz una presentación de 6 diapositivas sobre nuestros resultados del T3',
     intgExample3: 'Convierte budget.xlsx a PDF y ábrelo en UniWork Office',
     intgStep2Note:
-      'El asistente ejecuta la línea de comandos UniWork Office (genoffice) por sí mismo; nunca tienes que escribirla.',
+      'El asistente ejecuta la línea de comandos UniWork Office (uniwork-office) por sí mismo; nunca tienes que escribirla.',
     intgCliPartTitle: 'CLI · línea de comandos + skill',
     intgCliPartDesc:
-      'Para asistentes que pueden ejecutar comandos de terminal (Claude Code, Codex, Cursor y otros). Con el skill instalado, el asistente llama por sí mismo a la línea de comandos UniWork Office (genoffice) para crear, convertir, leer y editar archivos; nunca escribes un comando.',
+      'Para asistentes que pueden ejecutar comandos de terminal (Claude Code, Codex, Cursor y otros). Con el skill instalado, el asistente llama por sí mismo a la línea de comandos UniWork Office (uniwork-office) para crear, convertir, leer y editar archivos; nunca escribes un comando.',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP es el protocolo común con el que los asistentes de IA llaman a herramientas externas. Úsalo cuando tu asistente no pueda ejecutar comandos (Claude Desktop, por ejemplo) o cuando quieras que controle directamente la ventana de UniWork Office. Elige una de las dos formas de abajo.',
     intgMcpStdioTitle: 'Iniciado por el asistente (recomendado)',
     intgMcpStdioDesc:
-      'El asistente lanza UniWork Office (genoffice mcp) por sí mismo: nada que activar aquí, y UniWork Office no necesita estar abierto. Mismas funciones que la CLI.',
+      'El asistente lanza UniWork Office (uniwork-office mcp) por sí mismo: nada que activar aquí, y UniWork Office no necesita estar abierto. Mismas funciones que la CLI.',
     intgMcpHttpTitle: 'Servidor HTTP local',
     intgMcpHttpDesc:
       'Se ejecuta dentro de UniWork Office; el asistente se conecta a una URL y puedes ver cómo construye el documento paso a paso en el editor de Word. UniWork Office debe permanecer abierto; por ahora solo documentos Word.',
@@ -2615,9 +2615,9 @@ export const strings = {
     intgMcpNote:
       'El skill y MCP pueden convivir; el asistente elige uno. Ambos hacen exactamente lo mismo.',
     intgCliTitle: 'Avanzado: línea de comandos UniWork Office',
-    intgCliReady: 'UniWork Office (genoffice) {v} · listo en tu terminal ({path})',
+    intgCliReady: 'UniWork Office ({cmd}) {v} · listo en tu terminal ({path})',
     intgCliNotOnPath:
-      'UniWork Office (genoffice) {v} · no está en el PATH de tu terminal. Los asistentes lo encuentran igualmente mediante ~/.genoffice/launcher, así que el skill funciona. Para escribir genoffice tú mismo, ejecuta esto una vez:',
+      'UniWork Office ({cmd}) {v} · no está en el PATH de tu terminal. Los asistentes lo encuentran igualmente mediante ~/.genoffice/launcher, así que el skill funciona. Para escribir {cmd} tú mismo, ejecuta esto una vez:',
     intgCliLauncher: 'Carpeta del lanzador',
     intgStateOutdated: 'Instalado {v}, actualización a {next} disponible',
     intgStateModified: 'Instalado {v} (modificado)',
@@ -2906,7 +2906,7 @@ export const strings = {
     setDefaultAppFailed: 'เปลี่ยนไม่สำเร็จ โปรดตั้งค่าในการตั้งค่าระบบ',
     setCliLink: 'เครื่องมือบรรทัดคำสั่ง',
     setCliLinkDesc:
-      'เพิ่มคำสั่ง genoffice ลงในเทอร์มินัล เพื่อให้สคริปต์และเอเจนต์ AI ใช้ UniWork Office ได้',
+      'เพิ่มคำสั่ง {cmd} ลงในเทอร์มินัล เพื่อให้สคริปต์และเอเจนต์ AI ใช้ UniWork Office ได้',
     setCliLinkInstall: 'เพิ่มลงในเทอร์มินัล',
     setCliLinkBlocked: 'เพิ่มโดยอัตโนมัติไม่สำเร็จ โปรดรันคำสั่งนี้ในเทอร์มินัล: {cmd}',
     setAiSpellcheckDesc: 'ขีดเส้นใต้คำที่สะกดผิดขณะพิมพ์ในช่องแชท AI',
@@ -2982,16 +2982,16 @@ export const strings = {
     intgExample2: 'ทำสไลด์ 6 หน้าเกี่ยวกับผลประกอบการไตรมาส 3 ของเรา',
     intgExample3: 'แปลง budget.xlsx เป็น PDF แล้วเปิดใน UniWork Office',
     intgStep2Note:
-      'ผู้ช่วยจะเรียกใช้บรรทัดคำสั่ง UniWork Office (genoffice) เอง คุณไม่ต้องพิมพ์คำสั่งใด ๆ',
+      'ผู้ช่วยจะเรียกใช้บรรทัดคำสั่ง UniWork Office (uniwork-office) เอง คุณไม่ต้องพิมพ์คำสั่งใด ๆ',
     intgCliPartTitle: 'CLI · บรรทัดคำสั่ง + skill',
     intgCliPartDesc:
-      'สำหรับผู้ช่วยที่รันคำสั่งเทอร์มินัลได้ (Claude Code, Codex, Cursor และอื่น ๆ) เมื่อติดตั้ง skill แล้ว ผู้ช่วยจะเรียกบรรทัดคำสั่ง UniWork Office (genoffice) เองเพื่อสร้าง แปลง อ่าน และแก้ไขไฟล์ คุณไม่ต้องพิมพ์คำสั่งใด ๆ',
+      'สำหรับผู้ช่วยที่รันคำสั่งเทอร์มินัลได้ (Claude Code, Codex, Cursor และอื่น ๆ) เมื่อติดตั้ง skill แล้ว ผู้ช่วยจะเรียกบรรทัดคำสั่ง UniWork Office (uniwork-office) เองเพื่อสร้าง แปลง อ่าน และแก้ไขไฟล์ คุณไม่ต้องพิมพ์คำสั่งใด ๆ',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP คือโปรโตคอลกลางที่ผู้ช่วย AI ใช้เรียกเครื่องมือภายนอก ใช้เมื่อผู้ช่วยรันคำสั่งไม่ได้ (เช่น Claude Desktop) หรือเมื่อต้องการให้มันควบคุมหน้าต่าง UniWork Office โดยตรง เลือกวิธีใดวิธีหนึ่งจากสองวิธีด้านล่าง',
     intgMcpStdioTitle: 'ให้ผู้ช่วยเป็นผู้เริ่ม (แนะนำ)',
     intgMcpStdioDesc:
-      'ผู้ช่วยจะเรียก UniWork Office (genoffice mcp) ขึ้นมาเอง ไม่ต้องเปิดสวิตช์ใดที่นี่ และไม่ต้องเปิด UniWork Office ไว้ ความสามารถเหมือน CLI ทุกประการ',
+      'ผู้ช่วยจะเรียก UniWork Office (uniwork-office mcp) ขึ้นมาเอง ไม่ต้องเปิดสวิตช์ใดที่นี่ และไม่ต้องเปิด UniWork Office ไว้ ความสามารถเหมือน CLI ทุกประการ',
     intgMcpHttpTitle: 'เซิร์ฟเวอร์ HTTP ในเครื่อง',
     intgMcpHttpDesc:
       'ทำงานอยู่ใน UniWork Office ผู้ช่วยเชื่อมต่อผ่าน URL และคุณจะเห็นเอกสารค่อย ๆ ถูกสร้างขึ้นในตัวแก้ไข Word ต้องเปิด UniWork Office ไว้ตลอด ปัจจุบันรองรับเฉพาะ Word',
@@ -3005,9 +3005,9 @@ export const strings = {
     intgMcpNote:
       'สกิลและ MCP ตั้งค่าไว้พร้อมกันได้ ผู้ช่วยจะเลือกใช้เอง ทั้งสองทำงานเหมือนกันทุกอย่าง',
     intgCliTitle: 'ขั้นสูง: บรรทัดคำสั่ง UniWork Office',
-    intgCliReady: 'UniWork Office (genoffice) {v} · พร้อมใช้ในเทอร์มินัล ({path})',
+    intgCliReady: 'UniWork Office ({cmd}) {v} · พร้อมใช้ในเทอร์มินัล ({path})',
     intgCliNotOnPath:
-      'UniWork Office (genoffice) {v} · ยังไม่อยู่ใน PATH ของเทอร์มินัล ผู้ช่วยยังหาเจอผ่าน ~/.genoffice/launcher สกิลจึงใช้งานได้ตามปกติ หากต้องการพิมพ์ genoffice เอง ให้รันคำสั่งนี้ครั้งเดียว:',
+      'UniWork Office ({cmd}) {v} · ยังไม่อยู่ใน PATH ของเทอร์มินัล ผู้ช่วยยังหาเจอผ่าน ~/.genoffice/launcher สกิลจึงใช้งานได้ตามปกติ หากต้องการพิมพ์ {cmd} เอง ให้รันคำสั่งนี้ครั้งเดียว:',
     intgCliLauncher: 'โฟลเดอร์ตัวเรียกใช้',
     intgStateOutdated: 'ติดตั้งแล้ว {v} อัปเดตเป็น {next} ได้',
     intgStateModified: 'ติดตั้งแล้ว {v} (ถูกแก้ไข)',
@@ -3295,7 +3295,7 @@ export const strings = {
     setDefaultAppFailed: 'Tidak dapat mengubahnya. Atur di pengaturan sistem.',
     setCliLink: 'Alat baris perintah',
     setCliLinkDesc:
-      'Menambahkan perintah genoffice ke terminal agar skrip dan agen AI dapat memakai UniWork Office.',
+      'Menambahkan perintah {cmd} ke terminal agar skrip dan agen AI dapat memakai UniWork Office.',
     setCliLinkInstall: 'Tambahkan ke terminal',
     setCliLinkBlocked:
       'Tidak dapat menambahkannya secara otomatis. Jalankan ini di terminal: {cmd}',
@@ -3375,16 +3375,16 @@ export const strings = {
     intgExample2: 'Buat presentasi 6 slide tentang hasil Q3 kami',
     intgExample3: 'Konversi budget.xlsx ke PDF dan buka di UniWork Office',
     intgStep2Note:
-      'Asisten menjalankan baris perintah UniWork Office (genoffice) sendiri; Anda tidak perlu mengetiknya.',
+      'Asisten menjalankan baris perintah UniWork Office (uniwork-office) sendiri; Anda tidak perlu mengetiknya.',
     intgCliPartTitle: 'CLI · baris perintah + skill',
     intgCliPartDesc:
-      'Untuk asisten yang bisa menjalankan perintah terminal (Claude Code, Codex, Cursor, dan lainnya). Setelah skill terpasang, asisten memanggil baris perintah UniWork Office (genoffice) sendiri untuk membuat, mengonversi, membaca, dan mengedit file; Anda tidak pernah mengetik perintah.',
+      'Untuk asisten yang bisa menjalankan perintah terminal (Claude Code, Codex, Cursor, dan lainnya). Setelah skill terpasang, asisten memanggil baris perintah UniWork Office (uniwork-office) sendiri untuk membuat, mengonversi, membaca, dan mengedit file; Anda tidak pernah mengetik perintah.',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP adalah protokol umum yang dipakai asisten AI untuk memanggil alat eksternal. Gunakan saat asisten Anda tidak bisa menjalankan perintah (misalnya Claude Desktop) atau saat Anda ingin ia mengendalikan jendela UniWork Office secara langsung. Pilih salah satu dari dua cara di bawah.',
     intgMcpStdioTitle: 'Dijalankan oleh asisten (disarankan)',
     intgMcpStdioDesc:
-      'Asisten menjalankan UniWork Office (genoffice mcp) sendiri: tidak ada yang perlu dinyalakan di sini, dan UniWork Office tidak perlu terbuka. Fitur sama dengan CLI.',
+      'Asisten menjalankan UniWork Office (uniwork-office mcp) sendiri: tidak ada yang perlu dinyalakan di sini, dan UniWork Office tidak perlu terbuka. Fitur sama dengan CLI.',
     intgMcpHttpTitle: 'Server HTTP lokal',
     intgMcpHttpDesc:
       'Berjalan di dalam UniWork Office; asisten terhubung lewat URL dan Anda bisa melihat dokumen dibangun langkah demi langkah di editor Word. UniWork Office harus tetap terbuka; untuk saat ini hanya dokumen Word.',
@@ -3399,9 +3399,9 @@ export const strings = {
     intgMcpNote:
       'Skill dan MCP bisa dipasang bersamaan; asisten akan memilih salah satu. Keduanya melakukan hal yang sama persis.',
     intgCliTitle: 'Lanjutan: baris perintah UniWork Office',
-    intgCliReady: 'UniWork Office (genoffice) {v} · siap di terminal Anda ({path})',
+    intgCliReady: 'UniWork Office ({cmd}) {v} · siap di terminal Anda ({path})',
     intgCliNotOnPath:
-      'UniWork Office (genoffice) {v} · belum ada di PATH terminal Anda. Asisten tetap menemukannya lewat ~/.genoffice/launcher, jadi skill tetap berfungsi. Untuk mengetik genoffice sendiri, jalankan ini sekali:',
+      'UniWork Office ({cmd}) {v} · belum ada di PATH terminal Anda. Asisten tetap menemukannya lewat ~/.genoffice/launcher, jadi skill tetap berfungsi. Untuk mengetik {cmd} sendiri, jalankan ini sekali:',
     intgCliLauncher: 'Folder peluncur',
     intgStateOutdated: 'Terpasang {v}, pembaruan ke {next} tersedia',
     intgStateModified: 'Terpasang {v} (dimodifikasi)',
@@ -3689,7 +3689,7 @@ export const strings = {
     setDefaultAppFailed: 'Не удалось изменить. Задайте в системных настройках.',
     setCliLink: 'Инструмент командной строки',
     setCliLinkDesc:
-      'Добавляет команду genoffice в терминал, чтобы скрипты и ИИ-агенты могли работать с UniWork Office.',
+      'Добавляет команду {cmd} в терминал, чтобы скрипты и ИИ-агенты могли работать с UniWork Office.',
     setCliLinkInstall: 'Добавить в терминал',
     setCliLinkBlocked: 'Не удалось добавить автоматически. Выполните в терминале: {cmd}',
     setAiSpellcheckDesc: 'Подчёркивать слова с ошибками при вводе в поле чата ИИ.',
@@ -3768,16 +3768,16 @@ export const strings = {
     intgExample2: 'Сделай презентацию из 6 слайдов о наших результатах за 3-й квартал',
     intgExample3: 'Конвертируй budget.xlsx в PDF и открой в UniWork Office',
     intgStep2Note:
-      'Ассистент сам запускает командную строку UniWork Office (genoffice); вводить её вам не придётся.',
+      'Ассистент сам запускает командную строку UniWork Office (uniwork-office); вводить её вам не придётся.',
     intgCliPartTitle: 'CLI · командная строка + skill',
     intgCliPartDesc:
-      'Для ассистентов, умеющих выполнять команды терминала (Claude Code, Codex, Cursor и другие). После установки skill ассистент сам вызывает командную строку UniWork Office (genoffice), чтобы создавать, конвертировать, читать и редактировать файлы; вам не нужно вводить команды.',
+      'Для ассистентов, умеющих выполнять команды терминала (Claude Code, Codex, Cursor и другие). После установки skill ассистент сам вызывает командную строку UniWork Office (uniwork-office), чтобы создавать, конвертировать, читать и редактировать файлы; вам не нужно вводить команды.',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP — общий протокол, через который ИИ-ассистенты вызывают внешние инструменты. Используйте его, если ассистент не умеет выполнять команды (например, Claude Desktop) или если хотите, чтобы он напрямую управлял окном UniWork Office. Выберите один из двух способов ниже.',
     intgMcpStdioTitle: 'Запускает ассистент (рекомендуется)',
     intgMcpStdioDesc:
-      'Ассистент сам запускает UniWork Office (genoffice mcp): здесь ничего включать не нужно, и UniWork Office не обязан быть открыт. Те же возможности, что у CLI.',
+      'Ассистент сам запускает UniWork Office (uniwork-office mcp): здесь ничего включать не нужно, и UniWork Office не обязан быть открыт. Те же возможности, что у CLI.',
     intgMcpHttpTitle: 'Локальный HTTP-сервер',
     intgMcpHttpDesc:
       'Работает внутри UniWork Office; ассистент подключается по URL, и вы видите, как документ шаг за шагом собирается в редакторе Word. UniWork Office должен оставаться открытым; пока только документы Word.',
@@ -3792,9 +3792,9 @@ export const strings = {
     intgMcpNote:
       'Скилл и MCP могут быть настроены одновременно; ассистент выберет один из них. Они делают одно и то же.',
     intgCliTitle: 'Дополнительно: командная строка UniWork Office',
-    intgCliReady: 'UniWork Office (genoffice) {v} · доступен в терминале ({path})',
+    intgCliReady: 'UniWork Office ({cmd}) {v} · доступен в терминале ({path})',
     intgCliNotOnPath:
-      'UniWork Office (genoffice) {v} · отсутствует в PATH терминала. Ассистенты всё равно находят его через ~/.genoffice/launcher, так что скилл работает. Чтобы вводить genoffice самостоятельно, выполните один раз:',
+      'UniWork Office ({cmd}) {v} · отсутствует в PATH терминала. Ассистенты всё равно находят его через ~/.genoffice/launcher, так что скилл работает. Чтобы вводить {cmd} самостоятельно, выполните один раз:',
     intgCliLauncher: 'Папка лаунчера',
     intgStateOutdated: 'Установлен {v}, доступно обновление до {next}',
     intgStateModified: 'Установлен {v} (изменён)',
@@ -4084,7 +4084,7 @@ export const strings = {
     setDefaultAppFailed: 'تعذّر التغيير. يرجى تعيينه من إعدادات النظام.',
     setCliLink: 'أداة سطر الأوامر',
     setCliLinkDesc:
-      'تضيف الأمر genoffice إلى الطرفية ليتمكن النصوص البرمجية ووكلاء الذكاء الاصطناعي من استخدام UniWork Office.',
+      'تضيف الأمر {cmd} إلى الطرفية ليتمكن النصوص البرمجية ووكلاء الذكاء الاصطناعي من استخدام UniWork Office.',
     setCliLinkInstall: 'إضافة إلى الطرفية',
     setCliLinkBlocked: 'تعذّرت الإضافة تلقائيًا. شغّل هذا في الطرفية: {cmd}',
     setAiSpellcheckDesc:
@@ -4162,16 +4162,16 @@ export const strings = {
     intgExample2: 'أنشئ عرضاً من 6 شرائح عن نتائج الربع الثالث',
     intgExample3: 'حوّل budget.xlsx إلى PDF وافتحه في UniWork Office',
     intgStep2Note:
-      'المساعد يشغّل سطر أوامر UniWork Office (genoffice) بنفسه؛ لن تحتاج إلى كتابته أبداً.',
+      'المساعد يشغّل سطر أوامر UniWork Office (uniwork-office) بنفسه؛ لن تحتاج إلى كتابته أبداً.',
     intgCliPartTitle: 'CLI · سطر الأوامر + skill',
     intgCliPartDesc:
-      'للمساعدين الذين يستطيعون تنفيذ أوامر الطرفية (Claude Code وCodex وCursor وغيرها). بعد تثبيت skill، يستدعي المساعد سطر أوامر UniWork Office (genoffice) بنفسه لإنشاء الملفات وتحويلها وقراءتها وتحريرها؛ لن تكتب أي أمر.',
+      'للمساعدين الذين يستطيعون تنفيذ أوامر الطرفية (Claude Code وCodex وCursor وغيرها). بعد تثبيت skill، يستدعي المساعد سطر أوامر UniWork Office (uniwork-office) بنفسه لإنشاء الملفات وتحويلها وقراءتها وتحريرها؛ لن تكتب أي أمر.',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP هو البروتوكول المشترك الذي يستخدمه مساعدو الذكاء الاصطناعي لاستدعاء أدوات خارجية. استخدمه إذا كان مساعدك لا يستطيع تنفيذ الأوامر (مثل Claude Desktop) أو إذا أردت أن يتحكم في نافذة UniWork Office مباشرة. اختر إحدى الطريقتين أدناه.',
     intgMcpStdioTitle: 'يشغّله المساعد (موصى به)',
     intgMcpStdioDesc:
-      'يشغّل المساعد UniWork Office (genoffice mcp) بنفسه: لا شيء لتفعيله هنا، ولا يلزم أن يكون UniWork Office مفتوحًا. نفس إمكانات CLI.',
+      'يشغّل المساعد UniWork Office (uniwork-office mcp) بنفسه: لا شيء لتفعيله هنا، ولا يلزم أن يكون UniWork Office مفتوحًا. نفس إمكانات CLI.',
     intgMcpHttpTitle: 'خادم HTTP محلي',
     intgMcpHttpDesc:
       'يعمل داخل UniWork Office؛ يتصل المساعد عبر عنوان URL ويمكنك مشاهدة المستند يُبنى خطوة بخطوة في محرر Word. يجب أن يبقى UniWork Office مفتوحًا؛ مستندات Word فقط حاليًا.',
@@ -4185,9 +4185,9 @@ export const strings = {
     intgMcpNote:
       'يمكن إعداد المهارة و MCP معاً؛ يختار المساعد أحدهما. كلاهما يقوم بالأشياء نفسها تماماً.',
     intgCliTitle: 'متقدم: سطر أوامر UniWork Office',
-    intgCliReady: 'UniWork Office (genoffice) {v} · جاهز في الطرفية ({path})',
+    intgCliReady: 'UniWork Office ({cmd}) {v} · جاهز في الطرفية ({path})',
     intgCliNotOnPath:
-      'UniWork Office (genoffice) {v} · غير موجود في PATH الطرفية. ما زال المساعدون يجدونه عبر ~/.genoffice/launcher، فالمهارة تعمل. لكتابة genoffice بنفسك، شغّل هذا مرة واحدة:',
+      'UniWork Office ({cmd}) {v} · غير موجود في PATH الطرفية. ما زال المساعدون يجدونه عبر ~/.genoffice/launcher، فالمهارة تعمل. لكتابة {cmd} بنفسك، شغّل هذا مرة واحدة:',
     intgCliLauncher: 'مجلد المشغّل',
     intgStateOutdated: 'مثبّت {v}، يتوفر تحديث إلى {next}',
     intgStateModified: 'مثبّت {v} (تم تعديله)',
@@ -4470,7 +4470,7 @@ export const strings = {
     setDefaultAppFailed: 'Não foi possível alterar. Defina nas configurações do sistema.',
     setCliLink: 'Ferramenta de linha de comando',
     setCliLinkDesc:
-      'Adiciona o comando genoffice ao terminal para que scripts e agentes de IA possam usar o UniWork Office.',
+      'Adiciona o comando {cmd} ao terminal para que scripts e agentes de IA possam usar o UniWork Office.',
     setCliLinkInstall: 'Adicionar ao terminal',
     setCliLinkBlocked: 'Não foi possível adicionar automaticamente. Execute no terminal: {cmd}',
     setAiSpellcheckDesc:
@@ -4551,16 +4551,16 @@ export const strings = {
     intgExample2: 'Monte uma apresentação de 6 slides sobre nossos resultados do 3º trimestre',
     intgExample3: 'Converta budget.xlsx para PDF e abra no UniWork Office',
     intgStep2Note:
-      'O assistente executa a linha de comando UniWork Office (genoffice) sozinho; você nunca precisa digitá-la.',
+      'O assistente executa a linha de comando UniWork Office (uniwork-office) sozinho; você nunca precisa digitá-la.',
     intgCliPartTitle: 'CLI · linha de comando + skill',
     intgCliPartDesc:
-      'Para assistentes que executam comandos de terminal (Claude Code, Codex, Cursor e outros). Com o skill instalado, o assistente chama a linha de comando UniWork Office (genoffice) sozinho para criar, converter, ler e editar arquivos; você nunca digita um comando.',
+      'Para assistentes que executam comandos de terminal (Claude Code, Codex, Cursor e outros). Com o skill instalado, o assistente chama a linha de comando UniWork Office (uniwork-office) sozinho para criar, converter, ler e editar arquivos; você nunca digita um comando.',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP é o protocolo comum que assistentes de IA usam para chamar ferramentas externas. Use-o quando o assistente não puder executar comandos (Claude Desktop, por exemplo) ou quando quiser que ele controle a janela do UniWork Office diretamente. Escolha uma das duas formas abaixo.',
     intgMcpStdioTitle: 'Iniciado pelo assistente (recomendado)',
     intgMcpStdioDesc:
-      'O assistente inicia o UniWork Office (genoffice mcp) sozinho: nada para ligar aqui, e o UniWork Office não precisa estar aberto. Mesmos recursos da CLI.',
+      'O assistente inicia o UniWork Office (uniwork-office mcp) sozinho: nada para ligar aqui, e o UniWork Office não precisa estar aberto. Mesmos recursos da CLI.',
     intgMcpHttpTitle: 'Servidor HTTP local',
     intgMcpHttpDesc:
       'Roda dentro do UniWork Office; o assistente conecta por URL e você acompanha o documento sendo montado passo a passo no editor Word. O UniWork Office precisa ficar aberto; por enquanto só documentos Word.',
@@ -4574,9 +4574,9 @@ export const strings = {
     intgMcpNote:
       'O skill e o MCP podem coexistir; o assistente escolhe um deles. Ambos fazem exatamente as mesmas coisas.',
     intgCliTitle: 'Avançado: linha de comando UniWork Office',
-    intgCliReady: 'UniWork Office (genoffice) {v} · pronto no seu terminal ({path})',
+    intgCliReady: 'UniWork Office ({cmd}) {v} · pronto no seu terminal ({path})',
     intgCliNotOnPath:
-      'UniWork Office (genoffice) {v} · não está no PATH do seu terminal. Os assistentes ainda o encontram por ~/.genoffice/launcher, então o skill funciona. Para digitar genoffice você mesmo, execute isto uma vez:',
+      'UniWork Office ({cmd}) {v} · não está no PATH do seu terminal. Os assistentes ainda o encontram por ~/.genoffice/launcher, então o skill funciona. Para digitar {cmd} você mesmo, execute isto uma vez:',
     intgCliLauncher: 'Pasta do inicializador',
     intgStateOutdated: 'Instalado {v}, atualização para {next} disponível',
     intgStateModified: 'Instalado {v} (modificado)',
@@ -4860,7 +4860,7 @@ export const strings = {
     setDefaultAppFailed: 'Impossibile modificare. Impostala nelle impostazioni di sistema.',
     setCliLink: 'Strumento da riga di comando',
     setCliLinkDesc:
-      'Aggiunge il comando genoffice al terminale così script e agenti IA possono usare UniWork Office.',
+      'Aggiunge il comando {cmd} al terminale così script e agenti IA possono usare UniWork Office.',
     setCliLinkInstall: 'Aggiungi al terminale',
     setCliLinkBlocked: 'Impossibile aggiungerlo automaticamente. Esegui nel terminale: {cmd}',
     setAiSpellcheckDesc: 'Sottolinea le parole errate durante la digitazione nella chat IA.',
@@ -4941,16 +4941,16 @@ export const strings = {
     intgExample2: 'Prepara una presentazione di 6 slide sui nostri risultati del terzo trimestre',
     intgExample3: 'Converti budget.xlsx in PDF e aprilo in UniWork Office',
     intgStep2Note:
-      "L'assistente esegue da solo la riga di comando UniWork Office (genoffice); non dovrai mai digitarla.",
+      "L'assistente esegue da solo la riga di comando UniWork Office (uniwork-office); non dovrai mai digitarla.",
     intgCliPartTitle: 'CLI · riga di comando + skill',
     intgCliPartDesc:
-      'Per assistenti che possono eseguire comandi da terminale (Claude Code, Codex, Cursor e altri). Installato lo skill, l’assistente richiama da sé la riga di comando UniWork Office (genoffice) per creare, convertire, leggere e modificare file; non digiti mai un comando.',
+      'Per assistenti che possono eseguire comandi da terminale (Claude Code, Codex, Cursor e altri). Installato lo skill, l’assistente richiama da sé la riga di comando UniWork Office (uniwork-office) per creare, convertire, leggere e modificare file; non digiti mai un comando.',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP è il protocollo comune con cui gli assistenti IA richiamano strumenti esterni. Usalo quando l’assistente non può eseguire comandi (Claude Desktop, ad esempio) o quando vuoi che controlli direttamente la finestra di UniWork Office. Scegli uno dei due modi qui sotto.',
     intgMcpStdioTitle: 'Avviato dall’assistente (consigliato)',
     intgMcpStdioDesc:
-      'L’assistente avvia UniWork Office (genoffice mcp) da sé: niente da attivare qui, e UniWork Office non deve essere aperto. Stesse funzioni della CLI.',
+      'L’assistente avvia UniWork Office (uniwork-office mcp) da sé: niente da attivare qui, e UniWork Office non deve essere aperto. Stesse funzioni della CLI.',
     intgMcpHttpTitle: 'Server HTTP locale',
     intgMcpHttpDesc:
       'Gira dentro UniWork Office; l’assistente si collega a un URL e puoi vedere il documento prendere forma passo dopo passo nell’editor Word. UniWork Office deve restare aperto; per ora solo documenti Word.',
@@ -4964,9 +4964,9 @@ export const strings = {
     intgMcpNote:
       "Skill e MCP possono convivere; l'assistente ne sceglie uno. Fanno esattamente le stesse cose.",
     intgCliTitle: 'Avanzato: riga di comando UniWork Office',
-    intgCliReady: 'UniWork Office (genoffice) {v} · pronto nel terminale ({path})',
+    intgCliReady: 'UniWork Office ({cmd}) {v} · pronto nel terminale ({path})',
     intgCliNotOnPath:
-      'UniWork Office (genoffice) {v} · non è nel PATH del terminale. Gli assistenti lo trovano comunque tramite ~/.genoffice/launcher, quindi lo skill funziona. Per digitare genoffice tu stesso, esegui questo una volta:',
+      'UniWork Office ({cmd}) {v} · non è nel PATH del terminale. Gli assistenti lo trovano comunque tramite ~/.genoffice/launcher, quindi lo skill funziona. Per digitare {cmd} tu stesso, esegui questo una volta:',
     intgCliLauncher: 'Cartella del launcher',
     intgStateOutdated: 'Installato {v}, aggiornamento a {next} disponibile',
     intgStateModified: 'Installato {v} (modificato)',
@@ -5249,7 +5249,7 @@ export const strings = {
     setDefaultAppFailed: 'Nie udało się zmienić. Ustaw w ustawieniach systemu.',
     setCliLink: 'Narzędzie wiersza poleceń',
     setCliLinkDesc:
-      'Dodaje polecenie genoffice do terminala, aby skrypty i agenci AI mogły korzystać z UniWork Office.',
+      'Dodaje polecenie {cmd} do terminala, aby skrypty i agenci AI mogły korzystać z UniWork Office.',
     setCliLinkInstall: 'Dodaj do terminala',
     setCliLinkBlocked: 'Nie udało się dodać automatycznie. Uruchom w terminalu: {cmd}',
     setAiSpellcheckDesc: 'Podkreśla błędnie napisane słowa podczas pisania w polu czatu AI.',
@@ -5328,16 +5328,16 @@ export const strings = {
     intgExample2: 'Zrób prezentację z 6 slajdów o naszych wynikach za III kwartał',
     intgExample3: 'Przekonwertuj budget.xlsx do PDF i otwórz w UniWork Office',
     intgStep2Note:
-      'Asystent sam uruchamia wiersz poleceń UniWork Office (genoffice); nigdy nie musisz go wpisywać.',
+      'Asystent sam uruchamia wiersz poleceń UniWork Office (uniwork-office); nigdy nie musisz go wpisywać.',
     intgCliPartTitle: 'CLI · wiersz poleceń + skill',
     intgCliPartDesc:
-      'Dla asystentów, które potrafią uruchamiać polecenia terminala (Claude Code, Codex, Cursor i inne). Po zainstalowaniu skilla asystent sam wywołuje wiersz poleceń UniWork Office (genoffice), aby tworzyć, konwertować, czytać i edytować pliki; nigdy nie wpisujesz polecenia.',
+      'Dla asystentów, które potrafią uruchamiać polecenia terminala (Claude Code, Codex, Cursor i inne). Po zainstalowaniu skilla asystent sam wywołuje wiersz poleceń UniWork Office (uniwork-office), aby tworzyć, konwertować, czytać i edytować pliki; nigdy nie wpisujesz polecenia.',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP to wspólny protokół, którym asystenci AI wywołują zewnętrzne narzędzia. Użyj go, gdy asystent nie potrafi uruchamiać poleceń (np. Claude Desktop) lub gdy chcesz, aby bezpośrednio sterował oknem UniWork Office. Wybierz jeden z dwóch sposobów poniżej.',
     intgMcpStdioTitle: 'Uruchamiany przez asystenta (zalecane)',
     intgMcpStdioDesc:
-      'Asystent sam uruchamia UniWork Office (genoffice mcp): nic tu nie trzeba włączać, a UniWork Office nie musi być otwarty. Te same funkcje co CLI.',
+      'Asystent sam uruchamia UniWork Office (uniwork-office mcp): nic tu nie trzeba włączać, a UniWork Office nie musi być otwarty. Te same funkcje co CLI.',
     intgMcpHttpTitle: 'Lokalny serwer HTTP',
     intgMcpHttpDesc:
       'Działa wewnątrz UniWork Office; asystent łączy się przez URL, a Ty widzisz, jak dokument powstaje krok po kroku w edytorze Word. UniWork Office musi pozostać otwarty; na razie tylko dokumenty Word.',
@@ -5351,9 +5351,9 @@ export const strings = {
     intgMcpNote:
       'Skill i MCP mogą działać obok siebie; asystent wybiera jedno z nich. Oba robią dokładnie to samo.',
     intgCliTitle: 'Zaawansowane: wiersz poleceń UniWork Office',
-    intgCliReady: 'UniWork Office (genoffice) {v} · gotowy w terminalu ({path})',
+    intgCliReady: 'UniWork Office ({cmd}) {v} · gotowy w terminalu ({path})',
     intgCliNotOnPath:
-      'UniWork Office (genoffice) {v} · nie ma go w PATH terminala. Asystenty i tak znajdą go przez ~/.genoffice/launcher, więc skill działa. Aby samodzielnie wpisywać genoffice, uruchom to raz:',
+      'UniWork Office ({cmd}) {v} · nie ma go w PATH terminala. Asystenty i tak znajdą go przez ~/.genoffice/launcher, więc skill działa. Aby samodzielnie wpisywać {cmd}, uruchom to raz:',
     intgCliLauncher: 'Folder programu uruchamiającego',
     intgStateOutdated: 'Zainstalowano {v}, dostępna aktualizacja do {next}',
     intgStateModified: 'Zainstalowano {v} (zmodyfikowano)',
@@ -5674,16 +5674,16 @@ export const strings = {
     intgExample2: 'Udělej prezentaci o 6 snímcích o našich výsledcích za 3. čtvrtletí',
     intgExample3: 'Převeď budget.xlsx do PDF a otevři ho v UniWork Office',
     intgStep2Note:
-      'Asistent spouští příkazový řádek UniWork Office (genoffice) sám; nikdy ho nemusíte psát.',
+      'Asistent spouští příkazový řádek UniWork Office (uniwork-office) sám; nikdy ho nemusíte psát.',
     intgCliPartTitle: 'CLI · příkazový řádek + skill',
     intgCliPartDesc:
-      'Pro asistenty, kteří umí spouštět příkazy terminálu (Claude Code, Codex, Cursor a další). Po instalaci skillu asistent sám volá příkazový řádek UniWork Office (genoffice) k vytváření, převodu, čtení a úpravám souborů; žádný příkaz nepíšete.',
+      'Pro asistenty, kteří umí spouštět příkazy terminálu (Claude Code, Codex, Cursor a další). Po instalaci skillu asistent sám volá příkazový řádek UniWork Office (uniwork-office) k vytváření, převodu, čtení a úpravám souborů; žádný příkaz nepíšete.',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP je společný protokol, kterým AI asistenti volají externí nástroje. Použijte ho, když asistent neumí spouštět příkazy (např. Claude Desktop) nebo když chcete, aby přímo ovládal okno UniWork Office. Vyberte jeden ze dvou způsobů níže.',
     intgMcpStdioTitle: 'Spouští asistent (doporučeno)',
     intgMcpStdioDesc:
-      'Asistent spustí UniWork Office (genoffice mcp) sám: tady není co zapínat a UniWork Office nemusí být otevřený. Stejné funkce jako CLI.',
+      'Asistent spustí UniWork Office (uniwork-office mcp) sám: tady není co zapínat a UniWork Office nemusí být otevřený. Stejné funkce jako CLI.',
     intgMcpHttpTitle: 'Místní HTTP server',
     intgMcpHttpDesc:
       'Běží uvnitř UniWork Office; asistent se připojí přes URL a v editoru Word sledujete, jak dokument krok za krokem vzniká. UniWork Office musí zůstat otevřený; zatím jen dokumenty Word.',
@@ -5697,9 +5697,9 @@ export const strings = {
     intgMcpNote:
       'Skill a MCP mohou být nastaveny současně; asistent si jeden vybere. Oba dělají přesně to samé.',
     intgCliTitle: 'Pokročilé: příkazový řádek UniWork Office',
-    intgCliReady: 'UniWork Office (genoffice) {v} · připraven v terminálu ({path})',
+    intgCliReady: 'UniWork Office ({cmd}) {v} · připraven v terminálu ({path})',
     intgCliNotOnPath:
-      'UniWork Office (genoffice) {v} · není v PATH terminálu. Asistenti ho i tak najdou přes ~/.genoffice/launcher, skill tedy funguje. Chcete-li genoffice psát sami, spusťte jednou:',
+      'UniWork Office ({cmd}) {v} · není v PATH terminálu. Asistenti ho i tak najdou přes ~/.genoffice/launcher, skill tedy funguje. Chcete-li {cmd} psát sami, spusťte jednou:',
     intgCliLauncher: 'Složka spouštěče',
     intgStateOutdated: 'Nainstalováno {v}, k dispozici aktualizace na {next}',
     intgStateModified: 'Nainstalováno {v} (upraveno)',
@@ -5837,7 +5837,7 @@ export const strings = {
     setDefaultAppFailed: 'Změna se nezdařila. Nastavte ji v nastavení systému.',
     setCliLink: 'Nástroj příkazové řádky',
     setCliLinkDesc:
-      'Přidá příkaz genoffice do terminálu, aby skripty a agenti AI mohli používat UniWork Office.',
+      'Přidá příkaz {cmd} do terminálu, aby skripty a agenti AI mohli používat UniWork Office.',
     setCliLinkInstall: 'Přidat do terminálu',
     setCliLinkBlocked: 'Automatické přidání se nezdařilo. Spusťte v terminálu: {cmd}',
     setAiSpellcheckDesc: 'Podtrhávat překlepy při psaní do vstupního pole chatu AI.',
@@ -6021,7 +6021,7 @@ export const strings = {
     setDefaultAppFailed: 'Wijzigen is niet gelukt. Stel dit in via de systeeminstellingen.',
     setCliLink: 'Opdrachtregelprogramma',
     setCliLinkDesc:
-      'Voegt het commando genoffice toe aan je terminal, zodat scripts en AI-agents UniWork Office kunnen gebruiken.',
+      'Voegt het commando {cmd} toe aan je terminal, zodat scripts en AI-agents UniWork Office kunnen gebruiken.',
     setCliLinkInstall: 'Toevoegen aan terminal',
     setCliLinkBlocked: 'Automatisch toevoegen is niet gelukt. Voer dit uit in een terminal: {cmd}',
     setAiSpellcheckDesc:
@@ -6111,7 +6111,7 @@ export const strings = {
       'MCP is het gemeenschappelijke protocol waarmee AI-assistenten externe tools aanroepen. Gebruik het als je assistent geen opdrachten kan uitvoeren (bijvoorbeeld Claude Desktop) of als je wilt dat hij het UniWork Office-venster rechtstreeks bestuurt. Kies een van de twee manieren hieronder.',
     intgMcpStdioTitle: 'Gestart door de assistent (aanbevolen)',
     intgMcpStdioDesc:
-      'De assistent start UniWork Office (genoffice mcp) zelf: hier hoeft niets aan, en UniWork Office hoeft niet open te staan. Dezelfde functies als de CLI.',
+      'De assistent start UniWork Office (uniwork-office mcp) zelf: hier hoeft niets aan, en UniWork Office hoeft niet open te staan. Dezelfde functies als de CLI.',
     intgMcpHttpTitle: 'Lokale HTTP-server',
     intgMcpHttpDesc:
       'Draait in UniWork Office; de assistent verbindt via een URL en je ziet het document stap voor stap ontstaan in de Word-editor. UniWork Office moet open blijven; voorlopig alleen Word-documenten.',
@@ -6125,9 +6125,9 @@ export const strings = {
     intgMcpNote:
       'De skill en MCP kunnen naast elkaar bestaan; de assistent kiest er een. Ze doen precies hetzelfde.',
     intgCliTitle: 'Geavanceerd: UniWork Office-opdrachtregel',
-    intgCliReady: 'UniWork Office (genoffice) {v} · klaar in uw terminal ({path})',
+    intgCliReady: 'UniWork Office ({cmd}) {v} · klaar in uw terminal ({path})',
     intgCliNotOnPath:
-      'UniWork Office (genoffice) {v} · staat niet in het PATH van uw terminal. Assistenten vinden het toch via ~/.genoffice/launcher, dus de skill werkt. Om zelf genoffice te typen, voert u dit één keer uit:',
+      'UniWork Office ({cmd}) {v} · staat niet in het PATH van uw terminal. Assistenten vinden het toch via ~/.genoffice/launcher, dus de skill werkt. Om zelf {cmd} te typen, voert u dit één keer uit:',
     intgCliLauncher: 'Launcher-map',
     intgStateOutdated: 'Geïnstalleerd {v}, update naar {next} beschikbaar',
     intgStateModified: 'Geïnstalleerd {v} (gewijzigd)',
@@ -6410,7 +6410,7 @@ export const strings = {
     setDefaultAppFailed: 'Tidak dapat mengubahnya. Tetapkan dalam tetapan sistem.',
     setCliLink: 'Alat baris perintah',
     setCliLinkDesc:
-      'Menambah perintah genoffice ke terminal supaya skrip dan ejen AI boleh menggunakan UniWork Office.',
+      'Menambah perintah {cmd} ke terminal supaya skrip dan ejen AI boleh menggunakan UniWork Office.',
     setCliLinkInstall: 'Tambah ke terminal',
     setCliLinkBlocked:
       'Tidak dapat menambahnya secara automatik. Jalankan ini dalam terminal: {cmd}',
@@ -6493,16 +6493,16 @@ export const strings = {
     intgExample2: 'Buat pembentangan 6 slaid tentang hasil S3 kami',
     intgExample3: 'Tukar budget.xlsx kepada PDF dan buka dalam UniWork Office',
     intgStep2Note:
-      'Pembantu menjalankan baris arahan UniWork Office (genoffice) sendiri; anda tidak perlu menaipnya.',
+      'Pembantu menjalankan baris arahan UniWork Office (uniwork-office) sendiri; anda tidak perlu menaipnya.',
     intgCliPartTitle: 'CLI · baris arahan + skill',
     intgCliPartDesc:
-      'Untuk pembantu yang boleh menjalankan arahan terminal (Claude Code, Codex, Cursor dan lain-lain). Setelah skill dipasang, pembantu memanggil baris arahan UniWork Office (genoffice) sendiri untuk mencipta, menukar, membaca dan mengedit fail; anda tidak perlu menaip sebarang arahan.',
+      'Untuk pembantu yang boleh menjalankan arahan terminal (Claude Code, Codex, Cursor dan lain-lain). Setelah skill dipasang, pembantu memanggil baris arahan UniWork Office (uniwork-office) sendiri untuk mencipta, menukar, membaca dan mengedit fail; anda tidak perlu menaip sebarang arahan.',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP ialah protokol umum yang digunakan pembantu AI untuk memanggil alat luaran. Gunakannya apabila pembantu anda tidak boleh menjalankan arahan (contohnya Claude Desktop) atau apabila anda mahu ia mengawal tetingkap UniWork Office secara langsung. Pilih salah satu daripada dua cara di bawah.',
     intgMcpStdioTitle: 'Dimulakan oleh pembantu (disyorkan)',
     intgMcpStdioDesc:
-      'Pembantu melancarkan UniWork Office (genoffice mcp) sendiri: tiada apa yang perlu dihidupkan di sini, dan UniWork Office tidak perlu dibuka. Ciri sama seperti CLI.',
+      'Pembantu melancarkan UniWork Office (uniwork-office mcp) sendiri: tiada apa yang perlu dihidupkan di sini, dan UniWork Office tidak perlu dibuka. Ciri sama seperti CLI.',
     intgMcpHttpTitle: 'Pelayan HTTP tempatan',
     intgMcpHttpDesc:
       'Berjalan di dalam UniWork Office; pembantu menyambung melalui URL dan anda boleh melihat dokumen dibina langkah demi langkah dalam editor Word. UniWork Office mesti kekal dibuka; buat masa ini dokumen Word sahaja.',
@@ -6517,9 +6517,9 @@ export const strings = {
     intgMcpNote:
       'Skill dan MCP boleh dipasang serentak; pembantu akan memilih satu. Kedua-duanya melakukan perkara yang sama.',
     intgCliTitle: 'Lanjutan: baris arahan UniWork Office',
-    intgCliReady: 'UniWork Office (genoffice) {v} · sedia dalam terminal anda ({path})',
+    intgCliReady: 'UniWork Office ({cmd}) {v} · sedia dalam terminal anda ({path})',
     intgCliNotOnPath:
-      'UniWork Office (genoffice) {v} · tiada dalam PATH terminal anda. Pembantu masih menemuinya melalui ~/.genoffice/launcher, jadi skill berfungsi. Untuk menaip genoffice sendiri, jalankan ini sekali:',
+      'UniWork Office ({cmd}) {v} · tiada dalam PATH terminal anda. Pembantu masih menemuinya melalui ~/.genoffice/launcher, jadi skill berfungsi. Untuk menaip {cmd} sendiri, jalankan ini sekali:',
     intgCliLauncher: 'Folder pelancar',
     intgStateOutdated: 'Dipasang {v}, kemas kini ke {next} tersedia',
     intgStateModified: 'Dipasang {v} (diubah suai)',
@@ -6798,7 +6798,7 @@ export const strings = {
     setDefaultAppFailed: 'לא ניתן לשנות. יש להגדיר בהגדרות המערכת.',
     setCliLink: 'כלי שורת פקודה',
     setCliLinkDesc:
-      'מוסיף את הפקודה genoffice לטרמינל כדי שסקריפטים וסוכני בינה מלאכותית יוכלו להשתמש ב-UniWork Office.',
+      'מוסיף את הפקודה {cmd} לטרמינל כדי שסקריפטים וסוכני בינה מלאכותית יוכלו להשתמש ב-UniWork Office.',
     setCliLinkInstall: 'הוספה לטרמינל',
     setCliLinkBlocked: 'לא ניתן להוסיף אוטומטית. הריצו בטרמינל: {cmd}',
     setAiSpellcheckDesc: 'סימון מילים עם שגיאות כתיב בעת הקלדה בתיבת הצ׳אט של ה-AI.',
@@ -6875,16 +6875,16 @@ export const strings = {
     intgExample2: 'הכן מצגת של 6 שקופיות על תוצאות הרבעון השלישי שלנו',
     intgExample3: 'המר את budget.xlsx ל-PDF ופתח אותו ב-UniWork Office',
     intgStep2Note:
-      'העוזר מריץ בעצמו את שורת הפקודה UniWork Office (genoffice); לעולם לא תצטרכו להקליד אותה.',
+      'העוזר מריץ בעצמו את שורת הפקודה UniWork Office (uniwork-office); לעולם לא תצטרכו להקליד אותה.',
     intgCliPartTitle: 'CLI · שורת פקודה + skill',
     intgCliPartDesc:
-      'לעוזרים שיכולים להריץ פקודות טרמינל (Claude Code‏, Codex‏, Cursor ואחרים). לאחר התקנת ה‑skill העוזר קורא בעצמו לשורת הפקודה UniWork Office (genoffice) כדי ליצור, להמיר, לקרוא ולערוך קבצים; אתם לא מקלידים שום פקודה.',
+      'לעוזרים שיכולים להריץ פקודות טרמינל (Claude Code‏, Codex‏, Cursor ואחרים). לאחר התקנת ה‑skill העוזר קורא בעצמו לשורת הפקודה UniWork Office (uniwork-office) כדי ליצור, להמיר, לקרוא ולערוך קבצים; אתם לא מקלידים שום פקודה.',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP הוא הפרוטוקול המשותף שבו עוזרי AI קוראים לכלים חיצוניים. השתמשו בו כשהעוזר אינו יכול להריץ פקודות (למשל Claude Desktop) או כשאתם רוצים שהוא ישלוט ישירות בחלון UniWork Office. בחרו אחת משתי הדרכים למטה.',
     intgMcpStdioTitle: 'מופעל על ידי העוזר (מומלץ)',
     intgMcpStdioDesc:
-      'העוזר מפעיל את UniWork Office (genoffice mcp) בעצמו: אין מה להפעיל כאן, ו‑UniWork Office לא חייב להיות פתוח. אותן יכולות כמו ב‑CLI.',
+      'העוזר מפעיל את UniWork Office (uniwork-office mcp) בעצמו: אין מה להפעיל כאן, ו‑UniWork Office לא חייב להיות פתוח. אותן יכולות כמו ב‑CLI.',
     intgMcpHttpTitle: 'שרת HTTP מקומי',
     intgMcpHttpDesc:
       'פועל בתוך UniWork Office; העוזר מתחבר דרך כתובת URL ואפשר לראות את המסמך נבנה צעד אחר צעד בעורך Word. UniWork Office חייב להישאר פתוח; בשלב זה מסמכי Word בלבד.',
@@ -6897,9 +6897,9 @@ export const strings = {
     intgMcpNote:
       'הסקיל ו-MCP יכולים להיות מוגדרים יחד; העוזר יבחר אחד מהם. שניהם עושים בדיוק את אותם הדברים.',
     intgCliTitle: 'מתקדם: שורת הפקודה UniWork Office',
-    intgCliReady: 'UniWork Office (genoffice) {v} · מוכן בטרמינל ({path})',
+    intgCliReady: 'UniWork Office ({cmd}) {v} · מוכן בטרמינל ({path})',
     intgCliNotOnPath:
-      'UniWork Office (genoffice) {v} · לא נמצא ב-PATH של הטרמינל. העוזרים עדיין מוצאים אותו דרך ~/.genoffice/launcher, ולכן ה-skill עובד. כדי להקליד genoffice בעצמכם, הריצו זאת פעם אחת:',
+      'UniWork Office ({cmd}) {v} · לא נמצא ב-PATH של הטרמינל. העוזרים עדיין מוצאים אותו דרך ~/.genoffice/launcher, ולכן ה-skill עובד. כדי להקליד {cmd} בעצמכם, הריצו זאת פעם אחת:',
     intgCliLauncher: 'תיקיית המשגר',
     intgStateOutdated: 'מותקן {v}, זמין עדכון ל-{next}',
     intgStateModified: 'מותקן {v} (שונה)',
@@ -7176,7 +7176,7 @@ export const strings = {
     setDefaultAppFailed: 'बदला नहीं जा सका। कृपया सिस्टम सेटिंग में सेट करें।',
     setCliLink: 'कमांड लाइन टूल',
     setCliLinkDesc:
-      'टर्मिनल में genoffice कमांड जोड़ता है, ताकि स्क्रिप्ट और AI एजेंट UniWork Office का उपयोग कर सकें।',
+      'टर्मिनल में {cmd} कमांड जोड़ता है, ताकि स्क्रिप्ट और AI एजेंट UniWork Office का उपयोग कर सकें।',
     setCliLinkInstall: 'टर्मिनल में जोड़ें',
     setCliLinkBlocked: 'अपने आप नहीं जोड़ा जा सका। टर्मिनल में यह चलाएँ: {cmd}',
     setAiSpellcheckDesc: 'AI चैट इनपुट में टाइप करते समय गलत वर्तनी वाले शब्दों को रेखांकित करें।',
@@ -7254,16 +7254,16 @@ export const strings = {
     intgExample2: 'हमारे Q3 नतीजों पर 6 स्लाइड का प्रेज़ेंटेशन बनाओ',
     intgExample3: 'budget.xlsx को PDF में बदलो और UniWork Office में खोलो',
     intgStep2Note:
-      'UniWork Office (genoffice) कमांड लाइन असिस्टेंट खुद चलाता है; आपको कभी टाइप नहीं करना पड़ता।',
+      'UniWork Office (uniwork-office) कमांड लाइन असिस्टेंट खुद चलाता है; आपको कभी टाइप नहीं करना पड़ता।',
     intgCliPartTitle: 'CLI · कमांड लाइन + skill',
     intgCliPartDesc:
-      'उन सहायकों के लिए जो टर्मिनल कमांड चला सकते हैं (Claude Code, Codex, Cursor आदि)। skill इंस्टॉल होने के बाद सहायक फ़ाइलें बनाने, बदलने, पढ़ने और संपादित करने के लिए खुद UniWork Office (genoffice) कमांड लाइन चलाता है; आपको कोई कमांड टाइप नहीं करना पड़ता।',
+      'उन सहायकों के लिए जो टर्मिनल कमांड चला सकते हैं (Claude Code, Codex, Cursor आदि)। skill इंस्टॉल होने के बाद सहायक फ़ाइलें बनाने, बदलने, पढ़ने और संपादित करने के लिए खुद UniWork Office (uniwork-office) कमांड लाइन चलाता है; आपको कोई कमांड टाइप नहीं करना पड़ता।',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP वह साझा प्रोटोकॉल है जिससे AI सहायक बाहरी टूल बुलाते हैं। इसे तब चुनें जब सहायक कमांड न चला सके (जैसे Claude Desktop) या आप चाहें कि वह UniWork Office की विंडो को सीधे चलाए। नीचे दिए दो तरीकों में से कोई एक चुनें।',
     intgMcpStdioTitle: 'सहायक द्वारा शुरू (अनुशंसित)',
     intgMcpStdioDesc:
-      'सहायक खुद UniWork Office (genoffice mcp) चलाता है: यहाँ कुछ चालू करने की ज़रूरत नहीं, और UniWork Office खुला होना भी ज़रूरी नहीं। सुविधाएँ CLI जैसी ही।',
+      'सहायक खुद UniWork Office (uniwork-office mcp) चलाता है: यहाँ कुछ चालू करने की ज़रूरत नहीं, और UniWork Office खुला होना भी ज़रूरी नहीं। सुविधाएँ CLI जैसी ही।',
     intgMcpHttpTitle: 'स्थानीय HTTP सर्वर',
     intgMcpHttpDesc:
       'UniWork Office के अंदर चलता है; सहायक URL से जुड़ता है और आप Word संपादक में दस्तावेज़ को चरण-दर-चरण बनते देख सकते हैं। UniWork Office खुला रहना चाहिए; अभी केवल Word दस्तावेज़।',
@@ -7278,9 +7278,9 @@ export const strings = {
     intgMcpNote:
       'स्किल और MCP एक साथ सेट किए जा सकते हैं; असिस्टेंट एक को चुन लेता है। दोनों बिल्कुल एक जैसे काम करते हैं।',
     intgCliTitle: 'उन्नत: UniWork Office कमांड लाइन',
-    intgCliReady: 'UniWork Office (genoffice) {v} · टर्मिनल में तैयार ({path})',
+    intgCliReady: 'UniWork Office ({cmd}) {v} · टर्मिनल में तैयार ({path})',
     intgCliNotOnPath:
-      'UniWork Office (genoffice) {v} · टर्मिनल के PATH में नहीं है। असिस्टेंट इसे ~/.genoffice/launcher से फिर भी ढूँढ लेते हैं, इसलिए skill काम करता है। खुद genoffice टाइप करने के लिए यह एक बार चलाएँ:',
+      'UniWork Office ({cmd}) {v} · टर्मिनल के PATH में नहीं है। असिस्टेंट इसे ~/.genoffice/launcher से फिर भी ढूँढ लेते हैं, इसलिए skill काम करता है। खुद {cmd} टाइप करने के लिए यह एक बार चलाएँ:',
     intgCliLauncher: 'लॉन्चर फ़ोल्डर',
     intgStateOutdated: 'इंस्टॉल {v}, {next} पर अपडेट उपलब्ध',
     intgStateModified: 'इंस्टॉल {v} (बदला गया)',
@@ -7557,11 +7557,11 @@ export const strings = {
     intgExample1: 'Chuyển ~/Downloads/report.md thành tài liệu Word',
     intgExample2: 'Tạo bài trình chiếu 6 slide về kết quả Q3 của chúng ta',
     intgExample3: 'Chuyển budget.xlsx sang PDF và mở trong UniWork Office',
-    intgStep2Note: 'Trợ lý tự chạy dòng lệnh UniWork Office (genoffice); bạn không cần gõ gì.',
+    intgStep2Note: 'Trợ lý tự chạy dòng lệnh UniWork Office (uniwork-office); bạn không cần gõ gì.',
     intgCliTitle: 'Nâng cao: dòng lệnh UniWork Office',
-    intgCliReady: 'UniWork Office (genoffice) {v} · sẵn sàng trong terminal ({path})',
+    intgCliReady: 'UniWork Office ({cmd}) {v} · sẵn sàng trong terminal ({path})',
     intgCliNotOnPath:
-      'UniWork Office (genoffice) {v} · chưa có trong PATH của terminal. Trợ lý vẫn tìm được qua ~/.genoffice/launcher nên skill vẫn hoạt động. Để tự gõ genoffice, chạy một lần:',
+      'UniWork Office ({cmd}) {v} · chưa có trong PATH của terminal. Trợ lý vẫn tìm được qua ~/.genoffice/launcher nên skill vẫn hoạt động. Để tự gõ {cmd}, chạy một lần:',
     intgCliLauncher: 'Thư mục launcher',
     intgStateOutdated: 'Đã cài {v}, có bản cập nhật {next}',
     intgStateModified: 'Đã cài {v} (đã chỉnh sửa)',
@@ -7721,7 +7721,7 @@ export const strings = {
     setDefaultAppFailed: 'Không thể thay đổi. Vui lòng đặt trong cài đặt hệ thống.',
     setCliLink: 'Công cụ dòng lệnh',
     setCliLinkDesc:
-      'Thêm lệnh genoffice vào terminal để tập lệnh và trợ lý AI có thể dùng UniWork Office.',
+      'Thêm lệnh {cmd} vào terminal để tập lệnh và trợ lý AI có thể dùng UniWork Office.',
     setCliLinkInstall: 'Thêm vào terminal',
     setCliLinkBlocked: 'Không thể tự động thêm. Hãy chạy lệnh này trong terminal: {cmd}',
     setAiOpenInNewDocs: 'Mở bảng AI trong tài liệu mới',
@@ -7754,13 +7754,13 @@ export const strings = {
     setMcpLogEmpty: 'Chưa có mục nhật ký nào',
     intgCliPartTitle: 'CLI · dòng lệnh + kỹ năng',
     intgCliPartDesc:
-      'Dành cho các trợ lý có thể chạy lệnh terminal (Claude Code, Codex, Cursor và các trợ lý khác). Khi kỹ năng đã được cài đặt, trợ lý sẽ tự gọi dòng lệnh UniWork Office (genoffice) để tạo, chuyển đổi, đọc và chỉnh sửa tệp; bạn không cần nhập lệnh.',
+      'Dành cho các trợ lý có thể chạy lệnh terminal (Claude Code, Codex, Cursor và các trợ lý khác). Khi kỹ năng đã được cài đặt, trợ lý sẽ tự gọi dòng lệnh UniWork Office (uniwork-office) để tạo, chuyển đổi, đọc và chỉnh sửa tệp; bạn không cần nhập lệnh.',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP là giao thức tiêu chuẩn mà các trợ lý AI dùng để gọi công cụ bên ngoài. Sử dụng khi trợ lý của bạn không thể chạy lệnh (ví dụ Claude Desktop) hoặc khi bạn muốn trợ lý điều khiển trực tiếp cửa sổ UniWork Office. Chọn một trong hai cách bên dưới.',
     intgMcpStdioTitle: 'Được khởi động bởi trợ lý (khuyến nghị)',
     intgMcpStdioDesc:
-      'Trợ lý sẽ tự khởi chạy UniWork Office (genoffice mcp): không cần bật gì ở đây và UniWork Office không cần phải mở. Có đầy đủ tính năng tương tự CLI.',
+      'Trợ lý sẽ tự khởi chạy UniWork Office (uniwork-office mcp): không cần bật gì ở đây và UniWork Office không cần phải mở. Có đầy đủ tính năng tương tự CLI.',
     intgMcpHttpTitle: 'Máy chủ HTTP cục bộ',
     intgMcpHttpDesc:
       'Chạy bên trong UniWork Office; trợ lý kết nối với một URL và bạn có thể theo dõi nó tạo tài liệu từng bước trong trình chỉnh sửa Word. UniWork Office phải luôn mở; hiện tại chỉ hỗ trợ tài liệu Word.',
@@ -7933,7 +7933,7 @@ export const strings = {
     setDefaultAppOpenSettings: '開啟系統設定',
     setDefaultAppFailed: '設定失敗，請在系統設定中手動更改。',
     setCliLink: '命令列工具',
-    setCliLinkDesc: '將 genoffice 指令加入終端機，讓指令碼與 AI 助理可以使用 UniWork Office。',
+    setCliLinkDesc: '將 {cmd} 指令加入終端機，讓指令碼與 AI 助理可以使用 UniWork Office。',
     setCliLinkInstall: '加入終端機',
     setCliLinkBlocked: '無法自動加入。請在終端機執行：{cmd}',
     setAiSpellcheckDesc: '在 AI 對話輸入框中輸入時標示拼錯的單字。',
@@ -8004,16 +8004,16 @@ export const strings = {
     intgExample1: '把 ~/Downloads/report.md 轉成 Word 文件',
     intgExample2: '做一份 6 頁的簡報，介紹我們第三季的業績',
     intgExample3: '把 budget.xlsx 轉成 PDF，並在 UniWork Office 中開啟',
-    intgStep2Note: '助理會自行呼叫 UniWork Office (genoffice) 命令列，你不需要輸入任何指令。',
+    intgStep2Note: '助理會自行呼叫 UniWork Office (uniwork-office) 命令列，你不需要輸入任何指令。',
     intgCliPartTitle: 'CLI · 命令列 + skill',
     intgCliPartDesc:
-      '適合能執行終端機指令的助理（Claude Code、Codex、Cursor 等）。安裝 skill 後，助理會自己呼叫 UniWork Office (genoffice) 命令列建立、轉換、讀取和編輯檔案，你不需要輸入任何指令。',
+      '適合能執行終端機指令的助理（Claude Code、Codex、Cursor 等）。安裝 skill 後，助理會自己呼叫 UniWork Office (uniwork-office) 命令列建立、轉換、讀取和編輯檔案，你不需要輸入任何指令。',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
       'MCP 是 AI 助理呼叫外部工具的通用協定。助理不能執行指令（如 Claude Desktop），或你想讓它直接操作 UniWork Office 視窗時用這條路。下面兩種接法任選一種。',
     intgMcpStdioTitle: '由助理啟動（建議）',
     intgMcpStdioDesc:
-      '助理自己啟動 UniWork Office (genoffice mcp)，不需要在這裡開任何開關，UniWork Office 也不用開著。功能與 CLI 完全相同。',
+      '助理自己啟動 UniWork Office (uniwork-office mcp)，不需要在這裡開任何開關，UniWork Office 也不用開著。功能與 CLI 完全相同。',
     intgMcpHttpTitle: '本機 HTTP 服務',
     intgMcpHttpDesc:
       '在 UniWork Office 內執行，助理透過網址連線，可以看著它在 Word 編輯器裡逐步產生。需要 UniWork Office 保持開啟；目前只支援 Word。',
@@ -8026,9 +8026,9 @@ export const strings = {
       '把這段加進它的 MCP 伺服器設定（一個 JSON 檔，或設定裡的「新增 MCP 伺服器」）：',
     intgMcpNote: 'skill 和 MCP 可以同時存在，助理會自行選用；兩者做的事完全相同。',
     intgCliTitle: '進階：命令列 UniWork Office',
-    intgCliReady: 'UniWork Office (genoffice) {v} · 已可在終端機直接使用（{path}）',
+    intgCliReady: 'UniWork Office ({cmd}) {v} · 已可在終端機直接使用（{path}）',
     intgCliNotOnPath:
-      'UniWork Office (genoffice) {v} · 尚未加入終端機 PATH。助理仍能透過 ~/.genoffice/launcher 找到它，skill 不受影響。若想自己在終端機輸入 genoffice，執行一次：',
+      'UniWork Office ({cmd}) {v} · 尚未加入終端機 PATH。助理仍能透過 ~/.genoffice/launcher 找到它，skill 不受影響。若想自己在終端機輸入 {cmd}，執行一次：',
     intgCliLauncher: '啟動器資料夾',
     intgStateOutdated: '已安裝 {v}，可更新至 {next}',
     intgStateModified: '已安裝 {v}（已被修改）',

@@ -9,6 +9,8 @@ import type { InstallOutcome } from '@genoffice/cli/install'
 export type { AgentId, AgentTarget, SkillInstallState, SkillInstallStatus }
 
 export interface CliStatus extends InstallOutcome {
+  /** the name to type in a terminal (filled by the main process) */
+  command: string
   /** directory holding the genoffice launcher (what `~/.genoffice/launcher` points at) */
   launcherDir: string
   /** app runs from a dmg / AppImage mount: the launcher path will not survive a restart */

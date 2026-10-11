@@ -33,7 +33,9 @@ if hash update-desktop-database 2>/dev/null; then
   update-desktop-database /usr/share/applications || true
 fi
 
-# same ownership rule as the post-install: only a link into our install dir is ours
+# same ownership rule as the post-install: only a link into our install dir is ours.
+# Per-user links in ~/.local/bin and the uniwork:// entry in ~/.config/mimeapps.list are
+# out of reach here (this runs as root); the app removes them at its next launch.
 link=/usr/bin/genoffice
 if [ -L "$link" ]; then
   case "$(readlink "$link")" in
