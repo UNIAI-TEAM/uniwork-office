@@ -88,6 +88,7 @@ import type { OutlineNode } from './OutlinePanel'
 import { buildHeadingOutline, remapOutlinePages } from './heading-outline'
 import { printPdf } from './print'
 import { PasswordDialog } from './PasswordDialog'
+import { StaticTextDialog } from './StaticTextDialog'
 import { PropertiesDialog } from './PropertiesDialog'
 import { SignatureDialog, fileToCanvas } from './SignatureDialog'
 import type { SignatureData } from './SignatureDialog'
@@ -8412,6 +8413,8 @@ export default function App() {
                                         : null
                                     }
                                     editHint={t('editImageHint')}
+                                    staticFillHint={t('formStaticEditHint')}
+                                    isStaticFill={(ref) => savedStaticFillForRef(ref) !== undefined}
                                     onSelectEdit={(id, x, y) =>
                                       setSelected({ kind: 'imageEdit', id, ...popupPos(x, y) })
                                     }
@@ -9102,105 +9105,35 @@ export default function App() {
               />
             )}
             {staticTextDialog && (
-              <div
-                className="pdf-modal-mask"
-                onClick={() => {
+              <StaticTextDialog
+                t={t}
+                titleKey={
+                  staticTextPurpose === 'insert'
+                    ? textInsertEditId
+                      ? 'editInsertedText'
+                      : 'insertTextTitle'
+                    : staticTextEditTarget
+                      ? 'formEditText'
+                      : 'formAddTextTitle'
+                }
+                text={staticText}
+                size={staticTextSize}
+                color={staticTextColor}
+                colorOpen={staticTextColorOpen}
+                align={staticTextAlign}
+                colorFieldRef={staticColorFieldRef}
+                onText={setStaticText}
+                onSize={setStaticTextSize}
+                onColor={setStaticTextColor}
+                onColorOpen={setStaticTextColorOpen}
+                onAlign={setStaticTextAlign}
+                onCancel={() => {
                   setStaticTextDialog(false)
                   setStaticTextEditTarget(null)
                   setTextInsertEditId(null)
                 }}
-              >
-                <div className="pdf-modal" onClick={(e) => e.stopPropagation()}>
-                  <div className="pdf-modal-title">
-                    {t(
-                      staticTextPurpose === 'insert'
-                        ? textInsertEditId
-                          ? 'editInsertedText'
-                          : 'insertTextTitle'
-                        : staticTextEditTarget
-                          ? 'formEditText'
-                          : 'formAddTextTitle',
-                    )}
-                  </div>
-                  <textarea
-                    className="pdf-modal-textarea"
-                    value={staticText}
-                    placeholder={t('formAddTextPlaceholder')}
-                    autoFocus
-                    onChange={(e) => setStaticText(e.target.value)}
-                  />
-                  <label className="pdf-field">
-                    <span>{t('formTextSize')}</span>
-                    <input
-                      className="pdf-modal-input"
-                      type="number"
-                      min={6}
-                      max={72}
-                      value={staticTextSize}
-                      onChange={(e) =>
-                        setStaticTextSize(Math.min(72, Math.max(6, Number(e.target.value) || 14)))
-                      }
-                    />
-                  </label>
-                  <div className="pdf-field-grid">
-                    <div ref={staticColorFieldRef} className="pdf-field pdf-color-field">
-                      <span>{t('formTextColor')}</span>
-                      <button
-                        type="button"
-                        className="pdf-color-trigger"
-                        aria-expanded={staticTextColorOpen}
-                        onClick={() => setStaticTextColorOpen((open) => !open)}
-                      >
-                        <span
-                          className="pdf-color-trigger-swatch"
-                          style={{ background: staticTextColor }}
-                        />
-                        <span>{staticTextColor.toUpperCase()}</span>
-                      </button>
-                      {staticTextColorOpen && (
-                        <ColorPickerPopover
-                          value={staticTextColor}
-                          onPick={setStaticTextColor}
-                          onClose={() => setStaticTextColorOpen(false)}
-                        />
-                      )}
-                    </div>
-                    <label className="pdf-field">
-                      <span>{t('formTextAlign')}</span>
-                      <Dropdown
-                        className="pdf-modal-dd"
-                        ariaLabel={t('formTextAlign')}
-                        value={staticTextAlign}
-                        options={[
-                          { value: 'left', label: t('formAlignLeft') },
-                          { value: 'center', label: t('formAlignCenter') },
-                          { value: 'right', label: t('formAlignRight') },
-                        ]}
-                        onPick={setStaticTextAlign}
-                      />
-                    </label>
-                  </div>
-                  <div className="pdf-modal-actions">
-                    <button
-                      className="pdf-modal-btn"
-                      onClick={() => {
-                        setStaticTextDialog(false)
-                        setStaticTextEditTarget(null)
-                        setTextInsertEditId(null)
-                      }}
-                    >
-                      {t('cancel')}
-                    </button>
-                    <button
-                      className="pdf-modal-btn primary"
-                      disabled={!staticText.trim()}
-                      onClick={confirmStaticFormText}
-                    >
-                      {t('ok')}
-                    </button>
-                  </div>
-                </div>
-              </div>
+                onConfirm={confirmStaticFormText}
+              />
             )}
             {extractDlg && (
               <div className="pdf-modal-mask" onClick={() => setExtractDlg(false)}>

@@ -52,6 +52,8 @@ export function ImageEditLayer({
   selectedId,
   selectedKey,
   editHint,
+  staticFillHint,
+  isStaticFill,
   onSelectEdit,
   onSelectExisting,
   onRect,
@@ -69,6 +71,10 @@ export function ImageEditLayer({
   /** Selected existing image (imageRectKey), when nothing pending targets it yet */
   selectedKey: string | null
   editHint: string
+  /** Tooltip of a placed Add-text / check / cross mark: it is no picture to click, only to move or resize */
+  staticFillHint?: string
+  /** Is this untouched existing image a saved form-fill mark? */
+  isStaticFill?: (ref: PageImageRef) => boolean
   onSelectEdit: (id: string, x: number, y: number) => void
   onSelectExisting: (ref: PageImageRef, x: number, y: number) => void
   /** Committed move/resize of a pending op's rect; omit to disable (read-only) */
@@ -288,7 +294,7 @@ export function ImageEditLayer({
           className={`pdf-imgedit-img${sel ? ' pdf-imgedit-selected' : ''}`}
           src={`data:image/png;base64,${src}`}
           style={ghostStyle(target, e.input.rect, turns)}
-          data-tip={editHint}
+          data-tip={e.staticFill ? (staticFillHint ?? editHint) : editHint}
           alt=""
           draggable={false}
           {...pointerProps(target, e.input.rect)}
@@ -302,7 +308,7 @@ export function ImageEditLayer({
           key={e.id}
           className={`pdf-imgedit-ghostbox${sel ? ' pdf-imgedit-selected' : ''}`}
           style={dragStyle(target, e.input.rect)}
-          data-tip={editHint}
+          data-tip={e.staticFill ? (staticFillHint ?? editHint) : editHint}
           {...pointerProps(target, e.input.rect)}
         />,
       )
@@ -351,7 +357,7 @@ export function ImageEditLayer({
         key={key}
         className={`pdf-imgedit-hit${rectKey === selectedKey ? ' pdf-imgedit-selected' : ''}`}
         style={dragStyle(target, ref.rect)}
-        data-tip={editHint}
+        data-tip={isStaticFill?.(ref) ? (staticFillHint ?? editHint) : editHint}
         {...pointerProps(target, ref.rect)}
       />,
     )

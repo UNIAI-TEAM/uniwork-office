@@ -34,6 +34,7 @@ const fillFormStrings = {
   formAddCross: 'Cross',
   formAddCrossHint: 'Click the page to place an X mark',
   formPlaceStaticHint: 'Click to place; select the result to move or resize it',
+  formStaticEditHint: 'Drag to move, corners to resize',
   formXfaWarning:
     'This PDF contains XFA. Only AcroForm is supported; saving may not preserve XFA data.',
   redact: 'Redact area',
@@ -81,6 +82,7 @@ const localizedFillFormStrings = {
     formAddCross: '叉号',
     formAddCrossHint: '在页面上点击放置叉号',
     formPlaceStaticHint: '点击放置；选中后可移动或缩放',
+    formStaticEditHint: '拖动移动、拖角缩放',
     formXfaWarning: '此 PDF 包含 XFA；当前仅支持 AcroForm，保存可能无法保留 XFA 数据',
   },
   'zh-TW': {
@@ -115,6 +117,7 @@ const localizedFillFormStrings = {
     formAddCross: '叉號',
     formAddCrossHint: '在頁面上點擊放置叉號',
     formPlaceStaticHint: '點擊放置；選取後可移動或縮放',
+    formStaticEditHint: '拖曳移動、拖角縮放',
     formXfaWarning: '此 PDF 包含 XFA；目前僅支援 AcroForm，儲存時可能無法保留 XFA 資料',
   },
   vi: {
@@ -150,6 +153,7 @@ const localizedFillFormStrings = {
     formAddCross: 'Dấu X',
     formAddCrossHint: 'Bấm vào trang để đặt dấu X',
     formPlaceStaticHint: 'Bấm để đặt; chọn kết quả để di chuyển hoặc đổi kích cỡ',
+    formStaticEditHint: 'Kéo để di chuyển, kéo các góc để đổi kích thước',
     formXfaWarning:
       'PDF này chứa XFA. Chỉ hỗ trợ AcroForm; khi lưu có thể không giữ được dữ liệu XFA.',
   },
@@ -188,6 +192,7 @@ const localizedFillFormStrings = {
     formAddCrossHint: 'Kliknutím na stránku umístíte křížek',
     formPlaceStaticHint:
       'Kliknutím umístíte; výběrem výsledku ho můžete přesunout nebo změnit jeho velikost',
+    formStaticEditHint: 'Tažením přesunete, rohy mění velikost',
     formXfaWarning:
       'Tento PDF obsahuje XFA. Podporován je pouze AcroForm; uložení může data XFA nezachovat.',
   },
