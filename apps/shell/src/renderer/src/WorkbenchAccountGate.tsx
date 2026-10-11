@@ -19,7 +19,7 @@ export const LOAD_RETRY_DELAYS_MS: readonly number[] = [800, 2000]
  *
  * A load that fails is tried again a couple of times; if it still fails the
  * store stays closed (never another account's copy) and a quiet notice with a
- * retry button sits over Home, since nothing is saved until a load works.
+ * retry button sits above Home, since nothing is saved until a load works.
  */
 export function WorkbenchAccountGate({ children }: { children: ReactNode }) {
   const { t } = useI18n()
@@ -62,20 +62,20 @@ export function WorkbenchAccountGate({ children }: { children: ReactNode }) {
   }, [reloadKey])
 
   if (bucket === null) return null
+  if (!failed) return <Fragment key={bucket}>{children}</Fragment>
+  // the notice is a bar above Home that Home shrinks for, so it never covers the composer
   return (
-    <Fragment key={bucket}>
-      {children}
-      {failed && (
-        <div className="wb-load-failed" role="alert">
-          <div className="acct-notice-text">
-            <div className="acct-notice-title">{t('wbLoadFailedTitle')}</div>
-            <div className="acct-notice-body">{t('wbLoadFailedBody')}</div>
-          </div>
-          <button type="button" className="set-btn" onClick={() => setReloadKey((k) => k + 1)}>
-            {t('acctRetry')}
-          </button>
+    <div className="wb-gate-failed" key={bucket}>
+      <div className="wb-load-failed" role="alert">
+        <div className="acct-notice-text">
+          <div className="acct-notice-title">{t('wbLoadFailedTitle')}</div>
+          <div className="acct-notice-body">{t('wbLoadFailedBody')}</div>
         </div>
-      )}
-    </Fragment>
+        <button type="button" className="set-btn" onClick={() => setReloadKey((k) => k + 1)}>
+          {t('acctRetry')}
+        </button>
+      </div>
+      {children}
+    </div>
   )
 }

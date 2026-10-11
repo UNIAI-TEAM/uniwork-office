@@ -279,11 +279,16 @@ export async function loadWorkbenchSnapshot(
   try {
     const db = store.activeDb()
     const legacyPending = store.legacyPending(bucket)
-    if (!db) return { keys: {}, keyCount: 0, dbPath: '', bucket, legacyPending, unavailable: true }
+    if (!db) {
+      console.error('[workbench-db] the account database could not be opened')
+      return { keys: {}, keyCount: 0, dbPath: '', bucket, legacyPending, unavailable: true }
+    }
     const keys = db.loadAll()
     return { keys, keyCount: Object.keys(keys).length, dbPath: db.dbPath, bucket, legacyPending }
   } catch (err) {
-    console.error('[workbench-db] loadAll failed', err)
+    // the error code only: an error message carries the absolute path (and the OS user name)
+    const code = (err as NodeJS.ErrnoException)?.code
+    console.error(`[workbench-db] loadAll failed: ${code ?? 'unknown error'}`)
     return { keys: {}, keyCount: 0, dbPath: '', bucket, legacyPending: false, unavailable: true }
   }
 }

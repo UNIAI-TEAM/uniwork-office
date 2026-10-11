@@ -3,8 +3,9 @@
  * After hydrate(), read/write go through memory + IPC, scoped to the bucket of
  * the signed-in UniWork account (or signed-out use); see
  * apps/shell/src/main/workbench-accounts.ts. localStorage is shared by every
- * account on the computer, so it only holds data when the main-process store
- * is unavailable, and then under a per-bucket prefix.
+ * account on the computer, so it is only used when there is no main-process
+ * store at all (tests). A store that cannot be opened or read is a failed load:
+ * closed, reported, never answered from localStorage.
  */
 import type { WorkbenchIdbMediaDump, WorkbenchStoreApi } from '../../shared/home-api'
 import {
@@ -135,13 +136,11 @@ export async function hydrateWorkbenchStore(): Promise<void> {
   try {
     const snap = await api.loadAll()
     if (mine !== generation) return
+    // an account database that cannot be opened or read (corrupt file) is a
+    // failed load like a throwing call: closed and reported, never a silent
+    // localStorage copy; pre-upgrade copies stay where they are until a load works
+    if (snap.unavailable) throw new Error('wb_unavailable')
     setCurrentWorkbenchBucket(snap.bucket)
-    if (snap.unavailable) {
-      if (snap.legacyPending) await moveLegacyIntoLocalStorage(api, snap.bucket)
-      if (mine !== generation) return
-      hydrated = true
-      return
-    }
     const next = new Map(Object.entries(snap.keys ?? {}))
     if (snap.legacyPending) {
       const legacy = collectLegacyLocalStorageKeys()
@@ -167,18 +166,6 @@ export async function hydrateWorkbenchStore(): Promise<void> {
     failed = true
   }
   hydrated = true
-}
-
-async function moveLegacyIntoLocalStorage(api: WorkbenchStoreApi, bucket: string): Promise<void> {
-  const legacy = collectLegacyLocalStorageKeys()
-  for (const [k, v] of Object.entries(legacy)) {
-    try {
-      if (localStorage.getItem(lsKey(k)) == null) localStorage.setItem(lsKey(k), v)
-    } catch {
-      /* quota */
-    }
-  }
-  await moveLegacyMediaAndFinish(api, bucket, Object.keys(legacy))
 }
 
 async function moveLegacyMediaAndFinish(
