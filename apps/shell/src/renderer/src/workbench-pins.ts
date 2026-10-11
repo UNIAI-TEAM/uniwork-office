@@ -16,6 +16,7 @@ import {
   wbStoreSetRaw,
   wbStoreWrite,
 } from './workbench-store-client'
+import { wbMediaDbName } from './workbench-bucket'
 
 const PINS_PREFIX = 'uniwork.wb.pins.'
 const PILLAR_PINS_PREFIX = 'uniwork.wb.pillarPins.'
@@ -300,7 +301,7 @@ const TASK_MEDIA_STORE = 'blobs'
 
 function openTaskMediaDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open(TASK_MEDIA_DB, 1)
+    const req = indexedDB.open(wbMediaDbName(TASK_MEDIA_DB), 1)
     req.onupgradeneeded = () => {
       const db = req.result
       if (!db.objectStoreNames.contains(TASK_MEDIA_STORE)) {
@@ -869,7 +870,7 @@ const HEALTH_BODY_META_KEY = 'uniwork.wb.health.bodyMeta'
 
 function openHealthMediaDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open(HEALTH_BODY_DB, 1)
+    const req = indexedDB.open(wbMediaDbName(HEALTH_BODY_DB), 1)
     req.onupgradeneeded = () => {
       const db = req.result
       if (!db.objectStoreNames.contains(HEALTH_BODY_STORE)) {
@@ -1412,7 +1413,7 @@ const PETS_STORE = 'photos'
 
 function openPetsDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open(PETS_DB, 1)
+    const req = indexedDB.open(wbMediaDbName(PETS_DB), 1)
     req.onupgradeneeded = () => {
       const db = req.result
       if (!db.objectStoreNames.contains(PETS_STORE)) {

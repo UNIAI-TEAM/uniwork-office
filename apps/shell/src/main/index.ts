@@ -98,6 +98,8 @@ import {
   startUniworkAccount,
   startUniworkCloud,
   stopUniworkAccount,
+  onUniworkAccountStatus,
+  uniworkSessionIdentity,
 } from './uniwork-auth'
 import { createUniworkDocs, type UniworkDocsHandle } from './uniwork-docs/wiring'
 import { installUniworkModuleSeams } from './uniwork-docs/modules'
@@ -270,7 +272,8 @@ import type {
 } from '../shared/home-api'
 import { HOME_CHANNELS } from '../shared/home-api'
 import { extractAllowedFileExcerpts } from './file-excerpts'
-import { isAllowedWbKey, tryGetWorkbenchDb, type WbKvMap } from './workbench-db'
+import { isAllowedWbKey, type WbKvMap } from './workbench-db'
+import { WorkbenchAccounts } from './workbench-accounts'
 import { exportWorkbenchBackup, importWorkbenchBackup } from './workbench-backup'
 import {
   normalizeAiPanelPrefs,
@@ -2906,6 +2909,28 @@ const tm = (key: Parameters<typeof tMain>[1], params?: Parameters<typeof tMain>[
 // ---- the shell window + its tab manager (recreated if the user closes it on macOS) ----
 
 let shellWindow: BrowserWindow | null = null
+
+/** My AI chats and workbench data, one bucket per UniWork account (workbench-accounts.ts) */
+let workbenchAccountsStore: WorkbenchAccounts | null = null
+function workbenchAccounts(): WorkbenchAccounts {
+  workbenchAccountsStore ??= new WorkbenchAccounts({ userDataDir: app.getPath('userData') })
+  return workbenchAccountsStore
+}
+
+/**
+ * Points the workbench store at the live session's account (none = the
+ * signed-out bucket). On a change the Home renderer drops everything it shows
+ * and reloads from the new bucket.
+ */
+function syncWorkbenchOwner(): void {
+  const identity = uniworkSessionIdentity()
+  const owner = identity
+    ? { deploymentId: identity.deploymentId, accountId: identity.accountId }
+    : null
+  if (!workbenchAccounts().setOwner(owner)) return
+  const wc = shellWindow && !shellWindow.isDestroyed() ? shellWindow.webContents : null
+  if (wc && !wc.isDestroyed()) wc.send(HOME_CHANNELS.wbBucketChanged, workbenchAccounts().bucket())
+}
 let tabManager: TabManager | null = null
 
 /**
@@ -4290,49 +4315,58 @@ function registerHomeIpc(): void {
   )
 
   ipcMain.handle(HOME_CHANNELS.wbLoadAll, () => {
+    const store = workbenchAccounts()
+    syncWorkbenchOwner()
+    const bucket = store.bucket()
     try {
-      const db = tryGetWorkbenchDb(app.getPath('userData'))
-      if (!db) return { keys: {}, keyCount: 0, dbPath: '', unavailable: true }
+      const db = store.activeDb()
+      const legacyPending = store.legacyPending(bucket)
+      if (!db)
+        return { keys: {}, keyCount: 0, dbPath: '', bucket, legacyPending, unavailable: true }
       const keys = db.loadAll()
-      return { keys, keyCount: Object.keys(keys).length, dbPath: db.dbPath }
+      return { keys, keyCount: Object.keys(keys).length, dbPath: db.dbPath, bucket, legacyPending }
     } catch (err) {
       console.error('[workbench-db] loadAll failed', err)
-      return { keys: {}, keyCount: 0, dbPath: '', unavailable: true }
+      return { keys: {}, keyCount: 0, dbPath: '', bucket, legacyPending: false, unavailable: true }
     }
   })
 
-  ipcMain.handle(HOME_CHANNELS.wbGetKey, (_event, key: unknown) => {
+  // every call names the bucket it was loaded from; another account's bucket gets nothing
+  ipcMain.handle(HOME_CHANNELS.wbGetKey, (_event, key: unknown, bucket: unknown) => {
     try {
       if (typeof key !== 'string' || !isAllowedWbKey(key)) return null
-      return tryGetWorkbenchDb(app.getPath('userData'))?.get(key) ?? null
+      return workbenchAccounts().dbFor(bucket)?.get(key) ?? null
     } catch (err) {
       console.error('[workbench-db] getKey failed', err)
       return null
     }
   })
 
-  ipcMain.handle(HOME_CHANNELS.wbSetKey, (_event, key: unknown, value: unknown) => {
-    try {
-      if (typeof key !== 'string' || typeof value !== 'string' || !isAllowedWbKey(key)) return
-      tryGetWorkbenchDb(app.getPath('userData'))?.set(key, value)
-    } catch (err) {
-      console.error('[workbench-db] setKey failed', err)
-    }
-  })
+  ipcMain.handle(
+    HOME_CHANNELS.wbSetKey,
+    (_event, key: unknown, value: unknown, bucket: unknown) => {
+      try {
+        if (typeof key !== 'string' || typeof value !== 'string' || !isAllowedWbKey(key)) return
+        workbenchAccounts().dbFor(bucket)?.set(key, value)
+      } catch (err) {
+        console.error('[workbench-db] setKey failed', err)
+      }
+    },
+  )
 
-  ipcMain.handle(HOME_CHANNELS.wbRemoveKey, (_event, key: unknown) => {
+  ipcMain.handle(HOME_CHANNELS.wbRemoveKey, (_event, key: unknown, bucket: unknown) => {
     try {
       if (typeof key !== 'string' || !isAllowedWbKey(key)) return
-      tryGetWorkbenchDb(app.getPath('userData'))?.remove(key)
+      workbenchAccounts().dbFor(bucket)?.remove(key)
     } catch (err) {
       console.error('[workbench-db] removeKey failed', err)
     }
   })
 
-  ipcMain.handle(HOME_CHANNELS.wbImportKeys, (_event, keys: unknown) => {
+  ipcMain.handle(HOME_CHANNELS.wbImportKeys, (_event, keys: unknown, bucket: unknown) => {
     try {
       if (!keys || typeof keys !== 'object' || Array.isArray(keys)) return { imported: 0 }
-      const db = tryGetWorkbenchDb(app.getPath('userData'))
+      const db = workbenchAccounts().dbFor(bucket)
       if (!db) return { imported: 0 }
       return { imported: db.importKeys(keys as WbKvMap) }
     } catch (err) {
@@ -4341,11 +4375,20 @@ function registerHomeIpc(): void {
     }
   })
 
-  ipcMain.handle(HOME_CHANNELS.wbExportBackup, async (event, media: unknown) => {
+  ipcMain.handle(HOME_CHANNELS.wbLegacyDone, (_event, bucket: unknown) => {
+    try {
+      workbenchAccounts().markLegacyRendererDone(bucket)
+    } catch (err) {
+      console.error('[workbench-db] legacyDone failed', err)
+    }
+  })
+
+  ipcMain.handle(HOME_CHANNELS.wbExportBackup, async (event, media: unknown, bucket: unknown) => {
     try {
       const win = BrowserWindow.fromWebContents(event.sender)
       return await exportWorkbenchBackup(
         win,
+        () => workbenchAccounts().dbFor(bucket),
         media && typeof media === 'object'
           ? (media as import('../shared/home-api').WorkbenchIdbMediaDump)
           : null,
@@ -4356,10 +4399,10 @@ function registerHomeIpc(): void {
     }
   })
 
-  ipcMain.handle(HOME_CHANNELS.wbImportBackup, async (event) => {
+  ipcMain.handle(HOME_CHANNELS.wbImportBackup, async (event, bucket: unknown) => {
     try {
       const win = BrowserWindow.fromWebContents(event.sender)
-      return await importWorkbenchBackup(win)
+      return await importWorkbenchBackup(win, () => workbenchAccounts().dbFor(bucket))
     } catch (err) {
       console.error('[workbench-db] importBackup failed', err)
       return { ok: false as const, error: err instanceof Error ? err.message : String(err) }
@@ -6400,6 +6443,9 @@ app.whenReady().then(async () => {
   // UniWork account: register the active channel's sign-in scheme, restore the
   // session in the background (after the proxy install), then route held callbacks
   startUniworkAccount(mainProxyReady)
+  // My AI and workbench data follow the signed-in account (sign-out = signed-out bucket)
+  syncWorkbenchOwner()
+  onUniworkAccountStatus(() => syncWorkbenchOwner())
   startUniworkCloud()
   authCallbacks.start(routeAuthCallback)
   // UniWork document launch links (held since startup) route from here on

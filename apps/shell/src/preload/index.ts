@@ -716,31 +716,38 @@ const homeApi: HomeApi = {
   wb: {
     async loadAll() {
       const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.wbLoadAll)
-      if (result && typeof result === 'object') {
-        const r = result as { keys?: unknown; keyCount?: unknown; dbPath?: unknown }
-        return {
-          keys:
-            r.keys && typeof r.keys === 'object' && !Array.isArray(r.keys)
-              ? (r.keys as Record<string, string>)
-              : {},
-          keyCount: typeof r.keyCount === 'number' ? r.keyCount : 0,
-          dbPath: typeof r.dbPath === 'string' ? r.dbPath : '',
-        }
+      const r = (result && typeof result === 'object' ? result : {}) as {
+        keys?: unknown
+        keyCount?: unknown
+        dbPath?: unknown
+        bucket?: unknown
+        legacyPending?: unknown
+        unavailable?: unknown
       }
-      return { keys: {}, keyCount: 0, dbPath: '' }
+      return {
+        keys:
+          r.keys && typeof r.keys === 'object' && !Array.isArray(r.keys)
+            ? (r.keys as Record<string, string>)
+            : {},
+        keyCount: typeof r.keyCount === 'number' ? r.keyCount : 0,
+        dbPath: typeof r.dbPath === 'string' ? r.dbPath : '',
+        bucket: typeof r.bucket === 'string' ? r.bucket : '',
+        legacyPending: r.legacyPending === true,
+        ...(r.unavailable === true || typeof r.bucket !== 'string' ? { unavailable: true } : {}),
+      }
     },
-    async getKey(key) {
-      const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.wbGetKey, key)
+    async getKey(key, bucket) {
+      const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.wbGetKey, key, bucket)
       return typeof result === 'string' ? result : null
     },
-    async setKey(key, value) {
-      await ipcRenderer.invoke(HOME_CHANNELS.wbSetKey, key, value)
+    async setKey(key, value, bucket) {
+      await ipcRenderer.invoke(HOME_CHANNELS.wbSetKey, key, value, bucket)
     },
-    async removeKey(key) {
-      await ipcRenderer.invoke(HOME_CHANNELS.wbRemoveKey, key)
+    async removeKey(key, bucket) {
+      await ipcRenderer.invoke(HOME_CHANNELS.wbRemoveKey, key, bucket)
     },
-    async importKeys(keys) {
-      const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.wbImportKeys, keys)
+    async importKeys(keys, bucket) {
+      const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.wbImportKeys, keys, bucket)
       const imported =
         result &&
         typeof result === 'object' &&
@@ -749,16 +756,26 @@ const homeApi: HomeApi = {
           : 0
       return { imported }
     },
-    async exportBackup(media) {
-      return (await ipcRenderer.invoke(HOME_CHANNELS.wbExportBackup, media ?? null)) as {
+    async legacyDone(bucket) {
+      await ipcRenderer.invoke(HOME_CHANNELS.wbLegacyDone, bucket)
+    },
+    onBucketChanged(cb) {
+      const listener = (_event: IpcRendererEvent, bucket: unknown) => {
+        if (typeof bucket === 'string') cb(bucket)
+      }
+      ipcRenderer.on(HOME_CHANNELS.wbBucketChanged, listener)
+      return () => ipcRenderer.removeListener(HOME_CHANNELS.wbBucketChanged, listener)
+    },
+    async exportBackup(media, bucket) {
+      return (await ipcRenderer.invoke(HOME_CHANNELS.wbExportBackup, media ?? null, bucket)) as {
         ok: boolean
         path?: string
         error?: string
         canceled?: boolean
       }
     },
-    async importBackup() {
-      return (await ipcRenderer.invoke(HOME_CHANNELS.wbImportBackup)) as {
+    async importBackup(bucket) {
+      return (await ipcRenderer.invoke(HOME_CHANNELS.wbImportBackup, bucket)) as {
         ok: boolean
         keyCount?: number
         keys?: Record<string, string>

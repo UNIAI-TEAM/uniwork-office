@@ -1,6 +1,7 @@
 /**
  * Local Workbench database (SQLite via node:sqlite DatabaseSync).
- * Lives under userData/workbench/workbench.sqlite — source of truth for wb.* keys.
+ * One file per UniWork account (and one for signed-out use), see
+ * workbench-accounts.ts — source of truth for wb.* keys.
  *
  * SQLite is loaded lazily so a missing/broken node:sqlite never prevents the
  * shell main process from booting (falls back to renderer localStorage).
@@ -78,11 +79,15 @@ export class WorkbenchDb {
   readonly dbPath: string
   private db: DatabaseSyncInstance
 
-  constructor(userDataDir: string) {
-    this.rootDir = join(userDataDir, 'workbench')
+  /**
+   * `rootDir` = the folder of this database file; defaults to the pre-upgrade
+   * shared folder `<userData>/workbench` (see workbench-accounts.ts for the
+   * per-account folders).
+   */
+  constructor(userDataDir: string, rootDir = join(userDataDir, 'workbench')) {
+    this.rootDir = rootDir
     this.dbPath = join(this.rootDir, 'workbench.sqlite')
     mkdirSync(this.rootDir, { recursive: true })
-    mkdirSync(join(this.rootDir, 'media'), { recursive: true })
     const DatabaseSync = loadDatabaseSync()
     this.db = new DatabaseSync(this.dbPath)
     this.db.exec('PRAGMA journal_mode = WAL;')
@@ -256,37 +261,20 @@ export function isAllowedWbKey(key: string): boolean {
   )
 }
 
-let singleton: WorkbenchDb | null = null
-let singletonFailed = false
-
-export function getWorkbenchDb(userDataDir: string): WorkbenchDb {
-  if (singleton) return singleton
-  if (singletonFailed) throw new Error(sqliteLoadError || 'workbench-db-unavailable')
+/**
+ * Opens the database in `rootDir`; null when SQLite cannot open (the error
+ * is logged under userData/workbench/error.log) and callers fall back.
+ */
+export function tryOpenWorkbenchDb(userDataDir: string, rootDir?: string): WorkbenchDb | null {
   try {
-    singleton = new WorkbenchDb(userDataDir)
-    return singleton
+    return new WorkbenchDb(userDataDir, rootDir)
   } catch (err) {
-    singletonFailed = true
     logDbError(userDataDir, err)
-    throw err
-  }
-}
-
-/** Returns null when SQLite cannot open — callers should fall back. */
-export function tryGetWorkbenchDb(userDataDir: string): WorkbenchDb | null {
-  try {
-    return getWorkbenchDb(userDataDir)
-  } catch {
     return null
   }
 }
 
 export function resetWorkbenchDbForTests(): void {
-  if (singleton) {
-    singleton.close()
-    singleton = null
-  }
-  singletonFailed = false
   sqliteLoadError = null
   DatabaseSyncRef = null
 }

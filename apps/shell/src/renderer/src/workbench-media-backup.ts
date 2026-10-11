@@ -3,6 +3,8 @@
  * Stores: tasks attachments (Blob), pets photos (data URL), health body (data URL).
  */
 
+import { wbMediaDbName } from './workbench-bucket'
+
 export interface WbIdbMediaDump {
   version: 1
   tasks: Record<string, string>
@@ -124,7 +126,7 @@ async function restoreStore(
 export async function collectWorkbenchIdbMedia(): Promise<WbIdbMediaDump> {
   const dump: WbIdbMediaDump = { version: 1, tasks: {}, pets: {}, health: {} }
   for (const s of STORES) {
-    dump[s.slot] = await dumpStore(s.db, s.store, s.kind)
+    dump[s.slot] = await dumpStore(wbMediaDbName(s.db), s.store, s.kind)
   }
   return dump
 }
@@ -134,8 +136,65 @@ export async function restoreWorkbenchIdbMedia(dump: WbIdbMediaDump | null | und
   for (const s of STORES) {
     const entries = dump[s.slot]
     if (entries && typeof entries === 'object') {
-      await restoreStore(s.db, s.store, s.kind, entries)
+      await restoreStore(wbMediaDbName(s.db), s.store, s.kind, entries)
     }
+  }
+}
+
+function readAllRows(db: IDBDatabase, storeName: string): Promise<Array<[IDBValidKey, unknown]>> {
+  return new Promise((resolve, reject) => {
+    const req = db.transaction(storeName, 'readonly').objectStore(storeName).openCursor()
+    const rows: Array<[IDBValidKey, unknown]> = []
+    req.onsuccess = () => {
+      const cursor = req.result
+      if (!cursor) {
+        resolve(rows)
+        return
+      }
+      rows.push([cursor.key, cursor.value])
+      cursor.continue()
+    }
+    req.onerror = () => reject(req.error ?? new Error('idb_cursor_failed'))
+  })
+}
+
+/**
+ * One time, for the account that received the pre-upgrade data: the shared
+ * media databases move into the current bucket's (values copied as they are,
+ * existing entries kept), then the shared ones are deleted.
+ */
+export async function moveLegacyWorkbenchIdbMedia(): Promise<void> {
+  for (const s of STORES) {
+    const target = wbMediaDbName(s.db)
+    if (target === s.db) return
+    const legacy = await openDb(s.db, s.store)
+    let rows: Array<[IDBValidKey, unknown]>
+    try {
+      rows = await readAllRows(legacy, s.store)
+    } finally {
+      legacy.close()
+    }
+    if (rows.length > 0) {
+      const db = await openDb(target, s.store)
+      try {
+        const present = new Set((await readAllRows(db, s.store)).map(([key]) => String(key)))
+        await new Promise<void>((resolve, reject) => {
+          const tx = db.transaction(s.store, 'readwrite')
+          const store = tx.objectStore(s.store)
+          for (const [key, value] of rows) if (!present.has(String(key))) store.put(value, key)
+          tx.oncomplete = () => resolve()
+          tx.onerror = () => reject(tx.error ?? new Error('idb_move_failed'))
+        })
+      } finally {
+        db.close()
+      }
+    }
+    await new Promise<void>((resolve) => {
+      const req = indexedDB.deleteDatabase(s.db)
+      req.onsuccess = () => resolve()
+      req.onerror = () => resolve()
+      req.onblocked = () => resolve()
+    })
   }
 }
 
