@@ -6,14 +6,18 @@ không cần mở ứng dụng. Ứng dụng không thêm gì cho đến khi b�
 
 ## Ứng dụng tự làm gì
 
-- **Bản cài deb / rpm.** Liên kết trỏ vào trình khởi chạy của chính gói cài là `/usr/bin/genoffice`,
-  đường dẫn này giữ nguyên khi cập nhật. Vì `/usr/bin/uniwork-office` chính là ứng dụng, ứng dụng không
-  đặt thêm một lệnh `uniwork-office` khác đứng trước nó trong `PATH`: khi đó phần Tích hợp trong Cài đặt hiển thị
-  `genoffice` là lệnh đã sẵn sàng để gõ.
+- **Bản cài deb / rpm: lệnh vẫn là `genoffice`.** Gói cài đã đặt sẵn trình khởi chạy của nó vào `PATH`
+  là `/usr/bin/genoffice`, đường dẫn này giữ nguyên khi cập nhật. Gõ `uniwork-office` ở đó sẽ mở ứng dụng
+  (`/usr/bin/uniwork-office` chính là ứng dụng), nên ứng dụng không đặt thêm một liên kết dòng lệnh
+  `uniwork-office` đứng trước nó: phần Tích hợp trong Cài đặt hiển thị `genoffice` là lệnh đã sẵn sàng để gõ,
+  và `genoffice` là lệnh dùng cho tập lệnh và trợ lý. Tên lệnh `uniwork-office` áp dụng cho bản AppImage,
+  tarball và macOS.
 - **Mỗi lần mở ứng dụng.** Ứng dụng xóa các liên kết lệnh do nó tạo trước đây mà đích đã mất (ví dụ sau khi
-  gỡ gói), chuyển liên kết đang trỏ vào bản cũ của ứng dụng sang bản hiện tại, và thay liên kết tên
+  gỡ gói), chuyển liên kết đang trỏ vào đường dẫn cũ của cùng một bản cài (ví dụ thư mục có số phiên bản) sang trình
+  khởi chạy hiện tại, và thay liên kết tên
   `genoffice` của các phiên bản cũ bằng `uniwork-office`. Liên kết, tệp hoặc chương trình do ứng dụng
-  không tạo thì không bao giờ bị động đến. Trên Linux, ứng dụng cũng xóa dòng `uniwork://` đã cũ trong
+  không tạo thì không bao giờ bị động đến; liên kết còn hoạt động nhưng dẫn vào một bản cài khác (ví dụ
+  một bản dựng khác hoặc một bản sao khác của ứng dụng cài cạnh bản này) cũng được giữ nguyên. Trên Linux, ứng dụng cũng xóa dòng `uniwork://` đã cũ trong
   `~/.config/mimeapps.list` khi tệp desktop của ứng dụng không còn.
 - **Khi gỡ gói.** Bước gỡ chạy bằng quyền root nên không với tới thư mục cá nhân của bạn; liên kết bạn đã
   thêm có thể còn lại cho đến lần ứng dụng được mở tiếp theo. Liên kết hỏng không gây hại, nó chỉ khiến

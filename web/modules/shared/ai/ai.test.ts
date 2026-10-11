@@ -84,6 +84,8 @@ const CREDENTIALS = {
       key_hint: '…abcd',
       created_at: '2026-10-09T00:00:00Z',
       updated_at: '2026-10-09T00:00:00Z',
+      model: '',
+      model_updated_at: '',
     },
   ],
   providers: [
@@ -1207,7 +1209,10 @@ describe('the chosen model is saved on the server (UNI-1240 4b)', () => {
   })
 
   /** the credential list + a recorder for the model PUTs (`put` answers them, default: echo + a new time) */
-  function create(items: Array<{ provider: string }>, put?: (call: Call) => Response) {
+  function create(
+    items: Array<{ provider: string }>,
+    put?: (call: Call) => Response | Promise<Response>,
+  ) {
     const { calls, fetch } = recorder((c) =>
       c.init.method === 'PUT'
         ? put
@@ -1369,6 +1374,94 @@ describe('the chosen model is saved on the server (UNI-1240 4b)', () => {
     expect(document.querySelector('.ow-ai-state')).toBeNull()
     expect(errors).not.toHaveBeenCalled()
     errors.mockRestore()
+  })
+
+  it('two quick picks reach the server one at a time, the last pick wins and an old answer never overwrites it', async () => {
+    const gates: Array<(r: Response) => void> = []
+    const { ai, puts } = create(
+      [cred('openai', 'gpt-4.1-mini', '2026-10-10T08:00:00Z')],
+      () => new Promise<Response>((resolve) => gates.push(resolve)),
+    )
+    await ai.settings()
+    const echo = (model: string) =>
+      jsonResponse(200, {
+        ...cred('openai', model, '2026-10-11T09:00:00Z'),
+      })
+    ai.choose('openai', 'gpt-4.1')
+    await vi.waitFor(() => expect(puts()).toHaveLength(1))
+    ai.choose('openai', 'gpt-4.1-nano')
+    await new Promise((r) => setTimeout(r, 0))
+    // the second pick waits behind the first: no second PUT while the first is in flight
+    expect(puts()).toHaveLength(1)
+    gates[0]!(echo('gpt-4.1'))
+    await vi.waitFor(() => expect(puts()).toHaveLength(2))
+    expect(JSON.parse(String(puts()[1]!.init.body))).toEqual({ model: 'gpt-4.1-nano' })
+    gates[1]!(echo('gpt-4.1-nano'))
+    await new Promise((r) => setTimeout(r, 0))
+    // the cached item holds the last pick: choosing it again has nothing left to send
+    ai.choose('openai', 'gpt-4.1-nano')
+    await new Promise((r) => setTimeout(r, 0))
+    expect(puts()).toHaveLength(2)
+    expect((await ai.settings()).providers.openai.model).toBe('gpt-4.1-nano')
+  })
+
+  it('picks that return to the model the server already holds send nothing more, and a failed first PUT still sends the last pick', async () => {
+    const gates: Array<(r: Response) => void> = []
+    const { ai, puts } = create(
+      [cred('openai', 'gpt-4.1-mini', '2026-10-10T08:00:00Z')],
+      () => new Promise<Response>((resolve) => gates.push(resolve)),
+    )
+    await ai.settings()
+    ai.choose('openai', 'gpt-4.1')
+    await vi.waitFor(() => expect(puts()).toHaveLength(1))
+    ai.choose('openai', 'gpt-4.1-nano')
+    ai.choose('openai', 'gpt-4.1')
+    gates[0]!(jsonResponse(200, cred('openai', 'gpt-4.1', '2026-10-11T09:00:00Z')))
+    await new Promise((r) => setTimeout(r, 0))
+    // the server already holds the last pick
+    expect(puts()).toHaveLength(1)
+
+    ai.choose('openai', 'gpt-4.1-nano')
+    await vi.waitFor(() => expect(puts()).toHaveLength(2))
+    ai.choose('openai', 'gpt-4.1-mini')
+    gates[1]!(jsonResponse(503, { code: 'cloud_unavailable' }))
+    await vi.waitFor(() => expect(puts()).toHaveLength(3))
+    expect(JSON.parse(String(puts()[2]!.init.body))).toEqual({ model: 'gpt-4.1-mini' })
+    gates[2]!(jsonResponse(200, cred('openai', 'gpt-4.1-mini', '2026-10-11T09:01:00Z')))
+    await new Promise((r) => setTimeout(r, 0))
+    expect((await ai.settings()).providers.openai.model).toBe('gpt-4.1-mini')
+  })
+
+  it('a key list that failed to load is not "no key": the settings say the keys are unknown, and a later read recovers', async () => {
+    let listing = false
+    const { fetch } = recorder((c) =>
+      c.url.endsWith('/credentials')
+        ? listing
+          ? jsonResponse(200, {
+              items: [cred('openai', 'gpt-4.1')],
+              providers: CREDENTIALS.providers,
+            })
+          : jsonResponse(503, { code: 'cloud_unavailable' })
+        : jsonResponse(200, CLOUD),
+    )
+    const ai = createWebAi({
+      port,
+      capabilities: { ai: true },
+      fetch,
+      origin: ORIGIN,
+      now: () => 0,
+    })
+    const down = await ai.settings()
+    expect(down.credentialsUnavailable).toBe(true)
+    expect(down.providers.openai.apiKey).toBe('')
+    listing = true
+    const up = await ai.settings()
+    expect(up.credentialsUnavailable).toBeUndefined()
+    expect(up.providers.openai.apiKey).not.toBe('')
+    // a refresh that fails after one good load keeps the last answer instead of reporting unknown
+    listing = false
+    await ai.state(true).catch(() => null)
+    expect((await ai.settings()).credentialsUnavailable).toBeUndefined()
   })
 
   it('nothing is sent for a provider without a stored key, or for the model the server already holds', async () => {

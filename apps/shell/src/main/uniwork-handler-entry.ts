@@ -1,6 +1,14 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  readFileSync,
+  realpathSync,
+  renameSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 
 /**
  * Linux: `app.setAsDefaultProtocolClient` records the app's URL schemes in the user's
@@ -70,7 +78,8 @@ export function pruneMimeapps(
       continue
     }
     dropped.push(...ids.filter((id) => !kept.includes(id)))
-    if (kept.length > 0) out.push(`${key}=${kept.join(';')};`)
+    // a CRLF list keeps its line ending on the rewritten line
+    if (kept.length > 0) out.push(`${key}=${kept.join(';')};${line.endsWith('\r') ? '\r' : ''}`)
   }
   return { text: out.join('\n'), dropped }
 }
@@ -87,9 +96,28 @@ export function pruneStaleSchemeHandlers(opts: HandlerEntryOptions = {}): string
     const text = readFileSync(file, 'utf-8')
     const next = pruneMimeapps(text, (id) => !exists(id))
     if (next.dropped.length === 0) return []
-    writeFileSync(file, next.text, 'utf-8')
+    replaceFile(file, next.text)
     return next.dropped
   } catch {
     return []
+  }
+}
+
+/**
+ * Writes `text` to a temp file in the same dir and renames it over the target, so a crash or a
+ * concurrent writer (another desktop tool) never sees a truncated list. A symlinked list (a
+ * dotfiles setup) is replaced at its real location, and the file's mode is kept.
+ */
+function replaceFile(file: string, text: string): void {
+  const real = realpathSync(file)
+  const tmp = join(dirname(real), `.mimeapps.list.${process.pid}.${Date.now()}.tmp`)
+  try {
+    writeFileSync(tmp, text, { encoding: 'utf-8', mode: statSync(real).mode & 0o777 })
+    renameSync(tmp, real)
+  } catch (err) {
+    try {
+      unlinkSync(tmp)
+    } catch {}
+    throw err
   }
 }

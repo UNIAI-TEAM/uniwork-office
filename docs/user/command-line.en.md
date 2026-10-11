@@ -6,14 +6,18 @@ convert and read documents without opening the app. Nothing is added until you c
 
 ## What the app does for you
 
-- **deb / rpm installs.** The link points at the package's own launcher, `/usr/bin/genoffice`,
-  which stays in place across updates. Because `/usr/bin/uniwork-office` is the app itself, the
-  app never puts a second `uniwork-office` in front of it on your `PATH`: the pane then shows
-  `genoffice` as the command that is ready to type.
+- **deb / rpm installs: the command stays `genoffice`.** The package already puts its own
+  launcher on your `PATH` as `/usr/bin/genoffice`, and it stays in place across updates. Typing
+  `uniwork-office` there opens the app (`/usr/bin/uniwork-office` is the app itself), so the app
+  does not add a `uniwork-office` command line link in front of it: the pane shows `genoffice` as
+  the command that is ready to type, and `genoffice` is what to use in scripts and assistants.
+  The `uniwork-office` command name applies to AppImage, tarball and macOS installs.
 - **Every launch.** The app removes command links it created earlier whose target is gone
-  (for example after the package was removed), moves links that point at an older copy of the
-  app to the current one, and replaces a link from older versions named `genoffice` by
-  `uniwork-office`. Links, files and programs the app did not create are never touched. On
+  (for example after the package was removed), moves a link that points at an older path of the
+  same installation (for example the versioned folder) to the current launcher, and replaces a link from older versions named `genoffice` by
+  `uniwork-office`. Links, files and programs the app did not create are never touched, and
+  neither is a working link that leads into another installation (for example another build or
+  another copy of the app installed next to this one). On
   Linux it also drops a stale `uniwork://` entry from `~/.config/mimeapps.list` when the app's
   desktop file no longer exists.
 - **Removing the package.** The package cannot reach files in your home folder (the remove step

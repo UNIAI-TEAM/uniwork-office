@@ -208,6 +208,9 @@ export function linkTarget(
   const platform = opts.platform ?? process.platform
   const env = opts.env ?? process.env
   const packageLauncher = opts.packageLauncher ?? PACKAGE_LAUNCHER
+  // An AppImage run offers no `guiExecutable`, so the shadow guard is off for it. That cannot
+  // put a `uniwork-office` link in front of a deb's GUI: an AppImage is a temporary mount that
+  // never gets a launcher to link (the app passes none), it only sweeps dead links.
   if (platform !== 'linux' || env.APPIMAGE) return { launcher }
   try {
     if (realpathSync(packageLauncher) !== realpathSync(launcher)) return { launcher }
@@ -246,13 +249,16 @@ export interface CleanupReport {
 /**
  * Launch-time housekeeping for links an earlier run created, in the known bin dirs only.
  * A link is ours when it carries one of our names (`CLI_COMMAND` or a legacy name), is a
- * symlink, and its target is a launcher of ours: it resolves to one (`isOurLauncher`), or, when
- * the target is gone, its path has the shape the app installs (`looksLikeAppLauncher`).
- * Anything else (a regular file, npm's link, another vendor's launcher) is never touched.
+ * symlink, and its target is a launcher of ours: when the target is gone, its path has the shape
+ * the app installs (`looksLikeAppLauncher`); when it is alive, it sits in the very install root
+ * `launcher` belongs to (`isSameInstall`). Anything else (a regular file, npm's link, another
+ * vendor's launcher, a live link into some other install root) is never touched.
  *
  *   - dangling target: removed (an uninstalled package, a vanished AppImage mount);
- *   - ours but not at `launcher` (an old install, or a versioned path where the stable package
- *     launcher is now known): repointed at `launcher`;
+ *   - alive, in this install root, but not at `launcher` (a versioned path where the stable
+ *     package launcher is now known): repointed at `launcher`. A link into another install root
+ *     stays where it is, so two channels installed side by side do not take the link from each
+ *     other at every launch;
  *   - a legacy name: replaced by a `CLI_COMMAND` link at `launcher`. Where the new name would
  *     shadow the GUI executable (`shadowsGui`) the legacy link is only dropped, because the
  *     package launcher already answers to its own name.
@@ -282,7 +288,10 @@ export function cleanupCliLinks(opts: CleanupOptions = {}): CleanupReport {
         if (looksLikeAppLauncher(resolved) && tryUnlink(link)) report.removed.push(link)
         continue
       }
-      if (!launcher || !isOurLauncher(resolved, launcher)) continue
+      // a live link is touched only when it leads into the install we run from: another install
+      // root, including an upstream Genoffice with the same layout, is none of our business, and
+      // two packaged channels (stable + dev) never repoint each other's link
+      if (!launcher || !isSameInstall(resolved, launcher)) continue
       if (!legacy && target === launcher) continue
       if (shadowsGui(dir, opts.guiExecutable, env)) {
         if (tryUnlink(link)) report.removed.push(link)
@@ -301,6 +310,37 @@ export function cleanupCliLinks(opts: CleanupOptions = {}): CleanupReport {
     }
   }
   return report
+}
+
+/**
+ * Does `target` lead into the install root that `launcher` belongs to? Both are resolved through
+ * their symlinks (the package's `/usr/bin/genoffice`, a macOS alias), then compared by the root of
+ * the `<root>/resources/cli/genoffice` layout (`<app>.app/Contents` on macOS), or by the very same
+ * file when a launcher has no such layout. Unlike `isOurLauncher`, a launcher of another copy of
+ * the app that happens to have the same layout is not ours here: the cleanup acts unasked at every
+ * launch, so it takes the narrow reading.
+ */
+export function isSameInstall(target: string, launcher: string): boolean {
+  let a: string
+  let b: string
+  try {
+    a = realpathSync(target)
+    b = realpathSync(launcher)
+  } catch {
+    return false
+  }
+  if (a === b) return true
+  const root = installRoot(a)
+  return root !== undefined && root === installRoot(b)
+}
+
+function installRoot(launcher: string): string | undefined {
+  if (basename(launcher) !== LAUNCHER_NAME) return undefined
+  const cli = dirname(launcher)
+  const resources = dirname(cli)
+  return basename(cli) === 'cli' && basename(resources).toLowerCase() === 'resources'
+    ? dirname(resources)
+    : undefined
 }
 
 /**

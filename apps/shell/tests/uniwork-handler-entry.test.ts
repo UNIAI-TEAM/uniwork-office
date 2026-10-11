@@ -1,4 +1,13 @@
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import {
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -93,5 +102,57 @@ describe('uniwork:// handler entry (Linux)', () => {
       join('/b', 'applications'),
     ])
     expect(mimeappsPath({ XDG_CONFIG_HOME: '/c' }, '/h')).toBe(join('/c', 'mimeapps.list'))
+  })
+})
+
+describe('uniwork:// handler entry: writing the list back', () => {
+  function setup(text: string) {
+    const home = mkdtempSync(join(tmpdir(), 'uniwork-mime-write-'))
+    const file = mimeappsPath({}, home)
+    mkdirSync(join(file, '..'), { recursive: true })
+    writeFileSync(file, text)
+    return { home, file }
+  }
+
+  it('keeps CRLF line endings, including on a rewritten line', () => {
+    const crlf = LIST.replace(/\n/g, '\r\n')
+    const { home, file } = setup(crlf)
+    pruneStaleSchemeHandlers({ env: {}, home, desktopFileExists: () => false })
+    const after = readFileSync(file, 'utf-8')
+    expect(after).toContain('x-scheme-handler/uniwork-office-dev=other.desktop;\r\n')
+    // no bare LF anywhere: every line of the user's file still ends in CRLF
+    expect(after.replace(/\r\n/g, '')).not.toMatch(/[\r\n]/)
+  })
+
+  it('goes through a temp file in the same dir and leaves nothing behind', () => {
+    const { home, file } = setup(LIST)
+    const dir = join(file, '..')
+    const inodeBefore = statSync(file).ino
+    pruneStaleSchemeHandlers({ env: {}, home, desktopFileExists: () => false })
+    // a rename swaps the file: the old inode is not rewritten in place
+    if (process.platform !== 'win32') expect(statSync(file).ino).not.toBe(inodeBefore)
+    expect(readdirSync(dir)).toEqual(['mimeapps.list'])
+  })
+
+  it('writes through a symlinked list and keeps the link and the mode', () => {
+    const home = mkdtempSync(join(tmpdir(), 'uniwork-mime-link-'))
+    const real = join(home, 'dotfiles', 'mimeapps.list')
+    mkdirSync(join(real, '..'), { recursive: true })
+    writeFileSync(real, LIST, { mode: 0o640 })
+    const file = mimeappsPath({}, home)
+    mkdirSync(join(file, '..'), { recursive: true })
+    try {
+      symlinkSync(real, file)
+    } catch {
+      return // this host cannot create symlinks (Windows without the privilege)
+    }
+    expect(
+      pruneStaleSchemeHandlers({ env: {}, home, desktopFileExists: () => false }),
+    ).toHaveLength(3)
+    expect(lstatSync(file).isSymbolicLink()).toBe(true)
+    expect(readFileSync(real, 'utf-8')).not.toContain(
+      '[Default Applications]\nx-scheme-handler/uniwork=',
+    )
+    expect(statSync(real).mode & 0o777).toBe(0o640)
   })
 })

@@ -90,9 +90,13 @@ export function AiModelPicker({
   const wantedConfig = wanted ? settings?.providers?.[wanted] : undefined
   const hasKey = (wantedConfig?.apiKey ?? '') !== ''
   // web frames: the chip reads "Choose model" (nothing usable) -> send is off for everyone in the
-  // frame, viewer or editor, and the hint says what is missing: a model (a key is stored) or a key
+  // frame, viewer or editor, and the hint says what is missing: a model (a key is stored) or a key.
+  // A key list that failed to load says nothing about keys: no hint, send stays on, the server decides
   const needHint =
-    bridge.requireModel === true && settings !== null && !currentUsable
+    bridge.requireModel === true &&
+    settings !== null &&
+    !currentUsable &&
+    settings.credentialsUnavailable !== true
       ? hasKey
         ? strings.needModel
         : strings.needKey
@@ -107,6 +111,8 @@ export function AiModelPicker({
   }, [needHint, openSettings, openSettingsOnce])
 
   const toggle = () => {
+    // a key list that failed to load is tried again when the chip is opened (and on focus)
+    if (!open && settings?.credentialsUnavailable) refresh()
     if (!open) {
       const rect = chipRef.current?.getBoundingClientRect()
       // the composer sits at the panel bottom: open upwards, pinned to the chip

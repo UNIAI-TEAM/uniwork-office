@@ -90,6 +90,33 @@ it('no key at all: send is off too, and the hint is the add-a-key copy (viewer a
   expect(send.title).toBe(hint)
 })
 
+it('a key list that failed to load is not "add an API key": send stays on and the server decides', async () => {
+  const unknown = { ...settingsWith('custom', '', ''), credentialsUnavailable: true }
+  const { send, hint } = await mount(unknown, true)
+  expect(send.disabled).toBe(false)
+  expect(hint).toBe('Enter to send')
+  expect(host.querySelector('.ai-input-need')).toBeNull()
+})
+
+it('opening the chip reads the settings again while the key list is unknown', async () => {
+  let reads = 0
+  const unknown = { ...settingsWith('custom', '', ''), credentialsUnavailable: true }
+  const bridge: AiModelPickerBridge = {
+    getSettings: async () => (reads++, unknown),
+    setSettings: async () => {},
+    requireModel: true,
+  }
+  await act(async () => {
+    root.render(createElement(AiModelPicker, { bridge, lang: 'en' }))
+  })
+  await act(async () => {})
+  const before = reads
+  await act(async () => {
+    ;(host.querySelector('.ai-model-chip') as HTMLButtonElement).click()
+  })
+  expect(reads).toBeGreaterThan(before)
+})
+
 it('the icon-only composer shows the hint above the footer and it opens the AI settings', async () => {
   const open = vi.fn()
   const { send } = await mount(settingsWith('custom', '', ''), true, {

@@ -83,8 +83,18 @@ describe('Settings > Integrations prose', () => {
   it('reads naturally in English and Vietnamese', () => {
     expect(strings.en.intgCliTitle).toBe('Advanced: UniWork Office command line')
     expect(strings.vi.intgCliTitle).toBe('Nâng cao: dòng lệnh UniWork Office')
-    expect(strings.en.intgStep2Note).toContain('UniWork Office (uniwork-office) command line')
-    expect(strings.vi.intgStep2Note).toContain('dòng lệnh UniWork Office (uniwork-office)')
+    expect(strings.en.intgStep2Note).toContain('UniWork Office ({cmd}) command line')
+    expect(strings.vi.intgStep2Note).toContain('dòng lệnh UniWork Office ({cmd})')
+  })
+
+  it('never spells the command out where the app knows it: Windows and deb/rpm type genoffice', () => {
+    for (const [lang, table] of Object.entries(strings)) {
+      for (const key of ['intgStep2Note', 'intgCliPartDesc', 'intgMcpStdioDesc'] as const) {
+        expect(table[key], `${lang}.${key}`).not.toContain('uniwork-office')
+      }
+    }
+    expect(strings.en.intgMcpStdioDesc).toContain('UniWork Office ({cmd} mcp)')
+    expect(strings.vi.intgMcpStdioDesc).toContain('UniWork Office ({cmd} mcp)')
   })
 })
 

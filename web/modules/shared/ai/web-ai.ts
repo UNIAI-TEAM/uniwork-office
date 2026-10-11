@@ -359,7 +359,12 @@ export function createWebAi(opts: {
   async function settings(): Promise<AiSettings> {
     const base = defaultAiSettings()
     if (!(await activation)) return base
-    await load().catch(() => EMPTY)
+    // a list that never loaded says nothing about the keys; after one good load a failed refresh
+    // keeps the last answer instead
+    const listFailed = await load().then(
+      () => false,
+      () => !everLoaded,
+    )
     const usable = usableProviders()
     const fallback = state.credentials.providers.find((p) => WEB_PROVIDER_IDS.has(p.id))?.id
     // this browser's pick when its provider still has a key, else the server's default (the provider
@@ -393,7 +398,14 @@ export function createWebAi(opts: {
     }
     const cloudOn = opts.capabilities.imageGeneration === true
     // UniAI is the desktop's pool of cloud models: the web runs only the viewer's own providers
-    return { ...base, provider, providers, gskToolsEnabled: cloudOn, uniAiAvailable: false }
+    return {
+      ...base,
+      provider,
+      providers,
+      gskToolsEnabled: cloudOn,
+      uniAiAvailable: false,
+      ...(listFailed ? { credentialsUnavailable: true } : {}),
+    }
   }
 
   /**
@@ -414,6 +426,10 @@ export function createWebAi(opts: {
     return best?.provider ?? null
   }
 
+  // One PUT in flight per provider and only the latest pick waiting behind it, so two quick picks
+  // reach the server in order and the last one wins; each answer is the server's truth at that point.
+  const modelSaves = new Map<string, { latest: string; running: boolean }>()
+
   /**
    * Saves a chosen model with the person's credential, so another browser opens on it. Quiet by
    * design: a failed save (offline, an older server, a stale token) keeps this browser's choice and
@@ -421,21 +437,34 @@ export function createWebAi(opts: {
    * key (the server would refuse a model-only body) or when the server already holds that model.
    */
   async function saveModel(provider: string, model: string): Promise<void> {
-    const client = clientRef
-    const stored = state.credentials.items.find((c) => c.provider === provider)
-    if (!client || !stored || stored.model === model) return
+    const slot = modelSaves.get(provider) ?? { latest: model, running: false }
+    slot.latest = model
+    modelSaves.set(provider, slot)
+    if (slot.running) return
+    slot.running = true
     try {
-      const saved = await client.saveCredential(provider, { model })
-      state = {
-        ...state,
-        credentials: {
-          ...state.credentials,
-          items: state.credentials.items.map((c) => (c.provider === provider ? saved : c)),
-        },
+      for (;;) {
+        const want = slot.latest
+        const client = clientRef
+        const stored = state.credentials.items.find((c) => c.provider === provider)
+        if (!client || !stored || stored.model === want) return
+        try {
+          const saved = await client.saveCredential(provider, { model: want })
+          state = {
+            ...state,
+            credentials: {
+              ...state.credentials,
+              items: state.credentials.items.map((c) => (c.provider === provider ? saved : c)),
+            },
+          }
+          notifyChanged()
+        } catch {
+          // kept in this browser's cache only
+        }
+        if (slot.latest === want) return
       }
-      notifyChanged()
-    } catch {
-      // kept in this browser's cache only
+    } finally {
+      slot.running = false
     }
   }
 
