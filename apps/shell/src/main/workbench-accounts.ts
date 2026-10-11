@@ -56,13 +56,22 @@ export interface WorkbenchAccountsOptions {
   /** one line when the pre-upgrade data moves (account id only, no other personal data) */
   log?: (line: string) => void
   now?: () => Date
+  /** removes a file (tests make it fail) */
+  unlink?: (path: string) => void
 }
+
+/** longest wait for the first account status after start before the signed-out bucket is used anyway */
+const SETTLE_MAX_WAIT_MS = 10_000
 
 export class WorkbenchAccounts {
   private readonly userDataDir: string
   private readonly root: string
   private readonly log: (line: string) => void
   private readonly now: () => Date
+  private readonly unlink: (path: string) => void
+  /** the first owner after start has been applied: until then the bucket is a guess */
+  private settled = false
+  private settleWaiters: Array<() => void> = []
   private active = LOCAL_BUCKET
   private activeOwner: WorkbenchOwner | null = null
   /** the open database of the active bucket; undefined = not opened yet */
@@ -73,6 +82,30 @@ export class WorkbenchAccounts {
     this.root = join(options.userDataDir, 'workbench')
     this.log = options.log ?? ((line) => console.info(line))
     this.now = options.now ?? (() => new Date())
+    this.unlink = options.unlink ?? unlinkSync
+  }
+
+  /**
+   * Resolves once the first owner after start has been applied (a signed-in
+   * launch must not read the signed-out bucket while the session restore is
+   * still starting), or after `maxWaitMs` so a stuck start cannot leave the
+   * renderer without any data.
+   */
+  whenSettled(maxWaitMs: number = SETTLE_MAX_WAIT_MS): Promise<void> {
+    if (this.settled) return Promise.resolve()
+    return new Promise<void>((resolve) => {
+      const done = (): void => {
+        clearTimeout(timer)
+        resolve()
+      }
+      const timer = setTimeout(done, maxWaitMs)
+      this.settleWaiters.push(done)
+    })
+  }
+
+  private settle(): void {
+    this.settled = true
+    for (const done of this.settleWaiters.splice(0)) done()
   }
 
   /** the active bucket */
@@ -86,6 +119,7 @@ export class WorkbenchAccounts {
    */
   setOwner(owner: WorkbenchOwner | null): boolean {
     const next = workbenchBucketOf(owner)
+    this.settle()
     if (next === this.active) return false
     this.closeActive()
     this.active = next
@@ -172,7 +206,8 @@ export class WorkbenchAccounts {
   private migrateLegacy(bucket: string, owner: WorkbenchOwner): void {
     if (existsSync(this.markerPath())) return
     const legacyPath = join(this.root, 'workbench.sqlite')
-    if (existsSync(legacyPath)) {
+    const hadLegacyData = existsSync(legacyPath)
+    if (hadLegacyData) {
       const legacy = tryOpenWorkbenchDb(this.userDataDir, this.root)
       const target = legacy ? tryOpenWorkbenchDb(this.userDataDir, this.bucketDir(bucket)) : null
       if (!legacy || !target) {
@@ -191,9 +226,14 @@ export class WorkbenchAccounts {
       }
       for (const suffix of ['', '-wal', '-shm']) {
         try {
-          unlinkSync(`${legacyPath}${suffix}`)
-        } catch {
-          /* already gone */
+          this.unlink(`${legacyPath}${suffix}`)
+        } catch (err) {
+          // already gone is fine; anything else leaves the pre-upgrade file on disk, unreferenced
+          if ((err as NodeJS.ErrnoException)?.code !== 'ENOENT') {
+            this.log(
+              `[workbench] could not remove the pre-upgrade database file workbench.sqlite${suffix}: ${(err as Error)?.message ?? err}`,
+            )
+          }
         }
       }
     }
@@ -203,6 +243,8 @@ export class WorkbenchAccounts {
       movedAt: this.now().toISOString(),
       rendererDone: false,
     })
-    this.log(`[workbench] pre-upgrade My AI and workbench data moved to account ${owner.accountId}`)
+    // a fresh install has nothing to move (the marker still records the first account)
+    if (hadLegacyData)
+      this.log(`[workbench] pre-upgrade My AI and workbench data moved to account ${owner.accountId}`)
   }
 }

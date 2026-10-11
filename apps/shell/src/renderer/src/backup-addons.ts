@@ -9,12 +9,12 @@
  *    the Backup plan’s included quota.
  *
  * Server (future): checkout → entitlement webhook → GET /v1/addons/entitlements.
- * Client caches entitlements in localStorage; cloud APIs refuse sync without a
+ * Client caches entitlements in the per-account workbench store; cloud APIs refuse sync without a
  * valid signed entitlement. Until the API exists, purchase buttons open the
  * pricing page and “Simulate” is available only in DEV for UI testing.
  */
 
-import { wbStoreSetRaw } from './workbench-store-client'
+import { wbStoreGetRaw, wbStoreKeys, wbStoreSetRaw } from './workbench-store-client'
 
 export type BackupPlanId = 'backup-basic' | 'backup-plus'
 export type StoragePackId = 'storage-50' | 'storage-200' | 'storage-1tb'
@@ -156,7 +156,7 @@ export function defaultEntitlements(): AddonEntitlements {
 
 export function readEntitlements(): AddonEntitlements {
   try {
-    const raw = localStorage.getItem(ENTITLEMENT_KEY)
+    const raw = wbStoreGetRaw(ENTITLEMENT_KEY)
     if (!raw) return defaultEntitlements()
     const parsed = JSON.parse(raw) as AddonEntitlements
     if (parsed?.version !== 1) return defaultEntitlements()
@@ -168,10 +168,7 @@ export function readEntitlements(): AddonEntitlements {
 
 export function writeEntitlements(next: AddonEntitlements): void {
   try {
-    localStorage.setItem(
-      ENTITLEMENT_KEY,
-      JSON.stringify({ ...next, updatedAt: new Date().toISOString() }),
-    )
+    wbStoreSetRaw(ENTITLEMENT_KEY, JSON.stringify({ ...next, updatedAt: new Date().toISOString() }))
   } catch {
     /* ignore */
   }
@@ -192,26 +189,22 @@ export function hasCloudBackup(ent: AddonEntitlements): boolean {
   return ent.backupPlanId != null
 }
 
-/** Keys that belong in a Workbench / personal-space backup snapshot. */
+function isBackupKey(k: string): boolean {
+  return (
+    k.startsWith('uniwork.wb.') ||
+    k.startsWith('uniwork.skill.') ||
+    k.startsWith('uniwork.teacher') ||
+    k.startsWith('uniwork.activePractice') ||
+    k.startsWith('uniwork.my-ai.') ||
+    k.startsWith('uniwork.ai.') ||
+    k === 'uniwork.teacherUiLang' ||
+    k === ENTITLEMENT_KEY
+  )
+}
+
+/** Keys that belong in a Workbench / personal-space backup snapshot (of the signed-in account, or of signed-out use). */
 export function collectBackupKeys(): string[] {
-  const keys: string[] = []
-  for (let i = 0; i < localStorage.length; i++) {
-    const k = localStorage.key(i)
-    if (!k) continue
-    if (
-      k.startsWith('uniwork.wb.') ||
-      k.startsWith('uniwork.skill.') ||
-      k.startsWith('uniwork.teacher') ||
-      k.startsWith('uniwork.activePractice') ||
-      k.startsWith('uniwork.my-ai.') ||
-      k.startsWith('uniwork.ai.') ||
-      k === 'uniwork.teacherUiLang' ||
-      k === ENTITLEMENT_KEY
-    ) {
-      keys.push(k)
-    }
-  }
-  return keys.sort()
+  return wbStoreKeys().filter(isBackupKey).sort()
 }
 
 export interface LocalBackupSnapshot {
@@ -225,7 +218,7 @@ export interface LocalBackupSnapshot {
 export function exportLocalBackup(): LocalBackupSnapshot {
   const keys: Record<string, string> = {}
   for (const k of collectBackupKeys()) {
-    const v = localStorage.getItem(k)
+    const v = wbStoreGetRaw(k)
     if (v != null) keys[k] = v
   }
   return {
@@ -247,20 +240,7 @@ export function importLocalBackup(snapshot: LocalBackupSnapshot): { ok: true; co
   let count = 0
   for (const [k, v] of Object.entries(snapshot.keys)) {
     if (typeof k !== 'string' || typeof v !== 'string') continue
-    if (
-      !(
-        k.startsWith('uniwork.wb.') ||
-        k.startsWith('uniwork.skill.') ||
-        k.startsWith('uniwork.teacher') ||
-        k.startsWith('uniwork.activePractice') ||
-        k.startsWith('uniwork.my-ai.') ||
-        k.startsWith('uniwork.ai.') ||
-        k === 'uniwork.teacherUiLang' ||
-        k === ENTITLEMENT_KEY
-      )
-    ) {
-      continue
-    }
+    if (!isBackupKey(k)) continue
     wbStoreSetRaw(k, v)
     count++
   }
