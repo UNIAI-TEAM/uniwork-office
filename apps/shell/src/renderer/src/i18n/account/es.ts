@@ -75,4 +75,7 @@ export const es = {
   acctErrKeyringUnavailable: 'El almacenamiento seguro de este equipo no está disponible.',
   acctErrServerError: 'UniWork ha tenido un problema. Inténtalo de nuevo más tarde.',
   acctErrMalformedResponse: 'UniWork envió una respuesta inesperada. Inténtalo de nuevo más tarde.',
+  wbLoadFailedTitle: 'No se pudieron cargar tus datos guardados',
+  wbLoadFailedBody:
+    'Los cambios no se guardan hasta que se carguen. Inténtalo de nuevo; si sigue fallando, reinicia la aplicación.',
 } satisfies Record<keyof typeof zh, string>

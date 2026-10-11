@@ -73,4 +73,7 @@ export const th = {
   acctErrKeyringUnavailable: 'ที่เก็บข้อมูลที่ปลอดภัยบนคอมพิวเตอร์เครื่องนี้ไม่พร้อมใช้งาน',
   acctErrServerError: 'UniWork พบปัญหา โปรดลองอีกครั้งในภายหลัง',
   acctErrMalformedResponse: 'UniWork ส่งการตอบกลับที่ไม่คาดคิด โปรดลองอีกครั้งในภายหลัง',
+  wbLoadFailedTitle: 'ไม่สามารถโหลดข้อมูลที่บันทึกไว้ของคุณได้',
+  wbLoadFailedBody:
+    'การเปลี่ยนแปลงจะไม่ถูกบันทึกจนกว่าจะโหลดสำเร็จ ลองอีกครั้ง หากยังล้มเหลว ให้เริ่มแอปใหม่',
 } satisfies Record<keyof typeof zh, string>

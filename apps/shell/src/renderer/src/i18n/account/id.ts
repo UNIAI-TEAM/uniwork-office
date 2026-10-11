@@ -73,4 +73,7 @@ export const id = {
   acctErrKeyringUnavailable: 'Penyimpanan aman di komputer ini tidak tersedia.',
   acctErrServerError: 'UniWork mengalami masalah. Silakan coba lagi nanti.',
   acctErrMalformedResponse: 'UniWork mengirim respons yang tidak terduga. Silakan coba lagi nanti.',
+  wbLoadFailedTitle: 'Data tersimpan Anda tidak dapat dimuat',
+  wbLoadFailedBody:
+    'Perubahan tidak disimpan sampai data berhasil dimuat. Coba lagi; jika terus gagal, mulai ulang aplikasi.',
 } satisfies Record<keyof typeof zh, string>

@@ -72,4 +72,7 @@ export const vi = {
   acctErrKeyringUnavailable: 'Kho lưu trữ bảo mật trên máy tính này không khả dụng.',
   acctErrServerError: 'UniWork đang gặp sự cố. Vui lòng thử lại sau.',
   acctErrMalformedResponse: 'UniWork trả về phản hồi không mong đợi. Vui lòng thử lại sau.',
+  wbLoadFailedTitle: 'Không thể tải dữ liệu đã lưu của bạn',
+  wbLoadFailedBody:
+    'Các thay đổi sẽ không được lưu cho đến khi tải được. Hãy thử lại; nếu vẫn lỗi, hãy khởi động lại ứng dụng.',
 } satisfies Record<keyof typeof zh, string>

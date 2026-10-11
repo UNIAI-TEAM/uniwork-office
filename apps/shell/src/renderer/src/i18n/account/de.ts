@@ -80,4 +80,7 @@ export const de = {
     'Bei UniWork ist ein Problem aufgetreten. Bitte versuchen Sie es später erneut.',
   acctErrMalformedResponse:
     'UniWork hat eine unerwartete Antwort gesendet. Bitte versuchen Sie es später erneut.',
+  wbLoadFailedTitle: 'Ihre gespeicherten Daten konnten nicht geladen werden',
+  wbLoadFailedBody:
+    'Änderungen werden erst gespeichert, wenn die Daten geladen sind. Versuchen Sie es erneut; wenn es weiter fehlschlägt, starten Sie die App neu.',
 } satisfies Record<keyof typeof zh, string>

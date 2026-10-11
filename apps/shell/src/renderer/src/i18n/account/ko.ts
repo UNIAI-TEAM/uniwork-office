@@ -71,4 +71,7 @@ export const ko = {
   acctErrKeyringUnavailable: '이 컴퓨터의 보안 저장소를 사용할 수 없습니다.',
   acctErrServerError: 'UniWork에 문제가 발생했습니다. 나중에 다시 시도해 주세요.',
   acctErrMalformedResponse: 'UniWork에서 예상치 못한 응답이 왔습니다. 나중에 다시 시도해 주세요.',
+  wbLoadFailedTitle: '저장된 데이터를 불러오지 못했습니다',
+  wbLoadFailedBody:
+    '불러올 때까지 변경 사항이 저장되지 않습니다. 다시 시도해 보세요. 계속 실패하면 앱을 다시 시작하세요.',
 } satisfies Record<keyof typeof zh, string>

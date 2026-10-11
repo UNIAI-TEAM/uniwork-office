@@ -230,7 +230,9 @@ export function exportLocalBackup(): LocalBackupSnapshot {
   }
 }
 
-export function importLocalBackup(snapshot: LocalBackupSnapshot): { ok: true; count: number } | { ok: false; error: string } {
+export function importLocalBackup(
+  snapshot: LocalBackupSnapshot,
+): { ok: true; count: number } | { ok: false; error: string } {
   if (!snapshot || snapshot.kind !== 'uniwork-local-backup' || snapshot.version !== 1) {
     return { ok: false, error: 'invalid-format' }
   }

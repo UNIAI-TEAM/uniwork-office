@@ -70,4 +70,7 @@ export const he = {
   acctErrKeyringUnavailable: 'האחסון המאובטח במחשב זה אינו זמין.',
   acctErrServerError: 'אירעה בעיה ב-UniWork. נסה שוב מאוחר יותר.',
   acctErrMalformedResponse: 'UniWork שלח תגובה בלתי צפויה. נסה שוב מאוחר יותר.',
+  wbLoadFailedTitle: 'לא ניתן היה לטעון את הנתונים השמורים שלך',
+  wbLoadFailedBody:
+    'שינויים לא יישמרו עד שהטעינה תצליח. נסו שוב; אם הכשל נמשך, הפעילו מחדש את האפליקציה.',
 } satisfies Record<keyof typeof zh, string>

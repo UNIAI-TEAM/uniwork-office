@@ -1,11 +1,13 @@
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   LOCAL_BUCKET,
   WorkbenchAccounts,
+  loadWorkbenchSnapshot,
   workbenchBucketOf,
+  type WorkbenchLoadSource,
   type WorkbenchOwner,
 } from '../src/main/workbench-accounts'
 import { WorkbenchDb, resetWorkbenchDbForTests } from '../src/main/workbench-db'
@@ -226,7 +228,14 @@ describeSqlite('workbench data per UniWork account', () => {
       log: (line) => log.push(line),
       unlink: (path) => {
         // the -wal / -shm side files may simply not exist
-        if (path.endsWith('workbench.sqlite')) throw new Error('EBUSY: resource busy')
+        if (path.endsWith('workbench.sqlite')) {
+          // a real fs error message carries the absolute path (and the OS user name)
+          const busy = new Error(
+            `EBUSY: resource busy or locked, unlink '${path}'`,
+          ) as NodeJS.ErrnoException
+          busy.code = 'EBUSY'
+          throw busy
+        }
         const err = new Error('ENOENT') as NodeJS.ErrnoException
         err.code = 'ENOENT'
         throw err
@@ -236,8 +245,11 @@ describeSqlite('workbench data per UniWork account', () => {
     store.setOwner(OWNER)
     expect(store.activeDb()!.get(CHAT)).toBe('[]')
     expect(log).toHaveLength(2)
-    expect(log[0]).toMatch(/could not remove the pre-upgrade database file workbench\.sqlite: EBUSY/)
+    expect(log[0]).toMatch(
+      /could not remove the pre-upgrade database file workbench\.sqlite: EBUSY$/,
+    )
     expect(log[0]).not.toContain(dir)
+    expect(log[0]).not.toContain('resource busy')
     expect(log[1]).toMatch(/moved to account acc-owner$/)
   })
 })
@@ -269,5 +281,89 @@ describe('first account status after start', () => {
     await stuck.whenSettled(20)
     expect(Date.now() - started).toBeLessThan(5_000)
     expect(stuck.bucket()).toBe(LOCAL_BUCKET)
+  })
+})
+
+describe('wbLoadAll: the first read waits for the first account status', () => {
+  /** a store whose bucket only becomes the account's once the owner is applied */
+  function fakeSource(): {
+    source: WorkbenchLoadSource
+    settle: () => void
+    calls: string[]
+  } {
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const calls: string[] = []
+    let bucket = LOCAL_BUCKET
+    const source: WorkbenchLoadSource = {
+      whenSettled: () => gate.then(() => void calls.push('settled')),
+      bucket: () => bucket,
+      activeDb: () => {
+        calls.push(`open:${bucket}`)
+        return { dbPath: `/db/${bucket}`, loadAll: () => ({ k: bucket }) }
+      },
+      legacyPending: () => false,
+    }
+    return {
+      source,
+      calls,
+      settle: () => {
+        bucket = 'a-owner'
+        release()
+      },
+    }
+  }
+
+  it('does not apply the owner, read the bucket or open a database before it settled', async () => {
+    const { source, settle, calls } = fakeSource()
+    const syncOwner = vi.fn(() => void calls.push('sync'))
+    const load = loadWorkbenchSnapshot(source, syncOwner)
+    for (let i = 0; i < 5; i++) await Promise.resolve()
+    expect(syncOwner).not.toHaveBeenCalled()
+    expect(calls).toEqual([])
+
+    settle()
+    const snap = await load
+    expect(calls).toEqual(['settled', 'sync', 'open:a-owner'])
+    expect(snap).toMatchObject({ bucket: 'a-owner', keys: { k: 'a-owner' }, keyCount: 1 })
+    // never the signed-out bucket on the way
+    expect(calls).not.toContain(`open:${LOCAL_BUCKET}`)
+  })
+
+  it('reports an unavailable store and a failed read as unavailable, with the bucket that was asked for', async () => {
+    const none: WorkbenchLoadSource = {
+      whenSettled: async () => undefined,
+      bucket: () => 'a-owner',
+      activeDb: () => null,
+      legacyPending: () => true,
+    }
+    expect(await loadWorkbenchSnapshot(none, () => undefined)).toEqual({
+      keys: {},
+      keyCount: 0,
+      dbPath: '',
+      bucket: 'a-owner',
+      legacyPending: true,
+      unavailable: true,
+    })
+
+    const broken: WorkbenchLoadSource = {
+      ...none,
+      activeDb: () => ({
+        dbPath: '',
+        loadAll: () => {
+          throw new Error('disk error')
+        },
+      }),
+    }
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    try {
+      expect(await loadWorkbenchSnapshot(broken, () => undefined)).toMatchObject({
+        bucket: 'a-owner',
+        legacyPending: false,
+        unavailable: true,
+      })
+    } finally {
+      error.mockRestore()
+    }
   })
 })

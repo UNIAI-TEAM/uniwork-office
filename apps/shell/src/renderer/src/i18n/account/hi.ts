@@ -75,4 +75,7 @@ export const hi = {
   acctErrKeyringUnavailable: 'इस कंप्यूटर पर सुरक्षित स्टोरेज उपलब्ध नहीं है।',
   acctErrServerError: 'UniWork में कोई समस्या आई। कृपया बाद में फिर से प्रयास करें।',
   acctErrMalformedResponse: 'UniWork ने अप्रत्याशित जवाब भेजा। कृपया बाद में फिर से प्रयास करें।',
+  wbLoadFailedTitle: 'आपका सहेजा गया डेटा लोड नहीं हो सका',
+  wbLoadFailedBody:
+    'डेटा लोड होने तक बदलाव सहेजे नहीं जाएँगे। फिर से कोशिश करें; अगर फिर भी विफल रहे तो ऐप को दोबारा शुरू करें।',
 } satisfies Record<keyof typeof zh, string>

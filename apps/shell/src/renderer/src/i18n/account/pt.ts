@@ -73,4 +73,7 @@ export const pt = {
   acctErrKeyringUnavailable: 'O armazenamento seguro deste computador está indisponível.',
   acctErrServerError: 'O UniWork encontrou um problema. Tente novamente mais tarde.',
   acctErrMalformedResponse: 'O UniWork enviou uma resposta inesperada. Tente novamente mais tarde.',
+  wbLoadFailedTitle: 'Não foi possível carregar seus dados salvos',
+  wbLoadFailedBody:
+    'As alterações não são salvas até que o carregamento funcione. Tente novamente; se continuar falhando, reinicie o aplicativo.',
 } satisfies Record<keyof typeof zh, string>

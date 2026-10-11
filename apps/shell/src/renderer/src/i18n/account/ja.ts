@@ -77,4 +77,7 @@ export const ja = {
   acctErrServerError: 'UniWork で問題が発生しました。しばらくしてからもう一度お試しください。',
   acctErrMalformedResponse:
     'UniWork から予期しない応答がありました。しばらくしてからもう一度お試しください。',
+  wbLoadFailedTitle: '保存したデータを読み込めませんでした',
+  wbLoadFailedBody:
+    '読み込めるまで、変更は保存されません。もう一度お試しください。それでも失敗する場合は、アプリを再起動してください。',
 } satisfies Record<keyof typeof zh, string>

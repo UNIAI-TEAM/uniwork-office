@@ -75,4 +75,7 @@ export const cs = {
   acctErrKeyringUnavailable: 'Zabezpečené úložiště v tomto počítači není dostupné.',
   acctErrServerError: 'V UniWork došlo k problému. Zkuste to prosím později.',
   acctErrMalformedResponse: 'UniWork odeslal neočekávanou odpověď. Zkuste to prosím později.',
+  wbLoadFailedTitle: 'Uložená data se nepodařilo načíst',
+  wbLoadFailedBody:
+    'Změny se neukládají, dokud se data nenačtou. Zkuste to znovu; pokud to selhává, restartujte aplikaci.',
 } satisfies Record<keyof typeof zh, string>

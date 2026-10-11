@@ -77,4 +77,7 @@ export const fr = {
   acctErrServerError: 'UniWork a rencontré un problème. Veuillez réessayer plus tard.',
   acctErrMalformedResponse:
     'UniWork a envoyé une réponse inattendue. Veuillez réessayer plus tard.',
+  wbLoadFailedTitle: 'Impossible de charger vos données enregistrées',
+  wbLoadFailedBody:
+    'Les modifications ne sont pas enregistrées tant que le chargement n’aboutit pas. Réessayez ; si le problème persiste, redémarrez l’application.',
 } satisfies Record<keyof typeof zh, string>

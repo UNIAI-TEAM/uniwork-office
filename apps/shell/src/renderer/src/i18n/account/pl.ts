@@ -75,4 +75,7 @@ export const pl = {
   acctErrKeyringUnavailable: 'Bezpieczny magazyn na tym komputerze jest niedostępny.',
   acctErrServerError: 'W UniWork wystąpił problem. Spróbuj ponownie później.',
   acctErrMalformedResponse: 'UniWork wysłał nieoczekiwaną odpowiedź. Spróbuj ponownie później.',
+  wbLoadFailedTitle: 'Nie udało się wczytać zapisanych danych',
+  wbLoadFailedBody:
+    'Zmiany nie są zapisywane, dopóki dane się nie wczytają. Spróbuj ponownie; jeśli problem się powtarza, uruchom aplikację ponownie.',
 } satisfies Record<keyof typeof zh, string>

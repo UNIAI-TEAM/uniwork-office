@@ -273,7 +273,7 @@ import type {
 import { HOME_CHANNELS } from '../shared/home-api'
 import { extractAllowedFileExcerpts } from './file-excerpts'
 import { isAllowedWbKey, type WbKvMap } from './workbench-db'
-import { WorkbenchAccounts } from './workbench-accounts'
+import { WorkbenchAccounts, loadWorkbenchSnapshot } from './workbench-accounts'
 import { exportWorkbenchBackup, importWorkbenchBackup } from './workbench-backup'
 import {
   normalizeAiPanelPrefs,
@@ -4314,26 +4314,9 @@ function registerHomeIpc(): void {
     extractAllowedFileExcerpts(paths, tabManager?.openFilePaths() ?? []),
   )
 
-  ipcMain.handle(HOME_CHANNELS.wbLoadAll, async () => {
-    const store = workbenchAccounts()
-    // held until the first account status after start has been applied (the
-    // restore has read the stored session): a signed-in launch never loads or
-    // writes the signed-out bucket on the way
-    await store.whenSettled()
-    syncWorkbenchOwner()
-    const bucket = store.bucket()
-    try {
-      const db = store.activeDb()
-      const legacyPending = store.legacyPending(bucket)
-      if (!db)
-        return { keys: {}, keyCount: 0, dbPath: '', bucket, legacyPending, unavailable: true }
-      const keys = db.loadAll()
-      return { keys, keyCount: Object.keys(keys).length, dbPath: db.dbPath, bucket, legacyPending }
-    } catch (err) {
-      console.error('[workbench-db] loadAll failed', err)
-      return { keys: {}, keyCount: 0, dbPath: '', bucket, legacyPending: false, unavailable: true }
-    }
-  })
+  ipcMain.handle(HOME_CHANNELS.wbLoadAll, () =>
+    loadWorkbenchSnapshot(workbenchAccounts(), syncWorkbenchOwner),
+  )
 
   // every call names the bucket it was loaded from; another account's bucket gets nothing
   ipcMain.handle(HOME_CHANNELS.wbGetKey, (_event, key: unknown, bucket: unknown) => {
