@@ -68,7 +68,7 @@ describe('Settings > Integrations prose', () => {
     for (const [lang, table] of Object.entries(strings)) {
       for (const key of PROSE_KEYS) {
         const text = table[key]
-        // the command is the renamed one (or the {cmd} the app fills in); the only bare
+        // the command is the {cmd} the app fills in (uniwork-office-cli); the only bare
         // "genoffice" left is the ~/.genoffice path
         const stripped = text.replace(/~\/\.genoffice\/\w+/g, '')
         expect(stripped, `${lang}.${key}`).not.toMatch(/genoffice/i)
@@ -87,10 +87,11 @@ describe('Settings > Integrations prose', () => {
     expect(strings.vi.intgStep2Note).toContain('dòng lệnh UniWork Office ({cmd})')
   })
 
-  it('never spells the command out where the app knows it: Windows and deb/rpm type genoffice', () => {
+  it('never spells the command out where the app knows it: {cmd} is filled with uniwork-office-cli', () => {
     for (const [lang, table] of Object.entries(strings)) {
       for (const key of ['intgStep2Note', 'intgCliPartDesc', 'intgMcpStdioDesc'] as const) {
         expect(table[key], `${lang}.${key}`).not.toContain('uniwork-office')
+        expect(table[key], `${lang}.${key}`).toContain('{cmd}')
       }
     }
     expect(strings.en.intgMcpStdioDesc).toContain('UniWork Office ({cmd} mcp)')

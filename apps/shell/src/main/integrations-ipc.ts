@@ -14,7 +14,7 @@ import {
   type BundledSkill,
   type SkillLedger,
 } from '@genoffice/cli/agent-skills'
-import { commandName, inspectCliLink, linkTarget } from '@genoffice/cli/install'
+import { CLI_COMMAND, inspectCliLink, linkTarget } from '@genoffice/cli/install'
 import { readAppSettings, writeAppSetting } from './app-settings'
 import { isEphemeralInstall } from './cli-link'
 import { isInstallableSkillDir } from './skill-target'
@@ -59,7 +59,7 @@ export function registerIntegrationsIpc(deps: IntegrationsDeps): void {
     return {
       cli: {
         ...outcome,
-        command: commandName(outcome, process.platform),
+        command: CLI_COMMAND,
         launcherDir: deps.cliDir,
         ephemeral: app.isPackaged && isEphemeralInstall(process.resourcesPath, process.env),
         version: cliVersion(deps.cliPackageJson),

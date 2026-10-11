@@ -25,12 +25,12 @@ describe('mcp launch entry', () => {
   it('uses the absolute launcher while the linked dir is still off the PATH (genoffice#1019)', () => {
     const launcherDir = '/Applications/GenOffice.app/Contents/Resources/cli'
     expect(mcpLaunch({ status: 'present', launcherDir })).toEqual({
-      command: 'uniwork-office',
+      command: 'uniwork-office-cli',
       args: ['mcp'],
     })
-    // the package launcher answers to its own name (the app reports it)
-    expect(mcpLaunch({ status: 'present', launcherDir, command: 'genoffice' })).toEqual({
-      command: 'genoffice',
+    // the name the app reports wins over the default
+    expect(mcpLaunch({ status: 'present', launcherDir, command: 'uniwork-office-cli' })).toEqual({
+      command: 'uniwork-office-cli',
       args: ['mcp'],
     })
     expect(

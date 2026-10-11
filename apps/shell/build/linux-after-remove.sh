@@ -1,7 +1,7 @@
 #!/bin/bash
 # deb/rpm post-remove, run INSTEAD of electron-builder's default after-remove
 # template, so it repeats that template's cleanup (launcher link, AppArmor
-# profile) and drops the genoffice command-line link. Only on a real
+# profile) and drops the uniwork-office-cli command-line link. Only on a real
 # uninstall: rpm runs the old package's %postun after the new %post during an
 # upgrade (with $1 = 1); deb passes "upgrade" there. Removing then would kill
 # what the new version just set up.
@@ -36,10 +36,12 @@ fi
 # same ownership rule as the post-install: only a link into our install dir is ours.
 # Per-user links in ~/.local/bin and the uniwork:// entry in ~/.config/mimeapps.list are
 # out of reach here (this runs as root); the app removes them at its next launch.
-link=/usr/bin/genoffice
-if [ -L "$link" ]; then
-  case "$(readlink "$link")" in
-    '/opt/${sanitizedProductName}/'*) rm -f "$link" ;;
-  esac
-fi
+# /usr/bin/genoffice is what earlier packages linked; drop a leftover of ours too.
+for link in /usr/bin/uniwork-office-cli /usr/bin/genoffice; do
+  if [ -L "$link" ]; then
+    case "$(readlink "$link")" in
+      '/opt/${sanitizedProductName}/'*) rm -f "$link" ;;
+    esac
+  fi
+done
 exit 0

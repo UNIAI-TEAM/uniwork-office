@@ -69,7 +69,8 @@ function makeRoot() {
   return {
     opt,
     launcher,
-    link: join(bin, 'genoffice'),
+    link: join(bin, 'uniwork-office-cli'),
+    oldLink: join(bin, 'genoffice'),
     appLink: join(bin, 'uniwork-office'),
     calls: () => (existsSync(calls) ? readFileSync(calls, 'utf-8') : ''),
     install: script('linux-after-install.sh'),
@@ -108,6 +109,15 @@ describe.skipIf(process.platform === 'win32')('linux package scripts', () => {
 })
 
 describe.skipIf(process.platform === 'win32')('linux cli link scripts (genoffice#893)', () => {
+  it('links /usr/bin/uniwork-office-cli, never /usr/bin/genoffice, and leaves the desktop program alone', () => {
+    const t = makeRoot()
+    expect(t.install()).toEqual({ code: 0, stderr: '' })
+    expect(readlinkSync(t.link)).toBe(t.launcher)
+    expect(existsSync(t.oldLink)).toBe(false)
+    // the GUI link is the app's own, untouched by the command line part
+    expect(readlinkSync(t.appLink)).toBe(join(t.opt, 'uniwork-office'))
+  })
+
   it('links a free name, a dead link and a link into the old install', () => {
     const t = makeRoot()
     expect(t.install()).toEqual({ code: 0, stderr: '' })
@@ -125,12 +135,37 @@ describe.skipIf(process.platform === 'win32')('linux cli link scripts (genoffice
     expect(readlinkSync(t.link)).toBe(t.launcher)
   })
 
+  it('drops the /usr/bin/genoffice link an earlier package made, and only when it is ours', () => {
+    const t = makeRoot()
+    symlinkSync(t.launcher, t.oldLink)
+    expect(t.install()).toEqual({ code: 0, stderr: '' })
+    expect(existsSync(t.oldLink)).toBe(false)
+    expect(readlinkSync(t.link)).toBe(t.launcher)
+
+    // another program's genoffice (a file, or a link elsewhere) stays, silently
+    writeFileSync(t.oldLink, '#!/bin/sh\necho other\n')
+    expect(t.install()).toEqual({ code: 0, stderr: '' })
+    expect(readFileSync(t.oldLink, 'utf-8')).toContain('other')
+    expect(t.remove('remove').code).toBe(0)
+    expect(readFileSync(t.oldLink, 'utf-8')).toContain('other')
+    rmSync(t.oldLink)
+    const vendor = join(t.launcher, '..', '..', '..', '..', 'vendor', 'cli', 'genoffice')
+    mkdirSync(join(vendor, '..'), { recursive: true })
+    writeFileSync(vendor, '#!/bin/sh\n')
+    symlinkSync(vendor, t.oldLink)
+    expect(t.install()).toEqual({ code: 0, stderr: '' })
+    expect(readlinkSync(t.oldLink)).toBe(vendor)
+    expect(t.remove('remove').code).toBe(0)
+    expect(readlinkSync(t.oldLink)).toBe(vendor)
+  })
+
   it('leaves a foreign command or symlink alone and says so', () => {
     const t = makeRoot()
     writeFileSync(t.link, '#!/bin/sh\necho other\n')
     const r = t.install()
     expect(r.code).toBe(0)
     expect(r.stderr).toContain('another program')
+    expect(r.stderr).toContain('uniwork-office-cli')
     expect(lstatSync(t.link).isSymbolicLink()).toBe(false)
     expect(readFileSync(t.link, 'utf-8')).toContain('other')
     expect(t.remove('remove').code).toBe(0)
@@ -155,6 +190,17 @@ describe.skipIf(process.platform === 'win32')('linux cli link scripts (genoffice
     expect(t.remove('upgrade').code).toBe(0)
     expect(existsSync(t.link)).toBe(true)
     expect(t.remove('0').code).toBe(0)
+    expect(existsSync(t.link)).toBe(false)
+    // the desktop program link is removed by the package's default step, not by the command line part
+    expect(existsSync(t.appLink)).toBe(false)
+  })
+
+  it('uninstall also drops a leftover /usr/bin/genoffice of ours', () => {
+    const t = makeRoot()
+    t.install()
+    symlinkSync(t.launcher, t.oldLink)
+    expect(t.remove('remove').code).toBe(0)
+    expect(existsSync(t.oldLink)).toBe(false)
     expect(existsSync(t.link)).toBe(false)
   })
 })

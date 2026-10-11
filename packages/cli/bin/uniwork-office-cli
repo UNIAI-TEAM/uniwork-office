@@ -1,0 +1,5 @@
+#!/bin/sh
+# uniwork-office-cli: the command name next to the launcher (Git Bash on Windows, where the
+# install's resources/cli folder is on the PATH). Hands over to the genoffice launcher beside it.
+here=$(cd "$(dirname "$0")" && pwd)
+exec "$here/genoffice" "$@"

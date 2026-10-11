@@ -312,8 +312,8 @@ export interface DefaultAppStatus {
 }
 
 /**
- * The command line tool on the PATH (`command`: the name to type, `uniwork-office`
- * unless a package launcher answers to another). Created only when the user
+ * The command line tool on the PATH (`command`: the name to type, `uniwork-office-cli`
+ * on every OS). Created only when the user
  * asks for it in Settings: `absent` (not set up), `present`, `blocked` (no
  * writable folder, or another program of that name is in the way; `manual` is the
  * command to finish by hand), `unsupported` (dev run, temporary mount).

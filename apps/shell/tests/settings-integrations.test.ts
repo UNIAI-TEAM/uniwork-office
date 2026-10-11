@@ -60,10 +60,10 @@ function baseStatus(): IntegrationsStatus {
   return {
     cli: {
       status: 'missing',
-      command: 'uniwork-office',
-      location: '/usr/local/bin/uniwork-office',
+      command: 'uniwork-office-cli',
+      location: '/usr/local/bin/uniwork-office-cli',
       manual:
-        'sudo ln -sf /Applications/GenOffice.app/Contents/Resources/cli/genoffice /usr/local/bin/uniwork-office',
+        'sudo ln -sf /Applications/GenOffice.app/Contents/Resources/cli/genoffice /usr/local/bin/uniwork-office-cli',
       launcherDir: '/Applications/GenOffice.app/Contents/Resources/cli',
       ephemeral: false,
       version: '0.4.0',
@@ -133,18 +133,18 @@ async function openIntegrations(
 }
 
 describe('Settings → Integrations', () => {
-  it('names the command that is ready, the package launcher on deb/rpm included', async () => {
+  it('names the command that is ready, the package link on deb/rpm included', async () => {
     const status = baseStatus()
     status.cli = {
       ...status.cli,
       status: 'present',
-      location: '/usr/bin/genoffice',
-      command: 'genoffice',
+      location: '/usr/bin/uniwork-office-cli',
+      command: 'uniwork-office-cli',
       manual: undefined,
     }
     await openIntegrations({ status: async () => status, copyText: async () => {} })
     expect(host.textContent).toContain(
-      'UniWork Office (genoffice) 0.4.0 · ready in your terminal (/usr/bin/genoffice)',
+      'UniWork Office (uniwork-office-cli) 0.4.0 · ready in your terminal (/usr/bin/uniwork-office-cli)',
     )
     expect(host.textContent).not.toContain('{cmd}')
   })
@@ -195,12 +195,12 @@ describe('Settings → Integrations', () => {
   it('names the bare command once it is on the PATH and runs the app as Node on Windows', () => {
     const launcherDir = '/Applications/GenOffice.app/Contents/Resources/cli'
     expect(mcpLaunch({ status: 'present', launcherDir })).toEqual({
-      command: 'uniwork-office',
+      command: 'uniwork-office-cli',
       args: ['mcp'],
     })
-    // deb/rpm: the package launcher is the command that is ready
-    expect(mcpLaunch({ status: 'present', launcherDir, command: 'genoffice' })).toEqual({
-      command: 'genoffice',
+    // the name the app reports (the same on every OS) is the command that is ready
+    expect(mcpLaunch({ status: 'present', launcherDir, command: 'uniwork-office-cli' })).toEqual({
+      command: 'uniwork-office-cli',
       args: ['mcp'],
     })
     const winDir = 'C:\\Users\\Jane Doe\\AppData\\Local\\Programs\\GenOffice\\resources\\cli'
