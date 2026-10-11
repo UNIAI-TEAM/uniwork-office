@@ -159,6 +159,9 @@ function credentialSignature(list: AiCredentialList): string {
     .join('|')
 }
 
+/** typed failures that only mean "nothing to chat with yet" */
+const SETUP_STATES: ReadonlySet<string> = new Set(['credential_missing', 'model_required'])
+
 export function createWebAi(opts: {
   port: Pick<FramePort, 'whenInitialized' | 'getToken' | 'refreshToken'>
   capabilities: Record<string, unknown>
@@ -440,11 +443,12 @@ export function createWebAi(opts: {
     protocolOf,
     // a failed chat turn is announced once, by the panel's inline error (the typed text below);
     // only the calls with no transcript (one-shot chat here, the tool members below) raise the card
-    // "pick a model" is a setup state, not a failure: the code marks it so the panels draw a notice
-    // in every language (the same tag as the desktop no-key notice), not a red error line
+    // "no key yet" and "pick a model" are setup states, not failures: the code marks them so the
+    // panels draw a notice in every language (the same tag as the desktop no-key notice), not a red
+    // error line with a retry
     describe: (err, provider) => {
       const text = describeAiError(err, providerLabel(provider))
-      return err.code === 'model_required' ? aiNoticeTagged('no_model', text) : text
+      return SETUP_STATES.has(err.code) ? aiNoticeTagged('no_model', text) : text
     },
     onChatFailure: (err, provider) => showAiState(err, providerLabel(provider), { openSettings }),
   })

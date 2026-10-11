@@ -1,3 +1,4 @@
+import { aiNoticeKind } from '@genoffice/ai-provider/browser'
 import type { AiChatMessage } from './AiChatPanel'
 
 /**
@@ -14,7 +15,8 @@ export function markRunFailed(
   for (let i = next.length - 1; i >= 0; i--) {
     const entry = next[i]!
     if (entry.role === 'user') {
-      next[i] = { ...entry, undelivered: true }
+      // a setup state (no key / no model) is not a send failure: no "not sent" pill, no retry
+      next[i] = aiNoticeKind(error) ? entry : { ...entry, undelivered: true }
       break
     }
   }

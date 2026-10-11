@@ -1487,7 +1487,7 @@ export function AiPanel({
                       )}
                     </button>
                   )}
-                  {isLast && !busy && lastInstructionRef.current && (
+                  {isLast && !busy && lastInstructionRef.current && !aiNoticeKind(entry.error) && (
                     <button
                       className="ai-msg-tool-btn"
                       onClick={retry}

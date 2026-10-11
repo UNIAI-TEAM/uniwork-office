@@ -140,3 +140,9 @@
   border-radius: 0 0 var(--radius-6) var(--radius-6);
   color: var(--text-secondary);
 }
+
+/* a disabled Send button (nothing typed, or "Choose a model to send"): its brand art is a pale
+ * square, which on a dark surface reads as the active control; the token dims it in dark themes */
+.ai-send-btn:disabled img {
+  filter: var(--ai-send-off-filter, none);
+}

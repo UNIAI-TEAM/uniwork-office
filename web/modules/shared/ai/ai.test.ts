@@ -1268,6 +1268,33 @@ describe('the model of a provider with a key (UNI-1232 FX2: N3-01 / G-N1)', () =
     expect(aiNoticeBody(error)).toMatch(/^Choose a model\. Pick a model in the model menu/)
   })
 
+  it('a send with no key stored answers with a tagged notice too, a real failure stays an error', async () => {
+    const failing = (status: number, code: string) => {
+      const { fetch } = recorder((c) =>
+        c.url.endsWith('/credentials')
+          ? jsonResponse(200, { items: [stored('openai')], providers: CREDENTIALS.providers })
+          : c.url.includes('/byok/')
+            ? jsonResponse(status, { code })
+            : jsonResponse(200, CLOUD),
+      )
+      return createWebAi({ port, capabilities: { ai: true }, fetch, origin: ORIGIN, now: () => 0 })
+    }
+    const missing = failing(404, 'credential_missing')
+    const settings = await missing.settings()
+    const first = (await missing.streams.aiChat({ settings, system: 's', user: 'hi' })) as {
+      error: string
+    }
+    expect(aiNoticeKind(first.error)).toBe('no_model')
+    expect(aiNoticeBody(first.error)).toMatch(/^No AI key yet\./)
+    const down = failing(502, 'provider_unreachable')
+    const second = (await down.streams.aiChat({
+      settings: await down.settings(),
+      system: 's',
+      user: 'hi',
+    })) as { error: string }
+    expect(aiNoticeKind(second.error)).toBeNull()
+  })
+
   it('reads the model ids of the three wire formats', () => {
     expect(modelIdsOf({ data: [{ id: 'gpt-x' }, { id: 'gpt-x' }, {}] })).toEqual(['gpt-x'])
     expect(modelIdsOf({ models: [{ name: 'models/gemini-x' }] })).toEqual(['gemini-x'])

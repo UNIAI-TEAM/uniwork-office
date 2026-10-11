@@ -237,6 +237,9 @@ for (const module of ['docs', 'markdown'] as const) {
         timeout: 30_000,
       })
       await expect(frame.locator('.ow-ai-state')).toHaveCount(0)
+      // a setup state, not a failure: no error styling, no "Error:" prefix, no "not sent" retry pill
+      await expect(frame.locator('.ai-msg-error, .ai-msg-undelivered')).toHaveCount(0)
+      await expect(frame.locator('.ai-msg-assistant').last()).not.toContainText('Error:')
       await frame.locator('.ai-panel-header').getByRole('button', { name: 'AI settings' }).click()
       const dialog = frame.locator('.ow-ai-dialog')
       await expect(dialog).toBeVisible()

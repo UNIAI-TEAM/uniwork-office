@@ -771,7 +771,8 @@ export function AiPanel({
         },
         onError: (error) => {
           // once a tool ran the message was delivered; a later turn failing is not a send failure
-          const undelivered = runToolsRef.current.length === 0
+          // a setup state (no key / no model) is not a send failure either: no "not sent" pill
+          const undelivered = runToolsRef.current.length === 0 && !aiNoticeKind(error)
           setChat((prev) => {
             const next = [...prev]
             for (let i = undelivered ? next.length - 1 : -1; i >= 0; i--) {
