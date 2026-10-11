@@ -148,23 +148,23 @@ export class TabManager {
       const view = createSheetsView({ includeAiHandlers: false })
       // registering the session made the spare the menu-action target
       setActiveSheetsWebContents(active.view?.webContents ?? null)
-      // the spare is mounted seconds after a workbook opened, so it is the newest
-      // webContents in the window and its first load can take keyboard focus away
-      // from the visible tab: keys then reach a hidden page (Ctrl+W, typing).
-      // Close on the chord here too, and hand focus straight back.
+      this.spareSheetsView = view
       this.trackCloseChord(view.webContents)
-      view.webContents.on('focus', () => {
-        if (this.spareSheetsView === view) this.focusActiveView()
-      })
       this.shellWindow.contentView.addChildView(view)
       view.setVisible(false)
       view.setBounds(this.contentBounds())
+      // Chromium focuses a new webContents inside createSheetsView (its loadURL),
+      // before any `focus` listener exists, and OS keys sent to a hidden view
+      // reach no webContents at all (no before-input-event, no menu
+      // accelerator): Ctrl+W and typing died until a click in the grid.
+      // Hand focus back now and again once the first load is done.
+      this.refocusIfHidden(view.webContents)
+      view.webContents.once('did-finish-load', () => this.refocusIfHidden(view.webContents))
       view.webContents.once('render-process-gone', () => {
         if (this.spareSheetsView !== view) return
         this.spareSheetsView = null
         view.webContents.close()
       })
-      this.spareSheetsView = view
     }, delayMs)
   }
 
@@ -250,6 +250,20 @@ export class TabManager {
       event.preventDefault()
       this.closeActiveTab()
     })
+    // the chrome takes focus legitimately (tab strip, Home, dialogs); a hidden view
+    // must not keep it. Deferred: a focus() call made inside Chromium's own focus
+    // change does not stick (seen live: the spare kept focus until its load ended).
+    if (wc !== this.shellWindow.webContents) {
+      wc.on('focus', () => setImmediate(() => this.refocusIfHidden(wc)))
+    }
+  }
+
+  /** A hidden view of this window holding keyboard focus swallows every OS key
+   *  (they reach no webContents), so focus goes back to the active tab. */
+  private refocusIfHidden(wc: WebContents): void {
+    if (wc.isDestroyed() || !wc.isFocused() || !this.ownsWebContents(wc)) return
+    if (this.tabs.find((t) => t.id === this.activeId)?.view?.webContents === wc) return
+    this.focusActiveView()
   }
 
   /** the shell's own webContents, a tab view's or the spare's (not a detached window's) */

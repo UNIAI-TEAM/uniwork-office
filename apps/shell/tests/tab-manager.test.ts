@@ -32,6 +32,7 @@ interface FakeWebContents {
   close: ReturnType<typeof vi.fn>
   reload: ReturnType<typeof vi.fn>
   focus: ReturnType<typeof vi.fn>
+  isFocused: ReturnType<typeof vi.fn>
   isDestroyed: ReturnType<typeof vi.fn>
   listeners: Map<string, () => void>
 }
@@ -58,6 +59,7 @@ function makeFakeView(): FakeView {
       loadURL: vi.fn(async () => undefined),
       reload: vi.fn(),
       focus: vi.fn(),
+      isFocused: vi.fn(() => false),
       isDestroyed: vi.fn(() => false),
     },
     setVisible: vi.fn(),
@@ -642,17 +644,72 @@ describe('closing tabs', () => {
         shellWindow.isFocused.mockReturnValue(true)
         manager.focusActiveView()
         expect(tab.webContents.focus).toHaveBeenCalled()
-        // seconds later the next spare mounts and its first load takes focus
+        // seconds later the next spare mounts; Chromium focuses it inside
+        // createSheetsView (loadURL), before any `focus` listener exists, and
+        // OS keys sent to a hidden view reach no webContents at all
+        tab.webContents.focus.mockClear()
+        createSheetsView.mockImplementationOnce(() => {
+          const view = makeFakeView()
+          view.webContents.isFocused.mockReturnValue(true)
+          return view
+        })
         vi.advanceTimersByTime(3000)
         const spare = lastCreatedView(createSheetsView)
         expect(spare).not.toBe(tab)
-        tab.webContents.focus.mockClear()
-        spare.webContents.listeners.get('focus')!()
         expect(tab.webContents.focus).toHaveBeenCalledTimes(1)
         // a key that reached the hidden spare anyway still closes the visible tab
         const preventDefault = press(spare.webContents, chord())
         expect(preventDefault).toHaveBeenCalledTimes(1)
         await vi.waitFor(() => expect(manager.list().map((t) => t.id)).toEqual(['home']))
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('takes focus back from a spare that grabs it on its first load', () => {
+      vi.useFakeTimers()
+      try {
+        manager.openSheetsTab('/tmp/uniwork/Budget.xlsx')
+        const tab = lastCreatedView(createSheetsView)
+        vi.advanceTimersByTime(3000)
+        const spare = lastCreatedView(createSheetsView)
+        tab.webContents.focus.mockClear()
+        const loaded = spare.webContents.once.mock.calls.find(
+          ([event]) => event === 'did-finish-load',
+        )?.[1] as () => void
+        spare.webContents.isFocused.mockReturnValue(true)
+        loaded()
+        expect(tab.webContents.focus).toHaveBeenCalledTimes(1)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('never leaves keyboard focus on a hidden tab view', () => {
+      vi.useFakeTimers()
+      try {
+        manager.openSheetsTab()
+        const hidden = lastCreatedView(createSheetsView)
+        manager.openDocsTab('/tmp/report.docx')
+        const active = lastCreatedView(createDocsView)
+        active.webContents.focus.mockClear()
+        hidden.webContents.isFocused.mockReturnValue(true)
+        hidden.webContents.listeners.get('focus')!()
+        // a focus() made inside Chromium's own focus change does not stick
+        expect(active.webContents.focus).not.toHaveBeenCalled()
+        vi.runOnlyPendingTimers()
+        expect(active.webContents.focus).toHaveBeenCalledTimes(1)
+        // the active view and the chrome keep the focus they take
+        active.webContents.isFocused.mockReturnValue(true)
+        active.webContents.listeners.get('focus')!()
+        vi.runOnlyPendingTimers()
+        expect(active.webContents.focus).toHaveBeenCalledTimes(1)
+        expect(shellWindow.webContents.listeners.has('focus')).toBe(false)
+        // a background window does not pull OS focus; its `focus` handler re-runs it
+        shellWindow.isFocused.mockReturnValue(false)
+        hidden.webContents.listeners.get('focus')!()
+        vi.runOnlyPendingTimers()
+        expect(active.webContents.focus).toHaveBeenCalledTimes(1)
       } finally {
         vi.useRealTimers()
       }
