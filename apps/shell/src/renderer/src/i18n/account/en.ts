@@ -72,4 +72,7 @@ export const en = {
   acctErrKeyringUnavailable: 'Secure storage on this computer is unavailable.',
   acctErrServerError: 'UniWork ran into a problem. Please try again later.',
   acctErrMalformedResponse: 'UniWork sent an unexpected response. Please try again later.',
+  wbLoadFailedTitle: 'Your saved data could not be loaded',
+  wbLoadFailedBody:
+    'Changes are not saved until it loads. Try again; if it keeps failing, restart the app.',
 } satisfies Record<keyof typeof zh, string>

@@ -72,4 +72,7 @@ export const ar = {
   acctErrKeyringUnavailable: 'التخزين الآمن على هذا الكمبيوتر غير متاح.',
   acctErrServerError: 'واجه UniWork مشكلة. يُرجى المحاولة لاحقًا.',
   acctErrMalformedResponse: 'أرسل UniWork استجابة غير متوقعة. يُرجى المحاولة لاحقًا.',
+  wbLoadFailedTitle: 'تعذّر تحميل بياناتك المحفوظة',
+  wbLoadFailedBody:
+    'لا يتم حفظ التغييرات حتى يكتمل التحميل. حاول مرة أخرى، وإذا استمر الفشل فأعد تشغيل التطبيق.',
 } satisfies Record<keyof typeof zh, string>

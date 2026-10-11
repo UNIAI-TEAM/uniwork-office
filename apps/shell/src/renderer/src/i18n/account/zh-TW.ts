@@ -68,4 +68,6 @@ export const zhTW = {
   acctErrKeyringUnavailable: '此電腦上的安全儲存空間無法使用。',
   acctErrServerError: 'UniWork 發生問題，請稍後再試。',
   acctErrMalformedResponse: 'UniWork 傳回了非預期的回應，請稍後再試。',
+  wbLoadFailedTitle: '無法載入你儲存的資料',
+  wbLoadFailedBody: '載入成功之前，變更不會被儲存。請重試；如果仍然失敗，請重新啟動應用程式。',
 } satisfies Record<keyof typeof zh, string>

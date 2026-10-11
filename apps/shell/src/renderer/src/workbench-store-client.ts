@@ -58,6 +58,11 @@ export function isWorkbenchUsingSqlite(): boolean {
   return usingSqlite
 }
 
+/** the last load failed: the store is closed (nothing read or written) until a reset + load succeeds */
+export function isWorkbenchLoadFailed(): boolean {
+  return failed
+}
+
 /**
  * With a main-process store, nothing is read or written before a hydrate has
  * named the bucket (and after a reset): a write then would land outside any
@@ -190,7 +195,12 @@ async function moveLegacyMediaAndFinish(
     // again on the next load (a repeated copy keeps what is already there)
     return
   }
-  await api.legacyDone(bucket)
+  try {
+    await api.legacyDone(bucket)
+  } catch {
+    // everything is already moved; the confirmation is asked again on the next
+    // load, so it must not close the store for the rest of the session
+  }
 }
 
 /** Replace cache after import backup. */

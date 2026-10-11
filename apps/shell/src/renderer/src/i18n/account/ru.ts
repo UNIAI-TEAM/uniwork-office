@@ -74,4 +74,7 @@ export const ru = {
   acctErrKeyringUnavailable: 'Защищённое хранилище на этом компьютере недоступно.',
   acctErrServerError: 'В UniWork возникла проблема. Повторите попытку позже.',
   acctErrMalformedResponse: 'UniWork отправил непредвиденный ответ. Повторите попытку позже.',
+  wbLoadFailedTitle: 'Не удалось загрузить сохранённые данные',
+  wbLoadFailedBody:
+    'Изменения не сохраняются, пока данные не загрузятся. Повторите попытку; если ошибка повторяется, перезапустите приложение.',
 } satisfies Record<keyof typeof zh, string>

@@ -6,7 +6,10 @@ import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorkbenchSnapshot, WorkbenchStoreApi } from '../src/shared/home-api'
-import { WorkbenchAccountGate } from '../src/renderer/src/WorkbenchAccountGate'
+import {
+  LOAD_RETRY_DELAYS_MS,
+  WorkbenchAccountGate,
+} from '../src/renderer/src/WorkbenchAccountGate'
 import {
   exportLocalBackup,
   importLocalBackup,
@@ -22,6 +25,7 @@ import { moveLegacyWorkbenchIdbMedia } from '../src/renderer/src/workbench-media
 import {
   hydrateWorkbenchStore,
   importWorkbenchBackupUi,
+  isWorkbenchLoadFailed,
   resetWorkbenchStore,
   wbStoreGetRaw,
   wbStoreKeys,
@@ -59,6 +63,9 @@ class FakeMain {
   /** buckets the renderer actually loaded (after the gate) */
   loaded: string[] = []
   failLoad = false
+  /** the next n loads fail, then they work */
+  loadFailures = 0
+  failLegacyDone = false
   importBackupImpl: WorkbenchStoreApi['importBackup'] = async () => ({ ok: false })
 
   signIn(account: string): void {
@@ -89,6 +96,10 @@ class FakeMain {
       loadAll: async (): Promise<WorkbenchSnapshot> => {
         await this.loadGate
         if (this.failLoad) throw new Error('load failed')
+        if (this.loadFailures > 0) {
+          this.loadFailures--
+          throw new Error('load failed')
+        }
         this.loaded.push(this.active)
         const keys = Object.fromEntries(this.buckets.get(this.active)!)
         return {
@@ -113,6 +124,7 @@ class FakeMain {
         return { imported: Object.keys(keys).length }
       },
       legacyDone: async (bucket) => {
+        if (this.failLegacyDone) throw new Error('legacy done failed')
         if (bucket === this.legacyTo && bucket === this.active) this.legacyDone = true
       },
       onBucketChanged: (cb) => {
@@ -185,6 +197,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  vi.useRealTimers()
   act(() => root.unmount())
   host.remove()
   resetWorkbenchStore()
@@ -453,5 +466,80 @@ describe('pre-upgrade media move', () => {
     expect(moveLegacyWorkbenchIdbMedia).toHaveBeenCalledTimes(2)
     expect(main.legacyDone).toBe(true)
     expect(wbStoreGetRaw(CHAT)).toContain('before upgrade')
+  })
+})
+
+describe('a load that fails', () => {
+  const alert = (): HTMLElement | null => host.querySelector('.wb-load-failed')
+
+  async function advance(ms: number): Promise<void> {
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(ms)
+    })
+  }
+
+  it('a failing legacyDone does not close the store; it is confirmed on the next load', async () => {
+    ls.set(CHAT, '[{"id":"1","role":"user","text":"before upgrade"}]')
+    main.signIn('owner')
+    main.failLegacyDone = true
+    await hydrateWorkbenchStore()
+    // everything moved: the store is open and writable, only the confirmation is outstanding
+    expect(isWorkbenchLoadFailed()).toBe(false)
+    expect(wbStoreGetRaw(CHAT)).toContain('before upgrade')
+    wbStoreSetRaw(CHAT, 'later')
+    expect(main.buckets.get('a-owner')!.get(CHAT)).toBe('later')
+    expect(main.legacyDone).toBe(false)
+
+    main.failLegacyDone = false
+    await hydrateWorkbenchStore()
+    expect(main.legacyDone).toBe(true)
+    expect(wbStoreGetRaw(CHAT)).toBe('later')
+  })
+
+  it('is tried again a bounded number of times, quietly, and Home shows the account data once one works', async () => {
+    vi.useFakeTimers()
+    main.signIn('owner')
+    main.buckets.get('a-owner')!.set(CHAT, '[{"id":"1","role":"user","text":"owner history"}]')
+    main.loadFailures = 1
+    await renderGate()
+    // between attempts: nothing rendered, no notice yet
+    expect(host.textContent).toBe('')
+    await advance(LOAD_RETRY_DELAYS_MS[0]!)
+    expect(chatText()).toBe('owner history')
+    expect(alert()).toBeNull()
+  })
+
+  it('shows a notice over Home when every attempt failed, never another bucket, and the retry button recovers', async () => {
+    vi.useFakeTimers()
+    main.signIn('member')
+    // the previous account left a fallback copy under its own bucket name
+    ls.set(`uniwork.wbacct.a-owner.${CHAT}`, '[{"id":"1","role":"user","text":"owner fallback"}]')
+    main.failLoad = true
+    await renderGate()
+    for (const delay of LOAD_RETRY_DELAYS_MS) {
+      expect(host.textContent).toBe('')
+      await advance(delay)
+    }
+    // Home is there, empty, with the notice; the store stays closed
+    expect(host.querySelector('.chat')).not.toBeNull()
+    expect(chatText()).toBe('')
+    expect(alert()).not.toBeNull()
+    expect(alert()!.getAttribute('role')).toBe('alert')
+    expect(alert()!.textContent).toBeTruthy()
+    expect(isWorkbenchLoadFailed()).toBe(true)
+    wbStoreSetRaw(CHAT, 'x')
+    expect(main.buckets.get('a-member')!.size).toBe(0)
+    expect([...ls.keys()]).toEqual([`uniwork.wbacct.a-owner.${CHAT}`])
+    // no further attempts on their own
+    const before = main.loaded.length
+    await advance(60_000)
+    expect(main.loaded.length).toBe(before)
+
+    main.failLoad = false
+    main.buckets.get('a-member')!.set(CHAT, '[{"id":"2","role":"user","text":"member history"}]')
+    act(() => alert()!.querySelector('button')!.click())
+    await flush()
+    expect(alert()).toBeNull()
+    expect(chatText()).toBe('member history')
   })
 })

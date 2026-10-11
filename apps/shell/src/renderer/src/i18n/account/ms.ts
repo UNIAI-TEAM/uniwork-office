@@ -76,4 +76,7 @@ export const ms = {
   acctErrServerError: 'UniWork menghadapi masalah. Sila cuba lagi kemudian.',
   acctErrMalformedResponse:
     'UniWork menghantar respons yang tidak dijangka. Sila cuba lagi kemudian.',
+  wbLoadFailedTitle: 'Data tersimpan anda tidak dapat dimuatkan',
+  wbLoadFailedBody:
+    'Perubahan tidak disimpan sehingga data berjaya dimuatkan. Cuba lagi; jika terus gagal, mulakan semula aplikasi.',
 } satisfies Record<keyof typeof zh, string>

@@ -73,4 +73,7 @@ export const nl = {
   acctErrKeyringUnavailable: 'Beveiligde opslag op deze computer is niet beschikbaar.',
   acctErrServerError: 'Er is een probleem opgetreden bij UniWork. Probeer het later opnieuw.',
   acctErrMalformedResponse: 'UniWork stuurde een onverwacht antwoord. Probeer het later opnieuw.',
+  wbLoadFailedTitle: 'Je opgeslagen gegevens konden niet worden geladen',
+  wbLoadFailedBody:
+    'Wijzigingen worden niet opgeslagen totdat het laden lukt. Probeer het opnieuw; als het blijft mislukken, start de app opnieuw.',
 } satisfies Record<keyof typeof zh, string>

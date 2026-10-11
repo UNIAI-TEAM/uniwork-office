@@ -74,4 +74,7 @@ export const it = {
   acctErrKeyringUnavailable: 'L’archivio sicuro di questo computer non è disponibile.',
   acctErrServerError: 'UniWork ha riscontrato un problema. Riprova più tardi.',
   acctErrMalformedResponse: 'UniWork ha inviato una risposta imprevista. Riprova più tardi.',
+  wbLoadFailedTitle: 'Impossibile caricare i tuoi dati salvati',
+  wbLoadFailedBody:
+    'Le modifiche non vengono salvate finché il caricamento non riesce. Riprova; se continua a fallire, riavvia l’app.',
 } satisfies Record<keyof typeof zh, string>

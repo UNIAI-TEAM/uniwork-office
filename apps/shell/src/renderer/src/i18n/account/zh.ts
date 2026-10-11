@@ -66,4 +66,6 @@ export const zh = {
   acctErrKeyringUnavailable: '此电脑上的安全存储不可用。',
   acctErrServerError: 'UniWork 出现问题，请稍后再试。',
   acctErrMalformedResponse: 'UniWork 返回了意外的响应，请稍后再试。',
+  wbLoadFailedTitle: '无法加载你保存的数据',
+  wbLoadFailedBody: '加载成功之前，更改不会被保存。请重试；如果仍然失败，请重启应用。',
 }

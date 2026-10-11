@@ -23,6 +23,7 @@
 import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import type { WorkbenchSnapshot } from '../shared/home-api'
 import { tryOpenWorkbenchDb, type WorkbenchDb } from './workbench-db'
 
 /** the account a bucket belongs to (deployment-scoped, like working copies) */
@@ -230,8 +231,10 @@ export class WorkbenchAccounts {
         } catch (err) {
           // already gone is fine; anything else leaves the pre-upgrade file on disk, unreferenced
           if ((err as NodeJS.ErrnoException)?.code !== 'ENOENT') {
+            // the error code only: a fs error message carries the absolute path (and the OS user name)
+            const code = (err as NodeJS.ErrnoException)?.code
             this.log(
-              `[workbench] could not remove the pre-upgrade database file workbench.sqlite${suffix}: ${(err as Error)?.message ?? err}`,
+              `[workbench] could not remove the pre-upgrade database file workbench.sqlite${suffix}: ${code ?? 'unknown error'}`,
             )
           }
         }
@@ -245,6 +248,42 @@ export class WorkbenchAccounts {
     })
     // a fresh install has nothing to move (the marker still records the first account)
     if (hadLegacyData)
-      this.log(`[workbench] pre-upgrade My AI and workbench data moved to account ${owner.accountId}`)
+      this.log(
+        `[workbench] pre-upgrade My AI and workbench data moved to account ${owner.accountId}`,
+      )
+  }
+}
+
+/** what `loadWorkbenchSnapshot` needs of the account store (a fake in tests) */
+export interface WorkbenchLoadSource {
+  whenSettled(): Promise<void>
+  bucket(): string
+  activeDb(): { loadAll(): Record<string, string>; dbPath: string } | null
+  legacyPending(bucket: string): boolean
+}
+
+/**
+ * The renderer's first read of the active bucket. Held until the first account
+ * status after start has been applied (the restore has read the stored
+ * session), so a signed-in launch never loads or writes the signed-out bucket
+ * on the way; `syncOwner` then applies the current session identity before the
+ * bucket is read.
+ */
+export async function loadWorkbenchSnapshot(
+  store: WorkbenchLoadSource,
+  syncOwner: () => void,
+): Promise<WorkbenchSnapshot> {
+  await store.whenSettled()
+  syncOwner()
+  const bucket = store.bucket()
+  try {
+    const db = store.activeDb()
+    const legacyPending = store.legacyPending(bucket)
+    if (!db) return { keys: {}, keyCount: 0, dbPath: '', bucket, legacyPending, unavailable: true }
+    const keys = db.loadAll()
+    return { keys, keyCount: Object.keys(keys).length, dbPath: db.dbPath, bucket, legacyPending }
+  } catch (err) {
+    console.error('[workbench-db] loadAll failed', err)
+    return { keys: {}, keyCount: 0, dbPath: '', bucket, legacyPending: false, unavailable: true }
   }
 }
