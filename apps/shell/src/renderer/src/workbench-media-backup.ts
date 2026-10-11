@@ -133,7 +133,9 @@ export async function collectWorkbenchIdbMedia(): Promise<WbIdbMediaDump> {
   return dump
 }
 
-export async function restoreWorkbenchIdbMedia(dump: WbIdbMediaDump | null | undefined): Promise<void> {
+export async function restoreWorkbenchIdbMedia(
+  dump: WbIdbMediaDump | null | undefined,
+): Promise<void> {
   if (!dump || dump.version !== 1 || isWorkbenchBucketCleared()) return
   for (const s of STORES) {
     const entries = dump[s.slot]

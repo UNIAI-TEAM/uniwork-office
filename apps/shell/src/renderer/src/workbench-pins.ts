@@ -174,7 +174,9 @@ export interface WbTaskItem {
   completedAt?: string
 }
 
-export function normalizeTaskItem(raw: Partial<WbTaskItem> & { id: string; title: string }): WbTaskItem {
+export function normalizeTaskItem(
+  raw: Partial<WbTaskItem> & { id: string; title: string },
+): WbTaskItem {
   const now = new Date().toISOString()
   const status: WbTaskStatus =
     raw.status === 'todo' ||
@@ -397,7 +399,10 @@ export function normalizeStickyNote(raw: Partial<WbStickyNote> & { id: string })
     color: isStickyColor(raw.color) ? raw.color : 'yellow',
     x: clampPct(typeof raw.x === 'number' ? raw.x : 8),
     y: clampPct(typeof raw.y === 'number' ? raw.y : 8),
-    rotate: typeof raw.rotate === 'number' && Number.isFinite(raw.rotate) ? Math.max(-8, Math.min(8, raw.rotate)) : 0,
+    rotate:
+      typeof raw.rotate === 'number' && Number.isFinite(raw.rotate)
+        ? Math.max(-8, Math.min(8, raw.rotate))
+        : 0,
     z: typeof raw.z === 'number' && Number.isFinite(raw.z) ? raw.z : 1,
     createdAt: typeof raw.createdAt === 'string' ? raw.createdAt : now,
     updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : now,
@@ -497,7 +502,10 @@ export function writeNotes(practiceId: PracticeId, text: string): void {
   const body = text.trim()
   if (!body) return
   const existing = readStickyNotes(practiceId)
-  const joined = existing.map((n) => n.body.trim()).filter(Boolean).join('\n\n')
+  const joined = existing
+    .map((n) => n.body.trim())
+    .filter(Boolean)
+    .join('\n\n')
   if (joined === body) return
   if (body.startsWith(joined) && joined) {
     const appended = body.slice(joined.length).trim()
@@ -563,8 +571,7 @@ function seedDemoEmails(practiceId: PracticeId): WbEmailMessage[] {
       from: 'team@uniwork.local',
       to: 'me@local',
       subject: 'Chào mừng bạn đến Tab Email (MVP)',
-      body:
-        'Đây là thư mẫu trên máy — chưa đồng bộ hộp thư thật.\n\nBạn có thể soạn nháp, dùng AI chỉnh giọng văn, và lưu Sent cục bộ. Kết nối Gmail/Outlook sẽ có ở bước sau.',
+      body: 'Đây là thư mẫu trên máy — chưa đồng bộ hộp thư thật.\n\nBạn có thể soạn nháp, dùng AI chỉnh giọng văn, và lưu Sent cục bộ. Kết nối Gmail/Outlook sẽ có ở bước sau.',
       unread: true,
       demo: true,
       createdAt: iso(3600_000),
@@ -576,8 +583,7 @@ function seedDemoEmails(practiceId: PracticeId): WbEmailMessage[] {
       from: 'notes@uniwork.local',
       to: 'me@local',
       subject: 'Gợi ý: biến email thành việc cần làm',
-      body:
-        'Mở một thư → “Tạo việc” để đẩy sang tab Công việc.\n\nMVP tập trung soạn thảo + AI; inbox thật sẽ đến khi kết nối tài khoản.',
+      body: 'Mở một thư → “Tạo việc” để đẩy sang tab Công việc.\n\nMVP tập trung soạn thảo + AI; inbox thật sẽ đến khi kết nối tài khoản.',
       unread: true,
       starred: true,
       demo: true,
@@ -777,27 +783,12 @@ export interface WbHealthItem {
 }
 
 /** Sub-tabs inside Sức khoẻ */
-export type HealthSubTabId =
-  | 'metrics'
-  | 'running'
-  | 'yoga'
-  | 'sports'
-  | 'diet'
-  | 'fasting'
-  | 'veg'
+export type HealthSubTabId = 'metrics' | 'running' | 'yoga' | 'sports' | 'diet' | 'fasting' | 'veg'
 
 export function readHealthSubTab(): HealthSubTabId {
   try {
     const raw = wbStoreGetRaw('uniwork.wb.health.subtab')
-    const ok: HealthSubTabId[] = [
-      'metrics',
-      'running',
-      'yoga',
-      'sports',
-      'diet',
-      'fasting',
-      'veg',
-    ]
+    const ok: HealthSubTabId[] = ['metrics', 'running', 'yoga', 'sports', 'diet', 'fasting', 'veg']
     if (raw && (ok as string[]).includes(raw)) return raw as HealthSubTabId
   } catch {
     /* ignore */
@@ -1127,25 +1118,12 @@ export interface WbFamilyMember {
 }
 
 /** Sub-tabs inside Gia đình tôi */
-export type FamilySubTabId =
-  | 'members'
-  | 'parenting'
-  | 'meds'
-  | 'shopping'
-  | 'tree'
-  | 'milestones'
+export type FamilySubTabId = 'members' | 'parenting' | 'meds' | 'shopping' | 'tree' | 'milestones'
 
 export function readFamilySubTab(): FamilySubTabId {
   try {
     const raw = wbStoreGetRaw('uniwork.wb.family.subtab')
-    const ok: FamilySubTabId[] = [
-      'members',
-      'parenting',
-      'meds',
-      'shopping',
-      'tree',
-      'milestones',
-    ]
+    const ok: FamilySubTabId[] = ['members', 'parenting', 'meds', 'shopping', 'tree', 'milestones']
     if (raw && (ok as string[]).includes(raw)) return raw as FamilySubTabId
   } catch {
     /* ignore */
@@ -1354,15 +1332,7 @@ export type PetsSubTabId = 'roster' | 'gallery' | 'care'
 
 export type WbPetSpecies = 'dog' | 'cat' | 'bird' | 'fish' | 'rabbit' | 'other'
 
-export type WbPetCareKind =
-  | 'feed'
-  | 'walk'
-  | 'bath'
-  | 'groom'
-  | 'meds'
-  | 'vet'
-  | 'play'
-  | 'other'
+export type WbPetCareKind = 'feed' | 'walk' | 'bath' | 'groom' | 'meds' | 'vet' | 'play' | 'other'
 
 export type WbPetCareStatus = 'planned' | 'done' | 'skipped'
 
