@@ -381,8 +381,10 @@ test.describe('pdf module on the web', () => {
     const frame = await openPdf(page, { lang: 'vi' })
     await waitRendered(frame)
     const row = await frame.evaluate(() => {
-      const tabs = [...document.querySelectorAll('.ribbon-tabs > .ribbon-tab')] as HTMLElement[]
-      const strip = document.querySelector('.ribbon-tabs') as HTMLElement
+      const tabs = [
+        ...document.querySelectorAll('.ribbon-tab-scroll > .ribbon-tab'),
+      ] as HTMLElement[]
+      const strip = document.querySelector('.ribbon-tab-scroll') as HTMLElement
       return {
         tops: [...new Set(tabs.map((t) => Math.round(t.getBoundingClientRect().top)))],
         heights: tabs.map((t) => Math.round(t.getBoundingClientRect().height)),
@@ -390,9 +392,9 @@ test.describe('pdf module on the web', () => {
         overflowX: getComputedStyle(strip).overflowX,
       }
     })
-    // every tab shares one top (no second line) and none is taller than a one-line label
+    // every tab shares one top (no second line) and none is taller than one 44 px touch target
     expect(row.tops).toHaveLength(1)
-    expect(Math.max(...row.heights)).toBeLessThan(40)
+    expect(Math.max(...row.heights)).toBeLessThanOrEqual(44)
     expect(row.scrolls).toBe(true)
     expect(row.overflowX).toBe('auto')
     await noProblems(page, frame, problems)
@@ -492,6 +494,45 @@ test.describe('pdf module on the web', () => {
       }
     }
   })
+
+  // UNI-1232 F-1 / F-2: Home > Insert text drew nothing on the web because the build shipped WOFF2
+  // twins of the Liberation faces (no cmap the core can read) -> "No installed font can draw this
+  // text". The dialog also opened with the focus on the body, so typing went nowhere. This runs in a
+  // browser without system fonts that matter: only the bundled faces can answer canDrawText.
+  for (const text of ['Hello', 'Xin chào']) {
+    test(`Insert text draws "${text}": dialog takes the typing, text is placed and saved`, async ({
+      page,
+    }) => {
+      const problems = await watch(page)
+      const frame = await openPdf(page)
+      await waitRendered(frame)
+      await frame
+        .locator('.rb-big', { hasText: /^Insert text$/ })
+        .first()
+        .click()
+      // typing right after the dialog opens must land in the textarea (no click into it first)
+      await expect(frame.locator('.pdf-modal-textarea')).toBeFocused()
+      await page.keyboard.type(text)
+      await expect(frame.locator('.pdf-modal-textarea')).toHaveValue(text)
+      await frame.locator('.pdf-modal-actions .primary').click()
+      // accepted: the dialog closes (a refusal keeps it open and toasts "No installed font ...")
+      await expect(frame.locator('.pdf-modal-textarea')).toHaveCount(0)
+      await expect(frame.getByText('No installed font')).toHaveCount(0)
+      const off = await frameOffset(page)
+      const pb = await pageBox(frame)
+      await page.mouse.click(off.x + pb.x + pb.width * 0.4, off.y + pb.y + 300)
+      // (the pointer ghost of the pending insert shows the same text until the mouse leaves the page)
+      await expect(
+        frame.locator('.pdf-textinsert-preview', { hasText: text }).first(),
+      ).toBeVisible()
+      await clickSave(frame)
+      await waitVersion(page, 'v2')
+      // the text went into the saved file with an embedded font (bundled Liberation)
+      const { text: raw } = await savedPdf(page)
+      expect(raw).toContain('/FontFile2')
+      await noProblems(page, frame, problems)
+    })
+  }
 })
 
 // A7 / B: what the web build does not have says so (never hidden), and the zoom floor at 390 px

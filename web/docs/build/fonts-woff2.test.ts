@@ -54,6 +54,15 @@ describe('woff2UrlImport', () => {
     expect(woff2UrlImport('@genoffice/ui/fonts/Carlito-Regular.woff2?url')).toBeNull()
     expect(woff2UrlImport('react')).toBeNull()
   })
+
+  it('leaves the PDF save core fonts as TTF: its cmap reader and pdf-lib cannot read WOFF2', () => {
+    // UNI-1232 F-1: assets.ts imported the Liberation TTFs as `.ttf?url`, the plugin served the
+    // WOFF2 twins, fontCoversText saw no cmap and Insert text refused every text on the web
+    const assets = readFileSync(join(repoRoot, 'web/modules/pdf/assets.ts'), 'utf8')
+    const specs = [...assets.matchAll(/from '([^']+\.ttf\?[^']*)'/g)].map((m) => m[1]!)
+    expect(specs).toHaveLength(12)
+    for (const spec of specs) expect(woff2UrlImport(spec), spec).toBeNull()
+  })
 })
 
 describe('web/docs/fonts is in sync with fonts.css', () => {

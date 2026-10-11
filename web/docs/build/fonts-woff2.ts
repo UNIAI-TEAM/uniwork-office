@@ -33,7 +33,9 @@ export function rewriteTtfUrls(
   })
 }
 
-// JS imports of a font file as a URL: `import url from '@genoffice/ui/fonts/Carlito-Regular.ttf?url'`
+// JS imports of a font file as a URL: `import url from '@genoffice/ui/fonts/Carlito-Regular.ttf?url'`.
+// Only the bare `?url` is mapped: a consumer that needs the real TTF bytes (the PDF save core parses the
+// cmap and embeds the file) asks for `.ttf?url&ttf`, which this pattern does not match.
 const TTF_URL_IMPORT =
   /^(?:@genoffice\/ui\/fonts\/|\.{1,2}\/(?:[^?]*\/)?)([A-Za-z0-9-]+)\.ttf\?url$/
 

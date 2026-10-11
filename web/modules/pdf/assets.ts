@@ -7,18 +7,21 @@
 import pdfiumWasmUrl from '@embedpdf/pdfium/pdfium.wasm?url'
 // apps/pdf pins harfbuzzjs 0.10 (hb-subset.wasm at the package root); the root install is 1.x
 import hbSubsetWasmUrl from '../../../apps/pdf/node_modules/harfbuzzjs/hb-subset.wasm?url'
-import sansRegular from '../../../apps/docs/src/renderer/fonts/LiberationSans-Regular.ttf?url'
-import sansBold from '../../../apps/docs/src/renderer/fonts/LiberationSans-Bold.ttf?url'
-import sansItalic from '../../../apps/docs/src/renderer/fonts/LiberationSans-Italic.ttf?url'
-import sansBoldItalic from '../../../apps/docs/src/renderer/fonts/LiberationSans-BoldItalic.ttf?url'
-import serifRegular from '../../../apps/docs/src/renderer/fonts/LiberationSerif-Regular.ttf?url'
-import serifBold from '../../../apps/docs/src/renderer/fonts/LiberationSerif-Bold.ttf?url'
-import serifItalic from '../../../apps/docs/src/renderer/fonts/LiberationSerif-Italic.ttf?url'
-import serifBoldItalic from '../../../apps/docs/src/renderer/fonts/LiberationSerif-BoldItalic.ttf?url'
-import monoRegular from '../../../apps/docs/src/renderer/fonts/LiberationMono-Regular.ttf?url'
-import monoBold from '../../../apps/docs/src/renderer/fonts/LiberationMono-Bold.ttf?url'
-import monoItalic from '../../../apps/docs/src/renderer/fonts/LiberationMono-Italic.ttf?url'
-import monoBoldItalic from '../../../apps/docs/src/renderer/fonts/LiberationMono-BoldItalic.ttf?url'
+// The Liberation faces are imported as `?url&ttf`: the save core reads their cmap and pdf-lib embeds
+// the bytes, so they must stay real TTFs. A bare `.ttf?url` is rewritten to the WOFF2 twin by the web
+// build (web/docs/build/fonts-woff2.ts), which the core cannot parse (Insert text refused every text).
+import sansRegular from '../../../apps/docs/src/renderer/fonts/LiberationSans-Regular.ttf?url&ttf'
+import sansBold from '../../../apps/docs/src/renderer/fonts/LiberationSans-Bold.ttf?url&ttf'
+import sansItalic from '../../../apps/docs/src/renderer/fonts/LiberationSans-Italic.ttf?url&ttf'
+import sansBoldItalic from '../../../apps/docs/src/renderer/fonts/LiberationSans-BoldItalic.ttf?url&ttf'
+import serifRegular from '../../../apps/docs/src/renderer/fonts/LiberationSerif-Regular.ttf?url&ttf'
+import serifBold from '../../../apps/docs/src/renderer/fonts/LiberationSerif-Bold.ttf?url&ttf'
+import serifItalic from '../../../apps/docs/src/renderer/fonts/LiberationSerif-Italic.ttf?url&ttf'
+import serifBoldItalic from '../../../apps/docs/src/renderer/fonts/LiberationSerif-BoldItalic.ttf?url&ttf'
+import monoRegular from '../../../apps/docs/src/renderer/fonts/LiberationMono-Regular.ttf?url&ttf'
+import monoBold from '../../../apps/docs/src/renderer/fonts/LiberationMono-Bold.ttf?url&ttf'
+import monoItalic from '../../../apps/docs/src/renderer/fonts/LiberationMono-Italic.ttf?url&ttf'
+import monoBoldItalic from '../../../apps/docs/src/renderer/fonts/LiberationMono-BoldItalic.ttf?url&ttf'
 
 export { pdfiumWasmUrl, hbSubsetWasmUrl }
 
