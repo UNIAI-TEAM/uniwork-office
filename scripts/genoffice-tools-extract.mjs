@@ -30,14 +30,15 @@
  * found through a second, deliberately narrow `name` anchor: the object must be
  * an element of a tools-list array literal. A tools list is written in one of
  * three forms: an annotated binding (`AgentToolDef[]`, `readonly AgentToolDef[]`,
- * `Array<AgentToolDef> = [`), a `tools: [ ... ]` field, or a `return [ ... ]`
- * inside a `get tools()` accessor. `AgentToolDef` (or the bare `AgentTool`) is
- * matched exactly, so an `AgentToolCall[]` / `AgentToolResult[]` array — whose
- * records carry `name` too — is not a tools list. An unannotated array, one
- * typed as anything else (an option list, a typed command list), a nested
- * `options:` bag, a `get options()` returned literal or a plain helper's
- * `return [ ... ]` contributes no row, so a non-tool `{ name, description }`
- * array cannot manufacture phantom rows.
+ * `Array<AgentToolDef> = [`), a `tools: [ ... ]` field outside a schema bag, or
+ * a `return [ ... ]` inside a `get tools()` accessor. `AgentToolDef` (or the
+ * bare `AgentTool`) is matched exactly, so an `AgentToolCall[]` /
+ * `AgentToolResult[]` array — whose records carry `name` too — is not a tools
+ * list. An unannotated array, one typed as anything else (an option list, a
+ * typed command list), a nested `options:` bag, a `tools` bag in a schema, a
+ * `get options()` returned literal or a plain helper's `return [ ... ]`
+ * contributes no row, so a non-tool `{ name, description }` array cannot
+ * manufacture phantom rows.
  *
  * module = `agent-core`, or the app directory name (`docs`, `sheets`, `slides`,
  * `pdf`, `markdown`, `html`). source = repo-relative path of the defining file.
@@ -1542,19 +1543,52 @@ function insideToolsAccessor(tokens, at) {
   return false
 }
 
+/** the `{` of the object literal that encloses token index `at`, or -1 */
+function enclosingBrace(tokens, at) {
+  let depth = 0
+  for (let k = at - 1; k >= 0; k -= 1) {
+    const tk = tokens[k]
+    if (tk.type !== 'punct') continue
+    if (tk.value === '}') depth += 1
+    else if (tk.value === '{') {
+      if (depth === 0) return k
+      depth -= 1
+    }
+  }
+  return -1
+}
+
+/**
+ * Is the array literal at `at` — the value of a `tools:` field — inside a
+ * schema bag, i.e. inside an object that is the value of a `properties` /
+ * `inputSchema` key at any nesting level? A `tools` property of a schema
+ * describes a schema property; its items are not tools, however tool-shaped
+ * they look (R1-1).
+ */
+function insideSchemaBag(tokens, at) {
+  for (let open = enclosingBrace(tokens, at); open >= 0; open = enclosingBrace(tokens, open)) {
+    const colon = tokens[open - 1]
+    const key = tokens[open - 2]
+    if (!(colon && colon.type === 'punct' && colon.value === ':')) continue
+    if (!(key && (key.type === 'ident' || key.type === 'string'))) continue
+    if (key.value === 'properties' || key.value === 'inputSchema') return true
+  }
+  return false
+}
+
 /**
  * Token indices of the `[` that open a tools-list array literal. Three written
  * forms are a tools list:
  *   1. an annotated binding — `AgentToolDef[] = [`, `readonly AgentToolDef[] = [`,
  *      `Array<AgentToolDef> = [`;
- *   2. the value of a `tools:` field — `tools: [ ... ]`;
+ *   2. the value of a `tools:` field outside a schema bag — `tools: [ ... ]`;
  *   3. the operand of `return` inside a `get tools()` accessor —
  *      `get tools() { return [ ... ] }`.
  * Any other array — an unannotated array, one typed as something else (an
- * option list, a typed command list), a nested `options:` bag, a `get options()`
- * returned literal, a plain helper's `return [ ... ]` — is not a tools list for
- * the `name` anchor below, so a non-tool `{ name, description }` element cannot
- * manufacture a phantom row.
+ * option list, a typed command list), a nested `options:` bag, a `tools` bag
+ * inside a schema, a `get options()` returned literal, a plain helper's
+ * `return [ ... ]` — is not a tools list for the `name` anchor below, so a
+ * non-tool `{ name, description }` element cannot manufacture a phantom row.
  */
 function toolListArrayIndices(tokens) {
   const out = new Set()
@@ -1562,7 +1596,10 @@ function toolListArrayIndices(tokens) {
     const tk = tokens[b]
     if (!(tk.type === 'punct' && tk.value === '[')) continue
 
-    // `tools: [ ... ]` — the value of a `tools` field is a tools list
+    // `tools: [ ... ]` — the value of a `tools` field is a tools list, unless
+    // the field sits inside a schema: `properties: { tools: [ … ] }` describes
+    // a schema property, so its items are not tools however tool-shaped they
+    // look
     const colon = tokens[b - 1]
     const fieldName = tokens[b - 2]
     if (
@@ -1571,7 +1608,8 @@ function toolListArrayIndices(tokens) {
       colon.value === ':' &&
       fieldName &&
       fieldName.type === 'ident' &&
-      fieldName.value === 'tools'
+      fieldName.value === 'tools' &&
+      !insideSchemaBag(tokens, b)
     ) {
       out.add(b)
       continue
