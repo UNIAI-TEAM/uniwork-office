@@ -314,6 +314,7 @@ describe('save', () => {
     s.mock.bumpRemote(s.fileId)
     const pending = s.api.save(req(path))
     await choose('overwrite')
+    await choose('go')
     expect(await pending).toEqual({ ok: true })
     expect(s.mock.errors.some((e) => (e.error as { code?: string }).code === 'conflict')).toBe(true)
     expect(str(s.mock.bytesOf(s.fileId)!)).toBe('%PDF-1.7 v1+m0')
@@ -327,6 +328,7 @@ describe('save', () => {
     s.mock.commit(s.fileId, PDF('theirs'))
     const pending = s.api.save(req(path))
     await choose('reload')
+    await choose('discard')
     const r = await pending
     expect(r.ok).toBe(false)
     await flush()
@@ -344,7 +346,7 @@ describe('save', () => {
     expect(str(s.mock.bytesOf(s.fileId)!)).toBe('%PDF-1.7 theirs')
   })
 
-  it('host `save` runs the viewer save flow; its conflict goes to the host, no dialog', async () => {
+  it('host `save` runs the viewer save flow; its conflict opens the frame dialog, Cancel answers cancelled', async () => {
     const s = await setup()
     const path = (await s.api.consumePending())!
     s.api.onCloseSaveRequest(() => {
@@ -358,12 +360,48 @@ describe('save', () => {
     expect(s.mock.saved.at(-1)?.initiatedByFrame).toBe(false)
 
     s.mock.bumpRemote(s.fileId)
-    const res = (await s.mock.host.save({ reason: 'user' })) as {
-      ok: boolean
-      error?: { code: string }
-    }
-    expect(res).toMatchObject({ ok: false, error: { code: 'conflict' } })
+    const res = s.mock.host.save({ reason: 'user' })
+    await choose('cancel')
+    expect(await res).toMatchObject({ ok: false, error: { code: 'cancelled' } })
     expect(document.querySelector('[data-pdf-web="conflict"]')).toBeNull()
+    expect(s.mock.errors).toHaveLength(0)
+  })
+
+  it('host `save` conflict: DOM order and first focus, Overwrite… confirmed answers the new version', async () => {
+    const s = await setup()
+    const path = (await s.api.consumePending())!
+    s.api.onCloseSaveRequest(() => {
+      void s.api.save(req(path)).then((r) => s.api.sendCloseSaveResult(r.ok))
+    })
+    s.mock.bumpRemote(s.fileId)
+    const res = s.mock.host.save({ reason: 'user' })
+    await vi.waitFor(() =>
+      expect(document.querySelector('[data-pdf-web="conflict"] [data-choice]')).not.toBeNull(),
+    )
+    expect(
+      [...document.querySelectorAll('[data-choice]')].map((b) => (b as HTMLElement).dataset.choice),
+    ).toEqual(['reload', 'overwrite', 'cancel'])
+    expect((document.activeElement as HTMLElement).dataset.choice).toBe('cancel')
+    await choose('overwrite')
+    await choose('go')
+    expect(await res).toMatchObject({ ok: true, versionId: 'v3' })
+  })
+
+  it('host `save` conflict -> Reload answers ok without a versionId; download only with the capability', async () => {
+    const s = await setup()
+    const path = (await s.api.consumePending())!
+    s.api.onCloseSaveRequest(() => {
+      void s.api.save(req(path)).then((r) => s.api.sendCloseSaveResult(r.ok))
+    })
+    s.mock.bumpRemote(s.fileId)
+    const res = s.mock.host.save({ reason: 'navigate' })
+    await choose('reload')
+    await vi.waitFor(() => expect(document.querySelector('[data-choice="discard"]')).not.toBeNull())
+    expect(document.querySelector('[data-choice="download"]')).toBeNull()
+    await choose('discard')
+    const answer = await res
+    expect(answer).toMatchObject({ ok: true, file: { versionId: 'v2' } })
+    expect(answer).not.toHaveProperty('versionId')
   })
 
   it('a host `save` conflict reads as a conflict in the viewer, never the server message or "try again"', async () => {
@@ -377,7 +415,9 @@ describe('save', () => {
       })
     })
     s.mock.bumpRemote(s.fileId)
-    await s.mock.host.save({ reason: 'user' })
+    const res = s.mock.host.save({ reason: 'user' })
+    await choose('cancel')
+    await res
     await vi.waitFor(() => expect(failure).not.toBe(''))
     expect(failure).toBe('the document was changed elsewhere')
     expect(failure).not.toMatch(/try again|stale etag|409/i)

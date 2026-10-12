@@ -91,6 +91,16 @@ function clickChoice(marker: string, label: string): void {
   button.click()
 }
 
+/** clicks a labelled choice once it is on screen (a confirmation step renders after an await) */
+async function pickChoice(marker: string, label: string): Promise<void> {
+  await waitFor(() =>
+    [...document.querySelectorAll(`[data-slides-web="${marker}"] button`)].find(
+      (b) => b.textContent === label,
+    ),
+  )
+  clickChoice(marker, label)
+}
+
 async function waitFor<T>(fn: () => T | null | undefined, tries = 200): Promise<T> {
   for (let i = 0; i < tries; i++) {
     const v = fn()
@@ -239,6 +249,8 @@ describe('save', () => {
     await waitFor(() => document.querySelector('[data-slides-web="conflict"]'))
     expect(mock.errors.at(-1)?.error).toMatchObject({ code: 'conflict' })
     clickChoice('conflict', 'Overwrite…')
+    // the confirmation step: nothing is written before it
+    await pickChoice('conflict', 'Overwrite')
     expect(await pending).toMatchObject({ ok: true })
     expect(mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(2)
   })
@@ -261,12 +273,13 @@ describe('save', () => {
     pending = api.save()
     await waitFor(() => document.querySelector('[data-slides-web="conflict"]'))
     clickChoice('conflict', 'Reload latest')
+    await pickChoice('conflict', 'Discard changes and reload')
     expect(await pending).toMatchObject({ ok: false })
     expect(reloaded).toHaveLength(1)
     expect(await api.isDirty()).toBe(false)
   })
 
-  it('a host `save` request runs the renderer save flow and owns the conflict (no prompt)', async () => {
+  it('a host `save` request runs the renderer save flow; its conflict opens the frame dialog', async () => {
     const { mock, api, fileId } = await setup()
     await api.consumePendingOpen(FIT)
     api.onCloseSaveRequest(() => {
@@ -277,11 +290,51 @@ describe('save', () => {
     expect(mock.saved.at(-1)).toMatchObject({ initiatedByFrame: false })
     await api.setNotes({ slideIndex: 0, text: 'again' })
     mock.bumpRemote(fileId)
-    expect(await mock.host.save({ reason: 'navigate' } as never)).toMatchObject({
-      ok: false,
-      error: { code: 'conflict' },
-    })
+    const res = mock.host.save({ reason: 'navigate' } as never)
+    await pickChoice('conflict', 'Cancel')
+    expect(await res).toMatchObject({ ok: false, error: { code: 'cancelled' } })
     expect(document.querySelector('[data-slides-web="conflict"]')).toBeNull()
+  })
+
+  it('a host `save` conflict: one dialog, DOM order, Overwrite… confirmed answers the new version', async () => {
+    const { mock, api, fileId } = await setup()
+    await api.consumePendingOpen(FIT)
+    api.onCloseSaveRequest(() => {
+      void api.save().then((r) => api.reportCloseSaveResult(r.ok))
+    })
+    await api.setNotes({ slideIndex: 0, text: 'mine' })
+    mock.bumpRemote(fileId)
+    const res = mock.host.save({ reason: 'user' } as never)
+    await waitFor(() => document.querySelector('[data-slides-web="conflict"] [data-choice]'))
+    expect(document.querySelectorAll('[role="alertdialog"]')).toHaveLength(1)
+    expect(
+      [...document.querySelectorAll('[data-choice]')].map((b) => (b as HTMLElement).dataset.choice),
+    ).toEqual(['reload', 'overwrite', 'cancel'])
+    clickChoice('conflict', 'Overwrite…')
+    await pickChoice('conflict', 'Overwrite')
+    expect(await res).toMatchObject({ ok: true, versionId: 'v3' })
+    expect(
+      mock.errors.filter((e) => (e.error as { code?: string }).code === 'conflict'),
+    ).toHaveLength(0)
+  })
+
+  it('a host `save` conflict -> Reload answers ok without a versionId', async () => {
+    const { mock, api, fileId } = await setup()
+    await api.consumePendingOpen(FIT)
+    api.onCloseSaveRequest(() => {
+      void api.save().then((r) => api.reportCloseSaveResult(r.ok))
+    })
+    await api.setNotes({ slideIndex: 0, text: 'mine' })
+    mock.bumpRemote(fileId)
+    const res = mock.host.save({ reason: 'user' } as never)
+    await pickChoice('conflict', 'Reload latest')
+    expect(
+      document.querySelector('[data-slides-web="conflict"] [data-choice="download"]'),
+    ).toBeNull()
+    await pickChoice('conflict', 'Discard changes and reload')
+    const answer = await res
+    expect(answer).toMatchObject({ ok: true, file: { fileId } })
+    expect(answer).not.toHaveProperty('versionId')
   })
 
   it('a host `save` conflict reads as a conflict, not as "try again" (a retry conflicts again)', async () => {
@@ -296,7 +349,9 @@ describe('save', () => {
     })
     await api.setNotes({ slideIndex: 0, text: 'again' })
     mock.bumpRemote(fileId)
-    await mock.host.save({ reason: 'navigate' } as never)
+    const res = mock.host.save({ reason: 'navigate' } as never)
+    await pickChoice('conflict', 'Cancel')
+    await res
     expect(failure).toMatch(/changed elsewhere/)
     expect(failure).not.toMatch(/try again/i)
   })
