@@ -1056,6 +1056,191 @@ describe('extractor residuals (G7-06)', () => {
   })
 })
 
+// G706-BE-R1 (reviewer-be-ext-r1.md): `statementContinues` looked only at the
+// token after a line break, so a braceless consequent that was still open there
+// — an unclosed call, a returned object or array, a trailing operator that
+// still needs its operand, a nested control statement — was cut at that line
+// break. The named tool then lost its own `mutated: true` and the table said
+// `no` / `undeclared` for code that mutates. Each shape below must keep its
+// declaration inside the branch; the negatives keep the statement after a bare
+// `return` (a restricted production) out of it, and the sibling keeps the
+// switch route itself intact.
+describe('braceless consequent extent (G7-06 r2)', () => {
+  const MULTILINE_CONSEQUENT_FIXTURE = {
+    'apps/docs/src/renderer/ai/tools.ts': [
+      "import type { AgentToolCall, AgentToolDef, ToolExecution } from '@genoffice/agent-core'",
+      '',
+      'export const AGENT_TOOLS: AgentToolDef[] = [',
+      "  { name: 'open_call', description: 'an unclosed call continues', inputSchema: { type: 'object' } },",
+      "  { name: 'object_return', description: 'a returned object continues', inputSchema: { type: 'object' } },",
+      "  { name: 'array_return', description: 'a returned array continues', inputSchema: { type: 'object' } },",
+      "  { name: 'trailing_operator', description: 'a trailing && continues', inputSchema: { type: 'object' } },",
+      "  { name: 'comma_argument', description: 'a comma before the break continues', inputSchema: { type: 'object' } },",
+      "  { name: 'comment_inside_call', description: 'a block comment spans the break', inputSchema: { type: 'object' } },",
+      "  { name: 'string_punctuation', description: 'a string holding a brace is not punctuation', inputSchema: { type: 'object' } },",
+      "  { name: 'nested_if', description: 'a nested braceless if is the consequent', inputSchema: { type: 'object' } },",
+      "  { name: 'nested_if_block', description: 'a nested if with a block consequent', inputSchema: { type: 'object' } },",
+      "  { name: 'nested_if_else', description: 'the else binds to the nested if', inputSchema: { type: 'object' } },",
+      "  { name: 'nested_for', description: 'a nested for is the consequent', inputSchema: { type: 'object' } },",
+      "  { name: 'nested_for_await', description: 'a nested for await is the consequent', inputSchema: { type: 'object' } },",
+      "  { name: 'nested_while', description: 'a nested while is the consequent', inputSchema: { type: 'object' } },",
+      "  { name: 'nested_do', description: 'a nested do/while is the consequent', inputSchema: { type: 'object' } },",
+      "  { name: 'nested_switch', description: 'a nested switch is the consequent', inputSchema: { type: 'object' } },",
+      "  { name: 'nested_try', description: 'a nested try is the consequent', inputSchema: { type: 'object' } },",
+      "  { name: 'outer_else', description: 'the guard branch stops before its own else', inputSchema: { type: 'object' } },",
+      "  { name: 'bare_return_block', description: 'a block after a bare return', inputSchema: { type: 'object' } },",
+      "  { name: 'bare_return_call', description: 'a call after a bare return', inputSchema: { type: 'object' } },",
+      "  { name: 'mutating_sibling', description: 'mutating sibling routed by the switch', inputSchema: { type: 'object' } },",
+      ']',
+      '',
+      'const ready = true',
+      'const pending = false',
+      'const mode = 1',
+      'const items = [1]',
+      '',
+      'function read(call: AgentToolCall): ToolExecution {',
+      "  return { output: 'read', mutated: false, summary: 'read' }",
+      '}',
+      '',
+      'function write(call: AgentToolCall): ToolExecution {',
+      "  return { output: 'wrote', mutated: true, summary: 'write' }",
+      '}',
+      '',
+      'function wrap(value: ToolExecution): ToolExecution {',
+      '  return value',
+      '}',
+      '',
+      'export async function executeTool(call: AgentToolCall): Promise<ToolExecution> {',
+      "  if (call.name === 'open_call')",
+      '    return wrap(',
+      '      write(call)',
+      '    )',
+      "  if (call.name === 'object_return')",
+      '    return {',
+      "      output: 'wrote',",
+      '      mutated: true,',
+      "      summary: 'write',",
+      '    }',
+      "  if (call.name === 'array_return')",
+      '    return [',
+      '      write(call),',
+      '    ]',
+      "  if (call.name === 'trailing_operator')",
+      '    return read(call) &&',
+      '      write(call)',
+      "  if (call.name === 'comma_argument')",
+      '    return wrap(read(call),',
+      '      write(call))',
+      "  if (call.name === 'comment_inside_call')",
+      '    return wrap(read(call), /* the comment',
+      '      spans a line */',
+      '      write(call))',
+      "  if (call.name === 'string_punctuation')",
+      "    return read(call).output === '}' ? write(call) : read(call)",
+      "  if (call.name === 'nested_if')",
+      '    if (ready)',
+      '      return write(call)',
+      "  if (call.name === 'nested_if_block')",
+      '    if (ready) {',
+      '      return write(call)',
+      '    }',
+      "  if (call.name === 'nested_if_else')",
+      '    if (ready) return read(call)',
+      '    else return write(call)',
+      "  if (call.name === 'nested_for')",
+      '    for (const item of items)',
+      '      write(call)',
+      "  if (call.name === 'nested_for_await')",
+      '    for await (const item of items)',
+      '      write(call)',
+      "  if (call.name === 'nested_while')",
+      '    while (pending)',
+      '      write(call)',
+      "  if (call.name === 'nested_do')",
+      '    do {',
+      '      write(call)',
+      '    } while (pending)',
+      "  if (call.name === 'nested_switch')",
+      '    switch (mode) {',
+      '      case 1:',
+      '        return write(call)',
+      '      default:',
+      '        return read(call)',
+      '    }',
+      "  if (call.name === 'nested_try')",
+      '    try {',
+      '      write(call)',
+      '    } catch {',
+      '      return read(call)',
+      '    }',
+      "  if (call.name === 'outer_else')",
+      '    return read(call)',
+      '  else',
+      '    write(call)',
+      "  if (call.name === 'bare_return_block')",
+      '    return',
+      '  {',
+      '    mutated: true',
+      '  }',
+      "  if (call.name === 'bare_return_call')",
+      '    return',
+      '  (write(call))',
+      '  switch (call.name) {',
+      "    case 'mutating_sibling':",
+      '      return write(call)',
+      '    default:',
+      "      return { output: 'unknown', isError: true, mutated: false, summary: call.name }",
+      '  }',
+      '}',
+      '',
+    ].join('\n'),
+  }
+
+  it('keeps a multiline consequent inside the braceless guard that owns it (G706-BE-R1)', () => {
+    const { dir } = fixture(MULTILINE_CONSEQUENT_FIXTURE)
+    const { rows } = extract({ repo: dir, rev: 'HEAD' })
+    const write = (tool) => {
+      const row = rows.find((r) => r.tool === tool)
+      assert.ok(row, `expected a row for ${tool}`)
+      return row.write
+    }
+    // every consequent below runs `mutated: true`
+    for (const tool of [
+      'open_call', // return wrap( / write(call) / )
+      'object_return', // return { / mutated: true / }
+      'array_return', // return [ / write(call) / ]
+      'trailing_operator', // return read(call) && / write(call)
+      'comma_argument', // return wrap(read(call), / write(call))
+      'comment_inside_call', // the line break sits inside a block comment
+      'string_punctuation', // a string whose decoded value is `}` is not punctuation
+      'nested_if', // if (ready) / return write(call)
+      'nested_if_block', // if (ready) { / return write(call) / }
+      'nested_if_else', // if (ready) return read(call) / else return write(call)
+      'nested_for', // for (const item of items) / write(call)
+      'nested_for_await', // for await (const item of items) / write(call)
+      'nested_while', // while (pending) / write(call)
+      'nested_do', // do { write(call) } while (pending)
+      'nested_switch', // switch (mode) { case 1: return write(call) … }
+      'nested_try', // try { write(call) } catch { … }
+    ]) {
+      assert.equal(write(tool), 'yes', `${tool} must keep its own mutating branch`)
+    }
+    // the guard's own `else` is not the `===` path, and the switch below still routes
+    assert.equal(write('outer_else'), 'no')
+    assert.equal(write('mutating_sibling'), 'yes')
+  })
+
+  it('does not credit a statement after a bare `return` (G706-BE-R1)', () => {
+    const { dir } = fixture(MULTILINE_CONSEQUENT_FIXTURE)
+    const { rows } = extract({ repo: dir, rev: 'HEAD' })
+    const write = (tool) => rows.find((r) => r.tool === tool).write
+    // `return` NL is a restricted production: the line break ends the statement,
+    // so the block / call below it runs for every tool, not as this guard's branch
+    assert.equal(write('bare_return_block'), 'undeclared')
+    assert.equal(write('bare_return_call'), 'undeclared')
+  })
+})
+
 describe('real repo', () => {
   it('produces rows for each of the six apps at HEAD', () => {
     const { rows } = extract({ repo: REPO_ROOT, rev: 'HEAD' })
