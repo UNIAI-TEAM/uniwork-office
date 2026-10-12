@@ -39,6 +39,13 @@ describe('create_document on a UniWork-bound PDF', () => {
     expect(names).toContain('generate_image')
   })
 
+  it('tells the model why the tool is missing, only while bound', () => {
+    expect(createPdfSkill(makeDeps(true)).systemPrompt).toContain('create_document is unavailable')
+    expect(createPdfSkill(makeDeps(false)).systemPrompt).not.toContain(
+      'create_document is unavailable',
+    )
+  })
+
   it('refuses a stale call without writing anything (skill and executor)', async () => {
     const createDocument = vi.fn(async () => ({ ok: true as const, path: '/x/Summary.pdf' }))
     const deps = makeDeps(true, { createDocument })

@@ -179,6 +179,8 @@ export interface PdfAiDeps {
   stamps(): StampConfig | null
   /** Replace the session stamp configuration (null clears it); rendered on every page at save */
   setStamps(cfg: StampConfig | null): void
+  /** live predicate: the open PDF is a UniWork-bound copy (C-BOUND: no file written outside it); absent = plain local file */
+  uniworkBound?(): boolean
   /** AI create_document: write a new standalone file (pdf/docx/md) into the default folder and open it in a new tab */
   createDocument(request: CreateDocumentRequest): Promise<CreateDocumentResult>
   /** Inline confirmation card for a file-level operation; false when the user declines, the run is stopped, or the panel goes away */
@@ -1160,6 +1162,9 @@ export const AGENT_TOOLS: AgentToolDef[] = [
     },
   },
 ]
+
+const BOUND_OUTPUT =
+  'This document belongs to UniWork; creating separate files from here is not available. Put the content in your reply or into the open document instead.'
 
 const READONLY_OUTPUT =
   'The document is encrypted and read-only; it cannot be modified. Inform the user.'
@@ -3595,6 +3600,8 @@ export async function executePdfTool(
       }
     }
     case 'create_document': {
+      // C-BOUND: the skill already hides the tool; refuse a stale call too
+      if (deps.uniworkBound?.()) return err(BOUND_OUTPUT, t('aiToolCreateDocument'))
       const typeRaw = input.type === undefined ? 'pdf' : String(input.type)
       const summary = t('aiToolCreateDocument')
       if (typeRaw !== 'pdf' && typeRaw !== 'docx' && typeRaw !== 'md' && typeRaw !== 'html')
