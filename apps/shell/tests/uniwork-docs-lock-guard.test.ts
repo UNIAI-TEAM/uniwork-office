@@ -12,7 +12,7 @@ import {
   type ConflictUi,
 } from '../src/main/uniwork-docs/service'
 import { BINDING_FILE, INTENT_PAYLOAD_FILE } from '../src/main/uniwork-docs/binding-store'
-import { INTENT_STORE_REGISTRATION } from '../src/main/uniwork-sync/intent-store'
+import { INTENT_STORE_REGISTRATION, createIntentStore } from '../src/main/uniwork-sync/intent-store'
 import { createSafeStorageKeyProvider } from '../src/main/uniwork-sync/keys'
 import { createSyncStoreAccess } from '../src/main/uniwork-sync/session-store'
 import { createStoreLayer } from '../src/main/uniwork-sync/store'
@@ -149,7 +149,7 @@ function setup() {
     sleep: async () => undefined,
   }
   const service = new UniworkDocsService(deps)
-  return { service, ui, statuses, locks, deps, safeStorage }
+  return { service, ui, statuses, locks, deps, safeStorage, layer }
 }
 
 const bytesOf = (path: string) => readFileSync(path, 'utf8')
@@ -457,9 +457,21 @@ describe('a locked keychain holds a pre-store intent (W3b)', () => {
     expect((await ctx.service.openSyncStore()).kind).toBe('keystore_locked')
     expect(ctx.service.refuseLockedPath(docPath())).toBe(true)
     expect(ctx.locks.at(-1)?.reason).toBe('keystore_locked')
-    // the keychain is back: the lock clears and the copy opens with its local work
+    // the keychain is back: the lock clears, the legacy intent moves into the
+    // store exactly once, and the copy opens with its local work
     ctx.safeStorage.unlock()
     expect((await ctx.service.openSyncStore()).kind).toBe('ok')
+    const migrated = JSON.parse(bindingText()) as Record<string, unknown>
+    expect(migrated).toMatchObject({ schema: 2, min_store_level: 2, state: 'dirty' })
+    expect(migrated).not.toHaveProperty('pendingIntent')
+    expect(folderFiles()).toEqual(['Plan.docx', BINDING_FILE])
+    const records = await ctx.layer.open({ deploymentId: 'default', accountId: 'acc_1' })
+    if (records.kind !== 'ok') throw new Error(records.kind)
+    const intent = await createIntentStore(
+      records.store.records(INTENT_STORE_REGISTRATION.name),
+    ).get(DOC)
+    expect(intent?.intent).toMatchObject({ documentId: DOC, baseRevision: '41' })
+    expect(Buffer.from(intent?.payload ?? []).toString()).toBe('working copy bytes')
     expect(ctx.service.refuseLockedPath(docPath())).toBe(false)
     expect(ctx.service.currentLocks().filter((l) => l.reason === 'keystore_locked')).toEqual([])
     const opened = await ctx.service.openFromServer(DOC)

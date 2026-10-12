@@ -48,6 +48,7 @@ import type { DocumentDetail, LaunchDescriptor } from './parse'
 import { SaveCoordinator, toStatus, type IntentAccess } from './save-coordinator'
 import type { SyncStoreAccess, SyncStoreOpen } from '../uniwork-sync/session-store'
 import { createIntentStore, INTENT_STORE_REGISTRATION } from '../uniwork-sync/intent-store'
+import { migrateLegacyIntents } from '../uniwork-sync/migration'
 import { APP_STORE_LEVEL } from '../uniwork-sync/store-level'
 
 /**
@@ -223,6 +224,8 @@ export class UniworkDocsService {
   private syncOpen: Promise<SyncStoreOpen> | null = null
   /** the outcome of the last store open; 'unknown' until it is asked for */
   private storeOpenKind: SyncStoreOpen['kind'] | 'unknown' = 'unknown'
+  /** scopes whose schema 1 -> 2 sweep has finished in this process */
+  private readonly migratedScopes = new Set<string>()
   /**
    * The one conflict dialog open (native dialogs are window-wide, not per
    * tab). `fromClose` = opened by the close prompt of that document's tab.
@@ -368,14 +371,47 @@ export class UniworkDocsService {
     if (!sync) return Promise.resolve({ kind: 'no_session' })
     this.syncOpen ??= sync
       .open()
-      .then((open) => {
+      .then(async (open) => {
         this.noteStoreOpen(open)
+        if (open.kind === 'ok') await this.migrateLegacyState(sync, open)
         return open
       })
       .finally(() => {
         this.syncOpen = null
       })
     return this.syncOpen
+  }
+
+  /**
+   * The schema 1 -> 2 sweep (the pre-store plaintext intent moves into the
+   * durable store), once per scope and process: the first open after sign-in
+   * (or after the keychain unlocks) runs it, every later open skips it. A
+   * failed sweep is not remembered, so the next open retries; a locked store
+   * never reaches here.
+   */
+  private async migrateLegacyState(
+    sync: SyncStoreAccess,
+    open: SyncStoreOpen & { kind: 'ok' },
+  ): Promise<void> {
+    const scope = sync.scope()
+    if (!scope) return
+    const token = `${scope.deploymentId}/${scope.accountId}`
+    if (this.migratedScopes.has(token)) return
+    try {
+      const report = await migrateLegacyIntents({
+        root: this.store.root,
+        scope,
+        records: (name) => open.records(name),
+        appVersion: this.buildVersion(),
+      })
+      this.migratedScopes.add(token)
+      if (report.migrated > 0) {
+        console.warn(`uniwork sync: moved ${report.migrated} legacy save intent(s) into the store`)
+      }
+    } catch (error) {
+      // the store opened but the sweep could not finish: the next open retries
+      console.warn('uniwork sync: legacy save intent migration failed:', error)
+    }
   }
 
   /**
