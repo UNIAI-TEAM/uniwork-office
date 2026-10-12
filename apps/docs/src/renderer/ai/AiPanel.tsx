@@ -17,8 +17,12 @@ import {
 } from '@genoffice/ai-provider/browser'
 import type { AiSettings, AttachmentAddResult, AttachmentMeta } from '../../shared/ipc'
 import { ATTACHMENT_IMAGE_EXTS } from '../../shared/ipc'
-import type { PmNode } from '../editor/convert'
-import { TABLE_TRAILING_SKIP } from '../editor/extensions'
+import {
+  captureRunSnapshot,
+  restoreRunSnapshot,
+  type AiRunSnapshot,
+  type AiSideState,
+} from './run-snapshot'
 import { countWords, findNumId, type NumIds } from './protocol'
 import { DOC_NAV_SCHEME, navigateToBlock, parseDocNavHref } from './doc-nav'
 import {
@@ -112,7 +116,7 @@ interface ChatEntry {
   /** tool executions performed during this assistant turn */
   tools?: ToolActivity[]
   /** document state before this turn's first edit — rendered as an inline roll-back action */
-  snapshot?: PmNode
+  snapshot?: AiRunSnapshot
   /** attachments consumed from the composer by this user message (read-only echo chips) */
   attachments?: AttachmentMeta[]
   /** the selection this user message targeted, frozen at send */
@@ -336,6 +340,8 @@ interface AiPanelProps {
   readOnly?: boolean
   /** UniWork working copy: tools that write outside the document are hidden (C-BOUND) */
   bound?: boolean
+  /** App state beside the PM doc that a run's Roll back restores with it */
+  sideState?: AiSideState
 }
 
 const MODEL_BRIDGE: AiModelPickerBridge = {
@@ -374,6 +380,7 @@ export function AiPanel({
   notesAccess,
   readOnly = false,
   bound = false,
+  sideState,
 }: AiPanelProps) {
   const { t, lang } = useI18n()
   // Panel chrome follows the UI language; message text follows its own content (dir=auto below)
@@ -531,6 +538,8 @@ export function AiPanel({
   readOnlyRef.current = readOnly
   const boundRef = useRef(bound)
   boundRef.current = bound
+  const sideStateRef = useRef(sideState)
+  sideStateRef.current = sideState
   const trackChangesRef = useRef(trackChanges)
   trackChangesRef.current = trackChanges
   const commentsAccessRef = useRef(commentsAccess)
@@ -566,7 +575,7 @@ export function AiPanel({
   const instructionRef = useRef('')
   /** document state before the run's first edit — attached to the turn's final
       segment at run end (mid-turn segments never show the action toolbar) */
-  const runSnapshotRef = useRef<PmNode | null>(null)
+  const runSnapshotRef = useRef<AiRunSnapshot | null>(null)
   /** last sent instruction, for one-click retry */
   const lastInstructionRef = useRef('')
   /** Tool activity of the whole run (with args/output, accumulated across turns) — for full
@@ -764,13 +773,13 @@ export function AiPanel({
     decidePartial(false)
   }
 
-  const loopRef = useRef<AgentLoop<PmNode> | null>(null)
+  const loopRef = useRef<AgentLoop<AiRunSnapshot> | null>(null)
   if (!loopRef.current) {
     const numIds = (): NumIds => ({
       bullet: findNumId(blocksRef.current, 'bullet') ?? numIdFallbackRef.current?.bullet ?? null,
       ordered: findNumId(blocksRef.current, 'ordered') ?? numIdFallbackRef.current?.ordered ?? null,
     })
-    loopRef.current = new AgentLoop<PmNode>({
+    loopRef.current = new AgentLoop<AiRunSnapshot>({
       transport: transportRef.current,
       systemSuffix: aiLangDirective,
       skill: composeSkills('docs+files', '', [
@@ -793,7 +802,7 @@ export function AiPanel({
         ),
         createFilesSkill(availableAttachments),
       ]),
-      captureSnapshot: () => editorRef.current.getJSON() as PmNode,
+      captureSnapshot: () => captureRunSnapshot(editorRef.current, sideStateRef.current),
       events: {
         onText: (text) => patchLastAssistant({ text }),
         onToolStart: (call) => {
@@ -1211,12 +1220,9 @@ export function AiPanel({
     if (!next) acceptChanges()
   }
 
-  const rollback = (entryIdx: number, snapshot: PmNode) => {
-    editor
-      .chain()
-      .setMeta(TABLE_TRAILING_SKIP, true)
-      .setContent(snapshot as never)
-      .run()
+  const rollback = (entryIdx: number, snapshot: AiRunSnapshot) => {
+    // the PM tree plus the state saved beside it (comments, header/footer, styles, page setup, watermark)
+    restoreRunSnapshot(editor, snapshot, sideStateRef.current)
     // The document rewound to before this turn, so this and every later
     // rollback point now describe discarded futures
     setChat((prev) =>

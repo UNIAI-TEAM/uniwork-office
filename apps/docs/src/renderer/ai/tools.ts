@@ -1066,7 +1066,7 @@ async function setPictureWatermark(
   if (error) return fail(summary, error)
   return {
     output: `Picture watermark set (${natural.width}x${natural.height}px source).`,
-    mutated: false, // header part state, written on save
+    mutated: true, // header part state, written on save; the run rollback restores it
     summary,
   }
 }
@@ -1719,7 +1719,7 @@ function executeSyncTool(
       }
       return {
         output: `Comment ${rootId} marked as resolved.`,
-        mutated: false, // app state only; the document content is untouched
+        mutated: true, // comment state is saved with the document; the run rollback restores it
         summary: t('aiSumResolveComment'),
       }
     }
@@ -1898,7 +1898,7 @@ function executeSyncTool(
       if (error) return fail(summaryOf(), error)
       return {
         output: `Updated the ${kind}${view !== 'default' ? ` (${view}-page variant)` : ''}.`,
-        mutated: false, // app state only, saved with the document; not part of the PM doc
+        mutated: true, // header part state, saved with the document; the run rollback restores it
         summary: summaryOf(),
       }
     }
@@ -1942,7 +1942,7 @@ function executeSyncTool(
       }
       return {
         output: `Page setup updated.\n${lines.join('\n')}`,
-        mutated: false, // section settings live beside the document and are written on save
+        mutated: true, // section settings live beside the PM doc; the run rollback restores them
         summary,
       }
     }
@@ -1988,7 +1988,7 @@ function executeSyncTool(
       const { styleId } = resolved.value.upsert
       return {
         output: `${resolved.value.existing ? 'Updated' : 'Created'} style ${styleId}; apply it with the applyStyle op { op: "applyStyle", target, styleId: "${styleId}" }.`,
-        mutated: false, // styles.xml is written on save; the PM doc is untouched
+        mutated: true, // styles.xml is written on save; the run rollback restores the pending table
         summary,
       }
     }
@@ -2002,7 +2002,7 @@ function executeSyncTool(
       if (error) return fail(summary, error)
       return {
         output: resolved.spec ? `Watermark set to "${resolved.spec.text}".` : 'Watermark removed.',
-        mutated: false, // header part state, written on save
+        mutated: true, // header part state, written on save; the run rollback restores it
         summary,
       }
     }
