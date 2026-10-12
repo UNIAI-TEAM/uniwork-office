@@ -10,8 +10,9 @@ import { blockIndexRange, blockRange } from '../editor/ops'
  * fence at send and clears it when the run ends (`clearEditFence`); the tools check every write
  * against it in code (apply_ops is rolled back, whole-document writers are
  * refused), so the text outside stays byte-identical whatever the model
- * sends. A retried turn gets the fence of its own scope (`turnFence`), never
- * the one the last send left. Blocks are the unit because the ops address blocks: a fence over
+ * sends. A new turn gets the fence of its own scope (`turnFence`); a retried one
+ * gets the fence its entry ended with (`retryFence`), never the one the last
+ * send left. Blocks are the unit because the ops address blocks: a fence over
  * part of a paragraph allows rewriting that paragraph. Content inserted
  * directly before or after a fenced block counts as inside.
  */
@@ -38,12 +39,15 @@ export function selectionFence(editor: Editor): FenceRange[] | null {
   return empty ? null : [{ from, to }]
 }
 
-/** set (or with null clear) the fence for the editor's current AI turn */
+/**
+ * set (or with null clear) the fence for the editor's current AI turn; an empty
+ * list is a fence that allows nothing (every edit is refused), never "no fence"
+ */
 export function setEditFence(editor: Editor, ranges: FenceRange[] | null): void {
   const previous = fences.get(editor)
   if (previous) editor.off('transaction', previous.follow)
   fences.delete(editor)
-  if (!ranges || ranges.length === 0) return
+  if (!ranges) return
   const doc = editor.state.doc
   const fence: Fence = {
     // whole blocks, so a block the run inserts at a fenced block's edge stays editable
@@ -80,18 +84,37 @@ export function clearEditFence(editor: Editor): FenceRange[] | null {
 }
 
 /**
- * the fence a turn runs with, from the turn's own scope: a queue submission
- * keeps its anchored ranges; a scoped turn (scope chip) is fenced to the live
- * selection, or to `fallback` (where the repeated turn's fence ended up) when
- * the selection has since collapsed; an unscoped turn has no fence.
+ * the fence a NEW turn runs with: a queue submission keeps its anchored ranges
+ * (an empty list stays an empty fence); a scoped turn (scope chip) is fenced to
+ * the live selection; an unscoped turn has no fence.
  */
 export function turnFence(
   editor: Editor,
-  opts: { scoped: boolean; queueFence?: FenceRange[]; fallback?: FenceRange[] | null },
+  opts: { scoped: boolean; queueFence?: FenceRange[] },
 ): FenceRange[] | null {
   if (opts.queueFence) return opts.queueFence
   if (!opts.scoped) return null
-  return selectionFence(editor) ?? opts.fallback ?? null
+  return selectionFence(editor)
+}
+
+/** what a chat entry remembers about the fence of its turn */
+export interface EntryFence {
+  /** the turn was fenced (selection scope or queue submission) */
+  fenced: boolean
+  /** where the fence's ranges ended up when its run ended; absent for an entry restored from a transcript */
+  ranges?: FenceRange[] | null
+}
+
+/**
+ * the fence of a RETRIED turn, shared by the header retry and the bubble retry:
+ * a fenced turn is never retried unfenced. It reuses the ranges its own run
+ * ended with (not the live selection, not another entry's fence); when the
+ * entry has none (restored from a transcript) it runs against an empty fence,
+ * so every edit is refused instead of leaking. An unscoped turn stays unfenced.
+ */
+export function retryFence(entry: EntryFence): FenceRange[] | null {
+  if (!entry.fenced) return null
+  return entry.ranges ?? []
 }
 
 export function hasEditFence(editor: Editor): boolean {

@@ -30,7 +30,14 @@ import sendStop from '../assets/send-stop.png'
 import { clearAiHighlights } from '../editor/aiHighlight'
 import { setInactiveSelectionShown } from '../editor/inactiveSelection'
 import { queueAnchorRange } from '../editor/aiQueueAnchors'
-import { clearEditFence, setEditFence, turnFence, type FenceRange } from './edit-fence'
+import {
+  clearEditFence,
+  retryFence,
+  setEditFence,
+  turnFence,
+  type EntryFence,
+  type FenceRange,
+} from './edit-fence'
 import { createMarkdownSkill, MARKDOWN_RULES } from './markdown-skill'
 import {
   buildDocWriterRequest,
@@ -104,6 +111,8 @@ interface ChatEntry {
   tools?: ToolActivity[]
   /** the selection this user message targeted, frozen at send */
   scope?: AiScopeQuoteData
+  /** the edit fence of this user turn (selection scope or queue submission): a retry reuses it, never runs the turn unfenced */
+  fence?: EntryFence
 }
 
 /** longest selection excerpt echoed on a user bubble */
@@ -235,13 +244,23 @@ export function AiPanel({
   const runInstructionRef = useRef('')
   /** what the user saw for that instruction (queue submissions show a summary) */
   const runDisplayRef = useRef('')
-  /** the scope quote of the last send, so a retry reuses it instead of re-reading the live selection */
-  const lastScopeRef = useRef<AiScopeQuoteData | undefined>(undefined)
-  /** where the fence of the last scoped send ended up when its run ended, for retrying that same turn */
-  const lastFenceRef = useRef<FenceRange[] | null>(null)
-  /** the run ended (done, error or stop): the fence ends with it, keeping its ranges for a retry of this turn */
+  /**
+   * the run ended (done, error or stop): the fence ends with it. Its mapped ranges go on the
+   * turn's user entry, so any retry of that entry (header or bubble) runs with the same fence.
+   */
   const endRunFence = (editor: Editor): void => {
-    lastFenceRef.current = clearEditFence(editor)
+    const ranges = clearEditFence(editor)
+    if (!ranges) return
+    setChat((prev) => {
+      for (let i = prev.length - 1; i >= 0; i--) {
+        const entry = prev[i]!
+        if (entry.role !== 'user') continue
+        const next = [...prev]
+        next[i] = { ...entry, fence: { fenced: true, ranges } }
+        return next
+      }
+      return prev
+    })
   }
   const runMutatedRef = useRef(false)
   /** tool activity of the whole run, for transcript persistence */
@@ -546,7 +565,7 @@ export function AiPanel({
               isError: tool.isError,
               output: tool.output ? tool.output.slice(0, TOOL_OUTPUT_MAX_CHARS) : undefined,
             })),
-            ...(m.scope ? { scope: m.scope } : {}),
+            ...(m.scope ? { scope: m.scope, fence: { fenced: true } } : {}),
           }))
         })
         if (applied && !loopRef.current?.busy) {
@@ -586,13 +605,13 @@ export function AiPanel({
   }
 
   /**
-   * retryScope: null = a retry that had no scope; undefined = capture the live selection.
-   * queueFence: the anchored ranges of a queue submission.
+   * retryOf: the user entry being retried (its scope quote and fence); undefined = a new turn,
+   * which captures the live selection. queueFence: the anchored ranges of a queue submission.
    */
   const send = (
     text: string,
     displayText?: string,
-    retryScope?: AiScopeQuoteData | null,
+    retryOf?: Pick<ChatEntry, 'scope' | 'fence'>,
     queueFence?: FenceRange[],
   ): void => {
     const instruction = text.trim()
@@ -604,35 +623,31 @@ export function AiPanel({
     runMutatedRef.current = false
     runToolsRef.current = []
     // a queue batch carries its own display text: no selection quote
-    const scope =
-      retryScope !== undefined
-        ? (retryScope ?? undefined)
-        : displayText === undefined
-          ? selectionScopeQuote()
-          : undefined
-    const repeatsLast = retryScope != null && retryScope === lastScopeRef.current
-    lastScopeRef.current = scope
+    const scope = retryOf
+      ? retryOf.scope
+      : displayText === undefined
+        ? selectionScopeQuote()
+        : undefined
     // a scoped send (selection chip) or a queue submission may only edit its targets; tools
-    // enforce it in code. Every turn, a retry included, runs with the fence of its own scope:
-    // an unscoped entry has none, a scoped one is fenced to the selection (or, when that has
-    // collapsed and it repeats the last turn, to where that turn's fence ended up).
+    // enforce it in code. A new turn is fenced to its own scope; a retry, header or bubble, to
+    // the ranges its entry's run ended with, so a fenced turn is never retried unfenced.
     const ed = depsRef.current.getEditor()
-    if (ed) {
-      setEditFence(
-        ed,
-        turnFence(ed, {
-          scoped: scope !== undefined,
-          queueFence,
-          fallback: repeatsLast ? lastFenceRef.current : null,
-        }),
-      )
-    }
-    if (!repeatsLast) lastFenceRef.current = null
+    const fence = retryOf
+      ? retryFence(retryOf.fence ?? { fenced: scope !== undefined })
+      : ed
+        ? turnFence(ed, { scoped: scope !== undefined, queueFence })
+        : null
+    if (ed) setEditFence(ed, fence)
     // the popover input / composer own the DOM selection now: keep the targeted range visible until the run ends
     if (scope) setInactiveSelectionShown(depsRef.current.getEditor(), true)
     setChat((prev) => [
       ...prev,
-      { role: 'user', text: displayText ?? instruction, ...(scope ? { scope } : {}) },
+      {
+        role: 'user',
+        text: displayText ?? instruction,
+        ...(scope ? { scope } : {}),
+        ...(fence ? { fence: { fenced: true, ranges: fence } } : {}),
+      },
       { role: 'assistant', text: '', streaming: true },
     ])
     setPrompt('')
@@ -662,7 +677,11 @@ export function AiPanel({
   const stop = (): void => loopRef.current?.cancel()
 
   const retry = (): void =>
-    send(runInstructionRef.current, runDisplayRef.current, lastScopeRef.current ?? null)
+    send(
+      runInstructionRef.current,
+      runDisplayRef.current,
+      chat.findLast((entry) => entry.role === 'user') ?? {},
+    )
 
   // keep the scope chip & queue rows in sync with the editor selection/content
   useEffect(() => {
@@ -918,7 +937,7 @@ export function AiPanel({
                     {!busy && (
                       <button
                         className="ai-retry-btn"
-                        onClick={() => send(entry.text, undefined, entry.scope ?? null)}
+                        onClick={() => send(entry.text, undefined, entry)}
                       >
                         {t('aiRetry')}
                       </button>
