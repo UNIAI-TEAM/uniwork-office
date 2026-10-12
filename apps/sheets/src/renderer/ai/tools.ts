@@ -22,6 +22,7 @@ import type {
 import { cap } from '../capabilities'
 import { t } from '../i18n/locale'
 import { formatRangeAggregate, type RangeAggregate } from './aggregate'
+import type { CellRead } from './cell-read'
 import { guideCatalogSummary, loadGuides } from './guides'
 
 /**
@@ -206,10 +207,7 @@ export interface SheetsSkillDeps {
   /** Ensure a lazy workbook range is present in Univer before reading it. */
   ensureRangeLoaded?(range: RangeBounds, sheetId?: string): boolean | Promise<boolean>
   /** cell values/formulas; reads the active sheet unless sheetId targets another */
-  readCells(
-    addresses: readonly string[],
-    sheetId?: string,
-  ): Record<string, { value: CellScalar; formula?: string }>
+  readCells(addresses: readonly string[], sheetId?: string): Record<string, CellRead>
   /** per-cell explicit formatting; cells with no explicit format are omitted */
   readFormats(addresses: readonly string[], sheetId?: string): Record<string, CellFormatState>
   /** formatted report of a sheet's feature state (filters, CF, DV, names, visuals, …) */
@@ -291,7 +289,10 @@ export const WORKBOOK_TOOLS: AgentToolDef[] = [
     description:
       'Read current values/formulas by rectangular range, returning a grid with row numbers and column letters. ' +
       'The requested range is not the worksheet data extent: never infer total row or record count from its ending row; use get_workbook_context. ' +
-      'This is the preferred way to read data; max 2000 cells — read larger regions in multiple calls.',
+      'This is the preferred way to read data; max 2000 cells — read larger regions in multiple calls. ' +
+      'The grid shows the text as displayed; cells whose stored value differs (percent, currency, date, numbers with a format, numeric-looking text) ' +
+      'are listed under it as [type; raw value; number format], e.g. "B2: percent; raw 0.1; format 0%" — calculate with the raw value (dates are serial numbers). ' +
+      'Hidden/filtered rows are labelled in the grid.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -396,7 +397,9 @@ export const WORKBOOK_TOOLS: AgentToolDef[] = [
   {
     name: 'read_cells',
     description:
-      'Read current values/formulas of specific scattered cells (use read_range for contiguous regions). Always read the affected cells before writing — never assume their contents.',
+      'Read current values/formulas of specific scattered cells (use read_range for contiguous regions). Always read the affected cells before writing — never assume their contents. ' +
+      'A cell whose stored value differs from its shown text carries a [type; raw value; number format] note, e.g. "A1: 10% [percent; raw 0.1; format 0%]" ' +
+      'vs "A2: 10" (a plain number) vs "A3: 10 [text]" — calculate with the raw value; unannotated cells are plain text or General-format numbers.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -804,6 +807,42 @@ function formatCellScalar(cell: { value: CellScalar; formula?: string | undefine
   return escapeCellText(String(cell.value))
 }
 
+/** Text whose content reads as a number: the model must not treat it as one. */
+const NUMERIC_LOOKING_TEXT = /^\s*[-+]?[\d.,\s]*\d[\d.,\s]*%?\s*$/
+
+/**
+ * The [type; raw; format] note for a cell whose shown text alone would
+ * mislead: a percent/currency/date, a number with an explicit format, text
+ * that looks like a number, or any cell whose stored value differs from its
+ * display. Plain text and General numbers get no note.
+ */
+function cellTypeNote(cell: CellRead): string | null {
+  const { type, rawValue: raw, value: display } = cell
+  if (type === undefined || type === 'empty' || type === 'error') return null
+  const rawDiffers =
+    raw !== undefined &&
+    raw !== null &&
+    String(raw).toUpperCase() !== String(display ?? '').toUpperCase()
+  const numericText =
+    type === 'text' && typeof display === 'string' && NUMERIC_LOOKING_TEXT.test(display)
+  const notable =
+    rawDiffers ||
+    numericText ||
+    cell.numberFormat !== undefined ||
+    type === 'percent' ||
+    type === 'currency' ||
+    type === 'date' ||
+    type === 'boolean'
+  if (!notable) return null
+  const parts: string[] = [type]
+  if (rawDiffers) parts.push(`raw ${escapeCellText(String(raw))}`)
+  if (cell.numberFormat) parts.push(`format ${escapeCellText(cell.numberFormat)}`)
+  return parts.join('; ')
+}
+
+/** Cap on the per-cell type lines read_range lists under its grid. */
+const MAX_TYPE_NOTES = 200
+
 function formatPlanSummary(plan: ChangePlan): string {
   const parts: string[] = []
   if (plan.structuralChanges.length > 0) {
@@ -900,10 +939,14 @@ export function executeWorkbookTool(
           ),
         ].join('\t')
         const rows: string[] = [metadata, header]
+        const typeNotes: string[] = []
         for (let row = bounds.startRow; row <= bounds.endRow; row += 1) {
           const columns: string[] = [rowLabel(row)]
           for (let column = bounds.startColumn; column <= bounds.endColumn; column += 1) {
-            const cell = cells[formatAddress(row, column)]
+            const address = formatAddress(row, column)
+            const cell = cells[address]
+            const note = cell ? cellTypeNote(cell) : null
+            if (note) typeNotes.push(`${address}: ${note}`)
             columns.push(
               cell
                 ? cell.value === null
@@ -913,6 +956,17 @@ export function executeWorkbookTool(
             )
           }
           rows.push(columns.join('\t'))
+        }
+        if (typeNotes.length > 0) {
+          rows.push(
+            'Cell types (cells not listed hold plain text or General-format numbers; raw = the stored value behind the shown text):',
+            ...typeNotes.slice(0, MAX_TYPE_NOTES),
+          )
+          if (typeNotes.length > MAX_TYPE_NOTES) {
+            rows.push(
+              `…${typeNotes.length - MAX_TYPE_NOTES} more typed cells not listed — read_cells shows them one by one.`,
+            )
+          }
         }
         if (hidden.size > 0) {
           rows.push(
@@ -1102,7 +1156,9 @@ export function executeWorkbookTool(
         const cells = deps.readCells(addresses, sheetId)
         const lines = addresses.map((addr) => {
           const cell = cells[addr]
-          return `${addr}: ${cell ? formatCellScalar(cell) : '(unknown)'}`
+          if (!cell) return `${addr}: (unknown)`
+          const note = cellTypeNote(cell)
+          return `${addr}: ${formatCellScalar(cell)}${note ? ` [${note}]` : ''}`
         })
         if (unread > 0) {
           lines.unshift(

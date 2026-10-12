@@ -11,7 +11,9 @@ import type { InMemoryWorkbookAdapter } from '@genoffice/xlsx-gateway/domain/in-
 import type { CellFormatState, CellScalar } from '@genoffice/xlsx-gateway/domain/workbook.types'
 import { planFileTableRegistrations } from '../file-tables'
 import { toSelectionFormat } from '../selection-format'
-import { lazyCellReader } from '../univer-sync'
+import { plainCellValue } from '../edit-journal'
+import { lazyCellReader, modelCellValue } from '../univer-sync'
+import { classifyCellType, isGeneralFormat, type CellRead } from './cell-read'
 import { lazySheetScreenExtent, type LazyWorkbookState, type UniverRuntime } from '../univer-state'
 import type { ActiveSheetInfo, FrozenSelection } from './tools'
 
@@ -464,15 +466,43 @@ export function readHiddenRows(
   return rows
 }
 
+type ReadRange = {
+  getNumberFormat(): string
+  getDisplayValue?(): string
+  getValue(): unknown
+  getCellDatas(): ({ v?: unknown; t?: unknown } | null | undefined)[][]
+}
+
+function numberFormatOf(range: ReadRange | undefined): string | undefined {
+  try {
+    const format = range?.getNumberFormat()
+    return isGeneralFormat(format) ? undefined : format
+  } catch {
+    // number-format resolution can fail on never-touched cells; treat as General
+    return undefined
+  }
+}
+
+function typed(
+  cell: { value: CellScalar; formula?: string | undefined; rawValue?: CellScalar | undefined },
+  numberFormat: string | undefined,
+): CellRead {
+  const raw = modelCellValue(cell)
+  return {
+    value: cell.value,
+    ...(cell.formula ? { formula: cell.formula } : {}),
+    rawValue: cell.rawValue,
+    type: classifyCellType(raw, numberFormat),
+    ...(numberFormat ? { numberFormat } : {}),
+  }
+}
+
 export function readCells(
   ctx: WorkbookReadContext,
   addresses: readonly string[],
   sheetId?: string,
-): Record<string, { value: CellScalar; formula?: string; rawValue?: CellScalar | undefined }> {
-  const result: Record<
-    string,
-    { value: CellScalar; formula?: string; rawValue?: CellScalar | undefined }
-  > = {}
+): Record<string, CellRead> {
+  const result: Record<string, CellRead> = {}
   const workbook = ctx.univerRef.current?.univerAPI.getActiveWorkbook()
   const state = ctx.lazyWorkbookRef.current
   if (state) {
@@ -485,9 +515,12 @@ export function readCells(
       // `value` is the rendered text and `rawValue` the model value behind it;
       // machine-facing callers (the MCP bridge, the save pipeline) need the
       // latter — see modelCellValue in univer-sync.ts.
-      result[address] = cell.formula
-        ? { value: cell.value, formula: cell.formula, rawValue: cell.rawValue }
-        : { value: cell.value, rawValue: cell.rawValue }
+      result[address] = typed(
+        cell.formula
+          ? { value: cell.value, formula: cell.formula, rawValue: cell.rawValue }
+          : { value: cell.value, rawValue: cell.rawValue },
+        numberFormatOf(worksheet.getRange(address) as unknown as ReadRange),
+      )
     }
     return result
   }
@@ -497,24 +530,46 @@ export function readCells(
     sheets.find((s) => s.id === targetId) ?? (sheetId === undefined ? sheets[0] : undefined)
   if (!sheet) return result
   // The in-memory model stores only value:null for formula cells; computed
-  // values live in Univer's formula engine, backfilled by reading the grid
+  // values live in Univer's formula engine, backfilled by reading the grid.
+  // The grid also renders the display text, so demo reads take the lazy
+  // shape: `value` as shown, `rawValue` the model value.
   const worksheet =
     sheetId === undefined ? workbook?.getActiveSheet() : workbook?.getSheetBySheetId(sheetId)
   for (const address of addresses) {
     const cell = sheet.cells[address] ?? { value: null }
-    if (cell.formula) {
-      let computed = cell.value
-      if (computed === null && worksheet) {
-        try {
-          computed = worksheet.getRange(address).getValue() ?? null
-        } catch {
-          /* fail-open */
-        }
-      }
-      result[address] = { value: computed, formula: cell.formula }
-    } else {
-      result[address] = { value: cell.value }
+    let range: ReadRange | undefined
+    try {
+      range = worksheet?.getRange(address) as unknown as ReadRange | undefined
+    } catch {
+      range = undefined
     }
+    let raw: CellScalar = cell.value
+    if (cell.formula && raw === null && range) {
+      try {
+        const data = range.getCellDatas()[0]?.[0]
+        raw =
+          (plainCellValue(data?.v, data?.t) as CellScalar | undefined) ??
+          (range.getValue() as CellScalar | undefined) ??
+          null
+      } catch {
+        /* fail-open */
+      }
+    }
+    let display: CellScalar = raw
+    if (raw !== null && range?.getDisplayValue) {
+      try {
+        const text = range.getDisplayValue()
+        if (typeof text === 'string' && text !== '') display = text
+      } catch {
+        /* fail-open: show the raw value */
+      }
+    }
+    result[address] = typed(
+      cell.formula
+        ? { value: display, formula: cell.formula, rawValue: raw }
+        : { value: display, rawValue: raw },
+      numberFormatOf(range),
+    )
   }
   return result
 }
