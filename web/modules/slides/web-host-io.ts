@@ -301,7 +301,9 @@ export function createWebHostIO(deps: WebHostDeps): HostIO {
         await deps.reload(fileId)
         return true
       },
-      canEdit: () => deps.capabilities.save !== false,
+      // the host's grant now AND the file's own flag for the current token (as the Docs bridge)
+      canEdit: () =>
+        deps.capabilities.save !== false && deps.state.files.get(fileId)?.writable !== false,
       download: downloadVia(deps.port, deps.state.effective, () => bytes),
       markerAttr: 'data-slides-web',
     })

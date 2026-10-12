@@ -440,6 +440,8 @@ export async function runConflictDialog(io: ConflictIo): Promise<ConflictOutcome
           focus = 'overwrite'
           continue
         }
+        // the code the host hears is the variant the user closes: an earlier attempt's failure is stale
+        failure = null
         const res = await io.overwrite().catch((err: unknown): OverwriteAttempt => ({
           ok: false,
           error: { code: 'internal', message: String(err) },

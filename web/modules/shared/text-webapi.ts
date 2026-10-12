@@ -532,6 +532,7 @@ export function createTextWebApi(
   ): Promise<TextSaveResult> {
     // the dialog may stay open for long: the host request must not time out meanwhile
     host?.started()
+    let loaded = null as FileMeta | null
     const outcome = await runConflictDialog({
       title: text('webConflictTitle'),
       body: text('webConflictBody'),
@@ -550,14 +551,18 @@ export function createTextWebApi(
         }
         return res
       },
-      // the frame reloads once the host has its answer (below): the renderer boots on the head
-      reload: async () => true,
+      // the frame reloads once the host has its answer (below): the renderer boots on the head, and
+      // the answer names that head
+      reload: async () => {
+        loaded = await readHeadFile(port, fileId)
+        return true
+      },
       canEdit: () => !viewOnly(),
       download: downloadVia(port, downloadGranted ? { download: true } : undefined, () =>
         encodeText(data),
       ),
     })
-    const file = files.get(fileId)
+    const file = (outcome.kind === 'reloaded' ? loaded : null) ?? files.get(fileId)
     if (host && file) host.settle(conflictSaveResult(outcome, file))
     if (outcome.kind === 'overwritten') return { ok: true, path: pathFor(files.get(fileId)!) }
     if (outcome.kind === 'reloaded') {
