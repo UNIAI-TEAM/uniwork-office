@@ -650,7 +650,7 @@ function applyCall(callee, name, args, tokens, openParen, scope, depth) {
 /** `(p) => expr` / `p => expr` starting at token index i */
 function parseArrowAt(tokens, i) {
   let idx = i
-  let param = null
+  let param
   if (tokens[idx] && tokens[idx].value === '(') {
     if (
       tokens[idx + 1] &&
@@ -711,7 +711,7 @@ function parseObject(tokens, i, scope, depth) {
       }
       continue
     }
-    let key = null
+    let key
     if (tk.type === 'ident' || tk.type === 'string' || tk.type === 'number') {
       key = String(tk.value)
       idx += 1
@@ -1083,7 +1083,7 @@ function skipBraces(tokens, openIdx) {
 }
 
 /** records named/default/namespace imports; returns the index after the statement */
-function scanImport(tokens, i, path, imports, ctx) {
+function scanImport(tokens, i, path, imports, _ctx) {
   let idx = i + 1
   // `import type { ... }` — type-only, no runtime value
   if (tokens[idx] && tokens[idx].type === 'ident' && tokens[idx].value === 'type') {
@@ -1337,7 +1337,7 @@ function branchRange(tokens, openIdx) {
  * is not an `if` condition — a ternary, a `const` or an argument controls no
  * path, so it must not name a tool.
  */
-function guardRegions(analysis, at, op, functions, owners) {
+function guardRegions(analysis, at, op, functions, _owners) {
   const tokens = analysis.tokens
   const open = enclosingIfCondition(tokens, at)
   if (open < 0) return null
