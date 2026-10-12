@@ -83,7 +83,7 @@ describe('ask_clarification execution', () => {
   })
 
   it('errors when the card is unavailable or no question has options', async () => {
-    const none = await executePdfTool(makeDeps(), ask(QUESTIONS))
+    const none = await executePdfTool(makeDeps({ askClarification: undefined }), ask(QUESTIONS))
     expect(none.isError).toBe(true)
     expect(none.mutated).toBe(false)
     const empty = await executePdfTool(

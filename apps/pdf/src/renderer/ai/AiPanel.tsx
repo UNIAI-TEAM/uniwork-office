@@ -23,6 +23,8 @@ import sendEnterOff from '../assets/send-enter-off.png'
 import sendStop from '../assets/send-stop.png'
 import { createPdfSkill } from './pdf-skill'
 import { createElectronTransport } from './transport'
+import { ClarifyCard } from './ClarifyCard'
+import { useClarify } from './use-clarify'
 import { PDF_NAV_SCHEME, parsePdfNavHref } from './pdf-nav'
 import type { FileOpConfirm, PdfAiDeps, PdfAppDeps } from './tools'
 
@@ -314,8 +316,16 @@ export function AiPanel({
       setFileOpConfirm(req)
       signal?.addEventListener('abort', () => pending.settle(false), { once: true })
     })
+  /** ask_clarification card: the run waits on it; answered receipts stay under their user message */
+  const clarify = useClarify()
   // another document or the panel going away answers a pending card with "no"
-  useEffect(() => () => confirmRef.current?.settle(false), [filePath])
+  useEffect(
+    () => () => {
+      confirmRef.current?.settle(false)
+      clarify.dismiss()
+    },
+    [filePath],
+  )
 
   const patchLast = (patch: Partial<ChatEntry> | ((last: ChatEntry) => Partial<ChatEntry>)) => {
     setChat((prev) => {
@@ -347,6 +357,7 @@ export function AiPanel({
       annotationSummary: () => apiRef.current.annotationSummary(),
       createDocument: (request) => apiRef.current.createDocument(request),
       confirmFileOp: requestFileOpConfirm,
+      askClarification: (questions, signal) => clarify.ask(questions, signal),
       insertBlankPage: (afterVis) => apiRef.current.insertBlankPage(afterVis),
       setPageSize: (w, h) => apiRef.current.setPageSize(w, h),
       cropPages: (vis, rect) => apiRef.current.cropPages(vis, rect),
@@ -487,7 +498,7 @@ export function AiPanel({
     if (stickToBottomRef.current) {
       chatRef.current?.scrollTo({ top: chatRef.current.scrollHeight })
     }
-  }, [chat, busy, fileOpConfirm])
+  }, [chat, busy, fileOpConfirm, clarify.active])
 
   const onChatScroll = (): void => {
     const el = chatRef.current
@@ -655,6 +666,8 @@ export function AiPanel({
               onClick={() => {
                 stop()
                 loopRef.current?.reset()
+                clarify.dismiss()
+                clarify.clearReceipts()
                 setBusy(false)
                 setChat([])
               }}
@@ -708,6 +721,18 @@ export function AiPanel({
               <div key={i} className="ai-msg ai-msg-user">
                 {entry.scope && <AiScopeQuote scope={entry.scope} />}
                 <span dir="auto">{entry.text}</span>
+                {clarify.receipts
+                  .filter((r) => r.afterIdx === i)
+                  .map((r, k) => (
+                    <div key={`ca${k}`} className="ai-clarify-answered">
+                      {r.qa.map((pair, m) => (
+                        <div key={m} className="ai-clarify-answered-row">
+                          <div className="ai-clarify-answered-q">{pair.q}</div>
+                          <div className="ai-clarify-answered-a">{pair.a}</div>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
                 {entry.undelivered && (
                   <div className="ai-msg-undelivered">
                     {t('aiUndelivered')}
@@ -770,7 +795,18 @@ export function AiPanel({
         {busy && <AiTypingIndicator label={typingLabel} />}
       </div>
 
-      <div className="ai-composer">
+      {clarify.active && (
+        <div className="ai-composer">
+          <ClarifyCard
+            questions={clarify.active}
+            onSubmit={(answers, qa) =>
+              clarify.submit(answers, qa, chat.map((c) => c.role).lastIndexOf('user'))
+            }
+            onSkip={clarify.skip}
+          />
+        </div>
+      )}
+      <div className="ai-composer" style={clarify.active ? { display: 'none' } : undefined}>
         {readOnly && (
           <div className="ai-readonly-notice" role="note">
             {t('aiViewOnlyNotice')}

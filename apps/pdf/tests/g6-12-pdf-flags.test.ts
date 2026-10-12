@@ -9,6 +9,7 @@ function makeDeps(over: Record<string, unknown>): PdfAiDeps {
     fileName: () => 'doc.pdf',
     pageCount: () => 2,
     readOnly: () => false,
+    uniworkBound: () => false,
     ...over,
   }
   return new Proxy(target, {
