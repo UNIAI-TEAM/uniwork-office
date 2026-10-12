@@ -539,7 +539,7 @@ export function readCells(
       )
       // Streamed cells may carry only the file's cached value: say where a
       // formula value came from so a stale cache is never read as the answer.
-      let provenance: FormulaProvenance | null = null
+      let provenance: FormulaProvenance | null
       try {
         const position = parseAddress(address)
         const data = range.getCellDatas()[0]?.[0] as { f?: unknown; si?: unknown } | undefined
