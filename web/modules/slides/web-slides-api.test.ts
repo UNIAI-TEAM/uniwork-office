@@ -60,10 +60,16 @@ async function setup(
     capabilities?: Record<string, unknown>
     user?: string
     bytes?: Uint8Array
+    /** the host marks the file view-only for the current token (FileMeta.writable) */
+    writable?: boolean
   } = {},
 ): Promise<Setup> {
   const mock = createMockPort()
   const file = mock.seed('deck.pptx', opts.bytes ?? FIXTURE)
+  if (opts.writable === false) {
+    const open = mock.openPayload(file.fileId)
+    mock.override('api.open', () => ({ ...open, file: { ...open.file, writable: false } }))
+  }
   const downloads: Setup['downloads'] = []
   const web = createWebSlidesApi(
     {
@@ -316,6 +322,20 @@ describe('save', () => {
     expect(
       mock.errors.filter((e) => (e.error as { code?: string }).code === 'conflict'),
     ).toHaveLength(0)
+  })
+
+  it('the conflict dialog offers no Overwrite… for a deck the current token cannot edit', async () => {
+    const { mock, api, fileId } = await setup({ writable: false })
+    await api.consumePendingOpen(FIT)
+    await api.setNotes({ slideIndex: 0, text: 'mine' })
+    mock.bumpRemote(fileId)
+    const pending = api.save()
+    await waitFor(() => document.querySelector('[data-slides-web="conflict"] [data-choice]'))
+    expect(
+      [...document.querySelectorAll('[data-choice]')].map((b) => (b as HTMLElement).dataset.choice),
+    ).toEqual(['reload', 'cancel'])
+    clickChoice('conflict', 'Cancel')
+    await pending
   })
 
   it('a host `save` conflict -> Reload answers ok without a versionId', async () => {

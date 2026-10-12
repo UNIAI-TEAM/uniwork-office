@@ -322,6 +322,46 @@ describe('Overwrite…', () => {
     await pick('cancel')
     expect(await done).toEqual({ kind: 'failed', code: 'internal' })
   })
+
+  it('a retry that meets another 409 forgets the earlier 401: Cancel answers cancelled', async () => {
+    let head: ConflictHead = HEAD
+    const attempts: OverwriteAttempt[] = [
+      { ok: false, error: { code: 'unauthorized', message: 'HTTP 401' } },
+      { ok: false, error: { code: 'conflict', message: 'HTTP 409' } },
+    ]
+    const fake = io({
+      readHead: async () => head,
+      overwrite: vi.fn(async (): Promise<OverwriteAttempt> => {
+        const next = attempts.shift()!
+        if (next.ok === false && next.error.code === 'conflict') head = { revision: '13' }
+        return next
+      }),
+    })
+    const done = runConflictDialog(fake)
+    await pick('overwrite')
+    await pick('go')
+    expect(alertLine().textContent).toBe(t('uwConflictSessionWeb'))
+    await pick('overwrite')
+    await pick('go')
+    expect(alertLine().textContent).toBe(format(t('uwConflictHeadMoved'), { n: '13' }))
+    await pick('cancel')
+    expect(await done).toEqual({ kind: 'cancelled' })
+  })
+
+  it('a retry that meets 413 forgets an earlier 5xx: Cancel answers cancelled', async () => {
+    const attempts: OverwriteAttempt[] = [
+      { ok: false, error: { code: 'internal', message: 'HTTP 500' } },
+      { ok: false, error: { code: 'too_large', message: 'HTTP 413' } },
+    ]
+    const done = runConflictDialog(io({ overwrite: vi.fn(async () => attempts.shift()!) }))
+    await pick('overwrite')
+    await pick('go')
+    await pick('overwrite')
+    await pick('go')
+    expect(alertLine().textContent).toBe(t('uwConflictTooLarge'))
+    await pick('cancel')
+    expect(await done).toEqual({ kind: 'cancelled' })
+  })
 })
 
 describe('Reload latest (web)', () => {

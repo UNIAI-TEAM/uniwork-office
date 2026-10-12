@@ -291,6 +291,16 @@ describe('markdownApi: save conflicts', () => {
     await vi.waitFor(() => expect(reload).toHaveBeenCalledOnce())
   })
 
+  it('a host `save` -> Reload answers with the head that was loaded, not the stale file meta', async () => {
+    const { res, mock, file } = await hostConflict()
+    const head = (mock.openPayload(file.fileId) as { file: { etag?: string } }).file
+    expect(head.etag).not.toBe(file.etag)
+    await click('reload')
+    await click('discard')
+    const answer = await res
+    expect(answer).toMatchObject({ ok: true, file: { fileId: file.fileId, etag: head.etag } })
+  })
+
   it('the download choice shows only with the download capability', async () => {
     const plain = await hostConflict()
     await click('reload')
