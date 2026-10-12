@@ -27,3 +27,8 @@ export function fenceViolation(
   const inside = (p: Patch) => ranges.some(([from, to]) => p.from >= from && p.to <= to)
   return patches.every(inside) ? null : FENCE_REFUSAL
 }
+
+/** the fence a send carries: an empty or missing sid list means no fence */
+export function sendFence(sids: readonly number[] | null | undefined): readonly number[] | null {
+  return sids && sids.length > 0 ? sids : null
+}

@@ -57,6 +57,7 @@ import { pastedBase64Image } from './base64-paste'
 import { createElectronTransport } from './transport'
 import { DOC_NAV_SCHEME, parseDocNavHref } from './doc-nav'
 import { EditQueueCard } from './EditQueueCard'
+import { sendFence } from './edit-fence'
 import {
   buildQueueInstruction,
   buildQueueSummary,
@@ -220,6 +221,8 @@ interface ChatEntry {
   tools?: ToolActivity[]
   /** the element this user message targeted, frozen at send */
   scope?: AiScopeQuoteData
+  /** the sids this element-scoped turn may edit; a retry resends them */
+  fenceSids?: number[]
 }
 
 /** the whole source text: one string is the exact rollback unit */
@@ -934,7 +937,8 @@ export function AiPanel({
     runInstructionRef.current = instruction
     runDisplayRef.current = displayText ?? instruction
     lastScopeRef.current = scope
-    fenceRef.current = fenceSids && fenceSids.length > 0 ? fenceSids : null
+    const fence = sendFence(fenceSids)
+    fenceRef.current = fence
     runMutatedRef.current = false
     depsRef.current.onPrompt(displayText ?? instruction)
     runToolsRef.current = []
@@ -947,6 +951,7 @@ export function AiPanel({
         queueRun: queueRun || undefined,
         attachments: sentAtts.length > 0 ? sentAtts : undefined,
         scope,
+        fenceSids: fence ? [...fence] : undefined,
       },
       { role: 'assistant', text: '', streaming: true },
     ])
@@ -1284,6 +1289,7 @@ export function AiPanel({
                             entry.queueRun,
                             entry.attachments ?? [],
                             entry.scope,
+                            entry.fenceSids,
                           )
                         }
                       >
