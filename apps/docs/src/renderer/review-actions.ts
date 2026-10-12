@@ -62,18 +62,25 @@ export function setCommentAuthor(name: unknown): void {
   commentAuthor = trimmed.length > 0 ? trimmed : NEUTRAL_COMMENT_AUTHOR
 }
 
+/** G8-02: id of the latest author request; an older answer arriving late is dropped. */
+let authorRequest = 0
+
 /**
  * G8-02: refresh the author for the document at `path` — the signed-in UniWork
  * display name for a bound document, the neutral constant otherwise. Never the
- * OS account name. Called when a document opens; the last answer is used for
- * the comments created from here.
+ * OS account name. Called when a document opens and when the signed-in account
+ * changes; only the answer to the latest request is kept, so a slow answer for
+ * the previous document never overwrites the current one.
  */
 export async function refreshCommentAuthor(path: string | null): Promise<void> {
+  const request = ++authorRequest
+  let name: unknown = null
   try {
-    setCommentAuthor(await window.desktop.getCommentAuthor(path))
+    name = await window.desktop.getCommentAuthor(path)
   } catch {
-    setCommentAuthor(null)
+    name = null
   }
+  if (request === authorRequest) setCommentAuthor(name)
 }
 
 /** The App state the review actions need; built fresh per call. */

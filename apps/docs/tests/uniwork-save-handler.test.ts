@@ -202,3 +202,40 @@ describe('docs real handlers on a UniWork copy', () => {
     expect(readFileSync(path, 'utf8')).toBe('agent')
   })
 })
+
+describe('docs:comment-author (G8-02, BE-7)', () => {
+  const BOUND = 'C:/u/uniwork-documents/dep/acc/doc1/Plan.docx'
+  let signedIn: string | null = null
+  beforeEach(() => {
+    registerDocsIpc()
+    signedIn = 'Nguyễn An'
+    // the shell's resolver: bound + signed in = the display name, else "User"
+    setUniworkDocumentPolicy({
+      isBound: (p) => p === BOUND,
+      isReadOnly: () => false,
+      commentAuthor: (p) => (p === BOUND && signedIn ? signedIn : 'User'),
+    })
+  })
+  afterEach(() => setUniworkDocumentPolicy(null))
+
+  const author = (path: unknown) =>
+    Promise.resolve(handlers.get('docs:comment-author')!({ sender: fakeWc() }, path))
+
+  it('answers the display name for a bound document and "User" for anything else', async () => {
+    expect(await author(BOUND)).toBe('Nguyễn An')
+    expect(await author('C:/Users/me/notes.docx')).toBe('User')
+    expect(await author(null)).toBe('User')
+    expect(await author(42)).toBe('User')
+  })
+
+  it('follows the account live: after sign-out / session expiry the same path answers "User"', async () => {
+    expect(await author(BOUND)).toBe('Nguyễn An')
+    signedIn = null
+    expect(await author(BOUND)).toBe('User')
+  })
+
+  it('without a shell policy (standalone app) the answer is "User"', async () => {
+    setUniworkDocumentPolicy(null)
+    expect(await author(BOUND)).toBe('User')
+  })
+})

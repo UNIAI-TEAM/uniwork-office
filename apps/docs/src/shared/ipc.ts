@@ -368,6 +368,12 @@ export interface DesktopApi {
    * constant "User". Never the OS account name.
    */
   getCommentAuthor(path: string | null): Promise<string>
+  /**
+   * G8-02: the shell's ping when the signed-in display name changes (sign-in,
+   * sign-out, session expiry); the renderer re-asks getCommentAuthor. Absent
+   * outside the shell, where the author never changes.
+   */
+  onCommentAuthorChanged?(handler: () => void): () => void
   /** language switched from the shell home page */
   onLanguageChanged(
     handler: (

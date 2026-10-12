@@ -23,6 +23,11 @@ const api: DesktopApi = {
   getLanguage: () => ipcRenderer.invoke('app:get-language'),
   getSystemLocale: () => ipcRenderer.invoke('docs:system-locale'),
   getCommentAuthor: (path) => ipcRenderer.invoke('docs:comment-author', path),
+  onCommentAuthorChanged: (handler) => {
+    const listener = () => handler()
+    ipcRenderer.on('uniwork:comment-author-changed', listener)
+    return () => ipcRenderer.removeListener('uniwork:comment-author-changed', listener)
+  },
   onLanguageChanged: (handler) => {
     const listener = (
       _event: IpcRendererEvent,

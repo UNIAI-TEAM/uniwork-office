@@ -5,10 +5,10 @@
  * writes into word/comments.xml (w:author) and it is never the OS account name.
  */
 import { Editor } from '@tiptap/core'
-import { parseDocx, type CommentInfo } from '@genoffice/docx-engine'
+import { parseDocx, saveDocx, type CommentInfo } from '@genoffice/docx-engine'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { buildDocx } from '../../../packages/docx-engine/tests/helpers/build-docx'
-import { blocksToPmDoc } from '../src/renderer/editor/convert'
+import { blocksToPmDoc, pmDocToSavePlan, type PmNode } from '../src/renderer/editor/convert'
 import { editorExtensions } from '../src/renderer/editor/extensions'
 import { setModuleLang } from '../src/renderer/i18n/locale'
 import {
@@ -30,6 +30,10 @@ Object.assign(window, {
 setModuleLang('en')
 
 async function makeEditor(): Promise<Editor> {
+  return (await makeDocument()).editor
+}
+
+async function makeDocument() {
   const bytes = await buildDocx({ bodyXml: '<w:p><w:r><w:t>Hello world</w:t></w:r></w:p>' })
   const parsed = await parseDocx(bytes)
   const editor = new Editor({
@@ -39,7 +43,18 @@ async function makeEditor(): Promise<Editor> {
   })
   // a non-empty selection: the comment mark lands on the selected text
   editor.commands.setTextSelection({ from: 1, to: 6 })
-  return editor
+  return { parsed, editor }
+}
+
+/** the w:author values the saved word/comments.xml carries, in file order */
+async function savedAuthors(
+  editor: Editor,
+  parsed: Awaited<ReturnType<typeof parseDocx>>,
+  comments: CommentInfo[],
+) {
+  const plan = pmDocToSavePlan(editor.getJSON() as PmNode, parsed.blocks)
+  const saved = await saveDocx(parsed, plan.saveBlocks, { comments })
+  return (await parseDocx(saved)).comments.map((c) => c.author)
 }
 
 function makeCtx(editor: Editor | null): {
@@ -124,6 +139,45 @@ describe('comment author source', () => {
     editor.commands.setTextSelection({ from: 1, to: 6 })
     expect(replyToComment(ctx, parent, 'second reply')).toBe(true)
     expect(state.comments[2]!.author).toBe(NEUTRAL_COMMENT_AUTHOR)
+    editor.destroy()
+  })
+
+  it('a slow answer for the previous document never overwrites the current one (FE-3)', async () => {
+    let answerBound: (name: string) => void = () => undefined
+    getCommentAuthor.mockImplementationOnce(
+      () => new Promise<string>((resolve) => (answerBound = resolve)),
+    )
+    getCommentAuthor.mockResolvedValueOnce(NEUTRAL_COMMENT_AUTHOR)
+    // bound document opens, then the user switches to a local one before the
+    // first answer arrives
+    const first = refreshCommentAuthor('/u/uniwork-documents/dep/acc/doc1/Plan.docx')
+    await refreshCommentAuthor('C:/Users/me/notes.docx')
+    answerBound('Nguyễn An')
+    await first
+    expect(commentAuthorName()).toBe(NEUTRAL_COMMENT_AUTHOR)
+  })
+
+  it('the saved word/comments.xml carries the host author for roots and replies, never the OS account (BE-7)', async () => {
+    const { parsed, editor } = await makeDocument()
+    const { ctx, state } = makeCtx(editor)
+    getCommentAuthor.mockResolvedValue('Nguyễn An')
+    await refreshCommentAuthor('/u/uniwork-documents/dep/acc/doc1/Plan.docx')
+    submitNewComment(ctx, 'root')
+    editor.commands.setTextSelection({ from: 1, to: 6 })
+    expect(replyToComment(ctx, state.comments[0]!.id, 'reply')).toBe(true)
+
+    // the account signs out while the document stays open: the shell pings and
+    // the editor re-asks; the next comment is the neutral constant
+    getCommentAuthor.mockResolvedValue(NEUTRAL_COMMENT_AUTHOR)
+    await refreshCommentAuthor('/u/uniwork-documents/dep/acc/doc1/Plan.docx')
+    editor.commands.setTextSelection({ from: 7, to: 12 })
+    submitNewComment(ctx, 'after sign-out')
+
+    expect(await savedAuthors(editor, parsed, state.comments)).toEqual([
+      'Nguyễn An',
+      'Nguyễn An',
+      'User',
+    ])
     editor.destroy()
   })
 })

@@ -2946,9 +2946,13 @@ export function App() {
   // G8-02: comments written from here carry the author the host resolves for the
   // open document — the signed-in UniWork display name for a bound file, else
   // the neutral "User" constant. Never the OS account name.
+  // Re-asked when the signed-in account changes while the document stays open.
   const commentAuthorPath = doc?.filePath ?? null
   useEffect(() => {
     void refreshCommentAuthor(commentAuthorPath)
+    return window.desktop.onCommentAuthorChanged?.(
+      () => void refreshCommentAuthor(commentAuthorPath),
+    )
   }, [commentAuthorPath])
 
   const insertNote = useCallback((kind: 'footnote' | 'endnote') => {
