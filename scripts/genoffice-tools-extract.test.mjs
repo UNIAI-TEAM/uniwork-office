@@ -848,6 +848,33 @@ describe('name anchor hardening (N1/N2)', () => {
     const tools = rows.map((r) => r.tool).sort()
     assert.deepEqual(tools, ['real_tool'])
   })
+
+  // N2 (edge case): a `}` inside a string literal in the accessor body must not
+  // desynchronize the brace walk, or the tool is dropped.
+  const STRING_BRACE_FIXTURE = {
+    'apps/docs/src/renderer/ai/tools.ts': [
+      "import type { AgentSkill } from '@genoffice/agent-core'",
+      'export const s: AgentSkill = {',
+      "  id: 'docs',",
+      '  get tools() {',
+      "    const brace = '}'",
+      '    void brace',
+      '    return [',
+      "      { name: 'guarded_tool', description: 'no schema' },",
+      '    ]',
+      '  },',
+      '}',
+      '',
+    ].join('\n'),
+  }
+
+  it('finds a returned tool past a brace inside a string (N2)', () => {
+    const { dir } = fixture(STRING_BRACE_FIXTURE)
+    const { rows } = extract({ repo: dir, rev: 'HEAD' })
+    const tool = rows.find((r) => r.tool === 'guarded_tool')
+    assert.ok(tool, 'the schema-less tool must still get a row')
+    assert.equal(tool.hash, 'unresolved:missing')
+  })
 })
 
 describe('real repo', () => {
