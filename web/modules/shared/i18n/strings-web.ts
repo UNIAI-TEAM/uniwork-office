@@ -1,4 +1,4 @@
-import { createI18n, defineStrings, type Lang } from '@genoffice/i18n'
+import { createI18n, defineStrings, type Lang, type Params } from '@genoffice/i18n'
 import { zh } from './web/zh'
 import { en } from './web/en'
 import { ja } from './web/ja'
@@ -54,6 +54,7 @@ export type WebStringKey = keyof (typeof webStrings)['zh']
 
 const translate = createI18n(webStrings)
 
-export function webText(lang: Lang, key: WebStringKey): string {
-  return translate(lang, key)
+// params fill the {word} slots of the uw* conflict and new-version copy
+export function webText(lang: Lang, key: WebStringKey, params?: Params): string {
+  return translate(lang, key, params)
 }

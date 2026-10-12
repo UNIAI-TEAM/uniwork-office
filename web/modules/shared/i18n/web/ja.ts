@@ -36,4 +36,92 @@ export const ja = {
   webSaveRateLimited: 'リクエストが多すぎます。しばらく待ってからもう一度お試しください。',
   webSaveServer: 'UniWork で保存中に問題が発生しました。しばらくしてからもう一度お試しください。',
   webSaveFailedGeneric: 'ドキュメントを保存できませんでした。もう一度お試しください。',
+
+  // S5 conflict dialog and S6 new-version bar (U-02 closed catalogue; same text as the desktop sync shard)
+  // S5 conflict dialog (web only)
+  webConflictBodySafe:
+    '変更はまだ UniWork になく、ログアウトするまでこのブラウザーに保持されます。',
+  uwConflictReloadWebBody:
+    'ブラウザーは競合の下書きを保持しません。後でコピーできるよう自分のバージョンをダウンロードするか、変更を破棄してください。',
+  uwConflictDownloadThenReload: '自分のバージョンをダウンロードしてから再読み込み',
+  uwConflictDiscardThenReload: '変更を破棄して再読み込み',
+  uwConflictMineFileSuffix: '（自分のバージョン）',
+  uwConflictDownloadCheck:
+    'ブラウザーがファイルを受け取りました。保存されたことを確認してから「再読み込み」を選んでください。',
+  uwConflictSessionWeb:
+    'セッションの有効期限が切れたため、上書きされませんでした。変更はこのブラウザーに残っています。再ログインしてもう一度お試しください。',
+  uwConflictTooLarge:
+    'あなたのバージョンは UniWork のサイズ上限を超えているため、上書きできませんでした。',
+  uwConflictDownloadFailed:
+    'あなたのバージョンをダウンロードできなかったため、ドキュメントは再読み込みされませんでした。もう一度お試しください。',
+  uwConflictOfflineWeb:
+    'オフラインです。Web ではこの操作に接続が必要です。変更はこのブラウザーに残っています。',
+
+  // S5 conflict dialog: two-column table
+  uwConflictColMine: 'あなたのバージョン',
+  uwConflictColServer: 'UniWork のバージョン',
+  uwConflictRowVersion: 'バージョン',
+  uwConflictRowTime: '時刻',
+  uwConflictRowBy: '保存者',
+  uwConflictMineUnsaved: 'あなた（未保存）',
+  uwConflictBasedOn: 'バージョン {n} に基づく',
+
+  // S5 conflict dialog: step 1 extras, confirmation step and results
+  uwConflictViewDiff: '差分を表示',
+  uwConflictNoEdit: 'このドキュメントの編集権限がなくなりました。',
+  uwConflictOverwriteTitle: 'あなたのバージョンで上書きしますか？',
+  uwConflictOverwriteConfirm:
+    'UniWork はあなたのコピーからバージョン {next} を作成します。{author} のバージョン {server} は履歴に残ります。',
+  uwConflictOverwriteGo: '上書き',
+  uwConflictBack: '戻る',
+  uwConflictHeadMoved:
+    'その間に UniWork にバージョン {n} ができました。表を更新しました。もう一度選んでください。',
+  uwConflictReloadTitle: '最新版を再読み込み',
+  uwConflictReloadGo: '再読み込み',
+  uwConflictSaveCopy: 'コピーとして保存…',
+  uwConflictSaveCopyTitle: 'コピーとして保存しますか？',
+  uwConflictSaveCopyConfirm:
+    'UniWork はあなたのバージョンから、このドキュメントと同じ所有者とアクセス権を持つ新しいドキュメントを作成します。現在のドキュメントと {author} のバージョン {server} はそのまま残ります。',
+  uwConflictSaveCopyGo: 'コピーを作成',
+  uwConflictSaveCopyDone:
+    'あなたのバージョンを新しいドキュメントとして保存しました：{title}。このドキュメントは変わっていません。再読み込みまたは上書きを選ぶこともできます。',
+  uwConflictSaveCopyFailed:
+    'コピーを作成できませんでした。変更は引き続き安全です。もう一度お試しください。',
+  uwConflictSaveCopyOffline: 'オフラインです。コピーの作成には接続が必要です。変更は保持されます。',
+  uwConflictReloadFailed:
+    '最新バージョンを読み込めませんでした。ドキュメントは変わっていません。もう一度お試しください。',
+  uwConflictOverwriteFailed:
+    'まだ上書きできませんでした。ドキュメントは変わっていません。もう一度お試しください。',
+  uwConflictClose: '閉じる',
+
+  // S6 new-version bar
+  uwRemoteRegion: '新しいバージョン',
+  uwRemoteUpdated: 'バージョン {n} に更新しました（{author} が {time} に保存）。',
+  uwRemoteUpdatedNoRev: 'UniWork の最新バージョンに更新しました。',
+  uwRemoteNewerDirty:
+    'UniWork に新しいバージョンがあります（バージョン {n}）。未保存の変更があるため、ドキュメントは再読み込みされませんでした。',
+  uwRemoteNewerAi:
+    'UniWork に新しいバージョンがあります（バージョン {n}）。UniWork AI が実行中のため、ドキュメントは再読み込みされませんでした。AI の結果は開いているコピーにのみ適用されます。',
+  uwRemoteNowClean:
+    'すべての変更を元に戻しました。UniWork のバージョン {n} は開いているコピーより新しいです。',
+  uwRemoteStopAiConfirm:
+    '再読み込みのために実行中の UniWork AI を停止しますか？AI がすでに行った変更は開いているコピーのものです。',
+  uwRemoteWaitCommit: '進行中の保存が終わるのを待っています。その後で再読み込みできます。',
+  uwRemoteReload: '最新版を再読み込み…',
+  uwRemoteLater: '後で',
+  uwRemoteClose: '閉じる',
+  uwRemoteReloadFailed: 'バージョン {n} を読み込めませんでした。前のバージョンを表示したままです。',
+  uwRemoteDeleted: 'このドキュメントは UniWork で削除されました。保存待ちは停止しました。',
+  uwAuthorFallback: 'メンバー',
+
+  // S6 new-version bar (web only)
+  uwRemoteRevokedWeb:
+    'このドキュメントへのアクセス権がなくなりました。保存は停止しました。未保存の変更はログアウトするまでこのブラウザーに保持されます。',
+  uwRemoteOrgBlockedWeb:
+    '保存できませんでした：{reason}。未保存の変更はログアウトするまでこのブラウザーに保持されます。',
+
+  // {reason} of uwRemoteOrgBlockedWeb
+  uwReasonArchived: 'ドキュメントはアーカイブ済み',
+  uwReasonSuspended: '組織が停止中',
+  uwReasonDeactivated: 'この組織であなたのアカウントは無効化されています',
 } satisfies Record<keyof typeof zh, string>

@@ -36,4 +36,92 @@ export const ms = {
   webSaveRateLimited: 'Terlalu banyak permintaan. Tunggu sebentar dan cuba lagi.',
   webSaveServer: 'UniWork menghadapi masalah semasa menyimpan. Cuba lagi sebentar lagi.',
   webSaveFailedGeneric: 'Dokumen tidak dapat disimpan. Cuba lagi.',
+
+  // S5 conflict dialog and S6 new-version bar (U-02 closed catalogue; same text as the desktop sync shard)
+  // S5 conflict dialog (web only)
+  webConflictBodySafe:
+    'Perubahan anda belum ada di UniWork dan disimpan dalam pelayar ini sehingga anda log keluar.',
+  uwConflictReloadWebBody:
+    'Pelayar tidak menyimpan draf konflik. Muat turun versi anda untuk disalin kemudian, atau buang perubahan anda.',
+  uwConflictDownloadThenReload: 'Muat turun versi saya, kemudian muat semula',
+  uwConflictDiscardThenReload: 'Buang perubahan dan muat semula',
+  uwConflictMineFileSuffix: '(versi saya)',
+  uwConflictDownloadCheck:
+    'Pelayar anda menerima fail anda. Semak bahawa ia telah disimpan, kemudian pilih Muat semula.',
+  uwConflictSessionWeb:
+    'Sesi anda telah tamat tempoh, jadi tulis ganti tidak berlaku. Perubahan anda kekal dalam pelayar ini; log masuk semula dan cuba lagi.',
+  uwConflictTooLarge: 'Versi anda melebihi had saiz UniWork, jadi tidak dapat menulis ganti.',
+  uwConflictDownloadFailed:
+    'Tidak dapat memuat turun versi anda, jadi dokumen tidak dimuat semula. Cuba lagi.',
+  uwConflictOfflineWeb:
+    'Anda di luar talian. Di web, ini memerlukan sambungan; perubahan anda kekal dalam pelayar ini.',
+
+  // S5 conflict dialog: two-column table
+  uwConflictColMine: 'Versi anda',
+  uwConflictColServer: 'Versi di UniWork',
+  uwConflictRowVersion: 'Versi',
+  uwConflictRowTime: 'Masa',
+  uwConflictRowBy: 'Disimpan oleh',
+  uwConflictMineUnsaved: 'Anda (belum disimpan)',
+  uwConflictBasedOn: 'berdasarkan versi {n}',
+
+  // S5 conflict dialog: step 1 extras, confirmation step and results
+  uwConflictViewDiff: 'Lihat perbezaan',
+  uwConflictNoEdit: 'Anda tidak lagi mempunyai akses suntingan kepada dokumen ini.',
+  uwConflictOverwriteTitle: 'Tulis ganti dengan versi anda?',
+  uwConflictOverwriteConfirm:
+    'UniWork akan mencipta versi {next} daripada salinan anda. Versi {server} oleh {author} kekal dalam sejarah.',
+  uwConflictOverwriteGo: 'Tulis ganti',
+  uwConflictBack: 'Kembali',
+  uwConflictHeadMoved:
+    'Sementara itu UniWork mendapat versi {n}. Jadual telah dikemas kini; pilih semula.',
+  uwConflictReloadTitle: 'Muat semula versi terkini',
+  uwConflictReloadGo: 'Muat semula',
+  uwConflictSaveCopy: 'Simpan sebagai salinan…',
+  uwConflictSaveCopyTitle: 'Simpan sebagai salinan?',
+  uwConflictSaveCopyConfirm:
+    'UniWork akan mencipta dokumen baharu daripada versi anda, dengan pemilik dan akses yang sama seperti dokumen ini. Dokumen semasa dan versi {server} oleh {author} kekal seperti sedia ada.',
+  uwConflictSaveCopyGo: 'Cipta salinan',
+  uwConflictSaveCopyDone:
+    'Versi anda disimpan sebagai dokumen baharu: {title}. Dokumen ini tidak berubah; anda masih boleh memuat semula atau menulis ganti.',
+  uwConflictSaveCopyFailed:
+    'Tidak dapat mencipta salinan. Perubahan anda masih selamat; cuba lagi.',
+  uwConflictSaveCopyOffline:
+    'Anda di luar talian. Mencipta salinan memerlukan sambungan; perubahan anda disimpan.',
+  uwConflictReloadFailed:
+    'Tidak dapat memuatkan versi terkini. Dokumen anda tidak berubah; cuba lagi.',
+  uwConflictOverwriteFailed: 'Belum dapat menulis ganti. Dokumen anda tidak berubah; cuba lagi.',
+  uwConflictClose: 'Tutup',
+
+  // S6 new-version bar
+  uwRemoteRegion: 'Versi baharu',
+  uwRemoteUpdated: 'Dikemas kini ke versi {n}, disimpan oleh {author} pada {time}.',
+  uwRemoteUpdatedNoRev: 'Dikemas kini ke versi terkini di UniWork.',
+  uwRemoteNewerDirty:
+    'Terdapat versi lebih baharu di UniWork (versi {n}). Anda mempunyai perubahan yang belum disimpan, jadi dokumen tidak dimuatkan semula.',
+  uwRemoteNewerAi:
+    'Terdapat versi lebih baharu di UniWork (versi {n}). UniWork AI sedang berjalan, jadi dokumen tidak dimuatkan semula; hasil AI hanya digunakan pada salinan yang terbuka.',
+  uwRemoteNowClean:
+    'Anda telah membuat asal semua perubahan. Versi {n} di UniWork lebih baharu daripada salinan yang terbuka.',
+  uwRemoteStopAiConfirm:
+    'Hentikan larian UniWork AI yang sedang berjalan untuk memuat semula? Perubahan yang telah dibuat AI milik salinan yang terbuka.',
+  uwRemoteWaitCommit:
+    'Menunggu simpanan yang sedang berjalan selesai; anda boleh memuat semula selepas itu.',
+  uwRemoteReload: 'Muat semula versi terkini…',
+  uwRemoteLater: 'Kemudian',
+  uwRemoteClose: 'Tutup',
+  uwRemoteReloadFailed: 'Tidak dapat memuatkan versi {n}. Anda masih melihat versi sebelumnya.',
+  uwRemoteDeleted: 'Dokumen ini dipadam di UniWork. Simpanan dalam baris gilir dihentikan.',
+  uwAuthorFallback: 'seorang ahli',
+
+  // S6 new-version bar (web only)
+  uwRemoteRevokedWeb:
+    'Anda tidak lagi mempunyai akses kepada dokumen ini. Penyimpanan dihentikan; perubahan yang belum disimpan disimpan dalam pelayar ini sehingga anda log keluar.',
+  uwRemoteOrgBlockedWeb:
+    'Tidak dapat menyimpan: {reason}. Perubahan yang belum disimpan disimpan dalam pelayar ini sehingga anda log keluar.',
+
+  // {reason} of uwRemoteOrgBlockedWeb
+  uwReasonArchived: 'dokumen diarkibkan',
+  uwReasonSuspended: 'organisasi digantung',
+  uwReasonDeactivated: 'akaun anda dinyahaktifkan dalam organisasi ini',
 } satisfies Record<keyof typeof zh, string>
