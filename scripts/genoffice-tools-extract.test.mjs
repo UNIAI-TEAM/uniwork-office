@@ -1241,6 +1241,276 @@ describe('braceless consequent extent (G7-06 r2)', () => {
   })
 })
 
+// G706-BE-R3/-R4 (reviewer-be-ext-r2-report.md §5): the statement walk treated
+// a template literal as an operator that still needs its operand, so a
+// consequent that *ended* in a template never ended there — the walk ran on and
+// credited the following statement's `mutated: true` to a read-only tool, and
+// the symmetric `!==` fall-through lost a real flag. A template literal is one
+// complete primary expression: the next line continues the statement only when
+// it opens with an operator, a tagged template included. The same rule covers
+// the other completed tails (string, number, regex, an identifier — e.g. a
+// keyword used as a property name like `read(call).in` — and a closing `)`),
+// and a labelled control statement keeps its label inside the branch.
+describe('completed primary expression (G7-06 r3)', () => {
+  const COMPLETED_PRIMARY_FIXTURE = {
+    'apps/docs/src/renderer/ai/tools.ts': [
+      "import type { AgentToolCall, AgentToolDef, ToolExecution } from '@genoffice/agent-core'",
+      '',
+      'export const AGENT_TOOLS: AgentToolDef[] = [',
+      "  { name: 't_plain', description: 'a template ends the statement', inputSchema: { type: 'object' } },",
+      "  { name: 't_switch', description: 'a template then a sibling switch', inputSchema: { type: 'object' } },",
+      "  { name: 't_interp', description: 'an interpolated template ends the statement', inputSchema: { type: 'object' } },",
+      "  { name: 't_nested', description: 'a nested template ends the statement', inputSchema: { type: 'object' } },",
+      "  { name: 't_void', description: 'a void template ends the statement', inputSchema: { type: 'object' } },",
+      "  { name: 't_assign', description: 'an assigned template ends the statement', inputSchema: { type: 'object' } },",
+      "  { name: 'read_and', description: 'a read && template branch falls through', inputSchema: { type: 'object' } },",
+      "  { name: 't_prop_in', description: 'a property named in completes the statement', inputSchema: { type: 'object' } },",
+      "  { name: 't_prop_as', description: 'a property named as completes the statement', inputSchema: { type: 'object' } },",
+      "  { name: 't_string', description: 'a string ends the statement', inputSchema: { type: 'object' } },",
+      "  { name: 't_number', description: 'a number ends the statement', inputSchema: { type: 'object' } },",
+      "  { name: 't_regex', description: 'a regex ends the statement', inputSchema: { type: 'object' } },",
+      "  { name: 't_close', description: 'a member access on a call ends the statement', inputSchema: { type: 'object' } },",
+      "  { name: 'tag_next', description: 'a tagged template continues the statement', inputSchema: { type: 'object' } },",
+      "  { name: 'call_template', description: 'a template inside an open call continues', inputSchema: { type: 'object' } },",
+      "  { name: 'closed_call', description: 'a closed call with a template ends the statement', inputSchema: { type: 'object' } },",
+      "  { name: 'lbl_if', description: 'a labelled if is the consequent', inputSchema: { type: 'object' } },",
+      "  { name: 'lbl_for', description: 'a labelled for is the consequent', inputSchema: { type: 'object' } },",
+      "  { name: 'lbl_while', description: 'a labelled while is the consequent', inputSchema: { type: 'object' } },",
+      "  { name: 'lbl_block', description: 'a labelled block is the consequent', inputSchema: { type: 'object' } },",
+      "  { name: 'lbl_switch', description: 'a labelled switch is the consequent', inputSchema: { type: 'object' } },",
+      "  { name: 'sib_plain', description: 'mutating sibling of the plain template', inputSchema: { type: 'object' } },",
+      "  { name: 'sib_switch', description: 'mutating sibling in the switch route', inputSchema: { type: 'object' } },",
+      "  { name: 'sib_interp', description: 'mutating sibling of the interpolated template', inputSchema: { type: 'object' } },",
+      "  { name: 'sib_nested', description: 'mutating sibling of the nested template', inputSchema: { type: 'object' } },",
+      "  { name: 'sib_void', description: 'mutating sibling of the void template', inputSchema: { type: 'object' } },",
+      "  { name: 'sib_assign', description: 'mutating sibling of the assigned template', inputSchema: { type: 'object' } },",
+      "  { name: 'sib_read_and', description: 'mutating sibling after read && template', inputSchema: { type: 'object' } },",
+      "  { name: 'sib_prop_in', description: 'mutating sibling of the in property', inputSchema: { type: 'object' } },",
+      "  { name: 'sib_prop_as', description: 'mutating sibling of the as property', inputSchema: { type: 'object' } },",
+      "  { name: 'sib_string', description: 'mutating sibling of the string tail', inputSchema: { type: 'object' } },",
+      "  { name: 'sib_number', description: 'mutating sibling of the number tail', inputSchema: { type: 'object' } },",
+      "  { name: 'sib_regex', description: 'mutating sibling of the regex tail', inputSchema: { type: 'object' } },",
+      "  { name: 'sib_close', description: 'mutating sibling of the member access tail', inputSchema: { type: 'object' } },",
+      "  { name: 'sib_closed', description: 'mutating sibling in the closed-call switch', inputSchema: { type: 'object' } },",
+      "  { name: 'mutating_sibling', description: 'mutating sibling routed by the switch', inputSchema: { type: 'object' } },",
+      ']',
+      '',
+      'const ready = true',
+      'const pending = false',
+      'const mode = 1',
+      'const items = [1]',
+      'let out: unknown',
+      '',
+      'function read(call: AgentToolCall): ToolExecution {',
+      "  return { output: 'read', mutated: false, summary: 'read' }",
+      '}',
+      '',
+      'function write(call: AgentToolCall): ToolExecution {',
+      "  return { output: 'wrote', mutated: true, summary: 'write' }",
+      '}',
+      '',
+      'function wrap(value: ToolExecution): ToolExecution {',
+      "  return { output: 'wrapped', mutated: false, summary: 'wrap' }",
+      '}',
+      '',
+      'export async function executeTool(call: AgentToolCall): Promise<ToolExecution> {',
+      "  if (call.name === 't_plain')",
+      '    return `a`',
+      "  if (call.name === 'sib_plain') return write(call)",
+      "  if (call.name === 't_switch')",
+      '    return `a`',
+      '  switch (call.name) {',
+      "    case 'sib_switch':",
+      '      return write(call)',
+      '    default:',
+      '      return read(call)',
+      '  }',
+      "  if (call.name === 't_interp')",
+      '    return `${call.name}`',
+      "  if (call.name === 'sib_interp') return write(call)",
+      "  if (call.name === 't_nested')",
+      '    return `${`inner ${1}`}`',
+      "  if (call.name === 'sib_nested') return write(call)",
+      "  if (call.name === 't_void')",
+      '    void `a`',
+      "  if (call.name === 'sib_void') return write(call)",
+      "  if (call.name === 't_assign')",
+      '    out = `a`',
+      "  if (call.name === 'sib_assign') return write(call)",
+      "  if (call.name === 'read_and')",
+      '    read(call) &&',
+      '      `a`',
+      "  if (call.name === 'sib_read_and') return write(call)",
+      "  if (call.name === 't_prop_in')",
+      '    return read(call).in',
+      "  if (call.name === 'sib_prop_in') return write(call)",
+      "  if (call.name === 't_prop_as')",
+      '    return read(call).as',
+      "  if (call.name === 'sib_prop_as') return write(call)",
+      "  if (call.name === 't_string')",
+      "    return read(call) && 'a'",
+      "  if (call.name === 'sib_string') return write(call)",
+      "  if (call.name === 't_number')",
+      '    return read(call) && 5',
+      "  if (call.name === 'sib_number') return write(call)",
+      "  if (call.name === 't_regex')",
+      '    return read(call) && /a/',
+      "  if (call.name === 'sib_regex') return write(call)",
+      "  if (call.name === 't_close')",
+      '    return read(call).output',
+      "  if (call.name === 'sib_close') return write(call)",
+      "  if (call.name === 'tag_next')",
+      '    return wrap',
+      '      `a${1}',
+      'b` && write(call)',
+      "  if (call.name === 'call_template')",
+      '    return wrap(',
+      '      `a',
+      'b`,',
+      '      write(call))',
+      "  if (call.name === 'closed_call')",
+      '    return wrap(',
+      '      `a`',
+      '    )',
+      '  switch (call.name) {',
+      "    case 'sib_closed':",
+      '      return write(call)',
+      '  }',
+      "  if (call.name === 'lbl_if')",
+      '    label_if: if (ready)',
+      '      return write(call)',
+      "  if (call.name === 'lbl_for')",
+      '    label_for: for (const item of items)',
+      '      write(call)',
+      "  if (call.name === 'lbl_while')",
+      '    label_while: while (pending)',
+      '      write(call)',
+      "  if (call.name === 'lbl_block')",
+      '    label_block: {',
+      '      return write(call)',
+      '    }',
+      "  if (call.name === 'lbl_switch')",
+      '    label_switch: switch (mode) {',
+      '      case 1:',
+      '        write(call)',
+      '    }',
+      '  switch (call.name) {',
+      "    case 'mutating_sibling':",
+      '      return write(call)',
+      '    default:',
+      "      return { output: 'unknown', isError: true, mutated: false, summary: call.name }",
+      '  }',
+      '}',
+      '',
+    ].join('\n'),
+    'apps/docs/src/renderer/ai/neq.ts': [
+      "import type { AgentToolCall, AgentToolDef, ToolExecution } from '@genoffice/agent-core'",
+      '',
+      'export const AGENT_TOOLS: AgentToolDef[] = [',
+      "  { name: 't_neq', description: 'the fall-through keeps its own mutation', inputSchema: { type: 'object' } },",
+      "  { name: 't_neq_prop', description: 'the fall-through after a property tail', inputSchema: { type: 'object' } },",
+      ']',
+      '',
+      'function read(call: AgentToolCall): ToolExecution {',
+      "  return { output: 'read', mutated: false, summary: 'read' }",
+      '}',
+      '',
+      'function write(call: AgentToolCall): ToolExecution {',
+      "  return { output: 'wrote', mutated: true, summary: 'write' }",
+      '}',
+      '',
+      'export async function executeNeq(call: AgentToolCall): Promise<ToolExecution> {',
+      "  if (call.name !== 't_neq')",
+      '    return read(call) && `a`',
+      '  write(call)',
+      '}',
+      '',
+      'export async function executeNeqProp(call: AgentToolCall): Promise<ToolExecution> {',
+      "  if (call.name !== 't_neq_prop')",
+      '    return read(call).in',
+      '  write(call)',
+      '}',
+      '',
+    ].join('\n'),
+  }
+
+  it('ends a consequent at the primary expression that completes it (G706-BE-R3)', () => {
+    const { dir } = fixture(COMPLETED_PRIMARY_FIXTURE)
+    const { rows } = extract({ repo: dir, rev: 'HEAD' })
+    const write = (tool) => {
+      const row = rows.find((r) => r.tool === tool)
+      assert.ok(row, `expected a row for ${tool}`)
+      return row.write
+    }
+    // the template (plain, interpolated, nested) ends the consequent at ASI, so
+    // the sibling below it is a statement of its own, not part of this branch
+    for (const tool of ['t_plain', 't_switch', 't_interp', 't_nested', 't_void', 't_assign']) {
+      assert.equal(write(tool), 'undeclared', `${tool} must not borrow a sibling's mutation`)
+    }
+    // `read(call) &&` + template: the branch declares only read's `mutated: false`
+    assert.equal(write('read_and'), 'no')
+    // a keyword used as a property name is a complete expression too
+    assert.equal(write('t_prop_in'), 'no')
+    assert.equal(write('t_prop_as'), 'no')
+    // the already-correct completed tails (string, number, regex, member access)
+    for (const tool of ['t_string', 't_number', 't_regex', 't_close']) {
+      assert.equal(write(tool), 'no', `${tool} must end at its own statement`)
+    }
+    // and every sibling guard keeps its own mutating branch
+    for (const tool of [
+      'sib_plain',
+      'sib_switch',
+      'sib_interp',
+      'sib_nested',
+      'sib_void',
+      'sib_assign',
+      'sib_read_and',
+      'sib_prop_in',
+      'sib_prop_as',
+      'sib_string',
+      'sib_number',
+      'sib_regex',
+      'sib_close',
+      'sib_closed',
+    ]) {
+      assert.equal(write(tool), 'yes', `${tool} must keep its own mutating branch`)
+    }
+  })
+
+  it('keeps a template that does not complete the statement inside the branch (G706-BE-R3)', () => {
+    const { dir } = fixture(COMPLETED_PRIMARY_FIXTURE)
+    const { rows } = extract({ repo: dir, rev: 'HEAD' })
+    const write = (tool) => rows.find((r) => r.tool === tool).write
+    // a tagged template on the next line continues the statement
+    assert.equal(write('tag_next'), 'yes')
+    // and a template spanning lines inside an open call keeps the call's argument
+    assert.equal(write('call_template'), 'yes')
+    // a closed call (wrap declares `mutated: false`) ends the statement at `)`
+    assert.equal(write('closed_call'), 'no')
+  })
+
+  it('keeps the `!==` fall-through after a completed primary expression (G706-BE-R3)', () => {
+    const { dir } = fixture(COMPLETED_PRIMARY_FIXTURE)
+    const { rows } = extract({ repo: dir, rev: 'HEAD' })
+    const write = (tool) => rows.find((r) => r.tool === tool).write
+    // the early-return consequent ends at the template / the property access, so
+    // the `write(call)` under it is the tool's own fall-through path
+    assert.equal(write('t_neq'), 'yes')
+    assert.equal(write('t_neq_prop'), 'yes')
+  })
+
+  it('takes a labelled control statement with the braceless branch (G706-BE-R4)', () => {
+    const { dir } = fixture(COMPLETED_PRIMARY_FIXTURE)
+    const { rows } = extract({ repo: dir, rev: 'HEAD' })
+    const write = (tool) => rows.find((r) => r.tool === tool).write
+    // the three shapes the review found broken, plus the labelled block and
+    // labelled switch that were already correct before this fix
+    for (const tool of ['lbl_if', 'lbl_for', 'lbl_while', 'lbl_block', 'lbl_switch']) {
+      assert.equal(write(tool), 'yes', `${tool} must keep the labelled consequent`)
+    }
+  })
+})
+
 describe('real repo', () => {
   it('produces rows for each of the six apps at HEAD', () => {
     const { rows } = extract({ repo: REPO_ROOT, rev: 'HEAD' })
