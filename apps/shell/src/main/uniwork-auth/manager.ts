@@ -135,15 +135,17 @@ export class AccountManager extends SessionCore {
     this.clearRecoveryTimer()
     this.profile = next
     this.transport = this.deps.createTransport(next)
+    // A link may move the address silently, but never the sign-in: the
+    // deployment id is public, so a link naming it proves nothing about the
+    // new origin. The stored refresh credential stays bound to the origin that
+    // issued it and is dropped here (that origin is usually gone after a move);
+    // the user signs in again on the new origin in the browser, where they see
+    // its address. No token is ever sent to an origin the user did not sign in to.
     try {
       const stored = this.deps.credentials.load()
-      if (
-        stored &&
-        stored.deploymentId === next.deploymentId &&
-        stored.clientId === next.clientId &&
-        stored.apiOrigin !== next.apiOrigin
-      ) {
-        this.deps.credentials.save({ ...stored, apiOrigin: next.apiOrigin })
+      if (stored && stored.apiOrigin !== next.apiOrigin) {
+        this.session = null
+        this.deps.credentials.clear()
       }
     } catch {
       // an unreadable credential is reported by the restore below

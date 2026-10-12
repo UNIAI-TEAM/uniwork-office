@@ -837,13 +837,14 @@ describe('adoptProfile (a web link or the typed address chose a server)', () => 
     expect(ctx.manager.deploymentProfile()).toEqual(profile)
   })
 
-  it('the same deployment on a new origin keeps the sign-in and follows the move', async () => {
+  it('the same deployment on a new origin follows the move but never carries the sign-in there', async () => {
     const ctx = setup({ credentials: createMemoryCredentialStore(stored()) })
     expect((await ctx.manager.restore()).state).toBe('signed-in')
     const moved = { ...profile, apiOrigin: 'https://moved.example' }
     const status = await ctx.manager.adoptProfile(moved)
-    expect(status.state).toBe('signed-in')
-    expect(ctx.credentials.load()?.apiOrigin).toBe('https://moved.example')
+    expect(status.state).toBe('signed-out')
+    expect(ctx.credentials.load()).toBeNull()
+    expect(ctx.manager.deploymentProfile()).toEqual(moved)
   })
 
   it('another deployment never reuses the old credential', async () => {
