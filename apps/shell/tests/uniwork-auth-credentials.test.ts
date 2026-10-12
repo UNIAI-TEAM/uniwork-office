@@ -88,7 +88,7 @@ describe('uniwork credential store', () => {
     }
   })
 
-  it('keeps the file and reports keyring_unavailable when decryption fails (locked keyring)', () => {
+  it('keeps the file and reports keystore_locked when decryption fails (locked keyring)', () => {
     const writer = createCredentialStore({ userDataDir: dir, safeStorage: fakeSafeStorage() })
     writer.save(credential())
     const locked = createCredentialStore({
@@ -103,11 +103,41 @@ describe('uniwork credential store', () => {
       locked.load()
       expect.unreachable()
     } catch (error) {
-      expect((error as CredentialStoreError).code).toBe('keyring_unavailable')
+      expect((error as CredentialStoreError).code).toBe('keystore_locked')
     }
     // the refresh token survives: once the keyring opens again it is still there
     expect(readdirSync(join(dir, 'uniwork-auth'))).toEqual(['session.bin'])
     expect(writer.load()).toEqual(credential())
+  })
+
+  it('a locked keychain reports keystore_locked, never keyring_unavailable', () => {
+    const writer = createCredentialStore({ userDataDir: dir, safeStorage: fakeSafeStorage() })
+    writer.save(credential())
+    const locked = createCredentialStore({
+      userDataDir: dir,
+      safeStorage: fakeSafeStorage({
+        decryptString: () => {
+          throw new Error('keychain access denied')
+        },
+      }),
+    })
+    try {
+      locked.load()
+      expect.unreachable()
+    } catch (error) {
+      expect((error as CredentialStoreError).code).toBe('keystore_locked')
+    }
+    // a no-keyring host keeps the old code: the two cases stay distinct
+    const none = createCredentialStore({
+      userDataDir: dir,
+      safeStorage: fakeSafeStorage({ isEncryptionAvailable: () => false }),
+    })
+    try {
+      none.load()
+      expect.unreachable()
+    } catch (error) {
+      expect((error as CredentialStoreError).code).toBe('keyring_unavailable')
+    }
   })
 
   it('a fresh save replaces a credential the keyring can no longer decrypt', () => {

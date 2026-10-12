@@ -14,7 +14,7 @@ import {
   type UniworkTransport,
 } from '../src/main/uniwork-auth/transport'
 import { createAuthCallbackRouter } from '../src/main/uniwork-auth/routing'
-import { createMemoryCredentialStore } from './uniwork-auth-fakes'
+import { createLockableCredentialStore, createMemoryCredentialStore } from './uniwork-auth-fakes'
 
 const profile: DeploymentProfile = {
   deploymentId: 'default',
@@ -302,6 +302,17 @@ describe('sign-in', () => {
     expect(await ctx.manager.getAccessToken()).toBeNull()
   })
 
+  it('a no-keyring host still reports keyring-unavailable, not keystore-locked', async () => {
+    const credentials = createMemoryCredentialStore()
+    credentials.load = () => {
+      throw new CredentialStoreError('keyring_unavailable')
+    }
+    const ctx = setup({ credentials })
+    const status = await ctx.manager.restore()
+    expect(status.state).toBe('keyring-unavailable')
+    expect(status.error).toBe('keyring_unavailable')
+  })
+
   it('keyring-unavailable: a fresh sign-in replaces the unreadable credential', async () => {
     const credentials = createMemoryCredentialStore()
     const load = credentials.load
@@ -353,6 +364,67 @@ describe('sign-in', () => {
     expect((await ctx.manager.restore()).state).toBe('not-configured')
     expect(await ctx.manager.login()).toBe(false)
     expect(ctx.events.at(-1)).toEqual({ phase: 'error', error: 'not_configured' })
+  })
+})
+
+describe('keystore locked', () => {
+  it('restore while the keystore is locked shows keystore-locked, not keyring-unavailable', async () => {
+    const locked = createLockableCredentialStore(stored())
+    const ctx = setup({ credentials: locked.store })
+    expect((await ctx.manager.restore()).state).toBe('keystore-locked')
+    // a locked keystore never opens a network session
+    expect(ctx.transport.refresh).not.toHaveBeenCalled()
+    expect(ctx.manager.status().loggedIn).toBe(false)
+    expect(await ctx.manager.getAccessToken()).toBeNull()
+  })
+
+  it('keystore-locked preserves the saved credential (nothing cleared, no network session)', async () => {
+    const locked = createLockableCredentialStore(stored())
+    const ctx = setup({ credentials: locked.store })
+    const status = await ctx.manager.restore()
+    expect(status.state).toBe('keystore-locked')
+    expect(status.error).toBe('keystore_locked')
+    expect(status.loggedIn).toBe(false)
+    // the encrypted credential is left in place: unlocking brings the profile back
+    expect(locked.saved()?.profile?.email).toBe('cached@example.com')
+  })
+
+  it('unlock then restore signs in', async () => {
+    const locked = createLockableCredentialStore(stored())
+    const ctx = setup({ credentials: locked.store })
+    expect((await ctx.manager.restore()).state).toBe('keystore-locked')
+    locked.unlock()
+    expect((await ctx.manager.restore()).state).toBe('signed-in')
+  })
+
+  it('a sign-in while the keystore is locked never overwrites the stored credential', async () => {
+    const locked = createLockableCredentialStore(stored({ refreshToken: 'rt_keep' }))
+    const ctx = setup({ credentials: locked.store })
+    await signIn(ctx)
+    expect(ctx.manager.status().state).toBe('keystore-locked')
+    expect(ctx.events.at(-1)).toEqual({ phase: 'error', error: 'keystore_locked' })
+    // the persist was refused, so the saved credential is untouched
+    expect(locked.saved()?.refreshToken).toBe('rt_keep')
+  })
+
+  it('a sign-in while the keystore is locked opens no browser when nothing can be stored', async () => {
+    const locked = createLockableCredentialStore(stored())
+    locked.store.canStore = () => false
+    const ctx = setup({ credentials: locked.store })
+    await ctx.manager.restore()
+    expect(await ctx.manager.login()).toBe(false)
+    expect(ctx.transport.start).not.toHaveBeenCalled()
+    expect(ctx.openBrowser).not.toHaveBeenCalled()
+    expect(ctx.events.at(-1)).toEqual({ phase: 'error', error: 'keystore_locked' })
+    expect(ctx.manager.status().state).toBe('keystore-locked')
+  })
+
+  it('retry from keystore-locked re-reads the store and signs in once unlocked', async () => {
+    const locked = createLockableCredentialStore(stored())
+    const ctx = setup({ credentials: locked.store })
+    expect((await ctx.manager.restore()).state).toBe('keystore-locked')
+    locked.unlock()
+    expect((await ctx.manager.retry()).state).toBe('signed-in')
   })
 })
 
