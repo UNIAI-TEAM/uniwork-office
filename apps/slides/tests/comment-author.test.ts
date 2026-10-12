@@ -76,7 +76,7 @@ const DISPLAY_NAME = 'Nguyễn An'
 let root = ''
 const LOCAL_DECK = (): string => join(root, 'in', 'local.pptx')
 const BOUND_DECK = (): string => join(root, 'in', 'bound.pptx')
-let setUniworkDocumentPolicy: (policy: unknown) => void
+let setUniworkDocumentPolicy: typeof import('../src/main/slides-main').setUniworkDocumentPolicy
 
 beforeAll(async () => {
   root = mkdtempSync(join(tmpdir(), 'slides-comment-author-'))
@@ -106,7 +106,9 @@ async function commentAndReadBack(
   path: string,
 ): Promise<{ live: string[]; saved: string[] }> {
   expect(await invoke(wc, 'slides:open-path', path, FIT)).toBeTruthy()
-  expect(await invoke(wc, 'slides:add-comment', { slideIndex: 0, text: 'G8-02 author' })).toBeTruthy()
+  expect(
+    await invoke(wc, 'slides:add-comment', { slideIndex: 0, text: 'G8-02 author' }),
+  ).toBeTruthy()
   const comments = (await invoke(wc, 'slides:get-comments', 0)) as Array<{ author: string }>
   expect(await invoke(wc, 'slides:save')).toMatchObject({ ok: true })
   const reopened = await openPptx(new Uint8Array(readFileSync(path)))

@@ -104,15 +104,24 @@ afterEach(() => {
 
 describe('createCommentAuthorResolver (the single source)', () => {
   it('a bound document takes the signed-in account display name', () => {
-    const author = createCommentAuthorResolver({ isBound: (p) => p === BOUND, displayName: () => NAME })
+    const author = createCommentAuthorResolver({
+      isBound: (p) => p === BOUND,
+      displayName: () => NAME,
+    })
     expect(author(BOUND)).toBe(NAME)
   })
 
   it('local files, signed-out sessions and unnamed profiles take the neutral constant', () => {
-    const signedIn = createCommentAuthorResolver({ isBound: (p) => p === BOUND, displayName: () => NAME })
+    const signedIn = createCommentAuthorResolver({
+      isBound: (p) => p === BOUND,
+      displayName: () => NAME,
+    })
     expect(signedIn(LOCAL)).toBe(NEUTRAL_COMMENT_AUTHOR)
 
-    const signedOut = createCommentAuthorResolver({ isBound: (p) => p === BOUND, displayName: () => null })
+    const signedOut = createCommentAuthorResolver({
+      isBound: (p) => p === BOUND,
+      displayName: () => null,
+    })
     expect(signedOut(BOUND)).toBe(NEUTRAL_COMMENT_AUTHOR)
     expect(signedOut(LOCAL)).toBe(NEUTRAL_COMMENT_AUTHOR)
 
@@ -157,7 +166,12 @@ describe('installUniworkModuleSeams forwards the author source', () => {
     setters.policies.length = 0
     installUniworkModuleSeams(seam, () => '   ')
     const forwarded = setters.policies.map(
-      (policy) => policy as { isBound(path: string): boolean; isReadOnly(): boolean; commentAuthor(path: string): string },
+      (policy) =>
+        policy as {
+          isBound(path: string): boolean
+          isReadOnly(): boolean
+          commentAuthor(path: string): string
+        },
     )
     expect(forwarded.map((policy) => policy.commentAuthor(BOUND))).toEqual(Array(6).fill('   '))
     // what the shell installed, as each module's own policy: the helper reads
