@@ -686,6 +686,7 @@ export type AccountState =
   | 'server-unreachable'
   | 'wrong-deployment'
   | 'keyring-unavailable'
+  | 'keystore-locked'
 
 export type AccountErrorCode =
   | 'network'
@@ -702,6 +703,7 @@ export type AccountErrorCode =
   | 'wrong_deployment'
   | 'not_configured'
   | 'keyring_unavailable'
+  | 'keystore_locked'
   | 'server_error'
   | 'malformed_response'
 

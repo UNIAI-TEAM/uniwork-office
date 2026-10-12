@@ -1,6 +1,6 @@
 import type { AccountEntitlements, AccountErrorCode, AccountStatus } from '../../shared/home-api'
 import { isAuthCallbackUrl, validateCallback } from './callback'
-import type { StoredCredential } from './credentials'
+import { CredentialStoreError, type StoredCredential } from './credentials'
 import { redirectUriForProfile, type DeploymentProfile } from './deployment'
 import { pickOrg, toAccountOrg, toEntitlements, toProfile } from './mapping'
 import { LoginAttemptStore, type PendingLoginAttempt } from './pkce'
@@ -79,8 +79,14 @@ export class AccountManager extends SessionCore {
     let credential: StoredCredential | null
     try {
       credential = this.deps.credentials.load()
-    } catch {
-      this.setState('keyring-unavailable', 'keyring_unavailable')
+    } catch (error) {
+      // a locked keystore is transient (retry once unlocked) and keeps the
+      // saved profile; a missing keyring is the permanent keyring-unavailable
+      if (error instanceof CredentialStoreError && error.code === 'keystore_locked') {
+        this.setState('keystore-locked', 'keystore_locked')
+      } else {
+        this.setState('keyring-unavailable', 'keyring_unavailable')
+      }
       return null
     }
     if (!credential) {
@@ -166,6 +172,12 @@ export class AccountManager extends SessionCore {
     // be stored encrypted: otherwise the redeemed code would orphan a device
     if (this.state === 'keyring-unavailable' && !this.deps.credentials.canStore()) {
       this.emitLogin({ phase: 'error', error: 'keyring_unavailable' })
+      return false
+    }
+    // a locked keystore cannot be written: refuse before opening a browser, so
+    // the redeemed code never overwrites the saved credential
+    if (this.state === 'keystore-locked' && !this.deps.credentials.canStore()) {
+      this.emitLogin({ phase: 'error', error: 'keystore_locked' })
       return false
     }
     const profile = this.profile as DeploymentProfile
@@ -316,7 +328,7 @@ export class AccountManager extends SessionCore {
       refreshExpiresAt: this.now() + session.refreshExpiresIn * 1000,
     }
     if (!this.persist(credential)) {
-      this.failLogin('keyring_unavailable')
+      this.failLogin(this.state === 'keystore-locked' ? 'keystore_locked' : 'keyring_unavailable')
       return
     }
     this.resetSession()
@@ -330,7 +342,11 @@ export class AccountManager extends SessionCore {
   }
 
   async retry(): Promise<AccountStatus> {
-    if (this.state === 'not-configured' || this.state === 'keyring-unavailable')
+    if (
+      this.state === 'not-configured' ||
+      this.state === 'keyring-unavailable' ||
+      this.state === 'keystore-locked'
+    )
       return this.restore()
     if (this.state !== 'server-unreachable' && this.state !== 'signed-in') return this.status()
     if (!this.session) {

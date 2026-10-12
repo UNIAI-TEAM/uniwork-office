@@ -97,7 +97,9 @@ export class SessionCore {
     const showsAccount =
       this.state === 'signed-in' ||
       this.state === 'refreshing' ||
-      this.state === 'server-unreachable'
+      this.state === 'server-unreachable' ||
+      // a locked keystore shows the cached profile (no live session)
+      this.state === 'keystore-locked'
     const profile = showsAccount ? this.accountProfile : undefined
     return {
       loggedIn: this.state === 'signed-in' || this.state === 'refreshing',
@@ -129,7 +131,11 @@ export class SessionCore {
   }
 
   getEntitlements(): AccountEntitlements | null {
-    return this.state === 'signed-in' || this.state === 'refreshing' ? this.entitlements : null
+    return this.state === 'signed-in' ||
+      this.state === 'refreshing' ||
+      this.state === 'keystore-locked'
+      ? this.entitlements
+      : null
   }
 
   /**
@@ -372,6 +378,14 @@ export class SessionCore {
         this.setState('keyring-unavailable', 'keyring_unavailable')
         return false
       }
+      if (error instanceof CredentialStoreError && error.code === 'keystore_locked') {
+        // a locked keystore is transient: keep the session in memory for this
+        // run and show keystore-locked (no network session); Retry re-reads the
+        // store. The stored credential is left untouched.
+        this.resetSession()
+        this.setState('keystore-locked', 'keystore_locked')
+        return false
+      }
       // a disk failure keeps the session for this run; restart signs in again
       return true
     }
@@ -381,6 +395,15 @@ export class SessionCore {
     if (handled.has(error as object)) return this.error ?? 'server_error'
     this.markHandled(error)
     if (error instanceof CredentialStoreError) {
+      // the keystore is locked (transient), not missing: a distinct state that
+      // keeps the cached profile and is retried by re-reading the store
+      if (error.code === 'keystore_locked') {
+        return this.applyOutcome({
+          state: 'keystore-locked',
+          error: 'keystore_locked',
+          clearCredentials: false,
+        })
+      }
       return this.applyOutcome({
         state: 'keyring-unavailable',
         error: 'keyring_unavailable',
@@ -400,7 +423,8 @@ export class SessionCore {
     } else if (
       outcome.state === 'wrong-deployment' ||
       outcome.state === 'signed-out' ||
-      outcome.state === 'keyring-unavailable'
+      outcome.state === 'keyring-unavailable' ||
+      outcome.state === 'keystore-locked'
     ) {
       // no usable session: a later sign-in must start fresh, not "recover" this one
       this.resetSession()

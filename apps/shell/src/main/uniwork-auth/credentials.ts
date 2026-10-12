@@ -34,7 +34,7 @@ export interface StoredCredential {
   entitlements?: AccountEntitlements | null
 }
 
-export type CredentialStoreErrorCode = 'keyring_unavailable' | 'io'
+export type CredentialStoreErrorCode = 'keyring_unavailable' | 'keystore_locked' | 'io'
 
 export class CredentialStoreError extends Error {
   readonly code: CredentialStoreErrorCode
@@ -101,7 +101,8 @@ type ReadResult =
  * the server revoke the whole device (refresh_reused).
  *
  * A file the keyring cannot decrypt right now (locked Keychain, keyring
- * swapped, DPAPI hiccup) is kept and reported as keyring_unavailable; only a
+ * swapped, DPAPI hiccup) is kept and reported as keystore_locked - a transient
+ * lock, distinct from keyring_unavailable (no usable keyring at all); only a
  * file that decrypts to garbage is dropped. There is no plaintext fallback: a
  * Linux host on the `basic_text` backend or with encryption unavailable is
  * refused.
@@ -174,8 +175,9 @@ export function createCredentialStore(options: {
         case 'ok':
           return read.credential
         case 'locked':
-          // the refresh token may still be good once the keyring opens again
-          throw new CredentialStoreError('keyring_unavailable')
+          // the refresh token may still be good once the keyring opens again;
+          // this is a lock, not a missing keyring, so the caller can retry
+          throw new CredentialStoreError('keystore_locked')
         case 'unsupported':
           return null
         case 'corrupt':
