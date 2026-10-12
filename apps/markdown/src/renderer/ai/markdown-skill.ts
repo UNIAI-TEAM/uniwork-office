@@ -1,4 +1,4 @@
-import type { AgentSkill } from '@genoffice/agent-core'
+import type { AgentSkill, AgentToolDef } from '@genoffice/agent-core'
 import type { Editor } from '@tiptap/core'
 import type { AiDocWriter } from './doc-writer'
 import {
@@ -6,6 +6,7 @@ import {
   buildDocContext,
   executeTool,
   markDocSeen,
+  type AskClarification,
   type FrontmatterAccess,
 } from './tools'
 
@@ -69,6 +70,7 @@ export const READ_ONLY_TOOLS: ReadonlySet<string> = new Set([
   'get_document_context',
   'read_blocks',
   'read_frontmatter',
+  'ask_clarification',
 ])
 
 const VIEW_ONLY_NOTE =
@@ -86,7 +88,14 @@ export function createMarkdownSkill(
   getWriter?: () => AiDocWriter | undefined,
   /** live predicate: a view-only UniWork document, where the assistant may read but never edit */
   isReadOnly?: () => boolean,
+  /** the panel's questionnaire card behind ask_clarification; none hides the tool */
+  getAsk?: () => AskClarification | undefined,
 ): AgentSkill {
+  /** ask_clarification only exists while a panel hosts its card; it never edits, so view-only keeps it */
+  const withAsk = (tools: AgentToolDef[], readOnly: boolean): AgentToolDef[] =>
+    tools.filter((t) =>
+      t.name === 'ask_clarification' ? !!getAsk?.() : !readOnly || READ_ONLY_TOOLS.has(t.name),
+    )
   return {
     id: 'markdown',
     // live: the predicates are re-read before every model request
@@ -97,10 +106,13 @@ export function createMarkdownSkill(
         : AGENT_SYSTEM_PROMPT
     },
     get tools() {
-      if (isReadOnly?.()) return AGENT_TOOLS.filter((t) => READ_ONLY_TOOLS.has(t.name))
-      return imageGenAvailable?.() === false
-        ? AGENT_TOOLS.filter((t) => t.name !== 'generate_image')
-        : AGENT_TOOLS
+      if (isReadOnly?.()) return withAsk(AGENT_TOOLS, true)
+      return withAsk(
+        imageGenAvailable?.() === false
+          ? AGENT_TOOLS.filter((t) => t.name !== 'generate_image')
+          : AGENT_TOOLS,
+        false,
+      )
     },
     buildContext: () => {
       const editor = getEditor()
@@ -120,7 +132,7 @@ export function createMarkdownSkill(
       if (!editor) {
         return { output: 'editor not ready', isError: true, summary: call.name }
       }
-      return executeTool(editor, call, signal, fm, getWriter?.())
+      return executeTool(editor, call, signal, fm, getWriter?.(), getAsk?.())
     },
   }
 }
