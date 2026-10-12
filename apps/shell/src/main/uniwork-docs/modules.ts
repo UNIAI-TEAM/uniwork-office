@@ -63,6 +63,33 @@ export function createCommentAuthorResolver(deps: {
 }
 
 /**
+ * G8-02: pushed (no payload) to every renderer when the signed-in display name
+ * changes — sign-in, sign-out, automatic session expiry. The docs, pdf and
+ * sheets renderers cache the author per open document and re-ask on this ping;
+ * slides resolves the author at each add-comment and needs no ping.
+ */
+export const COMMENT_AUTHOR_CHANGED_CHANNEL = 'uniwork:comment-author-changed'
+
+/**
+ * G8-02: calls `broadcast` whenever an account status push changes the display
+ * name a bound document would take (null = signed out / no name). Token
+ * refreshes that keep the same name stay silent. Returns the unsubscribe.
+ */
+export function watchCommentAuthorChanges(deps: {
+  onStatus(listener: () => void): () => void
+  displayName(): string | null
+  broadcast(): void
+}): () => void {
+  let last = deps.displayName()
+  return deps.onStatus(() => {
+    const next = deps.displayName()
+    if (next === last) return
+    last = next
+    deps.broadcast()
+  })
+}
+
+/**
  * Hands every editor module the UniWork policy (bound / read-only paths), its
  * explicit-user-save hook and the single comment-author source. `commentAuthor`
  * is asked once per new comment with the document path and returns the author

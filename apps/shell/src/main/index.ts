@@ -105,9 +105,10 @@ import {
 import { createUniworkDocs, type UniworkDocsHandle } from './uniwork-docs/wiring'
 import { refuseLockedOpenPath } from './uniwork-docs/service'
 import {
-  NEUTRAL_COMMENT_AUTHOR,
+  COMMENT_AUTHOR_CHANGED_CHANNEL,
   createCommentAuthorResolver,
   installUniworkModuleSeams,
+  watchCommentAuthorChanges,
 } from './uniwork-docs/modules'
 import { createModuleSaveRequester } from './uniwork-docs/module-save'
 import { startEditorStatePoll } from './uniwork-docs/editor-state-poll'
@@ -6463,6 +6464,16 @@ app.whenReady().then(async () => {
   // My AI and workbench data follow the signed-in account (sign-out = signed-out bucket)
   syncWorkbenchOwner()
   onUniworkAccountStatus(() => syncWorkbenchOwner())
+  // G8-02: editors that cache the comment author re-ask when the signed-in
+  // display name changes (sign-in, sign-out, automatic session expiry)
+  watchCommentAuthorChanges({
+    onStatus: onUniworkAccountStatus,
+    displayName: uniworkAccountDisplayName,
+    broadcast: () => {
+      for (const wc of webContents.getAllWebContents())
+        if (!wc.isDestroyed()) wc.send(COMMENT_AUTHOR_CHANGED_CHANNEL)
+    },
+  })
   startUniworkCloud()
   authCallbacks.start(routeAuthCallback)
   // UniWork document launch links (held since startup) route from here on

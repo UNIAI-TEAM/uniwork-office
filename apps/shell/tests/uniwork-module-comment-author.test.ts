@@ -10,6 +10,8 @@
  * paths; the repository grep guard (no-os-account-author.test.ts) pins the
  * textual side.
  */
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   setUniworkDocumentPolicy as setDocsPolicy,
@@ -66,9 +68,11 @@ vi.mock('../../html/src/main/html-main', () => ({
 }))
 
 import {
+  COMMENT_AUTHOR_CHANGED_CHANNEL,
   NEUTRAL_COMMENT_AUTHOR,
   createCommentAuthorResolver,
   installUniworkModuleSeams,
+  watchCommentAuthorChanges,
 } from '../src/main/uniwork-docs/modules'
 
 const BOUND = 'C:/u/uniwork-documents/dep/acc/doc1/Plan.docx'
@@ -219,4 +223,72 @@ describe('the module helper (one per module)', () => {
       expect(author(BOUND)).toBe(NEUTRAL_COMMENT_AUTHOR)
     },
   )
+})
+
+describe('account changes reach the editors that cache the author (BE-4 / FE-4)', () => {
+  function account(initial: string | null) {
+    let name = initial
+    const listeners = new Set<() => void>()
+    return {
+      displayName: () => name,
+      onStatus: (listener: () => void) => {
+        listeners.add(listener)
+        return () => void listeners.delete(listener)
+      },
+      push: (next: string | null) => {
+        name = next
+        for (const listener of listeners) listener()
+      },
+    }
+  }
+
+  it('sign-in, sign-out and automatic session expiry each ping the editors once', () => {
+    const acc = account(null)
+    const broadcast = vi.fn()
+    watchCommentAuthorChanges({ ...acc, broadcast })
+
+    acc.push(NAME) // sign-in
+    expect(broadcast).toHaveBeenCalledTimes(1)
+    acc.push(null) // session expired: the status push carries loggedIn false
+    expect(broadcast).toHaveBeenCalledTimes(2)
+    acc.push('Trần Bình') // another account signs in
+    expect(broadcast).toHaveBeenCalledTimes(3)
+  })
+
+  it('a status push that keeps the same name (token refresh) stays silent', () => {
+    const acc = account(NAME)
+    const broadcast = vi.fn()
+    watchCommentAuthorChanges({ ...acc, broadcast })
+    acc.push(NAME)
+    expect(broadcast).not.toHaveBeenCalled()
+  })
+
+  it('unsubscribes', () => {
+    const acc = account(null)
+    const broadcast = vi.fn()
+    watchCommentAuthorChanges({ ...acc, broadcast })()
+    acc.push(NAME)
+    expect(broadcast).not.toHaveBeenCalled()
+  })
+
+  // The shell broadcasts on one channel; the three editors that cache the
+  // author must subscribe to exactly that channel in their preload.
+  const repo = join(__dirname, '..', '..', '..')
+  const source = (rel: string) => readFileSync(join(repo, rel), 'utf8')
+
+  it('the shell wires the watcher to the account status and broadcasts the channel', () => {
+    const index = source('apps/shell/src/main/index.ts')
+    expect(index).toMatch(
+      /watchCommentAuthorChanges\(\{\s*onStatus: onUniworkAccountStatus,\s*displayName: uniworkAccountDisplayName,/,
+    )
+    expect(index).toContain('wc.send(COMMENT_AUTHOR_CHANGED_CHANNEL)')
+  })
+
+  it.each([
+    'apps/docs/src/preload/index.ts',
+    'apps/pdf/src/preload/index.ts',
+    'apps/sheets/src/preload/index.ts',
+  ])('%s subscribes to the broadcast channel', (preload) => {
+    expect(source(preload)).toContain(`ipcRenderer.on('${COMMENT_AUTHOR_CHANGED_CHANNEL}'`)
+  })
 })
