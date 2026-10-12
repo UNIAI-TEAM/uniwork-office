@@ -12,6 +12,14 @@ import {
   type ConflictUi,
 } from '../src/main/uniwork-docs/service'
 import { BINDING_FILE, INTENT_PAYLOAD_FILE } from '../src/main/uniwork-docs/binding-store'
+import { INTENT_STORE_REGISTRATION } from '../src/main/uniwork-sync/intent-store'
+import { createSafeStorageKeyProvider } from '../src/main/uniwork-sync/keys'
+import { createSyncStoreAccess } from '../src/main/uniwork-sync/session-store'
+import { createStoreLayer } from '../src/main/uniwork-sync/store'
+import {
+  createLockableSafeStorage,
+  type LockableSafeStorage,
+} from '../src/main/uniwork-sync/test-kit/compliance'
 
 /**
  * G5-04g (AC-1, AC-2): a working copy whose folder holds a binding.json with an
@@ -100,6 +108,18 @@ function setup() {
   const statuses: UniworkDocStatus[] = []
   const launches: UniworkLaunchEvent[] = []
   const locks: UniworkDocLock[] = []
+  const safeStorage: LockableSafeStorage = createLockableSafeStorage()
+  const layer = createStoreLayer({
+    root: join(dir, 'uniwork-sync', 'store'),
+    keys: createSafeStorageKeyProvider({ safeStorage, dir: join(dir, 'uniwork-sync', 'keys') }),
+    budgetBytes: 1 << 20,
+    clock: () => 1_700_000_000_000,
+  })
+  layer.register(INTENT_STORE_REGISTRATION)
+  const syncStore = createSyncStoreAccess({
+    layer,
+    scope: () => ({ deploymentId: 'default', accountId: 'acc_1' }),
+  })
   const ui: ConflictUi = {
     chooseConflict: vi.fn(async () => 'later'),
     confirmDiscard: vi.fn(async () => false),
@@ -110,6 +130,7 @@ function setup() {
   }
   const deps = {
     userDataDir: dir,
+    syncStore,
     profile: () => profile,
     identity: () => ({ accountId: 'acc_1', deviceSessionId: 'dev_1', deploymentId: 'default' }),
     selectedOrgId: () => 'org_a',
@@ -128,7 +149,7 @@ function setup() {
     sleep: async () => undefined,
   }
   const service = new UniworkDocsService(deps)
-  return { service, ui, statuses, locks, deps }
+  return { service, ui, statuses, locks, deps, safeStorage }
 }
 
 const bytesOf = (path: string) => readFileSync(path, 'utf8')
@@ -382,4 +403,74 @@ describe('no intent, no module save, no client call for a locked path (AC-2)', (
       expect(bytesOf(docPath())).toBe('working copy bytes')
     },
   )
+})
+
+/**
+ * W3b: a copy that still holds a pre-store pending intent (schema 1 + the
+ * pendingIntent + pending-upload.bin) needs the durable store before it can
+ * open - the intent is the save that must not be lost. While the keychain is
+ * locked that open is refused with the S11 `keystore_locked`, the plaintext is
+ * left exactly as it is, and nothing is written; unlocking opens the copy.
+ */
+describe('a locked keychain holds a pre-store intent (W3b)', () => {
+  const LEGACY_INTENT = {
+    intentId: 'office-intent-legacy',
+    idempotencyKey: 'office-key-legacy',
+    documentId: DOC,
+    baseRevision: '41',
+    checksum: hex(enc('working copy bytes')),
+    createdAt: '2026-10-11T00:00:00.000Z',
+  }
+
+  function seedLegacyIntent(): void {
+    seedFolder({ ...schema1, state: 'saving', pendingIntent: LEGACY_INTENT })
+    writeFileSync(join(docDir(), INTENT_PAYLOAD_FILE), 'working copy bytes')
+  }
+
+  it('the open is refused with S11 keystore_locked and the plaintext stays untouched', async () => {
+    seedLegacyIntent()
+    const ctx = setup()
+    ctx.safeStorage.lock()
+    const before = { binding: bindingText(), copy: bytesOf(docPath()) }
+    await expect(ctx.service.openFromServer(DOC)).rejects.toMatchObject({
+      code: 'engine_incompatible',
+    })
+    expect(calls).toEqual([])
+    expect(ctx.deps.openPath).not.toHaveBeenCalled()
+    expect(ctx.locks.at(-1)).toEqual({
+      path: docPath(),
+      reason: 'keystore_locked',
+      name: 'Plan.docx',
+    })
+    // nothing was written anywhere: the binding, the copy and the payload are
+    // byte-identical, and the store holds no record
+    expect(bindingText()).toBe(before.binding)
+    expect(bytesOf(docPath())).toBe(before.copy)
+    expect(folderFiles()).toEqual(['Plan.docx', BINDING_FILE, INTENT_PAYLOAD_FILE])
+  })
+
+  it('the sync funnel refuses the path while locked, then opens it once unlocked', async () => {
+    seedLegacyIntent()
+    const ctx = setup()
+    ctx.safeStorage.lock()
+    // the same open the session does: the funnel is asked before any module sees it
+    expect((await ctx.service.openSyncStore()).kind).toBe('keystore_locked')
+    expect(ctx.service.refuseLockedPath(docPath())).toBe(true)
+    expect(ctx.locks.at(-1)?.reason).toBe('keystore_locked')
+    // the keychain is back: the lock clears and the copy opens with its local work
+    ctx.safeStorage.unlock()
+    expect((await ctx.service.openSyncStore()).kind).toBe('ok')
+    expect(ctx.service.refuseLockedPath(docPath())).toBe(false)
+    expect(ctx.service.currentLocks().filter((l) => l.reason === 'keystore_locked')).toEqual([])
+    const opened = await ctx.service.openFromServer(DOC)
+    expect(opened.path).toBe(docPath())
+    expect(bytesOf(docPath())).toBe('working copy bytes')
+    // a copy without a pre-store intent never needs the store to open
+    rmSync(docDir(), { recursive: true, force: true })
+    seedFolder(schema1)
+    const plain = setup()
+    plain.safeStorage.lock()
+    expect((await plain.service.openSyncStore()).kind).toBe('keystore_locked')
+    expect(plain.service.refuseLockedPath(docPath())).toBe(false)
+  })
 })

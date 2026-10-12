@@ -8,8 +8,9 @@ import {
   statSync,
   writeFileSync,
 } from 'node:fs'
+import { readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { basename, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
   UniworkConflictChoice,
@@ -25,6 +26,18 @@ import {
 } from '../src/main/uniwork-docs/service'
 import { BINDING_FILE } from '../src/main/uniwork-docs/binding-store'
 import { pageRecentPaths } from '../src/main/recent-files'
+import {
+  INTENT_STORE_REGISTRATION,
+  createIntentStore,
+  type PendingIntentValue,
+} from '../src/main/uniwork-sync/intent-store'
+import { createSafeStorageKeyProvider } from '../src/main/uniwork-sync/keys'
+import { createSyncStoreAccess } from '../src/main/uniwork-sync/session-store'
+import { createStoreLayer, type StoreLayer } from '../src/main/uniwork-sync/store'
+import {
+  createLockableSafeStorage,
+  type LockableSafeStorage,
+} from '../src/main/uniwork-sync/test-kit/compliance'
 
 const TOKEN = 'secret-access-token-0123456789'
 const ORIGIN = 'https://uniwork.example'
@@ -206,11 +219,25 @@ function setup(
     choice?: UniworkConflictChoice
     closeChoice?: UnsavedCloseChoice
     account?: string
+    /** the sync store's budget; a tiny one makes the intent write hit store_full */
+    budgetBytes?: number
   } = {},
 ) {
   const statuses: UniworkDocStatus[] = []
   const launches: UniworkLaunchEvent[] = []
   let account: string | null = (opts.signedIn ?? true) ? (opts.account ?? 'acc_1') : null
+  const safeStorage: LockableSafeStorage = createLockableSafeStorage()
+  const layer: StoreLayer = createStoreLayer({
+    root: join(dir, 'uniwork-sync', 'store'),
+    keys: createSafeStorageKeyProvider({ safeStorage, dir: join(dir, 'uniwork-sync', 'keys') }),
+    budgetBytes: opts.budgetBytes ?? 1 << 20,
+    clock: () => 1_700_000_000_000,
+  })
+  layer.register(INTENT_STORE_REGISTRATION)
+  const syncStore = createSyncStoreAccess({
+    layer,
+    scope: () => (account ? { deploymentId: 'default', accountId: account } : null),
+  })
   const ui: ConflictUi = {
     chooseConflict: vi.fn(async () => opts.choice ?? 'later'),
     confirmDiscard: vi.fn(async () => true),
@@ -223,6 +250,7 @@ function setup(
   }
   const deps = {
     userDataDir: dir,
+    syncStore,
     profile: () => profile,
     identity: () =>
       account ? { accountId: account, deviceSessionId: 'dev_1', deploymentId: 'default' } : null,
@@ -247,6 +275,9 @@ function setup(
     ui,
     statuses,
     launches,
+    layer,
+    safeStorage,
+    currentAccount: () => account,
     signOut: () => {
       account = null
     },
@@ -254,6 +285,36 @@ function setup(
       account = id
     },
   }
+}
+
+/** the intent the durable store holds for the working copy at `path` (acc_1's scope) */
+async function intentOf(
+  ctx: ReturnType<typeof setup>,
+  path: string,
+): Promise<PendingIntentValue | null> {
+  const opened = await ctx.layer.open({ deploymentId: 'default', accountId: 'acc_1' })
+  if (opened.kind !== 'ok') return null
+  return createIntentStore(opened.store.records(INTENT_STORE_REGISTRATION.name)).get(
+    basename(dirname(path)),
+  )
+}
+
+/** every file the store layer keeps on disk (no records = the store was never written to) */
+function storeFiles(ctx: ReturnType<typeof setup>): string[] {
+  const found: string[] = []
+  const visit = (current: string): void => {
+    for (const entry of readdirSync(current, { withFileTypes: true })) {
+      const full = join(current, entry.name)
+      if (entry.isDirectory()) visit(full)
+      else found.push(full)
+    }
+  }
+  try {
+    visit(join(dir, 'uniwork-sync', 'store'))
+  } catch {
+    return []
+  }
+  return found
 }
 
 async function openDoc(ctx: ReturnType<typeof setup>) {
@@ -357,7 +418,7 @@ describe('open flow', () => {
     writeFileSync(path, 'local edits')
     server.faults.push({ route: 'upload', kind: 'network' })
     await ctx.service.save(path)
-    expect(binding(path).pendingIntent).toBeTruthy()
+    expect(await intentOf(ctx, path)).not.toBeNull()
     server.state.revision = 50
     const downloadsBefore = server.calls.filter((c) => c.path.endsWith('/download')).length
     await openDoc(ctx)
@@ -501,23 +562,27 @@ describe('save pipeline', () => {
     expect(commits(server)[0]?.headers['idempotency-key']).toBe(key)
     expect(commits(server)[0]?.body).toMatchObject({ base_revision: '41' })
     expect(binding(path)).toMatchObject({ baseRevision: '42', baseVersion: 4, state: 'saved' })
-    expect(binding(path).pendingIntent).toBeUndefined()
+    expect(await intentOf(ctx, path)).toBeNull()
     expect(ctx.statuses.map((s) => s.state)).toContain('saving')
   })
 
-  it('persists the intent before the first network call', async () => {
+  it('persists the intent in the store before the first network call', async () => {
     const server = fakeServer({ bytes: enc('v3') })
     const ctx = setup(server)
     const path = await openDoc(ctx)
     writeFileSync(path, 'v4')
     let seen: unknown
     server.fetch.mockImplementationOnce(async () => {
-      seen = binding(path).pendingIntent
+      seen = await intentOf(ctx, path)
       throw new TypeError('fetch failed')
     })
     await ctx.service.save(path)
-    expect(seen).toMatchObject({ documentId: DOC, baseRevision: '41', checksum: hex(enc('v4')) })
-    expect(typeof (seen as { baseRevision: unknown }).baseRevision).toBe('string')
+    expect((seen as PendingIntentValue | null)?.intent).toMatchObject({
+      documentId: DOC,
+      baseRevision: '41',
+      checksum: hex(enc('v4')),
+    })
+    expect(typeof (seen as PendingIntentValue | null)?.intent.baseRevision).toBe('string')
   })
 
   it('two rapid saves make one intent (no queue)', async () => {
@@ -542,7 +607,8 @@ describe('save pipeline', () => {
     server.faults.push({ route: 'commit', kind: 'lost' })
     const first = await ctx.service.save(path)
     expect(first).toMatchObject({ state: 'offline', error: 'network' })
-    const intent = binding(path).pendingIntent
+    const intent = (await intentOf(ctx, path))?.intent
+    if (!intent) throw new Error('the intent is missing from the store')
     expect(intent.idempotencyKey).toMatch(/^office-key-/)
     // edits after the failure do not change the replayed payload
     writeFileSync(path, 'v5 typed later')
@@ -567,7 +633,7 @@ describe('save pipeline', () => {
     expect(status).toMatchObject({ state: 'conflict', error: 'conflict' })
     expect(readFileSync(path, 'utf8')).toBe('mine')
     expect(binding(path)).toMatchObject({ baseRevision: '41', serverRevision: '45' })
-    expect(binding(path).pendingIntent).toBeUndefined()
+    expect(await intentOf(ctx, path)).toBeNull()
     const calls = server.calls.length
     await ctx.service.save(path)
     await ctx.service.coordinator.save(path)
@@ -634,7 +700,7 @@ describe('save pipeline', () => {
       state: 'error',
       error: 'idempotency_mismatch',
     })
-    expect(binding(path).pendingIntent).toBeUndefined()
+    expect(await intentOf(ctx, path)).toBeNull()
     await ctx.service.save(path)
     const keys = uploads(server).map((c) => c.headers['idempotency-key'])
     expect(keys).toHaveLength(2)
@@ -650,7 +716,7 @@ describe('save pipeline', () => {
       server.faults.push({ route: 'upload', kind: 409, code: 'idempotency_in_flight' })
     expect(await ctx.service.save(path)).toMatchObject({ state: 'offline' })
     expect(uploads(server)).toHaveLength(4)
-    expect(binding(path).pendingIntent).toBeTruthy()
+    expect(await intentOf(ctx, path)).not.toBeNull()
   })
 
   it('403 forbidden blocks the save, keeps the file and downgrades access', async () => {
@@ -836,7 +902,7 @@ describe('review r1 save fixes', () => {
     writeFileSync(path, 'v4')
     server.faults.push({ route: 'commit', kind: 409, code: 'document_upload_invalid' })
     expect(await ctx.service.save(path)).toMatchObject({ state: 'dirty', error: 'server_error' })
-    expect(binding(path).pendingIntent).toBeUndefined()
+    expect(await intentOf(ctx, path)).toBeNull()
     const firstKey = uploads(server)[0]?.headers['idempotency-key']
     expect(await ctx.service.save(path)).toMatchObject({ state: 'saved' })
     const lastCommit = commits(server).at(-1)
@@ -854,7 +920,7 @@ describe('review r1 save fixes', () => {
     server.faults.push({ route: 'commit', kind: 404, code: 'not_found' })
     server.faults.push({ route: 'detail', kind: 404, code: 'not_found' })
     expect(await ctx.service.save(path)).toMatchObject({ state: 'blocked', error: 'not_found' })
-    expect(binding(path).pendingIntent).toBeUndefined()
+    expect(await intentOf(ctx, path)).toBeNull()
     expect(readFileSync(path, 'utf8')).toBe('v4')
   })
 
@@ -886,7 +952,7 @@ describe('review r1 save fixes', () => {
     })
     expect(uploads(server)).toHaveLength(1)
     expect(commits(server)).toHaveLength(0)
-    expect(binding(path).pendingIntent).toBeTruthy()
+    expect(await intentOf(ctx, path)).not.toBeNull()
   })
 
   it('a receipt without a checksum is confirmed against the document instead of failing forever (BE-4)', async () => {
@@ -897,7 +963,7 @@ describe('review r1 save fixes', () => {
     server.faults.push({ route: 'commit', kind: 'no-checksum' })
     expect(await ctx.service.save(path)).toMatchObject({ state: 'saved' })
     expect(binding(path)).toMatchObject({ baseRevision: '42', baseVersion: 4 })
-    expect(binding(path).pendingIntent).toBeUndefined()
+    expect(await intentOf(ctx, path)).toBeNull()
   })
 
   it('save-local-copy reports a copy that could not be written (BE-6)', async () => {
@@ -979,7 +1045,7 @@ describe('closing a document with changes not in UniWork (A1.4)', () => {
     vi.mocked(ctx.ui.chooseUnsavedClose).mockResolvedValueOnce('close')
     expect(await ctx.service.confirmClose(path)).toBe(true)
     expect(readFileSync(path, 'utf8')).toBe('v4')
-    expect(binding(path).pendingIntent).toBeTruthy()
+    expect(await intentOf(ctx, path)).not.toBeNull()
   })
 
   it('save to UniWork closes once saved, and keeps the tab open when the save fails', async () => {
@@ -1132,6 +1198,13 @@ describe('review r2 follow-ups', () => {
       await vi.advanceTimersByTimeAsync(CLOSE_SAVE_WAIT_MS - 1_000)
       expect(outcome).toBeUndefined()
       await vi.advanceTimersByTimeAsync(2_000)
+      // the close first asks the durable store (real fs reads) whether an
+      // intent is pending: faked timers stall that lookup until the test drives
+      // real I/O again, and the 30 s cap has already expired by then
+      for (let round = 0; round < 12 && outcome === undefined; round += 1) {
+        await readFile(path, 'utf8')
+        await vi.advanceTimersByTimeAsync(0)
+      }
       expect(outcome).toBe(false)
       expect(CLOSE_SAVE_WAIT_MS).toBeLessThanOrEqual(30_000)
     } finally {
@@ -1172,7 +1245,8 @@ describe('Retry replays a pending intent, it does not rewrite the file (F8)', ()
     writeFileSync(path, 'v4')
     server.faults.push({ route: 'commit', kind: 'lost' })
     expect(await ctx.service.save(path)).toMatchObject({ state: 'offline' })
-    const intent = binding(path).pendingIntent
+    const intent = (await intentOf(ctx, path))?.intent
+    if (!intent) throw new Error('the intent is missing from the store')
     const writes = reserializingModule(ctx)
     vi.mocked(ctx.deps.requestModuleSave).mockClear()
 
@@ -1182,7 +1256,7 @@ describe('Retry replays a pending intent, it does not rewrite the file (F8)', ()
     expect(retried).toMatchObject({ state: 'saved' })
     expect(retried?.error).toBeUndefined()
     expect(binding(path)).toMatchObject({ state: 'saved', baseChecksum: hex(enc('v4')) })
-    expect(binding(path).pendingIntent).toBeUndefined()
+    expect(await intentOf(ctx, path)).toBeNull()
     expect(new Set(commits(server).map((c) => c.headers['idempotency-key']))).toEqual(
       new Set([intent.idempotencyKey]),
     )
@@ -1210,7 +1284,7 @@ describe('Retry replays a pending intent, it does not rewrite the file (F8)', ()
     writeFileSync(path, 'v4')
     await ctx.service.refreshPath(path)
     expect(binding(path)).toMatchObject({ state: 'dirty' })
-    expect(binding(path).pendingIntent).toBeUndefined()
+    expect(await intentOf(ctx, path)).toBeNull()
     reserializingModule(ctx)
     await ctx.service.save(path)
     expect(ctx.deps.requestModuleSave).toHaveBeenCalledWith(path)
@@ -1225,7 +1299,8 @@ describe('Retry replays a pending intent, it does not rewrite the file (F8)', ()
     writeFileSync(path, 'v4')
     server.faults.push({ route: 'commit', kind: 'lost' })
     expect(await ctx.service.save(path)).toMatchObject({ state: 'offline' })
-    const intent = binding(path).pendingIntent
+    const intent = (await intentOf(ctx, path))?.intent
+    if (!intent) throw new Error('the intent is missing from the store')
     const writes = reserializingModule(ctx)
     vi.mocked(ctx.deps.requestModuleSave).mockClear()
 
@@ -1246,6 +1321,47 @@ describe('Retry replays a pending intent, it does not rewrite the file (F8)', ()
     reserializingModule(ctx)
     expect(await ctx.service.confirmClose(path)).toBe(true)
     expect(ctx.deps.requestModuleSave).toHaveBeenCalledWith(path, expect.any(Function))
+  })
+})
+
+describe('the durable store guards the save (W3b)', () => {
+  it('a locked store refuses the save with keystore_locked: no intent, no module save, no request', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    ctx.safeStorage.lock()
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'v4')
+    const before = server.calls.length
+    expect(await ctx.service.save(path)).toMatchObject({
+      state: 'error',
+      error: 'keystore_locked',
+    })
+    expect(ctx.deps.requestModuleSave).not.toHaveBeenCalled()
+    expect(binding(path)).toMatchObject({ state: 'error', error: 'keystore_locked' })
+    expect(server.calls.length).toBe(before)
+    // the coordinator (a user save with no tab, the close prompt) refuses the same
+    expect(await ctx.service.coordinator.save(path)).toMatchObject({
+      binding: { state: 'error', error: 'keystore_locked' },
+    })
+    expect(server.calls.length).toBe(before)
+    // the store was never written to (no record file exists)
+    expect(storeFiles(ctx)).toEqual([])
+    // once the keychain opens again the same save goes through
+    ctx.safeStorage.unlock()
+    expect(await ctx.service.save(path)).toMatchObject({ state: 'saved' })
+    expect(await intentOf(ctx, path)).toBeNull()
+  })
+
+  it('a store at its budget refuses the save with store_full and leaves no intent', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server, { budgetBytes: 1 })
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'v4')
+    expect(await ctx.service.save(path)).toMatchObject({ state: 'error', error: 'store_full' })
+    expect(binding(path)).toMatchObject({ state: 'error', error: 'store_full' })
+    expect(uploads(server)).toHaveLength(0)
+    expect(commits(server)).toHaveLength(0)
+    expect(storeFiles(ctx)).toEqual([])
   })
 })
 

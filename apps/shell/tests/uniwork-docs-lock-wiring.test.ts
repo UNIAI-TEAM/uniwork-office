@@ -21,6 +21,11 @@ vi.mock('electron', () => ({
   app: { getPath: () => dir },
   BrowserWindow: { getFocusedWindow: () => null },
   dialog: {},
+  safeStorage: {
+    isEncryptionAvailable: () => true,
+    encryptString: (text: string) => Buffer.from(`ENC1${text}`),
+    decryptString: (buf: Buffer) => buf.toString().slice(4),
+  },
 }))
 
 vi.mock('../src/main/uniwork-auth', () => ({

@@ -1,19 +1,24 @@
 import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import type { UniworkDocStatus } from '../../shared/home-api'
-import type { Binding, BindingStore, BoundDocument, PendingIntent } from './binding-store'
+import type { Binding, BindingStore, BoundDocument } from './binding-store'
 import type { UniworkDocsClient } from './client'
 import { UniworkDocError, isTerminalRefusal } from './errors'
 import { sha256Hex } from './formats'
 import type { CommitReceipt, DocumentDetail } from './parse'
+import type { IntentStore, PendingIntentRecord } from '../uniwork-sync/intent-store'
 
 /**
  * Saves a bound working copy to UniWork, once per explicit user Save. The
  * module has already written the bytes locally (that step always succeeds
  * first); this is only the UniWork step:
  *
- * - the intent (key, base revision, checksum) and its payload are persisted
- *   BEFORE any network call;
+ * - the intent (key, base revision, checksum) and its payload are persisted in
+ *   the account's durable store BEFORE any network call; the binding never
+ *   carries one (there is exactly one place a pending intent can be);
+ * - a store that cannot open (locked keychain) refuses the save with
+ *   `keystore_locked`, and a store that refuses the write (budget full) with
+ *   `store_full`: no intent, no request, no other save path;
  * - upload, then commit with the SAME Idempotency-Key; only a commit receipt
  *   for this document whose checksum equals the intent's moves the base;
  * - timeout / network / 5xx / malformed keep the intent, and the next Save
@@ -51,12 +56,22 @@ function needsRecheck(error: unknown): error is UniworkDocError {
   )
 }
 
+/**
+ * The intent store of the live session, or why it cannot be reached. A locked
+ * store refuses the save with `keystore_locked`; a session without one never
+ * saves (the intent is what makes a replay safe).
+ */
+export type IntentAccess =
+  { kind: 'ok'; intents: IntentStore } | { kind: 'keystore_locked' } | { kind: 'unavailable' }
+
 export interface SaveCoordinatorDeps {
   store: BindingStore
   client: Pick<UniworkDocsClient, 'upload' | 'commit' | 'getDocument'>
   isSignedIn(): boolean
   /** the binding belongs to the signed-in account and the active deployment */
   ownsBinding(doc: BoundDocument): boolean
+  /** the durable intent store of the live session (see IntentAccess) */
+  intents(): Promise<IntentAccess>
   /** status push for every state change */
   publish(status: UniworkDocStatus): void
   now?(): Date
@@ -83,12 +98,6 @@ export function toStatus(doc: BoundDocument): UniworkDocStatus {
 function withoutError(binding: Binding): Binding {
   const next = { ...binding }
   delete next.error
-  return next
-}
-
-function withoutIntent(binding: Binding): Binding {
-  const next = { ...binding }
-  delete next.pendingIntent
   return next
 }
 
@@ -164,24 +173,25 @@ export class SaveCoordinator {
       return this.commitState(doc, { ...doc.binding, state: 'signed-out', error: 'not_signed_in' })
     }
 
-    let intent = doc.binding.pendingIntent
-    let payload: Uint8Array | null = null
-    if (intent) {
-      payload = await store.readIntentPayload(doc.dir)
-      if (!payload || sha256Hex(payload) !== intent.checksum) {
-        // the replay must send the intent's own bytes; when they are gone the
-        // file itself still is them, or the intent cannot be replayed at all
-        payload = checksum === intent.checksum ? bytes : null
-        if (!payload) intent = undefined
-      }
+    const access = await this.deps.intents()
+    if (access.kind !== 'ok') {
+      // a locked keychain (or a session without a store) refuses the save: no
+      // intent, no request, no other save path
+      const error = access.kind === 'keystore_locked' ? 'keystore_locked' : 'server_error'
+      return this.commitState(doc, { ...doc.binding, state: 'error', error })
     }
+    const { intents } = access
+
+    const stored = await intents.get(doc.key)
+    let intent = stored?.intent ?? null
+    let payload: Uint8Array | null = stored?.payload ?? null
     let binding = doc.binding
     if (!intent) {
       if (checksum === binding.baseChecksum) {
-        return this.commitState(doc, withoutIntent(withoutError({ ...binding, state: 'saved' })))
+        return this.commitState(doc, withoutError({ ...binding, state: 'saved' }))
       }
       const id = this.uuid()
-      intent = {
+      const minted: PendingIntentRecord = {
         intentId: `office-intent-${id}`,
         idempotencyKey: `office-key-${id}`,
         documentId: binding.documentId,
@@ -189,12 +199,28 @@ export class SaveCoordinator {
         checksum,
         createdAt: this.now().toISOString(),
       }
+      const written = await intents.put(doc.key, minted, bytes)
+      if (written.kind === 'store_full') {
+        return this.commitState(doc, { ...doc.binding, state: 'error', error: 'store_full' })
+      }
+      if (written.kind === 'interrupted') {
+        // the account boundary wiped the scope under this save
+        return this.commitState(doc, {
+          ...doc.binding,
+          state: 'signed-out',
+          error: 'not_signed_in',
+        })
+      }
+      if (written.kind !== 'ok') {
+        return this.commitState(doc, { ...doc.binding, state: 'error', error: 'server_error' })
+      }
+      intent = minted
       payload = bytes
-      await store.writeIntentPayload(doc.dir, payload)
     }
-    binding = withoutError({ ...binding, pendingIntent: intent, state: 'saving' })
-    // persisted before the first network call: a crash or quit replays this
-    // intent, and an intent that could not be recorded is never sent
+    binding = withoutError({ ...binding, state: 'saving' })
+    // the binding is persisted before the first network call: a crash or quit
+    // replays the stored intent, and an intent that could not be recorded is
+    // never sent
     try {
       await store.write(doc.dir, binding)
     } catch {
@@ -208,23 +234,24 @@ export class SaveCoordinator {
       receipt = await this.uploadAndCommit(saving, intent, payload as Uint8Array)
     } catch (error) {
       if (needsRecheck(error)) {
-        return this.recheck(saving, intent, { state: 'dirty', error: 'server_error' })
+        return this.recheck(saving, intent, { state: 'dirty', error: 'server_error' }, intents)
       }
-      return this.fail(saving, intent, error)
+      return this.fail(saving, intent, error, intents)
     }
     if (receipt.documentId !== intent.documentId || receipt.checksumSha256 !== intent.checksum) {
       // not evidence of this commit (a replay keeps answering the same): the
       // document says whether these bytes landed; otherwise a new key next time
-      return this.recheck(saving, intent, { state: 'error', error: 'malformed_response' })
+      return this.recheck(saving, intent, { state: 'error', error: 'malformed_response' }, intents)
     }
-    return this.settle(saving, intent, receipt)
+    return this.settle(saving, intent, receipt, intents)
   }
 
   /** a verified commit of the intent's bytes: the base moves, the intent clears */
   private async settle(
     doc: BoundDocument,
-    intent: PendingIntent,
+    intent: PendingIntentRecord,
     landed: { revision: string; version: number },
+    intents: IntentStore,
   ): Promise<BoundDocument> {
     let current: string | null
     try {
@@ -232,20 +259,18 @@ export class SaveCoordinator {
     } catch {
       current = null
     }
-    const settled: Binding = withoutIntent(
-      withoutError({
-        ...doc.binding,
-        baseRevision: landed.revision,
-        baseVersion: landed.version,
-        baseChecksum: intent.checksum,
-        // the file changed while saving: those edits are not in UniWork yet
-        state: current === intent.checksum ? 'saved' : 'dirty',
-        lastSavedAt: this.now().toISOString(),
-      }),
-    )
+    const settled: Binding = withoutError({
+      ...doc.binding,
+      baseRevision: landed.revision,
+      baseVersion: landed.version,
+      baseChecksum: intent.checksum,
+      // the file changed while saving: those edits are not in UniWork yet
+      state: current === intent.checksum ? 'saved' : 'dirty',
+      lastSavedAt: this.now().toISOString(),
+    })
     delete settled.serverRevision
     const done = await this.commitState(doc, settled)
-    await this.deps.store.dropIntentPayload(doc.dir)
+    await intents.delete(doc.key)
     return done
   }
 
@@ -258,25 +283,31 @@ export class SaveCoordinator {
    */
   private async recheck(
     doc: BoundDocument,
-    intent: PendingIntent,
+    intent: PendingIntentRecord,
     otherwise: { state: 'dirty' | 'error'; error: 'server_error' | 'malformed_response' },
+    intents: IntentStore,
   ): Promise<BoundDocument> {
     let detail: DocumentDetail
     try {
       detail = await this.deps.client.getDocument(intent.documentId)
     } catch (error) {
-      return this.fail(doc, intent, error)
+      return this.fail(doc, intent, error, intents)
     }
     if (detail.id === intent.documentId && detail.file.checksumSha256 === intent.checksum) {
-      return this.settle(doc, intent, { revision: detail.revision, version: detail.file.version })
+      return this.settle(
+        doc,
+        intent,
+        { revision: detail.revision, version: detail.file.version },
+        intents,
+      )
     }
-    await this.deps.store.dropIntentPayload(doc.dir)
-    return this.commitState(doc, { ...withoutIntent(doc.binding), ...otherwise })
+    await intents.delete(doc.key)
+    return this.commitState(doc, { ...doc.binding, ...otherwise })
   }
 
   private async uploadAndCommit(
     doc: BoundDocument,
-    intent: PendingIntent,
+    intent: PendingIntentRecord,
     payload: Uint8Array,
   ): Promise<CommitReceipt> {
     for (let attempt = 0; ; attempt += 1) {
@@ -317,14 +348,14 @@ export class SaveCoordinator {
 
   private async fail(
     doc: BoundDocument,
-    intent: PendingIntent,
+    intent: PendingIntentRecord,
     raw: unknown,
+    intents: IntentStore,
   ): Promise<BoundDocument> {
     const error = raw instanceof UniworkDocError ? raw : new UniworkDocError('server_error')
-    const b = doc.binding
+    const base = doc.binding
     const dropped = isTerminalRefusal(error)
-    if (dropped) await this.deps.store.dropIntentPayload(doc.dir)
-    const base = dropped ? withoutIntent(b) : { ...b, pendingIntent: intent }
+    if (dropped) await intents.delete(doc.key)
     switch (error.code) {
       case 'conflict':
         // the working copy and the base stay; the user chooses what happens next

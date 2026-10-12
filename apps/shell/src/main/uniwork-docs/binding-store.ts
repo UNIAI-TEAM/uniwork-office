@@ -20,7 +20,11 @@ import { formatForName, isDecimalString } from './formats'
  */
 
 export const BINDING_FILE = 'binding.json'
-/** the bytes of a pending save intent, kept so a replay sends the same payload */
+/**
+ * The bytes of a pending save intent as pre-store builds kept them, beside
+ * the binding. This build never writes one (the intent lives in the durable
+ * store); the schema 1 -> 2 migration reads and deletes the leftovers.
+ */
 export const INTENT_PAYLOAD_FILE = 'pending-upload.bin'
 /** at the root: who last had a live session (see readLastOwner) */
 export const LAST_OWNER_FILE = 'last-account.json'
@@ -28,17 +32,6 @@ export const LAST_OWNER_FILE = 'last-account.json'
 export interface LastOwner {
   accountId: string
   deploymentId: string
-}
-
-export interface PendingIntent {
-  intentId: string
-  idempotencyKey: string
-  documentId: string
-  /** decimal string */
-  baseRevision: string
-  /** sha256 hex of the payload bytes */
-  checksum: string
-  createdAt: string
 }
 
 export interface Binding {
@@ -56,7 +49,6 @@ export interface Binding {
   state: UniworkSaveState
   error?: UniworkDocErrorCode
   serverRevision?: string
-  pendingIntent?: PendingIntent
   lastSavedAt?: string
 }
 
@@ -67,6 +59,8 @@ export interface BoundDocument {
   dir: string
   deploymentId: string
   userId: string
+  /** the document key: the working-copy folder segment (a version copy has its own) */
+  key: string
   binding: Binding
 }
 
@@ -113,6 +107,57 @@ export function bindingKindAt(dir: string): BindingKind | null {
   }
 }
 
+/** the document file name a folder's lock shows: the first in sorted order, so it is deterministic */
+export function documentNameIn(dir: string): string {
+  let name = basename(dir)
+  try {
+    name =
+      readdirSync(dir)
+        .sort()
+        .find((entry) => formatForName(entry) !== null) ?? name
+  } catch {
+    // unreadable folder: the folder's own name is all there is
+  }
+  return name
+}
+
+/**
+ * The working-copy folders of one account boundary:
+ * `<root>/<deploymentId>/<accountId>/<documentKey>/...`. The migration walks
+ * them; anything unreadable is skipped rather than failing the walk.
+ */
+export function scopeWorkingCopyDirs(
+  root: string,
+  scope: { deploymentId: string; accountId: string },
+): string[] {
+  const scopeDir = join(resolve(root), scope.deploymentId, scope.accountId)
+  try {
+    return readdirSync(scopeDir, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => join(scopeDir, entry.name))
+  } catch {
+    return []
+  }
+}
+
+/**
+ * True while `dir` still holds a pre-store pending upload: a schema-1
+ * binding.json that carries a `pendingIntent` plus the `pending-upload.bin`
+ * bytes beside it. Only the schema 1 -> 2 migration (and the S11 lock while
+ * the store cannot open) cares about either file.
+ */
+export function hasLegacyIntentFiles(dir: string): boolean {
+  if (!existsSync(join(dir, INTENT_PAYLOAD_FILE))) return false
+  try {
+    const raw = JSON.parse(readFileSync(join(dir, BINDING_FILE), 'utf8')) as unknown
+    if (!raw || typeof raw !== 'object') return false
+    const r = raw as Record<string, unknown>
+    return r.schema === 1 && r.pendingIntent !== undefined
+  } catch {
+    return false
+  }
+}
+
 const SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._@-]{0,127}$/
 const FORMATS: ReadonlySet<string> = new Set(['docx', 'xlsx', 'pptx', 'pdf', 'md', 'html'])
 const STATES: ReadonlySet<string> = new Set([
@@ -136,30 +181,6 @@ function isStr(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0
 }
 
-function parseIntent(raw: unknown): PendingIntent | undefined | null {
-  if (raw === undefined) return undefined
-  if (!raw || typeof raw !== 'object') return null
-  const r = raw as Record<string, unknown>
-  if (
-    !isStr(r.intentId) ||
-    !isStr(r.idempotencyKey) ||
-    !isStr(r.documentId) ||
-    !isDecimalString(r.baseRevision) ||
-    !isStr(r.checksum) ||
-    !isStr(r.createdAt)
-  ) {
-    return null
-  }
-  return {
-    intentId: r.intentId,
-    idempotencyKey: r.idempotencyKey,
-    documentId: r.documentId,
-    baseRevision: r.baseRevision,
-    checksum: r.checksum,
-    createdAt: r.createdAt,
-  }
-}
-
 /** a binding read back from disk; null for anything not exactly this schema */
 export function parseBinding(raw: unknown): Binding | null {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
@@ -173,8 +194,6 @@ export function parseBinding(raw: unknown): Binding | null {
   if (!isDecimalString(r.baseRevision) || typeof r.baseChecksum !== 'string') return null
   if (typeof r.baseVersion !== 'number' || !Number.isSafeInteger(r.baseVersion)) return null
   if (!isStr(r.state) || !STATES.has(r.state)) return null
-  const intent = parseIntent(r.pendingIntent)
-  if (intent === null) return null
   if (r.serverRevision !== undefined && !isDecimalString(r.serverRevision)) return null
   return {
     schema: 1,
@@ -188,11 +207,11 @@ export function parseBinding(raw: unknown): Binding | null {
     baseRevision: r.baseRevision,
     baseVersion: r.baseVersion,
     baseChecksum: r.baseChecksum,
-    // a save cannot still be running after a restart: it is retried from its intent
-    state: r.state === 'saving' ? (intent ? 'offline' : 'dirty') : (r.state as UniworkSaveState),
+    // a save cannot still be running after a restart: its intent is replayed
+    // from the durable store, so nothing is kept here
+    state: r.state === 'saving' ? 'dirty' : (r.state as UniworkSaveState),
     ...(typeof r.error === 'string' ? { error: r.error as UniworkDocErrorCode } : {}),
     ...(isDecimalString(r.serverRevision) ? { serverRevision: r.serverRevision } : {}),
-    ...(intent ? { pendingIntent: intent } : {}),
     ...(typeof r.lastSavedAt === 'string' ? { lastSavedAt: r.lastSavedAt } : {}),
   }
 }
@@ -229,7 +248,7 @@ export class BindingStore {
       return null
     }
     if (!binding || binding.filename !== filename) return null
-    return { path: full, dir, deploymentId, userId, binding }
+    return { path: full, dir, deploymentId, userId, key, binding }
   }
 
   /** the working-copy folder of `path` and its three segments, or null when the path is not one of ours */
@@ -267,10 +286,10 @@ export class BindingStore {
     }
     const binding = parseBinding(raw)
     if (!binding || binding.filename !== basename(full)) return { kind: 'plain' }
-    const [deploymentId, userId] = found.parts as [string, string, string, string]
+    const [deploymentId, userId, key] = found.parts as [string, string, string, string]
     return {
       kind: 'bound',
-      doc: { path: full, dir: found.dir, deploymentId, userId, binding },
+      doc: { path: full, dir: found.dir, deploymentId, userId, key, binding },
     }
   }
 
@@ -293,17 +312,20 @@ export class BindingStore {
    */
   newerStoreIn(dir: string): NewerStore | null {
     if (bindingKindAt(dir) !== 'newer') return null
-    let name = basename(dir)
-    try {
-      // sorted, so the lock's name does not depend on the readdir order
-      name =
-        readdirSync(dir)
-          .sort()
-          .find((entry) => formatForName(entry) !== null) ?? name
-    } catch {
-      // unreadable folder: the folder's own name is all there is
-    }
+    const name = documentNameIn(dir)
     return { path: join(dir, name), name }
+  }
+
+  /**
+   * True while the working copy at `path` still holds a pre-store pending
+   * upload (a schema-1 binding.json with a pendingIntent and its
+   * pending-upload.bin). The store-backed save never writes either file; until
+   * the schema 1 -> 2 migration moved the intent, opening such a copy needs the
+   * durable store, so a locked one is refused with the S11 `keystore_locked`.
+   */
+  legacyIntentAt(path: string): boolean {
+    const found = this.workingCopy(path)
+    return found !== null && hasLegacyIntentFiles(found.dir)
   }
 
   /** the binding of a document folder (any working-copy name), or null */
@@ -332,10 +354,6 @@ export class BindingStore {
 
   async removeWorkingCopy(dir: string, filename: string): Promise<void> {
     await unlink(join(dir, basename(filename))).catch(() => undefined)
-  }
-
-  async writeIntentPayload(dir: string, bytes: Uint8Array): Promise<void> {
-    await atomicWriteFile(join(dir, INTENT_PAYLOAD_FILE), bytes)
   }
 
   async readIntentPayload(dir: string): Promise<Uint8Array | null> {

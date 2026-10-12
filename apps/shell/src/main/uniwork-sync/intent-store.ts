@@ -52,7 +52,7 @@ function isStr(value: unknown): value is string {
 }
 
 /** the same shape check the binding store applied to its pendingIntent */
-function parseIntent(raw: unknown): PendingIntentRecord | null {
+export function parseIntentRecord(raw: unknown): PendingIntentRecord | null {
   if (!raw || typeof raw !== 'object') return null
   const r = raw as Record<string, unknown>
   if (!isStr(r.intentId) || !isStr(r.idempotencyKey) || !isStr(r.documentId)) return null
@@ -91,7 +91,7 @@ function decodeValue(bytes: Uint8Array): PendingIntentValue | null {
   } catch {
     return null
   }
-  const intent = parseIntent(raw)
+  const intent = parseIntentRecord(raw)
   if (!intent) return null
   return { intent, payload: new Uint8Array(buf.subarray(META_LENGTH_BYTES + metaLength)) }
 }
@@ -107,7 +107,7 @@ export function createIntentStore(records: StoreRecords): IntentStore {
     },
 
     async put(documentKey, intent, payload) {
-      const parsed = parseIntent(intent)
+      const parsed = parseIntentRecord(intent)
       if (!parsed) throw new Error('invalid pending intent')
       return records.write(documentKey, encodeValue(parsed, payload))
     },

@@ -142,6 +142,10 @@ export type UniworkDocErrorCode =
   | 'timeout'
   | 'server_error'
   | 'malformed_response'
+  // the account's durable sync store could not be opened (locked keychain) or
+  // refused the pending intent (budget full)
+  | 'keystore_locked'
+  | 'store_full'
 
 export interface UniworkWorkspaceRef {
   id: string
@@ -187,7 +191,7 @@ export interface UniworkDocStatus {
 export type UniworkConflictChoice = 'overwrite' | 'save-local-copy' | 'open-latest' | 'later'
 
 /** why a working copy was refused before anything opened (S11 lock panel) */
-export type UniworkLockReason = 'store_newer'
+export type UniworkLockReason = 'store_newer' | 'keystore_locked'
 
 /**
  * G5-04g: the folder of this working copy holds a binding.json with an integer
