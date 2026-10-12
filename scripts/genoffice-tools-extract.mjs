@@ -31,15 +31,15 @@
  * an element of a tools-list array literal. A tools list is written in one of
  * three forms: an annotated binding (`AgentToolDef[]`, `readonly AgentToolDef[]`,
  * `Array<AgentToolDef> = [`), a `tools: [ ... ]` field outside a schema bag, or
- * a `return [ ... ]` inside a `get tools()` accessor whose head may carry a
- * return-type annotation (`get tools(): AgentToolDef[]`). `AgentToolDef` (or
- * the bare `AgentTool`) is matched exactly, so an `AgentToolCall[]` /
- * `AgentToolResult[]` array — whose records carry `name` too — is not a tools
- * list. An unannotated array, one typed as anything else (an option list, a
- * typed command list), a nested `options:` bag, a `tools` bag in a schema, a
- * `get options()` returned literal or a plain helper's `return [ ... ]`
- * contributes no row, so a non-tool `{ name, description }` array cannot
- * manufacture phantom rows.
+ * a `return [ ... ]` at a `get tools()` accessor body's own brace level (the
+ * head may carry a return-type annotation, `get tools(): AgentToolDef[]`).
+ * `AgentToolDef` (or the bare `AgentTool`) is matched exactly, so an
+ * `AgentToolCall[]` / `AgentToolResult[]` array — whose records carry `name`
+ * too — is not a tools list. An unannotated array, one typed as anything else
+ * (an option list, a typed command list), a nested `options:` bag, a `tools`
+ * bag in a schema, a `get options()` returned literal or a plain helper's
+ * `return [ ... ]` contributes no row, so a non-tool `{ name, description }`
+ * array cannot manufacture phantom rows.
  *
  * module = `agent-core`, or the app directory name (`docs`, `sheets`, `slides`,
  * `pdf`, `markdown`, `html`). source = repo-relative path of the defining file.
@@ -1537,10 +1537,12 @@ function accessorParamClose(tokens, bodyOpen) {
 }
 
 /**
- * Is token index `at` inside the body of a `get tools()` accessor? Walks the
- * enclosing brace stack, so a `return [ ... ]` nested in an `if` block of the
- * accessor still counts. A return-type annotation on the accessor head
- * (`get tools(): AgentToolDef[]`) does not hide it. Any other accessor
+ * Is token index `at` the operand of a `return` at a `get tools()` accessor
+ * body's own brace level? Only the innermost enclosing brace is consulted: the
+ * body brace of `get tools() { ... }` — whose head may carry a return-type
+ * annotation — opens a tools list, while a `return [ ... ]` nested deeper
+ * inside the accessor (a local helper, a control block) is that statement's own
+ * value and must not manufacture a phantom row (R1-3). Any other accessor
  * (`get options()`) returns false.
  */
 function insideToolsAccessor(tokens, at) {
@@ -1551,26 +1553,23 @@ function insideToolsAccessor(tokens, at) {
     if (tk.value === '{') stack.push(k)
     else if (tk.value === '}') stack.pop()
   }
-  for (let i = stack.length - 1; i >= 0; i -= 1) {
-    const bodyOpen = stack[i]
-    const close = accessorParamClose(tokens, bodyOpen)
-    if (close < 0) continue
-    const open = tokens[close - 1]
-    const name = tokens[close - 2]
-    const get = tokens[close - 3]
-    if (
-      open &&
-      open.value === '(' &&
-      name &&
-      name.type === 'ident' &&
-      name.value === 'tools' &&
-      get &&
-      get.type === 'ident' &&
-      get.value === 'get'
-    )
-      return true
-  }
-  return false
+  const bodyOpen = stack[stack.length - 1]
+  if (bodyOpen === undefined) return false
+  const close = accessorParamClose(tokens, bodyOpen)
+  if (close < 0) return false
+  const open = tokens[close - 1]
+  const name = tokens[close - 2]
+  const get = tokens[close - 3]
+  return (
+    !!open &&
+    open.value === '(' &&
+    !!name &&
+    name.type === 'ident' &&
+    name.value === 'tools' &&
+    !!get &&
+    get.type === 'ident' &&
+    get.value === 'get'
+  )
 }
 
 /** the `{` of the object literal that encloses token index `at`, or -1 */
