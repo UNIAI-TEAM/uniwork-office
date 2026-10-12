@@ -51,16 +51,35 @@
  *
  * ── editor_write ─────────────────────────────────────────────────────────────
  * `yes` / `no` / `undeclared`, from declarations in the module's own sources
- * only (never inferred from behaviour):
- *   yes          the tool's case in a `switch (call.name)` executor returns a
- *                ToolExecution with `mutated: true`, or a computed `mutated:`
- *                expression (e.g. `mutated: changed > 0`) — the executor
- *                declares a mutation flag
- *   no           the executor declares only `mutated: false` for the tool, or
- *                the tool is a member of a declared read-only allowlist
- *                (`READ_ONLY_TOOLS` / `VIEW_ONLY_TOOLS`) in the same module
- *   undeclared   neither: the executor makes no `mutated` declaration for the
- *                tool and no read-only marker names it
+ * only (never inferred from behaviour). Two routing styles are followed, each
+ * bounded to the region that actually runs for the named tool:
+ *   1. `switch (call.name)` cases — the `mutated:` declarations inside the case
+ *      body, plus those inside local helpers that body calls.
+ *   2. `if (call.name === 'x')` / `if (call.name !== 'x')` guards (the skill
+ *      files route with an equality test). Only the guard's own consequent is
+ *      read for `===` (the branch the named tool takes); for `!==` the
+ *      enclosing body minus that consequent is read (the tool's own
+ *      fall-through path), so a `mutated: false` declared after an early-return
+ *      guard still counts. A `call.name === 'x'` anywhere else (a ternary, a
+ *      `const`, an argument) controls no path and contributes nothing.
+ * A local helper is resolved by declaration position and lexical scope, not by
+ * bare name, so same-named closures in different cases stay distinct. The
+ * recursion never enters a helper that itself dispatches on `call.name` (the
+ * shared `executeTool` / `executeSyncTool` executors), which would otherwise
+ * leak another tool's flag into the calling tool.
+ *   yes          the reached region returns a ToolExecution with
+ *                `mutated: true`, or a computed `mutated:` expression
+ *                (e.g. `mutated: changed > 0`) — the code declares a mutation
+ *   no           the reached region declares only `mutated: false` for the
+ *                tool, or the tool is a member of a declared read-only
+ *                allowlist (`READ_ONLY_TOOLS` / `VIEW_ONLY_TOOLS`) in the same
+ *                module
+ *   undeclared   neither: no `mutated` declaration is reached for the tool and
+ *                no read-only marker names it
+ *
+ * A tool-shaped object literal that carries `name` and `description` but no
+ * `inputSchema` still gets a row; its schema cell is `unresolved:missing` (a
+ * silent drop would hide a tool from the table).
  */
 
 import { execFileSync } from 'node:child_process'
@@ -823,7 +842,15 @@ function analyzeFile(repo, rev, path, ctx) {
   const src = readAt(repo, rev, path, ctx.fileCache)
   const analysis =
     src === null
-      ? { path, tokens: [], locals: new Map(), imports: new Map(), exports: new Map() }
+      ? {
+          path,
+          src: null,
+          tokens: [],
+          locals: new Map(),
+          imports: new Map(),
+          exports: new Map(),
+          functions: [],
+        }
       : scanFile(path, src, ctx)
   analysisCache.set(key, analysis)
   return analysis
@@ -834,7 +861,7 @@ function scanFile(path, src, ctx) {
   const locals = new Map()
   const imports = new Map()
   const exports = new Map()
-  const functions = new Map()
+  const functions = []
   let brace = 0
   let paren = 0
   let bracket = 0
@@ -856,7 +883,17 @@ function scanFile(path, src, ctx) {
       const decl = scanDeclaration(tokens, i)
       if (decl) {
         const fn = arrowFunctionBody(tokens, decl.index)
-        if (fn) functions.set(decl.name, fn)
+        // keyed by declaration position, not by bare name: same-named closures in
+        // different case bodies are distinct declarations
+        if (fn)
+          functions.push({
+            name: decl.name,
+            tokens,
+            start: fn.start,
+            end: fn.end,
+            declStart: i,
+            hoisted: false,
+          })
         if (brace === 0 && paren === 0 && bracket === 0) locals.set(decl.name, decl)
       }
       continue
@@ -872,7 +909,14 @@ function scanFile(path, src, ctx) {
       while (open < tokens.length && tokens[open].value !== '{' && tokens[open].value !== ';')
         open += 1
       if (open < tokens.length && tokens[open].value === '{') {
-        functions.set(name.value, { tokens, start: open, end: skipBraces(tokens, open) })
+        functions.push({
+          name: name.value,
+          tokens,
+          start: open,
+          end: skipBraces(tokens, open),
+          declStart: i,
+          hoisted: true,
+        })
       }
       continue
     }
@@ -893,7 +937,15 @@ function scanFile(path, src, ctx) {
           locals.set(decl.name, decl)
           exports.set(decl.name, decl)
           const fn = arrowFunctionBody(tokens, decl.index)
-          if (fn) functions.set(decl.name, fn)
+          if (fn)
+            functions.push({
+              name: decl.name,
+              tokens,
+              start: fn.start,
+              end: fn.end,
+              declStart: i,
+              hoisted: false,
+            })
         }
         continue
       }
@@ -927,7 +979,7 @@ function scanFile(path, src, ctx) {
       continue
     }
   }
-  return { path, tokens, locals, imports, exports, functions }
+  return { path, src, tokens, locals, imports, exports, functions }
 }
 
 /** index just past a `<...>` group starting at openIdx (generic args / type params) */
@@ -1087,8 +1139,21 @@ const MUTATED_LITERAL = new Set(['true', 'false'])
 
 const MUTATED_RANK = { no: 0, computed: 1, yes: 2 }
 
-/** `mutated:` declarations inside a token range; 'yes' | 'no' | 'computed' | null */
-function mutatedInRange(tokens, from, to, functions, depth = 0) {
+/** tokens[i..i+2] spell `call.name` */
+function atCallName(tokens, i) {
+  return (
+    !!tokens[i] &&
+    tokens[i].type === 'ident' &&
+    tokens[i].value === 'call' &&
+    !!tokens[i + 1] &&
+    tokens[i + 1].value === '.' &&
+    !!tokens[i + 2] &&
+    tokens[i + 2].value === 'name'
+  )
+}
+
+/** the `mutated:` flags declared directly in a token range; 'yes'|'no'|'computed'|null */
+function declaredMutated(tokens, from, to) {
   let mutated = null
   for (let k = from; k < to; k += 1) {
     const tk = tokens[k]
@@ -1101,55 +1166,172 @@ function mutatedInRange(tokens, from, to, functions, depth = 0) {
           ? 'yes'
           : 'no'
         : 'computed'
-    // a later declaration may be the one that actually fires (an early
-    // `mutated: false` return must not mask the `mutated: changed > 0` below it)
+    // a later declaration may be the one that fires (an early `mutated: false`
+    // return must not mask the `mutated: changed > 0` below it)
     if (mutated === null || MUTATED_RANK[found] > MUTATED_RANK[mutated]) mutated = found
   }
-  if (mutated === 'yes') return mutated
-  if (depth > 6) return mutated
-  // the case may delegate to a local helper that declares the flag itself
+  return mutated
+}
+
+/**
+ * A helper that dispatches on `call.name` itself (the shared `executeTool` /
+ * `executeSyncTool` executors). Following such a call would credit the caller
+ * with every tool's flag, so the walk stops there.
+ */
+function isDispatcher(fn) {
+  const tokens = fn.tokens
+  for (let k = fn.start; k < fn.end; k += 1) {
+    if (atCallName(tokens, k)) {
+      const op = tokens[k + 3]
+      if (
+        op &&
+        (op.value === '===' || op.value === '!==' || op.value === '==' || op.value === '!=')
+      )
+        return true
+      continue
+    }
+    // `switch (call.name)` — the statement form of the same dispatch
+    if (
+      tokens[k].value === 'switch' &&
+      tokens[k + 1] &&
+      tokens[k + 1].value === '(' &&
+      atCallName(tokens, k + 2)
+    )
+      return true
+  }
+  return false
+}
+
+/** innermost enclosing function body of a token index, or null at file scope */
+function enclosingFunction(functions, at) {
+  let best = null
+  for (const fn of functions) {
+    if (fn.start <= at && at < fn.end && (!best || fn.start >= best.start)) best = fn
+  }
+  return best
+}
+
+/** for each function, the innermost function it is declared inside (null = file scope) */
+function computeOwners(functions) {
+  return functions.map((fn) => {
+    let best = null
+    for (const other of functions) {
+      if (other === fn) continue
+      if (other.start < fn.declStart && fn.declStart < other.end) {
+        if (!best || other.start > best.start) best = other
+      }
+    }
+    return best
+  })
+}
+
+/**
+ * The functions visible at a token index: file-level declarations, plus locals of
+ * a function that encloses the index. Keyed by declaration, so two same-named
+ * closures in different case bodies never shadow one another.
+ */
+function scopeAt(functions, owners, at) {
+  const out = []
+  for (let i = 0; i < functions.length; i += 1) {
+    const owner = owners[i]
+    if (!owner || (owner.start <= at && at < owner.end)) out.push(functions[i])
+  }
+  return out
+}
+
+/**
+ * Non-dispatching helper named `name` visible at the call token `at`: the
+ * innermost block-scoped declaration that precedes the call (a `const` arrow in
+ * a case body), else a hoisted `function` declaration (which may sit below the
+ * call), else the innermost enclosing one.
+ */
+function findHelper(scope, at, name) {
+  let scoped = null
+  let hoisted = null
+  for (const fn of scope) {
+    if (fn.name !== name || isDispatcher(fn)) continue
+    if (fn.hoisted) {
+      if (!hoisted || fn.start > hoisted.start) hoisted = fn
+    } else if (fn.declStart < at && (!scoped || fn.declStart > scoped.declStart)) {
+      scoped = fn
+    }
+  }
+  return scoped || hoisted
+}
+
+/** `mutated:` flags reachable from a token range: its own, plus local helpers it calls */
+function mutatedInRange(analysis, from, to, scope, depth = 0) {
+  const tokens = analysis.tokens
+  let mutated = declaredMutated(tokens, from, to)
+  if (mutated === 'yes' || depth > 6) return mutated
+  // the range may delegate to a local helper that declares the flag itself
   for (let k = from; k < to; k += 1) {
-    const tk = tokens[k]
-    if (tk.type !== 'ident' || k + 1 >= to || tokens[k + 1].value !== '(') continue
-    const fn = functions.get(tk.value)
+    if (tokens[k].type !== 'ident' || k + 1 >= to || tokens[k + 1].value !== '(') continue
+    const fn = findHelper(scope, k, tokens[k].value)
     if (!fn) continue
-    const inner = mutatedInRange(fn.tokens, fn.start + 1, fn.end - 1, functions, depth + 1)
+    const inner = mutatedInRange(analysis, fn.start + 1, fn.end - 1, scope, depth + 1)
     if (inner === 'yes') return 'yes'
     if (inner && (mutated === null || MUTATED_RANK[inner] > MUTATED_RANK[mutated])) mutated = inner
   }
   return mutated
 }
 
-/** enclosing `{ ... }` range of a token index; [start, end) of the body */
-function enclosingBlock(tokens, index) {
-  let open = -1
+/** the `(` of the `if ( ... )` whose condition contains this index, or -1 */
+function enclosingIfCondition(tokens, at) {
   let depth = 0
-  for (let k = index - 1; k >= 0; k -= 1) {
-    const tk = tokens[k]
-    if (tk.value === '}') depth += 1
-    else if (tk.value === '{') {
+  for (let k = at - 1; k >= 0; k -= 1) {
+    const v = tokens[k].value
+    if (v === ')') depth += 1
+    else if (v === '(') {
       if (depth === 0) {
-        open = k
-        break
+        const prev = tokens[k - 1]
+        return prev && prev.type === 'ident' && prev.value === 'if' ? k : -1
       }
       depth -= 1
     }
   }
-  if (open < 0) return null
-  return { start: open + 1, end: skipBraces(tokens, open) - 1 }
+  return -1
+}
+
+/** [start, end) of the branch the `if (...)` at `openIdx` controls */
+function branchRange(tokens, openIdx) {
+  const start = skipBalanced(tokens, openIdx)
+  if (tokens[start] && tokens[start].value === '{') {
+    const end = skipBraces(tokens, start)
+    return { start: start + 1, end: end - 1, branchStart: start, branchEnd: end }
+  }
+  let end = start
+  while (end < tokens.length && tokens[end].value !== ';' && tokens[end].value !== '}') end += 1
+  return { start, end, branchStart: start, branchEnd: end }
 }
 
 /**
- * `call.name === 'x'` / `call.name !== 'x'` guards (the skill files route with
- * an equality test instead of a switch); each guard names its tool inside the
- * enclosing function body, which is where a `mutated:` declaration would live.
+ * The region(s) a `call.name` equality guard controls: the branch the named tool
+ * takes for `===`; for `!==` the rest of the enclosing body (the tool's own
+ * fall-through path, with the early-return branch excluded). Null when the guard
+ * is not an `if` condition — a ternary, a `const` or an argument controls no
+ * path, so it must not name a tool.
  */
-function collectGuardDeclarations(analysis, found, functions) {
+function guardRegions(analysis, at, op, functions, owners) {
+  const tokens = analysis.tokens
+  const open = enclosingIfCondition(tokens, at)
+  if (open < 0) return null
+  const branch = branchRange(tokens, open)
+  if (op === '===' || op === '==') return [{ from: branch.start, to: branch.end }]
+  const fn = enclosingFunction(functions, at)
+  if (!fn) return null
+  return [{ from: branch.branchEnd, to: fn.end - 1 }]
+}
+
+/**
+ * `call.name === 'x'` / `call.name !== 'x'` guards (the skill files route with an
+ * equality test instead of a switch); each guard names its tool, and only the
+ * flags on that tool's own path are credited.
+ */
+function collectGuardDeclarations(analysis, found, owners) {
   const tokens = analysis.tokens
   for (let i = 0; i < tokens.length - 4; i += 1) {
-    if (!(tokens[i].type === 'ident' && tokens[i].value === 'call')) continue
-    if (!(tokens[i + 1] && tokens[i + 1].value === '.')) continue
-    if (!(tokens[i + 2] && tokens[i + 2].value === 'name')) continue
+    if (!atCallName(tokens, i)) continue
     const op = tokens[i + 3]
     if (!(
       op &&
@@ -1158,41 +1340,40 @@ function collectGuardDeclarations(analysis, found, functions) {
       continue
     const lit = tokens[i + 4]
     if (!(lit && lit.type === 'string')) continue
-    const block = enclosingBlock(tokens, i)
-    if (!block) continue
-    const mutated = mutatedInRange(tokens, block.start, block.end, functions)
-    const value = mutated === 'computed' ? 'yes' : mutated
+    const regions = guardRegions(analysis, i, op.value, analysis.functions, owners)
+    if (!regions) continue
+    const scope = scopeAt(analysis.functions, owners, i)
+    let value = null
+    for (const region of regions) {
+      const m = mutatedInRange(analysis, region.from, region.to, scope)
+      const v = m === 'computed' ? 'yes' : m
+      if (v === 'yes') {
+        value = 'yes'
+        break
+      }
+      if (v && value === null) value = v
+    }
     if (value === null) continue
     const prev = found.get(lit.value)
     if (!prev || (prev === 'no' && value === 'yes')) found.set(lit.value, value)
   }
 }
 
-/** name → 'yes' | 'no' | 'undeclared', from `switch (call.name)` cases in one module */
+/** name → 'yes' | 'no' | 'undeclared', from the routing this module's code uses */
 function collectMutatedDeclarations(files) {
   const found = new Map()
-  const pool = new Map()
   for (const analysis of files) {
-    for (const [name, fn] of analysis.functions) {
-      if (!pool.has(name)) pool.set(name, fn)
-    }
-  }
-  for (const analysis of files) {
-    // a helper declared in the same file always wins over a same-named one elsewhere
-    const functions = new Map(pool)
-    for (const [name, fn] of analysis.functions) functions.set(name, fn)
-    collectGuardDeclarations(analysis, found, functions)
+    const owners = computeOwners(analysis.functions)
+    collectGuardDeclarations(analysis, found, owners)
     const tokens = analysis.tokens
     for (let i = 0; i < tokens.length; i += 1) {
       if (!(tokens[i].type === 'ident' && tokens[i].value === 'switch')) continue
       if (!(tokens[i + 1] && tokens[i + 1].value === '(')) continue
-      if (!(tokens[i + 2] && tokens[i + 2].value === 'call')) continue
-      if (!(tokens[i + 3] && tokens[i + 3].value === '.')) continue
-      if (!(tokens[i + 4] && tokens[i + 4].value === 'name')) continue
+      if (!atCallName(tokens, i + 2)) continue
       let open = i + 5
       while (open < tokens.length && tokens[open].value !== '{') open += 1
       if (open >= tokens.length) continue
-      const cases = collectCases(tokens, open, functions)
+      const cases = collectCases(analysis, open, owners)
       for (const entry of cases) {
         for (const name of entry.names) {
           const prev = found.get(name)
@@ -1207,7 +1388,8 @@ function collectMutatedDeclarations(files) {
   return found
 }
 
-function collectCases(tokens, openIdx, functions) {
+function collectCases(analysis, openIdx, owners) {
+  const tokens = analysis.tokens
   const out = []
   let depth = 0
   let names = []
@@ -1220,7 +1402,8 @@ function collectCases(tokens, openIdx, functions) {
       (t) =>
         t.type === 'ident' || t.type === 'string' || t.type === 'number' || t.type === 'template',
     )
-    const mutated = mutatedInRange(tokens, bodyStart, end, functions)
+    const scope = scopeAt(analysis.functions, owners, bodyStart)
+    const mutated = mutatedInRange(analysis, bodyStart, end, scope)
     if (empty) {
       carry = carry.concat(names)
     } else {
@@ -1289,9 +1472,18 @@ function collectReadOnlyNames(files) {
 
 // ──────────────────────────── extraction ────────────────────────────
 
+/**
+ * Candidate tool object literals. `inputSchema` is the primary anchor: any
+ * object carrying that key at a value position is a tool definition. `name` is
+ * a second anchor, limited to an element of an array literal (the tools list),
+ * so a tool-shaped object without `inputSchema` is still found and reported as
+ * `unresolved:missing` instead of vanishing; the array-element restriction
+ * keeps interface / type-literal braces (which parse as junk) out of the set.
+ */
 function findToolObjectTokens(tokens) {
   const stack = []
   const out = []
+  const seen = new Set()
   for (let i = 0; i < tokens.length; i += 1) {
     const tk = tokens[i]
     if (tk.type === 'punct') {
@@ -1299,12 +1491,22 @@ function findToolObjectTokens(tokens) {
       else if (tk.value === '}') stack.pop()
       continue
     }
-    const isKey = (tk.type === 'ident' || tk.type === 'string') && tk.value === 'inputSchema'
-    if (!isKey) continue
+    if (tk.type !== 'ident' && tk.type !== 'string') continue
+    if (tk.value !== 'name' && tk.value !== 'inputSchema') continue
     const next = tokens[i + 1]
     if (!(next && next.type === 'punct' && next.value === ':')) continue
     const objIdx = stack[stack.length - 1]
-    if (objIdx !== undefined && !out.includes(objIdx)) out.push(objIdx)
+    if (objIdx === undefined || seen.has(objIdx)) continue
+    const before = tokens[objIdx - 1]
+    if (tk.value === 'name') {
+      // only a tools-list element: preceded by `[`, `,` or `...`
+      if (!(before && before.type === 'punct' && ['[', ',', '...'].includes(before.value))) continue
+    } else if (before && before.type === 'punct' && before.value === ':') {
+      // a nested property bag such as `properties: { inputSchema: ... }`
+      continue
+    }
+    seen.add(objIdx)
+    out.push(objIdx)
   }
   return out
 }
@@ -1400,14 +1602,16 @@ export function extract({ repo, rev }) {
         if (!isPlainObject(value)) continue
         if (typeof value.name !== 'string') continue
         if (!Object.prototype.hasOwnProperty.call(value, 'description')) continue
-        if (!Object.prototype.hasOwnProperty.call(value, 'inputSchema')) continue
-        const schema = value.inputSchema
-        const reason = isU(schema) ? schema.__unresolved : findUnresolved(schema)
         let hash
-        if (reason) {
-          hash = `unresolved:${reason}`
+        if (!Object.prototype.hasOwnProperty.call(value, 'inputSchema')) {
+          // a tool-shaped object with no schema is still a tool: report it, never drop it
+          hash = 'unresolved:missing'
         } else {
-          hash = createHash('sha256').update(canonicalJson(schema), 'utf8').digest('hex')
+          const schema = value.inputSchema
+          const reason = isU(schema) ? schema.__unresolved : findUnresolved(schema)
+          hash = reason
+            ? `unresolved:${reason}`
+            : createHash('sha256').update(canonicalJson(schema), 'utf8').digest('hex')
         }
         let write = 'undeclared'
         const declared = mutated.get(value.name)
