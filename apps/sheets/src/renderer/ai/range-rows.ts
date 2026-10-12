@@ -21,6 +21,8 @@ export interface RangeRow {
   readonly values: CellScalar[]
   /** per column: the value is a formula's cached file result (lazy only) */
   readonly cached?: boolean[]
+  /** per column: formula text with a leading '=', when the cell holds one */
+  readonly formulas?: (string | undefined)[]
 }
 
 export type RangeRowsOutcome =
@@ -31,6 +33,8 @@ export type RangeRowsOutcome =
       staleInputs?: boolean
     }
   | { ok: false; error: string }
+
+const withEquals = (formula: string): string => (formula.startsWith('=') ? formula : `=${formula}`)
 
 /** Cells read per sidecar batch (aggregate_range uses the same budget). */
 const BATCH_CELLS = 18_000
@@ -63,6 +67,7 @@ export async function collectWorkbookRows(
     const rows: RangeRow[] = []
     for (let row = bounds.startRow; row <= bounds.endRow; row += 1) {
       const values: CellScalar[] = []
+      let formulas: (string | undefined)[] | undefined
       for (let column = bounds.startColumn; column <= bounds.endColumn; column += 1) {
         const address = formatAddress(row, column)
         const cell = sheet.cells[address]
@@ -81,8 +86,17 @@ export async function collectWorkbookRows(
           }
         }
         values.push(value)
+        if (cell?.formula) {
+          formulas ??= new Array<string | undefined>(width).fill(undefined)
+          formulas[column - bounds.startColumn] = withEquals(cell.formula)
+        }
       }
-      rows.push({ row, hidden: probe?.(row) != null, values })
+      rows.push({
+        row,
+        hidden: probe?.(row) != null,
+        values,
+        ...(formulas ? { formulas } : {}),
+      })
     }
     return { ok: true, rows }
   }
@@ -106,6 +120,16 @@ export async function collectWorkbookRows(
   const cached: boolean[][] = Array.from({ length: rowCount }, () =>
     new Array<boolean>(width).fill(false),
   )
+  const formulaTexts = new Map<number, (string | undefined)[]>()
+  const setFormula = (row: number, column: number, text: string | undefined): void => {
+    let rowFormulas = formulaTexts.get(row)
+    if (!rowFormulas) {
+      if (text === undefined) return
+      rowFormulas = new Array<string | undefined>(width).fill(undefined)
+      formulaTexts.set(row, rowFormulas)
+    }
+    rowFormulas[column - clamped.startColumn] = text === undefined ? undefined : withEquals(text)
+  }
   const fileHidden = new Set<number>()
   const fileEndRow = Math.min(clamped.endRow, sheetMeta.rowCount - 1)
   const fileEndColumn = Math.min(clamped.endColumn, sheetMeta.columnCount - 1)
@@ -150,12 +174,13 @@ export async function collectWorkbookRows(
         const rowValues = values[cell.row - clamped.startRow]!
         rowValues[cell.column - clamped.startColumn] = cell.value
         // The sidecar serves the file's cached <v> for formula cells.
-        if (
-          cell.formula !== undefined ||
-          formulaIndex?.has(`${cell.row}:${cell.column}`) ||
-          sharedFormulas?.textAt(cell.row, cell.column) !== undefined
-        ) {
+        const formula =
+          cell.formula ??
+          formulaIndex?.get(`${cell.row}:${cell.column}`) ??
+          sharedFormulas?.textAt(cell.row, cell.column)
+        if (formula !== undefined) {
           cached[cell.row - clamped.startRow]![cell.column - clamped.startColumn] = true
+          setFormula(cell.row, cell.column, formula)
         }
       }
     }
@@ -168,21 +193,25 @@ export async function collectWorkbookRows(
         if (!segment) continue
         values[row - clamped.startRow]![column - clamped.startColumn] = segment.value
         cached[row - clamped.startRow]![column - clamped.startColumn] = false
+        setFormula(row, column, undefined)
       }
     }
   }
   for (const entry of journalValues.values()) {
     values[entry.row - clamped.startRow]![entry.column - clamped.startColumn] = entry.value
     cached[entry.row - clamped.startRow]![entry.column - clamped.startColumn] = false
+    setFormula(entry.row, entry.column, entry.formula)
   }
   // Rows past the data extent are dropped; columns past it read as empty.
   const rows: RangeRow[] = values.map((rowValues, offset) => {
     const row = clamped.startRow + offset
+    const rowFormulas = formulaTexts.get(row)
     return {
       row,
       hidden: fileHidden.has(row) || probe?.(row) != null,
       values: rowValues,
       cached: cached[offset]!,
+      ...(rowFormulas ? { formulas: rowFormulas } : {}),
     }
   })
   return { ok: true, rows, staleInputs: sessionHasInputEdits(state.editJournal) }

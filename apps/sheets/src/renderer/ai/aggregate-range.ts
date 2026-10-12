@@ -246,7 +246,10 @@ export interface PreparedLazyRange {
   readonly clamped: RangeBounds
   readonly fillBands: readonly FillBand[]
   /** this session's explicit content entries in the range, keyed 'row:column' */
-  readonly journalValues: ReadonlyMap<string, { row: number; column: number; value: CellScalar }>
+  readonly journalValues: ReadonlyMap<
+    string,
+    { row: number; column: number; value: CellScalar; formula?: string | undefined }
+  >
 }
 
 /**
@@ -307,7 +310,10 @@ export function prepareLazyRange(
   const worksheet = ctx.univerRef.current?.univerAPI.getActiveWorkbook()?.getSheetBySheetId(sheetId)
   const fillBands = buildFillBands(bulkFills, clamped)
   // Explicit content entries win over every fill; style-only entries do not.
-  const journalValues = new Map<string, { row: number; column: number; value: CellScalar }>()
+  const journalValues = new Map<
+    string,
+    { row: number; column: number; value: CellScalar; formula?: string | undefined }
+  >()
   for (const entry of journalEntriesInRange(state.editJournal, sheetId, clamped)) {
     if (!entry.hasValue) continue
     let value = entry.value ?? null
@@ -326,6 +332,7 @@ export function prepareLazyRange(
       row: entry.row,
       column: entry.column,
       value,
+      ...(entry.formula ? { formula: entry.formula } : {}),
     })
   }
 

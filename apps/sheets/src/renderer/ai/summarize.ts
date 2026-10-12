@@ -7,6 +7,8 @@
 import { formatAddress } from '@genoffice/xlsx-gateway/domain/cell-address'
 import type { CellScalar } from '@genoffice/xlsx-gateway/domain/workbook.types'
 
+import { detectTotalRows, type TotalRow } from './total-rows'
+
 export type SummarizeFunction = 'sum' | 'count' | 'average' | 'min' | 'max'
 
 export const CRITERION_OPS = [
@@ -43,6 +45,8 @@ export interface SummarizeSpec {
   readonly where: readonly Criterion[]
   readonly groupBy?: number | undefined
   readonly hiddenRows: 'include' | 'skip'
+  /** detected total/subtotal rows (total-rows.ts): left out unless 'include' */
+  readonly totalRows?: 'include' | 'skip' | undefined
   readonly maxGroups: number
 }
 
@@ -51,6 +55,8 @@ export interface SummarizeRow {
   readonly hidden: boolean
   readonly values: readonly CellScalar[]
   readonly cached?: readonly boolean[] | undefined
+  /** formula text per column, when known (total-row detection) */
+  readonly formulas?: readonly (string | undefined)[] | undefined
 }
 
 export interface SkipBucket {
@@ -91,6 +97,8 @@ export interface SummarizeResult {
   groups: SummarizeGroup[]
   /** total number of groups before the cap */
   groupCount: number
+  /** detected total/subtotal rows, excluded unless spec.totalRows is 'include' */
+  readonly totalRows: readonly TotalRow[]
 }
 
 const ERROR_LITERAL =
@@ -207,7 +215,14 @@ export function summarizeRows(rows: readonly SummarizeRow[], spec: SummarizeSpec
     result: null,
     groups: [],
     groupCount: 0,
+    totalRows: detectTotalRows(rows, {
+      startColumn: spec.startColumn,
+      firstDataRow: spec.startRow + (spec.hasHeader ? 1 : 0),
+    }),
   }
+  const totalRowSet = new Set(
+    spec.totalRows === 'include' ? [] : result.totalRows.map((entry) => entry.row),
+  )
   const usedColumns = new Set<number>(spec.where.map((criterion) => criterion.column))
   if (spec.fn !== 'count' && spec.valueColumn !== undefined) usedColumns.add(spec.valueColumn)
   if (spec.groupBy !== undefined) usedColumns.add(spec.groupBy)
@@ -216,6 +231,8 @@ export function summarizeRows(rows: readonly SummarizeRow[], spec: SummarizeSpec
   const groups = new Map<string, { key: string; acc: Accumulator; rows: number }>()
   for (const row of rows) {
     if (row.row < result.firstDataRow) continue
+    // a total row restates data rows: counting it would double count
+    if (totalRowSet.has(row.row)) continue
     if (row.hidden) {
       result.hiddenRows += 1
       if (spec.hiddenRows === 'skip') continue

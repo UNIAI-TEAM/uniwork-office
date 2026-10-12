@@ -421,6 +421,11 @@ export const WORKBOOK_TOOLS: AgentToolDef[] = [
           description:
             'Leave out hidden/filtered rows (visible rows only). Default false: they are included; the result says how many there were.',
         },
+        includeTotalRows: {
+          type: 'boolean',
+          description:
+            'Count rows detected as totals/subtotals (SUBTOTAL formulas, a SUM over the block above, labels like "Total" / "Tổng cộng"). Default false: they are left out so nothing is counted twice; the result lists them.',
+        },
         maxGroups: {
           type: 'number',
           description: 'How many groups to list, largest result first (1-200, default 50)',
@@ -1001,6 +1006,7 @@ function formatPlanSummary(plan: ChangePlan): string {
 const MAX_SUMMARIZE_CELLS = 1_000_000
 const DEFAULT_SUMMARIZE_GROUPS = 50
 const MAX_SUMMARIZE_GROUPS = 200
+const MAX_TOTAL_ROWS_LISTED = 20
 
 /** A column letter of the sheet ("E", "aa") as a 0-based index, or null. */
 function parseColumnLetter(raw: unknown): number | null {
@@ -1024,6 +1030,7 @@ function formatSummary(
     where: readonly Criterion[]
     groupBy: number | undefined
     hiddenMode: 'include' | 'skip'
+    includeTotals: boolean
   },
 ): string {
   const named = (column: number): string => {
@@ -1053,6 +1060,22 @@ function formatSummary(
           ? ' (skipped — visible rows only)'
           : ' (included — pass skipHiddenRows=true for visible rows only)'),
   ]
+  if (result.totalRows.length > 0) {
+    const listed = result.totalRows.slice(0, MAX_TOTAL_ROWS_LISTED)
+    lines.push(
+      `- total/subtotal rows: ${result.totalRows.length} (` +
+        (context.includeTotals
+          ? 'INCLUDED — they restate data rows, so the result may count amounts twice'
+          : 'EXCLUDED so their amounts are not counted twice; pass includeTotalRows=true to count them') +
+        '):',
+      ...listed.map(
+        (entry) => `  row ${entry.row + 1} ${entry.kind}: ${escapeCellText(entry.reason)}`,
+      ),
+    )
+    if (result.totalRows.length > listed.length) {
+      lines.push(`  …${result.totalRows.length - listed.length} more`)
+    }
+  }
   if (context.fn !== 'count') {
     const skipped = (
       [
@@ -1401,11 +1424,12 @@ export function executeWorkbookTool(
         ...(fn !== 'count' && valueColumn !== undefined ? [valueColumn] : []),
         ...(groupBy !== undefined ? [groupBy] : []),
       ]
-      // Only the columns the calculation touches are read.
+      // Only the columns up to the last one the calculation touches are read;
+      // the range's first columns stay in so total-row labels are seen.
       const readBounds: RangeBounds = {
         startRow: bounds.startRow,
         endRow: bounds.endRow,
-        startColumn: used.length > 0 ? Math.min(...used) : bounds.startColumn,
+        startColumn: bounds.startColumn,
         endColumn: used.length > 0 ? Math.max(...used) : bounds.startColumn,
       }
       if (rangeCellCount(readBounds) > MAX_SUMMARIZE_CELLS) {
@@ -1441,6 +1465,7 @@ export function executeWorkbookTool(
           where,
           groupBy,
           hiddenRows: hiddenMode,
+          totalRows: call.input.includeTotalRows === true ? 'include' : 'skip',
           maxGroups,
         })
         const done = t('aiToolSummarizeOf', { range: rangeLabel })
@@ -1462,6 +1487,7 @@ export function executeWorkbookTool(
             where,
             groupBy,
             hiddenMode,
+            includeTotals: call.input.includeTotalRows === true,
           }),
           mutated: false,
           summary: done,
