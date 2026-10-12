@@ -2999,8 +2999,13 @@ export interface DesktopApi {
   headlessExportDone(result: { ok: boolean; error?: string }): void
   /// G8-02 author written into new threaded comments: the signed-in UniWork
   /// display name for a bound workbook, else the neutral constant "User"
-  /// (never the OS account name).
-  getUserDisplayName(): Promise<string>
+  /// (never the OS account name). `sessionId` names the open workbook session
+  /// whose file decides; without one the answer is the constant.
+  getUserDisplayName(sessionId?: string): Promise<string>
+  /// G8-02: the shell's ping when the signed-in display name changes (sign-in,
+  /// sign-out, session expiry); the renderer re-asks getUserDisplayName.
+  /// Absent outside the shell, where the author never changes.
+  onCommentAuthorChanged?(handler: () => void): () => void
   getAiSettings(): Promise<AiSettings>
   setAiSettings(settings: AiSettings): Promise<void>
   /// ai-settings.json was rewritten by any renderer; re-read it
