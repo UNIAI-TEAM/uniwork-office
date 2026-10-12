@@ -1511,6 +1511,267 @@ describe('completed primary expression (G7-06 r3)', () => {
   })
 })
 
+// G706-BE-R6/-R7 (reviewer-be-ext-r3-report.md §5): a keyword used as a property
+// name (`read(call).in`, `read(call).instanceof`) completes the expression, but
+// the tokenizer still read the `/` that opens the next line as a regex literal.
+// One `regex` token swallowed the division (`/ 2 /`), the walk stopped at the
+// property, and the consequent was cut short: the `===` branch lost its real
+// `write` call and the `!==` fall-through started early and credited one. The
+// tokenizer must keep a `/` after a member name a division — and after a
+// postfix `++`/`--`, the same completed-expression class — so the division that
+// really continues the statement does continue it.
+describe('division after a property name (G7-06 r4)', () => {
+  const KEYWORD_PROPERTIES = ['in', 'instanceof', 'typeof', 'delete', 'void', 'new', 'return']
+  const EQ_TOOLS = [
+    ...KEYWORD_PROPERTIES.flatMap((kw) => [`eq_${kw}`, `sib_eq_${kw}`]),
+    'eq_opt_in',
+    'sib_eq_opt_in',
+    'eq_as',
+    'sib_eq_as',
+    'eq_output',
+    'sib_eq_output',
+    'div_paren',
+    'sib_div_paren',
+    'div_bracket',
+    'sib_div_bracket',
+    'div_brace',
+    'sib_div_brace',
+    'div_literal',
+    'sib_div_literal',
+    'div_ident',
+    'sib_div_ident',
+    'div_string',
+    'sib_div_string',
+    'div_template',
+    'sib_div_template',
+    'div_regex',
+    'sib_div_regex',
+    'div_postfix_inc',
+    'sib_div_postfix_inc',
+    'div_postfix_dec',
+    'sib_div_postfix_dec',
+    'ctrl_regex_return',
+    'sib_ctrl_regex_return',
+    'ctrl_regex_and',
+    'sib_ctrl_regex_and',
+    'ctrl_regex_stmt',
+    'sib_ctrl_regex_stmt',
+  ]
+  // one guard per tool; the consequent on one line, its division on the next
+  const NEQ_ROWS = [
+    ...KEYWORD_PROPERTIES.map((kw) => [`neq_${kw}`, `read(call).${kw}`]),
+    ['neq_as', 'read(call).as'],
+    ['neq_output', 'read(call).output'],
+  ]
+
+  const DIVISION_PROPERTY_FIXTURE = {
+    'apps/docs/src/renderer/ai/div_eq.ts': [
+      "import type { AgentToolCall, AgentToolDef, ToolExecution } from '@genoffice/agent-core'",
+      '',
+      'export const AGENT_TOOLS: AgentToolDef[] = [',
+      ...EQ_TOOLS.map(
+        (name) =>
+          `  { name: '${name}', description: 'division continues a property tail', inputSchema: { type: 'object' } },`,
+      ),
+      ']',
+      '',
+      'const mode = 1',
+      'let counter = 0',
+      '',
+      'function read(call: AgentToolCall): ToolExecution {',
+      "  return { output: 'read', mutated: false, summary: 'read' }",
+      '}',
+      '',
+      'function write(call: AgentToolCall): ToolExecution {',
+      "  return { output: 'wrote', mutated: true, summary: 'write' }",
+      '}',
+      '',
+      'function wrap(value: ToolExecution): ToolExecution {',
+      "  return { output: 'wrapped', mutated: false, summary: 'wrap' }",
+      '}',
+      '',
+      'export async function executeTool(call: AgentToolCall): Promise<ToolExecution> {',
+      ...KEYWORD_PROPERTIES.flatMap((kw) => [
+        `  if (call.name === 'eq_${kw}')`,
+        `    return read(call).${kw}`,
+        '      / 2 / write(call)',
+        `  if (call.name === 'sib_eq_${kw}') return write(call)`,
+      ]),
+      "  if (call.name === 'eq_opt_in')",
+      '    return read(call)?.in',
+      '      / 2 / write(call)',
+      "  if (call.name === 'sib_eq_opt_in') return write(call)",
+      "  if (call.name === 'eq_as')",
+      '    return read(call).as',
+      '      / 2 / write(call)',
+      "  if (call.name === 'sib_eq_as') return write(call)",
+      "  if (call.name === 'eq_output')",
+      '    return read(call).output',
+      '      / 2 / write(call)',
+      "  if (call.name === 'sib_eq_output') return write(call)",
+      "  if (call.name === 'div_paren')",
+      '    return wrap(read(call))',
+      '      / 2 / write(call)',
+      "  if (call.name === 'sib_div_paren') return write(call)",
+      "  if (call.name === 'div_bracket')",
+      '    return [read(call)][0]',
+      '      / 2 / write(call)',
+      "  if (call.name === 'sib_div_bracket') return write(call)",
+      "  if (call.name === 'div_brace')",
+      '    return { output: read(call).output }',
+      '      / 2 / write(call)',
+      "  if (call.name === 'sib_div_brace') return write(call)",
+      "  if (call.name === 'div_literal')",
+      '    return read(call) && 5',
+      '      / 2 / write(call)',
+      "  if (call.name === 'sib_div_literal') return write(call)",
+      "  if (call.name === 'div_ident')",
+      '    return read(call) && mode',
+      '      / 2 / write(call)',
+      "  if (call.name === 'sib_div_ident') return write(call)",
+      "  if (call.name === 'div_string')",
+      "    return read(call) && 'a'",
+      '      / 2 / write(call)',
+      "  if (call.name === 'sib_div_string') return write(call)",
+      "  if (call.name === 'div_template')",
+      '    return read(call) && `a`',
+      '      / 2 / write(call)',
+      "  if (call.name === 'sib_div_template') return write(call)",
+      "  if (call.name === 'div_regex')",
+      '    return read(call) && /a/',
+      '      / 2 / write(call)',
+      "  if (call.name === 'sib_div_regex') return write(call)",
+      "  if (call.name === 'div_postfix_inc')",
+      '    counter++',
+      '      / 2 / write(call)',
+      "  if (call.name === 'sib_div_postfix_inc') return write(call)",
+      "  if (call.name === 'div_postfix_dec')",
+      '    counter--',
+      '      / 2 / write(call)',
+      "  if (call.name === 'sib_div_postfix_dec') return write(call)",
+      "  if (call.name === 'ctrl_regex_return')",
+      "    return / 2 /.test(String(read(call).output)) && write(call)",
+      "  if (call.name === 'sib_ctrl_regex_return') return write(call)",
+      "  if (call.name === 'ctrl_regex_and')",
+      '    return read(call) &&',
+      '      / 2 /.test(String(read(call).output)) && write(call)',
+      "  if (call.name === 'sib_ctrl_regex_and') return write(call)",
+      "  if (call.name === 'ctrl_regex_stmt')",
+      '    / 2 /.test(String(read(call).output)) && write(call)',
+      "  if (call.name === 'sib_ctrl_regex_stmt') return write(call)",
+      '}',
+      '',
+    ].join('\n'),
+    'apps/docs/src/renderer/ai/div_neq.ts': [
+      "import type { AgentToolCall, AgentToolDef, ToolExecution } from '@genoffice/agent-core'",
+      '',
+      'export const AGENT_TOOLS: AgentToolDef[] = [',
+      ...NEQ_ROWS.map(
+        ([name]) =>
+          `  { name: '${name}', description: 'division after a property tail', inputSchema: { type: 'object' } },`,
+      ),
+      ']',
+      '',
+      'function read(call: AgentToolCall): ToolExecution {',
+      "  return { output: 'read', mutated: false, summary: 'read' }",
+      '}',
+      '',
+      'function write(call: AgentToolCall): ToolExecution {',
+      "  return { output: 'wrote', mutated: true, summary: 'write' }",
+      '}',
+      '',
+      // the consequent (the branch the tool does not take) ends after the whole
+      // division statement, so the fall-through `return read(call)` is the
+      // tool's own path, and `write` must never reach it
+      ...NEQ_ROWS.flatMap(([name, tail]) => [
+        `export async function execute_${name}(call: AgentToolCall): Promise<ToolExecution> {`,
+        `  if (call.name !== '${name}')`,
+        `    return ${tail}`,
+        '      / 2 / write(call)',
+        '  return read(call)',
+        '}',
+        '',
+      ]),
+    ].join('\n'),
+  }
+
+  it('keeps the division that continues a keyword property tail in the `===` branch (G706-BE-R6)', () => {
+    const { dir } = fixture(DIVISION_PROPERTY_FIXTURE)
+    const { rows } = extract({ repo: dir, rev: 'HEAD' })
+    const write = (tool) => {
+      const row = rows.find((r) => r.tool === tool)
+      assert.ok(row, `expected a row for ${tool}`)
+      return row.write
+    }
+    // each consequent really is `return read(call).<kw> / 2 / write(call)`: the
+    // division-initial line continues the statement, so `write` is reached
+    for (const kw of KEYWORD_PROPERTIES) {
+      assert.equal(write(`eq_${kw}`), 'yes', `eq_${kw} must keep its division continuation`)
+      assert.equal(write(`sib_eq_${kw}`), 'yes', `sib_eq_${kw} must keep its own branch`)
+    }
+    assert.equal(write('eq_opt_in'), 'yes')
+    assert.equal(write('sib_eq_opt_in'), 'yes')
+  })
+
+  it('credits the `!==` fall-through only after the whole division statement (G706-BE-R6)', () => {
+    const { dir } = fixture(DIVISION_PROPERTY_FIXTURE)
+    const { rows } = extract({ repo: dir, rev: 'HEAD' })
+    const write = (tool) => {
+      const row = rows.find((r) => r.tool === tool)
+      assert.ok(row, `expected a row for ${tool}`)
+      return row.write
+    }
+    // the truncated consequent used to hand the rest of the statement to the
+    // fall-through, so `write` was credited to a read-only tool
+    for (const [name] of NEQ_ROWS) {
+      assert.equal(write(name), 'no', `${name} must not credit the early-return branch`)
+    }
+  })
+
+  it('keeps the division continuation after every other completed tail (G706-BE-R6 sweep)', () => {
+    const { dir } = fixture(DIVISION_PROPERTY_FIXTURE)
+    const { rows } = extract({ repo: dir, rev: 'HEAD' })
+    const write = (tool) => rows.find((r) => r.tool === tool).write
+    for (const tool of [
+      'div_paren',
+      'div_bracket',
+      'div_brace',
+      'div_literal',
+      'div_ident',
+      'div_string',
+      'div_template',
+      'div_regex',
+      'div_postfix_inc',
+      'div_postfix_dec',
+    ]) {
+      assert.equal(write(tool), 'yes', `${tool} must keep its division continuation`)
+      assert.equal(write(`sib_${tool}`), 'yes', `sib_${tool} must keep its own branch`)
+    }
+  })
+
+  it('keeps a non-keyword property and a real regex green (G706-BE-R6 controls)', () => {
+    const { dir } = fixture(DIVISION_PROPERTY_FIXTURE)
+    const { rows } = extract({ repo: dir, rev: 'HEAD' })
+    const write = (tool) => rows.find((r) => r.tool === tool).write
+    // `as` / `output` never allowed a regex after them, so they were already
+    // right; a real regex literal keeps being a regex
+    for (const tool of [
+      'eq_as',
+      'sib_eq_as',
+      'eq_output',
+      'sib_eq_output',
+      'ctrl_regex_return',
+      'sib_ctrl_regex_return',
+      'ctrl_regex_and',
+      'sib_ctrl_regex_and',
+      'ctrl_regex_stmt',
+      'sib_ctrl_regex_stmt',
+    ]) {
+      assert.equal(write(tool), 'yes', `${tool} must keep its own branch`)
+    }
+  })
+})
+
 describe('real repo', () => {
   it('produces rows for each of the six apps at HEAD', () => {
     const { rows } = extract({ repo: REPO_ROOT, rev: 'HEAD' })
