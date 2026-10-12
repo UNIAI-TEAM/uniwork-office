@@ -1050,12 +1050,23 @@ export function executeWorkbookTool(
       if ('fail' in parsedSheet) return parsedSheet.fail
       const sheetId = parsedSheet.sheetId
       const addresses = raw.slice(0, MAX_READ_ADDRESSES).map(String)
+      // Past the cap the rest is dropped; say so, or the model answers from a
+      // partial read believing it saw everything.
+      const unread = raw.length - addresses.length
       const executeRead = (): ToolExecution => {
         const cells = deps.readCells(addresses, sheetId)
         const lines = addresses.map((addr) => {
           const cell = cells[addr]
           return `${addr}: ${cell ? formatCellScalar(cell) : '(unknown)'}`
         })
+        if (unread > 0) {
+          lines.unshift(
+            `Note: ${raw.length} addresses were requested but only the first ${MAX_READ_ADDRESSES} were read ` +
+              `(max ${MAX_READ_ADDRESSES} per call); the remaining ${unread} were NOT read, starting at ` +
+              `${String(raw[MAX_READ_ADDRESSES])}. To get them, call read_cells again with the remaining ` +
+              'addresses, or use read_range / aggregate_range for contiguous blocks.',
+          )
+        }
         return {
           output: lines.join('\n'),
           mutated: false,
