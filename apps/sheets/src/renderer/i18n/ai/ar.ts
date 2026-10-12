@@ -63,6 +63,8 @@ export const ar = {
   aiToolReadRangeOf: 'قراءة النطاق {range}',
   aiToolAggregate: 'تجميع النطاق',
   aiToolAggregateOf: 'تجميع النطاق {range}',
+  aiToolSummarize: 'تلخيص النطاق',
+  aiToolSummarizeOf: 'تلخيص النطاق {range}',
   aiToolLoadGuide: 'تحميل الدليل',
   aiToolLoadGuideOf: 'تحميل الأدلة {names}',
   aiToolReadFormats: 'قراءة التنسيقات',

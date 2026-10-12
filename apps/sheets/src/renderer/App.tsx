@@ -142,6 +142,7 @@ import {
   rangeCellCount,
 } from '@genoffice/xlsx-gateway/domain/cell-address'
 import { aggregateWorkbookRange } from './ai/aggregate-range'
+import { collectWorkbookRows } from './ai/range-rows'
 import { collectCellFormulaTexts, quadraticFormulaError } from './formula-cost'
 import {
   applyChartStateEdit,
@@ -1693,6 +1694,7 @@ export function App({
       aggregateRange: (sheetId, bounds, options) =>
         aggregateWorkbookRange(readContext(), sheetId, bounds, options),
       hiddenRows: (sheetId, bounds) => readHiddenRowsImpl(readContext(), bounds, sheetId),
+      collectRows: (sheetId, bounds) => collectWorkbookRows(readContext(), sheetId, bounds),
       ensureRangeLoaded: async (range, sheetId) => {
         const state = lazyWorkbookRef.current
         if (!state) return true

@@ -64,6 +64,8 @@ export const ru = {
   aiToolReadRangeOf: 'Чтение диапазона {range}',
   aiToolAggregate: 'Агрегация диапазона',
   aiToolAggregateOf: 'Агрегация диапазона {range}',
+  aiToolSummarize: 'Сводка по диапазону',
+  aiToolSummarizeOf: 'Сводка по диапазону {range}',
   aiToolLoadGuide: 'Загрузка руководства',
   aiToolLoadGuideOf: 'Загрузка руководств {names}',
   aiToolReadFormats: 'Чтение форматов',

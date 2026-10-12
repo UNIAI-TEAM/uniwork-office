@@ -65,6 +65,8 @@ export const nl = {
   aiToolReadRangeOf: 'Bereik {range} lezen',
   aiToolAggregate: 'Bereik aggregeren',
   aiToolAggregateOf: 'Bereik {range} aggregeren',
+  aiToolSummarize: 'Bereik samenvatten',
+  aiToolSummarizeOf: 'Bereik {range} samenvatten',
   aiToolLoadGuide: 'Handleiding laden',
   aiToolLoadGuideOf: 'Handleidingen {names} laden',
   aiToolReadFormats: 'Opmaak lezen',

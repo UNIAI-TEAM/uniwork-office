@@ -12,6 +12,7 @@ import {
 } from '@genoffice/xlsx-gateway/domain/cell-address'
 import type { CellScalar } from '@genoffice/xlsx-gateway/domain/workbook.types'
 import { isSheetRemoved, journalEntriesInRange } from '../edit-journal'
+import type { LazyWorkbookState } from '../univer-state'
 import { createRangeAggregator, type RangeAggregate } from './aggregate'
 import { sessionHasInputEdits } from './cell-read'
 import { rowVisibilityProbe, type WorkbookReadContext } from './workbook-readers'
@@ -35,7 +36,7 @@ interface FillSegment {
   readonly priority: number
 }
 
-interface FillBand {
+export interface FillBand {
   readonly startRow: number
   endRow: number
   readonly segments: FillSegment[]
@@ -190,7 +191,7 @@ function buildFillBands(fills: readonly ConstantFill[], bounds: RangeBounds): Fi
   return bands
 }
 
-function fillSegmentAt(
+export function fillSegmentAt(
   bands: readonly FillBand[],
   row: number,
   column: number,
@@ -235,6 +236,100 @@ function filledAreaInRange(bands: readonly FillBand[], bounds: RangeBounds): num
     }
   }
   return area
+}
+
+export interface PreparedLazyRange {
+  readonly ok: true
+  readonly sheetId: string
+  readonly sheetMeta: LazyWorkbookState['file']['sheets'][number]
+  /** the request clamped to the data extent (file + this session's writes) */
+  readonly clamped: RangeBounds
+  readonly fillBands: readonly FillBand[]
+  /** this session's explicit content entries in the range, keyed 'row:column' */
+  readonly journalValues: ReadonlyMap<string, { row: number; column: number; value: CellScalar }>
+}
+
+/**
+ * The shared preamble of the streamed range readers: resolve the sheet,
+ * refuse what they cannot read correctly, clamp to the data extent, and
+ * collect this session's fills and explicit cell values over the range.
+ */
+export function prepareLazyRange(
+  ctx: WorkbookReadContext,
+  state: LazyWorkbookState,
+  sheetId: string | undefined,
+  bounds: RangeBounds,
+  toolName: string,
+): PreparedLazyRange | { ok: false; error: string } {
+  if (!sheetId) return { ok: false, error: 'No workbook is open.' }
+  if (isSheetRemoved(state.editJournal, sheetId)) {
+    return { ok: false, error: `Unknown sheet: ${sheetId}` }
+  }
+  const sheetMeta = state.file.sheets.find((candidate) => candidate.id === sheetId)
+  if (!sheetMeta) {
+    return {
+      ok: false,
+      error: `${toolName} only works on sheets that came with the file — read sheets added this session with read_range.`,
+    }
+  }
+  if ((state.editJournal.structuralOps.get(sheetId) ?? []).length > 0) {
+    return {
+      ok: false,
+      error: `${toolName} is unavailable after row/column structural changes on this sheet in this session — save the file first, then retry.`,
+    }
+  }
+  // Cells and declarative fills written this session can sit below/right of
+  // the file extent.
+  let extentRows = sheetMeta.rowCount
+  let extentColumns = sheetMeta.columnCount
+  for (const entry of state.editJournal.cells.get(sheetId)?.values() ?? []) {
+    if (!entry.hasValue) continue
+    extentRows = Math.max(extentRows, entry.row + 1)
+    extentColumns = Math.max(extentColumns, entry.column + 1)
+  }
+  const bulkFills = state.editJournal.bulkConstantFills.get(sheetId) ?? []
+  for (const fill of bulkFills) {
+    extentRows = Math.max(extentRows, fill.endRow + 1)
+    extentColumns = Math.max(extentColumns, fill.endColumn + 1)
+  }
+  const clamped = {
+    startRow: bounds.startRow,
+    endRow: Math.min(bounds.endRow, extentRows - 1),
+    startColumn: bounds.startColumn,
+    endColumn: Math.min(bounds.endColumn, extentColumns - 1),
+  }
+  if (clamped.startRow > clamped.endRow || clamped.startColumn > clamped.endColumn) {
+    return {
+      ok: false,
+      error: `The range is outside the sheet data extent A1:${columnLabel(extentColumns - 1)}${extentRows}.`,
+    }
+  }
+  const worksheet = ctx.univerRef.current?.univerAPI.getActiveWorkbook()?.getSheetBySheetId(sheetId)
+  const fillBands = buildFillBands(bulkFills, clamped)
+  // Explicit content entries win over every fill; style-only entries do not.
+  const journalValues = new Map<string, { row: number; column: number; value: CellScalar }>()
+  for (const entry of journalEntriesInRange(state.editJournal, sheetId, clamped)) {
+    if (!entry.hasValue) continue
+    let value = entry.value ?? null
+    // Journal formula entries store value:null; the computed result lives in
+    // Univer (journal edits are always applied there) — backfill like find_cells.
+    if (entry.formula && value === null && worksheet) {
+      try {
+        value =
+          (worksheet.getRange(formatAddress(entry.row, entry.column)).getValue() as CellScalar) ??
+          null
+      } catch {
+        /* fail-open: count the cell as empty */
+      }
+    }
+    journalValues.set(`${entry.row}:${entry.column}`, {
+      row: entry.row,
+      column: entry.column,
+      value,
+    })
+  }
+
+  return { ok: true, sheetId, sheetMeta, clamped, fillBands, journalValues }
 }
 
 export interface AggregateRangeOptions {
@@ -335,76 +430,15 @@ export async function aggregateWorkbookRange(
       ...(tracking ? { hiddenRows: demoHidden.size } : {}),
     }
   }
-  const sheetId = sheetIdArg ?? activeSheetId
-  if (!sheetId) return { ok: false, error: 'No workbook is open.' }
-  if (isSheetRemoved(state.editJournal, sheetId)) {
-    return { ok: false, error: `Unknown sheet: ${sheetId}` }
-  }
-  const sheetMeta = state.file.sheets.find((candidate) => candidate.id === sheetId)
-  if (!sheetMeta) {
-    return {
-      ok: false,
-      error:
-        'aggregate_range only works on sheets that came with the file — read sheets added this session with read_range.',
-    }
-  }
-  if ((state.editJournal.structuralOps.get(sheetId) ?? []).length > 0) {
-    return {
-      ok: false,
-      error:
-        'aggregate_range is unavailable after row/column structural changes on this sheet in this session — save the file first, then retry.',
-    }
-  }
-  // Cells and declarative fills written this session can sit below/right of
-  // the file extent.
-  let extentRows = sheetMeta.rowCount
-  let extentColumns = sheetMeta.columnCount
-  for (const entry of state.editJournal.cells.get(sheetId)?.values() ?? []) {
-    if (!entry.hasValue) continue
-    extentRows = Math.max(extentRows, entry.row + 1)
-    extentColumns = Math.max(extentColumns, entry.column + 1)
-  }
-  const bulkFills = state.editJournal.bulkConstantFills.get(sheetId) ?? []
-  for (const fill of bulkFills) {
-    extentRows = Math.max(extentRows, fill.endRow + 1)
-    extentColumns = Math.max(extentColumns, fill.endColumn + 1)
-  }
-  const clamped = {
-    startRow: bounds.startRow,
-    endRow: Math.min(bounds.endRow, extentRows - 1),
-    startColumn: bounds.startColumn,
-    endColumn: Math.min(bounds.endColumn, extentColumns - 1),
-  }
-  if (clamped.startRow > clamped.endRow || clamped.startColumn > clamped.endColumn) {
-    return {
-      ok: false,
-      error: `The range is outside the sheet data extent A1:${columnLabel(extentColumns - 1)}${extentRows}.`,
-    }
-  }
-  const worksheet = workbook?.getSheetBySheetId(sheetId)
-  const fillBands = buildFillBands(bulkFills, clamped)
-  // Explicit content entries win over every fill; style-only entries do not.
-  const journalValues = new Map<string, { row: number; column: number; value: CellScalar }>()
-  for (const entry of journalEntriesInRange(state.editJournal, sheetId, clamped)) {
-    if (!entry.hasValue) continue
-    let value = entry.value ?? null
-    // Journal formula entries store value:null; the computed result lives in
-    // Univer (journal edits are always applied there) — backfill like find_cells.
-    if (entry.formula && value === null && worksheet) {
-      try {
-        value =
-          (worksheet.getRange(formatAddress(entry.row, entry.column)).getValue() as CellScalar) ??
-          null
-      } catch {
-        /* fail-open: count the cell as empty */
-      }
-    }
-    journalValues.set(`${entry.row}:${entry.column}`, {
-      row: entry.row,
-      column: entry.column,
-      value,
-    })
-  }
+  const prepared = prepareLazyRange(
+    ctx,
+    state,
+    sheetIdArg ?? activeSheetId,
+    bounds,
+    'aggregate_range',
+  )
+  if (!prepared.ok) return prepared
+  const { sheetId, sheetMeta, clamped, fillBands, journalValues } = prepared
 
   let counted = 0
   const fileEndRow = Math.min(clamped.endRow, sheetMeta.rowCount - 1)

@@ -64,6 +64,8 @@ export const en = {
   aiToolReadRangeOf: 'Read range {range}',
   aiToolAggregate: 'Aggregate range',
   aiToolAggregateOf: 'Aggregate range {range}',
+  aiToolSummarize: 'Summarize range',
+  aiToolSummarizeOf: 'Summarize range {range}',
   aiToolLoadGuide: 'Load guide',
   aiToolLoadGuideOf: 'Load guides {names}',
   aiToolReadFormats: 'Read formats',

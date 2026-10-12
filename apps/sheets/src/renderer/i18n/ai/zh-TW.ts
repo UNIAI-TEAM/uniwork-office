@@ -59,6 +59,8 @@ export const zhTW = {
   aiToolReadRangeOf: '讀取範圍 {range}',
   aiToolAggregate: '統計範圍',
   aiToolAggregateOf: '統計範圍 {range}',
+  aiToolSummarize: '條件彙總',
+  aiToolSummarizeOf: '條件彙總 {range}',
   aiToolLoadGuide: '載入指南',
   aiToolLoadGuideOf: '載入指南 {names}',
   aiToolReadFormats: '讀取格式',

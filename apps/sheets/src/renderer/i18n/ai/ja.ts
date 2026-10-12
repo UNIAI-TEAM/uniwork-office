@@ -63,6 +63,8 @@ export const ja = {
   aiToolReadRangeOf: '範囲 {range} を読み取り',
   aiToolAggregate: '範囲を集計',
   aiToolAggregateOf: '範囲 {range} を集計',
+  aiToolSummarize: '条件付き集計',
+  aiToolSummarizeOf: '範囲 {range} を条件付き集計',
   aiToolLoadGuide: 'ガイドを読み込み',
   aiToolLoadGuideOf: 'ガイド {names} を読み込み',
   aiToolReadFormats: '書式を読み取り',

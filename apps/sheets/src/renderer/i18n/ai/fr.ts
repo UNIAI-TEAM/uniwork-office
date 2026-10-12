@@ -65,6 +65,8 @@ export const fr = {
   aiToolReadRangeOf: 'Lire la plage {range}',
   aiToolAggregate: 'Agréger la plage',
   aiToolAggregateOf: 'Agréger la plage {range}',
+  aiToolSummarize: 'Résumer la plage',
+  aiToolSummarizeOf: 'Résumer la plage {range}',
   aiToolLoadGuide: 'Charger le guide',
   aiToolLoadGuideOf: 'Charger les guides {names}',
   aiToolReadFormats: 'Lire les formats',

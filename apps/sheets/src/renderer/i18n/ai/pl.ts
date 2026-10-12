@@ -63,6 +63,8 @@ export const pl = {
   aiToolReadRangeOf: 'Odczyt zakresu {range}',
   aiToolAggregate: 'Agregacja zakresu',
   aiToolAggregateOf: 'Agregacja zakresu {range}',
+  aiToolSummarize: 'Podsumowanie zakresu',
+  aiToolSummarizeOf: 'Podsumowanie zakresu {range}',
   aiToolLoadGuide: 'Ładowanie przewodnika',
   aiToolLoadGuideOf: 'Ładowanie przewodników {names}',
   aiToolReadFormats: 'Odczyt formatów',

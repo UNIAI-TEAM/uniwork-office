@@ -66,6 +66,8 @@ export const es = {
   aiToolReadRangeOf: 'Leer rango {range}',
   aiToolAggregate: 'Agregar rango',
   aiToolAggregateOf: 'Agregar rango {range}',
+  aiToolSummarize: 'Resumir rango',
+  aiToolSummarizeOf: 'Resumir rango {range}',
   aiToolLoadGuide: 'Cargar guía',
   aiToolLoadGuideOf: 'Cargar guías {names}',
   aiToolReadFormats: 'Leer formatos',

@@ -64,6 +64,8 @@ export const ms = {
   aiToolReadRangeOf: 'Baca julat {range}',
   aiToolAggregate: 'Agregat julat',
   aiToolAggregateOf: 'Agregat julat {range}',
+  aiToolSummarize: 'Ringkaskan julat',
+  aiToolSummarizeOf: 'Ringkaskan julat {range}',
   aiToolLoadGuide: 'Muatkan panduan',
   aiToolLoadGuideOf: 'Muatkan panduan {names}',
   aiToolReadFormats: 'Baca format',

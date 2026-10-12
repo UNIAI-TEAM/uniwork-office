@@ -63,6 +63,8 @@ export const id = {
   aiToolReadRangeOf: 'Baca rentang {range}',
   aiToolAggregate: 'Agregasi rentang',
   aiToolAggregateOf: 'Agregasi rentang {range}',
+  aiToolSummarize: 'Ringkas rentang',
+  aiToolSummarizeOf: 'Ringkas rentang {range}',
   aiToolLoadGuide: 'Muat panduan',
   aiToolLoadGuideOf: 'Muat panduan {names}',
   aiToolReadFormats: 'Baca format',

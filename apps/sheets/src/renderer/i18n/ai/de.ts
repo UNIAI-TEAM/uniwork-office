@@ -65,6 +65,8 @@ export const de = {
   aiToolReadRangeOf: 'Bereich {range} lesen',
   aiToolAggregate: 'Bereich aggregieren',
   aiToolAggregateOf: 'Bereich {range} aggregieren',
+  aiToolSummarize: 'Bereich zusammenfassen',
+  aiToolSummarizeOf: 'Bereich {range} zusammenfassen',
   aiToolLoadGuide: 'Leitfaden laden',
   aiToolLoadGuideOf: 'Leitfäden {names} laden',
   aiToolReadFormats: 'Formate lesen',

@@ -8,6 +8,7 @@ import {
 } from '@genoffice/xlsx-gateway/domain/workbook-dsl'
 import {
   columnLabel,
+  parseAddress,
   parseRange,
   rangeCellCount,
   formatAddress,
@@ -23,6 +24,15 @@ import { cap } from '../capabilities'
 import { t } from '../i18n/locale'
 import { formatRangeAggregate, type RangeAggregate } from './aggregate'
 import type { CellRead } from './cell-read'
+import type { RangeRowsOutcome } from './range-rows'
+import {
+  CRITERION_OPS,
+  summarizeRows,
+  type Criterion,
+  type CriterionOp,
+  type SummarizeFunction,
+  type SummarizeResult,
+} from './summarize'
 import { guideCatalogSummary, loadGuides } from './guides'
 
 /**
@@ -249,6 +259,9 @@ export interface SheetsSkillDeps {
       }
     | { ok: false; error: string }
   >
+  /** Every row of a range with hidden flags and per-cell cached-formula flags
+   * (ai/range-rows.ts) — the input of summarize_range. */
+  collectRows?(sheetId: string | undefined, range: RangeBounds): Promise<RangeRowsOutcome>
   /** Hidden/filtered rows inside the range, ascending; read_range marks them. */
   hiddenRows?(
     sheetId: string | undefined,
@@ -341,6 +354,77 @@ export const WORKBOOK_TOOLS: AgentToolDef[] = [
           description:
             'Leave out rows that are hidden or filtered out (visible rows only, like SUBTOTAL). Default false: hidden rows are included, like SUM. ' +
             'The result always states how many hidden/filtered rows the range has and whether they were included — repeat that in your answer.',
+        },
+      },
+      required: ['range'],
+    },
+  },
+  {
+    name: 'summarize_range',
+    description:
+      'Read-only conditional statistics over a table range, computed by code: sum / count / average / min / max of one column, ' +
+      'optionally filtered by conditions on other columns (all must hold, like SUMIFS/COUNTIFS) and grouped by a column (like a pivot). ' +
+      'Use it for "total revenue for Hà Nội", "count of orders per region", "average price where qty > 10" — instead of writing COUNTIFS/SUMIFS helper cells or adding numbers yourself. ' +
+      'Columns are Excel column letters of the sheet (read the header row first to map names like X/Y/Z to letters). ' +
+      'Only real numbers are summed: text such as "1.234,5", blanks, booleans and errors are skipped and counted by reason, never converted. ' +
+      'Text conditions match case-insensitively; >, >=, <, <= compare numbers only (dates are serial numbers). ' +
+      'The result reports the range, the filter, rows processed/matching, hidden/filtered rows and every skipped cell — state these in your answer. Up to 1,000,000 cells.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        range: {
+          type: 'string',
+          description:
+            'The table, e.g. "A1:F5000"; its first row is the header unless hasHeader=false',
+        },
+        sheetId: {
+          type: 'string',
+          description: 'Target sheet id (from get_workbook_context); the active sheet when omitted',
+        },
+        function: {
+          type: 'string',
+          enum: ['sum', 'count', 'average', 'min', 'max'],
+          description:
+            'sum/average/min/max of valueColumn, or count of matching rows (default: sum when valueColumn is given, else count)',
+        },
+        valueColumn: {
+          type: 'string',
+          description:
+            'Column letter whose numbers are aggregated, e.g. "E" (required except for count)',
+        },
+        where: {
+          type: 'array',
+          description: 'Conditions that must all hold',
+          items: {
+            type: 'object',
+            properties: {
+              column: { type: 'string', description: 'Column letter, e.g. "C"' },
+              op: { type: 'string', enum: [...CRITERION_OPS] },
+              value: {
+                type: 'string',
+                description:
+                  'Comparison value (omit for blank / not_blank); numeric text like "100" compares as a number',
+              },
+            },
+            required: ['column', 'op'],
+          },
+        },
+        groupBy: {
+          type: 'string',
+          description: 'Column letter to group by; each distinct value gets its own result',
+        },
+        hasHeader: {
+          type: 'boolean',
+          description: 'The first row of range is a header row (default true)',
+        },
+        skipHiddenRows: {
+          type: 'boolean',
+          description:
+            'Leave out hidden/filtered rows (visible rows only). Default false: they are included; the result says how many there were.',
+        },
+        maxGroups: {
+          type: 'number',
+          description: 'How many groups to list, largest result first (1-200, default 50)',
         },
       },
       required: ['range'],
@@ -915,6 +999,115 @@ function formatPlanSummary(plan: ChangePlan): string {
   return parts.join(' | ') || '(no changes)'
 }
 
+const MAX_SUMMARIZE_CELLS = 1_000_000
+const DEFAULT_SUMMARIZE_GROUPS = 50
+const MAX_SUMMARIZE_GROUPS = 200
+
+/** A column letter of the sheet ("E", "aa") as a 0-based index, or null. */
+function parseColumnLetter(raw: unknown): number | null {
+  if (typeof raw !== 'string' || !/^\s*\$?[A-Za-z]{1,3}\s*$/.test(raw)) return null
+  try {
+    return parseAddress(`${raw.trim().replace('$', '').toUpperCase()}1`).column
+  } catch {
+    return null
+  }
+}
+
+/** Round away binary float noise (0.1 + 0.2) without hiding real digits. */
+const formatResultNumber = (value: number): string => String(Number(value.toPrecision(15)))
+
+function formatSummary(
+  result: SummarizeResult,
+  context: {
+    rangeLabel: string
+    fn: SummarizeFunction
+    valueColumn: number | undefined
+    where: readonly Criterion[]
+    groupBy: number | undefined
+    hiddenMode: 'include' | 'skip'
+  },
+): string {
+  const named = (column: number): string => {
+    const header = result.headers.get(column)
+    return header ? `${columnLabel(column)} "${escapeCellText(header)}"` : columnLabel(column)
+  }
+  const condition = (criterion: Criterion): string =>
+    criterion.op === 'blank' || criterion.op === 'not_blank'
+      ? `${named(criterion.column)} is ${criterion.op === 'blank' ? 'blank' : 'not blank'}`
+      : `${named(criterion.column)} ${criterion.op.replace('_', ' ')} ${
+          typeof criterion.value === 'string'
+            ? `"${escapeCellText(criterion.value)}"`
+            : String(criterion.value)
+        }`
+  const calculation =
+    context.fn === 'count'
+      ? 'count of matching rows'
+      : `${context.fn} of ${named(context.valueColumn!)}`
+  const lines = [
+    `Summary of ${context.rangeLabel}${result.headers.size > 0 ? ` (header row ${result.firstDataRow})` : ''}:`,
+    `- calculation: ${calculation}; filter: ${context.where.length > 0 ? context.where.map(condition).join(' AND ') : 'none'}` +
+      (context.groupBy !== undefined ? `; group by ${named(context.groupBy)}` : ''),
+    `- rows processed: ${result.rowsProcessed}; rows matching: ${result.rowsMatched}; hidden/filtered rows: ${result.hiddenRows}` +
+      (result.hiddenRows === 0
+        ? ''
+        : context.hiddenMode === 'skip'
+          ? ' (skipped — visible rows only)'
+          : ' (included — pass skipHiddenRows=true for visible rows only)'),
+  ]
+  if (context.fn !== 'count') {
+    const skipped = (
+      [
+        ['text', 'text, not converted to numbers'],
+        ['error', 'error'],
+        ['blank', 'blank'],
+        ['boolean', 'TRUE/FALSE'],
+      ] as const
+    )
+      .filter(([kind]) => result.skipped[kind].count > 0)
+      .map(([kind, label]) => {
+        const bucket = result.skipped[kind]
+        const examples = bucket.examples
+          .filter((example) => example.value !== null && example.value !== '')
+          .map(
+            (example) =>
+              `${example.address} ${typeof example.value === 'string' ? `"${escapeCellText(example.value)}"` : String(example.value)}`,
+          )
+        return `${bucket.count} ${label}${examples.length > 0 ? ` (e.g. ${examples.join(', ')})` : ''}`
+      })
+    lines.push(
+      `- value cells used: ${result.valuesUsed}; skipped: ${skipped.length > 0 ? skipped.join('; ') : 'none'}`,
+    )
+  }
+  if (result.criteriaNotComparable > 0) {
+    lines.push(
+      `- condition cells that could not be compared as numbers (text or errors, treated as not matching): ${result.criteriaNotComparable}`,
+    )
+  }
+  if (result.cachedFormulaCells > 0) {
+    lines.push(
+      `- ${result.cachedFormulaCells} formula cells read with their cached values from the file (not recalculated by this app; no inputs were edited this session) — say so in your answer`,
+    )
+  }
+  lines.push(
+    `- result: ${result.result === null ? '(no numeric values)' : formatResultNumber(result.result)}`,
+  )
+  if (context.groupBy !== undefined) {
+    lines.push(`Groups (${result.groupCount}, largest result first):`)
+    for (const group of result.groups) {
+      lines.push(
+        `- ${escapeCellText(group.key)}: ${group.result === null ? '(no numeric values)' : formatResultNumber(group.result)} ` +
+          `(rows ${group.rows}${context.fn === 'count' ? '' : `, values used ${group.valuesUsed}`})`,
+      )
+    }
+    if (result.groupCount > result.groups.length) {
+      lines.push(
+        `…${result.groupCount - result.groups.length} more groups not listed (their rows are in the total); raise maxGroups to see them.`,
+      )
+    }
+  }
+  return lines.join('\n')
+}
+
 export function executeWorkbookTool(
   call: AgentToolCall,
   deps: SheetsSkillDeps,
@@ -1117,6 +1310,162 @@ export function executeWorkbookTool(
           output: `${formatRangeAggregate(rangeLabel, outcome.aggregate, topValues)}\n${hiddenLine}${cachedLine}`,
           mutated: false,
           summary: t('aiToolAggregateOf', { range: rangeLabel }),
+        }
+      })
+    }
+
+    case 'summarize_range': {
+      const summary = t('aiToolSummarize')
+      const raw = call.input.range
+      if (typeof raw !== 'string' || !raw.trim())
+        return fail(summary, 'range must be a non-empty string')
+      let bounds: RangeBounds
+      try {
+        bounds = parseRange(raw.trim().toUpperCase().replace(/\$/g, ''))
+      } catch {
+        return fail(summary, `Cannot parse range: ${raw}`)
+      }
+      const hasHeader = call.input.hasHeader !== false
+      if (hasHeader && bounds.endRow === bounds.startRow) {
+        return fail(summary, 'The range holds only its header row; include the data rows below it.')
+      }
+      const column = (name: string, value: unknown): number | { error: string } => {
+        const index = parseColumnLetter(value)
+        if (index === null) return { error: `${name} must be a column letter like "E"` }
+        if (index < bounds.startColumn || index > bounds.endColumn) {
+          return {
+            error: `${name} ${String(value).trim().toUpperCase()} is outside the range ${raw.trim().toUpperCase()}`,
+          }
+        }
+        return index
+      }
+      let valueColumn: number | undefined
+      if (call.input.valueColumn !== undefined) {
+        const parsed = column('valueColumn', call.input.valueColumn)
+        if (typeof parsed !== 'number') return fail(summary, parsed.error)
+        valueColumn = parsed
+      }
+      const fnRaw = call.input.function ?? (valueColumn === undefined ? 'count' : 'sum')
+      if (
+        fnRaw !== 'sum' &&
+        fnRaw !== 'count' &&
+        fnRaw !== 'average' &&
+        fnRaw !== 'min' &&
+        fnRaw !== 'max'
+      ) {
+        return fail(summary, 'function must be one of sum/count/average/min/max')
+      }
+      const fn: SummarizeFunction = fnRaw
+      if (fn !== 'count' && valueColumn === undefined) {
+        return fail(
+          summary,
+          `${fn} needs valueColumn (the column letter whose numbers to aggregate)`,
+        )
+      }
+      let groupBy: number | undefined
+      if (call.input.groupBy !== undefined) {
+        const parsed = column('groupBy', call.input.groupBy)
+        if (typeof parsed !== 'number') return fail(summary, parsed.error)
+        groupBy = parsed
+      }
+      const whereRaw = call.input.where ?? []
+      if (!Array.isArray(whereRaw)) return fail(summary, 'where must be an array of conditions')
+      const where: Criterion[] = []
+      for (const entry of whereRaw) {
+        const condition = (entry ?? {}) as Record<string, unknown>
+        const parsed = column('where.column', condition.column)
+        if (typeof parsed !== 'number') return fail(summary, parsed.error)
+        const op = condition.op
+        if (typeof op !== 'string' || !(CRITERION_OPS as readonly string[]).includes(op)) {
+          return fail(summary, `where.op must be one of ${CRITERION_OPS.join(' ')}`)
+        }
+        const value = condition.value
+        if (op !== 'blank' && op !== 'not_blank') {
+          if (
+            typeof value !== 'string' &&
+            typeof value !== 'number' &&
+            typeof value !== 'boolean'
+          ) {
+            return fail(summary, `where.value is required for op ${op}`)
+          }
+        }
+        where.push({
+          column: parsed,
+          op: op as CriterionOp,
+          ...(typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'
+            ? { value }
+            : {}),
+        })
+      }
+      const used = [
+        ...where.map((criterion) => criterion.column),
+        ...(fn !== 'count' && valueColumn !== undefined ? [valueColumn] : []),
+        ...(groupBy !== undefined ? [groupBy] : []),
+      ]
+      // Only the columns the calculation touches are read.
+      const readBounds: RangeBounds = {
+        startRow: bounds.startRow,
+        endRow: bounds.endRow,
+        startColumn: used.length > 0 ? Math.min(...used) : bounds.startColumn,
+        endColumn: used.length > 0 ? Math.max(...used) : bounds.startColumn,
+      }
+      if (rangeCellCount(readBounds) > MAX_SUMMARIZE_CELLS) {
+        return fail(
+          summary,
+          `The columns used span more than ${MAX_SUMMARIZE_CELLS.toLocaleString('en-US')} cells; summarize fewer rows at a time.`,
+        )
+      }
+      if (!deps.collectRows)
+        return fail(summary, 'summarize_range is not available in this context.')
+      const info = deps.getActiveSheetInfo()
+      const parsedSheet = parseReadSheetId(call.input, info, summary)
+      if ('fail' in parsedSheet) return parsedSheet.fail
+      const sheetId = parsedSheet.sheetId
+      const sheetName =
+        info.sheets.find((sheet) => sheet.id === (sheetId ?? info.sheetId))?.name ?? info.sheetName
+      const groupsRaw = call.input.maxGroups
+      const maxGroups =
+        typeof groupsRaw === 'number' && Number.isFinite(groupsRaw)
+          ? Math.min(Math.max(Math.floor(groupsRaw), 1), MAX_SUMMARIZE_GROUPS)
+          : DEFAULT_SUMMARIZE_GROUPS
+      const hiddenMode = call.input.skipHiddenRows === true ? 'skip' : 'include'
+      const dataStart = bounds.startRow + (hasHeader ? 1 : 0)
+      const rangeLabel = `${sheetName}!${formatAddress(dataStart, bounds.startColumn)}:${formatAddress(bounds.endRow, bounds.endColumn)}`
+      return deps.collectRows(sheetId, readBounds).then((outcome) => {
+        if (!outcome.ok) return fail(summary, outcome.error)
+        const result = summarizeRows(outcome.rows, {
+          startRow: readBounds.startRow,
+          startColumn: readBounds.startColumn,
+          hasHeader,
+          fn,
+          valueColumn,
+          where,
+          groupBy,
+          hiddenRows: hiddenMode,
+          maxGroups,
+        })
+        const done = t('aiToolSummarizeOf', { range: rangeLabel })
+        if (result.cachedFormulaCells > 0 && outcome.staleInputs) {
+          return {
+            output:
+              `NOT RECALCULATED: ${result.cachedFormulaCells} formula cell(s) used by this calculation in ${rangeLabel} hold the ` +
+              "file's cached values from the last save, and cells were edited this session, so the result may be out of date — it is withheld. " +
+              'Tell the user it could not be recalculated (writing the formula on a sheet lets the engine calculate it live).',
+            mutated: false,
+            summary: done,
+          }
+        }
+        return {
+          output: formatSummary(result, {
+            rangeLabel,
+            fn,
+            valueColumn,
+            where,
+            groupBy,
+            hiddenMode,
+          }),
+          mutated: false,
+          summary: done,
         }
       })
     }

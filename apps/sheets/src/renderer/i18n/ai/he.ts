@@ -59,6 +59,8 @@ export const he = {
   aiToolReadRangeOf: 'קריאת הטווח {range}',
   aiToolAggregate: 'סיכום סטטיסטי של טווח',
   aiToolAggregateOf: 'סיכום סטטיסטי של הטווח {range}',
+  aiToolSummarize: 'סיכום מותנה של טווח',
+  aiToolSummarizeOf: 'סיכום מותנה של הטווח {range}',
   aiToolLoadGuide: 'טעינת מדריך',
   aiToolLoadGuideOf: 'טעינת המדריכים {names}',
   aiToolReadFormats: 'קריאת עיצובים',

@@ -62,6 +62,8 @@ export const ko = {
   aiToolReadRangeOf: '범위 {range} 읽기',
   aiToolAggregate: '범위 집계',
   aiToolAggregateOf: '범위 {range} 집계',
+  aiToolSummarize: '조건부 요약',
+  aiToolSummarizeOf: '범위 {range} 조건부 요약',
   aiToolLoadGuide: '가이드 불러오기',
   aiToolLoadGuideOf: '가이드 {names} 불러오기',
   aiToolReadFormats: '서식 읽기',

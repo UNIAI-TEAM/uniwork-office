@@ -58,6 +58,8 @@ export const zh = {
   aiToolReadRangeOf: '读取范围 {range}',
   aiToolAggregate: '统计范围',
   aiToolAggregateOf: '统计范围 {range}',
+  aiToolSummarize: '条件汇总',
+  aiToolSummarizeOf: '条件汇总 {range}',
   aiToolLoadGuide: '加载指南',
   aiToolLoadGuideOf: '加载指南 {names}',
   aiToolReadFormats: '读取格式',

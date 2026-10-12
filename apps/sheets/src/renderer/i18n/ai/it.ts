@@ -64,6 +64,8 @@ export const it = {
   aiToolReadRangeOf: "Lettura dell'intervallo {range}",
   aiToolAggregate: "Aggregazione dell'intervallo",
   aiToolAggregateOf: "Aggregazione dell'intervallo {range}",
+  aiToolSummarize: "Riepiloga l'intervallo",
+  aiToolSummarizeOf: "Riepiloga l'intervallo {range}",
   aiToolLoadGuide: 'Caricamento della guida',
   aiToolLoadGuideOf: 'Caricamento delle guide {names}',
   aiToolReadFormats: 'Lettura dei formati',
