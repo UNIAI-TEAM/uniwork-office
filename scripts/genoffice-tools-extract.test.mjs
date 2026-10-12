@@ -1772,6 +1772,57 @@ describe('division after a property name (G7-06 r4)', () => {
   })
 })
 
+// G706-BE-R8/-R9/-R10 and the fail-closed question (reviewer-be-ext-r4-report.md).
+// The residuals are LATENT under the advisor rule: no reachable trigger at
+// 66169a9a, 0d03b185 or cb76dde5, and their three-rev stdout is byte-identical.
+// They stay todos, with the exact source shape in each comment, so the fixture
+// can be written from them without re-deriving the trigger.
+describe('latent residuals (G7-06 r5)', () => {
+  // LATENT: zero prefix update followed by a regex token at all three revs.
+  // Equality shape, expected `yes` (f0fead82 gives `undeclared`):
+  //   if (call.name === 'target') ++/;/.lastIndex && write(call)
+  //   if (call.name === 'target') --/;/.lastIndex && write(call)
+  // Inequality shape, expected `no` (f0fead82 gives `yes`), the consequent is the
+  // early return and `return read(call)` is the fall-through:
+  //   if (call.name !== 'target') ++/;/.lastIndex && write(call)
+  //   return read(call)
+  // Postfix controls keep their division, expected `yes` under `===`:
+  //   counter++ NL / 2 / write(call)
+  //   counter-- NL / 2 / write(call)
+  it.todo('LATENT G706-BE-R8: prefix ++/-- before a regex member keeps the guard boundary')
+
+  // LATENT: zero decoded `.` or `?.` string followed by a regex-allowing keyword
+  // at all three revs (six `.` strings, each followed by `)` or `:`).
+  // Equality shape inside the guard block, expected `yes` (f0fead82 gives `undeclared`):
+  //   if (call.name === 'target') {
+  //     const x = '.'
+  //     return /}/.test('x') && write(call)
+  //   }
+  // The same with const x = '?.'. Real-member controls, expected `yes`:
+  //   return read(call).output NL / 2 / write(call)
+  //   return read(call).in NL / 2 / write(call)
+  it.todo('LATENT G706-BE-R9: string dot before return does not turn a regex into division')
+
+  // LATENT: verification gap linked to R8/R9. All 40 tests pass while the R8 and
+  // R9 shapes regress, because no fixture covers a prefix update before a regex
+  // member or a decoded dot string before a regex-allowing keyword. The two todos
+  // above are those complementary fixtures; zero occurrences at all three revs.
+  it.todo(
+    'LATENT G706-BE-R10: new tokenizer branches have complementary fixtures for prefix update and string dot',
+  )
+
+  // Fail-closed, not latent: the extractor does not fail closed today. Each probe
+  // below exits 0 with an ordinary cell (report: FAIL CLOSED NO). Expected: a
+  // nonzero exit or an explicit unresolved cell, and no yes/no for that analysis.
+  //   missing final `}` after `if (call.name === 't') return read(call)` + `return write(call)` (today: no)
+  //   `return { mutated:false` never closed, then `return write(call)` (today: yes)
+  //   unknown token `call.name §=== 't'` in the guard condition (today: no)
+  //   unterminated `'oops` after `return read(call) +` (today: no)
+  //   `return wrap(` NL `read(call)` NL `return write(call)`, no matching `)` (today: yes)
+  //   unbounded consequent `return typeof` NL `write(call)` (today: undeclared)
+  it.todo('extractor fails closed on malformed tokens and unbounded guard consequents')
+})
+
 describe('real repo', () => {
   it('produces rows for each of the six apps at HEAD', () => {
     const { rows } = extract({ repo: REPO_ROOT, rev: 'HEAD' })
