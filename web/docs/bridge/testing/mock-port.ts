@@ -116,6 +116,7 @@ export function createMockPort(session: Partial<PortSession> = {}) {
     'api.assets.resolve': () => {
       throw protocolError('unsupported', 'api.assets.resolve')
     },
+    'api.download': () => ({ delivered: true }),
   }
 
   const initSession: PortSession = { documentId: session.documentId ?? 'missing', ...session }
