@@ -1427,6 +1427,13 @@ export function executeWorkbookTool(
       if (!create || !cap('createDocument')) {
         return fail(summary, 'create_document is not available in this context.')
       }
+      // C-BOUND: hidden while bound (workbook-skill.ts); a stray call writes nothing
+      if (deps.isUniworkBound?.() === true) {
+        return fail(
+          summary,
+          'create_document is not available: this workbook is a UniWork document, and AI tools cannot write new files outside it. Make the change in this workbook, or tell the user what file they could create themselves.',
+        )
+      }
       const typeRaw = call.input.type === undefined ? 'xlsx' : String(call.input.type)
       if (
         typeRaw !== 'xlsx' &&
