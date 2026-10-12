@@ -13,18 +13,26 @@ import { strings } from './strings'
 import { accountStrings } from './i18n/strings-account'
 import { cloudStrings } from './i18n/strings-cloud'
 import { uniworkDocumentStrings } from './i18n/strings-uniwork-documents'
+import { syncStrings } from './i18n/strings-sync'
 
 export type StringKey =
   | keyof typeof strings.zh
   | keyof typeof accountStrings.zh
   | keyof typeof cloudStrings.zh
   | keyof typeof uniworkDocumentStrings.zh
+  | keyof typeof syncStrings.zh
 
 // the home table plus the sharded domains (each shard type-checks its own key set)
 const dicts = Object.fromEntries(
   LANGS.map((l) => [
     l,
-    { ...strings[l], ...accountStrings[l], ...cloudStrings[l], ...uniworkDocumentStrings[l] },
+    {
+      ...strings[l],
+      ...accountStrings[l],
+      ...cloudStrings[l],
+      ...uniworkDocumentStrings[l],
+      ...syncStrings[l],
+    },
   ]),
 ) as unknown as LangDicts<Record<StringKey, string>>
 
