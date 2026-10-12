@@ -87,11 +87,14 @@
  *      an identifier (a keyword used as a property name, `read(call).in`), or a
  *      closing `)`/`]`/`}` — ends the statement there: the next line continues
  *      it only when it opens with an operator, a tagged template included, so
- *      the sibling `switch` below is never credited. `return` is a restricted
- *      production: a line break after it ends the statement, so a `(`/`[` on
- *      the next line is not part of the branch. A `call.name === 'x'` anywhere
- *      else (a ternary, a `const`, an argument) controls no path and
- *      contributes nothing.
+ *      the sibling `switch` below is never credited. The tokenizer reads that
+ *      following operator as the operator it is: a `/` after a member name
+ *      (`.in`, `.instanceof`) or a postfix `++`/`--` is division, never a regex
+ *      start (G706-BE-R6), so `read(call).in` / break / `/ 2 / write(call)`
+ *      runs on to the `write` call. `return` is a restricted production: a line
+ *      break after it ends the statement, so a `(`/`[` on the next line is not
+ *      part of the branch. A `call.name === 'x'` anywhere else (a ternary, a
+ *      `const`, an argument) controls no path and contributes nothing.
  * A local helper is resolved by declaration position and lexical scope, not by
  * bare name, so same-named closures in different cases stay distinct. The
  * recursion never enters a helper that is itself a dispatcher — the shared
@@ -340,7 +343,14 @@ function tokenize(src) {
   }
   const regexAllowed = () => {
     if (!last) return true
-    if (last.type === 'ident') return REGEX_OK_AFTER_KEYWORD.has(last.value)
+    if (last.type === 'ident') {
+      if (!REGEX_OK_AFTER_KEYWORD.has(last.value)) return false
+      // a keyword that is a member name (`read(call).in`) is a completed
+      // property access, not an operator: the `/` after it is division, never
+      // the start of a regex (G706-BE-R6)
+      const before = tokens[tokens.length - 2]
+      return !(before && (before.value === '.' || before.value === '?.'))
+    }
     if (
       last.type === 'string' ||
       last.type === 'number' ||
@@ -348,7 +358,9 @@ function tokenize(src) {
       last.type === 'regex'
     )
       return false
-    return ![')', ']', '}'].includes(last.value)
+    // `)`/`]`/`}` close a completed expression and a postfix `++`/`--` ends
+    // one; a `/` after either is division, not a regex start
+    return ![')', ']', '}', '++', '--'].includes(last.value)
   }
   while (i < src.length) {
     const c = src[i]
@@ -1426,7 +1438,10 @@ function continuesExpression(tk) {
  * `satisfies`) that is a property name (`read(call).in`) is a completed member
  * access, not an operator waiting for a right-hand side. Without this, a
  * consequent ending in a template or a property access ran into the statement
- * below it (G706-BE-R3).
+ * below it (G706-BE-R3). The tokenizer agrees with the member-name case: the
+ * `/` that opens the next line there is a division (see `regexAllowed`), so
+ * this suppression only ends a statement that really ended and never cuts a
+ * division continuation short (G706-BE-R6).
  */
 function needsOperand(tokens, k) {
   const tk = tokens[k]
