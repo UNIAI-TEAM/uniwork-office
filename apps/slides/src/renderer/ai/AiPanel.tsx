@@ -61,6 +61,7 @@ import { useI18n, t as tGlobal, aiLangDirective, type TFunc } from '../i18n/loca
 import {
   AiScopeQuote,
   Markdown,
+  useAiModelNeedAction,
   useAiModelNeedHint,
   useAiPanelPrefs,
   type AiScopeQuoteData,
@@ -424,6 +425,7 @@ export function AiPanel({
   const { spellcheck } = useAiPanelPrefs()
   // no key or no known model (web): send stays off and the hint says why, as in AiComposer
   const needModelHint = useAiModelNeedHint()
+  const needModelAction = useAiModelNeedAction()
   const [busy, setBusy] = useState(false)
   const [chat, setChat] = useState<ChatEntry[]>([])
   /** Past conversation restored from JSONL (read-only transcript, not fed to the model) */
@@ -2512,11 +2514,20 @@ export function AiPanel({
               }}
               rows={1}
             />
+            {needModelHint !== null && !busy && (
+              // own full-width row above the footer (as in AiComposer): beside the chip it clipped
+              <div className="ai-input-need" role="status">
+                {needModelAction ? (
+                  <button type="button" className="ai-input-need-link" onClick={needModelAction}>
+                    {needModelHint}
+                  </button>
+                ) : (
+                  needModelHint
+                )}
+              </div>
+            )}
             <div className="ai-input-footer">
               <AiModelPicker bridge={MODEL_BRIDGE} lang={lang} />
-              {needModelHint !== null && !busy && (
-                <span className="ai-input-hint">{needModelHint}</span>
-              )}
               <button
                 className="ai-attach-btn"
                 onClick={pickAttachments}

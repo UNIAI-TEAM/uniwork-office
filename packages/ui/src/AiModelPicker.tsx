@@ -98,15 +98,17 @@ export function AiModelPicker({
   const need = settings ? aiModelPickerNeed(settings) : null
   const needHint =
     settings !== null && !currentUsable && settings.credentialsUnavailable !== true
-      ? bridge.requireModel === true
-        ? hasKey
-          ? strings.needModel
-          : strings.needKey
-        : need === 'model'
-          ? strings.needModel
-          : need === 'key'
-            ? strings.needKey
-            : null
+      ? need === 'base-url'
+        ? strings.needBaseUrl
+        : bridge.requireModel === true
+          ? hasKey
+            ? strings.needModel
+            : strings.needKey
+          : need === 'model'
+            ? strings.needModel
+            : need === 'key'
+              ? strings.needKey
+              : null
       : null
   const openSettings = bridge.openModelSettings
   const openSettingsOnce = useCallback(() => {

@@ -63,13 +63,13 @@ export function aiModelPickerSelection(settings: AiSettings): AiModelPickerSelec
 }
 
 /**
- * What the chosen vendor still lacks before a request can go out: 'model' (a key
- * but no model id) or 'key' (no key, or a custom endpoint without its URL).
- * null for a usable selection and for uniAI, whose access is the cloud account.
+ * What the chosen vendor still lacks before a request can go out: 'model' (no model
+ * id), 'base-url' (a custom endpoint without its server URL; its key is optional) or
+ * 'key' (no API key). null for a usable selection and for uniAI, whose access is the
+ * cloud account.
  */
-export function aiModelPickerNeed(settings: AiSettings): 'key' | 'model' | null {
-  const need = providerNeed(settings, selectedProvider(settings))
-  return need === null ? null : need === 'model' ? 'model' : 'key'
+export function aiModelPickerNeed(settings: AiSettings): 'key' | 'model' | 'base-url' | null {
+  return providerNeed(settings, selectedProvider(settings))
 }
 
 export function withAiModelSelection(
