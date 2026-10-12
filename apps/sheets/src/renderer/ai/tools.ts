@@ -237,7 +237,21 @@ export interface SheetsSkillDeps {
   aggregateRange?(
     sheetId: string | undefined,
     range: RangeBounds,
-  ): Promise<{ ok: true; aggregate: RangeAggregate } | { ok: false; error: string }>
+    options?: { hiddenRows: 'include' | 'skip' },
+  ): Promise<
+    | {
+        ok: true
+        aggregate: RangeAggregate
+        /** hidden/filtered rows inside the range (included or skipped per options) */
+        hiddenRows?: number
+      }
+    | { ok: false; error: string }
+  >
+  /** Hidden/filtered rows inside the range, ascending; read_range marks them. */
+  hiddenRows?(
+    sheetId: string | undefined,
+    range: RangeBounds,
+  ): readonly { row: number; reason: 'hidden' | 'filtered' }[]
   /** `applied` resolves with the real apply result (the lazy path applies async);
    * the tool awaits it so the model never hears "applied" for a batch that failed */
   proposeOperations(
@@ -316,6 +330,12 @@ export const WORKBOOK_TOOLS: AgentToolDef[] = [
         topValues: {
           type: 'number',
           description: 'How many most-frequent values to return (0-50, default 10)',
+        },
+        skipHiddenRows: {
+          type: 'boolean',
+          description:
+            'Leave out rows that are hidden or filtered out (visible rows only, like SUBTOTAL). Default false: hidden rows are included, like SUM. ' +
+            'The result always states how many hidden/filtered rows the range has and whether they were included — repeat that in your answer.',
         },
       },
       required: ['range'],
@@ -864,6 +884,15 @@ export function executeWorkbookTool(
           }
         }
         const cells = deps.readCells(addresses, sheetId)
+        const hidden = new Map(
+          (deps.hiddenRows?.(sheetId, bounds) ?? []).map((entry) => [entry.row, entry.reason]),
+        )
+        const rowLabel = (row: number): string => {
+          const reason = hidden.get(row)
+          return reason === undefined
+            ? String(row + 1)
+            : `${row + 1} (${reason === 'filtered' ? 'filtered out' : 'hidden'})`
+        }
         const header = [
           '',
           ...Array.from({ length: bounds.endColumn - bounds.startColumn + 1 }, (_, offset) =>
@@ -872,7 +901,7 @@ export function executeWorkbookTool(
         ].join('\t')
         const rows: string[] = [metadata, header]
         for (let row = bounds.startRow; row <= bounds.endRow; row += 1) {
-          const columns: string[] = [String(row + 1)]
+          const columns: string[] = [rowLabel(row)]
           for (let column = bounds.startColumn; column <= bounds.endColumn; column += 1) {
             const cell = cells[formatAddress(row, column)]
             columns.push(
@@ -884,6 +913,14 @@ export function executeWorkbookTool(
             )
           }
           rows.push(columns.join('\t'))
+        }
+        if (hidden.size > 0) {
+          rows.push(
+            `Hidden rows in this range: ${[...hidden]
+              .map(([row]) => rowLabel(row))
+              .join(', ')} — not visible to the user; ` +
+              'say whether your answer includes them (aggregate_range skipHiddenRows=true leaves them out).',
+          )
         }
         return {
           output: rows.join('\n'),
@@ -943,15 +980,23 @@ export function executeWorkbookTool(
         typeof topRaw === 'number' && Number.isFinite(topRaw)
           ? Math.min(Math.max(Math.floor(topRaw), 0), MAX_AGGREGATE_TOP_VALUES)
           : DEFAULT_AGGREGATE_TOP_VALUES
-      return deps.aggregateRange(sheetId, bounds).then((outcome) =>
-        outcome.ok
-          ? {
-              output: formatRangeAggregate(rangeLabel, outcome.aggregate, topValues),
-              mutated: false,
-              summary: t('aiToolAggregateOf', { range: rangeLabel }),
-            }
-          : fail(t('aiToolAggregate'), outcome.error),
-      )
+      const hiddenMode = call.input.skipHiddenRows === true ? 'skip' : 'include'
+      return deps.aggregateRange(sheetId, bounds, { hiddenRows: hiddenMode }).then((outcome) => {
+        if (!outcome.ok) return fail(t('aiToolAggregate'), outcome.error)
+        const hiddenLine =
+          outcome.hiddenRows === undefined
+            ? '- hidden/filtered rows: not checked for this range'
+            : outcome.hiddenRows === 0
+              ? '- hidden/filtered rows in the range: 0'
+              : hiddenMode === 'skip'
+                ? `- hidden/filtered rows in the range: ${outcome.hiddenRows.toLocaleString('en-US')} (SKIPPED — the statistics cover visible rows only)`
+                : `- hidden/filtered rows in the range: ${outcome.hiddenRows.toLocaleString('en-US')} (INCLUDED in the statistics; pass skipHiddenRows=true for visible rows only)`
+        return {
+          output: `${formatRangeAggregate(rangeLabel, outcome.aggregate, topValues)}\n${hiddenLine}`,
+          mutated: false,
+          summary: t('aiToolAggregateOf', { range: rangeLabel }),
+        }
+      })
     }
 
     case 'load_guide': {

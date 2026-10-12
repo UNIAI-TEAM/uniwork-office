@@ -413,6 +413,57 @@ export function getActiveSheetInfo(
   }
 }
 
+export type HiddenRowReason = 'hidden' | 'filtered'
+
+/**
+ * Row visibility of a sheet as the user sees it: rows the filter model hides
+ * ('filtered') and rows hidden by hand or by the file ('hidden'). The filter
+ * model lives on the workbook instance, so it answers for never-streamed rows
+ * too; streamed file-hidden rows are also recorded in the lazy state. Returns
+ * null when the sheet cannot be resolved.
+ */
+export function rowVisibilityProbe(
+  ctx: WorkbookReadContext,
+  sheetId?: string,
+): ((row: number) => HiddenRowReason | null) | null {
+  const workbook = ctx.univerRef.current?.univerAPI.getActiveWorkbook()
+  const worksheet =
+    sheetId === undefined ? workbook?.getActiveSheet() : workbook?.getSheetBySheetId(sheetId)
+  if (!worksheet) return null
+  let core: { getRowFiltered(row: number): boolean; getRowRawVisible(row: number): boolean } | null
+  try {
+    core = worksheet.getSheet()
+  } catch {
+    core = null
+  }
+  const fileHidden = ctx.lazyWorkbookRef.current?.hiddenFileRows?.get(worksheet.getSheetId())
+  return (row) => {
+    try {
+      if (core?.getRowFiltered(row)) return 'filtered'
+      if (core && !core.getRowRawVisible(row)) return 'hidden'
+    } catch {
+      // visibility unavailable for this row: fall through to the file record
+    }
+    return fileHidden?.has(row) ? 'hidden' : null
+  }
+}
+
+/** Hidden/filtered rows inside a range, ascending (read_range marks them). */
+export function readHiddenRows(
+  ctx: WorkbookReadContext,
+  bounds: { readonly startRow: number; readonly endRow: number },
+  sheetId?: string,
+): { row: number; reason: HiddenRowReason }[] {
+  const probe = rowVisibilityProbe(ctx, sheetId)
+  if (!probe) return []
+  const rows: { row: number; reason: HiddenRowReason }[] = []
+  for (let row = bounds.startRow; row <= bounds.endRow; row += 1) {
+    const reason = probe(row)
+    if (reason) rows.push({ row, reason })
+  }
+  return rows
+}
+
 export function readCells(
   ctx: WorkbookReadContext,
   addresses: readonly string[],

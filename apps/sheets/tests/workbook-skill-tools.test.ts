@@ -363,6 +363,7 @@ describe('executeWorkbookTool: aggregate_range', () => {
     expect(aggregateRange).toHaveBeenCalledWith(
       'sheet-1',
       expect.objectContaining({ startRow: 1, endRow: 88_587, startColumn: 3, endColumn: 3 }),
+      { hiddenRows: 'include' },
     )
     expect(result.output).toContain('distinct values: 312')
     expect(result.output).toContain('供应商A: 900')

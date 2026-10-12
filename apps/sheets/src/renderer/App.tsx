@@ -261,6 +261,7 @@ import {
 import {
   getActiveSheetInfo as getActiveSheetInfoImpl,
   readCells as readCellsImpl,
+  readHiddenRows as readHiddenRowsImpl,
   readFormats as readFormatsImpl,
   readSheetFeatures as readSheetFeaturesImpl,
   type WorkbookReadContext,
@@ -1689,7 +1690,9 @@ export function App({
   function sheetsSkillDeps(): SheetsSkillDeps {
     return {
       getActiveSheetInfo,
-      aggregateRange: (sheetId, bounds) => aggregateWorkbookRange(readContext(), sheetId, bounds),
+      aggregateRange: (sheetId, bounds, options) =>
+        aggregateWorkbookRange(readContext(), sheetId, bounds, options),
+      hiddenRows: (sheetId, bounds) => readHiddenRowsImpl(readContext(), bounds, sheetId),
       ensureRangeLoaded: async (range, sheetId) => {
         const state = lazyWorkbookRef.current
         if (!state) return true
