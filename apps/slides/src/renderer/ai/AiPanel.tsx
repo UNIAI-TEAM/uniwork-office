@@ -311,6 +311,8 @@ interface AiPanelProps {
   onQueueConsume?: (keys: string[]) => void
   /** view-only UniWork deck: the agent only gets read-only tools, edit-only composer affordances are gone */
   readOnly?: boolean
+  /** UniWork-bound deck: AI generation writes nothing outside the document (no draft, no sidecar) */
+  uniworkBound?: boolean
 }
 
 /** Some locales already end the label with an ellipsis — normalize to exactly one. */
@@ -409,6 +411,7 @@ export function AiPanel({
   onQueueFocus,
   onQueueConsume,
   readOnly = false,
+  uniworkBound = false,
 }: AiPanelProps) {
   const { t, lang } = useI18n()
   // Panel chrome follows the UI language; message text follows its own content (dir=auto below)
@@ -526,6 +529,8 @@ export function AiPanel({
   slidesRef.current = slides
   const readOnlyRef = useRef(readOnly)
   readOnlyRef.current = readOnly
+  const uniworkBoundRef = useRef(uniworkBound)
+  uniworkBoundRef.current = uniworkBound
   const currentRef = useRef(current)
   currentRef.current = current
   const selectedRef = useRef(selectedIds)
@@ -932,6 +937,7 @@ export function AiPanel({
 
     const access: DeckAccess = {
       readOnly: () => readOnlyRef.current,
+      uniworkBound: () => uniworkBoundRef.current,
       getSlides: () => slidesRef.current,
       getCurrent: () => currentRef.current,
       // A queue run names its targets explicitly; whatever is selected on the

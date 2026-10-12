@@ -134,6 +134,11 @@ export interface DeckAccess {
   /** live predicate: the deck is a view-only UniWork document, so only the read-only tools run */
   readOnly?(): boolean
   /**
+   * live predicate: the deck is a UniWork-bound document, so nothing is written outside it
+   * (no style sidecar next to the working copy); generated pages stay unsaved in the editor
+   */
+  uniworkBound?(): boolean
+  /**
    * Cloud single-page generation (gsk slide_generate), used by generate_deck's self-driven
    * pipeline: given the unified style + this page's brief/layout/images, the cloud service
    * writes the HTML and converts it to a one-slide pptx. Returns a marker string that goes
@@ -2463,7 +2468,8 @@ async function executeTool(
       if (state) state.htmlGenerated = true
 
       // ── Sidecar persistence (fail-open): write styleSkill to .styleskill.json next to the draft
-      if (landedPages > 0 && access.saveSidecar && styleSkill) {
+      // (never for a UniWork-bound deck: the file next to it is outside the document)
+      if (landedPages > 0 && access.saveSidecar && styleSkill && !access.uniworkBound?.()) {
         try {
           await access.saveSidecar({
             topic: topic || coreHook || '',
