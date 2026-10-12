@@ -56,9 +56,24 @@ export const UNIWORK_STATE_KEYS: Record<UniworkSaveState, StringKey> = {
   error: 'uwChipError',
 }
 
+/**
+ * A reason the document layer reports beyond the HTTP-level codes: the keychain
+ * holding the sync store's key is locked (session state `keystore-locked`).
+ */
+export type UniworkLockReason = 'keystore_locked'
+
+/** the status-row badge for a lock reason (error tone; the action is Retry, `uwActRetry`) */
+export const UNIWORK_LOCK_BADGE_KEYS: Record<UniworkLockReason, StringKey> = {
+  keystore_locked: 'uwBadgeKeystore',
+}
+
 /** short reason shown after "Blocked:" */
-export function blockedReasonKey(error: UniworkDocErrorCode | undefined): StringKey {
+export function blockedReasonKey(
+  error: UniworkDocErrorCode | UniworkLockReason | undefined,
+): StringKey {
   switch (error) {
+    case 'keystore_locked':
+      return 'uwReasonKeystore'
     case 'forbidden':
       return 'uwReasonForbidden'
     case 'not_found':
@@ -279,6 +294,7 @@ export function openCardOf(view: AccountView): OpenCardModel {
       return { action: 'settings', subKey: 'uwOpenCardSubSetup', attention: true }
     case 'wrong-deployment':
     case 'keyring-unavailable':
+    case 'keystore-locked':
       return { action: 'settings', subKey: 'uwOpenCardSubAttention', attention: true }
     // signed-in, refreshing, server-unreachable (cached session) and the first read:
     // the picker itself reports an unreachable server with a Retry

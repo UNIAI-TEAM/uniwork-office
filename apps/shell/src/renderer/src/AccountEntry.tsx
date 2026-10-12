@@ -21,6 +21,7 @@ const STATE_SUB: Partial<Record<AccountView, StringKey>> = {
   'wrong-deployment': 'acctWrongServerShort',
   'not-configured': 'acctNotConfiguredShort',
   'keyring-unavailable': 'acctKeyringShort',
+  'keystore-locked': 'uwBadgeKeystore',
 }
 
 const WARN_STATES: ReadonlySet<AccountView> = new Set([
@@ -29,6 +30,7 @@ const WARN_STATES: ReadonlySet<AccountView> = new Set([
   'server-unreachable',
   'wrong-deployment',
   'keyring-unavailable',
+  'keystore-locked',
 ])
 
 function Spinner() {

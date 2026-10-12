@@ -36,6 +36,8 @@ export const ACCOUNT_ERROR_KEYS: Record<AccountUiError, StringKey> = {
   wrong_deployment: 'acctErrWrongDeployment',
   not_configured: 'acctErrNotConfigured',
   keyring_unavailable: 'acctErrKeyringUnavailable',
+  // locked (transient), not missing: the sync shard's keychain-locked sentence
+  keystore_locked: 'uwLockKeystoreTitle',
   server_error: 'acctErrServerError',
   malformed_response: 'acctErrMalformedResponse',
 }
