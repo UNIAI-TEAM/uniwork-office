@@ -41,6 +41,9 @@ export const UNIWORK_ERROR_KEYS: Record<UniworkDocErrorCode, StringKey> = {
   timeout: 'uwErrTimeout',
   server_error: 'uwErrServerError',
   malformed_response: 'uwErrMalformedResponse',
+  // refusals before anything is queued: the keychain is locked, or the account's store is full
+  keystore_locked: 'uwReasonKeystore',
+  store_full: 'uwQueueFull',
 }
 
 /** chip label for every save state (ready and saved read the same: nothing is waiting to upload) */
@@ -74,6 +77,8 @@ export function blockedReasonKey(
   switch (error) {
     case 'keystore_locked':
       return 'uwReasonKeystore'
+    case 'store_full':
+      return 'uwReasonStoreFull'
     case 'forbidden':
       return 'uwReasonForbidden'
     case 'not_found':

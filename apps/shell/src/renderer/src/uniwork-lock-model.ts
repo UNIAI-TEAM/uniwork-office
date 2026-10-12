@@ -3,22 +3,39 @@ import { pathKey } from './uniwork-docs-model'
 
 /**
  * S11 lock panel model (G5-04g). Main refuses to open a working copy whose
- * store is newer than this app and pushes a lock; the shell shows one panel per
- * refused path. The strings are keys, translated at render time.
+ * store is newer than this app, or whose store key sits in a locked keychain,
+ * and pushes a lock; the shell shows one panel per refused path. The strings
+ * are keys, translated at render time.
  */
 
-export interface LockCopy {
-  titleKey: 'uwLockNewerStoreTitle'
-  bodyKey: 'uwLockNewerStore'
-  /** the one primary action: dismisses the lock, nothing else */
-  actionKey: 'uwPickClose'
-}
+export type LockCopy =
+  | {
+      titleKey: 'uwLockNewerStoreTitle'
+      bodyKey: 'uwLockNewerStore'
+      /** the one primary action: dismisses the lock, nothing else */
+      actionKey: 'uwPickClose'
+      action: 'dismiss'
+    }
+  | {
+      titleKey: 'uwLockKeystoreTitle'
+      bodyKey: 'uwLockKeystore'
+      /** retries the account (the keychain may be unlocked now); the lock goes away when the store opens */
+      actionKey: 'uwActRetry'
+      action: 'retry'
+    }
 
 const COPY: Record<UniworkLockReason, LockCopy> = {
   store_newer: {
     titleKey: 'uwLockNewerStoreTitle',
     bodyKey: 'uwLockNewerStore',
     actionKey: 'uwPickClose',
+    action: 'dismiss',
+  },
+  keystore_locked: {
+    titleKey: 'uwLockKeystoreTitle',
+    bodyKey: 'uwLockKeystore',
+    actionKey: 'uwActRetry',
+    action: 'retry',
   },
 }
 

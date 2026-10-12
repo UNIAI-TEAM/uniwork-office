@@ -7,6 +7,7 @@ import type {
 } from '../src/shared/home-api'
 import {
   PICKER_SEARCH_DEBOUNCE_MS,
+  UNIWORK_ERROR_KEYS,
   UNIWORK_LOCK_BADGE_KEYS,
   blockedReasonKey,
   chipCopy,
@@ -188,6 +189,38 @@ describe('keystore_locked reason', () => {
     expect(blockedReasonKey('forbidden')).toBe('uwReasonForbidden')
     expect(blockedReasonKey('quota_exceeded')).toBe('uwReasonQuota')
     expect(blockedReasonKey(undefined)).toBe('uwReasonOther')
+  })
+})
+
+describe('store_full reason', () => {
+  it('maps to the store-full reason and the full-store sentence', () => {
+    expect(blockedReasonKey('store_full')).toBe('uwReasonStoreFull')
+    expect(UNIWORK_ERROR_KEYS.store_full).toBe('uwQueueFull')
+    expect(t(blockedReasonKey('store_full'))).toBe(syncStrings.en.uwReasonStoreFull)
+    expect(blockedReasonKey('store_full')).not.toBe(blockedReasonKey(undefined))
+  })
+
+  it('has a sentence for keystore_locked and store_full in every shipped table', () => {
+    expect(UNIWORK_ERROR_KEYS.keystore_locked).toBe('uwReasonKeystore')
+    for (const lang of ['vi', 'en'] as const) {
+      const table = { ...syncStrings[lang], ...uniworkDocumentStrings[lang] } as Record<
+        string,
+        string
+      >
+      expect(table[UNIWORK_ERROR_KEYS.keystore_locked]).toBeTruthy()
+      expect(table[UNIWORK_ERROR_KEYS.store_full]).toBeTruthy()
+    }
+  })
+
+  it('shows the blocked chip with the keychain / full-store reason', () => {
+    const labelOf = (error: 'keystore_locked' | 'store_full') =>
+      chipCopy(chipModelOf(status({ state: 'blocked', error })), t, 'en-US')
+    const keystore = labelOf('keystore_locked')
+    expect(keystore.label).toContain(syncStrings.en.uwReasonKeystore)
+    expect(keystore.title).toContain(syncStrings.en.uwReasonKeystore)
+    const full = labelOf('store_full')
+    expect(full.label).toContain(syncStrings.en.uwReasonStoreFull)
+    expect(full.title).toContain(syncStrings.en.uwQueueFull)
   })
 })
 

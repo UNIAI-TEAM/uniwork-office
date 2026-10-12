@@ -29,11 +29,14 @@ export function useUniworkLocks(
 ): {
   locks: UniworkDocLock[]
   dismiss: (path: string) => void
+  /** read the list again (a keystore lock goes away in main when the store opens, without an event) */
+  refresh: () => void
 } {
   const [locks, setLocks] = useState<UniworkDocLock[]>([])
   /** what happened while the latest read was in flight (null = no read in flight) */
   const reading = useRef<{ dismissed: Set<string>; pushed: UniworkDocLock[] } | null>(null)
   const readSeq = useRef(0)
+  const readRef = useRef<() => void>(() => undefined)
   const onPushRef = useRef(onPush)
   onPushRef.current = onPush
 
@@ -63,6 +66,7 @@ export function useUniworkLocks(
       setLocks((prev) => mergeLocks(prev, [lock]))
     })
     const offAccount = window.aiOffice?.wb?.onBucketChanged?.(readLocks)
+    readRef.current = readLocks
     readLocks()
     return () => {
       live = false
@@ -85,7 +89,9 @@ export function useUniworkLocks(
     [api],
   )
 
-  return { locks, dismiss }
+  const refresh = useCallback(() => readRef.current(), [])
+
+  return { locks, dismiss, refresh }
 }
 
 /** input types that take no typed text: focusing past them cannot eat a keystroke */
@@ -153,10 +159,12 @@ export function UniworkLockPanel({
   lock,
   titleRef,
   onDismiss,
+  onRetry,
 }: {
   lock: UniworkDocLock
   titleRef: RefObject<HTMLHeadingElement | null>
   onDismiss: (path: string) => void
+  onRetry?: () => void
 }) {
   const { t } = useI18n()
   const copy = lockCopyOf(lock)
@@ -184,7 +192,7 @@ export function UniworkLockPanel({
         <button
           type="button"
           className="btn btn-primary uw-lock-action"
-          onClick={() => onDismiss(lock.path)}
+          onClick={() => (copy.action === 'retry' ? onRetry?.() : onDismiss(lock.path))}
         >
           {t(copy.actionKey)}
         </button>
@@ -212,10 +220,16 @@ export function UniworkLockHost({
   /** lock keys already brought forward: a tab the user picks afterwards is not overridden */
   const activated = useRef<Set<string>>(new Set())
   // a push of a lock that is already listed is newly shown again: Home comes forward again
-  const { locks, dismiss } = useUniworkLocks(window.aiOffice, (pushed) =>
+  const { locks, dismiss, refresh } = useUniworkLocks(window.aiOffice, (pushed) =>
     activated.current.delete(pathKey(pushed.path)),
   )
   const lock = shownLock(locks)
+  // Retry (keystore locked): the account re-reads the keychain; main drops the panel once the store opens
+  const retry = useCallback(() => {
+    void (window.aiOffice.accountRetry?.() ?? Promise.resolve())
+      .catch(() => undefined)
+      .finally(refresh)
+  }, [refresh])
   const shownKey = lock ? pathKey(lock.path) : null
   const titleRef = useRef<HTMLHeadingElement>(null)
   const regionRef = useRef<HTMLDivElement>(null)
@@ -293,7 +307,13 @@ export function UniworkLockHost({
         {children}
       </div>
       {lock && (
-        <UniworkLockPanel key={shownKey} lock={lock} titleRef={titleRef} onDismiss={dismiss} />
+        <UniworkLockPanel
+          key={shownKey}
+          lock={lock}
+          titleRef={titleRef}
+          onDismiss={dismiss}
+          onRetry={retry}
+        />
       )}
     </>
   )

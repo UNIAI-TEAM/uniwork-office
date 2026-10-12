@@ -15,6 +15,7 @@ import {
   withoutLock,
 } from '../src/renderer/src/uniwork-lock-model'
 import { uniworkDocumentStrings } from '../src/renderer/src/i18n/strings-uniwork-documents'
+import { syncStrings } from '../src/renderer/src/i18n/strings-sync'
 
 const actEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 actEnvironment.IS_REACT_ACT_ENVIRONMENT = true
@@ -31,10 +32,15 @@ describe('lock model', () => {
       titleKey: 'uwLockNewerStoreTitle',
       bodyKey: 'uwLockNewerStore',
       actionKey: 'uwPickClose',
+      action: 'dismiss',
     })
     for (const lang of ['vi', 'en'] as const) {
-      const table = uniworkDocumentStrings[lang] as Record<string, string>
-      for (const k of Object.values(lockCopyOf({ reason: 'store_newer' }))) {
+      const table = { ...syncStrings[lang], ...uniworkDocumentStrings[lang] } as Record<
+        string,
+        string
+      >
+      const copy = lockCopyOf({ reason: 'store_newer' })
+      for (const k of [copy.titleKey, copy.bodyKey, copy.actionKey]) {
         expect(table[k]).toBeTruthy()
       }
     }
@@ -646,5 +652,98 @@ describe('S11 lock panel: account change and re-push', () => {
     await clickClose()
     expect(api.dismissUniworkLock).toHaveBeenCalledWith(a.path)
     expect(region()).not.toBeNull() // B is still behind it
+  })
+})
+
+describe('S11 lock panel (keystore locked)', () => {
+  const keystoreLock = (name = 'Plan.docx'): UniworkDocLock => ({
+    ...lock(name),
+    reason: 'keystore_locked',
+  })
+  let accountRetry: ReturnType<typeof vi.fn>
+  const actionButton = () => region()!.querySelector('button')!
+
+  beforeEach(() => {
+    accountRetry = vi.fn(async () => ({ loggedIn: true, state: 'keystore-locked' }))
+    ;(window.aiOffice as unknown as { accountRetry: unknown }).accountRetry = accountRetry
+  })
+
+  it('maps keystore_locked to the keychain S11 keys and the Retry action; store_newer is unchanged', () => {
+    expect(lockCopyOf({ reason: 'keystore_locked' })).toEqual({
+      titleKey: 'uwLockKeystoreTitle',
+      bodyKey: 'uwLockKeystore',
+      actionKey: 'uwActRetry',
+      action: 'retry',
+    })
+    expect(lockCopyOf({ reason: 'store_newer' }).action).toBe('dismiss')
+  })
+
+  it('shows the keychain copy and Retry (en)', async () => {
+    await mount()
+    await act(async () => pushLock!(keystoreLock()))
+    await flush()
+    expect(title()!.textContent).toBe(syncStrings.en.uwLockKeystoreTitle)
+    expect(region()!.textContent).toContain(syncStrings.en.uwLockKeystore)
+    expect(title()!.textContent).not.toBe('A newer app version is needed')
+    expect(actionButton().textContent).toBe('Retry')
+    expect(alertText()).toBe(
+      `${syncStrings.en.uwLockKeystoreTitle}. ${syncStrings.en.uwLockKeystore}`,
+    )
+  })
+
+  it('shows the Vietnamese copy and Thử lại', async () => {
+    await mount(true, 'vi')
+    await act(async () => pushLock!(keystoreLock()))
+    await flush()
+    expect(title()!.textContent).toBe(syncStrings.vi.uwLockKeystoreTitle)
+    expect(actionButton().textContent).toBe('Thử lại')
+  })
+
+  it('Retry retries the account and re-reads the locks; it does not dismiss', async () => {
+    await mount()
+    await act(async () => pushLock!(keystoreLock()))
+    await flush()
+    // the keychain was unlocked: main dropped the lock when the store opened
+    initial = []
+    api.uniworkLocks.mockClear()
+    await act(async () => actionButton().click())
+    await flush()
+    expect(accountRetry).toHaveBeenCalledTimes(1)
+    expect(api.dismissUniworkLock).not.toHaveBeenCalled()
+    expect(api.uniworkLocks).toHaveBeenCalledTimes(1)
+    expect(region()).toBeNull()
+  })
+
+  it('keeps the panel when the keychain is still locked after Retry', async () => {
+    const still = keystoreLock()
+    initial = [still]
+    await mount()
+    await act(async () => actionButton().click())
+    await flush()
+    expect(accountRetry).toHaveBeenCalledTimes(1)
+    expect(title()!.textContent).toBe(syncStrings.en.uwLockKeystoreTitle)
+    expect(api.dismissUniworkLock).not.toHaveBeenCalled()
+  })
+
+  it('a failed Retry call still re-reads the locks', async () => {
+    initial = [keystoreLock()]
+    accountRetry.mockRejectedValueOnce(new Error('ipc'))
+    await mount()
+    api.uniworkLocks.mockClear()
+    await act(async () => actionButton().click())
+    await flush()
+    expect(api.uniworkLocks).toHaveBeenCalledTimes(1)
+    expect(region()).not.toBeNull()
+  })
+
+  it('store_newer keeps Close, which dismisses and does not retry', async () => {
+    await mount()
+    await act(async () => pushLock!(lock('Plan.docx')))
+    await flush()
+    expect(actionButton().textContent).toBe('Close')
+    await clickClose()
+    expect(api.dismissUniworkLock).toHaveBeenCalledTimes(1)
+    expect(accountRetry).not.toHaveBeenCalled()
+    expect(region()).toBeNull()
   })
 })
