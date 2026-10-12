@@ -117,6 +117,27 @@ export function retryFence(entry: EntryFence): FenceRange[] | null {
   return entry.ranges ?? []
 }
 
+/**
+ * what a user/assistant entry restored from a stored transcript carries. The stored message does
+ * not say whether a user turn was a queue submission (it is saved as its summary, without scope),
+ * so every restored user entry is fenced with unknown ranges (retryFence then refuses every edit)
+ * and flagged restored, which hides the bubble retry: a fenced turn is never retried unfenced.
+ */
+export function restoredEntryState(role: 'user' | 'assistant'): {
+  restored?: true
+  fence?: EntryFence
+} {
+  return role === 'user' ? { restored: true, fence: { fenced: true } } : {}
+}
+
+/** the bubble retry belongs to a live undelivered entry only, never to a restored one */
+export function canRetryEntry(
+  entry: { undelivered?: boolean; restored?: boolean },
+  busy: boolean,
+): boolean {
+  return !!entry.undelivered && !entry.restored && !busy
+}
+
 export function hasEditFence(editor: Editor): boolean {
   return fences.has(editor)
 }

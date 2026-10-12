@@ -32,6 +32,8 @@ import { setInactiveSelectionShown } from '../editor/inactiveSelection'
 import { queueAnchorRange } from '../editor/aiQueueAnchors'
 import {
   clearEditFence,
+  canRetryEntry,
+  restoredEntryState,
   retryFence,
   setEditFence,
   turnFence,
@@ -115,6 +117,8 @@ interface ChatEntry {
   scope?: AiScopeQuoteData
   /** the edit fence of this user turn (selection scope or queue submission): a retry reuses it, never runs the turn unfenced */
   fence?: EntryFence
+  /** restored from a stored transcript: no retry, its fence ranges are unknown */
+  restored?: true
 }
 
 /** longest selection excerpt echoed on a user bubble */
@@ -588,7 +592,8 @@ export function AiPanel({
               isError: tool.isError,
               output: tool.output ? tool.output.slice(0, TOOL_OUTPUT_MAX_CHARS) : undefined,
             })),
-            ...(m.scope ? { scope: m.scope, fence: { fenced: true } } : {}),
+            ...(m.scope ? { scope: m.scope } : {}),
+            ...restoredEntryState(m.role),
           }))
         })
         if (applied && !loopRef.current?.busy) {
@@ -960,7 +965,7 @@ export function AiPanel({
                 {entry.undelivered && (
                   <div className="ai-msg-undelivered">
                     {t('aiUndelivered')}
-                    {!busy && (
+                    {canRetryEntry(entry, busy) && (
                       <button
                         className="ai-retry-btn"
                         onClick={() => send(entry.text, undefined, entry)}
