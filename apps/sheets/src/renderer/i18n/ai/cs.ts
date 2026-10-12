@@ -101,4 +101,8 @@ export const cs = {
   aiScopeClearTitle: 'Zrušit omezení na oblast a pracovat s celým listem',
   aiViewOnlyNotice:
     'Dokument jen pro čtení: AI jej může číst a odpovídat na otázky, ale nemůže jej upravovat.',
+
+  // U-02 catalogue S9: cells summary under an edited result
+  aiResultCellsMeta:
+    'Zapsané buňky: {written} ({range}) · Přepsané existující buňky: {overwritten}',
 } satisfies Record<keyof typeof zh, string>

@@ -102,4 +102,8 @@ export const pt = {
   aiScopeClearTitle: 'Remover o escopo do intervalo e usar a planilha inteira',
   aiViewOnlyNotice:
     'Documento somente leitura: a IA pode lê-lo e responder a perguntas, mas não pode editá-lo.',
+
+  // U-02 catalogue S9: cells summary under an edited result
+  aiResultCellsMeta:
+    'Células gravadas: {written} ({range}) · Células existentes substituídas: {overwritten}',
 } satisfies Record<keyof typeof zh, string>

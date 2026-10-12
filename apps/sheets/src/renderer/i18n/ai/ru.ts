@@ -101,4 +101,8 @@ export const ru = {
   aiScopeClearTitle: 'Снять область диапазона и работать со всем листом',
   aiViewOnlyNotice:
     'Документ только для просмотра: ИИ может читать его и отвечать на вопросы, но не может редактировать.',
+
+  // U-02 catalogue S9: cells summary under an edited result
+  aiResultCellsMeta:
+    'Записано ячеек: {written} ({range}) · Перезаписано существующих ячеек: {overwritten}',
 } satisfies Record<keyof typeof zh, string>

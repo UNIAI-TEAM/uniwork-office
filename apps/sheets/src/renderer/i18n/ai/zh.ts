@@ -93,4 +93,7 @@ export const zh = {
   aiScopeRangeTip: 'AI 会把"这一列 / 这些行 / 选中部分"理解为该区域；发送后本轮固定不变',
   aiScopeClearTitle: '取消该区域范围，本次针对整张表',
   aiViewOnlyNotice: '仅查看文档:AI 可以阅读并回答问题,但无法编辑。',
+
+  // U-02 catalogue S9: cells summary under an edited result
+  aiResultCellsMeta: '已写入 {written} 个单元格（{range}）· 覆盖已有单元格 {overwritten} 个',
 }

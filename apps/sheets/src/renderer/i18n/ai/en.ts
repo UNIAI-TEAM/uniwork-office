@@ -101,4 +101,8 @@ export const en = {
   aiScopeClearTitle: 'Drop the range scope and target the whole sheet',
   aiViewOnlyNotice:
     'View-only document: AI can read it and answer questions, but editing is turned off.',
+
+  // U-02 catalogue S9: cells summary under an edited result
+  aiResultCellsMeta:
+    'Cells written: {written} ({range}) · Existing cells overwritten: {overwritten}',
 } satisfies Record<keyof typeof zh, string>

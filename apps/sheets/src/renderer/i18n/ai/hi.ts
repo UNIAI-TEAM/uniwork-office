@@ -101,4 +101,7 @@ export const hi = {
   aiScopeClearTitle: 'श्रेणी दायरा हटाएँ और पूरी शीट पर काम करें',
   aiViewOnlyNotice:
     'केवल-देखने योग्य दस्तावेज़: AI इसे पढ़ सकता है और प्रश्नों के उत्तर दे सकता है, लेकिन संपादित नहीं कर सकता।',
+
+  // U-02 catalogue S9: cells summary under an edited result
+  aiResultCellsMeta: 'लिखी गई सेल: {written} ({range}) · ओवरराइट हुई मौजूदा सेल: {overwritten}',
 } satisfies Record<keyof typeof zh, string>

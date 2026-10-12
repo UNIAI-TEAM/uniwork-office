@@ -100,4 +100,8 @@ export const ar = {
   aiScopeClearTitle: 'إلغاء نطاق التحديد واستهداف الورقة بأكملها',
   aiViewOnlyNotice:
     'مستند للعرض فقط: يمكن للذكاء الاصطناعي قراءته والإجابة عن الأسئلة، لكنه لا يستطيع تعديله.',
+
+  // U-02 catalogue S9: cells summary under an edited result
+  aiResultCellsMeta:
+    'الخلايا المكتوبة: {written} ({range}) · الخلايا الموجودة التي تمت الكتابة فوقها: {overwritten}',
 } satisfies Record<keyof typeof zh, string>

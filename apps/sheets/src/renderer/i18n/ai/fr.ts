@@ -102,4 +102,8 @@ export const fr = {
   aiScopeClearTitle: 'Retirer la portée de la plage et viser toute la feuille',
   aiViewOnlyNotice:
     'Document en lecture seule : l’IA peut le lire et répondre à des questions, mais ne peut pas le modifier.',
+
+  // U-02 catalogue S9: cells summary under an edited result
+  aiResultCellsMeta:
+    'Cellules écrites : {written} ({range}) · Cellules existantes remplacées : {overwritten}',
 } satisfies Record<keyof typeof zh, string>

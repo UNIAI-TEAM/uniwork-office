@@ -98,4 +98,7 @@ export const ko = {
     'AI는 "이 열 / 이 행들 / 선택한 부분"을 이 범위로 해석하며, 전송하면 이번 실행 동안 고정됩니다',
   aiScopeClearTitle: '범위 지정을 해제하고 시트 전체를 대상으로 하기',
   aiViewOnlyNotice: '보기 전용 문서: AI는 내용을 읽고 질문에 답할 수 있지만 편집할 수는 없습니다.',
+
+  // U-02 catalogue S9: cells summary under an edited result
+  aiResultCellsMeta: '기록한 셀: {written}({range}) · 덮어쓴 기존 셀: {overwritten}',
 } satisfies Record<keyof typeof zh, string>

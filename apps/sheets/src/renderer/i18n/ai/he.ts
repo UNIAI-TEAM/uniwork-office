@@ -95,4 +95,7 @@ export const he = {
     'ה-AI מפרש "העמודה הזו / השורות האלה / החלק הנבחר" כטווח הזה, והוא מקובע לכל ההרצה עם השליחה',
   aiScopeClearTitle: 'ביטול טווח הבחירה ומיקוד בגיליון כולו',
   aiViewOnlyNotice: 'מסמך לצפייה בלבד: ה-AI יכול לקרוא אותו ולענות על שאלות, אך לא לערוך אותו.',
+
+  // U-02 catalogue S9: cells summary under an edited result
+  aiResultCellsMeta: 'תאים שנכתבו: {written} ({range}) · תאים קיימים שנדרסו: {overwritten}',
 } satisfies Record<keyof typeof zh, string>

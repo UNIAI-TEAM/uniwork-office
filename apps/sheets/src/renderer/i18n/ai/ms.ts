@@ -101,4 +101,8 @@ export const ms = {
   aiScopeClearTitle: 'Buang skop julat dan gunakan seluruh helaian',
   aiViewOnlyNotice:
     'Dokumen lihat sahaja: AI boleh membaca dan menjawab soalan, tetapi tidak boleh mengedit.',
+
+  // U-02 catalogue S9: cells summary under an edited result
+  aiResultCellsMeta:
+    'Sel ditulis: {written} ({range}) · Sel sedia ada ditulis ganti: {overwritten}',
 } satisfies Record<keyof typeof zh, string>

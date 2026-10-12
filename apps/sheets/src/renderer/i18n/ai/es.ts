@@ -103,4 +103,8 @@ export const es = {
   aiScopeClearTitle: 'Quitar el ámbito del rango y usar toda la hoja',
   aiViewOnlyNotice:
     'Documento de solo lectura: la IA puede leerlo y responder preguntas, pero no puede editarlo.',
+
+  // U-02 catalogue S9: cells summary under an edited result
+  aiResultCellsMeta:
+    'Celdas escritas: {written} ({range}) · Celdas existentes sobrescritas: {overwritten}',
 } satisfies Record<keyof typeof zh, string>

@@ -100,4 +100,7 @@ export const vi = {
   aiScopeClearTitle: 'Bỏ phạm vi dải ô và áp dụng cho toàn bộ trang tính',
   aiViewOnlyNotice:
     'Tài liệu chỉ xem: AI có thể đọc và trả lời câu hỏi, nhưng không thể chỉnh sửa.',
+
+  // U-02 catalogue S9: cells summary under an edited result
+  aiResultCellsMeta: 'Đã ghi {written} ô ({range}) · {overwritten} ô có sẵn bị ghi đè',
 } satisfies Record<keyof typeof zh, string>

@@ -94,4 +94,7 @@ export const zhTW = {
   aiScopeRangeTip: 'AI 會把「這一欄 / 這些列 / 選取部分」理解為該範圍；送出後本輪固定不變',
   aiScopeClearTitle: '取消該範圍，本次針對整張工作表',
   aiViewOnlyNotice: '唯讀文件:AI 可以閱讀並回答問題,但無法編輯。',
+
+  // U-02 catalogue S9: cells summary under an edited result
+  aiResultCellsMeta: '已寫入 {written} 個儲存格（{range}）· 覆寫既有儲存格 {overwritten} 個',
 } satisfies Record<keyof typeof zh, string>

@@ -100,4 +100,8 @@ export const pl = {
   aiScopeClearTitle: 'Usuń zakres zaznaczenia i obejmij cały arkusz',
   aiViewOnlyNotice:
     'Dokument tylko do odczytu: AI może go czytać i odpowiadać na pytania, ale nie może go edytować.',
+
+  // U-02 catalogue S9: cells summary under an edited result
+  aiResultCellsMeta:
+    'Zapisane komórki: {written} ({range}) · Nadpisane istniejące komórki: {overwritten}',
 } satisfies Record<keyof typeof zh, string>

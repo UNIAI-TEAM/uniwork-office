@@ -100,4 +100,7 @@ export const id = {
   aiScopeClearTitle: 'Hapus cakupan rentang dan gunakan seluruh lembar',
   aiViewOnlyNotice:
     'Dokumen hanya-lihat: AI dapat membaca dan menjawab pertanyaan, tetapi tidak dapat mengedit.',
+
+  // U-02 catalogue S9: cells summary under an edited result
+  aiResultCellsMeta: 'Sel ditulis: {written} ({range}) · Sel yang ada ditimpa: {overwritten}',
 } satisfies Record<keyof typeof zh, string>

@@ -102,4 +102,8 @@ export const de = {
   aiScopeClearTitle: 'Bereichsvorgabe aufheben und das ganze Blatt verwenden',
   aiViewOnlyNotice:
     'Schreibgeschütztes Dokument: Die KI kann es lesen und Fragen beantworten, aber nicht bearbeiten.',
+
+  // U-02 catalogue S9: cells summary under an edited result
+  aiResultCellsMeta:
+    'Geschriebene Zellen: {written} ({range}) · Überschriebene vorhandene Zellen: {overwritten}',
 } satisfies Record<keyof typeof zh, string>

@@ -100,4 +100,7 @@ export const ja = {
   aiScopeClearTitle: '範囲指定を解除してシート全体を対象にする',
   aiViewOnlyNotice:
     '閲覧専用のドキュメント: AI は内容の読み取りと質問への回答はできますが、編集はできません。',
+
+  // U-02 catalogue S9: cells summary under an edited result
+  aiResultCellsMeta: '書き込んだセル: {written}（{range}）· 上書きした既存セル: {overwritten}',
 } satisfies Record<keyof typeof zh, string>

@@ -102,4 +102,8 @@ export const nl = {
   aiScopeClearTitle: 'Bereikbereik wissen en het hele blad gebruiken',
   aiViewOnlyNotice:
     'Alleen-lezen document: AI kan het lezen en vragen beantwoorden, maar niet bewerken.',
+
+  // U-02 catalogue S9: cells summary under an edited result
+  aiResultCellsMeta:
+    'Geschreven cellen: {written} ({range}) · Overschreven bestaande cellen: {overwritten}',
 } satisfies Record<keyof typeof zh, string>
