@@ -216,7 +216,7 @@ export async function mergeSourcesIntoCurrent(
     if (!workbook) throw new Error(t('appMergeWorkbooksFailed'))
     const commandService = runtime.univer.__getInjector().get(ICommandService)
     const unitId = workbook.getId()
-    const undoDepthBefore = undoStackDepth(runtime)
+    const undoDepthBefore = undoStackDepth(runtime, unitId)
     const taken = new Set<string>(workbook.getSheets().map((sheet) => sheet.getSheetName()))
     const sheetNames: string[] = []
     let importedSheets = 0
@@ -295,7 +295,7 @@ export async function mergeSourcesIntoCurrent(
     }
     setMessage(t('appMergeWorkbooksDone', { sheets: importedSheets, files: sources.length }))
     // a full stack may have shifted out the merge's first items (or older ones)
-    const undoDepthAfter = undoStackDepth(runtime)
+    const undoDepthAfter = undoStackDepth(runtime, unitId)
     const undoSteps =
       undoDepthAfter < UNDO_STACK_CAPACITY ? Math.max(0, undoDepthAfter - undoDepthBefore) : null
     return { importedSheets, files: sources.length, sheetNames, undoSteps }

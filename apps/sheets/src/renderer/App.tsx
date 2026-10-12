@@ -197,7 +197,7 @@ import { createWorkbookSkill } from './ai/workbook-skill'
 import { findWorkbookCells, selectWorkbookRange } from './ai/workbook-search'
 import { traceWorkbookDependents, traceWorkbookPrecedents } from './ai/formula-audit'
 import { createFilesSkill } from './ai/files-skill'
-import { createMergeSkill } from './ai/merge-skill'
+import { createMergeSkill, mergePathsWithUndo } from './ai/merge-skill'
 import { mergeAttachedWorkbooks } from './merge-workbooks'
 import { createSearchSkill } from './ai/search-skill'
 import { createImageSkill } from './ai/image-skill'
@@ -1438,26 +1438,11 @@ export function App({
           gateSkill(
             createMergeSkill({
               getAttachments: availableAttachments,
-              mergePaths: (paths) => {
+              mergePaths: mergePathsWithUndo((paths) => {
                 const runtime = univerRef.current
                 if (!runtime) throw new Error(t('appMergeWorkbooksFailed'))
-                return mergeAttachedWorkbooks({ runtime, lazyWorkbookRef, setMessage }, paths).then(
-                  (result) => {
-                    // same inline [Undo] as an applied plan, when the history holds the whole merge
-                    if (result.undoSteps) {
-                      const undoSteps = result.undoSteps
-                      patchLastAssistant((entry) => ({
-                        ...entry,
-                        autoApplied: {
-                          opCount: (entry.autoApplied?.opCount ?? 0) + result.importedSheets,
-                          undoSteps: (entry.autoApplied?.undoSteps ?? 0) + undoSteps,
-                        },
-                      }))
-                    }
-                    return result
-                  },
-                )
-              },
+                return mergeAttachedWorkbooks({ runtime, lazyWorkbookRef, setMessage }, paths)
+              }, patchLastAssistant),
             }),
             () => cap('mergeWorkbooks'),
           ),

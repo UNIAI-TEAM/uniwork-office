@@ -8,6 +8,7 @@
  */
 import type { AgentSkill } from '@genoffice/agent-core'
 import type { AttachmentMeta } from '../../shared/desktop-api'
+import type { AiChatMessage } from './AiChatPanel'
 import type { MergeSourcesResult } from '../merge-workbooks'
 
 export const SPREADSHEET_ATTACHMENT_EXTS = new Set(['xlsx', 'xlsm', 'xls', 'csv', 'tsv'])
@@ -31,6 +32,31 @@ export function spreadsheetAttachmentIndexes(list: readonly AttachmentMeta[]): n
 export interface MergeSkillDeps {
   getAttachments(): readonly AttachmentMeta[]
   mergePaths(paths: string[]): Promise<MergeSourcesResult>
+}
+
+/**
+ * The merge tool's `mergePaths` as the App wires it: runs the merge, then, when the undo history
+ * holds the whole merge, lands the same inline [Undo] an applied plan gets on the last assistant
+ * entry (`autoApplied.undoSteps`, which the panel renders as the button).
+ */
+export function mergePathsWithUndo(
+  merge: (paths: string[]) => Promise<MergeSourcesResult>,
+  patchLastAssistant: (patch: (entry: AiChatMessage) => AiChatMessage) => void,
+): (paths: string[]) => Promise<MergeSourcesResult> {
+  return async (paths) => {
+    const result = await merge(paths)
+    if (result.undoSteps) {
+      const undoSteps = result.undoSteps
+      patchLastAssistant((entry) => ({
+        ...entry,
+        autoApplied: {
+          opCount: (entry.autoApplied?.opCount ?? 0) + result.importedSheets,
+          undoSteps: (entry.autoApplied?.undoSteps ?? 0) + undoSteps,
+        },
+      }))
+    }
+    return result
+  }
 }
 
 export function createMergeSkill(deps: MergeSkillDeps): AgentSkill {

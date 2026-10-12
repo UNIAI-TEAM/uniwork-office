@@ -140,10 +140,12 @@ function undoRedoService(runtime: UniverRuntime): UndoRedoServiceInternals {
   return runtime.univer.__getInjector().get<UndoRedoServiceInternals>(IUndoRedoService)
 }
 
-export function undoStackDepth(runtime: UniverRuntime | null): number {
+/// Depth of one unit's undo stack; defaults to the active workbook's unit. A caller that spans
+/// awaits pins the unit id once so the before/after reads cannot land on different units.
+export function undoStackDepth(runtime: UniverRuntime | null, pinnedUnitId?: string): number {
   if (!runtime) return 0
   try {
-    const unitId = runtime.univerAPI.getActiveWorkbook()?.getId()
+    const unitId = pinnedUnitId ?? runtime.univerAPI.getActiveWorkbook()?.getId()
     if (!unitId) return 0
     return undoRedoService(runtime)._undoStacks?.get(unitId)?.length ?? 0
   } catch {
