@@ -67,6 +67,8 @@ export const de = {
   aiToolAggregateOf: 'Bereich {range} aggregieren',
   aiToolSummarize: 'Bereich zusammenfassen',
   aiToolSummarizeOf: 'Bereich {range} zusammenfassen',
+  aiToolCompareRanges: 'Bereiche vergleichen',
+  aiToolCompareRangesOf: '{left} mit {right} vergleichen',
   aiToolLoadGuide: 'Leitfaden laden',
   aiToolLoadGuideOf: 'Leitfäden {names} laden',
   aiToolReadFormats: 'Formate lesen',

@@ -67,6 +67,8 @@ export const pt = {
   aiToolAggregateOf: 'Agregar intervalo {range}',
   aiToolSummarize: 'Resumir intervalo',
   aiToolSummarizeOf: 'Resumir intervalo {range}',
+  aiToolCompareRanges: 'Comparar intervalos',
+  aiToolCompareRangesOf: 'Comparar {left} com {right}',
   aiToolLoadGuide: 'Carregar guia',
   aiToolLoadGuideOf: 'Carregar guias {names}',
   aiToolReadFormats: 'Ler formatos',

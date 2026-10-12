@@ -61,6 +61,8 @@ export const he = {
   aiToolAggregateOf: 'סיכום סטטיסטי של הטווח {range}',
   aiToolSummarize: 'סיכום מותנה של טווח',
   aiToolSummarizeOf: 'סיכום מותנה של הטווח {range}',
+  aiToolCompareRanges: 'השוואת טווחים',
+  aiToolCompareRangesOf: 'השוואת {left} עם {right}',
   aiToolLoadGuide: 'טעינת מדריך',
   aiToolLoadGuideOf: 'טעינת המדריכים {names}',
   aiToolReadFormats: 'קריאת עיצובים',

@@ -65,6 +65,8 @@ export const th = {
   aiToolAggregateOf: 'สรุปสถิติช่วง {range}',
   aiToolSummarize: 'สรุปแบบมีเงื่อนไข',
   aiToolSummarizeOf: 'สรุปแบบมีเงื่อนไขของช่วง {range}',
+  aiToolCompareRanges: 'เปรียบเทียบช่วง',
+  aiToolCompareRangesOf: 'เปรียบเทียบ {left} กับ {right}',
   aiToolLoadGuide: 'โหลดคู่มือ',
   aiToolLoadGuideOf: 'โหลดคู่มือ {names}',
   aiToolReadFormats: 'อ่านรูปแบบ',

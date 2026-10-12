@@ -66,6 +66,8 @@ export const it = {
   aiToolAggregateOf: "Aggregazione dell'intervallo {range}",
   aiToolSummarize: "Riepiloga l'intervallo",
   aiToolSummarizeOf: "Riepiloga l'intervallo {range}",
+  aiToolCompareRanges: 'Confronta intervalli',
+  aiToolCompareRangesOf: 'Confronta {left} con {right}',
   aiToolLoadGuide: 'Caricamento della guida',
   aiToolLoadGuideOf: 'Caricamento delle guide {names}',
   aiToolReadFormats: 'Lettura dei formati',

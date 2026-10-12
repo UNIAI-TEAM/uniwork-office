@@ -67,6 +67,8 @@ export const nl = {
   aiToolAggregateOf: 'Bereik {range} aggregeren',
   aiToolSummarize: 'Bereik samenvatten',
   aiToolSummarizeOf: 'Bereik {range} samenvatten',
+  aiToolCompareRanges: 'Bereiken vergelijken',
+  aiToolCompareRangesOf: '{left} vergelijken met {right}',
   aiToolLoadGuide: 'Handleiding laden',
   aiToolLoadGuideOf: 'Handleidingen {names} laden',
   aiToolReadFormats: 'Opmaak lezen',

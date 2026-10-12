@@ -66,6 +66,8 @@ export const ru = {
   aiToolAggregateOf: 'Агрегация диапазона {range}',
   aiToolSummarize: 'Сводка по диапазону',
   aiToolSummarizeOf: 'Сводка по диапазону {range}',
+  aiToolCompareRanges: 'Сравнение диапазонов',
+  aiToolCompareRangesOf: 'Сравнение {left} с {right}',
   aiToolLoadGuide: 'Загрузка руководства',
   aiToolLoadGuideOf: 'Загрузка руководств {names}',
   aiToolReadFormats: 'Чтение форматов',

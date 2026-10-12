@@ -65,6 +65,8 @@ export const ar = {
   aiToolAggregateOf: 'تجميع النطاق {range}',
   aiToolSummarize: 'تلخيص النطاق',
   aiToolSummarizeOf: 'تلخيص النطاق {range}',
+  aiToolCompareRanges: 'مقارنة النطاقات',
+  aiToolCompareRangesOf: 'مقارنة {left} مع {right}',
   aiToolLoadGuide: 'تحميل الدليل',
   aiToolLoadGuideOf: 'تحميل الأدلة {names}',
   aiToolReadFormats: 'قراءة التنسيقات',

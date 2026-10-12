@@ -60,6 +60,8 @@ export const zh = {
   aiToolAggregateOf: '统计范围 {range}',
   aiToolSummarize: '条件汇总',
   aiToolSummarizeOf: '条件汇总 {range}',
+  aiToolCompareRanges: '比较范围',
+  aiToolCompareRangesOf: '比较 {left} 与 {right}',
   aiToolLoadGuide: '加载指南',
   aiToolLoadGuideOf: '加载指南 {names}',
   aiToolReadFormats: '读取格式',

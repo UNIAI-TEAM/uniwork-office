@@ -25,6 +25,7 @@ import { t } from '../i18n/locale'
 import { formatRangeAggregate, type RangeAggregate } from './aggregate'
 import type { CellRead } from './cell-read'
 import type { RangeRowsOutcome } from './range-rows'
+import { reconcileRows, type ReconcileResult, type ReconcileSideResult } from './reconcile'
 import {
   CRITERION_OPS,
   summarizeRows,
@@ -432,6 +433,72 @@ export const WORKBOOK_TOOLS: AgentToolDef[] = [
         },
       },
       required: ['range'],
+    },
+  },
+  {
+    name: 'compare_ranges',
+    description:
+      'Read-only reconciliation of two ranges (two sheets, or a ledger vs a bank export), computed by code: rows are matched on a key column (trimmed, case-insensitive), ' +
+      'and the result lists keys found only on the left, only on the right, and matched keys whose compared values differ (with right − left for numbers). ' +
+      'Compared columns pair by identical header text unless leftColumns/rightColumns give explicit pairs. A number and the same digits stored as text count as different, never cast. ' +
+      'Coverage is always reported: rows processed per side, blank and duplicate keys, hidden rows, and total/subtotal rows (left out by default). Use it instead of reading both ranges and comparing them yourself.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        leftRange: {
+          type: 'string',
+          description:
+            'First table, e.g. "A1:F500" (header in the first row unless hasHeader=false)',
+        },
+        leftSheetId: {
+          type: 'string',
+          description:
+            'Sheet of leftRange (id from get_workbook_context); the active sheet when omitted',
+        },
+        leftKey: { type: 'string', description: 'Key column letter in leftRange, e.g. "A"' },
+        leftColumns: {
+          type: 'array',
+          items: { type: 'string' },
+          description:
+            'Column letters to compare on the left, paired by position with rightColumns',
+        },
+        rightRange: { type: 'string', description: 'Second table, e.g. "A1:D480"' },
+        rightSheetId: {
+          type: 'string',
+          description: 'Sheet of rightRange; the active sheet when omitted',
+        },
+        rightKey: { type: 'string', description: 'Key column letter in rightRange' },
+        rightColumns: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Column letters to compare on the right, same count as leftColumns',
+        },
+        hasHeader: {
+          type: 'boolean',
+          description: 'Both ranges start with a header row (default true)',
+        },
+        tolerance: {
+          type: 'number',
+          description:
+            'Numbers whose absolute difference is at most this compare equal (default 0)',
+        },
+        skipHiddenRows: {
+          type: 'boolean',
+          description:
+            'Leave out hidden/filtered rows on both sides (default false: included and counted)',
+        },
+        includeTotalRows: {
+          type: 'boolean',
+          description:
+            'Also match rows detected as totals/subtotals (default false: left out and listed)',
+        },
+        maxListed: {
+          type: 'number',
+          description:
+            'How many missing keys and differences to list per section (1-200, default 50)',
+        },
+      },
+      required: ['leftRange', 'leftKey', 'rightRange', 'rightKey'],
     },
   },
   {
@@ -1130,6 +1197,111 @@ function formatSummary(
   return lines.join('\n')
 }
 
+const DEFAULT_COMPARE_LISTED = 50
+const MAX_COMPARE_LISTED = 200
+
+function formatComparison(
+  result: ReconcileResult,
+  context: {
+    leftLabel: string
+    rightLabel: string
+    leftKey: number
+    rightKey: number
+    tolerance: number
+    hiddenMode: 'include' | 'skip'
+    includeTotals: boolean
+    maxListed: number
+  },
+): string {
+  const named = (side: ReconcileSideResult, column: number): string => {
+    const header = side.headers.get(column)
+    return header ? `${columnLabel(column)} "${escapeCellText(header)}"` : columnLabel(column)
+  }
+  const show = (value: CellScalar): string =>
+    value === null || value === ''
+      ? '(empty)'
+      : typeof value === 'string'
+        ? `"${escapeCellText(value)}"`
+        : String(value)
+  const sideLine = (name: string, side: ReconcileSideResult): string =>
+    `- ${name}: rows processed ${side.rowsProcessed}; keys ${side.keys}; blank keys: ${side.blankKeys}; ` +
+    `duplicate keys: ${side.duplicateKeys.length}` +
+    (side.duplicateKeys.length > 0
+      ? ` (only the first row of each is compared: ${side.duplicateKeys
+          .slice(0, 10)
+          .map(
+            (entry) =>
+              `"${escapeCellText(entry.key)}" rows ${entry.rows.map((row) => row + 1).join('/')}`,
+          )
+          .join(', ')})`
+      : '') +
+    `; hidden/filtered rows: ${side.hiddenRows}${side.hiddenRows > 0 ? (context.hiddenMode === 'skip' ? ' (skipped)' : ' (included)') : ''}` +
+    (side.totalRows.length > 0
+      ? context.includeTotals
+        ? `; total/subtotal rows included: ${side.totalRows.length}`
+        : `; total/subtotal rows excluded: ${side.totalRows.length} (${side.totalRows
+            .slice(0, 5)
+            .map((entry) => `row ${entry.row + 1}: ${escapeCellText(entry.reason)}`)
+            .join('; ')})`
+      : '')
+  const lines = [
+    `Comparison of ${context.leftLabel} (left) with ${context.rightLabel} (right) by key ` +
+      `${named(result.left, context.leftKey)} ↔ ${named(result.right, context.rightKey)}; compared columns: ` +
+      (result.pairs.length > 0
+        ? result.pairs
+            .map(([left, right]) => `${named(result.left, left)} ↔ ${named(result.right, right)}`)
+            .join(', ')
+        : 'none (no shared header names — keys only; pass leftColumns/rightColumns to compare values)') +
+      (context.tolerance > 0 ? ` (numeric tolerance ${context.tolerance})` : ''),
+    sideLine('left', result.left),
+    sideLine('right', result.right),
+    `- matched keys: ${result.matched} (${result.identical} identical, ${result.matched - result.identical} with differences); ` +
+      `only in left: ${result.onlyLeft.length}; only in right: ${result.onlyRight.length}`,
+  ]
+  const listKeys = (title: string, entries: readonly { key: string; row: number }[]): void => {
+    if (entries.length === 0) return
+    lines.push(
+      `${title} (${entries.length}): ${entries
+        .slice(0, context.maxListed)
+        .map((entry) => `"${escapeCellText(entry.key)}" (row ${entry.row + 1})`)
+        .join(
+          ', ',
+        )}${entries.length > context.maxListed ? `, …${entries.length - context.maxListed} more` : ''}`,
+    )
+  }
+  listKeys('Only in left', result.onlyLeft)
+  listKeys('Only in right', result.onlyRight)
+  if (result.differences.length > 0) {
+    lines.push(`Differences (${result.differences.length} cell(s)):`)
+    for (const difference of result.differences.slice(0, context.maxListed)) {
+      const note =
+        difference.delta !== undefined
+          ? ` (right − left = ${difference.delta})`
+          : typeof difference.left !== typeof difference.right &&
+              difference.left !== null &&
+              difference.right !== null
+            ? ` (${typeof difference.left === 'number' ? 'number' : typeof difference.left === 'string' ? 'text' : typeof difference.left} vs ${typeof difference.right === 'number' ? 'number' : typeof difference.right === 'string' ? 'text' : typeof difference.right})`
+            : ''
+      lines.push(
+        `- "${escapeCellText(difference.key)}": ${named(result.left, difference.leftColumn)} ${show(difference.left)} ↔ ` +
+          `${named(result.right, difference.rightColumn)} ${show(difference.right)}${note} ` +
+          `[left row ${difference.leftRow + 1}, right row ${difference.rightRow + 1}]`,
+      )
+    }
+    if (result.differences.length > context.maxListed) {
+      lines.push(
+        `…${result.differences.length - context.maxListed} more differences not listed; raise maxListed.`,
+      )
+    }
+  }
+  if (result.left.cachedFormulaCells + result.right.cachedFormulaCells > 0) {
+    lines.push(
+      `- ${result.left.cachedFormulaCells + result.right.cachedFormulaCells} formula cells read with their cached values from the file (not recalculated by this app; no inputs were edited this session) — say so in your answer`,
+    )
+  }
+  return lines.join('\n')
+}
+
 export function executeWorkbookTool(
   call: AgentToolCall,
   deps: SheetsSkillDeps,
@@ -1488,6 +1660,171 @@ export function executeWorkbookTool(
             groupBy,
             hiddenMode,
             includeTotals: call.input.includeTotalRows === true,
+          }),
+          mutated: false,
+          summary: done,
+        }
+      })
+    }
+
+    case 'compare_ranges': {
+      const summary = t('aiToolCompareRanges')
+      const info = deps.getActiveSheetInfo()
+      const hasHeader = call.input.hasHeader !== false
+      type Side = {
+        bounds: RangeBounds
+        sheetId: string | undefined
+        key: number
+        columns: number[] | undefined
+        label: string
+      }
+      const parseSide = (prefix: 'left' | 'right'): Side | { error: string } => {
+        const raw = call.input[`${prefix}Range`]
+        if (typeof raw !== 'string' || !raw.trim())
+          return { error: `${prefix}Range must be a non-empty string` }
+        let bounds: RangeBounds
+        try {
+          bounds = parseRange(raw.trim().toUpperCase().replace(/\$/g, ''))
+        } catch {
+          return { error: `Cannot parse ${prefix}Range: ${raw}` }
+        }
+        if (hasHeader && bounds.endRow === bounds.startRow) {
+          return { error: `${prefix}Range holds only its header row` }
+        }
+        if (rangeCellCount(bounds) > MAX_SUMMARIZE_CELLS) {
+          return {
+            error: `${prefix}Range has more than ${MAX_SUMMARIZE_CELLS.toLocaleString('en-US')} cells; compare fewer rows at a time`,
+          }
+        }
+        const inRange = (name: string, value: unknown): number | { error: string } => {
+          const index = parseColumnLetter(value)
+          if (index === null) return { error: `${name} must be a column letter like "A"` }
+          if (index < bounds.startColumn || index > bounds.endColumn) {
+            return {
+              error: `${name} ${String(value).trim().toUpperCase()} is outside ${prefix}Range ${raw.trim().toUpperCase()}`,
+            }
+          }
+          return index
+        }
+        const key = inRange(`${prefix}Key`, call.input[`${prefix}Key`])
+        if (typeof key !== 'number') return key
+        let columns: number[] | undefined
+        const columnsRaw = call.input[`${prefix}Columns`]
+        if (columnsRaw !== undefined) {
+          if (!Array.isArray(columnsRaw) || columnsRaw.length === 0) {
+            return { error: `${prefix}Columns must be a non-empty array of column letters` }
+          }
+          columns = []
+          for (const entry of columnsRaw) {
+            const column = inRange(`${prefix}Columns`, entry)
+            if (typeof column !== 'number') return column
+            columns.push(column)
+          }
+        }
+        const parsedSheet = parseReadSheetId(
+          { sheetId: call.input[`${prefix}SheetId`] },
+          info,
+          summary,
+        )
+        if ('fail' in parsedSheet) return { error: parsedSheet.fail.output }
+        const sheetName =
+          info.sheets.find((sheet) => sheet.id === (parsedSheet.sheetId ?? info.sheetId))?.name ??
+          info.sheetName
+        const dataStart = bounds.startRow + (hasHeader ? 1 : 0)
+        return {
+          bounds,
+          sheetId: parsedSheet.sheetId,
+          key,
+          columns,
+          label: `${sheetName}!${formatAddress(dataStart, bounds.startColumn)}:${formatAddress(bounds.endRow, bounds.endColumn)}`,
+        }
+      }
+      const left = parseSide('left')
+      if ('error' in left) return fail(summary, left.error)
+      const right = parseSide('right')
+      if ('error' in right) return fail(summary, right.error)
+      if ((left.columns === undefined) !== (right.columns === undefined)) {
+        return fail(
+          summary,
+          'Give leftColumns and rightColumns together (or neither, to pair by header)',
+        )
+      }
+      if (left.columns && right.columns && left.columns.length !== right.columns.length) {
+        return fail(summary, 'leftColumns and rightColumns must have the same number of columns')
+      }
+      if (!hasHeader && !left.columns) {
+        return fail(summary, 'Without a header row, give leftColumns and rightColumns to compare')
+      }
+      if (!deps.collectRows)
+        return fail(summary, 'compare_ranges is not available in this context.')
+      const toleranceRaw = call.input.tolerance
+      const tolerance =
+        typeof toleranceRaw === 'number' && Number.isFinite(toleranceRaw) && toleranceRaw > 0
+          ? toleranceRaw
+          : 0
+      const listedRaw = call.input.maxListed
+      const maxListed =
+        typeof listedRaw === 'number' && Number.isFinite(listedRaw)
+          ? Math.min(Math.max(Math.floor(listedRaw), 1), MAX_COMPARE_LISTED)
+          : DEFAULT_COMPARE_LISTED
+      const hiddenMode = call.input.skipHiddenRows === true ? 'skip' : 'include'
+      const includeTotals = call.input.includeTotalRows === true
+      const collect = deps.collectRows
+      return Promise.all([
+        collect(left.sheetId, left.bounds),
+        collect(right.sheetId, right.bounds),
+      ]).then(([leftRows, rightRows]) => {
+        if (!leftRows.ok) return fail(summary, `left: ${leftRows.error}`)
+        if (!rightRows.ok) return fail(summary, `right: ${rightRows.error}`)
+        const result = reconcileRows({
+          left: {
+            rows: leftRows.rows,
+            startRow: left.bounds.startRow,
+            startColumn: left.bounds.startColumn,
+            keyColumn: left.key,
+          },
+          right: {
+            rows: rightRows.rows,
+            startRow: right.bounds.startRow,
+            startColumn: right.bounds.startColumn,
+            keyColumn: right.key,
+          },
+          hasHeader,
+          pairs:
+            left.columns && right.columns
+              ? left.columns.map((column, index): [number, number] => [
+                  column,
+                  right.columns![index]!,
+                ])
+              : undefined,
+          hiddenRows: hiddenMode,
+          totalRows: includeTotals ? 'include' : 'skip',
+          tolerance,
+        })
+        const done = t('aiToolCompareRangesOf', { left: left.label, right: right.label })
+        const stale =
+          (result.left.cachedFormulaCells > 0 && leftRows.staleInputs === true) ||
+          (result.right.cachedFormulaCells > 0 && rightRows.staleInputs === true)
+        if (stale) {
+          return {
+            output:
+              `NOT RECALCULATED: keys or compared values in ${left.label} / ${right.label} are formula cells holding the file's cached values ` +
+              'from the last save, and cells were edited this session, so the comparison may be out of date — it is withheld. ' +
+              'Tell the user it could not be recalculated, or compare ranges without formulas.',
+            mutated: false,
+            summary: done,
+          }
+        }
+        return {
+          output: formatComparison(result, {
+            leftLabel: left.label,
+            rightLabel: right.label,
+            leftKey: left.key,
+            rightKey: right.key,
+            tolerance,
+            hiddenMode,
+            includeTotals,
+            maxListed,
           }),
           mutated: false,
           summary: done,

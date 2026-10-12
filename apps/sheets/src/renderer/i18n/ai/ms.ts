@@ -66,6 +66,8 @@ export const ms = {
   aiToolAggregateOf: 'Agregat julat {range}',
   aiToolSummarize: 'Ringkaskan julat',
   aiToolSummarizeOf: 'Ringkaskan julat {range}',
+  aiToolCompareRanges: 'Bandingkan julat',
+  aiToolCompareRangesOf: 'Bandingkan {left} dengan {right}',
   aiToolLoadGuide: 'Muatkan panduan',
   aiToolLoadGuideOf: 'Muatkan panduan {names}',
   aiToolReadFormats: 'Baca format',

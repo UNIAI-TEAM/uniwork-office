@@ -61,6 +61,8 @@ export const zhTW = {
   aiToolAggregateOf: '統計範圍 {range}',
   aiToolSummarize: '條件彙總',
   aiToolSummarizeOf: '條件彙總 {range}',
+  aiToolCompareRanges: '比較範圍',
+  aiToolCompareRangesOf: '比較 {left} 與 {right}',
   aiToolLoadGuide: '載入指南',
   aiToolLoadGuideOf: '載入指南 {names}',
   aiToolReadFormats: '讀取格式',

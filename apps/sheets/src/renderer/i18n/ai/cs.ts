@@ -66,6 +66,8 @@ export const cs = {
   aiToolAggregateOf: 'Agregace oblasti {range}',
   aiToolSummarize: 'Souhrn oblasti',
   aiToolSummarizeOf: 'Souhrn oblasti {range}',
+  aiToolCompareRanges: 'Porovnat oblasti',
+  aiToolCompareRangesOf: 'Porovnat {left} s {right}',
   aiToolLoadGuide: 'Načtení průvodce',
   aiToolLoadGuideOf: 'Načtení průvodců {names}',
   aiToolReadFormats: 'Načtení formátů',

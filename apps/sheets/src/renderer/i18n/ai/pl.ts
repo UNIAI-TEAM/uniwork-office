@@ -65,6 +65,8 @@ export const pl = {
   aiToolAggregateOf: 'Agregacja zakresu {range}',
   aiToolSummarize: 'Podsumowanie zakresu',
   aiToolSummarizeOf: 'Podsumowanie zakresu {range}',
+  aiToolCompareRanges: 'Porównaj zakresy',
+  aiToolCompareRangesOf: 'Porównaj {left} z {right}',
   aiToolLoadGuide: 'Ładowanie przewodnika',
   aiToolLoadGuideOf: 'Ładowanie przewodników {names}',
   aiToolReadFormats: 'Odczyt formatów',

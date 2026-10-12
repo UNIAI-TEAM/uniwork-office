@@ -65,6 +65,8 @@ export const id = {
   aiToolAggregateOf: 'Agregasi rentang {range}',
   aiToolSummarize: 'Ringkas rentang',
   aiToolSummarizeOf: 'Ringkas rentang {range}',
+  aiToolCompareRanges: 'Bandingkan rentang',
+  aiToolCompareRangesOf: 'Bandingkan {left} dengan {right}',
   aiToolLoadGuide: 'Muat panduan',
   aiToolLoadGuideOf: 'Muat panduan {names}',
   aiToolReadFormats: 'Baca format',

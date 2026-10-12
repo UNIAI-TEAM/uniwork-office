@@ -65,6 +65,8 @@ export const vi = {
   aiToolAggregateOf: 'Tổng hợp dải ô {range}',
   aiToolSummarize: 'Tổng hợp có điều kiện',
   aiToolSummarizeOf: 'Tổng hợp có điều kiện {range}',
+  aiToolCompareRanges: 'Đối chiếu dải ô',
+  aiToolCompareRangesOf: 'Đối chiếu {left} với {right}',
   aiToolLoadGuide: 'Tải hướng dẫn',
   aiToolLoadGuideOf: 'Tải hướng dẫn {names}',
   aiToolReadFormats: 'Đọc định dạng',

@@ -11,6 +11,7 @@ export const VIEW_ONLY_TOOLS: ReadonlySet<string> = new Set([
   'read_range',
   'aggregate_range',
   'summarize_range',
+  'compare_ranges',
   'load_guide',
   'read_formats',
   'read_sheet_features',

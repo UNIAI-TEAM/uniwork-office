@@ -66,6 +66,8 @@ export const hi = {
   aiToolAggregateOf: 'श्रेणी {range} की सांख्यिकी',
   aiToolSummarize: 'श्रेणी का सशर्त सारांश',
   aiToolSummarizeOf: 'श्रेणी {range} का सशर्त सारांश',
+  aiToolCompareRanges: 'श्रेणियों की तुलना',
+  aiToolCompareRangesOf: '{left} की {right} से तुलना',
   aiToolLoadGuide: 'मार्गदर्शिका लोड करें',
   aiToolLoadGuideOf: 'मार्गदर्शिकाएं {names} लोड करें',
   aiToolReadFormats: 'स्वरूप पढ़ें',
