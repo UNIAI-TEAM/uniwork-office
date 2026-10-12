@@ -44,6 +44,7 @@ import type {
   FileSearchSettings,
   UniworkDocErrorCode,
   UniworkDocListPage,
+  UniworkDocLock,
   UniworkDocStatus,
   UniworkLaunchEvent,
   UniworkResult,
@@ -66,6 +67,11 @@ const uniworkLaunches = createLaunchReplay<UniworkLaunchEvent>()
 ipcRenderer.on(
   UNIWORK_DOC_CHANNELS.launchEvent,
   (_event: IpcRendererEvent, event: UniworkLaunchEvent) => uniworkLaunches.deliver(event),
+)
+// a lock can be pushed while the shell page still loads (a cold-start open)
+const uniworkLocks = createLaunchReplay<UniworkDocLock>()
+ipcRenderer.on(UNIWORK_DOC_CHANNELS.lock, (_event: IpcRendererEvent, lock: UniworkDocLock) =>
+  uniworkLocks.deliver(lock),
 )
 
 const UI_LANGUAGES: readonly UiLanguage[] = [
@@ -150,6 +156,20 @@ function asUniworkResult<T>(result: unknown): UniworkResult<T> {
     return result as UniworkResult<T>
   }
   return { ok: false, error: 'malformed_response' satisfies UniworkDocErrorCode }
+}
+
+/** a lock from main: path, reason and name only; anything else is dropped */
+function asUniworkLock(result: unknown): UniworkDocLock | null {
+  if (!result || typeof result !== 'object') return null
+  const r = result as Partial<UniworkDocLock>
+  if (typeof r.path !== 'string' || !r.path) return null
+  if (r.reason !== 'store_newer') return null
+  return { path: r.path, reason: r.reason, name: typeof r.name === 'string' ? r.name : '' }
+}
+
+function asUniworkLocks(result: unknown): UniworkDocLock[] {
+  if (!Array.isArray(result)) return []
+  return result.map(asUniworkLock).filter((lock): lock is UniworkDocLock => lock !== null)
 }
 
 function asUniworkStatus(result: unknown): UniworkDocStatus | null {
@@ -829,6 +849,15 @@ const homeApi: HomeApi = {
   },
   onUniworkLaunch(cb) {
     return uniworkLaunches.subscribe(cb)
+  },
+  onUniworkLock(cb) {
+    return uniworkLocks.subscribe((lock) => cb(asUniworkLock(lock) ?? lock))
+  },
+  async uniworkLocks() {
+    return asUniworkLocks(await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.locks))
+  },
+  async dismissUniworkLock(path) {
+    await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.dismissLock, path)
   },
 }
 

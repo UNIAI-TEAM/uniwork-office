@@ -9,6 +9,7 @@ import type {
   UniworkDocFormat,
   UniworkDocListPage,
   UniworkDocListQuery,
+  UniworkDocLock,
   UniworkDocStatus,
   UniworkLaunchEvent,
   UniworkResult,
@@ -20,7 +21,13 @@ import {
   type DeploymentProfile,
 } from '../uniwork-auth/deployment'
 import type { ProfileOutcome } from '../uniwork-auth/profile-store'
-import { type Binding, BindingStore, type BoundDocument, type LastOwner } from './binding-store'
+import {
+  type Binding,
+  BindingStore,
+  type BoundDocument,
+  type LastOwner,
+  type NewerStore,
+} from './binding-store'
 import { type FetchLike, type UniworkDocsClient, createUniworkDocsClient } from './client'
 import { UniworkDocError } from './errors'
 import {
@@ -30,6 +37,7 @@ import {
   sha256Hex,
   workingCopyName,
 } from './formats'
+import { pathKey } from './path-key'
 import { LaunchController } from './launch'
 import type { DocumentDetail, LaunchDescriptor } from './parse'
 import { SaveCoordinator, toStatus } from './save-coordinator'
@@ -100,6 +108,8 @@ export interface UniworkDocsServiceDeps {
   ui: ConflictUi
   pushStatus(status: UniworkDocStatus): void
   pushLaunch(event: UniworkLaunchEvent): void
+  /** a working copy refused by the newer-store guard (S11 lock panel) */
+  pushLock?(lock: UniworkDocLock): void
   reveal(): void
   /** test seam: replaces the HTTP client */
   client?: UniworkDocsClient
@@ -163,6 +173,8 @@ export class UniworkDocsService {
   private clientOrigin: string | null = null
   private lastOwner: LastOwner | null
   private readonly statusListeners = new Set<(status: UniworkDocStatus) => void>()
+  /** path key -> the newer-store lock currently shown for it (S11) */
+  private readonly locks = new Map<string, UniworkDocLock>()
   /** path -> checksum of the file as of its mtime/size (the sync close check) */
   private readonly hashMemo = new Map<string, { mtimeMs: number; size: number; checksum: string }>()
   /** working copies whose editor holds edits not written to the file yet */
@@ -304,9 +316,59 @@ export class UniworkDocsService {
     )
   }
 
+  // ---- newer-store guard (G5-04g) ------------------------------------------
+
+  /**
+   * The lock for a working copy whose folder declares a store this build does
+   * not read (an integer schema >= 2 binding.json): recorded and pushed, so the
+   * shell shows the S11 panel. True = nothing may open for that path. Nothing
+   * is written and no client call is made: the binding is not parsed at all.
+   */
+  refuseLockedPath(path: string): boolean {
+    const lock = this.store.newerStoreAt(path)
+    if (!lock) return false
+    this.recordLock(lock)
+    return true
+  }
+
+  /** the same for a document folder known before the file name (a launch ticket) */
+  private refuseLockedDir(dir: string): boolean {
+    const lock = this.store.newerStoreIn(dir)
+    if (!lock) return false
+    this.recordLock(lock)
+    return true
+  }
+
+  /** true while a lock is shown for this path (defence in depth: no save, no intent, no request) */
+  isLockedPath(path: string): boolean {
+    return this.locks.has(pathKey(path))
+  }
+
+  /** the locks currently shown (the shell reads them when it mounts) */
+  currentLocks(): UniworkDocLock[] {
+    return [...this.locks.values()]
+  }
+
+  /** "Close" on the S11 panel: the lock is forgotten, nothing else happens */
+  dismissLock(path: string): void {
+    this.locks.delete(pathKey(path))
+  }
+
+  private recordLock(store: NewerStore): void {
+    const lock: UniworkDocLock = { path: store.path, reason: 'store_newer', name: store.name }
+    this.locks.set(pathKey(lock.path), lock)
+    this.deps.pushLock?.(lock)
+  }
+
   // ---- module policy -------------------------------------------------------
 
+  /**
+   * A working copy whose store is newer is bound (so no module treats it as a
+   * plain local file) and read-only (so nothing writes it), even though no
+   * binding could be read.
+   */
   isBound(path: string): boolean {
+    if (this.store.newerStoreAt(path)) return true
     return this.store.lookup(path) !== null
   }
 
@@ -330,8 +392,9 @@ export class UniworkDocsService {
     )
   }
 
-  /** view access, or a working copy of another account/deployment */
+  /** view access, another account's copy, or a newer store this build cannot read */
   isReadOnly(path: string): boolean {
+    if (this.store.newerStoreAt(path)) return true
     const doc = this.store.lookup(path)
     return !!doc && (doc.binding.access === 'view' || !this.ownsLocally(doc))
   }
@@ -812,19 +875,32 @@ export class UniworkDocsService {
     if (!profile || profile.deploymentId !== identity.deploymentId) {
       throw new UniworkDocError('wrong_deployment')
     }
+    // a ticket naming a version is a view ticket (the launch contract: the
+    // client never upgrades a ticket to edit): a read-only copy of that version
+    const viewTicket = !!launch && launch.version > 0
+    const key = viewTicket ? `${documentId}@v${launch.version}` : documentId
+    // G5-04g: the folder is known from the ids alone, so a document whose local
+    // folder declares a newer store is refused BEFORE the first request: no
+    // metadata read, no download, no write to that folder. The ticket itself was
+    // already redeemed (it is the only way to learn the document); the lock is
+    // pushed and the caller gets the "app needs updating" code.
+    const dirs = [
+      this.store.dirFor(identity.deploymentId, identity.accountId, key),
+      this.store.dirFor(identity.deploymentId, identity.accountId, documentId),
+    ]
+    for (const dir of dirs) {
+      if (this.refuseLockedDir(dir)) throw new UniworkDocError('engine_incompatible')
+    }
     const detail = await this.api().getDocument(documentId)
     const format =
       formatForMime(detail.file.mimeType) ??
       formatForName(detail.file.filename) ??
       formatForName(detail.title)
     if (!format) throw new UniworkDocError('unsupported_format')
-    // a ticket naming a version is a view ticket (the launch contract: the
-    // client never upgrades a ticket to edit): a read-only copy of that
-    // version. The one exception is a version that is still the current one
-    // while a tab of the document is open: that tab is focused, neither
-    // duplicated, downgraded nor upgraded. A ticket without a version takes
-    // the live ACL (view only when the descriptor says view).
-    const viewTicket = !!launch && launch.version > 0
+    // A ticket without a version takes the live ACL (view only when the
+    // descriptor says view). The one exception for a version ticket is a
+    // version that is still the current one while a tab of the document is
+    // open: that tab is focused, neither duplicated, downgraded nor upgraded.
     if (viewTicket && launch.version === detail.file.version) {
       const open = await this.openTabCopy(identity, documentId)
       if (open) return this.focusOpen(open.path, open.title)
@@ -832,8 +908,7 @@ export class UniworkDocsService {
     const viewRequested = !!launch && launch.version === 0 && launch.operation === 'view'
     const access: UniworkDocAccess =
       viewTicket || viewRequested ? 'view' : accessFor(detail.myLevel)
-    const key = viewTicket ? `${documentId}@v${launch.version}` : documentId
-    const dir = this.store.dirFor(identity.deploymentId, identity.accountId, key)
+    const dir = dirs[0]!
     const existing = await this.store.readDir(dir)
     const workspaceId = launch?.workspaceId ?? detail.workspaceId
     const orgId = launch?.organizationId ?? detail.organizationId
@@ -931,12 +1006,19 @@ export class UniworkDocsService {
     return { path: local, title: existing.title }
   }
 
+  /** nothing opens for a path whose folder declares a newer store (never a wrong "unsupported") */
+  private refuseOpen(path: string): void {
+    if (this.refuseLockedPath(path)) throw new UniworkDocError('engine_incompatible')
+  }
+
   private focusOpen(path: string, title: string): { path: string; title: string } {
+    this.refuseOpen(path)
     if (!this.deps.openPath(path)) throw new UniworkDocError('unsupported_format')
     return { path, title }
   }
 
   private show(path: string, binding: Binding): { path: string; title: string } {
+    this.refuseOpen(path)
     if (!this.deps.openPath(path)) throw new UniworkDocError('unsupported_format')
     const doc = this.store.lookup(path)
     if (doc) this.publish(toStatus(doc))

@@ -123,6 +123,10 @@ export class SaveCoordinator {
    * document after the attempt (null for an unbound path); never throws.
    */
   async save(path: string): Promise<BoundDocument | null> {
+    // G5-04g defence in depth: a working copy whose folder declares a store this
+    // build does not read never reaches the intent, the upload or the commit,
+    // even if a module somehow has it open.
+    if (this.deps.store.newerStoreAt(path)) return null
     const doc = this.deps.store.lookup(path)
     if (!doc) return null
     if (this.saving.has(doc.path)) return doc
