@@ -26,6 +26,15 @@
  * tools reached only through a capability-keyed `get tools()` getter (the
  * getter itself is not evaluated — the object literal is the definition).
  *
+ * A tool-shaped object with `name` + `description` but no `inputSchema` is also
+ * found through a second, deliberately narrow `name` anchor: the object must be
+ * an element of an array literal whose initializer is annotated with a tool-def
+ * type (`AgentToolDef[]`, `readonly AgentToolDef[]`, `Array<AgentToolDef>`, ...).
+ * An unannotated array, or one typed as anything else (an option list, a typed
+ * command list, a nested `options:` bag), is not a tools list and contributes no
+ * row, so a non-tool `{ name, description }` array cannot manufacture phantom
+ * rows.
+ *
  * module = `agent-core`, or the app directory name (`docs`, `sheets`, `slides`,
  * `pdf`, `markdown`, `html`). source = repo-relative path of the defining file.
  * Rows are sorted by module, then tool name, then source (code-unit order);
@@ -64,9 +73,14 @@
  *      `const`, an argument) controls no path and contributes nothing.
  * A local helper is resolved by declaration position and lexical scope, not by
  * bare name, so same-named closures in different cases stay distinct. The
- * recursion never enters a helper that itself dispatches on `call.name` (the
- * shared `executeTool` / `executeSyncTool` executors), which would otherwise
- * leak another tool's flag into the calling tool.
+ * recursion never enters a helper that is itself a dispatcher — the shared
+ * `executeTool` / `executeSyncTool` executors — which would otherwise leak
+ * another tool's flag into the calling tool. A helper counts as a dispatcher
+ * only when it really branches on `call.name`: a `switch (call.name)`, or a
+ * `call.name ===/!==/==/!= '...'` comparison that is an `if` condition. A
+ * comparison that only picks a value (a ternary, a `const`, an argument)
+ * controls no path, so a mutating helper that mentions `call.name` that way is
+ * still followed and its `mutated: true` still reaches the calling tool.
  *   yes          the reached region returns a ToolExecution with
  *                `mutated: true`, or a computed `mutated:` expression
  *                (e.g. `mutated: changed > 0`) — the code declares a mutation
@@ -1174,18 +1188,25 @@ function declaredMutated(tokens, from, to) {
 }
 
 /**
- * A helper that dispatches on `call.name` itself (the shared `executeTool` /
- * `executeSyncTool` executors). Following such a call would credit the caller
- * with every tool's flag, so the walk stops there.
+ * A helper that really branches on `call.name` itself — the shared
+ * `executeTool` / `executeSyncTool` executors. Following such a call would
+ * credit the caller with every tool's flag, so the walk stops there. A helper
+ * counts only when the branch is real: a `switch (call.name)`, or a
+ * `call.name ===/!==/==/!= '...'` comparison that is an `if` condition. A
+ * comparison that merely picks a value (a ternary, a `const`, an argument)
+ * controls no path, so a mutating helper that mentions `call.name` that way is
+ * still followed and its `mutated: true` still reaches the calling tool.
  */
 function isDispatcher(fn) {
   const tokens = fn.tokens
   for (let k = fn.start; k < fn.end; k += 1) {
     if (atCallName(tokens, k)) {
       const op = tokens[k + 3]
+      const cond = enclosingIfCondition(tokens, k)
       if (
         op &&
-        (op.value === '===' || op.value === '!==' || op.value === '==' || op.value === '!=')
+        (op.value === '===' || op.value === '!==' || op.value === '==' || op.value === '!=') &&
+        cond >= fn.start
       )
         return true
       continue
@@ -1472,16 +1493,86 @@ function collectReadOnlyNames(files) {
 
 // ──────────────────────────── extraction ────────────────────────────
 
+/** an identifier naming a tool-definition type (`AgentToolDef`, `AgentTool`, ...) */
+const TOOL_DEF_TYPE_RE = /^Agent[A-Za-z]*Tool[A-Za-z]*$/
+
+/**
+ * Token indices of the `[` that open a tools-list array literal — one whose
+ * initializer is annotated as a tool-def list (`AgentToolDef[]`,
+ * `readonly AgentToolDef[]`, `Array<AgentToolDef>`). Only such an array is a
+ * tools list for the `name` anchor below: an unannotated array, or one typed as
+ * anything else (an option list, a typed command list, a nested `options:`
+ * bag), is ignored, so a non-tool `{ name, description }` element cannot
+ * manufacture a phantom row.
+ */
+function toolListArrayIndices(tokens) {
+  const out = new Set()
+  for (let b = 1; b < tokens.length; b += 1) {
+    const tk = tokens[b]
+    if (!(tk.type === 'punct' && tk.value === '[')) continue
+    const eq = tokens[b - 1]
+    if (!(eq && eq.type === 'punct' && eq.value === '=')) continue
+    const close = tokens[b - 2]
+    // `X[] = [` — the annotation is a bare tool-def ident followed by `[]`
+    const open = tokens[b - 3]
+    const name = tokens[b - 4]
+    if (
+      close &&
+      close.value === ']' &&
+      open &&
+      open.value === '[' &&
+      name &&
+      name.type === 'ident' &&
+      TOOL_DEF_TYPE_RE.test(name.value)
+    ) {
+      out.add(b)
+      continue
+    }
+    // `Array<X> = [` / `ReadonlyArray<X> = [` — walk back over the generic args
+    if (close && close.value === '>') {
+      let k = b - 2
+      let depth = 0
+      while (k >= 0) {
+        const v = tokens[k].value
+        if (v === '>') depth += 1
+        else if (v === '<') {
+          depth -= 1
+          if (depth === 0) break
+        }
+        k -= 1
+      }
+      const head = tokens[k - 1]
+      const arg = tokens[k + 1]
+      if (
+        head &&
+        head.type === 'ident' &&
+        /^(?:Readonly)?Array$/.test(head.value) &&
+        arg &&
+        arg.type === 'ident' &&
+        TOOL_DEF_TYPE_RE.test(arg.value)
+      ) {
+        out.add(b)
+      }
+    }
+  }
+  return out
+}
+
 /**
  * Candidate tool object literals. `inputSchema` is the primary anchor: any
  * object carrying that key at a value position is a tool definition. `name` is
- * a second anchor, limited to an element of an array literal (the tools list),
- * so a tool-shaped object without `inputSchema` is still found and reported as
- * `unresolved:missing` instead of vanishing; the array-element restriction
- * keeps interface / type-literal braces (which parse as junk) out of the set.
+ * a second anchor, limited to an element of a tools-list array literal (see
+ * `toolListArrayIndices`), so a tool-shaped object without `inputSchema` is
+ * still found and reported as `unresolved:missing` instead of vanishing, while
+ * a `{ name, description }` object in any other array — an option list, a
+ * command palette, a nested options bag — is left alone; the array-element
+ * restriction also keeps interface / type-literal braces (which parse as junk)
+ * out of the set.
  */
 function findToolObjectTokens(tokens) {
+  const toolLists = toolListArrayIndices(tokens)
   const stack = []
+  const brackets = []
   const out = []
   const seen = new Set()
   for (let i = 0; i < tokens.length; i += 1) {
@@ -1489,6 +1580,8 @@ function findToolObjectTokens(tokens) {
     if (tk.type === 'punct') {
       if (tk.value === '{') stack.push(i)
       else if (tk.value === '}') stack.pop()
+      else if (tk.value === '[') brackets.push(i)
+      else if (tk.value === ']') brackets.pop()
       continue
     }
     if (tk.type !== 'ident' && tk.type !== 'string') continue
@@ -1499,7 +1592,10 @@ function findToolObjectTokens(tokens) {
     if (objIdx === undefined || seen.has(objIdx)) continue
     const before = tokens[objIdx - 1]
     if (tk.value === 'name') {
-      // only a tools-list element: preceded by `[`, `,` or `...`
+      // only an element of a tools-list array: preceded by `[`, `,` or `...`,
+      // and the innermost enclosing array annotated as a tool-def list
+      const arr = brackets[brackets.length - 1]
+      if (arr === undefined || !toolLists.has(arr)) continue
       if (!(before && before.type === 'punct' && ['[', ',', '...'].includes(before.value))) continue
     } else if (before && before.type === 'punct' && before.value === ':') {
       // a nested property bag such as `properties: { inputSchema: ... }`
