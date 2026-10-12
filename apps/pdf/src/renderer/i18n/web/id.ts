@@ -4,8 +4,8 @@ export const id = {
   webCancel: 'Batal',
   webConflictTitle: 'Dokumen ini telah diubah di tempat lain',
   webConflictBody:
-    'Versi yang lebih baru disimpan saat Anda mengedit. Timpa dengan versi Anda, atau muat ulang versi terbaru dan buang perubahan Anda?',
-  webConflictOverwrite: 'Timpa',
+    'Perubahan Anda belum ada di UniWork dan disimpan di browser ini sampai Anda keluar.',
+  webConflictOverwrite: 'Timpa…',
   webConflictReload: 'Muat versi terbaru',
   webConflictNotSaved: 'dokumen telah diubah di tempat lain',
   webFatalTitle: 'Dokumen tidak dapat dibuka',

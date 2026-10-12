@@ -507,8 +507,8 @@ export const en = {
   appStyleNamePlaceholder: 'Style name',
   appWebConflictTitle: 'This document was changed elsewhere',
   appWebConflictBody:
-    'A newer version was saved while you were editing. Overwrite it with your version, or reload the latest version and discard your changes?',
-  appWebConflictOverwrite: 'Overwrite',
+    'Your changes aren’t on UniWork yet and are kept in this browser until you sign out.',
+  appWebConflictOverwrite: 'Overwrite…',
   appWebConflictReload: 'Reload latest',
   appWebConflictNotSaved: 'the document was changed elsewhere',
   appWebDiscardTitle: 'Discard unsaved changes?',

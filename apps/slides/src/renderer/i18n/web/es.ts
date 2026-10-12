@@ -3,8 +3,8 @@ import type { zh } from './zh'
 export const es = {
   webConflictTitle: 'Esta presentación se modificó en otro lugar',
   webConflictBody:
-    'Alguien guardó una versión más reciente. Sobrescribir la reemplaza con tus cambios; Recargar la última descarta tus cambios y abre la versión más reciente.',
-  webConflictOverwrite: 'Sobrescribir',
+    'Tus cambios aún no están en UniWork y se conservan en este navegador hasta que cierres sesión.',
+  webConflictOverwrite: 'Sobrescribir…',
   webConflictReload: 'Recargar la última',
   webConflictNotSaved: 'la presentación se modificó en otro lugar',
   webDiscardTitle: '¿Descartar los cambios no guardados?',

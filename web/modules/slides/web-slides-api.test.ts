@@ -238,7 +238,7 @@ describe('save', () => {
     const pending = api.save()
     await waitFor(() => document.querySelector('[data-slides-web="conflict"]'))
     expect(mock.errors.at(-1)?.error).toMatchObject({ code: 'conflict' })
-    clickChoice('conflict', 'Overwrite')
+    clickChoice('conflict', 'Overwrite…')
     expect(await pending).toMatchObject({ ok: true })
     expect(mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(2)
   })

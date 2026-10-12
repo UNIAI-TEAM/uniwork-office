@@ -4,8 +4,8 @@ export const en = {
   webCancel: 'Cancel',
   webConflictTitle: 'This document was changed elsewhere',
   webConflictBody:
-    'A newer version was saved while you were editing. Overwrite it with your version, or reload the latest version and discard your changes?',
-  webConflictOverwrite: 'Overwrite',
+    'Your changes aren’t on UniWork yet and are kept in this browser until you sign out.',
+  webConflictOverwrite: 'Overwrite…',
   webConflictReload: 'Reload latest',
   webConflictNotSaved: 'the document was changed elsewhere',
   webFatalTitle: 'The document could not be opened',

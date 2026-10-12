@@ -1563,8 +1563,8 @@ export const es = {
   appWebViewOnly: 'Solo lectura: no puedes guardar cambios en este libro.',
   appWebConflictTitle: 'Este libro se modificó en otro lugar',
   appWebConflictBody:
-    'Alguien guardó una versión más reciente mientras editabas. Sobrescríbela con tu versión o vuelve a cargar la última versión (se descartarán los cambios sin guardar).',
-  appWebConflictOverwrite: 'Sobrescribir',
+    'Tus cambios aún no están en UniWork y se conservan en este navegador hasta que cierres sesión.',
+  appWebConflictOverwrite: 'Sobrescribir…',
   appWebConflictReload: 'Cargar la última versión',
   appWebConflictNotSaved: 'No guardado: existe una versión más reciente.',
   appWebDiscardTitle: '¿Descartar los cambios sin guardar?',

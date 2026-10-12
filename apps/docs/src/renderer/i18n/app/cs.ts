@@ -512,8 +512,8 @@ export const cs = {
   appStyleNamePlaceholder: 'Název stylu',
   appWebConflictTitle: 'Tento dokument byl změněn jinde',
   appWebConflictBody:
-    'Během úprav byla uložena novější verze. Chcete ji přepsat svou verzí, nebo načíst nejnovější verzi a zahodit své změny?',
-  appWebConflictOverwrite: 'Přepsat',
+    'Vaše změny zatím nejsou v UniWork a zůstanou v tomto prohlížeči, dokud se neodhlásíte.',
+  appWebConflictOverwrite: 'Přepsat…',
   appWebConflictReload: 'Načíst nejnovější verzi',
   appWebConflictNotSaved: 'dokument byl změněn jinde',
   appWebDiscardTitle: 'Zahodit neuložené změny?',

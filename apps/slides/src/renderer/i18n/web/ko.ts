@@ -2,9 +2,8 @@ import type { zh } from './zh'
 
 export const ko = {
   webConflictTitle: '이 프레젠테이션이 다른 곳에서 변경되었습니다',
-  webConflictBody:
-    '누군가 최신 버전을 저장했습니다. 덮어쓰기는 내 변경 내용으로 바꾸고, 최신 버전 다시 불러오기는 내 변경 내용을 버리고 최신 버전을 엽니다.',
-  webConflictOverwrite: '덮어쓰기',
+  webConflictBody: '변경 사항은 아직 UniWork에 없으며 로그아웃할 때까지 이 브라우저에 보관됩니다.',
+  webConflictOverwrite: '덮어쓰기…',
   webConflictReload: '최신 버전 다시 불러오기',
   webConflictNotSaved: '프레젠테이션이 다른 곳에서 변경되었습니다',
   webDiscardTitle: '저장하지 않은 변경 내용을 버리시겠습니까?',

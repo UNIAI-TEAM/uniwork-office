@@ -3,9 +3,8 @@ import type { zh } from './zh'
 export const ja = {
   webCancel: 'キャンセル',
   webConflictTitle: 'このドキュメントは別の場所で変更されました',
-  webConflictBody:
-    '編集中に新しいバージョンが保存されました。自分のバージョンで上書きしますか?それとも最新バージョンを再読み込みして変更を破棄しますか?',
-  webConflictOverwrite: '上書き',
+  webConflictBody: '変更はまだ UniWork になく、ログアウトするまでこのブラウザーに保持されます。',
+  webConflictOverwrite: '上書き…',
   webConflictReload: '最新版を再読み込み',
   webConflictNotSaved: 'ドキュメントは別の場所で変更されています',
   webFatalTitle: 'ドキュメントを開けませんでした',

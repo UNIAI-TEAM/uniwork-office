@@ -3,8 +3,8 @@ import type { zh } from './zh'
 export const ms = {
   webConflictTitle: 'Persembahan ini telah diubah di tempat lain',
   webConflictBody:
-    'Seseorang telah menyimpan versi yang lebih baharu. Tulis ganti menggantikannya dengan perubahan anda; Muat semula terkini membuang perubahan anda dan membuka versi terkini.',
-  webConflictOverwrite: 'Tulis ganti',
+    'Perubahan anda belum ada di UniWork dan disimpan dalam pelayar ini sehingga anda log keluar.',
+  webConflictOverwrite: 'Tulis ganti…',
   webConflictReload: 'Muat semula terkini',
   webConflictNotSaved: 'persembahan telah diubah di tempat lain',
   webDiscardTitle: 'Buang perubahan yang belum disimpan?',

@@ -1556,8 +1556,8 @@ export const nl = {
   appWebViewOnly: 'Alleen-lezen: je kunt wijzigingen in deze werkmap niet opslaan.',
   appWebConflictTitle: 'Deze werkmap is ergens anders gewijzigd',
   appWebConflictBody:
-    'Iemand heeft een nieuwere versie opgeslagen terwijl je bewerkte. Overschrijf die met jouw versie of laad de nieuwste versie opnieuw (niet-opgeslagen wijzigingen gaan verloren).',
-  appWebConflictOverwrite: 'Overschrijven',
+    'Je wijzigingen staan nog niet op UniWork en blijven in deze browser tot je je afmeldt.',
+  appWebConflictOverwrite: 'Overschrijven…',
   appWebConflictReload: 'Nieuwste versie laden',
   appWebConflictNotSaved: 'Niet opgeslagen: er is een nieuwere versie.',
   appWebDiscardTitle: 'Niet-opgeslagen wijzigingen verwerpen?',

@@ -1519,8 +1519,8 @@ export const ms = {
   appWebViewOnly: 'Lihat sahaja: anda tidak boleh menyimpan perubahan pada buku kerja ini.',
   appWebConflictTitle: 'Buku kerja ini telah diubah di tempat lain',
   appWebConflictBody:
-    'Seseorang telah menyimpan versi yang lebih baharu semasa anda menyunting. Tulis gantinya dengan versi anda, atau muat semula versi terkini (perubahan yang belum disimpan akan dibuang).',
-  appWebConflictOverwrite: 'Tulis ganti',
+    'Perubahan anda belum ada di UniWork dan disimpan dalam pelayar ini sehingga anda log keluar.',
+  appWebConflictOverwrite: 'Tulis ganti…',
   appWebConflictReload: 'Muat semula versi terkini',
   appWebConflictNotSaved: 'Tidak disimpan: terdapat versi yang lebih baharu.',
   appWebDiscardTitle: 'Buang perubahan yang belum disimpan?',

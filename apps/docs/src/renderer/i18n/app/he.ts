@@ -502,9 +502,8 @@ export const he = {
   appNewStyleFromSelection: 'סגנון חדש מהקטע המסומן הנוכחי',
   appStyleNamePlaceholder: 'שם הסגנון',
   appWebConflictTitle: 'מסמך זה שונה במקום אחר',
-  appWebConflictBody:
-    'גרסה חדשה יותר נשמרה בזמן שערכת. לדרוס אותה בגרסה שלך, או לטעון מחדש את הגרסה העדכנית ולבטל את השינויים שלך?',
-  appWebConflictOverwrite: 'דריסה',
+  appWebConflictBody: 'השינויים שלך עדיין לא ב-UniWork והם נשמרים בדפדפן הזה עד שתתנתק.',
+  appWebConflictOverwrite: 'דריסה…',
   appWebConflictReload: 'טעינת הגרסה העדכנית',
   appWebConflictNotSaved: 'המסמך שונה במקום אחר',
   appWebDiscardTitle: 'לבטל את השינויים שלא נשמרו?',

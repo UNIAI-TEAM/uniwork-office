@@ -3,8 +3,8 @@ import type { zh } from './zh'
 export const en = {
   webConflictTitle: 'This presentation was changed elsewhere',
   webConflictBody:
-    'Someone saved a newer version. Overwrite replaces it with your changes; Reload latest discards your changes and opens the newest version.',
-  webConflictOverwrite: 'Overwrite',
+    'Your changes aren’t on UniWork yet and are kept in this browser until you sign out.',
+  webConflictOverwrite: 'Overwrite…',
   webConflictReload: 'Reload latest',
   webConflictNotSaved: 'the presentation was changed elsewhere',
   webDiscardTitle: 'Discard unsaved changes?',

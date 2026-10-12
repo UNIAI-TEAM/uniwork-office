@@ -2,9 +2,8 @@ import type { zh } from './zh'
 
 export const ar = {
   webConflictTitle: 'تم تغيير هذا العرض التقديمي في مكان آخر',
-  webConflictBody:
-    'قام شخص ما بحفظ إصدار أحدث. الكتابة فوقه تستبدله بتغييراتك؛ إعادة تحميل الأحدث تتجاهل تغييراتك وتفتح أحدث إصدار.',
-  webConflictOverwrite: 'الكتابة فوقه',
+  webConflictBody: 'تغييراتك ليست على UniWork بعد وتبقى في هذا المتصفح حتى تسجّل الخروج.',
+  webConflictOverwrite: 'استبدال…',
   webConflictReload: 'إعادة تحميل الأحدث',
   webConflictNotSaved: 'تم تغيير العرض التقديمي في مكان آخر',
   webDiscardTitle: 'هل تريد تجاهل التغييرات غير المحفوظة؟',

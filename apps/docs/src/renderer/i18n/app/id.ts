@@ -515,8 +515,8 @@ export const id = {
   appStyleNamePlaceholder: 'Nama gaya',
   appWebConflictTitle: 'Dokumen ini telah diubah di tempat lain',
   appWebConflictBody:
-    'Versi yang lebih baru disimpan saat Anda mengedit. Timpa dengan versi Anda, atau muat ulang versi terbaru dan buang perubahan Anda?',
-  appWebConflictOverwrite: 'Timpa',
+    'Perubahan Anda belum ada di UniWork dan disimpan di browser ini sampai Anda keluar.',
+  appWebConflictOverwrite: 'Timpa…',
   appWebConflictReload: 'Muat versi terbaru',
   appWebConflictNotSaved: 'dokumen telah diubah di tempat lain',
   appWebDiscardTitle: 'Buang perubahan yang belum disimpan?',

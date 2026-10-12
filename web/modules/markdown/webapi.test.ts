@@ -214,7 +214,7 @@ describe('markdownApi: save conflicts', () => {
   it('shows Reload latest / Overwrite / Cancel in the UI language, Overwrite destructive, Reload latest primary, Cancel focused', async () => {
     const { pending, click, mock } = await conflicted()
     const labels = [...document.querySelectorAll('[data-choice]')].map((b) => b.textContent)
-    expect(labels).toEqual(['Reload latest', 'Overwrite', 'Cancel'])
+    expect(labels).toEqual(['Reload latest', 'Overwrite…', 'Cancel'])
     expect(document.querySelector('.ow-dlg-btn.danger')?.getAttribute('data-choice')).toBe(
       'overwrite',
     )

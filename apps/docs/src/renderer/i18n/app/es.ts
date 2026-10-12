@@ -519,8 +519,8 @@ export const es = {
   appStyleNamePlaceholder: 'Nombre del estilo',
   appWebConflictTitle: 'Este documento se modificó en otro lugar',
   appWebConflictBody:
-    'Se guardó una versión más reciente mientras editabas. ¿Quieres sobrescribirla con tu versión o volver a cargar la última versión y descartar tus cambios?',
-  appWebConflictOverwrite: 'Sobrescribir',
+    'Tus cambios aún no están en UniWork y se conservan en este navegador hasta que cierres sesión.',
+  appWebConflictOverwrite: 'Sobrescribir…',
   appWebConflictReload: 'Cargar la última versión',
   appWebConflictNotSaved: 'el documento se modificó en otro lugar',
   appWebDiscardTitle: '¿Descartar los cambios sin guardar?',
