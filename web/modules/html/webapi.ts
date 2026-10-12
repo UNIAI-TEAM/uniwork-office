@@ -39,6 +39,8 @@ export const HTML_WEB_CAPABILITIES = Object.freeze({
   presentNewTab: false,
   // html2docx drives a hidden browser window (desktop main process)
   exportDocx: false,
+  // chat attachments are parsed in the desktop main process; readAttachment is a stub here
+  attachments: false,
 })
 
 /** host grants -> entries: the text-module ones, and visual edit only where the user may save */

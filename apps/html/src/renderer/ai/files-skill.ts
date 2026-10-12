@@ -1,12 +1,16 @@
 import type { AgentSkill } from '@genoffice/agent-core'
 import type { AttachmentMeta } from '../../shared/ipc'
 import { ATTACHMENT_IMAGE_EXTS } from '../../shared/ipc'
+import { cap } from '../capabilities'
 import { t } from '../i18n/locale'
 
 /**
  * Chat attachments as an AgentSkill (same contract as the docs panel): the
  * per-turn context lists the attached local files and read_attachment pages
  * through their extracted text; parsing happens in the main process.
+ * Offered only while the `attachments` capability is on (off on the web
+ * frame, where readAttachment is a stub): off, the skill contributes no tool,
+ * prompt or context, re-read live before every model request.
  */
 
 const READ_CHUNK_CHARS = 24_000
@@ -26,28 +30,34 @@ function formatSize(bytes: number): string {
 }
 
 export function createFilesSkill(getAttachments: () => AttachmentMeta[]): AgentSkill {
+  const tools: AgentSkill['tools'] = [
+    {
+      name: 'read_attachment',
+      description:
+        'Read the text content of an attachment (parsed locally). Long files are paged: read offset=0 first, then decide whether to continue based on the returned total character count.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          index: {
+            type: 'integer',
+            description: 'attachment index (0-based, see the attachment list)',
+          },
+          offset: { type: 'integer', description: 'start character position, default 0' },
+        },
+        required: ['index'],
+      },
+    },
+  ]
   return {
     id: 'files',
-    systemPrompt: FILES_SYSTEM_PROMPT,
-    tools: [
-      {
-        name: 'read_attachment',
-        description:
-          'Read the text content of an attachment (parsed locally). Long files are paged: read offset=0 first, then decide whether to continue based on the returned total character count.',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            index: {
-              type: 'integer',
-              description: 'attachment index (0-based, see the attachment list)',
-            },
-            offset: { type: 'integer', description: 'start character position, default 0' },
-          },
-          required: ['index'],
-        },
-      },
-    ],
+    get systemPrompt() {
+      return cap('attachments') ? FILES_SYSTEM_PROMPT : ''
+    },
+    get tools() {
+      return cap('attachments') ? tools : []
+    },
     buildContext: () => {
+      if (!cap('attachments')) return ''
       const list = getAttachments()
       if (list.length === 0) return ''
       const lines = list.map((a, i) => `${i} | ${a.name} | .${a.ext} | ${formatSize(a.sizeBytes)}`)
@@ -56,6 +66,13 @@ export function createFilesSkill(getAttachments: () => AttachmentMeta[]): AgentS
     executeTool: async (call) => {
       if (call.name !== 'read_attachment') {
         return { output: `unknown tool: ${call.name}`, isError: true, summary: call.name }
+      }
+      if (!cap('attachments')) {
+        return {
+          output: 'attachments are not available here',
+          isError: true,
+          summary: t('aiSumReadAttachment'),
+        }
       }
       const list = getAttachments()
       const index = Number(call.input.index)

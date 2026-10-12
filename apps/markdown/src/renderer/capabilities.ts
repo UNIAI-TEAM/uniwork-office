@@ -9,6 +9,8 @@ import { createCapabilityReader, type CapabilityObject } from '@genoffice/ui/cap
  *   autoSave                                     AutoSave toggle + 30 s / blur autosave timer
  *   openInDocs                                   "export .docx and open in Docs"
  *   imageHost                                    bring-your-own image host settings (Insert ribbon)
+ *   aiImageFetch                                 AI insert_image: download a picture URL beside the document
+ *                                                (desktop main process; the web frame has no such route)
  *   saveStatus, viewOnlyChip                     the renderer's own save-state label (status bar) and "view only" chip;
  *                                                false on the web: the host header + one banner announce them
  *   save                                         false = view only (host withheld `save`)
@@ -22,6 +24,7 @@ export type MarkdownCapability =
   | 'autoSave'
   | 'openInDocs'
   | 'imageHost'
+  | 'aiImageFetch'
   | 'save'
   | 'saveStatus'
   | 'viewOnlyChip'
