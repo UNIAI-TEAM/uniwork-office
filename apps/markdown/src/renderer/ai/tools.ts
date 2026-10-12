@@ -141,7 +141,7 @@ export const AGENT_TOOLS: AgentToolDef[] = [
   },
   {
     name: 'apply_ops',
-    description: `Edit the document with a batch of ops — the same operations the editor's own toolbar performs. Ops run in order and stop at the first failure; the result lists what each op did.\n\n${buildOpsGuide()}`,
+    description: `Edit the document with a batch of ops — the same operations the editor's own toolbar performs. Ops run in order as one atomic batch: if any op fails, nothing is applied (the ops before it are undone) and the result names the failing op; otherwise the result lists what each op did.\n\n${buildOpsGuide()}`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -280,12 +280,16 @@ function applyOps(editor: Editor, input: unknown, fm?: FrontmatterAccess): ToolE
   )
   const skipped = parsed.ops.length - r.results.length
   if (skipped > 0) lines.push(`${skipped} later op(s) were not executed.`)
+  if (r.rolledBack) {
+    lines.push(
+      'Nothing was applied (atomic): the ops before the failure were undone and the document is unchanged. Fix the failing op and resend the whole batch.',
+    )
+  }
   if (r.blocksChanged) lines.push(INDEX_CHANGE_NOTICE)
   if (r.applied > 0) markDocSeen(editor)
-  const failed = r.applied < parsed.ops.length
   return {
     output: lines.join('\n'),
-    isError: failed || undefined,
+    isError: r.rolledBack || undefined,
     mutated: r.applied > 0,
     summary: opsSummary(parsed.ops, r.applied),
   }

@@ -1,6 +1,6 @@
 import type { Editor, ChainedCommands, SingleCommands } from '@tiptap/core'
 import type { Node as PmNode } from '@tiptap/pm/model'
-import { NodeSelection, TextSelection, type Transaction } from '@tiptap/pm/state'
+import { NodeSelection, Selection, TextSelection, type Transaction } from '@tiptap/pm/state'
 import type { Mapping } from '@tiptap/pm/transform'
 import { createTable } from '@tiptap/extension-table'
 import { stripLegacyFencedDivs } from '../markdown/docText'
@@ -95,10 +95,12 @@ export interface OpMeta {
 
 export interface RunOpsResult {
   results: OpResult[]
-  /** ops executed before the first failure (all of them on success) */
+  /** ops that took effect: all of them on success, 0 when a failure rolled the batch back */
   applied: number
   /** the top-level block list changed shape — indexes the model holds are stale */
   blocksChanged: boolean
+  /** an op failed and the ops before it were undone: the document is as it was before the call */
+  rolledBack: boolean
 }
 
 type FieldType =
@@ -984,12 +986,13 @@ function execOp(exec: Exec, op: MdOp): OpResult {
 const IN_PLACE_OPS = new Set<OpName>(['replaceText', 'setStyle', 'setLink', 'setFrontmatter'])
 
 /**
- * Execute ops in order, stopping at the first failure. Index-addressed ops
- * keep meaning "the document as it was before the call": positions are
- * mapped through every transaction the earlier ops dispatched.
+ * Execute ops in order, stopping at the first failure. An AI batch is atomic:
+ * the failure also undoes every op that ran before it (body, frontmatter,
+ * selection), so a failed batch never leaves a half-edited document. Index-addressed ops keep
+ * meaning "the document as it was before the call": positions are mapped
+ * through every transaction the earlier ops dispatched.
  */
 let batchSeq = 0
-
 export function runOps(editor: Editor, ops: MdOp[], ctx: OpsContext): RunOpsResult {
   const batch = ++batchSeq
   const exec: Exec = {
@@ -999,8 +1002,25 @@ export function runOps(editor: Editor, ops: MdOp[], ctx: OpsContext): RunOpsResu
     mappings: [],
     meta: { op: ops[0]!.op, source: ctx.source, batch },
   }
-  const onTransaction = ({ transaction }: { transaction: Transaction }) => {
-    if (transaction.docChanged) exec.mappings.push(transaction.mapping)
+  const origSelection = editor.state.selection.toJSON()
+  const origFrontmatter = ops.some((op) => op.op === 'setFrontmatter')
+    ? ctx.frontmatter?.read()
+    : undefined
+  // every doc-changing transaction of the batch, appended ones included, for the rollback
+  const dispatched: Transaction[] = []
+  const onTransaction = ({
+    transaction,
+    appendedTransactions,
+  }: {
+    transaction: Transaction
+    appendedTransactions?: Transaction[]
+  }) => {
+    for (const tr of [transaction, ...(appendedTransactions ?? [])]) {
+      if (tr.docChanged) {
+        exec.mappings.push(tr.mapping)
+        dispatched.push(tr)
+      }
+    }
   }
   editor.on('transaction', onTransaction)
   const results: OpResult[] = []
@@ -1020,12 +1040,47 @@ export function runOps(editor: Editor, ops: MdOp[], ctx: OpsContext): RunOpsResu
   } finally {
     editor.off('transaction', onTransaction)
   }
+  // UI actions keep a failed op's partial effect (e.g. /paragraph lifting a quote, then
+  // finding the block already a paragraph); the AI batch is all-or-nothing
+  const failed = results.some((r) => !r.ok)
+  if (failed && ctx.source === 'ai') {
+    rollbackBatch(exec, dispatched, origSelection)
+    if (origFrontmatter !== undefined && ctx.frontmatter?.read() !== origFrontmatter)
+      ctx.frontmatter?.write(origFrontmatter)
+    return { results, applied: 0, blocksChanged: false, rolledBack: true }
+  }
   const applied = results.filter((r) => r.ok).length
   return {
     results,
     applied,
     blocksChanged: ops.slice(0, applied).some((op) => !IN_PLACE_OPS.has(op.op)),
+    rolledBack: false,
   }
+}
+
+/**
+ * Invert every transaction of a failed batch in one step-wise transaction.
+ * It stays out of the undo history: the batch's own history items map
+ * through it to nothing, so undo can never re-apply part of the batch.
+ */
+function rollbackBatch(exec: Exec, dispatched: Transaction[], selection: unknown): void {
+  const { editor } = exec
+  if (editor.isDestroyed) return
+  const tr = editor.state.tr
+  for (let t = dispatched.length - 1; t >= 0; t--) {
+    const applied = dispatched[t]!
+    for (let i = applied.steps.length - 1; i >= 0; i--) {
+      tr.step(applied.steps[i]!.invert(applied.docs[i]!))
+    }
+  }
+  try {
+    tr.setSelection(Selection.fromJSON(tr.doc, selection))
+  } catch {
+    // the original selection no longer resolves; keep the mapped one
+  }
+  tr.setMeta(OP_META, { ...exec.meta, rollback: true })
+  tr.setMeta('addToHistory', false)
+  editor.view.dispatch(tr)
 }
 
 /** UI convenience: one op on the current selection, focus kept in the editor */
