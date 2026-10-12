@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   parseDeploymentProfile,
+  readBuildDefaults,
   redirectUriForProfile,
   resolveDeploymentProfile,
   type DeploymentProfile,
@@ -367,17 +368,40 @@ describe('deployment profile', () => {
     return JSON.stringify(map[key])
   }
 
-  it('prefers the installed profile, then userData, then env, then the app setting', () => {
-    const installed = { deploymentId: 'acme', apiOrigin: 'https://acme.example', channel: 'stable' }
+  const baked = {
+    channel: 'stable',
+    defaultProfile: { deploymentId: 'acme', apiOrigin: 'https://acme.example' },
+  }
+
+  it('prefers userData, then the baked default, then env, then the app setting', () => {
+    const chosen = { deploymentId: 'mine', apiOrigin: 'https://mine.example', channel: 'stable' }
     expect(
       resolveDeploymentProfile({
         resourcesDir: '/res',
         userDataDir: '/ud',
         isPackaged: true,
         env: { UNIWORK_API_ORIGIN: 'https://env.example' },
-        readFile: files({ '/res/deployment-profile.json': installed }),
+        settingsApiOrigin: 'https://setting.example',
+        readFile: files({
+          '/ud/deployment-profile.json': chosen,
+          '/res/deployment-defaults.json': baked,
+        }),
       }),
-    ).toEqual({ ...installed, clientId: 'uniwork-office' })
+    ).toEqual({ ...chosen, clientId: 'uniwork-office' })
+    expect(
+      resolveDeploymentProfile({
+        resourcesDir: '/res',
+        userDataDir: '/ud',
+        isPackaged: true,
+        env: { UNIWORK_API_ORIGIN: 'https://env.example' },
+        readFile: files({ '/res/deployment-defaults.json': baked }),
+      }),
+    ).toEqual({
+      deploymentId: 'acme',
+      apiOrigin: 'https://acme.example',
+      clientId: 'uniwork-office',
+      channel: 'stable',
+    })
     expect(
       resolveDeploymentProfile({
         userDataDir: '/ud',
@@ -415,24 +439,60 @@ describe('deployment profile', () => {
     ).toBeNull()
   })
 
-  it('reads a profile beside an AppImage after resources and before userData', () => {
-    const bundle = { deploymentId: 'acme', apiOrigin: 'https://acme.example', channel: 'dev' }
-    const user = { deploymentId: 'other', apiOrigin: 'https://other.example', channel: 'beta' }
+  it('no longer reads a profile beside the AppImage or inside resources', () => {
+    const stray = { deploymentId: 'acme', apiOrigin: 'https://acme.example', channel: 'dev' }
     expect(
       resolveDeploymentProfile({
         resourcesDir: '/res',
-        appImageDir: '/home/u/Downloads',
         userDataDir: '/ud',
         isPackaged: true,
+        env: {},
         readFile: files({
-          '/home/u/Downloads/deployment-profile.json': bundle,
-          '/ud/deployment-profile.json': user,
+          '/res/deployment-profile.json': stray,
+          '/home/u/Downloads/deployment-profile.json': stray,
         }),
       }),
-    ).toEqual({ ...bundle, clientId: 'uniwork-office-dev' })
+    ).toBeNull()
   })
 
-  it('fails closed on an invalid profile file and http outside dev loopback', () => {
+  it('takes the channel from the build file, and ignores a userData profile of another channel', () => {
+    const other = { deploymentId: 'x', apiOrigin: 'https://x.example', channel: 'dev' }
+    expect(
+      resolveDeploymentProfile({
+        resourcesDir: '/res',
+        userDataDir: '/ud',
+        isPackaged: true,
+        env: {},
+        readFile: files({
+          '/ud/deployment-profile.json': other,
+          '/res/deployment-defaults.json': { channel: 'beta' },
+        }),
+      }),
+    ).toBeNull()
+    expect(
+      readBuildDefaults({
+        resourcesDir: '/res',
+        userDataDir: '/ud',
+        isPackaged: true,
+        readFile: files({ '/res/deployment-defaults.json': { channel: 'beta' } }),
+      }),
+    ).toEqual({ channel: 'beta', profile: null })
+    // no build file: stable when packaged, dev when running from source
+    expect(
+      readBuildDefaults({
+        userDataDir: '/ud',
+        isPackaged: true,
+        resourcesDir: '/res',
+        readFile: files({}),
+      }),
+    ).toEqual({ channel: 'stable', profile: null })
+    expect(readBuildDefaults({ userDataDir: '/ud', isPackaged: false, env: {} })).toEqual({
+      channel: 'dev',
+      profile: null,
+    })
+  })
+
+  it('skips an invalid userData profile and refuses http outside dev loopback', () => {
     expect(
       resolveDeploymentProfile({
         userDataDir: '/ud',
@@ -446,7 +506,12 @@ describe('deployment profile', () => {
           },
         }),
       }),
-    ).toBeNull()
+    ).toEqual({
+      deploymentId: 'default',
+      apiOrigin: 'https://env.example',
+      clientId: 'uniwork-office',
+      channel: 'stable',
+    })
     expect(
       parseDeploymentProfile({
         deploymentId: 'd',

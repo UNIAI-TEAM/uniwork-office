@@ -94,16 +94,12 @@ describe.skipIf(process.platform === 'win32')('linux package scripts', () => {
     expect(t.calls()).toContain('update-mime-database /usr/share/mime')
   })
 
-  it('drop the launcher link and an installed deployment profile on uninstall only', () => {
+  it('drop the launcher link on uninstall only', () => {
     const t = makeRoot()
     t.install()
-    const profile = join(t.opt, 'resources', 'deployment-profile.json')
-    writeFileSync(profile, '{}')
     expect(t.remove('upgrade').code).toBe(0)
-    expect(existsSync(profile)).toBe(true)
     expect(existsSync(t.appLink)).toBe(true)
     expect(t.remove('remove').code).toBe(0)
-    expect(existsSync(profile)).toBe(false)
     expect(existsSync(t.appLink)).toBe(false)
   })
 })

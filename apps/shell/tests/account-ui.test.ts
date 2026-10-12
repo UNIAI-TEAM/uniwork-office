@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
   AccountErrorCode,
   AccountLoginEvent,
+  AccountSetServerResult,
   AccountState,
   AccountStatus,
   HomeApi,
@@ -97,6 +98,10 @@ function makeApi(initial: AccountStatus) {
     accountLogin: vi.fn(async () => true),
     accountCancelLogin: vi.fn(async () => undefined),
     accountRetry: vi.fn(async () => statusFor('signed-in')),
+    accountSetServer: vi.fn(async (_address: string): Promise<AccountSetServerResult> => ({
+      ok: true,
+      status: statusFor('signed-out'),
+    })),
     accountSelectOrg: vi.fn(async (orgId: string) =>
       statusFor('signed-in', { org: ORGS.find((o) => o.id === orgId) }),
     ),
@@ -429,11 +434,69 @@ describe('Settings → Account pane', () => {
     expect(api.accountLogin).toHaveBeenCalledTimes(1)
   })
 
-  it('not-configured: explains, with no dead button', async () => {
+  it('not-configured: the connect screen with an address field', async () => {
     await render(statusFor('not-configured', { serverOrigin: undefined }), { open: true })
-    expect(pane()?.textContent).toContain(en.acctNotConfiguredTitle)
-    expect(pane()?.querySelectorAll('button').length).toBe(0)
+    expect(pane()?.textContent).toContain(en.acctConnectTitle)
+    expect(pane()?.textContent).toContain(en.acctConnectBody)
+    expect(host.querySelector('#acct-server-address')).toBeTruthy()
+    expect(button(en.acctConnectButton)?.disabled).toBe(true)
     expectNoRawKeys()
+  })
+
+  it('not-configured, Vietnamese: the copy the product asks for', async () => {
+    await render(statusFor('not-configured', { serverOrigin: undefined }), {
+      open: true,
+      lang: 'vi',
+    })
+    expect(pane()?.textContent).toContain('Kết nối UniWork')
+    expect(pane()?.textContent).toContain('Mở UniWork trên trình duyệt và bấm Mở UniWork Office.')
+  })
+
+  async function typeAddress(value: string): Promise<void> {
+    const input = host.querySelector<HTMLInputElement>('#acct-server-address')!
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+      setter.call(input, value)
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+  }
+
+  it('the connect button sends the typed address to main', async () => {
+    await render(statusFor('not-configured', { serverOrigin: undefined }), { open: true })
+    await typeAddress('uniwork.example')
+    await click(button(en.acctConnectButton))
+    expect(api.accountSetServer).toHaveBeenCalledWith('uniwork.example')
+    expect(pane()?.dataset.state).toBe('signed-out')
+  })
+
+  it.each([
+    ['invalid_address', en.acctConnectInvalid],
+    ['unreachable', en.acctConnectFailed],
+    ['refused', en.acctConnectFailed],
+  ] as const)('a refused address (%s) says why and keeps the field', async (error, line) => {
+    await render(statusFor('not-configured', { serverOrigin: undefined }), { open: true })
+    api.accountSetServer.mockImplementationOnce(async () => ({
+      ok: false,
+      error,
+      status: statusFor('not-configured'),
+    }))
+    await typeAddress('nope')
+    await click(button(en.acctConnectButton))
+    expect(pane()?.textContent).toContain(line)
+    expect(host.querySelector('#acct-server-address')).toBeTruthy()
+  })
+
+  it('server unreachable: names the saved server and offers the field', async () => {
+    await render(statusFor('server-unreachable', { error: 'network' }), { open: true })
+    expect(pane()?.textContent).toContain('Can’t reach uniwork.example')
+    expect(host.querySelector('#acct-server-address')).toBeTruthy()
+  })
+
+  it('signed in: the address stays behind Change server', async () => {
+    await render(statusFor('signed-in'), { open: true })
+    expect(host.querySelector('#acct-server-address')).toBeNull()
+    await click(button(en.acctChangeServer))
+    expect(host.querySelector('#acct-server-address')).toBeTruthy()
   })
 
   it('keyring unavailable: retry reads the stored sign-in again', async () => {

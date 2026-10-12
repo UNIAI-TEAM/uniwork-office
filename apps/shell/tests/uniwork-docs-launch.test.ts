@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { UniworkLaunchEvent } from '../src/shared/home-api'
+import type { ProfileOutcome } from '../src/main/uniwork-auth/profile-store'
 import { createAuthCallbackRouter } from '../src/main/uniwork-auth/routing'
 import { isAuthCallbackUrl } from '../src/main/uniwork-auth/callback'
 import { createUniworkDocsClient, type FetchLike } from '../src/main/uniwork-docs/client'
@@ -142,7 +143,11 @@ const link = (ticket: string, scheme = SCHEME) => `${scheme}://open?ticket=${tic
 
 describe('deep-link parser (shared vectors)', () => {
   it.each(DEEP_LINK.valid)('$id', ({ url, expected }) => {
-    expect(parseOfficeDeepLink(url, SCHEME)).toEqual({ ok: true, ticket: expected.ticket })
+    expect(parseOfficeDeepLink(url, SCHEME)).toEqual({
+      ok: true,
+      ticket: expected.ticket,
+      profile: null,
+    })
   })
   it.each(DEEP_LINK.invalid)('$id', ({ url, expected_reason }) => {
     expect(parseOfficeDeepLink(url, SCHEME)).toEqual({ ok: false, reason: expected_reason })
@@ -163,6 +168,7 @@ describe('deep-link parser (shared vectors)', () => {
     expect(parseOfficeDeepLink(link(TICKET, 'uniwork-office-dev'), 'uniwork-office-dev')).toEqual({
       ok: true,
       ticket: TICKET,
+      profile: null,
     })
     expect(parseOfficeDeepLink(`${SCHEME}://open/?ticket=${TICKET}`, SCHEME).ok).toBe(true)
     expect(parseOfficeDeepLink(`${link(TICKET)}#x`, SCHEME)).toEqual({
@@ -177,9 +183,86 @@ describe('deep-link parser (shared vectors)', () => {
       ok: false,
       reason: 'wrong_host',
     })
+    // neither a ticket nor a profile: bring the window forward, change nothing
     expect(parseOfficeDeepLink(`${SCHEME}://open`, SCHEME)).toEqual({
+      ok: true,
+      ticket: null,
+      profile: null,
+    })
+    expect(parseOfficeDeepLink(`${SCHEME}://`, SCHEME)).toEqual({
+      ok: true,
+      ticket: null,
+      profile: null,
+    })
+  })
+})
+
+const PROFILE_QUERY =
+  'deploymentId=production-eu&apiOrigin=https%3A%2F%2Funiwork.example&clientId=uniwork-office&channel=stable'
+const PROFILE = {
+  deploymentId: 'production-eu',
+  apiOrigin: 'https://uniwork.example',
+  clientId: 'uniwork-office',
+  channel: 'stable',
+}
+
+describe('deep-link parser: the server profile', () => {
+  it('reads a ticket with the four profile parameters', () => {
+    expect(parseOfficeDeepLink(`${link(TICKET)}&${PROFILE_QUERY}`, SCHEME)).toEqual({
+      ok: true,
+      ticket: TICKET,
+      profile: PROFILE,
+    })
+  })
+  it('reads the app-home form: profile without a ticket', () => {
+    expect(parseOfficeDeepLink(`${SCHEME}://open?${PROFILE_QUERY}`, SCHEME)).toEqual({
+      ok: true,
+      ticket: null,
+      profile: PROFILE,
+    })
+  })
+  it('keeps the old ticket-only link valid', () => {
+    expect(parseOfficeDeepLink(link(TICKET), SCHEME)).toMatchObject({ ok: true, profile: null })
+  })
+  it('rejects a partial profile, a repeated parameter and any other parameter', () => {
+    expect(
+      parseOfficeDeepLink(`${link(TICKET)}&deploymentId=production-eu&channel=stable`, SCHEME),
+    ).toEqual({ ok: false, reason: 'partial_profile' })
+    expect(parseOfficeDeepLink(`${link(TICKET)}&${PROFILE_QUERY}&channel=stable`, SCHEME)).toEqual({
       ok: false,
-      reason: 'missing_ticket',
+      reason: 'duplicate_parameter',
+    })
+    expect(parseOfficeDeepLink(`${link(TICKET)}&${PROFILE_QUERY}&x=1`, SCHEME)).toEqual({
+      ok: false,
+      reason: 'unexpected_parameter',
+    })
+  })
+  it('rejects values the profile rules refuse', () => {
+    const bad = (query: string) => parseOfficeDeepLink(`${SCHEME}://open?${query}`, SCHEME)
+    const withOrigin = (origin: string) =>
+      PROFILE_QUERY.replace('https%3A%2F%2Funiwork.example', origin)
+    const invalid = { ok: false, reason: 'invalid_profile' }
+    // http outside dev loopback, a path, a client id that does not fit the channel
+    expect(bad(withOrigin('http%3A%2F%2Funiwork.example'))).toEqual(invalid)
+    expect(bad(withOrigin('https%3A%2F%2Funiwork.example%2Fapi'))).toEqual(invalid)
+    expect(
+      bad(PROFILE_QUERY.replace('clientId=uniwork-office', 'clientId=uniwork-office-dev')),
+    ).toEqual(invalid)
+    expect(bad(PROFILE_QUERY.replace('channel=stable', 'channel=nightly'))).toEqual(invalid)
+  })
+  it('allows http loopback only for a dev link on the dev scheme', () => {
+    const dev =
+      'deploymentId=default&apiOrigin=http%3A%2F%2Flocalhost%3A8080&clientId=uniwork-office-dev&channel=dev'
+    expect(
+      parseOfficeDeepLink(`uniwork-office-dev://open?${dev}`, 'uniwork-office-dev'),
+    ).toMatchObject({
+      ok: true,
+      profile: { apiOrigin: 'http://localhost:8080', channel: 'dev' },
+    })
+    // a dev profile on the stable scheme is not addressed to this app
+    expect(parseOfficeDeepLink(`${SCHEME}://open?${dev}`, SCHEME)).toEqual({
+      ok: false,
+      reason: 'invalid_profile',
     })
   })
 })
@@ -263,6 +346,7 @@ describe('launch controller', () => {
     const reveal = vi.fn()
     const controller = new LaunchController({
       scheme: () => SCHEME,
+      applyProfile: async () => 'applied',
       isSignedIn: () => signedIn,
       identity: () =>
         signedIn ? { deviceSessionId: 'device-01', deploymentId: 'production-eu' } : null,
@@ -362,6 +446,7 @@ describe('launch controller', () => {
     const exchange = vi.fn()
     const controller = new LaunchController({
       scheme: () => SCHEME,
+      applyProfile: async () => 'applied',
       isSignedIn: () => true,
       identity: () => ({ deviceSessionId: 'd', deploymentId: 'other' }),
       profile: () => ({ deploymentId: 'production-eu', clientId: 'uniwork-office' }),
@@ -373,6 +458,81 @@ describe('launch controller', () => {
     await controller.handleUrl(link(TICKET))
     expect(exchange).not.toHaveBeenCalled()
     expect(events.at(-1)).toEqual({ phase: 'failed', error: 'wrong_deployment' })
+  })
+})
+
+describe('launch controller: the server profile comes before the ticket', () => {
+  const descriptor = parseExchange(EXCHANGE.valid_response)
+  const withProfile = `${link(TICKET)}&${PROFILE_QUERY}`
+
+  function setup(outcome: ProfileOutcome, signedIn = true) {
+    const events: UniworkLaunchEvent[] = []
+    const calls: string[] = []
+    const applyProfile = vi.fn(async (_profile: unknown) => {
+      calls.push('profile')
+      return outcome
+    })
+    const exchange = vi.fn(async () => {
+      calls.push('exchange')
+      return descriptor
+    })
+    const controller = new LaunchController({
+      scheme: () => SCHEME,
+      applyProfile,
+      isSignedIn: () => signedIn,
+      identity: () => ({ deviceSessionId: 'device-01', deploymentId: 'production-eu' }),
+      profile: () => ({ deploymentId: 'production-eu', clientId: 'uniwork-office' }),
+      exchange,
+      open: vi.fn(async () => ({ path: '/wc/a.docx', title: 'Q4 plan' })),
+      emit: (e) => events.push(e),
+      reveal: vi.fn(),
+    })
+    return { controller, events, applyProfile, exchange, calls }
+  }
+
+  it('applies the profile, then redeems the ticket', async () => {
+    const ctx = setup('applied')
+    await ctx.controller.handleUrl(withProfile)
+    expect(ctx.applyProfile).toHaveBeenCalledWith(PROFILE)
+    expect(ctx.calls).toEqual(['profile', 'exchange'])
+  })
+  it('a declined server drops the link: nothing redeemed or held', async () => {
+    const ctx = setup('declined', false)
+    await ctx.controller.handleUrl(withProfile)
+    expect(ctx.exchange).not.toHaveBeenCalled()
+    expect(ctx.events).toEqual([])
+    await ctx.controller.onSignedIn()
+    expect(ctx.exchange).not.toHaveBeenCalled()
+  })
+  it('a refused server (other channel) fails the ticket without redeeming it', async () => {
+    const ctx = setup('refused')
+    await ctx.controller.handleUrl(withProfile)
+    expect(ctx.exchange).not.toHaveBeenCalled()
+    expect(ctx.events).toEqual([{ phase: 'failed', error: 'ticket_invalid' }])
+  })
+  it('the home link (profile, no ticket) only applies the profile', async () => {
+    const ctx = setup('applied')
+    await ctx.controller.handleUrl(`${SCHEME}://open?${PROFILE_QUERY}`)
+    expect(ctx.applyProfile).toHaveBeenCalledTimes(1)
+    expect(ctx.exchange).not.toHaveBeenCalled()
+    expect(ctx.events).toEqual([])
+  })
+  it('a ticket-only link never touches the profile', async () => {
+    const ctx = setup('applied')
+    await ctx.controller.handleUrl(link(TICKET))
+    expect(ctx.applyProfile).not.toHaveBeenCalled()
+    expect(ctx.exchange).toHaveBeenCalledTimes(1)
+  })
+  it('a bare scheme only reveals the window', async () => {
+    const ctx = setup('applied')
+    await ctx.controller.handleUrl(`${SCHEME}://`)
+    expect(ctx.applyProfile).not.toHaveBeenCalled()
+    expect(ctx.events).toEqual([])
+  })
+  it('routes the bare scheme and the profile link to the launch route, not sign-in', () => {
+    expect(isAuthCallbackUrl(`${SCHEME}://`)).toBe(false)
+    expect(isAuthCallbackUrl(`${SCHEME}://open?${PROFILE_QUERY}`)).toBe(false)
+    expect(isAuthCallbackUrl(`${SCHEME}://auth/callback?code=a&state=b`)).toBe(true)
   })
 })
 

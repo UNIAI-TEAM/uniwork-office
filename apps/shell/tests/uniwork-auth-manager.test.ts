@@ -827,3 +827,33 @@ describe('signing in again after the device was revoked', () => {
     expect(ctx.transport.start).toHaveBeenCalledTimes(2)
   })
 })
+
+describe('adoptProfile (a web link or the typed address chose a server)', () => {
+  it('first run: from not-configured to signed-out on the chosen server', async () => {
+    const ctx = setup({ profile: null })
+    expect((await ctx.manager.restore()).state).toBe('not-configured')
+    const status = await ctx.manager.adoptProfile(profile)
+    expect(status).toMatchObject({ state: 'signed-out', serverOrigin: 'uniwork.example' })
+    expect(ctx.manager.deploymentProfile()).toEqual(profile)
+  })
+
+  it('the same deployment on a new origin keeps the sign-in and follows the move', async () => {
+    const ctx = setup({ credentials: createMemoryCredentialStore(stored()) })
+    expect((await ctx.manager.restore()).state).toBe('signed-in')
+    const moved = { ...profile, apiOrigin: 'https://moved.example' }
+    const status = await ctx.manager.adoptProfile(moved)
+    expect(status.state).toBe('signed-in')
+    expect(ctx.credentials.load()?.apiOrigin).toBe('https://moved.example')
+  })
+
+  it('another deployment never reuses the old credential', async () => {
+    const ctx = setup({ credentials: createMemoryCredentialStore(stored()) })
+    await ctx.manager.restore()
+    const other = { ...profile, deploymentId: 'other', apiOrigin: 'https://other.example' }
+    // the caller signs out first (documents closed, device revoked)
+    await ctx.manager.logout()
+    expect((await ctx.manager.adoptProfile(other)).state).toBe('signed-out')
+    expect(ctx.credentials.load()).toBeNull()
+    expect(ctx.manager.deploymentProfile()).toEqual(other)
+  })
+})
