@@ -92,4 +92,7 @@ export const hi = {
 
   setCliLinkReady: 'कमांड लाइन टूल उपलब्ध है।',
   setAutoSaveUniworkNote: 'UniWork दस्तावेज़ों पर लागू नहीं होता।',
+  uwLockNewerStoreTitle: 'ऐप का नया संस्करण चाहिए',
+  uwLockNewerStore:
+    'इस डेटा के लिए ऐप का नया संस्करण चाहिए। UniWork Office अपडेट करें; कुछ भी हटाया नहीं गया है और कोई नई सेव नहीं बनी है।',
 } satisfies Record<keyof typeof zh, string>

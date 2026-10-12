@@ -92,4 +92,7 @@ export const he = {
 
   setCliLinkReady: 'כלי שורת הפקודה זמין.',
   setAutoSaveUniworkNote: 'לא חל על מסמכי UniWork.',
+  uwLockNewerStoreTitle: 'נדרשת גרסה חדשה יותר של האפליקציה',
+  uwLockNewerStore:
+    'הנתונים האלה דורשים גרסה חדשה יותר של האפליקציה. עדכנו את UniWork Office; לא נמחק דבר ולא נוצרה שמירה חדשה.',
 } satisfies Record<keyof typeof zh, string>

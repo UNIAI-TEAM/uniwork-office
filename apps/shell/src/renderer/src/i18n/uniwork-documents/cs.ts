@@ -93,4 +93,7 @@ export const cs = {
 
   setCliLinkReady: 'Nástroj příkazového řádku je k dispozici.',
   setAutoSaveUniworkNote: 'Netýká se dokumentů UniWork.',
+  uwLockNewerStoreTitle: 'Je potřeba novější verze aplikace',
+  uwLockNewerStore:
+    'Tato data vyžadují novější verzi aplikace. Aktualizujte UniWork Office; nic nebylo smazáno a nevzniklo žádné nové uložení.',
 } satisfies Record<keyof typeof zh, string>

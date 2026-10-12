@@ -91,4 +91,7 @@ export const zh = {
 
   setCliLinkReady: '命令行工具已可用。',
   setAutoSaveUniworkNote: '不适用于 UniWork 文档。',
+  uwLockNewerStoreTitle: '需要更新版本的应用',
+  uwLockNewerStore:
+    '这些数据需要更新版本的应用。请更新 UniWork Office；数据没有被删除，也没有产生新的保存。',
 }

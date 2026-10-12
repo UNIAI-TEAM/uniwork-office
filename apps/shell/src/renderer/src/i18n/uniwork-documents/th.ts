@@ -96,4 +96,7 @@ export const th = {
 
   setCliLinkReady: 'ใช้เครื่องมือบรรทัดคำสั่งได้แล้ว',
   setAutoSaveUniworkNote: 'ไม่มีผลกับเอกสาร UniWork',
+  uwLockNewerStoreTitle: 'ต้องใช้แอปเวอร์ชันที่ใหม่กว่า',
+  uwLockNewerStore:
+    'ข้อมูลนี้ต้องใช้แอปเวอร์ชันที่ใหม่กว่า โปรดอัปเดต UniWork Office ข้อมูลไม่ถูกลบ และไม่มีการบันทึกใหม่เกิดขึ้น',
 } satisfies Record<keyof typeof zh, string>

@@ -92,4 +92,7 @@ export const en = {
 
   setCliLinkReady: 'Command line tool is available.',
   setAutoSaveUniworkNote: 'Does not apply to UniWork documents.',
+  uwLockNewerStoreTitle: 'A newer app version is needed',
+  uwLockNewerStore:
+    'This data needs a newer app version. Update UniWork Office; nothing was deleted and no new save was created.',
 } satisfies Record<keyof typeof zh, string>

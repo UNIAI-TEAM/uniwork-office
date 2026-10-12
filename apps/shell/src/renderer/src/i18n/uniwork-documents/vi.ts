@@ -92,4 +92,7 @@ export const vi = {
 
   setCliLinkReady: 'Công cụ dòng lệnh đã sẵn sàng.',
   setAutoSaveUniworkNote: 'Không áp dụng cho tài liệu UniWork.',
+  uwLockNewerStoreTitle: 'Cần phiên bản ứng dụng mới hơn',
+  uwLockNewerStore:
+    'Dữ liệu này cần phiên bản ứng dụng mới hơn. Hãy cập nhật UniWork Office; dữ liệu không bị xóa và không có lần lưu mới nào được tạo.',
 } satisfies Record<keyof typeof zh, string>

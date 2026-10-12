@@ -94,4 +94,7 @@ export const pt = {
 
   setCliLinkReady: 'A ferramenta de linha de comando está disponível.',
   setAutoSaveUniworkNote: 'Não se aplica aos documentos do UniWork.',
+  uwLockNewerStoreTitle: 'É necessária uma versão mais recente do aplicativo',
+  uwLockNewerStore:
+    'Estes dados precisam de uma versão mais recente do aplicativo. Atualize o UniWork Office; nada foi excluído e nenhum novo salvamento foi criado.',
 } satisfies Record<keyof typeof zh, string>

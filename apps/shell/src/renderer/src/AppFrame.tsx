@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Home } from './Home'
 import { Onboarding } from './Onboarding'
 import { TabBar } from './TabBar'
+import { UniworkLockHost } from './UniworkLockPanel'
 import { WorkbenchAccountGate } from './WorkbenchAccountGate'
 
 interface AppFrameProps {
@@ -43,6 +44,8 @@ export function AppFrame({ initialOnboardingSeen }: AppFrameProps) {
         <WorkbenchAccountGate>
           <Home />
         </WorkbenchAccountGate>
+        {/* S11: a working copy refused by the newer-store guard; replaces the content area until closed */}
+        <UniworkLockHost homeActive={homeActive} />
       </div>
       {/* editor WebContentsViews paint above ALL shell DOM, so the overlay only
        * renders while the home tab is active — it comes back when home does */}

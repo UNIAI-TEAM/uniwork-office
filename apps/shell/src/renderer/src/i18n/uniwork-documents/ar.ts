@@ -92,4 +92,7 @@ export const ar = {
 
   setCliLinkReady: 'أداة سطر الأوامر متاحة.',
   setAutoSaveUniworkNote: 'لا ينطبق على مستندات UniWork.',
+  uwLockNewerStoreTitle: 'يلزم إصدار أحدث من التطبيق',
+  uwLockNewerStore:
+    'تحتاج هذه البيانات إلى إصدار أحدث من التطبيق. حدّث UniWork Office؛ لم يُحذف شيء ولم يُنشأ أي حفظ جديد.',
 } satisfies Record<keyof typeof zh, string>

@@ -105,6 +105,14 @@ describe('uniwork documents string shards', () => {
     )
   })
 
+  it.each([...LANGS])('locale %s has the S11 newer-store lock copy', (lang) => {
+    for (const k of ['uwLockNewerStoreTitle', 'uwLockNewerStore']) {
+      expect(referenceKeys).toContain(k)
+      expect(table(lang)[k]!.trim()).not.toBe('')
+    }
+    expect(table(lang).uwLockNewerStore).toContain('UniWork Office')
+  })
+
   it('does not show revision numbers or version jargon in vi/en copy', () => {
     for (const lang of ['vi', 'en'] as const) {
       expect(

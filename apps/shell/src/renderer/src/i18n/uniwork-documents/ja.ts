@@ -96,4 +96,7 @@ export const ja = {
 
   setCliLinkReady: 'コマンドラインツールを利用できます。',
   setAutoSaveUniworkNote: 'UniWork のドキュメントには適用されません。',
+  uwLockNewerStoreTitle: '新しいバージョンのアプリが必要です',
+  uwLockNewerStore:
+    'このデータには新しいバージョンのアプリが必要です。UniWork Office を更新してください。データは削除されておらず、新たな保存も行われていません。',
 } satisfies Record<keyof typeof zh, string>

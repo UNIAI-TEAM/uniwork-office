@@ -95,4 +95,7 @@ export const ru = {
 
   setCliLinkReady: 'Инструмент командной строки доступен.',
   setAutoSaveUniworkNote: 'Не распространяется на документы UniWork.',
+  uwLockNewerStoreTitle: 'Требуется более новая версия приложения',
+  uwLockNewerStore:
+    'Для этих данных нужна более новая версия приложения. Обновите UniWork Office; ничего не удалено, новое сохранение не создавалось.',
 } satisfies Record<keyof typeof zh, string>
