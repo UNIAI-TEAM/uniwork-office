@@ -189,4 +189,16 @@ export const de = {
   aiCmdSkipped: ' ({count} geschützte Blöcke übersprungen)',
   aiViewOnlyNotice:
     'Schreibgeschütztes Dokument: Die KI kann es lesen und Fragen beantworten, aber nicht bearbeiten.',
+  aiClarifyTitle: 'Ein paar Fragen, bevor ich weitermache',
+  aiClarifyDecide: 'Entscheide für mich',
+  aiClarifyDecideAnswer: '(entscheide für mich)',
+  aiClarifyMulti: 'Mehrfachauswahl',
+  aiClarifyNext: 'Weiter',
+  aiClarifyPrev: 'Zurück',
+  aiClarifyOther: 'Sonstiges (eingeben)',
+  aiClarifySelected: '{n} ausgewählt',
+  aiClarifySkip: 'Überspringen',
+  aiClarifySubmit: 'Weiter',
+  aiSumClarify: 'Rückfragen beantwortet',
+  aiSumClarifySkipped: 'Rückfragen übersprungen',
 } satisfies Record<keyof typeof zh, string>

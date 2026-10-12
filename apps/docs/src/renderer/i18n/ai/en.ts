@@ -184,4 +184,16 @@ export const en = {
   aiCmdSkipped: ' ({count} protected block(s) skipped)',
   aiViewOnlyNotice:
     'View-only document: AI can read it and answer questions, but editing is turned off.',
+  aiClarifyTitle: 'A few questions before I continue',
+  aiClarifyDecide: 'Decide for me',
+  aiClarifyDecideAnswer: '(decide for me)',
+  aiClarifyMulti: 'Multiple choice',
+  aiClarifyNext: 'Next',
+  aiClarifyPrev: 'Previous',
+  aiClarifyOther: 'Other (type in)',
+  aiClarifySelected: '{n} selected',
+  aiClarifySkip: 'Skip',
+  aiClarifySubmit: 'Continue',
+  aiSumClarify: 'Clarification answered',
+  aiSumClarifySkipped: 'Clarification skipped',
 } satisfies Record<keyof typeof zh, string>

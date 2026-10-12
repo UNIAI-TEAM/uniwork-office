@@ -30,6 +30,8 @@ import {
   type AiCommentsAccess,
   type AiDocExtras,
   type AiHeaderFooterAccess,
+  type AskClarification,
+  type ClarifyQuestion,
 } from './tools'
 import type { AiPageSetupAccess } from './page-setup'
 import type { AiNotesAccess } from './note-ops'
@@ -43,6 +45,7 @@ import {
   type DocWriteSpec,
 } from './doc-writer'
 import { EditQueueCard } from './EditQueueCard'
+import { ClarifyCard } from '../components/ClarifyCard'
 import {
   buildQueueInstruction,
   buildQueueSummary,
@@ -394,6 +397,24 @@ export function AiPanel({
   const [chat, setChat] = useState<ChatEntry[]>([])
   /** a streamed write stopped early: the draft stays in the document until the user keeps or discards it */
   const [activePartial, setActivePartial] = useState<{ blocks: number } | null>(null)
+  /** ask_clarification card docked in the composer slot while the run waits for the user */
+  const [activeClarify, setActiveClarify] = useState<ClarifyQuestion[] | null>(null)
+  const clarifyResolverRef = useRef<((r: { answers: string; cancelled?: boolean }) => void) | null>(
+    null,
+  )
+  /** settle an open card as skipped so the waiting tool call never dangles */
+  const dismissClarify = (): void => {
+    clarifyResolverRef.current?.({ answers: '', cancelled: true })
+    clarifyResolverRef.current = null
+    setActiveClarify(null)
+  }
+  const askClarification: AskClarification = (questions) =>
+    new Promise((resolve) => {
+      // a second card replaces a stale one; the stale call reads as skipped
+      clarifyResolverRef.current?.({ answers: '', cancelled: true })
+      clarifyResolverRef.current = resolve
+      setActiveClarify(questions)
+    })
   const partialResolverRef = useRef<((keep: boolean) => void) | null>(null)
   /** bumped by New chat / unmount: a writer resuming after its abort must not open the keep card */
   const writerEpochRef = useRef(0)
@@ -493,6 +514,8 @@ export function AiPanel({
       writerEpochRef.current++
       partialResolverRef.current?.(false)
       partialResolverRef.current = null
+      clarifyResolverRef.current?.({ answers: '', cancelled: true })
+      clarifyResolverRef.current = null
     },
     [],
   )
@@ -799,6 +822,7 @@ export function AiPanel({
           () => mediaAnalysisAvailable(settingsRef.current, gskLoggedInRef.current),
           () => readOnlyRef.current,
           () => boundRef.current,
+          () => askClarification,
         ),
         createFilesSkill(availableAttachments),
       ]),
@@ -1106,6 +1130,7 @@ export function AiPanel({
 
   const cancel = () => {
     if (pendingSendRef.current) pendingSendRef.current.aborted = true
+    dismissClarify()
     loopRef.current?.cancel()
   }
 
@@ -1142,6 +1167,7 @@ export function AiPanel({
       pendingSendRef.current = null
     }
     abandonWriter()
+    dismissClarify()
     loopRef.current?.reset()
     setBusy(false)
     setChat([])
@@ -1548,7 +1574,20 @@ export function AiPanel({
         })}
       </div>
 
-      <div className="ai-composer">
+      {activeClarify && (
+        <div className="ai-composer">
+          <ClarifyCard
+            questions={activeClarify}
+            onSubmit={(answers) => {
+              clarifyResolverRef.current?.({ answers })
+              clarifyResolverRef.current = null
+              setActiveClarify(null)
+            }}
+            onSkip={dismissClarify}
+          />
+        </div>
+      )}
+      <div className="ai-composer" style={activeClarify ? { display: 'none' } : undefined}>
         {readOnly && (
           <div className="ai-readonly-notice" role="status">
             {t('aiViewOnlyNotice')}
