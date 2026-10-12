@@ -1,4 +1,12 @@
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -238,5 +246,51 @@ describe('local (unbound) deck keeps the draft auto-save', () => {
     expect(r.error).toBeUndefined()
     expect(drafts()).toEqual(['Launch Plan.pptx'])
     expect(sessions.get(WC)!.path).toBe(join(draftsDir(), 'Launch Plan.pptx'))
+  })
+})
+
+describe('local deck whose draft write fails', () => {
+  // a plain file where the drafts folder should be: the folder check passes, the write fails
+  const breakDraftsDir = () => {
+    mkdirSync(join(env.dir, 'documents'), { recursive: true })
+    writeFileSync(draftsDir(), 'not a folder')
+  }
+  afterEach(() => rmSync(draftsDir(), { recursive: true, force: true }))
+
+  it('append reports no draft (empty path) and keeps the session path', async () => {
+    breakDraftsDir()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const r = (await call(
+      'slides:land-generated-pages',
+      [await issuePage('appended')],
+      FIT,
+      'append',
+      undefined,
+      'Quarterly Review',
+    )) as Landed
+    expect(r.error).toBeUndefined()
+    expect(warn).toHaveBeenCalled()
+    warn.mockRestore()
+    // saveDraftAfterGenerate returns false on a failed write, so the panel gets no path
+    expect(r.path).toBe('')
+    expect(sessions.get(WC)!.path).toBe(deckPath)
+    expect(readFileSync(deckPath, 'utf8')).toBe(ORIGINAL)
+  })
+
+  it('replace reports no draft (empty path) for the new deck', async () => {
+    breakDraftsDir()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const r = (await call(
+      'slides:land-generated-pages',
+      [await issuePage('page one')],
+      FIT,
+      'replace',
+      undefined,
+      'Launch Plan',
+    )) as Landed
+    warn.mockRestore()
+    expect(r.error).toBeUndefined()
+    expect(r.path).toBe('')
+    expect(sessions.get(WC)!.path).toBe('')
   })
 })
