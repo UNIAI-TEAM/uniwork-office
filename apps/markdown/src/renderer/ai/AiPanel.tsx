@@ -53,6 +53,7 @@ import { createSearchSkill } from './search-skill'
 import { createElectronTransport } from './transport'
 import { EditQueueCard } from './EditQueueCard'
 import { ClarifyCard } from '../components/ClarifyCard'
+import { withReceipt, withoutReceipts, type ClarifyQa } from './clarify-receipts'
 import type { AskClarification, ClarifyQuestion } from './tools'
 import {
   buildQueueInstruction,
@@ -119,6 +120,8 @@ interface ChatEntry {
   fence?: EntryFence
   /** restored from a stored transcript: no retry, its fence ranges are unknown */
   restored?: true
+  /** answered ask_clarification cards of this message's run (view-only receipts) */
+  clarifyReceipts?: ClarifyQa[][]
 }
 
 /** longest selection excerpt echoed on a user bubble */
@@ -596,6 +599,7 @@ export function AiPanel({
             ...restoredEntryState(m.role),
           }))
         })
+        if (applied) setChat((prev) => withoutReceipts(prev))
         if (applied && !loopRef.current?.busy) {
           loopRef.current?.restore(msgs.map((m) => ({ role: m.role, text: m.text })))
         }
@@ -606,6 +610,13 @@ export function AiPanel({
   }, [])
 
   /** after an untitled document's first save, bind the unsaved-* history to the real path */
+  // answered receipts belong to the document they were given for: drop them when another
+  // one opens (an untitled document getting its first path is the same document)
+  useEffect(() => {
+    const previous = filePathRef.current
+    if (previous && previous !== filePath) setChat((prev) => withoutReceipts(prev))
+  }, [filePath])
+
   useEffect(() => {
     filePathRef.current = filePath
     const ids = chatIdsRef.current
@@ -962,6 +973,16 @@ export function AiPanel({
               <div key={i} className="ai-msg ai-msg-user">
                 {entry.scope && <AiScopeQuote scope={entry.scope} />}
                 <span dir="auto">{entry.text}</span>
+                {entry.clarifyReceipts?.map((qa, k) => (
+                  <div key={`ca${k}`} className="ai-clarify-answered">
+                    {qa.map((pair, m) => (
+                      <div key={m} className="ai-clarify-answered-row">
+                        <div className="ai-clarify-answered-q">{pair.q}</div>
+                        <div className="ai-clarify-answered-a">{pair.a}</div>
+                      </div>
+                    ))}
+                  </div>
+                ))}
                 {entry.undelivered && (
                   <div className="ai-msg-undelivered">
                     {t('aiUndelivered')}
@@ -1087,7 +1108,8 @@ export function AiPanel({
         <div className="ai-composer">
           <ClarifyCard
             questions={activeClarify}
-            onSubmit={(answers) => {
+            onSubmit={(answers, qa) => {
+              setChat((prev) => withReceipt(prev, qa))
               clarifyResolverRef.current?.({ answers })
               clarifyResolverRef.current = null
               setActiveClarify(null)
