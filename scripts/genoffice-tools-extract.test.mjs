@@ -964,6 +964,41 @@ describe('extractor residuals (G7-06)', () => {
       'a `get options()` accessor is not a tools list',
     )
   })
+
+  // R1-3 (same review): `insideToolsAccessor` answered true when *any* enclosing
+  // brace was a `get tools()` body, so a local helper declared inside the
+  // accessor and returning a tool-shaped array was read as the accessor's own
+  // tools list. Only the accessor body's own brace level is that list; the
+  // direct `return [ ... ]` in the same fixture must keep its row.
+  const NESTED_HELPER_RETURN_FIXTURE = {
+    'apps/docs/src/renderer/ai/tools.ts': [
+      "import type { AgentSkill } from '@genoffice/agent-core'",
+      '',
+      'export const s: AgentSkill = {',
+      "  id: 'docs',",
+      '  get tools() {',
+      '    const helper = () => {',
+      '      return [',
+      "        { name: 'inner_tool', description: 'the helper return value, not the accessor list' },",
+      '      ]',
+      '    }',
+      '    void helper',
+      '    return [',
+      "      { name: 'direct_tool', description: 'schema-less tool in the accessor return' },",
+      '    ]',
+      '  },',
+      '}',
+      '',
+    ].join('\n'),
+  }
+
+  it('ignores a nested helper return inside `get tools()` (R1-3)', () => {
+    const { dir } = fixture(NESTED_HELPER_RETURN_FIXTURE)
+    const { rows } = extract({ repo: dir, rev: 'HEAD' })
+    const tools = rows.map((r) => r.tool).sort()
+    assert.deepEqual(tools, ['direct_tool'])
+    assert.equal(rows.find((r) => r.tool === 'direct_tool').hash, 'unresolved:missing')
+  })
 })
 
 describe('real repo', () => {
