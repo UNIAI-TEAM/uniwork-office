@@ -1,13 +1,26 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   BINDING_FILE,
   BindingStore,
   bindingKindAt,
   bindingKindOf,
 } from '../src/main/uniwork-docs/binding-store'
+
+// counts reads of binding.json (a module namespace cannot be spied on in ESM)
+const reads = vi.hoisted(() => ({ binding: 0 }))
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>()
+  return {
+    ...actual,
+    readFileSync: (...args: unknown[]) => {
+      if (String(args[0]).endsWith('binding.json')) reads.binding += 1
+      return (actual.readFileSync as (...a: unknown[]) => unknown)(...args)
+    },
+  }
+})
 
 /**
  * G5-04g: a folder whose binding.json declares an integer schema >= 2 holds a
@@ -170,6 +183,17 @@ describe('BindingStore.newerStoreIn (the launch route knows only the folder)', (
     expect(new BindingStore(root).newerStoreIn(dir)).toEqual({ path: join(dir, DOCX), name: DOCX })
   })
 
+  it('picks the name in sorted order, so it is the same on every run (R1-be-8)', () => {
+    const { dir } = folder({ schema: 2 })
+    // a second document file, listed first by some readdir orders and last by others
+    writeFileSync(join(dir, 'AAA first.xlsx'), 'x')
+    const store = new BindingStore(root)
+    const name = store.newerStoreIn(dir)?.name
+    expect(name).toBe('AAA first.xlsx')
+    // stable across repeated calls, whatever order the filesystem reports
+    for (let i = 0; i < 5; i += 1) expect(store.newerStoreIn(dir)?.name).toBe(name)
+  })
+
   it('falls back to the folder name, and is null for a schema-1 folder', () => {
     const empty = join(root, 'default', 'acc_1', 'doc_2')
     mkdirSync(empty, { recursive: true })
@@ -180,5 +204,30 @@ describe('BindingStore.newerStoreIn (the launch route knows only the folder)', (
     })
     const one = folder(schema1)
     expect(new BindingStore(root).newerStoreIn(one.dir)).toBeNull()
+  })
+})
+
+describe('BindingStore.classify reads the binding once (R1-be-5)', () => {
+  it('classifies a path in one read: newer, bound or plain', () => {
+    const two = folder({ schema: 2 })
+    const store = new BindingStore(root)
+    reads.binding = 0
+    expect(store.classify(two.path)).toEqual({ kind: 'newer', path: two.path, name: DOCX })
+    expect(reads.binding).toBe(1)
+    const one = folder(schema1)
+    reads.binding = 0
+    expect(store.classify(one.path)).toMatchObject({ kind: 'bound' })
+    expect(reads.binding).toBe(1)
+    reads.binding = 0
+    expect(store.classify(join(root, 'plain.docx'))).toEqual({ kind: 'plain' })
+    expect(store.classify(join(tmpdir(), 'elsewhere.docx'))).toEqual({ kind: 'plain' })
+    // neither is a working-copy folder: no binding read is even attempted
+    expect(reads.binding).toBe(0)
+  })
+
+  it('a binding for another file name in the same folder is plain', () => {
+    const { dir } = folder(schema1)
+    const store = new BindingStore(root)
+    expect(store.classify(join(dir, 'Other.docx'))).toEqual({ kind: 'plain' })
   })
 })

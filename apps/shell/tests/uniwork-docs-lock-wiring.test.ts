@@ -9,11 +9,13 @@ import { BINDING_FILE } from '../src/main/uniwork-docs/binding-store'
  * G5-04g wiring: the lock IPC and the open-route diversion. `lock` is a push
  * to the shell window, `locks`/`dismissLock` are invoke handlers, and the
  * service's openPath goes through the guard, so no module ever opens a working
- * copy whose folder declares a store this build does not read.
+ * copy whose folder declares a store this build does not read. The account
+ * boundary clears the previous account's locks (R1-be-6).
  */
 
 let dir: string
 let identity: { accountId: string; deviceSessionId: string; deploymentId: string } | null = null
+let statusListener: ((status: { state: string }) => void) | null = null
 
 vi.mock('electron', () => ({
   app: { getPath: () => dir },
@@ -24,7 +26,10 @@ vi.mock('electron', () => ({
 vi.mock('../src/main/uniwork-auth', () => ({
   authorizedRequest: vi.fn(),
   setUniworkSignOutHooks: vi.fn(),
-  onUniworkAccountStatus: () => () => undefined,
+  onUniworkAccountStatus: (listener: (status: { state: string }) => void) => {
+    statusListener = listener
+    return () => undefined
+  },
   uniworkAccount: () => ({ status: () => ({ state: 'signed-out', org: null }) }),
   uniworkDeploymentProfile: () => ({
     deploymentId: 'default',
@@ -38,16 +43,27 @@ vi.mock('../src/main/uniwork-auth', () => ({
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'uw-lock-wiring-'))
   identity = { accountId: 'acc_1', deviceSessionId: 'dev_1', deploymentId: 'default' }
+  statusListener = null
 })
 afterEach(() => rmSync(dir, { recursive: true, force: true }))
 
 const docDir = () => join(dir, 'uniwork-documents', 'default', 'acc_1', 'doc_1')
 const docPath = () => join(docDir(), 'Plan.docx')
 
+/** a newer-store working copy of another account (acc_9) */
+const otherDir = () => join(dir, 'uniwork-documents', 'default', 'acc_9', 'doc_9')
+const otherPath = () => join(otherDir(), 'Other.docx')
+
 function seed(binding: unknown): void {
   mkdirSync(docDir(), { recursive: true })
   writeFileSync(docPath(), 'working copy bytes')
   writeFileSync(join(docDir(), BINDING_FILE), JSON.stringify(binding))
+}
+
+function seedOther(binding: unknown): void {
+  mkdirSync(otherDir(), { recursive: true })
+  writeFileSync(otherPath(), 'other bytes')
+  writeFileSync(join(otherDir(), BINDING_FILE), JSON.stringify(binding))
 }
 
 async function setup(openPath = vi.fn(() => true)) {
@@ -123,6 +139,24 @@ describe('the newer-store lock IPC (G5-04g)', () => {
     )
     expect(openPath).not.toHaveBeenCalled()
     expect(sent).toHaveLength(1)
+  })
+
+  it("a sign-in as another account forgets the previous account's locks (R1-be-6)", async () => {
+    seed({ schema: 2 })
+    seedOther({ schema: 2 })
+    const { handle, handlers } = await setup()
+    // two locks: one of the account that goes away, one of the account that takes over
+    expect(handle.service.refuseLockedPath(docPath())).toBe(true)
+    expect(handle.service.refuseLockedPath(otherPath())).toBe(true)
+    expect(handle.service.currentLocks()).toHaveLength(2)
+    // acc_9 signs in: acc_1's working copy (and its lock) is no longer this session's
+    identity = { accountId: 'acc_9', deviceSessionId: 'dev_9', deploymentId: 'default' }
+    statusListener?.({ state: 'signed-in' })
+    await vi.waitFor(() =>
+      expect(handlers.get(UNIWORK_DOC_CHANNELS.locks)!(null)).toEqual([
+        { path: otherPath(), reason: 'store_newer', name: 'Other.docx' },
+      ]),
+    )
   })
 
   it('a schema-1 working copy still opens through the router', async () => {

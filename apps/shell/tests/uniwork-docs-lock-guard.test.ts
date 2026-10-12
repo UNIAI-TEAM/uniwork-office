@@ -4,8 +4,13 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { UniworkDocLock, UniworkDocStatus, UniworkLaunchEvent } from '../src/shared/home-api'
+import { pathKey } from '../src/shared/path-key'
 import type { DeploymentProfile } from '../src/main/uniwork-auth/deployment'
-import { UniworkDocsService, type ConflictUi } from '../src/main/uniwork-docs/service'
+import {
+  UniworkDocsService,
+  refuseLockedOpenPath,
+  type ConflictUi,
+} from '../src/main/uniwork-docs/service'
 import { BINDING_FILE, INTENT_PAYLOAD_FILE } from '../src/main/uniwork-docs/binding-store'
 
 /**
@@ -15,6 +20,20 @@ import { BINDING_FILE, INTENT_PAYLOAD_FILE } from '../src/main/uniwork-docs/bind
  * not create an intent, write the folder or touch the network for that
  * document. `min_app_version` is never compared (OQ-P4).
  */
+
+// counts reads of binding.json, so the hot-path policy can be pinned to one
+// read per call (a module namespace cannot be spied on in ESM)
+const reads = vi.hoisted(() => ({ binding: 0 }))
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>()
+  return {
+    ...actual,
+    readFileSync: (...args: unknown[]) => {
+      if (String(args[0]).endsWith('binding.json')) reads.binding += 1
+      return (actual.readFileSync as (...a: unknown[]) => unknown)(...args)
+    },
+  }
+})
 
 const TOKEN = 'secret-access-token-0123456789'
 const ORIGIN = 'https://uniwork.example'
@@ -116,6 +135,22 @@ const bytesOf = (path: string) => readFileSync(path, 'utf8')
 const bindingText = () => readFileSync(join(docDir(), BINDING_FILE), 'utf8')
 const folderFiles = () => readdirSync(docDir()).sort()
 
+/** a schema-1 binding: the store this build writes, bound and editable */
+const schema1 = {
+  schema: 1,
+  documentId: DOC,
+  workspaceId: 'ws_1',
+  orgId: 'org_a',
+  title: 'Plan.docx',
+  filename: 'Plan.docx',
+  format: 'docx',
+  access: 'edit',
+  baseRevision: '41',
+  baseVersion: 3,
+  baseChecksum: hex(enc('working copy bytes')),
+  state: 'ready',
+}
+
 /** the four min_app_version shapes of AC-1 plus a schema-3 store */
 const NEWER: Array<[string, unknown]> = [
   ['schema 2, min_app_version lower', { schema: 2, min_app_version: '0.0.1' }],
@@ -150,6 +185,23 @@ describe('a newer store is refused before anything opens (AC-1)', () => {
     },
   )
 
+  it('the funnel decision is the guard, exercised at runtime over a seeded store (R1-be-7)', () => {
+    seedFolder({ schema: 2 })
+    const ctx = setup()
+    // the real function the router calls, with the real service
+    expect(refuseLockedOpenPath(ctx.service, docPath())).toBe(true)
+    expect(refuseLockedOpenPath(ctx.service, docPath())).toBe(true)
+    expect(ctx.service.currentLocks()).toHaveLength(1)
+    // no service yet (before app ready): the router keeps its normal behaviour
+    expect(refuseLockedOpenPath(null, docPath())).toBe(false)
+    expect(refuseLockedOpenPath(undefined, docPath())).toBe(false)
+    // a schema-1 copy and a plain local file are not refused
+    rmSync(docDir(), { recursive: true, force: true })
+    seedFolder({ schema: 1 })
+    expect(refuseLockedOpenPath(ctx.service, docPath())).toBe(false)
+    expect(refuseLockedOpenPath(ctx.service, join(dir, 'plain.docx'))).toBe(false)
+  })
+
   it('the open route calls no module and pushes the lock again only on a new refusal', () => {
     seedFolder({ schema: 2 })
     const ctx = setup()
@@ -168,28 +220,29 @@ describe('a newer store is refused before anything opens (AC-1)', () => {
     seedFolder({ schema: 2 })
     const ctx = setup()
     expect(ctx.service.refuseLockedPath(docPath())).toBe(true)
-    ctx.service.dismissLock(docPath().toUpperCase())
+    ctx.service.dismissLock(docPath())
     expect(ctx.service.currentLocks()).toEqual([])
-    expect(ctx.service.isLockedPath(docPath())).toBe(false)
+    expect(ctx.service.lockShownFor(docPath())).toBe(false)
     // the folder is still there, untouched: only the panel went away
     expect(folderFiles()).toEqual(['Plan.docx', BINDING_FILE])
   })
 
+  it('keys a lock by pathKey: a drive-letter path spelled another way dismisses it (R1-be-2)', () => {
+    seedFolder({ schema: 2 })
+    const ctx = setup()
+    expect(ctx.service.refuseLockedPath(docPath())).toBe(true)
+    // the fold is a drive-letter rule; assert it on a drive-letter path, not on
+    // this temp dir (which keeps its case on Linux, where the suite also runs)
+    expect(pathKey('C:\\Root\\Plan.docx')).toBe(pathKey('c:/root/PLAN.DOCX'))
+    // the same file spelled with the other slash or case is the same lock
+    const other = docPath().replace(/\\/g, '/')
+    expect(other).not.toBe(docPath())
+    ctx.service.dismissLock(other)
+    expect(ctx.service.currentLocks()).toEqual([])
+  })
+
   it('schema 1 stays a plain bound document, and garbage stays unbound (regression)', () => {
-    seedFolder({
-      schema: 1,
-      documentId: DOC,
-      workspaceId: 'ws_1',
-      orgId: 'org_a',
-      title: 'Plan.docx',
-      filename: 'Plan.docx',
-      format: 'docx',
-      access: 'edit',
-      baseRevision: '41',
-      baseVersion: 3,
-      baseChecksum: hex(enc('working copy bytes')),
-      state: 'ready',
-    })
+    seedFolder(schema1)
     const ctx = setup()
     expect(ctx.service.refuseLockedPath(docPath())).toBe(false)
     expect(ctx.locks).toEqual([])
@@ -206,9 +259,42 @@ describe('a newer store is refused before anything opens (AC-1)', () => {
   })
 })
 
-describe('no intent, no module save, no client call for a locked path (AC-2)', () => {
-  function locked() {
+describe('the module policy reads binding.json once per call (R1-be-5)', () => {
+  it('isBound / isReadOnly cost one binding read each, even for a newer store', () => {
     seedFolder({ schema: 2, min_app_version: '99.0.0' })
+    const ctx = setup()
+    reads.binding = 0
+    expect(ctx.service.isBound(docPath())).toBe(true)
+    expect(reads.binding).toBe(1)
+    reads.binding = 0
+    expect(ctx.service.isReadOnly(docPath())).toBe(true)
+    expect(reads.binding).toBe(1)
+  })
+
+  it('a schema-1 copy is also classified in one read, and still bound and editable', () => {
+    seedFolder(schema1)
+    const ctx = setup()
+    reads.binding = 0
+    expect(ctx.service.isBound(docPath())).toBe(true)
+    expect(reads.binding).toBe(1)
+    reads.binding = 0
+    expect(ctx.service.isReadOnly(docPath())).toBe(false)
+    expect(reads.binding).toBe(1)
+  })
+
+  it('a plain local file costs no binding read at all', () => {
+    seedFolder(schema1)
+    const ctx = setup()
+    reads.binding = 0
+    expect(ctx.service.isBound(join(dir, 'plain.docx'))).toBe(false)
+    expect(ctx.service.isReadOnly(join(dir, 'plain.docx'))).toBe(false)
+    expect(reads.binding).toBe(0)
+  })
+})
+
+describe('no intent, no module save, no client call for a locked path (AC-2)', () => {
+  function locked(binding: unknown = { schema: 2, min_app_version: '99.0.0' }) {
+    seedFolder(binding)
     const ctx = setup()
     expect(ctx.service.refuseLockedPath(docPath())).toBe(true)
     return ctx
@@ -247,40 +333,49 @@ describe('no intent, no module save, no client call for a locked path (AC-2)', (
     expect(calls).toEqual([])
   })
 
-  it('opening the document from UniWork refuses it before the first request', async () => {
-    const ctx = locked()
-    calls.length = 0
-    await expect(ctx.service.openFromServer(DOC)).rejects.toMatchObject({
-      code: 'engine_incompatible',
-    })
-    // zero requests for that document: no metadata read, no download
-    expect(calls).toEqual([])
-    expect(ctx.locks.at(-1)).toEqual({
-      path: docPath(),
-      reason: 'store_newer',
-      name: 'Plan.docx',
-    })
-    expect(folderFiles()).toEqual(['Plan.docx', BINDING_FILE])
-  })
+  // R1-be-7 (c): the five AC-1 variants, not just one, run through the open path
+  it.each(NEWER)(
+    '%s: openFromServer refuses before the first request and opens no module',
+    async (_name, binding) => {
+      const ctx = locked(binding)
+      calls.length = 0
+      await expect(ctx.service.openFromServer(DOC)).rejects.toMatchObject({
+        code: 'engine_incompatible',
+      })
+      // zero requests for that document: no metadata read, no download
+      expect(calls).toEqual([])
+      expect(ctx.locks.at(-1)).toEqual({
+        path: docPath(),
+        reason: 'store_newer',
+        name: 'Plan.docx',
+      })
+      expect(ctx.deps.openPath).not.toHaveBeenCalled()
+      expect(folderFiles()).toEqual(['Plan.docx', BINDING_FILE])
+    },
+  )
 
-  it('a launch ticket for such a document also opens nothing and sends nothing', async () => {
-    const ctx = locked()
-    calls.length = 0
-    await expect(
-      ctx.service.openFromServer(DOC, {
-        receiptId: 'r',
-        redeemedAt: '2026-10-12T10:00:00Z',
-        id: DOC,
-        organizationId: 'org_a',
-        workspaceId: 'ws_1',
-        title: 'Plan.docx',
-        operation: 'edit',
-        version: 0,
-        revision: '41',
-        downloadPath: `/api/v1/documents/${DOC}/download`,
-      }),
-    ).rejects.toMatchObject({ code: 'engine_incompatible' })
-    expect(calls).toEqual([])
-    expect(bytesOf(docPath())).toBe('working copy bytes')
-  })
+  it.each(NEWER)(
+    '%s: a launch ticket also opens nothing and sends nothing',
+    async (_name, binding) => {
+      const ctx = locked(binding)
+      calls.length = 0
+      await expect(
+        ctx.service.openFromServer(DOC, {
+          receiptId: 'r',
+          redeemedAt: '2026-10-12T10:00:00Z',
+          id: DOC,
+          organizationId: 'org_a',
+          workspaceId: 'ws_1',
+          title: 'Plan.docx',
+          operation: 'edit',
+          version: 0,
+          revision: '41',
+          downloadPath: `/api/v1/documents/${DOC}/download`,
+        }),
+      ).rejects.toMatchObject({ code: 'engine_incompatible' })
+      expect(calls).toEqual([])
+      expect(ctx.deps.openPath).not.toHaveBeenCalled()
+      expect(bytesOf(docPath())).toBe('working copy bytes')
+    },
+  )
 })
