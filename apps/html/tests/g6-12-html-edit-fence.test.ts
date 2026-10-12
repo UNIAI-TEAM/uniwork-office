@@ -3,6 +3,7 @@ import { buildParseMap, type ParseMap } from '../src/renderer/document/parse-map
 import { compileOps, type HtmlOp } from '../src/renderer/document/ops'
 import { applyPatches } from '../src/renderer/document/patch'
 import { createHtmlSkillCore, type HtmlDocAccess } from '../src/renderer/ai/tools'
+import { sendFence } from '../src/renderer/ai/edit-fence'
 
 // G6-12 #9: a turn sent from "Ask AI" on a selected element, or a queue submission, may only
 // edit those elements; the code refuses anything else and the source outside stays identical.
@@ -146,5 +147,27 @@ describe('html selection edit fence', () => {
     })
     expect(r.isError).toBeFalsy()
     expect(doc.text).toContain('Alpha edited.')
+  })
+})
+
+// round 2: the undelivered-bubble retry resends the entry's own fence
+describe('html fence on retry', () => {
+  it('sendFence keeps the sids of a scoped entry and drops an empty list', () => {
+    expect(sendFence([4, 9])).toEqual([4, 9])
+    expect(sendFence([])).toBeNull()
+    expect(sendFence(null)).toBeNull()
+    expect(sendFence(undefined)).toBeNull()
+  })
+
+  it('a retried element-scoped turn is still fenced in code', async () => {
+    const doc = fakeAccess(DOC, () => fence)
+    const entry = { fenceSids: [sidOf(doc.access, 'b')] }
+    // what the retry button passes to send
+    const fence = sendFence(entry.fenceSids)
+    const r = await run(doc.access, 'apply_ops', {
+      ops: [{ op: 'set_text', sid: sidOf(doc.access, 'a'), text: 'Alpha edited.' }],
+    })
+    expect(r.isError).toBe(true)
+    expect(doc.text).toBe(DOC)
   })
 })

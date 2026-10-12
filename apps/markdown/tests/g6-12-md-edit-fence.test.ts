@@ -4,7 +4,14 @@ import { TextSelection } from '@tiptap/pm/state'
 import { buildExtensions } from '../src/renderer/editor/extensions'
 import { blockRange } from '../src/renderer/editor/ops'
 import { executeTool, type FrontmatterAccess } from '../src/renderer/ai/tools'
-import { selectionFence, setEditFence } from '../src/renderer/ai/edit-fence'
+import {
+  clearEditFence,
+  fencedBlocks,
+  hasEditFence,
+  selectionFence,
+  setEditFence,
+  turnFence,
+} from '../src/renderer/ai/edit-fence'
 
 // G6-12 #9: in a turn that edits the selection (scope chip) or the queued targets, the code
 // refuses edits outside them; the text outside stays byte-identical whatever the model sends.
@@ -195,5 +202,66 @@ describe('markdown selection edit fence', () => {
       ops({ op: 'replaceText', target: { start: 1 }, find: 'one', replace: '1' }),
     )
     expect(r.isError).toBeUndefined()
+  })
+})
+
+// round 2: a retried turn runs with its own scope, and the fence ends with the run
+
+describe('markdown fence on retry and at run end', () => {
+  it('an unscoped turn gets no fence even while a selection is live (retry of an older whole-document entry)', () => {
+    const editor = createEditor(DOC)
+    selectText(editor, 'two')
+    expect(turnFence(editor, { scoped: false })).toBeNull()
+  })
+
+  it('a scoped turn is fenced to the live selection', () => {
+    const editor = createEditor(DOC)
+    selectText(editor, 'two')
+    const fence = turnFence(editor, { scoped: true })
+    expect(fence).toHaveLength(1)
+    expect(editor.state.doc.textBetween(fence![0]!.from, fence![0]!.to)).toBe('two')
+  })
+
+  it('a scoped retry whose selection is gone keeps the fence of the turn it repeats', () => {
+    const editor = createEditor(DOC)
+    const kept = [fenceBlocks(editor, 3)]
+    expect(turnFence(editor, { scoped: true, fallback: kept })).toEqual(kept)
+    // a scoped entry never silently becomes a whole-document turn when it can be fenced
+    selectText(editor, 'one')
+    const live = turnFence(editor, { scoped: true, fallback: kept })
+    expect(editor.state.doc.textBetween(live![0]!.from, live![0]!.to)).toBe('one')
+  })
+
+  it('a queue submission keeps its anchored ranges, scope or not', () => {
+    const editor = createEditor(DOC)
+    selectText(editor, 'two')
+    const queued = [fenceBlocks(editor, 1)]
+    expect(turnFence(editor, { scoped: false, queueFence: queued })).toEqual(queued)
+  })
+
+  it('clearEditFence ends the fence: no refusal afterwards, no transaction listener left', async () => {
+    const editor = createEditor(DOC)
+    const listeners = () =>
+      (editor as unknown as { callbacks: Record<string, unknown[] | undefined> }).callbacks
+        .transaction?.length ?? 0
+    const baseline = listeners()
+    setEditFence(editor, [fenceBlocks(editor, 2)])
+    expect(hasEditFence(editor)).toBe(true)
+    expect(listeners()).toBe(baseline + 1)
+    const ranges = clearEditFence(editor)
+    expect(ranges).toHaveLength(1)
+    expect(hasEditFence(editor)).toBe(false)
+    expect(fencedBlocks(editor)).toEqual([])
+    expect(listeners()).toBe(baseline)
+    const free = await run(
+      editor,
+      ops({ op: 'replaceText', target: { start: 1 }, find: 'one', replace: '1' }),
+    )
+    expect(free.isError).toBeUndefined()
+  })
+
+  it('clearEditFence on an editor without a fence is a no-op', () => {
+    const editor = createEditor(DOC)
+    expect(clearEditFence(editor)).toBeNull()
   })
 })
