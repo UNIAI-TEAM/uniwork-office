@@ -189,4 +189,16 @@ export const it = {
   aiCmdSkipped: ' ({count} blocco/i protetto/i ignorato/i)',
   aiViewOnlyNotice:
     'Documento di sola lettura: l’IA può leggerlo e rispondere a domande, ma non può modificarlo.',
+  aiClarifyTitle: 'Qualche domanda prima di continuare',
+  aiClarifyDecide: 'Decidi tu per me',
+  aiClarifyDecideAnswer: '(decidi tu per me)',
+  aiClarifyMulti: 'Scelta multipla',
+  aiClarifyNext: 'Avanti',
+  aiClarifyPrev: 'Indietro',
+  aiClarifyOther: 'Altro (da digitare)',
+  aiClarifySelected: '{n} selezionati',
+  aiClarifySkip: 'Salta',
+  aiClarifySubmit: 'Continua',
+  aiSumClarify: 'Chiarimenti forniti',
+  aiSumClarifySkipped: 'Chiarimenti saltati',
 } satisfies Record<keyof typeof zh, string>

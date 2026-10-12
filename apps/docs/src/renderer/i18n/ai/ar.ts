@@ -181,4 +181,16 @@ export const ar = {
   aiCmdSkipped: ' (تم تخطي {count} كتلة محمية)',
   aiViewOnlyNotice:
     'مستند للعرض فقط: يمكن للذكاء الاصطناعي قراءته والإجابة عن الأسئلة، لكنه لا يستطيع تعديله.',
+  aiClarifyTitle: 'بعض الأسئلة قبل المتابعة',
+  aiClarifyDecide: 'قرِّر بالنيابة عني',
+  aiClarifyDecideAnswer: '(قرِّر بالنيابة عني)',
+  aiClarifyMulti: 'اختيار متعدد',
+  aiClarifyNext: 'التالي',
+  aiClarifyPrev: 'السابق',
+  aiClarifyOther: 'أخرى (يمكن الكتابة)',
+  aiClarifySelected: 'تم تحديد {n}',
+  aiClarifySkip: 'تخطٍّ',
+  aiClarifySubmit: 'متابعة',
+  aiSumClarify: 'تمت الإجابة عن أسئلة التوضيح',
+  aiSumClarifySkipped: 'تم تخطي أسئلة التوضيح',
 } satisfies Record<keyof typeof zh, string>

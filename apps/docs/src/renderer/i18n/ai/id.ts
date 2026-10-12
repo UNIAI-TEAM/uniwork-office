@@ -183,4 +183,16 @@ export const id = {
   aiCmdSkipped: ' ({count} blok terlindungi dilewati)',
   aiViewOnlyNotice:
     'Dokumen hanya-lihat: AI dapat membaca dan menjawab pertanyaan, tetapi tidak dapat mengedit.',
+  aiClarifyTitle: 'Beberapa pertanyaan sebelum melanjutkan',
+  aiClarifyDecide: 'Putuskan untuk saya',
+  aiClarifyDecideAnswer: '(putuskan untuk saya)',
+  aiClarifyMulti: 'Pilih beberapa',
+  aiClarifyNext: 'Berikutnya',
+  aiClarifyPrev: 'Sebelumnya',
+  aiClarifyOther: 'Lainnya (isi sendiri)',
+  aiClarifySelected: '{n} dipilih',
+  aiClarifySkip: 'Lewati',
+  aiClarifySubmit: 'Lanjutkan',
+  aiSumClarify: 'Klarifikasi dijawab',
+  aiSumClarifySkipped: 'Klarifikasi dilewati',
 } satisfies Record<keyof typeof zh, string>

@@ -184,4 +184,16 @@ export const vi = {
   aiOpenSettingsBtn: 'Mở cài đặt AI',
   aiViewOnlyNotice:
     'Tài liệu chỉ xem: AI có thể đọc và trả lời câu hỏi, nhưng không thể chỉnh sửa.',
+  aiClarifyTitle: 'Vài câu hỏi trước khi tiếp tục',
+  aiClarifyDecide: 'Quyết định giúp tôi',
+  aiClarifyDecideAnswer: '(quyết định giúp tôi)',
+  aiClarifyMulti: 'Nhiều lựa chọn',
+  aiClarifyNext: 'Tiếp theo',
+  aiClarifyPrev: 'Quay lại',
+  aiClarifyOther: 'Khác (nhập vào)',
+  aiClarifySelected: 'Đã chọn {n}',
+  aiClarifySkip: 'Bỏ qua',
+  aiClarifySubmit: 'Tiếp tục',
+  aiSumClarify: 'Đã trả lời câu hỏi làm rõ',
+  aiSumClarifySkipped: 'Đã bỏ qua câu hỏi làm rõ',
 } satisfies Record<keyof typeof zh, string>

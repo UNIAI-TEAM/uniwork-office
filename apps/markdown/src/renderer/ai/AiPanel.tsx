@@ -41,6 +41,8 @@ import {
 import { createSearchSkill } from './search-skill'
 import { createElectronTransport } from './transport'
 import { EditQueueCard } from './EditQueueCard'
+import { ClarifyCard } from '../components/ClarifyCard'
+import type { AskClarification, ClarifyQuestion } from './tools'
 import {
   buildQueueInstruction,
   buildQueueSummary,
@@ -191,6 +193,24 @@ export function AiPanel({
   /** a streamed write stopped early: the draft stays in the document until the user keeps or discards it */
   const [activePartial, setActivePartial] = useState<{ blocks: number } | null>(null)
   const partialResolverRef = useRef<((keep: boolean) => void) | null>(null)
+  /** ask_clarification card docked in the composer slot while the run waits for the user */
+  const [activeClarify, setActiveClarify] = useState<ClarifyQuestion[] | null>(null)
+  const clarifyResolverRef = useRef<((r: { answers: string; cancelled?: boolean }) => void) | null>(
+    null,
+  )
+  /** settle an open card as skipped so the waiting tool call never dangles */
+  const dismissClarify = (): void => {
+    clarifyResolverRef.current?.({ answers: '', cancelled: true })
+    clarifyResolverRef.current = null
+    setActiveClarify(null)
+  }
+  const askClarification: AskClarification = (questions) =>
+    new Promise((resolve) => {
+      // a second card replaces a stale one; the stale call reads as skipped
+      clarifyResolverRef.current?.({ answers: '', cancelled: true })
+      clarifyResolverRef.current = resolve
+      setActiveClarify(questions)
+    })
   /** bumped by New chat / unmount: a writer resuming after its abort must not open the keep card */
   const writerEpochRef = useRef(0)
   const [prompt, setPrompt] = useState('')
@@ -391,6 +411,7 @@ export function AiPanel({
             write: (spec, onProgress, signal) => runDocWriterRef.current(spec, onProgress, signal),
           }),
           () => readOnlyRef.current,
+          () => askClarification,
         ),
         createSearchSkill(),
       ]),
@@ -493,6 +514,8 @@ export function AiPanel({
     return () => {
       mountedRef.current = false
       partialResolverRef.current?.(false)
+      clarifyResolverRef.current?.({ answers: '', cancelled: true })
+      clarifyResolverRef.current = null
       loopRef.current?.cancel()
       const editor = depsRef.current.getEditor()
       if (editor) clearAiHighlights(editor)
@@ -616,7 +639,10 @@ export function AiPanel({
     })()
   }
 
-  const stop = (): void => loopRef.current?.cancel()
+  const stop = (): void => {
+    dismissClarify()
+    loopRef.current?.cancel()
+  }
 
   const retry = (): void =>
     send(runInstructionRef.current, runDisplayRef.current, lastScopeRef.current ?? null)
@@ -987,7 +1013,20 @@ export function AiPanel({
         </div>
       )}
 
-      <div className="ai-composer">
+      {activeClarify && (
+        <div className="ai-composer">
+          <ClarifyCard
+            questions={activeClarify}
+            onSubmit={(answers) => {
+              clarifyResolverRef.current?.({ answers })
+              clarifyResolverRef.current = null
+              setActiveClarify(null)
+            }}
+            onSkip={dismissClarify}
+          />
+        </div>
+      )}
+      <div className="ai-composer" style={activeClarify ? { display: 'none' } : undefined}>
         {readOnly && (
           <div className="ai-readonly-notice" role="note">
             {t('aiViewOnlyNotice')}

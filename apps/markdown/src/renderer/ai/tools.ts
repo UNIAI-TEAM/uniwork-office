@@ -115,12 +115,54 @@ export function buildDocContext(editor: Editor): string {
 
 // ── tool definitions ──
 
+/** one question on the ask_clarification card (same shape as html's) */
+export interface ClarifyQuestion {
+  id: string
+  label: string
+  description?: string
+  /** ≤5 options; the card appends "decide for me" and a free-text "other" itself */
+  options: string[]
+  multi?: boolean
+}
+
+/** the panel's questionnaire card; resolves with the answers, or cancelled when skipped / stopped */
+export type AskClarification = (
+  questions: ClarifyQuestion[],
+) => Promise<{ answers: string; cancelled?: boolean }>
+
 export const AGENT_TOOLS: AgentToolDef[] = [
   {
     name: 'get_document_context',
     description:
       'Refresh the document overview: a numbered list of top-level blocks (index | type | preview) plus the current selection. Call this before index-based edits when in doubt.',
     inputSchema: { type: 'object', properties: {}, required: [] },
+  },
+  {
+    name: 'ask_clarification',
+    description:
+      'Ask the user before an edit or an answer when the request is ambiguous about meaning, scope or target (which section or blocks, what a term, heading or table column in the document means, how far a rewrite should go). Shows a questionnaire card: 1–4 questions, ≤5 options each; the card adds "decide for me" and a free-text option itself. Use it only when a guess would likely change the wrong thing; skip it when the request or the document already answers it. Wait for the answers, then continue. Do not repeat the questions in your reply.',
+    inputSchema: {
+      type: 'object',
+      required: ['questions'],
+      properties: {
+        questions: {
+          type: 'array',
+          minItems: 1,
+          maxItems: 4,
+          items: {
+            type: 'object',
+            required: ['id', 'label', 'options'],
+            properties: {
+              id: { type: 'string' },
+              label: { type: 'string' },
+              description: { type: 'string' },
+              options: { type: 'array', items: { type: 'string' }, maxItems: 5 },
+              multi: { type: 'boolean' },
+            },
+          },
+        },
+      },
+    },
   },
   {
     name: 'read_blocks',
@@ -438,13 +480,66 @@ async function writeDocument(
   }
 }
 
+/** ask_clarification: the card blocks the run until the user answers or skips (result texts as html's) */
+async function askClarification(
+  call: AgentToolCall,
+  ask: AskClarification | undefined,
+): Promise<ToolExecution> {
+  if (!ask)
+    return {
+      output: 'questionnaire cards are not available here; decide sensible defaults and continue',
+      isError: true,
+      mutated: false,
+      summary: t('aiToolClarify'),
+    }
+  const raw: unknown[] = Array.isArray(call.input.questions) ? call.input.questions : []
+  const questions: ClarifyQuestion[] = raw
+    .map((item, i) => {
+      const q = (item ?? {}) as Record<string, unknown>
+      return {
+        id: String(q.id ?? `q${i + 1}`),
+        label: String(q.label ?? '').trim(),
+        description: q.description ? String(q.description) : undefined,
+        options: Array.isArray(q.options)
+          ? q.options.map((o: unknown) => String(o)).slice(0, 5)
+          : [],
+        multi: !!q.multi,
+      }
+    })
+    .filter((q) => q.label && q.options.length > 0)
+    .slice(0, 4)
+  if (questions.length === 0)
+    return {
+      output: 'questions must be non-empty and every question needs options',
+      isError: true,
+      mutated: false,
+      summary: t('aiToolClarify'),
+    }
+  const r = await ask(questions)
+  return r.cancelled
+    ? {
+        output:
+          'The user skipped the questionnaire. Decide sensible defaults yourself and continue.',
+        mutated: false,
+        summary: t('aiToolClarifySkipped'),
+      }
+    : {
+        output: `User answers:\n${r.answers}\nNow continue with the request following these answers.`,
+        mutated: false,
+        summary: t('aiToolClarify'),
+      }
+}
+
 export function executeTool(
   editor: Editor,
   call: AgentToolCall,
   signal?: AbortSignal,
   fm?: FrontmatterAccess,
   writer?: AiDocWriter,
+  /** the panel's questionnaire card; without one ask_clarification reports it is unavailable */
+  ask?: AskClarification,
 ): ToolExecution | Promise<ToolExecution> {
+  if (call.name === 'ask_clarification') return askClarification(call, ask)
   const doc = editor.state.doc
   const maxIndex = doc.childCount - 1
 

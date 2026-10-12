@@ -101,6 +101,7 @@ import { AI_PROVIDERS } from '../shared/ipc'
 import { ZoteroDocumentController } from './zotero/controller'
 import { AiPanel, AI_REVISION_AUTHOR } from './ai/AiPanel'
 import type { AiCommentsAccess, AiDocExtras, AiHeaderFooterAccess } from './ai/tools'
+import { createAiSideState, type AiSideSlice, type AiSideState } from './ai/run-snapshot'
 import type { AiStyleInfo } from './ai/style-ops'
 import { applyResolvedPageSetup, describeSection, type AiPageSetupAccess } from './ai/page-setup'
 import { patchPendingSectPr, sectionIndexAtBlock } from './ai/pending-sections'
@@ -6481,6 +6482,85 @@ export function App() {
     [upsertStyleDef],
   )
 
+  // Roll back of an AI run restores the state saved beside the PM doc that the AI
+  // tools change (comments, header/footer, style table, page setup, watermark).
+  // Plain slices read this render's values; comments and style upserts read their
+  // synchronous mirrors. The loaded file version keys the capture: a save or
+  // reload resets these from the file, so an older capture is not replayed.
+  const aiSideLive = {
+    commentsDirty,
+    header,
+    headerDirty,
+    footer,
+    footerDirty,
+    hfVariants,
+    hfVariantsDirty,
+    sectionHfEdits,
+    titlePg,
+    titlePgDirty,
+    evenOddHf,
+    evenOddHfDirty,
+    section,
+    sectionDirty,
+    sections,
+    sectionsDirty,
+    trailingStartType,
+    pgNumEdit,
+    pgNumDirtySections,
+    watermark,
+    watermarkDirty,
+    watermarkStyle,
+    watermarkPicture,
+  }
+  const aiSideLiveRef = useRef(aiSideLive)
+  aiSideLiveRef.current = aiSideLive
+  const aiSideState = useMemo<AiSideState>(() => {
+    type Live = typeof aiSideLiveRef.current
+    const live = <K extends keyof Live>(key: K, set: (value: Live[K]) => void): AiSideSlice => ({
+      get: () => aiSideLiveRef.current[key],
+      set: (value) => set(value as Live[K]),
+    })
+    return createAiSideState(
+      {
+        comments: {
+          get: () => commentsLiveRef.current,
+          set: (value) => setComments(value as CommentInfo[]),
+        },
+        styleUpserts: {
+          get: () => aiStyleUpsertsRef.current,
+          set: (value) => {
+            aiStyleUpsertsRef.current = value as Record<string, StyleUpsert>
+            setStyleUpserts(aiStyleUpsertsRef.current)
+          },
+        },
+        commentsDirty: live('commentsDirty', setCommentsDirty),
+        header: live('header', setHeader),
+        headerDirty: live('headerDirty', setHeaderDirty),
+        footer: live('footer', setFooter),
+        footerDirty: live('footerDirty', setFooterDirty),
+        hfVariants: live('hfVariants', setHfVariants),
+        hfVariantsDirty: live('hfVariantsDirty', setHfVariantsDirty),
+        sectionHfEdits: live('sectionHfEdits', setSectionHfEdits),
+        titlePg: live('titlePg', setTitlePg),
+        titlePgDirty: live('titlePgDirty', setTitlePgDirty),
+        evenOddHf: live('evenOddHf', setEvenOddHf),
+        evenOddHfDirty: live('evenOddHfDirty', setEvenOddHfDirty),
+        section: live('section', setSection),
+        sectionDirty: live('sectionDirty', setSectionDirty),
+        sections: live('sections', setSections),
+        sectionsDirty: live('sectionsDirty', setSectionsDirty),
+        trailingStartType: live('trailingStartType', setTrailingStartType),
+        pgNumEdit: live('pgNumEdit', setPgNumEdit),
+        pgNumDirtySections: live('pgNumDirtySections', setPgNumDirtySections),
+        watermark: live('watermark', setWatermark),
+        watermarkDirty: live('watermarkDirty', setWatermarkDirty),
+        watermarkStyle: live('watermarkStyle', setWatermarkStyle),
+        watermarkPicture: live('watermarkPicture', setWatermarkPicture),
+      },
+      () => fileCtxRef.current.doc,
+    )
+  }, [setComments])
+
   const aiHfAccess = useMemo<AiHeaderFooterAccess>(
     () => ({
       read: () => {
@@ -7142,6 +7222,8 @@ export function App() {
               docExtras={aiDocExtras}
               notesAccess={aiNotesAccess}
               readOnly={uniwork.readOnly}
+              bound={uniwork.bound}
+              sideState={aiSideState}
             />
           </div>
         )}
