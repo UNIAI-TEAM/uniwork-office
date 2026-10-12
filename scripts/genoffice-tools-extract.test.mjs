@@ -1,0 +1,708 @@
+// node --test scripts/genoffice-tools-extract.test.mjs
+//
+// The extractor reads its inputs through git at a revision, so the fixtures are
+// real (tiny) git repositories built in a temp dir: one commit, a handful of TS
+// files that mirror the shapes the product sources use (literal schemas, schemas
+// built from shared consts and spreads, a capability-keyed getter list, a
+// duplicate tool name, a schema the evaluator must refuse to guess).
+import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { after, describe, it } from 'node:test'
+
+import { extract } from './genoffice-tools-extract.mjs'
+
+const SCRIPT = fileURLToPath(new URL('./genoffice-tools-extract.mjs', import.meta.url))
+const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url))
+
+const roots = []
+
+after(() => {
+  for (const root of roots) rmSync(root, { recursive: true, force: true })
+})
+
+/** write a file tree into a fresh git repo with one commit; returns { dir, sha } */
+function fixture(files) {
+  const dir = mkdtempSync(join(tmpdir(), 'genoffice-tools-extract-'))
+  roots.push(dir)
+  for (const [path, text] of Object.entries(files)) {
+    const full = join(dir, path)
+    mkdirSync(dirname(full), { recursive: true })
+    writeFileSync(full, text)
+  }
+  const git = (...args) =>
+    execFileSync('git', ['-C', dir, ...args], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+  git('init', '--quiet')
+  git('add', '-A')
+  git(
+    '-c',
+    'user.email=test@example.com',
+    '-c',
+    'user.name=test',
+    'commit',
+    '--quiet',
+    '-m',
+    'fixture',
+  )
+  return { dir, sha: git('rev-parse', 'HEAD').trim() }
+}
+
+/** independent canonical-JSON + sha256 (does not import the extractor's helpers) */
+function canonical(value) {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value)
+  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`
+  const keys = Object.keys(value).sort()
+  return `{${keys.map((k) => `${JSON.stringify(k)}:${canonical(value[k])}`).join(',')}}`
+}
+
+function sha256(text) {
+  // small, dependency-free implementation kept independent of the extractor
+  return execFileSync(
+    process.execPath,
+    [
+      '-e',
+      'const c=require("node:crypto");let s="";process.stdin.on("data",(d)=>s+=d).on("end",()=>process.stdout.write(c.createHash("sha256").update(s,"utf8").digest("hex")))',
+    ],
+    { input: text, encoding: 'utf8' },
+  )
+}
+
+function hashOf(schema) {
+  return sha256(canonical(schema))
+}
+
+// ────────────────────────────── fixture ──────────────────────────────
+
+const SHARED_SCHEMA = {
+  type: 'object',
+  properties: { query: { type: 'string' } },
+  required: ['query'],
+}
+
+const SPREAD_PARTS = {
+  properties: { a: { type: 'integer' } },
+  required: ['a'],
+}
+
+const ORDER_A = {
+  type: 'object',
+  properties: { alpha: { type: 'string' }, beta: { type: 'integer' } },
+}
+
+const ORDER_B = {
+  properties: { beta: { type: 'integer' }, alpha: { type: 'string' } },
+  type: 'object',
+}
+
+const LITERAL_SCHEMA = {
+  type: 'object',
+  properties: { zeta: { type: 'string' }, alpha: { type: 'integer' } },
+  required: ['alpha'],
+}
+
+const FIXTURE = {
+  'packages/agent-core/src/types.ts': [
+    'export interface AgentToolDef {',
+    '  name: string',
+    '  description: string',
+    '  inputSchema: Record<string, unknown>',
+    '}',
+    '',
+  ].join('\n'),
+
+  'apps/docs/src/renderer/ai/shared.ts': [
+    "import type { AgentToolDef } from '@genoffice/agent-core'",
+    '',
+    'export const SHARED_SCHEMA = {',
+    "  type: 'object',",
+    '  properties: { query: { type: "string" } },',
+    "  required: ['query'],",
+    '}',
+    '',
+    'export const SPREAD_PARTS = {',
+    '  properties: { a: { type: "integer" } },',
+    "  required: ['a'],",
+    '}',
+    '',
+    'export const SHARED_TOOL: AgentToolDef = {',
+    "  name: 'shared_tool',",
+    "  description: 'schema comes from a shared const in another file',",
+    '  inputSchema: SHARED_SCHEMA,',
+    '}',
+    '',
+    'export const SPREAD_TOOL: AgentToolDef = {',
+    "  name: 'spread_tool',",
+    "  description: 'schema assembled with a spread',",
+    "  inputSchema: { type: 'object', ...SPREAD_PARTS },",
+    '}',
+    '',
+  ].join('\n'),
+
+  'apps/docs/src/renderer/ai/tools.ts': [
+    "import type { AgentSkill, AgentToolCall, AgentToolDef, ToolExecution } from '@genoffice/agent-core'",
+    "import { SHARED_TOOL, SPREAD_TOOL } from './shared'",
+    '',
+    'export const AGENT_TOOLS: AgentToolDef[] = [',
+    '  {',
+    "    name: 'literal_tool',",
+    "    description: 'literal schema',",
+    '    inputSchema: {',
+    "      type: 'object',",
+    '      properties: { zeta: { type: "string" }, alpha: { type: "integer" } },',
+    "      required: ['alpha'],",
+    '    },',
+    '  },',
+    '  SHARED_TOOL,',
+    '  SPREAD_TOOL,',
+    '  {',
+    "    name: 'duplicate',",
+    "    description: 'first declaration of a duplicated name',",
+    "    inputSchema: { type: 'object', properties: { one: { type: 'string' } } },",
+    '  },',
+    '  {',
+    "    name: 'duplicate',",
+    "    description: 'second declaration of a duplicated name',",
+    "    inputSchema: { type: 'object', properties: { two: { type: 'string' } } },",
+    '  },',
+    '  {',
+    "    name: 'order_a',",
+    "    description: 'keys in one order',",
+    '    inputSchema: {',
+    "      type: 'object',",
+    '      properties: { alpha: { type: "string" }, beta: { type: "integer" } },',
+    '    },',
+    '  },',
+    '  {',
+    "    name: 'order_b',",
+    "    description: 'same schema, keys in another order',",
+    '    inputSchema: {',
+    '      properties: { beta: { type: "integer" }, alpha: { type: "string" } },',
+    "      type: 'object',",
+    '    },',
+    '  },',
+    '  {',
+    "    name: 'unresolvable',",
+    "    description: 'schema produced by a call the evaluator refuses to fold',",
+    "    inputSchema: buildSchema('unresolvable'),",
+    '  },',
+    '  {',
+    "    name: 'call_tool',",
+    "    description: 'schema produced by an unsupported method call',",
+    '    inputSchema: [1, 2].flat().slice(0, 1),',
+    '  },',
+    ']',
+    '',
+    '/** tools a view-only document keeps */',
+    "export const READ_ONLY_TOOLS: ReadonlySet<string> = new Set(['shared_tool'])",
+    '',
+    'export function createDocsSkill(available: () => boolean): AgentSkill {',
+    '  return {',
+    "    id: 'docs',",
+    '    // live like tools: the capability is re-read before every request',
+    '    get tools() {',
+    '      return available()',
+    '        ? [',
+    '            ...AGENT_TOOLS,',
+    '            {',
+    "              name: 'gated_tool',",
+    "              description: 'only offered while the capability is on',",
+    "              inputSchema: { type: 'object', properties: {} },",
+    '            },',
+    '          ]',
+    '        : AGENT_TOOLS',
+    '    },',
+    '  }',
+    '}',
+    '',
+    'export function executeTool(call: AgentToolCall): ToolExecution {',
+    '  switch (call.name) {',
+    "    case 'literal_tool':",
+    "      return { output: 'ok', mutated: true, summary: 'literal' }",
+    "    case 'duplicate':",
+    "      return { output: 'ok', mutated: false, summary: 'duplicate' }",
+    "    case 'gated_tool':",
+    "      return { output: 'ok', mutated: changes > 0, summary: 'gated' }",
+    '    default:',
+    "      return { output: 'unknown', isError: true, summary: call.name }",
+    '  }',
+    '}',
+    '',
+  ].join('\n'),
+
+  'apps/sheets/src/renderer/ai/tools.ts': [
+    "import type { AgentToolDef } from '@genoffice/agent-core'",
+    '',
+    'export const WORKBOOK_TOOLS: AgentToolDef[] = [',
+    '  {',
+    "    name: 'sheet_tool',",
+    "    description: 'one tool in a second module',",
+    "    inputSchema: { type: 'object', properties: { range: { type: 'string' } } },",
+    '  },',
+    ']',
+    '',
+  ].join('\n'),
+}
+
+const ROWS = [
+  ['docs', 'call_tool', 'unresolved:call:flat', 'undeclared', 'apps/docs/src/renderer/ai/tools.ts'],
+  [
+    'docs',
+    'duplicate',
+    hashOf({ type: 'object', properties: { one: { type: 'string' } } }),
+    'no',
+    'apps/docs/src/renderer/ai/tools.ts',
+  ],
+  [
+    'docs',
+    'duplicate',
+    hashOf({ type: 'object', properties: { two: { type: 'string' } } }),
+    'no',
+    'apps/docs/src/renderer/ai/tools.ts',
+  ],
+  [
+    'docs',
+    'gated_tool',
+    hashOf({ type: 'object', properties: {} }),
+    'yes',
+    'apps/docs/src/renderer/ai/tools.ts',
+  ],
+  ['docs', 'literal_tool', hashOf(LITERAL_SCHEMA), 'yes', 'apps/docs/src/renderer/ai/tools.ts'],
+  ['docs', 'order_a', hashOf(ORDER_A), 'undeclared', 'apps/docs/src/renderer/ai/tools.ts'],
+  ['docs', 'order_b', hashOf(ORDER_B), 'undeclared', 'apps/docs/src/renderer/ai/tools.ts'],
+  ['docs', 'shared_tool', hashOf(SHARED_SCHEMA), 'no', 'apps/docs/src/renderer/ai/shared.ts'],
+  [
+    'docs',
+    'spread_tool',
+    hashOf({ type: 'object', ...SPREAD_PARTS }),
+    'undeclared',
+    'apps/docs/src/renderer/ai/shared.ts',
+  ],
+  [
+    'docs',
+    'unresolvable',
+    'unresolved:identifier:buildSchema',
+    'undeclared',
+    'apps/docs/src/renderer/ai/tools.ts',
+  ],
+  [
+    'sheets',
+    'sheet_tool',
+    hashOf({ type: 'object', properties: { range: { type: 'string' } } }),
+    'undeclared',
+    'apps/sheets/src/renderer/ai/tools.ts',
+  ],
+]
+
+function expectedText(sha, rows) {
+  const lines = [
+    `<!-- genoffice-tools-extract v1 rev=${sha} -->`,
+    '| module | tool | input_schema_sha256 | editor_write | source |',
+    '| --- | --- | --- | --- | --- |',
+    ...rows.map((r) => `| ${r.join(' | ')} |`),
+  ]
+  return `${lines.join('\n')}\n`
+}
+
+// ────────────────────────────── tests ──────────────────────────────
+
+describe('extract', () => {
+  it('prints the exact table for the fixture', () => {
+    const { dir, sha } = fixture(FIXTURE)
+    const result = extract({ repo: dir, rev: 'HEAD' })
+    assert.equal(result.sha, sha)
+    assert.equal(result.text, expectedText(sha, ROWS))
+  })
+
+  it('resolves spread and shared-const schemas, and refuses to guess the rest', () => {
+    const { dir } = fixture(FIXTURE)
+    const { rows } = extract({ repo: dir, rev: 'HEAD' })
+    const byName = (name, source) =>
+      rows.filter((r) => r.tool === name && (!source || r.source === source))
+    assert.equal(byName('spread_tool').length, 1)
+    assert.equal(byName('shared_tool').length, 1)
+    assert.equal(byName('unresolvable')[0].hash, 'unresolved:identifier:buildSchema')
+    assert.equal(byName('call_tool')[0].hash, 'unresolved:call:flat')
+  })
+
+  it('finds tools reachable only through a capability-keyed getter', () => {
+    const { dir } = fixture(FIXTURE)
+    const { rows } = extract({ repo: dir, rev: 'HEAD' })
+    assert.ok(rows.some((r) => r.tool === 'gated_tool'))
+  })
+
+  it('keeps both rows of a duplicate (module, tool) pair', () => {
+    const { dir } = fixture(FIXTURE)
+    const { rows } = extract({ repo: dir, rev: 'HEAD' })
+    const dup = rows.filter((r) => r.tool === 'duplicate')
+    assert.equal(dup.length, 2)
+    assert.notEqual(dup[0].hash, dup[1].hash)
+  })
+
+  it('hashes are independent of key order, at every nesting level', () => {
+    const { dir } = fixture(FIXTURE)
+    const { rows } = extract({ repo: dir, rev: 'HEAD' })
+    const a = rows.find((r) => r.tool === 'order_a')
+    const b = rows.find((r) => r.tool === 'order_b')
+    assert.equal(a.hash, b.hash)
+    // an independent canonicalizer agrees with the script's hash
+    assert.equal(
+      a.hash,
+      hashOf({
+        properties: { alpha: { type: 'string' }, beta: { type: 'integer' } },
+        type: 'object',
+      }),
+    )
+  })
+
+  it('derives editor_write from declarations only', () => {
+    const { dir } = fixture(FIXTURE)
+    const { rows } = extract({ repo: dir, rev: 'HEAD' })
+    const write = (tool) => rows.find((r) => r.tool === tool).write
+    assert.equal(write('literal_tool'), 'yes') // mutated: true in its case
+    assert.equal(write('gated_tool'), 'yes') // mutated: <expression> in its case
+    assert.equal(write('duplicate'), 'no') // mutated: false in its case
+    assert.equal(write('shared_tool'), 'no') // named by READ_ONLY_TOOLS
+    assert.equal(write('spread_tool'), 'undeclared') // no declaration at all
+  })
+
+  it('is byte-identical across two runs', () => {
+    const { dir } = fixture(FIXTURE)
+    const first = extract({ repo: dir, rev: 'HEAD' }).text
+    const second = extract({ repo: dir, rev: 'HEAD' }).text
+    assert.equal(first, second)
+  })
+
+  it('sorts by module, then tool, then source', () => {
+    const { dir } = fixture(FIXTURE)
+    const { rows } = extract({ repo: dir, rev: 'HEAD' })
+    const keys = rows.map((r) => `${r.module}\u0000${r.tool}\u0000${r.source}`)
+    const sorted = [...keys].sort()
+    assert.deepEqual(keys, sorted)
+    assert.ok(keys.some((k) => k.startsWith('agent-core') === false))
+    assert.ok(rows.some((r) => r.module === 'sheets'))
+  })
+})
+
+describe('CLI', () => {
+  const run = (args, cwd) => {
+    try {
+      const stdout = execFileSync(process.execPath, [SCRIPT, ...args], {
+        cwd,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+      })
+      return { status: 0, stdout }
+    } catch (error) {
+      return { status: error.status, stdout: error.stdout ?? '', stderr: error.stderr ?? '' }
+    }
+  }
+
+  it('exits 0 and prints the same table as the API', () => {
+    const { dir } = fixture(FIXTURE)
+    const cli = run([], dir)
+    assert.equal(cli.status, 0)
+    assert.equal(cli.stdout, extract({ repo: dir, rev: 'HEAD' }).text)
+  })
+
+  it('is byte-identical across two CLI runs', () => {
+    const { dir } = fixture(FIXTURE)
+    assert.equal(run([], dir).stdout, run([], dir).stdout)
+  })
+
+  it('reads an explicit --rev and --repo', () => {
+    const { dir, sha } = fixture(FIXTURE)
+    const cli = run(['--rev', sha, '--repo', dir], REPO_ROOT)
+    assert.equal(cli.status, 0)
+    assert.ok(cli.stdout.includes(`rev=${sha}`))
+  })
+
+  it('exits non-zero with a message on a bad rev', () => {
+    const { dir } = fixture(FIXTURE)
+    const cli = run(['--rev', 'deadbeef'], dir)
+    assert.notEqual(cli.status, 0)
+    assert.match(cli.stderr, /cannot read rev/)
+  })
+})
+
+describe('editor_write routing', () => {
+  // R1-1: a `call.name === 'x'` guard in a shared executor names its tool, but
+  // only the branch that tool takes may contribute a flag. The read-only tool's
+  // guard delegates to a helper that declares `mutated: false`, while a sibling
+  // case in another helper declares `mutated: true`; the guard must not pick the
+  // sibling's flag up.
+  const GUARD_FIXTURE = {
+    'apps/docs/src/renderer/ai/tools.ts': [
+      "import type { AgentSkill, AgentToolCall, AgentToolDef, ToolExecution } from '@genoffice/agent-core'",
+      '',
+      'export const AGENT_TOOLS: AgentToolDef[] = [',
+      '  {',
+      "    name: 'read_only_tool',",
+      "    description: 'guarded read-only tool',",
+      "    inputSchema: { type: 'object', properties: {} },",
+      '  },',
+      '  {',
+      "    name: 'mutating_sibling',",
+      "    description: 'mutating sibling in the same executor',",
+      "    inputSchema: { type: 'object', properties: {} },",
+      '  },',
+      ']',
+      '',
+      'export function createDocsSkill(): AgentSkill {',
+      '  return {',
+      "    id: 'docs',",
+      '    tools: AGENT_TOOLS,',
+      '    executeTool(call: AgentToolCall): ToolExecution | Promise<ToolExecution> {',
+      "      if (call.name === 'read_only_tool') return executeAsyncTool(call)",
+      '      return executeSyncTool(call)',
+      '    },',
+      '  }',
+      '}',
+      '',
+      'async function executeAsyncTool(call: AgentToolCall): Promise<ToolExecution> {',
+      "  return { output: 'searched', mutated: false, summary: 'search' }",
+      '}',
+      '',
+      'function executeSyncTool(call: AgentToolCall): ToolExecution {',
+      '  switch (call.name) {',
+      "    case 'mutating_sibling':",
+      "      return { output: 'wrote', mutated: true, summary: 'write' }",
+      '    default:',
+      "      return { output: 'unknown', isError: true, mutated: false, summary: call.name }",
+      '  }',
+      '}',
+      '',
+    ].join('\n'),
+  }
+
+  // R1-2: two same-named local closures in different case bodies. Keying helpers
+  // by bare name collapses them and leaks the second one's `mutated: true`.
+  const DUP_HELPER_FIXTURE = {
+    'apps/docs/src/renderer/ai/tools.ts': [
+      "import type { AgentToolCall, AgentToolDef, ToolExecution } from '@genoffice/agent-core'",
+      '',
+      'export const AGENT_TOOLS: AgentToolDef[] = [',
+      '  {',
+      "    name: 'read_tool',",
+      "    description: 'read-only tool with its own finish',",
+      "    inputSchema: { type: 'object', properties: {} },",
+      '  },',
+      '  {',
+      "    name: 'write_tool',",
+      "    description: 'mutating tool with its own finish',",
+      "    inputSchema: { type: 'object', properties: {} },",
+      '  },',
+      ']',
+      '',
+      'export function executeTool(call: AgentToolCall): ToolExecution {',
+      '  switch (call.name) {',
+      "    case 'read_tool': {",
+      '      const finish = (): ToolExecution => {',
+      '        return {',
+      "          output: 'read',",
+      '          mutated: false,',
+      "          summary: 'read',",
+      '        }',
+      '      }',
+      '      return finish()',
+      '    }',
+      "    case 'write_tool': {",
+      '      const finish = (): ToolExecution => {',
+      '        return {',
+      "          output: 'wrote',",
+      '          mutated: true,',
+      "          summary: 'write',",
+      '        }',
+      '      }',
+      '      return finish()',
+      '    }',
+      '    default:',
+      "      return { output: 'unknown', isError: true, mutated: false, summary: call.name }",
+      '  }',
+      '}',
+      '',
+    ].join('\n'),
+  }
+
+  // R1-3: a tool-shaped object with no `inputSchema` is reported, not dropped.
+  const NO_SCHEMA_FIXTURE = {
+    'apps/docs/src/renderer/ai/tools.ts': [
+      "import type { AgentToolDef } from '@genoffice/agent-core'",
+      '',
+      'export const AGENT_TOOLS: AgentToolDef[] = [',
+      '  {',
+      "    name: 'normal_tool',",
+      "    description: 'has a schema',",
+      "    inputSchema: { type: 'object', properties: {} },",
+      '  },',
+      '  {',
+      "    name: 'no_schema_tool',",
+      "    description: 'no schema property at all',",
+      '  },',
+      ']',
+      '',
+    ].join('\n'),
+  }
+
+  it('credits only the guard branch the named tool takes (R1-1)', () => {
+    const { dir } = fixture(GUARD_FIXTURE)
+    const { rows } = extract({ repo: dir, rev: 'HEAD' })
+    const write = (tool) => rows.find((r) => r.tool === tool).write
+    assert.equal(write('read_only_tool'), 'no') // its own branch declares mutated: false
+    assert.equal(write('mutating_sibling'), 'yes') // its own case declares mutated: true
+  })
+
+  it('keeps same-named local helpers distinct by position (R1-2)', () => {
+    const { dir } = fixture(DUP_HELPER_FIXTURE)
+    const { rows } = extract({ repo: dir, rev: 'HEAD' })
+    const write = (tool) => rows.find((r) => r.tool === tool).write
+    assert.equal(write('read_tool'), 'no') // its own `finish` declares mutated: false
+    assert.equal(write('write_tool'), 'yes') // its own `finish` declares mutated: true
+  })
+
+  it('reports a tool object without inputSchema as unresolved:missing (R1-3)', () => {
+    const { dir } = fixture(NO_SCHEMA_FIXTURE)
+    const { rows } = extract({ repo: dir, rev: 'HEAD' })
+    const noSchema = rows.find((r) => r.tool === 'no_schema_tool')
+    assert.ok(noSchema, 'the schema-less tool must still get a row')
+    assert.equal(noSchema.hash, 'unresolved:missing')
+    assert.ok(rows.some((r) => r.tool === 'normal_tool'))
+  })
+
+  // R2-1 (negative): the `name` anchor must fire only inside a tools-list array.
+  // A non-tool `{ name, description }` array — an option list, a typed command
+  // list, a nested `options:` bag — must produce no row, while the real
+  // (annotated) tools list next to it still yields its rows.
+  const NON_TOOL_ARRAY_FIXTURE = {
+    'apps/docs/src/renderer/ai/tools.ts': [
+      "import type { AgentToolDef } from '@genoffice/agent-core'",
+      '',
+      'export const AGENT_TOOLS: AgentToolDef[] = [',
+      '  {',
+      "    name: 'real_tool',",
+      "    description: 'a real tool in the annotated list',",
+      "    inputSchema: { type: 'object', properties: {} },",
+      '  },',
+      '  {',
+      "    name: 'real_schemaless',",
+      "    description: 'a real tool with no schema, still in the list',",
+      '  },',
+      ']',
+      '',
+      '// an unannotated menu of { name, description } rows is not a tools list',
+      'const MENU_ITEMS = [',
+      "  { name: 'menu_open', description: 'Open' },",
+      "  { name: 'menu_save', description: 'Save' },",
+      ']',
+      '',
+      'type Command = { name: string; description: string }',
+      'const COMMANDS: Command[] = [',
+      "  { name: 'cmd_export', description: 'Export' },",
+      "  { name: 'cmd_print', description: 'Print' },",
+      ']',
+      '',
+      'const CONFIG = {',
+      '  options: [',
+      "    { name: 'opt_a', description: 'A' },",
+      "    { name: 'opt_b', description: 'B' },",
+      '  ],',
+      '}',
+      '',
+      'export function menu(): void {',
+      '  void MENU_ITEMS',
+      '  void COMMANDS',
+      '  void CONFIG',
+      '}',
+      '',
+    ].join('\n'),
+  }
+
+  it('ignores non-tool {name, description} arrays (R2-1)', () => {
+    const { dir } = fixture(NON_TOOL_ARRAY_FIXTURE)
+    const { rows } = extract({ repo: dir, rev: 'HEAD' })
+    const tools = rows.map((r) => r.tool).sort()
+    assert.deepEqual(tools, ['real_schemaless', 'real_tool'])
+    const schemaless = rows.find((r) => r.tool === 'real_schemaless')
+    assert.equal(schemaless.hash, 'unresolved:missing')
+  })
+
+  // R2-2 (negative): a mutating helper that only *mentions* `call.name` in a
+  // ternary is not a dispatcher, so the walk follows it and the calling tool
+  // still reads `yes`. The ternary names only this tool, so the old
+  // "any comparison anywhere" rule wrongly stopped the walk.
+  const TERNARY_HELPER_FIXTURE = {
+    'apps/docs/src/renderer/ai/tools.ts': [
+      "import type { AgentToolCall, AgentToolDef, ToolExecution } from '@genoffice/agent-core'",
+      '',
+      'export const AGENT_TOOLS: AgentToolDef[] = [',
+      '  {',
+      "    name: 'writer_tool',",
+      "    description: 'a mutating tool whose helper mentions call.name in a ternary',",
+      "    inputSchema: { type: 'object', properties: {} },",
+      '  },',
+      ']',
+      '',
+      'export function executeTool(call: AgentToolCall): ToolExecution {',
+      '  switch (call.name) {',
+      "    case 'writer_tool':",
+      '      return writeDoc(call)',
+      '    default:',
+      "      return { output: 'unknown', isError: true, mutated: false, summary: call.name }",
+      '  }',
+      '}',
+      '',
+      'function writeDoc(call: AgentToolCall): ToolExecution {',
+      "  const summary = call.name === 'writer_tool' ? 'write doc' : 'other'",
+      "  return { output: 'wrote', mutated: true, summary }",
+      '}',
+      '',
+    ].join('\n'),
+  }
+
+  it('follows a mutating helper that only mentions call.name in a ternary (R2-2)', () => {
+    const { dir } = fixture(TERNARY_HELPER_FIXTURE)
+    const { rows } = extract({ repo: dir, rev: 'HEAD' })
+    const writer = rows.find((r) => r.tool === 'writer_tool')
+    assert.ok(writer, 'the tool must get a row')
+    assert.equal(writer.write, 'yes')
+  })
+})
+
+describe('real repo', () => {
+  it('produces rows for each of the six apps at HEAD', () => {
+    const { rows } = extract({ repo: REPO_ROOT, rev: 'HEAD' })
+    const counts = new Map()
+    for (const row of rows) counts.set(row.module, (counts.get(row.module) ?? 0) + 1)
+    for (const app of ['docs', 'sheets', 'slides', 'pdf', 'markdown', 'html']) {
+      assert.ok((counts.get(app) ?? 0) > 0, `expected rows for ${app}`)
+    }
+  })
+
+  it('reports the two blocked rows as read-only at the pin (R1-1, R1-2)', () => {
+    const { rows } = extract({ repo: REPO_ROOT, rev: 'HEAD' })
+    const write = (module, tool) => rows.find((r) => r.module === module && r.tool === tool).write
+    // docs web_search: its own `mutated: false` in executeAsyncTool, not the sibling executors
+    assert.equal(write('docs', 'web_search'), 'no')
+    // sheets find_cells: its own `finish` closure declares mutated: false
+    assert.equal(write('sheets', 'find_cells'), 'no')
+  })
+
+  it('is deterministic and keeps every hash well formed at HEAD', () => {
+    const first = extract({ repo: REPO_ROOT, rev: 'HEAD' })
+    const second = extract({ repo: REPO_ROOT, rev: 'HEAD' })
+    assert.equal(first.text, second.text)
+    for (const row of first.rows) {
+      assert.ok(
+        /^[0-9a-f]{64}$/.test(row.hash) || /^unresolved:[a-z]+/.test(row.hash),
+        `bad hash for ${row.module}/${row.tool}: ${row.hash}`,
+      )
+      assert.ok(['yes', 'no', 'undeclared'].includes(row.write))
+      assert.ok(!row.source.startsWith('/'))
+    }
+  })
+})
