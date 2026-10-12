@@ -51,12 +51,13 @@ describe('lock model', () => {
     )
   })
 
-  it('merges by path (case-insensitive drive letter), newest wins, and removes by path', () => {
+  it('merges by path (case-insensitive drive letter), the newest push wins and moves to the end, and removes by path', () => {
     const a = lock('A.docx', 'a')
     const b = lock('B.docx', 'b')
     const aAgain = { ...a, path: a.path.replace('C:', 'c:') }
     expect(mergeLocks([a], [b])).toEqual([a, b])
-    expect(mergeLocks([a, b], [aAgain])).toEqual([aAgain, b])
+    expect(mergeLocks([a, b], [aAgain])).toEqual([b, aAgain])
+    expect(shownLock(mergeLocks([a, b], [aAgain]))).toBe(aAgain)
     expect(withoutLock([a, b], a.path.toLowerCase())).toEqual([b])
     expect(shownLock([a, b])).toBe(b)
     expect(shownLock([])).toBeNull()
@@ -66,6 +67,7 @@ describe('lock model', () => {
 let host: HTMLDivElement
 let root: Root
 let pushLock: ((l: UniworkDocLock) => void) | null
+let changeAccount: (() => void) | null
 let initial: UniworkDocLock[]
 let api: {
   onUniworkLock: ReturnType<typeof vi.fn>
@@ -90,16 +92,27 @@ const homeStub = () =>
     createElement('a', { id: 'home-link', href: '#x' }, 'Recent'),
   )
 
-async function mount(homeActive = true, locale: 'en' | 'vi' = 'en'): Promise<void> {
+async function mount(
+  homeActive = true,
+  locale: 'en' | 'vi' = 'en',
+  home: () => ReturnType<typeof createElement> = homeStub,
+): Promise<void> {
   await act(async () => {
     root.render(
       createElement(
         LocaleProvider,
         { initial: locale },
-        createElement(UniworkLockHost, { homeActive }, homeStub()),
+        createElement(UniworkLockHost, { homeActive }, home()),
       ),
     )
   })
+  await flush()
+}
+
+/** the signed-in account changed: main already forgot the old locks, the shell is told via the workbench bucket */
+async function switchAccount(remaining: UniworkDocLock[]): Promise<void> {
+  initial = remaining
+  await act(async () => changeAccount!())
   await flush()
 }
 
@@ -129,6 +142,7 @@ beforeEach(() => {
   document.body.append(host)
   root = createRoot(host)
   pushLock = null
+  changeAccount = null
   initial = []
   api = {
     onUniworkLock: vi.fn((cb: (l: UniworkDocLock) => void) => {
@@ -143,6 +157,14 @@ beforeEach(() => {
   tabs = { activate: vi.fn(async () => undefined) }
   window.aiOffice = {
     ...api,
+    wb: {
+      onBucketChanged: vi.fn((cb: () => void) => {
+        changeAccount = cb
+        return () => {
+          changeAccount = null
+        }
+      }),
+    },
     accountStatus: vi.fn(async () => ({ loggedIn: false, state: 'signed-out' })),
     onAccountStatus: vi.fn(() => () => undefined),
     onAccountLogin: vi.fn(() => () => undefined),
@@ -405,14 +427,76 @@ describe('S11 lock panel: Home behind the panel', () => {
     expect(document.activeElement).toBe(button)
   })
 
-  it('Close of the last lock falls back to the Home region when nothing usable had focus', async () => {
+  it('Home carries no permanent tabindex: a click on a plain spot of Home focuses nothing', async () => {
+    await mount()
+    expect(homeRegion().hasAttribute('tabindex')).toBe(false)
+    await act(async () => pushLock!(lock('Plan.docx')))
+    await flush()
+    expect(homeRegion().hasAttribute('tabindex')).toBe(false)
+    await clickClose()
+    expect(homeRegion().hasAttribute('tabindex')).toBe(false)
+  })
+
+  it('Close of the last lock falls back to a visible Home landmark when nothing usable had focus', async () => {
     await mount()
     expect(document.activeElement).toBe(document.body)
     await act(async () => pushLock!(lock('Plan.docx')))
     await flush()
     await clickClose()
-    expect(document.activeElement).toBe(homeRegion())
-    expect(homeRegion().getAttribute('tabindex')).toBe('-1')
+    const main = host.querySelector<HTMLElement>('[data-testid="home"]')!
+    expect(document.activeElement).toBe(main)
+    // the ring marker and the tabindex exist only while it holds focus
+    expect(main.hasAttribute('data-uw-focus-fallback')).toBe(true)
+    expect(main.getAttribute('tabindex')).toBe('-1')
+    await act(async () => host.querySelector<HTMLElement>('#home-action')!.focus())
+    expect(main.hasAttribute('data-uw-focus-fallback')).toBe(false)
+    expect(main.hasAttribute('tabindex')).toBe(false)
+  })
+
+  it("the fallback prefers Home's heading to a landmark, and skips a hidden one", async () => {
+    const homeWithHeading = () =>
+      createElement(
+        'div',
+        null,
+        createElement('h1', { id: 'hidden-h1', hidden: true }, 'Hidden'),
+        createElement('main', { id: 'home-main' }, createElement('h1', { id: 'home-h1' }, 'Hello')),
+      )
+    await mount(true, 'en', homeWithHeading)
+    await act(async () => pushLock!(lock('Plan.docx')))
+    await flush()
+    await clickClose()
+    const heading = host.querySelector<HTMLElement>('#home-h1')!
+    expect(document.activeElement).toBe(heading)
+    expect(heading.hasAttribute('data-uw-focus-fallback')).toBe(true)
+  })
+
+  it('a previously focused element that is no longer connected falls back to the Home target', async () => {
+    await mount()
+    const button = host.querySelector<HTMLElement>('#home-action')!
+    button.focus()
+    await act(async () => pushLock!(lock('Plan.docx')))
+    await flush()
+    button.remove()
+    await clickClose()
+    expect(document.activeElement).toBe(host.querySelector('[data-testid="home"]'))
+  })
+
+  it('focus that already went elsewhere is not pulled back on Close', async () => {
+    await mount()
+    await act(async () => pushLock!(lock('Plan.docx')))
+    await flush()
+    const outside = document.createElement('button')
+    document.body.append(outside)
+    try {
+      await act(async () => {
+        region()!.querySelector('button')!.click()
+        outside.focus()
+      })
+      await flush()
+      expect(document.activeElement).toBe(outside)
+    } finally {
+      outside.remove()
+    }
   })
 
   it('Close with a lock still queued moves focus to the next panel title, not back to Home', async () => {
@@ -432,5 +516,135 @@ describe('S11 lock panel: Home behind the panel', () => {
   it('does not steal focus on mount when there is no lock', async () => {
     await mount()
     expect(document.activeElement).toBe(document.body)
+  })
+})
+
+describe('S11 lock panel: account change and re-push', () => {
+  it('a lock shown, the account changes and main has none left: the panel is gone and Home is not inert', async () => {
+    await mount()
+    await act(async () => pushLock!(lock('Plan.docx')))
+    await flush()
+    expect(region()).not.toBeNull()
+    expect(homeRegion().hasAttribute('inert')).toBe(true)
+    await switchAccount([])
+    expect(api.uniworkLocks).toHaveBeenCalledTimes(2)
+    expect(region()).toBeNull()
+    expect(alertText()).toBe('')
+    expect(homeRegion().hasAttribute('inert')).toBe(false)
+    homeControls().forEach((el) => expect(isInert(el)).toBe(false))
+  })
+
+  it('the list is replaced by what main has now, not merged', async () => {
+    await mount()
+    await act(async () => pushLock!(lock('A.docx', 'a')))
+    await flush()
+    await switchAccount([lock('B.docx', 'b')])
+    expect(host.querySelectorAll('[role="region"]')).toHaveLength(1)
+    // A is gone for good: closing B leaves nothing behind it
+    await clickClose()
+    expect(api.dismissUniworkLock).toHaveBeenCalledWith(lock('B.docx', 'b').path)
+    expect(region()).toBeNull()
+  })
+
+  it('a lock pushed while the account read is in flight survives it; a stale one does not', async () => {
+    await mount()
+    await act(async () => pushLock!(lock('Old.docx', 'o')))
+    await flush()
+    let release!: (v: UniworkDocLock[]) => void
+    api.uniworkLocks.mockImplementationOnce(() => new Promise((res) => (release = res)))
+    await act(async () => changeAccount!())
+    await act(async () => pushLock!(lock('New.docx', 'n')))
+    await act(async () => release([]))
+    await flush()
+    expect(title()).not.toBeNull()
+    await clickClose()
+    expect(api.dismissUniworkLock).toHaveBeenCalledWith(lock('New.docx', 'n').path)
+    expect(region()).toBeNull()
+  })
+
+  it("a failed re-read drops the previous account's panel instead of keeping it", async () => {
+    await mount()
+    await act(async () => pushLock!(lock('Plan.docx')))
+    await flush()
+    api.uniworkLocks.mockImplementationOnce(async () => {
+      throw new Error('ipc')
+    })
+    await act(async () => changeAccount!())
+    await flush()
+    expect(region()).toBeNull()
+    expect(homeRegion().hasAttribute('inert')).toBe(false)
+  })
+
+  it('the activated set is pruned: the same path locked again for the next account brings Home forward', async () => {
+    await mount(false)
+    await act(async () => pushLock!(lock('Plan.docx')))
+    await flush()
+    expect(tabs.activate).toHaveBeenCalledTimes(1)
+    await switchAccount([])
+    expect(region()).toBeNull()
+    await act(async () => pushLock!(lock('Plan.docx')))
+    await flush()
+    expect(tabs.activate).toHaveBeenCalledTimes(2)
+  })
+
+  it('the activated set is pruned to the remaining keys: a lock that left and comes back by a read is newly shown', async () => {
+    await mount(false)
+    await act(async () => pushLock!(lock('Plan.docx')))
+    await flush()
+    expect(tabs.activate).toHaveBeenCalledTimes(1)
+    await switchAccount([])
+    await switchAccount([lock('Plan.docx')]) // no push in between: only the prune can have cleared the key
+    expect(region()).not.toBeNull()
+    expect(tabs.activate).toHaveBeenCalledTimes(2)
+  })
+
+  it('an account change that returns the same lock does not bring Home forward again', async () => {
+    await mount(false)
+    await act(async () => pushLock!(lock('Plan.docx')))
+    await flush()
+    await switchAccount([lock('Plan.docx')])
+    expect(region()).not.toBeNull()
+    expect(tabs.activate).toHaveBeenCalledTimes(1)
+  })
+
+  it('a re-push of the shown lock while an editor tab is active brings Home forward again', async () => {
+    await mount(false)
+    await act(async () => pushLock!(lock('Plan.docx')))
+    await flush()
+    expect(tabs.activate).toHaveBeenCalledTimes(1)
+    await mount(true)
+    await mount(false) // the user picks an editor tab, opens the same copy again; main pushes it again
+    await act(async () => pushLock!(lock('Plan.docx')))
+    await flush()
+    expect(tabs.activate).toHaveBeenCalledTimes(2)
+    expect(tabs.activate).toHaveBeenLastCalledWith('home')
+    expect(host.querySelectorAll('[role="region"]')).toHaveLength(1)
+  })
+
+  it('a re-push with Home already in front does not call activate', async () => {
+    await mount(true)
+    await act(async () => pushLock!(lock('Plan.docx')))
+    await act(async () => pushLock!(lock('Plan.docx')))
+    await flush()
+    expect(tabs.activate).not.toHaveBeenCalled()
+  })
+
+  it('a re-push of a queued lock makes it the shown one and brings Home forward', async () => {
+    const a = lock('A.docx', 'a')
+    const b = lock('B.docx', 'b')
+    await mount(false)
+    await act(async () => pushLock!(a))
+    await act(async () => pushLock!(b))
+    await flush()
+    expect(tabs.activate).toHaveBeenCalledTimes(2)
+    await mount(true)
+    await mount(false)
+    await act(async () => pushLock!(a)) // A was queued behind B: it is shown now
+    await flush()
+    expect(tabs.activate).toHaveBeenCalledTimes(3)
+    await mount(true)
+    await clickClose()
+    expect(api.dismissUniworkLock).toHaveBeenCalledWith(a.path)
+    expect(region()).not.toBeNull() // B is still behind it
   })
 })

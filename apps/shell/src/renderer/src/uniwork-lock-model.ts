@@ -26,7 +26,10 @@ export function lockCopyOf(lock: Pick<UniworkDocLock, 'reason'>): LockCopy {
   return COPY[lock.reason]
 }
 
-/** add a lock, or replace the one already shown for the same path (the newest push wins) */
+/**
+ * add a lock; one already listed for the same path is replaced and moves to the
+ * end, where the newest push is (it is the lock shown)
+ */
 export function mergeLocks(
   list: readonly UniworkDocLock[],
   incoming: readonly UniworkDocLock[],
@@ -35,8 +38,8 @@ export function mergeLocks(
   for (const lock of incoming) {
     const key = pathKey(lock.path)
     const at = next.findIndex((entry) => pathKey(entry.path) === key)
-    if (at === -1) next.push(lock)
-    else next[at] = lock
+    if (at !== -1) next.splice(at, 1)
+    next.push(lock)
   }
   return next
 }

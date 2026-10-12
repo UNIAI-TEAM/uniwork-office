@@ -597,9 +597,10 @@ body.overlay-title-bar .tab-bar-drag-spacer {
 
 /* ── S11 lock panel (newer-store guard): fills the content area under the tab strip ── */
 
-/* Home's wrapper: a plain block (no layout of its own), a programmatic focus sink after Close */
-.uw-home-region:focus {
-  outline: none;
+/* Home's heading/landmark that takes focus after the last lock closes (see UniworkLockPanel.tsx): visible ring */
+[data-uw-focus-fallback]:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .uw-lock-layer {

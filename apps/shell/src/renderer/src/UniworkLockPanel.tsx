@@ -15,44 +15,70 @@ import { lockCopyOf, mergeLocks, shownLock, withoutLock } from './uniwork-lock-m
 type LockApi = Pick<Window['aiOffice'], 'onUniworkLock' | 'uniworkLocks' | 'dismissUniworkLock'>
 
 /**
- * Locks main currently shows: the pushed ones, plus the ones read on mount (a
- * reload of the shell window must not lose a panel). A lock dismissed while the
- * mount read is in flight stays dismissed.
+ * Locks main currently shows: the pushed ones, plus the ones read from main. The
+ * list is read on mount (a reload of the shell window must not lose a panel) and
+ * again whenever the signed-in account changes (the signal the workbench gate
+ * reloads Home on): the new list REPLACES the old one, because main forgets the
+ * previous account's locks without sending an event. A lock pushed or dismissed
+ * while a read is in flight is not overwritten by it. `onPush` hears every pushed
+ * lock: a push counts as the lock newly shown, even when it is already listed.
  */
-export function useUniworkLocks(api: LockApi): {
+export function useUniworkLocks(
+  api: LockApi,
+  onPush?: (lock: UniworkDocLock) => void,
+): {
   locks: UniworkDocLock[]
   dismiss: (path: string) => void
 } {
   const [locks, setLocks] = useState<UniworkDocLock[]>([])
-  const dismissedWhileReading = useRef<Set<string> | null>(new Set())
+  /** what happened while the latest read was in flight (null = no read in flight) */
+  const reading = useRef<{ dismissed: Set<string>; pushed: UniworkDocLock[] } | null>(null)
+  const readSeq = useRef(0)
+  const onPushRef = useRef(onPush)
+  onPushRef.current = onPush
 
   useEffect(() => {
     let live = true
-    const off = api.onUniworkLock((lock) => {
-      dismissedWhileReading.current?.delete(pathKey(lock.path))
+    const readLocks = () => {
+      const mine = ++readSeq.current
+      const during = { dismissed: new Set<string>(), pushed: [] as UniworkDocLock[] }
+      reading.current = during
+      void api
+        .uniworkLocks()
+        .catch((): UniworkDocLock[] => [])
+        .then((fresh) => {
+          if (!live || mine !== readSeq.current) return
+          reading.current = null
+          const keep = fresh.filter((lock) => !during.dismissed.has(pathKey(lock.path)))
+          setLocks(mergeLocks(keep, during.pushed))
+        })
+    }
+    const offPush = api.onUniworkLock((lock) => {
+      const during = reading.current
+      if (during) {
+        during.dismissed.delete(pathKey(lock.path))
+        during.pushed = mergeLocks(during.pushed, [lock])
+      }
+      onPushRef.current?.(lock)
       setLocks((prev) => mergeLocks(prev, [lock]))
     })
-    void api
-      .uniworkLocks()
-      .then((initial) => {
-        if (!live) return
-        const skipped = dismissedWhileReading.current
-        const keep = initial.filter((lock) => !skipped?.has(pathKey(lock.path)))
-        setLocks((prev) => mergeLocks(keep, prev))
-      })
-      .catch(() => undefined)
-      .finally(() => {
-        dismissedWhileReading.current = null
-      })
+    const offAccount = window.aiOffice?.wb?.onBucketChanged?.(readLocks)
+    readLocks()
     return () => {
       live = false
-      off()
+      reading.current = null
+      offPush()
+      offAccount?.()
     }
   }, [api])
 
   const dismiss = useCallback(
     (path: string) => {
-      dismissedWhileReading.current?.add(pathKey(path))
+      const during = reading.current
+      if (during) {
+        during.dismissed.add(pathKey(path))
+        during.pushed = withoutLock(during.pushed, path)
+      }
       setLocks((prev) => withoutLock(prev, path))
       void api.dismissUniworkLock(path).catch(() => undefined)
     },
@@ -81,6 +107,41 @@ function isEditable(el: Element | null): boolean {
   if (el instanceof HTMLInputElement) return !NON_TEXT_INPUTS.has(el.type)
   if (el instanceof HTMLTextAreaElement) return true
   return el.closest('[contenteditable]:not([contenteditable="false"])') !== null
+}
+
+/** the element exists in the layout and is not hidden (`checkVisibility` is Chromium's; elsewhere only `hidden` is checked) */
+function isVisible(el: HTMLElement): boolean {
+  if (el.closest('[hidden]')) return false
+  return typeof el.checkVisibility === 'function' ? el.checkVisibility() : true
+}
+
+/** the Home targets focus can land on after the last lock closes, best first */
+const HOME_FOCUS_TARGETS = ['h1', 'main, [role="main"]', 'nav, aside']
+
+/**
+ * Focus Home's main heading, else its first landmark, with a visible ring. They are
+ * not focusable by themselves: tabindex -1 and the ring marker last only until the
+ * element loses focus again, so Home's own focus behavior is unchanged.
+ */
+function focusHomeTarget(region: HTMLElement | null): void {
+  if (!region) return
+  for (const selector of HOME_FOCUS_TARGETS) {
+    const target = Array.from(region.querySelectorAll<HTMLElement>(selector)).find(isVisible)
+    if (!target) continue
+    const addedTabIndex = !target.hasAttribute('tabindex')
+    if (addedTabIndex) target.setAttribute('tabindex', '-1')
+    target.setAttribute('data-uw-focus-fallback', '')
+    target.addEventListener(
+      'blur',
+      () => {
+        target.removeAttribute('data-uw-focus-fallback')
+        if (addedTabIndex) target.removeAttribute('tabindex')
+      },
+      { once: true },
+    )
+    target.focus()
+    return
+  }
 }
 
 /**
@@ -137,7 +198,8 @@ export function UniworkLockPanel({
  * While a lock is shown the Home subtree is `inert` (the panel replaces the area:
  * nothing behind it is focusable or in the a11y tree); the window's single
  * `role=alert` node sits outside both. An editor tab in front is switched to Home
- * once per newly shown lock; closing the last lock puts focus back where it was.
+ * once per newly shown lock; closing the last lock puts focus back where it was,
+ * or on Home's heading when that is gone.
  */
 export function UniworkLockHost({
   homeActive,
@@ -147,24 +209,34 @@ export function UniworkLockHost({
   children?: ReactNode
 }) {
   const { t } = useI18n()
-  const { locks, dismiss } = useUniworkLocks(window.aiOffice)
+  /** lock keys already brought forward: a tab the user picks afterwards is not overridden */
+  const activated = useRef<Set<string>>(new Set())
+  // a push of a lock that is already listed is newly shown again: Home comes forward again
+  const { locks, dismiss } = useUniworkLocks(window.aiOffice, (pushed) =>
+    activated.current.delete(pathKey(pushed.path)),
+  )
   const lock = shownLock(locks)
   const shownKey = lock ? pathKey(lock.path) : null
   const titleRef = useRef<HTMLHeadingElement>(null)
   const regionRef = useRef<HTMLDivElement>(null)
-  /** lock keys already brought forward: a tab the user picks afterwards is not overridden */
-  const activated = useRef<Set<string>>(new Set())
   /** what had focus when the first lock appeared (null = nothing usable), restored on the last Close */
   const returnFocus = useRef<{ el: HTMLElement | null } | null>(null)
   /** the path whose "{title}. {sentence}" was already written to the alert node */
   const [announcedFor, setAnnouncedFor] = useState<string | null>(null)
+
+  // a lock that left the list (Close, or the account changed) is forgotten: shown again later = newly shown
+  useEffect(() => {
+    const listed = new Set(locks.map((entry) => pathKey(entry.path)))
+    for (const key of activated.current) if (!listed.has(key)) activated.current.delete(key)
+  }, [locks])
 
   // editor views paint above shell DOM: without Home in front the panel could not be seen or focused
   useEffect(() => {
     if (!shownKey || activated.current.has(shownKey)) return
     activated.current.add(shownKey)
     if (!homeActive) void window.aiOfficeTabs.activate('home').catch(() => undefined)
-  }, [shownKey, homeActive])
+    // `lock`: a re-push replaces the object, which is what re-runs this after the push cleared its key
+  }, [shownKey, homeActive, lock])
 
   // Layout effect: the browser drops focus from a field that turns inert in its next
   // rendering step, so what was focused (and whether it was being typed in) is read first.
@@ -190,7 +262,7 @@ export function UniworkLockHost({
     return () => cancelAnimationFrame(frame)
   }, [shownKey, homeActive])
 
-  // last lock closed: the panel unmounted with focus inside it, so put focus somewhere stable
+  // last lock closed: the panel unmounted with focus inside it, so put focus somewhere visible
   const wasShown = useRef(false)
   useEffect(() => {
     if (lock) {
@@ -201,18 +273,11 @@ export function UniworkLockHost({
     wasShown.current = false
     const saved = returnFocus.current?.el
     returnFocus.current = null
-    const home = regionRef.current
-    if (saved?.isConnected && !saved.closest('[inert]')) saved.focus()
-    else home?.focus()
+    // focus that already went somewhere (the user moved on) is left alone
+    if (document.activeElement && document.activeElement !== document.body) return
+    if (saved?.isConnected && !saved.closest('[inert]') && isVisible(saved)) saved.focus()
+    else focusHomeTarget(regionRef.current)
   }, [lock])
-
-  const onDismiss = useCallback(
-    (path: string) => {
-      activated.current.delete(pathKey(path))
-      dismiss(path)
-    },
-    [dismiss],
-  )
 
   const alertText =
     lock && announcedFor === shownKey
@@ -224,11 +289,11 @@ export function UniworkLockHost({
       <div className="uw-sr-only" role="alert" data-testid="uw-lock-alert">
         {alertText}
       </div>
-      <div className="uw-home-region" ref={regionRef} tabIndex={-1} inert={lock ? true : undefined}>
+      <div className="uw-home-region" ref={regionRef} inert={lock ? true : undefined}>
         {children}
       </div>
       {lock && (
-        <UniworkLockPanel key={shownKey} lock={lock} titleRef={titleRef} onDismiss={onDismiss} />
+        <UniworkLockPanel key={shownKey} lock={lock} titleRef={titleRef} onDismiss={dismiss} />
       )}
     </>
   )
