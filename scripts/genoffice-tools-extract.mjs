@@ -31,8 +31,9 @@
  * an element of a tools-list array literal. A tools list is written in one of
  * three forms: an annotated binding (`AgentToolDef[]`, `readonly AgentToolDef[]`,
  * `Array<AgentToolDef> = [`), a `tools: [ ... ]` field outside a schema bag, or
- * a `return [ ... ]` inside a `get tools()` accessor. `AgentToolDef` (or the
- * bare `AgentTool`) is matched exactly, so an `AgentToolCall[]` /
+ * a `return [ ... ]` inside a `get tools()` accessor whose head may carry a
+ * return-type annotation (`get tools(): AgentToolDef[]`). `AgentToolDef` (or
+ * the bare `AgentTool`) is matched exactly, so an `AgentToolCall[]` /
  * `AgentToolResult[]` array — whose records carry `name` too — is not a tools
  * list. An unannotated array, one typed as anything else (an option list, a
  * typed command list), a nested `options:` bag, a `tools` bag in a schema, a
@@ -1508,9 +1509,39 @@ function collectReadOnlyNames(files) {
 const TOOL_DEF_TYPE_RE = /^(?:AgentToolDef|AgentTool)$/
 
 /**
+ * Index of the `)` that closes the parameter list of the accessor whose body
+ * brace is at `bodyOpen`, or -1. In `get tools() {` the `)` sits right before
+ * the body; the annotated spelling `get tools(): AgentToolDef[] {` puts a
+ * return-type annotation between them, so the walk back skips that annotation
+ * (balanced `()` / `[]` / `<>` groups) and stops at the `:` that separates it
+ * from the parameter list (R1-2). Any other brace head returns -1.
+ */
+function accessorParamClose(tokens, bodyOpen) {
+  const prev = tokens[bodyOpen - 1]
+  if (prev && prev.value === ')') return bodyOpen - 1
+  let depth = 0
+  for (let k = bodyOpen - 1; k >= 0; k -= 1) {
+    const tk = tokens[k]
+    if (tk.type !== 'punct') continue
+    const v = tk.value
+    if (v === ')' || v === ']' || v === '>') depth += 1
+    else if (v === '(' || v === '[' || v === '<') {
+      if (depth === 0) return -1
+      depth -= 1
+    } else if (depth === 0) {
+      if (v === ':') return tokens[k - 1] && tokens[k - 1].value === ')' ? k - 1 : -1
+      if (v === '{' || v === '}' || v === ';' || v === '=' || v === ',') return -1
+    }
+  }
+  return -1
+}
+
+/**
  * Is token index `at` inside the body of a `get tools()` accessor? Walks the
  * enclosing brace stack, so a `return [ ... ]` nested in an `if` block of the
- * accessor still counts. Any other accessor (`get options()`) returns false.
+ * accessor still counts. A return-type annotation on the accessor head
+ * (`get tools(): AgentToolDef[]`) does not hide it. Any other accessor
+ * (`get options()`) returns false.
  */
 function insideToolsAccessor(tokens, at) {
   const stack = []
@@ -1522,13 +1553,12 @@ function insideToolsAccessor(tokens, at) {
   }
   for (let i = stack.length - 1; i >= 0; i -= 1) {
     const bodyOpen = stack[i]
-    const close = tokens[bodyOpen - 1]
-    const open = tokens[bodyOpen - 2]
-    const name = tokens[bodyOpen - 3]
-    const get = tokens[bodyOpen - 4]
+    const close = accessorParamClose(tokens, bodyOpen)
+    if (close < 0) continue
+    const open = tokens[close - 1]
+    const name = tokens[close - 2]
+    const get = tokens[close - 3]
     if (
-      close &&
-      close.value === ')' &&
       open &&
       open.value === '(' &&
       name &&
