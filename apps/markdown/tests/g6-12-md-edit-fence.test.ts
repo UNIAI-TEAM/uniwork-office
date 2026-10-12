@@ -8,6 +8,7 @@ import {
   clearEditFence,
   fencedBlocks,
   hasEditFence,
+  retryFence,
   selectionFence,
   setEditFence,
   turnFence,
@@ -222,16 +223,6 @@ describe('markdown fence on retry and at run end', () => {
     expect(editor.state.doc.textBetween(fence![0]!.from, fence![0]!.to)).toBe('two')
   })
 
-  it('a scoped retry whose selection is gone keeps the fence of the turn it repeats', () => {
-    const editor = createEditor(DOC)
-    const kept = [fenceBlocks(editor, 3)]
-    expect(turnFence(editor, { scoped: true, fallback: kept })).toEqual(kept)
-    // a scoped entry never silently becomes a whole-document turn when it can be fenced
-    selectText(editor, 'one')
-    const live = turnFence(editor, { scoped: true, fallback: kept })
-    expect(editor.state.doc.textBetween(live![0]!.from, live![0]!.to)).toBe('one')
-  })
-
   it('a queue submission keeps its anchored ranges, scope or not', () => {
     const editor = createEditor(DOC)
     selectText(editor, 'two')
@@ -263,5 +254,54 @@ describe('markdown fence on retry and at run end', () => {
   it('clearEditFence on an editor without a fence is a no-op', () => {
     const editor = createEditor(DOC)
     expect(clearEditFence(editor)).toBeNull()
+  })
+})
+
+// round 3: a fenced turn is never retried unfenced; a retry reuses the fence its entry's run ended with
+
+describe('markdown retry fence (header retry and bubble retry share retryFence)', () => {
+  it('an unscoped entry retries with no fence, even while a selection is live', () => {
+    expect(retryFence({ fenced: false })).toBeNull()
+    expect(retryFence({ fenced: false, ranges: null })).toBeNull()
+  })
+
+  it('a scoped entry retries with its own stored ranges, not the live selection elsewhere', () => {
+    const editor = createEditor(DOC)
+    const stored = [fenceBlocks(editor, 1)]
+    selectText(editor, 'three') // a different passage is selected now
+    expect(retryFence({ fenced: true, ranges: stored })).toEqual(stored)
+  })
+
+  it('a queue entry retries with the fence its run ended with (queue anchors are consumed)', async () => {
+    const editor = createEditor(DOC)
+    const ended = [fenceBlocks(editor, 1), fenceBlocks(editor, 3)]
+    setEditFence(editor, retryFence({ fenced: true, ranges: ended }))
+    const gap = await run(
+      editor,
+      ops({ op: 'replaceText', target: { start: 2 }, find: 'two', replace: '2' }),
+    )
+    expect(gap.isError).toBe(true)
+    expect(editor.getMarkdown()).toContain('beta two')
+  })
+
+  it('a restored fenced entry without ranges runs against an empty fence: every edit is refused', async () => {
+    const editor = createEditor(DOC)
+    const fence = retryFence({ fenced: true })
+    expect(fence).toEqual([])
+    setEditFence(editor, fence)
+    expect(hasEditFence(editor)).toBe(true)
+    const before = editor.getMarkdown()
+    const edit = await run(
+      editor,
+      ops({ op: 'replaceText', target: { start: 1 }, find: 'one', replace: '1' }),
+    )
+    expect(edit.isError).toBe(true)
+    expect(editor.getMarkdown()).toBe(before)
+  })
+
+  it('a queue submission whose anchors all vanished is an empty fence, not an unfenced turn', () => {
+    const editor = createEditor(DOC)
+    setEditFence(editor, turnFence(editor, { scoped: false, queueFence: [] }))
+    expect(hasEditFence(editor)).toBe(true)
   })
 })
