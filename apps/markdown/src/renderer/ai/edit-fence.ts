@@ -7,10 +7,11 @@ import { blockIndexRange, blockRange } from '../editor/ops'
  * Edit fence of a selection-scoped AI turn: when the user sends with the
  * scope chip (a non-empty selection) or submits the edit queue, the run may
  * only change the top-level blocks those ranges cover. The panel sets the
- * fence at send and clears it when the run ends; the tools check every write
+ * fence at send and clears it when the run ends (`clearEditFence`); the tools check every write
  * against it in code (apply_ops is rolled back, whole-document writers are
  * refused), so the text outside stays byte-identical whatever the model
- * sends. Blocks are the unit because the ops address blocks: a fence over
+ * sends. A retried turn gets the fence of its own scope (`turnFence`), never
+ * the one the last send left. Blocks are the unit because the ops address blocks: a fence over
  * part of a paragraph allows rewriting that paragraph. Content inserted
  * directly before or after a fenced block counts as inside.
  */
@@ -63,6 +64,34 @@ export function setEditFence(editor: Editor, ranges: FenceRange[] | null): void 
   }
   editor.on('transaction', fence.follow)
   fences.set(editor, fence)
+}
+
+/**
+ * clear the fence at the end of a run (done, error or stop) and drop its
+ * transaction listener; returns where the ranges ended up (null when no fence
+ * was set) so a retry of the same turn can reuse them
+ */
+export function clearEditFence(editor: Editor): FenceRange[] | null {
+  const previous = fences.get(editor)
+  if (!previous) return null
+  editor.off('transaction', previous.follow)
+  fences.delete(editor)
+  return previous.ranges
+}
+
+/**
+ * the fence a turn runs with, from the turn's own scope: a queue submission
+ * keeps its anchored ranges; a scoped turn (scope chip) is fenced to the live
+ * selection, or to `fallback` (where the repeated turn's fence ended up) when
+ * the selection has since collapsed; an unscoped turn has no fence.
+ */
+export function turnFence(
+  editor: Editor,
+  opts: { scoped: boolean; queueFence?: FenceRange[]; fallback?: FenceRange[] | null },
+): FenceRange[] | null {
+  if (opts.queueFence) return opts.queueFence
+  if (!opts.scoped) return null
+  return selectionFence(editor) ?? opts.fallback ?? null
 }
 
 export function hasEditFence(editor: Editor): boolean {

@@ -30,7 +30,7 @@ import sendStop from '../assets/send-stop.png'
 import { clearAiHighlights } from '../editor/aiHighlight'
 import { setInactiveSelectionShown } from '../editor/inactiveSelection'
 import { queueAnchorRange } from '../editor/aiQueueAnchors'
-import { selectionFence, setEditFence, type FenceRange } from './edit-fence'
+import { clearEditFence, setEditFence, turnFence, type FenceRange } from './edit-fence'
 import { createMarkdownSkill, MARKDOWN_RULES } from './markdown-skill'
 import {
   buildDocWriterRequest,
@@ -237,6 +237,12 @@ export function AiPanel({
   const runDisplayRef = useRef('')
   /** the scope quote of the last send, so a retry reuses it instead of re-reading the live selection */
   const lastScopeRef = useRef<AiScopeQuoteData | undefined>(undefined)
+  /** where the fence of the last scoped send ended up when its run ended, for retrying that same turn */
+  const lastFenceRef = useRef<FenceRange[] | null>(null)
+  /** the run ended (done, error or stop): the fence ends with it, keeping its ranges for a retry of this turn */
+  const endRunFence = (editor: Editor): void => {
+    lastFenceRef.current = clearEditFence(editor)
+  }
   const runMutatedRef = useRef(false)
   /** tool activity of the whole run, for transcript persistence */
   const runToolsRef = useRef<ToolActivity[]>([])
@@ -457,11 +463,16 @@ export function AiPanel({
           }))
           persistMessage('assistant', final, runToolsRef.current)
           const editor = depsRef.current.getEditor()
-          if (editor) clearAiHighlights(editor)
+          if (editor) {
+            clearAiHighlights(editor)
+            endRunFence(editor)
+          }
           depsRef.current.onRunDone(runMutatedRef.current)
           setBusy(false)
         },
         onError: (error) => {
+          const editor = depsRef.current.getEditor()
+          if (editor) endRunFence(editor)
           setChat((prev) => {
             const next = [...prev]
             for (let i = next.length - 1; i >= 0; i--) {
@@ -497,7 +508,10 @@ export function AiPanel({
       partialResolverRef.current?.(false)
       loopRef.current?.cancel()
       const editor = depsRef.current.getEditor()
-      if (editor) clearAiHighlights(editor)
+      if (editor) {
+        clearAiHighlights(editor)
+        clearEditFence(editor)
+      }
     }
   }, [])
 
@@ -596,13 +610,24 @@ export function AiPanel({
         : displayText === undefined
           ? selectionScopeQuote()
           : undefined
+    const repeatsLast = retryScope != null && retryScope === lastScopeRef.current
     lastScopeRef.current = scope
     // a scoped send (selection chip) or a queue submission may only edit its targets; tools
-    // enforce it in code. A retry keeps the fence of the turn it repeats (mapped since).
+    // enforce it in code. Every turn, a retry included, runs with the fence of its own scope:
+    // an unscoped entry has none, a scoped one is fenced to the selection (or, when that has
+    // collapsed and it repeats the last turn, to where that turn's fence ended up).
     const ed = depsRef.current.getEditor()
-    if (ed && retryScope === undefined) {
-      setEditFence(ed, queueFence ?? (scope ? selectionFence(ed) : null))
+    if (ed) {
+      setEditFence(
+        ed,
+        turnFence(ed, {
+          scoped: scope !== undefined,
+          queueFence,
+          fallback: repeatsLast ? lastFenceRef.current : null,
+        }),
+      )
     }
+    if (!repeatsLast) lastFenceRef.current = null
     // the popover input / composer own the DOM selection now: keep the targeted range visible until the run ends
     if (scope) setInactiveSelectionShown(depsRef.current.getEditor(), true)
     setChat((prev) => [
@@ -622,6 +647,8 @@ export function AiPanel({
         await loop.run(instruction)
       } catch (err) {
         if (!mountedRef.current) return
+        const editor = depsRef.current.getEditor()
+        if (editor) endRunFence(editor)
         patchLast({
           streaming: false,
           text: err instanceof Error ? err.message : String(err),
