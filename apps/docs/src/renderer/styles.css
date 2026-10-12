@@ -13689,6 +13689,39 @@ tr > .page-gap-cut {
   }
 }
 
+/* Answered receipt kept under the user message once the card is answered */
+.ai-clarify-answered {
+  align-self: flex-end;
+  margin: 8px 0 0 auto;
+  max-width: 420px;
+  padding: 12px 16px;
+  background: var(--color-bg-subtle);
+  border: none;
+  border-radius: 12px;
+}
+
+.ai-clarify-answered-row {
+  margin: 0 0 8px;
+}
+
+.ai-clarify-answered-row:last-child {
+  margin-bottom: 0;
+}
+
+.ai-clarify-answered-q {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0 0 2px;
+}
+
+.ai-clarify-answered-a {
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
 @keyframes ai-clarify-slide-prev {
   from {
     opacity: 0;

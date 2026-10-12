@@ -46,6 +46,7 @@ import {
 } from './doc-writer'
 import { EditQueueCard } from './EditQueueCard'
 import { ClarifyCard } from '../components/ClarifyCard'
+import { withReceipt, withoutReceipts, type ClarifyQa } from './clarify-receipts'
 import {
   buildQueueInstruction,
   buildQueueSummary,
@@ -124,6 +125,8 @@ interface ChatEntry {
   attachments?: AttachmentMeta[]
   /** the selection this user message targeted, frozen at send */
   scope?: AiScopeQuoteData
+  /** answered ask_clarification cards of this message's run (view-only receipts) */
+  clarifyReceipts?: ClarifyQa[][]
 }
 
 /** longest selection excerpt echoed on a user bubble */
@@ -620,6 +623,8 @@ export function AiPanel({
       })
       .then((msgs) => {
         if (msgs.length === 0) return
+        // answered receipts belong to the live turn they were given in: drop them with a reload
+        setChat((prev) => withoutReceipts(prev))
         setHistoricChat(
           msgs.map((m) => ({
             role: m.role,
@@ -664,6 +669,15 @@ export function AiPanel({
       .catch(() => {
         /* silent */
       })
+  }, [filePath])
+
+  // answered receipts belong to the document they were given for: drop them when another
+  // one opens (an untitled document getting its first path is the same document)
+  const receiptPathRef = useRef(filePath)
+  useEffect(() => {
+    const previous = receiptPathRef.current
+    receiptPathRef.current = filePath
+    if (previous && previous !== filePath) setChat((prev) => withoutReceipts(prev))
   }, [filePath])
 
   const persistMessage = (
@@ -1473,6 +1487,16 @@ export function AiPanel({
               ) : (
                 <span dir="auto">{entry.text}</span>
               )}
+              {entry.clarifyReceipts?.map((qa, k) => (
+                <div key={`ca${k}`} className="ai-clarify-answered">
+                  {qa.map((pair, m) => (
+                    <div key={m} className="ai-clarify-answered-row">
+                      <div className="ai-clarify-answered-q">{pair.q}</div>
+                      <div className="ai-clarify-answered-a">{pair.a}</div>
+                    </div>
+                  ))}
+                </div>
+              ))}
               {entry.tools && entry.tools.length > 0 && <ToolChipList tools={entry.tools} />}
               {entry.error &&
                 (aiNoticeKind(entry.error) ? (
@@ -1578,7 +1602,8 @@ export function AiPanel({
         <div className="ai-composer">
           <ClarifyCard
             questions={activeClarify}
-            onSubmit={(answers) => {
+            onSubmit={(answers, qa) => {
+              setChat((prev) => withReceipt(prev, qa))
               clarifyResolverRef.current?.({ answers })
               clarifyResolverRef.current = null
               setActiveClarify(null)
