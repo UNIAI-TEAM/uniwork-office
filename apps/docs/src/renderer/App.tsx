@@ -7142,6 +7142,7 @@ export function App() {
               docExtras={aiDocExtras}
               notesAccess={aiNotesAccess}
               readOnly={uniwork.readOnly}
+              bound={uniwork.bound}
             />
           </div>
         )}

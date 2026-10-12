@@ -334,6 +334,8 @@ interface AiPanelProps {
   notesAccess?: AiNotesAccess
   /** view-only UniWork document: the agent only reads, nothing here may edit the document */
   readOnly?: boolean
+  /** UniWork working copy: tools that write outside the document are hidden (C-BOUND) */
+  bound?: boolean
 }
 
 const MODEL_BRIDGE: AiModelPickerBridge = {
@@ -371,6 +373,7 @@ export function AiPanel({
   docExtras,
   notesAccess,
   readOnly = false,
+  bound = false,
 }: AiPanelProps) {
   const { t, lang } = useI18n()
   // Panel chrome follows the UI language; message text follows its own content (dir=auto below)
@@ -526,6 +529,8 @@ export function AiPanel({
   }
   const readOnlyRef = useRef(readOnly)
   readOnlyRef.current = readOnly
+  const boundRef = useRef(bound)
+  boundRef.current = bound
   const trackChangesRef = useRef(trackChanges)
   trackChangesRef.current = trackChanges
   const commentsAccessRef = useRef(commentsAccess)
@@ -784,6 +789,7 @@ export function AiPanel({
           () => notesAccessRef.current,
           () => mediaAnalysisAvailable(settingsRef.current, gskLoggedInRef.current),
           () => readOnlyRef.current,
+          () => boundRef.current,
         ),
         createFilesSkill(availableAttachments),
       ]),

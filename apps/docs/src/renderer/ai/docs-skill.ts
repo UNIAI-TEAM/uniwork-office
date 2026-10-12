@@ -45,6 +45,22 @@ export const READ_ONLY_TOOLS: ReadonlySet<string> = new Set([
   'analyze_media',
 ])
 
+/**
+ * Tools that write outside the open document (a new file on disk). A
+ * UniWork-bound document never offers them: its content must not leave the
+ * UniWork copy through the AI (C-BOUND).
+ */
+export const BOUND_HIDDEN_TOOLS: ReadonlySet<string> = new Set(['create_document'])
+
+function refuseBound(tool: string): ToolExecution {
+  return {
+    output: `${tool} is unavailable: this is a UniWork document, so the AI cannot write files outside it.`,
+    isError: true,
+    mutated: false,
+    summary: tool.replace(/[_-]+/g, ' '),
+  }
+}
+
 const VIEW_ONLY_NOTE =
   '\n\nNote: this document is view-only. You can read it and answer questions about it, but you must not change it: no editing tool is available, so tell the user it cannot be edited instead of attempting it.'
 
@@ -87,6 +103,8 @@ export function createDocsSkill(
   mediaAnalysisAvailable?: () => boolean,
   /** live predicate: a view-only UniWork document, where the agent may only read */
   isReadOnly?: () => boolean,
+  /** live predicate: the document is a UniWork working copy (hides BOUND_HIDDEN_TOOLS) */
+  isBound?: () => boolean,
 ): AgentSkill {
   // Selection frozen per run: tools act on the range the prompt described,
   // not on wherever the user's live selection has wandered mid-run. The doc
@@ -112,6 +130,7 @@ export function createDocsSkill(
     get tools() {
       const hidden = mediaToolsOff()
       for (const [tool, c] of CAPABILITY_TOOLS) if (!cap(c)) hidden.add(tool)
+      if (isBound?.() === true) for (const tool of BOUND_HIDDEN_TOOLS) hidden.add(tool)
       const readOnly = isReadOnly?.() === true
       if (!readOnly && hidden.size === 0) return AGENT_TOOLS
       return AGENT_TOOLS.filter(
@@ -133,19 +152,21 @@ export function createDocsSkill(
     executeTool: (call, signal) =>
       isReadOnly?.() && !READ_ONLY_TOOLS.has(call.name)
         ? refuseViewOnly(call.name)
-        : executeTool(
-            getEditor(),
-            call,
-            getNumIds(),
-            getTrack?.(),
-            signal,
-            frozen,
-            getComments?.(),
-            getHf?.(),
-            getWriter?.(),
-            getPageSetup?.(),
-            getExtras?.(),
-            getNotes?.(),
-          ),
+        : isBound?.() && BOUND_HIDDEN_TOOLS.has(call.name)
+          ? refuseBound(call.name)
+          : executeTool(
+              getEditor(),
+              call,
+              getNumIds(),
+              getTrack?.(),
+              signal,
+              frozen,
+              getComments?.(),
+              getHf?.(),
+              getWriter?.(),
+              getPageSetup?.(),
+              getExtras?.(),
+              getNotes?.(),
+            ),
   }
 }
