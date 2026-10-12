@@ -13,7 +13,7 @@
   top: 0;
   left: 0;
   right: 0;
-  height: 40px;
+  height: var(--tab-bar-height, 40px);
   display: flex;
   align-items: stretch;
   background: var(--tabstrip-bg);
@@ -322,8 +322,14 @@ body.overlay-title-bar .tab-bar-drag-spacer {
   background: rgba(0, 0, 0, 0.08);
 }
 
+.app-frame {
+  --tab-bar-height: 40px;
+}
+
 .app-frame-content {
-  padding-top: 40px;
+  /* containing block of the S11 lock layer */
+  position: relative;
+  padding-top: var(--tab-bar-height);
 }
 
 /* ── Dark mode tab bar overrides ─────────────────────────── */
@@ -591,9 +597,14 @@ body.overlay-title-bar .tab-bar-drag-spacer {
 
 /* ── S11 lock panel (newer-store guard): fills the content area under the tab strip ── */
 
+/* Home's wrapper: a plain block (no layout of its own), a programmatic focus sink after Close */
+.uw-home-region:focus {
+  outline: none;
+}
+
 .uw-lock-layer {
-  position: fixed;
-  inset: 40px 0 0;
+  position: absolute;
+  inset: var(--tab-bar-height) 0 0;
   z-index: 20;
   overflow: auto;
   background: var(--surface);

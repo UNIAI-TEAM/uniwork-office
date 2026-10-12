@@ -80,13 +80,23 @@ async function flush(): Promise<void> {
   })
 }
 
+/** stand-in for the Home area: a search field, a button, a link (everything a Tab could reach) */
+const homeStub = () =>
+  createElement(
+    'main',
+    { 'data-testid': 'home' },
+    createElement('input', { id: 'home-search', type: 'text' }),
+    createElement('button', { id: 'home-action', type: 'button' }, 'New'),
+    createElement('a', { id: 'home-link', href: '#x' }, 'Recent'),
+  )
+
 async function mount(homeActive = true, locale: 'en' | 'vi' = 'en'): Promise<void> {
   await act(async () => {
     root.render(
       createElement(
         LocaleProvider,
         { initial: locale },
-        createElement(UniworkLockHost, { homeActive }),
+        createElement(UniworkLockHost, { homeActive }, homeStub()),
       ),
     )
   })
@@ -95,7 +105,17 @@ async function mount(homeActive = true, locale: 'en' | 'vi' = 'en'): Promise<voi
 
 const region = () => host.querySelector<HTMLElement>('[role="region"]')
 const title = () => host.querySelector<HTMLElement>('h3')
-const alertText = () => host.querySelector('[role="alert"]')?.textContent
+const alertNode = () => host.querySelector<HTMLElement>('[role="alert"]')
+const alertText = () => alertNode()?.textContent
+const homeControls = () =>
+  Array.from(
+    host.querySelectorAll<HTMLElement>(
+      '[data-testid="home"] input, [data-testid="home"] button, [data-testid="home"] a[href]',
+    ),
+  )
+/** what a browser does with `inert`: the element and its whole subtree leave focus order and a11y tree */
+const isInert = (el: Element) => el.closest('[inert]') !== null
+const homeRegion = () => host.querySelector<HTMLElement>('.uw-home-region')!
 
 async function clickClose(): Promise<void> {
   await act(async () => {
@@ -188,13 +208,64 @@ describe('S11 lock panel (newer store)', () => {
 
   it('writes "{title}. {sentence}" once to the alert node', async () => {
     await mount()
-    expect(alertText()).toBeUndefined()
+    expect(alertText()).toBe('')
     await act(async () => pushLock!(lock('Plan.docx')))
     await flush()
     expect(alertText()).toBe(
       `${uniworkDocumentStrings.en.uwLockNewerStoreTitle}. ${uniworkDocumentStrings.en.uwLockNewerStore}`,
     )
     expect(host.querySelectorAll('[role="alert"]')).toHaveLength(1)
+  })
+
+  it('keeps one persistent alert node outside the keyed panel, across locks and Close', async () => {
+    await mount()
+    const node = alertNode()!
+    expect(node.closest('.uw-lock-layer')).toBeNull()
+    expect(isInert(node)).toBe(false)
+    await act(async () => pushLock!(lock('A.docx', 'a')))
+    await flush()
+    expect(alertNode()).toBe(node)
+    expect(node.textContent).not.toBe('')
+    await act(async () => pushLock!(lock('B.docx', 'b')))
+    await flush()
+    expect(alertNode()).toBe(node)
+    expect(node.textContent).not.toBe('')
+    expect(isInert(node)).toBe(false)
+    await clickClose()
+    await clickClose()
+    expect(region()).toBeNull()
+    expect(alertNode()).toBe(node)
+    expect(node.textContent).toBe('')
+  })
+
+  it('while typing in a field: the alert is written now, focus follows after the keystroke (next frame)', async () => {
+    const frames: FrameRequestCallback[] = []
+    const raf = vi
+      .spyOn(window, 'requestAnimationFrame')
+      .mockImplementation((cb: FrameRequestCallback) => frames.push(cb))
+    try {
+      await mount()
+      const field = host.querySelector<HTMLInputElement>('#home-search')!
+      field.focus()
+      expect(document.activeElement).toBe(field)
+      await act(async () => pushLock!(lock('Plan.docx')))
+      await flush()
+      expect(alertText()).not.toBe('')
+      expect(document.activeElement).toBe(field)
+      expect(frames).toHaveLength(1)
+      await act(async () => frames[0]!(0))
+      expect(document.activeElement).toBe(title())
+    } finally {
+      raf.mockRestore()
+    }
+  })
+
+  it('a field that is not being typed in (a button) takes the focus move at once', async () => {
+    await mount()
+    host.querySelector<HTMLElement>('#home-action')!.focus()
+    await act(async () => pushLock!(lock('Plan.docx')))
+    await flush()
+    expect(document.activeElement).toBe(title())
   })
 
   it('a second push for the same path does not stack panels', async () => {
@@ -256,5 +327,110 @@ describe('S11 lock panel (newer store)', () => {
     await act(async () => pushLock!(lock('Plan.docx')))
     await flush()
     expect(tabs.activate).not.toHaveBeenCalled()
+  })
+
+  it('user switches away after the lock was shown: no re-activate of Home', async () => {
+    await mount(true)
+    await act(async () => pushLock!(lock('Plan.docx')))
+    await flush()
+    await mount(false) // the user clicks an open editor tab
+    await mount(true)
+    await mount(false)
+    expect(tabs.activate).not.toHaveBeenCalled()
+  })
+
+  it('brings Home forward once per newly shown lock, not on every homeActive change', async () => {
+    await mount(false)
+    await act(async () => pushLock!(lock('A.docx', 'a')))
+    await flush()
+    expect(tabs.activate).toHaveBeenCalledTimes(1)
+    await mount(true)
+    await mount(false) // the user leaves again while the same lock is up
+    expect(tabs.activate).toHaveBeenCalledTimes(1)
+    // a further lock is a new one: it comes forward too
+    await act(async () => pushLock!(lock('B.docx', 'b')))
+    await flush()
+    expect(tabs.activate).toHaveBeenCalledTimes(2)
+    // and the same path locked again after Close is newly shown as well
+    await mount(true)
+    await clickClose()
+    await clickClose()
+    await mount(false)
+    await act(async () => pushLock!(lock('B.docx', 'b')))
+    await flush()
+    expect(tabs.activate).toHaveBeenCalledTimes(3)
+  })
+})
+
+describe('S11 lock panel: Home behind the panel', () => {
+  it('Home controls are focusable before the lock, not while it is shown, and again after Close', async () => {
+    await mount()
+    expect(homeControls()).toHaveLength(3)
+    expect(homeRegion().hasAttribute('inert')).toBe(false)
+    homeControls().forEach((el) => expect(isInert(el)).toBe(false))
+
+    await act(async () => pushLock!(lock('Plan.docx')))
+    await flush()
+    expect(homeRegion().hasAttribute('inert')).toBe(true)
+    // inert = out of the tab order and the a11y tree, for the field, the button and the link alike
+    homeControls().forEach((el) => expect(isInert(el)).toBe(true))
+    // the panel, its Close button and the alert node stay reachable
+    expect(isInert(region()!)).toBe(false)
+    expect(isInert(region()!.querySelector('button')!)).toBe(false)
+    expect(isInert(alertNode()!)).toBe(false)
+
+    await clickClose()
+    expect(homeRegion().hasAttribute('inert')).toBe(false)
+    homeControls().forEach((el) => expect(isInert(el)).toBe(false))
+  })
+
+  it('stays inert while a second lock is queued behind the first', async () => {
+    await mount()
+    await act(async () => pushLock!(lock('A.docx', 'a')))
+    await act(async () => pushLock!(lock('B.docx', 'b')))
+    await flush()
+    await clickClose()
+    expect(region()).not.toBeNull()
+    expect(homeRegion().hasAttribute('inert')).toBe(true)
+  })
+
+  it('Close of the last lock puts focus back on what had it when the lock appeared', async () => {
+    await mount()
+    const button = host.querySelector<HTMLElement>('#home-action')!
+    button.focus()
+    await act(async () => pushLock!(lock('Plan.docx')))
+    await flush()
+    expect(document.activeElement).toBe(title())
+    await clickClose()
+    expect(document.activeElement).toBe(button)
+  })
+
+  it('Close of the last lock falls back to the Home region when nothing usable had focus', async () => {
+    await mount()
+    expect(document.activeElement).toBe(document.body)
+    await act(async () => pushLock!(lock('Plan.docx')))
+    await flush()
+    await clickClose()
+    expect(document.activeElement).toBe(homeRegion())
+    expect(homeRegion().getAttribute('tabindex')).toBe('-1')
+  })
+
+  it('Close with a lock still queued moves focus to the next panel title, not back to Home', async () => {
+    await mount()
+    const button = host.querySelector<HTMLElement>('#home-action')!
+    button.focus()
+    await act(async () => pushLock!(lock('A.docx', 'a')))
+    await act(async () => pushLock!(lock('B.docx', 'b')))
+    await flush()
+    await clickClose()
+    expect(document.activeElement).toBe(title())
+    await clickClose()
+    // the element captured for the first lock is still the one restored
+    expect(document.activeElement).toBe(button)
+  })
+
+  it('does not steal focus on mount when there is no lock', async () => {
+    await mount()
+    expect(document.activeElement).toBe(document.body)
   })
 })
