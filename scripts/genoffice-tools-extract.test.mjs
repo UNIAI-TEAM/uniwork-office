@@ -430,6 +430,151 @@ describe('CLI', () => {
   })
 })
 
+describe('editor_write routing', () => {
+  // R1-1: a `call.name === 'x'` guard in a shared executor names its tool, but
+  // only the branch that tool takes may contribute a flag. The read-only tool's
+  // guard delegates to a helper that declares `mutated: false`, while a sibling
+  // case in another helper declares `mutated: true`; the guard must not pick the
+  // sibling's flag up.
+  const GUARD_FIXTURE = {
+    'apps/docs/src/renderer/ai/tools.ts': [
+      "import type { AgentSkill, AgentToolCall, AgentToolDef, ToolExecution } from '@genoffice/agent-core'",
+      '',
+      'export const AGENT_TOOLS: AgentToolDef[] = [',
+      '  {',
+      "    name: 'read_only_tool',",
+      "    description: 'guarded read-only tool',",
+      "    inputSchema: { type: 'object', properties: {} },",
+      '  },',
+      '  {',
+      "    name: 'mutating_sibling',",
+      "    description: 'mutating sibling in the same executor',",
+      "    inputSchema: { type: 'object', properties: {} },",
+      '  },',
+      ']',
+      '',
+      'export function createDocsSkill(): AgentSkill {',
+      '  return {',
+      "    id: 'docs',",
+      '    tools: AGENT_TOOLS,',
+      '    executeTool(call: AgentToolCall): ToolExecution | Promise<ToolExecution> {',
+      "      if (call.name === 'read_only_tool') return executeAsyncTool(call)",
+      '      return executeSyncTool(call)',
+      '    },',
+      '  }',
+      '}',
+      '',
+      'async function executeAsyncTool(call: AgentToolCall): Promise<ToolExecution> {',
+      "  return { output: 'searched', mutated: false, summary: 'search' }",
+      '}',
+      '',
+      'function executeSyncTool(call: AgentToolCall): ToolExecution {',
+      '  switch (call.name) {',
+      "    case 'mutating_sibling':",
+      "      return { output: 'wrote', mutated: true, summary: 'write' }",
+      '    default:',
+      "      return { output: 'unknown', isError: true, mutated: false, summary: call.name }",
+      '  }',
+      '}',
+      '',
+    ].join('\n'),
+  }
+
+  // R1-2: two same-named local closures in different case bodies. Keying helpers
+  // by bare name collapses them and leaks the second one's `mutated: true`.
+  const DUP_HELPER_FIXTURE = {
+    'apps/docs/src/renderer/ai/tools.ts': [
+      "import type { AgentToolCall, AgentToolDef, ToolExecution } from '@genoffice/agent-core'",
+      '',
+      'export const AGENT_TOOLS: AgentToolDef[] = [',
+      '  {',
+      "    name: 'read_tool',",
+      "    description: 'read-only tool with its own finish',",
+      "    inputSchema: { type: 'object', properties: {} },",
+      '  },',
+      '  {',
+      "    name: 'write_tool',",
+      "    description: 'mutating tool with its own finish',",
+      "    inputSchema: { type: 'object', properties: {} },",
+      '  },',
+      ']',
+      '',
+      'export function executeTool(call: AgentToolCall): ToolExecution {',
+      '  switch (call.name) {',
+      "    case 'read_tool': {",
+      '      const finish = (): ToolExecution => {',
+      '        return {',
+      "          output: 'read',",
+      '          mutated: false,',
+      "          summary: 'read',",
+      '        }',
+      '      }',
+      '      return finish()',
+      '    }',
+      "    case 'write_tool': {",
+      '      const finish = (): ToolExecution => {',
+      '        return {',
+      "          output: 'wrote',",
+      '          mutated: true,',
+      "          summary: 'write',",
+      '        }',
+      '      }',
+      '      return finish()',
+      '    }',
+      '    default:',
+      "      return { output: 'unknown', isError: true, mutated: false, summary: call.name }",
+      '  }',
+      '}',
+      '',
+    ].join('\n'),
+  }
+
+  // R1-3: a tool-shaped object with no `inputSchema` is reported, not dropped.
+  const NO_SCHEMA_FIXTURE = {
+    'apps/docs/src/renderer/ai/tools.ts': [
+      "import type { AgentToolDef } from '@genoffice/agent-core'",
+      '',
+      'export const AGENT_TOOLS: AgentToolDef[] = [',
+      '  {',
+      "    name: 'normal_tool',",
+      "    description: 'has a schema',",
+      "    inputSchema: { type: 'object', properties: {} },",
+      '  },',
+      '  {',
+      "    name: 'no_schema_tool',",
+      "    description: 'no schema property at all',",
+      '  },',
+      ']',
+      '',
+    ].join('\n'),
+  }
+
+  it('credits only the guard branch the named tool takes (R1-1)', () => {
+    const { dir } = fixture(GUARD_FIXTURE)
+    const { rows } = extract({ repo: dir, rev: 'HEAD' })
+    const write = (tool) => rows.find((r) => r.tool === tool).write
+    assert.equal(write('read_only_tool'), 'no') // its own branch declares mutated: false
+    assert.equal(write('mutating_sibling'), 'yes') // its own case declares mutated: true
+  })
+
+  it('keeps same-named local helpers distinct by position (R1-2)', () => {
+    const { dir } = fixture(DUP_HELPER_FIXTURE)
+    const { rows } = extract({ repo: dir, rev: 'HEAD' })
+    const write = (tool) => rows.find((r) => r.tool === tool).write
+    assert.equal(write('read_tool'), 'no') // its own `finish` declares mutated: false
+    assert.equal(write('write_tool'), 'yes') // its own `finish` declares mutated: true
+  })
+
+  it('reports a tool object without inputSchema as unresolved:missing (R1-3)', () => {
+    const { dir } = fixture(NO_SCHEMA_FIXTURE)
+    const { rows } = extract({ repo: dir, rev: 'HEAD' })
+    const noSchema = rows.find((r) => r.tool === 'no_schema_tool')
+    assert.ok(noSchema, 'the schema-less tool must still get a row')
+    assert.equal(noSchema.hash, 'unresolved:missing')
+    assert.ok(rows.some((r) => r.tool === 'normal_tool'))
+  })
+})
+
 describe('real repo', () => {
   it('produces rows for each of the six apps at HEAD', () => {
     const { rows } = extract({ repo: REPO_ROOT, rev: 'HEAD' })
@@ -438,6 +583,15 @@ describe('real repo', () => {
     for (const app of ['docs', 'sheets', 'slides', 'pdf', 'markdown', 'html']) {
       assert.ok((counts.get(app) ?? 0) > 0, `expected rows for ${app}`)
     }
+  })
+
+  it('reports the two blocked rows as read-only at the pin (R1-1, R1-2)', () => {
+    const { rows } = extract({ repo: REPO_ROOT, rev: 'HEAD' })
+    const write = (module, tool) => rows.find((r) => r.module === module && r.tool === tool).write
+    // docs web_search: its own `mutated: false` in executeAsyncTool, not the sibling executors
+    assert.equal(write('docs', 'web_search'), 'no')
+    // sheets find_cells: its own `finish` closure declares mutated: false
+    assert.equal(write('sheets', 'find_cells'), 'no')
   })
 
   it('is deterministic and keeps every hash well formed at HEAD', () => {
