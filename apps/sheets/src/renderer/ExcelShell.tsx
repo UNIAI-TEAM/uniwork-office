@@ -73,6 +73,7 @@ import type { ChartSeriesVisualState } from '@genoffice/xlsx-gateway/domain/char
 import type { ChangePlan } from '@genoffice/xlsx-gateway/domain/workbook.types'
 import type { AttachmentMeta } from '../shared/desktop-api'
 import { AiChatPanel, type AiChatMessage } from './ai/AiChatPanel'
+import { resolveCopilotOpen } from './ai/copilot-open'
 import { AiSelectionAsk } from './ai/AiSelectionAsk'
 import type { SelectionAskAnchor } from './ai/selection-ask'
 import {
@@ -572,9 +573,16 @@ export function ExcelShell({
     return false
   })
   // without the `ai` capability (web frame) the dock never opens
+  // a waiting ask_clarification keeps the dock open: its card lives there
+  const askingRef = useRef(aiClarify !== null)
+  askingRef.current = aiClarify !== null
   const setIsCopilotOpen: typeof setIsCopilotOpenState = (next) => {
-    if (cap('ai')) setIsCopilotOpenState(next)
+    if (cap('ai'))
+      setIsCopilotOpenState((prev) => resolveCopilotOpen(prev, next, askingRef.current))
   }
+  useEffect(() => {
+    if (aiClarify && !isCopilotOpen) setIsCopilotOpen(true)
+  })
   useEffect(() => {
     if (autoCollapsedRef.current) {
       if (!isCopilotOpen) return
