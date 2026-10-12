@@ -296,7 +296,7 @@ export function mediaConfigUsable(
   config: AiMediaProviderConfig | undefined,
 ): boolean {
   if (!config) return false
-  // Trim-aware like activeProvider: whitespace-only survivors of in-memory
+  // Trim-aware like providerNeed: whitespace-only survivors of in-memory
   // settings are not usable configs.
   if (meta.needsBaseUrl) return !!config.baseUrl?.trim()
   return !!config.apiKey?.trim()

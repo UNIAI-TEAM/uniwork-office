@@ -3,6 +3,7 @@ import type { Lang } from '@genoffice/i18n'
 import type { AiSettings } from '@genoffice/ai-provider/browser'
 import {
   aiModelPickerGroups,
+  aiModelPickerNeed,
   aiModelPickerSelection,
   withAiModelSelection,
   type AiModelPickerSelection,
@@ -85,21 +86,29 @@ export function AiModelPicker({
   )
   const current = settings ? aiModelPickerSelection(settings) : null
   const currentUsable = groups.some((g) => g.id === current?.provider)
-  // the wanted provider is read raw: the active one falls back to uniAI once it has no model
+  // the wanted provider is read raw (a key list that failed to load masks nothing here)
   const wanted = settings?.provider
   const wantedConfig = wanted ? settings?.providers?.[wanted] : undefined
   const hasKey = (wantedConfig?.apiKey ?? '') !== ''
-  // web frames: the chip reads "Choose model" (nothing usable) -> send is off for everyone in the
-  // frame, viewer or editor, and the hint says what is missing: a model (a key is stored) or a key.
-  // A key list that failed to load says nothing about keys: no hint, send stays on, the server decides
+  // The chip reads "Choose model" while the chosen provider cannot send yet; the composer's send
+  // is then off and the hint says what is missing: a model (a key is stored) or a key. This holds
+  // on every host: a chosen vendor is never swapped for uniAI, so the chip and the request agree.
+  // Web frames apply it to uniAI too (nothing usable at all). A key list that failed to load says
+  // nothing about keys: no hint, send stays on, the server decides
+  const need = settings ? aiModelPickerNeed(settings) : null
   const needHint =
-    bridge.requireModel === true &&
-    settings !== null &&
-    !currentUsable &&
-    settings.credentialsUnavailable !== true
-      ? hasKey
-        ? strings.needModel
-        : strings.needKey
+    settings !== null && !currentUsable && settings.credentialsUnavailable !== true
+      ? need === 'base-url'
+        ? strings.needBaseUrl
+        : bridge.requireModel === true
+          ? hasKey
+            ? strings.needModel
+            : strings.needKey
+          : need === 'model'
+            ? strings.needModel
+            : need === 'key'
+              ? strings.needKey
+              : null
       : null
   const openSettings = bridge.openModelSettings
   const openSettingsOnce = useCallback(() => {

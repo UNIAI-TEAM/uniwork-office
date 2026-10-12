@@ -11,6 +11,8 @@ export interface AiModelPickerStrings {
   needModel: string
   /** composer hint while no key is stored (send is off until one is added in the AI settings) */
   needKey: string
+  /** composer hint while a custom endpoint has a model but no server URL (its API key is optional) */
+  needBaseUrl: string
 }
 
 export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
@@ -20,6 +22,7 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     manage: '管理模型…',
     needModel: '请先选择模型再发送',
     needKey: '请在 AI 设置中添加 API 密钥后再使用助手。',
+    needBaseUrl: '请在 AI 设置中添加服务器地址后再使用助手。',
   },
   en: {
     title: 'Model',
@@ -27,6 +30,7 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     manage: 'Manage models…',
     needModel: 'Choose a model to send',
     needKey: 'Add an API key in AI settings to use the assistant.',
+    needBaseUrl: 'Add the server URL in AI settings to use the assistant.',
   },
   ja: {
     title: 'モデル',
@@ -34,6 +38,7 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     manage: 'モデルを管理…',
     needModel: '送信するにはモデルを選択してください',
     needKey: 'アシスタントを使うには、AI 設定で API キーを追加してください。',
+    needBaseUrl: 'アシスタントを使うには、AI 設定でサーバー URL を追加してください。',
   },
   ko: {
     title: '모델',
@@ -41,6 +46,7 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     manage: '모델 관리…',
     needModel: '보내려면 모델을 선택하세요',
     needKey: '어시스턴트를 사용하려면 AI 설정에서 API 키를 추가하세요.',
+    needBaseUrl: '어시스턴트를 사용하려면 AI 설정에서 서버 URL을 추가하세요.',
   },
   fr: {
     title: 'Modèle',
@@ -48,6 +54,7 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     manage: 'Gérer les modèles…',
     needModel: 'Choisissez un modèle pour envoyer',
     needKey: 'Ajoutez une clé API dans les paramètres IA pour utiliser l’assistant.',
+    needBaseUrl: 'Ajoutez l’URL du serveur dans les paramètres IA pour utiliser l’assistant.',
   },
   de: {
     title: 'Modell',
@@ -56,6 +63,8 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     needModel: 'Zum Senden ein Modell auswählen',
     needKey:
       'Fügen Sie in den KI-Einstellungen einen API-Schlüssel hinzu, um den Assistenten zu nutzen.',
+    needBaseUrl:
+      'Fügen Sie in den KI-Einstellungen die Server-URL hinzu, um den Assistenten zu nutzen.',
   },
   es: {
     title: 'Modelo',
@@ -63,6 +72,7 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     manage: 'Gestionar modelos…',
     needModel: 'Elige un modelo para enviar',
     needKey: 'Añade una clave de API en los ajustes de IA para usar el asistente.',
+    needBaseUrl: 'Añade la URL del servidor en los ajustes de IA para usar el asistente.',
   },
   th: {
     title: 'โมเดล',
@@ -70,6 +80,7 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     manage: 'จัดการโมเดล…',
     needModel: 'เลือกโมเดลก่อนส่ง',
     needKey: 'เพิ่มคีย์ API ในการตั้งค่า AI เพื่อใช้ผู้ช่วย',
+    needBaseUrl: 'เพิ่ม URL ของเซิร์ฟเวอร์ในการตั้งค่า AI เพื่อใช้ผู้ช่วย',
   },
   id: {
     title: 'Model',
@@ -77,6 +88,7 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     manage: 'Kelola model…',
     needModel: 'Pilih model untuk mengirim',
     needKey: 'Tambahkan kunci API di pengaturan AI untuk memakai asisten.',
+    needBaseUrl: 'Tambahkan URL server di pengaturan AI untuk memakai asisten.',
   },
   ru: {
     title: 'Модель',
@@ -84,6 +96,7 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     manage: 'Управление моделями…',
     needModel: 'Выберите модель, чтобы отправить',
     needKey: 'Добавьте ключ API в настройках ИИ, чтобы пользоваться помощником.',
+    needBaseUrl: 'Добавьте URL сервера в настройках ИИ, чтобы пользоваться помощником.',
   },
   ar: {
     title: 'النموذج',
@@ -91,6 +104,7 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     manage: 'إدارة النماذج…',
     needModel: 'اختر نموذجًا للإرسال',
     needKey: 'أضف مفتاح API في إعدادات الذكاء الاصطناعي لاستخدام المساعد.',
+    needBaseUrl: 'أضف عنوان URL للخادم في إعدادات الذكاء الاصطناعي لاستخدام المساعد.',
   },
   pt: {
     title: 'Modelo',
@@ -98,6 +112,7 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     manage: 'Gerenciar modelos…',
     needModel: 'Escolha um modelo para enviar',
     needKey: 'Adicione uma chave de API nas configurações de IA para usar o assistente.',
+    needBaseUrl: 'Adicione o URL do servidor nas configurações de IA para usar o assistente.',
   },
   it: {
     title: 'Modello',
@@ -105,6 +120,7 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     manage: 'Gestisci modelli…',
     needModel: 'Scegli un modello per inviare',
     needKey: 'Aggiungi una chiave API nelle impostazioni IA per usare l’assistente.',
+    needBaseUrl: 'Aggiungi l’URL del server nelle impostazioni IA per usare l’assistente.',
   },
   pl: {
     title: 'Model',
@@ -112,6 +128,7 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     manage: 'Zarządzaj modelami…',
     needModel: 'Wybierz model, aby wysłać',
     needKey: 'Dodaj klucz API w ustawieniach AI, aby korzystać z asystenta.',
+    needBaseUrl: 'Dodaj adres URL serwera w ustawieniach AI, aby korzystać z asystenta.',
   },
   cs: {
     title: 'Model',
@@ -119,6 +136,7 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     manage: 'Spravovat modely…',
     needModel: 'Pro odeslání vyberte model',
     needKey: 'Pro použití asistenta přidejte v nastavení AI klíč API.',
+    needBaseUrl: 'Pro použití asistenta přidejte v nastavení AI adresu URL serveru.',
   },
   nl: {
     title: 'Model',
@@ -126,6 +144,7 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     manage: 'Modellen beheren…',
     needModel: 'Kies een model om te versturen',
     needKey: 'Voeg een API-sleutel toe in de AI-instellingen om de assistent te gebruiken.',
+    needBaseUrl: 'Voeg de server-URL toe in de AI-instellingen om de assistent te gebruiken.',
   },
   ms: {
     title: 'Model',
@@ -133,6 +152,7 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     manage: 'Urus model…',
     needModel: 'Pilih model untuk menghantar',
     needKey: 'Tambah kunci API dalam tetapan AI untuk menggunakan pembantu.',
+    needBaseUrl: 'Tambah URL pelayan dalam tetapan AI untuk menggunakan pembantu.',
   },
   he: {
     title: 'מודל',
@@ -140,6 +160,7 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     manage: 'ניהול מודלים…',
     needModel: 'בחרו מודל כדי לשלוח',
     needKey: 'הוסף מפתח API בהגדרות ה-AI כדי להשתמש בעוזר.',
+    needBaseUrl: 'הוסף את כתובת ה-URL של השרת בהגדרות ה-AI כדי להשתמש בעוזר.',
   },
   hi: {
     title: 'मॉडल',
@@ -147,6 +168,7 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     manage: 'मॉडल प्रबंधित करें…',
     needModel: 'भेजने के लिए मॉडल चुनें',
     needKey: 'सहायक का उपयोग करने के लिए AI सेटिंग में API कुंजी जोड़ें।',
+    needBaseUrl: 'सहायक का उपयोग करने के लिए AI सेटिंग में सर्वर URL जोड़ें।',
   },
   'zh-TW': {
     title: '模型',
@@ -154,6 +176,7 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     manage: '管理模型…',
     needModel: '請先選擇模型再傳送',
     needKey: '請在 AI 設定中新增 API 金鑰後再使用助理。',
+    needBaseUrl: '請在 AI 設定中新增伺服器網址後再使用助理。',
   },
   vi: {
     title: 'Mô hình',
@@ -161,5 +184,6 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     manage: 'Quản lý mô hình…',
     needModel: 'Chọn mô hình để gửi',
     needKey: 'Thêm khóa API trong Cài đặt AI để dùng trợ lý.',
+    needBaseUrl: 'Thêm URL máy chủ trong Cài đặt AI để dùng trợ lý.',
   },
 }

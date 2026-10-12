@@ -8,12 +8,14 @@ export type {
 } from './types'
 export {
   AI_PROVIDERS,
-  activeProvider,
   cloudToolsEnabled,
   DEFAULT_MAX_OUTPUT_TOKENS,
   MAX_MAX_OUTPUT_TOKENS,
   MIN_MAX_OUTPUT_TOKENS,
   clampMaxOutputTokens,
+  isProviderUsable,
+  providerNeed,
+  selectedProvider,
   uniAiOpenRouterKey,
 } from './providers'
 export { getProviderAdapter, modelLacksVision } from './registry'

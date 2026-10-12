@@ -390,7 +390,7 @@ export function createWebAi(opts: {
         ...providers[id],
         // The real key never reaches the frame. A provider with a key stored in UniWork carries
         // its masked hint (non-empty, never sent: ./stream.ts drops it) so the shared picker and
-        // `activeProvider` see it as configured; one without stays empty and is not listed.
+        // `isProviderUsable` see it as configured; one without stays empty and is not listed.
         apiKey: usableHere ? stored?.key_hint || '…' : '',
         ...(usableHere && providers[id].baseUrl !== undefined
           ? { baseUrl: stored?.base_url || protocolBaseOf(id) || providerLabel(id) }

@@ -18,10 +18,10 @@ import { join } from 'node:path'
 import {
   aiStreamErrorFields,
   defaultAiSettings,
-  activeProvider,
   maxOutputTokensOf,
   refreshUniworkCloudStatus,
   resolveAiSettings,
+  selectedProvider,
   sanitizeAiSettings,
   noModelMessage,
   setAiUserAgent,
@@ -122,8 +122,9 @@ export function registerAiIpc(): void {
   ipcMain.handle('ai:get-settings', (): AiSettings => {
     const stored = readJson<Partial<AiSettings> & LegacyAiSettings>(AI_SETTINGS_PATH(), {})
     const settings = resolveAiSettings(stored, defaultAiSettings())
-    // a stored BYOK provider is honored when usable; half-filled configs fall back to genspark
-    settings.provider = activeProvider(settings)
+    // the stored provider stays selected even while its config is incomplete (the picker and
+    // Settings show what is missing); only an unknown id degrades to genspark
+    settings.provider = selectedProvider(settings)
     return settings
   })
 

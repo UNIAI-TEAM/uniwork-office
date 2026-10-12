@@ -4,12 +4,13 @@ import {
   DEFAULT_MAX_OUTPUT_TOKENS,
   MAX_MAX_OUTPUT_TOKENS,
   MIN_MAX_OUTPUT_TOKENS,
-  activeProvider,
+  isProviderUsable,
   clampMaxOutputTokens,
   cloudToolsEnabled,
   defaultAiSettings,
   maxOutputTokensOf,
   resolveAiSettings,
+  selectedProvider,
   uniAiOpenRouterKey,
   withUniAiOpenRouterAuth,
 } from '../src/providers'
@@ -116,7 +117,8 @@ describe('resolveAiSettings', () => {
         defaults,
       )
       expect(resolved.providers.anthropic).toEqual(defaults.providers.anthropic)
-      expect(activeProvider(resolved)).toBe('genspark')
+      expect(selectedProvider(resolved)).toBe('anthropic')
+      expect(isProviderUsable(resolved, 'anthropic')).toBe(false)
     }
   })
 
@@ -327,26 +329,29 @@ describe('clampMaxOutputTokens', () => {
   })
 })
 
-describe('activeProvider', () => {
-  it('honors a configured BYOK provider and falls back to genspark otherwise', () => {
+describe('selectedProvider / isProviderUsable', () => {
+  it('keeps the chosen provider while its config is incomplete and reports it unusable', () => {
     const settings = defaultAiSettings()
-    expect(activeProvider(settings)).toBe('genspark')
+    expect(selectedProvider(settings)).toBe('genspark')
 
     settings.provider = 'kimi'
-    expect(activeProvider(settings)).toBe('genspark') // no key yet
+    settings.providers.kimi.apiKey = ''
+    expect(selectedProvider(settings)).toBe('kimi')
+    expect(isProviderUsable(settings, 'kimi')).toBe(false) // no key yet
     settings.providers.kimi.apiKey = 'sk-user'
-    expect(activeProvider(settings)).toBe('kimi')
+    expect(isProviderUsable(settings, 'kimi')).toBe(true)
   })
 
   it('requires a base URL for providers that declare needsBaseUrl', () => {
     const settings = defaultAiSettings()
     settings.provider = 'custom'
     settings.providers.custom.apiKey = 'k'
-    expect(activeProvider(settings)).toBe('genspark')
+    expect(isProviderUsable(settings, 'custom')).toBe(false)
     settings.providers.custom.baseUrl = 'http://localhost:1234/v1'
-    expect(activeProvider(settings)).toBe('genspark') // custom's default model is empty
+    expect(isProviderUsable(settings, 'custom')).toBe(false) // custom's default model is empty
     settings.providers.custom.model = 'my-model'
-    expect(activeProvider(settings)).toBe('custom')
+    expect(isProviderUsable(settings, 'custom')).toBe(true)
+    expect(selectedProvider(settings)).toBe('custom')
   })
 
   it('allows keyless custom endpoints for local servers', () => {
@@ -355,15 +360,15 @@ describe('activeProvider', () => {
     settings.providers.custom.apiKey = ''
     settings.providers.custom.baseUrl = 'http://localhost:11434/v1'
     settings.providers.custom.model = 'llama3'
-    expect(activeProvider(settings)).toBe('custom')
+    expect(isProviderUsable(settings, 'custom')).toBe(true)
   })
 
   it('auto-discovers Codex without an API key and preserves an optional override', () => {
     const settings = defaultAiSettings()
     settings.provider = 'codex'
-    expect(activeProvider(settings)).toBe('codex')
+    expect(isProviderUsable(settings, 'codex')).toBe(true)
     settings.providers.codex.cliPath = ' C:\\Tools\\codex.exe '
-    expect(activeProvider(settings)).toBe('codex')
+    expect(isProviderUsable(settings, 'codex')).toBe(true)
 
     const resolved = resolveAiSettings(
       { providers: { codex: settings.providers.codex } as never },
@@ -377,30 +382,31 @@ describe('activeProvider', () => {
     const settings = defaultAiSettings()
     settings.provider = 'kimi'
     settings.providers.kimi.apiKey = '   '
-    expect(activeProvider(settings)).toBe('genspark')
+    expect(isProviderUsable(settings, 'kimi')).toBe(false)
     settings.providers.kimi.apiKey = 'sk-user'
     settings.providers.kimi.model = '  '
-    expect(activeProvider(settings)).toBe('genspark')
+    expect(isProviderUsable(settings, 'kimi')).toBe(false)
     settings.providers.kimi.model = 'kimi-k2'
-    expect(activeProvider(settings)).toBe('kimi')
+    expect(isProviderUsable(settings, 'kimi')).toBe(true)
 
     const custom = defaultAiSettings()
     custom.provider = 'custom'
     custom.providers.custom.baseUrl = '   '
     custom.providers.custom.model = 'my-model'
-    expect(activeProvider(custom)).toBe('genspark')
+    expect(isProviderUsable(custom, 'custom')).toBe(false)
   })
 
   it('falls back to genspark for unknown ids from a hand-edited settings file', () => {
     const settings = defaultAiSettings()
     settings.provider = 'nonsense' as AiProviderId
-    expect(activeProvider(settings)).toBe('genspark')
+    expect(selectedProvider(settings)).toBe('genspark')
   })
 
   it('UniAI stays selectable without a key (Token Hub key is required at request time)', () => {
     const settings = defaultAiSettings()
     settings.provider = 'genspark'
-    expect(activeProvider(settings)).toBe('genspark')
+    expect(selectedProvider(settings)).toBe('genspark')
+    expect(isProviderUsable(settings, 'genspark')).toBe(true)
   })
 })
 
