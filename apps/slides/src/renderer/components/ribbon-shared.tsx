@@ -289,6 +289,8 @@ export interface Props {
   uniworkBound?: boolean
   /** View-only UniWork document: Save and the AI actions that edit the deck are disabled (Save As stays available) */
   uniworkReadOnly?: boolean
+  /** the "AI image" button is shown only while image generation is offered (grant + a live way to generate) */
+  imageGenerationOffered?: boolean
   onOpen: () => void
   onSave: () => void
   onUndo: () => void
@@ -605,6 +607,7 @@ export interface RibbonTabCtx extends Pick<
   | 'onAddSlideWithLayout'
   | 'onAiPreset'
   | 'uniworkReadOnly'
+  | 'imageGenerationOffered'
   | 'onAlign'
   | 'onDirection'
   | 'onArrange'

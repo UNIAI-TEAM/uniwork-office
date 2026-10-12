@@ -101,6 +101,7 @@ export function RibbonHomeTab({ rb }: { rb: RibbonTabCtx }) {
     onAddSlideWithLayout,
     onAiPreset,
     uniworkReadOnly,
+    imageGenerationOffered,
     onAlign,
     onDirection,
     onArrange,
@@ -267,19 +268,21 @@ export function RibbonHomeTab({ rb }: { rb: RibbonTabCtx }) {
               </span>
               <span>{t('aiFactCheckBtn')}</span>
             </button>
-            <button
-              className="rb-big ai-entry"
-              disabled={!hasDoc || deckEmpty || uniworkReadOnly}
-              data-tip={uniworkReadOnly ? t('aiViewOnlyNotice') : t('aiImageBtn')}
-              onClick={() => onAiPreset(t('aiImagePrompt'))}
-            >
-              <span className="rb-big-icon">
-                <span className="ai-feature-icon" aria-hidden="true">
-                  <IconAiImage />
+            {imageGenerationOffered && (
+              <button
+                className="rb-big ai-entry"
+                disabled={!hasDoc || deckEmpty || uniworkReadOnly}
+                data-tip={uniworkReadOnly ? t('aiViewOnlyNotice') : t('aiImageBtn')}
+                onClick={() => onAiPreset(t('aiImagePrompt'))}
+              >
+                <span className="rb-big-icon">
+                  <span className="ai-feature-icon" aria-hidden="true">
+                    <IconAiImage />
+                  </span>
                 </span>
-              </span>
-              <span>{t('aiImageBtn')}</span>
-            </button>
+                <span>{t('aiImageBtn')}</span>
+              </button>
+            )}
           </Group>
           <div className="ribbon-sep" />
         </>

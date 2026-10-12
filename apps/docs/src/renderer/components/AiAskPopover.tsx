@@ -40,6 +40,8 @@ interface Props {
   onQueueAdd: (text: string) => void
   onQueueUpdate: (qid: string, text: string) => void
   onQueueRemove: (qid: string) => void
+  /** image generation is offered (grant + a live way to generate): without it the "Regenerate with AI" chip is not shown */
+  imageGenerationOffered?: boolean
 }
 
 type OpenState = { mode: 'new' } | { mode: 'edit'; qid: string }
@@ -57,6 +59,11 @@ const CHIP_KEYS: Record<SelectionKind, StringKey[]> = {
   chart: ['aiChipChartData', 'aiChipChartTitle'],
   table: ['aiChipTableEdit', 'aiChipPolish', 'aiChipFixGrammar'],
   text: ['aiChipPolish', 'aiChipShorten', 'aiChipExpand', 'aiChipFixGrammar'],
+}
+
+/** the chips for a selection; without image generation the "Regenerate with AI" chip is left out */
+export function chipKeysFor(kind: SelectionKind, imageGenerationOffered: boolean): StringKey[] {
+  return CHIP_KEYS[kind].filter((key) => key !== 'aiChipRegenImage' || imageGenerationOffered)
 }
 
 function selectionKind(editor: Editor): SelectionKind {
@@ -100,6 +107,7 @@ export function AiAskPopover({
   onQueueAdd,
   onQueueUpdate,
   onQueueRemove,
+  imageGenerationOffered = true,
 }: Props): React.JSX.Element | null {
   const { t } = useI18n()
   const [trigger, setTrigger] = useState<{ left: number; top: number } | null>(null)
@@ -324,7 +332,7 @@ export function AiAskPopover({
         />
         {open.mode === 'new' && (
           <div className="ai-ask-pop-chips">
-            {CHIP_KEYS[kind].map((key) => (
+            {chipKeysFor(kind, imageGenerationOffered).map((key) => (
               <button
                 key={key}
                 className="ai-ask-chip"

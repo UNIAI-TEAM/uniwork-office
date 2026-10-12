@@ -384,7 +384,9 @@ export function AiPanel({
             read: () => depsRef.current.getFrontmatter(),
             write: (inner) => depsRef.current.setFrontmatter(inner),
           },
-          () => imageGenerationAvailable(settingsRef.current, gskLoggedInRef.current),
+          () =>
+            cap('imageGeneration') &&
+            imageGenerationAvailable(settingsRef.current, gskLoggedInRef.current),
           () => ({
             write: (spec, onProgress, signal) => runDocWriterRef.current(spec, onProgress, signal),
           }),
