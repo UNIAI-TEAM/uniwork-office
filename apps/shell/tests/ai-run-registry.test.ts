@@ -51,10 +51,13 @@ describe('AI run registry', () => {
     expect(isAiRunning(4)).toBe(false)
   })
 
-  it('a reload, a destroyed view or clearAiRun drops the flag', () => {
+  it('a reload, a crashed renderer, a destroyed view or clearAiRun drops the flag', () => {
     const wc = fakeSender(5)
     noteAiRun(wc, { state: 'running' })
     ;(wc as unknown as { emit(e: string): void }).emit('did-start-loading')
+    expect(isAiRunning(5)).toBe(false)
+    noteAiRun(wc, { state: 'running' })
+    ;(wc as unknown as { emit(e: string): void }).emit('render-process-gone')
     expect(isAiRunning(5)).toBe(false)
     noteAiRun(wc, { state: 'running' })
     clearAiRun(5)

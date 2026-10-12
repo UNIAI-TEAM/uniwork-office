@@ -22,7 +22,7 @@ export interface EditorState {
 
 /** webContents.id -> id of the running turn ('' when the editor sent none) */
 const runningByWc = new Map<number, string>()
-/** views whose destroy/reload already clears the flag */
+/** views whose destroy/reload/crash already clears the flag */
 const watched = new Set<number>()
 
 export function isAiRunning(webContentsId: number): boolean {
@@ -62,6 +62,8 @@ function watch(wc: WebContents): void {
   })
   // reload() remounts the renderer without destroying webContents: the turn is gone
   wc.on('did-start-loading', () => runningByWc.delete(wcId))
+  // a crashed renderer keeps its webContents (and may be reloaded later): the turn is gone
+  wc.on('render-process-gone', () => runningByWc.delete(wcId))
 }
 
 export function registerAiRunIpc(ipc: Pick<IpcMain, 'on'>): void {

@@ -1128,6 +1128,17 @@ describe('dirty-tab queries (shell close guard)', () => {
     expect(after.find((s) => s.path === '/uw/d.pdf')?.aiRunning).toBe(false)
   })
 
+  it('a crashed renderer (render-process-gone) reads aiRunning false', async () => {
+    manager.openDocsTab('/uw/a.docx')
+    const view = lastCreatedView(createDocsView)
+    noteAiRun(view.webContents as never, { state: 'running', runId: 'turn-1' })
+    expect((await manager.editorDirtyStates(() => true))[0].aiRunning).toBe(true)
+    view.webContents.listeners.get('render-process-gone')!()
+    expect(await manager.editorDirtyStates(() => true)).toEqual([
+      { path: '/uw/a.docx', dirty: false, aiRunning: false },
+    ])
+  })
+
   it('a tab closed mid-run (even while its dirty query yields) reads aiRunning false', async () => {
     const id = manager.openDocsTab('/uw/a.docx')
     const view = lastCreatedView(createDocsView)
