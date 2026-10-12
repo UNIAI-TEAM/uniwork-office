@@ -1514,9 +1514,10 @@ const TOOL_DEF_TYPE_RE = /^(?:AgentToolDef|AgentTool)$/
 function insideToolsAccessor(tokens, at) {
   const stack = []
   for (let k = 0; k < at; k += 1) {
-    const v = tokens[k].value
-    if (v === '{') stack.push(k)
-    else if (v === '}') stack.pop()
+    const tk = tokens[k]
+    if (tk.type !== 'punct') continue // a string/template `{` is not a brace
+    if (tk.value === '{') stack.push(k)
+    else if (tk.value === '}') stack.pop()
   }
   for (let i = stack.length - 1; i >= 0; i -= 1) {
     const bodyOpen = stack[i]
