@@ -920,6 +920,50 @@ describe('extractor residuals (G7-06)', () => {
     assert.deepEqual(tools, ['field_tool', 'real_tool'])
     assert.equal(rows.find((r) => r.tool === 'field_tool').hash, 'unresolved:missing')
   })
+
+  // R1-2 (same review): `insideToolsAccessor` requires the token right before
+  // the body brace to be `)`, so a return-type annotation on the accessor
+  // (`get tools(): AgentToolDef[]`) hides the accessor and its schema-less
+  // tools are dropped silently. The `get options()` negative must stay a
+  // non-tools accessor.
+  const ANNOTATED_ACCESSOR_FIXTURE = {
+    'apps/docs/src/renderer/ai/tools.ts': [
+      "import type { AgentSkill, AgentToolDef } from '@genoffice/agent-core'",
+      '',
+      'export const s: AgentSkill = {',
+      "  id: 'docs',",
+      '  get tools(): AgentToolDef[] {',
+      '    return [',
+      '      {',
+      "        name: 'annotated_tool',",
+      "        description: 'schema-less tool in a return-type-annotated accessor',",
+      '      },',
+      '    ]',
+      '  },',
+      '}',
+      '',
+      'export const menu = {',
+      '  get options(): Option[] {',
+      '    return [',
+      "      { name: 'opt_a', description: 'A' },",
+      '    ]',
+      '  },',
+      '}',
+      '',
+    ].join('\n'),
+  }
+
+  it('finds a returned tool in a return-type-annotated `get tools()` (R1-2)', () => {
+    const { dir } = fixture(ANNOTATED_ACCESSOR_FIXTURE)
+    const { rows } = extract({ repo: dir, rev: 'HEAD' })
+    const tool = rows.find((r) => r.tool === 'annotated_tool')
+    assert.ok(tool, 'the annotated accessor tools list must be recognised')
+    assert.equal(tool.hash, 'unresolved:missing')
+    assert.ok(
+      !rows.some((r) => r.tool === 'opt_a'),
+      'a `get options()` accessor is not a tools list',
+    )
+  })
 })
 
 describe('real repo', () => {
