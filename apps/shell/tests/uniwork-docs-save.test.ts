@@ -1203,7 +1203,7 @@ describe('review r2 follow-ups', () => {
       // the close first asks the durable store (real fs reads) whether an
       // intent is pending: faked timers stall that lookup until the test drives
       // real I/O again, and the 30 s cap has already expired by then
-      for (let round = 0; round < 12 && outcome === undefined; round += 1) {
+      for (let round = 0; round < 200 && outcome === undefined; round += 1) {
         await readFile(path, 'utf8')
         await vi.advanceTimersByTimeAsync(0)
       }
