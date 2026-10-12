@@ -849,8 +849,21 @@ function cellTypeNote(cell: CellRead): string | null {
  * cached result is labelled; once inputs were edited this session it is
  * replaced by NOT RECALCULATED so it can never pass for the answer.
  */
+/** "unsupported function: X — …" for a formula calling functions the engine lacks. */
+function unsupportedNote(cell: Pick<CellRead, 'unsupportedFunctions'>): string | null {
+  const missing = cell.unsupportedFunctions ?? []
+  if (missing.length === 0) return null
+  return (
+    `unsupported function${missing.length > 1 ? 's' : ''}: ${missing.join(', ')} — ` +
+    'the formula engine in this app cannot calculate it, so this is not a real result; ' +
+    'tell the user, or rewrite the formula with supported functions'
+  )
+}
+
 function describeReadCell(cell: CellRead): { text: string; notes: string[] } {
   const notes: string[] = []
+  const unsupported = unsupportedNote(cell)
+  if (unsupported) notes.push(unsupported)
   const typeNote = cellTypeNote(cell)
   if (cell.valueSource === 'cache' && cell.formula) {
     const formula = escapeCellText(cell.formula)
@@ -1511,9 +1524,12 @@ export function executeWorkbookTool(
             const cells = deps.readCells(addresses, cellSheetId)
             const prefix = bySheet.size > 1 ? `${sheetNames.get(cellSheetId) ?? cellSheetId}!` : ''
             for (const addr of addresses) {
-              const v = cells[addr]?.value
+              const cell = cells[addr]
+              const v = cell?.value
+              const unsupported = cell ? unsupportedNote(cell) : null
               lines.push(
-                `${prefix}${addr} = ${v === null || v === undefined ? '(still computing; verify with read_cells)' : String(v)}`,
+                `${prefix}${addr} = ${v === null || v === undefined ? (unsupported ? '(no result)' : '(still computing; verify with read_cells)') : String(v)}` +
+                  (unsupported ? ` (${unsupported})` : ''),
               )
             }
           }

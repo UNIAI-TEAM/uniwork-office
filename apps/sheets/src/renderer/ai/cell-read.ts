@@ -29,6 +29,8 @@ export interface CellRead {
   staleCache?: boolean
   /** the engine's own result when the shown value is the file's cached one */
   engineResult?: CellScalar
+  /** functions the formula calls that the engine does not implement */
+  unsupportedFunctions?: readonly string[]
 }
 
 /** Currency glyphs and the codes Vietnamese/English files spell out. */

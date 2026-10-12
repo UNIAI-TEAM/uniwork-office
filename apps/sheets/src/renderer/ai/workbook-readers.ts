@@ -12,7 +12,7 @@ import type { CellFormatState, CellScalar } from '@genoffice/xlsx-gateway/domain
 import { planFileTableRegistrations } from '../file-tables'
 import { toSelectionFormat } from '../selection-format'
 import { plainCellValue } from '../edit-journal'
-import { lazyCellReader, modelCellValue } from '../univer-sync'
+import { lazyCellReader, modelCellValue, unsupportedFunctionNames } from '../univer-sync'
 import {
   classifyCellType,
   formulaProvenance,
@@ -503,6 +503,14 @@ function typed(
   }
 }
 
+/** Name the functions the engine lacks, so #NAME?/blank results explain themselves. */
+function withUnsupportedFunctions(read: CellRead): CellRead {
+  if (!read.formula) return read
+  const missing = unsupportedFunctionNames(read.formula)
+  if (missing.length > 0) read.unsupportedFunctions = missing
+  return read
+}
+
 export function readCells(
   ctx: WorkbookReadContext,
   addresses: readonly string[],
@@ -550,7 +558,7 @@ export function readCells(
         if (provenance.stale) read.staleCache = true
         if (provenance.engineResult !== undefined) read.engineResult = provenance.engineResult
       }
-      result[address] = read
+      result[address] = withUnsupportedFunctions(read)
     }
     return result
   }
@@ -594,11 +602,13 @@ export function readCells(
         /* fail-open: show the raw value */
       }
     }
-    result[address] = typed(
-      cell.formula
-        ? { value: display, formula: cell.formula, rawValue: raw }
-        : { value: display, rawValue: raw },
-      numberFormatOf(range),
+    result[address] = withUnsupportedFunctions(
+      typed(
+        cell.formula
+          ? { value: display, formula: cell.formula, rawValue: raw }
+          : { value: display, rawValue: raw },
+        numberFormatOf(range),
+      ),
     )
   }
   return result
