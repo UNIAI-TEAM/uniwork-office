@@ -96,6 +96,7 @@ import {
   dialogParent,
   getFontMetrics,
   hostWindowFor,
+  markMetaDirty,
   resetFontMetrics,
   pushHistory,
   runtime,
@@ -764,6 +765,34 @@ function sanitizeDraftBaseName(raw: string | undefined): string | null {
   return cleaned.length > 40 ? cleaned.slice(0, 40).trim() : cleaned
 }
 
+/**
+ * After pages land in an existing deck: persist the whole deck as the draft (append mode),
+ * then reopen from the written bytes so the session is clean (same as slides:save) —
+ * otherwise pure AI generation (per-page merges mark structureDirty) would trigger the
+ * close confirmation even without edits. A UniWork-bound deck is not serialized at all
+ * (serializing clears the dirty flags): it stays dirty until the user saves. Returns
+ * whether a draft was written.
+ */
+async function draftLandedPages(
+  wc: WebContents,
+  session: Session,
+  deckName?: string,
+): Promise<boolean> {
+  if (uniworkIsBound(session.path)) {
+    // merged pages carry no dirty flags of their own: flag the deck so Save and the
+    // close guard see the generated pages as unsaved
+    markMetaDirty(session)
+    return false
+  }
+  const bytes = await savePptx(session.opened)
+  if (!(await saveDraftAfterGenerate(wc, session, bytes, 'append', deckName))) return false
+  if (session.path) {
+    session.opened = await openPptx(bytes)
+    session.metaDirty = false
+  }
+  return true
+}
+
 /** Pick a draft path from deckName: append -2/-3… if a same-named file exists; fall back to timestamp naming without a valid deckName. */
 function pickDraftPath(draftsDir: string, deckName?: string): string {
   const base = sanitizeDraftBaseName(deckName)
@@ -782,6 +811,9 @@ function pickDraftPath(draftsDir: string, deckName?: string): string {
  * Append mode reuses the session's existing draft path (overwrite); replace mode generates a
  * new filename. On successful write, update session.path, pushRecent, slidesOpenedHook.
  * On write failure, degrade silently (console.warn) without blocking the in-memory session.
+ * A UniWork-bound deck is never drafted: the generated pages stay in the editor (unsaved)
+ * until the user saves, so nothing is written outside the document and the session keeps
+ * its path. Returns false in that case.
  */
 async function saveDraftAfterGenerate(
   wc: WebContents,
@@ -789,7 +821,8 @@ async function saveDraftAfterGenerate(
   bytes: Uint8Array,
   mode: 'replace' | 'append',
   deckName?: string,
-): Promise<void> {
+): Promise<boolean> {
+  if (uniworkIsBound(session.path)) return false
   try {
     const draftsDir = getDraftsDir()
     // Ensure the directory exists
@@ -813,6 +846,7 @@ async function saveDraftAfterGenerate(
       err,
     )
   }
+  return true
 }
 
 /** After a successful Slides → PDF export: open the file in a PDF tab (shell)
@@ -1218,17 +1252,10 @@ export function registerSlidesIpc(): void {
           }
           existing.fitWidthPx = fitWidthPx
           // Save the draft: persist the current complete deck
-          const bytes = await savePptx(opened)
-          await saveDraftAfterGenerate(e.sender, existing, bytes, 'append', deckName)
-          // Draft now matches memory: reopen from the output bytes to clear dirty (same as
-          // slides:save) — otherwise pure AI generation (per-page append merges mark
-          // structureDirty) would trigger the close confirmation even without edits
-          if (existing.path) {
-            existing.opened = await openPptx(bytes)
-            existing.metaDirty = false
-          }
+          const drafted = await draftLandedPages(e.sender, existing, deckName)
           return {
-            path: existing.path,
+            // bound: no path change for the panel (title, dirty flag): the deck is unsaved
+            path: drafted ? existing.path : '',
             slides: buildAllRenderSlides(existing.opened, fitWidthPx),
             size: { cx: existing.opened.deck.size.cx, cy: existing.opened.deck.size.cy },
             defaultFont: deckDefaultFont(existing.opened),
@@ -1270,14 +1297,10 @@ export function registerSlidesIpc(): void {
             return { error: r.failures?.[0]?.error ?? tm('errReplaceFailed') }
           }
           existing.fitWidthPx = fitWidthPx
-          const bytes = await savePptx(opened)
-          await saveDraftAfterGenerate(e.sender, existing, bytes, 'append', deckName)
-          if (existing.path) {
-            existing.opened = await openPptx(bytes)
-            existing.metaDirty = false
-          }
+          const drafted = await draftLandedPages(e.sender, existing, deckName)
           return {
-            path: existing.path,
+            // bound: no path change for the panel (title, dirty flag): the deck is unsaved
+            path: drafted ? existing.path : '',
             slides: buildAllRenderSlides(existing.opened, fitWidthPx),
             size: { cx: existing.opened.deck.size.cx, cy: existing.opened.deck.size.cy },
             defaultFont: deckDefaultFont(existing.opened),
@@ -1316,14 +1339,10 @@ export function registerSlidesIpc(): void {
             return { error: r.failures?.[0]?.error ?? tm('errInsertFailed') }
           }
           existing.fitWidthPx = fitWidthPx
-          const bytes = await savePptx(opened)
-          await saveDraftAfterGenerate(e.sender, existing, bytes, 'append', deckName)
-          if (existing.path) {
-            existing.opened = await openPptx(bytes)
-            existing.metaDirty = false
-          }
+          const drafted = await draftLandedPages(e.sender, existing, deckName)
           return {
-            path: existing.path,
+            // bound: no path change for the panel (title, dirty flag): the deck is unsaved
+            path: drafted ? existing.path : '',
             slides: buildAllRenderSlides(existing.opened, fitWidthPx),
             size: { cx: existing.opened.deck.size.cx, cy: existing.opened.deck.size.cy },
             defaultFont: deckDefaultFont(existing.opened),
@@ -1342,15 +1361,27 @@ export function registerSlidesIpc(): void {
           redoStack: [],
         }
         const old = sessions.get(e.sender.id)
+        // A UniWork-bound deck keeps its document: the new deck replaces the content of the
+        // same working copy and stays unsaved until the user saves (no draft below)
+        if (old && uniworkIsBound(old.path)) {
+          replaceSession.path = old.path
+          markMetaDirty(replaceSession)
+        }
         carryHistoryForReplacement(old, replaceSession)
         sessions.set(e.sender.id, replaceSession)
         // Re-point windows that shared the old session, or they diverge onto a dead deck
         if (old) for (const id of attachedIds(old)) sessions.set(id, replaceSession)
         // Save the draft: await completion so the real path is returned; on failure degrade silently (session.path stays '')
-        await saveDraftAfterGenerate(e.sender, replaceSession, bytes, 'replace', deckName)
+        const drafted = await saveDraftAfterGenerate(
+          e.sender,
+          replaceSession,
+          bytes,
+          'replace',
+          deckName,
+        )
         scheduleDeckBroadcast(replaceSession)
         return {
-          path: replaceSession.path,
+          path: drafted ? replaceSession.path : '',
           slides: buildAllRenderSlides(opened, fitWidthPx),
           size: { cx: opened.deck.size.cx, cy: opened.deck.size.cy },
           defaultFont: deckDefaultFont(opened),
