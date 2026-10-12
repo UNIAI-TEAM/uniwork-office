@@ -45,12 +45,8 @@ import { createAppOpen } from './app-open'
 import hide, { hostGrants, webCapabilities } from './hide'
 import { createHeadless, isTopLevel, parseHeadlessEntry } from './headless'
 import { installFocusReturn } from './focus-return'
-import {
-  AI_FRAME_CAPABILITIES,
-  aiHostGrants,
-  createWebAi,
-  withWebAi,
-} from '../../modules/shared/ai/web-ai'
+import { aiHostGrants, createWebAi, withWebAi } from '../../modules/shared/ai/web-ai'
+import { FRAME_BASE_CAPABILITIES } from './module-bridge'
 import type { DesktopCapabilities } from '../../../apps/docs/src/shared/ipc'
 
 const headlessEntry = parseHeadlessEntry(location.href, isTopLevel(window))
@@ -61,7 +57,8 @@ const client =
   headless?.port ??
   createFrameClient({
     capabilities: {
-      ...AI_FRAME_CAPABILITIES,
+      // the AI keys, desktopOpen (A7) and download (X-02); each effective only with the host grant
+      ...FRAME_BASE_CAPABILITIES,
       save: true,
       saveAs: true,
       recents: true,
@@ -69,8 +66,6 @@ const client =
       exportPdf: true,
       exportHtml: true,
       filePick: true,
-      // the frame's "Open in app" action (A7); effective only when the host grants it
-      desktopOpen: true,
     },
   })
 /** read by the renderer's cap(); boot waits (bounded) for init, so the grants land before the first render */

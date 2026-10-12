@@ -50,6 +50,8 @@ export const AI_FRAME_CAPABILITIES: Capabilities = Object.freeze({
   webSearch: true,
   imageSearch: true,
   imageGeneration: true,
+  // UniWork AI (X-02 key): not claimed until the frame has the adapter (G6-05 flips it to true)
+  uniworkAi: false,
 })
 
 /**
