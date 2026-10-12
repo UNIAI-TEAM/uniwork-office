@@ -75,12 +75,16 @@
  *      read for `===` (the branch the named tool takes); for `!==` the
  *      enclosing body minus that consequent is read (the tool's own
  *      fall-through path), so a `mutated: false` declared after an early-return
- *      guard still counts. A braceless consequent is one statement: it ends at
- *      the `;` that closes it or, the fork's sources carrying no semicolons, at
- *      the line break ASI reads as the end of the statement — never at the next
- *      `;`/`}` further down the file. A `call.name === 'x'` anywhere else (a
- *      ternary, a `const`, an argument) controls no path and contributes
- *      nothing.
+ *      guard still counts. A braceless consequent is one statement, and its
+ *      extent is that statement's own: it runs through an open call, object,
+ *      array or template and through a trailing operator, and takes a nested
+ *      if/else/for/while consequent (with the `else` that binds to it) with it,
+ *      up to the `;` that closes it, the enclosing block's `}`, or the line
+ *      break where ASI ends it — never on into the next `;`/`}` or the `switch`
+ *      below. `return` is a restricted production: a line break after it ends
+ *      the statement, so a `(`/`[` on the next line is not part of the branch.
+ *      A `call.name === 'x'` anywhere else (a ternary, a `const`, an argument)
+ *      controls no path and contributes nothing.
  * A local helper is resolved by declaration position and lexical scope, not by
  * bare name, so same-named closures in different cases stay distinct. The
  * recursion never enters a helper that is itself a dispatcher — the shared
@@ -1377,38 +1381,150 @@ function lineBreakBetween(src, before, after) {
 
 /**
  * Does the statement that reached token `k` continue at `k`? Without a line
- * break it does. After one, only a token that can continue an expression — an
- * operator, `.`, `(`, `[`, a tagged template, `instanceof`/`in`/`as` — keeps
- * the statement open; anything else starts a new statement (ASI).
+ * break it does. After one it does when the token after the break can continue
+ * the expression — an operator, `.`, `(`, `[`, a tagged template,
+ * `instanceof`/`in`/`as` — or when the token before the break still needs its
+ * operand, as a trailing `&&` does. `return` is a restricted production: a line
+ * break after it ends the statement whatever follows, so a `(`/`[` below it
+ * starts a new statement and is not a continuation. Anything else starts a new
+ * statement (ASI).
  */
 function statementContinues(tokens, src, k) {
   const tk = tokens[k]
-  if (!lineBreakBetween(src, tokens[k - 1], tk)) return true
+  const prev = tokens[k - 1]
+  if (!lineBreakBetween(src, prev, tk)) return true
+  if (prev.type === 'ident' && prev.value === 'return') {
+    const before = tokens[k - 2]
+    if (!(before && (before.value === '.' || before.value === '?.'))) return false
+  }
+  return continuesExpression(tk) || continuesExpression(prev)
+}
+
+/** can this token continue the expression the statement has built so far? */
+function continuesExpression(tk) {
   if (tk.type === 'template') return true
+  if (tk.type !== 'punct' && tk.type !== 'ident') return false
   return CONTINUES_EXPRESSION.has(tk.value)
+}
+
+/** index just past the `( ... )` header at `at`, when `at` is its `(` */
+function headerEnd(tokens, at) {
+  return tokens[at] && tokens[at].value === '(' ? skipBalanced(tokens, at) : at
+}
+
+/**
+ * Index just past the statement that starts at `at`. A statement that is itself
+ * a control statement consumes its own consequent — and, for `if`, the `else`
+ * that binds to it — so a nested braceless consequent belongs to the outer
+ * branch and a line break inside it never ends the outer statement. Anything
+ * else is an expression statement.
+ */
+function statementEnd(tokens, src, at) {
+  const tk = tokens[at]
+  if (!tk || (tk.type !== 'punct' && tk.type !== 'ident')) {
+    return expressionStatementEnd(tokens, src, at)
+  }
+  switch (tk.value) {
+    case ';':
+      return at
+    case '{':
+      return skipBraces(tokens, at)
+    case 'if':
+      return ifStatementEnd(tokens, src, at)
+    case 'for': {
+      // `for await (...)` is a `for` statement too
+      const open = tokens[at + 1] && tokens[at + 1].value === 'await' ? at + 2 : at + 1
+      return statementEnd(tokens, src, headerEnd(tokens, open))
+    }
+    case 'while':
+      return statementEnd(tokens, src, headerEnd(tokens, at + 1))
+    case 'do':
+      return doStatementEnd(tokens, src, at)
+    case 'switch':
+      return switchStatementEnd(tokens, at)
+    case 'try':
+      return tryStatementEnd(tokens, src, at)
+    default:
+      return expressionStatementEnd(tokens, src, at)
+  }
+}
+
+/**
+ * `if (cond) stmt [else stmt]`. The `else` binds to the nearest `if` that is
+ * still looking for one, so it belongs to this branch even when the consequent
+ * is a nested `if` or the `else` sits on the line below.
+ */
+function ifStatementEnd(tokens, src, at) {
+  let end = statementEnd(tokens, src, headerEnd(tokens, at + 1))
+  if (tokens[end] && tokens[end].value === ';') end += 1
+  if (tokens[end] && tokens[end].value === 'else') end = statementEnd(tokens, src, end + 1)
+  return end
+}
+
+/** `do stmt while (cond)` — the `while` closes the `do` it belongs to */
+function doStatementEnd(tokens, src, at) {
+  const end = statementEnd(tokens, src, at + 1)
+  return tokens[end] && tokens[end].value === 'while' ? headerEnd(tokens, end + 1) : end
+}
+
+/** `switch (cond) { ... }` */
+function switchStatementEnd(tokens, at) {
+  const header = headerEnd(tokens, at + 1)
+  return tokens[header] && tokens[header].value === '{' ? skipBraces(tokens, header) : header
+}
+
+/** `try Block [catch [(param)] Block] [finally Block]` */
+function tryStatementEnd(tokens, src, at) {
+  let end = statementEnd(tokens, src, at + 1)
+  while (tokens[end] && (tokens[end].value === 'catch' || tokens[end].value === 'finally')) {
+    const header = tokens[end].value === 'catch' ? headerEnd(tokens, end + 1) : end + 1
+    end = tokens[header] && tokens[header].value === '{' ? skipBraces(tokens, header) : header
+  }
+  return end
+}
+
+/**
+ * Index just past an expression statement: through the `;` or `}` that closes
+ * it at the outer level, else up to the line break where ASI ends it. A line
+ * break inside an open delimiter never ends it, so a multiline call, object or
+ * array stays one statement.
+ */
+function expressionStatementEnd(tokens, src, at) {
+  let end = at
+  let depth = 0
+  while (end < tokens.length) {
+    const tk = tokens[end]
+    const punct = tk.type === 'punct'
+    if (depth === 0 && end > at) {
+      if (punct && (tk.value === ';' || tk.value === '}')) break
+      if (!statementContinues(tokens, src, end)) break
+    }
+    if (punct && (tk.value === '(' || tk.value === '[' || tk.value === '{')) depth += 1
+    else if (punct && (tk.value === ')' || tk.value === ']' || tk.value === '}')) {
+      if (depth === 0) break
+      depth -= 1
+    }
+    end += 1
+  }
+  return end
 }
 
 /**
  * [start, end) of the branch the `if (...)` at `openIdx` controls. A block
- * branch ends at its matching `}`; a braceless branch is one statement and ends
- * at the `;` that closes it, at the line break ASI reads as the end of the
- * statement, or at the enclosing block's `}` — never at the next `;`/`}` far
- * below. Reading to the next `;` alone ran a semicolon-free branch on into the
- * code beneath it: in the markdown source the `=== 'ask_clarification'` guard
- * swallowed the whole `switch` below and over-reported `editor_write`.
+ * branch ends at its matching `}`; a braceless branch is one statement, and the
+ * walk above finds that statement's real end — so a semicolon-free consequent
+ * stops where ASI ends it and never runs on into the code beneath it. Reading to
+ * the next `;`/`}` alone ran the markdown guard `=== 'ask_clarification'`
+ * through the whole `switch` below and over-reported `editor_write`.
  */
 function branchRange(analysis, openIdx) {
   const tokens = analysis.tokens
   const start = skipBalanced(tokens, openIdx)
-  if (tokens[start] && tokens[start].value === '{') {
+  if (tokens[start] && tokens[start].type === 'punct' && tokens[start].value === '{') {
     const end = skipBraces(tokens, start)
     return { start: start + 1, end: end - 1, branchStart: start, branchEnd: end }
   }
-  let end = start
-  while (end < tokens.length && tokens[end].value !== ';' && tokens[end].value !== '}') {
-    if (end > start && !statementContinues(tokens, analysis.src, end)) break
-    end += 1
-  }
+  const end = statementEnd(tokens, analysis.src, start)
   return { start, end, branchStart: start, branchEnd: end }
 }
 
