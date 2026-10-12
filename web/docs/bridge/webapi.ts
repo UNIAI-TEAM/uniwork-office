@@ -29,12 +29,14 @@
  * |                           | dirty; offered before the renderer loads (Restore = `recovered`, starts dirty)    |
  * Every successful save emits `saved` {file, versionId, initiatedByFrame}.
  *
- * Save conflicts (the host answers `conflict`: someone saved a newer version). A host `save`
- * request gets it in its SaveResult and owns the UI. Otherwise the host gets an `error` event
- * {code:'conflict', fatal:false} and, for a manual save, the frame asks like the desktop's
- * "modified by another program" box (./notice.ts): Overwrite (re-read the head etag with
- * api.open, save again), Reload latest (api.open replaces the document) or Cancel (stays dirty,
- * "Save failed" with the reason; the next save asks again). An autosave never prompts.
+ * Save conflicts (the host answers `conflict`: someone saved a newer version). Every manual save
+ * that hits it, the frame's own and the host's `save {reason}`, opens the one conflict dialog
+ * (../../modules/shared/conflict-dialog.ts): Reload latest (api.open replaces the document),
+ * Overwrite… (re-read the head etag with api.open, save again; a second conflict asks again),
+ * Cancel (stays dirty). A frame-initiated save also tells the host with an `error` event
+ * {code:'conflict', fatal:false}; the host's `save` gets the outcome as its answer instead
+ * (conflictSaveResult: ok with/without versionId, cancelled, unauthorized / forbidden /
+ * not_found / internal). An autosave never prompts.
  * A timed-out / network-failed save may still have landed: the bridge re-reads the head and
  * adopts its etag when it looks like our own write (see reconcileAfterUnknown).
  *
@@ -68,7 +70,16 @@ import {
 import { TIMEOUTS, errorCode, type FramePort } from './frame-port'
 import { ownHeadAfterUnknown } from './head-match'
 import { downloadBlob, printFrame } from './browser'
-import { ask, hideFatal, onModalChange, showFatal, text } from './notice'
+import { ask, conflictFrame, hideFatal, onModalChange, showFatal, text } from './notice'
+import {
+  conflictSaveResult,
+  downloadVia,
+  headFromFile,
+  overwriteHead,
+  readHeadFile,
+  revisionOf,
+  runConflictDialog,
+} from '../../modules/shared/conflict-dialog'
 import { createSession, type SessionOptions } from './session'
 import type { DraftHost, DraftRecovery } from './draft-recovery'
 import { bridgeDraftRecovery } from '../../modules/shared/recovery-prompt'
@@ -266,7 +277,11 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
   // ------------------------------------------------------------ save bookkeeping
 
   /** set while the host's `save` request runs the editor's save flow */
-  let hostSave: { error: ProtocolErrorShape | null } | null = null
+  let hostSave: {
+    error: ProtocolErrorShape | null
+    /** the conflict dialog's answer (overwritten / reloaded / cancelled / failed) */
+    answer: SaveResult | null
+  } | null = null
   /** set while the host's `saveAs` request waits for the editor's saveDocxAs */
   let hostSaveAs: {
     name?: string
@@ -340,9 +355,10 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
     if (!current) return failure('not_ready', 'no document is open')
     if (isViewOnly(current)) return failure('unsupported', READ_ONLY)
     if (hostSave) return failure('busy', 'a save is already running')
-    hostSave = { error: null }
+    hostSave = { error: null, answer: null }
     try {
       const ok = await session.runSave()
+      if (hostSave.answer) return hostSave.answer
       const file = files.get(current)
       if (ok && file) {
         return { ok: true, file, ...(file.versionId ? { versionId: file.versionId } : {}) }
@@ -382,17 +398,6 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
 
   // ------------------------------------------------------------ conflicts / unknown outcomes
 
-  /** api.open for the metadata only (the head etag); the source is not downloaded */
-  async function headMeta(fileId: string): Promise<FileMeta | null> {
-    try {
-      const open = await port.request('api.open', { fileId }, { timeoutMs: TIMEOUTS.short })
-      return open?.file?.fileId === fileId ? open.file : null
-    } catch (err) {
-      console.warn('[docs-web] reading the head version failed:', err)
-      return null
-    }
-  }
-
   /**
    * After a save whose outcome is unknown (timeout / network; the request was cancelled but
    * the host may have committed it): when the head moved on and holds exactly the bytes we sent,
@@ -405,36 +410,52 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
     if (head) remember(head)
   }
 
-  /** the user chose for a frame-initiated save that hit `conflict` */
+  /**
+   * A save that hit `conflict` (frame-initiated or the host's `save`): the shared conflict dialog
+   * settles it in the frame. The host's `save` gets its answer from the outcome (hostSave.answer).
+   */
   async function resolveConflict(
-    path: string,
     fileId: string,
     data: ArrayBuffer,
   ): Promise<{ ok: boolean; error?: string; reason?: 'external-modified' }> {
-    const choice = await ask({
-      title: 'appWebConflictTitle',
-      body: 'appWebConflictBody',
-      choices: [
-        { id: 'cancel', label: 'appCancel' },
-        { id: 'reload', label: 'appWebConflictReload' },
-        { id: 'overwrite', label: 'appWebConflictOverwrite', danger: true },
-      ],
-      cancelId: 'cancel',
-      marker: 'conflict',
-    })
-    if (choice === 'overwrite') {
-      const head = await headMeta(fileId)
-      if (!head) return { ok: false, error: text('appWebConflictNotSaved') }
-      remember(head)
-      return desktopPart.saveDocx(path, data, false)
-    }
-    if (choice === 'reload') {
-      try {
+    const outcome = await runConflictDialog({
+      title: text('appWebConflictTitle'),
+      body: text('appWebConflictBody'),
+      reloadLabel: text('appWebConflictReload'),
+      overwriteLabel: text('appWebConflictOverwrite'),
+      cancelLabel: text('appCancel'),
+      baseRevision: revisionOf(files.get(fileId)),
+      readHead: async () => headFromFile(await readHeadFile(port, fileId)),
+      overwrite: async () => {
+        const res = await overwriteHead(port, fileId, data)
+        if (res.ok && res.file) {
+          landed({
+            ok: true,
+            file: res.file,
+            ...(res.versionId ? { versionId: res.versionId } : {}),
+          })
+        }
+        return res
+      },
+      reload: async () => {
         deliver(await openById(fileId))
-        // the document is being replaced by the latest version: no error banner
-        return { ok: false, reason: 'external-modified' }
-      } catch (err) {
-        console.error('[docs-web] reloading the latest version failed:', err)
+        return true
+      },
+      canEdit: () => !isViewOnly(fileId),
+      download: downloadVia(port, grants, () => data),
+      ...conflictFrame(),
+    })
+    const file = files.get(fileId)
+    if (hostSave && file) hostSave.answer = conflictSaveResult(outcome, file)
+    if (outcome.kind === 'overwritten') return { ok: true }
+    // the document is being replaced by the latest version: no error banner
+    if (outcome.kind === 'reloaded') return { ok: false, reason: 'external-modified' }
+    if (outcome.kind === 'failed') {
+      return {
+        ok: false,
+        error: saveFailureText({ code: outcome.code, message: '' }, () =>
+          text('appWebSaveOffline'),
+        ),
       }
     }
     return { ok: false, error: text('appWebConflictNotSaved') }
@@ -637,15 +658,11 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
       if (hostSave) hostSave.error = res.error
       const code = res.error.code
       if (code === 'conflict') {
-        // a host `save` request gets the conflict in its result and owns the UI
-        if (hostSave) {
-          // the server's own message is in the account language: say it in the page language
-          return { ok: false, reason: 'external-modified', error: text('appWebConflictNotSaved') }
-        }
-        port.reportError(res.error, false)
+        // the host's own `save` waits for the dialog's answer instead of an error event
+        if (!hostSave) port.reportError(res.error, false)
         // an autosave never prompts: it stays dirty and the next manual save asks
         if (auto === true) return { ok: false, reason: 'external-modified' }
-        return resolveConflict(path, fileId, data)
+        return resolveConflict(fileId, data)
       }
       if (code === 'timeout' || code === 'network') {
         await reconcileAfterUnknown(fileId, data)

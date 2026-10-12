@@ -23,6 +23,8 @@
 import type { Capabilities, OfficeModule } from '../protocol/types'
 import browser from './browser'
 import { createCapabilityObject } from './capability-object'
+import { onFrameModal } from '../../modules/shared/frame-dialog'
+import { rememberRemoteVersion } from '../../modules/shared/conflict-dialog'
 import { bindHostAppearance, createFrameClient, frameVersionFromDocument } from './frame-boot'
 import type { FramePort } from './frame-port'
 import { hostGrants } from './hide'
@@ -58,6 +60,8 @@ export type ModuleBridgePort = Pick<
   | 'onLanguage'
   | 'setDirty'
   | 'setTitle'
+  | 'setModal'
+  | 'onRemoteVersion'
   | 'reportSaved'
   | 'reportError'
   | 'getToken'
@@ -166,6 +170,10 @@ export function installModuleBridge(spec: ModuleBridgeSpec): InstalledModuleBrid
     }),
   )
   bindHostAppearance(client)
+  // the frame's dialogs (save conflict, draft prompt…) tell the host so it inerts its own page and
+  // holds its save watchdog; the conflict table learns who saved a revision from doc.remoteVersion
+  onFrameModal((open) => client.setModal?.(open))
+  client.onRemoteVersion?.(rememberRemoteVersion)
   const ai = createWebAi({ port: client, capabilities })
 
   const ctx: ModuleBridgeContext = { module: spec.module, client, capabilities }

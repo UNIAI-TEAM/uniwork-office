@@ -1,7 +1,8 @@
 /**
  * In-frame dialogs the bridge raises on its own (the desktop raises the same ones from the main
  * process, e.g. the "modified by another program" Overwrite/Cancel box in docs-main.ts):
- *   - `ask()`: a choice (save conflict, discard unsaved changes before opening another document),
+ *   - `ask()`: a choice (discard unsaved changes before opening another document),
+ *   - `conflictFrame()`: where the shared save conflict dialog goes (marker, backdrop, `modal`),
  *   - `showFatal()`: a blocking notice when the document could not be opened.
  *
  * The box is the shared frame dialog (web/modules/shared/frame-dialog.ts), the same in every
@@ -80,6 +81,11 @@ export function ask<T extends string>(opts: {
     maskClass: MASK_CLASS,
     onChange: syncModal,
   })
+}
+
+/** where the save conflict dialog (../../modules/shared/conflict-dialog.ts) lives in this frame */
+export function conflictFrame(): { markerAttr: string; maskClass: string; onChange: () => void } {
+  return { markerAttr: MARKER_ATTR, maskClass: MASK_CLASS, onChange: syncModal }
 }
 
 const FATAL = 'fatal'
