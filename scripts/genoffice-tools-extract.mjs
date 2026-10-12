@@ -76,15 +76,22 @@
  *      enclosing body minus that consequent is read (the tool's own
  *      fall-through path), so a `mutated: false` declared after an early-return
  *      guard still counts. A braceless consequent is one statement, and its
- *      extent is that statement's own: it runs through an open call, object,
- *      array or template and through a trailing operator, and takes a nested
- *      if/else/for/while consequent (with the `else` that binds to it) with it,
- *      up to the `;` that closes it, the enclosing block's `}`, or the line
- *      break where ASI ends it — never on into the next `;`/`}` or the `switch`
- *      below. `return` is a restricted production: a line break after it ends
- *      the statement, so a `(`/`[` on the next line is not part of the branch.
- *      A `call.name === 'x'` anywhere else (a ternary, a `const`, an argument)
- *      controls no path and contributes nothing.
+ *      extent is that statement's own: it runs through an open call, object or
+ *      array, takes a nested control statement with it (the `else` that binds
+ *      to it and a `label:` that names it included), and crosses a line break
+ *      only when the break sits inside such an open group or one of the two
+ *      tokens beside it is an operator that still needs its operand (`return
+ *      read(call) &&` / break / `write(call)`). A *completed* primary
+ *      expression at the end of the line — a template literal with its
+ *      interpolations and nested templates, a string, number or regex literal,
+ *      an identifier (a keyword used as a property name, `read(call).in`), or a
+ *      closing `)`/`]`/`}` — ends the statement there: the next line continues
+ *      it only when it opens with an operator, a tagged template included, so
+ *      the sibling `switch` below is never credited. `return` is a restricted
+ *      production: a line break after it ends the statement, so a `(`/`[` on
+ *      the next line is not part of the branch. A `call.name === 'x'` anywhere
+ *      else (a ternary, a `const`, an argument) controls no path and
+ *      contributes nothing.
  * A local helper is resolved by declaration position and lexical scope, not by
  * bare name, so same-named closures in different cases stay distinct. The
  * recursion never enters a helper that is itself a dispatcher — the shared
@@ -1397,14 +1404,39 @@ function statementContinues(tokens, src, k) {
     const before = tokens[k - 2]
     if (!(before && (before.value === '.' || before.value === '?.'))) return false
   }
-  return continuesExpression(tk) || continuesExpression(prev)
+  return continuesExpression(tk) || needsOperand(tokens, k - 1)
 }
 
-/** can this token continue the expression the statement has built so far? */
+/**
+ * Can the token after a line break continue an expression? An operator, `.`,
+ * `(`, `[`, `in`/`as`/`instanceof`/`satisfies`, or a template literal — a
+ * tagged template whose tag ended the line above (`wrap` / break / `` `a` ``).
+ */
 function continuesExpression(tk) {
   if (tk.type === 'template') return true
   if (tk.type !== 'punct' && tk.type !== 'ident') return false
   return CONTINUES_EXPRESSION.has(tk.value)
+}
+
+/**
+ * Does the token *before* a line break still need its operand, so the statement
+ * runs on? Only a genuine operator does. A completed primary expression — a
+ * template literal, a string/number/regex literal, a closing `)`/`]`/`}` — ends
+ * the expression there, and a keyword token (`in`, `as`, `instanceof`,
+ * `satisfies`) that is a property name (`read(call).in`) is a completed member
+ * access, not an operator waiting for a right-hand side. Without this, a
+ * consequent ending in a template or a property access ran into the statement
+ * below it (G706-BE-R3).
+ */
+function needsOperand(tokens, k) {
+  const tk = tokens[k]
+  if (tk.type !== 'punct' && tk.type !== 'ident') return false
+  if (!CONTINUES_EXPRESSION.has(tk.value)) return false
+  if (tk.type === 'ident') {
+    const dot = tokens[k - 1]
+    if (dot && (dot.value === '.' || dot.value === '?.')) return false
+  }
+  return true
 }
 
 /** index just past the `( ... )` header at `at`, when `at` is its `(` */
@@ -1423,6 +1455,11 @@ function statementEnd(tokens, src, at) {
   const tk = tokens[at]
   if (!tk || (tk.type !== 'punct' && tk.type !== 'ident')) {
     return expressionStatementEnd(tokens, src, at)
+  }
+  // `label: stmt` — the label is part of the statement it names, so the branch
+  // runs to the labelled statement's own end (G706-BE-R4), stacked labels too
+  if (tk.type === 'ident' && tokens[at + 1] && tokens[at + 1].value === ':') {
+    return statementEnd(tokens, src, at + 2)
   }
   switch (tk.value) {
     case ';':
