@@ -9,6 +9,7 @@ import type {
   UniworkSaveState,
   UniworkWorkspaceRef,
 } from '../../shared/home-api'
+import { pathKey } from '../../shared/path-key'
 import type { AccountView } from './account-model'
 import type { StringKey, TFunc } from './locale'
 
@@ -210,11 +211,9 @@ export function chipCopy(
   return { label, tip: fullTip, title: `${label}\n${fullTip}` }
 }
 
-/** status of a bound tab, keyed so a path spelled with the other slash or case still finds it */
-export function pathKey(path: string): string {
-  const slashed = path.replace(/\\/g, '/')
-  return /^[a-z]:\//i.test(slashed) ? slashed.toLowerCase() : slashed
-}
+// status of a bound tab is keyed by the shared pathKey, so a path spelled with
+// the other slash or case still finds it and main keys its lock map identically
+export { pathKey }
 
 // ── Launch notice (open in desktop app / recents failure) ─
 

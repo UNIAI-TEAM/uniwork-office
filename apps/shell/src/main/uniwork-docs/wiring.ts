@@ -5,8 +5,9 @@ import {
   type UniworkConflictChoice,
   type UniworkDocFormat,
   type UniworkDocListQuery,
+  type UniworkDocLock,
 } from '../../shared/home-api'
-import { createLaunchPusher } from './launch'
+import { createLaunchPusher, createPushHolder } from './launch'
 import {
   applyUniworkProfile,
   authorizedRequest,
@@ -237,9 +238,15 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     ui: conflictUi(wiring),
     pushStatus: (status) => push(UNIWORK_DOC_CHANNELS.docStatusEvent, status),
     pushLaunch: createLaunchPusher(() => wiring.shellContents(), UNIWORK_DOC_CHANNELS.launchEvent),
-    // a cold-start lock can be pushed before the shell page subscribes; the
-    // preload holds it exactly like a launch event (createLaunchPusher)
-    pushLock: createLaunchPusher(() => wiring.shellContents(), UNIWORK_DOC_CHANNELS.lock),
+    // A lock can be pushed before the shell page has loaded (a cold-start open):
+    // main holds the latest one and sends it when the page finishes loading.
+    // The preload does NOT replay a held lock - the shell reads uniworkLocks()
+    // when it mounts, so a push missed before that is not lost and a lock the
+    // user dismissed in the meantime is not resurrected.
+    pushLock: createPushHolder<UniworkDocLock>(
+      () => wiring.shellContents(),
+      UNIWORK_DOC_CHANNELS.lock,
+    ),
     reveal: () => wiring.reveal(),
   })
 
@@ -273,6 +280,9 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     closeNow: (path) => wiring.closePathNow(path),
     aiHistoryPaths: () => wiring.aiHistoryPaths(),
     forgetAiHistory: (paths) => wiring.forgetAiHistory(paths),
+    // the previous account's locks go with its documents: the next session is
+    // not shown an S11 panel for a working copy it cannot explain
+    forgetLocks: (match) => service.forgetLocksWhere(match),
     closeConflictPrompt: () => service.closeConflictPrompt(),
   })
   setUniworkSignOutHooks({

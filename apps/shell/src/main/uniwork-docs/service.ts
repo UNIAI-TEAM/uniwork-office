@@ -27,6 +27,7 @@ import {
   type BoundDocument,
   type LastOwner,
   type NewerStore,
+  type PathBinding,
 } from './binding-store'
 import { type FetchLike, type UniworkDocsClient, createUniworkDocsClient } from './client'
 import { UniworkDocError } from './errors'
@@ -37,7 +38,7 @@ import {
   sha256Hex,
   workingCopyName,
 } from './formats'
-import { pathKey } from './path-key'
+import { pathKey } from '../../shared/path-key'
 import { LaunchController } from './launch'
 import type { DocumentDetail, LaunchDescriptor } from './parse'
 import { SaveCoordinator, toStatus } from './save-coordinator'
@@ -49,6 +50,25 @@ import { SaveCoordinator, toStatus } from './save-coordinator'
  * policy and the recents filter. Electron-free: windows, dialogs, tabs and
  * IPC come in through `deps` (see wiring.ts).
  */
+
+/**
+ * The decision the shell's open funnel makes before any module sees a path: a
+ * working copy whose folder declares a store this build does not read is
+ * refused (the service records the S11 lock) instead of opening. Exported and
+ * Electron-free so the decision is exercised at runtime by a test with a seeded
+ * store, not only by matching the router's source text.
+ */
+export function refuseLockedOpenPath(
+  refuser: LockRefuser | null | undefined,
+  path: string,
+): boolean {
+  return refuser ? refuser.refuseLockedPath(path) : false
+}
+
+/** the slice of the service the open funnel needs */
+export interface LockRefuser {
+  refuseLockedPath(path: string): boolean
+}
 
 export interface SessionIdentity {
   accountId: string
@@ -339,8 +359,13 @@ export class UniworkDocsService {
     return true
   }
 
-  /** true while a lock is shown for this path (defence in depth: no save, no intent, no request) */
-  isLockedPath(path: string): boolean {
+  /**
+   * True while an S11 panel is currently shown for this path. NOT "the path is
+   * refused": dismissing the panel forgets the lock and the folder still
+   * refuses the next open. No production caller; the renderer's own list is the
+   * source of truth for what is on screen.
+   */
+  lockShownFor(path: string): boolean {
     return this.locks.has(pathKey(path))
   }
 
@@ -354,6 +379,18 @@ export class UniworkDocsService {
     this.locks.delete(pathKey(path))
   }
 
+  /**
+   * Forgets every lock whose path matches, without touching the folders. The
+   * account boundary uses it when the account those locks belong to goes away,
+   * so the next session is not handed an S11 panel for another account's
+   * working copy.
+   */
+  forgetLocksWhere(match: (path: string) => boolean): void {
+    for (const [key, lock] of [...this.locks]) {
+      if (match(lock.path)) this.locks.delete(key)
+    }
+  }
+
   private recordLock(store: NewerStore): void {
     const lock: UniworkDocLock = { path: store.path, reason: 'store_newer', name: store.name }
     this.locks.set(pathKey(lock.path), lock)
@@ -365,11 +402,11 @@ export class UniworkDocsService {
   /**
    * A working copy whose store is newer is bound (so no module treats it as a
    * plain local file) and read-only (so nothing writes it), even though no
-   * binding could be read.
+   * binding could be read. One classification (and so one read of binding.json)
+   * per call: the editor-state poll asks this for every open tab every second.
    */
   isBound(path: string): boolean {
-    if (this.store.newerStoreAt(path)) return true
-    return this.store.lookup(path) !== null
+    return this.store.classify(path).kind !== 'plain'
   }
 
   /**
@@ -392,11 +429,14 @@ export class UniworkDocsService {
     )
   }
 
-  /** view access, another account's copy, or a newer store this build cannot read */
+  /** view access, another account's copy, or a newer store this build cannot read (one read) */
   isReadOnly(path: string): boolean {
-    if (this.store.newerStoreAt(path)) return true
-    const doc = this.store.lookup(path)
-    return !!doc && (doc.binding.access === 'view' || !this.ownsLocally(doc))
+    const found: PathBinding = this.store.classify(path)
+    if (found.kind === 'newer') return true
+    return (
+      found.kind === 'bound' &&
+      (found.doc.binding.access === 'view' || !this.ownsLocally(found.doc))
+    )
   }
 
   /** moves on every user Save; see noteEditorDirty */

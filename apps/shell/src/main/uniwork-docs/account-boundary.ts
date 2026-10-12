@@ -10,9 +10,10 @@ import type { LastOwner } from './binding-store'
  * unsaved-changes prompt, then the UniWork prompt: the working copy stays on
  * this computer as the draft that reopening restores), and the AI chat
  * history of those documents is deleted, so none of it is shown to the next
- * person. Local files outside the root are not account data and are never
- * touched. Electron-free: tabs, windows and the chat store come in through
- * `deps` (see wiring.ts).
+ * person, and the S11 locks of those working copies are forgotten. Local files
+ * outside the root are not account data and are never touched. Electron-free:
+ * tabs, windows, the chat store and the lock map come in through `deps` (see
+ * wiring.ts).
  */
 
 export interface AccountBoundaryDeps {
@@ -30,6 +31,12 @@ export interface AccountBoundaryDeps {
   aiHistoryPaths(): string[]
   /** deletes the AI transcripts and project entries of these paths for good */
   forgetAiHistory(paths: string[]): void
+  /**
+   * forgets the S11 locks of these paths (their folders are untouched). The
+   * locks belong to the account that went away, so the next session is not
+   * shown a panel for a working copy it cannot explain.
+   */
+  forgetLocks(match: (path: string) => boolean): void
   /** closes an open conflict dialog as "Decide later" before the documents close */
   closeConflictPrompt(): void
 }
@@ -87,6 +94,7 @@ export class AccountBoundary {
     for (const path of paths) if (!(await this.deps.confirmClose(path))) return false
     // a prompt may have taken a while: close what still shows a working copy
     for (const path of this.pathsWhere(this.anyAccount)) this.deps.closeNow(path)
+    this.deps.forgetLocks(this.anyAccount)
     return true
   }
 
@@ -94,6 +102,7 @@ export class AccountBoundary {
   afterSignOut(): void {
     this.enforced = null
     this.forgetWhere(this.anyAccount)
+    this.deps.forgetLocks(this.anyAccount)
   }
 
   /**
@@ -110,6 +119,9 @@ export class AccountBoundary {
       if (this.deps.openPaths().some(foreign)) this.deps.closeConflictPrompt()
       const closed = await this.closeWhere(foreign)
       this.forgetWhere(foreign)
+      // the locks of the account that went away go too, even when a prompt was
+      // cancelled: they are not this account's copies to explain
+      this.deps.forgetLocks(foreign)
       if (closed) this.enforced = key
     })()
     this.running = run

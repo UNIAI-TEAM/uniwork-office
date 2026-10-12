@@ -137,32 +137,40 @@ export interface LaunchPushTarget {
 }
 
 /**
- * Launch events of a cold start arrive before the shell page has loaded; a
- * send then is lost. While the page loads the latest event is kept and sent
- * once it finished loading (the preload holds it until the renderer
- * subscribes).
+ * A payload pushed while the shell page is still loading is lost; the latest
+ * one is therefore kept and sent once the page finished loading. Generic over
+ * the payload: the launch event and the newer-store lock both push through
+ * this, and `createLaunchPusher` is the launch-event instantiation.
  */
-export function createLaunchPusher(
+export function createPushHolder<T>(
   target: () => LaunchPushTarget | null,
   channel: string,
-): (event: UniworkLaunchEvent) => void {
-  let held: UniworkLaunchEvent | null = null
-  return (event) => {
+): (payload: T) => void {
+  let held: T | null = null
+  return (payload) => {
     const wc = target()
     if (!wc || wc.isDestroyed()) return
     if (!wc.isLoadingMainFrame()) {
-      wc.send(channel, event)
+      wc.send(channel, payload)
       return
     }
     const waiting = held !== null
-    held = event
+    held = payload
     if (waiting) return
     wc.once('did-finish-load', () => {
       const latest = held
       held = null
-      if (latest && !wc.isDestroyed()) wc.send(channel, latest)
+      if (latest !== null && !wc.isDestroyed()) wc.send(channel, latest)
     })
   }
+}
+
+/** the launch-event instantiation of createPushHolder */
+export function createLaunchPusher(
+  target: () => LaunchPushTarget | null,
+  channel: string,
+): (event: UniworkLaunchEvent) => void {
+  return createPushHolder<UniworkLaunchEvent>(target, channel)
 }
 
 export interface LaunchControllerDeps {

@@ -90,6 +90,12 @@ export function bindingKindOf(raw: unknown): BindingKind {
   return schema >= 2 ? 'newer' : 'unrecognized'
 }
 
+/** how `BindingStore.classify` reads a path: one binding.json read, three outcomes */
+export type PathBinding =
+  | { kind: 'newer'; path: string; name: string }
+  | { kind: 'bound'; doc: BoundDocument }
+  | { kind: 'plain' }
+
 /** a working copy whose folder declares a store this build does not read */
 export interface NewerStore {
   /** the working copy, or its folder when the working-copy name is not known yet */
@@ -226,15 +232,46 @@ export class BindingStore {
     return { path: full, dir, deploymentId, userId, binding }
   }
 
-  /** the working-copy folder of `path`, or null when the path is not one of ours */
-  private workingCopyDir(path: string): string | null {
+  /** the working-copy folder of `path` and its three segments, or null when the path is not one of ours */
+  private workingCopy(path: string): { dir: string; parts: string[] } | null {
     const full = resolve(path)
     const rel = relative(this.root, full)
     if (!rel || rel.startsWith('..') || isAbsolute(rel)) return null
     const parts = rel.split(sep)
     if (parts.length !== 4) return null
     if (!parts.slice(0, 3).every((part) => SEGMENT.test(part))) return null
-    return dirname(full)
+    return { dir: dirname(full), parts }
+  }
+
+  /**
+   * How this build reads the binding of the working copy `path` names, in ONE
+   * read of its binding.json. The module policy asks per open tab every second
+   * (isBound / isReadOnly), so classifying and then parsing must not cost two
+   * reads of the same file. `newer` is a store this build does not read,
+   * `bound` a schema-1 document of this file name, `plain` everything else
+   * (outside the root, not a working-copy folder, no or unreadable binding, a
+   * binding for another file name).
+   */
+  classify(path: string): PathBinding {
+    const found = this.workingCopy(path)
+    if (!found) return { kind: 'plain' }
+    let raw: unknown
+    try {
+      raw = JSON.parse(readFileSync(join(found.dir, BINDING_FILE), 'utf8'))
+    } catch {
+      return { kind: 'plain' }
+    }
+    const full = resolve(path)
+    if (bindingKindOf(raw) === 'newer') {
+      return { kind: 'newer', path: full, name: basename(full) }
+    }
+    const binding = parseBinding(raw)
+    if (!binding || binding.filename !== basename(full)) return { kind: 'plain' }
+    const [deploymentId, userId] = found.parts as [string, string, string, string]
+    return {
+      kind: 'bound',
+      doc: { path: full, dir: found.dir, deploymentId, userId, binding },
+    }
   }
 
   /**
@@ -244,22 +281,25 @@ export class BindingStore {
    * root, schema 1, no or unreadable binding).
    */
   newerStoreAt(path: string): NewerStore | null {
-    const dir = this.workingCopyDir(path)
-    if (!dir || bindingKindAt(dir) !== 'newer') return null
-    const full = resolve(path)
-    return { path: full, name: basename(full) }
+    const found = this.classify(path)
+    return found.kind === 'newer' ? { path: found.path, name: found.name } : null
   }
 
   /**
    * The same from the folder alone, for the routes that know the folder before
-   * the file name (a launch ticket). The folder's document file names the lock;
-   * a folder with none (or an unreadable one) is named by the folder itself.
+   * the file name (a launch ticket). The folder's document file names the lock
+   * (the first in sorted order, so the name is deterministic); a folder with
+   * none (or an unreadable one) is named by the folder itself.
    */
   newerStoreIn(dir: string): NewerStore | null {
     if (bindingKindAt(dir) !== 'newer') return null
     let name = basename(dir)
     try {
-      name = readdirSync(dir).find((entry) => formatForName(entry) !== null) ?? name
+      // sorted, so the lock's name does not depend on the readdir order
+      name =
+        readdirSync(dir)
+          .sort()
+          .find((entry) => formatForName(entry) !== null) ?? name
     } catch {
       // unreadable folder: the folder's own name is all there is
     }

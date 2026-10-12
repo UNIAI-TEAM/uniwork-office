@@ -102,6 +102,7 @@ import {
   uniworkSessionIdentity,
 } from './uniwork-auth'
 import { createUniworkDocs, type UniworkDocsHandle } from './uniwork-docs/wiring'
+import { refuseLockedOpenPath } from './uniwork-docs/service'
 import { installUniworkModuleSeams } from './uniwork-docs/modules'
 import { createModuleSaveRequester } from './uniwork-docs/module-save'
 import { startEditorStatePoll } from './uniwork-docs/editor-state-poll'
@@ -3772,7 +3773,7 @@ function uniworkDocsWiring() {
       shellWindow && !shellWindow.isDestroyed() ? shellWindow.webContents : null,
     openPath: (path: string) => openDocumentPath(path),
     // G5-04g: a newer-store working copy is locked, never routed to a module
-    refuseLockedPath: (path: string) => uniworkDocs?.service.refuseLockedPath(path) ?? false,
+    refuseLockedPath: (path: string) => refuseLockedOpenPath(uniworkDocs?.service, path),
     isPathOpen: (path: string) => webContentsForPath(path) !== undefined,
     // the module's own Save (same path as the menu), which ends in the user-save hook
     requestModuleSave: requestUniworkModuleSave,
@@ -3836,8 +3837,9 @@ function routeDocumentPath(filePath: string): boolean {
   // G5-04g: every open route (File > Open, recents, argv, drag, MCP, a module
   // asking for another file) passes through here, so a working copy whose folder
   // declares a store this build does not read is refused in one place: main
-  // records the lock, pushes it to the shell renderer and opens nothing.
-  if (uniworkDocs?.service.refuseLockedPath(filePath)) return false
+  // records the lock, pushes it to the shell renderer and opens nothing. The
+  // decision itself lives in refuseLockedOpenPath, which is exercised at runtime.
+  if (refuseLockedOpenPath(uniworkDocs?.service, filePath)) return false
   if (!existsSync(filePath)) return false
   // a detached editor window already shows this file — focus it, never a second copy
   if (focusDetachedByPath(filePath)) return true
