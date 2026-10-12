@@ -42,6 +42,7 @@ import { pathKey } from '../../shared/path-key'
 import { LaunchController } from './launch'
 import type { DocumentDetail, LaunchDescriptor } from './parse'
 import { SaveCoordinator, toStatus } from './save-coordinator'
+import type { SyncStoreAccess, SyncStoreOpen } from '../uniwork-sync/session-store'
 
 /**
  * UniWork documents in the shell main process: the picker reads, the open
@@ -103,6 +104,12 @@ export type UnsavedCloseChoice = 'save' | 'resolve' | 'close' | 'cancel'
 
 export interface UniworkDocsServiceDeps {
   userDataDir: string
+  /**
+   * The session's durable sync store (wiring): intents, feed cursors and the
+   * doc index live here. Absent = no store-backed saves (tests that never
+   * touch one).
+   */
+  syncStore?: SyncStoreAccess
   profile(): DeploymentProfile | null
   /** the channel of this build (its launch scheme), known before any server is chosen */
   channel(): DeploymentChannel
@@ -202,6 +209,8 @@ export class UniworkDocsService {
   /** per path, the saveMark of its last user Save */
   private readonly lastUserSave = new Map<string, number>()
   private saveCounter = 0
+  /** one open of the session's store is shared; never remembered when it failed */
+  private syncOpen: Promise<SyncStoreOpen> | null = null
   /**
    * The one conflict dialog open (native dialogs are window-wide, not per
    * tab). `fromClose` = opened by the close prompt of that document's tab.
@@ -321,6 +330,23 @@ export class UniworkDocsService {
   /** the session's account may have changed: remember it as the last owner */
   noteSessionIdentity(): void {
     this.liveIdentity()
+    // a live session opens its store: the scope's migration and every later
+    // intent write go through this one open
+    void this.openSyncStore().catch(() => undefined)
+  }
+
+  /**
+   * The durable store of the live session, or why it cannot be opened right
+   * now. Concurrent callers share one open; a failed open (a locked keychain,
+   * no keyring, no session) is never remembered, so the next call retries.
+   */
+  openSyncStore(): Promise<SyncStoreOpen> {
+    const sync = this.deps.syncStore
+    if (!sync) return Promise.resolve({ kind: 'no_session' })
+    this.syncOpen ??= sync.open().finally(() => {
+      this.syncOpen = null
+    })
+    return this.syncOpen
   }
 
   /** the binding belongs to the signed-in account and the active deployment */

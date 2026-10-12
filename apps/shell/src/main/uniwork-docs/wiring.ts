@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, type IpcMain, type WebContents } from 'electron'
+import { app, BrowserWindow, dialog, safeStorage, type IpcMain, type WebContents } from 'electron'
 import { join } from 'node:path'
 import {
   UNIWORK_DOC_CHANNELS,
@@ -20,6 +20,10 @@ import {
 } from '../uniwork-auth'
 import { AccountBoundary } from './account-boundary'
 import { setUniworkCloseGuard } from './close-guard'
+import { INTENT_STORE_REGISTRATION } from '../uniwork-sync/intent-store'
+import { createSafeStorageKeyProvider } from '../uniwork-sync/keys'
+import { createSyncStoreAccess } from '../uniwork-sync/session-store'
+import { createStoreLayer, type StoreLayer } from '../uniwork-sync/store'
 import {
   UniworkDocsService,
   type ConflictUi,
@@ -211,14 +215,54 @@ export interface UniworkDocsHandle {
   activate(startLaunch: (route: (url: string) => void) => void): void
 }
 
+/** encrypted bytes the account's sync store (intents, cursors, index) may keep */
+export const SYNC_STORE_BUDGET_BYTES = 256 * 1024 * 1024
+
+/**
+ * The durable sync store of the session. One key provider (keys wrapped by
+ * Electron safeStorage) and one layer under `userData/uniwork-sync/`, holding
+ * every store this build registers; the records are encrypted, budgeted and
+ * wiped at the account boundary. The wrapped keys sit beside the layer root,
+ * outside the wiped scope, so unlocking after a sign-out reads them again.
+ */
+function createSyncStoreLayer(): StoreLayer {
+  const root = join(app.getPath('userData'), 'uniwork-sync')
+  const layer = createStoreLayer({
+    root: join(root, 'store'),
+    keys: createSafeStorageKeyProvider({ safeStorage, dir: join(root, 'keys') }),
+    budgetBytes: SYNC_STORE_BUDGET_BYTES,
+    clock: () => Date.now(),
+  })
+  layer.register(INTENT_STORE_REGISTRATION)
+  return layer
+}
+
+/** the store layer of the shell, built once (the service and the feed runtime share it) */
+let syncLayer: StoreLayer | null = null
+
+function syncStoreLayer(): StoreLayer {
+  syncLayer ??= createSyncStoreLayer()
+  return syncLayer
+}
+
 /** Registers the IPC handlers (safe before app ready: nothing touches the account yet). */
 export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): UniworkDocsHandle {
   const push = (channel: string, payload: unknown) => {
     const wc = wiring.shellContents()
     if (wc && !wc.isDestroyed()) wc.send(channel, payload)
   }
+  const syncStore = createSyncStoreAccess({
+    layer: syncStoreLayer(),
+    scope: () => {
+      const identity = uniworkSessionIdentity()
+      return identity
+        ? { deploymentId: identity.deploymentId, accountId: identity.accountId }
+        : null
+    },
+  })
   const service = new UniworkDocsService({
     userDataDir: app.getPath('userData'),
+    syncStore,
     profile: () => uniworkDeploymentProfile(),
     channel: () => uniworkAppChannel(),
     applyProfile: (profile) =>
