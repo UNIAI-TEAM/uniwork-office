@@ -94,10 +94,15 @@ export function createMergeSkill(deps: MergeSkillDeps): AgentSkill {
           `Merged ${result.importedSheets} sheets from ${result.files} files into the current workbook.`,
           `New sheets: ${result.sheetNames.join(', ')}`,
           'Source formulas were imported as computed values.',
+          result.undoSteps === null
+            ? 'The merge is too large for the undo history: it cannot be undone with [Undo] or ⌘Z; to revert it, the new sheets must be deleted.'
+            : 'Undo via the side panel [Undo] button or ⌘Z reverts the merge.',
         ]
         if (skipped.length > 0) lines.push(`Skipped: ${skipped.join('; ')}`)
         return {
           output: lines.join('\n'),
+          // writes sheets into the open workbook
+          mutated: true,
           summary: `merged ${result.importedSheets} sheets`,
         }
       } catch (error: unknown) {

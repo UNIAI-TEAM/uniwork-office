@@ -1419,7 +1419,22 @@ export function App({
               mergePaths: (paths) => {
                 const runtime = univerRef.current
                 if (!runtime) throw new Error(t('appMergeWorkbooksFailed'))
-                return mergeAttachedWorkbooks({ runtime, lazyWorkbookRef, setMessage }, paths)
+                return mergeAttachedWorkbooks({ runtime, lazyWorkbookRef, setMessage }, paths).then(
+                  (result) => {
+                    // same inline [Undo] as an applied plan, when the history holds the whole merge
+                    if (result.undoSteps) {
+                      const undoSteps = result.undoSteps
+                      patchLastAssistant((entry) => ({
+                        ...entry,
+                        autoApplied: {
+                          opCount: (entry.autoApplied?.opCount ?? 0) + result.importedSheets,
+                          undoSteps: (entry.autoApplied?.undoSteps ?? 0) + undoSteps,
+                        },
+                      }))
+                    }
+                    return result
+                  },
+                )
               },
             }),
             () => cap('mergeWorkbooks'),
