@@ -29,6 +29,8 @@ import sendEnterOff from '../assets/send-enter-off.png'
 import sendStop from '../assets/send-stop.png'
 import { clearAiHighlights } from '../editor/aiHighlight'
 import { setInactiveSelectionShown } from '../editor/inactiveSelection'
+import { queueAnchorRange } from '../editor/aiQueueAnchors'
+import { selectionFence, setEditFence, type FenceRange } from './edit-fence'
 import { createMarkdownSkill, MARKDOWN_RULES } from './markdown-skill'
 import {
   buildDocWriterRequest,
@@ -569,8 +571,16 @@ export function AiPanel({
     stickToBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 48
   }
 
-  /** retryScope: null = a retry that had no scope; undefined = capture the live selection */
-  const send = (text: string, displayText?: string, retryScope?: AiScopeQuoteData | null): void => {
+  /**
+   * retryScope: null = a retry that had no scope; undefined = capture the live selection.
+   * queueFence: the anchored ranges of a queue submission.
+   */
+  const send = (
+    text: string,
+    displayText?: string,
+    retryScope?: AiScopeQuoteData | null,
+    queueFence?: FenceRange[],
+  ): void => {
     const instruction = text.trim()
     const loop = loopRef.current
     if (!instruction || !loop || loop.busy) return
@@ -587,6 +597,12 @@ export function AiPanel({
           ? selectionScopeQuote()
           : undefined
     lastScopeRef.current = scope
+    // a scoped send (selection chip) or a queue submission may only edit its targets; tools
+    // enforce it in code. A retry keeps the fence of the turn it repeats (mapped since).
+    const ed = depsRef.current.getEditor()
+    if (ed && retryScope === undefined) {
+      setEditFence(ed, queueFence ?? (scope ? selectionFence(ed) : null))
+    }
     // the popover input / composer own the DOM selection now: keep the targeted range visible until the run ends
     if (scope) setInactiveSelectionShown(depsRef.current.getEditor(), true)
     setChat((prev) => [
@@ -699,10 +715,13 @@ export function AiPanel({
     }
     const instruction = buildQueueInstruction(entries)
     const display = buildQueueSummary(t('aiQueueSubmitted', { count: entries.length }), entries)
+    const fence = entries
+      .map((entry) => queueAnchorRange(current.state, entry.item.qid))
+      .filter((range): range is FenceRange => range !== null)
     // consumed at send: the run rewrites the anchored passages, which would
     // orphan the anchors anyway; a failed run is retried via the retry action
     onQueueConsume?.(editQueue.map((item) => item.qid))
-    send(instruction, display)
+    send(instruction, display, undefined, fence)
   }
 
   // ribbon presets auto-send; while a run is active they land in the composer instead

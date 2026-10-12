@@ -73,6 +73,8 @@ export interface FrontmatterAccess {
 export interface OpsContext {
   source: 'ai' | 'ui'
   frontmatter?: FrontmatterAccess
+  /** AI only: judge the finished batch (doc before, doc after); a message rolls it back */
+  verify?: (before: PmNode, after: PmNode) => string | null
 }
 
 interface Range {
@@ -101,6 +103,8 @@ export interface RunOpsResult {
   blocksChanged: boolean
   /** an op failed and the ops before it were undone: the document is as it was before the call */
   rolledBack: boolean
+  /** ctx.verify's message when it refused the finished batch (rolled back) */
+  refused?: string
 }
 
 type FieldType =
@@ -1042,12 +1046,15 @@ export function runOps(editor: Editor, ops: MdOp[], ctx: OpsContext): RunOpsResu
   }
   // UI actions keep a failed op's partial effect (e.g. /paragraph lifting a quote, then
   // finding the block already a paragraph); the AI batch is all-or-nothing
-  const failed = results.some((r) => !r.ok)
-  if (failed && ctx.source === 'ai') {
-    rollbackBatch(exec, dispatched, origSelection)
-    if (origFrontmatter !== undefined && ctx.frontmatter?.read() !== origFrontmatter)
-      ctx.frontmatter?.write(origFrontmatter)
-    return { results, applied: 0, blocksChanged: false, rolledBack: true }
+  if (ctx.source === 'ai') {
+    const failed = results.some((r) => !r.ok)
+    const refused = failed ? undefined : (ctx.verify?.(exec.origDoc, editor.state.doc) ?? undefined)
+    if (failed || refused) {
+      rollbackBatch(exec, dispatched, origSelection)
+      if (origFrontmatter !== undefined && ctx.frontmatter?.read() !== origFrontmatter)
+        ctx.frontmatter?.write(origFrontmatter)
+      return { results, applied: 0, blocksChanged: false, rolledBack: true, refused }
+    }
   }
   const applied = results.filter((r) => r.ok).length
   return {

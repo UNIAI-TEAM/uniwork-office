@@ -12,6 +12,7 @@ import {
   validateOps,
   type FrontmatterAccess,
   type MdOp,
+  type OpsContext,
 } from '../editor/ops'
 import { t } from '../i18n/locale'
 import {
@@ -20,6 +21,13 @@ import {
   type DocWriteResult,
   type WritePosition,
 } from './doc-writer'
+import {
+  FENCE_REFUSAL,
+  fenceViolation,
+  fencedBlocks,
+  hasEditFence,
+  insertInsideFence,
+} from './edit-fence'
 
 export type { FrontmatterAccess } from '../editor/ops'
 export { blockIndexRange } from '../editor/ops'
@@ -267,12 +275,26 @@ function opsSummary(ops: MdOp[], applied: number): string {
   return t('aiToolApplyOpsDone', { n: applied })
 }
 
+/** a selection-scoped turn's check for runOps: blocks outside the fence must not change */
+function fenceVerify(editor: Editor): OpsContext['verify'] {
+  if (!hasEditFence(editor)) return undefined
+  const spans = fencedBlocks(editor)
+  return (before, after) => fenceViolation(before, after, spans)
+}
+
 function applyOps(editor: Editor, input: unknown, fm?: FrontmatterAccess): ToolExecution {
   const label = t('aiToolApplyOps')
   const parsed = validateOps(input)
   if ('error' in parsed) return fail(parsed.error, label)
   if (usesBlockIndexes(parsed.ops) && editedExternally(editor)) return fail(STALE_DOC_ERROR, label)
-  const r = runOps(editor, parsed.ops, { source: 'ai', frontmatter: fm })
+  // the properties block sits outside every selection
+  if (hasEditFence(editor) && parsed.ops.some((op) => op.op === 'setFrontmatter'))
+    return fail(FENCE_REFUSAL, label)
+  const r = runOps(editor, parsed.ops, {
+    source: 'ai',
+    frontmatter: fm,
+    verify: fenceVerify(editor),
+  })
   const lines = r.results.map((res, i) =>
     res.ok
       ? `ops[${i}] ${parsed.ops[i]!.op}: ${res.message}`
@@ -280,7 +302,9 @@ function applyOps(editor: Editor, input: unknown, fm?: FrontmatterAccess): ToolE
   )
   const skipped = parsed.ops.length - r.results.length
   if (skipped > 0) lines.push(`${skipped} later op(s) were not executed.`)
-  if (r.rolledBack) {
+  if (r.refused) {
+    lines.push(`REFUSED: ${r.refused}`)
+  } else if (r.rolledBack) {
     lines.push(
       'Nothing was applied (atomic): the ops before the failure were undone and the document is unchanged. Fix the failing op and resend the whole batch.',
     )
@@ -351,9 +375,11 @@ async function insertImageFromUrl(
       : maxIndex
   const r = runOps(editor, [{ op: 'insertImage', after, src: rel, alt: String(input.alt ?? '') }], {
     source: 'ai',
+    verify: fenceVerify(editor),
   })
   const res = r.results[0]!
   if (!res.ok) return fail(res.error, labels.fail)
+  if (r.refused) return fail(r.refused, labels.fail)
   if (!userEditedDuringFetch) markDocSeen(editor)
   return {
     output: `Inserted the image (saved as ${rel}). ${INDEX_CHANGE_NOTICE}`,
@@ -388,6 +414,12 @@ async function writeDocument(
       label,
     )
   }
+  // a selection-scoped turn writes only next to (or into) its fenced blocks, never the whole document
+  if (
+    hasEditFence(editor) &&
+    (position.kind === 'whole' || !insertInsideFence(editor, position.index))
+  )
+    return fail(FENCE_REFUSAL, label)
   const str = (v: unknown) => (v === undefined || v === null ? undefined : String(v))
   const draft = new DraftLanding(editor, position)
   let result: DocWriteResult
@@ -428,9 +460,10 @@ async function writeDocument(
           markdown,
         }
       : { op: 'insertContent', after: draft.indexBefore(), markdown }
-  const r = runOps(editor, [op], { source: 'ai' })
+  const r = runOps(editor, [op], { source: 'ai', verify: fenceVerify(editor) })
   const res = r.results[0]!
   if (!res.ok) return fail(res.error, t('aiToolWriteDocFailed'))
+  if (r.refused) return fail(r.refused, t('aiToolWriteDocFailed'))
   markDocSeen(editor)
   const note = result.truncated
     ? ' The stream ended early, so the content is INCOMPLETE (the user chose to keep it): the tail is missing. Say so and offer to finish the missing sections with write_document (afterIndex at the end) or apply_ops insertContent.'
