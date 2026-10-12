@@ -573,6 +573,104 @@ describe('editor_write routing', () => {
     assert.equal(noSchema.hash, 'unresolved:missing')
     assert.ok(rows.some((r) => r.tool === 'normal_tool'))
   })
+
+  // R2-1 (negative): the `name` anchor must fire only inside a tools-list array.
+  // A non-tool `{ name, description }` array — an option list, a typed command
+  // list, a nested `options:` bag — must produce no row, while the real
+  // (annotated) tools list next to it still yields its rows.
+  const NON_TOOL_ARRAY_FIXTURE = {
+    'apps/docs/src/renderer/ai/tools.ts': [
+      "import type { AgentToolDef } from '@genoffice/agent-core'",
+      '',
+      'export const AGENT_TOOLS: AgentToolDef[] = [',
+      '  {',
+      "    name: 'real_tool',",
+      "    description: 'a real tool in the annotated list',",
+      "    inputSchema: { type: 'object', properties: {} },",
+      '  },',
+      '  {',
+      "    name: 'real_schemaless',",
+      "    description: 'a real tool with no schema, still in the list',",
+      '  },',
+      ']',
+      '',
+      '// an unannotated menu of { name, description } rows is not a tools list',
+      'const MENU_ITEMS = [',
+      "  { name: 'menu_open', description: 'Open' },",
+      "  { name: 'menu_save', description: 'Save' },",
+      ']',
+      '',
+      'type Command = { name: string; description: string }',
+      'const COMMANDS: Command[] = [',
+      "  { name: 'cmd_export', description: 'Export' },",
+      "  { name: 'cmd_print', description: 'Print' },",
+      ']',
+      '',
+      'const CONFIG = {',
+      '  options: [',
+      "    { name: 'opt_a', description: 'A' },",
+      "    { name: 'opt_b', description: 'B' },",
+      '  ],',
+      '}',
+      '',
+      'export function menu(): void {',
+      '  void MENU_ITEMS',
+      '  void COMMANDS',
+      '  void CONFIG',
+      '}',
+      '',
+    ].join('\n'),
+  }
+
+  it('ignores non-tool {name, description} arrays (R2-1)', () => {
+    const { dir } = fixture(NON_TOOL_ARRAY_FIXTURE)
+    const { rows } = extract({ repo: dir, rev: 'HEAD' })
+    const tools = rows.map((r) => r.tool).sort()
+    assert.deepEqual(tools, ['real_schemaless', 'real_tool'])
+    const schemaless = rows.find((r) => r.tool === 'real_schemaless')
+    assert.equal(schemaless.hash, 'unresolved:missing')
+  })
+
+  // R2-2 (negative): a mutating helper that only *mentions* `call.name` in a
+  // ternary is not a dispatcher, so the walk follows it and the calling tool
+  // still reads `yes`. The ternary names only this tool, so the old
+  // "any comparison anywhere" rule wrongly stopped the walk.
+  const TERNARY_HELPER_FIXTURE = {
+    'apps/docs/src/renderer/ai/tools.ts': [
+      "import type { AgentToolCall, AgentToolDef, ToolExecution } from '@genoffice/agent-core'",
+      '',
+      'export const AGENT_TOOLS: AgentToolDef[] = [',
+      '  {',
+      "    name: 'writer_tool',",
+      "    description: 'a mutating tool whose helper mentions call.name in a ternary',",
+      "    inputSchema: { type: 'object', properties: {} },",
+      '  },',
+      ']',
+      '',
+      'export function executeTool(call: AgentToolCall): ToolExecution {',
+      '  switch (call.name) {',
+      "    case 'writer_tool':",
+      '      return writeDoc(call)',
+      '    default:',
+      "      return { output: 'unknown', isError: true, mutated: false, summary: call.name }",
+      '  }',
+      '}',
+      '',
+      'function writeDoc(call: AgentToolCall): ToolExecution {',
+      "  const summary = call.name === 'writer_tool' ? 'write doc' : 'other'",
+      "  return { output: 'wrote', mutated: true, summary }",
+      '}',
+      '',
+    ].join('\n'),
+  }
+
+  it('follows a mutating helper that only mentions call.name in a ternary (R2-2)', () => {
+    const { dir } = fixture(TERNARY_HELPER_FIXTURE)
+    const { rows } = extract({ repo: dir, rev: 'HEAD' })
+    const writer = rows.find((r) => r.tool === 'writer_tool')
+    assert.ok(writer, 'the tool must get a row')
+    assert.equal(writer.write, 'yes')
+  })
 })
 
 describe('real repo', () => {
