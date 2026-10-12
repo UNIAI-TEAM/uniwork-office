@@ -18,19 +18,50 @@ export interface FieldOpHelpers {
 }
 
 const TEXT_BLOCKS = new Set(['docParagraph', 'docHeading', 'docListItem'])
+/** fields with a dedicated op or tool: the error names it */
 const BLOCKED: Record<string, string> = {
   TOC: 'use insertToc',
-  INDEX: 'index fields are not supported',
-  XE: 'index entries are not supported',
   HYPERLINK: 'use setFont with link',
   INCLUDEPICTURE: 'use insert_image',
   INCLUDETEXT: 'use insert_content',
-  EMBED: 'embedded objects are not supported',
-  FORMCHECKBOX: 'form fields are not supported',
-  FORMTEXT: 'form fields are not supported',
-  FORMDROPDOWN: 'form fields are not supported',
-  ADDIN: 'add-in fields are not supported',
 }
+/**
+ * The only field types the AI may insert, and the only existing fields
+ * updateFields marks dirty. Anything else (DDE, DDEAUTO, LINK, IMPORT,
+ * INCLUDE*, DATABASE, macro / prompt fields, unknown keywords) can fetch
+ * external data, run code or prompt the user when Word refreshes it on open,
+ * so an allowlist rather than a blocklist (spec 6.3 (a)).
+ */
+const ALLOWED = new Set([
+  'SEQ',
+  'REF',
+  'PAGEREF',
+  'NOTEREF',
+  'STYLEREF',
+  'DATE',
+  'TIME',
+  'CREATEDATE',
+  'SAVEDATE',
+  'PRINTDATE',
+  'EDITTIME',
+  'MERGEFIELD',
+  'IF',
+  'PAGE',
+  'NUMPAGES',
+  'SECTIONPAGES',
+  'SECTION',
+  'NUMWORDS',
+  'NUMCHARS',
+  'AUTHOR',
+  'TITLE',
+  'SUBJECT',
+  'KEYWORDS',
+  'COMMENTS',
+  'LASTSAVEDBY',
+  'REVNUM',
+  'DOCPROPERTY',
+  'LISTNUM',
+])
 /** result defaults to "1" and Word recomputes on open */
 const COUNTER_FIELDS = new Set([
   'PAGE',
@@ -602,8 +633,8 @@ function runUpdateFields(op: Op, env: RunEnv, h: FieldOpHelpers, now = new Date(
       recomputed++
     } else if (
       scope === 'all' &&
+      ALLOWED.has(keyword) &&
       keyword !== 'MERGEFIELD' &&
-      !/^(?:ADDIN|FORMCHECKBOX)$/.test(keyword) &&
       run.instr!.attrs.dirty !== true &&
       !run.instr!.attrs.beginXml
     ) {
@@ -627,7 +658,7 @@ export function fieldOpDefs(h: FieldOpHelpers): OpDef[] {
   const insertField: OpDef = {
     name: 'insertField',
     signature:
-      '{ op: "insertField", target, type: "SEQ"|"REF"|"PAGEREF"|"DATE"|"TIME"|"MERGEFIELD"|"IF"|"PAGE"|"NUMPAGES"|"AUTHOR"|..., args?: string, result?: string, position?: "start"|"end", afterText?: string }  // insert a Word field into exactly one paragraph, at its end unless position or afterText says otherwise; args is the instruction after the keyword ({ SEQ Figure \\* ARABIC } = type "SEQ", args "Figure \\* ARABIC"). Computed here: SEQ (visible fields with that identifier so far + 1), REF/PAGEREF (the bookmarked paragraph; insertBookmark creates one), DATE/TIME (now, \\@ picture), MERGEFIELD («Name»), IF with literal operands; PAGE/NUMPAGES show "1"; anything else needs result, the text shown until Word updates it. Fields only Word can compute are marked dirty and refresh when the file opens in Word',
+      '{ op: "insertField", target, type: "SEQ"|"REF"|"PAGEREF"|"DATE"|"TIME"|"MERGEFIELD"|"IF"|"PAGE"|"NUMPAGES"|"AUTHOR"|"TITLE"|"DOCPROPERTY"|... (allowlist; no DDE, LINK, INCLUDE*, IMPORT, DATABASE), args?: string, result?: string, position?: "start"|"end", afterText?: string }  // insert a Word field into exactly one paragraph, at its end unless position or afterText says otherwise; args is the instruction after the keyword ({ SEQ Figure \\* ARABIC } = type "SEQ", args "Figure \\* ARABIC"). Computed here: SEQ (visible fields with that identifier so far + 1), REF/PAGEREF (the bookmarked paragraph; insertBookmark creates one), DATE/TIME (now, \\@ picture), MERGEFIELD («Name»), IF with literal operands; PAGE/NUMPAGES show "1"; anything else needs result, the text shown until Word updates it. Fields only Word can compute are marked dirty and refresh when the file opens in Word',
     keys: ['type', 'args', 'result', 'position', 'afterText'],
     target: 'required',
     validate(op, where) {
@@ -635,9 +666,11 @@ export function fieldOpDefs(h: FieldOpHelpers): OpDef[] {
       if (shape) return shape
       if (typeof op.type !== 'string' || !/^[A-Za-z]+$/.test(op.type))
         return `${where}: type must be a field keyword such as SEQ, REF or DATE`
-      const blocked = BLOCKED[op.type.toUpperCase()]
-      if (blocked)
-        return `${where}: ${op.type.toUpperCase()} fields cannot be inserted this way; ${blocked}`
+      const type = op.type.toUpperCase()
+      const blocked = BLOCKED[type]
+      if (blocked) return `${where}: ${type} fields cannot be inserted this way; ${blocked}`
+      if (!ALLOWED.has(type))
+        return `${where}: ${type} fields cannot be inserted; allowed types: ${[...ALLOWED].join(', ')}`
       if (op.args !== undefined && typeof op.args !== 'string')
         return `${where}: args must be a string`
       if (op.result !== undefined && (typeof op.result !== 'string' || op.result === ''))
@@ -670,7 +703,7 @@ export function fieldOpDefs(h: FieldOpHelpers): OpDef[] {
   const updateFields: OpDef = {
     name: 'updateFields',
     signature:
-      '{ op: "updateFields", scope?: "all"|"SEQ"|"REF"|"DATE" }  // recompute the inline fields the editor can: SEQ numbering in document order, REF results from their bookmarks, DATE/TIME to now; with scope "all" every other field (PAGE, NUMPAGES, AUTHOR...) is marked dirty so Word recomputes it on open. Table-of-contents blocks are untouched (insertToc rebuilds one)',
+      '{ op: "updateFields", scope?: "all"|"SEQ"|"REF"|"DATE" }  // recompute the inline fields the editor can: SEQ numbering in document order, REF results from their bookmarks, DATE/TIME to now; with scope "all" every other allowed field (PAGE, NUMPAGES, AUTHOR...) is marked dirty so Word recomputes it on open; external-data fields (DDE, LINK, INCLUDE...) are left as they are. Table-of-contents blocks are untouched (insertToc rebuilds one)',
     keys: ['scope'],
     target: 'none',
     validate(op, where) {
