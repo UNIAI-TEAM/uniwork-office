@@ -747,7 +747,9 @@ describe('secrets and egress', () => {
   })
 })
 
-const flushSaves = () => new Promise((r) => setTimeout(r, 20))
+// onUserSave starts the save synchronously, so settled() waits for exactly that save (a fixed sleep raced a slow runner)
+const flushSaves = (ctx: ReturnType<typeof setup>, path: string) =>
+  ctx.service.coordinator.settled(path)
 
 describe('local saves never depend on a live session (review r1 BE-1)', () => {
   it("signed out: the last account's copy stays editable, saves locally and lands in signed-out", async () => {
@@ -760,7 +762,7 @@ describe('local saves never depend on a live session (review r1 BE-1)', () => {
     writeFileSync(path, 'v4 while signed out')
     const before = server.calls.length
     ctx.service.onUserSave(path)
-    await flushSaves()
+    await flushSaves(ctx, path)
     expect(server.calls.length).toBe(before)
     expect(readFileSync(path, 'utf8')).toBe('v4 while signed out')
     expect(binding(path)).toMatchObject({ state: 'signed-out', error: 'not_signed_in' })
@@ -778,7 +780,7 @@ describe('local saves never depend on a live session (review r1 BE-1)', () => {
     ctx.signOut()
     writeFileSync(path, 'v4 while signed out')
     ctx.service.onUserSave(path)
-    await flushSaves()
+    await flushSaves(ctx, path)
     expect(binding(path)).toMatchObject({ state: 'signed-out' })
     // the session is valid again and the document is opened (the web launch)
     ctx.signInAs('acc_1')
@@ -791,7 +793,7 @@ describe('local saves never depend on a live session (review r1 BE-1)', () => {
     // a copy whose bytes match UniWork has nothing to send: it reads ready
     ctx.signOut()
     ctx.service.onUserSave(path)
-    await flushSaves()
+    await flushSaves(ctx, path)
     expect(binding(path)).toMatchObject({ state: 'signed-out' })
     ctx.signInAs('acc_1')
     await ctx.service.openFromServer(DOC)

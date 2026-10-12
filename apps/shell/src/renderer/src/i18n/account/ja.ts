@@ -31,7 +31,8 @@ export const ja = {
   acctConnectButton: '接続',
   acctConnecting: '接続中…',
   acctConnectInvalid: '有効なサーバーのアドレスを入力してください。',
-  acctConnectFailed: 'そのサーバーに接続できませんでした。アドレスとネットワーク接続を確認してください。',
+  acctConnectFailed:
+    'そのサーバーに接続できませんでした。アドレスとネットワーク接続を確認してください。',
   acctChangeServer: 'サーバーを変更',
   acctNoPlan: 'プランなし',
   acctSwitchOrg: '組織を切り替える',

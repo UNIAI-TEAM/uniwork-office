@@ -25,7 +25,8 @@ export const fr = {
   acctPlan: 'Offre',
   acctServer: 'Serveur',
   acctConnectTitle: 'Se connecter à UniWork',
-  acctConnectBody: 'Ouvrez UniWork dans votre navigateur, puis choisissez « Ouvrir UniWork Office ».',
+  acctConnectBody:
+    'Ouvrez UniWork dans votre navigateur, puis choisissez « Ouvrir UniWork Office ».',
   acctConnectUnreachable: 'Impossible de joindre {server}',
   acctConnectField: 'Adresse du serveur',
   acctConnectButton: 'Se connecter',

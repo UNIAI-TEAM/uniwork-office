@@ -85,7 +85,9 @@ export function parseOfficeDeepLink(value: unknown, scheme: string): DeepLinkPar
   if (url.hash || value.includes('#')) return reject('fragment_not_allowed')
   const params = [...url.searchParams.entries()]
   // the home route names no document, so it never carries a ticket
-  const known = new Set<string>(url.hostname === HOME_HOST ? PROFILE_KEYS : ['ticket', ...PROFILE_KEYS])
+  const known = new Set<string>(
+    url.hostname === HOME_HOST ? PROFILE_KEYS : ['ticket', ...PROFILE_KEYS],
+  )
   if (params.some(([key]) => !known.has(key))) return reject('unexpected_parameter')
   const tickets = params.filter(([key]) => key === 'ticket')
   if (tickets.length > 1) return reject('duplicate_ticket')

@@ -31,7 +31,8 @@ export const de = {
   acctConnectButton: 'Verbinden',
   acctConnecting: 'Verbindung wird hergestellt …',
   acctConnectInvalid: 'Geben Sie eine gültige Serveradresse ein.',
-  acctConnectFailed: 'Dieser Server ist nicht erreichbar. Prüfen Sie die Adresse und Ihre Verbindung.',
+  acctConnectFailed:
+    'Dieser Server ist nicht erreichbar. Prüfen Sie die Adresse und Ihre Verbindung.',
   acctChangeServer: 'Server ändern',
   acctNoPlan: 'Kein Tarif',
   acctSwitchOrg: 'Organisation wechseln',
