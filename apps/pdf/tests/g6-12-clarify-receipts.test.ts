@@ -19,7 +19,9 @@ vi.mock('@genoffice/agent-core', async (orig) => {
       await this.opts.skill.executeTool({
         id: 'c1',
         name: 'ask_clarification',
-        input: { questions: [{ id: 'scope', label: 'Which pages?', options: ['All', 'Selection'] }] },
+        input: {
+          questions: [{ id: 'scope', label: 'Which pages?', options: ['All', 'Selection'] }],
+        },
       })
       this.busy = false
       this.opts.events.onDone({ text: 'done', cancelled: false })

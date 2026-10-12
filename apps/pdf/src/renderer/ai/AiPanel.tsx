@@ -230,6 +230,8 @@ export function AiPanel({
       })
       .then((msgs) => {
         if (msgs.length === 0) return
+        // restored messages go in front, so receipts keyed by chat index would re-attach to them
+        clarify.clearReceipts()
         setChat((prev) => [
           ...msgs.map((m) => ({
             role: m.role,
@@ -326,6 +328,15 @@ export function AiPanel({
     },
     [filePath],
   )
+  // answered receipts belong to the document they were given for: drop them when another
+  // one opens (an untitled document getting its first path is the same document)
+  const receiptPathRef = useRef(filePath)
+  const { clearReceipts } = clarify
+  useEffect(() => {
+    const previous = receiptPathRef.current
+    receiptPathRef.current = filePath
+    if (previous && previous !== filePath) clearReceipts()
+  }, [filePath, clearReceipts])
 
   const patchLast = (patch: Partial<ChatEntry> | ((last: ChatEntry) => Partial<ChatEntry>)) => {
     setChat((prev) => {
