@@ -2997,7 +2997,9 @@ export interface DesktopApi {
   consumeHeadlessExport(): Promise<string | null>
   /// Headless export mode: report the export outcome so the main process can quit.
   headlessExportDone(result: { ok: boolean; error?: string }): void
-  /// Display name for authored threaded comments (OS account name).
+  /// G8-02 author written into new threaded comments: the signed-in UniWork
+  /// display name for a bound workbook, else the neutral constant "User"
+  /// (never the OS account name).
   getUserDisplayName(): Promise<string>
   getAiSettings(): Promise<AiSettings>
   setAiSettings(settings: AiSettings): Promise<void>

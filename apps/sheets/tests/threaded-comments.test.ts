@@ -63,6 +63,19 @@ describe('ThreadStore', () => {
     expect(changed).toEqual(['s1'])
   })
 
+  it('G8-02: the neutral fallback is the fixed "User" constant, so a locale change cannot mint a person', () => {
+    // the value written into the file is the constant the shell writes; the UI
+    // label is translated at render time only and never reaches the store
+    expect(FALLBACK_AUTHOR).toBe('User')
+    const { store } = storeWithFile()
+    const thread = store.add('s1', 5, 5, 'Hello')
+    expect(thread.author).toBe('User')
+    expect(store.authorName()).toBe('User')
+    // the person id derives from the written name: same name, same person
+    expect(thread.personId).toBe(personIdFor('User'))
+    expect(personIdFor('User')).toBe(personIdFor('User'))
+  })
+
   it('replies, resolves, edits and deletes replies in place', () => {
     const { store, changed } = storeWithFile()
     store.setAuthor('Grace')

@@ -30,7 +30,10 @@ export interface CellThread {
   readonly replies: readonly ThreadReply[]
 }
 
-export const FALLBACK_AUTHOR = 'UniWork Office User'
+/// G8-02: the author written into a new thread when main has no better answer
+/// — a fixed, locale-independent constant (never the OS account name). The
+/// person id derives from it, so switching the UI language never adds a person.
+export const FALLBACK_AUTHOR = 'User'
 
 export interface CellRange {
   readonly startRow: number

@@ -45,6 +45,37 @@ export interface NotePrompt {
   id?: string
 }
 
+/** G8-02: the author written into comments when no UniWork account resolves. */
+export const NEUTRAL_COMMENT_AUTHOR = 'User'
+
+/** G8-02: author written into new comments — refreshed from the host per open document. */
+let commentAuthor = NEUTRAL_COMMENT_AUTHOR
+
+/** G8-02: last author the host reported; anything unusable reads as the neutral constant. */
+export function commentAuthorName(): string {
+  return commentAuthor
+}
+
+/** G8-02: set the author; a blank/absent value keeps the neutral constant. */
+export function setCommentAuthor(name: unknown): void {
+  const trimmed = typeof name === 'string' ? name.trim() : ''
+  commentAuthor = trimmed.length > 0 ? trimmed : NEUTRAL_COMMENT_AUTHOR
+}
+
+/**
+ * G8-02: refresh the author for the document at `path` — the signed-in UniWork
+ * display name for a bound document, the neutral constant otherwise. Never the
+ * OS account name. Called when a document opens; the last answer is used for
+ * the comments created from here.
+ */
+export async function refreshCommentAuthor(path: string | null): Promise<void> {
+  try {
+    setCommentAuthor(await window.desktop.getCommentAuthor(path))
+  } catch {
+    setCommentAuthor(null)
+  }
+}
+
 /** The App state the review actions need; built fresh per call. */
 export interface ReviewContext {
   editor: Editor | null
@@ -170,7 +201,7 @@ export function submitNewComment(ctx: ReviewContext, text: string): void {
     return
   }
   const now = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z')
-  ctx.setComments((prev) => [...prev, { id, author: 'User', date: now, text }])
+  ctx.setComments((prev) => [...prev, { id, author: commentAuthor, date: now, text }])
   ctx.setCommentsDirty(true)
   ctx.setCommentComposing(false)
   ctx.dirtyRef.current = true
@@ -204,7 +235,7 @@ export function replyToComment(
   ctx: ReviewContext,
   parentId: string,
   text: string,
-  author = 'User',
+  author = commentAuthor,
 ): boolean {
   if (!ctx.editor) return false
   const id = nextCommentId(ctx.comments)

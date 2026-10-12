@@ -99,11 +99,16 @@ import {
   startUniworkCloud,
   stopUniworkAccount,
   onUniworkAccountStatus,
+  uniworkAccountDisplayName,
   uniworkSessionIdentity,
 } from './uniwork-auth'
 import { createUniworkDocs, type UniworkDocsHandle } from './uniwork-docs/wiring'
 import { refuseLockedOpenPath } from './uniwork-docs/service'
-import { installUniworkModuleSeams } from './uniwork-docs/modules'
+import {
+  NEUTRAL_COMMENT_AUTHOR,
+  createCommentAuthorResolver,
+  installUniworkModuleSeams,
+} from './uniwork-docs/modules'
 import { createModuleSaveRequester } from './uniwork-docs/module-save'
 import { startEditorStatePoll } from './uniwork-docs/editor-state-poll'
 import { IPC_CHANNELS as SHEETS_IPC_CHANNELS } from '../../../sheets/src/shared/ipc-channels'
@@ -4182,8 +4187,17 @@ function registerHomeIpc(): void {
   )
   // UniWork documents (open from UniWork, launch links, Save to UniWork); logic in ./uniwork-docs
   uniworkDocs = createUniworkDocs(ipcMain, uniworkDocsWiring())
-  installUniworkModuleSeams(uniworkDocs.service)
   const uniworkService = uniworkDocs.service
+  // G8-02: the single comment-author source. A bound document takes the
+  // signed-in account's display name; local files and signed-out sessions take
+  // the neutral constant — the OS account name is never an author.
+  installUniworkModuleSeams(
+    uniworkService,
+    createCommentAuthorResolver({
+      isBound: (path) => uniworkService.isBound(path),
+      displayName: uniworkAccountDisplayName,
+    }),
+  )
   // the chip reads "Unsaved changes" while an editor holds edits not saved yet
   startEditorStatePoll({
     editorDirtyStates: async (wanted) => (await tabManager?.editorDirtyStates(wanted)) ?? [],

@@ -200,6 +200,19 @@ export function getAccountEntitlements(): AccountEntitlements | null {
   return manager?.getEntitlements() ?? null
 }
 
+/**
+ * G8-02: display name of the signed-in account, or null when signed out (or
+ * the profile carries no usable name). Read-only: never a token, never the OS
+ * account. This is the single author source for comment authorship.
+ */
+export function uniworkAccountDisplayName(): string | null {
+  if (!manager) return null
+  const status = manager.status()
+  if (!status.loggedIn) return null
+  const name = status.profile?.displayName.trim()
+  return name ? name : null
+}
+
 export function onAccountEntitlementsChanged(
   listener: (entitlements: AccountEntitlements | null) => void,
 ): () => void {

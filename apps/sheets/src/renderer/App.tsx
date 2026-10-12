@@ -2126,6 +2126,9 @@ export function App({
       recordNoteChange(state.editJournal, sheetId)
       setPendingEdits(journalSize(state.editJournal))
     }
+    // G8-02: new threads carry the author main resolves for this tab's workbook
+    // (the signed-in UniWork display name for a bound document, else the
+    // neutral constant) — never the OS account name.
     void window.desktopApi.getUserDisplayName?.().then((name) => threadStore.setAuthor(name))
     // Univer's own UI (rule-management panels, dialogs) follows the app
     // language instead of hard-coded English.
@@ -4652,6 +4655,9 @@ export function App({
         setMessage(t('appOpenFailed'))
         return
       }
+      // G8-02: the workbook that just opened decides the author (bound document
+      // + signed in = the UniWork display name; anything else = "User").
+      void window.desktopApi?.getUserDisplayName?.().then((name) => threadStore.setAuthor(name))
       setEmptyCsvNotice(selected.emptyCsv === true)
       setMessage(selected.emptyCsv ? '' : t('appOpened', { name: selected.name }))
     } catch (error: unknown) {

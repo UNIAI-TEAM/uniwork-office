@@ -362,6 +362,12 @@ export interface DesktopApi {
   getLanguage(): Promise<'zh' | 'en' | 'ja' | 'ko' | 'fr' | 'de' | 'es' | 'th' | 'id' | 'ru' | 'ar'>
   /** OS regional-settings locale (BCP 47); Word derives the new-document paper size from it */
   getSystemLocale(): Promise<string>
+  /**
+   * G8-02: author written into new comments of the document at `path` — the
+   * signed-in UniWork display name for a bound document, else the neutral
+   * constant "User". Never the OS account name.
+   */
+  getCommentAuthor(path: string | null): Promise<string>
   /** language switched from the shell home page */
   onLanguageChanged(
     handler: (

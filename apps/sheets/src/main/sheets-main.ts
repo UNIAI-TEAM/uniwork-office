@@ -7,6 +7,7 @@ import {
   uniworkRequestOrigin,
   uniworkSaveAsDefault,
   uniworkSaveDecision,
+  uniworkCommentAuthor,
 } from './uniwork-policy'
 import { workbookDisplayName } from './workbook-name'
 import { createHash, randomUUID } from 'node:crypto'
@@ -22,7 +23,6 @@ import {
 } from 'node:fs'
 import { copyFile, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
-import { userInfo } from 'node:os'
 import { basename, dirname, isAbsolute, join } from 'node:path'
 
 import {
@@ -2575,13 +2575,14 @@ export function registerSheetsIpc(): void {
   if (coreIpcRegistered) return
   coreIpcRegistered = true
 
+  // G8-02: the author written into new threaded comments. The shell's single
+  // source answers with the signed-in account's display name for a bound
+  // workbook and the neutral constant otherwise — never the OS account name.
   ipcMain.handle(IPC_CHANNELS.userDisplayName, (event): string => {
     sessionFor(event)
-    try {
-      return userInfo().username
-    } catch {
-      return ''
-    }
+    const path =
+      lastOpenedWorkbookPaths.get(event.sender.id) ?? queuedWorkbookPaths.get(event.sender.id)
+    return uniworkCommentAuthor(path)
   })
 
   // Registered here (not in registerSheetsAiIpc, skipped in shell mode):

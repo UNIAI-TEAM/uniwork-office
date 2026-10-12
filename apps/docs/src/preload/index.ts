@@ -22,6 +22,7 @@ import { installDropOpenBridge } from '@genoffice/electron-utils/drop-open'
 const api: DesktopApi = {
   getLanguage: () => ipcRenderer.invoke('app:get-language'),
   getSystemLocale: () => ipcRenderer.invoke('docs:system-locale'),
+  getCommentAuthor: (path) => ipcRenderer.invoke('docs:comment-author', path),
   onLanguageChanged: (handler) => {
     const listener = (
       _event: IpcRendererEvent,
