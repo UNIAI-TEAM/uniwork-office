@@ -130,7 +130,7 @@ function deps(overrides: Partial<SheetsSkillDeps>): SheetsSkillDeps {
 
 const collect = () =>
   vi.fn((sheetId: string | undefined) =>
-    Promise.resolve({ ok: true, rows: sheetId === 's-bank' ? RIGHT : LEFT }),
+    Promise.resolve({ ok: true as const, rows: sheetId === 's-bank' ? RIGHT : LEFT }),
   )
 
 describe('g6-12 #24b: compare_ranges tool', () => {
