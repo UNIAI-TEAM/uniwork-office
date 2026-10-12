@@ -352,8 +352,7 @@ export const WORKBOOK_TOOLS: AgentToolDef[] = [
         skipHiddenRows: {
           type: 'boolean',
           description:
-            'Leave out rows that are hidden or filtered out (visible rows only, like SUBTOTAL). Default false: hidden rows are included, like SUM. ' +
-            'The result always states how many hidden/filtered rows the range has and whether they were included — repeat that in your answer.',
+            'Leave out hidden/filtered rows (visible rows only, like SUBTOTAL). Default false: they are included, like SUM. The result always states how many there were and whether they were included — repeat that in your answer.',
         },
       },
       required: ['range'],
