@@ -639,6 +639,10 @@ export function App({
   const aiViewOnly = isUniworkViewOnly(workbookFile)
   const aiViewOnlyRef = useRef(aiViewOnly)
   aiViewOnlyRef.current = aiViewOnly
+  // UniWork working copy (C-BOUND): AI tools must not write outside it or read
+  // local files the user did not attach
+  const aiUniworkBoundRef = useRef(false)
+  aiUniworkBoundRef.current = workbookFile?.uniworkBound === true
   const autoSaveOn = autoSave && !autoSaveLocked
   // Ref mirror for callbacks captured when an AI run starts
   const autoSaveRef = useRef(autoSaveOn)
@@ -1720,6 +1724,8 @@ export function App({
         traceWorkbookDependents(readContext(), sheetId, address),
       proposeOperations,
       createDocument: (request) => createAiDocument({ univerRef, lazyWorkbookRef }, request),
+      isUniworkBound: () => aiUniworkBoundRef.current,
+      getAttachments: availableAttachments,
     }
   }
 

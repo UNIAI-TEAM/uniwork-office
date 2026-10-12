@@ -19,6 +19,7 @@ import type {
   CellScalar,
   ChangePlan,
 } from '@genoffice/xlsx-gateway/domain/workbook.types'
+import type { AttachmentMeta } from '../../shared/desktop-api'
 import { cap } from '../capabilities'
 import { t } from '../i18n/locale'
 import { formatRangeAggregate, type RangeAggregate } from './aggregate'
@@ -248,6 +249,11 @@ export interface SheetsSkillDeps {
    * worksheet; docx/pdf/md from content) into the default save folder and
    * open it in a new tab (ai/create-document.ts). */
   createDocument?(request: CreateDocumentToolRequest): Promise<CreateDocumentToolOutcome>
+  /** the open workbook is a working copy of a UniWork document (C-BOUND):
+   * no reads of local files the user did not attach */
+  isUniworkBound?(): boolean
+  /** chat attachments the user gave this conversation (sent + composer) */
+  getAttachments?(): readonly AttachmentMeta[]
 }
 
 const MAX_READ_ADDRESSES = 100
@@ -574,6 +580,28 @@ const fail = (summary: string, output: string): ToolExecution => ({
   mutated: false,
   summary,
 })
+
+/** add_image sources that never read a local file by path: remote URLs (main
+ * fetches them through the SSRF guard + size cap), cloud-generated data: URLs
+ * and file: URLs (main resolves only its own generated-image store). */
+const NON_LOCAL_IMAGE_SOURCE = /^(?:https?:\/\/|file:\/\/|data:image\/)/i
+
+/** For a UniWork-bound workbook, the add_image paths that would read a local
+ * file the user did not attach (C-BOUND, §6.3); empty when nothing is refused. */
+export function refusedLocalImagePaths(
+  operations: readonly WorkbookOperation[],
+  deps: Pick<SheetsSkillDeps, 'isUniworkBound' | 'getAttachments'>,
+): string[] {
+  if (deps.isUniworkBound?.() !== true) return []
+  const attached = new Set((deps.getAttachments?.() ?? []).map((a) => a.path))
+  const refused: string[] = []
+  for (const op of operations) {
+    if (op.op !== 'add_image') continue
+    if (NON_LOCAL_IMAGE_SOURCE.test(op.path) || attached.has(op.path)) continue
+    refused.push(op.path)
+  }
+  return refused
+}
 
 /** Optional sheetId input shared by the read tools: validated against the
  * workbook's sheet list so a bad id fails with a clear message instead of
@@ -1285,6 +1313,15 @@ export function executeWorkbookTool(
         return fail(t('aiToolPropose'), describeOperationErrors(rawOps, parsedOps.error))
       }
       const operations: WorkbookOperation[] = parsedOps.data
+      const refusedImages = refusedLocalImagePaths(operations, deps)
+      if (refusedImages.length > 0) {
+        return fail(
+          t('aiToolPropose'),
+          `Rejected — none of the ${operations.length} operation(s) were applied: this workbook is a UniWork document, ` +
+            `so add_image cannot read local files by path (${refusedImages.join(', ')}). ` +
+            'Use an image URL from image_search / generate_image, or ask the user to attach the image to the chat and pass its attachment path.',
+        )
+      }
       const outcome = deps.proposeOperations(operations, summaryInput.trim())
       if (!outcome.ok) {
         return fail(
