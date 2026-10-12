@@ -15,6 +15,7 @@ import { statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
+import { fillBlankModel } from './providers'
 import { AI_PROVIDER_ADAPTERS, normalizeBaseUrl } from './registry'
 import type { AiProviderConfig, AiProviderId, AiSettings } from './types'
 
@@ -133,7 +134,11 @@ export function sanitizeAiSettings(input: unknown): AiSettings | null {
   const providers = {} as AiSettings['providers']
   for (const [id, config] of Object.entries(raw.providers as Record<string, unknown>)) {
     if (!PROVIDER_IDS.includes(id as AiProviderId)) continue
-    ;(providers as Record<string, AiProviderConfig>)[id] = sanitizeProviderConfig(config)
+    // a blank model of a provider with a default is written as that default, never as ''
+    ;(providers as Record<string, AiProviderConfig>)[id] = fillBlankModel(
+      id as AiProviderId,
+      sanitizeProviderConfig(config),
+    )!
   }
   const settings: AiSettings = {
     provider: provider as AiProviderId,

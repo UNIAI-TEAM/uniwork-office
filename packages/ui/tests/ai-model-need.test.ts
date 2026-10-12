@@ -136,8 +136,24 @@ it('the hint goes away once a key and a model are known', async () => {
   expect(host.querySelector('.ai-input-need')).toBeNull()
 })
 
-it('a host that did not ask for the rule (desktop) is untouched', async () => {
-  const { send, hint } = await mount(settingsWith('custom', '…abcd', ''), false)
+it('desktop: a chosen vendor that cannot send yet says what is missing instead of becoming uniAI', async () => {
+  // UNI-1395: the chip and the request agree, so send is off with the same hint as a web frame
+  const model = await mount(settingsWith('custom', '…abcd', ''), false)
+  expect(model.chip).toBe(AI_MODEL_PICKER_STRINGS.en.choose)
+  expect(model.send.disabled).toBe(true)
+  expect(model.hint).toBe('Choose a model to send')
+  act(() => root.unmount())
+  root = createRoot(host)
+  const key = await mount(settingsWith('openai', '', 'gpt-x'), false)
+  expect(key.send.disabled).toBe(true)
+  expect(key.hint).toBe('Add an API key in AI settings to use the assistant.')
+})
+
+it('a host that did not ask for the rule keeps send on for the default uniAI selection', async () => {
+  const { send, hint } = await mount(
+    { ...defaultAiSettings(), uniAiAvailable: false, provider: 'genspark' },
+    false,
+  )
   expect(send.disabled).toBe(false)
   expect(hint).toBe('Enter to send')
 })

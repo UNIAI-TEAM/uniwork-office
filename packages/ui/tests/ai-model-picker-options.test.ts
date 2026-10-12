@@ -66,7 +66,7 @@ describe('hosts without the UniAI pool (web frames)', () => {
     })
   })
 
-  it('no stored key: the selection falls to uniAI but nothing is listed, so the chip says Choose model', () => {
+  it('no stored key: the selection stays on the chosen vendor and nothing is listed, so the chip says Choose model', () => {
     const settings = { ...defaultAiSettings(), uniAiAvailable: false, provider: 'openai' as const }
     expect(aiModelPickerGroups(settings, true)).toEqual([])
     expect(
@@ -94,10 +94,10 @@ describe('selection round trip', () => {
     expect(settings.providers.anthropic.model).toBe(anthropicModels[0])
   })
 
-  it('falls back to uniAI when the stored provider is unusable', () => {
+  it('keeps an unusable stored provider selected instead of falling back to uniAI', () => {
     const settings = defaultAiSettings()
     settings.provider = 'anthropic'
-    expect(aiModelPickerSelection(settings).provider).toBe('genspark')
+    expect(aiModelPickerSelection(settings).provider).toBe('anthropic')
   })
 })
 
