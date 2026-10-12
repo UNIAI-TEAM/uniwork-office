@@ -1451,9 +1451,8 @@ export const zh = {
   appWebEngineHint: '您的文件未被更改。',
   appWebViewOnly: '仅查看：您无法保存对此工作簿的更改。',
   appWebConflictTitle: '此工作簿已在别处被修改',
-  appWebConflictBody:
-    '您编辑期间，有人保存了更新的版本。可以用您的版本覆盖它，或重新加载最新版本（未保存的更改将被丢弃）。',
-  appWebConflictOverwrite: '覆盖',
+  appWebConflictBody: '你的更改尚未存到 UniWork，会保留在此浏览器中，直到你退出登录。',
+  appWebConflictOverwrite: '覆盖…',
   appWebConflictReload: '重新加载最新版本',
   appWebConflictNotSaved: '未保存：已有更新的版本。',
   appWebDiscardTitle: '放弃未保存的更改？',

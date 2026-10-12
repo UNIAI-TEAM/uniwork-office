@@ -3,9 +3,8 @@ import type { zh } from './zh'
 export const he = {
   webCancel: 'ביטול',
   webConflictTitle: 'מסמך זה שונה במקום אחר',
-  webConflictBody:
-    'גרסה חדשה יותר נשמרה בזמן שערכת. לדרוס אותה בגרסה שלך, או לטעון מחדש את הגרסה העדכנית ולבטל את השינויים שלך?',
-  webConflictOverwrite: 'דריסה',
+  webConflictBody: 'השינויים שלך עדיין לא ב-UniWork והם נשמרים בדפדפן הזה עד שתתנתק.',
+  webConflictOverwrite: 'דריסה…',
   webConflictReload: 'טעינת הגרסה העדכנית',
   webConflictNotSaved: 'המסמך שונה במקום אחר',
   webFatalTitle: 'לא ניתן לפתוח את המסמך',

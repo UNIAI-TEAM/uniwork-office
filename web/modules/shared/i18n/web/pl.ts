@@ -4,8 +4,8 @@ export const pl = {
   webCancel: 'Anuluj',
   webConflictTitle: 'Ten dokument został zmieniony w innym miejscu',
   webConflictBody:
-    'Podczas edycji zapisano nowszą wersję. Czy zastąpić ją swoją wersją, czy wczytać najnowszą wersję i odrzucić swoje zmiany?',
-  webConflictOverwrite: 'Zastąp',
+    'Twoich zmian nie ma jeszcze w UniWork; są przechowywane w tej przeglądarce do czasu wylogowania.',
+  webConflictOverwrite: 'Zastąp…',
   webConflictReload: 'Wczytaj najnowszą wersję',
   webConflictNotSaved: 'dokument został zmieniony w innym miejscu',
   webFatalTitle: 'Nie można otworzyć dokumentu',

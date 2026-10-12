@@ -3,9 +3,8 @@ import type { zh } from './zh'
 export const ko = {
   webCancel: '취소',
   webConflictTitle: '이 문서는 다른 곳에서 변경되었습니다',
-  webConflictBody:
-    '편집하는 동안 새 버전이 저장되었습니다. 내 버전으로 덮어쓰시겠습니까, 아니면 최신 버전을 다시 불러오고 변경 내용을 버리시겠습니까?',
-  webConflictOverwrite: '덮어쓰기',
+  webConflictBody: '변경 사항은 아직 UniWork에 없으며 로그아웃할 때까지 이 브라우저에 보관됩니다.',
+  webConflictOverwrite: '덮어쓰기…',
   webConflictReload: '최신 버전 다시 불러오기',
   webConflictNotSaved: '문서가 다른 곳에서 변경되었습니다',
   webFatalTitle: '문서를 열 수 없습니다',

@@ -3,8 +3,8 @@ import type { zh } from './zh'
 export const cs = {
   webConflictTitle: 'Tato prezentace byla změněna jinde',
   webConflictBody:
-    'Někdo uložil novější verzi. Přepsat ji nahradí vašimi změnami; Načíst nejnovější zahodí vaše změny a otevře nejnovější verzi.',
-  webConflictOverwrite: 'Přepsat',
+    'Vaše změny zatím nejsou v UniWork a zůstanou v tomto prohlížeči, dokud se neodhlásíte.',
+  webConflictOverwrite: 'Přepsat…',
   webConflictReload: 'Načíst nejnovější',
   webConflictNotSaved: 'prezentace byla změněna jinde',
   webDiscardTitle: 'Zahodit neuložené změny?',

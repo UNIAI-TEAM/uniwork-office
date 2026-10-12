@@ -523,8 +523,8 @@ export const fr = {
   appStyleNamePlaceholder: 'Nom du style',
   appWebConflictTitle: 'Ce document a été modifié ailleurs',
   appWebConflictBody:
-    'Une version plus récente a été enregistrée pendant que vous modifiiez. Voulez-vous l’écraser avec votre version, ou recharger la dernière version et abandonner vos modifications ?',
-  appWebConflictOverwrite: 'Écraser',
+    'Vos modifications ne sont pas encore sur UniWork et sont conservées dans ce navigateur jusqu’à votre déconnexion.',
+  appWebConflictOverwrite: 'Écraser…',
   appWebConflictReload: 'Recharger la dernière version',
   appWebConflictNotSaved: 'le document a été modifié ailleurs',
   appWebDiscardTitle: 'Abandonner les modifications non enregistrées ?',

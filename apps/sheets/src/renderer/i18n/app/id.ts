@@ -1520,8 +1520,8 @@ export const id = {
   appWebViewOnly: 'Hanya lihat: Anda tidak dapat menyimpan perubahan pada buku kerja ini.',
   appWebConflictTitle: 'Buku kerja ini diubah di tempat lain',
   appWebConflictBody:
-    'Seseorang menyimpan versi yang lebih baru saat Anda mengedit. Timpa dengan versi Anda, atau muat ulang versi terbaru (perubahan yang belum disimpan akan dibuang).',
-  appWebConflictOverwrite: 'Timpa',
+    'Perubahan Anda belum ada di UniWork dan disimpan di browser ini sampai Anda keluar.',
+  appWebConflictOverwrite: 'Timpa…',
   appWebConflictReload: 'Muat ulang versi terbaru',
   appWebConflictNotSaved: 'Tidak disimpan: ada versi yang lebih baru.',
   appWebDiscardTitle: 'Buang perubahan yang belum disimpan?',

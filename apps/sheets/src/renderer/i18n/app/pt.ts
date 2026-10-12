@@ -1560,8 +1560,8 @@ export const pt = {
   appWebViewOnly: 'Somente leitura: você não pode salvar alterações nesta pasta de trabalho.',
   appWebConflictTitle: 'Esta pasta de trabalho foi alterada em outro lugar',
   appWebConflictBody:
-    'Alguém salvou uma versão mais recente enquanto você editava. Substitua-a pela sua versão ou recarregue a versão mais recente (as alterações não salvas serão descartadas).',
-  appWebConflictOverwrite: 'Substituir',
+    'Suas alterações ainda não estão no UniWork e ficam neste navegador até você sair.',
+  appWebConflictOverwrite: 'Substituir…',
   appWebConflictReload: 'Recarregar a versão mais recente',
   appWebConflictNotSaved: 'Não salvo: existe uma versão mais recente.',
   appWebDiscardTitle: 'Descartar alterações não salvas?',

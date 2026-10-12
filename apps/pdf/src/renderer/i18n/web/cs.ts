@@ -4,8 +4,8 @@ export const cs = {
   webCancel: 'Zrušit',
   webConflictTitle: 'Tento dokument byl změněn jinde',
   webConflictBody:
-    'Během úprav byla uložena novější verze. Chcete ji přepsat svou verzí, nebo načíst nejnovější verzi a zahodit své změny?',
-  webConflictOverwrite: 'Přepsat',
+    'Vaše změny zatím nejsou v UniWork a zůstanou v tomto prohlížeči, dokud se neodhlásíte.',
+  webConflictOverwrite: 'Přepsat…',
   webConflictReload: 'Načíst nejnovější verzi',
   webConflictNotSaved: 'dokument byl změněn jinde',
   webFatalTitle: 'Dokument nelze otevřít',

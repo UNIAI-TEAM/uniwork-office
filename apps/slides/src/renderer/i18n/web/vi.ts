@@ -3,8 +3,8 @@ import type { zh } from './zh'
 export const vi = {
   webConflictTitle: 'Bản trình bày này đã được thay đổi ở nơi khác',
   webConflictBody:
-    'Ai đó đã lưu một phiên bản mới hơn. Ghi đè sẽ thay thế bằng thay đổi của bạn; Tải lại bản mới nhất sẽ bỏ thay đổi của bạn và mở phiên bản mới nhất.',
-  webConflictOverwrite: 'Ghi đè',
+    'Thay đổi của bạn chưa lưu lên UniWork và vẫn được giữ trong trình duyệt này cho tới khi bạn đăng xuất.',
+  webConflictOverwrite: 'Ghi đè…',
   webConflictReload: 'Tải lại bản mới nhất',
   webConflictNotSaved: 'bản trình bày đã được thay đổi ở nơi khác',
   webDiscardTitle: 'Bỏ các thay đổi chưa lưu?',

@@ -1565,9 +1565,8 @@ export const ja = {
   appWebEngineHint: 'ファイルは変更されていません。',
   appWebViewOnly: '表示のみ: このブックの変更は保存できません。',
   appWebConflictTitle: 'このブックは別の場所で変更されました',
-  appWebConflictBody:
-    '編集中に新しいバージョンが保存されました。自分のバージョンで上書きするか、最新バージョンを再読み込みしてください（未保存の変更は破棄されます）。',
-  appWebConflictOverwrite: '上書き',
+  appWebConflictBody: '変更はまだ UniWork になく、ログアウトするまでこのブラウザーに保持されます。',
+  appWebConflictOverwrite: '上書き…',
   appWebConflictReload: '最新版を再読み込み',
   appWebConflictNotSaved: '保存されていません: 新しいバージョンがあります。',
   appWebDiscardTitle: '保存されていない変更を破棄しますか?',

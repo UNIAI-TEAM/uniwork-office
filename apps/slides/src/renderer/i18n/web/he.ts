@@ -2,9 +2,8 @@ import type { zh } from './zh'
 
 export const he = {
   webConflictTitle: 'המצגת הזו שונתה במקום אחר',
-  webConflictBody:
-    'מישהו שמר גרסה חדשה יותר. דריסה מחליפה אותה בשינויים שלך; טעינת הגרסה האחרונה מבטלת את השינויים שלך ופותחת את הגרסה החדשה ביותר.',
-  webConflictOverwrite: 'דריסה',
+  webConflictBody: 'השינויים שלך עדיין לא ב-UniWork והם נשמרים בדפדפן הזה עד שתתנתק.',
+  webConflictOverwrite: 'דריסה…',
   webConflictReload: 'טעינת הגרסה האחרונה',
   webConflictNotSaved: 'המצגת שונתה במקום אחר',
   webDiscardTitle: 'לבטל שינויים שלא נשמרו?',

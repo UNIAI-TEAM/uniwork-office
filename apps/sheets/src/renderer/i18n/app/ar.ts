@@ -1478,9 +1478,8 @@ export const ar = {
   appWebEngineHint: 'لم يتغير ملفك.',
   appWebViewOnly: 'عرض فقط: لا يمكنك حفظ التغييرات على هذا المصنف.',
   appWebConflictTitle: 'تم تغيير هذا المصنف في مكان آخر',
-  appWebConflictBody:
-    'قام شخص ما بحفظ إصدار أحدث أثناء التحرير. استبدله بإصدارك، أو أعد تحميل أحدث إصدار (سيتم تجاهل التغييرات غير المحفوظة).',
-  appWebConflictOverwrite: 'استبدال',
+  appWebConflictBody: 'تغييراتك ليست على UniWork بعد وتبقى في هذا المتصفح حتى تسجّل الخروج.',
+  appWebConflictOverwrite: 'استبدال…',
   appWebConflictReload: 'إعادة تحميل أحدث إصدار',
   appWebConflictNotSaved: 'لم يتم الحفظ: يوجد إصدار أحدث.',
   appWebDiscardTitle: 'تجاهل التغييرات غير المحفوظة؟',

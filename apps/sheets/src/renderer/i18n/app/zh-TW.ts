@@ -1423,9 +1423,8 @@ export const zhTW = {
   appWebEngineHint: '您的檔案未被變更。',
   appWebViewOnly: '僅供檢視：您無法儲存對此活頁簿的變更。',
   appWebConflictTitle: '此活頁簿已在別處被修改',
-  appWebConflictBody:
-    '在您編輯期間，有人儲存了較新的版本。可以用您的版本覆寫，或重新載入最新版本（未儲存的變更將被捨棄）。',
-  appWebConflictOverwrite: '覆寫',
+  appWebConflictBody: '你的變更尚未存到 UniWork，會保留在此瀏覽器中，直到你登出。',
+  appWebConflictOverwrite: '覆寫…',
   appWebConflictReload: '重新載入最新版本',
   appWebConflictNotSaved: '未儲存：已有較新的版本。',
   appWebDiscardTitle: '捨棄未儲存的變更？',

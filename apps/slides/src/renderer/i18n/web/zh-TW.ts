@@ -2,9 +2,8 @@ import type { zh } from './zh'
 
 export const zhTW = {
   webConflictTitle: '此簡報已在其他地方被修改',
-  webConflictBody:
-    '有人儲存了較新的版本。覆寫會以你的變更取代它；重新載入會捨棄你的變更並開啟最新版本。',
-  webConflictOverwrite: '覆寫',
+  webConflictBody: '你的變更尚未存到 UniWork，會保留在此瀏覽器中，直到你登出。',
+  webConflictOverwrite: '覆寫…',
   webConflictReload: '重新載入最新版本',
   webConflictNotSaved: '簡報已在其他地方被修改',
   webDiscardTitle: '捨棄未儲存的變更？',

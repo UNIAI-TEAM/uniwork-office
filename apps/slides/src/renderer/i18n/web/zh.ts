@@ -1,9 +1,8 @@
 /** web-frame strings (bridge-owned dialogs and notices), zh: defines the key set every other locale shard must match. */
 export const zh = {
   webConflictTitle: '此演示文稿已在别处被修改',
-  webConflictBody:
-    '有人保存了更新的版本。覆盖会用你的更改替换它；重新加载会放弃你的更改并打开最新版本。',
-  webConflictOverwrite: '覆盖',
+  webConflictBody: '你的更改尚未存到 UniWork，会保留在此浏览器中，直到你退出登录。',
+  webConflictOverwrite: '覆盖…',
   webConflictReload: '重新加载最新版本',
   webConflictNotSaved: '演示文稿已在别处被修改',
   webDiscardTitle: '放弃未保存的更改？',
