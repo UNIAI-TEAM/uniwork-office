@@ -5,9 +5,11 @@ import { buildExtensions } from '../src/renderer/editor/extensions'
 import { blockRange } from '../src/renderer/editor/ops'
 import { executeTool, type FrontmatterAccess } from '../src/renderer/ai/tools'
 import {
+  canRetryEntry,
   clearEditFence,
   fencedBlocks,
   hasEditFence,
+  restoredEntryState,
   retryFence,
   selectionFence,
   setEditFence,
@@ -303,5 +305,28 @@ describe('markdown retry fence (header retry and bubble retry share retryFence)'
     const editor = createEditor(DOC)
     setEditFence(editor, turnFence(editor, { scoped: false, queueFence: [] }))
     expect(hasEditFence(editor)).toBe(true)
+  })
+})
+
+// a stored transcript does not say which user turn was a queue submission (it is saved as its
+// summary, without scope), so a restored user entry must never be retried unfenced
+describe('a restored transcript never retries a fenced turn unfenced', () => {
+  it('every restored user entry is fenced with unknown ranges and flagged restored', () => {
+    const queueSummary = restoredEntryState('user')
+    expect(queueSummary.restored).toBe(true)
+    expect(queueSummary.fence).toEqual({ fenced: true })
+    // retrying it runs against an empty fence: every edit is refused, nothing leaks
+    expect(retryFence(queueSummary.fence!)).toEqual([])
+  })
+
+  it('assistant entries carry no fence', () => {
+    expect(restoredEntryState('assistant')).toEqual({})
+  })
+
+  it('the bubble retry is offered only on a live undelivered entry, never on a restored one', () => {
+    expect(canRetryEntry({ undelivered: true }, false)).toBe(true)
+    expect(canRetryEntry({ undelivered: true }, true)).toBe(false)
+    expect(canRetryEntry({ undelivered: true, restored: true }, false)).toBe(false)
+    expect(canRetryEntry({}, false)).toBe(false)
   })
 })
