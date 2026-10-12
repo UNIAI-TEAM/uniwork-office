@@ -126,26 +126,29 @@ const NEWER: Array<[string, unknown]> = [
 ]
 
 describe('a newer store is refused before anything opens (AC-1)', () => {
-  it.each(NEWER)('%s: lock pushed, nothing opened, folder untouched, no request', (_name, binding) => {
-    seedFolder(binding)
-    const ctx = setup()
-    const before = { binding: bindingText(), copy: bytesOf(docPath()) }
+  it.each(NEWER)(
+    '%s: lock pushed, nothing opened, folder untouched, no request',
+    (_name, binding) => {
+      seedFolder(binding)
+      const ctx = setup()
+      const before = { binding: bindingText(), copy: bytesOf(docPath()) }
 
-    expect(ctx.service.refuseLockedPath(docPath())).toBe(true)
+      expect(ctx.service.refuseLockedPath(docPath())).toBe(true)
 
-    expect(ctx.locks).toEqual([{ path: docPath(), reason: 'store_newer', name: 'Plan.docx' }])
-    expect(ctx.service.currentLocks()).toEqual(ctx.locks)
-    expect(ctx.service.isBound(docPath())).toBe(true)
-    expect(ctx.service.isReadOnly(docPath())).toBe(true)
-    // never a plain local file in recents: a working copy of ours is enriched,
-    // and one whose binding cannot be read stays hidden (as it does today)
-    expect(ctx.service.recentSource(docPath())).toBe('hidden')
-    expect(calls).toEqual([])
-    // not one byte of the folder changed, and no intent was created
-    expect(bindingText()).toBe(before.binding)
-    expect(bytesOf(docPath())).toBe(before.copy)
-    expect(folderFiles()).toEqual(['Plan.docx', BINDING_FILE])
-  })
+      expect(ctx.locks).toEqual([{ path: docPath(), reason: 'store_newer', name: 'Plan.docx' }])
+      expect(ctx.service.currentLocks()).toEqual(ctx.locks)
+      expect(ctx.service.isBound(docPath())).toBe(true)
+      expect(ctx.service.isReadOnly(docPath())).toBe(true)
+      // never a plain local file in recents: a working copy of ours is enriched,
+      // and one whose binding cannot be read stays hidden (as it does today)
+      expect(ctx.service.recentSource(docPath())).toBe('hidden')
+      expect(calls).toEqual([])
+      // not one byte of the folder changed, and no intent was created
+      expect(bindingText()).toBe(before.binding)
+      expect(bytesOf(docPath())).toBe(before.copy)
+      expect(folderFiles()).toEqual(['Plan.docx', BINDING_FILE])
+    },
+  )
 
   it('the open route calls no module and pushes the lock again only on a new refusal', () => {
     seedFolder({ schema: 2 })

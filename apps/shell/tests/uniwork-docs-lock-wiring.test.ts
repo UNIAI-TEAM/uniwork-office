@@ -61,7 +61,10 @@ async function setup(openPath = vi.fn(() => true)) {
     once: () => undefined,
   }
   const handle = createUniworkDocs(
-    { handle: (channel: string, fn: (event: unknown, ...args: unknown[]) => unknown) => handlers.set(channel, fn) } as never,
+    {
+      handle: (channel: string, fn: (event: unknown, ...args: unknown[]) => unknown) =>
+        handlers.set(channel, fn),
+    } as never,
     {
       shellWindow: () => null,
       shellContents: () => wc as never,
@@ -112,9 +115,9 @@ describe('the newer-store lock IPC (G5-04g)', () => {
     const openPath = vi.fn(() => true)
     const { handle, sent } = await setup(openPath)
     // the service asks its deps.openPath; the wiring refuses before the router
-    const shown = (handle.service as unknown as {
+    const shown = handle.service as unknown as {
       show(path: string, binding: unknown): unknown
-    })
+    }
     expect(() => shown.show(docPath(), {})).toThrowError(
       expect.objectContaining({ code: 'engine_incompatible' }),
     )
@@ -139,9 +142,9 @@ describe('the newer-store lock IPC (G5-04g)', () => {
     })
     const openPath = vi.fn(() => true)
     const { handle, sent } = await setup(openPath)
-    const shown = (handle.service as unknown as {
+    const shown = handle.service as unknown as {
       show(path: string, binding: unknown): unknown
-    })
+    }
     expect(shown.show(docPath(), { title: 'Plan.docx' })).toEqual({
       path: docPath(),
       title: 'Plan.docx',

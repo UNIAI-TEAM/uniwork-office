@@ -58,7 +58,10 @@ describe('bindingKindOf (the classifier)', () => {
 
   it('ignores min_app_version completely: lower, higher, missing or malformed', () => {
     for (const minAppVersion of ['0.0.1', '999.0.0', undefined, null, 7, {}, [], 'nonsense']) {
-      const binding = { schema: 2, ...(minAppVersion === undefined ? {} : { min_app_version: minAppVersion }) }
+      const binding = {
+        schema: 2,
+        ...(minAppVersion === undefined ? {} : { min_app_version: minAppVersion }),
+      }
       expect(bindingKindOf(binding)).toBe('newer')
     }
     // and the field cannot turn a schema-1 store into a newer one
@@ -109,7 +112,11 @@ describe('BindingStore.lookup keeps its schema-1 semantics', () => {
     const { path } = folder(schema1)
     const doc = new BindingStore(root).lookup(path)
     expect(doc).toMatchObject({ path, deploymentId: 'default', userId: 'acc_1' })
-    expect(doc?.binding).toMatchObject({ schema: 1, documentId: schema1.documentId, state: 'ready' })
+    expect(doc?.binding).toMatchObject({
+      schema: 1,
+      documentId: schema1.documentId,
+      state: 'ready',
+    })
   })
 
   it('a schema >= 2 working copy is not a bound document (as today: null)', () => {
