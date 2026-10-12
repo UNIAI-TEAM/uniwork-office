@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -192,5 +192,28 @@ describe('the newer-store lock IPC (G5-04g)', () => {
     // the status chip is pushed as usual; no lock is
     expect(sent.filter((m) => m.channel === UNIWORK_DOC_CHANNELS.lock)).toEqual([])
     expect(sent.map((m) => m.channel)).toEqual([UNIWORK_DOC_CHANNELS.docStatusEvent])
+  })
+})
+
+describe('the durable store at the account boundary (W3b)', () => {
+  it('an explicit Sign out locks and wipes the outgoing scope', async () => {
+    seed({ schema: 2 })
+    const { handle } = await setup()
+    // the account's store scope holds a record
+    const scopeDir = join(dir, 'uniwork-sync', 'store', 'default', 'acc_1', 'feed-cursors')
+    mkdirSync(scopeDir, { recursive: true })
+    writeFileSync(join(scopeDir, 'record.rec'), 'encrypted bytes')
+    // the hooks the shell's sign-out runs (see uniwork-auth's signOutUniwork)
+    expect(await handle.boundary.beforeSignOut()).toBe(true)
+    handle.boundary.afterSignOut()
+    expect(existsSync(join(dir, 'uniwork-sync', 'store', 'default', 'acc_1'))).toBe(false)
+    // another account's scope is not touched
+    const otherScope = join(dir, 'uniwork-sync', 'store', 'default', 'acc_9', 'feed-cursors')
+    mkdirSync(otherScope, { recursive: true })
+    writeFileSync(join(otherScope, 'record.rec'), 'x')
+    identity = { accountId: 'acc_9', deviceSessionId: 'dev_9', deploymentId: 'default' }
+    statusListener?.({ state: 'signed-in' })
+    await handle.boundary.enforce({ accountId: 'acc_9', deploymentId: 'default' })
+    expect(existsSync(otherScope)).toBe(true)
   })
 })

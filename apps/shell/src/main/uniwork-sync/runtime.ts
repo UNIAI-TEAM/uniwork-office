@@ -176,8 +176,10 @@ export class SyncRuntime {
         ;(timer as { unref?: () => void }).unref?.()
         return () => clearInterval(timer)
       })
-    this.cancel = schedule(() => void this.tick())
-    void this.tick()
+    this.cancel = schedule(() => {
+      void this.tick().catch(() => undefined)
+    })
+    void this.tick().catch(() => undefined)
   }
 
   /** stops the interval and forgets every consumer (sign-out, account switch, a wiped scope) */

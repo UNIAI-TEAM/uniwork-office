@@ -235,8 +235,7 @@ export const SYNC_STORE_BUDGET_BYTES = 256 * 1024 * 1024
  * wiped at the account boundary. The wrapped keys sit beside the layer root,
  * outside the wiped scope, so unlocking after a sign-out reads them again.
  */
-function createSyncStoreLayer(): StoreLayer {
-  const root = join(app.getPath('userData'), 'uniwork-sync')
+function createSyncStoreLayer(root: string): StoreLayer {
   const layer = createStoreLayer({
     root: join(root, 'store'),
     keys: createSafeStorageKeyProvider({ safeStorage, dir: join(root, 'keys') }),
@@ -249,28 +248,27 @@ function createSyncStoreLayer(): StoreLayer {
   return layer
 }
 
-/** the store layer of the shell, built once (the service and the feed runtime share it) */
-let syncLayer: StoreLayer | null = null
+/** the layer and the session's access to it: one pair per userData root */
+const syncStores = new Map<string, { layer: StoreLayer; access: SyncStoreAccess }>()
 
-function syncStoreLayer(): StoreLayer {
-  syncLayer ??= createSyncStoreLayer()
-  return syncLayer
-}
-
-/** the session's store access, built once: the key provider and layer are process-wide */
-let syncAccess: SyncStoreAccess | null = null
-
-function syncStoreAccess(): SyncStoreAccess {
-  syncAccess ??= createSyncStoreAccess({
-    layer: syncStoreLayer(),
-    scope: () => {
-      const identity = uniworkSessionIdentity()
-      return identity
-        ? { deploymentId: identity.deploymentId, accountId: identity.accountId }
-        : null
-    },
-  })
-  return syncAccess
+function syncStoreFor(): { layer: StoreLayer; access: SyncStoreAccess } {
+  const root = join(app.getPath('userData'), 'uniwork-sync')
+  let found = syncStores.get(root)
+  if (!found) {
+    const layer = createSyncStoreLayer(root)
+    const access = createSyncStoreAccess({
+      layer,
+      scope: () => {
+        const identity = uniworkSessionIdentity()
+        return identity
+          ? { deploymentId: identity.deploymentId, accountId: identity.accountId }
+          : null
+      },
+    })
+    found = { layer, access }
+    syncStores.set(root, found)
+  }
+  return found
 }
 
 /**
@@ -324,7 +322,7 @@ function createSyncRuntime(service: UniworkDocsService): SyncRuntime {
     },
   }
   return new SyncRuntime({
-    store: syncStoreAccess(),
+    store: syncStoreFor().access,
     targets,
     capability: async (orgId) => {
       const found = clients()
@@ -357,7 +355,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     const wc = wiring.shellContents()
     if (wc && !wc.isDestroyed()) wc.send(channel, payload)
   }
-  const syncStore = syncStoreAccess()
+  const syncStore = syncStoreFor().access
   const service = new UniworkDocsService({
     userDataDir: app.getPath('userData'),
     syncStore,
@@ -428,6 +426,25 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     // not shown an S11 panel for a working copy it cannot explain
     forgetLocks: (match) => service.forgetLocksWhere(match),
     closeConflictPrompt: () => service.closeConflictPrompt(),
+    sessionOwner: () => {
+      const identity = uniworkSessionIdentity()
+      return identity
+        ? { accountId: identity.accountId, deploymentId: identity.deploymentId }
+        : null
+    },
+    // the outgoing account's durable store (intents, feed cursors, doc index)
+    // is locked and wiped with its documents; the feed stops first so no
+    // in-flight consumer writes into a wiped scope
+    wipeStore: async (owner) => {
+      runtime.stop()
+      if (!owner) return
+      const store = syncStoreFor()
+      store.access.forget()
+      await store.layer.lockAndWipe({
+        deploymentId: owner.deploymentId,
+        accountId: owner.accountId,
+      })
+    },
   })
   setUniworkSignOutHooks({
     before: () => boundary.beforeSignOut(),
