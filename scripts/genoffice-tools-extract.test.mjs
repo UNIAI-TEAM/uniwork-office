@@ -877,6 +877,51 @@ describe('name anchor hardening (N1/N2)', () => {
   })
 })
 
+describe('extractor residuals (G7-06)', () => {
+  // R1-1 (g6-12/review-be-extractor-1.md): the `tools: [...]` branch is
+  // file-global, so a property bag that happens to be named `tools` inside a
+  // schema is read as a tools list and its `{ name, description }` items become
+  // phantom rows. A schema property bag is a schema description, not a list of
+  // tools, while a real `tools:` field next to it still names its tools.
+  const SCHEMA_TOOLS_BAG_FIXTURE = {
+    'apps/docs/src/renderer/ai/tools.ts': [
+      "import type { AgentSkill, AgentToolDef } from '@genoffice/agent-core'",
+      '',
+      'export const realTool: AgentToolDef = {',
+      "  name: 'real_tool',",
+      "  description: 'a tool whose schema has a property bag named tools',",
+      '  inputSchema: {',
+      "    type: 'object',",
+      '    properties: {',
+      '      tools: [',
+      "        { name: 'phantom_in_schema', description: 'a schema property bag item, not a tool' },",
+      '      ],',
+      '    },',
+      '  },',
+      '}',
+      '',
+      'export const docsSkill: AgentSkill = {',
+      "  id: 'docs',",
+      '  tools: [',
+      '    {',
+      "      name: 'field_tool',",
+      "      description: 'schema-less tool in a real tools: field',",
+      '    },',
+      '  ],',
+      '}',
+      '',
+    ].join('\n'),
+  }
+
+  it('ignores a `tools` property bag nested in a schema (R1-1)', () => {
+    const { dir } = fixture(SCHEMA_TOOLS_BAG_FIXTURE)
+    const { rows } = extract({ repo: dir, rev: 'HEAD' })
+    const tools = rows.map((r) => r.tool).sort()
+    assert.deepEqual(tools, ['field_tool', 'real_tool'])
+    assert.equal(rows.find((r) => r.tool === 'field_tool').hash, 'unresolved:missing')
+  })
+})
+
 describe('real repo', () => {
   it('produces rows for each of the six apps at HEAD', () => {
     const { rows } = extract({ repo: REPO_ROOT, rev: 'HEAD' })
