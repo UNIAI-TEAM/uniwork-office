@@ -58,6 +58,7 @@ import {
   MAX_SAVE_EDITS_TOTAL,
   SAVE_EDITS_CHUNK_JSON_MAX,
 } from '../shared/ipc-channels'
+import { installAiRunBridge } from '@genoffice/electron-utils/ai-run-bridge'
 import { installDropOpenBridge } from '@genoffice/electron-utils/drop-open'
 
 const desktopApi: DesktopApi = {
@@ -773,6 +774,9 @@ if (process.env.GENOFFICE_DEBUG_HOOKS === '1') {
 
 // open documents dragged from the OS onto this tab as a new shell tab
 installDropOpenBridge()
+
+// window.uniworkAiRun.reportAiRun: the shell learns when an AI turn runs here
+installAiRunBridge()
 
 function parseWorkbookFile(input: unknown): WorkbookFile {
   if (!isRecord(input)) throw new Error('Invalid workbook response.')
