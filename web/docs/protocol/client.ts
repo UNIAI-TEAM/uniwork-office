@@ -410,8 +410,9 @@ export function createDocsFrameClient(options: DocsFrameClientOptions): DocsFram
     reportError(error, fatal = false) {
       guarded(() => ep.emit('error', { error: toProtocolError(error).toShape(), fatal }))
     },
+    // an empty run_id is omitted: the host validator (isNonEmptyStr) would reject the event
     reportAiRun: ({ state, run_id }) =>
-      guarded(() => ep.emit('aiRun', run_id !== undefined ? { state, run_id } : { state })),
+      guarded(() => ep.emit('aiRun', run_id ? { state, run_id } : { state })),
     dispose() {
       stopReady()
       token = null

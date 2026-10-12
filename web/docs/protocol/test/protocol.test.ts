@@ -1316,6 +1316,18 @@ describe('X-02 new frame <-> new host', () => {
     expect(seen).toEqual([{ state: 'running', run_id: 'r1' }, { state: 'idle' }])
   })
 
+  it('aiRun with an empty run_id omits the key, so the host accepts the idle', async () => {
+    const { host, client, hostRejects } = setup()
+    await host.whenReady()
+    const seen: unknown[] = []
+    host.on('aiRun', (p) => seen.push(p))
+    client.reportAiRun({ state: 'running', run_id: '' })
+    client.reportAiRun({ state: 'idle', run_id: '' })
+    await flush()
+    expect(seen).toEqual([{ state: 'running' }, { state: 'idle' }])
+    expect(hostRejects).toEqual([])
+  })
+
   it('api.download goes to the host handler; without one it is unsupported', async () => {
     const handler = vi.fn(async () => ({ delivered: true as const }))
     const withHandler = setup({ api: { 'api.download': handler } })
