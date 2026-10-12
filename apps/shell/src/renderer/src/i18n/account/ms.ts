@@ -55,9 +55,6 @@ export const ms = {
     'Apl ini dipautkan kepada {server}, tetapi sesi anda milik pelayan UniWork yang lain. Log masuk semula dengan {server}, atau log keluar.',
   acctThisServer: 'pelayan yang dikonfigurasikan',
   acctNotConfiguredShort: 'Belum dipautkan',
-  acctNotConfiguredTitle: 'Tidak dipautkan kepada pelayan UniWork',
-  acctNotConfiguredBody:
-    'Salinan UniWork Office ini belum disediakan dengan pelayan UniWork, jadi log masuk tidak tersedia. Minta pentadbir anda untuk pemasang yang telah dikonfigurasikan.',
   acctKeyringShort: 'Storan selamat diperlukan',
   acctKeyringTitle: 'Storan selamat tidak tersedia',
   acctKeyringBody:

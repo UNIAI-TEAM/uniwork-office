@@ -537,6 +537,24 @@ describe('launch controller: the server profile comes before the ticket', () => 
     expect(ctx.exchange).not.toHaveBeenCalled()
     expect(ctx.events).toEqual([])
   })
+  it('a ticket held for the old server is dropped when a link moves the server', async () => {
+    const ctx = setup('applied', false)
+    await ctx.controller.handleUrl(link(TICKET))
+    expect(ctx.events).toEqual([{ phase: 'needs-sign-in' }])
+    await ctx.controller.handleUrl(`${SCHEME}://home?${PROFILE_QUERY}`)
+    await ctx.controller.onSignedIn()
+    expect(ctx.exchange).not.toHaveBeenCalled()
+    // and the same ticket delivered again is not held a second time
+    await ctx.controller.handleUrl(link(TICKET))
+    expect(ctx.events).toEqual([{ phase: 'needs-sign-in' }])
+  })
+  it('an unchanged server keeps the held ticket', async () => {
+    const ctx = setup('unchanged', false)
+    await ctx.controller.handleUrl(link(TICKET))
+    await ctx.controller.handleUrl(`${SCHEME}://home?${PROFILE_QUERY}`)
+    await ctx.controller.onSignedIn()
+    expect(ctx.exchange).toHaveBeenCalledTimes(1)
+  })
   it('a ticket-only link never touches the profile', async () => {
     const ctx = setup('applied')
     await ctx.controller.handleUrl(link(TICKET))

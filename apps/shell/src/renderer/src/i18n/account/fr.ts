@@ -55,9 +55,6 @@ export const fr = {
     'Cette application est liée à {server}, mais votre session appartient à un autre serveur UniWork. Reconnectez-vous avec {server} ou déconnectez-vous.',
   acctThisServer: 'le serveur configuré',
   acctNotConfiguredShort: 'Non lié',
-  acctNotConfiguredTitle: 'Non lié à un serveur UniWork',
-  acctNotConfiguredBody:
-    'Cette copie d’UniWork Office n’est pas encore configurée avec un serveur UniWork ; la connexion n’est donc pas disponible. Demandez un programme d’installation configuré à votre administrateur.',
   acctKeyringShort: 'Stockage sécurisé requis',
   acctKeyringTitle: 'Le stockage sécurisé est indisponible',
   acctKeyringBody:

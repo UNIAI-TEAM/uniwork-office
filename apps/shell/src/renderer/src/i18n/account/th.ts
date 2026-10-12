@@ -54,9 +54,6 @@ export const th = {
     'แอปนี้เชื่อมต่อกับ {server} แต่เซสชันของคุณเป็นของเซิร์ฟเวอร์ UniWork อื่น โปรดเข้าสู่ระบบอีกครั้งด้วย {server} หรือออกจากระบบ',
   acctThisServer: 'เซิร์ฟเวอร์ที่กำหนดค่าไว้',
   acctNotConfiguredShort: 'ยังไม่ได้เชื่อมต่อ',
-  acctNotConfiguredTitle: 'ยังไม่ได้เชื่อมต่อกับเซิร์ฟเวอร์ UniWork',
-  acctNotConfiguredBody:
-    'UniWork Office เวอร์ชันนี้ยังไม่ได้ตั้งค่าให้เชื่อมต่อกับเซิร์ฟเวอร์ UniWork จึงยังเข้าสู่ระบบไม่ได้ โปรดติดต่อผู้ดูแลระบบเพื่อขอตัวติดตั้งที่กำหนดค่าไว้แล้ว',
   acctKeyringShort: 'ต้องใช้ที่เก็บข้อมูลที่ปลอดภัย',
   acctKeyringTitle: 'ไม่สามารถใช้ที่เก็บข้อมูลที่ปลอดภัยได้',
   acctKeyringBody:

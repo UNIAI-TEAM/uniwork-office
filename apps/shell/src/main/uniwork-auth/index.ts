@@ -20,9 +20,9 @@ import {
 } from './deployment'
 import {
   createProfileApplier,
+  serializeProfileApplies,
   profileFromAddress,
   writeUserProfile,
-  type ProfileOutcome,
   type ServerAddressError,
 } from './profile-store'
 import { createUniworkCloudClient, UniworkCloudController, type CloudAccountView } from './cloud'
@@ -132,27 +132,30 @@ export function uniworkAppChannel(): DeploymentChannel {
  * the server is new or another deployment; then the old sign-in ends (its
  * documents close first) and the userData profile is written before the
  * account moves. Anything but applied / unchanged means nothing changed.
+ * One change runs at a time (see serializeProfileApplies).
  */
-export function applyUniworkProfile(
-  incoming: DeploymentProfile,
-  options: { confirm(origin: string): Promise<boolean>; confirmed?: boolean },
-): Promise<ProfileOutcome> {
-  const account = uniworkAccount()
-  return createProfileApplier({
-    appChannel: uniworkAppChannel,
-    current: () => account.deploymentProfile(),
-    confirm: options.confirm,
-    endSession: async () => {
-      await signOutUniwork(account)
-      // the sign-out hooks may be cancelled by the user: the session then stays
-      return account.sessionIdentity() === null
-    },
-    save: (profile) => writeUserProfile(app.getPath('userData'), profile),
-    adopt: async (profile) => {
-      await account.adoptProfile(profile)
-    },
-  }).apply(incoming, { confirmed: options.confirmed })
-}
+export const applyUniworkProfile = serializeProfileApplies(
+  (
+    incoming: DeploymentProfile,
+    options: { confirm(origin: string): Promise<boolean>; confirmed?: boolean },
+  ) => {
+    const account = uniworkAccount()
+    return createProfileApplier({
+      appChannel: uniworkAppChannel,
+      current: () => account.deploymentProfile(),
+      confirm: options.confirm,
+      endSession: async () => {
+        await signOutUniwork(account)
+        // the sign-out hooks may be cancelled by the user: the session then stays
+        return account.sessionIdentity() === null
+      },
+      save: (profile) => writeUserProfile(app.getPath('userData'), profile),
+      adopt: async (profile) => {
+        await account.adoptProfile(profile)
+      },
+    }).apply(incoming, { confirmed: options.confirmed })
+  },
+)
 
 /** Settings / connect screen: a typed address becomes the profile (no second question). */
 export async function connectUniworkServer(
@@ -360,10 +363,14 @@ export function registerAccountIpc(
   })
   ipcMain.handle(HOME_CHANNELS.accountSetServer, async (event, address: unknown) => {
     const current = account(event.sender)
+    // re-points the app without the link question, so only the shell's own
+    // page (Settings > Account lives in it) may ask, never a frame inside it
+    const fromShell =
+      event.sender === shellContents() && event.senderFrame === event.sender.mainFrame
     const result =
-      typeof address === 'string'
+      fromShell && typeof address === 'string'
         ? await connectUniworkServer(address)
-        : ({ ok: false, error: 'invalid_address' } as const)
+        : ({ ok: false, error: fromShell ? 'invalid_address' : 'refused' } as const)
     return { ...result, status: current.status() }
   })
   ipcMain.handle(HOME_CHANNELS.accountRetry, (event) => account(event.sender).retry())

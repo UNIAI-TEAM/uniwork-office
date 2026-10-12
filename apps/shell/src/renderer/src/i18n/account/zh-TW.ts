@@ -52,9 +52,6 @@ export const zhTW = {
     '此應用程式已連結至 {server}，但您的工作階段屬於另一個 UniWork 伺服器。請使用 {server} 重新登入，或登出。',
   acctThisServer: '已設定的伺服器',
   acctNotConfiguredShort: '未連結',
-  acctNotConfiguredTitle: '未連結至 UniWork 伺服器',
-  acctNotConfiguredBody:
-    '此 UniWork Office 尚未設定 UniWork 伺服器，因此無法登入。請向管理員索取已設定好的安裝程式。',
   acctKeyringShort: '需要安全儲存空間',
   acctKeyringTitle: '無法使用安全儲存空間',
   acctKeyringBody:

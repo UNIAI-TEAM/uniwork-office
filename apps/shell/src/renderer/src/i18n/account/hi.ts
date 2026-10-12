@@ -54,9 +54,6 @@ export const hi = {
     'यह ऐप {server} से जुड़ा है, लेकिन आपका सत्र किसी दूसरे UniWork सर्वर का है। {server} के साथ फिर से साइन इन करें, या साइन आउट करें।',
   acctThisServer: 'कॉन्फ़िगर किया गया सर्वर',
   acctNotConfiguredShort: 'जुड़ा नहीं है',
-  acctNotConfiguredTitle: 'UniWork सर्वर से नहीं जुड़ा है',
-  acctNotConfiguredBody:
-    'UniWork Office की यह कॉपी अभी किसी UniWork सर्वर के साथ सेट अप नहीं है, इसलिए साइन इन उपलब्ध नहीं है। अपने व्यवस्थापक से कॉन्फ़िगर किया हुआ इंस्टॉलर माँगें।',
   acctKeyringShort: 'सुरक्षित स्टोरेज ज़रूरी है',
   acctKeyringTitle: 'सुरक्षित स्टोरेज उपलब्ध नहीं है',
   acctKeyringBody:

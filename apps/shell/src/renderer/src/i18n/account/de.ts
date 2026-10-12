@@ -56,9 +56,6 @@ export const de = {
     'Diese App ist mit {server} verknüpft, Ihre Sitzung gehört jedoch zu einem anderen UniWork-Server. Melden Sie sich erneut bei {server} an oder melden Sie sich ab.',
   acctThisServer: 'dem konfigurierten Server',
   acctNotConfiguredShort: 'Nicht verknüpft',
-  acctNotConfiguredTitle: 'Nicht mit einem UniWork-Server verknüpft',
-  acctNotConfiguredBody:
-    'Diese Kopie von UniWork Office ist noch nicht mit einem UniWork-Server eingerichtet, daher ist die Anmeldung nicht verfügbar. Fragen Sie Ihren Administrator nach einem konfigurierten Installationsprogramm.',
   acctKeyringShort: 'Sicherer Speicher erforderlich',
   acctKeyringTitle: 'Der sichere Speicher ist nicht verfügbar',
   acctKeyringBody:

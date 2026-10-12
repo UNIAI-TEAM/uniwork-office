@@ -50,9 +50,6 @@ export const zh = {
     '此应用已关联 {server}，但当前登录属于另一个 UniWork 服务器。请使用 {server} 重新登录，或退出登录。',
   acctThisServer: '已配置的服务器',
   acctNotConfiguredShort: '未关联服务器',
-  acctNotConfiguredTitle: '未关联 UniWork 服务器',
-  acctNotConfiguredBody:
-    '此 UniWork Office 尚未配置 UniWork 服务器，因此暂时无法登录。请向管理员索取已配置的安装包。',
   acctKeyringShort: '需要安全存储',
   acctKeyringTitle: '安全存储不可用',
   acctKeyringBody:

@@ -55,9 +55,6 @@ export const es = {
     'Esta aplicación está vinculada a {server}, pero tu sesión pertenece a otro servidor de UniWork. Vuelve a iniciar sesión con {server} o cierra la sesión.',
   acctThisServer: 'el servidor configurado',
   acctNotConfiguredShort: 'Sin vincular',
-  acctNotConfiguredTitle: 'No vinculado a un servidor de UniWork',
-  acctNotConfiguredBody:
-    'Esta copia de UniWork Office aún no está configurada con un servidor de UniWork, por lo que no se puede iniciar sesión. Pide a tu administrador un instalador configurado.',
   acctKeyringShort: 'Se necesita almacenamiento seguro',
   acctKeyringTitle: 'El almacenamiento seguro no está disponible',
   acctKeyringBody:

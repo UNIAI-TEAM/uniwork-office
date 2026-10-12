@@ -12,6 +12,7 @@ import {
   createProfileApplier,
   decideProfileChange,
   profileFromAddress,
+  serializeProfileApplies,
   writeUserProfile,
   type ProfileApplierDeps,
 } from '../src/main/uniwork-auth/profile-store'
@@ -87,13 +88,19 @@ describe('profile applier', () => {
     return { applier: createProfileApplier(deps), deps, calls }
   }
 
-  it('same deployment id with a new origin: saved and adopted without asking or signing out', async () => {
+  it('same deployment id with a new origin: no question, the old sign-in ends through the hooks', async () => {
     const { applier, deps, calls } = setup()
     const next = profile({ apiOrigin: 'https://new.example' })
     expect(await applier.apply(next)).toBe('applied')
-    expect(calls).toEqual(['save', 'adopt'])
+    expect(calls).toEqual(['endSession', 'save', 'adopt'])
     expect(deps.confirm).not.toHaveBeenCalled()
-    expect(deps.endSession).not.toHaveBeenCalled()
+  })
+
+  it('a moved origin whose close prompt is cancelled changes nothing', async () => {
+    const { applier, deps } = setup({ endSession: vi.fn(async () => false) })
+    expect(await applier.apply(profile({ apiOrigin: 'https://new.example' }))).toBe('declined')
+    expect(deps.save).not.toHaveBeenCalled()
+    expect(deps.adopt).not.toHaveBeenCalled()
   })
 
   it('a new deployment id asks once, ends the old session, then saves and adopts', async () => {
@@ -154,6 +161,32 @@ describe('profile applier', () => {
   })
 })
 
+describe('serializeProfileApplies', () => {
+  it('drops a link while a change is open, queues a typed address, decides each in turn', async () => {
+    let release!: () => void
+    const gate = new Promise<void>((r) => (release = r))
+    const order: string[] = []
+    const apply = serializeProfileApplies(
+      async (incoming: DeploymentProfile, _options: { confirmed?: boolean }) => {
+        order.push(`start ${incoming.deploymentId}`)
+        if (incoming.deploymentId === 'first') await gate
+        order.push(`end ${incoming.deploymentId}`)
+        return 'applied' as const
+      },
+    )
+    const first = apply(profile({ deploymentId: 'first' }), {})
+    const burst = apply(profile({ deploymentId: 'burst' }), {})
+    const typed = apply(profile({ deploymentId: 'typed' }), { confirmed: true })
+    expect(await burst).toBe('declined')
+    release()
+    expect(await first).toBe('applied')
+    expect(await typed).toBe('applied')
+    expect(order).toEqual(['start first', 'end first', 'start typed', 'end typed'])
+    // idle again: the next link runs
+    expect(await apply(profile({ deploymentId: 'later' }), {})).toBe('applied')
+  })
+})
+
 describe('userData profile file', () => {
   let dir = ''
   afterEach(() => rmSync(dir, { recursive: true, force: true }))
@@ -188,6 +221,13 @@ describe('profileFromAddress (the typed address)', () => {
       },
     })
     expect(fetch.mock.calls[0]![0]).toBe('https://uniwork.example/api/v1/config')
+  })
+
+  it('does not read past 64 KB of a typed host answer', async () => {
+    const huge = JSON.stringify({ office_deployment_id: 'big', pad: 'x'.repeat(70 * 1024) })
+    const fetch = vi.fn(async () => new Response(huge, { status: 200 }))
+    const result = await profileFromAddress('https://uniwork.example', 'stable', fetch)
+    expect(result).toMatchObject({ ok: true, profile: { deploymentId: 'default' } })
   })
 
   it('keeps the default id when the server answers without one', async () => {

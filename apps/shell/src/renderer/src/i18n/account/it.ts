@@ -55,9 +55,6 @@ export const it = {
     'Questa app è collegata a {server}, ma la tua sessione appartiene a un altro server UniWork. Accedi di nuovo con {server} oppure esci.',
   acctThisServer: 'il server configurato',
   acctNotConfiguredShort: 'Non collegata',
-  acctNotConfiguredTitle: 'Non collegata a un server UniWork',
-  acctNotConfiguredBody:
-    'Questa copia di UniWork Office non è ancora configurata con un server UniWork, quindi l’accesso non è disponibile. Chiedi al tuo amministratore un programma di installazione già configurato.',
   acctKeyringShort: 'Archivio sicuro necessario',
   acctKeyringTitle: 'Archivio sicuro non disponibile',
   acctKeyringBody:

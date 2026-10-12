@@ -55,9 +55,6 @@ export const cs = {
     'Tato aplikace je propojena se serverem {server}, ale vaše relace patří jinému serveru UniWork. Přihlaste se znovu k serveru {server} nebo se odhlaste.',
   acctThisServer: 'nakonfigurovaný server',
   acctNotConfiguredShort: 'Nepropojeno',
-  acctNotConfiguredTitle: 'Nepropojeno se serverem UniWork',
-  acctNotConfiguredBody:
-    'Tato kopie UniWork Office zatím není nastavena na server UniWork, proto není přihlášení dostupné. Požádejte správce o nakonfigurovaný instalační balíček.',
   acctKeyringShort: 'Nutné zabezpečené úložiště',
   acctKeyringTitle: 'Zabezpečené úložiště není dostupné',
   acctKeyringBody:

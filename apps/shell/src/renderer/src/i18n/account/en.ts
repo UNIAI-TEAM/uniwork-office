@@ -54,9 +54,6 @@ export const en = {
     'This app is linked to {server}, but your session belongs to another UniWork server. Sign in again with {server}, or sign out.',
   acctThisServer: 'the configured server',
   acctNotConfiguredShort: 'Not linked',
-  acctNotConfiguredTitle: 'Not linked to a UniWork server',
-  acctNotConfiguredBody:
-    'This copy of UniWork Office isn’t set up with a UniWork server yet, so signing in isn’t available. Ask your administrator for a configured installer.',
   acctKeyringShort: 'Secure storage needed',
   acctKeyringTitle: 'Secure storage is unavailable',
   acctKeyringBody:

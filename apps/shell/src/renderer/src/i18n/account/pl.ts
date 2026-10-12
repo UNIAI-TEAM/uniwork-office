@@ -55,9 +55,6 @@ export const pl = {
     'Ta aplikacja jest połączona z serwerem {server}, ale Twoja sesja należy do innego serwera UniWork. Zaloguj się ponownie na serwerze {server} lub wyloguj się.',
   acctThisServer: 'skonfigurowany serwer',
   acctNotConfiguredShort: 'Niepołączono',
-  acctNotConfiguredTitle: 'Brak połączenia z serwerem UniWork',
-  acctNotConfiguredBody:
-    'Ta kopia UniWork Office nie została jeszcze skonfigurowana z serwerem UniWork, więc logowanie jest niedostępne. Poproś administratora o skonfigurowany instalator.',
   acctKeyringShort: 'Wymagany bezpieczny magazyn',
   acctKeyringTitle: 'Bezpieczny magazyn jest niedostępny',
   acctKeyringBody:

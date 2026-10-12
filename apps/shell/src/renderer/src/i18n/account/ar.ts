@@ -53,9 +53,6 @@ export const ar = {
     'هذا التطبيق مرتبط بـ {server}، لكن جلستك تنتمي إلى خادم UniWork آخر. سجّل الدخول مرة أخرى باستخدام {server}، أو سجّل الخروج.',
   acctThisServer: 'الخادم المُهيّأ',
   acctNotConfiguredShort: 'غير مرتبط',
-  acctNotConfiguredTitle: 'غير مرتبط بخادم UniWork',
-  acctNotConfiguredBody:
-    'لم يتم إعداد نسخة UniWork Office هذه مع خادم UniWork بعد، لذا لا يتوفر تسجيل الدخول. اطلب من المسؤول مثبّتًا مُهيّأً مسبقًا.',
   acctKeyringShort: 'التخزين الآمن مطلوب',
   acctKeyringTitle: 'التخزين الآمن غير متاح',
   acctKeyringBody:

@@ -19,7 +19,8 @@ export type ProfileChange = 'refuse' | 'unchanged' | 'update' | 'confirm'
 /**
  * - another channel's profile is refused (a dev link never re-points a stable app);
  * - the same deployment id with the same origin changes nothing, with a new
- *   origin it moves silently (the domain moved);
+ *   origin it moves without a question (the domain moved), but the old
+ *   sign-in still ends the normal way;
  * - no profile yet, or another deployment id, needs the user's yes.
  */
 export function decideProfileChange(
@@ -73,10 +74,12 @@ export function createProfileApplier(deps: ProfileApplierDeps): ProfileApplier {
       try {
         if (change === 'refuse') return 'refused'
         if (change === 'unchanged') return 'unchanged'
-        if (change === 'confirm') {
-          if (!options.confirmed && !(await deps.confirm(incoming.apiOrigin))) return 'declined'
-          if (!(await deps.endSession())) return 'declined'
+        if (change === 'confirm' && !options.confirmed) {
+          if (!(await deps.confirm(incoming.apiOrigin))) return 'declined'
         }
+        // a moved origin also ends the old sign-in through the sign-out hooks:
+        // its documents close and its AI history is forgotten, as on Sign out
+        if (!(await deps.endSession())) return 'declined'
         deps.save(incoming)
         await deps.adopt(incoming)
         return 'applied'
@@ -88,9 +91,52 @@ export function createProfileApplier(deps: ProfileApplierDeps): ProfileApplier {
   }
 }
 
+/**
+ * One profile change at a time. A link that arrives while another change is
+ * still being decided (a confirm or close prompt is open) is dropped, so a
+ * burst of links cannot stack dialogs; a typed address waits its turn. Each
+ * change decides on the profile in force when it runs.
+ */
+export function serializeProfileApplies<O extends { confirmed?: boolean }>(
+  apply: (incoming: DeploymentProfile, options: O) => Promise<ProfileOutcome>,
+): (incoming: DeploymentProfile, options: O) => Promise<ProfileOutcome> {
+  let running: Promise<ProfileOutcome> | null = null
+  return (incoming, options) => {
+    if (running && !options.confirmed) return Promise.resolve('declined')
+    const next: Promise<ProfileOutcome> = (running ?? Promise.resolve('unchanged'))
+      .catch(() => 'refused' as const)
+      .then(() => apply(incoming, options))
+    running = next
+    void next.finally(() => {
+      if (running === next) running = null
+    })
+    return next
+  }
+}
+
 export type ServerAddressError = 'invalid_address' | 'unreachable'
 
 const SERVER_PROBE_MS = 8_000
+/** the public config is a few KB; a typed host never gets to stream more */
+const SERVER_PROBE_MAX_BYTES = 64 * 1024
+
+async function readBounded(response: Response, limit: number): Promise<string | null> {
+  const reader = response.body?.getReader()
+  if (!reader) return null
+  const chunks: Uint8Array[] = []
+  let size = 0
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    size += value.byteLength
+    if (size > limit) {
+      await reader.cancel().catch(() => undefined)
+      return null
+    }
+    chunks.push(value)
+  }
+  return Buffer.concat(chunks).toString('utf8')
+}
 const SERVER_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/
 
 /**
@@ -122,7 +168,13 @@ export async function profileFromAddress(
       redirect: 'error',
       signal: AbortSignal.timeout(SERVER_PROBE_MS),
     })
-    const body: unknown = await response.json().catch(() => null)
+    const text = await readBounded(response, SERVER_PROBE_MAX_BYTES)
+    let body: unknown = null
+    try {
+      body = text === null ? null : JSON.parse(text)
+    } catch {
+      body = null
+    }
     const id =
       body && typeof body === 'object'
         ? (body as Record<string, unknown>).office_deployment_id

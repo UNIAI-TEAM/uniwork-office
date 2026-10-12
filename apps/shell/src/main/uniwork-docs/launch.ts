@@ -230,6 +230,8 @@ export class LaunchController {
         return
       }
       if (outcome === 'declined') return
+      // another server now: a ticket held for the old one is never sent to it
+      if (outcome === 'applied') this.dropHeld()
     }
     if (!ticket) return
     // the same link delivered twice (argv + open-url, a double click) redeems once
@@ -256,6 +258,13 @@ export class LaunchController {
       return
     }
     await this.redeem(held.ticket)
+  }
+
+  private dropHeld(): void {
+    if (!this.held) return
+    clearTimeout(this.held.timer)
+    this.terminal.add(this.held.ticket)
+    this.held = null
   }
 
   dispose(): void {

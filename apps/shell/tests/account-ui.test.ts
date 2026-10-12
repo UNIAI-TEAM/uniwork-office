@@ -443,6 +443,14 @@ describe('Settings → Account pane', () => {
     expectNoRawKeys()
   })
 
+  it('first run: one click on the sidebar chip opens the connect screen', async () => {
+    await render(statusFor('not-configured', { serverOrigin: undefined }))
+    expect(pane()).toBeNull()
+    await click(entry())
+    expect(pane()?.textContent).toContain(en.acctConnectTitle)
+    expect(host.querySelector('#acct-server-address')).toBeTruthy()
+  })
+
   it('not-configured, Vietnamese: the copy the product asks for', async () => {
     await render(statusFor('not-configured', { serverOrigin: undefined }), {
       open: true,

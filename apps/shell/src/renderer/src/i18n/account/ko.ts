@@ -53,9 +53,6 @@ export const ko = {
     '이 앱은 {server}에 연결되어 있지만 현재 세션은 다른 UniWork 서버의 것입니다. {server}으로 다시 로그인하거나 로그아웃하세요.',
   acctThisServer: '구성된 서버',
   acctNotConfiguredShort: '연결되지 않음',
-  acctNotConfiguredTitle: 'UniWork 서버에 연결되어 있지 않습니다',
-  acctNotConfiguredBody:
-    '이 UniWork Office는 아직 UniWork 서버와 설정되지 않아 로그인할 수 없습니다. 구성된 설치 프로그램은 관리자에게 문의하세요.',
   acctKeyringShort: '보안 저장소 필요',
   acctKeyringTitle: '보안 저장소를 사용할 수 없습니다',
   acctKeyringBody:

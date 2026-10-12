@@ -55,9 +55,6 @@ export const ru = {
     'Это приложение связано с сервером {server}, но ваш сеанс относится к другому серверу UniWork. Войдите снова на {server} или выйдите.',
   acctThisServer: 'настроенный сервер',
   acctNotConfiguredShort: 'Не подключено',
-  acctNotConfiguredTitle: 'Нет связи с сервером UniWork',
-  acctNotConfiguredBody:
-    'Эта копия UniWork Office ещё не настроена на работу с сервером UniWork, поэтому вход недоступен. Обратитесь к администратору за настроенным установщиком.',
   acctKeyringShort: 'Нужно защищённое хранилище',
   acctKeyringTitle: 'Защищённое хранилище недоступно',
   acctKeyringBody:

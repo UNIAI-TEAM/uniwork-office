@@ -54,9 +54,6 @@ export const vi = {
     'Ứng dụng này được liên kết với {server}, nhưng phiên đăng nhập của bạn thuộc một máy chủ UniWork khác. Hãy đăng nhập lại với {server} hoặc đăng xuất.',
   acctThisServer: 'máy chủ đã cấu hình',
   acctNotConfiguredShort: 'Chưa liên kết',
-  acctNotConfiguredTitle: 'Chưa liên kết với máy chủ UniWork',
-  acctNotConfiguredBody:
-    'Bản UniWork Office này chưa được thiết lập với máy chủ UniWork nên chưa thể đăng nhập. Hãy liên hệ quản trị viên để nhận bộ cài đã được cấu hình.',
   acctKeyringShort: 'Cần kho lưu trữ bảo mật',
   acctKeyringTitle: 'Không dùng được kho lưu trữ bảo mật',
   acctKeyringBody:

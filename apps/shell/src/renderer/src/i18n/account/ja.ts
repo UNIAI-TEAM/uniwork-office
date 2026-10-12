@@ -55,9 +55,6 @@ export const ja = {
     'このアプリは {server} に接続されていますが、現在のセッションは別の UniWork サーバーのものです。{server} で再度サインインするか、サインアウトしてください。',
   acctThisServer: '設定済みのサーバー',
   acctNotConfiguredShort: '未接続',
-  acctNotConfiguredTitle: 'UniWork サーバーに接続されていません',
-  acctNotConfiguredBody:
-    'この UniWork Office はまだ UniWork サーバーと設定されていないため、サインインできません。設定済みのインストーラーについては管理者にお問い合わせください。',
   acctKeyringShort: 'セキュアストレージが必要です',
   acctKeyringTitle: 'セキュアストレージを利用できません',
   acctKeyringBody:

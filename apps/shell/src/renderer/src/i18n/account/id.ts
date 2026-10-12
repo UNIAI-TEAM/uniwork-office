@@ -54,9 +54,6 @@ export const id = {
     'Aplikasi ini terhubung ke {server}, tetapi sesi Anda milik server UniWork lain. Masuk lagi dengan {server}, atau keluar.',
   acctThisServer: 'server yang dikonfigurasi',
   acctNotConfiguredShort: 'Belum terhubung',
-  acctNotConfiguredTitle: 'Belum terhubung ke server UniWork',
-  acctNotConfiguredBody:
-    'UniWork Office ini belum diatur dengan server UniWork, sehingga fitur masuk belum tersedia. Minta penginstal yang sudah dikonfigurasi kepada administrator Anda.',
   acctKeyringShort: 'Perlu penyimpanan aman',
   acctKeyringTitle: 'Penyimpanan aman tidak tersedia',
   acctKeyringBody:

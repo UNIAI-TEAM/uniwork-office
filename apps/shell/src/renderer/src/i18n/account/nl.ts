@@ -54,9 +54,6 @@ export const nl = {
     'Deze app is gekoppeld aan {server}, maar je sessie hoort bij een andere UniWork-server. Log opnieuw in bij {server} of log uit.',
   acctThisServer: 'de geconfigureerde server',
   acctNotConfiguredShort: 'Niet gekoppeld',
-  acctNotConfiguredTitle: 'Niet gekoppeld aan een UniWork-server',
-  acctNotConfiguredBody:
-    'Deze kopie van UniWork Office is nog niet ingesteld met een UniWork-server, dus inloggen is niet beschikbaar. Vraag je beheerder om een geconfigureerd installatieprogramma.',
   acctKeyringShort: 'Beveiligde opslag vereist',
   acctKeyringTitle: 'Beveiligde opslag is niet beschikbaar',
   acctKeyringBody:

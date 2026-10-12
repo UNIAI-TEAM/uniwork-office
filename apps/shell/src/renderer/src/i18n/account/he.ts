@@ -53,9 +53,6 @@ export const he = {
     'האפליקציה הזו מקושרת אל {server}, אך ההפעלה שלך שייכת לשרת UniWork אחר. היכנס שוב אל {server} או צא.',
   acctThisServer: 'השרת שהוגדר',
   acctNotConfiguredShort: 'לא מקושר',
-  acctNotConfiguredTitle: 'לא מקושר לשרת UniWork',
-  acctNotConfiguredBody:
-    'עותק זה של UniWork Office עדיין לא הוגדר עם שרת UniWork, ולכן הכניסה אינה זמינה. בקש ממנהל המערכת מתקין מוגדר.',
   acctKeyringShort: 'נדרש אחסון מאובטח',
   acctKeyringTitle: 'האחסון המאובטח אינו זמין',
   acctKeyringBody:
