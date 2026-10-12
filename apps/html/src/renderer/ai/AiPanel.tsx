@@ -240,6 +240,8 @@ export interface AiPreset {
   /** what the chat bubble shows when the instruction itself carries protocol text */
   displayText?: string
   scope?: AiScopeQuoteData
+  /** element-scoped send: the sids the run may edit (enforced by the tools) */
+  fenceSids?: number[]
 }
 
 /** Prefill the composer without sending (Ask AI about the selected element) */
@@ -511,6 +513,8 @@ export function AiPanel({
   const runDisplayRef = useRef('')
   /** the scope quote of the last send, carried over by the header retry */
   const lastScopeRef = useRef<AiScopeQuoteData | undefined>(undefined)
+  /** sids the current turn may edit (Ask AI on an element, queue run); null = the whole page */
+  const fenceRef = useRef<readonly number[] | null>(null)
   const runMutatedRef = useRef(false)
   /** tool activity of the whole run, for transcript persistence */
   const runToolsRef = useRef<ToolActivity[]>([])
@@ -694,6 +698,7 @@ export function AiPanel({
             getInstruction: () => runInstructionRef.current,
             resolveAttachmentSrc: (ref) => resolveAttachmentSrc(ref),
             listAttachmentNames: () => availableAttachments().map((a) => a.name),
+            getEditFence: () => fenceRef.current,
           },
           () => readOnlyRef.current,
         ),
@@ -908,6 +913,7 @@ export function AiPanel({
     queueRun = false,
     attachmentsOverride?: AttachmentMeta[],
     scope?: AiScopeQuoteData,
+    fenceSids: readonly number[] | null = null,
   ): boolean => {
     const instruction = text.trim()
     const loop = loopRef.current
@@ -928,6 +934,7 @@ export function AiPanel({
     runInstructionRef.current = instruction
     runDisplayRef.current = displayText ?? instruction
     lastScopeRef.current = scope
+    fenceRef.current = fenceSids && fenceSids.length > 0 ? fenceSids : null
     runMutatedRef.current = false
     depsRef.current.onPrompt(displayText ?? instruction)
     runToolsRef.current = []
@@ -983,6 +990,9 @@ export function AiPanel({
       buildQueueInstruction(entries),
       buildQueueSummary(t('aiQueueSubmitted', { count: entries.length }), entries),
       true,
+      undefined,
+      undefined,
+      entries.map((entry) => entry.target.sid),
     )
     // consume only once the run is under way; a failed run keeps its retry via the bubble's instruction
     if (started) onQueueConsume(editQueue.map((item) => item.qid))
@@ -1034,6 +1044,7 @@ export function AiPanel({
       lastQueueRunRef.current,
       undefined,
       lastScopeRef.current,
+      fenceRef.current,
     )
   }
 
@@ -1061,7 +1072,7 @@ export function AiPanel({
     presetNonceRef.current = preset.nonce
     // while a run is active the request lands in the composer as the user phrased it, never as protocol text
     if (loopRef.current?.busy) setPrompt(preset.displayText ?? preset.text)
-    else send(preset.text, preset.displayText, false, undefined, preset.scope)
+    else send(preset.text, preset.displayText, false, undefined, preset.scope, preset.fenceSids)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preset])
 

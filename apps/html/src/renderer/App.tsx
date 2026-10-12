@@ -1016,6 +1016,7 @@ export default function App() {
       displayText: instruction,
       nonce: Date.now(),
       scope,
+      fenceSids: [askTarget.sid],
     })
   }
   /** viewport rect of the selected element, clipped to the stage; identity changes whenever the geometry does */
