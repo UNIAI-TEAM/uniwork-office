@@ -196,6 +196,13 @@ const homeApi: HomeApi = {
   async starred(query) {
     return asRecentPage(await ipcRenderer.invoke(HOME_CHANNELS.starred, query))
   },
+  async starredGroups() {
+    const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.starredGroups)
+    return Array.isArray(result) ? result.filter((g): g is string => typeof g === 'string') : []
+  },
+  async setStarredGroup(paths, group) {
+    await ipcRenderer.invoke(HOME_CHANNELS.setStarredGroup, paths, group)
+  },
   async statPaths(paths) {
     const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.statPaths, paths)
     return Array.isArray(result) ? (result as RecentEntry[]) : []
@@ -203,6 +210,37 @@ const homeApi: HomeApi = {
   async toggleStar(path) {
     if (typeof path !== 'string' || !path) throw new Error('Invalid path.')
     await ipcRenderer.invoke(HOME_CHANNELS.toggleStar, path)
+  },
+  async openHelp() {
+    await ipcRenderer.invoke(HOME_CHANNELS.openHelp)
+  },
+  // knowledge-base ask panel (handlers live in the shell main, same process
+  // that owns the index and the shared ai:stream registration)
+  async kbList() {
+    return ipcRenderer.invoke('kb:list')
+  },
+  async kbSearch(query) {
+    return ipcRenderer.invoke('kb:search', query)
+  },
+  async kbRead(path, offset) {
+    return ipcRenderer.invoke('kb:read', { path, offset })
+  },
+  async aiGetSettings() {
+    return ipcRenderer.invoke('ai:get-settings')
+  },
+  async aiStream(request) {
+    await ipcRenderer.invoke('ai:stream', request)
+  },
+  async aiStreamCancel(requestId) {
+    await ipcRenderer.invoke('ai:stream-cancel', requestId)
+  },
+  onAiStream(handler) {
+    const listener = (_event: Electron.IpcRendererEvent, chunk: unknown) => handler(chunk as never)
+    ipcRenderer.on('ai:stream-chunk', listener)
+    return () => ipcRenderer.removeListener('ai:stream-chunk', listener)
+  },
+  async aiGskStatus() {
+    return ipcRenderer.invoke('ai:gsk-status')
   },
   async openPath(path) {
     if (typeof path !== 'string' || !path) throw new Error('Invalid path.')
@@ -299,6 +337,9 @@ const homeApi: HomeApi = {
   },
   async removeRecent(paths) {
     await ipcRenderer.invoke(HOME_CHANNELS.removeRecent, paths)
+  },
+  async unstarPaths(paths) {
+    await ipcRenderer.invoke(HOME_CHANNELS.unstarPaths, paths)
   },
   async revealPath(path) {
     if (typeof path !== 'string' || !path) throw new Error('Invalid path.')

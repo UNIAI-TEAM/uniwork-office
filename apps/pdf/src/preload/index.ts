@@ -8,6 +8,7 @@ import type { PdfApi, UiTheme } from '../shared/ipc'
 
 const api: PdfApi = {
   consumePending: () => ipcRenderer.invoke(PDF_CHANNELS.consumePending),
+<<<<<<< ours
   consumeAiPreset: () => ipcRenderer.invoke(PDF_CHANNELS.consumeAiPreset),
   onAiPreset: (handler) => {
     const listener = (
@@ -17,6 +18,9 @@ const api: PdfApi = {
     ipcRenderer.on('my-ai:ai-preset', listener)
     return () => ipcRenderer.removeListener('my-ai:ai-preset', listener)
   },
+=======
+  openSourcePath: (path: string) => ipcRenderer.invoke('home:open-path', path),
+>>>>>>> theirs
   readFile: (path) => ipcRenderer.invoke(PDF_CHANNELS.readFile, path),
   save: (request) => ipcRenderer.invoke(PDF_CHANNELS.save, request),
   requestRedactionCopy: (path) => ipcRenderer.invoke(PDF_CHANNELS.requestRedactionCopy, path),
@@ -49,14 +53,27 @@ const api: PdfApi = {
     ipcRenderer.invoke(AI_CHANNELS.imageSearch, query, maxResults),
   fetchImage: (url) => ipcRenderer.invoke(AI_CHANNELS.fetchImage, url),
   generateImage: (op) => ipcRenderer.invoke(PDF_CHANNELS.generateImage, op),
+  listDigitalSignatures: (path) => ipcRenderer.invoke(PDF_CHANNELS.listDigitalSignatures, path),
+  pickCertificate: () => ipcRenderer.invoke(PDF_CHANNELS.pickCertificate),
+  listSystemCertificates: (storePassword) =>
+    ipcRenderer.invoke(PDF_CHANNELS.listSystemCertificates, storePassword),
+  releaseCertificate: (certId) => ipcRenderer.send(PDF_CHANNELS.releaseCertificate, certId),
+  inspectCertificate: (certId, password, storePassword) =>
+    ipcRenderer.invoke(PDF_CHANNELS.inspectCertificate, certId, password, storePassword),
+  signWithCertificate: (request) => ipcRenderer.invoke(PDF_CHANNELS.signWithCertificate, request),
   listSavedSignatures: () => ipcRenderer.invoke(PDF_CHANNELS.listSignatures),
   addSavedSignature: (data) => ipcRenderer.invoke(PDF_CHANNELS.addSignature, data),
   removeSavedSignature: (id) => ipcRenderer.invoke(PDF_CHANNELS.removeSignature, id),
   getUsername: () => ipcRenderer.invoke(PDF_CHANNELS.getUsername),
   setDirty: (dirty) => ipcRenderer.send(PDF_CHANNELS.dirtyChanged, dirty),
   onCloseSaveRequest: (handler) => {
+<<<<<<< ours
     const listener = (_e: Electron.IpcRendererEvent, request?: { origin?: unknown }) =>
       handler({ origin: request?.origin === 'internal' ? 'internal' : 'user' })
+=======
+    const listener = (_e: unknown, opts?: { flushAll?: boolean }) =>
+      handler({ flushAll: opts?.flushAll === true })
+>>>>>>> theirs
     ipcRenderer.on(PDF_CHANNELS.closeSaveRequest, listener)
     return () => ipcRenderer.removeListener(PDF_CHANNELS.closeSaveRequest, listener)
   },

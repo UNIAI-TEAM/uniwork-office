@@ -15,7 +15,11 @@ import { AiQueueAnchors } from './aiQueueAnchors'
 import { InactiveSelection } from './inactiveSelection'
 import { SearchHighlight } from './searchHighlight'
 import { buildMathExtensions } from './math'
+<<<<<<< ours
 import { RawHtmlBlock, RawHtmlInline } from './rawHtml'
+=======
+import { Redaction } from './Redaction'
+>>>>>>> theirs
 import {
   BlockStartEscapedParagraph,
   SelectiveEscapeMarkdown,
@@ -118,9 +122,15 @@ export function buildExtensions(options: BuildExtensionsOptions): AnyExtension[]
     StyledTaskItem.configure({ nested: true }),
     // KaTeX-rendered $...$ / $$...$$ formulas (issue #100)
     ...buildMathExtensions(),
+<<<<<<< ours
     // raw HTML / comments survive open → save byte-identically
     RawHtmlBlock,
     RawHtmlInline,
+=======
+    // text the reader withholds from the model: the words stay in the document
+    // and in the file, and only the model-facing view replaces them
+    Redaction,
+>>>>>>> theirs
     LocalImage,
     // links open externally via main-process guard
     ImageAwareLink.configure({ openOnClick: false }),

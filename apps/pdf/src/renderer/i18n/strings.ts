@@ -1,4 +1,8 @@
+<<<<<<< ours
 import { webStrings } from './strings-web'
+=======
+import { certSignStringsFor } from './cert-sign-strings'
+>>>>>>> theirs
 
 const fillFormStrings = {
   ribbonTabFillForm: 'Fill Form',
@@ -47,11 +51,138 @@ const fillFormStrings = {
     'Redactions were not applied. Click Apply redactions to apply these marks to the working copy; Normal Save never applies these marks.',
   redactSaveFirst: 'Save other pending changes before applying redactions.',
   redactStructureBlocked: 'Apply or clear pending redactions before changing page structure.',
+  ribbonTabFormDesign: 'Form Design',
+  formDesignText: 'Text field',
+  formDesignTextHint: 'Click or drag on the page to add a fillable text field',
+  formDesignCheckbox: 'Checkbox',
+  formDesignCheckboxHint: 'Click or drag on the page to add a checkbox',
+  formDesignSignature: 'Signature field',
+  formDesignSignatureHint: 'Click or drag on the page to add a signature field',
+  formDesignDelete: 'Delete field',
+  formDesignDeleted: 'Field deleted',
+  formDesignPending: '{count} new fields, written to the PDF on save',
+  formDesignEmptyHint: 'Pick a field type, then click or drag on the page',
+  formDesignRequired: 'Required',
+  formDesignMultiLine: 'Multi-line',
+  formDesignDefaultValue: 'Default value',
+  formDesignDefaultChecked: 'Checked by default',
+  formDesignNameInvalid: 'Field names must be unique and cannot contain "." "/" or "\\"',
+  formDesignExportValueTaken: 'Each button in a radio group needs its own, non-empty option value',
+  formDesignOptionsEmpty: 'A dropdown needs at least one option',
+  formDesignRadio: 'Radio button',
+  formDesignRadioHint:
+    'Click or drag to add a radio button; consecutive buttons join one group (same name)',
+  formDesignChoice: 'Dropdown',
+  formDesignChoiceHint: 'Click or drag on the page to add a dropdown list',
+  formDesignDate: 'Date field',
+  formDesignDateHint: 'Click or drag on the page to add a date field with format checking',
+  formDesignExportValue: 'Option value',
+  formDesignRadioGroupHint: 'Buttons with the same field name form one group',
+  formDesignOptions: 'Options (one per line)',
+  formDesignDateFormat: 'Date format',
+  formDesignDetect: 'Auto detect',
+  formDesignDetecting: 'Detecting…',
+  formDesignDetectHint:
+    'Find blanks, boxes and "Label:" gaps on every page and add fields there; review and delete what you do not want',
+  formDesignDetected: '{count} fields detected and added; adjust or delete them as needed',
+  formDesignDetectedNone: 'No blanks or boxes found to turn into fields',
+  formDesignArrange: 'Arrange',
+  formDesignArrangeHint:
+    'Align, distribute or size the selected fields (select several with Shift or a drag)',
+  formDesignAlignLeft: 'Align left',
+  formDesignAlignCenterH: 'Center horizontally',
+  formDesignAlignRight: 'Align right',
+  formDesignAlignTop: 'Align top',
+  formDesignAlignCenterV: 'Center vertically',
+  formDesignAlignBottom: 'Align bottom',
+  formDesignDistributeH: 'Distribute horizontally',
+  formDesignDistributeV: 'Distribute vertically',
+  formDesignSameWidth: 'Same width',
+  formDesignSameHeight: 'Same height',
+  formDesignSameSize: 'Same size',
+  formDesignProperties: 'Properties',
+  formDesignCopy: 'Copy',
+  formDesignPaste: 'Paste',
+  formDesignDuplicate: 'Duplicate',
+  formDesignKeepTool: 'Keep adding',
+  formDesignKeepToolHint: 'Keep the field tool armed after each placement (or hold Ctrl/⌘)',
+  formDesignPreview: 'Preview',
+  formDesignPreviewHint: 'Try filling the form as a reader would; toggle again to keep editing',
+  formDesignPreviewOn: 'Preview: fill the fields to try them, then toggle Preview off to edit',
+  formDesignPlaceHint: 'Click or drag on the page to place the field; Esc cancels',
+  formDesignDone: 'Done',
+  formDateInvalid: 'Enter a date as {format}',
+  formDatePick: 'Pick a date',
+  formDesignCancel: 'Cancel',
+  formDesignExistingHint: 'Saved field: move, resize, mark required or delete',
+  formDesignSignedLocked: 'This field is signed; clear the signature before moving or deleting it',
 }
 
 const localizedFillFormStrings = {
   zh: {
     ribbonTabFillForm: '填写表单',
+    ribbonTabFormDesign: '表单设计',
+    formDesignRadio: '单选按钮',
+    formDesignRadioHint: '点击或拖拽添加单选按钮；连续添加的按钮同属一组（同名）',
+    formDesignChoice: '下拉框',
+    formDesignChoiceHint: '在页面上点击或拖拽，添加下拉列表',
+    formDesignDate: '日期',
+    formDesignDateHint: '在页面上点击或拖拽，添加带格式校验的日期字段',
+    formDesignExportValue: '选项值',
+    formDesignRadioGroupHint: '字段名相同的按钮属于同一组',
+    formDesignOptions: '选项（每行一个）',
+    formDesignDateFormat: '日期格式',
+    formDateInvalid: '请按 {format} 格式输入日期',
+    formDatePick: '选择日期',
+    formDesignDetect: '自动识别',
+    formDesignDetecting: '识别中…',
+    formDesignDetectHint: '扫描各页的下划线、方框和「标签：」后的空白并添加字段；之后可调整或删除',
+    formDesignDetected: '已识别并添加 {count} 个字段，可按需调整或删除',
+    formDesignDetectedNone: '没有找到可转为字段的空白或方框',
+    formDesignArrange: '排列',
+    formDesignArrangeHint: '对齐、分布或统一所选字段尺寸（Shift 点选或框选多个）',
+    formDesignAlignLeft: '左对齐',
+    formDesignAlignCenterH: '水平居中',
+    formDesignAlignRight: '右对齐',
+    formDesignAlignTop: '顶端对齐',
+    formDesignAlignCenterV: '垂直居中',
+    formDesignAlignBottom: '底端对齐',
+    formDesignDistributeH: '横向分布',
+    formDesignDistributeV: '纵向分布',
+    formDesignSameWidth: '等宽',
+    formDesignSameHeight: '等高',
+    formDesignSameSize: '等尺寸',
+    formDesignProperties: '属性',
+    formDesignCopy: '复制',
+    formDesignPaste: '粘贴',
+    formDesignDuplicate: '创建副本',
+    formDesignKeepTool: '连续添加',
+    formDesignKeepToolHint: '放置后保持工具激活（或按住 Ctrl/⌘）',
+    formDesignPreview: '预览',
+    formDesignPreviewHint: '像读者一样试填表单；再次点击回到编辑',
+    formDesignPreviewOn: '预览中：可直接试填字段，再次点击「预览」继续编辑',
+    formDesignPlaceHint: '在页面上点击或拖拽放置字段；Esc 取消',
+    formDesignDone: '完成',
+    formDesignCancel: '取消',
+    formDesignExistingHint: '已保存的字段：可移动、缩放、设为必填或删除',
+    formDesignSignedLocked: '该字段已签名；请先清除签名再移动或删除',
+    formDesignText: '文本框',
+    formDesignTextHint: '在页面上点击或拖拽，添加可填写的文本框',
+    formDesignCheckbox: '复选框',
+    formDesignCheckboxHint: '在页面上点击或拖拽，添加复选框',
+    formDesignSignature: '签名域',
+    formDesignSignatureHint: '在页面上点击或拖拽，添加签名域',
+    formDesignDelete: '删除字段',
+    formDesignDeleted: '字段已删除',
+    formDesignPending: '{count} 个新字段，保存时写入 PDF',
+    formDesignEmptyHint: '先选择字段类型，再在页面上点击或拖拽',
+    formDesignRequired: '必填',
+    formDesignMultiLine: '多行',
+    formDesignDefaultValue: '默认值',
+    formDesignDefaultChecked: '默认勾选',
+    formDesignNameInvalid: '字段名称需唯一，且不能包含 . / \\',
+    formDesignExportValueTaken: '同一单选组内每个按钮的选项值必须唯一且非空',
+    formDesignOptionsEmpty: '下拉框至少需要一个选项',
     formPreviousField: '上一字段',
     formNextField: '下一字段',
     insertText: '插入文字',
@@ -87,6 +218,68 @@ const localizedFillFormStrings = {
   },
   'zh-TW': {
     ribbonTabFillForm: '填寫表單',
+    ribbonTabFormDesign: '表單設計',
+    formDesignRadio: '單選按鈕',
+    formDesignRadioHint: '點擊或拖曳新增單選按鈕；連續新增的按鈕同屬一組（同名）',
+    formDesignChoice: '下拉選單',
+    formDesignChoiceHint: '在頁面上點擊或拖曳，新增下拉選單',
+    formDesignDate: '日期',
+    formDesignDateHint: '在頁面上點擊或拖曳，新增帶格式檢查的日期欄位',
+    formDesignExportValue: '選項值',
+    formDesignRadioGroupHint: '欄位名稱相同的按鈕屬於同一組',
+    formDesignOptions: '選項（每行一個）',
+    formDesignDateFormat: '日期格式',
+    formDateInvalid: '請依 {format} 格式輸入日期',
+    formDatePick: '選擇日期',
+    formDesignDetect: '自動辨識',
+    formDesignDetecting: '辨識中…',
+    formDesignDetectHint: '掃描各頁的底線、方框和「標籤：」後的空白並新增欄位；之後可調整或刪除',
+    formDesignDetected: '已辨識並新增 {count} 個欄位，可視需要調整或刪除',
+    formDesignDetectedNone: '找不到可轉為欄位的空白或方框',
+    formDesignArrange: '排列',
+    formDesignArrangeHint: '對齊、分佈或統一所選欄位尺寸（Shift 點選或框選多個）',
+    formDesignAlignLeft: '靠左對齊',
+    formDesignAlignCenterH: '水平置中',
+    formDesignAlignRight: '靠右對齊',
+    formDesignAlignTop: '靠上對齊',
+    formDesignAlignCenterV: '垂直置中',
+    formDesignAlignBottom: '靠下對齊',
+    formDesignDistributeH: '水平分佈',
+    formDesignDistributeV: '垂直分佈',
+    formDesignSameWidth: '等寬',
+    formDesignSameHeight: '等高',
+    formDesignSameSize: '等尺寸',
+    formDesignProperties: '屬性',
+    formDesignCopy: '複製',
+    formDesignPaste: '貼上',
+    formDesignDuplicate: '建立副本',
+    formDesignKeepTool: '連續新增',
+    formDesignKeepToolHint: '放置後保持工具啟用（或按住 Ctrl/⌘）',
+    formDesignPreview: '預覽',
+    formDesignPreviewHint: '像讀者一樣試填表單；再按一次回到編輯',
+    formDesignPreviewOn: '預覽中：可直接試填欄位，再按一次「預覽」繼續編輯',
+    formDesignPlaceHint: '在頁面上點擊或拖曳放置欄位；Esc 取消',
+    formDesignDone: '完成',
+    formDesignCancel: '取消',
+    formDesignExistingHint: '已儲存的欄位：可移動、縮放、設為必填或刪除',
+    formDesignSignedLocked: '該欄位已簽名；請先清除簽名再移動或刪除',
+    formDesignText: '文字欄位',
+    formDesignTextHint: '在頁面上點選或拖曳，新增可填寫的文字欄位',
+    formDesignCheckbox: '核取方塊',
+    formDesignCheckboxHint: '在頁面上點選或拖曳，新增核取方塊',
+    formDesignSignature: '簽名欄位',
+    formDesignSignatureHint: '在頁面上點選或拖曳，新增簽名欄位',
+    formDesignDelete: '刪除欄位',
+    formDesignDeleted: '欄位已刪除',
+    formDesignPending: '{count} 個新欄位，儲存時寫入 PDF',
+    formDesignEmptyHint: '先選擇欄位類型，再在頁面上點選或拖曳',
+    formDesignRequired: '必填',
+    formDesignMultiLine: '多行',
+    formDesignDefaultValue: '預設值',
+    formDesignDefaultChecked: '預設勾選',
+    formDesignNameInvalid: '欄位名稱需唯一，且不能包含 . / \\',
+    formDesignExportValueTaken: '同一單選組內每個按鈕的選項值必須唯一且非空',
+    formDesignOptionsEmpty: '下拉選單至少需要一個選項',
     formPreviousField: '上一欄位',
     formNextField: '下一欄位',
     insertText: '插入文字',
@@ -206,8 +399,12 @@ const fillFormStringsFor = (lang: string) => ({
 export const strings = {
   zh: {
     ...fillFormStringsFor('zh'),
+<<<<<<< ours
     ...webStrings.zh,
     aiViewOnlyNotice: '仅查看文档:AI 可以阅读并回答问题,但无法编辑。',
+=======
+    ...certSignStringsFor('zh'),
+>>>>>>> theirs
     ribbonTabHome: '开始',
     ribbonTabAnnotate: '注释',
     ribbonTabEdit: '编辑',
@@ -539,9 +736,13 @@ export const strings = {
   },
   en: {
     ...fillFormStringsFor('en'),
+<<<<<<< ours
     ...webStrings.en,
     aiViewOnlyNotice:
       'View-only document: AI can read it and answer questions, but editing is turned off.',
+=======
+    ...certSignStringsFor('en'),
+>>>>>>> theirs
     ribbonTabHome: 'Home',
     ribbonTabAnnotate: 'Annotate',
     ribbonTabEdit: 'Edit',
@@ -882,9 +1083,13 @@ export const strings = {
   },
   vi: {
     ...fillFormStringsFor('vi'),
+<<<<<<< ours
     ...webStrings.vi,
     aiViewOnlyNotice:
       'Tài liệu chỉ xem: AI có thể đọc và trả lời câu hỏi, nhưng không thể chỉnh sửa.',
+=======
+    ...certSignStringsFor('vi'),
+>>>>>>> theirs
     ribbonTabHome: 'Trang chủ',
     ribbonTabAnnotate: 'Chú thích',
     ribbonTabEdit: 'Chỉnh sửa',
@@ -1228,9 +1433,13 @@ export const strings = {
   },
   ja: {
     ...fillFormStringsFor('ja'),
+<<<<<<< ours
     ...webStrings.ja,
     aiViewOnlyNotice:
       '閲覧専用のドキュメント: AI は内容の読み取りと質問への回答はできますが、編集はできません。',
+=======
+    ...certSignStringsFor('ja'),
+>>>>>>> theirs
     ribbonTabHome: 'ホーム',
     ribbonTabAnnotate: '注釈',
     ribbonTabEdit: '編集',
@@ -1570,9 +1779,13 @@ export const strings = {
   },
   ko: {
     ...fillFormStringsFor('ko'),
+<<<<<<< ours
     ...webStrings.ko,
     aiViewOnlyNotice:
       '보기 전용 문서: AI는 내용을 읽고 질문에 답할 수 있지만 편집할 수는 없습니다.',
+=======
+    ...certSignStringsFor('ko'),
+>>>>>>> theirs
     ribbonTabHome: '홈',
     ribbonTabAnnotate: '주석',
     ribbonTabEdit: '편집',
@@ -1911,9 +2124,13 @@ export const strings = {
   },
   fr: {
     ...fillFormStringsFor('fr'),
+<<<<<<< ours
     ...webStrings.fr,
     aiViewOnlyNotice:
       'Document en lecture seule : l’IA peut le lire et répondre à des questions, mais ne peut pas le modifier.',
+=======
+    ...certSignStringsFor('fr'),
+>>>>>>> theirs
     ribbonTabHome: 'Accueil',
     ribbonTabAnnotate: 'Annoter',
     ribbonTabEdit: 'Édition',
@@ -2262,9 +2479,13 @@ export const strings = {
   },
   de: {
     ...fillFormStringsFor('de'),
+<<<<<<< ours
     ...webStrings.de,
     aiViewOnlyNotice:
       'Schreibgeschütztes Dokument: Die KI kann es lesen und Fragen beantworten, aber nicht bearbeiten.',
+=======
+    ...certSignStringsFor('de'),
+>>>>>>> theirs
     ribbonTabHome: 'Start',
     ribbonTabAnnotate: 'Anmerken',
     ribbonTabEdit: 'Bearbeiten',
@@ -2611,9 +2832,13 @@ export const strings = {
   },
   es: {
     ...fillFormStringsFor('es'),
+<<<<<<< ours
     ...webStrings.es,
     aiViewOnlyNotice:
       'Documento de solo lectura: la IA puede leerlo y responder preguntas, pero no puede editarlo.',
+=======
+    ...certSignStringsFor('es'),
+>>>>>>> theirs
     ribbonTabHome: 'Inicio',
     ribbonTabAnnotate: 'Anotar',
     ribbonTabEdit: 'Editar',
@@ -2960,8 +3185,12 @@ export const strings = {
   },
   th: {
     ...fillFormStringsFor('th'),
+<<<<<<< ours
     ...webStrings.th,
     aiViewOnlyNotice: 'เอกสารแบบดูอย่างเดียว: AI อ่านและตอบคำถามได้ แต่แก้ไขไม่ได้',
+=======
+    ...certSignStringsFor('th'),
+>>>>>>> theirs
     ribbonTabHome: 'หน้าแรก',
     ribbonTabAnnotate: 'คำอธิบายประกอบ',
     ribbonTabEdit: 'แก้ไข',
@@ -3300,9 +3529,13 @@ export const strings = {
   },
   id: {
     ...fillFormStringsFor('id'),
+<<<<<<< ours
     ...webStrings.id,
     aiViewOnlyNotice:
       'Dokumen hanya-lihat: AI dapat membaca dan menjawab pertanyaan, tetapi tidak dapat mengedit.',
+=======
+    ...certSignStringsFor('id'),
+>>>>>>> theirs
     ribbonTabHome: 'Beranda',
     ribbonTabAnnotate: 'Anotasi',
     ribbonTabEdit: 'Edit',
@@ -3646,9 +3879,13 @@ export const strings = {
   },
   ru: {
     ...fillFormStringsFor('ru'),
+<<<<<<< ours
     ...webStrings.ru,
     aiViewOnlyNotice:
       'Документ только для просмотра: ИИ может читать его и отвечать на вопросы, но не может редактировать.',
+=======
+    ...certSignStringsFor('ru'),
+>>>>>>> theirs
     ribbonTabHome: 'Главная',
     ribbonTabAnnotate: 'Аннотирование',
     ribbonTabEdit: 'Правка',
@@ -3993,9 +4230,13 @@ export const strings = {
   },
   ar: {
     ...fillFormStringsFor('ar'),
+<<<<<<< ours
     ...webStrings.ar,
     aiViewOnlyNotice:
       'مستند للعرض فقط: يمكن للذكاء الاصطناعي قراءته والإجابة عن الأسئلة، لكنه لا يستطيع تعديله.',
+=======
+    ...certSignStringsFor('ar'),
+>>>>>>> theirs
     ribbonTabHome: 'الشريط الرئيسي',
     ribbonTabAnnotate: 'تعليق توضيحي',
     ribbonTabEdit: 'تحرير',
@@ -4333,9 +4574,13 @@ export const strings = {
   },
   pt: {
     ...fillFormStringsFor('pt'),
+<<<<<<< ours
     ...webStrings.pt,
     aiViewOnlyNotice:
       'Documento somente leitura: a IA pode lê-lo e responder a perguntas, mas não pode editá-lo.',
+=======
+    ...certSignStringsFor('pt'),
+>>>>>>> theirs
     ribbonTabHome: 'Página Inicial',
     ribbonTabAnnotate: 'Anotar',
     ribbonTabEdit: 'Editar',
@@ -4681,9 +4926,13 @@ export const strings = {
   },
   it: {
     ...fillFormStringsFor('it'),
+<<<<<<< ours
     ...webStrings.it,
     aiViewOnlyNotice:
       'Documento di sola lettura: l’IA può leggerlo e rispondere a domande, ma non può modificarlo.',
+=======
+    ...certSignStringsFor('it'),
+>>>>>>> theirs
     ribbonTabHome: 'Home',
     ribbonTabAnnotate: 'Annota',
     ribbonTabEdit: 'Modifica',
@@ -5032,9 +5281,13 @@ export const strings = {
   },
   pl: {
     ...fillFormStringsFor('pl'),
+<<<<<<< ours
     ...webStrings.pl,
     aiViewOnlyNotice:
       'Dokument tylko do odczytu: AI może go czytać i odpowiadać na pytania, ale nie może go edytować.',
+=======
+    ...certSignStringsFor('pl'),
+>>>>>>> theirs
     ribbonTabHome: 'Narzędzia główne',
     ribbonTabAnnotate: 'Adnotacje',
     ribbonTabEdit: 'Edycja',
@@ -5378,9 +5631,13 @@ export const strings = {
   },
   cs: {
     ...fillFormStringsFor('cs'),
+<<<<<<< ours
     ...webStrings.cs,
     aiViewOnlyNotice:
       'Dokument jen pro čtení: AI jej může číst a odpovídat na otázky, ale nemůže jej upravovat.',
+=======
+    ...certSignStringsFor('cs'),
+>>>>>>> theirs
     ribbonTabHome: 'Domů',
     ribbonTabAnnotate: 'Anotace',
     ribbonTabEdit: 'Úpravy',
@@ -5722,9 +5979,13 @@ export const strings = {
   },
   nl: {
     ...fillFormStringsFor('nl'),
+<<<<<<< ours
     ...webStrings.nl,
     aiViewOnlyNotice:
       'Alleen-lezen document: AI kan het lezen en vragen beantwoorden, maar niet bewerken.',
+=======
+    ...certSignStringsFor('nl'),
+>>>>>>> theirs
     ribbonTabHome: 'Start',
     ribbonTabAnnotate: 'Annoteren',
     ribbonTabEdit: 'Bewerken',
@@ -6068,9 +6329,13 @@ export const strings = {
   },
   ms: {
     ...fillFormStringsFor('ms'),
+<<<<<<< ours
     ...webStrings.ms,
     aiViewOnlyNotice:
       'Dokumen lihat sahaja: AI boleh membaca dan menjawab soalan, tetapi tidak boleh mengedit.',
+=======
+    ...certSignStringsFor('ms'),
+>>>>>>> theirs
     ribbonTabHome: 'Laman Utama',
     ribbonTabAnnotate: 'Anotasi',
     ribbonTabEdit: 'Edit',
@@ -6413,8 +6678,12 @@ export const strings = {
   },
   he: {
     ...fillFormStringsFor('he'),
+<<<<<<< ours
     ...webStrings.he,
     aiViewOnlyNotice: 'מסמך לצפייה בלבד: ה-AI יכול לקרוא אותו ולענות על שאלות, אך לא לערוך אותו.',
+=======
+    ...certSignStringsFor('he'),
+>>>>>>> theirs
     ribbonTabHome: 'בית',
     ribbonTabAnnotate: 'הערות',
     ribbonTabEdit: 'עריכה',
@@ -6748,9 +7017,13 @@ export const strings = {
   },
   hi: {
     ...fillFormStringsFor('hi'),
+<<<<<<< ours
     ...webStrings.hi,
     aiViewOnlyNotice:
       'केवल-देखने योग्य दस्तावेज़: AI इसे पढ़ सकता है और प्रश्नों के उत्तर दे सकता है, लेकिन संपादित नहीं कर सकता।',
+=======
+    ...certSignStringsFor('hi'),
+>>>>>>> theirs
     ribbonTabHome: 'होम',
     ribbonTabAnnotate: 'एनोटेट',
     ribbonTabEdit: 'संपादन',
@@ -7090,8 +7363,12 @@ export const strings = {
   },
   'zh-TW': {
     ...fillFormStringsFor('zh-TW'),
+<<<<<<< ours
     ...webStrings['zh-TW'],
     aiViewOnlyNotice: '唯讀文件:AI 可以閱讀並回答問題,但無法編輯。',
+=======
+    ...certSignStringsFor('zh-TW'),
+>>>>>>> theirs
     ribbonTabHome: '常用',
     ribbonTabAnnotate: '註解',
     ribbonTabEdit: '編輯',

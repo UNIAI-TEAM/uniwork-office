@@ -9,12 +9,16 @@ import type {
   AiSettings,
   AiStreamChunk,
   AiStreamRequest,
+<<<<<<< ours
   AiTestFailureKind,
+=======
+>>>>>>> theirs
   CodexModelCatalog,
   OpenRouterKeyStatus,
   UniworkCloudStatus,
 } from '@genoffice/ai-provider'
 import type { UpdateChannel, UpdateUiState } from './update-api'
+<<<<<<< ours
 
 /** Legal files shipped beside the app and opened from Settings > About. */
 export type LegalDoc = 'license' | 'notice' | 'modifications' | 'thirdParty'
@@ -50,6 +54,9 @@ export interface AttachmentImageResult {
   mime?: string
   error?: string
 }
+=======
+import type { KbFileInfo, KbReadPage, KbSearchHit } from '@genoffice/agent-core'
+>>>>>>> theirs
 import type { AiPanelPrefs } from '@genoffice/ui/ai-panel-prefs'
 import type { FileExcerpt } from './file-excerpt'
 
@@ -211,6 +218,9 @@ export interface RecentEntry {
   sizeBytes: number
   /** whether the user starred this file */
   starred: boolean
+  /** the starred group this file belongs to (absent when ungrouped); only
+      populated by the starred() query — the other list queries omit it */
+  group?: string
   /** the path failed to stat (disconnected drive, moved, deleted) — kept
       listed like Word's recents instead of silently dropped (r158) */
   missing?: boolean
@@ -226,6 +236,8 @@ export interface RecentQuery {
   limit?: number
   /** restrict to one extension ('docx' | 'xlsx' | 'pptx'); omit for all */
   ext?: string
+  /** starred() only: restrict to one starred group; omit for all */
+  group?: string
 }
 
 export interface RecentPage {
@@ -259,12 +271,12 @@ export interface FileSearchHit extends RecentEntry {
 
 /**
  * Endpoints the search reranker can judge against. The hosted Jev routes are
- * OpenRouter and TypeSafe's own API; Perplexity and Cloudflare host their own
- * decision models; Kev and Rizzo Flow are local /v1/systemone servers;
- * `custom` points at any other /v1/systemone-compatible server.
+ * OpenRouter and TypeSafe's own API; Perplexity, Cloudflare and Liquid AI host
+ * their own decision models; Kev and Rizzo Flow are local /v1/systemone
+ * servers; `custom` points at any other /v1/systemone-compatible server.
  */
 export type DecisionEndpoint =
-  'openrouter' | 'direct' | 'perplexity' | 'cloudflare' | 'kev' | 'rizzo' | 'custom'
+  'openrouter' | 'direct' | 'perplexity' | 'liquid' | 'cloudflare' | 'kev' | 'rizzo' | 'custom'
 
 /** home search options persisted in app-settings.json under `fileSearch` */
 export interface FileSearchSettings {
@@ -279,7 +291,7 @@ export interface FileSearchSettings {
   customModel: string
   /** `cloudflare` endpoint only: Workers AI account id */
   cloudflareAccountId: string
-  /** `cloudflare` endpoint only: Workers AI model path, e.g. @cf/cloudflare/clef */
+  /** `cloudflare` endpoint only: Workers AI model path, e.g. @cf/cloudflare/clef or @cf/cloudflare/clef-omni */
   cloudflareModel: string
 }
 
@@ -347,11 +359,32 @@ export interface HomeApi {
   testFileSearchRerank(settings: FileSearchSettings): Promise<AiConnectionTestResult>
   /** starred files (independent of the recent list), newest first (paged) */
   starred(query?: RecentQuery): Promise<RecentPage>
+  /** starred group names that currently have at least one file, in creation order */
+  starredGroups(): Promise<string[]>
+  /** put each starred path into `group` (null = remove from its group) */
+  setStarredGroup(paths: string[], group: string | null): Promise<void>
   /** stat a specific set of paths (project view); unstat-able files come back flagged `missing` */
   statPaths(paths: string[]): Promise<RecentEntry[]>
   /** star / unstar a file */
   toggleStar(path: string): Promise<void>
+  // ---- knowledge-base ask panel: the reader's starred corpus, askable ----
+  /** the starred corpus as the AI's knowledge base */
+  kbList(): Promise<KbFileInfo[]>
+  /** full-text search over the corpus */
+  kbSearch(query: { q: string; limit?: number }): Promise<KbSearchHit[]>
+  /** one page of a corpus file's parsed text (path must be in kbList) */
+  kbRead(path: string, offset: number): Promise<KbReadPage>
+  /** the user's AI provider settings (shared with every app's panel) */
+  aiGetSettings(): Promise<AiSettings>
+  /** one streamed model turn over the shared ai:stream handler */
+  aiStream(request: AiStreamRequest): Promise<void>
+  aiStreamCancel(requestId: string): Promise<void>
+  /** subscribe to stream chunks; returns unsubscribe */
+  onAiStream(handler: (chunk: AiStreamChunk) => void): () => void
+  /** Genspark login state (the default provider's auth source) */
+  aiGskStatus(): Promise<{ loggedIn: boolean; email?: string }>
   /** open an existing file, routing to the right module by extension */
+  openHelp(): Promise<void>
   openPath(path: string): Promise<void>
   /**
    * Budget-capped text excerpts for Recent/Starred files (My AI summarize).
@@ -405,6 +438,8 @@ export interface HomeApi {
   newHtml(opts?: NewFileOpts & { projectId?: string }): Promise<void>
   /** drop entries from the recent list (does not touch the files) */
   removeRecent(paths: string[]): Promise<void>
+  /** unstar files in bulk (Starred view selection bar); the recents list and the files are untouched */
+  unstarPaths(paths: string[]): Promise<void>
   /** reveal the file in Finder / Explorer */
   revealPath(path: string): Promise<void>
   /** rename the file on disk (same directory) and update the recent list */
@@ -1038,6 +1073,7 @@ export interface MoveResult {
 }
 
 export const HOME_CHANNELS = {
+  openHelp: 'home:open-help',
   recents: 'home:recents',
   searchFiles: 'home:search-files',
   rerankSearch: 'home:rerank-search',
@@ -1047,6 +1083,9 @@ export const HOME_CHANNELS = {
   starred: 'home:starred',
   statPaths: 'home:stat-paths',
   toggleStar: 'home:toggle-star',
+  unstarPaths: 'home:unstar-paths',
+  starredGroups: 'home:starred-groups',
+  setStarredGroup: 'home:set-starred-group',
   openPath: 'home:open-path',
   browse: 'home:browse',
   newDoc: 'home:new-doc',

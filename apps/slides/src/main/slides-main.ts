@@ -992,11 +992,355 @@ export function registerSlidesIpc(): void {
     return null
   })
 
+<<<<<<< ours
   // ── Cloud single-page generation: brief → cloud HTML+conversion → one-slide pptx saved to a
   // temp file. Returns a marker string that slides:land-generated-pages redeems for the bytes.
   // Off: slide generation is not a UniWork cloud tool (gskSlideGenerate always
   // rejects), so the panel keeps the local pipeline even while signed in.
   const cloudSlideEnabled = () => false
+=======
+  // Shim over the canonical setText op (rich-text rebuild, link rels, resource cleanup,
+  // level rematerialization live in the op); autofit is a render concern and stays here.
+  ipcMain.handle('slides:edit-text', (e, op: EditTextOp) => {
+    const session = sessions.get(e.sender.id)
+    if (!session) return null
+    pushHistory(session)
+    const r = journaledTxn(session, 'edit', {
+      ops: [
+        {
+          op: 'setText',
+          target: { slide: op.slideIndex, el: op.sourceId },
+          paragraphs: op.paragraphs,
+          ...(op.groupId ? { group: op.groupId } : {}),
+        },
+      ],
+    })
+    if (!r.applied) {
+      session.undoStack.pop()
+      return null
+    }
+    const levelDirty = (r.records?.[0]?.after as { levelDirty?: boolean } | undefined)?.levelDirty
+    if (op.groupId || levelDirty) return rebuildSlide(session, op.slideIndex)
+    const rendered = applyAutofitResize(
+      session,
+      op.slideIndex,
+      op.sourceId,
+      rebuildSlide(session, op.slideIndex),
+    )
+    return syncAutofitScale(session, op.slideIndex, op.sourceId, rendered)
+  })
+
+  // Shim over the canonical setFont op: one per_op transaction covers the whole
+  // selection (non-text elements fail their own op and are skipped, matching the
+  // legacy "changed if any succeeded" semantics).
+  ipcMain.handle('slides:set-element-font', (e, op: SetElementFontOp) => {
+    const session = sessions.get(e.sender.id)
+    if (!session) return null
+    const font = {
+      fontFamily: op.fontFamily,
+      fontSizePt: op.fontSizePt,
+      fontSizeStep: op.fontSizeStep,
+      strike: op.strike,
+      bold: op.bold,
+      italic: op.italic,
+      underline: op.underline,
+      color: op.color,
+    }
+    pushHistory(session)
+    const r = journaledTxn(session, 'edit', {
+      isolation: 'per_op',
+      ops: op.sourceIds.map((id) => ({
+        op: 'setFont',
+        target: { slide: op.slideIndex, el: id },
+        font,
+        ...(op.groupId ? { group: op.groupId } : {}),
+      })),
+    })
+    if (!r.applied) {
+      session.undoStack.pop() // All non-text elements (images etc.): nothing happened, pop the just-pushed history
+      return null
+    }
+    let rendered = rebuildSlide(session, op.slideIndex)
+    for (const id of op.sourceIds) {
+      rendered = applyAutofitResize(session, op.slideIndex, id, rendered)
+      rendered = syncAutofitScale(session, op.slideIndex, id, rendered)
+    }
+    return rendered
+  })
+
+  // Shim over the canonical setParagraphFormat op (same per_op selection semantics as setFont).
+  ipcMain.handle('slides:set-element-paragraph-format', (e, op: SetElementParagraphFormatOp) => {
+    const session = sessions.get(e.sender.id)
+    if (!session) return null
+    const format = {
+      bullet: op.bullet,
+      bulletChar: op.bulletChar,
+      bulletFont: op.bulletFont,
+      numType: op.numType,
+      startAt: op.startAt,
+      bulletImage: op.bulletImage,
+      bulletHangEmu: op.bulletHangEmu,
+      bulletSizePct: op.bulletSizePct,
+      bulletColor: op.bulletColor,
+      lineSpacingPct: op.lineSpacingPct,
+      spaceBeforePt: op.spaceBeforePt,
+      spaceAfterPt: op.spaceAfterPt,
+      align: op.align,
+      rtl: op.rtl,
+      indentDelta: op.indentDelta,
+    }
+    pushHistory(session)
+    const r = journaledTxn(session, 'edit', {
+      isolation: 'per_op',
+      ops: op.sourceIds.map((id) => ({
+        op: 'setParagraphFormat',
+        target: { slide: op.slideIndex, el: id },
+        format,
+        ...(op.groupId ? { group: op.groupId } : {}),
+      })),
+    })
+    if (!r.applied) {
+      session.undoStack.pop()
+      return null
+    }
+    if (op.indentDelta) {
+      // Level changes affect inherited defaults; bake into bytes then reparse
+      materializeSlide(session.opened, op.slideIndex)
+      return rebuildSlide(session, op.slideIndex)
+    }
+    let rendered = rebuildSlide(session, op.slideIndex)
+    for (const id of op.sourceIds) {
+      rendered = applyAutofitResize(session, op.slideIndex, id, rendered)
+      rendered = syncAutofitScale(session, op.slideIndex, id, rendered)
+    }
+    return rendered
+  })
+
+  // px→EMU (inverting the viewport scale) for one setTransform. In-group editing: the
+  // pixel box is in group-local coords (with ext/chExt scaling baked in); divide out
+  // the group scale first, then convert back to the child EMU coordinate system.
+  const transformPayload = (
+    session: Session,
+    slideIndex: number,
+    fitWidthPx: number,
+    item: Omit<EditTransformOp, 'slideIndex' | 'fitWidthPx' | 'preview'>,
+  ) => {
+    const slide = session.opened.deck.slides[slideIndex]
+    if (!slide) return null
+    const childId = item.groupId
+      ? resolveGroupChildId(slide, item.groupId, item.sourceId)
+      : item.sourceId
+    const grpChild = item.groupId ? findGroupChild(slide, item.groupId, childId) : null
+    if (item.groupId && !grpChild) return null
+    const baseWidthPx = session.opened.deck.size.cx / EMU_PER_PX_96
+    const scale = fitWidthPx / baseWidthPx
+    const toEmu = (px: number) => Math.round((px / scale) * EMU_PER_PX_96)
+    let box: { x: number; y: number; cx: number; cy: number }
+    if (grpChild) {
+      const ch = grpChild.grp.childOffset
+      const chX = ch?.x ?? grpChild.grp.transform.offset.x
+      const chY = ch?.y ?? grpChild.grp.transform.offset.y
+      const gExt = grpChild.grp.transform.offset
+      const gsx = ch?.cx ? gExt.cx / ch.cx : 1
+      const gsy = ch?.cy ? gExt.cy / ch.cy : 1
+      box = {
+        x: toEmu(item.xPx / gsx) + chX,
+        y: toEmu(item.yPx / gsy) + chY,
+        cx: toEmu(item.wPx / gsx),
+        cy: toEmu(item.hPx / gsy),
+      }
+    } else {
+      box = { x: toEmu(item.xPx), y: toEmu(item.yPx), cx: toEmu(item.wPx), cy: toEmu(item.hPx) }
+    }
+    return {
+      op: 'setTransform' as const,
+      target: { slide: slideIndex, el: item.sourceId },
+      box,
+      rotDeg: item.rotationDeg,
+      // Tables redistribute gridCol widths / tr heights so the file matches the frame
+      ...(item.groupId ? { group: item.groupId } : { resizeTableGrid: true }),
+    }
+  }
+
+  // Shim over the canonical setTransform op. Preview-gesture undo bookkeeping is a
+  // surface concern and stays here.
+  ipcMain.handle('slides:edit-transform', (e, op: EditTransformOp) => {
+    const session = sessions.get(e.sender.id)
+    if (!session) return null
+    const payload = transformPayload(session, op.slideIndex, op.fitWidthPx, op)
+    if (!payload) return null
+    // Validate BEFORE the preview bookkeeping: a failed first preview must not set
+    // transformPreview (later frames would skip pushHistory and the eventual commit
+    // would lose its undo step) and must not clear the redo stack.
+    if (runTxn(session.opened, { dryRun: true, ops: [payload] }).failures?.length) return null
+    // Undo semantics for preview gestures: one whole drag = one undo step.
+    // The first preview pushes a pre-gesture snapshot; later previews and the final commit do not.
+    let pushed = false
+    if (op.preview) {
+      if (!session.transformPreview) {
+        session.previewRedo = session.redoStack
+        pushHistory(session)
+        pushed = true
+        session.transformPreview = true
+      }
+    } else if (session.transformPreview) {
+      session.transformPreview = false
+      session.previewRedo = undefined
+    } else {
+      pushHistory(session)
+      pushed = true
+    }
+    // Journal only the settled commit: preview frames would flood the ring with
+    // intermediate boxes (undo coalesces the gesture the same way via transformPreview).
+    const r = op.preview
+      ? runTxn(session.opened, { ops: [payload] })
+      : journaledTxn(session, 'edit', { ops: [payload] })
+    if (!r.applied) {
+      // Apply-time failure (e.g. a group-child slice that validation cannot see):
+      // unwind everything this call did, including the preview flag it set — a stuck
+      // flag would make later frames skip pushHistory and cost the commit its undo step.
+      if (pushed) {
+        session.undoStack.pop()
+        if (op.preview) {
+          session.transformPreview = false
+          if (session.previewRedo) session.redoStack = session.previewRedo
+          session.previewRedo = undefined
+        }
+      }
+      return null
+    }
+    return rebuildSlide(session, op.slideIndex)
+  })
+
+  // Escape mid-resize: the preview frames live in the model and their undo snapshot is the
+  // pre-gesture state, so restoring that snapshot and dropping it leaves no trace of the gesture
+  ipcMain.handle('slides:cancel-transform-preview', (e, op: { slideIndex: number }) => {
+    const session = sessions.get(e.sender.id)
+    if (!session || !session.transformPreview) return null
+    session.transformPreview = false
+    const snap = session.undoStack.pop()
+    if (snap) restoreSnapshot(session, snap)
+    if (session.previewRedo) session.redoStack = session.previewRedo
+    session.previewRedo = undefined
+    scheduleHistoryNotify(session)
+    scheduleDeckBroadcast(session)
+    return rebuildSlide(session, op.slideIndex)
+  })
+
+  // A multi-selection nudge/rotate: every item commits exactly like edit-transform,
+  // the whole batch is one undo step (PowerPoint undoes the action, not each shape).
+  ipcMain.handle('slides:edit-transform-multi', (e, op: EditTransformMultiOp) => {
+    const session = sessions.get(e.sender.id)
+    if (!session) return null
+    const ops: NonNullable<ReturnType<typeof transformPayload>>[] = []
+    for (const item of op.items) {
+      const payload = transformPayload(session, op.slideIndex, op.fitWidthPx, item)
+      if (!payload) return null
+      ops.push(payload)
+    }
+    if (!ops.length) return null
+    const r = sessionTxn(session, { ops })
+    return r ? rebuildSlide(session, op.slideIndex) : null
+  })
+
+  // Connector endpoint drag: box+flip re-derived from the two endpoints;
+  // attach/detach writes a:stCxn/a:endCxn so the connector follows later shape moves
+  ipcMain.handle('slides:edit-connector-endpoints', (e, op: EditConnectorEndpointsOp) => {
+    const session = sessions.get(e.sender.id)
+    if (!session) return null
+    const baseWidthPx = session.opened.deck.size.cx / EMU_PER_PX_96
+    const scale = op.fitWidthPx / baseWidthPx
+    const toEmu = (px: number) => Math.round((px / scale) * EMU_PER_PX_96)
+    const r = sessionTxn(session, {
+      ops: [
+        {
+          op: 'setConnectorEndpoints',
+          target: { slide: op.slideIndex, el: op.sourceId },
+          p1: { x: toEmu(op.x1Px), y: toEmu(op.y1Px) },
+          p2: { x: toEmu(op.x2Px), y: toEmu(op.y2Px) },
+          start: op.start,
+          end: op.end,
+        },
+      ],
+    })
+    return r ? rebuildSlide(session, op.slideIndex) : null
+  })
+
+  // Read-only: RenderSlide for every page of the current session (E2E driver/debug use, no state change)
+  ipcMain.handle('slides:get-render-slides', (e) => {
+    const session = sessions.get(e.sender.id)
+    if (!session) return null
+    return session.opened.deck.slides.map((_, i) => rebuildSlide(session, i))
+  })
+
+  // Shim: the whole selection is one atomic transaction of setTransform ops — the
+  // executor's plan step reproduces the legacy "every element must exist" gate.
+  ipcMain.handle('slides:batch-edit-transform', (e, op: BatchEditTransformOp) => {
+    const session = sessions.get(e.sender.id)
+    if (!session) return null
+    const baseWidthPx = session.opened.deck.size.cx / EMU_PER_PX_96
+    const scale = op.fitWidthPx / baseWidthPx
+    const toEmu = (px: number) => Math.round((px / scale) * EMU_PER_PX_96)
+    const r = sessionTxn(session, {
+      ops: op.items.map((item) => ({
+        op: 'setTransform',
+        target: { slide: op.slideIndex, el: item.sourceId },
+        box: { x: toEmu(item.xPx), y: toEmu(item.yPx), cx: toEmu(item.wPx), cy: toEmu(item.hPx) },
+        rotDeg: item.rotationDeg,
+        // Legacy parity: the batch path never redistributed table grids
+      })),
+    })
+    return r ? rebuildSlide(session, op.slideIndex) : null
+  })
+
+  // AI batch surface: raw ops arrive as one transaction — the shared core in
+  // applySessionTxn (validation, atomicity/rollback/journal, autofit render pass)
+  // is the same code the shell's MCP slides bridge drives.
+  ipcMain.handle('slides:apply-txn', (e, req: ApplyTxnOp): ApplyTxnResult | null => {
+    const session = sessions.get(e.sender.id)
+    if (!session) return null
+    return applySessionTxn(session, req)
+  })
+
+  // The whole edit script as ONE transaction: the collected primitives arrive in a
+  // single IPC, compile to ops (script-map), and apply atomically — the executor
+  // owns validation, rollback and the journal. Autofit is a render concern and
+  // stays here, mirroring the per-op shims the script used to fan out to.
+  ipcMain.handle('slides:apply-edit-script', (e, op: ApplyEditScriptOp) => {
+    const session = sessions.get(e.sender.id)
+    if (!session) return null
+    const ops = mapScriptOps(session.opened, op)
+    if (ops.length === 0) return null
+    const plan = runTxn(session.opened, { ops, dryRun: true })
+    if (plan.failures?.length) return { error: plan.failures[0]!.error }
+    pushHistory(session)
+    const r = journaledTxn(session, 'script', { ops })
+    if (!r.applied) {
+      session.undoStack.pop()
+      return { error: r.failures?.[0]?.error ?? 'the transaction could not be applied' }
+    }
+    let rendered = rebuildSlide(session, op.slideIndex)
+    for (const rec of r.records ?? []) {
+      const o = rec.op
+      const id = o.target?.el
+      if (!id || o.group || !rendered) continue
+      if (o.op === 'setText') {
+        // Level changes rematerialized inside the op; autofit would fight the reparse
+        if ((rec.after as { levelDirty?: boolean } | undefined)?.levelDirty) continue
+        rendered = applyAutofitResize(session, op.slideIndex, id, rendered)
+        rendered = syncAutofitScale(session, op.slideIndex, id, rendered)
+      } else if (o.op === 'setFont' || o.op === 'setParagraphFormat') {
+        rendered = applyAutofitResize(session, op.slideIndex, id, rendered)
+        rendered = syncAutofitScale(session, op.slideIndex, id, rendered)
+      }
+    }
+    return rendered ? { slide: rendered } : null
+  })
+  // ── Cloud single-page generation (gsk slide_generate): brief → cloud HTML+conversion → one-slide
+  // pptx saved to a temp file. Returns a marker string that slides:land-generated-pages redeems for
+  // the bytes. Enabled when gsk is logged in; GENOFFICE_CLOUD_SLIDE=0 is the kill switch.
+  const cloudSlideEnabled = () => process.env.GENOFFICE_CLOUD_SLIDE !== '0' && !!gskApiKey()
+>>>>>>> theirs
 
   ipcMain.handle('slides:cloud-gen-status', () => ({ enabled: cloudSlideEnabled() }))
 

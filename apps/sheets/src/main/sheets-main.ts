@@ -20,6 +20,7 @@ import {
   writeFileSync,
 } from 'node:fs'
 import { copyFile, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { refreshCsvDigest } from './csv-digest'
 import { createServer } from 'node:http'
 import { userInfo } from 'node:os'
 import { basename, dirname, isAbsolute, join } from 'node:path'
@@ -102,6 +103,13 @@ import {
   sheetCsvToXlsxBuffer,
 } from '@genoffice/xlsx-gateway/gateway/csv-import'
 import {
+<<<<<<< ours
+=======
+  ensureGenofficeLogin,
+  noteGskCallFailure,
+  setGenofficeLoginOpener,
+  gskApiKey,
+>>>>>>> theirs
   gskLoginInfo,
   hasGskAuth,
   webSearchTool,
@@ -3161,17 +3169,10 @@ export function registerSheetsIpc(): void {
       Buffer.from(request.content, 'utf8'),
     ])
     await atomicWriteFile(targetPath, csvBytes)
-    // An export can land on a CSV session's own source file — refresh that
-    // session's guard digest so its next Save doesn't mistake this write for
-    // an external change.
+    // An export can land on a CSV session's own source file; refresh the
+    // digest so the next Save does not read this write as an external change.
     const writtenSha = await sha256File(targetPath).catch(() => undefined)
-    if (writtenSha !== undefined) {
-      for (const [sessionId, session] of entry.sessions) {
-        if (session.csvSourcePath === targetPath) {
-          entry.sessions.set(sessionId, { ...session, csvSourceSha: writtenSha })
-        }
-      }
-    }
+    if (writtenSha !== undefined) refreshCsvDigest(entry.sessions, targetPath, writtenSha)
     return { canceled: false, path: targetPath }
   })
 
@@ -3723,6 +3724,16 @@ export function registerSheetsAiIpc(): void {
     },
   )
 
+<<<<<<< ours
+=======
+  // a 401 on the gsk key opens the device-code login once (genoffice-auth recovery)
+  setGenofficeLoginOpener((url) => void shell.openExternal(url))
+
+  ipcMain.handle(IPC_CHANNELS.aiGskLogin, () => {
+    ensureGenofficeLogin((url) => void shell.openExternal(url))
+  })
+
+>>>>>>> theirs
   ipcMain.handle(IPC_CHANNELS.aiSetSettings, async (event, input: unknown) => {
     sessionFor(event)
     const settings = aiSettingsInputSchema.parse(input)
@@ -3735,11 +3746,21 @@ export function registerSheetsAiIpc(): void {
     sessionFor(event)
     const request = aiChatRequestSchema.parse(input)
     const provider = request.settings.provider as AiProviderId
+<<<<<<< ours
     const config = withUniAiOpenRouterAuth(
       request.settings,
       provider,
       request.settings.providers[provider],
     )
+=======
+    let config = request.settings.providers[provider]
+    // set only when the gsk key was injected: a 401 then means that key expired
+    let gskKey = ''
+    if (provider === 'genspark' && config && !config.apiKey) {
+      gskKey = gskApiKey()
+      config = { ...config, apiKey: gskKey }
+    }
+>>>>>>> theirs
     if (!config || (provider !== 'codex' && !config.apiKey)) {
       return {
         ok: false,
@@ -3754,10 +3775,23 @@ export function registerSheetsAiIpc(): void {
     }
     try {
       const result = await chatForProvider(provider, config, request.system, request.user)
+<<<<<<< ours
       // the one-shot path reports HTTP failures as ok:false with the raw body
       return result.ok ? result : failed(aiChatFailure(result, getUiLang(), tm('errAiBusy')))
     } catch (err) {
       return failed(aiChatFailureFromError(err, getUiLang(), tm('errAiBusy')))
+=======
+      // the one-shot path reports HTTP failures as ok:false with the raw body —
+      // replace capacity/rate-limit dumps with the localized "busy" message
+      if (!result.ok && isAiOverloadedError(result.error)) {
+        return { ok: false, error: tm('errAiBusy') }
+      }
+      if (!result.ok) noteGskCallFailure(gskKey, result.error)
+      return result
+    } catch (err) {
+      noteGskCallFailure(gskKey, err)
+      return { ok: false, error: isAiOverloadedError(err) ? tm('errAiBusy') : String(err) }
+>>>>>>> theirs
     }
   })
 
@@ -3768,11 +3802,23 @@ export function registerSheetsAiIpc(): void {
     const tools = request.tools ?? []
     const maxTokens = request.maxTokens ?? maxOutputTokensOf(request.settings)
     const provider = request.settings.provider as AiProviderId
+<<<<<<< ours
     const config = withUniAiOpenRouterAuth(
       request.settings,
       provider,
       request.settings.providers[provider],
     )
+=======
+    let config = request.settings.providers[provider]
+    // Genspark's key never enters the settings file; it is read from the gsk
+    // login state per request
+    // set only when the gsk key was injected: a 401 then means that key expired
+    let gskKey = ''
+    if (provider === 'genspark' && config && !config.apiKey) {
+      gskKey = gskApiKey()
+      config = { ...config, apiKey: gskKey }
+    }
+>>>>>>> theirs
     const send = (chunk: AiStreamChunk) => {
       if (!event.sender.isDestroyed()) event.sender.send(IPC_CHANNELS.aiStreamChunk, chunk)
     }
@@ -3811,6 +3857,7 @@ export function registerSheetsAiIpc(): void {
         onStopReason: (reason) => {
           stopReason = reason
         },
+        onUsage: (usage) => send({ requestId, type: 'usage', usage }),
       })
       // sheets tsconfig sets exactOptionalPropertyTypes: an explicit
       // `stopReason: undefined` is not assignable to AiStreamChunk, so only
@@ -3824,10 +3871,29 @@ export function registerSheetsAiIpc(): void {
       if (controller.signal.aborted) {
         send({ requestId, type: 'done' })
       } else {
+<<<<<<< ours
         const { raw, ...fields } = aiStreamErrorFields(err, getUiLang())
         // the panel gets the product message; the provider's own text stays in the log
         console.warn(`[ai-stream] ${requestId} (${provider}/${config.model}) failed:`, raw)
         send({ requestId, type: 'error', ...fields })
+=======
+        // an expired/revoked key drops to signed-out so the inline sign-in button shows
+        noteGskCallFailure(gskKey, err)
+        send({
+          requestId,
+          type: 'error',
+          error: err instanceof Error ? err.message : String(err),
+          ...(err instanceof AiTimeoutError
+            ? { errorCode: 'timeout' as const }
+            : err instanceof AiCreditsError
+              ? { errorCode: 'credits' as const }
+              : isAiNetworkError(err)
+                ? { errorCode: 'network' as const }
+                : isAiOverloadedError(err)
+                  ? { errorCode: 'overloaded' as const }
+                  : {}),
+        })
+>>>>>>> theirs
       }
     } finally {
       unwatchSender()

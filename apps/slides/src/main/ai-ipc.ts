@@ -46,6 +46,13 @@ import {
 import {
   webSearchTool,
   imageSearchTool,
+<<<<<<< ours
+=======
+  ensureGenofficeLogin,
+  noteGskCallFailure,
+  setGenofficeLoginOpener,
+  gskApiKey,
+>>>>>>> theirs
   generateImageTool,
   analyzeMediaTool,
   documentMediaRoots,
@@ -140,6 +147,16 @@ export function registerAiIpc(): void {
     },
   )
 
+<<<<<<< ours
+=======
+  // a 401 on the gsk key opens the device-code login once (genoffice-auth recovery)
+  setGenofficeLoginOpener((url) => void shell.openExternal(url))
+
+  ipcMain.handle('ai:gsk-login', () => {
+    ensureGenofficeLogin((url) => void shell.openExternal(url))
+  })
+
+>>>>>>> theirs
   ipcMain.handle('ai:set-settings', (_event, settings: AiSettings) => {
     // SECURITY.md: payloads are schema-checked in the main process. The settings
     // file feeds cliPath into spawn() and baseUrl receives provider credentials,
@@ -175,7 +192,18 @@ export function registerAiIpc(): void {
     const tools = request.tools ?? []
     const maxTokens = request.maxTokens ?? maxOutputTokensOf(settings)
     const provider = settings.provider
+<<<<<<< ours
     const config = withUniAiOpenRouterAuth(settings, provider, settings.providers?.[provider])
+=======
+    let config = settings.providers?.[provider]
+    // The genspark key never enters the settings file; it is fetched from the gsk login state per request
+    // set only when the gsk key was injected: a 401 then means that key expired
+    let gskKey = ''
+    if (provider === 'genspark' && config && !config.apiKey) {
+      gskKey = gskApiKey()
+      config = { ...config, apiKey: gskKey }
+    }
+>>>>>>> theirs
     const send = (chunk: AiStreamChunk) => {
       if (!event.sender.isDestroyed()) event.sender.send('ai:stream-chunk', chunk)
     }
@@ -214,6 +242,7 @@ export function registerAiIpc(): void {
         onStopReason: (reason) => {
           stopReason = reason
         },
+        onUsage: (usage) => send({ requestId, type: 'usage', usage }),
       })
       send(
         stopReason === undefined
@@ -224,10 +253,31 @@ export function registerAiIpc(): void {
       if (controller.signal.aborted) {
         send({ requestId, type: 'done' })
       } else {
+<<<<<<< ours
         const { raw, ...fields } = aiStreamErrorFields(err, getUiLang())
         // the panel gets the product message; the provider's own text stays in the log
         console.error(`[ai-stream] ${requestId} (${provider}/${config.model}) failed:`, raw)
         send({ requestId, type: 'error', ...fields })
+=======
+        // an expired/revoked key drops to signed-out so the inline sign-in button shows
+        noteGskCallFailure(gskKey, err)
+        const msg = err instanceof Error ? err.message : String(err)
+        console.error(`[ai-stream] ${requestId} (${provider}/${config.model}) failed:`, msg)
+        send({
+          requestId,
+          type: 'error',
+          error: msg,
+          ...(err instanceof AiTimeoutError
+            ? { errorCode: 'timeout' as const }
+            : err instanceof AiCreditsError
+              ? { errorCode: 'credits' as const }
+              : isAiNetworkError(err)
+                ? { errorCode: 'network' as const }
+                : isAiOverloadedError(err)
+                  ? { errorCode: 'overloaded' as const }
+                  : {}),
+        })
+>>>>>>> theirs
       }
     } finally {
       unwatchSender()

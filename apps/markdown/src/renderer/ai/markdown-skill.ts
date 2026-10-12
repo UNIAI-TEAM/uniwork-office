@@ -1,6 +1,7 @@
 import type { AgentSkill } from '@genoffice/agent-core'
 import type { Editor } from '@tiptap/core'
 import type { AiDocWriter } from './doc-writer'
+import { redactLabelsOf, placeholderInstruction } from '../editor/redact'
 import {
   AGENT_TOOLS,
   buildDocContext,
@@ -91,10 +92,23 @@ export function createMarkdownSkill(
     id: 'markdown',
     // live: the predicates are re-read before every model request
     get systemPrompt() {
+<<<<<<< ours
       if (isReadOnly?.()) return AGENT_SYSTEM_PROMPT + VIEW_ONLY_NOTE
       return imageGenAvailable?.() === false
         ? AGENT_SYSTEM_PROMPT + IMAGE_GEN_OFF_NOTE
         : AGENT_SYSTEM_PROMPT
+=======
+      const base =
+        imageGenAvailable?.() === false
+          ? AGENT_SYSTEM_PROMPT + IMAGE_GEN_OFF_NOTE
+          : AGENT_SYSTEM_PROMPT
+      // only when the open document actually withholds something, so a
+      // document without spans pays nothing and the model is not told to
+      // look for markers that are not there
+      const editor = getEditor()
+      const labels = editor ? redactLabelsOf(editor.getJSON() as never) : []
+      return labels.length > 0 ? `${base}\n\n${placeholderInstruction(labels)}` : base
+>>>>>>> theirs
     },
     get tools() {
       if (isReadOnly?.()) return AGENT_TOOLS.filter((t) => READ_ONLY_TOOLS.has(t.name))

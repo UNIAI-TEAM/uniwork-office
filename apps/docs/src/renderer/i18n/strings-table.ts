@@ -26,6 +26,7 @@ const en = {
   ribbonCellMargins: 'Default cell margins',
 }
 
+<<<<<<< ours
 /** Vietnamese is reviewed for the UniWork web (the Table Design tab was English in vi). */
 const vi: Record<keyof typeof en, string> = {
   ribbonTableStyleOptions: 'Tùy chọn kiểu bảng',
@@ -51,6 +52,32 @@ const vi: Record<keyof typeof en, string> = {
   ribbonVerticalPosition: 'Vị trí dọc',
   ribbonDistanceFromText: 'Khoảng cách đến văn bản',
   ribbonCellMargins: 'Lề ô mặc định',
+=======
+const ru: Record<keyof typeof en, string> = {
+  ribbonTableStyleOptions: 'Параметры стилей таблиц',
+  ribbonTableFirstRow: 'Строка заголовка',
+  ribbonTableLastRow: 'Строка итогов',
+  ribbonTableBandedRows: 'Чередующиеся строки',
+  ribbonTableFirstColumn: 'Первый столбец',
+  ribbonTableLastColumn: 'Последний столбец',
+  ribbonTableBandedColumns: 'Чередующиеся столбцы',
+  ribbonTablePresetGrid: 'Простая сетка',
+  ribbonTablePresetBlueHeader: 'Синий заголовок',
+  ribbonTablePresetBlueBanded: 'Синие полосы',
+  ribbonTablePresetGrayBanded: 'Серые полосы',
+  ribbonTablePresetGreenHeader: 'Зелёный заголовок',
+  ribbonAutoFit: 'Автоподбор',
+  ribbonAutoFitContents: 'Автоподбор по содержимому',
+  ribbonAutoFitWindow: 'Автоподбор по ширине окна',
+  ribbonFixedColumnWidth: 'Фиксированная ширина столбца',
+  ribbonRepeatHeaderRows: 'Повторять строки заголовков',
+  ribbonTableProperties: 'Свойства таблицы',
+  ribbonTableData: 'Таблица',
+  ribbonHorizontalPosition: 'Положение по горизонтали',
+  ribbonVerticalPosition: 'Положение по вертикали',
+  ribbonDistanceFromText: 'Расстояние от текста',
+  ribbonCellMargins: 'Поля ячеек по умолчанию',
+>>>>>>> theirs
 }
 
 /**
@@ -68,7 +95,7 @@ export const tableStrings = defineStrings({
   es: en,
   th: en,
   id: en,
-  ru: en,
+  ru,
   ar: en,
   pt: en,
   it: en,

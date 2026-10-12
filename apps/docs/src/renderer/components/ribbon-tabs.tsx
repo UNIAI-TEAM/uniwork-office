@@ -34,7 +34,6 @@ import type { RevisionDisplayMode } from '../editor/revision-view'
 import { TRANSLATE_LANGS, ribbonLangKey } from './translate-langs'
 import {
   IconAccept,
-  IconAiPanel,
   IconCaret,
   IconComment,
   IconCommentNext,
@@ -65,6 +64,7 @@ import {
   IconUndo,
   IconWebLayout,
   IconWholePage,
+  IconMultiPage,
   IconZoom,
   IconZoom100,
   IconZoomIn,
@@ -131,6 +131,7 @@ const DIRECT_PARA_ATTRS: Record<string, unknown> = {
   indentLeft: null,
   indentRight: null,
   indentFirstLine: null,
+  indentFirstLineChars: null,
   spaceBefore: null,
   spaceAfter: null,
   spaceBeforeAuto: null,
@@ -1299,10 +1300,8 @@ interface ViewTabProps {
   filePath: string | null
   zoom: number
   onZoom: (zoom: number) => void
-  onZoomFit: (mode: 'width' | 'page') => void
+  onZoomFit: (mode: 'width' | 'page' | 'multi') => void
   onZoomDialog: () => void
-  showAi: boolean
-  onToggleAi: () => void
   darkPage: boolean
   onDarkPage: (v: boolean) => void
   showRuler: boolean
@@ -1327,8 +1326,6 @@ export function ViewTab({
   onZoom,
   onZoomFit,
   onZoomDialog,
-  showAi,
-  onToggleAi,
   darkPage,
   onDarkPage,
   showRuler,
@@ -1498,6 +1495,17 @@ export function ViewTab({
             </span>
             <span>{t('ribbonWholePage')}</span>
           </button>
+          <button
+            className="rb-big"
+            disabled={!hasDoc}
+            data-tip={t('ribbonMultiPageTip')}
+            onClick={() => onZoomFit('multi')}
+          >
+            <span className="rb-big-icon">
+              <IconMultiPage size={BIG} />
+            </span>
+            <span>{t('ribbonMultiPage')}</span>
+          </button>
         </div>
         <div className="ribbon-group-label">{t('ribbonGroupZoom')}</div>
       </div>
@@ -1506,6 +1514,7 @@ export function ViewTab({
 
       <div className="ribbon-group">
         <div className="ribbon-group-items">
+<<<<<<< ours
           {cap('ai') && (
             <button
               className={`rb-big ${showAi ? 'active' : ''}`}
@@ -1518,6 +1527,8 @@ export function ViewTab({
               <span>{t('ribbonAiPanel')}</span>
             </button>
           )}
+=======
+>>>>>>> theirs
           <button
             className={`rb-big ${darkPage ? 'active' : ''}`}
             data-tip={t('ribbonDarkModeTip')}

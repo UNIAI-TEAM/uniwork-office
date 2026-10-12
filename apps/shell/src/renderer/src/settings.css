@@ -1404,6 +1404,7 @@
   background: var(--hover);
 }
 
+<<<<<<< ours
 /* Settings → About: product identity above the version rows */
 .set-about-hero {
   display: flex;
@@ -1655,3 +1656,15 @@
   margin-left: 8px;
   font-size: 12px;
 }
+=======
+.set-ai-endpoint-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.set-ai-endpoint-row .set-dd {
+  flex: 1;
+  min-width: 0;
+}
+>>>>>>> theirs

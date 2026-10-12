@@ -1,3 +1,4 @@
+import { resolveCustomEndpoints } from './custom-endpoints'
 import { defaultAiMediaSettings, resolveAiMediaSettings } from './media'
 import { OPENROUTER_CHAT_MODELS, OPENROUTER_DEFAULT_MODEL } from './openrouter'
 import { defaultAiSearchSettings, resolveAiSearchSettings } from './search-settings'
@@ -30,12 +31,35 @@ export const DEEPSEEK_V41_FLASH = 'deep-seek-v4.1-flash'
 export const AI_PROVIDERS: AiProviderMeta[] = [
   {
     id: 'genspark',
+<<<<<<< ours
     label: 'uniAI',
     // UniAI chat is OpenRouter behind the brand; model ids match the shared
     // Token Hub catalog (same as the explicit OpenRouter provider).
     models: [...OPENROUTER_CHAT_MODELS],
     defaultModel: OPENROUTER_DEFAULT_MODEL,
     keyPlaceholder: 'sk-or-...',
+=======
+    label: 'Genspark',
+    // must stay within the proxy's served set (GET /api/llm_proxy/v1/models);
+    // bare gpt-5.6 and the gemini family dropped off it (verified 2026-08-31).
+    // DeepSeek goes by the proxy's hyphenated pool id; V4.1 Flash takes images
+    // (live-verified 2026-09-15). gpt-6-astra: chat, tool call and image
+    // input all live-verified through the proxy 2026-09-17; claude-opus-5-5,
+    // gpt-6-sol and gpt-6-luna the same way 2026-09-24. Opus 4.7/4.8 dropped
+    // 2026-10-09: 5.5 is cheaper and supersedes both.
+    models: [
+      'claude-opus-5-5',
+      'claude-sonnet-4-6',
+      'gpt-6-astra',
+      'gpt-6-sol',
+      'gpt-6-luna',
+      'gpt-5.6-terra',
+      'gpt-5.6-luna',
+      DEEPSEEK_V41_FLASH,
+    ],
+    defaultModel: 'claude-opus-5-5',
+    keyPlaceholder: 'Not required - sign in to Genspark',
+>>>>>>> theirs
   },
   {
     id: 'codex',
@@ -50,7 +74,7 @@ export const AI_PROVIDERS: AiProviderMeta[] = [
   {
     id: 'anthropic',
     label: 'Claude',
-    // current-generation ids per platform.claude.com models overview (2026-09-24).
+    // current-generation ids per platform.claude.com models overview (2026-10-09).
     // Fable needs data retention enabled on the org, otherwise the API answers
     // model_not_available; every other id is served to any key.
     models: [
@@ -59,10 +83,8 @@ export const AI_PROVIDERS: AiProviderMeta[] = [
       'claude-fable-5-1',
       'claude-opus-5',
       'claude-fable-5',
-      'claude-opus-4-8',
-      'claude-opus-4-7',
       'claude-sonnet-4-6',
-      'claude-haiku-4-5-20251001',
+      'claude-haiku-5-5',
     ],
     defaultModel: 'claude-sonnet-5',
     keyPlaceholder: 'sk-ant-api03-...',
@@ -295,10 +317,35 @@ export const AI_PROVIDERS: AiProviderMeta[] = [
     keyPlaceholder: 'ci_live_...',
   },
   {
+    id: 'atlascloud',
+    label: 'Atlas Cloud',
+    // Lab-namespaced ids exactly as GET api.atlascloud.ai/v1/models lists them
+    // (2026-10-08, public endpoint, no key needed); the rest of the 117-model
+    // catalog works as-is when typed in. Chat, temperature and — for the
+    // multimodal ids — data-URI image input are live-verified. The text-only
+    // ids (deepseek-v4-*, glm-5.3, both MiniMax) are listed in
+    // modelLacksVision(); Atlas Cloud serves MiniMax M3 text-only even though
+    // MiniMax's own API takes images.
+    models: [
+      'deepseek-ai/deepseek-v4-pro',
+      'deepseek-ai/deepseek-v4-flash',
+      'moonshotai/kimi-k3',
+      'moonshotai/kimi-k2.6',
+      'zai-org/glm-5.3',
+      'zai-org/glm-5.3-flash',
+      'qwen/qwen3.8-max',
+      'qwen/qwen3.5-flash',
+      'minimaxai/minimax-m3',
+      'minimaxai/minimax-m2.5',
+    ],
+    defaultModel: 'deepseek-ai/deepseek-v4-pro',
+    keyPlaceholder: 'apikey-...',
+  },
+  {
     id: 'opencode-zen',
     label: 'OpenCode Zen',
     // Pay-as-you-go gateway (opencode.ai/docs/zen); ids exactly as GET
-    // /zen/v1/models lists them (2026-09-24). GPT-5.x/6, Grok and Muse Spark
+    // /zen/v1/models lists them (2026-10-09). GPT-5.x/6, Grok and Muse Spark
     // are served only through the Responses API, which has no protocol here,
     // so they stay out until one exists.
     models: [
@@ -306,7 +353,7 @@ export const AI_PROVIDERS: AiProviderMeta[] = [
       'claude-opus-5-5',
       'claude-opus-5',
       'claude-fable-5-1',
-      'claude-haiku-4-5',
+      'claude-haiku-5-5',
       'gemini-3.7-flash',
       'gemini-3.1-pro',
       'kimi-k3',
@@ -495,6 +542,7 @@ const RETIRED_MODELS: Partial<Record<AiProviderId, Record<string, string>>> = {
   // UniAI moved off the Genspark LLM proxy onto OpenRouter; remap stored
   // proxy-era ids onto OpenRouter vendor-prefixed slugs / auto.
   genspark: {
+<<<<<<< ours
     'gpt-5.6': 'openai/gpt-5.6-terra',
     'gpt-5.6-terra': 'openai/gpt-5.6-terra',
     'gpt-5.6-luna': 'openai/gpt-5.6-terra',
@@ -504,6 +552,14 @@ const RETIRED_MODELS: Partial<Record<AiProviderId, Record<string, string>>> = {
     'gemini-3.1-pro-preview': OPENROUTER_DEFAULT_MODEL,
     'gemini-3-flash-preview': OPENROUTER_DEFAULT_MODEL,
     'gemini-3.7-flash': OPENROUTER_DEFAULT_MODEL,
+=======
+    'gpt-5.6': 'gpt-5.6-terra',
+    'gemini-3.1-pro-preview': 'claude-opus-5-5',
+    'gemini-3-flash-preview': 'claude-opus-5-5',
+    'gemini-3.7-flash': 'claude-opus-5-5',
+    'claude-opus-4-7': 'claude-opus-5-5',
+    'claude-opus-4-8': 'claude-opus-5-5',
+>>>>>>> theirs
   },
 }
 
@@ -595,10 +651,12 @@ export function resolveAiSettings(stored: unknown, defaults: AiSettings): AiSett
         baseUrl: str(settings.baseUrl) || 'https://api.openai.com/v1',
       }
     }
-    return defaults
+    return resolveCustomEndpoints(defaults)
   }
-  return {
+  return resolveCustomEndpoints({
     provider: settings.provider ?? defaults.provider,
+    customEndpoints: settings.customEndpoints,
+    customEndpoint: settings.customEndpoint,
     // Trim before migrating: a pasted " deepseek-reasoner " must still hit
     // the retired-id remap instead of being sent to the API verbatim.
     // Then mirror UniAI <-> OpenRouter Token Hub keys when only one slot is set.
@@ -617,5 +675,5 @@ export function resolveAiSettings(stored: unknown, defaults: AiSettings): AiSett
           ),
         }
       : {}),
-  }
+  })
 }

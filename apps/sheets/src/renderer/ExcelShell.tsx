@@ -9,6 +9,7 @@ import {
   useRibbonCollapse,
   aiPanelInitiallyOpen,
   rememberAiPanelOpen,
+  type AiTokenUsageView,
 } from '@genoffice/ui'
 
 import {
@@ -240,6 +241,8 @@ interface ExcelShellProps {
   readonly sheetHasContent: boolean
   /// true while the real LLM agent is running (composer disabled meanwhile).
   readonly aiBusy: boolean
+  /** tokens billed across the session, shown beside the composer */
+  readonly sessionUsage?: AiTokenUsageView
   readonly chat: readonly AiChatMessage[]
   readonly historicChat?: readonly AiChatMessage[]
   /// Chat attachments (chips + 📎 button + drag-and-drop), same structure as the
@@ -461,6 +464,7 @@ export function ExcelShell({
   formatPainterActive,
   sheetHasContent,
   aiBusy,
+  sessionUsage,
   chat,
   historicChat,
   attachments,
@@ -1020,6 +1024,7 @@ export function ExcelShell({
 
       {/* AI panel docks on the left, full height under the ribbon (unified with docs) */}
       <div className="sheet-body">
+<<<<<<< ours
         {cap('ai') && (
           <AiChatPanel
             isOpen={isCopilotOpen}
@@ -1050,6 +1055,41 @@ export function ExcelShell({
             viewOnly={aiViewOnly}
           />
         )}
+=======
+        <AiChatPanel
+          isOpen={isCopilotOpen}
+          hasContent={sheetHasContent}
+          chat={chat}
+          {...(historicChat !== undefined ? { historicChat } : {})}
+          attachments={attachments}
+          attachNotice={attachNotice}
+          onPickAttachments={onPickAttachments}
+          onAddAttachmentPaths={onAddAttachmentPaths}
+          onAddPastedImage={onAddPastedImage}
+          onRemoveAttachment={onRemoveAttachment}
+          prompt={prompt}
+          preview={preview}
+          aiBusy={aiBusy}
+          sessionUsage={sessionUsage}
+          onPromptChange={onPromptChange}
+          onSend={onSend}
+          onSendQueued={(text, atts) => {
+            if (aiBusy) return false
+            onSend(text, atts)
+            return true
+          }}
+          onStop={onStop}
+          onNewChat={onNewChat}
+          onUndo={onUndo}
+          scopeRange={aiScopeRange}
+          scopeColumns={aiScopeColumns}
+          scopeLocked={aiScopeLocked}
+          onScopeDismiss={onAiScopeDismiss}
+          onCitation={onAiCitation}
+          onExpand={() => setIsCopilotOpen(true)}
+          onCollapse={() => setIsCopilotOpen(false)}
+        />
+>>>>>>> theirs
         <div className="sheet-main">
           <section className="workbook-area">
             <div id="univer-container" className="spreadsheet" />
@@ -3086,7 +3126,7 @@ function Ribbon({
           <RibbonButton
             large
             label={t('appFilter')}
-            detail={t('appFilterToggleDetail')}
+            detail={platformShortcuts(t('appFilterToggleDetail'))}
             symbol="▽"
             onClick={() => onCommand('filter-toggle')}
           />

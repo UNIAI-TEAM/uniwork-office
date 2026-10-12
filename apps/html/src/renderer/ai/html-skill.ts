@@ -1,5 +1,6 @@
 import type { AgentSkill } from '@genoffice/agent-core'
 import { createHtmlSkill, type HtmlDocAccess } from './tools'
+import { buildProjection, placeholderInstruction } from './redact'
 
 const SYSTEM_PROMPT = [
   'You are the assistant inside UniWork HTML, a design-first editor for single-file HTML pages: landing pages, reports, one-pagers, infographic posters, dashboards, invitations. The user sees the rendered page in a live preview and the source next to it.',
@@ -52,6 +53,21 @@ const SYSTEM_PROMPT = [
   '- Keep replies short; the edits are the deliverable. Summarize what you changed in one or two sentences.',
 ].join('\n')
 
+<<<<<<< ours
 export function createDocumentSkill(access: HtmlDocAccess, isReadOnly?: () => boolean): AgentSkill {
   return createHtmlSkill(access, SYSTEM_PROMPT, isReadOnly)
+=======
+export function createDocumentSkill(access: HtmlDocAccess): AgentSkill {
+  // live like the tool list: rebuilt per request from the page as it is now, so
+  // a mark applied a moment ago is in the next prompt and a removed one is gone
+  // from it. A page with nothing withheld pays nothing and is not told to look
+  // for markers that are not there.
+  return createHtmlSkill(access, {
+    get systemPrompt(): string {
+      const proj = buildProjection(access.getText(), access.getMap())
+      if (proj.empty) return SYSTEM_PROMPT
+      return `${SYSTEM_PROMPT}\n\n${placeholderInstruction(proj.labels())}`
+    },
+  })
+>>>>>>> theirs
 }

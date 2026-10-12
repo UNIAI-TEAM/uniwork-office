@@ -17,6 +17,7 @@ export type {
   AiSettings,
   AiStreamChunk,
   AiStreamRequest,
+  AiTokenUsage,
   GenSparkAccountStatus,
   LegacyAiSettings,
 } from './types'
@@ -34,6 +35,15 @@ export {
   uniAiOpenRouterKey,
   withUniAiOpenRouterAuth,
 } from './providers'
+export {
+  activeCustomEndpoint,
+  customEndpointLabel,
+  newCustomEndpointId,
+  removeCustomEndpoint,
+  resolveCustomEndpoints,
+  selectCustomEndpoint,
+  upsertCustomEndpoint,
+} from './custom-endpoints'
 export {
   AI_MEDIA_PROVIDERS,
   GEMINI_MEDIA_BASE_URL,

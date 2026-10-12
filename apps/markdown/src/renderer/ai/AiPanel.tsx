@@ -16,10 +16,17 @@ import {
 } from '@genoffice/ai-provider/browser'
 import {
   AiComposer,
+  AiQueueStrip,
+  AI_QUEUE_LABELS,
   AiScopeQuote,
   AiTypingIndicator,
+  AiUsageChip,
+  addTokenUsage,
+  createFileNav,
   Markdown,
+  useChatRunQueue,
   type AiScopeQuoteData,
+  type AiTokenUsageView,
 } from '@genoffice/ui'
 import type { Editor } from '@tiptap/core'
 import { aiLangDirective, t as tGlobal, useI18n } from '../i18n/locale'
@@ -102,6 +109,8 @@ interface ChatEntry {
   tools?: ToolActivity[]
   /** the selection this user message targeted, frozen at send */
   scope?: AiScopeQuoteData
+  /** tokens the provider billed for this reply, summed across its turns (absent when unreported) */
+  usage?: AiTokenUsageView
 }
 
 /** longest selection excerpt echoed on a user bubble */
@@ -195,6 +204,16 @@ export function AiPanel({
   const writerEpochRef = useRef(0)
   const [prompt, setPrompt] = useState('')
   const [busy, setBusy] = useState(false)
+  /** messages queued while a reply runs; the pump re-runs them through send on settle */
+  const msgQueue = useChatRunQueue<void>({
+    busy,
+    submit: (text) => {
+      const loop = loopRef.current
+      if (!loop || loop.busy) return false
+      send(text, text, null)
+      return true
+    },
+  })
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null)
   const [snapshots, setSnapshots] = useState<Snapshot[]>([])
   // bumped on selection/doc changes so the scope chip & queue rows stay fresh
@@ -238,6 +257,10 @@ export function AiPanel({
   const runMutatedRef = useRef(false)
   /** tool activity of the whole run, for transcript persistence */
   const runToolsRef = useRef<ToolActivity[]>([])
+  /** tokens billed so far in the in-flight run (summed across turns) */
+  const runUsageRef = useRef<AiTokenUsageView | undefined>(undefined)
+  /** tokens billed across the panel's session (the composer chip) */
+  const [sessionUsage, setSessionUsage] = useState<AiTokenUsageView | undefined>(undefined)
   const chatIdsRef = useRef<{ projectId: string; chatId: string } | null>(null)
   /** messages sent before resolveChat returned, flushed once the chat id is known */
   const pendingPersistRef = useRef<
@@ -437,6 +460,11 @@ export function AiPanel({
           patchLast({ streaming: false })
           setChat((prev) => [...prev, { role: 'assistant', text: '', streaming: true }])
         },
+        onUsage: (usage) => {
+          runUsageRef.current = addTokenUsage(runUsageRef.current, usage)
+          setSessionUsage((prev) => addTokenUsage(prev, usage))
+          patchLast({ usage: runUsageRef.current })
+        },
         onDone: ({ text, cancelled, turnLimit, truncated }) => {
           const base = turnLimit
             ? [text, tGlobal('aiTurnLimit')].filter(Boolean).join('\n\n')
@@ -579,6 +607,7 @@ export function AiPanel({
     runDisplayRef.current = displayText ?? instruction
     runMutatedRef.current = false
     runToolsRef.current = []
+    runUsageRef.current = undefined
     // a queue batch carries its own display text: no selection quote
     const scope =
       retryScope !== undefined
@@ -616,7 +645,18 @@ export function AiPanel({
     })()
   }
 
-  const stop = (): void => loopRef.current?.cancel()
+  const stop = (): void => {
+    msgQueue.hold()
+    loopRef.current?.cancel()
+  }
+
+  /** Enter while a reply runs: the draft joins the queue above the composer */
+  const enqueueDraft = () => {
+    const text = prompt.trim()
+    if (!text) return
+    msgQueue.enqueue(text, undefined)
+    setPrompt('')
+  }
 
   const retry = (): void =>
     send(runInstructionRef.current, runDisplayRef.current, lastScopeRef.current ?? null)
@@ -686,6 +726,10 @@ export function AiPanel({
       if (index !== null && current) navigateToBlock(current, index)
     },
   }
+  // [name](filenav:///abs/path) citations open the cited file in its own app
+  const fileNav = createFileNav((path) => {
+    void window.markdownApi.openSourcePath(path)
+  })
 
   /** submit every still-anchored queued edit as one batch run */
   const sendQueue = (): void => {
@@ -802,6 +846,7 @@ export function AiPanel({
               onClick={() => {
                 stop()
                 abandonWriter()
+                msgQueue.clear()
                 loopRef.current?.reset()
                 setBusy(false)
                 setChat([])
@@ -902,11 +947,20 @@ export function AiPanel({
               ) : (
                 entry.text && (
                   <div dir="auto">
+<<<<<<< ours
                     <Markdown text={aiNoticeBody(entry.text)} nav={docNav} />
+=======
+                    <Markdown text={entry.text} navs={[docNav, fileNav]} />
+>>>>>>> theirs
                   </div>
                 )
               )}
               {hasTools && <ToolChipList tools={entry.tools!} />}
+              {entry.usage && (
+                <div className="ai-message-usage">
+                  <AiUsageChip usage={entry.usage} lang={lang} />
+                </div>
+              )}
               {showToolbar && (
                 <div className="ai-msg-toolbar">
                   <button
@@ -1028,6 +1082,20 @@ export function AiPanel({
           />
         )}
         <AiComposer
+          queueStrip={
+            <AiQueueStrip
+              items={msgQueue.queued}
+              labels={AI_QUEUE_LABELS[lang]}
+              onUpdate={msgQueue.update}
+              onRemove={msgQueue.remove}
+              onClear={msgQueue.clear}
+              paused={msgQueue.paused}
+              onTogglePause={msgQueue.togglePaused}
+              onMove={msgQueue.move}
+            />
+          }
+          onQueue={enqueueDraft}
+          queuePlaceholder={AI_QUEUE_LABELS[lang].queuePlaceholder}
           value={prompt}
           busy={busy}
           header={
@@ -1073,7 +1141,12 @@ export function AiPanel({
           sendLabel={t('aiSend')}
           stopLabel={t('aiStop')}
           iconOnly
-          footerStart={<AiModelPicker bridge={MODEL_BRIDGE} lang={lang} />}
+          footerStart={
+            <>
+              <AiModelPicker bridge={MODEL_BRIDGE} lang={lang} />
+              {sessionUsage && <AiUsageChip usage={sessionUsage} session lang={lang} />}
+            </>
+          }
           sendIconEnabled={<img src={sendEnterOn} alt="" aria-hidden />}
           sendIconDisabled={<img src={sendEnterOff} alt="" aria-hidden />}
           stopIcon={<img src={sendStop} alt="" aria-hidden />}

@@ -23,6 +23,7 @@ export type AiProviderId =
   | 'requesty'
   | 'opper'
   | 'cheaperinference'
+  | 'atlascloud'
   | 'opencode-zen'
   | 'opencode-go'
   | 'custom'
@@ -40,6 +41,17 @@ export interface AiProviderConfig {
   baseUrl?: string | undefined
   /** optional Codex CLI override; empty means auto-detect the current authenticated install */
   cliPath?: string | undefined
+}
+
+/** One user-hosted OpenAI-compatible server; the active one is mirrored into `providers.custom` */
+export interface AiCustomEndpoint {
+  id: string
+  name: string
+  baseUrl: string
+  apiKey: string
+  model: string
+  /** ids the server advertised on the last `/models` probe, so the composer chip can list them offline */
+  models?: string[] | undefined
 }
 
 /** Live picker data returned by Codex app-server's model/list method. */
@@ -145,6 +157,10 @@ export interface AiSearchSettings {
 export interface AiSettings {
   provider: AiProviderId
   providers: Record<AiProviderId, AiProviderConfig>
+  /** every saved custom endpoint; absent on files written before the list existed */
+  customEndpoints?: AiCustomEndpoint[] | undefined
+  /** id of the endpoint `providers.custom` mirrors */
+  customEndpoint?: string | undefined
   /**
    * Provider for generate_image / analyze_media. Absent (pre-media settings
    * files) means the UniWork cloud route, i.e. signed in + entitled + the gskToolsEnabled gate.
@@ -213,11 +229,19 @@ export interface AiStreamRequest {
   maxTokens?: number
 }
 
+/** Token usage a provider reported for one model turn. Both fields are best-effort:
+ * some providers (and the Genspark proxy) never report usage, and consumers must
+ * treat an absent figure as "unknown", never as zero. */
+export interface AiTokenUsage {
+  inputTokens?: number
+  outputTokens?: number
+}
+
 export interface AiStreamChunk {
   requestId: string
   /** 'ping' = wire-level keepalive so the renderer can tell a live stream from a dead one;
    * 'reasoning' = model thinking delta (text carries it), stored for interleaved-thinking echo */
-  type: 'delta' | 'reasoning' | 'tool-call' | 'done' | 'error' | 'ping'
+  type: 'delta' | 'reasoning' | 'tool-call' | 'usage' | 'done' | 'error' | 'ping'
   text?: string
   /** complete parsed tool call (emitted once its arguments finish streaming) */
   toolCall?: AgentToolCall
@@ -226,4 +250,6 @@ export interface AiStreamChunk {
   errorCode?: 'timeout' | 'credits' | 'network' | 'overloaded'
   /** normalized stop reason carried on 'done' ('max_tokens' = output cut off by the token limit) */
   stopReason?: string
+  /** tokens the provider billed for this turn, carried on 'usage' (always sent before 'done') */
+  usage?: AiTokenUsage
 }

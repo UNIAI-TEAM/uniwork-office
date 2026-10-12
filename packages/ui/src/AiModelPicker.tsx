@@ -84,6 +84,7 @@ export function AiModelPicker({
     [settings, loggedIn],
   )
   const current = settings ? aiModelPickerSelection(settings) : null
+<<<<<<< ours
   const currentUsable = groups.some((g) => g.id === current?.provider)
   // the wanted provider is read raw: the active one falls back to uniAI once it has no model
   const wanted = settings?.provider
@@ -109,6 +110,11 @@ export function AiModelPicker({
     setAiModelNeedHint(needHint, openSettings ? openSettingsOnce : null)
     return () => setAiModelNeedHint(null)
   }, [needHint, openSettings, openSettingsOnce])
+=======
+  const sameGroup = (g: { id: string; endpoint?: string | undefined }) =>
+    g.id === current?.provider && (g.id !== 'custom' || g.endpoint === current?.endpoint)
+  const currentUsable = groups.some(sameGroup)
+>>>>>>> theirs
 
   const toggle = () => {
     // a key list that failed to load is tried again when the chip is opened (and on focus)
@@ -137,7 +143,7 @@ export function AiModelPicker({
   if (!settings) return null
   const chipText =
     currentUsable && current
-      ? current.model || groupLabel(groups, current.provider)
+      ? current.model || (groups.find(sameGroup)?.label ?? '')
       : strings.choose
 
   return (
@@ -184,21 +190,21 @@ export function AiModelPicker({
         >
           <div className="ai-model-pop-list">
             {groups.map((g) => (
-              <div key={g.id} className="ai-model-group">
+              <div key={g.endpoint ? `${g.id}:${g.endpoint}` : g.id} className="ai-model-group">
                 <div className="ai-model-group-head">
                   <ProviderLogo id={g.id} />
                   <span>{g.label}</span>
                 </div>
                 {(g.models.length > 0 ? g.models : ['']).map((m) => {
-                  const selected = current?.provider === g.id && current.model === m
+                  const selected = sameGroup(g) && current?.model === m
                   return (
                     <button
-                      key={`${g.id}:${m}`}
+                      key={`${g.id}:${g.endpoint ?? ''}:${m}`}
                       type="button"
                       role="option"
                       aria-selected={selected}
                       className={`ai-model-item${selected ? ' selected' : ''}`}
-                      onClick={() => pick({ provider: g.id, model: m })}
+                      onClick={() => pick({ provider: g.id, endpoint: g.endpoint, model: m })}
                     >
                       <span className="ai-model-item-text">{m || g.label}</span>
                       {selected && (
@@ -242,8 +248,4 @@ export function AiModelPicker({
       )}
     </div>
   )
-}
-
-function groupLabel(groups: ReadonlyArray<{ id: string; label: string }>, id: string): string {
-  return groups.find((g) => g.id === id)?.label ?? id
 }

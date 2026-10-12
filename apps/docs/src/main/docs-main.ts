@@ -14,6 +14,7 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
+  renameSync,
   statSync,
   unlinkSync,
   writeFileSync,
@@ -130,6 +131,13 @@ import {
 import { listCodexModels, shutdownCodexAppServers } from '@genoffice/ai-provider/codex-app-server'
 import { listCustomModelsForIpc } from '@genoffice/ai-provider/custom-models'
 import {
+<<<<<<< ours
+=======
+  ensureGenofficeLogin,
+  noteGskCallFailure,
+  setGenofficeLoginOpener,
+  gskApiKey,
+>>>>>>> theirs
   generateImageTool,
   testSearchProvider,
   gskLoginInfo,
@@ -190,7 +198,21 @@ import {
 } from './docx-encryption'
 import { isExternallyModified, type DiskFileState } from './external-change'
 import { copyImageDisplaySize, validCopyImageDataUrl } from './copy-image-guard'
+<<<<<<< ours
 import { hasNoPrinter, pdfExportPath, printScaleOption, validPrintGeometry } from './print-args'
+=======
+import { printScaleOption, validPrintGeometry } from './print-args'
+import {
+  assignStarredGroup,
+  dropStarredItems,
+  readStarredItems,
+  renameStarredItem,
+  starredGroupMap,
+  starredGroupNames,
+  toggleStarredItem,
+  writeStarredItems,
+} from './starred-files'
+>>>>>>> theirs
 import { initDocsAutoUpdater } from './updater'
 import { registerZoteroIpc, teardownZoteroIpc } from './zotero-ipc'
 
@@ -273,6 +295,7 @@ const tMain = createI18n({
     menuZoom100: '实际大小 (100%)',
     menuPageWidth: '页宽',
     menuWholePage: '整页',
+    menuMultiPage: '多页',
     menuAiSidebar: 'AI 侧栏',
     menuDarkMode: '深色模式',
     menuFullscreen: '进入全屏',
@@ -331,7 +354,10 @@ const tMain = createI18n({
     menuWindow: '窗口',
     menuHelp: '帮助',
     menuShortcuts: '键盘快捷键',
+<<<<<<< ours
     menuDocsHelp: 'UniWork Docs 帮助',
+=======
+>>>>>>> theirs
   },
   // en and vi are ours (UniWork wording, e.g. errNoApiKey: no AI model set up yet); the other locales keep
   // upstream's wording. tools/rebrand re-applies the vi errNoApiKey (rule vi-no-api-key).
@@ -406,6 +432,7 @@ const tMain = createI18n({
     menuZoom100: 'Actual Size (100%)',
     menuPageWidth: 'Page Width',
     menuWholePage: 'Whole Page',
+    menuMultiPage: 'Multiple Pages',
     menuAiSidebar: 'AI Sidebar',
     menuDarkMode: 'Dark Mode',
     menuFullscreen: 'Enter Full Screen',
@@ -464,7 +491,10 @@ const tMain = createI18n({
     menuWindow: 'Window',
     menuHelp: 'Help',
     menuShortcuts: 'Keyboard Shortcuts',
+<<<<<<< ours
     menuDocsHelp: 'UniWork Docs Help',
+=======
+>>>>>>> theirs
   },
   vi: {
     dlgOpenDoc: 'Mở tài liệu',
@@ -538,6 +568,7 @@ const tMain = createI18n({
     menuZoom100: 'Kích thước thực tế (100%)',
     menuPageWidth: 'Chiều rộng trang',
     menuWholePage: 'Toàn bộ trang',
+    menuMultiPage: 'Nhiều trang',
     menuAiSidebar: 'Thanh bên AI',
     menuDarkMode: 'Chế độ tối',
     menuFullscreen: 'Vào chế độ toàn màn hình',
@@ -596,7 +627,10 @@ const tMain = createI18n({
     menuWindow: 'Cửa sổ',
     menuHelp: 'Trợ giúp',
     menuShortcuts: 'Phím tắt bàn phím',
+<<<<<<< ours
     menuDocsHelp: 'Trợ giúp UniWork Docs',
+=======
+>>>>>>> theirs
   },
   ja: {
     dlgOpenDoc: '文書を開く',
@@ -668,6 +702,7 @@ const tMain = createI18n({
     menuZoom100: '実際のサイズ (100%)',
     menuPageWidth: 'ページ幅',
     menuWholePage: 'ページ全体',
+    menuMultiPage: '複数ページ',
     menuAiSidebar: 'AI サイドバー',
     menuDarkMode: 'ダークモード',
     menuFullscreen: 'フルスクリーンにする',
@@ -726,7 +761,10 @@ const tMain = createI18n({
     menuWindow: 'ウィンドウ',
     menuHelp: 'ヘルプ',
     menuShortcuts: 'キーボードショートカット',
+<<<<<<< ours
     menuDocsHelp: 'UniWork Docs ヘルプ',
+=======
+>>>>>>> theirs
   },
   ko: {
     dlgOpenDoc: '문서 열기',
@@ -799,6 +837,7 @@ const tMain = createI18n({
     menuZoom100: '실제 크기(100%)',
     menuPageWidth: '페이지 너비',
     menuWholePage: '전체 페이지',
+    menuMultiPage: '여러 페이지',
     menuAiSidebar: 'AI 사이드바',
     menuDarkMode: '다크 모드',
     menuFullscreen: '전체 화면 시작',
@@ -857,7 +896,10 @@ const tMain = createI18n({
     menuWindow: '창',
     menuHelp: '도움말',
     menuShortcuts: '키보드 바로 가기',
+<<<<<<< ours
     menuDocsHelp: 'UniWork Docs 도움말',
+=======
+>>>>>>> theirs
   },
   fr: {
     dlgOpenDoc: 'Ouvrir un document',
@@ -931,6 +973,7 @@ const tMain = createI18n({
     menuZoom100: 'Taille réelle (100 %)',
     menuPageWidth: 'Largeur de page',
     menuWholePage: 'Page entière',
+    menuMultiPage: 'Plusieurs pages',
     menuAiSidebar: 'Volet IA',
     menuDarkMode: 'Mode sombre',
     menuFullscreen: 'Activer le mode plein écran',
@@ -989,7 +1032,10 @@ const tMain = createI18n({
     menuWindow: 'Fenêtre',
     menuHelp: 'Aide',
     menuShortcuts: 'Raccourcis clavier',
+<<<<<<< ours
     menuDocsHelp: 'Aide UniWork Docs',
+=======
+>>>>>>> theirs
   },
   de: {
     dlgOpenDoc: 'Dokument öffnen',
@@ -1063,6 +1109,7 @@ const tMain = createI18n({
     menuZoom100: 'Originalgröße (100 %)',
     menuPageWidth: 'Seitenbreite',
     menuWholePage: 'Ganze Seite',
+    menuMultiPage: 'Mehrere Seiten',
     menuAiSidebar: 'KI-Seitenleiste',
     menuDarkMode: 'Dunkelmodus',
     menuFullscreen: 'Vollbild ein',
@@ -1121,7 +1168,10 @@ const tMain = createI18n({
     menuWindow: 'Fenster',
     menuHelp: 'Hilfe',
     menuShortcuts: 'Tastenkombinationen',
+<<<<<<< ours
     menuDocsHelp: 'UniWork Docs-Hilfe',
+=======
+>>>>>>> theirs
   },
   es: {
     dlgOpenDoc: 'Abrir documento',
@@ -1195,6 +1245,7 @@ const tMain = createI18n({
     menuZoom100: 'Tamaño real (100 %)',
     menuPageWidth: 'Ancho de página',
     menuWholePage: 'Página completa',
+    menuMultiPage: 'Varias páginas',
     menuAiSidebar: 'Barra lateral de IA',
     menuDarkMode: 'Modo oscuro',
     menuFullscreen: 'Usar pantalla completa',
@@ -1253,7 +1304,10 @@ const tMain = createI18n({
     menuWindow: 'Ventana',
     menuHelp: 'Ayuda',
     menuShortcuts: 'Atajos de teclado',
+<<<<<<< ours
     menuDocsHelp: 'Ayuda de UniWork Docs',
+=======
+>>>>>>> theirs
   },
   th: {
     dlgOpenDoc: 'เปิดเอกสาร',
@@ -1325,6 +1379,7 @@ const tMain = createI18n({
     menuZoom100: 'ขนาดจริง (100%)',
     menuPageWidth: 'ความกว้างของหน้า',
     menuWholePage: 'ทั้งหน้า',
+    menuMultiPage: 'หลายหน้า',
     menuAiSidebar: 'แถบข้าง AI',
     menuDarkMode: 'โหมดมืด',
     menuFullscreen: 'เข้าสู่โหมดเต็มหน้าจอ',
@@ -1383,7 +1438,10 @@ const tMain = createI18n({
     menuWindow: 'หน้าต่าง',
     menuHelp: 'วิธีใช้',
     menuShortcuts: 'แป้นพิมพ์ลัด',
+<<<<<<< ours
     menuDocsHelp: 'วิธีใช้ UniWork Docs',
+=======
+>>>>>>> theirs
   },
   id: {
     dlgOpenDoc: 'Buka Dokumen',
@@ -1456,6 +1514,7 @@ const tMain = createI18n({
     menuZoom100: 'Ukuran Sebenarnya (100%)',
     menuPageWidth: 'Lebar Halaman',
     menuWholePage: 'Seluruh Halaman',
+    menuMultiPage: 'Beberapa halaman',
     menuAiSidebar: 'Bilah Samping AI',
     menuDarkMode: 'Mode Gelap',
     menuFullscreen: 'Masuk Layar Penuh',
@@ -1514,7 +1573,10 @@ const tMain = createI18n({
     menuWindow: 'Jendela',
     menuHelp: 'Bantuan',
     menuShortcuts: 'Pintasan Papan Ketik',
+<<<<<<< ours
     menuDocsHelp: 'Bantuan UniWork Docs',
+=======
+>>>>>>> theirs
   },
   ru: {
     dlgOpenDoc: 'Открыть документ',
@@ -1587,6 +1649,7 @@ const tMain = createI18n({
     menuZoom100: 'Фактический размер (100%)',
     menuPageWidth: 'По ширине страницы',
     menuWholePage: 'Страница целиком',
+    menuMultiPage: 'Несколько страниц',
     menuAiSidebar: 'Боковая панель ИИ',
     menuDarkMode: 'Темный режим',
     menuFullscreen: 'Перейти в полноэкранный режим',
@@ -1645,7 +1708,10 @@ const tMain = createI18n({
     menuWindow: 'Окно',
     menuHelp: 'Справка',
     menuShortcuts: 'Сочетания клавиш',
+<<<<<<< ours
     menuDocsHelp: 'Справка UniWork Docs',
+=======
+>>>>>>> theirs
   },
   ar: {
     dlgOpenDoc: 'فتح مستند',
@@ -1718,6 +1784,7 @@ const tMain = createI18n({
     menuZoom100: 'الحجم الفعلي (100%)',
     menuPageWidth: 'عرض الصفحة',
     menuWholePage: 'صفحة كاملة',
+    menuMultiPage: 'صفحات متعددة',
     menuAiSidebar: 'الشريط الجانبي للذكاء الاصطناعي',
     menuDarkMode: 'الوضع الداكن',
     menuFullscreen: 'الدخول إلى ملء الشاشة',
@@ -1776,7 +1843,10 @@ const tMain = createI18n({
     menuWindow: 'نافذة',
     menuHelp: 'تعليمات',
     menuShortcuts: 'اختصارات لوحة المفاتيح',
+<<<<<<< ours
     menuDocsHelp: 'تعليمات UniWork Docs',
+=======
+>>>>>>> theirs
   },
   pt: {
     dlgOpenDoc: 'Abrir Documento',
@@ -1849,6 +1919,7 @@ const tMain = createI18n({
     menuZoom100: 'Tamanho Real (100%)',
     menuPageWidth: 'Largura da Página',
     menuWholePage: 'Página Inteira',
+    menuMultiPage: 'Várias páginas',
     menuAiSidebar: 'Barra Lateral de IA',
     menuDarkMode: 'Modo Escuro',
     menuFullscreen: 'Entrar em Tela Cheia',
@@ -1907,7 +1978,10 @@ const tMain = createI18n({
     menuWindow: 'Janela',
     menuHelp: 'Ajuda',
     menuShortcuts: 'Atalhos de Teclado',
+<<<<<<< ours
     menuDocsHelp: 'Ajuda do UniWork Docs',
+=======
+>>>>>>> theirs
   },
   it: {
     dlgOpenDoc: 'Apri documento',
@@ -1980,6 +2054,7 @@ const tMain = createI18n({
     menuZoom100: 'Dimensioni effettive (100%)',
     menuPageWidth: 'Larghezza pagina',
     menuWholePage: 'Pagina intera',
+    menuMultiPage: 'Più pagine',
     menuAiSidebar: 'Barra laterale IA',
     menuDarkMode: 'Modalità scura',
     menuFullscreen: 'Attiva schermo intero',
@@ -2038,7 +2113,10 @@ const tMain = createI18n({
     menuWindow: 'Finestra',
     menuHelp: 'Aiuto',
     menuShortcuts: 'Scelte rapide da tastiera',
+<<<<<<< ours
     menuDocsHelp: 'Guida di UniWork Docs',
+=======
+>>>>>>> theirs
   },
   pl: {
     dlgOpenDoc: 'Otwórz dokument',
@@ -2111,6 +2189,7 @@ const tMain = createI18n({
     menuZoom100: 'Rzeczywisty rozmiar (100%)',
     menuPageWidth: 'Szerokość strony',
     menuWholePage: 'Cała strona',
+    menuMultiPage: 'Wiele stron',
     menuAiSidebar: 'Pasek boczny AI',
     menuDarkMode: 'Tryb ciemny',
     menuFullscreen: 'Przejdź do pełnego ekranu',
@@ -2169,7 +2248,10 @@ const tMain = createI18n({
     menuWindow: 'Okno',
     menuHelp: 'Pomoc',
     menuShortcuts: 'Skróty klawiaturowe',
+<<<<<<< ours
     menuDocsHelp: 'Pomoc UniWork Docs',
+=======
+>>>>>>> theirs
   },
   cs: {
     dlgOpenDoc: 'Otevřít dokument',
@@ -2242,6 +2324,7 @@ const tMain = createI18n({
     menuZoom100: 'Skutečná velikost (100 %)',
     menuPageWidth: 'Šířka stránky',
     menuWholePage: 'Celá stránka',
+    menuMultiPage: 'Více stránek',
     menuAiSidebar: 'Boční panel AI',
     menuDarkMode: 'Tmavý režim',
     menuFullscreen: 'Přejít na celou obrazovku',
@@ -2300,7 +2383,10 @@ const tMain = createI18n({
     menuWindow: 'Okno',
     menuHelp: 'Nápověda',
     menuShortcuts: 'Klávesové zkratky',
+<<<<<<< ours
     menuDocsHelp: 'Nápověda UniWork Docs',
+=======
+>>>>>>> theirs
   },
   nl: {
     dlgOpenDoc: 'Document openen',
@@ -2373,6 +2459,7 @@ const tMain = createI18n({
     menuZoom100: 'Ware grootte (100%)',
     menuPageWidth: 'Paginabreedte',
     menuWholePage: 'Hele pagina',
+    menuMultiPage: "Meerdere pagina's",
     menuAiSidebar: 'AI-zijbalk',
     menuDarkMode: 'Donkere modus',
     menuFullscreen: 'Schermvullende weergave',
@@ -2431,7 +2518,10 @@ const tMain = createI18n({
     menuWindow: 'Venster',
     menuHelp: 'Help',
     menuShortcuts: 'Sneltoetsen',
+<<<<<<< ours
     menuDocsHelp: 'UniWork Docs Help',
+=======
+>>>>>>> theirs
   },
   ms: {
     dlgOpenDoc: 'Buka Dokumen',
@@ -2504,6 +2594,7 @@ const tMain = createI18n({
     menuZoom100: 'Saiz Sebenar (100%)',
     menuPageWidth: 'Lebar Halaman',
     menuWholePage: 'Seluruh Halaman',
+    menuMultiPage: 'Beberapa halaman',
     menuAiSidebar: 'Bar Sisi AI',
     menuDarkMode: 'Mod Gelap',
     menuFullscreen: 'Masuk Skrin Penuh',
@@ -2562,7 +2653,10 @@ const tMain = createI18n({
     menuWindow: 'Tetingkap',
     menuHelp: 'Bantuan',
     menuShortcuts: 'Pintasan Papan Kekunci',
+<<<<<<< ours
     menuDocsHelp: 'Bantuan UniWork Docs',
+=======
+>>>>>>> theirs
   },
   he: {
     dlgOpenDoc: 'פתיחת מסמך',
@@ -2634,6 +2728,7 @@ const tMain = createI18n({
     menuZoom100: 'גודל אמיתי (100%)',
     menuPageWidth: 'רוחב עמוד',
     menuWholePage: 'עמוד שלם',
+    menuMultiPage: 'עמודים מרובים',
     menuAiSidebar: 'סרגל צד AI',
     menuDarkMode: 'מצב כהה',
     menuFullscreen: 'מעבר למסך מלא',
@@ -2692,7 +2787,10 @@ const tMain = createI18n({
     menuWindow: 'חלון',
     menuHelp: 'עזרה',
     menuShortcuts: 'קיצורי מקלדת',
+<<<<<<< ours
     menuDocsHelp: 'עזרה של UniWork Docs',
+=======
+>>>>>>> theirs
   },
   hi: {
     dlgOpenDoc: 'दस्तावेज़ खोलें',
@@ -2765,6 +2863,7 @@ const tMain = createI18n({
     menuZoom100: 'वास्तविक आकार (100%)',
     menuPageWidth: 'पृष्ठ चौड़ाई',
     menuWholePage: 'पूरा पृष्ठ',
+    menuMultiPage: 'एकाधिक पृष्ठ',
     menuAiSidebar: 'AI साइडबार',
     menuDarkMode: 'डार्क मोड',
     menuFullscreen: 'पूर्ण स्क्रीन में जाएँ',
@@ -2823,7 +2922,10 @@ const tMain = createI18n({
     menuWindow: 'विंडो',
     menuHelp: 'सहायता',
     menuShortcuts: 'कीबोर्ड शॉर्टकट',
+<<<<<<< ours
     menuDocsHelp: 'UniWork Docs सहायता',
+=======
+>>>>>>> theirs
   },
   'zh-TW': {
     dlgOpenDoc: '開啟文件',
@@ -2894,6 +2996,7 @@ const tMain = createI18n({
     menuZoom100: '實際大小 (100%)',
     menuPageWidth: '頁面寬度',
     menuWholePage: '整頁',
+    menuMultiPage: '多頁',
     menuAiSidebar: 'AI 側邊欄',
     menuDarkMode: '深色模式',
     menuFullscreen: '進入全螢幕',
@@ -2952,7 +3055,10 @@ const tMain = createI18n({
     menuWindow: '視窗',
     menuHelp: '說明',
     menuShortcuts: '鍵盤快速鍵',
+<<<<<<< ours
     menuDocsHelp: 'UniWork Docs 說明',
+=======
+>>>>>>> theirs
   },
 })
 const tm = (key: Parameters<typeof tMain>[1], params?: Parameters<typeof tMain>[2]) =>
@@ -3203,17 +3309,14 @@ export function replaceRecentFile(oldPath: string, newPath: string): void {
     RECENT_PATH(),
     recent.map((p) => (p === oldPath ? newPath : p)),
   )
-  const starred = readJson<string[]>(STARRED_PATH(), [])
-  if (starred.includes(oldPath)) {
-    writeJsonAtomic(
-      STARRED_PATH(),
-      starred.map((p) => (p === oldPath ? newPath : p)),
-    )
-  }
+  const renamed = renameStarredItem(readStarredItems(STARRED_PATH()), oldPath, newPath)
+  if (renamed) writeStarredItems(STARRED_PATH(), renamed)
   buildDocsMenu()
 }
 
 // ---- starred files (home screen favorites) ----
+// the store lives in starred-files.ts (pure, unit-tested); legacy flat
+// string[] files migrate to the versioned shape on the first write
 
 const STARRED_PATH = () => userDataPath('starred.json')
 
@@ -3221,25 +3324,37 @@ const STARRED_PATH = () => userDataPath('starred.json')
  *  unavailable starred file must keep its star and its Starred-view row —
  *  filtering here also desynced the star state shown on recents rows (r158) */
 export function readStarredFiles(): string[] {
-  return readJson<string[]>(STARRED_PATH(), [])
+  return readStarredItems(STARRED_PATH()).map((item) => item.path)
 }
 
 export function toggleStarredFile(filePath: string): void {
-  const starred = readJson<string[]>(STARRED_PATH(), [])
-  const next = starred.includes(filePath)
-    ? starred.filter((p) => p !== filePath)
-    : [...starred, filePath]
-  writeJsonAtomic(STARRED_PATH(), next)
+  writeStarredItems(STARRED_PATH(), toggleStarredItem(readStarredItems(STARRED_PATH()), filePath))
 }
 
-/** Bulk unstar (in-app delete, or removing an unavailable entry from the
- *  recents list): the star must not outlive the row it pointed at (r158) */
+/** Bulk unstar (in-app delete, bulk unfollow from the Starred view, or
+ *  removing an unavailable entry from the recents list): the star must not
+ *  outlive the row it pointed at (r158) */
 export function removeStarredFiles(filePaths: string[]): void {
-  const drop = new Set(filePaths)
-  if (drop.size === 0) return
-  const starred = readJson<string[]>(STARRED_PATH(), [])
-  const next = starred.filter((p) => !drop.has(p))
-  if (next.length !== starred.length) writeJsonAtomic(STARRED_PATH(), next)
+  const next = dropStarredItems(readStarredItems(STARRED_PATH()), filePaths)
+  if (next) writeStarredItems(STARRED_PATH(), next)
+}
+
+/** put each starred path into `group` (null = back to ungrouped). Groups have
+ *  no separate list: a group exists while an entry carries its name, so
+ *  creating one is assigning its first file and emptying one is implicit. */
+export function setStarredGroup(filePaths: string[], group: string | null): void {
+  const next = assignStarredGroup(readStarredItems(STARRED_PATH()), filePaths, group)
+  if (next) writeStarredItems(STARRED_PATH(), next)
+}
+
+/** group names that currently have at least one starred file, first-seen order */
+export function readStarredGroups(): string[] {
+  return starredGroupNames(readStarredItems(STARRED_PATH()))
+}
+
+/** starred path → its group (ungrouped paths absent); feeds the home IPC entries */
+export function readStarredGroupMap(): Map<string, string> {
+  return starredGroupMap(readStarredItems(STARRED_PATH()))
 }
 
 // ---- original archive (pass-through base: original file archived by content hash) ----
@@ -3788,9 +3903,17 @@ export function registerAiIpc(): void {
     },
   )
 
+<<<<<<< ours
   /** Editor AI panels: jump to Home → Settings → AI Model (where the user adds their own key). */
   ipcMain.handle('ai:open-billing', () => {
     shellHooks?.openSettings?.('aiModel')
+=======
+  // a 401 on the gsk key opens the device-code login once (genoffice-auth recovery)
+  setGenofficeLoginOpener((url) => void shell.openExternal(url))
+
+  ipcMain.handle('ai:gsk-login', () => {
+    ensureGenofficeLogin((url) => void shell.openExternal(url))
+>>>>>>> theirs
   })
 
   ipcMain.handle('ai:set-settings', (_event, settings: AiSettings) => {
@@ -3835,7 +3958,18 @@ export function registerAiIpc(): void {
     const tools = request.tools ?? []
     const maxTokens = request.maxTokens ?? maxOutputTokensOf(settings)
     const provider = settings.provider
+<<<<<<< ours
     const config = withUniAiOpenRouterAuth(settings, provider, settings.providers?.[provider])
+=======
+    let config = settings.providers?.[provider]
+    // the genspark key never enters the settings file; requests take it from the gsk login state
+    // set only when the gsk key was injected: a 401 then means that key expired
+    let gskKey = ''
+    if (provider === 'genspark' && config && !config.apiKey) {
+      gskKey = gskApiKey()
+      config = { ...config, apiKey: gskKey }
+    }
+>>>>>>> theirs
     const send = (chunk: AiStreamChunk) => {
       if (!event.sender.isDestroyed()) event.sender.send('ai:stream-chunk', chunk)
     }
@@ -3874,16 +4008,36 @@ export function registerAiIpc(): void {
         onStopReason: (reason) => {
           stopReason = reason
         },
+        onUsage: (usage) => send({ requestId, type: 'usage', usage }),
       })
       send({ requestId, type: 'done', stopReason })
     } catch (err) {
       if (controller.signal.aborted) {
         send({ requestId, type: 'done' })
       } else {
+<<<<<<< ours
         const { raw, ...fields } = aiStreamErrorFields(err, getUiLang())
         // the panel gets the product message; the provider's own text stays in the log
         console.warn(`[ai-stream] ${requestId} (${provider}/${config.model}) failed:`, raw)
         send({ requestId, type: 'error', ...fields })
+=======
+        // an expired/revoked key drops to signed-out so the inline sign-in button shows
+        noteGskCallFailure(gskKey, err)
+        send({
+          requestId,
+          type: 'error',
+          error: err instanceof Error ? err.message : String(err),
+          ...(err instanceof AiTimeoutError
+            ? { errorCode: 'timeout' as const }
+            : err instanceof AiCreditsError
+              ? { errorCode: 'credits' as const }
+              : isAiNetworkError(err)
+                ? { errorCode: 'network' as const }
+                : isAiOverloadedError(err)
+                  ? { errorCode: 'overloaded' as const }
+                  : {}),
+        })
+>>>>>>> theirs
       }
     } finally {
       unwatchSender()
@@ -4039,7 +4193,17 @@ export function registerAiIpc(): void {
     const settings = sanitizeAiSettings(request.settings)
     if (!settings) return { ok: false, error: 'invalid AI settings payload', errorKind: 'failed' }
     const provider = settings.provider
+<<<<<<< ours
     const config = withUniAiOpenRouterAuth(settings, provider, settings.providers?.[provider])
+=======
+    let config = settings.providers?.[provider]
+    // set only when the gsk key was injected: a 401 then means that key expired
+    let gskKey = ''
+    if (provider === 'genspark' && config && !config.apiKey) {
+      gskKey = gskApiKey()
+      config = { ...config, apiKey: gskKey }
+    }
+>>>>>>> theirs
     if (!config || (provider !== 'codex' && !config.apiKey)) {
       return {
         ok: false,
@@ -4058,6 +4222,7 @@ export function registerAiIpc(): void {
     const target = chatConfigOf(request)
     if (!('config' in target)) return target
     try {
+<<<<<<< ours
       const result = await chatForProvider(
         target.provider,
         target.config,
@@ -4068,6 +4233,19 @@ export function registerAiIpc(): void {
       return result.ok ? result : failedChat(aiChatFailure(result, getUiLang(), tm('errAiBusy')))
     } catch (err) {
       return failedChat(aiChatFailureFromError(err, getUiLang(), tm('errAiBusy')))
+=======
+      const result = await chatForProvider(provider, config, system, user)
+      // the one-shot path reports HTTP failures as ok:false with the raw body —
+      // replace capacity/rate-limit dumps with the localized "busy" message
+      if (!result.ok && isAiOverloadedError(result.error)) {
+        return { ok: false, error: tm('errAiBusy') }
+      }
+      if (!result.ok) noteGskCallFailure(gskKey, result.error)
+      return result
+    } catch (err) {
+      noteGskCallFailure(gskKey, err)
+      return { ok: false, error: isAiOverloadedError(err) ? tm('errAiBusy') : String(err) }
+>>>>>>> theirs
     }
   }
 
@@ -5789,6 +5967,7 @@ export function buildDocsMenu(): void {
             })),
             { label: tm('menuPageWidth'), click: () => sendCommand('zoom-page-width') },
             { label: tm('menuWholePage'), click: () => sendCommand('zoom-whole-page') },
+            { label: tm('menuMultiPage'), click: () => sendCommand('zoom-multi-page') },
           ],
         },
         { type: 'separator' },
@@ -5967,8 +6146,6 @@ export function buildDocsMenu(): void {
           accelerator: 'CmdOrCtrl+/',
           click: () => sendCommand('shortcuts'),
         },
-        { type: 'separator' },
-        { label: tm('menuDocsHelp'), enabled: false },
         { type: 'separator' },
         checkUpdatesMenuItem(appMenuLabels(getUiLang())),
         aboutMenuItem(appMenuLabels(getUiLang())),
@@ -6347,7 +6524,28 @@ export function startDocsStandalone(): void {
   // AI_OFFICE_USER_DATA: E2E/screenshot runs isolate userData (and the
   // single-instance lock) so parallel automation sessions don't evict each other
   if (process.env.AI_OFFICE_USER_DATA) app.setPath('userData', process.env.AI_OFFICE_USER_DATA)
+<<<<<<< ours
   else if (isDev) app.setPath('userData', join(app.getPath('appData'), 'UniWork Docs Dev'))
+=======
+  else if (isDev) {
+    // "GenOffice Docs Dev" carried a space, against the XDG one-token
+    // convention (genoffice#1817); move the old profile once, as the shell does.
+    const appData = app.getPath('appData')
+    const devDir = join(appData, 'GenOffice-Docs-Dev')
+    const oldDevDir = join(appData, 'GenOffice Docs Dev')
+    let userData = devDir
+    if (existsSync(oldDevDir) && !existsSync(devDir)) {
+      try {
+        renameSync(oldDevDir, devDir)
+      } catch {
+        // another dev instance holds the directory: keep using the old one so
+        // the profile is not lost and the move is retried on the next launch
+        userData = oldDevDir
+      }
+    }
+    app.setPath('userData', userData)
+  }
+>>>>>>> theirs
 
   const hasSingleInstanceLock = app.requestSingleInstanceLock()
   if (!hasSingleInstanceLock) {
