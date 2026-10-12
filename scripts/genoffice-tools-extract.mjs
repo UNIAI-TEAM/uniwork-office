@@ -75,8 +75,12 @@
  *      read for `===` (the branch the named tool takes); for `!==` the
  *      enclosing body minus that consequent is read (the tool's own
  *      fall-through path), so a `mutated: false` declared after an early-return
- *      guard still counts. A `call.name === 'x'` anywhere else (a ternary, a
- *      `const`, an argument) controls no path and contributes nothing.
+ *      guard still counts. A braceless consequent is one statement: it ends at
+ *      the `;` that closes it or, the fork's sources carrying no semicolons, at
+ *      the line break ASI reads as the end of the statement — never at the next
+ *      `;`/`}` further down the file. A `call.name === 'x'` anywhere else (a
+ *      ternary, a `const`, an argument) controls no path and contributes
+ *      nothing.
  * A local helper is resolved by declaration position and lexical scope, not by
  * bare name, so same-named closures in different cases stay distinct. The
  * recursion never enters a helper that is itself a dispatcher — the shared
@@ -1320,15 +1324,91 @@ function enclosingIfCondition(tokens, at) {
   return -1
 }
 
-/** [start, end) of the branch the `if (...)` at `openIdx` controls */
-function branchRange(tokens, openIdx) {
+/**
+ * Tokens that can continue an expression across a line break. A line break in
+ * front of anything else ends the statement (ASI), which is how the fork's
+ * semicolon-free braceless consequents end.
+ */
+const CONTINUES_EXPRESSION = new Set([
+  '.',
+  '?.',
+  '(',
+  '[',
+  ',',
+  '?',
+  ':',
+  '=',
+  '=>',
+  '==',
+  '===',
+  '!=',
+  '!==',
+  '<',
+  '>',
+  '<=',
+  '>=',
+  '+',
+  '-',
+  '*',
+  '/',
+  '%',
+  '**',
+  '&&',
+  '||',
+  '??',
+  '|',
+  '&',
+  '^',
+  '<<',
+  '>>',
+  '>>>',
+  'instanceof',
+  'in',
+  'as',
+  'satisfies',
+])
+
+const LINE_BREAK_RE = /[\n\r\u2028\u2029]/
+
+/** is there a line terminator between two tokens in the source? */
+function lineBreakBetween(src, before, after) {
+  return LINE_BREAK_RE.test(src.slice(before.end, after.start))
+}
+
+/**
+ * Does the statement that reached token `k` continue at `k`? Without a line
+ * break it does. After one, only a token that can continue an expression — an
+ * operator, `.`, `(`, `[`, a tagged template, `instanceof`/`in`/`as` — keeps
+ * the statement open; anything else starts a new statement (ASI).
+ */
+function statementContinues(tokens, src, k) {
+  const tk = tokens[k]
+  if (!lineBreakBetween(src, tokens[k - 1], tk)) return true
+  if (tk.type === 'template') return true
+  return CONTINUES_EXPRESSION.has(tk.value)
+}
+
+/**
+ * [start, end) of the branch the `if (...)` at `openIdx` controls. A block
+ * branch ends at its matching `}`; a braceless branch is one statement and ends
+ * at the `;` that closes it, at the line break ASI reads as the end of the
+ * statement, or at the enclosing block's `}` — never at the next `;`/`}` far
+ * below. Reading to the next `;` alone ran a semicolon-free branch on into the
+ * code beneath it: in the markdown source the `=== 'ask_clarification'` guard
+ * swallowed the whole `switch` below and over-reported `editor_write`.
+ */
+function branchRange(analysis, openIdx) {
+  const tokens = analysis.tokens
   const start = skipBalanced(tokens, openIdx)
   if (tokens[start] && tokens[start].value === '{') {
     const end = skipBraces(tokens, start)
     return { start: start + 1, end: end - 1, branchStart: start, branchEnd: end }
   }
   let end = start
-  while (end < tokens.length && tokens[end].value !== ';' && tokens[end].value !== '}') end += 1
+  while (end < tokens.length && tokens[end].value !== ';' && tokens[end].value !== '}') {
+    if (end > start && !statementContinues(tokens, analysis.src, end)) break
+    end += 1
+  }
   return { start, end, branchStart: start, branchEnd: end }
 }
 
@@ -1343,7 +1423,7 @@ function guardRegions(analysis, at, op, functions, _owners) {
   const tokens = analysis.tokens
   const open = enclosingIfCondition(tokens, at)
   if (open < 0) return null
-  const branch = branchRange(tokens, open)
+  const branch = branchRange(analysis, open)
   if (op === '===' || op === '==') return [{ from: branch.start, to: branch.end }]
   const fn = enclosingFunction(functions, at)
   if (!fn) return null
