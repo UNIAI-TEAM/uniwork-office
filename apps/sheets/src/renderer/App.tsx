@@ -183,6 +183,7 @@ import {
 import { scopeLabel, type AiChatMessage } from './ai/AiChatPanel'
 import { markRunFailed } from './ai/run-error'
 import { pruneFailedExchange } from './ai/retry-prune'
+import { withReceipt, withoutReceipts } from './ai/clarify-receipts'
 import { parseSheetNavHref } from './ai/sheet-nav'
 import {
   boundsToA1,
@@ -1281,7 +1282,11 @@ export function App({
     const stale = () => chatResolveGenRef.current !== generation
     // Reset (new workbook or new session)
     chatRefIdsRef.current = null
-    if (!continues) setHistoricChat([])
+    if (!continues) {
+      setHistoricChat([])
+      // answered clarification receipts belong to the workbook they were given for
+      setChat(withoutReceipts)
+    }
     const tempChatId = `unsaved-${Date.now()}`
     const sessionId = workbookFile?.sessionId
     const resolveArgs: Parameters<typeof api.resolveChat>[0] = { filePath: null, tempChatId }
@@ -1312,6 +1317,8 @@ export function App({
           limit: 200,
         })
         if (stale() || msgs.length === 0) return
+        // restored history lands above the live turn: its receipts are view-only, drop them
+        setChat(withoutReceipts)
         setHistoricChat(
           msgs.map((m) => ({
             role: m.role,
@@ -5189,7 +5196,10 @@ export function App({
           aiClarify
             ? {
                 questions: aiClarify,
-                onSubmit: (answers) => settleClarify({ answers }),
+                onSubmit: (answers, qa) => {
+                  setChat((previous) => withReceipt(previous, qa))
+                  settleClarify({ answers })
+                },
                 onSkip: () => settleClarify({ answers: '', cancelled: true }),
               }
             : null

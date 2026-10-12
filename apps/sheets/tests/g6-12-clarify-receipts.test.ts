@@ -63,7 +63,13 @@ describe('AiChatPanel receipts', () => {
   function mount(chat: readonly AiChatMessage[], clarify: any = null) {
     vi.stubGlobal(
       'desktopApi',
-      new Proxy({}, { get: () => (() => Promise.resolve(undefined)) as never }),
+      new Proxy(
+        {},
+        {
+          get: (_target, prop: string) =>
+            /^on[A-Z]/.test(prop) ? () => () => {} : () => Promise.resolve(undefined),
+        },
+      ),
     )
     container = document.createElement('div')
     document.body.appendChild(container)
@@ -72,7 +78,7 @@ describe('AiChatPanel receipts', () => {
       root!.render(
         createElement(
           LocaleProvider,
-          { initial: 'en' },
+          { initial: 'en', children: null },
           createElement(AiChatPanel, {
             isOpen: true,
             hasContent: true,
@@ -150,13 +156,13 @@ describe('App wiring', () => {
 
   it('drops the receipts when another workbook opens (not on a same-conversation save)', () => {
     expect(app).toMatch(
-      /if \(!continues\) \{\s*setHistoricChat\(\[\]\)\s*setChat\(withoutReceipts\)/,
+      /if \(!continues\) \{\s*setHistoricChat\(\[\]\)\s*(?:\/\/[^\n]*\s*)?setChat\(withoutReceipts\)/,
     )
   })
 
   it('drops the receipts when restored history lands', () => {
     expect(app).toMatch(
-      /if \(stale\(\) \|\| msgs\.length === 0\) return\s*setChat\(withoutReceipts\)/,
+      /if \(stale\(\) \|\| msgs\.length === 0\) return\s*(?:\/\/[^\n]*\s*)?setChat\(withoutReceipts\)/,
     )
   })
 })

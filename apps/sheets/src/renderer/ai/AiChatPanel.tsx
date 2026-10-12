@@ -16,6 +16,7 @@ import { Markdown } from '@genoffice/ui'
 import { SHEET_NAV_SCHEME } from './sheet-nav'
 import type { ClarifyQuestion } from './tools'
 import { ClarifyCard } from './ClarifyCard'
+import type { ClarifyQa } from './clarify-receipts'
 import sendEnterOn from '../assets/send-enter-on.png'
 import sendEnterOff from '../assets/send-enter-off.png'
 import sendStop from '../assets/send-stop.png'
@@ -214,6 +215,8 @@ export interface AiChatMessage {
   readonly attachments?: readonly AttachmentMeta[] | undefined
   /** the range this user message targeted, frozen at send */
   readonly scope?: AiScopeQuoteData | undefined
+  /** answered ask_clarification cards of this message's run (view-only receipts) */
+  readonly clarifyReceipts?: readonly (readonly ClarifyQa[])[] | undefined
 }
 
 const MODEL_BRIDGE: AiModelPickerBridge = {
@@ -308,7 +311,7 @@ export function AiChatPanel({
    *  until answered or skipped */
   readonly clarify?: {
     readonly questions: readonly ClarifyQuestion[]
-    readonly onSubmit: (answers: string) => void
+    readonly onSubmit: (answers: string, qa: readonly ClarifyQa[]) => void
     readonly onSkip: () => void
   } | null
 }): React.JSX.Element {
@@ -626,6 +629,16 @@ export function AiChatPanel({
                   <SentAttachments atts={entry.attachments} previews={attachmentPreviews} />
                 )}
                 <span dir="auto">{entry.text}</span>
+                {entry.clarifyReceipts?.map((qa, k) => (
+                  <div key={`ca${k}`} className="ai-clarify-answered">
+                    {qa.map((pair, m) => (
+                      <div key={m} className="ai-clarify-answered-row">
+                        <div className="ai-clarify-answered-q">{pair.q}</div>
+                        <div className="ai-clarify-answered-a">{pair.a}</div>
+                      </div>
+                    ))}
+                  </div>
+                ))}
                 {entry.undelivered && (
                   <div className="ai-msg-undelivered">
                     {t('aiUndelivered')}
@@ -733,7 +746,7 @@ export function AiChatPanel({
         <div className="ai-composer">
           <ClarifyCard
             questions={clarify.questions}
-            onSubmit={(answers) => clarify.onSubmit(answers)}
+            onSubmit={(answers, qa) => clarify.onSubmit(answers, qa)}
             onSkip={clarify.onSkip}
           />
         </div>
