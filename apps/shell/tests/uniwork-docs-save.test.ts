@@ -344,7 +344,9 @@ describe('open flow', () => {
     expect(path).toBe(join(dir, 'uniwork-documents', 'default', 'acc_1', DOC, 'Q4 plan.docx'))
     expect(readFileSync(path, 'utf8')).toBe('v3 bytes')
     expect(binding(path)).toMatchObject({
-      schema: 1,
+      schema: 2,
+      min_store_level: 2,
+      min_app_version: '0.0.0',
       documentId: DOC,
       workspaceId: 'ws_1',
       orgId: 'org_a',
@@ -1468,7 +1470,7 @@ describe('the conflict dialog belongs to the document that hit the conflict (GOA
     const xlsx = join(sheetDir, 'Budget.xlsx')
     await ctx.service.store.writeWorkingCopy(sheetDir, 'Budget.xlsx', enc('my xlsx'))
     await ctx.service.store.write(sheetDir, {
-      schema: 1,
+      schema: 2,
       documentId: SHEET,
       workspaceId: 'ws_1',
       orgId: 'org_a',
@@ -1482,6 +1484,8 @@ describe('the conflict dialog belongs to the document that hit the conflict (GOA
       state: 'conflict',
       error: 'conflict',
       serverRevision: '8',
+      minStoreLevel: 2,
+      minAppVersion: '0.0.0',
     })
     return { server, ctx, docx, xlsx }
   }

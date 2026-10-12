@@ -48,6 +48,7 @@ import type { DocumentDetail, LaunchDescriptor } from './parse'
 import { SaveCoordinator, toStatus, type IntentAccess } from './save-coordinator'
 import type { SyncStoreAccess, SyncStoreOpen } from '../uniwork-sync/session-store'
 import { createIntentStore, INTENT_STORE_REGISTRATION } from '../uniwork-sync/intent-store'
+import { APP_STORE_LEVEL } from '../uniwork-sync/store-level'
 
 /**
  * UniWork documents in the shell main process: the picker reads, the open
@@ -115,6 +116,8 @@ export interface UniworkDocsServiceDeps {
    * touch one).
    */
   syncStore?: SyncStoreAccess
+  /** this build's version, stamped into every binding as `min_app_version` (display only) */
+  appVersion?: () => string
   profile(): DeploymentProfile | null
   /** the channel of this build (its launch scheme), known before any server is chosen */
   channel(): DeploymentChannel
@@ -201,6 +204,8 @@ export class UniworkDocsService {
   readonly coordinator: SaveCoordinator
   readonly launch: LaunchController
   private readonly deps: UniworkDocsServiceDeps
+  /** the build's own version, stamped into bindings (see binding-store's minAppVersion) */
+  private readonly appVersion: () => string
   private client: UniworkDocsClient | null
   private clientOrigin: string | null = null
   private lastOwner: LastOwner | null
@@ -232,6 +237,7 @@ export class UniworkDocsService {
   constructor(deps: UniworkDocsServiceDeps) {
     this.deps = deps
     this.client = deps.client ?? null
+    this.appVersion = deps.appVersion ?? (() => '0.0.0')
     this.store = new BindingStore(join(deps.userDataDir, 'uniwork-documents'))
     this.lastOwner = this.store.readLastOwner()
     this.coordinator = new SaveCoordinator({
@@ -341,6 +347,15 @@ export class UniworkDocsService {
     // a live session opens its store: the scope's migration and every later
     // intent write go through this one open
     void this.openSyncStore().catch(() => undefined)
+  }
+
+  /** this build's version, as stamped into bindings (display only, never a gate) */
+  private buildVersion(): string {
+    try {
+      return this.appVersion() || '0.0.0'
+    } catch {
+      return '0.0.0'
+    }
   }
 
   /**
@@ -1161,7 +1176,7 @@ export class UniworkDocsService {
     const path = await this.store.writeWorkingCopy(dir, filename, bytes)
     if (stale && stale !== filename) await this.store.removeWorkingCopy(dir, stale)
     const binding: Binding = {
-      schema: 1,
+      schema: 2,
       documentId,
       workspaceId,
       orgId,
@@ -1173,6 +1188,8 @@ export class UniworkDocsService {
       baseVersion: viewTicket ? launch.version : base.file.version,
       baseChecksum: sha256Hex(bytes),
       state: 'ready',
+      minStoreLevel: APP_STORE_LEVEL,
+      minAppVersion: this.buildVersion(),
       ...(existing?.lastSavedAt ? { lastSavedAt: existing.lastSavedAt } : {}),
     }
     await this.store.write(dir, binding)

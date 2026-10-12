@@ -8,6 +8,7 @@ import type {
   UniworkSaveState,
 } from '../../shared/home-api'
 import { atomicWriteFile } from '../atomic-write'
+import { APP_STORE_LEVEL, readStoreGate } from '../uniwork-sync/store-level'
 import { formatForName, isDecimalString } from './formats'
 
 /**
@@ -35,7 +36,8 @@ export interface LastOwner {
 }
 
 export interface Binding {
-  schema: 1
+  /** the schema this build reads and writes; schema 1 is upgraded on the next write */
+  schema: 2
   documentId: string
   workspaceId: string
   orgId: string
@@ -49,6 +51,10 @@ export interface Binding {
   state: UniworkSaveState
   error?: UniworkDocErrorCode
   serverRevision?: string
+  /** OQ-P4 (b): the store generation this copy needs (written as `min_store_level`) */
+  minStoreLevel: number
+  /** OQ-P4 (b): the build that wrote it, display only (written as `min_app_version`) */
+  minAppVersion: string
   lastSavedAt?: string
 }
 
@@ -66,22 +72,28 @@ export interface BoundDocument {
 
 /**
  * How this build reads a binding.json value, without parsing it: `current` is
- * schema 1 (the store this build writes), `newer` an integer schema >= 2 (a
- * store a newer app wrote: not read here, and never treated as a plain local
- * file), `unrecognized` anything else (no or garbage schema, non-JSON).
+ * a store this build reads (schema 1 - the legacy form - and schema 2 whose
+ * `min_store_level` is inside this build's window), `newer` a store it must
+ * not read (schema >= 3, or a schema-2 `min_store_level` missing, malformed or
+ * above this build: the G5-04g S11 lock), `unrecognized` anything else (no or
+ * garbage schema, non-JSON).
  */
 export type BindingKind = 'current' | 'newer' | 'unrecognized'
 
 /**
- * min_app_version is deliberately not looked at: G5-04g refuses every integer
- * schema >= 2 whatever that field says (OQ-P4).
+ * OQ-P4 (b): what this build does with the store the binding declares. Schema
+ * 1 is this app's own legacy form and opens; schema 2 needs a safe-integer
+ * `min_store_level` in 1..APP_STORE_LEVEL; schema >= 3 belongs to a newer app,
+ * as does a malformed schema-2 level (the G5-04g rule). `min_app_version` is
+ * never a gate: it is read for display only.
  */
 export function bindingKindOf(raw: unknown): BindingKind {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return 'unrecognized'
   const schema = (raw as Record<string, unknown>).schema
   if (typeof schema !== 'number' || !Number.isSafeInteger(schema)) return 'unrecognized'
   if (schema === 1) return 'current'
-  return schema >= 2 ? 'newer' : 'unrecognized'
+  if (schema >= 2) return readStoreGate(raw) === 'open' ? 'current' : 'newer'
+  return 'unrecognized'
 }
 
 /** how `BindingStore.classify` reads a path: one binding.json read, three outcomes */
@@ -181,11 +193,16 @@ function isStr(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0
 }
 
-/** a binding read back from disk; null for anything not exactly this schema */
+/**
+ * A binding read back from disk, normalized to what this build writes: a
+ * schema-1 value reads as its schema-2 form (the next write stamps it), and a
+ * schema-2 value is read only when the store gate opens (`newer` values never
+ * reach here). null for anything not exactly one of those schemas.
+ */
 export function parseBinding(raw: unknown): Binding | null {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+  if (bindingKindOf(raw) !== 'current') return null
   const r = raw as Record<string, unknown>
-  if (r.schema !== 1) return null
+  const schema2 = r.schema === 2
   if (!isStr(r.documentId) || !isStr(r.workspaceId) || !isStr(r.title) || !isStr(r.filename))
     return null
   if (typeof r.orgId !== 'string') return null
@@ -195,8 +212,10 @@ export function parseBinding(raw: unknown): Binding | null {
   if (typeof r.baseVersion !== 'number' || !Number.isSafeInteger(r.baseVersion)) return null
   if (!isStr(r.state) || !STATES.has(r.state)) return null
   if (r.serverRevision !== undefined && !isDecimalString(r.serverRevision)) return null
+  const minStoreLevel = schema2 ? (r.min_store_level as number) : APP_STORE_LEVEL
+  const minAppVersion = typeof r.min_app_version === 'string' ? r.min_app_version : ''
   return {
-    schema: 1,
+    schema: 2,
     documentId: r.documentId,
     workspaceId: r.workspaceId,
     orgId: r.orgId,
@@ -212,7 +231,23 @@ export function parseBinding(raw: unknown): Binding | null {
     state: r.state === 'saving' ? 'dirty' : (r.state as UniworkSaveState),
     ...(typeof r.error === 'string' ? { error: r.error as UniworkDocErrorCode } : {}),
     ...(isDecimalString(r.serverRevision) ? { serverRevision: r.serverRevision } : {}),
+    minStoreLevel,
+    minAppVersion,
     ...(typeof r.lastSavedAt === 'string' ? { lastSavedAt: r.lastSavedAt } : {}),
+  }
+}
+
+/**
+ * The binding.json value of a binding: schema 2 with `min_store_level` and
+ * `min_app_version` (the OQ-P4 field names the reader gate looks at).
+ */
+export function bindingJson(binding: Binding): Record<string, unknown> {
+  const { minStoreLevel, minAppVersion, ...rest } = binding
+  return {
+    ...rest,
+    schema: 2,
+    min_store_level: minStoreLevel,
+    min_app_version: minAppVersion,
   }
 }
 
@@ -341,7 +376,7 @@ export class BindingStore {
     await mkdir(dir, { recursive: true })
     await atomicWriteFile(
       join(dir, BINDING_FILE),
-      new TextEncoder().encode(`${JSON.stringify(binding, null, 2)}\n`),
+      new TextEncoder().encode(`${JSON.stringify(bindingJson(binding), null, 2)}\n`),
     )
   }
 

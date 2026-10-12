@@ -263,6 +263,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   const service = new UniworkDocsService({
     userDataDir: app.getPath('userData'),
     syncStore,
+    appVersion: () => app.getVersion(),
     profile: () => uniworkDeploymentProfile(),
     channel: () => uniworkAppChannel(),
     applyProfile: (profile) =>
