@@ -20,13 +20,14 @@
  */
 
 const { execFileSync } = require('node:child_process')
-const { existsSync, readFileSync, rmSync } = require('node:fs')
+const { existsSync, readFileSync, rmSync, writeFileSync } = require('node:fs')
 const { join } = require('node:path')
 
 // Legal identity (company, contact, homepage, copyright year): one file shared
 // with Settings > About, the NOTICE / MODIFICATIONS sync (tools/legal) and the
 // third-party notice header. Absolute path so vm-based tests can load it too.
 const legal = require(join(__dirname, 'src/shared/legal.json'))
+const { bakedDeploymentDefaults } = require(join(__dirname, 'build/deployment-defaults.cjs'))
 
 function normalizeHttpsBaseUrl(name, value) {
   if (!value || !value.trim()) return null
@@ -318,6 +319,11 @@ const config = {
   },
   files: ['out/**'],
   extraResources: [
+    // channel + optional baked server, written from the release env in beforePack
+    {
+      from: 'build/deployment-defaults.json',
+      to: 'deployment-defaults.json',
+    },
     {
       from: 'build/THIRD-PARTY-NOTICES.txt',
       to: 'THIRD-PARTY-NOTICES.txt',
@@ -704,6 +710,7 @@ const config = {
     allowToChangeInstallationDirectory: true,
   },
   beforePack: async (context) => {
+    writeDeploymentDefaults()
     ensurePlatformHelpers()
     assertExtraResourceSources()
     ensureThirdPartyNotices()
@@ -838,6 +845,16 @@ if (releaseChannel) {
     ...config.protocols,
     { name: 'UniWork Office sign-in (dev)', schemes: ['uniwork-office-dev'] },
   ]
+}
+
+/** resources/deployment-defaults.json: the channel and the baked server (env UNIWORK_DEFAULT_*) */
+function writeDeploymentDefaults() {
+  const defaults = bakedDeploymentDefaults(process.env, releaseChannel || 'stable')
+  writeFileSync(
+    join(__dirname, 'build/deployment-defaults.json'),
+    `${JSON.stringify(defaults, null, 2)}
+`,
+  )
 }
 
 /** A release build must ship `<apps/shell version>-<channel>.<n>` (-c.extraMetadata.version). */

@@ -14,8 +14,12 @@ import type {
   UniworkResult,
   UniworkWorkspaceRef,
 } from '../../shared/home-api'
-import type { DeploymentProfile } from '../uniwork-auth/deployment'
-import { callbackSchemeForChannel } from '../uniwork-auth/deployment'
+import {
+  callbackSchemeForChannel,
+  type DeploymentChannel,
+  type DeploymentProfile,
+} from '../uniwork-auth/deployment'
+import type { ProfileOutcome } from '../uniwork-auth/profile-store'
 import { type Binding, BindingStore, type BoundDocument, type LastOwner } from './binding-store'
 import { type FetchLike, type UniworkDocsClient, createUniworkDocsClient } from './client'
 import { UniworkDocError } from './errors'
@@ -72,6 +76,10 @@ export type UnsavedCloseChoice = 'save' | 'resolve' | 'close' | 'cancel'
 export interface UniworkDocsServiceDeps {
   userDataDir: string
   profile(): DeploymentProfile | null
+  /** the channel of this build (its launch scheme), known before any server is chosen */
+  channel(): DeploymentChannel
+  /** applies the server a launch link names (confirm / sign-out rules live in uniwork-auth) */
+  applyProfile(profile: DeploymentProfile): Promise<ProfileOutcome>
   identity(): SessionIdentity | null
   selectedOrgId(): string | null
   authorized<T>(call: (token: string) => Promise<T>): Promise<T>
@@ -191,10 +199,8 @@ export class UniworkDocsService {
       ...(deps.sleep ? { sleep: deps.sleep } : {}),
     })
     this.launch = new LaunchController({
-      scheme: () => {
-        const profile = deps.profile()
-        return profile ? callbackSchemeForChannel(profile.channel) : null
-      },
+      scheme: () => callbackSchemeForChannel(deps.channel()),
+      applyProfile: (profile) => deps.applyProfile(profile),
       isSignedIn: () => deps.identity() !== null,
       identity: () => deps.identity(),
       profile: () => deps.profile(),

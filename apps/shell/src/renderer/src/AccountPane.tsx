@@ -1,5 +1,6 @@
 import { Dropdown } from '@genoffice/ui'
 import type { ReactNode } from 'react'
+import { ServerConnect } from './ServerConnect'
 import { useI18n } from './locale'
 import type { StringKey } from './locale'
 import {
@@ -25,11 +26,8 @@ const NOTICE: Partial<
     tone: 'warn',
   },
   'wrong-deployment': { title: 'acctWrongServerTitle', body: 'acctWrongServerBody', tone: 'warn' },
-  'not-configured': {
-    title: 'acctNotConfiguredTitle',
-    body: 'acctNotConfiguredBody',
-    tone: 'info',
-  },
+  // no server chosen yet: the connect screen (the address field sits below)
+  'not-configured': { title: 'acctConnectTitle', body: 'acctConnectBody', tone: 'info' },
   'keyring-unavailable': { title: 'acctKeyringTitle', body: 'acctKeyringBody', tone: 'warn' },
 }
 
@@ -74,6 +72,11 @@ export function AccountPane({ account }: { account: AccountController }) {
   const orgs = status?.orgs ?? []
   const server = status?.serverOrigin || t('acctThisServer')
   const notice = NOTICE[view]
+  // the saved server did not answer: name it and offer the address field
+  const unreachable =
+    view === 'server-unreachable' ||
+    (view === 'signed-out' && (error === 'network' || error === 'timeout'))
+  const canChangeServer = view !== 'signing-in' && view !== 'loading'
   const withProfile = showsProfile(view, status)
   // a cancelled attempt was the user's own choice, not a failure worth a red line;
   // states whose notice body already says it all get no repeated error line
@@ -246,6 +249,14 @@ export function AccountPane({ account }: { account: AccountController }) {
         <Row label={t('acctServer')}>{status.serverOrigin}</Row>
       )}
 
+      {canChangeServer && (
+        <ServerConnect
+          key={view === 'not-configured' || unreachable ? 'open' : 'closed'}
+          account={account}
+          startOpen={view === 'not-configured' || unreachable}
+          unreachableServer={unreachable ? server : null}
+        />
+      )}
       {actions && <div className="set-pane-footer acct-actions">{actions}</div>}
     </section>
   )

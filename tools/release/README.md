@@ -116,41 +116,28 @@ version, two installers for one platform, mixed versions and a non-HTTPS base UR
 The mac job checks every app with `codesign --verify --deep --strict` and `codesign -dv`
 (expects `Signature=adhoc` while unsigned) and checks each app's architecture with `lipo`.
 
-## Organization deployment profile
+## Which server the app connects to (deployment profile)
 
-A server download bundle carries `deployment-profile.json` next to the installer. The NSIS
-installer copies it to `<install dir>\resources\deployment-profile.json`
-(`process.resourcesPath` at runtime) when present and a real uninstall removes it. An
-over-install or update keeps the existing profile: the installer saves it before the old
-version's files are removed and puts it back afterwards. A profile beside the new installer
-always replaces the kept one. Interactive installs hide the details list and silent installs
-write no log, so only a failure is visible: a failed save, copy or restore shows a message box
-(answered with OK automatically in a silent install) that tells the user to extract the
-bundle and run the installer again.
+The installer is the same plain file for everyone; there is no per-server bundle. The app learns
+its server (deploymentId, apiOrigin, clientId, channel) from, in this order:
 
-The kept copy is read from the install location registered for the install context being
-installed into (per-machine or per-user), falling back to the per-user install when that
-context has none. So a profile that exists only in the per-user install is dropped when a
-per-machine install and a per-user install both exist and the per-machine one is updated; and
-switching a per-user install to per-machine copies its profile from the user-writable
-`%LOCALAPPDATA%` into `Program Files`. A bundle profile beside the installer avoids both.
+1. `deployment-profile.json` in the user data folder: what the user or a web link chose. A
+   web "Open UniWork Office" link carries the four values; the app asks once
+   ("Connect UniWork Office to <origin>?") when the server is new or another deployment, moves
+   silently when the same deployment id has a new origin, and refuses a link of another channel.
+   The "Kết nối UniWork" screen (Settings > Account) writes the same file from a typed address.
+2. The default baked into the build (below).
+3. `UNIWORK_API_ORIGIN` in the environment (dev), then the legacy `uniworkApiOrigin` setting.
 
-Extract the downloaded bundle before running the installer. Opening the installer straight
-from the zip in Explorer extracts only the installer to a temporary folder, so no profile is
-found next to it.
-
-### Linux
-
-- **deb:** a package script cannot see the folder the deb was opened from, so the profile
-  is copied by hand after the install:
-  `sudo install -m 644 deployment-profile.json "/opt/UniWork Office/resources/"`. dpkg
-  leaves that file alone on an upgrade (it is not a package file), and the package's
-  post-remove script deletes it on a real uninstall, like the Windows uninstaller.
-- **AppImage:** its resources are read-only, so the app reads `deployment-profile.json`
-  from the folder holding the AppImage (after `resources/`, before the userData copy).
-  Extracting the bundle zip and running the AppImage from there is enough.
-- Either way, `~/.config/UniWork Office/deployment-profile.json` also works (the userData
-  fallback every platform has).
+The default is optional. The workflow reads `default_api_origin` and `default_deployment_id`
+(workflow_dispatch inputs; on a tag push the repository variables `UNIWORK_DEFAULT_API_ORIGIN`
+and `UNIWORK_DEFAULT_DEPLOYMENT_ID`) and passes them to the build as env of the names
+`UNIWORK_DEFAULT_API_ORIGIN` / `UNIWORK_DEFAULT_DEPLOYMENT_ID`. `apps/shell/build/deployment-defaults.cjs`
+validates them (https only, http for localhost on dev, bare origin, both set or both empty); the
+meta job runs it first, so an invalid value fails before any build. electron-builder then writes
+`resources/deployment-defaults.json` (the channel and the default, if any), which is a package
+file: an upgrade replaces it, an uninstall removes it, and the user's own choice in the user
+data folder is untouched by both.
 
 ## Auto-update is off
 

@@ -106,7 +106,9 @@ export class SessionCore {
       ...(showsAccount && this.org ? { org: toAccountOrg(this.org) } : {}),
       ...(showsAccount && this.orgs.length ? { orgs: this.orgs.map(toAccountOrg) } : {}),
       ...(showsAccount ? { entitlements: this.entitlements ?? this.cachedEntitlements } : {}),
-      ...(this.profile ? { serverOrigin: new URL(this.profile.apiOrigin).host } : {}),
+      ...(this.profile
+        ? { serverOrigin: new URL(this.profile.apiOrigin).host, serverUrl: this.profile.apiOrigin }
+        : {}),
       ...(this.error ? { error: this.error } : {}),
     }
   }

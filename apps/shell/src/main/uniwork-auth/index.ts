@@ -1,5 +1,4 @@
 import { app, safeStorage, shell, type IpcMain, type WebContents } from 'electron'
-import { dirname } from 'node:path'
 import {
   setUniworkCloudRefresher,
   setUniworkCloudStatus,
@@ -13,9 +12,19 @@ import { createCredentialStore } from './credentials'
 import {
   callbackSchemeForChannel,
   isLoopbackHost,
+  readBuildDefaults,
   resolveDeploymentProfile,
+  type DeploymentChannel,
   type DeploymentProfile,
+  type ResolveDeploymentOptions,
 } from './deployment'
+import {
+  createProfileApplier,
+  profileFromAddress,
+  writeUserProfile,
+  type ProfileOutcome,
+  type ServerAddressError,
+} from './profile-store'
 import { createUniworkCloudClient, UniworkCloudController, type CloudAccountView } from './cloud'
 import { AccountManager } from './manager'
 import { TransportError, createUniworkTransport } from './transport'
@@ -102,23 +111,71 @@ export function configureUniworkAccount(options: { settingsPath: () => string })
   settingsPath = options.settingsPath
 }
 
+function resolveOptions(): ResolveDeploymentOptions {
+  const settings = settingsPath
+  return {
+    resourcesDir: app.isPackaged ? process.resourcesPath : undefined,
+    userDataDir: app.getPath('userData'),
+    isPackaged: app.isPackaged,
+    settingsApiOrigin: settings ? readAppSettings(settings()).uniworkApiOrigin : undefined,
+  }
+}
+
+/** The channel of this build (its launch scheme); known before any server is chosen. */
+export function uniworkAppChannel(): DeploymentChannel {
+  return readBuildDefaults(resolveOptions()).channel
+}
+
+/**
+ * The server a web link names, or the address the user typed (`confirmed`).
+ * `confirm` asks the one "Connect UniWork Office to <origin>?" question when
+ * the server is new or another deployment; then the old sign-in ends (its
+ * documents close first) and the userData profile is written before the
+ * account moves. Anything but applied / unchanged means nothing changed.
+ */
+export function applyUniworkProfile(
+  incoming: DeploymentProfile,
+  options: { confirm(origin: string): Promise<boolean>; confirmed?: boolean },
+): Promise<ProfileOutcome> {
+  const account = uniworkAccount()
+  return createProfileApplier({
+    appChannel: uniworkAppChannel,
+    current: () => account.deploymentProfile(),
+    confirm: options.confirm,
+    endSession: async () => {
+      await signOutUniwork(account)
+      // the sign-out hooks may be cancelled by the user: the session then stays
+      return account.sessionIdentity() === null
+    },
+    save: (profile) => writeUserProfile(app.getPath('userData'), profile),
+    adopt: async (profile) => {
+      await account.adoptProfile(profile)
+    },
+  }).apply(incoming, { confirmed: options.confirmed })
+}
+
+/** Settings / connect screen: a typed address becomes the profile (no second question). */
+export async function connectUniworkServer(
+  address: string,
+): Promise<{ ok: true } | { ok: false; error: ServerAddressError | 'refused' }> {
+  const found = await profileFromAddress(address, uniworkAppChannel())
+  if (!found.ok) return found
+  const outcome = await applyUniworkProfile(found.profile, {
+    confirm: () => Promise.resolve(true),
+    confirmed: true,
+  })
+  return outcome === 'applied' || outcome === 'unchanged'
+    ? { ok: true }
+    : { ok: false, error: 'refused' }
+}
+
 /** The process-wide manager; created on first use, which is after app ready. */
 export function uniworkAccount(): AccountManager {
   if (manager) return manager
   const settings = settingsPath
   if (!settings) throw new Error('UniWork account is not configured')
   const created = new AccountManager({
-    resolveProfile: () =>
-      resolveDeploymentProfile({
-        resourcesDir: app.isPackaged ? process.resourcesPath : undefined,
-        appImageDir:
-          app.isPackaged && process.platform === 'linux' && process.env.APPIMAGE
-            ? dirname(process.env.APPIMAGE)
-            : undefined,
-        userDataDir: app.getPath('userData'),
-        isPackaged: app.isPackaged,
-        settingsApiOrigin: readAppSettings(settings()).uniworkApiOrigin,
-      }),
+    resolveProfile: () => resolveDeploymentProfile(resolveOptions()),
     createTransport: (profile) => createUniworkTransport(profile),
     credentials: createCredentialStore({ userDataDir: app.getPath('userData'), safeStorage }),
     openBrowser: openAuthorizationUrl,
@@ -300,6 +357,14 @@ export function registerAccountIpc(
   })
   ipcMain.handle(HOME_CHANNELS.accountCancelLogin, (event) => {
     account(event.sender).cancelLogin()
+  })
+  ipcMain.handle(HOME_CHANNELS.accountSetServer, async (event, address: unknown) => {
+    const current = account(event.sender)
+    const result =
+      typeof address === 'string'
+        ? await connectUniworkServer(address)
+        : ({ ok: false, error: 'invalid_address' } as const)
+    return { ...result, status: current.status() }
   })
   ipcMain.handle(HOME_CHANNELS.accountRetry, (event) => account(event.sender).retry())
   ipcMain.handle(HOME_CHANNELS.uniworkCloudStatus, (event) => {

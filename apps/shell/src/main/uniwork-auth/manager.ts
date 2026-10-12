@@ -121,6 +121,36 @@ export class AccountManager extends SessionCore {
     return this.status()
   }
 
+  /**
+   * Points the account at `next` (the user or a web link chose another
+   * server). A stored sign-in for the same deployment follows a moved origin;
+   * one for another deployment stays refused by the restore check (the caller
+   * signs out first). Ends with a restore against the new server.
+   */
+  async adoptProfile(next: DeploymentProfile): Promise<AccountStatus> {
+    this.generation++
+    this.attempts.cancel()
+    this.clearAttemptTimer()
+    this.clearRefreshTimer()
+    this.clearRecoveryTimer()
+    this.profile = next
+    this.transport = this.deps.createTransport(next)
+    try {
+      const stored = this.deps.credentials.load()
+      if (
+        stored &&
+        stored.deploymentId === next.deploymentId &&
+        stored.clientId === next.clientId &&
+        stored.apiOrigin !== next.apiOrigin
+      ) {
+        this.deps.credentials.save({ ...stored, apiOrigin: next.apiOrigin })
+      }
+    } catch {
+      // an unreadable credential is reported by the restore below
+    }
+    return this.restore()
+  }
+
   async login(): Promise<boolean> {
     if (this.state === 'signed-in' || this.state === 'refreshing') return true
     // a live session (server-unreachable) is recovered, never shadowed by a

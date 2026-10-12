@@ -24,9 +24,7 @@ if [ -f "$apparmor_target" ]; then
   rm -f "$apparmor_target"
 fi
 
-# An organization deployment profile copied into resources/ is not a package
-# file; drop it (and the then-empty install dir) like the Windows uninstaller.
-rm -f '/opt/${sanitizedProductName}/resources/deployment-profile.json'
+# Drop the then-empty install dir (dpkg removed the package files itself).
 rmdir '/opt/${sanitizedProductName}/resources' '/opt/${sanitizedProductName}' 2>/dev/null || true
 
 if hash update-desktop-database 2>/dev/null; then

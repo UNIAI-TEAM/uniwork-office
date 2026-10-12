@@ -37,6 +37,12 @@ const en = {
     'The document was deleted in UniWork, so your changes can’t be saved there. They stay on this computer.',
   closeBlockedOther:
     'UniWork isn’t accepting this document right now, so your changes can’t be saved there. They stay on this computer.',
+  connectTitle: 'Connect to UniWork',
+  connectMessage: 'Connect UniWork Office to {title}?',
+  connectDetail:
+    'You will sign in again on that server. Documents already on this computer stay here.',
+  connectYes: 'Connect',
+  connectNo: 'Cancel',
 }
 
 type Key = keyof typeof en
@@ -75,6 +81,11 @@ const vi = {
     'Tài liệu đã bị xóa trên UniWork nên không thể lưu thay đổi lên đó. Các thay đổi vẫn còn trên máy này.',
   closeBlockedOther:
     'UniWork hiện không nhận tài liệu này nên không thể lưu thay đổi lên đó. Các thay đổi vẫn còn trên máy này.',
+  connectTitle: 'Kết nối UniWork',
+  connectMessage: 'Kết nối UniWork Office tới {title}?',
+  connectDetail: 'Bạn sẽ đăng nhập lại trên máy chủ đó. Tài liệu đã có trên máy này vẫn được giữ.',
+  connectYes: 'Kết nối',
+  connectNo: 'Hủy',
 } satisfies Record<Key, string>
 
 export const UNIWORK_DOC_STRINGS = { en, vi } as const

@@ -1,11 +1,23 @@
 import type { UniworkDocErrorCode, UniworkLaunchEvent } from '../../shared/home-api'
+import {
+  callbackSchemeForChannel,
+  isChannel,
+  parseDeploymentProfile,
+  type DeploymentProfile,
+} from '../uniwork-auth/deployment'
+import type { ProfileOutcome } from '../uniwork-auth/profile-store'
 import { UniworkDocError } from './errors'
 import type { LaunchDescriptor } from './parse'
 
 /**
- * "Open in desktop app" from the UniWork web: `uniwork-office[-dev]://open?ticket=`.
- * The parser is the only place a launch URL is read; the ticket is the one
- * value that crosses it, and a refusal never echoes the URL or the ticket.
+ * "Open in desktop app" from the UniWork web:
+ * `uniwork-office[-dev]://open?ticket=<t>&deploymentId=&apiOrigin=&clientId=&channel=`.
+ * The four profile parameters are all-or-nothing (the server the link was made
+ * on); a link without them is the older ticket-only form. `open` with neither
+ * a ticket nor a profile, or a bare scheme, only brings the window forward.
+ * The parser is the only place a launch URL is read; the ticket and the
+ * profile are the values that cross it, and a refusal never echoes the URL,
+ * the ticket or the profile.
  * The controller redeems each ticket at most once (in-flight + terminal
  * sets), holds a ticket in memory while the user signs in (within its 120 s
  * TTL), and treats a lost exchange response as terminal: a ticket is never
@@ -24,15 +36,20 @@ export type DeepLinkRejectReason =
   | 'wrong_host'
   | 'wrong_path'
   | 'fragment_not_allowed'
-  | 'missing_ticket'
   | 'duplicate_ticket'
+  | 'duplicate_parameter'
+  | 'partial_profile'
+  | 'invalid_profile'
   | 'unexpected_parameter'
   | 'oversized_ticket'
   | 'invalid_ticket'
   | 'login_code'
 
 export type DeepLinkParseResult =
-  Readonly<{ ok: true; ticket: string }> | Readonly<{ ok: false; reason: DeepLinkRejectReason }>
+  | Readonly<{ ok: true; ticket: string | null; profile: DeploymentProfile | null }>
+  | Readonly<{ ok: false; reason: DeepLinkRejectReason }>
+
+const PROFILE_KEYS = ['deploymentId', 'apiOrigin', 'clientId', 'channel'] as const
 
 const reject = (reason: DeepLinkRejectReason): DeepLinkParseResult => ({ ok: false, reason })
 
@@ -48,24 +65,61 @@ export function parseOfficeDeepLink(value: unknown, scheme: string): DeepLinkPar
     return reject('malformed_url')
   }
   if (url.protocol !== `${scheme}:`) return reject('wrong_scheme')
-  if (url.hostname !== LAUNCH_HOST || url.username || url.password || url.port) {
-    return reject('wrong_host')
+  if (url.username || url.password || url.port) return reject('wrong_host')
+  // a bare `scheme://` only brings the window forward
+  if (
+    url.hostname === '' &&
+    url.pathname === '' &&
+    !url.search &&
+    !url.hash &&
+    !value.includes('?')
+  ) {
+    return { ok: true, ticket: null, profile: null }
   }
+  if (url.hostname !== LAUNCH_HOST) return reject('wrong_host')
   // `://open?ticket=` normalizes to an empty path; a single slash is the same
   if (url.pathname !== '' && url.pathname !== '/') return reject('wrong_path')
   if (url.hash || value.includes('#')) return reject('fragment_not_allowed')
   const params = [...url.searchParams.entries()]
+  const known = new Set<string>(['ticket', ...PROFILE_KEYS])
+  if (params.some(([key]) => !known.has(key))) return reject('unexpected_parameter')
   const tickets = params.filter(([key]) => key === 'ticket')
-  if (tickets.length === 0) return reject('missing_ticket')
   if (tickets.length > 1) return reject('duplicate_ticket')
-  if (params.some(([key]) => key !== 'ticket')) return reject('unexpected_parameter')
+  for (const key of PROFILE_KEYS) {
+    if (params.filter(([name]) => name === key).length > 1) return reject('duplicate_parameter')
+  }
+  const profile = profileOf(params, scheme)
+  if (profile === 'partial') return reject('partial_profile')
+  if (profile === 'invalid') return reject('invalid_profile')
+  if (tickets.length === 0) return { ok: true, ticket: null, profile }
   const ticket = tickets[0]?.[1] ?? ''
   if (ticket.length > TICKET_MAX) return reject('oversized_ticket')
   if (/^(?:code|state|attempt)[_-]/i.test(ticket) || /^fake-code-/i.test(ticket)) {
     return reject('login_code')
   }
   if (ticket.length < TICKET_MIN || !TICKET.test(ticket)) return reject('invalid_ticket')
-  return { ok: true, ticket }
+  return { ok: true, ticket, profile }
+}
+
+/** the four profile parameters: none -> null, some -> 'partial', all -> parsed or 'invalid' */
+function profileOf(
+  params: readonly (readonly [string, string])[],
+  scheme: string,
+): DeploymentProfile | null | 'partial' | 'invalid' {
+  const found = PROFILE_KEYS.filter((key) => params.some(([name]) => name === key))
+  if (found.length === 0) return null
+  if (found.length !== PROFILE_KEYS.length) return 'partial'
+  const value = (key: string) => params.find(([name]) => name === key)?.[1] ?? ''
+  const channel = value('channel')
+  if (!isChannel(channel)) return 'invalid'
+  const profile = parseDeploymentProfile({
+    deploymentId: value('deploymentId'),
+    apiOrigin: value('apiOrigin'),
+    clientId: value('clientId'),
+    channel,
+  })
+  // the link must be addressed to the scheme it arrived on
+  return profile && callbackSchemeForChannel(channel) === scheme ? profile : 'invalid'
 }
 
 /** the slice of the shell window's WebContents a launch push needs */
@@ -106,8 +160,13 @@ export function createLaunchPusher(
 }
 
 export interface LaunchControllerDeps {
-  /** the active channel's launch scheme, or null without a deployment profile */
-  scheme(): string | null
+  /** this build's launch scheme (known before any server is chosen) */
+  scheme(): string
+  /**
+   * The server a link names: applied (with the confirm / sign-out rules)
+   * before its ticket is redeemed. Anything but applied / unchanged drops the link.
+   */
+  applyProfile(profile: DeploymentProfile): Promise<ProfileOutcome>
   isSignedIn(): boolean
   /** the device session of the signed-in account (never a token) */
   identity(): { deviceSessionId: string; deploymentId: string } | null
@@ -153,12 +212,22 @@ export class LaunchController {
   async handleUrl(url: string): Promise<void> {
     this.deps.reveal()
     const scheme = this.deps.scheme()
-    const parsed = scheme ? parseOfficeDeepLink(url, scheme) : reject('wrong_scheme')
+    const parsed = parseOfficeDeepLink(url, scheme)
     if (!parsed.ok) {
       this.deps.emit({ phase: 'failed', error: 'ticket_invalid' })
       return
     }
-    const { ticket } = parsed
+    const { ticket, profile } = parsed
+    // the server first: a ticket for a refused or declined server is never held or redeemed
+    if (profile) {
+      const outcome = await this.deps.applyProfile(profile)
+      if (outcome === 'refused') {
+        if (ticket) this.deps.emit({ phase: 'failed', error: 'ticket_invalid' })
+        return
+      }
+      if (outcome === 'declined') return
+    }
+    if (!ticket) return
     // the same link delivered twice (argv + open-url, a double click) redeems once
     if (this.terminal.has(ticket) || this.inFlight.has(ticket) || this.held?.ticket === ticket) {
       return

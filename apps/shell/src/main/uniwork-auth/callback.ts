@@ -5,9 +5,9 @@ import type { PendingLoginAttempt } from './pkce'
  * to the `uniwork://` office-bridge router. */
 const AUTH_SCHEME_PREFIX = /^uniwork-office(-dev)?:\/\//i
 
-/** `uniwork-office[-dev]://open...`: a UniWork document launch link, not a
- * sign-in callback (the launch parser validates the rest). */
-const LAUNCH_URL_PREFIX = /^uniwork-office(-dev)?:\/\/open(?:[/?#]|$)/i
+/** `uniwork-office[-dev]://open...` (or the bare scheme): a UniWork launch
+ * link, not a sign-in callback (the launch parser validates the rest). */
+const LAUNCH_URL_PREFIX = /^uniwork-office(-dev)?:\/\/(?:open)?(?:[/?#]|$)/i
 
 export function isOfficeLaunchUrl(url: unknown): url is string {
   return typeof url === 'string' && LAUNCH_URL_PREFIX.test(url)

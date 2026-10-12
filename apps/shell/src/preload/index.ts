@@ -21,6 +21,7 @@ import { normalizeAiPanelPrefs } from '@genoffice/ui/ai-panel-prefs'
 import type {
   AccountLoginEvent,
   AiConnectionTestResult,
+  AccountSetServerResult,
   AccountStatus,
   AttachmentAddResult,
   AttachmentImageResult,
@@ -415,6 +416,15 @@ const homeApi: HomeApi = {
   async accountRetry() {
     const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.accountRetry)
     return (result ?? { loggedIn: false, state: 'signed-out' }) as AccountStatus
+  },
+  async accountSetServer(address) {
+    const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.accountSetServer, address)
+    const value = (result ?? {}) as Partial<AccountSetServerResult>
+    return {
+      ok: value.ok === true,
+      ...(value.ok === false && value.error ? { error: value.error } : {}),
+      status: value.status ?? { loggedIn: false, state: 'signed-out' },
+    } as AccountSetServerResult
   },
   async accountSelectOrg(orgId) {
     if (typeof orgId !== 'string' || !orgId) throw new Error('Invalid organization id.')

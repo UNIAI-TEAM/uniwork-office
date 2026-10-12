@@ -463,6 +463,8 @@ export interface HomeApi {
   accountCancelLogin(): Promise<void>
   /** retry after server-unreachable (refresh + profile reload); resolves with the new status */
   accountRetry(): Promise<AccountStatus>
+  /** connect to the server at this address (validated, saved as the profile); the status after */
+  accountSetServer(address: string): Promise<AccountSetServerResult>
   /** choose the active organization (persists uniworkOrgId, reloads entitlements) */
   accountSelectOrg(orgId: string): Promise<AccountStatus>
   /** UniWork cloud AI: signed in + entitled, per-tool availability and credits (never a token) */
@@ -727,8 +729,14 @@ export interface AccountStatus {
   entitlements?: AccountEntitlements | null
   /** API origin of the active deployment profile (display only, e.g. "uniwork.app") */
   serverOrigin?: string
+  /** full API origin of the active profile (prefills the server address field) */
+  serverUrl?: string
   error?: AccountErrorCode
 }
+
+export type AccountSetServerResult = { status: AccountStatus } & (
+  { ok: true } | { ok: false; error: 'invalid_address' | 'unreachable' | 'refused' }
+)
 
 /** login flow progress pushed from main */
 export interface AccountLoginEvent {
@@ -1076,6 +1084,7 @@ export const HOME_CHANNELS = {
   accountStatusEvent: 'home:account-status-event',
   accountCancelLogin: 'home:account-cancel-login',
   accountRetry: 'home:account-retry',
+  accountSetServer: 'home:account-set-server',
   accountSelectOrg: 'home:account-select-org',
   /** UniWork cloud AI status (token-free UniworkCloudStatus); refresh re-reads credits */
   uniworkCloudStatus: 'home:uniwork-cloud-status',

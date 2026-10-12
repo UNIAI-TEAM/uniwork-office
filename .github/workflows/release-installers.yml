@@ -12,6 +12,14 @@ name: Release installers
 #       build every platform as version <version>-<channel>.<run number> and
 #       keep the installers as workflow artifacts only (no tag, no release).
 #
+# The app learns which UniWork server to use from the web "open" link, from the
+# address the user types, or from a default baked in here: the inputs
+# default_api_origin / default_deployment_id (workflow_dispatch) or, on a tag
+# push, the repository variables UNIWORK_DEFAULT_API_ORIGIN and
+# UNIWORK_DEFAULT_DEPLOYMENT_ID. They reach the build as env of the same names;
+# empty = no default (the app asks), one without the other or an invalid value
+# fails the meta job before anything is built.
+#
 # <version> must equal apps/shell/package.json. Stable is refused while builds
 # are unsigned. Auto-update stays off: no GENOFFICE_UPDATE_URL, --publish never,
 # and the output is checked for app-update.yml. A tag must point at a commit
@@ -40,6 +48,14 @@ on:
         type: choice
         options: [dev, beta]
         default: dev
+      default_api_origin:
+        description: Server origin baked in as the default, e.g. https://uniwork.example (empty = none)
+        type: string
+        default: ''
+      default_deployment_id:
+        description: Deployment id of that server (required with default_api_origin)
+        type: string
+        default: ''
 
 concurrency:
   group: release-installers-${{ github.ref }}
@@ -124,6 +140,13 @@ jobs:
           } >> "$GITHUB_OUTPUT"
           echo "Release $version (channel $channel, publish $publish)" >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Check the baked default server
+        env:
+          UNIWORK_DEFAULT_API_ORIGIN: ${{ inputs.default_api_origin || vars.UNIWORK_DEFAULT_API_ORIGIN }}
+          UNIWORK_DEFAULT_DEPLOYMENT_ID: ${{ inputs.default_deployment_id || vars.UNIWORK_DEFAULT_DEPLOYMENT_ID }}
+          CHANNEL: ${{ steps.resolve.outputs.channel }}
+        run: node apps/shell/build/deployment-defaults.cjs "$CHANNEL"
+
       # UniWork brand gate on the sources (dependency-free, see tools/rebrand/README.md)
       - name: Check brand
         run: npm run check:brand
@@ -142,6 +165,8 @@ jobs:
         shell: bash
     env:
       UNIWORK_RELEASE_CHANNEL: ${{ needs.meta.outputs.channel }}
+      UNIWORK_DEFAULT_API_ORIGIN: ${{ inputs.default_api_origin || vars.UNIWORK_DEFAULT_API_ORIGIN }}
+      UNIWORK_DEFAULT_DEPLOYMENT_ID: ${{ inputs.default_deployment_id || vars.UNIWORK_DEFAULT_DEPLOYMENT_ID }}
       RELEASE_VERSION: ${{ needs.meta.outputs.version }}
       BUILD_DIR: ${{ github.workspace }}/release-out
       # Built natively on the Windows runner with MSVC; the crate's
@@ -284,6 +309,8 @@ jobs:
       contents: read
     env:
       UNIWORK_RELEASE_CHANNEL: ${{ needs.meta.outputs.channel }}
+      UNIWORK_DEFAULT_API_ORIGIN: ${{ inputs.default_api_origin || vars.UNIWORK_DEFAULT_API_ORIGIN }}
+      UNIWORK_DEFAULT_DEPLOYMENT_ID: ${{ inputs.default_deployment_id || vars.UNIWORK_DEFAULT_DEPLOYMENT_ID }}
       RELEASE_VERSION: ${{ needs.meta.outputs.version }}
       BUILD_DIR: ${{ github.workspace }}/release-out
       # both arches: arm64 + x64 dmg from one fat sidecar / OCR helper
@@ -442,6 +469,8 @@ jobs:
       contents: read
     env:
       UNIWORK_RELEASE_CHANNEL: ${{ needs.meta.outputs.channel }}
+      UNIWORK_DEFAULT_API_ORIGIN: ${{ inputs.default_api_origin || vars.UNIWORK_DEFAULT_API_ORIGIN }}
+      UNIWORK_DEFAULT_DEPLOYMENT_ID: ${{ inputs.default_deployment_id || vars.UNIWORK_DEFAULT_DEPLOYMENT_ID }}
       RELEASE_VERSION: ${{ needs.meta.outputs.version }}
       BUILD_DIR: ${{ github.workspace }}/release-out
     steps:

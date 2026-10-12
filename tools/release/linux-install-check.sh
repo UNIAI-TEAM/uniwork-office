@@ -7,8 +7,8 @@
 # - the launcher link /usr/bin/uniwork-office and a valid desktop entry
 # - the desktop entry handles uniwork://, uniwork-office:// and
 #   uniwork-office-dev:// (xdg-mime), which the sign-in callback needs
-# - an organization deployment profile in resources/ survives a reinstall
-#   (the upgrade path) and is deleted on uninstall
+# - the build deployment defaults (resources/deployment-defaults.json) are installed,
+#   survive a reinstall (the upgrade path) and go on uninstall
 # - --smoke: launches the installed app headless (xvfb, with its sandbox) and
 #   opens a new document in each of the six editors
 #   (e2e/packaged-linux-smoke.spec.ts; needs npm ci and xvfb-run)
@@ -23,7 +23,7 @@ smoke="${2:-}"
 deb="$(realpath "$deb")"
 install_dir='/opt/UniWork Office'
 desktop=/usr/share/applications/uniwork-office.desktop
-profile="$install_dir/resources/deployment-profile.json"
+profile="$install_dir/resources/deployment-defaults.json"
 
 fail() {
   echo "::error::$*" >&2
@@ -53,11 +53,10 @@ for scheme in uniwork uniwork-office uniwork-office-dev; do
   [ "$handler" = uniwork-office.desktop ] || fail "$scheme:// is handled by '$handler'"
 done
 
-echo "== deployment profile kept across a reinstall"
-printf '{"deploymentId":"check","apiOrigin":"https://uniwork.example","channel":"dev"}\n' \
-  | sudo tee "$profile" >/dev/null
+echo "== deployment defaults kept across a reinstall"
+[ -f "$profile" ] || fail 'the package did not install deployment-defaults.json'
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --reinstall "$deb"
-[ -f "$profile" ] || fail 'the deployment profile did not survive the reinstall'
+[ -f "$profile" ] || fail 'the deployment defaults did not survive the reinstall'
 [ -x /usr/bin/uniwork-office ] || fail 'the launcher link did not survive the reinstall'
 
 if [ "$smoke" = --smoke ]; then
@@ -70,6 +69,6 @@ echo "== uninstall"
 sudo DEBIAN_FRONTEND=noninteractive apt-get remove -y uniwork-office
 [ ! -e /usr/bin/uniwork-office ] || fail '/usr/bin/uniwork-office is left behind'
 [ ! -e "$desktop" ] || fail "$desktop is left behind"
-[ ! -e "$profile" ] || fail 'the deployment profile is left behind'
+[ ! -e "$profile" ] || fail 'the deployment defaults are left behind'
 [ ! -e "$install_dir" ] || fail "$install_dir is left behind: $(ls -A "$install_dir")"
 echo "linux-install-check: ok"

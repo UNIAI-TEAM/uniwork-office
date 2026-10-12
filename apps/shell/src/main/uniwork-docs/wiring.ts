@@ -7,10 +7,12 @@ import {
   type UniworkDocListQuery,
 } from '../../shared/home-api'
 import {
+  applyUniworkProfile,
   authorizedRequest,
   onUniworkAccountStatus,
   setUniworkSignOutHooks,
   uniworkAccount,
+  uniworkAppChannel,
   uniworkDeploymentProfile,
   uniworkSessionIdentity,
 } from '../uniwork-auth'
@@ -64,6 +66,27 @@ const CHOICES: readonly UniworkConflictChoice[] = [
   'open-latest',
   'later',
 ]
+
+/** the one question a web link may ask: connect this install to the server it names? */
+async function confirmConnect(wiring: UniworkDocsWiring, origin: string): Promise<boolean> {
+  const t = (key: Parameters<typeof tUniworkDocs>[1], title?: string) =>
+    tUniworkDocs(wiring.lang(), key, { title })
+  const options: Electron.MessageBoxOptions = {
+    type: 'question',
+    title: t('connectTitle'),
+    message: t('connectMessage', origin),
+    detail: t('connectDetail'),
+    buttons: [t('connectYes'), t('connectNo')],
+    defaultId: 1,
+    cancelId: 1,
+    noLink: true,
+  }
+  const parent = wiring.shellWindow()
+  const { response } = parent
+    ? await dialog.showMessageBox(parent, options)
+    : await dialog.showMessageBox(options)
+  return response === 0
+}
 
 function conflictUi(wiring: UniworkDocsWiring): ConflictUi {
   const t = (key: Parameters<typeof tUniworkDocs>[1], title?: string) =>
@@ -190,6 +213,9 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   const service = new UniworkDocsService({
     userDataDir: app.getPath('userData'),
     profile: () => uniworkDeploymentProfile(),
+    channel: () => uniworkAppChannel(),
+    applyProfile: (profile) =>
+      applyUniworkProfile(profile, { confirm: (origin) => confirmConnect(wiring, origin) }),
     identity: () => uniworkSessionIdentity(),
     selectedOrgId: () => uniworkAccount().status().org?.id ?? null,
     authorized: (call) => authorizedRequest(call),

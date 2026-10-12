@@ -19,7 +19,10 @@ export interface DeploymentProfile {
 export const STABLE_CLIENT_ID = 'uniwork-office'
 export const DEV_CLIENT_ID = 'uniwork-office-dev'
 const DEPLOYMENT_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/
-const PROFILE_FILE = 'deployment-profile.json'
+/** the profile the user or a web link chose; lives in userData */
+export const PROFILE_FILE = 'deployment-profile.json'
+/** written at build time from the release env (channel + optional baked default) */
+const BUILD_DEFAULTS_FILE = 'deployment-defaults.json'
 
 export function clientIdForChannel(channel: DeploymentChannel): string {
   return channel === 'dev' ? DEV_CLIENT_ID : STABLE_CLIENT_ID
@@ -44,7 +47,7 @@ export function isAllowedOrigin(url: URL, channel: DeploymentChannel): boolean {
   return channel === 'dev' && url.protocol === 'http:' && isLoopbackHost(url.hostname)
 }
 
-function isChannel(value: unknown): value is DeploymentChannel {
+export function isChannel(value: unknown): value is DeploymentChannel {
   return value === 'stable' || value === 'beta' || value === 'dev'
 }
 
@@ -75,22 +78,17 @@ export function parseDeploymentProfile(raw: unknown): DeploymentProfile | null {
 }
 
 export interface ResolveDeploymentOptions {
-  /** process.resourcesPath of a packaged build (installer-provided profile) */
+  /** process.resourcesPath of a packaged build (holds deployment-defaults.json) */
   resourcesDir?: string
-  /**
-   * The folder holding a Linux AppImage. Its resources are read-only, so a
-   * download bundle's profile is read from beside the AppImage instead.
-   */
-  appImageDir?: string
   userDataDir: string
   isPackaged: boolean
   env?: NodeJS.ProcessEnv
-  /** the existing `uniworkApiOrigin` app setting */
+  /** the legacy `uniworkApiOrigin` app setting */
   settingsApiOrigin?: unknown
   readFile?: (path: string) => string
 }
 
-function readProfileFile(path: string, read: (path: string) => string): unknown {
+function readJson(path: string, read: (path: string) => string): unknown {
   try {
     return JSON.parse(read(path))
   } catch {
@@ -98,45 +96,84 @@ function readProfileFile(path: string, read: (path: string) => string): unknown 
   }
 }
 
+export interface BuildDefaults {
+  channel: DeploymentChannel
+  /** the profile baked in at build time, or null when the build has none */
+  profile: DeploymentProfile | null
+}
+
 /**
- * Resolution order: installed profile in resources, then one beside an
- * AppImage, then a userData profile,
- * then the UNIWORK_API_ORIGIN environment, then the `uniworkApiOrigin` app
- * setting. A profile file that exists but is invalid fails closed (null)
- * instead of silently falling through to a weaker source.
+ * The channel of this build and its baked default profile. A packaged build
+ * reads resources/deployment-defaults.json (written by electron-builder from
+ * the release env); an unpackaged run is the dev channel unless
+ * UNIWORK_OFFICE_CHANNEL says otherwise. A missing or invalid file means
+ * stable with no default.
+ */
+export function readBuildDefaults(options: ResolveDeploymentOptions): BuildDefaults {
+  const read = options.readFile ?? ((path: string) => readFileSync(path, 'utf8'))
+  const env = options.env ?? process.env
+  const envChannel = env.UNIWORK_OFFICE_CHANNEL?.trim()
+  if (!options.isPackaged) {
+    return { channel: isChannel(envChannel) ? envChannel : 'dev', profile: null }
+  }
+  const raw = options.resourcesDir
+    ? readJson(join(options.resourcesDir, BUILD_DEFAULTS_FILE), read)
+    : undefined
+  const value = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {}
+  const channel: DeploymentChannel = isChannel(value.channel)
+    ? value.channel
+    : isChannel(envChannel)
+      ? envChannel
+      : 'stable'
+  const baked = value.defaultProfile
+  const profile =
+    baked && typeof baked === 'object'
+      ? parseDeploymentProfile({ ...(baked as Record<string, unknown>), channel })
+      : null
+  return { channel, profile }
+}
+
+/** The profile file in userData that matches this build's channel, else null. */
+export function readUserProfile(
+  userDataDir: string,
+  channel: DeploymentChannel,
+  read: (path: string) => string = (path) => readFileSync(path, 'utf8'),
+): DeploymentProfile | null {
+  const raw = readJson(join(userDataDir, PROFILE_FILE), read)
+  if (raw === undefined) return null
+  const profile = parseDeploymentProfile(raw)
+  return profile && profile.channel === channel ? profile : null
+}
+
+/**
+ * Resolution order: the userData profile (what the user or a link chose), the
+ * default baked into this build, the UNIWORK_API_ORIGIN environment (dev), the
+ * legacy `uniworkApiOrigin` setting. An unreadable, invalid or other-channel
+ * userData file is ignored so the next source (or the connect screen) takes over.
  */
 export function resolveDeploymentProfile(
   options: ResolveDeploymentOptions,
 ): DeploymentProfile | null {
-  const read = options.readFile ?? ((path: string) => readFileSync(path, 'utf8'))
-  const files = [
-    options.resourcesDir ? join(options.resourcesDir, PROFILE_FILE) : undefined,
-    options.appImageDir ? join(options.appImageDir, PROFILE_FILE) : undefined,
-    join(options.userDataDir, PROFILE_FILE),
-  ].filter((path): path is string => Boolean(path))
-  for (const file of files) {
-    const raw = readProfileFile(file, read)
-    if (raw === undefined) continue
-    return parseDeploymentProfile(raw)
-  }
+  const defaults = readBuildDefaults(options)
+  const chosen = readUserProfile(options.userDataDir, defaults.channel, options.readFile)
+  if (chosen) return chosen
+  if (defaults.profile) return defaults.profile
   const env = options.env ?? process.env
-  const envChannel = env.UNIWORK_OFFICE_CHANNEL?.trim()
-  const channel: DeploymentChannel = isChannel(envChannel)
-    ? envChannel
-    : options.isPackaged
-      ? 'stable'
-      : 'dev'
   const envOrigin = env.UNIWORK_API_ORIGIN?.trim()
   if (envOrigin) {
     return parseDeploymentProfile({
       deploymentId: env.UNIWORK_DEPLOYMENT_ID?.trim() || 'default',
       apiOrigin: envOrigin,
-      channel,
+      channel: defaults.channel,
     })
   }
   const fromSettings = options.settingsApiOrigin
   if (typeof fromSettings === 'string' && fromSettings.trim()) {
-    return parseDeploymentProfile({ deploymentId: 'default', apiOrigin: fromSettings, channel })
+    return parseDeploymentProfile({
+      deploymentId: 'default',
+      apiOrigin: fromSettings,
+      channel: defaults.channel,
+    })
   }
   return null
 }

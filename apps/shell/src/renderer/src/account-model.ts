@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type {
   AccountErrorCode,
+  AccountSetServerResult,
   AccountProfile,
   AccountState,
   AccountStatus,
@@ -13,7 +14,10 @@ export type AccountView = AccountState | 'loading'
 /** login-flow error, plus `launch` when main could not start the attempt at all */
 export type AccountUiError = AccountErrorCode | 'launch'
 
-export type AccountBusy = 'signing-out' | 'retrying' | 'switching' | null
+export type AccountBusy = 'signing-out' | 'retrying' | 'switching' | 'connecting' | null
+
+/** why a typed server address was not accepted */
+export type ServerConnectError = Extract<AccountSetServerResult, { ok: false }>['error']
 
 /** human copy for every error the main process can report */
 export const ACCOUNT_ERROR_KEYS: Record<AccountUiError, StringKey> = {
@@ -114,6 +118,8 @@ export interface AccountController {
   urlCopied: boolean
   busy: AccountBusy
   orgSwitchFailed: boolean
+  /** the last typed server address failed (null once one is accepted) */
+  connectError: ServerConnectError | null
   signIn(): void
   cancelSignIn(): void
   openLoginUrl(): void
@@ -121,6 +127,8 @@ export interface AccountController {
   signOut(): void
   retry(): void
   selectOrg(orgId: string): void
+  /** connect to the server at a typed address; main validates it and saves the profile */
+  connectServer(address: string): void
   /** re-read the status from main (e.g. when Settings opens) */
   refresh(): void
 }
@@ -138,6 +146,7 @@ export function useAccount(): AccountController {
   const [urlCopied, setUrlCopied] = useState(false)
   const [busy, setBusy] = useState<AccountBusy>(null)
   const [orgSwitchFailed, setOrgSwitchFailed] = useState(false)
+  const [connectError, setConnectError] = useState<ServerConnectError | null>(null)
   const [callbackNotice, setCallbackNotice] = useState(false)
   const noticeTimer = useRef<number | null>(null)
   // bumped on sign-out so an in-flight status read (which can still report
@@ -289,6 +298,20 @@ export function useAccount(): AccountController {
       .finally(() => setBusy(null))
   }
 
+  const connectServer = (address: string) => {
+    setConnectError(null)
+    setBusy('connecting')
+    void window.aiOffice
+      .accountSetServer?.(address)
+      .then((result) => {
+        if (!result) return
+        apply(result.status)
+        if (!result.ok) setConnectError(result.error)
+      })
+      .catch(() => setConnectError('unreachable'))
+      .finally(() => setBusy(null))
+  }
+
   return {
     status,
     view,
@@ -299,6 +322,7 @@ export function useAccount(): AccountController {
     urlCopied,
     busy,
     orgSwitchFailed,
+    connectError,
     signIn,
     cancelSignIn,
     openLoginUrl: () => void window.aiOffice.openLoginUrl?.(),
@@ -306,6 +330,7 @@ export function useAccount(): AccountController {
     signOut,
     retry,
     selectOrg,
+    connectServer,
     refresh,
   }
 }
