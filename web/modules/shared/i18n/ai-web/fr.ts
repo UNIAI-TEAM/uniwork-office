@@ -54,4 +54,8 @@ export const fr = {
   aiWebStateProviderBody: "Ce fournisseur n'est pas pris en charge.",
   aiWebStateUnknownTitle: 'Échec de la requête IA',
   aiWebStateUnknownBody: 'Un problème est survenu. Réessayez.',
+
+  // U-02 catalogue S10: workbook over the web AI size limit
+  aiErrWorkbookTooLarge:
+    'Ce classeur est trop volumineux pour l’IA sur le web. Ouvrez-le dans l’application UniWork Office.',
 } satisfies Record<keyof typeof zh, string>

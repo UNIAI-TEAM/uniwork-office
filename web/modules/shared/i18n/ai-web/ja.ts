@@ -54,4 +54,8 @@ export const ja = {
   aiWebStateProviderBody: 'このプロバイダーはサポートされていません。',
   aiWebStateUnknownTitle: 'AI リクエストに失敗しました',
   aiWebStateUnknownBody: '問題が発生しました。もう一度お試しください。',
+
+  // U-02 catalogue S10: workbook over the web AI size limit
+  aiErrWorkbookTooLarge:
+    'このブックは大きすぎるため、Web 版では AI を使えません。UniWork Office アプリで開いてください。',
 } satisfies Record<keyof typeof zh, string>

@@ -51,4 +51,8 @@ export const ru = {
   aiWebStateProviderBody: 'Этот провайдер не поддерживается.',
   aiWebStateUnknownTitle: 'Ошибка запроса к ИИ',
   aiWebStateUnknownBody: 'Что-то пошло не так. Повторите попытку.',
+
+  // U-02 catalogue S10: workbook over the web AI size limit
+  aiErrWorkbookTooLarge:
+    'Эта книга слишком велика для ИИ в веб-версии. Откройте её в приложении UniWork Office.',
 } satisfies Record<keyof typeof zh, string>

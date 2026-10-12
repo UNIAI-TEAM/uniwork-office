@@ -50,4 +50,8 @@ export const id = {
   aiWebStateProviderBody: 'Penyedia ini tidak didukung.',
   aiWebStateUnknownTitle: 'Permintaan AI gagal',
   aiWebStateUnknownBody: 'Terjadi kesalahan. Coba lagi.',
+
+  // U-02 catalogue S10: workbook over the web AI size limit
+  aiErrWorkbookTooLarge:
+    'Buku kerja ini terlalu besar untuk AI di web. Buka di aplikasi UniWork Office.',
 } satisfies Record<keyof typeof zh, string>

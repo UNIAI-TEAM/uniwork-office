@@ -50,4 +50,8 @@ export const ko = {
   aiWebStateProviderBody: '지원되지 않는 공급자입니다.',
   aiWebStateUnknownTitle: 'AI 요청 실패',
   aiWebStateUnknownBody: '문제가 발생했습니다. 다시 시도하세요.',
+
+  // U-02 catalogue S10: workbook over the web AI size limit
+  aiErrWorkbookTooLarge:
+    '이 통합 문서는 너무 커서 웹에서 AI를 사용할 수 없습니다. UniWork Office 앱에서 여세요.',
 } satisfies Record<keyof typeof zh, string>

@@ -50,4 +50,8 @@ export const he = {
   aiWebStateProviderBody: 'ספק זה אינו נתמך.',
   aiWebStateUnknownTitle: 'בקשת ה-AI נכשלה',
   aiWebStateUnknownBody: 'משהו השתבש. נסה שוב.',
+
+  // U-02 catalogue S10: workbook over the web AI size limit
+  aiErrWorkbookTooLarge:
+    'חוברת העבודה הזו גדולה מדי ל-AI באינטרנט. פתח אותה באפליקציית UniWork Office.',
 } satisfies Record<keyof typeof zh, string>

@@ -50,4 +50,8 @@ export const hi = {
   aiWebStateProviderBody: 'यह प्रदाता समर्थित नहीं है।',
   aiWebStateUnknownTitle: 'AI अनुरोध विफल',
   aiWebStateUnknownBody: 'कुछ गलत हो गया। फिर कोशिश करें।',
+
+  // U-02 catalogue S10: workbook over the web AI size limit
+  aiErrWorkbookTooLarge:
+    'यह वर्कबुक वेब पर AI के लिए बहुत बड़ी है। इसे UniWork Office ऐप में खोलें।',
 } satisfies Record<keyof typeof zh, string>

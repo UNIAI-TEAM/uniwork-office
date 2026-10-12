@@ -46,4 +46,7 @@ export const zh = {
   aiWebStateProviderBody: '此服务商不受支持。',
   aiWebStateUnknownTitle: 'AI 请求失败',
   aiWebStateUnknownBody: '出现问题，请重试。',
+
+  // U-02 catalogue S10: workbook over the web AI size limit
+  aiErrWorkbookTooLarge: '此工作簿太大，无法在网页上使用 AI。请在 UniWork Office 应用中打开。',
 }

@@ -50,4 +50,8 @@ export const ar = {
   aiWebStateProviderBody: 'هذا المزوّد غير مدعوم.',
   aiWebStateUnknownTitle: 'فشل طلب الذكاء الاصطناعي',
   aiWebStateUnknownBody: 'حدث خطأ ما. حاول مرة أخرى.',
+
+  // U-02 catalogue S10: workbook over the web AI size limit
+  aiErrWorkbookTooLarge:
+    'هذا المصنف كبير جدًا على الذكاء الاصطناعي على الويب. افتحه في تطبيق UniWork Office.',
 } satisfies Record<keyof typeof zh, string>
