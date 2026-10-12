@@ -23,6 +23,7 @@ import { LocaleProvider } from '../src/renderer/src/locale'
 import type { Lang } from '../src/renderer/src/locale'
 import type { SettingsSectionId } from '../src/renderer/src/SettingsModal'
 import { accountStrings } from '../src/renderer/src/i18n/strings-account'
+import { syncStrings } from '../src/renderer/src/i18n/strings-sync'
 
 const actEnvironment = globalThis as typeof globalThis & {
   IS_REACT_ACT_ENVIRONMENT?: boolean
@@ -31,6 +32,9 @@ actEnvironment.IS_REACT_ACT_ENVIRONMENT = true
 
 const en = accountStrings.en
 const vi_ = accountStrings.vi
+// keystore-locked reuses the sync shard's keychain-locked copy
+const sync = syncStrings.en
+const syncVi = syncStrings.vi
 
 const PROFILE = { accountId: 'acc-1', email: 'lan.nguyen@example.com', displayName: 'Lan Nguyen' }
 const ORGS = [
@@ -206,6 +210,7 @@ describe('sidebar account entry', () => {
     ['wrong-deployment', en.acctTitle, en.acctWrongServerShort],
     ['not-configured', en.acctTitle, en.acctNotConfiguredShort],
     ['keyring-unavailable', en.acctTitle, en.acctKeyringShort],
+    ['keystore-locked', en.acctTitle, sync.uwBadgeKeystore],
   ]
 
   it.each(cases)('%s shows its own label and sub-line', async (state, name, sub) => {
@@ -532,6 +537,50 @@ describe('Settings → Account pane', () => {
     )
   })
 
+  it('keystore locked: Retry (never Online / sign-out / sign-in) re-reads the stored sign-in', async () => {
+    await render(statusFor('keystore-locked', { error: 'keystore_locked' }), { open: true })
+    expect(pane()?.dataset.state).toBe('keystore-locked')
+    const text = pane()?.textContent ?? ''
+    expect(text).toContain(sync.uwLockKeystoreTitle)
+    expect(text).toContain(sync.uwLockKeystore)
+    // not the no-keyring copy, no signed-in profile, nothing that reads as connected
+    expect(text).not.toContain(en.acctKeyringTitle)
+    expect(text).not.toMatch(/online/i)
+    expect(text).not.toContain(PROFILE.email)
+    expect(button(en.acctSignOut)).toBeUndefined()
+    expect(button(en.acctSignInAgain)).toBeUndefined()
+    expect(button(en.acctSignIn)).toBeUndefined()
+    // the notice says it all: no repeated error line
+    expect(pane()?.querySelector('.acct-notice-error')).toBeNull()
+    expect(pane()?.querySelector('.acct-notice')?.getAttribute('role')).toBe('alert')
+    const retry = button(en.acctRetry)
+    expect(retry).toBeDefined()
+    expect(retry?.tagName).toBe('BUTTON')
+    await click(retry)
+    expect(api.accountRetry).toHaveBeenCalledTimes(1)
+    expect(api.accountLogin).not.toHaveBeenCalled()
+  })
+
+  it('keystore locked: the sidebar entry is a warning and never shows the sign-in / online label', async () => {
+    await render(statusFor('keystore-locked', { error: 'keystore_locked' }))
+    expect(entry().querySelector('.account-sub')?.textContent).toBe(sync.uwBadgeKeystore)
+    expect(entry().textContent).not.toMatch(/online/i)
+    await click(entry())
+    expect(api.accountLogin).not.toHaveBeenCalled()
+  })
+
+  it('keystore locked: a refused sign-in attempt says the keychain is locked', async () => {
+    await render(statusFor('keystore-locked', { error: 'keystore_locked' }), { open: true })
+    await act(async () => api.login({ phase: 'error', error: 'keystore_locked' }))
+    expect(pane()?.querySelector('.acct-notice-error')?.textContent).toBe(sync.uwLockKeystoreTitle)
+  })
+
+  it('keystore locked in Vietnamese reads from the sync shard', async () => {
+    await render(statusFor('keystore-locked'), { open: true, lang: 'vi' })
+    expect(pane()?.textContent).toContain(syncVi.uwLockKeystoreTitle)
+    expect(button(vi_.acctRetry)).toBeDefined()
+  })
+
   it('a rejected sign-in link shows a passing notice and the attempt goes on', async () => {
     await render(statusFor('signing-in'), { open: true })
     await act(async () => api.login({ phase: 'url', url: 'https://uniwork.example/consent?x=1' }))
@@ -577,16 +626,19 @@ describe('error copy', () => {
     'wrong_deployment',
     'not_configured',
     'keyring_unavailable',
+    'keystore_locked',
     'server_error',
     'malformed_response',
   ]
 
   it('maps every AccountErrorCode to a distinct en + vi string', () => {
     expect(Object.keys(ACCOUNT_ERROR_KEYS).sort()).toEqual([...codes, 'launch'].sort())
-    const texts = codes.map((c) => en[ACCOUNT_ERROR_KEYS[c] as keyof typeof en])
+    const enAll = { ...en, ...sync } as Record<string, string>
+    const viAll = { ...vi_, ...syncVi } as Record<string, string>
+    const texts = codes.map((c) => enAll[ACCOUNT_ERROR_KEYS[c]])
     expect(texts.every((x) => typeof x === 'string' && x.length > 0)).toBe(true)
     expect(new Set(texts).size).toBe(texts.length)
-    for (const c of codes) expect(vi_[ACCOUNT_ERROR_KEYS[c] as keyof typeof vi_]).toBeTruthy()
+    for (const c of codes) expect(viAll[ACCOUNT_ERROR_KEYS[c]]).toBeTruthy()
   })
 })
 

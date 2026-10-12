@@ -7,6 +7,8 @@ import type {
 } from '../src/shared/home-api'
 import {
   PICKER_SEARCH_DEBOUNCE_MS,
+  UNIWORK_LOCK_BADGE_KEYS,
+  blockedReasonKey,
   chipCopy,
   chipModelOf,
   docExtension,
@@ -34,9 +36,14 @@ import { publishUniworkNotice } from '../src/renderer/src/uniwork-notice-bus'
 import { subscribeUniworkOpened } from '../src/renderer/src/uniwork-recents-refresh'
 import { uniworkDocumentStrings } from '../src/renderer/src/i18n/strings-uniwork-documents'
 import { accountStrings } from '../src/renderer/src/i18n/strings-account'
+import { syncStrings } from '../src/renderer/src/i18n/strings-sync'
 import type { StringKey, TFunc } from '../src/renderer/src/locale'
 
-const copy = { ...accountStrings.en, ...uniworkDocumentStrings.en } as Record<string, string>
+const copy = {
+  ...accountStrings.en,
+  ...syncStrings.en,
+  ...uniworkDocumentStrings.en,
+} as Record<string, string>
 /** English translator with the same {placeholder} rule as the real one */
 const t: TFunc = (key: StringKey, params) =>
   (copy[key] ?? key).replace(/\{(\w+)\}/g, (_, name: string) => String(params?.[name] ?? ''))
@@ -168,6 +175,22 @@ describe('chipModelOf: save state -> chip', () => {
   })
 })
 
+describe('keystore_locked reason', () => {
+  it('maps to the keychain-locked reason and badge, not the generic ones', () => {
+    expect(blockedReasonKey('keystore_locked')).toBe('uwReasonKeystore')
+    expect(UNIWORK_LOCK_BADGE_KEYS.keystore_locked).toBe('uwBadgeKeystore')
+    expect(t(blockedReasonKey('keystore_locked'))).toBe(syncStrings.en.uwReasonKeystore)
+    expect(t(UNIWORK_LOCK_BADGE_KEYS.keystore_locked)).toBe('Keychain locked')
+    expect(blockedReasonKey('keystore_locked')).not.toBe(blockedReasonKey(undefined))
+  })
+
+  it('keeps the existing reasons unchanged', () => {
+    expect(blockedReasonKey('forbidden')).toBe('uwReasonForbidden')
+    expect(blockedReasonKey('quota_exceeded')).toBe('uwReasonQuota')
+    expect(blockedReasonKey(undefined)).toBe('uwReasonOther')
+  })
+})
+
 describe('errorActionOf', () => {
   it('sign in for an expired session, retry for transport trouble, nothing for a verdict', () => {
     expect(errorActionOf('session_expired')).toBe('sign-in')
@@ -234,6 +257,7 @@ describe('openCardOf: the card is always there, the call to action follows the a
     ['not-configured', 'settings', true],
     ['wrong-deployment', 'settings', true],
     ['keyring-unavailable', 'settings', true],
+    ['keystore-locked', 'settings', true],
   ] as const)('%s -> %s', (view, action, attention) => {
     const card = openCardOf(view)
     expect(card.action).toBe(action)
