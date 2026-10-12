@@ -12,6 +12,14 @@
 import type { IpcMain, IpcMainEvent, WebContents } from 'electron'
 import { AI_RUN_CHANNEL, parseAiRunReport } from '@genoffice/electron-utils/ai-run'
 
+/** one editor's answer to the shell's per-document poll (editorDirtyStates) */
+export interface EditorState {
+  path: string
+  /** null: the editor did not answer, the caller keeps what it last knew */
+  dirty: boolean | null
+  aiRunning: boolean
+}
+
 /** webContents.id -> id of the running turn ('' when the editor sent none) */
 const runningByWc = new Map<number, string>()
 /** views whose destroy/reload already clears the flag */
