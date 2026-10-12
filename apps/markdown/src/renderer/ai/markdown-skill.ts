@@ -1,5 +1,6 @@
 import type { AgentSkill, AgentToolDef } from '@genoffice/agent-core'
 import type { Editor } from '@tiptap/core'
+import { cap } from '../capabilities'
 import type { AiDocWriter } from './doc-writer'
 import {
   AGENT_TOOLS,
@@ -76,6 +77,17 @@ export const READ_ONLY_TOOLS: ReadonlySet<string> = new Set([
 const VIEW_ONLY_NOTE =
   '\n\nNote: this document is view-only. You can read it and answer questions about it, but you cannot edit it: no edit tools are available. If the user asks for a change, explain that the document is view-only and that they can save a copy to edit it.'
 
+/** both land a downloaded picture beside the document (fetchImage + saveImage) */
+const IMAGE_FETCH_TOOLS: ReadonlySet<string> = new Set(['insert_image', 'generate_image'])
+
+/** tools the host cannot run (web: no image download route) are never offered */
+function hostOffers(name: string): boolean {
+  return !IMAGE_FETCH_TOOLS.has(name) || cap('aiImageFetch')
+}
+
+const IMAGE_FETCH_OFF_NOTE =
+  '\n\nNote: insert_image and generate_image are unavailable here (images cannot be downloaded into this document). Do not call or promise them; image_search results can be shared as links.'
+
 const IMAGE_GEN_OFF_NOTE =
   '\n\nNote: generate_image is currently unavailable (no image model is configured under Settings → AI media). Do not call or promise it; use image_search for imagery.'
 
@@ -101,16 +113,20 @@ export function createMarkdownSkill(
     // live: the predicates are re-read before every model request
     get systemPrompt() {
       if (isReadOnly?.()) return AGENT_SYSTEM_PROMPT + VIEW_ONLY_NOTE
-      return imageGenAvailable?.() === false
-        ? AGENT_SYSTEM_PROMPT + IMAGE_GEN_OFF_NOTE
-        : AGENT_SYSTEM_PROMPT
+      const prompt =
+        imageGenAvailable?.() === false
+          ? AGENT_SYSTEM_PROMPT + IMAGE_GEN_OFF_NOTE
+          : AGENT_SYSTEM_PROMPT
+      return hostOffers('insert_image') ? prompt : prompt + IMAGE_FETCH_OFF_NOTE
     },
     get tools() {
       if (isReadOnly?.()) return withAsk(AGENT_TOOLS, true)
-      return withAsk(
+      const tools =
         imageGenAvailable?.() === false
           ? AGENT_TOOLS.filter((t) => t.name !== 'generate_image')
-          : AGENT_TOOLS,
+          : AGENT_TOOLS
+      return withAsk(
+        tools.filter((t) => hostOffers(t.name)),
         false,
       )
     },
@@ -127,6 +143,9 @@ export function createMarkdownSkill(
           isError: true,
           summary: call.name,
         }
+      }
+      if (!hostOffers(call.name)) {
+        return { output: `${call.name} is not available here.`, isError: true, summary: call.name }
       }
       const editor = getEditor()
       if (!editor) {

@@ -57,6 +57,7 @@ import { pastedBase64Image } from './base64-paste'
 import { createElectronTransport } from './transport'
 import { DOC_NAV_SCHEME, parseDocNavHref } from './doc-nav'
 import { EditQueueCard } from './EditQueueCard'
+import { sendFence } from './edit-fence'
 import {
   buildQueueInstruction,
   buildQueueSummary,
@@ -220,6 +221,8 @@ interface ChatEntry {
   tools?: ToolActivity[]
   /** the element this user message targeted, frozen at send */
   scope?: AiScopeQuoteData
+  /** the sids this element-scoped turn may edit; a retry resends them */
+  fenceSids?: number[]
 }
 
 /** the whole source text: one string is the exact rollback unit */
@@ -240,6 +243,8 @@ export interface AiPreset {
   /** what the chat bubble shows when the instruction itself carries protocol text */
   displayText?: string
   scope?: AiScopeQuoteData
+  /** element-scoped send: the sids the run may edit (enforced by the tools) */
+  fenceSids?: number[]
 }
 
 /** Prefill the composer without sending (Ask AI about the selected element) */
@@ -511,6 +516,8 @@ export function AiPanel({
   const runDisplayRef = useRef('')
   /** the scope quote of the last send, carried over by the header retry */
   const lastScopeRef = useRef<AiScopeQuoteData | undefined>(undefined)
+  /** sids the current turn may edit (Ask AI on an element, queue run); null = the whole page */
+  const fenceRef = useRef<readonly number[] | null>(null)
   const runMutatedRef = useRef(false)
   /** tool activity of the whole run, for transcript persistence */
   const runToolsRef = useRef<ToolActivity[]>([])
@@ -694,6 +701,7 @@ export function AiPanel({
             getInstruction: () => runInstructionRef.current,
             resolveAttachmentSrc: (ref) => resolveAttachmentSrc(ref),
             listAttachmentNames: () => availableAttachments().map((a) => a.name),
+            getEditFence: () => fenceRef.current,
           },
           () => readOnlyRef.current,
         ),
@@ -908,6 +916,7 @@ export function AiPanel({
     queueRun = false,
     attachmentsOverride?: AttachmentMeta[],
     scope?: AiScopeQuoteData,
+    fenceSids: readonly number[] | null = null,
   ): boolean => {
     const instruction = text.trim()
     const loop = loopRef.current
@@ -928,6 +937,8 @@ export function AiPanel({
     runInstructionRef.current = instruction
     runDisplayRef.current = displayText ?? instruction
     lastScopeRef.current = scope
+    const fence = sendFence(fenceSids)
+    fenceRef.current = fence
     runMutatedRef.current = false
     depsRef.current.onPrompt(displayText ?? instruction)
     runToolsRef.current = []
@@ -940,6 +951,7 @@ export function AiPanel({
         queueRun: queueRun || undefined,
         attachments: sentAtts.length > 0 ? sentAtts : undefined,
         scope,
+        fenceSids: fence ? [...fence] : undefined,
       },
       { role: 'assistant', text: '', streaming: true },
     ])
@@ -983,6 +995,9 @@ export function AiPanel({
       buildQueueInstruction(entries),
       buildQueueSummary(t('aiQueueSubmitted', { count: entries.length }), entries),
       true,
+      undefined,
+      undefined,
+      entries.map((entry) => entry.target.sid),
     )
     // consume only once the run is under way; a failed run keeps its retry via the bubble's instruction
     if (started) onQueueConsume(editQueue.map((item) => item.qid))
@@ -1034,6 +1049,7 @@ export function AiPanel({
       lastQueueRunRef.current,
       undefined,
       lastScopeRef.current,
+      fenceRef.current,
     )
   }
 
@@ -1061,7 +1077,7 @@ export function AiPanel({
     presetNonceRef.current = preset.nonce
     // while a run is active the request lands in the composer as the user phrased it, never as protocol text
     if (loopRef.current?.busy) setPrompt(preset.displayText ?? preset.text)
-    else send(preset.text, preset.displayText, false, undefined, preset.scope)
+    else send(preset.text, preset.displayText, false, undefined, preset.scope, preset.fenceSids)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preset])
 
@@ -1273,6 +1289,7 @@ export function AiPanel({
                             entry.queueRun,
                             entry.attachments ?? [],
                             entry.scope,
+                            entry.fenceSids,
                           )
                         }
                       >

@@ -111,7 +111,7 @@ describe('apply_ops batches', () => {
     expect(result.output).toContain('Block indexes may have changed')
   })
 
-  it('stops at the first failing op and reports what ran', () => {
+  it('stops at the first failing op, reports what ran and rolls it back', () => {
     const editor = createEditor('one\n\ntwo')
     const result = executeTool(
       editor,
@@ -122,11 +122,12 @@ describe('apply_ops batches', () => {
       ),
     )
     expect(result.isError).toBe(true)
-    expect(result.mutated).toBe(true)
+    expect(result.mutated).toBe(false)
     expect(result.output).toContain('ops[0] replaceText: Replaced 1')
     expect(result.output).toContain('ops[1] replaceText FAILED')
     expect(result.output).toContain('1 later op(s) were not executed')
-    expect(editor.getMarkdown()).toContain('two')
+    expect(result.output).toContain('Nothing was applied (atomic)')
+    expect(editor.getMarkdown()).toBe('one\n\ntwo')
   })
 
   it('a deleted target is reported instead of hitting a neighbour', () => {

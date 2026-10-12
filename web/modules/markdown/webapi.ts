@@ -23,6 +23,8 @@ export const MARKDOWN_WEB_CAPABILITIES = Object.freeze({
   openInDocs: false,
   // pasted pictures go to the document's assets through the host, never to a third-party image host
   imageHost: false,
+  // AI insert_image downloads through the desktop main process; fetchImage is a stub here
+  aiImageFetch: false,
 })
 
 /**

@@ -1,7 +1,7 @@
 import type { AgentSkill, AgentToolCall, AgentToolDef, ToolExecution } from '@genoffice/agent-core'
 import { t } from '../i18n/locale'
 import type { ElementEntry, ParseMap } from '../document/parse-map'
-import type { HtmlOp, OpError } from '../document/ops'
+import { compileOps, type HtmlOp, type OpError } from '../document/ops'
 import { lineOf } from '../document/match'
 import {
   briefPinEdit,
@@ -13,6 +13,7 @@ import {
 } from '../document/brief'
 import type { PageWriteResult, PageWriteSpec } from './page-writer'
 import type { BriefPlanResult, BriefPlanSpec } from './brief-writer'
+import { FENCE_REFUSAL, fenceViolation } from './edit-fence'
 
 export const CONTEXT_MAX_CHARS = 8000
 export const OUTLINE_MAX_LINES = 80
@@ -54,6 +55,8 @@ export interface HtmlDocAccess {
   ): Promise<{ ok: true; src: string } | { ok: false; error: string }>
   /** names of the attachments the model can reference; lets refs to names with spaces or parentheses match whole */
   listAttachmentNames?(): string[]
+  /** sids an element-scoped turn may edit (Ask AI on the selection, edit queue); null = the whole page */
+  getEditFence?(): readonly number[] | null
 }
 
 export type PlanMode = 'new' | 'redesign' | 'restyle' | 'extract'
@@ -720,6 +723,22 @@ export function createHtmlSkillCore(access: HtmlDocAccess): {
               ? call.input.summary
               : `apply_ops (${ops.length})`
           const finish = (finalOps: HtmlOp[]): ToolExecution => {
+            // element-scoped turn: compile first and refuse the whole batch when any patch
+            // lands outside the fenced elements (compile errors are reported by applyOps)
+            const fence = access.getEditFence?.()
+            if (fence) {
+              const current = access.getMap()
+              const compiled = compileOps(access.getText(), current, finalOps)
+              const refused =
+                compiled.errors.length === 0 && fenceViolation(current, compiled.patches, fence)
+              if (refused) {
+                return {
+                  output: `0 of ${ops.length} ops applied. REFUSED: ${refused}`,
+                  isError: true,
+                  summary: t('aiToolApplyOpsFailed'),
+                }
+              }
+            }
             const result = access.applyOps(finalOps, label)
             if (!result.ok) {
               const lines = result.errors.map(
@@ -814,6 +833,8 @@ export function createHtmlSkillCore(access: HtmlDocAccess): {
           )
         }
         case 'plan_page': {
+          if (access.getEditFence?.())
+            return { output: FENCE_REFUSAL, isError: true, summary: t('aiToolPlan') }
           const { planBrief, confirmBrief } = access
           if (!planBrief || !confirmBrief)
             return {
@@ -892,6 +913,8 @@ export function createHtmlSkillCore(access: HtmlDocAccess): {
           })
         }
         case 'write_document': {
+          if (access.getEditFence?.())
+            return { output: FENCE_REFUSAL, isError: true, summary: t('aiToolWritePage') }
           const plan = String(call.input.plan ?? '').trim()
           if (!plan)
             return {
