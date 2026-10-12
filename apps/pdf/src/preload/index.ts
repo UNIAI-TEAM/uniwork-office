@@ -54,6 +54,11 @@ const api: PdfApi = {
   addSavedSignature: (data) => ipcRenderer.invoke(PDF_CHANNELS.addSignature, data),
   removeSavedSignature: (id) => ipcRenderer.invoke(PDF_CHANNELS.removeSignature, id),
   getUsername: () => ipcRenderer.invoke(PDF_CHANNELS.getUsername),
+  onCommentAuthorChanged: (handler) => {
+    const listener = () => handler()
+    ipcRenderer.on('uniwork:comment-author-changed', listener)
+    return () => ipcRenderer.removeListener('uniwork:comment-author-changed', listener)
+  },
   setDirty: (dirty) => ipcRenderer.send(PDF_CHANNELS.dirtyChanged, dirty),
   onCloseSaveRequest: (handler) => {
     const listener = (_e: Electron.IpcRendererEvent, request?: { origin?: unknown }) =>

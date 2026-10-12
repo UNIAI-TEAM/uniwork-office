@@ -43,6 +43,7 @@ import { groupLineSpans } from './text-line'
 import { DRAW_COLORS, DrawLayer, cssRgb } from './DrawLayer'
 import { ColorPickerPopover } from './ColorPicker'
 import type { DrawTool, LocalDrawing, SavedNotePin } from './DrawLayer'
+import { followCommentAuthor } from './comment-author'
 import { NoteMarginColumn } from './NoteMargin'
 import type { NoteMarginDraft, NoteMarginThread } from './NoteMargin'
 import {
@@ -408,9 +409,17 @@ export default function App() {
   const [activeNote, setActiveNote] = useState<{ origIdx: number; rootKey: string } | null>(null)
   /** G8-02: author for new note comments — UniWork display name or "User", never the OS account */
   const [noteAuthor, setNoteAuthor] = useState('')
-  useEffect(() => {
-    window.pdfApi.getUsername().then(setNoteAuthor, () => {})
-  }, [])
+  // Re-asked when the open document changes (main answers for the file this view
+  // shows) and when the signed-in account changes while it stays open.
+  useEffect(
+    () =>
+      followCommentAuthor(
+        () => window.pdfApi.getUsername(),
+        window.pdfApi.onCommentAuthorChanged,
+        setNoteAuthor,
+      ),
+    [filePath],
+  )
   const [highlightColor, setHighlightColor] = useState<[number, number, number]>(
     MARKUP_COLORS.highlight,
   )

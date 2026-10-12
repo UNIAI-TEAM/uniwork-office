@@ -806,6 +806,12 @@ export interface PdfApi {
    * account name.
    */
   getUsername(): Promise<string>
+  /**
+   * G8-02: the shell's ping when the signed-in display name changes (sign-in,
+   * sign-out, session expiry); the renderer re-asks getUsername. Absent outside
+   * the shell, where the author never changes.
+   */
+  onCommentAuthorChanged?(handler: () => void): () => void
   /** Mirror unsaved-changes state to the main process; drives the save prompt before closing a tab/window */
   setDirty(dirty: boolean): void
   /** Main process picked "Save" in the close prompt, or flushes before an export → renderer saves with that origin and replies via sendCloseSaveResult */
