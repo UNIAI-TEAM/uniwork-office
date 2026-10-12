@@ -882,6 +882,13 @@ export function AiPanel({
       })
   }, [])
 
+  // answered receipts belong to the document they were given for: drop them when another
+  // one opens (an untitled document getting its first path is the same document)
+  useEffect(() => {
+    const previous = filePathRef.current
+    if (previous && previous !== filePath) setReceipts([])
+  }, [filePath])
+
   /** after an untitled document's first save, bind the unsaved-* history to the real path */
   useEffect(() => {
     filePathRef.current = filePath
