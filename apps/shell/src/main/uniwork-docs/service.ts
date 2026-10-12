@@ -455,6 +455,25 @@ export class UniworkDocsService {
     if (access.kind === 'ok') await access.intents.delete(doc.key)
   }
 
+  /**
+   * True while the document has local work the feed's full resync must never
+   * evict: a working copy that is not clean (dirty, conflict, offline,
+   * blocked, signed-out, error, saving) or one with a stored save intent. The
+   * reconcile asks this for every indexed id the snapshot no longer lists.
+   */
+  async hasLocalDraft(documentId: string): Promise<boolean> {
+    const identity = this.deps.identity()
+    if (!identity) return false
+    const dir = this.store.dirFor(identity.deploymentId, identity.accountId, documentId)
+    const binding = await this.store.readDir(dir)
+    if (!binding || binding.documentId !== documentId) return false
+    if (KEEP_LOCAL_STATES.has(binding.state) || binding.state === 'saving') return true
+    const access = await this.intentAccess()
+    // the store cannot answer: keep the copy rather than evict local work
+    if (access.kind !== 'ok') return true
+    return (await access.intents.get(documentId)) !== null
+  }
+
   /** the binding belongs to the signed-in account and the active deployment */
   owns(doc: BoundDocument): boolean {
     const identity = this.liveIdentity()

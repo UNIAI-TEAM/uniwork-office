@@ -22,8 +22,18 @@ import { AccountBoundary } from './account-boundary'
 import { setUniworkCloseGuard } from './close-guard'
 import { INTENT_STORE_REGISTRATION } from '../uniwork-sync/intent-store'
 import { createSafeStorageKeyProvider } from '../uniwork-sync/keys'
-import { createSyncStoreAccess } from '../uniwork-sync/session-store'
+import {
+  DOC_INDEX_REGISTRATION,
+  FEED_CURSORS_REGISTRATION,
+  SyncRuntime,
+  type SyncRuntimeTargets,
+} from '../uniwork-sync/runtime'
+import { createSyncStoreAccess, type SyncStoreAccess } from '../uniwork-sync/session-store'
 import { createStoreLayer, type StoreLayer } from '../uniwork-sync/store'
+import { createFeedClient, type FeedClient } from '../uniwork-sync/feed/client'
+import { createCapabilityFetch } from '../uniwork-sync/capability/client'
+import { CapabilityCache, NEVER_READ_CAPABILITIES } from '../uniwork-sync/capability/cache'
+import { createUniworkDocsClient, type UniworkDocsClient } from './client'
 import {
   UniworkDocsService,
   type ConflictUi,
@@ -234,6 +244,8 @@ function createSyncStoreLayer(): StoreLayer {
     clock: () => Date.now(),
   })
   layer.register(INTENT_STORE_REGISTRATION)
+  layer.register(FEED_CURSORS_REGISTRATION)
+  layer.register(DOC_INDEX_REGISTRATION)
   return layer
 }
 
@@ -245,13 +257,11 @@ function syncStoreLayer(): StoreLayer {
   return syncLayer
 }
 
-/** Registers the IPC handlers (safe before app ready: nothing touches the account yet). */
-export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): UniworkDocsHandle {
-  const push = (channel: string, payload: unknown) => {
-    const wc = wiring.shellContents()
-    if (wc && !wc.isDestroyed()) wc.send(channel, payload)
-  }
-  const syncStore = createSyncStoreAccess({
+/** the session's store access, built once: the key provider and layer are process-wide */
+let syncAccess: SyncStoreAccess | null = null
+
+function syncStoreAccess(): SyncStoreAccess {
+  syncAccess ??= createSyncStoreAccess({
     layer: syncStoreLayer(),
     scope: () => {
       const identity = uniworkSessionIdentity()
@@ -260,6 +270,94 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
         : null
     },
   })
+  return syncAccess
+}
+
+/**
+ * The change-feed runtime of the shell: one FeedConsumer per (org, workspace)
+ * of the signed-in account, over the shared durable store, started on sign-in
+ * and re-run on a 60 s poll. There is no desktop realtime channel today, so
+ * this poll (plus a pass per sign-in) is the whole mechanism. Clients are
+ * rebuilt when the deployment origin changes; capabilities are cached per org.
+ * A capability or feed 401 asks the account to re-evaluate its session.
+ */
+function createSyncRuntime(service: UniworkDocsService): SyncRuntime {
+  let origin: string | null = null
+  let docs: UniworkDocsClient | null = null
+  let feed: FeedClient | null = null
+  let capability: CapabilityCache = new CapabilityCache({
+    fetch: () => Promise.resolve({ status: 0, body: undefined }),
+    clock: { now: () => Date.now() },
+  })
+  const clients = (): {
+    docs: UniworkDocsClient
+    feed: FeedClient
+    capability: CapabilityCache
+  } | null => {
+    const profile = uniworkDeploymentProfile()
+    if (!profile) return null
+    if (origin !== profile.apiOrigin) {
+      origin = profile.apiOrigin
+      const options = {
+        apiOrigin: profile.apiOrigin,
+        authorized: <T>(call: (token: string) => Promise<T>) => authorizedRequest(call),
+        isSignedIn: () => uniworkSessionIdentity() !== null,
+      }
+      docs = createUniworkDocsClient(options)
+      feed = createFeedClient(options)
+      capability = new CapabilityCache({
+        fetch: createCapabilityFetch(options),
+        clock: { now: () => Date.now() },
+      })
+    }
+    return docs && feed ? { docs, feed, capability } : null
+  }
+  const targets: SyncRuntimeTargets = {
+    orgs: () =>
+      uniworkAccount()
+        .status()
+        .orgs?.map((org) => org.id) ?? [],
+    workspaces: async (orgId) => {
+      const found = clients()
+      if (!found) return []
+      return (await found.docs.listWorkspaces(orgId)).map((workspace) => workspace.id)
+    },
+  }
+  return new SyncRuntime({
+    store: syncStoreAccess(),
+    targets,
+    capability: async (orgId) => {
+      const found = clients()
+      if (!found) {
+        return {
+          kind: 'ok' as const,
+          capabilities: { ...NEVER_READ_CAPABILITIES },
+          source: 'default' as const,
+        }
+      }
+      return found.capability.get(orgId)
+    },
+    client: () => clients()?.feed ?? null,
+    keepDraft: (documentId) => service.hasLocalDraft(documentId),
+    clock: { now: () => Date.now() },
+    onSessionExpired: () => {
+      // a capability or feed 401: the account re-reads the session and applies
+      // its own state (keystore-locked, signed-out, restoring, ...)
+      void uniworkAccount()
+        .retry()
+        .catch(() => undefined)
+    },
+    log: (message) => console.warn(message),
+  })
+}
+
+/** Registers the IPC handlers (safe before app ready: nothing touches the account yet). */
+export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): UniworkDocsHandle {
+  const push = (channel: string, payload: unknown) => {
+    const wc = wiring.shellContents()
+    if (wc && !wc.isDestroyed()) wc.send(channel, payload)
+  }
+  const syncStore = syncStoreAccess()
   const service = new UniworkDocsService({
     userDataDir: app.getPath('userData'),
     syncStore,
@@ -315,6 +413,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     if (typeof path === 'string') service.dismissLock(path)
   })
   setUniworkCloseGuard(service)
+  const runtime = createSyncRuntime(service)
   // Sign out and a sign-in as someone else close the previous account's
   // documents and delete their AI history (see account-boundary.ts)
   const boundary = new AccountBoundary({
@@ -348,6 +447,10 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
         const now = status.state === 'signed-in'
         if (now && !signedIn) void service.launch.onSignedIn()
         signedIn = now
+        // the feed runs only for a live session: start on sign-in (one pass
+        // plus the 60 s poll), stop on sign-out, a lock or a switch
+        if (now && identity) runtime.start()
+        else runtime.stop()
       })
       startLaunch((url) => void service.launch.handleUrl(url))
     },
