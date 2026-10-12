@@ -4,13 +4,15 @@
 // html; the card blocks the run until the user answers or skips.
 import { describe, expect, it, vi } from 'vitest'
 
-import { AGENT_TOOLS as HTML_TOOLS } from '../../html/src/renderer/ai/tools'
+import htmlInputSchema from './fixtures/html-ask-clarification-input-schema.json'
 import { WORKBOOK_TOOLS, executeWorkbookTool, type SheetsSkillDeps } from '../src/renderer/ai/tools'
 import { VIEW_ONLY_TOOLS } from '../src/renderer/ai/view-only-skill'
 import { zh } from '../src/renderer/i18n/ai/zh'
 import { en } from '../src/renderer/i18n/ai/en'
 import { vi as viShard } from '../src/renderer/i18n/ai/vi'
 
+// Pinned copy of html's ask_clarification inputSchema (apps/html/src/renderer/ai/tools.ts
+// at e6862e53), kept as a fixture so the sheets typecheck does not pull html sources in.
 const tool = (list: readonly { name: string }[], name: string) =>
   list.find((entry) => entry.name === name) as
     { name: string; description: string; inputSchema: unknown } | undefined
@@ -31,9 +33,8 @@ const ask = (d: SheetsSkillDeps, input: Record<string, unknown>) =>
 describe('g6-12 sheets ask_clarification', () => {
   it('is offered with the html input schema, byte for byte', () => {
     const sheets = tool(WORKBOOK_TOOLS, 'ask_clarification')
-    const html = tool(HTML_TOOLS, 'ask_clarification')
     expect(sheets).toBeDefined()
-    expect(JSON.stringify(sheets!.inputSchema)).toBe(JSON.stringify(html!.inputSchema))
+    expect(JSON.stringify(sheets!.inputSchema)).toBe(JSON.stringify(htmlInputSchema))
   })
 
   it('describes confirming column meaning / target range before calculating or writing', () => {
@@ -75,7 +76,7 @@ describe('g6-12 sheets ask_clarification', () => {
   })
 
   it('refuses empty questions and keeps at most 4 questions / 5 options', async () => {
-    const askClarification = vi.fn(async () => ({ answers: 'x' }))
+    const askClarification = vi.fn(async (_questions: unknown) => ({ answers: 'x' }))
     const empty = await ask(deps(askClarification), {
       questions: [{ id: 'a', label: '', options: [] }],
     })
@@ -88,7 +89,7 @@ describe('g6-12 sheets ask_clarification', () => {
       options: ['a', 'b', 'c', 'd', 'e', 'f', 'g'],
     }))
     await ask(deps(askClarification), { questions: many })
-    const asked = askClarification.mock.calls[0]![0] as unknown as { options: string[] }[]
+    const asked = askClarification.mock.calls[0]![0] as { options: string[] }[]
     expect(asked).toHaveLength(4)
     expect(asked.every((q) => q.options.length === 5)).toBe(true)
   })
