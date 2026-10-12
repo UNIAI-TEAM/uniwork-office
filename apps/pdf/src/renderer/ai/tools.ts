@@ -2788,6 +2788,8 @@ async function generateImageTool(
   if (!r.url) return err(`image generation failed: ${r.error ?? 'unknown error'}`, summary)
   return {
     output: `Generated image URL: ${r.url}\nInsert it into the document with insert_image.`,
+    // returns a URL only; the open document is untouched until insert_image
+    mutated: false,
     summary,
   }
 }
@@ -3613,6 +3615,8 @@ export async function executePdfTool(
         output: r.path
           ? `Created the new document at ${r.path} and opened it in a new tab.`
           : `Created the new document "${name}" in a new tab; it saves itself into the default folder.`,
+        // a NEW file is written; the open PDF is not modified
+        mutated: false,
         summary: t('aiToolCreatedDocument', { name }),
       }
     }
