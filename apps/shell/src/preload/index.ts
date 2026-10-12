@@ -68,11 +68,15 @@ ipcRenderer.on(
   UNIWORK_DOC_CHANNELS.launchEvent,
   (_event: IpcRendererEvent, event: UniworkLaunchEvent) => uniworkLaunches.deliver(event),
 )
-// a lock can be pushed while the shell page still loads (a cold-start open)
-const uniworkLocks = createLaunchReplay<UniworkDocLock>()
-ipcRenderer.on(UNIWORK_DOC_CHANNELS.lock, (_event: IpcRendererEvent, lock: UniworkDocLock) =>
-  uniworkLocks.deliver(lock),
-)
+// a lock can be pushed before the renderer subscribes (a cold-start open); the
+// shell also reads uniworkLocks() when it mounts, so a missed push is not lost
+// and a dismissed lock is never resurrected
+const uniworkLockSubscribers = new Set<(lock: UniworkDocLock) => void>()
+ipcRenderer.on(UNIWORK_DOC_CHANNELS.lock, (_event: IpcRendererEvent, raw: unknown) => {
+  const lock = asUniworkLock(raw)
+  if (!lock) return
+  for (const cb of [...uniworkLockSubscribers]) cb(lock)
+})
 
 const UI_LANGUAGES: readonly UiLanguage[] = [
   'zh',
@@ -851,7 +855,10 @@ const homeApi: HomeApi = {
     return uniworkLaunches.subscribe(cb)
   },
   onUniworkLock(cb) {
-    return uniworkLocks.subscribe((lock) => cb(asUniworkLock(lock) ?? lock))
+    uniworkLockSubscribers.add(cb)
+    return () => {
+      uniworkLockSubscribers.delete(cb)
+    }
   },
   async uniworkLocks() {
     return asUniworkLocks(await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.locks))

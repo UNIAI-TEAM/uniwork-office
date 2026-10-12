@@ -51,6 +51,7 @@ describe('last owner follows the session identity (R2-5)', () => {
       shellWindow: () => null,
       shellContents: () => null,
       openPath: () => true,
+      refuseLockedPath: () => false,
       isPathOpen: () => false,
       requestModuleSave: () => false,
       reloadPath: () => undefined,
@@ -83,6 +84,47 @@ describe('last owner follows the session identity (R2-5)', () => {
   })
 })
 
+describe('the newer-store guard reaches the wiring (G5-04g)', () => {
+  it('the service openPath refuses a locked path before the module router is asked', async () => {
+    const { mkdirSync, writeFileSync } = await import('node:fs')
+    const { BINDING_FILE } = await import('../src/main/uniwork-docs/binding-store')
+    const folder = join(dir, 'uniwork-documents', 'default', 'acc_1', 'doc_1')
+    mkdirSync(folder, { recursive: true })
+    writeFileSync(join(folder, 'Plan.docx'), 'bytes')
+    writeFileSync(join(folder, BINDING_FILE), JSON.stringify({ schema: 2 }))
+    const path = join(folder, 'Plan.docx')
+    const openPath = vi.fn(() => true)
+    const { createUniworkDocs } = await import('../src/main/uniwork-docs/wiring')
+    const handle = createUniworkDocs({ handle: vi.fn() } as never, {
+      shellWindow: () => null,
+      shellContents: () => null,
+      openPath,
+      refuseLockedPath: (p: string) => handle.service.refuseLockedPath(p),
+      isPathOpen: () => false,
+      requestModuleSave: () => false,
+      reloadPath: () => undefined,
+      activePath: () => undefined,
+      reveal: () => undefined,
+      lang: () => 'en',
+      defaultSaveDir: () => dir,
+      openPaths: () => [],
+      closePath: async () => true,
+      confirmClosePath: async () => true,
+      closePathNow: () => undefined,
+      aiHistoryPaths: () => [],
+      forgetAiHistory: () => undefined,
+    })
+    const shown = handle.service as unknown as { show(p: string, b: unknown): unknown }
+    expect(() => shown.show(path, {})).toThrowError(
+      expect.objectContaining({ code: 'engine_incompatible' }),
+    )
+    expect(openPath).not.toHaveBeenCalled()
+    expect(handle.service.currentLocks()).toEqual([
+      { path, reason: 'store_newer', name: 'Plan.docx' },
+    ])
+  })
+})
+
 describe('a sign-in as another account (GOA9-r3-04)', () => {
   it("closes the previous account's open documents and deletes their AI history", async () => {
     const { createUniworkDocs } = await import('../src/main/uniwork-docs/wiring')
@@ -100,6 +142,7 @@ describe('a sign-in as another account (GOA9-r3-04)', () => {
       shellWindow: () => null,
       shellContents: () => null,
       openPath: () => true,
+      refuseLockedPath: () => false,
       isPathOpen: () => false,
       requestModuleSave: () => false,
       reloadPath: () => undefined,
