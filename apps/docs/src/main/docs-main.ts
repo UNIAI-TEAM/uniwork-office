@@ -3,6 +3,7 @@ import {
   setUniworkUserSaveHook,
   uniworkDocState,
   uniworkIsBound,
+  uniworkRefusesOpen,
   uniworkSamePath,
   uniworkSaveDecision,
 } from './uniwork-policy'
@@ -3521,6 +3522,10 @@ async function loadDocx(
   password?: string,
 ): Promise<OpenDocxResult> {
   if (typeof filePath !== 'string' || !/\.docx$/i.test(filePath)) return null
+  // G5-04g: a working copy whose folder declares a store this build does not
+  // read is refused before any read of the file (the shell already pushed the
+  // S11 lock); the renderer must not treat it as a local file.
+  if (uniworkRefusesOpen(filePath)) return null
   if (!existsSync(filePath)) return null
   const size = (await stat(filePath)).size
   const lazy = await openLazyDocx(filePath, wcId)

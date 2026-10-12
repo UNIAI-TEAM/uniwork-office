@@ -3,6 +3,7 @@ import {
   setUniworkUserSaveHook,
   uniworkIsBound,
   uniworkIsReadOnly,
+  uniworkRefusesOpen,
   uniworkRequestOrigin,
   uniworkSaveAsDefault,
   uniworkSaveDecision,
@@ -2727,6 +2728,8 @@ export function registerSheetsIpc(): void {
       emptySource: prepared.emptySource,
       unsavedNew: prepared.unsavedNew,
     })
+    // G5-04g: a refused working copy never opened a session; report it as such
+    if (result === null) return null
     // The sidecar open itself can also outlive the tab after the pre-open
     // check. Close the newly registered session instead of stranding it in
     // the detached entry map.
@@ -2820,7 +2823,10 @@ export function registerSheetsIpc(): void {
           emptySource: prepared.emptySource,
           unsavedNew: prepared.unsavedNew,
         })
-        opened.push(result as { sessionId: string })
+        // G5-04g: a refused merge source opened no session; skip it rather than
+        // register a phantom entry
+        if (result === null) continue
+        opened.push(result)
         if (event.sender.isDestroyed()) break
       }
     } catch (error) {
@@ -3420,6 +3426,10 @@ export function registerSheetsIpc(): void {
             }
           : undefined,
     )
+    // G5-04g: the save gate above already refused a locked target, so this is
+    // unreachable in practice; a null here means the session could not be
+    // swapped over the bytes we just wrote.
+    if (file === null) throw new Error('the saved workbook could not be reopened')
     if (quietUnsavedNew && session.suggestSaveAs !== undefined) {
       // the temp path must not reach the title or recents; the recovery copy
       // is what a crash restores from, so it tracks the saved bytes
@@ -4326,7 +4336,11 @@ async function openWorkbookSession(
     emptySource?: boolean | undefined
     unsavedNew?: boolean | undefined
   },
-): Promise<WorkbookFile> {
+): Promise<WorkbookFile | null> {
+  // G5-04g: a workbook whose folder declares a store this build does not read
+  // is refused before the snapshot copy or any sidecar read (the shell already
+  // pushed the S11 lock). null is this pipeline's not-opened result.
+  if (uniworkRefusesOpen(path)) return null
   const {
     suggestSaveAs,
     csvImport,

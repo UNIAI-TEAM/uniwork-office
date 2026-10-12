@@ -9,6 +9,7 @@ import {
   setUniworkUserSaveHook,
   uniworkIsBound,
   uniworkIsReadOnly,
+  uniworkRefusesOpen,
   uniworkSaveDecision,
   type UniworkSaveOrigin,
 } from './uniwork-policy'
@@ -685,7 +686,11 @@ async function openAndBuild(
   wc: WebContents,
   path: string,
   fitWidthPx: number,
-): Promise<OpenResult> {
+): Promise<OpenResult | null> {
+  // G5-04g: a deck whose folder declares a store this build does not read is
+  // refused before any read of the file (the shell already pushed the S11
+  // lock). null is this function's existing nothing-opened result.
+  if (uniworkRefusesOpen(path)) return null
   // Same file already open in another window: attach to that session instead of
   // opening an independent copy (which would silently lose the loser's edits on
   // save). Both windows then see the same live deck; edits propagate via

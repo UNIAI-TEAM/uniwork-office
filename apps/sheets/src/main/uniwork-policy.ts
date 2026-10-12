@@ -10,6 +10,12 @@ import { basename, resolve } from 'node:path'
 export interface UniworkDocumentPolicy {
   isBound(path: string): boolean
   isReadOnly(path: string): boolean
+  /**
+   * G5-04g: true when the path's folder declares a store this build does not
+   * read (a working copy the shell must not open). Optional: the shell installs
+   * it for the three editor modules that own a working copy.
+   */
+  refuseOpen?(path: string): boolean
 }
 
 let policy: UniworkDocumentPolicy | null = null
@@ -37,6 +43,20 @@ export function uniworkIsReadOnly(path: string | null | undefined): boolean {
   if (!path || !policy) return false
   try {
     return policy.isReadOnly(path)
+  } catch {
+    return false
+  }
+}
+
+/**
+ * G5-04g: the open chokepoint asks before it reads. A policy that throws, or a
+ * policy without refuseOpen, reads as not refused, so a standalone app and a
+ * plain local file are unaffected.
+ */
+export function uniworkRefusesOpen(path: string | null | undefined): boolean {
+  if (!path || !policy || !policy.refuseOpen) return false
+  try {
+    return policy.refuseOpen(path)
   } catch {
     return false
   }
