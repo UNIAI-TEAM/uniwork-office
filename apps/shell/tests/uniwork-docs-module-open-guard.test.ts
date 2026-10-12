@@ -192,6 +192,17 @@ describe('each open chokepoint refuses before its first file read', () => {
     // the open routes (picker, path, queued restore) all funnel through it
     expect(source).toMatch(/return openAndBuild\(e\.sender, path, fitWidthPx\)/)
     expect(source).toMatch(/const result = await openAndBuild\(e\.sender, queued, fitWidthPx\)/)
+    // G5-04g (R1-be-2-3): each route also guards the ORIGINAL path before
+    // rejectLegacyPpt reads it, not only inside openAndBuild
+    expect(source).toMatch(
+      /if \(uniworkRefusesOpen\(r\.filePaths\[0\]\)\) return null\n\s*if \(await rejectLegacyPpt\(r\.filePaths\[0\]\)\) return null/,
+    )
+    expect(source).toMatch(
+      /if \(uniworkRefusesOpen\(path\)\) return null\n\s*if \(await rejectLegacyPpt\(path\)\) return null/,
+    )
+    expect(source).toMatch(
+      /if \(uniworkRefusesOpen\(queued\)\) \{\n\s*dropQueued\(\)\n\s*return null\n\s*\}\n\s*if \(await rejectLegacyPpt\(queued\)\)/,
+    )
   })
 
   it('sheets: openWorkbookSession guards before the snapshot copy', () => {
@@ -205,5 +216,17 @@ describe('each open chokepoint refuses before its first file read', () => {
     // the widened result type is handled at both call sites (open, merge source)
     expect(source).toMatch(/if \(result === null\) return null/)
     expect(source).toMatch(/if \(result === null\) continue/)
+    // G5-04g (R1-be-2-2): prepareWorkbookForOpen refuses the ORIGINAL path before
+    // it derives one (recovery copy / empty xlsx), so a locked working copy is
+    // never opened under a derived path
+    const prep = source.slice(source.indexOf('async function prepareWorkbookForOpen('))
+    const prepGuard = prep.indexOf('if (uniworkRefusesOpen(path)) return null')
+    const derived = prep.indexOf('pendingRecoveryFor(path)')
+    expect(prepGuard).toBeGreaterThan(-1)
+    expect(prepGuard).toBeLessThan(derived)
+    expect(prep.slice(0, prepGuard)).toMatch(/\| null>/)
+    // both call sites treat the refused (null) prepare as nothing to open
+    expect(source).toMatch(/if \(prepared === null\) return null/)
+    expect(source).toMatch(/if \(prepared === null\) continue/)
   })
 })

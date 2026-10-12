@@ -978,12 +978,16 @@ export function registerSlidesIpc(): void {
     }
     const r = await showOpenDialogWithMemory(dialog, parent, options)
     if (r.canceled || !r.filePaths[0]) return null
+    // G5-04g: a locked working copy is refused before rejectLegacyPpt reads it
+    if (uniworkRefusesOpen(r.filePaths[0])) return null
     if (await rejectLegacyPpt(r.filePaths[0])) return null
     return openAndBuild(e.sender, r.filePaths[0], fitWidthPx)
   })
 
   ipcMain.handle('slides:open-path', async (e, path: string, fitWidthPx: number) => {
     if (!path || !existsSync(path)) return null
+    // G5-04g: a locked working copy is refused before rejectLegacyPpt reads it
+    if (uniworkRefusesOpen(path)) return null
     if (await rejectLegacyPpt(path)) return null
     return openAndBuild(e.sender, path, fitWidthPx)
   })
@@ -1006,6 +1010,11 @@ export function registerSlidesIpc(): void {
       }
       // A CFB file (legacy .ppt / encrypted, possibly misnamed .pptx) can never
       // parse: tell the user and drop it, or every relaunch restores a blank tab
+      // G5-04g: a locked working copy is refused before rejectLegacyPpt reads it
+      if (uniworkRefusesOpen(queued)) {
+        dropQueued()
+        return null
+      }
       if (await rejectLegacyPpt(queued)) {
         dropQueued()
         return null

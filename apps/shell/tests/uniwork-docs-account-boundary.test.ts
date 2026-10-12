@@ -222,6 +222,26 @@ describe('a sign-in that changes the account', () => {
     expect(h.forgottenLocks).toEqual([aSheet, otherDeployment])
   })
 
+  it('forgets the locks before it closes anything: panel state must not wait on a save prompt (F4 residual)', async () => {
+    const order: string[] = []
+    const h = harness([aSheet], [], new Set([aSheet]), [aSheet])
+    const forget = h.deps.forgetLocks.getMockImplementation()
+    h.deps.forgetLocks.mockImplementation((match: (path: string) => boolean) => {
+      order.push('forgetLocks')
+      forget?.(match)
+    })
+    const close = h.deps.closeDocument.getMockImplementation()
+    h.deps.closeDocument.mockImplementation(async (path: string) => {
+      order.push('closeDocument')
+      return close ? close(path) : true
+    })
+    await h.boundary.enforce(ownerB)
+    // the lock is forgotten first, so a renderer re-read on the account change
+    // never waits behind the close prompt; the cancelled prompt still forgot it
+    expect(order).toEqual(['forgetLocks', 'closeDocument'])
+    expect(h.shownLocks).toEqual([])
+  })
+
   it('runs once per account, and again after a switch', async () => {
     const h = harness([aSheet], [])
     await h.boundary.enforce(ownerA)

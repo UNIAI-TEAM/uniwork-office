@@ -2710,6 +2710,9 @@ export function registerSheetsIpc(): void {
       event.sender,
       dialogParent(event),
     )
+    // G5-04g: a locked working copy was refused on the original path; no
+    // session was derived and nothing opened
+    if (prepared === null) return null
     // The recovery prompt (or the file dialog / import conversion) can outlive
     // the tab: once the renderer is destroyed, its 'destroyed' handler has
     // already run closeAllSessions and dropped the tab entry, so a session
@@ -2810,6 +2813,8 @@ export function registerSheetsIpc(): void {
           dialogParent(event),
           { skipRecoveryPrompt: true },
         )
+        // G5-04g: a refused merge source is skipped, like a refused open
+        if (prepared === null) continue
         if (event.sender.isDestroyed()) {
           await discardPreparedOpen(prepared)
           break
@@ -4471,7 +4476,13 @@ async function prepareWorkbookForOpen(
   restoreTarget?: string
   emptySource?: boolean
   unsavedNew?: boolean
-}> {
+} | null> {
+  // G5-04g: the ORIGINAL user path is refused before this pipeline derives a
+  // new one (the recovery-copy and empty-xlsx branches below rewrite openPath),
+  // so a locked working copy never reaches a session under a derived path. null
+  // is the pipeline's not-opened result; the guard in openWorkbookSession stays
+  // as the backstop for the derived path.
+  if (uniworkRefusesOpen(path)) return null
   // A shell-created "New spreadsheet" opens from a temp directory and has no
   // user-visible file yet: Save As produces it, and closing unsaved discards
   // the directory. The mark is consumed once the session exists (see

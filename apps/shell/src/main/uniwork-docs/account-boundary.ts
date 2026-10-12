@@ -117,11 +117,13 @@ export class AccountBoundary {
     const run = (async () => {
       const foreign = this.notOwnedBy(owner)
       if (this.deps.openPaths().some(foreign)) this.deps.closeConflictPrompt()
+      // the locks of the account that went away go first: they are panel state,
+      // so they must not wait on a save prompt, and a renderer re-read on the
+      // account change already sees them gone (F4 residual). They go even when a
+      // prompt is cancelled: they are not this account's copies to explain.
+      this.deps.forgetLocks(foreign)
       const closed = await this.closeWhere(foreign)
       this.forgetWhere(foreign)
-      // the locks of the account that went away go too, even when a prompt was
-      // cancelled: they are not this account's copies to explain
-      this.deps.forgetLocks(foreign)
       if (closed) this.enforced = key
     })()
     this.running = run

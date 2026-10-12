@@ -234,8 +234,12 @@ describe('a newer store is refused before anything opens (AC-1)', () => {
     // the fold is a drive-letter rule; assert it on a drive-letter path, not on
     // this temp dir (which keeps its case on Linux, where the suite also runs)
     expect(pathKey('C:\\Root\\Plan.docx')).toBe(pathKey('c:/root/PLAN.DOCX'))
-    // the same file spelled with the other slash or case is the same lock
-    const other = docPath().replace(/\\/g, '/')
+    // the same file spelled with the other separator is the same lock: pathKey
+    // folds backslashes on every platform, so swap either way by platform (the
+    // Linux cloud runner's temp dir already uses '/', where a one-way swap was
+    // a no-op and the old assertion failed)
+    const other =
+      process.platform === 'win32' ? docPath().replace(/\\/g, '/') : docPath().replace(/\//g, '\\')
     expect(other).not.toBe(docPath())
     ctx.service.dismissLock(other)
     expect(ctx.service.currentLocks()).toEqual([])
