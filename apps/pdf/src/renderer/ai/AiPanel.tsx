@@ -15,7 +15,7 @@ import {
   type AiSettings,
 } from '@genoffice/ai-provider/browser'
 import { AiComposer, AiScopeQuote, AiTypingIndicator, type AiScopeQuoteData } from '@genoffice/ui'
-import { platform } from '../capabilities'
+import { cap, platform } from '../capabilities'
 import { aiLangDirective, t as tGlobal, useI18n } from '../i18n/locale'
 import { Markdown } from '@genoffice/ui'
 import sendEnterOn from '../assets/send-enter-on.png'
@@ -389,6 +389,7 @@ export function AiPanel({
       searchImages: (query, max) => apiRef.current.searchImages(query, max),
       generateImage: (op) => apiRef.current.generateImage(op),
       imageGenAvailable: () =>
+        cap('imageGeneration') &&
         imageGenerationAvailable(settingsRef.current, gskLoggedInRef.current),
       fetchImage: (url) => apiRef.current.fetchImage(url),
     }

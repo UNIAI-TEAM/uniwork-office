@@ -46,6 +46,8 @@ interface Props {
   onSendNow?: (text: string) => void
   /** Disables "Add to queue" only; sending now never touches the queue */
   queueFull?: boolean
+  /** image generation is offered: without it the remove-background chip (a generate_image run) is not shown */
+  imageGenerationOffered?: boolean
 }
 
 const WIDTH = 340
@@ -130,12 +132,14 @@ export function AiAskTrigger({ getAnchorRect, onOpen }: TriggerProps): React.JSX
 }
 
 /** At most four suggestions, keyed by what is selected; each fills the input rather than submitting */
-function chipKeys(targets: AskTarget[]): StringKey[] {
+function chipKeys(targets: AskTarget[], imageGenerationOffered: boolean): StringKey[] {
   if (targets.length !== 1) return ['aiChipUnify', 'aiChipRecolor']
   const only = targets[0]!.desc
   switch (only.type) {
     case 'picture':
-      return ['aiChipReplaceImage', 'aiChipRemoveBg', 'aiChipRecolor']
+      return imageGenerationOffered
+        ? ['aiChipReplaceImage', 'aiChipRemoveBg', 'aiChipRecolor']
+        : ['aiChipReplaceImage', 'aiChipRecolor']
     case 'table':
       return ['aiChipTableEdit', 'aiChipRecolor', 'aiChipPolish']
     case 'chart':
@@ -157,6 +161,7 @@ export function AiAskPopover({
   onCancel,
   onSendNow,
   queueFull,
+  imageGenerationOffered = true,
 }: Props): React.JSX.Element | null {
   const { t } = useI18n()
   const [text, setText] = useState(initialText ?? '')
@@ -289,7 +294,7 @@ export function AiAskPopover({
         }}
       />
       <div className="ai-ask-pop-chips">
-        {chipKeys(targets).map((key) => (
+        {chipKeys(targets, imageGenerationOffered).map((key) => (
           <button
             key={key}
             className="ai-ask-chip"

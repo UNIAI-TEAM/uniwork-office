@@ -1355,6 +1355,7 @@ export function AiPanel({
         }
       },
       imageGenAvailable: () =>
+        cap('imageGeneration') &&
         imageGenerationAvailable(settingsRef.current, gskLoggedInRef.current),
       mediaAnalysisAvailable: () =>
         mediaAnalysisAvailable(settingsRef.current, gskLoggedInRef.current),

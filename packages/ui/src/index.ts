@@ -1,5 +1,6 @@
 export { AiPanelSideButton } from './AiPanelSideButton'
 export { useCloudSignedIn } from './use-cloud-signed-in'
+export { useImageGenerationOffered } from './use-image-generation-offered'
 export { AiComposer } from './AiComposer'
 export { AiScopeQuote, type AiScopeQuoteData } from './AiScopeQuote'
 export {

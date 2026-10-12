@@ -112,6 +112,7 @@ import {
   createWheelPager,
   createZoomWheelClassifier,
   useAutoSavePref,
+  useImageGenerationOffered,
   type AiScopeQuoteData,
   type WordArtPreset,
   aiPanelInitiallyOpen,
@@ -519,6 +520,11 @@ export function App() {
   const [showFormat, setShowFormat] = useState(false)
   const [showBgFormat, setShowBgFormat] = useState(false)
   const [aiSettings, setAiSettings] = useState<AiSettings | null>(null)
+  // the image-generation entries (ribbon + stage bar buttons, remove-background chip): host grant
+  // AND a live way to generate, the same rule as the generate_image tool
+  const imageGenerationOffered = useImageGenerationOffered(cap('imageGeneration'), aiSettings, () =>
+    window.slidesApi?.aiGskStatus(),
+  )
   const [aiPreset, setAiPreset] = useState<{
     text: string
     nonce: number
@@ -3318,6 +3324,7 @@ export function App() {
         onAutoSaveChange={setAutoSave}
         uniworkBound={uniwork.bound}
         uniworkReadOnly={uniwork.readOnly}
+        imageGenerationOffered={imageGenerationOffered}
         onOpen={() => void openDialog()}
         onSave={() => void save()}
         onUndo={() => void undo()}
@@ -4065,14 +4072,16 @@ export function App() {
                                     <IconAiFactCheck size={14} />
                                     <span>{t('aiFactCheckBtn')}</span>
                                   </button>
-                                  <button
-                                    className="stage-ai-btn"
-                                    data-tip={t('aiImageBtn')}
-                                    onClick={() => pushAiPreset(t('aiImagePrompt'))}
-                                  >
-                                    <IconAiImage size={14} />
-                                    <span>{t('aiImageBtn')}</span>
-                                  </button>
+                                  {imageGenerationOffered && (
+                                    <button
+                                      className="stage-ai-btn"
+                                      data-tip={t('aiImageBtn')}
+                                      onClick={() => pushAiPreset(t('aiImagePrompt'))}
+                                    >
+                                      <IconAiImage size={14} />
+                                      <span>{t('aiImageBtn')}</span>
+                                    </button>
+                                  )}
                                 </>
                               )}
                             </div>
@@ -4692,6 +4701,7 @@ export function App() {
       {aiEnabled && askState && askTargets.length > 0 && (
         <AiAskPopover
           targets={askTargets}
+          imageGenerationOffered={imageGenerationOffered}
           getAnchorRect={getAskAnchorRect}
           queueFull={editQueue.length >= EDIT_QUEUE_MAX}
           onSubmit={(instruction) => {

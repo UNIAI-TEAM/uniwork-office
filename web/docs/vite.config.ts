@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import react from '@vitejs/plugin-react'
 import { defineConfig, loadConfigFromFile, type PluginOption, type UserConfig } from 'vite'
@@ -38,7 +38,7 @@ async function rendererParts(
 /** the module's web-only plugins (modules.ts `webPlugins`), none for most modules */
 async function webOnlyPlugins(s: WebModuleSpec): Promise<PluginOption[]> {
   if (!s.webPlugins) return []
-  const mod = (await import(resolve(repoRoot, s.webPlugins))) as {
+  const mod = (await import(pathToFileURL(resolve(repoRoot, s.webPlugins)).href)) as {
     default: () => PluginOption[]
   }
   return mod.default()

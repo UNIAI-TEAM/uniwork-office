@@ -10,6 +10,7 @@ import {
   aiPanelInitiallyOpen,
   rememberAiPanelOpen,
   useAutoSavePref,
+  useImageGenerationOffered,
 } from '@genoffice/ui'
 import {
   pollUntilReady,
@@ -62,6 +63,7 @@ import { buildPrintHtml } from './export/printHtml'
 import { diagramSvgToPng, renderDiagram } from './editor/diagrams'
 import type { DiagramLanguage } from './editor/diagrams'
 import type { ExportFormat, SaveMode, UniworkViewState } from '../shared/ipc'
+import type { AiSettings } from '@genoffice/ai-provider/browser'
 import { uiOp } from './editor/ops'
 import { cap, platform } from './capabilities'
 
@@ -229,6 +231,17 @@ export default function App() {
 
   // web frame (capabilities.ts): AI and autosave off, view only without the host's save grant
   const aiEnabled = cap('ai')
+  // the selection popover's "Regenerate with AI" chip: host grant + a live way to generate
+  const [aiSettings, setAiSettings] = useState<AiSettings | null>(null)
+  useEffect(() => {
+    if (!aiEnabled) return
+    const loadSettings = () => void window.markdownApi.getAiSettings().then(setAiSettings)
+    loadSettings()
+    return window.markdownApi.onAiSettingsChanged?.(loadSettings)
+  }, [aiEnabled])
+  const imageGenerationOffered = useImageGenerationOffered(cap('imageGeneration'), aiSettings, () =>
+    window.markdownApi?.aiGskStatus?.(),
+  )
   const canEdit = cap('save')
 
   const markDirty = useCallback(() => {
@@ -1370,6 +1383,7 @@ export default function App() {
       {editor && !sourceMode && status === 'ready' && aiEnabled && canEdit && !uniwork.readOnly && (
         <AiAskPopover
           editor={editor}
+          imageGenerationOffered={imageGenerationOffered}
           queueFull={editQueue.length >= EDIT_QUEUE_MAX}
           getItem={getQueueItem}
           onSendNow={askSendNow}

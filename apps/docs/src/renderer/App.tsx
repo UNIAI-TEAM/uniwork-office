@@ -24,6 +24,7 @@ import {
   rememberAiPanelOpen,
   createZoomWheelClassifier,
   useAutoSavePref,
+  useImageGenerationOffered,
 } from '@genoffice/ui'
 import { wordRangeAtCaret } from './editor/comments'
 import {
@@ -800,6 +801,10 @@ export function App() {
   // capability-gated: when the platform has no AI the dock never shows, whatever
   // the stored preference or a stray setShowAi(true) says
   const aiEnabled = cap('ai')
+  // the selection popover's "Regenerate with AI" chip: host grant + a live way to generate
+  const imageGenerationOffered = useImageGenerationOffered(cap('imageGeneration'), settings, () =>
+    window.desktop?.aiGskStatus?.(),
+  )
   // a narrow viewport (the web frame on a phone) starts with the panel collapsed: it would cover the page
   const [showAiPref, setShowAi] = useState(
     () => aiPanelInitiallyOpen('aidocs.showAi') && !isNarrowViewport(),
@@ -7171,6 +7176,7 @@ export function App() {
             {doc && aiEnabled && !uniwork.readOnly && (
               <AiAskPopover
                 editor={editor}
+                imageGenerationOffered={imageGenerationOffered}
                 queueFull={editQueue.length >= EDIT_QUEUE_MAX}
                 getItem={getQueueItem}
                 onSendNow={askSendNow}

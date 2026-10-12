@@ -10,6 +10,7 @@ import { createCapabilityReader } from '@genoffice/ui/capabilities'
  * |------------------|-------------------------------------------------------------------------|
  * | edit             | every editing entry (view-only: the host withholds the save grant)      |
  * | ai               | AI panel, AI ribbon buttons, ask-AI popover                             |
+ * | imageGeneration  | the AI tool generate_image (also needs a live way to generate)         |
  * | autoSave         | the 30 s / blur autosave timer (no autosave on the web, CONTRACT C10)   |
  * | autoRename       | content-derived rename after the first save                             |
  * | convertOffice    | PDF -> Word / Excel / PowerPoint (web: the entry stays, its menu says   |
@@ -30,6 +31,7 @@ import { createCapabilityReader } from '@genoffice/ui/capabilities'
 export type PdfCapability =
   | 'edit'
   | 'ai'
+  | 'imageGeneration'
   | 'autoSave'
   | 'autoRename'
   | 'convertOffice'
