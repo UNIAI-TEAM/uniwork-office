@@ -180,6 +180,64 @@ describe('step 1', () => {
     expect(await done).toEqual({ kind: 'cancelled' })
   })
 
+  it('offline: the one shared reason is shown once, both buttons described by it', async () => {
+    const done = runConflictDialog(io({ online: () => false }))
+    await shown()
+    const lines = [...card().querySelectorAll('.ow-dlg-reason')]
+    expect(lines.map((l) => l.textContent)).toEqual([t('uwConflictOfflineWeb')])
+    expect(btn('reload').getAttribute('aria-describedby')).toBe(lines[0]!.id)
+    expect(btn('overwrite').getAttribute('aria-describedby')).toBe(lines[0]!.id)
+    btn('cancel').click()
+    await done
+  })
+
+  it('goes offline and back online while open: Reload and Overwrite follow, with the reason line', async () => {
+    let on = true
+    const reload = vi.fn(async () => true)
+    const done = runConflictDialog(io({ online: () => on, reload }))
+    await shown()
+    expect(btn('reload').hasAttribute('aria-disabled')).toBe(false)
+    expect(card().querySelectorAll('.ow-dlg-reason').length).toBe(0)
+
+    on = false
+    window.dispatchEvent(new Event('offline'))
+    for (const id of ['reload', 'overwrite']) {
+      expect(btn(id).getAttribute('aria-disabled')).toBe('true')
+      expect(document.getElementById(btn(id).getAttribute('aria-describedby')!)!.textContent).toBe(
+        t('uwConflictOfflineWeb'),
+      )
+    }
+    // the click does nothing while offline: no step 2
+    btn('reload').click()
+    await flush()
+    expect(choices()).toEqual(['reload', 'overwrite', 'cancel'])
+
+    on = true
+    window.dispatchEvent(new Event('online'))
+    for (const id of ['reload', 'overwrite']) {
+      expect(btn(id).hasAttribute('aria-disabled')).toBe(false)
+      expect(btn(id).hasAttribute('aria-describedby')).toBe(false)
+    }
+    expect(card().querySelectorAll('.ow-dlg-reason').length).toBe(0)
+    // the focus stays where it was
+    expect(document.activeElement).toBe(btn('cancel'))
+    btn('reload').click()
+    await flush()
+    expect(choices()).toContain('discard')
+    btn('cancel').click()
+    await done
+  })
+
+  it('stops listening to the network once the dialog has settled', async () => {
+    const online = vi.fn(() => true)
+    const done = runConflictDialog(io({ online }))
+    await pick('cancel')
+    await done
+    const calls = online.mock.calls.length
+    window.dispatchEvent(new Event('offline'))
+    expect(online.mock.calls.length).toBe(calls)
+  })
+
   it('reports modal open while it shows and closed when it settles', async () => {
     const seen: boolean[] = []
     const off = onFrameModal((open) => seen.push(open))
