@@ -10,6 +10,8 @@ export const VIEW_ONLY_TOOLS: ReadonlySet<string> = new Set([
   'get_workbook_context',
   'read_range',
   'aggregate_range',
+  'summarize_range',
+  'compare_ranges',
   'load_guide',
   'read_formats',
   'read_sheet_features',

@@ -4286,6 +4286,15 @@ function callsUnsupportedFunction(formula: string, probe: SupportedFunctionProbe
   return extractFunctionNames(formula).some((name) => !probe.supports(name))
 }
 
+/// The functions a formula calls that the running engine does not implement,
+/// for AI tool output (a bare #NAME? or an IFERROR fallback says nothing about
+/// why). Empty while no registry probe is installed or before the builtins land.
+export function unsupportedFunctionNames(formula: string): string[] {
+  const probe = supportedFunctionProbe
+  if (probe === null || !probe.ready()) return []
+  return extractFunctionNames(formula).filter((name) => !probe.supports(name))
+}
+
 export function formulaKeepsCache(formula: string, hasCachedValue = true): boolean {
   let verdict = keepsCacheMemo.get(formula)
   if (verdict === undefined) {

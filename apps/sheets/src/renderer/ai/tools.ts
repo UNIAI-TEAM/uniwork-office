@@ -8,6 +8,7 @@ import {
 } from '@genoffice/xlsx-gateway/domain/workbook-dsl'
 import {
   columnLabel,
+  parseAddress,
   parseRange,
   rangeCellCount,
   formatAddress,
@@ -22,6 +23,17 @@ import type {
 import { cap } from '../capabilities'
 import { t } from '../i18n/locale'
 import { formatRangeAggregate, type RangeAggregate } from './aggregate'
+import type { CellRead } from './cell-read'
+import type { RangeRowsOutcome } from './range-rows'
+import { reconcileRows, type ReconcileResult, type ReconcileSideResult } from './reconcile'
+import {
+  CRITERION_OPS,
+  summarizeRows,
+  type Criterion,
+  type CriterionOp,
+  type SummarizeFunction,
+  type SummarizeResult,
+} from './summarize'
 import { guideCatalogSummary, loadGuides } from './guides'
 
 /**
@@ -206,10 +218,7 @@ export interface SheetsSkillDeps {
   /** Ensure a lazy workbook range is present in Univer before reading it. */
   ensureRangeLoaded?(range: RangeBounds, sheetId?: string): boolean | Promise<boolean>
   /** cell values/formulas; reads the active sheet unless sheetId targets another */
-  readCells(
-    addresses: readonly string[],
-    sheetId?: string,
-  ): Record<string, { value: CellScalar; formula?: string }>
+  readCells(addresses: readonly string[], sheetId?: string): Record<string, CellRead>
   /** per-cell explicit formatting; cells with no explicit format are omitted */
   readFormats(addresses: readonly string[], sheetId?: string): Record<string, CellFormatState>
   /** formatted report of a sheet's feature state (filters, CF, DV, names, visuals, …) */
@@ -237,7 +246,28 @@ export interface SheetsSkillDeps {
   aggregateRange?(
     sheetId: string | undefined,
     range: RangeBounds,
-  ): Promise<{ ok: true; aggregate: RangeAggregate } | { ok: false; error: string }>
+    options?: { hiddenRows: 'include' | 'skip' },
+  ): Promise<
+    | {
+        ok: true
+        aggregate: RangeAggregate
+        /** hidden/filtered rows inside the range (included or skipped per options) */
+        hiddenRows?: number
+        /** formula cells whose counted value is the file's cached result */
+        cachedFormulaCells?: number
+        /** cached formula values counted while inputs were edited this session */
+        staleCache?: boolean
+      }
+    | { ok: false; error: string }
+  >
+  /** Every row of a range with hidden flags and per-cell cached-formula flags
+   * (ai/range-rows.ts) — the input of summarize_range. */
+  collectRows?(sheetId: string | undefined, range: RangeBounds): Promise<RangeRowsOutcome>
+  /** Hidden/filtered rows inside the range, ascending; read_range marks them. */
+  hiddenRows?(
+    sheetId: string | undefined,
+    range: RangeBounds,
+  ): readonly { row: number; reason: 'hidden' | 'filtered' }[]
   /** `applied` resolves with the real apply result (the lazy path applies async);
    * the tool awaits it so the model never hears "applied" for a batch that failed */
   proposeOperations(
@@ -277,7 +307,10 @@ export const WORKBOOK_TOOLS: AgentToolDef[] = [
     description:
       'Read current values/formulas by rectangular range, returning a grid with row numbers and column letters. ' +
       'The requested range is not the worksheet data extent: never infer total row or record count from its ending row; use get_workbook_context. ' +
-      'This is the preferred way to read data; max 2000 cells — read larger regions in multiple calls.',
+      'This is the preferred way to read data; max 2000 cells — read larger regions in multiple calls. ' +
+      'The grid shows the text as displayed; cells whose stored value differs (percent, currency, date, numbers with a format, numeric-looking text) ' +
+      'are listed under it as [type; raw value; number format], e.g. "B2: percent; raw 0.1; format 0%" — calculate with the raw value (dates are serial numbers). ' +
+      'Hidden/filtered rows are labelled in the grid.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -317,8 +350,155 @@ export const WORKBOOK_TOOLS: AgentToolDef[] = [
           type: 'number',
           description: 'How many most-frequent values to return (0-50, default 10)',
         },
+        skipHiddenRows: {
+          type: 'boolean',
+          description:
+            'Leave out hidden/filtered rows (visible rows only, like SUBTOTAL). Default false: they are included, like SUM. The result always states how many there were and whether they were included — repeat that in your answer.',
+        },
       },
       required: ['range'],
+    },
+  },
+  {
+    name: 'summarize_range',
+    description:
+      'Read-only conditional statistics over a table range, computed by code: sum / count / average / min / max of one column, ' +
+      'optionally filtered by conditions on other columns (all must hold, like SUMIFS/COUNTIFS) and grouped by a column (like a pivot). ' +
+      'Use it for "total revenue for Hà Nội", "count of orders per region", "average price where qty > 10" — instead of writing COUNTIFS/SUMIFS helper cells or adding numbers yourself. ' +
+      'Columns are Excel column letters of the sheet (read the header row first to map names like X/Y/Z to letters). ' +
+      'Only real numbers are summed: text such as "1.234,5", blanks, booleans and errors are skipped and counted by reason, never converted. ' +
+      'Text conditions match case-insensitively; >, >=, <, <= compare numbers only (dates are serial numbers). ' +
+      'The result reports the range, the filter, rows processed/matching, hidden/filtered rows and every skipped cell — state these in your answer. Up to 1,000,000 cells.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        range: {
+          type: 'string',
+          description:
+            'The table, e.g. "A1:F5000"; its first row is the header unless hasHeader=false',
+        },
+        sheetId: {
+          type: 'string',
+          description: 'Target sheet id (from get_workbook_context); the active sheet when omitted',
+        },
+        function: {
+          type: 'string',
+          enum: ['sum', 'count', 'average', 'min', 'max'],
+          description:
+            'sum/average/min/max of valueColumn, or count of matching rows (default: sum when valueColumn is given, else count)',
+        },
+        valueColumn: {
+          type: 'string',
+          description:
+            'Column letter whose numbers are aggregated, e.g. "E" (required except for count)',
+        },
+        where: {
+          type: 'array',
+          description: 'Conditions that must all hold',
+          items: {
+            type: 'object',
+            properties: {
+              column: { type: 'string', description: 'Column letter, e.g. "C"' },
+              op: { type: 'string', enum: [...CRITERION_OPS] },
+              value: {
+                type: 'string',
+                description:
+                  'Comparison value (omit for blank / not_blank); numeric text like "100" compares as a number',
+              },
+            },
+            required: ['column', 'op'],
+          },
+        },
+        groupBy: {
+          type: 'string',
+          description: 'Column letter to group by; each distinct value gets its own result',
+        },
+        hasHeader: {
+          type: 'boolean',
+          description: 'The first row of range is a header row (default true)',
+        },
+        skipHiddenRows: {
+          type: 'boolean',
+          description:
+            'Leave out hidden/filtered rows (visible rows only). Default false: they are included; the result says how many there were.',
+        },
+        includeTotalRows: {
+          type: 'boolean',
+          description:
+            'Count rows detected as totals/subtotals (SUBTOTAL formulas, a SUM over the block above, labels like "Total" / "Tổng cộng"). Default false: they are left out so nothing is counted twice; the result lists them.',
+        },
+        maxGroups: {
+          type: 'number',
+          description: 'How many groups to list, largest result first (1-200, default 50)',
+        },
+      },
+      required: ['range'],
+    },
+  },
+  {
+    name: 'compare_ranges',
+    description:
+      'Read-only reconciliation of two ranges (two sheets, or a ledger vs a bank export), computed by code: rows are matched on a key column (trimmed, case-insensitive), ' +
+      'and the result lists keys found only on the left, only on the right, and matched keys whose compared values differ (with right − left for numbers). ' +
+      'Compared columns pair by identical header text unless leftColumns/rightColumns give explicit pairs. A number and the same digits stored as text count as different, never cast. ' +
+      'Coverage is always reported: rows processed per side, blank and duplicate keys, hidden rows, and total/subtotal rows (left out by default). Use it instead of reading both ranges and comparing them yourself.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        leftRange: {
+          type: 'string',
+          description:
+            'First table, e.g. "A1:F500" (header in the first row unless hasHeader=false)',
+        },
+        leftSheetId: {
+          type: 'string',
+          description:
+            'Sheet of leftRange (id from get_workbook_context); the active sheet when omitted',
+        },
+        leftKey: { type: 'string', description: 'Key column letter in leftRange, e.g. "A"' },
+        leftColumns: {
+          type: 'array',
+          items: { type: 'string' },
+          description:
+            'Column letters to compare on the left, paired by position with rightColumns',
+        },
+        rightRange: { type: 'string', description: 'Second table, e.g. "A1:D480"' },
+        rightSheetId: {
+          type: 'string',
+          description: 'Sheet of rightRange; the active sheet when omitted',
+        },
+        rightKey: { type: 'string', description: 'Key column letter in rightRange' },
+        rightColumns: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Column letters to compare on the right, same count as leftColumns',
+        },
+        hasHeader: {
+          type: 'boolean',
+          description: 'Both ranges start with a header row (default true)',
+        },
+        tolerance: {
+          type: 'number',
+          description:
+            'Numbers whose absolute difference is at most this compare equal (default 0)',
+        },
+        skipHiddenRows: {
+          type: 'boolean',
+          description:
+            'Leave out hidden/filtered rows on both sides (default false: included and counted)',
+        },
+        includeTotalRows: {
+          type: 'boolean',
+          description:
+            'Also match rows detected as totals/subtotals (default false: left out and listed)',
+        },
+        maxListed: {
+          type: 'number',
+          description:
+            'How many missing keys and differences to list per section (1-200, default 50)',
+        },
+      },
+      required: ['leftRange', 'leftKey', 'rightRange', 'rightKey'],
     },
   },
   {
@@ -376,7 +556,9 @@ export const WORKBOOK_TOOLS: AgentToolDef[] = [
   {
     name: 'read_cells',
     description:
-      'Read current values/formulas of specific scattered cells (use read_range for contiguous regions). Always read the affected cells before writing — never assume their contents.',
+      'Read current values/formulas of specific scattered cells (use read_range for contiguous regions). Always read the affected cells before writing — never assume their contents. ' +
+      'A cell whose stored value differs from its shown text carries a [type; raw value; number format] note, e.g. "A1: 10% [percent; raw 0.1; format 0%]" ' +
+      'vs "A2: 10" (a plain number) vs "A3: 10 [text]" — calculate with the raw value; unannotated cells are plain text or General-format numbers.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -784,6 +966,87 @@ function formatCellScalar(cell: { value: CellScalar; formula?: string | undefine
   return escapeCellText(String(cell.value))
 }
 
+/** Text whose content reads as a number: the model must not treat it as one. */
+const NUMERIC_LOOKING_TEXT = /^\s*[-+]?[\d.,\s]*\d[\d.,\s]*%?\s*$/
+
+/**
+ * The [type; raw; format] note for a cell whose shown text alone would
+ * mislead: a percent/currency/date, a number with an explicit format, text
+ * that looks like a number, or any cell whose stored value differs from its
+ * display. Plain text and General numbers get no note.
+ */
+function cellTypeNote(cell: CellRead): string | null {
+  const { type, rawValue: raw, value: display } = cell
+  if (type === undefined || type === 'empty' || type === 'error') return null
+  const rawDiffers =
+    raw !== undefined &&
+    raw !== null &&
+    String(raw).toUpperCase() !== String(display ?? '').toUpperCase()
+  const numericText =
+    type === 'text' && typeof display === 'string' && NUMERIC_LOOKING_TEXT.test(display)
+  const notable =
+    rawDiffers ||
+    numericText ||
+    cell.numberFormat !== undefined ||
+    type === 'percent' ||
+    type === 'currency' ||
+    type === 'date' ||
+    type === 'boolean'
+  if (!notable) return null
+  const parts: string[] = [type]
+  if (rawDiffers) parts.push(`raw ${escapeCellText(String(raw))}`)
+  if (cell.numberFormat) parts.push(`format ${escapeCellText(cell.numberFormat)}`)
+  return parts.join('; ')
+}
+
+/**
+ * A read cell's text plus its notes. A formula value that is the file's
+ * cached result is labelled; once inputs were edited this session it is
+ * replaced by NOT RECALCULATED so it can never pass for the answer.
+ */
+/** "unsupported function: X — …" for a formula calling functions the engine lacks. */
+function unsupportedNote(cell: Pick<CellRead, 'unsupportedFunctions'>): string | null {
+  const missing = cell.unsupportedFunctions ?? []
+  if (missing.length === 0) return null
+  return (
+    `unsupported function${missing.length > 1 ? 's' : ''}: ${missing.join(', ')} — ` +
+    'the formula engine in this app cannot calculate it, so this is not a real result; ' +
+    'tell the user, or rewrite the formula with supported functions'
+  )
+}
+
+function describeReadCell(cell: CellRead): { text: string; notes: string[] } {
+  const notes: string[] = []
+  const unsupported = unsupportedNote(cell)
+  if (unsupported) notes.push(unsupported)
+  const typeNote = cellTypeNote(cell)
+  if (cell.valueSource === 'cache' && cell.formula) {
+    const formula = escapeCellText(cell.formula)
+    const shown = cell.value === null ? '(empty)' : escapeCellText(String(cell.value))
+    const engine =
+      cell.engineResult !== undefined
+        ? `the formula engine cannot calculate this formula (it returns ${escapeCellText(String(cell.engineResult))}); `
+        : ''
+    if (cell.staleCache) {
+      notes.push(
+        `not recalculated — ${engine}the file's cached value from the last save (${shown}) may be out of date ` +
+          'because cells were edited this session; do not give it as the answer',
+      )
+      return { text: `NOT RECALCULATED (${formula})`, notes }
+    }
+    if (typeNote) notes.push(typeNote)
+    notes.push(
+      `cached value from the file — ${engine}not recalculated by this app; no inputs were edited this session`,
+    )
+    return { text: formatCellScalar(cell), notes }
+  }
+  if (typeNote) notes.push(typeNote)
+  return { text: formatCellScalar(cell), notes }
+}
+
+/** Cap on the per-cell type lines read_range lists under its grid. */
+const MAX_TYPE_NOTES = 200
+
 function formatPlanSummary(plan: ChangePlan): string {
   const parts: string[] = []
   if (plan.structuralChanges.length > 0) {
@@ -805,6 +1068,238 @@ function formatPlanSummary(plan: ChangePlan): string {
     parts.push(plan.sheetRenames.map((r) => `sheet ${r.before} → ${r.after}`).join('; '))
   }
   return parts.join(' | ') || '(no changes)'
+}
+
+const MAX_SUMMARIZE_CELLS = 1_000_000
+const DEFAULT_SUMMARIZE_GROUPS = 50
+const MAX_SUMMARIZE_GROUPS = 200
+const MAX_TOTAL_ROWS_LISTED = 20
+
+/** A column letter of the sheet ("E", "aa") as a 0-based index, or null. */
+function parseColumnLetter(raw: unknown): number | null {
+  if (typeof raw !== 'string' || !/^\s*\$?[A-Za-z]{1,3}\s*$/.test(raw)) return null
+  try {
+    return parseAddress(`${raw.trim().replace('$', '').toUpperCase()}1`).column
+  } catch {
+    return null
+  }
+}
+
+/** Round away binary float noise (0.1 + 0.2) without hiding real digits. */
+const formatResultNumber = (value: number): string => String(Number(value.toPrecision(15)))
+
+function formatSummary(
+  result: SummarizeResult,
+  context: {
+    rangeLabel: string
+    fn: SummarizeFunction
+    valueColumn: number | undefined
+    where: readonly Criterion[]
+    groupBy: number | undefined
+    hiddenMode: 'include' | 'skip'
+    includeTotals: boolean
+  },
+): string {
+  const named = (column: number): string => {
+    const header = result.headers.get(column)
+    return header ? `${columnLabel(column)} "${escapeCellText(header)}"` : columnLabel(column)
+  }
+  const condition = (criterion: Criterion): string =>
+    criterion.op === 'blank' || criterion.op === 'not_blank'
+      ? `${named(criterion.column)} is ${criterion.op === 'blank' ? 'blank' : 'not blank'}`
+      : `${named(criterion.column)} ${criterion.op.replace('_', ' ')} ${
+          typeof criterion.value === 'string'
+            ? `"${escapeCellText(criterion.value)}"`
+            : String(criterion.value)
+        }`
+  const calculation =
+    context.fn === 'count'
+      ? 'count of matching rows'
+      : `${context.fn} of ${named(context.valueColumn!)}`
+  const lines = [
+    `Summary of ${context.rangeLabel}${result.headers.size > 0 ? ` (header row ${result.firstDataRow})` : ''}:`,
+    `- calculation: ${calculation}; filter: ${context.where.length > 0 ? context.where.map(condition).join(' AND ') : 'none'}` +
+      (context.groupBy !== undefined ? `; group by ${named(context.groupBy)}` : ''),
+    `- rows processed: ${result.rowsProcessed}; rows matching: ${result.rowsMatched}; hidden/filtered rows: ${result.hiddenRows}` +
+      (result.hiddenRows === 0
+        ? ''
+        : context.hiddenMode === 'skip'
+          ? ' (skipped — visible rows only)'
+          : ' (included — pass skipHiddenRows=true for visible rows only)'),
+  ]
+  if (result.totalRows.length > 0) {
+    const listed = result.totalRows.slice(0, MAX_TOTAL_ROWS_LISTED)
+    lines.push(
+      `- total/subtotal rows: ${result.totalRows.length} (` +
+        (context.includeTotals
+          ? 'INCLUDED — they restate data rows, so the result may count amounts twice'
+          : 'EXCLUDED so their amounts are not counted twice; pass includeTotalRows=true to count them') +
+        '):',
+      ...listed.map(
+        (entry) => `  row ${entry.row + 1} ${entry.kind}: ${escapeCellText(entry.reason)}`,
+      ),
+    )
+    if (result.totalRows.length > listed.length) {
+      lines.push(`  …${result.totalRows.length - listed.length} more`)
+    }
+  }
+  if (context.fn !== 'count') {
+    const skipped = (
+      [
+        ['text', 'text, not converted to numbers'],
+        ['error', 'error'],
+        ['blank', 'blank'],
+        ['boolean', 'TRUE/FALSE'],
+      ] as const
+    )
+      .filter(([kind]) => result.skipped[kind].count > 0)
+      .map(([kind, label]) => {
+        const bucket = result.skipped[kind]
+        const examples = bucket.examples
+          .filter((example) => example.value !== null && example.value !== '')
+          .map(
+            (example) =>
+              `${example.address} ${typeof example.value === 'string' ? `"${escapeCellText(example.value)}"` : String(example.value)}`,
+          )
+        return `${bucket.count} ${label}${examples.length > 0 ? ` (e.g. ${examples.join(', ')})` : ''}`
+      })
+    lines.push(
+      `- value cells used: ${result.valuesUsed}; skipped: ${skipped.length > 0 ? skipped.join('; ') : 'none'}`,
+    )
+  }
+  if (result.criteriaNotComparable > 0) {
+    lines.push(
+      `- condition cells that could not be compared as numbers (text or errors, treated as not matching): ${result.criteriaNotComparable}`,
+    )
+  }
+  if (result.cachedFormulaCells > 0) {
+    lines.push(
+      `- ${result.cachedFormulaCells} formula cells read with their cached values from the file (not recalculated by this app; no inputs were edited this session) — say so in your answer`,
+    )
+  }
+  lines.push(
+    `- result: ${result.result === null ? '(no numeric values)' : formatResultNumber(result.result)}`,
+  )
+  if (context.groupBy !== undefined) {
+    lines.push(`Groups (${result.groupCount}, largest result first):`)
+    for (const group of result.groups) {
+      lines.push(
+        `- ${escapeCellText(group.key)}: ${group.result === null ? '(no numeric values)' : formatResultNumber(group.result)} ` +
+          `(rows ${group.rows}${context.fn === 'count' ? '' : `, values used ${group.valuesUsed}`})`,
+      )
+    }
+    if (result.groupCount > result.groups.length) {
+      lines.push(
+        `…${result.groupCount - result.groups.length} more groups not listed (their rows are in the total); raise maxGroups to see them.`,
+      )
+    }
+  }
+  return lines.join('\n')
+}
+
+const DEFAULT_COMPARE_LISTED = 50
+const MAX_COMPARE_LISTED = 200
+
+function formatComparison(
+  result: ReconcileResult,
+  context: {
+    leftLabel: string
+    rightLabel: string
+    leftKey: number
+    rightKey: number
+    tolerance: number
+    hiddenMode: 'include' | 'skip'
+    includeTotals: boolean
+    maxListed: number
+  },
+): string {
+  const named = (side: ReconcileSideResult, column: number): string => {
+    const header = side.headers.get(column)
+    return header ? `${columnLabel(column)} "${escapeCellText(header)}"` : columnLabel(column)
+  }
+  const show = (value: CellScalar): string =>
+    value === null || value === ''
+      ? '(empty)'
+      : typeof value === 'string'
+        ? `"${escapeCellText(value)}"`
+        : String(value)
+  const sideLine = (name: string, side: ReconcileSideResult): string =>
+    `- ${name}: rows processed ${side.rowsProcessed}; keys ${side.keys}; blank keys: ${side.blankKeys}; ` +
+    `duplicate keys: ${side.duplicateKeys.length}` +
+    (side.duplicateKeys.length > 0
+      ? ` (only the first row of each is compared: ${side.duplicateKeys
+          .slice(0, 10)
+          .map(
+            (entry) =>
+              `"${escapeCellText(entry.key)}" rows ${entry.rows.map((row) => row + 1).join('/')}`,
+          )
+          .join(', ')})`
+      : '') +
+    `; hidden/filtered rows: ${side.hiddenRows}${side.hiddenRows > 0 ? (context.hiddenMode === 'skip' ? ' (skipped)' : ' (included)') : ''}` +
+    (side.totalRows.length > 0
+      ? context.includeTotals
+        ? `; total/subtotal rows included: ${side.totalRows.length}`
+        : `; total/subtotal rows excluded: ${side.totalRows.length} (${side.totalRows
+            .slice(0, 5)
+            .map((entry) => `row ${entry.row + 1}: ${escapeCellText(entry.reason)}`)
+            .join('; ')})`
+      : '')
+  const lines = [
+    `Comparison of ${context.leftLabel} (left) with ${context.rightLabel} (right) by key ` +
+      `${named(result.left, context.leftKey)} ↔ ${named(result.right, context.rightKey)}; compared columns: ` +
+      (result.pairs.length > 0
+        ? result.pairs
+            .map(([left, right]) => `${named(result.left, left)} ↔ ${named(result.right, right)}`)
+            .join(', ')
+        : 'none (no shared header names — keys only; pass leftColumns/rightColumns to compare values)') +
+      (context.tolerance > 0 ? ` (numeric tolerance ${context.tolerance})` : ''),
+    sideLine('left', result.left),
+    sideLine('right', result.right),
+    `- matched keys: ${result.matched} (${result.identical} identical, ${result.matched - result.identical} with differences); ` +
+      `only in left: ${result.onlyLeft.length}; only in right: ${result.onlyRight.length}`,
+  ]
+  const listKeys = (title: string, entries: readonly { key: string; row: number }[]): void => {
+    if (entries.length === 0) return
+    lines.push(
+      `${title} (${entries.length}): ${entries
+        .slice(0, context.maxListed)
+        .map((entry) => `"${escapeCellText(entry.key)}" (row ${entry.row + 1})`)
+        .join(
+          ', ',
+        )}${entries.length > context.maxListed ? `, …${entries.length - context.maxListed} more` : ''}`,
+    )
+  }
+  listKeys('Only in left', result.onlyLeft)
+  listKeys('Only in right', result.onlyRight)
+  if (result.differences.length > 0) {
+    lines.push(`Differences (${result.differences.length} cell(s)):`)
+    for (const difference of result.differences.slice(0, context.maxListed)) {
+      const note =
+        difference.delta !== undefined
+          ? ` (right − left = ${difference.delta})`
+          : typeof difference.left !== typeof difference.right &&
+              difference.left !== null &&
+              difference.right !== null
+            ? ` (${typeof difference.left === 'number' ? 'number' : typeof difference.left === 'string' ? 'text' : typeof difference.left} vs ${typeof difference.right === 'number' ? 'number' : typeof difference.right === 'string' ? 'text' : typeof difference.right})`
+            : ''
+      lines.push(
+        `- "${escapeCellText(difference.key)}": ${named(result.left, difference.leftColumn)} ${show(difference.left)} ↔ ` +
+          `${named(result.right, difference.rightColumn)} ${show(difference.right)}${note} ` +
+          `[left row ${difference.leftRow + 1}, right row ${difference.rightRow + 1}]`,
+      )
+    }
+    if (result.differences.length > context.maxListed) {
+      lines.push(
+        `…${result.differences.length - context.maxListed} more differences not listed; raise maxListed.`,
+      )
+    }
+  }
+  if (result.left.cachedFormulaCells + result.right.cachedFormulaCells > 0) {
+    lines.push(
+      `- ${result.left.cachedFormulaCells + result.right.cachedFormulaCells} formula cells read with their cached values from the file (not recalculated by this app; no inputs were edited this session) — say so in your answer`,
+    )
+  }
+  return lines.join('\n')
 }
 
 export function executeWorkbookTool(
@@ -864,6 +1359,15 @@ export function executeWorkbookTool(
           }
         }
         const cells = deps.readCells(addresses, sheetId)
+        const hidden = new Map(
+          (deps.hiddenRows?.(sheetId, bounds) ?? []).map((entry) => [entry.row, entry.reason]),
+        )
+        const rowLabel = (row: number): string => {
+          const reason = hidden.get(row)
+          return reason === undefined
+            ? String(row + 1)
+            : `${row + 1} (${reason === 'filtered' ? 'filtered out' : 'hidden'})`
+        }
         const header = [
           '',
           ...Array.from({ length: bounds.endColumn - bounds.startColumn + 1 }, (_, offset) =>
@@ -871,19 +1375,44 @@ export function executeWorkbookTool(
           ),
         ].join('\t')
         const rows: string[] = [metadata, header]
+        const typeNotes: string[] = []
         for (let row = bounds.startRow; row <= bounds.endRow; row += 1) {
-          const columns: string[] = [String(row + 1)]
+          const columns: string[] = [rowLabel(row)]
           for (let column = bounds.startColumn; column <= bounds.endColumn; column += 1) {
-            const cell = cells[formatAddress(row, column)]
+            const address = formatAddress(row, column)
+            const cell = cells[address]
+            const described = cell ? describeReadCell(cell) : null
+            if (described && described.notes.length > 0) {
+              typeNotes.push(`${address}: ${described.notes.join('; ')}`)
+            }
             columns.push(
               cell
-                ? cell.value === null
+                ? cell.value === null && cell.valueSource !== 'cache'
                   ? escapeCellText(cell.formula ?? '')
-                  : formatCellScalar(cell)
+                  : (described?.text ?? '')
                 : '',
             )
           }
           rows.push(columns.join('\t'))
+        }
+        if (typeNotes.length > 0) {
+          rows.push(
+            'Cell types and value sources (cells not listed hold plain text, General-format numbers or freshly calculated formulas; raw = the stored value behind the shown text):',
+            ...typeNotes.slice(0, MAX_TYPE_NOTES),
+          )
+          if (typeNotes.length > MAX_TYPE_NOTES) {
+            rows.push(
+              `…${typeNotes.length - MAX_TYPE_NOTES} more typed cells not listed — read_cells shows them one by one.`,
+            )
+          }
+        }
+        if (hidden.size > 0) {
+          rows.push(
+            `Hidden rows in this range: ${[...hidden]
+              .map(([row]) => rowLabel(row))
+              .join(', ')} — not visible to the user; ` +
+              'say whether your answer includes them (aggregate_range skipHiddenRows=true leaves them out).',
+          )
         }
         return {
           output: rows.join('\n'),
@@ -943,15 +1472,364 @@ export function executeWorkbookTool(
         typeof topRaw === 'number' && Number.isFinite(topRaw)
           ? Math.min(Math.max(Math.floor(topRaw), 0), MAX_AGGREGATE_TOP_VALUES)
           : DEFAULT_AGGREGATE_TOP_VALUES
-      return deps.aggregateRange(sheetId, bounds).then((outcome) =>
-        outcome.ok
-          ? {
-              output: formatRangeAggregate(rangeLabel, outcome.aggregate, topValues),
-              mutated: false,
-              summary: t('aiToolAggregateOf', { range: rangeLabel }),
+      const hiddenMode = call.input.skipHiddenRows === true ? 'skip' : 'include'
+      return deps.aggregateRange(sheetId, bounds, { hiddenRows: hiddenMode }).then((outcome) => {
+        if (!outcome.ok) return fail(t('aiToolAggregate'), outcome.error)
+        const hiddenLine =
+          outcome.hiddenRows === undefined
+            ? '- hidden/filtered rows: not checked for this range'
+            : outcome.hiddenRows === 0
+              ? '- hidden/filtered rows in the range: 0'
+              : hiddenMode === 'skip'
+                ? `- hidden/filtered rows in the range: ${outcome.hiddenRows.toLocaleString('en-US')} (SKIPPED — the statistics cover visible rows only)`
+                : `- hidden/filtered rows in the range: ${outcome.hiddenRows.toLocaleString('en-US')} (INCLUDED in the statistics; pass skipHiddenRows=true for visible rows only)`
+        const cached = outcome.cachedFormulaCells ?? 0
+        if (cached > 0 && outcome.staleCache) {
+          return {
+            output:
+              `NOT RECALCULATED: ${cached.toLocaleString('en-US')} formula cell(s) in ${rangeLabel} hold the file's cached values ` +
+              'from the last save, and cells were edited this session, so statistics over them may be out of date — ' +
+              'they are withheld. Do not give a total for this range as the answer; tell the user it could not be recalculated ' +
+              '(writing the formula on a sheet lets the engine calculate it live), or aggregate a range without formulas.\n' +
+              hiddenLine,
+            mutated: false,
+            summary: t('aiToolAggregateOf', { range: rangeLabel }),
+          }
+        }
+        const cachedLine =
+          cached > 0
+            ? `\n- ${cached.toLocaleString('en-US')} formula cells counted with their cached values from the file (not recalculated by this app; no inputs were edited this session) — say so in your answer`
+            : ''
+        return {
+          output: `${formatRangeAggregate(rangeLabel, outcome.aggregate, topValues)}\n${hiddenLine}${cachedLine}`,
+          mutated: false,
+          summary: t('aiToolAggregateOf', { range: rangeLabel }),
+        }
+      })
+    }
+
+    case 'summarize_range': {
+      const summary = t('aiToolSummarize')
+      const raw = call.input.range
+      if (typeof raw !== 'string' || !raw.trim())
+        return fail(summary, 'range must be a non-empty string')
+      let bounds: RangeBounds
+      try {
+        bounds = parseRange(raw.trim().toUpperCase().replace(/\$/g, ''))
+      } catch {
+        return fail(summary, `Cannot parse range: ${raw}`)
+      }
+      const hasHeader = call.input.hasHeader !== false
+      if (hasHeader && bounds.endRow === bounds.startRow) {
+        return fail(summary, 'The range holds only its header row; include the data rows below it.')
+      }
+      const column = (name: string, value: unknown): number | { error: string } => {
+        const index = parseColumnLetter(value)
+        if (index === null) return { error: `${name} must be a column letter like "E"` }
+        if (index < bounds.startColumn || index > bounds.endColumn) {
+          return {
+            error: `${name} ${String(value).trim().toUpperCase()} is outside the range ${raw.trim().toUpperCase()}`,
+          }
+        }
+        return index
+      }
+      let valueColumn: number | undefined
+      if (call.input.valueColumn !== undefined) {
+        const parsed = column('valueColumn', call.input.valueColumn)
+        if (typeof parsed !== 'number') return fail(summary, parsed.error)
+        valueColumn = parsed
+      }
+      const fnRaw = call.input.function ?? (valueColumn === undefined ? 'count' : 'sum')
+      if (
+        fnRaw !== 'sum' &&
+        fnRaw !== 'count' &&
+        fnRaw !== 'average' &&
+        fnRaw !== 'min' &&
+        fnRaw !== 'max'
+      ) {
+        return fail(summary, 'function must be one of sum/count/average/min/max')
+      }
+      const fn: SummarizeFunction = fnRaw
+      if (fn !== 'count' && valueColumn === undefined) {
+        return fail(
+          summary,
+          `${fn} needs valueColumn (the column letter whose numbers to aggregate)`,
+        )
+      }
+      let groupBy: number | undefined
+      if (call.input.groupBy !== undefined) {
+        const parsed = column('groupBy', call.input.groupBy)
+        if (typeof parsed !== 'number') return fail(summary, parsed.error)
+        groupBy = parsed
+      }
+      const whereRaw = call.input.where ?? []
+      if (!Array.isArray(whereRaw)) return fail(summary, 'where must be an array of conditions')
+      const where: Criterion[] = []
+      for (const entry of whereRaw) {
+        const condition = (entry ?? {}) as Record<string, unknown>
+        const parsed = column('where.column', condition.column)
+        if (typeof parsed !== 'number') return fail(summary, parsed.error)
+        const op = condition.op
+        if (typeof op !== 'string' || !(CRITERION_OPS as readonly string[]).includes(op)) {
+          return fail(summary, `where.op must be one of ${CRITERION_OPS.join(' ')}`)
+        }
+        const value = condition.value
+        if (op !== 'blank' && op !== 'not_blank') {
+          if (
+            typeof value !== 'string' &&
+            typeof value !== 'number' &&
+            typeof value !== 'boolean'
+          ) {
+            return fail(summary, `where.value is required for op ${op}`)
+          }
+        }
+        where.push({
+          column: parsed,
+          op: op as CriterionOp,
+          ...(typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'
+            ? { value }
+            : {}),
+        })
+      }
+      const used = [
+        ...where.map((criterion) => criterion.column),
+        ...(fn !== 'count' && valueColumn !== undefined ? [valueColumn] : []),
+        ...(groupBy !== undefined ? [groupBy] : []),
+      ]
+      // Only the columns up to the last one the calculation touches are read;
+      // the range's first columns stay in so total-row labels are seen.
+      const readBounds: RangeBounds = {
+        startRow: bounds.startRow,
+        endRow: bounds.endRow,
+        startColumn: bounds.startColumn,
+        endColumn: used.length > 0 ? Math.max(...used) : bounds.startColumn,
+      }
+      if (rangeCellCount(readBounds) > MAX_SUMMARIZE_CELLS) {
+        return fail(
+          summary,
+          `The columns used span more than ${MAX_SUMMARIZE_CELLS.toLocaleString('en-US')} cells; summarize fewer rows at a time.`,
+        )
+      }
+      if (!deps.collectRows)
+        return fail(summary, 'summarize_range is not available in this context.')
+      const info = deps.getActiveSheetInfo()
+      const parsedSheet = parseReadSheetId(call.input, info, summary)
+      if ('fail' in parsedSheet) return parsedSheet.fail
+      const sheetId = parsedSheet.sheetId
+      const sheetName =
+        info.sheets.find((sheet) => sheet.id === (sheetId ?? info.sheetId))?.name ?? info.sheetName
+      const groupsRaw = call.input.maxGroups
+      const maxGroups =
+        typeof groupsRaw === 'number' && Number.isFinite(groupsRaw)
+          ? Math.min(Math.max(Math.floor(groupsRaw), 1), MAX_SUMMARIZE_GROUPS)
+          : DEFAULT_SUMMARIZE_GROUPS
+      const hiddenMode = call.input.skipHiddenRows === true ? 'skip' : 'include'
+      const dataStart = bounds.startRow + (hasHeader ? 1 : 0)
+      const rangeLabel = `${sheetName}!${formatAddress(dataStart, bounds.startColumn)}:${formatAddress(bounds.endRow, bounds.endColumn)}`
+      return deps.collectRows(sheetId, readBounds).then((outcome) => {
+        if (!outcome.ok) return fail(summary, outcome.error)
+        const result = summarizeRows(outcome.rows, {
+          startRow: readBounds.startRow,
+          startColumn: readBounds.startColumn,
+          hasHeader,
+          fn,
+          valueColumn,
+          where,
+          groupBy,
+          hiddenRows: hiddenMode,
+          totalRows: call.input.includeTotalRows === true ? 'include' : 'skip',
+          maxGroups,
+        })
+        const done = t('aiToolSummarizeOf', { range: rangeLabel })
+        if (result.cachedFormulaCells > 0 && outcome.staleInputs) {
+          return {
+            output:
+              `NOT RECALCULATED: ${result.cachedFormulaCells} formula cell(s) used by this calculation in ${rangeLabel} hold the ` +
+              "file's cached values from the last save, and cells were edited this session, so the result may be out of date — it is withheld. " +
+              'Tell the user it could not be recalculated (writing the formula on a sheet lets the engine calculate it live).',
+            mutated: false,
+            summary: done,
+          }
+        }
+        return {
+          output: formatSummary(result, {
+            rangeLabel,
+            fn,
+            valueColumn,
+            where,
+            groupBy,
+            hiddenMode,
+            includeTotals: call.input.includeTotalRows === true,
+          }),
+          mutated: false,
+          summary: done,
+        }
+      })
+    }
+
+    case 'compare_ranges': {
+      const summary = t('aiToolCompareRanges')
+      const info = deps.getActiveSheetInfo()
+      const hasHeader = call.input.hasHeader !== false
+      type Side = {
+        bounds: RangeBounds
+        sheetId: string | undefined
+        key: number
+        columns: number[] | undefined
+        label: string
+      }
+      const parseSide = (prefix: 'left' | 'right'): Side | { error: string } => {
+        const raw = call.input[`${prefix}Range`]
+        if (typeof raw !== 'string' || !raw.trim())
+          return { error: `${prefix}Range must be a non-empty string` }
+        let bounds: RangeBounds
+        try {
+          bounds = parseRange(raw.trim().toUpperCase().replace(/\$/g, ''))
+        } catch {
+          return { error: `Cannot parse ${prefix}Range: ${raw}` }
+        }
+        if (hasHeader && bounds.endRow === bounds.startRow) {
+          return { error: `${prefix}Range holds only its header row` }
+        }
+        if (rangeCellCount(bounds) > MAX_SUMMARIZE_CELLS) {
+          return {
+            error: `${prefix}Range has more than ${MAX_SUMMARIZE_CELLS.toLocaleString('en-US')} cells; compare fewer rows at a time`,
+          }
+        }
+        const inRange = (name: string, value: unknown): number | { error: string } => {
+          const index = parseColumnLetter(value)
+          if (index === null) return { error: `${name} must be a column letter like "A"` }
+          if (index < bounds.startColumn || index > bounds.endColumn) {
+            return {
+              error: `${name} ${String(value).trim().toUpperCase()} is outside ${prefix}Range ${raw.trim().toUpperCase()}`,
             }
-          : fail(t('aiToolAggregate'), outcome.error),
-      )
+          }
+          return index
+        }
+        const key = inRange(`${prefix}Key`, call.input[`${prefix}Key`])
+        if (typeof key !== 'number') return key
+        let columns: number[] | undefined
+        const columnsRaw = call.input[`${prefix}Columns`]
+        if (columnsRaw !== undefined) {
+          if (!Array.isArray(columnsRaw) || columnsRaw.length === 0) {
+            return { error: `${prefix}Columns must be a non-empty array of column letters` }
+          }
+          columns = []
+          for (const entry of columnsRaw) {
+            const column = inRange(`${prefix}Columns`, entry)
+            if (typeof column !== 'number') return column
+            columns.push(column)
+          }
+        }
+        const parsedSheet = parseReadSheetId(
+          { sheetId: call.input[`${prefix}SheetId`] },
+          info,
+          summary,
+        )
+        if ('fail' in parsedSheet) return { error: parsedSheet.fail.output }
+        const sheetName =
+          info.sheets.find((sheet) => sheet.id === (parsedSheet.sheetId ?? info.sheetId))?.name ??
+          info.sheetName
+        const dataStart = bounds.startRow + (hasHeader ? 1 : 0)
+        return {
+          bounds,
+          sheetId: parsedSheet.sheetId,
+          key,
+          columns,
+          label: `${sheetName}!${formatAddress(dataStart, bounds.startColumn)}:${formatAddress(bounds.endRow, bounds.endColumn)}`,
+        }
+      }
+      const left = parseSide('left')
+      if ('error' in left) return fail(summary, left.error)
+      const right = parseSide('right')
+      if ('error' in right) return fail(summary, right.error)
+      if ((left.columns === undefined) !== (right.columns === undefined)) {
+        return fail(
+          summary,
+          'Give leftColumns and rightColumns together (or neither, to pair by header)',
+        )
+      }
+      if (left.columns && right.columns && left.columns.length !== right.columns.length) {
+        return fail(summary, 'leftColumns and rightColumns must have the same number of columns')
+      }
+      if (!hasHeader && !left.columns) {
+        return fail(summary, 'Without a header row, give leftColumns and rightColumns to compare')
+      }
+      if (!deps.collectRows)
+        return fail(summary, 'compare_ranges is not available in this context.')
+      const toleranceRaw = call.input.tolerance
+      const tolerance =
+        typeof toleranceRaw === 'number' && Number.isFinite(toleranceRaw) && toleranceRaw > 0
+          ? toleranceRaw
+          : 0
+      const listedRaw = call.input.maxListed
+      const maxListed =
+        typeof listedRaw === 'number' && Number.isFinite(listedRaw)
+          ? Math.min(Math.max(Math.floor(listedRaw), 1), MAX_COMPARE_LISTED)
+          : DEFAULT_COMPARE_LISTED
+      const hiddenMode = call.input.skipHiddenRows === true ? 'skip' : 'include'
+      const includeTotals = call.input.includeTotalRows === true
+      const collect = deps.collectRows
+      return Promise.all([
+        collect(left.sheetId, left.bounds),
+        collect(right.sheetId, right.bounds),
+      ]).then(([leftRows, rightRows]) => {
+        if (!leftRows.ok) return fail(summary, `left: ${leftRows.error}`)
+        if (!rightRows.ok) return fail(summary, `right: ${rightRows.error}`)
+        const result = reconcileRows({
+          left: {
+            rows: leftRows.rows,
+            startRow: left.bounds.startRow,
+            startColumn: left.bounds.startColumn,
+            keyColumn: left.key,
+          },
+          right: {
+            rows: rightRows.rows,
+            startRow: right.bounds.startRow,
+            startColumn: right.bounds.startColumn,
+            keyColumn: right.key,
+          },
+          hasHeader,
+          pairs:
+            left.columns && right.columns
+              ? left.columns.map((column, index): [number, number] => [
+                  column,
+                  right.columns![index]!,
+                ])
+              : undefined,
+          hiddenRows: hiddenMode,
+          totalRows: includeTotals ? 'include' : 'skip',
+          tolerance,
+        })
+        const done = t('aiToolCompareRangesOf', { left: left.label, right: right.label })
+        const stale =
+          (result.left.cachedFormulaCells > 0 && leftRows.staleInputs === true) ||
+          (result.right.cachedFormulaCells > 0 && rightRows.staleInputs === true)
+        if (stale) {
+          return {
+            output:
+              `NOT RECALCULATED: keys or compared values in ${left.label} / ${right.label} are formula cells holding the file's cached values ` +
+              'from the last save, and cells were edited this session, so the comparison may be out of date — it is withheld. ' +
+              'Tell the user it could not be recalculated, or compare ranges without formulas.',
+            mutated: false,
+            summary: done,
+          }
+        }
+        return {
+          output: formatComparison(result, {
+            leftLabel: left.label,
+            rightLabel: right.label,
+            leftKey: left.key,
+            rightKey: right.key,
+            tolerance,
+            hiddenMode,
+            includeTotals,
+            maxListed,
+          }),
+          mutated: false,
+          summary: done,
+        }
+      })
     }
 
     case 'load_guide': {
@@ -1050,12 +1928,25 @@ export function executeWorkbookTool(
       if ('fail' in parsedSheet) return parsedSheet.fail
       const sheetId = parsedSheet.sheetId
       const addresses = raw.slice(0, MAX_READ_ADDRESSES).map(String)
+      // Past the cap the rest is dropped; say so, or the model answers from a
+      // partial read believing it saw everything.
+      const unread = raw.length - addresses.length
       const executeRead = (): ToolExecution => {
         const cells = deps.readCells(addresses, sheetId)
         const lines = addresses.map((addr) => {
           const cell = cells[addr]
-          return `${addr}: ${cell ? formatCellScalar(cell) : '(unknown)'}`
+          if (!cell) return `${addr}: (unknown)`
+          const { text, notes } = describeReadCell(cell)
+          return `${addr}: ${text}${notes.length > 0 ? ` [${notes.join('; ')}]` : ''}`
         })
+        if (unread > 0) {
+          lines.unshift(
+            `Note: ${raw.length} addresses were requested but only the first ${MAX_READ_ADDRESSES} were read ` +
+              `(max ${MAX_READ_ADDRESSES} per call); the remaining ${unread} were NOT read, starting at ` +
+              `${String(raw[MAX_READ_ADDRESSES])}. To get them, call read_cells again with the remaining ` +
+              'addresses, or use read_range / aggregate_range for contiguous blocks.',
+          )
+        }
         return {
           output: lines.join('\n'),
           mutated: false,
@@ -1344,9 +2235,12 @@ export function executeWorkbookTool(
             const cells = deps.readCells(addresses, cellSheetId)
             const prefix = bySheet.size > 1 ? `${sheetNames.get(cellSheetId) ?? cellSheetId}!` : ''
             for (const addr of addresses) {
-              const v = cells[addr]?.value
+              const cell = cells[addr]
+              const v = cell?.value
+              const unsupported = cell ? unsupportedNote(cell) : null
               lines.push(
-                `${prefix}${addr} = ${v === null || v === undefined ? '(still computing; verify with read_cells)' : String(v)}`,
+                `${prefix}${addr} = ${v === null || v === undefined ? (unsupported ? '(no result)' : '(still computing; verify with read_cells)') : String(v)}` +
+                  (unsupported ? ` (${unsupported})` : ''),
               )
             }
           }
