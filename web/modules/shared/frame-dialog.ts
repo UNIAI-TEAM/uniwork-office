@@ -13,12 +13,16 @@
  * - close X: top right of every choice dialog, answers like Escape (`cancelId`), last in the Tab loop;
  * - focus: the safe primary the caller named first (never a destructive one; without one, e.g. the
  *   save conflict, the cancel choice, so Enter never discards edits),
- *   Tab stays inside, Escape = `cancelId`, focus returns to where it was when it closes.
+ *   Tab stays inside, Escape = `cancelId`, focus returns to where it was when it closes. The
+ *   first focus never scrolls (the title and description stay in view when the card is taller
+ *   than a zoomed frame), a step starts at the top, and focus that falls out of the card (a click
+ *   on the backdrop) goes back to the last control it held.
  *
  * `openFrameDialog` is the multi-step form (the save conflict, ./conflict-dialog.ts): a later step
  * replaces the card's content in place (never a second dialog), a `content` slot sits between the
  * body and the actions (comparison table, notes), choices may be `aria-disabled` with a reason and
- * stay in the Tab loop (every focusable element of the card, in DOM order), the card keeps one
+ * stay in the Tab loop (every focusable element of the card, in DOM order; one shared reason is
+ * shown once and can change live with `setChoiceDisabled`), the card keeps one
  * fixed role=alert line (collapsed when empty, never display:none) and an `h2[tabindex=-1]` title
  * that takes the focus when a variant changes in place. While a dialog is open the rest of the
  * frame is `inert` and `onFrameModal` listeners hear open / closed (the protocol `modal` event).
@@ -225,6 +229,11 @@ export interface FrameDialogHandle<T extends string> {
   step(step: FrameDialogStep<T>, opts?: { closeOnAnswer?: boolean }): Promise<T>
   /** writes the dialog's own alert line (empty clears it) */
   setAlert(text: string): void
+  /**
+   * turns a choice of the shown step `aria-disabled` with its reason (a string), or enabled
+   * (`null`), without re-rendering the step: the focus stays where it is
+   */
+  setChoiceDisabled(id: T, reason: string | null): void
   /** removes the dialog and returns the focus to where it was when it opened */
   close(): void
   readonly card: HTMLElement
@@ -264,6 +273,10 @@ export function openFrameDialog<T extends string>(
   card.append(actions, x)
 
   const returnTo = document.activeElement as HTMLElement | null
+  /** the last control of the card that held the focus (where a lost focus returns to) */
+  let lastFocus: HTMLElement | null = null
+  /** the shown step's buttons and whether each is runnable (`reason` = the line that explains) */
+  const buttons = new Map<T, { el: HTMLButtonElement; disabled: boolean; reason?: string }>()
   let current: {
     step: FrameDialogStep<T>
     resolve: (id: T) => void
@@ -300,6 +313,23 @@ export function openFrameDialog<T extends string>(
     if (current) answer(current.step.closeId ?? current.step.cancelId)
   })
 
+  card.addEventListener('focusin', (e) => {
+    lastFocus = e.target as HTMLElement
+  })
+  // a click on the backdrop or on inert page chrome drops the focus to the body: put it back
+  card.addEventListener('focusout', (e) => {
+    const to = e.relatedTarget
+    if (to instanceof Node && mask.contains(to)) return
+    // after the browser settled the new focus: a step that replaced the button has refocused
+    setTimeout(() => {
+      if (closed) return
+      const at = document.activeElement
+      if (at && at !== document.body && at !== document.documentElement) return
+      const target = lastFocus?.isConnected && card.contains(lastFocus) ? lastFocus : null
+      ;(target ?? tabStops(card)[0] ?? x).focus({ preventScroll: true })
+    }, 0)
+  })
+
   mask.setAttribute(MODAL_ATTR, '')
   document.addEventListener('keydown', onKey, true)
   document.body.append(mask)
@@ -307,7 +337,41 @@ export function openFrameDialog<T extends string>(
   syncModal()
   frame.onChange?.()
 
+  /**
+   * The reason lines of the disabled choices, one per distinct sentence (two choices that are
+   * blocked for the same reason, e.g. offline, share one line), each button described by its own.
+   */
+  function paintReasons(): void {
+    reasons.replaceChildren()
+    const lines = new Map<string, HTMLElement>()
+    for (const [choiceId, b] of buttons) {
+      if (!b.disabled) {
+        b.el.removeAttribute('aria-disabled')
+        b.el.removeAttribute('aria-describedby')
+        continue
+      }
+      b.el.setAttribute('aria-disabled', 'true')
+      if (!b.reason) {
+        b.el.removeAttribute('aria-describedby')
+        continue
+      }
+      let line = lines.get(b.reason)
+      if (!line) {
+        line = document.createElement('p')
+        line.className = 'ow-dlg-reason'
+        line.id = `${id}-why-${choiceId}`
+        line.textContent = b.reason
+        lines.set(b.reason, line)
+        reasons.append(line)
+      }
+      b.el.setAttribute('aria-describedby', line.id)
+    }
+  }
+
   function render(step: FrameDialogStep<T>): void {
+    // every step starts at the top: the title is the first thing in view
+    mask.scrollTop = 0
+    head.scrollTop = 0
     title.textContent = step.title
     body.textContent = step.body
     details.replaceChildren(
@@ -320,7 +384,7 @@ export function openFrameDialog<T extends string>(
     )
     slot.replaceChildren(...(step.content ? [step.content] : []))
     alert.textContent = step.alert ?? ''
-    reasons.replaceChildren()
+    buttons.clear()
     actions.replaceChildren()
     const tones = tonesOf(step.choices, step.cancelId)
     const ordered = step.choices
@@ -339,17 +403,11 @@ export function openFrameDialog<T extends string>(
       b.dataset.choice = c.id
       b.className = tone === 'neutral' ? 'ow-dlg-btn' : `ow-dlg-btn ${tone}`
       b.textContent = c.label
-      if (c.disabled) {
-        b.setAttribute('aria-disabled', 'true')
-        if (c.reason) {
-          const r = document.createElement('p')
-          r.className = 'ow-dlg-reason'
-          r.id = `${id}-why-${c.id}`
-          r.textContent = c.reason
-          reasons.append(r)
-          b.setAttribute('aria-describedby', r.id)
-        }
-      }
+      buttons.set(c.id, {
+        el: b,
+        disabled: c.disabled === true,
+        ...(c.reason ? { reason: c.reason } : {}),
+      })
       b.addEventListener('click', () => {
         if (b.getAttribute('aria-disabled') === 'true') return
         answer(c.id)
@@ -358,7 +416,9 @@ export function openFrameDialog<T extends string>(
       if (c.id === safeId) initial = b
       else if (!fallback && tone !== 'danger') fallback = b
     }
-    ;(initial ?? fallback ?? actions.querySelector('button') ?? x).focus()
+    paintReasons()
+    // preventScroll: the focused button may sit below the fold of a zoomed frame, the title not
+    ;(initial ?? fallback ?? actions.querySelector('button') ?? x).focus({ preventScroll: true })
   }
 
   const handle: FrameDialogHandle<T> = {
@@ -375,6 +435,14 @@ export function openFrameDialog<T extends string>(
     },
     setAlert(text) {
       alert.textContent = text
+    },
+    setChoiceDisabled(choiceId, reason) {
+      const b = buttons.get(choiceId)
+      if (!b) return
+      b.disabled = reason !== null
+      if (reason !== null) b.reason = reason
+      else delete b.reason
+      paintReasons()
     },
     close() {
       if (closed) return

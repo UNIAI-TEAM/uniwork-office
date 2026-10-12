@@ -252,6 +252,18 @@ export async function runConflictDialog(io: ConflictIo): Promise<ConflictOutcome
   let tooLarge = false
   let alert = ''
   let focus: Id | typeof FOCUS_TITLE = 'cancel'
+  /** step 1 is the one on screen: the only step whose Reload / Overwrite depend on the network */
+  let onStep1 = false
+
+  /** Reload latest and Overwrite… follow the network while step 1 is open (no re-render) */
+  const applyOnline = (): void => {
+    if (!onStep1) return
+    const why = online() ? null : t('uwConflictOfflineWeb')
+    dialog.setChoiceDisabled('reload', why)
+    dialog.setChoiceDisabled('overwrite', why)
+  }
+  window.addEventListener('online', applyOnline)
+  window.addEventListener('offline', applyOnline)
 
   const authorOf = (h: ConflictHead | null) => h?.author ?? t('uwAuthorFallback')
   const timeOf = (h: ConflictHead | null) =>
@@ -302,6 +314,7 @@ export async function runConflictDialog(io: ConflictIo): Promise<ConflictOutcome
   }
 
   function step1(): Promise<Id> {
+    onStep1 = true
     const content = document.createElement('div')
     tableBox = document.createElement('div')
     tableBox.append(table())
@@ -343,7 +356,9 @@ export async function runConflictDialog(io: ConflictIo): Promise<ConflictOutcome
       alert,
     })
     alert = ''
-    return shown
+    return shown.finally(() => {
+      onStep1 = false
+    })
   }
 
   function overwriteStep(): Promise<Id> {
@@ -524,6 +539,8 @@ export async function runConflictDialog(io: ConflictIo): Promise<ConflictOutcome
       }
     }
   } finally {
+    window.removeEventListener('online', applyOnline)
+    window.removeEventListener('offline', applyOnline)
     dialog.close()
   }
 }

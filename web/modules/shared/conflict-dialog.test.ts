@@ -224,6 +224,8 @@ describe('step 1', () => {
     btn('reload').click()
     await flush()
     expect(choices()).toContain('discard')
+    btn('back').click()
+    await flush()
     btn('cancel').click()
     await done
   })
