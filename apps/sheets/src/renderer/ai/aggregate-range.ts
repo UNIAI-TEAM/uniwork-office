@@ -13,6 +13,7 @@ import {
 import type { CellScalar } from '@genoffice/xlsx-gateway/domain/workbook.types'
 import { isSheetRemoved, journalEntriesInRange } from '../edit-journal'
 import { createRangeAggregator, type RangeAggregate } from './aggregate'
+import { sessionHasInputEdits } from './cell-read'
 import { rowVisibilityProbe, type WorkbookReadContext } from './workbook-readers'
 
 interface ConstantFill {
@@ -257,6 +258,10 @@ export type AggregateRangeOutcome =
       aggregate: RangeAggregate
       /** hidden/filtered rows in the range; set only in `hiddenRows` mode */
       hiddenRows?: number
+      /** lazy `hiddenRows` mode: counted formula cells whose value is the file's cached <v> */
+      cachedFormulaCells?: number
+      /** cachedFormulaCells > 0 while this session edited formula inputs */
+      staleCache?: boolean
     }
   | { ok: false; error: string }
 
@@ -408,6 +413,9 @@ export async function aggregateWorkbookRange(
   // AI mode also honours the live filter model, which owns row visibility
   // for filters applied this session and for restored file filters.
   const visibility = tracking ? rowVisibilityProbe(ctx, sheetId) : null
+  let cachedFormulaCells = 0
+  const formulaIndex = state.formulaText?.get(sheetId)
+  const sharedFormulas = state.sharedFormulaGroups?.get(sheetId)
   const filterProbe = visibility ? (row: number): boolean => visibility(row) === 'filtered' : null
   if (clamped.startRow <= fileEndRow && clamped.startColumn <= fileEndColumn) {
     const width = fileEndColumn - clamped.startColumn + 1
@@ -472,6 +480,16 @@ export async function aggregateWorkbookRange(
         }
         aggregator.add(cell.value)
         counted += 1
+        // The sidecar serves the file's cached <v> for formula cells — shared
+        // followers carry no formula text there, the harvested index does.
+        if (
+          tracking &&
+          (cell.formula !== undefined ||
+            formulaIndex?.has(`${cell.row}:${cell.column}`) ||
+            sharedFormulas?.textAt(cell.row, cell.column) !== undefined)
+        ) {
+          cachedFormulaCells += 1
+        }
       }
     }
   }
@@ -510,6 +528,12 @@ export async function aggregateWorkbookRange(
   return {
     ok: true,
     aggregate: aggregator.finish(50),
-    ...(tracking ? { hiddenRows: hiddenRows.size } : {}),
+    ...(tracking
+      ? {
+          hiddenRows: hiddenRows.size,
+          cachedFormulaCells,
+          staleCache: cachedFormulaCells > 0 && sessionHasInputEdits(state.editJournal),
+        }
+      : {}),
   }
 }

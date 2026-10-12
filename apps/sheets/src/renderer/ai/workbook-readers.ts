@@ -13,7 +13,13 @@ import { planFileTableRegistrations } from '../file-tables'
 import { toSelectionFormat } from '../selection-format'
 import { plainCellValue } from '../edit-journal'
 import { lazyCellReader, modelCellValue } from '../univer-sync'
-import { classifyCellType, isGeneralFormat, type CellRead } from './cell-read'
+import {
+  classifyCellType,
+  formulaProvenance,
+  isGeneralFormat,
+  type CellRead,
+  type FormulaProvenance,
+} from './cell-read'
 import { lazySheetScreenExtent, type LazyWorkbookState, type UniverRuntime } from '../univer-state'
 import type { ActiveSheetInfo, FrozenSelection } from './tools'
 
@@ -510,17 +516,41 @@ export function readCells(
       sheetId === undefined ? workbook?.getActiveSheet() : workbook?.getSheetBySheetId(sheetId)
     if (!worksheet) return result
     const reader = lazyCellReader(worksheet)
+    const targetSheetId = worksheet.getSheetId()
     for (const address of addresses) {
       const cell = reader(address)
+      const range = worksheet.getRange(address) as unknown as ReadRange
       // `value` is the rendered text and `rawValue` the model value behind it;
       // machine-facing callers (the MCP bridge, the save pipeline) need the
       // latter — see modelCellValue in univer-sync.ts.
-      result[address] = typed(
+      const read = typed(
         cell.formula
           ? { value: cell.value, formula: cell.formula, rawValue: cell.rawValue }
           : { value: cell.value, rawValue: cell.rawValue },
-        numberFormatOf(worksheet.getRange(address) as unknown as ReadRange),
+        numberFormatOf(range),
       )
+      // Streamed cells may carry only the file's cached value: say where a
+      // formula value came from so a stale cache is never read as the answer.
+      let provenance: FormulaProvenance | null = null
+      try {
+        const position = parseAddress(address)
+        const data = range.getCellDatas()[0]?.[0] as { f?: unknown; si?: unknown } | undefined
+        provenance = formulaProvenance(state, targetSheetId, position.row, position.column, {
+          formula: cell.formula,
+          modelHasFormula: Boolean(data?.f || data?.si),
+          value: cell.value,
+          rawValue: cell.rawValue,
+        })
+      } catch {
+        provenance = null
+      }
+      if (provenance) {
+        read.formula = provenance.formula
+        read.valueSource = provenance.source
+        if (provenance.stale) read.staleCache = true
+        if (provenance.engineResult !== undefined) read.engineResult = provenance.engineResult
+      }
+      result[address] = read
     }
     return result
   }

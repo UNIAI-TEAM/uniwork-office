@@ -242,6 +242,10 @@ export interface SheetsSkillDeps {
         aggregate: RangeAggregate
         /** hidden/filtered rows inside the range (included or skipped per options) */
         hiddenRows?: number
+        /** formula cells whose counted value is the file's cached result */
+        cachedFormulaCells?: number
+        /** cached formula values counted while inputs were edited this session */
+        staleCache?: boolean
       }
     | { ok: false; error: string }
   >
@@ -840,6 +844,38 @@ function cellTypeNote(cell: CellRead): string | null {
   return parts.join('; ')
 }
 
+/**
+ * A read cell's text plus its notes. A formula value that is the file's
+ * cached result is labelled; once inputs were edited this session it is
+ * replaced by NOT RECALCULATED so it can never pass for the answer.
+ */
+function describeReadCell(cell: CellRead): { text: string; notes: string[] } {
+  const notes: string[] = []
+  const typeNote = cellTypeNote(cell)
+  if (cell.valueSource === 'cache' && cell.formula) {
+    const formula = escapeCellText(cell.formula)
+    const shown = cell.value === null ? '(empty)' : escapeCellText(String(cell.value))
+    const engine =
+      cell.engineResult !== undefined
+        ? `the formula engine cannot calculate this formula (it returns ${escapeCellText(String(cell.engineResult))}); `
+        : ''
+    if (cell.staleCache) {
+      notes.push(
+        `not recalculated — ${engine}the file's cached value from the last save (${shown}) may be out of date ` +
+          'because cells were edited this session; do not give it as the answer',
+      )
+      return { text: `NOT RECALCULATED (${formula})`, notes }
+    }
+    if (typeNote) notes.push(typeNote)
+    notes.push(
+      `cached value from the file — ${engine}not recalculated by this app; no inputs were edited this session`,
+    )
+    return { text: formatCellScalar(cell), notes }
+  }
+  if (typeNote) notes.push(typeNote)
+  return { text: formatCellScalar(cell), notes }
+}
+
 /** Cap on the per-cell type lines read_range lists under its grid. */
 const MAX_TYPE_NOTES = 200
 
@@ -945,13 +981,15 @@ export function executeWorkbookTool(
           for (let column = bounds.startColumn; column <= bounds.endColumn; column += 1) {
             const address = formatAddress(row, column)
             const cell = cells[address]
-            const note = cell ? cellTypeNote(cell) : null
-            if (note) typeNotes.push(`${address}: ${note}`)
+            const described = cell ? describeReadCell(cell) : null
+            if (described && described.notes.length > 0) {
+              typeNotes.push(`${address}: ${described.notes.join('; ')}`)
+            }
             columns.push(
               cell
-                ? cell.value === null
+                ? cell.value === null && cell.valueSource !== 'cache'
                   ? escapeCellText(cell.formula ?? '')
-                  : formatCellScalar(cell)
+                  : (described?.text ?? '')
                 : '',
             )
           }
@@ -959,7 +997,7 @@ export function executeWorkbookTool(
         }
         if (typeNotes.length > 0) {
           rows.push(
-            'Cell types (cells not listed hold plain text or General-format numbers; raw = the stored value behind the shown text):',
+            'Cell types and value sources (cells not listed hold plain text, General-format numbers or freshly calculated formulas; raw = the stored value behind the shown text):',
             ...typeNotes.slice(0, MAX_TYPE_NOTES),
           )
           if (typeNotes.length > MAX_TYPE_NOTES) {
@@ -1045,8 +1083,25 @@ export function executeWorkbookTool(
               : hiddenMode === 'skip'
                 ? `- hidden/filtered rows in the range: ${outcome.hiddenRows.toLocaleString('en-US')} (SKIPPED — the statistics cover visible rows only)`
                 : `- hidden/filtered rows in the range: ${outcome.hiddenRows.toLocaleString('en-US')} (INCLUDED in the statistics; pass skipHiddenRows=true for visible rows only)`
+        const cached = outcome.cachedFormulaCells ?? 0
+        if (cached > 0 && outcome.staleCache) {
+          return {
+            output:
+              `NOT RECALCULATED: ${cached.toLocaleString('en-US')} formula cell(s) in ${rangeLabel} hold the file's cached values ` +
+              'from the last save, and cells were edited this session, so statistics over them may be out of date — ' +
+              'they are withheld. Do not give a total for this range as the answer; tell the user it could not be recalculated ' +
+              '(writing the formula on a sheet lets the engine calculate it live), or aggregate a range without formulas.\n' +
+              hiddenLine,
+            mutated: false,
+            summary: t('aiToolAggregateOf', { range: rangeLabel }),
+          }
+        }
+        const cachedLine =
+          cached > 0
+            ? `\n- ${cached.toLocaleString('en-US')} formula cells counted with their cached values from the file (not recalculated by this app; no inputs were edited this session) — say so in your answer`
+            : ''
         return {
-          output: `${formatRangeAggregate(rangeLabel, outcome.aggregate, topValues)}\n${hiddenLine}`,
+          output: `${formatRangeAggregate(rangeLabel, outcome.aggregate, topValues)}\n${hiddenLine}${cachedLine}`,
           mutated: false,
           summary: t('aiToolAggregateOf', { range: rangeLabel }),
         }
@@ -1157,8 +1212,8 @@ export function executeWorkbookTool(
         const lines = addresses.map((addr) => {
           const cell = cells[addr]
           if (!cell) return `${addr}: (unknown)`
-          const note = cellTypeNote(cell)
-          return `${addr}: ${formatCellScalar(cell)}${note ? ` [${note}]` : ''}`
+          const { text, notes } = describeReadCell(cell)
+          return `${addr}: ${text}${notes.length > 0 ? ` [${notes.join('; ')}]` : ''}`
         })
         if (unread > 0) {
           lines.unshift(
