@@ -14,6 +14,14 @@
  * - focus: the safe primary the caller named first (never a destructive one; without one, e.g. the
  *   save conflict, the cancel choice, so Enter never discards edits),
  *   Tab stays inside, Escape = `cancelId`, focus returns to where it was when it closes.
+ *
+ * `openFrameDialog` is the multi-step form (the save conflict, ./conflict-dialog.ts): a later step
+ * replaces the card's content in place (never a second dialog), a `content` slot sits between the
+ * body and the actions (comparison table, notes), choices may be `aria-disabled` with a reason and
+ * stay in the Tab loop (every focusable element of the card, in DOM order), the card keeps one
+ * fixed role=alert line (collapsed when empty, never display:none) and an `h2[tabindex=-1]` title
+ * that takes the focus when a variant changes in place. While a dialog is open the rest of the
+ * frame is `inert` and `onFrameModal` listeners hear open / closed (the protocol `modal` event).
  */
 import { webLanguage } from '../../docs/bridge/browser'
 import './frame-dialog.css'
@@ -27,18 +35,42 @@ export interface FrameChoice<T extends string> {
   primary?: boolean
   /** destructive (Overwrite, Discard): soft red, never the initial focus */
   danger?: boolean
+  /**
+   * shown and kept in the Tab order but not runnable (`aria-disabled`, never the native
+   * `disabled`, so keyboard and screen-reader users still reach it and hear why)
+   */
+  disabled?: boolean
+  /** already translated: why a disabled choice cannot run (its `aria-describedby`) */
+  reason?: string
 }
 
-export interface FrameDialogOptions<T extends string> {
+/** the first-focus target that is the dialog's own title (a variant changed in place) */
+export const FOCUS_TITLE = '@title'
+
+/** one step of a dialog: a later step replaces the content of the same card (no stacking) */
+export interface FrameDialogStep<T extends string> {
   title: string
   body: string
   /** extra muted lines under the body (names, times) */
   details?: readonly string[]
+  /** DOM slot between the body and the actions (comparison table, radio group) */
+  content?: HTMLElement
   choices: readonly FrameChoice<T>[]
   /** resolved on Escape; when it names one of `choices`, that button is the quiet way out */
   cancelId: T
-  /** the button that takes the first focus (default: the named safe primary, else the cancel choice) */
-  focusId?: T
+  /** what the close X answers (default: `cancelId`) */
+  closeId?: T
+  /**
+   * the first focus (default: the named safe primary, else the cancel choice); `FOCUS_TITLE`
+   * focuses the title, for a variant that changed in place
+   */
+  focusId?: T | typeof FOCUS_TITLE
+  /** the dialog's own alert line (role=alert, always in the tree; empty = collapsed) */
+  alert?: string
+}
+
+/** where the dialog lives: one card, marker and backdrop, whatever step it shows */
+export interface FrameDialogFrame {
   /** accessible name of the close X (already translated; default: the shared "Close") */
   closeLabel?: string
   /** the dialog's marker value (tests and e2e) */
@@ -49,6 +81,10 @@ export interface FrameDialogOptions<T extends string> {
   maskClass?: string
   /** called after the dialog was added and after it was removed */
   onChange?: () => void
+}
+
+export interface FrameDialogOptions<T extends string> extends FrameDialogStep<T>, FrameDialogFrame {
+  focusId?: T
 }
 
 export const FRAME_DIALOG_MARKER_ATTR = 'data-office-web'
@@ -62,7 +98,7 @@ function build(opts: {
   marker: string
   markerAttr?: string
   maskClass?: string
-}): { mask: HTMLElement; card: HTMLElement } {
+}): { mask: HTMLElement; card: HTMLElement; head: HTMLElement; id: string } {
   const id = `ow-dlg-${++seq}`
   const mask = document.createElement('div')
   mask.className = opts.maskClass ? `ow-dlg-mask ${opts.maskClass}` : 'ow-dlg-mask'
@@ -92,7 +128,7 @@ function build(opts: {
   }
   card.append(head)
   mask.append(card)
-  return { mask, card }
+  return { mask, card, head, id }
 }
 
 type Tone = 'primary' | 'neutral' | 'danger' | 'ghost'
@@ -134,68 +170,230 @@ function closeButton(label: string): HTMLButtonElement {
   return b
 }
 
-/** modal choice; resolves with the chosen id, or `cancelId` on Escape */
-export function frameAsk<T extends string>(opts: FrameDialogOptions<T>): Promise<T> {
-  return new Promise<T>((resolve) => {
-    const { mask, card } = build(opts)
-    const returnTo = document.activeElement as HTMLElement | null
-    const actions = document.createElement('div')
-    actions.className = 'ow-dlg-actions'
-    const buttons: HTMLButtonElement[] = []
-    const finish = (id: T): void => {
-      document.removeEventListener('keydown', onKey, true)
-      mask.remove()
-      opts.onChange?.()
-      if (returnTo?.isConnected) returnTo.focus({ preventScroll: true })
-      resolve(id)
-    }
-    const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        e.stopPropagation()
-        finish(opts.cancelId)
-        return
-      }
-      if (e.key !== 'Tab' || buttons.length === 0) return
+const FOCUSABLE =
+  'button, [href], input, select, textarea, summary, [tabindex]:not([tabindex="-1"])'
+
+/** every element of the card the Tab key reaches, in DOM order (aria-disabled ones included) */
+function tabStops(card: HTMLElement): HTMLElement[] {
+  return [...card.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
+    (el) => !el.hasAttribute('disabled') && !el.closest('[hidden]'),
+  )
+}
+
+// ------------------------------------------------------------ open-dialog tracking
+
+type ModalListener = (open: boolean) => void
+const modalListeners = new Set<ModalListener>()
+let reportedOpen = false
+const MODAL_ATTR = 'data-ow-modal'
+
+/** read from the DOM, so a dialog removed by anyone (or a reset body) still reports closed */
+function syncModal(): void {
+  if (typeof document === 'undefined') return
+  const open = document.querySelector(`[${MODAL_ATTR}]`) !== null
+  if (open === reportedOpen) return
+  reportedOpen = open
+  for (const l of modalListeners) l(open)
+}
+
+/**
+ * Hear when the first frame dialog opens and the last one closes (the bridge forwards it as the
+ * protocol `modal` event, so the host inerts its own page and pauses its save watchdog).
+ */
+export function onFrameModal(listener: ModalListener): () => void {
+  modalListeners.add(listener)
+  reportedOpen =
+    typeof document !== 'undefined' && document.querySelector(`[${MODAL_ATTR}]`) !== null
+  return () => modalListeners.delete(listener)
+}
+
+/** the rest of the frame leaves the tree while a dialog is open (screen-reader browse mode too) */
+function inertSiblings(mask: HTMLElement): () => void {
+  const changed: Element[] = []
+  for (const el of document.body.children) {
+    if (el === mask || el.hasAttribute('inert')) continue
+    el.setAttribute('inert', '')
+    changed.push(el)
+  }
+  return () => {
+    for (const el of changed) el.removeAttribute('inert')
+  }
+}
+
+export interface FrameDialogHandle<T extends string> {
+  /** shows a step in the same card; resolves with the chosen id (Escape: `cancelId`) */
+  step(step: FrameDialogStep<T>, opts?: { closeOnAnswer?: boolean }): Promise<T>
+  /** writes the dialog's own alert line (empty clears it) */
+  setAlert(text: string): void
+  /** removes the dialog and returns the focus to where it was when it opened */
+  close(): void
+  readonly card: HTMLElement
+}
+
+/**
+ * A modal dialog that can change its content in place (a confirmation step, a variant after a
+ * failure) without stacking a second dialog. `frameAsk` is the one-step use.
+ */
+export function openFrameDialog<T extends string>(
+  frame: FrameDialogFrame & { title?: string; body?: string },
+): FrameDialogHandle<T> {
+  const { mask, card, head, id } = build({
+    title: frame.title ?? '',
+    body: frame.body ?? '',
+    marker: frame.marker,
+    ...(frame.markerAttr ? { markerAttr: frame.markerAttr } : {}),
+    ...(frame.maskClass ? { maskClass: frame.maskClass } : {}),
+  })
+  const title = head.querySelector<HTMLElement>('.ow-dlg-title')!
+  title.tabIndex = -1
+  const body = head.querySelector<HTMLElement>('.ow-dlg-body')!
+  const details = document.createElement('div')
+  details.className = 'ow-dlg-details'
+  const slot = document.createElement('div')
+  slot.className = 'ow-dlg-content'
+  // the dialog's own alert node: fixed from the start, never display:none, collapsed when empty
+  const alert = document.createElement('div')
+  alert.className = 'ow-dlg-alert'
+  alert.setAttribute('role', 'alert')
+  const reasons = document.createElement('div')
+  reasons.className = 'ow-dlg-reasons'
+  head.append(details, slot, alert, reasons)
+  const actions = document.createElement('div')
+  actions.className = 'ow-dlg-actions'
+  const x = closeButton(frame.closeLabel ?? webText(webLanguage(), 'webClose'))
+  card.append(actions, x)
+
+  const returnTo = document.activeElement as HTMLElement | null
+  let current: {
+    step: FrameDialogStep<T>
+    resolve: (id: T) => void
+    closeOnAnswer: boolean
+  } | null = null
+  let closed = false
+
+  const answer = (choice: T): void => {
+    const pending = current
+    current = null
+    // a one-step dialog is gone before its caller hears the answer (frameAsk)
+    if (pending?.closeOnAnswer) handle.close()
+    pending?.resolve(choice)
+  }
+  const onKey = (e: KeyboardEvent): void => {
+    if (e.key === 'Escape') {
       e.preventDefault()
       e.stopPropagation()
-      const at = buttons.indexOf(document.activeElement as HTMLButtonElement)
-      const step = e.shiftKey ? -1 : 1
-      buttons[at < 0 ? 0 : (at + step + buttons.length) % buttons.length]!.focus()
+      if (current) answer(current.step.cancelId)
+      return
     }
-    const tones = tonesOf(opts.choices, opts.cancelId)
-    const ordered = opts.choices
+    if (e.key !== 'Tab') return
+    e.preventDefault()
+    e.stopPropagation()
+    const stops = tabStops(card)
+    if (stops.length === 0) return
+    const at = stops.indexOf(document.activeElement as HTMLElement)
+    const step = e.shiftKey ? -1 : 1
+    const next =
+      at < 0 ? (e.shiftKey ? stops.length - 1 : 0) : (at + step + stops.length) % stops.length
+    stops[next]!.focus()
+  }
+  x.addEventListener('click', () => {
+    if (current) answer(current.step.closeId ?? current.step.cancelId)
+  })
+
+  mask.setAttribute(MODAL_ATTR, '')
+  document.addEventListener('keydown', onKey, true)
+  document.body.append(mask)
+  const restore = inertSiblings(mask)
+  syncModal()
+  frame.onChange?.()
+
+  function render(step: FrameDialogStep<T>): void {
+    title.textContent = step.title
+    body.textContent = step.body
+    details.replaceChildren(
+      ...(step.details ?? []).map((line) => {
+        const d = document.createElement('p')
+        d.className = 'ow-dlg-detail'
+        d.textContent = line
+        return d
+      }),
+    )
+    slot.replaceChildren(...(step.content ? [step.content] : []))
+    alert.textContent = step.alert ?? ''
+    reasons.replaceChildren()
+    actions.replaceChildren()
+    const tones = tonesOf(step.choices, step.cancelId)
+    const ordered = step.choices
       .map((c, i) => ({ c, i, tone: tones[i]! }))
       .sort((a, b) => RANK[a.tone] - RANK[b.tone] || a.i - b.i)
     // the first focus: the caller's pick, else the primary the caller named (never destructive),
-    // else the way out. A primary that was only lifted for looks (the save conflict's Reload
-    // latest) never takes the focus: Enter on it would discard edits, so the non-destructive
-    // way out is the default there, the same safe default as the leave and draft dialogs.
+    // else the way out. A primary that was only lifted for looks never takes the focus: Enter
+    // on it could discard edits, so the non-destructive way out is the default there.
     const safeId =
-      opts.focusId ?? opts.choices.find((c) => c.primary && !c.danger)?.id ?? opts.cancelId
-    let initial: HTMLButtonElement | null = null
-    let fallback: HTMLButtonElement | null = null
+      step.focusId ?? step.choices.find((c) => c.primary && !c.danger)?.id ?? step.cancelId
+    let initial: HTMLElement | null = safeId === FOCUS_TITLE ? title : null
+    let fallback: HTMLElement | null = null
     for (const { c, tone } of ordered) {
       const b = document.createElement('button')
       b.type = 'button'
       b.dataset.choice = c.id
       b.className = tone === 'neutral' ? 'ow-dlg-btn' : `ow-dlg-btn ${tone}`
       b.textContent = c.label
-      b.addEventListener('click', () => finish(c.id))
+      if (c.disabled) {
+        b.setAttribute('aria-disabled', 'true')
+        if (c.reason) {
+          const r = document.createElement('p')
+          r.className = 'ow-dlg-reason'
+          r.id = `${id}-why-${c.id}`
+          r.textContent = c.reason
+          reasons.append(r)
+          b.setAttribute('aria-describedby', r.id)
+        }
+      }
+      b.addEventListener('click', () => {
+        if (b.getAttribute('aria-disabled') === 'true') return
+        answer(c.id)
+      })
       actions.append(b)
-      buttons.push(b)
       if (c.id === safeId) initial = b
       else if (!fallback && tone !== 'danger') fallback = b
     }
-    const x = closeButton(opts.closeLabel ?? webText(webLanguage(), 'webClose'))
-    x.addEventListener('click', () => finish(opts.cancelId))
-    buttons.push(x)
-    card.append(actions, x)
-    document.addEventListener('keydown', onKey, true)
-    document.body.append(mask)
-    opts.onChange?.()
-    ;(initial ?? fallback ?? buttons[0])?.focus()
-  })
+    ;(initial ?? fallback ?? actions.querySelector('button') ?? x).focus()
+  }
+
+  const handle: FrameDialogHandle<T> = {
+    card,
+    step(step, opts) {
+      if (closed) return Promise.resolve(step.cancelId)
+      const prior = current
+      return new Promise<T>((resolve) => {
+        current = { step, resolve, closeOnAnswer: opts?.closeOnAnswer === true }
+        // a caller that replaces an unanswered step gets that step's way out
+        prior?.resolve(prior.step.cancelId)
+        render(step)
+      })
+    },
+    setAlert(text) {
+      alert.textContent = text
+    },
+    close() {
+      if (closed) return
+      closed = true
+      document.removeEventListener('keydown', onKey, true)
+      if (current) answer(current.step.cancelId)
+      mask.remove()
+      restore()
+      syncModal()
+      frame.onChange?.()
+      if (returnTo?.isConnected) returnTo.focus({ preventScroll: true })
+    },
+  }
+  return handle
+}
+
+/** modal choice; resolves with the chosen id, or `cancelId` on Escape */
+export function frameAsk<T extends string>(opts: FrameDialogOptions<T>): Promise<T> {
+  return openFrameDialog<T>(opts).step(opts, { closeOnAnswer: true })
 }
 
 /** blocking notice without buttons (the host decides what happens next); returns its backdrop */
