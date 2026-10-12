@@ -775,6 +775,7 @@ export function createHtmlSkillCore(access: HtmlDocAccess): {
               output:
                 'questionnaire cards are not available here; decide sensible defaults and continue',
               isError: true,
+              mutated: false,
               summary: t('aiToolClarify'),
             }
           const raw = Array.isArray(call.input.questions) ? call.input.questions : []
@@ -794,6 +795,7 @@ export function createHtmlSkillCore(access: HtmlDocAccess): {
             return {
               output: 'questions must be non-empty and every question needs options',
               isError: true,
+              mutated: false,
               summary: t('aiToolClarify'),
             }
           return access.askClarification(questions).then((r) =>
@@ -801,10 +803,12 @@ export function createHtmlSkillCore(access: HtmlDocAccess): {
               ? {
                   output:
                     'The user skipped the questionnaire. Decide the core hook and style yourself, then call plan_page.',
+                  mutated: false,
                   summary: t('aiToolClarifySkipped'),
                 }
               : {
                   output: `User answers:\n${r.answers}\nNow call plan_page with a brief that follows these choices.`,
+                  mutated: false,
                   summary: t('aiToolClarify'),
                 },
           )
