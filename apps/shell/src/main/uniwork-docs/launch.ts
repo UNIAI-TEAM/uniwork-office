@@ -13,8 +13,10 @@ import type { LaunchDescriptor } from './parse'
  * "Open in desktop app" from the UniWork web:
  * `uniwork-office[-dev]://open?ticket=<t>&deploymentId=&apiOrigin=&clientId=&channel=`.
  * The four profile parameters are all-or-nothing (the server the link was made
- * on); a link without them is the older ticket-only form. `open` with neither
- * a ticket nor a profile, or a bare scheme, only brings the window forward.
+ * on); a link without them is the older ticket-only form. `home` (the web's
+ * "Open UniWork Office") is the same without a ticket: it opens the home
+ * screen and may carry the profile. `open` or `home` with nothing, or a bare
+ * scheme, only brings the window forward.
  * The parser is the only place a launch URL is read; the ticket and the
  * profile are the values that cross it, and a refusal never echoes the URL,
  * the ticket or the profile.
@@ -25,6 +27,7 @@ import type { LaunchDescriptor } from './parse'
  */
 
 const LAUNCH_HOST = 'open'
+const HOME_HOST = 'home'
 const TICKET_MAX = 192
 const TICKET_MIN = 39
 const TICKET = /^ticket_[A-Za-z0-9_-]{32,185}$/
@@ -76,12 +79,13 @@ export function parseOfficeDeepLink(value: unknown, scheme: string): DeepLinkPar
   ) {
     return { ok: true, ticket: null, profile: null }
   }
-  if (url.hostname !== LAUNCH_HOST) return reject('wrong_host')
+  if (url.hostname !== LAUNCH_HOST && url.hostname !== HOME_HOST) return reject('wrong_host')
   // `://open?ticket=` normalizes to an empty path; a single slash is the same
   if (url.pathname !== '' && url.pathname !== '/') return reject('wrong_path')
   if (url.hash || value.includes('#')) return reject('fragment_not_allowed')
   const params = [...url.searchParams.entries()]
-  const known = new Set<string>(['ticket', ...PROFILE_KEYS])
+  // the home route names no document, so it never carries a ticket
+  const known = new Set<string>(url.hostname === HOME_HOST ? PROFILE_KEYS : ['ticket', ...PROFILE_KEYS])
   if (params.some(([key]) => !known.has(key))) return reject('unexpected_parameter')
   const tickets = params.filter(([key]) => key === 'ticket')
   if (tickets.length > 1) return reject('duplicate_ticket')

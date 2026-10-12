@@ -221,6 +221,26 @@ describe('deep-link parser: the server profile', () => {
       profile: PROFILE,
     })
   })
+  it('reads the home route: the profile, never a ticket', () => {
+    expect(parseOfficeDeepLink(`${SCHEME}://home?${PROFILE_QUERY}`, SCHEME)).toEqual({
+      ok: true,
+      ticket: null,
+      profile: PROFILE,
+    })
+    expect(parseOfficeDeepLink(`${SCHEME}://home`, SCHEME)).toEqual({
+      ok: true,
+      ticket: null,
+      profile: null,
+    })
+    expect(parseOfficeDeepLink(`${SCHEME}://home?ticket=${TICKET}`, SCHEME)).toEqual({
+      ok: false,
+      reason: 'unexpected_parameter',
+    })
+    expect(parseOfficeDeepLink(`${SCHEME}://home/x?${PROFILE_QUERY}`, SCHEME)).toEqual({
+      ok: false,
+      reason: 'wrong_path',
+    })
+  })
   it('keeps the old ticket-only link valid', () => {
     expect(parseOfficeDeepLink(link(TICKET), SCHEME)).toMatchObject({ ok: true, profile: null })
   })
@@ -532,6 +552,8 @@ describe('launch controller: the server profile comes before the ticket', () => 
   it('routes the bare scheme and the profile link to the launch route, not sign-in', () => {
     expect(isAuthCallbackUrl(`${SCHEME}://`)).toBe(false)
     expect(isAuthCallbackUrl(`${SCHEME}://open?${PROFILE_QUERY}`)).toBe(false)
+    expect(isAuthCallbackUrl(`${SCHEME}://home?${PROFILE_QUERY}`)).toBe(false)
+    expect(isAuthCallbackUrl(`${SCHEME}://homepage`)).toBe(true)
     expect(isAuthCallbackUrl(`${SCHEME}://auth/callback?code=a&state=b`)).toBe(true)
   })
 })
