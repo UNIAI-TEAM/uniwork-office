@@ -813,7 +813,7 @@ function pickDraftPath(draftsDir: string, deckName?: string): string {
  * On write failure, degrade silently (console.warn) without blocking the in-memory session.
  * A UniWork-bound deck is never drafted: the generated pages stay in the editor (unsaved)
  * until the user saves, so nothing is written outside the document and the session keeps
- * its path. Returns false in that case.
+ * its path. Returns false in that case, and when the draft write fails.
  */
 async function saveDraftAfterGenerate(
   wc: WebContents,
@@ -845,6 +845,7 @@ async function saveDraftAfterGenerate(
       '[slides] Failed to persist AI-generated draft to disk; the in-memory session still works:',
       err,
     )
+    return false
   }
   return true
 }
