@@ -23,6 +23,13 @@ export default defineConfig({
       '@genoffice/electron-utils/safe-external-url': local(
         '../../packages/electron-utils/src/safe-external-url.ts',
       ),
+      '@genoffice/electron-utils/ai-run-bridge': local(
+        '../../packages/electron-utils/src/ai-run-bridge.ts',
+      ),
+      '@genoffice/electron-utils/ai-run': local('../../packages/electron-utils/src/ai-run.ts'),
+      '@genoffice/electron-utils/drop-open': local(
+        '../../packages/electron-utils/src/drop-open.ts',
+      ),
       '@genoffice/electron-utils': local('../../packages/electron-utils/src/index.ts'),
       '@genoffice/ai-provider/browser': local('../../packages/ai-provider/src/browser.ts'),
       '@genoffice/ai-provider/codex-app-server': local(

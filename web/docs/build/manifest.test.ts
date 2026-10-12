@@ -4,7 +4,15 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import zlib from 'node:zlib'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { buildManifest, initialPaths, kindOf, MANIFEST_FILE, verifyManifest } from './manifest'
+import {
+  buildManifest,
+  initialPaths,
+  kindOf,
+  MANIFEST_FILE,
+  PROTOCOL_DIR,
+  protocolSha256,
+  verifyManifest,
+} from './manifest'
 import type { VersionInfo } from './version'
 
 const VERSION: VersionInfo = {
@@ -80,6 +88,33 @@ describe('buildManifest', () => {
     })
     expect(m.totalBytes).toBe(m.files.reduce((n, f) => n + f.bytes, 0))
     expect(m.gzipBytes).toBe(m.files.reduce((n, f) => n + f.gzipBytes, 0))
+  })
+
+  it('records the sha256 of the three frame protocol files (X-02 pin)', () => {
+    const m = buildManifest({ dir, version: VERSION, builtAt: BUILT_AT })
+    const raw = (file: string) => sha(readFileSync(join(PROTOCOL_DIR, file)))
+    expect(m.protocolSha256).toEqual({
+      protocol: raw('types.ts'),
+      endpoint: raw('endpoint.ts'),
+      host: raw('host.ts'),
+    })
+    for (const digest of Object.values(m.protocolSha256)) expect(digest).toMatch(/^[0-9a-f]{64}$/)
+  })
+
+  it('hashes the protocol files byte for byte, from the directory it is given', () => {
+    const proto = join(dir, 'proto')
+    const types = 'export type A = 1\n'
+    const endpoint = "import type { A } from './types'\r\n"
+    const host = 'export {}\n'
+    put('proto/types.ts', types)
+    put('proto/endpoint.ts', endpoint)
+    put('proto/host.ts', host)
+    expect(protocolSha256(proto)).toEqual({
+      protocol: sha(types),
+      endpoint: sha(endpoint),
+      host: sha(host),
+    })
+    expect(() => protocolSha256(join(dir, 'missing'))).toThrow()
   })
 
   it('splits initial (static closure from the entry) from deferred (lazy chunk, font)', () => {

@@ -151,6 +151,7 @@ vi.mock('../../html/src/main/html-main', () => ({
   requestHtmlClose: (...args: unknown[]) => requestHtmlClose(...(args as [])),
 }))
 
+import { noteAiRun, resetAiRunRegistry } from '../src/main/ai-run-registry'
 import { TabManager } from '../src/main/tab-manager'
 import type { TabKind } from '../src/shared/tabs-api'
 
@@ -204,6 +205,7 @@ function lastCreatedView(factory: ReturnType<typeof vi.fn>): FakeView {
 }
 
 beforeEach(() => {
+  resetAiRunRegistry()
   vi.clearAllMocks()
   nextWebContentsId = 1
   docsQueryDirty.mockImplementation(() => Promise.resolve(false))
@@ -1057,6 +1059,12 @@ describe('file path bookkeeping', () => {
   })
 })
 
+/** the live view of the tab showing `path` */
+function viewOfPath(path: string): FakeView {
+  const tabs = (manager as unknown as { tabs: Array<{ filePath?: string; view?: FakeView }> }).tabs
+  return tabs.find((t) => t.filePath === path)!.view!
+}
+
 describe('dirty-tab queries (shell close guard)', () => {
   it('lists only tabs whose module reports unsaved changes', () => {
     const dirtySheetsId = manager.openSheetsTab()
@@ -1090,12 +1098,69 @@ describe('dirty-tab queries (shell close guard)', () => {
     markdownIsDirty.mockImplementation(() => true)
     const states = await manager.editorDirtyStates((path) => path.startsWith('/uw/'))
     expect(states).toEqual([
-      { path: '/uw/a.docx', dirty: null },
-      { path: '/uw/b.md', dirty: true },
+      { path: '/uw/a.docx', dirty: null, aiRunning: false },
+      { path: '/uw/b.md', dirty: true, aiRunning: false },
     ])
     expect(pdfIsDirty).not.toHaveBeenCalled()
     markdownIsDirty.mockImplementation(() => false)
     docsQueryEditorDirty.mockImplementation(() => Promise.resolve(false))
+  })
+
+  it('reports aiRunning for every editor kind from the AI run registry', async () => {
+    const opened: Array<[string, FakeView]> = []
+    manager.openDocsTab('/uw/a.docx')
+    opened.push(['/uw/a.docx', lastCreatedView(createDocsView)])
+    manager.openSheetsTab('/uw/b.xlsx')
+    opened.push(['/uw/b.xlsx', viewOfPath('/uw/b.xlsx')])
+    manager.openSlidesTab('/uw/c.pptx')
+    opened.push(['/uw/c.pptx', viewOfPath('/uw/c.pptx')])
+    manager.openPdfTab('/uw/d.pdf')
+    opened.push(['/uw/d.pdf', viewOfPath('/uw/d.pdf')])
+    manager.openMarkdownTab('/uw/e.md')
+    opened.push(['/uw/e.md', viewOfPath('/uw/e.md')])
+    manager.openHtmlTab('/uw/f.html')
+    opened.push(['/uw/f.html', viewOfPath('/uw/f.html')])
+    for (const [, view] of opened) noteAiRun(view.webContents as never, { state: 'running' })
+    const states = await manager.editorDirtyStates((path) => path.startsWith('/uw/'))
+    expect(states.map((s) => [s.path, s.aiRunning])).toEqual(opened.map(([p]) => [p, true]))
+    noteAiRun(opened[3][1].webContents as never, { state: 'idle' })
+    const after = await manager.editorDirtyStates((path) => path.startsWith('/uw/'))
+    expect(after.find((s) => s.path === '/uw/d.pdf')?.aiRunning).toBe(false)
+  })
+
+  it('a crashed renderer (render-process-gone) reads aiRunning false', async () => {
+    manager.openDocsTab('/uw/a.docx')
+    const view = lastCreatedView(createDocsView)
+    noteAiRun(view.webContents as never, { state: 'running', runId: 'turn-1' })
+    expect((await manager.editorDirtyStates(() => true))[0].aiRunning).toBe(true)
+    view.webContents.listeners.get('render-process-gone')!()
+    expect(await manager.editorDirtyStates(() => true)).toEqual([
+      { path: '/uw/a.docx', dirty: false, aiRunning: false },
+    ])
+  })
+
+  it('a tab closed mid-run (even while its dirty query yields) reads aiRunning false', async () => {
+    const id = manager.openDocsTab('/uw/a.docx')
+    const view = lastCreatedView(createDocsView)
+    noteAiRun(view.webContents as never, { state: 'running', runId: 'turn-1' })
+    let answer: (dirty: boolean) => void = () => undefined
+    docsQueryEditorDirty.mockImplementation(() => new Promise((resolve) => (answer = resolve)))
+    const pending = manager.editorDirtyStates(() => true)
+    manager.closeTabWithoutPrompt(id)
+    answer(false)
+    expect(await pending).toEqual([{ path: '/uw/a.docx', dirty: false, aiRunning: false }])
+    expect(await manager.editorDirtyStates(() => true)).toEqual([])
+    docsQueryEditorDirty.mockImplementation(() => Promise.resolve(false))
+  })
+
+  it('a Present tab adds no entry; its owner tab reports the run', async () => {
+    manager.openHtmlTab('/uw/f.html')
+    const owner = viewOfPath('/uw/f.html')
+    manager.openHtmlPresentTab(owner.webContents as never, 'Preview')
+    noteAiRun(owner.webContents as never, { state: 'running' })
+    expect(await manager.editorDirtyStates(() => true)).toEqual([
+      { path: '/uw/f.html', dirty: false, aiRunning: true },
+    ])
   })
 
   it('lists every live docs tab for the async dirtiness sweep', () => {

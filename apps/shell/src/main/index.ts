@@ -331,6 +331,7 @@ import { FileIndexStore } from './file-index/store'
 import { normalizeFileSearchSettings, probeDecision, SearchReranker } from './file-index/rerank'
 import { runHeadlessExport, type HeadlessExporters } from './headless-export'
 import { isVersionRequest } from './version-flag'
+import { registerAiRunIpc } from './ai-run-registry'
 import { TabManager } from './tab-manager'
 import { installShellCloseGuard } from './window-close-guard'
 import {
@@ -6189,6 +6190,8 @@ registerIntegrationsIpc({
 })
 registerTabsIpc()
 registerDroppedFilesIpc()
+// editors report a running AI turn per webContents (TabManager.editorDirtyStates reads it)
+registerAiRunIpc(ipcMain)
 
 // sheets' project:resolveChat goes through the handler registered by docs-main; the sessionId reverse lookup hooks in here
 setSessionPathResolver(resolveSheetsSessionPath)

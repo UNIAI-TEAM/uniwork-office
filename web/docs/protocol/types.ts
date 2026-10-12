@@ -265,6 +265,17 @@ export type Capability =
    * it the frame shows the "use the app" message only.
    */
   | 'desktopOpen'
+  /**
+   * additive (X-02): the host installed `api.download` (it names, types, size-checks and delivers
+   * the frame's bytes itself). Advertise it in `init` only then; the frame offers a download only
+   * when the effective capabilities have it.
+   */
+  | 'download'
+  /**
+   * additive (X-02): UniWork AI (the cloud agent behind the org entitlement) in the frame's AI panel.
+   * The frame claims it once it has the adapter (G6-05); effective = host grant AND frame claim.
+   */
+  | 'uniworkAi'
 
 export type Capabilities = Partial<Record<Capability, boolean>>
 
@@ -283,6 +294,8 @@ export const CAPABILITY_KEYS: readonly Capability[] = [
   'imageSearch',
   'imageGeneration',
   'desktopOpen',
+  'download',
+  'uniworkAi',
 ]
 
 /**
@@ -317,6 +330,11 @@ export interface FileMeta {
   modifiedAt?: number
   /** false when the user may only view */
   writable?: boolean
+  /**
+   * additive (X-02): the document revision of exactly these bytes, a decimal string (compare as
+   * BigInt, never as text). Absent from hosts before X-02: show no number then.
+   */
+  revision?: string
 }
 
 /** Where the document bytes come from. */
@@ -452,6 +470,35 @@ export interface PrintPayload {
 
 export interface ApiOpenPayload {
   fileId: string
+  /**
+   * additive (X-02, OQ-P3): the version the frame wants (`doc.remoteVersion.version_id`). The host
+   * still answers with the head: when this version is no longer the head it sets
+   * `ApiOpenResult.versionChanged`; an unknown version or one of another document is refused with
+   * `not_found`. A host before X-02 ignores the key and answers the latest without `revision`.
+   */
+  versionId?: string
+}
+
+/**
+ * The `api.open` answer: always the head, its bytes and its `file.revision` from one read (never
+ * an older version's bytes with the head revision).
+ */
+export interface ApiOpenResult extends OpenPayload {
+  /** additive (X-02, OQ-P3): the asked `versionId` was no longer the head; requires `file.revision` */
+  versionChanged?: boolean
+}
+
+/** a document revision on the wire: a non-negative decimal integer string */
+export function isDecimalRevision(x: unknown): x is string {
+  return typeof x === 'string' && x.length <= 20 && /^(0|[1-9][0-9]*)$/.test(x)
+}
+
+/**
+ * The revision the frame may show and save on after an `api.open`: the reply's own, never the one
+ * it asked for. null = a host before X-02 (no number: the "updated" bar without a revision).
+ */
+export function openReplyRevision(reply: Pick<OpenPayload, 'file'>): string | null {
+  return isDecimalRevision(reply.file.revision) ? reply.file.revision : null
 }
 
 export interface ApiSavePayload {
@@ -508,6 +555,21 @@ export interface ApiExportResult {
   name?: string
 }
 
+/**
+ * additive (X-02): hand the open bytes to the host to download (send only with the `download`
+ * capability). Bytes only: the host picks the name, extension, MIME type and size limit, checks
+ * the permission and delivers them from its own origin. Refusals use existing codes
+ * (`malformed`, `too_large`, `forbidden`); a host before X-02 answers `unknown_type`.
+ */
+export interface ApiDownloadPayload {
+  data: ArrayBuffer
+}
+
+export interface ApiDownloadResult {
+  /** the host gave the file to the browser (not: the user saved it) */
+  delivered: true
+}
+
 export interface UploadItem {
   name: string
   mimeType: string
@@ -559,6 +621,34 @@ export interface TitlePayload {
  */
 export interface ModalPayload {
   open: boolean
+}
+
+/**
+ * additive (X-02): a new version of a document was saved elsewhere. Field names are the server's.
+ * The frame ignores an event for another `document_id`; it reloads through `api.open` and takes
+ * the revision from that reply, never from this event.
+ */
+export interface RemoteVersionPayload {
+  document_id: string
+  /** decimal string */
+  revision: string
+  version_id: string
+  /** ISO 8601 */
+  saved_at: string
+  /** only when the viewer may see members; absent = "a member" */
+  author_name?: string
+}
+
+export type AiRunState = 'running' | 'idle'
+
+/**
+ * additive (X-02): an AI turn (UniWork AI, BYOK, CLI) started (`running`) or ended (`idle`, exactly
+ * once per turn). The emit rules and end paths live in EXPERIENCE.md › Foundation; a host treats the
+ * turn as idle when the frame unloads.
+ */
+export interface AiRunPayload {
+  state: AiRunState
+  run_id?: string
 }
 
 export interface ThemePayload {
@@ -694,12 +784,14 @@ export interface HostEvents {
   cancel: CancelPayload
   /** the open document was renamed outside the editor */
   'file.renamed': FileRenamedPayload
+  /** additive (X-02): a newer version was saved elsewhere; frames before X-02 have no listener */
+  'doc.remoteVersion': RemoteVersionPayload
 }
 
 /** Requests the frame sends to the host. `api.*` are proxied to UniWork APIs. */
 export interface FrameRequests {
   'token.refresh': Rpc<TokenRefreshRequestPayload, TokenPayload>
-  'api.open': Rpc<ApiOpenPayload, OpenPayload>
+  'api.open': Rpc<ApiOpenPayload, ApiOpenResult>
   'api.save': Rpc<ApiSavePayload, SaveResult>
   'api.saveAs': Rpc<ApiSaveAsPayload, SaveResult>
   'api.recents': Rpc<ApiRecentsPayload, ApiRecentsResult>
@@ -720,6 +812,8 @@ export interface FrameRequests {
    * `unsupported`; the frame keeps the URLs it has.
    */
   'api.assets.resolve': Rpc<ApiAssetsResolvePayload, ApiAssetsResolveResult>
+  /** additive (X-02): download the open bytes; send only with the `download` capability */
+  'api.download': Rpc<ApiDownloadPayload, ApiDownloadResult>
 }
 
 /** Events the frame sends to the host. */
@@ -735,6 +829,8 @@ export interface FrameEvents {
   error: ErrorEventPayload
   /** frame aborts a frame->host request */
   cancel: CancelPayload
+  /** additive (X-02): an AI turn started / ended; hosts before X-02 have no listener */
+  aiRun: AiRunPayload
 }
 
 export type HostRequestType = keyof HostRequests
@@ -771,6 +867,7 @@ const HOST_EVENTS: Record<HostEventType, true> = {
   language: true,
   cancel: true,
   'file.renamed': true,
+  'doc.remoteVersion': true,
 }
 const FRAME_REQUESTS: Record<FrameRequestType, true> = {
   'token.refresh': true,
@@ -786,6 +883,7 @@ const FRAME_REQUESTS: Record<FrameRequestType, true> = {
   'convert.altChunkHtml': true,
   'app.open': true,
   'api.assets.resolve': true,
+  'api.download': true,
 }
 const FRAME_EVENTS: Record<FrameEventType, true> = {
   ready: true,
@@ -796,6 +894,7 @@ const FRAME_EVENTS: Record<FrameEventType, true> = {
   saved: true,
   error: true,
   cancel: true,
+  aiRun: true,
 }
 export const HOST_REQUEST_TYPES = Object.keys(HOST_REQUESTS) as readonly HostRequestType[]
 export const HOST_EVENT_TYPES = Object.keys(HOST_EVENTS) as readonly HostEventType[]
@@ -865,7 +964,8 @@ export function isFileMeta(x: unknown): x is FileMeta {
     isOpt(x.versionId, isStr) &&
     isOpt(x.etag, isStr) &&
     isOpt(x.modifiedAt, isFiniteNum) &&
-    isOpt(x.writable, isBool)
+    isOpt(x.writable, isBool) &&
+    isOpt(x.revision, isDecimalRevision)
   )
 }
 
@@ -973,10 +1073,18 @@ const PAYLOAD_VALIDATORS: Record<string, (x: unknown) => boolean> = {
   'event:theme': (x) => isObj(x) && isTheme(x.theme),
   'event:language': (x) => isObj(x) && isNonEmptyStr(x.locale),
   'event:cancel': (x) => isObj(x) && isNonEmptyStr(x.id),
+  'event:doc.remoteVersion': (x) =>
+    isObj(x) &&
+    isNonEmptyStr(x.document_id) &&
+    isDecimalRevision(x.revision) &&
+    isNonEmptyStr(x.version_id) &&
+    isNonEmptyStr(x.saved_at) &&
+    isOpt(x.author_name, isStr),
   // frame -> host requests
   'request:token.refresh': (x) =>
     isObj(x) && (x.reason === 'expiring' || x.reason === 'unauthorized'),
-  'request:api.open': (x) => isObj(x) && isNonEmptyStr(x.fileId),
+  'request:api.open': (x) =>
+    isObj(x) && isNonEmptyStr(x.fileId) && isOpt(x.versionId, isNonEmptyStr),
   'request:api.save': (x) =>
     isObj(x) &&
     isNonEmptyStr(x.fileId) &&
@@ -1014,6 +1122,7 @@ const PAYLOAD_VALIDATORS: Record<string, (x: unknown) => boolean> = {
     x.paths.length >= 1 &&
     x.paths.length <= 50 &&
     x.paths.every(isNonEmptyStr),
+  'request:api.download': (x) => isObj(x) && isBuffer(x.data),
   // frame -> host events
   'event:ready': isReadyPayload,
   'event:dirty': (x) => isObj(x) && isBool(x.dirty),
@@ -1023,6 +1132,8 @@ const PAYLOAD_VALIDATORS: Record<string, (x: unknown) => boolean> = {
   'event:saved': (x) =>
     isObj(x) && isFileMeta(x.file) && isOpt(x.versionId, isStr) && isBool(x.initiatedByFrame),
   'event:error': (x) => isObj(x) && isProtocolErrorShape(x.error) && isBool(x.fatal),
+  'event:aiRun': (x) =>
+    isObj(x) && (x.state === 'running' || x.state === 'idle') && isOpt(x.run_id, isNonEmptyStr),
   // successful responses
   'response:init': isInitAck,
   'response:open': (x) => isObj(x) && x.opened === true && isOpt(x.title, isStr),
@@ -1030,7 +1141,12 @@ const PAYLOAD_VALIDATORS: Record<string, (x: unknown) => boolean> = {
   'response:saveAs': isSaveResult,
   'response:print': (x) => isObj(x) && isBool(x.printed),
   'response:token.refresh': isTokenPayload,
-  'response:api.open': isOpenPayload,
+  'response:api.open': (x) =>
+    isObj(x) &&
+    isOpenPayload(x) &&
+    isOpt(x.versionChanged, isBool) &&
+    // a "the version changed" answer always says which revision it carries
+    (x.versionChanged !== true || x.file.revision !== undefined),
   'response:api.save': isSaveResult,
   'response:api.saveAs': isSaveResult,
   'response:api.recents': (x) => isObj(x) && Array.isArray(x.files) && x.files.every(isFileMeta),
@@ -1052,6 +1168,7 @@ const PAYLOAD_VALIDATORS: Record<string, (x: unknown) => boolean> = {
   'response:app.open': (x) =>
     isObj(x) && isStr(x.outcome) && (APP_OPEN_OUTCOMES as readonly string[]).includes(x.outcome),
   'response:convert.altChunkHtml': (x) => isObj(x) && (x.data === null || isBuffer(x.data)),
+  'response:api.download': (x) => isObj(x) && x.delivered === true,
 }
 
 /** Outcome of `parseEnvelope`. */

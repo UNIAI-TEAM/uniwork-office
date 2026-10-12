@@ -10,7 +10,8 @@
  * Moving the session core out of Electron main must leave that trace unchanged.
  *
  * Non-determinism is pinned: Date (fake timers), crypto.randomUUID (counter), Math.random
- * (LCG) and font metrics (heuristic provider instead of the machine's system fonts).
+ * (LCG), font metrics (heuristic provider instead of the machine's system fonts) and the OS
+ * username used as the comment author.
  */
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
@@ -42,6 +43,12 @@ const uuids = vi.hoisted(() => {
 vi.mock('node:crypto', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:crypto')>()
   return { ...actual, randomUUID: uuids }
+})
+// The comment author is the OS username (electron-host-io), which lands in the saved bytes and the
+// comment digests: pin it so the trace does not depend on who runs the test (CI runs as "runner")
+vi.mock('node:os', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:os')>()
+  return { ...actual, userInfo: () => ({ ...actual.userInfo(), username: 'ubuntu' }) }
 })
 vi.mock('../src/main/fonts', async () => {
   const { HeuristicMetrics } = await import('@genoffice/pptx-render')

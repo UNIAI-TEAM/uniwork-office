@@ -114,6 +114,19 @@ export const MODULE_WEB_CAPABILITIES: Readonly<Record<string, unknown>> = Object
   viewOnlyChip: false,
 })
 
+/**
+ * What every frame (Docs and the five modules) claims in `ready` on top of its own keys; each is
+ * effective only with the host grant:
+ *   - the web AI keys (CONTRACT C16; `uniworkAi` stays false until the G6-05 adapter),
+ *   - `desktopOpen`: the host's "Open in desktop app" flow for `app.open` (A7),
+ *   - `download`: the host downloads the open bytes for `api.download` (X-02).
+ */
+export const FRAME_BASE_CAPABILITIES: Capabilities = Object.freeze({
+  ...AI_FRAME_CAPABILITIES,
+  desktopOpen: true,
+  download: true,
+})
+
 /** NO_AUTO_SAVE_DEFAULT of @genoffice/ui auto-save-pref.ts: autosave off, never set */
 const NO_AUTO_SAVE = Object.freeze({ on: false, updatedAt: 0 })
 
@@ -137,8 +150,7 @@ export function installModuleBridge(spec: ModuleBridgeSpec): InstalledModuleBrid
     spec.client ??
     createFrameClient({
       module: spec.module,
-      // desktopOpen: every module frame can ask the host for its "Open in desktop app" flow (A7)
-      capabilities: { ...AI_FRAME_CAPABILITIES, desktopOpen: true, ...spec.frameCapabilities },
+      capabilities: { ...FRAME_BASE_CAPABILITIES, ...spec.frameCapabilities },
       frameVersion: frameVersionFromDocument(),
     })
   const grants = spec.capabilities?.grants ?? hostGrants

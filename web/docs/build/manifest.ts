@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 import { readdirSync, readFileSync } from 'node:fs'
-import { extname, join, posix, relative, resolve, sep } from 'node:path'
+import { dirname, extname, join, posix, relative, resolve, sep } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import zlib from 'node:zlib'
 import type { VersionInfo } from './version'
 
@@ -24,6 +25,38 @@ export interface SizeTotals {
   gzipBytes: number
 }
 
+/**
+ * sha256 of the frame protocol sources this bundle was built from (X-02). The
+ * host vendors the same three files and pins these digests, so a bundle built
+ * against another protocol revision is refused at install. The fork hashes its
+ * raw files; the host normalises its vendored copies to the fork form first
+ * (scripts/office/frame-protocol-vendor.test.mjs on the host side).
+ */
+export interface ProtocolSha256 {
+  /** web/docs/protocol/types.ts */
+  protocol: string
+  /** web/docs/protocol/endpoint.ts */
+  endpoint: string
+  /** web/docs/protocol/host.ts */
+  host: string
+}
+
+/** web/docs/protocol, next to this build directory */
+export const PROTOCOL_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '../protocol')
+
+/** The three protocol digests, hashing the files byte for byte. */
+export function protocolSha256(protocolDir: string = PROTOCOL_DIR): ProtocolSha256 {
+  const digest = (file: string) =>
+    createHash('sha256')
+      .update(readFileSync(join(protocolDir, file)))
+      .digest('hex')
+  return {
+    protocol: digest('types.ts'),
+    endpoint: digest('endpoint.ts'),
+    host: digest('host.ts'),
+  }
+}
+
 export interface Manifest {
   schemaVersion: 1
   /** the genoffice editor this bundle runs (GO-B4/B5/B6): docs, pdf, markdown, html, slides, sheets */
@@ -45,6 +78,7 @@ export interface Manifest {
   initial: SizeTotals
   /** everything else except metadata: fonts (loaded per face, on demand), sourcemaps, lazily imported chunks */
   deferred: SizeTotals
+  protocolSha256: ProtocolSha256
 }
 
 /** files that describe the build and are generated after it; manifest.json itself is never listed (it would hash itself) */
@@ -118,6 +152,8 @@ export interface BuildManifestInput {
   entry?: string
   /** injectable for tests */
   builtAt?: string
+  /** default: web/docs/protocol of this checkout */
+  protocolDir?: string
 }
 
 /** Describe a finished build directory. Pure with respect to the directory contents + `builtAt`. */
@@ -127,6 +163,7 @@ export function buildManifest({
   module = 'docs',
   entry = 'index.html',
   builtAt = new Date().toISOString(),
+  protocolDir = PROTOCOL_DIR,
 }: BuildManifestInput): Manifest {
   const root = resolve(dir)
   const rels = walk(root)
@@ -167,6 +204,7 @@ export function buildManifest({
     gzipBytes: totals.gzipBytes,
     initial: sum(files.filter((f) => f.initial)),
     deferred: sum(files.filter((f) => !f.initial && f.kind !== 'meta')),
+    protocolSha256: protocolSha256(protocolDir),
   }
 }
 
