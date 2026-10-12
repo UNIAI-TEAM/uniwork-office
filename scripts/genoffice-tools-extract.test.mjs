@@ -673,6 +673,210 @@ describe('editor_write routing', () => {
   })
 })
 
+describe('name anchor hardening (N1/N2)', () => {
+  // N1 (negative): only `AgentToolDef` (and `AgentTool`) name a tool *definition*.
+  // An array annotated `AgentToolCall[]` / `AgentToolResult[]` holds call/result
+  // records, not tool definitions: a `{ name, description }` element there must
+  // yield no row, while the real `AgentToolDef[]` list next to it still yields
+  // its own members (including the schema-less one).
+  const CALL_RESULT_TYPES_FIXTURE = {
+    'apps/docs/src/renderer/ai/tools.ts': [
+      "import type { AgentToolCall, AgentToolDef, AgentToolResult } from '@genoffice/agent-core'",
+      '',
+      '// a call record has `name` too — it is not a tool definition',
+      'const CALLS: AgentToolCall[] = [',
+      "  { name: 'call_like', description: 'looks like a tool call' },",
+      ']',
+      '',
+      '// a result record has `name` too — it is not a tool definition',
+      'const RESULTS: AgentToolResult[] = [',
+      "  { name: 'result_like', description: 'looks like a tool result' },",
+      ']',
+      '',
+      'export const AGENT_TOOLS: AgentToolDef[] = [',
+      '  {',
+      "    name: 'real_tool',",
+      "    description: 'a real tool in the annotated list',",
+      "    inputSchema: { type: 'object', properties: {} },",
+      '  },',
+      '  {',
+      "    name: 'real_schemaless',",
+      "    description: 'a real schema-less tool, still in the list',",
+      '  },',
+      ']',
+      '',
+      'export function touch(): void {',
+      '  void CALLS',
+      '  void RESULTS',
+      '}',
+      '',
+    ].join('\n'),
+  }
+
+  it('ignores {name, description} elements of AgentToolCall[]/AgentToolResult[] (N1)', () => {
+    const { dir } = fixture(CALL_RESULT_TYPES_FIXTURE)
+    const { rows } = extract({ repo: dir, rev: 'HEAD' })
+    const tools = rows.map((r) => r.tool).sort()
+    assert.deepEqual(tools, ['real_schemaless', 'real_tool'])
+    const schemaless = rows.find((r) => r.tool === 'real_schemaless')
+    assert.equal(schemaless.hash, 'unresolved:missing')
+  })
+
+  it('still finds a schema-less member of an AgentToolDef[] list (N1)', () => {
+    const { dir } = fixture(CALL_RESULT_TYPES_FIXTURE)
+    const { rows } = extract({ repo: dir, rev: 'HEAD' })
+    assert.ok(
+      rows.some((r) => r.tool === 'real_schemaless'),
+      'the AgentToolDef[] schema-less member must keep its row',
+    )
+  })
+
+  // N2 (positive): a schema-less tool written as a returned array literal inside a
+  // `get tools()` accessor is a tools list, so the `name` anchor must fire and
+  // report `unresolved:missing` instead of dropping the tool silently.
+  const RETURNED_LITERAL_FIXTURE = {
+    'apps/docs/src/renderer/ai/tools.ts': [
+      "import type { AgentSkill } from '@genoffice/agent-core'",
+      '',
+      'export function createDocsSkill(): AgentSkill {',
+      '  return {',
+      "    id: 'docs',",
+      '    get tools() {',
+      '      return [',
+      '        {',
+      "          name: 'ret_tool',",
+      "          description: 'schema-less tool in a returned array literal',",
+      '        },',
+      '        {',
+      "          name: 'ret_tool2',",
+      "          description: 'a tool with a schema in the same literal',",
+      "          inputSchema: { type: 'object', properties: {} },",
+      '        },',
+      '      ]',
+      '    },',
+      '  }',
+      '}',
+      '',
+    ].join('\n'),
+  }
+
+  it('reports a schema-less tool in a `get tools()` returned literal (N2)', () => {
+    const { dir } = fixture(RETURNED_LITERAL_FIXTURE)
+    const { rows } = extract({ repo: dir, rev: 'HEAD' })
+    const ret = rows.find((r) => r.tool === 'ret_tool')
+    assert.ok(ret, 'the schema-less tool must get a row')
+    assert.equal(ret.hash, 'unresolved:missing')
+    assert.ok(rows.some((r) => r.tool === 'ret_tool2'))
+  })
+
+  // N2 (positive): the same shape written as a `tools: [ ... ]` field.
+  const TOOLS_FIELD_FIXTURE = {
+    'apps/docs/src/renderer/ai/tools.ts': [
+      "import type { AgentSkill } from '@genoffice/agent-core'",
+      '',
+      'export const docsSkill: AgentSkill = {',
+      "  id: 'docs',",
+      '  tools: [',
+      '    {',
+      "      name: 'field_tool',",
+      "      description: 'schema-less tool in a tools: field',",
+      '    },',
+      '  ],',
+      '}',
+      '',
+    ].join('\n'),
+  }
+
+  it('reports a schema-less tool in a `tools: [...]` field (N2)', () => {
+    const { dir } = fixture(TOOLS_FIELD_FIXTURE)
+    const { rows } = extract({ repo: dir, rev: 'HEAD' })
+    const field = rows.find((r) => r.tool === 'field_tool')
+    assert.ok(field, 'the schema-less tool must get a row')
+    assert.equal(field.hash, 'unresolved:missing')
+  })
+
+  // N2 (negative): arrays that are not a tools list — a `get options()` returned
+  // literal, an `options: [...]` field, an unannotated `return [...]` in a plain
+  // helper — still yield no rows, while the real tools list does.
+  const NON_TOOLS_ARRAYS_FIXTURE = {
+    'apps/docs/src/renderer/ai/tools.ts': [
+      "import type { AgentToolDef } from '@genoffice/agent-core'",
+      '',
+      'export const AGENT_TOOLS: AgentToolDef[] = [',
+      '  {',
+      "    name: 'real_tool',",
+      "    description: 'a real tool in the annotated list',",
+      "    inputSchema: { type: 'object', properties: {} },",
+      '  },',
+      ']',
+      '',
+      '// a `get options()` accessor is not a tools list',
+      'export const menu = {',
+      '  get options() {',
+      '    return [',
+      "      { name: 'opt_a', description: 'A' },",
+      "      { name: 'opt_b', description: 'B' },",
+      '    ]',
+      '  },',
+      '}',
+      '',
+      '// an `options: [...]` field is not a tools list',
+      'const CONFIG = {',
+      '  options: [',
+      "    { name: 'cfg_a', description: 'A' },",
+      '  ],',
+      '}',
+      '',
+      '// a plain helper returning a {name, description} array is not a tools list',
+      'export function palette(): unknown {',
+      '  return [',
+      "    { name: 'menu_open', description: 'Open' },",
+      '  ]',
+      '}',
+      '',
+      'export function touch(): void {',
+      '  void CONFIG',
+      '  void palette',
+      '}',
+      '',
+    ].join('\n'),
+  }
+
+  it('ignores non-tools returned/`options:` arrays (N2 negative)', () => {
+    const { dir } = fixture(NON_TOOLS_ARRAYS_FIXTURE)
+    const { rows } = extract({ repo: dir, rev: 'HEAD' })
+    const tools = rows.map((r) => r.tool).sort()
+    assert.deepEqual(tools, ['real_tool'])
+  })
+
+  // N2 (edge case): a `}` inside a string literal in the accessor body must not
+  // desynchronize the brace walk, or the tool is dropped.
+  const STRING_BRACE_FIXTURE = {
+    'apps/docs/src/renderer/ai/tools.ts': [
+      "import type { AgentSkill } from '@genoffice/agent-core'",
+      'export const s: AgentSkill = {',
+      "  id: 'docs',",
+      '  get tools() {',
+      "    const brace = '}'",
+      '    void brace',
+      '    return [',
+      "      { name: 'guarded_tool', description: 'no schema' },",
+      '    ]',
+      '  },',
+      '}',
+      '',
+    ].join('\n'),
+  }
+
+  it('finds a returned tool past a brace inside a string (N2)', () => {
+    const { dir } = fixture(STRING_BRACE_FIXTURE)
+    const { rows } = extract({ repo: dir, rev: 'HEAD' })
+    const tool = rows.find((r) => r.tool === 'guarded_tool')
+    assert.ok(tool, 'the schema-less tool must still get a row')
+    assert.equal(tool.hash, 'unresolved:missing')
+  })
+})
+
 describe('real repo', () => {
   it('produces rows for each of the six apps at HEAD', () => {
     const { rows } = extract({ repo: REPO_ROOT, rev: 'HEAD' })
