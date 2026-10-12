@@ -495,7 +495,7 @@ async function toolCliPost(
   timeoutMs: number,
   signal?: AbortSignal,
 ): Promise<unknown> {
-  if (!gskApiKey()) throw new Error('Not logged in to Genspark (gsk login)')
+  if (!gskApiKey()) throw new Error('Not logged in to UniWork (gsk login)')
   return withKeyRecovery((key) => toolCliPostOnce(key, path, body, timeoutMs, signal))
 }
 

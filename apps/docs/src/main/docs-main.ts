@@ -6531,8 +6531,8 @@ export function startDocsStandalone(): void {
     // "GenOffice Docs Dev" carried a space, against the XDG one-token
     // convention (genoffice#1817); move the old profile once, as the shell does.
     const appData = app.getPath('appData')
-    const devDir = join(appData, 'GenOffice-Docs-Dev')
-    const oldDevDir = join(appData, 'GenOffice Docs Dev')
+    const devDir = join(appData, 'UniWork Office-Docs-Dev')
+    const oldDevDir = join(appData, 'UniWork Docs Dev')
     let userData = devDir
     if (existsSync(oldDevDir) && !existsSync(devDir)) {
       try {

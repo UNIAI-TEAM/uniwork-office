@@ -1,6 +1,6 @@
 # Conectar un agente de codificación
 
-GenOffice habla el Model Context Protocol, de modo que un agente de codificación puede leer, escribir y renderizar sus documentos con los mismos motores que usa la aplicación. El agente no está adivinando un formato de archivo: recibe los esquemas tipados de las op a partir de las mismas definiciones contra las que valida el executor.
+UniWork Office habla el Model Context Protocol, de modo que un agente de codificación puede leer, escribir y renderizar sus documentos con los mismos motores que usa la aplicación. El agente no está adivinando un formato de archivo: recibe los esquemas tipados de las op a partir de las mismas definiciones contra las que valida el executor.
 
 ## Registrarlo desde la aplicación
 
@@ -70,7 +70,7 @@ Un agente que no conoce el vocabulario de las ops adivinará. El skill lleva la 
 
 ## Qué alcanza en la aplicación
 
-El servidor no se limita a los archivos del disco. Mientras GenOffice está en marcha, el agente también puede trabajar a través de la ventana:
+El servidor no se limita a los archivos del disco. Mientras UniWork Office está en marcha, el agente también puede trabajar a través de la ventana:
 
 - **`open_in_genoffice`** abre un archivo en una pestaña y le da el foco.
 - **`open_documents`** enumera todos los documentos que tiene abiertos —id, tipo, ruta y si tienen cambios sin guardar— y después lee el contenido actual de uno o lo cierra, guardando antes salvo que le pida que lo descarte.
