@@ -116,7 +116,10 @@ describe('uniwork sync store key provider', () => {
       { getSelectedStorageBackend: () => 'basic_text' },
     ]
     for (const overrides of cases) {
-      const provider = createSafeStorageKeyProvider({ safeStorage: fakeSafeStorage(overrides), dir })
+      const provider = createSafeStorageKeyProvider({
+        safeStorage: fakeSafeStorage(overrides),
+        dir,
+      })
       try {
         await provider.key(scope())
         expect.unreachable()

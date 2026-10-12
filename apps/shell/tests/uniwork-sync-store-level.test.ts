@@ -44,19 +44,14 @@ describe('uniwork store level gate (OQ-P4 b)', () => {
   })
 
   it('treats min_app_version as display only: equal level decides the same way', () => {
-    const cases: Array<[{ schema: number; min_store_level: number; min_app_version: string }, string]> =
-      [
-        [
-          { schema: 2, min_store_level: 2, min_app_version: '0.11.0-beta.9' },
-          'open',
-        ],
-        [{ schema: 2, min_store_level: 2, min_app_version: '0.11.0-dev.3' }, 'open'],
-        [
-          { schema: 2, min_store_level: 3, min_app_version: '0.11.0-beta.9' },
-          'store_newer',
-        ],
-        [{ schema: 2, min_store_level: 3, min_app_version: '0.11.0-dev.3' }, 'store_newer'],
-      ]
+    const cases: Array<
+      [{ schema: number; min_store_level: number; min_app_version: string }, string]
+    > = [
+      [{ schema: 2, min_store_level: 2, min_app_version: '0.11.0-beta.9' }, 'open'],
+      [{ schema: 2, min_store_level: 2, min_app_version: '0.11.0-dev.3' }, 'open'],
+      [{ schema: 2, min_store_level: 3, min_app_version: '0.11.0-beta.9' }, 'store_newer'],
+      [{ schema: 2, min_store_level: 3, min_app_version: '0.11.0-dev.3' }, 'store_newer'],
+    ]
     for (const [binding, expected] of cases) {
       expect(readStoreGate(binding)).toBe(expected)
     }

@@ -33,10 +33,7 @@ export interface StoreRegistration {
 }
 
 export type StoreWriteResult =
-  | { kind: 'ok' }
-  | { kind: 'store_full' }
-  | { kind: 'refused' }
-  | { kind: 'interrupted' }
+  { kind: 'ok' } | { kind: 'store_full' } | { kind: 'refused' } | { kind: 'interrupted' }
 
 export type StoreReadResult =
   | { kind: 'ok'; value: Uint8Array }
@@ -60,9 +57,7 @@ export interface OpenedStore {
 }
 
 export type StoreOpenResult =
-  | { kind: 'ok'; store: OpenedStore }
-  | { kind: 'keystore_locked' }
-  | { kind: 'keyring_unavailable' }
+  { kind: 'ok'; store: OpenedStore } | { kind: 'keystore_locked' } | { kind: 'keyring_unavailable' }
 
 export interface StoreUsage {
   /** encrypted bytes on disk for the whole account */
