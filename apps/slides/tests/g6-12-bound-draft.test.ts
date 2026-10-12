@@ -217,6 +217,51 @@ describe('generate_deck / regenerate_slide landing on a UniWork-bound deck', () 
   })
 })
 
+describe('explicit Save of a bound deck after an AI landing', () => {
+  const slideTexts = (opened: Awaited<ReturnType<typeof openPptx>>) =>
+    JSON.stringify(opened.deck.slides)
+
+  it('writes the generated pages into the working copy (append)', async () => {
+    bind(deckPath)
+    const before = session.opened.deck.slides.length
+    await call(
+      'slides:land-generated-pages',
+      [await issuePage('saved page text')],
+      FIT,
+      'append',
+      undefined,
+      'Quarterly Review',
+    )
+    expect(readFileSync(deckPath, 'utf8')).toBe(ORIGINAL)
+    const r = (await call('slides:save', 'user')) as { ok: boolean; path?: string }
+    expect(r.ok).toBe(true)
+    expect(drafts()).toEqual([])
+    const saved = await openPptx(new Uint8Array(readFileSync(deckPath)))
+    expect(saved.deck.slides.length).toBe(before + 1)
+    expect(slideTexts(saved)).toContain('saved page text')
+    expect(sessionDirty(sessions.get(WC)!)).toBe(false)
+  })
+
+  it('writes the new deck into the working copy (replace)', async () => {
+    bind(deckPath)
+    await call(
+      'slides:land-generated-pages',
+      [await issuePage('first new page'), await issuePage('second new page')],
+      FIT,
+      'replace',
+      undefined,
+      'Quarterly Review',
+    )
+    const r = (await call('slides:save', 'user')) as { ok: boolean }
+    expect(r.ok).toBe(true)
+    const saved = await openPptx(new Uint8Array(readFileSync(deckPath)))
+    expect(saved.deck.slides.length).toBe(2)
+    expect(slideTexts(saved)).toContain('first new page')
+    expect(slideTexts(saved)).toContain('second new page')
+    expect(drafts()).toEqual([])
+  })
+})
+
 describe('local (unbound) deck keeps the draft auto-save', () => {
   it('append writes a named draft and re-points the session to it', async () => {
     const r = (await call(
