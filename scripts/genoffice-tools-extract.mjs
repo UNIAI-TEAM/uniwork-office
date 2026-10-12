@@ -28,12 +28,16 @@
  *
  * A tool-shaped object with `name` + `description` but no `inputSchema` is also
  * found through a second, deliberately narrow `name` anchor: the object must be
- * an element of an array literal whose initializer is annotated with a tool-def
- * type (`AgentToolDef[]`, `readonly AgentToolDef[]`, `Array<AgentToolDef>`, ...).
- * An unannotated array, or one typed as anything else (an option list, a typed
- * command list, a nested `options:` bag), is not a tools list and contributes no
- * row, so a non-tool `{ name, description }` array cannot manufacture phantom
- * rows.
+ * an element of a tools-list array literal. A tools list is written in one of
+ * three forms: an annotated binding (`AgentToolDef[]`, `readonly AgentToolDef[]`,
+ * `Array<AgentToolDef> = [`), a `tools: [ ... ]` field, or a `return [ ... ]`
+ * inside a `get tools()` accessor. `AgentToolDef` (or the bare `AgentTool`) is
+ * matched exactly, so an `AgentToolCall[]` / `AgentToolResult[]` array — whose
+ * records carry `name` too — is not a tools list. An unannotated array, one
+ * typed as anything else (an option list, a typed command list), a nested
+ * `options:` bag, a `get options()` returned literal or a plain helper's
+ * `return [ ... ]` contributes no row, so a non-tool `{ name, description }`
+ * array cannot manufacture phantom rows.
  *
  * module = `agent-core`, or the app directory name (`docs`, `sheets`, `slides`,
  * `pdf`, `markdown`, `html`). source = repo-relative path of the defining file.
@@ -1493,16 +1497,62 @@ function collectReadOnlyNames(files) {
 
 // ──────────────────────────── extraction ────────────────────────────
 
-/** an identifier naming a tool-definition type (`AgentToolDef`, `AgentTool`, ...) */
-const TOOL_DEF_TYPE_RE = /^Agent[A-Za-z]*Tool[A-Za-z]*$/
+/**
+ * An identifier naming a tool-*definition* type: `AgentToolDef`, or the bare
+ * `AgentTool` some code bases use for the same thing. The match is exact, not a
+ * prefix: `AgentToolCall` / `AgentToolResult` / `AgentToolbar` are call, result
+ * and UI types whose arrays hold records, not tool definitions, so a
+ * `{ name, description }` element of such an array must not become a row.
+ */
+const TOOL_DEF_TYPE_RE = /^(?:AgentToolDef|AgentTool)$/
 
 /**
- * Token indices of the `[` that open a tools-list array literal — one whose
- * initializer is annotated as a tool-def list (`AgentToolDef[]`,
- * `readonly AgentToolDef[]`, `Array<AgentToolDef>`). Only such an array is a
- * tools list for the `name` anchor below: an unannotated array, or one typed as
- * anything else (an option list, a typed command list, a nested `options:`
- * bag), is ignored, so a non-tool `{ name, description }` element cannot
+ * Is token index `at` inside the body of a `get tools()` accessor? Walks the
+ * enclosing brace stack, so a `return [ ... ]` nested in an `if` block of the
+ * accessor still counts. Any other accessor (`get options()`) returns false.
+ */
+function insideToolsAccessor(tokens, at) {
+  const stack = []
+  for (let k = 0; k < at; k += 1) {
+    const v = tokens[k].value
+    if (v === '{') stack.push(k)
+    else if (v === '}') stack.pop()
+  }
+  for (let i = stack.length - 1; i >= 0; i -= 1) {
+    const bodyOpen = stack[i]
+    const close = tokens[bodyOpen - 1]
+    const open = tokens[bodyOpen - 2]
+    const name = tokens[bodyOpen - 3]
+    const get = tokens[bodyOpen - 4]
+    if (
+      close &&
+      close.value === ')' &&
+      open &&
+      open.value === '(' &&
+      name &&
+      name.type === 'ident' &&
+      name.value === 'tools' &&
+      get &&
+      get.type === 'ident' &&
+      get.value === 'get'
+    )
+      return true
+  }
+  return false
+}
+
+/**
+ * Token indices of the `[` that open a tools-list array literal. Three written
+ * forms are a tools list:
+ *   1. an annotated binding — `AgentToolDef[] = [`, `readonly AgentToolDef[] = [`,
+ *      `Array<AgentToolDef> = [`;
+ *   2. the value of a `tools:` field — `tools: [ ... ]`;
+ *   3. the operand of `return` inside a `get tools()` accessor —
+ *      `get tools() { return [ ... ] }`.
+ * Any other array — an unannotated array, one typed as something else (an
+ * option list, a typed command list), a nested `options:` bag, a `get options()`
+ * returned literal, a plain helper's `return [ ... ]` — is not a tools list for
+ * the `name` anchor below, so a non-tool `{ name, description }` element cannot
  * manufacture a phantom row.
  */
 function toolListArrayIndices(tokens) {
@@ -1510,6 +1560,30 @@ function toolListArrayIndices(tokens) {
   for (let b = 1; b < tokens.length; b += 1) {
     const tk = tokens[b]
     if (!(tk.type === 'punct' && tk.value === '[')) continue
+
+    // `tools: [ ... ]` — the value of a `tools` field is a tools list
+    const colon = tokens[b - 1]
+    const fieldName = tokens[b - 2]
+    if (
+      colon &&
+      colon.type === 'punct' &&
+      colon.value === ':' &&
+      fieldName &&
+      fieldName.type === 'ident' &&
+      fieldName.value === 'tools'
+    ) {
+      out.add(b)
+      continue
+    }
+
+    // `return [ ... ]` inside a `get tools()` accessor — a tools list written as
+    // a returned array literal rather than an annotated binding
+    const ret = tokens[b - 1]
+    if (ret && ret.type === 'ident' && ret.value === 'return' && insideToolsAccessor(tokens, b)) {
+      out.add(b)
+      continue
+    }
+
     const eq = tokens[b - 1]
     if (!(eq && eq.type === 'punct' && eq.value === '=')) continue
     const close = tokens[b - 2]
