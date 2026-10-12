@@ -202,6 +202,15 @@ export type CreateDocumentToolOutcome =
     }
   | { ok: false; error: string }
 
+/** one question of an ask_clarification card (same shape as html's) */
+export interface ClarifyQuestion {
+  id: string
+  label: string
+  description?: string | undefined
+  options: string[]
+  multi?: boolean
+}
+
 export interface SheetsSkillDeps {
   getActiveSheetInfo(): ActiveSheetInfo
   /** Ensure a lazy workbook range is present in Univer before reading it. */
@@ -254,6 +263,9 @@ export interface SheetsSkillDeps {
   isUniworkBound?(): boolean
   /** chat attachments the user gave this conversation (sent + composer) */
   getAttachments?(): readonly AttachmentMeta[]
+  /** ask_clarification card in the AI panel; resolves with the answers, or
+   * cancelled when the user skips, stops the run or starts a new chat */
+  askClarification?(questions: ClarifyQuestion[]): Promise<{ answers: string; cancelled?: boolean }>
 }
 
 const MAX_READ_ADDRESSES = 100
@@ -562,6 +574,35 @@ export const WORKBOOK_TOOLS: AgentToolDef[] = [
         },
       },
       required: [],
+    },
+  },
+  {
+    name: 'ask_clarification',
+    description:
+      '[Before calculating or writing when the meaning or the target is unclear] Show a question card so the user confirms what you would otherwise guess: what a column holds (e.g. whether column X, Y or Z is net revenue, or whether "Amount" includes tax), which rows count, or which range the result goes into. ' +
+      'Ask only what the data and the request do not answer (read the headers and a sample first); 1–4 questions, ≤5 options each, built from what you actually see (header names, ranges); the card adds "decide for me" and a free-text option itself. ' +
+      'Skip it when the request is already clear. Wait for the answers, then continue with them. Do not repeat the questions in your reply.',
+    inputSchema: {
+      type: 'object',
+      required: ['questions'],
+      properties: {
+        questions: {
+          type: 'array',
+          minItems: 1,
+          maxItems: 4,
+          items: {
+            type: 'object',
+            required: ['id', 'label', 'options'],
+            properties: {
+              id: { type: 'string' },
+              label: { type: 'string' },
+              description: { type: 'string' },
+              options: { type: 'array', items: { type: 'string' }, maxItems: 5 },
+              multi: { type: 'boolean' },
+            },
+          },
+        },
+      },
     },
   },
 ]
@@ -1491,6 +1532,52 @@ export function executeWorkbookTool(
           summary: t('aiToolCreatedDocument', { name: outcome.name }),
         }
       })
+    }
+
+    case 'ask_clarification': {
+      const ask = deps.askClarification
+      if (!ask) {
+        return fail(
+          t('aiToolClarify'),
+          'question cards are not available here; state your assumption in the reply and continue',
+        )
+      }
+      const raw: unknown[] = Array.isArray(call.input.questions) ? call.input.questions : []
+      const questions: ClarifyQuestion[] = raw
+        .map((entry, i) => {
+          const q = (entry ?? {}) as Record<string, unknown>
+          return {
+            id: String(q.id ?? `q${i + 1}`),
+            label: String(q.label ?? '').trim(),
+            description: q.description ? String(q.description) : undefined,
+            options: Array.isArray(q.options)
+              ? q.options.map((o: unknown) => String(o)).slice(0, 5)
+              : [],
+            multi: !!q.multi,
+          }
+        })
+        .filter((q) => q.label && q.options.length > 0)
+        .slice(0, 4)
+      if (questions.length === 0) {
+        return fail(
+          t('aiToolClarify'),
+          'questions must be non-empty and every question needs options',
+        )
+      }
+      return ask(questions).then((r): ToolExecution =>
+        r.cancelled
+          ? {
+              output:
+                'The user skipped the questionnaire. Decide the most likely reading yourself, state that assumption in your reply, then continue.',
+              mutated: false,
+              summary: t('aiToolClarifySkipped'),
+            }
+          : {
+              output: `User answers:\n${r.answers}\nNow continue with the request using these answers.`,
+              mutated: false,
+              summary: t('aiToolClarify'),
+            },
+      )
     }
 
     default:

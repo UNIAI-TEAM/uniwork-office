@@ -21,6 +21,8 @@ export const VIEW_ONLY_TOOLS: ReadonlySet<string> = new Set([
   'read_attachment',
   'web_search',
   'image_search',
+  // a question card changes nothing
+  'ask_clarification',
 ])
 
 const VIEW_ONLY_NOTE =
