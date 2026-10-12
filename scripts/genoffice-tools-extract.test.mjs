@@ -999,6 +999,61 @@ describe('extractor residuals (G7-06)', () => {
     assert.deepEqual(tools, ['direct_tool'])
     assert.equal(rows.find((r) => r.tool === 'direct_tool').hash, 'unresolved:missing')
   })
+
+  // ASI (doc §3.1 group C, packet-G6-12): the markdown module routes with a
+  // semicolon-free braceless guard — `if (call.name === 'ask_clarification')
+  // return …` on one line with the `switch` below it. `branchRange()` used to
+  // end such a branch only at the next `;` or `}`, so the guard swallowed the
+  // `switch` and the guarded read-only tool was credited with a sibling case's
+  // `mutated: true`. The consequent is a single statement: it ends at the line
+  // break (ASI), while an unguarded sibling keeps its own switch flag.
+  const BRACELESS_GUARD_FIXTURE = {
+    'apps/docs/src/renderer/ai/tools.ts': [
+      "import type { AgentToolCall, AgentToolDef, ToolExecution } from '@genoffice/agent-core'",
+      '',
+      'export const AGENT_TOOLS: AgentToolDef[] = [',
+      '  {',
+      "    name: 'read_only_tool',",
+      "    description: 'guarded read-only tool',",
+      "    inputSchema: { type: 'object', properties: {} },",
+      '  },',
+      '  {',
+      "    name: 'mutating_sibling',",
+      "    description: 'mutating sibling routed by the switch below',",
+      "    inputSchema: { type: 'object', properties: {} },",
+      '  },',
+      ']',
+      '',
+      'export function executeTool(call: AgentToolCall): ToolExecution {',
+      "  if (call.name === 'read_only_tool') return executeRead(call)",
+      '  const doc = state.doc',
+      '  void doc',
+      '  switch (call.name) {',
+      "    case 'mutating_sibling':",
+      '      return writeDoc(call)',
+      '    default:',
+      "      return { output: 'unknown', isError: true, mutated: false, summary: call.name }",
+      '  }',
+      '}',
+      '',
+      'function executeRead(call: AgentToolCall): ToolExecution {',
+      "  return { output: 'read', mutated: false, summary: 'read' }",
+      '}',
+      '',
+      'function writeDoc(call: AgentToolCall): ToolExecution {',
+      "  return { output: 'wrote', mutated: true, summary: 'write' }",
+      '}',
+      '',
+    ].join('\n'),
+  }
+
+  it('ends a semicolon-free braceless `if` branch at its own statement (G7-06 ASI)', () => {
+    const { dir } = fixture(BRACELESS_GUARD_FIXTURE)
+    const { rows } = extract({ repo: dir, rev: 'HEAD' })
+    const write = (tool) => rows.find((r) => r.tool === tool).write
+    assert.equal(write('read_only_tool'), 'no')
+    assert.equal(write('mutating_sibling'), 'yes')
+  })
 })
 
 describe('real repo', () => {
