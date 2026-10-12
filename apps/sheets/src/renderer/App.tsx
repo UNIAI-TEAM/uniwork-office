@@ -176,6 +176,7 @@ import { createElectronTransport } from './ai/transport'
 import {
   MAX_READ_RANGE_CELLS,
   type ActiveSheetInfo,
+  type ClarifyQuestion,
   type FrozenSelection,
   type SheetsSkillDeps,
 } from './ai/tools'
@@ -641,6 +642,10 @@ export function App({
   const aiViewOnly = isUniworkViewOnly(workbookFile)
   const aiViewOnlyRef = useRef(aiViewOnly)
   aiViewOnlyRef.current = aiViewOnly
+  // UniWork working copy (C-BOUND): AI tools must not write outside it or read
+  // local files the user did not attach
+  const aiUniworkBoundRef = useRef(false)
+  aiUniworkBoundRef.current = workbookFile?.uniworkBound === true
   const autoSaveOn = autoSave && !autoSaveLocked
   // Ref mirror for callbacks captured when an AI run starts
   const autoSaveRef = useRef(autoSaveOn)
@@ -1085,6 +1090,25 @@ export function App({
     window.desktopApi?.aiGskStatus(),
   )
   const [aiBusy, setAiBusy] = useState(false)
+  /** ask_clarification card waiting for the user; its resolver unblocks the tool */
+  const [aiClarify, setAiClarify] = useState<readonly ClarifyQuestion[] | null>(null)
+  const clarifyResolverRef = useRef<
+    ((result: { answers: string; cancelled?: boolean }) => void) | null
+  >(null)
+  /** answer or dismiss the pending card (skip, stop, new chat, unmount: cancelled) */
+  const settleClarify = (result: { answers: string; cancelled?: boolean }): void => {
+    const resolve = clarifyResolverRef.current
+    clarifyResolverRef.current = null
+    setAiClarify(null)
+    resolve?.(result)
+  }
+  useEffect(
+    () => () => {
+      clarifyResolverRef.current?.({ answers: '', cancelled: true })
+      clarifyResolverRef.current = null
+    },
+    [],
+  )
   // Display history survives restarts via localStorage; the AgentLoop's model
   // context does not, so restored turns are read-only transcript.
   const [chat, setChat] = useState<readonly AiChatMessage[]>([])
@@ -1417,7 +1441,22 @@ export function App({
               mergePaths: (paths) => {
                 const runtime = univerRef.current
                 if (!runtime) throw new Error(t('appMergeWorkbooksFailed'))
-                return mergeAttachedWorkbooks({ runtime, lazyWorkbookRef, setMessage }, paths)
+                return mergeAttachedWorkbooks({ runtime, lazyWorkbookRef, setMessage }, paths).then(
+                  (result) => {
+                    // same inline [Undo] as an applied plan, when the history holds the whole merge
+                    if (result.undoSteps) {
+                      const undoSteps = result.undoSteps
+                      patchLastAssistant((entry) => ({
+                        ...entry,
+                        autoApplied: {
+                          opCount: (entry.autoApplied?.opCount ?? 0) + result.importedSheets,
+                          undoSteps: (entry.autoApplied?.undoSteps ?? 0) + undoSteps,
+                        },
+                      }))
+                    }
+                    return result
+                  },
+                )
               },
             }),
             () => cap('mergeWorkbooks'),
@@ -1648,6 +1687,7 @@ export function App({
   }
 
   function handleStopAgent(): void {
+    settleClarify({ answers: '', cancelled: true })
     agentLoopRef.current?.cancel()
   }
 
@@ -1661,6 +1701,7 @@ export function App({
   }
 
   function handleNewChat(): void {
+    settleClarify({ answers: '', cancelled: true })
     agentLoopRef.current?.reset()
     setAiRunScope(undefined)
     setAiBusy(false)
@@ -1725,6 +1766,15 @@ export function App({
         traceWorkbookDependents(readContext(), sheetId, address),
       proposeOperations,
       createDocument: (request) => createAiDocument({ univerRef, lazyWorkbookRef }, request),
+      isUniworkBound: () => aiUniworkBoundRef.current,
+      getAttachments: availableAttachments,
+      askClarification: (questions) =>
+        new Promise((resolve) => {
+          // a card still open from an earlier call is superseded, never left hanging
+          clarifyResolverRef.current?.({ answers: '', cancelled: true })
+          clarifyResolverRef.current = resolve
+          setAiClarify(questions)
+        }),
     }
   }
 
@@ -5150,6 +5200,15 @@ export function App({
         onAutoSaveChange={setAutoSave}
         autoSaveHidden={autoSaveLocked}
         aiViewOnly={aiViewOnly}
+        aiClarify={
+          aiClarify
+            ? {
+                questions: aiClarify,
+                onSubmit: (answers) => settleClarify({ answers }),
+                onSkip: () => settleClarify({ answers: '', cancelled: true }),
+              }
+            : null
+        }
         selectedChart={selectedChart}
         selectedShape={selectedShape}
         selectedVisualKind={

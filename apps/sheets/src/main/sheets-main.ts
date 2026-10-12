@@ -53,7 +53,6 @@ import {
   buildPrintableHtml,
   configuredDefaultSaveDir,
   contextMenuLabels,
-  fetchRemoteImage,
   installContextMenu,
   installNavigationGuard,
   isHeadlessMode,
@@ -162,6 +161,7 @@ import {
 } from '../shared/desktop-api'
 import { IPC_CHANNELS } from '../shared/ipc-channels'
 import { createOpenRetryPaths } from './open-retry-paths'
+import { fetchAiImage } from './ai-fetch-image'
 import { atomicWriteFile } from './atomic-write'
 import { closeGuardDecision, ShutdownLatch } from './close-guard'
 import { SaveEditsTransferStore } from './save-edits-transfer'
@@ -1634,8 +1634,6 @@ interface SheetsTabSession {
 /** per-tab session state, keyed by webContents.id — replaces the old single-window closures
  * that `registerIpcHandlers`/`validateSender` used to capture, which broke as soon as a second
  * tab (or a closed-then-reopened tab) registered and overwrote the previous closure. */
-/// Same ceiling as local add_image (readLocalImage's 20MB check)
-const MAX_REMOTE_IMAGE_BYTES = 20 * 1024 * 1024
 /** Max .csv/.tsv bytes converted on open: stops a 500MB text file OOMing main before sidecar limits. */
 const MAX_DELIMITED_IMPORT_BYTES = 32 * 1024 * 1024
 
@@ -3865,47 +3863,9 @@ export function registerSheetsAiIpc(): void {
     }
   })
 
-  // Standalone parity with docs-main's shell-wide handler: AI-supplied URLs are
-  // prompt-injectable, so fetchRemoteImage refuses non-http schemes and
-  // private/link-local targets and validates every redirect hop. Size-capped to
-  // match the local add_image limit.
-  ipcMain.handle(
-    'ai:fetch-image',
-    async (_event, url: unknown): Promise<{ base64: string; mime: string } | null> => {
-      try {
-        const resp = await fetchRemoteImage(z.string().parse(url))
-        if (!resp || !resp.ok || !resp.body) return null
-        const declared = Number(resp.headers.get('content-length') ?? 0)
-        if (declared > MAX_REMOTE_IMAGE_BYTES) return null
-        // Stream with a running cap: a missing/understated Content-Length must
-        // not let a prompt-injected URL buffer unbounded bytes before a
-        // post-hoc size check
-        const reader = resp.body.getReader()
-        const chunks: Buffer[] = []
-        let received = 0
-        for (;;) {
-          const { done, value } = await reader.read()
-          if (done) break
-          received += value.byteLength
-          if (received > MAX_REMOTE_IMAGE_BYTES) {
-            await reader.cancel()
-            return null
-          }
-          chunks.push(Buffer.from(value))
-        }
-        const buf = Buffer.concat(chunks)
-        const ct = resp.headers.get('content-type') ?? ''
-        const mime = ct.includes('png')
-          ? 'image/png'
-          : ct.includes('gif')
-            ? 'image/gif'
-            : 'image/jpeg'
-        return { base64: buf.toString('base64'), mime }
-      } catch {
-        return null
-      }
-    },
-  )
+  // AI-supplied URLs are prompt-injectable: SSRF guard + size cap live in
+  // ai-fetch-image.ts (tests/g6-12-fetch-image-guard.test.ts pins both)
+  ipcMain.handle('ai:fetch-image', (_event, url: unknown) => fetchAiImage(url))
 }
 
 // ── project-store IPC (standalone mode) ────────────────────────────────────

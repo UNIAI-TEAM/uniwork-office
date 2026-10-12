@@ -1,5 +1,5 @@
 import type { IFunctionInfo } from '@univerjs/engine-formula'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ComponentProps } from 'react'
 import { platformShortcuts } from '@genoffice/i18n'
 import {
   Dropdown,
@@ -315,6 +315,8 @@ interface ExcelShellProps {
   /// UniWork view-only workbook: the AI reads and answers but never edits, so the
   /// edit-capable AI actions are off (with the reason as tooltip).
   readonly aiViewOnly?: boolean
+  /// ask_clarification card waiting for the user (docked in the AI composer slot).
+  readonly aiClarify?: ComponentProps<typeof AiChatPanel>['clarify']
   /// Non-null while a floating chart is selected in the grid.
   readonly selectedChart: SelectedChartRibbon | null
   /// Non-null while an editable shape is selected (Shape Format tab).
@@ -539,6 +541,7 @@ export function ExcelShell({
   onAutoSaveChange,
   autoSaveHidden = false,
   aiViewOnly = false,
+  aiClarify = null,
   selectedChart,
   selectedShape,
   selectedTable,
@@ -1048,6 +1051,7 @@ export function ExcelShell({
             onExpand={() => setIsCopilotOpen(true)}
             onCollapse={() => setIsCopilotOpen(false)}
             viewOnly={aiViewOnly}
+            clarify={aiClarify}
           />
         )}
         <div className="sheet-main">

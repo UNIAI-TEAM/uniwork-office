@@ -14,6 +14,8 @@ import { ATTACHMENT_IMAGE_EXTS, type AttachmentMeta } from '../../shared/desktop
 import { useI18n, type TFunc } from '../i18n/locale'
 import { Markdown } from '@genoffice/ui'
 import { SHEET_NAV_SCHEME } from './sheet-nav'
+import type { ClarifyQuestion } from './tools'
+import { ClarifyCard } from './ClarifyCard'
 import sendEnterOn from '../assets/send-enter-on.png'
 import sendEnterOff from '../assets/send-enter-off.png'
 import sendStop from '../assets/send-stop.png'
@@ -253,6 +255,7 @@ export function AiChatPanel({
   onCitation,
   onExpand,
   onCollapse,
+  clarify = null,
 }: {
   readonly isOpen: boolean
   /** the workbook has cells with content — empty workbooks get "build me a sheet" copy instead */
@@ -301,6 +304,13 @@ export function AiChatPanel({
   readonly onCitation: (href: string) => void
   readonly onExpand: () => void
   readonly onCollapse: () => void
+  /** ask_clarification card waiting for the user: docked in the composer slot
+   *  until answered or skipped */
+  readonly clarify?: {
+    readonly questions: readonly ClarifyQuestion[]
+    readonly onSubmit: (answers: string) => void
+    readonly onSkip: () => void
+  } | null
 }): React.JSX.Element {
   const { t, lang } = useI18n()
   // Panel chrome follows the UI language; message text follows its own content (dir=auto below)
@@ -719,7 +729,17 @@ export function AiChatPanel({
         )}
       </div>
 
-      <div className="ai-composer">
+      {clarify && (
+        <div className="ai-composer">
+          <ClarifyCard
+            questions={clarify.questions}
+            onSubmit={(answers) => clarify.onSubmit(answers)}
+            onSkip={clarify.onSkip}
+          />
+        </div>
+      )}
+      {/* the composer stays mounted (draft, attachments) while the card holds the run */}
+      <div className="ai-composer" style={clarify ? { display: 'none' } : undefined}>
         {attachNotice && <div className="ai-attach-notice">{attachNotice}</div>}
         {viewOnly && (
           <div className="ai-readonly-notice" role="status">
