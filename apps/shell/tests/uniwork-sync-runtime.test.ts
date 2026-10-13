@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -75,8 +75,12 @@ function harness(
     orgs?: string[]
     workspaces?: Record<string, string[]>
     capabilities?: Record<string, CapabilityRead>
+    /** replaces the capability read (a gate, a counter, ...) */
+    capabilityRead?: (orgId: string) => Promise<CapabilityRead>
     pages?(call: { workspaceId: string; cursor?: string }): FeedPage | Error
     keepDraft?: (documentId: string) => Promise<boolean>
+    /** wraps one registered store's records (a refused write, a torn commit, ...) */
+    wrapRecords?: (name: string, records: StoreRecords) => StoreRecords
   } = {},
 ): Harness {
   const safeStorage = createLockableSafeStorage()
@@ -108,9 +112,15 @@ function harness(
       open: async () => {
         if (!scope) return { kind: 'no_session' }
         const open = await layer.open(scope)
-        return open.kind === 'ok'
-          ? { kind: 'ok', records: (name: string) => open.store.records(name) }
-          : open
+        if (open.kind !== 'ok') return open
+        const wrap = options.wrapRecords
+        return {
+          kind: 'ok',
+          records: (name: string) => {
+            const records = open.store.records(name)
+            return wrap ? wrap(name, records) : records
+          },
+        }
       },
       forget: () => undefined,
     },
@@ -119,6 +129,7 @@ function harness(
       workspaces: async (orgId) => options.workspaces?.[orgId] ?? ['ws_1'],
     },
     capability: async (orgId) =>
+      options.capabilityRead?.(orgId) ??
       options.capabilities?.[orgId] ??
       ({
         kind: 'ok',
@@ -160,12 +171,34 @@ async function cursorOf(h: Harness, orgId: string, workspaceId: string): Promise
   return read.kind === 'ok' ? new TextDecoder().decode(read.value) : null
 }
 
-/** the document ids the doc index holds for one workspace */
-async function indexOf(h: Harness, orgId: string, workspaceId: string): Promise<string[]> {
+/** the workspace's cache record as the durable store holds it */
+async function cacheOf(
+  h: Harness,
+  orgId: string,
+  workspaceId: string,
+): Promise<{ index: string[]; docs: Record<string, { documentId: string; revision: string }> }> {
   const read = await (
     await recordsOf(h.layer, DOC_INDEX_REGISTRATION.name)
   ).read(`${orgId}/${workspaceId}/index`)
-  return read.kind === 'ok' ? (JSON.parse(new TextDecoder().decode(read.value)) as string[]) : []
+  if (read.kind !== 'ok') return { index: [], docs: {} }
+  return JSON.parse(new TextDecoder().decode(read.value)) as {
+    index: string[]
+    docs: Record<string, { documentId: string; revision: string }>
+  }
+}
+
+/** the document ids the doc index holds for one workspace */
+async function indexOf(h: Harness, orgId: string, workspaceId: string): Promise<string[]> {
+  return (await cacheOf(h, orgId, workspaceId)).index
+}
+
+/** the record files one registered store of the account holds */
+function recordFiles(storeName: string): string[] {
+  try {
+    return readdirSync(join(base, 'records', SCOPE.deploymentId, SCOPE.accountId, storeName))
+  } catch {
+    return []
+  }
 }
 
 const networkError = () => new FeedError({ kind: 'other', error: new UniworkDocError('network') })
@@ -247,10 +280,83 @@ describe('the feed runtime', () => {
     expire = true
     await h.runtime.tick()
     expect(await indexOf(h, 'org_a', 'ws_1')).toEqual(['doc_1'])
-    const read = await (
-      await recordsOf(h.layer, DOC_INDEX_REGISTRATION.name)
-    ).read('org_a/ws_1/doc_2')
-    expect(read.kind).toBe('missing')
+    // the evicted row went with the index: nothing left the index cannot reach
+    expect(Object.keys((await cacheOf(h, 'org_a', 'ws_1')).docs)).toEqual(['doc_1'])
+    expect(recordFiles(DOC_INDEX_REGISTRATION.name)).toHaveLength(1)
+  })
+
+  it('a torn page commit keeps the previous page whole: no orphan row (G504-be-2)', async () => {
+    let commits = 0
+    let page = 0
+    const h = harness({
+      pages: () => {
+        page += 1
+        return page === 1
+          ? { ...PAGE, changes: [change('doc_1')], nextCursor: 'c1' }
+          : { ...PAGE, changes: [change('doc_2')], nextCursor: 'c2' }
+      },
+      wrapRecords: (name, records) =>
+        name === DOC_INDEX_REGISTRATION.name
+          ? {
+              ...records,
+              write: async (key, value) => {
+                commits += 1
+                // the snapshot commits (page + reconcile); the next page dies
+                // in its commit, before anything is published
+                if (commits === 3) throw Object.assign(new Error('torn'), { code: 'EIO' })
+                return records.write(key, value)
+              },
+            }
+          : records,
+    })
+    await h.runtime.tick()
+    expect(await indexOf(h, 'org_a', 'ws_1')).toEqual(['doc_1'])
+    // the page dies mid-commit: neither its row nor its id is visible
+    await expect(h.runtime.tick()).rejects.toThrow('torn')
+    expect(await indexOf(h, 'org_a', 'ws_1')).toEqual(['doc_1'])
+    expect(Object.keys((await cacheOf(h, 'org_a', 'ws_1')).docs)).toEqual(['doc_1'])
+    expect(await cursorOf(h, 'org_a', 'ws_1')).toBe('c1')
+    // one record per workspace, so no orphan row survives the torn commit
+    expect(recordFiles(DOC_INDEX_REGISTRATION.name)).toHaveLength(1)
+    // the replay commits the whole page at once
+    await h.runtime.tick()
+    expect(await indexOf(h, 'org_a', 'ws_1')).toEqual(['doc_1', 'doc_2'])
+    expect(recordFiles(DOC_INDEX_REGISTRATION.name)).toHaveLength(1)
+  })
+
+  it('a store_full page apply never moves the cursor, and the page is retried (G504-be-1)', async () => {
+    let full = false
+    const h = harness({
+      pages: ({ cursor }) =>
+        cursor
+          ? { ...PAGE, changes: [change('doc_2')], nextCursor: 'c2' }
+          : { ...PAGE, changes: [change('doc_1')], nextCursor: 'c1' },
+      wrapRecords: (name, records) =>
+        name === DOC_INDEX_REGISTRATION.name
+          ? {
+              ...records,
+              // the budget is full for this page's rows; the cursor write still fits
+              write: async (key, value) =>
+                full ? { kind: 'store_full' } : records.write(key, value),
+            }
+          : records,
+    })
+    await h.runtime.tick()
+    expect(await cursorOf(h, 'org_a', 'ws_1')).toBe('c1')
+    full = true
+    await h.runtime.tick()
+    // the page could not be applied: the cursor stays on the applied page
+    expect(await cursorOf(h, 'org_a', 'ws_1')).toBe('c1')
+    expect(await indexOf(h, 'org_a', 'ws_1')).toEqual(['doc_1'])
+    // and the next tick asks the server for exactly that page again
+    await h.runtime.tick()
+    expect(h.calls.at(-1)?.cursor).toBe('c1')
+    expect(await cursorOf(h, 'org_a', 'ws_1')).toBe('c1')
+    // the budget frees up: the same page lands once and the cursor moves
+    full = false
+    await h.runtime.tick()
+    expect(await cursorOf(h, 'org_a', 'ws_1')).toBe('c2')
+    expect(await indexOf(h, 'org_a', 'ws_1')).toEqual(['doc_1', 'doc_2'])
   })
 
   it('another account or deployment never sees this stream', async () => {
@@ -330,6 +436,41 @@ describe('the feed runtime', () => {
     expect(runs).toHaveLength(1)
     scheduled.stop()
     expect(stop).toHaveBeenCalled()
+  })
+
+  it('stop() ends the pass in flight and the next start runs at once (G504-be-7)', async () => {
+    let release!: (read: CapabilityRead) => void
+    const gate = new Promise<CapabilityRead>((resolve) => {
+      release = resolve
+    })
+    let entered!: () => void
+    const reading = new Promise<void>((resolve) => {
+      entered = resolve
+    })
+    let reads = 0
+    const h = harness({
+      capabilityRead: async () => {
+        reads += 1
+        entered()
+        return gate
+      },
+    })
+    // the pass is suspended inside the capability read when the boundary lands
+    const first = h.runtime.tick()
+    await reading
+    h.runtime.stop()
+    // a start now must not wait behind the pass that was just cancelled
+    const second = h.runtime.tick()
+    release({
+      kind: 'ok',
+      capabilities: { ...NEVER_READ_CAPABILITIES, sync_feed: true },
+      source: 'fresh',
+    })
+    await Promise.all([first, second])
+    // only the pass that started after the stop reached the feed
+    expect(reads).toBe(2)
+    expect(h.calls).toHaveLength(1)
+    expect(await cursorOf(h, 'org_a', 'ws_1')).toBe('c1')
   })
 })
 

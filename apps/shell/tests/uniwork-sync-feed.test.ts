@@ -7,7 +7,11 @@ import {
   parseFeedPage,
   type FeedChange,
 } from '../src/main/uniwork-sync/feed/client'
-import { FeedConsumer, type DocCache } from '../src/main/uniwork-sync/feed/consumer'
+import {
+  FeedConsumer,
+  type DocCache,
+  type DocCacheCommit,
+} from '../src/main/uniwork-sync/feed/consumer'
 import {
   createMemoryCursorStore,
   cursorKey,
@@ -92,8 +96,10 @@ function memoryCache() {
   const entries = new Map<string, string>()
   const drafts = new Set<string>()
   let effects = 0
+  let refusedPage: DocCacheCommit | null = null
   const cache: DocCache = {
     async applyPage(changes: readonly FeedChange[]) {
+      if (refusedPage) return refusedPage
       for (const change of changes) {
         const current = entries.get(change.documentId)
         if (current === undefined || compareRevision(change.revision, current) > 0) {
@@ -101,11 +107,13 @@ function memoryCache() {
           effects += 1
         }
       }
+      return { kind: 'ok' }
     },
     async reconcile(ids, options) {
       for (const id of [...entries.keys()]) {
         if (!ids.has(id) && !(options.keepDrafts && drafts.has(id))) entries.delete(id)
       }
+      return { kind: 'ok' }
     },
   }
   return {
@@ -114,6 +122,10 @@ function memoryCache() {
     drafts,
     get effects() {
       return effects
+    },
+    /** the next page applies fail with this commit, as a full store would */
+    refusePage: (commit: DocCacheCommit | null) => {
+      refusedPage = commit
     },
   }
 }
@@ -289,6 +301,49 @@ describe('feed consumer', () => {
     expect(await memory.get(cursorKey(SCOPE))).toBe('feed:1')
   })
 
+  it('a page the store refused keeps the cursor, surfaces the error and is retried (G504-be-1)', async () => {
+    const t = setup({ cursors: createMemoryCursorStore([[cursorKey(SCOPE), 'feed:0']]) })
+    t.server.incremental.push([
+      ['d1', '5'],
+      ['d2', '6'],
+    ])
+    t.cache.refusePage({ kind: 'failed', failure: 'store_full' })
+    const refused = await t.consumer.sync()
+    if (refused.kind !== 'failed') throw new Error(`expected a failure, got ${refused.kind}`)
+    expect(refused.error.code).toBe('store_full')
+    // nothing of the page is cached, and the cursor is still on it
+    expect(t.cache.effects).toBe(0)
+    expect(await t.cursors.get(cursorKey(SCOPE))).toBe('feed:0')
+    // the same page comes back on the next tick; once it commits, the cursor moves with it
+    t.cache.refusePage(null)
+    expect(await t.consumer.sync()).toEqual({ kind: 'synced', pages: 1, resynced: false })
+    expect(t.server.requests.map((url) => url.searchParams.get('cursor'))).toEqual([
+      'feed:0',
+      'feed:0',
+    ])
+    expect([...t.cache.entries]).toEqual([
+      ['d1', '5'],
+      ['d2', '6'],
+    ])
+    expect(await t.cursors.get(cursorKey(SCOPE))).toBe('feed:1')
+  })
+
+  it('a cancelled run stops before the next request and moves no cursor (G504-be-7)', async () => {
+    const t = setup({ cursors: createMemoryCursorStore([[cursorKey(SCOPE), 'feed:0']]) })
+    t.server.incremental.push([['d1', '5']], [['d2', '6']])
+    const realApply = t.cache.cache.applyPage.bind(t.cache.cache)
+    // the runtime stops right as the first page is being committed
+    t.cache.cache.applyPage = async (changes) => {
+      t.consumer.cancel()
+      return realApply(changes)
+    }
+    expect(await t.consumer.sync()).toEqual({ kind: 'cancelled' })
+    // no second request goes out and the cursor still points at the page, so
+    // the next run replays it (idempotently) instead of skipping it
+    expect(t.server.requests).toHaveLength(1)
+    expect(await t.cursors.get(cursorKey(SCOPE))).toBe('feed:0')
+  })
+
   it('a replayed page is idempotent, and an older revision never overwrites a newer one', async () => {
     const t = setup()
     const page: FeedChange[] = [
@@ -319,7 +374,7 @@ describe('feed consumer', () => {
     t.cache.cache.applyPage = async (changes) => {
       pagesApplied += 1
       if (pagesApplied === 2) throw new Error('crash')
-      await realApply(changes)
+      return realApply(changes)
     }
     await expect(t.consumer.sync()).rejects.toThrow('crash')
     expect(await t.cursors.get(cursorKey(SCOPE))).toBeNull()

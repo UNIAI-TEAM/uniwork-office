@@ -1,10 +1,11 @@
 import type { CapabilityRead, OfficeCapabilities } from './capability/cache'
 import type { FeedChange, FeedClient } from './feed/client'
-import { FeedConsumer, type DocCache } from './feed/consumer'
+import { FeedConsumer, type DocCache, type DocCacheCommit } from './feed/consumer'
 import { cursorKey, type CursorStore, type FeedScope } from './feed/cursor-store'
+import { compareRevision } from './feed/revision'
 import type { SyncStoreAccess } from './session-store'
 import { APP_STORE_LEVEL } from './store-level'
-import type { StoreRecords, StoreRegistration } from './store'
+import type { StoreReadResult, StoreRecords, StoreRegistration, StoreWriteResult } from './store'
 
 /**
  * The change-feed runtime of the signed-in account. For every (org, workspace)
@@ -50,14 +51,18 @@ export function createStoreCursorStore(records: StoreRecords): CursorStore {
   }
 }
 
-/** the doc ids the index knows for one workspace */
-function indexKey(scope: FeedScope): string {
+/** the whole cache of one workspace: its listed ids and each document's row */
+interface DocCacheState {
+  index: string[]
+  docs: Record<string, FeedChange>
+}
+
+function cacheKey(scope: FeedScope): string {
   return `${scope.orgId}/${scope.workspaceId}/index`
 }
 
-function docKey(scope: FeedScope, documentId: string): string {
-  return `${scope.orgId}/${scope.workspaceId}/${documentId}`
-}
+/** the store could not be reached at all: nothing may be committed over it */
+const UNAVAILABLE: DocCacheCommit = { kind: 'failed', failure: 'store_unavailable' }
 
 function encodeJson(value: unknown): Uint8Array {
   return new TextEncoder().encode(JSON.stringify(value))
@@ -71,6 +76,38 @@ function decodeJson<T>(bytes: Uint8Array, fallback: T): T {
   }
 }
 
+function isFeedChange(value: unknown): value is FeedChange {
+  if (!value || typeof value !== 'object') return false
+  const row = value as Record<string, unknown>
+  return (
+    typeof row.documentId === 'string' &&
+    typeof row.kind === 'string' &&
+    typeof row.revision === 'string' &&
+    typeof row.currentVersion === 'number' &&
+    (row.versionId === null || typeof row.versionId === 'string')
+  )
+}
+
+function decodeState(bytes: Uint8Array): DocCacheState {
+  const parsed = decodeJson<unknown>(bytes, null)
+  if (Array.isArray(parsed)) {
+    // the bare id list of an older layout: the rows are rebuilt by a resync
+    return { index: parsed.filter((id): id is string => typeof id === 'string'), docs: {} }
+  }
+  if (!parsed || typeof parsed !== 'object') return { index: [], docs: {} }
+  const record = parsed as { index?: unknown; docs?: unknown }
+  const index = Array.isArray(record.index)
+    ? record.index.filter((id): id is string => typeof id === 'string')
+    : []
+  const docs: Record<string, FeedChange> = {}
+  if (record.docs && typeof record.docs === 'object' && !Array.isArray(record.docs)) {
+    for (const [documentId, value] of Object.entries(record.docs as Record<string, unknown>)) {
+      if (isFeedChange(value)) docs[documentId] = value
+    }
+  }
+  return { index, docs }
+}
+
 export interface StoreDocCacheOptions {
   records: StoreRecords
   scope: FeedScope
@@ -79,40 +116,65 @@ export interface StoreDocCacheOptions {
 }
 
 /**
- * The doc index of one workspace: one record per listed document plus one
- * inventory record naming the ids the index holds. `applyPage` writes the
- * page's rows first and the inventory last, so a crash leaves either the old
- * inventory or the complete page (a replay is idempotent by document id);
- * the consumer saves the stream's cursor only after this resolved. `reconcile`
- * walks the inventory: every id the snapshot no longer lists loses its record
- * unless it is kept as a draft. Documents the snapshot still lists keep
- * theirs.
+ * The doc index of one workspace. The whole cache - its listed ids and each
+ * document's row - is one record, so a page is committed with a single atomic
+ * write: a crash (or a store refusal) shows either the old page and index or
+ * the new page and index, never a half page the index does not list, and there
+ * is no orphan row a later reconcile could not reach. A replayed page is
+ * idempotent by document id and revision. `reconcile` rewrites the same
+ * record: every id the snapshot no longer lists loses its row unless it is
+ * kept as a draft.
  */
 export function createStoreDocCache(options: StoreDocCacheOptions): DocCache {
   const { records, scope } = options
-  const keyOf = (documentId: string) => docKey(scope, documentId)
-  const loadIndex = async (): Promise<string[]> => {
-    const read = await records.read(indexKey(scope))
-    return read.kind === 'ok' ? decodeJson<string[]>(read.value, []) : []
+  const key = cacheKey(scope)
+  const empty = (): DocCacheState => ({ index: [], docs: {} })
+
+  /** the store could not be read right now: never write over what it holds */
+  const unusable = (kind: StoreReadResult['kind']): boolean =>
+    kind === 'interrupted' || kind === 'refused'
+
+  const load = async (): Promise<DocCacheState | null> => {
+    const read = await records.read(key)
+    if (unusable(read.kind)) return null
+    // a missing (first run) or corrupt (torn by an older build) record is
+    // rebuilt from the feed, which is the cache's only source of truth
+    return read.kind === 'ok' ? decodeState(read.value) : empty()
   }
-  const saveIndex = async (ids: readonly string[]): Promise<void> => {
-    await records.write(indexKey(scope), encodeJson([...ids]))
-  }
+
+  /** the store's write outcome, as the cache commit the consumer acts on */
+  const commitResult = (written: StoreWriteResult): DocCacheCommit =>
+    written.kind === 'ok'
+      ? { kind: 'ok' }
+      : {
+          kind: 'failed',
+          failure: written.kind === 'store_full' ? 'store_full' : 'store_unavailable',
+        }
+
+  const commit = async (state: DocCacheState): Promise<DocCacheCommit> =>
+    commitResult(await records.write(key, encodeJson(state)))
 
   return {
     async applyPage(changes: readonly FeedChange[]) {
+      const state = await load()
+      if (!state) return UNAVAILABLE
       for (const change of changes) {
-        const written = await records.write(keyOf(change.documentId), encodeJson(change))
-        if (written.kind !== 'ok') return
+        const known = state.docs[change.documentId]
+        // an older revision never overwrites a newer one, so a replay is inert
+        if (known && compareRevision(change.revision, known.revision) <= 0) continue
+        state.docs[change.documentId] = change
       }
-      const known = new Set(await loadIndex())
-      for (const change of changes) known.add(change.documentId)
-      await saveIndex([...known])
+      const listed = new Set(state.index)
+      for (const change of changes) listed.add(change.documentId)
+      state.index = [...listed]
+      return commit(state)
     },
 
     async reconcile(ids: ReadonlySet<string>, { keepDrafts }) {
+      const state = await load()
+      if (!state) return UNAVAILABLE
       const kept: string[] = []
-      for (const documentId of await loadIndex()) {
+      for (const documentId of state.index) {
         if (ids.has(documentId)) {
           kept.push(documentId)
           continue
@@ -122,9 +184,13 @@ export function createStoreDocCache(options: StoreDocCacheOptions): DocCache {
           kept.push(documentId)
           continue
         }
-        await records.delete(keyOf(documentId))
       }
-      await saveIndex(kept)
+      const keep = new Set(kept)
+      for (const documentId of Object.keys(state.docs)) {
+        if (!keep.has(documentId)) delete state.docs[documentId]
+      }
+      state.index = kept
+      return commit(state)
     },
   }
 }
@@ -160,6 +226,8 @@ export class SyncRuntime {
   private readonly capabilities = new Map<string, OfficeCapabilities>()
   private cancel: (() => void) | null = null
   private ticking: Promise<void> | null = null
+  /** bumped by stop(): a pass that started before it is no longer current */
+  private generation = 0
 
   constructor(options: SyncRuntimeOptions) {
     this.options = options
@@ -182,29 +250,45 @@ export class SyncRuntime {
     void this.tick().catch(() => undefined)
   }
 
-  /** stops the interval and forgets every consumer (sign-out, account switch, a wiped scope) */
+  /**
+   * Stops the interval and forgets every consumer (sign-out, account switch, a
+   * wiped scope). The generation bump makes any run in flight stop at its next
+   * await: it creates no consumer, issues no further request, and cannot write
+   * back into the pass a later start owns.
+   */
   stop(): void {
+    this.generation += 1
     this.cancel?.()
     this.cancel = null
+    // a start after this must not wait behind the run that was just cancelled
+    this.ticking = null
+    for (const consumer of this.running.values()) consumer.cancel()
     this.running.clear()
+    this.capabilities.clear()
   }
 
   /** one pass; concurrent calls share it */
   tick(): Promise<void> {
-    this.ticking ??= this.run().finally(() => {
-      this.ticking = null
+    if (this.ticking) return this.ticking
+    const run = this.run().finally(() => {
+      // only this pass may clear itself: a stop() already dropped it
+      if (this.ticking === run) this.ticking = null
     })
-    return this.ticking
+    this.ticking = run
+    return run
   }
 
   private async run(): Promise<void> {
+    const generation = this.generation
+    const current = () => this.generation === generation
     const scope = this.options.store.scope()
     const client = this.options.client()
     if (!scope || !client) {
-      this.running.clear()
+      if (current()) this.running.clear()
       return
     }
     const open = await this.options.store.open()
+    if (!current()) return
     if (open.kind !== 'ok') {
       // no feed without the store: a cursor cannot move without its record
       this.running.clear()
@@ -214,7 +298,9 @@ export class SyncRuntime {
     const wanted = new Set<string>()
     let sessionExpired = false
     for (const orgId of this.options.targets.orgs()) {
+      if (!current()) return
       const capability = await this.options.capability(orgId)
+      if (!current()) return
       if (capability.kind === 'session_expired') sessionExpired = true
       this.capabilities.set(orgId, capability.capabilities)
       if (!capability.capabilities.sync_feed) continue
@@ -224,15 +310,19 @@ export class SyncRuntime {
       } catch {
         continue
       }
+      if (!current()) return
       for (const workspaceId of workspaces) {
+        if (!current()) return
         const feedScope: FeedScope = { ...scope, orgId, workspaceId }
         const key = cursorKey(feedScope)
         wanted.add(key)
         const consumer = this.consumerFor(key, feedScope, open.records, client)
         const result = await consumer.sync()
+        if (!current()) return
         if (result.kind === 'session_expired') sessionExpired = true
       }
     }
+    if (!current()) return
     for (const key of [...this.running.keys()]) {
       if (!wanted.has(key)) this.running.delete(key)
     }

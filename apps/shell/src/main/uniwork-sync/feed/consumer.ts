@@ -1,4 +1,4 @@
-import type { UniworkDocError } from '../../uniwork-docs/errors'
+import { UniworkDocError } from '../../uniwork-docs/errors'
 import type { FeedChange, FeedClient, FeedPage } from './client'
 import { cursorKey, type CursorStore, type FeedScope } from './cursor-store'
 import { FeedError } from './errors'
@@ -7,9 +7,9 @@ import { FeedError } from './errors'
  * Pulls one workspace's change feed into the local document cache.
  *
  * - With a saved cursor every page is applied, then its next cursor is saved:
- *   the cursor only moves after `applyPage` resolved, so a crash between the
- *   two replays the same page (DocCache.applyPage is idempotent by id +
- *   revision).
+ *   the cursor only moves after `applyPage` committed the page, so a crash
+ *   between the two replays the same page (DocCache.applyPage is idempotent by
+ *   id + revision) and a refused page never moves the cursor at all.
  * - Without one (cold start, `change_cursor_expired`, `change_cursor_invalid`)
  *   it runs a full resync: every snapshot page is applied, the cache is
  *   reconciled to exactly the ids seen (drafts kept, lost-permission entries
@@ -25,11 +25,17 @@ import { FeedError } from './errors'
  * org or deployment never reads or moves this stream's cursor or cache.
  */
 
+/** why a cache commit failed; the cursor must not move past a page that failed */
+export type DocCacheCommitFailure = 'store_full' | 'store_unavailable'
+
+/** the outcome of one cache commit: `failed` means nothing of it is on disk */
+export type DocCacheCommit = { kind: 'ok' } | { kind: 'failed'; failure: DocCacheCommitFailure }
+
 export interface DocCache {
   /** upsert the page's rows as one atomic step; a replayed page has no further effect */
-  applyPage(changes: readonly FeedChange[]): Promise<void>
+  applyPage(changes: readonly FeedChange[]): Promise<DocCacheCommit>
   /** full resync: keep exactly `ids` (plus local drafts), evict every other cached entry */
-  reconcile(ids: ReadonlySet<string>, options: { keepDrafts: true }): Promise<void>
+  reconcile(ids: ReadonlySet<string>, options: { keepDrafts: true }): Promise<DocCacheCommit>
 }
 
 export interface FeedClock {
@@ -59,11 +65,18 @@ export type FeedSyncResult =
   | { kind: 'synced'; pages: number; resynced: boolean }
   | { kind: 'backoff'; retryAt: number }
   | { kind: 'session_expired' }
+  | { kind: 'cancelled' }
   | { kind: 'failed'; error: UniworkDocError }
 
 export const FEED_BACKOFF_BASE_MS = 30_000
 export const FEED_BACKOFF_MAX_MS = 30 * 60_000
 const KNOWN_PHASES = new Set(['snapshot', 'changes'])
+
+/** a commit that did not land: the page stays unapplied and the error is surfaced */
+function commitFailed(commit: DocCacheCommit & { kind: 'failed' }): FeedSyncResult {
+  const code = commit.failure === 'store_full' ? 'store_full' : 'keystore_locked'
+  return { kind: 'failed', error: new UniworkDocError(code) }
+}
 
 type PageRun =
   | { kind: 'done'; pages: number }
@@ -80,6 +93,7 @@ export class FeedConsumer {
   private resyncRefusals = 0
   private retryAt = 0
   private loggedPhases = new Set<string>()
+  private cancelled = false
 
   constructor(options: FeedConsumerOptions) {
     this.options = options
@@ -94,14 +108,32 @@ export class FeedConsumer {
     return this.running
   }
 
+  /**
+   * The owning runtime stopped (sign-out, account switch, a wiped scope): the
+   * run ends at its next await, issues no further request and moves no cursor.
+   */
+  cancel(): void {
+    this.cancelled = true
+  }
+
   private enabled(): boolean {
     return this.options.capability().sync_feed === true
   }
 
-  private async run(): Promise<FeedSyncResult> {
+  /** the run must not go on: cancelled, or the capability turned off */
+  private stopReason(): FeedSyncResult | null {
+    if (this.cancelled) return { kind: 'cancelled' }
     if (!this.enabled()) return { kind: 'disabled' }
+    return null
+  }
+
+  private async run(): Promise<FeedSyncResult> {
+    const stopped = this.stopReason()
+    if (stopped) return stopped
     if (this.options.clock.now() < this.retryAt) return { kind: 'backoff', retryAt: this.retryAt }
     const cursor = await this.options.cursors.get(this.key)
+    const cancelled = this.stopReason()
+    if (cancelled) return cancelled
     if (cursor) {
       const run = await this.incremental(cursor)
       if (run.kind === 'stopped') return run.result
@@ -115,10 +147,18 @@ export class FeedConsumer {
     let cursor = start
     let pages = 0
     for (;;) {
-      if (!this.enabled()) return { kind: 'stopped', result: { kind: 'disabled' } }
+      const stopped = this.stopReason()
+      if (stopped) return { kind: 'stopped', result: stopped }
       const page = await this.fetch(cursor)
+      const afterFetch = this.stopReason()
+      if (afterFetch) return { kind: 'stopped', result: afterFetch }
       if (page.kind !== 'page') return page
-      await this.options.cache.applyPage(page.changes)
+      const applied = await this.options.cache.applyPage(page.changes)
+      // a page the store refused is never skipped: no cursor move, the page
+      // comes back on the next tick
+      if (applied.kind !== 'ok') return { kind: 'stopped', result: commitFailed(applied) }
+      const beforeCommit = this.stopReason()
+      if (beforeCommit) return { kind: 'stopped', result: beforeCommit }
       await this.options.cursors.set(this.key, page.nextCursor)
       pages += 1
       // a server that hands back the same cursor would loop forever
@@ -132,18 +172,26 @@ export class FeedConsumer {
     let cursor: string | undefined
     let pages = 0
     for (;;) {
-      if (!this.enabled()) return { kind: 'disabled' }
+      const stopped = this.stopReason()
+      if (stopped) return stopped
       const page = await this.fetch(cursor)
+      const afterFetch = this.stopReason()
+      if (afterFetch) return afterFetch
       if (page.kind === 'stopped') return page.result
       if (page.kind !== 'page') return this.backOff()
-      await this.options.cache.applyPage(page.changes)
+      const applied = await this.options.cache.applyPage(page.changes)
+      if (applied.kind !== 'ok') return commitFailed(applied)
       for (const change of page.changes) seen.add(change.documentId)
       pages += 1
       const done = !page.hasMore || page.nextCursor === cursor
       cursor = page.nextCursor
       if (done) break
     }
-    await this.options.cache.reconcile(seen, { keepDrafts: true })
+    const reconciled = await this.options.cache.reconcile(seen, { keepDrafts: true })
+    // an unfinished resync keeps no cursor at all, so the next run starts over
+    if (reconciled.kind !== 'ok') return commitFailed(reconciled)
+    const stopped = this.stopReason()
+    if (stopped) return stopped
     // the loop ran at least once, so cursor is the final page's next cursor
     if (cursor) await this.options.cursors.set(this.key, cursor)
     this.resyncRefusals = 0
