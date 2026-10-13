@@ -125,6 +125,13 @@ export interface UniworkDocsServiceDeps {
   /** applies the server a launch link names (confirm / sign-out rules live in uniwork-auth) */
   applyProfile(profile: DeploymentProfile): Promise<ProfileOutcome>
   identity(): SessionIdentity | null
+  /**
+   * True while the auth module is in its keystore-locked state: the OS keychain
+   * cannot produce the store key even though a saved account exists. The store
+   * then reports `keystore_locked` independently of the network session (a cold
+   * restore has none), so the S11 lock and the save refusal still happen.
+   */
+  keystoreLocked?(): boolean
   selectedOrgId(): string | null
   authorized<T>(call: (token: string) => Promise<T>): Promise<T>
   fetch?: FetchLike
@@ -369,6 +376,14 @@ export class UniworkDocsService {
   openSyncStore(): Promise<SyncStoreOpen> {
     const sync = this.deps.syncStore
     if (!sync) return Promise.resolve({ kind: 'no_session' })
+    // A cold start with a locked keychain has no live session to name a scope
+    // (the locked restore dropped it): the saved account's copies still need
+    // the store, so this is the store's lock, not "no session".
+    if (!this.deps.identity() && this.storeLocked()) {
+      const open: SyncStoreOpen = { kind: 'keystore_locked' }
+      this.noteStoreOpen(open)
+      return Promise.resolve(open)
+    }
     this.syncOpen ??= sync
       .open()
       .then(async (open) => {
@@ -503,7 +518,7 @@ export class UniworkDocsService {
       this.recordLock(lock)
       return true
     }
-    if (this.storeOpenKind === 'keystore_locked' && this.store.legacyIntentAt(path)) {
+    if (this.storeLocked() && this.store.legacyIntentAt(path)) {
       this.recordPathLock(path, 'keystore_locked')
       return true
     }
@@ -531,12 +546,37 @@ export class UniworkDocsService {
 
   /** while the store cannot open, every copy still holding a pre-store intent is locked */
   private lockLegacyIntents(): void {
-    const scope = this.deps.syncStore?.scope()
+    const scope = this.localScope()
     if (!scope) return
     for (const dir of scopeWorkingCopyDirs(this.store.root, scope)) {
       if (!hasLegacyIntentFiles(dir)) continue
       this.recordDirLock(dir, 'keystore_locked')
     }
+  }
+
+  /**
+   * The store cannot open right now: the last open said so, or the auth module
+   * is in its keystore-locked state (which a cold restore reports with no live
+   * session, before any open was even asked for).
+   */
+  private storeLocked(): boolean {
+    return this.storeOpenKind === 'keystore_locked' || this.deps.keystoreLocked?.() === true
+  }
+
+  /**
+   * The account boundary whose working copies this build may still act on: the
+   * live session, or - with no session and a locked keychain - the saved owner
+   * of the last live session on the active deployment (the same account whose
+   * copies stay editable, see ownsLocally).
+   */
+  private localScope(): { deploymentId: string; accountId: string } | null {
+    const live = this.deps.syncStore?.scope()
+    if (live) return { deploymentId: live.deploymentId, accountId: live.accountId }
+    if (this.deps.keystoreLocked?.() !== true) return null
+    const last = this.lastOwner
+    const profile = this.deps.profile()
+    if (!last || !profile || last.deploymentId !== profile.deploymentId) return null
+    return { deploymentId: last.deploymentId, accountId: last.accountId }
   }
 
   /** the store opened (again): the keystore_locked panels are stale */

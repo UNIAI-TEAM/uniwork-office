@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { UNIWORK_DOC_CHANNELS, type UniworkDocLock } from '../src/shared/home-api'
-import { BINDING_FILE } from '../src/main/uniwork-docs/binding-store'
+import { BINDING_FILE, INTENT_PAYLOAD_FILE } from '../src/main/uniwork-docs/binding-store'
 
 /**
  * G5-04g wiring: the lock IPC and the open-route diversion. `lock` is a push
@@ -16,6 +16,8 @@ import { BINDING_FILE } from '../src/main/uniwork-docs/binding-store'
 let dir: string
 let identity: { accountId: string; deviceSessionId: string; deploymentId: string } | null = null
 let statusListener: ((status: { state: string }) => void) | null = null
+/** the account state the mocked auth module reports (keystore-locked after a lock) */
+let accountState = 'signed-out'
 
 vi.mock('electron', () => ({
   app: { getPath: () => dir },
@@ -35,7 +37,7 @@ vi.mock('../src/main/uniwork-auth', () => ({
     statusListener = listener
     return () => undefined
   },
-  uniworkAccount: () => ({ status: () => ({ state: 'signed-out', org: null }) }),
+  uniworkAccount: () => ({ status: () => ({ state: accountState, org: null }) }),
   uniworkDeploymentProfile: () => ({
     deploymentId: 'default',
     apiOrigin: 'https://uniwork.example',
@@ -49,6 +51,7 @@ beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'uw-lock-wiring-'))
   identity = { accountId: 'acc_1', deviceSessionId: 'dev_1', deploymentId: 'default' }
   statusListener = null
+  accountState = 'signed-out'
 })
 afterEach(() => rmSync(dir, { recursive: true, force: true }))
 
@@ -215,5 +218,54 @@ describe('the durable store at the account boundary (W3b)', () => {
     statusListener?.({ state: 'signed-in' })
     await handle.boundary.enforce({ accountId: 'acc_9', deploymentId: 'default' })
     expect(existsSync(otherScope)).toBe(true)
+  })
+})
+
+describe('a cold locked restore at the wiring (R1-be-4)', () => {
+  it('the account keystore-locked state locks the saved account copy with no session', async () => {
+    mkdirSync(docDir(), { recursive: true })
+    writeFileSync(docPath(), 'working copy bytes')
+    writeFileSync(
+      join(docDir(), BINDING_FILE),
+      JSON.stringify({
+        schema: 1,
+        documentId: 'doc_1',
+        workspaceId: 'ws_1',
+        orgId: 'org_a',
+        title: 'Plan.docx',
+        filename: 'Plan.docx',
+        format: 'docx',
+        access: 'edit',
+        baseRevision: '41',
+        baseVersion: 3,
+        baseChecksum: 'abc',
+        state: 'saving',
+        pendingIntent: {
+          intentId: 'office-intent-legacy',
+          idempotencyKey: 'office-key-legacy',
+          documentId: 'doc_1',
+          baseRevision: '41',
+          checksum: 'abc',
+          createdAt: '2026-10-11T00:00:00.000Z',
+        },
+      }),
+    )
+    writeFileSync(join(docDir(), INTENT_PAYLOAD_FILE), 'working copy bytes')
+    mkdirSync(join(dir, 'uniwork-documents'), { recursive: true })
+    writeFileSync(
+      join(dir, 'uniwork-documents', 'last-account.json'),
+      JSON.stringify({ accountId: 'acc_1', deploymentId: 'default' }),
+    )
+    // the locked restart: the restore dropped the session, the account says locked
+    identity = null
+    accountState = 'keystore-locked'
+    const { handle, sent } = await setup()
+    expect(handle.service.refuseLockedPath(docPath())).toBe(true)
+    expect(sent.at(-1)).toEqual({
+      channel: UNIWORK_DOC_CHANNELS.lock,
+      payload: { path: docPath(), reason: 'keystore_locked', name: 'Plan.docx' },
+    })
+    // the plaintext pair is untouched
+    expect(existsSync(join(docDir(), INTENT_PAYLOAD_FILE))).toBe(true)
   })
 })

@@ -365,6 +365,9 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     applyProfile: (profile) =>
       applyUniworkProfile(profile, { confirm: (origin) => confirmConnect(wiring, origin) }),
     identity: () => uniworkSessionIdentity(),
+    // a locked keychain is the account's state, not the session's: a cold
+    // restore has no session and must still lock the saved account's copies
+    keystoreLocked: () => uniworkAccount().status().state === 'keystore-locked',
     selectedOrgId: () => uniworkAccount().status().org?.id ?? null,
     authorized: (call) => authorizedRequest(call),
     openPath: (path) => {

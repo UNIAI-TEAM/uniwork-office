@@ -104,11 +104,15 @@ function seedFolder(binding: unknown): void {
   writeFileSync(join(docDir(), BINDING_FILE), JSON.stringify(binding, null, 2))
 }
 
-function setup() {
+function setup(opts: { account?: string | null; keystoreLocked?: boolean } = {}) {
   const statuses: UniworkDocStatus[] = []
   const launches: UniworkLaunchEvent[] = []
   const locks: UniworkDocLock[] = []
   const safeStorage: LockableSafeStorage = createLockableSafeStorage()
+  /** the live session identity; null models a cold locked restore */
+  let account: string | null = opts.account === undefined ? 'acc_1' : opts.account
+  /** the account's keystore-locked state, independent of the session */
+  let keystoreLocked = opts.keystoreLocked === true
   const layer = createStoreLayer({
     root: join(dir, 'uniwork-sync', 'store'),
     keys: createSafeStorageKeyProvider({ safeStorage, dir: join(dir, 'uniwork-sync', 'keys') }),
@@ -118,7 +122,7 @@ function setup() {
   layer.register(INTENT_STORE_REGISTRATION)
   const syncStore = createSyncStoreAccess({
     layer,
-    scope: () => ({ deploymentId: 'default', accountId: 'acc_1' }),
+    scope: () => (account ? { deploymentId: 'default', accountId: account } : null),
   })
   const ui: ConflictUi = {
     chooseConflict: vi.fn(async () => 'later'),
@@ -132,7 +136,9 @@ function setup() {
     userDataDir: dir,
     syncStore,
     profile: () => profile,
-    identity: () => ({ accountId: 'acc_1', deviceSessionId: 'dev_1', deploymentId: 'default' }),
+    identity: () =>
+      account ? { accountId: account, deviceSessionId: 'dev_1', deploymentId: 'default' } : null,
+    keystoreLocked: () => keystoreLocked,
     selectedOrgId: () => 'org_a',
     authorized: <T>(call: (token: string) => Promise<T>) => call(TOKEN),
     fetch: fakeFetch as never,
@@ -149,7 +155,20 @@ function setup() {
     sleep: async () => undefined,
   }
   const service = new UniworkDocsService(deps)
-  return { service, ui, statuses, locks, deps, safeStorage, layer }
+  return {
+    service,
+    ui,
+    statuses,
+    locks,
+    deps,
+    safeStorage,
+    layer,
+    /** the keychain unlocks and Retry restores the saved session */
+    signIn: (id: string) => {
+      account = id
+      keystoreLocked = false
+    },
+  }
 }
 
 const bytesOf = (path: string) => readFileSync(path, 'utf8')
@@ -484,5 +503,49 @@ describe('a locked keychain holds a pre-store intent (W3b)', () => {
     plain.safeStorage.lock()
     expect((await plain.service.openSyncStore()).kind).toBe('keystore_locked')
     expect(plain.service.refuseLockedPath(docPath())).toBe(false)
+  })
+
+  it('a cold locked restore (no live session) still tells keystore_locked and locks the copy (R1-be-4)', async () => {
+    seedLegacyIntent()
+    // the state a locked restart leaves behind: the saved profile and the last
+    // owner on disk, no in-memory session, the account keystore-locked
+    writeFileSync(
+      join(dir, 'uniwork-documents', 'last-account.json'),
+      JSON.stringify({ accountId: 'acc_1', deploymentId: 'default' }),
+    )
+    const ctx = setup({ account: null, keystoreLocked: true })
+    ctx.safeStorage.lock()
+    const before = {
+      binding: bindingText(),
+      copy: bytesOf(docPath()),
+      payload: readFileSync(join(docDir(), INTENT_PAYLOAD_FILE), 'utf8'),
+    }
+
+    // the store is the lock, not "no session": the cold restore maps the open
+    // to keystore_locked and locks the saved account's still-legacy copy
+    expect((await ctx.service.openSyncStore()).kind).toBe('keystore_locked')
+    expect(ctx.locks.at(-1)).toEqual({
+      path: docPath(),
+      reason: 'keystore_locked',
+      name: 'Plan.docx',
+    })
+    // opening the document from recents is refused before any module sees it
+    expect(refuseLockedOpenPath(ctx.service, docPath())).toBe(true)
+    expect(ctx.deps.openPath).not.toHaveBeenCalled()
+    // nothing was written anywhere: binding, copy and payload are byte-identical
+    expect(bindingText()).toBe(before.binding)
+    expect(bytesOf(docPath())).toBe(before.copy)
+    expect(readFileSync(join(docDir(), INTENT_PAYLOAD_FILE), 'utf8')).toBe(before.payload)
+
+    // the keychain unlocks and Retry restores the session: the lock clears and
+    // the sweep moves the intent exactly once
+    ctx.safeStorage.unlock()
+    ctx.signIn('acc_1')
+    expect((await ctx.service.openSyncStore()).kind).toBe('ok')
+    const migrated = JSON.parse(bindingText()) as Record<string, unknown>
+    expect(migrated).toMatchObject({ schema: 2, min_store_level: 2, state: 'dirty' })
+    expect(migrated).not.toHaveProperty('pendingIntent')
+    expect(folderFiles()).toEqual(['Plan.docx', BINDING_FILE])
+    expect(ctx.service.currentLocks().filter((l) => l.reason === 'keystore_locked')).toEqual([])
   })
 })
