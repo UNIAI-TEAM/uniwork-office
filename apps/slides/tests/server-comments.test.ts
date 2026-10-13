@@ -19,6 +19,7 @@ import type {
 } from '../src/renderer/comments-seam'
 import {
   anchorUpdatesAfterSave,
+  createSlideTracker,
   createSlidesAnchorAdapter,
   loadCommentsContext,
   pptxAnchorFor,
@@ -76,6 +77,8 @@ interface FakeOpts {
   context?: () => Promise<unknown>
   /** reject the next `anchors` calls with this protocol error code (400 anchor_version_invalid) */
   anchorsFail?: { code: string; status?: number; detailsCode?: string }
+  /** `list` waits for this promise (the first list still in flight) */
+  listGate?: Promise<void>
 }
 
 function fakeBridge(seed: Row[] = [], opts: FakeOpts = {}) {
@@ -92,12 +95,14 @@ function fakeBridge(seed: Row[] = [], opts: FakeOpts = {}) {
   const bridge: UniworkCommentsSeamApi = {
     list: (input) => {
       calls.push({ op: 'list', input })
-      return ok({
-        comments: rows.map((r) => ({ ...r })),
-        mentions: [],
-        list_token: `t${++token}`,
-        unchanged: false,
-      })
+      const answer = () =>
+        ok({
+          comments: rows.map((r) => ({ ...r })),
+          mentions: [],
+          list_token: `t${++token}`,
+          unchanged: false,
+        })
+      return opts.listGate ? opts.listGate.then(answer) : answer()
     },
     create: (input) => {
       calls.push({ op: 'create', input })
@@ -303,6 +308,96 @@ describe('pptx anchors follow the slide, not its position', () => {
     expect(selectedObjectId(s, ['src-slide1'])).toBe('e_slide1')
     expect(selectedObjectId(s, [])).toBeUndefined()
     expect(selectedObjectId(s, ['src-slide1', 'other'])).toBeUndefined()
+  })
+})
+
+/** a slide that is not the one `deck(id)` builds: the same p:sldId and part name, other content */
+const replacementOf = (id: string): SlideIdentity => ({
+  sldId: sldIdOf(id),
+  partPath: `ppt/slides/${id}.xml`,
+  nodes: [{ sourceId: `new-${id}`, durableId: `n_${id}` }],
+})
+
+describe('RFE14-01: a lost thread never re-binds to a slide that reuses its p:sldId', () => {
+  it('post-save: a root the server holds as lost is never sent as exact', () => {
+    const before = deck('slide1', 'slide2', 'slide3')
+    const lostRoot = {
+      id: 'a',
+      document_id: 'd',
+      body: 'x',
+      anchor: anchorOn(before, 2),
+      anchor_state: 'lost',
+    }
+    // slide 3 was deleted and Save marked it lost; a new slide got p:sldId 258 again
+    const after = [before[0]!, before[1]!, replacementOf('slide3')]
+    expect(anchorUpdatesAfterSave([lostRoot], after)).toEqual([])
+    // a live thread on a surviving slide still moves as before
+    const live = { id: 'b', document_id: 'd', body: 'y', anchor: anchorOn(before, 0) }
+    expect(anchorUpdatesAfterSave([lostRoot, live], after)).toEqual([
+      { commentId: 'b', state: 'exact', anchor: { ...anchorOn(before, 0), slide_index: 0 } },
+    ])
+  })
+
+  it('the adapter does not locate, order or go to a lost thread by the reused id', () => {
+    const before = deck('slide1', 'slide2', 'slide3')
+    const anchor = anchorOn(before, 2)
+    const slides = [before[0]!, replacementOf('slide3')]
+    const goTo = vi.fn()
+    const lost = new Set<unknown>([anchor])
+    const adapter = createSlidesAnchorAdapter({
+      slides: () => slides,
+      goTo,
+      isLost: (a) => lost.has(a),
+    })
+    expect(adapter.locate(anchor)).toBe(false)
+    // sorted where it was, not where the id sits now
+    expect(adapter.order(anchor)).toBe(2)
+    adapter.goTo(anchor)
+    expect(goTo).not.toHaveBeenCalled()
+  })
+
+  it('tracker: an id that comes back as another slide is replaced; one that comes back unchanged (undo) is not', () => {
+    const base = deck('slide1', 'slide2', 'slide3')
+    let clock = 1000
+    const t = createSlideTracker(() => clock)
+    t.observe(base)
+    t.observe([base[0]!, base[1]!])
+    t.observe(base) // undo: the same slide is back
+    expect(t.replacedAt('258')).toBeUndefined()
+    t.observe([base[0]!, base[1]!])
+    clock = 2000
+    t.observe([base[0]!, base[1]!, replacementOf('slide3')])
+    expect(t.replacedAt('258')).toBe(2000)
+    expect(t.replacedAt('257')).toBeUndefined()
+    t.settle()
+    expect(t.replacedAt('258')).toBeUndefined()
+  })
+
+  it('pre-save reuse: the old thread is lost, a thread created after the reuse stays exact', () => {
+    const base = deck('slide1', 'slide2', 'slide3')
+    const t = createSlideTracker(() => Date.parse('2026-10-13T10:00:00Z'))
+    t.observe(base)
+    t.observe([base[0]!, base[1]!])
+    const after = [base[0]!, base[1]!, replacementOf('slide3')]
+    t.observe(after)
+    const old = {
+      id: 'old',
+      document_id: 'd',
+      body: 'x',
+      anchor: anchorOn(base, 2),
+      created_at: '2026-10-12T09:00:00Z',
+    }
+    const fresh = {
+      id: 'new',
+      document_id: 'd',
+      body: 'y',
+      anchor: anchorOn(after, 2),
+      created_at: '2026-10-13T10:00:05Z',
+    }
+    expect(anchorUpdatesAfterSave([old, fresh], after, (id) => t.replacedAt(id))).toEqual([
+      { commentId: 'old', state: 'lost', anchor: anchorOn(base, 2) },
+      { commentId: 'new', state: 'exact', anchor: { ...anchorOn(after, 2), slide_index: 2 } },
+    ])
   })
 })
 
@@ -599,6 +694,8 @@ describe('ServerCommentsHost over the comments bridge', () => {
     expect(slot.querySelector('.comments-server-hint')?.textContent).toBe(
       paneStrings.zh.paneCommentsSaveFirst,
     )
+    // RFE14-04: announced to assistive tech
+    expect(slot.querySelector('.comments-server-hint')?.getAttribute('role')).toBe('status')
     expect(h.statuses).toEqual([paneStrings.zh.paneCommentsSaveFirst])
     expect(h.server.ops()).not.toContain('create')
     // the first Save receipt gives the open version: the hint goes, a thread can start
@@ -788,6 +885,107 @@ describe('ServerCommentsHost over the comments bridge', () => {
     expect(h.server.ops()).toContain('resolve')
     expect(addComment).not.toHaveBeenCalled()
     expect(deleteComment).not.toHaveBeenCalled()
+  })
+})
+
+describe('G8-14 fix r1: host behaviour', () => {
+  const anchorRounds = (h: Awaited<ReturnType<typeof mountHost>>) =>
+    h.server.calls.filter((c) => c.op === 'anchors')
+
+  it('RFE14-01: delete the last slide with a thread, Save, add a slide, Save: nothing is sent exact for it', async () => {
+    const slides = deck('slide1', 'slide2', 'slide3')
+    const h = await mountHost({
+      slides,
+      versionId: 'v1',
+      rows: [rootRow('x1', anchorOn(slides, 2))],
+    })
+    await h.render({ slides: [slides[0]!, slides[1]!] })
+    await h.save('v2')
+    expect(anchorRounds(h)).toHaveLength(1)
+    expect(anchorRounds(h)[0]!.input).toMatchObject({
+      anchors: [{ commentId: 'x1', state: 'lost', anchor: { slide_id: '258', slide_index: 2 } }],
+    })
+    expect(h.server.rows[0]!.anchor_state).toBe('lost')
+    // a new slide takes p:sldId 258 again
+    await h.render({ slides: [slides[0]!, slides[1]!, replacementOf('slide3')] })
+    await h.save('v3')
+    const exactFor = anchorRounds(h)
+      .flatMap((c) => (c.input as { anchors: Array<{ commentId: string; state: string }> }).anchors)
+      .filter((a) => a.commentId === 'x1' && a.state === 'exact')
+    expect(exactFor).toEqual([])
+    expect(h.server.rows[0]!.anchor_state).toBe('lost')
+    expect(h.server.rows[0]!.anchor).toMatchObject({ slide_id: '258', slide_index: 2 })
+    // the label keeps the old slide and says the location is gone
+    expect(slot.textContent).toContain(collabStrings('zh').collabAnchorLost)
+    h.goTo.mockClear()
+  })
+
+  it('RFE14-01: delete + insert before one Save: the old thread is sent lost', async () => {
+    const slides = deck('slide1', 'slide2', 'slide3')
+    const h = await mountHost({
+      slides,
+      versionId: 'v1',
+      rows: [rootRow('x1', anchorOn(slides, 2))],
+    })
+    await h.render({ slides: [slides[0]!, slides[1]!] })
+    await h.render({ slides: [slides[0]!, slides[1]!, replacementOf('slide3')] })
+    await h.save('v2')
+    expect(anchorRounds(h)).toHaveLength(1)
+    expect(anchorRounds(h)[0]!.input).toMatchObject({
+      versionId: 'v2',
+      anchors: [{ commentId: 'x1', state: 'lost', anchor: { slide_id: '258', slide_index: 2 } }],
+    })
+  })
+
+  it('RFE14-01: undoing the delete is not a reuse: the thread follows its slide', async () => {
+    const slides = deck('slide1', 'slide2', 'slide3')
+    const h = await mountHost({
+      slides,
+      versionId: 'v1',
+      rows: [rootRow('x1', anchorOn(slides, 2))],
+    })
+    await h.render({ slides: [slides[0]!, slides[1]!] })
+    await h.render({ slides })
+    await h.save('v2')
+    expect(anchorRounds(h)[0]!.input).toMatchObject({
+      anchors: [{ commentId: 'x1', state: 'exact', anchor: { slide_id: '258', slide_index: 2 } }],
+    })
+  })
+
+  it('RFE14-02: a receipt while the list is loading runs once, with the latest version, when it is ready', async () => {
+    const slides = deck('slide1', 'slide2')
+    let release: () => void = () => {}
+    const listGate = new Promise<void>((r) => (release = r))
+    const h = await mountHost({
+      slides,
+      versionId: 'v1',
+      rows: [rootRow('x1', anchorOn(slides, 0))],
+      fake: { listGate },
+    })
+    await h.render({ slides: [slides[1]!, slides[0]!] })
+    await h.save('v2')
+    await h.save('v3')
+    expect(anchorRounds(h)).toHaveLength(0)
+    await act(async () => {
+      release()
+      await flush()
+      await flush()
+    })
+    const rounds = anchorRounds(h)
+    expect(rounds).toHaveLength(1)
+    expect(rounds[0]!.input).toMatchObject({
+      versionId: 'v3',
+      anchors: [{ commentId: 'x1', state: 'exact', anchor: { slide_id: '256', slide_index: 1 } }],
+    })
+  })
+
+  it('RFE14-03: New Comment on a slide without identity says so in the status line', async () => {
+    const h = await mountHost({ slides: [{}, ...deck('slide2')], versionId: 'v1' })
+    await act(async () => {
+      expect(h.handleRef.current!.startThread(0)).toBe(false)
+      await flush()
+    })
+    expect(h.statuses).toEqual([paneStrings.zh.paneCommentsNewNoSlide])
   })
 })
 
