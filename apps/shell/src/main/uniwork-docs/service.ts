@@ -372,11 +372,11 @@ function accessFor(level: string | null): UniworkDocAccess {
  * caller's level, and the server version id of the base bytes when the base is
  * the version that read describes (a binding on another version keeps its own).
  */
-function withServerContext(binding: Binding, detail: DocumentDetail, viewTicket = false): Binding {
+function withServerContext(binding: Binding, detail: DocumentDetail, readOnly = false): Binding {
   const next = { ...binding }
   const level = docLevelOf(detail.myLevel)
-  // a view-ticket copy is read-only: its level never exceeds the ticket's access
-  if (level) next.level = viewTicket ? 'view' : level
+  // a read-only copy (a view ticket, or a launch that asked to view) never shows a level above view
+  if (level) next.level = readOnly ? 'view' : level
   else delete next.level
   if (detail.file.versionId && next.baseVersion === detail.file.version) {
     next.baseVersionId = detail.file.versionId
@@ -2129,7 +2129,7 @@ export class UniworkDocsService {
           const binding: Binding = withServerContext(
             { ...existing, title: detail.title, access },
             detail,
-            viewTicket,
+            viewTicket || viewRequested,
           )
           if (existing.state === 'blocked' && existing.error === 'forbidden' && access === 'edit') {
             binding.state = 'dirty'
@@ -2213,7 +2213,7 @@ export class UniworkDocsService {
         ...(existing?.lastSavedAt ? { lastSavedAt: existing.lastSavedAt } : {}),
       },
       base,
-      viewTicket,
+      viewTicket || viewRequested,
     )
     // a refused write is never ignored, exactly as in the branch above: the
     // copy then reads as the binding that persisted, not the refused one
