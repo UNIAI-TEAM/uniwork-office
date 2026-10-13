@@ -34,7 +34,7 @@ function stripDiacritics(s: string): string {
 
 function wb(
   action: 'open' | 'add_item',
-  moduleId: 'tasks' | 'clients' | 'contracts' | 'calendar' | 'email' | 'notes',
+  moduleId: 'tasks' | 'calendar' | 'notes',
   text: string,
   summary: string,
 ): MyAiStep {
@@ -84,10 +84,10 @@ const PLAYBOOKS: readonly MyAiPlaybook[] = [
     labelEn: 'Quote + follow-up',
     chip: {
       id: 'sales-quote',
-      labelVi: 'Báo giá + việc + Clients',
-      labelEn: 'Quote + task + Clients',
-      promptVi: 'Soạn báo giá Word và thêm việc follow-up, mở tab Clients',
-      promptEn: 'Draft a Word quote and add a follow-up task, open Clients',
+      labelVi: 'Báo giá + việc',
+      labelEn: 'Quote + task',
+      promptVi: 'Soạn báo giá Word và thêm việc follow-up',
+      promptEn: 'Draft a Word quote and add a follow-up task',
     },
     match: (lower, norm) =>
       /(?:báo giá|bao gia|quote|pricing|đề xuất giá|de xuat gia)/i.test(lower) ||
@@ -103,7 +103,6 @@ const PLAYBOOKS: readonly MyAiPlaybook[] = [
       return [
         fillTemplate('sales-quote', raw),
         wb('add_item', 'tasks', `Follow-up báo giá: ${topic.slice(0, 80)}`, 'Thêm việc follow-up'),
-        wb('open', 'clients', 'Mở tab Clients', 'Mở Clients'),
       ]
     },
   },
@@ -147,8 +146,8 @@ const PLAYBOOKS: readonly MyAiPlaybook[] = [
       id: 'accounting-invoice',
       labelVi: 'Hóa đơn Excel + việc',
       labelEn: 'Invoice sheet + task',
-      promptVi: 'Tạo bảng hóa đơn Excel, nháp email yêu cầu chứng từ (tab Email), thêm việc đối soát',
-      promptEn: 'Create an invoice sheet, draft a voucher-request in Email tab, add a reconcile task',
+      promptVi: 'Tạo bảng hóa đơn Excel và thêm việc đối soát',
+      promptEn: 'Create an invoice sheet and add a reconcile task',
     },
     match: (lower, norm) =>
       /(?:hóa đơn|hoa don|invoice|chứng từ|chung tu|billing|xuất hóa đơn|xuat hoa don|nhắc thanh toán|nhac thanh toan)/i.test(
@@ -165,12 +164,6 @@ const PLAYBOOKS: readonly MyAiPlaybook[] = [
       return [
         createSheets(
           `Bảng hóa đơn / theo dõi chứng từ: ${topic}. Cột: STT, mô tả, SL, đơn giá, VAT, thành tiền, hạn TT, trạng thái.`,
-        ),
-        wb(
-          'add_item',
-          'email',
-          `Yêu cầu chứng từ / nhắc thanh toán: ${topic.slice(0, 120)}`,
-          'Nháp email chứng từ',
         ),
         wb('add_item', 'tasks', `Đối soát hóa đơn: ${topic.slice(0, 80)}`, 'Thêm việc đối soát'),
       ]
@@ -306,10 +299,10 @@ const PLAYBOOKS: readonly MyAiPlaybook[] = [
     labelEn: 'RFP / vendor request',
     chip: {
       id: 'procurement-rfp',
-      labelVi: 'RFP + Contracts',
-      labelEn: 'RFP + Contracts',
-      promptVi: 'Soạn RFP / yêu cầu báo giá NCC Word, thêm việc chấm thầu, mở Contracts',
-      promptEn: 'Draft an RFP / vendor RFQ in Word, add an evaluation task, open Contracts',
+      labelVi: 'RFP + việc',
+      labelEn: 'RFP + task',
+      promptVi: 'Soạn RFP / yêu cầu báo giá NCC Word và thêm việc chấm thầu',
+      promptEn: 'Draft an RFP / vendor RFQ in Word and add an evaluation task',
     },
     match: (lower, norm) =>
       /(?:\brfp\b|rfq|yêu cầu báo giá|yeu cau bao gia|nhà cung cấp|nha cung cap|chào thầu|chao thau|đấu thầu|dau thau)/i.test(
@@ -322,7 +315,6 @@ const PLAYBOOKS: readonly MyAiPlaybook[] = [
       return [
         createDocs(topic),
         wb('add_item', 'tasks', `Chấm thầu / RFP: ${topic.slice(0, 80)}`, 'Thêm việc chấm thầu'),
-        wb('open', 'contracts', 'Mở Contracts', 'Open Contracts'),
       ]
     },
   },
@@ -365,10 +357,10 @@ const PLAYBOOKS: readonly MyAiPlaybook[] = [
     labelEn: 'Property listing',
     chip: {
       id: 're-listing',
-      labelVi: 'Listing + Clients',
-      labelEn: 'Listing + Clients',
-      promptVi: 'Soạn mô tả listing BĐS Word, thêm việc hẹn xem nhà, mở Clients',
-      promptEn: 'Draft a property listing in Word, add a viewing task, open Clients',
+      labelVi: 'Listing + việc',
+      labelEn: 'Listing + task',
+      promptVi: 'Soạn mô tả listing BĐS Word và thêm việc hẹn xem nhà',
+      promptEn: 'Draft a property listing in Word and add a viewing task',
     },
     match: (lower, norm) =>
       /(?:listing|tin đăng|tin dang|mô tả (?:nhà|căn|bđs)|mo ta (?:nha|can|bds)|xem nhà|xem nha)/i.test(
@@ -381,7 +373,6 @@ const PLAYBOOKS: readonly MyAiPlaybook[] = [
       return [
         createDocs(topic),
         wb('add_item', 'tasks', `Hẹn xem nhà: ${topic.slice(0, 80)}`, 'Thêm việc xem nhà'),
-        wb('open', 'clients', 'Mở Clients', 'Open Clients'),
       ]
     },
   },
@@ -392,10 +383,10 @@ const PLAYBOOKS: readonly MyAiPlaybook[] = [
     labelEn: 'Customer follow-up',
     chip: {
       id: 'sales-followup',
-      labelVi: 'Follow-up + Clients',
-      labelEn: 'Follow-up + Clients',
-      promptVi: 'Soạn thư follow-up sau demo và thêm việc gọi lại, mở Clients',
-      promptEn: 'Draft a post-demo follow-up and add a callback task, open Clients',
+      labelVi: 'Follow-up + việc',
+      labelEn: 'Follow-up + task',
+      promptVi: 'Soạn thư follow-up sau demo và thêm việc gọi lại',
+      promptEn: 'Draft a post-demo follow-up and add a callback task',
     },
     match: (lower, norm) =>
       /(?:follow[\s-]?up|theo dõi|theo doi|gọi lại|goi lai|sau demo)/i.test(lower) ||
@@ -407,7 +398,6 @@ const PLAYBOOKS: readonly MyAiPlaybook[] = [
       return [
         createDocs(brief),
         wb('add_item', 'tasks', `Follow-up: ${brief.slice(0, 80)}`, 'Thêm việc follow-up'),
-        wb('open', 'clients', 'Mở tab Clients', 'Mở Clients'),
       ]
     },
   },
@@ -420,8 +410,8 @@ const PLAYBOOKS: readonly MyAiPlaybook[] = [
       id: 'cs-reply',
       labelVi: 'Trả lời khách + task',
       labelEn: 'Reply + task',
-      promptVi: 'Soạn thư trả lời khách khiếu nại và thêm việc theo dõi, mở Clients',
-      promptEn: 'Draft a complaint reply and add a follow-up task, open Clients',
+      promptVi: 'Soạn thư trả lời khách khiếu nại và thêm việc theo dõi',
+      promptEn: 'Draft a complaint reply and add a follow-up task',
     },
     match: (lower) =>
       /(?:trả lời khách|tra loi khach|khiếu nại|khieu nai|csat|ticket|phản hồi khách|phan hoi khach)/i.test(
@@ -434,7 +424,6 @@ const PLAYBOOKS: readonly MyAiPlaybook[] = [
       return [
         fillTemplate('cs-reply', raw),
         wb('add_item', 'tasks', `CS follow-up: ${brief.slice(0, 80)}`, 'Thêm việc CS'),
-        wb('open', 'clients', 'Mở Clients', 'Open Clients'),
       ]
     },
   },
@@ -445,10 +434,10 @@ const PLAYBOOKS: readonly MyAiPlaybook[] = [
     labelEn: 'Contract + task',
     chip: {
       id: 'legal-contract',
-      labelVi: 'Hợp đồng + Contracts',
-      labelEn: 'Contract + Contracts',
-      promptVi: 'Soạn hợp đồng thuê nhà Word và thêm việc rà soát, mở tab Contracts',
-      promptEn: 'Draft a lease contract in Word and add a review task, open Contracts',
+      labelVi: 'Hợp đồng + việc',
+      labelEn: 'Contract + task',
+      promptVi: 'Soạn hợp đồng thuê nhà Word và thêm việc rà soát',
+      promptEn: 'Draft a lease contract in Word and add a review task',
     },
     match: (lower, norm) =>
       /(?:hợp đồng|hop dong|contract|thoả thuận|thoa thuan)/i.test(lower) ||
@@ -460,7 +449,6 @@ const PLAYBOOKS: readonly MyAiPlaybook[] = [
       return [
         fillTemplate('legal-contract', raw),
         wb('add_item', 'tasks', `Rà soát hợp đồng: ${brief.slice(0, 80)}`, 'Thêm việc rà soát'),
-        wb('open', 'contracts', 'Mở Contracts', 'Open Contracts'),
       ]
     },
   },

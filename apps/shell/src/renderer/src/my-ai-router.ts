@@ -789,9 +789,9 @@ export function routeMyAiTextSingle(text: string): MyAiStep | Extract<MyAiRoute,
   return {
     kind: 'unknown',
     hintVi:
-      'Thử: “Soạn báo giá Word và thêm việc follow-up, mở tab Clients”, “Mở file báo cáo”, “Tóm tắt file gần đây”.',
+      'Thử: “Soạn báo giá Word và thêm việc follow-up”, “Mở file báo cáo”, “Tóm tắt file gần đây”.',
     hintEn:
-      'Try: “Draft a Word quote and add a follow-up task, open Clients”, “Open report file”, “Summarize recent files”.',
+      'Try: “Draft a Word quote and add a follow-up task”, “Open report file”, “Summarize recent files”.',
   }
 }
 

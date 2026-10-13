@@ -20,24 +20,18 @@ describe('my-ai multi-tool plans (B4)', () => {
     ])
   })
 
-  it('builds create + task + open Clients plan with one goal (P3)', () => {
-    const r = routeMyAiText(
-      'Soạn báo giá Word và thêm công việc follow-up khách, mở tab Clients',
-      { practiceId: 'sales' },
-    )
+  it('builds create + task plan with one goal (P3)', () => {
+    const r = routeMyAiText('Soạn báo giá Word và thêm công việc follow-up khách', {
+      practiceId: 'sales',
+    })
     expect(r.kind).toBe('plan')
     if (r.kind !== 'plan') return
-    expect(r.steps).toHaveLength(3)
+    expect(r.steps).toHaveLength(2)
     expect(r.steps[0]).toMatchObject({ kind: 'fill_template', templateId: 'sales-quote' })
     expect(r.steps[1]).toMatchObject({ kind: 'workbench' })
-    expect(r.steps[2]).toMatchObject({ kind: 'workbench' })
     if (r.steps[1]!.kind === 'workbench') {
       expect(r.steps[1].intent.action).toBe('add_item')
       expect(r.steps[1].intent.target).toEqual({ kind: 'module', id: 'tasks' })
-    }
-    if (r.steps[2]!.kind === 'workbench') {
-      expect(r.steps[2].intent.action).toBe('open')
-      expect(r.steps[2].intent.target).toEqual({ kind: 'module', id: 'clients' })
     }
     expect(r.goalVi).toMatch(/[Bb]áo giá|follow-up/i)
     expect(r.goalVi).not.toMatch(/bước|→/)

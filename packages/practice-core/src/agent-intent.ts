@@ -96,27 +96,8 @@ const MODULE_KEYWORDS: readonly { id: WorkbenchModuleId; keys: readonly string[]
   { id: 'calendar', keys: ['lịch', 'calendar', 'hẹn', 'deadline', 'cuộc họp'] },
   { id: 'tasks', keys: ['công việc', 'tasks', 'todo', 'việc cần', 'to-do', 'task'] },
   { id: 'notes', keys: ['ghi chú', 'notes', 'note', 'nháp'] },
-  { id: 'email', keys: ['email', 'e-mail', 'thư', 'mail', 'hộp thư', 'inbox'] },
-  { id: 'assistant', keys: ['trợ lý', 'assistant', 'ai assistant'] },
   { id: 'forms', keys: ['biểu mẫu', 'forms', 'form', 'mẫu giấy'] },
   { id: 'personal', keys: ['hồ sơ', 'personal', 'cá nhân profile'] },
-  {
-    id: 'personal-finance',
-    keys: ['tài chính', 'finance', 'chi tiêu', 'thu chi', 'đầu tư', 'money'],
-  },
-  { id: 'events', keys: ['sự kiện', 'events', 'hội thảo', 'event'] },
-  { id: 'health', keys: ['sức khoẻ', 'sức khỏe', 'health', 'khám', 'yoga', 'chạy bộ'] },
-  { id: 'self-growth', keys: ['phát triển', 'self-growth', 'growth', 'thói quen'] },
-  { id: 'family', keys: ['gia đình', 'family', 'con cái', 'gia phả'] },
-  { id: 'friends', keys: ['bạn bè', 'friends', 'bạn'] },
-  {
-    id: 'pets',
-    keys: ['thú cưng', 'pets', 'pet', 'chó', 'mèo', 'dog', 'cat'],
-  },
-  { id: 'travel', keys: ['du lịch', 'travel', 'chuyến đi', 'trip'] },
-  { id: 'clients', keys: ['khách hàng', 'clients', 'client', 'đối tác'] },
-  { id: 'contracts', keys: ['hợp đồng', 'contracts', 'contract'] },
-  { id: 'matters', keys: ['vụ việc', 'matters', 'hồ sơ vụ'] },
 ]
 
 const PILLAR_KEYWORDS: readonly { id: PracticePillarId; keys: readonly string[] }[] = [
@@ -268,16 +249,7 @@ export function parseAgentIntentTarget(
 
 /** Modules that support add_item on-device today (must write a real row). */
 export function moduleSupportsAddItem(id: WorkbenchModuleId): boolean {
-  return (
-    id === 'tasks' ||
-    id === 'notes' ||
-    id === 'email' ||
-    id === 'calendar' ||
-    id === 'events' ||
-    id === 'personal-finance' ||
-    id === 'health' ||
-    id === 'self-growth'
-  )
+  return id === 'tasks' || id === 'notes' || id === 'calendar'
 }
 
 /** Catalog export for PWA / Hub documentation. */

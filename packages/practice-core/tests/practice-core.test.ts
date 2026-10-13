@@ -79,43 +79,30 @@ describe('practice-core', () => {
   })
 
   it('exposes workbench modules and role defaults', () => {
-    const ids = WORKBENCH_MODULES.map((m) => m.id)
-    expect(ids).toEqual(
-      expect.arrayContaining([
-        'desk',
-        'calendar',
-        'tasks',
-        'notes',
-        'email',
-        'assistant',
-        'forms',
-        'personal',
-        'personal-finance',
-        'events',
-        'health',
-        'self-growth',
-        'family',
-        'friends',
-        'pets',
-        'travel',
-        'clients',
-        'contracts',
-        'matters',
-      ]),
-    )
-    const core = ['desk', 'tasks', 'calendar', 'forms']
-    expect(defaultPinnedModules('principal')).toEqual(core)
+    expect(WORKBENCH_MODULES.map((m) => m.id)).toEqual([
+      'desk',
+      'calendar',
+      'tasks',
+      'notes',
+      'forms',
+      'personal',
+    ])
+    const core = ['desk', 'tasks', 'calendar']
     expect(defaultPinnedModules('legal')).toEqual(core)
-    expect(defaultPinnedModules('teacher')).toEqual(core)
     expect(defaultPinnedModules('construction')).toEqual(core)
     expect(isCorePinnedModule('desk')).toBe(true)
-    expect(isCorePinnedModule('clients')).toBe(false)
-    expect(ensureCorePinnedModules(['desk', 'clients'])).toEqual([
+    expect(isCorePinnedModule('forms')).toBe(false)
+    expect(ensureCorePinnedModules(['desk', 'forms'])).toEqual([
       'desk',
       'tasks',
       'calendar',
       'forms',
-      'clients',
+    ])
+    expect(ensureCorePinnedModules(['desk', 'health' as never, 'notes'])).toEqual([
+      'desk',
+      'tasks',
+      'calendar',
+      'notes',
     ])
   })
 

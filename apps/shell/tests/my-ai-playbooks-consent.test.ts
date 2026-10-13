@@ -8,16 +8,25 @@ import { matchPracticePlaybook, practiceMyAiChips } from '../src/renderer/src/my
 import { routeMyAiText } from '../src/renderer/src/my-ai-router'
 
 describe('Phase C / P1 practice playbooks', () => {
-  it('matches sales quote → Word + task + Clients', () => {
-    const hit = matchPracticePlaybook(
-      'sales',
-      'Soạn báo giá Word và thêm việc follow-up, mở tab Clients',
-    )
+  it('matches sales quote → Word + task', () => {
+    const hit = matchPracticePlaybook('sales', 'Soạn báo giá Word và thêm việc follow-up')
     expect(hit?.playbook.id).toBe('sales-quote')
-    expect(hit?.steps).toHaveLength(3)
+    expect(hit?.steps).toHaveLength(2)
     expect(hit?.steps[0]).toMatchObject({ kind: 'fill_template', templateId: 'sales-quote' })
     expect(hit?.steps[1]?.kind).toBe('workbench')
-    expect(hit?.steps[2]?.kind).toBe('workbench')
+  })
+
+  it('only targets Workbench modules that still exist', () => {
+    const practices = ['sales', 'accounting', 'procurement', 'real-estate', 'customer-care', 'legal'] as const
+    for (const p of practices) {
+      for (const chip of practiceMyAiChips(p)) {
+        for (const s of matchPracticePlaybook(p, chip.promptVi)?.steps ?? []) {
+          if (s.kind === 'workbench' && s.intent.target.kind === 'module') {
+            expect(['tasks', 'calendar', 'notes']).toContain(s.intent.target.id)
+          }
+        }
+      }
+    }
   })
 
   it('routes via practiceId in routeMyAiText', () => {
@@ -53,12 +62,12 @@ describe('Phase C / P1 practice playbooks', () => {
     expect(hit?.steps.length).toBe(4)
   })
 
-  it('accounting invoice → sheets + email draft + task', () => {
+  it('accounting invoice → sheets + task', () => {
     const hit = matchPracticePlaybook('accounting', 'Tạo hóa đơn Excel cho khách ABC')
     expect(hit?.playbook.id).toBe('accounting-invoice')
+    expect(hit?.steps).toHaveLength(2)
     expect(hit?.steps[0]).toMatchObject({ kind: 'create_file', app: 'sheets' })
     expect(hit?.steps[1]?.kind).toBe('workbench')
-    expect(hit?.steps[2]?.kind).toBe('workbench')
   })
 
   it('IT runbook → docs + task + notes', () => {

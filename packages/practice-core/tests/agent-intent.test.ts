@@ -15,10 +15,10 @@ describe('agent-intent catalog', () => {
     expect(tabs.find((t) => t.id === 'tasks')?.actions).toContain('add_item')
   })
 
-  it('resolves Vietnamese NL to health / tasks', () => {
-    const health = resolveAgentIntentFromText('Mở tab sức khoẻ giúp tôi')
-    expect(health?.target).toEqual({ kind: 'module', id: 'health' })
-    expect(health?.action).toBe('open')
+  it('resolves Vietnamese NL to calendar / tasks', () => {
+    const cal = resolveAgentIntentFromText('Mở tab lịch giúp tôi')
+    expect(cal?.target).toEqual({ kind: 'module', id: 'calendar' })
+    expect(cal?.action).toBe('open')
 
     const task = resolveAgentIntentFromText('Thêm công việc mua sữa')
     expect(task?.target).toEqual({ kind: 'module', id: 'tasks' })
@@ -39,6 +39,15 @@ describe('agent-intent catalog', () => {
     })
     expect(tabIdForTarget({ kind: 'skill-domain', id: 'legal' })).toBe('skills')
     expect(moduleSupportsAddItem('notes')).toBe(true)
-    expect(moduleSupportsAddItem('assistant')).toBe(false)
+    expect(moduleSupportsAddItem('forms')).toBe(false)
+  })
+
+  it('no longer routes removed consumer modules', () => {
+    const ids = listAgentRoutableTabs().map((t) => t.id)
+    for (const gone of ['health', 'personal-finance', 'family', 'email', 'assistant', 'clients']) {
+      expect(ids).not.toContain(gone)
+    }
+    expect(parseAgentIntentTarget('pets')).toBeNull()
+    expect(resolveAgentIntentFromText('Mở tab sức khoẻ giúp tôi')).toBeNull()
   })
 })

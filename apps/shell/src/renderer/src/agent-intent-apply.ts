@@ -10,22 +10,11 @@ import {
   pinModule,
   pinPillar,
   readCalendar,
-  readEmails,
-  readEvents,
-  readFinance,
-  readGrowth,
-  readHealth,
   readStickyNotes,
-  createEmailDraft,
   createStickyNote,
   readPinnedModules,
   readTasks,
   writeCalendar,
-  writeEmails,
-  writeEvents,
-  writeFinance,
-  writeGrowth,
-  writeHealth,
   writeStickyNotes,
   writeTasks,
 } from './workbench-pins'
@@ -98,56 +87,9 @@ function addItem(
       undo: { moduleId, itemId: note.id },
     }
   }
-  if (moduleId === 'email') {
-    const draft = createEmailDraft(practiceId, { subject: title, body: '' })
-    return {
-      vi: `Đã tạo nháp trong ${place}: ${title}`,
-      en: `Created draft in ${placeEn}: ${title}`,
-      undo: { moduleId, itemId: draft.id },
-    }
-  }
   if (moduleId === 'calendar') {
     const id = newId()
     writeCalendar(practiceId, [{ id, date: todayIso(), title }, ...readCalendar(practiceId)])
-    return {
-      vi: `Đã thêm vào ${place}: ${title}`,
-      en: `Added to ${placeEn}: ${title}`,
-      undo: { moduleId, itemId: id },
-    }
-  }
-  if (moduleId === 'events') {
-    const id = newId()
-    writeEvents(practiceId, [{ id, date: todayIso(), title }, ...readEvents(practiceId)])
-    return {
-      vi: `Đã thêm vào ${place}: ${title}`,
-      en: `Added to ${placeEn}: ${title}`,
-      undo: { moduleId, itemId: id },
-    }
-  }
-  if (moduleId === 'personal-finance') {
-    const id = newId()
-    writeFinance([
-      { id, date: todayIso(), kind: 'expense', amount: 0, label: title },
-      ...readFinance(),
-    ])
-    return {
-      vi: `Đã ghi trong ${place}: ${title}`,
-      en: `Logged in ${placeEn}: ${title}`,
-      undo: { moduleId, itemId: id },
-    }
-  }
-  if (moduleId === 'health') {
-    const id = newId()
-    writeHealth([{ id, date: todayIso(), kind: 'other', note: title }, ...readHealth()])
-    return {
-      vi: `Đã ghi trong ${place}: ${title}`,
-      en: `Logged in ${placeEn}: ${title}`,
-      undo: { moduleId, itemId: id },
-    }
-  }
-  if (moduleId === 'self-growth') {
-    const id = newId()
-    writeGrowth([{ id, title, progress: 0, done: false }, ...readGrowth()])
     return {
       vi: `Đã thêm vào ${place}: ${title}`,
       en: `Added to ${placeEn}: ${title}`,
@@ -175,27 +117,11 @@ export function undoAgentAddItem(
       practiceId,
       readStickyNotes(practiceId).filter((n) => n.id !== itemId),
     )
-  } else if (moduleId === 'email') {
-    writeEmails(
-      practiceId,
-      readEmails(practiceId).filter((m) => m.id !== itemId),
-    )
   } else if (moduleId === 'calendar') {
     writeCalendar(
       practiceId,
       readCalendar(practiceId).filter((c) => c.id !== itemId),
     )
-  } else if (moduleId === 'events') {
-    writeEvents(
-      practiceId,
-      readEvents(practiceId).filter((e) => e.id !== itemId),
-    )
-  } else if (moduleId === 'personal-finance') {
-    writeFinance(readFinance().filter((f) => f.id !== itemId))
-  } else if (moduleId === 'health') {
-    writeHealth(readHealth().filter((h) => h.id !== itemId))
-  } else if (moduleId === 'self-growth') {
-    writeGrowth(readGrowth().filter((g) => g.id !== itemId))
   } else {
     return {
       ok: false,
@@ -254,7 +180,7 @@ export function applyAgentIntent(
     )
     return {
       ok: true,
-      tabId: 'assistant',
+      tabId,
       messageVi: 'Đã mở My AI để tóm tắt ngữ cảnh trên máy.',
       messageEn: 'Opened My AI to summarize on-device context.',
     }
