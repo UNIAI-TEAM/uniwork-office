@@ -138,8 +138,9 @@ Source of truth: dev-uniwork `docs/office/g5g6g7/contract-collab.md` §2 (routes
   `unsupported` (nothing is posted) when it is missing, so a new frame on an old host just hides server mode.
 - `init.user.id?`: recognises "my comments" (`author_id`) only, never an authorisation input.
   `init.commentsLevel?: 'view' | 'edit' | 'manage'` (the server's `my_level`): a host granting `comments` must send it
-  (`checkInitComments(init)` returns the `malformed` host error, `details.code = 'comments_level_missing'`). The frame
-  still accepts such an init. `commentsAccess(session, {forbidden?})` + `canActOnComment(access, comment, action)`
+  (`checkInitComments(init)` returns the `malformed` host error, `details.code = 'comments_level_missing'` or
+  `'comments_level_invalid'`). The frame never rejects an init over the hint fields: a missing, unknown (future level) or
+  null `commentsLevel` and an empty / non-string `user.id` are treated as missing (fallback rules below). `commentsAccess(session, {forbidden?})` + `canActOnComment(access, comment, action)`
   hold the panel rules: `view` writes nothing; `edit` = composer, edit/delete own, resolve/reopen; `manage` = also
   edit/delete of others; missing level = composer and actions on own comments only, never on others; a 403 from the
   server (`forbidden: true`) turns the panel read-only; a tombstone takes no action.
@@ -163,7 +164,7 @@ Source of truth: dev-uniwork `docs/office/g5g6g7/contract-collab.md` §2 (routes
 
 - Errors: every host maps the UniWork API answer with `commentsErrorFromHttp(status, body)` (status 0 = no response):
   409 `comment_deleted` → `conflict` + `details.code`, not retryable; 409 `idempotency_*` → `conflict` + `details.code`;
-  400 (`anchor_version_invalid`, `invalid_request`) → `malformed` + `details.code`; 413 → `too_large` + `details.code`;
+  400 (`anchor_version_invalid`, `invalid_request`) → `malformed` + `details.code`; 413 → `too_large` + `details.code` (`payload_too_large` even when the limiter sent no code; a 400/409 without a code gets none);
   401/403/404 → `unauthorized`/`forbidden`/`not_found`; 429 → `rate_limited` (retryable); 5xx → `internal`
   (retryable); no response → `network` (retryable). A frame reads `details.code` before `code`: `comment_deleted`
   never takes the document reload/retry path, keeps the composer draft and reloads the comment list only.

@@ -121,7 +121,8 @@ export interface DocsFrameHost {
   /**
    * the comments of `documentId` changed (additive, G8-08: realtime `document.comment_*` /
    * `comment_anchors_updated`). Sent only to a frame whose InitAck has `comments`; also wakes a
-   * pending `revealComment` retry.
+   * pending `revealComment` retry. The wake ignores `documentId` and releases every pending retry
+   * (one host = one document, so there is nothing to tell apart).
    */
   notifyCommentsChanged(documentId: string): void
   /**
