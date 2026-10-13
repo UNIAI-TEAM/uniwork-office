@@ -128,14 +128,50 @@ function shiftRanges(
 }
 
 /**
+ * The edit region a caret pins down, when `next` is `prev` with one run of characters inserted
+ * (the caret sits after it) or removed (the caret sits where it was); `null` when the caret
+ * and the two texts do not agree on such an edit.
+ */
+function anchoredEdit(
+  prev: string,
+  next: string,
+  caret: number,
+): { from: number; delEnd: number; insEnd: number } | null {
+  const delta = next.length - prev.length
+  if (delta > 0) {
+    const from = caret - delta
+    if (from < 0 || caret > next.length) return null
+    if (prev.slice(0, from) !== next.slice(0, from) || prev.slice(from) !== next.slice(caret)) {
+      return null
+    }
+    return { from, delEnd: from, insEnd: caret }
+  }
+  if (delta < 0) {
+    const delEnd = caret - delta
+    if (caret < 0 || delEnd > prev.length) return null
+    if (prev.slice(0, caret) !== next.slice(0, caret) || prev.slice(delEnd) !== next.slice(caret)) {
+      return null
+    }
+    return { from: caret, delEnd, insEnd: caret }
+  }
+  return null
+}
+
+/**
  * The doc after the user changed the textarea from `prev.text` to `next`. The edit is the
  * region between the common prefix and suffix; ranges follow as in `shiftRanges`, and pasted
  * text that holds mention tokens is converted to `@Name` + ranges. `mapCaret` translates a
  * caret of `next` into the displayed text when a conversion changed its length.
+ *
+ * The prefix/suffix split is ambiguous when the inserted or removed text equals the characters
+ * it slides over (an `@` typed right before an `@Name` chip). The caret of the change event
+ * (`caret`, the textarea's `selectionStart` after the edit) then anchors a pure insertion or
+ * deletion; a caret that does not describe the change is ignored.
  */
 export function applyMentionEdit(
   prev: MentionDoc,
   next: string,
+  caret?: number,
 ): { doc: MentionDoc; mapCaret(caret: number): number } {
   const same = (caret: number) => caret
   let p = 0
@@ -148,22 +184,29 @@ export function applyMentionEdit(
   ) {
     s++
   }
-  const delEnd = prev.text.length - s
-  const insEnd = next.length - s
+  let from = p
+  let delEnd = prev.text.length - s
+  let insEnd = next.length - s
+  const anchor = caret === undefined ? null : anchoredEdit(prev.text, next, caret)
+  if (anchor) {
+    from = anchor.from
+    delEnd = anchor.delEnd
+    insEnd = anchor.insEnd
+  }
   // a range whose characters no longer read `@label` is stale (never trust it)
   const live = prev.ranges.filter((r) => prev.text.slice(r.start, r.end) === displayOf(r.label))
-  const ins = next.slice(p, insEnd)
+  const ins = next.slice(from, insEnd)
   const conv = mentionDocFromBody(ins)
-  const kept = shiftRanges(live, p, delEnd, conv.text.length)
-  const added = conv.ranges.map((r) => ({ ...r, start: r.start + p, end: r.end + p }))
+  const kept = shiftRanges(live, from, delEnd, conv.text.length)
+  const added = conv.ranges.map((r) => ({ ...r, start: r.start + from, end: r.end + from }))
   const ranges = [...kept, ...added].sort((a, b) => a.start - b.start)
-  const text = next.slice(0, p) + conv.text + next.slice(insEnd)
+  const text = next.slice(0, from) + conv.text + next.slice(insEnd)
   if (conv.text.length === ins.length) return { doc: { text, ranges }, mapCaret: same }
   const diff = conv.text.length - ins.length
   return {
     doc: { text, ranges },
     mapCaret: (caret) =>
-      caret >= insEnd ? caret + diff : caret > p ? p + conv.text.length : caret,
+      caret >= insEnd ? caret + diff : caret > from ? from + conv.text.length : caret,
   }
 }
 
