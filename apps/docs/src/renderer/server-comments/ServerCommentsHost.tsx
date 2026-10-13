@@ -255,7 +255,14 @@ export function ServerCommentsHost(p: ServerCommentsHostProps) {
     return mode.api.onReveal(async ({ path, commentId }) => {
       if (path && mode.path && path !== mode.path) return false
       if (!(await loaded())) throw { code: 'not_ready', retryable: true }
-      if (!threadOf(ctlRef.current, commentId)) return false
+      if (!threadOf(ctlRef.current, commentId)) {
+        // web frame (no path): the router asks the editor only after the Discussion panel declined,
+        // so a miss is real and this panel shows the S15 line; desktop: the id may be the shell's
+        if (mode.path !== '') return false
+        openRef.current()
+        await ctlRef.current.reveal(commentId)
+        return false
+      }
       openRef.current()
       const r = await ctlRef.current.reveal(commentId)
       return r.revealed
