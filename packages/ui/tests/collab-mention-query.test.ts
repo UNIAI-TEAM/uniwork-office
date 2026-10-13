@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
+import { buildMentionToken } from '../src/collab/body'
 import {
   MENTION_DEBOUNCE_MS,
   MENTION_MAX_ROWS,
-  buildMentionToken,
   findMentionTrigger,
   insertMention,
 } from '../src/collab/mention-query'
@@ -52,22 +52,6 @@ describe('findMentionTrigger', () => {
 
   it('rejects a second @ inside the query', () => {
     expect(findMentionTrigger('@a@b', 4)).toBeNull()
-  })
-})
-
-describe('buildMentionToken (stub until body.ts)', () => {
-  it('builds [@Label](mention://member/<id>)', () => {
-    expect(buildMentionToken(ULID_A, 'Minh Anh')).toBe(`[@Minh Anh](mention://member/${ULID_A})`)
-  })
-
-  it('escapes [ ] ( ) in the label with a backslash', () => {
-    expect(buildMentionToken(ULID_A, 'Nguyễn [An] (QA)')).toBe(
-      `[@Nguyễn \\[An\\] \\(QA\\)](mention://member/${ULID_A})`,
-    )
-  })
-
-  it('keeps a label on one line', () => {
-    expect(buildMentionToken(ULID_A, 'A\nB')).toBe(`[@A B](mention://member/${ULID_A})`)
   })
 })
 

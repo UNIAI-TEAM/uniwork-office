@@ -1,5 +1,6 @@
 /** @vitest-environment jsdom */
 import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -57,7 +58,7 @@ function render(over: Partial<CollabComposerProps> = {}): Mounted {
     mode: 'reply',
     strings: COMPOSER_STRINGS,
     source,
-    draftKey: DRAFT_KEY,
+    draftKey: DRAFT_KEY.threadKey,
     onSubmit,
     onCancel,
     announce,
@@ -89,7 +90,8 @@ function type(value: string, caret = value.length) {
 function key(k: string, init: KeyboardEventInit = {}) {
   const ev = new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true, ...init })
   act(() => {
-    ;(document.activeElement ?? ta()).dispatchEvent(ev)
+    const active = document.activeElement
+    ;(active instanceof HTMLElement && active !== document.body ? active : ta()).dispatchEvent(ev)
   })
   return ev
 }
@@ -573,8 +575,11 @@ describe('mention picker in the composer', () => {
 })
 
 describe('styles', () => {
-  const css = readFileSync(new URL('../src/collab/collab-composer.css', import.meta.url), 'utf8')
-  const tokens = readFileSync(new URL('../src/tokens.css', import.meta.url), 'utf8')
+  const css = readFileSync(
+    resolve(import.meta.dirname, '../src/collab/collab-composer.css'),
+    'utf8',
+  )
+  const tokens = readFileSync(resolve(import.meta.dirname, '../src/tokens.css'), 'utf8')
 
   it('uses no raw colour in a rule (custom-property definitions aside)', () => {
     const raw = css
@@ -587,12 +592,17 @@ describe('styles', () => {
   it('every var(--token) it uses is defined for light and dark (or is a per-app accent)', () => {
     const used = new Set([...css.matchAll(/var\((--[\w-]+)/g)].map((m) => m[1]!))
     const perApp = new Set(['--accent', '--accent-soft', '--accent-dark'])
-    const darkStart = tokens.indexOf("[data-theme='dark']")
+    const darkStart = tokens.search(/^\[data-theme='dark'\]/m)
     expect(darkStart).toBeGreaterThan(0)
     const light = tokens.slice(0, darkStart)
     const dark = tokens.slice(darkStart)
     for (const t of used) {
       if (perApp.has(t)) continue
+      // sizes and radii do not change with the theme: the :root block alone defines them
+      if (/^--(radius-|text-small|text-caption)/.test(t)) {
+        expect(light, `${t} in :root`).toContain(`${t}:`)
+        continue
+      }
       expect(light, `${t} in light`).toContain(`${t}:`)
       expect(dark, `${t} in dark`).toContain(`${t}:`)
     }
