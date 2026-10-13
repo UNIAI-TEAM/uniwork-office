@@ -18,6 +18,7 @@ import {
   pickerRowMeta,
   retryActionOf,
 } from './uniwork-docs-model'
+import { readActiveWorkspaceId, writeActiveWorkspaceId } from './active-workspace'
 
 /** a rejected IPC call is a network failure to the person using the picker */
 function settle<T>(call: Promise<UniworkResult<T>>): Promise<UniworkResult<T>> {
@@ -61,7 +62,9 @@ export function UniworkOpenDialog({
   onSignIn: () => void
 }) {
   const { t, dateLocale } = useI18n()
-  const [state, dispatch] = useReducer(pickerReducer, undefined, initialPickerState)
+  const [state, dispatch] = useReducer(pickerReducer, undefined, () =>
+    initialPickerState(readActiveWorkspaceId()),
+  )
   const stateRef = useRef(state)
   stateRef.current = state
   const mounted = useRef(true)
@@ -366,7 +369,10 @@ export function UniworkOpenDialog({
               className="uw-pick-ws"
               aria-label={t('uwPickWorkspace')}
               value={state.workspaceId ?? ''}
-              onChange={(e) => dispatch({ type: 'select-workspace', id: e.target.value })}
+              onChange={(e) => {
+                writeActiveWorkspaceId(e.target.value)
+                dispatch({ type: 'select-workspace', id: e.target.value })
+              }}
             >
               {state.workspaces.items.map((w) => (
                 <option key={w.id} value={w.id}>
