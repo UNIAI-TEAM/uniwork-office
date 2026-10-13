@@ -15,9 +15,14 @@ import { FeedError } from './errors'
  *   reconciled to exactly the ids seen (drafts kept, lost-permission entries
  *   evicted), and only then is the final cursor saved. A crash mid-resync
  *   leaves no cursor, so the next run starts the snapshot over.
- * - An invalid cursor is cleared and earns exactly one resync per run; a
- *   resync refused again by a cursor verdict backs off exponentially (capped)
- *   on the injected clock instead of looping.
+ * - An invalid cursor is cleared and earns exactly one resync per run; a feed
+ *   cursor the server answers with 501 `unsupported_operation` (G5-01a's
+ *   `errChangeFeedPending`: genuine cursor, no incremental feed yet) is
+ *   treated the same - cleared, rebuilt from a snapshot in the same pass,
+ *   never surfaced as a failure and never as a deletion. A resync refused
+ *   again by a cursor verdict backs off exponentially (capped) on the
+ *   injected clock instead of looping, and a 501 inside a resync is a
+ *   failure, so a server stuck on 501 cannot loop either.
  * - `sync_feed` off -> no feed request at all.
  *
  * One consumer per scope; the cursor key is
@@ -88,6 +93,8 @@ type PageRun =
   | { kind: 'done'; pages: number }
   | { kind: 'cursor_expired' }
   | { kind: 'cursor_invalid' }
+  /** G5-01a answered a feed cursor with 501 unsupported_operation (errChangeFeedPending) */
+  | { kind: 'feed_cursor_unsupported'; error: UniworkDocError }
   | { kind: 'stopped'; result: FeedSyncResult }
 
 type FetchOutcome = ({ kind: 'page' } & FeedPage) | Exclude<PageRun, { kind: 'done' }>
@@ -144,7 +151,20 @@ export class FeedConsumer {
       const run = await this.incremental(cursor)
       if (run.kind === 'stopped') return run.result
       if (run.kind === 'done') return { kind: 'synced', pages: run.pages, resynced: false }
-      if (run.kind === 'cursor_invalid') await this.options.cursors.clear(this.key)
+      // Drop a cursor the server refused: 400 is a cursor of another scope (or
+      // a tamper), 501 is G5-01a's errChangeFeedPending - the feed cursor is
+      // genuine, the incremental feed is simply not there yet. Either way the
+      // pass rebuilds from a snapshot below, once: resync is entered a single
+      // time here, and a 501 answered inside it is a failure (see resync), so
+      // a server stuck on 501 cannot loop.
+      if (run.kind === 'cursor_invalid' || run.kind === 'feed_cursor_unsupported') {
+        if (run.kind === 'feed_cursor_unsupported') {
+          this.options.log?.(
+            'uniwork feed: the incremental feed is not available; rebuilding from a snapshot',
+          )
+        }
+        await this.options.cursors.clear(this.key)
+      }
     }
     return this.resync()
   }
@@ -184,6 +204,9 @@ export class FeedConsumer {
       const afterFetch = this.stopReason()
       if (afterFetch) return afterFetch
       if (page.kind === 'stopped') return page.result
+      // a 501 to a resync request (the first one carries no cursor at all): the
+      // server cannot serve this feed, and a fallback of a fallback would loop
+      if (page.kind === 'feed_cursor_unsupported') return { kind: 'failed', error: page.error }
       if (page.kind !== 'page') return this.backOff()
       const applied = await this.options.cache.applyPage(page.changes)
       if (applied.kind !== 'ok') return commitFailed(applied)
@@ -231,6 +254,9 @@ export class FeedConsumer {
       const failure = error.failure
       if (failure.kind === 'cursor_expired' || failure.kind === 'cursor_invalid') {
         return { kind: failure.kind }
+      }
+      if (failure.kind === 'feed_cursor_unsupported') {
+        return { kind: 'feed_cursor_unsupported', error: failure.error }
       }
       if (failure.kind === 'session_expired') {
         return { kind: 'stopped', result: { kind: 'session_expired' } }

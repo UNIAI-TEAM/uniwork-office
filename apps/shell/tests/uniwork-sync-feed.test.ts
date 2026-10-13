@@ -202,6 +202,21 @@ describe('feed errors', () => {
     const bare = parseFeedError(502, undefined)
     expect(bare.kind === 'other' && bare.error.code).toBe('server_error')
   })
+
+  it('501 unsupported_operation is the feed cursor verdict (errChangeFeedPending), never deleted', () => {
+    const body = { error: { code: 'unsupported_operation', message: 'x' } }
+    const failure = parseFeedError(501, body)
+    if (failure.kind !== 'feed_cursor_unsupported') {
+      throw new Error(`expected the feed cursor verdict, got ${failure.kind}`)
+    }
+    // it still carries the documents mapping, with the server's own code
+    expect(failure.error.serverCode).toBe('unsupported_operation')
+    expect(failure.error.code).not.toBe('deleted')
+    // a 501 without that code (a gateway page) and the code on another status
+    // are not the verdict
+    expect(parseFeedError(501, undefined).kind).toBe('other')
+    expect(parseFeedError(502, body).kind).toBe('other')
+  })
 })
 
 describe('feed client', () => {
@@ -478,6 +493,103 @@ describe('feed consumer', () => {
     expect(await t.consumer.sync()).toEqual({ kind: 'backoff', retryAt: t.clock.now() + 1000 })
     expect(snapshotStarts(t.server.requests)).toBe(1)
     expect(await t.cursors.get(cursorKey(SCOPE))).toBeNull()
+  })
+
+  it('501 on a saved feed cursor clears it and resyncs once in the same pass (G5-01a)', async () => {
+    const memory = createMemoryCursorStore([[cursorKey(SCOPE), 'feed:0']])
+    const clear = vi.spyOn(memory, 'clear')
+    const t = setup({ cursors: memory })
+    t.server.rows.set(WS, [
+      ['d1', '1'],
+      ['d2', '2'],
+      ['d3', '3'],
+    ])
+    // a row the snapshot will list again and a local draft it will not: the
+    // fallback reconciles by id, so neither is lost and neither is deleted
+    await t.cache.cache.applyPage([
+      { documentId: 'd1', kind: 'file', revision: '1', currentVersion: 1, versionId: null },
+      { documentId: 'draft', kind: 'file', revision: '1', currentVersion: 1, versionId: null },
+    ])
+    t.cache.drafts.add('draft')
+    const effectsBefore = t.cache.effects
+    t.server.script.push(() => envelope(501, 'unsupported_operation'))
+
+    expect(await t.consumer.sync()).toEqual({ kind: 'synced', pages: 2, resynced: true })
+    expect(clear).toHaveBeenCalledWith(cursorKey(SCOPE))
+    expect(t.server.requests.map((url) => url.searchParams.get('cursor'))).toEqual([
+      'feed:0',
+      null,
+      'snap:2',
+    ])
+    expect(snapshotStarts(t.server.requests)).toBe(1)
+    expect([...t.cache.entries].sort()).toEqual([
+      ['d1', '1'],
+      ['d2', '2'],
+      ['d3', '3'],
+      ['draft', '1'],
+    ])
+    // only the two rows the old stream did not hold are real writes
+    expect(t.cache.effects).toBe(effectsBefore + 2)
+    expect(await t.cursors.get(cursorKey(SCOPE))).toBe('feed:0')
+  })
+
+  it('501 on a later incremental page earns exactly one fallback, never a loop', async () => {
+    const t = setup({ cursors: createMemoryCursorStore([[cursorKey(SCOPE), 'feed:0']]) })
+    t.server.rows.set(WS, [
+      ['d1', '6'],
+      ['d2', '2'],
+    ])
+    // the first incremental page lands, the one after it is refused
+    const changesPage = (changes: Array<[string, string]>, next: string) => () =>
+      new Response(
+        `{"phase":"changes","changes":[${changes.map(([id, rev]) => row(id, rev)).join(',')}],` +
+          `"has_more":true,"next_cursor":"${next}","expires_at":""}`,
+        { status: 200 },
+      )
+    t.server.script.push(changesPage([['d1', '5']], 'feed:1'), () =>
+      envelope(501, 'unsupported_operation'),
+    )
+
+    expect(await t.consumer.sync()).toEqual({ kind: 'synced', pages: 1, resynced: true })
+    expect(t.server.requests.map((url) => url.searchParams.get('cursor'))).toEqual([
+      'feed:0',
+      'feed:1',
+      null,
+    ])
+    expect(snapshotStarts(t.server.requests)).toBe(1)
+    // the page that did land stays applied; the snapshot's newer revision wins
+    expect([...t.cache.entries]).toEqual([
+      ['d1', '6'],
+      ['d2', '2'],
+    ])
+    expect(await t.cursors.get(cursorKey(SCOPE))).toBe('feed:0')
+  })
+
+  it('501 during the fallback is a failure, not a second resync', async () => {
+    const t = setup({ cursors: createMemoryCursorStore([[cursorKey(SCOPE), 'feed:0']]) })
+    t.server.script.push(
+      () => envelope(501, 'unsupported_operation'),
+      () => envelope(501, 'unsupported_operation'),
+    )
+    const result = await t.consumer.sync()
+    if (result.kind !== 'failed') throw new Error(`expected a failure, got ${result.kind}`)
+    expect(result.error.serverCode).toBe('unsupported_operation')
+    expect(t.server.requests).toHaveLength(2)
+    expect(snapshotStarts(t.server.requests)).toBe(1)
+    expect(await t.cursors.get(cursorKey(SCOPE))).toBeNull()
+    expect(t.cache.effects).toBe(0)
+  })
+
+  it('501 on a cursorless snapshot request stays a failure', async () => {
+    const t = setup()
+    t.server.script.push(() => envelope(501, 'unsupported_operation'))
+    const result = await t.consumer.sync()
+    if (result.kind !== 'failed') throw new Error(`expected a failure, got ${result.kind}`)
+    expect(result.error.serverCode).toBe('unsupported_operation')
+    expect(t.server.requests).toHaveLength(1)
+    expect(snapshotStarts(t.server.requests)).toBe(1)
+    expect(await t.cursors.get(cursorKey(SCOPE))).toBeNull()
+    expect(t.cache.effects).toBe(0)
   })
 
   it('full resync evicts lost-permission cache entries and keeps drafts', async () => {
