@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
-import type { UniworkDocErrorCode, UniworkResult } from '../../shared/home-api'
+import type { UniworkDocErrorCode, UniworkDocListPage, UniworkResult } from '../../shared/home-api'
 import { FileBadge } from './FileBadge'
+import { UniworkDocInfoPanel, type DocInfoLoad } from './UniworkDocInfoPanel'
 import { useI18n } from './locale'
 import { needsSignIn, type AccountView } from './account-model'
 import { publishUniworkNotice } from './uniwork-notice-bus'
 import {
   PICKER_PAGE_SIZE,
   PICKER_SEARCH_DEBOUNCE_MS,
+  SHARED_SOURCE_VALUE,
   UNIWORK_ERROR_KEYS,
   docExtension,
   errorActionOf,
@@ -17,7 +19,15 @@ import {
   pickerReducer,
   pickerRowMeta,
   retryActionOf,
+  visibleDocs,
+  workspaceLabel,
+  type PickerState,
 } from './uniwork-docs-model'
+import {
+  listSharedDocuments,
+  loadDocProperties,
+  type SharedDocSummary,
+} from './uniwork-library-api'
 
 /** a rejected IPC call is a network failure to the person using the picker */
 function settle<T>(call: Promise<UniworkResult<T>>): Promise<UniworkResult<T>> {
@@ -42,7 +52,24 @@ function Spinner() {
   )
 }
 
-const FOCUSABLE = 'button:not([disabled]), select:not([disabled]), input:not([disabled])'
+const FOCUSABLE =
+  'button:not([disabled]):not([tabindex="-1"]), select:not([disabled]), input:not([disabled]), [tabindex="0"]'
+
+/** one page of the current source: the workspace's documents, or the shared list */
+function fetchPage(s: PickerState, cursor?: string): Promise<UniworkResult<UniworkDocListPage>> {
+  const workspaceId = s.workspaceId!
+  if (s.source === 'shared') {
+    return settle(listSharedDocuments({ workspaceId, cursor, limit: PICKER_PAGE_SIZE }))
+  }
+  return settle(
+    window.aiOffice.uniworkListDocuments({
+      workspaceId,
+      query: s.query || undefined,
+      cursor,
+      limit: PICKER_PAGE_SIZE,
+    }),
+  )
+}
 
 /**
  * "Open from UniWork" picker: workspace selector, debounced search, a paged
@@ -72,6 +99,9 @@ export function UniworkOpenDialog({
   const [draft, setDraft] = useState('')
   const [composing, setComposing] = useState(false)
   const [workspaceTick, setWorkspaceTick] = useState(0)
+  /** the document whose details panel is open */
+  const [info, setInfo] = useState<{ id: string; title: string; load: DocInfoLoad } | null>(null)
+  const infoRequest = useRef(0)
 
   useEffect(() => {
     mounted.current = true
@@ -96,15 +126,10 @@ export function UniworkOpenDialog({
   // a fresh document fetch starts whenever the reducer bumps the request id
   const requestId = state.list.requestId
   useEffect(() => {
-    const { workspaceId, query } = stateRef.current
-    if (requestId === 0 || !workspaceId) return
-    void settle(
-      window.aiOffice.uniworkListDocuments({
-        workspaceId,
-        query: query || undefined,
-        limit: PICKER_PAGE_SIZE,
-      }),
-    ).then((result) => dispatch({ type: 'list-loaded', requestId, append: false, result }))
+    if (requestId === 0 || !stateRef.current.workspaceId) return
+    void fetchPage(stateRef.current).then((result) =>
+      dispatch({ type: 'list-loaded', requestId, append: false, result }),
+    )
   }, [requestId])
 
   // debounced search; IME composition waits for the committed text
@@ -130,14 +155,38 @@ export function UniworkOpenDialog({
     if (!nextCursor || s.list.loadingMore || !s.workspaceId) return
     const { requestId: id } = s.list
     dispatch({ type: 'load-more' })
-    void settle(
-      window.aiOffice.uniworkListDocuments({
-        workspaceId: s.workspaceId,
-        query: s.query || undefined,
-        cursor: nextCursor,
-        limit: PICKER_PAGE_SIZE,
-      }),
-    ).then((result) => dispatch({ type: 'list-loaded', requestId: id, append: true, result }))
+    void fetchPage(s, nextCursor).then((result) =>
+      dispatch({ type: 'list-loaded', requestId: id, append: true, result }),
+    )
+  }
+
+  const showInfo = (id: string, title: string) => {
+    const request = ++infoRequest.current
+    setInfo({ id, title, load: { status: 'loading' } })
+    void settle(loadDocProperties(id)).then((result) => {
+      if (!mounted.current || request !== infoRequest.current) return
+      setInfo({
+        id,
+        title,
+        load: result.ok
+          ? { status: 'ready', info: result.value }
+          : { status: 'error', error: result.error },
+      })
+    })
+  }
+
+  /** close the details panel and give focus back to the row's Details button */
+  const closeInfo = () => {
+    const id = info?.id
+    infoRequest.current++
+    setInfo(null)
+    if (id) {
+      window.setTimeout(() => {
+        Array.from(dialogRef.current?.querySelectorAll<HTMLElement>('[data-info-for]') ?? [])
+          .find((el) => el.dataset.infoFor === id)
+          ?.focus()
+      })
+    }
   }
 
   const openDoc = (id: string) => {
@@ -176,7 +225,8 @@ export function UniworkOpenDialog({
   }, [accountView])
 
   const body = pickerBodyOf(state)
-  const activeIndex = state.list.docs.findIndex((d) => d.id === state.activeId)
+  const docs = visibleDocs(state)
+  const activeIndex = docs.findIndex((d) => d.id === state.activeId)
   const optionId = (index: number) => `uw-doc-${index}`
 
   useEffect(() => {
@@ -190,7 +240,9 @@ export function UniworkOpenDialog({
     if (event.key === 'Escape') {
       event.preventDefault()
       event.stopPropagation()
-      onClose()
+      // the details panel closes first, then the dialog
+      if (info) closeInfo()
+      else onClose()
       return
     }
     if (event.key === 'Tab') {
@@ -208,6 +260,8 @@ export function UniworkOpenDialog({
       return
     }
     if (event.nativeEvent.isComposing || target.tagName === 'SELECT') return
+    // keys inside the details panel are its own
+    if (target.closest('.uw-info')) return
     const inSearch = target.tagName === 'INPUT'
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault()
@@ -270,6 +324,12 @@ export function UniworkOpenDialog({
             <p className="uw-pick-state-hint">{t('uwPickEmptyHint')}</p>
           </div>
         )
+      case 'shared-empty':
+        return (
+          <div className="uw-pick-state">
+            <p className="uw-pick-state-title">{t('uwLibSharedEmpty')}</p>
+          </div>
+        )
       case 'no-results':
         return (
           <div className="uw-pick-state">
@@ -280,7 +340,9 @@ export function UniworkOpenDialog({
         return (
           <>
             <div className="uw-pick-heading">
-              {t(state.query ? 'uwPickHeadingResults' : 'uwPickHeadingRecent')}
+              {state.query
+                ? t('uwPickHeadingResults')
+                : t(state.source === 'shared' ? 'uwLibShared' : 'uwPickHeadingRecent')}
             </div>
             <ul
               className="uw-pick-list"
@@ -289,10 +351,13 @@ export function UniworkOpenDialog({
               aria-label={t('uwPickListLabel')}
               ref={listRef}
             >
-              {state.list.docs.map((doc, index) => {
+              {docs.map((doc, index) => {
                 const openable = isOpenable(doc)
                 const active = doc.id === state.activeId
                 const meta = openable ? pickerRowMeta(doc, t, dateLocale) : t('uwPickUnsupported')
+                // shared rows come from several workspaces: name the one each lives in
+                const where =
+                  state.source === 'shared' ? (doc as SharedDocSummary).workspaceName?.trim() : ''
                 return (
                   <li
                     key={doc.id}
@@ -309,8 +374,46 @@ export function UniworkOpenDialog({
                     <FileBadge ext={docExtension(doc)} size={24} />
                     <span className="uw-pick-row-text">
                       <span className="uw-pick-row-title">{doc.title}</span>
-                      {meta && <span className="uw-pick-row-meta">{meta}</span>}
+                      {(meta || where) && (
+                        <span className="uw-pick-row-meta">
+                          {where && <span className="uw-pick-row-where">{where}</span>}
+                          {where && meta ? ' · ' : ''}
+                          {meta}
+                        </span>
+                      )}
                     </span>
+                    <button
+                      type="button"
+                      className={`uw-pick-info-btn${info?.id === doc.id ? ' on' : ''}`}
+                      data-info-for={doc.id}
+                      aria-label={t('uwDocInfoFor', { name: doc.title })}
+                      data-tip={t('uwDocInfo')}
+                      aria-expanded={info?.id === doc.id}
+                      tabIndex={active || info?.id === doc.id ? 0 : -1}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        if (info?.id === doc.id) closeInfo()
+                        else showInfo(doc.id, doc.title)
+                      }}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
+                        <circle
+                          cx="8"
+                          cy="8"
+                          r="6.25"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          fill="none"
+                        />
+                        <path
+                          d="M8 7.25v4"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                        />
+                        <circle cx="8" cy="5" r="0.9" fill="currentColor" />
+                      </svg>
+                    </button>
                   </li>
                 )
               })}
@@ -339,7 +442,7 @@ export function UniworkOpenDialog({
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div
-        className="modal uw-pick"
+        className={`modal uw-pick${info ? ' with-info' : ''}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby="uw-pick-title"
@@ -365,14 +468,21 @@ export function UniworkOpenDialog({
             <select
               className="uw-pick-ws"
               aria-label={t('uwPickWorkspace')}
-              value={state.workspaceId ?? ''}
-              onChange={(e) => dispatch({ type: 'select-workspace', id: e.target.value })}
+              value={state.source === 'shared' ? SHARED_SOURCE_VALUE : (state.workspaceId ?? '')}
+              onChange={(e) => {
+                setInfo(null)
+                if (e.target.value === SHARED_SOURCE_VALUE) dispatch({ type: 'select-shared' })
+                else dispatch({ type: 'select-workspace', id: e.target.value })
+              }}
             >
-              {state.workspaces.items.map((w) => (
-                <option key={w.id} value={w.id}>
-                  {w.name}
-                </option>
-              ))}
+              <optgroup label={t('uwPickWorkspace')}>
+                {state.workspaces.items.map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {workspaceLabel(w, t)}
+                  </option>
+                ))}
+              </optgroup>
+              <option value={SHARED_SOURCE_VALUE}>{t('uwLibShared')}</option>
             </select>
           )}
           <input
@@ -392,8 +502,19 @@ export function UniworkOpenDialog({
             onCompositionEnd={() => setComposing(false)}
           />
         </div>
-        <div className="uw-pick-body" aria-busy={body.kind === 'loading'}>
-          {renderBody()}
+        <div className="uw-pick-main">
+          <div className="uw-pick-body" aria-busy={body.kind === 'loading'}>
+            {renderBody()}
+          </div>
+          {info && (
+            <UniworkDocInfoPanel
+              key={info.id}
+              title={info.title}
+              load={info.load}
+              onClose={closeInfo}
+              onRetry={() => showInfo(info.id, info.title)}
+            />
+          )}
         </div>
         {state.opening && (
           <div className="uw-pick-progress" role="status">

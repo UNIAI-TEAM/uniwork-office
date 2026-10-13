@@ -1,5 +1,6 @@
 import { Dropdown } from '@genoffice/ui'
 import type { ReactNode } from 'react'
+import { OrgChoiceStep } from './OrgChoiceStep'
 import { ServerConnect } from './ServerConnect'
 import { useI18n } from './locale'
 import type { StringKey } from './locale'
@@ -11,6 +12,7 @@ import {
   type AccountController,
   type AccountView,
 } from './account-model'
+import { orgBlockKey, orgChoiceOf } from './uniwork-docs-model'
 
 /** banner copy for the states that need an explanation */
 const NOTICE: Partial<
@@ -75,6 +77,7 @@ export function AccountPane({ account }: { account: AccountController }) {
   const email = profile?.email || status?.email || ''
   const name = displayNameOf(status)
   const orgs = status?.orgs ?? []
+  const orgChoice = orgChoiceOf(status)
   const server = status?.serverOrigin || t('acctThisServer')
   const notice = NOTICE[view]
   // the saved server did not answer: name it and offer the address field
@@ -231,17 +234,42 @@ export function AccountPane({ account }: { account: AccountController }) {
         </div>
       )}
 
-      {withProfile && (
+      {withProfile && orgChoice.loadError && (
+        <div className="acct-notice warn uw-org-error" role="alert">
+          <div className="acct-notice-text">
+            <div className="acct-notice-title">{t('uwOrgPickError')}</div>
+          </div>
+          {retryBtn}
+        </div>
+      )}
+      {withProfile && !orgChoice.loadError && orgChoice.needed && (
+        <OrgChoiceStep
+          orgs={orgChoice.rows}
+          rememberedGone={orgChoice.rememberedGone}
+          busy={busy === 'switching'}
+          failed={account.orgSwitchFailed}
+          onChoose={account.selectOrg}
+          onSignOut={account.signOut}
+        />
+      )}
+      {withProfile && !orgChoice.loadError && !orgChoice.needed && (
         <>
-          <Row label={t('acctOrg')}>
+          <Row label={t('uwOrgSettingsLabel')}>
             {orgs.length > 1 ? (
               <Dropdown
                 className="set-dd acct-org-dd"
                 value={status?.org?.id ?? orgs[0]!.id}
-                ariaLabel={t('acctSwitchOrg')}
+                ariaLabel={t('uwOrgSettingsLabel')}
                 tip={t('acctSwitchOrg')}
                 disabled={busy === 'switching' || view === 'server-unreachable'}
-                options={orgs.map((o) => ({ value: o.id, label: o.name }))}
+                options={orgChoice.rows.map((o) => {
+                  const reason = orgBlockKey(o)
+                  return {
+                    value: o.id,
+                    label: reason ? `${o.name} · ${t(reason)}` : o.name,
+                    disabled: reason !== null,
+                  }
+                })}
                 onPick={(id) => {
                   if (id !== status?.org?.id) account.selectOrg(id)
                 }}
@@ -270,7 +298,10 @@ export function AccountPane({ account }: { account: AccountController }) {
           unreachableServer={unreachable ? server : null}
         />
       )}
-      {actions && <div className="set-pane-footer acct-actions">{actions}</div>}
+      {/* the organization step carries its own Sign out */}
+      {actions && !(withProfile && orgChoice.needed && !orgChoice.loadError) && (
+        <div className="set-pane-footer acct-actions">{actions}</div>
+      )}
     </section>
   )
 }
