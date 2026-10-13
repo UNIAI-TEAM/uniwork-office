@@ -86,6 +86,20 @@ describeSqlite('workbench data per UniWork account', () => {
     expect(workbenchBucketOf(OWNER)).not.toContain('acc-owner')
   })
 
+  it('does not move pre-upgrade data into the temporary no-org bucket', () => {
+    const dir = userData()
+    seedLegacy(dir, { [CHAT]: '[{"id":"1"}]' })
+    const store = open(dir)
+    store.setOwner({ ...OWNER, orgId: '' })
+    expect(store.activeDb()!.loadAll()).toEqual({})
+    expect(store.legacyPending()).toBe(false)
+    expect(existsSync(join(dir, 'workbench', 'legacy-migration.json'))).toBe(false)
+    // the org arrives: the data lands in the org bucket
+    store.setOwner(OWNER)
+    expect(store.activeDb()!.get(CHAT)).toContain('"id":"1"')
+    expect(store.legacyPending()).toBe(true)
+  })
+
   it('account switch, sign-out, sign-in again: each account sees only its own data', () => {
     const dir = userData()
     const store = open(dir)

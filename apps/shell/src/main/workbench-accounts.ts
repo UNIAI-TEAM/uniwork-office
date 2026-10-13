@@ -208,7 +208,8 @@ export class WorkbenchAccounts {
    * next open tries again.
    */
   private migrateLegacy(bucket: string, owner: WorkbenchOwner): void {
-    if (existsSync(this.markerPath())) return
+    // signed in but no org yet: a temporary bucket, the data waits for the real one
+    if (!owner.orgId || existsSync(this.markerPath())) return
     const legacyPath = join(this.root, 'workbench.sqlite')
     const hadLegacyData = existsSync(legacyPath)
     if (hadLegacyData) {
