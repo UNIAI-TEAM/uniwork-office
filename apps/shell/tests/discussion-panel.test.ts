@@ -70,7 +70,7 @@ const ok = <T>(value: T) => ({ ok: true as const, value })
 let host: HTMLDivElement
 let root: Root
 let tabs: TabSummary[]
-let pushTabs: ((next: TabSummary[]) => void) | null
+let tabListeners: Set<(next: TabSummary[]) => void>
 let statuses: Map<string, UniworkDocStatus | null>
 let accountState: 'signed-in' | 'signed-out'
 let revealHandlers: Map<string, (commentId: string) => void>
@@ -110,9 +110,9 @@ function installWindow(): void {
   win.aiOfficeTabs = {
     list: vi.fn(async () => tabs),
     onChanged: vi.fn((cb: (next: TabSummary[]) => void) => {
-      pushTabs = cb
+      tabListeners.add(cb)
       return () => {
-        pushTabs = null
+        tabListeners.delete(cb)
       }
     }),
     activate: vi.fn(async () => undefined),
@@ -162,7 +162,7 @@ async function mount(): Promise<void> {
 async function switchTo(active: 'a' | 'b' | 'local'): Promise<void> {
   tabs = tabs.map((tab) => ({ ...tab, active: tab.id === active }))
   await act(async () => {
-    pushTabs?.(tabs)
+    for (const listener of [...tabListeners]) listener(tabs)
   })
   await flush()
 }
@@ -175,11 +175,13 @@ async function click(el: Element | null | undefined): Promise<void> {
   await flush()
 }
 
-const toggle = () => host.querySelector<HTMLButtonElement>('button[aria-controls]')
+const toggle = () => host.querySelector<HTMLButtonElement>('#uw-discussion-toggle')
 const panel = () => host.querySelector<HTMLElement>('aside.collab-panel')
 const frame = () => host.querySelector<HTMLElement>('.uw-discussion')
 
 beforeEach(() => {
+  // jsdom has no layout: the tab strip scrolls the active tab into view
+  Element.prototype.scrollIntoView = vi.fn()
   host = document.createElement('div')
   document.body.append(host)
   root = createRoot(host)
@@ -187,14 +189,21 @@ beforeEach(() => {
     { id: 'home', kind: 'home', title: 'Home', closable: false, active: false },
     { id: 'a', kind: 'docs', title: 'Plan', closable: true, active: true, filePath: PATH_A },
     { id: 'b', kind: 'sheets', title: 'Budget', closable: true, active: false, filePath: PATH_B },
-    { id: 'local', kind: 'markdown', title: 'todo', closable: true, active: false, filePath: PATH_LOCAL },
+    {
+      id: 'local',
+      kind: 'markdown',
+      title: 'todo',
+      closable: true,
+      active: false,
+      filePath: PATH_LOCAL,
+    },
   ]
   statuses = new Map([
     [PATH_A, status(PATH_A)],
     [PATH_B, status(PATH_B)],
   ])
   accountState = 'signed-in'
-  pushTabs = null
+  tabListeners = new Set()
   revealHandlers = new Map()
   listGate = null
   bridge = makeBridge()
@@ -245,6 +254,22 @@ describe('toggle', () => {
     const open = bridge.setPanel.mock.calls.filter(([i]) => i.open)
     expect(open.length).toBeGreaterThan(0)
     expect(open.at(-1)![0].width).toBeGreaterThanOrEqual(280)
+  })
+})
+
+describe('width', () => {
+  it('draws and reports the width main will take: the editor keeps its minimum', async () => {
+    const wide = window.innerWidth
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 600 })
+    try {
+      await mount()
+      await click(toggle())
+      // 600 - 360 (editor minimum) = 240, below the panel's own minimum: the window decides
+      expect(bridge.setPanel).toHaveBeenLastCalledWith({ open: true, width: 240 })
+      expect(frame()!.style.width).toBe('240px')
+    } finally {
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: wide })
+    }
   })
 })
 
@@ -339,18 +364,16 @@ describe('keyboard', () => {
 
 describe('refresh', () => {
   it('polls every 30 s while open and stops when closed', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     await mount()
     await click(toggle())
-    vi.useFakeTimers()
     const before = bridge.list.mock.calls.length
     await act(async () => {
       await vi.advanceTimersByTimeAsync(30_000)
     })
     expect(bridge.list.mock.calls.length).toBeGreaterThan(before)
     expect(bridge.list.mock.calls.at(-1)![0].sinceToken).toBe('t1')
-    vi.useRealTimers()
     await click(toggle())
-    vi.useFakeTimers()
     const closed = bridge.list.mock.calls.length
     await act(async () => {
       await vi.advanceTimersByTimeAsync(90_000)
