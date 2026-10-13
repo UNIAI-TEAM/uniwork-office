@@ -26,18 +26,6 @@ import { WorkbenchTabs } from './WorkbenchTabs'
 import { pinPillar } from './workbench-pins'
 import { WbDeleteBtn, WbOpenBtn, WbRowActions } from './WbRowActions'
 
-const UI_LANG_KEY = 'uniwork.teacherUiLang'
-
-type WorkbenchUiLang = 'vi' | 'en'
-
-function persistWorkbenchUiLang(next: WorkbenchUiLang): void {
-  try {
-    localStorage.setItem(UI_LANG_KEY, next)
-  } catch {
-    /* ignore */
-  }
-}
-
 interface PracticeHomeProps {
   practice: PracticeDefinition
   projects: ProjectSummaryEntry[]
@@ -74,15 +62,9 @@ export function PracticeHome({
   onRefresh,
   onSwitchPractice,
 }: PracticeHomeProps): ReactElement {
-  const { lang, setLang } = useI18n()
+  const { lang } = useI18n()
   const vi = lang === 'vi'
-  const uiLang: WorkbenchUiLang = vi ? 'vi' : 'en'
   const label = (a: string, b: string) => (vi ? a : b)
-
-  const changeUiLang = (next: WorkbenchUiLang) => {
-    persistWorkbenchUiLang(next)
-    setLang(next)
-  }
 
   const [tab, setTab] = useState<string>('desk')
   const [qQuery, setQQuery] = useState('')
@@ -563,17 +545,6 @@ export function PracticeHome({
                     ))}
                   </optgroup>
                 ))}
-              </select>
-            </label>
-            <label className="teacher-lang">
-              <span>{label('Ngôn ngữ', 'Language')}</span>
-              <select
-                value={uiLang}
-                onChange={(e) => changeUiLang(e.target.value as WorkbenchUiLang)}
-                aria-label={label('Ngôn ngữ bàn làm việc', 'Workbench language')}
-              >
-                <option value="vi">Tiếng Việt</option>
-                <option value="en">English</option>
               </select>
             </label>
           </div>

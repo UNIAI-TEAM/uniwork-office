@@ -16,8 +16,6 @@ import type {
   HomeApi,
 } from '../src/shared/home-api'
 import { AccountEntry } from '../src/renderer/src/AccountEntry'
-import { BillingPaymentPane } from '../src/renderer/src/BillingPaymentPane'
-import { LicenseDevicesPane } from '../src/renderer/src/LicenseDevicesPane'
 import { ACCOUNT_ERROR_KEYS, CALLBACK_NOTICE_MS } from '../src/renderer/src/account-model'
 import { LocaleProvider } from '../src/renderer/src/locale'
 import type { Lang } from '../src/renderer/src/locale'
@@ -671,67 +669,10 @@ describe('error text contrast', () => {
     expect(home).toMatch(/\.account-sub\.warn \{[^}]*color: var\(--danger-text\)/)
     // Sign out: --danger itself is about 2.6:1 on the dark surface
     expect(settings).toMatch(/\.set-btn\.danger \{[^}]*color: var\(--danger-text\)/)
-    expect(settings).toMatch(/\.set-license-warn \{[^}]*color: var\(--danger-text\)/)
     expect(home).toMatch(/\.account-avatar \{[^}]*color: var\(--text-secondary\)/)
     expect(home).toMatch(
       /\.account-avatar\.logged-in \{[^}]*background: var\(--account-avatar-bg\)/,
     )
     expect(settings).toMatch(/\.acct-card-avatar \{[^}]*background: var\(--account-avatar-bg\)/)
-  })
-})
-
-describe('legacy license panes next to the UniWork account', () => {
-  async function renderPane(el: ReturnType<typeof createElement>) {
-    await act(async () => {
-      root.render(el)
-    })
-    await flush()
-  }
-
-  it('signed in: the license pane shows the account plan and no sign-in hint', async () => {
-    await renderPane(
-      createElement(LicenseDevicesPane, {
-        lang: 'en',
-        loggedIn: true,
-        accountPlanName: 'Team Plan',
-      }),
-    )
-    const text = host.textContent ?? ''
-    expect(host.querySelector('.set-license-summary strong')?.textContent).toBe('Team Plan')
-    expect(text).not.toContain('Sign in to sync license')
-    expect(text).not.toContain('when the license API is live')
-  })
-
-  it('signed in: the rows derived from the on-device license are hidden', async () => {
-    await renderPane(
-      createElement(LicenseDevicesPane, {
-        lang: 'en',
-        loggedIn: true,
-        accountPlanName: 'Team Plan',
-      }),
-    )
-    const labels = [...host.querySelectorAll('.set-license-summary span')].map((n) => n.textContent)
-    expect(labels).toEqual(['Plan'])
-    const text = host.textContent ?? ''
-    expect(text).not.toContain('Office Bridge')
-    expect(text).not.toContain('needs Personal+')
-    expect(text).not.toContain('AI token')
-    expect(host.querySelector('.set-license-devices')).toBeNull()
-    expect(host.querySelector('.set-license-sim')).toBeNull()
-  })
-
-  it('signed out: the license pane is unchanged', async () => {
-    await renderPane(createElement(LicenseDevicesPane, { lang: 'en', loggedIn: false }))
-    expect(host.textContent).toContain('Sign in to sync license')
-    const labels = [...host.querySelectorAll('.set-license-summary span')].map((n) => n.textContent)
-    expect(labels).toEqual(expect.arrayContaining(['Plan', 'Status', 'Devices', 'Office Bridge']))
-    expect(host.querySelector('.set-license-devices')).not.toBeNull()
-  })
-
-  it('signed in: no payout account warning; signed out: unchanged', async () => {
-    await renderPane(createElement(BillingPaymentPane, { lang: 'en', signedIn: true }))
-    expect(host.textContent).not.toContain('No account number')
-    await renderPane(createElement(BillingPaymentPane, { lang: 'en' }))
-    expect(host.textContent).toContain('No account number')
   })
 })

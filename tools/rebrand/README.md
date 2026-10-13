@@ -1,8 +1,11 @@
 # UniWork rebrand + upstream sync
 
 UniWork Office is genoffice (`genspark-ai/genoffice`) with a UniWork brand and
-teacher-edu features on top. There is no shared git history with upstream, so
-upstream changes arrive as patches and the brand is re-applied by script.
+UniWork work features (the Workbench, UniWork sign-in and cloud documents) on
+top. The education features (Teacher mode, lesson packs, `@uniwork/edu-core`)
+were removed on purpose in October 2026, so a sync must not restore them. There
+is no shared git history with upstream, so upstream changes arrive as patches
+and the brand is re-applied by script.
 Internal names stay upstream's on purpose (`@genoffice/*` packages, import
 paths, code identifiers, `GENOFFICE_*` env vars, the `genoffice` CLI command,
 font aliases) so patches keep applying.
@@ -56,7 +59,7 @@ the rebrand tests (a fixed file list) and Prettier (`--config` / `--ignore-path`
 and deletes the new one.
 
 On conflicts it stops after step 2 (exit 2) with the conflicted files in the working tree. Resolve them (keep the
-UniWork brand and teacher-edu work, upstream wins elsewhere), `git add` them and run `--continue`, which commits the
+UniWork brand and UniWork work features, upstream wins elsewhere), `git add` them and run `--continue`, which commits the
 patch and finishes steps 3 and 4. `--commit-conflicts` instead commits the files with their markers so a pull request
 shows them, and still finishes the remaining steps; `--ci` (the workflow's mode) is `--commit-conflicts` plus a
 failure when Prettier is missing. Files that did not apply are listed loudly at the top of the report:
