@@ -390,6 +390,13 @@ export interface InitPayload extends TokenPayload {
    * web draft recovery (additive, CONTRACT C18). Absent = recovery off (the frame shows nothing).
    */
   recovery?: InitRecovery
+  /**
+   * additive (X-02 r2b): the largest file, in bytes, the host's `api.download` accepts for this
+   * document. A positive safe integer; sent only together with the `download` capability. The
+   * frame disables its "download my version" choice up front when its version is larger (equal
+   * is allowed). Absent = the choice is disabled only after a `too_large` answer.
+   */
+  downloadMaxBytes?: number
 }
 
 /**
@@ -920,6 +927,9 @@ function isNonEmptyStr(x: unknown): x is string {
 function isFiniteNum(x: unknown): x is number {
   return typeof x === 'number' && Number.isFinite(x)
 }
+function isPositiveSafeInt(x: unknown): x is number {
+  return typeof x === 'number' && Number.isSafeInteger(x) && x > 0
+}
 function isBool(x: unknown): x is boolean {
   return typeof x === 'boolean'
 }
@@ -1027,7 +1037,8 @@ export function isInitPayload(x: unknown): x is InitPayload {
     isOpt(x.open, isOpenPayload) &&
     isOpt(x.module, isOfficeModule) &&
     isOpt(x.user, isInitUser) &&
-    isOpt(x.recovery, isInitRecovery)
+    isOpt(x.recovery, isInitRecovery) &&
+    isOpt(x.downloadMaxBytes, isPositiveSafeInt)
   )
 }
 

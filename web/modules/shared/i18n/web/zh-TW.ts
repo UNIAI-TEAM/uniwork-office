@@ -43,6 +43,7 @@ export const zhTW = {
   uwConflictSessionWeb:
     '登入工作階段已過期，因此沒有完成覆寫。你的變更仍保留在此瀏覽器中；請重新登入後重試。',
   uwConflictTooLarge: '你的版本超過了 UniWork 的大小限制，因此無法覆寫。',
+  uwConflictDownloadTooLarge: '你的版本超過了 UniWork 的大小限制，因此無法在此下載。',
   uwConflictDownloadFailed: '無法下載你的版本，因此文件沒有重新載入。請重試。',
   uwConflictOfflineWeb: '離線中。在網頁上執行此操作需要網路連線；你的變更仍保留在瀏覽器中。',
 

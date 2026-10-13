@@ -40,6 +40,7 @@ function setup(
     bytes?: Uint8Array
     name?: string
     drafts?: TextWebApiOptions['drafts']
+    downloadMaxBytes?: number
   } = {},
 ) {
   const mock = createMockPort()
@@ -61,7 +62,11 @@ function setup(
     target,
   })
   const api = target.markdownApi as Api
-  mock.init({ documentId: file.fileId, capabilities: opts.caps ?? FULL })
+  mock.init({
+    documentId: file.fileId,
+    capabilities: opts.caps ?? FULL,
+    ...(opts.downloadMaxBytes !== undefined ? { downloadMaxBytes: opts.downloadMaxBytes } : {}),
+  })
   return { mock, file, api, print, reload }
 }
 
@@ -251,8 +256,11 @@ describe('markdownApi: save conflicts', () => {
     expect(mock.dirty.at(-1)).toBe(false)
   })
 
-  async function hostConflict(caps?: Capabilities) {
-    const s = setup(caps ? { caps } : {})
+  async function hostConflict(caps?: Capabilities, downloadMaxBytes?: number) {
+    const s = setup({
+      ...(caps ? { caps } : {}),
+      ...(downloadMaxBytes !== undefined ? { downloadMaxBytes } : {}),
+    })
     const { text } = await open(s.api)
     s.api.onSaveRequest(() => void s.api.save({ text: `${text}x`, imageSources: [], mode: 'save' }))
     s.api.setDirty(true)
@@ -317,6 +325,42 @@ describe('markdownApi: save conflicts', () => {
     )
     await click('go')
     expect(await granted.res).toMatchObject({ ok: true })
+  })
+
+  it('my version over init.downloadMaxBytes: the download choice is aria-disabled up front', async () => {
+    const granted = await hostConflict({ ...FULL, download: true }, 4)
+    await click('reload')
+    await vi.waitFor(() =>
+      expect(document.querySelector('[data-choice="download"]')).not.toBeNull(),
+    )
+    const choice = document.querySelector('[data-choice="download"]')!
+    expect(choice.getAttribute('aria-disabled')).toBe('true')
+    ;(choice as HTMLElement).click()
+    expect(granted.mock.calls.some((c) => c.type === 'api.download')).toBe(false)
+    await click('back')
+    await click('cancel')
+    await granted.res
+  })
+
+  it('a cap equal to my version leaves the download choice enabled', async () => {
+    // measure the Save the dialog holds: overwrite it once and read what was sent
+    const probe = await hostConflict()
+    await click('overwrite')
+    await click('go')
+    await probe.res
+    const size = lastSave(probe.mock)!.data.byteLength
+    document.body.replaceChildren()
+    const granted = await hostConflict({ ...FULL, download: true }, size)
+    await click('reload')
+    await vi.waitFor(() =>
+      expect(document.querySelector('[data-choice="download"]')).not.toBeNull(),
+    )
+    expect(
+      document.querySelector('[data-choice="download"]')!.getAttribute('aria-disabled'),
+    ).toBeNull()
+    await click('back')
+    await click('cancel')
+    await granted.res
   })
 })
 

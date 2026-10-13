@@ -51,6 +51,8 @@ export const cs = {
   uwConflictSessionWeb:
     'Relace vypršela, proto k přepsání nedošlo. Změny zůstávají v tomto prohlížeči; znovu se přihlaste a zkuste to znovu.',
   uwConflictTooLarge: 'Vaše verze překračuje limit velikosti UniWork, proto ji nešlo přepsat.',
+  uwConflictDownloadTooLarge:
+    'Vaše verze překračuje limit velikosti UniWork, proto ji tady nelze stáhnout.',
   uwConflictDownloadFailed:
     'Vaši verzi se nepodařilo stáhnout, proto se dokument znovu nenačetl. Zkuste to znovu.',
   uwConflictOfflineWeb:

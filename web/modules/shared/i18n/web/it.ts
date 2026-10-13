@@ -51,6 +51,8 @@ export const it = {
     'La sessione è scaduta, quindi la sovrascrittura non è avvenuta. Le modifiche restano in questo browser; accedi di nuovo e riprova.',
   uwConflictTooLarge:
     'La tua versione supera il limite di dimensione di UniWork, quindi non è stato possibile sovrascrivere.',
+  uwConflictDownloadTooLarge:
+    'La tua versione supera il limite di dimensione di UniWork, quindi non può essere scaricata qui.',
   uwConflictDownloadFailed:
     'Impossibile scaricare la tua versione, quindi il documento non è stato ricaricato. Riprova.',
   uwConflictOfflineWeb:

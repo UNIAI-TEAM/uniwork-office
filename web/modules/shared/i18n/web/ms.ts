@@ -51,6 +51,8 @@ export const ms = {
   uwConflictSessionWeb:
     'Sesi anda telah tamat tempoh, jadi tulis ganti tidak berlaku. Perubahan anda kekal dalam pelayar ini; log masuk semula dan cuba lagi.',
   uwConflictTooLarge: 'Versi anda melebihi had saiz UniWork, jadi tidak dapat menulis ganti.',
+  uwConflictDownloadTooLarge:
+    'Versi anda melebihi had saiz UniWork, jadi tidak dapat dimuat turun di sini.',
   uwConflictDownloadFailed:
     'Tidak dapat memuat turun versi anda, jadi dokumen tidak dimuat semula. Cuba lagi.',
   uwConflictOfflineWeb:

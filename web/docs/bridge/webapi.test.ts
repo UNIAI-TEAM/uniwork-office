@@ -815,6 +815,60 @@ describe('host save / saveAs requests (editor flows)', () => {
     expect(await res).toMatchObject({ ok: true, file: { fileId: 'f1' } })
   })
 
+  it('save conflict with the download capability and my version over init.downloadMaxBytes: the download choice is aria-disabled up front', async () => {
+    const meta = mock.seed('Report.docx', DOCX)
+    mock.init({
+      documentId: meta.fileId,
+      capabilities: { save: true, download: true },
+      downloadMaxBytes: 1,
+    })
+    const doc = (await api.consumePendingOpenDocx()) as OpenFileResult
+    wireRenderer(
+      () => doc.path,
+      () => api.saveDocx(doc.path, buf([4, 4])),
+    )
+    mock.bumpRemote('f1')
+    const res = mock.host.save({ reason: 'user' })
+    await choose('conflict', 'reload')
+    await vi.waitFor(() =>
+      expect(document.querySelector('[data-choice="download"]')).not.toBeNull(),
+    )
+    const download = document.querySelector('[data-choice="download"]') as HTMLElement
+    expect(download.getAttribute('aria-disabled')).toBe('true')
+    download.click()
+    for (let i = 0; i < 5; i++) await flush()
+    expect(mock.calls.some((c) => c.type === 'api.download')).toBe(false)
+    await choose('conflict', 'back')
+    await choose('conflict', 'cancel')
+    await res
+  })
+
+  it('save conflict: a version exactly at init.downloadMaxBytes can still be downloaded', async () => {
+    const meta = mock.seed('Report.docx', DOCX)
+    mock.init({
+      documentId: meta.fileId,
+      capabilities: { save: true, download: true },
+      downloadMaxBytes: 2,
+    })
+    const doc = (await api.consumePendingOpenDocx()) as OpenFileResult
+    wireRenderer(
+      () => doc.path,
+      () => api.saveDocx(doc.path, buf([4, 4])),
+    )
+    mock.bumpRemote('f1')
+    const res = mock.host.save({ reason: 'user' })
+    await choose('conflict', 'reload')
+    await vi.waitFor(() =>
+      expect(document.querySelector('[data-choice="download"]')).not.toBeNull(),
+    )
+    expect(
+      document.querySelector('[data-choice="download"]')!.getAttribute('aria-disabled'),
+    ).toBeNull()
+    await choose('conflict', 'back')
+    await choose('conflict', 'cancel')
+    await res
+  })
+
   it('save conflict -> Overwrite gets 401: the session line, closing answers unauthorized', async () => {
     const doc = await bootWith()
     wireRenderer(() => doc.path)

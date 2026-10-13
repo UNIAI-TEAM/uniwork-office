@@ -67,6 +67,7 @@ import type { DraftHost, DraftRecovery } from '../../docs/bridge/draft-recovery'
 import { TIMEOUTS, errorCode } from '../../docs/bridge/frame-port'
 import type { ModuleBridgePort } from '../../docs/bridge/module-bridge'
 import { idFromPath, pathFor } from '../../docs/bridge/webapi'
+import { bridgeDownloadCap } from '../shared/conflict-dialog'
 import { bridgeDraftRecovery } from '../shared/recovery-prompt'
 import { ask, hideFatal, showFatal, text, type WebKey } from './dialogs'
 import { createFullscreenControl } from './fullscreen-hint'
@@ -477,6 +478,7 @@ export function createWebSlidesApi(
     return fontsRelaid ? openResultFor(session, fitWidthPx) : result
   }
 
+  state.downloadCap = bridgeDownloadCap(port)
   let booted = false
   let pendingOpen: Promise<OpenPayload | null> | null = port
     .whenInitialized()

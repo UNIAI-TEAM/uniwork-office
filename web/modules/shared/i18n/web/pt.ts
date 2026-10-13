@@ -51,6 +51,8 @@ export const pt = {
     'Sua sessão expirou, então a substituição não aconteceu. Suas alterações continuam neste navegador; entre novamente e tente de novo.',
   uwConflictTooLarge:
     'Sua versão ultrapassa o limite de tamanho do UniWork, então não foi possível substituir.',
+  uwConflictDownloadTooLarge:
+    'Sua versão ultrapassa o limite de tamanho do UniWork, então não é possível baixá-la aqui.',
   uwConflictDownloadFailed:
     'Não foi possível baixar sua versão, então o documento não foi recarregado. Tente novamente.',
   uwConflictOfflineWeb:

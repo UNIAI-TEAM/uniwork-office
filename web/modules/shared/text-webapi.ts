@@ -53,6 +53,7 @@ import type { DraftHost, DraftRecovery } from '../../docs/bridge/draft-recovery'
 import { createAssetStore } from './assets'
 import {
   conflictSaveResult,
+  bridgeDownloadCap,
   downloadVia,
   headFromFile,
   overwriteHead,
@@ -209,6 +210,8 @@ export function createTextWebApi(
   let imagesGranted = false
   let desktopOpenGranted = false
   let downloadGranted = false
+  /** `init.downloadMaxBytes`: the largest file the host's `api.download` accepts (X-02 r2b) */
+  const downloadCap = bridgeDownloadCap(port)
 
   const viewOnly = (): boolean => !saveGranted || inexact
 
@@ -533,6 +536,8 @@ export function createTextWebApi(
     // the dialog may stay open for long: the host request must not time out meanwhile
     host?.started()
     let loaded = null as FileMeta | null
+    // encoded once: the Overwrite, the download and the cap check all use these bytes
+    const mine = encodeText(data)
     const outcome = await runConflictDialog({
       title: text('webConflictTitle'),
       body: text('webConflictBody'),
@@ -542,7 +547,7 @@ export function createTextWebApi(
       baseRevision: revisionOf(files.get(fileId)),
       readHead: async () => headFromFile(await readHeadFile(port, fileId)),
       overwrite: async () => {
-        const res = await overwriteHead(port, fileId, encodeText(data))
+        const res = await overwriteHead(port, fileId, mine)
         if (res.ok && res.file) {
           landed(
             { ok: true, file: res.file, ...(res.versionId ? { versionId: res.versionId } : {}) },
@@ -558,9 +563,10 @@ export function createTextWebApi(
         return true
       },
       canEdit: () => !viewOnly(),
-      download: downloadVia(port, downloadGranted ? { download: true } : undefined, () =>
-        encodeText(data),
-      ),
+      download: downloadVia(port, downloadGranted ? { download: true } : undefined, () => mine, {
+        size: mine.byteLength,
+        maxBytes: downloadCap(),
+      }),
     })
     const file = (outcome.kind === 'reloaded' ? loaded : null) ?? files.get(fileId)
     if (host && file) host.settle(conflictSaveResult(outcome, file))

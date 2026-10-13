@@ -51,6 +51,8 @@ export const ja = {
     'セッションの有効期限が切れたため、上書きされませんでした。変更はこのブラウザーに残っています。再ログインしてもう一度お試しください。',
   uwConflictTooLarge:
     'あなたのバージョンは UniWork のサイズ上限を超えているため、上書きできませんでした。',
+  uwConflictDownloadTooLarge:
+    'あなたのバージョンは UniWork のサイズ上限を超えているため、ここではダウンロードできません。',
   uwConflictDownloadFailed:
     'あなたのバージョンをダウンロードできなかったため、ドキュメントは再読み込みされませんでした。もう一度お試しください。',
   uwConflictOfflineWeb:

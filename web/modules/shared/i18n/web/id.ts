@@ -50,6 +50,8 @@ export const id = {
   uwConflictSessionWeb:
     'Sesi Anda kedaluwarsa, jadi penimpaan tidak terjadi. Perubahan Anda tetap di browser ini; masuk lagi lalu coba ulang.',
   uwConflictTooLarge: 'Versi Anda melebihi batas ukuran UniWork, jadi tidak dapat menimpa.',
+  uwConflictDownloadTooLarge:
+    'Versi Anda melebihi batas ukuran UniWork, jadi tidak dapat diunduh di sini.',
   uwConflictDownloadFailed:
     'Tidak dapat mengunduh versi Anda, jadi dokumen tidak dimuat ulang. Coba lagi.',
   uwConflictOfflineWeb:
