@@ -1,4 +1,5 @@
 /** @vitest-environment jsdom */
+import { readFileSync } from 'node:fs'
 import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -320,5 +321,93 @@ describe('resolve / reply / conflict', () => {
     expect(box.textContent).toContain(EN.collabCommentDeleted)
     await click(btn(EN.collabCopyText, box))
     expect(writeText).toHaveBeenCalledWith('keep me')
+  })
+})
+
+describe('visual r1 fixes (panel / thread)', () => {
+  const lostAnchor = { format: 'docx', v: 1, start: 1, path: [0], end: 4, quote: 'quote 1' }
+
+  it('a comment_deleted conflict scrolls the deleted frame into view and keeps focus in the composer', async () => {
+    const scrollIntoView = vi.fn()
+    Object.defineProperty(Element.prototype, 'scrollIntoView', {
+      value: scrollIntoView,
+      configurable: true,
+      writable: true,
+    })
+    const src = fakeSource(list([cm({ id: 'a' })], 't1'))
+    let submit!: (b: string) => Promise<void>
+    await act(async () => {
+      root.render(
+        createElement(function H() {
+          ctl = useCollabThreads(src, host(), { strings: EN })
+          return createElement(CollabPanel, {
+            controller: ctl,
+            strings: EN,
+            renderComposer: (s) => {
+              submit = s.onSubmit
+              return createElement('textarea', { 'data-composer': s.mode })
+            },
+          })
+        }),
+      )
+      await flush()
+    })
+    await click(btn(EN.collabReply, el))
+    const area = $<HTMLTextAreaElement>('[data-composer="reply"]')!
+    area.focus()
+    scrollIntoView.mockClear()
+    src.create.mockRejectedValueOnce(err('conflict', 'comment_deleted'))
+    src.list.mockResolvedValueOnce(list([], 't2'))
+    await act(async () => {
+      await submit('keep me').catch(() => {})
+      await flush()
+    })
+    const tomb = $('[data-thread-id="a"] [data-deleted-for="a"]')!
+    expect(tomb).not.toBeNull()
+    const targets = scrollIntoView.mock.contexts as Element[]
+    expect(targets).toContain(tomb)
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' })
+    // the composer keeps focus; the frame is only scrolled to
+    expect(document.activeElement).toBe($('[data-composer="reply"]'))
+    // the conflict line stays next to the composer, after it
+    const slot = $('[data-thread-id="a"] .collab-comp-slot')!
+    expect(slot.nextElementSibling?.classList.contains('collab-tdel')).toBe(true)
+  })
+
+  it('a lost anchor leaves no empty slot in the action row', async () => {
+    const src = fakeSource(
+      list([cm({ id: 'l', author_id: 'me', anchor: lostAnchor, anchor_state: 'lost' })]),
+    )
+    await act(async () => {
+      root.render(
+        createElement(function H() {
+          ctl = useCollabThreads(src, host(), {
+            strings: EN,
+            adapter: { order: (a) => a.start as number, locate: () => true, goTo: vi.fn() },
+          })
+          return createElement(CollabPanel, {
+            controller: ctl,
+            strings: EN,
+            renderComposer: () => null,
+          })
+        }),
+      )
+      await flush()
+    })
+    const row = $('[data-comment-id="l"] .collab-acts')!
+    expect(btn(EN.collabGoToAnchor, row)).toBeUndefined()
+    expect(row.children.length).toBeGreaterThan(0)
+    for (const child of row.children) {
+      expect(
+        (child.textContent ?? '').trim() !== '' || child.querySelector('button') !== null,
+      ).toBe(true)
+    }
+  })
+
+  it('under a coarse pointer the Edited link keeps its 44px hit area without growing the row', () => {
+    const css = readFileSync(`${__dirname}/../src/collab/collab.css`, 'utf8')
+    const coarse = css.slice(css.indexOf('@media (pointer: coarse)'))
+    expect(coarse).toMatch(/\.collab-cmh \.collab-link\s*\{[^}]*min-height: 24px/)
+    expect(coarse).toMatch(/\.collab-cmh \.collab-link::after\s*\{[^}]*content: ''[^}]*inset:/)
   })
 })
