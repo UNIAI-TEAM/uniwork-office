@@ -27,6 +27,7 @@ import {
   type CommentsRevealResult,
 } from '../../../docs/protocol/types'
 import { FrameDiscussion, type FrameDiscussionHandle } from './FrameDiscussion'
+import { createEditorShield, type EditorShield } from './overlay'
 import { createFrameDiscussionSource } from './source'
 
 /** what the mount needs from the frame client; the two comment hooks are absent on old ports and mocks */
@@ -80,6 +81,15 @@ function DiscussionRoot({ port, session, revealMissing, doc }: RootProps) {
     user: session.user,
   })
   const handle = useRef<FrameDiscussionHandle>(null)
+  const shield = useRef<EditorShield | null>(null)
+  useEffect(() => {
+    const s = createEditorShield(doc)
+    shield.current = s
+    return () => {
+      s.dispose()
+      shield.current = null
+    }
+  }, [doc])
 
   useEffect(() => {
     const offChanged = port.onCommentsChanged?.(() => void handle.current?.controller().reload())
@@ -109,7 +119,10 @@ function DiscussionRoot({ port, session, revealMissing, doc }: RootProps) {
       myUserId={access.userId}
       lang={lang}
       platform={platformOf()}
-      onOpenChange={(open) => doc.documentElement.classList.toggle(OPEN_CLASS, open)}
+      onOpenChange={(open) => {
+        doc.documentElement.classList.toggle(OPEN_CLASS, open)
+        shield.current?.setOpen(open)
+      }}
     />
   )
 }

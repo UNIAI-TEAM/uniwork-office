@@ -431,23 +431,24 @@ describe('mountFrameDiscussion', () => {
 // ---------------------------------------------------------------- W11G webfix (G8-11 review + visual r1)
 
 describe('Esc follows the kit (F3)', () => {
-  /** a keydown on the panel's textarea (the root composer) as the kit leaves it */
+  /**
+   * Esc on a fake kit field inside the panel: a plain textarea whose handler consumes (or ignores)
+   * Esc the way the kit's composer does, so the frame rule is tested apart from the kit's own
+   * Esc behaviour (which the kit lane owns)
+   */
   async function escOn(p: ReturnType<typeof discussionPort>, consume: boolean) {
     await mount(p)
     await act(async () => toggle()!.click())
     await flush()
-    const area = panel()!.querySelector('textarea')!
-    expect(area).not.toBeNull()
-    // a fake kit: a handler on the textarea that consumes (or ignores) Esc before it bubbles to the frame
-    const kit = (e: Event) => consume && e.preventDefault()
-    area.addEventListener('keydown', kit)
+    const area = document.createElement('textarea')
+    area.addEventListener('keydown', (e) => consume && e.preventDefault())
+    panel()!.append(area)
     await act(async () => {
       area.dispatchEvent(
         new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
       )
     })
     await flush()
-    area.removeEventListener('keydown', kit)
   }
 
   it('Esc in the composer that the kit did not consume closes the panel and focuses the toggle', async () => {
