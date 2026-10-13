@@ -389,7 +389,8 @@ export class SaveCoordinator {
           state: 'blocked',
           error: 'forbidden',
           access: 'view',
-          ...(base.level ? { level: 'view' as const } : {}),
+          // a fact about the server's answer, also for a binding written before levels existed
+          level: 'view' as const,
         })
       case 'quota_exceeded':
       case 'not_found':
