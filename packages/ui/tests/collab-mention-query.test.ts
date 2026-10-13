@@ -124,6 +124,45 @@ describe('mention ranges (the composer shows @Name, the stored body keeps the to
     expect(mentionDocToBody(applyMentionEdit(doc, 'Hi @Minh An ').doc)).toBe('Hi @Minh An ')
   })
 
+  it('an @ typed right before a chip keeps the chip (the caret anchors the ambiguous edit)', () => {
+    const doc = mentionDocFromBody(`${tok} hi`)
+    const out = applyMentionEdit(doc, '@@Minh Anh hi', 1)
+    expect(out.doc.text).toBe('@@Minh Anh hi')
+    expect(out.doc.ranges).toHaveLength(1)
+    expect(out.doc.ranges[0]).toMatchObject({ start: 1, end: 10, id: AN })
+    expect(mentionDocToBody(out.doc)).toBe(`@${tok} hi`)
+    // mid-text, with something before the chip
+    const mid = applyMentionEdit(mentionDocFromBody(`Hi ${tok} `), 'Hi @@Minh Anh ', 4)
+    expect(mid.doc.ranges[0]).toMatchObject({ start: 4, end: 13 })
+  })
+
+  it('deleting a plain @ right before a chip keeps the chip', () => {
+    const doc = mentionDocFromBody(`@${tok} hi`)
+    const out = applyMentionEdit(doc, '@Minh Anh hi', 0)
+    expect(out.doc.ranges[0]).toMatchObject({ start: 0, end: 9 })
+    expect(mentionDocToBody(out.doc)).toBe(`${tok} hi`)
+  })
+
+  it('a plain letter typed right before or right after a chip keeps and shifts it', () => {
+    const doc = mentionDocFromBody(`${tok} hi`)
+    const before = applyMentionEdit(doc, 'x@Minh Anh hi', 1)
+    expect(before.doc.ranges[0]).toMatchObject({ start: 1, end: 10 })
+    expect(mentionDocToBody(before.doc)).toBe(`x${tok} hi`)
+    const after = applyMentionEdit(doc, '@Minh Anhh hi', 10)
+    expect(after.doc.ranges[0]).toMatchObject({ start: 0, end: 9 })
+    expect(mentionDocToBody(after.doc)).toBe(`${tok}h hi`)
+    // the same letters without a caret keep working as before
+    expect(applyMentionEdit(doc, 'x@Minh Anh hi').doc.ranges[0]).toMatchObject({ start: 1 })
+    expect(applyMentionEdit(doc, '@Minh Anhh hi').doc.ranges).toHaveLength(1)
+  })
+
+  it('a caret that does not describe the edit is ignored (edit inside a chip still drops it)', () => {
+    const doc = mentionDocFromBody(`Hi ${tok} `)
+    expect(applyMentionEdit(doc, 'Hi @Minh Xnh ', 99).doc.ranges).toEqual([])
+    expect(applyMentionEdit(doc, 'Hi @Minh Xnh ', 8).doc.ranges).toEqual([])
+    expect(applyMentionEdit(doc, 'Hi @Minh An ', 8).doc.ranges).toEqual([])
+  })
+
   it('deleting the whole mention removes it; a space right after it is kept', () => {
     const doc = mentionDocFromBody(`${tok} x`)
     expect(applyMentionEdit(doc, ' x').doc.ranges).toEqual([])
