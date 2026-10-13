@@ -61,10 +61,10 @@ export const WORKBENCH_MODULES: readonly WorkbenchModuleDef[] = [
   },
   {
     id: 'personal',
-    labelVi: 'Cá nhân',
-    labelEn: 'Personal',
-    hintVi: 'Hồ sơ cá nhân dùng khi soạn văn bản',
-    hintEn: 'Personal profile for drafting',
+    labelVi: 'Hồ sơ',
+    labelEn: 'Profile',
+    hintVi: 'Hồ sơ UniWork của bạn, chỉ đọc',
+    hintEn: 'Your UniWork profile, read-only',
     available: true,
   },
 ] as const

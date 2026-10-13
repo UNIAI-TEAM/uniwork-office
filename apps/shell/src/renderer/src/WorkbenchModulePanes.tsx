@@ -4,17 +4,12 @@ import { getWorkbenchModule, type PracticeId, type WorkbenchModuleId } from '@un
 import type { UniworkWorkspaceRef } from '../../shared/home-api'
 import type { UniworkWorkError } from '../../shared/uniwork-work-api'
 import { NotesPane } from './NotesPane'
+import { WorkProfilePane } from './WorkProfilePane'
+import { escapeHtml, profileForDraft, profileMergeHtml } from './form-merge'
 import { WorkCalendarPane } from './WorkCalendarPane'
 import { WorkTasksPane } from './WorkTasksPane'
 import { WbDeleteBtn, WbDraftBtn, WbEditBtn, WbFileBtn, WbRowActions } from './WbRowActions'
-import {
-  readForms,
-  readPersonal,
-  writeForms,
-  writePersonal,
-  type WbFormItem,
-  type WbPersonalProfile,
-} from './workbench-pins'
+import { readForms, writeForms, type WbFormItem } from './workbench-pins'
 import type { WorkPaneProps } from './WorkErrorState'
 
 interface Props {
@@ -77,9 +72,15 @@ export function WorkbenchModulePane({
       {moduleId === 'tasks' && <WorkTasksPane {...server} />}
       {moduleId === 'notes' && <NotesPane practiceId={practiceId} vi={vi} />}
       {moduleId === 'forms' && (
-        <FormsPane practiceId={practiceId} vi={vi} packId={packId} onPackLinked={onPackLinked} />
+        <FormsPane
+          practiceId={practiceId}
+          vi={vi}
+          packId={packId}
+          onPackLinked={onPackLinked}
+          orgId={workspace?.orgId ?? null}
+        />
       )}
-      {moduleId === 'personal' && <PersonalPane vi={vi} />}
+      {moduleId === 'personal' && <WorkProfilePane {...server} />}
     </section>
   )
 }
@@ -89,11 +90,14 @@ function FormsPane({
   vi,
   packId,
   onPackLinked,
+  orgId,
 }: {
   practiceId: PracticeId
   vi: boolean
   packId?: string | null
   onPackLinked?: () => void
+  /** the active org, for the cached UniWork profile the compose merge reads; null when signed out */
+  orgId: string | null
 }): ReactElement {
   const label = (a: string, b: string) => (vi ? a : b)
   const [items, setItems] = useState<WbFormItem[]>(() => readForms(practiceId))
@@ -197,14 +201,8 @@ function FormsPane({
   const openForm = async (item: WbFormItem) => {
     const targetPack = packId ?? item.linkedProjectId
     if (!targetPack) return
-    const profile = readPersonal()
-    const metaLines = [
-      profile.fullName ? `<p><strong>Họ tên:</strong> ${escapeHtml(profile.fullName)}</p>` : '',
-      profile.org ? `<p><strong>Đơn vị:</strong> ${escapeHtml(profile.org)}</p>` : '',
-      profile.title ? `<p><strong>Chức danh:</strong> ${escapeHtml(profile.title)}</p>` : '',
-    ]
-      .filter(Boolean)
-      .join('')
+    // merge fields from the UniWork profile: cached first, never blocking compose (form-merge.ts)
+    const metaLines = profileMergeHtml(await profileForDraft(orgId))
     const fileHint = item.fileName
       ? `<p><em>${vi ? 'Mẫu gốc' : 'Source template'}: ${escapeHtml(item.fileName)}</em></p>`
       : ''
@@ -350,62 +348,4 @@ function FormsPane({
       </ul>
     </>
   )
-}
-
-function PersonalPane({ vi }: { vi: boolean }): ReactElement {
-  const label = (a: string, b: string) => (vi ? a : b)
-  const [profile, setProfile] = useState<WbPersonalProfile>(() => readPersonal())
-  const [saved, setSaved] = useState(false)
-
-  const setField = (key: keyof WbPersonalProfile, value: string) => {
-    setProfile((p) => ({ ...p, [key]: value }))
-    setSaved(false)
-  }
-
-  return (
-    <>
-      <p className="wb-hint">
-        {label(
-          'Hồ sơ dùng chung mọi vai trò — Biểu mẫu có thể ghép tự động khi mở.',
-          'Shared across all roles — Forms can merge this when opening.',
-        )}
-      </p>
-      <div className="wb-form">
-        {(
-          [
-            ['fullName', 'Họ và tên', 'Full name'],
-            ['title', 'Chức danh', 'Job title'],
-            ['org', 'Đơn vị / trường', 'Organization'],
-            ['phone', 'Điện thoại', 'Phone'],
-            ['email', 'Email', 'Email'],
-            ['address', 'Địa chỉ', 'Address'],
-          ] as const
-        ).map(([key, viLabel, enLabel]) => (
-          <label key={key} className={key === 'address' ? 'wb-form-wide' : undefined}>
-            <span>{vi ? viLabel : enLabel}</span>
-            <input value={profile[key]} onChange={(e) => setField(key, e.target.value)} />
-          </label>
-        ))}
-      </div>
-      <button
-        type="button"
-        className="btn btn-primary"
-        onClick={() => {
-          writePersonal(profile)
-          setSaved(true)
-        }}
-      >
-        {label('Lưu hồ sơ', 'Save profile')}
-      </button>
-      {saved ? <p className="wb-hint">{label('Đã lưu.', 'Saved.')}</p> : null}
-    </>
-  )
-}
-
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
 }

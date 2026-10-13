@@ -305,36 +305,10 @@ export interface WbFormItem {
   templateId?: string
 }
 
-export interface WbPersonalProfile {
-  fullName: string
-  org: string
-  title: string
-  phone: string
-  email: string
-  address: string
-}
-
-const DEFAULT_PERSONAL: WbPersonalProfile = {
-  fullName: '',
-  org: '',
-  title: '',
-  phone: '',
-  email: '',
-  address: '',
-}
-
 export function readForms(practiceId: PracticeId): WbFormItem[] {
   return readJson(`uniwork.wb.forms.${practiceId}`, [])
 }
 
 export function writeForms(practiceId: PracticeId, items: WbFormItem[]): void {
   writeJson(`uniwork.wb.forms.${practiceId}`, items)
-}
-
-export function readPersonal(): WbPersonalProfile {
-  return { ...DEFAULT_PERSONAL, ...readJson('uniwork.wb.personal', {}) }
-}
-
-export function writePersonal(profile: WbPersonalProfile): void {
-  writeJson('uniwork.wb.personal', profile)
 }

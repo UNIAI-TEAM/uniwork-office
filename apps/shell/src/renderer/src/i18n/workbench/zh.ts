@@ -100,4 +100,11 @@ export const zh = {
   wbCalKindTask: '任务',
   wbCalKindMeeting: '会议',
   wbCalKindExternal: '外部日历',
+  wbProfileJobTitle: '职位',
+  wbProfileDepartment: '部门',
+  wbProfileManager: '上级',
+  wbProfileEmail: '邮箱',
+  wbProfileTimezone: '时区',
+  wbProfileHint: 'UniAI 起草文档时会使用这些信息。',
+  wbProfileEditOnWeb: '在网页上编辑',
 }

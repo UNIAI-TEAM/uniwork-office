@@ -95,4 +95,11 @@ export const en = {
   wbCalKindTask: 'Task',
   wbCalKindMeeting: 'Meeting',
   wbCalKindExternal: 'External calendar',
+  wbProfileJobTitle: 'Job title',
+  wbProfileDepartment: 'Department',
+  wbProfileManager: 'Manager',
+  wbProfileEmail: 'Email',
+  wbProfileTimezone: 'Time zone',
+  wbProfileHint: 'UniAI uses this information when drafting documents.',
+  wbProfileEditOnWeb: 'Edit on the web',
 } satisfies Record<keyof typeof zh, string>

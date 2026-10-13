@@ -95,4 +95,11 @@ export const vi = {
   wbCalKindTask: 'Việc',
   wbCalKindMeeting: 'Cuộc họp',
   wbCalKindExternal: 'Lịch bên ngoài',
+  wbProfileJobTitle: 'Chức danh',
+  wbProfileDepartment: 'Phòng ban',
+  wbProfileManager: 'Quản lý trực tiếp',
+  wbProfileEmail: 'Email',
+  wbProfileTimezone: 'Múi giờ',
+  wbProfileHint: 'UniAI dùng thông tin này khi soạn văn bản.',
+  wbProfileEditOnWeb: 'Sửa trên web',
 } satisfies Record<keyof typeof zh, string>

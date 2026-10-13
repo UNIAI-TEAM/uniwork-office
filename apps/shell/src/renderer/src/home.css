@@ -5766,3 +5766,26 @@ html[dir='rtl'] .quick-title-row {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.wb-profile-name {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.wb-profile {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 16px;
+  margin: 0;
+  font-size: 13px;
+}
+
+.wb-profile dt {
+  color: var(--text-secondary);
+}
+
+.wb-profile dd {
+  margin: 0;
+  color: var(--text);
+}
