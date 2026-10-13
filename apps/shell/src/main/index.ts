@@ -3805,6 +3805,23 @@ function uniworkDocsWiring() {
       }
       return undefined
     },
+    // G8-11: the shell Discussion panel's bridge answers only the shell
+    // window's own webContents, and only for the paths open as its tabs
+    // (detached editor windows have no panel)
+    discussionTabPaths: (sender: { id: number }) =>
+      shellWindow && !shellWindow.isDestroyed() && shellWindow.webContents.id === sender.id
+        ? (tabManager?.openFilePaths() ?? [])
+        : null,
+    discussionTarget: (path: string) =>
+      shellWindow && !shellWindow.isDestroyed() && tabManager?.findTabByPath(path)
+        ? shellWindow.webContents
+        : null,
+    setDiscussionPanel: (sender: { id: number }, panel: { open: boolean; width: number }) => {
+      if (!shellWindow || shellWindow.isDestroyed() || shellWindow.webContents.id !== sender.id) {
+        return
+      }
+      tabManager?.setDiscussionPanel(panel)
+    },
     lang: () => currentLang(),
     defaultSaveDir: () => defaultSaveDir(),
     openPaths,

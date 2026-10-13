@@ -7,7 +7,9 @@ import '@genoffice/ui/tokens.css'
 import '@genoffice/ui/screentip.css'
 import '@genoffice/ui/dropdown.css'
 import './home.css'
+import '@genoffice/ui/collab.css'
 import './tabbar.css'
+import './discussion.css'
 import { installScreenTips } from '@genoffice/ui'
 
 installScreenTips()

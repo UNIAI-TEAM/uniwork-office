@@ -1,6 +1,11 @@
 import type { IpcMain, WebContents } from 'electron'
 import {
   COMMENTS_CHANNELS,
+  DISCUSSION_CHANNELS,
+  parseDiscussionCreateInput,
+  parseDiscussionListInput,
+  parseDiscussionPanelInput,
+  parseDiscussionRevealRequest,
   parseCommentsAnchorsInput,
   parseCommentsCreateInput,
   parseCommentsIdInput,
@@ -16,6 +21,7 @@ import type {
   CommentsReply,
   CommentsUpdateInput,
   CommentsRevealPayload,
+  DiscussionPanelInput,
   MentionsSearchInput,
 } from '@genoffice/electron-utils/comments-ipc'
 import { DocsProtocolError, type ProtocolErrorShape } from '../../../../../web/docs/protocol/types'
@@ -58,10 +64,33 @@ export interface CommentsWiringDeps {
    * for exactly that path. undefined/null when nothing shows one.
    */
   shownPath?(sender: { id: number }): string | null
+  /**
+   * G8-11 (D2): the file paths open as tabs of the window whose SHELL
+   * webContents is `sender`; null when `sender` is not a live shell
+   * webContents. Every discussion channel is refused without it.
+   */
+  shellTabPaths?(sender: { id: number }): readonly string[] | null
+  /**
+   * G8-11 (D3): the shell webContents of the window that has `path` open as a
+   * tab, for the discussion reveal push; null when no shell shows it.
+   */
+  shellTarget?(path: string): DiscussionPushTarget | null
+  /** G8-11 (D1): narrow / restore the active editor view of the sender's window */
+  setDiscussionPanel?(sender: { id: number }, panel: DiscussionPanelInput): void
   /** injectable for tests */
   fetch?: (input: string, init: RequestInit) => Promise<Response>
   idempotencyKey?(): string
 }
+
+/** the slice of a shell webContents the discussion reveal push needs */
+export interface DiscussionPushTarget extends Partial<Pick<WebContents, 'on'>> {
+  id: number
+  isDestroyed(): boolean
+  send(channel: string, payload: unknown): void
+}
+
+/** a shell webContents' realm events (D2-2 reset), as the editor senders have */
+type RealmSender = Pick<WebContents, 'id' | 'on'>
 
 export interface UniworkCommentsHandle {
   /** reveal a comment in the editor showing `path` (the launch-ticket deep link) */
@@ -236,9 +265,199 @@ export function createUniworkComments(
     return { path, commentId }
   })
 
+  // G8-11 (D2): the shell Discussion panel's bridge. Main answers it only for
+  // the shell webContents of a window, only for a path that is an open tab of
+  // THAT window and bound, and forces kind 'discussion' on list/create (the
+  // parsers refuse an anchor or another kind). Id-based calls run against
+  // that document's binding exactly like the editor ones; the server scopes
+  // the comment id to it.
+  const shellPaths = (sender: { id: number }): readonly string[] => {
+    const paths = deps.shellTabPaths?.(sender) ?? null
+    if (!paths) {
+      throw new DocsProtocolError({
+        code: 'forbidden',
+        message: 'discussion: not a shell window',
+        retryable: false,
+      })
+    }
+    return paths
+  }
+
+  const discussionBinding = (sender: { id: number }, path: string): CommentBinding => {
+    if (!shellPaths(sender).includes(path)) unbound()
+    return binding(path)
+  }
+
+  // D2-2 for the shell: the armed discussion listeners belong to one realm of
+  // the shell page. A reload, a navigation or a crash replaces it, so its
+  // armed paths and the reveals held for that shell's tabs are dropped (the
+  // new realm starts clean, like the editor side) and the editor view gets
+  // its full width back (the panel is gone with it).
+  const armed = new Map<number, Set<string>>()
+  // D3: the latest launch reveal per path, held for the shell panel until the
+  // shell pulls it for that path (delivered once)
+  const shellHeld = new Map<string, string>()
+  const watchedShells = new Set<number>()
+
+  const watchShell = (sender: RealmSender): void => {
+    if (watchedShells.has(sender.id) || typeof sender.on !== 'function') return
+    watchedShells.add(sender.id)
+    const id = sender.id
+    const reset = (): void => {
+      for (const path of armed.get(id) ?? []) shellHeld.delete(path)
+      for (const path of deps.shellTabPaths?.({ id }) ?? []) shellHeld.delete(path)
+      armed.delete(id)
+      deps.setDiscussionPanel?.({ id }, { open: false, width: 0 })
+    }
+    sender.on('did-start-navigation', (details) => {
+      if (details.isMainFrame && !details.isSameDocument) reset()
+    })
+    sender.on('did-navigate', reset)
+    sender.on('render-process-gone', reset)
+    sender.on('destroyed', () => {
+      armed.delete(id)
+      watchedShells.delete(id)
+    })
+  }
+
+  // W11A-2: a hold lives only while a shell shows its path. A closed tab's hold
+  // is swept on the next shell message or reveal, so the map is bounded by the
+  // open tabs (plus the reveal being held right now).
+  const sweepShellHeld = (keep?: string): void => {
+    for (const path of [...shellHeld.keys()]) {
+      if (path !== keep && !deps.shellTarget?.(path)) shellHeld.delete(path)
+    }
+  }
+
+  const handleDiscussion = <I extends { path: string }, R>(
+    channel: string,
+    parse: (payload: unknown) => I | null,
+    run: (binding: CommentBinding, input: I) => Promise<R>,
+  ): void => {
+    ipcMain.handle(channel, async (event, payload: unknown): Promise<CommentsReply<R>> => {
+      const input = parse(payload)
+      if (!input) {
+        return {
+          ok: false,
+          error: { code: 'malformed', message: 'comments: invalid request', retryable: false },
+        }
+      }
+      try {
+        return { ok: true, value: await run(discussionBinding(event.sender, input.path), input) }
+      } catch (error) {
+        return { ok: false, error: errorShape(error) }
+      }
+    })
+  }
+
+  // the discussion channels exist only where a shell window can be told
+  // apart (the shell build passes shellTabPaths); without it nothing is served
+  if (deps.shellTabPaths) {
+    handleDiscussion<CommentsListInput, unknown>(
+      DISCUSSION_CHANNELS.list,
+      parseDiscussionListInput,
+      (bound, input) => api().list(bound, input),
+    )
+    handleDiscussion<CommentsCreateInput, unknown>(
+      DISCUSSION_CHANNELS.create,
+      parseDiscussionCreateInput,
+      (bound, input) => api().create(bound, input),
+    )
+    handleDiscussion<CommentsUpdateInput, unknown>(
+      DISCUSSION_CHANNELS.update,
+      parseCommentsUpdateInput,
+      (bound, input) => api().update(bound, input.commentId, input.body),
+    )
+    handleDiscussion<CommentsIdInput, unknown>(
+      DISCUSSION_CHANNELS.remove,
+      parseCommentsIdInput,
+      (bound, input) => api().remove(bound, input.commentId),
+    )
+    handleDiscussion<CommentsIdInput, unknown>(
+      DISCUSSION_CHANNELS.resolve,
+      parseCommentsIdInput,
+      (bound, input) => api().resolve(bound, input.commentId),
+    )
+    handleDiscussion<CommentsIdInput, unknown>(
+      DISCUSSION_CHANNELS.reopen,
+      parseCommentsIdInput,
+      (bound, input) => api().reopen(bound, input.commentId),
+    )
+    handleDiscussion<CommentsIdInput, unknown>(
+      DISCUSSION_CHANNELS.revisions,
+      parseCommentsIdInput,
+      (bound, input) => api().revisions(bound, input.commentId),
+    )
+    handleDiscussion<MentionsSearchInput, unknown>(
+      DISCUSSION_CHANNELS.searchMentions,
+      parseMentionsSearchInput,
+      (bound, input) => api().searchMentions(bound, input),
+    )
+
+    ipcMain.handle(DISCUSSION_CHANNELS.revealPending, (event, payload: unknown) => {
+      const request = parseDiscussionRevealRequest(payload)
+      if (!request) return null
+      const { path } = request
+      // another window's, an unopened or an unbound path is neither returned,
+      // armed nor cleared
+      const paths = deps.shellTabPaths?.(event.sender) ?? null
+      if (!paths || !paths.includes(path) || !resolveCommentBinding(deps.service, path)) return null
+      watchShell(event.sender)
+      sweepShellHeld()
+      const set = armed.get(event.sender.id) ?? new Set<string>()
+      set.add(path)
+      armed.set(event.sender.id, set)
+      const commentId = shellHeld.get(path)
+      if (commentId === undefined) return null
+      shellHeld.delete(path)
+      return { path, commentId }
+    })
+
+    ipcMain.on(DISCUSSION_CHANNELS.revealRelease, (event, payload: unknown) => {
+      const request = parseDiscussionRevealRequest(payload)
+      if (!request) return
+      // W11E-1: only a live shell that owns the path may let go of it - one of
+      // its open tabs, or a path it armed (so the cleanup after a tab close
+      // still works). An editor, an unknown sender or another shell window
+      // must not cancel the owner's held reveal.
+      const paths = deps.shellTabPaths?.(event.sender) ?? null
+      const own = armed.get(event.sender.id)
+      if (!paths || !(paths.includes(request.path) || own?.has(request.path))) return
+      own?.delete(request.path)
+      // W11A-2: the panel let go of this path; its hold goes with it
+      shellHeld.delete(request.path)
+    })
+
+    ipcMain.on(DISCUSSION_CHANNELS.panel, (event, payload: unknown) => {
+      const panel = parseDiscussionPanelInput(payload)
+      if (!panel || !deps.shellTabPaths?.(event.sender)) return
+      watchShell(event.sender)
+      sweepShellHeld()
+      deps.setDiscussionPanel?.(event.sender, panel)
+    })
+  }
+
+  /** push to an armed shell listener for `path`, else hold until it pulls */
+  const revealToShell = (path: string, commentId: string): void => {
+    const target = deps.shellTarget?.(path) ?? null
+    // a shell that never talked to us is watched from its first reveal, so a
+    // reload before its first pull still starts a clean realm (W11A-1)
+    if (target && !target.isDestroyed() && typeof target.on === 'function') {
+      watchShell(target as RealmSender)
+    }
+    sweepShellHeld(path)
+    if (target && !target.isDestroyed() && armed.get(target.id)?.has(path)) {
+      target.send(DISCUSSION_CHANNELS.reveal, { path, commentId })
+      shellHeld.delete(path)
+      return
+    }
+    shellHeld.set(path, commentId)
+  }
+
   return {
     reveal(path, commentId) {
       if (!resolveCommentBinding(deps.service, path)) return
+      revealToShell(path, commentId)
       const outcome = deps.sendReveal({ path, commentId }, () => {
         // D1-4: the deferred push is dropped once a pull delivered the reveal
         // D1-1: if the editor is subscribed by then, the push lands in its
