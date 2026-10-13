@@ -258,7 +258,7 @@ export function WorkbenchTabs({
       <div className="wb-tab-add-wrap" ref={wrapRef}>
         <button
           type="button"
-          className={`wb-tab wb-tab-add${menuOpen ? ' active' : ''}`}
+          className="wb-tab wb-tab-add"
           aria-haspopup="menu"
           aria-expanded={menuOpen}
           onClick={() => setMenuOpen((o) => !o)}
