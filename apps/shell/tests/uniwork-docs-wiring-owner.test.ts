@@ -73,10 +73,13 @@ describe('last owner follows the session identity (R2-5)', () => {
     })
     handle.activate(() => undefined)
     const note = vi.spyOn(handle.service, 'noteSessionIdentity')
+    const noteOrg = vi.spyOn(handle.service, 'noteSelectedOrg')
     expect(statusListener).not.toBeNull()
     identity = { accountId: 'acc_9', deviceSessionId: 'dev_1', deploymentId: 'default' }
     statusListener?.({ state: 'signed-in' })
     expect(note).toHaveBeenCalledTimes(1)
+    // G8-16 S16: a status push also tells the service the selected org (here: none)
+    expect(noteOrg).toHaveBeenCalledWith(null)
     const doc = {
       deploymentId: 'default',
       userId: 'acc_9',
