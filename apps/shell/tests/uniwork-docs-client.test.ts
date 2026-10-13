@@ -35,7 +35,7 @@ describe('egress', () => {
     )
     const api = client(fetch)
     expect(await api.listWorkspaces('org_a')).toEqual([
-      { id: 'ws_1', name: 'Team', orgId: 'org_a' },
+      { id: 'ws_1', name: 'Team', orgId: 'org_a', myRole: null },
     ])
     await api.listDocuments({ workspaceId: 'ws_1' }).catch(() => undefined)
     await api

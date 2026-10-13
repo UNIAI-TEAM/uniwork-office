@@ -6,7 +6,7 @@ import {
   resolveDeploymentProfile,
   type DeploymentProfile,
 } from '../src/main/uniwork-auth/deployment'
-import { classifyTransportFailure, pickOrg } from '../src/main/uniwork-auth/mapping'
+import { classifyTransportFailure, resolveOrgChoice } from '../src/main/uniwork-auth/mapping'
 import {
   TransportError,
   createUniworkTransport,
@@ -349,15 +349,46 @@ describe('error mapping', () => {
     })
   })
 
-  it('picks the persisted org while a member, else the first active one', () => {
+  it('uses the remembered org, else picks a single active one, else asks (G8-16)', () => {
     const orgs = [
       { id: 'o1', name: 'A', slug: 'a', role: 'member', status: 'suspended' },
       { id: 'o2', name: 'B', slug: 'b', role: 'owner', status: 'active' },
+      { id: 'o3', name: 'C', slug: 'c', role: 'member', status: 'active' },
     ]
-    expect(pickOrg(orgs, 'o1')?.id).toBe('o1')
-    expect(pickOrg(orgs, 'gone')?.id).toBe('o2')
-    expect(pickOrg(orgs, undefined)?.id).toBe('o2')
-    expect(pickOrg([orgs[0]], undefined)).toBeUndefined()
+    // a remembered, usable org is used with no question
+    expect(resolveOrgChoice([orgs[1]!, orgs[2]!], 'o2')).toMatchObject({
+      org: { id: 'o2' },
+      needsOrgChoice: false,
+      rememberedGone: false,
+    })
+    // a single usable org is picked automatically
+    expect(resolveOrgChoice([orgs[0]!, orgs[1]!], undefined)).toMatchObject({
+      org: { id: 'o2' },
+      needsOrgChoice: false,
+    })
+    // two usable orgs and no choice: the picker, no guess
+    expect(resolveOrgChoice([orgs[1]!, orgs[2]!], undefined)).toMatchObject({
+      org: undefined,
+      needsOrgChoice: true,
+      rememberedGone: false,
+    })
+    // a remembered org that is gone returns the picker with the notice
+    expect(resolveOrgChoice([orgs[1]!, orgs[2]!], 'gone')).toMatchObject({
+      org: undefined,
+      needsOrgChoice: true,
+      rememberedGone: true,
+    })
+    // a remembered org that is blocked (suspended) returns the picker, no notice
+    expect(resolveOrgChoice([orgs[0]!, orgs[2]!], 'o1')).toMatchObject({
+      org: undefined,
+      needsOrgChoice: true,
+      rememberedGone: false,
+    })
+    // nothing usable: no picker (the all-blocked panel handles it)
+    expect(resolveOrgChoice([orgs[0]!], undefined)).toMatchObject({
+      org: undefined,
+      needsOrgChoice: false,
+    })
   })
 })
 

@@ -97,6 +97,17 @@ const stored = (overrides: Partial<StoredCredential> = {}): StoredCredential => 
   refreshToken: 'rt_stored',
   refreshExpiresAt: Date.now() + 86_400_000,
   profile: { accountId: 'acc_1', email: 'cached@example.com', displayName: 'Cached' },
+  // a credential always carries the last chosen organization (and plan); the
+  // G8-16 picker must not appear for a remembered choice
+  org: { id: 'org_a', name: 'Acme', slug: 'acme', role: 'owner', membership: 'active' },
+  entitlements: {
+    orgId: 'org_a',
+    planCode: 'starter',
+    planName: 'Starter',
+    status: 'active',
+    features: [],
+    fetchedAt: 1,
+  },
   ...overrides,
 })
 
@@ -214,7 +225,7 @@ describe('sign-in', () => {
     // G8-16 S16: two usable orgs and no remembered choice -> the picker, no plan
     expect(status.org).toBeUndefined()
     expect(status.needsOrgChoice).toBe(true)
-    expect(status.entitlements).toBeUndefined()
+    expect(status.entitlements).toBeNull()
     expect(status.orgs).toHaveLength(3)
     expect(status.orgs?.map((o) => o.membership)).toEqual([
       'organization_suspended',
@@ -532,7 +543,7 @@ describe('keystore locked', () => {
 
 describe('restore and refresh', () => {
   it('restores by refreshing; the rotated refresh token is persisted', async () => {
-    const ctx = setup({ credentials: createMemoryCredentialStore(stored()) })
+    const ctx = setup({ credentials: createMemoryCredentialStore(stored()), orgId: 'org_a' })
     const status = await ctx.manager.restore()
     expect(ctx.transport.refresh).toHaveBeenCalledWith({
       deviceSessionId: 'dev_1',
@@ -718,7 +729,7 @@ describe('restore and refresh', () => {
   })
 
   it('server-unreachable after a restart shows the cached organization and plan', async () => {
-    const ctx = setup({ credentials: createMemoryCredentialStore(stored()) })
+    const ctx = setup({ credentials: createMemoryCredentialStore(stored()), orgId: 'org_a' })
     expect((await ctx.manager.restore()).state).toBe('signed-in')
     // a new process: only the stored credential survives
     const next = setup({ credentials: ctx.credentials })
@@ -861,9 +872,9 @@ describe('organizations and entitlements', () => {
   })
 
   it('a billing failure after a restart shows the cached plan but never publishes it as live', async () => {
-    const first = setup({ credentials: createMemoryCredentialStore(stored()) })
+    const first = setup({ credentials: createMemoryCredentialStore(stored()), orgId: 'org_a' })
     expect((await first.manager.restore()).state).toBe('signed-in')
-    const next = setup({ credentials: first.credentials })
+    const next = setup({ credentials: first.credentials, orgId: 'org_a' })
     next.transport.billing.mockImplementation(fail('server_error'))
     const status = await next.manager.restore()
     expect(status).toMatchObject({
@@ -885,9 +896,107 @@ describe('organizations and entitlements', () => {
   })
 })
 
+describe('G8-16 organization choice (S16)', () => {
+  it('a two-org account asks, and makes no org-scoped call before the choice', async () => {
+    const ctx = setup()
+    await signIn(ctx)
+    const status = ctx.manager.status()
+    expect(status.needsOrgChoice).toBe(true)
+    expect(status.rememberedGone).toBe(false)
+    expect(status.org).toBeUndefined()
+    // billing is the org-scoped read the account itself makes: never before the choice
+    expect(ctx.transport.billing).not.toHaveBeenCalled()
+    expect(ctx.manager.getEntitlements()).toBeNull()
+
+    await ctx.manager.selectOrg('org_a')
+    expect(ctx.transport.billing).toHaveBeenCalledWith('org_a', expect.any(String))
+    expect(ctx.persistSelectedOrgId).toHaveBeenCalledWith('org_a')
+    expect(ctx.manager.status()).toMatchObject({
+      needsOrgChoice: false,
+      org: { id: 'org_a' },
+      entitlements: { orgId: 'org_a', planCode: 'starter' },
+    })
+  })
+
+  it('a remembered organization is used with no question', async () => {
+    const ctx = setup({ orgId: 'org_b' })
+    await signIn(ctx)
+    expect(ctx.manager.status()).toMatchObject({
+      needsOrgChoice: false,
+      rememberedGone: false,
+      org: { id: 'org_b' },
+      entitlements: { orgId: 'org_b', planCode: 'pro' },
+    })
+    // no re-persist: the stored choice was already correct
+    expect(ctx.persistSelectedOrgId).not.toHaveBeenCalled()
+  })
+
+  it('a single usable organization is picked automatically and remembered', async () => {
+    const ctx = setup()
+    ctx.transport.orgs.mockImplementation(async () => [
+      { id: 'org_a', name: 'Acme', slug: 'acme', role: 'owner', status: 'active' },
+      { id: 'org_s', name: 'Old', slug: 'old', role: 'member', status: 'suspended' },
+    ])
+    await signIn(ctx)
+    expect(ctx.manager.status()).toMatchObject({
+      needsOrgChoice: false,
+      org: { id: 'org_a' },
+      entitlements: { orgId: 'org_a' },
+    })
+    expect(ctx.persistSelectedOrgId).toHaveBeenCalledWith('org_a')
+  })
+
+  it('a remembered organization that is gone asks again with rememberedGone', async () => {
+    const ctx = setup({ orgId: 'org_gone' })
+    await signIn(ctx)
+    expect(ctx.manager.status()).toMatchObject({ needsOrgChoice: true, rememberedGone: true })
+    expect(ctx.manager.status().org).toBeUndefined()
+    expect(ctx.transport.billing).not.toHaveBeenCalled()
+  })
+
+  it('a suspended organization is not selectable and its row says so', async () => {
+    const ctx = setup()
+    await signIn(ctx)
+    const row = ctx.manager.status().orgs?.find((o) => o.id === 'org_s')
+    expect(row?.membership).toBe('organization_suspended')
+    await ctx.manager.selectOrg('org_s')
+    expect(ctx.manager.status().org).toBeUndefined()
+    expect(ctx.persistSelectedOrgId).not.toHaveBeenCalled()
+  })
+
+  it('a deactivated membership is refused and the row is marked', async () => {
+    const ctx = setup()
+    ctx.transport.orgMembership.mockImplementation(async (slug: string) =>
+      slug === 'acme' ? { role: 'owner', deactivatedAt: '2026-10-01T00:00:00Z' } : { role: 'member' },
+    )
+    await signIn(ctx)
+    await ctx.manager.selectOrg('org_a')
+    expect(ctx.manager.status().org).toBeUndefined()
+    expect(ctx.manager.status().needsOrgChoice).toBe(true)
+    expect(ctx.manager.status().orgs?.find((o) => o.id === 'org_a')?.membership).toBe(
+      'member_deactivated',
+    )
+    expect(ctx.persistSelectedOrgId).not.toHaveBeenCalled()
+    // another usable org still works
+    await ctx.manager.selectOrg('org_b')
+    expect(ctx.manager.status().org?.id).toBe('org_b')
+  })
+
+  it('every organization blocked leaves no picker (the lock panel handles it)', async () => {
+    const ctx = setup()
+    ctx.transport.orgs.mockImplementation(async () => [
+      { id: 'org_s', name: 'Old', slug: 'old', role: 'member', status: 'suspended' },
+    ])
+    await signIn(ctx)
+    expect(ctx.manager.status()).toMatchObject({ needsOrgChoice: false, rememberedGone: false })
+    expect(ctx.manager.status().org).toBeUndefined()
+    expect(ctx.manager.status().orgs?.every((o) => o.membership !== 'active')).toBe(true)
+  })
+})
+
 describe('logout', () => {
   it('revokes the device, then clears local credentials', async () => {
-    const ctx = setup()
+    const ctx = setup({ orgId: 'org_a' })
     await signIn(ctx)
     const status = await ctx.manager.logout()
     await vi.advanceTimersByTimeAsync(0)

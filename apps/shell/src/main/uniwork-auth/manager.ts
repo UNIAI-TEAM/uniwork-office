@@ -478,8 +478,8 @@ export class AccountManager extends SessionCore {
     this.rememberedGone = choice.rememberedGone
     this.org = choice.org
     if (choice.needsOrgChoice) {
-      // no org to load a plan for, and nothing org-scoped may run yet
-      this.setEntitlements(null, this.entitlements?.orgId ? this.entitlements : null)
+      // no org to load a plan for, and nothing org-scoped may run yet: the
+      // credential's display-only cached plan (if any) is left untouched
       this.setState('signed-in')
       return
     }
