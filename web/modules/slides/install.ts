@@ -28,6 +28,8 @@ export const bridge = audienceShow
   ? null
   : installModuleBridge({
       module: 'slides',
+      // no frame comments yet: the page panel serves Comments + Discussion until the in-frame comments land
+      frameComments: false,
       // the frame saves (api.save / api.saveAs), opens other decks (file.pick), lists recents, and
       // prints / exports PDF in the frame; no AI, no attachments upload
       frameCapabilities: {

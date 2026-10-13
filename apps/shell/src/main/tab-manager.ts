@@ -60,6 +60,7 @@ import {
 } from '../../../slides/src/main/slides-main'
 import type { DocumentTabKind, OpenDocumentTab, TabKind, TabSummary } from '../shared/tabs-api'
 import { TAB_STRIP_HEIGHT } from '../shared/tab-drag-geometry'
+import { clampDiscussionPanelWidth } from '@genoffice/electron-utils/comments-ipc'
 import { isAiRunning, type EditorState } from './ai-run-registry'
 import { isCloseTabChord } from './close-tab-chord'
 import { blankRetiredPage } from './retire-page'
@@ -100,6 +101,8 @@ export class TabManager {
   /** Last activated Office editor tab (Home/My AI stays active while user chats). */
   private lastOfficeId: string | null = null
   private nextId = 1
+  /** G8-11: the width the shell renderer draws the Discussion panel at (0 = closed) */
+  private discussionPanelWidth = 0
   /** tab whose page entered HTML fullscreen (e.g. slides slideshow) — its view covers the tab strip */
   private htmlFullScreenId: string | null = null
   /** webContents ids whose view must cover the tab strip without HTML fullscreen
@@ -189,16 +192,41 @@ export class TabManager {
     return this.untitledTitleFor?.(kind) ?? fallback
   }
 
-  private contentBounds(): Rectangle {
+  /** bounds for the view of tab `forId` (default: the active tab). activateTab
+   *  asks for the tab it is about to show, so the full-bleed / panel rule is
+   *  judged on the tab being shown, not on the one being left (W11A-3). */
+  private contentBounds(forId: string | null = this.activeId): Rectangle {
     const { width, height } = this.shellWindow.getContentBounds()
-    if (this.htmlFullScreenId !== null && this.htmlFullScreenId === this.activeId) {
+    if (this.htmlFullScreenId !== null && this.htmlFullScreenId === forId) {
       return { x: 0, y: 0, width, height }
     }
-    const active = this.tabs.find((t) => t.id === this.activeId)
+    const active = this.tabs.find((t) => t.id === forId)
     if (active?.view && this.bleedWcIds.has(active.view.webContents.id)) {
       return { x: 0, y: 0, width, height }
     }
-    return { x: 0, y: TAB_STRIP_HEIGHT, width, height: Math.max(0, height - TAB_STRIP_HEIGHT) }
+    // the Discussion panel is drawn by the shell renderer at the right edge,
+    // under no view: the active editor view gives up the clamped panel width
+    const panel = this.discussionPanelWidth
+      ? clampDiscussionPanelWidth(this.discussionPanelWidth, width)
+      : 0
+    return {
+      x: 0,
+      y: TAB_STRIP_HEIGHT,
+      width: Math.max(0, width - panel),
+      height: Math.max(0, height - TAB_STRIP_HEIGHT),
+    }
+  }
+
+  /**
+   * G8-11 (D1): open / close the shell's Discussion panel. The active view is
+   * narrowed now; tab switches and window resizes re-apply it through
+   * contentBounds(); closing restores the full width. A non-finite width
+   * narrows nothing.
+   */
+  setDiscussionPanel(panel: { open: boolean; width: number }): void {
+    this.discussionPanelWidth =
+      panel.open && Number.isFinite(panel.width) ? Math.max(0, panel.width) : 0
+    this.layout()
   }
 
   /** Grow/restore a tab view over the tab strip on request (slides show fullscreen) */
@@ -631,7 +659,7 @@ export class TabManager {
     const target = this.tabs.find((t) => t.id === id)
     if (!target) return
     for (const t of this.tabs) t.view?.setVisible(t.id === id)
-    if (target.view) target.view.setBounds(this.contentBounds())
+    if (target.view) target.view.setBounds(this.contentBounds(id))
     this.activeId = id
     if (this.isOfficeTab(target)) this.lastOfficeId = id
     if (target.kind === 'sheets') this.scheduleSpareSheetsView(3000)

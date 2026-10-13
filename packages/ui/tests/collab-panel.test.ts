@@ -312,6 +312,26 @@ describe('focus', () => {
     expect(document.activeElement).toBe($('[data-thread-id="b"] [data-thread-heading]'))
   })
 
+  it('reveal scrolls the whole thread into view (centered), not only its header edge', async () => {
+    const scroll = vi.fn()
+    Element.prototype.scrollIntoView = scroll
+    try {
+      const src = fakeSource(
+        list([cm({ id: 'a', anchor: docx(1) }), cm({ id: 'b', anchor: docx(2) })]),
+      )
+      await mount(src, host(), { adapter: ad() })
+      scroll.mockClear()
+      await act(async () => {
+        await ctl.reveal('b')
+        await flush()
+      })
+      expect(scroll).toHaveBeenCalledWith({ block: 'center' })
+      expect(scroll).not.toHaveBeenCalledWith({ block: 'nearest' })
+    } finally {
+      delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView
+    }
+  })
+
   it('reveal of a missing comment focuses the notice line', async () => {
     const src = fakeSource(list([cm({ id: 'a' })]))
     await mount(src)

@@ -272,3 +272,135 @@ export function parseMentionsSearchInput(payload: unknown): MentionsSearchInput 
   if (limit !== undefined && (typeof limit !== 'number' || !Number.isInteger(limit))) return null
   return { path, q, ...(limit !== undefined ? { limit } : {}) }
 }
+
+/**
+ * G8-11 (UNI-1406): the shell's Discussion panel bridge. The panel lives in the
+ * shell renderer (one panel for every editor), so it gets its own channels:
+ * main accepts them only from the shell webContents of a window, only for a
+ * path that is an open tab of that window AND bound, and forces
+ * `kind: 'discussion'` on list/create. The editor preloads never see these.
+ */
+export const DISCUSSION_CHANNELS = {
+  list: 'uniwork:discussion:list',
+  create: 'uniwork:discussion:create',
+  update: 'uniwork:discussion:update',
+  remove: 'uniwork:discussion:delete',
+  resolve: 'uniwork:discussion:resolve',
+  reopen: 'uniwork:discussion:reopen',
+  revisions: 'uniwork:discussion:revisions',
+  searchMentions: 'uniwork:discussion:search-mentions',
+  /** main -> shell renderer: a launch ticket named a comment of `path` */
+  reveal: 'uniwork:discussion:reveal',
+  /**
+   * shell -> main (invoke `{ path }`): arm the shell listener for `path` and
+   * pull the reveal held for it; answers the held payload or null
+   */
+  revealPending: 'uniwork:discussion:reveal:pending',
+  /** shell -> main (send `{ path }`): the listener for `path` is gone */
+  revealRelease: 'uniwork:discussion:reveal:release',
+  /** shell -> main (send `{ open, width }`): narrow / restore the active editor view */
+  panel: 'uniwork:discussion:panel',
+} as const
+
+/** the global the shell preload exposes the discussion bridge under */
+export const DISCUSSION_BRIDGE_KEY = 'uniworkDiscussion'
+
+export interface DiscussionListInput extends CommentsDocRef {
+  sinceToken?: string
+}
+
+/** a discussion post or reply: never an anchor, never a base version */
+export interface DiscussionCreateInput extends CommentsDocRef {
+  parentId?: string
+  body: string
+}
+
+export interface DiscussionPanelInput {
+  open: boolean
+  /** the width (CSS px) the shell draws the panel at */
+  width: number
+}
+
+/**
+ * `window.uniworkDiscussion` (shell preload only). Every call resolves to the
+ * `CommentsReply` envelope, like `UniworkCommentsApi`.
+ */
+export interface UniworkDiscussionApi {
+  list(input: DiscussionListInput): Promise<CommentsReply<CommentsListResult>>
+  create(input: DiscussionCreateInput): Promise<CommentsReply<CommentResult>>
+  update(input: CommentsUpdateInput): Promise<CommentsReply<CommentResult>>
+  remove(input: CommentsIdInput): Promise<CommentsReply<CommentsDeleteResult>>
+  resolve(input: CommentsIdInput): Promise<CommentsReply<CommentResult>>
+  reopen(input: CommentsIdInput): Promise<CommentsReply<CommentResult>>
+  revisions(input: CommentsIdInput): Promise<CommentsReply<CommentsRevisionsResult>>
+  searchMentions(input: MentionsSearchInput): Promise<CommentsReply<MentionsSearchResult>>
+  /**
+   * Reveals of `path` (the comment id). Subscribing arms main's push for that
+   * path and pulls the reveal main held for it (delivered once); returns the
+   * unsubscribe, which disarms the push again.
+   */
+  onReveal(path: string, handler: (commentId: string) => void): () => void
+  /** main narrows the active editor view by the (clamped) panel width */
+  setPanel(input: DiscussionPanelInput): void
+}
+
+/** `comments.list` for the Discussion panel: the kind is forced, never read */
+export function parseDiscussionListInput(payload: unknown): CommentsListInput | null {
+  if (!isRecord(payload)) return null
+  const path = readCommentsPath(payload)
+  if (!path) return null
+  const { kind, sinceToken } = payload
+  if (kind !== undefined && kind !== 'discussion') return null
+  if (sinceToken !== undefined && (typeof sinceToken !== 'string' || sinceToken.length > 512)) {
+    return null
+  }
+  return { path, kind: 'discussion', ...(sinceToken !== undefined ? { sinceToken } : {}) }
+}
+
+/**
+ * `comments.create` for the Discussion panel: kind forced to 'discussion'; an
+ * anchor, a base version or another kind is refused (OQ-C2: a discussion post
+ * has no anchor)
+ */
+export function parseDiscussionCreateInput(payload: unknown): CommentsCreateInput | null {
+  if (!isRecord(payload)) return null
+  const path = readCommentsPath(payload)
+  if (!path) return null
+  const { kind, parentId, body, anchor, baseVersionId } = payload
+  if (kind !== undefined && kind !== 'discussion') return null
+  if (anchor !== undefined || baseVersionId !== undefined) return null
+  if (typeof body !== 'string' || body.length === 0) return null
+  if (parentId !== undefined && !isId(parentId)) return null
+  return { path, kind: 'discussion', body, ...(parentId !== undefined ? { parentId } : {}) }
+}
+
+/** the `{ path }` of a reveal pull / release, or null when malformed */
+export function parseDiscussionRevealRequest(payload: unknown): { path: string } | null {
+  const path = readCommentsPath(payload)
+  return path ? { path } : null
+}
+
+export function parseDiscussionPanelInput(payload: unknown): DiscussionPanelInput | null {
+  if (!isRecord(payload)) return null
+  const { open, width } = payload
+  if (typeof open !== 'boolean') return null
+  if (typeof width !== 'number' || !Number.isFinite(width)) return null
+  return { open, width }
+}
+
+/** the panel never goes narrower / wider than this, and leaves the editor this much */
+export const DISCUSSION_PANEL_LIMITS = { min: 280, max: 560, editorMin: 360 } as const
+
+/**
+ * The width main takes off the active editor view for an open panel: the
+ * request clamped to [min, max], then capped so the editor keeps `editorMin`
+ * (a narrow window shrinks the panel below `min`; 0 when even the editor does
+ * not fit). The shell draws the panel at the same
+ * width, so both sides use this one function.
+ */
+export function clampDiscussionPanelWidth(requested: number, contentWidth: number): number {
+  if (!Number.isFinite(requested) || !Number.isFinite(contentWidth)) return 0
+  const { min, max, editorMin } = DISCUSSION_PANEL_LIMITS
+  const wanted = Math.round(Math.min(max, Math.max(min, requested)))
+  return Math.max(0, Math.min(wanted, Math.floor(contentWidth) - editorMin))
+}

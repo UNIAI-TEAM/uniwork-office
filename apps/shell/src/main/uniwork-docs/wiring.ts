@@ -24,7 +24,11 @@ import {
   uniworkSessionIdentity,
 } from '../uniwork-auth'
 import { AccountBoundary } from './account-boundary'
-import { createUniworkComments, type UniworkCommentsHandle } from './comments-wiring'
+import {
+  createUniworkComments,
+  type DiscussionPushTarget,
+  type UniworkCommentsHandle,
+} from './comments-wiring'
 import type { CommentsRevealPayload } from '@genoffice/electron-utils/comments-ipc'
 import { setUniworkCloseGuard } from './close-guard'
 import { INTENT_STORE_REGISTRATION } from '../uniwork-sync/intent-store'
@@ -82,6 +86,15 @@ export interface UniworkDocsWiring {
    * pulled for exactly that path; undefined when nothing shows one.
    */
   commentsPathFor?(sender: { id: number }): string | undefined
+  /**
+   * G8-11: the file paths open as tabs of the window whose shell webContents
+   * is `sender`; null for any other sender (the discussion bridge is refused).
+   */
+  discussionTabPaths?(sender: { id: number }): readonly string[] | null
+  /** G8-11: the shell webContents that has `path` open as a tab, for the reveal push */
+  discussionTarget?(path: string): DiscussionPushTarget | null
+  /** G8-11: narrow / restore the active editor view of the sender's window */
+  setDiscussionPanel?(sender: { id: number }, panel: { open: boolean; width: number }): void
   lang(): string
   defaultSaveDir(): string
   /** every file path a tab or detached editor window shows */
@@ -533,6 +546,16 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     },
     // R1-2: the sender's own path scopes the pending-reveal pull
     shownPath: (sender) => wiring.commentsPathFor?.(sender) ?? null,
+    // G8-11: the shell Discussion panel's bridge, served only for the shell
+    // webContents and the open tabs of its window
+    ...(wiring.discussionTabPaths
+      ? {
+          shellTabPaths: (sender: { id: number }) => wiring.discussionTabPaths?.(sender) ?? null,
+          shellTarget: (path: string) => wiring.discussionTarget?.(path) ?? null,
+          setDiscussionPanel: (sender: { id: number }, panel: { open: boolean; width: number }) =>
+            wiring.setDiscussionPanel?.(sender, panel),
+        }
+      : {}),
   })
 
   ipcMain.handle(UNIWORK_DOC_CHANNELS.listWorkspaces, () => service.listWorkspaces())
