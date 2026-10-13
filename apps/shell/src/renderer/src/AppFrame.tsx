@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { DiscussionPanel } from './DiscussionPanel'
 import { Home } from './Home'
 import { Onboarding } from './Onboarding'
 import { TabBar } from './TabBar'
@@ -49,6 +50,8 @@ export function AppFrame({ initialOnboardingSeen }: AppFrameProps) {
           </WorkbenchAccountGate>
         </UniworkLockHost>
       </div>
+      {/* S13: main narrows the active editor view by this width, so the panel draws in the strip it frees */}
+      <DiscussionPanel />
       {/* editor WebContentsViews paint above ALL shell DOM, so the overlay only
        * renders while the home tab is active — it comes back when home does */}
       {showOnboarding && homeActive && <Onboarding onDone={finishOnboarding} />}

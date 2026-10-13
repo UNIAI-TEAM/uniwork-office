@@ -5,6 +5,7 @@ import { TEAR_OFF_SLACK, insertionIndexForX, isBeyondBand } from '../../shared/t
 import { notifyFilesChanged } from './file-events'
 import { useI18n } from './locale'
 import {
+  DiscussionToggle,
   UniworkNotice,
   UniworkStatusChip,
   UniworkTabMarker,
@@ -605,6 +606,7 @@ export function TabBar() {
       </div>
       <div className="uw-chrome">
         <UniworkNotice />
+        {activeStatus && <DiscussionToggle status={activeStatus} />}
         {activeStatus && (
           // one chip per document: a Resolve still running stays with its own tab
           <UniworkStatusChip
