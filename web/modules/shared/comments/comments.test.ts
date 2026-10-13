@@ -169,7 +169,13 @@ describe('createFrameCommentsApi: the desktop shape over the frame protocol', ()
     const api = createFrameCommentsApi(p.port, { version })
     expect(await api.context({ path: '' })).toEqual({
       ok: true,
-      value: { documentId: 'doc-1', versionId: file.versionId, level: 'manage', myUserId: ME },
+      value: {
+        documentId: 'doc-1',
+        versionId: file.versionId,
+        level: 'manage',
+        myUserId: ME,
+        frame: true,
+      },
     })
     const heard: unknown[] = []
     const off = api.onSaved((s) => heard.push(s))
@@ -194,7 +200,7 @@ describe('createFrameCommentsApi: the desktop shape over the frame protocol', ()
     const api = createFrameCommentsApi(p.port, { version: createFrameDocVersion() })
     const reply = (await api.context({ path: '' })) as { ok: true; value: object }
     expect(reply.value).not.toHaveProperty('level')
-    expect(reply.value).toMatchObject({ documentId: 'doc-1', myUserId: ME })
+    expect(reply.value).toMatchObject({ documentId: 'doc-1', myUserId: ME, frame: true })
   })
 })
 
