@@ -467,6 +467,53 @@ describe('protocol errors cross the IPC boundary as data (R1-1)', () => {
   })
 })
 
+/** The shared body fixture (contract §3; copy of web/docs/protocol/test/comments.test.ts): a mention token + every Markdown-subset part. */
+const BODY_FIXTURE =
+  'Xem lại [@Nguyễn \\[An\\]](mention://member/01J8X4USR0AAAAAAAAAAAAAAAA) giúp nhé:\n' +
+  '**đậm**, *nghiêng*, `code [@x](mention://member/01J8X4USR0BBBBBBBBBBBBBBBB)`,\n' +
+  '[liên kết](https://example.com/a?b=1&c=2)  \nxuống dòng — <b>không HTML</b> ✓'
+
+describe('the shared body fixture round-trips over the desktop IPC (card T1)', () => {
+  type Reply<T> = { ok: true; value: T }
+
+  it('create then list returns the body byte-identical; an update stays byte-identical too', async () => {
+    const server = createFakeCommentServer()
+    const { handlers } = mount({ server })
+
+    const created = (await handlers.get(COMMENTS_CHANNELS.create)!(
+      {},
+      { path: PATH, kind: 'discussion', body: BODY_FIXTURE },
+    )) as Reply<{ comment: { id: string; body: string } }>
+    expect(created.ok).toBe(true)
+    expect(created.value.comment.body).toBe(BODY_FIXTURE)
+    // what reached the server is the very same string
+    expect(server.lastCall()?.body).toEqual({ kind: 'discussion', body: BODY_FIXTURE })
+
+    const listed = (await handlers.get(COMMENTS_CHANNELS.list)!({}, { path: PATH })) as Reply<{
+      comments: Array<{ id: string; body: string }>
+    }>
+    expect(listed.ok).toBe(true)
+    const found = listed.value.comments.find((c) => c.id === created.value.comment.id)
+    expect(found?.body).toBe(BODY_FIXTURE)
+
+    const edited = `${BODY_FIXTURE}\n**sửa** [@Nguyễn \\[An\\]](mention://member/01J8X4USR0AAAAAAAAAAAAAAAA)`
+    const updated = (await handlers.get(COMMENTS_CHANNELS.update)!(
+      {},
+      { path: PATH, commentId: created.value.comment.id, body: edited },
+    )) as Reply<{ comment: { body: string } }>
+    expect(updated.ok).toBe(true)
+    expect(updated.value.comment.body).toBe(edited)
+    expect(server.lastCall()?.body).toEqual({ body: edited })
+
+    const relisted = (await handlers.get(COMMENTS_CHANNELS.list)!({}, { path: PATH })) as Reply<{
+      comments: Array<{ id: string; body: string }>
+    }>
+    expect(relisted.value.comments.find((c) => c.id === created.value.comment.id)?.body).toBe(
+      edited,
+    )
+  })
+})
+
 describe('the launch reveal is held until the editor subscribes (R1-2)', () => {
   const pull = (handlers: Map<string, Handler>, senderId: number) =>
     handlers.get(COMMENTS_CHANNELS.revealPending)!({ sender: { id: senderId } }, undefined)

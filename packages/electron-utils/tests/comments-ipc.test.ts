@@ -260,4 +260,75 @@ describe('the comments reload scheduler (contract §4.7)', () => {
     poll.setPanelOpen(false)
     expect(poll.active()).toBe(false)
   })
+
+  it('reload() while active lists at once with since_token = the last list_token (focus / comments.changed)', async () => {
+    const { poll, fetch, onChanged } = harness()
+    fetch
+      .mockResolvedValueOnce({ unchanged: false, listToken: 'lt1:1' })
+      .mockResolvedValueOnce({ unchanged: false, listToken: 'lt1:2' })
+      .mockResolvedValueOnce({ unchanged: true, listToken: 'lt1:2' })
+    poll.setPanelOpen(true)
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(fetch).toHaveBeenCalledTimes(1)
+    // a focus / comments.changed reload lists immediately, no timer tick needed
+    poll.reload()
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(fetch).toHaveBeenCalledTimes(2)
+    expect(fetch).toHaveBeenNthCalledWith(2, { sinceToken: 'lt1:1' })
+    expect(onChanged).toHaveBeenLastCalledWith('lt1:2')
+    // and the next reload carries the token the previous one returned
+    poll.reload()
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(fetch).toHaveBeenNthCalledWith(3, { sinceToken: 'lt1:2' })
+  })
+
+  it('reload() restarts the 30 s timer so a focus reload is not doubled by a near tick', async () => {
+    const { poll, timers } = harness()
+    poll.setPanelOpen(true)
+    await Promise.resolve()
+    await Promise.resolve()
+    const before = timers.length
+    poll.reload()
+    expect(timers.length).toBe(before + 1)
+    expect(timers[timers.length - 1]?.ms).toBe(COMMENTS_POLL_INTERVAL_MS)
+  })
+
+  it('reload() does nothing while the panel is closed', async () => {
+    const { poll, fetch, timers } = harness()
+    poll.reload() // panel closed from the start
+    await Promise.resolve()
+    expect(fetch).not.toHaveBeenCalled()
+    expect(timers).toHaveLength(0)
+    poll.setPanelOpen(true)
+    await Promise.resolve()
+    await Promise.resolve()
+    poll.setPanelOpen(false)
+    fetch.mockClear()
+    poll.reload() // closed again
+    await Promise.resolve()
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('reload() does nothing while the tab is hidden', async () => {
+    const { poll, fetch, timers } = harness()
+    poll.setPanelOpen(true)
+    await Promise.resolve()
+    await Promise.resolve()
+    poll.setVisible(false)
+    fetch.mockClear()
+    const timersBefore = timers.length
+    poll.reload()
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(fetch).not.toHaveBeenCalled()
+    expect(timers.length).toBe(timersBefore)
+    // focus back: the visibility change itself lists once, with the kept token
+    poll.setVisible(true)
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(fetch).toHaveBeenCalledWith({ sinceToken: 'lt1:1' })
+  })
 })
