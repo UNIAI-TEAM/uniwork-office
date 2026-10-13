@@ -61,6 +61,7 @@ import {
 import { installAiRunBridge } from '@genoffice/electron-utils/ai-run-bridge'
 import { installUniworkCommentsBridge } from '@genoffice/electron-utils/comments-bridge'
 import { installDropOpenBridge } from '@genoffice/electron-utils/drop-open'
+import { parseWorksheetComment } from './worksheet-comments'
 
 const desktopApi: DesktopApi = {
   getLanguage: () => ipcRenderer.invoke('app:get-language'),
@@ -969,23 +970,8 @@ function parseWorkbookFile(input: unknown): WorkbookFile {
           : { headerBottomBorderStyle: table.headerBottomBorderStyle }),
       }
     })
-    const comments = sheet.comments.map((comment) => {
-      if (
-        !isRecord(comment) ||
-        !isNonnegativeInteger(comment.row) ||
-        !isNonnegativeInteger(comment.column) ||
-        typeof comment.author !== 'string' ||
-        typeof comment.text !== 'string'
-      ) {
-        throw new Error('Invalid worksheet comment.')
-      }
-      return {
-        row: comment.row,
-        column: comment.column,
-        author: comment.author,
-        text: comment.text,
-      }
-    })
+    // G8-13 (F2): the threaded-comment identity rides along, or a reopen shows threads as notes
+    const comments = sheet.comments.map(parseWorksheetComment)
     const columnWidths = sheet.columnWidths.map((columnWidth) => {
       if (
         !isRecord(columnWidth) ||
