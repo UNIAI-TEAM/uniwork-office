@@ -42,14 +42,20 @@ html.uw-disc-on #root {
 
 .uw-disc-toggle {
   box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 6px;
   min-width: 24px;
-  min-height: 28px;
-  padding: 0 10px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-6, 6px);
-  background: transparent;
-  color: var(--text);
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--text-secondary);
   font: inherit;
+  line-height: 1.4;
+  white-space: nowrap;
   cursor: pointer;
 }
 
@@ -57,10 +63,12 @@ html.uw-disc-on #root {
   background: var(--hover);
 }
 
+/* same open look as the shell toggle; --text on --accent-soft is >= 8.4:1 in every app and theme
+   (--accent on it is 4.18:1 in markdown dark) */
 .uw-disc-toggle[aria-expanded='true'] {
-  border-color: var(--border);
-  background: var(--accent-soft, var(--active-bg));
-  color: var(--accent, var(--text));
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text);
 }
 
 .uw-disc-toggle:focus-visible {
@@ -70,7 +78,7 @@ html.uw-disc-on #root {
 
 @media (pointer: coarse) {
   .uw-disc-toggle {
-    min-height: 44px;
+    height: 44px;
   }
   html.uw-disc-on {
     --uw-disc-bar-h: 52px;
@@ -79,7 +87,7 @@ html.uw-disc-on #root {
 
 .uw-disc {
   position: fixed;
-  z-index: 40;
+  z-index: 1000;
   top: var(--uw-disc-bar-h);
   bottom: 0;
   inset-inline-end: 0;
@@ -95,5 +103,15 @@ html.uw-disc-on #root {
 @media (min-width: 640px) {
   html.uw-disc-open #root {
     margin-inline-end: var(--uw-disc-w);
+  }
+}
+
+/* the panel covers the editor: lift it above every editor toolbar or overlay by giving the editor
+   its own stacking context (its z-indexes stay inside it); mount.tsx also makes it inert */
+@media (max-width: 639.98px) {
+  html.uw-disc-open #root {
+    position: relative;
+    z-index: 0;
+    isolation: isolate;
   }
 }

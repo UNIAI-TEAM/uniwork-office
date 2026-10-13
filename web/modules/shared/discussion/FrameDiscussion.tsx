@@ -86,11 +86,10 @@ export function FrameDiscussion(p: FrameDiscussionProps) {
     onOpenChangeRef.current?.(open)
   }, [open])
 
-  // Esc closes the panel unless something inside handled it (composer cancel, picker, dialog)
+  // Same rule as the desktop shell panel: the kit consumes Esc for its picker, composer, menus and
+  // dialogs (defaultPrevented); what is left closes the panel and focus returns to the toggle
   const onKeyDown = (e: KeyboardEvent) => {
     if (e.key !== 'Escape' || e.defaultPrevented) return
-    const t = e.target as HTMLElement | null
-    if (t?.closest('textarea, [role="dialog"], [role="listbox"]')) return
     e.preventDefault()
     close()
   }
@@ -107,7 +106,15 @@ export function FrameDiscussion(p: FrameDiscussionProps) {
           aria-controls={panelId}
           onClick={() => (open ? close() : setOpen(true))}
         >
-          {strings.collabDiscussion}
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path
+              d="M4 5.5A1.5 1.5 0 0 1 5.5 4h13A1.5 1.5 0 0 1 20 5.5v9a1.5 1.5 0 0 1-1.5 1.5H10l-4.5 4v-4h0A1.5 1.5 0 0 1 4 14.5z"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinejoin="round"
+            />
+          </svg>
+          <span className="uw-disc-toggle-label">{strings.collabDiscussion}</span>
         </button>
       </div>
       <div id={panelId} className="uw-disc" hidden={!open} onKeyDown={onKeyDown}>
