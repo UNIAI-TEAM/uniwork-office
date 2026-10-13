@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { COMMENTS_CHANNELS } from '@genoffice/electron-utils/comments-ipc'
 import {
   UNIWORK_DOC_CHANNELS,
+  type AccountStatus,
   type UniworkConflictChoice,
   type UniworkDocFormat,
   type UniworkDocListQuery,
@@ -297,6 +298,18 @@ export interface SyncRuntimeSeam {
 }
 
 /**
+ * G8-16 S16: the one organization the change-feed may touch - the chosen org
+ * of the signed-in account, and only once the choice is made. Null while the
+ * picker is up (or no org is chosen), so no capability, workspace or feed call
+ * can run for a non-selected org or before the choice. Read on every pass, so
+ * a pass that outlives its choice makes no call either.
+ */
+export function feedOrgId(status: AccountStatus): string | null {
+  if (status.state !== 'signed-in' || status.needsOrgChoice) return null
+  return status.org?.id ?? null
+}
+
+/**
  * The change-feed runtime of the shell: one FeedConsumer per (org, workspace)
  * of the signed-in account, over the shared durable store, started on sign-in
  * and re-run on a 60 s poll. There is no desktop realtime channel today, so
@@ -353,10 +366,13 @@ export function createSyncRuntime(
     return docs && feed ? { docs, feed, capability } : null
   }
   const targets: SyncRuntimeTargets = {
-    orgs: () =>
-      uniworkAccount()
-        .status()
-        .orgs?.map((org) => org.id) ?? [],
+    // G8-16 S16: the chosen org of the live session only. The feed never
+    // touches another org of the account, a non-active one, or anything at
+    // all while the picker is up (this is read on every pass).
+    orgs: () => {
+      const orgId = feedOrgId(uniworkAccount().status())
+      return orgId ? [orgId] : []
+    },
     workspaces: async (orgId) => {
       const found = clients()
       if (!found) return []
@@ -540,6 +556,8 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     comments,
     activate(startLaunch) {
       let signedIn = uniworkAccount().status().state === 'signed-in'
+      /** the org the feed currently runs for; null = no pass may run */
+      let feedOrg: string | null = null
       onUniworkAccountStatus((status) => {
         // the session's account may have changed: it becomes the last owner
         service.noteSessionIdentity()
@@ -550,10 +568,15 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
         const now = status.state === 'signed-in'
         if (now && !signedIn) void service.launch.onSignedIn()
         signedIn = now
-        // the feed runs only for a live session: start on sign-in (one pass
-        // plus the 60 s poll), stop on sign-out, a lock or a switch
-        if (now && identity) runtime.start()
-        else runtime.stop()
+        // the feed runs only for the chosen org of a live session: while the
+        // picker is up nothing starts, and the choice's own status push starts
+        // it for that org (one pass plus the 60 s poll). Sign-out, a lock, an
+        // account switch or an org change stops the pass it replaces.
+        const target = identity ? feedOrgId(status) : null
+        if (target === feedOrg) return
+        runtime.stop()
+        feedOrg = target
+        if (target) runtime.start()
       })
       startLaunch((url) => void service.launch.handleUrl(url))
     },
