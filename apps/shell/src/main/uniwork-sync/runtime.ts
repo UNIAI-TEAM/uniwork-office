@@ -216,12 +216,15 @@ export interface SyncRuntimeOptions {
   onSessionExpired?(): void
   /**
    * Runs after every pass (sign-in and each interval tick), for the durable
-   * save queue the same poll drives: `online` is the pass's connectivity
-   * (false when a capability or feed round trip failed, true when the pass
-   * reached the server). It dispatches the pending intents and advances their
+   * save queue the same poll drives. `online` is the pass's connectivity
+   * verdict: `false` only when a capability or feed round trip actually failed
+   * (a network/timeout error or a consumer backoff), `true` when a request
+   * reached the server, and `undefined` when the pass simply had nothing to do
+   * (no chosen org, no scope) - a no-op is neither, so it must not park the
+   * queue (G506-be-3). It dispatches the pending intents and advances their
    * reconciling clocks. Awaited, so a slow dispatch cannot overlap the next pass.
    */
-  onPoll?(online: boolean): Promise<void>
+  onPoll?(online: boolean | undefined): Promise<void>
   intervalMs?: number
   /** test seam: schedule `run` on the interval, return the cancel */
   schedule?(run: () => void): () => void
@@ -302,20 +305,24 @@ export class SyncRuntime {
     const client = this.options.client()
     if (!scope || !client) {
       if (current()) this.running.clear()
-      // no session to reach the server: the queue's intents wait where they are
-      await this.options.onPoll?.(false)
+      // no session to reach the server: nothing was attempted, so there is no
+      // connectivity verdict to report (G506-be-3)
+      await this.options.onPoll?.(undefined)
       return
     }
     const open = await this.options.store.open()
     if (!current()) return
     if (open.kind !== 'ok') {
-      // no feed without the store: a cursor cannot move without its record
+      // no feed without the store: a cursor cannot move without its record.
+      // Nothing was attempted, so there is no verdict either (G506-be-3)
       this.running.clear()
-      await this.options.onPoll?.(false)
+      await this.options.onPoll?.(undefined)
       return
     }
-    /** whether this pass reached the server at least once (capability or feed) */
-    let reachedServer = false
+    /** whether any capability or feed round trip was attempted at all */
+    let attempted = false
+    /** whether an attempted capability or feed round trip failed (network/timeout) */
+    let transportFailed = false
 
     const wanted = new Set<string>()
     let sessionExpired = false
@@ -323,7 +330,7 @@ export class SyncRuntime {
       if (!current()) return
       const capability = await this.options.capability(orgId)
       if (!current()) return
-      reachedServer = true
+      attempted = true
       if (capability.kind === 'session_expired') sessionExpired = true
       this.capabilities.set(orgId, capability.capabilities)
       if (!capability.capabilities.sync_feed) continue
@@ -343,6 +350,8 @@ export class SyncRuntime {
         const result = await consumer.sync()
         if (!current()) return
         if (result.kind === 'session_expired') sessionExpired = true
+        // a failed or backed-off feed round trip is a real transport failure
+        if (result.kind === 'failed' || result.kind === 'backoff') transportFailed = true
       }
     }
     if (!current()) return
@@ -350,7 +359,10 @@ export class SyncRuntime {
       if (!wanted.has(key)) this.running.delete(key)
     }
     if (sessionExpired) this.options.onSessionExpired?.()
-    await this.options.onPoll?.(reachedServer)
+    // a real failed round trip marks the queue offline, a reached one marks it
+    // online, and a pass with nothing to do (no chosen org) reports neither
+    // (G506-be-3)
+    await this.options.onPoll?.(attempted ? !transportFailed : undefined)
   }
 
   private consumerFor(

@@ -418,7 +418,10 @@ export function createSyncRuntime(
     // and mirror the pass's connectivity onto the queue's waiting intents (a
     // failed round trip parks them, a working one wakes them)
     onPoll: async (online) => {
-      await service.setQueueOnline?.(online)
+      // `undefined` = the pass had nothing to do (no chosen org, no scope): no
+      // verdict to apply, so the queue's intents are left where they are
+      // (G506-be-3). A real failed round trip parks them, a reached one wakes them
+      if (online !== undefined) await service.setQueueOnline?.(online)
       await service.pollSaveQueue?.()
     },
     onSessionExpired: () => {

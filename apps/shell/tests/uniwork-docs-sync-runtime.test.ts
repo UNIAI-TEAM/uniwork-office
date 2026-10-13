@@ -107,6 +107,28 @@ async function runtimeWith() {
   return createSyncRuntime(service, { fetch: fakeFetch, now: () => 1_000_000 })
 }
 
+/**
+ * A service stub whose queued intent is parked by `setQueueOnline(false)` and
+ * dispatched by the poll (G506-be-3): the feed pass's connectivity verdict
+ * decides whether the queued save moves.
+ */
+async function queueRuntime() {
+  const { createSyncRuntime } = await import('../src/main/uniwork-docs/wiring')
+  const state = { parked: false, dispatched: 0, verdicts: [] as boolean[] }
+  const service = {
+    hasLocalDraft: async () => false,
+    setQueueOnline: async (value: boolean) => {
+      state.verdicts.push(value)
+      state.parked = !value
+    },
+    pollSaveQueue: async () => {
+      if (!state.parked) state.dispatched += 1
+    },
+  } as unknown as UniworkDocsService
+  const runtime = createSyncRuntime(service, { fetch: fakeFetch, now: () => 1_000_000 })
+  return { runtime, state }
+}
+
 describe('the feed runtime capability cache across an account boundary (R1-be-8)', () => {
   it('clears on a same-origin account switch instead of serving the old account’s flags', async () => {
     chosen('org_a')
@@ -213,4 +235,19 @@ describe('G8-16 S16: the feed makes no org-scoped call before the choice (F-1)',
     await runtime.tick()
     expect(fetched).toEqual([])
   })
+})
+
+describe('G506-be-3: the queue online verdict is a real transport result, not a feed no-op', () => {
+  it('no chosen org + a queued intent -> the poll dispatches it', async () => {
+    // signed in, the picker is up: no org is chosen, so the feed has nothing to
+    // do. That is NOT a failed round trip, so the queued save must not be parked
+    // and the poll must dispatch it
+    const { runtime, state } = await queueRuntime()
+    await runtime.tick()
+    expect(fetched).toEqual([])
+    expect(state.verdicts).toEqual([])
+    expect(state.parked).toBe(false)
+    expect(state.dispatched).toBe(1)
+  })
+
 })
