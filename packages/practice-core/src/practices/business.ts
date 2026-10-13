@@ -13,7 +13,13 @@ interface BusinessPracticeInput {
   workVi: string
   workEn: string
   categories: readonly string[]
-  skillHints: readonly { id: string; labelVi: string; labelEn: string; descVi: string; descEn: string }[]
+  skillHints: readonly {
+    id: string
+    labelVi: string
+    labelEn: string
+    descVi: string
+    descEn: string
+  }[]
 }
 
 function skill(

@@ -81,7 +81,13 @@ export function workErrorOfDocCode(code: UniworkDocErrorCode): UniworkWorkError 
 
 /** Server catalogue key. The built-in keys are listed. The server may send others. */
 export type WorkTaskStatusKey =
-  | 'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done' | 'blocked' | 'cancelled'
+  | 'backlog'
+  | 'todo'
+  | 'in_progress'
+  | 'in_review'
+  | 'done'
+  | 'blocked'
+  | 'cancelled'
   | (string & {})
 
 export interface WorkTask {
@@ -179,8 +185,7 @@ export interface WorkPerson {
 
 /** Overview "Tài liệu gần đây": cloud rows from aiOffice.uniworkListDocuments, plus local recents labelled "trên máy". */
 export type WorkRecentDocument =
-  | { source: 'uniwork'; doc: UniworkDocSummary }
-  | { source: 'local'; entry: RecentEntry }
+  { source: 'uniwork'; doc: UniworkDocSummary } | { source: 'local'; entry: RecentEntry }
 
 export interface WorkCreateTaskInput {
   workspaceId: string
@@ -215,7 +220,11 @@ export interface UniworkWorkApi {
   /** status = catalogue KEY (e.g. 'done' / 'todo'), not a status id */
   setTaskStatus(taskId: string, status: string): Promise<UniworkWorkResult<WorkTask>>
   createTask(input: WorkCreateTaskInput): Promise<UniworkWorkResult<WorkTask>>
-  calendarEvents(input: { workspaceId: string; from: string; to: string }): Promise<UniworkWorkResult<WorkCalendarEvent[]>>
+  calendarEvents(input: {
+    workspaceId: string
+    from: string
+    to: string
+  }): Promise<UniworkWorkResult<WorkCalendarEvent[]>>
   /** the signed-in user in the selected org (main resolves org slug + account id) */
   myProfile(): Promise<UniworkWorkResult<WorkPerson>>
   /** false when the target fails validation or no profile is set */
@@ -232,8 +241,8 @@ export interface UniworkWorkspaceRef {
   id: string
   name: string
   orgId: string
-  slug: string     // NEW: server `slug` ('' when absent)
-  orgSlug: string  // NEW: server `organization_slug` ('' when absent)
+  slug: string // NEW: server `slug` ('' when absent)
+  orgSlug: string // NEW: server `organization_slug` ('' when absent)
 }
 // Parse change in uniwork-docs/client.ts:212-220. Also update
 // e2e/fixtures/uniwork-documents-stub.ts:268-272 and tests/uniwork-docs-client.test.ts.
@@ -262,24 +271,26 @@ export declare function uniworkId(value: string): string
 // NEW: apps/shell/src/main/uniwork-work/client.ts  (+ parse.ts hand-written guards like uniwork-docs/parse.ts; no zod)
 // ════════════════════════════════════════════════════════════════════════════
 export interface UniworkWorkClient {
-  homeSummary(workspaceId: string): Promise<WorkHomeSummary>                      // GET  /workspaces/{ws}/home
-  myTasks(workspaceId: string): Promise<WorkTask[]>                               // GET  /workspaces/{ws}/my-tasks?limit=200 → .tasks
-  taskStatuses(workspaceId: string): Promise<WorkTaskStatus[]>                    // GET  /workspaces/{ws}/task-statuses → .statuses
-  setTaskStatus(taskId: string, status: string): Promise<WorkTask>                // PATCH /tasks/{taskID} body {status} → .task
-  createTask(input: WorkCreateTaskInput): Promise<WorkTask>                       // POST /workspaces/{ws}/tasks body {title, due_date?} + Idempotency-Key → .task
+  homeSummary(workspaceId: string): Promise<WorkHomeSummary> // GET  /workspaces/{ws}/home
+  myTasks(workspaceId: string): Promise<WorkTask[]> // GET  /workspaces/{ws}/my-tasks?limit=200 → .tasks
+  taskStatuses(workspaceId: string): Promise<WorkTaskStatus[]> // GET  /workspaces/{ws}/task-statuses → .statuses
+  setTaskStatus(taskId: string, status: string): Promise<WorkTask> // PATCH /tasks/{taskID} body {status} → .task
+  createTask(input: WorkCreateTaskInput): Promise<WorkTask> // POST /workspaces/{ws}/tasks body {title, due_date?} + Idempotency-Key → .task
   calendarEvents(i: { workspaceId: string; from: string; to: string }): Promise<WorkCalendarEvent[]> // GET /workspaces/{ws}/calendar/events?from&to&mine=true → .events
-  person(orgSlug: string, userId: string): Promise<WorkPerson>                    // GET  /orgs/{orgSlug}/people/{userId} → .person
+  person(orgSlug: string, userId: string): Promise<WorkPerson> // GET  /orgs/{orgSlug}/people/{userId} → .person
 }
 /** Throws UniworkDocError, like the docs client. Every call uses METADATA_TIMEOUT_MS. */
-export declare function createUniworkWorkClient(options: UniworkDocsClientOptions): UniworkWorkClient
+export declare function createUniworkWorkClient(
+  options: UniworkDocsClientOptions,
+): UniworkWorkClient
 
 // NEW: apps/shell/src/main/uniwork-work/wiring.ts
 export interface UniworkWorkDeps {
-  profile(): DeploymentProfile | null                         // uniworkDeploymentProfile
-  identity(): { accountId: string } | null                    // uniworkSessionIdentity
-  org(): { id: string; slug: string } | null                  // () => uniworkAccount().status().org ?? null
+  profile(): DeploymentProfile | null // uniworkDeploymentProfile
+  identity(): { accountId: string } | null // uniworkSessionIdentity
+  org(): { id: string; slug: string } | null // () => uniworkAccount().status().org ?? null
   authorized<T>(call: (token: string) => Promise<T>): Promise<T> // authorizedRequest
-  openExternal(url: string): Promise<void>                    // shell.openExternal
+  openExternal(url: string): Promise<void> // shell.openExternal
   fetch?: FetchLike
 }
 /** Handlers wrap every call: `try { ok, value } catch (e) { ok:false, error: workErrorOfDocCode(e instanceof UniworkDocError ? e.code : 'server_error') }`.
@@ -356,12 +367,23 @@ export const CORE_PINNED_MODULES: readonly WorkbenchModuleId[] = ['desk', 'tasks
 import type { PracticePillarId, WorkbenchModuleId } from '@uniwork/practice-core'
 export type Tint = 'gray' | 'green' | 'yellow' | 'orange' | 'violet' | 'blue' | 'teal' | 'pink'
 export const MODULE_TONES: Record<WorkbenchModuleId | PracticePillarId, Tint> = {
-  desk: 'gray', tasks: 'green', calendar: 'yellow', personal: 'pink', forms: 'teal', notes: 'gray',
-  knowledge: 'blue', materials: 'blue', skills: 'blue', compose: 'blue', // "Tri thức" = the 4 pillars
+  desk: 'gray',
+  tasks: 'green',
+  calendar: 'yellow',
+  personal: 'pink',
+  forms: 'teal',
+  notes: 'gray',
+  knowledge: 'blue',
+  materials: 'blue',
+  skills: 'blue',
+  compose: 'blue', // "Tri thức" = the 4 pillars
 }
 /** calendar agenda: task rows use MODULE_TONES.tasks; meeting rows use this (UniWork: "meetings keep violet") */
 export const MEETING_TINT: Tint = 'violet'
-export const tintStyle = (t: Tint) => ({ background: `var(--tint-${t})`, color: `var(--tint-${t}-fg)` })
+export const tintStyle = (t: Tint) => ({
+  background: `var(--tint-${t})`,
+  color: `var(--tint-${t}-fg)`,
+})
 
 // ════════════════════════════════════════════════════════════════════════════
 // i18n: workbench shard
@@ -396,6 +418,7 @@ export const tintStyle = (t: Tint) => ({ background: `var(--tint-${t})`, color: 
 ### Sự thật đã xác minh
 
 **Xác thực, client và lỗi**
+
 - Base URL lấy từ `DeploymentProfile.apiOrigin` (`main/uniwork-auth/deployment.ts:11-17`). Client tài liệu được dựng trong `uniwork-docs/service.ts:249-262` với `profile.apiOrigin`, `deps.authorized` và `isSignedIn = identity() !== null`. `wiring.ts:222,227-228` cung cấp `uniworkDeploymentProfile`, `uniworkAccount().status().org?.id` và `authorizedRequest`.
 - Token chỉ được dùng bên trong `authorizedRequest(call)` (`uniwork-auth/index.ts:276-279`), hàm này refresh một lần và thử lại một lần khi gặp 401. `uniworkSessionIdentity()` trả `{accountId, deviceSessionId, deploymentId}` và không bao giờ trả token (`index.ts:282-289`).
 - `client.ts:24` định nghĩa `FetchLike`; `:26` đặt `METADATA_TIMEOUT_MS = 30_000`. `send` (`:125-193`):
@@ -408,17 +431,20 @@ export const tintStyle = (t: Tint) => ({ background: `var(--tint-${t})`, color: 
 - Helper kết quả hiện có trả `{ok:true,value}|{ok:false,error}` (`service.ts:168-174`, `home-api.ts:168`).
 
 **Kiểu dùng chung, preload và window API**
+
 - `UniworkWorkspaceRef = {id, name, orgId}` (`home-api.ts:146-150`), parse từ `id`, `name`, `organization_id` của server (`client.ts:212-220`). Server còn gửi `slug`, `organization_slug`, `organization_name` (`uniwork:server/internal/handler/organization.go:54-58`, `dto/sdo/workspace.go:13-20`).
 - `AccountOrg = {id, name, slug, role}` (`home-api.ts:715-720`). `AccountStatus.org` ở `:750`.
 - `accountId` của desktop là user id phía server (`manager.ts:427` so `me.id` với `credential.accountId`; `mapping.ts:71`).
 - Pattern preload: `asUniworkResult` đổi reply sai dạng thành lỗi (`preload/index.ts:153-163`); lời gọi dùng `ipcRenderer.invoke(CHANNEL, …)` (`:822-836`); API expose bằng `contextBridge.exposeInMainWorld('aiOffice'|'aiOfficeProject'|'aiOfficeIntegrations'|'aiOfficeTabs', …)` (`:883, 946, 976, 1044`). Kiểu window khai báo trong file renderer dùng nó bằng `declare global { interface Window {…} }` (`Home.tsx:46-52`, `TabBar.tsx:13-17`). Pattern hằng kênh: `UNIWORK_DOC_CHANNELS` (`home-api.ts:1164-1180`).
 
 **Bucket và workspace đang chọn**
-- Bucket: `sha256(\`${deploymentId}\n${accountId}\`)` → `a-<32 hex>` (`workbench-accounts.ts:37-44`). Owner được đặt trong `syncWorkbenchOwner` (`main/index.ts:2927-2936`), do `onUniworkAccountStatus` kích hoạt (`index.ts:6451`). `selectOrg` kết thúc bằng `setState` nên phát một status push (`manager.ts:351-372`). Test: `apps/shell/tests/workbench-accounts.test.ts:27-71`.
+
+- Bucket: `sha256(\`${deploymentId}\n${accountId}\`)`→`a-<32 hex>` (`workbench-accounts.ts:37-44`). Owner được đặt trong `syncWorkbenchOwner` (`main/index.ts:2927-2936`), do `onUniworkAccountStatus` kích hoạt (`index.ts:6451`). `selectOrg`kết thúc bằng`setState` nên phát một status push (`manager.ts:351-372`). Test: `apps/shell/tests/workbench-accounts.test.ts:27-71`.
 - wb_kv đọc/ghi qua `wbStoreGetRaw/wbStoreSetRaw` (`renderer/src/workbench-store-client.ts:201,239`; mẫu dùng `skill-domain-pins.ts:6-26`). Không gian khóa `uniwork.*` là quy ước sẵn có.
 - `workbench-bucket.ts` export `currentWorkbenchBucket`, `setCurrentWorkbenchBucket`, `clearCurrentWorkbenchBucket`, `isWorkbenchBucketCleared`, `wbMediaDbName`.
 
 **Route và payload phía server**
+
 - Mọi route trong hợp đồng (`registerTasks`, `registerTasksSuite`, `registerHome`, `registerCalendar`, `registerPeople`) nằm cùng nhóm `authed` (`RequireAuthWithDevice`) với `registerDocuments`, route desktop đã gọi thành công (`uniwork:server/internal/handler/router/router.go:133-179`). Không route nào sau feature flag.
 - `PATCH /tasks/{taskID}`: `PatchTaskSDI.status` là key catalogue (`dto/sdi/task.go:32-45`); response `{task}` (`sdo/task.go:4-6`).
 - `POST /workspaces/{ws}/tasks`: nhận `title`, `due_date` và header `Idempotency-Key` (`router/tasks.go:25-32`, `sdi/task.go:9-27`). Tiêu đề trùng một việc đang mở cho `active_duplicate_task`.
@@ -431,12 +457,14 @@ export const tintStyle = (t: Tint) => ({ background: `var(--tint-${t})`, color: 
 - Câu thông báo web dùng tham số `{{actor}}`, `{{task}}`, … (`uniwork:packages/core/i18n/locales/en.json`, ví dụ `"task_assigned": "{{actor}} assigned you “{{task}}”"`).
 
 **Token và i18n**
+
 - Các khối của `tokens.css`: `:root` l.8, `[data-theme='dark']` l.96, system dark l.163-164. Quy tắc accent theo app ở l.4. Accent và on-accent của shell: `home.css:3-23, 61-76, 79-96`.
 - Tint nguồn: `uniwork:packages/ui/styles/tokens.css` l.266-283 (light) và l.474-491 (dark). `--info` l.173/420, `--info-soft` l.189/433.
 - i18n: mẫu aggregator `i18n/strings-account.ts:1-47`, mẫu shard `i18n/account/{zh,vi}.ts`, gộp trong `locale.tsx:13-36`. Có 21 `LANGS` (`packages/i18n/src/index.ts:24-46`).
 - Khóa lưu trữ `uniwork.teacher*` / `uniwork.teacherUiLang` chỉ còn trong ba allowlist (`backup-addons.ts:196,200`, `workbench-store-client.ts:29,31`, `main/workbench-db.ts:255,257`) và hai nơi ghi (`TeacherHome.tsx:109`, `PracticeHome.tsx:29`).
 
 **Lệnh test (đã chạy thử)**
+
 - Unit test shell: `cd /Users/ducquang/UNICOM/uniwork-office/apps/shell && npx vitest run tests/<file>.test.ts` (ví dụ `workbench-accounts.test.ts`, 14 pass). Config `apps/shell/vitest.config.ts`: `include tests/**/*.test.ts`, `environment node`.
   - Test component là file `.ts` có `/** @vitest-environment jsdom */`, dùng `createElement` + `react-dom/client`. Mẫu: `tests/uniwork-docs-ui-components.test.ts:1-8`.
 - practice-core: `cd packages/practice-core && npx vitest run` (2 file, 9 pass trước plan).
@@ -481,24 +509,29 @@ Task này không có code sản phẩm. Token chỉ nằm trong `authorizedReque
 Thứ tự: Task 2–6 (cắt gọn) không cần server, chạy được kể cả khi spike chưa xong. Task 7 trở đi phụ thuộc kết quả spike.
 
 **Files:**
+
 - Sửa tạm, hoàn tác ở Step 4: `apps/shell/src/main/index.ts` (khối import l.92-103; sau l.6451 `onUniworkAccountStatus(() => syncWorkbenchOwner())`)
 - Modify: `docs/superpowers/specs/2026-10-13-workbench-enterprise-design.md` (§9, sau mục 1)
 
 **Interfaces:**
+
 - Consumes: `authorizedRequest<T>(call: (token: string) => Promise<T>): Promise<T>`, `uniworkDeploymentProfile(): DeploymentProfile | null`, `uniworkSessionIdentity(): { accountId; deviceSessionId; deploymentId } | null`, `onUniworkAccountStatus(cb: (s: AccountStatus) => void)` (đều từ `./uniwork-auth`), và `TransportError` từ `./uniwork-auth/transport`.
 - Produces: không có code sản phẩm, chỉ một kết luận được ghi lại.
 
 - [ ] **Step 1: Bật server UniWork dev và chuẩn bị tài khoản có ít nhất một workspace**
 
 Dùng deployment dev chung mà nhóm đang đăng nhập, hoặc chạy cục bộ:
+
 ```bash
 cd /Users/ducquang/UNICOM/uniwork && make start   # API on http://localhost:8080 (.env PORT=8080)
 ```
+
 Trên web app, đăng nhập và bảo đảm tài khoản có một org với ít nhất một workspace. Tạo một việc giao cho chính mình, hạn hôm nay.
 
 - [ ] **Step 2: Áp bản probe dùng một lần (KHÔNG stage)**
 
 Trong `apps/shell/src/main/index.ts`, mở rộng import `./uniwork-auth` (l.92-103):
+
 ```ts
 import {
   bindAuthCallbackEvents,
@@ -516,58 +549,73 @@ import {
 } from './uniwork-auth'
 import { TransportError } from './uniwork-auth/transport'
 ```
+
 Ngay sau `  onUniworkAccountStatus(() => syncWorkbenchOwner())` (l.6451), chèn:
+
 ```ts
-  // SPIKE (Task 1): probe the work routes with the desktop token. Never commit.
-  let spikeRan = false
-  onUniworkAccountStatus((s) => {
-    const profile = uniworkDeploymentProfile()
-    const me = uniworkSessionIdentity()
-    if (spikeRan || !s.loggedIn || !s.org || !profile || !me) return
-    spikeRan = true
-    const org = s.org
-    const base = `${new URL(profile.apiOrigin).origin}/api/v1`
-    const probe = async (route: string): Promise<{ status: number; body: unknown } | null> => {
-      try {
-        const r = await authorizedRequest(async (token) => {
-          const res = await fetch(`${base}${route}`, {
-            headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
-            cache: 'no-store',
-            redirect: 'error',
-          })
-          if (res.status === 401) throw new TransportError('unauthorized', 401)
-          return { status: res.status, body: (await res.json().catch(() => null)) as unknown }
+// SPIKE (Task 1): probe the work routes with the desktop token. Never commit.
+let spikeRan = false
+onUniworkAccountStatus((s) => {
+  const profile = uniworkDeploymentProfile()
+  const me = uniworkSessionIdentity()
+  if (spikeRan || !s.loggedIn || !s.org || !profile || !me) return
+  spikeRan = true
+  const org = s.org
+  const base = `${new URL(profile.apiOrigin).origin}/api/v1`
+  const probe = async (route: string): Promise<{ status: number; body: unknown } | null> => {
+    try {
+      const r = await authorizedRequest(async (token) => {
+        const res = await fetch(`${base}${route}`, {
+          headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+          cache: 'no-store',
+          redirect: 'error',
         })
-        const keys = r.body && typeof r.body === 'object' ? Object.keys(r.body).join(',') : ''
-        console.log('[spike]', route, r.status, `keys=${keys}`, r.status >= 400 ? JSON.stringify(r.body) : '')
-        return r
-      } catch (e) {
-        console.log('[spike]', route, 'REJECTED', e instanceof Error ? e.message : String(e))
-        return null
-      }
+        if (res.status === 401) throw new TransportError('unauthorized', 401)
+        return { status: res.status, body: (await res.json().catch(() => null)) as unknown }
+      })
+      const keys = r.body && typeof r.body === 'object' ? Object.keys(r.body).join(',') : ''
+      console.log(
+        '[spike]',
+        route,
+        r.status,
+        `keys=${keys}`,
+        r.status >= 400 ? JSON.stringify(r.body) : '',
+      )
+      return r
+    } catch (e) {
+      console.log('[spike]', route, 'REJECTED', e instanceof Error ? e.message : String(e))
+      return null
     }
-    void (async () => {
-      const ws = await probe(`/orgs/${org.id}/workspaces`)
-      const first = (ws?.body as { workspaces?: { id: string }[] } | null)?.workspaces?.[0]?.id
-      if (!first) return console.log('[spike] no workspace in this org: create one on the web, restart')
-      const home = await probe(`/workspaces/${first}/home`)
-      console.log('[spike] home.partial', JSON.stringify((home?.body as { partial?: unknown } | null)?.partial))
-      await probe(`/workspaces/${first}/my-tasks?limit=5`)
-      await probe(`/workspaces/${first}/task-statuses`)
-      const from = new Date().toISOString().slice(0, 10)
-      const to = new Date(Date.now() + 14 * 86_400_000).toISOString().slice(0, 10)
-      await probe(`/workspaces/${first}/calendar/events?from=${from}&to=${to}&mine=true`)
-      await probe(`/orgs/${org.slug}/people/${me.accountId}`)
-      await probe(`/workspaces/${first}/documents/recent?limit=1&kind=file`)
-    })()
-  })
+  }
+  void (async () => {
+    const ws = await probe(`/orgs/${org.id}/workspaces`)
+    const first = (ws?.body as { workspaces?: { id: string }[] } | null)?.workspaces?.[0]?.id
+    if (!first)
+      return console.log('[spike] no workspace in this org: create one on the web, restart')
+    const home = await probe(`/workspaces/${first}/home`)
+    console.log(
+      '[spike] home.partial',
+      JSON.stringify((home?.body as { partial?: unknown } | null)?.partial),
+    )
+    await probe(`/workspaces/${first}/my-tasks?limit=5`)
+    await probe(`/workspaces/${first}/task-statuses`)
+    const from = new Date().toISOString().slice(0, 10)
+    const to = new Date(Date.now() + 14 * 86_400_000).toISOString().slice(0, 10)
+    await probe(`/workspaces/${first}/calendar/events?from=${from}&to=${to}&mine=true`)
+    await probe(`/orgs/${org.slug}/people/${me.accountId}`)
+    await probe(`/workspaces/${first}/documents/recent?limit=1&kind=file`)
+  })()
+})
 ```
+
 Probe chỉ log mã trạng thái, các key cấp cao nhất và body lỗi, không bao giờ log token. Probe chỉ đọc: không PATCH, không POST, nên không đổi dữ liệu server.
 
 Typecheck bản vá:
+
 ```bash
 cd /Users/ducquang/UNICOM/uniwork-office && npm run typecheck -w @genoffice/shell
 ```
+
 Kết quả mong đợi: exit 0.
 
 - [ ] **Step 3: Chạy và ghi kết quả**
@@ -575,25 +623,27 @@ Kết quả mong đợi: exit 0.
 ```bash
 cd /Users/ducquang/UNICOM/uniwork-office && UNIWORK_API_ORIGIN=http://localhost:8080 npm run dev
 ```
+
 `UNIWORK_API_ORIGIN` chỉ có tác dụng khi chưa chọn server trong app (`deployment.ts:150-170`). Nếu đã lưu server khác, chọn server dev ở màn kết nối. Đăng nhập bằng tài khoản ở Step 1 và chọn org. Terminal của main process in các dòng `[spike]`.
 
 Ghi lại:
 
-| Route | Status | Keys / error code |
-|---|---|---|
-| `GET /orgs/{orgId}/workspaces` (đối chứng: client tài liệu đã dùng) | | |
-| `GET /workspaces/{ws}/home` (+ `home.partial`) | | |
-| `GET /workspaces/{ws}/my-tasks?limit=5` | | |
-| `GET /workspaces/{ws}/task-statuses` | | |
-| `GET /workspaces/{ws}/calendar/events?from&to&mine=true` | | |
-| `GET /orgs/{orgSlug}/people/{accountId}` | | |
-| `GET /workspaces/{ws}/documents/recent` (đối chứng) | | |
+| Route                                                               | Status | Keys / error code |
+| ------------------------------------------------------------------- | ------ | ----------------- |
+| `GET /orgs/{orgId}/workspaces` (đối chứng: client tài liệu đã dùng) |        |                   |
+| `GET /workspaces/{ws}/home` (+ `home.partial`)                      |        |                   |
+| `GET /workspaces/{ws}/my-tasks?limit=5`                             |        |                   |
+| `GET /workspaces/{ws}/task-statuses`                                |        |                   |
+| `GET /workspaces/{ws}/calendar/events?from&to&mine=true`            |        |                   |
+| `GET /orgs/{orgSlug}/people/{accountId}`                            |        |                   |
+| `GET /workspaces/{ws}/documents/recent` (đối chứng)                 |        |                   |
 
 Ghi thêm phiên bản server: `git -C /Users/ducquang/UNICOM/uniwork rev-parse --short HEAD`, hoặc build của deployment dev nếu ở xa.
 
 Kết quả mong đợi (C12): mọi dòng là 200. Key mong đợi: `today,timezone,counts,my_work,upcoming_meetings,inbox,partial,generated_at` cho home, `tasks,total,limit,offset` cho my-tasks, `statuses,categories,total` cho task-statuses, `events` cho calendar, `person,reports` cho people.
 
 **Điều kiện DỪNG.** Không bắt đầu Task 7 hay bất kỳ task nào dùng server nếu một trong hai điều sau đúng:
+
 - `/home` hoặc `/my-tasks` cho `REJECTED unauthorized`, 403 hoặc 404 trong khi hai dòng đối chứng trả 200;
 - route people trả 403/404 cho chính account id của bạn.
 
@@ -604,11 +654,13 @@ Khi đó báo bảng kết quả cho người dùng. Theo §9.1, phải sửa se
 ```bash
 cd /Users/ducquang/UNICOM/uniwork-office && git checkout -- apps/shell/src/main/index.ts && git status --short apps/shell/src/main/index.ts
 ```
+
 Kết quả mong đợi: không có output (file sạch).
 
 Trong `docs/superpowers/specs/2026-10-13-workbench-enterprise-design.md`, thêm một ghi chú thụt lề dưới §9 mục 1 (sau dòng kết thúc bằng `…xử lý phía server trước.`), điền giá trị đo được:
+
 ```markdown
-   - Kết quả spike (YYYY-MM-DD, server `<sha hoặc build>`): `/home` <status>, `/my-tasks` <status>, `/task-statuses` <status>, `/calendar/events` <status>, `/people/{id}` <status>; đối chứng `/workspaces` và `/documents/recent` <status>. `home.partial` = <giá trị>. Kết luận: <tiếp tục | dừng, cần sửa server>.
+- Kết quả spike (YYYY-MM-DD, server `<sha hoặc build>`): `/home` <status>, `/my-tasks` <status>, `/task-statuses` <status>, `/calendar/events` <status>, `/people/{id}` <status>; đối chứng `/workspaces` và `/documents/recent` <status>. `home.partial` = <giá trị>. Kết luận: <tiếp tục | dừng, cần sửa server>.
 ```
 
 - [ ] **Step 5: Commit**
@@ -626,6 +678,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 Ghi chú thứ tự: `@uniwork/practice-core` resolve về source (`node_modules/@uniwork/practice-core -> packages/practice-core`, `exports: ./src/index.ts`). Nếu chỉ thu hẹp union `WorkbenchModuleId` thì `npm run typecheck -w @genoffice/shell` báo 31 lỗi ở `WorkbenchModulePanes.tsx`, `WorkbenchIcons.tsx`, `agent-intent-apply.ts`, `context-manager.ts` và `my-ai-playbooks.ts` (đã thử trên bản sao). Để mọi task đều xanh, Task 2 sửa luôn năm file đó, chuỗi gợi ý trong `my-ai-router.ts` và hai test shell. Task 3 xóa file, store, widget, CSS và test không còn ai dùng.
 
 **Files:**
+
 - Modify: `packages/practice-core/src/modules.ts` (l.3-28 union + doc, l.41-47 gợi ý desk, l.73-88 và l.105-192 định nghĩa module, l.195-204 tab lõi)
 - Modify: `packages/practice-core/src/agent-intent.ts` (l.99-100, l.103-119 `MODULE_KEYWORDS`; l.270-281 `moduleSupportsAddItem`)
 - Test: `packages/practice-core/tests/practice-core.test.ts` (l.81-120), `packages/practice-core/tests/agent-intent.test.ts` (l.18-43)
@@ -638,6 +691,7 @@ Ghi chú thứ tự: `@uniwork/practice-core` resolve về source (`node_modules
 - Test: `apps/shell/tests/my-ai-playbooks-consent.test.ts` (l.11-21, l.56-62), `apps/shell/tests/my-ai-router-plan.test.ts` (l.23-41)
 
 **Interfaces:**
+
 - Produces (hợp đồng): `export type WorkbenchModuleId = 'desk' | 'tasks' | 'calendar' | 'forms' | 'notes' | 'personal'` và `export const CORE_PINNED_MODULES: readonly WorkbenchModuleId[] = ['desk', 'tasks', 'calendar']`.
 - Produces: `moduleSupportsAddItem(id)` chỉ đúng với `tasks | notes | calendar` (Task 15 thu tiếp về `tasks | notes`). `listAgentRoutableTabs()` liệt kê 6 module và 4 trụ cột.
 - Consumes: không có gì mới. Pin đã lưu chứa id bị xóa được `ensureCorePinnedModules` sẵn có bỏ qua im lặng (lọc qua `isWorkbenchModuleId`).
@@ -645,55 +699,59 @@ Ghi chú thứ tự: `@uniwork/practice-core` resolve về source (`node_modules
 - [ ] **Step 1: Viết test practice-core sẽ fail**
 
 Trong `packages/practice-core/tests/practice-core.test.ts`, thay toàn bộ khối `it('exposes workbench modules and role defaults', …)` (l.81-120) bằng:
+
 ```ts
-  it('exposes workbench modules and role defaults', () => {
-    expect(WORKBENCH_MODULES.map((m) => m.id)).toEqual([
-      'desk',
-      'calendar',
-      'tasks',
-      'notes',
-      'forms',
-      'personal',
-    ])
-    const core = ['desk', 'tasks', 'calendar']
-    expect(defaultPinnedModules('legal')).toEqual(core)
-    expect(defaultPinnedModules('construction')).toEqual(core)
-    expect(isCorePinnedModule('desk')).toBe(true)
-    expect(isCorePinnedModule('forms')).toBe(false)
-    expect(ensureCorePinnedModules(['desk', 'forms'])).toEqual([
-      'desk',
-      'tasks',
-      'calendar',
-      'forms',
-    ])
-    expect(ensureCorePinnedModules(['desk', 'health' as never, 'notes'])).toEqual([
-      'desk',
-      'tasks',
-      'calendar',
-      'notes',
-    ])
-  })
+it('exposes workbench modules and role defaults', () => {
+  expect(WORKBENCH_MODULES.map((m) => m.id)).toEqual([
+    'desk',
+    'calendar',
+    'tasks',
+    'notes',
+    'forms',
+    'personal',
+  ])
+  const core = ['desk', 'tasks', 'calendar']
+  expect(defaultPinnedModules('legal')).toEqual(core)
+  expect(defaultPinnedModules('construction')).toEqual(core)
+  expect(isCorePinnedModule('desk')).toBe(true)
+  expect(isCorePinnedModule('forms')).toBe(false)
+  expect(ensureCorePinnedModules(['desk', 'forms'])).toEqual(['desk', 'tasks', 'calendar', 'forms'])
+  expect(ensureCorePinnedModules(['desk', 'health' as never, 'notes'])).toEqual([
+    'desk',
+    'tasks',
+    'calendar',
+    'notes',
+  ])
+})
 ```
+
 Trong `packages/practice-core/tests/agent-intent.test.ts`, thay l.18-21:
+
 ```ts
   it('resolves Vietnamese NL to health / tasks', () => {
     const health = resolveAgentIntentFromText('Mở tab sức khoẻ giúp tôi')
     expect(health?.target).toEqual({ kind: 'module', id: 'health' })
     expect(health?.action).toBe('open')
 ```
+
 bằng:
+
 ```ts
   it('resolves Vietnamese NL to calendar / tasks', () => {
     const cal = resolveAgentIntentFromText('Mở tab lịch giúp tôi')
     expect(cal?.target).toEqual({ kind: 'module', id: 'calendar' })
     expect(cal?.action).toBe('open')
 ```
+
 Rồi thay l.42-43:
+
 ```ts
     expect(moduleSupportsAddItem('assistant')).toBe(false)
   })
 ```
+
 bằng:
+
 ```ts
     expect(moduleSupportsAddItem('forms')).toBe(false)
   })
@@ -713,13 +771,16 @@ bằng:
 ```bash
 cd /Users/ducquang/UNICOM/uniwork-office/packages/practice-core && npx vitest run
 ```
+
 Kết quả mong đợi: FAIL ở `exposes workbench modules and role defaults` (danh sách nhận được có 19 id) và ở `no longer routes removed consumer modules` (`expected [...] to not include 'health'`).
 
 - [ ] **Step 3: Sửa practice-core**
 
 `packages/practice-core/src/modules.ts`:
+
 1. Xóa object module `email` và `assistant` (l.73-88) và từ `personal-finance` tới `matters` (l.105-192, dừng ngay trước `] as const`).
 2. Thay l.3-28:
+
 ```ts
 /**
  * Optional Workbench modules (pinned via Tab +).
@@ -748,7 +809,9 @@ export type WorkbenchModuleId =
   | 'contracts'
   | 'matters'
 ```
+
 bằng:
+
 ```ts
 /**
  * Optional Workbench modules (pinned via Tab +).
@@ -758,17 +821,23 @@ bằng:
  */
 export type WorkbenchModuleId = 'desk' | 'tasks' | 'calendar' | 'forms' | 'notes' | 'personal'
 ```
+
 3. Trong định nghĩa `desk`, thay:
+
 ```ts
     hintVi: 'Tổng hợp việc làm & đời sống — chỉ số, nhắc, biểu đồ',
     hintEn: 'Work and life at a glance — KPIs, reminders, charts',
 ```
+
 bằng:
+
 ```ts
     hintVi: 'Tổng hợp việc và lịch — chỉ số, nhắc, biểu đồ',
     hintEn: 'Tasks and calendar at a glance — KPIs, reminders, charts',
 ```
+
 4. Thay:
+
 ```ts
 /**
  * Always-on Workbench tabs (cannot be removed via Tab ×).
@@ -781,7 +850,9 @@ export const CORE_PINNED_MODULES: readonly WorkbenchModuleId[] = [
   'forms',
 ]
 ```
+
 bằng:
+
 ```ts
 /**
  * Always-on Workbench tabs (cannot be removed via Tab ×).
@@ -791,7 +862,9 @@ export const CORE_PINNED_MODULES: readonly WorkbenchModuleId[] = ['desk', 'tasks
 ```
 
 `packages/practice-core/src/agent-intent.ts`:
+
 1. Xóa các dòng `MODULE_KEYWORDS` của `email` và `assistant` (l.99-100), rồi các dòng từ `personal-finance` tới `matters` (l.103-119). Phần còn lại:
+
 ```ts
 const MODULE_KEYWORDS: readonly { id: WorkbenchModuleId; keys: readonly string[] }[] = [
   { id: 'desk', keys: ['my space', 'không gian', 'myspace', 'desk', 'bàn cá nhân'] },
@@ -802,22 +875,26 @@ const MODULE_KEYWORDS: readonly { id: WorkbenchModuleId; keys: readonly string[]
   { id: 'personal', keys: ['hồ sơ', 'personal', 'cá nhân profile'] },
 ]
 ```
+
 2. Thay thân `moduleSupportsAddItem` (l.271-280):
+
 ```ts
-  return (
-    id === 'tasks' ||
-    id === 'notes' ||
-    id === 'email' ||
-    id === 'calendar' ||
-    id === 'events' ||
-    id === 'personal-finance' ||
-    id === 'health' ||
-    id === 'self-growth'
-  )
+return (
+  id === 'tasks' ||
+  id === 'notes' ||
+  id === 'email' ||
+  id === 'calendar' ||
+  id === 'events' ||
+  id === 'personal-finance' ||
+  id === 'health' ||
+  id === 'self-growth'
+)
 ```
+
 bằng:
+
 ```ts
-  return id === 'tasks' || id === 'notes' || id === 'calendar'
+return id === 'tasks' || id === 'notes' || id === 'calendar'
 ```
 
 - [ ] **Step 4: Chạy test practice-core và typecheck**
@@ -826,44 +903,57 @@ bằng:
 cd /Users/ducquang/UNICOM/uniwork-office/packages/practice-core && npx vitest run
 cd /Users/ducquang/UNICOM/uniwork-office && npm run typecheck -w @uniwork/practice-core
 ```
+
 Kết quả mong đợi: `Tests 10 passed (10)`; typecheck exit 0.
 
 - [ ] **Step 5: Viết test playbook shell sẽ fail**
 
 Trong `apps/shell/tests/my-ai-playbooks-consent.test.ts`, thay l.11-21 (`it('matches sales quote → Word + task + Clients', …)`) bằng:
-```ts
-  it('matches sales quote → Word + task', () => {
-    const hit = matchPracticePlaybook('sales', 'Soạn báo giá Word và thêm việc follow-up')
-    expect(hit?.playbook.id).toBe('sales-quote')
-    expect(hit?.steps).toHaveLength(2)
-    expect(hit?.steps[0]).toMatchObject({ kind: 'fill_template', templateId: 'sales-quote' })
-    expect(hit?.steps[1]?.kind).toBe('workbench')
-  })
 
-  it('only targets Workbench modules that still exist', () => {
-    const practices = ['sales', 'accounting', 'procurement', 'real-estate', 'customer-care', 'legal'] as const
-    for (const p of practices) {
-      for (const chip of practiceMyAiChips(p)) {
-        for (const s of matchPracticePlaybook(p, chip.promptVi)?.steps ?? []) {
-          if (s.kind === 'workbench' && s.intent.target.kind === 'module') {
-            expect(['tasks', 'calendar', 'notes']).toContain(s.intent.target.id)
-          }
+```ts
+it('matches sales quote → Word + task', () => {
+  const hit = matchPracticePlaybook('sales', 'Soạn báo giá Word và thêm việc follow-up')
+  expect(hit?.playbook.id).toBe('sales-quote')
+  expect(hit?.steps).toHaveLength(2)
+  expect(hit?.steps[0]).toMatchObject({ kind: 'fill_template', templateId: 'sales-quote' })
+  expect(hit?.steps[1]?.kind).toBe('workbench')
+})
+
+it('only targets Workbench modules that still exist', () => {
+  const practices = [
+    'sales',
+    'accounting',
+    'procurement',
+    'real-estate',
+    'customer-care',
+    'legal',
+  ] as const
+  for (const p of practices) {
+    for (const chip of practiceMyAiChips(p)) {
+      for (const s of matchPracticePlaybook(p, chip.promptVi)?.steps ?? []) {
+        if (s.kind === 'workbench' && s.intent.target.kind === 'module') {
+          expect(['tasks', 'calendar', 'notes']).toContain(s.intent.target.id)
         }
       }
     }
-  })
+  }
+})
 ```
+
 Thay l.56-62 (`it('accounting invoice → sheets + email draft + task', …)`) bằng:
+
 ```ts
-  it('accounting invoice → sheets + task', () => {
-    const hit = matchPracticePlaybook('accounting', 'Tạo hóa đơn Excel cho khách ABC')
-    expect(hit?.playbook.id).toBe('accounting-invoice')
-    expect(hit?.steps).toHaveLength(2)
-    expect(hit?.steps[0]).toMatchObject({ kind: 'create_file', app: 'sheets' })
-    expect(hit?.steps[1]?.kind).toBe('workbench')
-  })
+it('accounting invoice → sheets + task', () => {
+  const hit = matchPracticePlaybook('accounting', 'Tạo hóa đơn Excel cho khách ABC')
+  expect(hit?.playbook.id).toBe('accounting-invoice')
+  expect(hit?.steps).toHaveLength(2)
+  expect(hit?.steps[0]).toMatchObject({ kind: 'create_file', app: 'sheets' })
+  expect(hit?.steps[1]?.kind).toBe('workbench')
+})
 ```
+
 Trong `apps/shell/tests/my-ai-router-plan.test.ts`, thay l.23-41 (từ `it('builds create + task + open Clients plan with one goal (P3)'` tới dấu `}` đóng khối `r.steps[2]`) bằng đoạn sau. Ba dòng `goalVi` / `summaryVi` phía sau giữ nguyên.
+
 ```ts
   it('builds create + task plan with one goal (P3)', () => {
     const r = routeMyAiText('Soạn báo giá Word và thêm công việc follow-up khách', {
@@ -885,6 +975,7 @@ Trong `apps/shell/tests/my-ai-router-plan.test.ts`, thay l.23-41 (từ `it('buil
 ```bash
 cd /Users/ducquang/UNICOM/uniwork-office/apps/shell && npx vitest run tests/my-ai-playbooks-consent.test.ts tests/my-ai-router-plan.test.ts
 ```
+
 Kết quả mong đợi: FAIL, có `expected [ 'tasks', 'calendar', 'notes' ] to include 'clients'` và `expected [ …(3) ] to have a length of 2 but got 3`.
 
 - [ ] **Step 7: Sửa shell (mọi lỗi biên dịch do đổi union)**
@@ -892,6 +983,7 @@ Kết quả mong đợi: FAIL, có `expected [ 'tasks', 'calendar', 'notes' ] to
 Lúc này `npm run typecheck -w @genoffice/shell` liệt kê 31 lỗi đã biết (TS2367, TS2353, TS2322, TS2345) trong năm file dưới. Các sửa sau xử lý hết.
 
 **`apps/shell/src/renderer/src/WorkbenchModulePanes.tsx`.** Xóa từ dưới lên: trước tiên l.501-1683 (`function EventsPane` tới dấu `}` đóng `MattersPane` và dòng trống sau đó; `function escapeHtml` giữ lại), rồi l.132-182 (`function AssistantPane` và dòng trống sau). Sau đó thay import ở l.4-51:
+
 ```ts
 import { CalendarPane } from './CalendarPane'
 import { DeskPane } from './DeskPane'
@@ -942,7 +1034,9 @@ import {
   type WbTravelTrip,
 } from './workbench-pins'
 ```
+
 bằng:
+
 ```ts
 import { CalendarPane } from './CalendarPane'
 import { DeskPane } from './DeskPane'
@@ -958,7 +1052,9 @@ import {
   type WbPersonalProfile,
 } from './workbench-pins'
 ```
+
 Thay `  const hideChrome = moduleId === 'desk' || moduleId === 'notes' || moduleId === 'email'` bằng `  const hideChrome = moduleId === 'desk' || moduleId === 'notes'`. Rồi thay đuôi dispatcher:
+
 ```tsx
       {moduleId === 'notes' && <NotesPane practiceId={practiceId} vi={vi} />}
       {moduleId === 'email' && <EmailPane practiceId={practiceId} vi={vi} />}
@@ -989,7 +1085,9 @@ Thay `  const hideChrome = moduleId === 'desk' || moduleId === 'notes' || module
       )}
     </section>
 ```
+
 bằng:
+
 ```tsx
       {moduleId === 'notes' && <NotesPane practiceId={practiceId} vi={vi} />}
       {moduleId === 'forms' && (
@@ -1002,6 +1100,7 @@ bằng:
 **`apps/shell/src/renderer/src/WorkbenchIcons.tsx`.** Xóa l.131-267 (các mục `'personal-finance'` tới `matters` của `BADGE`), rồi l.90-112 (mục `email` và `assistant`). `add` giữ lại.
 
 **`apps/shell/src/renderer/src/agent-intent-apply.ts`.** Thay import `./workbench-pins` (l.9-31) bằng:
+
 ```ts
 import {
   pinModule,
@@ -1016,7 +1115,9 @@ import {
   writeTasks,
 } from './workbench-pins'
 ```
+
 Xóa khối `if (moduleId === 'email') { … }` trong `addItem` (l.101-108). Rồi thay toàn bộ từ `  if (moduleId === 'events') {` (l.118) tới `  return null` (l.157) bằng đúng một dòng `  return null`. Trong `undoAgentAddItem`, thay:
+
 ```ts
   } else if (moduleId === 'email') {
     writeEmails(
@@ -1041,7 +1142,9 @@ Xóa khối `if (moduleId === 'email') { … }` trong `addItem` (l.101-108). R�
     writeGrowth(readGrowth().filter((g) => g.id !== itemId))
   } else {
 ```
+
 bằng:
+
 ```ts
   } else if (moduleId === 'calendar') {
     writeCalendar(
@@ -1050,9 +1153,11 @@ bằng:
     )
   } else {
 ```
+
 Trong nhánh `summarize`, đổi `      tabId: 'assistant',` thành `      tabId,`. Nếu không, `PracticeHome` sẽ `setTab('assistant')` và không còn gì để vẽ.
 
 **`apps/shell/src/renderer/src/context-manager.ts`.** Thay import ở l.13-21 bằng `import { readCalendar, readNotes, readTasks } from './workbench-pins'`. Trong `moduleContext`, thay toàn bộ từ `  } else if (moduleId === 'email') {` tới hết nhánh `desk`:
+
 ```ts
   } else if (moduleId === 'desk') {
     const tasks = readTasks(practiceId).filter((t) => !t.done).length
@@ -1063,7 +1168,9 @@ Trong nhánh `summarize`, đổi `      tabId: 'assistant',` thành `      tabId
       text: `My Space pulse: openTasks=${tasks}, events=${events}`,
     })
 ```
+
 bằng:
+
 ```ts
   } else if (moduleId === 'desk') {
     const tasks = readTasks(practiceId).filter((t) => !t.done).length
@@ -1073,9 +1180,11 @@ bằng:
       text: `My Space pulse: openTasks=${tasks}`,
     })
 ```
+
 Trong `buildMyAiContextPack`, xóa câu lệnh `const mails = readEmails(practiceId).slice(0, MAX_LIST)` và lời gọi `chunks.push({ id: 'email', … })` theo sau cùng dòng trống sau nó (l.203-219).
 
 **`apps/shell/src/renderer/src/my-ai-playbooks.ts`.**
+
 - l.37: `  moduleId: 'tasks' | 'clients' | 'contracts' | 'calendar' | 'email' | 'notes',` thành `  moduleId: 'tasks' | 'calendar' | 'notes',`.
 - Xóa các dòng step: l.106 `        wb('open', 'clients', 'Mở tab Clients', 'Mở Clients'),`; l.169-174 (lời gọi 6 dòng `wb('add_item', 'email', …)`); l.325 `        wb('open', 'contracts', 'Mở Contracts', 'Open Contracts'),`; l.384 `        wb('open', 'clients', 'Mở Clients', 'Open Clients'),`; l.410 `        wb('open', 'clients', 'Mở tab Clients', 'Mở Clients'),`; l.437 `        wb('open', 'clients', 'Mở Clients', 'Open Clients'),`; l.463 `        wb('open', 'contracts', 'Mở Contracts', 'Open Contracts'),`.
 - Thay chữ trên chip (chính xác `trước` → `sau`):
@@ -1088,6 +1197,7 @@ Trong `buildMyAiContextPack`, xóa câu lệnh `const mails = readEmails(practic
   - `labelVi: 'Hợp đồng + Contracts'` → `labelVi: 'Hợp đồng + việc'`; `labelEn: 'Contract + Contracts'` → `labelEn: 'Contract + task'`; `'Soạn hợp đồng thuê nhà Word và thêm việc rà soát, mở tab Contracts'` → `'Soạn hợp đồng thuê nhà Word và thêm việc rà soát'`; `'Draft a lease contract in Word and add a review task, open Contracts'` → `'Draft a lease contract in Word and add a review task'`
 
 **`apps/shell/src/renderer/src/my-ai-router.ts`** (chuỗi gợi ý nhắc tới tab không còn):
+
 - l.792 `'Thử: “Soạn báo giá Word và thêm việc follow-up, mở tab Clients”, “Mở file báo cáo”, “Tóm tắt file gần đây”.',` thành `'Thử: “Soạn báo giá Word và thêm việc follow-up”, “Mở file báo cáo”, “Tóm tắt file gần đây”.',`
 - l.794 `'Try: “Draft a Word quote and add a follow-up task, open Clients”, “Open report file”, “Summarize recent files”.',` thành `'Try: “Draft a Word quote and add a follow-up task”, “Open report file”, “Summarize recent files”.',`
 
@@ -1099,6 +1209,7 @@ Sau bước này `FinancePane`, `HealthPane`, `FamilyPane`, `FriendsPane`, `Pets
 cd /Users/ducquang/UNICOM/uniwork-office && npm run typecheck -w @genoffice/shell
 cd /Users/ducquang/UNICOM/uniwork-office/apps/shell && npx vitest run
 ```
+
 Kết quả mong đợi: typecheck exit 0, mọi file test shell pass (`Tests 2108 passed` trên bản chạy thử). Không file main nào đổi nên không cần rebuild shell.
 
 - [ ] **Step 9: Commit**
@@ -1118,6 +1229,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ### Task 3: Xóa pane, store, widget desk, slot media và CSS mồ côi trong shell
 
 **Files:**
+
 - Delete: `apps/shell/src/renderer/src/{FinancePane.tsx,HealthPane.tsx,HealthMetricsViz.tsx,FamilyPane.tsx,FamilyTreeCanvas.tsx,family-tree-layout.ts,FriendsPane.tsx,PetsPane.tsx,EmailPane.tsx}`, `apps/shell/tests/family-tree-layout.test.ts`
 - Modify: `apps/shell/src/renderer/src/workbench-pins.ts` (xóa l.518-644, l.669-735, l.760-1623; thay l.236-264)
 - Modify: `apps/shell/src/renderer/src/WbRowActions.tsx` (xóa l.186-234)
@@ -1132,6 +1244,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 - Test: `apps/shell/tests/my-ai-templates.test.ts`, `apps/shell/tests/my-ai-forms.test.ts`, `apps/shell/tests/my-ai-local-answer.test.ts`
 
 **Interfaces:**
+
 - Produces: `WbIdbMediaDump = { version: 1; tasks: Record<string, string> }` trong cả `workbench-media-backup.ts` và `shared/home-api.ts` (`WorkbenchIdbMediaDump`). ZIP backup cũ còn mang khóa `pets` và `health` vẫn nhập được, vì chỉ `tasks` được kiểm tra và khôi phục.
 - Produces: `TemplateResolveResult = { template; slots; missing }` (bỏ `clientRow`). `buildFormFillBrief(opts: { form; vi; userHint; excerpt? })` (bỏ `clientRow`). Xóa `resolveFormFillContext`. `LocalAnswerSnapshot` bỏ `emails`, `LocalAnswerTopic` bỏ `'email'`.
 - Produces: `DeskWidgetId = 'kpi-strip' | 'reminders' | 'tasks-ring' | 'calendar-14d'`. Layout đã lưu có id bị xóa được bộ lọc `isDeskWidgetId` sẵn có bỏ qua.
@@ -1140,6 +1253,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 - [ ] **Step 1: Cập nhật test theo hành vi mới**
 
 `apps/shell/tests/my-ai-templates.test.ts`. Thay l.1-19 (các import và khối `vi.mock('../src/renderer/src/workbench-pins', …)`) bằng:
+
 ```ts
 import { describe, expect, it } from 'vitest'
 import {
@@ -1148,24 +1262,24 @@ import {
   resolveTemplateSlots,
 } from '../src/renderer/src/my-ai-templates'
 ```
+
 Rồi thay `it('resolves sales-quote slots from clients + text', …)` (l.28-39) bằng:
+
 ```ts
-  it('resolves sales-quote slots from the request text', () => {
-    const r = resolveTemplateSlots(
-      'sales',
-      'sales-quote',
-      'Soạn báo giá cho khách ABC gói Premier',
-    )
-    expect(r).not.toBeNull()
-    expect(r!.missing).toHaveLength(0)
-    expect(r!.slots.client).toBe('ABC')
-    expect(r!.slots.party).toBe('ABC')
-    expect(r!.slots.topic).toMatch(/Premier/i)
-  })
+it('resolves sales-quote slots from the request text', () => {
+  const r = resolveTemplateSlots('sales', 'sales-quote', 'Soạn báo giá cho khách ABC gói Premier')
+  expect(r).not.toBeNull()
+  expect(r!.missing).toHaveLength(0)
+  expect(r!.slots.client).toBe('ABC')
+  expect(r!.slots.party).toBe('ABC')
+  expect(r!.slots.topic).toMatch(/Premier/i)
+})
 ```
+
 và trong `builds structured brief with outline`, đổi `expect(brief).toMatch(/Công ty ABC/)` thành `expect(brief).toMatch(/Khách hàng: ABC/)`.
 
 `apps/shell/tests/my-ai-forms.test.ts`. Xóa l.36 `  readClients: () => [{ id: 'c1', name: 'Công ty ABC', email: 'an@abc.vn' }],`. Rồi thay l.67-77 bằng:
+
 ```ts
   it('builds brief with excerpt + request', () => {
     const form = matchFormByQuery('sales', 'nghỉ phép')!
@@ -1178,6 +1292,7 @@ và trong `builds structured brief with outline`, đổi `expect(brief).toMatch(
     expect(brief).toMatch(/Đơn xin nghỉ phép/)
     expect(brief).toMatch(/khách ABC/)
 ```
+
 Các kỳ vọng `Họ tên`, `không bịa` và dấu `})` đóng giữ nguyên.
 
 `apps/shell/tests/my-ai-local-answer.test.ts`. Xóa l.8 `  emails: [],`.
@@ -1194,11 +1309,13 @@ git rm src/renderer/src/FinancePane.tsx src/renderer/src/HealthPane.tsx src/rend
 - [ ] **Step 3: Gỡ store khỏi `workbench-pins.ts`**
 
 Xóa từ dưới lên, theo số dòng ở HEAD:
+
 - l.760-1623: từ dòng trống sau `writePersonal` tới hết file. Gồm `readFinance/writeFinance`, `WbEventItem`, mọi kiểu, store và IndexedDB sức khỏe (`uniwork.wb.health.media`), `healthDeskCounts`, growth, `readEvents/writeEvents`, family, friends, pets cùng `compressPetImage` và `uniwork.wb.pets.media`, travel, và clients/contracts/matters. File kết thúc ở dấu `}` đóng `writePersonal`.
 - l.669-735: `WbFinanceItem` tới `writeFinanceInvest` và dòng trống sau. `DEFAULT_PERSONAL` giữ lại.
 - l.518-644: `WbEmailFolder` tới `createEmailDraft` và dòng trống sau.
 
 Rồi bỏ việc ghi kép calendar↔events. Thay:
+
 ```ts
 /** Guard re-entrant dual-write between Calendar ↔ Events. */
 let calendarEventsSyncing = false
@@ -1230,7 +1347,9 @@ export function writeCalendar(practiceId: PracticeId, items: WbCalendarItem[]): 
   }
 }
 ```
+
 bằng:
+
 ```ts
 export function readCalendar(practiceId: PracticeId): WbCalendarItem[] {
   return readJson(`uniwork.wb.calendar.${practiceId}`, [])
@@ -1240,6 +1359,7 @@ export function writeCalendar(practiceId: PracticeId, items: WbCalendarItem[]): 
   writeJson(`uniwork.wb.calendar.${practiceId}`, items)
 }
 ```
+
 Khối import (l.1-19) giữ nguyên: mọi tên import vẫn được dùng.
 
 - [ ] **Step 4: Gỡ nút mail/expand khỏi `WbRowActions.tsx`**
@@ -1249,6 +1369,7 @@ Xóa l.186-234 (`IconMail`, `IconChevron`, `WbMailBtn`, `WbExpandBtn`). Nơi dù
 - [ ] **Step 5: Thay `workbench-desk.ts` (chỉ widget công việc)**
 
 Thay toàn bộ file bằng:
+
 ```ts
 import type { PracticeId } from '@uniwork/practice-core'
 import { wbStoreGetRaw, wbStoreSetRaw } from './workbench-store-client'
@@ -1357,11 +1478,13 @@ export function addDaysIso(base: Date, delta: number): string {
   return d.toISOString().slice(0, 10)
 }
 ```
+
 `DeskWidgetGroup`, `monthKey`, `formatMonthShort` và `lastNMonthKeys` chỉ widget tài chính dùng. `DESK_CHART` còn hex thô chỉ tạm thời: Task 13 xóa cả file khi Tổng quan thay `DeskPane`.
 
 - [ ] **Step 6: Thay `DeskPane.tsx` (không còn đọc finance, health, growth, family, events, clients, contracts, matters)**
 
 Thay toàn bộ file bằng:
+
 ```tsx
 import { useEffect, useMemo, useState } from 'react'
 import type { ReactElement } from 'react'
@@ -1566,9 +1689,7 @@ export function DeskPane({ practiceId, vi }: Props): ReactElement {
               'Desktop alerts for due tasks / today’s calendar (opt-in)',
             )}
           >
-            {notifyOn
-              ? label('Nhắc: bật', 'Reminders: on')
-              : label('Nhắc: tắt', 'Reminders: off')}
+            {notifyOn ? label('Nhắc: bật', 'Reminders: on') : label('Nhắc: tắt', 'Reminders: off')}
           </button>
           <button type="button" className="btn btn-secondary" onClick={() => setTick((t) => t + 1)}>
             {label('Làm mới', 'Refresh')}
@@ -1631,7 +1752,11 @@ export function DeskPane({ practiceId, vi }: Props): ReactElement {
                       >
                         ↓
                       </button>
-                      <button type="button" className="btn btn-secondary" onClick={() => remove(id)}>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => remove(id)}
+                      >
                         {label('Ẩn', 'Hide')}
                       </button>
                     </div>
@@ -1710,7 +1835,10 @@ export function DeskPane({ practiceId, vi }: Props): ReactElement {
                     color={DESK_CHART.tasks}
                     caption={
                       data.taskTotal === 0
-                        ? label('Chưa có việc — thêm ở tab Công việc.', 'No tasks yet — add in Tasks.')
+                        ? label(
+                            'Chưa có việc — thêm ở tab Công việc.',
+                            'No tasks yet — add in Tasks.',
+                          )
                         : label(
                             `${data.doneTasks}/${data.taskTotal} hoàn thành`,
                             `${data.doneTasks}/${data.taskTotal} done`,
@@ -1843,8 +1971,10 @@ function DayDensityChart({
 - [ ] **Step 7: Bỏ slot media pets/health (renderer, kiểu dùng chung, main)**
 
 `apps/shell/src/renderer/src/workbench-media-backup.ts`:
+
 - l.3 ` * Stores: tasks attachments (Blob), pets photos (data URL), health body (data URL).` thành ` * Stores: tasks attachments (Blob).`
 - Thay l.8-24:
+
 ```ts
 export interface WbIdbMediaDump {
   version: 1
@@ -1864,7 +1994,9 @@ const STORES = [
   },
 ]
 ```
+
 bằng:
+
 ```ts
 export interface WbIdbMediaDump {
   version: 1
@@ -1875,23 +2007,28 @@ const STORES = [
   { db: 'uniwork.wb.tasks.media', store: 'blobs', slot: 'tasks' as const, kind: 'blob' as const },
 ]
 ```
+
 - l.127 `  const dump: WbIdbMediaDump = { version: 1, tasks: {}, pets: {}, health: {} }` thành `  const dump: WbIdbMediaDump = { version: 1, tasks: {} }`.
 - Trong `isWbIdbMediaDump`, thay `return ( … )` (l.211-219) bằng `  return v.version === 1 && typeof v.tasks === 'object' && v.tasks != null`.
 
 `apps/shell/src/shared/home-api.ts` l.620-625: xóa hai dòng `  pets: Record<string, string>` và `  health: Record<string, string>` khỏi `WorkbenchIdbMediaDump`.
 
 `apps/shell/src/main/workbench-backup.ts`, `isMediaDump` (l.28-36). Thay `return ( … )` bằng:
+
 ```ts
-  return v.version === 1 && typeof v.tasks === 'object' && v.tasks != null
+return v.version === 1 && typeof v.tasks === 'object' && v.tasks != null
 ```
+
 Thay đổi này bắt buộc. Nếu không, main từ chối dump `{version, tasks}` mới của renderer vì "không phải media", và backup âm thầm làm mất file đính kèm của việc.
 
 - [ ] **Step 8: Gỡ phần đọc client/contract/matter và email khỏi My AI**
 
 `apps/shell/src/renderer/src/my-ai-templates.ts`:
+
 - Xóa l.7 `import { readClients, readContracts, readMatters, type WbClientItem } from './workbench-pins'`.
 - Xóa `function stripDiacritics` (l.216-219 và dòng trống sau). Chỉ `matchClient` dùng nó.
 - Thay l.284-300 (`function matchClient …` tới interface `TemplateResolveResult`) bằng:
+
 ```ts
 export interface TemplateResolveResult {
   template: PracticeDocTemplate
@@ -1899,19 +2036,24 @@ export interface TemplateResolveResult {
   missing: TemplateSlotDef[]
 }
 ```
-- Trong `resolveTemplateSlots`, thay toàn bộ từ `  const slots: ResolvedSlots = { ...extractSlotsFromUserText(userText) }` tới hết khối `try { const matters … } catch { … }` (l.310-343) bằng:
-```ts
-  const slots: ResolvedSlots = { ...extractSlotsFromUserText(userText) }
 
-  // party / investor reuse the client named in the request
-  if (!slots.party && slots.client) slots.party = slots.client
-  if (!slots.investor && slots.client) slots.investor = slots.client
+- Trong `resolveTemplateSlots`, thay toàn bộ từ `  const slots: ResolvedSlots = { ...extractSlotsFromUserText(userText) }` tới hết khối `try { const matters … } catch { … }` (l.310-343) bằng:
+
+```ts
+const slots: ResolvedSlots = { ...extractSlotsFromUserText(userText) }
+
+// party / investor reuse the client named in the request
+if (!slots.party && slots.client) slots.party = slots.client
+if (!slots.investor && slots.client) slots.investor = slots.client
 ```
+
 - `  return { template, slots, missing, clientRow }` thành `  return { template, slots, missing }`.
 - Trong `buildTemplateBrief`: `  const { template, slots, clientRow } = result` thành `  const { template, slots } = result`. Xóa khối `  if (clientRow) { … }` (l.385-390).
 
 `apps/shell/src/renderer/src/my-ai-forms.ts`:
+
 - Thay l.3-15:
+
 ```ts
  * Uploaded files are read on-device via readAttachment; slots reuse clients when useful.
  */
@@ -1927,7 +2069,9 @@ import {
   type WbFormItem,
 } from './workbench-pins'
 ```
+
 bằng:
+
 ```ts
  * Uploaded files are read on-device via readAttachment.
  */
@@ -1935,44 +2079,58 @@ import type { PracticeId } from '@uniwork/practice-core'
 import type { PracticeDocTemplate } from './my-ai-templates'
 import { readForms, type WbFormItem } from './workbench-pins'
 ```
+
 - Xóa `function matchClientHint` (l.152-161 và dòng trống sau).
 - Trong `buildFormFillBrief`, thay:
+
 ```ts
   excerpt?: string
   clientRow?: WbClientItem
 }): string {
   const { form, vi, userHint, excerpt, clientRow } = opts
 ```
+
 bằng:
+
 ```ts
   excerpt?: string
 }): string {
   const { form, vi, userHint, excerpt } = opts
 ```
+
 và xóa khối `  if (clientRow) { … }` (l.185-191).
+
 - Xóa `resolveFormFillContext` cùng doc comment và dòng trống phía trước (l.225-237).
 
 `apps/shell/src/renderer/src/NewChatPane.tsx`:
+
 - Xóa l.35 `  resolveFormFillContext,` khỏi import `./my-ai-forms`.
 - l.38 `import { readClients, readForms } from './workbench-pins'` thành `import { readForms } from './workbench-pins'`.
 - Thay l.900-902:
+
 ```ts
-      const { clientRow } = resolveFormFillContext(practiceId, form, hint)
-      const excerpt = form.filePath ? await readFormFileExcerpt(form.filePath) : ''
-      const brief = buildFormFillBrief({ form, vi, userHint: hint, excerpt, clientRow })
+const { clientRow } = resolveFormFillContext(practiceId, form, hint)
+const excerpt = form.filePath ? await readFormFileExcerpt(form.filePath) : ''
+const brief = buildFormFillBrief({ form, vi, userHint: hint, excerpt, clientRow })
 ```
+
 bằng:
+
 ```ts
-      const excerpt = form.filePath ? await readFormFileExcerpt(form.filePath) : ''
-      const brief = buildFormFillBrief({ form, vi, userHint: hint, excerpt })
+const excerpt = form.filePath ? await readFormFileExcerpt(form.filePath) : ''
+const brief = buildFormFillBrief({ form, vi, userHint: hint, excerpt })
 ```
+
 - Thay l.922-939 (`const clients = readClients(practiceId).slice(0, 5)` tới dấu `}` đóng `if (needsClient) { … }`) bằng:
+
 ```ts
-        const choices: ChatChoice[] = []
+const choices: ChatChoice[] = []
 ```
+
 - Xóa khối `      if (local.topic === 'email') { … }` (l.1652-1659).
 
 `apps/shell/src/renderer/src/my-ai-local-answer.ts`:
+
 - l.7 thành `import { readCalendar, readNotes, readTasks } from './workbench-pins'`.
 - Xóa l.14 `  | 'email'` (trong `LocalAnswerTopic`) và l.31 `  emails: { subject: string; folder: string; to?: string; from?: string }[]` (trong `LocalAnswerSnapshot`).
 - Xóa `function wantsEmail` (l.87-90 và dòng trống sau), câu lệnh `const mailLines = …` (l.148-151), và khối `if (wantsEmail(lower)) { … }` (l.263-273 và dòng trống sau).
@@ -1981,6 +2139,7 @@ bằng:
 - [ ] **Step 9: Xóa CSS của các module đã gỡ khỏi `home.css`**
 
 Xóa các khoảng dòng HEAD sau, từ dưới lên để số dòng còn đúng:
+
 1. `7481-7502` (`.wb-growth-main` … `.wb-growth-progress input[type='range']`)
 2. `7337-7471` (`.wb-desk-bars` … `.wb-finance-summary strong`; `.wb-module-form select` ở 7472 giữ lại)
 3. `7304-7326` (`.wb-desk-legend-list` …)
@@ -1994,6 +2153,7 @@ Xóa các khoảng dòng HEAD sau, từ dưới lên để số dòng còn đún
 11. `3928-4005` (`.wb-row-actions .wb-row-chip` … `.wb-travel-check-add`)
 
 Rồi thay rule dùng chung (trước đây l.4006-4012):
+
 ```css
 .wb-family,
 .wb-friends,
@@ -2003,15 +2163,20 @@ Rồi thay rule dùng chung (trước đây l.4006-4012):
 .wb-cal,
 .wb-tasks {
 ```
+
 bằng:
+
 ```css
 .wb-cal,
 .wb-tasks {
 ```
+
 Kiểm tra không còn class nào đã xóa:
+
 ```bash
 cd /Users/ducquang/UNICOM/uniwork-office && grep -nE '\.wb-(pets-(hero|grid|card|empty|form|album|gallery|care|shot|toolbar|notes|photo|back)|pet-|hdash|health|finance|family|friends|ft-|email|travel|growth|assistant|row-chip|desk-(bars?|bar-|health|kpi|mini|legend|donut-(wrap|label)))' apps/shell/src/renderer/src/home.css
 ```
+
 Kết quả mong đợi: không có output. File giảm từ 8462 xuống 6722 dòng.
 
 - [ ] **Step 10: Typecheck, test, tìm tham chiếu còn sót**
@@ -2022,7 +2187,9 @@ cd /Users/ducquang/UNICOM/uniwork-office/apps/shell && npx vitest run
 cd /Users/ducquang/UNICOM/uniwork-office && grep -rnE "FinancePane|HealthPane|HealthMetricsViz|FamilyPane|FamilyTreeCanvas|family-tree-layout|FriendsPane|PetsPane|EmailPane|readEmails|readFinance|readHealth|readFamily|readFriends|readPets|readTravel|readClients|readContracts|readMatters|readEvents|readGrowth|compressPetImage|healthDeskCounts|WbMailBtn|WbExpandBtn" apps/shell/src apps/shell/tests
 npm run check:theme-colors -- --base origin/main
 ```
+
 Kết quả mong đợi:
+
 - typecheck exit 0;
 - mọi file test shell pass (`Test Files 134 passed`, `Tests 2106 passed` trên bản chạy thử; ít hơn một file vì `family-tree-layout.test.ts` đã xóa);
 - grep không in gì;
@@ -2033,9 +2200,11 @@ Kết quả mong đợi:
 ```bash
 cd /Users/ducquang/UNICOM/uniwork-office && npm run build -w @genoffice/shell
 ```
+
 Kết quả mong đợi: build thành công. `src/main/workbench-backup.ts` đã đổi, nên build shell cũ sẽ tiếp tục từ chối dump media mới.
 
 Rồi chạy `npm run dev`. Trong Bàn làm việc:
+
 - menu "+" của thanh tab chỉ liệt kê Ghi chú, Biểu mẫu, Cá nhân và 4 trụ cột; tab Việc và Lịch mở được;
 - My Space hiện 2 chip nhịp và các thẻ Nhắc việc, Tiến độ công việc, Lịch 14 ngày;
 - Cài đặt → sao lưu Bàn làm việc vẫn xuất ra ZIP.
@@ -2064,6 +2233,7 @@ Số dòng dưới đây tính ở commit `9194f306`. Task 1–3 có thể làm 
 Ghi chú hợp đồng: Task 4 gỡ các consumer duy nhất của `@uniwork/edu-core` (`main/edu-commercial.ts`, `TeacherHome.tsx`, `practices/teacher.ts`). Không còn ai import `hub.ts`, nên Task 5 xóa nó cùng `tests/edu-core.test.ts` và cả package; không chuyển gì (C7). Form Hub Token, ghi chú giá ở hero ("Desktop miễn phí; Token AI…") và các `window.confirm` "Tốn Token" chỉ nằm trong `TeacherHome.tsx`, nên bị gỡ ở đây. Modal "Dùng Token AI?" của `PracticeHome` giữ lại: kỹ năng nó chặn chạy với `autoRun: true` và tốn credit AI.
 
 **Files:**
+
 - Delete: `apps/shell/src/renderer/src/TeacherHome.tsx`, `apps/shell/src/main/edu-commercial.ts`, `packages/practice-core/src/practices/teacher.ts`, `packages/practice-core/src/practices/principal.ts`
 - Modify: `apps/shell/src/renderer/src/Home.tsx` (import l.28, l.32, l.3447-3485)
 - Modify: `apps/shell/src/main/index.ts` (l.84, l.4466-4484)
@@ -2076,6 +2246,7 @@ Ghi chú hợp đồng: Task 4 gỡ các consumer duy nhất của `@uniwork/edu
 - Test: `packages/practice-core/tests/practice-core.test.ts`, `packages/practice-core/tests/agent-intent.test.ts`, `packages/project-store/tests/store.test.ts` (l.1145-1204), `apps/shell/tests/skill-domain-pins.test.ts` (mới), `apps/shell/tests/strings-visible-copy.test.ts` (l.103), `apps/shell/tests/{my-ai-history,my-ai-playbooks-consent,workbench-account-gate,workbench-accounts,workbench-db}.test.ts`
 
 **Interfaces:**
+
 - Consumes: `PRACTICE_IDS` sau khi cắt theo hợp đồng (13 id, mặc định `'entrepreneur'`).
 - Produces:
   - `PRACTICE_IDS` không còn `'teacher'` và `'principal'`.
@@ -2095,6 +2266,7 @@ git rm apps/shell/src/renderer/src/TeacherHome.tsx apps/shell/src/main/edu-comme
 ```
 
 `apps/shell/src/renderer/src/Home.tsx`:
+
 - Xóa l.32 `import { TeacherHome } from './TeacherHome'`.
 - Đổi l.28 từ `import { getPractice, isPracticeId, listPractices, type PracticeId } from '@uniwork/practice-core'` thành `import { getPractice, isPracticeId, requirePractice, type PracticeId } from '@uniwork/practice-core'`.
 - Thay l.3447-3485. Trước:
@@ -2168,15 +2340,18 @@ Sau:
 Fallback của `useState` ở l.1152-1157 (`return 'entrepreneur'`) giữ nguyên.
 
 `apps/shell/src/main/index.ts`:
+
 - Xóa l.84 `import { exportLessonPackZip, probeAiHub } from './edu-commercial'`.
 - Xóa l.4466-4484: toàn bộ khối `ipcMain.handle(HOME_CHANNELS.probeAiHub, …)`, toàn bộ khối `ipcMain.handle(HOME_CHANNELS.exportLessonPack, async (event, projectId: unknown) => { … })` và dòng trống sau, dừng ngay trước `ipcMain.handle(HOME_CHANNELS.newDoc, …`.
 
 `apps/shell/src/preload/index.ts`:
+
 - Xóa l.900-912: các member `async createEducationProject(args) {…}`, `async getEduMeta(projectId) {…}` và `async patchEduMeta(args) {…}`, dừng trước `async createPracticeProject(args) {`.
 - Xóa l.298-305: member `async exportLessonPack(projectId) { … },`.
 - Xóa l.271-278: member `async probeAiHub(opts) { … },`.
 
 `apps/shell/src/shared/home-api.ts`:
+
 - Xóa l.1186-1188 trong `PROJECT_CHANNELS`: `createEducation: 'project:createEducation',`, `getEduMeta: 'project:getEduMeta',` và `patchEduMeta: 'project:patchEduMeta',`.
 - Xóa l.1142-1143 trong `HOME_CHANNELS`: `probeAiHub: 'home:probe-ai-hub',` và `exportLessonPack: 'home:export-lesson-pack',`.
 - Xóa l.1029-1034 trong `ProjectHomeApi`: ba doc comment và các method `createEducationProject(…)`, `getEduMeta(…)`, `patchEduMeta(…)`.
@@ -2257,7 +2432,6 @@ describe('legacy edu/meta.json', () => {
     expect(summary?.kind).toBeUndefined()
   })
 })
-
 ```
 
 - [ ] **Step 5: (B) Chạy và thấy test fail**
@@ -2268,6 +2442,7 @@ Kết quả mong đợi: FAIL, 1 test fail (`legacy edu/meta.json > is not read 
 - [ ] **Step 6: (B) Gỡ phần edu khỏi project-store và kiểu ở docs-main**
 
 `packages/project-store/src/types.ts`:
+
 - `ProjectKind` (l.66-81): xóa `  | 'education'` và `  | 'principal'`.
 - l.83: đổi `/** Practice pack ids (teacher uses legacy education kind). */` thành `/** Practice pack ids. */`. Trong `PracticeId` (l.84-99), xóa `  | 'teacher'` và `  | 'principal'`.
 - l.101-104: thay comment bằng `/** Generic practice pack metadata (projects/<id>/practice/meta.json). */`.
@@ -2279,6 +2454,7 @@ Kết quả mong đợi: FAIL, 1 test fail (`legacy edu/meta.json > is not read 
 `packages/project-store/src/index.ts`: xóa l.6 `  EduProjectMeta,`.
 
 `packages/project-store/src/store.ts`:
+
 - Xóa l.38 `  EduProjectMeta,`.
 - `PROJECT_KINDS` (l.52-68): xóa `  'education',` và `  'principal',`.
 - `practiceKindToProjectKind`: xóa `  if (practiceId === 'teacher') return 'education'`.
@@ -2286,37 +2462,34 @@ Kết quả mong đợi: FAIL, 1 test fail (`legacy edu/meta.json > is not read 
 - `listProjectsSummary`, l.1009-1022. Trước:
 
 ```ts
-      const edu = this.getEduMeta(info.id) ?? undefined
-      const practice = this.getPracticeMeta(info.id) ?? undefined
-      const kind =
-        info.kind ??
-        edu?.kind ??
-        (practice ? practiceKindToProjectKind(practice.practiceId) : undefined)
-      return {
-        ...info,
-        ...(kind ? { kind } : {}),
-        fileCount,
-        lastActiveAt,
-        isDefault: info.id === 'default',
-        ...(edu ? { edu } : {}),
-        ...(practice ? { practice } : {}),
-      }
+const edu = this.getEduMeta(info.id) ?? undefined
+const practice = this.getPracticeMeta(info.id) ?? undefined
+const kind =
+  info.kind ?? edu?.kind ?? (practice ? practiceKindToProjectKind(practice.practiceId) : undefined)
+return {
+  ...info,
+  ...(kind ? { kind } : {}),
+  fileCount,
+  lastActiveAt,
+  isDefault: info.id === 'default',
+  ...(edu ? { edu } : {}),
+  ...(practice ? { practice } : {}),
+}
 ```
 
 Sau:
 
 ```ts
-      const practice = this.getPracticeMeta(info.id) ?? undefined
-      const kind =
-        info.kind ?? (practice ? practiceKindToProjectKind(practice.practiceId) : undefined)
-      return {
-        ...info,
-        ...(kind ? { kind } : {}),
-        fileCount,
-        lastActiveAt,
-        isDefault: info.id === 'default',
-        ...(practice ? { practice } : {}),
-      }
+const practice = this.getPracticeMeta(info.id) ?? undefined
+const kind = info.kind ?? (practice ? practiceKindToProjectKind(practice.practiceId) : undefined)
+return {
+  ...info,
+  ...(kind ? { kind } : {}),
+  fileCount,
+  lastActiveAt,
+  isDefault: info.id === 'default',
+  ...(practice ? { practice } : {}),
+}
 ```
 
 - Xóa l.1027-1049: `getEduMeta(…) { … }`, `setEduMeta(…) { … }` và dòng trống sau.
@@ -2344,6 +2517,7 @@ Sau:
 ```
 
 `apps/docs/src/main/docs-main.ts`:
+
 - Đổi l.82 từ `import { ProjectStore } from '@genoffice/project-store'` thành `import { ProjectStore, type PracticeId } from '@genoffice/project-store'`.
 - Handler `'project:createPractice'`: đổi `  /** Create a non-teacher practice pack */` thành `  /** Create a practice pack */`.
 - Đổi `        practiceId: 'legal' | 'construction' | 'procurement' | 'principal'` thành `        practiceId: PracticeId`.
@@ -2373,33 +2547,33 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 Trong `packages/practice-core/tests/practice-core.test.ts`, thay `it(...)` đầu tiên (l.23-50) bằng:
 
 ```ts
-  it('registers the 13 business practices and no education role', () => {
-    const ids = listPractices().map((p) => p.id)
-    expect(ids).toEqual(
-      expect.arrayContaining([
-        'legal',
-        'construction',
-        'procurement',
-        'sales',
-        'customer-care',
-        'entrepreneur',
-        'freelancer',
-        'content-creator',
-        'marketing',
-        'hr',
-        'accounting',
-        'it',
-        'real-estate',
-      ]),
-    )
-    expect(ids).toHaveLength(13)
-    expect(ids).not.toContain('teacher')
-    expect(ids).not.toContain('principal')
-    expect(practiceProjectKind('legal')).toBe('legal')
-    expect(practiceProjectKind('sales')).toBe('sales')
-    expect(practiceIdFromProjectKind('education')).toBeNull()
-    expect(practiceIdFromProjectKind('content-creator')).toBe('content-creator')
-  })
+it('registers the 13 business practices and no education role', () => {
+  const ids = listPractices().map((p) => p.id)
+  expect(ids).toEqual(
+    expect.arrayContaining([
+      'legal',
+      'construction',
+      'procurement',
+      'sales',
+      'customer-care',
+      'entrepreneur',
+      'freelancer',
+      'content-creator',
+      'marketing',
+      'hr',
+      'accounting',
+      'it',
+      'real-estate',
+    ]),
+  )
+  expect(ids).toHaveLength(13)
+  expect(ids).not.toContain('teacher')
+  expect(ids).not.toContain('principal')
+  expect(practiceProjectKind('legal')).toBe('legal')
+  expect(practiceProjectKind('sales')).toBe('sales')
+  expect(practiceIdFromProjectKind('education')).toBeNull()
+  expect(practiceIdFromProjectKind('content-creator')).toBe('content-creator')
+})
 ```
 
 Test mới không còn gọi `getPractice` (dòng `getPractice('teacher')?.projectKind` cũ là nơi dùng duy nhất), nên xóa dòng `  getPractice,` khỏi khối import `../src/index.js` ở đầu file. Nếu không, `npx eslint packages/practice-core` (Task 15 Step 17) và `npm run lint` (Task 19 Step 7) báo `'getPractice' is defined but never used`.
@@ -2409,39 +2583,39 @@ Test `'exposes workbench modules and role defaults'` đã được Task 2 viết
 Thay test `'exposes skill domains with starter skills'` (l.122-141 ở HEAD) bằng:
 
 ```ts
-  it('exposes skill domains with starter skills and role-based defaults', () => {
-    const ids = SKILL_DOMAINS.map((d) => d.id)
-    expect(ids).toEqual(
-      expect.arrayContaining([
-        'health',
-        'legal',
-        'design',
-        'project-mgmt',
-        'sales',
-        'admin',
-        'hr',
-        'customer-care',
-        'personal',
-      ]),
-    )
-    expect(ids).not.toContain('education')
-    expect(isSkillDomainId('education')).toBe(false)
-    expect(defaultPinnedSkillDomains('entrepreneur')).toEqual(['sales', 'admin'])
-    expect(defaultPinnedSkillDomains('legal')).toEqual(['legal', 'admin'])
-    expect(defaultPinnedSkillDomains('accounting')).toEqual(['admin'])
-    expect(isSkillDomainId('sales')).toBe(true)
-    expect(skillsForDomain('legal').length).toBeGreaterThan(0)
-    expect(skillsForDomain('personal').every((s) => s.domainId === 'personal')).toBe(true)
-  })
+it('exposes skill domains with starter skills and role-based defaults', () => {
+  const ids = SKILL_DOMAINS.map((d) => d.id)
+  expect(ids).toEqual(
+    expect.arrayContaining([
+      'health',
+      'legal',
+      'design',
+      'project-mgmt',
+      'sales',
+      'admin',
+      'hr',
+      'customer-care',
+      'personal',
+    ]),
+  )
+  expect(ids).not.toContain('education')
+  expect(isSkillDomainId('education')).toBe(false)
+  expect(defaultPinnedSkillDomains('entrepreneur')).toEqual(['sales', 'admin'])
+  expect(defaultPinnedSkillDomains('legal')).toEqual(['legal', 'admin'])
+  expect(defaultPinnedSkillDomains('accounting')).toEqual(['admin'])
+  expect(isSkillDomainId('sales')).toBe(true)
+  expect(skillsForDomain('legal').length).toBeGreaterThan(0)
+  expect(skillsForDomain('personal').every((s) => s.domainId === 'personal')).toBe(true)
+})
 ```
 
 Trong `packages/practice-core/tests/agent-intent.test.ts`, đổi l.36-39 (đoạn `parseAgentIntentTarget(null, 'education')`) thành:
 
 ```ts
-    expect(parseAgentIntentTarget(null, 'legal')).toEqual({
-      kind: 'skill-domain',
-      id: 'legal',
-    })
+expect(parseAgentIntentTarget(null, 'legal')).toEqual({
+  kind: 'skill-domain',
+  id: 'legal',
+})
 ```
 
 - [ ] **Step 10: (C) Viết test skill-pin của shell sẽ fail**
@@ -2504,6 +2678,7 @@ cd /Users/ducquang/UNICOM/uniwork-office/apps/shell && npx vitest run tests/skil
 ```
 
 Kết quả mong đợi:
+
 - practice-core: FAIL, 2 test fail. Danh sách id dài 15, và `defaultPinnedSkillDomains('entrepreneur')` trả `['education','personal','admin']`.
 - shell: FAIL, 4 test fail. Mặc định là `['education','personal','admin']`, pin `education` đã lưu vẫn giữ, và `readActiveSkillDomain([])` trả `'education'`.
 
@@ -2515,6 +2690,7 @@ git rm packages/practice-core/src/practices/teacher.ts packages/practice-core/sr
 ```
 
 `packages/practice-core/src/types.ts`:
+
 - Trong `PRACTICE_IDS` (l.2-18), xóa `  'teacher',` và `  'principal',`.
 - Thay l.27-31 (`/** ProjectStore kind … Teacher keeps legacy education … */ export type PracticeProjectKind = 'education' | Exclude<PracticeId, 'teacher'>`) bằng:
 
@@ -2536,6 +2712,7 @@ export function practiceIdFromProjectKind(kind: string | undefined): PracticeId 
 ```
 
 `packages/practice-core/src/registry.ts`:
+
 - Xóa l.4 `import { principalPractice } from './practices/principal.js'` và l.6 `import { teacherPractice } from './practices/teacher.js'`.
 - Trong `PRACTICE_REGISTRY`, xóa `  teacherPractice,` và `  principalPractice,`.
 - Trong `PRACTICE_GROUPS`, xóa nhóm đầu (l.25-30):
@@ -2565,6 +2742,7 @@ type BusinessPracticeId = Exclude<PracticeId, 'legal' | 'construction' | 'procur
 ```
 
 `packages/practice-core/src/skill-domains.ts`:
+
 - Sau comment đầu file (trước `export type SkillDomainId =`), thêm `import type { PracticeId } from './types.js'`.
 - Trong union `SkillDomainId`, xóa `  | 'education'`.
 - Trong `SKILL_DOMAINS`, xóa mục đầu (l.42-50, `{ id: 'education', … color: '#3276CD', available: true },`).
@@ -2609,6 +2787,7 @@ Chạy `cd /Users/ducquang/UNICOM/uniwork-office/packages/practice-core && npx v
 - [ ] **Step 13: (C) Typecheck shell để gom các lỗi đã biết**
 
 Chạy `cd /Users/ducquang/UNICOM/uniwork-office && npm run typecheck -w @genoffice/shell`. Kết quả mong đợi: FAIL với đúng các lỗi sau (dự đoán từ việc đọc code; số dòng có thể lệch do Task 2–3):
+
 - `src/renderer/src/PracticeHome.tsx(327,…)`: TS2367, "comparison appears to be unintentional … 'PracticeId' and '"teacher"'".
 - `src/renderer/src/my-ai-playbooks.ts(469,…)`: TS2322, `'"teacher"'` và `'"principal"'` không gán được cho `PracticeId`.
 - `src/renderer/src/skill-domain-pins.ts` (l.14, 16, 18, 20, 38): TS2554, "Expected 1 arguments, but got 0".
@@ -2722,6 +2901,7 @@ Sau:
 `apps/shell/src/renderer/src/my-ai-templates.ts`: xóa l.151-174, toàn bộ phần tử `{ id: 'teacher-lesson', playbookId: 'teacher-lesson', … },`, dừng trước `  {\n    id: 'cs-reply',`.
 
 `apps/shell/src/shared/home-api.ts`:
+
 - Trong `PracticeIdEntry`, xóa `  | 'teacher'` và `  | 'principal'`.
 - Trong `ProjectKindEntry`, xóa `  | 'education'` và `  | 'principal'`.
 - Trong `CreatePracticeProjectArgs`, đổi `  practiceId: Exclude<PracticeIdEntry, 'teacher'>` thành `  practiceId: PracticeIdEntry`.
@@ -2765,6 +2945,7 @@ npm run build -w @genoffice/shell
 ```
 
 Kết quả mong đợi:
+
 - grep không in gì.
 - Mọi typecheck pass.
 - practice-core 10 passed, project-store pass.
@@ -2785,6 +2966,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
 Ghi chú cho phần CSS (spec 6.9): sau task này, các rule `home.css` sau đã chết vì chỉ TeacherHome dùng; Task 12 Step 14 xóa chúng (sau khi đổi tiền tố thành `wb-*`):
+
 - `.teacher-filters` (l.7509-7538, danh sách selector chung còn gồm `.teacher-form select` và `.teacher-add-row select`)
 - `.teacher-chip-row-spaced` (7617)
 - `.teacher-hub-toggle`, `.teacher-hub-nested`, `.teacher-hub` (7621-7646)
@@ -2795,11 +2977,13 @@ Ghi chú cho phần CSS (spec 6.9): sau task này, các rule `home.css` sau đã
 ### Task 5: Xóa `packages/edu-core`
 
 **Files:**
+
 - Delete: `packages/edu-core/` (`package.json`, `tsconfig.json`, `vitest.config.ts`, `src/{catalog,hub,index,knowledge,materials,meta,pack,prompts,skills,templates,types}.ts`, `tests/edu-core.test.ts`)
 - Modify: `apps/shell/package.json:42`, `packages/practice-core/package.json:7,16-18`, `package.json:36-37`, `package-lock.json` (l.295, 6383-6386, 16201-16209, 16396-16398)
 - Test: không có test mới. Sau Task 4 `hub.ts` không còn consumer, nên test của nó đi cùng package.
 
 **Interfaces:**
+
 - Consumes: Task 4 (không source nào import `@uniwork/edu-core` nữa).
 - Produces: workspace `@uniwork/edu-core` không còn tồn tại.
 
@@ -2807,6 +2991,7 @@ Ghi chú cho phần CSS (spec 6.9): sau task này, các rule `home.css` sau đã
 
 Chạy `cd /Users/ducquang/UNICOM/uniwork-office && git grep -n "edu-core" -- apps packages package.json ':!packages/edu-core'`.
 Kết quả mong đợi: đúng bốn dòng ở ba file:
+
 - `apps/shell/package.json:42`
 - `package.json:36`, `package.json:37`
 - `packages/practice-core/package.json:17`
@@ -2823,6 +3008,7 @@ git rm -r packages/edu-core
 `apps/shell/package.json`: xóa dòng `    "@uniwork/edu-core": "*",`.
 
 `package.json`:
+
 - Trong `scripts.test`, đổi `npm run test -w @genoffice/i18n && npm run test -w @uniwork/edu-core && npm run test -w @uniwork/practice-core` thành `npm run test -w @genoffice/i18n && npm run test -w @uniwork/practice-core`.
 - Trong `scripts.typecheck`, đổi `npm run typecheck -w @genoffice/i18n && npm run typecheck -w @uniwork/edu-core && npm run typecheck -w @uniwork/practice-core` thành `npm run typecheck -w @genoffice/i18n && npm run typecheck -w @uniwork/practice-core`.
 
@@ -2892,6 +3078,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 Ghi chú hợp đồng: UI phụ thuộc `license-entitlements.ts` là `LicenseDevicesPane.tsx` và `BillingPaymentPane.tsx`; helper duy nhất của chúng là `payment-account.ts` và `vietqr.ts`. Task này xóa cả năm. Cài đặt vẫn hiện tên gói qua `AccountPane.tsx:245`.
 
 **Files:**
+
 - Delete: `apps/shell/src/renderer/src/license-entitlements.ts`, `LicenseDevicesPane.tsx`, `BillingPaymentPane.tsx`, `payment-account.ts`, `vietqr.ts` (đều trong `apps/shell/src/renderer/src/`)
 - Modify: `apps/shell/src/renderer/src/SettingsModal.tsx` (l.49, 56, 1730-1737)
 - Modify: `apps/shell/src/renderer/src/settings.css` (l.1109-1390)
@@ -2901,6 +3088,7 @@ Ghi chú hợp đồng: UI phụ thuộc `license-entitlements.ts` là `LicenseD
 - Test: `apps/shell/tests/account-ui.test.ts` (l.19-20, 674, 682-737)
 
 **Interfaces:**
+
 - Consumes: không có.
 - Produces: không còn export `LicensePlanId`, `LicenseDevicesPane`, `BillingPaymentPane`. Cài đặt → Tài khoản hiện ô ngôn ngữ, `AccountPane` (vẫn hiện tên gói, `AccountPane.tsx:245`) và `UniworkCloudAccountRows`. Khóa `uniwork.teacher*` và `uniwork.teacherUiLang` không còn được lưu, sao lưu hay khôi phục (spec 4.2).
 
@@ -2912,6 +3100,7 @@ git rm license-entitlements.ts LicenseDevicesPane.tsx BillingPaymentPane.tsx pay
 ```
 
 `SettingsModal.tsx`:
+
 - Xóa l.49 `import { BillingPaymentPane } from './BillingPaymentPane'` và l.56 `import { LicenseDevicesPane } from './LicenseDevicesPane'`.
 - l.1729-1738. Trước:
 
@@ -2938,6 +3127,7 @@ Sau:
 `settings.css`: xóa l.1109-1390, từ `/* ── License & devices ──… */` tới dấu `}` đóng `.set-billing-order span { … }`. Dòng giữ lại tiếp theo là `/* Settings → About: the one-click update entry next to the version row */`, dòng trống 1108 giữ nguyên.
 
 `apps/shell/tests/account-ui.test.ts`:
+
 - Xóa l.19 `import { BillingPaymentPane } from '../src/renderer/src/BillingPaymentPane'` và l.20 `import { LicenseDevicesPane } from '../src/renderer/src/LicenseDevicesPane'`.
 - Xóa l.674 `    expect(settings).toMatch(/\.set-license-warn \{[^}]*color: var\(--danger-text\)/)`.
 - Xóa l.682-737: dòng trống và toàn bộ khối `describe('legacy license panes next to the UniWork account', …)`, tới hết file.
@@ -2957,29 +3147,28 @@ Kết quả mong đợi: grep không in gì, typecheck pass, account-ui pass (í
 - [ ] **Step 3: Gỡ ô chọn ngôn ngữ ở hero của PracticeHome**
 
 `apps/shell/src/renderer/src/PracticeHome.tsx`:
+
 - Xóa l.28-39: dòng trống, `const UI_LANG_KEY = 'uniwork.teacherUiLang'`, `type WorkbenchUiLang = 'vi' | 'en'` và toàn bộ `function persistWorkbenchUiLang(…) { … }`. Giữ một dòng trống sau các import.
 - l.77-85. Trước:
 
 ```tsx
-  const { lang, setLang } = useI18n()
-  const vi = lang === 'vi'
-  const uiLang: WorkbenchUiLang = vi ? 'vi' : 'en'
-  const label = (a: string, b: string) => (vi ? a : b)
+const { lang, setLang } = useI18n()
+const vi = lang === 'vi'
+const uiLang: WorkbenchUiLang = vi ? 'vi' : 'en'
+const label = (a: string, b: string) => (vi ? a : b)
 
-  const changeUiLang = (next: WorkbenchUiLang) => {
-    persistWorkbenchUiLang(next)
-    setLang(next)
-  }
-
+const changeUiLang = (next: WorkbenchUiLang) => {
+  persistWorkbenchUiLang(next)
+  setLang(next)
+}
 ```
 
 Sau:
 
 ```tsx
-  const { lang } = useI18n()
-  const vi = lang === 'vi'
-  const label = (a: string, b: string) => (vi ? a : b)
-
+const { lang } = useI18n()
+const vi = lang === 'vi'
+const label = (a: string, b: string) => (vi ? a : b)
 ```
 
 - Xóa l.571-581, `<label className="teacher-lang">` thứ hai (select "Ngôn ngữ / Language" có `value={uiLang}`) tới hết `</label>` của nó. Label chọn vai trò phía trên giữ lại (Task 12 thay cả hero bằng thanh trên). Ngôn ngữ app vẫn đổi ở Cài đặt → Tài khoản → Ngôn ngữ.
@@ -3098,6 +3287,7 @@ Chưa kiểm ở Task 4–6: không chạy e2e và chưa thử các sửa đổi
 Ghi chú hợp đồng: Task 7 sở hữu thay đổi `slug`/`orgSlug` của `UniworkWorkspaceRef` (C5): kiểu, phần parse trong `uniwork-docs/client.ts`, stub e2e và test client tài liệu. Task 7 tạo `apps/shell/src/shared/uniwork-work-api.ts` với kiểu lỗi và kết quả, `workErrorOfDocCode`, các DTO và `WorkCreateTaskInput`; Task 8 thêm `WorkRecentDocument`, `WorkWebTarget`, `UNIWORK_WORK_CHANNELS` và `UniworkWorkApi` vào cuối file. `uniworkId` giờ từ chối cả giá trị không phải chuỗi: trước đây id không phải chuỗi từ IPC lọt qua regex dưới dạng chuỗi "undefined", nay thành `not_found` (renderer thấy `'forbidden'`). Caller của docs không bị ảnh hưởng. Quick add không gửi `allow_duplicate` (C15).
 
 **Files:**
+
 - Create: `apps/shell/src/shared/uniwork-work-api.ts`
 - Create: `apps/shell/src/main/uniwork-work/parse.ts`
 - Create: `apps/shell/src/main/uniwork-work/client.ts`
@@ -3108,6 +3298,7 @@ Ghi chú hợp đồng: Task 7 sở hữu thay đổi `slug`/`orgSlug` của `Un
 - Test (modify): `apps/shell/tests/uniwork-docs-client.test.ts:32-39`, thêm một khối describe trước `:115`
 
 **Interfaces:**
+
 - Consumes:
   - `UniworkDocsClientOptions`, `FetchLike`, `METADATA_TIMEOUT_MS` từ `main/uniwork-docs/client.ts`
   - `UniworkDocError`, `errorFromResponse` từ `main/uniwork-docs/errors.ts`
@@ -3722,13 +3913,16 @@ export interface WorkCreateTaskInput {
 - [ ] **Step 4: Tách đường gửi đã gia cố ra khỏi client tài liệu.** Sửa ba chỗ trong `apps/shell/src/main/uniwork-docs/client.ts`. Thân `send` (l.126-189 hiện nay) giữ nguyên từng byte.
 
   Sửa A (l.78-81). Trước:
+
 ```ts
 function id(value: string): string {
   if (!ID.test(value)) throw new UniworkDocError('not_found')
   return encodeURIComponent(value)
 }
 ```
-  Sau:
+
+Sau:
+
 ```ts
 /** a route segment: an id the server issued, never a path (the work client uses it too) */
 export function uniworkId(value: string): string {
@@ -3737,7 +3931,9 @@ export function uniworkId(value: string): string {
 }
 const id = uniworkId
 ```
-  Sửa B (l.107-125). Trước:
+
+Sửa B (l.107-125). Trước:
+
 ```ts
 export function createUniworkDocsClient(options: UniworkDocsClientOptions): UniworkDocsClient {
   const origin = new URL(options.apiOrigin).origin
@@ -3759,7 +3955,9 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
 
   async function send<T>(call: Call<T>): Promise<T> {
 ```
-  Sau:
+
+Sau:
+
 ```ts
 /** one request to a UniWork route (documents, and the Workbench's work routes) */
 export interface UniworkCall<T> {
@@ -3783,7 +3981,9 @@ export function createUniworkSend(
 
   return async function send<T>(call: UniworkCall<T>): Promise<T> {
 ```
-  Sửa C (l.190-195). Trước:
+
+Sửa C (l.190-195). Trước:
+
 ```ts
     } catch (error) {
       throw fromAuthFailure(error)
@@ -3792,7 +3992,9 @@ export function createUniworkSend(
 
   const json = (response: Response): Promise<unknown> => response.json()
 ```
-  Sau:
+
+Sau:
+
 ```ts
     } catch (error) {
       throw fromAuthFailure(error)
@@ -3806,9 +4008,11 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
   const send = createUniworkSend(options)
   const json = (response: Response): Promise<unknown> => response.json()
 ```
-  Kiểm không có hồi quy:
-  - Lệnh: `cd /Users/ducquang/UNICOM/uniwork-office/apps/shell && npx vitest run tests/uniwork-docs-client.test.ts tests/uniwork-docs-save.test.ts`
-  - Kết quả mong đợi: PASS (93 test).
+
+Kiểm không có hồi quy:
+
+- Lệnh: `cd /Users/ducquang/UNICOM/uniwork-office/apps/shell && npx vitest run tests/uniwork-docs-client.test.ts tests/uniwork-docs-save.test.ts`
+- Kết quả mong đợi: PASS (93 test).
 
 - [ ] **Step 5: Viết parser.** Tạo `apps/shell/src/main/uniwork-work/parse.ts`:
 
@@ -4164,6 +4368,7 @@ export function createUniworkWorkClient(options: UniworkDocsClientOptions): Uniw
   - Kết quả mong đợi: PASS (14 + 23 test).
 
 - [ ] **Step 8: Commit.**
+
 ```bash
 cd /Users/ducquang/UNICOM/uniwork-office
 git add apps/shell/src/shared/uniwork-work-api.ts apps/shell/src/main/uniwork-work/parse.ts apps/shell/src/main/uniwork-work/client.ts apps/shell/src/main/uniwork-docs/client.ts apps/shell/tests/uniwork-work-client.test.ts
@@ -4175,36 +4380,39 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 - [ ] **Step 9: Viết test slug workspace sẽ fail (C5).** Sửa hai chỗ trong `apps/shell/tests/uniwork-docs-client.test.ts`.
 
   Dòng 32-39, trước:
+
 ```ts
-    const fetch = vi.fn<FetchLike>(async () =>
-      json(200, { workspaces: [{ id: 'ws_1', name: 'Team', organization_id: 'org_a' }] }),
-    )
-    const api = client(fetch)
-    expect(await api.listWorkspaces('org_a')).toEqual([
-      { id: 'ws_1', name: 'Team', orgId: 'org_a' },
-    ])
+const fetch = vi.fn<FetchLike>(async () =>
+  json(200, { workspaces: [{ id: 'ws_1', name: 'Team', organization_id: 'org_a' }] }),
+)
+const api = client(fetch)
+expect(await api.listWorkspaces('org_a')).toEqual([{ id: 'ws_1', name: 'Team', orgId: 'org_a' }])
 ```
-  Sau:
+
+Sau:
+
 ```ts
-    const fetch = vi.fn<FetchLike>(async () =>
-      json(200, {
-        workspaces: [
-          {
-            id: 'ws_1',
-            name: 'Team',
-            slug: 'team',
-            organization_id: 'org_a',
-            organization_slug: 'acme',
-          },
-        ],
-      }),
-    )
-    const api = client(fetch)
-    expect(await api.listWorkspaces('org_a')).toEqual([
-      { id: 'ws_1', name: 'Team', orgId: 'org_a', slug: 'team', orgSlug: 'acme' },
-    ])
+const fetch = vi.fn<FetchLike>(async () =>
+  json(200, {
+    workspaces: [
+      {
+        id: 'ws_1',
+        name: 'Team',
+        slug: 'team',
+        organization_id: 'org_a',
+        organization_slug: 'acme',
+      },
+    ],
+  }),
+)
+const api = client(fetch)
+expect(await api.listWorkspaces('org_a')).toEqual([
+  { id: 'ws_1', name: 'Team', orgId: 'org_a', slug: 'team', orgSlug: 'acme' },
+])
 ```
-  Chèn khối này ngay trước `describe('error envelope mapping', () => {` (dòng 115):
+
+Chèn khối này ngay trước `describe('error envelope mapping', () => {` (dòng 115):
+
 ```ts
 describe('workspace slugs', () => {
   it('reads as empty when the server sends none', async () => {
@@ -4214,15 +4422,17 @@ describe('workspace slugs', () => {
     ])
   })
 })
-
 ```
-  Chạy:
-  - Lệnh: `cd /Users/ducquang/UNICOM/uniwork-office/apps/shell && npx vitest run tests/uniwork-docs-client.test.ts`
-  - Kết quả mong đợi: FAIL ở 2 test; cả hai `toEqual` báo thiếu `slug` và `orgSlug`.
+
+Chạy:
+
+- Lệnh: `cd /Users/ducquang/UNICOM/uniwork-office/apps/shell && npx vitest run tests/uniwork-docs-client.test.ts`
+- Kết quả mong đợi: FAIL ở 2 test; cả hai `toEqual` báo thiếu `slug` và `orgSlug`.
 
 - [ ] **Step 10: Thêm slug vào kiểu, phần parse và stub e2e.**
 
   `apps/shell/src/shared/home-api.ts:146-150`, sau khi sửa:
+
 ```ts
 export interface UniworkWorkspaceRef {
   id: string
@@ -4234,33 +4444,45 @@ export interface UniworkWorkspaceRef {
   orgSlug: string
 }
 ```
-  `apps/shell/src/main/uniwork-docs/client.ts`, trong `listWorkspaces`. Trước:
+
+`apps/shell/src/main/uniwork-docs/client.ts`, trong `listWorkspaces`. Trước:
+
 ```ts
-        return { id: r.id, name: r.name, orgId: rowOrg }
+return { id: r.id, name: r.name, orgId: rowOrg }
 ```
-  Sau:
+
+Sau:
+
 ```ts
-        return {
-          id: r.id,
-          name: r.name,
-          orgId: rowOrg,
-          slug: typeof r.slug === 'string' ? r.slug : '',
-          orgSlug: typeof r.organization_slug === 'string' ? r.organization_slug : '',
-        }
+return {
+  id: r.id,
+  name: r.name,
+  orgId: rowOrg,
+  slug: typeof r.slug === 'string' ? r.slug : '',
+  orgSlug: typeof r.organization_slug === 'string' ? r.organization_slug : '',
+}
 ```
-  `e2e/fixtures/uniwork-documents-stub.ts:33`. Trước:
+
+`e2e/fixtures/uniwork-documents-stub.ts:33`. Trước:
+
 ```ts
 export const STUB_WORKSPACE = { id: 'ws_e2e_01', name: 'Engineering notes' }
 ```
-  Sau:
+
+Sau:
+
 ```ts
 export const STUB_WORKSPACE = { id: 'ws_e2e_01', name: 'Engineering notes', slug: 'engineering' }
 ```
-  `e2e/fixtures/uniwork-documents-stub.ts:270`. Trước:
+
+`e2e/fixtures/uniwork-documents-stub.ts:270`. Trước:
+
 ```ts
           { id: STUB_WORKSPACE.id, name: STUB_WORKSPACE.name, organization_id: STUB_ORG.id },
 ```
-  Sau:
+
+Sau:
+
 ```ts
           {
             id: STUB_WORKSPACE.id,
@@ -4270,13 +4492,16 @@ export const STUB_WORKSPACE = { id: 'ws_e2e_01', name: 'Engineering notes', slug
             organization_slug: STUB_ORG.slug,
           },
 ```
-  Chạy test và typecheck:
-  - Lệnh: `cd /Users/ducquang/UNICOM/uniwork-office/apps/shell && npx vitest run tests/uniwork-docs-client.test.ts tests/uniwork-docs-ui.test.ts tests/uniwork-work-client.test.ts`
-    - Kết quả mong đợi: PASS.
-  - Lệnh: `cd /Users/ducquang/UNICOM/uniwork-office && npm run typecheck -w @genoffice/shell`
-    - Kết quả mong đợi: không lỗi. Object `UniworkWorkspaceRef` trong `src/` chỉ được tạo bởi phần parse trên, và test không nằm trong typecheck.
+
+Chạy test và typecheck:
+
+- Lệnh: `cd /Users/ducquang/UNICOM/uniwork-office/apps/shell && npx vitest run tests/uniwork-docs-client.test.ts tests/uniwork-docs-ui.test.ts tests/uniwork-work-client.test.ts`
+  - Kết quả mong đợi: PASS.
+- Lệnh: `cd /Users/ducquang/UNICOM/uniwork-office && npm run typecheck -w @genoffice/shell`
+  - Kết quả mong đợi: không lỗi. Object `UniworkWorkspaceRef` trong `src/` chỉ được tạo bởi phần parse trên, và test không nằm trong typecheck.
 
 - [ ] **Step 11: Commit.**
+
 ```bash
 cd /Users/ducquang/UNICOM/uniwork-office
 git add apps/shell/src/shared/home-api.ts apps/shell/src/main/uniwork-docs/client.ts apps/shell/tests/uniwork-docs-client.test.ts e2e/fixtures/uniwork-documents-stub.ts
@@ -4290,6 +4515,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 Ghi chú hợp đồng: Task 8 khai báo `window.uniworkWork` đúng một lần, **không optional** (`uniworkWork: UniworkWorkApi`, giống `aiOffice`), trong `declare global` của `Home.tsx`. File renderer sau dùng mà không khai báo lại. Task 8 thêm `authorizedRequest`, `uniworkAccount` và `uniworkDeploymentProfile` vào import `./uniwork-auth` trong `main/index.ts`; Task 9 dựa vào `uniworkAccount` từ import đó. `myProfile()` khi đã đăng nhập mà chưa chọn org trả `{ok:false, error:'server'}`.
 
 **Files:**
+
 - Modify: `apps/shell/src/shared/uniwork-work-api.ts` (import ở dòng 1, rồi thêm khối ở cuối file)
 - Create: `apps/shell/src/main/uniwork-work/wiring.ts`
 - Modify: `apps/shell/src/main/index.ts:92-104` (import), `:4184` (đăng ký cạnh `createUniworkDocs`)
@@ -4298,6 +4524,7 @@ Ghi chú hợp đồng: Task 8 khai báo `window.uniworkWork` đúng một lần
 - Test (create): `apps/shell/tests/uniwork-work-wiring.test.ts`
 
 **Interfaces:**
+
 - Consumes:
   - `createUniworkWorkClient` và `UniworkWorkClient` (Task 7)
   - `workErrorOfDocCode` và `UniworkWorkResult` (Task 7)
@@ -4469,16 +4696,20 @@ describe('uniwork-work IPC', () => {
 - [ ] **Step 3: Thêm kiểu cầu nối.** Sửa `apps/shell/src/shared/uniwork-work-api.ts`.
 
   Dòng 1, trước:
+
 ```ts
 import type { UniworkDocErrorCode } from './home-api'
 ```
-  Sau:
+
+Sau:
+
 ```ts
 import type { RecentEntry, UniworkDocErrorCode, UniworkDocSummary } from './home-api'
 ```
-  Thêm vào cuối file:
-```ts
 
+Thêm vào cuối file:
+
+```ts
 /** Overview "recent documents": UniWork rows (aiOffice.uniworkListDocuments) plus local recents */
 export type WorkRecentDocument =
   { source: 'uniwork'; doc: UniworkDocSummary } | { source: 'local'; entry: RecentEntry }
@@ -4660,13 +4891,16 @@ export function registerUniworkWork(ipcMain: IpcMain, deps: UniworkWorkDeps): vo
 - [ ] **Step 6: Đăng ký handler trong main.** Sửa `apps/shell/src/main/index.ts`.
 
   Dòng 101-104, trước:
+
 ```ts
   onUniworkAccountStatus,
   uniworkSessionIdentity,
 } from './uniwork-auth'
 import { createUniworkDocs, type UniworkDocsHandle } from './uniwork-docs/wiring'
 ```
-  Sau:
+
+Sau:
+
 ```ts
   onUniworkAccountStatus,
   uniworkSessionIdentity,
@@ -4677,31 +4911,39 @@ import { createUniworkDocs, type UniworkDocsHandle } from './uniwork-docs/wiring
 import { createUniworkDocs, type UniworkDocsHandle } from './uniwork-docs/wiring'
 import { registerUniworkWork } from './uniwork-work/wiring'
 ```
-  Dòng 4184, trước:
+
+Dòng 4184, trước:
+
 ```ts
-  uniworkDocs = createUniworkDocs(ipcMain, uniworkDocsWiring())
+uniworkDocs = createUniworkDocs(ipcMain, uniworkDocsWiring())
 ```
-  Sau:
+
+Sau:
+
 ```ts
-  uniworkDocs = createUniworkDocs(ipcMain, uniworkDocsWiring())
-  // UniWork work data for the Workbench (home, tasks, calendar, profile); logic in ./uniwork-work
-  registerUniworkWork(ipcMain, {
-    profile: () => uniworkDeploymentProfile(),
-    identity: () => uniworkSessionIdentity(),
-    org: () => uniworkAccount().status().org ?? null,
-    authorized: (call) => authorizedRequest(call),
-    openExternal: (url) => shell.openExternal(url),
-  })
+uniworkDocs = createUniworkDocs(ipcMain, uniworkDocsWiring())
+// UniWork work data for the Workbench (home, tasks, calendar, profile); logic in ./uniwork-work
+registerUniworkWork(ipcMain, {
+  profile: () => uniworkDeploymentProfile(),
+  identity: () => uniworkSessionIdentity(),
+  org: () => uniworkAccount().status().org ?? null,
+  authorized: (call) => authorizedRequest(call),
+  openExternal: (url) => shell.openExternal(url),
+})
 ```
-  `shell` đã được import từ `electron` ở dòng 26.
+
+`shell` đã được import từ `electron` ở dòng 26.
 
 - [ ] **Step 7: Expose `window.uniworkWork` trong preload.** Sửa `apps/shell/src/preload/index.ts`.
 
   Dòng 61, trước:
+
 ```ts
 import { TABS_CHANNELS } from '../shared/tabs-api'
 ```
-  Sau:
+
+Sau:
+
 ```ts
 import { TABS_CHANNELS } from '../shared/tabs-api'
 import { UNIWORK_WORK_CHANNELS } from '../shared/uniwork-work-api'
@@ -4715,11 +4957,15 @@ import type {
   WorkTaskStatus,
 } from '../shared/uniwork-work-api'
 ```
-  Dòng 1044, trước:
+
+Dòng 1044, trước:
+
 ```ts
 contextBridge.exposeInMainWorld('aiOfficeTabs', tabsApi)
 ```
-  Sau:
+
+Sau:
+
 ```ts
 contextBridge.exposeInMainWorld('aiOfficeTabs', tabsApi)
 
@@ -4778,15 +5024,20 @@ contextBridge.exposeInMainWorld('uniworkWork', workApi)
 - [ ] **Step 8: Khai báo kiểu window một lần.** Sửa `apps/shell/src/renderer/src/Home.tsx`.
 
   Dòng 18, trước:
+
 ```ts
 import type { IntegrationsApi } from '../../shared/integrations-api'
 ```
-  Sau:
+
+Sau:
+
 ```ts
 import type { IntegrationsApi } from '../../shared/integrations-api'
 import type { UniworkWorkApi } from '../../shared/uniwork-work-api'
 ```
-  Dòng 46-52, trước:
+
+Dòng 46-52, trước:
+
 ```ts
 declare global {
   interface Window {
@@ -4796,7 +5047,9 @@ declare global {
   }
 }
 ```
-  Sau:
+
+Sau:
+
 ```ts
 declare global {
   interface Window {
@@ -4816,6 +5069,7 @@ declare global {
   - Kết quả mong đợi: PASS.
 
 - [ ] **Step 10: Commit.**
+
 ```bash
 cd /Users/ducquang/UNICOM/uniwork-office
 git add apps/shell/src/shared/uniwork-work-api.ts apps/shell/src/main/uniwork-work/wiring.ts apps/shell/src/main/index.ts apps/shell/src/preload/index.ts apps/shell/src/renderer/src/Home.tsx apps/shell/tests/uniwork-work-wiring.test.ts
@@ -4827,6 +5081,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ### Task 9: Workspace đang chọn theo org, và bucket Bàn làm việc theo org
 
 **Files:**
+
 - Create: `apps/shell/src/renderer/src/active-workspace.ts`
 - Modify: `apps/shell/src/renderer/src/uniwork-docs-model.ts:13` (import), `:394-397` (`initialPickerState`), `:464-465` (`'workspaces-loaded'`)
 - Modify: `apps/shell/src/renderer/src/UniworkOpenDialog.tsx:20` (import), `:64` (`useReducer`), `:369` (`onChange`)
@@ -4836,6 +5091,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 - Test (modify): `apps/shell/tests/workbench-accounts.test.ts:1`, `:25-28`, `:173`
 
 **Interfaces:**
+
 - Consumes:
   - `wbStoreGetRaw` và `wbStoreSetRaw` (`workbench-store-client.ts:201,239`)
   - `UniworkWorkspaceRef`, đã có `slug` và `orgSlug` sau Task 7
@@ -4929,27 +5185,35 @@ export function pickActiveWorkspace(
   return items.find((w) => w.id === stored)?.id ?? items[0]?.id ?? null
 }
 ```
-  Tiền tố `uniwork.wb.` đã được cả hai allowlist cho phép (`workbench-store-client.ts:26` và `main/workbench-db.ts:253`).
+
+Tiền tố `uniwork.wb.` đã được cả hai allowlist cho phép (`workbench-store-client.ts:26` và `main/workbench-db.ts:253`).
 
 - [ ] **Step 4: Cho picker bắt đầu từ workspace đã lưu.**
 
   `apps/shell/src/renderer/src/uniwork-docs-model.ts:13`, trước:
+
 ```ts
 import type { AccountView } from './account-model'
 ```
-  Sau:
+
+Sau:
+
 ```ts
 import type { AccountView } from './account-model'
 import { pickActiveWorkspace } from './active-workspace'
 ```
-  `uniwork-docs-model.ts:394-397`, trước:
+
+`uniwork-docs-model.ts:394-397`, trước:
+
 ```ts
 export function initialPickerState(): PickerState {
   return {
     workspaces: { status: 'loading', items: [] },
     workspaceId: null,
 ```
-  Sau:
+
+Sau:
+
 ```ts
 /** `workspaceId`: the stored active workspace (active-workspace.ts), kept when still listed */
 export function initialPickerState(workspaceId: string | null = null): PickerState {
@@ -4957,39 +5221,55 @@ export function initialPickerState(workspaceId: string | null = null): PickerSta
     workspaces: { status: 'loading', items: [] },
     workspaceId,
 ```
-  `uniwork-docs-model.ts:464-465`, trước:
+
+`uniwork-docs-model.ts:464-465`, trước:
+
 ```ts
-      const keep = items.find((w) => w.id === state.workspaceId)
-      const workspaceId = keep?.id ?? items[0]?.id ?? null
+const keep = items.find((w) => w.id === state.workspaceId)
+const workspaceId = keep?.id ?? items[0]?.id ?? null
 ```
-  Sau:
+
+Sau:
+
 ```ts
-      const workspaceId = pickActiveWorkspace(items, state.workspaceId)
+const workspaceId = pickActiveWorkspace(items, state.workspaceId)
 ```
-  `apps/shell/src/renderer/src/UniworkOpenDialog.tsx:20`, trước:
+
+`apps/shell/src/renderer/src/UniworkOpenDialog.tsx:20`, trước:
+
 ```ts
 } from './uniwork-docs-model'
 ```
-  Sau:
+
+Sau:
+
 ```ts
 } from './uniwork-docs-model'
 import { readActiveWorkspaceId, writeActiveWorkspaceId } from './active-workspace'
 ```
-  `UniworkOpenDialog.tsx:64`, trước:
+
+`UniworkOpenDialog.tsx:64`, trước:
+
 ```ts
-  const [state, dispatch] = useReducer(pickerReducer, undefined, initialPickerState)
+const [state, dispatch] = useReducer(pickerReducer, undefined, initialPickerState)
 ```
-  Sau:
+
+Sau:
+
 ```ts
-  const [state, dispatch] = useReducer(pickerReducer, undefined, () =>
-    initialPickerState(readActiveWorkspaceId()),
-  )
+const [state, dispatch] = useReducer(pickerReducer, undefined, () =>
+  initialPickerState(readActiveWorkspaceId()),
+)
 ```
-  `UniworkOpenDialog.tsx:369`, trước:
+
+`UniworkOpenDialog.tsx:369`, trước:
+
 ```tsx
               onChange={(e) => dispatch({ type: 'select-workspace', id: e.target.value })}
 ```
-  Sau:
+
+Sau:
+
 ```tsx
               onChange={(e) => {
                 writeActiveWorkspaceId(e.target.value)
@@ -5002,6 +5282,7 @@ import { readActiveWorkspaceId, writeActiveWorkspaceId } from './active-workspac
   - Kết quả mong đợi: PASS (152 test).
 
 - [ ] **Step 6: Commit.**
+
 ```bash
 cd /Users/ducquang/UNICOM/uniwork-office
 git add apps/shell/src/renderer/src/active-workspace.ts apps/shell/src/renderer/src/uniwork-docs-model.ts apps/shell/src/renderer/src/UniworkOpenDialog.tsx apps/shell/tests/active-workspace.test.ts
@@ -5013,22 +5294,29 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 - [ ] **Step 7: Viết test bucket sẽ fail.** Sửa `apps/shell/tests/workbench-accounts.test.ts`.
 
   Dòng 1, trước:
+
 ```ts
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 ```
-  Sau:
+
+Sau:
+
 ```ts
 import { createHash } from 'node:crypto'
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 ```
-  Dòng 25-28, trước:
+
+Dòng 25-28, trước:
+
 ```ts
 const describeSqlite = sqliteAvailable() ? describe : describe.skip
 
 const OWNER: WorkbenchOwner = { deploymentId: 'default', accountId: 'acc-owner' }
 const MEMBER: WorkbenchOwner = { deploymentId: 'default', accountId: 'acc-member' }
 ```
-  Sau:
+
+Sau:
+
 ```ts
 const describeSqlite = sqliteAvailable() ? describe : describe.skip
 
@@ -5049,32 +5337,43 @@ describe('bucket key', () => {
 const OWNER: WorkbenchOwner = { deploymentId: 'default', accountId: 'acc-owner', orgId: 'org_a' }
 const MEMBER: WorkbenchOwner = { deploymentId: 'default', accountId: 'acc-member', orgId: 'org_a' }
 ```
-  Dòng 173, trước:
+
+Dòng 173, trước:
+
 ```ts
-    store.setOwner({ deploymentId: 'default', accountId: 'acc-42' })
+store.setOwner({ deploymentId: 'default', accountId: 'acc-42' })
 ```
-  Sau:
+
+Sau:
+
 ```ts
-    store.setOwner({ deploymentId: 'default', accountId: 'acc-42', orgId: 'org_a' })
+store.setOwner({ deploymentId: 'default', accountId: 'acc-42', orgId: 'org_a' })
 ```
-  Chạy:
-  - Lệnh: `cd /Users/ducquang/UNICOM/uniwork-office/apps/shell && npx vitest run tests/workbench-accounts.test.ts`
-  - Kết quả mong đợi: FAIL ở 1 test (`is one bucket per (deployment, account, org)`); 14 test còn lại pass.
+
+Chạy:
+
+- Lệnh: `cd /Users/ducquang/UNICOM/uniwork-office/apps/shell && npx vitest run tests/workbench-accounts.test.ts`
+- Kết quả mong đợi: FAIL ở 1 test (`is one bucket per (deployment, account, org)`); 14 test còn lại pass.
 
 - [ ] **Step 8: Khóa bucket theo org, và lấy org từ phiên.**
 
   `apps/shell/src/main/workbench-accounts.ts:12-13`, trước:
+
 ```ts
  * The bucket name is a hash of deployment + account id: no account id or
  * email appears in a path.
 ```
-  Sau:
+
+Sau:
+
 ```ts
  * The bucket name is a hash of deployment + account id + org id: no id or
  * email appears in a path. An org switch is a bucket switch (notes, forms
  * and the active workspace are per org).
 ```
-  `workbench-accounts.ts:29-44`, trước:
+
+`workbench-accounts.ts:29-44`, trước:
+
 ```ts
 /** the account a bucket belongs to (deployment-scoped, like working copies) */
 export interface WorkbenchOwner {
@@ -5091,7 +5390,9 @@ export function workbenchBucketOf(owner: WorkbenchOwner | null): string {
     .update(`${owner.deploymentId}\n${owner.accountId}`)
     .digest('hex')
 ```
-  Sau:
+
+Sau:
+
 ```ts
 /** the account and org a bucket belongs to (deployment-scoped, like working copies) */
 export interface WorkbenchOwner {
@@ -5110,7 +5411,9 @@ export function workbenchBucketOf(owner: WorkbenchOwner | null): string {
     .update(`${owner.deploymentId}\n${owner.accountId}\n${owner.orgId}`)
     .digest('hex')
 ```
-  `apps/shell/src/main/index.ts:2921-2932`, trước:
+
+`apps/shell/src/main/index.ts:2921-2932`, trước:
+
 ```ts
 /**
  * Points the workbench store at the live session's account (none = the
@@ -5123,7 +5426,9 @@ function syncWorkbenchOwner(): void {
     ? { deploymentId: identity.deploymentId, accountId: identity.accountId }
     : null
 ```
-  Sau:
+
+Sau:
+
 ```ts
 /**
  * Points the workbench store at the live session's account and selected org
@@ -5140,7 +5445,8 @@ function syncWorkbenchOwner(): void {
       }
     : null
 ```
-  Không cần đăng ký thêm. `selectOrg` kết thúc bằng `setState`, phát một status push (`manager.ts:351-372`). Push đó tới `onUniworkAccountStatus(() => syncWorkbenchOwner())` (`index.ts:6451`), và push `wbBucketChanged` sẵn có làm renderer tải lại. `uniworkAccount` có trong import `./uniwork-auth` từ Task 8; nó chỉ được gọi khi đã có identity nên manager luôn tồn tại.
+
+Không cần đăng ký thêm. `selectOrg` kết thúc bằng `setState`, phát một status push (`manager.ts:351-372`). Push đó tới `onUniworkAccountStatus(() => syncWorkbenchOwner())` (`index.ts:6451`), và push `wbBucketChanged` sẵn có làm renderer tải lại. `uniworkAccount` có trong import `./uniwork-auth` từ Task 8; nó chỉ được gọi khi đã có identity nên manager luôn tồn tại.
 
 - [ ] **Step 9: Chạy test, typecheck và rebuild shell.**
   - Lệnh: `cd /Users/ducquang/UNICOM/uniwork-office/apps/shell && npx vitest run tests/workbench-accounts.test.ts tests/workbench-account-gate.test.ts tests/workbench-db.test.ts tests/active-workspace.test.ts`
@@ -5149,6 +5455,7 @@ function syncWorkbenchOwner(): void {
     - Kết quả mong đợi: không lỗi kiểu, build thành công. Bắt buộc rebuild shell vì main đã đổi.
 
 - [ ] **Step 10: Commit.**
+
 ```bash
 cd /Users/ducquang/UNICOM/uniwork-office
 git add apps/shell/src/main/workbench-accounts.ts apps/shell/src/main/index.ts apps/shell/tests/workbench-accounts.test.ts
@@ -5162,6 +5469,7 @@ Chưa kiểm ở Task 7–9: chạy thử trên bản sao `apps/shell` (test m�
 ### Task 10: Token: tint UniWork, tín hiệu info, accent của shell, tone module
 
 **Files:**
+
 - Modify: `packages/ui/src/tokens.css`. Chèn sau `--warning-border` ở mỗi khối trong ba khối: `:root` l.50, `[data-theme='dark']` l.135, system dark l.204.
 - Modify: `apps/shell/src/renderer/src/home.css`. Dòng light l.4-6 và l.22; dark l.62-63 và l.74-75; system-dark l.81-82 và l.93-94.
 - Create: `apps/shell/src/renderer/src/module-tones.ts`
@@ -5170,6 +5478,7 @@ Chưa kiểm ở Task 7–9: chạy thử trên bản sao `apps/shell` (test m�
 - Test: `apps/shell/tests/module-tones.test.ts` (mới)
 
 **Interfaces:**
+
 - Consumes `WorkbenchModuleId`, đã thu hẹp còn `'desk' | 'tasks' | 'calendar' | 'forms' | 'notes' | 'personal'` ở Task 2, và `PracticePillarId = 'knowledge' | 'materials' | 'skills' | 'compose'`, đều từ `@uniwork/practice-core`. Nếu task này chạy trước Task 2, `tsc` báo thiếu 13 key module trong `MODULE_TONES`.
 - Produces các token CSS sau, mỗi token có ở cả ba khối của `tokens.css`:
   - `--tint-{gray,green,yellow,orange,violet,blue,teal,pink}`
@@ -5182,6 +5491,7 @@ Chưa kiểm ở Task 7–9: chạy thử trên bản sao `apps/shell` (test m�
   - `--shadow-btn-primary`: dùng rgb của accent mới
   - `--accent-soft` giữ nguyên `#eaf0fd` / `#24354d`; `account-ui.test.ts` kiểm độ tương phản của `--danger-text` trên nó.
 - Produces:
+
   ```ts
   export type Tint = 'gray' | 'green' | 'yellow' | 'orange' | 'violet' | 'blue' | 'teal' | 'pink'
   export const MODULE_TONES: Record<WorkbenchModuleId | PracticePillarId, Tint>
@@ -5255,100 +5565,100 @@ Kết quả mong đợi: FAIL. Test đếm khối pass; cả 18 trường hợp 
 Trong `packages/ui/src/tokens.css`, khối `:root`. Trước:
 
 ```css
-  --warning-border: #f2d9a6;
-  --color-bg-overlay: rgb(0 0 0 / 50%);
+--warning-border: #f2d9a6;
+--color-bg-overlay: rgb(0 0 0 / 50%);
 ```
 
 Sau:
 
 ```css
-  --warning-border: #f2d9a6;
-  /* UniWork module tints (pale fill + readable glyph) and the info signal (uniwork tokens.css) */
-  --tint-gray: #eeeeef;
-  --tint-gray-fg: #5c5c5c;
-  --tint-green: #e6f7ee;
-  --tint-green-fg: #137046;
-  --tint-yellow: #fff6d6;
-  --tint-yellow-fg: #8f5300;
-  --tint-orange: #ffece5;
-  --tint-orange-fg: #a84300;
-  --tint-violet: #efedfd;
-  --tint-violet-fg: #7612fa;
-  --tint-blue: #e6f0ff;
-  --tint-blue-fg: #0a66bc;
-  --tint-teal: #e0f5f2;
-  --tint-teal-fg: #0d6e66;
-  --tint-pink: #fff1fe;
-  --tint-pink-fg: #b8107f;
-  --info: #0a66bc;
-  --info-bg: #e6f0ff;
-  --color-bg-overlay: rgb(0 0 0 / 50%);
+--warning-border: #f2d9a6;
+/* UniWork module tints (pale fill + readable glyph) and the info signal (uniwork tokens.css) */
+--tint-gray: #eeeeef;
+--tint-gray-fg: #5c5c5c;
+--tint-green: #e6f7ee;
+--tint-green-fg: #137046;
+--tint-yellow: #fff6d6;
+--tint-yellow-fg: #8f5300;
+--tint-orange: #ffece5;
+--tint-orange-fg: #a84300;
+--tint-violet: #efedfd;
+--tint-violet-fg: #7612fa;
+--tint-blue: #e6f0ff;
+--tint-blue-fg: #0a66bc;
+--tint-teal: #e0f5f2;
+--tint-teal-fg: #0d6e66;
+--tint-pink: #fff1fe;
+--tint-pink-fg: #b8107f;
+--info: #0a66bc;
+--info-bg: #e6f0ff;
+--color-bg-overlay: rgb(0 0 0 / 50%);
 ```
 
 Khối `[data-theme='dark']`. Các dòng thụt 2 dấu cách; mốc là dòng bắt đầu bằng đúng 2 dấu cách rồi `--warning-border: #5a4a28;`. Trước:
 
 ```css
-  --warning-border: #5a4a28;
-  --color-bg-overlay: rgb(0 0 0 / 60%);
+--warning-border: #5a4a28;
+--color-bg-overlay: rgb(0 0 0 / 60%);
 ```
 
 Sau:
 
 ```css
-  --warning-border: #5a4a28;
-  /* UniWork module tints (pale fill + readable glyph) and the info signal (uniwork tokens.css) */
-  --tint-gray: #262626;
-  --tint-gray-fg: #a1a1aa;
-  --tint-green: #16301f;
-  --tint-green-fg: #4ade80;
-  --tint-yellow: #3a2f10;
-  --tint-yellow-fg: #fbbf24;
-  --tint-orange: #3d2416;
-  --tint-orange-fg: #ffa06b;
-  --tint-violet: #2a1f4a;
-  --tint-violet-fg: #b38cff;
-  --tint-blue: #182640;
-  --tint-blue-fg: #5db4ff;
-  --tint-teal: #123430;
-  --tint-teal-fg: #3fd6c5;
-  --tint-pink: #3d1a35;
-  --tint-pink-fg: #ff7ad9;
-  --info: #5db4ff;
-  --info-bg: #182640;
-  --color-bg-overlay: rgb(0 0 0 / 60%);
+--warning-border: #5a4a28;
+/* UniWork module tints (pale fill + readable glyph) and the info signal (uniwork tokens.css) */
+--tint-gray: #262626;
+--tint-gray-fg: #a1a1aa;
+--tint-green: #16301f;
+--tint-green-fg: #4ade80;
+--tint-yellow: #3a2f10;
+--tint-yellow-fg: #fbbf24;
+--tint-orange: #3d2416;
+--tint-orange-fg: #ffa06b;
+--tint-violet: #2a1f4a;
+--tint-violet-fg: #b38cff;
+--tint-blue: #182640;
+--tint-blue-fg: #5db4ff;
+--tint-teal: #123430;
+--tint-teal-fg: #3fd6c5;
+--tint-pink: #3d1a35;
+--tint-pink-fg: #ff7ad9;
+--info: #5db4ff;
+--info-bg: #182640;
+--color-bg-overlay: rgb(0 0 0 / 60%);
 ```
 
 Khối `@media (prefers-color-scheme: dark)`. Các dòng thụt 4 dấu cách. Trước:
 
 ```css
-    --warning-border: #5a4a28;
-    --color-bg-overlay: rgb(0 0 0 / 60%);
+--warning-border: #5a4a28;
+--color-bg-overlay: rgb(0 0 0 / 60%);
 ```
 
 Sau:
 
 ```css
-    --warning-border: #5a4a28;
-    /* UniWork module tints (pale fill + readable glyph) and the info signal (uniwork tokens.css) */
-    --tint-gray: #262626;
-    --tint-gray-fg: #a1a1aa;
-    --tint-green: #16301f;
-    --tint-green-fg: #4ade80;
-    --tint-yellow: #3a2f10;
-    --tint-yellow-fg: #fbbf24;
-    --tint-orange: #3d2416;
-    --tint-orange-fg: #ffa06b;
-    --tint-violet: #2a1f4a;
-    --tint-violet-fg: #b38cff;
-    --tint-blue: #182640;
-    --tint-blue-fg: #5db4ff;
-    --tint-teal: #123430;
-    --tint-teal-fg: #3fd6c5;
-    --tint-pink: #3d1a35;
-    --tint-pink-fg: #ff7ad9;
-    --info: #5db4ff;
-    --info-bg: #182640;
-    --color-bg-overlay: rgb(0 0 0 / 60%);
+--warning-border: #5a4a28;
+/* UniWork module tints (pale fill + readable glyph) and the info signal (uniwork tokens.css) */
+--tint-gray: #262626;
+--tint-gray-fg: #a1a1aa;
+--tint-green: #16301f;
+--tint-green-fg: #4ade80;
+--tint-yellow: #3a2f10;
+--tint-yellow-fg: #fbbf24;
+--tint-orange: #3d2416;
+--tint-orange-fg: #ffa06b;
+--tint-violet: #2a1f4a;
+--tint-violet-fg: #b38cff;
+--tint-blue: #182640;
+--tint-blue-fg: #5db4ff;
+--tint-teal: #123430;
+--tint-teal-fg: #3fd6c5;
+--tint-pink: #3d1a35;
+--tint-pink-fg: #ff7ad9;
+--info: #5db4ff;
+--info-bg: #182640;
+--color-bg-overlay: rgb(0 0 0 / 60%);
 ```
 
 - [ ] **Step 4: Chạy test token và xác nhận pass**
@@ -5427,85 +5737,85 @@ Kết quả mong đợi: FAIL cả 3 trường hợp. Light báo `expected '#0f7
 Khối `:root`. Trước (l.4-6):
 
 ```css
-  /* Genspark DS v4.1: guide/onboarding accent is the brand blue */
-  --accent: #0f7fff;
-  --accent-hover: #0e72e5;
+/* Genspark DS v4.1: guide/onboarding accent is the brand blue */
+--accent: #0f7fff;
+--accent-hover: #0e72e5;
 ```
 
 Sau:
 
 ```css
-  /* UniWork brand blue (uniwork tokens.css); dark themes put a dark ink on it (--on-accent) */
-  --accent: #0a52e6;
-  --accent-hover: #0843bd;
+/* UniWork brand blue (uniwork tokens.css); dark themes put a dark ink on it (--on-accent) */
+--accent: #0a52e6;
+--accent-hover: #0843bd;
 ```
 
 Trước (l.22):
 
 ```css
-  --shadow-btn-primary: 0 2px 6px rgb(15 127 255 / 28%), 0 6px 18px rgb(15 127 255 / 18%);
+--shadow-btn-primary: 0 2px 6px rgb(15 127 255 / 28%), 0 6px 18px rgb(15 127 255 / 18%);
 ```
 
 Sau:
 
 ```css
-  --shadow-btn-primary: 0 2px 6px rgb(10 82 230 / 28%), 0 6px 18px rgb(10 82 230 / 18%);
+--shadow-btn-primary: 0 2px 6px rgb(10 82 230 / 28%), 0 6px 18px rgb(10 82 230 / 18%);
 ```
 
 Khối `[data-theme='dark']`. Trước (l.62-63):
 
 ```css
-  --accent: #3f99ff;
-  --accent-hover: #5ba5ff;
+--accent: #3f99ff;
+--accent-hover: #5ba5ff;
 ```
 
 Sau:
 
 ```css
-  --accent: #5a96ff;
-  --accent-hover: #7aabff;
+--accent: #5a96ff;
+--accent-hover: #7aabff;
 ```
 
 Trước (l.74-75):
 
 ```css
-  --shadow-btn-primary: 0 2px 8px rgb(63 153 255 / 35%), 0 8px 22px rgb(63 153 255 / 22%);
-  --on-accent: #ffffff;
+--shadow-btn-primary: 0 2px 8px rgb(63 153 255 / 35%), 0 8px 22px rgb(63 153 255 / 22%);
+--on-accent: #ffffff;
 ```
 
 Sau:
 
 ```css
-  --shadow-btn-primary: 0 2px 8px rgb(90 150 255 / 35%), 0 8px 22px rgb(90 150 255 / 22%);
-  --on-accent: #0d1220;
+--shadow-btn-primary: 0 2px 8px rgb(90 150 255 / 35%), 0 8px 22px rgb(90 150 255 / 22%);
+--on-accent: #0d1220;
 ```
 
 Khối `@media (prefers-color-scheme: dark)`. Hai sửa đổi giống trên, thụt 4 dấu cách. Trước (l.81-82):
 
 ```css
-    --accent: #3f99ff;
-    --accent-hover: #5ba5ff;
+--accent: #3f99ff;
+--accent-hover: #5ba5ff;
 ```
 
 Sau:
 
 ```css
-    --accent: #5a96ff;
-    --accent-hover: #7aabff;
+--accent: #5a96ff;
+--accent-hover: #7aabff;
 ```
 
 Trước (l.93-94):
 
 ```css
-    --shadow-btn-primary: 0 2px 8px rgb(63 153 255 / 35%), 0 8px 22px rgb(63 153 255 / 22%);
-    --on-accent: #ffffff;
+--shadow-btn-primary: 0 2px 8px rgb(63 153 255 / 35%), 0 8px 22px rgb(63 153 255 / 22%);
+--on-accent: #ffffff;
 ```
 
 Sau:
 
 ```css
-    --shadow-btn-primary: 0 2px 8px rgb(90 150 255 / 35%), 0 8px 22px rgb(90 150 255 / 22%);
-    --on-accent: #0d1220;
+--shadow-btn-primary: 0 2px 8px rgb(90 150 255 / 35%), 0 8px 22px rgb(90 150 255 / 22%);
+--on-accent: #0d1220;
 ```
 
 Giữ nguyên `--account-avatar-bg: #3f99ff` (l.66, l.85). Đó là token riêng và `account-ui.test.ts` kiểm độ tương phản của nó.
@@ -5525,10 +5835,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { MEETING_TINT, MODULE_TONES, tintStyle } from '../src/renderer/src/module-tones'
 
-const tokens = readFileSync(
-  join(__dirname, '..', '..', '..', 'packages/ui/src/tokens.css'),
-  'utf8',
-)
+const tokens = readFileSync(join(__dirname, '..', '..', '..', 'packages/ui/src/tokens.css'), 'utf8')
 const blocks = tokens.split(/\n(?=\[data-theme='dark'\]|@media \(prefers-color-scheme: dark\))/)
 
 describe('module tones', () => {
@@ -5619,6 +5926,7 @@ Kết quả mong đợi: mọi test PASS, cả hai typecheck exit 0. Theme check
 - [ ] **Step 13: Xem ở cả hai theme (rủi ro spec 9.3)**
 
 Chạy: `cd /Users/ducquang/UNICOM/uniwork-office && npm run dev`. Trong Cài đặt, đổi theme sang Light, rồi Dark, rồi System. Ở mỗi theme, kiểm:
+
 - nút `.btn-primary` (Home và Cài đặt);
 - nút Gửi của chat mới (`.new-chat-send`): chữ và icon phải là mực tối trên nền xanh ở dark mode;
 - checkbox danh sách (`.col-check`);
@@ -5643,6 +5951,7 @@ Rủi ro của Task 10: ở dark mode, dấu tick của `.col-check` là SVG dat
 Ghi chú hòa giải: task này tạo hạ tầng shard và chỉ seed các key nhiều tab dùng chung: nhãn "trên máy này" (`wbOnThisDevice`, dùng ở Tổng quan, Biểu mẫu, Ghi chú, 4 trụ cột) và câu thông báo theo kind (C10). Mỗi task giao diện sau tự thêm key của mình (Task 12 `wbTop*`, Task 13 `wbOv*`, Task 14 `wbWork*`/`wbTasks*`, Task 15 `wbCal*`, Task 16 `wbProfile*`, Task 17 `wbNotes*`) vào `zh.ts`, `vi.ts`, `en.ts`; 18 shard còn lại là `{ ...en }` nên tự nhận key mới và không cần sửa lại.
 
 **Files:**
+
 - Create: `apps/shell/src/renderer/src/i18n/workbench/zh.ts` (định nghĩa bộ key)
 - Create: `apps/shell/src/renderer/src/i18n/workbench/en.ts`, `.../workbench/vi.ts` (viết tay)
 - Create: `apps/shell/src/renderer/src/i18n/workbench/{ja,ko,fr,de,es,th,id,ru,ar,pt,it,pl,cs,nl,ms,he,hi,zh-TW}.ts`. Mỗi file là `{ ...en }` như spec 6.8 yêu cầu.
@@ -5653,6 +5962,7 @@ Ghi chú hòa giải: task này tạo hạ tầng shard và chỉ seed các key 
 - Test: `apps/shell/tests/strings-workbench.test.ts` (mới)
 
 **Interfaces:**
+
 - Produces `workbenchStrings` (`export const` trong `strings-workbench.ts`). Key của nó gộp vào `StringKey`, nên mọi `t()` ở renderer nhận `t('wbX', params)`.
 - **Bộ key seed** (20 key):
   - `wbOnThisDevice`: nhãn file/tab chỉ lưu trên máy.
@@ -6046,13 +6356,13 @@ fs.writeFileSync(f, out.join("\n"))'
 Trong `apps/shell/src/renderer/src/Home.tsx`, trước:
 
 ```tsx
-              <span className="nav-label">{t('navTeacher')}</span>
+<span className="nav-label">{t('navTeacher')}</span>
 ```
 
 Sau:
 
 ```tsx
-              <span className="nav-label">{t('navWorkbench')}</span>
+<span className="nav-label">{t('navWorkbench')}</span>
 ```
 
 Xác nhận không còn sót: `cd /Users/ducquang/UNICOM/uniwork-office && git grep -n navTeacher -- apps packages e2e`. Kết quả mong đợi: không có output.
@@ -6081,6 +6391,7 @@ Task 11 chưa chuyển các chuỗi `label(vi, en)` sẵn có trong `PracticeHom
 ### Task 12: Khung Bàn làm việc (thanh trên, ô icon tab tô tint, đổi `teacher-*` → `wb-*`)
 
 **Files:**
+
 - Create: `apps/shell/src/renderer/src/WorkbenchTopBar.tsx`
 - Create: `apps/shell/tests/workbench-icons.test.ts`
 - Create: `apps/shell/tests/workbench-topbar.test.ts`
@@ -6107,9 +6418,11 @@ Task 11 chưa chuyển các chuỗi `label(vi, en)` sẵn có trong `PracticeHom
   - `home.css`
 
   `my-ai-playbooks.ts` và `my-ai-templates.ts` từng chứa id `'teacher-lesson'` (đã gỡ ở Task 4), không phải tên class; chúng là file `.ts` và không bị đụng.
+
 - Modify: `apps/shell/src/renderer/src/i18n/workbench/{zh,vi,en}.ts` (thêm key; 18 shard còn lại spread `en`)
 
 **Interfaces:**
+
 - Consumes (từ task trước):
   - `MODULE_TONES`, `tintStyle`, `Tint` (`./module-tones`, Task 10)
   - `pickActiveWorkspace`, `readActiveWorkspaceId`, `writeActiveWorkspaceId` (`./active-workspace`, Task 9)
@@ -6119,9 +6432,19 @@ Task 11 chưa chuyển các chuỗi `label(vi, en)` sẵn có trong `PracticeHom
 - Produces:
   ```ts
   // WorkbenchIcons.tsx (signature unchanged)
-  export function WorkbenchIcon({ id, size }: { id: PracticePillarId | WorkbenchModuleId | 'add'; size?: number }): ReactElement
+  export function WorkbenchIcon({
+    id,
+    size,
+  }: {
+    id: PracticePillarId | WorkbenchModuleId | 'add'
+    size?: number
+  }): ReactElement
   // WorkbenchTopBar.tsx
-  export interface WorkbenchNewItem { ext: string; title: string; action: () => unknown }
+  export interface WorkbenchNewItem {
+    ext: string
+    title: string
+    action: () => unknown
+  }
   export function WorkbenchTopBar(props: {
     practice: PracticeDefinition
     onSwitchPractice: (id: PracticeId) => void
@@ -6143,6 +6466,7 @@ Ghi chú: `wb-ms-breathe`, `wb-ms-fade-up` và gradient hero chỉ nằm trong k
 - [ ] **Step 1: Viết test icon sẽ fail**
 
 `apps/shell/tests/workbench-icons.test.ts`:
+
 ```ts
 /**
  * @vitest-environment jsdom
@@ -6203,12 +6527,14 @@ describe('WorkbenchIcon', () => {
 
 Chạy: `cd /Users/ducquang/UNICOM/uniwork-office/apps/shell && npx vitest run tests/workbench-icons.test.ts`
 Kết quả mong đợi: FAIL.
+
 - Test đầu throw `TypeError: Cannot read properties of null (reading 'style')` vì chưa có `.wb-icon-tile`.
 - Các test hex fail vì `fill="#2F9E8A"` và tương tự.
 
 - [ ] **Step 3: Viết lại `WorkbenchIcons.tsx`**
 
 Thay toàn bộ file bằng:
+
 ```tsx
 import type { ReactElement } from 'react'
 import type { PracticePillarId, WorkbenchModuleId } from '@uniwork/practice-core'
@@ -6270,7 +6596,12 @@ const GLYPH: Record<IconId, ReactElement> = {
   ),
   tasks: (
     <>
-      <path d="M7 8h10M7 12h10M7 16h7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      <path
+        d="M7 8h10M7 12h10M7 16h7"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
       <path
         d="M5.5 8l1 1 2-2.2"
         stroke="currentColor"
@@ -6339,18 +6670,23 @@ Kết quả mong đợi: PASS (13 test).
 - [ ] **Step 5: Đổi class `teacher-*` thành `wb-*`**
 
 52 tên class đã được kiểm: không tên nào trùng một tên `wb-*` sẵn có.
+
 ```bash
 cd /Users/ducquang/UNICOM/uniwork-office/apps/shell/src/renderer/src
 grep -rlE 'teacher-[a-z]' --include='*.tsx' --include='*.css' . | xargs sed -i '' -E 's/teacher-([a-z])/wb-\1/g'
 grep -rnE 'teacher-[a-z]' --include='*.tsx' --include='*.css' .
 ```
+
 Kết quả mong đợi: lệnh cuối không in gì.
 
 Trong `home.css` (l.3371), đổi comment mục:
+
 ```css
 /* ── Teacher / education mode ── */
 ```
+
 →
+
 ```css
 /* ── Workbench ── */
 ```
@@ -6358,6 +6694,7 @@ Trong `home.css` (l.3371), đổi comment mục:
 - [ ] **Step 6: Làm lại thanh tab (gạch chân, ô 18px, radius 6/8/10/12, chữ 11/12/13)**
 
 Trong `home.css`, thay rule `.wb-home` (trước là `.teacher-home`, l.3373-3378):
+
 ```css
 .wb-home {
   display: flex;
@@ -6366,7 +6703,9 @@ Trong `home.css`, thay rule `.wb-home` (trước là `.teacher-home`, l.3373-337
   padding-bottom: 48px;
 }
 ```
+
 →
+
 ```css
 .wb-home {
   display: flex;
@@ -6375,7 +6714,9 @@ Trong `home.css`, thay rule `.wb-home` (trước là `.teacher-home`, l.3373-337
   padding-bottom: 32px;
 }
 ```
+
 Tiếp theo, thay toàn bộ từ `.wb-tabs {` (trước là l.3557) tới hết `.wb-tab-menu-item strong { … }` (trước là l.3784-3789) bằng:
+
 ```css
 .wb-tabs {
   display: flex;
@@ -6578,19 +6919,27 @@ Tiếp theo, thay toàn bộ từ `.wb-tabs {` (trước là l.3557) tới hết
   font-weight: 500;
 }
 ```
+
 Trong `WorkbenchTabs.tsx`, icon menu thành ô 18px như tab. Ở cả l.295 và l.319:
+
 ```tsx
 <WorkbenchIcon id={p.id} size={22} />
 ```
+
 →
+
 ```tsx
 <WorkbenchIcon id={p.id} size={18} />
 ```
+
 và
+
 ```tsx
 <WorkbenchIcon id={m.id} size={22} />
 ```
+
 →
+
 ```tsx
 <WorkbenchIcon id={m.id} size={18} />
 ```
@@ -6598,6 +6947,7 @@ và
 - [ ] **Step 7: Chạy kiểm tra và commit phần khung**
 
 Chạy:
+
 ```bash
 cd /Users/ducquang/UNICOM/uniwork-office
 npm run typecheck -w @genoffice/shell
@@ -6605,7 +6955,9 @@ cd apps/shell && npx vitest run && cd ../..
 npm run check:theme-colors -- --base origin/main
 npm run format
 ```
+
 Kết quả mong đợi:
+
 - typecheck exit 0;
 - mọi test shell PASS;
 - theme check không in vi phạm;
@@ -6627,6 +6979,7 @@ EOF
 - [ ] **Step 8: Viết test thanh trên sẽ fail**
 
 `apps/shell/tests/workbench-topbar.test.ts`:
+
 ```ts
 /**
  * @vitest-environment jsdom
@@ -6698,7 +7051,9 @@ describe('WorkbenchTopBar', () => {
   it('shows the title, the selected workspace and the role', async () => {
     await mount(props())
     expect(host.querySelector('h1')?.textContent).toBe('Workbench')
-    expect(host.querySelector<HTMLSelectElement>('select[aria-label="Workspace"]')!.value).toBe('w2')
+    expect(host.querySelector<HTMLSelectElement>('select[aria-label="Workspace"]')!.value).toBe(
+      'w2',
+    )
     expect(host.querySelector<HTMLSelectElement>('select[aria-label="Role"]')!.value).toBe(
       'entrepreneur',
     )
@@ -6750,6 +7105,7 @@ Kết quả mong đợi: FAIL với `Failed to resolve import "../src/renderer/s
 - [ ] **Step 10: Tạo script thêm key và thêm chuỗi của thanh trên**
 
 Script này nối một khối dòng vào cuối object của mỗi shard (trước dấu `}` cuối cùng). Task 13–17 dùng lại; nếu thư mục tạm bị xóa, tạo lại từ bước này.
+
 ```bash
 cd /Users/ducquang/UNICOM/uniwork-office
 D=apps/shell/src/renderer/src/i18n/workbench
@@ -6796,6 +7152,7 @@ node "$K/insert.cjs" "$K/t12-en.txt" $D/en.ts
 npx prettier --write $D
 npm run typecheck -w @genoffice/shell
 ```
+
 Kết quả mong đợi: typecheck exit 0. 18 shard còn lại là `{ ...en }` nên tự có key mới (spec §6.8).
 
 - [ ] **Step 11: Viết `WorkbenchTopBar.tsx`**
@@ -6965,101 +7322,119 @@ Task 6 đã gỡ `UI_LANG_KEY`, `persistWorkbenchUiLang`, `uiLang`, `changeUiLan
 1. Import của `PracticeHome.tsx`: xóa `listPracticeGroups,` khỏi danh sách import `@uniwork/practice-core`, rồi thay như sau.
 
    Thay:
+
    ```ts
    import type { ProjectSummaryEntry } from '../../shared/home-api'
    ```
+
    bằng:
+
    ```ts
    import type { ProjectSummaryEntry, UniworkWorkspaceRef } from '../../shared/home-api'
-   import { pickActiveWorkspace, readActiveWorkspaceId, writeActiveWorkspaceId } from './active-workspace'
+   import {
+     pickActiveWorkspace,
+     readActiveWorkspaceId,
+     writeActiveWorkspaceId,
+   } from './active-workspace'
    ```
+
    Thay:
+
    ```ts
    import { WorkbenchTabs } from './WorkbenchTabs'
    ```
+
    bằng:
+
    ```ts
    import { WorkbenchTabs } from './WorkbenchTabs'
    import { WorkbenchTopBar, type WorkbenchNewItem } from './WorkbenchTopBar'
    ```
 
 2. Props: sau `onSwitchPractice: (id: PracticeId) => void` trong `interface PracticeHomeProps`, thêm:
+
    ```ts
      /** Home's NEW_ITEMS, for the top bar's + New menu */
      newItems: readonly WorkbenchNewItem[]
    ```
+
    Trong phần destructuring, sau `onSwitchPractice,` thêm `newItems,`.
 
 3. Thay đầu thân component (kết quả của Task 6 Step 3):
+
    ```ts
-     const { lang } = useI18n()
-     const vi = lang === 'vi'
-     const label = (a: string, b: string) => (vi ? a : b)
+   const { lang } = useI18n()
+   const vi = lang === 'vi'
+   const label = (a: string, b: string) => (vi ? a : b)
    ```
+
    bằng:
+
    ```ts
-     const { lang } = useI18n()
-     const vi = lang === 'vi'
-     const label = (a: string, b: string) => (vi ? a : b)
+   const { lang } = useI18n()
+   const vi = lang === 'vi'
+   const label = (a: string, b: string) => (vi ? a : b)
 
-     // null while the list loads; Home remounts on an account or org change
-     // (WorkbenchAccountGate keys it by bucket), so one load per mount plus Refresh is enough
-     const [workspaces, setWorkspaces] = useState<UniworkWorkspaceRef[] | null>(null)
-     const [workspaceId, setWorkspaceId] = useState<string | null>(null)
-     const [refreshTick, setRefreshTick] = useState(0)
+   // null while the list loads; Home remounts on an account or org change
+   // (WorkbenchAccountGate keys it by bucket), so one load per mount plus Refresh is enough
+   const [workspaces, setWorkspaces] = useState<UniworkWorkspaceRef[] | null>(null)
+   const [workspaceId, setWorkspaceId] = useState<string | null>(null)
+   const [refreshTick, setRefreshTick] = useState(0)
 
-     useEffect(() => {
-       let live = true
-       void window.aiOffice.uniworkListWorkspaces().then(
-         (result) => {
-           if (!live) return
-           const items = result.ok ? result.value : []
-           setWorkspaces(items)
-           setWorkspaceId(pickActiveWorkspace(items, readActiveWorkspaceId()))
-         },
-         () => {
-           if (live) setWorkspaces([])
-         },
-       )
-       return () => {
-         live = false
-       }
-     }, [refreshTick])
-
-     const selectWorkspace = (id: string) => {
-       setWorkspaceId(id)
-       writeActiveWorkspaceId(id)
+   useEffect(() => {
+     let live = true
+     void window.aiOffice.uniworkListWorkspaces().then(
+       (result) => {
+         if (!live) return
+         const items = result.ok ? result.value : []
+         setWorkspaces(items)
+         setWorkspaceId(pickActiveWorkspace(items, readActiveWorkspaceId()))
+       },
+       () => {
+         if (live) setWorkspaces([])
+       },
+     )
+     return () => {
+       live = false
      }
+   }, [refreshTick])
 
-     const refresh = () => {
-       onRefresh()
-       setRefreshTick((n) => n + 1)
-     }
+   const selectWorkspace = (id: string) => {
+     setWorkspaceId(id)
+     writeActiveWorkspaceId(id)
+   }
+
+   const refresh = () => {
+     onRefresh()
+     setRefreshTick((n) => n + 1)
+   }
    ```
 
 4. Thay toàn bộ hero `<section className="wb-hero"> … </section>` (sau Step 5 đã đổi tên từ `teacher-hero`; sau Task 6 gồm tiêu đề, phụ đề, số pack và ô chọn vai trò) bằng:
+
    ```tsx
-         <WorkbenchTopBar
-           practice={practice}
-           onSwitchPractice={onSwitchPractice}
-           workspaces={workspaces ?? []}
-           workspaceId={workspaceId}
-           onSelectWorkspace={selectWorkspace}
-           newItems={newItems}
-           onNewTask={() => setTab('tasks')}
-           onRefresh={refresh}
-         />
+   <WorkbenchTopBar
+     practice={practice}
+     onSwitchPractice={onSwitchPractice}
+     workspaces={workspaces ?? []}
+     workspaceId={workspaceId}
+     onSelectWorkspace={selectWorkspace}
+     newItems={newItems}
+     onNewTask={() => setTab('tasks')}
+     onRefresh={refresh}
+   />
    ```
 
 5. `Home.tsx`, trong phần tử `<PracticeHome` (khoảng l.3465-3483, sau Task 4), sau dòng `onSwitchPractice={switchPractice}`, thêm:
    ```tsx
-               newItems={NEW_ITEMS}
+   newItems = { NEW_ITEMS }
    ```
    `NEW_ITEMS` (l.2009) có trong scope và khớp cấu trúc `WorkbenchNewItem`. Ở chế độ Bàn làm việc `selectedProjectId` là null, nên file mới vào vị trí mặc định.
 
 - [ ] **Step 14: Thêm CSS thanh trên và xóa rule hero, hub, filter đã chết**
 
 1. Trong `home.css`, ngay sau rule `.wb-home { … }`, thêm:
+
    ```css
    .wb-topbar {
      display: flex;
@@ -7158,10 +7533,12 @@ Task 6 đã gỡ `UI_LANG_KEY`, `persistWorkbenchUiLang`, `uiLang`, `changeUiLan
    ```
 
 2. Xác nhận không còn gì vẽ các class sắp xóa. Chúng đã chết sau khi thay hero, xóa TeacherHome và bỏ Hub Token.
+
    ```bash
    cd /Users/ducquang/UNICOM/uniwork-office/apps/shell/src/renderer/src
    grep -rnE "wb-(hero|lang|title|subtitle|hub|filters|actions|chip-ai|chip-row-spaced|detail-header|error-inline)\b" --include='*.tsx' .
    ```
+
    Kết quả mong đợi: không có output.
 
 3. Xóa nguyên các khối rule sau khỏi `home.css` ở bất kỳ đâu chúng còn:
@@ -7218,6 +7595,7 @@ Task 6 đã gỡ `UI_LANG_KEY`, `persistWorkbenchUiLang`, `uiLang`, `changeUiLan
 - [ ] **Step 15: Kiểm tra và commit**
 
 Chạy:
+
 ```bash
 cd /Users/ducquang/UNICOM/uniwork-office
 npm run typecheck -w @genoffice/shell
@@ -7226,12 +7604,15 @@ npm run check:theme-colors -- --base origin/main
 npm run format
 npm run dev
 ```
+
 Kết quả mong đợi:
+
 - typecheck exit 0;
 - mọi test shell PASS, kể cả các test `strings*` và kiểm bộ key của shard Bàn làm việc;
 - theme check sạch.
 
 Kiểm trong app (task chỉ đổi renderer nên không cần rebuild shell). Mở Bàn làm việc và xác nhận:
+
 - thanh trên hiện "Bàn làm việc", ô chọn workspace khi đã đăng nhập, ô chọn vai trò, "+ Tạo mới" (Việc mới cùng 6 loại file) và "Làm mới";
 - tab có ô icon 18px tô tint và gạch chân accent ở tab đang chọn;
 - cả theme light và dark đều đúng.
@@ -7253,6 +7634,7 @@ EOF
 ### Task 13: Tab Tổng quan (Home của server) thay DeskPane
 
 **Files:**
+
 - Create: `apps/shell/src/renderer/src/work-home.ts` (hàm thuần và hai hook)
 - Create: `apps/shell/src/renderer/src/WorkOverview.tsx`
 - Create: `apps/shell/tests/work-home.test.ts`
@@ -7275,6 +7657,7 @@ EOF
   - `apps/shell/src/renderer/src/workbench-reminders.ts` (chỉ DeskPane import nó, và nó nhắc việc của store cục bộ mà server thay thế)
 
 **Interfaces:**
+
 - Consumes:
   - `window.uniworkWork: UniworkWorkApi` (khai báo ở `Home.tsx`, Task 8): `homeSummary`, `setTaskStatus`, `openWeb`
   - kiểu `UniworkWorkError`, `UniworkWorkResult`, `WorkHomeSummary`, `WorkHomeCounts`, `WorkHomeSource`, `WorkTask`, `WorkNotification`, `WorkRecentDocument`, `WorkWebTarget`, và `workErrorOfDocCode` (`shared/uniwork-work-api.ts`)
@@ -7296,22 +7679,53 @@ EOF
   export function hourIn(timeZone: string | undefined, now?: Date): number
   export function clock(iso: string, locale: string, timeZone?: string): string
   export function greetingKey(hour: number): StringKey
-  export interface WorkHeadline { key: StringKey; params: Record<string, string | number>; at?: string; liveMeetingId?: string }
+  export interface WorkHeadline {
+    key: StringKey
+    params: Record<string, string | number>
+    at?: string
+    liveMeetingId?: string
+  }
   export function buildHeadline(summary: WorkHomeSummary): WorkHeadline
   export type DueState = 'overdue' | 'today' | 'later' | 'none'
   export function dueState(task: WorkTask, today: string): DueState
   export function isQuiet(summary: WorkHomeSummary): boolean
-  export function withTaskStatus(summary: WorkHomeSummary, taskId: string, status: string): WorkHomeSummary
-  export function mergeRecentDocuments(cloud: readonly UniworkDocSummary[], local: readonly RecentEntry[], limit?: number): WorkRecentDocument[]
-  export function inboxTarget(n: WorkNotification, ws: { orgSlug: string; wsSlug: string }): WorkWebTarget
+  export function withTaskStatus(
+    summary: WorkHomeSummary,
+    taskId: string,
+    status: string,
+  ): WorkHomeSummary
+  export function mergeRecentDocuments(
+    cloud: readonly UniworkDocSummary[],
+    local: readonly RecentEntry[],
+    limit?: number,
+  ): WorkRecentDocument[]
+  export function inboxTarget(
+    n: WorkNotification,
+    ws: { orgSlug: string; wsSlug: string },
+  ): WorkWebTarget
   export function notificationKey(kind: string): StringKey
-  export type OverviewView = 'loading' | 'ready' | 'stale' | 'no-workspace' | 'signed-out' | 'forbidden' | 'unreachable'
-  export function overviewView(i: { workspaces: readonly unknown[] | null; workspaceError: UniworkWorkError | null; summary: WorkHomeSummary | null; error: UniworkWorkError | null }): OverviewView
+  export type OverviewView =
+    'loading' | 'ready' | 'stale' | 'no-workspace' | 'signed-out' | 'forbidden' | 'unreachable'
+  export function overviewView(i: {
+    workspaces: readonly unknown[] | null
+    workspaceError: UniworkWorkError | null
+    summary: WorkHomeSummary | null
+    error: UniworkWorkError | null
+  }): OverviewView
   export function settleWork<T>(call: Promise<UniworkWorkResult<T>>): Promise<UniworkWorkResult<T>>
   export const HOME_REFRESH_MS = 60_000
-  export interface WorkHome { summary: WorkHomeSummary | null; updatedAt: number | null; error: UniworkWorkError | null; reload(): void; update(edit: (s: WorkHomeSummary) => WorkHomeSummary): void }
+  export interface WorkHome {
+    summary: WorkHomeSummary | null
+    updatedAt: number | null
+    error: UniworkWorkError | null
+    reload(): void
+    update(edit: (s: WorkHomeSummary) => WorkHomeSummary): void
+  }
   export function useWorkHome(workspaceId: string | null, refreshTick: number): WorkHome
-  export function useRecentDocuments(workspaceId: string | null, refreshTick: number): WorkRecentDocument[]
+  export function useRecentDocuments(
+    workspaceId: string | null,
+    refreshTick: number,
+  ): WorkRecentDocument[]
   // WorkOverview.tsx
   export function WorkOverview(props: {
     workspaces: readonly UniworkWorkspaceRef[] | null
@@ -7326,6 +7740,7 @@ EOF
   - Selector cho E2E (Task 19): 5 ô `.wb-ov-stat` theo thứ tự Đang mở, Quá hạn, Đến hạn hôm nay, Họp hôm nay, Chưa đọc; thẻ tài liệu gần đây `.wb-ov-recent`.
 
 Ghi chú:
+
 - `buildHeadline` không nhận `now`. Đây là bản chuyển trực tiếp của `uniwork:packages/core/home/brief.ts`, chỉ đọc summary vì "hôm nay" đến từ server theo múi giờ người dùng.
 - Cache summary là một `Map` cấp module khóa theo `${currentWorkbenchBucket()}|${workspaceId}`, nên tài khoản hay org này không bao giờ thấy cache của tài khoản/org khác.
 - Cột "dự án" hiện `identifier` (C9).
@@ -7335,6 +7750,7 @@ Ghi chú:
 - [ ] **Step 1: Thêm chuỗi Tổng quan (zh, vi, en)**
 
 Câu tiếng Việt chuyển từ `uniwork:packages/core/i18n/locales/vi.json`, thay các từ tiếng Anh. 18 shard còn lại nhận bản tiếng Anh qua `{ ...en }` (spec §6.8). `insert.cjs` là script ở Task 12 Step 10.
+
 ```bash
 cd /Users/ducquang/UNICOM/uniwork-office
 D=apps/shell/src/renderer/src/i18n/workbench
@@ -7488,25 +7904,34 @@ node "$K/insert.cjs" "$K/t13-vi.txt" $D/vi.ts
 node "$K/insert.cjs" "$K/t13-en.txt" $D/en.ts
 npx prettier --write $D
 ```
+
 Chạy: `cd /Users/ducquang/UNICOM/uniwork-office && npm run typecheck -w @genoffice/shell && cd apps/shell && npx vitest run strings`
 Kết quả mong đợi: typecheck exit 0 vì mọi shard có bộ key của zh; các test `strings*` PASS.
 
 - [ ] **Step 2: Viết test `openUniworkDocument` sẽ fail**
 
 Trong `apps/shell/tests/uniwork-docs-ui.test.ts`, thay l.32:
+
 ```ts
 import { openRecentEntry } from '../src/renderer/src/uniwork-open'
 ```
+
 bằng:
+
 ```ts
 import { openRecentEntry, openUniworkDocument } from '../src/renderer/src/uniwork-open'
 ```
+
 Thêm sau khối `describe('openRecentEntry', …)`:
+
 ```ts
 describe('openUniworkDocument', () => {
   it('opens a cloud document by id and reports progress in the notice', async () => {
     const api = {
-      uniworkOpenDocument: vi.fn(async () => ({ ok: true as const, value: { path: '/w/Plan.docx' } })),
+      uniworkOpenDocument: vi.fn(async () => ({
+        ok: true as const,
+        value: { path: '/w/Plan.docx' },
+      })),
     }
     const notify = vi.fn()
     await openUniworkDocument({ documentId: 'd1', title: 'Plan' }, api as never, notify)
@@ -7518,12 +7943,14 @@ describe('openUniworkDocument', () => {
   })
 })
 ```
+
 Chạy: `cd /Users/ducquang/UNICOM/uniwork-office/apps/shell && npx vitest run tests/uniwork-docs-ui.test.ts`
 Kết quả mong đợi: FAIL với `openUniworkDocument is not a function`.
 
 - [ ] **Step 3: Tách `openUniworkDocument` trong `uniwork-open.ts`**
 
 Thay phần thân sau dòng `type OpenApi = …` bằng:
+
 ```ts
 /**
  * Open a UniWork document through UniWork (so the binding, the permission
@@ -7564,12 +7991,14 @@ export async function openRecentEntry(
   await openUniworkDocument(entry.uniwork, api, notify)
 }
 ```
+
 Chạy: `cd /Users/ducquang/UNICOM/uniwork-office/apps/shell && npx vitest run tests/uniwork-docs-ui.test.ts`
 Kết quả mong đợi: PASS. Các test `openRecentEntry` sẵn có không đổi.
 
 - [ ] **Step 4: Viết test hàm thuần sẽ fail**
 
 `apps/shell/tests/work-home.test.ts` (khối `the summary zone decides today near midnight` ở cuối là test ghim cho Review Focus 2):
+
 ```ts
 import { describe, expect, it } from 'vitest'
 import type { RecentEntry, UniworkDocSummary } from '../src/shared/home-api'
@@ -7687,12 +8116,16 @@ describe('buildHeadline (port of uniwork core/home/brief.ts)', () => {
         upcoming_meetings: [meeting({ status: 'IN_PROGRESS' })],
       }),
     )
-    expect(h).toEqual({ key: 'wbOvHeadlineLive', params: { title: 'Weekly sync' }, liveMeetingId: 'm1' })
+    expect(h).toEqual({
+      key: 'wbOvHeadlineLive',
+      params: { title: 'Weekly sync' },
+      liveMeetingId: 'm1',
+    })
   })
   it('then a failed source, because its zeros are not true', () => {
-    expect(buildHeadline(summary({ counts: { ...ZERO, overdue: 1 }, partial: ['tasks'] })).key).toBe(
-      'wbOvHeadlinePartial',
-    )
+    expect(
+      buildHeadline(summary({ counts: { ...ZERO, overdue: 1 }, partial: ['tasks'] })).key,
+    ).toBe('wbOvHeadlinePartial')
   })
   it('then the oldest open overdue task with its days late', () => {
     const h = buildHeadline(
@@ -7701,7 +8134,10 @@ describe('buildHeadline (port of uniwork core/home/brief.ts)', () => {
         my_work: [task({ id: 'done', status: 'done', due_date: '2026-10-01' }), task()],
       }),
     )
-    expect(h).toEqual({ key: 'wbOvHeadlineOverdue', params: { title: 'Send the contract', count: 3 } })
+    expect(h).toEqual({
+      key: 'wbOvHeadlineOverdue',
+      params: { title: 'Send the contract', count: 3 },
+    })
   })
   it('counts overdue work that is not in the list', () => {
     expect(buildHeadline(summary({ counts: { ...ZERO, overdue: 2 } }))).toEqual({
@@ -7763,11 +8199,22 @@ describe('mergeRecentDocuments', () => {
   const doc = (id: string, title: string, format: UniworkDocSummary['format'], updatedAt: string) =>
     ({ id, workspaceId: 'w', title, format, updatedAt }) as UniworkDocSummary
   const entry = (path: string, iso: string, over: Partial<RecentEntry> = {}) =>
-    ({ path, name: path.slice(1), ext: 'docx', mtimeMs: Date.parse(iso), sizeBytes: 1, starred: false, ...over }) as RecentEntry
+    ({
+      path,
+      name: path.slice(1),
+      ext: 'docx',
+      mtimeMs: Date.parse(iso),
+      sizeBytes: 1,
+      starred: false,
+      ...over,
+    }) as RecentEntry
 
   it('drops files that cannot open, missing files and working copies, newest first', () => {
     const rows = mergeRecentDocuments(
-      [doc('d1', 'Plan.docx', 'docx', '2026-10-12T09:00:00Z'), doc('d2', 'Photo.png', null, '2026-10-13T09:00:00Z')],
+      [
+        doc('d1', 'Plan.docx', 'docx', '2026-10-12T09:00:00Z'),
+        doc('d2', 'Photo.png', null, '2026-10-13T09:00:00Z'),
+      ],
       [
         entry('/a.docx', '2026-10-11T09:00:00Z'),
         entry('/gone.docx', '2026-10-14T09:00:00Z', { missing: true }),
@@ -7776,10 +8223,15 @@ describe('mergeRecentDocuments', () => {
         }),
       ],
     )
-    expect(rows.map((r) => (r.source === 'uniwork' ? r.doc.id : r.entry.path))).toEqual(['d1', '/a.docx'])
+    expect(rows.map((r) => (r.source === 'uniwork' ? r.doc.id : r.entry.path))).toEqual([
+      'd1',
+      '/a.docx',
+    ])
   })
   it('shows at most six', () => {
-    const local = Array.from({ length: 9 }, (_, i) => entry(`/f${i}.docx`, `2026-10-0${i + 1}T09:00:00Z`))
+    const local = Array.from({ length: 9 }, (_, i) =>
+      entry(`/f${i}.docx`, `2026-10-0${i + 1}T09:00:00Z`),
+    )
     expect(mergeRecentDocuments([], local)).toHaveLength(6)
   })
 })
@@ -7792,7 +8244,12 @@ describe('notificationKey and inboxTarget', () => {
   })
   it('opens a task or a meeting on the web, anything else in the web inbox', () => {
     const ws = { orgSlug: 'acme', wsSlug: 'team' }
-    expect(inboxTarget(note(), ws)).toEqual({ kind: 'task', orgSlug: 'acme', wsSlug: 'team', id: 't9' })
+    expect(inboxTarget(note(), ws)).toEqual({
+      kind: 'task',
+      orgSlug: 'acme',
+      wsSlug: 'team',
+      id: 't9',
+    })
     expect(inboxTarget(note({ resource_type: 'meeting', resource_id: 'm2' }), ws)).toEqual({
       kind: 'meeting',
       orgSlug: 'acme',
@@ -7846,6 +8303,7 @@ describe('the summary zone decides today near midnight', () => {
   })
 })
 ```
+
 Chạy: `cd /Users/ducquang/UNICOM/uniwork-office/apps/shell && npx vitest run tests/work-home.test.ts`
 Kết quả mong đợi: FAIL với `Failed to resolve import "../src/renderer/src/work-home"`.
 
@@ -7971,7 +8429,8 @@ function nextMeetingToday(summary: WorkHomeSummary) {
 export function buildHeadline(summary: WorkHomeSummary): WorkHeadline {
   const { counts, today } = summary
   const live = summary.upcoming_meetings.find((m) => m.status === 'IN_PROGRESS')
-  if (live) return { key: 'wbOvHeadlineLive', params: { title: live.title }, liveMeetingId: live.id }
+  if (live)
+    return { key: 'wbOvHeadlineLive', params: { title: live.title }, liveMeetingId: live.id }
   if (summary.partial.length > 0) return { key: 'wbOvHeadlinePartial', params: {} }
   if (counts.overdue > 0) {
     const oldest = oldestOverdue(summary)
@@ -7984,9 +8443,11 @@ export function buildHeadline(summary: WorkHomeSummary): WorkHeadline {
   }
   if (counts.meetings_today > 0) {
     const next = nextMeetingToday(summary)
-    if (next) return { key: 'wbOvHeadlineMeeting', params: { title: next.title }, at: next.starts_at }
+    if (next)
+      return { key: 'wbOvHeadlineMeeting', params: { title: next.title }, at: next.starts_at }
   }
-  if (counts.due_today > 0) return { key: 'wbOvHeadlineDueToday', params: { count: counts.due_today } }
+  if (counts.due_today > 0)
+    return { key: 'wbOvHeadlineDueToday', params: { count: counts.due_today } }
   if (counts.unread > 0) return { key: 'wbOvHeadlineUnread', params: { count: counts.unread } }
   return { key: 'wbOvHeadlineClear', params: {} }
 }
@@ -8032,9 +8493,10 @@ export function mergeRecentDocuments(
   limit = 6,
 ): WorkRecentDocument[] {
   const rows: { at: number; row: WorkRecentDocument }[] = [
-    ...cloud
-      .filter(isOpenable)
-      .map((doc) => ({ at: Date.parse(doc.updatedAt) || 0, row: { source: 'uniwork' as const, doc } })),
+    ...cloud.filter(isOpenable).map((doc) => ({
+      at: Date.parse(doc.updatedAt) || 0,
+      row: { source: 'uniwork' as const, doc },
+    })),
     ...local
       .filter((entry) => !entry.missing && !entry.uniwork)
       .map((entry) => ({ at: entry.mtimeMs, row: { source: 'local' as const, entry } })),
@@ -8061,13 +8523,7 @@ export function notificationKey(kind: string): StringKey {
 }
 
 export type OverviewView =
-  | 'loading'
-  | 'ready'
-  | 'stale'
-  | 'no-workspace'
-  | 'signed-out'
-  | 'forbidden'
-  | 'unreachable'
+  'loading' | 'ready' | 'stale' | 'no-workspace' | 'signed-out' | 'forbidden' | 'unreachable'
 
 /** which of the spec §7 states the Overview shows */
 export function overviewView(i: {
@@ -8196,6 +8652,7 @@ export function useRecentDocuments(
   return docs
 }
 ```
+
 Chạy: `cd /Users/ducquang/UNICOM/uniwork-office/apps/shell && npx vitest run tests/work-home.test.ts`
 Kết quả mong đợi: PASS.
 
@@ -8220,6 +8677,7 @@ EOF
 - [ ] **Step 7: Viết test component Tổng quan sẽ fail**
 
 `apps/shell/tests/work-overview.test.ts`:
+
 ```ts
 /**
  * @vitest-environment jsdom
@@ -8228,7 +8686,12 @@ import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { HomeApi, RecentEntry, UniworkDocSummary, UniworkWorkspaceRef } from '../src/shared/home-api'
+import type {
+  HomeApi,
+  RecentEntry,
+  UniworkDocSummary,
+  UniworkWorkspaceRef,
+} from '../src/shared/home-api'
 import type { UniworkWorkApi, WorkHomeSummary, WorkTask } from '../src/shared/uniwork-work-api'
 import { LocaleProvider } from '../src/renderer/src/locale'
 import { WorkOverview } from '../src/renderer/src/WorkOverview'
@@ -8366,7 +8829,9 @@ async function flush(): Promise<void> {
 
 async function render(props: Props): Promise<void> {
   await act(async () => {
-    root.render(createElement(LocaleProvider, { initial: 'en' }, createElement(WorkOverview, props)))
+    root.render(
+      createElement(LocaleProvider, { initial: 'en' }, createElement(WorkOverview, props)),
+    )
   })
   await flush()
 }
@@ -8420,10 +8885,18 @@ describe('WorkOverview', () => {
     expect(text()).toContain('Plan.docx')
     expect(text()).toContain('notes.docx')
     expect(text()).toContain('On this device')
-    expect(api.uniworkListDocuments).toHaveBeenCalledWith({ workspaceId: props.workspaceId, limit: 20 })
+    expect(api.uniworkListDocuments).toHaveBeenCalledWith({
+      workspaceId: props.workspaceId,
+      limit: 20,
+    })
 
     await click(buttons('Join')[0])
-    expect(work.openWeb).toHaveBeenCalledWith({ kind: 'room', orgSlug: 'acme', wsSlug: 'team', id: 'm1' })
+    expect(work.openWeb).toHaveBeenCalledWith({
+      kind: 'room',
+      orgSlug: 'acme',
+      wsSlug: 'team',
+      id: 'm1',
+    })
 
     const cloudCard = Array.from(host.querySelectorAll('button')).find((b) =>
       b.textContent?.includes('Plan.docx'),
@@ -8525,6 +8998,7 @@ describe('WorkOverview', () => {
   })
 })
 ```
+
 Chạy: `cd /Users/ducquang/UNICOM/uniwork-office/apps/shell && npx vitest run tests/work-overview.test.ts`
 Kết quả mong đợi: FAIL với `Failed to resolve import "../src/renderer/src/WorkOverview"`.
 
@@ -8583,9 +9057,26 @@ const STATS: readonly {
   section: string
 }[] = [
   { key: 'open', source: 'tasks', label: 'wbOvStatOpen', section: 'wb-ov-mywork' },
-  { key: 'overdue', source: 'tasks', label: 'wbOvStatOverdue', tone: 'danger', section: 'wb-ov-mywork' },
-  { key: 'due_today', source: 'tasks', label: 'wbOvStatDueToday', tone: 'warning', section: 'wb-ov-mywork' },
-  { key: 'meetings_today', source: 'meetings', label: 'wbOvStatMeetingsToday', section: 'wb-ov-meetings' },
+  {
+    key: 'overdue',
+    source: 'tasks',
+    label: 'wbOvStatOverdue',
+    tone: 'danger',
+    section: 'wb-ov-mywork',
+  },
+  {
+    key: 'due_today',
+    source: 'tasks',
+    label: 'wbOvStatDueToday',
+    tone: 'warning',
+    section: 'wb-ov-mywork',
+  },
+  {
+    key: 'meetings_today',
+    source: 'meetings',
+    label: 'wbOvStatMeetingsToday',
+    section: 'wb-ov-meetings',
+  },
   { key: 'unread', source: 'notifications', label: 'wbOvStatUnread', section: 'wb-ov-inbox' },
 ]
 
@@ -8616,7 +9107,12 @@ export function WorkOverview({
   const recents = useRecentDocuments(workspace?.id ?? null, refreshTick)
   const [name, setName] = useState('')
   const [failedWrite, setFailedWrite] = useState<{ task: WorkTask; status: string } | null>(null)
-  const view = overviewView({ workspaces, workspaceError, summary: home.summary, error: home.error })
+  const view = overviewView({
+    workspaces,
+    workspaceError,
+    summary: home.summary,
+    error: home.error,
+  })
   const shown = view === 'ready' || view === 'stale' ? home.summary : null
   const base = workspace ? { orgSlug: workspace.orgSlug, wsSlug: workspace.slug } : null
 
@@ -8688,7 +9184,9 @@ export function WorkOverview({
         </div>
         {view === 'stale' && home.updatedAt !== null ? (
           <p className="wb-ov-stale">
-            {t('wbOvUpdatedAt', { time: clock(new Date(home.updatedAt).toISOString(), dateLocale) })}{' '}
+            {t('wbOvUpdatedAt', {
+              time: clock(new Date(home.updatedAt).toISOString(), dateLocale),
+            })}{' '}
             ·{' '}
             <button type="button" className="wb-link" onClick={home.reload}>
               {t('acctRetry')}
@@ -8859,7 +9357,10 @@ export function WorkOverview({
                 type="button"
                 className="wb-ov-recent"
                 onClick={() =>
-                  void openUniworkDocument({ documentId: r.doc.id, title: r.doc.title }, window.aiOffice)
+                  void openUniworkDocument(
+                    { documentId: r.doc.id, title: r.doc.title },
+                    window.aiOffice,
+                  )
                 }
               >
                 <FileBadge ext={docExtension(r.doc)} size={24} />
@@ -8962,6 +9463,7 @@ Kết quả mong đợi: PASS (9 test component cùng toàn bộ test hàm thu�
 - [ ] **Step 10: CSS của Tổng quan (chỉ token)**
 
 Trong `home.css`, ngay sau rule `.wb-new-item:hover, .wb-new-item:focus-visible { … }` của Task 12, thêm:
+
 ```css
 /* ── Workbench Overview (desk tab) ── */
 .wb-ov {
@@ -9331,16 +9833,20 @@ button.wb-ov-stat-body:hover {
 - [ ] **Step 11: Gắn Tổng quan vào `PracticeHome` và bỏ `DeskPane`**
 
 1. Import của `PracticeHome.tsx`: sau import `active-workspace`, thêm:
+
    ```ts
    import { workErrorOfDocCode, type UniworkWorkError } from '../../shared/uniwork-work-api'
    import { WorkOverview } from './WorkOverview'
    ```
 
 2. Effect workspace (thêm ở Task 12). Sau dòng `const [workspaceId, setWorkspaceId] = useState<string | null>(null)`, thêm:
+
    ```ts
-     const [workspaceError, setWorkspaceError] = useState<UniworkWorkError | null>(null)
+   const [workspaceError, setWorkspaceError] = useState<UniworkWorkError | null>(null)
    ```
+
    Rồi thay:
+
    ```ts
          (result) => {
            if (!live) return
@@ -9352,7 +9858,9 @@ button.wb-ov-stat-body:hover {
            if (live) setWorkspaces([])
          },
    ```
+
    bằng:
+
    ```ts
          (result) => {
            if (!live) return
@@ -9369,20 +9877,24 @@ button.wb-ov-stat-body:hover {
    ```
 
 3. Sau `const refresh = () => { … }`, thêm (`pinPillar` đã được import từ `./workbench-pins`):
+
    ```ts
-     const openCompose = () => {
-       pinPillar(practice.id, 'compose')
-       window.dispatchEvent(new Event('uniwork:wb-pins-changed'))
-       setTab('compose')
-     }
+   const openCompose = () => {
+     pinPillar(practice.id, 'compose')
+     window.dispatchEvent(new Event('uniwork:wb-pins-changed'))
+     setTab('compose')
+   }
    ```
 
 4. Bộ chuyển pane. Thay:
+
    ```tsx
          {isWorkbenchModuleId(tab) ? (
            <WorkbenchModulePane
    ```
+
    bằng:
+
    ```tsx
          {tab === 'desk' ? (
            <WorkOverview
@@ -9403,13 +9915,16 @@ button.wb-ov-stat-body:hover {
    - đổi `const hideChrome = moduleId === 'desk' || moduleId === 'notes'` (kết quả của Task 2) thành `const hideChrome = moduleId === 'notes'`.
 
 6. `packages/practice-core/src/modules.ts`, trong mục `desk` (giá trị sau Task 2):
+
    ```ts
        labelVi: 'Không gian của tôi',
        labelEn: 'My Space',
        hintVi: 'Tổng hợp việc và lịch — chỉ số, nhắc, biểu đồ',
        hintEn: 'Tasks and calendar at a glance — KPIs, reminders, charts',
    ```
+
    →
+
    ```ts
        labelVi: 'Tổng quan',
        labelEn: 'Overview',
@@ -9418,12 +9933,14 @@ button.wb-ov-stat-body:hover {
    ```
 
 7. Xóa code desk cũ:
+
    ```bash
    cd /Users/ducquang/UNICOM/uniwork-office
    git rm apps/shell/src/renderer/src/DeskPane.tsx apps/shell/src/renderer/src/workbench-desk.ts apps/shell/src/renderer/src/workbench-reminders.ts
    ```
 
 8. Xóa CSS desk trong `home.css` bằng script gỡ rule (Task 14, 15, 17 dùng lại script này; nếu thư mục tạm bị xóa, tạo lại từ đây):
+
    ```bash
    mkdir -p "${TMPDIR:-/tmp}/wb-css"
    cat > "${TMPDIR:-/tmp}/wb-css/strip-css-rules.cjs" <<'EOF'
@@ -9467,6 +9984,7 @@ button.wb-ov-stat-body:hover {
    cd /Users/ducquang/UNICOM/uniwork-office
    NODE_PATH=$PWD/node_modules node "${TMPDIR:-/tmp}/wb-css/strip-css-rules.cjs" apps/shell/src/renderer/src/home.css .wb-myspace .wb-ms .wb-desk
    ```
+
    Kết quả mong đợi: `rules touched:` với một số lớn hơn 0 và `vars removed: 0`. Sau đó sửa tay:
    - xóa nguyên hai khối `@keyframes wb-ms-fade-up { … }` và `@keyframes wb-ms-breathe { … }` (script không gỡ keyframes);
    - đổi comment `/* ── My Space (desk module) ─────────────────────────────── */` thành `/* ── Immersive module panes ── */`;
@@ -9483,6 +10001,7 @@ button.wb-ov-stat-body:hover {
 - [ ] **Step 12: Kiểm toàn bộ và commit**
 
 Chạy:
+
 ```bash
 cd /Users/ducquang/UNICOM/uniwork-office
 npm run typecheck -w @genoffice/shell
@@ -9493,13 +10012,16 @@ npm run check:theme-colors -- --base origin/main
 npm run format
 npm run dev
 ```
+
 Kết quả mong đợi:
+
 - cả hai typecheck exit 0;
 - test practice-core PASS (chúng kiểm id module, không kiểm nhãn);
 - mọi test shell PASS, kể cả `work-home`, `work-overview`, `uniwork-docs-ui` và các test `strings*`;
 - theme check không in vi phạm.
 
 Kiểm trong app (chỉ đổi renderer nên không cần rebuild shell). Tab lõi hiện "Tổng quan" / "Overview".
+
 - **Chưa đăng nhập:** một bảng đăng nhập và các file gần đây trên máy mang nhãn "Trên máy này".
 - **Đã đăng nhập:**
   - dòng ngày, lời chào và câu đầu trang;
@@ -9530,6 +10052,7 @@ EOF
 ```
 
 Chưa làm ở Task 13:
+
 - Lời chào dùng toàn bộ display name, chưa theo quy tắc `greetingName` (chỉ tên) của web.
 - Checkbox ở Tổng quan coi đúng key `'done'` là xong; một key tùy biến thuộc nhóm done (ví dụ `shipped`) hiện chưa tick ở Tổng quan nhưng là đã đóng ở tab Việc (Task 14 dùng `closedStatusKeys`). Server thường không trả việc đã đóng trong `my_work`.
 - Thiếu slug thì `openWeb` từ chối target, nên liên kết việc, họp và thông báo không làm gì (C5 đảm bảo có slug khi server gửi).
@@ -9539,6 +10062,7 @@ Chưa làm ở Task 13:
 Ghi chú hợp đồng: Task 14–19 dựa trên trạng thái sau Task 1–13: các module đã cắt; `DeskPane.tsx`, `EmailPane.tsx`, `workbench-reminders.ts` và store events/finance/health/growth/travel/pets đã xóa; `moduleSupportsAddItem` chỉ đúng với `tasks | notes | calendar`; `window.uniworkWork: UniworkWorkApi` khai báo trong `declare global` của `Home.tsx`; `PracticeHome` giữ `workspaces`, `workspaceId`, `workspaceError`, `refreshTick`, `refresh()`. Task này thêm `WB_REFRESH_EVENT = 'uniwork:wb-refresh'` ở `work-cache.ts`; các tab server tải lại khi có event này và khi cửa sổ được focus, và `refresh()` của `PracticeHome` phát event (Step 18). Theo C9, cột "dự án" hiện `identifier`, nhãn "Mã việc" / "Key". Theo C15, quick add không gửi `allow_duplicate`; 409 thành `'server'` và hiện "Could not add the task." My AI `add_item` → Việc giờ tạo việc trên UniWork nên `applyAgentIntent` thành async.
 
 **Files:**
+
 - Create: `apps/shell/src/renderer/src/work-tasks.ts`, `apps/shell/src/renderer/src/work-cache.ts`, `apps/shell/src/renderer/src/WorkErrorState.tsx`, `apps/shell/src/renderer/src/WorkTasksPane.tsx`
 - Test (create): `apps/shell/tests/work-tasks.test.ts`, `apps/shell/tests/work-cache.test.ts`, `apps/shell/tests/work-tasks-pane.test.ts`, `apps/shell/tests/agent-intent-apply-tasks.test.ts`
 - Modify: `apps/shell/src/renderer/src/i18n/workbench/{zh,vi,en}.ts` (thêm key)
@@ -9553,6 +10077,7 @@ Ghi chú hợp đồng: Task 14–19 dựa trên trạng thái sau Task 1–13: 
 - Delete: `apps/shell/src/renderer/src/TasksPane.tsx`
 
 **Interfaces:**
+
 - Consumes: `UniworkWorkApi.myTasks(ws)`, `.taskStatuses(ws)`, `.setTaskStatus(taskId, statusKey)`, `.createTask(WorkCreateTaskInput)`, `.openWeb(WorkWebTarget)`. Kiểu `WorkTask`, `WorkTaskStatus`, `UniworkWorkError`, `UniworkWorkResult<T>` (`shared/uniwork-work-api.ts`). `UniworkWorkspaceRef {id,name,orgId,slug,orgSlug}` (`shared/home-api.ts`). `readActiveWorkspaceId(): string | null` và `pickActiveWorkspace(items, stored)` (`active-workspace.ts`). `currentWorkbenchBucket()` và `isWorkbenchBucketCleared()` (`workbench-bucket.ts`). `useAccount().signIn` và `useAccount().view` (`account-model.ts`). `useI18n(): { t, dateLocale }`. `insert.cjs` (Task 12) và `strip-css-rules.cjs` (Task 13).
 - Produces:
   - `work-tasks.ts`: `type TaskDueGroup = 'overdue'|'today'|'week'|'later'|'none'`; `localIsoDate(d: Date): string`; `endOfWeek(today: string): string`; `groupTasksByDue(tasks: readonly WorkTask[], today: string): { group: TaskDueGroup; tasks: WorkTask[] }[]`; `closedStatusKeys(statuses: readonly WorkTaskStatus[]): Set<string>`
@@ -9571,7 +10096,9 @@ grep -n "uniworkWork: UniworkWorkApi" apps/shell/src/renderer/src/Home.tsx
 grep -n "workspaceError\|refreshTick" apps/shell/src/renderer/src/PracticeHome.tsx | head -3
 ls apps/shell/src/renderer/src/i18n/workbench/zh.ts apps/shell/src/renderer/src/active-workspace.ts apps/shell/src/renderer/src/module-tones.ts apps/shell/src/shared/uniwork-work-api.ts
 ```
+
 Kết quả mong đợi:
+
 - `3`
 - một kết quả trong `Home.tsx`
 - `PracticeHome.tsx` có `workspaceError` và `refreshTick` (Task 12–13)
@@ -9580,18 +10107,20 @@ Kết quả mong đợi:
 Nếu `PracticeHome.tsx` chưa có state workspace, dừng lại: Task 12–13 phải xong trước.
 
 `apps/shell/src/renderer/src/WorkbenchModulePanes.tsx`:
+
 - thêm `import type { UniworkWorkspaceRef } from '../../shared/home-api'`;
 - thêm vào `interface Props`:
   ```ts
-    /** the active UniWork workspace; null = signed out or a member of none */
-    workspace: UniworkWorkspaceRef | null
+  /** the active UniWork workspace; null = signed out or a member of none */
+  workspace: UniworkWorkspaceRef | null
   ```
 - thêm `workspace,` vào phần destructuring của `WorkbenchModulePane`.
 
 `apps/shell/src/renderer/src/PracticeHome.tsx`:
+
 - sau dòng `const [workspaceError, setWorkspaceError] = …` (Task 13), thêm:
   ```ts
-    const workspace = workspaces?.find((w) => w.id === workspaceId) ?? null
+  const workspace = workspaces?.find((w) => w.id === workspaceId) ?? null
   ```
 - trong bộ chuyển pane (sau Task 13), thay:
   ```tsx
@@ -9613,6 +10142,7 @@ Nếu `PracticeHome.tsx` chưa có state workspace, dừng lại: Task 12–13 p
 - [ ] **Step 2: Viết test hàm hạn chót sẽ fail**
 
 `apps/shell/tests/work-tasks.test.ts`:
+
 ```ts
 import { describe, expect, it } from 'vitest'
 import type { WorkTask, WorkTaskStatus } from '../src/shared/uniwork-work-api'
@@ -9694,7 +10224,12 @@ describe('closedStatusKeys', () => {
       { id: '2', key: 'shipped', name: 'Shipped', category: 'done', color: '', position: 2 },
       { id: '3', key: 'dropped', name: 'Dropped', category: 'cancelled', color: '', position: 3 },
     ]
-    expect([...closedStatusKeys(statuses)].sort()).toEqual(['cancelled', 'done', 'dropped', 'shipped'])
+    expect([...closedStatusKeys(statuses)].sort()).toEqual([
+      'cancelled',
+      'done',
+      'dropped',
+      'shipped',
+    ])
     expect([...closedStatusKeys([])].sort()).toEqual(['cancelled', 'done'])
   })
 })
@@ -9708,6 +10243,7 @@ Kết quả mong đợi: FAIL với `Failed to resolve import "../src/renderer/s
 - [ ] **Step 4: Viết `work-tasks.ts`**
 
 `apps/shell/src/renderer/src/work-tasks.ts`:
+
 ```ts
 /**
  * Tasks tab helpers (pure): due-date groups like the web My work list, plus
@@ -9779,6 +10315,7 @@ Kết quả mong đợi: PASS, 6 test.
 - [ ] **Step 6: Viết test cache công việc sẽ fail**
 
 `apps/shell/tests/work-cache.test.ts`:
+
 ```ts
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorkTask, WorkTaskStatus } from '../src/shared/uniwork-work-api'
@@ -9846,6 +10383,7 @@ Kết quả mong đợi: FAIL với `Failed to resolve import "../src/renderer/s
 - [ ] **Step 8: Viết `work-cache.ts`**
 
 `apps/shell/src/renderer/src/work-cache.ts`:
+
 ```ts
 /**
  * The last server answer per key, kept in memory for this window: shown with
@@ -9996,6 +10534,7 @@ node "$K/insert.cjs" "$K/t14-en.txt" $D/en.ts
 npx prettier --write $D
 npm run typecheck -w @genoffice/shell
 ```
+
 Kết quả mong đợi: typecheck pass, vì `satisfies Record<keyof typeof zh, string>` đúng ở mọi shard (18 locale còn lại spread `en`, spec §6.8). Đã kiểm bằng script: không key `wbWork*` / `wbTasks*` nào trùng key của Task 11–13, 15–18 hay của `strings.ts` và các shard account, cloud, sync, uniwork-documents.
 
 - [ ] **Step 12: Viết test component tab Việc sẽ fail**
@@ -10003,6 +10542,7 @@ Kết quả mong đợi: typecheck pass, vì `satisfies Record<keyof typeof zh, 
 Ba test cuối là test ghim của Review Focus 1, 3 và 4.
 
 `apps/shell/tests/work-tasks-pane.test.ts`:
+
 ```ts
 /**
  * @vitest-environment jsdom
@@ -10041,10 +10581,14 @@ const STATUSES: WorkTaskStatus[] = [
 function makeApi() {
   return {
     homeSummary: vi.fn(),
-    myTasks: vi.fn(async (): Promise<UniworkWorkResult<WorkTask[]>> => ({ ok: true, value: [TASK] })),
-    taskStatuses: vi.fn(
-      async (): Promise<UniworkWorkResult<WorkTaskStatus[]>> => ({ ok: true, value: STATUSES }),
-    ),
+    myTasks: vi.fn(async (): Promise<UniworkWorkResult<WorkTask[]>> => ({
+      ok: true,
+      value: [TASK],
+    })),
+    taskStatuses: vi.fn(async (): Promise<UniworkWorkResult<WorkTaskStatus[]>> => ({
+      ok: true,
+      value: STATUSES,
+    })),
     setTaskStatus: vi.fn(
       async (_id: string, status: string): Promise<UniworkWorkResult<WorkTask>> => ({
         ok: true,
@@ -10131,7 +10675,9 @@ describe('Tasks tab', () => {
     await mount()
     await click(checkbox())
     expect(checkbox().checked).toBe(false)
-    expect(host.querySelector('[role="alert"]')?.textContent).toContain('Could not save the change.')
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain(
+      'Could not save the change.',
+    )
     await click(buttonByText('Retry'))
     expect(api.setTaskStatus).toHaveBeenCalledTimes(2)
     expect(checkbox().checked).toBe(true)
@@ -10144,18 +10690,27 @@ describe('Tasks tab', () => {
     await mount()
     const input = host.querySelector<HTMLInputElement>('.wb-work-quick input')!
     await act(async () => {
-      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, 'Call the bank')
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
+        input,
+        'Call the bank',
+      )
       input.dispatchEvent(new Event('input', { bubbles: true }))
     })
     await act(async () => {
-      host.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+      host
+        .querySelector('form')!
+        .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
     })
     await flush()
     await click(buttonByText('Retry'))
     expect(api.createTask).toHaveBeenCalledTimes(2)
     const first = api.createTask.mock.calls[0]![0]
     const second = api.createTask.mock.calls[1]![0]
-    expect(first).toEqual({ workspaceId: 'w1', title: 'Call the bank', idempotencyKey: expect.any(String) })
+    expect(first).toEqual({
+      workspaceId: 'w1',
+      title: 'Call the bank',
+      idempotencyKey: expect.any(String),
+    })
     expect(second.idempotencyKey).toBe(first.idempotencyKey)
     expect(host.textContent).toContain('Call the bank')
   })
@@ -10208,6 +10763,7 @@ Kết quả mong đợi: FAIL với `Failed to resolve import "../src/renderer/s
 - [ ] **Step 14: Tạo các trạng thái dùng chung của tab server**
 
 `apps/shell/src/renderer/src/WorkErrorState.tsx`:
+
 ```tsx
 import type { ReactElement } from 'react'
 import type { UniworkWorkError } from '../../shared/uniwork-work-api'
@@ -10292,6 +10848,7 @@ export function WorkStaleNote({ at, onRetry }: { at: number; onRetry: () => void
 - [ ] **Step 15: Tạo tab Việc**
 
 `apps/shell/src/renderer/src/WorkTasksPane.tsx`:
+
 ```tsx
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent, ReactElement } from 'react'
@@ -10326,7 +10883,11 @@ interface WriteFailure {
  * grouped by due date. Ticking a row sets its status (optimistic, put back on
  * failure); quick add creates a task; a title opens the task on the web.
  */
-export function WorkTasksPane({ workspace }: { workspace: UniworkWorkspaceRef | null }): ReactElement {
+export function WorkTasksPane({
+  workspace,
+}: {
+  workspace: UniworkWorkspaceRef | null
+}): ReactElement {
   const { t, dateLocale } = useI18n()
   const wsId = workspace?.id ?? null
   const wsRef = useRef(wsId)
@@ -10503,7 +11064,9 @@ export function WorkTasksPane({ workspace }: { workspace: UniworkWorkspaceRef | 
                       <input
                         type="checkbox"
                         checked={done}
-                        aria-label={t(done ? 'wbTasksReopen' : 'wbTasksMarkDone', { title: task.title })}
+                        aria-label={t(done ? 'wbTasksReopen' : 'wbTasksMarkDone', {
+                          title: task.title,
+                        })}
                         onChange={(e) => void setDone(task, e.target.checked)}
                       />
                     </td>
@@ -10519,7 +11082,9 @@ export function WorkTasksPane({ workspace }: { workspace: UniworkWorkspaceRef | 
                     </td>
                     <td className="wb-work-muted">{task.identifier}</td>
                     <td>
-                      <span className="wb-work-pill">{statusName.get(task.status) ?? task.status}</span>
+                      <span className="wb-work-pill">
+                        {statusName.get(task.status) ?? task.status}
+                      </span>
                     </td>
                     <td>
                       {day ? (
@@ -10545,6 +11110,7 @@ export function WorkTasksPane({ workspace }: { workspace: UniworkWorkspaceRef | 
 - [ ] **Step 16: Thêm style tab server (chỉ token) vào `home.css`**
 
 Thêm vào cuối `apps/shell/src/renderer/src/home.css`:
+
 ```css
 /* ── Workbench server tabs (Tasks / Calendar / Profile) ───────────── */
 .wb-work {
@@ -10711,39 +11277,48 @@ Kết quả mong đợi: PASS, 7 test.
 - [ ] **Step 18: Gắn tab Việc vào Bàn làm việc và cho nút Làm mới tới được nó**
 
 Trong `apps/shell/src/renderer/src/WorkbenchModulePanes.tsx`:
+
 - trước: `import { TasksPane } from './TasksPane'`
   sau: `import { WorkTasksPane } from './WorkTasksPane'`
 - trước: `      {moduleId === 'tasks' && <TasksPane practiceId={practiceId} vi={vi} />}`
   sau: `      {moduleId === 'tasks' && <WorkTasksPane workspace={workspace} />}`
 
 Trong `packages/practice-core/src/modules.ts` (mục tasks):
+
 - trước:
+
 ```ts
     hintVi: 'Tự quản trị việc cá nhân — List, Kanban, Lịch, Dashboard',
     hintEn: 'Personal task board — list, kanban, calendar, dashboard',
 ```
+
 - sau:
+
 ```ts
     hintVi: 'Việc của bạn trên UniWork, chia theo hạn',
     hintEn: 'Your UniWork tasks, grouped by due date',
 ```
 
 Trong `apps/shell/src/renderer/src/PracticeHome.tsx`, cho `refresh()` (Task 12) phát event để các tab server tải lại:
+
 - thêm `import { WB_REFRESH_EVENT } from './work-cache'`;
 - trước:
+
 ```ts
-  const refresh = () => {
-    onRefresh()
-    setRefreshTick((n) => n + 1)
-  }
+const refresh = () => {
+  onRefresh()
+  setRefreshTick((n) => n + 1)
+}
 ```
+
 - sau:
+
 ```ts
-  const refresh = () => {
-    window.dispatchEvent(new Event(WB_REFRESH_EVENT))
-    onRefresh()
-    setRefreshTick((n) => n + 1)
-  }
+const refresh = () => {
+  window.dispatchEvent(new Event(WB_REFRESH_EVENT))
+  onRefresh()
+  setRefreshTick((n) => n + 1)
+}
 ```
 
 - [ ] **Step 19: Typecheck, lint và commit phần gắn kết**
@@ -10765,11 +11340,13 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 EOF
 )"
 ```
+
 Kết quả mong đợi: typecheck và eslint đều exit 0.
 
 - [ ] **Step 20: Viết test My AI "thêm việc" sẽ fail**
 
 `apps/shell/tests/agent-intent-apply-tasks.test.ts`:
+
 ```ts
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createAgentIntent } from '@uniwork/practice-core'
@@ -10829,7 +11406,11 @@ describe('My AI add_item → Tasks', () => {
       title: 'Gọi lại khách',
       idempotencyKey: expect.any(String),
     })
-    expect(r).toMatchObject({ ok: true, tabId: 'tasks', messageEn: 'Added to tasks: Gọi lại khách' })
+    expect(r).toMatchObject({
+      ok: true,
+      tabId: 'tasks',
+      messageEn: 'Added to tasks: Gọi lại khách',
+    })
     expect(r.undo).toBeUndefined()
   })
 
@@ -10858,11 +11439,15 @@ Kết quả mong đợi: FAIL. `addItem` vẫn ghi store cục bộ, nên thấy
 Trong `apps/shell/src/renderer/src/agent-intent-apply.ts`:
 
 1. Xóa dòng `  readTasks,` và `  writeTasks,` khỏi import `./workbench-pins` (import nhiều dòng từ Task 2). Dưới import `./my-ai-consent`, thêm:
+
 ```ts
 import { pickActiveWorkspace, readActiveWorkspaceId } from './active-workspace'
 ```
+
 2. Thay như sau:
+
 - trước:
+
 ```ts
 function addItem(
   practiceId: PracticeId,
@@ -10896,7 +11481,9 @@ function addItem(
     }
   }
 ```
+
 - sau:
+
 ```ts
 interface AddItemOutcome {
   vi: string
@@ -10941,8 +11528,11 @@ async function addItem(
     return { vi: `Đã thêm vào ${place}: ${title}`, en: `Added to ${placeEn}: ${title}` }
   }
 ```
+
 3. Trong `undoAgentAddItem`:
+
 - trước:
+
 ```ts
   if (moduleId === 'tasks') {
     writeTasks(
@@ -10951,61 +11541,74 @@ async function addItem(
     )
   } else if (moduleId === 'notes') {
 ```
+
 - sau:
+
 ```ts
   if (moduleId === 'notes') {
 ```
+
 4. Cho `applyAgentIntent` thành async:
+
 - trước: `export function applyAgentIntent(` … `): AgentIntentApplyResult {`
   sau: `export async function applyAgentIntent(` … `): Promise<AgentIntentApplyResult> {`
 - trước: `    const msg = addItem(practiceId, intent.target.id, intent.text ?? intent.summary)`
   sau: `    const msg = await addItem(practiceId, intent.target.id, intent.text ?? intent.summary)`
 - trước:
+
 ```ts
-    if (msg) {
-      return {
-        ok: true,
-        tabId,
-        messageVi: msg.vi,
-        messageEn: msg.en,
-        undo: msg.undo,
-      }
-    }
+if (msg) {
+  return {
+    ok: true,
+    tabId,
+    messageVi: msg.vi,
+    messageEn: msg.en,
+    undo: msg.undo,
+  }
+}
 ```
+
 - sau:
+
 ```ts
-    if (msg) {
-      return {
-        ok: !msg.failed,
-        tabId,
-        messageVi: msg.vi,
-        messageEn: msg.en,
-        ...(msg.undo ? { undo: msg.undo } : {}),
-      }
-    }
+if (msg) {
+  return {
+    ok: !msg.failed,
+    tabId,
+    messageVi: msg.vi,
+    messageEn: msg.en,
+    ...(msg.undo ? { undo: msg.undo } : {}),
+  }
+}
 ```
 
 - [ ] **Step 23: Cho hai nơi gọi chờ kết quả**
 
 `apps/shell/src/renderer/src/NewChatPane.tsx` (trong `executeStep` async):
+
 - trước: `    const result = applyAgentIntent(step.intent, practiceId)`
 - sau: `    const result = await applyAgentIntent(step.intent, practiceId)`
 
 `apps/shell/src/renderer/src/AgentIntentBanner.tsx`:
+
 - trước:
+
 ```ts
   const runApply = (intent: AgentIntent) => {
     // Switch into Workbench first; navigate bus keeps the tab switch if home mounts late.
     ensureWorkbench()
     const result = applyAgentIntent(intent, practiceId)
 ```
+
 - sau:
+
 ```ts
   const runApply = async (intent: AgentIntent) => {
     // Switch into Workbench first; navigate bus keeps the tab switch if home mounts late.
     ensureWorkbench()
     const result = await applyAgentIntent(intent, practiceId)
 ```
+
 - trước: `<button type="button" className="btn btn-primary" onClick={() => runApply(pending)}>` (dòng 106 ở HEAD; Task 12 không đổi dòng này vì nó không có class `teacher-*`)
 - sau: `<button type="button" className="btn btn-primary" onClick={() => void runApply(pending)}>`
 
@@ -11024,11 +11627,13 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 EOF
 )"
 ```
+
 Kết quả mong đợi: PASS, 3 test; typecheck và eslint đều exit 0.
 
 - [ ] **Step 25: Cho ngữ cảnh My AI đọc việc từ cache server**
 
 `apps/shell/src/renderer/src/context-manager.ts`:
+
 - trước (import một dòng từ Task 2): `import { readCalendar, readNotes, readTasks } from './workbench-pins'`
   sau:
   ```ts
@@ -11044,6 +11649,7 @@ Kết quả mong đợi: PASS, 3 test; typecheck và eslint đều exit 0.
 - Thay cả hai `source: 'local:tasks',` bằng `source: 'uniwork:tasks',` (replace_all).
 
 `apps/shell/src/renderer/src/my-ai-local-answer.ts`:
+
 - trước (sau Task 3): `import { readCalendar, readNotes, readTasks } from './workbench-pins'`
   sau:
   ```ts
@@ -11059,9 +11665,11 @@ Kết quả mong đợi: PASS, 3 test; typecheck và eslint đều exit 0.
 cd /Users/ducquang/UNICOM/uniwork-office
 git rm apps/shell/src/renderer/src/TasksPane.tsx
 ```
+
 `workbench-reminders.ts` đã bị xóa ở Task 13 cùng `DeskPane`; việc đến hạn giờ hiện ở Tổng quan và inbox trên web.
 
 Trong `apps/shell/src/renderer/src/workbench-pins.ts`, xóa:
+
 - khối từ `/** Personal task board — no approval workflow. */` tới dấu `}` đóng `export function taskWithStatus(…)`. Gồm `WbTaskStatus`, `WbTaskPriority`, `TasksViewId`, `WbTaskAttachmentMeta`, `WbTaskItem`, `normalizeTaskItem` và `taskWithStatus`;
 - khối từ `export function readTasks(practiceId: PracticeId): WbTaskItem[] {` tới dấu `}` đóng `export async function deleteTaskAttachmentBlob(…)`. Gồm `readTasks`, `writeTasks`, `readTasksView`, `writeTasksView`, `TASK_MEDIA_DB`, `TASK_MEDIA_STORE`, `openTaskMediaDb`, `putTaskAttachmentBlob`, `getTaskAttachmentBlob` và `deleteTaskAttachmentBlob`;
 - dòng `import { wbMediaDbName } from './workbench-bucket'`. Ở HEAD `wbMediaDbName` được gọi ba chỗ: `openTaskMediaDb` (xóa ở bước này), store media sức khỏe và pets (xóa ở Task 3 Step 3), nên sau bước này import không còn ai dùng và ESLint sẽ báo nếu giữ lại.
@@ -11071,10 +11679,12 @@ Giữ nguyên slot `tasks` trong `workbench-media-backup.ts` (xem ghi chú cuố
 - [ ] **Step 27: Gỡ CSS `.wb-tasks*` cũ**
 
 Dùng `strip-css-rules.cjs` (Task 13 Step 11; nếu thư mục tạm bị xóa, tạo lại từ đó):
+
 ```bash
 cd /Users/ducquang/UNICOM/uniwork-office
 NODE_PATH=$PWD/node_modules node "${TMPDIR:-/tmp}/wb-css/strip-css-rules.cjs" apps/shell/src/renderer/src/home.css .wb-tasks
 ```
+
 Kết quả mong đợi: `rules touched:` với một số trên 100 (133 trên file hiện tại) và `vars removed: 0`. Trong rule gộp `.wb-cal, .wb-tasks {` (Task 3 đã thu gọn), chỉ selector `.wb-tasks` bị bỏ.
 
 - [ ] **Step 28: Xác nhận không còn gì dùng store việc cục bộ**
@@ -11083,6 +11693,7 @@ Kết quả mong đợi: `rules touched:` với một số trên 100 (133 trên 
 cd /Users/ducquang/UNICOM/uniwork-office
 grep -rnw -e readTasks -e writeTasks -e WbTaskItem -e normalizeTaskItem -e putTaskAttachmentBlob -e getTaskAttachmentBlob -e deleteTaskAttachmentBlob -e TasksPane -e workbench-reminders -e wb-tasks apps/shell/src apps/shell/tests e2e
 ```
+
 Kết quả mong đợi: không có output.
 
 - [ ] **Step 29: Typecheck, lint và chạy mọi test shell và practice-core**
@@ -11093,6 +11704,7 @@ npm run typecheck -w @genoffice/shell && npm run typecheck -w @uniwork/practice-
 npx eslint apps/shell/src/renderer/src apps/shell/tests
 cd apps/shell && npx vitest run && cd ../../packages/practice-core && npx vitest run
 ```
+
 Kết quả mong đợi: typecheck exit 0, eslint exit 0, mọi suite shell và practice-core pass.
 
 - [ ] **Step 30: Commit phần gỡ bỏ**
@@ -11117,6 +11729,7 @@ EOF
 Ghi chú hợp đồng: `add_item` của My AI cho Lịch được đổi thành `open`, vì không có route tạo cuộc họp (họp tạo trên web).
 
 **Files:**
+
 - Create: `apps/shell/src/renderer/src/work-calendar.ts`, `apps/shell/src/renderer/src/WorkCalendarPane.tsx`
 - Test (create): `apps/shell/tests/work-calendar.test.ts`, `apps/shell/tests/work-calendar-pane.test.ts`
 - Test (modify): `apps/shell/tests/work-cache.test.ts`, `apps/shell/tests/agent-intent-apply-tasks.test.ts`, `packages/practice-core/tests/agent-intent.test.ts`
@@ -11130,6 +11743,7 @@ Ghi chú hợp đồng: `add_item` của My AI cho Lịch được đổi thành
 - Delete: `apps/shell/src/renderer/src/CalendarPane.tsx`
 
 **Interfaces:**
+
 - Consumes:
   - `UniworkWorkApi.calendarEvents({ workspaceId, from, to }): Promise<UniworkWorkResult<WorkCalendarEvent[]>>` và `.openWeb(WorkWebTarget)`;
   - `MODULE_TONES`, `MEETING_TINT`, `tintStyle(t: Tint)` và `Tint` (`module-tones.ts`);
@@ -11143,12 +11757,19 @@ Ghi chú hợp đồng: `add_item` của My AI cho Lịch được đổi thành
 - [ ] **Step 1: Viết test hàm agenda sẽ fail**
 
 `apps/shell/tests/work-calendar.test.ts`:
+
 ```ts
 import { describe, expect, it } from 'vitest'
 import type { WorkCalendarEvent } from '../src/shared/uniwork-work-api'
 import { agendaRange, eventDay, groupAgenda } from '../src/renderer/src/work-calendar'
 
-const ev = (id: string, start: string, allDay: boolean, kind = 'task', title = id): WorkCalendarEvent => ({
+const ev = (
+  id: string,
+  start: string,
+  allDay: boolean,
+  kind = 'task',
+  title = id,
+): WorkCalendarEvent => ({
   id,
   kind,
   entity_id: id,
@@ -11200,7 +11821,11 @@ describe('groupAgenda', () => {
   })
 
   it('puts an event that began before the range on the first day and drops days after it', () => {
-    const days = groupAgenda([ev('old', '2026-10-10', true), ev('late', '2026-10-27', true)], from, to)
+    const days = groupAgenda(
+      [ev('old', '2026-10-10', true), ev('late', '2026-10-27', true)],
+      from,
+      to,
+    )
     expect(days).toEqual([{ day: from, events: [expect.objectContaining({ id: 'old' })] }])
   })
 })
@@ -11214,6 +11839,7 @@ Kết quả mong đợi: FAIL với `Failed to resolve import "../src/renderer/s
 - [ ] **Step 3: Viết `work-calendar.ts`**
 
 `apps/shell/src/renderer/src/work-calendar.ts`:
+
 ```ts
 /** Calendar tab helpers (pure): the 14-day agenda window and its day groups. */
 import type { WorkCalendarEvent } from '../../shared/uniwork-work-api'
@@ -11273,30 +11899,42 @@ Kết quả mong đợi: PASS, 5 test.
 - [ ] **Step 5: Thêm test cache agenda của My AI sẽ fail**
 
 Trong `apps/shell/tests/work-cache.test.ts`:
+
 - trước: `import { cacheWork, cachedOpenTasks, cachedWork } from '../src/renderer/src/work-cache'`
   sau: `import { cacheWork, cachedAgendaItems, cachedOpenTasks, cachedWork } from '../src/renderer/src/work-cache'`
 - Thêm `it` này làm test cuối trong `describe('work cache', …)`:
+
 ```ts
-  it('My AI sees the active workspace agenda as day + title, unreadable rows dropped', () => {
-    cacheWork('calendar:w1', [
-      { id: 'e1', kind: 'task', entity_id: 't1', title: 'Send quote', start: '2026-10-14', all_day: true },
-      { id: 'e2', kind: 'meeting', entity_id: 'm1', title: 'Broken', start: 'later', all_day: false },
-    ])
-    expect(cachedAgendaItems()).toEqual([{ date: '2026-10-14', title: 'Send quote' }])
-    env.active = null
-    expect(cachedAgendaItems()).toEqual([])
-  })
+it('My AI sees the active workspace agenda as day + title, unreadable rows dropped', () => {
+  cacheWork('calendar:w1', [
+    {
+      id: 'e1',
+      kind: 'task',
+      entity_id: 't1',
+      title: 'Send quote',
+      start: '2026-10-14',
+      all_day: true,
+    },
+    { id: 'e2', kind: 'meeting', entity_id: 'm1', title: 'Broken', start: 'later', all_day: false },
+  ])
+  expect(cachedAgendaItems()).toEqual([{ date: '2026-10-14', title: 'Send quote' }])
+  env.active = null
+  expect(cachedAgendaItems()).toEqual([])
+})
 ```
+
 Chạy: `cd /Users/ducquang/UNICOM/uniwork-office/apps/shell && npx vitest run tests/work-cache.test.ts`
 Kết quả mong đợi: FAIL với `cachedAgendaItems is not a function`.
 
 - [ ] **Step 6: Viết `cachedAgendaItems`**
 
 Trong `apps/shell/src/renderer/src/work-cache.ts`:
+
 - trước: `import type { WorkTask, WorkTaskStatus } from '../../shared/uniwork-work-api'`
   sau: `import type { WorkCalendarEvent, WorkTask, WorkTaskStatus } from '../../shared/uniwork-work-api'`
 - dưới import `./workbench-bucket`, thêm `import { eventDay } from './work-calendar'`
 - thêm vào cuối file:
+
 ```ts
 /** The active workspace's agenda from the last load, as day + title (My AI grounding). */
 export function cachedAgendaItems(): { date: string; title: string }[] {
@@ -11308,6 +11946,7 @@ export function cachedAgendaItems(): { date: string; title: string }[] {
   })
 }
 ```
+
 Chạy: `cd /Users/ducquang/UNICOM/uniwork-office/apps/shell && npx vitest run tests/work-cache.test.ts tests/work-calendar.test.ts`
 Kết quả mong đợi: PASS, 9 test.
 
@@ -11361,6 +12000,7 @@ node "$K/insert.cjs" "$K/t15-en.txt" $D/en.ts
 npx prettier --write $D
 npm run typecheck -w @genoffice/shell
 ```
+
 Kết quả mong đợi: typecheck exit 0.
 
 - [ ] **Step 9: Viết test component tab Lịch sẽ fail**
@@ -11368,6 +12008,7 @@ Kết quả mong đợi: typecheck exit 0.
 Test cuối là test ghim của Review Focus 5.
 
 `apps/shell/tests/work-calendar-pane.test.ts`:
+
 ```ts
 /**
  * @vitest-environment jsdom
@@ -11392,7 +12033,14 @@ const WS: UniworkWorkspaceRef = { id: 'w1', name: 'Ops', orgId: 'o1', slug: 'ops
 const TODAY = localIsoDate(new Date())
 const inOneHour = new Date(Date.now() + 3_600_000)
 const EVENTS: WorkCalendarEvent[] = [
-  { id: 'task:t1', kind: 'task', entity_id: 't1', title: 'File the report', start: TODAY, all_day: true },
+  {
+    id: 'task:t1',
+    kind: 'task',
+    entity_id: 't1',
+    title: 'File the report',
+    start: TODAY,
+    all_day: true,
+  },
   {
     id: 'meeting:m1',
     kind: 'meeting',
@@ -11427,7 +12075,11 @@ afterEach(() => {
 async function mount(): Promise<void> {
   await act(async () => {
     root.render(
-      createElement(LocaleProvider, { initial: 'en' }, createElement(WorkCalendarPane, { workspace: WS })),
+      createElement(
+        LocaleProvider,
+        { initial: 'en' },
+        createElement(WorkCalendarPane, { workspace: WS }),
+      ),
     )
   })
   await act(async () => {
@@ -11439,29 +12091,45 @@ describe('Calendar tab', () => {
   it('asks for my 14-day window and tells tasks from meetings', async () => {
     await mount()
     expect(api.calendarEvents).toHaveBeenCalledWith({ workspaceId: 'w1', ...agendaRange(TODAY) })
-    const labels = Array.from(host.querySelectorAll('.wb-agenda-icon')).map((n) => n.getAttribute('aria-label'))
+    const labels = Array.from(host.querySelectorAll('.wb-agenda-icon')).map((n) =>
+      n.getAttribute('aria-label'),
+    )
     expect(labels).toEqual(['Task', 'Meeting'])
     expect(host.textContent).toContain('All day')
   })
 
   it('a row opens the item on the web', async () => {
     await mount()
-    const meeting = Array.from(host.querySelectorAll<HTMLButtonElement>('.wb-agenda-row')).find((b) =>
-      b.textContent?.includes('Weekly sync'),
+    const meeting = Array.from(host.querySelectorAll<HTMLButtonElement>('.wb-agenda-row')).find(
+      (b) => b.textContent?.includes('Weekly sync'),
     )!
     await act(async () => meeting.click())
-    expect(api.openWeb).toHaveBeenCalledWith({ kind: 'meeting', orgSlug: 'acme', wsSlug: 'ops', id: 'm1' })
+    expect(api.openWeb).toHaveBeenCalledWith({
+      kind: 'meeting',
+      orgSlug: 'acme',
+      wsSlug: 'ops',
+      id: 'm1',
+    })
   })
 
   it('an event kind the desktop does not know shows as external and opens the web calendar', async () => {
     api.calendarEvents.mockResolvedValueOnce({
       ok: true,
       value: [
-        { id: 'x:1', kind: 'reminder', entity_id: 'r1', title: 'Renew licence', start: TODAY, all_day: true },
+        {
+          id: 'x:1',
+          kind: 'reminder',
+          entity_id: 'r1',
+          title: 'Renew licence',
+          start: TODAY,
+          all_day: true,
+        },
       ],
     })
     await mount()
-    expect(host.querySelector('.wb-agenda-icon')?.getAttribute('aria-label')).toBe('External calendar')
+    expect(host.querySelector('.wb-agenda-icon')?.getAttribute('aria-label')).toBe(
+      'External calendar',
+    )
     expect(host.textContent).toContain('Renew licence')
     const row = host.querySelector<HTMLButtonElement>('.wb-agenda-row')!
     await act(async () => row.click())
@@ -11469,17 +12137,23 @@ describe('Calendar tab', () => {
   })
 })
 ```
+
 Chạy: `cd /Users/ducquang/UNICOM/uniwork-office/apps/shell && npx vitest run tests/work-calendar-pane.test.ts`
 Kết quả mong đợi: FAIL với `Failed to resolve import "../src/renderer/src/WorkCalendarPane"`.
 
 - [ ] **Step 10: Tạo tab Lịch**
 
 `apps/shell/src/renderer/src/WorkCalendarPane.tsx`:
+
 ```tsx
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import type { UniworkWorkspaceRef } from '../../shared/home-api'
-import type { UniworkWorkError, WorkCalendarEvent, WorkWebTarget } from '../../shared/uniwork-work-api'
+import type {
+  UniworkWorkError,
+  WorkCalendarEvent,
+  WorkWebTarget,
+} from '../../shared/uniwork-work-api'
 import { useI18n, type StringKey } from './locale'
 import { MEETING_TINT, MODULE_TONES, tintStyle, type Tint } from './module-tones'
 import { WB_REFRESH_EVENT, cacheWork, cachedWork } from './work-cache'
@@ -11518,12 +12192,33 @@ function KindIcon({ kind }: { kind: AgendaKind }): ReactElement {
         />
       ) : kind === 'meeting' ? (
         <>
-          <rect x="2" y="4.5" width="8" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.4" />
-          <path d="M10 7l4-2v6l-4-2" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+          <rect
+            x="2"
+            y="4.5"
+            width="8"
+            height="7"
+            rx="1.5"
+            stroke="currentColor"
+            strokeWidth="1.4"
+          />
+          <path
+            d="M10 7l4-2v6l-4-2"
+            stroke="currentColor"
+            strokeWidth="1.4"
+            strokeLinejoin="round"
+          />
         </>
       ) : (
         <>
-          <rect x="2.5" y="3.5" width="11" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.4" />
+          <rect
+            x="2.5"
+            y="3.5"
+            width="11"
+            height="10"
+            rx="1.5"
+            stroke="currentColor"
+            strokeWidth="1.4"
+          />
           <path d="M2.5 6.5h11" stroke="currentColor" strokeWidth="1.4" />
         </>
       )}
@@ -11532,7 +12227,11 @@ function KindIcon({ kind }: { kind: AgendaKind }): ReactElement {
 }
 
 /** Calendar tab: the next 14 days of the user's UniWork tasks and meetings, by day; a row opens on the web. */
-export function WorkCalendarPane({ workspace }: { workspace: UniworkWorkspaceRef | null }): ReactElement {
+export function WorkCalendarPane({
+  workspace,
+}: {
+  workspace: UniworkWorkspaceRef | null
+}): ReactElement {
   const { t, dateLocale } = useI18n()
   const wsId = workspace?.id ?? null
   const loadSeq = useRef(0)
@@ -11555,7 +12254,8 @@ export function WorkCalendarPane({ workspace }: { workspace: UniworkWorkspaceRef
       setStaleAt(null)
       return
     }
-    const cached = r.error === 'offline' ? cachedWork<WorkCalendarEvent[]>(`calendar:${wsId}`) : null
+    const cached =
+      r.error === 'offline' ? cachedWork<WorkCalendarEvent[]>(`calendar:${wsId}`) : null
     setEvents(cached?.value ?? null)
     setStaleAt(cached?.at ?? null)
     setError(r.error)
@@ -11642,6 +12342,7 @@ export function WorkCalendarPane({ workspace }: { workspace: UniworkWorkspaceRef
 ```
 
 Thêm vào cuối `apps/shell/src/renderer/src/home.css`:
+
 ```css
 .wb-agenda-day h3 {
   margin: 8px 0 4px;
@@ -11701,28 +12402,35 @@ Thêm vào cuối `apps/shell/src/renderer/src/home.css`:
   white-space: nowrap;
 }
 ```
+
 Chạy: `cd /Users/ducquang/UNICOM/uniwork-office/apps/shell && npx vitest run tests/work-calendar-pane.test.ts`
 Kết quả mong đợi: PASS, 3 test.
 
 - [ ] **Step 11: Gắn tab Lịch và commit**
 
 `apps/shell/src/renderer/src/WorkbenchModulePanes.tsx`:
+
 - trước: `import { CalendarPane } from './CalendarPane'`
   sau: `import { WorkCalendarPane } from './WorkCalendarPane'`
 - trước: `      {moduleId === 'calendar' && <CalendarPane practiceId={practiceId} vi={vi} />}`
   sau: `      {moduleId === 'calendar' && <WorkCalendarPane workspace={workspace} />}`
 
 `packages/practice-core/src/modules.ts` (mục calendar):
+
 - trước:
+
 ```ts
     hintVi: 'Xem dạng Calendar hoặc danh sách · mốc hạn theo vai trò',
     hintEn: 'Calendar or list view · role deadlines',
 ```
+
 - sau:
+
 ```ts
     hintVi: 'Việc có hạn và cuộc họp trong 14 ngày tới',
     hintEn: 'Due tasks and meetings in the next 14 days',
 ```
+
 ```bash
 cd /Users/ducquang/UNICOM/uniwork-office
 npm run typecheck -w @genoffice/shell && npm run typecheck -w @uniwork/practice-core
@@ -11743,47 +12451,55 @@ EOF
 - [ ] **Step 12: Viết test `add_item` của Lịch sẽ fail**
 
 Thêm `it` này làm test cuối trong `describe('agent-intent catalog', …)` của `packages/practice-core/tests/agent-intent.test.ts`:
+
 ```ts
-  it('opens Calendar for an add request: meetings are created on the web', () => {
-    const intent = resolveAgentIntentFromText('Thêm cuộc họp vào lịch tuần sau')
-    expect(intent?.target).toEqual({ kind: 'module', id: 'calendar' })
-    expect(intent?.action).toBe('open')
-    expect(moduleSupportsAddItem('calendar')).toBe(false)
-    expect(moduleSupportsAddItem('tasks')).toBe(true)
-  })
+it('opens Calendar for an add request: meetings are created on the web', () => {
+  const intent = resolveAgentIntentFromText('Thêm cuộc họp vào lịch tuần sau')
+  expect(intent?.target).toEqual({ kind: 'module', id: 'calendar' })
+  expect(intent?.action).toBe('open')
+  expect(moduleSupportsAddItem('calendar')).toBe(false)
+  expect(moduleSupportsAddItem('tasks')).toBe(true)
+})
 ```
+
 Thêm `it` này làm test cuối trong `apps/shell/tests/agent-intent-apply-tasks.test.ts`:
+
 ```ts
-  it('an add request for Calendar opens the tab and writes nothing', async () => {
-    const r = await applyAgentIntent(
-      createAgentIntent({
-        target: { kind: 'module', id: 'calendar' },
-        action: 'add_item',
-        source: 'desktop',
-        summary: 'x',
-        text: 'Họp khách',
-      }),
-      'entrepreneur',
-    )
-    expect(r).toMatchObject({ ok: true, tabId: 'calendar', messageEn: 'Opened calendar.' })
-    expect(createTask).not.toHaveBeenCalled()
-  })
+it('an add request for Calendar opens the tab and writes nothing', async () => {
+  const r = await applyAgentIntent(
+    createAgentIntent({
+      target: { kind: 'module', id: 'calendar' },
+      action: 'add_item',
+      source: 'desktop',
+      summary: 'x',
+      text: 'Họp khách',
+    }),
+    'entrepreneur',
+  )
+  expect(r).toMatchObject({ ok: true, tabId: 'calendar', messageEn: 'Opened calendar.' })
+  expect(createTask).not.toHaveBeenCalled()
+})
 ```
+
 Chạy: `cd /Users/ducquang/UNICOM/uniwork-office/packages/practice-core && npx vitest run tests/agent-intent.test.ts; cd ../../apps/shell && npx vitest run tests/agent-intent-apply-tasks.test.ts`
 Kết quả mong đợi: cả hai FAIL. practice-core báo `expected 'add_item' to be 'open'`. Shell báo `[vitest] No "writeCalendar" export is defined on the mock`.
 
 - [ ] **Step 13: Bỏ `add_item` của Lịch và việc ghi lịch cục bộ**
 
 Trong `packages/practice-core/src/agent-intent.ts`:
+
 - Thay toàn bộ hàm `moduleSupportsAddItem` bằng:
+
 ```ts
 /** Modules that support add_item (must write a real row): Tasks on UniWork, Notes on this device. */
 export function moduleSupportsAddItem(id: WorkbenchModuleId): boolean {
   return id === 'tasks' || id === 'notes'
 }
 ```
+
 - Trong `resolveAgentIntentFromText`:
   - trước:
+
 ```ts
     if (action === 'add_item') {
       target = { kind: 'module', id: 'tasks' }
@@ -11794,7 +12510,9 @@ export function moduleSupportsAddItem(id: WorkbenchModuleId): boolean {
 
   const modLabel =
 ```
-  - sau:
+
+- sau:
+
 ```ts
     if (action === 'add_item') {
       target = { kind: 'module', id: 'tasks' }
@@ -11811,20 +12529,24 @@ export function moduleSupportsAddItem(id: WorkbenchModuleId): boolean {
 ```
 
 Trong `apps/shell/src/renderer/src/agent-intent-apply.ts`:
+
 - Xóa dòng `  readCalendar,` và `  writeCalendar,` khỏi import `./workbench-pins`.
 - Xóa khối này trong `addItem`:
+
 ```ts
-  if (moduleId === 'calendar') {
-    const id = newId()
-    writeCalendar(practiceId, [{ id, date: todayIso(), title }, ...readCalendar(practiceId)])
-    return {
-      vi: `Đã thêm vào ${place}: ${title}`,
-      en: `Added to ${placeEn}: ${title}`,
-      undo: { moduleId, itemId: id },
-    }
+if (moduleId === 'calendar') {
+  const id = newId()
+  writeCalendar(practiceId, [{ id, date: todayIso(), title }, ...readCalendar(practiceId)])
+  return {
+    vi: `Đã thêm vào ${place}: ${title}`,
+    en: `Added to ${placeEn}: ${title}`,
+    undo: { moduleId, itemId: id },
   }
+}
 ```
+
 - Xóa nhánh này trong `undoAgentAddItem`:
+
 ```ts
   } else if (moduleId === 'calendar') {
     writeCalendar(
@@ -11832,6 +12554,7 @@ Trong `apps/shell/src/renderer/src/agent-intent-apply.ts`:
       readCalendar(practiceId).filter((c) => c.id !== itemId),
     )
 ```
+
 - Chạy `grep -n "newId()\|todayIso()" apps/shell/src/renderer/src/agent-intent-apply.ts`. Khi chỉ còn hai dòng định nghĩa `function`, xóa `function newId(): string {…}` và `function todayIso(): string {…}`.
 
 Chạy: `cd /Users/ducquang/UNICOM/uniwork-office/packages/practice-core && npx vitest run; cd ../../apps/shell && npx vitest run tests/agent-intent-apply-tasks.test.ts`
@@ -11840,6 +12563,7 @@ Kết quả mong đợi: PASS, practice-core xanh toàn bộ (11 test) và agent
 - [ ] **Step 14: Cho ngữ cảnh My AI đọc agenda từ cache**
 
 `apps/shell/src/renderer/src/context-manager.ts`:
+
 - trước (sau Task 14): `import { readCalendar, readNotes } from './workbench-pins'`
   sau: `import { readNotes } from './workbench-pins'`
 - trước: `import { cachedOpenTasks } from './work-cache'`
@@ -11851,6 +12575,7 @@ Kết quả mong đợi: PASS, practice-core xanh toàn bộ (11 test) và agent
 - Thay cả hai `source: 'local:calendar',` bằng `source: 'uniwork:calendar',` (replace_all).
 
 `apps/shell/src/renderer/src/my-ai-local-answer.ts`:
+
 - trước (sau Task 14): `import { readCalendar, readNotes } from './workbench-pins'`
   sau: `import { readNotes } from './workbench-pins'`
 - trước: `import { cachedOpenTasks } from './work-cache'`
@@ -11865,15 +12590,18 @@ cd /Users/ducquang/UNICOM/uniwork-office
 git rm apps/shell/src/renderer/src/CalendarPane.tsx
 grep -rn "wb-task-check\|wb-cal-\|\"wb-cal\"" apps/shell/src/renderer/src --include='*.tsx'
 ```
+
 Kết quả mong đợi: grep không in gì. Những nơi khác từng dùng (GrowthPane, TravelPane, HealthPane) đã bị xóa ở Task 2–3.
 
 Trong `apps/shell/src/renderer/src/workbench-pins.ts`, xóa:
+
 - `export interface WbCalendarItem {…}`, `export type CalendarViewMode`, `export function readCalendarView(…)` và `export function writeCalendarView(…)`. Giữ comment `// ── Lightweight local module data (per practice) ───────────` phía trên;
 - `export function readCalendar(…) {…}` và `export function writeCalendar(…) {…}`.
 
 ```bash
 NODE_PATH=$PWD/node_modules node "${TMPDIR:-/tmp}/wb-css/strip-css-rules.cjs" apps/shell/src/renderer/src/home.css .wb-cal .wb-task-check
 ```
+
 (Script ở Task 13 Step 11; tạo lại từ đó nếu thư mục tạm bị xóa.)
 Kết quả mong đợi: `rules touched:` với một số trên 30 và `vars removed: 0`.
 
@@ -11882,6 +12610,7 @@ Kết quả mong đợi: `rules touched:` với một số trên 30 và `vars re
 ```bash
 grep -rnw -e readCalendar -e writeCalendar -e WbCalendarItem -e readCalendarView -e writeCalendarView -e CalendarPane -e calendarEventsSyncing -e wb-cal -e wb-task-check apps/shell/src apps/shell/tests e2e
 ```
+
 Kết quả mong đợi: không có output.
 
 - [ ] **Step 17: Typecheck, lint, test và commit**
@@ -11903,11 +12632,13 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 EOF
 )"
 ```
+
 Kết quả mong đợi: typecheck và eslint đều exit 0, mọi suite pass.
 
 ### Task 16: Tab Hồ sơ từ person của UniWork
 
 **Files:**
+
 - Create: `apps/shell/src/renderer/src/WorkProfilePane.tsx`
 - Test (create): `apps/shell/tests/work-profile-pane.test.ts`
 - Modify: `apps/shell/src/renderer/src/i18n/workbench/{zh,vi,en}.ts`
@@ -11917,6 +12648,7 @@ Kết quả mong đợi: typecheck và eslint đều exit 0, mọi suite pass.
 - Modify: `apps/shell/src/renderer/src/workbench-pins.ts` (gỡ `WbPersonalProfile`, `DEFAULT_PERSONAL`, `readPersonal`/`writePersonal`)
 
 **Interfaces:**
+
 - Consumes: `UniworkWorkApi.myProfile(): Promise<UniworkWorkResult<WorkPerson>>` và `.openWeb({ kind: 'person', orgSlug, wsSlug, id })`. `WorkPerson { user_id, display_name, email, title, department: {id,name}|null, manager: {id,kind,display_name}|null, timezone }`. Từ Task 14: `cacheWork`, `cachedWork`, `WB_REFRESH_EVENT`, `WorkErrorState`, `WorkNoWorkspace`, `WorkStaleNote`.
 - Produces: `WorkProfilePane({ workspace: UniworkWorkspaceRef | null }): ReactElement`. Nút "Soạn" của `FormsPane` trộn `display_name`, `department.name` và `title` từ person trên server (spec 6.6).
 
@@ -11959,11 +12691,13 @@ node "$K/insert.cjs" "$K/t16-en.txt" $D/en.ts
 npx prettier --write $D
 npm run typecheck -w @genoffice/shell
 ```
+
 Kết quả mong đợi: typecheck exit 0.
 
 - [ ] **Step 2: Viết test component sẽ fail**
 
 `apps/shell/tests/work-profile-pane.test.ts`:
+
 ```ts
 /**
  * @vitest-environment jsdom
@@ -12009,7 +12743,11 @@ async function flush(): Promise<void> {
 async function mount(): Promise<void> {
   await act(async () => {
     root.render(
-      createElement(LocaleProvider, { initial: 'en' }, createElement(WorkProfilePane, { workspace: WS })),
+      createElement(
+        LocaleProvider,
+        { initial: 'en' },
+        createElement(WorkProfilePane, { workspace: WS }),
+      ),
     )
   })
   await flush()
@@ -12023,7 +12761,10 @@ beforeEach(() => {
   document.body.append(host)
   root = createRoot(host)
   api = {
-    myProfile: vi.fn(async (): Promise<UniworkWorkResult<WorkPerson>> => ({ ok: true, value: PERSON })),
+    myProfile: vi.fn(async (): Promise<UniworkWorkResult<WorkPerson>> => ({
+      ok: true,
+      value: PERSON,
+    })),
     openWeb: vi.fn(async () => true),
   }
   ;(window as unknown as { uniworkWork: unknown }).uniworkWork = api
@@ -12043,7 +12784,12 @@ describe('Profile tab', () => {
     }
     expect(host.querySelector('input, textarea')).toBeNull()
     await act(async () => buttonByText('Edit on the web')!.click())
-    expect(api.openWeb).toHaveBeenCalledWith({ kind: 'person', orgSlug: 'acme', wsSlug: 'ops', id: 'u1' })
+    expect(api.openWeb).toHaveBeenCalledWith({
+      kind: 'person',
+      orgSlug: 'acme',
+      wsSlug: 'ops',
+      id: 'u1',
+    })
   })
 
   it('a failed load offers Retry', async () => {
@@ -12056,12 +12802,14 @@ describe('Profile tab', () => {
   })
 })
 ```
+
 Chạy: `cd /Users/ducquang/UNICOM/uniwork-office/apps/shell && npx vitest run tests/work-profile-pane.test.ts`
 Kết quả mong đợi: FAIL với `Failed to resolve import "../src/renderer/src/WorkProfilePane"`.
 
 - [ ] **Step 3: Tạo tab Hồ sơ**
 
 `apps/shell/src/renderer/src/WorkProfilePane.tsx`:
+
 ```tsx
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
@@ -12072,7 +12820,11 @@ import { WB_REFRESH_EVENT, cacheWork, cachedWork } from './work-cache'
 import { WorkErrorState, WorkNoWorkspace, WorkStaleNote } from './WorkErrorState'
 
 /** Profile tab: the signed-in user's UniWork profile, read-only; edits happen on the web. */
-export function WorkProfilePane({ workspace }: { workspace: UniworkWorkspaceRef | null }): ReactElement {
+export function WorkProfilePane({
+  workspace,
+}: {
+  workspace: UniworkWorkspaceRef | null
+}): ReactElement {
   const { t } = useI18n()
   const orgId = workspace?.orgId ?? null
   const loadSeq = useRef(0)
@@ -12162,7 +12914,9 @@ export function WorkProfilePane({ workspace }: { workspace: UniworkWorkspaceRef 
   )
 }
 ```
+
 Thêm vào cuối `apps/shell/src/renderer/src/home.css`:
+
 ```css
 .wb-profile-name {
   font-size: 18px;
@@ -12187,51 +12941,60 @@ Thêm vào cuối `apps/shell/src/renderer/src/home.css`:
   color: var(--text);
 }
 ```
+
 Chạy: `cd /Users/ducquang/UNICOM/uniwork-office/apps/shell && npx vitest run tests/work-profile-pane.test.ts`
 Kết quả mong đợi: PASS, 2 test.
 
 - [ ] **Step 4: Dùng tab Hồ sơ và cho "Soạn" của Biểu mẫu đọc hồ sơ server**
 
 `apps/shell/src/renderer/src/WorkbenchModulePanes.tsx`:
+
 - Xóa các dòng `  readPersonal,`, `  writePersonal,` và `  type WbPersonalProfile,` khỏi import `./workbench-pins` (import nhiều dòng từ Task 2). Dưới import `./NotesPane`, thêm `import { WorkProfilePane } from './WorkProfilePane'`.
 - trước: `      {moduleId === 'personal' && <PersonalPane vi={vi} />}`
   sau: `      {moduleId === 'personal' && <WorkProfilePane workspace={workspace} />}`
 - Xóa toàn bộ `function PersonalPane({ vi }: { vi: boolean }): ReactElement { … }`.
 - Trong `openForm` của `FormsPane` (đã là `async`):
   - trước:
+
 ```ts
-    const profile = readPersonal()
-    const metaLines = [
-      profile.fullName ? `<p><strong>Họ tên:</strong> ${escapeHtml(profile.fullName)}</p>` : '',
-      profile.org ? `<p><strong>Đơn vị:</strong> ${escapeHtml(profile.org)}</p>` : '',
-      profile.title ? `<p><strong>Chức danh:</strong> ${escapeHtml(profile.title)}</p>` : '',
-    ]
+const profile = readPersonal()
+const metaLines = [
+  profile.fullName ? `<p><strong>Họ tên:</strong> ${escapeHtml(profile.fullName)}</p>` : '',
+  profile.org ? `<p><strong>Đơn vị:</strong> ${escapeHtml(profile.org)}</p>` : '',
+  profile.title ? `<p><strong>Chức danh:</strong> ${escapeHtml(profile.title)}</p>` : '',
+]
 ```
-  - sau:
+
+- sau:
+
 ```ts
-    // merge fields come from the UniWork profile; signed out, the draft has none
-    const me = await window.uniworkWork.myProfile()
-    const profile = me.ok ? me.value : null
-    const metaLines = [
-      profile?.display_name
-        ? `<p><strong>Họ tên:</strong> ${escapeHtml(profile.display_name)}</p>`
-        : '',
-      profile?.department
-        ? `<p><strong>Đơn vị:</strong> ${escapeHtml(profile.department.name)}</p>`
-        : '',
-      profile?.title ? `<p><strong>Chức danh:</strong> ${escapeHtml(profile.title)}</p>` : '',
-    ]
+// merge fields come from the UniWork profile; signed out, the draft has none
+const me = await window.uniworkWork.myProfile()
+const profile = me.ok ? me.value : null
+const metaLines = [
+  profile?.display_name
+    ? `<p><strong>Họ tên:</strong> ${escapeHtml(profile.display_name)}</p>`
+    : '',
+  profile?.department
+    ? `<p><strong>Đơn vị:</strong> ${escapeHtml(profile.department.name)}</p>`
+    : '',
+  profile?.title ? `<p><strong>Chức danh:</strong> ${escapeHtml(profile.title)}</p>` : '',
+]
 ```
 
 `packages/practice-core/src/modules.ts` (mục personal):
+
 - trước:
+
 ```ts
     labelVi: 'Cá nhân',
     labelEn: 'Personal',
     hintVi: 'Hồ sơ cá nhân dùng khi soạn văn bản',
     hintEn: 'Personal profile for drafting',
 ```
+
 - sau:
+
 ```ts
     labelVi: 'Hồ sơ',
     labelEn: 'Profile',
@@ -12248,6 +13011,7 @@ cd /Users/ducquang/UNICOM/uniwork-office
 grep -rnw -e readPersonal -e writePersonal -e WbPersonalProfile -e PersonalPane -e DEFAULT_PERSONAL apps/shell/src apps/shell/tests
 grep -rn "uniwork.wb.personal" apps/shell/src apps/shell/tests
 ```
+
 Kết quả mong đợi: cả hai grep không in gì. Nơi đọc còn lại duy nhất, `EmailPane.tsx`, đã bị xóa ở Task 3.
 
 - [ ] **Step 6: Typecheck, lint, test và commit**
@@ -12273,6 +13037,7 @@ EOF
 ### Task 17: Làm lại các tab cục bộ (Biểu mẫu, Ghi chú, 4 trụ cột) và màu Bàn làm việc chỉ dùng token
 
 **Files:**
+
 - Create: `apps/shell/src/renderer/src/LocalTag.tsx`
 - Rewrite: `apps/shell/src/renderer/src/NotesPane.tsx`
 - Modify: `apps/shell/src/renderer/src/workbench-pins.ts` (khóa lưu của ghi chú và biểu mẫu không còn theo vai trò, spec §5.6)
@@ -12286,6 +13051,7 @@ EOF
 - Chỉ kiểm: `apps/shell/src/renderer/src/WorkbenchIcons.tsx` (Task 12 đã chuyển sang tint), `apps/shell/src/renderer/src/workbench-desk.ts` (Task 13 đã xóa cùng `DESK_CHART`)
 
 **Interfaces:**
+
 - Consumes: `MODULE_TONES`, `tintStyle(t: Tint): { background: string; color: string }` và `Tint` (`module-tones.ts`). `readStickyNotes`, `writeStickyNotes`, `createStickyNote` và `normalizeStickyNote` (`workbench-pins.ts`, không đổi; trường màu và x/y vẫn nằm trong dữ liệu, không dùng). Key `wbOnThisDevice` (Task 11).
 - Produces: `LocalTag(): ReactElement` và `NotesPane({ practiceId }: { practiceId: PracticeId }): ReactElement` (bỏ prop `vi`). `WorkbenchModulePane` luôn hiện tiêu đề và gợi ý của module (không còn chế độ immersive).
 - Produces: ghi chú và biểu mẫu lưu dưới khóa `uniwork.wb.stickies` và `uniwork.wb.forms`, chung cho mọi vai trò trong một bucket. Chữ ký `readStickyNotes(practiceId)`, `writeStickyNotes(_practiceId, items)`, `createStickyNote(practiceId, body, color?)`, `readNotes(practiceId)`, `readForms(_practiceId)` và `writeForms(_practiceId, items)` giữ nguyên nên không nơi gọi nào phải sửa. Theo D3, ghi chú và biểu mẫu cũ lưu theo từng vai trò bị bỏ qua.
@@ -12293,6 +13059,7 @@ EOF
 - [ ] **Step 1: Thêm chuỗi Ghi chú (zh, vi, en)**
 
 Nhãn "trên máy này" dùng key `wbOnThisDevice` có sẵn từ Task 11.
+
 ```bash
 cd /Users/ducquang/UNICOM/uniwork-office
 D=apps/shell/src/renderer/src/i18n/workbench
@@ -12330,6 +13097,7 @@ npx prettier --write $D
 - [ ] **Step 2: Viết lại Ghi chú thành danh sách thẻ phẳng**
 
 Thay toàn bộ `apps/shell/src/renderer/src/NotesPane.tsx` bằng:
+
 ```tsx
 import { useEffect, useState } from 'react'
 import type { FormEvent, ReactElement } from 'react'
@@ -12432,6 +13200,7 @@ export function NotesPane({ practiceId }: { practiceId: PracticeId }): ReactElem
 - [ ] **Step 3: Thêm nhãn "Trên máy này" và dùng ở Biểu mẫu, Ghi chú và 4 trụ cột**
 
 `apps/shell/src/renderer/src/LocalTag.tsx`:
+
 ```tsx
 import type { ReactElement } from 'react'
 import { useI18n } from './locale'
@@ -12442,9 +13211,12 @@ export function LocalTag(): ReactElement {
   return <span className="wb-local-tag">{t('wbOnThisDevice')}</span>
 }
 ```
+
 `apps/shell/src/renderer/src/WorkbenchModulePanes.tsx`:
+
 - Dưới import `./NotesPane`, thêm `import { LocalTag } from './LocalTag'`.
 - Ghi chú giờ hiện tiêu đề và gợi ý bình thường, nên bỏ chế độ immersive. Trước (sau Task 2, 12, 13):
+
 ```tsx
   const hideChrome = moduleId === 'notes'
 
@@ -12463,7 +13235,9 @@ export function LocalTag(): ReactElement {
         </>
       )}
 ```
-  Sau:
+
+Sau:
+
 ```tsx
   return (
     <section className="wb-panel wb-detail" aria-label={vi ? mod.labelVi : mod.labelEn}>
@@ -12473,28 +13247,42 @@ export function LocalTag(): ReactElement {
         {contextTitle ? ` · ${contextTitle}` : ''}
       </p>
 ```
+
 - trước: `      {moduleId === 'notes' && <NotesPane practiceId={practiceId} vi={vi} />}`
 - sau:
+
 ```tsx
-      {moduleId === 'notes' && <NotesPane practiceId={practiceId} />}
-      {(moduleId === 'forms' || moduleId === 'notes') && <LocalTag />}
+{
+  moduleId === 'notes' && <NotesPane practiceId={practiceId} />
+}
+{
+  ;(moduleId === 'forms' || moduleId === 'notes') && <LocalTag />
+}
 ```
+
 `apps/shell/src/renderer/src/PracticeHome.tsx` (`isPracticePillarId` đã được import):
+
 - Dưới import `./WorkbenchModulePanes`, thêm `import { LocalTag } from './LocalTag'`.
 - trước: `      {tab === 'knowledge' && (`
 - sau:
+
 ```tsx
       {isPracticePillarId(tab) && <LocalTag />}
 
       {tab === 'knowledge' && (
 ```
+
 `packages/practice-core/src/modules.ts` (mục notes):
+
 - trước:
+
 ```ts
     hintVi: 'Bảng ghim giấy note — kéo thả, đổi màu',
     hintEn: 'Sticky pinboard — drag, recolor, pin notes',
 ```
+
 - sau:
+
 ```ts
     hintVi: 'Ghi chú nhanh, lưu trên máy này',
     hintEn: 'Quick notes, stored on this device',
@@ -12503,8 +13291,10 @@ export function LocalTag(): ReactElement {
 - [ ] **Step 4: Cho badge domain của Kỹ năng dùng tint thay hex**
 
 Trong `apps/shell/src/renderer/src/SkillDomainTabs.tsx`:
+
 - Dưới import `./skill-domain-pins`, thêm `import { MODULE_TONES, tintStyle } from './module-tones'`.
 - trước:
+
 ```tsx
 function DomainBadge({ id, size = 18 }: { id: SkillDomainId; size?: number }): ReactElement {
   const def = getSkillDomain(id)
@@ -12527,7 +13317,9 @@ function DomainBadge({ id, size = 18 }: { id: SkillDomainId; size?: number }): R
   )
 }
 ```
+
 - sau:
+
 ```tsx
 function DomainBadge({ id, size = 18 }: { id: SkillDomainId; size?: number }): ReactElement {
   const def = getSkillDomain(id)
@@ -12547,10 +13339,12 @@ function DomainBadge({ id, size = 18 }: { id: SkillDomainId; size?: number }): R
 - [ ] **Step 5: Kiểm icon module và trụ cột không còn hex**
 
 Task 12 đã viết lại `WorkbenchIcons.tsx` theo tint. Chạy:
+
 ```bash
 cd /Users/ducquang/UNICOM/uniwork-office
 grep -cE "#[0-9a-fA-F]{3,8}\b" apps/shell/src/renderer/src/WorkbenchIcons.tsx
 ```
+
 Kết quả mong đợi: `0`. Nếu khác 0, Task 12 Step 3 chưa xong; làm lại bước đó.
 
 - [ ] **Step 6: Kiểm bảng màu biểu đồ Desk đã mất**
@@ -12560,6 +13354,7 @@ cd /Users/ducquang/UNICOM/uniwork-office
 grep -rn "DESK_CHART" apps/shell/src
 ls apps/shell/src/renderer/src/workbench-desk.ts 2>&1 | grep -c 'No such file'
 ```
+
 Kết quả mong đợi: grep đầu không in gì, lệnh sau in `1` (Task 13 đã xóa `workbench-desk.ts`).
 
 - [ ] **Step 7: Gỡ CSS pinboard, Pets và immersive, rồi thêm rule mới**
@@ -12569,24 +13364,31 @@ cd /Users/ducquang/UNICOM/uniwork-office
 NODE_PATH=$PWD/node_modules node "${TMPDIR:-/tmp}/wb-css/strip-css-rules.cjs" apps/shell/src/renderer/src/home.css .wb-notes .wb-sticky .wb-pets .wb-pet --vars --wb-sticky- --wb-board-
 grep -n "Sticky notes board (paper colors\|is-immersive\|Immersive module panes" apps/shell/src/renderer/src/home.css
 ```
+
 (Script ở Task 13 Step 11; tạo lại từ đó nếu thư mục tạm bị xóa.)
 Kết quả mong đợi: `vars removed: 30` và `rules touched:` với một số trên 50. Grep cho thấy comment mồ côi trong `:root`, rule `.wb-detail.is-immersive` và comment `Immersive module panes` (Task 13). Xóa tay:
+
 - comment mồ côi và dòng trống phía trên nó:
   - trước:
+
 ```css
   --on-accent: #ffffff;
 
   /* Sticky notes board (paper colors stay vivid in both themes) */
 }
 ```
-  - sau:
+
+- sau:
+
 ```css
   --on-accent: #ffffff;
 }
 ```
+
 - toàn bộ rule `.wb-detail.is-immersive { … }` và comment `/* ── Immersive module panes ── */` phía trên nó (không còn gì dùng class `is-immersive`).
 
 Thêm vào cuối `apps/shell/src/renderer/src/home.css`:
+
 ```css
 /* ── Local-only tabs (Forms / Notes / pillars) ───────────── */
 .wb-local-tag {
@@ -12703,6 +13505,7 @@ NODE_PATH=$PWD/node_modules node "${TMPDIR:-/tmp}/wb-css/list-raw-colors.cjs" ap
 cd apps/shell/src/renderer/src
 grep -nE "#[0-9a-fA-F]{3,8}\b|\b(rgb|rgba|hsl|hsla)\(" PracticeHome.tsx WorkbenchModulePanes.tsx WorkbenchTabs.tsx WorkbenchIcons.tsx WorkbenchTopBar.tsx SkillDomainTabs.tsx NotesPane.tsx LocalTag.tsx WorkOverview.tsx WorkTasksPane.tsx WorkCalendarPane.tsx WorkProfilePane.tsx WorkErrorState.tsx WbRowActions.tsx WorkbenchAccountGate.tsx module-tones.ts work-home.ts
 ```
+
 Kết quả mong đợi: cả hai lệnh không in gì. Đã chạy thử lệnh CSS trên `9194f306`: nó in 15 khai báo, và cả 15 nằm trong rule bị gỡ ở Task 3 (`.wb-pets-*`, `.wb-pet-*`, `.wb-health*`…), Task 14 (`.wb-tasks-bar-track …`) hoặc Step 7 ở trên. Hex duy nhất trong các file TSX liệt kê là `'#64748B'` và `"#fff"` của `DomainBadge`, đã gỡ ở Step 4. Nếu lệnh vẫn in một dòng, một bước gỡ trước đó chưa chạy: quay lại bước đó, không sửa màu tại chỗ.
 
 - [ ] **Step 9: Ghi chú và biểu mẫu thuộc về người dùng, không theo vai trò (spec §5.6)**
@@ -12710,6 +13513,7 @@ Kết quả mong đợi: cả hai lệnh không in gì. Đã chạy thử lệnh
 Spec §5.6: vai trò không còn là namespace dữ liệu. Hiện ghi chú lưu ở `uniwork.wb.stickies.<vai trò>` và biểu mẫu ở `uniwork.wb.forms.<vai trò>`, nên đổi vai trò làm "mất" ghi chú. Bucket đã tách theo deployment + account + org (Task 9), nên một khóa cố định là đủ. Ghim tab vẫn theo vai trò, vì vai trò quyết định tab ghim mặc định (§5.6).
 
 Tạo `apps/shell/tests/workbench-local-data.test.ts`:
+
 ```ts
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -12754,24 +13558,31 @@ describe('notes and forms are not per role (spec 5.6)', () => {
   })
 })
 ```
+
 Chạy: `cd /Users/ducquang/UNICOM/uniwork-office/apps/shell && npx vitest run tests/workbench-local-data.test.ts`
 Kết quả mong đợi: FAIL ở cả 2 test (`expected [] to deeply equal [ 'Call the notary' ]` và `expected [] to deeply equal [ 'f1' ]`).
 
 Trong `apps/shell/src/renderer/src/workbench-pins.ts`:
+
 - trước:
+
 ```ts
 function stickyKey(practiceId: PracticeId): string {
   return `uniwork.wb.stickies.${practiceId}`
 }
 ```
+
 - sau:
+
 ```ts
 /** Notes and forms belong to the user, not the role (spec 5.6): one list per Workbench bucket. */
 const STICKIES_KEY = 'uniwork.wb.stickies'
 const FORMS_KEY = 'uniwork.wb.forms'
 ```
+
 - trong `readStickyNotes`, trước: `  const key = stickyKey(practiceId)`; sau: `  const key = STICKIES_KEY`. (`migrateLegacyNotes(practiceId)` ngay dưới vẫn dùng `practiceId`, nên tham số được giữ.)
 - trước:
+
 ```ts
 export function writeStickyNotes(practiceId: PracticeId, items: WbStickyNote[]): void {
   writeJson(
@@ -12780,7 +13591,9 @@ export function writeStickyNotes(practiceId: PracticeId, items: WbStickyNote[]):
   )
 }
 ```
+
 - sau:
+
 ```ts
 export function writeStickyNotes(_practiceId: PracticeId, items: WbStickyNote[]): void {
   writeJson(
@@ -12789,7 +13602,9 @@ export function writeStickyNotes(_practiceId: PracticeId, items: WbStickyNote[])
   )
 }
 ```
+
 - trước:
+
 ```ts
 export function readForms(practiceId: PracticeId): WbFormItem[] {
   return readJson(`uniwork.wb.forms.${practiceId}`, [])
@@ -12799,7 +13614,9 @@ export function writeForms(practiceId: PracticeId, items: WbFormItem[]): void {
   writeJson(`uniwork.wb.forms.${practiceId}`, items)
 }
 ```
+
 - sau:
+
 ```ts
 export function readForms(_practiceId: PracticeId): WbFormItem[] {
   return readJson(FORMS_KEY, [])
@@ -12809,6 +13626,7 @@ export function writeForms(_practiceId: PracticeId, items: WbFormItem[]): void {
   writeJson(FORMS_KEY, items)
 }
 ```
+
 Tham số `_practiceId` được giữ để không phải sửa nơi gọi (NotesPane, FormsPane, my-ai-forms, NewChatPane, context-manager, agent-intent-apply); tiền tố `_` theo `argsIgnorePattern` của ESLint, giống `defaultPinnedModules(_practiceId)` trong practice-core.
 
 Chạy: `cd /Users/ducquang/UNICOM/uniwork-office/apps/shell && npx vitest run tests/workbench-local-data.test.ts tests/my-ai-forms.test.ts tests/workbench-db.test.ts`
@@ -12836,6 +13654,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 EOF
 )"
 ```
+
 Kết quả mong đợi: typecheck và eslint đều exit 0, `check:theme-colors` không in vi phạm, mọi suite shell pass.
 
 ### Task 18: Chuyển chuỗi `label(vi, en)` còn lại của Bàn làm việc vào shard (spec §6.8)
@@ -12843,6 +13662,7 @@ Kết quả mong đợi: typecheck và eslint đều exit 0, `check:theme-colors
 Spec §6.8: chuỗi của Bàn làm việc đang viết qua `label(vi, en)` chuyển sang `i18n/workbench/<lang>.ts`. Sau Task 2–17 còn đúng 95 lời gọi `label(…)` trong bốn file: `PracticeHome.tsx` (56: Tri thức, Tài liệu, Kỹ năng, Soạn mới, hộp xác nhận Token và các thông báo), `WorkbenchTabs.tsx` (10), `SkillDomainTabs.tsx` (6) và `WorkbenchModulePanes.tsx` (23: `WorkbenchModulePane` và `FormsPane`). Hero, `AssistantPane`, `PersonalPane` và các pane đời sống đã bị xóa ở Task 2, 6, 12 và 16, nên chuỗi của chúng không có ở đây. Đã chạy thử script dưới trên bản sao bốn file ở `9194f306` (bỏ hero dòng 543-584 của `PracticeHome.tsx`, bỏ `AssistantPane` và mọi pane sau `FormsPane`): 95 lời gọi được thay, không còn `label(` nào.
 
 Ngoài phạm vi task này (giữ nguyên):
+
 - `vi ? x.labelVi : x.labelEn` đọc nhãn từ dữ liệu practice-core (module, trụ cột, vai trò, kỹ năng). Đó là dữ liệu hai ngôn ngữ, không phải chuỗi UI viết tay.
 - `vi ? 'Mẫu gốc' : 'Source template'` và `vi ? 'Nội dung' : 'Content'` trong `openForm` của `FormsPane`: đây là nội dung văn bản nháp được tạo ra (quy tắc 4 của CLAUDE.md), không phải chrome.
 - `AgentIntentBanner.tsx`: banner của My AI, không thuộc Bàn làm việc.
@@ -12850,17 +13670,20 @@ Ngoài phạm vi task này (giữ nguyên):
 Câu tiếng Việt trong shard được viết lại ở chỗ code cũ trộn tiếng Anh (spec §6.8, và test `formal vi copy` của Task 11 chặn `tab`): "Bỏ tab" thành "Bỏ ghim", "Thêm tab" thành "Thêm khu vực", "Mở Skills" thành "Đã mở Kỹ năng", "file" thành "tệp", "Module" thành "Mô-đun", "My AI … seed Docs" thành "Trợ lý của bạn … tạo văn bản". Câu tiếng Anh giữ nguyên. Thông báo vẫn được lưu vào state dưới dạng chuỗi đã dịch như code hiện tại; `t` không được thêm vào mảng phụ thuộc nào.
 
 **Files:**
+
 - Modify: `apps/shell/src/renderer/src/PracticeHome.tsx`, `apps/shell/src/renderer/src/WorkbenchTabs.tsx`, `apps/shell/src/renderer/src/SkillDomainTabs.tsx`, `apps/shell/src/renderer/src/WorkbenchModulePanes.tsx`
 - Modify: `apps/shell/src/renderer/src/i18n/workbench/{zh,vi,en}.ts` (85 key; 18 shard còn lại spread `en`)
 - Test (create): `apps/shell/tests/workbench-copy.test.ts`
 
 **Interfaces:**
+
 - Consumes: shard `i18n/workbench` (Task 11) và các key Task 12–17 đã thêm; `useI18n()` (`locale.tsx`).
 - Produces: 85 key mới với tiền tố `wbCommon*`, `wbAgentApplied`, `wbKn*`, `wbMat*`, `wbSk*`, `wbCmp*`, `wbTabs*`, `wbSkTabs*`, `wbModuleUnknown`, `wbForms*`. Không key nào trùng key của Task 11–17 hay của `strings.ts` và các shard khác (đã kiểm bằng script). Bốn file trên không còn helper `label`.
 
 - [ ] **Step 1: Viết test chặn sẽ fail**
 
 `apps/shell/tests/workbench-copy.test.ts`:
+
 ```ts
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -12868,7 +13691,12 @@ import { describe, expect, it } from 'vitest'
 import { workbenchStrings } from '../src/renderer/src/i18n/strings-workbench'
 
 /** Workbench chrome reads its copy from the i18n shard (spec 6.8), not from label(vi, en). */
-const FILES = ['PracticeHome.tsx', 'WorkbenchTabs.tsx', 'SkillDomainTabs.tsx', 'WorkbenchModulePanes.tsx']
+const FILES = [
+  'PracticeHome.tsx',
+  'WorkbenchTabs.tsx',
+  'SkillDomainTabs.tsx',
+  'WorkbenchModulePanes.tsx',
+]
 
 describe('Workbench copy lives in the i18n shard', () => {
   it.each(FILES)('%s has no label(vi, en) helper left', (file) => {
@@ -12894,6 +13722,7 @@ Kết quả mong đợi: FAIL ở cả 5 test. Bốn test file báo `expected '�
 - [ ] **Step 3: Tạo script thay chuỗi và bảng chuỗi**
 
 Script nằm cạnh `insert.cjs` của Task 12 Step 10. Nó thay đúng số lời gọi đã ghi cho mỗi file (khoảng trắng, xuống dòng và dấu phẩy cuối không quan trọng), dừng nếu số lần gặp khác, rồi nối 85 key vào `zh.ts`, `vi.ts` và `en.ts`.
+
 ```bash
 mkdir -p "${TMPDIR:-/tmp}/wb-keys"
 cat > "${TMPDIR:-/tmp}/wb-keys/relabel.cjs" <<'EOF'
@@ -13235,23 +14064,28 @@ K="${TMPDIR:-/tmp}/wb-keys"
 node "$K/relabel.cjs" "$K/relabel-table.cjs" apps/shell/src/renderer/src apps/shell/src/renderer/src/i18n/workbench
 npx prettier --write apps/shell/src/renderer/src/i18n/workbench
 ```
+
 Kết quả mong đợi: `replaced 95 label() calls in 4 files; added 85 keys`. Nếu script dừng với `expected N × label(…), found M`, một task trước đã đổi chuỗi đó: sửa `count` hoặc chuỗi trong bảng cho khớp file rồi chạy lại từ `git checkout` bốn file và ba shard.
 
 - [ ] **Step 5: Khai báo `t` ở bốn file và gỡ helper `label`**
 
 `apps/shell/src/renderer/src/PracticeHome.tsx`:
+
 - trước: `  const { lang } = useI18n()`; sau: `  const { lang, t } = useI18n()`
 - xóa dòng `  const label = (a: string, b: string) => (vi ? a : b)`.
 
 `apps/shell/src/renderer/src/WorkbenchTabs.tsx`:
+
 - dưới `import { WorkbenchIcon } from './WorkbenchIcons'`, thêm `import { useI18n } from './locale'`;
 - trước: `  const label = (a: string, b: string) => (vi ? a : b)`; sau: `  const { t } = useI18n()`.
 
 `apps/shell/src/renderer/src/SkillDomainTabs.tsx`:
+
 - dưới `import { MODULE_TONES, tintStyle } from './module-tones'` (Task 17 Step 4), thêm `import { useI18n } from './locale'`;
 - trước: `  const label = (a: string, b: string) => (vi ? a : b)`; sau: `  const { t } = useI18n()`.
 
 `apps/shell/src/renderer/src/WorkbenchModulePanes.tsx`:
+
 - dưới `import { LocalTag } from './LocalTag'` (Task 17 Step 3), thêm `import { useI18n } from './locale'`;
 - thay cả hai dòng `  const label = (a: string, b: string) => (vi ? a : b)` (trong `WorkbenchModulePane`, trước `if (!mod)`, và trong `FormsPane`) bằng `  const { t } = useI18n()` (replace_all). Hook vẫn được gọi trước lệnh `return` sớm.
 
@@ -13269,6 +14103,7 @@ cd apps/shell && npx vitest run tests/workbench-copy.test.ts tests/strings-workb
 npm run check:theme-colors -- --base origin/main
 npm run format
 ```
+
 Kết quả mong đợi: typecheck exit 0 (key thiếu trong shard là lỗi `StringKey`); eslint exit 0 (có thể còn cảnh báo `react-hooks/exhaustive-deps` sẵn có về hàm dịch trong effect, vốn đã có với `label`; không thêm `t` vào mảng phụ thuộc); `workbench-copy` 5 test và `strings-workbench` pass, kể cả `formal vi copy does not mix in English UI words` và kiểm placeholder của 21 locale; mọi test shell pass; theme check sạch (task không đổi CSS).
 
 Kiểm trong app (chỉ đổi renderer): Cài đặt → Tài khoản → Ngôn ngữ, đổi lần lượt Tiếng Việt, English và tiếng Trung. Mở Bàn làm việc → Tri thức, Tài liệu, Kỹ năng, Soạn mới, Biểu mẫu và menu "+" của thanh tab: mọi chữ đổi theo ngôn ngữ, tiếng Việt không còn "tab", "file", "Skills".
@@ -13294,16 +14129,19 @@ EOF
 ### Task 19: E2E smoke với stub UniWork, và kiểm tra cuối
 
 **Files:**
+
 - Create: `e2e/fixtures/uniwork-work-stub.ts`, `e2e/workbench-overview.spec.ts`
 - Modify: `e2e/fixtures/uniwork-documents-stub.ts` (comment đầu file l.1-19, import l.22-30, lời gọi `startUniworkAuthStub` l.532)
 
 **Interfaces:**
+
 - Consumes: `StubRouteContext { req, res, route, url, readBody(), send(status, body), deviceSessionId() }`, `STUB_ACCOUNT` và `STUB_ORG` (`e2e/fixtures/uniwork-auth-stub.ts`). `startUniworkDocumentsStub()` và `addDocument({ filename, bytes })` (`uniwork-documents-stub.ts`, có slug từ Task 7). `launchShell`, `closeAndSaveVideo` và `waitForPageWithUrl` (`e2e/helpers.ts`). `shellEnv`, `signIn`, `hasOsKeyring`, `accountButton` và `NO_KEYRING_SKIP` (`uniwork-signin-steps.ts`). Selector Tổng quan của Task 13: `.wb-ov-stat` (5 ô theo thứ tự Đang mở, Quá hạn, Đến hạn hôm nay, Họp hôm nay, Chưa đọc) và `.wb-ov-recent`; mục nav tiếng Anh `.nav-item` có chữ "Workbench" (Task 11).
 - Produces: `workRoute(ctx: StubRouteContext): boolean`, trả lời `GET /workspaces/{ws}/home`, và `STUB_HOME_COUNTS`.
 
 - [ ] **Step 1: Viết spec E2E sẽ fail**
 
 `e2e/workbench-overview.spec.ts`:
+
 ```ts
 import { test, expect } from '@playwright/test'
 import { readFile } from 'node:fs/promises'
@@ -13401,7 +14239,9 @@ test.describe.serial('Workbench Overview', () => {
   })
 })
 ```
+
 Tạo luôn `e2e/fixtures/uniwork-work-stub.ts` chỉ với số đếm để spec biên dịch được:
+
 ```ts
 export const STUB_HOME_COUNTS = { open: 7, overdue: 1, due_today: 2, meetings_today: 3, unread: 5 }
 ```
@@ -13413,11 +14253,13 @@ cd /Users/ducquang/UNICOM/uniwork-office
 npm run build:all
 npx playwright test --config e2e/playwright.config.ts e2e/workbench-overview.spec.ts
 ```
+
 Kết quả mong đợi: FAIL. Stub trả 404 cho `GET /home`, nên Tổng quan hiện trạng thái lỗi thay vì ô số, và lỗi là `expect(locator).toHaveCount(5)` hoặc `toContainText("7")`. Trên runner Linux không có keyring, test bị `1 skipped` (`NO_KEYRING_SKIP`); chạy trên macOS hoặc Windows.
 
 - [ ] **Step 3: Cho stub trả lời `/home`**
 
 Thay `e2e/fixtures/uniwork-work-stub.ts` bằng:
+
 ```ts
 /**
  * Work routes the Workbench Overview reads, on the documents stub's origin
@@ -13505,15 +14347,18 @@ export function workRoute(ctx: StubRouteContext): boolean {
   return true
 }
 ```
+
 Trong `e2e/fixtures/uniwork-documents-stub.ts`:
+
 - Trong comment đầu file, sau dòng `*   POST /office/sessions/exchange                 (single-use ticket, device match)`, thêm ` *   GET  /workspaces/{ws}/home                     (uniwork-work-stub.ts)`.
 - Dưới import `./uniwork-auth-stub`, thêm `import { workRoute } from './uniwork-work-stub'`.
 - trước: `  const base = await startUniworkAuthStub({ extend: documentsRoute })`
 - sau:
+
 ```ts
-  const base = await startUniworkAuthStub({
-    extend: async (ctx) => (await documentsRoute(ctx)) || workRoute(ctx),
-  })
+const base = await startUniworkAuthStub({
+  extend: async (ctx) => (await documentsRoute(ctx)) || workRoute(ctx),
+})
 ```
 
 - [ ] **Step 4: Chạy và xác nhận pass**
@@ -13545,6 +14390,7 @@ cd /Users/ducquang/UNICOM/uniwork-office
 grep -rnw -e readTasks -e readCalendar -e readPersonal -e TasksPane -e CalendarPane -e PersonalPane -e workbench-reminders -e wb-sticky -e wb-board -e DESK_CHART -e TeacherHome apps packages e2e --include='*.ts' --include='*.tsx' --include='*.css' | grep -v node_modules | grep -v '/out/'
 grep -rn "0f7fff\|15 127 255" apps/shell/src/renderer/src --include='*.css'
 ```
+
 Kết quả mong đợi: cả hai lệnh không in gì. Lệnh thứ hai chứng minh accent cũ đã rời CSS của shell.
 
 - [ ] **Step 7: Kiểm cuối: chạy mọi cổng CI ở máy**
@@ -13559,6 +14405,7 @@ npm run check:theme-colors -- --base origin/main
 npm run check:english-comments
 npm run check:brand
 ```
+
 Kết quả mong đợi: mọi lệnh exit 0. `npm test` chạy mọi suite workspace, không còn `@uniwork/edu-core` (C7).
 
 - [ ] **Step 8: Kiểm cuối: rebuild shell và khởi chạy**
@@ -13568,11 +14415,13 @@ cd /Users/ducquang/UNICOM/uniwork-office
 npm run build:all
 npx electron apps/shell
 ```
+
 Kết quả mong đợi: app khởi động, renderer không trắng. Bắt buộc rebuild vì code main và preload của các task trước chỉ chạy từ build shell.
 
 - [ ] **Step 9: Kiểm cuối: rà ảnh chụp light và dark (đổi accent, spec §9.3)**
 
 Đổi theme ở Cài đặt → Theme (Light, rồi Dark). Ở mỗi màn dưới, chụp một ảnh cho mỗi theme và tick từng ô:
+
 - [ ] Home → File gần đây: hero, thẻ tạo nhanh, mục nav đang chọn. Accent là `#0a52e6` ở light và `#5a96ff` ở dark.
 - [ ] Chat My AI: nút gửi và chip gợi ý. Chữ trên accent là trắng ở light và `#0d1220` ở dark, đọc được ở cả hai.
 - [ ] Bàn làm việc → Tổng quan: ô số, câu đầu trang, dải tài liệu gần đây, nhãn "Trên máy này" ở file cục bộ.
@@ -13584,13 +14433,16 @@ Kết quả mong đợi: app khởi động, renderer không trắng. Bắt bu�
 - [ ] Không còn gradient, hero glow hay chuyển động `wb-ms-breathe` ở đâu. Khi bật "Reduce motion" của hệ điều hành, không có gì chuyển động quá các transition 150–250 ms.
 
 **Chưa làm ở Task 14–19:**
+
 - Backup media IndexedDB còn một slot `tasks` mà không còn ai ghi. Dọn nó đụng tới code backup ở main và kiểu dùng chung, nên để lại.
 - `SkillDomainDef.color` trong practice-core giờ là dữ liệu không dùng.
 
 **Chưa kiểm:**
+
 - Liệu `my-tasks` (relation=all) của server có trả cả việc người dùng chỉ tạo mà không được giao.
 - `my-tasks` lấy tối đa 200 việc (`limit=200`); người có hơn 200 việc mở sẽ thấy danh sách thiếu mà không có báo hiệu.
 
 **Rủi ro:**
+
 - `applyAgentIntent` giờ là async.
 - 18 locale còn lại hiện tiếng Anh cho tới khi được dịch.

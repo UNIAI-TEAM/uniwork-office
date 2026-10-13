@@ -6,14 +6,7 @@ import type { PracticeId } from '@uniwork/practice-core'
 import type { OfficeApp } from './my-ai-router'
 
 export type TemplateSlotId =
-  | 'client'
-  | 'party'
-  | 'topic'
-  | 'scope'
-  | 'amount'
-  | 'deadline'
-  | 'investor'
-  | 'project'
+  'client' | 'party' | 'topic' | 'scope' | 'amount' | 'deadline' | 'investor' | 'project'
 
 export interface TemplateSlotDef {
   id: TemplateSlotId
@@ -100,7 +93,12 @@ const TEMPLATES: readonly PracticeDocTemplate[] = [
     app: 'docs',
     slots: [
       { id: 'investor', required: true, labelVi: 'Chủ đầu tư', labelEn: 'Investor / owner' },
-      { id: 'project', required: true, labelVi: 'Công trình / hạng mục', labelEn: 'Project / package' },
+      {
+        id: 'project',
+        required: true,
+        labelVi: 'Công trình / hạng mục',
+        labelEn: 'Project / package',
+      },
       { id: 'deadline', required: false, labelVi: 'Ngày / đợt GS', labelEn: 'Date / visit' },
       { id: 'scope', required: false, labelVi: 'Nội dung kiểm tra', labelEn: 'Inspection focus' },
     ],
@@ -126,7 +124,12 @@ const TEMPLATES: readonly PracticeDocTemplate[] = [
     labelEn: 'Campaign brief',
     app: 'docs',
     slots: [
-      { id: 'topic', required: true, labelVi: 'Tên / mục tiêu chiến dịch', labelEn: 'Campaign name / goal' },
+      {
+        id: 'topic',
+        required: true,
+        labelVi: 'Tên / mục tiêu chiến dịch',
+        labelEn: 'Campaign name / goal',
+      },
       { id: 'client', required: false, labelVi: 'Thương hiệu / khách', labelEn: 'Brand / client' },
       { id: 'scope', required: false, labelVi: 'Audience / kênh', labelEn: 'Audience / channels' },
       { id: 'deadline', required: false, labelVi: 'Timeline', labelEn: 'Timeline' },
@@ -205,8 +208,7 @@ export function extractSlotsFromUserText(text: string): ResolvedSlots {
     /(?:với|với bên|đối tác|doi tac|bên b|ben b|counterparty)\s*[:\-–]?\s*([^,.;\n]+)/i.exec(raw)
   if (party?.[1]?.trim()) out.party = party[1].trim().slice(0, 120)
 
-  const investor =
-    /(?:chủ đầu tư|chu dau tu|investor|CĐT|cdt)\s*[:\-–]?\s*([^,.;\n]+)/i.exec(raw)
+  const investor = /(?:chủ đầu tư|chu dau tu|investor|CĐT|cdt)\s*[:\-–]?\s*([^,.;\n]+)/i.exec(raw)
   if (investor?.[1]?.trim()) out.investor = investor[1].trim().slice(0, 120)
 
   const project =
@@ -241,8 +243,7 @@ export function extractSlotsFromUserText(text: string): ResolvedSlots {
     )
   if (deadline?.[1]?.trim()) out.deadline = deadline[1].trim().slice(0, 80)
 
-  const scope =
-    /(?:phạm vi|pham vi|scope|audience|kênh|kenh)\s*[:\-–]?\s*([^,.;\n]+)/i.exec(raw)
+  const scope = /(?:phạm vi|pham vi|scope|audience|kênh|kenh)\s*[:\-–]?\s*([^,.;\n]+)/i.exec(raw)
   if (scope?.[1]?.trim()) out.scope = scope[1].trim().slice(0, 160)
 
   return out
@@ -287,10 +288,7 @@ export function resolveTemplateSlots(
   return { template, slots, missing }
 }
 
-export function buildTemplateBrief(
-  result: TemplateResolveResult,
-  vi: boolean,
-): string {
+export function buildTemplateBrief(result: TemplateResolveResult, vi: boolean): string {
   const { template, slots } = result
   const lines: string[] = []
   const title = vi ? template.labelVi : template.labelEn
@@ -320,7 +318,11 @@ export function buildTemplateBrief(
   return lines.join('\n')
 }
 
-export function slotPromptPrefix(slot: TemplateSlotDef, template: PracticeDocTemplate, vi: boolean): string {
+export function slotPromptPrefix(
+  slot: TemplateSlotDef,
+  template: PracticeDocTemplate,
+  vi: boolean,
+): string {
   const tpl = vi ? template.labelVi : template.labelEn
   const lab = vi ? slot.labelVi : slot.labelEn
   if (slot.id === 'client' || slot.id === 'party' || slot.id === 'investor') {

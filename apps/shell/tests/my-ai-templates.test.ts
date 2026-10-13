@@ -13,11 +13,7 @@ describe('my-ai templates', () => {
   })
 
   it('resolves sales-quote slots from the request text', () => {
-    const r = resolveTemplateSlots(
-      'sales',
-      'sales-quote',
-      'Soạn báo giá cho khách ABC gói Premier',
-    )
+    const r = resolveTemplateSlots('sales', 'sales-quote', 'Soạn báo giá cho khách ABC gói Premier')
     expect(r).not.toBeNull()
     expect(r!.missing).toHaveLength(0)
     expect(r!.slots.client).toBe('ABC')

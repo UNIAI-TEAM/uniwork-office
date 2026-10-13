@@ -17,7 +17,14 @@ describe('Phase C / P1 practice playbooks', () => {
   })
 
   it('only targets Workbench modules that still exist', () => {
-    const practices = ['sales', 'accounting', 'procurement', 'real-estate', 'customer-care', 'legal'] as const
+    const practices = [
+      'sales',
+      'accounting',
+      'procurement',
+      'real-estate',
+      'customer-care',
+      'legal',
+    ] as const
     for (const p of practices) {
       for (const chip of practiceMyAiChips(p)) {
         for (const s of matchPracticePlaybook(p, chip.promptVi)?.steps ?? []) {
@@ -52,10 +59,7 @@ describe('Phase C / P1 practice playbooks', () => {
   })
 
   it('marketing campaign → brief + slides + task + calendar', () => {
-    const hit = matchPracticePlaybook(
-      'marketing',
-      'Soạn brief chiến dịch ra mắt sản phẩm mới',
-    )
+    const hit = matchPracticePlaybook('marketing', 'Soạn brief chiến dịch ra mắt sản phẩm mới')
     expect(hit?.playbook.id).toBe('marketing-campaign')
     expect(hit?.steps[0]).toMatchObject({ kind: 'fill_template', templateId: 'marketing-campaign' })
     expect(hit?.steps[1]).toMatchObject({ kind: 'create_file', app: 'slides' })
@@ -78,18 +82,18 @@ describe('Phase C / P1 practice playbooks', () => {
   })
 
   it('construction / content / entrepreneur / procurement / hr / re playbooks match', () => {
-    expect(matchPracticePlaybook('construction', 'Soạn nhật ký giám sát hôm nay')?.playbook.id).toBe(
-      'construction-site',
-    )
-    expect(matchPracticePlaybook('content-creator', 'Soạn kịch bản video tuần này')?.playbook.id).toBe(
-      'content-calendar',
-    )
+    expect(
+      matchPracticePlaybook('construction', 'Soạn nhật ký giám sát hôm nay')?.playbook.id,
+    ).toBe('construction-site')
+    expect(
+      matchPracticePlaybook('content-creator', 'Soạn kịch bản video tuần này')?.playbook.id,
+    ).toBe('content-calendar')
     expect(matchPracticePlaybook('entrepreneur', 'Tạo pitch gọi vốn seed')?.playbook.id).toBe(
       'entrepreneur-pitch',
     )
-    expect(matchPracticePlaybook('procurement', 'Soạn RFP nhà cung cấp phần mềm')?.playbook.id).toBe(
-      'procurement-rfp',
-    )
+    expect(
+      matchPracticePlaybook('procurement', 'Soạn RFP nhà cung cấp phần mềm')?.playbook.id,
+    ).toBe('procurement-rfp')
     expect(matchPracticePlaybook('hr', 'Soạn JD và checklist onboarding')?.playbook.id).toBe(
       'hr-onboard',
     )

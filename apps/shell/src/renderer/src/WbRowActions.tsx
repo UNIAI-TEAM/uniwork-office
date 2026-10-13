@@ -144,7 +144,13 @@ export function WbOpenBtn({
   title?: string
 }): ReactElement {
   return (
-    <WbIconBtn label={label} variant="accent" onClick={onClick} disabled={disabled} title={title ?? label}>
+    <WbIconBtn
+      label={label}
+      variant="accent"
+      onClick={onClick}
+      disabled={disabled}
+      title={title ?? label}
+    >
       <IconOpen />
     </WbIconBtn>
   )
@@ -162,7 +168,13 @@ export function WbDraftBtn({
   title?: string
 }): ReactElement {
   return (
-    <WbIconBtn label={label} variant="accent" onClick={onClick} disabled={disabled} title={title ?? label}>
+    <WbIconBtn
+      label={label}
+      variant="accent"
+      onClick={onClick}
+      disabled={disabled}
+      title={title ?? label}
+    >
       <IconDoc />
     </WbIconBtn>
   )

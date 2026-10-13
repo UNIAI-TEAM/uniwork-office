@@ -1,11 +1,7 @@
 /**
  * Phase C — practice-scoped playbooks for My AI (1 command → multi-step).
  */
-import {
-  createAgentIntent,
-  getPractice,
-  type PracticeId,
-} from '@uniwork/practice-core'
+import { createAgentIntent, getPractice, type PracticeId } from '@uniwork/practice-core'
 import type { MyAiStep } from './my-ai-router'
 
 export interface MyAiPlaybookChip {
@@ -196,7 +192,12 @@ const PLAYBOOKS: readonly MyAiPlaybook[] = [
         createDocs(
           `Runbook / báo cáo sự cố: ${topic}. Gồm: triệu chứng, impact, bước xử lý, rollback, tiêu chí xong, liên hệ.`,
         ),
-        wb('add_item', 'tasks', `Theo dõi sự cố: ${topic.slice(0, 80)}`, 'Thêm việc theo dõi sự cố'),
+        wb(
+          'add_item',
+          'tasks',
+          `Theo dõi sự cố: ${topic.slice(0, 80)}`,
+          'Thêm việc theo dõi sự cố',
+        ),
         wb('open', 'notes', 'Mở Notes', 'Open Notes'),
       ]
     },
@@ -226,8 +227,15 @@ const PLAYBOOKS: readonly MyAiPlaybook[] = [
         ]) || 'Hạng mục / đợt GS — thời tiết, nhân lực, khối lượng, tồn đọng'
       return [
         fillTemplate('construction-site', raw),
-        createSheets(`Checklist giám sát: ${topic}. Cột: hạng mục, tiêu chí, đạt/không, ghi chú, ảnh.`),
-        wb('add_item', 'tasks', `Tồn đọng hiện trường: ${topic.slice(0, 80)}`, 'Thêm việc tồn đọng'),
+        createSheets(
+          `Checklist giám sát: ${topic}. Cột: hạng mục, tiêu chí, đạt/không, ghi chú, ảnh.`,
+        ),
+        wb(
+          'add_item',
+          'tasks',
+          `Tồn đọng hiện trường: ${topic.slice(0, 80)}`,
+          'Thêm việc tồn đọng',
+        ),
       ]
     },
   },
@@ -256,9 +264,7 @@ const PLAYBOOKS: readonly MyAiPlaybook[] = [
         ]) || 'Nội dung tuần — chủ đề, CTA, kênh đăng'
       return [
         createDocs(`Kịch bản / caption: ${topic}`),
-        createSheets(
-          `Lịch nội dung: ${topic}. Cột: ngày, kênh, format, tiêu đề, CTA, trạng thái.`,
-        ),
+        createSheets(`Lịch nội dung: ${topic}. Cột: ngày, kênh, format, tiêu đề, CTA, trạng thái.`),
         wb('open', 'calendar', 'Mở lịch', 'Open calendar'),
       ]
     },
@@ -288,7 +294,12 @@ const PLAYBOOKS: readonly MyAiPlaybook[] = [
       return [
         createSlides(`Pitch deck: ${topic}`),
         createDocs(`Kế hoạch 30 ngày: ${topic}`),
-        wb('add_item', 'tasks', `Follow-up pitch: ${topic.slice(0, 80)}`, 'Thêm việc follow-up pitch'),
+        wb(
+          'add_item',
+          'tasks',
+          `Follow-up pitch: ${topic.slice(0, 80)}`,
+          'Thêm việc follow-up pitch',
+        ),
       ]
     },
   },
@@ -393,8 +404,7 @@ const PLAYBOOKS: readonly MyAiPlaybook[] = [
       /(?:follow.?up|theo doi)/i.test(norm),
     buildSteps: (raw) => {
       const brief =
-        residualBrief(raw, [AND_TAIL]) ||
-        'Thư follow-up: nhắc lợi ích, bước tiếp, CTA rõ'
+        residualBrief(raw, [AND_TAIL]) || 'Thư follow-up: nhắc lợi ích, bước tiếp, CTA rõ'
       return [
         createDocs(brief),
         wb('add_item', 'tasks', `Follow-up: ${brief.slice(0, 80)}`, 'Thêm việc follow-up'),
@@ -419,8 +429,7 @@ const PLAYBOOKS: readonly MyAiPlaybook[] = [
       ),
     buildSteps: (raw) => {
       const brief =
-        residualBrief(raw, [AND_TAIL]) ||
-        'Trả lời khách: thừa nhận vấn đề, hướng xử lý, thời hạn'
+        residualBrief(raw, [AND_TAIL]) || 'Trả lời khách: thừa nhận vấn đề, hướng xử lý, thời hạn'
       return [
         fillTemplate('cs-reply', raw),
         wb('add_item', 'tasks', `CS follow-up: ${brief.slice(0, 80)}`, 'Thêm việc CS'),

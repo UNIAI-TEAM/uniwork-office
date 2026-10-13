@@ -83,14 +83,10 @@ export function extractFormQuery(raw: string): string {
   const m =
     /(?:điền|dien|soạn|soan|fill|draft|dùng|dung)?\s*(?:theo\s+)?(?:biểu mẫu|bieu mau|form|mẫu|mau)\s*[:\-–]?\s*(.+)$/i.exec(
       raw.trim(),
-    ) ||
-    /(?:theo\s+mẫu|theo\s+mau)\s*[:\-–]?\s*(.+)$/i.exec(raw.trim())
+    ) || /(?:theo\s+mẫu|theo\s+mau)\s*[:\-–]?\s*(.+)$/i.exec(raw.trim())
   let q = (m?.[1] ?? raw).trim()
   q = q
-    .replace(
-      /^(?:điền|dien|soạn|soan|fill|draft|dùng|dung|theo)\s+/i,
-      '',
-    )
+    .replace(/^(?:điền|dien|soạn|soan|fill|draft|dùng|dung|theo)\s+/i, '')
     .replace(/^(?:biểu mẫu|bieu mau|form|mẫu|mau)\s*/i, '')
     .replace(/\b(?:word|excel|slide|pdf|văn bản|van ban)\b/gi, ' ')
     .replace(/\s+/g, ' ')
@@ -99,9 +95,7 @@ export function extractFormQuery(raw: string): string {
 }
 
 export type FormFillRoute =
-  | { kind: 'form'; formId: string }
-  | { kind: 'pick'; forms: WbFormItem[] }
-  | null
+  { kind: 'form'; formId: string } | { kind: 'pick'; forms: WbFormItem[] } | null
 
 /** Route NL → fill a library form (uploaded preferred). */
 export function routeFormFill(practiceId: PracticeId, raw: string): FormFillRoute {

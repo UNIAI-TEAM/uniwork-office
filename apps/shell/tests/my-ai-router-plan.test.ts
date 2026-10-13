@@ -10,14 +10,8 @@ import {
 describe('my-ai multi-tool plans (B4)', () => {
   it('splits Vietnamese conjunction + action comma', () => {
     expect(
-      splitMyAiClauses(
-        'Soạn báo giá Word và thêm công việc follow-up khách, mở tab Clients',
-      ),
-    ).toEqual([
-      'Soạn báo giá Word',
-      'thêm công việc follow-up khách',
-      'mở tab Clients',
-    ])
+      splitMyAiClauses('Soạn báo giá Word và thêm công việc follow-up khách, mở tab Clients'),
+    ).toEqual(['Soạn báo giá Word', 'thêm công việc follow-up khách', 'mở tab Clients'])
   })
 
   it('builds create + task plan with one goal (P3)', () => {

@@ -51,7 +51,9 @@ function main() {
     console.error(git.stderr)
     process.exit(git.status ?? 1)
   }
-  const root = spawnSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).stdout.trim()
+  const root = spawnSync('git', ['rev-parse', '--show-toplevel'], {
+    encoding: 'utf8',
+  }).stdout.trim()
   const violations = git.stdout
     .trim()
     .split('\n')

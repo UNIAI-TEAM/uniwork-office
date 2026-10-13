@@ -1,5 +1,10 @@
 import { isPracticeId } from './types.js'
-import type { CreatePracticeMetaInput, PracticeId, PracticeMeta, PracticeProjectKind } from './types.js'
+import type {
+  CreatePracticeMetaInput,
+  PracticeId,
+  PracticeMeta,
+  PracticeProjectKind,
+} from './types.js'
 
 function nowIso(): string {
   return new Date().toISOString()
@@ -13,7 +18,11 @@ export function practiceIdFromProjectKind(kind: string | undefined): PracticeId 
   return isPracticeId(kind) ? kind : null
 }
 
-export function packDisplayName(practiceLabel: string, title: string, facets: Record<string, string>): string {
+export function packDisplayName(
+  practiceLabel: string,
+  title: string,
+  facets: Record<string, string>,
+): string {
   const secondary = Object.values(facets)
     .map((v) => v.trim())
     .filter(Boolean)

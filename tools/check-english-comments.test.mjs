@@ -15,7 +15,9 @@ describe('findViolations', () => {
     assert.equal(count('a.md', `${FENCE}ts\nconst a = "${HAN}"\n${FENCE}`), 0)
   })
   it('flags Han again after the fence closes', () => {
-    assert.deepEqual(findViolations('a.md', `${FENCE}\n${HAN}\n${FENCE}\n${HAN}`), [`  a.md:4: ${HAN}`])
+    assert.deepEqual(findViolations('a.md', `${FENCE}\n${HAN}\n${FENCE}\n${HAN}`), [
+      `  a.md:4: ${HAN}`,
+    ])
   })
   it('supports ~~~ fences', () => {
     assert.equal(count('a.md', `~~~\n${HAN}\n~~~\n`), 0)
