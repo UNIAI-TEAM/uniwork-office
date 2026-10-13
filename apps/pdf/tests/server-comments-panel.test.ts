@@ -152,19 +152,27 @@ interface Mounted {
   api: { current: PdfServerComments | null }
   goTo: ReturnType<typeof vi.fn>
   onRevealRequest: ReturnType<typeof vi.fn>
+  onClose: ReturnType<typeof vi.fn>
+  onPendingAnchor: ReturnType<typeof vi.fn>
+  onFocusOpener: ReturnType<typeof vi.fn>
+  /** render again with the panel open or closed (the host stays mounted, like App) */
+  setOpen(open: boolean): Promise<void>
 }
 
 async function mount(bridge: FakeBridge, opts: { readOnly?: boolean } = {}): Promise<Mounted> {
   const api: Mounted['api'] = { current: null }
   const goTo = vi.fn()
   const onRevealRequest = vi.fn()
+  const onClose = vi.fn()
+  const onPendingAnchor = vi.fn()
+  const onFocusOpener = vi.fn()
   const adapter = createPdfAnchorAdapter({
     pageCount: 3,
     isShown: () => true,
     viewTop: (_i, rect) => 842 - rect[3],
     goTo,
   })
-  await act(async () => {
+  const render = (open: boolean) =>
     root.render(
       createElement(PdfServerCommentsHost, {
         bridge,
@@ -172,17 +180,26 @@ async function mount(bridge: FakeBridge, opts: { readOnly?: boolean } = {}): Pro
         lang: 'en',
         readOnly: opts.readOnly ?? false,
         adapter,
-        open: true,
+        open,
         apiRef: api,
         onRevealRequest,
-        onClose: () => {},
-        onPendingAnchor: () => {},
+        onClose,
+        onPendingAnchor,
+        onFocusOpener,
         saveFirstText: 'Save the document first to add a comment',
       }),
     )
+  await act(async () => {
+    render(true)
     await flush()
   })
-  return { api, goTo, onRevealRequest }
+  const setOpen = async (open: boolean) => {
+    await act(async () => {
+      render(open)
+      await flush()
+    })
+  }
+  return { api, goTo, onRevealRequest, onClose, onPendingAnchor, onFocusOpener, setOpen }
 }
 
 const nativeValue = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!
@@ -446,5 +463,159 @@ describe('anchor_version_invalid keeps the anchors stale and retries on the next
         { commentId: 'c2', anchor: makePdfAnchor(1, RECT), state: 'exact' },
       ],
     })
+  })
+})
+
+const esc = () =>
+  box().dispatchEvent(
+    new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+  )
+const lastPending = (m: Mounted) => m.onPendingAnchor.mock.calls.at(-1)?.[0]
+
+describe('an empty new-thread composer can be dismissed (V15-02)', () => {
+  it('Esc drops it, clears the pending frame and closes the panel', async () => {
+    const m = await mount(fakeBridge())
+    await act(async () => {
+      m.api.current!.startAt(1, [100, 700])
+      await flush()
+    })
+    expect(lastPending(m)).toMatchObject({ page: 1 })
+    await act(async () => {
+      esc()
+      await flush()
+    })
+    expect(el.querySelector('.collab-thread--new')).toBeNull()
+    expect(lastPending(m)).toBeNull()
+    expect(m.onClose).toHaveBeenCalledTimes(1)
+    expect(m.onFocusOpener).toHaveBeenCalled()
+  })
+
+  it('Esc with typed text asks first and neither drops nor closes (the kit owns it)', async () => {
+    const m = await mount(fakeBridge())
+    await act(async () => {
+      m.api.current!.startAt(1, [100, 700])
+      await flush()
+    })
+    await act(async () => {
+      nativeValue.call(box(), 'half a thought')
+      box().dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await act(async () => {
+      esc()
+      await flush()
+    })
+    expect(el.querySelector('.collab-thread--new')).not.toBeNull()
+    expect(m.onClose).not.toHaveBeenCalled()
+  })
+
+  it('closing the panel drops an empty composer and its frame; a typed draft survives the close', async () => {
+    const m = await mount(fakeBridge())
+    await act(async () => {
+      m.api.current!.startAt(1, [100, 700])
+      await flush()
+    })
+    await m.setOpen(false)
+    expect(lastPending(m)).toBeNull()
+    await m.setOpen(true)
+    expect(el.querySelector('.collab-thread--new')).toBeNull()
+
+    await act(async () => {
+      m.api.current!.startAt(1, [100, 700])
+      await flush()
+    })
+    await act(async () => {
+      nativeValue.call(box(), 'keep me')
+      box().dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await m.setOpen(false)
+    await m.setOpen(true)
+    expect(box().value).toBe('keep me')
+    expect(lastPending(m)).toMatchObject({ page: 1 })
+  })
+
+  it('cancelEmptyThread (Note tool off) drops an untouched composer, never one with text or an AI draft', async () => {
+    const m = await mount(fakeBridge())
+    await act(async () => {
+      m.api.current!.startAt(1, [100, 700])
+      await flush()
+    })
+    await act(async () => {
+      m.api.current!.cancelEmptyThread()
+      await flush()
+    })
+    expect(el.querySelector('.collab-thread--new')).toBeNull()
+
+    await act(async () => {
+      m.api.current!.startAt(1, [100, 700], 'AI suggestion')
+      await flush()
+    })
+    await act(async () => {
+      m.api.current!.cancelEmptyThread()
+      await flush()
+    })
+    expect(box().value).toBe('AI suggestion')
+  })
+})
+
+describe('focus after a new thread (V15-03)', () => {
+  it('Send moves the focus to the new thread heading', async () => {
+    const bridge = fakeBridge()
+    const m = await mount(bridge)
+    await act(async () => {
+      m.api.current!.startAt(1, [100, 700])
+      await flush()
+    })
+    await typeAndSend('Please check the total')
+    const heading = el.querySelector('[data-thread-id="new-0"] [data-thread-heading]')
+    expect(heading).not.toBeNull()
+    expect(document.activeElement).toBe(heading)
+  })
+
+  it('Discard hands the focus back to the opener', async () => {
+    const m = await mount(fakeBridge())
+    await act(async () => {
+      m.api.current!.startAt(1, [100, 700])
+      await flush()
+    })
+    // an empty root composer has no Cancel button (kit): Discard comes with a draft
+    await act(async () => {
+      nativeValue.call(box(), 'draft')
+      box().dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    const cancelBtn = [
+      ...el.querySelectorAll<HTMLButtonElement>('.collab-thread--new button'),
+    ].find((b) => b.textContent === collabStrings('en').collabCancel)!
+    await act(async () => {
+      cancelBtn.click()
+      await flush()
+    })
+    const discard = [...document.querySelectorAll<HTMLButtonElement>('button')].find(
+      (b) => b.textContent === collabStrings('en').collabDiscard,
+    )
+    await act(async () => {
+      discard?.click()
+      await flush()
+    })
+    expect(el.querySelector('.collab-thread--new')).toBeNull()
+    expect(m.onFocusOpener).toHaveBeenCalled()
+  })
+})
+
+describe('an older preload without the seam (V15-07)', () => {
+  it('is not "save first": no receipt will ever come, so the generic line applies', async () => {
+    const bridge = fakeBridge()
+    ;(bridge as { context?: unknown }).context = undefined
+    ;(bridge as { onSaved?: unknown }).onSaved = undefined
+    const { api } = await mount(bridge)
+    expect(api.current?.needsSave).toBe(false)
+    expect(api.current?.canStartThread).toBe(false)
+    expect(el.textContent).not.toContain('Save the document first')
+  })
+
+  it('a seam with an unknown version still says save first', async () => {
+    const bridge = fakeBridge([], boundContext({ versionId: undefined }))
+    const { api } = await mount(bridge)
+    expect(api.current?.needsSave).toBe(true)
+    expect(el.textContent).toContain('Save the document first')
   })
 })
