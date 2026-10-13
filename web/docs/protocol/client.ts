@@ -28,6 +28,7 @@ import {
   PROTOCOL_VERSION,
   moduleOf,
   errorFromHttpStatus,
+  isCommentsLevel,
   isCommentsRequestType,
   toProtocolError,
   type AiRunPayload,
@@ -273,11 +274,13 @@ export function createDocsFrameClient(options: DocsFrameClientOptions): DocsFram
     if (p.open) next.open = p.open
     if (p.user) {
       next.user = { displayName: p.user.displayName }
-      if (p.user.id !== undefined) next.user.id = p.user.id
+      // hint fields never fail the init: an empty / non-string id is absent
+      if (typeof p.user.id === 'string' && p.user.id !== '') next.user.id = p.user.id
     }
     if (p.recovery) next.recovery = { key: p.recovery.key, scope: p.recovery.scope }
     if (p.downloadMaxBytes !== undefined) next.downloadMaxBytes = p.downloadMaxBytes
-    if (p.commentsLevel !== undefined) next.commentsLevel = p.commentsLevel
+    // an unknown (future) or null level is treated as missing: the fallback rules apply
+    if (isCommentsLevel(p.commentsLevel)) next.commentsLevel = p.commentsLevel
     // a repeated init (host re-handshake) updates the object callers already hold
     if (session) {
       delete session.open

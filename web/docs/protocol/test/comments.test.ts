@@ -164,10 +164,19 @@ describe('G8-08 protocol shape', () => {
     const { commentsLevel: _l, user: _u, ...bare } = init
     expect(isInitPayload(bare)).toBe(true)
     expect(isInitPayload({ ...init, user: { displayName: 'An' } })).toBe(true)
-    expect(isInitPayload({ ...init, commentsLevel: 'admin' })).toBe(false)
-    expect(isInitPayload({ ...init, commentsLevel: null })).toBe(false)
-    expect(isInitPayload({ ...init, user: { displayName: 'An', id: 7 } })).toBe(false)
-    expect(isInitPayload({ ...init, user: { displayName: 'An', id: '' } })).toBe(false)
+  })
+
+  it('init: hint fields (commentsLevel, user.id) never reject the whole init (FE-W8P-1)', () => {
+    const init = { ...baseInit(), protocolVersion: PROTOCOL_VERSION }
+    for (const level of ['admin', 'owner', null, 7, '']) {
+      expect(isInitPayload({ ...init, commentsLevel: level })).toBe(true)
+    }
+    for (const id of ['', null, 7]) {
+      expect(isInitPayload({ ...init, user: { displayName: 'An', id } })).toBe(true)
+    }
+    // the rest of the init stays strict
+    expect(isInitPayload({ ...init, user: { id: 'u1' } })).toBe(false)
+    expect(isInitPayload({ ...init, documentId: '' })).toBe(false)
   })
 
   it('frame -> host request payloads', () => {
@@ -261,6 +270,14 @@ describe('G8-08 protocol shape', () => {
     })
     // fields a newer server adds pass through
     ok('comments.list', { ...LIST, comments: [{ ...COMMENT, reactions: [{ emoji: '+1' }] }] })
+    // forward-compatible values keep the row (FE-W8P-2): null author, unknown kind / anchor_state
+    ok('comments.list', { ...LIST, comments: [{ ...COMMENT, author_id: null }] })
+    ok('comments.list', { ...LIST, comments: [{ ...COMMENT, kind: 'suggestion' }] })
+    ok('comments.list', { ...LIST, comments: [{ ...COMMENT, anchor_state: 'moved' }] })
+    // ... but a wrong type is still malformed
+    bad('comments.list', { ...LIST, comments: [{ ...COMMENT, author_id: 7 }] })
+    bad('comments.list', { ...LIST, comments: [{ ...COMMENT, kind: 7 }] })
+    bad('comments.list', { ...LIST, comments: [{ ...COMMENT, anchor_state: 7 }] })
 
     for (const t of ['comments.create', 'comments.update', 'comments.resolve', 'comments.reopen']) {
       ok(t, { comment: COMMENT })
@@ -282,6 +299,31 @@ describe('G8-08 protocol shape', () => {
       ],
     })
     bad('comments.revisions', { revisions: [{ id: 'r1' }] })
+    // a system / AI author may have no id (FE-W8P-2)
+    ok('comments.revisions', {
+      revisions: [
+        {
+          id: 'r1',
+          revision: 1,
+          body: 'old',
+          created_by_id: null,
+          created_by_kind: 'system',
+          created_at: 't',
+        },
+      ],
+    })
+    bad('comments.revisions', {
+      revisions: [
+        {
+          id: 'r1',
+          revision: 1,
+          body: 'x',
+          created_by_id: 7,
+          created_by_kind: 'h',
+          created_at: 't',
+        },
+      ],
+    })
     ok('comments.anchors', {
       updated: [COMMENT.id],
       skipped: [{ comment_id: 'c2', reason: 'older_version' }],
@@ -357,6 +399,25 @@ describe('commentsErrorFromHttp (contract §9, fixed table)', () => {
       retryable: true,
       message: expect.any(String),
     })
+  })
+
+  it('413 without a body code still carries details.code payload_too_large (FE-W8P-3)', () => {
+    for (const b of [undefined, null, 'too big', {}, { error: {} }]) {
+      expect(commentsErrorFromHttp(413, b).toShape()).toEqual({
+        code: 'too_large',
+        status: 413,
+        retryable: false,
+        message: expect.any(String),
+        details: { code: 'payload_too_large' },
+      })
+    }
+    // a code the server did send wins
+    expect(commentsErrorFromHttp(413, body('request_too_big')).details).toEqual({
+      code: 'request_too_big',
+    })
+    // 400 / 409 without a code stay without: §9 keys those rows on the server's code
+    expect(commentsErrorFromHttp(400).details).toBeUndefined()
+    expect(commentsErrorFromHttp(409).details).toBeUndefined()
   })
 
   it('reads a flat {code} body too, and tolerates garbage bodies', () => {
@@ -470,6 +531,22 @@ describe('commentsLevel and the frame affordances', () => {
     expect(checkInitComments({ ...noLevel, capabilities: { save: true } })).toBeNull()
   })
 
+  it('the host-side check stays strict about the level value (FE-W8P-1)', () => {
+    const base = { ...baseInit(), protocolVersion: PROTOCOL_VERSION }
+    for (const level of ['admin', null, '', 7]) {
+      const e = checkInitComments({ ...base, commentsLevel: level } as never)
+      expect(e?.toShape()).toMatchObject({
+        code: 'malformed',
+        details: { code: 'comments_level_invalid' },
+      })
+    }
+    expect(checkInitComments({ ...base, commentsLevel: 'view' })).toBeNull()
+    // not granted: the value is not looked at
+    expect(
+      checkInitComments({ ...base, capabilities: { save: true }, commentsLevel: 'admin' } as never),
+    ).toBeNull()
+  })
+
   it('the frame still accepts such an init and applies the missing-field rules', async () => {
     const { commentsLevel: _l, ...noLevel } = baseInit()
     const { host, client } = setup({ getInit: async () => noLevel })
@@ -478,6 +555,26 @@ describe('commentsLevel and the frame affordances', () => {
     expect(s.capabilities.comments).toBe(true)
     expect(s.commentsLevel).toBeUndefined()
     expect(commentsAccess(s)).toMatchObject({ enabled: true, level: null, canCreate: true })
+  })
+
+  it('unknown / null commentsLevel and an empty user.id are treated as missing (FE-W8P-1)', async () => {
+    for (const [commentsLevel, id] of [
+      ['owner', ''],
+      [null, null],
+      [7, 7],
+    ] as const) {
+      const init = baseInit({ commentsLevel: commentsLevel as never })
+      init.user = { displayName: 'An', id: id as never }
+      const { host, client } = setup({ getInit: async () => init })
+      await host.whenReady()
+      const s = await client.whenInitialized()
+      expect(s.commentsLevel).toBeUndefined()
+      expect(s.user).toEqual({ displayName: 'An' })
+      expect(s.capabilities.comments).toBe(true)
+      // the missing-field rules apply
+      expect(commentsAccess(s)).toMatchObject({ enabled: true, level: null, canCreate: true })
+      expect(commentsAccess(s).userId).toBeUndefined()
+    }
   })
 
   it('the session carries user.id and commentsLevel; a re-init replaces them', async () => {
