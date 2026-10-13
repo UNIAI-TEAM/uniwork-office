@@ -12,13 +12,23 @@
  * Invariant 7: an AI suggestion only pre-fills a composer (`aiDraft`); nothing
  * here calls `comments.create` before the user presses Send.
  */
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
+} from 'react'
 import type { Lang } from '@genoffice/i18n'
 import {
   CollabComposer,
   CollabPanel,
   collabStrings,
+  loadDraft,
   useCollabThreads,
+  type CollabActions,
   type CollabAnchorAdapter,
   type CollabController,
   type CollabHostState,
@@ -60,6 +70,8 @@ export interface PdfServerComments {
   needsSave: boolean
   /** open the root composer at a point placement (the note tool click), optionally pre-filled by AI */
   startAt(page: number, at: readonly [number, number], aiText?: string): boolean
+  /** drop the pending new-thread composer when nothing was typed (no draft text, no AI draft) */
+  cancelEmptyThread(): void
   /** the AI draft of the pending root composer, if any */
   aiDraft: { draftKey: string; text: string } | null
   /** the renderer's save of this document landed: queue the anchor re-send */
@@ -75,6 +87,8 @@ export function usePdfServerComments(o: PdfServerCommentsOptions): PdfServerComm
     fallbackPdfCommentsContext(path, readOnly),
   )
   const [aiDraft, setAiDraft] = useState<{ draftKey: string; text: string } | null>(null)
+  const aiDraftRef = useRef(aiDraft)
+  aiDraftRef.current = aiDraft
 
   useEffect(() => {
     let live = true
@@ -185,8 +199,11 @@ export function usePdfServerComments(o: PdfServerCommentsOptions): PdfServerComm
 
   const canStartThread =
     controller.state === 'ready' && controller.can.canWrite && context.versionId !== null
+  // "save first" only makes sense when a receipt can still arrive: an older preload without the
+  // context / saved seam never sends one, so that case keeps the generic unavailable line
+  const hasSeam = typeof bridge.context === 'function' && typeof bridge.onSaved === 'function'
   const needsSave =
-    controller.state === 'ready' && controller.can.canWrite && context.versionId === null
+    hasSeam && controller.state === 'ready' && controller.can.canWrite && context.versionId === null
 
   const startAt = useCallback(
     (page: number, at: readonly [number, number], aiText?: string): boolean => {
@@ -202,6 +219,17 @@ export function usePdfServerComments(o: PdfServerCommentsOptions): PdfServerComm
     [context.versionId],
   )
 
+  const documentIdRef = useRef(context.documentId)
+  documentIdRef.current = context.documentId
+  const cancelEmptyThread = useCallback(() => {
+    const c = ctlRef.current
+    if (!c.newThread) return
+    const draftKey = rootDraftKey(c.newThread.anchor as PdfAnchor)
+    if (aiDraftRef.current?.draftKey === draftKey) return
+    if (loadDraft({ documentId: documentIdRef.current, threadKey: draftKey })) return
+    c.cancelThread()
+  }, [])
+
   // the AI label belongs to one pending root composer only
   const pendingKey = controller.newThread
     ? rootDraftKey(controller.newThread.anchor as PdfAnchor)
@@ -210,7 +238,16 @@ export function usePdfServerComments(o: PdfServerCommentsOptions): PdfServerComm
     if (aiDraft && aiDraft.draftKey !== pendingKey) setAiDraft(null)
   }, [aiDraft, pendingKey])
 
-  return { controller, context, canStartThread, needsSave, startAt, aiDraft, saved }
+  return {
+    controller,
+    context,
+    canStartThread,
+    needsSave,
+    startAt,
+    cancelEmptyThread,
+    aiDraft,
+    saved,
+  }
 }
 
 export interface PdfCommentsPanelProps {
@@ -219,6 +256,8 @@ export interface PdfCommentsPanelProps {
   id?: string
   lang: Lang
   onClose(): void
+  /** the control that opened the panel or the composer takes the focus back (Discard, Esc) */
+  onFocusOpener?(): void
   /** the file's own notes, read-only */
   inFile?: { count: number; content: ReactNode }
   /** the line under the header while the open version is unknown: save the document first */
@@ -226,15 +265,81 @@ export interface PdfCommentsPanelProps {
 }
 
 export function PdfCommentsPanel(p: PdfCommentsPanelProps) {
-  const { comments, lang } = p
+  const { comments, lang, onClose } = p
   const strings = useMemo(() => collabStrings(lang), [lang])
   const ai = comments.aiDraft
+  const baseCtl = comments.controller
+  const baseRef = useRef(baseCtl)
+  baseRef.current = baseCtl
+  const panelRef = useRef<HTMLDivElement>(null)
+  const focusOpenerRef = useRef(p.onFocusOpener)
+  focusOpenerRef.current = p.onFocusOpener
+
+  // After Send of a NEW thread the composer unmounts with the focus in it: the focus goes to the
+  // panel title at once (the list reloads later), then to the new thread's heading once it is listed.
+  const [sent, setSent] = useState<ReadonlySet<string> | null>(null)
+  const create: CollabActions['create'] = async (body, np) => {
+    const b = baseRef.current
+    const before = new Set([...b.threads, ...b.resolved].map((th) => th.id))
+    await b.actions.create(body, np)
+    if (!np?.anchor) return
+    const active = document.activeElement
+    if (!active || active === document.body || panelRef.current?.contains(active)) {
+      panelRef.current?.querySelector<HTMLElement>('.collab-title')?.focus()
+      setSent(before)
+    }
+  }
+  // Discard / Cancel of a new thread: the composer takes the focus with it, so it goes back to the opener
+  const cancelThread = () => {
+    baseRef.current.cancelThread()
+    focusOpenerRef.current?.()
+  }
+  const ctl = { ...baseCtl, cancelThread, actions: { ...baseCtl.actions, create } }
+
+  useEffect(() => {
+    if (!sent) return
+    const mine = [...baseCtl.threads, ...baseCtl.resolved].find(
+      (th) => !sent.has(th.id) && th.root.author_id === baseCtl.host.myUserId,
+    )
+    const active = document.activeElement
+    const free =
+      !active ||
+      active === document.body ||
+      active === panelRef.current?.querySelector('.collab-title')
+    if (!mine || !free) return
+    const heading = panelRef.current?.querySelector<HTMLElement>(
+      `[data-thread-id="${mine.id.replace(/["\\]/g, '\\$&')}"] [data-thread-heading]`,
+    )
+    if (!heading) return
+    heading.focus()
+    heading.scrollIntoView?.({ block: 'center' })
+    setSent(null)
+  }, [sent, baseCtl])
+  // a thread that never shows up (someone else's Save raced, a failed reload) stops waiting
+  useEffect(() => {
+    if (!sent) return
+    const timer = window.setTimeout(() => setSent(null), 5000)
+    return () => window.clearTimeout(timer)
+  }, [sent])
+
+  // Esc: the kit consumes it in a dirty composer, an edit box, a menu and a dialog; an EMPTY
+  // new-thread composer lets it fall through. It is dropped (with its page frame) and the panel closes.
+  const onKeyDown = (e: ReactKeyboardEvent) => {
+    if (e.key !== 'Escape' || e.defaultPrevented || e.nativeEvent.isComposing) return
+    if (!baseRef.current.newThread || !(e.target as HTMLElement).closest('.collab-thread--new'))
+      return
+    e.stopPropagation()
+    baseRef.current.cancelThread()
+    onClose()
+    focusOpenerRef.current?.()
+  }
+
   return (
-    <div className="pdf-server-comments" id={p.id}>
+    <div className="pdf-server-comments" id={p.id} ref={panelRef} onKeyDown={onKeyDown}>
       <CollabPanel
-        controller={comments.controller}
+        controller={ctl}
         strings={strings}
-        onClose={p.onClose}
+        onClose={onClose}
         {...(p.inFile ? { inFile: p.inFile } : {})}
         renderComposer={(slot) => {
           const suggested = ai && slot.draftKey === ai.draftKey ? ai.text : undefined
@@ -259,6 +364,8 @@ export interface PdfServerCommentsHostProps extends Omit<PdfServerCommentsOption
   apiRef: { current: PdfServerComments | null }
   /** the pending new thread's anchor (null when none): App frames it on the page */
   onPendingAnchor(anchor: PdfAnchor | null): void
+  /** the control that opened the panel / the composer (Note tool, Comments button) takes the focus */
+  onFocusOpener?(): void
   inFile?: { count: number; content: ReactNode }
   panelId?: string
   /** shown under the panel while the open version is unknown ("save the document first") */
@@ -267,7 +374,17 @@ export interface PdfServerCommentsHostProps extends Omit<PdfServerCommentsOption
 
 /** mounted for the whole time a bound document is open; the panel itself draws only while `open` */
 export function PdfServerCommentsHost(p: PdfServerCommentsHostProps) {
-  const { apiRef, onPendingAnchor, open, onClose, inFile, panelId, saveFirstText, ...opts } = p
+  const {
+    apiRef,
+    onPendingAnchor,
+    onFocusOpener,
+    open,
+    onClose,
+    inFile,
+    panelId,
+    saveFirstText,
+    ...opts
+  } = p
   const comments = usePdfServerComments({ ...opts, open })
   apiRef.current = comments
   useEffect(
@@ -283,6 +400,13 @@ export function PdfServerCommentsHost(p: PdfServerCommentsHostProps) {
   useEffect(() => {
     onPendingRef.current(pendingKey ? (JSON.parse(pendingKey) as PdfAnchor) : null)
   }, [pendingKey])
+  // closing the panel drops an empty pending composer (and with it the dashed frame on the page);
+  // a draft with text stays and comes back with the panel
+  const wasOpen = useRef(open)
+  useEffect(() => {
+    if (wasOpen.current && !open) comments.cancelEmptyThread()
+    wasOpen.current = open
+  }, [open, comments])
   if (!open) return null
   return (
     <PdfCommentsPanel
@@ -290,6 +414,7 @@ export function PdfServerCommentsHost(p: PdfServerCommentsHostProps) {
       {...(panelId ? { id: panelId } : {})}
       lang={opts.lang}
       onClose={onClose}
+      {...(onFocusOpener ? { onFocusOpener } : {})}
       {...(inFile ? { inFile } : {})}
       {...(comments.needsSave ? { saveFirst: saveFirstText } : {})}
     />
