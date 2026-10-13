@@ -168,7 +168,7 @@ beforeEach(() => {
 })
 
 describe('every editor preload exposes window.uniworkComments', () => {
-  it('the same ten-method surface per app', async () => {
+  it('the same twelve-method surface per app', async () => {
     for (const app of APPS) {
       bridge.exposed.clear()
       vi.resetModules()

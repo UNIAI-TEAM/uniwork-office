@@ -209,10 +209,6 @@ export function readCommentsPath(payload: unknown): string | null {
   return path
 }
 
-function isLevel(value: unknown): value is CommentsLevel {
-  return value === 'view' || value === 'edit' || value === 'manage'
-}
-
 /**
  * `context`: only the path is read; a document or version id the renderer adds
  * is dropped (main resolves both from the binding)
@@ -229,23 +225,6 @@ export function parseCommentsSaved(payload: unknown): CommentsSavedPayload | nul
   const { versionId } = payload as Record<string, unknown>
   if (!isId(versionId)) return null
   return { path, versionId }
-}
-
-/**
- * A validated context answer, or null when malformed. An unknown level is
- * dropped (it reads as "unknown", never as a grant).
- */
-export function parseCommentsContextResult(value: unknown): CommentsContextResult | null {
-  if (!isRecord(value)) return null
-  const { documentId, versionId, level, myUserId } = value
-  if (!isId(documentId)) return null
-  if (versionId !== null && !isId(versionId)) return null
-  return {
-    documentId,
-    versionId,
-    ...(isLevel(level) ? { level } : {}),
-    ...(isId(myUserId) ? { myUserId } : {}),
-  }
 }
 
 /** `comments.list`: kind is optional, sinceToken a bounded opaque token */
