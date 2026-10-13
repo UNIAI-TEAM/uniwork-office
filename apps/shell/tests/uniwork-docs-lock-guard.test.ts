@@ -175,6 +175,23 @@ const bytesOf = (path: string) => readFileSync(path, 'utf8')
 const bindingText = () => readFileSync(join(docDir(), BINDING_FILE), 'utf8')
 const folderFiles = () => readdirSync(docDir()).sort()
 
+/**
+ * The intent records the durable store actually holds on disk (one `.rec` per
+ * intent). Read from the filesystem, not through the layer: while the keychain
+ * is locked the layer cannot be asked, and "no record was written" is the
+ * assertion.
+ */
+const intentRecords = () =>
+  (() => {
+    try {
+      return readdirSync(join(dir, 'uniwork-sync', 'store', 'default', 'acc_1', 'intents')).filter(
+        (name) => name.endsWith('.rec'),
+      )
+    } catch {
+      return []
+    }
+  })()
+
 /** a schema-1 binding: the store this build writes, bound and editable */
 const schema1 = {
   schema: 1,
@@ -191,13 +208,31 @@ const schema1 = {
   state: 'ready',
 }
 
-/** the four min_app_version shapes of AC-1 plus a schema-3 store */
+/**
+ * The four malformed/missing-level shapes of AC-1, a VALID min_store_level
+ * above this build's APP_STORE_LEVEL (OQ-P4: the level is the gate) and a
+ * schema-3 store. `min_app_version` alone never locks anything.
+ */
 const NEWER: Array<[string, unknown]> = [
   ['schema 2, min_app_version lower', { schema: 2, min_app_version: '0.0.1' }],
   ['schema 2, min_app_version higher', { schema: 2, min_app_version: '99.0.0' }],
   ['schema 2, no min_app_version', { schema: 2 }],
   ['schema 2, malformed min_app_version', { schema: 2, min_app_version: { nested: true } }],
+  ['schema 2, min_store_level above this build', { schema: 2, min_store_level: 3 }],
   ['schema 3', { schema: 3, min_app_version: '0.1.0' }],
+]
+
+/** schema-2 stores inside the level window: they open like any bound copy */
+const OPENING: Array<[string, unknown]> = [
+  [
+    'schema 2, min_store_level 2, min_app_version 0.11.0-beta.9',
+    { ...schema1, schema: 2, min_store_level: 2, min_app_version: '0.11.0-beta.9' },
+  ],
+  [
+    'schema 2, min_store_level 2, min_app_version 0.11.0-dev.3',
+    { ...schema1, schema: 2, min_store_level: 2, min_app_version: '0.11.0-dev.3' },
+  ],
+  ['schema 2, min_store_level 1', { ...schema1, schema: 2, min_store_level: 1 }],
 ]
 
 describe('a newer store is refused before anything opens (AC-1)', () => {
@@ -300,6 +335,25 @@ describe('a newer store is refused before anything opens (AC-1)', () => {
     expect(other.service.refuseLockedPath(docPath())).toBe(false)
     expect(other.service.isBound(docPath())).toBe(false)
     expect(other.locks).toEqual([])
+  })
+})
+
+describe('a schema-2 store level inside the window opens (OQ-P4)', () => {
+  it.each(OPENING)('%s: bound, editable, opens with no lock', async (_name, binding) => {
+    seedFolder(binding)
+    const ctx = setup()
+    // the gate is min_store_level only: a level <= APP_STORE_LEVEL opens, and
+    // the two prerelease tails of the same base decide identically
+    expect(ctx.service.refuseLockedPath(docPath())).toBe(false)
+    expect(ctx.service.isBound(docPath())).toBe(true)
+    expect(ctx.service.isReadOnly(docPath())).toBe(false)
+    expect(ctx.locks).toEqual([])
+    const opened = await ctx.service.openFromServer(DOC)
+    expect(opened.path).toBe(docPath())
+    expect(ctx.deps.openPath).toHaveBeenCalledWith(docPath())
+    expect(ctx.locks).toEqual([])
+    // the ordinary open flow ran: the document was read once
+    expect(calls).toHaveLength(1)
   })
 })
 
@@ -450,7 +504,11 @@ describe('a locked keychain holds a pre-store intent (W3b)', () => {
     seedLegacyIntent()
     const ctx = setup()
     ctx.safeStorage.lock()
-    const before = { binding: bindingText(), copy: bytesOf(docPath()) }
+    const before = {
+      binding: bindingText(),
+      copy: bytesOf(docPath()),
+      payload: readFileSync(join(docDir(), INTENT_PAYLOAD_FILE), 'utf8'),
+    }
     await expect(ctx.service.openFromServer(DOC)).rejects.toMatchObject({
       code: 'engine_incompatible',
     })
@@ -462,10 +520,13 @@ describe('a locked keychain holds a pre-store intent (W3b)', () => {
       name: 'Plan.docx',
     })
     // nothing was written anywhere: the binding, the copy and the payload are
-    // byte-identical, and the store holds no record
+    // byte-identical
     expect(bindingText()).toBe(before.binding)
     expect(bytesOf(docPath())).toBe(before.copy)
+    expect(readFileSync(join(docDir(), INTENT_PAYLOAD_FILE), 'utf8')).toBe(before.payload)
     expect(folderFiles()).toEqual(['Plan.docx', BINDING_FILE, INTENT_PAYLOAD_FILE])
+    // and the durable store holds no intent record at all while it is locked
+    expect(intentRecords()).toEqual([])
   })
 
   it('the sync funnel refuses the path while locked, then opens it once unlocked', async () => {
@@ -489,8 +550,17 @@ describe('a locked keychain holds a pre-store intent (W3b)', () => {
     const intent = await createIntentStore(
       records.store.records(INTENT_STORE_REGISTRATION.name),
     ).get(DOC)
-    expect(intent?.intent).toMatchObject({ documentId: DOC, baseRevision: '41' })
+    expect(intent?.intent).toMatchObject({
+      documentId: DOC,
+      baseRevision: '41',
+      idempotencyKey: LEGACY_INTENT.idempotencyKey,
+    })
     expect(Buffer.from(intent?.payload ?? []).toString()).toBe('working copy bytes')
+    // exactly one record was written, and a second open is a no-op: the sweep
+    // runs once per scope
+    expect(intentRecords()).toHaveLength(1)
+    expect((await ctx.service.openSyncStore()).kind).toBe('ok')
+    expect(intentRecords()).toHaveLength(1)
     expect(ctx.service.refuseLockedPath(docPath())).toBe(false)
     expect(ctx.service.currentLocks().filter((l) => l.reason === 'keystore_locked')).toEqual([])
     const opened = await ctx.service.openFromServer(DOC)
@@ -536,6 +606,8 @@ describe('a locked keychain holds a pre-store intent (W3b)', () => {
     expect(bindingText()).toBe(before.binding)
     expect(bytesOf(docPath())).toBe(before.copy)
     expect(readFileSync(join(docDir(), INTENT_PAYLOAD_FILE), 'utf8')).toBe(before.payload)
+    // the store holds no intent record while it cannot open
+    expect(intentRecords()).toEqual([])
 
     // the keychain unlocks and Retry restores the session: the lock clears and
     // the sweep moves the intent exactly once
@@ -547,5 +619,15 @@ describe('a locked keychain holds a pre-store intent (W3b)', () => {
     expect(migrated).not.toHaveProperty('pendingIntent')
     expect(folderFiles()).toEqual(['Plan.docx', BINDING_FILE])
     expect(ctx.service.currentLocks().filter((l) => l.reason === 'keystore_locked')).toEqual([])
+    // one intent record, same idempotencyKey; a second open changes nothing
+    expect(intentRecords()).toHaveLength(1)
+    const records = await ctx.layer.open({ deploymentId: 'default', accountId: 'acc_1' })
+    if (records.kind !== 'ok') throw new Error(records.kind)
+    const intent = await createIntentStore(
+      records.store.records(INTENT_STORE_REGISTRATION.name),
+    ).get(DOC)
+    expect(intent?.intent.idempotencyKey).toBe(LEGACY_INTENT.idempotencyKey)
+    expect((await ctx.service.openSyncStore()).kind).toBe('ok')
+    expect(intentRecords()).toHaveLength(1)
   })
 })
