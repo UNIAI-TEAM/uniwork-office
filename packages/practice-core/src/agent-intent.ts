@@ -17,12 +17,7 @@ export type AgentIntentScope = 'local' | 'cloud' | 'dual'
  * Actions the desktop Agent Host can apply to a Workbench tab / pillar.
  * Keep this list small and explicit — PWA NL maps here before touching stores.
  */
-export type AgentIntentAction =
-  | 'open'
-  | 'navigate'
-  | 'add_item'
-  | 'summarize'
-  | 'run_skill'
+export type AgentIntentAction = 'open' | 'navigate' | 'add_item' | 'summarize' | 'run_skill'
 
 export type AgentIntentTarget =
   | { kind: 'module'; id: WorkbenchModuleId }
@@ -92,7 +87,10 @@ const PILLARS: readonly PracticePillarId[] = ['knowledge', 'materials', 'skills'
 
 /** Keywords (vi/en, lowercase) → module id for NL routing. */
 const MODULE_KEYWORDS: readonly { id: WorkbenchModuleId; keys: readonly string[] }[] = [
-  { id: 'desk', keys: ['my space', 'không gian', 'myspace', 'desk', 'bàn cá nhân'] },
+  {
+    id: 'desk',
+    keys: ['tổng quan', 'overview', 'my space', 'không gian', 'myspace', 'desk', 'bàn cá nhân'],
+  },
   { id: 'calendar', keys: ['lịch', 'calendar', 'hẹn', 'deadline', 'cuộc họp'] },
   { id: 'tasks', keys: ['công việc', 'tasks', 'todo', 'việc cần', 'to-do', 'task'] },
   { id: 'notes', keys: ['ghi chú', 'notes', 'note', 'nháp'] },
@@ -112,9 +110,7 @@ const SUM_KEYS = ['tóm tắt', 'summarize', 'summary', 'tổng hợp'] as const
 const OPEN_KEYS = ['mở', 'open', 'vào', 'go to', 'chuyển'] as const
 
 export function isAgentIntentAction(value: unknown): value is AgentIntentAction {
-  return (
-    typeof value === 'string' && AGENT_INTENT_ACTIONS.some((a) => a.id === value)
-  )
+  return typeof value === 'string' && AGENT_INTENT_ACTIONS.some((a) => a.id === value)
 }
 
 export function isPracticePillarId(value: unknown): value is PracticePillarId {
@@ -170,7 +166,8 @@ export function createAgentIntent(
     text: partial.text?.slice(0, 2000),
     fields: partial.fields,
     requireConsent:
-      partial.requireConsent ?? (source === 'pwa' || source === 'hub' || partial.action === 'add_item'),
+      partial.requireConsent ??
+      (source === 'pwa' || source === 'hub' || partial.action === 'add_item'),
     createdAt: partial.createdAt ?? new Date().toISOString(),
   }
 }
@@ -221,7 +218,7 @@ export function resolveAgentIntentFromText(
 
   const modLabel =
     target.kind === 'module'
-      ? getWorkbenchModule(target.id)?.labelVi ?? target.id
+      ? (getWorkbenchModule(target.id)?.labelVi ?? target.id)
       : labelForTarget(target, true)
 
   return createAgentIntent({
@@ -265,9 +262,9 @@ export function listAgentRoutableTabs(): {
     kind: 'module' as const,
     labelVi: m.labelVi,
     labelEn: m.labelEn,
-    actions: (
-      ['open', 'navigate'] as AgentIntentAction[]
-    ).concat(moduleSupportsAddItem(m.id) ? (['add_item'] as AgentIntentAction[]) : []),
+    actions: (['open', 'navigate'] as AgentIntentAction[]).concat(
+      moduleSupportsAddItem(m.id) ? (['add_item'] as AgentIntentAction[]) : [],
+    ),
   }))
   const pillars = PILLARS.map((id) => ({
     id,

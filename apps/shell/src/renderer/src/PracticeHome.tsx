@@ -31,6 +31,7 @@ import { WorkbenchTabs } from './WorkbenchTabs'
 import { WorkbenchTopBar, type WorkbenchNewItem } from './WorkbenchTopBar'
 import { pinPillar } from './workbench-pins'
 import { WbDeleteBtn, WbOpenBtn, WbRowActions } from './WbRowActions'
+import { WorkOverview } from './WorkOverview'
 
 interface PracticeHomeProps {
   practice: PracticeDefinition
@@ -109,6 +110,12 @@ export function PracticeHome({
   const refresh = () => {
     onRefresh()
     setRefreshTick((n) => n + 1)
+  }
+
+  const openCompose = () => {
+    pinPillar(practice.id, 'compose')
+    window.dispatchEvent(new Event('uniwork:wb-pins-changed'))
+    setTab('compose')
   }
 
   const [tab, setTab] = useState<string>('desk')
@@ -590,7 +597,16 @@ export function PracticeHome({
       {error && <p className="wb-error">{error}</p>}
       {notice && <p className="wb-hint">{notice}</p>}
 
-      {isWorkbenchModuleId(tab) ? (
+      {tab === 'desk' ? (
+        <WorkOverview
+          workspaces={workspaces}
+          workspaceId={workspaceId}
+          workspaceError={workspaceError}
+          refreshTick={refreshTick}
+          onReload={refresh}
+          onCompose={openCompose}
+        />
+      ) : isWorkbenchModuleId(tab) ? (
         <WorkbenchModulePane
           moduleId={tab}
           practiceId={practice.id}

@@ -50,4 +50,15 @@ describe('agent-intent catalog', () => {
     expect(parseAgentIntentTarget('pets')).toBeNull()
     expect(resolveAgentIntentFromText('Mở tab sức khoẻ giúp tôi')).toBeNull()
   })
+
+  it('opens the Overview tab by its new name', () => {
+    expect(resolveAgentIntentFromText('Mở tab tổng quan')?.target).toEqual({
+      kind: 'module',
+      id: 'desk',
+    })
+    expect(resolveAgentIntentFromText('Open the overview')?.target).toEqual({
+      kind: 'module',
+      id: 'desk',
+    })
+  })
 })

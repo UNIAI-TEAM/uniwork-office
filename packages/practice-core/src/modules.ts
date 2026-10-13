@@ -21,10 +21,10 @@ export interface WorkbenchModuleDef {
 export const WORKBENCH_MODULES: readonly WorkbenchModuleDef[] = [
   {
     id: 'desk',
-    labelVi: 'Không gian của tôi',
-    labelEn: 'My Space',
-    hintVi: 'Tổng hợp việc và lịch — chỉ số, nhắc, biểu đồ',
-    hintEn: 'Tasks and calendar at a glance — KPIs, reminders, charts',
+    labelVi: 'Tổng quan',
+    labelEn: 'Overview',
+    hintVi: 'Việc, lịch họp và thông báo hôm nay',
+    hintEn: 'Today’s work, meetings and notifications',
     available: true,
   },
   {

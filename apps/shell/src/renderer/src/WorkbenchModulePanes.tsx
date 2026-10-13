@@ -3,7 +3,6 @@ import type { ReactElement } from 'react'
 import { getWorkbenchModule, type PracticeId, type WorkbenchModuleId } from '@uniwork/practice-core'
 import type { UniworkWorkError } from '../../shared/uniwork-work-api'
 import { CalendarPane } from './CalendarPane'
-import { DeskPane } from './DeskPane'
 import { NotesPane } from './NotesPane'
 import { TasksPane } from './TasksPane'
 import { WbDeleteBtn, WbDraftBtn, WbEditBtn, WbFileBtn, WbRowActions } from './WbRowActions'
@@ -49,7 +48,7 @@ export function WorkbenchModulePane({
     return <p className="wb-empty">{label('Module không tồn tại.', 'Unknown module.')}</p>
   }
 
-  const hideChrome = moduleId === 'desk' || moduleId === 'notes'
+  const hideChrome = moduleId === 'notes'
 
   return (
     <section
@@ -65,7 +64,6 @@ export function WorkbenchModulePane({
           </p>
         </>
       )}
-      {moduleId === 'desk' && <DeskPane practiceId={practiceId} vi={vi} />}
       {moduleId === 'calendar' && <CalendarPane practiceId={practiceId} vi={vi} />}
       {moduleId === 'tasks' && <TasksPane practiceId={practiceId} vi={vi} />}
       {moduleId === 'notes' && <NotesPane practiceId={practiceId} vi={vi} />}
