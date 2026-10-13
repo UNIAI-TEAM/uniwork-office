@@ -176,7 +176,11 @@ function readV2(r: Record<string, unknown>): IntentRecordV2 | null {
   const receipt = readReceipt(r.receipt)
   if (receipt === null) return null
   if (r.lastError !== undefined && !isStr(r.lastError)) return null
-  if (r.cancelReason !== undefined && r.cancelReason !== 'user' && r.cancelReason !== 'superseded') {
+  if (
+    r.cancelReason !== undefined &&
+    r.cancelReason !== 'user' &&
+    r.cancelReason !== 'superseded'
+  ) {
     return null
   }
   return {
@@ -204,17 +208,31 @@ function readV2(r: Record<string, unknown>): IntentRecordV2 | null {
 }
 
 /**
- * The record on disk as a v2 one, or null when it is malformed. A v2 record is
- * read as it is; a v1 record is upgraded with `facts`.
+ * The record as it is stored: v2 verbatim, v1 verbatim, anything from a newer
+ * queue (or malformed) null. `get` serves this view.
  */
-export function readIntentRecord(raw: unknown, facts: IntentBindFacts): IntentRecordV2 | null {
+export function parseStoredIntent(raw: unknown): IntentRecordV2 | PendingIntentRecord | null {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
   const r = raw as Record<string, unknown>
   if (r.v === 2) return readV2(r)
-  if (r.v === undefined || r.v === 1) {
-    const legacy = parsePendingIntentRecord(raw)
-    return legacy ? upgradePendingIntent(legacy, facts) : null
-  }
+  if (r.v === undefined || r.v === 1) return parsePendingIntentRecord(raw)
   // a record from a newer queue: this build does not read it
   return null
+}
+
+/** whether a stored record is the v2 one */
+export function isIntentRecordV2(
+  value: IntentRecordV2 | PendingIntentRecord,
+): value is IntentRecordV2 {
+  return (value as { v?: unknown }).v === 2
+}
+
+/**
+ * The record as a v2 one, or null when it is malformed. A v2 record is read as
+ * it is; a v1 record is upgraded with `facts`.
+ */
+export function readIntentRecord(raw: unknown, facts: IntentBindFacts): IntentRecordV2 | null {
+  const stored = parseStoredIntent(raw)
+  if (!stored) return null
+  return isIntentRecordV2(stored) ? stored : upgradePendingIntent(stored, facts)
 }
