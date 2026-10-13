@@ -4522,11 +4522,6 @@ button.wb-ov-stat-body:focus-visible {
   color: var(--warning-text);
 }
 
-.wb-pill.is-success {
-  background: var(--success-bg);
-  color: var(--success);
-}
-
 .wb-ov-recent-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -4822,8 +4817,8 @@ button.wb-ov-stat-body:focus-visible {
   box-shadow: var(--wb-shadow);
 }
 
-.wb-packs h2,
-.wb-detail h2 {
+.wb-packs h3,
+.wb-detail h3 {
   display: flex;
   align-items: baseline;
   gap: 6px;

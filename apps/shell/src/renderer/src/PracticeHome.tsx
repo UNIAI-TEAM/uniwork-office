@@ -661,10 +661,10 @@ export function PracticeHome({
           </label>
           <div className="wb-layout">
             <section className="wb-packs">
-              <h2>
+              <h3>
                 {t('wbKnLibrary')}
                 <span className="wb-count wb-num">{packs.length}</span>
-              </h2>
+              </h3>
               {packs.length === 0 ? (
                 <WorkStatePanel
                   tone={MODULE_TONES.knowledge}
@@ -694,7 +694,7 @@ export function PracticeHome({
             <aside className="wb-detail">
               {selected && meta ? (
                 <>
-                  <h2>{meta.title}</h2>
+                  <h3>{meta.title}</h3>
                   <p>{Object.values(meta.facets).filter(Boolean).join(' · ')}</p>
                   <div className="wb-chip-row">
                     <button
