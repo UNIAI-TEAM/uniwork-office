@@ -3,6 +3,7 @@ export type {
   OpenedStore,
   StoreDeleteResult,
   StoreFs,
+  StoreKeyStatus,
   StoreLayer,
   StoreLayerOptions,
   StoreOpenResult,

@@ -59,6 +59,9 @@ export interface OpenedStore {
 export type StoreOpenResult =
   { kind: 'ok'; store: OpenedStore } | { kind: 'keystore_locked' } | { kind: 'keyring_unavailable' }
 
+/** whether a scope's record key can be produced right now */
+export type StoreKeyStatus = 'ok' | 'keystore_locked' | 'keyring_unavailable'
+
 export interface StoreUsage {
   /** encrypted bytes on disk for the whole account */
   bytes: number
@@ -86,6 +89,13 @@ export interface StoreFs {
 export interface StoreLayer {
   register(registration: StoreRegistration): void
   open(scope: StoreScope): Promise<StoreOpenResult>
+  /**
+   * Re-check that the scope's key can still be produced - an OS keychain that
+   * relocked since `open` refuses here - without reading or writing records.
+   * A caller holding an already-opened store asks this before every use, so a
+   * cached handle never outlives the key it was built from.
+   */
+  verifyKey(scope: StoreScope): Promise<StoreKeyStatus>
   /** close every handle of `scope` and wipe everything it kept on disk */
   lockAndWipe(scope: StoreScope): Promise<void>
   usage(scope: StoreScope): Promise<StoreUsage>
@@ -266,6 +276,26 @@ export function createStoreLayer(options: StoreLayerOptions): StoreLayer {
     }
   }
 
+  /**
+   * The record key of one scope, or why it cannot be produced right now. A
+   * keyring that refuses the unwrap is a lock the caller retries later (or a
+   * host with no usable keyring at all); anything else is the provider's bug
+   * and is rethrown.
+   */
+  const fetchKey = async (
+    scope: StoreScope,
+  ): Promise<{ key: Buffer } | { kind: 'keystore_locked' } | { kind: 'keyring_unavailable' }> => {
+    try {
+      return { key: await keys.key(scope) }
+    } catch (error) {
+      if (error instanceof CredentialStoreError) {
+        if (error.code === 'keystore_locked') return { kind: 'keystore_locked' }
+        if (error.code === 'keyring_unavailable') return { kind: 'keyring_unavailable' }
+      }
+      throw error
+    }
+  }
+
   const recordsFor = (
     name: string,
     scope: StoreScope,
@@ -308,14 +338,32 @@ export function createStoreLayer(options: StoreLayerOptions): StoreLayer {
             storePath,
             `.${recordFileName(key)}.${process.pid}.${clock()}.${randomBytes(4).toString('hex')}.tmp`,
           )
-          await fs.writeFile(tmp, encoded, 0o600)
-          await fs.syncFile(tmp)
+          try {
+            await fs.writeFile(tmp, encoded, 0o600)
+            await fs.syncFile(tmp)
+          } catch (error) {
+            // a wipe mid-flush takes the folder with it: that is the wipe's
+            // interruption, not a filesystem failure to report
+            if (!live()) return { kind: 'interrupted' }
+            throw error
+          }
           if (!live()) {
             await fs.rm(tmp)
             return { kind: 'interrupted' }
           }
-          if (!(await publish(live, tmp, dest))) return { kind: 'interrupted' }
+          let published: boolean
+          try {
+            published = await publish(live, tmp, dest)
+          } catch (error) {
+            // the rename can fail because the wiped folder is gone
+            if (!live()) return { kind: 'interrupted' }
+            throw error
+          }
+          if (!published) return { kind: 'interrupted' }
           await syncDir(storePath)
+          // the wipe may have landed since the rename: a record it removed is
+          // never reported as written
+          if (!live()) return { kind: 'interrupted' }
           return { kind: 'ok' }
         })
       },
@@ -326,9 +374,14 @@ export function createStoreLayer(options: StoreLayerOptions): StoreLayer {
         try {
           bytes = await fs.readFile(join(storePath, recordFileName(key)))
         } catch (error) {
+          // a record the wipe removed was not a missing record
+          if (!live()) return { kind: 'interrupted' }
           if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { kind: 'missing' }
           throw error
         }
+        // the wipe may have landed while the read was suspended: never decrypt
+        // (let alone hand back) plaintext of a scope that was locked and wiped
+        if (!live()) return { kind: 'interrupted' }
         const frame = readRecordFrame(bytes)
         const header = frame ? recordHeaderOf(frame.header) : null
         if (!frame || !header) return { kind: 'corrupt' }
@@ -342,7 +395,13 @@ export function createStoreLayer(options: StoreLayerOptions): StoreLayer {
         if (!live()) return { kind: 'interrupted' }
         return enqueue(token, async (): Promise<StoreDeleteResult> => {
           if (!live()) return { kind: 'interrupted' }
-          await fs.rm(join(storePath, recordFileName(key)))
+          try {
+            await fs.rm(join(storePath, recordFileName(key)))
+          } catch (error) {
+            if (!live()) return { kind: 'interrupted' }
+            throw error
+          }
+          if (!live()) return { kind: 'interrupted' }
           return { kind: 'ok' }
         })
       },
@@ -372,16 +431,9 @@ export function createStoreLayer(options: StoreLayerOptions): StoreLayer {
       // captured before the key is fetched: a wipe during open() leaves the
       // handle dead instead of live inside a wiped scope
       const epoch = epochOf(token)
-      let recordKey: Buffer
-      try {
-        recordKey = await keys.key(scope)
-      } catch (error) {
-        if (error instanceof CredentialStoreError) {
-          if (error.code === 'keystore_locked') return { kind: 'keystore_locked' }
-          if (error.code === 'keyring_unavailable') return { kind: 'keyring_unavailable' }
-        }
-        throw error
-      }
+      const fetched = await fetchKey(scope)
+      if ('kind' in fetched) return fetched
+      const recordKey = fetched.key
       await fs.mkdir(scopePath, 0o700)
       await scrubTemps(scopePath)
       const opened: StoreScope = { deploymentId: scope.deploymentId, accountId: scope.accountId }
@@ -392,6 +444,11 @@ export function createStoreLayer(options: StoreLayerOptions): StoreLayer {
           records: (name) => recordsFor(name, opened, token, scopePath, epoch, recordKey),
         },
       }
+    },
+
+    async verifyKey(scope) {
+      const fetched = await fetchKey(scope)
+      return 'kind' in fetched ? fetched.kind : 'ok'
     },
 
     async lockAndWipe(scope) {

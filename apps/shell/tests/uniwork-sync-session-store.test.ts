@@ -133,4 +133,101 @@ describe('createSyncStoreAccess', () => {
       kind: 'missing',
     })
   })
+
+  it('a keychain that relocks after the handle was cached refuses, and revokes it (G504-be-3)', async () => {
+    const { layer, safeStorage } = make()
+    let opens = 0
+    const counting: StoreLayer = {
+      ...layer,
+      open: async (scope) => {
+        opens += 1
+        return layer.open(scope)
+      },
+    }
+    const access = createSyncStoreAccess({
+      layer: counting,
+      scope: () => ({ deploymentId: 'dep_1', accountId: 'acc_1' }),
+    })
+    const first = await access.open()
+    if (first.kind !== 'ok') throw new Error(first.kind)
+    expect(
+      await first.records(INTENT_STORE_REGISTRATION.name).write('k', Buffer.from('before')),
+    ).toEqual({ kind: 'ok' })
+
+    // the OS keychain relocks; nothing calls forget(): the cached handle must
+    // not be served, so every save that asks for the store is refused
+    safeStorage.lock()
+    expect(await access.open()).toEqual({ kind: 'keystore_locked' })
+    // the handle was revoked with the lock: the unlock opens a fresh one
+    safeStorage.unlock()
+    const again = await access.open()
+    expect(again.kind).toBe('ok')
+    expect(opens).toBe(2)
+  })
+
+  it('a pending open is never shared with another scope, and a stale result is discarded (G504-be-6)', async () => {
+    const { layer } = make()
+    let account = 'acc_1'
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    let opens = 0
+    const gated: StoreLayer = {
+      ...layer,
+      open: async (scope) => {
+        opens += 1
+        await gate
+        return layer.open(scope)
+      },
+    }
+    const access = createSyncStoreAccess({
+      layer: gated,
+      scope: () => ({ deploymentId: 'dep_1', accountId: account }),
+    })
+    // A's open is in flight when the account switches to B
+    const a = access.open()
+    account = 'acc_2'
+    const b = access.open()
+    release()
+    const [aResult, bResult] = await Promise.all([a, b])
+    expect(opens).toBe(2)
+    // A's late handle is never handed out: it is A's records handle
+    expect(aResult).toEqual({ kind: 'no_session' })
+    if (bResult.kind !== 'ok') throw new Error(bResult.kind)
+    expect(await bResult.records(INTENT_STORE_REGISTRATION.name).read('k')).toEqual({
+      kind: 'missing',
+    })
+  })
+
+  it('a completion that lands after forget is discarded and not cached (G504-be-6)', async () => {
+    const { layer } = make()
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    let opens = 0
+    const gated: StoreLayer = {
+      ...layer,
+      open: async (scope) => {
+        opens += 1
+        await gate
+        return layer.open(scope)
+      },
+    }
+    const access = createSyncStoreAccess({
+      layer: gated,
+      scope: () => ({ deploymentId: 'dep_1', accountId: 'acc_1' }),
+    })
+    const inflight = access.open()
+    // the boundary wipes the scope while the open is still in flight
+    access.forget()
+    release()
+    expect(await inflight).toEqual({ kind: 'no_session' })
+    // the discarded handle was not written back into the cache: the next call
+    // opens the (empty, post-wipe) scope again
+    const next = await access.open()
+    expect(next.kind).toBe('ok')
+    expect(opens).toBe(2)
+  })
 })

@@ -10,6 +10,7 @@ import {
   writeFileSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
+import { rm, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
@@ -342,5 +343,120 @@ describe('uniwork sync store layer', () => {
     await expect(layer.lockAndWipe({ deploymentId: 'dep_1', accountId: 'a/b' })).rejects.toThrow(
       /invalid store path segment/,
     )
+  })
+
+  it('a wipe between the flush and the publish interrupts the write (G504-be-11)', async () => {
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    let reached!: () => void
+    const held = new Promise<void>((resolve) => {
+      reached = resolve
+    })
+    let holdOnce = true
+    const layer = makeLayer({
+      fs: {
+        // the flush phase: the last real I/O before the record is published
+        syncFile: async () => {
+          if (!holdOnce) return
+          holdOnce = false
+          reached()
+          await gate
+        },
+      },
+    })
+    const records = await openRecords(layer)
+    const marker = Buffer.from('in flight at the flush')
+    const pending = records.write('inflight', marker)
+    await held
+    const wiping = layer.lockAndWipe(SCOPE)
+    release()
+    expect(await pending).toEqual({ kind: 'interrupted' })
+    await wiping
+    expect(listFilesUnder(scopeDir(dir, SCOPE))).toEqual([])
+    expect(filesContaining(dir, marker)).toEqual([])
+    const reopened = await openRecords(layer)
+    expect(await reopened.read('inflight')).toEqual({ kind: 'missing' })
+  })
+
+  it('a wipe that removes the folder mid-write is an interruption, not a throw (G504-be-11)', async () => {
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    let reached!: () => void
+    const held = new Promise<void>((resolve) => {
+      reached = resolve
+    })
+    let removed!: () => void
+    const gone = new Promise<void>((resolve) => {
+      removed = resolve
+    })
+    let holdOnce = true
+    const layer = makeLayer({
+      fs: {
+        rm: async (path) => {
+          await rm(path, { recursive: true, force: true })
+          removed()
+        },
+        writeFile: async (path, data, mode) => {
+          if (holdOnce) {
+            holdOnce = false
+            reached()
+            await gate
+          }
+          // the wipe took the folder: this is the ENOENT a real write gets
+          await writeFile(path, data, { mode })
+        },
+      },
+    })
+    const records = await openRecords(layer)
+    const marker = Buffer.from('written while the folder goes')
+    const pending = records.write('inflight', marker)
+    await held
+    const wiping = layer.lockAndWipe(SCOPE)
+    await gone
+    release()
+    expect(await pending).toEqual({ kind: 'interrupted' })
+    await wiping
+    expect(listFilesUnder(scopeDir(dir, SCOPE))).toEqual([])
+    expect(filesContaining(dir, marker)).toEqual([])
+  })
+
+  it('a wipe while the read is suspended never yields the plaintext (G504-be-11)', async () => {
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    let reached!: () => void
+    const held = new Promise<void>((resolve) => {
+      reached = resolve
+    })
+    let holdOnce = true
+    const layer = makeLayer({
+      fs: {
+        // the bytes are already read off the disk when the wipe lands
+        readFile: async (path) => {
+          const bytes = readFileSync(path)
+          if (holdOnce) {
+            holdOnce = false
+            reached()
+            await gate
+          }
+          return bytes
+        },
+      },
+    })
+    const records = await openRecords(layer)
+    const marker = Buffer.from('read while wiped')
+    expect(await records.write('k', marker)).toEqual({ kind: 'ok' })
+
+    const pending = records.read('k')
+    await held
+    await layer.lockAndWipe(SCOPE)
+    release()
+    expect(await pending).toEqual({ kind: 'interrupted' })
+    expect(filesContaining(dir, marker)).toEqual([])
   })
 })
