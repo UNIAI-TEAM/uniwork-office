@@ -187,6 +187,21 @@ describe('G8-16 S16: the feed makes no org-scoped call before the choice (F-1)',
     expect(fetched.some((path) => path.includes('org_a'))).toBe(false)
   })
 
+  it('a pending choice blocks the pass even with an org already set', async () => {
+    // defensive: the gate is the choice, not the org field, so a status that
+    // still carries an org while the picker is up makes no call either
+    accountStatus = {
+      loggedIn: true,
+      state: 'signed-in',
+      needsOrgChoice: true,
+      org: { id: 'org_a', name: 'Org A', slug: 'org-a', role: 'owner', membership: 'active' },
+      orgs: accountStatus.orgs,
+    }
+    const runtime = await runtimeWith()
+    await runtime.tick()
+    expect(fetched).toEqual([])
+  })
+
   it('no org chosen (every org blocked) still fetches nothing', async () => {
     accountStatus = {
       loggedIn: true,
