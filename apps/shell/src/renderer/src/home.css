@@ -5701,7 +5701,8 @@ html[dir='rtl'] .quick-title-row {
 
 .wb-agenda-head {
   position: sticky;
-  top: 0;
+  /* offsets .content's 28px padding-top so the head hugs the visible top edge */
+  top: -28px;
   z-index: 1;
   display: flex;
   align-items: center;
