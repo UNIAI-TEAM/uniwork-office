@@ -10,7 +10,11 @@
 import { act } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createMockPort } from '../../../docs/bridge/testing/mock-port'
-import type { CommentsListResult, DocumentComment } from '../../../docs/protocol/types'
+import {
+  COMMENTS_REVEAL_WAIT_MS,
+  type CommentsListResult,
+  type DocumentComment,
+} from '../../../docs/protocol/types'
 import { mountFrameDiscussion, type DiscussionPort } from '../discussion/mount'
 import {
   createFrameCommentsApi,
@@ -79,6 +83,7 @@ function framePort(
       (await revealHandler!({ comment_id: id }, { signal: new AbortController().signal })) as {
         revealed: boolean
       },
+    handler: () => revealHandler as NonNullable<typeof revealHandler>,
     hasRevealHandler: () => revealHandler !== undefined,
     calls: (type: string) => mock.calls.filter((c) => c.type === type),
   }
@@ -323,6 +328,78 @@ describe('the frame reveal router (one handler, exactly one panel reacts)', () =
     expect(settled).toBe(1)
     expect(result).toEqual({ revealed: false })
     expect(editor).toHaveBeenCalledTimes(1)
+  })
+
+  describe('an editor is expected (installFrameComments ran) but has not registered yet', () => {
+    async function expecting() {
+      const p = framePort()
+      await mountDiscussion(p)
+      const target: Record<string, unknown> = {}
+      await installFrameComments(p.port, { version: createFrameDocVersion() }, target)
+      return p
+    }
+
+    it('an editor-owned id revealed before addEditor waits for the editor, which answers true; Discussion shows no notice', async () => {
+      const p = await expecting()
+      let result: unknown
+      let settled = false
+      const pending = p.reveal('c1').then((r) => {
+        settled = true
+        result = r
+      })
+      await flush()
+      // not answered `revealed:false` just because the editor has not registered: still waiting
+      expect(settled).toBe(false)
+      const editor = vi.fn(async (payload: { commentId: string }) => payload.commentId === 'c1')
+      disposers.push(createFrameCommentsApi(p.port).onReveal(editor))
+      await act(async () => pending)
+      await flush()
+      expect(result).toEqual({ revealed: true })
+      expect(editor).toHaveBeenCalledTimes(1)
+      expect(discussionPanel()).toBeNull()
+    })
+
+    it('a discussion id is still answered by Discussion at once, without waiting for the editor', async () => {
+      const p = await expecting()
+      let result: unknown
+      await act(async () => {
+        result = await p.reveal('p1')
+      })
+      expect(result).toEqual({ revealed: true })
+    })
+
+    it('no editor within the reveal budget throws the retryable not_ready, never revealed:false', async () => {
+      vi.useFakeTimers()
+      try {
+        const p = await expecting()
+        const pending = p.reveal('c1').then(
+          (r) => ({ ok: true as const, r }),
+          (e: unknown) => ({ ok: false as const, e }),
+        )
+        await vi.advanceTimersByTimeAsync(COMMENTS_REVEAL_WAIT_MS)
+        const out = await pending
+        expect(out.ok).toBe(false)
+        expect(out).toMatchObject({ e: { code: 'not_ready', retryable: true } })
+        expect(discussionPanel()).toBeNull()
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('the cancelled reveal stops waiting', async () => {
+      const p = await expecting()
+      const ctl = new AbortController()
+      const handler = p.handler()
+      const pending = Promise.resolve(handler({ comment_id: 'c1' }, { signal: ctl.signal })).then(
+        (r) => ({ ok: true as const, r }),
+        (e: unknown) => ({ ok: false as const, e }),
+      )
+      await flush()
+      ctl.abort()
+      const out = await pending
+      expect(out.ok).toBe(false)
+      expect(out).toMatchObject({ e: { code: 'cancelled' } })
+    })
   })
 
   it('the router unregisters from the port when its last owner leaves', () => {
