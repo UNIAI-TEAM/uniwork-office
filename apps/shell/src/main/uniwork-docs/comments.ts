@@ -257,9 +257,7 @@ export function createUniworkCommentsClient(
         if (call.json !== undefined) headers['Content-Type'] = 'application/json'
         if (call.idempotencyKey) headers['Idempotency-Key'] = call.idempotencyKey
         const controller = new AbortController()
-        let timedOut = false
         const timer = setTimeout(() => {
-          timedOut = true
           controller.abort()
         }, timeoutMs)
         try {
