@@ -31,6 +31,8 @@ import {
   type DraftRecord,
   type DraftRecovery,
 } from '../../docs/bridge/draft-recovery'
+import { webLanguage } from '../../docs/bridge/browser'
+import { webText } from '../shared/i18n/strings-web'
 import { createFakeIdb } from '../../docs/bridge/testing/fake-idb'
 
 const flush = async () => {
@@ -1086,5 +1088,21 @@ describe('new version on UniWork (doc.remoteVersion)', () => {
     expect(await t.mock.host.save({ reason: 'user' })).toMatchObject({ ok: false })
     expect(t.mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(0)
     expect(t.fake.opened).toHaveLength(1)
+  })
+
+  it('doc.blocked with an organisation reason: the bar only, the sheet usable, Save still reaches the host', async () => {
+    const t = setup({ revision: '10' })
+    const wb = await t.boot()
+    t.desktop.notifyPendingEdits(1)
+    t.mock.sendBlocked({ document_id: t.file.fileId, reason: 'organization_suspended' })
+    expect(barText()).toBe(
+      webText(webLanguage(), 'uwRemoteOrgBlockedWeb', {
+        reason: webText(webLanguage(), 'uwReasonSuspended'),
+      }),
+    )
+    const off = t.desktop.onMenuAction(() => {})
+    await t.desktop.saveWorkbookEdits(saveRequest(wb.sessionId, [[0, 0, 1]]))
+    off()
+    expect(t.mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(1)
   })
 })

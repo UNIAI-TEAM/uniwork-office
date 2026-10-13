@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 // GO-B4 M-1/M-2 (UNI-1014): window.markdownApi over a mocked frame port.
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { webLanguage } from '../../docs/bridge/browser'
+import { webText } from '../shared/i18n/strings-web'
 import { installModuleBridge } from '../../docs/bridge/module-bridge'
 import { createMockPort, type MockPort } from '../../docs/bridge/testing/mock-port'
 import type { Capabilities } from '../../docs/protocol/types'
@@ -832,5 +834,20 @@ describe('markdownApi: new version on UniWork', () => {
       0,
     )
     expect(reload).not.toHaveBeenCalled()
+  })
+
+  it('doc.blocked with an organisation reason: the bar only, the editor usable, Save still reaches the host', async () => {
+    const { api, mock, file } = setup({ revision: '10' })
+    await open(api)
+    api.setDirty(true)
+    mock.sendBlocked({ document_id: file.fileId, reason: 'organization_suspended' })
+    expect(document.querySelector('.uw-remote-bar--error')).not.toBeNull()
+    expect(barText()).toBe(
+      webText(webLanguage(), 'uwRemoteOrgBlockedWeb', {
+        reason: webText(webLanguage(), 'uwReasonSuspended'),
+      }),
+    )
+    expect((await api.save({ text: 'mine', imageSources: [], mode: 'save' })).ok).toBe(true)
+    expect(mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(1)
   })
 })

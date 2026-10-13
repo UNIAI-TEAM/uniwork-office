@@ -17,7 +17,8 @@ import {
   type DraftRecord,
   type DraftRecovery,
 } from '../../docs/bridge/draft-recovery'
-import { setWebLanguage } from '../../docs/bridge/browser'
+import { setWebLanguage, webLanguage } from '../../docs/bridge/browser'
+import { webText } from '../shared/i18n/strings-web'
 import { createFakeIdb } from '../../docs/bridge/testing/fake-idb'
 import type { PdfCore } from './core'
 import { createSignatureStore } from './signatures'
@@ -781,5 +782,21 @@ describe('new version on UniWork (doc.remoteVersion)', () => {
     })
     expect(mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(0)
     expect(reloads).toEqual([])
+  })
+
+  it('doc.blocked with an organisation reason: the bar only, the viewer usable, Save still reaches the host', async () => {
+    const { mock, meta, api } = await bootAt10()
+    api.setDirty(true)
+    mock.sendBlocked({ document_id: meta.fileId, reason: 'organization_suspended' })
+    expect(document.querySelector('.uw-remote-bar--error')).not.toBeNull()
+    expect(barText()).toBe(
+      webText(webLanguage(), 'uwRemoteOrgBlockedWeb', {
+        reason: webText(webLanguage(), 'uwReasonSuspended'),
+      }),
+    )
+    expect(await api.save(req(pathFor(meta), { markups: [{} as never] }))).toEqual({
+      ok: true,
+    })
+    expect(mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(1)
   })
 })

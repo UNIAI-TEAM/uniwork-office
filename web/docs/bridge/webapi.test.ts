@@ -1407,6 +1407,16 @@ describe('new version on UniWork (doc.remoteVersion)', () => {
     expect(mock.calls.filter((c) => c.type === 'api.open')).toEqual([])
   })
 
+  it('doc.blocked with an organisation reason: the bar only, the editor usable, Save still reaches the host', async () => {
+    const doc = await bootRevision('10')
+    guardDirty(true)
+    mock.sendBlocked({ document_id: 'f1', reason: 'organization_suspended' })
+    expect(barText()).toBe(wt('uwRemoteOrgBlockedWeb', { reason: wt('uwReasonSuspended') }))
+    expect(document.getElementById('root')?.hasAttribute('inert') ?? false).toBe(false)
+    expect((await api.saveDocx(doc.path, buf([5]), false)).ok).toBe(true)
+    expect(mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(1)
+  })
+
   it('doc.blocked deleted on a clean frame: the delete bar, a not_found answer to the host', async () => {
     await bootRevision('10')
     guardDirty(false)
