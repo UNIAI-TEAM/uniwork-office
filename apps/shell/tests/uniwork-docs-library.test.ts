@@ -43,6 +43,7 @@ function fakeServer(options: {
   fail?: 'members' | 'role' | 'shared'
 }) {
   const calls: Call[] = []
+  const state = { members: options.members ?? [] }
   const fetch = vi.fn(async (url: string, _init: RequestInit): Promise<Response> => {
     const u = new URL(url)
     calls.push({ path: u.pathname, query: u.search })
@@ -73,7 +74,7 @@ function fakeServer(options: {
     }
     if (p === '/api/v1/orgs/acme/members') {
       if (options.fail === 'members') return json(500, { error: { code: 'server_error' } })
-      return json(200, { members: options.members ?? [] })
+      return json(200, { members: state.members })
     }
     const docMatch = /^\/api\/v1\/documents\/([A-Za-z0-9_-]+)$/.exec(p)
     if (docMatch) {
@@ -82,10 +83,23 @@ function fakeServer(options: {
     }
     return json(404, { error: { code: 'not_found' } })
   })
-  return { fetch: fetch as unknown as FetchLike, calls }
+  return {
+    fetch: fetch as unknown as FetchLike,
+    calls,
+    get members() {
+      return state.members
+    },
+    set members(next: Array<{ user_id: string; display_name: string }>) {
+      state.members = next
+    },
+  }
 }
 
-function serviceWith(server: ReturnType<typeof fakeServer>, org: { id: string; slug: string } | null = { id: 'org_a', slug: 'acme' }) {
+function serviceWith(
+  server: ReturnType<typeof fakeServer>,
+  org: { id: string; slug: string } | null = { id: 'org_a', slug: 'acme' },
+  fetchOverride?: FetchLike,
+) {
   const dir = mkdtempSync(join(tmpdir(), 'uw-docs-library-'))
   const ui: ConflictUi = {
     chooseConflict: vi.fn(async () => 'later'),
@@ -104,7 +118,7 @@ function serviceWith(server: ReturnType<typeof fakeServer>, org: { id: string; s
     keystoreLocked: () => false,
     selectedOrg: () => org,
     authorized: <T>(call: (token: string) => Promise<T>) => call(TOKEN),
-    fetch: server.fetch,
+    fetch: fetchOverride ?? server.fetch,
     openPath: () => true,
     isPathOpen: () => false,
     requestModuleSave: () => false,
@@ -122,16 +136,35 @@ const membersCalls = (server: ReturnType<typeof fakeServer>): number =>
   server.calls.filter((c) => c.path === '/api/v1/orgs/acme/members').length
 
 /**
- * A service whose members list answers `status`; every other route works, so
- * the properties panel still returns ok:true with null names.
+ * A service whose members list answers `answer` (a status/code, or a thrown
+ * network error); every other route works, so the properties panel still
+ * returns ok:true with null names. `setAnswer` changes it between calls.
  */
-function serviceWithFailingMembers(status: number, code: string) {
-  const server = fakeServer({ document: { id: 'd1', workspace_id: 'ws_1', title: 'P.docx', kind: 'file', revision: '1', current_version: 3, my_level: 'edit' } })
+function serviceWithFailingMembers(answer: { status: number; code: string } | 'network') {
+  const server = fakeServer({
+    document: {
+      id: 'd1',
+      workspace_id: 'ws_1',
+      title: 'P.docx',
+      kind: 'file',
+      revision: '1',
+      current_version: 3,
+      my_level: 'edit',
+      owner_kind: 'human',
+      owner_id: 'u_owner',
+      created_by: 'u_creator',
+      updated_by: 'u_updater',
+    },
+  })
+  let current = answer
   const inner = server.fetch
   const fetch = (async (url: string, init: RequestInit) => {
     if (new URL(url).pathname === '/api/v1/orgs/acme/members') {
+      // a 200 delegates to the real route, which records the call itself
+      if (current.status === 200 && current !== 'network') return inner(url, init)
       server.calls.push({ path: '/api/v1/orgs/acme/members', query: '' })
-      return json(status, { error: { code } })
+      if (current === 'network') throw new TypeError('fetch failed')
+      return json(current.status, { error: { code: current.code } })
     }
     return inner(url, init)
   }) as typeof inner
@@ -163,7 +196,13 @@ function serviceWithFailingMembers(status: number, code: string) {
     pushLaunch: () => undefined,
     reveal: () => undefined,
   })
-  return { service, server }
+  return {
+    service,
+    server,
+    setAnswer: (next: { status: number; code: string } | 'network') => {
+      current = next
+    },
+  }
 }
 
 const docRow = (id: string, ws: string, title: string, updatedAt: string) => ({
@@ -360,9 +399,9 @@ describe('document properties (S17)', () => {
     expect(result.ok && result.value.versionByName).toBeNull()
   })
 
-  it('a transient members failure caches "unavailable": null names, one call per org', async () => {
-    const { service, server } = serviceWithFailingMembers(500, 'server_error')
-    const first = await service.documentProperties('d1')
+  it('a 5xx members answer is null names, never cached, and the next open retries', async () => {
+    const ctx = serviceWithFailingMembers({ status: 500, code: 'server_error' })
+    const first = await ctx.service.documentProperties('d1')
     expect(first.ok).toBe(true)
     if (!first.ok) return
     expect(first.value.ownerName).toBeNull()
@@ -371,33 +410,78 @@ describe('document properties (S17)', () => {
     // the server-sent facts still ride through, no error result
     expect(first.value.myLevel).toBe('edit')
     expect(first.value.version).toBe(3)
+    expect(membersCalls(ctx.server)).toBe(1)
 
-    // the failed answer is cached: a second document does not re-read members
-    await service.documentProperties('d2')
-    expect(membersCalls(server)).toBe(1)
+    // a 5xx is not cached: the next panel open calls again
+    ctx.setAnswer({ status: 200, code: '' })
+    // the fake's members route only answers errors; point it at a real list
+    ctx.server.members = [{ user_id: 'u_creator', display_name: 'Creator Name' }]
+    const second = await ctx.service.documentProperties('d1')
+    expect(membersCalls(ctx.server)).toBe(2)
+    expect(second.ok && second.value.createdByName).toBe('Creator Name')
   })
 
-  it('a 403 from the members list is null names, never an error result', async () => {
-    const { service, server } = serviceWithFailingMembers(403, 'forbidden')
+  it('a network error is null names, never cached, and the next open retries', async () => {
+    const ctx = serviceWithFailingMembers('network')
+    const first = await ctx.service.documentProperties('d1')
+    expect(first.ok && first.value.updatedByName).toBeNull()
+    expect(membersCalls(ctx.server)).toBe(1)
+    ctx.setAnswer({ status: 200, code: '' })
+    ctx.server.members = [{ user_id: 'u_updater', display_name: 'Updater Name' }]
+    const second = await ctx.service.documentProperties('d1')
+    expect(membersCalls(ctx.server)).toBe(2)
+    expect(second.ok && second.value.updatedByName).toBe('Updater Name')
+  })
+
+  it('a 403 from the members list is null names, never an error result, and IS cached', async () => {
+    const { service, server } = serviceWithFailingMembers({ status: 403, code: 'forbidden' })
     const result = await service.documentProperties('d1')
     expect(result.ok).toBe(true)
     if (!result.ok) return
     expect(result.value.ownerName).toBeNull()
     expect(result.value.createdByName).toBeNull()
     expect(result.value.updatedByName).toBeNull()
-    // 403 is cached as "names unavailable for this org"
+    // a 403 is a stable answer: cached as "names unavailable for this org"
     await service.documentProperties('d2')
     expect(membersCalls(server)).toBe(1)
   })
 
-  it('a 404 from the members list is null names, never an error result', async () => {
-    const { service, server } = serviceWithFailingMembers(404, 'not_found')
+  it('a 404 from the members list is null names, never an error result, and IS cached', async () => {
+    const { service, server } = serviceWithFailingMembers({ status: 404, code: 'not_found' })
     const result = await service.documentProperties('d1')
     expect(result.ok).toBe(true)
     if (!result.ok) return
     expect(result.value.createdByName).toBeNull()
     await service.documentProperties('d2')
     expect(membersCalls(server)).toBe(1)
+  })
+
+  it('two concurrent panel opens share one members request', async () => {
+    const server = fakeServer({
+      document: { ...document, owner_kind: 'human' },
+      members: [{ user_id: 'u_creator', display_name: 'Creator Name' }],
+    })
+    // hold the members answer so both panels are in flight together
+    const inner = server.fetch
+    let release: () => void = () => undefined
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    let seen = 0
+    const fetch = (async (url: string, init: RequestInit) => {
+      if (new URL(url).pathname === '/api/v1/orgs/acme/members') {
+        seen += 1
+        await gate
+      }
+      return inner(url, init)
+    }) as typeof inner
+    const { service } = serviceWith(server, { id: 'org_a', slug: 'acme' }, fetch)
+    const pending = [service.documentProperties('d1'), service.documentProperties('d2')]
+    // let both panels reach the members read before the answer is released
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    release()
+    const [a, b] = await Promise.all(pending)
+    expect(seen).toBe(1)
+    expect(a.ok && a.value.createdByName).toBe('Creator Name')
+    expect(b.ok && b.value.createdByName).toBe('Creator Name')
   })
 
   it('the members list is fetched once per org, not once per document', async () => {

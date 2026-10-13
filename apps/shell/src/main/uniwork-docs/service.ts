@@ -269,6 +269,9 @@ export class UniworkDocsService {
   private orgMemberNames = new Map<string, string>()
   /** the org whose member names the map holds (null = nothing cached) */
   private orgMemberNamesOrg: string | null = null
+  /** the one in-flight members read per org, shared by concurrent panel opens */
+  private orgMemberNamesInFlight: { orgId: string; promise: Promise<Map<string, string>> } | null =
+    null
   /** per path, the saveMark of its last user Save */
   private readonly lastUserSave = new Map<string, number>()
   private saveCounter = 0
@@ -644,6 +647,9 @@ export class UniworkDocsService {
       this.orgMemberNames = new Map()
       this.orgMemberNamesOrg = null
     }
+    if (this.orgMemberNamesInFlight && this.orgMemberNamesInFlight.orgId !== orgId) {
+      this.orgMemberNamesInFlight = null
+    }
   }
 
   /** the binding belongs to the signed-in account and the active deployment */
@@ -972,29 +978,48 @@ export class UniworkDocsService {
   }
 
   /**
-   * The org's member names (id -> display name), fetched ONCE per org and
-   * cached; every document's properties panel reads this map, never the
-   * network. A 403/404 (a plain member the org will not list) or a transient
-   * failure caches an empty map — "names unavailable for this org" — so the
-   * panel shows "—" without an error and without one request per document.
-   * The cache is dropped on an org change / sign-out (`noteSelectedOrg`) and
-   * on the next library reload (`noteLibraryReload`), which is where a failed
-   * read is retried.
+   * The org's member names (id -> display name). Only a success or a 403/404
+   * (the org will not list members to a plain member) is cached, so the panel
+   * never issues one request per document; a network error or 5xx is NOT
+   * cached — the call returns an empty map ("—", no error banner) and the next
+   * panel open retries. At most one read per org is in flight: concurrent
+   * panel opens share the same promise. The cache is dropped on an org change
+   * / sign-out (`noteSelectedOrg`) and at the next library reload
+   * (`noteLibraryReload`).
    */
-  private async memberNames(): Promise<Map<string, string>> {
+  private memberNames(): Promise<Map<string, string>> {
     const org = this.deps.selectedOrg()
-    if (!org) return new Map()
-    if (this.orgMemberNamesOrg === org.id) return this.orgMemberNames
-    let names = new Map<string, string>()
+    if (!org) return Promise.resolve(new Map())
+    if (this.orgMemberNamesOrg === org.id) return Promise.resolve(this.orgMemberNames)
+    if (this.orgMemberNamesInFlight?.orgId === org.id) return this.orgMemberNamesInFlight.promise
+    const promise = this.loadMemberNames(org)
+    this.orgMemberNamesInFlight = { orgId: org.id, promise }
+    return promise
+  }
+
+  private async loadMemberNames(org: { id: string; slug: string }): Promise<Map<string, string>> {
     try {
       const members = await this.api().listOrgMembers(org.slug)
-      names = new Map(members.map((m) => [m.userId, m.displayName]))
-    } catch {
-      // cached as "unavailable": not retried per document
+      const names = new Map(members.map((m) => [m.userId, m.displayName]))
+      this.orgMemberNames = names
+      this.orgMemberNamesOrg = org.id
+      return names
+    } catch (error) {
+      // a 403/404 is a stable answer ("names unavailable for this org"); a
+      // transient failure is not cached and is retried on the next open
+      const stable =
+        error instanceof UniworkDocError &&
+        (error.code === 'forbidden' || error.code === 'not_found')
+      if (stable) {
+        const empty = new Map<string, string>()
+        this.orgMemberNames = empty
+        this.orgMemberNamesOrg = org.id
+        return empty
+      }
+      return new Map()
+    } finally {
+      if (this.orgMemberNamesInFlight?.orgId === org.id) this.orgMemberNamesInFlight = null
     }
-    this.orgMemberNames = names
-    this.orgMemberNamesOrg = org.id
-    return names
   }
 
   /**
@@ -1003,6 +1028,8 @@ export class UniworkDocsService {
    * earlier is retried at this point, not on every properties panel.
    */
   noteLibraryReload(): void {
+    // a read still in flight settles its own cache entry; only the settled
+    // map is dropped here, so the one-in-flight rule is not broken
     this.orgMemberNames = new Map()
     this.orgMemberNamesOrg = null
   }
