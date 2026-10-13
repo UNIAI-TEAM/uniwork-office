@@ -770,20 +770,14 @@ describe('save pipeline', () => {
     expect(readFileSync(path, 'utf8')).toBe('v4')
     server.state.myLevel = 'edit'
     await openDoc(ctx)
-    // W4b: service.ts's reopen-unblock branch still keys on the old 'forbidden'
-    // code, so a re-granted edit level does not clear a permission_revoked copy
-    // yet. The contract's code is asserted here; the unblock lands in W4b.
-    expect(binding(path)).toMatchObject({
-      access: 'edit',
-      state: 'blocked',
-      error: 'permission_revoked',
-    })
+    // W4b: the reopen-unblock branch now clears the contract's permission_revoked
+    // copy when the server grants edit again, so the local work can be saved
+    expect(binding(path)).toMatchObject({ access: 'edit', state: 'dirty' })
+    expect(binding(path).error).toBeUndefined()
     const refused = server.calls.length
-    expect(await ctx.service.save(path)).toMatchObject({
-      state: 'blocked',
-      error: 'permission_revoked',
-    })
-    expect(server.calls.length).toBe(refused)
+    expect(await ctx.service.save(path)).toMatchObject({ state: 'saved' })
+    expect(server.calls.length).toBeGreaterThan(refused)
+    expect(binding(path)).toMatchObject({ baseRevision: '42' })
   })
 
   it('a view-only document never reaches the network', async () => {
@@ -928,17 +922,14 @@ describe('review r1 save fixes', () => {
       state: 'blocked',
       error: 'document_deleted',
     })
-    // restored from the trash: the reopen answers again. W4b: service.ts's
-    // reopen branch still keys on the old 'deleted'/'not_found' codes, so the
-    // restored copy is not unblocked yet; the contract's code is asserted here
-    // and the unblock lands in W4b.
+    // restored from the trash: the reopen answers again. W4b: the reopen-unblock
+    // branch now clears the contract's document_deleted copy when the document
+    // answers, so the local work can be saved once more
     await openDoc(ctx)
-    expect(binding(path)).toMatchObject({ state: 'blocked', error: 'document_deleted' })
+    expect(binding(path)).toMatchObject({ state: 'dirty' })
+    expect(binding(path).error).toBeUndefined()
     expect(readFileSync(path, 'utf8')).toBe('v4')
-    expect(await ctx.service.save(path)).toMatchObject({
-      state: 'blocked',
-      error: 'document_deleted',
-    })
+    expect(await ctx.service.save(path)).toMatchObject({ state: 'saved' })
   })
 
   it('an expired staged upload drops the intent, stays dirty, and the next save mints a new key on the same base (A1.2)', async () => {
