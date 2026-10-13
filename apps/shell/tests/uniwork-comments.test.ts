@@ -194,6 +194,63 @@ describe('the §9 error table, through the fake server', () => {
     expect(await shapeOf(api.list(binding, {}))).toMatchObject({ code: 'network', retryable: true })
   })
 
+  it('a deadline abort during the body read reads network, retryable (D2-4)', async () => {
+    const fetch = async (_url: string, init: RequestInit): Promise<Response> =>
+      ({
+        status: 200,
+        ok: true,
+        redirected: false,
+        json: () =>
+          new Promise((_resolve, reject) => {
+            const signal = init.signal
+            const abort = () => {
+              const error = new Error('aborted')
+              error.name = 'AbortError'
+              reject(error)
+            }
+            if (signal?.aborted) abort()
+            else signal?.addEventListener('abort', abort)
+          }),
+      }) as unknown as Response
+    const api = createUniworkCommentsClient({
+      apiOrigin: ORIGIN,
+      authorized: <T>(call: (t: string) => Promise<T>) => call('tok'),
+      isSignedIn: () => true,
+      timeoutMs: 20,
+      fetch,
+    })
+    // the 30 s deadline aborts while the 200 body is still being read: the
+    // server never delivered it, so the editor must get §9's network + retry
+    expect(await shapeOf(api.list(binding, {}))).toMatchObject({
+      name: 'DocsProtocolError',
+      code: 'network',
+      retryable: true,
+    })
+  })
+
+  it('a bad JSON body stays malformed, not retryable', async () => {
+    const fetch = async (): Promise<Response> =>
+      ({
+        status: 200,
+        ok: true,
+        redirected: false,
+        json: async () => {
+          throw new SyntaxError('Unexpected token < in JSON at position 0')
+        },
+      }) as unknown as Response
+    const api = createUniworkCommentsClient({
+      apiOrigin: ORIGIN,
+      authorized: <T>(call: (t: string) => Promise<T>) => call('tok'),
+      isSignedIn: () => true,
+      fetch,
+    })
+    expect(await shapeOf(api.list(binding, {}))).toMatchObject({
+      name: 'DocsProtocolError',
+      code: 'malformed',
+      retryable: false,
+    })
+  })
+
   it('a signed-out session reads unauthorized, no request made', async () => {
     const server = createFakeCommentServer()
     const api = createUniworkCommentsClient({
