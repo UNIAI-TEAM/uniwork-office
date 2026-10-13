@@ -64,8 +64,7 @@ function discussionPort(
   mock.override('comments.list', () => first)
   const changed: Array<(p: { document_id: string }) => void> = []
   let revealHandler:
-    | ((p: { comment_id: string }, ctx: { signal: AbortSignal }) => unknown)
-    | undefined
+    ((p: { comment_id: string }, ctx: { signal: AbortSignal }) => unknown) | undefined
   const port: DiscussionPort = {
     ...mock.port,
     onCommentsChanged: (l) => (changed.push(l), () => {}),
@@ -76,10 +75,9 @@ function discussionPort(
     port,
     sendChanged: () => changed.forEach((l) => l({ document_id: 'doc-1' })),
     reveal: async (id: string) =>
-      (await revealHandler!(
-        { comment_id: id },
-        { signal: new AbortController().signal },
-      )) as { revealed: boolean },
+      (await revealHandler!({ comment_id: id }, { signal: new AbortController().signal })) as {
+        revealed: boolean
+      },
     hasRevealHandler: () => revealHandler !== undefined,
     lists: () => mock.calls.filter((c) => c.type === 'comments.list'),
   }
@@ -191,7 +189,10 @@ describe('frame claim per module (D4)', () => {
     } as never)
     const client = createDocsFrameClient({
       allowedOrigins: [ORIGIN],
-      capabilities: moduleFrameCapabilities({ module: 'markdown', frameCapabilities: { save: true } }),
+      capabilities: moduleFrameCapabilities({
+        module: 'markdown',
+        frameCapabilities: { save: true },
+      }),
       module: 'markdown',
       parent: hostWin,
       self: frameWin,
@@ -204,7 +205,10 @@ describe('frame claim per module (D4)', () => {
       const readies = frameWin.sent.filter((m) => (m as { type?: string }).type === 'ready')
       expect(readies.length).toBeGreaterThan(0)
       for (const r of readies) {
-        expect((r as { payload: { capabilities: { comments?: boolean } } }).payload.capabilities.comments).toBe(true)
+        expect(
+          (r as { payload: { capabilities: { comments?: boolean } } }).payload.capabilities
+            .comments,
+        ).toBe(true)
       }
       // the host re-keys the same document (a new ready instance): the effective claim never drops
       hostWin.deliver(
@@ -216,7 +220,10 @@ describe('frame claim per module (D4)', () => {
           type: 'ready',
           payload: {
             protocolVersion: PROTOCOL_VERSION,
-            capabilities: moduleFrameCapabilities({ module: 'markdown', frameCapabilities: { save: true } }),
+            capabilities: moduleFrameCapabilities({
+              module: 'markdown',
+              frameCapabilities: { save: true },
+            }),
             instanceId: 'rekey',
             module: 'markdown',
           },
@@ -340,7 +347,7 @@ describe('mountFrameDiscussion', () => {
     expect(btn.getAttribute('aria-expanded')).toBe('true')
     const aside = panel()!
     expect(aside).not.toBeNull()
-    expect(btn.getAttribute('aria-controls')).toBe(aside.closest('[id]')!.id)
+    expect(document.getElementById(btn.getAttribute('aria-controls')!)!.contains(aside)).toBe(true)
     expect(aside.textContent).toContain('body p1')
     expect(document.documentElement.classList.contains('uw-disc-open')).toBe(true)
 

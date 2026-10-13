@@ -12,6 +12,8 @@ import { MARKDOWN_WEB_CAPABILITIES, createMarkdownWebApi } from './webapi'
 
 export const bridge = installModuleBridge({
   module: 'markdown',
+  // the frame Discussion panel + `comments` claim (S13; this format has no anchored comments)
+  frameComments: true,
   // what the bundle supports (effective = frame ∩ host grant); exportPdf = print dialog
   frameCapabilities: { save: true, saveAs: true, print: true, exportPdf: true, images: true },
   capabilities: {
