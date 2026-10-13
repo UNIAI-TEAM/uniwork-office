@@ -35,6 +35,8 @@ export function loadDocProperties(
 }
 
 // ── Create, rename, archive (S18) ───────────────────────
+// Contract G8-17 §1-§3: the shapes below mirror home-api's UniworkDocAction*
+// types structurally until the main side merges; then they can be imported.
 
 /** an action's failure: a contract error code, or a name the server refused */
 export type DocActionError = UniworkDocErrorCode | DocNameError
