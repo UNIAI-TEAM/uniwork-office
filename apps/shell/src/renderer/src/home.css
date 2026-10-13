@@ -4012,7 +4012,7 @@ body.vib .home {
   align-items: center;
   justify-content: center;
   width: 10px;
-  color: var(--text-tertiary);
+  color: var(--text-secondary);
   font-size: 11px;
   letter-spacing: -2px;
   line-height: 1;
@@ -4111,7 +4111,7 @@ body.vib .home {
   font-weight: 600;
   letter-spacing: 0.02em;
   text-transform: uppercase;
-  color: var(--text-tertiary);
+  color: var(--text-secondary);
 }
 
 .wb-tab-menu-section:first-of-type {
@@ -4214,6 +4214,12 @@ body.vib .home {
   transform: scale(0.94);
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .wb-icon-btn:active:not(:disabled) {
+    transform: none;
+  }
+}
+
 .wb-icon-btn:disabled {
   opacity: 0.35;
   cursor: not-allowed;
@@ -4221,7 +4227,7 @@ body.vib .home {
 
 .wb-icon-btn.is-danger:hover:not(:disabled) {
   background: var(--danger-bg);
-  color: var(--danger);
+  color: var(--danger-text);
 }
 
 .wb-icon-btn.is-accent:hover:not(:disabled) {
@@ -4350,7 +4356,7 @@ button.wb-ov-stat-body:focus-visible {
 }
 
 .wb-ov-stat-value.is-danger {
-  color: var(--danger);
+  color: var(--danger-text);
 }
 
 .wb-ov-stat-value.is-warning {
@@ -4358,7 +4364,7 @@ button.wb-ov-stat-body:focus-visible {
 }
 
 .wb-ov-stat-value.is-muted {
-  color: var(--text-tertiary);
+  color: var(--text-secondary);
 }
 
 .wb-ov-stat-label {
@@ -4846,7 +4852,7 @@ button.wb-ov-stat-body:focus-visible {
 }
 
 .wb-error {
-  color: var(--danger);
+  color: var(--danger-text);
   margin: 0 0 10px;
   font-size: 13px;
 }
