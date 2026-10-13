@@ -1,8 +1,13 @@
+import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AccountLoginEvent, AccountStatus } from '../src/shared/home-api'
 import {
   CredentialStoreError,
+  createCredentialStore,
   type CredentialStore,
+  type SafeStorageLike,
   type StoredCredential,
 } from '../src/main/uniwork-auth/credentials'
 import type { DeploymentProfile } from '../src/main/uniwork-auth/deployment'
@@ -14,7 +19,7 @@ import {
   type UniworkTransport,
 } from '../src/main/uniwork-auth/transport'
 import { createAuthCallbackRouter } from '../src/main/uniwork-auth/routing'
-import { createMemoryCredentialStore } from './uniwork-auth-fakes'
+import { createLockableCredentialStore, createMemoryCredentialStore } from './uniwork-auth-fakes'
 
 const profile: DeploymentProfile = {
   deploymentId: 'default',
@@ -93,6 +98,36 @@ const stored = (overrides: Partial<StoredCredential> = {}): StoredCredential => 
   profile: { accountId: 'acc_1', email: 'cached@example.com', displayName: 'Cached' },
   ...overrides,
 })
+
+/**
+ * A real-store keychain stand-in whose lock() makes the wrap refuse (as a
+ * locked OS keychain does at save time) while reads keep working, so a test
+ * can lock it between the credential load and the rotated save.
+ */
+function lockableKeychain() {
+  let locked = false
+  const safeStorage: SafeStorageLike = {
+    isEncryptionAvailable: () => true,
+    encryptString: (text) => {
+      if (locked) throw new Error('keychain access denied')
+      return Buffer.from(`enc:${text}`)
+    },
+    decryptString: (buf) => {
+      const raw = buf.toString()
+      if (!raw.startsWith('enc:')) throw new Error('bad ciphertext')
+      return raw.slice(4)
+    },
+  }
+  return {
+    safeStorage,
+    lock: () => {
+      locked = true
+    },
+    unlock: () => {
+      locked = false
+    },
+  }
+}
 
 function setup(
   options: {
@@ -302,6 +337,17 @@ describe('sign-in', () => {
     expect(await ctx.manager.getAccessToken()).toBeNull()
   })
 
+  it('a no-keyring host still reports keyring-unavailable, not keystore-locked', async () => {
+    const credentials = createMemoryCredentialStore()
+    credentials.load = () => {
+      throw new CredentialStoreError('keyring_unavailable')
+    }
+    const ctx = setup({ credentials })
+    const status = await ctx.manager.restore()
+    expect(status.state).toBe('keyring-unavailable')
+    expect(status.error).toBe('keyring_unavailable')
+  })
+
   it('keyring-unavailable: a fresh sign-in replaces the unreadable credential', async () => {
     const credentials = createMemoryCredentialStore()
     const load = credentials.load
@@ -353,6 +399,119 @@ describe('sign-in', () => {
     expect((await ctx.manager.restore()).state).toBe('not-configured')
     expect(await ctx.manager.login()).toBe(false)
     expect(ctx.events.at(-1)).toEqual({ phase: 'error', error: 'not_configured' })
+  })
+})
+
+describe('keystore locked', () => {
+  it('restore while the keystore is locked shows keystore-locked, not keyring-unavailable', async () => {
+    const locked = createLockableCredentialStore(stored())
+    const ctx = setup({ credentials: locked.store })
+    expect((await ctx.manager.restore()).state).toBe('keystore-locked')
+    // a locked keystore never opens a network session
+    expect(ctx.transport.refresh).not.toHaveBeenCalled()
+    expect(ctx.manager.status().loggedIn).toBe(false)
+    expect(await ctx.manager.getAccessToken()).toBeNull()
+  })
+
+  it('keystore-locked preserves the saved credential (nothing cleared, no network session)', async () => {
+    const locked = createLockableCredentialStore(stored())
+    const ctx = setup({ credentials: locked.store })
+    const status = await ctx.manager.restore()
+    expect(status.state).toBe('keystore-locked')
+    expect(status.error).toBe('keystore_locked')
+    expect(status.loggedIn).toBe(false)
+    // the encrypted credential is left in place: unlocking brings the profile back
+    expect(locked.saved()?.profile?.email).toBe('cached@example.com')
+  })
+
+  it('unlock then restore signs in', async () => {
+    const locked = createLockableCredentialStore(stored())
+    const ctx = setup({ credentials: locked.store })
+    expect((await ctx.manager.restore()).state).toBe('keystore-locked')
+    locked.unlock()
+    expect((await ctx.manager.restore()).state).toBe('signed-in')
+  })
+
+  it('a sign-in while the keystore is locked never overwrites the stored credential', async () => {
+    const locked = createLockableCredentialStore(stored({ refreshToken: 'rt_keep' }))
+    const ctx = setup({ credentials: locked.store })
+    await signIn(ctx)
+    expect(ctx.manager.status().state).toBe('keystore-locked')
+    expect(ctx.events.at(-1)).toEqual({ phase: 'error', error: 'keystore_locked' })
+    // the persist was refused, so the saved credential is untouched
+    expect(locked.saved()?.refreshToken).toBe('rt_keep')
+  })
+
+  it('a sign-in while the keystore is locked opens no browser when nothing can be stored', async () => {
+    const locked = createLockableCredentialStore(stored())
+    locked.store.canStore = () => false
+    const ctx = setup({ credentials: locked.store })
+    await ctx.manager.restore()
+    expect(await ctx.manager.login()).toBe(false)
+    expect(ctx.transport.start).not.toHaveBeenCalled()
+    expect(ctx.openBrowser).not.toHaveBeenCalled()
+    expect(ctx.events.at(-1)).toEqual({ phase: 'error', error: 'keystore_locked' })
+    expect(ctx.manager.status().state).toBe('keystore-locked')
+  })
+
+  it('retry from keystore-locked re-reads the store and signs in once unlocked', async () => {
+    const locked = createLockableCredentialStore(stored())
+    const ctx = setup({ credentials: locked.store })
+    expect((await ctx.manager.restore()).state).toBe('keystore-locked')
+    locked.unlock()
+    expect((await ctx.manager.retry()).state).toBe('signed-in')
+  })
+
+  it('a keychain that locks between load and save is keystore_locked, never io (real store)', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'uw-auth-lock-'))
+    const keychain = lockableKeychain()
+    const store = createCredentialStore({ userDataDir: dir, safeStorage: keychain.safeStorage })
+    try {
+      store.save(stored({ refreshToken: 'rt_keep' }))
+      const before = readFileSync(join(dir, 'uniwork-auth', 'session.bin'))
+      // the credential loads; the keychain then locks before the rotated one is wrapped
+      keychain.lock()
+      const ctx = setup({ credentials: store })
+      const status = await ctx.manager.restore()
+      expect(status).toMatchObject({
+        state: 'keystore-locked',
+        error: 'keystore_locked',
+        loggedIn: false,
+      })
+      // a failed persist must not continue as if saved
+      expect(ctx.statuses.map((s) => s.state)).not.toContain('signed-in')
+      expect(ctx.transport.me).not.toHaveBeenCalled()
+      // refused before any write: the stored credential still holds the old token
+      keychain.unlock()
+      expect(store.load()?.refreshToken).toBe('rt_keep')
+      expect(readFileSync(join(dir, 'uniwork-auth', 'session.bin'))).toEqual(before)
+      expect(readdirSync(join(dir, 'uniwork-auth'))).toEqual(['session.bin'])
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('a sign-in whose credential cannot be wrapped never overwrites the stored one (real store)', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'uw-auth-lock-'))
+    const keychain = lockableKeychain()
+    const store = createCredentialStore({ userDataDir: dir, safeStorage: keychain.safeStorage })
+    try {
+      store.save(stored({ refreshToken: 'rt_keep' }))
+      keychain.lock()
+      const ctx = setup({ credentials: store })
+      await signIn(ctx)
+      expect(ctx.manager.status()).toMatchObject({
+        state: 'keystore-locked',
+        error: 'keystore_locked',
+        loggedIn: false,
+      })
+      expect(ctx.events.at(-1)).toEqual({ phase: 'error', error: 'keystore_locked' })
+      // the redeemed credential was refused before writing: the stored one survives
+      keychain.unlock()
+      expect(store.load()?.refreshToken).toBe('rt_keep')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })
 

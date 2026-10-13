@@ -12,7 +12,10 @@ import { useI18n } from './locale'
 import { pathKey } from './uniwork-docs-model'
 import { lockCopyOf, mergeLocks, shownLock, withoutLock } from './uniwork-lock-model'
 
-type LockApi = Pick<Window['aiOffice'], 'onUniworkLock' | 'uniworkLocks' | 'dismissUniworkLock'>
+type LockApi = Pick<
+  Window['aiOffice'],
+  'onUniworkLock' | 'onUniworkLocksChanged' | 'uniworkLocks' | 'dismissUniworkLock'
+>
 
 /**
  * Locks main currently shows: the pushed ones, plus the ones read from main. The
@@ -22,6 +25,12 @@ type LockApi = Pick<Window['aiOffice'], 'onUniworkLock' | 'uniworkLocks' | 'dism
  * previous account's locks without sending an event. A lock pushed or dismissed
  * while a read is in flight is not overwritten by it. `onPush` hears every pushed
  * lock: a push counts as the lock newly shown, even when it is already listed.
+ * Main also pushes the whole list when a lock clears on its own (the keychain
+ * unlocked and the store opened): that list REPLACES this one and outranks a read
+ * still in flight, which may have been answered before the lock cleared.
+ * A path the user closed stays out of every list built before main saw the close
+ * (a push snapshot can be in flight when Close is clicked); it is forgotten once
+ * a push or read no longer contains it, or when it is pushed again.
  */
 export function useUniworkLocks(
   api: LockApi,
@@ -29,19 +38,32 @@ export function useUniworkLocks(
 ): {
   locks: UniworkDocLock[]
   dismiss: (path: string) => void
+  /** read the list again (a retry that races the store open can still see the lock; main pushes the cleared list) */
+  refresh: () => void
 } {
   const [locks, setLocks] = useState<UniworkDocLock[]>([])
-  /** what happened while the latest read was in flight (null = no read in flight) */
-  const reading = useRef<{ dismissed: Set<string>; pushed: UniworkDocLock[] } | null>(null)
+  /** what was pushed while the latest read was in flight (null = no read in flight) */
+  const reading = useRef<{ pushed: UniworkDocLock[] } | null>(null)
+  /** closed since the last list that no longer held the path (main may not have processed the close yet) */
+  const dismissedRef = useRef<Set<string>>(new Set())
   const readSeq = useRef(0)
+  const readRef = useRef<() => void>(() => undefined)
   const onPushRef = useRef(onPush)
   onPushRef.current = onPush
 
   useEffect(() => {
     let live = true
+    // drops the paths closed here from a list main built; a path the list no longer holds is forgotten
+    const unclosed = (list: UniworkDocLock[]): UniworkDocLock[] => {
+      const closed = dismissedRef.current
+      if (closed.size === 0) return list
+      const listed = new Set(list.map((lock) => pathKey(lock.path)))
+      for (const key of closed) if (!listed.has(key)) closed.delete(key)
+      return list.filter((lock) => !closed.has(pathKey(lock.path)))
+    }
     const readLocks = () => {
       const mine = ++readSeq.current
-      const during = { dismissed: new Set<string>(), pushed: [] as UniworkDocLock[] }
+      const during = { pushed: [] as UniworkDocLock[] }
       reading.current = during
       void api
         .uniworkLocks()
@@ -49,25 +71,34 @@ export function useUniworkLocks(
         .then((fresh) => {
           if (!live || mine !== readSeq.current) return
           reading.current = null
-          const keep = fresh.filter((lock) => !during.dismissed.has(pathKey(lock.path)))
-          setLocks(mergeLocks(keep, during.pushed))
+          setLocks(mergeLocks(unclosed(fresh), during.pushed))
         })
     }
     const offPush = api.onUniworkLock((lock) => {
       const during = reading.current
-      if (during) {
-        during.dismissed.delete(pathKey(lock.path))
-        during.pushed = mergeLocks(during.pushed, [lock])
-      }
+      dismissedRef.current.delete(pathKey(lock.path))
+      if (during) during.pushed = mergeLocks(during.pushed, [lock])
       onPushRef.current?.(lock)
       setLocks((prev) => mergeLocks(prev, [lock]))
     })
-    const offAccount = window.aiOffice?.wb?.onBucketChanged?.(readLocks)
+    const offChanged = api.onUniworkLocksChanged?.((next) => {
+      // a read answered before this list was built is stale now; what the user closed stays closed
+      readSeq.current++
+      reading.current = null
+      setLocks(mergeLocks([], unclosed(next)))
+    })
+    // the new account's locks are not the previous account's: a closed path there is a different lock
+    const offAccount = window.aiOffice?.wb?.onBucketChanged?.(() => {
+      dismissedRef.current.clear()
+      readLocks()
+    })
+    readRef.current = readLocks
     readLocks()
     return () => {
       live = false
       reading.current = null
       offPush()
+      offChanged?.()
       offAccount?.()
     }
   }, [api])
@@ -75,17 +106,17 @@ export function useUniworkLocks(
   const dismiss = useCallback(
     (path: string) => {
       const during = reading.current
-      if (during) {
-        during.dismissed.add(pathKey(path))
-        during.pushed = withoutLock(during.pushed, path)
-      }
+      dismissedRef.current.add(pathKey(path))
+      if (during) during.pushed = withoutLock(during.pushed, path)
       setLocks((prev) => withoutLock(prev, path))
       void api.dismissUniworkLock(path).catch(() => undefined)
     },
     [api],
   )
 
-  return { locks, dismiss }
+  const refresh = useCallback(() => readRef.current(), [])
+
+  return { locks, dismiss, refresh }
 }
 
 /** input types that take no typed text: focusing past them cannot eat a keystroke */
@@ -153,10 +184,15 @@ export function UniworkLockPanel({
   lock,
   titleRef,
   onDismiss,
+  onRetry,
+  retrying = false,
 }: {
   lock: UniworkDocLock
   titleRef: RefObject<HTMLHeadingElement | null>
   onDismiss: (path: string) => void
+  onRetry?: () => void
+  /** the retry is in flight: its button is aria-disabled, not disabled (focus stays on it) and ignores activation */
+  retrying?: boolean
 }) {
   const { t } = useI18n()
   const copy = lockCopyOf(lock)
@@ -184,7 +220,12 @@ export function UniworkLockPanel({
         <button
           type="button"
           className="btn btn-primary uw-lock-action"
-          onClick={() => onDismiss(lock.path)}
+          aria-disabled={copy.action === 'retry' && retrying ? true : undefined}
+          aria-busy={copy.action === 'retry' && retrying ? true : undefined}
+          onClick={() => {
+            if (copy.action !== 'retry') onDismiss(lock.path)
+            else if (!retrying) onRetry?.()
+          }}
         >
           {t(copy.actionKey)}
         </button>
@@ -212,10 +253,27 @@ export function UniworkLockHost({
   /** lock keys already brought forward: a tab the user picks afterwards is not overridden */
   const activated = useRef<Set<string>>(new Set())
   // a push of a lock that is already listed is newly shown again: Home comes forward again
-  const { locks, dismiss } = useUniworkLocks(window.aiOffice, (pushed) =>
+  const { locks, dismiss, refresh } = useUniworkLocks(window.aiOffice, (pushed) =>
     activated.current.delete(pathKey(pushed.path)),
   )
   const lock = shownLock(locks)
+  // Retry (keystore locked): the account re-reads the keychain; main pushes the cleared list once the
+  // store opens, which can come after this re-read. One retry at a time: the ref also covers a second click
+  // that lands before the busy state has rendered.
+  const [retrying, setRetrying] = useState(false)
+  const retryRunning = useRef(false)
+  const retry = useCallback(() => {
+    if (retryRunning.current) return
+    retryRunning.current = true
+    setRetrying(true)
+    void (window.aiOffice.accountRetry?.() ?? Promise.resolve())
+      .catch(() => undefined)
+      .finally(() => {
+        retryRunning.current = false
+        setRetrying(false)
+        refresh()
+      })
+  }, [refresh])
   const shownKey = lock ? pathKey(lock.path) : null
   const titleRef = useRef<HTMLHeadingElement>(null)
   const regionRef = useRef<HTMLDivElement>(null)
@@ -293,7 +351,14 @@ export function UniworkLockHost({
         {children}
       </div>
       {lock && (
-        <UniworkLockPanel key={shownKey} lock={lock} titleRef={titleRef} onDismiss={dismiss} />
+        <UniworkLockPanel
+          key={shownKey}
+          lock={lock}
+          titleRef={titleRef}
+          onDismiss={dismiss}
+          onRetry={retry}
+          retrying={retrying}
+        />
       )}
     </>
   )

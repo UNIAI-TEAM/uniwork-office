@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { LANGS } from '@genoffice/i18n'
 import { uniworkDocumentStrings } from '../src/renderer/src/i18n/strings-uniwork-documents'
 import { accountStrings } from '../src/renderer/src/i18n/strings-account'
+import { syncStrings } from '../src/renderer/src/i18n/strings-sync'
 import { strings } from '../src/renderer/src/strings'
 import { UNIWORK_ERROR_KEYS, UNIWORK_STATE_KEYS } from '../src/renderer/src/uniwork-docs-model'
 
@@ -70,9 +71,13 @@ describe('uniwork documents string shards', () => {
         'timeout',
         'server_error',
         'malformed_response',
+        'keystore_locked',
+        'store_full',
       ].sort(),
     )
-    for (const key of Object.values(UNIWORK_ERROR_KEYS)) expect(referenceKeys).toContain(key)
+    // the G5-04 refusals reuse the sync shard's sentences
+    const sentenceKeys = [...referenceKeys, ...Object.keys(syncStrings.zh)]
+    for (const key of Object.values(UNIWORK_ERROR_KEYS)) expect(sentenceKeys).toContain(key)
   })
 
   it('has chip copy for every save state of the contract', () => {

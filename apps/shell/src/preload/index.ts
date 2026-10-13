@@ -77,6 +77,15 @@ ipcRenderer.on(UNIWORK_DOC_CHANNELS.lock, (_event: IpcRendererEvent, raw: unknow
   if (!lock) return
   for (const cb of [...uniworkLockSubscribers]) cb(lock)
 })
+// the whole list when it changes in main (a keystore lock cleared): the shell
+// replaces its list instead of waiting for the next unrelated push
+const uniworkLocksSubscribers = new Set<(locks: UniworkDocLock[]) => void>()
+ipcRenderer.on(UNIWORK_DOC_CHANNELS.locksChanged, (_event: IpcRendererEvent, raw: unknown) => {
+  // not a list: ignore it, an empty one would replace (and so clear) every panel
+  if (!Array.isArray(raw)) return
+  const locks = asUniworkLocks(raw)
+  for (const cb of [...uniworkLocksSubscribers]) cb(locks)
+})
 
 const UI_LANGUAGES: readonly UiLanguage[] = [
   'zh',
@@ -167,7 +176,7 @@ function asUniworkLock(result: unknown): UniworkDocLock | null {
   if (!result || typeof result !== 'object') return null
   const r = result as Partial<UniworkDocLock>
   if (typeof r.path !== 'string' || !r.path) return null
-  if (r.reason !== 'store_newer') return null
+  if (r.reason !== 'store_newer' && r.reason !== 'keystore_locked') return null
   return { path: r.path, reason: r.reason, name: typeof r.name === 'string' ? r.name : '' }
 }
 
@@ -862,6 +871,12 @@ const homeApi: HomeApi = {
   },
   async uniworkLocks() {
     return asUniworkLocks(await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.locks))
+  },
+  onUniworkLocksChanged(cb) {
+    uniworkLocksSubscribers.add(cb)
+    return () => {
+      uniworkLocksSubscribers.delete(cb)
+    }
   },
   async dismissUniworkLock(path) {
     await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.dismissLock, path)

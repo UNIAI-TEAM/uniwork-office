@@ -76,6 +76,7 @@ export const vi = {
   acctErrWrongDeployment: 'Tài khoản này thuộc một máy chủ UniWork khác.',
   acctErrNotConfigured: 'Ứng dụng này chưa được liên kết với máy chủ UniWork.',
   acctErrKeyringUnavailable: 'Kho lưu trữ bảo mật trên máy tính này không khả dụng.',
+  acctErrKeystoreLocked: 'Kho khóa của máy đang khóa. Hãy mở khóa rồi thử lại.',
   acctErrServerError: 'UniWork đang gặp sự cố. Vui lòng thử lại sau.',
   acctErrMalformedResponse: 'UniWork trả về phản hồi không mong đợi. Vui lòng thử lại sau.',
   wbLoadFailedTitle: 'Không thể tải dữ liệu đã lưu của bạn',

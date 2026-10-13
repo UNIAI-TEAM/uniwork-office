@@ -39,6 +39,18 @@ export interface AccountBoundaryDeps {
   forgetLocks(match: (path: string) => boolean): void
   /** closes an open conflict dialog as "Decide later" before the documents close */
   closeConflictPrompt(): void
+  /**
+   * The owner of the live session (the account about to sign out), when there
+   * is one. `wipeStore` falls back to the last owner `enforce` saw.
+   */
+  sessionOwner?(): LastOwner | null
+  /**
+   * Locks and wipes the durable store of the account that goes away (intents,
+   * feed cursors, doc index). Runs after `forgetLocks`; a failure never stops
+   * the documents from closing - the records are encrypted and belong to an
+   * account that no longer has a key path into them here.
+   */
+  wipeStore?(owner: LastOwner | null): Promise<void>
 }
 
 /** the account a working-copy path belongs to; null outside the root */
@@ -58,6 +70,8 @@ export class AccountBoundary {
   private readonly deps: AccountBoundaryDeps
   /** `deploymentId/accountId` whose boundary is enforced; null = not yet, or signed out */
   private enforced: string | null = null
+  /** the last live owner `enforce` saw (the account an account switch leaves) */
+  private lastOwner: LastOwner | null = null
   private running: Promise<unknown> | null = null
 
   constructor(deps: AccountBoundaryDeps) {
@@ -95,6 +109,10 @@ export class AccountBoundary {
     // a prompt may have taken a while: close what still shows a working copy
     for (const path of this.pathsWhere(this.anyAccount)) this.deps.closeNow(path)
     this.deps.forgetLocks(this.anyAccount)
+    // the account is about to leave: its durable store is locked and wiped with
+    // its documents (the sign-out did go ahead)
+    const owner = this.deps.sessionOwner?.() ?? this.lastOwner
+    await this.wipe(owner)
     return true
   }
 
@@ -103,6 +121,10 @@ export class AccountBoundary {
     this.enforced = null
     this.forgetWhere(this.anyAccount)
     this.deps.forgetLocks(this.anyAccount)
+    // idempotent with beforeSignOut: whatever owner is left loses its store
+    const owner = this.lastOwner
+    this.lastOwner = null
+    if (owner) void this.wipe(owner)
   }
 
   /**
@@ -114,6 +136,8 @@ export class AccountBoundary {
   async enforce(owner: LastOwner): Promise<void> {
     const key = `${owner.deploymentId}/${owner.accountId}`
     if (this.enforced === key || this.running) return
+    const previous = this.lastOwner
+    this.lastOwner = owner
     const run = (async () => {
       const foreign = this.notOwnedBy(owner)
       if (this.deps.openPaths().some(foreign)) this.deps.closeConflictPrompt()
@@ -122,6 +146,10 @@ export class AccountBoundary {
       // account change already sees them gone (F4 residual). They go even when a
       // prompt is cancelled: they are not this account's copies to explain.
       this.deps.forgetLocks(foreign)
+      if (previous && `${previous.deploymentId}/${previous.accountId}` !== key) {
+        // the switched-out account's durable store goes with its documents
+        await this.wipe(previous)
+      }
       const closed = await this.closeWhere(foreign)
       this.forgetWhere(foreign)
       if (closed) this.enforced = key
@@ -131,6 +159,19 @@ export class AccountBoundary {
       await run
     } finally {
       if (this.running === run) this.running = null
+    }
+  }
+
+  /**
+   * Lock and wipe one account's durable store. Best effort by design: the
+   * records are encrypted, they belong to an account that is leaving, and a
+   * wipe that fails must never keep the documents of that account open.
+   */
+  private async wipe(owner: LastOwner | null): Promise<void> {
+    try {
+      await this.deps.wipeStore?.(owner)
+    } catch {
+      // the next sign-in opens a fresh scope anyway
     }
   }
 

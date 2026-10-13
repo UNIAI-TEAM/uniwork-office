@@ -44,6 +44,7 @@ function harness(
   history: string[],
   refuse: ReadonlySet<string> = new Set(),
   locks: string[] = [],
+  sessionOwner: { accountId: string; deploymentId: string } | null = null,
 ) {
   const shown = [...open]
   const known = [...history]
@@ -51,6 +52,8 @@ function harness(
   const forgotten: string[] = []
   const shownLocks = [...locks]
   const forgottenLocks: string[] = []
+  const wiped: Array<{ accountId: string; deploymentId: string } | null> = []
+  const order: string[] = []
   const deps = {
     root,
     openPaths: () => [...shown],
@@ -73,6 +76,7 @@ function harness(
     }),
     // the lock map of the service (pathKey-keyed there; here the raw paths)
     forgetLocks: vi.fn((match: (path: string) => boolean) => {
+      order.push('forgetLocks')
       for (const path of [...shownLocks]) {
         if (!match(path)) continue
         shownLocks.splice(shownLocks.indexOf(path), 1)
@@ -80,6 +84,11 @@ function harness(
       }
     }),
     closeConflictPrompt: vi.fn(),
+    sessionOwner: () => sessionOwner,
+    wipeStore: vi.fn(async (owner: { accountId: string; deploymentId: string } | null) => {
+      order.push('wipeStore')
+      wiped.push(owner)
+    }),
   }
   return {
     boundary: new AccountBoundary(deps),
@@ -89,6 +98,8 @@ function harness(
     forgotten,
     shownLocks,
     forgottenLocks,
+    wiped,
+    order,
   }
 }
 
@@ -194,6 +205,40 @@ describe('Sign out', () => {
     } finally {
       setUniworkSignOutHooks(null)
     }
+  })
+})
+
+describe('the durable store at the account boundary (W3b)', () => {
+  it('sign-out wipes the outgoing scope, after the locks and with a live owner', async () => {
+    const h = harness([aSheet], [], new Set(), [aSheet], ownerA)
+    expect(await h.boundary.beforeSignOut()).toBe(true)
+    expect(h.wiped).toEqual([ownerA])
+    // the locks are forgotten first: a wipe must not wait behind panel state
+    expect(h.order.indexOf('forgetLocks')).toBeLessThan(h.order.indexOf('wipeStore'))
+  })
+
+  it('a cancelled sign-out keeps the store: the account did not go away', async () => {
+    const h = harness([aSheet], [], new Set([aSheet]), [aSheet], ownerA)
+    // a live session first (the first owner has nothing to wipe)
+    await h.boundary.enforce(ownerA)
+    expect(h.wiped).toEqual([])
+    expect(await h.boundary.beforeSignOut()).toBe(false)
+    expect(h.wiped).toEqual([])
+    // the sign-out does go ahead afterwards: the last owner loses its store
+    h.boundary.afterSignOut()
+    expect(h.wiped).toEqual([ownerA])
+  })
+
+  it('a sign-in as another account wipes only the switched-out scope', async () => {
+    const h = harness([aSheet], [], new Set(), [], ownerA)
+    // the first live session has nothing to wipe (no owner before it)
+    await h.boundary.enforce(ownerA)
+    expect(h.wiped).toEqual([])
+    await h.boundary.enforce(ownerB)
+    expect(h.wiped).toEqual([ownerA])
+    // the same owner again (a status push): nothing is wiped twice
+    await h.boundary.enforce(ownerB)
+    expect(h.wiped).toEqual([ownerA])
   })
 })
 

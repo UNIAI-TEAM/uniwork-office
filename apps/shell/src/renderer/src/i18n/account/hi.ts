@@ -79,6 +79,7 @@ export const hi = {
   acctErrWrongDeployment: 'यह खाता किसी दूसरे UniWork सर्वर का है।',
   acctErrNotConfigured: 'यह ऐप किसी UniWork सर्वर से नहीं जुड़ा है।',
   acctErrKeyringUnavailable: 'इस कंप्यूटर पर सुरक्षित स्टोरेज उपलब्ध नहीं है।',
+  acctErrKeystoreLocked: 'इस कंप्यूटर का कीचेन लॉक है। उसे अनलॉक करके फिर से कोशिश करें।',
   acctErrServerError: 'UniWork में कोई समस्या आई। कृपया बाद में फिर से प्रयास करें।',
   acctErrMalformedResponse: 'UniWork ने अप्रत्याशित जवाब भेजा। कृपया बाद में फिर से प्रयास करें।',
   wbLoadFailedTitle: 'आपका सहेजा गया डेटा लोड नहीं हो सका',

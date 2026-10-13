@@ -652,6 +652,12 @@ body.overlay-title-bar .tab-bar-drag-spacer {
   min-height: 24px;
 }
 
+.uw-lock-action[aria-disabled='true'] {
+  /* busy, not disabled: it keeps focus, so no box-shadow reset (the focus ring stays) */
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 @media (pointer: coarse) {
   .uw-lock-action {
     min-width: 44px;

@@ -83,6 +83,8 @@ export const de = {
   acctErrWrongDeployment: 'Dieses Konto gehört zu einem anderen UniWork-Server.',
   acctErrNotConfigured: 'Diese App ist nicht mit einem UniWork-Server verknüpft.',
   acctErrKeyringUnavailable: 'Der sichere Speicher auf diesem Computer ist nicht verfügbar.',
+  acctErrKeystoreLocked:
+    'Der Schlüsselbund dieses Computers ist gesperrt. Entsperren Sie ihn und versuchen Sie es erneut.',
   acctErrServerError:
     'Bei UniWork ist ein Problem aufgetreten. Bitte versuchen Sie es später erneut.',
   acctErrMalformedResponse:

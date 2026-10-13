@@ -49,6 +49,10 @@ export function readEnvelope(
   }
 }
 
+/** change-feed cursor verdicts (G5-01a): about the cursor, never a document */
+export const CHANGE_CURSOR_EXPIRED = 'change_cursor_expired'
+export const CHANGE_CURSOR_INVALID = 'change_cursor_invalid'
+
 const CONFLICT_CODES = new Set(['document_version_conflict', 'revision_conflict'])
 const IDEMPOTENCY_STOP_CODES = new Set(['idempotency_payload_mismatch', 'idempotency_key_reuse'])
 
@@ -61,6 +65,11 @@ export function errorFromResponse(status: number, body: unknown): UniworkDocErro
   const envelope = readEnvelope(body)
   const serverCode = envelope?.code
   const at = { status, ...(serverCode ? { serverCode } : {}) }
+  // a feed cursor verdict must never reach the coded-410 -> `deleted` branch
+  // below; the feed classifies it first with parseFeedError
+  if (serverCode === CHANGE_CURSOR_EXPIRED || serverCode === CHANGE_CURSOR_INVALID) {
+    return new UniworkDocError('server_error', at)
+  }
   if (serverCode && CONFLICT_CODES.has(serverCode)) {
     const current = envelope?.fields?.current_revision
     return new UniworkDocError('conflict', {

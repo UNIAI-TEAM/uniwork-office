@@ -1,5 +1,7 @@
 import { createHash } from 'node:crypto'
 import {
+  existsSync,
+  mkdirSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
@@ -8,8 +10,9 @@ import {
   statSync,
   writeFileSync,
 } from 'node:fs'
+import { readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { basename, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
   UniworkConflictChoice,
@@ -20,11 +23,28 @@ import type { DeploymentProfile } from '../src/main/uniwork-auth/deployment'
 import {
   CLOSE_SAVE_WAIT_MS,
   UniworkDocsService,
+  coreSemver,
   type ConflictUi,
   type UnsavedCloseChoice,
 } from '../src/main/uniwork-docs/service'
-import { BINDING_FILE } from '../src/main/uniwork-docs/binding-store'
+import {
+  BINDING_FILE,
+  BindingStore,
+  INTENT_PAYLOAD_FILE,
+} from '../src/main/uniwork-docs/binding-store'
 import { pageRecentPaths } from '../src/main/recent-files'
+import {
+  INTENT_STORE_REGISTRATION,
+  createIntentStore,
+  type PendingIntentValue,
+} from '../src/main/uniwork-sync/intent-store'
+import { createSafeStorageKeyProvider } from '../src/main/uniwork-sync/keys'
+import { createSyncStoreAccess } from '../src/main/uniwork-sync/session-store'
+import { createStoreLayer, type StoreLayer } from '../src/main/uniwork-sync/store'
+import {
+  createLockableSafeStorage,
+  type LockableSafeStorage,
+} from '../src/main/uniwork-sync/test-kit/compliance'
 
 const TOKEN = 'secret-access-token-0123456789'
 const ORIGIN = 'https://uniwork.example'
@@ -206,11 +226,29 @@ function setup(
     choice?: UniworkConflictChoice
     closeChoice?: UnsavedCloseChoice
     account?: string
+    /** the sync store's budget; a tiny one makes the intent write hit store_full */
+    budgetBytes?: number
+    /** the build version stamped into bindings (default '0.0.0') */
+    appVersion?: string
+    /** the auth module reports its keystore-locked state (the S11 lock) */
+    keystoreLocked?: boolean
   } = {},
 ) {
   const statuses: UniworkDocStatus[] = []
   const launches: UniworkLaunchEvent[] = []
   let account: string | null = (opts.signedIn ?? true) ? (opts.account ?? 'acc_1') : null
+  const safeStorage: LockableSafeStorage = createLockableSafeStorage()
+  const layer: StoreLayer = createStoreLayer({
+    root: join(dir, 'uniwork-sync', 'store'),
+    keys: createSafeStorageKeyProvider({ safeStorage, dir: join(dir, 'uniwork-sync', 'keys') }),
+    budgetBytes: opts.budgetBytes ?? 1 << 20,
+    clock: () => 1_700_000_000_000,
+  })
+  layer.register(INTENT_STORE_REGISTRATION)
+  const syncStore = createSyncStoreAccess({
+    layer,
+    scope: () => (account ? { deploymentId: 'default', accountId: account } : null),
+  })
   const ui: ConflictUi = {
     chooseConflict: vi.fn(async () => opts.choice ?? 'later'),
     confirmDiscard: vi.fn(async () => true),
@@ -223,6 +261,9 @@ function setup(
   }
   const deps = {
     userDataDir: dir,
+    syncStore,
+    appVersion: () => opts.appVersion ?? '0.0.0',
+    keystoreLocked: () => opts.keystoreLocked ?? false,
     profile: () => profile,
     identity: () =>
       account ? { accountId: account, deviceSessionId: 'dev_1', deploymentId: 'default' } : null,
@@ -247,6 +288,9 @@ function setup(
     ui,
     statuses,
     launches,
+    layer,
+    safeStorage,
+    currentAccount: () => account,
     signOut: () => {
       account = null
     },
@@ -254,6 +298,36 @@ function setup(
       account = id
     },
   }
+}
+
+/** the intent the durable store holds for the working copy at `path` (acc_1's scope) */
+async function intentOf(
+  ctx: ReturnType<typeof setup>,
+  path: string,
+): Promise<PendingIntentValue | null> {
+  const opened = await ctx.layer.open({ deploymentId: 'default', accountId: 'acc_1' })
+  if (opened.kind !== 'ok') return null
+  return createIntentStore(opened.store.records(INTENT_STORE_REGISTRATION.name)).get(
+    basename(dirname(path)),
+  )
+}
+
+/** every file the store layer keeps on disk (no records = the store was never written to) */
+function storeFiles(): string[] {
+  const found: string[] = []
+  const visit = (current: string): void => {
+    for (const entry of readdirSync(current, { withFileTypes: true })) {
+      const full = join(current, entry.name)
+      if (entry.isDirectory()) visit(full)
+      else found.push(full)
+    }
+  }
+  try {
+    visit(join(dir, 'uniwork-sync', 'store'))
+  } catch {
+    return []
+  }
+  return found
 }
 
 async function openDoc(ctx: ReturnType<typeof setup>) {
@@ -283,7 +357,9 @@ describe('open flow', () => {
     expect(path).toBe(join(dir, 'uniwork-documents', 'default', 'acc_1', DOC, 'Q4 plan.docx'))
     expect(readFileSync(path, 'utf8')).toBe('v3 bytes')
     expect(binding(path)).toMatchObject({
-      schema: 1,
+      schema: 2,
+      min_store_level: 2,
+      min_app_version: '0.0.0',
       documentId: DOC,
       workspaceId: 'ws_1',
       orgId: 'org_a',
@@ -357,7 +433,7 @@ describe('open flow', () => {
     writeFileSync(path, 'local edits')
     server.faults.push({ route: 'upload', kind: 'network' })
     await ctx.service.save(path)
-    expect(binding(path).pendingIntent).toBeTruthy()
+    expect(await intentOf(ctx, path)).not.toBeNull()
     server.state.revision = 50
     const downloadsBefore = server.calls.filter((c) => c.path.endsWith('/download')).length
     await openDoc(ctx)
@@ -501,23 +577,27 @@ describe('save pipeline', () => {
     expect(commits(server)[0]?.headers['idempotency-key']).toBe(key)
     expect(commits(server)[0]?.body).toMatchObject({ base_revision: '41' })
     expect(binding(path)).toMatchObject({ baseRevision: '42', baseVersion: 4, state: 'saved' })
-    expect(binding(path).pendingIntent).toBeUndefined()
+    expect(await intentOf(ctx, path)).toBeNull()
     expect(ctx.statuses.map((s) => s.state)).toContain('saving')
   })
 
-  it('persists the intent before the first network call', async () => {
+  it('persists the intent in the store before the first network call', async () => {
     const server = fakeServer({ bytes: enc('v3') })
     const ctx = setup(server)
     const path = await openDoc(ctx)
     writeFileSync(path, 'v4')
     let seen: unknown
     server.fetch.mockImplementationOnce(async () => {
-      seen = binding(path).pendingIntent
+      seen = await intentOf(ctx, path)
       throw new TypeError('fetch failed')
     })
     await ctx.service.save(path)
-    expect(seen).toMatchObject({ documentId: DOC, baseRevision: '41', checksum: hex(enc('v4')) })
-    expect(typeof (seen as { baseRevision: unknown }).baseRevision).toBe('string')
+    expect((seen as PendingIntentValue | null)?.intent).toMatchObject({
+      documentId: DOC,
+      baseRevision: '41',
+      checksum: hex(enc('v4')),
+    })
+    expect(typeof (seen as PendingIntentValue | null)?.intent.baseRevision).toBe('string')
   })
 
   it('two rapid saves make one intent (no queue)', async () => {
@@ -542,7 +622,8 @@ describe('save pipeline', () => {
     server.faults.push({ route: 'commit', kind: 'lost' })
     const first = await ctx.service.save(path)
     expect(first).toMatchObject({ state: 'offline', error: 'network' })
-    const intent = binding(path).pendingIntent
+    const intent = (await intentOf(ctx, path))?.intent
+    if (!intent) throw new Error('the intent is missing from the store')
     expect(intent.idempotencyKey).toMatch(/^office-key-/)
     // edits after the failure do not change the replayed payload
     writeFileSync(path, 'v5 typed later')
@@ -567,7 +648,7 @@ describe('save pipeline', () => {
     expect(status).toMatchObject({ state: 'conflict', error: 'conflict' })
     expect(readFileSync(path, 'utf8')).toBe('mine')
     expect(binding(path)).toMatchObject({ baseRevision: '41', serverRevision: '45' })
-    expect(binding(path).pendingIntent).toBeUndefined()
+    expect(await intentOf(ctx, path)).toBeNull()
     const calls = server.calls.length
     await ctx.service.save(path)
     await ctx.service.coordinator.save(path)
@@ -634,7 +715,7 @@ describe('save pipeline', () => {
       state: 'error',
       error: 'idempotency_mismatch',
     })
-    expect(binding(path).pendingIntent).toBeUndefined()
+    expect(await intentOf(ctx, path)).toBeNull()
     await ctx.service.save(path)
     const keys = uploads(server).map((c) => c.headers['idempotency-key'])
     expect(keys).toHaveLength(2)
@@ -650,7 +731,7 @@ describe('save pipeline', () => {
       server.faults.push({ route: 'upload', kind: 409, code: 'idempotency_in_flight' })
     expect(await ctx.service.save(path)).toMatchObject({ state: 'offline' })
     expect(uploads(server)).toHaveLength(4)
-    expect(binding(path).pendingIntent).toBeTruthy()
+    expect(await intentOf(ctx, path)).not.toBeNull()
   })
 
   it('403 forbidden blocks the save, keeps the file and downgrades access', async () => {
@@ -836,7 +917,7 @@ describe('review r1 save fixes', () => {
     writeFileSync(path, 'v4')
     server.faults.push({ route: 'commit', kind: 409, code: 'document_upload_invalid' })
     expect(await ctx.service.save(path)).toMatchObject({ state: 'dirty', error: 'server_error' })
-    expect(binding(path).pendingIntent).toBeUndefined()
+    expect(await intentOf(ctx, path)).toBeNull()
     const firstKey = uploads(server)[0]?.headers['idempotency-key']
     expect(await ctx.service.save(path)).toMatchObject({ state: 'saved' })
     const lastCommit = commits(server).at(-1)
@@ -854,7 +935,7 @@ describe('review r1 save fixes', () => {
     server.faults.push({ route: 'commit', kind: 404, code: 'not_found' })
     server.faults.push({ route: 'detail', kind: 404, code: 'not_found' })
     expect(await ctx.service.save(path)).toMatchObject({ state: 'blocked', error: 'not_found' })
-    expect(binding(path).pendingIntent).toBeUndefined()
+    expect(await intentOf(ctx, path)).toBeNull()
     expect(readFileSync(path, 'utf8')).toBe('v4')
   })
 
@@ -886,7 +967,7 @@ describe('review r1 save fixes', () => {
     })
     expect(uploads(server)).toHaveLength(1)
     expect(commits(server)).toHaveLength(0)
-    expect(binding(path).pendingIntent).toBeTruthy()
+    expect(await intentOf(ctx, path)).not.toBeNull()
   })
 
   it('a receipt without a checksum is confirmed against the document instead of failing forever (BE-4)', async () => {
@@ -897,7 +978,7 @@ describe('review r1 save fixes', () => {
     server.faults.push({ route: 'commit', kind: 'no-checksum' })
     expect(await ctx.service.save(path)).toMatchObject({ state: 'saved' })
     expect(binding(path)).toMatchObject({ baseRevision: '42', baseVersion: 4 })
-    expect(binding(path).pendingIntent).toBeUndefined()
+    expect(await intentOf(ctx, path)).toBeNull()
   })
 
   it('save-local-copy reports a copy that could not be written (BE-6)', async () => {
@@ -979,7 +1060,7 @@ describe('closing a document with changes not in UniWork (A1.4)', () => {
     vi.mocked(ctx.ui.chooseUnsavedClose).mockResolvedValueOnce('close')
     expect(await ctx.service.confirmClose(path)).toBe(true)
     expect(readFileSync(path, 'utf8')).toBe('v4')
-    expect(binding(path).pendingIntent).toBeTruthy()
+    expect(await intentOf(ctx, path)).not.toBeNull()
   })
 
   it('save to UniWork closes once saved, and keeps the tab open when the save fails', async () => {
@@ -1132,6 +1213,13 @@ describe('review r2 follow-ups', () => {
       await vi.advanceTimersByTimeAsync(CLOSE_SAVE_WAIT_MS - 1_000)
       expect(outcome).toBeUndefined()
       await vi.advanceTimersByTimeAsync(2_000)
+      // the close first asks the durable store (real fs reads) whether an
+      // intent is pending: faked timers stall that lookup until the test drives
+      // real I/O again, and the 30 s cap has already expired by then
+      for (let round = 0; round < 200 && outcome === undefined; round += 1) {
+        await readFile(path, 'utf8')
+        await vi.advanceTimersByTimeAsync(0)
+      }
       expect(outcome).toBe(false)
       expect(CLOSE_SAVE_WAIT_MS).toBeLessThanOrEqual(30_000)
     } finally {
@@ -1172,7 +1260,8 @@ describe('Retry replays a pending intent, it does not rewrite the file (F8)', ()
     writeFileSync(path, 'v4')
     server.faults.push({ route: 'commit', kind: 'lost' })
     expect(await ctx.service.save(path)).toMatchObject({ state: 'offline' })
-    const intent = binding(path).pendingIntent
+    const intent = (await intentOf(ctx, path))?.intent
+    if (!intent) throw new Error('the intent is missing from the store')
     const writes = reserializingModule(ctx)
     vi.mocked(ctx.deps.requestModuleSave).mockClear()
 
@@ -1182,7 +1271,7 @@ describe('Retry replays a pending intent, it does not rewrite the file (F8)', ()
     expect(retried).toMatchObject({ state: 'saved' })
     expect(retried?.error).toBeUndefined()
     expect(binding(path)).toMatchObject({ state: 'saved', baseChecksum: hex(enc('v4')) })
-    expect(binding(path).pendingIntent).toBeUndefined()
+    expect(await intentOf(ctx, path)).toBeNull()
     expect(new Set(commits(server).map((c) => c.headers['idempotency-key']))).toEqual(
       new Set([intent.idempotencyKey]),
     )
@@ -1210,7 +1299,7 @@ describe('Retry replays a pending intent, it does not rewrite the file (F8)', ()
     writeFileSync(path, 'v4')
     await ctx.service.refreshPath(path)
     expect(binding(path)).toMatchObject({ state: 'dirty' })
-    expect(binding(path).pendingIntent).toBeUndefined()
+    expect(await intentOf(ctx, path)).toBeNull()
     reserializingModule(ctx)
     await ctx.service.save(path)
     expect(ctx.deps.requestModuleSave).toHaveBeenCalledWith(path)
@@ -1225,7 +1314,8 @@ describe('Retry replays a pending intent, it does not rewrite the file (F8)', ()
     writeFileSync(path, 'v4')
     server.faults.push({ route: 'commit', kind: 'lost' })
     expect(await ctx.service.save(path)).toMatchObject({ state: 'offline' })
-    const intent = binding(path).pendingIntent
+    const intent = (await intentOf(ctx, path))?.intent
+    if (!intent) throw new Error('the intent is missing from the store')
     const writes = reserializingModule(ctx)
     vi.mocked(ctx.deps.requestModuleSave).mockClear()
 
@@ -1246,6 +1336,293 @@ describe('Retry replays a pending intent, it does not rewrite the file (F8)', ()
     reserializingModule(ctx)
     expect(await ctx.service.confirmClose(path)).toBe(true)
     expect(ctx.deps.requestModuleSave).toHaveBeenCalledWith(path, expect.any(Function))
+  })
+})
+
+describe('the durable store guards the save (W3b)', () => {
+  it('a locked store refuses the save with keystore_locked: no intent, no module save, no request', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    ctx.safeStorage.lock()
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'v4')
+    const before = server.calls.length
+    expect(await ctx.service.save(path)).toMatchObject({
+      state: 'error',
+      error: 'keystore_locked',
+    })
+    expect(ctx.deps.requestModuleSave).not.toHaveBeenCalled()
+    expect(binding(path)).toMatchObject({ state: 'error', error: 'keystore_locked' })
+    expect(server.calls.length).toBe(before)
+    // the coordinator (a user save with no tab, the close prompt) refuses the same
+    expect(await ctx.service.coordinator.save(path)).toMatchObject({
+      binding: { state: 'error', error: 'keystore_locked' },
+    })
+    expect(server.calls.length).toBe(before)
+    // the store was never written to (no record file exists)
+    expect(storeFiles()).toEqual([])
+    // once the keychain opens again the same save goes through
+    ctx.safeStorage.unlock()
+    expect(await ctx.service.save(path)).toMatchObject({ state: 'saved' })
+    expect(await intentOf(ctx, path)).toBeNull()
+  })
+
+  it('a store at its budget refuses the save with store_full and leaves no intent', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server, { budgetBytes: 1 })
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'v4')
+    expect(await ctx.service.save(path)).toMatchObject({ state: 'error', error: 'store_full' })
+    expect(binding(path)).toMatchObject({ state: 'error', error: 'store_full' })
+    expect(uploads(server)).toHaveLength(0)
+    expect(commits(server)).toHaveLength(0)
+    expect(storeFiles()).toEqual([])
+  })
+})
+
+/**
+ * R1-be-5: a sweep that could not move a pre-store intent (the store was at
+ * its budget) is not complete. The copy keeps its plaintext intent, no save
+ * may rewrite its binding into schema 2 (which would drop `pendingIntent`),
+ * and the next open - here after the budget frees - migrates it exactly once,
+ * with its own idempotency key.
+ */
+describe('a deferred sweep never erases the pre-store intent (R1-be-5)', () => {
+  const LEGACY = {
+    intentId: 'office-intent-legacy',
+    idempotencyKey: 'office-key-legacy',
+    documentId: DOC,
+    baseRevision: '41',
+    checksum: hex(enc('working copy bytes')),
+    createdAt: '2026-10-11T00:00:00.000Z',
+  }
+  const folder = () => join(dir, 'uniwork-documents', 'default', 'acc_1', DOC)
+  const copyPath = (name = 'Plan.docx') => join(folder(), name)
+  const payloadPath = () => join(folder(), INTENT_PAYLOAD_FILE)
+
+  /** the pre-store working copy: a schema-1 binding with the intent + its payload */
+  function seedLegacy(
+    state = 'saving',
+    opts: { filename?: string; title?: string; baseRevision?: string; baseChecksum?: string } = {},
+  ): void {
+    const filename = opts.filename ?? 'Plan.docx'
+    mkdirSync(folder(), { recursive: true })
+    writeFileSync(copyPath(filename), 'working copy bytes')
+    writeFileSync(
+      join(folder(), BINDING_FILE),
+      JSON.stringify(
+        {
+          schema: 1,
+          documentId: DOC,
+          workspaceId: 'ws_1',
+          orgId: 'org_a',
+          title: opts.title ?? 'Plan.docx',
+          filename,
+          format: 'docx',
+          access: 'edit',
+          baseRevision: opts.baseRevision ?? '41',
+          baseVersion: 3,
+          baseChecksum: opts.baseChecksum ?? 'stale',
+          state,
+          pendingIntent: LEGACY,
+        },
+        null,
+        2,
+      ),
+    )
+    writeFileSync(payloadPath(), 'working copy bytes')
+  }
+
+  /** the intent store of the account's scope, as the layer hands it back */
+  async function intentStoreOf(ctx: ReturnType<typeof setup>) {
+    const opened = await ctx.layer.open({ deploymentId: 'default', accountId: 'acc_1' })
+    if (opened.kind !== 'ok') throw new Error(opened.kind)
+    return createIntentStore(opened.store.records(INTENT_STORE_REGISTRATION.name))
+  }
+
+  /** write records until the account's budget refuses the next one */
+  async function fillBudget(ctx: ReturnType<typeof setup>): Promise<string[]> {
+    const intents = await intentStoreOf(ctx)
+    const keys: string[] = []
+    for (let i = 0; i < 200; i += 1) {
+      const key = `fill-${i}`
+      if ((await intents.put(key, LEGACY, new Uint8Array(1))).kind === 'store_full') break
+      keys.push(key)
+    }
+    return keys
+  }
+
+  it('keeps the plaintext, refuses every binding rewrite, then migrates once when the budget frees', async () => {
+    seedLegacy()
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server, { budgetBytes: 4096 })
+    const fillers = await fillBudget(ctx)
+    const before = {
+      binding: readFileSync(join(folder(), BINDING_FILE), 'utf8'),
+      payload: readFileSync(payloadPath(), 'utf8'),
+    }
+
+    // the sweep runs on the open and cannot move the intent: nothing is complete
+    expect((await ctx.service.openSyncStore()).kind).toBe('ok')
+    expect(binding(copyPath())).toMatchObject({ schema: 1, state: 'saving' })
+    expect(binding(copyPath()).pendingIntent).toEqual(LEGACY)
+
+    // a save in that window is refused with the store's reason and must not
+    // mint a new intent or rewrite the binding
+    expect(await ctx.service.save(copyPath())).toMatchObject({
+      state: 'error',
+      error: 'store_full',
+    })
+    expect(ctx.statuses.at(-1)).toMatchObject({ state: 'error', error: 'store_full' })
+    expect(readFileSync(join(folder(), BINDING_FILE), 'utf8')).toBe(before.binding)
+    expect(readFileSync(payloadPath(), 'utf8')).toBe(before.payload)
+    expect(uploads(server)).toHaveLength(0)
+    expect(commits(server)).toHaveLength(0)
+
+    // the budget frees: the next open completes the sweep, exactly once
+    const intents = await intentStoreOf(ctx)
+    for (const key of fillers) await intents.delete(key)
+    expect((await ctx.service.openSyncStore()).kind).toBe('ok')
+    const migrated = await intentOf(ctx, copyPath())
+    expect(migrated?.intent.idempotencyKey).toBe(LEGACY.idempotencyKey)
+    expect(Buffer.from(migrated?.payload ?? []).toString()).toBe('working copy bytes')
+    expect(binding(copyPath())).toMatchObject({ schema: 2, min_store_level: 2, state: 'dirty' })
+    expect(binding(copyPath())).not.toHaveProperty('pendingIntent')
+    expect(existsSync(payloadPath())).toBe(false)
+    // one record only: the fillers are gone and no second intent was minted
+    expect(storeFiles()).toHaveLength(1)
+  })
+
+  it('R2-be-5: a status or close check in the deferred window rewrites nothing (docStatus, refreshPath, confirmClose)', async () => {
+    // a ready copy whose bytes no longer match its base: `refreshDirty` (the
+    // status read, tab activation and the close guard all call it) wants to
+    // rewrite the binding as dirty, which would stamp schema 2 and drop the
+    // plaintext intent (the review's proving trigger)
+    seedLegacy('ready')
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server, { budgetBytes: 4096 })
+    const fillers = await fillBudget(ctx)
+    const before = {
+      binding: readFileSync(join(folder(), BINDING_FILE), 'utf8'),
+      payload: readFileSync(payloadPath(), 'utf8'),
+    }
+
+    // the sweep runs on the open and cannot move the intent: every check that
+    // follows leaves binding.json and the payload exactly as they are
+    expect((await ctx.service.openSyncStore()).kind).toBe('ok')
+    expect(await ctx.service.docStatus(copyPath())).toMatchObject({ state: 'ready' })
+    await ctx.service.refreshPath(copyPath())
+    expect(await ctx.service.confirmClose(copyPath())).toBe(true)
+    expect(readFileSync(join(folder(), BINDING_FILE), 'utf8')).toBe(before.binding)
+    expect(readFileSync(payloadPath(), 'utf8')).toBe(before.payload)
+    expect(binding(copyPath())).toMatchObject({ schema: 1, state: 'ready' })
+    expect(binding(copyPath()).pendingIntent).toEqual(LEGACY)
+    expect(uploads(server)).toHaveLength(0)
+
+    // the budget frees: the sweep completes and keeps the intent's own key
+    const intents = await intentStoreOf(ctx)
+    for (const key of fillers) await intents.delete(key)
+    expect((await ctx.service.openSyncStore()).kind).toBe('ok')
+    const migrated = await intentOf(ctx, copyPath())
+    expect(migrated?.intent.idempotencyKey).toBe(LEGACY.idempotencyKey)
+    expect(Buffer.from(migrated?.payload ?? []).toString()).toBe('working copy bytes')
+    expect(binding(copyPath())).toMatchObject({ schema: 2, min_store_level: 2 })
+    expect(binding(copyPath())).not.toHaveProperty('pendingIntent')
+    expect(existsSync(payloadPath())).toBe(false)
+  })
+
+  it('R3-be-1: the open of a held folder renames nothing and deletes nothing (fresh download)', async () => {
+    // the review's trigger: a deferred schema-1 copy named from a corrupt
+    // upload name (U+FFFD, so a fresh download would repair the name) with a
+    // stale base (so the copy is not kept by the branch above). The open used
+    // to write the new file and delete the old one while the binding write was
+    // refused: the opened tab named the deleted file and stayed unbound
+    const corrupt = 'B\uFFFDo c\uFFFDo.docx'
+    const title = 'Báo cáo.docx'
+    seedLegacy('ready', {
+      filename: corrupt,
+      title,
+      baseRevision: '40',
+      baseChecksum: hex(enc('working copy bytes')),
+    })
+    const server = fakeServer({ bytes: enc('v3'), title })
+    const ctx = setup(server, { budgetBytes: 4096 })
+    const fillers = await fillBudget(ctx)
+    const snapshot = () => ({
+      names: readdirSync(folder()).sort(),
+      binding: readFileSync(join(folder(), BINDING_FILE), 'utf8'),
+      payload: readFileSync(payloadPath(), 'utf8'),
+      copy: readFileSync(copyPath(corrupt), 'utf8'),
+    })
+    const before = snapshot()
+
+    // the open runs the sweep (deferred: the budget is full), so the folder is
+    // held: the copy opens as it is, exactly as when its rewrite is refused
+    const opened = await ctx.service.openDocument(DOC)
+    if (!opened.ok) throw new Error(opened.error)
+    expect(opened.value.path).toBe(copyPath(corrupt))
+    expect(existsSync(opened.value.path)).toBe(true)
+    expect(snapshot()).toEqual(before)
+    // the opened copy is the one binding.json names, not an unbound new file
+    expect(new BindingStore(join(dir, 'uniwork-documents')).classify(opened.value.path).kind).toBe(
+      'bound',
+    )
+    expect(uploads(server)).toHaveLength(0)
+    expect(commits(server)).toHaveLength(0)
+
+    // the budget frees: the sweep completes and keeps the intent's own key
+    const intents = await intentStoreOf(ctx)
+    for (const key of fillers) await intents.delete(key)
+    expect((await ctx.service.openSyncStore()).kind).toBe('ok')
+    const migrated = await intentOf(ctx, copyPath(corrupt))
+    expect(migrated?.intent.idempotencyKey).toBe(LEGACY.idempotencyKey)
+    expect(Buffer.from(migrated?.payload ?? []).toString()).toBe('working copy bytes')
+    expect(binding(copyPath(corrupt))).toMatchObject({ schema: 2, min_store_level: 2 })
+    expect(binding(copyPath(corrupt))).not.toHaveProperty('pendingIntent')
+    expect(existsSync(payloadPath())).toBe(false)
+  })
+
+  it('R4-be-1: a held folder with no copy to open reports the lock, not store_full', async () => {
+    // binding.json still carries the pre-store pair but the copy it names is
+    // gone: the held fresh-download corner has nothing to open and must stop.
+    // With the store locked the reason is the lock - never the storage-full
+    // sentence, which offers no retry (the split a refused save reports)
+    seedLegacy('ready')
+    rmSync(copyPath(), { force: true })
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server, { budgetBytes: 4096, keystoreLocked: true })
+    // the sweep cannot move the intent (the budget is full), so the folder is
+    // held while the auth module reports the keychain locked
+    await fillBudget(ctx)
+    const snapshot = () => ({
+      names: readdirSync(folder()).sort(),
+      binding: readFileSync(join(folder(), BINDING_FILE), 'utf8'),
+      payload: readFileSync(payloadPath(), 'utf8'),
+    })
+    const before = snapshot()
+    expect(await ctx.service.openDocument(DOC)).toEqual({ ok: false, error: 'keystore_locked' })
+    // the folder stays byte for byte and nothing is sent
+    expect(snapshot()).toEqual(before)
+    expect(uploads(server)).toHaveLength(0)
+    expect(commits(server)).toHaveLength(0)
+  })
+
+  it('R4-be-1: the same corner with a budget deferral reports store_full', async () => {
+    seedLegacy('ready')
+    rmSync(copyPath(), { force: true })
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server, { budgetBytes: 4096 })
+    await fillBudget(ctx)
+    const snapshot = () => ({
+      names: readdirSync(folder()).sort(),
+      binding: readFileSync(join(folder(), BINDING_FILE), 'utf8'),
+      payload: readFileSync(payloadPath(), 'utf8'),
+    })
+    const before = snapshot()
+    expect(await ctx.service.openDocument(DOC)).toEqual({ ok: false, error: 'store_full' })
+    expect(snapshot()).toEqual(before)
+    expect(uploads(server)).toHaveLength(0)
+    expect(commits(server)).toHaveLength(0)
   })
 })
 
@@ -1352,7 +1729,7 @@ describe('the conflict dialog belongs to the document that hit the conflict (GOA
     const xlsx = join(sheetDir, 'Budget.xlsx')
     await ctx.service.store.writeWorkingCopy(sheetDir, 'Budget.xlsx', enc('my xlsx'))
     await ctx.service.store.write(sheetDir, {
-      schema: 1,
+      schema: 2,
       documentId: SHEET,
       workspaceId: 'ws_1',
       orgId: 'org_a',
@@ -1366,6 +1743,8 @@ describe('the conflict dialog belongs to the document that hit the conflict (GOA
       state: 'conflict',
       error: 'conflict',
       serverRevision: '8',
+      minStoreLevel: 2,
+      minAppVersion: '0.0.0',
     })
     return { server, ctx, docx, xlsx }
   }
@@ -1486,5 +1865,26 @@ describe('the conflict dialog belongs to the document that hit the conflict (GOA
     expect(await flow).toMatchObject({ path: xlsx, state: 'conflict' })
     expect(readFileSync(xlsx, 'utf8')).toBe('my xlsx')
     expect(ctx.deps.reloadPath).not.toHaveBeenCalled()
+  })
+})
+
+/**
+ * R1-be-12 (OQ-P4): `min_app_version` is display metadata and carries the core
+ * semver - a beta/dev build must not stamp its prerelease tail.
+ */
+describe('min_app_version is the core semver (R1-be-12)', () => {
+  it('a prerelease build stamps the core version into every new binding', async () => {
+    const server = fakeServer({ bytes: enc('v3 bytes') })
+    const ctx = setup(server, { appVersion: '0.11.0-dev.3' })
+    const path = await openDoc(ctx)
+    expect(binding(path)).toMatchObject({ schema: 2, min_app_version: '0.11.0' })
+  })
+
+  it('strips the prerelease and build metadata, and keeps anything else verbatim', () => {
+    expect(coreSemver('0.11.0-beta.9')).toBe('0.11.0')
+    expect(coreSemver('0.11.0-dev.3')).toBe('0.11.0')
+    expect(coreSemver('1.2.3+build.7')).toBe('1.2.3')
+    expect(coreSemver(' 0.11.0 ')).toBe('0.11.0')
+    expect(coreSemver('dev')).toBe('dev')
   })
 })

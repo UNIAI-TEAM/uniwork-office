@@ -77,6 +77,8 @@ export const nl = {
   acctErrWrongDeployment: 'Dit account hoort bij een andere UniWork-server.',
   acctErrNotConfigured: 'Deze app is niet gekoppeld aan een UniWork-server.',
   acctErrKeyringUnavailable: 'Beveiligde opslag op deze computer is niet beschikbaar.',
+  acctErrKeystoreLocked:
+    'De sleutelhanger van deze computer is vergrendeld. Ontgrendel hem en probeer het opnieuw.',
   acctErrServerError: 'Er is een probleem opgetreden bij UniWork. Probeer het later opnieuw.',
   acctErrMalformedResponse: 'UniWork stuurde een onverwacht antwoord. Probeer het later opnieuw.',
   wbLoadFailedTitle: 'Je opgeslagen gegevens konden niet worden geladen',

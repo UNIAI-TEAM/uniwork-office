@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, type IpcMain, type WebContents } from 'electron'
+import { app, BrowserWindow, dialog, safeStorage, type IpcMain, type WebContents } from 'electron'
 import { join } from 'node:path'
 import { COMMENTS_CHANNELS } from '@genoffice/electron-utils/comments-ipc'
 import {
@@ -23,6 +23,20 @@ import { AccountBoundary } from './account-boundary'
 import { createUniworkComments, type UniworkCommentsHandle } from './comments-wiring'
 import type { CommentsRevealPayload } from '@genoffice/electron-utils/comments-ipc'
 import { setUniworkCloseGuard } from './close-guard'
+import { INTENT_STORE_REGISTRATION } from '../uniwork-sync/intent-store'
+import { createSafeStorageKeyProvider } from '../uniwork-sync/keys'
+import {
+  DOC_INDEX_REGISTRATION,
+  FEED_CURSORS_REGISTRATION,
+  SyncRuntime,
+  type SyncRuntimeTargets,
+} from '../uniwork-sync/runtime'
+import { createSyncStoreAccess, type SyncStoreAccess } from '../uniwork-sync/session-store'
+import { createStoreLayer, type StoreLayer } from '../uniwork-sync/store'
+import { createFeedClient, type FeedClient } from '../uniwork-sync/feed/client'
+import { createCapabilityFetch } from '../uniwork-sync/capability/client'
+import { CapabilityCache, NEVER_READ_CAPABILITIES } from '../uniwork-sync/capability/cache'
+import { createUniworkDocsClient, type FetchLike, type UniworkDocsClient } from './client'
 import {
   UniworkDocsService,
   type ConflictUi,
@@ -226,23 +240,179 @@ export interface UniworkDocsHandle {
   activate(startLaunch: (route: (url: string) => void) => void): void
 }
 
+/** encrypted bytes the account's sync store (intents, cursors, index) may keep */
+export const SYNC_STORE_BUDGET_BYTES = 256 * 1024 * 1024
+
+/**
+ * The durable sync store of the session. One key provider (keys wrapped by
+ * Electron safeStorage) and one layer under `userData/uniwork-sync/`, holding
+ * every store this build registers; the records are encrypted, budgeted and
+ * wiped at the account boundary. The wrapped keys sit beside the layer root,
+ * outside the wiped scope, so unlocking after a sign-out reads them again.
+ */
+function createSyncStoreLayer(root: string): StoreLayer {
+  const layer = createStoreLayer({
+    root: join(root, 'store'),
+    keys: createSafeStorageKeyProvider({ safeStorage, dir: join(root, 'keys') }),
+    budgetBytes: SYNC_STORE_BUDGET_BYTES,
+    clock: () => Date.now(),
+  })
+  layer.register(INTENT_STORE_REGISTRATION)
+  layer.register(FEED_CURSORS_REGISTRATION)
+  layer.register(DOC_INDEX_REGISTRATION)
+  return layer
+}
+
+/** the layer and the session's access to it: one pair per userData root */
+const syncStores = new Map<string, { layer: StoreLayer; access: SyncStoreAccess }>()
+
+function syncStoreFor(): { layer: StoreLayer; access: SyncStoreAccess } {
+  const root = join(app.getPath('userData'), 'uniwork-sync')
+  let found = syncStores.get(root)
+  if (!found) {
+    const layer = createSyncStoreLayer(root)
+    const access = createSyncStoreAccess({
+      layer,
+      scope: () => {
+        const identity = uniworkSessionIdentity()
+        return identity
+          ? { deploymentId: identity.deploymentId, accountId: identity.accountId }
+          : null
+      },
+    })
+    found = { layer, access }
+    syncStores.set(root, found)
+  }
+  return found
+}
+
+/**
+ * Test seams of the feed runtime: the HTTP round trip of the capability and
+ * feed clients, and the clock their caches read. Production leaves both out.
+ */
+export interface SyncRuntimeSeam {
+  fetch?: FetchLike
+  now?(): number
+}
+
+/**
+ * The change-feed runtime of the shell: one FeedConsumer per (org, workspace)
+ * of the signed-in account, over the shared durable store, started on sign-in
+ * and re-run on a 60 s poll. There is no desktop realtime channel today, so
+ * this poll (plus a pass per sign-in) is the whole mechanism. Clients are
+ * rebuilt when the deployment origin changes; capabilities are cached per org
+ * FOR ONE ACCOUNT - a same-origin account switch clears the cache, so the
+ * outgoing account's org flags are never served to the incoming one.
+ * A capability or feed 401 asks the account to re-evaluate its session.
+ */
+export function createSyncRuntime(
+  service: UniworkDocsService,
+  seam: SyncRuntimeSeam = {},
+): SyncRuntime {
+  let origin: string | null = null
+  /** the account the capability cache belongs to: '', or `deployment/account` */
+  let account = ''
+  let docs: UniworkDocsClient | null = null
+  let feed: FeedClient | null = null
+  const clock = { now: () => seam.now?.() ?? Date.now() }
+  let capability: CapabilityCache = new CapabilityCache({
+    fetch: () => Promise.resolve({ status: 0, body: undefined }),
+    clock,
+  })
+  const clients = (): {
+    docs: UniworkDocsClient
+    feed: FeedClient
+    capability: CapabilityCache
+  } | null => {
+    const profile = uniworkDeploymentProfile()
+    if (!profile) return null
+    const identity = uniworkSessionIdentity()
+    const token = identity ? `${identity.deploymentId}/${identity.accountId}` : ''
+    if (origin !== profile.apiOrigin) {
+      origin = profile.apiOrigin
+      account = token
+      const options = {
+        apiOrigin: profile.apiOrigin,
+        authorized: <T>(call: (token: string) => Promise<T>) => authorizedRequest(call),
+        isSignedIn: () => uniworkSessionIdentity() !== null,
+        ...(seam.fetch ? { fetch: seam.fetch } : {}),
+      }
+      docs = createUniworkDocsClient(options)
+      feed = createFeedClient(options)
+      capability = new CapabilityCache({
+        fetch: createCapabilityFetch(options),
+        clock,
+      })
+    } else if (account !== token) {
+      // the boundary is the identity, not the origin: cached per-org flags of
+      // the outgoing account must never answer for the incoming one (R1-be-8)
+      account = token
+      capability.clear()
+    }
+    return docs && feed ? { docs, feed, capability } : null
+  }
+  const targets: SyncRuntimeTargets = {
+    orgs: () =>
+      uniworkAccount()
+        .status()
+        .orgs?.map((org) => org.id) ?? [],
+    workspaces: async (orgId) => {
+      const found = clients()
+      if (!found) return []
+      return (await found.docs.listWorkspaces(orgId)).map((workspace) => workspace.id)
+    },
+  }
+  return new SyncRuntime({
+    store: syncStoreFor().access,
+    targets,
+    capability: async (orgId) => {
+      const found = clients()
+      if (!found) {
+        return {
+          kind: 'ok' as const,
+          capabilities: { ...NEVER_READ_CAPABILITIES },
+          source: 'default' as const,
+        }
+      }
+      return found.capability.get(orgId)
+    },
+    client: () => clients()?.feed ?? null,
+    keepDraft: (documentId) => service.hasLocalDraft(documentId),
+    clock: { now: () => Date.now() },
+    onSessionExpired: () => {
+      // a capability or feed 401: the account re-reads the session and applies
+      // its own state (keystore-locked, signed-out, restoring, ...)
+      void uniworkAccount()
+        .retry()
+        .catch(() => undefined)
+    },
+    log: (message) => console.warn(message),
+  })
+}
+
 /** Registers the IPC handlers (safe before app ready: nothing touches the account yet). */
 export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): UniworkDocsHandle {
   const push = (channel: string, payload: unknown) => {
     const wc = wiring.shellContents()
     if (wc && !wc.isDestroyed()) wc.send(channel, payload)
   }
+  const syncStore = syncStoreFor().access
   // the comments handle is built after the service (it resolves bindings through
   // it) but the service needs it for the launch-ticket reveal: a holder breaks
   // the cycle, and the reveal only runs once both exist
   let comments: UniworkCommentsHandle | null = null
   const service = new UniworkDocsService({
     userDataDir: app.getPath('userData'),
+    syncStore,
+    appVersion: () => app.getVersion(),
     profile: () => uniworkDeploymentProfile(),
     channel: () => uniworkAppChannel(),
     applyProfile: (profile) =>
       applyUniworkProfile(profile, { confirm: (origin) => confirmConnect(wiring, origin) }),
     identity: () => uniworkSessionIdentity(),
+    // a locked keychain is the account's state, not the session's: a cold
+    // restore has no session and must still lock the saved account's copies
+    keystoreLocked: () => uniworkAccount().status().state === 'keystore-locked',
     selectedOrgId: () => uniworkAccount().status().org?.id ?? null,
     authorized: (call) => authorizedRequest(call),
     openPath: (path) => {
@@ -266,6 +436,9 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
       () => wiring.shellContents(),
       UNIWORK_DOC_CHANNELS.lock,
     ),
+    // the whole list when locks clear (a Retry that unlocked the keychain): the
+    // shell replaces its list, so the S11 panel does not outlive the lock
+    pushLocks: () => push(UNIWORK_DOC_CHANNELS.locksChanged, service.currentLocks()),
     reveal: () => wiring.reveal(),
     revealComment: (path, commentId) => comments?.reveal(path, commentId),
   })
@@ -311,6 +484,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     if (typeof path === 'string') service.dismissLock(path)
   })
   setUniworkCloseGuard(service)
+  const runtime = createSyncRuntime(service)
   // Sign out and a sign-in as someone else close the previous account's
   // documents and delete their AI history (see account-boundary.ts)
   const boundary = new AccountBoundary({
@@ -325,6 +499,25 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     // not shown an S11 panel for a working copy it cannot explain
     forgetLocks: (match) => service.forgetLocksWhere(match),
     closeConflictPrompt: () => service.closeConflictPrompt(),
+    sessionOwner: () => {
+      const identity = uniworkSessionIdentity()
+      return identity
+        ? { accountId: identity.accountId, deploymentId: identity.deploymentId }
+        : null
+    },
+    // the outgoing account's durable store (intents, feed cursors, doc index)
+    // is locked and wiped with its documents; the feed stops first so no
+    // in-flight consumer writes into a wiped scope
+    wipeStore: async (owner) => {
+      runtime.stop()
+      if (!owner) return
+      const store = syncStoreFor()
+      store.access.forget()
+      await store.layer.lockAndWipe({
+        deploymentId: owner.deploymentId,
+        accountId: owner.accountId,
+      })
+    },
   })
   setUniworkSignOutHooks({
     before: () => boundary.beforeSignOut(),
@@ -345,6 +538,10 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
         const now = status.state === 'signed-in'
         if (now && !signedIn) void service.launch.onSignedIn()
         signedIn = now
+        // the feed runs only for a live session: start on sign-in (one pass
+        // plus the 60 s poll), stop on sign-out, a lock or a switch
+        if (now && identity) runtime.start()
+        else runtime.stop()
       })
       startLaunch((url) => void service.launch.handleUrl(url))
     },

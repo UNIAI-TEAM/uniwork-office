@@ -74,6 +74,7 @@ export const he = {
   acctErrWrongDeployment: 'החשבון הזה שייך לשרת UniWork אחר.',
   acctErrNotConfigured: 'האפליקציה הזו אינה מקושרת לשרת UniWork.',
   acctErrKeyringUnavailable: 'האחסון המאובטח במחשב זה אינו זמין.',
+  acctErrKeystoreLocked: 'מחזיק המפתחות של מחשב זה נעול. בטלו את הנעילה ונסו שוב.',
   acctErrServerError: 'אירעה בעיה ב-UniWork. נסה שוב מאוחר יותר.',
   acctErrMalformedResponse: 'UniWork שלח תגובה בלתי צפויה. נסה שוב מאוחר יותר.',
   wbLoadFailedTitle: 'לא ניתן היה לטעון את הנתונים השמורים שלך',

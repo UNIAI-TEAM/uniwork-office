@@ -1,6 +1,6 @@
 import { readFileSync, statSync } from 'node:fs'
 import { copyFile, readFile } from 'node:fs/promises'
-import { extname, join, resolve } from 'node:path'
+import { basename, extname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import type {
   RecentUniworkSource,
   UniworkConflictChoice,
@@ -12,6 +12,7 @@ import type {
   UniworkDocLock,
   UniworkDocStatus,
   UniworkLaunchEvent,
+  UniworkLockReason,
   UniworkResult,
   UniworkWorkspaceRef,
 } from '../../shared/home-api'
@@ -25,9 +26,12 @@ import {
   type Binding,
   BindingStore,
   type BoundDocument,
+  documentNameIn,
+  hasLegacyIntentFiles,
   type LastOwner,
   type NewerStore,
   type PathBinding,
+  scopeWorkingCopyDirs,
 } from './binding-store'
 import { type FetchLike, type UniworkDocsClient, createUniworkDocsClient } from './client'
 import { UniworkDocError } from './errors'
@@ -41,7 +45,11 @@ import {
 import { pathKey } from '../../shared/path-key'
 import { LaunchController } from './launch'
 import type { DocumentDetail, LaunchDescriptor } from './parse'
-import { SaveCoordinator, toStatus } from './save-coordinator'
+import { SaveCoordinator, toStatus, type IntentAccess } from './save-coordinator'
+import type { SyncStoreAccess, SyncStoreOpen } from '../uniwork-sync/session-store'
+import { createIntentStore, INTENT_STORE_REGISTRATION } from '../uniwork-sync/intent-store'
+import { migrateLegacyIntents } from '../uniwork-sync/migration'
+import { APP_STORE_LEVEL } from '../uniwork-sync/store-level'
 
 /**
  * UniWork documents in the shell main process: the picker reads, the open
@@ -103,12 +111,27 @@ export type UnsavedCloseChoice = 'save' | 'resolve' | 'close' | 'cancel'
 
 export interface UniworkDocsServiceDeps {
   userDataDir: string
+  /**
+   * The session's durable sync store (wiring): intents, feed cursors and the
+   * doc index live here. Absent = no store-backed saves (tests that never
+   * touch one).
+   */
+  syncStore?: SyncStoreAccess
+  /** this build's version, stamped into every binding as `min_app_version` (display only) */
+  appVersion?: () => string
   profile(): DeploymentProfile | null
   /** the channel of this build (its launch scheme), known before any server is chosen */
   channel(): DeploymentChannel
   /** applies the server a launch link names (confirm / sign-out rules live in uniwork-auth) */
   applyProfile(profile: DeploymentProfile): Promise<ProfileOutcome>
   identity(): SessionIdentity | null
+  /**
+   * True while the auth module is in its keystore-locked state: the OS keychain
+   * cannot produce the store key even though a saved account exists. The store
+   * then reports `keystore_locked` independently of the network session (a cold
+   * restore has none), so the S11 lock and the save refusal still happen.
+   */
+  keystoreLocked?(): boolean
   selectedOrgId(): string | null
   authorized<T>(call: (token: string) => Promise<T>): Promise<T>
   fetch?: FetchLike
@@ -130,6 +153,12 @@ export interface UniworkDocsServiceDeps {
   pushLaunch(event: UniworkLaunchEvent): void
   /** a working copy refused by the newer-store guard (S11 lock panel) */
   pushLock?(lock: UniworkDocLock): void
+  /**
+   * The lock list changed in a way the single-lock push does not carry (a
+   * keystore lock cleared when the store opened): the shell replaces its list,
+   * so a panel on screen goes away without waiting for an unrelated push.
+   */
+  pushLocks?(): void
   reveal(): void
   /**
    * G8-08: a launch ticket named a comment; after the editor shows the
@@ -190,11 +219,25 @@ function accessFor(level: string | null): UniworkDocAccess {
   return level === 'edit' || level === 'manage' ? 'edit' : 'view'
 }
 
+/**
+ * The core semver of a version string: `0.11.0-dev.3` -> `0.11.0` (build
+ * metadata after `+` goes too). OQ-P4: `min_app_version` is display metadata,
+ * so a prerelease build must not stamp its tail - the store gate reads
+ * `min_store_level` only, and two builds differing only in the tail must
+ * stamp the same value. Anything without a leading `major.minor.patch` is
+ * kept verbatim.
+ */
+export function coreSemver(version: string): string {
+  return /^\d+\.\d+\.\d+/.exec(version.trim())?.[0] ?? version
+}
+
 export class UniworkDocsService {
   readonly store: BindingStore
   readonly coordinator: SaveCoordinator
   readonly launch: LaunchController
   private readonly deps: UniworkDocsServiceDeps
+  /** the build's own version, stamped into bindings (see binding-store's minAppVersion) */
+  private readonly appVersion: () => string
   private client: UniworkDocsClient | null
   private clientOrigin: string | null = null
   private lastOwner: LastOwner | null
@@ -208,6 +251,12 @@ export class UniworkDocsService {
   /** per path, the saveMark of its last user Save */
   private readonly lastUserSave = new Map<string, number>()
   private saveCounter = 0
+  /** one open of the session's store is shared; never remembered when it failed */
+  private syncOpen: Promise<SyncStoreOpen> | null = null
+  /** the outcome of the last store open; 'unknown' until it is asked for */
+  private storeOpenKind: SyncStoreOpen['kind'] | 'unknown' = 'unknown'
+  /** scopes whose schema 1 -> 2 sweep has finished in this process */
+  private readonly migratedScopes = new Set<string>()
   /**
    * The one conflict dialog open (native dialogs are window-wide, not per
    * tab). `fromClose` = opened by the close prompt of that document's tab.
@@ -222,7 +271,10 @@ export class UniworkDocsService {
   constructor(deps: UniworkDocsServiceDeps) {
     this.deps = deps
     this.client = deps.client ?? null
-    this.store = new BindingStore(join(deps.userDataDir, 'uniwork-documents'))
+    this.appVersion = deps.appVersion ?? (() => '0.0.0')
+    this.store = new BindingStore(join(deps.userDataDir, 'uniwork-documents'), (dir) =>
+      this.heldByMigration(dir),
+    )
     this.lastOwner = this.store.readLastOwner()
     this.coordinator = new SaveCoordinator({
       store: this.store,
@@ -233,6 +285,7 @@ export class UniworkDocsService {
       },
       isSignedIn: () => deps.identity() !== null,
       ownsBinding: (doc) => this.owns(doc),
+      intents: () => this.intentAccess(),
       publish: (status) => this.publish(status),
       ...(deps.sleep ? { sleep: deps.sleep } : {}),
     })
@@ -333,6 +386,231 @@ export class UniworkDocsService {
   /** the session's account may have changed: remember it as the last owner */
   noteSessionIdentity(): void {
     this.liveIdentity()
+    // a live session opens its store: the scope's migration and every later
+    // intent write go through this one open
+    void this.openSyncStore().catch(() => undefined)
+  }
+
+  /** this build's version, as stamped into bindings (display only, never a gate) */
+  private buildVersion(): string {
+    try {
+      return coreSemver(this.appVersion() || '0.0.0')
+    } catch {
+      return '0.0.0'
+    }
+  }
+
+  /**
+   * The durable store of the live session, or why it cannot be opened right
+   * now. Concurrent callers share one open; a failed open (a locked keychain,
+   * no keyring, no session) is never remembered, so the next call retries.
+   */
+  openSyncStore(): Promise<SyncStoreOpen> {
+    const sync = this.deps.syncStore
+    if (!sync) return Promise.resolve({ kind: 'no_session' })
+    // A cold start with a locked keychain has no live session to name a scope
+    // (the locked restore dropped it): the saved account's copies still need
+    // the store, so this is the store's lock, not "no session".
+    if (!this.deps.identity() && this.storeLocked()) {
+      const open: SyncStoreOpen = { kind: 'keystore_locked' }
+      this.noteStoreOpen(open)
+      return Promise.resolve(open)
+    }
+    this.syncOpen ??= sync
+      .open()
+      .then(async (open) => {
+        this.noteStoreOpen(open)
+        if (open.kind === 'ok') await this.migrateLegacyState(sync, open)
+        return open
+      })
+      .finally(() => {
+        this.syncOpen = null
+      })
+    return this.syncOpen
+  }
+
+  /**
+   * The schema 1 -> 2 sweep (the pre-store plaintext intent moves into the
+   * durable store), once per scope and process: the first open after sign-in
+   * (or after the keychain unlocks) runs it, every later open skips it. A
+   * failed or deferred sweep is not remembered, so the next open retries; a
+   * locked store never reaches here.
+   */
+  private async migrateLegacyState(
+    sync: SyncStoreAccess,
+    open: SyncStoreOpen & { kind: 'ok' },
+  ): Promise<void> {
+    const scope = sync.scope()
+    if (!scope) return
+    const token = `${scope.deploymentId}/${scope.accountId}`
+    if (this.migratedScopes.has(token)) return
+    try {
+      const report = await migrateLegacyIntents({
+        root: this.store.root,
+        scope,
+        records: (name) => open.records(name),
+        appVersion: this.buildVersion(),
+      })
+      // a sweep that could not move every pre-store intent (a store at its
+      // budget) is not complete: the next open runs it again, and until then
+      // those copies are never rewritten (see awaitingMigration)
+      if (report.deferred > 0) {
+        console.warn(
+          `uniwork sync: legacy save intent migration deferred for ${report.deferred} working copy/copies`,
+        )
+        return
+      }
+      this.migratedScopes.add(token)
+      if (report.migrated > 0) {
+        console.warn(`uniwork sync: moved ${report.migrated} legacy save intent(s) into the store`)
+      }
+    } catch (error) {
+      // the store opened but the sweep could not finish: the next open retries
+      console.warn('uniwork sync: legacy save intent migration failed:', error)
+    }
+  }
+
+  /**
+   * True while the copy still holds the pre-store intent pair and this
+   * process's sweep has not moved it. Any binding rewrite would stamp schema 2
+   * and drop `pendingIntent` - the only replayable record of the save - so
+   * such a copy is left exactly as it is until the sweep completes (every
+   * store open retries it; the caller sees the failure when one happened).
+   */
+  private awaitingMigration(doc: BoundDocument): boolean {
+    return this.awaitingMigrationIn(doc.dir, doc.deploymentId, doc.userId)
+  }
+
+  /** the same for a folder, before the binding is read (the open flow, the guard) */
+  private awaitingMigrationIn(dir: string, deploymentId: string, accountId: string): boolean {
+    if (this.migratedScopes.has(`${deploymentId}/${accountId}`)) return false
+    return hasLegacyIntentFiles(dir)
+  }
+
+  /**
+   * The one choke point every binding rewrite goes through (BindingStore.write):
+   * while the sweep still owns the folder, the write is refused - whatever
+   * caller asked for it (a save, the status refresh behind docStatus /
+   * refreshPath / confirmClose, an open, a conflict choice). The account scope
+   * comes from the folder's own segments, so a folder that is not a
+   * working-copy folder of ours is never held.
+   */
+  private heldByMigration(dir: string): boolean {
+    const rel = relative(this.store.root, resolve(dir))
+    if (!rel || rel.startsWith('..') || isAbsolute(rel)) return false
+    const [deploymentId, accountId, key] = rel.split(sep)
+    if (!deploymentId || !accountId || !key) return false
+    return this.awaitingMigrationIn(dir, deploymentId, accountId)
+  }
+
+  /**
+   * The save of a copy the sweep still owns: the store open runs the sweep
+   * again, and while it cannot complete the save stops here - no intent, no
+   * request and no binding write. True = the copy must not be written.
+   */
+  private async holdForMigration(doc: BoundDocument): Promise<boolean> {
+    if (!this.awaitingMigration(doc)) return false
+    await this.openSyncStore().catch(() => null)
+    return this.awaitingMigration(doc)
+  }
+
+  /**
+   * The refusal of a save the sweep still owns: the chip says why, but nothing
+   * is written - a binding write would stamp schema 2 and drop the plaintext
+   * intent. keystore_locked while the store is locked, store_full while it
+   * refused the intent write; the next store open retries the sweep either way.
+   */
+  private refuseMigration(doc: BoundDocument): UniworkDocStatus {
+    const status = toStatus({
+      ...doc,
+      binding: {
+        ...doc.binding,
+        state: 'error',
+        error: this.migrationRefusalCode(),
+      },
+    })
+    this.publish(status)
+    return status
+  }
+
+  /**
+   * The one reason a copy whose pre-store intent could not move reports: the
+   * store's own lock while it cannot open, otherwise the store's refusal (a
+   * budget it cannot fit). Shared by the save refusal (refuseMigration) and the
+   * open's held corner, so the renderer's remedy matches the cause in both.
+   */
+  private migrationRefusalCode(): 'keystore_locked' | 'store_full' {
+    return this.storeLocked() ? 'keystore_locked' : 'store_full'
+  }
+
+  /**
+   * The outcome of the last open decides the S11 picture: while the store is
+   * locked, a working copy that still holds a pre-store intent is locked too
+   * (it cannot be opened until the intent can move into the store); once it
+   * opens, those locks go - the migration (and every later save) works again.
+   */
+  private noteStoreOpen(open: SyncStoreOpen): void {
+    const was = this.storeOpenKind
+    this.storeOpenKind = open.kind
+    if (open.kind === 'ok') this.clearKeystoreLocks()
+    else if (open.kind === 'keystore_locked' && was !== 'keystore_locked') {
+      this.lockLegacyIntents()
+    }
+  }
+
+  /** the intent store of the session, or why a save cannot record an intent */
+  private async intentAccess(): Promise<IntentAccess> {
+    const open = await this.openSyncStore()
+    if (open.kind === 'ok') {
+      return {
+        kind: 'ok',
+        intents: createIntentStore(open.records(INTENT_STORE_REGISTRATION.name)),
+      }
+    }
+    return open.kind === 'keystore_locked' ? { kind: 'keystore_locked' } : { kind: 'unavailable' }
+  }
+
+  /** whether the durable store holds an intent for `doc`; 'locked' = unreachable now */
+  private async hasIntent(doc: BoundDocument): Promise<boolean | 'locked' | 'unavailable'> {
+    const access = await this.intentAccess()
+    if (access.kind === 'keystore_locked') return 'locked'
+    if (access.kind !== 'ok') return 'unavailable'
+    return (await access.intents.get(doc.key)) !== null
+  }
+
+  /** forget the stored intent of `doc` (a new base made it invalid) */
+  private async dropIntent(doc: BoundDocument): Promise<void> {
+    const access = await this.intentAccess()
+    if (access.kind === 'ok') await access.intents.delete(doc.key)
+  }
+
+  /**
+   * True while the document has local work the feed's full resync must never
+   * evict: a working copy that is not clean (dirty, conflict, offline,
+   * blocked, signed-out, error, saving), one whose editor holds unsaved edits
+   * the file does not show yet, or one with a stored save intent. The
+   * reconcile asks this for every indexed id the snapshot no longer lists.
+   */
+  async hasLocalDraft(documentId: string): Promise<boolean> {
+    const identity = this.deps.identity()
+    if (!identity) return false
+    const dir = this.store.dirFor(identity.deploymentId, identity.accountId, documentId)
+    const binding = await this.store.readDir(dir)
+    if (!binding || binding.documentId !== documentId) return false
+    if (KEEP_LOCAL_STATES.has(binding.state) || binding.state === 'saving') return true
+    // the editor holds edits the file does not show yet: keeping the index
+    // entry keeps the tab's document reachable until the save lands
+    if (this.editorDirty.has(join(dir, binding.filename))) return true
+    const access = await this.intentAccess()
+    // the store cannot answer: keep the copy rather than evict local work
+    if (access.kind !== 'ok') return true
+    // the editor signal was read before this await: an editor that turned
+    // dirty while the store was answering is local work too, so re-read it
+    // here instead of evicting the entry the tab still needs
+    return (
+      (await access.intents.get(documentId)) !== null ||
+      this.editorDirty.has(join(dir, binding.filename))
+    )
   }
 
   /** the binding belongs to the signed-in account and the active deployment */
@@ -348,27 +626,95 @@ export class UniworkDocsService {
     )
   }
 
-  // ---- newer-store guard (G5-04g) ------------------------------------------
+  // ---- store guard (G5-04g newer store, G5-04 lock) ------------------------
 
   /**
-   * The lock for a working copy whose folder declares a store this build does
-   * not read (an integer schema >= 2 binding.json): recorded and pushed, so the
-   * shell shows the S11 panel. True = nothing may open for that path. Nothing
-   * is written and no client call is made: the binding is not parsed at all.
+   * The lock for a working copy that must not open: a folder whose binding
+   * declares a store this build does not read (schema >= 2 outside the level
+   * window), or - while the session store is locked - a copy still holding a
+   * pre-store pending intent. Recorded and pushed, so the shell shows the S11
+   * panel. True = nothing may open for that path. Nothing is written and no
+   * client call is made for it.
    */
   refuseLockedPath(path: string): boolean {
     const lock = this.store.newerStoreAt(path)
-    if (!lock) return false
-    this.recordLock(lock)
+    if (lock) {
+      this.recordLock(lock)
+      return true
+    }
+    if (this.storeLocked() && this.store.legacyIntentAt(path)) {
+      this.recordPathLock(path, 'keystore_locked')
+      return true
+    }
+    return false
+  }
+
+  /**
+   * The same for a document folder known before the file name (a launch
+   * ticket, the open flow). The store is asked only when the folder really
+   * holds a pre-store intent: then a locked store refuses the folder, and a
+   * store that opens lets the open (and its migration) go ahead.
+   */
+  private async refuseLockedDir(dir: string): Promise<boolean> {
+    const lock = this.store.newerStoreIn(dir)
+    if (lock) {
+      this.recordLock(lock)
+      return true
+    }
+    if (!hasLegacyIntentFiles(dir)) return false
+    const open = await this.openSyncStore().catch(() => null)
+    if (open?.kind !== 'keystore_locked') return false
+    this.recordDirLock(dir, 'keystore_locked')
     return true
   }
 
-  /** the same for a document folder known before the file name (a launch ticket) */
-  private refuseLockedDir(dir: string): boolean {
-    const lock = this.store.newerStoreIn(dir)
-    if (!lock) return false
-    this.recordLock(lock)
-    return true
+  /** while the store cannot open, every copy still holding a pre-store intent is locked */
+  private lockLegacyIntents(): void {
+    const scope = this.localScope()
+    if (!scope) return
+    for (const dir of scopeWorkingCopyDirs(this.store.root, scope)) {
+      if (!hasLegacyIntentFiles(dir)) continue
+      this.recordDirLock(dir, 'keystore_locked')
+    }
+  }
+
+  /**
+   * The store cannot open right now: the last open said so, or the auth module
+   * is in its keystore-locked state (which a cold restore reports with no live
+   * session, before any open was even asked for).
+   */
+  private storeLocked(): boolean {
+    return this.storeOpenKind === 'keystore_locked' || this.deps.keystoreLocked?.() === true
+  }
+
+  /**
+   * The account boundary whose working copies this build may still act on: the
+   * live session, or - with no session and a locked keychain - the saved owner
+   * of the last live session on the active deployment (the same account whose
+   * copies stay editable, see ownsLocally).
+   */
+  private localScope(): { deploymentId: string; accountId: string } | null {
+    const live = this.deps.syncStore?.scope()
+    if (live) return { deploymentId: live.deploymentId, accountId: live.accountId }
+    if (this.deps.keystoreLocked?.() !== true) return null
+    const last = this.lastOwner
+    const profile = this.deps.profile()
+    if (!last || !profile || last.deploymentId !== profile.deploymentId) return null
+    return { deploymentId: last.deploymentId, accountId: last.accountId }
+  }
+
+  /** the store opened (again): the keystore_locked panels are stale */
+  private clearKeystoreLocks(): void {
+    let cleared = false
+    for (const [key, lock] of [...this.locks]) {
+      if (lock.reason === 'keystore_locked') {
+        this.locks.delete(key)
+        cleared = true
+      }
+    }
+    // the renderer's list is its own: it must be told the list changed, or a
+    // Retry that worked leaves the S11 panel up until some other push
+    if (cleared) this.deps.pushLocks?.()
   }
 
   /**
@@ -403,10 +749,22 @@ export class UniworkDocsService {
     }
   }
 
-  private recordLock(store: NewerStore): void {
-    const lock: UniworkDocLock = { path: store.path, reason: 'store_newer', name: store.name }
+  private recordLock(store: NewerStore, reason: UniworkLockReason = 'store_newer'): void {
+    const lock: UniworkDocLock = { path: store.path, reason, name: store.name }
     this.locks.set(pathKey(lock.path), lock)
     this.deps.pushLock?.(lock)
+  }
+
+  /** a lock named by the working-copy path itself */
+  private recordPathLock(path: string, reason: UniworkLockReason): void {
+    const full = resolve(path)
+    this.recordLock({ path: full, name: basename(full) }, reason)
+  }
+
+  /** a lock named by the document file of its folder (the launch route knows the folder) */
+  private recordDirLock(dir: string, reason: UniworkLockReason): void {
+    const name = documentNameIn(dir)
+    this.recordLock({ path: join(dir, name), name }, reason)
   }
 
   // ---- module policy -------------------------------------------------------
@@ -463,6 +821,13 @@ export class UniworkDocsService {
     this.lastUserSave.set(doc.path, ++this.saveCounter)
     // the module just wrote what its editor held
     this.editorDirty.delete(doc.path)
+    // the sweep still owns this copy's pre-store intent: nothing is sent, and
+    // a binding write here would drop the intent (the open retries the sweep)
+    if (this.awaitingMigration(doc)) {
+      void this.openSyncStore().catch(() => undefined)
+      this.refuseMigration(doc)
+      return
+    }
     void this.coordinator.save(path)
   }
 
@@ -523,7 +888,6 @@ export class UniworkDocsService {
     const clean = (b: Binding) =>
       b.access === 'edit' &&
       (b.state === 'ready' || b.state === 'saved') &&
-      !b.pendingIntent &&
       !this.coordinator.isSaving(doc.path)
     if (!clean(doc.binding)) return doc
     let checksum: string
@@ -548,17 +912,29 @@ export class UniworkDocsService {
   }
 
   /**
-   * Save/Retry from the chip. A pending intent is replayed as it is (same key,
-   * its own payload) without asking the module to write: a module Save may
-   * re-serialize different bytes, which would leave a landed save looking
-   * dirty. With no intent it runs the module's own Save.
+   * Save/Retry from the chip. A stored pending intent is replayed as it is
+   * (same key, its own payload) without asking the module to write: a module
+   * Save may re-serialize different bytes, which would leave a landed save
+   * looking dirty. With no intent it runs the module's own Save; a locked
+   * store refuses before either, so no other save path exists.
    */
   async save(path: string): Promise<UniworkDocStatus | null> {
     const doc = typeof path === 'string' ? this.store.lookup(path) : null
     if (!doc || !this.ownsLocally(doc)) return null
     if (!this.canSave(doc)) return this.statusOf(doc)
-    if (!doc.binding.pendingIntent && this.deps.requestModuleSave(doc.path))
-      return this.statusOf(doc)
+    // a copy whose pre-store intent the sweep has not moved yet is left alone:
+    // a save would rewrite its binding and drop that intent (R1-be-5)
+    if (await this.holdForMigration(doc)) return this.refuseMigration(doc)
+    const intent = await this.hasIntent(doc)
+    if (intent === 'locked') {
+      const refused = await this.coordinator.commitState(doc, {
+        ...doc.binding,
+        state: 'error',
+        error: 'keystore_locked',
+      })
+      return this.statusOf(refused)
+    }
+    if (intent !== true && this.deps.requestModuleSave(doc.path)) return this.statusOf(doc)
     // a pending intent, or no tab shows it: the file on disk is the user's last saved bytes
     const saved = await this.coordinator.save(doc.path)
     return saved ? this.statusOf(saved) : null
@@ -592,7 +968,7 @@ export class UniworkDocsService {
     const doc = this.store.lookup(path)
     if (!doc || doc.binding.access !== 'edit' || !this.ownsLocally(doc)) return false
     const b = doc.binding
-    if (b.pendingIntent || this.coordinator.isSaving(doc.path)) return true
+    if (this.coordinator.isSaving(doc.path)) return true
     if (b.state !== 'ready' && b.state !== 'saved') return true
     try {
       const { mtimeMs, size } = statSync(doc.path)
@@ -629,7 +1005,7 @@ export class UniworkDocsService {
       }
       doc = await this.refreshDirty(doc)
       const b = doc.binding
-      if (!b.pendingIntent && !UNSENT_STATES.has(b.state)) return true
+      if (!UNSENT_STATES.has(b.state)) return true
       const kind: UnsavedCloseKind =
         b.state === 'conflict'
           ? 'conflict'
@@ -652,12 +1028,28 @@ export class UniworkDocsService {
   private async saveForClose(path: string): Promise<boolean> {
     const latest = this.store.lookup(path)
     if (!latest || !this.canSave(latest)) return this.keepOpen(path)
+    // the sweep still owns the copy's pre-store intent: nothing may be written
+    if (await this.holdForMigration(latest)) {
+      this.refuseMigration(latest)
+      return false
+    }
     const wait = this.waitForSettle(latest.path, CLOSE_SAVE_WAIT_MS)
     const notWritten = () => {
       if (!this.coordinator.isSaving(latest.path)) wait.cancel()
     }
-    // a pending intent is replayed as it is, the module is not asked to write
-    if (latest.binding.pendingIntent || !this.deps.requestModuleSave(latest.path, notWritten)) {
+    const intent = await this.hasIntent(latest)
+    if (intent === 'locked') {
+      // the store cannot record an intent: nothing is written and nothing is sent
+      await this.coordinator.commitState(latest, {
+        ...latest.binding,
+        state: 'error',
+        error: 'keystore_locked',
+      })
+      wait.cancel()
+      return this.keepOpen(path)
+    }
+    // a stored intent is replayed as it is, the module is not asked to write
+    if (intent === true || !this.deps.requestModuleSave(latest.path, notWritten)) {
       void this.coordinator.save(latest.path)
     }
     return (await wait.promise)?.state === 'saved' ? true : this.keepOpen(path)
@@ -872,7 +1264,8 @@ export class UniworkDocsService {
     }
     delete next.error
     delete next.serverRevision
-    delete next.pendingIntent
+    // the old base's intent is invalid on the server's revision
+    await this.dropIntent(doc)
     const ready = await this.coordinator.commitState(doc, next)
     if (this.deps.requestModuleSave(ready.path, onNotWritten)) return this.statusOf(ready)
     const saved = await this.coordinator.save(ready.path)
@@ -883,7 +1276,8 @@ export class UniworkDocsService {
   private async replaceWithLatest(doc: BoundDocument): Promise<BoundDocument> {
     const { detail, bytes } = await this.fetchLatest(doc.binding.documentId)
     await this.store.writeWorkingCopy(doc.dir, doc.binding.filename, bytes)
-    await this.store.dropIntentPayload(doc.dir)
+    // the local work (and its intent) is discarded: nothing is left to replay
+    await this.dropIntent(doc)
     const next: Binding = {
       ...doc.binding,
       title: detail.title,
@@ -895,7 +1289,6 @@ export class UniworkDocsService {
     }
     delete next.error
     delete next.serverRevision
-    delete next.pendingIntent
     const done = await this.coordinator.commitState(doc, next)
     this.deps.reloadPath(doc.path)
     return done
@@ -941,7 +1334,7 @@ export class UniworkDocsService {
       this.store.dirFor(identity.deploymentId, identity.accountId, documentId),
     ]
     for (const dir of dirs) {
-      if (this.refuseLockedDir(dir)) throw new UniworkDocError('engine_incompatible')
+      if (await this.refuseLockedDir(dir)) throw new UniworkDocError('engine_incompatible')
     }
     const detail = await this.api().getDocument(documentId)
     const format =
@@ -972,7 +1365,6 @@ export class UniworkDocsService {
           .then((bytes) => sha256Hex(new Uint8Array(bytes)))
           .catch(() => '')
         const keepLocal =
-          !!existing.pendingIntent ||
           KEEP_LOCAL_STATES.has(existing.state) ||
           localChecksum !== existing.baseChecksum ||
           this.deps.isPathOpen(local)
@@ -990,8 +1382,7 @@ export class UniworkDocsService {
           // again" left by an earlier session is stale, so the copy reads as what
           // it holds now (its local work can be saved, or it matches UniWork)
           if (existing.state === 'signed-out') {
-            binding.state =
-              !existing.pendingIntent && localChecksum === existing.baseChecksum ? 'ready' : 'dirty'
+            binding.state = localChecksum === existing.baseChecksum ? 'ready' : 'dirty'
             delete binding.error
           }
           // the document answers again (restored from the trash, a transient
@@ -1000,12 +1391,14 @@ export class UniworkDocsService {
             existing.state === 'blocked' &&
             (existing.error === 'not_found' || existing.error === 'deleted')
           ) {
-            binding.state =
-              !existing.pendingIntent && localChecksum === existing.baseChecksum ? 'ready' : 'dirty'
+            binding.state = localChecksum === existing.baseChecksum ? 'ready' : 'dirty'
             delete binding.error
           }
-          await this.store.write(dir, binding)
-          return this.show(local, binding)
+          // the sweep still owns this copy's pre-store intent: the rewrite is
+          // refused by the store's own hold and the copy opens with its old
+          // binding - opening is fine, dropping `pendingIntent` is not
+          const written = await this.store.write(dir, binding)
+          return this.show(local, written ? binding : existing)
         }
       }
     }
@@ -1019,6 +1412,24 @@ export class UniworkDocsService {
       bytes = latest.bytes
       base = latest.detail
     }
+    // while the sweep still owns this folder the fresh download writes
+    // nothing: its binding write below would be refused (the store's hold), so
+    // the new file would open unbound - no binding names it - and the old
+    // file, the one binding.json still carries, would be replaced or deleted.
+    // The copy opens as it is, the route the branch above takes when its
+    // rewrite is refused, and binding.json, that file and pending-upload.bin
+    // stay byte for byte until the sweep moves the intent (R3-be-1)
+    if (this.heldByMigration(dir)) {
+      if (existing && existing.documentId === documentId) {
+        const local = join(dir, existing.filename)
+        if (this.store.exists(local)) return this.show(local, existing)
+      }
+      // nothing may be written and the binding names no copy to open: the
+      // folder's pre-store intent could not move (the store refused it, or is
+      // locked), so the open stops instead of landing a half-written copy.
+      // The reason follows the same split a refused save reports (R4-be-1)
+      throw new UniworkDocError(this.migrationRefusalCode())
+    }
     // a copy keeps its name, unless an earlier build named it from a corrupt
     // upload name (U+FFFD): that one is renamed with this fresh download
     const stale = existing && hasReplacementChar(existing.filename) ? existing.filename : null
@@ -1027,7 +1438,7 @@ export class UniworkDocsService {
     const path = await this.store.writeWorkingCopy(dir, filename, bytes)
     if (stale && stale !== filename) await this.store.removeWorkingCopy(dir, stale)
     const binding: Binding = {
-      schema: 1,
+      schema: 2,
       documentId,
       workspaceId,
       orgId,
@@ -1039,10 +1450,14 @@ export class UniworkDocsService {
       baseVersion: viewTicket ? launch.version : base.file.version,
       baseChecksum: sha256Hex(bytes),
       state: 'ready',
+      minStoreLevel: APP_STORE_LEVEL,
+      minAppVersion: this.buildVersion(),
       ...(existing?.lastSavedAt ? { lastSavedAt: existing.lastSavedAt } : {}),
     }
-    await this.store.write(dir, binding)
-    return this.show(path, binding)
+    // a refused write is never ignored, exactly as in the branch above: the
+    // copy then reads as the binding that persisted, not the refused one
+    const written = await this.store.write(dir, binding)
+    return this.show(path, written ? binding : (existing ?? binding))
   }
 
   /** the document's own working copy when a tab shows it */

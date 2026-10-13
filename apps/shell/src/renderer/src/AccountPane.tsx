@@ -29,6 +29,8 @@ const NOTICE: Partial<
   // no server chosen yet: the connect screen (the address field sits below)
   'not-configured': { title: 'acctConnectTitle', body: 'acctConnectBody', tone: 'info' },
   'keyring-unavailable': { title: 'acctKeyringTitle', body: 'acctKeyringBody', tone: 'warn' },
+  // the keychain exists but is locked: nothing was lost, unlock it and retry
+  'keystore-locked': { title: 'uwLockKeystoreTitle', body: 'uwLockKeystore', tone: 'warn' },
 }
 
 /** states whose notice body is the whole explanation (the error code would repeat it) */
@@ -37,6 +39,7 @@ const SELF_EXPLAINED: ReadonlySet<AccountView> = new Set([
   'session-revoked',
   'not-configured',
   'keyring-unavailable',
+  'keystore-locked',
   'wrong-deployment',
 ])
 
@@ -45,7 +48,9 @@ function showsErrorLine(account: AccountController): boolean {
   const { error, view } = account
   if (!error || error === 'cancelled') return false
   // a sign-in the user just tried from here failed: say so, even if the notice explains the state
-  if (view === 'keyring-unavailable') return account.loginError === error
+  if (view === 'keyring-unavailable' || view === 'keystore-locked') {
+    return account.loginError === error
+  }
   // the outage notice already says to check the connection
   if (view === 'server-unreachable' && error === 'network') return false
   return !SELF_EXPLAINED.has(view)
@@ -101,7 +106,8 @@ export function AccountPane({ account }: { account: AccountController }) {
     <button
       type="button"
       className="set-btn"
-      disabled={busy === 'retrying'}
+      aria-disabled={busy === 'retrying' ? true : undefined}
+      aria-busy={busy === 'retrying' ? true : undefined}
       onClick={account.retry}
     >
       {busy === 'retrying' ? t('acctRetrying') : t('acctRetry')}
@@ -143,7 +149,8 @@ export function AccountPane({ account }: { account: AccountController }) {
           <button
             type="button"
             className="set-btn primary"
-            disabled={busy === 'retrying'}
+            aria-disabled={busy === 'retrying' ? true : undefined}
+            aria-busy={busy === 'retrying' ? true : undefined}
             onClick={account.retry}
           >
             {busy === 'retrying' ? t('acctRetrying') : t('acctRetry')}
@@ -168,6 +175,12 @@ export function AccountPane({ account }: { account: AccountController }) {
           {signInBtn('acctSignInAgain')}
         </>
       )
+      break
+    case 'keystore-locked':
+      // Retry re-reads the stored sign-in once the keychain is unlocked; signing in
+      // again is refused while locked (it would overwrite the saved sign-in), so
+      // there is no second button
+      actions = retryBtn
       break
     case 'signed-in':
     case 'refreshing':
