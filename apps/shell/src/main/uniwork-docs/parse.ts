@@ -445,6 +445,14 @@ export function parseFolders(raw: unknown): UniworkDocFolderRef[] {
   return out
 }
 
+/**
+ * The revision a full `DocumentSDO` answer carries (create/rename): the value
+ * the rename produced, which keys the feed-echo suppression (R1-6).
+ */
+export function documentRevisionOf(raw: unknown): string {
+  return revision(record(record(raw).document).revision)
+}
+
 /** the new title a rename answered with, or null when the server sent none */
 export function parseRenamedTitle(raw: unknown): string | null {
   const doc = record(record(raw).document)

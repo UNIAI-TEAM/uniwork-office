@@ -415,11 +415,14 @@ export class UniworkDocsService {
     done: Promise<unknown>
   } | null = null
   /**
-   * S18: documents whose binding title this service just changed itself. A
-   * `document.updated` from the feed for one of these is this service's own
-   * write coming back, so it must not re-publish the rename a second time.
+   * S18: documents whose binding title this service just changed itself, keyed
+   * by the revision its own rename produced. A `document.updated` from the feed
+   * carrying exactly that revision is this service's own write coming back, so
+   * it must not re-publish the rename a second time; a change for any other
+   * revision is someone else's (the echo may never arrive at all, so a plain
+   * set would swallow it) and is followed as usual.
    */
-  private readonly selfRenamed = new Set<string>()
+  private readonly selfRenamed = new Map<string, string>()
   /**
    * S18: the in-flight uploads by the renderer's own `uploadId`, so the dialog's
    * Cancel can abort the one it started (the read, or the POST already running).
@@ -1264,10 +1267,11 @@ export class UniworkDocsService {
         }
         if (title === detail.title) return this.summaryOf(detail)
         const renamed = await this.api().rename({ documentId, revision: detail.revision, title })
-        // this service's own rename: the feed echoing it must not re-announce it
-        this.selfRenamed.add(documentId)
-        await this.afterLocalRename(documentId, renamed.title)
-        return renamed
+        // this service's own rename: only the revision it produced is its echo,
+        // so a genuine later change for another revision is still followed (R1-6)
+        this.selfRenamed.set(documentId, renamed.revision)
+        await this.afterLocalRename(documentId, renamed.summary.title)
+        return renamed.summary
       },
       { nameField: true },
     )
@@ -1462,12 +1466,21 @@ export class UniworkDocsService {
   // ---- S18: renamed elsewhere -------------------------------------------------
 
   /**
-   * A change the G5-04 feed applied for `documentId` (wiring). A rename this
-   * service just made itself is skipped: its own write is echoing back.
+   * A change the G5-04 feed applied for `documentId` (wiring), with the
+   * revision the feed reported. A rename this service made itself is skipped
+   * only for the revision that rename produced: its own write echoing back. A
+   * change for any other revision - including the first one when the echo never
+   * arrived - is someone else's rename and is followed (R1-6). Without a
+   * revision the notice is taken as this service's own echo, so the one-shot
+   * suppression the callers without a feed still rely on is unchanged.
    */
-  noteFeedChange(documentId: string): void {
+  noteFeedChange(documentId: string, revision?: string): void {
     if (typeof documentId !== 'string' || !documentId) return
-    if (this.selfRenamed.delete(documentId)) return
+    const own = this.selfRenamed.get(documentId)
+    if (own !== undefined) {
+      this.selfRenamed.delete(documentId)
+      if (revision === undefined || revision === own) return
+    }
     void this.refreshMetadataFor(documentId).catch(() => undefined)
   }
 
@@ -1495,8 +1508,17 @@ export class UniworkDocsService {
     } catch {
       return
     }
-    if (detail.title === existing.title) return
-    await this.applyTitle(existing, detail.title, local, true)
+    // the metadata read is async: a save may have started or settled, and an
+    // editor may have made the copy dirty, while it was in flight. The title is
+    // applied to the binding as it is NOW - never re-written from the one read
+    // before the await, which would clear that newer state (R1-4).
+    const latest = await this.store.readDir(dir)
+    if (!latest || latest.documentId !== documentId) return
+    const latestLocal = join(dir, latest.filename)
+    if (!this.store.exists(latestLocal)) return
+    if (KEEP_LOCAL_STATES.has(latest.state) || this.coordinator.isSaving(latestLocal)) return
+    if (detail.title === latest.title) return
+    await this.applyTitle(latest, detail.title, latestLocal, true)
   }
 
   /** the binding rewrite that follows a title change, plus the pushes it owes */
@@ -1510,10 +1532,16 @@ export class UniworkDocsService {
     let filename = doc.filename
     let path = local
     const open = this.deps.isPathOpen(local)
+    // the schema 1 -> 2 sweep still owns this folder: the store refuses every
+    // binding write (see BindingStore.write), so moving the file first would
+    // leave binding.json naming a file that no longer exists and the copy
+    // unreachable by lookup. The title is what this call may still carry; the
+    // pre-store intent pair stays byte for byte (R1-3, the open flow's guard).
+    const held = this.heldByMigration(dir)
     // an editor holding the copy keeps its file name: the shell re-keys a tab
     // only for a path that actually moved, and Windows refuses a rename under an
     // open handle
-    if (!open) {
+    if (!open && !held) {
       const candidate = workingCopyName(title, doc.filename, doc.format)
       if (candidate !== doc.filename) {
         const next = join(dir, candidate)

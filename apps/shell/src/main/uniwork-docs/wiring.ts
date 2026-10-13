@@ -423,7 +423,9 @@ export function createSyncRuntime(
     store: syncStoreFor().access,
     // S18: a change the feed applies for a bound document re-reads its metadata,
     // so a rename on the web reaches the open desktop copy
-    onFeedChange: (change) => service.noteFeedChange(change.documentId),
+    // the change's revision, so the echo of this service's own rename is
+    // recognised by it and a genuine later change is never swallowed (R1-6)
+    onFeedChange: (change) => service.noteFeedChange(change.documentId, change.revision),
     targets,
     capability: async (orgId) => {
       const found = clients()

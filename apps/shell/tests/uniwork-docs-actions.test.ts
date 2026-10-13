@@ -814,6 +814,102 @@ describe('renamed elsewhere', () => {
     expect(ctx.renamed).toHaveLength(0)
   })
 
+  // R1-3 (reviewer probe "own rename preserves the working copy while legacy
+  // migration holds binding writes"): while the schema 1 -> 2 sweep owns the
+  // folder, every binding write is refused - so the file must not move either,
+  // or binding.json would name a file that no longer exists and the copy would
+  // be unreachable by lookup. The pre-store intent pair stays untouched.
+  it('a rename while the migration holds the folder keeps the file and the intent', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    const opened = await ctx.service.openDocument(DOC)
+    if (!opened.ok) throw new Error(opened.error)
+    // a copy from an earlier build: schema 1 + pendingIntent, its bytes still
+    // beside it, and the sweep cannot move them (no store in this test)
+    const dir = docDir(DOC)
+    const legacy = binding(opened.value.path)
+    writeFileSync(
+      join(dir, BINDING_FILE),
+      JSON.stringify({ ...legacy, schema: 1, pendingIntent: { idempotencyKey: 'legacy' } }),
+    )
+    writeFileSync(join(dir, 'pending-upload.bin'), 'pending bytes')
+
+    const renamed = await ctx.service.renameDocument(DOC, 'Other.docx')
+    expect(renamed.ok).toBe(true)
+    // the binding still names a file that is really there, and the file kept
+    // its name (the title could not be written: the store refused it)
+    const written = binding(opened.value.path)
+    expect(copiesIn(DOC)).toContain(written.filename)
+    expect(written).toMatchObject({ title: 'Q4 plan.docx', filename: 'Q4 plan.docx' })
+    expect(copiesIn(DOC).sort()).toEqual(['Q4 plan.docx', 'pending-upload.bin'])
+    expect(ctx.pathRenames).toHaveLength(0)
+  })
+
+  // R1-4 (reviewer probe "a metadata response must preserve a dirty state
+  // written during its request"): the metadata GET is async, so the binding is
+  // re-read when it resolves - a copy that turned dirty meanwhile keeps its
+  // state and its old title instead of being reverted to the pre-await read.
+  it('a metadata response never overwrites a state written while it was pending', async () => {
+    const server = fakeServer()
+    const original = server.fetch
+    let release: () => void = () => undefined
+    let entered: () => void = () => undefined
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const seen = new Promise<void>((resolve) => {
+      entered = resolve
+    })
+    let paused = false
+    server.fetch = (async (url: string, init: RequestInit) => {
+      const response = await original(url, init)
+      if (paused && String(url).endsWith(`/documents/${DOC}`)) {
+        entered()
+        await gate
+      }
+      return response
+    }) as typeof server.fetch
+
+    const ctx = setup(server, { pathOpen: true })
+    const opened = await ctx.service.openDocument(DOC)
+    if (!opened.ok) throw new Error(opened.error)
+    server.state.title = 'Renamed on web.docx'
+    paused = true
+    const refresh = ctx.service.refreshMetadataFor(DOC)
+    await seen
+    // the editor made the copy dirty while the GET was in flight
+    writeFileSync(
+      join(docDir(DOC), BINDING_FILE),
+      JSON.stringify({ ...binding(opened.value.path), state: 'dirty' }),
+    )
+    writeFileSync(opened.value.path, 'unsaved local work')
+    release()
+    await refresh
+
+    expect(binding(opened.value.path)).toMatchObject({ state: 'dirty', title: 'Q4 plan.docx' })
+    expect(ctx.renamed).toHaveLength(0)
+  })
+
+  // R1-6: the feed is off, so the echo of this service's own rename never
+  // arrives; a later, genuine remote rename must not be swallowed by the
+  // suppression the own rename left behind. Only the revision it produced is
+  // treated as its own echo.
+  it('a genuine remote rename is followed even when no echo of our own arrived', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    const opened = await ctx.service.openDocument(DOC)
+    if (!opened.ok) throw new Error(opened.error)
+    const renamed = await ctx.service.renameDocument(DOC, 'Mine.docx')
+    expect(renamed.ok).toBe(true)
+    // the feed never echoed our own rename; the web renames it again (a newer
+    // revision) and the single change that arrives carries that newer revision
+    server.state.title = 'Theirs.docx'
+    server.state.revision += 1
+    ctx.service.noteFeedChange(DOC, String(server.state.revision))
+    await vi.waitFor(() => expect(ctx.renamed).toHaveLength(1))
+    expect(ctx.renamed[0]).toEqual({ documentId: DOC, title: 'Theirs.docx' })
+  })
+
   it('focus refresh picks up a title change without the feed (closed document)', async () => {
     const server = fakeServer()
     const ctx = setup(server)

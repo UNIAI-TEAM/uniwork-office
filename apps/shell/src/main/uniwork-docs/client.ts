@@ -9,6 +9,7 @@ import { TransportError } from '../uniwork-auth/transport'
 import { UniworkDocError, errorFromResponse } from './errors'
 import { formatForName, isDecimalString, mimeForFormat } from './formats'
 import {
+  documentRevisionOf,
   parseCommit,
   parseDetail,
   parseDocumentList,
@@ -100,9 +101,18 @@ export interface UniworkDocsClient {
     title: string
     parentId: string | null
     idempotencyKey: string
+    signal?: AbortSignal
   }): Promise<UniworkDocSummary>
-  /** rename a document (S18); the server compares `revision` and may answer a conflict */
-  rename(input: { documentId: string; revision: string; title: string }): Promise<UniworkDocSummary>
+  /**
+   * rename a document (S18); the server compares `revision` and may answer a
+   * conflict. The answer carries the row the renderer shows and the revision
+   * this rename produced (the feed echo of it is recognisable by that revision)
+   */
+  rename(input: {
+    documentId: string
+    revision: string
+    title: string
+  }): Promise<{ summary: UniworkDocSummary; revision: string }>
   /** archive a document (S18); there is no hard-delete route */
   archive(documentId: string, idempotencyKey: string): Promise<UniworkDocSummary>
   /** restore an archived document (S18) */
@@ -397,7 +407,7 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
         timeoutMs: metadataTimeout,
         read: json,
       })
-      return parseDocumentSummary(raw)
+      return { summary: parseDocumentSummary(raw), revision: documentRevisionOf(raw) }
     },
 
     async archive(documentId, idempotencyKey) {
