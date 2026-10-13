@@ -38,3 +38,11 @@ export { parseBody, serialize, buildMentionToken, type BodyToken } from './body'
 export { CollabBody, type CollabBodyProps } from './CollabBody'
 export { anchorLabel } from './anchor-label'
 export { AnchorLabel, type AnchorLabelProps, type AnchorLabelStrings } from './AnchorLabel'
+export {
+  CollabComposer,
+  type CollabComposerMode,
+  type CollabComposerProps,
+  type CollabComposerStrings,
+} from './CollabComposer'
+export { MentionPicker, type CollabPickerStrings } from './MentionPicker'
+export { clearDraft, loadDraft, saveDraft, type CollabDraftKey } from './draft-store'

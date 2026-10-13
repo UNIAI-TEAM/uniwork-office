@@ -2,6 +2,7 @@
  * --accent-soft, with shared fallbacks); light and dark come from the token blocks. Targets >= 24px,
  * >= 44px under a coarse pointer. Layout mirrors the genoffice side panes (header bar, card threads). */
 @import './collab-body.css';
+@import './collab-composer.css';
 
 /* ---------- base ---------- */
 
