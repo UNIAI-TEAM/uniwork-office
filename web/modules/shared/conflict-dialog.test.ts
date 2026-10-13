@@ -366,6 +366,10 @@ describe('Overwrite…', () => {
     expect(choices()).toEqual(['reload', 'overwrite', 'cancel'])
     await pick('reload')
     expect(btn('download').getAttribute('aria-disabled')).toBe('true')
+    // the reason speaks of the download, not of the overwrite that just failed
+    const reason = card().querySelector<HTMLElement>('.ow-dlg-reasons')!.textContent
+    expect(reason).toContain(t('uwConflictDownloadTooLarge'))
+    expect(reason).not.toContain(t('uwConflictTooLarge'))
     btn('download').click()
     await flush()
     expect(send).not.toHaveBeenCalled()
@@ -498,7 +502,8 @@ describe('Reload latest (web)', () => {
       await openStep2({ bytes, send, size: 101, maxBytes: 100 })
       expect(choices()).toEqual(['download', 'discard', 'back'])
       expect(btn('download').getAttribute('aria-disabled')).toBe('true')
-      expect(reasons().textContent).toContain(t('uwConflictTooLarge'))
+      expect(reasons().textContent).toContain(t('uwConflictDownloadTooLarge'))
+      expect(reasons().textContent).not.toContain(t('uwConflictTooLarge'))
       btn('download').click()
       await flush()
       expect(send).not.toHaveBeenCalled()
