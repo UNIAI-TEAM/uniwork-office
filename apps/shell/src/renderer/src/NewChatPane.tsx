@@ -125,8 +125,8 @@ const SUGGESTIONS: readonly Suggestion[] = [
   {
     id: 'multi',
     group: 'write',
-    promptVi: 'Soạn báo giá Word và thêm công việc follow-up khách, mở tab Clients',
-    promptEn: 'Draft a Word quote and add a follow-up task, open Clients tab',
+    promptVi: 'Soạn báo giá Word và thêm công việc theo dõi khách',
+    promptEn: 'Draft a Word quote and add a follow-up task',
   },
   {
     id: 'revenue-sheet',

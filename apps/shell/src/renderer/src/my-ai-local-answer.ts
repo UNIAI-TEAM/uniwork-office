@@ -45,9 +45,9 @@ function bullets(items: string[], emptyVi: string, emptyEn: string, vi: boolean)
   return items.map((t) => `• ${t}`).join('\n')
 }
 
-const TASKS_NOT_LOADED_VI = '• Chưa tải danh sách việc từ UniWork: mở tab Việc để tải.'
+const TASKS_NOT_LOADED_VI = '• Chưa tải danh sách việc từ UniWork: mở mục Công việc để tải.'
 const TASKS_NOT_LOADED_EN = '• Tasks are not loaded from UniWork yet: open the Tasks tab.'
-const CAL_NOT_LOADED_VI = '• Chưa tải lịch từ UniWork: mở tab Lịch để tải.'
+const CAL_NOT_LOADED_VI = '• Chưa tải lịch từ UniWork: mở mục Lịch để tải.'
 const CAL_NOT_LOADED_EN = '• The calendar is not loaded from UniWork yet: open the Calendar tab.'
 
 function looksOffTopic(lower: string): boolean {
