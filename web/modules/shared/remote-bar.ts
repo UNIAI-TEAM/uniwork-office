@@ -2,7 +2,8 @@
  * The new-version bar (S6, EXPERIENCE.md › Thanh phiên bản mới) of every web frame: one `region`
  * above the editor with a sentence and link actions, never stacked. The sentence in the bar is the
  * visible copy and carries no live attribute: it is written once into the window's fixed live nodes
- * (polite for the information bars, alert for the rest) so a screen reader hears it exactly once.
+ * (polite for the new-version bars: information, dirty and AI; alert for the rest) so a screen
+ * reader hears it exactly once.
  * An information bar hides itself after 8 s, but never while it has the focus or the pointer.
  */
 import './remote-bar.css'
@@ -60,7 +61,9 @@ export function createRemoteBar(doc: Document = document): RemoteBar {
   let hovered = false
 
   function announce(text: string, tone: BarTone): void {
-    if (tone === 'info') {
+    // a newer version is news, not an emergency: the information bar and the dirty / AI warnings
+    // wait for a pause instead of cutting in while the user types; only the error bars interrupt
+    if (tone !== 'error') {
       polite ??= liveNode(doc, 'status')
       polite.textContent = ''
       polite.textContent = text

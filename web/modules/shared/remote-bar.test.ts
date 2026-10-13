@@ -72,6 +72,21 @@ describe('createRemoteBar', () => {
     expect(alert.textContent).toBe('')
   })
 
+  it('the dirty / AI warning is announced politely too: only an error bar interrupts', () => {
+    const b = createRemoteBar()
+    b.show({ tone: 'warn', region: 'remote', text: 'A newer version is on UniWork.' })
+    expect(document.querySelector('[role=status]')!.textContent).toBe(
+      'A newer version is on UniWork.',
+    )
+    expect(document.querySelector('[role=alert]')).toBeNull()
+    b.show({ tone: 'error', region: 'lock', text: 'No access.' })
+    expect(document.querySelector('[role=alert]')!.textContent).toBe('No access.')
+    // the warning did not leak into the assertive node
+    expect(document.querySelector('[role=status]')!.textContent).toBe(
+      'A newer version is on UniWork.',
+    )
+  })
+
   it('an information bar hides itself after 8 s', () => {
     const b = createRemoteBar()
     b.show({ tone: 'info', region: 'remote', text: 'Updated.', autoHideMs: BAR_AUTO_HIDE_MS })
