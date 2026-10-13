@@ -230,6 +230,8 @@ function setup(
     budgetBytes?: number
     /** the build version stamped into bindings (default '0.0.0') */
     appVersion?: string
+    /** the auth module reports its keystore-locked state (the S11 lock) */
+    keystoreLocked?: boolean
   } = {},
 ) {
   const statuses: UniworkDocStatus[] = []
@@ -261,6 +263,7 @@ function setup(
     userDataDir: dir,
     syncStore,
     appVersion: () => opts.appVersion ?? '0.0.0',
+    keystoreLocked: () => opts.keystoreLocked ?? false,
     profile: () => profile,
     identity: () =>
       account ? { accountId: account, deviceSessionId: 'dev_1', deploymentId: 'default' } : null,
@@ -1577,6 +1580,49 @@ describe('a deferred sweep never erases the pre-store intent (R1-be-5)', () => {
     expect(binding(copyPath(corrupt))).toMatchObject({ schema: 2, min_store_level: 2 })
     expect(binding(copyPath(corrupt))).not.toHaveProperty('pendingIntent')
     expect(existsSync(payloadPath())).toBe(false)
+  })
+
+  it('R4-be-1: a held folder with no copy to open reports the lock, not store_full', async () => {
+    // binding.json still carries the pre-store pair but the copy it names is
+    // gone: the held fresh-download corner has nothing to open and must stop.
+    // With the store locked the reason is the lock - never the storage-full
+    // sentence, which offers no retry (the split a refused save reports)
+    seedLegacy('ready')
+    rmSync(copyPath(), { force: true })
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server, { budgetBytes: 4096, keystoreLocked: true })
+    // the sweep cannot move the intent (the budget is full), so the folder is
+    // held while the auth module reports the keychain locked
+    await fillBudget(ctx)
+    const snapshot = () => ({
+      names: readdirSync(folder()).sort(),
+      binding: readFileSync(join(folder(), BINDING_FILE), 'utf8'),
+      payload: readFileSync(payloadPath(), 'utf8'),
+    })
+    const before = snapshot()
+    expect(await ctx.service.openDocument(DOC)).toEqual({ ok: false, error: 'keystore_locked' })
+    // the folder stays byte for byte and nothing is sent
+    expect(snapshot()).toEqual(before)
+    expect(uploads(server)).toHaveLength(0)
+    expect(commits(server)).toHaveLength(0)
+  })
+
+  it('R4-be-1: the same corner with a budget deferral reports store_full', async () => {
+    seedLegacy('ready')
+    rmSync(copyPath(), { force: true })
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server, { budgetBytes: 4096 })
+    await fillBudget(ctx)
+    const snapshot = () => ({
+      names: readdirSync(folder()).sort(),
+      binding: readFileSync(join(folder(), BINDING_FILE), 'utf8'),
+      payload: readFileSync(payloadPath(), 'utf8'),
+    })
+    const before = snapshot()
+    expect(await ctx.service.openDocument(DOC)).toEqual({ ok: false, error: 'store_full' })
+    expect(snapshot()).toEqual(before)
+    expect(uploads(server)).toHaveLength(0)
+    expect(commits(server)).toHaveLength(0)
   })
 })
 

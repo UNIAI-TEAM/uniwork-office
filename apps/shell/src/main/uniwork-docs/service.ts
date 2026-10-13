@@ -514,11 +514,21 @@ export class UniworkDocsService {
       binding: {
         ...doc.binding,
         state: 'error',
-        error: this.storeLocked() ? 'keystore_locked' : 'store_full',
+        error: this.migrationRefusalCode(),
       },
     })
     this.publish(status)
     return status
+  }
+
+  /**
+   * The one reason a copy whose pre-store intent could not move reports: the
+   * store's own lock while it cannot open, otherwise the store's refusal (a
+   * budget it cannot fit). Shared by the save refusal (refuseMigration) and the
+   * open's held corner, so the renderer's remedy matches the cause in both.
+   */
+  private migrationRefusalCode(): 'keystore_locked' | 'store_full' {
+    return this.storeLocked() ? 'keystore_locked' : 'store_full'
   }
 
   /**
@@ -1397,9 +1407,10 @@ export class UniworkDocsService {
         if (this.store.exists(local)) return this.show(local, existing)
       }
       // nothing may be written and the binding names no copy to open: the
-      // folder's pre-store intent could not move (the store refused it), so
-      // the open stops instead of landing a half-written copy
-      throw new UniworkDocError('store_full')
+      // folder's pre-store intent could not move (the store refused it, or is
+      // locked), so the open stops instead of landing a half-written copy.
+      // The reason follows the same split a refused save reports (R4-be-1)
+      throw new UniworkDocError(this.migrationRefusalCode())
     }
     // a copy keeps its name, unless an earlier build named it from a corrupt
     // upload name (U+FFFD): that one is renamed with this fresh download
