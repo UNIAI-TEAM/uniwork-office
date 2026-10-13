@@ -119,7 +119,12 @@ describe('the comments client routes every call to the contract §2 path', () =>
     // never invents an anchors route of its own
     expect(server.lastCall()?.method).toBe('PUT')
     expect(server.lastCall()?.url).toContain(`/api/v1/documents/${DOC}/comments/anchors`)
-    expect(out).toMatchObject({ name: 'DocsProtocolError', code: 'unsupported', status: 405, retryable: false })
+    expect(out).toMatchObject({
+      name: 'DocsProtocolError',
+      code: 'unsupported',
+      status: 405,
+      retryable: false,
+    })
   })
 
   it('a hard-deleted thread disappears on the next full list', async () => {
