@@ -96,3 +96,17 @@ html.uw-remote-bar-on #root {
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+/* A locked frame (revoke / delete): #root is inert, so the ribbon / toolbar also look disabled
+ * instead of merely not answering. Opacity and a grey filter carry no colour: both themes dim the
+ * same way, the document itself is left as it is. */
+html.uw-locked
+  #root
+  :is(.ribbon, .ribbon-tabs, .ribbon-body, .toolbar, [role='toolbar']):not(
+    :is(.ribbon, .ribbon-tabs, .ribbon-body, .toolbar, [role='toolbar'])
+      :is(.ribbon, .ribbon-tabs, .ribbon-body, .toolbar, [role='toolbar'])
+  ) {
+  opacity: 0.5;
+  filter: grayscale(1);
+  cursor: not-allowed;
+}

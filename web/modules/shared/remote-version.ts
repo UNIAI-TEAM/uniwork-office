@@ -19,6 +19,9 @@
  *     any save: the reason's bar (revoke, delete, or the organisation sentence; a reason this frame
  *     does not know reads as revoked), the editor inert with its content (dirty edits included)
  *     kept, every save refused. Once per reason; another document lifts it (`reset`).
+ * - a frame that cannot swap its document in place (the text modules read it once at boot) reloads
+ *   itself in `apply` and hands the notice over (`ReloadNotice`): after the boot `reloaded` shows
+ *   the same information bar.
  * A module supplies the bits that are its own (what is open, dirty, how a head replaces the
  * document); the rest is shared by Docs, PDF, Markdown, HTML, Slides and Sheets.
  */
@@ -42,6 +45,30 @@ import { createRemoteBar, type BarAction, type RemoteBar } from './remote-bar'
 
 export type LockKind = 'revoked' | 'deleted'
 
+/**
+ * What the "updated to version N" bar says, as plain data so a frame that reloads itself can carry
+ * it across the reload (sessionStorage) and show the bar after the boot.
+ */
+export interface ReloadNotice {
+  /** the revision of the head that was loaded, null when the host sent none */
+  revision: string | null
+  /** the author's name when the event names the very version that was loaded */
+  author: string | null
+  /** when that version was saved (ms), null when unknown */
+  savedAt: number | null
+}
+
+/** the notice of a loaded head; the author and the time are the event's only for the same version */
+export function reloadNotice(reply: OpenPayload, event: RemoteVersionPayload | null): ReloadNotice {
+  const sameVersion = event !== null && reply.file.versionId === event.version_id
+  const savedAt = reply.file.modifiedAt ?? (sameVersion ? Date.parse(event.saved_at) : Number.NaN)
+  return {
+    revision: openReplyRevision(reply),
+    author: (sameVersion ? event.author_name : undefined) ?? null,
+    savedAt: Number.isFinite(savedAt) ? savedAt : null,
+  }
+}
+
 export interface RemoteVersionHost {
   port: Pick<FramePort, 'onRemoteVersion' | 'onBlocked' | 'request'>
   /** the open document; `revision` is the open copy's (decimal), null when the host sent none */
@@ -50,8 +77,11 @@ export interface RemoteVersionHost {
   isDirty(): boolean
   /** the editor may edit (frame token + file), for the Reload confirm's download choice */
   canEdit(): boolean
-  /** replace the document the editor shows with this head; rejects when it could not be loaded */
-  apply(reply: OpenPayload): Promise<void>
+  /**
+   * replace the document the editor shows with this head; rejects when it could not be loaded. A
+   * frame that restarts instead hands `notice` to its next boot (`RemoteVersion.reloaded`).
+   */
+  apply(reply: OpenPayload, notice: ReloadNotice): Promise<void>
   /** the Reload confirm's "download my version" IO (only with the `download` capability) */
   download?(): ConflictIo['download']
   /** where the module's dialogs live (marker attribute, backdrop class, modal tracking) */
@@ -75,8 +105,13 @@ export interface SaveFailure {
 export interface RemoteVersion {
   /** the editor's dirty state changed (the bar follows: dirty <-> "undone all changes") */
   dirtyChanged(dirty: boolean): void
-  /** a save (or an Overwrite) failed: 401 / 403 / 410 get their bar */
-  saveFailed(error: SaveFailure): void
+  /**
+   * a save (or an Overwrite) failed: 401 / 403 / 410 get their bar. True when the bar says it, so
+   * the module does not also show its own failure toast (one surface, never two).
+   */
+  saveFailed(error: SaveFailure): boolean
+  /** a reloaded frame booted on the head a `ReloadNotice` was made for: the information bar */
+  reloaded(notice: ReloadNotice): void
   /** revoke / delete: the frame refuses every save */
   locked(): LockKind | null
   /** the sentence a refused save answers with */
@@ -93,6 +128,9 @@ const ORG_BLOCKED: Record<string, WebStringKey> = {
 }
 
 type Newer = 'dirty' | 'ai' | 'nowClean'
+
+/** set on <html> while the frame is locked (revoke / delete): the dimmed chrome of remote-bar.css */
+export const LOCKED_CLASS = 'uw-locked'
 
 function big(rev: string | null | undefined): bigint | null {
   if (!isDecimalRevision(rev)) return null
@@ -161,22 +199,21 @@ export function createRemoteVersion(host: RemoteVersionHost): RemoteVersion {
     bar.hide()
   }
 
-  function showUpdated(reply: OpenPayload, event: RemoteVersionPayload | null): void {
-    const rev = openReplyRevision(reply)
-    // the author and the time are the event's only when it is the version that was loaded
-    const sameVersion = event !== null && reply.file.versionId === event.version_id
-    const author = (sameVersion ? event.author_name : undefined) ?? t('uwAuthorFallback')
-    const savedAt = reply.file.modifiedAt ?? (sameVersion ? Date.parse(event.saved_at) : Number.NaN)
-    const time = Number.isFinite(savedAt)
-      ? new Intl.DateTimeFormat(lang(), { dateStyle: 'medium', timeStyle: 'short' }).format(savedAt)
-      : null
+  function showUpdated(notice: ReloadNotice): void {
+    const author = notice.author ?? t('uwAuthorFallback')
+    const time =
+      notice.savedAt !== null
+        ? new Intl.DateTimeFormat(lang(), { dateStyle: 'medium', timeStyle: 'short' }).format(
+            notice.savedAt,
+          )
+        : null
     shown = null
     bar.show({
       tone: 'info',
       region: 'remote',
       text:
-        rev !== null && time !== null
-          ? t('uwRemoteUpdated', { n: rev, author, time })
+        notice.revision !== null && time !== null
+          ? t('uwRemoteUpdated', { n: notice.revision, author, time })
           : t('uwRemoteUpdatedNoRev'),
       actions: [barAction('close', t('uwRemoteClose'), () => bar.hide())],
       autoHideMs: 8000,
@@ -210,6 +247,9 @@ export function createRemoteVersion(host: RemoteVersionHost): RemoteVersion {
     if (root && inertBefore === null) {
       inertBefore = root.hasAttribute('inert')
       root.setAttribute('inert', '')
+      // and it looks it: the ribbon / toolbar dim (remote-bar.css), not only stop answering
+      root.setAttribute('aria-disabled', 'true')
+      root.ownerDocument.documentElement.classList.add(LOCKED_CLASS)
     }
     host.onLock?.(kind)
   }
@@ -219,6 +259,10 @@ export function createRemoteVersion(host: RemoteVersionHost): RemoteVersion {
     lockSentence = ''
     const root = rootEl()
     if (root && inertBefore === false) root.removeAttribute('inert')
+    if (root && inertBefore !== null) {
+      root.removeAttribute('aria-disabled')
+      root.ownerDocument.documentElement.classList.remove(LOCKED_CLASS)
+    }
     inertBefore = null
   }
 
@@ -292,11 +336,12 @@ export function createRemoteVersion(host: RemoteVersionHost): RemoteVersion {
         bar.hide()
         return { kind: 'dropped' }
       }
-      await host.apply(reply)
+      const notice = reloadNotice(reply, event)
+      await host.apply(reply, notice)
       if (my !== token || lock) return { kind: 'applied' }
       latest = null
       dismissed = null
-      showUpdated(reply, event)
+      showUpdated(notice)
       return { kind: 'applied' }
     } catch (err) {
       const lost = openError(err)
@@ -452,16 +497,26 @@ export function createRemoteVersion(host: RemoteVersionHost): RemoteVersion {
           text: t('webSaveUnauthorized'),
           actions: [barAction('close', t('uwRemoteClose'), () => bar.hide())],
         })
-        return
+        return true
       }
       if (error.code === 'forbidden') {
         const apiCode = error.details?.apiCode
         const reason = typeof apiCode === 'string' ? ORG_BLOCKED[apiCode] : undefined
-        if (!reason) return lockFrame('revoked')
-        showOrgBlocked(reason)
-        return
+        if (!reason) lockFrame('revoked')
+        else showOrgBlocked(reason)
+        return true
       }
-      if (error.code === 'not_found' || status === 410) lockFrame('deleted')
+      if (error.code === 'not_found' || status === 410) {
+        lockFrame('deleted')
+        return true
+      }
+      return false
+    },
+    reloaded(notice) {
+      if (lock) return
+      latest = null
+      dismissed = null
+      showUpdated(notice)
     },
     locked: () => lock,
     lockText: () => lockSentence,

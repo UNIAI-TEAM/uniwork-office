@@ -142,7 +142,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.restoreAllMocks()
   document.body.replaceChildren()
-  document.documentElement.classList.remove('uw-remote-bar-on')
+  document.documentElement.classList.remove('uw-remote-bar-on', 'uw-locked')
 })
 
 describe('a clean frame with no AI turn', () => {
@@ -591,11 +591,112 @@ describe('web save failures', () => {
 
   it('a conflict, a timeout and a 5xx are not this bar (the conflict dialog / the save line own them)', () => {
     const r = rig()
-    r.rv.saveFailed({ code: 'conflict', status: 409 })
-    r.rv.saveFailed({ code: 'timeout' })
-    r.rv.saveFailed({ code: 'internal', status: 500 })
+    expect(r.rv.saveFailed({ code: 'conflict', status: 409 })).toBe(false)
+    expect(r.rv.saveFailed({ code: 'timeout' })).toBe(false)
+    expect(r.rv.saveFailed({ code: 'internal', status: 500 })).toBe(false)
     expect(bar()).toBeNull()
     expect(r.rv.locked()).toBeNull()
+  })
+
+  it('says whether the bar owns the failure, so the module raises no toast of its own on top', () => {
+    expect(rig().rv.saveFailed({ code: 'unauthorized', status: 401 })).toBe(true)
+    expect(rig().rv.saveFailed({ code: 'forbidden', status: 403 })).toBe(true)
+    expect(
+      rig().rv.saveFailed({
+        code: 'forbidden',
+        status: 403,
+        details: { apiCode: 'organization_suspended' },
+      }),
+    ).toBe(true)
+    expect(rig().rv.saveFailed({ code: 'not_found', status: 404 })).toBe(true)
+    expect(rig().rv.saveFailed({ code: 'internal', status: 410 })).toBe(true)
+  })
+})
+
+describe('a locked frame looks disabled, not only inert', () => {
+  const locked = () => document.documentElement.classList.contains('uw-locked')
+  const root = () => document.getElementById('root')!
+
+  it('revoke and delete: the dimmed-chrome class on the page and aria-disabled on the editor root', () => {
+    const r = rig()
+    expect(locked()).toBe(false)
+    r.rv.saveFailed({ code: 'forbidden' })
+    expect(locked()).toBe(true)
+    expect(root().getAttribute('aria-disabled')).toBe('true')
+    expect(root().hasAttribute('inert')).toBe(true)
+  })
+
+  it('doc.blocked locks the same way, and a delete after a revoke keeps it', () => {
+    const r = rig()
+    r.block({ document_id: 'd1', reason: 'permission_revoked' } as DocBlockedPayload)
+    expect(locked()).toBe(true)
+    r.block({ document_id: 'd1', reason: 'document_deleted' } as DocBlockedPayload)
+    expect(locked()).toBe(true)
+  })
+
+  it('a bar that leaves the editor usable (organisation, 401) does not dim anything', () => {
+    const r = rig()
+    r.rv.saveFailed({ code: 'unauthorized' })
+    r.rv.saveFailed({ code: 'forbidden', details: { apiCode: 'organization_suspended' } })
+    expect(locked()).toBe(false)
+    expect(root().hasAttribute('aria-disabled')).toBe(false)
+  })
+
+  it('reset and dispose bring the chrome back', () => {
+    const r = rig()
+    r.rv.saveFailed({ code: 'forbidden' })
+    r.rv.reset()
+    expect(locked()).toBe(false)
+    expect(root().hasAttribute('aria-disabled')).toBe(false)
+    r.rv.saveFailed({ code: 'forbidden' })
+    r.rv.dispose()
+    expect(locked()).toBe(false)
+    expect(root().hasAttribute('aria-disabled')).toBe(false)
+  })
+
+  it('an editor root that was inert before keeps its inert, but still lifts the dim', () => {
+    const r = rig()
+    root().setAttribute('inert', '')
+    r.rv.saveFailed({ code: 'forbidden' })
+    r.rv.reset()
+    expect(root().hasAttribute('inert')).toBe(true)
+    expect(locked()).toBe(false)
+  })
+})
+
+describe('a frame that restarts for the new version (reloaded)', () => {
+  it('apply gets the notice to carry across the restart: revision, author and time of the loaded head', async () => {
+    const r = rig()
+    r.emit(event('12'))
+    await flush()
+    expect(r.apply).toHaveBeenCalledWith(expect.anything(), {
+      revision: '12',
+      author: 'Trần An',
+      savedAt: SAVED_AT,
+    })
+  })
+
+  it('the next boot shows the same information bar from the notice', () => {
+    const r = rig()
+    r.rv.reloaded({ revision: '12', author: 'Trần An', savedAt: SAVED_AT })
+    expect(tone()).toBe('info')
+    expect(barText()).toBe(
+      t('uwRemoteUpdated', { n: '12', author: 'Trần An', time: time(SAVED_AT) }),
+    )
+    expect(actions()).toEqual(['close'])
+  })
+
+  it('without an author or a time it says the plain updated sentence', () => {
+    const r = rig()
+    r.rv.reloaded({ revision: null, author: null, savedAt: null })
+    expect(barText()).toBe(t('uwRemoteUpdatedNoRev'))
+  })
+
+  it('a locked frame keeps its lock bar', () => {
+    const r = rig()
+    r.rv.saveFailed({ code: 'forbidden' })
+    r.rv.reloaded({ revision: '12', author: null, savedAt: SAVED_AT })
+    expect(tone()).toBe('error')
   })
 })
 
