@@ -26,4 +26,10 @@ export const zh = {
   wbNotif_chat_mentioned: '{actor} 在 {room} 中提到了你',
   wbNotif_chat_dm: '{actor} 给你发了消息',
   wbNotif_chat_thread_replied: '{actor} 回复了 {room} 中的话题',
+  wbTopTitle: '工作台',
+  wbTopWorkspace: '工作区',
+  wbTopRole: '角色',
+  wbTopNew: '新建',
+  wbTopNewTask: '新任务',
+  wbTopRefresh: '刷新',
 }

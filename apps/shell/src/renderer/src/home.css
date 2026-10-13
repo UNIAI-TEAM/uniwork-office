@@ -3377,6 +3377,101 @@ body.vib .home {
   padding-bottom: 32px;
 }
 
+.wb-topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.wb-topbar-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.wb-topbar-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-8);
+  background: var(--surface);
+}
+
+.wb-topbar-picker select {
+  max-width: 220px;
+  border: none;
+  border-radius: var(--radius-6);
+  background: transparent;
+  color: var(--text);
+  padding: 4px 6px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.wb-topbar-picker select:hover,
+.wb-topbar-picker select:focus-visible {
+  background: var(--hover);
+  outline: none;
+}
+
+.wb-topbar-sep {
+  color: var(--text-tertiary);
+  font-size: 13px;
+}
+
+.wb-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.wb-new-wrap {
+  position: relative;
+}
+
+.wb-new-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  min-width: 220px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: var(--shadow-menu);
+}
+
+.wb-new-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: none;
+  border-radius: var(--radius-6);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.wb-new-item:hover,
+.wb-new-item:focus-visible {
+  background: var(--hover);
+  outline: none;
+}
+
 /* ── Skill domain mini-tabs (under Skills pillar) ───────── */
 .skill-domain-tabs {
   display: flex;
@@ -5727,28 +5822,6 @@ body.vib .home {
   gap: 16px;
 }
 
-.wb-filters {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1.4fr 1fr;
-  gap: 12px;
-}
-
-@media (max-width: 960px) {
-  .wb-filters {
-    grid-template-columns: 1fr 1fr;
-  }
-}
-
-.wb-filters label {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
-.wb-filters select,
-.wb-filters input,
 .wb-form select,
 .wb-add-row select {
   border: 1px solid var(--border);
@@ -5835,88 +5908,6 @@ body.vib .home {
   margin-top: 14px;
 }
 
-.wb-chip-row-spaced {
-  margin-top: 12px;
-}
-
-.wb-hub-toggle {
-  margin-top: 18px;
-  align-self: flex-start;
-}
-
-.wb-hub-nested {
-  margin-top: 12px;
-}
-
-.wb-hub {
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--surface);
-  padding: 20px;
-}
-
-.wb-hub h2 {
-  margin: 0 0 8px;
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text);
-}
-
-.wb-hub .wb-form {
-  margin-top: 12px;
-}
-
-.wb-hero-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 16px;
-}
-
-.wb-hero-controls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  justify-content: flex-end;
-}
-
-.wb-lang {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  flex-shrink: 0;
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
-.wb-lang select {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-12);
-  background: var(--surface);
-  color: var(--text);
-  padding: 9px 12px;
-  font: inherit;
-  box-shadow: var(--shadow-btn);
-  transition:
-    box-shadow 160ms ease,
-    border-color 160ms ease;
-  min-width: 140px;
-}
-
-.wb-title {
-  margin: 0 0 8px;
-  font-size: 28px;
-  font-weight: 650;
-  color: var(--text);
-}
-
-.wb-subtitle {
-  margin: 0;
-  max-width: 640px;
-  color: var(--text-secondary);
-  line-height: 1.5;
-}
-
 .wb-layout {
   display: grid;
   grid-template-columns: minmax(280px, 1.1fr) minmax(260px, 0.9fr);
@@ -5941,8 +5932,7 @@ body.vib .home {
 
 .wb-create h2,
 .wb-packs h2,
-.wb-detail h2,
-.wb-actions h3 {
+.wb-detail h2 {
   margin: 0 0 14px;
   font-size: 16px;
   font-weight: 600;
@@ -5994,10 +5984,6 @@ body.vib .home {
   color: var(--danger);
   margin: 0 0 10px;
   font-size: 13px;
-}
-
-.wb-error-inline {
-  color: var(--danger);
 }
 
 .wb-empty {
@@ -6059,25 +6045,6 @@ body.vib .home {
   font-style: normal;
 }
 
-.wb-detail-header {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  align-items: flex-start;
-  margin-bottom: 18px;
-}
-
-.wb-detail-header p {
-  margin: 6px 0 0;
-  color: var(--text-secondary);
-}
-
-.wb-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-
 .wb-chip-row {
   display: flex;
   flex-wrap: wrap;
@@ -6111,17 +6078,6 @@ body.vib .home {
   opacity: 0.55;
   cursor: not-allowed;
   box-shadow: none;
-}
-
-.wb-chip-ai {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-  color: var(--text);
-}
-
-.wb-chip-ai:hover:not(:disabled) {
-  border-color: var(--accent-hover);
-  box-shadow: var(--shadow-btn-primary);
 }
 
 .wb-hint {

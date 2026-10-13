@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { ReactElement } from 'react'
 import { getWorkbenchModule, type PracticeId, type WorkbenchModuleId } from '@uniwork/practice-core'
+import type { UniworkWorkError } from '../../shared/uniwork-work-api'
 import { CalendarPane } from './CalendarPane'
 import { DeskPane } from './DeskPane'
 import { NotesPane } from './NotesPane'
@@ -23,6 +24,10 @@ interface Props {
   /** Selected Tri thức pack — Soạn from modules joins Tài liệu on first save. */
   packId?: string | null
   onPackLinked?: () => void
+  /** why the workspace list failed (the last good list stays); server tabs show it instead of "no workspace" */
+  workspaceError: UniworkWorkError | null
+  /** the top bar's Refresh: re-lists workspaces and reloads every server tab */
+  onReload: () => void
 }
 
 function newId(): string {

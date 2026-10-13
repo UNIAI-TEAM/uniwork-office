@@ -21,4 +21,10 @@ export const en = {
   wbNotif_chat_mentioned: '{actor} mentioned you in {room}',
   wbNotif_chat_dm: '{actor} sent you a message',
   wbNotif_chat_thread_replied: '{actor} replied to a thread in {room}',
+  wbTopTitle: 'Workbench',
+  wbTopWorkspace: 'Workspace',
+  wbTopRole: 'Role',
+  wbTopNew: 'New',
+  wbTopNewTask: 'New task',
+  wbTopRefresh: 'Refresh',
 } satisfies Record<keyof typeof zh, string>

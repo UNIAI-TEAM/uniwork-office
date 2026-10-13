@@ -6,7 +6,6 @@ import {
   getSkillDomain,
   isPracticePillarId,
   isWorkbenchModuleId,
-  listPracticeGroups,
   practiceMaterialSeedHtml,
   practiceMatchesFilter,
   practiceSkillPrompt,
@@ -16,13 +15,20 @@ import {
   type PracticeMeta,
   type SkillDomainId,
 } from '@uniwork/practice-core'
-import type { ProjectSummaryEntry } from '../../shared/home-api'
+import type { ProjectSummaryEntry, UniworkResult, UniworkWorkspaceRef } from '../../shared/home-api'
+import {
+  afterWorkspaceList,
+  readActiveWorkspaceId,
+  writeActiveWorkspaceId,
+  type WorkspaceListState,
+} from './active-workspace'
 import { onAgentIntentNavigate } from './agent-intent-bus'
 import { useI18n } from './locale'
 import { SkillDomainTabs } from './SkillDomainTabs'
 import { readActiveSkillDomain, readPinnedSkillDomains } from './skill-domain-pins'
 import { WorkbenchModulePane } from './WorkbenchModulePanes'
 import { WorkbenchTabs } from './WorkbenchTabs'
+import { WorkbenchTopBar, type WorkbenchNewItem } from './WorkbenchTopBar'
 import { pinPillar } from './workbench-pins'
 import { WbDeleteBtn, WbOpenBtn, WbRowActions } from './WbRowActions'
 
@@ -34,6 +40,8 @@ interface PracticeHomeProps {
   onOpenPackFiles: (id: string) => void
   onRefresh: () => void
   onSwitchPractice: (id: PracticeId) => void
+  /** Home's NEW_ITEMS, for the top bar's + New menu */
+  newItems: readonly WorkbenchNewItem[]
 }
 
 function toPracticeMeta(entry: ProjectSummaryEntry, practiceId: PracticeId): PracticeMeta | null {
@@ -61,10 +69,47 @@ export function PracticeHome({
   onOpenPackFiles,
   onRefresh,
   onSwitchPractice,
+  newItems,
 }: PracticeHomeProps): ReactElement {
   const { lang } = useI18n()
   const vi = lang === 'vi'
   const label = (a: string, b: string) => (vi ? a : b)
+
+  // null while the list loads; Home remounts on an account or org change
+  // (WorkbenchAccountGate keys it by bucket), so one load per mount plus Refresh is enough
+  const [wsState, setWsState] = useState<WorkspaceListState>({
+    workspaces: null,
+    workspaceId: null,
+    workspaceError: null,
+  })
+  const { workspaces, workspaceId, workspaceError } = wsState
+  const [refreshTick, setRefreshTick] = useState(0)
+
+  useEffect(() => {
+    let live = true
+    void window.aiOffice
+      .uniworkListWorkspaces()
+      // a rejected bridge call reads as offline, like every other work call
+      .catch((): UniworkResult<UniworkWorkspaceRef[]> => ({ ok: false, error: 'network' }))
+      .then((result) => {
+        if (live) setWsState((prev) => afterWorkspaceList(prev, result, readActiveWorkspaceId()))
+      })
+    return () => {
+      live = false
+    }
+  }, [refreshTick])
+
+  // the workspace on screen is the stored one: My AI and Open from UniWork read the same id
+  useEffect(() => {
+    if (workspaceId && workspaceId !== readActiveWorkspaceId()) writeActiveWorkspaceId(workspaceId)
+  }, [workspaceId])
+
+  const selectWorkspace = (id: string) => setWsState((s) => ({ ...s, workspaceId: id }))
+
+  const refresh = () => {
+    onRefresh()
+    setRefreshTick((n) => n + 1)
+  }
 
   const [tab, setTab] = useState<string>('desk')
   const [qQuery, setQQuery] = useState('')
@@ -519,37 +564,16 @@ export function PracticeHome({
 
   return (
     <main className="content wb-home">
-      <section className="wb-hero">
-        <div className="wb-hero-top">
-          <div>
-            <p className="wb-hint">{label('Vai trò làm việc', 'Practice role')}</p>
-            <h1 className="wb-title">{vi ? practice.labelVi : practice.labelEn}</h1>
-            <p className="wb-subtitle">{vi ? practice.subtitleVi : practice.subtitleEn}</p>
-            <p className="wb-hint">
-              {label(`${packs.length} gói trong thư viện`, `${packs.length} packs in library`)}
-            </p>
-          </div>
-          <div className="wb-hero-controls">
-            <label className="wb-lang">
-              <span>{label('Vai trò', 'Role')}</span>
-              <select
-                value={practice.id}
-                onChange={(e) => onSwitchPractice(e.target.value as PracticeId)}
-              >
-                {listPracticeGroups(vi).map((g) => (
-                  <optgroup key={g.label} label={g.label}>
-                    {g.practices.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {vi ? p.labelVi : p.labelEn}
-                      </option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
-            </label>
-          </div>
-        </div>
-      </section>
+      <WorkbenchTopBar
+        practice={practice}
+        onSwitchPractice={onSwitchPractice}
+        workspaces={workspaces ?? []}
+        workspaceId={workspaceId}
+        onSelectWorkspace={selectWorkspace}
+        newItems={newItems}
+        onNewTask={() => setTab('tasks')}
+        onRefresh={refresh}
+      />
 
       <WorkbenchTabs
         practiceId={practice.id}
@@ -574,6 +598,8 @@ export function PracticeHome({
           contextTitle={meta?.title}
           packId={selectedId}
           onPackLinked={onRefresh}
+          workspaceError={workspaceError}
+          onReload={refresh}
         />
       ) : null}
 

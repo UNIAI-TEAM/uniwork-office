@@ -1,4 +1,5 @@
-import type { UniworkWorkspaceRef } from '../../shared/home-api'
+import type { UniworkResult, UniworkWorkspaceRef } from '../../shared/home-api'
+import { workErrorOfDocCode, type UniworkWorkError } from '../../shared/uniwork-work-api'
 import { wbStoreGetRaw, wbStoreSetRaw } from './workbench-store-client'
 
 /**
@@ -23,4 +24,35 @@ export function pickActiveWorkspace(
   stored: string | null,
 ): string | null {
   return items.find((w) => w.id === stored)?.id ?? items[0]?.id ?? null
+}
+
+/** The Workbench's workspace list; `workspaces` null = still loading. */
+export interface WorkspaceListState {
+  workspaces: UniworkWorkspaceRef[] | null
+  workspaceId: string | null
+  workspaceError: UniworkWorkError | null
+}
+
+/**
+ * State after a list answer. A failure keeps the last good list and pick, so an
+ * offline Refresh never reads as "no workspace" and the tabs keep their cached
+ * data. A first failure is an empty list, so the tabs show the error, not a skeleton.
+ */
+export function afterWorkspaceList(
+  prev: WorkspaceListState,
+  result: UniworkResult<UniworkWorkspaceRef[]>,
+  stored: string | null,
+): WorkspaceListState {
+  if (!result.ok) {
+    return {
+      ...prev,
+      workspaces: prev.workspaces ?? [],
+      workspaceError: workErrorOfDocCode(result.error),
+    }
+  }
+  return {
+    workspaces: result.value,
+    workspaceId: pickActiveWorkspace(result.value, stored),
+    workspaceError: null,
+  }
 }

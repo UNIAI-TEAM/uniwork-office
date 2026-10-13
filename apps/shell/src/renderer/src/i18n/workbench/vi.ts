@@ -21,4 +21,10 @@ export const vi = {
   wbNotif_chat_mentioned: '{actor} đã nhắc đến bạn trong {room}',
   wbNotif_chat_dm: '{actor} đã nhắn tin cho bạn',
   wbNotif_chat_thread_replied: '{actor} đã trả lời một chuỗi tin nhắn trong {room}',
+  wbTopTitle: 'Bàn làm việc',
+  wbTopWorkspace: 'Không gian làm việc',
+  wbTopRole: 'Vai trò',
+  wbTopNew: 'Tạo mới',
+  wbTopNewTask: 'Việc mới',
+  wbTopRefresh: 'Làm mới',
 } satisfies Record<keyof typeof zh, string>
