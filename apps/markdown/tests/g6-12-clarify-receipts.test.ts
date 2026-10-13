@@ -10,6 +10,7 @@ import { Editor } from '@tiptap/core'
 import { buildExtensions } from '../src/renderer/editor/extensions'
 import { LocaleProvider } from '../src/renderer/i18n/locale'
 import { strings } from '../src/renderer/i18n/strings'
+import { usableAiSettings } from './helpers/ai-settings'
 
 // the loop is replaced by a fake whose run() asks one clarification and then finishes
 vi.mock('@genoffice/agent-core', async (orig) => {
@@ -75,7 +76,9 @@ describe('answered clarify receipts (markdown)', () => {
           if (!(prop in target)) {
             target[prop] = /^on[A-Z]/.test(prop)
               ? vi.fn(() => () => {})
-              : vi.fn(async () => undefined)
+              : prop === 'getAiSettings'
+                ? vi.fn(async () => usableAiSettings())
+                : vi.fn(async () => undefined)
           }
           return target[prop]
         },

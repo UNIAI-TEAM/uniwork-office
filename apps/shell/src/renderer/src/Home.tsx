@@ -18,6 +18,7 @@ import type {
 import type { IntegrationsApi } from '../../shared/integrations-api'
 import { markText } from '../../shared/text-marks'
 import { useDismissablePopover } from '@genoffice/ui'
+import { boxOf, clipBoxesOf, followMenuAnchor } from './folder-menu-anchor'
 import { fileCountLabel, visiblePageCount } from './counts'
 import { useI18n } from './locale'
 import type { I18n, StringKey } from './locale'
@@ -1559,12 +1560,33 @@ export function Home() {
   useDismissablePopover(folderMenu !== null, () => setFolderMenu(null), {
     inside: () => [folderMenuWrapRef.current],
   })
-  // the fixed-position folder menu would detach from its row while the tree scrolls
+  // the fixed-position folder menu would detach from its row while a list scrolls: it
+  // follows the row while the row stays visible and closes once it does not. A scroll
+  // event that moved nothing (it is dispatched a frame late, so it can predate the click
+  // that opened the menu) leaves the menu alone.
   useEffect(() => {
     if (!folderMenu) return
-    const close = () => setFolderMenu(null)
-    window.addEventListener('scroll', close, true)
-    return () => window.removeEventListener('scroll', close, true)
+    const wrap = folderMenuWrapRef.current
+    if (!wrap) return
+    const opened = boxOf(wrap)
+    const onScroll = () => {
+      const next = followMenuAnchor(
+        opened,
+        wrap.isConnected ? boxOf(wrap) : null,
+        clipBoxesOf(wrap),
+      )
+      if (next === 'stay') return
+      if (next === 'close') {
+        setFolderMenu(null)
+        return
+      }
+      // a new anchor re-runs this effect, which then measures the row where it now is
+      setFolderMenu((menu) =>
+        menu ? { ...menu, top: menu.top + next.dy, right: menu.right - next.dx } : menu,
+      )
+    }
+    window.addEventListener('scroll', onScroll, true)
+    return () => window.removeEventListener('scroll', onScroll, true)
   }, [folderMenu])
 
   // Escape closes the row menu and the confirm dialogs

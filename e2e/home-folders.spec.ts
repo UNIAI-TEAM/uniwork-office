@@ -179,6 +179,49 @@ test.describe('home folders panel', () => {
     }
   })
 
+  test('a folder menu survives a scroll event that moved nothing and follows a row that did move', async () => {
+    const launched = await launchShell({
+      onboardingSeen: true,
+      settings: { defaultSaveDir: root },
+      videoDir: 'home-folders-menu-scroll',
+    })
+    const { page } = launched
+    try {
+      const tree = page.locator('.folder-panel .tree')
+      const rootRow = tree.locator(':scope > .tree-item > .tree-row').first()
+      await rootRow.hover()
+      await rootRow.locator('.folder-more-btn').click()
+      const menu = page.locator('.folder-menu')
+      await expect(menu).toBeVisible()
+
+      // a scroll event is dispatched a frame late: one that reports an older layout change
+      // arrives after the menu opened while its row is exactly where it was
+      await tree.evaluate((el) => el.dispatchEvent(new Event('scroll')))
+      await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => done(null))))
+      await expect(menu).toBeVisible()
+
+      // the row really moving keeps the menu on it as long as the row is visible. The menu
+      // fades in with a short translateY, so measure both boxes once that has settled and
+      // compare the menu's move with the row's own move instead of a hard-coded distance
+      await menu.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)))
+      const menuBefore = await menu.boundingBox()
+      const rowBefore = await rootRow.boundingBox()
+      await tree.evaluate((el) => {
+        ;(el as HTMLElement).style.paddingTop = '16px'
+        el.dispatchEvent(new Event('scroll'))
+      })
+      await expect
+        .poll(async () => (await rootRow.boundingBox())?.y)
+        .toBeCloseTo((rowBefore?.y ?? 0) + 16, 0)
+      await expect
+        .poll(async () => (await menu.boundingBox())?.y)
+        .toBeCloseTo((menuBefore?.y ?? 0) + 16, 0)
+      await expect(menu).toBeVisible()
+    } finally {
+      await closeAndSaveVideo(launched, 'home-folders-menu-scroll')
+    }
+  })
+
   test('a file created from a folder view lands in that folder', async () => {
     const launched = await launchShell({
       onboardingSeen: true,
