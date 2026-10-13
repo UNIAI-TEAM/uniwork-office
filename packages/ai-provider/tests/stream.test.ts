@@ -1501,7 +1501,7 @@ describe('streamForProvider: 200 + non-stream JSON instead of SSE', () => {
           candidates: [
             {
               content: {
-                parts: [{ text: 'Out of quota, visit https://uniwork.app/pricing to top up.' }],
+                parts: [{ text: 'Out of quota, visit https://uniworkos.com/pricing to top up.' }],
               },
             },
           ],

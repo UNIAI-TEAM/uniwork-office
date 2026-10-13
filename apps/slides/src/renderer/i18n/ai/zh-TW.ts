@@ -111,7 +111,7 @@ export const zhTW = {
   aiErrStreamTimeout: 'AI 請求逾時：網路長時間無回應，已停止。請檢查網路後重試',
   aiErrOverloaded: 'AI 服務目前繁忙，請稍後重試',
   aiErrNetwork: '網路有問題，無法連接 AI 服務。請檢查網路後重試',
-  aiCreditsExhausted: 'UniWork 點數已用完，請前往 uniwork.app/pricing 儲值後重試',
+  aiCreditsExhausted: 'UniWork 點數已用完，請前往 uniworkos.com/pricing 儲值後重試',
   aiErrRequestFailed: '要求傳送失敗: {msg}',
   aiErrGenerateFailed: '產生失敗',
   aiErrRegenFailed: '重做頁面失敗',

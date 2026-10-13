@@ -356,8 +356,8 @@ export const rules = [
     files: ['apps/*/src/**/i18n/**/*.ts', 'apps/*/src/**/i18n-*.ts', 'apps/*/src/**/strings*.ts'],
     skipComments: true,
     replace: [
-      [/genspark\.ai\/pricing/g, 'uniwork.app/pricing'],
-      [/(?<![A-Za-z0-9./])genspark\.ai(?![A-Za-z0-9/-])/g, 'uniwork.app'],
+      [/genspark\.ai\/pricing/g, 'uniworkos.com/pricing'],
+      [/(?<![A-Za-z0-9./])genspark\.ai(?![A-Za-z0-9/-])/g, 'uniworkos.com'],
     ],
   },
   {

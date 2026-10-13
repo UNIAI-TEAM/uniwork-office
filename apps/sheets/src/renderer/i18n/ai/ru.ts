@@ -58,7 +58,7 @@ export const ru = {
   aiNetworkError:
     'Проблема с сетью: не удалось подключиться к сервису ИИ. Проверьте подключение и повторите попытку',
   aiCreditsExhausted:
-    'Кредиты UniWork исчерпаны. Пополните баланс на uniwork.app/pricing и повторите попытку',
+    'Кредиты UniWork исчерпаны. Пополните баланс на uniworkos.com/pricing и повторите попытку',
   aiToolWorkbookContext: 'Чтение сведений о книге',
   aiToolReadRange: 'Чтение диапазона',
   aiToolReadRangeOf: 'Чтение диапазона {range}',

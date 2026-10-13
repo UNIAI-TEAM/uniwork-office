@@ -113,7 +113,7 @@ export const vi = {
   aiErrNetwork:
     'Sự cố mạng: không thể kết nối tới dịch vụ AI. Vui lòng kiểm tra kết nối và thử lại',
   aiCreditsExhausted:
-    'Credit UniWork của bạn đã hết. Truy cập uniwork.app/pricing để nạp thêm rồi thử lại',
+    'Credit UniWork của bạn đã hết. Truy cập uniworkos.com/pricing để nạp thêm rồi thử lại',
   aiErrRequestFailed: 'Gửi yêu cầu thất bại: {msg}',
   aiErrGenerateFailed: 'Tạo thất bại',
   aiErrRegenFailed: 'Tạo lại trang chiếu thất bại',

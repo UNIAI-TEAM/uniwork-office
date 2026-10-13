@@ -113,7 +113,7 @@ export const th = {
   aiNetworkError:
     'เครือข่ายมีปัญหา ไม่สามารถเชื่อมต่อบริการ AI ได้ โปรดตรวจสอบการเชื่อมต่อแล้วลองใหม่',
   aiCreditsExhausted:
-    'เครดิต UniWork ของคุณหมดแล้ว โปรดเติมเครดิตที่ uniwork.app/pricing แล้วลองใหม่',
+    'เครดิต UniWork ของคุณหมดแล้ว โปรดเติมเครดิตที่ uniworkos.com/pricing แล้วลองใหม่',
   aiSumReadAttachment: 'อ่านสิ่งที่แนบ',
   aiSumImageAttachment: 'รูปภาพแนบ {name}',
   aiSumRead: 'อ่าน {name}',

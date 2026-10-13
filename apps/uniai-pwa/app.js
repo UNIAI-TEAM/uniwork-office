@@ -1,6 +1,6 @@
 /**
  * UniAI standalone PWA — ChatGPT-style shell.
- * Production host: https://uniwork.app/app
+ * Production host: https://uniworkos.com/app
  */
 
 const STORE_KEY = 'uniai.chats.v1'
@@ -1368,7 +1368,7 @@ function renderSettings() {
           <span class="settings-label">Gói đăng ký</span>
           <small>${escapeHtml(window.UniAIPlans?.getPlan?.(normalizePlanId(prefs.plan))?.nameVi || prefs.plan)} · chọn gói bên dưới (xem thử local)</small>
         </div>
-        <a class="settings-link" href="https://uniwork.app" target="_blank" rel="noopener" id="btnUpgrade">Thanh toán</a>
+        <a class="settings-link" href="https://uniworkos.com" target="_blank" rel="noopener" id="btnUpgrade">Thanh toán</a>
       </div>
       <div class="settings-row">
         <div>
@@ -1393,7 +1393,7 @@ function renderSettings() {
           <label for="setOfficeApi">API origin</label>
           <small>HTTPS UniWork hoặc http://127.0.0.1 — dùng để Mở trong Office (session token)</small>
         </div>
-        <input id="setOfficeApi" type="url" placeholder="https://uniwork.app" value="${escapeHtml(prefs.officeApiBase || '')}" />
+        <input id="setOfficeApi" type="url" placeholder="https://uniworkos.com" value="${escapeHtml(prefs.officeApiBase || '')}" />
       </div>
       <div class="settings-row settings-row-stack">
         <div>
@@ -1424,7 +1424,7 @@ function renderSettings() {
       <h3>Trợ giúp</h3>
       <div class="settings-row">
         <div><span class="settings-label">Trung tâm trợ giúp</span><small>Hướng dẫn UniAI &amp; Token Hub</small></div>
-        <a class="settings-link" href="https://uniwork.app" target="_blank" rel="noopener">Mở</a>
+        <a class="settings-link" href="https://uniworkos.com" target="_blank" rel="noopener">Mở</a>
       </div>
       <div class="settings-row">
         <div><span class="settings-label">Cài UniWork Office</span><small>Desktop để mở Workbench &amp; file Office</small></div>
