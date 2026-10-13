@@ -1301,7 +1301,9 @@ describe('new version on UniWork (doc.remoteVersion)', () => {
   it('clean: reloads through api.open (the event version) and hands the head to the renderer', async () => {
     const delivered: OpenFileResult[] = []
     await bootRevision('10')
-    api.onOpenDocx((r) => delivered.push(r))
+    api.onOpenDocx((r) => {
+      if ('dataUrl' in r) delivered.push(r)
+    })
     guardDirty(false)
     const head = new Uint8Array([0x50, 0x4b, 9, 9])
     serveHead('12', head)
@@ -1317,7 +1319,9 @@ describe('new version on UniWork (doc.remoteVersion)', () => {
   it('the Save after a head reload is based on the reply (etag = its revision), not the old copy', async () => {
     const delivered: OpenFileResult[] = []
     await bootRevision('10')
-    api.onOpenDocx((r) => delivered.push(r))
+    api.onOpenDocx((r) => {
+      if ('dataUrl' in r) delivered.push(r)
+    })
     guardDirty(false)
     serveHead('12', new Uint8Array([0x50, 0x4b, 7]))
     mock.sendRemoteVersion(event('12'))
@@ -1334,7 +1338,9 @@ describe('new version on UniWork (doc.remoteVersion)', () => {
   it('dirty: the content is not replaced and the warn bar shows', async () => {
     const delivered: OpenFileResult[] = []
     await bootRevision('10')
-    api.onOpenDocx((r) => delivered.push(r))
+    api.onOpenDocx((r) => {
+      if ('dataUrl' in r) delivered.push(r)
+    })
     guardDirty(true)
     mock.sendRemoteVersion(event('12'))
     await flush()
@@ -1347,7 +1353,9 @@ describe('new version on UniWork (doc.remoteVersion)', () => {
   it('an AI turn is running: no reload, the AI bar; the turn ends, the version loads', async () => {
     const delivered: OpenFileResult[] = []
     await bootRevision('10')
-    api.onOpenDocx((r) => delivered.push(r))
+    api.onOpenDocx((r) => {
+      if ('dataUrl' in r) delivered.push(r)
+    })
     guardDirty(false)
     serveHead('12', new Uint8Array([0x50, 0x4b, 1]))
     frameAiRun.begin('turn-1')
@@ -1377,6 +1385,37 @@ describe('new version on UniWork (doc.remoteVersion)', () => {
     })
     expect(mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(calls)
     expect(document.getElementById('root')?.hasAttribute('inert') ?? true).toBe(true)
+  })
+
+  it('doc.blocked on a dirty frame: the bar and the lock at once, Save and Save As refused, edits kept', async () => {
+    const doc = await bootRevision('10')
+    guardDirty(true)
+    mock.sendBlocked({ document_id: 'f1', reason: 'permission_revoked' })
+    expect(barText()).toBe(wt('uwRemoteRevokedWeb'))
+    expect(document.getElementById('root')?.hasAttribute('inert') ?? true).toBe(true)
+    expect(await api.saveDocx(doc.path, buf([5]), false)).toEqual({
+      ok: false,
+      error: wt('uwRemoteRevokedWeb'),
+    })
+    expect((await api.saveDocxAs('Copy', buf([5]), doc.path)).ok).toBe(false)
+    expect(await mock.host.save({ reason: 'user' })).toMatchObject({
+      ok: false,
+      error: { code: 'forbidden' },
+    })
+    expect(mock.calls.filter((c) => c.type === 'api.save' || c.type === 'api.saveAs')).toEqual([])
+    // the frame never reverts the editor's edits: nothing was re-opened
+    expect(mock.calls.filter((c) => c.type === 'api.open')).toEqual([])
+  })
+
+  it('doc.blocked deleted on a clean frame: the delete bar, a not_found answer to the host', async () => {
+    await bootRevision('10')
+    guardDirty(false)
+    mock.sendBlocked({ document_id: 'f1', reason: 'document_deleted' })
+    expect(barText()).toBe(wt('uwRemoteDeleted'))
+    expect(await mock.host.save({ reason: 'user' })).toMatchObject({
+      ok: false,
+      error: { code: 'not_found' },
+    })
   })
 
   it('a save answered 410 (deleted): the delete bar and a not_found answer to the host', async () => {

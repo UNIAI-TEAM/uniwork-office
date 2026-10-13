@@ -5,6 +5,7 @@ import { format } from '@genoffice/i18n'
 import { webLanguage } from '../../docs/bridge/browser'
 import {
   DocsProtocolError,
+  type DocBlockedPayload,
   type OpenPayload,
   type RemoteVersionPayload,
 } from '../../docs/protocol/types'
@@ -62,6 +63,7 @@ const tone = () => bar()?.className.match(/uw-remote-bar--(\w+)/)?.[1] ?? null
 interface Rig {
   rv: RemoteVersion
   emit(p: RemoteVersionPayload): void
+  block(p: DocBlockedPayload): void
   request: ReturnType<typeof vi.fn>
   apply: ReturnType<typeof vi.fn>
   dialog: ReturnType<typeof vi.fn>
@@ -79,6 +81,7 @@ function rig(
 ): Rig {
   const state = { revision: '10' as string | null, dirty: false, fileId: 'd1' }
   let listener: (p: RemoteVersionPayload) => void = () => {}
+  let blockedListener: (p: DocBlockedPayload) => void = () => {}
   const request = vi.fn(async (_type: string, payload: { fileId: string; versionId?: string }) =>
     (over.reply ?? (() => head('12')))(payload),
   )
@@ -101,6 +104,10 @@ function rig(
         listener = l
         return () => {}
       },
+      onBlocked: (l) => {
+        blockedListener = l
+        return () => {}
+      },
       request: request as never,
     },
     current: () => ({ fileId: state.fileId, revision: state.revision }),
@@ -114,7 +121,18 @@ function rig(
     confirmStop,
     ...over.host,
   })
-  return { rv, emit: (p) => listener(p), request, apply, dialog, state, ai, onLock, confirmStop }
+  return {
+    rv,
+    emit: (p) => listener(p),
+    block: (p) => blockedListener(p),
+    request,
+    apply,
+    dialog,
+    state,
+    ai,
+    onLock,
+    confirmStop,
+  }
 }
 
 beforeEach(() => {
@@ -578,5 +596,93 @@ describe('web save failures', () => {
     r.rv.saveFailed({ code: 'internal', status: 500 })
     expect(bar()).toBeNull()
     expect(r.rv.locked()).toBeNull()
+  })
+})
+
+describe('doc.blocked (the host pushes the block, no save needed)', () => {
+  const blocked = (reason: string, document_id = 'd1') =>
+    ({ document_id, reason }) as DocBlockedPayload
+  const inert = () => document.getElementById('root')!.hasAttribute('inert')
+
+  it('permission_revoked on a clean frame: the revoke bar, the editor inert, saves refused', () => {
+    const r = rig()
+    r.block(blocked('permission_revoked'))
+    expect(tone()).toBe('error')
+    expect(barText()).toBe(t('uwRemoteRevokedWeb'))
+    expect(inert()).toBe(true)
+    expect(r.rv.locked()).toBe('revoked')
+    expect(r.rv.lockText()).toBe(t('uwRemoteRevokedWeb'))
+    expect(r.onLock).toHaveBeenCalledWith('revoked')
+    expect(r.request).not.toHaveBeenCalled()
+  })
+
+  it('document_deleted on a dirty frame: the delete bar, the dirty content kept (nothing reloaded)', () => {
+    const r = rig()
+    r.state.dirty = true
+    r.block(blocked('document_deleted'))
+    expect(barText()).toBe(t('uwRemoteDeleted'))
+    expect(inert()).toBe(true)
+    expect(r.rv.locked()).toBe('deleted')
+    expect(r.apply).not.toHaveBeenCalled()
+    expect(r.request).not.toHaveBeenCalled()
+    expect(r.state).toMatchObject({ dirty: true, revision: '10' })
+  })
+
+  it('the organisation reasons: their own sentence, locked like a revoke', () => {
+    for (const [reason, key] of [
+      ['organization_suspended', 'uwReasonSuspended'],
+      ['member_deactivated', 'uwReasonDeactivated'],
+      ['document_archived', 'uwReasonArchived'],
+    ] as const) {
+      const r = rig()
+      r.block(blocked(reason))
+      const sentence = t('uwRemoteOrgBlockedWeb', { reason: t(key) })
+      expect(barText()).toBe(sentence)
+      expect(r.rv.locked()).toBe('revoked')
+      expect(r.rv.lockText()).toBe(sentence)
+      expect(inert()).toBe(true)
+      r.rv.dispose()
+      document.body.replaceChildren()
+    }
+  })
+
+  it('a reason this frame does not know reads as revoked', () => {
+    const r = rig()
+    r.block(blocked('a_reason_from_a_newer_host'))
+    expect(barText()).toBe(t('uwRemoteRevokedWeb'))
+    expect(r.rv.locked()).toBe('revoked')
+  })
+
+  it('another document changes nothing', () => {
+    const r = rig()
+    r.block(blocked('document_deleted', 'other'))
+    expect(bar()).toBeNull()
+    expect(r.rv.locked()).toBeNull()
+    expect(inert()).toBe(false)
+  })
+
+  it('once per reason; a delete after a revoke takes over, a revoke after a delete does not', () => {
+    const r = rig()
+    r.block(blocked('permission_revoked'))
+    r.block(blocked('permission_revoked'))
+    expect(r.onLock).toHaveBeenCalledTimes(1)
+    r.block(blocked('document_deleted'))
+    expect(r.rv.locked()).toBe('deleted')
+    expect(barText()).toBe(t('uwRemoteDeleted'))
+    r.block(blocked('permission_revoked'))
+    expect(r.rv.locked()).toBe('deleted')
+    expect(r.onLock).toHaveBeenCalledTimes(2)
+  })
+
+  it('a blocked frame ignores new versions; another document lifts the block', async () => {
+    const r = rig()
+    r.block(blocked('permission_revoked'))
+    r.emit(event('12'))
+    await flush()
+    expect(r.request).not.toHaveBeenCalled()
+    r.rv.reset()
+    expect(r.rv.locked()).toBeNull()
+    expect(inert()).toBe(false)
+    expect(bar()).toBeNull()
   })
 })

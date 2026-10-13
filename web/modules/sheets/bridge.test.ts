@@ -1071,4 +1071,20 @@ describe('new version on UniWork (doc.remoteVersion)', () => {
     off()
     expect(t.mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(0)
   })
+
+  it('doc.blocked locks at once with pending edits: the bar, saves refused, nothing re-opened', async () => {
+    const t = setup({ revision: '10' })
+    const wb = await t.boot()
+    t.desktop.notifyPendingEdits(1)
+    t.mock.sendBlocked({ document_id: t.file.fileId, reason: 'document_deleted' })
+    expect(document.querySelector('.uw-remote-bar--error')).not.toBeNull()
+    const off = t.desktop.onMenuAction(() => {})
+    await expect(
+      t.desktop.saveWorkbookEdits(saveRequest(wb.sessionId, [[0, 0, 1]])),
+    ).rejects.toThrow()
+    off()
+    expect(await t.mock.host.save({ reason: 'user' })).toMatchObject({ ok: false })
+    expect(t.mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(0)
+    expect(t.fake.opened).toHaveLength(1)
+  })
 })

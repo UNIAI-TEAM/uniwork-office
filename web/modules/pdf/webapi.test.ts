@@ -767,4 +767,19 @@ describe('new version on UniWork (doc.remoteVersion)', () => {
     expect(reloads).toEqual([])
     expect(document.querySelector('[data-action="reload"]')).not.toBeNull()
   })
+
+  it('doc.blocked locks at once on a dirty viewer: the bar, the host save refused, no reload', async () => {
+    const { mock, meta, api } = await bootAt10()
+    const reloads: string[] = []
+    api.onReloadRequest((p) => reloads.push(p))
+    api.setDirty(true)
+    mock.sendBlocked({ document_id: meta.fileId, reason: 'permission_revoked' })
+    expect(document.querySelector('.uw-remote-bar--error')).not.toBeNull()
+    expect(await mock.host.save({ reason: 'user' })).toMatchObject({
+      ok: false,
+      error: { code: 'forbidden' },
+    })
+    expect(mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(0)
+    expect(reloads).toEqual([])
+  })
 })

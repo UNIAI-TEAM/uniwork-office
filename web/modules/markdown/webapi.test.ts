@@ -816,4 +816,21 @@ describe('markdownApi: new version on UniWork', () => {
     expect(res.ok).toBe(false)
     expect(mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(0)
   })
+
+  it('doc.blocked locks at once on a dirty document: the bar, saves refused, no reload', async () => {
+    const { api, mock, file, reload } = setup({ revision: '10' })
+    await open(api)
+    api.setDirty(true)
+    mock.sendBlocked({ document_id: file.fileId, reason: 'document_deleted' })
+    expect(document.querySelector('.uw-remote-bar--error')).not.toBeNull()
+    expect(barText()).not.toBeNull()
+    const res = await api.save({ text: 'mine', imageSources: [], mode: 'save' })
+    expect(res.ok).toBe(false)
+    const copy = await api.save({ text: 'mine', imageSources: [], mode: 'saveAs' })
+    expect(copy.ok).toBe(false)
+    expect(mock.calls.filter((c) => c.type === 'api.save' || c.type === 'api.saveAs')).toHaveLength(
+      0,
+    )
+    expect(reload).not.toHaveBeenCalled()
+  })
 })

@@ -918,4 +918,19 @@ describe('new version on UniWork (doc.remoteVersion)', () => {
     expect(r.ok).toBe(false)
     expect(mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(0)
   })
+
+  it('doc.blocked locks at once on an edited deck: the bar, Save refused, the deck kept', async () => {
+    const { mock, api, fileId } = await setup({ revision: '10' })
+    await api.consumePendingOpen(FIT)
+    const seen: string[] = []
+    api.onOpened((r) => seen.push(r.path))
+    await api.setNotes({ slideIndex: 0, text: 'mine' })
+    await flush()
+    mock.sendBlocked({ document_id: fileId, reason: 'organization_suspended' })
+    expect(document.querySelector('.uw-remote-bar--error')).not.toBeNull()
+    const r = await api.save()
+    expect(r.ok).toBe(false)
+    expect(mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(0)
+    expect(seen).toEqual([])
+  })
 })
