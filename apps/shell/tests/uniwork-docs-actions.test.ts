@@ -53,6 +53,8 @@ function fakeServer(
     nameRefused?: boolean
     /** a conflict on archive/restore */
     lifecycleConflict?: boolean
+    /** D's `my_level` is omitempty: absent on a row the caller may not edit (default view) */
+    omitMyLevel?: boolean
   } = {},
 ) {
   const state = {
@@ -76,7 +78,7 @@ function fakeServer(
     kind: 'file',
     revision: String(state.revision),
     current_version: 1,
-    my_level: state.myLevel,
+    ...(options.omitMyLevel ? {} : { my_level: state.myLevel }),
     ...(state.archived && id === DOC ? { archived_at: '2026-10-13T09:00:00Z' } : {}),
     file: {
       file_id: `f_${id}`,
@@ -545,6 +547,30 @@ describe('my_level gating', () => {
     expect(await ctx.service.restoreDocument(DOC)).toEqual({ ok: false, error: 'forbidden' })
     // only the detail reads that decide the level; no PATCH/archive/restore
     expect(server.calls.every((c) => c.method === 'GET')).toBe(true)
+  })
+
+  // R1-1: D's `my_level` is omitempty and its documented default is view, so a
+  // detail without the field must fail closed exactly like a 'view' row; the
+  // list rows already read it that way (`canEdit` false). No PATCH may leave
+  // main for a level main cannot prove is edit or manage.
+  it('refuses a rename when the detail carries no my_level, before any PATCH', async () => {
+    const server = fakeServer({ omitMyLevel: true })
+    const ctx = setup(server)
+    expect(await ctx.service.renameDocument(DOC, 'Q4 v2.docx')).toEqual({
+      ok: false,
+      error: 'forbidden',
+    })
+    expect(server.calls.map((c) => c.method)).toEqual(['GET'])
+  })
+
+  it('refuses a rename on an unknown my_level, before any PATCH', async () => {
+    const server = fakeServer({ myLevel: 'owner' })
+    const ctx = setup(server)
+    expect(await ctx.service.renameDocument(DOC, 'Q4 v2.docx')).toEqual({
+      ok: false,
+      error: 'forbidden',
+    })
+    expect(server.calls.map((c) => c.method)).toEqual(['GET'])
   })
 
   it('lets an edit-level row rename but not archive', async () => {

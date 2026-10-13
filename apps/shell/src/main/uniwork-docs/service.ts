@@ -1162,9 +1162,12 @@ export class UniworkDocsService {
   }
 
   /**
-   * Rename a document. A view-only document is refused before any write (the
+   * Rename a document. Anything below edit is refused before any write (the
    * server is the real gate, but the person has no such action, so main does not
-   * even try). The current revision is read first because PATCH requires it.
+   * even try): D omits `my_level` on a row it will not let the caller edit and
+   * its documented default is view, so an absent or unknown level fails closed,
+   * exactly like the list rows' `canEdit`. The current revision is read first
+   * because PATCH requires it.
    */
   renameDocument(
     documentId: string,
@@ -1176,7 +1179,9 @@ export class UniworkDocsService {
         if (typeof documentId !== 'string' || !documentId) throw new UniworkDocError('not_found')
         const title = requireName(name)
         const detail = await this.api().getDocument(documentId)
-        if (detail.myLevel === 'view') throw new UniworkDocError('forbidden')
+        if (detail.myLevel !== 'edit' && detail.myLevel !== 'manage') {
+          throw new UniworkDocError('forbidden')
+        }
         if (title === detail.title) return this.summaryOf(detail)
         const renamed = await this.api().rename({ documentId, revision: detail.revision, title })
         // this service's own rename: the feed echoing it must not re-announce it
