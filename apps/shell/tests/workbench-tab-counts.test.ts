@@ -188,4 +188,81 @@ describe('Workbench tab counts follow the Overview summary', () => {
     await flush()
     expect(tabCount('Tasks')).toBe('1')
   })
+
+  const quickAdd = async (title: string) => {
+    const input = host.querySelector<HTMLInputElement>('.wb-work-quick input')!
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, title)
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await act(async () => {
+      host
+        .querySelector('.wb-work-quick')!
+        .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+    })
+    await flush()
+  }
+
+  const openTasksTab = async () => {
+    const tasksTab = Array.from(host.querySelectorAll<HTMLButtonElement>('.wb-tab-module')).find(
+      (b) => b.textContent?.includes('Tasks'),
+    )
+    await act(async () => tasksTab?.click())
+    await flush()
+  }
+
+  const withTasksApi = () => {
+    let n = 0
+    Object.assign(window.uniworkWork, {
+      myTasks: vi.fn(async () => ({ ok: true, value: [] })),
+      taskStatuses: vi.fn(async () => ({ ok: true, value: [] })),
+      createTask: vi.fn(async (input: { workspaceId: string; title: string }) => ({
+        ok: true,
+        value: {
+          id: `n${++n}`,
+          workspace_id: input.workspaceId,
+          identifier: `OPS-${n}`,
+          title: input.title,
+          status: 'todo',
+          priority: 'medium',
+          updated_at: '2026-10-13T08:00:00Z',
+        },
+      })),
+    })
+  }
+
+  it('a quick add in the Tasks tab reloads the summary once', async () => {
+    withTasksApi()
+    await renderHome()
+    await act(async () => land({ ok: true, value: SUMMARY }))
+    await flush()
+    await openTasksTab()
+    const calls = vi.mocked(window.uniworkWork.homeSummary).mock.calls.length
+    await quickAdd('Call the bank')
+    expect(window.uniworkWork.createTask).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(window.uniworkWork.homeSummary).mock.calls.length).toBe(calls + 1)
+  })
+
+  it('two quick writes: an older summary landing last never replaces the newer one', async () => {
+    withTasksApi()
+    await renderHome()
+    await act(async () => land({ ok: true, value: SUMMARY }))
+    await flush()
+    await openTasksTab()
+    await quickAdd('First')
+    const landFirst = land
+    await quickAdd('Second')
+    const landSecond = land
+    expect(landSecond).not.toBe(landFirst)
+    const withOverdue = (overdue: number) => ({
+      ok: true,
+      value: { ...SUMMARY, counts: { ...SUMMARY.counts, overdue } },
+    })
+    await act(async () => landSecond(withOverdue(5)))
+    await flush()
+    expect(tabCount('Tasks')).toBe('5')
+    await act(async () => landFirst(withOverdue(3)))
+    await flush()
+    expect(tabCount('Tasks')).toBe('5')
+  })
 })

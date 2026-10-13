@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import {
   domainSkillPrompt,
@@ -130,11 +130,13 @@ export function PracticeHome({
   const selectWorkspace = (id: string) => setWsState((s) => ({ ...s, workspaceId: id }))
 
   // a write in the Tasks tab moves the tab counts: reload the summary they read from the cache
+  const homeSeq = useRef(0)
   const reloadHomeSummary = () => {
     if (!workspace) return
+    const mine = ++homeSeq.current
     const slot = workCacheSlot(`home:${workspace.id}`)
     void settleWork(window.uniworkWork.homeSummary(workspace.id)).then((r) => {
-      if (!r.ok) return
+      if (mine !== homeSeq.current || !r.ok) return // a newer reload is on its way
       cacheWork(slot, r.value)
       setHomeSummary(r.value)
     })
