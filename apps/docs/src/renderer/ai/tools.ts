@@ -1979,7 +1979,10 @@ function executeSyncTool(
       }
       if (comments.server) {
         if (!comments.server.draftNew({ from: anchor.from, to: anchor.to }, body)) {
-          return fail(t('aiSumAddComment'), 'the range holds no text to anchor a comment to')
+          return fail(
+            t('aiSumAddComment'),
+            'a new comment cannot be drafted here: the range holds no text, or the document must be saved once first',
+          )
         }
         return {
           output: `Drafted a comment on block ${call.input.blockIndex}, anchored to "${clipExcerpt(anchor.excerpt)}". ${SERVER_DRAFT_NOTE}`,

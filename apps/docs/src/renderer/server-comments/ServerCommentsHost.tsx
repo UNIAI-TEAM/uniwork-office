@@ -67,6 +67,8 @@ export interface ServerCommentsHostProps {
   onStatus(text: string): void
   /** the translated "select the text to comment on first" line */
   selectTextMessage: string
+  /** the translated "save first" line: no new root while the open version is unknown */
+  saveFirstMessage: string
   /** comments stored in the file (shown read-only) */
   inFileComments: readonly CommentInfo[]
   /** the UI-language label of the neutral stored author "User" */
@@ -280,6 +282,8 @@ export function ServerCommentsHost(p: ServerCommentsHostProps) {
 
   const startAt = useCallback(
     (range: PmRange): boolean => {
+      // a root comment needs base_version_id (OQ-C2): unknown until the first Save receipt
+      if (!versionRef.current) return false
       const a = anchorsRef.current
       const anchor = a?.encode(range)
       if (!anchor) return false
@@ -288,7 +292,7 @@ export function ServerCommentsHost(p: ServerCommentsHostProps) {
       }
       ctlRef.current.startThread({
         anchor,
-        ...(versionRef.current ? { base_version_id: versionRef.current } : {}),
+        base_version_id: versionRef.current,
       })
       openRef.current()
       return true
@@ -300,10 +304,17 @@ export function ServerCommentsHost(p: ServerCommentsHostProps) {
   statusRef.current = p.onStatus
   const selectRef = useRef(p.selectTextMessage)
   selectRef.current = p.selectTextMessage
+  const saveFirstRef = useRef(p.saveFirstMessage)
+  saveFirstRef.current = p.saveFirstMessage
 
   p.handleRef.current = {
     startThread: () => {
       if (editor.isDestroyed) return
+      if (!versionRef.current) {
+        statusRef.current(saveFirstRef.current)
+        openRef.current()
+        return
+      }
       let { from, to } = editor.state.selection
       if (from === to) {
         // Word anchors on the word under a collapsed caret, as the local composer does
