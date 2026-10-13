@@ -42,9 +42,12 @@ export function WorkTasksPane({
   workspaceError,
   onReload,
   head,
+  onWritten,
 }: WorkPaneProps & {
   /** the tab header, drawn here so its aside can count the loaded list (WorkbenchModulePane passes it) */
   head?: Omit<WorkPaneHeaderProps, 'aside'>
+  /** a write landed: the tab counts (Overview summary) are stale */
+  onWritten?: () => void
 }): ReactElement {
   const { t, dateLocale } = useI18n()
   const wsId = workspace?.id ?? null
@@ -87,6 +90,7 @@ export function WorkTasksPane({
     const r = await settleWork(window.uniworkWork.setTaskStatus(task.id, next))
     if (r.ok) {
       list.update((rows) => rows.map((x) => (x.id === task.id ? r.value : x)))
+      onWritten?.()
       return
     }
     setRowStatus(task.id, task.status)
@@ -102,6 +106,7 @@ export function WorkTasksPane({
     if (r.ok) {
       setDraft('')
       list.update((rows) => [r.value, ...rows])
+      onWritten?.()
       return
     }
     // Retry sends the same Idempotency-Key: a lost answer never creates a second task

@@ -42,6 +42,7 @@ import {
   cacheWork,
   cachedWork,
   cachedWorkspaceListState,
+  settleWork,
   workCacheSlot,
 } from './work-cache'
 import { tabCounts } from './work-home'
@@ -127,6 +128,17 @@ export function PracticeHome({
   }, [workspaceId])
 
   const selectWorkspace = (id: string) => setWsState((s) => ({ ...s, workspaceId: id }))
+
+  // a write in the Tasks tab moves the tab counts: reload the summary they read from the cache
+  const reloadHomeSummary = () => {
+    if (!workspace) return
+    const slot = workCacheSlot(`home:${workspace.id}`)
+    void settleWork(window.uniworkWork.homeSummary(workspace.id)).then((r) => {
+      if (!r.ok) return
+      cacheWork(slot, r.value)
+      setHomeSummary(r.value)
+    })
+  }
 
   const refresh = () => {
     window.dispatchEvent(new Event(WB_REFRESH_EVENT))
@@ -632,6 +644,7 @@ export function PracticeHome({
           workspace={workspace}
           workspaceError={workspaceError}
           onReload={refresh}
+          onTasksWritten={reloadHomeSummary}
           loading={workspaces === null}
         />
       ) : null}

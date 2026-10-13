@@ -7,7 +7,12 @@ import type { Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { requirePractice } from '@uniwork/practice-core'
 import type { HomeApi, UniworkWorkspaceRef } from '../src/shared/home-api'
-import type { UniworkWorkApi, WorkHomeSummary } from '../src/shared/uniwork-work-api'
+import type {
+  UniworkWorkApi,
+  WorkHomeSummary,
+  WorkTask,
+  WorkTaskStatus,
+} from '../src/shared/uniwork-work-api'
 
 const store = vi.hoisted(() => new Map<string, string>())
 vi.mock('../src/renderer/src/workbench-store-client', async (importOriginal) => ({
@@ -62,6 +67,33 @@ async function flush(): Promise<void> {
   })
 }
 
+async function renderHome(): Promise<void> {
+  await act(async () => {
+    root.render(
+      createElement(
+        LocaleProvider,
+        { initial: 'en' },
+        createElement(PracticeHome, {
+          practice: requirePractice('entrepreneur'),
+          projects: [],
+          selectedId: null,
+          onSelectPack: vi.fn(),
+          onOpenPackFiles: vi.fn(),
+          onRefresh: vi.fn(),
+          onSwitchPractice: vi.fn(),
+          newItems: [],
+        }),
+      ),
+    )
+  })
+  await flush()
+}
+
+const tabCount = (label: string) =>
+  Array.from(host.querySelectorAll('.wb-tab-module'))
+    .find((b) => b.textContent?.includes(label))
+    ?.querySelector('.wb-tab-count')?.textContent ?? null
+
 beforeEach(() => {
   store.clear()
   host = document.createElement('div')
@@ -96,25 +128,7 @@ afterEach(() => {
 
 describe('Workbench tab counts follow the Overview summary', () => {
   it('no count before the summary lands; the counts appear when it does, without a tab switch', async () => {
-    await act(async () => {
-      root.render(
-        createElement(
-          LocaleProvider,
-          { initial: 'en' },
-          createElement(PracticeHome, {
-            practice: requirePractice('entrepreneur'),
-            projects: [],
-            selectedId: null,
-            onSelectPack: vi.fn(),
-            onOpenPackFiles: vi.fn(),
-            onRefresh: vi.fn(),
-            onSwitchPractice: vi.fn(),
-            newItems: [],
-          }),
-        ),
-      )
-    })
-    await flush()
+    await renderHome()
     expect(window.uniworkWork.homeSummary).toHaveBeenCalled()
     expect(host.querySelector('.wb-tab-count')).toBeNull()
     await act(async () => land({ ok: true, value: SUMMARY }))
@@ -127,5 +141,51 @@ describe('Workbench tab counts follow the Overview summary', () => {
       ['2', true],
       ['1', false],
     ])
+  })
+  it('a task ticked done in the Tasks tab reloads the summary, and the tab count follows', async () => {
+    const overdue: WorkTask = {
+      id: 't1',
+      workspace_id: WS.id,
+      identifier: 'OPS-7',
+      title: 'Send the quote',
+      status: 'todo',
+      priority: 'medium',
+      due_date: '2026-10-01',
+      updated_at: '2026-10-01T08:00:00Z',
+    }
+    const statuses: WorkTaskStatus[] = [
+      { id: 's1', key: 'todo', name: 'To do', category: 'todo', color: '', position: 1 },
+      { id: 's2', key: 'done', name: 'Done', category: 'done', color: '', position: 2 },
+    ]
+    Object.assign(window.uniworkWork, {
+      myTasks: vi.fn(async () => ({ ok: true, value: [overdue] })),
+      taskStatuses: vi.fn(async () => ({ ok: true, value: statuses })),
+      setTaskStatus: vi.fn(async (_id: string, status: string) => ({
+        ok: true,
+        value: { ...overdue, status },
+      })),
+    })
+    await renderHome()
+    await act(async () => land({ ok: true, value: SUMMARY }))
+    await flush()
+    expect(tabCount('Tasks')).toBe('2')
+
+    const tasksTab = Array.from(host.querySelectorAll<HTMLButtonElement>('.wb-tab-module')).find(
+      (b) => b.textContent?.includes('Tasks'),
+    )
+    await act(async () => tasksTab?.click())
+    await flush()
+    const box = host.querySelector<HTMLInputElement>('.wb-work-row input[type="checkbox"]')
+    expect(box).not.toBeNull()
+    const calls = vi.mocked(window.uniworkWork.homeSummary).mock.calls.length
+    await act(async () => box?.click())
+    await flush()
+    expect(window.uniworkWork.setTaskStatus).toHaveBeenCalledWith('t1', 'done')
+    expect(vi.mocked(window.uniworkWork.homeSummary).mock.calls.length).toBe(calls + 1)
+    await act(async () =>
+      land({ ok: true, value: { ...SUMMARY, counts: { ...SUMMARY.counts, overdue: 1 } } }),
+    )
+    await flush()
+    expect(tabCount('Tasks')).toBe('1')
   })
 })

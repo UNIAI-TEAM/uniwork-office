@@ -31,6 +31,8 @@ interface Props {
   workspaceError: UniworkWorkError | null
   /** the top bar's Refresh: re-lists workspaces and reloads every server tab */
   onReload: () => void
+  /** a task write landed in the Tasks tab (the tab counts reload) */
+  onTasksWritten?: () => void
   /** the workspace list is still loading: a server tab shows its header over the skeleton */
   loading?: boolean
 }
@@ -49,6 +51,7 @@ export function WorkbenchModulePane({
   workspace,
   workspaceError,
   onReload,
+  onTasksWritten,
   loading = false,
 }: Props): ReactElement {
   const mod = getWorkbenchModule(moduleId)
@@ -85,7 +88,7 @@ export function WorkbenchModulePane({
         <WorkPaneHeader {...head} aside={local ? <LocalTag /> : undefined} />
       )}
       {moduleId === 'calendar' && <WorkCalendarPane {...server} />}
-      {moduleId === 'tasks' && <WorkTasksPane {...server} head={head} />}
+      {moduleId === 'tasks' && <WorkTasksPane {...server} head={head} onWritten={onTasksWritten} />}
       {moduleId === 'notes' && <NotesPane practiceId={practiceId} />}
       {moduleId === 'forms' && (
         <FormsPane
