@@ -9,11 +9,13 @@ import type { UniworkWorkspaceRef } from '../../shared/home-api'
 import type {
   UniworkWorkError,
   UniworkWorkResult,
+  WorkCalendarEvent,
   WorkTask,
   WorkTaskStatus,
 } from '../../shared/uniwork-work-api'
 import { pickActiveWorkspace, readActiveWorkspaceId } from './active-workspace'
-import { closedStatusKeys } from './work-tasks'
+import { agendaRange, groupAgenda } from './work-calendar'
+import { closedStatusKeys, localIsoDate } from './work-tasks'
 import { currentWorkbenchBucket, isWorkbenchBucketCleared } from './workbench-bucket'
 
 /** Dispatched on window by the Workbench Refresh button; the server tabs reload on it. */
@@ -166,4 +168,15 @@ export function cachedOpenTasks(): WorkTask[] | null {
   if (!tasks) return null
   const closed = closedStatusKeys(cachedWork<WorkTaskStatus[]>(`taskStatuses:${ws}`)?.value ?? [])
   return tasks.filter((x) => !closed.has(x.status))
+}
+
+/** The agenda My AI reads, as the Calendar tab shows it (day + title); null when it was never loaded. */
+export function cachedAgendaItems(): { date: string; title: string }[] | null {
+  const ws = cachedActiveWorkspaceId()
+  const events = ws ? cachedWork<WorkCalendarEvent[]>(`calendar:${ws}`)?.value : undefined
+  if (!events) return null
+  const { from, to } = agendaRange(localIsoDate(new Date()))
+  return groupAgenda(events, from, to).flatMap((d) =>
+    d.events.map((e) => ({ date: d.day, title: e.title })),
+  )
 }

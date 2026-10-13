@@ -15,11 +15,13 @@ import type { UniworkWorkspaceRef } from '../src/shared/home-api'
 import type { WorkTask, WorkTaskStatus } from '../src/shared/uniwork-work-api'
 import {
   cacheWork,
+  cachedAgendaItems,
   cachedOpenTasks,
   cachedWork,
   settleWork,
   workCacheSlot,
 } from '../src/renderer/src/work-cache'
+import { localIsoDate } from '../src/renderer/src/work-tasks'
 
 beforeEach(() => {
   env.bucket = 'a-one'
@@ -110,5 +112,25 @@ describe('cachedOpenTasks (My AI grounding)', () => {
     expect(cachedOpenTasks()?.map((x) => x.id)).toEqual(['first'])
     env.active = 'gone'
     expect(cachedOpenTasks()?.map((x) => x.id)).toEqual(['first'])
+  })
+})
+
+describe('cachedAgendaItems (My AI grounding)', () => {
+  it('lists the active workspace agenda as the tab shows it (day + title), null before any load', () => {
+    env.bucket = 'a-agenda'
+    expect(cachedAgendaItems()).toBeNull()
+    const today = localIsoDate(new Date())
+    cacheWork(workCacheSlot('calendar:w1'), [
+      { id: 'e1', kind: 'task', entity_id: 't1', title: 'Send quote', start: today, all_day: true },
+      {
+        id: 'e2',
+        kind: 'meeting',
+        entity_id: 'm1',
+        title: 'Broken',
+        start: 'later',
+        all_day: false,
+      },
+    ])
+    expect(cachedAgendaItems()).toEqual([{ date: today, title: 'Send quote' }])
   })
 })
