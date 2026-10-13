@@ -62,6 +62,7 @@ import type { ModuleBridgePort } from '../../docs/bridge/module-bridge'
 import { decodeDataUrl, idFromPath, pathFor } from '../../docs/bridge/webapi'
 import type { DraftHost, DraftRecovery } from '../../docs/bridge/draft-recovery'
 import { bridgeDraftRecovery } from '../shared/recovery-prompt'
+import { createRemoteVersion, type RemoteVersion, type SaveFailure } from '../shared/remote-version'
 import { saveFailureDetail } from '../shared/save-failure'
 import {
   conflictSaveResult,
@@ -203,6 +204,8 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
   const sessions = new Map<string, Session>()
   let current: string | null = null
   let dirty = false
+  /** the "new version on UniWork" bar and its reload / lock rules (G5-03w); created below the save plumbing */
+  let remote: RemoteVersion | undefined
 
   // ------------------------------------------------------------ draft recovery (C18)
 
@@ -363,12 +366,15 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
       }
       throw err
     }
+    // another workbook: the pending version and the bar of the old one are gone
+    if (current !== null && current !== payload.file.fileId) remote?.reset()
     remember(payload.file)
     sessions.set(opened.sessionId, { fileId: payload.file.fileId, name: payload.file.name })
     restored = draft !== null
     latest = draft ? { sessionId: opened.sessionId, data: draft } : null
     dirty = restored
     port.setDirty(dirty)
+    remote?.dirtyChanged(dirty)
     return decorate(opened, payload.file, restored)
   }
 
@@ -458,7 +464,22 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
     })
   }
 
+  /** the answer of a save the frame refuses because the document was revoked / deleted */
+  function lockedSave(): SaveResult | null {
+    const lock = remote?.locked()
+    if (!lock) return null
+    return {
+      ok: false,
+      error: {
+        code: lock === 'revoked' ? 'forbidden' : 'not_found',
+        message: remote!.lockText(),
+      },
+    }
+  }
+
   port.handleSave(async () => {
+    const locked = lockedSave()
+    if (locked) return locked
     if (!canSave()) return { ok: false, error: { code: 'forbidden', message: 'view-only' } }
     if (!current) return { ok: false, error: { code: 'not_ready', message: 'no workbook is open' } }
     if (hostSave)
@@ -480,6 +501,8 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
   })
 
   port.handleSaveAs(async (payload) => {
+    const locked = lockedSave()
+    if (locked) return locked
     if (!granted('saveAs'))
       return { ok: false, error: { code: 'forbidden', message: 'save-as not granted' } }
     if (hostSaveAs)
@@ -533,7 +556,8 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
       if (res?.ok === false) return res
       return { ok: false, error: { code: 'malformed', message: 'unexpected save result' } }
     } catch (err) {
-      return { ok: false, error: { code: errorCode(err), message: describe(err) } }
+      // the status and details (a 403's reason) go with it: the new-version bar reads them
+      return { ok: false, error: toProtocolError(err).toShape() }
     }
   }
 
@@ -586,7 +610,13 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
     if (hostSave && file) hostSave.answer = conflictSaveResult(outcome, file)
     if (outcome.kind === 'overwritten') return { file: outcome.file ?? file! }
     if (outcome.kind === 'reloaded') return { canceled: true }
-    if (outcome.kind === 'failed') throw saveFailure({ code: outcome.code, message: '' })
+    if (outcome.kind === 'failed') {
+      throw saveFailure({
+        code: outcome.code,
+        message: '',
+        ...(outcome.apiCode ? { details: { apiCode: outcome.apiCode } } : {}),
+      })
+    }
     throw new Error(text('appWebConflictNotSaved'))
   }
 
@@ -613,7 +643,9 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
    * it; any other failure adds the shared localized sentence of its status, never the host's raw
    * English status line ("Internal Server Error")
    */
-  function saveFailure(error: { code: string; message: string; status?: number }): Error {
+  function saveFailure(error: SaveFailure & { message: string }): Error {
+    // a 401 / 403 / 410 gets the new-version bar's error variant (G5-03w)
+    remote?.saveFailed(error)
     const detail = saveFailureDetail(error)
     return new Error(detail ? `${text('appWebSaveFailed')} ${detail}` : text('appWebSaveFailed'))
   }
@@ -658,6 +690,34 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
 
   const unavailable = (what: string) => () => Promise.reject(new Error(`${what}: ${NOT_AVAILABLE}`))
   const noopDisposer = () => () => {}
+
+  // ------------------------------------------------------------ new version on UniWork (G5-03w, S6)
+
+  remote = createRemoteVersion({
+    port,
+    current: () =>
+      current === null ? null : { fileId: current, revision: revisionOf(files.get(current)) },
+    isDirty: () => dirty,
+    canEdit: canSave,
+    // a clean reload hands the renderer the head through its open flow, like the conflict dialog's
+    // Reload latest (nothing is dirty, so no draft is offered)
+    apply: async (reply) => {
+      remember(reply.file)
+      queued = async () => reply
+      reloadWithoutDraft = true
+      runMenu('open')
+    },
+    // the renderer's latest recovery copy (30 s tick) is the only live serialization of a dirty workbook
+    download: () =>
+      downloadVia(port, effective, () => {
+        const session = latest ? sessions.get(latest.sessionId) : undefined
+        if (!latest || !session || session.fileId !== current) {
+          throw new Error('no copy of the open workbook is available')
+        }
+        return latest.data
+      }),
+    frame: { markerAttr: 'data-sheets-web' },
+  })
 
   const desktopApi = {
     ...aiStubs,
@@ -728,6 +788,7 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
 
     // ---- save --------------------------------------------------------------
     async saveWorkbookEdits(input: WorkbookSaveRequest): Promise<WorkbookSaveResult> {
+      if (remote?.locked()) throw new Error(remote.lockText())
       if (!canSave() || (input.mode === 'save-as' && !granted('saveAs'))) {
         hostSaveAs?.settle({ ok: false, error: { code: 'forbidden', message: 'view-only' } })
         throw new Error(text('appWebViewOnly'))
@@ -869,6 +930,7 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
       // grant) can never hold unsaved work, so it never tells the host it is dirty
       dirty = canSave() && (count > 0 || restored)
       port.setDirty(dirty)
+      remote?.dirtyChanged(dirty)
     },
     onCloseSaveRequest(callback: () => void): () => void {
       closeSaveHandlers.add(callback)
