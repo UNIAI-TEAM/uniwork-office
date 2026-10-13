@@ -51,6 +51,8 @@ export const pl = {
     'Sesja wygasła, więc nie zastąpiono dokumentu. Zmiany pozostają w tej przeglądarce; zaloguj się ponownie i spróbuj jeszcze raz.',
   uwConflictTooLarge:
     'Twoja wersja przekracza limit rozmiaru UniWork, więc nie można było zastąpić.',
+  uwConflictDownloadTooLarge:
+    'Twoja wersja przekracza limit rozmiaru UniWork, więc nie można jej tutaj pobrać.',
   uwConflictDownloadFailed:
     'Nie udało się pobrać Twojej wersji, więc dokument nie został ponownie wczytany. Spróbuj ponownie.',
   uwConflictOfflineWeb:

@@ -27,7 +27,7 @@ import {
   type SaveResult,
 } from '../../docs/protocol/types'
 import { webLanguage } from '../../docs/bridge/browser'
-import { TIMEOUTS, type FramePort } from '../../docs/bridge/frame-port'
+import { TIMEOUTS, type FramePort, type PortSession } from '../../docs/bridge/frame-port'
 import {
   FOCUS_TITLE,
   openFrameDialog,
@@ -74,6 +74,10 @@ export interface ConflictIo {
     bytes(): Promise<ArrayBuffer>
     /** `api.download {data}`: resolves when the host delivered the file, rejects otherwise */
     send(data: ArrayBuffer): Promise<void>
+    /** byte size of the user's version (the Save that got the 409), if known */
+    size?: number
+    /** the largest file the host's `api.download` accepts (`init.downloadMaxBytes`), if it said */
+    maxBytes?: number
   }
   /** default: navigator.onLine */
   online?: () => boolean
@@ -176,16 +180,38 @@ export async function overwriteHead(
 }
 
 /**
+ * The host's `init.downloadMaxBytes` as the protocol session holds it (a later `init` after a
+ * frame reload updates the same session object): read when the dialog opens, undefined until
+ * `init` or when the host sent none.
+ */
+export function bridgeDownloadCap(
+  port: Pick<FramePort, 'whenInitialized'>,
+): () => number | undefined {
+  let session: PortSession | null = null
+  port.whenInitialized().then(
+    (s) => {
+      session = s
+    },
+    () => {},
+  )
+  return () => session?.downloadMaxBytes
+}
+
+/**
  * The download choice's IO, only when the effective capabilities include `download` (host
- * advertised it and the frame claimed it). `api.download` carries the bytes only.
+ * advertised it and the frame claimed it). `api.download` carries the bytes only. `limit` is the
+ * size of the user's version and the host's cap, so the dialog can disable the choice up front.
  */
 export function downloadVia(
   port: RequestPort,
   caps: Capabilities | undefined,
   bytes: () => Promise<ArrayBuffer | Uint8Array> | ArrayBuffer | Uint8Array,
+  limit?: { size: number; maxBytes?: number },
 ): ConflictIo['download'] {
   if (caps?.download !== true) return undefined
   return {
+    ...(limit ? { size: limit.size } : {}),
+    ...(limit?.maxBytes !== undefined ? { maxBytes: limit.maxBytes } : {}),
     bytes: async () => copyBuffer(await bytes()),
     async send(data) {
       const res = await port.request(
@@ -248,8 +274,14 @@ export async function runConflictDialog(io: ConflictIo): Promise<ConflictOutcome
     })
   /** the code the host hears when the user closes after a failed Overwrite */
   let failure: ConflictOutcome | null = null
-  /** an Overwrite answered 413: the same limit blocks the download */
-  let tooLarge = false
+  /**
+   * the download is known to be refused: an Overwrite answered 413, or my version is already over
+   * the cap the host announced in `init` (equal to the cap is allowed)
+   */
+  let tooLarge =
+    io.download?.size !== undefined &&
+    io.download.maxBytes !== undefined &&
+    io.download.size > io.download.maxBytes
   let alert = ''
   let focus: Id | typeof FOCUS_TITLE = 'cancel'
   /** step 1 is the one on screen: the only step whose Reload / Overwrite depend on the network */
@@ -385,7 +417,7 @@ export async function runConflictDialog(io: ConflictIo): Promise<ConflictOutcome
       choices.push({
         id: 'download',
         label: t('uwConflictDownloadThenReload'),
-        ...(tooLarge ? { disabled: true, reason: t('uwConflictTooLarge') } : {}),
+        ...(tooLarge ? { disabled: true, reason: t('uwConflictDownloadTooLarge') } : {}),
       })
     }
     choices.push(

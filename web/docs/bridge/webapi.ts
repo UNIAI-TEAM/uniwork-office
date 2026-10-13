@@ -73,6 +73,7 @@ import { downloadBlob, printFrame } from './browser'
 import { ask, conflictFrame, hideFatal, onModalChange, showFatal, text } from './notice'
 import {
   conflictSaveResult,
+  bridgeDownloadCap,
   downloadVia,
   headFromFile,
   overwriteHead,
@@ -191,6 +192,8 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
   let current: string | null = null
   /** the host's effective grants from `init` (undefined until the handshake, and in unit-test sessions) */
   let grants: Capabilities | undefined
+  /** `init.downloadMaxBytes`: the largest file the host's `api.download` accepts (X-02 r2b) */
+  const downloadCap = bridgeDownloadCap(port)
 
   /**
    * View-only (protocol README "Read-only documents"): the host withheld the `save` grant, or the
@@ -442,7 +445,10 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
         return true
       },
       canEdit: () => !isViewOnly(fileId),
-      download: downloadVia(port, grants, () => data),
+      download: downloadVia(port, grants, () => data, {
+        size: data.byteLength,
+        maxBytes: downloadCap(),
+      }),
       ...conflictFrame(),
     })
     const file = files.get(fileId)

@@ -65,6 +65,7 @@ import { bridgeDraftRecovery } from '../shared/recovery-prompt'
 import { saveFailureDetail } from '../shared/save-failure'
 import {
   conflictSaveResult,
+  bridgeDownloadCap,
   downloadVia,
   headFromFile,
   overwriteHead,
@@ -209,6 +210,8 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
   let initDocumentId: string | null = null
   /** the effective capabilities from `init` (`download` for the conflict dialog) */
   let effective: Capabilities | undefined
+  /** `init.downloadMaxBytes`: the largest file the host's `api.download` accepts (X-02 r2b) */
+  const downloadCap = bridgeDownloadCap(port)
   port
     .whenInitialized()
     .then((s) => {
@@ -573,7 +576,10 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
         return true
       },
       canEdit: canSave,
-      download: downloadVia(port, effective, () => data),
+      download: downloadVia(port, effective, () => data, {
+        size: data.byteLength,
+        maxBytes: downloadCap(),
+      }),
       markerAttr: 'data-sheets-web',
     })
     const file = files.get(fileId)

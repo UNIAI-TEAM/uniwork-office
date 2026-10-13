@@ -52,6 +52,8 @@ export const nl = {
     'Je sessie is verlopen, dus er is niet overschreven. Je wijzigingen blijven in deze browser; meld je opnieuw aan en probeer het nog eens.',
   uwConflictTooLarge:
     'Je versie is groter dan de limiet van UniWork, dus overschrijven was niet mogelijk.',
+  uwConflictDownloadTooLarge:
+    'Je versie is groter dan de limiet van UniWork, dus downloaden is hier niet mogelijk.',
   uwConflictDownloadFailed:
     'Kan je versie niet downloaden, dus het document is niet opnieuw geladen. Probeer het opnieuw.',
   uwConflictOfflineWeb:

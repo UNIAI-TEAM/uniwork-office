@@ -366,6 +366,10 @@ describe('Overwrite…', () => {
     expect(choices()).toEqual(['reload', 'overwrite', 'cancel'])
     await pick('reload')
     expect(btn('download').getAttribute('aria-disabled')).toBe('true')
+    // the reason speaks of the download, not of the overwrite that just failed
+    const reason = card().querySelector<HTMLElement>('.ow-dlg-reasons')!.textContent
+    expect(reason).toContain(t('uwConflictDownloadTooLarge'))
+    expect(reason).not.toContain(t('uwConflictTooLarge'))
     btn('download').click()
     await flush()
     expect(send).not.toHaveBeenCalled()
@@ -481,6 +485,77 @@ describe('Reload latest (web)', () => {
     expect(alertLine().textContent).toBe(t('uwConflictDownloadFailed'))
     expect(choices()).toEqual(['download', 'discard', 'back'])
     expect(fake.reload).not.toHaveBeenCalled()
+  })
+
+  describe('download cap (init.downloadMaxBytes, X-02 r2b)', () => {
+    const reasons = () => card().querySelector<HTMLElement>('.ow-dlg-reasons')!
+
+    async function openStep2(download: NonNullable<ConflictIo['download']>) {
+      const done = runConflictDialog(io({ download }))
+      await pick('reload')
+      return { done }
+    }
+
+    it('my version over the cap: the download choice is aria-disabled with the too-large reason at open', async () => {
+      const send = vi.fn(async () => {})
+      const bytes = vi.fn(async () => new ArrayBuffer(101))
+      await openStep2({ bytes, send, size: 101, maxBytes: 100 })
+      expect(choices()).toEqual(['download', 'discard', 'back'])
+      expect(btn('download').getAttribute('aria-disabled')).toBe('true')
+      expect(reasons().textContent).toContain(t('uwConflictDownloadTooLarge'))
+      expect(reasons().textContent).not.toContain(t('uwConflictTooLarge'))
+      btn('download').click()
+      await flush()
+      expect(send).not.toHaveBeenCalled()
+      expect(bytes).not.toHaveBeenCalled()
+      // the other two choices keep working
+      expect(btn('discard').getAttribute('aria-disabled')).toBeNull()
+    })
+
+    it('exactly the cap is allowed', async () => {
+      const send = vi.fn(async () => {})
+      await openStep2({ bytes: async () => new ArrayBuffer(100), send, size: 100, maxBytes: 100 })
+      expect(btn('download').getAttribute('aria-disabled')).toBeNull()
+      await pick('download')
+      expect(send).toHaveBeenCalledTimes(1)
+    })
+
+    it('under the cap is allowed', async () => {
+      const send = vi.fn(async () => {})
+      await openStep2({ bytes: async () => new ArrayBuffer(3), send, size: 3, maxBytes: 100 })
+      expect(btn('download').getAttribute('aria-disabled')).toBeNull()
+      await pick('download')
+      expect(send).toHaveBeenCalledTimes(1)
+    })
+
+    it('no cap from the host: as today, enabled until a 413 / too_large answer', async () => {
+      const send = vi.fn(async () => {})
+      await openStep2({ bytes: async () => new ArrayBuffer(1), send, size: 10 ** 9 })
+      expect(btn('download').getAttribute('aria-disabled')).toBeNull()
+      await pick('download')
+      expect(send).toHaveBeenCalledTimes(1)
+    })
+
+    it('a cap without a known size changes nothing', async () => {
+      await openStep2({ bytes: async () => new ArrayBuffer(1), send: vi.fn(), maxBytes: 100 })
+      expect(btn('download').getAttribute('aria-disabled')).toBeNull()
+    })
+
+    it('without the download capability there is still no download choice, cap or not', async () => {
+      void runConflictDialog(io())
+      await pick('reload')
+      expect(choices()).toEqual(['discard', 'back'])
+    })
+
+    it('an over-cap version still reaches Discard and reload', async () => {
+      const fake = io({
+        download: { bytes: async () => new ArrayBuffer(5), send: vi.fn(), size: 5, maxBytes: 4 },
+      })
+      const done = runConflictDialog(fake)
+      await pick('reload')
+      await pick('discard')
+      expect(await done).toEqual({ kind: 'reloaded' })
+    })
   })
 
   it('without edit access there is no download choice', async () => {
