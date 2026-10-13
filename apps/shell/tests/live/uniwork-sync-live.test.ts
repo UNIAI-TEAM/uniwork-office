@@ -84,6 +84,14 @@ function skipStep(context: TestContext, reason: string): void {
   context.skip(reason)
 }
 
+/** the reason steps 2-6 print when the run was started with FF_OFFICE_SYNC_FEED=false */
+function feedOffNote(step: string): string {
+  return (
+    `${step}: office_sync_feed is off for this run (FF_OFFICE_SYNC_FEED override), so the feed answers 403 office_capability_off; ` +
+    'run without the override to ground this step'
+  )
+}
+
 describe.skipIf(!LIVE)('G5-04 AC-5 live: real D server against the fork feed/capability', () => {
   beforeAll(async () => {
     const origin = LIVE_ORIGIN
@@ -161,10 +169,15 @@ describe.skipIf(!LIVE)('G5-04 AC-5 live: real D server against the fork feed/cap
     if (first.kind !== 'ok') return
     s.capabilities = first.capabilities
     expect(first.source, '1: the first read must be fresh').toBe('fresh')
-    expect(
-      first.capabilities.sync_feed,
-      '1: office_sync_feed defaults to true (D keys.go); a false here means the run was started with an override',
-    ).toBe(true)
+    expect(typeof first.capabilities.sync_feed, '1: sync_feed must be a boolean').toBe('boolean')
+    // D keys.go defaults office_sync_feed to true, so the default run reads
+    // true here and steps 2-6 run; a run started with FF_OFFICE_SYNC_FEED=false
+    // reads false, skips 2-6 and grounds step 8 instead.
+    if (!first.capabilities.sync_feed) {
+      console.log(
+        'step 1: office_sync_feed is OFF for this run (FF_OFFICE_SYNC_FEED override): steps 2-6 skip, step 8 asserts the 403 path',
+      )
+    }
     expect(first.capabilities.sync_write).toBe(body.sync_write as boolean)
     expect(first.capabilities.offline_library).toBe(body.offline_library as boolean)
     expect(first.capabilities.ai_uniwork).toBe(body.ai_uniwork as boolean)
@@ -177,8 +190,13 @@ describe.skipIf(!LIVE)('G5-04 AC-5 live: real D server against the fork feed/cap
     expect(requests, '1: the cache must issue exactly one request inside the TTL').toBe(1)
   }, 30_000)
 
-  it('2. snapshot: FeedConsumer applies every seeded id and moves the cursor after the commit', async () => {
+  it('2. snapshot: FeedConsumer applies every seeded id and moves the cursor after the commit', async (context) => {
     const s = live()
+    if (!s.capabilities.sync_feed) {
+      skipStep(context, feedOffNote('2'))
+      return
+    }
+    expect(s.capabilities.sync_feed, '2: this step needs office_sync_feed on').toBe(true)
     const result = await s.consumer.sync()
     expect(result, '2: a cold start with sync_feed on must sync the snapshot').toEqual({
       kind: 'synced',
@@ -224,8 +242,12 @@ describe.skipIf(!LIVE)('G5-04 AC-5 live: real D server against the fork feed/cap
     )
   }, 30_000)
 
-  it('3. paging: limit=1 chains every page by next_cursor and lists each id once', async () => {
+  it('3. paging: limit=1 chains every page by next_cursor and lists each id once', async (context) => {
     const s = live()
+    if (!s.capabilities.sync_feed) {
+      skipStep(context, feedOffNote('3'))
+      return
+    }
     s.client.pages.length = 0
     s.client.requests.length = 0
     const cache = createRecordingCache()
@@ -275,17 +297,21 @@ describe.skipIf(!LIVE)('G5-04 AC-5 live: real D server against the fork feed/cap
     ])
   }, 30_000)
 
-  it('4. replay: a second run from the saved cursor is idempotent and deletes nothing', async () => {
+  it('4. replay: a second run from the saved cursor is idempotent and deletes nothing', async (context) => {
     const s = live()
+    if (!s.capabilities.sync_feed) {
+      skipStep(context, feedOffNote('4'))
+      return
+    }
     const key = cursorKey(s.scope)
     const saved = s.cursors.memory.entries.get(key)
     const effectsBefore = s.cache.state.effects
     const first = await s.consumer.sync()
-    let note = ''
+    let note: string
     if (first.kind === 'synced') {
       expect(first.resynced, '4: a saved cursor must be followed incrementally').toBe(false)
       note = `the server served the saved cursor incrementally (${first.pages} page(s)); the replay wrote nothing`
-    } else if (first.kind === 'failed' && first.error.code === 'unsupported_operation') {
+    } else if (first.kind === 'failed' && first.error.serverCode === 'unsupported_operation') {
       note =
         'G5-01a answers 501 unsupported_operation for a feed cursor (the incremental feed is G5-01b); the fork reports it as failed, moves no cursor and deletes nothing'
       expect(
@@ -315,8 +341,12 @@ describe.skipIf(!LIVE)('G5-04 AC-5 live: real D server against the fork feed/cap
     console.log(`step 4: ${note}`)
   }, 30_000)
 
-  it('5. tampered cursor: 400 change_cursor_invalid, one full resync, nothing deleted', async () => {
+  it('5. tampered cursor: 400 change_cursor_invalid, one full resync, nothing deleted', async (context) => {
     const s = live()
+    if (!s.capabilities.sync_feed) {
+      skipStep(context, feedOffNote('5'))
+      return
+    }
     const key = cursorKey(s.scope)
     const probe = await s.client.client.listChanges(s.seed.workspaceId, undefined, 1)
     expect(probe.hasMore, '5: 3 documents with limit=1 must leave a snapshot cursor').toBe(true)
@@ -394,6 +424,10 @@ describe.skipIf(!LIVE)('G5-04 AC-5 live: real D server against the fork feed/cap
 
   it('6. expired cursor: 410 change_cursor_expired clears into one full resync', async (context) => {
     const s = live()
+    if (!s.capabilities.sync_feed) {
+      skipStep(context, feedOffNote('6'))
+      return
+    }
     const key = cursorKey(s.scope)
     const probe = await s.client.client.listChanges(s.seed.workspaceId, undefined, 1)
     expect(probe.hasMore, '6: 3 documents with limit=1 must leave a snapshot cursor').toBe(true)
