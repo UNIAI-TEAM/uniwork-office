@@ -214,16 +214,20 @@ function rangeOf(needle: string): { from: number; to: number } {
   return out
 }
 
-function mode(api: ServerCommentsApi): ServerMode {
-  return { api, path: PATH, documentId: 'doc1', versionId: 'v1', level: 'edit', myUserId: 'me' }
+function mode(api: ServerCommentsApi, versionId: string | null = 'v1'): ServerMode {
+  return { api, path: PATH, documentId: 'doc1', versionId, level: 'edit', myUserId: 'me' }
 }
 
-async function mount(server: ReturnType<typeof fakeServer>, panelOpen = true) {
+async function mount(
+  server: ReturnType<typeof fakeServer>,
+  panelOpen = true,
+  versionId: string | null = 'v1',
+) {
   const status = vi.fn()
   const render = (open: boolean) =>
     root.render(
       createElement(ServerCommentsHost, {
-        mode: mode(server.api),
+        mode: mode(server.api, versionId),
         editor,
         lang: 'en',
         panelOpen: open,
@@ -231,6 +235,7 @@ async function mount(server: ReturnType<typeof fakeServer>, panelOpen = true) {
         onClosePanel: () => render(false),
         onStatus: status,
         selectTextMessage: 'Select text first',
+        saveFirstMessage: 'Save first',
         inFileComments: [],
         neutralAuthor: 'User',
         handleRef: handle,
@@ -345,6 +350,31 @@ describe('server mode panel: thread actions through the host', () => {
     await flush()
     expect(status).toHaveBeenCalledWith('Select text first')
     expect(el.querySelector('.collab-thread--new')).toBeNull()
+  })
+})
+
+describe('server mode: unknown open version', () => {
+  it('no new root without a base version; replies still work; a Save receipt unlocks roots', async () => {
+    const server = fakeServer()
+    const anchor = encodeDocxAnchor(editor.state.doc, rangeOf('Closing'))!
+    const row = server.add({ body: 'existing', anchor, anchor_state: 'exact' })
+    const { status } = await mount(server, true, null)
+    editor.commands.setTextSelection(rangeOf('third quarter'))
+    await act(async () => handle.current!.startThread())
+    await flush()
+    expect(status).toHaveBeenCalledWith('Save first')
+    expect(el.querySelector('.collab-thread--new')).toBeNull()
+    expect(handle.current!.ai.draftNew(rangeOf('third quarter'), 'x')).toBe(false)
+    await click(buttons(EN.collabReply!).find((b) => thread(row.id).contains(b)))
+    await typeAndSend(thread(row.id).querySelector('textarea')!, 'still can reply')
+    expect(server.calls.create).toHaveBeenCalledWith(
+      expect.objectContaining({ parentId: row.id, body: 'still can reply' }),
+    )
+    await act(async () => server.saved('v2'))
+    await flush()
+    await act(async () => handle.current!.startThread())
+    await flush()
+    expect(el.querySelector('.collab-thread--new')).not.toBeNull()
   })
 })
 
