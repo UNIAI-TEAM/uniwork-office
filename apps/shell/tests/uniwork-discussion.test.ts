@@ -24,6 +24,8 @@ const LOCAL = '/home/u/Desktop/copy.docx'
 const CMT = '01J8X4CMTN0000000000000001'
 const SHELL_ID = 1
 const EDITOR_ID = 7
+/** a second shell window, with only OTHER open */
+const SHELL2_ID = 2
 
 type Listener = (...args: unknown[]) => void
 type Handler = (event: unknown, payload: unknown) => unknown
@@ -94,7 +96,12 @@ function mount(options: { tabs?: string[] } = {}) {
       return 'delivered'
     },
     shownPath: (sender) => (sender.id === EDITOR_ID ? PATH : null),
-    shellTabPaths: (sender) => (sender.id === shell.id && !shell.isDestroyed() ? tabs : null),
+    shellTabPaths: (sender) =>
+      sender.id === shell.id && !shell.isDestroyed()
+        ? tabs
+        : sender.id === SHELL2_ID
+          ? [OTHER]
+          : null,
     shellTarget: (path) => (tabs.includes(path) ? shell : null),
     setDiscussionPanel: (sender, panel) => void panels.push({ senderId: sender.id, ...panel }),
   })
@@ -412,6 +419,47 @@ describe('reveal for the shell panel: push when armed, else hold; delivered once
     release(PATH)
     expect(await pull(PATH)).toBeNull()
     expect(await pull(OTHER)).toEqual({ path: OTHER, commentId: CMT })
+  })
+
+  it('a release from an editor, an unknown sender or another shell leaves the hold intact (W11E-1)', async () => {
+    const { handle, pull, release } = mount()
+    handle.reveal(PATH, CMT)
+    release(PATH, { id: EDITOR_ID }) // an editor webContents
+    release(PATH, { id: 99 }) // a sender that is no shell at all
+    release(PATH, { id: SHELL2_ID }) // another shell that does not show PATH
+    expect(await pull(PATH)).toEqual({ path: PATH, commentId: CMT })
+  })
+
+  it('a release from another shell does not disarm the owner either (W11E-1)', async () => {
+    const { handle, pull, release, shellReveals } = mount()
+    await pull(PATH) // arms the listener
+    release(PATH, { id: SHELL2_ID })
+    handle.reveal(PATH, CMT)
+    expect(shellReveals()).toEqual([{ path: PATH, commentId: CMT }])
+  })
+
+  it('the owning shell can still release: hold and armed listener both go (W11E-1)', async () => {
+    const { handle, pull, release, shellReveals } = mount()
+    handle.reveal(PATH, CMT)
+    release(PATH)
+    expect(await pull(PATH)).toBeNull() // the hold is gone
+    release(PATH)
+    handle.reveal(PATH, CMT)
+    expect(shellReveals()).toEqual([]) // and nothing is armed any more
+  })
+
+  it('a release after the shell closed that tab still clears its armed path (W11E-1)', async () => {
+    const tabs = [PATH, OTHER]
+    const { handle, pull, release, shellReveals } = mount({ tabs })
+    await pull(PATH) // arms PATH
+    tabs.splice(tabs.indexOf(PATH), 1) // the tab closes
+    handle.reveal(PATH, CMT) // no shell shows it: held
+    release(PATH) // the panel's cleanup for the closed tab
+    tabs.push(PATH) // the same document is opened again
+    expect(await pull(PATH)).toBeNull() // the hold went with the release
+    release(PATH)
+    handle.reveal(PATH, CMT)
+    expect(shellReveals()).toEqual([]) // and the armed path is gone
   })
 
   it('a hold for a tab that was closed is evicted, not kept for the process lifetime (W11A-2)', async () => {
