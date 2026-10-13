@@ -99,8 +99,12 @@ import {
   stopUniworkAccount,
   onUniworkAccountStatus,
   uniworkSessionIdentity,
+  authorizedRequest,
+  uniworkAccount,
+  uniworkDeploymentProfile,
 } from './uniwork-auth'
 import { createUniworkDocs, type UniworkDocsHandle } from './uniwork-docs/wiring'
+import { registerUniworkWork } from './uniwork-work/wiring'
 import { refuseLockedOpenPath } from './uniwork-docs/service'
 import { installUniworkModuleSeams } from './uniwork-docs/modules'
 import { createModuleSaveRequester } from './uniwork-docs/module-save'
@@ -4181,6 +4185,14 @@ function registerHomeIpc(): void {
   )
   // UniWork documents (open from UniWork, launch links, Save to UniWork); logic in ./uniwork-docs
   uniworkDocs = createUniworkDocs(ipcMain, uniworkDocsWiring())
+  // UniWork work data for the Workbench (home, tasks, calendar, profile); logic in ./uniwork-work
+  registerUniworkWork(ipcMain, {
+    profile: () => uniworkDeploymentProfile(),
+    identity: () => uniworkSessionIdentity(),
+    org: () => uniworkAccount().status().org ?? null,
+    authorized: (call) => authorizedRequest(call),
+    openExternal: (url) => shell.openExternal(url),
+  })
   installUniworkModuleSeams(uniworkDocs.service)
   const uniworkService = uniworkDocs.service
   // the chip reads "Unsaved changes" while an editor holds edits not saved yet

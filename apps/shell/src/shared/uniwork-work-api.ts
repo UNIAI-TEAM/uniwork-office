@@ -1,4 +1,4 @@
-import type { UniworkDocErrorCode } from './home-api'
+import type { RecentEntry, UniworkDocErrorCode, UniworkDocSummary } from './home-api'
 
 /**
  * The Workbench's UniWork work data (home, my tasks, statuses, calendar,
@@ -155,4 +155,51 @@ export interface WorkCreateTaskInput {
   dueDate?: string
   /** the renderer mints one (crypto.randomUUID()) per intent and reuses it on Retry */
   idempotencyKey: string
+}
+
+/** Overview "recent documents": UniWork rows (aiOffice.uniworkListDocuments) plus local recents */
+export type WorkRecentDocument =
+  { source: 'uniwork'; doc: UniworkDocSummary } | { source: 'local'; entry: RecentEntry }
+
+/**
+ * A UniWork web page to open. Main builds the URL; the renderer never passes
+ * one (paths follow uniwork:packages/core/paths/paths.ts).
+ */
+export type WorkWebTarget =
+  | { kind: 'task' | 'meeting' | 'room' | 'person'; orgSlug: string; wsSlug: string; id: string }
+  | { kind: 'my-tasks' | 'calendar' | 'inbox' | 'tasks'; orgSlug: string; wsSlug: string }
+  | { kind: 'onboarding' }
+
+export const UNIWORK_WORK_CHANNELS = {
+  homeSummary: 'uniwork-work:home-summary',
+  myTasks: 'uniwork-work:my-tasks',
+  taskStatuses: 'uniwork-work:task-statuses',
+  setTaskStatus: 'uniwork-work:set-task-status',
+  createTask: 'uniwork-work:create-task',
+  calendarEvents: 'uniwork-work:calendar-events',
+  myProfile: 'uniwork-work:my-profile',
+  openWeb: 'uniwork-work:open-web',
+} as const
+
+/**
+ * window.uniworkWork. Workspaces and recent cloud documents are not here:
+ * reuse aiOffice.uniworkListWorkspaces() and
+ * aiOffice.uniworkListDocuments({ workspaceId, limit: 20 }) (slice to 6).
+ */
+export interface UniworkWorkApi {
+  homeSummary(workspaceId: string): Promise<UniworkWorkResult<WorkHomeSummary>>
+  myTasks(workspaceId: string): Promise<UniworkWorkResult<WorkTask[]>>
+  taskStatuses(workspaceId: string): Promise<UniworkWorkResult<WorkTaskStatus[]>>
+  /** `status` is a catalogue key ('done', 'todo', ...), not a status id */
+  setTaskStatus(taskId: string, status: string): Promise<UniworkWorkResult<WorkTask>>
+  createTask(input: WorkCreateTaskInput): Promise<UniworkWorkResult<WorkTask>>
+  calendarEvents(input: {
+    workspaceId: string
+    from: string
+    to: string
+  }): Promise<UniworkWorkResult<WorkCalendarEvent[]>>
+  /** the signed-in user in the selected org (main resolves the org slug and account id) */
+  myProfile(): Promise<UniworkWorkResult<WorkPerson>>
+  /** false when the target fails validation or no deployment profile is set */
+  openWeb(target: WorkWebTarget): Promise<boolean>
 }

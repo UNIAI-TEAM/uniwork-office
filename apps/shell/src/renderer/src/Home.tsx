@@ -16,6 +16,7 @@ import type {
   FileSearchRerank,
 } from '../../shared/home-api'
 import type { IntegrationsApi } from '../../shared/integrations-api'
+import type { UniworkWorkApi } from '../../shared/uniwork-work-api'
 import { markText } from '../../shared/text-marks'
 import { useDismissablePopover } from '@genoffice/ui'
 import { fileCountLabel, visiblePageCount } from './counts'
@@ -47,6 +48,8 @@ declare global {
     aiOffice: HomeApi
     aiOfficeIntegrations?: IntegrationsApi
     aiOfficeProject?: ProjectHomeApi
+    /** UniWork work data (preload, same lifetime as aiOffice); declared here only */
+    uniworkWork: UniworkWorkApi
   }
 }
 
