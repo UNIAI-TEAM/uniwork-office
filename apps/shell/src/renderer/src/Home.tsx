@@ -3409,7 +3409,7 @@ export function Home() {
                   strokeLinejoin="round"
                 />
               </svg>
-              <span className="nav-label">{t('navTeacher')}</span>
+              <span className="nav-label">{t('navWorkbench')}</span>
             </button>
           )}
         </nav>
