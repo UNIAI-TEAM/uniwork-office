@@ -46,3 +46,14 @@ export {
 } from './CollabComposer'
 export { MentionPicker, type CollabPickerStrings } from './MentionPicker'
 export { clearDraft, loadDraft, saveDraft, type CollabDraftKey } from './draft-store'
+export { collabStrings, type CollabAllStrings } from './strings'
+export {
+  collabPanelStrings,
+  collabPanelText,
+  type CollabPanelStringKey,
+} from '../strings-collab-panel'
+export {
+  collabMentionStrings,
+  collabMentionText,
+  type CollabMentionStringKey,
+} from '../strings-collab-mention'
