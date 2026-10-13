@@ -543,6 +543,7 @@ function CollabThreadImpl(p: CollabThreadProps) {
   const [deleting, setDeleting] = useState<string | null>(null)
   const [failed, setFailed] = useState(false)
   const replyBtnRef = useRef<HTMLButtonElement>(null)
+  const itemRef = useRef<HTMLLIElement>(null)
   /** the control that opened history / edit / delete, for focus return */
   const openerRef = useRef<HTMLElement | null>(null)
 
@@ -801,12 +802,21 @@ function CollabThreadImpl(p: CollabThreadProps) {
   }
 
   const conflict = p.conflict && p.conflict.threadId === thread.id ? p.conflict : null
+  // the deleted frame appears where the thread was, possibly scrolled out of view: bring it in without taking
+  // focus from the composer that holds the draft
+  useEffect(() => {
+    if (!conflict) return
+    itemRef.current
+      ?.querySelector<HTMLElement>('[data-deleted-for]')
+      ?.scrollIntoView?.({ block: 'nearest' })
+  }, [conflict])
   // a reply that hit comment_deleted keeps its composer (and draft) under the deleted thread
   const showComposer =
     replyOpen && can.canWrite && (!thread.deleted || conflict !== null) && p.renderComposer
 
   return (
     <li
+      ref={itemRef}
       className={[
         'collab-thread',
         thread.resolved ? 'collab-thread--resolved' : '',
