@@ -87,6 +87,20 @@ export function slideIdOfPath(opened: OpenedPptx, slidePath: string): string | u
 }
 
 /**
+ * The p:sldId/@id of every slide part in the deck, keyed by part path. One
+ * presentation.xml + rels read for the whole deck: a caller that needs the id of
+ * every slide (a full-deck rebuild) must use this instead of calling slideIdOfPath
+ * per slide, which re-reads and re-parses presentation.xml for each one (O(N^2)).
+ */
+export function slideIdsByPath(opened: OpenedPptx): Map<string, string> {
+  const out = new Map<string, string>()
+  for (const e of readSlideEntries(opened)) {
+    if (e.path) out.set(e.path, e.sldId)
+  }
+  return out
+}
+
+/**
  * Parse presentation.xml's p14:sectionLst. Returns [] if there are no sections
  * (older documents). sldIds referencing deleted slides are silently skipped.
  */
