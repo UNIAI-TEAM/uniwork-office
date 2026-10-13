@@ -208,7 +208,11 @@ export interface UniworkDocProperties {
   myLevel: string | null
   /** current version ordinal */
   version: number | null
-  /** who produced the current version */
+  /**
+   * who produced the current version. Always null today: D's DocumentDTO has
+   * no per-version updater (`updated_by` is also set by a rename), so the
+   * renderer shows "—" until the server sends one (D residual, G8-16).
+   */
   versionByName: string | null
   ownerId: string | null
   createdById: string | null

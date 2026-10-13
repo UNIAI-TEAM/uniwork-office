@@ -11,6 +11,7 @@ import type {
   UniworkDocListQuery,
   UniworkDocLock,
   UniworkDocProperties,
+  UniworkDocSummary,
   UniworkDocStatus,
   UniworkLaunchEvent,
   UniworkLockReason,
@@ -938,22 +939,27 @@ export class UniworkDocsService {
       if (typeof documentId !== 'string') throw new UniworkDocError('not_found')
       const properties = await this.api().documentProperties(documentId)
       const names = await this.memberNames()
-      const nameOf = (id: string | null): string | null => {
-        if (!id) return null
-        return names.get(id) ?? null
-      }
+      // a name resolves only for an id in the member list; a person who left,
+      // or a non-human actor, stays null ("—")
+      const nameOf = (id: string | null): string | null => (id ? (names.get(id) ?? null) : null)
+      // an owner is a person only when owner_kind says so (a work_product owner
+      // id is not a member and must not be shown as one)
+      const ownerName = properties.ownerKind === 'human' ? nameOf(properties.ownerId) : null
       return {
         documentId: properties.id,
         workspaceId: properties.workspaceId,
         title: properties.title,
-        ownerName: nameOf(properties.ownerId),
+        ownerName,
         createdByName: nameOf(properties.createdById),
         createdAt: properties.createdAt,
         updatedByName: nameOf(properties.updatedById),
         updatedAt: properties.updatedAt,
         myLevel: properties.myLevel,
         version: properties.currentVersion,
-        versionByName: nameOf(properties.updatedById),
+        // D's DocumentDTO carries no per-version updater: `updated_by` is also
+        // set by a rename/metadata patch, so it must not name the version's
+        // author. Always null until D sends one (see contract residual).
+        versionByName: null,
         ownerId: properties.ownerId,
         createdById: properties.createdById,
         updatedById: properties.updatedById,
@@ -970,14 +976,17 @@ export class UniworkDocsService {
     const org = this.deps.selectedOrg()
     if (!org) return new Map()
     if (this.orgMemberNamesOrg === org.id) return this.orgMemberNames
+    let names: Map<string, string>
     try {
       const members = await this.api().listOrgMembers(org.slug)
-      this.orgMemberNames = new Map(members.map((m) => [m.userId, m.displayName]))
+      names = new Map(members.map((m) => [m.userId, m.displayName]))
     } catch {
-      this.orgMemberNames = new Map()
+      // a failed read is never cached: the next panel read tries again
+      return new Map()
     }
+    this.orgMemberNames = names
     this.orgMemberNamesOrg = org.id
-    return this.orgMemberNames
+    return names
   }
 
   listDocuments(query: UniworkDocListQuery): Promise<UniworkResult<UniworkDocListPage>> {

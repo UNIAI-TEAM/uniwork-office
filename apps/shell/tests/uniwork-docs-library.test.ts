@@ -7,7 +7,6 @@ import {
   UniworkDocsService,
   type ConflictUi,
 } from '../src/main/uniwork-docs/service'
-import { createUniworkDocsClient } from '../src/main/uniwork-docs/client'
 import type { FetchLike } from '../src/main/uniwork-docs/client'
 
 /**
@@ -25,7 +24,6 @@ const profile: DeploymentProfile = {
   channel: 'stable',
 }
 const TOKEN = 'tok'
-const ID = /^[A-Za-z0-9_-]{1,128}$/
 
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
@@ -86,7 +84,7 @@ function fakeServer(options: {
 }
 
 function serviceWith(server: ReturnType<typeof fakeServer>, org: { id: string; slug: string } | null = { id: 'org_a', slug: 'acme' }) {
-  let dir = mkdtempSync(join(tmpdir(), 'uw-docs-library-'))
+  const dir = mkdtempSync(join(tmpdir(), 'uw-docs-library-'))
   const ui: ConflictUi = {
     chooseConflict: vi.fn(async () => 'later'),
     confirmDiscard: vi.fn(async () => false),
@@ -250,9 +248,9 @@ describe('document properties (S17)', () => {
     updated_at: '2026-04-01T09:00:00Z',
   }
 
-  it('resolves names through the org member list', async () => {
+  it('resolves a member id to a name', async () => {
     const server = fakeServer({
-      document,
+      document: { ...document, owner_kind: 'human' },
       members: [
         { user_id: 'u_owner', display_name: 'Owner Name' },
         { user_id: 'u_creator', display_name: 'Creator Name' },
@@ -274,7 +272,8 @@ describe('document properties (S17)', () => {
         updatedAt: '2026-04-01T09:00:00Z',
         myLevel: 'edit',
         version: 3,
-        versionByName: 'Updater Name',
+        // D sends no per-version updater: never derived from updated_by
+        versionByName: null,
         ownerId: 'u_owner',
         createdById: 'u_creator',
         updatedById: 'u_updater',
@@ -282,8 +281,12 @@ describe('document properties (S17)', () => {
     })
   })
 
-  it('leaves names null when the member read fails (the renderer shows "—")', async () => {
-    const server = fakeServer({ document, fail: 'members' })
+  it('an id that is not a member resolves to null (person left / non-human)', async () => {
+    const server = fakeServer({
+      document: { ...document, owner_kind: 'work_product' },
+      // the creator/updater ids are absent from the list; the owner is not a person
+      members: [{ user_id: 'someone_else', display_name: 'Else' }],
+    })
     const { service } = serviceWith(server)
     const result = await service.documentProperties('d1')
     expect(result.ok).toBe(true)
@@ -291,11 +294,79 @@ describe('document properties (S17)', () => {
     expect(result.value.ownerName).toBeNull()
     expect(result.value.createdByName).toBeNull()
     expect(result.value.updatedByName).toBeNull()
-    expect(result.value.versionByName).toBeNull()
+    // the raw ids stay available for the renderer
+    expect(result.value.ownerId).toBe('u_owner')
+    expect(result.value.updatedById).toBe('u_updater')
+  })
+
+  it('versionByName stays null even when updated_by resolves to a member', async () => {
+    const server = fakeServer({
+      document: { ...document, owner_kind: 'human' },
+      members: [{ user_id: 'u_updater', display_name: 'Updater Name' }],
+    })
+    const { service } = serviceWith(server)
+    const result = await service.documentProperties('d1')
+    expect(result.ok && result.value.updatedByName).toBe('Updater Name')
+    expect(result.ok && result.value.versionByName).toBeNull()
+  })
+
+  it('a members read failure leaves names null and is not cached', async () => {
+    let failing = true
+    const server = fakeServer({ document: { ...document, owner_kind: 'human' } })
+    const inner = server.fetch
+    const flaky: typeof inner = (async (url: string, init: RequestInit) => {
+      if (failing && new URL(url).pathname === '/api/v1/orgs/acme/members') {
+        server.calls.push({ path: '/api/v1/orgs/acme/members', query: '' })
+        return json(500, { error: { code: 'server_error' } })
+      }
+      return inner(url, init)
+    }) as typeof inner
+    const dir = mkdtempSync(join(tmpdir(), 'uw-docs-library-'))
+    const service = new UniworkDocsService({
+      userDataDir: dir,
+      profile: () => profile,
+      channel: () => 'stable',
+      applyProfile: async () => 'unchanged',
+      identity: () => ({ accountId: 'acc_1', deviceSessionId: 'dev_1', deploymentId: 'default' }),
+      keystoreLocked: () => false,
+      selectedOrg: () => ({ id: 'org_a', slug: 'acme' }),
+      authorized: <T>(call: (token: string) => Promise<T>) => call(TOKEN),
+      fetch: flaky,
+      openPath: () => true,
+      isPathOpen: () => false,
+      requestModuleSave: () => false,
+      reloadPath: () => undefined,
+      activePath: () => undefined,
+      ui: {
+        chooseConflict: async () => 'later',
+        confirmDiscard: async () => false,
+        pickCopyPath: async () => null,
+        showOpenLatestFailed: () => undefined,
+        showCopyFailed: () => undefined,
+        chooseUnsavedClose: async () => 'cancel',
+      },
+      pushStatus: () => undefined,
+      pushLaunch: () => undefined,
+      reveal: () => undefined,
+    })
+    const failed = await service.documentProperties('d1')
+    expect(failed.ok).toBe(true)
+    if (!failed.ok) return
+    expect(failed.value.ownerName).toBeNull()
+    expect(failed.value.createdByName).toBeNull()
+    expect(failed.value.updatedByName).toBeNull()
     // the server-sent facts still ride through
-    expect(result.value.myLevel).toBe('edit')
-    expect(result.value.version).toBe(3)
-    expect(result.value.createdAt).toBe('2026-03-01T09:00:00Z')
+    expect(failed.value.myLevel).toBe('edit')
+    expect(failed.value.version).toBe(3)
+
+    // the failure was not cached: a later read tries the members list again
+    failing = false
+    const callsBefore = server.calls.filter((c) => c.path === '/api/v1/orgs/acme/members').length
+    const ok = await service.documentProperties('d1')
+    expect(server.calls.filter((c) => c.path === '/api/v1/orgs/acme/members')).toHaveLength(
+      callsBefore + 1,
+    )
+    expect(ok.ok && ok.value.ownerName).toBeNull()
   })
 
   it('missing server fields become null, never an error', async () => {
@@ -330,8 +401,8 @@ describe('member-name cache and org switch (S16)', () => {
       },
       members: [{ user_id: 'u1', display_name: 'One' }],
     })
-    let org: { id: string; slug: string } | null = { id: 'org_a', slug: 'acme' }
-    let dir = mkdtempSync(join(tmpdir(), 'uw-docs-library-'))
+    const org: { id: string; slug: string } | null = { id: 'org_a', slug: 'acme' }
+    const dir = mkdtempSync(join(tmpdir(), 'uw-docs-library-'))
     const service = new UniworkDocsService({
       userDataDir: dir,
       profile: () => profile,
