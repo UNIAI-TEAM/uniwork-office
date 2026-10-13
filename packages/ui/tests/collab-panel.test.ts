@@ -231,6 +231,27 @@ describe('states', () => {
     expect(last.statusLineId).toBe(line.id)
   })
 
+  it('Send describes the connection status, never an S15 notice', async () => {
+    const src = fakeSource(list([cm({ id: 'a' })], 't'))
+    await mount(src, host({ kind: 'discussion' }))
+    await act(async () => {
+      await ctl.reveal('zzz')
+      await flush()
+    })
+    src.list.mockRejectedValueOnce(err('network'))
+    slots = []
+    await act(async () => {
+      await ctl.reload()
+    })
+    const lines = $$('.collab-pnote')
+    expect(lines.map((l) => l.textContent)).toEqual([EN.collabDiscussionDeleted, EN.collabOffline])
+    expect(new Set(lines.map((l) => l.id)).size).toBe(2)
+    const last = slots[slots.length - 1]!
+    expect(last.disabledReason).toBe('status')
+    expect(last.statusLineId).toBe(lines[1]!.id)
+    expect(last.statusLineId).not.toBe(lines[0]!.id)
+  })
+
   it('view only: badge + line, no composer, no write actions (hidden, not aria-disabled)', async () => {
     const src = fakeSource(list([cm({ id: 'a', author_id: 'me', anchor: docx(1) })]))
     await mount(src, host({ level: 'view' }), { adapter: ad() })
