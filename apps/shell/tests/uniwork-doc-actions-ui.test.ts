@@ -1,6 +1,8 @@
 /**
  * @vitest-environment jsdom
  */
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
@@ -446,7 +448,7 @@ describe('S18 row menu', () => {
     expect(modal()).toBeNull()
     const archived = rowOf('Old.docx')
     expect(archived.textContent).toContain(en.uwDocArchived)
-    expect(archived.getAttribute('aria-disabled')).toBe('true')
+    expect(archived.getAttribute('aria-disabled')).toBeNull()
     await click(menuButton(archived)!)
     const items = Array.from(host.querySelectorAll('[role="menuitem"]')).map((i) => i.textContent)
     expect(items).toEqual([en.uwDocRestore])
@@ -476,6 +478,104 @@ describe('S18 row menu', () => {
     expect(host.querySelector('[role="menu"]')).toBeNull()
     expect(document.activeElement).toBe(button)
     expect(onClose).not.toHaveBeenCalled()
+  })
+})
+
+describe('S18 archived row and archive confirm (FX4)', () => {
+  const archivedRow = () => row('m', 'Old.docx', { canEdit: true, canManage: true, archived: true })
+
+  it('V17-01: the dimming of a parked row never reaches its menu', () => {
+    const css = readFileSync(join(__dirname, '../src/renderer/src/home.css'), 'utf8')
+    const block = (selector: string) =>
+      css.match(new RegExp(`${selector.replace(/[.>]/g, '\\$&')}\\s*\\{([^}]*)\\}`))?.[1] ?? ''
+    // the row itself is not translucent (that would dim the menu popup with it)
+    expect(block('.uw-pick-row.disabled')).not.toMatch(/opacity/)
+    // only the icon and the text are
+    expect(block('.uw-pick-row.disabled > .uw-pick-row-text')).toMatch(/opacity:\s*0\.6/)
+  })
+
+  it('V17-02: an archived row says it is archived, never "not supported"', async () => {
+    await render([archivedRow(), row('u', 'Notes.txt', { format: null })])
+    const archived = rowOf('Old.docx')
+    const meta = archived.querySelector('.uw-pick-row-meta')!.textContent!
+    expect(meta).toContain(en.uwDocArchived)
+    expect(archived.textContent).not.toContain(en.uwPickUnsupported)
+    // a really unsupported format keeps its own reason
+    expect(rowOf('Notes.txt').textContent).toContain(en.uwPickUnsupported)
+  })
+
+  it('V17-03: an archived row is not aria-disabled and Restore is reachable by keyboard', async () => {
+    await render([archivedRow(), row('u', 'Notes.txt', { format: null })])
+    const archived = rowOf('Old.docx')
+    expect(archived.getAttribute('aria-disabled')).toBeNull()
+    expect(rowOf('Notes.txt').getAttribute('aria-disabled')).toBe('true')
+    const button = menuButton(archived)!
+    // in the tab order although the row is never the highlighted one
+    expect(button.tabIndex).toBe(0)
+    await key(button, 'Enter')
+    const item = host.querySelector<HTMLElement>('[role="menuitem"]')!
+    expect(item.textContent).toBe(en.uwDocRestore)
+    expect(document.activeElement).toBe(item)
+    await click(item)
+    expect(api.uniworkRestoreDocument).toHaveBeenCalledWith('m')
+  })
+
+  it('V17-04: the confirm opens on Cancel and focus returns to the row opener', async () => {
+    await render([row('m', 'Old.docx', { canEdit: true, canManage: true })])
+    const opener = menuButton(rowOf('Old.docx'))!
+    await openMenuItem('Old.docx', en.uwDocArchive)
+    const dialog = modal()!
+    expect(document.activeElement).toBe(buttonByText(dialog, 'Cancel'))
+    // the heading names the document
+    expect(dialog.querySelector('h3')!.textContent).toContain('Old.docx')
+    await key(document.activeElement!, 'Escape')
+    expect(modal()).toBeNull()
+    expect(api.uniworkArchiveDocument).not.toHaveBeenCalled()
+    expect(document.activeElement).toBe(opener)
+
+    // Cancel does the same
+    await openMenuItem('Old.docx', en.uwDocArchive)
+    await click(buttonByText(modal()!, 'Cancel'))
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 5))
+    })
+    expect(document.activeElement).toBe(menuButton(rowOf('Old.docx')))
+  })
+
+  it('V17-07: the error toast has an icon and a dismiss button and stays role=alert', async () => {
+    await render([row('e', 'Plan.docx', { canEdit: true })])
+    api.uniworkRenameDocument.mockResolvedValueOnce(fail('server_error'))
+    await openMenuItem('Plan.docx', en.uwDocRename)
+    const input = host.querySelector<HTMLInputElement>('.uw-rename-input')!
+    await type(input, 'Gone')
+    await key(input, 'Enter')
+    const toast = host.querySelector<HTMLElement>('.uw-act-toast')!
+    expect(toast.getAttribute('role')).toBe('alert')
+    expect(toast.querySelector('svg.uw-act-toast-icon')).not.toBeNull()
+    await click(buttonByText(toast, ''))
+    expect(host.querySelector('.uw-act-toast')).toBeNull()
+  })
+
+  it('F7: empty and taken names set aria-invalid and point aria-describedby at the message', async () => {
+    // New document
+    await render([])
+    await click(buttonByText(host, en.uwDocNew))
+    const dialog = modal()!
+    const name = dialog.querySelector<HTMLInputElement>('input[type="text"]')!
+    const errorId = name.getAttribute('aria-describedby')!
+    expect(name.getAttribute('aria-invalid')).toBe('false')
+    expect(document.getElementById(errorId)!.textContent).toBe('')
+    await click(buttonByText(dialog, en.uwDocCreate))
+    expect(name.getAttribute('aria-invalid')).toBe('true')
+    expect(name.getAttribute('aria-describedby')).toBe(errorId)
+    expect(document.getElementById(errorId)!.textContent).toBe(en.uwDocNameEmpty)
+    api.uniworkCreateDocument.mockResolvedValueOnce(fail('name_taken'))
+    await type(name, 'Plan')
+    expect(name.getAttribute('aria-invalid')).toBe('false')
+    await click(buttonByText(dialog, en.uwDocCreate))
+    expect(name.getAttribute('aria-invalid')).toBe('true')
+    expect(name.getAttribute('aria-describedby')).toBe(errorId)
+    expect(document.getElementById(errorId)!.textContent).toBe(en.uwDocNameTaken)
   })
 })
 
