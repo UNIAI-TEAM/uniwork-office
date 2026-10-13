@@ -101,7 +101,8 @@ export const cs = {
   uwOrgPickBody: 'Váš účet patří do více organizací. Později to můžete změnit v Nastavení › Účet.',
   uwOrgPickRole: 'Role: {role}',
   uwOrgPickContinue: 'Pokračovat',
-  uwOrgPickRememberedGone: 'Organizace, kterou jste zvolili minule, už není dostupná. Vyberte znovu.',
+  uwOrgPickRememberedGone:
+    'Organizace, kterou jste zvolili minule, už není dostupná. Vyberte znovu.',
   uwOrgRowSuspended: 'Organizace je pozastavena',
   uwOrgRowDeactivated: 'Váš účet je v této organizaci deaktivován',
   uwOrgAllBlocked: 'Zatím nemůžete pracovat v žádné organizaci. Obraťte se na správce.',
@@ -122,4 +123,7 @@ export const cs = {
   uwAccessView: 'Zobrazení',
   uwAccessEdit: 'Úpravy',
   uwAccessManage: 'Správa',
+  uwRoleOwner: 'Vlastník',
+  uwRoleAdmin: 'Správce',
+  uwRoleMember: 'Člen',
 } satisfies Record<keyof typeof zh, string>

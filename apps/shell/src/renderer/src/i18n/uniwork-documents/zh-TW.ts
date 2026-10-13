@@ -121,4 +121,7 @@ export const zhTW = {
   uwAccessView: '檢視',
   uwAccessEdit: '編輯',
   uwAccessManage: '管理',
+  uwRoleOwner: '擁有者',
+  uwRoleAdmin: '管理員',
+  uwRoleMember: '成員',
 } satisfies Record<keyof typeof zh, string>

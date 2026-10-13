@@ -104,13 +104,16 @@ export const de = {
     'Diese Daten erfordern eine neuere App-Version. Aktualisieren Sie UniWork Office; es wurde nichts gelöscht und keine neue Speicherung erstellt.',
   // S16 organization choice, S17 shared-with-me and document details
   uwOrgPickTitle: 'Organisation auswählen',
-  uwOrgPickBody: 'Ihr Konto gehört zu mehreren Organisationen. Sie können das später unter Einstellungen › Konto ändern.',
+  uwOrgPickBody:
+    'Ihr Konto gehört zu mehreren Organisationen. Sie können das später unter Einstellungen › Konto ändern.',
   uwOrgPickRole: 'Rolle: {role}',
   uwOrgPickContinue: 'Weiter',
-  uwOrgPickRememberedGone: 'Die zuletzt gewählte Organisation ist nicht mehr verfügbar. Bitte wählen Sie erneut.',
+  uwOrgPickRememberedGone:
+    'Die zuletzt gewählte Organisation ist nicht mehr verfügbar. Bitte wählen Sie erneut.',
   uwOrgRowSuspended: 'Die Organisation ist gesperrt',
   uwOrgRowDeactivated: 'Ihr Konto ist in dieser Organisation deaktiviert',
-  uwOrgAllBlocked: 'Sie können derzeit in keiner Organisation arbeiten. Wenden Sie sich an Ihren Administrator.',
+  uwOrgAllBlocked:
+    'Sie können derzeit in keiner Organisation arbeiten. Wenden Sie sich an Ihren Administrator.',
   uwOrgPickError: 'Ihre Organisationen konnten nicht geladen werden.',
   uwOrgSettingsLabel: 'Aktive Organisation',
   uwLibShared: 'Für mich freigegeben',
@@ -128,4 +131,7 @@ export const de = {
   uwAccessView: 'Ansehen',
   uwAccessEdit: 'Bearbeiten',
   uwAccessManage: 'Verwalten',
+  uwRoleOwner: 'Eigentümer',
+  uwRoleAdmin: 'Administrator',
+  uwRoleMember: 'Mitglied',
 } satisfies Record<keyof typeof zh, string>

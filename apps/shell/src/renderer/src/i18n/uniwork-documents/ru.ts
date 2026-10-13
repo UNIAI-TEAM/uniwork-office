@@ -100,13 +100,16 @@ export const ru = {
     'Для этих данных нужна более новая версия приложения. Обновите UniWork Office; ничего не удалено, новое сохранение не создавалось.',
   // S16 organization choice, S17 shared-with-me and document details
   uwOrgPickTitle: 'Выберите организацию',
-  uwOrgPickBody: 'Ваша учётная запись входит в несколько организаций. Позже это можно изменить в разделе «Настройки › Аккаунт».',
+  uwOrgPickBody:
+    'Ваша учётная запись входит в несколько организаций. Позже это можно изменить в разделе «Настройки › Аккаунт».',
   uwOrgPickRole: 'Роль: {role}',
   uwOrgPickContinue: 'Продолжить',
-  uwOrgPickRememberedGone: 'Организация, выбранная в прошлый раз, больше недоступна. Выберите снова.',
+  uwOrgPickRememberedGone:
+    'Организация, выбранная в прошлый раз, больше недоступна. Выберите снова.',
   uwOrgRowSuspended: 'Организация приостановлена',
   uwOrgRowDeactivated: 'Ваша учётная запись деактивирована в этой организации',
-  uwOrgAllBlocked: 'Пока вы не можете работать ни в одной организации. Обратитесь к администратору.',
+  uwOrgAllBlocked:
+    'Пока вы не можете работать ни в одной организации. Обратитесь к администратору.',
   uwOrgPickError: 'Не удалось загрузить список организаций.',
   uwOrgSettingsLabel: 'Рабочая организация',
   uwLibShared: 'Доступные мне',
@@ -124,4 +127,7 @@ export const ru = {
   uwAccessView: 'Просмотр',
   uwAccessEdit: 'Редактирование',
   uwAccessManage: 'Управление',
+  uwRoleOwner: 'Владелец',
+  uwRoleAdmin: 'Администратор',
+  uwRoleMember: 'Участник',
 } satisfies Record<keyof typeof zh, string>

@@ -125,4 +125,7 @@ export const th = {
   uwAccessView: 'ดู',
   uwAccessEdit: 'แก้ไข',
   uwAccessManage: 'จัดการ',
+  uwRoleOwner: 'เจ้าของ',
+  uwRoleAdmin: 'ผู้ดูแลระบบ',
+  uwRoleMember: 'สมาชิก',
 } satisfies Record<keyof typeof zh, string>

@@ -123,4 +123,7 @@ export const ko = {
   uwAccessView: '보기',
   uwAccessEdit: '편집',
   uwAccessManage: '관리',
+  uwRoleOwner: '소유자',
+  uwRoleAdmin: '관리자',
+  uwRoleMember: '멤버',
 } satisfies Record<keyof typeof zh, string>

@@ -97,7 +97,8 @@ export const hi = {
     'इस डेटा के लिए ऐप का नया संस्करण चाहिए। UniWork Office अपडेट करें; कुछ भी हटाया नहीं गया है और कोई नई सेव नहीं बनी है।',
   // S16 organization choice, S17 shared-with-me and document details
   uwOrgPickTitle: 'संगठन चुनें',
-  uwOrgPickBody: 'आपका खाता कई संगठनों से जुड़ा है। आप इसे बाद में सेटिंग्स › खाता में बदल सकते हैं।',
+  uwOrgPickBody:
+    'आपका खाता कई संगठनों से जुड़ा है। आप इसे बाद में सेटिंग्स › खाता में बदल सकते हैं।',
   uwOrgPickRole: 'भूमिका: {role}',
   uwOrgPickContinue: 'जारी रखें',
   uwOrgPickRememberedGone: 'पिछली बार चुना गया संगठन अब उपलब्ध नहीं है। फिर से चुनें।',
@@ -121,4 +122,7 @@ export const hi = {
   uwAccessView: 'देखें',
   uwAccessEdit: 'संपादित करें',
   uwAccessManage: 'प्रबंधित करें',
+  uwRoleOwner: 'स्वामी',
+  uwRoleAdmin: 'व्यवस्थापक',
+  uwRoleMember: 'सदस्य',
 } satisfies Record<keyof typeof zh, string>

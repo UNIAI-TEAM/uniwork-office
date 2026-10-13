@@ -100,13 +100,16 @@ export const nl = {
     'Deze gegevens hebben een nieuwere appversie nodig. Werk UniWork Office bij; er is niets verwijderd en er is geen nieuwe opslag gemaakt.',
   // S16 organization choice, S17 shared-with-me and document details
   uwOrgPickTitle: 'Kies een organisatie',
-  uwOrgPickBody: 'Je account hoort bij meerdere organisaties. Je kunt dit later wijzigen via Instellingen › Account.',
+  uwOrgPickBody:
+    'Je account hoort bij meerdere organisaties. Je kunt dit later wijzigen via Instellingen › Account.',
   uwOrgPickRole: 'Rol: {role}',
   uwOrgPickContinue: 'Doorgaan',
-  uwOrgPickRememberedGone: 'De organisatie die je de vorige keer koos, is niet meer beschikbaar. Kies opnieuw.',
+  uwOrgPickRememberedGone:
+    'De organisatie die je de vorige keer koos, is niet meer beschikbaar. Kies opnieuw.',
   uwOrgRowSuspended: 'De organisatie is opgeschort',
   uwOrgRowDeactivated: 'Je account is gedeactiveerd in deze organisatie',
-  uwOrgAllBlocked: 'Je kunt nog in geen enkele organisatie werken. Neem contact op met je beheerder.',
+  uwOrgAllBlocked:
+    'Je kunt nog in geen enkele organisatie werken. Neem contact op met je beheerder.',
   uwOrgPickError: 'Je organisaties konden niet worden geladen.',
   uwOrgSettingsLabel: 'Werkorganisatie',
   uwLibShared: 'Gedeeld met mij',
@@ -124,4 +127,7 @@ export const nl = {
   uwAccessView: 'Bekijken',
   uwAccessEdit: 'Bewerken',
   uwAccessManage: 'Beheren',
+  uwRoleOwner: 'Eigenaar',
+  uwRoleAdmin: 'Beheerder',
+  uwRoleMember: 'Lid',
 } satisfies Record<keyof typeof zh, string>

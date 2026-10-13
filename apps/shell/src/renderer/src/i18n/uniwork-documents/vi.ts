@@ -97,7 +97,8 @@ export const vi = {
     'Dữ liệu này cần phiên bản ứng dụng mới hơn. Hãy cập nhật UniWork Office; dữ liệu không bị xóa và không có lần lưu mới nào được tạo.',
   // S16 organization choice, S17 shared-with-me and document details
   uwOrgPickTitle: 'Chọn tổ chức để làm việc',
-  uwOrgPickBody: 'Tài khoản của bạn thuộc nhiều tổ chức. Bạn có thể đổi sau trong Cài đặt › Tài khoản.',
+  uwOrgPickBody:
+    'Tài khoản của bạn thuộc nhiều tổ chức. Bạn có thể đổi sau trong Cài đặt › Tài khoản.',
   uwOrgPickRole: 'Vai trò: {role}',
   uwOrgPickContinue: 'Tiếp tục',
   uwOrgPickRememberedGone: 'Tổ chức bạn chọn lần trước không còn khả dụng. Hãy chọn lại.',
@@ -121,4 +122,7 @@ export const vi = {
   uwAccessView: 'Xem',
   uwAccessEdit: 'Chỉnh sửa',
   uwAccessManage: 'Quản lý',
+  uwRoleOwner: 'Chủ sở hữu',
+  uwRoleAdmin: 'Quản trị viên',
+  uwRoleMember: 'Thành viên',
 } satisfies Record<keyof typeof zh, string>

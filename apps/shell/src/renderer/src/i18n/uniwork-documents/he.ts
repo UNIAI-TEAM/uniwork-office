@@ -121,4 +121,7 @@ export const he = {
   uwAccessView: 'צפייה',
   uwAccessEdit: 'עריכה',
   uwAccessManage: 'ניהול',
+  uwRoleOwner: 'בעלים',
+  uwRoleAdmin: 'מנהל',
+  uwRoleMember: 'חבר',
 } satisfies Record<keyof typeof zh, string>

@@ -104,13 +104,16 @@ export const fr = {
     'Ces données nécessitent une version plus récente de l’application. Mettez à jour UniWork Office ; rien n’a été supprimé et aucun nouvel enregistrement n’a été créé.',
   // S16 organization choice, S17 shared-with-me and document details
   uwOrgPickTitle: 'Choisissez une organisation',
-  uwOrgPickBody: 'Votre compte appartient à plusieurs organisations. Vous pourrez changer plus tard dans Paramètres › Compte.',
+  uwOrgPickBody:
+    'Votre compte appartient à plusieurs organisations. Vous pourrez changer plus tard dans Paramètres › Compte.',
   uwOrgPickRole: 'Rôle : {role}',
   uwOrgPickContinue: 'Continuer',
-  uwOrgPickRememberedGone: 'L’organisation choisie la dernière fois n’est plus disponible. Choisissez-en une autre.',
+  uwOrgPickRememberedGone:
+    'L’organisation choisie la dernière fois n’est plus disponible. Choisissez-en une autre.',
   uwOrgRowSuspended: 'L’organisation est suspendue',
   uwOrgRowDeactivated: 'Votre compte est désactivé dans cette organisation',
-  uwOrgAllBlocked: 'Vous ne pouvez encore travailler dans aucune organisation. Contactez votre administrateur.',
+  uwOrgAllBlocked:
+    'Vous ne pouvez encore travailler dans aucune organisation. Contactez votre administrateur.',
   uwOrgPickError: 'Impossible de charger vos organisations.',
   uwOrgSettingsLabel: 'Organisation de travail',
   uwLibShared: 'Partagés avec moi',
@@ -128,4 +131,7 @@ export const fr = {
   uwAccessView: 'Lecture',
   uwAccessEdit: 'Modification',
   uwAccessManage: 'Gestion',
+  uwRoleOwner: 'Propriétaire',
+  uwRoleAdmin: 'Administrateur',
+  uwRoleMember: 'Membre',
 } satisfies Record<keyof typeof zh, string>

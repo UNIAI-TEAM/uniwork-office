@@ -120,4 +120,7 @@ export const zh = {
   uwAccessView: '查看',
   uwAccessEdit: '编辑',
   uwAccessManage: '管理',
+  uwRoleOwner: '所有者',
+  uwRoleAdmin: '管理员',
+  uwRoleMember: '成员',
 }

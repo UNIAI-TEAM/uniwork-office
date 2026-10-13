@@ -121,4 +121,7 @@ export const ar = {
   uwAccessView: 'عرض',
   uwAccessEdit: 'تحرير',
   uwAccessManage: 'إدارة',
+  uwRoleOwner: 'المالك',
+  uwRoleAdmin: 'المسؤول',
+  uwRoleMember: 'عضو',
 } satisfies Record<keyof typeof zh, string>

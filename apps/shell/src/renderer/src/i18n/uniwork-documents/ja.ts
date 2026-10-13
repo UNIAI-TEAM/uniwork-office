@@ -101,7 +101,8 @@ export const ja = {
     'このデータには新しいバージョンのアプリが必要です。UniWork Office を更新してください。データは削除されておらず、新たな保存も行われていません。',
   // S16 organization choice, S17 shared-with-me and document details
   uwOrgPickTitle: '作業する組織を選択',
-  uwOrgPickBody: 'このアカウントは複数の組織に所属しています。あとで［設定 › アカウント］から変更できます。',
+  uwOrgPickBody:
+    'このアカウントは複数の組織に所属しています。あとで［設定 › アカウント］から変更できます。',
   uwOrgPickRole: 'ロール: {role}',
   uwOrgPickContinue: '続行',
   uwOrgPickRememberedGone: '前回選択した組織は利用できなくなりました。もう一度選択してください。',
@@ -125,4 +126,7 @@ export const ja = {
   uwAccessView: '閲覧',
   uwAccessEdit: '編集',
   uwAccessManage: '管理',
+  uwRoleOwner: 'オーナー',
+  uwRoleAdmin: '管理者',
+  uwRoleMember: 'メンバー',
 } satisfies Record<keyof typeof zh, string>

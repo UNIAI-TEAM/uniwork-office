@@ -98,10 +98,12 @@ export const id = {
     'Data ini memerlukan versi aplikasi yang lebih baru. Perbarui UniWork Office; tidak ada yang dihapus dan tidak ada penyimpanan baru yang dibuat.',
   // S16 organization choice, S17 shared-with-me and document details
   uwOrgPickTitle: 'Pilih organisasi',
-  uwOrgPickBody: 'Akun Anda tergabung di beberapa organisasi. Anda dapat mengubahnya nanti di Pengaturan › Akun.',
+  uwOrgPickBody:
+    'Akun Anda tergabung di beberapa organisasi. Anda dapat mengubahnya nanti di Pengaturan › Akun.',
   uwOrgPickRole: 'Peran: {role}',
   uwOrgPickContinue: 'Lanjutkan',
-  uwOrgPickRememberedGone: 'Organisasi yang Anda pilih terakhir kali sudah tidak tersedia. Pilih lagi.',
+  uwOrgPickRememberedGone:
+    'Organisasi yang Anda pilih terakhir kali sudah tidak tersedia. Pilih lagi.',
   uwOrgRowSuspended: 'Organisasi ini ditangguhkan',
   uwOrgRowDeactivated: 'Akun Anda dinonaktifkan di organisasi ini',
   uwOrgAllBlocked: 'Anda belum dapat bekerja di organisasi mana pun. Hubungi admin Anda.',
@@ -122,4 +124,7 @@ export const id = {
   uwAccessView: 'Lihat',
   uwAccessEdit: 'Edit',
   uwAccessManage: 'Kelola',
+  uwRoleOwner: 'Pemilik',
+  uwRoleAdmin: 'Admin',
+  uwRoleMember: 'Anggota',
 } satisfies Record<keyof typeof zh, string>

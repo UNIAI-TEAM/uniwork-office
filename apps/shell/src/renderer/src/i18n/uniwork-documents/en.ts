@@ -97,10 +97,12 @@ export const en = {
     'This data needs a newer app version. Update UniWork Office; nothing was deleted and no new save was created.',
   // S16 organization choice, S17 shared-with-me and document details
   uwOrgPickTitle: 'Choose an organization',
-  uwOrgPickBody: 'Your account belongs to several organizations. You can change this later in Settings › Account.',
+  uwOrgPickBody:
+    'Your account belongs to several organizations. You can change this later in Settings › Account.',
   uwOrgPickRole: 'Role: {role}',
   uwOrgPickContinue: 'Continue',
-  uwOrgPickRememberedGone: 'The organization you chose last time is no longer available. Choose again.',
+  uwOrgPickRememberedGone:
+    'The organization you chose last time is no longer available. Choose again.',
   uwOrgRowSuspended: 'The organization is suspended',
   uwOrgRowDeactivated: 'Your account is deactivated in this organization',
   uwOrgAllBlocked: 'You can’t work in any organization yet. Contact your admin.',
@@ -121,4 +123,7 @@ export const en = {
   uwAccessView: 'View',
   uwAccessEdit: 'Edit',
   uwAccessManage: 'Manage',
+  uwRoleOwner: 'Owner',
+  uwRoleAdmin: 'Admin',
+  uwRoleMember: 'Member',
 } satisfies Record<keyof typeof zh, string>
