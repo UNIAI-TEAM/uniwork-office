@@ -27,7 +27,11 @@ import {
   type ConflictUi,
   type UnsavedCloseChoice,
 } from '../src/main/uniwork-docs/service'
-import { BINDING_FILE, INTENT_PAYLOAD_FILE } from '../src/main/uniwork-docs/binding-store'
+import {
+  BINDING_FILE,
+  BindingStore,
+  INTENT_PAYLOAD_FILE,
+} from '../src/main/uniwork-docs/binding-store'
 import { pageRecentPaths } from '../src/main/recent-files'
 import {
   INTENT_STORE_REGISTRATION,
@@ -1390,13 +1394,17 @@ describe('a deferred sweep never erases the pre-store intent (R1-be-5)', () => {
     createdAt: '2026-10-11T00:00:00.000Z',
   }
   const folder = () => join(dir, 'uniwork-documents', 'default', 'acc_1', DOC)
-  const copyPath = () => join(folder(), 'Plan.docx')
+  const copyPath = (name = 'Plan.docx') => join(folder(), name)
   const payloadPath = () => join(folder(), INTENT_PAYLOAD_FILE)
 
   /** the pre-store working copy: a schema-1 binding with the intent + its payload */
-  function seedLegacy(state = 'saving'): void {
+  function seedLegacy(
+    state = 'saving',
+    opts: { filename?: string; title?: string; baseRevision?: string; baseChecksum?: string } = {},
+  ): void {
+    const filename = opts.filename ?? 'Plan.docx'
     mkdirSync(folder(), { recursive: true })
-    writeFileSync(copyPath(), 'working copy bytes')
+    writeFileSync(copyPath(filename), 'working copy bytes')
     writeFileSync(
       join(folder(), BINDING_FILE),
       JSON.stringify(
@@ -1405,13 +1413,13 @@ describe('a deferred sweep never erases the pre-store intent (R1-be-5)', () => {
           documentId: DOC,
           workspaceId: 'ws_1',
           orgId: 'org_a',
-          title: 'Plan.docx',
-          filename: 'Plan.docx',
+          title: opts.title ?? 'Plan.docx',
+          filename,
           format: 'docx',
           access: 'edit',
-          baseRevision: '41',
+          baseRevision: opts.baseRevision ?? '41',
           baseVersion: 3,
-          baseChecksum: 'stale',
+          baseChecksum: opts.baseChecksum ?? 'stale',
           state,
           pendingIntent: LEGACY,
         },
@@ -1517,6 +1525,57 @@ describe('a deferred sweep never erases the pre-store intent (R1-be-5)', () => {
     expect(Buffer.from(migrated?.payload ?? []).toString()).toBe('working copy bytes')
     expect(binding(copyPath())).toMatchObject({ schema: 2, min_store_level: 2 })
     expect(binding(copyPath())).not.toHaveProperty('pendingIntent')
+    expect(existsSync(payloadPath())).toBe(false)
+  })
+
+  it('R3-be-1: the open of a held folder renames nothing and deletes nothing (fresh download)', async () => {
+    // the review's trigger: a deferred schema-1 copy named from a corrupt
+    // upload name (U+FFFD, so a fresh download would repair the name) with a
+    // stale base (so the copy is not kept by the branch above). The open used
+    // to write the new file and delete the old one while the binding write was
+    // refused: the opened tab named the deleted file and stayed unbound
+    const corrupt = 'B\uFFFDo c\uFFFDo.docx'
+    const title = 'Báo cáo.docx'
+    seedLegacy('ready', {
+      filename: corrupt,
+      title,
+      baseRevision: '40',
+      baseChecksum: hex(enc('working copy bytes')),
+    })
+    const server = fakeServer({ bytes: enc('v3'), title })
+    const ctx = setup(server, { budgetBytes: 4096 })
+    const fillers = await fillBudget(ctx)
+    const snapshot = () => ({
+      names: readdirSync(folder()).sort(),
+      binding: readFileSync(join(folder(), BINDING_FILE), 'utf8'),
+      payload: readFileSync(payloadPath(), 'utf8'),
+      copy: readFileSync(copyPath(corrupt), 'utf8'),
+    })
+    const before = snapshot()
+
+    // the open runs the sweep (deferred: the budget is full), so the folder is
+    // held: the copy opens as it is, exactly as when its rewrite is refused
+    const opened = await ctx.service.openDocument(DOC)
+    if (!opened.ok) throw new Error(opened.error)
+    expect(opened.value.path).toBe(copyPath(corrupt))
+    expect(existsSync(opened.value.path)).toBe(true)
+    expect(snapshot()).toEqual(before)
+    // the opened copy is the one binding.json names, not an unbound new file
+    expect(new BindingStore(join(dir, 'uniwork-documents')).classify(opened.value.path).kind).toBe(
+      'bound',
+    )
+    expect(uploads(server)).toHaveLength(0)
+    expect(commits(server)).toHaveLength(0)
+
+    // the budget frees: the sweep completes and keeps the intent's own key
+    const intents = await intentStoreOf(ctx)
+    for (const key of fillers) await intents.delete(key)
+    expect((await ctx.service.openSyncStore()).kind).toBe('ok')
+    const migrated = await intentOf(ctx, copyPath(corrupt))
+    expect(migrated?.intent.idempotencyKey).toBe(LEGACY.idempotencyKey)
+    expect(Buffer.from(migrated?.payload ?? []).toString()).toBe('working copy bytes')
+    expect(binding(copyPath(corrupt))).toMatchObject({ schema: 2, min_store_level: 2 })
+    expect(binding(copyPath(corrupt))).not.toHaveProperty('pendingIntent')
     expect(existsSync(payloadPath())).toBe(false)
   })
 })

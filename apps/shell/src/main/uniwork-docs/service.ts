@@ -1380,6 +1380,23 @@ export class UniworkDocsService {
       bytes = latest.bytes
       base = latest.detail
     }
+    // while the sweep still owns this folder the fresh download writes
+    // nothing: its binding write below would be refused (the store's hold), so
+    // the new file would open unbound - no binding names it - and the old
+    // file, the one binding.json still carries, would be replaced or deleted.
+    // The copy opens as it is, the route the branch above takes when its
+    // rewrite is refused, and binding.json, that file and pending-upload.bin
+    // stay byte for byte until the sweep moves the intent (R3-be-1)
+    if (this.heldByMigration(dir)) {
+      if (existing && existing.documentId === documentId) {
+        const local = join(dir, existing.filename)
+        if (this.store.exists(local)) return this.show(local, existing)
+      }
+      // nothing may be written and the binding names no copy to open: the
+      // folder's pre-store intent could not move (the store refused it), so
+      // the open stops instead of landing a half-written copy
+      throw new UniworkDocError('store_full')
+    }
     // a copy keeps its name, unless an earlier build named it from a corrupt
     // upload name (U+FFFD): that one is renamed with this fresh download
     const stale = existing && hasReplacementChar(existing.filename) ? existing.filename : null
@@ -1404,11 +1421,10 @@ export class UniworkDocsService {
       minAppVersion: this.buildVersion(),
       ...(existing?.lastSavedAt ? { lastSavedAt: existing.lastSavedAt } : {}),
     }
-    // while the sweep still owns the folder this write is refused (the store's
-    // hold): the fresh working copy opens, and `pendingIntent` plus the payload
-    // beside it stay exactly as they are until the migration moves them
-    await this.store.write(dir, binding)
-    return this.show(path, binding)
+    // a refused write is never ignored, exactly as in the branch above: the
+    // copy then reads as the binding that persisted, not the refused one
+    const written = await this.store.write(dir, binding)
+    return this.show(path, written ? binding : (existing ?? binding))
   }
 
   /** the document's own working copy when a tab shows it */
