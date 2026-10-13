@@ -3341,8 +3341,237 @@ body.vib .home {
 .wb-home {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 18px;
+  padding-inline: 24px;
   padding-bottom: 32px;
+}
+
+/* the content column (redesign spec 2.4): left-aligned and capped; the fixed modal overlay is not */
+.wb-home > :not(.modal-overlay) {
+  max-width: 1180px;
+}
+
+/* readable line length for prose (redesign spec 2.3) */
+:where(.wb-home) p {
+  max-width: 64ch;
+  text-wrap: pretty;
+}
+
+/* Workbench foundation (redesign spec 2): brand buttons, tabular numbers, list blocks and
+ * rows, the drawn checkbox and the shimmer skeleton. Colors come from tokens only. */
+
+.wb-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-8);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
+}
+
+.wb-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.wb-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.wb-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.wb-btn-primary {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.wb-btn-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.wb-btn-secondary {
+  border-color: var(--border);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.wb-btn-secondary:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+.wb-btn-ghost {
+  color: var(--text-secondary);
+}
+
+.wb-btn-ghost:hover:not(:disabled) {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.wb-btn-icon {
+  width: 32px;
+  padding: 0;
+}
+
+.wb-btn-sm {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 12.5px;
+}
+
+.wb-num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* the app has no mono token: same stack as settings.css */
+.wb-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+}
+
+.wb-block {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-12);
+  background: var(--surface);
+  box-shadow: var(--wb-shadow);
+  overflow: hidden;
+}
+
+.wb-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 7px 12px;
+  font-size: 13px;
+  color: var(--text);
+  transition: background-color 150ms ease;
+}
+
+.wb-row:hover {
+  background: var(--wb-row-hover);
+}
+
+.wb-row + .wb-row {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.wb-group-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 10px 12px 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.wb-group-head.is-overdue {
+  color: var(--danger-text);
+}
+
+/* the native input stays (as .uw-sr-only) for keyboard and screen readers; the box is drawn */
+.wb-check {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.wb-check-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--wb-check-border);
+  border-radius: 4px;
+  background: var(--surface);
+  color: transparent;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease;
+}
+
+.wb-check input:checked + .wb-check-box {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.wb-check input:focus-visible + .wb-check-box {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.wb-check input:disabled + .wb-check-box {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* --bg-hover-strong is the .uw-skel fill: --surface-subtle vanishes on the light page */
+.wb-skel {
+  display: block;
+  border-radius: var(--radius-6);
+  background: linear-gradient(
+      90deg,
+      var(--bg-hover-strong) 0%,
+      var(--bg-hover-subtle) 50%,
+      var(--bg-hover-strong) 100%
+    )
+    0 0 / 200% 100%;
+  animation: wb-skel-shimmer 1.2s linear infinite;
+}
+
+.wb-skel-strip {
+  height: 76px;
+  border-radius: var(--radius-12);
+}
+
+.wb-skel-row {
+  height: 36px;
+}
+
+@keyframes wb-skel-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+
+  to {
+    background-position: 0 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wb-btn {
+    transition: none;
+  }
+
+  .wb-btn:active:not(:disabled) {
+    transform: none;
+  }
+
+  .wb-skel {
+    animation: none;
+  }
 }
 
 .wb-topbar {
@@ -3910,10 +4139,12 @@ body.vib .home {
   gap: 2px;
   flex: 0 0 auto;
   margin-left: auto;
-  opacity: 0.7;
+  opacity: 0;
   transition: opacity 140ms ease;
 }
 
+.wb-row:hover .wb-row-actions,
+.wb-row:focus-within .wb-row-actions,
 .wb-module-row:hover .wb-row-actions,
 .wb-module-row:focus-within .wb-row-actions,
 .wb-material-row:hover .wb-row-actions,
@@ -3970,40 +4201,6 @@ body.vib .home {
 .wb-icon-btn.is-accent:hover:not(:disabled) {
   background: var(--accent-soft);
   color: var(--accent);
-}
-
-.wb-subtabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-}
-
-.wb-subtab {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-30);
-  background: var(--bg-content);
-  color: var(--text-secondary);
-  padding: 7px 12px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  box-shadow: var(--shadow-pill);
-  transition:
-    background 140ms ease,
-    color 140ms ease,
-    border-color 140ms ease;
-}
-
-.wb-subtab:hover {
-  background: var(--bg-hover);
-  color: var(--text);
-}
-
-.wb-subtab.active {
-  background: var(--accent-soft);
-  color: var(--text);
-  border-color: var(--accent);
 }
 
 /* Prefer .wb-module-meta; keep legacy first-child content column for unmigrated rows */

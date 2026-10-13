@@ -110,6 +110,11 @@
   --text-small: 14px;
   --text-caption: 12px;
 
+  /* Workbench redesign: list blocks, row hover, the drawn checkbox outline (3:1 on both) */
+  --wb-shadow: 0 1px 2px rgb(16 24 40 / 5%), 0 1px 3px rgb(16 24 40 / 4%);
+  --wb-row-hover: #f7f8fa;
+  --wb-check-border: #858b94;
+
   color-scheme: light;
 }
 
@@ -197,6 +202,11 @@
   --color-dialog-primary: #5a96ff;
   --color-dialog-primary-hover: #7aabff;
   --color-dialog-primary-text: #0d1220;
+
+  /* Workbench redesign: no shadow in dark, blocks separate by their border */
+  --wb-shadow: none;
+  --wb-row-hover: #26282c;
+  --wb-check-border: #72777f;
 
   color-scheme: dark;
 }
@@ -286,6 +296,11 @@
     --color-dialog-primary: #5a96ff;
     --color-dialog-primary-hover: #7aabff;
     --color-dialog-primary-text: #0d1220;
+
+    /* Workbench redesign: no shadow in dark, blocks separate by their border */
+    --wb-shadow: none;
+    --wb-row-hover: #26282c;
+    --wb-check-border: #72777f;
 
     color-scheme: dark;
   }
