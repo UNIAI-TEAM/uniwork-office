@@ -234,6 +234,8 @@ function serviceFor(bound: boolean) {
   } as unknown as Parameters<typeof createUniworkComments>[1]['service']
 }
 
+type RevealOutcome = 'delivered' | 'deferred' | 'none'
+
 /** mount the wiring over a fake server; returns the handler map and the reveal spy */
 function mount(
   options: {
@@ -241,6 +243,11 @@ function mount(
     bound?: boolean
     /** the path the invoking editor window shows (R1-2 pull scope) */
     shownPath?: (sender: { id: number }) => string | null
+    /** what the push reports back (D1-1/D1-4); default: handed to a live editor */
+    sendReveal?: (
+      payload: { path: string; commentId: string },
+      stillWanted: () => boolean,
+    ) => RevealOutcome
   } = {},
 ) {
   const { ipcMain, handlers } = fakeIpc()
@@ -252,7 +259,12 @@ function mount(
     authorized: <T>(call: (t: string) => Promise<T>) => call('tok'),
     isSignedIn: () => true,
     fetch: server.fetch,
-    sendReveal: (payload) => reveals.push(payload),
+    sendReveal:
+      options.sendReveal ??
+      ((payload) => {
+        reveals.push(payload)
+        return 'delivered'
+      }),
     ...(options.shownPath ? { shownPath: options.shownPath } : {}),
   })
   return { handle, handlers, server, reveals }
@@ -414,6 +426,64 @@ describe('the launch reveal is held until the editor subscribes (R1-2)', () => {
     await pull(handlers, 7)
     handle.reveal(PATH, 'c2')
     expect(reveals).toEqual([{ path: PATH, commentId: 'c2' }])
+  })
+})
+
+describe('a delivered reveal is not replayed on the next subscribe (D1-1)', () => {
+  const pull = (handlers: Map<string, Handler>, senderId: number) =>
+    handlers.get(COMMENTS_CHANNELS.revealPending)!({ sender: { id: senderId } }, undefined)
+
+  it('a push handed to a subscribed editor ends the hold', async () => {
+    const { handle, handlers } = mount({ shownPath: (sender) => (sender.id === 7 ? PATH : null) })
+    expect(await pull(handlers, 7)).toBeNull() // the first subscribe holds nothing
+    handle.reveal(PATH, CMT) // handed to the armed listener, not held
+    expect(await pull(handlers, 7)).toBeNull() // a resubscribe must not replay it
+  })
+
+  it('a deferred push stays held until the editor pulls it', async () => {
+    const { handle, handlers } = mount({
+      shownPath: (sender) => (sender.id === 7 ? PATH : null),
+      sendReveal: () => 'deferred',
+    })
+    handle.reveal(PATH, CMT)
+    expect(await pull(handlers, 7)).toEqual({ path: PATH, commentId: CMT })
+    expect(await pull(handlers, 7)).toBeNull()
+  })
+
+  it('a deferred push handed to a subscribed editor still ends the hold', async () => {
+    let stillWanted: (() => boolean) | null = null
+    const { handle, handlers } = mount({
+      shownPath: (sender) => (sender.id === 7 ? PATH : null),
+      sendReveal: (_payload, wanted) => {
+        stillWanted = wanted
+        return 'deferred'
+      },
+    })
+    expect(await pull(handlers, 7)).toBeNull()
+    handle.reveal(PATH, CMT)
+    // the editor pulled before the reveal was decided, so the deferred push
+    // lands in its listener once the page loads and the hold ends there
+    expect(stillWanted!()).toBe(true)
+    expect(await pull(handlers, 7)).toBeNull()
+  })
+})
+
+describe('a pull that lands before the deferred push delivers once (D1-4)', () => {
+  it('the deferred copy is dropped once the pull delivered the reveal', async () => {
+    let stillWanted: (() => boolean) | null = null
+    const { handle, handlers } = mount({
+      shownPath: (sender) => (sender.id === 7 ? PATH : null),
+      sendReveal: (_payload, wanted) => {
+        stillWanted = wanted
+        return 'deferred'
+      },
+    })
+    handle.reveal(PATH, CMT)
+    expect(stillWanted!()).toBe(true) // still held: the push owes the renderer the reveal
+    expect(
+      await handlers.get(COMMENTS_CHANNELS.revealPending)!({ sender: { id: 7 } }, undefined),
+    ).toEqual({ path: PATH, commentId: CMT })
+    expect(stillWanted!()).toBe(false) // the pull delivered it: the push must not
   })
 })
 
