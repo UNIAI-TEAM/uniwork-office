@@ -665,7 +665,10 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     // first so no in-flight consumer or dispatch writes into a wiped scope
     wipeStore: async (owner) => {
       runtime.stop()
-      service.teardownSaveQueue?.()
+      // await the queue teardown BEFORE the wipe: the in-flight poll/dispatch
+      // must unwind (and release its locks) before the scope is wiped, so no
+      // lookup or record write runs into a wiped scope (G506-be-d1-1)
+      await service.teardownSaveQueue?.()
       if (!owner) return
       const store = syncStoreFor()
       store.access.forget()

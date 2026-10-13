@@ -495,6 +495,12 @@ export class UniworkDocsService {
   private readonly windowOwner = `${process.pid}:${randomUUID()}`
   /** the document keys the current poll pass is dispatching (see dispatcherBusy) */
   private readonly queueInFlight = new Set<string>()
+  /**
+   * A read-only window's own `blocked/other_window` status, keyed by path. It is
+   * window-local and never written to the shared binding.json: the holder reads
+   * the same file and keeps its own chip (G506-be-d1-2).
+   */
+  private readonly otherWindowStatus = new Map<string, UniworkDocStatus>()
   /** the poll pass in flight right now, awaited by teardownSaveQueue (G506-be-4) */
   private queuePass: Promise<void> | null = null
   /**
@@ -646,6 +652,10 @@ export class UniworkDocsService {
    * the rest are never hidden by the editor state.
    */
   private present(status: UniworkDocStatus): UniworkDocStatus {
+    // a read-only window's own status wins for THIS window (never written to the
+    // shared binding, so the holder is unaffected) - G506-be-d1-2
+    const overlay = this.otherWindowStatus.get(status.path)
+    if (overlay) return overlay
     const quiet = status.state === 'ready' || status.state === 'saved'
     return quiet && status.access === 'edit' && this.editorDirty.has(status.path)
       ? { ...status, state: 'dirty' }
@@ -1013,6 +1023,21 @@ export class UniworkDocsService {
   private async applyRecord(record: IntentRecordV2): Promise<void> {
     const doc = await this.boundDocFor(record.documentId)
     if (!doc) return
+    if (record.state === 'blocked' && record.lastError === 'other_window') {
+      // a read-only window's own status: pushed to THIS window only, never the
+      // shared binding.json - the holder reads the same file and must keep its
+      // own chip (G506-be-d1-2)
+      const local: UniworkDocStatus = {
+        ...this.statusOf(doc),
+        state: 'blocked',
+        error: 'other_window',
+      }
+      this.otherWindowStatus.set(doc.path, local)
+      this.publish(local)
+      return
+    }
+    // a real record change ends the window-local read-only status
+    this.otherWindowStatus.delete(doc.path)
     if (record.state === 'committed') {
       await this.settleFromRecord(doc, record)
       return
@@ -1118,11 +1143,12 @@ export class UniworkDocsService {
     const docs = await this.pendingQueueDocs()
     if (docs.length === 0) return
     if (!this.isQueueSessionCurrent(access)) return
-    await access.dispatcher.tick(docs)
-    // the keys this pass is about to run: the inline pipeline skips them, so one
-    // intent never has two writers at once (G506-be-1)
+    // the keys this pass is about to run, marked BEFORE `tick`: the inline
+    // pipeline skips them for the WHOLE pass, so the poll's tick/reconcile and
+    // its dispatch never race a Save of the same intent (G506-be-1, d1-3)
     for (const doc of docs) this.queueInFlight.add(doc.key)
     try {
+      await access.dispatcher.tick(docs)
       await access.dispatcher.dispatchAll(docs)
     } finally {
       for (const doc of docs) this.queueInFlight.delete(doc.key)

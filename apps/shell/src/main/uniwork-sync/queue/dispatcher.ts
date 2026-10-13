@@ -294,8 +294,10 @@ export class QueueDispatcher {
         if (this.isInFlightState(doc.record.state)) {
           // a stop left this record mid-flight and THIS dispatcher is not
           // running it: resolve it through the lookup, never a new key or a
-          // blind re-upload (G5-06 fix-C item 4)
-          outcomes.set(doc.key, await this.settleInFlight(doc, now))
+          // blind re-upload. It runs under the SAME guards as a full dispatch -
+          // the document lock and `canCommit` - so a window without the lock
+          // does nothing at all (G5-06 fix-C item 4, d1-1)
+          outcomes.set(doc.key, await this.runOne(doc, now))
           dispatched += 1
           continue
         }
@@ -517,9 +519,10 @@ export class QueueDispatcher {
 
   /**
    * A stored record in one of these states was mid-flight when its writer
-   * stopped (a lost lock, `canCommit` false, a crash): `dispatchAll` never
-   * picks it, so a session that is not running it must resolve it through the
-   * G5-07 lookup before it can settle (see `settleInFlight`).
+   * stopped (a lost lock, `canCommit` false, a crash): `dispatchAll` never picks
+   * it, so a session that is not running it must resolve it first - `committing`
+   * through the G5-07 lookup (`settleInFlight`), `validating`/`uploading` by a
+   * local requeue and re-send (AC-4; see `runOne`).
    */
   private isInFlightState(state: QueueState): boolean {
     return state === 'validating' || state === 'uploading' || state === 'committing'
@@ -544,7 +547,17 @@ export class QueueDispatcher {
     )
   }
 
-  /** one document through validate -> upload -> lock check -> commit */
+  /**
+   * One document through the queue. A record that is dispatchable runs
+   * validate -> upload -> lock check -> commit. A record left mid-flight at rest
+   * because its writer stopped (a lost lock, `canCommit` false, a crash) is
+   * resolved first: `committing` at rest settles through ONE lookup (the commit
+   * POST may have landed), while `validating`/`uploading` at rest provably never
+   * sent the commit, so it goes back to `queued` with the SAME key and is
+   * re-sent here. Every path holds the document lock and honours `canCommit`, so
+   * a window that does not own the document never writes the shared record or
+   * sends a request.
+   */
   private async runOne(doc: QueueDoc, now: number): Promise<QueueState> {
     const lock = await this.deps.lock.acquire(doc.key)
     if (lock.kind === 'other_window') {
@@ -556,18 +569,37 @@ export class QueueDispatcher {
       return doc.record.state
     }
     this.otherWindow.delete(doc.key)
+    // a record left mid-flight at rest: resolve it below. It skips the
+    // dispatchable/driving gates (its state is not dispatchable) but still holds
+    // the lock and passes `canCommit` first (G506-be-d1-1).
+    const inFlight = this.isInFlightState(doc.record.state)
+    const commitInFlight = doc.record.state === 'committing'
     // the record may have been settled while this pass waited for the lock: a
     // cancel, supersede or tombstone that won must leave exactly one outcome,
     // and a record the store no longer holds (or holds for another intent) is
     // not this pass's to send
-    if (!this.isDispatchable(doc.record.state)) return doc.record.state
-    if (!(await this.driving(doc))) return doc.record.state
+    if (!inFlight && !this.isDispatchable(doc.record.state)) return doc.record.state
+    if (!inFlight && !(await this.driving(doc))) return doc.record.state
     const generation = lock.generation
     const stopBeat = this.startHeartbeat(doc.key, generation)
     this.committing.add(doc.key)
     try {
-      // the session must still own this document before a byte moves
+      // the session must still own this document before a byte moves (or before
+      // a settle lookup): false stops the pass with no request and no write
       if (!this.sessionAllows(doc)) return doc.record.state
+      // `committing` at rest: the commit POST may have landed, so exactly one
+      // lookup with the SAME key decides - never a new key, never a blind
+      // re-upload (G5-06 fix-C item 4)
+      if (commitInFlight) return await this.settleInFlight(doc, now)
+      if (inFlight) {
+        // `validating`/`uploading` at rest: the commit POST was never sent, so
+        // the server never received this key and a lookup would answer 410
+        // commit_intent_unknown -> reconciling-stuck for a save it never saw
+        // (AC-4). The record is provably not committed: requeue it with the SAME
+        // key and re-send it here, under this same lock and canCommit guard.
+        await this.apply(doc, { type: 'lookup', outcome: 'not_committed' }, now)
+        if (doc.record.state !== 'queued') return doc.record.state
+      }
       // validation passed: the first `uploaded` advances validating -> uploading
       await this.apply(doc, { type: 'dispatch' }, now)
       await this.apply(doc, { type: 'uploaded' }, now)

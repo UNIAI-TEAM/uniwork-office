@@ -581,7 +581,7 @@ describe('G5-06 W4b save queue wiring', () => {
     expect((await storedIntent(ctx, path))?.intent.state).toBe('conflict')
   })
 
-  it('G5-06 fix-C item 4: a stored in-flight record is settled by lookup on the next poll', async () => {
+  it('G5-06 fix-C item 4 / AC-4: committing at rest is settled by lookup, uploading at rest re-sends', async () => {
     const seed = async (
       ctx: Ctx,
       state: 'uploading' | 'committing',
@@ -617,28 +617,25 @@ describe('G5-06 W4b save queue wiring', () => {
     const lookups = (server: ReturnType<typeof fakeServer>) =>
       server.calls.filter((c) => c.path.endsWith('/versions/commit') && c.method === 'GET')
 
-    // a stop left the record `uploading` at rest (lost lock / crash). Its lookup
-    // answers not_committed: the next poll resolves it to queued with the SAME
-    // key (one lookup, no upload/commit), and the poll after that re-sends it
+    // a stop left the record `uploading` at rest (lost lock / crash). The commit
+    // POST was never sent, so a lookup would answer 410 commit_intent_unknown
+    // for a save the server never saw (AC-4): the poll re-sends the SAME key
+    // instead - ZERO lookups, one upload, one commit, in that one poll
     const server = fakeServer({ bytes: enc('v3') })
     const ctx = setup(server)
     const path = await openDoc(ctx)
     await seed(ctx, 'uploading', path, 'key_stuck')
     await ctx.service.pollSaveQueue()
-    expect(lookups(server)).toHaveLength(1)
-    expect(uploads(server)).toHaveLength(0)
-    expect(commits(server)).toHaveLength(0)
-    expect((await storedIntent(ctx, path))?.intent).toMatchObject({
-      state: 'queued',
-      idempotencyKey: 'key_stuck',
-    })
-    await ctx.service.pollSaveQueue()
+    expect(lookups(server)).toHaveLength(0)
     expect(uploads(server)).toHaveLength(1)
     expect(commits(server)).toHaveLength(1)
+    expect(uploads(server)[0]!.headers['idempotency-key']).toBe('key_stuck')
     expect(commits(server)[0]!.headers['idempotency-key']).toBe('key_stuck')
+    expect(await storedIntent(ctx, path)).toBeNull()
 
-    // a record left `committing` whose lookup answers committed settles with the
-    // receipt: one lookup, no upload, no commit, and the record is cleared
+    // a record left `committing` (the commit POST may have been sent) whose
+    // lookup answers committed settles with the receipt: one lookup, no upload,
+    // no commit, and the record is cleared
     const second = fakeServer({ bytes: enc('v3') })
     const ctx2 = setup(second)
     const path2 = await openDoc(ctx2)
@@ -767,5 +764,214 @@ describe('G5-06 W4b save queue wiring', () => {
     await saving
     expect(uploads(server)).toHaveLength(1)
     expect(commits(server)).toHaveLength(1)
+  })
+
+  it('G506-be-d1-1: a settle left in flight is not sent after teardown resolves', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    const key = basename(dirname(path))
+    // a record at rest in `committing` (a lost lock / crash after the commit
+    // POST may have been sent): the poll settles it through the G5-07 lookup
+    // with the SAME key
+    const opened = await ctx.layer.open({ deploymentId: 'default', accountId: 'acc_1' })
+    if (opened.kind !== 'ok') throw new Error('store did not open')
+    await createIntentStore(opened.store.records(INTENT_STORE_REGISTRATION.name)).put(
+      key,
+      {
+        v: 2,
+        intentId: `intent_${key}`,
+        idempotencyKey: 'key_stuck',
+        documentId: DOC,
+        orgId: 'org_a',
+        workspaceId: 'ws_1',
+        baseRevision: '41',
+        baseVersion: 3,
+        checksum: hex(enc('v4')),
+        length: enc('v4').byteLength,
+        generation: 1,
+        state: 'committing',
+        attempt: 1,
+        createdAt: '2026-10-13T00:00:00.000Z',
+        updatedAt: '2026-10-13T00:00:00.000Z',
+      },
+      enc('v4'),
+    )
+    // gate the settle lookup so the poll is mid-settle when teardown lands
+    const realFetch = server.fetch.getMockImplementation()!
+    let releaseLookup!: () => void
+    const lookupGate = new Promise<void>((resolve) => {
+      releaseLookup = resolve
+    })
+    let enteredLookup!: () => void
+    const inLookup = new Promise<void>((resolve) => {
+      enteredLookup = resolve
+    })
+    server.fetch.mockImplementation(async (url: string, init: RequestInit) => {
+      if (url.endsWith('/versions/commit') && (init.method ?? 'GET') === 'GET') {
+        enteredLookup()
+        await lookupGate
+      }
+      return realFetch(url, init)
+    })
+    const polling = ctx.service.pollSaveQueue()
+    await inLookup
+    // the account switches mid-settle: teardown must await the in-flight pass
+    ctx.signInAs('acc_2')
+    let resolved = false
+    const teardown = ctx.service.teardownSaveQueue().then(() => {
+      resolved = true
+    })
+    await new Promise((resolve) => setTimeout(resolve, 30))
+    expect(resolved).toBe(false)
+    releaseLookup()
+    await teardown
+    const after = server.calls.length
+    await polling
+    // no lookup/record write landed after teardown resolved
+    expect(server.calls.length).toBe(after)
+  })
+
+  it("G506-be-d1-2: a read-only window status does not rewrite the holder's binding.json", async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const first = setup(server)
+    const second = setup(server)
+    const path = await openDoc(first)
+    await openDoc(second)
+    const key = basename(dirname(path))
+    // a stored pending intent for window 2 (no save: no binding write yet)
+    const opened = await second.layer.open({ deploymentId: 'default', accountId: 'acc_1' })
+    if (opened.kind !== 'ok') throw new Error('store did not open')
+    await createIntentStore(opened.store.records(INTENT_STORE_REGISTRATION.name)).put(
+      key,
+      {
+        v: 2,
+        intentId: `intent_${key}`,
+        idempotencyKey: 'key_pending',
+        documentId: DOC,
+        orgId: 'org_a',
+        workspaceId: 'ws_1',
+        baseRevision: '41',
+        baseVersion: 3,
+        checksum: hex(enc('v4')),
+        length: enc('v4').byteLength,
+        generation: 1,
+        state: 'queued',
+        attempt: 0,
+        createdAt: '2026-10-13T00:00:00.000Z',
+        updatedAt: '2026-10-13T00:00:00.000Z',
+      },
+      enc('v4'),
+    )
+    // window 1 takes a fresh lease (a live holder)
+    const opener = createDocLock({
+      root: join(dir, 'uniwork-documents'),
+      scope: { deploymentId: 'default', accountId: 'acc_1' },
+      clock: () => Date.now(),
+      owner: 'win1',
+    })
+    expect((await opener.acquire(key)).kind).toBe('held')
+    const before = readFileSync(join(path, '..', BINDING_FILE))
+    // window 2's poll sees window 1's fresh lease and goes read-only, pushing
+    // blocked/other_window to ITSELF only (never the shared binding.json)
+    await second.service.pollSaveQueue()
+    expect(second.service.isOtherWindow(path)).toBe(true)
+    // window 2's own status reads blocked/other_window
+    await vi.waitFor(async () =>
+      expect(await second.service.docStatus(path)).toMatchObject({
+        state: 'blocked',
+        error: 'other_window',
+      }),
+    )
+    // window 1's binding.json is byte-for-byte unchanged, and its own status is
+    // still the holder's (never the loser's other_window)
+    expect(readFileSync(join(path, '..', BINDING_FILE))).toEqual(before)
+    expect(await first.service.docStatus(path)).not.toMatchObject({ error: 'other_window' })
+    await opener.release(key, 1)
+  })
+
+  it("G506-be-d1-3: an inline Save during the poll's tick is excluded (one writer)", async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    const key = basename(dirname(path))
+    // a stored `reconciling` record: the poll's tick looks it up
+    const opened = await ctx.layer.open({ deploymentId: 'default', accountId: 'acc_1' })
+    if (opened.kind !== 'ok') throw new Error('store did not open')
+    await createIntentStore(opened.store.records(INTENT_STORE_REGISTRATION.name)).put(
+      key,
+      {
+        v: 2,
+        intentId: `intent_${key}`,
+        idempotencyKey: 'key_reconcile',
+        documentId: DOC,
+        orgId: 'org_a',
+        workspaceId: 'ws_1',
+        baseRevision: '41',
+        baseVersion: 3,
+        checksum: hex(enc('v3')),
+        length: enc('v3').byteLength,
+        generation: 1,
+        state: 'reconciling-stuck',
+        attempt: 1,
+        reconcileSince: '2026-10-13T00:00:00.000Z',
+        createdAt: '2026-10-13T00:00:00.000Z',
+        updatedAt: '2026-10-13T00:00:00.000Z',
+      },
+      enc('v3'),
+    )
+    // gate the tick's lookup so the poll is inside tick when the Save starts
+    const realFetch = server.fetch.getMockImplementation()!
+    let releaseLookup!: () => void
+    const lookupGate = new Promise<void>((resolve) => {
+      releaseLookup = resolve
+    })
+    let enteredLookup!: () => void
+    const inLookup = new Promise<void>((resolve) => {
+      enteredLookup = resolve
+    })
+    server.fetch.mockImplementation(async (url: string, init: RequestInit) => {
+      if (url.endsWith('/versions/commit') && (init.method ?? 'GET') === 'GET') {
+        enteredLookup()
+        await lookupGate
+      }
+      return realFetch(url, init)
+    })
+    const polling = ctx.service.pollSaveQueue()
+    await inLookup
+    // an inline Save of the same document starts while the poll is inside tick:
+    // the key is already marked in flight, so the inline pipeline is excluded
+    // (it never starts its own upload of the same intent)
+    writeFileSync(path, 'v4 inline')
+    const inline = ctx.service.coordinator.save(path)
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(uploads(server)).toHaveLength(0)
+    releaseLookup()
+    await polling
+    await inline
+    // one writer: the poll's tick lookup settled the record, and only the poll
+    // dispatched it - never a second upload from the inline save
+    expect(
+      server.calls.filter((c) => c.path.endsWith('/versions/commit') && c.method === 'GET'),
+    ).toHaveLength(1)
+    expect(uploads(server)).toHaveLength(1)
+    expect(uploads(server)[0]!.headers['idempotency-key']).toBe('key_reconcile')
+    expect(commits(server)).toHaveLength(1)
+    expect(commits(server)[0]!.headers['idempotency-key']).toBe('key_reconcile')
+  })
+
+  it('G506-be-d1-1: the account-boundary wipe awaits teardownSaveQueue before the wipe', () => {
+    // the wiring source pins the order: the in-flight poll/dispatch must unwind
+    // before the scope is wiped, so no settle lookup runs into a wiped scope
+    const source = readFileSync(join(__dirname, '..', 'src/main/uniwork-docs/wiring.ts'), 'utf8')
+    const wipe = source.slice(source.indexOf('wipeStore: async (owner) =>'))
+    const awaited = wipe.indexOf('await service.teardownSaveQueue?.()')
+    const lockAndWipe = wipe.indexOf('lockAndWipe(')
+    expect(awaited).toBeGreaterThan(-1)
+    expect(lockAndWipe).toBeGreaterThan(-1)
+    expect(awaited).toBeLessThan(lockAndWipe)
+    // and it is awaited, not a fire-and-forget call
+    expect(wipe).toMatch(/await service\.teardownSaveQueue\?\.\(\)/)
+    expect(wipe).not.toMatch(/\n\s+service\.teardownSaveQueue\?\.\(\)\n/)
   })
 })
