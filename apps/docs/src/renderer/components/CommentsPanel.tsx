@@ -176,7 +176,7 @@ export const CommentsPanel = memo(function CommentsPanel({
     const replies = repliesOf(c.id)
     const head = (
       <div className="comment-card-head">
-        <span className="comment-avatar">
+        <span className="comment-avatar" aria-hidden="true">
           {(c.initials || authorLabel(c.author) || '?').slice(0, 2)}
         </span>
         <span className="comment-author" title={authorLabel(c.author) || undefined}>
@@ -263,7 +263,7 @@ export const CommentsPanel = memo(function CommentsPanel({
         {replies.map((r) => (
           <div key={r.id} className="comment-reply">
             <div className="comment-card-head">
-              <span className="comment-avatar">
+              <span className="comment-avatar" aria-hidden="true">
                 {(r.initials || authorLabel(r.author) || '?').slice(0, 2)}
               </span>
               <span className="comment-author" title={authorLabel(r.author) || undefined}>

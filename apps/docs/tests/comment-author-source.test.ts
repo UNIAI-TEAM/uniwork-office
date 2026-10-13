@@ -241,6 +241,10 @@ describe('the neutral author shows in the UI language (BE-6 / FE-1)', () => {
     )
     const names = [...container.querySelectorAll('.comment-author')].map((el) => el.textContent)
     expect(names).toEqual(['Người dùng', 'Nguyễn An'])
+    // the initials avatar is decorative: the author name is read once (visual F4)
+    for (const avatar of container.querySelectorAll('.comment-avatar')) {
+      expect(avatar.getAttribute('aria-hidden')).toBe('true')
+    }
     // display only: the comment that will be saved still carries the constant
     expect(comments[0]!.author).toBe('User')
     act(() => root.unmount())
