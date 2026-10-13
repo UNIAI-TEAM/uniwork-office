@@ -18,7 +18,8 @@ import type {
  * a cache, carry a deadline over the whole exchange (body included), and send
  * the bearer token only inside `authorized` (single in-flight refresh, one
  * retry on 401). Responses are parsed strictly from the server's snake_case
- * DTOs; anything else is `malformed_response`.
+ * DTOs; anything else is `malformed_response`. `send` is shared with the work
+ * client via createUniworkSend.
  */
 
 export type FetchLike = (input: string, init: RequestInit) => Promise<Response>
@@ -75,10 +76,12 @@ export interface UniworkDocsClient {
   }): Promise<LaunchDescriptor>
 }
 
-function id(value: string): string {
-  if (!ID.test(value)) throw new UniworkDocError('not_found')
+/** a route segment: an id the server issued, never a path (the work client uses it too) */
+export function uniworkId(value: string): string {
+  if (typeof value !== 'string' || !ID.test(value)) throw new UniworkDocError('not_found')
   return encodeURIComponent(value)
 }
+const id = uniworkId
 
 /** a refused redirect surfaces as a fetch TypeError whose cause names it */
 function isRedirectRefusal(error: unknown): boolean {
@@ -104,25 +107,27 @@ function fromAuthFailure(error: unknown): UniworkDocError {
   return new UniworkDocError('server_error')
 }
 
-export function createUniworkDocsClient(options: UniworkDocsClientOptions): UniworkDocsClient {
+/** one request to a UniWork route (documents, and the Workbench's work routes) */
+export interface UniworkCall<T> {
+  method: 'GET' | 'POST' | 'PATCH'
+  route: string
+  query?: URLSearchParams
+  json?: unknown
+  form?: FormData
+  idempotencyKey?: string
+  timeoutMs: number
+  read(response: Response): Promise<T>
+}
+
+/** the hardened request every UniWork client in main goes through (see the header) */
+export function createUniworkSend(
+  options: UniworkDocsClientOptions,
+): <T>(call: UniworkCall<T>) => Promise<T> {
   const origin = new URL(options.apiOrigin).origin
   const base = `${origin}/api/v1`
   const fetchImpl: FetchLike = options.fetch ?? ((input, init) => fetch(input, init))
-  const metadataTimeout = options.metadataTimeoutMs ?? METADATA_TIMEOUT_MS
-  const transferTimeout = options.transferTimeoutMs ?? TRANSFER_TIMEOUT_MS
 
-  interface Call<T> {
-    method: 'GET' | 'POST'
-    route: string
-    query?: URLSearchParams
-    json?: unknown
-    form?: FormData
-    idempotencyKey?: string
-    timeoutMs: number
-    read(response: Response): Promise<T>
-  }
-
-  async function send<T>(call: Call<T>): Promise<T> {
+  return async function send<T>(call: UniworkCall<T>): Promise<T> {
     if (!options.isSignedIn()) throw new UniworkDocError('not_signed_in')
     const query = call.query?.toString()
     const url = `${base}${call.route}${query ? `?${query}` : ''}`
@@ -191,7 +196,12 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
       throw fromAuthFailure(error)
     }
   }
+}
 
+export function createUniworkDocsClient(options: UniworkDocsClientOptions): UniworkDocsClient {
+  const metadataTimeout = options.metadataTimeoutMs ?? METADATA_TIMEOUT_MS
+  const transferTimeout = options.transferTimeoutMs ?? TRANSFER_TIMEOUT_MS
+  const send = createUniworkSend(options)
   const json = (response: Response): Promise<unknown> => response.json()
 
   return {
