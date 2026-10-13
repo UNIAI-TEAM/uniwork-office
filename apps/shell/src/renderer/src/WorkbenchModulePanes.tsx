@@ -60,10 +60,10 @@ export function WorkbenchModulePane({
         {vi ? mod.hintVi : mod.hintEn}
         {contextTitle ? ` · ${contextTitle}` : ''}
       </p>
+      {(moduleId === 'forms' || moduleId === 'notes') && <LocalTag />}
       {moduleId === 'calendar' && <WorkCalendarPane {...server} />}
       {moduleId === 'tasks' && <WorkTasksPane {...server} />}
       {moduleId === 'notes' && <NotesPane practiceId={practiceId} />}
-      {(moduleId === 'forms' || moduleId === 'notes') && <LocalTag />}
       {moduleId === 'forms' && (
         <FormsPane
           practiceId={practiceId}
