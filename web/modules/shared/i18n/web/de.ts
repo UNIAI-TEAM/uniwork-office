@@ -54,6 +54,8 @@ export const de = {
     'Ihre Sitzung ist abgelaufen, daher wurde nicht überschrieben. Ihre Änderungen bleiben in diesem Browser; melden Sie sich erneut an und versuchen Sie es noch einmal.',
   uwConflictTooLarge:
     'Ihre Version überschreitet die Größenbeschränkung von UniWork und konnte daher nicht überschreiben.',
+  uwConflictDownloadTooLarge:
+    'Ihre Version überschreitet die Größenbeschränkung von UniWork und kann hier daher nicht heruntergeladen werden.',
   uwConflictDownloadFailed:
     'Ihre Version konnte nicht heruntergeladen werden, daher wurde das Dokument nicht neu geladen. Versuchen Sie es erneut.',
   uwConflictOfflineWeb:

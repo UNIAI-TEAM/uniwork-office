@@ -49,6 +49,8 @@ export const en = {
   uwConflictSessionWeb:
     'Your session expired, so the overwrite didn’t happen. Your changes stay in this browser; sign in again and retry.',
   uwConflictTooLarge: 'Your version is over UniWork’s size limit, so it couldn’t overwrite.',
+  uwConflictDownloadTooLarge:
+    'Your version is over UniWork’s size limit, so it can’t be downloaded here.',
   uwConflictDownloadFailed:
     'Couldn’t download your version, so the document didn’t reload. Try again.',
   uwConflictOfflineWeb:

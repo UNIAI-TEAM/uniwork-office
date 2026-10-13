@@ -417,7 +417,7 @@ export async function runConflictDialog(io: ConflictIo): Promise<ConflictOutcome
       choices.push({
         id: 'download',
         label: t('uwConflictDownloadThenReload'),
-        ...(tooLarge ? { disabled: true, reason: t('uwConflictTooLarge') } : {}),
+        ...(tooLarge ? { disabled: true, reason: t('uwConflictDownloadTooLarge') } : {}),
       })
     }
     choices.push(

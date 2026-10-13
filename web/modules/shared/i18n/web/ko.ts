@@ -48,6 +48,8 @@ export const ko = {
   uwConflictSessionWeb:
     '세션이 만료되어 덮어쓰지 못했습니다. 변경 사항은 이 브라우저에 남아 있습니다. 다시 로그인한 후 다시 시도하세요.',
   uwConflictTooLarge: '내 버전이 UniWork의 크기 제한을 넘어 덮어쓸 수 없습니다.',
+  uwConflictDownloadTooLarge:
+    '내 버전이 UniWork의 크기 제한을 넘어 여기서는 다운로드할 수 없습니다.',
   uwConflictDownloadFailed:
     '내 버전을 다운로드하지 못해 문서를 다시 불러오지 않았습니다. 다시 시도하세요.',
   uwConflictOfflineWeb:
