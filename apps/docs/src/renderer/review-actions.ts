@@ -74,7 +74,7 @@ let authorRequest = 0
  */
 export async function refreshCommentAuthor(path: string | null): Promise<void> {
   const request = ++authorRequest
-  let name: unknown = null
+  let name: unknown
   try {
     name = await window.desktop.getCommentAuthor(path)
   } catch {
