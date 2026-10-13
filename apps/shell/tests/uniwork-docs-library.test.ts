@@ -71,7 +71,13 @@ function fakeServer(options: {
     }
     if (p === '/api/v1/orgs/acme/members') {
       if (options.fail === 'members') return json(500, { error: { code: 'server_error' } })
-      return json(200, { members: state.members })
+      // page like D: default 50 rows, opaque offset cursor `m:<n>`
+      const limit = Math.min(100, Math.max(1, Number(u.searchParams.get('limit')) || 50))
+      const raw = u.searchParams.get('cursor')
+      const offset = raw && /^m:(\d+)$/.test(raw) ? Number(raw.slice(2)) : 0
+      const slice = state.members.slice(offset, offset + limit)
+      const next = offset + limit < state.members.length ? `m:${offset + limit}` : null
+      return json(200, { members: slice, next_cursor: next })
     }
     const docMatch = /^\/api\/v1\/documents\/([A-Za-z0-9_-]+)$/.exec(p)
     if (docMatch) {
@@ -500,6 +506,54 @@ describe('document properties (S17)', () => {
     await service.listWorkspaces()
     await service.documentProperties('d4')
     expect(membersCalls(server)).toBe(2)
+  })
+
+  it('resolves a member from page 2 of a >100-member org, still one logical read (RBE1-01)', async () => {
+    // 120 members: D caps a page at 100 (the largest limit main asks for), so
+    // the owner sits on the second page and a single-page read could never
+    // resolve it
+    const members = Array.from({ length: 120 }, (_, i) => ({
+      user_id: `u${i}`,
+      display_name: `Member ${i}`,
+    }))
+    members.push({ user_id: 'u_owner', display_name: 'Owner Name' })
+    const server = fakeServer({
+      document: { ...document, owner_kind: 'human' },
+      members,
+    })
+    const { service } = serviceWith(server)
+    const result = await service.documentProperties('d1')
+    expect(result.ok && result.value.ownerName).toBe('Owner Name')
+    // one logical read = the pages it took, and only once per org
+    const memberCalls = membersCalls(server)
+    expect(memberCalls).toBeGreaterThanOrEqual(2)
+    await service.documentProperties('d2')
+    expect(membersCalls(server)).toBe(memberCalls)
+  })
+
+  it('a non-human creator/updater resolves to null with no lookup (RBE1-06)', async () => {
+    const server = fakeServer({
+      document: {
+        ...document,
+        owner_kind: 'human',
+        created_by_kind: 'agent',
+        updated_by_kind: 'system',
+      },
+      // both ids exist in the member list, so only the kind can make them null
+      members: [
+        { user_id: 'u_owner', display_name: 'Owner Name' },
+        { user_id: 'u_creator', display_name: 'Creator Name' },
+        { user_id: 'u_updater', display_name: 'Updater Name' },
+      ],
+    })
+    const { service } = serviceWith(server)
+    const result = await service.documentProperties('d1')
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.createdByName).toBeNull()
+    expect(result.value.updatedByName).toBeNull()
+    // the human owner still resolves
+    expect(result.value.ownerName).toBe('Owner Name')
   })
 
   it('missing server fields become null, never an error', async () => {

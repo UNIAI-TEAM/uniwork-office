@@ -19,7 +19,7 @@ import type {
   DocumentListResult,
   DocumentProperties,
   LaunchDescriptor,
-  OrgMemberName,
+  OrgMemberPage,
   UploadReceipt,
 } from './parse'
 
@@ -74,8 +74,16 @@ export interface UniworkDocsClient {
   }): Promise<DocumentListResult>
   /** the properties panel of one document (ids/times/level/version, no names) */
   documentProperties(documentId: string): Promise<DocumentProperties>
-  /** org members (id + display name) for resolving the properties panel's names */
-  listOrgMembers(orgSlug: string): Promise<OrgMemberName[]>
+  /**
+   * one page of org members (id + display name) for resolving the properties
+   * panel's names; `cursor` is D's opaque `next_cursor` and `limit` is capped
+   * at D's maximum (100)
+   */
+  listOrgMembers(input: {
+    orgSlug: string
+    cursor?: string
+    limit?: number
+  }): Promise<OrgMemberPage>
   getDocument(documentId: string): Promise<DocumentDetail>
   download(documentId: string, version?: number): Promise<DownloadResult>
   upload(input: {
@@ -284,12 +292,19 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
       return properties
     },
 
-    async listOrgMembers(orgSlug) {
+    async listOrgMembers(input) {
       // a slug is lowercase alphanumerics and dashes; anything else never leaves
-      if (!/^[a-z0-9][a-z0-9-]{0,63}$/.test(orgSlug)) throw new UniworkDocError('not_found')
+      if (!/^[a-z0-9][a-z0-9-]{0,63}$/.test(input.orgSlug)) throw new UniworkDocError('not_found')
+      const params = new URLSearchParams()
+      // D caps `limit` at 100 (maxMemberPageSize); ask for the largest page so
+      // a big tenant needs as few reads as possible
+      const limit = Math.min(100, Math.max(1, Math.floor(Number(input.limit) || 100)))
+      params.set('limit', String(limit))
+      if (input.cursor) params.set('cursor', input.cursor.slice(0, 512))
       const raw = await send({
         method: 'GET',
-        route: `/orgs/${orgSlug}/members`,
+        route: `/orgs/${input.orgSlug}/members`,
+        query: params,
         timeoutMs: metadataTimeout,
         read: json,
       })

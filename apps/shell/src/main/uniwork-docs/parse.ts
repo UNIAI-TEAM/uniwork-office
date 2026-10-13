@@ -319,21 +319,31 @@ export interface OrgMemberName {
   displayName: string
 }
 
+/** one page of GET /orgs/{slug}/members: rows plus D's opaque next cursor */
+export interface OrgMemberPage {
+  members: OrgMemberName[]
+  /** `next_cursor`; null on the last page */
+  nextCursor: string | null
+}
+
 /**
- * GET /orgs/{slug}/members -> id + display name rows for the properties panel.
+ * GET /orgs/{slug}/members -> one page of id + display name rows for the
+ * properties panel, with the opaque cursor of the next page (null at the end).
  * A row without a usable id or name is skipped rather than failing the panel.
  */
-export function parseOrgMembers(raw: unknown): OrgMemberName[] {
+export function parseOrgMembers(raw: unknown): OrgMemberPage {
   const body = record(raw)
   if (!Array.isArray(body.members)) bad()
-  const out: OrgMemberName[] = []
+  const next = body.next_cursor
+  if (next !== null && next !== undefined && typeof next !== 'string') bad()
+  const members: OrgMemberName[] = []
   for (const value of body.members) {
     if (!isRecord(value)) continue
     const userId = value.user_id
     const displayName = value.display_name
     if (typeof userId !== 'string' || !userId || typeof displayName !== 'string') continue
     if (displayName.length === 0) continue
-    out.push({ userId, displayName })
+    members.push({ userId, displayName })
   }
-  return out
+  return { members, nextCursor: typeof next === 'string' && next ? next : null }
 }

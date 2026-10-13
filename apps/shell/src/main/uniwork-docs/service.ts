@@ -210,6 +210,17 @@ const SHARED_PAGE_SIZE = 50
 const SHARED_MAX_ROWS = 500
 const SHARED_MAX_PAGES = 10
 
+/**
+ * The org member list is paged by D (default 50, max 100 rows per page). The
+ * properties panel needs the whole directory to resolve any actor id, so the
+ * reads follow `next_cursor` until the end or this cap. 20 pages x 100 rows
+ * bounds one logical read at 2000 members, so a pathological tenant cannot
+ * make a panel open unbounded; a bigger org simply shows "—" for members past
+ * the cap (documented residual, no D change).
+ */
+const MEMBERS_PAGE_SIZE = 100
+const MEMBERS_MAX_PAGES = 20
+
 /** `shared:<n>` -> n; anything else is the first page */
 function parseOffsetCursor(cursor: string | undefined): number {
   if (!cursor) return 0
@@ -948,8 +959,7 @@ export class UniworkDocsService {
   /**
    * S17 properties panel. Reads GET /documents/{id} for the ids/times/level/
    * version, then resolves display names best-effort through the org member
-   * list (readable by every member) plus the caller's own profile for a
-   * self-authored document. Anything unresolved stays null ("—").
+   * list (readable by every member). Anything unresolved stays null ("—").
    */
   documentProperties(documentId: string): Promise<UniworkResult<UniworkDocProperties>> {
     return result(async () => {
@@ -957,20 +967,24 @@ export class UniworkDocsService {
       if (typeof documentId !== 'string') throw new UniworkDocError('not_found')
       const properties = await this.api().documentProperties(documentId)
       const names = await this.memberNames()
-      // a name resolves only for an id in the member list; a person who left,
-      // or a non-human actor, stays null ("—")
+      // a name resolves only for an id in the member list; a person who left
+      // stays null ("—")
       const nameOf = (id: string | null): string | null => (id ? (names.get(id) ?? null) : null)
-      // an owner is a person only when owner_kind says so (a work_product owner
-      // id is not a member and must not be shown as one)
-      const ownerName = properties.ownerKind === 'human' ? nameOf(properties.ownerId) : null
+      // an actor is a person only when the kind says so; a `work_product` owner
+      // or an agent/system creator/updater is never shown as a member even if
+      // its id happens to match one. A kind the server did not send stays
+      // lenient (an older server omits it) and is looked up.
+      const personName = (id: string | null, kind: string | null): string | null =>
+        kind === null || kind === 'human' ? nameOf(id) : null
       return {
         documentId: properties.id,
         workspaceId: properties.workspaceId,
         title: properties.title,
-        ownerName,
-        createdByName: nameOf(properties.createdById),
+        // the owner follows D's own rule: only owner_kind === 'human' is a person
+        ownerName: properties.ownerKind === 'human' ? nameOf(properties.ownerId) : null,
+        createdByName: personName(properties.createdById, properties.createdByKind),
         createdAt: properties.createdAt,
-        updatedByName: nameOf(properties.updatedById),
+        updatedByName: personName(properties.updatedById, properties.updatedByKind),
         updatedAt: properties.updatedAt,
         myLevel: properties.myLevel,
         version: properties.currentVersion,
@@ -986,13 +1000,14 @@ export class UniworkDocsService {
   }
 
   /**
-   * The org's member names (id -> display name). Only a success or a 403/404
+   * The org's member names (id -> display name), read across D's pages
+   * (`next_cursor`, up to `MEMBERS_MAX_PAGES`). Only a success or a 403/404
    * (the org will not list members to a plain member) is cached, so the panel
-   * never issues one request per document; a network error or 5xx is NOT
+   * never issues one logical read per document; a network error or 5xx is NOT
    * cached — the call returns an empty map ("—", no error banner) and the next
-   * panel open retries. At most one read per org is in flight: concurrent
-   * panel opens share the same promise. The cache is dropped on an org change
-   * / sign-out (`noteSelectedOrg`) and at the next library reload
+   * panel open retries. At most one logical read per org is in flight:
+   * concurrent panel opens share the same promise. The cache is dropped on an
+   * org change / sign-out (`noteSelectedOrg`) and at the next library reload
    * (`noteLibraryReload`).
    */
   private memberNames(): Promise<Map<string, string>> {
@@ -1007,8 +1022,7 @@ export class UniworkDocsService {
 
   private async loadMemberNames(org: { id: string; slug: string }): Promise<Map<string, string>> {
     try {
-      const members = await this.api().listOrgMembers(org.slug)
-      const names = new Map(members.map((m) => [m.userId, m.displayName]))
+      const names = await this.readAllMemberNames(org.slug)
       this.orgMemberNames = names
       this.orgMemberNamesOrg = org.id
       return names
@@ -1028,6 +1042,30 @@ export class UniworkDocsService {
     } finally {
       if (this.orgMemberNamesInFlight?.orgId === org.id) this.orgMemberNamesInFlight = null
     }
+  }
+
+  /**
+   * Every member of the org as id -> display name, following D's `next_cursor`
+   * across pages. One logical read per org (the caller caches the result and
+   * dedupes concurrent opens), so an org larger than one page still resolves
+   * names from later pages. `MEMBERS_MAX_PAGES` caps the walk.
+   */
+  private async readAllMemberNames(orgSlug: string): Promise<Map<string, string>> {
+    const api = this.api()
+    const names = new Map<string, string>()
+    let cursor: string | undefined
+    let pages = 0
+    do {
+      const page = await api.listOrgMembers({
+        orgSlug,
+        limit: MEMBERS_PAGE_SIZE,
+        ...(cursor ? { cursor } : {}),
+      })
+      for (const member of page.members) names.set(member.userId, member.displayName)
+      cursor = page.nextCursor ?? undefined
+      pages += 1
+    } while (cursor && pages < MEMBERS_MAX_PAGES)
+    return names
   }
 
   /**
