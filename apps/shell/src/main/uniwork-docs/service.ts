@@ -207,6 +207,18 @@ function accessFor(level: string | null): UniworkDocAccess {
   return level === 'edit' || level === 'manage' ? 'edit' : 'view'
 }
 
+/**
+ * The core semver of a version string: `0.11.0-dev.3` -> `0.11.0` (build
+ * metadata after `+` goes too). OQ-P4: `min_app_version` is display metadata,
+ * so a prerelease build must not stamp its tail - the store gate reads
+ * `min_store_level` only, and two builds differing only in the tail must
+ * stamp the same value. Anything without a leading `major.minor.patch` is
+ * kept verbatim.
+ */
+export function coreSemver(version: string): string {
+  return /^\d+\.\d+\.\d+/.exec(version.trim())?.[0] ?? version
+}
+
 export class UniworkDocsService {
   readonly store: BindingStore
   readonly coordinator: SaveCoordinator
@@ -362,7 +374,7 @@ export class UniworkDocsService {
   /** this build's version, as stamped into bindings (display only, never a gate) */
   private buildVersion(): string {
     try {
-      return this.appVersion() || '0.0.0'
+      return coreSemver(this.appVersion() || '0.0.0')
     } catch {
       return '0.0.0'
     }
