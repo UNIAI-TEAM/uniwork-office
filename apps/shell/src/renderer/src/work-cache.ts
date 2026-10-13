@@ -5,7 +5,15 @@
  * loader hook with the refresh rules of spec §5.5 and the states of §7.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { UniworkWorkError, UniworkWorkResult } from '../../shared/uniwork-work-api'
+import type { UniworkWorkspaceRef } from '../../shared/home-api'
+import type {
+  UniworkWorkError,
+  UniworkWorkResult,
+  WorkTask,
+  WorkTaskStatus,
+} from '../../shared/uniwork-work-api'
+import { pickActiveWorkspace, readActiveWorkspaceId } from './active-workspace'
+import { closedStatusKeys } from './work-tasks'
 import { currentWorkbenchBucket, isWorkbenchBucketCleared } from './workbench-bucket'
 
 /** Dispatched on window by the Workbench Refresh button; the server tabs reload on it. */
@@ -142,4 +150,20 @@ export function useWorkLoad<T>(
     reload,
     update,
   }
+}
+
+/** The workspace My AI reads, as agentWorkspaceId picks it: the stored one while listed, else the first listed. */
+function cachedActiveWorkspaceId(): string | null {
+  const listed = cachedWork<UniworkWorkspaceRef[]>('workspaces')?.value
+  const stored = readActiveWorkspaceId()
+  return listed ? pickActiveWorkspace(listed, stored) : stored
+}
+
+/** Open tasks of that workspace from the last load (My AI grounding); null when they were never loaded. */
+export function cachedOpenTasks(): WorkTask[] | null {
+  const ws = cachedActiveWorkspaceId()
+  const tasks = ws ? cachedWork<WorkTask[]>(`tasks:${ws}`)?.value : undefined
+  if (!tasks) return null
+  const closed = closedStatusKeys(cachedWork<WorkTaskStatus[]>(`taskStatuses:${ws}`)?.value ?? [])
+  return tasks.filter((x) => !closed.has(x.status))
 }
