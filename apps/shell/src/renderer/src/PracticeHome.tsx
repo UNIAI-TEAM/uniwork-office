@@ -518,19 +518,19 @@ export function PracticeHome({
   }
 
   return (
-    <main className="content teacher-home">
-      <section className="teacher-hero">
-        <div className="teacher-hero-top">
+    <main className="content wb-home">
+      <section className="wb-hero">
+        <div className="wb-hero-top">
           <div>
-            <p className="teacher-hint">{label('Vai trò làm việc', 'Practice role')}</p>
-            <h1 className="teacher-title">{vi ? practice.labelVi : practice.labelEn}</h1>
-            <p className="teacher-subtitle">{vi ? practice.subtitleVi : practice.subtitleEn}</p>
-            <p className="teacher-hint">
+            <p className="wb-hint">{label('Vai trò làm việc', 'Practice role')}</p>
+            <h1 className="wb-title">{vi ? practice.labelVi : practice.labelEn}</h1>
+            <p className="wb-subtitle">{vi ? practice.subtitleVi : practice.subtitleEn}</p>
+            <p className="wb-hint">
               {label(`${packs.length} gói trong thư viện`, `${packs.length} packs in library`)}
             </p>
           </div>
-          <div className="teacher-hero-controls">
-            <label className="teacher-lang">
+          <div className="wb-hero-controls">
+            <label className="wb-lang">
               <span>{label('Vai trò', 'Role')}</span>
               <select
                 value={practice.id}
@@ -563,8 +563,8 @@ export function PracticeHome({
         }}
       />
 
-      {error && <p className="teacher-error">{error}</p>}
-      {notice && <p className="teacher-hint">{notice}</p>}
+      {error && <p className="wb-error">{error}</p>}
+      {notice && <p className="wb-hint">{notice}</p>}
 
       {isWorkbenchModuleId(tab) ? (
         <WorkbenchModulePane
@@ -578,8 +578,8 @@ export function PracticeHome({
       ) : null}
 
       {tab === 'knowledge' && (
-        <section className="teacher-panel">
-          <label className="teacher-form-wide">
+        <section className="wb-panel">
+          <label className="wb-form-wide">
             <span>{label('Tìm', 'Search')}</span>
             <input
               value={qQuery}
@@ -587,23 +587,23 @@ export function PracticeHome({
               placeholder={label('Tên gói, thẻ, ghi chú…', 'Title, tags, notes…')}
             />
           </label>
-          <div className="teacher-layout">
-            <section className="teacher-packs">
+          <div className="wb-layout">
+            <section className="wb-packs">
               <h2>
                 {label('Thư viện', 'Library')}
-                <span className="teacher-count">{packs.length}</span>
+                <span className="wb-count">{packs.length}</span>
               </h2>
               {packs.length === 0 ? (
-                <p className="teacher-empty">
+                <p className="wb-empty">
                   {label('Chưa có gói. Tạo ở tab Soạn mới.', 'No packs yet. Create in Compose.')}
                 </p>
               ) : (
-                <ul className="teacher-pack-list">
+                <ul className="wb-pack-list">
                   {packs.map(({ entry, meta: m }) => (
                     <li key={entry.id}>
                       <button
                         type="button"
-                        className={`teacher-pack-item${entry.id === selectedId ? ' active' : ''}`}
+                        className={`wb-pack-item${entry.id === selectedId ? ' active' : ''}`}
                         onClick={() => onSelectPack(entry.id === selectedId ? null : entry.id)}
                       >
                         <strong>{m.title}</strong>
@@ -617,12 +617,12 @@ export function PracticeHome({
                 </ul>
               )}
             </section>
-            <aside className="teacher-detail">
+            <aside className="wb-detail">
               {selected && meta ? (
                 <>
                   <h2>{meta.title}</h2>
                   <p>{Object.values(meta.facets).filter(Boolean).join(' · ')}</p>
-                  <div className="teacher-chip-row">
+                  <div className="wb-chip-row">
                     <button
                       type="button"
                       className="btn btn-secondary"
@@ -650,12 +650,12 @@ export function PracticeHome({
                       {label('Xóa gói', 'Delete pack')}
                     </button>
                   </div>
-                  <div className="teacher-form teacher-form-spaced">
-                    <label className="teacher-form-wide">
+                  <div className="wb-form wb-form-spaced">
+                    <label className="wb-form-wide">
                       <span>{label('Thẻ', 'Tags')}</span>
                       <input value={tagDraft} onChange={(e) => setTagDraft(e.target.value)} />
                     </label>
-                    <label className="teacher-form-wide">
+                    <label className="wb-form-wide">
                       <span>{label('Ghi chú', 'Notes')}</span>
                       <textarea
                         rows={3}
@@ -674,7 +674,7 @@ export function PracticeHome({
                   </button>
                 </>
               ) : (
-                <p className="teacher-empty">{label('Chọn một gói.', 'Select a pack.')}</p>
+                <p className="wb-empty">{label('Chọn một gói.', 'Select a pack.')}</p>
               )}
             </aside>
           </div>
@@ -682,9 +682,9 @@ export function PracticeHome({
       )}
 
       {tab === 'materials' && (
-        <section className="teacher-panel teacher-detail">
+        <section className="wb-panel wb-detail">
           {!selected || !meta ? (
-            <p className="teacher-empty">
+            <p className="wb-empty">
               {label('Chọn gói ở Tri thức trước.', 'Select a Knowledge pack first.')}
             </p>
           ) : (
@@ -692,16 +692,16 @@ export function PracticeHome({
               <h2>
                 {label('Tài liệu', 'Materials')} · {meta.title}
               </h2>
-              <ul className="teacher-material-list">
+              <ul className="wb-material-list">
                 {packFiles.length === 0 ? (
-                  <li className="teacher-empty">
+                  <li className="wb-empty">
                     {label('Chưa có file — thêm bên dưới.', 'No files yet — add below.')}
                   </li>
                 ) : (
                   packFiles.map((fp) => {
                     const base = fp.split(/[/\\]/).pop() || fp
                     return (
-                      <li key={fp} className="teacher-material-row">
+                      <li key={fp} className="wb-material-row">
                         <div>
                           <strong>{base}</strong>
                           <span>
@@ -724,7 +724,7 @@ export function PracticeHome({
                   })
                 )}
               </ul>
-              <div className="teacher-add-row">
+              <div className="wb-add-row">
                 <label>
                   <span>{label('Thêm tài liệu', 'Add material')}</span>
                   <select value={addRole} onChange={(e) => setAddRole(e.target.value)}>
@@ -744,16 +744,16 @@ export function PracticeHome({
                   {label('Thêm & mở', 'Add & open')}
                 </button>
               </div>
-              <p className="teacher-hint">
+              <p className="wb-hint">
                 {label(
                   'Tạo nhanh Office vào gói này (lưu lần đầu = hiện trong danh sách). File đã có: chuyển gói từ Home → danh sách file.',
                   'Quick-create Office into this pack (first save lists it here). Existing files: move pack from Home → file list.',
                 )}
               </p>
-              <div className="teacher-chip-row">
+              <div className="wb-chip-row">
                 <button
                   type="button"
-                  className="teacher-chip"
+                  className="wb-chip"
                   disabled={!!busy}
                   onClick={() => void window.aiOffice.newDoc({ projectId: selected.id })}
                 >
@@ -761,7 +761,7 @@ export function PracticeHome({
                 </button>
                 <button
                   type="button"
-                  className="teacher-chip"
+                  className="wb-chip"
                   disabled={!!busy}
                   onClick={() => void window.aiOffice.newSheet({ projectId: selected.id })}
                 >
@@ -769,7 +769,7 @@ export function PracticeHome({
                 </button>
                 <button
                   type="button"
-                  className="teacher-chip"
+                  className="wb-chip"
                   disabled={!!busy}
                   onClick={() => void window.aiOffice.newSlide({ projectId: selected.id })}
                 >
@@ -777,7 +777,7 @@ export function PracticeHome({
                 </button>
                 <button
                   type="button"
-                  className="teacher-chip"
+                  className="wb-chip"
                   disabled={!!busy}
                   onClick={() => void window.aiOffice.newPdf({ projectId: selected.id })}
                 >
@@ -785,12 +785,12 @@ export function PracticeHome({
                 </button>
               </div>
               <h3>{label('Mẫu nhanh (miễn phí)', 'Quick templates (free)')}</h3>
-              <div className="teacher-chip-row">
+              <div className="wb-chip-row">
                 {practice.templates.map((t) => (
                   <button
                     key={t.id}
                     type="button"
-                    className="teacher-chip"
+                    className="wb-chip"
                     disabled={!!busy}
                     onClick={() => void openTemplate(t.id)}
                   >
@@ -799,7 +799,7 @@ export function PracticeHome({
                 ))}
               </div>
               {practice.freeChainTemplateIds && practice.freeChainTemplateIds.length > 0 ? (
-                <div className="teacher-chip-row">
+                <div className="wb-chip-row">
                   <button
                     type="button"
                     className="btn btn-secondary"
@@ -816,10 +816,10 @@ export function PracticeHome({
       )}
 
       {tab === 'skills' && (
-        <section className="teacher-panel teacher-detail">
+        <section className="wb-panel wb-detail">
           <h2>{label('Kỹ năng', 'Skills')}</h2>
           {!selected || !meta ? (
-            <p className="teacher-empty">
+            <p className="wb-empty">
               {label(
                 'Chọn gói ở Tri thức để gắn ngữ cảnh trước khi chạy.',
                 'Select a Knowledge pack for context before running.',
@@ -834,15 +834,15 @@ export function PracticeHome({
           {roleSkills.length > 0 ? (
             <>
               <h3>{label('Kỹ năng theo vai', 'Role skills')}</h3>
-              <p className="teacher-hint">
+              <p className="wb-hint">
                 {label(
                   'Kỹ năng gắn với vai trò hiện tại. Mỗi lần chạy hỏi xác nhận Token.',
                   'Skills for this practice role. Each run asks to confirm Tokens.',
                 )}
               </p>
-              <ul className="teacher-skill-list">
+              <ul className="wb-skill-list">
                 {roleSkills.map((s) => (
-                  <li key={s.id} className="teacher-skill-row">
+                  <li key={s.id} className="wb-skill-row">
                     <div>
                       <strong>{vi ? s.labelVi : s.labelEn}</strong>
                       <span>{vi ? s.descVi : s.descEn}</span>
@@ -865,7 +865,7 @@ export function PracticeHome({
           ) : null}
 
           <h3>{label('Kỹ năng lĩnh vực', 'Domain skills')}</h3>
-          <p className="teacher-hint">
+          <p className="wb-hint">
             {label(
               'Thêm tab lĩnh vực bằng +. Mỗi lần chạy hỏi xác nhận Token.',
               'Add domain tabs with +. Each run asks to confirm Tokens.',
@@ -880,12 +880,12 @@ export function PracticeHome({
                   : skillDomainDef.labelEn
                 : label('Kỹ năng', 'Skills')}
             </h3>
-            <p className="teacher-hint">
+            <p className="wb-hint">
               {skillDomainDef ? (vi ? skillDomainDef.hintVi : skillDomainDef.hintEn) : ''}
             </p>
-            <ul className="teacher-skill-list">
+            <ul className="wb-skill-list">
               {domainSkills.map((s) => (
-                <li key={s.id} className="teacher-skill-row">
+                <li key={s.id} className="wb-skill-row">
                   <div>
                     <strong>{vi ? s.labelVi : s.labelEn}</strong>
                     <span>{vi ? s.descVi : s.descEn}</span>
@@ -909,13 +909,13 @@ export function PracticeHome({
       )}
 
       {tab === 'compose' && (
-        <section className="teacher-panel teacher-create">
+        <section className="wb-panel wb-create">
           <h2>{label('Soạn gói mới', 'New pack')}</h2>
-          <div className="teacher-form">
+          <div className="wb-form">
             {practice.facets.map((f) => {
               if (f.id === practice.titleFacetId) {
                 return (
-                  <label key={f.id} className="teacher-form-wide">
+                  <label key={f.id} className="wb-form-wide">
                     <span>{vi ? f.labelVi : f.labelEn}</span>
                     <input
                       value={titleDraft}
@@ -949,7 +949,7 @@ export function PracticeHome({
                 </label>
               )
             })}
-            <label className="teacher-form-wide">
+            <label className="wb-form-wide">
               <span>{label('Thẻ', 'Tags')}</span>
               <input value={tagsText} onChange={(e) => setTagsText(e.target.value)} />
             </label>

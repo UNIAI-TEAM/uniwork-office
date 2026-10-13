@@ -201,9 +201,7 @@ export function DeskPane({ practiceId, vi }: Props): ReactElement {
               'Desktop alerts for due tasks / today’s calendar (opt-in)',
             )}
           >
-            {notifyOn
-              ? label('Nhắc: bật', 'Reminders: on')
-              : label('Nhắc: tắt', 'Reminders: off')}
+            {notifyOn ? label('Nhắc: bật', 'Reminders: on') : label('Nhắc: tắt', 'Reminders: off')}
           </button>
           <button type="button" className="btn btn-secondary" onClick={() => setTick((t) => t + 1)}>
             {label('Làm mới', 'Refresh')}
@@ -249,7 +247,7 @@ export function DeskPane({ practiceId, vi }: Props): ReactElement {
                       <strong>{vi ? w.labelVi : w.labelEn}</strong>
                       <span>{vi ? w.hintVi : w.hintEn}</span>
                     </div>
-                    <div className="teacher-chip-row">
+                    <div className="wb-chip-row">
                       <button
                         type="button"
                         className="btn btn-secondary"
@@ -266,7 +264,11 @@ export function DeskPane({ practiceId, vi }: Props): ReactElement {
                       >
                         ↓
                       </button>
-                      <button type="button" className="btn btn-secondary" onClick={() => remove(id)}>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => remove(id)}
+                      >
                         {label('Ẩn', 'Hide')}
                       </button>
                     </div>
@@ -279,7 +281,7 @@ export function DeskPane({ practiceId, vi }: Props): ReactElement {
             <h3>{label('Thêm vào Không gian của tôi', 'Add to My Space')}</h3>
             <ul className="wb-desk-customize-list">
               {hidden.length === 0 ? (
-                <li className="teacher-empty">{label('Đã thêm hết.', 'All widgets added.')}</li>
+                <li className="wb-empty">{label('Đã thêm hết.', 'All widgets added.')}</li>
               ) : (
                 hidden.map((w) => (
                   <li key={w.id}>
@@ -321,7 +323,7 @@ export function DeskPane({ practiceId, vi }: Props): ReactElement {
               <div className="wb-ms-card-body">
                 {id === 'reminders' &&
                   (data.reminders.length === 0 ? (
-                    <p className="teacher-empty">
+                    <p className="wb-empty">
                       {label(
                         'Chưa có nhắc — thêm ở Lịch / Công việc.',
                         'No reminders — add in Calendar / Tasks.',
@@ -345,7 +347,10 @@ export function DeskPane({ practiceId, vi }: Props): ReactElement {
                     color={DESK_CHART.tasks}
                     caption={
                       data.taskTotal === 0
-                        ? label('Chưa có việc — thêm ở tab Công việc.', 'No tasks yet — add in Tasks.')
+                        ? label(
+                            'Chưa có việc — thêm ở tab Công việc.',
+                            'No tasks yet — add in Tasks.',
+                          )
                         : label(
                             `${data.doneTasks}/${data.taskTotal} hoàn thành`,
                             `${data.doneTasks}/${data.taskTotal} done`,
@@ -425,7 +430,7 @@ function RingProgress({
           {Math.round(pct * 100)}%
         </text>
       </svg>
-      <p className="teacher-hint">{caption}</p>
+      <p className="wb-hint">{caption}</p>
     </div>
   )
 }
@@ -441,7 +446,7 @@ function DayDensityChart({
 }): ReactElement {
   const max = Math.max(1, ...days.map((d) => d.n))
   const has = days.some((d) => d.n > 0)
-  if (!has) return <p className="teacher-empty">{empty}</p>
+  if (!has) return <p className="wb-empty">{empty}</p>
   const w = 320
   const h = 100
   const pad = 8

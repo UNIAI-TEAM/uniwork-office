@@ -3368,13 +3368,13 @@ body.vib .home {
   }
 }
 
-/* ── Teacher / education mode ── */
+/* ── Workbench ── */
 
-.teacher-home {
+.wb-home {
   display: flex;
   flex-direction: column;
-  gap: 28px;
-  padding-bottom: 48px;
+  gap: 16px;
+  padding-bottom: 32px;
 }
 
 /* ── Skill domain mini-tabs (under Skills pillar) ───────── */
@@ -3554,238 +3554,205 @@ body.vib .home {
   color: var(--text);
 }
 
-.teacher-tabs {
+.wb-tabs {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
   align-items: center;
+  gap: 2px;
+  border-bottom: 1px solid var(--border);
 }
 
-.teacher-tab {
+.wb-tab {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-30);
-  background: var(--surface);
+  gap: 6px;
+  margin-bottom: -1px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: var(--radius-6) var(--radius-6) 0 0;
+  background: transparent;
   color: var(--text-secondary);
-  padding: 9px 16px;
+  padding: 8px 10px;
+  font: inherit;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
-  box-shadow: var(--shadow-btn);
   transition:
-    background 160ms ease,
-    color 160ms ease,
-    border-color 160ms ease,
-    box-shadow 160ms ease,
-    transform 160ms ease;
+    color 150ms ease,
+    background 150ms ease,
+    border-color 150ms ease;
 }
 
-.teacher-tab-icon {
+.wb-tab:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.wb-tab.active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+
+.wb-tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.wb-tab-icon,
+.wb-tab-menu-icon {
   display: inline-flex;
-  align-items: center;
-  justify-content: center;
   flex-shrink: 0;
   line-height: 0;
 }
 
-.teacher-tab-icon .wb-app-icon {
-  display: block;
-  border-radius: 5px;
-  box-shadow: var(--shadow-pill);
+.wb-icon-tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: var(--radius-6);
+  line-height: 0;
 }
 
-.teacher-tab:hover {
-  background: var(--bg-hover);
-  color: var(--text);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-btn-lift);
-}
-
-.teacher-tab.active {
-  background: var(--accent-soft);
-  color: var(--text);
-  border-color: var(--accent);
-  box-shadow: var(--shadow-btn-primary);
-}
-
-.teacher-tab-module {
-  gap: 6px;
+.wb-tab-module {
   cursor: grab;
 }
 
-.teacher-tab-module:active {
+.wb-tab-module:active {
   cursor: grabbing;
 }
 
-.teacher-tab-module.is-dragging {
+.wb-tab-module.is-dragging {
   opacity: 0.45;
-  transform: scale(0.98);
 }
 
-.teacher-tab-module.is-drag-over {
-  border-color: var(--accent);
-  box-shadow: var(--shadow-btn-primary);
+.wb-tab-module.is-drag-over {
   background: var(--accent-soft);
 }
 
-.teacher-tab-grip {
+.wb-tab-grip {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 12px;
-  margin-left: -2px;
-  color: var(--text-secondary);
+  width: 10px;
+  color: var(--text-tertiary);
   font-size: 11px;
   letter-spacing: -2px;
   line-height: 1;
-  opacity: 0.55;
+  opacity: 0;
   user-select: none;
+  transition: opacity 150ms ease;
 }
 
-.teacher-tab-module:hover .teacher-tab-grip {
-  opacity: 0.9;
-  color: var(--text);
+.wb-tab-module:hover .wb-tab-grip {
+  opacity: 1;
 }
 
-.teacher-tab-unpin {
+.wb-tab-unpin {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  color: var(--text-secondary);
-  font-size: 14px;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-6);
+  color: var(--text-tertiary);
+  font-size: 13px;
   line-height: 1;
   transition:
-    background 140ms ease,
-    color 140ms ease;
+    background 150ms ease,
+    color 150ms ease;
 }
 
-.teacher-tab-unpin:hover {
-  background: var(--surface);
+.wb-tab-unpin:hover {
+  background: var(--hover);
   color: var(--text);
-  box-shadow: var(--shadow-pill);
 }
 
-.teacher-tab-add {
-  min-width: 40px;
-  min-height: 40px;
-  padding: 0 12px;
-  justify-content: center;
+.wb-tab-add {
+  padding: 8px;
 }
 
-.teacher-tab-add:hover,
-.teacher-tab-add.active {
-  background: var(--accent-soft);
-  border-color: var(--accent);
-}
-
-.teacher-tab-add-wrap {
+.wb-tab-add-wrap {
   position: relative;
 }
 
-.teacher-tab-menu {
+.wb-tab-menu {
   position: absolute;
-  top: calc(100% + 8px);
+  top: calc(100% + 4px);
   left: 0;
   z-index: 40;
-  width: min(340px, 92vw);
-  padding: 12px;
+  width: min(320px, 92vw);
+  padding: 8px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-16);
+  border-radius: 10px;
   background: var(--surface);
   box-shadow: var(--shadow-menu);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
 }
 
-.teacher-tab-menu-grid {
+.wb-tab-menu-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  gap: 2px;
 }
 
-.teacher-tab-menu-title {
-  margin: 0 4px 4px;
+.wb-tab-menu-title {
+  margin: 0 4px 2px;
   font-size: 12px;
   font-weight: 600;
   color: var(--text-secondary);
 }
 
-.teacher-tab-menu-section {
-  margin: 10px 4px 4px;
+.wb-tab-menu-section {
+  margin: 8px 4px 2px;
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.02em;
   text-transform: uppercase;
-  color: var(--text-secondary);
+  color: var(--text-tertiary);
 }
 
-.teacher-tab-menu-section:first-of-type {
+.wb-tab-menu-section:first-of-type {
   margin-top: 2px;
 }
 
-.teacher-tab-menu-empty {
+.wb-tab-menu-empty {
   margin: 0;
   padding: 8px;
   font-size: 13px;
   color: var(--text-secondary);
 }
 
-.teacher-tab-menu-item {
+.wb-tab-menu-item {
   display: flex;
-  flex-direction: row;
   align-items: center;
   gap: 8px;
   width: 100%;
-  min-height: 44px;
-  text-align: left;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-12);
-  background: var(--bg-content);
+  min-height: 32px;
+  padding: 6px 8px;
+  border: none;
+  border-radius: var(--radius-6);
+  background: transparent;
   color: var(--text);
-  padding: 10px 12px;
-  cursor: pointer;
   font: inherit;
-  box-shadow: var(--shadow-pill);
-  transition:
-    background 140ms ease,
-    border-color 140ms ease,
-    box-shadow 140ms ease,
-    transform 140ms ease;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 150ms ease;
 }
 
-.teacher-tab-menu-item:hover {
-  background: var(--bg-hover);
-  border-color: var(--accent);
-  box-shadow: var(--shadow-btn);
-  transform: translateY(-1px);
+.wb-tab-menu-item:hover,
+.wb-tab-menu-item:focus-visible {
+  background: var(--hover);
+  outline: none;
 }
 
-.teacher-tab-menu-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  line-height: 0;
-}
-
-.teacher-tab-menu-icon .wb-app-icon {
-  width: 22px;
-  height: 22px;
-  border-radius: 5px;
-  box-shadow: var(--shadow-pill);
-}
-
-.teacher-tab-menu-item strong {
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1.25;
+.wb-tab-menu-item strong {
   min-width: 0;
+  font-size: 13px;
+  font-weight: 500;
 }
 
 .wb-module-form {
@@ -3849,7 +3816,7 @@ body.vib .home {
 }
 
 .wb-module-meta span,
-.wb-module-meta .teacher-hint {
+.wb-module-meta .wb-hint {
   font-size: 12px;
   color: var(--text-secondary);
   line-height: 1.35;
@@ -3869,10 +3836,10 @@ body.vib .home {
 
 .wb-module-row:hover .wb-row-actions,
 .wb-module-row:focus-within .wb-row-actions,
-.teacher-material-row:hover .wb-row-actions,
-.teacher-material-row:focus-within .wb-row-actions,
-.teacher-skill-row:hover .wb-row-actions,
-.teacher-skill-row:focus-within .wb-row-actions {
+.wb-material-row:hover .wb-row-actions,
+.wb-material-row:focus-within .wb-row-actions,
+.wb-skill-row:hover .wb-row-actions,
+.wb-skill-row:focus-within .wb-row-actions {
   opacity: 1;
 }
 
@@ -4928,7 +4895,7 @@ body.vib .home {
 }
 
 /* Prefer .wb-module-meta; keep legacy first-child content column for unmigrated rows */
-.wb-module-row > div:not(.wb-row-actions):not(.teacher-chip-row) {
+.wb-module-row > div:not(.wb-row-actions):not(.wb-chip-row) {
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -4936,7 +4903,7 @@ body.vib .home {
   flex: 1 1 auto;
 }
 
-.wb-module-row > .teacher-chip-row {
+.wb-module-row > .wb-chip-row {
   display: inline-flex;
   flex-wrap: nowrap;
   flex: 0 0 auto;
@@ -4945,7 +4912,7 @@ body.vib .home {
 }
 
 .wb-module-row.is-done .wb-module-meta span,
-.wb-module-row.is-done > div:not(.wb-row-actions):not(.teacher-chip-row) span {
+.wb-module-row.is-done > div:not(.wb-row-actions):not(.wb-chip-row) span {
   text-decoration: line-through;
   color: var(--text-secondary);
 }
@@ -5319,7 +5286,7 @@ body.vib .home {
 }
 
 /* ── My Space (desk module) ─────────────────────────────── */
-.teacher-detail.is-immersive {
+.wb-detail.is-immersive {
   padding: 0;
   border: none;
   background: transparent;
@@ -5754,25 +5721,25 @@ body.vib .home {
   font: inherit;
 }
 
-.teacher-panel {
+.wb-panel {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
-.teacher-filters {
+.wb-filters {
   display: grid;
   grid-template-columns: 1fr 1fr 1.4fr 1fr;
   gap: 12px;
 }
 
 @media (max-width: 960px) {
-  .teacher-filters {
+  .wb-filters {
     grid-template-columns: 1fr 1fr;
   }
 }
 
-.teacher-filters label {
+.wb-filters label {
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -5780,10 +5747,10 @@ body.vib .home {
   color: var(--text-secondary);
 }
 
-.teacher-filters select,
-.teacher-filters input,
-.teacher-form select,
-.teacher-add-row select {
+.wb-filters select,
+.wb-filters input,
+.wb-form select,
+.wb-add-row select {
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--bg-content);
@@ -5792,8 +5759,8 @@ body.vib .home {
   font: inherit;
 }
 
-.teacher-material-list,
-.teacher-skill-list {
+.wb-material-list,
+.wb-skill-list {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -5802,16 +5769,16 @@ body.vib .home {
   gap: 8px;
 }
 
-.teacher-material-row,
-.teacher-skill-row,
+.wb-material-row,
+.wb-skill-row,
 .wb-module-row {
   border-radius: var(--radius-16);
   background: var(--surface);
   box-shadow: var(--shadow-btn);
 }
 
-.teacher-material-row,
-.teacher-skill-row {
+.wb-material-row,
+.wb-skill-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -5821,41 +5788,41 @@ body.vib .home {
   min-height: 48px;
 }
 
-.teacher-material-row > .wb-row-actions,
-.teacher-skill-row > .wb-row-actions {
+.wb-material-row > .wb-row-actions,
+.wb-skill-row > .wb-row-actions {
   margin-left: auto;
 }
 
-.teacher-material-row div,
-.teacher-skill-row div {
+.wb-material-row div,
+.wb-skill-row div {
   display: flex;
   flex-direction: column;
   gap: 4px;
   min-width: 0;
 }
 
-.teacher-material-row strong,
-.teacher-skill-row strong {
+.wb-material-row strong,
+.wb-skill-row strong {
   color: var(--text);
   font-size: 14px;
 }
 
-.teacher-material-row span,
-.teacher-skill-row span,
-.teacher-skill-row em {
+.wb-material-row span,
+.wb-skill-row span,
+.wb-skill-row em {
   color: var(--text-secondary);
   font-size: 12px;
   font-style: normal;
 }
 
-.teacher-add-row {
+.wb-add-row {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
   gap: 12px;
 }
 
-.teacher-add-row label {
+.wb-add-row label {
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -5864,56 +5831,56 @@ body.vib .home {
   min-width: 220px;
 }
 
-.teacher-form-spaced {
+.wb-form-spaced {
   margin-top: 14px;
 }
 
-.teacher-chip-row-spaced {
+.wb-chip-row-spaced {
   margin-top: 12px;
 }
 
-.teacher-hub-toggle {
+.wb-hub-toggle {
   margin-top: 18px;
   align-self: flex-start;
 }
 
-.teacher-hub-nested {
+.wb-hub-nested {
   margin-top: 12px;
 }
 
-.teacher-hub {
+.wb-hub {
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--surface);
   padding: 20px;
 }
 
-.teacher-hub h2 {
+.wb-hub h2 {
   margin: 0 0 8px;
   font-size: 16px;
   font-weight: 600;
   color: var(--text);
 }
 
-.teacher-hub .teacher-form {
+.wb-hub .wb-form {
   margin-top: 12px;
 }
 
-.teacher-hero-top {
+.wb-hero-top {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   gap: 16px;
 }
 
-.teacher-hero-controls {
+.wb-hero-controls {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
   justify-content: flex-end;
 }
 
-.teacher-lang {
+.wb-lang {
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -5922,7 +5889,7 @@ body.vib .home {
   color: var(--text-secondary);
 }
 
-.teacher-lang select {
+.wb-lang select {
   border: 1px solid var(--border);
   border-radius: var(--radius-12);
   background: var(--surface);
@@ -5936,35 +5903,35 @@ body.vib .home {
   min-width: 140px;
 }
 
-.teacher-title {
+.wb-title {
   margin: 0 0 8px;
   font-size: 28px;
   font-weight: 650;
   color: var(--text);
 }
 
-.teacher-subtitle {
+.wb-subtitle {
   margin: 0;
   max-width: 640px;
   color: var(--text-secondary);
   line-height: 1.5;
 }
 
-.teacher-layout {
+.wb-layout {
   display: grid;
   grid-template-columns: minmax(280px, 1.1fr) minmax(260px, 0.9fr);
   gap: 24px;
 }
 
 @media (max-width: 960px) {
-  .teacher-layout {
+  .wb-layout {
     grid-template-columns: 1fr;
   }
 }
 
-.teacher-create,
-.teacher-packs,
-.teacher-detail {
+.wb-create,
+.wb-packs,
+.wb-detail {
   border: 1px solid var(--border);
   border-radius: var(--radius-16);
   background: var(--surface);
@@ -5972,30 +5939,30 @@ body.vib .home {
   box-shadow: var(--shadow-btn);
 }
 
-.teacher-create h2,
-.teacher-packs h2,
-.teacher-detail h2,
-.teacher-actions h3 {
+.wb-create h2,
+.wb-packs h2,
+.wb-detail h2,
+.wb-actions h3 {
   margin: 0 0 14px;
   font-size: 16px;
   font-weight: 600;
   color: var(--text);
 }
 
-.teacher-count {
+.wb-count {
   margin-left: 8px;
   font-weight: 500;
   color: var(--text-secondary);
 }
 
-.teacher-form {
+.wb-form {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
   margin-bottom: 14px;
 }
 
-.teacher-form label {
+.wb-form label {
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -6003,12 +5970,12 @@ body.vib .home {
   color: var(--text-secondary);
 }
 
-.teacher-form-wide {
+.wb-form-wide {
   grid-column: 1 / -1;
 }
 
-.teacher-form input,
-.teacher-form textarea {
+.wb-form input,
+.wb-form textarea {
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--bg-content);
@@ -6017,28 +5984,28 @@ body.vib .home {
   font: inherit;
 }
 
-.teacher-form input:focus,
-.teacher-form textarea:focus {
+.wb-form input:focus,
+.wb-form textarea:focus {
   outline: none;
   border-color: var(--accent, var(--text-secondary));
 }
 
-.teacher-error {
+.wb-error {
   color: var(--danger);
   margin: 0 0 10px;
   font-size: 13px;
 }
 
-.teacher-error-inline {
+.wb-error-inline {
   color: var(--danger);
 }
 
-.teacher-empty {
+.wb-empty {
   color: var(--text-secondary);
   margin: 0;
 }
 
-.teacher-pack-list {
+.wb-pack-list {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -6049,7 +6016,7 @@ body.vib .home {
   overflow: auto;
 }
 
-.teacher-pack-item {
+.wb-pack-item {
   width: 100%;
   text-align: left;
   border: 1px solid var(--border);
@@ -6069,30 +6036,30 @@ body.vib .home {
     transform 160ms ease;
 }
 
-.teacher-pack-item:hover {
+.wb-pack-item:hover {
   background: var(--bg-hover);
   transform: translateY(-1px);
   box-shadow: var(--shadow-btn-lift);
 }
 
-.teacher-pack-item.active {
+.wb-pack-item.active {
   background: var(--accent-soft);
   border-color: var(--accent);
   box-shadow: var(--shadow-btn-primary);
 }
 
-.teacher-pack-item strong {
+.wb-pack-item strong {
   font-size: 14px;
 }
 
-.teacher-pack-item span,
-.teacher-pack-item em {
+.wb-pack-item span,
+.wb-pack-item em {
   font-size: 12px;
   color: var(--text-secondary);
   font-style: normal;
 }
 
-.teacher-detail-header {
+.wb-detail-header {
   display: flex;
   justify-content: space-between;
   gap: 16px;
@@ -6100,24 +6067,24 @@ body.vib .home {
   margin-bottom: 18px;
 }
 
-.teacher-detail-header p {
+.wb-detail-header p {
   margin: 6px 0 0;
   color: var(--text-secondary);
 }
 
-.teacher-actions {
+.wb-actions {
   display: flex;
   flex-direction: column;
   gap: 18px;
 }
 
-.teacher-chip-row {
+.wb-chip-row {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
-.teacher-chip {
+.wb-chip {
   border: 1px solid var(--border);
   border-radius: var(--radius-30);
   background: var(--surface);
@@ -6134,30 +6101,30 @@ body.vib .home {
     transform 160ms ease;
 }
 
-.teacher-chip:hover:not(:disabled) {
+.wb-chip:hover:not(:disabled) {
   background: var(--bg-hover);
   transform: translateY(-1px);
   box-shadow: var(--shadow-btn-lift);
 }
 
-.teacher-chip:disabled {
+.wb-chip:disabled {
   opacity: 0.55;
   cursor: not-allowed;
   box-shadow: none;
 }
 
-.teacher-chip-ai {
+.wb-chip-ai {
   border-color: var(--accent);
   background: var(--accent-soft);
   color: var(--text);
 }
 
-.teacher-chip-ai:hover:not(:disabled) {
+.wb-chip-ai:hover:not(:disabled) {
   border-color: var(--accent-hover);
   box-shadow: var(--shadow-btn-primary);
 }
 
-.teacher-hint {
+.wb-hint {
   margin: 10px 0 0;
   font-size: 12px;
   color: var(--text-secondary);

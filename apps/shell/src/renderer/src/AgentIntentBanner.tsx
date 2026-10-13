@@ -84,7 +84,7 @@ export function AgentIntentBanner({ practiceId, ensureWorkbench }: Props): React
         <h3>
           {pack.actionLabel} → {pack.targetLabel}
         </h3>
-        <p className="teacher-hint">{pending.summary}</p>
+        <p className="wb-hint">{pending.summary}</p>
         {pending.text ? <p className="agent-intent-text">{pending.text}</p> : null}
         <details className="agent-intent-pack">
           <summary>

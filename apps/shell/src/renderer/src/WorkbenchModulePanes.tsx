@@ -41,20 +41,20 @@ export function WorkbenchModulePane({
   const label = (a: string, b: string) => (vi ? a : b)
 
   if (!mod) {
-    return <p className="teacher-empty">{label('Module không tồn tại.', 'Unknown module.')}</p>
+    return <p className="wb-empty">{label('Module không tồn tại.', 'Unknown module.')}</p>
   }
 
   const hideChrome = moduleId === 'desk' || moduleId === 'notes'
 
   return (
     <section
-      className={`teacher-panel teacher-detail${hideChrome ? ' is-immersive' : ''}`}
+      className={`wb-panel wb-detail${hideChrome ? ' is-immersive' : ''}`}
       aria-label={vi ? mod.labelVi : mod.labelEn}
     >
       {!hideChrome && (
         <>
           <h2>{vi ? mod.labelVi : mod.labelEn}</h2>
-          <p className="teacher-hint">
+          <p className="wb-hint">
             {vi ? mod.hintVi : mod.hintEn}
             {contextTitle ? ` · ${contextTitle}` : ''}
           </p>
@@ -221,19 +221,19 @@ function FormsPane({
 
   return (
     <>
-      <p className="teacher-hint">
+      <p className="wb-hint">
         {label(
           'Tải file mẫu (Word/PDF/Excel…) vào thư viện — My AI có thể điền theo mẫu thật. “Soạn” seed Docs vào gói đang chọn; “Mở file” mở mẫu gốc.',
           'Upload a template file (Word/PDF/Excel…) — My AI can fill from the real form. “Draft” seeds Docs into the selected pack; “Open file” opens the source template.',
         )}
       </p>
       {!packId ? (
-        <p className="teacher-hint">
+        <p className="wb-hint">
           {label('Chọn gói ở Tri thức trước khi Soạn.', 'Select a Knowledge pack before drafting.')}
         </p>
       ) : null}
       <div className="wb-module-form">
-        <label className="teacher-form-wide">
+        <label className="wb-form-wide">
           <span>{label('Tên biểu mẫu', 'Form title')}</span>
           <input
             value={title}
@@ -244,11 +244,11 @@ function FormsPane({
             }}
           />
         </label>
-        <label className="teacher-form-wide">
+        <label className="wb-form-wide">
           <span>{label('Ghi chú (tuỳ chọn)', 'Note (optional)')}</span>
           <input value={note} onChange={(e) => setNote(e.target.value)} />
         </label>
-        <div className="teacher-chip-row">
+        <div className="wb-chip-row">
           <button
             type="button"
             className="btn btn-secondary"
@@ -265,12 +265,12 @@ function FormsPane({
           ) : null}
         </div>
         {draftFile ? (
-          <p className="teacher-hint">
+          <p className="wb-hint">
             {label('File mẫu:', 'Template file:')} {draftFile.fileName}
           </p>
         ) : null}
-        {uploadNotice ? <p className="teacher-hint">{uploadNotice}</p> : null}
-        <div className="teacher-chip-row">
+        {uploadNotice ? <p className="wb-hint">{uploadNotice}</p> : null}
+        <div className="wb-chip-row">
           <button type="button" className="btn btn-primary" onClick={save}>
             {editingId
               ? label('Lưu biểu mẫu', 'Save form')
@@ -285,7 +285,7 @@ function FormsPane({
       </div>
       <ul className="wb-module-list">
         {items.length === 0 ? (
-          <li className="teacher-empty">{label('Chưa có biểu mẫu.', 'No forms yet.')}</li>
+          <li className="wb-empty">{label('Chưa có biểu mẫu.', 'No forms yet.')}</li>
         ) : (
           items.map((it) => {
             const canOpen = Boolean(packId ?? it.linkedProjectId)
@@ -295,12 +295,12 @@ function FormsPane({
                   <strong>{it.title}</strong>
                   {it.note ? <span>{it.note}</span> : null}
                   {it.fileName ? (
-                    <span className="teacher-hint">
+                    <span className="wb-hint">
                       {label('File:', 'File:')} {it.fileName}
                     </span>
                   ) : null}
                   {it.linkedProjectId ? (
-                    <span className="teacher-hint">
+                    <span className="wb-hint">
                       {label('Đã gắn gói Tài liệu', 'Linked to Materials pack')}
                     </span>
                   ) : null}
@@ -352,13 +352,13 @@ function PersonalPane({ vi }: { vi: boolean }): ReactElement {
 
   return (
     <>
-      <p className="teacher-hint">
+      <p className="wb-hint">
         {label(
           'Hồ sơ dùng chung mọi vai trò — Biểu mẫu có thể ghép tự động khi mở.',
           'Shared across all roles — Forms can merge this when opening.',
         )}
       </p>
-      <div className="teacher-form">
+      <div className="wb-form">
         {(
           [
             ['fullName', 'Họ và tên', 'Full name'],
@@ -369,7 +369,7 @@ function PersonalPane({ vi }: { vi: boolean }): ReactElement {
             ['address', 'Địa chỉ', 'Address'],
           ] as const
         ).map(([key, viLabel, enLabel]) => (
-          <label key={key} className={key === 'address' ? 'teacher-form-wide' : undefined}>
+          <label key={key} className={key === 'address' ? 'wb-form-wide' : undefined}>
             <span>{vi ? viLabel : enLabel}</span>
             <input value={profile[key]} onChange={(e) => setField(key, e.target.value)} />
           </label>
@@ -385,7 +385,7 @@ function PersonalPane({ vi }: { vi: boolean }): ReactElement {
       >
         {label('Lưu hồ sơ', 'Save profile')}
       </button>
-      {saved ? <p className="teacher-hint">{label('Đã lưu.', 'Saved.')}</p> : null}
+      {saved ? <p className="wb-hint">{label('Đã lưu.', 'Saved.')}</p> : null}
     </>
   )
 }

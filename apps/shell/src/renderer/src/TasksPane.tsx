@@ -58,7 +58,13 @@ function priorityLabel(id: WbTaskPriority, vi: boolean) {
   return vi ? p.labelVi : p.labelEn
 }
 
-export function TasksPane({ practiceId, vi }: { practiceId: PracticeId; vi: boolean }): ReactElement {
+export function TasksPane({
+  practiceId,
+  vi,
+}: {
+  practiceId: PracticeId
+  vi: boolean
+}): ReactElement {
   const label = (a: string, b: string) => (vi ? a : b)
   const [items, setItems] = useState<WbTaskItem[]>(() => readTasks(practiceId))
   const [view, setView] = useState<TasksViewId>(() => readTasksView())
@@ -117,7 +123,11 @@ export function TasksPane({ practiceId, vi }: { practiceId: PracticeId; vi: bool
   }
 
   const updateTask = (next: WbTaskItem) => {
-    persist(items.map((t) => (t.id === next.id ? normalizeTaskItem({ ...next, updatedAt: new Date().toISOString() }) : t)))
+    persist(
+      items.map((t) =>
+        t.id === next.id ? normalizeTaskItem({ ...next, updatedAt: new Date().toISOString() }) : t,
+      ),
+    )
   }
 
   const removeTask = async (id: string) => {
@@ -196,13 +206,20 @@ export function TasksPane({ practiceId, vi }: { practiceId: PracticeId; vi: bool
               if (e.key === 'Enter') addQuick()
             }}
           />
-          <button type="button" className="btn btn-primary" onClick={addQuick} disabled={!draft.trim()}>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={addQuick}
+            disabled={!draft.trim()}
+          >
             {label('Thêm', 'Add')}
           </button>
         </div>
       ) : null}
 
-      <div className={`wb-tasks-body${selected && (view === 'list' || view === 'kanban') ? ' has-detail' : ''}`}>
+      <div
+        className={`wb-tasks-body${selected && (view === 'list' || view === 'kanban') ? ' has-detail' : ''}`}
+      >
         <div className="wb-tasks-main">
           {view === 'list' && (
             <ListView
@@ -298,14 +315,22 @@ function ListView({
     return (
       <div className="wb-tasks-empty">
         <span aria-hidden="true">✓</span>
-        <p>{label('Chưa có việc phù hợp bộ lọc. Thêm việc mới phía trên.', 'No tasks for this filter. Add one above.')}</p>
+        <p>
+          {label(
+            'Chưa có việc phù hợp bộ lọc. Thêm việc mới phía trên.',
+            'No tasks for this filter. Add one above.',
+          )}
+        </p>
       </div>
     )
   }
   return (
     <ul className="wb-tasks-list">
       {items.map((it) => (
-        <li key={it.id} className={`wb-tasks-list-row${selectedId === it.id ? ' is-selected' : ''}${it.done ? ' is-done' : ''}`}>
+        <li
+          key={it.id}
+          className={`wb-tasks-list-row${selectedId === it.id ? ' is-selected' : ''}${it.done ? ' is-done' : ''}`}
+        >
           <label className="wb-tasks-check">
             <input type="checkbox" checked={it.done} onChange={() => onToggle(it.id)} />
           </label>
@@ -325,7 +350,8 @@ function ListView({
             className="wb-tasks-icon-btn"
             aria-label={label('Xoá', 'Delete')}
             onClick={() => {
-              if (window.confirm(label(`Xoá «${it.title}»?`, `Delete “${it.title}”?`))) onDelete(it.id)
+              if (window.confirm(label(`Xoá «${it.title}»?`, `Delete “${it.title}”?`)))
+                onDelete(it.id)
             }}
           >
             ×
@@ -578,7 +604,10 @@ function DashboardView({ vi, items }: { vi: boolean; items: WbTaskItem[] }): Rea
           </header>
           <svg viewBox="0 0 200 120" className="wb-tasks-donut" role="img">
             {(() => {
-              const total = Math.max(1, byPri.reduce((a, b) => a + b.n, 0))
+              const total = Math.max(
+                1,
+                byPri.reduce((a, b) => a + b.n, 0),
+              )
               const colors = ['#94a3b8', '#38bdf8', '#fbbf24', '#fb7185']
               let angle = -Math.PI / 2
               const cx = 60
@@ -605,12 +634,26 @@ function DashboardView({ vi, items }: { vi: boolean; items: WbTaskItem[] }): Rea
                     )
                   })}
                   <circle cx={cx} cy={cy} r={22} fill="var(--surface)" />
-                  <text x={cx} y={cy + 4} textAnchor="middle" fill="var(--text)" fontSize="12" fontWeight="700">
+                  <text
+                    x={cx}
+                    y={cy + 4}
+                    textAnchor="middle"
+                    fill="var(--text)"
+                    fontSize="12"
+                    fontWeight="700"
+                  >
                     {open.length}
                   </text>
                   {byPri.map((p, i) => (
                     <g key={`l-${p.id}`}>
-                      <rect x={120} y={18 + i * 22} width={10} height={10} rx={2} fill={colors[i]} />
+                      <rect
+                        x={120}
+                        y={18 + i * 22}
+                        width={10}
+                        height={10}
+                        rx={2}
+                        fill={colors[i]}
+                      />
                       <text x={136} y={27 + i * 22} fill="var(--text-secondary)" fontSize="10">
                         {(vi ? p.labelVi : p.labelEn) + ` (${p.n})`}
                       </text>
@@ -769,8 +812,11 @@ function TaskDetail({
           </button>
           <input ref={fileRef} type="file" multiple hidden onChange={(e) => void onFiles(e)} />
         </div>
-        <p className="teacher-hint">
-          {label('Lưu trên máy (IndexedDB) — không tải lên đám mây.', 'Stored on-device (IndexedDB) — not uploaded to the cloud.')}
+        <p className="wb-hint">
+          {label(
+            'Lưu trên máy (IndexedDB) — không tải lên đám mây.',
+            'Stored on-device (IndexedDB) — not uploaded to the cloud.',
+          )}
         </p>
         {err ? <p className="wb-pets-err">{err}</p> : null}
         {(task.attachments ?? []).length === 0 ? (
@@ -779,11 +825,19 @@ function TaskDetail({
           <ul className="wb-tasks-file-list">
             {(task.attachments ?? []).map((att) => (
               <li key={att.id}>
-                <button type="button" className="wb-tasks-file-open" onClick={() => void openAtt(att)}>
+                <button
+                  type="button"
+                  className="wb-tasks-file-open"
+                  onClick={() => void openAtt(att)}
+                >
                   <strong>{att.name}</strong>
                   <span>{Math.max(1, Math.round(att.size / 1024))} KB</span>
                 </button>
-                <button type="button" className="wb-tasks-icon-btn" onClick={() => void removeAtt(att.id)}>
+                <button
+                  type="button"
+                  className="wb-tasks-icon-btn"
+                  onClick={() => void removeAtt(att.id)}
+                >
                   ×
                 </button>
               </li>

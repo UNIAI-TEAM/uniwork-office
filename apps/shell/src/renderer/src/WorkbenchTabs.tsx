@@ -165,7 +165,7 @@ export function WorkbenchTabs({
   }
 
   return (
-    <nav className="teacher-tabs" aria-label={label('Khu vực làm việc', 'Workbench areas')}>
+    <nav className="wb-tabs" aria-label={label('Khu vực làm việc', 'Workbench areas')}>
       {pins.map((id) => {
         const mod = getWorkbenchModule(id)
         if (!mod) return null
@@ -176,7 +176,7 @@ export function WorkbenchTabs({
             key={id}
             type="button"
             draggable
-            className={`teacher-tab teacher-tab-module${active === id ? ' active' : ''}${
+            className={`wb-tab wb-tab-module${active === id ? ' active' : ''}${
               dragging ? ' is-dragging' : ''
             }${over ? ' is-drag-over' : ''}`}
             onClick={() => {
@@ -192,16 +192,16 @@ export function WorkbenchTabs({
             onDragEnd={onDragEnd}
             title={`${vi ? mod.hintVi : mod.hintEn} · ${label('Kéo để sắp xếp', 'Drag to reorder')}`}
           >
-            <span className="teacher-tab-grip" aria-hidden="true" title={label('Kéo', 'Drag')}>
+            <span className="wb-tab-grip" aria-hidden="true" title={label('Kéo', 'Drag')}>
               ⋮⋮
             </span>
-            <span className="teacher-tab-icon">
+            <span className="wb-tab-icon">
               <WorkbenchIcon id={id} size={18} />
             </span>
             <span>{vi ? mod.labelVi : mod.labelEn}</span>
             {isCorePinnedModule(id) ? null : (
               <span
-                className="teacher-tab-unpin"
+                className="wb-tab-unpin"
                 role="button"
                 tabIndex={0}
                 draggable={false}
@@ -226,16 +226,16 @@ export function WorkbenchTabs({
         <button
           key={p.id}
           type="button"
-          className={`teacher-tab teacher-tab-module${active === p.id ? ' active' : ''}`}
+          className={`wb-tab wb-tab-module${active === p.id ? ' active' : ''}`}
           onClick={() => onSelect(p.id)}
           title={vi ? p.hintVi : p.hintEn}
         >
-          <span className="teacher-tab-icon">
+          <span className="wb-tab-icon">
             <WorkbenchIcon id={p.id as PracticePillarId} size={18} />
           </span>
           <span>{vi ? p.labelVi : p.labelEn}</span>
           <span
-            className="teacher-tab-unpin"
+            className="wb-tab-unpin"
             role="button"
             tabIndex={0}
             draggable={false}
@@ -254,45 +254,45 @@ export function WorkbenchTabs({
         </button>
       ))}
 
-      <div className="teacher-tab-add-wrap" ref={wrapRef}>
+      <div className="wb-tab-add-wrap" ref={wrapRef}>
         <button
           type="button"
-          className={`teacher-tab teacher-tab-add${menuOpen ? ' active' : ''}`}
+          className={`wb-tab wb-tab-add${menuOpen ? ' active' : ''}`}
           aria-haspopup="menu"
           aria-expanded={menuOpen}
           onClick={() => setMenuOpen((o) => !o)}
           title={label('Thêm tab', 'Add tab')}
         >
-          <span className="teacher-tab-icon">
+          <span className="wb-tab-icon">
             <WorkbenchIcon id="add" size={18} />
           </span>
         </button>
         {menuOpen && (
-          <div className="teacher-tab-menu" role="menu">
-            <p className="teacher-tab-menu-title">{label('Thêm vào bàn làm việc', 'Add to Workbench')}</p>
+          <div className="wb-tab-menu" role="menu">
+            <p className="wb-tab-menu-title">
+              {label('Thêm vào bàn làm việc', 'Add to Workbench')}
+            </p>
             {nothingToAdd ? (
-              <p className="teacher-tab-menu-empty">
+              <p className="wb-tab-menu-empty">
                 {label('Đã thêm đủ khu vực.', 'All areas are pinned.')}
               </p>
             ) : (
               <>
                 {availablePillars.length > 0 ? (
                   <>
-                    <p className="teacher-tab-menu-section">
-                      {label('Khu vực chính', 'Core areas')}
-                    </p>
-                    <div className="teacher-tab-menu-grid">
+                    <p className="wb-tab-menu-section">{label('Khu vực chính', 'Core areas')}</p>
+                    <div className="wb-tab-menu-grid">
                       {availablePillars.map((p) => (
                         <button
                           key={p.id}
                           type="button"
                           role="menuitem"
-                          className="teacher-tab-menu-item"
+                          className="wb-tab-menu-item"
                           onClick={() => addPillar(p.id)}
                           title={vi ? p.hintVi : p.hintEn}
                         >
-                          <span className="teacher-tab-menu-icon">
-                            <WorkbenchIcon id={p.id} size={22} />
+                          <span className="wb-tab-menu-icon">
+                            <WorkbenchIcon id={p.id} size={18} />
                           </span>
                           <strong>{vi ? p.labelVi : p.labelEn}</strong>
                         </button>
@@ -302,21 +302,19 @@ export function WorkbenchTabs({
                 ) : null}
                 {availableModules.length > 0 ? (
                   <>
-                    <p className="teacher-tab-menu-section">
-                      {label('Module', 'Modules')}
-                    </p>
-                    <div className="teacher-tab-menu-grid">
+                    <p className="wb-tab-menu-section">{label('Module', 'Modules')}</p>
+                    <div className="wb-tab-menu-grid">
                       {availableModules.map((m) => (
                         <button
                           key={m.id}
                           type="button"
                           role="menuitem"
-                          className="teacher-tab-menu-item"
+                          className="wb-tab-menu-item"
                           onClick={() => addModule(m.id)}
                           title={vi ? m.hintVi : m.hintEn}
                         >
-                          <span className="teacher-tab-menu-icon">
-                            <WorkbenchIcon id={m.id} size={22} />
+                          <span className="wb-tab-menu-icon">
+                            <WorkbenchIcon id={m.id} size={18} />
                           </span>
                           <strong>{vi ? m.labelVi : m.labelEn}</strong>
                         </button>

@@ -129,7 +129,9 @@ export function CalendarPane({
   })
 
   const listGroups = useMemo(() => {
-    const sorted = [...items].sort((a, b) => a.date.localeCompare(b.date) || a.title.localeCompare(b.title))
+    const sorted = [...items].sort(
+      (a, b) => a.date.localeCompare(b.date) || a.title.localeCompare(b.title),
+    )
     const groups: { date: string; items: WbCalendarItem[] }[] = []
     for (const it of sorted) {
       const last = groups[groups.length - 1]
@@ -145,9 +147,7 @@ export function CalendarPane({
     if (editingId) {
       persist(
         items
-          .map((x) =>
-            x.id === editingId ? { ...x, date: selected, title: t } : x,
-          )
+          .map((x) => (x.id === editingId ? { ...x, date: selected, title: t } : x))
           .sort((a, b) => a.date.localeCompare(b.date)),
       )
     } else {
@@ -181,7 +181,7 @@ export function CalendarPane({
 
   return (
     <div className="wb-cal">
-      <p className="teacher-hint">
+      <p className="wb-hint">
         {label(
           'Lịch mốc hạn trực quan — xem dạng lịch tháng hoặc danh sách. Chạm ngày để thêm sự kiện.',
           'Visual deadline calendar — month grid or list. Tap a day to add events.',
@@ -256,7 +256,7 @@ export function CalendarPane({
             }}
           />
         </label>
-        <label className="teacher-form-wide">
+        <label className="wb-form-wide">
           <span>{label('Sự kiện / hạn', 'Event / deadline')}</span>
           <input
             value={title}
@@ -267,7 +267,7 @@ export function CalendarPane({
             }}
           />
         </label>
-        <div className="teacher-chip-row">
+        <div className="wb-chip-row">
           <button type="button" className="btn btn-primary" onClick={save}>
             {editingId ? label('Lưu', 'Save') : label('Thêm', 'Add')}
           </button>
@@ -354,10 +354,10 @@ export function CalendarPane({
           <div className="wb-cal-day-panel">
             <h4>
               {label('Ngày', 'Day')} {selected}
-              <span className="teacher-count">{selectedItems.length}</span>
+              <span className="wb-count">{selectedItems.length}</span>
             </h4>
             {selectedItems.length === 0 ? (
-              <p className="teacher-empty">{label('Chưa có mốc ngày này.', 'No events this day.')}</p>
+              <p className="wb-empty">{label('Chưa có mốc ngày này.', 'No events this day.')}</p>
             ) : (
               <ul className="wb-module-list">
                 {selectedItems.map((it) => (
@@ -382,7 +382,7 @@ export function CalendarPane({
       ) : (
         <div className="wb-cal-list">
           {listGroups.length === 0 ? (
-            <p className="teacher-empty">{label('Chưa có mốc nào.', 'No events yet.')}</p>
+            <p className="wb-empty">{label('Chưa có mốc nào.', 'No events yet.')}</p>
           ) : (
             listGroups.map((g) => {
               const isPast = g.date < todayIso
@@ -409,7 +409,7 @@ export function CalendarPane({
                         })}
                       </span>
                     </button>
-                    <span className="teacher-count">{g.items.length}</span>
+                    <span className="wb-count">{g.items.length}</span>
                   </header>
                   <ul className="wb-module-list">
                     {g.items.map((it) => (
