@@ -4678,11 +4678,15 @@ button.wb-ov-stat-body:focus-visible {
 
 .wb-pane-meta {
   margin: 2px 0 0;
-  overflow: hidden;
   font-size: 12px;
   color: var(--text-secondary);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: -webkit-box;
+  max-width: none;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  text-wrap: pretty;
 }
 
 .wb-pane-aside {
@@ -4774,17 +4778,14 @@ button.wb-ov-stat-body:focus-visible {
   background: var(--wb-row-hover);
 }
 
-.wb-material-list > .wb-empty {
-  padding: 7px 12px;
-}
-
 .wb-material-row > .wb-row-actions,
 .wb-skill-row > .wb-row-actions {
   margin-left: auto;
 }
 
-.wb-material-row div,
-.wb-skill-row div {
+/* the text column only: a bare `div` would also stack the row's .wb-row-actions */
+.wb-material-row > div:first-child,
+.wb-skill-row > div:first-child {
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -5777,13 +5778,18 @@ html[dir='rtl'] .quick-title-row {
   font-weight: 600;
 }
 
+/* instructions: the full pane width, wrapping to at most two lines (the title attribute keeps the rest) */
 .wb-forms-hint {
   margin: 0;
-  overflow: hidden;
   color: var(--text-secondary);
   font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: -webkit-box;
+  max-width: none;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  text-wrap: pretty;
 }
 
 .wb-forms-add {

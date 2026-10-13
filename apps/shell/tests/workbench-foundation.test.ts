@@ -150,24 +150,35 @@ describe('workbench states and pane title (home.css)', () => {
     expect(rule('.wb-work-skeleton')).not.toMatch(/height|background/)
   })
 
-  it('the pane title is 16/600 with a one-line meta and a right-hand aside', () => {
+  it('the pane title is 16/600 with a meta line and a right-hand aside', () => {
     expect(rule('.wb-pane-title')).toMatch(
       /font-size: 16px;\n {2}font-weight: 600;\n {2}letter-spacing: -0\.01em;/,
     )
-    expect(rule('.wb-pane-meta')).toMatch(/text-overflow: ellipsis;\n {2}white-space: nowrap;/)
     expect(rule('.wb-pane-text')).toMatch(/min-width: 0;/)
     expect(rule('.wb-pane-aside')).toMatch(/margin-left: auto;/)
   })
 })
 
 describe('long titles (review focus: very long workspace and task names)', () => {
-  it.each(['.wb-ov-row-title', '.wb-work-title', '.wb-crumb-name', '.wb-pane-meta'])(
+  it.each(['.wb-ov-row-title', '.wb-work-title', '.wb-crumb-name'])(
     '%s truncates to one line with an ellipsis instead of pushing its row apart',
     (selector) => {
       const body = rule(selector)
       expect(body).toMatch(/overflow: hidden;/)
       expect(body).toMatch(/text-overflow: ellipsis;/)
       expect(body).toMatch(/white-space: nowrap;/)
+    },
+  )
+
+  // the pack context and the Forms instructions are sentences: an ellipsis after ~700px hid them
+  it.each(['.wb-pane-meta', '.wb-forms-hint'])(
+    '%s uses the pane width and wraps to at most two lines',
+    (selector) => {
+      const body = rule(selector)
+      expect(body).not.toMatch(/white-space: nowrap|text-overflow: ellipsis/)
+      expect(body).toMatch(/max-width: none;/)
+      expect(body).toMatch(/-webkit-line-clamp: 2;/)
+      expect(body).toMatch(/text-wrap: pretty;/)
     },
   )
 

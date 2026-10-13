@@ -15,7 +15,7 @@ import { WorkTasksPane } from './WorkTasksPane'
 import { WorkPaneHeader } from './WorkPaneHeader'
 import { WbDeleteBtn, WbDraftBtn, WbEditBtn, WbFileBtn, WbRowActions } from './WbRowActions'
 import { readForms, writeForms, type WbFormItem } from './workbench-pins'
-import { WorkStatePanel, type WorkPaneProps } from './WorkErrorState'
+import { WorkSkeleton, WorkStatePanel, type WorkPaneProps } from './WorkErrorState'
 
 interface Props {
   moduleId: WorkbenchModuleId
@@ -31,6 +31,8 @@ interface Props {
   workspaceError: UniworkWorkError | null
   /** the top bar's Refresh: re-lists workspaces and reloads every server tab */
   onReload: () => void
+  /** the workspace list is still loading: a server tab shows its header over the skeleton */
+  loading?: boolean
 }
 
 function newId(): string {
@@ -47,6 +49,7 @@ export function WorkbenchModulePane({
   workspace,
   workspaceError,
   onReload,
+  loading = false,
 }: Props): ReactElement {
   const mod = getWorkbenchModule(moduleId)
   const { t } = useI18n()
@@ -64,6 +67,16 @@ export function WorkbenchModulePane({
     meta: `${vi ? mod.hintVi : mod.hintEn}${contextTitle ? ` · ${contextTitle}` : ''}`,
   }
   const local = moduleId === 'forms' || moduleId === 'notes'
+
+  // server tabs wait for the workspace list: null would read as "no workspace"
+  if (loading && !local) {
+    return (
+      <section className="wb-pane" aria-label={title}>
+        <WorkPaneHeader {...head} />
+        <WorkSkeleton />
+      </section>
+    )
+  }
 
   return (
     <section className="wb-pane" aria-label={title}>

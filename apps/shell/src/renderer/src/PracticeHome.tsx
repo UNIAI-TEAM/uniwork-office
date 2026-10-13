@@ -13,6 +13,7 @@ import {
   type PracticeDefinition,
   type PracticeId,
   type PracticeMeta,
+  type PracticePillarId,
   type SkillDomainId,
 } from '@uniwork/practice-core'
 import type { ProjectSummaryEntry, UniworkResult, UniworkWorkspaceRef } from '../../shared/home-api'
@@ -44,7 +45,7 @@ import {
   workCacheSlot,
 } from './work-cache'
 import { tabCounts } from './work-home'
-import { WorkSkeleton, WorkStatePanel } from './WorkErrorState'
+import { WorkStatePanel } from './WorkErrorState'
 import { WorkOverview } from './WorkOverview'
 
 interface PracticeHomeProps {
@@ -254,6 +255,14 @@ export function PracticeHome({
   }, [projects, practice.id, practice.projectKind, qQuery])
   const pillar = practice.pillars.find((p) => p.id === tab)
   const pillarTitleId = useId()
+  /** a pillar's empty sentence on the shared state template (spec 5): its tinted tile and one line */
+  const pillarState = (id: PracticePillarId, title: StringKey) => (
+    <WorkStatePanel
+      tone={MODULE_TONES[id]}
+      icon={<WorkbenchIcon id={id} size={20} />}
+      title={t(title)}
+    />
+  )
 
   useEffect(() => {
     if (!meta) {
@@ -612,9 +621,6 @@ export function PracticeHome({
           onCompose={openCompose}
           onSummary={setHomeSummary}
         />
-      ) : isWorkbenchModuleId(tab) && workspaces === null && tab !== 'forms' && tab !== 'notes' ? (
-        // server tabs wait for the workspace list: null would read as "no workspace"
-        <WorkSkeleton />
       ) : isWorkbenchModuleId(tab) ? (
         <WorkbenchModulePane
           moduleId={tab}
@@ -626,6 +632,7 @@ export function PracticeHome({
           workspace={workspace}
           workspaceError={workspaceError}
           onReload={refresh}
+          loading={workspaces === null}
         />
       ) : null}
 
@@ -666,11 +673,7 @@ export function PracticeHome({
                 <span className="wb-count wb-num">{packs.length}</span>
               </h3>
               {packs.length === 0 ? (
-                <WorkStatePanel
-                  tone={MODULE_TONES.knowledge}
-                  icon={<WorkbenchIcon id="knowledge" size={20} />}
-                  title={t('wbKnEmpty')}
-                />
+                pillarState('knowledge', 'wbKnEmpty')
               ) : (
                 <ul className="wb-pack-list">
                   {packs.map(({ entry, meta: m }) => (
@@ -748,7 +751,7 @@ export function PracticeHome({
                   </button>
                 </>
               ) : (
-                <p className="wb-empty">{t('wbKnSelectPack')}</p>
+                pillarState('knowledge', 'wbKnSelectPack')
               )}
             </aside>
           </div>
@@ -758,14 +761,14 @@ export function PracticeHome({
       {tab === 'materials' && (
         <section className="wb-pane" aria-labelledby={pillarTitleId}>
           {!selected || !meta ? (
-            <p className="wb-empty">{t('wbMatSelectPackFirst')}</p>
+            pillarState('materials', 'wbMatSelectPackFirst')
           ) : (
             <>
-              <ul className="wb-material-list">
-                {packFiles.length === 0 ? (
-                  <li className="wb-empty">{t('wbMatEmpty')}</li>
-                ) : (
-                  packFiles.map((fp) => {
+              {packFiles.length === 0 ? (
+                pillarState('materials', 'wbMatEmpty')
+              ) : (
+                <ul className="wb-material-list">
+                  {packFiles.map((fp) => {
                     const base = fp.split(/[/\\]/).pop() || fp
                     return (
                       <li key={fp} className="wb-material-row">
@@ -788,9 +791,9 @@ export function PracticeHome({
                         </WbRowActions>
                       </li>
                     )
-                  })
-                )}
-              </ul>
+                  })}
+                </ul>
+              )}
               <div className="wb-add-row">
                 <label>
                   <span>{t('wbMatAdd')}</span>
@@ -880,7 +883,7 @@ export function PracticeHome({
       {tab === 'skills' && (
         <section className="wb-pane" aria-labelledby={pillarTitleId}>
           {!selected || !meta ? (
-            <p className="wb-empty">{t('wbSkNeedPack')}</p>
+            pillarState('skills', 'wbSkNeedPack')
           ) : (
             <p>
               {t('wbSkContext')} <strong>{meta.title}</strong>

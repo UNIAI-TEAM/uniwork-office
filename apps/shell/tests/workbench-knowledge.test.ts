@@ -1,6 +1,8 @@
 /**
  * @vitest-environment jsdom
  */
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
@@ -97,7 +99,13 @@ afterEach(() => {
   host.remove()
 })
 
-async function openKnowledge(projects: ProjectSummaryEntry[], selectedId: string | null) {
+async function openKnowledge(
+  projects: ProjectSummaryEntry[],
+  selectedId: string | null,
+  pillarId: 'knowledge' | 'materials' | 'skills' = 'knowledge',
+) {
+  pinPillar(PRACTICE.id, pillarId)
+  const label = PRACTICE.pillars.find((p) => p.id === pillarId)!.labelEn
   await act(async () => {
     root.render(
       createElement(
@@ -118,9 +126,9 @@ async function openKnowledge(projects: ProjectSummaryEntry[], selectedId: string
   })
   await flush()
   const tab = Array.from(host.querySelectorAll<HTMLButtonElement>('button.wb-tab')).find((b) =>
-    b.textContent?.includes(KNOWLEDGE.labelEn),
+    b.textContent?.includes(label),
   )
-  expect(tab, 'Knowledge tab').toBeTruthy()
+  expect(tab, `${label} tab`).toBeTruthy()
   await act(async () => tab!.click())
   await flush()
 }
@@ -149,5 +157,49 @@ describe('Knowledge pillar (redesign spec 4.8)', () => {
     expect(host.querySelector('section.wb-pane .btn')).toBeNull()
     expect(host.querySelectorAll('.wb-detail .wb-btn-secondary')).toHaveLength(3)
     expect(host.querySelector('.wb-detail .wb-btn-primary')?.textContent).toBe('Save')
+  })
+})
+
+describe('pillar empty sentences use the shared state panel (redesign spec 5)', () => {
+  const state = () => ({
+    title: host.querySelector('.wb-state .wb-state-title')?.textContent,
+    tile: host.querySelector('.wb-state .wb-state-icon svg') !== null,
+    bare: host.querySelector('.wb-empty'),
+  })
+
+  it('Knowledge: packs but none selected', async () => {
+    await openKnowledge([PACK], null)
+    expect(host.querySelector('.wb-detail .wb-state-title')?.textContent).toBe('Select a pack.')
+    expect(state()).toMatchObject({ tile: true, bare: null })
+  })
+
+  it('Materials: no pack selected', async () => {
+    await openKnowledge([PACK], null, 'materials')
+    expect(state()).toEqual({ title: 'Select a Knowledge pack first.', tile: true, bare: null })
+  })
+
+  it('Materials: a pack with no files draws the panel instead of an empty list', async () => {
+    await openKnowledge([PACK], 'p1', 'materials')
+    expect(state()).toEqual({ title: 'No files yet — add below.', tile: true, bare: null })
+    expect(host.querySelector('.wb-material-list')).toBeNull()
+  })
+
+  it('Skills: no pack selected', async () => {
+    await openKnowledge([PACK], null, 'skills')
+    expect(state()).toEqual({
+      title: 'Select a Knowledge pack for context before running.',
+      tile: true,
+      bare: null,
+    })
+  })
+
+  it('CSS: Materials row actions stay one horizontal cluster', () => {
+    const css = readFileSync(join(__dirname, '../src/renderer/src/home.css'), 'utf8')
+    // a bare `.wb-material-row div` (0,1,1) beat `.wb-row-actions` (0,1,0) and stacked the icons
+    expect(css).not.toMatch(/\.wb-(?:material|skill)-row div\b/)
+    expect(css).toContain(
+      '\n.wb-material-row > div:first-child,\n.wb-skill-row > div:first-child {',
+    )
+    expect(css).toMatch(/\n\.wb-row-actions \{[^}]*display: inline-flex;[^}]*flex-wrap: nowrap;/)
   })
 })

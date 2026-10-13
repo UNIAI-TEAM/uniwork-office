@@ -47,7 +47,7 @@ afterEach(() => {
   host.remove()
 })
 
-async function mount(moduleId: WorkbenchModuleId, contextTitle?: string) {
+async function mount(moduleId: WorkbenchModuleId, contextTitle?: string, loading?: boolean) {
   await act(async () => {
     root.render(
       createElement(
@@ -61,6 +61,7 @@ async function mount(moduleId: WorkbenchModuleId, contextTitle?: string) {
           workspace: null,
           workspaceError: null,
           onReload: () => undefined,
+          loading,
         }),
       ),
     )
@@ -93,5 +94,28 @@ describe('Workbench module pane frame (redesign spec 4.2)', () => {
     expect(host.querySelectorAll('.wb-pane-head')).toHaveLength(1)
     expect(host.querySelector('.wb-pane-title')?.textContent).toBe('Tasks')
     expect(host.querySelector('.wb-pane-aside')).toBeNull()
+  })
+
+  // the workspace list is still loading (PracticeHome passes workspaces === null)
+  it.each([
+    ['tasks', 'Tasks'],
+    ['calendar', 'Calendar'],
+    ['personal', 'Profile'],
+  ] as const)('%s keeps its header above the skeleton while workspaces load', async (id, title) => {
+    await mount(id, undefined, true)
+    expect(host.querySelector('section.wb-pane')?.getAttribute('aria-label')).toBe(title)
+    expect(host.querySelectorAll('.wb-pane-head')).toHaveLength(1)
+    expect(host.querySelector('.wb-pane-title')?.textContent).toBe(title)
+    const skeleton = host.querySelector('.wb-work-skeleton')!
+    expect(skeleton.getAttribute('aria-busy')).toBe('true')
+    expect(host.querySelector('.wb-pane-head')!.compareDocumentPosition(skeleton)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    )
+  })
+
+  it('a local tab ignores the workspace load', async () => {
+    await mount('notes', undefined, true)
+    expect(host.querySelector('.wb-work-skeleton')).toBeNull()
+    expect(host.querySelector('.wb-pane-aside .wb-local-tag')).not.toBeNull()
   })
 })
