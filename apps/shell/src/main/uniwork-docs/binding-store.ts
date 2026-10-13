@@ -251,11 +251,23 @@ export function bindingJson(binding: Binding): Record<string, unknown> {
   }
 }
 
+/**
+ * True while the binding.json of `dir` must not be rewritten: the schema 1 -> 2
+ * sweep still owns that working copy, and a rewrite would stamp schema 2 and
+ * drop `pendingIntent` - the only replayable record of the pre-store save while
+ * `pending-upload.bin` holds its bytes. Injected by the service (the one choke
+ * point every binding rewrite goes through); the sweep itself writes with
+ * atomicWriteFile, so its own guard never refuses it.
+ */
+export type BindingWriteHold = (dir: string) => boolean
+
 export class BindingStore {
   readonly root: string
+  private readonly holdWrite: BindingWriteHold
 
-  constructor(root: string) {
+  constructor(root: string, holdWrite: BindingWriteHold = () => false) {
     this.root = resolve(root)
+    this.holdWrite = holdWrite
   }
 
   /** the working-copy folder of one document (historical versions get their own key) */
@@ -372,12 +384,21 @@ export class BindingStore {
     }
   }
 
-  async write(dir: string, binding: Binding): Promise<void> {
+  /**
+   * Writes the binding atomically. Resolves `false`, writing nothing, while
+   * `holdWrite` says the schema 1 -> 2 sweep still owns this folder: every
+   * binding rewrite - save, status refresh, open, conflict flow - goes through
+   * here, so no caller can drop a `pendingIntent` the sweep has not moved yet.
+   * `true` once the write landed (a resolve without a throw is still a write).
+   */
+  async write(dir: string, binding: Binding): Promise<boolean> {
+    if (this.holdWrite(dir)) return false
     await mkdir(dir, { recursive: true })
     await atomicWriteFile(
       join(dir, BINDING_FILE),
       new TextEncoder().encode(`${JSON.stringify(bindingJson(binding), null, 2)}\n`),
     )
+    return true
   }
 
   async writeWorkingCopy(dir: string, filename: string, bytes: Uint8Array): Promise<string> {

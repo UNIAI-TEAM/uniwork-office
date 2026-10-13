@@ -222,7 +222,8 @@ export class SaveCoordinator {
     // replays the stored intent, and an intent that could not be recorded is
     // never sent
     try {
-      await store.write(doc.dir, binding)
+      // the sweep still owns this copy: no rewrite, no request, nothing sent
+      if (!(await store.write(doc.dir, binding))) return doc
     } catch {
       return this.commitState(doc, { ...doc.binding, state: 'error', error: 'server_error' })
     }
@@ -394,13 +395,25 @@ export class SaveCoordinator {
     }
   }
 
-  /** persists the binding, then pushes the status; a failed write still pushes */
+  /**
+   * Persists the binding, then pushes the status; a failed write still pushes.
+   * A write the store refuses - the schema 1 -> 2 sweep still owns this copy -
+   * is not a failure: nothing was written, so the document keeps its binding
+   * (and the copy keeps its plaintext intent) and the old status is what the
+   * chip shows.
+   */
   async commitState(doc: BoundDocument, binding: Binding): Promise<BoundDocument> {
     const next: BoundDocument = { ...doc, binding }
+    let written: boolean
     try {
-      await this.deps.store.write(doc.dir, binding)
+      written = await this.deps.store.write(doc.dir, binding)
     } catch {
       // the in-memory state is still shown; the next Save writes again
+      written = true
+    }
+    if (!written) {
+      this.deps.publish(toStatus(doc))
+      return doc
     }
     this.deps.publish(toStatus(next))
     return next

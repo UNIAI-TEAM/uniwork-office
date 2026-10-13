@@ -1394,7 +1394,7 @@ describe('a deferred sweep never erases the pre-store intent (R1-be-5)', () => {
   const payloadPath = () => join(folder(), INTENT_PAYLOAD_FILE)
 
   /** the pre-store working copy: a schema-1 binding with the intent + its payload */
-  function seedLegacy(): void {
+  function seedLegacy(state = 'saving'): void {
     mkdirSync(folder(), { recursive: true })
     writeFileSync(copyPath(), 'working copy bytes')
     writeFileSync(
@@ -1412,7 +1412,7 @@ describe('a deferred sweep never erases the pre-store intent (R1-be-5)', () => {
           baseRevision: '41',
           baseVersion: 3,
           baseChecksum: 'stale',
-          state: 'saving',
+          state,
           pendingIntent: LEGACY,
         },
         null,
@@ -1479,7 +1479,45 @@ describe('a deferred sweep never erases the pre-store intent (R1-be-5)', () => {
     expect(binding(copyPath())).not.toHaveProperty('pendingIntent')
     expect(existsSync(payloadPath())).toBe(false)
     // one record only: the fillers are gone and no second intent was minted
-    expect(storeFiles(ctx)).toHaveLength(1)
+    expect(storeFiles()).toHaveLength(1)
+  })
+
+  it('R2-be-5: a status or close check in the deferred window rewrites nothing (docStatus, refreshPath, confirmClose)', async () => {
+    // a ready copy whose bytes no longer match its base: `refreshDirty` (the
+    // status read, tab activation and the close guard all call it) wants to
+    // rewrite the binding as dirty, which would stamp schema 2 and drop the
+    // plaintext intent (the review's proving trigger)
+    seedLegacy('ready')
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server, { budgetBytes: 4096 })
+    const fillers = await fillBudget(ctx)
+    const before = {
+      binding: readFileSync(join(folder(), BINDING_FILE), 'utf8'),
+      payload: readFileSync(payloadPath(), 'utf8'),
+    }
+
+    // the sweep runs on the open and cannot move the intent: every check that
+    // follows leaves binding.json and the payload exactly as they are
+    expect((await ctx.service.openSyncStore()).kind).toBe('ok')
+    expect(await ctx.service.docStatus(copyPath())).toMatchObject({ state: 'ready' })
+    await ctx.service.refreshPath(copyPath())
+    expect(await ctx.service.confirmClose(copyPath())).toBe(true)
+    expect(readFileSync(join(folder(), BINDING_FILE), 'utf8')).toBe(before.binding)
+    expect(readFileSync(payloadPath(), 'utf8')).toBe(before.payload)
+    expect(binding(copyPath())).toMatchObject({ schema: 1, state: 'ready' })
+    expect(binding(copyPath()).pendingIntent).toEqual(LEGACY)
+    expect(uploads(server)).toHaveLength(0)
+
+    // the budget frees: the sweep completes and keeps the intent's own key
+    const intents = await intentStoreOf(ctx)
+    for (const key of fillers) await intents.delete(key)
+    expect((await ctx.service.openSyncStore()).kind).toBe('ok')
+    const migrated = await intentOf(ctx, copyPath())
+    expect(migrated?.intent.idempotencyKey).toBe(LEGACY.idempotencyKey)
+    expect(Buffer.from(migrated?.payload ?? []).toString()).toBe('working copy bytes')
+    expect(binding(copyPath())).toMatchObject({ schema: 2, min_store_level: 2 })
+    expect(binding(copyPath())).not.toHaveProperty('pendingIntent')
+    expect(existsSync(payloadPath())).toBe(false)
   })
 })
 

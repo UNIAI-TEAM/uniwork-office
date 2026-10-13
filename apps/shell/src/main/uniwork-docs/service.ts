@@ -1,6 +1,6 @@
 import { readFileSync, statSync } from 'node:fs'
 import { copyFile, readFile } from 'node:fs/promises'
-import { basename, extname, join, resolve } from 'node:path'
+import { basename, extname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import type {
   RecentUniworkSource,
   UniworkConflictChoice,
@@ -266,7 +266,9 @@ export class UniworkDocsService {
     this.deps = deps
     this.client = deps.client ?? null
     this.appVersion = deps.appVersion ?? (() => '0.0.0')
-    this.store = new BindingStore(join(deps.userDataDir, 'uniwork-documents'))
+    this.store = new BindingStore(join(deps.userDataDir, 'uniwork-documents'), (dir) =>
+      this.heldByMigration(dir),
+    )
     this.lastOwner = this.store.readLastOwner()
     this.coordinator = new SaveCoordinator({
       store: this.store,
@@ -467,10 +469,26 @@ export class UniworkDocsService {
     return this.awaitingMigrationIn(doc.dir, doc.deploymentId, doc.userId)
   }
 
-  /** the same for a folder, before the binding is read (the open flow) */
+  /** the same for a folder, before the binding is read (the open flow, the guard) */
   private awaitingMigrationIn(dir: string, deploymentId: string, accountId: string): boolean {
     if (this.migratedScopes.has(`${deploymentId}/${accountId}`)) return false
     return hasLegacyIntentFiles(dir)
+  }
+
+  /**
+   * The one choke point every binding rewrite goes through (BindingStore.write):
+   * while the sweep still owns the folder, the write is refused - whatever
+   * caller asked for it (a save, the status refresh behind docStatus /
+   * refreshPath / confirmClose, an open, a conflict choice). The account scope
+   * comes from the folder's own segments, so a folder that is not a
+   * working-copy folder of ours is never held.
+   */
+  private heldByMigration(dir: string): boolean {
+    const rel = relative(this.store.root, resolve(dir))
+    if (!rel || rel.startsWith('..') || isAbsolute(rel)) return false
+    const [deploymentId, accountId, key] = rel.split(sep)
+    if (!deploymentId || !accountId || !key) return false
+    return this.awaitingMigrationIn(dir, deploymentId, accountId)
   }
 
   /**
@@ -1344,13 +1362,11 @@ export class UniworkDocsService {
             binding.state = localChecksum === existing.baseChecksum ? 'ready' : 'dirty'
             delete binding.error
           }
-          // the sweep still owns this copy's pre-store intent: opening the
-          // copy is fine, rewriting its binding is not (schema 2 would drop it)
-          if (this.awaitingMigrationIn(dir, identity.deploymentId, identity.accountId)) {
-            return this.show(local, existing)
-          }
-          await this.store.write(dir, binding)
-          return this.show(local, binding)
+          // the sweep still owns this copy's pre-store intent: the rewrite is
+          // refused by the store's own hold and the copy opens with its old
+          // binding - opening is fine, dropping `pendingIntent` is not
+          const written = await this.store.write(dir, binding)
+          return this.show(local, written ? binding : existing)
         }
       }
     }
@@ -1388,6 +1404,9 @@ export class UniworkDocsService {
       minAppVersion: this.buildVersion(),
       ...(existing?.lastSavedAt ? { lastSavedAt: existing.lastSavedAt } : {}),
     }
+    // while the sweep still owns the folder this write is refused (the store's
+    // hold): the fresh working copy opens, and `pendingIntent` plus the payload
+    // beside it stay exactly as they are until the migration moves them
     await this.store.write(dir, binding)
     return this.show(path, binding)
   }
