@@ -425,6 +425,10 @@ export type PickerAction =
   | { type: 'open-start'; id: string; title: string }
   | { type: 'open-failed'; error: UniworkDocErrorCode }
   | { type: 'clear-open-error' }
+  /** a row's title changed (renamed here, a failed rename reverting, or renamed elsewhere) */
+  | { type: 'doc-renamed'; id: string; title: string }
+  /** a row was archived or restored from its menu */
+  | { type: 'doc-archived'; id: string; archived: boolean }
 
 export function initialPickerState(): PickerState {
   return {
@@ -441,7 +445,8 @@ export function initialPickerState(): PickerState {
 
 /** only docx, xlsx, pptx, pdf, md and html open; the server list also holds other file types */
 export function isOpenable(doc: UniworkDocSummary): boolean {
-  return doc.format !== null
+  // an archived row stays listed (to restore it) but does not open
+  return doc.format !== null && (doc as LibraryDocRow).archived !== true
 }
 
 /** extension for the file-type icon: the known format, else whatever the title ends in */
@@ -602,6 +607,14 @@ export function pickerReducer(state: PickerState, action: PickerAction): PickerS
       return { ...state, opening: null, openError: action.error }
     case 'clear-open-error':
       return state.openError ? { ...state, openError: null } : state
+    case 'doc-renamed':
+    case 'doc-archived': {
+      if (!state.list.docs.some((d) => d.id === action.id)) return state
+      const patch =
+        action.type === 'doc-renamed' ? { title: action.title } : { archived: action.archived }
+      const docs = state.list.docs.map((d) => (d.id === action.id ? { ...d, ...patch } : d))
+      return { ...state, list: { ...state.list, docs } }
+    }
   }
 }
 
@@ -650,6 +663,89 @@ export function visibleDocs(
 /** retry what failed: the workspace list when that was it, else the document list */
 export function retryActionOf(state: PickerState): PickerAction {
   return state.workspaces.status === 'error' ? { type: 'workspaces-retry' } : { type: 'list-retry' }
+}
+
+// ── Create, rename, archive (S18) ───────────────────────
+
+/** the formats a new blank document can have */
+export const NEW_DOC_FORMATS = ['docx', 'xlsx', 'pptx'] as const
+export type NewDocFormat = (typeof NEW_DOC_FORMATS)[number]
+
+/**
+ * A library row with what S18 reads beyond the summary: the action flags main
+ * derives from my_level, and whether the row was archived from this dialog.
+ * A row without flags (an older main) gets no actions: nothing is offered that
+ * the server may refuse.
+ */
+export type LibraryDocRow = UniworkDocSummary & {
+  canEdit?: boolean
+  canManage?: boolean
+  archived?: boolean
+}
+
+export interface RowActions {
+  rename: boolean
+  archive: boolean
+  restore: boolean
+}
+
+/**
+ * The row menu's items. A view-only row has none, so its "…" button is not
+ * rendered at all (the person has no such action; not a disabled control).
+ */
+export function rowActionsOf(doc: LibraryDocRow): RowActions {
+  const archived = doc.archived === true
+  return {
+    rename: doc.canEdit === true && !archived,
+    archive: doc.canManage === true && !archived,
+    restore: doc.canManage === true && archived,
+  }
+}
+
+export function hasRowActions(doc: LibraryDocRow): boolean {
+  const a = rowActionsOf(doc)
+  return a.rename || a.archive || a.restore
+}
+
+/** errors a name field shows in place; every other failure is a toast */
+export type DocNameError = 'name_empty' | 'name_taken'
+
+export const DOC_NAME_ERROR_KEYS: Record<DocNameError, StringKey> = {
+  name_empty: 'uwDocNameEmpty',
+  name_taken: 'uwDocNameTaken',
+}
+
+/** the trimmed name, or the empty-name error before any call goes out */
+export function checkDocName(
+  raw: string,
+): { ok: true; name: string } | { ok: false; error: 'name_empty' } {
+  const name = raw.trim()
+  return name ? { ok: true, name } : { ok: false, error: 'name_empty' }
+}
+
+export function isDocNameError(error: string): error is DocNameError {
+  return error === 'name_empty' || error === 'name_taken'
+}
+
+/**
+ * The name a rename field starts with. A file title keeps its extension on the
+ * server, so the field shows the base name and the extension is put back on
+ * save (the person renames the document, not its type).
+ */
+export function renameParts(
+  title: string,
+  format: UniworkDocSummary['format'],
+): {
+  base: string
+  ext: string
+} {
+  if (format) {
+    const ext = `.${format}`
+    if (title.toLowerCase().endsWith(ext) && title.length > ext.length) {
+      return { base: title.slice(0, -ext.length), ext: title.slice(-ext.length) }
+    }
+  }
+  return { base: title, ext: '' }
 }
 
 // ── Time ────────────────────────────────────────────────

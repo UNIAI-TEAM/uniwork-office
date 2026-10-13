@@ -4,6 +4,7 @@ import type { UniworkDocStatus } from '../../shared/home-api'
 import { useI18n } from './locale'
 import { useAccount } from './account-model'
 import { onUniworkNotice } from './uniwork-notice-bus'
+import { onDocRenamed } from './uniwork-library-api'
 import {
   chipCopy,
   chipModelOf,
@@ -245,5 +246,29 @@ export function UniworkNotice() {
     return () => window.clearTimeout(timer)
   }, [notice])
 
-  return notice ? <NoticePill notice={notice} onDismiss={() => setNotice(null)} /> : null
+  return (
+    <>
+      {notice && <NoticePill notice={notice} onDismiss={() => setNotice(null)} />}
+      <RenamedAnnouncer />
+    </>
+  )
+}
+
+/**
+ * Polite announcement when an open UniWork document gets a new name from
+ * elsewhere (main refreshed its metadata; the tab title follows from main).
+ * The live region is always in the DOM so screen readers pick changes up.
+ */
+function RenamedAnnouncer() {
+  const { t } = useI18n()
+  const [name, setName] = useState<{ title: string; n: number } | null>(null)
+  useEffect(
+    () => onDocRenamed(({ title }) => setName((prev) => ({ title, n: (prev?.n ?? 0) + 1 }))),
+    [],
+  )
+  return (
+    <span className="uw-sr-only" role="status" aria-live="polite">
+      {name ? <span key={name.n}>{t('uwDocRenamedAnnounce', { name: name.title })}</span> : null}
+    </span>
+  )
 }
