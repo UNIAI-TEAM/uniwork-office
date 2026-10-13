@@ -381,6 +381,55 @@ describe('reveal for the shell panel: push when armed, else hold; delivered once
     expect(b.shellReveals()).toEqual([{ path: PATH, commentId: CMT }])
   })
 
+  it('a shell reload also drops the held reveal: a fresh realm pulls nothing (W11A-1)', async () => {
+    const { handle, pull, shell } = mount()
+    handle.reveal(PATH, CMT) // held: the panel is not armed
+    shell.reload()
+    expect(await pull(PATH)).toBeNull()
+    // a reveal after the reload is held for the new realm as before
+    handle.reveal(PATH, CMT)
+    expect(await pull(PATH)).toEqual({ path: PATH, commentId: CMT })
+  })
+
+  it('a crash drops the held reveal; an in-page navigation keeps it (W11A-1)', async () => {
+    const a = mount()
+    a.handle.reveal(PATH, CMT)
+    a.shell.crash()
+    expect(await a.pull(PATH)).toBeNull()
+
+    const b = mount()
+    b.handle.reveal(PATH, CMT)
+    b.shell.inPage()
+    expect(await b.pull(PATH)).toEqual({ path: PATH, commentId: CMT })
+  })
+
+  it('release drops the held reveal for that path only (W11A-2)', async () => {
+    const tabs = [PATH, OTHER]
+    const { handle, pull, release } = mount({ tabs })
+    handle.reveal(PATH, CMT)
+    handle.reveal(OTHER, CMT)
+    release(PATH)
+    expect(await pull(PATH)).toBeNull()
+    expect(await pull(OTHER)).toEqual({ path: OTHER, commentId: CMT })
+  })
+
+  it('a hold for a tab that was closed is evicted, not kept for the process lifetime (W11A-2)', async () => {
+    const tabs = [PATH, OTHER]
+    const { handle, pull, setPanel } = mount({ tabs })
+    handle.reveal(OTHER, CMT)
+    tabs.splice(tabs.indexOf(OTHER), 1) // the tab closes
+    setPanel({ open: true, width: 320 }) // any later shell message sweeps the closed tab's hold
+    tabs.push(OTHER) // the same document is opened again
+    expect(await pull(OTHER)).toBeNull()
+  })
+
+  it('the hold of an open tab survives a sweep (W11A-2)', async () => {
+    const { handle, pull, setPanel } = mount()
+    handle.reveal(PATH, CMT)
+    setPanel({ open: true, width: 320 })
+    expect(await pull(PATH)).toEqual({ path: PATH, commentId: CMT })
+  })
+
   it('the latest reveal for a path wins while held', async () => {
     const { handle, pull } = mount()
     handle.reveal(PATH, CMT)

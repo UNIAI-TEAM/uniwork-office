@@ -1358,6 +1358,26 @@ describe('the Discussion panel narrows the active editor view (G8-11 D1)', () =>
     })
   })
 
+  it('bounds are computed for the tab being shown, not the one being left (W11A-3)', () => {
+    manager.openSlidesTab()
+    const slidesId = manager.list().find((t) => t.kind === 'slides')!.id
+    const slides = lastCreatedView(createSlidesView)
+    const docsId = manager.openDocsTab()
+    const docs = lastCreatedView(createDocsView)
+    manager.activateTab(slidesId)
+    manager.setDiscussionPanel({ open: true, width: 320 })
+    slides.webContents.listeners.get('enter-html-full-screen')!()
+    const bleed = { x: 0, y: 0, width: WINDOW_WIDTH, height: WINDOW_HEIGHT }
+    expect(slides.setBounds).toHaveBeenLastCalledWith(bleed)
+    // leaving the slideshow tab: the new view is narrowed by the open panel and
+    // sits under the tab strip, not full-window
+    manager.activateTab(docsId)
+    expect(docs.setBounds).toHaveBeenLastCalledWith({ ...full, width: WINDOW_WIDTH - 320 })
+    // coming back to the slideshow tab: full-bleed again, the panel is ignored
+    manager.activateTab(slidesId)
+    expect(slides.setBounds).toHaveBeenLastCalledWith(bleed)
+  })
+
   it('a malformed width closes nothing open by accident and narrows nothing', () => {
     manager.openDocsTab()
     const view = lastCreatedView(createDocsView)
