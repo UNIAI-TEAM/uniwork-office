@@ -1,15 +1,16 @@
 import { useId } from 'react'
 import type { ReactNode } from 'react'
 import type { AiProviderId } from '@genoffice/ai-provider/browser'
+import { UniAiMark } from './UniAiMark'
 
 // ── AI provider brand logos (settings provider picker, composer model chip) ──
 // Vector marks adapted from the MIT-licensed @lobehub/icons set, plus a
-// plain sparkle for uniAI, OpenCode's pixel-block favicon glyph and a
+// the UniAI mark, OpenCode's pixel-block favicon glyph and a
 // generic icon for the "custom" endpoint.
-// Brand-colored logos keep their official colors in both themes (brand
+// Brand-colored logos (UniAI included) keep their official colors in both themes (brand
 // assets, not chrome — see CLAUDE.md theming rules); monochrome marks
 // (OpenAI, Kimi, Grok, OpenRouter, Requesty, Opper, Cheaper Inference, OpenCode,
-// uniAI, Custom) use currentColor so they stay legible in dark mode.
+// Custom) use currentColor so they stay legible in dark mode.
 //
 // Gradient-filled marks (Gemini, Qwen, MiniMax) are components so useId can
 // namespace their <linearGradient> ids per mount: the dropdown renders the
@@ -113,12 +114,8 @@ const opencodeLogo = (
 )
 
 const LOGOS: Record<AiProviderId, ReactNode> = {
-  // uniAI (internal id `genspark`): a plain sparkle, no third-party mark
-  genspark: (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M10 3Q11 9 17 10 11 11 10 17 9 11 3 10 9 9 10 3zM18 13Q18.5 16 21 16.5 18.5 17 18 20 17.5 17 15 16.5 17.5 16 18 13z" />
-    </svg>
-  ),
+  // UniAI (internal id `genspark`): the shared UniAI mark
+  genspark: <UniAiMark />,
   codex: (
     <svg
       viewBox="0 0 24 24"

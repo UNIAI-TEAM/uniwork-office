@@ -4727,7 +4727,7 @@ async function applyMainProcessProxy(): Promise<void> {
   }
   try {
     await app.whenReady()
-    // PAC/rule proxies answer per-host: probe the host the built-in uniAI
+    // PAC/rule proxies answer per-host: probe the host the built-in UniAI
     // provider actually targets
     const resolved = await electronSession.defaultSession.resolveProxy('https://openrouter.ai/')
     const m = /PROXY\s+([^;]+)/i.exec(resolved || '')

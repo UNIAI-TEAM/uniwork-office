@@ -833,23 +833,3 @@ export const RIBBON_GLYPH_ICONS: Record<string, ReactElement> = {
     </Icon>
   ),
 }
-
-/** Generic AI badge (not a vendor mark). Function name kept for call sites. */
-export function GensparkMark({ size = 18 }: { readonly size?: number }): ReactElement {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden
-    >
-      <rect x="2.5" y="2.5" width="19" height="19" rx="5" stroke="currentColor" strokeWidth="1.5" />
-      <path
-        d="M12 6.25 13.15 10.1 17 11.25 13.15 12.4 12 16.25 10.85 12.4 7 11.25 10.85 10.1 Z"
-        fill="currentColor"
-      />
-    </svg>
-  )
-}

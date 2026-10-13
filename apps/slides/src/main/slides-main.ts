@@ -1980,7 +1980,7 @@ async function applyMainProcessProxy(): Promise<void> {
   // No environment variables: read the system proxy (requires app ready)
   try {
     await app.whenReady()
-    // PAC/rule proxies answer per-host: probe the host the default uniAI chat route targets
+    // PAC/rule proxies answer per-host: probe the host the default UniAI chat route targets
     const resolved = await electronSession.defaultSession.resolveProxy('https://openrouter.ai/')
     // resolveProxy returns strings like "PROXY 127.0.0.1:1087" or "DIRECT"
     const m = /PROXY\s+([^;]+)/i.exec(resolved || '')

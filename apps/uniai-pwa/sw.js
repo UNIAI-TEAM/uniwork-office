@@ -1,4 +1,4 @@
-/* uniAI PWA — offline shell cache (UI only; chat needs network). */
+/* UniAI PWA — offline shell cache (UI only; chat needs network). */
 const CACHE = 'uniai-shell-v16'
 const ASSETS = [
   './',
@@ -24,14 +24,20 @@ const ASSETS = [
 ]
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting()))
+  event.waitUntil(
+    caches
+      .open(CACHE)
+      .then((c) => c.addAll(ASSETS))
+      .then(() => self.skipWaiting()),
+  )
 })
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))),
-    ).then(() => self.clients.claim()),
+    caches
+      .keys()
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then(() => self.clients.claim()),
   )
 })
 

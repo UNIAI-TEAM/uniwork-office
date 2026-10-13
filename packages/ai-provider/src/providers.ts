@@ -30,7 +30,7 @@ export const DEEPSEEK_V41_FLASH = 'deep-seek-v4.1-flash'
 export const AI_PROVIDERS: AiProviderMeta[] = [
   {
     id: 'genspark',
-    label: 'uniAI',
+    label: 'UniAI',
     // UniAI chat is OpenRouter behind the brand; model ids match the shared
     // Token Hub catalog (same as the explicit OpenRouter provider).
     models: [...OPENROUTER_CHAT_MODELS],
@@ -403,7 +403,7 @@ export type ProviderNeed = 'key' | 'model' | 'base-url'
 /**
  * What a provider's stored config still lacks before it can send a request
  * (api-key providers need a model id and a key; custom needs a model and a base
- * URL, its key stays optional). Codex auto-discovers its executable, and uniAI
+ * URL, its key stays optional). Codex auto-discovers its executable, and UniAI
  * authenticates through the cloud account, so neither reports a need here.
  * Trim-aware: in-memory settings bypass the trimConfigs applied to persisted
  * files, and a whitespace-only key/URL/model is a 401, not a config.
@@ -432,7 +432,7 @@ export function isProviderUsable(settings: AiSettings, id: AiProviderId): boolea
  * The provider the user chose. It is never swapped for another when its config
  * is incomplete: Settings and every module picker keep showing it with a
  * needs-key / choose-model state (`providerNeed`), so a half-filled setup never
- * silently turns into a uniAI request. Only an id this build does not know
+ * silently turns into a UniAI request. Only an id this build does not know
  * (a hand-edited file) degrades to genspark, the default of a fresh install.
  */
 export function selectedProvider(settings: AiSettings): AiProviderId {

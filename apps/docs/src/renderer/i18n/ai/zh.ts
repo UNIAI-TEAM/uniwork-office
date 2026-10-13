@@ -8,7 +8,7 @@ export const zh = {
   aiStarterContinue: '接着现有内容往下写',
   aiStarterFillTemplate: '找出并填写文档里的占位符',
   aiOpenSettingsBtn: '打开 AI 设置',
-  aiPanelTitle: 'uniAI',
+  aiPanelTitle: 'UniAI',
   aiOpenAssistant: '打开 AI 助手',
   aiSummarizeBtn: 'AI 总结',
   aiSummarizePrompt: '总结这篇文档的主要内容和要点',

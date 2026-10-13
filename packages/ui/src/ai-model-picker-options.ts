@@ -20,7 +20,7 @@ export interface AiModelPickerSelection {
 }
 
 /**
- * Providers the composer chip may switch to: uniAI once its Token Hub key is
+ * Providers the composer chip may switch to: UniAI once its Token Hub key is
  * set (or while a cloud sign-in is reported), every
  * other vendor once its settings pass the same usability test the chat path
  * applies (`isProviderUsable`), so picking a row never lands on a 401. A model
@@ -53,7 +53,7 @@ export function aiModelPickerGroups(
 /**
  * The chosen provider, even while its config is incomplete: the chip then reads
  * "Choose model" and `aiModelPickerNeed` says what is missing, instead of the
- * selection silently turning into uniAI.
+ * selection silently turning into UniAI.
  */
 export function aiModelPickerSelection(settings: AiSettings): AiModelPickerSelection {
   const provider = selectedProvider(settings)
@@ -65,7 +65,7 @@ export function aiModelPickerSelection(settings: AiSettings): AiModelPickerSelec
 /**
  * What the chosen vendor still lacks before a request can go out: 'model' (no model
  * id), 'base-url' (a custom endpoint without its server URL; its key is optional) or
- * 'key' (no API key). null for a usable selection and for uniAI, whose access is the
+ * 'key' (no API key). null for a usable selection and for UniAI, whose access is the
  * cloud account.
  */
 export function aiModelPickerNeed(settings: AiSettings): 'key' | 'model' | 'base-url' | null {

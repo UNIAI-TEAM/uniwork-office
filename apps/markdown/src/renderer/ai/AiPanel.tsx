@@ -4,6 +4,7 @@ import {
   AiModelPicker,
   useCloudSignedIn,
   type AiModelPickerBridge,
+  UniAiMark,
 } from '@genoffice/ui'
 import { useEffect, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent, ReactElement, ReactNode } from 'react'
@@ -891,12 +892,12 @@ export function AiPanel({
         onPointerDown={startResize}
         role="separator"
         aria-orientation="vertical"
-        aria-label="uniAI"
+        aria-label="UniAI"
       />
       <header className="ai-panel-header">
         <span className="ai-panel-title">
-          <GensparkMark size={22} />
-          uniAI
+          <UniAiMark size={22} />
+          UniAI
         </span>
         <div className="ai-panel-header-actions">
           <AiPanelSideButton
@@ -1431,26 +1432,6 @@ function IconClock(): ReactElement {
     >
       <circle cx="8" cy="8" r="6" />
       <path d="M8 4.8V8l2.2 1.6" />
-    </svg>
-  )
-}
-
-/** Generic AI badge (not a vendor mark). Function name kept for call sites. */
-export function GensparkMark({ size = 18 }: { size?: number }): React.JSX.Element {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden
-    >
-      <rect x="2.5" y="2.5" width="19" height="19" rx="5" stroke="currentColor" strokeWidth="1.5" />
-      <path
-        d="M12 6.25 13.15 10.1 17 11.25 13.15 12.4 12 16.25 10.85 12.4 7 11.25 10.85 10.1 Z"
-        fill="currentColor"
-      />
     </svg>
   )
 }

@@ -16,7 +16,7 @@ const providerNeed = (s: unknown, id: string): string | null =>
 
 const openaiDefault = AI_PROVIDERS.find((m) => m.id === 'openai')!.defaultModel
 
-describe('UNI-1395: a stored provider choice is never replaced by uniAI', () => {
+describe('UNI-1395: a stored provider choice is never replaced by UniAI', () => {
   it('keeps an unusable provider selected and says what is missing', () => {
     const settings = defaultAiSettings()
     settings.provider = 'openai'
@@ -43,7 +43,7 @@ describe('UNI-1395: a stored provider choice is never replaced by uniAI', () => 
     expect(providerNeed(settings, 'custom')).toBeNull()
   })
 
-  it('a fresh install and a hand-edited unknown id still land on uniAI', () => {
+  it('a fresh install and a hand-edited unknown id still land on UniAI', () => {
     expect(selectedProvider(defaultAiSettings())).toBe('genspark')
     const settings = defaultAiSettings()
     settings.provider = 'nonsense' as never
@@ -60,7 +60,7 @@ describe('UNI-1395: a stored provider choice is never replaced by uniAI', () => 
     expect(providerNeed(resolved, 'openai')).toBeNull()
   })
 
-  it('reading a stored file with no key keeps the provider (needs-key, not uniAI)', () => {
+  it('reading a stored file with no key keeps the provider (needs-key, not UniAI)', () => {
     const resolved = resolveAiSettings(
       { provider: 'openai', providers: { openai: { apiKey: '', model: openaiDefault } } },
       defaultAiSettings(),

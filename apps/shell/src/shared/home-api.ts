@@ -560,7 +560,7 @@ export interface HomeApi {
   setAiSettings(settings: AiSettings): Promise<void>
   /** ai-settings.json was rewritten by any renderer (composer model chip, another window) */
   onAiSettingsChanged(handler: () => void): () => void
-  /** provider catalog with each fixed endpoint's default base URL (empty for uniAI/custom) */
+  /** provider catalog with each fixed endpoint's default base URL (empty for UniAI/custom) */
   getAiProviders(): AiCatalogEntry[]
   /** live Codex model catalog discovered through the current or overridden app-server */
   getCodexModels(cliPath?: string): Promise<CodexModelCatalog>

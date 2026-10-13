@@ -44,7 +44,7 @@
       teamAdmin: false,
       features: [
         'Docs / Sheets / Slides / PDF trên máy',
-        'Workbench & uniAI local',
+        'Workbench & UniAI local',
         '1 thiết bị',
         '10 000 token AI / tháng',
       ],
@@ -84,12 +84,7 @@
       tokensMonth: 200_000,
       bridge: true,
       teamAdmin: false,
-      features: [
-        'Mọi quyền Personal',
-        '3 thiết bị',
-        '200 000 token AI / tháng',
-        'Hỗ trợ ưu tiên',
-      ],
+      features: ['Mọi quyền Personal', '3 thiết bị', '200 000 token AI / tháng', 'Hỗ trợ ưu tiên'],
     },
     {
       id: 'team',

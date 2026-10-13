@@ -3,11 +3,11 @@ import {
   AiPanelSideButton,
   AiModelPicker,
   type AiModelPickerBridge,
+  UniAiMark,
 } from '@genoffice/ui'
 import React, { useEffect, useRef, useState } from 'react'
 import { AiComposer, AiScopeQuote, AiTypingIndicator, type AiScopeQuoteData } from '@genoffice/ui'
 import { aiNoticeBody, aiNoticeKind } from '@genoffice/ai-provider/browser'
-import { GensparkMark } from '../ribbon-icons'
 import { cap, platform } from '../capabilities'
 import type { ChangePlan } from '@genoffice/xlsx-gateway/domain/workbook.types'
 import { ATTACHMENT_IMAGE_EXTS, type AttachmentMeta } from '../../shared/desktop-api'
@@ -478,7 +478,7 @@ export function AiChatPanel({
           data-tip={t('aiOpenAssistant')}
           aria-label={t('aiOpenAssistant')}
         >
-          <GensparkMark size={22} />
+          <UniAiMark size={22} />
         </button>
       </aside>
     )
@@ -543,12 +543,12 @@ export function AiChatPanel({
         onPointerDown={startResize}
         role="separator"
         aria-orientation="vertical"
-        aria-label="uniAI"
+        aria-label="UniAI"
       />
       <header className="ai-panel-header">
         <span className="ai-panel-title">
-          <GensparkMark size={22} />
-          uniAI
+          <UniAiMark size={22} />
+          UniAI
         </span>
         <div className="ai-panel-header-actions">
           <AiPanelSideButton

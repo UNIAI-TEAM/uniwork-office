@@ -12,7 +12,7 @@ function contextBlock(meta: EduMeta): string {
   return lines.join('\n')
 }
 
-/** Prompt the teacher can paste into uniAI, or that Home can seed as intent. */
+/** Prompt the teacher can paste into UniAI, or that Home can seed as intent. */
 export function eduWorkflowPrompt(workflowId: EduWorkflowId, meta: EduMeta): string {
   const ctx = contextBlock(meta)
   switch (workflowId) {

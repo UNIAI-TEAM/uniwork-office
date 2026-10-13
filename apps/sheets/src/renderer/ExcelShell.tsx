@@ -9,6 +9,7 @@ import {
   useRibbonCollapse,
   aiPanelInitiallyOpen,
   rememberAiPanelOpen,
+  UniAiMark,
 } from '@genoffice/ui'
 
 import {
@@ -21,7 +22,6 @@ import {
   BorderThickOuterIcon,
   BorderTopIcon,
   CaretIcon,
-  GensparkMark,
   RIBBON_GLYPH_ICONS,
   RedoIcon,
   SaveAsIcon,
@@ -3454,7 +3454,7 @@ function Ribbon({
             onClick={onAiToggle}
           >
             <span className="tool-icon-row">
-              <GensparkMark size={26} />
+              <UniAiMark size={26} />
             </span>
             <span>
               <strong>AI</strong>

@@ -1,5 +1,5 @@
 /**
- * uniAI standalone PWA — ChatGPT-style shell.
+ * UniAI standalone PWA — ChatGPT-style shell.
  * Production host: https://uniwork.app/app
  */
 
@@ -16,7 +16,7 @@ const ACCENTS = [
   { id: 'amber', value: '#f59e0b' },
 ]
 
-/** Selectable uniAI avatars for new-chat hero + assistant bubbles. */
+/** Selectable UniAI avatars for new-chat hero + assistant bubbles. */
 const AVATARS = [
   { id: 'ai', label: 'Classic AI', glyph: 'AI', from: '#5b8cff', to: '#1d4ed8' },
   { id: 'spark', label: 'Spark', glyph: '✦', from: '#a78bfa', to: '#6d28d9' },
@@ -34,7 +34,7 @@ const DEFAULT_PREFS = {
   accent: 'blue',
   fontSize: 'default',
   avatarId: 'ai',
-  accountName: 'Người dùng uniAI',
+  accountName: 'Người dùng UniAI',
   email: '',
   /** @type {'free'|'personal'|'pro'|'team'} */
   plan: 'free',
@@ -66,7 +66,7 @@ const SUGGESTIONS = [
   },
   {
     title: 'Explain Token Hub',
-    subtitle: 'How credits work with uniAI',
+    subtitle: 'How credits work with UniAI',
   },
 ]
 
@@ -119,7 +119,7 @@ const WORKBENCH_TABS = [
   {
     id: 'assistant',
     label: 'Trợ lý AI',
-    hint: 'Lối tắt vào uniAI',
+    hint: 'Lối tắt vào UniAI',
     color: '#8b5cf6',
     icon: '<path d="M12 3 13.8 8.2 19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>',
   },
@@ -403,7 +403,7 @@ function applyPrefs() {
   const fontMap = { small: '14px', default: '16px', large: '18px', xlarge: '20px' }
   document.documentElement.style.setProperty('--font-size', fontMap[prefs.fontSize] || '16px')
   document.body.style.fontSize = fontMap[prefs.fontSize] || '16px'
-  if (el.accountName) el.accountName.textContent = prefs.accountName || 'uniAI'
+  if (el.accountName) el.accountName.textContent = prefs.accountName || 'UniAI'
   if (el.accountEmail) {
     el.accountEmail.textContent = prefs.email || 'Cá nhân hoá & tài khoản'
   }
@@ -720,7 +720,7 @@ let officePreviewCleanup = null
 
 function renderLibrary() {
   const titles = {
-    knowledge: ['Tri thức', 'Kho kiến thức, skill và ghi chú dùng lại trong uniAI.'],
+    knowledge: ['Tri thức', 'Kho kiến thức, skill và ghi chú dùng lại trong UniAI.'],
     documents: ['Tài liệu', 'Xem trên PWA (local) hoặc mở bằng UniWork Office trên máy.'],
     tasks: ['Công việc', 'Việc cần làm — lưu trên thiết bị này.'],
     projects: ['Dự án', 'Theo dõi dự án đang chạy — lưu trên thiết bị này.'],
@@ -1318,7 +1318,7 @@ function renderSettings() {
     <section class="settings-group">
       <h3>Tùy chỉnh</h3>
       <div class="settings-row">
-        <div><label for="setLang">Ngôn ngữ</label><small>Ngôn ngữ giao diện uniAI</small></div>
+        <div><label for="setLang">Ngôn ngữ</label><small>Ngôn ngữ giao diện UniAI</small></div>
         <select id="setLang">
           <option value="vi">Tiếng Việt</option>
           <option value="en">English</option>
@@ -1348,7 +1348,7 @@ function renderSettings() {
         </select>
       </div>
       <div class="settings-row settings-row-stack">
-        <div><span class="settings-label">Avatar uniAI</span><small>Hiện trên trang New chat và tin nhắn trợ lý</small></div>
+        <div><span class="settings-label">Avatar UniAI</span><small>Hiện trên trang New chat và tin nhắn trợ lý</small></div>
         <div class="avatar-picker" id="settingsAvatarPicker"></div>
       </div>
     </section>
@@ -1423,7 +1423,7 @@ function renderSettings() {
     <section class="settings-group">
       <h3>Trợ giúp</h3>
       <div class="settings-row">
-        <div><span class="settings-label">Trung tâm trợ giúp</span><small>Hướng dẫn uniAI &amp; Token Hub</small></div>
+        <div><span class="settings-label">Trung tâm trợ giúp</span><small>Hướng dẫn UniAI &amp; Token Hub</small></div>
         <a class="settings-link" href="https://uniwork.app" target="_blank" rel="noopener">Mở</a>
       </div>
       <div class="settings-row">
@@ -1604,7 +1604,7 @@ function fillAvatarPicker(host, onPicked) {
 
 function renderThread() {
   const chat = activeChat()
-  el.title.textContent = chat.messages.length === 0 ? 'uniAI' : chat.title
+  el.title.textContent = chat.messages.length === 0 ? 'UniAI' : chat.title
   el.thread.innerHTML = ''
   el.thread.classList.toggle('is-empty', chat.messages.length === 0)
 
@@ -1619,14 +1619,14 @@ function renderThread() {
     h2.textContent = 'Where should we begin?'
     const p = document.createElement('p')
     p.textContent =
-      'uniAI is your independent UniWork assistant — Token Hub on the web, optional Office deep links on this device.'
+      'UniAI is your independent UniWork assistant — Token Hub on the web, optional Office deep links on this device.'
     const pickerLabel = document.createElement('p')
     pickerLabel.className = 'avatar-picker-label'
     pickerLabel.textContent = 'Chọn avatar'
     const picker = document.createElement('div')
     picker.className = 'avatar-picker'
     picker.setAttribute('role', 'listbox')
-    picker.setAttribute('aria-label', 'Chọn avatar uniAI')
+    picker.setAttribute('aria-label', 'Chọn avatar UniAI')
     fillAvatarPicker(picker, () => renderThread())
     empty.append(mark, h2, p, pickerLabel, picker)
     el.thread.appendChild(empty)
@@ -1701,12 +1701,12 @@ function demoReply(text, atts) {
   }
   if (lower.includes('token')) {
     return (
-      'Token Hub meters uniAI usage on your UniWork account.\n\n' +
+      'Token Hub meters UniAI usage on your UniWork account.\n\n' +
       'Sign in on the web PWA to use your balance. Desktop Office is optional for chat.'
     )
   }
   return (
-    'uniAI received your message.\n\n' +
+    'UniAI received your message.\n\n' +
     'Dùng nút + để mở Camera, Ảnh, Tệp, hoặc Plugin (Office + Workbench).'
   )
 }

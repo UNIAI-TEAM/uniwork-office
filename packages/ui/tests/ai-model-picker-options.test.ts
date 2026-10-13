@@ -13,12 +13,12 @@ describe('aiModelPickerGroups', () => {
     expect(aiModelPickerGroups(defaultAiSettings(), false)).toEqual([])
   })
 
-  it('lists uniAI when signed in', () => {
+  it('lists UniAI when signed in', () => {
     const ids = aiModelPickerGroups(defaultAiSettings(), true).map((g) => g.id)
     expect(ids).toEqual(['genspark'])
   })
 
-  it('lists uniAI once a Token Hub key is set, from either key slot', () => {
+  it('lists UniAI once a Token Hub key is set, from either key slot', () => {
     const own = defaultAiSettings()
     own.providers.genspark = { ...own.providers.genspark, apiKey: 'sk-or-1' }
     expect(aiModelPickerGroups(own, false).map((g) => g.id)).toContain('genspark')
@@ -45,7 +45,7 @@ describe('aiModelPickerGroups', () => {
 })
 
 describe('hosts without the UniAI pool (web frames)', () => {
-  it('never lists uniAI nor names openrouter/auto, even while the cloud sign-in is reported', () => {
+  it('never lists UniAI nor names openrouter/auto, even while the cloud sign-in is reported', () => {
     const settings = { ...defaultAiSettings(), uniAiAvailable: false }
     expect(aiModelPickerGroups(settings, true)).toEqual([])
     settings.providers.genspark = { ...settings.providers.genspark, apiKey: 'sk-or-1' }
@@ -94,7 +94,7 @@ describe('selection round trip', () => {
     expect(settings.providers.anthropic.model).toBe(anthropicModels[0])
   })
 
-  it('keeps an unusable stored provider selected instead of falling back to uniAI', () => {
+  it('keeps an unusable stored provider selected instead of falling back to UniAI', () => {
     const settings = defaultAiSettings()
     settings.provider = 'anthropic'
     expect(aiModelPickerSelection(settings).provider).toBe('anthropic')

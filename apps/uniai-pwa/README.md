@@ -1,4 +1,4 @@
-# uniAI PWA
+# UniAI PWA
 
 Standalone ChatGPT-style shell for UniWork AI (Token Hub + UniOffice hub).
 
@@ -27,4 +27,4 @@ Copy static assets (`index.html`, `fonts.css`, `styles.css`, `plans.js`, `office
 
 ## Install (users)
 
-Settings → **uniAI** in UniWork Office opens `https://uniwork.app/app` and lists Chrome / Edge / Safari install steps. Or open the URL and use the browser’s Install / Add to Home Screen.
+Settings → **UniAI** in UniWork Office opens `https://uniwork.app/app` and lists Chrome / Edge / Safari install steps. Or open the URL and use the browser’s Install / Add to Home Screen.

@@ -82,7 +82,7 @@ test('rewrites product names, ids and catalog values', () => {
 
     const en = read(root, 'apps/docs/src/renderer/i18n/app/en.ts')
     assert.match(en, /appLoginGenspark: 'Sign in to UniWork'/)
-    assert.match(en, /aiPanelTitle: 'uniAI'/)
+    assert.match(en, /aiPanelTitle: 'UniAI'/)
   })
 })
 

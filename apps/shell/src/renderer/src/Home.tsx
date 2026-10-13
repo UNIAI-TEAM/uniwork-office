@@ -1152,7 +1152,8 @@ export function Home() {
   const [activePracticeId, setActivePracticeId] = useState<PracticeId>(() => {
     const raw = wbStoreGetRaw('uniwork.activePracticeId')
     if (isPracticeId(raw)) return raw
-    return 'teacher'
+    // enterprise edition: a first-run user lands on the business-owner role
+    return 'entrepreneur'
   })
   const switchPractice = useCallback((id: PracticeId) => {
     setActivePracticeId(id)

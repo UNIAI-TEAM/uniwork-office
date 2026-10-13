@@ -44,6 +44,7 @@ import {
   isSymbolFontFamily,
   useDismissablePopover,
   useRibbonCollapse,
+  UniAiMark,
 } from '@genoffice/ui'
 import { HIGHLIGHT_CSS } from '../editor/extensions'
 import { applyCase, type CaseMode } from '../editor/case-transform'
@@ -159,7 +160,6 @@ import {
 import { WRAP_OPTIONS } from './ContextMenu'
 import { CropDialog, CutoutDialog } from './PictureDialogs'
 import {
-  GensparkMark,
   IconAlignCenter,
   IconAlignJustify,
   IconAlignLeft,
@@ -3063,7 +3063,7 @@ function RibbonInner({
                       onClick={onToggleAi}
                     >
                       <span className="rb-big-icon">
-                        <GensparkMark size={26} />
+                        <UniAiMark size={26} />
                       </span>
                       <span>AI</span>
                     </button>

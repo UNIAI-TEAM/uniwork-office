@@ -22,7 +22,7 @@ export const id = {
   aiQcPageSkipped: 'Halaman {n}: pemeriksaan tata letak otomatis dilewati',
   aiQcStopped: 'Pemeriksaan tata letak dihentikan',
   aiQcCapped: '{count} halaman lagi tidak diperiksa (batas per proses)',
-  aiPanelTitle: 'uniAI',
+  aiPanelTitle: 'UniAI',
   aiOpenAssistant: 'Buka asisten AI',
   aiFactCheckBtn: 'Cek Fakta AI',
   aiFactCheckPrompt:

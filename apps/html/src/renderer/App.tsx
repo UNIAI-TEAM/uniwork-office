@@ -9,6 +9,7 @@ import {
   type FindTarget,
   aiPanelInitiallyOpen,
   rememberAiPanelOpen,
+  UniAiMark,
 } from '@genoffice/ui'
 import {
   pollUntilReady,
@@ -26,7 +27,7 @@ import { usesBlockedPreviewFeatures } from './preview/preview-limits'
 import { instrumentForPreview } from './preview/instrument'
 import type { ComputedSnapshot, ElementRect, FromInspector } from './preview/inspector-protocol'
 import inspectorSource from './preview/inspector.js?raw'
-import { AiPanel, GensparkMark, type AiPreset, type HtmlAiDeps } from './ai/AiPanel'
+import { AiPanel, type AiPreset, type HtmlAiDeps } from './ai/AiPanel'
 import { AiAskPopover, type AnchorRect, type AskMode } from './components/AiAskPopover'
 import {
   EDIT_QUEUE_MAX,
@@ -1616,7 +1617,7 @@ export default function App() {
                 aria-label={t('aiOpenAssistant')}
                 onClick={() => setAiOpen(true)}
               >
-                <GensparkMark size={18} />
+                <UniAiMark size={18} />
               </button>
             )}
             {/* stays mounted while collapsed: an in-flight run, its snapshots and the loop context survive */}

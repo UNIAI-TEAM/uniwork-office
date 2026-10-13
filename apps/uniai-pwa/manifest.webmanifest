@@ -1,7 +1,7 @@
 {
   "id": "/app",
-  "name": "uniAI",
-  "short_name": "uniAI",
+  "name": "UniAI",
+  "short_name": "UniAI",
   "description": "UniWork AI assistant — chat, Token Hub, and natural-language commands.",
   "start_url": "/app/",
   "scope": "/app/",

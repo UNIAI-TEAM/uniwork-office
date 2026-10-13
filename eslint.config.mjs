@@ -95,7 +95,7 @@ export default tseslint.config(
     },
   },
   {
-    // The uniAI PWA is plain browser JS served as static files; its service
+    // The UniAI PWA is plain browser JS served as static files; its service
     // worker runs in the ServiceWorkerGlobalScope.
     files: ['apps/uniai-pwa/**/*.js'],
     ignores: ['apps/uniai-pwa/sw.js'],

@@ -304,10 +304,10 @@ export const rules = [
   },
   {
     id: 'ai-panel-title-i18n',
-    why: 'Vendor heading in every locale catalog: AI panel title "Genspark" -> "uniAI", ribbon button "Genspark" -> "AI"',
+    why: 'Vendor heading in every locale catalog: AI panel title "Genspark" -> "UniAI", ribbon button "Genspark" -> "AI"',
     files: ['apps/*/src/renderer/i18n/**/*.ts'],
     replace: [
-      [/^(\s*aiPanelTitle\s*:\s*['"])Genspark(['"])/gm, '$1uniAI$2'],
+      [/^(\s*aiPanelTitle\s*:\s*['"])Genspark(['"])/gm, '$1UniAI$2'],
       [/^(\s*ribbonAiAssistant\s*:\s*['"])Genspark(['"])/gm, '$1AI$2'],
     ],
   },
@@ -320,11 +320,11 @@ export const rules = [
   },
   {
     id: 'ai-panel-brand',
-    why: 'AI side-panel header and aria-label: vendor name -> "uniAI"',
+    why: 'AI side-panel header and aria-label: vendor name -> "UniAI"',
     files: ['apps/*/src/renderer/ai/{AiPanel,AiChatPanel}.tsx'],
     replace: [
-      [/aria-label="Genspark"/g, 'aria-label="uniAI"'],
-      [/^(\s*)Genspark(\s*)$/gm, '$1uniAI$2'],
+      [/aria-label="Genspark"/g, 'aria-label="UniAI"'],
+      [/^(\s*)Genspark(\s*)$/gm, '$1UniAI$2'],
     ],
   },
   {

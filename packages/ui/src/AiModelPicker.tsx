@@ -92,8 +92,8 @@ export function AiModelPicker({
   const hasKey = (wantedConfig?.apiKey ?? '') !== ''
   // The chip reads "Choose model" while the chosen provider cannot send yet; the composer's send
   // is then off and the hint says what is missing: a model (a key is stored) or a key. This holds
-  // on every host: a chosen vendor is never swapped for uniAI, so the chip and the request agree.
-  // Web frames apply it to uniAI too (nothing usable at all). A key list that failed to load says
+  // on every host: a chosen vendor is never swapped for UniAI, so the chip and the request agree.
+  // Web frames apply it to UniAI too (nothing usable at all). A key list that failed to load says
   // nothing about keys: no hint, send stays on, the server decides
   const need = settings ? aiModelPickerNeed(settings) : null
   const needHint =

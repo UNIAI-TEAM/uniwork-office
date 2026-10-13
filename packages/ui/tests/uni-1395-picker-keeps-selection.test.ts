@@ -8,7 +8,7 @@ const aiModelPickerNeed = (s: unknown): string | null =>
   (options as unknown as Record<string, (s: unknown) => string | null>).aiModelPickerNeed!(s)
 
 describe('UNI-1395: the picker keeps an unusable selection', () => {
-  it('stored openai without a key stays openai (needs-key), not uniAI', () => {
+  it('stored openai without a key stays openai (needs-key), not UniAI', () => {
     const settings = defaultAiSettings()
     settings.provider = 'openai'
     expect(aiModelPickerSelection(settings).provider).toBe('openai')
@@ -25,7 +25,7 @@ describe('UNI-1395: the picker keeps an unusable selection', () => {
     expect(aiModelPickerNeed(settings)).toBe('model')
   })
 
-  it('a usable selection and uniAI report no need', () => {
+  it('a usable selection and UniAI report no need', () => {
     const usable = defaultAiSettings()
     usable.provider = 'anthropic'
     usable.providers.anthropic = { apiKey: 'k', model: 'claude-x' }
