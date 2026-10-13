@@ -57,11 +57,36 @@ describe('the comments IPC channel contract', () => {
 
   it('comments.create: kind + non-empty body, optional parent/anchor/baseVersionId', () => {
     const anchor = { format: 'xlsx', v: 1, sheet: 'S1', range: 'B7' }
-    expect(parseCommentsCreateInput({ path: 'p', kind: 'comment', body: 'hi' })).toEqual({
+    // OQ-C2: root comment = anchor + base version; reply = no anchor; discussion = no anchor
+    expect(parseCommentsCreateInput({ path: 'p', kind: 'discussion', body: 'hi' })).toEqual({
       path: 'p',
-      kind: 'comment',
+      kind: 'discussion',
       body: 'hi',
     })
+    expect(
+      parseCommentsCreateInput({ path: 'p', kind: 'comment', parentId: 'c1', body: 'hi' }),
+    ).toEqual({ path: 'p', kind: 'comment', parentId: 'c1', body: 'hi' })
+    expect(parseCommentsCreateInput({ path: 'p', kind: 'comment', body: 'hi' })).toBeNull()
+    expect(parseCommentsCreateInput({ path: 'p', kind: 'comment', body: 'hi', anchor })).toBeNull()
+    expect(
+      parseCommentsCreateInput({
+        path: 'p',
+        kind: 'comment',
+        parentId: 'c1',
+        body: 'hi',
+        anchor,
+        baseVersionId: 'v1',
+      }),
+    ).toBeNull()
+    expect(
+      parseCommentsCreateInput({
+        path: 'p',
+        kind: 'discussion',
+        body: 'hi',
+        anchor,
+        baseVersionId: 'v1',
+      }),
+    ).toBeNull()
     expect(
       parseCommentsCreateInput({
         path: 'p',

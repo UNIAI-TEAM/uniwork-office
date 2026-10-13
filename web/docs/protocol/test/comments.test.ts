@@ -201,6 +201,23 @@ describe('G8-08 protocol shape', () => {
     ok('comments.create', { kind: 'discussion', body: BODY_FIXTURE })
     ok('comments.create', { kind: 'comment', body: 'a', anchor, base_version_id: 'v1' })
     ok('comments.create', { kind: 'comment', parent_id: COMMENT.id, body: 'reply' })
+    // OQ-C2: a root comment is anchored on a version; a reply carries no anchor; a discussion no anchor
+    bad('comments.create', { kind: 'comment', body: 'root without anchor' })
+    bad('comments.create', { kind: 'comment', body: 'a', base_version_id: 'v1' })
+    bad('comments.create', {
+      kind: 'comment',
+      parent_id: COMMENT.id,
+      body: 'reply',
+      anchor,
+      base_version_id: 'v1',
+    })
+    bad('comments.create', {
+      kind: 'comment',
+      parent_id: COMMENT.id,
+      body: 'r',
+      base_version_id: 'v1',
+    })
+    bad('comments.create', { kind: 'discussion', body: 'd', anchor, base_version_id: 'v1' })
     bad('comments.create', { body: 'no kind' })
     bad('comments.create', { kind: 'comment', body: '' })
     bad('comments.create', { kind: 'comment', body: 'a', anchor }) // anchor needs base_version_id
