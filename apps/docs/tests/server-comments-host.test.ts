@@ -136,7 +136,9 @@ function fakeServer() {
       },
     ),
     searchMentions: vi.fn(() => ok({ candidates: [] })),
-    context: vi.fn(() => ok({ documentId: 'doc1', versionId: 'v1', level: 'edit', myUserId: 'me' })),
+    context: vi.fn(() =>
+      ok({ documentId: 'doc1', versionId: 'v1', level: 'edit', myUserId: 'me' }),
+    ),
     onSaved: vi.fn((h: (p: { path: string; versionId: string }) => void) => {
       savedHandlers.push(h)
       return () => savedHandlers.splice(savedHandlers.indexOf(h), 1)
@@ -260,7 +262,12 @@ async function typeAndSend(box: HTMLTextAreaElement, text: string) {
   })
   await act(async () => {
     box.dispatchEvent(
-      new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true, cancelable: true }),
+      new KeyboardEvent('keydown', {
+        key: 'Enter',
+        ctrlKey: true,
+        bubbles: true,
+        cancelable: true,
+      }),
     )
   })
   await flush()
@@ -437,11 +444,12 @@ describe('server mode: anchors after Save', () => {
   it('anchor_version_invalid keeps the map for the next Save (no throw, no reload)', async () => {
     const server = fakeServer()
     seed(server, 'third quarter')
-    server.calls.anchors.mockImplementationOnce(() =>
-      Promise.resolve({
-        ok: false,
-        error: { code: 'malformed', details: { code: 'anchor_version_invalid' } },
-      }) as never,
+    server.calls.anchors.mockImplementationOnce(
+      () =>
+        Promise.resolve({
+          ok: false,
+          error: { code: 'malformed', details: { code: 'anchor_version_invalid' } },
+        }) as never,
     )
     await mount(server, false)
     const lists = server.calls.list.mock.calls.length
@@ -517,7 +525,16 @@ describe('server mode: reveal', () => {
     const server = fakeServer()
     const row = server.add({
       body: 'gone',
-      anchor: { format: 'docx', v: 1, path: [7], start: 0, end: 4, quote: 'nope', prefix: '', suffix: '' },
+      anchor: {
+        format: 'docx',
+        v: 1,
+        path: [7],
+        start: 0,
+        end: 4,
+        quote: 'nope',
+        prefix: '',
+        suffix: '',
+      },
       anchor_state: 'lost',
     })
     await mount(server, false)

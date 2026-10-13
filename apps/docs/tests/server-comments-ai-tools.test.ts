@@ -41,7 +41,12 @@ function setup() {
     draftReply: vi.fn(() => true),
     draftNew: vi.fn(() => true),
   }
-  const local = { reply: vi.fn(() => true), resolve: vi.fn(() => true), add: vi.fn(), remove: vi.fn() }
+  const local = {
+    reply: vi.fn(() => true),
+    resolve: vi.fn(() => true),
+    add: vi.fn(),
+    remove: vi.fn(),
+  }
   const access: AiCommentsAccess = {
     list: () => [...inFile, ...server],
     reply: local.reply,
@@ -51,15 +56,7 @@ function setup() {
     server: drafts,
   }
   const run = (name: string, input: Record<string, unknown>) =>
-    executeTool(
-      editor,
-      { id: 't', name, input },
-      NUM_IDS,
-      undefined,
-      undefined,
-      undefined,
-      access,
-    )
+    executeTool(editor, { id: 't', name, input }, NUM_IDS, undefined, undefined, undefined, access)
   return { editor, drafts, local, run }
 }
 

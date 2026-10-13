@@ -340,16 +340,14 @@ export function ServerCommentsHost(p: ServerCommentsHostProps) {
         [...ctlRef.current.threads, ...ctlRef.current.resolved].flatMap((t) =>
           [t.root, ...t.replies]
             .filter((c) => !c.deleted_at)
-            .map(
-              (c): CommentInfo => ({
-                id: c.id,
-                author: c.display_name || strings.collabFormerMember || '',
-                date: c.created_at ?? '',
-                text: c.body,
-                ...(c.id !== t.id ? { parentId: t.id } : {}),
-                ...(t.resolved && c.id === t.id ? { done: true } : {}),
-              }),
-            ),
+            .map((c): CommentInfo => ({
+              id: c.id,
+              author: c.display_name || strings.collabFormerMember || '',
+              date: c.created_at ?? '',
+              text: c.body,
+              ...(c.id !== t.id ? { parentId: t.id } : {}),
+              ...(t.resolved && c.id === t.id ? { done: true } : {}),
+            })),
         ),
       draftReply: (id, text) => {
         const thread = threadOf(ctlRef.current, id)

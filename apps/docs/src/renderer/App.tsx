@@ -130,10 +130,7 @@ import {
   nonAsianWordCount,
 } from './word-count'
 import { CommentsPanel } from './components/CommentsPanel'
-import {
-  ServerCommentsHost,
-  type ServerCommentsHandle,
-} from './server-comments/ServerCommentsHost'
+import { ServerCommentsHost, type ServerCommentsHandle } from './server-comments/ServerCommentsHost'
 import { useServerMode } from './server-comments/mode'
 import { paraIdResolver } from './server-comments/para-id'
 import { EquationModal } from './components/EquationModal'

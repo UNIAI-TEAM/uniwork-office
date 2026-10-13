@@ -18,7 +18,8 @@ export function paraIdResolver(
     if (!cached || cached.source !== list) {
       const ids = new Map<number, string>()
       for (const b of list) {
-        const m = typeof b.docxIndex === 'number' && b.originalXml ? PARA_ID.exec(b.originalXml) : null
+        const m =
+          typeof b.docxIndex === 'number' && b.originalXml ? PARA_ID.exec(b.originalXml) : null
         if (m) ids.set(b.docxIndex as number, m[1]!)
       }
       cached = { source: list, ids }

@@ -66,7 +66,12 @@ function fakeApi() {
   const ok = <T>(value: T) => Promise.resolve({ ok: true as const, value })
   const api = {
     list: vi.fn(() =>
-      ok({ comments: rows.map((r) => ({ ...r })), mentions: [], list_token: `t${rows.length}`, unchanged: false }),
+      ok({
+        comments: rows.map((r) => ({ ...r })),
+        mentions: [],
+        list_token: `t${rows.length}`,
+        unchanged: false,
+      }),
     ),
     create: vi.fn((i: { body: string; anchor?: Record<string, unknown> }) => {
       const row = {
@@ -101,7 +106,8 @@ describe('server comments leave the file bytes alone', () => {
         {
           path: 'word/comments.xml',
           xml: COMMENTS_XML,
-          contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.comments+xml',
+          contentType:
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.comments+xml',
         },
       ],
     })
@@ -154,7 +160,12 @@ describe('server comments leave the file bytes alone', () => {
     })
     await act(async () => {
       box.dispatchEvent(
-        new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true, cancelable: true }),
+        new KeyboardEvent('keydown', {
+          key: 'Enter',
+          ctrlKey: true,
+          bubbles: true,
+          cancelable: true,
+        }),
       )
     })
     await flush()

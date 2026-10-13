@@ -34,7 +34,9 @@ describe('resolveServerMode', () => {
       await resolveServerMode(apiWith({ ok: false, error: { code: 'not_found' } }), '/a.docx'),
     ).toBeNull()
     expect(await resolveServerMode(apiWith({ ok: true, value: { nope: 1 } }), '/a.docx')).toBeNull()
-    const throwing = { context: () => Promise.reject(new Error('x')) } as unknown as ServerCommentsApi
+    const throwing = {
+      context: () => Promise.reject(new Error('x')),
+    } as unknown as ServerCommentsApi
     expect(await resolveServerMode(throwing, '/a.docx')).toBeNull()
   })
 
@@ -74,13 +76,19 @@ function ctxFor(server: ReviewContext['server']) {
     content: {
       type: 'doc',
       content: [
-        { type: 'docParagraph', attrs: { docxIndex: null }, content: [{ type: 'text', text: 'Some words here' }] },
+        {
+          type: 'docParagraph',
+          attrs: { docxIndex: null },
+          content: [{ type: 'text', text: 'Some words here' }],
+        },
       ],
     },
   })
   editors.add(editor)
   addCommentToRange(editor, 1, 5, '1')
-  const comments: CommentInfo[] = [{ id: '1', author: 'User', date: '2026-01-01T00:00:00Z', text: 'in file' }]
+  const comments: CommentInfo[] = [
+    { id: '1', author: 'User', date: '2026-01-01T00:00:00Z', text: 'in file' },
+  ]
   const ctx = {
     editor,
     doc: null,
