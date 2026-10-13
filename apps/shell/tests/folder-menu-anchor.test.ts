@@ -16,7 +16,7 @@ describe('followMenuAnchor', () => {
   it('keeps the menu when a scroll event arrives but the row did not move', () => {
     // a scroll event is dispatched on the next frame: the layout change it reports can
     // be older than the click that opened the menu, so the anchor is where it was
-    expect(followMenuAnchor(box(397, 190), box(397, 190), [viewport, box(300, 12, 190, 200)])).toBe(
+    expect(followMenuAnchor(box(397, 190), box(397, 190), [viewport, box(300, 12, 190, 220)])).toBe(
       'stay',
     )
   })
@@ -26,12 +26,12 @@ describe('followMenuAnchor', () => {
   })
 
   it('moves the menu by the distance its row moved while the row is still visible', () => {
-    const next = followMenuAnchor(box(397, 190), box(373, 190), [viewport, box(300, 12, 190, 200)])
+    const next = followMenuAnchor(box(397, 190), box(373, 190), [viewport, box(300, 12, 190, 220)])
     expect(next).toEqual({ dx: 0, dy: -24 })
   })
 
   it('closes when the row scrolled out of the scrollable list that holds it', () => {
-    expect(followMenuAnchor(box(397, 190), box(250, 190), [viewport, box(300, 12, 190, 200)])).toBe(
+    expect(followMenuAnchor(box(397, 190), box(250, 190), [viewport, box(300, 12, 190, 220)])).toBe(
       'close',
     )
   })
