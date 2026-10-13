@@ -116,11 +116,11 @@ const panel = () => document.querySelector<HTMLElement>('aside.collab-panel')
 // ---------------------------------------------------------------- claim (invariant 8, D4)
 
 describe('frame claim per module (D4)', () => {
-  it('markdown + html claim comments; docs, sheets, slides, pdf do not (until G8-12..15)', () => {
+  it('markdown + html + docs (G8-12) claim comments; sheets, slides, pdf do not (until G8-13..15)', () => {
     expect(FRAME_COMMENTS).toEqual({
       markdown: true,
       html: true,
-      docs: false,
+      docs: true,
       sheets: true,
       slides: false,
       pdf: false,
@@ -154,12 +154,19 @@ describe('frame claim per module (D4)', () => {
       'modules/sheets/install.ts': true,
       'modules/slides/install.ts': false,
       'modules/pdf/install.ts': false,
-      'docs/bridge/install.ts': false,
+      'docs/bridge/install.ts': true,
     }
     for (const [file, on] of Object.entries(expected)) {
       const src = readFileSync(join(root, file), 'utf8')
       expect(src, file).toMatch(new RegExp(`frameComments(: |\\s*=\\s*)${on}\\b`))
     }
+  })
+
+  it('G8-12: the Docs frame installs the comments API and keeps the Discussion panel silent on a miss', () => {
+    const src = readFileSync(join(__dirname, '..', '..', '..', 'docs/bridge/install.ts'), 'utf8')
+    // the editor S12 panel owns anchored ids and shows its own S15 line
+    expect(src).toMatch(/mountFrameDiscussion\(client, \{ revealMissing: 'silent' \}\)/)
+    expect(src).toMatch(/installFrameComments\(client\)/)
   })
 
   it('R8: the claim stays on across a re-handshake of the same document', async () => {

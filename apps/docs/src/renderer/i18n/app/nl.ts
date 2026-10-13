@@ -115,6 +115,7 @@ export const nl = {
   appMixedExportOpening:
     'Gemengde papierformaten: pagineringsvoorbeeld wordt geopend om per pagina samengevoegd te exporteren…',
   appSelectTextToComment: 'Selecteer eerst de tekst waarop je een opmerking wilt plaatsen',
+  appCommentSaveFirst: 'Sla het document eerst op om een opmerking toe te voegen',
   appCommentSelectionLost:
     'De selectie is niet meer geldig; selecteer de tekst voor de opmerking opnieuw',
   appCommentAdded: 'Opmerking toegevoegd; wordt bij het opslaan naar het document geschreven',

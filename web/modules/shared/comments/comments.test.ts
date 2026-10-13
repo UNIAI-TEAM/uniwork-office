@@ -10,13 +10,20 @@
 import { act } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createMockPort } from '../../../docs/bridge/testing/mock-port'
-import type { CommentsListResult, DocumentComment } from '../../../docs/protocol/types'
+import {
+  COMMENTS_REVEAL_WAIT_MS,
+  type CommentsListResult,
+  type DocumentComment,
+} from '../../../docs/protocol/types'
 import { mountFrameDiscussion, type DiscussionPort } from '../discussion/mount'
 import {
+  FRAME_SIDE_PANEL_EVENT,
+  announceFrameSidePanel,
   createFrameCommentsApi,
   createFrameDocVersion,
   frameRevealRouter,
   installFrameComments,
+  onFrameSidePanel,
 } from './index'
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -79,6 +86,7 @@ function framePort(
       (await revealHandler!({ comment_id: id }, { signal: new AbortController().signal })) as {
         revealed: boolean
       },
+    handler: () => revealHandler as NonNullable<typeof revealHandler>,
     hasRevealHandler: () => revealHandler !== undefined,
     calls: (type: string) => mock.calls.filter((c) => c.type === type),
   }
@@ -161,7 +169,13 @@ describe('createFrameCommentsApi: the desktop shape over the frame protocol', ()
     const api = createFrameCommentsApi(p.port, { version })
     expect(await api.context({ path: '' })).toEqual({
       ok: true,
-      value: { documentId: 'doc-1', versionId: file.versionId, level: 'manage', myUserId: ME },
+      value: {
+        documentId: 'doc-1',
+        versionId: file.versionId,
+        level: 'manage',
+        myUserId: ME,
+        frame: true,
+      },
     })
     const heard: unknown[] = []
     const off = api.onSaved((s) => heard.push(s))
@@ -186,7 +200,7 @@ describe('createFrameCommentsApi: the desktop shape over the frame protocol', ()
     const api = createFrameCommentsApi(p.port, { version: createFrameDocVersion() })
     const reply = (await api.context({ path: '' })) as { ok: true; value: object }
     expect(reply.value).not.toHaveProperty('level')
-    expect(reply.value).toMatchObject({ documentId: 'doc-1', myUserId: ME })
+    expect(reply.value).toMatchObject({ documentId: 'doc-1', myUserId: ME, frame: true })
   })
 })
 
@@ -263,7 +277,11 @@ describe('the frame reveal router (one handler, exactly one panel reacts)', () =
     })
     await flush()
     expect(result).toEqual({ revealed: true })
-    expect(editor).toHaveBeenCalledWith({ path: 'uniwork://f/Plan.docx', commentId: 'c1' })
+    expect(editor).toHaveBeenCalledWith({
+      path: 'uniwork://f/Plan.docx',
+      commentId: 'c1',
+      last: true,
+    })
     expect(discussionPanel()).toBeNull()
   })
 
@@ -323,6 +341,184 @@ describe('the frame reveal router (one handler, exactly one panel reacts)', () =
     expect(settled).toBe(1)
     expect(result).toEqual({ revealed: false })
     expect(editor).toHaveBeenCalledTimes(1)
+  })
+
+  describe('an editor is expected (installFrameComments ran) but has not registered yet', () => {
+    async function expecting() {
+      const p = framePort()
+      await mountDiscussion(p)
+      const target: Record<string, unknown> = {}
+      await installFrameComments(p.port, { version: createFrameDocVersion() }, target)
+      return p
+    }
+
+    it('an editor-owned id revealed before addEditor waits for the editor, which answers true; Discussion shows no notice', async () => {
+      const p = await expecting()
+      let result: unknown
+      let settled = false
+      const pending = p.reveal('c1').then((r) => {
+        settled = true
+        result = r
+      })
+      await flush()
+      // not answered `revealed:false` just because the editor has not registered: still waiting
+      expect(settled).toBe(false)
+      const editor = vi.fn(async (payload: { commentId: string }) => payload.commentId === 'c1')
+      disposers.push(createFrameCommentsApi(p.port).onReveal(editor))
+      await act(async () => pending)
+      await flush()
+      expect(result).toEqual({ revealed: true })
+      expect(editor).toHaveBeenCalledTimes(1)
+      expect(discussionPanel()).toBeNull()
+    })
+
+    it('a discussion id is still answered by Discussion at once, without waiting for the editor', async () => {
+      const p = await expecting()
+      let result: unknown
+      await act(async () => {
+        result = await p.reveal('p1')
+      })
+      expect(result).toEqual({ revealed: true })
+    })
+
+    it('no editor within the reveal budget throws the retryable not_ready, never revealed:false', async () => {
+      vi.useFakeTimers()
+      try {
+        const p = await expecting()
+        const pending = p.reveal('c1').then(
+          (r) => ({ ok: true as const, r }),
+          (e: unknown) => ({ ok: false as const, e }),
+        )
+        await vi.advanceTimersByTimeAsync(COMMENTS_REVEAL_WAIT_MS)
+        const out = await pending
+        expect(out.ok).toBe(false)
+        expect(out).toMatchObject({ e: { code: 'not_ready', retryable: true } })
+        expect(discussionPanel()).toBeNull()
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('the cancelled reveal stops waiting', async () => {
+      const p = await expecting()
+      const ctl = new AbortController()
+      const handler = p.handler()
+      const pending = Promise.resolve(handler({ comment_id: 'c1' }, { signal: ctl.signal })).then(
+        (r) => ({ ok: true as const, r }),
+        (e: unknown) => ({ ok: false as const, e }),
+      )
+      await flush()
+      ctl.abort()
+      const out = await pending
+      expect(out.ok).toBe(false)
+      expect(out).toMatchObject({ e: { code: 'cancelled' } })
+    })
+  })
+
+  describe('the editor owner is told when it is the last one asked (note A)', () => {
+    it('the only editor owner gets last:true; with two the first gets false and the second true', async () => {
+      const p = framePort()
+      const router = frameRevealRouter(p.port)
+      const seen: Array<[string, boolean]> = []
+      router.addEditor((_id, { last }) => {
+        seen.push(['a', last])
+        return false
+      })
+      await p.reveal('x')
+      expect(seen).toEqual([['a', true]])
+      seen.length = 0
+      router.addEditor((_id, { last }) => {
+        seen.push(['b', last])
+        return false
+      })
+      await p.reveal('x')
+      expect(seen).toEqual([
+        ['a', false],
+        ['b', true],
+      ])
+    })
+
+    it('onReveal hands the web handler { path, commentId, last } with last always set', async () => {
+      const p = framePort()
+      const version = createFrameDocVersion()
+      version.noteOpened({ path: 'uniwork://f/Plan.docx', versionId: 'v1' })
+      const handler = vi.fn(() => false)
+      disposers.push(createFrameCommentsApi(p.port, { version }).onReveal(handler))
+      await p.reveal('x')
+      expect(handler).toHaveBeenCalledWith({
+        path: 'uniwork://f/Plan.docx',
+        commentId: 'x',
+        last: true,
+      })
+    })
+  })
+
+  describe('one side panel at a time in the frame (note B)', () => {
+    const emit = (owner: string, open: boolean) =>
+      window.dispatchEvent(new CustomEvent(FRAME_SIDE_PANEL_EVENT, { detail: { owner, open } }))
+
+    it('uses the agreed event name and detail shape', () => {
+      expect(FRAME_SIDE_PANEL_EVENT).toBe('uniwork:frame-side-panel')
+      const seen: unknown[] = []
+      const on = (e: Event) => seen.push((e as CustomEvent).detail)
+      window.addEventListener(FRAME_SIDE_PANEL_EVENT, on)
+      announceFrameSidePanel('editor', true)
+      window.removeEventListener(FRAME_SIDE_PANEL_EVENT, on)
+      expect(seen).toEqual([{ owner: 'editor', open: true }])
+    })
+
+    it('onFrameSidePanel closes only for an open event of another owner', () => {
+      const close = vi.fn()
+      const off = onFrameSidePanel('discussion', close)
+      emit('discussion', true)
+      emit('editor', false)
+      expect(close).not.toHaveBeenCalled()
+      emit('editor', true)
+      expect(close).toHaveBeenCalledTimes(1)
+      off()
+      emit('editor', true)
+      expect(close).toHaveBeenCalledTimes(1)
+    })
+
+    it('the Discussion panel announces its own open and close', async () => {
+      const p = framePort()
+      await mountDiscussion(p)
+      const seen: Array<{ owner: string; open: boolean }> = []
+      const on = (e: Event) => seen.push((e as CustomEvent).detail)
+      window.addEventListener(FRAME_SIDE_PANEL_EVENT, on)
+      try {
+        await act(async () => {
+          await p.reveal('p1')
+        })
+        await flush()
+        expect(discussionPanel()).not.toBeNull()
+        expect(seen).toEqual([{ owner: 'discussion', open: true }])
+        await act(async () => {
+          emit('editor', true)
+        })
+        await flush()
+        expect(discussionPanel()).toBeNull()
+        // it closes itself without announcing another open
+        expect(seen.filter((d) => d.owner === 'discussion' && d.open)).toHaveLength(1)
+        expect(seen.at(-1)).toEqual({ owner: 'discussion', open: false })
+      } finally {
+        window.removeEventListener(FRAME_SIDE_PANEL_EVENT, on)
+      }
+    })
+
+    it('without an editor event the Discussion panel stays as it is', async () => {
+      const p = framePort()
+      await mountDiscussion(p)
+      await act(async () => {
+        await p.reveal('p1')
+      })
+      await flush()
+      await act(async () => {
+        emit('discussion', true)
+      })
+      await flush()
+      expect(discussionPanel()).not.toBeNull()
+    })
   })
 
   it('the router unregisters from the port when its last owner leaves', () => {

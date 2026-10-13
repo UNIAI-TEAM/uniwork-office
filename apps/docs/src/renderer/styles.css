@@ -3791,6 +3791,17 @@ th.cell-rev-del {
   cursor: pointer;
 }
 
+/* a UniWork (server) comment: a screen-only decoration, never part of the document */
+.doc-server-comment {
+  background: var(--docs-paper-comment-bg);
+  border-bottom: 2px solid var(--docs-paper-comment-line);
+}
+
+/* the server comment panel (kit S12) takes the local pane's column and narrow-screen overlay */
+.comments-pane.docs-server-comments {
+  width: min(300px, 100%);
+}
+
 /* range picked for a comment that is still being composed */
 .comment-pending {
   background: var(--docs-paper-comment-bg);

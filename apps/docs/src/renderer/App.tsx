@@ -130,6 +130,9 @@ import {
   nonAsianWordCount,
 } from './word-count'
 import { CommentsPanel } from './components/CommentsPanel'
+import { ServerCommentsHost, type ServerCommentsHandle } from './server-comments/ServerCommentsHost'
+import { useServerMode } from './server-comments/mode'
+import { paraIdResolver } from './server-comments/para-id'
 import { EquationModal } from './components/EquationModal'
 import { HeaderFooterArea } from './components/HeaderFooterArea'
 import { PageFootnotes, PageEndnotes } from './components/PageNoteAreas'
@@ -394,6 +397,7 @@ import {
 import {
   applyAiDocContent as applyAiDocContentImpl,
   buildDocBytes as buildDocBytesImpl,
+  currentDocGeneration,
   exportPdf as exportPdfImpl,
   exportHtml as exportHtmlImpl,
   exportImages as exportImagesImpl,
@@ -1087,6 +1091,18 @@ export function App() {
   uniworkRef.current = uniworkState
   /** autosave as it actually runs: the pref, forced off for a UniWork document */
   const autoSaveActive = autoSave && !uniwork.bound
+  // G8-12: server comments (S12) when the host answers a comments context for this document; a
+  // Save replaces `doc` but not the document generation, so server mode survives it
+  const serverMode = useServerMode(doc ? currentDocGeneration() + 1 : 0, doc?.filePath)
+  const serverCommentsRef = useRef<ServerCommentsHandle | null>(null)
+  const serverActiveRef = useRef(false)
+  serverActiveRef.current = serverMode !== null
+  const parsedBlocksRef = useRef<DocState['parsed']['blocks']>([])
+  parsedBlocksRef.current = doc?.parsed.blocks ?? []
+  const serverCodec = useMemo(
+    () => ({ paraIdOf: paraIdResolver(() => parsedBlocksRef.current) }),
+    [],
+  )
   // tab closed but this renderer kept alive (shell freeze workaround): go inert
   const [tornDown, setTornDown] = useState(false)
   const [aiPreset, setAiPreset] = useState<{
@@ -2941,6 +2957,9 @@ export function App() {
     setInkAnnotations,
     setInksDirty,
     setCompareResult,
+    server: serverActiveRef.current
+      ? { startThread: () => serverCommentsRef.current?.startThread() }
+      : null,
   }
 
   // G8-02: comments written from here carry the author the host resolves for the
@@ -6292,7 +6311,22 @@ export function App() {
   // AI comment tools run the same review-actions code paths as the comments pane
   const aiCommentsAccess = useMemo<AiCommentsAccess>(
     () => ({
-      list: () => reviewCtxRef.current.comments,
+      list: () => [
+        ...reviewCtxRef.current.comments,
+        ...(serverActiveRef.current ? (serverCommentsRef.current?.ai.list() ?? []) : []),
+      ],
+      // G8-12: on a bound document the tools only fill server composer drafts (invariant 7)
+      get server() {
+        const handle = serverActiveRef.current ? serverCommentsRef.current : null
+        return handle
+          ? {
+              owns: (id: string) => handle.ai.owns(id),
+              draftReply: (id: string, text: string) => handle.ai.draftReply(id, text),
+              draftNew: (range: { from: number; to: number }, text: string) =>
+                handle.ai.draftNew(range, text),
+            }
+          : undefined
+      },
       reply: (parentId, text) =>
         replyToCommentImpl(reviewCtxRef.current, parentId, text, AI_REVISION_AUTHOR),
       resolve: (id) => {
@@ -7516,7 +7550,25 @@ export function App() {
                 {t('appExitReadMode')}
               </button>
             )}
-            {doc && showComments && (
+            {doc && serverMode && editor && (
+              <ServerCommentsHost
+                key={`${serverMode.documentId}\u0000${serverMode.path}`}
+                mode={serverMode}
+                editor={editor}
+                lang={lang}
+                panelOpen={showComments && !readMode}
+                onOpenPanel={() => setShowComments(true)}
+                onClosePanel={closeCommentsPanel}
+                onStatus={setStatus}
+                selectTextMessage={t('appSelectTextToComment')}
+                saveFirstMessage={t('appCommentSaveFirst')}
+                inFileComments={comments}
+                neutralAuthor={t('editorNeutralCommentAuthor')}
+                handleRef={serverCommentsRef}
+                codec={serverCodec}
+              />
+            )}
+            {doc && !serverMode && showComments && (
               <CommentsPanel
                 comments={comments}
                 docNode={editor.state.doc}

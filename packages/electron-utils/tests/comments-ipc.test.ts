@@ -10,7 +10,6 @@ import {
   COMMENTS_CHANNELS,
   parseCommentsAnchorsInput,
   parseCommentsContextInput,
-  parseCommentsContextResult,
   parseCommentsCreateInput,
   parseCommentsSaved,
   parseCommentsIdInput,
@@ -432,27 +431,5 @@ describe('the comments context + saved seam (G8-12 §3.1)', () => {
     expect(parseCommentsSaved({ path: '/w/Plan.docx', versionId: 'x'.repeat(129) })).toBeNull()
     expect(parseCommentsSaved({ path: '', versionId: 'v' })).toBeNull()
     expect(parseCommentsSaved([])).toBeNull()
-  })
-
-  it('a context result keeps documentId, versionId (or null), a known level and myUserId', () => {
-    expect(
-      parseCommentsContextResult({
-        documentId: 'd1',
-        versionId: 'v3',
-        level: 'manage',
-        myUserId: 'u1',
-      }),
-    ).toEqual({ documentId: 'd1', versionId: 'v3', level: 'manage', myUserId: 'u1' })
-    expect(parseCommentsContextResult({ documentId: 'd1', versionId: null })).toEqual({
-      documentId: 'd1',
-      versionId: null,
-    })
-    // an unknown level reads as "unknown" (own-comments-only rule), never as a grant
-    expect(
-      parseCommentsContextResult({ documentId: 'd1', versionId: 'v', level: 'owner' }),
-    ).toEqual({ documentId: 'd1', versionId: 'v' })
-    expect(parseCommentsContextResult({ documentId: '', versionId: 'v' })).toBeNull()
-    expect(parseCommentsContextResult({ documentId: 'd1' })).toBeNull()
-    expect(parseCommentsContextResult({ documentId: 'd1', versionId: 3 })).toBeNull()
   })
 })

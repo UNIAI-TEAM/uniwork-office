@@ -105,14 +105,16 @@ export function createFrameCommentsApi(
           versionId: version.current().versionId ?? session.open?.file.versionId ?? null,
           ...(isLevel(session.commentsLevel) ? { level: session.commentsLevel } : {}),
           ...(typeof userId === 'string' && userId ? { myUserId: userId } : {}),
+          frame: true,
         }
       }),
     onSaved: (handler: (payload: CommentsSavedPayload) => void) =>
       version.onSaved((saved) => handler(saved)),
     onReveal: (handler: (payload: CommentsRevealPayload) => unknown) =>
       // on the web the handler may answer boolean | Promise<boolean>: true = this panel owns the id
-      frameRevealRouter(client).addEditor((commentId) =>
-        handler({ path: version.current().path ?? '', commentId }),
+      // `last` is always set here (desktop pushes never carry it): the editor shows its S15 line on a miss only then
+      frameRevealRouter(client).addEditor((commentId, { last }) =>
+        handler({ path: version.current().path ?? '', commentId, last }),
       ),
   }
 }
@@ -134,6 +136,9 @@ export async function installFrameComments(
   }
   if (!commentsAccess({ capabilities: session.capabilities ?? {} }).enabled) return null
   const api = createFrameCommentsApi(client, hooks)
+  // the editor serving the anchored comments registers its onReveal owner later: the reveal router
+  // waits for it instead of answering revealed:false for an id the editor owns
+  frameRevealRouter(client).expectEditor()
   target[COMMENTS_BRIDGE_KEY] = api
   return api
 }

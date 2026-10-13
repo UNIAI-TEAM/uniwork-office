@@ -97,6 +97,11 @@ export interface MentionsSearchInput extends CommentsDocRef {
 export interface CommentsRevealPayload {
   path: string
   commentId: string
+  /**
+   * Web frame only (set by the frame comments API, never by a desktop push or `parseCommentsReveal`):
+   * true when no other reveal owner is asked after this editor, so it shows its S15 line on a miss.
+   */
+  last?: boolean
 }
 
 /** the caller's effective level on the document (contract-collab §10) */
@@ -115,6 +120,11 @@ export interface CommentsContextResult {
   level?: CommentsLevel
   /** the signed-in UniWork user id ("mine" only, never a permission) */
   myUserId?: string
+  /**
+   * Web frame only (set by the frame comments API, never by desktop main): editors skip the
+   * desktop poll there, since the frame reloads on `comments.changed` (addendum §4.7).
+   */
+  frame?: true
 }
 
 /** main pushes this after a Save of `path` settled with a commit receipt */
@@ -209,10 +219,6 @@ export function readCommentsPath(payload: unknown): string | null {
   return path
 }
 
-function isLevel(value: unknown): value is CommentsLevel {
-  return value === 'view' || value === 'edit' || value === 'manage'
-}
-
 /**
  * `context`: only the path is read; a document or version id the renderer adds
  * is dropped (main resolves both from the binding)
@@ -229,23 +235,6 @@ export function parseCommentsSaved(payload: unknown): CommentsSavedPayload | nul
   const { versionId } = payload as Record<string, unknown>
   if (!isId(versionId)) return null
   return { path, versionId }
-}
-
-/**
- * A validated context answer, or null when malformed. An unknown level is
- * dropped (it reads as "unknown", never as a grant).
- */
-export function parseCommentsContextResult(value: unknown): CommentsContextResult | null {
-  if (!isRecord(value)) return null
-  const { documentId, versionId, level, myUserId } = value
-  if (!isId(documentId)) return null
-  if (versionId !== null && !isId(versionId)) return null
-  return {
-    documentId,
-    versionId,
-    ...(isLevel(level) ? { level } : {}),
-    ...(isId(myUserId) ? { myUserId } : {}),
-  }
 }
 
 /** `comments.list`: kind is optional, sinceToken a bounded opaque token */

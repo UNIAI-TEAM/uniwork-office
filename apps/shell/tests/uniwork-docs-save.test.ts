@@ -1943,6 +1943,39 @@ describe('the comments context of a bound copy (G8-12 §3.1)', () => {
     expect(ctx.service.commentContext(path)).toMatchObject({ versionId: 'v4' })
   })
 
+  it('a 403 save downgrades the level to view, also for a binding written before levels existed', async () => {
+    const server = fakeServer({ bytes: enc('v3'), myLevel: 'manage' })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    // an old binding: no `level` field
+    const file = join(path, '..', BINDING_FILE)
+    const raw = JSON.parse(readFileSync(file, 'utf8'))
+    delete raw.level
+    writeFileSync(file, JSON.stringify(raw))
+    expect(binding(path).level).toBeUndefined()
+    writeFileSync(path, 'v4')
+    server.faults.push({ route: 'commit', kind: 403, code: 'forbidden' })
+    await ctx.service.save(path)
+    expect(binding(path)).toMatchObject({ access: 'view', level: 'view' })
+    expect(ctx.service.commentContext(path)).toMatchObject({ level: 'view' })
+  })
+
+  it('a view-ticket copy caps the comments level at view', async () => {
+    const server = fakeServer({ bytes: enc('v3'), myLevel: 'manage' })
+    const ctx = setup(server)
+    const opened = await ctx.service.openFromServer(DOC, {
+      organizationId: 'org_launch',
+      workspaceId: 'ws_launch',
+      title: 'Q4 plan',
+      operation: 'view' as const,
+      version: 3,
+      revision: '41',
+      downloadPath: `/api/v1/documents/${DOC}/download?version=3`,
+    } as never)
+    expect(binding(opened.path)).toMatchObject({ access: 'view', level: 'view' })
+    expect(ctx.service.commentContext(opened.path)).toMatchObject({ level: 'view' })
+  })
+
   it('a conflicted or failed Save pushes nothing and keeps the open version', async () => {
     const server = fakeServer({ bytes: enc('v3') })
     const ctx = setup(server)
