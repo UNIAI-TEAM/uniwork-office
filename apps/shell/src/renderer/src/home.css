@@ -8787,13 +8787,27 @@ html[dir='rtl'] .quick-title-row {
 }
 
 /* row "…" menu */
+/* a sibling of the option inside the row item (like the Details button), parked left of that button */
 .uw-row-menu {
-  position: relative;
-  flex-shrink: 0;
+  position: absolute;
+  top: 0;
+  right: 40px;
+  bottom: 0;
+  width: 28px;
 }
 
-.uw-pick-row:hover .uw-row-menu-btn,
-.uw-pick-row.active .uw-row-menu-btn {
+.uw-row-menu-btn {
+  right: 0;
+}
+
+/* room for the menu button beside the Details button */
+.uw-pick-item:has(> .uw-row-menu) > .uw-pick-row {
+  padding-right: 80px;
+}
+
+.uw-pick-item:hover .uw-row-menu-btn,
+.uw-pick-item:focus-within .uw-row-menu-btn,
+.uw-pick-item:has(> .uw-pick-row.active) .uw-row-menu-btn {
   opacity: 1;
 }
 
@@ -8847,7 +8861,7 @@ html[dir='rtl'] .quick-title-row {
 }
 
 /* Restore is the only action of an archived row: always visible, not on hover only */
-.uw-pick-row.archived .uw-row-menu-btn {
+.uw-pick-item:has(> .uw-pick-row.archived) .uw-row-menu-btn {
   opacity: 1;
 }
 
@@ -8927,5 +8941,14 @@ html[dir='rtl'] .quick-title-row {
 
   .uw-row-menu-btn {
     opacity: 1;
+  }
+
+  .uw-row-menu {
+    right: 56px;
+    width: 44px;
+  }
+
+  .uw-pick-item:has(> .uw-row-menu) > .uw-pick-row {
+    padding-right: 108px;
   }
 }

@@ -141,7 +141,9 @@ async function render(docs: LibraryDocRow[]) {
 
 const rows = () => Array.from(host.querySelectorAll<HTMLElement>('.uw-pick-row'))
 const rowOf = (title: string) => rows().find((r) => r.textContent?.includes(title))!
-const menuButton = (r: HTMLElement) => r.querySelector<HTMLButtonElement>('.uw-row-menu-btn')
+// the menu sits beside the option in the row item (like Details), never inside the role=option element
+const menuButton = (r: HTMLElement) =>
+  r.closest('.uw-pick-item')?.querySelector<HTMLButtonElement>('.uw-row-menu-btn') ?? null
 const modal = () => host.querySelector<HTMLElement>('.modal.uw-act')
 const buttonByText = (scope: ParentNode, text: string) =>
   Array.from(scope.querySelectorAll<HTMLButtonElement>('button')).find(
@@ -402,6 +404,7 @@ describe('S18 row menu', () => {
     expect(viewer.querySelector('[aria-disabled="true"] .uw-row-menu-btn')).toBeNull()
     const editor = menuButton(rowOf('Editor.docx'))!
     expect(editor.getAttribute('aria-haspopup')).toBe('menu')
+    expect(editor.closest('[role="option"]')).toBeNull()
     expect(editor.getAttribute('aria-label')).toBe('More actions for “Editor.docx”')
     await click(editor)
     const items = Array.from(host.querySelectorAll('[role="menuitem"]')).map((i) => i.textContent)
