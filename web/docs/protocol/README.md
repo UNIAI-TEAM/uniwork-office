@@ -53,40 +53,43 @@ gets no `init` within its retry budget (40 × 500 ms), or is opened top-level (`
 | `file.renamed`      | event   | {file: FileMeta}                                                                                                                                                                                                                                           |
 | `doc.remoteVersion` | event   | {document_id, revision (decimal), version_id, saved_at, author_name?} (additive, X-02)                                                                                                                                                                     |
 | `cancel`            | event   | {id} — abort a host→frame request                                                                                                                                                                                                                          |
+| `comments.changed`  | event   | {document_id} — reload the comment list (additive, G8-08; see "Server comments")                                                                                                                                                                           |
+| `comments.reveal`   | request | {comment_id} → {revealed} (additive, G8-08; only after an InitAck with `comments`)                                                                                                                                                                         |
 
 ### Frame → host
 
-| type                   | kind    | payload → result                                                                        |
-| ---------------------- | ------- | --------------------------------------------------------------------------------------- |
-| `ready`                | event   | {protocolVersion, frameVersion?, capabilities, instanceId?, module?}                    |
-| `token.refresh`        | request | {reason: 'expiring' \| 'unauthorized'} → {token, tokenExpiresAt}                        |
-| `api.open`             | request | {fileId, versionId?} → `OpenPayload` + {versionChanged?} (head only; see below)         |
-| `api.save`             | request | {fileId, data, etag?, auto?} → `SaveResult` (etag mismatch → `conflict`)                |
-| `api.saveAs`           | request | {name, data, sourceFileId?, folderId?, silent?} → `SaveResult`                          |
-| `api.recents`          | request | {limit?} → {files: FileMeta[]}                                                          |
-| `api.export`           | request | {format: 'pdf' \| 'html', fileId?, data?, html?, geometry?} → {data, mimeType, name?}   |
-| `api.attachments.add`  | request | {files: UploadItem[]} → {accepted, rejected}                                            |
-| `api.images.upload`    | request | UploadItem + {fileId?} → {imageId, url}                                                 |
-| `file.pick`            | request | {purpose: 'open' \| 'insert', accept?} → {file: OpenPayload \| null}                    |
-| `image.fetch`          | request | {url (http/s)} → {image: {base64, mime} \| null}                                        |
-| `convert.altChunkHtml` | request | {html} → {data: ArrayBuffer \| null}                                                    |
-| `app.open`             | request | {feature?} → {outcome: 'launched' \| 'installer' \| 'unavailable'} (cap `desktopOpen`)  |
-| `api.assets.resolve`   | request | {fileId?, paths: string[] (1..50)} → {assets: Record<path, url>} (Markdown/HTML frames) |
-| `api.download`         | request | {data} → {delivered: true} (cap `download`, additive, X-02; see below)                  |
-| `dirty`                | event   | {dirty} (client de-duplicates)                                                          |
-| `title`                | event   | {title}                                                                                 |
-| `modal`                | event   | {open} — a frame dialog is open; the host may dim its own chrome (advisory, additive)   |
-| `resize`               | event   | {height} (CSS px, content height)                                                       |
-| `saved`                | event   | {file, versionId?, initiatedByFrame}                                                    |
-| `error`                | event   | {error: ProtocolErrorShape, fatal}                                                      |
-| `cancel`               | event   | {id} — abort a frame→host request                                                       |
-| `aiRun`                | event   | {state: 'running' \| 'idle', run_id?} — an AI turn started / ended (additive, X-02)     |
+| type                            | kind    | payload → result                                                                        |
+| ------------------------------- | ------- | --------------------------------------------------------------------------------------- |
+| `ready`                         | event   | {protocolVersion, frameVersion?, capabilities, instanceId?, module?}                    |
+| `token.refresh`                 | request | {reason: 'expiring' \| 'unauthorized'} → {token, tokenExpiresAt}                        |
+| `api.open`                      | request | {fileId, versionId?} → `OpenPayload` + {versionChanged?} (head only; see below)         |
+| `api.save`                      | request | {fileId, data, etag?, auto?} → `SaveResult` (etag mismatch → `conflict`)                |
+| `api.saveAs`                    | request | {name, data, sourceFileId?, folderId?, silent?} → `SaveResult`                          |
+| `api.recents`                   | request | {limit?} → {files: FileMeta[]}                                                          |
+| `api.export`                    | request | {format: 'pdf' \| 'html', fileId?, data?, html?, geometry?} → {data, mimeType, name?}   |
+| `api.attachments.add`           | request | {files: UploadItem[]} → {accepted, rejected}                                            |
+| `api.images.upload`             | request | UploadItem + {fileId?} → {imageId, url}                                                 |
+| `file.pick`                     | request | {purpose: 'open' \| 'insert', accept?} → {file: OpenPayload \| null}                    |
+| `image.fetch`                   | request | {url (http/s)} → {image: {base64, mime} \| null}                                        |
+| `convert.altChunkHtml`          | request | {html} → {data: ArrayBuffer \| null}                                                    |
+| `app.open`                      | request | {feature?} → {outcome: 'launched' \| 'installer' \| 'unavailable'} (cap `desktopOpen`)  |
+| `api.assets.resolve`            | request | {fileId?, paths: string[] (1..50)} → {assets: Record<path, url>} (Markdown/HTML frames) |
+| `api.download`                  | request | {data} → {delivered: true} (cap `download`, additive, X-02; see below)                  |
+| `dirty`                         | event   | {dirty} (client de-duplicates)                                                          |
+| `title`                         | event   | {title}                                                                                 |
+| `modal`                         | event   | {open} — a frame dialog is open; the host may dim its own chrome (advisory, additive)   |
+| `resize`                        | event   | {height} (CSS px, content height)                                                       |
+| `saved`                         | event   | {file, versionId?, initiatedByFrame}                                                    |
+| `error`                         | event   | {error: ProtocolErrorShape, fatal}                                                      |
+| `cancel`                        | event   | {id} — abort a frame→host request                                                       |
+| `aiRun`                         | event   | {state: 'running' \| 'idle', run_id?} — an AI turn started / ended (additive, X-02)     |
+| `comments.*`, `mentions.search` | request | server comments (additive, G8-08, cap `comments`); see "Server comments" below          |
 
 `api.*`, `file.pick`, `image.fetch` and `convert.altChunkHtml` are proxied by the host's `api` handlers; a type
 without a handler answers `unsupported` (e.g. AI-adjacent calls stay unavailable on the web).
 
 Capabilities: `save`, `saveAs`, `recents`, `filePick`, `print`, `exportPdf`, `exportHtml`, `attachments`, `images`,
-`ai`, and (additive, CONTRACT C16) `webSearch`, `imageSearch`, `imageGeneration`, and (additive, X-02) `download`, `uniworkAi`. The effective set is the frame's ∩
+`ai`, and (additive, CONTRACT C16) `webSearch`, `imageSearch`, `imageGeneration`, and (additive, X-02) `download`, `uniworkAi`, and (additive, G8-08) `comments`. The effective set is the frame's ∩
 the host's grant. `desktopOpen` (additive, default false) is the "Open in desktop app" grant, see "Open in desktop app (`app.open`)" below. The three cloud-tool keys only count together with `ai`; see "AI (web)" below. The frame hides File > Open / Ctrl+O unless `filePick`
 is granted (grant it only with an `api` handler for `file.pick`) and stops asking for recents without `recents`.
 
@@ -124,6 +127,55 @@ URL must widen `connect-src` in the CSP it serves (`csp.json`) for that origin.
 - `uniworkAi`: UniWork AI in the AI panel. The frame claims it (`AI_FRAME_CAPABILITIES`) once the adapter exists
   (G6-05); until then it is `false` whatever the host grants.
 - `save` answers keep the existing codes and `SaveResult`; `PROTOCOL_VERSION` stays 1.
+
+### Server comments (`comments`, additive, G8-08)
+
+Source of truth: dev-uniwork `docs/office/g5g6g7/contract-collab.md` §2 (routes), §3 (body), §6 (`list_token`), §9
+(error table), §10 (this protocol), OQ-C12. `PROTOCOL_VERSION` stays 1; everything is optional.
+
+- Capability `comments`: the host grants it only for a document bound to UniWork whose user has at least `view`. The
+  frame sends `comments.*` / `mentions.search` only with the effective key; `client.request` refuses them locally with
+  `unsupported` (nothing is posted) when it is missing, so a new frame on an old host just hides server mode.
+- `init.user.id?`: recognises "my comments" (`author_id`) only, never an authorisation input.
+  `init.commentsLevel?: 'view' | 'edit' | 'manage'` (the server's `my_level`): a host granting `comments` must send it
+  (`checkInitComments(init)` returns the `malformed` host error, `details.code = 'comments_level_missing'`). The frame
+  still accepts such an init. `commentsAccess(session, {forbidden?})` + `canActOnComment(access, comment, action)`
+  hold the panel rules: `view` writes nothing; `edit` = composer, edit/delete own, resolve/reopen; `manage` = also
+  edit/delete of others; missing level = composer and actions on own comments only, never on others; a 403 from the
+  server (`forbidden: true`) turns the panel read-only; a tombstone takes no action.
+- Frame → host requests (field names are the server's, bodies forwarded unchanged so a body with mention tokens and
+  Markdown round-trips byte for byte):
+
+  | type                 | payload                                                                    | result                                      |
+  | -------------------- | -------------------------------------------------------------------------- | ------------------------------------------- |
+  | `comments.list`      | {kind?, since_token?}                                                      | {comments, mentions, list_token, unchanged} |
+  | `comments.create`    | {kind, parent_id?, body, anchor?, base_version_id?}                        | {comment}                                   |
+  | `comments.update`    | {comment_id, body}                                                         | {comment}                                   |
+  | `comments.delete`    | {comment_id}                                                               | {outcome: 'tombstoned' \| 'removed'}        |
+  | `comments.resolve`   | {comment_id}                                                               | {comment}                                   |
+  | `comments.reopen`    | {comment_id}                                                               | {comment}                                   |
+  | `comments.revisions` | {comment_id}                                                               | {revisions}                                 |
+  | `comments.anchors`   | {version_id, anchors: [{comment_id, anchor, state: exact\|lost}]} (1..500) | {updated, skipped, list_token}              |
+  | `mentions.search`    | {q, limit?}                                                                | {candidates}                                |
+
+  `anchor` needs `base_version_id`; `unchanged: true` (since_token = current token) means keep the held comments and
+  mentions, otherwise replace the whole list. Never use the `comments.anchors` `list_token` as a `since_token`.
+
+- Errors: every host maps the UniWork API answer with `commentsErrorFromHttp(status, body)` (status 0 = no response):
+  409 `comment_deleted` → `conflict` + `details.code`, not retryable; 409 `idempotency_*` → `conflict` + `details.code`;
+  400 (`anchor_version_invalid`, `invalid_request`) → `malformed` + `details.code`; 413 → `too_large` + `details.code`;
+  401/403/404 → `unauthorized`/`forbidden`/`not_found`; 429 → `rate_limited` (retryable); 5xx → `internal`
+  (retryable); no response → `network` (retryable). A frame reads `details.code` before `code`: `comment_deleted`
+  never takes the document reload/retry path, keeps the composer draft and reloads the comment list only.
+- `comments.changed {document_id}` (host → frame, ids only): `host.notifyCommentsChanged(id)` sends it only to a frame
+  whose InitAck has `comments`; `client.onCommentsChanged` drops other documents.
+- `comments.reveal {comment_id}` → `{revealed}`: `host.revealComment(id)` rejects `unsupported` without sending when
+  the InitAck lacks `comments` (the web falls back to its own panel). The frame (`client.handleCommentsReveal`) holds a
+  reveal that arrives before the first successful `comments.list` and answers right after it; a failing list, or no
+  list within `COMMENTS_REVEAL_WAIT_MS` (10 s), answers `not_ready` (retryable). The host's reveal timeout is never
+  below 15 s, and it retries once on `not_ready` / `timeout`, after 2 s or on the next `notifyCommentsChanged`; a
+  second failure rejects and the caller shows nothing. `revealed: false` = the list is loaded and has no such comment
+  (the frame shows that state itself).
 
 ### Open in desktop app (`app.open`, additive)
 

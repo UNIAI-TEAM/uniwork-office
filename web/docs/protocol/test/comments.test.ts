@@ -713,6 +713,7 @@ describe('comments.reveal ordering and wait limit', () => {
     await flush(60)
     // the frame said not_ready at once (last list failed, none in flight); the host waits
     const second = client.request('comments.list', {})
+    await flush(60) // the second list reached the host handler
     release(LIST)
     await second
     host.notifyCommentsChanged('doc-1') // wakes the host's retry before the 2 s
@@ -792,6 +793,7 @@ describe('G8-08 new frame -> old host', () => {
     const s = await client.whenInitialized()
     expect(s.capabilities.comments).toBe(false)
     expect(commentsAccess(s)).toMatchObject({ enabled: false, canCreate: false })
+    await flush() // the InitAck went out
     const before = frameWin.sent.length
     await expect(client.request('comments.list', {})).rejects.toMatchObject({ code: 'unsupported' })
     await flush()
