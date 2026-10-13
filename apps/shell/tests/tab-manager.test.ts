@@ -1302,3 +1302,61 @@ describe('detach / attach (Open in New Window, tear-off, dock)', () => {
     expect(manager.list()).toHaveLength(1)
   })
 })
+
+describe('the Discussion panel narrows the active editor view (G8-11 D1)', () => {
+  const full = { x: 0, y: TAB_STRIP_HEIGHT, width: WINDOW_WIDTH, height: WINDOW_HEIGHT - TAB_STRIP_HEIGHT }
+
+  it('takes the clamped panel width off the right edge and restores it on close', () => {
+    manager.openDocsTab()
+    const view = lastCreatedView(createDocsView)
+    manager.setDiscussionPanel({ open: true, width: 320 })
+    expect(view.setBounds).toHaveBeenLastCalledWith({ ...full, width: WINDOW_WIDTH - 320 })
+    // wider than the window allows: the editor keeps its minimum (800 - 360)
+    manager.setDiscussionPanel({ open: true, width: 1000 })
+    expect(view.setBounds).toHaveBeenLastCalledWith({ ...full, width: 360 })
+    // narrower than the panel minimum: clamped up to 280
+    manager.setDiscussionPanel({ open: true, width: 10 })
+    expect(view.setBounds).toHaveBeenLastCalledWith({ ...full, width: WINDOW_WIDTH - 280 })
+    manager.setDiscussionPanel({ open: false, width: 320 })
+    expect(view.setBounds).toHaveBeenLastCalledWith(full)
+  })
+
+  it('re-applies on tab switch and on window resize', () => {
+    const docsId = manager.openDocsTab()
+    const docsView = lastCreatedView(createDocsView)
+    manager.openSheetsTab()
+    const sheetsView = lastCreatedView(createSheetsView)
+    manager.setDiscussionPanel({ open: true, width: 300 })
+    expect(sheetsView.setBounds).toHaveBeenLastCalledWith({ ...full, width: WINDOW_WIDTH - 300 })
+    manager.activateTab(docsId)
+    expect(docsView.setBounds).toHaveBeenLastCalledWith({ ...full, width: WINDOW_WIDTH - 300 })
+
+    shellWindow.getContentBounds = () => ({ x: 0, y: 0, width: 1200, height: WINDOW_HEIGHT })
+    manager.layout()
+    expect(docsView.setBounds).toHaveBeenLastCalledWith({ ...full, width: 1200 - 300 })
+    // a window too narrow for both leaves the editor alone
+    shellWindow.getContentBounds = () => ({ x: 0, y: 0, width: 500, height: WINDOW_HEIGHT })
+    manager.layout()
+    expect(docsView.setBounds).toHaveBeenLastCalledWith({ ...full, width: 500 })
+  })
+
+  it('a full-bleed view (slideshow, HTML fullscreen) ignores the panel', () => {
+    manager.openSlidesTab()
+    const view = lastCreatedView(createSlidesView)
+    manager.setDiscussionPanel({ open: true, width: 320 })
+    view.webContents.listeners.get('enter-html-full-screen')!()
+    expect(view.setBounds).toHaveBeenLastCalledWith({
+      x: 0,
+      y: 0,
+      width: WINDOW_WIDTH,
+      height: WINDOW_HEIGHT,
+    })
+  })
+
+  it('a malformed width closes nothing open by accident and narrows nothing', () => {
+    manager.openDocsTab()
+    const view = lastCreatedView(createDocsView)
+    manager.setDiscussionPanel({ open: true, width: Number.NaN })
+    expect(view.setBounds).toHaveBeenLastCalledWith(full)
+  })
+})
