@@ -250,6 +250,7 @@ Bám `uniwork:packages/views/home/home-view.tsx`.
 
 ## 9. Rủi ro và bước đầu tiên
 1. Chưa xác minh token desktop được chấp nhận ở `/home` và `/my-tasks`. Kế hoạch mở đầu bằng một spike gọi thử với server dev. Nếu bị từ chối, dừng lại và xử lý phía server trước.
+   - Kết quả spike (2026-10-13, kiểm tĩnh trên `40dd0e2fd`): các route /home, /my-tasks, /task-statuses, /calendar/events, /people/{id}, PATCH /tasks/{id}, POST /workspaces/{ws}/tasks cùng nhóm RequireAuthWithDevice với /workspaces và /documents (router.go, nhóm `authed`); không route nào thêm middleware riêng, và /auth/desktop/exchange cấp token bằng cùng `TokenMinter.MintSession` (Web=false, đi qua kiểm tra thiết bị). Chưa probe trực tiếp (không có server dev); người dùng cần chạy probe trước khi phát hành. Kết luận: tiếp tục.
 2. Gỡ `edu-core` khi chưa chuyển `hub.ts` sẽ làm vỡ AI gateway. Phải chuyển trước, xóa sau.
 3. Đổi accent ảnh hưởng toàn bộ chrome của shell. Cần rà ảnh chụp các màn chính ở cả light và dark.
 4. Bộ quy tắc rebrand và sync upstream phải được cập nhật cùng đợt (mục 4.3).
