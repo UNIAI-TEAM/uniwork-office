@@ -18,6 +18,7 @@ import {
 } from './draft-recovery'
 import { createFakeIdb } from './testing/fake-idb'
 import { bridgeDraftRecovery } from '../../modules/shared/recovery-prompt'
+import { frameDocVersion } from '../../modules/shared/comments/doc-version'
 
 const DOCX = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 1, 2, 3])
 const flush = () => new Promise((r) => setTimeout(r, 0))
@@ -1517,5 +1518,28 @@ describe('new version on UniWork (doc.remoteVersion)', () => {
     await choose('conflict', 'close')
     expect(await res).toMatchObject({ ok: false, error: { code: 'forbidden' } })
     expect(barText()).toBe(wt('uwRemoteOrgBlockedWeb', { reason: wt('uwReasonSuspended') }))
+  })
+})
+
+describe('the comments version notifier (G8-12 §3.3)', () => {
+  it('the open file and every landed save reach frameDocVersion; only the save is announced', async () => {
+    const heard: unknown[] = []
+    const off = frameDocVersion.onSaved((saved) => heard.push(saved))
+    try {
+      const doc = await bootWith()
+      expect(frameDocVersion.current()).toEqual({ path: doc.path, versionId: 'v1' })
+      expect(heard).toEqual([])
+      expect(await api.saveDocx(doc.path, buf([9]), false)).toEqual({ ok: true })
+      expect(heard).toEqual([{ path: doc.path, versionId: 'v2' }])
+      expect(frameDocVersion.current()).toEqual({ path: doc.path, versionId: 'v2' })
+      // a refused save announces nothing
+      mock.bumpRemote('f1')
+      const pending = api.saveDocx(doc.path, buf([5]))
+      await choose('conflict', 'cancel')
+      await pending
+      expect(heard).toHaveLength(1)
+    } finally {
+      off()
+    }
   })
 })

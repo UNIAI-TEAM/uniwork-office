@@ -525,6 +525,8 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     pushLocks: () => push(UNIWORK_DOC_CHANNELS.locksChanged, service.currentLocks()),
     reveal: () => wiring.reveal(),
     revealComment: (path, commentId) => comments?.reveal(path, commentId),
+    // G8-12: a settled Save tells the editor's comment panel its new version
+    notifySaved: (path, versionId) => comments?.saved(path, versionId),
   })
 
   // G8-08: the UniWork comments IPC (one handler per frame request kind) and
@@ -546,6 +548,13 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     },
     // R1-2: the sender's own path scopes the pending-reveal pull
     shownPath: (sender) => wiring.commentsPathFor?.(sender) ?? null,
+    // G8-12: the saved push goes to the loaded editor showing the path only; a
+    // page still loading reads the version through context() once it mounts
+    sendSaved: (payload) => {
+      const target = wiring.commentsTarget?.(payload.path)
+      if (!target || target.isDestroyed() || target.isLoadingMainFrame()) return
+      target.send(COMMENTS_CHANNELS.saved, payload)
+    },
     // G8-11: the shell Discussion panel's bridge, served only for the shell
     // webContents and the open tabs of its window
     ...(wiring.discussionTabPaths

@@ -9,7 +9,10 @@ import {
   COMMENTS_BRIDGE_KEY,
   COMMENTS_CHANNELS,
   parseCommentsAnchorsInput,
+  parseCommentsContextInput,
+  parseCommentsContextResult,
   parseCommentsCreateInput,
+  parseCommentsSaved,
   parseCommentsIdInput,
   parseCommentsListInput,
   parseCommentsReveal,
@@ -41,6 +44,8 @@ describe('the comments IPC channel contract', () => {
       searchMentions: 'uniwork:comments:search-mentions',
       reveal: 'uniwork:comments:reveal',
       revealPending: 'uniwork:comments:reveal:pending',
+      context: 'uniwork:comments:context',
+      saved: 'uniwork:comments:saved',
     })
     expect(COMMENTS_BRIDGE_KEY).toBe('uniworkComments')
   })
@@ -393,5 +398,61 @@ describe('the discussion bridge contract (G8-11)', () => {
     expect(clampDiscussionPanelWidth(320, 500)).toBe(500 - editorMin)
     expect(clampDiscussionPanelWidth(320, 300)).toBe(0)
     expect(clampDiscussionPanelWidth(Number.NaN, 1400)).toBe(0)
+  })
+})
+
+describe('the comments context + saved seam (G8-12 §3.1)', () => {
+  it('names the two new channels next to the others', () => {
+    expect(COMMENTS_CHANNELS.context).toBe('uniwork:comments:context')
+    expect(COMMENTS_CHANNELS.saved).toBe('uniwork:comments:saved')
+  })
+
+  it('context takes only the path; anything the renderer adds is dropped', () => {
+    expect(parseCommentsContextInput({ path: '/w/Plan.docx' })).toEqual({ path: '/w/Plan.docx' })
+    // a renderer-supplied document or version id is never trusted
+    expect(
+      parseCommentsContextInput({ path: '/w/Plan.docx', documentId: 'd', versionId: 'v' }),
+    ).toEqual({ path: '/w/Plan.docx' })
+    expect(parseCommentsContextInput({ path: '' })).toBeNull()
+    expect(parseCommentsContextInput(null)).toBeNull()
+    expect(parseCommentsContextInput('/w/Plan.docx')).toBeNull()
+  })
+
+  it('a saved push needs a path and a bounded version id', () => {
+    expect(parseCommentsSaved({ path: '/w/Plan.docx', versionId: 'ver_4' })).toEqual({
+      path: '/w/Plan.docx',
+      versionId: 'ver_4',
+    })
+    expect(parseCommentsSaved({ path: '/w/Plan.docx', versionId: 'ver_4', extra: 1 })).toEqual({
+      path: '/w/Plan.docx',
+      versionId: 'ver_4',
+    })
+    expect(parseCommentsSaved({ path: '/w/Plan.docx' })).toBeNull()
+    expect(parseCommentsSaved({ path: '/w/Plan.docx', versionId: '' })).toBeNull()
+    expect(parseCommentsSaved({ path: '/w/Plan.docx', versionId: 'x'.repeat(129) })).toBeNull()
+    expect(parseCommentsSaved({ path: '', versionId: 'v' })).toBeNull()
+    expect(parseCommentsSaved([])).toBeNull()
+  })
+
+  it('a context result keeps documentId, versionId (or null), a known level and myUserId', () => {
+    expect(
+      parseCommentsContextResult({
+        documentId: 'd1',
+        versionId: 'v3',
+        level: 'manage',
+        myUserId: 'u1',
+      }),
+    ).toEqual({ documentId: 'd1', versionId: 'v3', level: 'manage', myUserId: 'u1' })
+    expect(parseCommentsContextResult({ documentId: 'd1', versionId: null })).toEqual({
+      documentId: 'd1',
+      versionId: null,
+    })
+    // an unknown level reads as "unknown" (own-comments-only rule), never as a grant
+    expect(
+      parseCommentsContextResult({ documentId: 'd1', versionId: 'v', level: 'owner' }),
+    ).toEqual({ documentId: 'd1', versionId: 'v' })
+    expect(parseCommentsContextResult({ documentId: '', versionId: 'v' })).toBeNull()
+    expect(parseCommentsContextResult({ documentId: 'd1' })).toBeNull()
+    expect(parseCommentsContextResult({ documentId: 'd1', versionId: 3 })).toBeNull()
   })
 })

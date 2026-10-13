@@ -27,6 +27,11 @@ export interface DocumentDetail {
     filename: string
     mimeType: string
     version: number
+    /**
+     * G8-12: the server version id of the current bytes (`file.version_id`),
+     * the comments anchor base; absent when the server sent none
+     */
+    versionId?: string
     checksumSha256: string
     sizeBytes: number
   }
@@ -194,6 +199,10 @@ export function parseDetail(raw: unknown): DocumentDetail {
   const file = record(doc.file)
   const myLevel = doc.my_level
   if (myLevel !== undefined && myLevel !== null && typeof myLevel !== 'string') bad()
+  // G8-12: optional - a missing or odd one only leaves the comments base unknown
+  const versionId = file.version_id
+  const knownVersionId =
+    typeof versionId === 'string' && versionId.length > 0 && versionId.length <= 128
   return {
     id: str(doc.id, 128),
     organizationId: str(doc.organization_id, 128),
@@ -207,6 +216,7 @@ export function parseDetail(raw: unknown): DocumentDetail {
       filename: str(file.filename),
       mimeType: typeof file.mime_type === 'string' ? file.mime_type : '',
       version: nonNegInt(file.version),
+      ...(knownVersionId ? { versionId } : {}),
       checksumSha256: checksum(file.checksum_sha256),
       sizeBytes: nonNegInt(file.size_bytes),
     },
