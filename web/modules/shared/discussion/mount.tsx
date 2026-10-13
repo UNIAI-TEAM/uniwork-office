@@ -32,6 +32,7 @@ import { FrameDiscussion, type FrameDiscussionHandle } from './FrameDiscussion'
 import { createEditorShield, type EditorShield } from './overlay'
 import { createFrameDiscussionSource } from './source'
 import { frameRevealRouter } from '../comments/reveal-router'
+import { announceFrameSidePanel, onFrameSidePanel } from '../comments/side-panel'
 
 /** what the mount needs from the frame client; the two comment hooks are absent on old ports and mocks */
 export type DiscussionPort = Pick<FramePort, 'whenInitialized' | 'request'> & {
@@ -106,12 +107,20 @@ function DiscussionRoot({ port, session, revealMissing, doc }: RootProps) {
       else h.controller().dismissNotice()
       return result.revealed
     })
+    // one side panel at a time: the editor's panel opening closes this one
+    const offSide = onFrameSidePanel(
+      'discussion',
+      () => handle.current?.close(),
+      doc.defaultView ?? undefined,
+    )
     return () => {
       offChanged?.()
       offReveal()
+      offSide()
       doc.defaultView?.removeEventListener('focus', onFocus)
     }
   }, [port, doc, revealMissing])
+  const announced = useRef(false)
 
   return (
     <FrameDiscussion
@@ -125,6 +134,10 @@ function DiscussionRoot({ port, session, revealMissing, doc }: RootProps) {
       onOpenChange={(open) => {
         doc.documentElement.classList.toggle(OPEN_CLASS, open)
         shield.current?.setOpen(open)
+        if (open !== announced.current) {
+          announced.current = open
+          announceFrameSidePanel('discussion', open, doc.defaultView ?? undefined)
+        }
       }}
     />
   )

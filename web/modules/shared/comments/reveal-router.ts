@@ -34,7 +34,8 @@ import {
 export type DiscussionRevealOwner = (commentId: string, ctx: { last: boolean }) => Promise<boolean>
 
 /** an editor panel's owner (the `onReveal` handler); anything but `true` reads as "not mine" */
-export type EditorRevealOwner = (commentId: string) => unknown
+/** `last`: no other owner is asked after this one, so a miss is shown by this panel (S15) */
+export type EditorRevealOwner = (commentId: string, ctx: { last: boolean }) => unknown
 
 /** the port slice the router registers with (the real frame client has it) */
 export interface RevealPort {
@@ -128,8 +129,10 @@ export function frameRevealRouter(port: RevealPort): FrameRevealRouter {
     }
     if (waitForEditor)
       editors = state.editors.length > 0 ? [...state.editors] : await whenEditor(signal)
-    for (const editor of editors) {
-      if ((await editor(commentId)) === true) return { revealed: true }
+    for (const [i, editor] of editors.entries()) {
+      if ((await editor(commentId, { last: i === editors.length - 1 })) === true) {
+        return { revealed: true }
+      }
     }
     return { revealed: false }
   }

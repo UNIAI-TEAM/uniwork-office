@@ -19,3 +19,9 @@ export {
   type FrameRevealRouter,
   type RevealPort,
 } from './reveal-router'
+export {
+  FRAME_SIDE_PANEL_EVENT,
+  announceFrameSidePanel,
+  onFrameSidePanel,
+  type FrameSidePanelDetail,
+} from './side-panel'

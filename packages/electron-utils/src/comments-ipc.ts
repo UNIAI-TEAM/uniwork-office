@@ -97,6 +97,11 @@ export interface MentionsSearchInput extends CommentsDocRef {
 export interface CommentsRevealPayload {
   path: string
   commentId: string
+  /**
+   * Web frame only (set by the frame comments API, never by a desktop push or `parseCommentsReveal`):
+   * true when no other reveal owner is asked after this editor, so it shows its S15 line on a miss.
+   */
+  last?: boolean
 }
 
 /** the caller's effective level on the document (contract-collab §10) */

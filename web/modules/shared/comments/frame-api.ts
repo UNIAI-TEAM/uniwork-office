@@ -111,8 +111,9 @@ export function createFrameCommentsApi(
       version.onSaved((saved) => handler(saved)),
     onReveal: (handler: (payload: CommentsRevealPayload) => unknown) =>
       // on the web the handler may answer boolean | Promise<boolean>: true = this panel owns the id
-      frameRevealRouter(client).addEditor((commentId) =>
-        handler({ path: version.current().path ?? '', commentId }),
+      // `last` is always set here (desktop pushes never carry it): the editor shows its S15 line on a miss only then
+      frameRevealRouter(client).addEditor((commentId, { last }) =>
+        handler({ path: version.current().path ?? '', commentId, last }),
       ),
   }
 }
