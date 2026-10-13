@@ -47,9 +47,8 @@ function fakeServer() {
   let seq = 0
   let token = 0
   const savedHandlers: Array<(p: { path: string; versionId: string }) => void> = []
-  const revealHandlers: Array<
-    (p: { path: string; commentId: string; last?: boolean }) => unknown
-  > = []
+  const revealHandlers: Array<(p: { path: string; commentId: string; last?: boolean }) => unknown> =
+    []
   const ok = <T>(value: T) => Promise.resolve({ ok: true as const, value })
   const stamp = () => `2026-10-13T10:00:${String(++seq).padStart(2, '0')}Z`
   const find = (id: string) => rows.find((r) => r.id === id)!
@@ -655,25 +654,19 @@ describe('server mode: one side panel at a time in the frame (V12-2)', () => {
     const server = fakeServer()
     const { closes } = await mount(server, true)
     await act(async () => {
-      window.dispatchEvent(
-        new CustomEvent(EVENT, { detail: { owner: 'editor', open: true } }),
-      )
-      window.dispatchEvent(
-        new CustomEvent(EVENT, { detail: { owner: 'discussion', open: false } }),
-      )
+      window.dispatchEvent(new CustomEvent(EVENT, { detail: { owner: 'editor', open: true } }))
+      window.dispatchEvent(new CustomEvent(EVENT, { detail: { owner: 'discussion', open: false } }))
     })
     expect(closes).not.toHaveBeenCalled()
     await act(async () => {
-      window.dispatchEvent(
-        new CustomEvent(EVENT, { detail: { owner: 'discussion', open: true } }),
-      )
+      window.dispatchEvent(new CustomEvent(EVENT, { detail: { owner: 'discussion', open: true } }))
     })
     expect(closes).toHaveBeenCalledTimes(1)
     expect(el.querySelector('.collab-panel')).toBeNull()
   })
 })
 
-describe('server mode: the desktop poll is not the frame\'s (FE12-3)', () => {
+describe("server mode: the desktop poll is not the frame's (FE12-3)", () => {
   it('a window focus reloads the list on desktop and does not in the frame', async () => {
     const desktop = fakeServer()
     await mount(desktop, true)
