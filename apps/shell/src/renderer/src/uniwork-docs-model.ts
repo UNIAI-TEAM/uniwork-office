@@ -1,7 +1,9 @@
 import type {
+  AccountStatus,
   RecentEntry,
   UniworkDocErrorCode,
   UniworkDocListPage,
+  UniworkDocProperties,
   UniworkDocStatus,
   UniworkDocSummary,
   UniworkLaunchEvent,
@@ -378,6 +380,8 @@ export interface PickerState {
     error?: UniworkDocErrorCode
   }
   workspaceId: string | null
+  /** the chosen workspace's documents, or what was shared with me directly */
+  source: PickerSource
   /** committed (debounced) search text */
   query: string
   list: {
@@ -396,8 +400,15 @@ export interface PickerState {
   openError: UniworkDocErrorCode | null
 }
 
+/** where the picker lists documents from */
+export type PickerSource = 'workspace' | 'shared'
+
+/** the source select's value for "Shared with me" (never a workspace id) */
+export const SHARED_SOURCE_VALUE = '\u0000shared'
+
 export type PickerAction =
   | { type: 'workspaces-retry' }
+  | { type: 'select-shared' }
   | { type: 'workspaces-loaded'; result: UniworkResult<UniworkWorkspaceRef[]> }
   | { type: 'select-workspace'; id: string }
   | { type: 'set-query'; query: string }
@@ -419,6 +430,7 @@ export function initialPickerState(): PickerState {
   return {
     workspaces: { status: 'loading', items: [] },
     workspaceId: null,
+    source: 'workspace',
     query: '',
     list: { status: 'loading', docs: [], nextCursor: null, loadingMore: false, requestId: 0 },
     activeId: null,
@@ -497,16 +509,32 @@ export function pickerReducer(state: PickerState, action: PickerAction): PickerS
       }
     }
     case 'select-workspace':
-      if (action.id === state.workspaceId) return state
+      if (action.id === state.workspaceId && state.source === 'workspace') return state
       return {
         ...state,
         workspaceId: action.id,
+        source: 'workspace',
+        list: freshList(state.list),
+        activeId: null,
+        openError: null,
+      }
+    case 'select-shared':
+      // the shared list still needs a workspace: the server reads it in that context
+      if (state.source === 'shared' || !state.workspaceId) return state
+      return {
+        ...state,
+        source: 'shared',
         list: freshList(state.list),
         activeId: null,
         openError: null,
       }
     case 'set-query': {
       if (action.query === state.query) return state
+      if (state.source === 'shared') {
+        // filtered in place: the shared list has no server search
+        const next = { ...state, query: action.query, openError: null }
+        return { ...next, activeId: firstOpenable(visibleDocs(next)) }
+      }
       return {
         ...state,
         query: action.query,
@@ -540,6 +568,7 @@ export function pickerReducer(state: PickerState, action: PickerAction): PickerS
       }
       const page = action.result.value
       const docs = action.append ? [...state.list.docs, ...page.documents] : page.documents
+      const shown = visibleDocs({ ...state, list: { ...state.list, docs } })
       return {
         ...state,
         list: {
@@ -552,9 +581,9 @@ export function pickerReducer(state: PickerState, action: PickerAction): PickerS
           moreError: undefined,
         },
         activeId:
-          state.activeId && docs.some((d) => d.id === state.activeId && isOpenable(d))
+          state.activeId && shown.some((d) => d.id === state.activeId && isOpenable(d))
             ? state.activeId
-            : firstOpenable(docs),
+            : firstOpenable(shown),
       }
     }
     case 'load-more':
@@ -563,7 +592,7 @@ export function pickerReducer(state: PickerState, action: PickerAction): PickerS
       }
       return { ...state, list: { ...state.list, loadingMore: true, moreError: undefined } }
     case 'move-active':
-      return { ...state, activeId: moveActive(state.list.docs, state.activeId, action.to) }
+      return { ...state, activeId: moveActive(visibleDocs(state), state.activeId, action.to) }
     case 'set-active':
       return { ...state, activeId: action.id }
     case 'open-start':
@@ -581,6 +610,7 @@ export type PickerBody =
   | { kind: 'no-workspaces' }
   | { kind: 'error'; error: UniworkDocErrorCode; action: ErrorAction }
   | { kind: 'empty' }
+  | { kind: 'shared-empty' }
   | { kind: 'no-results'; query: string }
   | { kind: 'list' }
 
@@ -598,10 +628,23 @@ export function pickerBodyOf(state: PickerState): PickerBody {
     const error = list.error ?? 'server_error'
     return { kind: 'error', error, action: errorActionOf(error) }
   }
-  if (list.docs.length === 0) {
-    return state.query ? { kind: 'no-results', query: state.query } : { kind: 'empty' }
+  if (visibleDocs(state).length === 0) {
+    if (state.query) return { kind: 'no-results', query: state.query }
+    return state.source === 'shared' ? { kind: 'shared-empty' } : { kind: 'empty' }
   }
   return { kind: 'list' }
+}
+
+/**
+ * the rows the list shows: the server searches a workspace, while the shared
+ * list has no search on the server, so its loaded rows are filtered by title
+ */
+export function visibleDocs(
+  state: Pick<PickerState, 'source' | 'query' | 'list'>,
+): UniworkDocSummary[] {
+  if (state.source !== 'shared' || !state.query) return state.list.docs
+  const needle = state.query.toLocaleLowerCase()
+  return state.list.docs.filter((d) => d.title.toLocaleLowerCase().includes(needle))
 }
 
 /** retry what failed: the workspace list when that was it, else the document list */
@@ -640,4 +683,196 @@ export function pickerRowMeta(
   if (!time) return ''
   const name = doc.updatedByName?.trim()
   return name ? t('uwPickUpdatedBy', { name, time }) : t('uwPickUpdated', { time })
+}
+
+// ── Organization choice (after sign-in, Settings › Account) ─────────
+
+export type OrgMembership = 'active' | 'member_deactivated' | 'organization_suspended'
+
+/** one row of the organization step: what the renderer needs of an account organization */
+export interface OrgChoiceRow {
+  id: string
+  name: string
+  /** my role in the organization, as the server names it ('' when unknown) */
+  role: string
+  /** missing = active (older main builds send no membership) */
+  membership?: OrgMembership
+}
+
+/**
+ * The organization choice main reports with the account status. Read through
+ * one adapter so the field names of the IPC contract live in one place.
+ */
+export interface OrgChoiceModel {
+  /** several organizations and none chosen (or the remembered one is gone) */
+  needed: boolean
+  rememberedGone: boolean
+  /** the organization list could not be loaded */
+  loadError: boolean
+  rows: OrgChoiceRow[]
+}
+
+type OrgChoiceWire = {
+  org?: { id: string }
+  needsOrgChoice?: boolean
+  rememberedGone?: boolean
+  orgsError?: unknown
+  orgs?: Array<{
+    id: string
+    name: string
+    role?: string
+    myRole?: string
+    membership?: OrgMembership
+  }>
+}
+
+export function orgChoiceOf(status: AccountStatus | null): OrgChoiceModel {
+  const wire = (status ?? {}) as OrgChoiceWire
+  const rows = (wire.orgs ?? []).map((o) => ({
+    id: o.id,
+    name: o.name,
+    role: o.myRole ?? o.role ?? '',
+    membership: o.membership,
+  }))
+  // contract §2: "every organization locked" is not sent; main reports no
+  // choice and no org, and every row is locked, so the step shows the lock notice
+  const blocked = !wire.org && allOrgsBlocked(rows)
+  return {
+    needed: wire.needsOrgChoice === true || blocked,
+    rememberedGone: wire.rememberedGone === true,
+    loadError: Boolean(wire.orgsError),
+    rows,
+  }
+}
+
+/** reason a row cannot be chosen, or null when it can */
+export function orgBlockKey(org: Pick<OrgChoiceRow, 'membership'> | undefined): StringKey | null {
+  if (!org) return null
+  if (org.membership === 'organization_suspended') return 'uwOrgRowSuspended'
+  if (org.membership === 'member_deactivated') return 'uwOrgRowDeactivated'
+  return null
+}
+
+export function firstSelectableOrg(orgs: OrgChoiceRow[]): string | null {
+  return orgs.find((o) => orgBlockKey(o) === null)?.id ?? null
+}
+
+/** every organization is locked: the step turns into the lock notice */
+export function allOrgsBlocked(orgs: OrgChoiceRow[]): boolean {
+  return orgs.length > 0 && firstSelectableOrg(orgs) === null
+}
+
+/** arrow keys in the radio group step over locked rows and wrap; Home / End jump to the ends */
+export function moveOrgChoice(
+  orgs: OrgChoiceRow[],
+  current: string | null,
+  to: 'next' | 'prev' | 'first' | 'last',
+): string | null {
+  const ids = orgs.filter((o) => orgBlockKey(o) === null).map((o) => o.id)
+  if (ids.length === 0) return null
+  if (to === 'first') return ids[0]!
+  if (to === 'last') return ids[ids.length - 1]!
+  const at = current ? ids.indexOf(current) : -1
+  if (at < 0) return to === 'next' ? ids[0]! : ids[ids.length - 1]!
+  const step = to === 'next' ? 1 : -1
+  return ids[(at + step + ids.length) % ids.length]!
+}
+
+// ── Document details panel ──────────────────────────────
+
+/** what the server says I may do with a document (my_level) */
+export type UniworkAccessLevel = 'view' | 'edit' | 'manage'
+
+const ACCESS_KEYS: Record<UniworkAccessLevel, StringKey> = {
+  view: 'uwAccessView',
+  edit: 'uwAccessEdit',
+  manage: 'uwAccessManage',
+}
+
+export function accessKeyOf(level: string | null | undefined): StringKey | null {
+  return level && level in ACCESS_KEYS ? ACCESS_KEYS[level as UniworkAccessLevel] : null
+}
+
+/** a field the server did not send */
+export const MISSING_VALUE = '—'
+
+/** the details panel input: the fields of the properties read it shows (null = not sent) */
+export type DocInfoFields = Pick<
+  UniworkDocProperties,
+  | 'ownerName'
+  | 'createdByName'
+  | 'createdAt'
+  | 'updatedByName'
+  | 'updatedAt'
+  | 'myLevel'
+  | 'version'
+  | 'versionByName'
+>
+
+export interface DocInfoRow {
+  labelKey: StringKey
+  value: string
+}
+
+/** full date and time for the details panel ('' when the server sent no usable time) */
+export function formatFullWhen(iso: string | null, locale: string): string {
+  if (!iso) return ''
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return ''
+  try {
+    return new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(date)
+  } catch {
+    return date.toISOString().slice(0, 16).replace('T', ' ')
+  }
+}
+
+/** "Lan, 3 Oct 2026, 10:42" / just the name / just the time / "—" */
+function byAt(name: string | null, iso: string | null, t: TFunc, locale: string): string {
+  const who = name?.trim() ?? ''
+  const time = formatFullWhen(iso, locale)
+  if (who && time) return t('uwDocInfoByAt', { name: who, time })
+  return who || time || MISSING_VALUE
+}
+
+/** the dl rows of the details panel, in spine order; a field the server left out reads "—" */
+export function docInfoRows(info: DocInfoFields, t: TFunc, locale: string): DocInfoRow[] {
+  const access = accessKeyOf(info.myLevel)
+  const versionBy = info.versionByName?.trim() ?? ''
+  const version =
+    info.version && info.version > 0
+      ? versionBy
+        ? t('uwDocInfoVersionBy', { version: String(info.version), name: versionBy })
+        : String(info.version)
+      : MISSING_VALUE
+  return [
+    { labelKey: 'uwDocInfoOwner', value: info.ownerName?.trim() || MISSING_VALUE },
+    { labelKey: 'uwDocInfoCreated', value: byAt(info.createdByName, info.createdAt, t, locale) },
+    { labelKey: 'uwDocInfoUpdated', value: byAt(info.updatedByName, info.updatedAt, t, locale) },
+    { labelKey: 'uwDocInfoMyAccess', value: access ? t(access) : MISSING_VALUE },
+    { labelKey: 'uwDocInfoVersion', value: version },
+  ]
+}
+
+// ── Roles ───────────────────────────────────────────────
+
+const ROLE_KEYS: Record<string, StringKey> = {
+  owner: 'uwRoleOwner',
+  admin: 'uwRoleAdmin',
+  member: 'uwRoleMember',
+}
+
+/** my role in an organization or workspace; an unknown role shows as the server names it */
+export function roleLabel(role: string | null | undefined, t: TFunc): string {
+  const key = role ? ROLE_KEYS[role] : undefined
+  return key ? t(key) : (role ?? '')
+}
+
+/** "Sales · Admin" for the workspace select; just "Sales" when the role is unknown or the read failed */
+export function workspaceLabel(ws: UniworkWorkspaceRef, t: TFunc): string {
+  const myRole = (ws as UniworkWorkspaceRef & { myRole?: string | null }).myRole
+  // an older main build sends no role, or the role read failed: the name alone
+  // (a dash after the middot reads as unfinished)
+  const role = myRole ? roleLabel(myRole, t) : ''
+  if (!role) return ws.name
+  return t('uwLibWsRole', { workspace: ws.name, role })
 }

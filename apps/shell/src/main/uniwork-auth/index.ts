@@ -182,8 +182,11 @@ export function uniworkAccount(): AccountManager {
     createTransport: (profile) => createUniworkTransport(profile),
     credentials: createCredentialStore({ userDataDir: app.getPath('userData'), safeStorage }),
     openBrowser: openAuthorizationUrl,
+    // G8-16 S16: the remembered organization is per account + machine, so a
+    // choice made by one account is never read back for another on this install
     readSelectedOrgId: () => readAppSettings(settings()).uniworkOrgId,
-    persistSelectedOrgId: (orgId) => writeAppSetting(settings(), 'uniworkOrgId', orgId),
+    persistSelectedOrgId: (accountId, orgId) =>
+      writeAppSetting(settings(), 'uniworkOrgId', { accountId, orgId }),
     device: deviceInfo(process.platform, app.getVersion()),
   })
   created.onStatus((status) => push?.(HOME_CHANNELS.accountStatusEvent, status))

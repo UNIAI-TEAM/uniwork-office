@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { AccountStatus } from '../src/shared/home-api'
 
 /**
  * R2-5: the last-owner record follows the session itself. The account status
@@ -11,8 +12,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
  */
 
 let dir: string
-let statusListener: ((status: { state: string }) => void) | null = null
+let statusListener: ((status: AccountStatus) => void) | null = null
 let identity: { accountId: string; deviceSessionId: string; deploymentId: string } | null = null
+/** the status `uniworkAccount().status()` answers (the feed's targets read it) */
+let statusNow: AccountStatus = { loggedIn: false, state: 'signed-out' }
+/** every `/api/v1/...` path the runtime's HTTP round trip asked for */
+let fetched: string[] = []
 
 vi.mock('electron', () => ({
   app: { getPath: () => dir },
@@ -26,13 +31,13 @@ vi.mock('electron', () => ({
 }))
 
 vi.mock('../src/main/uniwork-auth', () => ({
-  authorizedRequest: vi.fn(),
+  authorizedRequest: <T>(call: (token: string) => Promise<T>) => call('fake-token'),
   setUniworkSignOutHooks: vi.fn(),
-  onUniworkAccountStatus: (listener: (status: { state: string }) => void) => {
+  onUniworkAccountStatus: (listener: (status: AccountStatus) => void) => {
     statusListener = listener
     return () => undefined
   },
-  uniworkAccount: () => ({ status: () => ({ state: 'signed-out', org: null }) }),
+  uniworkAccount: () => ({ status: () => statusNow }),
   uniworkDeploymentProfile: () => ({
     deploymentId: 'default',
     apiOrigin: 'https://uniwork.example',
@@ -46,8 +51,31 @@ beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'uw-docs-wiring-'))
   statusListener = null
   identity = null
+  statusNow = { loggedIn: false, state: 'signed-out' }
+  fetched = []
+  // the runtime's HTTP round trip: record the path, answer a capability that
+  // turns the feed off so no workspace or feed read follows
+  vi.stubGlobal('fetch', (input: RequestInfo | URL) => {
+    fetched.push(new URL(String(input)).pathname)
+    return Promise.resolve(
+      new Response(
+        JSON.stringify({
+          sync_feed: false,
+          sync_write: false,
+          offline_library: false,
+          ai_uniwork: false,
+          ai_uniwork_formats: [],
+          ttl_seconds: 300,
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    )
+  })
 })
-afterEach(() => rmSync(dir, { recursive: true, force: true }))
+afterEach(() => {
+  vi.unstubAllGlobals()
+  rmSync(dir, { recursive: true, force: true })
+})
 
 describe('last owner follows the session identity (R2-5)', () => {
   it('the account status callback records the signed-in account', async () => {
@@ -73,10 +101,13 @@ describe('last owner follows the session identity (R2-5)', () => {
     })
     handle.activate(() => undefined)
     const note = vi.spyOn(handle.service, 'noteSessionIdentity')
+    const noteOrg = vi.spyOn(handle.service, 'noteSelectedOrg')
     expect(statusListener).not.toBeNull()
     identity = { accountId: 'acc_9', deviceSessionId: 'dev_1', deploymentId: 'default' }
     statusListener?.({ state: 'signed-in' })
     expect(note).toHaveBeenCalledTimes(1)
+    // G8-16 S16: a status push also tells the service the selected org (here: none)
+    expect(noteOrg).toHaveBeenCalledWith(null)
     const doc = {
       deploymentId: 'default',
       userId: 'acc_9',
@@ -170,5 +201,96 @@ describe('a sign-in as another account (GOA9-r3-04)', () => {
     expect(closePath).toHaveBeenCalledWith(previous)
     expect(open).toEqual([local, own])
     expect(forgetAiHistory).toHaveBeenCalledWith([previous])
+  })
+})
+
+describe('G8-16 S16: the feed starts only for the chosen org (F-1)', () => {
+  const ORGS = [
+    { id: 'org_a', name: 'Acme', slug: 'acme', role: 'owner', membership: 'active' as const },
+    { id: 'org_b', name: 'Beta', slug: 'beta', role: 'member', membership: 'active' as const },
+  ]
+
+  async function handle() {
+    const { createUniworkDocs } = await import('../src/main/uniwork-docs/wiring')
+    const created = createUniworkDocs({ handle: vi.fn() } as never, {
+      shellWindow: () => null,
+      shellContents: () => null,
+      openPath: () => true,
+      refuseLockedPath: () => false,
+      isPathOpen: () => false,
+      requestModuleSave: () => false,
+      reloadPath: () => undefined,
+      activePath: () => undefined,
+      reveal: () => undefined,
+      lang: () => 'en',
+      defaultSaveDir: () => dir,
+      openPaths: () => [],
+      closePath: async () => true,
+      confirmClosePath: async () => true,
+      closePathNow: () => undefined,
+      aiHistoryPaths: () => [],
+      forgetAiHistory: () => undefined,
+    })
+    created.activate(() => undefined)
+    return created
+  }
+
+  it('a two-org account fetches nothing before the choice, then only the chosen org', async () => {
+    await handle()
+    identity = { accountId: 'acc_1', deviceSessionId: 'dev_1', deploymentId: 'default' }
+    // signed in with the picker up: the feed must not start at all
+    statusNow = { loggedIn: true, state: 'signed-in', needsOrgChoice: true, orgs: ORGS }
+    statusListener?.(statusNow)
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(fetched).toEqual([])
+
+    // the choice's own status push starts the feed for that org alone
+    statusNow = {
+      loggedIn: true,
+      state: 'signed-in',
+      needsOrgChoice: false,
+      org: ORGS[0],
+      orgs: ORGS,
+    }
+    statusListener?.(statusNow)
+    await vi.waitFor(() => expect(fetched).toContain('/api/v1/orgs/org_a/office/capabilities'))
+    expect(fetched.some((path) => path.includes('org_b'))).toBe(false)
+  })
+
+  it('an org change stops the old pass and starts the new org', async () => {
+    await handle()
+    identity = { accountId: 'acc_1', deviceSessionId: 'dev_1', deploymentId: 'default' }
+    statusNow = {
+      loggedIn: true,
+      state: 'signed-in',
+      needsOrgChoice: false,
+      org: ORGS[0],
+      orgs: ORGS,
+    }
+    statusListener?.(statusNow)
+    await vi.waitFor(() => expect(fetched).toContain('/api/v1/orgs/org_a/office/capabilities'))
+    statusNow = { ...statusNow, org: ORGS[1] }
+    statusListener?.(statusNow)
+    await vi.waitFor(() => expect(fetched).toContain('/api/v1/orgs/org_b/office/capabilities'))
+  })
+
+  it('sign-out stops the feed', async () => {
+    await handle()
+    identity = { accountId: 'acc_1', deviceSessionId: 'dev_1', deploymentId: 'default' }
+    statusNow = {
+      loggedIn: true,
+      state: 'signed-in',
+      needsOrgChoice: false,
+      org: ORGS[0],
+      orgs: ORGS,
+    }
+    statusListener?.(statusNow)
+    await vi.waitFor(() => expect(fetched).toContain('/api/v1/orgs/org_a/office/capabilities'))
+    const seen = fetched.length
+    identity = null
+    statusNow = { loggedIn: false, state: 'signed-out' }
+    statusListener?.(statusNow)
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(fetched).toHaveLength(seen)
   })
 })

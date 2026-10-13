@@ -96,4 +96,38 @@ export const it = {
   uwLockNewerStoreTitle: 'Serve una versione più recente dell’app',
   uwLockNewerStore:
     'Questi dati richiedono una versione più recente dell’app. Aggiorna UniWork Office; non è stato eliminato nulla e non è stato creato alcun nuovo salvataggio.',
+  // S16 organization choice, S17 shared-with-me and document details
+  uwOrgPickTitle: 'Scegli un’organizzazione',
+  uwOrgPickBody:
+    'Il tuo account appartiene a più organizzazioni. Potrai cambiarla in seguito in Impostazioni › Account.',
+  uwOrgPickRole: 'Ruolo: {role}',
+  uwOrgPickContinue: 'Continua',
+  uwOrgPickRememberedGone:
+    'L’organizzazione scelta l’ultima volta non è più disponibile. Scegli di nuovo.',
+  uwOrgRowSuspended: 'L’organizzazione è sospesa',
+  uwOrgRowDeactivated: 'Il tuo account è disattivato in questa organizzazione',
+  uwOrgAllBlocked: 'Non puoi ancora lavorare in nessuna organizzazione. Contatta l’amministratore.',
+  uwOrgPickError: 'Impossibile caricare le tue organizzazioni.',
+  uwOrgSettingsLabel: 'Organizzazione di lavoro',
+  uwLibShared: 'Condivisi con me',
+  uwLibSharedEmpty: 'Nessun documento è stato ancora condiviso direttamente con te.',
+  uwLibSharedPartial:
+    'Sono stati cercati solo i documenti caricati finora. Carica altri documenti per continuare.',
+  uwLibWsRole: '{workspace} · {role}',
+  uwDocInfo: 'Dettagli',
+  uwDocInfoFor: 'Dettagli di “{name}”',
+  uwDocInfoClose: 'Chiudi dettagli',
+  uwDocInfoOwner: 'Proprietario',
+  uwDocInfoCreated: 'Creato',
+  uwDocInfoUpdated: 'Aggiornato',
+  uwDocInfoMyAccess: 'Il mio accesso',
+  uwDocInfoVersion: 'Versione',
+  uwDocInfoByAt: '{name}, {time}',
+  uwDocInfoVersionBy: '{version} · {name}',
+  uwAccessView: 'Visualizzazione',
+  uwAccessEdit: 'Modifica',
+  uwAccessManage: 'Gestione',
+  uwRoleOwner: 'Proprietario',
+  uwRoleAdmin: 'Amministratore',
+  uwRoleMember: 'Membro',
 } satisfies Record<keyof typeof zh, string>

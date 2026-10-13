@@ -93,6 +93,14 @@ export interface BillingResponse {
   }[]
 }
 
+/** GET /orgs/{slug}/members/me: the caller's own membership, read even when deactivated */
+export interface OrgMembershipResponse {
+  role: string
+  /** RFC3339 when the account is switched off in this organization; absent when active */
+  deactivatedAt?: string
+  platformRole?: string
+}
+
 export interface UniworkTransport {
   start(request: StartRequest): Promise<{ authorizationUrl: string }>
   exchange(request: {
@@ -105,6 +113,8 @@ export interface UniworkTransport {
   logout(request: { deviceSessionId: string }, accessToken: string): Promise<void>
   me(accessToken: string): Promise<MeResponse>
   orgs(accessToken: string): Promise<OrgResponse[]>
+  /** the caller's own membership in one organization (by slug), deactivated included */
+  orgMembership(orgSlug: string, accessToken: string): Promise<OrgMembershipResponse>
   billing(orgId: string, accessToken: string): Promise<BillingResponse>
 }
 
@@ -112,6 +122,7 @@ export type FetchLike = (input: string, init: RequestInit) => Promise<Response>
 
 export const REQUEST_TIMEOUT_MS = 15_000
 const ORG_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/
+const ORG_SLUG = /^[a-z0-9][a-z0-9-]{0,63}$/
 
 type Route =
   | '/auth/desktop/start'
@@ -120,6 +131,7 @@ type Route =
   | '/auth/desktop/logout'
   | '/me'
   | '/orgs'
+  | `/orgs/${string}/members/me`
   | `/orgs/${string}/billing`
 
 /** server error code -> transport code; anything else falls back by status */
@@ -222,6 +234,19 @@ export function parseOrgs(raw: unknown): OrgResponse[] {
       status: optStr(row.status) ?? 'active',
     }
   })
+}
+
+export function parseOrgMembership(raw: unknown): OrgMembershipResponse {
+  if (!isRecord(raw) || !isRecord(raw.membership)) throw new TransportError('malformed_response')
+  const m = raw.membership
+  const role = str(m.role)
+  const deactivatedAt = optStr(m.deactivated_at)
+  const platformRole = optStr(m.platform_role)
+  return {
+    role,
+    ...(deactivatedAt ? { deactivatedAt } : {}),
+    ...(platformRole ? { platformRole } : {}),
+  }
 }
 
 export function parseBilling(raw: unknown): BillingResponse {
@@ -377,6 +402,12 @@ export function createUniworkTransport(
     },
     async orgs(accessToken) {
       return parseOrgs(await request('GET', '/orgs', { accessToken }))
+    },
+    async orgMembership(orgSlug, accessToken) {
+      if (!ORG_SLUG.test(orgSlug)) throw new TransportError('invalid_request')
+      return parseOrgMembership(
+        await request('GET', `/orgs/${orgSlug}/members/me`, { accessToken }),
+      )
     },
     async billing(orgId, accessToken) {
       if (!ORG_ID.test(orgId)) throw new TransportError('invalid_request')

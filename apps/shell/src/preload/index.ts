@@ -45,9 +45,12 @@ import type {
   UniworkDocErrorCode,
   UniworkDocListPage,
   UniworkDocLock,
+  UniworkDocProperties,
   UniworkDocStatus,
   UniworkLaunchEvent,
   UniworkResult,
+  UniworkSharedPage,
+  UniworkSharedQuery,
   UniworkWorkspaceRef,
 } from '../shared/home-api'
 import { HOME_CHANNELS, PROJECT_CHANNELS, UNIWORK_DOC_CHANNELS } from '../shared/home-api'
@@ -836,6 +839,16 @@ const homeApi: HomeApi = {
   async uniworkListDocuments(query) {
     return asUniworkResult<UniworkDocListPage>(
       await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.listDocuments, query),
+    )
+  },
+  async uniworkListSharedWithMe(query?: UniworkSharedQuery) {
+    return asUniworkResult<UniworkSharedPage>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.listSharedWithMe, query),
+    )
+  },
+  async uniworkDocumentProperties(documentId: string) {
+    return asUniworkResult<UniworkDocProperties>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.documentProperties, documentId),
     )
   },
   async uniworkOpenDocument(documentId) {
