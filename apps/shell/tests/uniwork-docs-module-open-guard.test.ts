@@ -157,7 +157,10 @@ describe('installUniworkModuleSeams forwards refuseLockedPath (R1-be-3)', () => 
     expect(read('src/main/uniwork-docs/modules.ts')).toMatch(
       /refuseOpen: \(path: string\) => seam\.refuseLockedPath\(path\)/,
     )
-    expect(read('src/main/index.ts')).toMatch(/installUniworkModuleSeams\(uniworkDocs\.service\)/)
+    // G8-02: the same installation carries the comment-author source
+    expect(read('src/main/index.ts')).toMatch(
+      /installUniworkModuleSeams\(\s*uniworkService,\s*createCommentAuthorResolver\(\{\s*isBound: \(path\) => uniworkService\.isBound\(path\),\s*displayName: uniworkAccountDisplayName,\s*\}\),\s*\)/,
+    )
   })
 })
 

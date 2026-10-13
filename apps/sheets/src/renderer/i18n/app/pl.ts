@@ -1475,6 +1475,7 @@ export const pl = {
   appThreadReplyPlaceholder: 'Odpowiedz…',
   appThreadNewPlaceholder: 'Rozpocznij konwersację',
   appThreadPost: 'Opublikuj',
+  appThreadNeutralAuthor: 'Użytkownik',
   appThreadResolve: 'Rozwiąż',
   appThreadReopen: 'Otwórz ponownie',
   appThreadResolved: 'Rozwiązano',

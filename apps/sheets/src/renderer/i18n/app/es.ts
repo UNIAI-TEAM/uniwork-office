@@ -1492,6 +1492,7 @@ export const es = {
   appThreadReplyPlaceholder: 'Responder…',
   appThreadNewPlaceholder: 'Iniciar una conversación',
   appThreadPost: 'Publicar',
+  appThreadNeutralAuthor: 'Usuario',
   appThreadResolve: 'Resolver',
   appThreadReopen: 'Reabrir',
   appThreadResolved: 'Resuelto',

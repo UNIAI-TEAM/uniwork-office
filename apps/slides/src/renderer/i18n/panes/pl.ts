@@ -62,6 +62,7 @@ export const pl = {
   paneCommentsDelete: 'Usuń komentarz',
   paneCommentsPlaceholder: 'Nowy komentarz… (⌘/Ctrl+Enter, aby opublikować)',
   paneCommentsPost: 'Opublikuj',
+  paneCommentsNeutralAuthor: 'Użytkownik',
 
   paneCsdTitle: 'Pokazy niestandardowe',
   paneCsdDefaultName: 'Pokaz niestandardowy {n}',

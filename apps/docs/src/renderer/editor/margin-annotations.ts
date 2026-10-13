@@ -24,6 +24,7 @@
 import type { CommentInfo } from '@genoffice/docx-engine'
 import type { EditorView } from '@tiptap/pm/view'
 import type { Mark as PmMark, Node as PmNode } from '@tiptap/pm/model'
+import { displayCommentAuthor } from '../comment-author'
 import { t } from '../i18n/locale'
 import { collectRevisions } from './revisions'
 
@@ -64,11 +65,15 @@ export interface MarginHandlers {
   onCommentBalloon?: (id: string) => void
 }
 
+/** G8-02: the neutral author shows in the UI language, as in the Comments pane */
+const authorLabel = (author: string): string =>
+  displayCommentAuthor(author, t('editorNeutralCommentAuthor'))
+
 function makeBalloonIcon(c: CommentInfo, onJump: () => void): HTMLElement {
   const btn = document.createElement('button')
   btn.type = 'button'
   btn.className = 'comment-balloon'
-  btn.title = `${c.author}\n${c.text.split('\n')[0] ?? ''}`
+  btn.title = `${authorLabel(c.author)}\n${c.text.split('\n')[0] ?? ''}`
   btn.dataset.commentId = c.id
   btn.innerHTML =
     '<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M 2.99 3.91 h 10.01 v 6.83 h -5.46 L 4.81 13.46 v -2.73 h -1.82 z"/><path d="M 5.27 6.18 h 5.46 M 5.27 8.46 h 3.64"/></svg>'
@@ -101,7 +106,7 @@ function makeBubble(root: CommentInfo, replies: CommentInfo[], onJump: () => voi
     if (cls) entry.className = cls
     const author = document.createElement('div')
     author.className = 'comment-bubble-author'
-    author.textContent = c.author
+    author.textContent = authorLabel(c.author)
     const text = document.createElement('div')
     text.className = 'comment-bubble-text'
     text.textContent = c.text

@@ -1497,6 +1497,7 @@ export const ja = {
   appThreadReplyPlaceholder: '返信…',
   appThreadNewPlaceholder: '会話を開始',
   appThreadPost: '投稿',
+  appThreadNeutralAuthor: 'ユーザー',
   appThreadResolve: '解決',
   appThreadReopen: '再開',
   appThreadResolved: '解決済み',

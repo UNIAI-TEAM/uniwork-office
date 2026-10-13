@@ -389,6 +389,7 @@ import { installRuleDetail } from './univer-rule-detail'
 import { installActiveCellDataValidationChrome } from './data-validation-dropdown'
 import { installInvalidDataMarkerSuppression } from './data-validation-marker'
 import { installThreadedCommentAffordances, type ThreadHover } from './threaded-comment-marker'
+import { followCommentAuthor } from './comment-author'
 import { threadPane, threadStore } from './threaded-comments'
 import { ThreadHoverCard, ThreadedCommentsPane } from './ThreadedCommentsPane'
 import { installFormulaNullResultFix } from './formula-null-result'
@@ -1355,6 +1356,29 @@ export function App({
       })
   }, [workbookFile?.sessionId])
 
+  // G8-02: new threads carry the author main resolves for the open workbook
+  // session (the signed-in UniWork display name for a bound document, else the
+  // neutral constant) — never the OS account name. Re-asked when the session
+  // changes (open, Save As, reopen) and when the signed-in account changes; only
+  // the latest answer is kept.
+  const commentAuthorSessionId = workbookFile?.sessionId
+  const commentAuthorFilePath = workbookFile?.path
+  useEffect(() => {
+    const sessionId = (): string | undefined => {
+      // A sidecar crash recovery swaps the session under the same file without
+      // a re-render; the live state then names the session main still holds.
+      const live = lazyWorkbookRef.current?.file
+      return live?.path !== undefined && live.path === commentAuthorFilePath
+        ? live.sessionId
+        : commentAuthorSessionId
+    }
+    return followCommentAuthor(
+      () => window.desktopApi?.getUserDisplayName?.(sessionId()) ?? Promise.resolve(''),
+      window.desktopApi?.onCommentAuthorChanged,
+      (name) => threadStore.setAuthor(name),
+    )
+  }, [commentAuthorSessionId, commentAuthorFilePath])
+
   const persistChatMessage = (
     role: 'user' | 'assistant',
     text: string,
@@ -2126,7 +2150,6 @@ export function App({
       recordNoteChange(state.editJournal, sheetId)
       setPendingEdits(journalSize(state.editJournal))
     }
-    void window.desktopApi.getUserDisplayName?.().then((name) => threadStore.setAuthor(name))
     // Univer's own UI (rule-management panels, dialogs) follows the app
     // language instead of hard-coded English.
     void applyUniverLocale(runtime, getLang())

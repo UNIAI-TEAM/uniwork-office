@@ -62,6 +62,7 @@ export const nl = {
   paneCommentsDelete: 'Opmerking verwijderen',
   paneCommentsPlaceholder: 'Nieuwe opmerking… (⌘/Ctrl+Enter om te plaatsen)',
   paneCommentsPost: 'Plaatsen',
+  paneCommentsNeutralAuthor: 'Gebruiker',
 
   paneCsdTitle: 'Aangepaste voorstellingen',
   paneCsdDefaultName: 'Aangepaste voorstelling {n}',

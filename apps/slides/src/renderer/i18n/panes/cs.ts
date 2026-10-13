@@ -62,6 +62,7 @@ export const cs = {
   paneCommentsDelete: 'Odstranit komentář',
   paneCommentsPlaceholder: 'Nový komentář… (⌘/Ctrl+Enter odešle)',
   paneCommentsPost: 'Odeslat',
+  paneCommentsNeutralAuthor: 'Uživatel',
 
   paneCsdTitle: 'Vlastní prezentace',
   paneCsdDefaultName: 'Vlastní prezentace {n}',

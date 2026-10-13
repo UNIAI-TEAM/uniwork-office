@@ -1383,6 +1383,7 @@ export const zh = {
   appThreadReplyPlaceholder: '回复…',
   appThreadNewPlaceholder: '开始对话',
   appThreadPost: '发布',
+  appThreadNeutralAuthor: '用户',
   appThreadResolve: '解决',
   appThreadReopen: '重新打开',
   appThreadResolved: '已解决',

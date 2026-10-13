@@ -62,6 +62,7 @@ export const th = {
   paneCommentsDelete: 'ลบข้อคิดเห็น',
   paneCommentsPlaceholder: 'ข้อคิดเห็นใหม่… (⌘/Ctrl+Enter เพื่อโพสต์)',
   paneCommentsPost: 'โพสต์',
+  paneCommentsNeutralAuthor: 'ผู้ใช้',
 
   paneCsdTitle: 'การนำเสนอแบบกำหนดเอง',
   paneCsdDefaultName: 'การนำเสนอแบบกำหนดเอง {n}',

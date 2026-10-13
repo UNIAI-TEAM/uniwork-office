@@ -3,6 +3,7 @@ import type { ReactElement } from 'react'
 import type { Lang } from '@genoffice/i18n'
 import type { TFunc } from './i18n/locale'
 import { NOTE_FALLBACK_COLOR, cssRgb } from './DrawLayer'
+import { displayCommentAuthor } from './comment-author'
 import { flattenThread } from './note-threads'
 import type { NoteThreadItem } from './note-threads'
 import { CARD_PIN_ALIGN, layoutMarginCards } from './note-margin-layout'
@@ -165,7 +166,9 @@ function NoteCard({
             className={`pdf-note-comment${depth > 0 ? ' pdf-note-comment-reply' : ''}`}
           >
             <div className="pdf-note-comment-head">
-              <span className="pdf-note-author">{item.author || 'UniWork Office'}</span>
+              <span className="pdf-note-author">
+                {displayCommentAuthor(item.author, t('noteNeutralAuthor')) || 'UniWork Office'}
+              </span>
               <span className="pdf-note-time">
                 {item.timeMs !== null ? timeFmt.format(item.timeMs) : ''}
               </span>
@@ -302,7 +305,9 @@ function NoteDraftCard({
       style={{ top, borderTopColor: cssRgb(color) }}
     >
       <div className="pdf-note-card-head">
-        <span className="pdf-note-author">{author || 'UniWork Office'}</span>
+        <span className="pdf-note-author">
+          {displayCommentAuthor(author, t('noteNeutralAuthor')) || 'UniWork Office'}
+        </span>
         <span className="pdf-note-time">{timeFmt.format(createdMs)}</span>
       </div>
       <div className="pdf-note-draft-box">

@@ -62,6 +62,7 @@ export const es = {
   paneCommentsDelete: 'Eliminar comentario',
   paneCommentsPlaceholder: 'Nuevo comentario… (⌘/Ctrl+Entrar para publicar)',
   paneCommentsPost: 'Publicar',
+  paneCommentsNeutralAuthor: 'Usuario',
 
   paneCsdTitle: 'Presentaciones personalizadas',
   paneCsdDefaultName: 'Presentación personalizada {n}',

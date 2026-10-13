@@ -1449,6 +1449,7 @@ export const cs = {
   appThreadReplyPlaceholder: 'Odpovědět…',
   appThreadNewPlaceholder: 'Zahájit konverzaci',
   appThreadPost: 'Odeslat',
+  appThreadNeutralAuthor: 'Uživatel',
   appThreadResolve: 'Vyřešit',
   appThreadReopen: 'Znovu otevřít',
   appThreadResolved: 'Vyřešeno',

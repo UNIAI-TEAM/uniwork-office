@@ -1449,6 +1449,7 @@ export const id = {
   appThreadReplyPlaceholder: 'Balas…',
   appThreadNewPlaceholder: 'Mulai percakapan',
   appThreadPost: 'Kirim',
+  appThreadNeutralAuthor: 'Pengguna',
   appThreadResolve: 'Selesaikan',
   appThreadReopen: 'Buka kembali',
   appThreadResolved: 'Selesai',

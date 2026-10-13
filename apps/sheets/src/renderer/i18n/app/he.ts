@@ -1387,6 +1387,7 @@ export const he = {
   appThreadReplyPlaceholder: 'השב…',
   appThreadNewPlaceholder: 'התחל שיחה',
   appThreadPost: 'פרסם',
+  appThreadNeutralAuthor: 'משתמש',
   appThreadResolve: 'פתור',
   appThreadReopen: 'פתח מחדש',
   appThreadResolved: 'נפתר',

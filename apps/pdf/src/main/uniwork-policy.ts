@@ -11,6 +11,12 @@ import { PDF_UNIWORK_AUTOSAVE_OFF, PDF_UNIWORK_VIEW_ONLY } from '../shared/uniwo
 export interface UniworkDocumentPolicy {
   isBound(path: string): boolean
   isReadOnly(path: string): boolean
+  /**
+   * G8-02: author name for a new comment on `path` — the shell's single source
+   * (the signed-in account's display name for a bound document, else the
+   * neutral constant). Absent = neutral constant; never the OS account name.
+   */
+  commentAuthor?(path: string): string
 }
 
 let policy: UniworkDocumentPolicy | null = null
@@ -40,6 +46,24 @@ export function uniworkIsReadOnly(path: string | null | undefined): boolean {
     return policy.isReadOnly(path)
   } catch {
     return false
+  }
+}
+
+/** G8-02: the author written into a comment when no UniWork account resolves. */
+export const NEUTRAL_COMMENT_AUTHOR = 'User'
+
+/**
+ * G8-02: author name for a new comment on `path` — the installed source's
+ * answer, or the neutral constant when no source is installed or it fails.
+ * Never the OS account name: no author path reads the OS account any more.
+ */
+export function uniworkCommentAuthor(path: string | null | undefined): string {
+  if (!path || !policy?.commentAuthor) return NEUTRAL_COMMENT_AUTHOR
+  try {
+    const name = policy.commentAuthor(path).trim()
+    return name.length > 0 ? name : NEUTRAL_COMMENT_AUTHOR
+  } catch {
+    return NEUTRAL_COMMENT_AUTHOR
   }
 }
 
