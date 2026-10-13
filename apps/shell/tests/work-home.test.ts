@@ -10,6 +10,7 @@ import {
   buildHeadline,
   dueState,
   greetingKey,
+  greetingName,
   hourIn,
   inboxTarget,
   isQuiet,
@@ -92,6 +93,23 @@ describe('greetingKey', () => {
     [23, 'wbOvGreetingEvening'],
   ] as const)('hour %i → %s', (hour, key) => {
     expect(greetingKey(hour)).toBe(key)
+  })
+})
+
+describe('greetingName', () => {
+  it.each([
+    ['Phan Đức Quang', 'Quang'],
+    ['Nguyễn Văn An', 'An'],
+    ['Nguyen Van An', 'An'],
+    ['  Trần   Thị Bích  ', 'Bích'],
+    ['Đỗ Minh', 'Minh'],
+    ['Ada Lovelace', 'Ada'],
+    ['Lan Nguyen', 'Lan'],
+    ['Linh', 'Linh'],
+    ['  Linh ', 'Linh'],
+    ['', ''],
+  ])('splits Vietnamese and Western names correctly: %j -> %j', (full, short) => {
+    expect(greetingName(full)).toBe(short)
   })
 })
 

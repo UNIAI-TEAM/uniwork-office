@@ -253,4 +253,16 @@ describe('Tasks tab', () => {
     expect(host.textContent).toContain('Send the quote')
     expect(host.textContent).toContain('Updated at')
   })
+
+  it('an empty list keeps quick add and shows the tasks empty state, tinted like the tab', async () => {
+    api.myTasks.mockResolvedValue({ ok: true, value: [] })
+    await mount({ ...WS, id: 'w-empty' })
+    expect(host.querySelector('.wb-work-quick input')).not.toBeNull()
+    const panel = host.querySelector('.wb-state')!
+    expect(panel.querySelector('.wb-state-title')?.textContent).toBe('No open tasks.')
+    expect(panel.querySelector<HTMLElement>('.wb-state-icon')!.style.background).toBe(
+      'var(--tint-green)',
+    )
+    expect(host.querySelector('.wb-work-state')).toBeNull()
+  })
 })

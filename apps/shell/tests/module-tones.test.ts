@@ -1,7 +1,12 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { MEETING_TINT, MODULE_TONES, tintStyle } from '../src/renderer/src/module-tones'
+import {
+  MEETING_TINT,
+  MODULE_TONES,
+  signalStyle,
+  tintStyle,
+} from '../src/renderer/src/module-tones'
 
 const tokens = readFileSync(join(__dirname, '..', '..', '..', 'packages/ui/src/tokens.css'), 'utf8')
 const blocks = tokens.split(/\n(?=\[data-theme='dark'\]|@media \(prefers-color-scheme: dark\))/)
@@ -38,5 +43,17 @@ describe('module tones', () => {
       background: 'var(--tint-green)',
       color: 'var(--tint-green-fg)',
     })
+  })
+
+  it('signalStyle paints a status tile from the signal tokens (info has no -text twin)', () => {
+    expect(signalStyle('danger')).toEqual({
+      background: 'var(--danger-bg)',
+      color: 'var(--danger-text)',
+    })
+    expect(signalStyle('warning')).toEqual({
+      background: 'var(--warning-bg)',
+      color: 'var(--warning-text)',
+    })
+    expect(signalStyle('info')).toEqual({ background: 'var(--info-bg)', color: 'var(--info)' })
   })
 })

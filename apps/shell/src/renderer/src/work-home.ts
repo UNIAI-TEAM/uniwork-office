@@ -96,6 +96,30 @@ export function greetingKey(hour: number): StringKey {
   return 'wbOvGreetingEvening'
 }
 
+/**
+ * Common Vietnamese family names without diacritics (port of uniwork
+ * packages/core/home/greeting.ts). A name that starts with one is written family-first, so a
+ * person is called by the last word ("Phan Đức Quang" -> "Quang"); any other name is
+ * given-first ("Ada Lovelace" -> "Ada").
+ */
+const VI_FAMILY_NAMES = new Set(
+  (
+    'nguyen tran le pham hoang huynh phan vu vo dang bui do ho ngo duong ly dinh doan trinh ' +
+    'truong lam mai cao ta ha luu luong to chau quach tong thai kieu trieu khuc la van vuong ' +
+    'lai ton tang'
+  ).split(' '),
+)
+
+const plainWord = (word: string) =>
+  word.normalize('NFD').replace(/\p{M}/gu, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase()
+
+/** The name the greeting calls a person by; the whole (trimmed) name when it is one word. */
+export function greetingName(displayName: string): string {
+  const words = displayName.trim().split(/\s+/).filter(Boolean)
+  if (words.length < 2) return displayName.trim()
+  return VI_FAMILY_NAMES.has(plainWord(words[0]!)) ? words[words.length - 1]! : words[0]!
+}
+
 export interface WorkHeadline {
   key: StringKey
   params: Record<string, string | number>

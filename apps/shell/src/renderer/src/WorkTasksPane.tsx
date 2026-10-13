@@ -2,16 +2,19 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent, ReactElement } from 'react'
 import type { WorkCreateTaskInput, WorkTask, WorkTaskStatus } from '../../shared/uniwork-work-api'
 import { useI18n, type StringKey } from './locale'
+import { MODULE_TONES } from './module-tones'
 import { settleWork, useWorkLoad } from './work-cache'
 import { formatDay } from './work-home'
 import { closedStatusKeys, groupTasksByDue, localIsoDate, type TaskDueGroup } from './work-tasks'
 import {
   WorkNoWorkspace,
   WorkStaleNote,
+  WorkStatePanel,
   WorkToast,
   workLoadState,
   type WorkPaneProps,
 } from './WorkErrorState'
+import { WorkbenchIcon } from './WorkbenchIcons'
 
 const GROUP_LABEL: Record<TaskDueGroup, StringKey> = {
   overdue: 'wbTasksGroupOverdue',
@@ -139,7 +142,11 @@ export function WorkTasksPane({
         </button>
       </form>
       {groups.length === 0 ? (
-        <p className="wb-work-state">{t('wbTasksEmpty')}</p>
+        <WorkStatePanel
+          tone={MODULE_TONES.tasks}
+          icon={<WorkbenchIcon id="tasks" size={20} />}
+          title={t('wbTasksEmpty')}
+        />
       ) : (
         <table className="wb-work-table">
           <thead>

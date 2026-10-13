@@ -4531,28 +4531,88 @@ button.wb-ov-stat-body:hover {
   color: var(--text-secondary);
 }
 
-.wb-work-state {
+/* empty / error / sign-in states (WorkStatePanel): no box around them, the tile carries the tone */
+.wb-state {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 8px;
   margin: 0;
   padding: 24px;
-  border: 1px dashed var(--border);
-  border-radius: var(--radius-12);
-  color: var(--text-secondary);
-  font-size: 13px;
 }
 
-.wb-work-state h3 {
+.wb-state-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+}
+
+.wb-state-title {
   margin: 0;
   font-size: 14px;
   font-weight: 600;
   color: var(--text);
 }
 
-.wb-work-state p {
+.wb-state-body {
+  max-width: 52ch;
   margin: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+  text-wrap: pretty;
+}
+
+.wb-state .wb-btn {
+  margin-top: 4px;
+}
+
+/* the shared tab title (WorkPaneHeader) */
+.wb-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+
+.wb-pane-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.wb-pane-text {
+  min-width: 0;
+}
+
+.wb-pane-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.wb-pane-meta {
+  margin: 2px 0 0;
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wb-pane-aside {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-secondary);
 }
 
 .wb-work-stale {
@@ -4562,9 +4622,9 @@ button.wb-ov-stat-body:hover {
 }
 
 .wb-work-skeleton {
-  height: 120px;
-  border-radius: var(--radius-8);
-  background: var(--surface-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .wb-ov-quiet {

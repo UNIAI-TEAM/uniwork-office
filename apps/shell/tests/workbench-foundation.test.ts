@@ -134,3 +134,28 @@ describe('workbench primitives (home.css)', () => {
     expect(css).not.toMatch(/\.wb-subtab/)
   })
 })
+
+describe('workbench states and pane title (home.css)', () => {
+  it('state panels draw no box: the dashed .wb-work-state is gone', () => {
+    expect(rule('.wb-state')).not.toMatch(/border/)
+    expect(css).not.toMatch(/\.wb-work-state\b/)
+    expect(rule('.wb-state-icon')).toMatch(
+      /width: 36px;\n {2}height: 36px;\n {2}border-radius: 10px;/,
+    )
+    expect(rule('.wb-state-title')).toMatch(/font-size: 14px;\n {2}font-weight: 600;/)
+    expect(rule('.wb-state-body')).toMatch(/max-width: 52ch;/)
+  })
+
+  it('the skeleton wrapper is a column of shimmer rows, no fixed grey block', () => {
+    expect(rule('.wb-work-skeleton')).not.toMatch(/height|background/)
+  })
+
+  it('the pane title is 16/600 with a one-line meta and a right-hand aside', () => {
+    expect(rule('.wb-pane-title')).toMatch(
+      /font-size: 16px;\n {2}font-weight: 600;\n {2}letter-spacing: -0\.01em;/,
+    )
+    expect(rule('.wb-pane-meta')).toMatch(/text-overflow: ellipsis;\n {2}white-space: nowrap;/)
+    expect(rule('.wb-pane-text')).toMatch(/min-width: 0;/)
+    expect(rule('.wb-pane-aside')).toMatch(/margin-left: auto;/)
+  })
+})

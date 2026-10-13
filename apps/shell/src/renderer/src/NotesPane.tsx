@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react'
 import type { FormEvent, ReactElement } from 'react'
 import type { PracticeId } from '@uniwork/practice-core'
 import { useI18n } from './locale'
+import { MODULE_TONES } from './module-tones'
+import { WorkStatePanel } from './WorkErrorState'
+import { WorkbenchIcon } from './WorkbenchIcons'
 import {
   createStickyNote,
   normalizeStickyNote,
@@ -59,7 +62,11 @@ export function NotesPane({ practiceId }: { practiceId: PracticeId }): ReactElem
         </button>
       </form>
       {items.length === 0 ? (
-        <p className="wb-work-state">{t('wbNotesEmpty')}</p>
+        <WorkStatePanel
+          tone={MODULE_TONES.notes}
+          icon={<WorkbenchIcon id="notes" size={20} />}
+          title={t('wbNotesEmpty')}
+        />
       ) : (
         <ul className="wb-notes-list">
           {items.map((note) => (

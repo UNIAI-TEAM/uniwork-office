@@ -7,7 +7,14 @@ import { useWorkLoad } from './work-cache'
 import { agendaRange, agendaRequest, groupAgenda, rowTime } from './work-calendar'
 import { clock, formatDay } from './work-home'
 import { localIsoDate } from './work-tasks'
-import { WorkNoWorkspace, WorkStaleNote, workLoadState, type WorkPaneProps } from './WorkErrorState'
+import {
+  WorkNoWorkspace,
+  WorkStaleNote,
+  WorkStatePanel,
+  workLoadState,
+  type WorkPaneProps,
+} from './WorkErrorState'
+import { WorkbenchIcon } from './WorkbenchIcons'
 
 type AgendaKind = 'task' | 'meeting' | 'external'
 
@@ -103,7 +110,11 @@ export function WorkCalendarPane({
         <WorkStaleNote at={load.updatedAt} onRetry={onReload} />
       ) : null}
       {days.length === 0 ? (
-        <p className="wb-work-state">{t('wbCalEmpty')}</p>
+        <WorkStatePanel
+          tone={MODULE_TONES.calendar}
+          icon={<WorkbenchIcon id="calendar" size={20} />}
+          title={t('wbCalEmpty')}
+        />
       ) : (
         days.map(({ day, events: rows }) => (
           <section key={day} className="wb-agenda-day">

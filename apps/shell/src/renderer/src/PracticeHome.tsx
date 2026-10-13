@@ -33,6 +33,7 @@ import { WorkbenchTopBar, type WorkbenchNewItem } from './WorkbenchTopBar'
 import { pinPillar } from './workbench-pins'
 import { WbDeleteBtn, WbOpenBtn, WbRowActions } from './WbRowActions'
 import { WB_REFRESH_EVENT, cacheWork, cachedWorkspaceListState, workCacheSlot } from './work-cache'
+import { WorkSkeleton } from './WorkErrorState'
 import { WorkOverview } from './WorkOverview'
 
 interface PracticeHomeProps {
@@ -594,7 +595,7 @@ export function PracticeHome({
         />
       ) : isWorkbenchModuleId(tab) && workspaces === null && tab !== 'forms' && tab !== 'notes' ? (
         // server tabs wait for the workspace list: null would read as "no workspace"
-        <div className="wb-work-skeleton" aria-busy="true" />
+        <WorkSkeleton />
       ) : isWorkbenchModuleId(tab) ? (
         <WorkbenchModulePane
           moduleId={tab}

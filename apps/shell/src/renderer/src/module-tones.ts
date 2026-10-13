@@ -24,3 +24,11 @@ export const tintStyle = (t: Tint) => ({
   background: `var(--tint-${t})`,
   color: `var(--tint-${t}-fg)`,
 })
+
+/** status hues for error / offline / sign-in tiles; the glyph is the AA text token of each pair */
+export type SignalTone = 'danger' | 'warning' | 'info'
+
+export const signalStyle = (s: SignalTone) => ({
+  background: `var(--${s}-bg)`,
+  color: s === 'info' ? 'var(--info)' : `var(--${s}-text)`,
+})
