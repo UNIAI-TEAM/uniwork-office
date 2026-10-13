@@ -68,6 +68,7 @@ function fakeTransport() {
       { id: 'org_a', name: 'Acme', slug: 'acme', role: 'owner', status: 'active' },
       { id: 'org_b', name: 'Beta', slug: 'beta', role: 'member', status: 'active' },
     ]),
+    orgMembership: vi.fn(async () => ({ role: 'member' })),
     billing: vi.fn(async (orgId: string) => ({
       planCode: orgId === 'org_b' ? 'pro' : 'starter',
       planName: orgId === 'org_b' ? 'Pro' : 'Starter',
@@ -208,11 +209,25 @@ describe('sign-in', () => {
       state: 'signed-in',
       email: 'mai@example.com',
       profile: { accountId: 'acc_1', displayName: 'Mai' },
-      org: { id: 'org_a', name: 'Acme', slug: 'acme', role: 'owner' },
       serverOrigin: 'uniwork.example',
+    })
+    // G8-16 S16: two usable orgs and no remembered choice -> the picker, no plan
+    expect(status.org).toBeUndefined()
+    expect(status.needsOrgChoice).toBe(true)
+    expect(status.entitlements).toBeUndefined()
+    expect(status.orgs).toHaveLength(3)
+    expect(status.orgs?.map((o) => o.membership)).toEqual([
+      'organization_suspended',
+      'active',
+      'active',
+    ])
+    // the picker's one org-scoped read is the chosen org's membership
+    await ctx.manager.selectOrg('org_a')
+    expect(ctx.manager.status()).toMatchObject({
+      org: { id: 'org_a', name: 'Acme', slug: 'acme', role: 'owner' },
+      needsOrgChoice: false,
       entitlements: { orgId: 'org_a', planCode: 'starter' },
     })
-    expect(status.orgs).toHaveLength(3)
     expect(ctx.statuses.map((s) => s.state)).toContain('signing-in')
     // tokens never reach a status payload; the refresh token is persisted
     expect(JSON.stringify(ctx.statuses)).not.toMatch(/at_\d|rt_\d/)
@@ -834,7 +849,7 @@ describe('organizations and entitlements', () => {
   })
 
   it('selectOrg persists the choice and reloads entitlements', async () => {
-    const ctx = setup()
+    const ctx = setup({ orgId: 'org_a' })
     await signIn(ctx)
     const status = await ctx.manager.selectOrg('org_b')
     expect(ctx.persistSelectedOrgId).toHaveBeenCalledWith('org_b')

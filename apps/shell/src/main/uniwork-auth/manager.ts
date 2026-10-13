@@ -2,7 +2,7 @@ import type { AccountEntitlements, AccountErrorCode, AccountStatus } from '../..
 import { isAuthCallbackUrl, validateCallback } from './callback'
 import { CredentialStoreError, type StoredCredential } from './credentials'
 import { redirectUriForProfile, type DeploymentProfile } from './deployment'
-import { pickOrg, toAccountOrg, toEntitlements, toProfile } from './mapping'
+import { resolveOrgChoice, toAccountOrg, toEntitlements, toProfile } from './mapping'
 import { LoginAttemptStore, type PendingLoginAttempt } from './pkce'
 import {
   ACCESS_TOKEN_SKEW_MS,
@@ -108,7 +108,8 @@ export class AccountManager extends SessionCore {
     // (or while it cannot be reached)
     const org = credential.org
     if (org && typeof org.id === 'string' && typeof org.name === 'string') {
-      this.org = { ...org, status: 'active' }
+      // display-only until the server answers: a cached org is shown as active
+      this.org = { id: org.id, name: org.name, slug: org.slug, role: org.role, status: 'active' }
       this.orgs = [this.org]
       if (credential.entitlements?.orgId === org.id)
         this.cachedEntitlements = credential.entitlements
@@ -367,13 +368,38 @@ export class AccountManager extends SessionCore {
   async selectOrg(orgId: string): Promise<AccountStatus> {
     const org = this.orgs.find((candidate) => candidate.id === orgId)
     if (!org || !this.session) return this.status()
+    // a suspended organization is never selectable, and its row says so
+    if (org.status !== 'active') return this.status()
+    const generation = this.generation
+    // the org list cannot carry a deactivated membership (D sends only the
+    // tenant status), so the caller's own membership is read here: this is
+    // the one org-scoped call a select makes, and only for the chosen org.
+    try {
+      const membership = await this.authorized((token) =>
+        (this.transport as UniworkTransport).orgMembership(org.slug, token),
+      )
+      if (generation !== this.generation) return this.status()
+      if (membership.deactivatedAt) {
+        this.deactivatedOrgIds.add(org.id)
+        this.setState(this.state, this.error)
+        return this.status()
+      }
+    } catch (error) {
+      if (generation !== this.generation) return this.status()
+      // an unreachable membership read must not silently hand out an org the
+      // account may no longer be in: keep the picker and report the failure
+      this.applyFailure(error, 'session')
+      return this.status()
+    }
+    this.deactivatedOrgIds.delete(org.id)
     try {
       this.deps.persistSelectedOrgId(org.id)
     } catch {
       // the choice still applies to this run
     }
     this.org = org
-    const generation = this.generation
+    this.needsOrgChoice = false
+    this.rememberedGone = false
     try {
       await this.loadEntitlements(generation)
     } catch (error) {
@@ -445,7 +471,27 @@ export class AccountManager extends SessionCore {
     }
     this.accountProfile = toProfile(me)
     this.orgs = orgs
-    this.org = pickOrg(orgs, this.deps.readSelectedOrgId())
+    // G8-16 S16: a >1-org account with no remembered choice stops here, before
+    // any org-scoped read (billing included); one org is picked automatically.
+    const choice = resolveOrgChoice(orgs, this.deps.readSelectedOrgId())
+    this.needsOrgChoice = choice.needsOrgChoice
+    this.rememberedGone = choice.rememberedGone
+    this.org = choice.org
+    if (choice.needsOrgChoice) {
+      // no org to load a plan for, and nothing org-scoped may run yet
+      this.setEntitlements(null, this.entitlements?.orgId ? this.entitlements : null)
+      this.setState('signed-in')
+      return
+    }
+    // the auto-picked single org is remembered like a manual choice, so the
+    // next sign-in on this machine skips the question
+    if (this.org && this.org.id !== this.deps.readSelectedOrgId()) {
+      try {
+        this.deps.persistSelectedOrgId(this.org.id)
+      } catch {
+        // the choice still applies to this run
+      }
+    }
     await this.loadEntitlements(generation)
     if (generation !== this.generation || !this.session) return
     this.cacheAccount()

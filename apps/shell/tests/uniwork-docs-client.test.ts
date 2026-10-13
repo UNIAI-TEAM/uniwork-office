@@ -230,6 +230,7 @@ describe('401: one shared refresh, one retry (real account session)', () => {
       orgs: vi.fn(async () => [
         { id: 'org_a', name: 'Acme', slug: 'acme', role: 'owner', status: 'active' },
       ]),
+      orgMembership: vi.fn(async () => ({ role: 'owner' })),
       billing: vi.fn(async () => ({
         planCode: 'p',
         planName: 'P',

@@ -2,12 +2,24 @@ import type { UniworkDocFormat, UniworkWorkspaceRef } from '../../shared/home-ap
 import { TransportError } from '../uniwork-auth/transport'
 import { UniworkDocError, errorFromResponse } from './errors'
 import { formatForName, isDecimalString, mimeForFormat } from './formats'
-import { parseCommit, parseDetail, parseDocumentList, parseExchange, parseUpload } from './parse'
+import {
+  parseCommit,
+  parseDetail,
+  parseDocumentList,
+  parseExchange,
+  parseMembershipRole,
+  parseOrgMembers,
+  parseProperties,
+  parseSharedWithMe,
+  parseUpload,
+} from './parse'
 import type {
   CommitReceipt,
   DocumentDetail,
   DocumentListResult,
+  DocumentProperties,
   LaunchDescriptor,
+  OrgMemberName,
   UploadReceipt,
 } from './parse'
 
@@ -46,12 +58,24 @@ export interface DownloadResult {
 
 export interface UniworkDocsClient {
   listWorkspaces(orgId: string): Promise<UniworkWorkspaceRef[]>
+  /** the caller's effective role in one workspace, or null when the server sends none */
+  workspaceRole(workspaceId: string): Promise<string | null>
   listDocuments(input: {
     workspaceId: string
     query?: string
     cursor?: string
     limit?: number
   }): Promise<DocumentListResult>
+  /** documents shared directly with the caller in one workspace (paged) */
+  listSharedWithMe(input: {
+    workspaceId: string
+    cursor?: string
+    limit?: number
+  }): Promise<DocumentListResult>
+  /** the properties panel of one document (ids/times/level/version, no names) */
+  documentProperties(documentId: string): Promise<DocumentProperties>
+  /** org members (id + display name) for resolving the properties panel's names */
+  listOrgMembers(orgSlug: string): Promise<OrgMemberName[]>
   getDocument(documentId: string): Promise<DocumentDetail>
   download(documentId: string, version?: number): Promise<DownloadResult>
   upload(input: {
@@ -216,8 +240,60 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
         }
         const rowOrg =
           typeof r.organization_id === 'string' && r.organization_id ? r.organization_id : orgId
-        return { id: r.id, name: r.name, orgId: rowOrg }
+        // the role is a second read per workspace (GET /workspaces/{id}/me); it
+        // is filled by the service, not here, so this list stays one request
+        return { id: r.id, name: r.name, orgId: rowOrg, myRole: null }
       })
+    },
+
+    async workspaceRole(workspaceId) {
+      const raw = await send({
+        method: 'GET',
+        route: `/workspaces/${id(workspaceId)}/me`,
+        timeoutMs: metadataTimeout,
+        read: json,
+      })
+      return parseMembershipRole(raw)
+    },
+
+    async listSharedWithMe(input) {
+      const params = new URLSearchParams()
+      if (input.cursor) params.set('cursor', input.cursor.slice(0, 512))
+      const limit = Math.min(100, Math.max(1, Math.floor(Number(input.limit) || 50)))
+      params.set('limit', String(limit))
+      const ws = id(input.workspaceId)
+      const raw = await send({
+        method: 'GET',
+        route: `/workspaces/${ws}/documents/shared-with-me`,
+        query: params,
+        timeoutMs: metadataTimeout,
+        read: json,
+      })
+      return parseSharedWithMe(raw, input.workspaceId)
+    },
+
+    async documentProperties(documentId) {
+      const raw = await send({
+        method: 'GET',
+        route: `/documents/${id(documentId)}`,
+        timeoutMs: metadataTimeout,
+        read: json,
+      })
+      const properties = parseProperties(raw)
+      if (properties.id !== documentId) throw new UniworkDocError('malformed_response')
+      return properties
+    },
+
+    async listOrgMembers(orgSlug) {
+      // a slug is lowercase alphanumerics and dashes; anything else never leaves
+      if (!/^[a-z0-9][a-z0-9-]{0,63}$/.test(orgSlug)) throw new UniworkDocError('not_found')
+      const raw = await send({
+        method: 'GET',
+        route: `/orgs/${orgSlug}/members`,
+        timeoutMs: metadataTimeout,
+        read: json,
+      })
+      return parseOrgMembers(raw)
     },
 
     async listDocuments(input) {

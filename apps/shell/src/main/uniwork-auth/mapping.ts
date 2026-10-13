@@ -4,6 +4,7 @@ import type {
   AccountOrg,
   AccountProfile,
   AccountState,
+  OrgMembershipState,
 } from '../../shared/home-api'
 import type { BillingResponse, MeResponse, OrgResponse, TransportErrorCode } from './transport'
 
@@ -75,20 +76,69 @@ export function toProfile(me: MeResponse): AccountProfile {
   }
 }
 
-export function toAccountOrg(org: OrgResponse): AccountOrg {
-  return { id: org.id, name: org.name, slug: org.slug, role: org.role }
+/**
+ * The membership state of one org row. `/orgs` reports only the tenant's own
+ * status, so a suspended (or archived) organization is blocked here; a
+ * deactivated membership is learned later from the per-org membership read
+ * (see `resolveOrgChoice` and AccountManager.selectOrg).
+ */
+export function membershipOf(org: OrgResponse, deactivated = false): OrgMembershipState {
+  if (org.status !== 'active') return 'organization_suspended'
+  return deactivated ? 'member_deactivated' : 'active'
 }
 
-/** persisted choice if still a member, else the first active organization */
-export function pickOrg(
+export function toAccountOrg(org: OrgResponse, deactivated = false): AccountOrg {
+  return {
+    id: org.id,
+    name: org.name,
+    slug: org.slug,
+    role: org.role,
+    membership: membershipOf(org, deactivated),
+  }
+}
+
+export interface OrgChoice {
+  /** the organization to work in; undefined while a choice is pending or every org is blocked */
+  org: OrgResponse | undefined
+  /** true when the renderer must show the S16 picker and no org-scoped call may run yet */
+  needsOrgChoice: boolean
+  /** true when a stored choice is no longer a membership of this account */
+  rememberedGone: boolean
+}
+
+/**
+ * G8-16 S16: no auto-pick when the account belongs to more than one usable
+ * organization and none was remembered. The stored choice (per account +
+ * machine) is used when it is still a membership and usable; when it is gone
+ * the picker returns with `rememberedGone`; when it is present but blocked the
+ * picker returns without `rememberedGone` (the row itself is not selectable).
+ */
+export function resolveOrgChoice(
   orgs: readonly OrgResponse[],
   persistedId: unknown,
-): OrgResponse | undefined {
-  if (typeof persistedId === 'string' && persistedId) {
-    const kept = orgs.find((org) => org.id === persistedId)
-    if (kept) return kept
+): OrgChoice {
+  const remembered =
+    typeof persistedId === 'string' && persistedId
+      ? orgs.find((org) => org.id === persistedId)
+      : undefined
+  if (remembered) {
+    if (remembered.status === 'active') {
+      return { org: remembered, needsOrgChoice: false, rememberedGone: false }
+    }
+    // still a membership, but the organization (or the membership) is blocked
+    return { org: undefined, needsOrgChoice: true, rememberedGone: false }
   }
-  return orgs.find((org) => org.status === 'active')
+  const hadRemembered = typeof persistedId === 'string' && persistedId.length > 0
+  const active = orgs.filter((org) => org.status === 'active')
+  if (active.length === 1) {
+    return { org: active[0], needsOrgChoice: false, rememberedGone: false }
+  }
+  if (active.length > 1) {
+    // more than one usable organization and no remembered choice: never guess
+    return { org: undefined, needsOrgChoice: true, rememberedGone: hadRemembered }
+  }
+  // nothing usable: no picker (the renderer shows the all-blocked panel)
+  return { org: undefined, needsOrgChoice: false, rememberedGone: hadRemembered }
 }
 
 export function toEntitlements(

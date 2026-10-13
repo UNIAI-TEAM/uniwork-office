@@ -151,6 +151,8 @@ export interface UniworkWorkspaceRef {
   id: string
   name: string
   orgId: string
+  /** my effective role in this workspace (owner|admin|member); null when the server did not answer */
+  myRole: string | null
 }
 
 export interface UniworkDocSummary {
@@ -160,6 +162,8 @@ export interface UniworkDocSummary {
   format: UniworkDocFormat | null
   updatedAt: string
   updatedByName?: string
+  /** shared-with-me rows only: the workspace the share lives in (name resolved by main) */
+  workspaceName?: string
 }
 
 export interface UniworkDocListQuery {
@@ -174,6 +178,41 @@ export type UniworkResult<T> = { ok: true; value: T } | { ok: false; error: Uniw
 export interface UniworkDocListPage {
   documents: UniworkDocSummary[]
   nextCursor: string | null
+}
+
+/** paged "shared with me" query; main aggregates the selected org's workspaces */
+export interface UniworkSharedQuery {
+  /** opaque cursor from the previous page; omit for the first page */
+  cursor?: string
+  /** page size, default 50, max 100 */
+  limit?: number
+}
+
+export type UniworkSharedPage = UniworkDocListPage
+
+/**
+ * The document properties panel (S17). Every name/time the server does not
+ * send is null and the renderer shows "—"; `ownerId`/`createdById`/
+ * `updatedById` stay for the case a name could not be resolved.
+ */
+export interface UniworkDocProperties {
+  documentId: string
+  workspaceId: string
+  title: string
+  ownerName: string | null
+  createdByName: string | null
+  createdAt: string | null
+  updatedByName: string | null
+  updatedAt: string | null
+  /** view | edit | manage */
+  myLevel: string | null
+  /** current version ordinal */
+  version: number | null
+  /** who produced the current version */
+  versionByName: string | null
+  ownerId: string | null
+  createdById: string | null
+  updatedById: string | null
 }
 
 export interface UniworkDocStatus {
@@ -605,6 +644,10 @@ export interface HomeApi {
   wb: WorkbenchStoreApi
   uniworkListWorkspaces(): Promise<UniworkResult<UniworkWorkspaceRef[]>>
   uniworkListDocuments(query: UniworkDocListQuery): Promise<UniworkResult<UniworkDocListPage>>
+  /** documents shared directly with me, aggregated across the selected org's workspaces (S17) */
+  uniworkListSharedWithMe(query?: UniworkSharedQuery): Promise<UniworkResult<UniworkSharedPage>>
+  /** the document properties panel (S17); nulls where the server sends no value */
+  uniworkDocumentProperties(documentId: string): Promise<UniworkResult<UniworkDocProperties>>
   uniworkOpenDocument(documentId: string): Promise<UniworkResult<{ path: string }>>
   uniworkDocStatus(path: string): Promise<UniworkDocStatus | null>
   uniworkActiveDocStatus(): Promise<UniworkDocStatus | null>
@@ -724,11 +767,16 @@ export interface AccountProfile {
   avatarUrl?: string
 }
 
+/** why an organization row may or may not be chosen after sign-in (S16) */
+export type OrgMembershipState = 'active' | 'member_deactivated' | 'organization_suspended'
+
 export interface AccountOrg {
   id: string
   name: string
   slug: string
   role: string
+  /** the row's selectability: only 'active' may be chosen */
+  membership: OrgMembershipState
 }
 
 export interface AccountEntitlement {
@@ -766,6 +814,13 @@ export interface AccountStatus {
   serverOrigin?: string
   /** full API origin of the active profile (prefills the server address field) */
   serverUrl?: string
+  /**
+   * G8-16 S16: a choice is required before any organization-scoped call; the
+   * `org` is absent until the user picks one.
+   */
+  needsOrgChoice?: boolean
+  /** G8-16 S16: a remembered organization is no longer a membership of this account */
+  rememberedGone?: boolean
   error?: AccountErrorCode
 }
 
@@ -1176,6 +1231,10 @@ export const HOME_CHANNELS = {
 export const UNIWORK_DOC_CHANNELS = {
   listWorkspaces: 'uniwork-doc:list-workspaces',
   listDocuments: 'uniwork-doc:list-documents',
+  /** invoke(query?) -> the org's documents shared directly with me (paged) */
+  listSharedWithMe: 'uniwork-doc:list-shared-with-me',
+  /** invoke(documentId) -> the properties panel of one document */
+  documentProperties: 'uniwork-doc:document-properties',
   openDocument: 'uniwork-doc:open-document',
   docStatus: 'uniwork-doc:status',
   activeDocStatus: 'uniwork-doc:active-status',

@@ -7,6 +7,7 @@ import {
   type UniworkDocFormat,
   type UniworkDocListQuery,
   type UniworkDocLock,
+  type UniworkSharedQuery,
 } from '../../shared/home-api'
 import { createLaunchPusher, createPushHolder, type LaunchPushTarget } from './launch'
 import {
@@ -413,7 +414,10 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     // a locked keychain is the account's state, not the session's: a cold
     // restore has no session and must still lock the saved account's copies
     keystoreLocked: () => uniworkAccount().status().state === 'keystore-locked',
-    selectedOrgId: () => uniworkAccount().status().org?.id ?? null,
+    selectedOrg: () => {
+      const org = uniworkAccount().status().org
+      return org ? { id: org.id, slug: org.slug } : null
+    },
     authorized: (call) => authorizedRequest(call),
     openPath: (path) => {
       // G5-04g: a newer store is refused before any module sees the path
@@ -467,6 +471,12 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   ipcMain.handle(UNIWORK_DOC_CHANNELS.listWorkspaces, () => service.listWorkspaces())
   ipcMain.handle(UNIWORK_DOC_CHANNELS.listDocuments, (_event, query: unknown) =>
     service.listDocuments((query ?? {}) as UniworkDocListQuery),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.listSharedWithMe, (_event, query: unknown) =>
+    service.listSharedWithMe((query ?? {}) as UniworkSharedQuery),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.documentProperties, (_event, documentId: unknown) =>
+    service.documentProperties(documentId as string),
   )
   ipcMain.handle(UNIWORK_DOC_CHANNELS.openDocument, (_event, documentId: unknown) =>
     service.openDocument(documentId as string),
@@ -533,6 +543,8 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
       onUniworkAccountStatus((status) => {
         // the session's account may have changed: it becomes the last owner
         service.noteSessionIdentity()
+        // G8-16 S16: changing the organization reloads the library data
+        service.noteSelectedOrg(status.org?.id ?? null)
         const identity = uniworkSessionIdentity()
         if (identity) void boundary.enforce(identity).catch(() => undefined)
         const now = status.state === 'signed-in'

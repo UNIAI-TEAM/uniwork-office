@@ -10,10 +10,13 @@ import type {
   UniworkDocListPage,
   UniworkDocListQuery,
   UniworkDocLock,
+  UniworkDocProperties,
   UniworkDocStatus,
   UniworkLaunchEvent,
   UniworkLockReason,
   UniworkResult,
+  UniworkSharedPage,
+  UniworkSharedQuery,
   UniworkWorkspaceRef,
 } from '../../shared/home-api'
 import {
@@ -132,7 +135,8 @@ export interface UniworkDocsServiceDeps {
    * restore has none), so the S11 lock and the save refusal still happen.
    */
   keystoreLocked?(): boolean
-  selectedOrgId(): string | null
+  /** the selected organization: id for org-scoped routes, slug for the members read */
+  selectedOrg(): { id: string; slug: string } | null
   authorized<T>(call: (token: string) => Promise<T>): Promise<T>
   fetch?: FetchLike
   /** the shell's single document router; false = nothing opened */
@@ -200,6 +204,18 @@ const UNSENT_STATES: ReadonlySet<string> = new Set([
  */
 export const CLOSE_SAVE_WAIT_MS = 30_000
 
+/** shared-with-me aggregation bounds (one workspace page, total rows, total pages) */
+const SHARED_PAGE_SIZE = 50
+const SHARED_MAX_ROWS = 500
+const SHARED_MAX_PAGES = 10
+
+/** `shared:<n>` -> n; anything else is the first page */
+function parseOffsetCursor(cursor: string | undefined): number {
+  if (!cursor) return 0
+  const match = /^shared:(\d+)$/.exec(cursor)
+  return match ? Number(match[1]) : 0
+}
+
 async function result<T>(run: () => Promise<T>): Promise<UniworkResult<T>> {
   try {
     return { ok: true, value: await run() }
@@ -248,6 +264,10 @@ export class UniworkDocsService {
   private readonly hashMemo = new Map<string, { mtimeMs: number; size: number; checksum: string }>()
   /** working copies whose editor holds edits not written to the file yet */
   private readonly editorDirty = new Set<string>()
+  /** id -> display name of one org's members; dropped when the selected org changes */
+  private orgMemberNames = new Map<string, string>()
+  /** the org whose member names the map holds (null = nothing cached) */
+  private orgMemberNamesOrg: string | null = null
   /** per path, the saveMark of its last user Save */
   private readonly lastUserSave = new Map<string, number>()
   private saveCounter = 0
@@ -613,6 +633,18 @@ export class UniworkDocsService {
     )
   }
 
+  /**
+   * G8-16 S16: the selected organization changed. The member-name map belongs
+   * to one org, so it is dropped (the library lists are re-read by the
+   * renderer on the same status push; nothing else here caches a library).
+   */
+  noteSelectedOrg(orgId: string | null): void {
+    if (this.orgMemberNamesOrg !== null && this.orgMemberNamesOrg !== orgId) {
+      this.orgMemberNames = new Map()
+      this.orgMemberNamesOrg = null
+    }
+  }
+
   /** the binding belongs to the signed-in account and the active deployment */
   owns(doc: BoundDocument): boolean {
     const identity = this.liveIdentity()
@@ -836,9 +868,116 @@ export class UniworkDocsService {
   listWorkspaces(): Promise<UniworkResult<UniworkWorkspaceRef[]>> {
     return result(async () => {
       if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
-      const orgId = this.deps.selectedOrgId()
-      return orgId ? this.api().listWorkspaces(orgId) : []
+      const org = this.deps.selectedOrg()
+      if (!org) return []
+      const workspaces = await this.api().listWorkspaces(org.id)
+      // S17: each row carries my role. One read per workspace, in parallel; a
+      // failed role read is null (the row still lists, the renderer shows "—").
+      const roles = await Promise.all(
+        workspaces.map((ws) =>
+          this.api()
+            .workspaceRole(ws.id)
+            .catch(() => null),
+        ),
+      )
+      return workspaces.map((ws, index) => ({ ...ws, myRole: roles[index] ?? null }))
     })
+  }
+
+  /**
+   * S17 "Shared with me": the selected org's direct shares, aggregated across
+   * its workspaces (the D route is per workspace), de-duplicated by document
+   * id, newest first, then paged locally. `cursor` is this method's own
+   * opaque offset cursor; a per-workspace page and total-row cap keeps one
+   * call bounded.
+   */
+  listSharedWithMe(query: UniworkSharedQuery = {}): Promise<UniworkResult<UniworkSharedPage>> {
+    return result(async () => {
+      if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
+      const org = this.deps.selectedOrg()
+      if (!org) return { documents: [], nextCursor: null }
+      const api = this.api()
+      const workspaces = await api.listWorkspaces(org.id)
+      const nameOf = new Map(workspaces.map((ws) => [ws.id, ws.name]))
+      const merged = new Map<string, UniworkDocSummary>()
+      await Promise.all(
+        workspaces.map(async (ws) => {
+          let cursor: string | undefined
+          let pages = 0
+          do {
+            const page: Awaited<ReturnType<typeof api.listSharedWithMe>> =
+              await api.listSharedWithMe({ workspaceId: ws.id, cursor, limit: SHARED_PAGE_SIZE })
+            for (const doc of page.documents) {
+              if (!merged.has(doc.id)) {
+                merged.set(doc.id, { ...doc, workspaceName: nameOf.get(doc.workspaceId) ?? ws.name })
+              }
+            }
+            cursor = page.nextCursor ?? undefined
+            pages += 1
+          } while (cursor && pages < SHARED_MAX_PAGES && merged.size < SHARED_MAX_ROWS)
+        }),
+      )
+      const all = [...merged.values()].sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0))
+      const limit = Math.min(SHARED_PAGE_SIZE, Math.max(1, Math.floor(Number(query.limit) || SHARED_PAGE_SIZE)))
+      const offset = parseOffsetCursor(query.cursor)
+      const slice = all.slice(offset, offset + limit)
+      const next = offset + limit < all.length ? `shared:${offset + limit}` : null
+      return { documents: slice, nextCursor: next }
+    })
+  }
+
+  /**
+   * S17 properties panel. Reads GET /documents/{id} for the ids/times/level/
+   * version, then resolves display names best-effort through the org member
+   * list (readable by every member) plus the caller's own profile for a
+   * self-authored document. Anything unresolved stays null ("—").
+   */
+  documentProperties(documentId: string): Promise<UniworkResult<UniworkDocProperties>> {
+    return result(async () => {
+      if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
+      if (typeof documentId !== 'string') throw new UniworkDocError('not_found')
+      const properties = await this.api().documentProperties(documentId)
+      const names = await this.memberNames()
+      const nameOf = (id: string | null): string | null => {
+        if (!id) return null
+        return names.get(id) ?? null
+      }
+      return {
+        documentId: properties.id,
+        workspaceId: properties.workspaceId,
+        title: properties.title,
+        ownerName: nameOf(properties.ownerId),
+        createdByName: nameOf(properties.createdById),
+        createdAt: properties.createdAt,
+        updatedByName: nameOf(properties.updatedById),
+        updatedAt: properties.updatedAt,
+        myLevel: properties.myLevel,
+        version: properties.currentVersion,
+        versionByName: nameOf(properties.updatedById),
+        ownerId: properties.ownerId,
+        createdById: properties.createdById,
+        updatedById: properties.updatedById,
+      }
+    })
+  }
+
+  /**
+   * The org's member names (id -> display name), cached for the run and
+   * dropped when the selected org changes so a switch cannot show the old
+   * org's names. A read failure yields an empty map: names then show "—".
+   */
+  private async memberNames(): Promise<Map<string, string>> {
+    const org = this.deps.selectedOrg()
+    if (!org) return new Map()
+    if (this.orgMemberNamesOrg === org.id) return this.orgMemberNames
+    try {
+      const members = await this.api().listOrgMembers(org.slug)
+      this.orgMemberNames = new Map(members.map((m) => [m.userId, m.displayName]))
+    } catch {
+      this.orgMemberNames = new Map()
+    }
+    this.orgMemberNamesOrg = org.id
+    return this.orgMemberNames
   }
 
   listDocuments(query: UniworkDocListQuery): Promise<UniworkResult<UniworkDocListPage>> {

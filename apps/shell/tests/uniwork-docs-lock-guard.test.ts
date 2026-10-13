@@ -139,7 +139,7 @@ function setup(opts: { account?: string | null; keystoreLocked?: boolean } = {})
     identity: () =>
       account ? { accountId: account, deviceSessionId: 'dev_1', deploymentId: 'default' } : null,
     keystoreLocked: () => keystoreLocked,
-    selectedOrgId: () => 'org_a',
+    selectedOrg: () => ({ id: 'org_a', slug: 'acme' }),
     authorized: <T>(call: (token: string) => Promise<T>) => call(TOKEN),
     fetch: fakeFetch as never,
     openPath: vi.fn(() => true),

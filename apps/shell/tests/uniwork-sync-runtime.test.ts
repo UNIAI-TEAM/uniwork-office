@@ -573,7 +573,7 @@ describe('the full resync keeps drafts through the real hasLocalDraft (wiring ke
       applyProfile: async () => 'unchanged',
       identity: () => identity,
       keystoreLocked: () => false,
-      selectedOrgId: () => 'org_a',
+      selectedOrg: () => ({ id: 'org_a', slug: 'acme' }),
       authorized: <T>(call: (token: string) => Promise<T>) => call('token'),
       openPath: () => true,
       isPathOpen: () => false,
