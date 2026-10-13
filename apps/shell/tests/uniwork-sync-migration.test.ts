@@ -257,6 +257,47 @@ describe('migrateLegacyIntents', () => {
     expect(readFileSync(join(brokenDir, BINDING_FILE), 'utf8')).toBe('not json')
   })
 
+  it('leaves a newer or unclassifiable store and its payload byte-for-byte alone (R1-be-9)', async () => {
+    // a schema-3 store (a newer app), a schema-2 binding above this build's
+    // level, and a binding this build cannot classify: the sweep must not
+    // rewrite, delete or write anything in these folders
+    const newer = copyDir('newer_doc')
+    writeFileSync(join(newer, DOCX), PAYLOAD)
+    writeFileSync(
+      join(newer, BINDING_FILE),
+      JSON.stringify({ schema: 3, min_store_level: 3, min_app_version: '9.0.0' }, null, 2),
+    )
+    writeFileSync(join(newer, INTENT_PAYLOAD_FILE), PAYLOAD)
+    const above = copyDir('above_doc')
+    writeFileSync(join(above, DOCX), PAYLOAD)
+    writeFileSync(
+      join(above, BINDING_FILE),
+      JSON.stringify({ schema: 2, min_store_level: 9, min_app_version: '9.0.0' }, null, 2),
+    )
+    writeFileSync(join(above, INTENT_PAYLOAD_FILE), PAYLOAD)
+    const unknown = copyDir('unknown_doc')
+    writeFileSync(join(unknown, BINDING_FILE), JSON.stringify({ schema: 'x' }, null, 2))
+    writeFileSync(join(unknown, INTENT_PAYLOAD_FILE), PAYLOAD)
+
+    const snapshot = (dir: string) =>
+      readdirSync(dir)
+        .sort()
+        .map((name) => [name, readFileSync(join(dir, name), 'utf8')] as const)
+    const before = [snapshot(newer), snapshot(above), snapshot(unknown)]
+
+    const layer = makeLayer()
+    const report = await migrateLegacyIntents({
+      root,
+      scope: SCOPE,
+      records: await openRecords(layer),
+      appVersion: APP_VERSION,
+    })
+    expect(report).toEqual({ found: 0, migrated: 0, cleaned: 0, deferred: 0 })
+    // byte for byte: nothing rewritten, nothing deleted, no record written
+    expect([snapshot(newer), snapshot(above), snapshot(unknown)]).toEqual(before)
+    expect(recordFiles()).toEqual([])
+  })
+
   it('a schema-2 copy with a stray payload (crash after the rewrite) loses only the payload', async () => {
     const dir = copyDir(DOC_KEY)
     const binding: Binding = {

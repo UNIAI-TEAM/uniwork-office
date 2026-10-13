@@ -7,6 +7,7 @@ import {
   BINDING_FILE,
   INTENT_PAYLOAD_FILE,
   bindingJson,
+  bindingKindOf,
   parseBinding,
   scopeWorkingCopyDirs,
 } from '../uniwork-docs/binding-store'
@@ -32,7 +33,9 @@ import type { StoreRecords } from './store'
  * reads schema 1 while the payload exists). The caller opens the store first:
  * while the keychain is locked nothing runs and no plaintext is touched. A
  * schema-2 copy with a stray payload (a crash after step 2) just loses the
- * payload, which the store already holds.
+ * payload, which the store already holds. A folder this build must not open
+ * (schema >= 3, a store level above this build, an unclassifiable binding) is
+ * never rewritten or cleaned: newer stores stay byte-for-byte intact.
  */
 
 export interface LegacyIntentMigrationReport {
@@ -98,6 +101,10 @@ export async function migrateLegacyIntents(
         ? parseIntentRecord(raw.pendingIntent)
         : null
     if (!legacy) {
+      // a folder this build must not open (schema >= 3, a store level above
+      // it, an unclassifiable binding) is left exactly as it is, payload
+      // included: the sweep never mutates a newer store (OQ-P4 / R1-be-9)
+      if (bindingKindOf(raw) !== 'current') continue
       // no intent to move; a payload left behind (a crash after the binding was
       // rewritten, or an intent the old build had already dropped) belongs to
       // nothing and goes - with the schema-1 binding upgraded with it
