@@ -210,6 +210,16 @@ describe('Tasks tab', () => {
     expect(host.textContent).toContain('Send the quote')
   })
 
+  it('a rejected bridge call reads as offline: an error with Retry, never a stuck skeleton', async () => {
+    // e.g. a missing handler after a stale preload: useWorkLoad must settle it (settleWork)
+    api.myTasks.mockRejectedValueOnce(new Error('ipc closed'))
+    await mount({ ...WS, id: 'w-rejected' })
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain('Couldn’t reach UniWork')
+    expect(host.querySelector('.wb-work-skeleton')).toBeNull()
+    await click(buttonByText('Retry'))
+    expect(host.textContent).toContain('Send the quote')
+  })
+
   it('a status key missing from the catalogue shows as-is and stays open', async () => {
     api.myTasks.mockResolvedValueOnce({ ok: true, value: [{ ...TASK, status: 'qa_hold' }] })
     await mount({ ...WS, id: 'w-unknown' })
