@@ -757,6 +757,24 @@ export class TabManager {
     return affected
   }
 
+  /**
+   * A document's title changed on the server while its working copy keeps its
+   * file name (an editor holds it, so the file is not moved): re-title the open
+   * tab by path and return its view, so the caller can tell the embedded editor.
+   */
+  retitleTabFile(path: string, title: string): Array<{ kind: TabKind; webContents: WebContents }> {
+    const affected: Array<{ kind: TabKind; webContents: WebContents }> = []
+    const wanted = canonicalPath(path)
+    for (const tab of this.tabs) {
+      if (!tab.filePath || canonicalPath(tab.filePath) !== wanted) continue
+      if (tab.title === title) continue
+      tab.title = title
+      if (tab.view) affected.push({ kind: tab.kind, webContents: tab.view.webContents })
+    }
+    if (affected.length > 0) this.onChanged()
+    return affected
+  }
+
   /** sheets tabs whose renderer reports unsaved journal edits (shell-close guard) */
   dirtySheetsTabs(): Array<{ id: string; webContents: WebContents }> {
     return this.tabs

@@ -3,29 +3,61 @@ import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
 import type { UniworkDocErrorCode, UniworkDocListPage, UniworkResult } from '../../shared/home-api'
 import { FileBadge } from './FileBadge'
 import { UniworkDocInfoPanel, type DocInfoLoad } from './UniworkDocInfoPanel'
+import {
+  ActionToast,
+  ArchiveConfirm,
+  NewDocDialog,
+  RenameField,
+  RowMenu,
+  UploadDocDialog,
+  type ActionOutcome,
+  type DocTarget,
+  type RowAction,
+  type UploadProgress,
+} from './UniworkDocActions'
 import { useI18n } from './locale'
 import { needsSignIn, type AccountView } from './account-model'
-import { publishUniworkNotice } from './uniwork-notice-bus'
+import { publishLocalRename, publishUniworkNotice } from './uniwork-notice-bus'
 import {
   PICKER_PAGE_SIZE,
   PICKER_SEARCH_DEBOUNCE_MS,
   SHARED_SOURCE_VALUE,
   UNIWORK_ERROR_KEYS,
+  checkDocName,
   docExtension,
   errorActionOf,
+  hasRowActions,
+  isDocNameError,
+  isDocTitleTooLong,
   initialPickerState,
+  isNavigable,
   isOpenable,
   pickerBodyOf,
   pickerReducer,
   pickerRowMeta,
+  renameParts,
   retryActionOf,
+  rowActionsOf,
   visibleDocs,
   workspaceLabel,
+  type DocNameError,
+  type LibraryDocRow,
   type PickerState,
 } from './uniwork-docs-model'
 import {
+  archiveDocument,
+  cancelUploadDocument,
+  createDocument,
+  listFolders,
   listSharedDocuments,
   loadDocProperties,
+  onDocRenamed,
+  onUploadProgress,
+  pickUploadFile,
+  renameDocument,
+  restoreDocument,
+  uploadDocument,
+  type DocActionResult,
   type SharedDocSummary,
 } from './uniwork-library-api'
 
@@ -54,6 +86,11 @@ function Spinner() {
 
 const FOCUSABLE =
   'button:not([disabled]):not([tabindex="-1"]), select:not([disabled]), input:not([disabled]), [tabindex="0"]'
+
+/** an action call that rejected is a failure like any other (toast, nothing applied) */
+function settleAction<T>(call: Promise<DocActionResult<T>>): Promise<DocActionResult<T>> {
+  return call.catch((): DocActionResult<T> => ({ ok: false, error: 'network' }))
+}
 
 /** one page of the current source: the workspace's documents, or the shared list */
 function fetchPage(s: PickerState, cursor?: string): Promise<UniworkResult<UniworkDocListPage>> {
@@ -93,7 +130,7 @@ export function UniworkOpenDialog({
   stateRef.current = state
   const mounted = useRef(true)
   /** the document the last open attempt was for (Retry / sign-in resumes it) */
-  const lastOpenId = useRef<string | null>(null)
+  const lastOpen = useRef<{ id: string; title: string } | null>(null)
   const dialogRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLUListElement>(null)
   const [draft, setDraft] = useState('')
@@ -102,6 +139,23 @@ export function UniworkOpenDialog({
   /** the document whose details panel is open */
   const [info, setInfo] = useState<{ id: string; title: string; load: DocInfoLoad } | null>(null)
   const infoRequest = useRef(0)
+  /** S18: the New document / Upload dialog, the row being renamed, the archive prompt */
+  const [form, setForm] = useState<'new' | 'upload' | null>(null)
+  const [upload, setUpload] = useState<UploadProgress | null>(null)
+  /** bumped by every upload start and cancel: a result of an older upload is ignored */
+  const uploadRun = useRef(0)
+  /** the id of the upload under way: progress of any other upload is not ours */
+  const uploadId = useRef<string | null>(null)
+  /** rows with an archive/restore call in flight (one call per row at a time) */
+  const rowBusy = useRef(new Set<string>())
+  const [renaming, setRenaming] = useState<{
+    id: string
+    error: DocNameError | null
+    busy: boolean
+  } | null>(null)
+  const [archiving, setArchiving] = useState<{ id: string; title: string } | null>(null)
+  const [toast, setToast] = useState<string | null>(null)
+  const clearToast = useCallback(() => setToast(null), [])
 
   useEffect(() => {
     mounted.current = true
@@ -122,6 +176,24 @@ export function UniworkOpenDialog({
       live = false
     }
   }, [workspaceTick])
+
+  // a document renamed elsewhere (or by main after a save) shows its new title in place
+  useEffect(
+    () =>
+      onDocRenamed(({ documentId, title }) =>
+        dispatch({ type: 'doc-renamed', id: documentId, title }),
+      ),
+    [],
+  )
+
+  useEffect(
+    () =>
+      onUploadProgress((event) => {
+        if (event.uploadId !== uploadId.current) return
+        setUpload((prev) => (prev ? { ...prev, loaded: event.loaded, total: event.total } : prev))
+      }),
+    [],
+  )
 
   // a fresh document fetch starts whenever the reducer bumps the request id
   const requestId = state.list.requestId
@@ -191,8 +263,14 @@ export function UniworkOpenDialog({
 
   const openDoc = (id: string) => {
     const doc = stateRef.current.list.docs.find((d) => d.id === id)
-    if (!doc || !isOpenable(doc) || stateRef.current.opening) return
-    lastOpenId.current = doc.id
+    if (!doc || !isOpenable(doc)) return
+    openById(doc)
+  }
+
+  /** open a document by its id (a listed row, or the one just created / uploaded) */
+  const openById = (doc: { id: string; title: string }) => {
+    if (stateRef.current.opening) return
+    lastOpen.current = { id: doc.id, title: doc.title }
     dispatch({ type: 'open-start', id: doc.id, title: doc.title })
     void settle(window.aiOffice.uniworkOpenDocument(doc.id)).then((result) => {
       if (result.ok) {
@@ -208,6 +286,143 @@ export function UniworkOpenDialog({
     })
   }
 
+  // ── S18: create, upload, rename, archive ──
+
+  /** where a new document goes by default: the workspace being browsed, top level */
+  const defaultTarget = (): DocTarget => {
+    const s = stateRef.current
+    return { workspaceId: s.workspaceId ?? s.workspaces.items[0]?.id ?? '', folderId: null }
+  }
+
+  /** a name error stays at the field; anything else is a toast and nothing applies */
+  const outcomeOf = (error: string): ActionOutcome => {
+    if (isDocNameError(error)) return { ok: false, error }
+    setToast(t('uwDocActionFailed'))
+    return { ok: false, error: 'failed' }
+  }
+
+  /** a new or uploaded document opens by its id: the server's document, no local copy first */
+  const created = (result: DocActionResult<{ id: string; title: string }>): ActionOutcome => {
+    if (!mounted.current) return { ok: true }
+    if (!result.ok) return outcomeOf(result.error)
+    setForm(null)
+    openById(result.value)
+    return { ok: true }
+  }
+
+  const createDoc = (input: Parameters<typeof createDocument>[0]) =>
+    settleAction(createDocument(input)).then(created)
+
+  /**
+   * Cancel / Esc / overlay on the Upload dialog. Main aborts the upload by its
+   * id; if the server had already answered, the document exists anyway, so the
+   * renderer also stops listening: a late result neither opens it nor toasts.
+   */
+  const cancelUpload = () => {
+    uploadRun.current++
+    if (uploadId.current) void cancelUploadDocument(uploadId.current).catch(() => undefined)
+    uploadId.current = null
+    setUpload(null)
+    setForm(null)
+  }
+
+  const uploadDoc = (input: DocTarget & { path: string; name: string }) => {
+    const run = ++uploadRun.current
+    const id = crypto.randomUUID()
+    uploadId.current = id
+    setUpload({ name: input.name, loaded: 0, total: 0 })
+    return settleAction(
+      uploadDocument({
+        workspaceId: input.workspaceId,
+        folderId: input.folderId,
+        path: input.path,
+        uploadId: id,
+      }),
+    ).then((result): ActionOutcome => {
+      if (run !== uploadRun.current) return { ok: true }
+      uploadId.current = null
+      if (mounted.current) setUpload(null)
+      // a cancelled upload is never an error to show
+      if (!result.ok && result.error === 'upload_cancelled') return { ok: true }
+      return created(result)
+    })
+  }
+
+  /** focus back on a row's "…" button (after rename / archive) */
+  const focusRowMenu = (id: string) => {
+    window.setTimeout(() => {
+      Array.from(dialogRef.current?.querySelectorAll<HTMLElement>('[data-menu-for]') ?? [])
+        .find((el) => el.dataset.menuFor === id)
+        ?.focus()
+    })
+  }
+
+  const endRename = (id: string) => {
+    setRenaming(null)
+    focusRowMenu(id)
+  }
+
+  const saveRename = (doc: LibraryDocRow, value: string) => {
+    const { ext } = renameParts(doc.title, doc.format)
+    const checked = checkDocName(value)
+    if (!checked.ok) {
+      setRenaming({ id: doc.id, error: checked.error, busy: false })
+      return
+    }
+    const next = checked.name + ext
+    // the limit counts the whole title, so a long name plus its extension is caught here too
+    if (isDocTitleTooLong(next)) {
+      setRenaming({ id: doc.id, error: 'name_too_long', busy: false })
+      return
+    }
+    if (next === doc.title) {
+      endRename(doc.id)
+      return
+    }
+    const before = doc.title
+    setRenaming({ id: doc.id, error: null, busy: true })
+    dispatch({ type: 'doc-renamed', id: doc.id, title: next })
+    void settleAction(renameDocument(doc.id, next)).then((result) => {
+      if (!mounted.current) return
+      if (result.ok) {
+        const title = result.value.title || next
+        dispatch({ type: 'doc-renamed', id: doc.id, title })
+        // main does not push a rename made here back: say it once in the live region
+        publishLocalRename(title)
+        endRename(doc.id)
+        return
+      }
+      // not applied: the row goes back to the name it had
+      dispatch({ type: 'doc-renamed', id: doc.id, title: before })
+      if (isDocNameError(result.error)) {
+        setRenaming({ id: doc.id, error: result.error, busy: false })
+      } else {
+        outcomeOf(result.error)
+        endRename(doc.id)
+      }
+    })
+  }
+
+  const setArchived = (id: string, archived: boolean) => {
+    if (rowBusy.current.has(id)) return
+    rowBusy.current.add(id)
+    const call = archived ? archiveDocument(id) : restoreDocument(id)
+    void settleAction(call).then((result) => {
+      rowBusy.current.delete(id)
+      if (!mounted.current) return
+      if (result.ok) dispatch({ type: 'doc-archived', id, archived })
+      else outcomeOf(result.error)
+      focusRowMenu(id)
+    })
+  }
+
+  const onRowAction = (doc: LibraryDocRow, action: RowAction) => {
+    setToast(null)
+    if (action === 'rename') setRenaming({ id: doc.id, error: null, busy: false })
+    else if (action === 'archive') setArchiving({ id: doc.id, title: doc.title })
+    else setArchived(doc.id, false)
+  }
+
   // signed in again from the dialog: pick up where the failed call left off
   const previousView = useRef(accountView)
   useEffect(() => {
@@ -215,9 +430,9 @@ export function UniworkOpenDialog({
     previousView.current = accountView
     if (!needsSignIn(was) || (accountView !== 'signed-in' && accountView !== 'refreshing')) return
     const s = stateRef.current
-    if (s.openError && lastOpenId.current) {
+    if (s.openError && lastOpen.current) {
       dispatch({ type: 'clear-open-error' })
-      openDoc(lastOpenId.current)
+      openById(lastOpen.current)
     } else if (pickerBodyOf(s).kind === 'error') {
       retry()
     }
@@ -261,7 +476,7 @@ export function UniworkOpenDialog({
     }
     if (event.nativeEvent.isComposing || target.tagName === 'SELECT') return
     // keys inside the details panel are its own
-    if (target.closest('.uw-info')) return
+    if (target.closest('.uw-info, .uw-rename, .uw-row-menu')) return
     const inSearch = target.tagName === 'INPUT'
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault()
@@ -377,8 +592,18 @@ export function UniworkOpenDialog({
             >
               {docs.map((doc, index) => {
                 const openable = isOpenable(doc)
+                const row = doc as LibraryDocRow
+                const editing = renaming?.id === doc.id ? renaming : null
                 const active = doc.id === state.activeId
-                const meta = openable ? pickerRowMeta(doc, t, dateLocale) : t('uwPickUnsupported')
+                const archived = row.archived === true
+                const navigable = isNavigable(doc)
+                // an archived row is a supported document that is parked, not an unsupported one
+                const updated = pickerRowMeta(doc, t, dateLocale)
+                const meta = archived
+                  ? [t('uwDocArchived'), updated].filter(Boolean).join(' · ')
+                  : openable
+                    ? updated
+                    : t('uwPickUnsupported')
                 // shared rows come from several workspaces: name the one each lives in
                 const where =
                   state.source === 'shared' ? (doc as SharedDocSummary).workspaceName?.trim() : ''
@@ -388,16 +613,32 @@ export function UniworkOpenDialog({
                       id={optionId(index)}
                       role="option"
                       aria-selected={active}
-                      aria-disabled={!openable}
-                      className={`uw-pick-row${active ? ' active' : ''}${openable ? '' : ' disabled'}${state.opening?.id === doc.id ? ' opening' : ''}`}
+                      aria-disabled={archived ? undefined : !openable}
+                      className={`uw-pick-row${active ? ' active' : ''}${openable ? '' : ' disabled'}${archived ? ' archived' : ''}${state.opening?.id === doc.id ? ' opening' : ''}`}
                       onMouseMove={() => {
-                        if (openable && !active) dispatch({ type: 'set-active', id: doc.id })
+                        if (navigable && !active) dispatch({ type: 'set-active', id: doc.id })
                       }}
-                      onClick={() => openDoc(doc.id)}
+                      onClick={() => {
+                        if (!editing) openDoc(doc.id)
+                      }}
                     >
                       <FileBadge ext={docExtension(doc)} size={24} />
                       <span className="uw-pick-row-text">
-                        <span className="uw-pick-row-title">{doc.title}</span>
+                        {editing ? (
+                          <RenameField
+                            initial={renameParts(doc.title, doc.format).base}
+                            label={doc.title}
+                            error={editing.error}
+                            busy={editing.busy}
+                            onSave={(value) => saveRename(row, value)}
+                            onCancel={() => endRename(doc.id)}
+                            onEdit={() => {
+                              if (editing.error) setRenaming({ ...editing, error: null })
+                            }}
+                          />
+                        ) : (
+                          <span className="uw-pick-row-title">{doc.title}</span>
+                        )}
                         {(meta || where) && (
                           <span className="uw-pick-row-meta">
                             {where && <span className="uw-pick-row-where">{where}</span>}
@@ -439,6 +680,15 @@ export function UniworkOpenDialog({
                         <circle cx="8" cy="5" r="0.9" fill="currentColor" />
                       </svg>
                     </button>
+                    {hasRowActions(row) && (
+                      <RowMenu
+                        docId={doc.id}
+                        title={doc.title}
+                        actions={rowActionsOf(row)}
+                        tabbable={active}
+                        onAction={(action) => onRowAction(row, action)}
+                      />
+                    )}
                   </li>
                 )
               })}
@@ -464,6 +714,16 @@ export function UniworkOpenDialog({
       >
         <div className="uw-pick-head">
           <h3 id="uw-pick-title">{t('uwPickTitle')}</h3>
+          {state.workspaces.items.length > 0 && (
+            <div className="uw-pick-actions">
+              <button type="button" className="btn btn-secondary" onClick={() => setForm('upload')}>
+                {t('uwDocUpload')}
+              </button>
+              <button type="button" className="btn btn-primary" onClick={() => setForm('new')}>
+                {t('uwDocNew')}
+              </button>
+            </div>
+          )}
           <button className="uw-pick-close" aria-label={t('uwPickClose')} onClick={onClose}>
             <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
               <path
@@ -544,13 +804,48 @@ export function UniworkOpenDialog({
                 {t('acctSignIn')}
               </button>
             )}
-            {openErrorAction === 'retry' && lastOpenId.current && (
-              <button className="btn btn-secondary" onClick={() => openDoc(lastOpenId.current!)}>
+            {openErrorAction === 'retry' && lastOpen.current && (
+              <button className="btn btn-secondary" onClick={() => openById(lastOpen.current!)}>
                 {t('acctRetry')}
               </button>
             )}
           </div>
         )}
+        {form === 'new' && (
+          <NewDocDialog
+            workspaces={state.workspaces.items}
+            initialTarget={defaultTarget()}
+            loadFolders={listFolders}
+            onCreate={createDoc}
+            onCancel={() => setForm(null)}
+          />
+        )}
+        {form === 'upload' && (
+          <UploadDocDialog
+            workspaces={state.workspaces.items}
+            initialTarget={defaultTarget()}
+            loadFolders={listFolders}
+            pickFile={pickUploadFile}
+            onUpload={uploadDoc}
+            progress={upload}
+            onCancel={cancelUpload}
+          />
+        )}
+        {archiving && (
+          <ArchiveConfirm
+            name={archiving.title}
+            onCancel={() => {
+              const id = archiving.id
+              setArchiving(null)
+              focusRowMenu(id)
+            }}
+            onConfirm={() => {
+              setArchiving(null)
+              setArchived(archiving.id, true)
+            }}
+          />
+        )}
+        {toast && <ActionToast message={toast} onDone={clearToast} />}
       </div>
     </div>
   )

@@ -486,6 +486,10 @@ export type PickerAction =
   | { type: 'open-start'; id: string; title: string }
   | { type: 'open-failed'; error: UniworkDocErrorCode }
   | { type: 'clear-open-error' }
+  /** a row's title changed (renamed here, a failed rename reverting, or renamed elsewhere) */
+  | { type: 'doc-renamed'; id: string; title: string }
+  /** a row was archived or restored from its menu */
+  | { type: 'doc-archived'; id: string; archived: boolean }
 
 export function initialPickerState(): PickerState {
   return {
@@ -502,7 +506,8 @@ export function initialPickerState(): PickerState {
 
 /** only docx, xlsx, pptx, pdf, md and html open; the server list also holds other file types */
 export function isOpenable(doc: UniworkDocSummary): boolean {
-  return doc.format !== null
+  // an archived row stays listed (to restore it) but does not open
+  return doc.format !== null && (doc as LibraryDocRow).archived !== true
 }
 
 /** extension for the file-type icon: the known format, else whatever the title ends in */
@@ -512,17 +517,26 @@ export function docExtension(doc: UniworkDocSummary): string {
   return dot > 0 ? doc.title.slice(dot + 1).toLowerCase() : ''
 }
 
-function firstOpenable(docs: UniworkDocSummary[]): string | null {
-  return docs.find(isOpenable)?.id ?? null
+/**
+ * Rows the arrow keys can land on: the openable ones plus the archived ones,
+ * so the single "…" tab stop (the active row's) reaches Restore by keyboard.
+ */
+export function isNavigable(doc: UniworkDocSummary): boolean {
+  return isOpenable(doc) || (doc as LibraryDocRow).archived === true
 }
 
-/** arrow keys step over documents that cannot be opened */
+function firstOpenable(docs: UniworkDocSummary[]): string | null {
+  // a list of archived rows only still gets a row to start from (its "…" is the tab stop)
+  return (docs.find(isOpenable) ?? docs.find(isNavigable))?.id ?? null
+}
+
+/** arrow keys step over documents that are neither openable nor archived (a row that can only be listed) */
 export function moveActive(
   docs: UniworkDocSummary[],
   activeId: string | null,
   to: 'next' | 'prev' | 'first' | 'last',
 ): string | null {
-  const ids = docs.filter(isOpenable).map((d) => d.id)
+  const ids = docs.filter(isNavigable).map((d) => d.id)
   if (ids.length === 0) return null
   if (to === 'first') return ids[0]!
   if (to === 'last') return ids[ids.length - 1]!
@@ -642,7 +656,7 @@ export function pickerReducer(state: PickerState, action: PickerAction): PickerS
           moreError: undefined,
         },
         activeId:
-          state.activeId && shown.some((d) => d.id === state.activeId && isOpenable(d))
+          state.activeId && shown.some((d) => d.id === state.activeId && isNavigable(d))
             ? state.activeId
             : firstOpenable(shown),
       }
@@ -663,6 +677,14 @@ export function pickerReducer(state: PickerState, action: PickerAction): PickerS
       return { ...state, opening: null, openError: action.error }
     case 'clear-open-error':
       return state.openError ? { ...state, openError: null } : state
+    case 'doc-renamed':
+    case 'doc-archived': {
+      if (!state.list.docs.some((d) => d.id === action.id)) return state
+      const patch =
+        action.type === 'doc-renamed' ? { title: action.title } : { archived: action.archived }
+      const docs = state.list.docs.map((d) => (d.id === action.id ? { ...d, ...patch } : d))
+      return { ...state, list: { ...state.list, docs } }
+    }
   }
 }
 
@@ -711,6 +733,112 @@ export function visibleDocs(
 /** retry what failed: the workspace list when that was it, else the document list */
 export function retryActionOf(state: PickerState): PickerAction {
   return state.workspaces.status === 'error' ? { type: 'workspaces-retry' } : { type: 'list-retry' }
+}
+
+// ── Create, rename, archive (S18) ───────────────────────
+
+/** the formats a new blank document can have */
+export const NEW_DOC_FORMATS = ['docx', 'xlsx', 'pptx'] as const
+export type NewDocFormat = (typeof NEW_DOC_FORMATS)[number]
+
+/**
+ * A library row with what S18 reads beyond the summary: the action flags main
+ * derives from my_level, and whether the row was archived from this dialog.
+ * A row without flags (an older main) gets no actions: nothing is offered that
+ * the server may refuse.
+ */
+export type LibraryDocRow = UniworkDocSummary & {
+  canEdit?: boolean
+  canManage?: boolean
+  archived?: boolean
+}
+
+export interface RowActions {
+  rename: boolean
+  archive: boolean
+  restore: boolean
+}
+
+/**
+ * The row menu's items. A view-only row has none, so its "…" button is not
+ * rendered at all (the person has no such action; not a disabled control).
+ */
+export function rowActionsOf(doc: LibraryDocRow): RowActions {
+  const archived = doc.archived === true
+  return {
+    rename: doc.canEdit === true && !archived,
+    archive: doc.canManage === true && !archived,
+    restore: doc.canManage === true && archived,
+  }
+}
+
+export function hasRowActions(doc: LibraryDocRow): boolean {
+  const a = rowActionsOf(doc)
+  return a.rename || a.archive || a.restore
+}
+
+/** errors a name field shows in place; every other failure is a toast */
+export type DocNameError = 'name_empty' | 'name_too_long'
+
+export const DOC_NAME_ERROR_KEYS: Record<DocNameError, StringKey> = {
+  name_empty: 'uwDocNameEmpty',
+  name_too_long: 'uwDocNameTooLong',
+}
+
+/** the longest name the server accepts, in runes (code points); a duplicate name is allowed */
+export const DOC_NAME_MAX_RUNES = 500
+
+/** whether a full title (name plus its extension) is over the server's limit */
+export function isDocTitleTooLong(title: string): boolean {
+  return Array.from(title).length > DOC_NAME_MAX_RUNES
+}
+
+/** the trimmed name, or the empty / too-long error before any call goes out */
+export function checkDocName(
+  raw: string,
+): { ok: true; name: string } | { ok: false; error: DocNameError } {
+  const name = raw.trim()
+  if (!name) return { ok: false, error: 'name_empty' }
+  if (isDocTitleTooLong(name)) return { ok: false, error: 'name_too_long' }
+  return { ok: true, name }
+}
+
+export function isDocNameError(error: string): error is DocNameError {
+  return error === 'name_empty' || error === 'name_too_long'
+}
+
+/**
+ * The name a rename field starts with. A file title keeps its extension on the
+ * server, so the field shows the base name and the extension is put back on
+ * save (the person renames the document, not its type).
+ */
+export function renameParts(
+  title: string,
+  format: UniworkDocSummary['format'],
+): {
+  base: string
+  ext: string
+} {
+  if (format) {
+    const ext = `.${format}`
+    if (title.toLowerCase().endsWith(ext) && title.length > ext.length) {
+      return { base: title.slice(0, -ext.length), ext: title.slice(-ext.length) }
+    }
+  }
+  return { base: title, ext: '' }
+}
+
+const OFFICE_EXTENSIONS = ['.docx', '.xlsx', '.pptx']
+
+/**
+ * The name a blank document is created with: the chosen format's extension is
+ * put on unless the typed name already ends in .docx / .xlsx / .pptx (any case,
+ * and something before the dot), the same way rename keeps a title's extension.
+ */
+export function nameWithExtension(name: string, format: NewDocFormat): string {
+  const lower = name.toLowerCase()
+  const has = OFFICE_EXTENSIONS.some((ext) => lower.endsWith(ext) && name.length > ext.length)
+  return has ? name : `${name}.${format}`
 }
 
 // ── Time ────────────────────────────────────────────────

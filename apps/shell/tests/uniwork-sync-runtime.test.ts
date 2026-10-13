@@ -82,6 +82,8 @@ function harness(
     capabilityRead?: (orgId: string) => Promise<CapabilityRead>
     pages?(call: { workspaceId: string; cursor?: string }): FeedPage | Error
     keepDraft?: (documentId: string) => Promise<boolean>
+    /** S18: a page the doc cache committed (a renamed-elsewhere notice) */
+    onFeedChange?: (change: Change) => void
     /** wraps one registered store's records (a refused write, a torn commit, ...) */
     wrapRecords?: (name: string, records: StoreRecords) => StoreRecords
   } = {},
@@ -141,6 +143,7 @@ function harness(
       } as CapabilityRead),
     client: () => client,
     keepDraft: options.keepDraft ?? (async () => false),
+    ...(options.onFeedChange ? { onFeedChange: options.onFeedChange } : {}),
     clock,
     onSessionExpired: () => {
       expired += 1
@@ -797,5 +800,53 @@ describe('G506-be-3: only a failed feed round trip reports the queue offline', (
     })
     await runtime.tick()
     expect(polls).toEqual([false])
+  })
+})
+
+describe('the S18 change notice (G8-17)', () => {
+  it('announces every document of a page the doc cache committed, exactly once', async () => {
+    const seen: string[] = []
+    const h = harness({
+      pages: () => ({ ...PAGE, changes: [change('doc_1'), change('doc_2')], nextCursor: 'c1' }),
+      onFeedChange: (c) => seen.push(c.documentId),
+    })
+    await h.runtime.tick()
+    expect(seen).toEqual(['doc_1', 'doc_2'])
+    // a replayed page (the cache already holds those rows) is inert: no second
+    // notice, so the service is not asked to re-read metadata again
+    seen.length = 0
+    await h.runtime.tick()
+    expect(seen).toEqual([])
+  })
+
+  // R1-7: a page can carry two changes for one document (a fast double edit);
+  // both pass the revision comparison in the same pass, so the applied ids are
+  // deduped per document - one metadata re-read, not two.
+  it('announces a document with two changes in one page exactly once', async () => {
+    const seen: string[] = []
+    const h = harness({
+      pages: () => ({
+        ...PAGE,
+        changes: [change('doc_1'), { ...change('doc_1'), revision: '42' }, change('doc_2')],
+        nextCursor: 'c1',
+      }),
+      onFeedChange: (c) => seen.push(c.documentId),
+    })
+    await h.runtime.tick()
+    expect(seen).toEqual(['doc_1', 'doc_2'])
+  })
+
+  it('announces nothing when the cache refuses the page', async () => {
+    const seen: string[] = []
+    const h = harness({
+      onFeedChange: (c) => seen.push(c.documentId),
+      wrapRecords: (name, records) =>
+        name === DOC_INDEX_REGISTRATION.name
+          ? { ...records, write: async () => ({ kind: 'store_full' as const }) }
+          : records,
+    })
+    const result = await h.runtime.tick()
+    expect(result).toBeUndefined()
+    expect(seen).toEqual([])
   })
 })

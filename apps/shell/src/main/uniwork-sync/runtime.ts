@@ -158,16 +158,21 @@ export function createStoreDocCache(options: StoreDocCacheOptions): DocCache {
     async applyPage(changes: readonly FeedChange[]) {
       const state = await load()
       if (!state) return UNAVAILABLE
+      // one id per document, however many of its changes this page carries: a
+      // fast double edit passes the revision comparison twice in one pass, and
+      // the notice must still be one per document (R1-7)
+      const applied = new Set<string>()
       for (const change of changes) {
         const known = state.docs[change.documentId]
         // an older revision never overwrites a newer one, so a replay is inert
         if (known && compareRevision(change.revision, known.revision) <= 0) continue
         state.docs[change.documentId] = change
+        applied.add(change.documentId)
       }
       const listed = new Set(state.index)
       for (const change of changes) listed.add(change.documentId)
       state.index = [...listed]
-      return commit(state)
+      return { ...(await commit(state)), applied: [...applied] }
     },
 
     async reconcile(ids: ReadonlySet<string>, { keepDrafts }) {
@@ -225,6 +230,13 @@ export interface SyncRuntimeOptions {
    * reconciling clocks. Awaited, so a slow dispatch cannot overlap the next pass.
    */
   onPoll?(online: boolean | undefined): Promise<void>
+  /**
+   * A page the feed applied and the cache committed. G8-17 S18: a document
+   * renamed elsewhere is noticed from here, so its open working copy follows
+   * without waiting for its tab to gain focus. Announced only for a page that
+   * committed (a refused page is replayed, and would announce twice).
+   */
+  onFeedChange?(change: FeedChange): void
   intervalMs?: number
   /** test seam: schedule `run` on the interval, return the cancel */
   schedule?(run: () => void): () => void
@@ -377,11 +389,13 @@ export class SyncRuntime {
       scope,
       client,
       cursors: createStoreCursorStore(records(FEED_CURSORS_REGISTRATION.name)),
-      cache: createStoreDocCache({
-        records: records(DOC_INDEX_REGISTRATION.name),
-        scope,
-        keepDraft: (documentId) => this.options.keepDraft(documentId),
-      }),
+      cache: this.announcingCache(
+        createStoreDocCache({
+          records: records(DOC_INDEX_REGISTRATION.name),
+          scope,
+          keepDraft: (documentId) => this.options.keepDraft(documentId),
+        }),
+      ),
       clock: this.options.clock,
       // the flags of the capability read of this pass (off -> no request)
       capability: () => ({ sync_feed: this.capabilities.get(scope.orgId)?.sync_feed ?? false }),
@@ -389,5 +403,32 @@ export class SyncRuntime {
     })
     this.running.set(key, consumer)
     return consumer
+  }
+
+  /**
+   * The doc cache, plus the S18 change notice: every page the cache committed is
+   * handed to `onFeedChange` once, after the commit, so a rename on the web
+   * reaches an open desktop working copy. A page the cache refused announces
+   * nothing (it is replayed on the next tick).
+   */
+  private announcingCache(cache: DocCache): DocCache {
+    const notify = this.options.onFeedChange
+    if (!notify) return cache
+    return {
+      async applyPage(changes) {
+        const commit = await cache.applyPage(changes)
+        // only a document whose row this commit changed is announced: a replayed
+        // page (a snapshot that lists documents the cache already holds) is inert
+        if (commit.kind === 'ok' && commit.applied) {
+          const byId = new Map(changes.map((change) => [change.documentId, change]))
+          for (const documentId of commit.applied) {
+            const change = byId.get(documentId)
+            if (change) notify(change)
+          }
+        }
+        return commit
+      },
+      reconcile: (ids, options) => cache.reconcile(ids, options),
+    }
   }
 }

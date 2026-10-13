@@ -1,17 +1,22 @@
 import { readFileSync, statSync } from 'node:fs'
-import { copyFile, readFile } from 'node:fs/promises'
+import { copyFile, readFile, rename, stat } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
-import { basename, extname, isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import type {
   RecentUniworkSource,
   UniworkConflictChoice,
+  UniworkCreateDocInput,
   UniworkDocAccess,
+  UniworkDocActionError,
+  UniworkDocActionResult,
+  UniworkDocFolderRef,
   UniworkDocErrorCode,
   UniworkDocFormat,
   UniworkDocListPage,
   UniworkDocListQuery,
   UniworkDocLock,
   UniworkDocProperties,
+  UniworkDocRenamedEvent,
   UniworkDocSummary,
   UniworkDocStatus,
   UniworkLaunchEvent,
@@ -19,6 +24,8 @@ import type {
   UniworkResult,
   UniworkSharedPage,
   UniworkSharedQuery,
+  UniworkUploadDocInput,
+  UniworkUploadProgress,
   UniworkWorkspaceRef,
 } from '../../shared/home-api'
 import {
@@ -49,7 +56,7 @@ import {
 } from './formats'
 import { pathKey } from '../../shared/path-key'
 import { LaunchController } from './launch'
-import type { DocumentDetail, LaunchDescriptor } from './parse'
+import { actionFlags, type DocumentDetail, type LaunchDescriptor } from './parse'
 import { SaveCoordinator, toStatus, type IntentAccess } from './save-coordinator'
 import type { SyncStoreAccess, SyncStoreOpen } from '../uniwork-sync/session-store'
 import {
@@ -177,6 +184,29 @@ export interface UniworkDocsServiceDeps {
   /** remounts the tab showing the path so it re-reads the file */
   reloadPath(path: string): void
   activePath(): string | undefined
+  /**
+   * S18: the native open dialog for an upload (Electron-free seam). Null when
+   * the person cancelled or the file is not usable.
+   */
+  pickUploadFile?(): Promise<{ path: string; name: string } | null>
+  /** S18: bytes sent while an upload runs (the renderer's progress bar) */
+  pushUploadProgress?(event: UniworkUploadProgress): void
+  /** S18: a document's title changed (renamed here, or renamed elsewhere) */
+  pushDocRenamed?(event: UniworkDocRenamedEvent): void
+  /**
+   * S18: the open tab/editor of a working copy must follow its new path (the
+   * shell re-keys the tab and tells the editor, the desktop host's equivalent
+   * of the X-02 `file.renamed` event). Absent in tests that do not open tabs.
+   */
+  notifyPathRenamed?(oldPath: string, newPath: string): void
+  /**
+   * S18: the file of an open working copy keeps its name while an editor holds
+   * it (a rename under an open handle is refused on Windows), so the new title
+   * is carried to the shell directly: the open tab/window is re-titled by its
+   * path and the editor is told through the module's own rename IPC, without
+   * moving the file. Absent in tests that do not open tabs.
+   */
+  notifyTitleRenamed?(path: string, title: string): void
   ui: ConflictUi
   pushStatus(status: UniworkDocStatus): void
   pushLaunch(event: UniworkLaunchEvent): void
@@ -267,6 +297,87 @@ async function result<T>(run: () => Promise<T>): Promise<UniworkResult<T>> {
 }
 
 /** one file (Windows paths compare case-insensitively) */
+/** the longest document name D accepts, counted in runes (code points) like D's own check */
+const MAX_DOC_NAME_RUNES = 500
+
+/**
+ * D stages at most 50 MiB per upload part (`files/registry.go`), so a bigger
+ * file is refused before it is read: main must not buffer a multi-GB pick only
+ * to be told too_large. Exactly 50 MiB is still sent.
+ */
+const MAX_UPLOAD_BYTES = 50 * 1024 * 1024
+
+/** the renderer's own id for one upload start; a Cancel names the upload through it */
+const MAX_UPLOAD_ID_LENGTH = 128
+
+/**
+ * The upload id of one upload: a non-empty string the renderer minted. Without
+ * one there is nothing a Cancel could name, so the upload is refused before any
+ * read (the renderer always sends it).
+ */
+function requireUploadId(raw: unknown): string {
+  if (typeof raw !== 'string' || !raw || raw.length > MAX_UPLOAD_ID_LENGTH) {
+    throw new UniworkDocError('not_found')
+  }
+  return raw
+}
+
+/** the upload a Cancel aborted: never part of UniworkDocErrorCode (see its action union) */
+function cancelledUpload(): UniworkDocError {
+  return new UniworkDocError('upload_cancelled' as UniworkDocErrorCode)
+}
+
+/**
+ * a trimmed document name of 1..500 runes; the empty and the too-long cases are
+ * S18's field errors, not requests. A duplicate name is allowed (FD-D10 a), so
+ * there is no uniqueness check here.
+ */
+function requireName(raw: string): string {
+  const name = typeof raw === 'string' ? raw.trim() : ''
+  if (!name) throw new UniworkDocError('name_empty' as UniworkDocErrorCode)
+  if (Array.from(name).length > MAX_DOC_NAME_RUNES) {
+    throw new UniworkDocError('name_too_long' as UniworkDocErrorCode)
+  }
+  return name
+}
+
+/**
+ * The S18 action result: like `result`, but the two name errors survive as
+ * themselves (`name_empty` / `name_too_long`) so the renderer can show them at
+ * the field. Duplicate names are allowed (FD-D10 a), so a server 409 is an
+ * ordinary failure here, never a field error. `nameField` marks a call whose
+ * title D validates (create, rename): D answers a title over 500 runes with a
+ * bare 400 `invalid_request` (the message is not machine-readable), and the
+ * empty title is caught before the request, so that 400 is the too-long case.
+ */
+async function actionResult<T>(
+  run: () => Promise<T>,
+  options: { nameField?: boolean } = {},
+): Promise<UniworkDocActionResult<T>> {
+  try {
+    return { ok: true, value: await run() }
+  } catch (error) {
+    return { ok: false, error: actionErrorOf(error, options.nameField === true) }
+  }
+}
+
+function actionErrorOf(error: unknown, nameField: boolean): UniworkDocActionError {
+  if (error instanceof UniworkDocError) {
+    // the name errors and a cancelled upload are carried on the error's `code`
+    // even though they are not part of UniworkDocErrorCode; the cast is the one
+    // place that bridges them
+    const code = error.code as string
+    if (code === 'name_empty' || code === 'name_too_long' || code === 'upload_cancelled') {
+      return code
+    }
+    if (nameField && error.status === 400 && error.serverCode === 'invalid_request') {
+      return 'name_too_long'
+    }
+    return error.code
+  }
+  return 'server_error'
+}
+
 function samePath(a: string, b: string): boolean {
   const ra = resolve(a)
   const rb = resolve(b)
@@ -396,6 +507,21 @@ export class UniworkDocsService {
     fromClose: boolean
     done: Promise<unknown>
   } | null = null
+  /**
+   * S18: documents whose binding title this service just changed itself, keyed
+   * by the revision its own rename produced. A `document.updated` from the feed
+   * carrying exactly that revision is this service's own write coming back, so
+   * it must not re-publish the rename a second time; a change for any other
+   * revision is someone else's (the echo may never arrive at all, so a plain
+   * set would swallow it) and is followed as usual.
+   */
+  private readonly selfRenamed = new Map<string, string>()
+  /**
+   * S18: the in-flight uploads by the renderer's own `uploadId`, so the dialog's
+   * Cancel can abort the one it started (the read, or the POST already running).
+   * An entry lives exactly as long as its upload call.
+   */
+  private readonly uploads = new Map<string, AbortController>()
 
   constructor(deps: UniworkDocsServiceDeps) {
     this.deps = deps
@@ -1551,6 +1677,227 @@ export class UniworkDocsService {
     })
   }
 
+  // ---- S18: create, rename, archive ------------------------------------------
+
+  /** the folders of one workspace, for the "Location" field of create/upload */
+  listFolders(workspaceId: string): Promise<UniworkResult<UniworkDocFolderRef[]>> {
+    return result(async () => {
+      if (typeof workspaceId !== 'string' || !workspaceId) throw new UniworkDocError('not_found')
+      return this.api().listFolders(workspaceId)
+    })
+  }
+
+  /**
+   * Create a blank document (docx/xlsx/pptx) in a workspace/folder. The name is
+   * validated before any call (empty -> `name_empty`, over 500 runes ->
+   * `name_too_long`, no request), and the answer is the server document; the
+   * caller opens it by id, so no second local copy exists. A duplicate name is
+   * allowed: the request goes out and the server decides.
+   */
+  createDocument(input: UniworkCreateDocInput): Promise<UniworkDocActionResult<UniworkDocSummary>> {
+    return actionResult(
+      async () => {
+        if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
+        const target = this.docTarget(input)
+        const name = requireName(input.name)
+        return this.api().createBlank({
+          workspaceId: target.workspaceId,
+          format: input.format,
+          title: name,
+          parentId: target.folderId,
+          idempotencyKey: this.newIdempotencyKey(),
+        })
+      },
+      { nameField: true },
+    )
+  }
+
+  /**
+   * Upload one local file as a UniWork document. Main stats the file first (a
+   * pick past the server's 50 MiB stage limit is refused unread with
+   * `too_large`), reads the bytes and sends them as the multipart `file` part
+   * while reporting progress; the title is the file name (the server's own
+   * default). Nothing is written locally: the working copy is the download the
+   * open flow makes from the created document.
+   *
+   * The upload is reachable for the dialog's Cancel through its own `uploadId`:
+   * `cancelUpload` aborts the read and the POST, and this call then answers
+   * `upload_cancelled`. An abort that lands after D already answered 2xx is
+   * ignored - the created document is returned as usual (never a hidden delete).
+   */
+  uploadDocument(input: UniworkUploadDocInput): Promise<UniworkDocActionResult<UniworkDocSummary>> {
+    return actionResult(async () => {
+      if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
+      const target = this.docTarget(input)
+      const uploadId = requireUploadId(input.uploadId)
+      if (typeof input.path !== 'string' || !input.path) throw new UniworkDocError('not_found')
+      const filename = basename(input.path)
+      if (!filename) throw new UniworkDocError('not_found')
+      // the controller is registered before the first await: a Cancel that lands
+      // while the file is still being stat'ed finds the upload and is never
+      // dropped (R2-1)
+      const controller = new AbortController()
+      this.uploads.set(uploadId, controller)
+      try {
+        let size: number
+        try {
+          const info = await stat(input.path)
+          if (!info.isFile()) throw new UniworkDocError('not_found')
+          size = info.size
+        } catch (error) {
+          throw error instanceof UniworkDocError ? error : new UniworkDocError('not_found')
+        }
+        // a Cancel during the stat: answer it before the read and the POST
+        if (controller.signal.aborted) throw cancelledUpload()
+        if (size > MAX_UPLOAD_BYTES) throw new UniworkDocError('too_large')
+        let bytes: Uint8Array
+        try {
+          bytes = new Uint8Array(await readFile(input.path, { signal: controller.signal }))
+        } catch {
+          if (controller.signal.aborted) throw cancelledUpload()
+          throw new UniworkDocError('not_found')
+        }
+        // the read can also resolve just as the abort lands: no POST then
+        if (controller.signal.aborted) throw cancelledUpload()
+        const total = bytes.byteLength
+        this.deps.pushUploadProgress?.({ uploadId, path: input.path, loaded: 0, total })
+        const created = await this.api()
+          .createFile({
+            workspaceId: target.workspaceId,
+            bytes,
+            filename,
+            title: filename,
+            parentId: target.folderId,
+            idempotencyKey: this.newIdempotencyKey(),
+            signal: controller.signal,
+          })
+          .catch((error: unknown) => {
+            // the person cancelled while the POST was in flight: that is the
+            // answer, not the network failure the abort surfaced as
+            if (controller.signal.aborted) throw cancelledUpload()
+            throw error
+          })
+        this.deps.pushUploadProgress?.({ uploadId, path: input.path, loaded: total, total })
+        return created
+      } finally {
+        // a newer upload with the same id (never minted twice) keeps its controller
+        if (this.uploads.get(uploadId) === controller) this.uploads.delete(uploadId)
+      }
+    })
+  }
+
+  /**
+   * S18: the dialog's Cancel/Esc. The abort ends this upload's file read or its
+   * running POST (whichever it is in); the upload call answers
+   * `upload_cancelled`. An unknown or already-finished id is a no-op, so a
+   * Cancel racing its own upload's settle is harmless.
+   */
+  cancelUpload(uploadId: string): void {
+    if (typeof uploadId !== 'string' || !uploadId) return
+    this.uploads.get(uploadId)?.abort()
+  }
+
+  /** S18: main shows the native open dialog for an upload */
+  pickUploadFile(): Promise<{ path: string; name: string } | null> {
+    return this.deps.pickUploadFile?.() ?? Promise.resolve(null)
+  }
+
+  /**
+   * Rename a document. Anything below edit is refused before any write (the
+   * server is the real gate, but the person has no such action, so main does not
+   * even try): D omits `my_level` on a row it will not let the caller edit and
+   * its documented default is view, so an absent or unknown level fails closed,
+   * exactly like the list rows' `canEdit`. The current revision is read first
+   * because PATCH requires it.
+   */
+  renameDocument(
+    documentId: string,
+    name: string,
+  ): Promise<UniworkDocActionResult<UniworkDocSummary>> {
+    return actionResult(
+      async () => {
+        if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
+        if (typeof documentId !== 'string' || !documentId) throw new UniworkDocError('not_found')
+        const title = requireName(name)
+        const detail = await this.api().getDocument(documentId)
+        if (detail.myLevel !== 'edit' && detail.myLevel !== 'manage') {
+          throw new UniworkDocError('forbidden')
+        }
+        if (title === detail.title) return this.summaryOf(detail)
+        const renamed = await this.api().rename({ documentId, revision: detail.revision, title })
+        // this service's own rename: only the revision it produced is its echo,
+        // so a genuine later change for another revision is still followed (R1-6)
+        this.selfRenamed.set(documentId, renamed.revision)
+        await this.afterLocalRename(documentId, renamed.summary.title)
+        return renamed.summary
+      },
+      { nameField: true },
+    )
+  }
+
+  /** S18: archive a document (the server moves its subtree to the trash) */
+  archiveDocument(documentId: string): Promise<UniworkDocActionResult<UniworkDocSummary>> {
+    return actionResult(async () => {
+      if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
+      if (typeof documentId !== 'string' || !documentId) throw new UniworkDocError('not_found')
+      await this.requireManage(documentId)
+      return this.api().archive(documentId, this.newIdempotencyKey())
+    })
+  }
+
+  /** S18: restore an archived document (only its own archive batch comes back) */
+  restoreDocument(documentId: string): Promise<UniworkDocActionResult<UniworkDocSummary>> {
+    return actionResult(async () => {
+      if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
+      if (typeof documentId !== 'string' || !documentId) throw new UniworkDocError('not_found')
+      await this.requireManage(documentId)
+      return this.api().restore(documentId, this.newIdempotencyKey())
+    })
+  }
+
+  /** the workspace/folder a create or upload targets, validated before any call */
+  private docTarget(input: { workspaceId?: unknown; folderId?: unknown }): {
+    workspaceId: string
+    folderId: string | null
+  } {
+    const workspaceId = typeof input.workspaceId === 'string' ? input.workspaceId : ''
+    if (!workspaceId) throw new UniworkDocError('not_found')
+    const folderId = typeof input.folderId === 'string' && input.folderId ? input.folderId : null
+    return { workspaceId, folderId }
+  }
+
+  /** archive/restore need manage; a view row (and an edit row) is refused without a call */
+  private async requireManage(documentId: string): Promise<void> {
+    const detail = await this.api().getDocument(documentId)
+    if (detail.myLevel !== 'manage') throw new UniworkDocError('forbidden')
+  }
+
+  /**
+   * The summary a rename/create answer already carries, without a second read.
+   * The flags come from the detail the call was gated on (a no-op rename of an
+   * archived manage-level document must not report `canManage:false,
+   * archived:false`), and the format from the file block first (R1-2).
+   */
+  private summaryOf(detail: DocumentDetail): UniworkDocSummary {
+    return {
+      id: detail.id,
+      workspaceId: detail.workspaceId,
+      title: detail.title,
+      format:
+        formatForMime(detail.file.mimeType) ??
+        formatForName(detail.file.filename) ??
+        formatForName(detail.title),
+      updatedAt: '',
+      ...actionFlags(detail.myLevel, detail.archivedAt),
+    }
+  }
+
+  private newIdempotencyKey(): string {
+    return this.deps.now
+      ? `uniwork-doc-${this.deps.now()}-${randomUUID()}`
+      : `uniwork-doc-${randomUUID()}`
+  }
+
   /**
    * The org's member names (id -> display name), read across D's pages
    * (`next_cursor`, up to `MEMBERS_MAX_PAGES`). Only a success or a 403/404
@@ -1670,7 +2017,125 @@ export class UniworkDocsService {
   /** tab activation: bytes written outside the save hook show as dirty */
   async refreshPath(path: string | undefined): Promise<void> {
     const doc = path ? this.store.lookup(path) : null
-    if (doc && this.ownsLocally(doc)) await this.refreshDirty(doc)
+    if (!doc || !this.ownsLocally(doc)) return
+    await this.refreshDirty(doc)
+    // S18 renamed-elsewhere: a tab that gains focus re-reads the document's
+    // metadata, so a title changed on the web shows here without the feed
+    void this.refreshMetadataFor(doc.binding.documentId).catch(() => undefined)
+  }
+
+  // ---- S18: renamed elsewhere -------------------------------------------------
+
+  /**
+   * A change the G5-04 feed applied for `documentId` (wiring), with the
+   * revision the feed reported. A rename this service made itself is skipped
+   * only for the revision that rename produced: its own write echoing back. A
+   * change for any other revision - including the first one when the echo never
+   * arrived - is someone else's rename and is followed (R1-6). Without a
+   * revision the notice is taken as this service's own echo, so the one-shot
+   * suppression the callers without a feed still rely on is unchanged.
+   */
+  noteFeedChange(documentId: string, revision?: string): void {
+    if (typeof documentId !== 'string' || !documentId) return
+    const own = this.selfRenamed.get(documentId)
+    if (own !== undefined) {
+      this.selfRenamed.delete(documentId)
+      if (revision === undefined || revision === own) return
+    }
+    void this.refreshMetadataFor(documentId).catch(() => undefined)
+  }
+
+  /**
+   * Re-read one document's metadata and, when its title changed, follow it: the
+   * binding's title (and the working-copy name, while the copy is clean and no
+   * editor holds it), the pushed status, the shell's tab/editor re-key and the
+   * renderer's S18 announce. Never runs for a document with local work (a
+   * rename must not disturb an unsaved copy) or for one this session does not
+   * own.
+   */
+  async refreshMetadataFor(documentId: string): Promise<void> {
+    if (typeof documentId !== 'string' || !documentId) return
+    const identity = this.liveIdentity()
+    if (!identity) return
+    const dir = this.store.dirFor(identity.deploymentId, identity.accountId, documentId)
+    const existing = await this.store.readDir(dir)
+    if (!existing || existing.documentId !== documentId) return
+    const local = join(dir, existing.filename)
+    if (!this.store.exists(local)) return
+    if (KEEP_LOCAL_STATES.has(existing.state) || this.coordinator.isSaving(local)) return
+    let detail: DocumentDetail
+    try {
+      detail = await this.api().getDocument(documentId)
+    } catch {
+      return
+    }
+    // the metadata read is async: a save may have started or settled, and an
+    // editor may have made the copy dirty, while it was in flight. The title is
+    // applied to the binding as it is NOW - never re-written from the one read
+    // before the await, which would clear that newer state (R1-4).
+    const latest = await this.store.readDir(dir)
+    if (!latest || latest.documentId !== documentId) return
+    const latestLocal = join(dir, latest.filename)
+    if (!this.store.exists(latestLocal)) return
+    if (KEEP_LOCAL_STATES.has(latest.state) || this.coordinator.isSaving(latestLocal)) return
+    if (detail.title === latest.title) return
+    await this.applyTitle(latest, detail.title, latestLocal, true)
+  }
+
+  /** the binding rewrite that follows a title change, plus the pushes it owes */
+  private async applyTitle(
+    doc: Binding,
+    title: string,
+    local: string,
+    announce: boolean,
+  ): Promise<void> {
+    const dir = dirname(local)
+    let filename = doc.filename
+    let path = local
+    const open = this.deps.isPathOpen(local)
+    // the schema 1 -> 2 sweep still owns this folder: the store refuses every
+    // binding write (see BindingStore.write), so moving the file first would
+    // leave binding.json naming a file that no longer exists and the copy
+    // unreachable by lookup. The title is what this call may still carry; the
+    // pre-store intent pair stays byte for byte (R1-3, the open flow's guard).
+    const held = this.heldByMigration(dir)
+    // an editor holding the copy keeps its file name: the shell re-keys a tab
+    // only for a path that actually moved, and Windows refuses a rename under an
+    // open handle
+    if (!open && !held) {
+      const candidate = workingCopyName(title, doc.filename, doc.format)
+      if (candidate !== doc.filename) {
+        const next = join(dir, candidate)
+        try {
+          await rename(local, next)
+          filename = candidate
+          path = next
+        } catch {
+          // the old name stays; the title still updates
+        }
+      }
+    }
+    const written = await this.store.write(dir, { ...doc, title, filename })
+    const fresh = written ? this.store.lookup(path) : null
+    if (fresh) this.publish(toStatus(fresh))
+    if (path !== local) this.deps.notifyPathRenamed?.(local, path)
+    // the copy kept its name under an open editor: the title must still reach
+    // the tab and the editor, so the shell re-titles the open tab/window by path
+    // and the module follows through its own rename IPC (S18 `file.renamed`)
+    else if (open) this.deps.notifyTitleRenamed?.(local, title)
+    if (announce) this.deps.pushDocRenamed?.({ documentId: doc.documentId, title })
+  }
+
+  /** a rename this service made: follow the binding, but do not re-announce it */
+  private async afterLocalRename(documentId: string, title: string): Promise<void> {
+    const identity = this.liveIdentity()
+    if (!identity) return
+    const dir = this.store.dirFor(identity.deploymentId, identity.accountId, documentId)
+    const existing = await this.store.readDir(dir)
+    if (!existing || existing.documentId !== documentId) return
+    const local = join(dir, existing.filename)
+    if (!this.store.exists(local) || existing.title === title) return
+    await this.applyTitle(existing, title, local, false)
   }
 
   /**

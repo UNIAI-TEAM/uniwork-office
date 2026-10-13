@@ -1,13 +1,15 @@
 import { app, BrowserWindow, dialog, safeStorage, type IpcMain, type WebContents } from 'electron'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { COMMENTS_CHANNELS } from '@genoffice/electron-utils/comments-ipc'
 import {
   UNIWORK_DOC_CHANNELS,
   type AccountStatus,
   type UniworkConflictChoice,
+  type UniworkCreateDocInput,
   type UniworkDocFormat,
   type UniworkDocListQuery,
   type UniworkDocLock,
+  type UniworkUploadDocInput,
   type UniworkSharedQuery,
 } from '../../shared/home-api'
 import { createLaunchPusher, createPushHolder, type LaunchPushTarget } from './launch'
@@ -109,6 +111,17 @@ export interface UniworkDocsWiring {
   aiHistoryPaths(): string[]
   /** deletes the AI chat history and project entries of these paths */
   forgetAiHistory(paths: string[]): void
+  /**
+   * S18: an open working copy got a new name; the shell re-keys its tab and the
+   * module follows (the desktop equivalent of the X-02 `file.renamed` event).
+   */
+  notifyPathRenamed(oldPath: string, newPath: string): void
+  /**
+   * S18: an open working copy keeps its file name (an editor holds it), so the
+   * shell re-titles the open tab/window by path and the module follows through
+   * its own rename IPC; no file moves. Absent in tests that do not open tabs.
+   */
+  notifyTitleRenamed?(path: string, title: string): void
 }
 
 const CHOICES: readonly UniworkConflictChoice[] = [
@@ -137,6 +150,33 @@ async function confirmConnect(wiring: UniworkDocsWiring, origin: string): Promis
     ? await dialog.showMessageBox(parent, options)
     : await dialog.showMessageBox(options)
   return response === 0
+}
+
+/**
+ * S18 upload: the native open dialog. The filters follow the formats UniWork
+ * Office can open (a file of any other type would be uploaded but never
+ * openable here); a cancelled dialog is null and no request is made.
+ */
+async function pickUploadFile(
+  wiring: UniworkDocsWiring,
+): Promise<{ path: string; name: string } | null> {
+  const parent = wiring.shellWindow()
+  const options: Electron.OpenDialogOptions = {
+    title: tUniworkDocs(wiring.lang(), 'uploadPickTitle'),
+    properties: ['openFile'],
+    filters: [
+      {
+        name: tUniworkDocs(wiring.lang(), 'uploadPickDocuments'),
+        extensions: ['docx', 'xlsx', 'pptx', 'pdf', 'md', 'html'],
+      },
+      { name: tUniworkDocs(wiring.lang(), 'uploadPickAll'), extensions: ['*'] },
+    ],
+  }
+  const picked = parent
+    ? await dialog.showOpenDialog(parent, options)
+    : await dialog.showOpenDialog(options)
+  const path = picked.canceled ? undefined : picked.filePaths[0]
+  return path ? { path, name: basename(path) } : null
 }
 
 function conflictUi(wiring: UniworkDocsWiring): ConflictUi {
@@ -398,6 +438,11 @@ export function createSyncRuntime(
   }
   return new SyncRuntime({
     store: syncStoreFor().access,
+    // S18: a change the feed applies for a bound document re-reads its metadata,
+    // so a rename on the web reaches the open desktop copy
+    // the change's revision, so the echo of this service's own rename is
+    // recognised by it and a genuine later change is never swallowed (R1-6)
+    onFeedChange: (change) => service.noteFeedChange(change.documentId, change.revision),
     targets,
     capability: async (orgId) => {
       const found = clients()
@@ -476,6 +521,12 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     requestModuleSave: (path, onNotWritten) => wiring.requestModuleSave(path, onNotWritten),
     reloadPath: (path) => wiring.reloadPath(path),
     activePath: () => wiring.activePath(),
+    // S18: main owns the native dialog (Electron); the service stays Electron-free
+    pickUploadFile: () => pickUploadFile(wiring),
+    pushUploadProgress: (event) => push(UNIWORK_DOC_CHANNELS.uploadProgress, event),
+    pushDocRenamed: (event) => push(UNIWORK_DOC_CHANNELS.docRenamed, event),
+    notifyPathRenamed: (oldPath, newPath) => wiring.notifyPathRenamed(oldPath, newPath),
+    notifyTitleRenamed: (path, title) => wiring.notifyTitleRenamed?.(path, title),
     ui: conflictUi(wiring),
     pushStatus: (status) => push(UNIWORK_DOC_CHANNELS.docStatusEvent, status),
     // the save queue's lane verdicts read the same per-org capability cache the
@@ -544,6 +595,32 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   )
   ipcMain.handle(UNIWORK_DOC_CHANNELS.documentProperties, (_event, documentId: unknown) =>
     service.documentProperties(documentId as string),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.createDocument, (_event, input: unknown) =>
+    service.createDocument((input ?? {}) as UniworkCreateDocInput),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.pickUploadFile, () => service.pickUploadFile())
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.uploadDocument, (_event, input: unknown) =>
+    service.uploadDocument((input ?? {}) as UniworkUploadDocInput),
+  )
+  // S18 cancel: a no-op for an id main does not hold, so a Cancel racing its own
+  // upload's settle (or a stale dialog's) is harmless
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.cancelUpload, (_event, uploadId: unknown) => {
+    if (typeof uploadId === 'string') service.cancelUpload(uploadId)
+  })
+  ipcMain.handle(
+    UNIWORK_DOC_CHANNELS.renameDocument,
+    (_event, documentId: unknown, name: unknown) =>
+      service.renameDocument(documentId as string, name as string),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.archiveDocument, (_event, documentId: unknown) =>
+    service.archiveDocument(documentId as string),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.restoreDocument, (_event, documentId: unknown) =>
+    service.restoreDocument(documentId as string),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.listFolders, (_event, workspaceId: unknown) =>
+    service.listFolders(workspaceId as string),
   )
   ipcMain.handle(UNIWORK_DOC_CHANNELS.openDocument, (_event, documentId: unknown) =>
     service.openDocument(documentId as string),

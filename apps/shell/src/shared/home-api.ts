@@ -188,6 +188,16 @@ export interface UniworkDocSummary {
   updatedByName?: string
   /** shared-with-me rows only: the workspace the share lives in (name resolved by main) */
   workspaceName?: string
+  /**
+   * S18 row actions, derived by main from the server's `my_level`: `edit` or
+   * `manage` may rename. Absent on a row whose level the server did not send
+   * (the renderer then offers no action, never a disabled one).
+   */
+  canEdit?: boolean
+  /** `my_level` is `manage`: the row may be archived (or, when archived, restored) */
+  canManage?: boolean
+  /** the row is in the trash (`archived_at` present); it stays listed so it can be restored */
+  archived?: boolean
 }
 
 export interface UniworkDocListQuery {
@@ -241,6 +251,64 @@ export interface UniworkDocProperties {
   ownerId: string | null
   createdById: string | null
   updatedById: string | null
+}
+
+/** errors a name field shows in place; every other failure is a toast */
+export type UniworkDocNameError = 'name_empty' | 'name_too_long'
+/**
+ * What a create/rename/archive/upload call may fail with. `name_empty` /
+ * `name_too_long` are S18 field errors and `upload_cancelled` is an upload the
+ * person aborted; none of them is part of `UniworkDocErrorCode`, because that
+ * union is switched on exhaustively by the renderer's error copy table (a
+ * cancelled upload is not an error to show at all).
+ */
+export type UniworkDocActionError = UniworkDocErrorCode | UniworkDocNameError | 'upload_cancelled'
+export type UniworkDocActionResult<T> =
+  { ok: true; value: T } | { ok: false; error: UniworkDocActionError }
+
+/** the formats the New document dialog offers (D accepts more; these three are the Office ones) */
+export type UniworkDocNewFormat = 'docx' | 'xlsx' | 'pptx'
+
+export interface UniworkCreateDocInput {
+  workspaceId: string
+  /** ULID of the parent folder/page; null = the workspace root */
+  folderId: string | null
+  name: string
+  format: UniworkDocNewFormat
+}
+
+export interface UniworkUploadDocInput {
+  workspaceId: string
+  folderId: string | null
+  /** the local file main's dialog returned; main reads the bytes and uploads them */
+  path: string
+  /**
+   * renderer-minted, unique per upload start: `uniworkCancelUploadDocument`
+   * names the upload it aborts through this id (never a path).
+   */
+  uploadId: string
+}
+
+/** one folder the "Location" field of the create/upload dialog offers */
+export interface UniworkDocFolderRef {
+  id: string
+  /** the folder's title (D `DocumentSummaryDTO.title`) */
+  title: string
+}
+
+/** upload progress: bytes sent of the total (0 when the total is not known yet) */
+export interface UniworkUploadProgress {
+  /** the upload this event belongs to (the dialog's own `uploadId`) */
+  uploadId: string
+  path: string
+  loaded: number
+  total: number
+}
+
+/** a document's title changed (here, or renamed elsewhere and picked up by main) */
+export interface UniworkDocRenamedEvent {
+  documentId: string
+  title: string
 }
 
 export interface UniworkDocStatus {
@@ -678,6 +746,37 @@ export interface HomeApi {
   uniworkListSharedWithMe(query?: UniworkSharedQuery): Promise<UniworkResult<UniworkSharedPage>>
   /** the document properties panel (S17); nulls where the server sends no value */
   uniworkDocumentProperties(documentId: string): Promise<UniworkResult<UniworkDocProperties>>
+  /** S18: create a blank document (docx/xlsx/pptx) in a workspace/folder */
+  uniworkCreateDocument(
+    input: UniworkCreateDocInput,
+  ): Promise<UniworkDocActionResult<UniworkDocSummary>>
+  /** S18: main shows the native open dialog; null when the person cancelled */
+  uniworkPickUploadFile(): Promise<{ path: string; name: string } | null>
+  /** S18: upload a local file into a workspace/folder as one UniWork document */
+  uniworkUploadDocument(
+    input: UniworkUploadDocInput,
+  ): Promise<UniworkDocActionResult<UniworkDocSummary>>
+  /** bytes sent while an upload runs; returns an unsubscribe */
+  onUniworkUploadProgress(cb: (event: UniworkUploadProgress) => void): () => void
+  /**
+   * S18: abort the running upload started with this `uploadId` (Cancel/Esc of
+   * the dialog). The upload then answers `upload_cancelled`; an id main does
+   * not hold - already finished, or a stale dialog - is a no-op.
+   */
+  uniworkCancelUploadDocument(uploadId: string): Promise<void>
+  /** S18: rename a document (the server keeps the title) */
+  uniworkRenameDocument(
+    documentId: string,
+    name: string,
+  ): Promise<UniworkDocActionResult<UniworkDocSummary>>
+  /** S18: archive a document (never a hard delete) */
+  uniworkArchiveDocument(documentId: string): Promise<UniworkDocActionResult<UniworkDocSummary>>
+  /** S18: restore an archived document */
+  uniworkRestoreDocument(documentId: string): Promise<UniworkDocActionResult<UniworkDocSummary>>
+  /** the folders of one workspace, for the create/upload "Location" field */
+  uniworkListFolders(workspaceId: string): Promise<UniworkResult<UniworkDocFolderRef[]>>
+  /** a document was renamed (here or elsewhere); returns an unsubscribe */
+  onUniworkDocRenamed(cb: (event: UniworkDocRenamedEvent) => void): () => void
   uniworkOpenDocument(documentId: string): Promise<UniworkResult<{ path: string }>>
   uniworkDocStatus(path: string): Promise<UniworkDocStatus | null>
   uniworkActiveDocStatus(): Promise<UniworkDocStatus | null>
@@ -1272,6 +1371,26 @@ export const UNIWORK_DOC_CHANNELS = {
   listSharedWithMe: 'uniwork-doc:list-shared-with-me',
   /** invoke(documentId) -> the properties panel of one document */
   documentProperties: 'uniwork-doc:document-properties',
+  /** invoke(input) -> create a blank document (S18) */
+  createDocument: 'uniwork-doc:create-document',
+  /** invoke() -> the native open dialog's pick, or null when cancelled (S18) */
+  pickUploadFile: 'uniwork-doc:pick-upload-file',
+  /** invoke(input) -> upload a local file as one document (S18) */
+  uploadDocument: 'uniwork-doc:upload-document',
+  /** push -> upload bytes sent of the total (S18) */
+  uploadProgress: 'uniwork-doc:upload-progress',
+  /** invoke(uploadId) -> abort a running upload; an unknown/finished id is a no-op (S18) */
+  cancelUpload: 'uniwork-doc:cancel-upload',
+  /** invoke(documentId, name) -> rename (S18) */
+  renameDocument: 'uniwork-doc:rename-document',
+  /** invoke(documentId) -> archive (S18; there is no delete) */
+  archiveDocument: 'uniwork-doc:archive-document',
+  /** invoke(documentId) -> restore an archived document (S18) */
+  restoreDocument: 'uniwork-doc:restore-document',
+  /** invoke(workspaceId) -> the workspace's folders (S18 location field) */
+  listFolders: 'uniwork-doc:list-folders',
+  /** push -> a document's title changed (S18 renamed-elsewhere announce) */
+  docRenamed: 'uniwork-doc:doc-renamed',
   openDocument: 'uniwork-doc:open-document',
   docStatus: 'uniwork-doc:status',
   activeDocStatus: 'uniwork-doc:active-status',

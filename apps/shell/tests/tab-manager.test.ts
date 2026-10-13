@@ -866,6 +866,26 @@ describe('file path bookkeeping', () => {
     expect(onChanged).not.toHaveBeenCalled()
   })
 
+  // F1 (S18): a document renamed on the web keeps its file name under an open
+  // editor, so the tab is re-titled by path without re-keying it.
+  it('re-titles an open tab by path without moving its file', () => {
+    manager.openDocsTab('/tmp/Q4 plan.docx')
+    const view = lastCreatedView(createDocsView)
+    const affected = manager.retitleTabFile('/tmp/Q4 plan.docx', 'Q4 plan v2.docx')
+    expect(affected).toEqual([{ kind: 'docs', webContents: view.webContents }])
+    expect(manager.list()[1].title).toBe('Q4 plan v2.docx')
+    // the path is untouched: nothing moved on disk
+    expect(manager.findDocsTabByPath('/tmp/Q4 plan.docx')).toBe('t1')
+  })
+
+  it('re-titles the same path only once, and reports nothing when it matches none', () => {
+    manager.openDocsTab('/tmp/Q4 plan.docx')
+    expect(manager.retitleTabFile('/tmp/Q4 plan.docx', 'Q4 plan v2.docx')).toHaveLength(1)
+    // the title already carries the new value: no second change, no re-render
+    expect(manager.retitleTabFile('/tmp/Q4 plan.docx', 'Q4 plan v2.docx')).toEqual([])
+    expect(manager.retitleTabFile('/tmp/other.docx', 'Nope.docx')).toEqual([])
+  })
+
   /**
    * One case per TabKind a file can live in. The shell dispatches a rename to a
    * per-app hook on the kind renameTabFile reports, so a kind with no case here

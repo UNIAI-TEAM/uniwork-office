@@ -353,6 +353,7 @@ import {
   detachedRenameFile,
   detachedSetFileFor,
   detachedWebContentsFor,
+  detachedRetitleFile,
   detachedSetTitleFor,
   detachedWindowForWebContents,
   dockBandFor,
@@ -3143,6 +3144,15 @@ function afterFileMoved(oldPath: string, newPath: string): void {
   const affected = tabManager?.renameTabFile(oldPath, newPath) ?? []
   const detachedAffected = detachedRenameFile(oldPath, newPath)
   if (detachedAffected) affected.push(detachedAffected)
+  notifyEditorsOfMove(affected, oldPath, newPath)
+}
+
+/** every module's own rename IPC for the views whose path moved */
+function notifyEditorsOfMove(
+  affected: Array<{ kind: TabKind; webContents: WebContents }>,
+  oldPath: string,
+  newPath: string,
+): void {
   for (const t of affected) {
     if (t.kind === 'slides') slidesFileRenamed(t.webContents, oldPath, newPath)
     else if (t.kind === 'docs') docsFileRenamed(t.webContents, oldPath, newPath)
@@ -3151,6 +3161,20 @@ function afterFileMoved(oldPath: string, newPath: string): void {
     else if (t.kind === 'html') htmlFileRenamed(t.webContents, oldPath, newPath)
     else if (t.kind === 'pdf') pdfFileRenamed(t.webContents, oldPath, newPath)
   }
+}
+
+/**
+ * S18: a document renamed on the server kept its file name because an editor
+ * holds the working copy (a rename under an open handle is refused on Windows).
+ * The title still has to reach the tab and the editor: re-title the open
+ * tab/window by path and hand the view the module's own rename IPC with
+ * `newPath === path`, the desktop equivalent of the X-02 `file.renamed` event.
+ */
+function afterTitleChanged(path: string, title: string): void {
+  const affected = tabManager?.retitleTabFile(path, title) ?? []
+  const detached = detachedRetitleFile(path, title)
+  if (detached) affected.push(detached)
+  notifyEditorsOfMove(affected, path, path)
 }
 
 function trackedFilesUnder(dir: string): string[] {
@@ -3838,6 +3862,14 @@ function uniworkDocsWiring() {
     },
     aiHistoryPaths: () => projectFilePaths(),
     forgetAiHistory: (paths: string[]) => projectForgetFiles(paths),
+    // S18: a document renamed on the server renamed its working copy on disk;
+    // the shell re-keys the tab, the recents/project entries and tells the
+    // editor - exactly the path a Home-list rename takes (the desktop host's
+    // equivalent of the X-02 `file.renamed` frame event)
+    notifyPathRenamed: (oldPath: string, newPath: string) => afterFileMoved(oldPath, newPath),
+    // the copy kept its name (an editor holds it): re-title the open tab/window
+    // by path and tell the editor, without moving any file
+    notifyTitleRenamed: (path: string, title: string) => afterTitleChanged(path, title),
   }
 }
 

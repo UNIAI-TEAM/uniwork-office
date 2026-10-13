@@ -43,6 +43,9 @@ const en = {
     'You will sign in again on that server. Documents already on this computer stay here.',
   connectYes: 'Connect',
   connectNo: 'Cancel',
+  uploadPickTitle: 'Choose a file to upload',
+  uploadPickDocuments: 'Documents',
+  uploadPickAll: 'All files',
 }
 
 type Key = keyof typeof en
@@ -86,6 +89,9 @@ const vi = {
   connectDetail: 'Bạn sẽ đăng nhập lại trên máy chủ đó. Tài liệu đã có trên máy này vẫn được giữ.',
   connectYes: 'Kết nối',
   connectNo: 'Hủy',
+  uploadPickTitle: 'Chọn tệp để tải lên',
+  uploadPickDocuments: 'Tài liệu',
+  uploadPickAll: 'Mọi tệp',
 } satisfies Record<Key, string>
 
 export const UNIWORK_DOC_STRINGS = { en, vi } as const

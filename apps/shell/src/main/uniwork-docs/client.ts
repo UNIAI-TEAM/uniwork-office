@@ -1,13 +1,22 @@
-import type { UniworkDocFormat, UniworkWorkspaceRef } from '../../shared/home-api'
+import type {
+  UniworkDocFolderRef,
+  UniworkDocFormat,
+  UniworkDocNewFormat,
+  UniworkDocSummary,
+  UniworkWorkspaceRef,
+} from '../../shared/home-api'
 import { TransportError } from '../uniwork-auth/transport'
 import { UniworkDocError, errorFromResponse, parseRetryAfter } from './errors'
 import { formatForName, isDecimalString, mimeForFormat } from './formats'
 import {
+  documentRevisionOf,
   parseCommit,
   parseCommitLookup,
   parseDetail,
   parseDocumentList,
+  parseDocumentSummary,
   parseExchange,
+  parseFolders,
   parseMembershipRole,
   parseOrgMembers,
   parseProperties,
@@ -41,6 +50,14 @@ export const METADATA_TIMEOUT_MS = 30_000
 export const TRANSFER_TIMEOUT_MS = 120_000
 /** the server stages at most 50 MiB per upload; a download far past that is refused */
 const MAX_DOWNLOAD_BYTES = 256 * 1024 * 1024
+/**
+ * The folder list follows D's `next_cursor` for the "Location" field. D caps a
+ * page at 100 rows; 10 pages bound one read at 1000 folders, so a pathological
+ * workspace cannot make the dialog read for ever (residual: past the bound the
+ * remaining folders are not offered).
+ */
+const FOLDERS_PAGE_SIZE = 100
+const FOLDERS_MAX_PAGES = 10
 const ID = /^[A-Za-z0-9_-]{1,128}$/
 
 export interface UniworkDocsClientOptions {
@@ -76,6 +93,44 @@ export interface UniworkDocsClient {
   }): Promise<DocumentListResult>
   /** the properties panel of one document (ids/times/level/version, no names) */
   documentProperties(documentId: string): Promise<DocumentProperties>
+  /**
+   * the workspace's folders (S18 location field): every `kind=folder` page,
+   * following `next_cursor` up to `FOLDERS_MAX_PAGES` (a bigger workspace's
+   * remaining folders are simply not offered - documented residual, no D change)
+   */
+  listFolders(workspaceId: string): Promise<UniworkDocFolderRef[]>
+  /** create a blank document (S18); `format` must have a blank generator */
+  createBlank(input: {
+    workspaceId: string
+    format: UniworkDocNewFormat
+    title: string
+    parentId: string | null
+    idempotencyKey: string
+  }): Promise<UniworkDocSummary>
+  /** create one file document from local bytes (S18 upload); `signal` aborts the POST */
+  createFile(input: {
+    workspaceId: string
+    bytes: Uint8Array
+    filename: string
+    title: string
+    parentId: string | null
+    idempotencyKey: string
+    signal?: AbortSignal
+  }): Promise<UniworkDocSummary>
+  /**
+   * rename a document (S18); the server compares `revision` and may answer a
+   * conflict. The answer carries the row the renderer shows and the revision
+   * this rename produced (the feed echo of it is recognisable by that revision)
+   */
+  rename(input: {
+    documentId: string
+    revision: string
+    title: string
+  }): Promise<{ summary: UniworkDocSummary; revision: string }>
+  /** archive a document (S18); there is no hard-delete route */
+  archive(documentId: string, idempotencyKey: string): Promise<UniworkDocSummary>
+  /** restore an archived document (S18) */
+  restore(documentId: string, idempotencyKey: string): Promise<UniworkDocSummary>
   /**
    * one page of org members (id + display name) for resolving the properties
    * panel's names; `cursor` is D's opaque `next_cursor` and `limit` is capped
@@ -152,12 +207,14 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
   const transferTimeout = options.transferTimeoutMs ?? TRANSFER_TIMEOUT_MS
 
   interface Call<T> {
-    method: 'GET' | 'POST'
+    method: 'GET' | 'POST' | 'PATCH'
     route: string
     query?: URLSearchParams
     json?: unknown
     form?: FormData
     idempotencyKey?: string
+    /** the caller's abort (S18 upload cancel): aborts the request like a timeout */
+    signal?: AbortSignal
     timeoutMs: number
     read(response: Response): Promise<T>
   }
@@ -181,6 +238,15 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
           timedOut = true
           controller.abort()
         }, call.timeoutMs)
+        // the caller's own abort rides the same controller as the deadline: one
+        // signal ends the request, whatever started it. Once D answers an
+        // accepted 2xx the bridge is detached (below), so a Cancel that lands
+        // after the write was accepted still lets the answer be read
+        const abortFromCaller = () => controller.abort()
+        if (call.signal) {
+          if (call.signal.aborted) controller.abort()
+          else call.signal.addEventListener('abort', abortFromCaller, { once: true })
+        }
         try {
           let response: Response
           try {
@@ -198,6 +264,10 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
             // a redirect means another host or path answered: never followed
             throw new UniworkDocError(isRedirectRefusal(error) ? 'server_error' : 'network')
           }
+          // D accepted the request (2xx): the caller's abort ends its job here,
+          // so its created document is parsed and returned as usual (R2-2).
+          // The deadline above stays armed for a body that never arrives.
+          if (response.ok) call.signal?.removeEventListener('abort', abortFromCaller)
           if (
             response.redirected ||
             (response.status >= 300 && response.status < 400) ||
@@ -231,6 +301,7 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
           }
         } finally {
           clearTimeout(timer)
+          call.signal?.removeEventListener('abort', abortFromCaller)
         }
       })
     } catch (error) {
@@ -304,6 +375,104 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
       const properties = parseProperties(raw)
       if (properties.id !== documentId) throw new UniworkDocError('malformed_response')
       return properties
+    },
+
+    async listFolders(workspaceId) {
+      const ws = id(workspaceId)
+      const folders: UniworkDocFolderRef[] = []
+      let cursor: string | undefined
+      let pages = 0
+      do {
+        const params = new URLSearchParams()
+        params.set('kind', 'folder')
+        params.set('limit', String(FOLDERS_PAGE_SIZE))
+        if (cursor) params.set('cursor', cursor.slice(0, 512))
+        const raw = await send({
+          method: 'GET',
+          route: `/workspaces/${ws}/documents`,
+          query: params,
+          timeoutMs: metadataTimeout,
+          read: json,
+        })
+        const page = parseFolders(raw)
+        folders.push(...page.folders)
+        cursor = page.nextCursor ?? undefined
+        pages += 1
+      } while (cursor && pages < FOLDERS_MAX_PAGES)
+      return folders
+    },
+
+    async createBlank(input) {
+      const raw = await send({
+        method: 'POST',
+        route: `/workspaces/${id(input.workspaceId)}/documents/files/blank`,
+        json: {
+          format: input.format,
+          title: input.title,
+          ...(input.parentId ? { parent_id: input.parentId } : {}),
+        },
+        idempotencyKey: input.idempotencyKey,
+        timeoutMs: metadataTimeout,
+        read: json,
+      })
+      return parseDocumentSummary(raw)
+    },
+
+    async createFile(input) {
+      const form = new FormData()
+      // the text fields precede the file part: the server streams the file part
+      // and a title that trails it would fall back to the file name
+      if (input.parentId) form.set('parent_id', input.parentId)
+      form.set('title', input.title)
+      form.set(
+        'file',
+        new Blob([input.bytes as BlobPart], { type: 'application/octet-stream' }),
+        input.filename,
+      )
+      const raw = await send({
+        method: 'POST',
+        route: `/workspaces/${id(input.workspaceId)}/documents/files`,
+        form,
+        idempotencyKey: input.idempotencyKey,
+        ...(input.signal ? { signal: input.signal } : {}),
+        timeoutMs: transferTimeout,
+        read: json,
+      })
+      return parseDocumentSummary(raw)
+    },
+
+    async rename(input) {
+      if (!isDecimalString(input.revision)) throw new UniworkDocError('malformed_response')
+      const raw = await send({
+        method: 'PATCH',
+        route: `/documents/${id(input.documentId)}`,
+        json: { revision: input.revision, title: input.title },
+        timeoutMs: metadataTimeout,
+        read: json,
+      })
+      return { summary: parseDocumentSummary(raw), revision: documentRevisionOf(raw) }
+    },
+
+    async archive(documentId, idempotencyKey) {
+      const raw = await send({
+        method: 'POST',
+        route: `/documents/${id(documentId)}/archive`,
+        idempotencyKey,
+        timeoutMs: metadataTimeout,
+        read: json,
+      })
+      return parseDocumentSummary(raw)
+    },
+
+    async restore(documentId, idempotencyKey) {
+      const raw = await send({
+        method: 'POST',
+        route: `/documents/${id(documentId)}/restore`,
+        idempotencyKey,
+        timeoutMs: metadataTimeout,
+        read: json,
+      })
+      return parseDocumentSummary(raw)
     },
 
     async listOrgMembers(input) {

@@ -33,8 +33,14 @@ import { FeedError } from './errors'
 /** why a cache commit failed; the cursor must not move past a page that failed */
 export type DocCacheCommitFailure = 'store_full' | 'store_unavailable'
 
-/** the outcome of one cache commit: `failed` means nothing of it is on disk */
-export type DocCacheCommit = { kind: 'ok' } | { kind: 'failed'; failure: DocCacheCommitFailure }
+/**
+ * The outcome of one cache commit: `failed` means nothing of it is on disk.
+ * `applied` (ok only) names the documents whose row this commit actually
+ * changed — a replayed page reports none, so a change notice never repeats for
+ * a document the cache already held.
+ */
+export type DocCacheCommit =
+  { kind: 'ok'; applied?: readonly string[] } | { kind: 'failed'; failure: DocCacheCommitFailure }
 
 export interface DocCache {
   /** upsert the page's rows as one atomic step; a replayed page has no further effect */
