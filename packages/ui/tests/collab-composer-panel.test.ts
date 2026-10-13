@@ -92,9 +92,12 @@ describe('CollabComposer as the panel composer slot (discussion)', () => {
     expect(box().getAttribute('aria-describedby')).toContain(
       [...el.querySelectorAll('.collab-composer-error')][0]!.id,
     )
-    // the panel status line (server error) now blocks Send with a pointer to it
+    // F2 reloads after a failed write; the successful reload clears the panel status, so Send stays usable
+    await act(async () => {
+      await flush()
+    })
     const send = [...el.querySelectorAll('button')].find((b) => b.textContent === 'Send')!
-    expect(send.getAttribute('aria-disabled')).toBe('true')
-    expect(document.getElementById(send.getAttribute('aria-describedby')!)).not.toBeNull()
+    expect(send.getAttribute('aria-disabled')).not.toBe('true')
+    expect(send.getAttribute('aria-describedby')).toBeNull()
   })
 })
