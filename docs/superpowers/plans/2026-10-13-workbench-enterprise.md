@@ -6018,7 +6018,7 @@ Sau:
 - [ ] **Step 9: Chạy test. Test shard pass, test nav vẫn fail.**
 
 Chạy: `cd /Users/ducquang/UNICOM/uniwork-office/apps/shell && npx vitest run tests/strings-workbench.test.ts`
-Kết quả mong đợi: mọi test trong describe `workbench string shards` pass. Cả 21 trường hợp của `Workbench nav label` FAIL, ví dụ `navTeacher` của zh là `'专业工作台'` chứ không phải undefined.
+Kết quả mong đợi: mọi test trong describe `workbench string shards` pass. Cả 21 trường hợp của `Workbench nav label` FAIL, ví dụ `navTeacher` của zh là a non-empty Chinese string chứ không phải undefined.
 
 - [ ] **Step 10: Đổi `navTeacher` → `navWorkbench` với bản dịch thật ở cả 21 khối locale**
 
@@ -13271,7 +13271,7 @@ npm run format
 ```
 Kết quả mong đợi: typecheck exit 0 (key thiếu trong shard là lỗi `StringKey`); eslint exit 0 (có thể còn cảnh báo `react-hooks/exhaustive-deps` sẵn có về hàm dịch trong effect, vốn đã có với `label`; không thêm `t` vào mảng phụ thuộc); `workbench-copy` 5 test và `strings-workbench` pass, kể cả `formal vi copy does not mix in English UI words` và kiểm placeholder của 21 locale; mọi test shell pass; theme check sạch (task không đổi CSS).
 
-Kiểm trong app (chỉ đổi renderer): Cài đặt → Tài khoản → Ngôn ngữ, đổi lần lượt Tiếng Việt, English và 中文. Mở Bàn làm việc → Tri thức, Tài liệu, Kỹ năng, Soạn mới, Biểu mẫu và menu "+" của thanh tab: mọi chữ đổi theo ngôn ngữ, tiếng Việt không còn "tab", "file", "Skills".
+Kiểm trong app (chỉ đổi renderer): Cài đặt → Tài khoản → Ngôn ngữ, đổi lần lượt Tiếng Việt, English và Chinese. Mở Bàn làm việc → Tri thức, Tài liệu, Kỹ năng, Soạn mới, Biểu mẫu và menu "+" của thanh tab: mọi chữ đổi theo ngôn ngữ, tiếng Việt không còn "tab", "file", "Skills".
 
 - [ ] **Step 7: Commit**
 

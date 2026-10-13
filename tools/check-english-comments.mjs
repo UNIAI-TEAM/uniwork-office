@@ -55,13 +55,7 @@ function main() {
   const violations = git.stdout
     .trim()
     .split('\n')
-    .flatMap((file) => {
-      try {
-        return findViolations(file, readFileSync(join(root, file), 'utf8'))
-      } catch {
-        return []
-      }
-    })
+    .flatMap((file) => findViolations(file, readFileSync(join(root, file), 'utf8')))
   if (violations.length > 0) {
     console.error(
       `Chinese text found in code comments or docs:\n${violations.join('\n')}\n` +
