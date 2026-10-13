@@ -1,4 +1,4 @@
-import type { IpcMain } from 'electron'
+import type { IpcMain, WebContents } from 'electron'
 import {
   COMMENTS_CHANNELS,
   parseCommentsAnchorsInput,
@@ -190,6 +190,38 @@ export function createUniworkComments(
   // D1-1: paths whose editor has pulled the held reveal; its listener is armed
   // from then on (main cannot see the listener itself)
   const subscribed = new Set<string>()
+  // D2-2: `subscribed` is keyed by path, but the subscription belongs to one
+  // realm of that path's editor. A reload, a navigation, a crashed process or
+  // the closed editor replaces the realm without the wiring noticing; the stale
+  // flag would then report a push inside that window delivered - the push is
+  // sent into a page whose listener is not armed yet, the hold is cleared, and
+  // the new realm's pull reads null. Watching the sender's webContents drops
+  // the path from `subscribed` the moment its document is replaced, so a push
+  // in the window stays held and the new realm's pull gets it exactly once.
+  const watchedRealm = new Map<number, { path: string }>()
+
+  const watchRealm = (sender: WebContents, path: string): void => {
+    const watched = watchedRealm.get(sender.id)
+    if (watched) {
+      watched.path = path
+      return
+    }
+    const entry = { path }
+    const reset = (): void => {
+      subscribed.delete(entry.path)
+    }
+    sender.on('did-start-navigation', (details) => {
+      // an in-page navigation keeps the document (and its armed listener)
+      if (details.isMainFrame && !details.isSameDocument) reset()
+    })
+    sender.on('did-navigate', reset)
+    sender.on('render-process-gone', reset)
+    sender.on('destroyed', () => {
+      reset()
+      watchedRealm.delete(sender.id)
+    })
+    watchedRealm.set(sender.id, entry)
+  }
 
   ipcMain.handle(COMMENTS_CHANNELS.revealPending, (event) => {
     // scoped to the sender's own path: another editor's held reveal is neither
@@ -197,6 +229,7 @@ export function createUniworkComments(
     const path = deps.shownPath?.(event.sender) ?? null
     if (!path) return null
     subscribed.add(path)
+    watchRealm(event.sender, path)
     const commentId = heldReveals.get(path)
     if (commentId === undefined) return null
     heldReveals.delete(path)
