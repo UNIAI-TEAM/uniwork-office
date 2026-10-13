@@ -12,6 +12,7 @@ import {
   type FrameRequests,
   type HostRequests,
   type OpenPayload,
+  type RemoteVersionPayload,
   type ProtocolErrorCode,
   type SavedPayload,
   type Theme,
@@ -56,6 +57,7 @@ export function createMockPort(session: Partial<PortSession> = {}) {
   const renameListeners: Array<(file: FileMeta) => void> = []
   const themeListeners: Array<(theme: Theme) => void> = []
   const languageListeners: Array<(locale: string) => void> = []
+  const remoteListeners: Array<(p: RemoteVersionPayload) => void> = []
 
   function put(name: string, bytes: Uint8Array, fileId = `f${++seq}`): FileMeta {
     const version = (store.get(fileId)?.meta.versionId ?? 'v0').replace(/\d+$/, (n) =>
@@ -155,6 +157,7 @@ export function createMockPort(session: Partial<PortSession> = {}) {
     handlePrint: (h) => ((handlers.print = h as never), () => {}),
     handleCloseCheck: (h) => ((handlers['doc.closeCheck'] = h as never), () => {}),
     onFileRenamed: (l) => (renameListeners.push(l), () => {}),
+    onRemoteVersion: (l) => (remoteListeners.push(l), () => {}),
     onTheme: (l) => (themeListeners.push(l), () => {}),
     onLanguage: (l) => (languageListeners.push(l), () => {}),
     setDirty: (d, opts) => {
@@ -198,6 +201,8 @@ export function createMockPort(session: Partial<PortSession> = {}) {
       f.meta = { ...f.meta, name }
       for (const l of renameListeners) l({ ...f.meta })
     },
+    /** host event `doc.remoteVersion` (a newer version was saved elsewhere) */
+    sendRemoteVersion: (p: RemoteVersionPayload) => remoteListeners.forEach((l) => l(p)),
     /** host events theme / language */
     sendTheme: (theme: Theme) => themeListeners.forEach((l) => l(theme)),
     sendLanguage: (locale: string) => languageListeners.forEach((l) => l(locale)),

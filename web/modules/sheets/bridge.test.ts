@@ -115,6 +115,8 @@ function setup(
     transport?: SheetsEngineTransport
     features?: Partial<SheetsEngineTransport['features']>
     drafts?: (host: import('../../docs/bridge/draft-recovery').DraftHost) => DraftRecovery
+    /** the revision the handshake open reports (G5-03w: an event must be newer than it) */
+    revision?: string
   } = {},
 ) {
   const mock = createMockPort({ documentId: 'pending' })
@@ -161,7 +163,18 @@ function setup(
     print,
     download,
     async boot(): Promise<WorkbookFile> {
-      mock.init({ documentId: file.fileId, capabilities: opts.grants ?? ALL_GRANTS })
+      mock.init({
+        documentId: file.fileId,
+        capabilities: opts.grants ?? ALL_GRANTS,
+        ...(opts.revision !== undefined
+          ? {
+              open: {
+                ...mock.openPayload(file.fileId),
+                file: { ...file, revision: opts.revision },
+              },
+            }
+          : {}),
+      })
       await flush()
       expect(await desktop.hasQueuedWorkbook()).toBe(true)
       const wb = await desktop.selectWorkbook()
@@ -995,3 +1008,67 @@ describe('draft recovery (C18)', () => {
 })
 
 export type { MockPort }
+
+// G5-03w: a newer version saved elsewhere (doc.remoteVersion)
+describe('new version on UniWork (doc.remoteVersion)', () => {
+  const event = (fileId: string, revision: string) => ({
+    document_id: fileId,
+    revision,
+    version_id: `v${revision}`,
+    saved_at: new Date(Date.UTC(2026, 9, 12, 8)).toISOString(),
+    author_name: 'Trần An',
+  })
+  const barText = () => document.querySelector('.uw-remote-bar-text')?.textContent ?? null
+
+  it('clean: the renderer is sent through its open flow with the head bytes', async () => {
+    const t = setup({ revision: '10' })
+    await t.boot()
+    const actions: string[] = []
+    const off = t.desktop.onMenuAction((a) => actions.push(a))
+    t.mock.commit(t.file.fileId, enc('head'))
+    t.mock.override('api.open', (payload) => {
+      const open = t.mock.openPayload((payload as { fileId: string }).fileId)
+      return { ...open, file: { ...open.file, revision: '12', versionId: 'v12' } }
+    })
+    t.mock.sendRemoteVersion(event(t.file.fileId, '12'))
+    await vi.waitFor(() => expect(actions).toContain('open'))
+    const wb = await t.desktop.selectWorkbook()
+    off()
+    expect(wb).not.toBeNull()
+    expect(dec(t.fake.opened.at(-1)!.data)).toBe('head')
+    expect(t.mock.calls.filter((c) => c.type === 'api.open').at(-1)!.payload).toEqual({
+      fileId: t.file.fileId,
+      versionId: 'v12',
+    })
+  })
+
+  it('dirty: nothing is opened and the warn bar offers Reload', async () => {
+    const t = setup({ revision: '10' })
+    await t.boot()
+    const actions: string[] = []
+    const off = t.desktop.onMenuAction((a) => actions.push(a))
+    t.desktop.notifyPendingEdits(1)
+    t.mock.sendRemoteVersion(event(t.file.fileId, '12'))
+    await vi.waitFor(() => expect(barText()).toContain('12'))
+    off()
+    expect(actions).not.toContain('open')
+    expect(t.fake.opened).toHaveLength(1)
+    expect(document.querySelector('[data-action="reload"]')).not.toBeNull()
+  })
+
+  it('a revoked document locks saving with the status bar', async () => {
+    const t = setup({ revision: '10' })
+    const wb = await t.boot()
+    t.mock.override('api.open', () => {
+      throw protocolError('forbidden', 'revoked')
+    })
+    t.mock.sendRemoteVersion(event(t.file.fileId, '12'))
+    await vi.waitFor(() => expect(document.querySelector('.uw-remote-bar--error')).not.toBeNull())
+    const off = t.desktop.onMenuAction(() => {})
+    await expect(
+      t.desktop.saveWorkbookEdits(saveRequest(wb.sessionId, [[0, 0, 1]])),
+    ).rejects.toThrow()
+    off()
+    expect(t.mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(0)
+  })
+})

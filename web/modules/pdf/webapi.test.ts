@@ -706,3 +706,65 @@ describe('openInApp (A7: the "use the app" action)', () => {
     expect(await t.api.openInApp()).toEqual({ outcome: 'launched' })
   })
 })
+
+// G5-03w: a newer version saved elsewhere (doc.remoteVersion)
+describe('new version on UniWork (doc.remoteVersion)', () => {
+  const event = (fileId: string, revision: string) => ({
+    document_id: fileId,
+    revision,
+    version_id: `v${revision}`,
+    saved_at: new Date(Date.UTC(2026, 9, 12, 8)).toISOString(),
+    author_name: 'Trần An',
+  })
+  const barText = () => document.querySelector('.uw-remote-bar-text')?.textContent ?? null
+  /** a viewer that opened the document at revision 10, so a revision 12 event is newer */
+  async function bootAt10() {
+    const mock = createMockPort()
+    const meta = mock.seed('Report.pdf', PDF('v1'))
+    const { api } = createPdfWebApi(mock.port, {
+      capabilities: { edit: true },
+      core: async () => fakeCore(),
+      ensureFonts: async () => {},
+      signatures: createSignatureStore({ idb: () => null, legacy: () => null }),
+      download: () => {},
+      saveTimeoutMs: 2000,
+    })
+    mock.init({
+      documentId: meta.fileId,
+      open: { ...mock.openPayload(meta.fileId), file: { ...meta, revision: '10' } },
+    })
+    await api.consumePending()
+    return { mock, meta, api }
+  }
+
+  it('clean: the head is read through api.open and the viewer reloads it in place', async () => {
+    const { mock, meta, api } = await bootAt10()
+    const reloads: string[] = []
+    api.onReloadRequest((p) => reloads.push(p))
+    api.setDirty(false)
+    mock.commit(meta.fileId, PDF('head'))
+    mock.override('api.open', (payload) => {
+      const open = mock.openPayload((payload as { fileId: string }).fileId)
+      return { ...open, file: { ...open.file, revision: '12', versionId: 'v12' } }
+    })
+    mock.sendRemoteVersion(event(meta.fileId, '12'))
+    await vi.waitFor(() => expect(reloads).toHaveLength(1))
+    expect(str(await api.readFile(reloads[0]!))).toBe('%PDF-1.7 head')
+    expect(mock.calls.filter((c) => c.type === 'api.open').at(-1)!.payload).toEqual({
+      fileId: meta.fileId,
+      versionId: 'v12',
+    })
+    expect(barText()).toContain('12')
+  })
+
+  it('dirty: the viewer keeps its copy and the warn bar shows', async () => {
+    const { mock, meta, api } = await bootAt10()
+    const reloads: string[] = []
+    api.onReloadRequest((p) => reloads.push(p))
+    api.setDirty(true)
+    mock.sendRemoteVersion(event(meta.fileId, '12'))
+    await vi.waitFor(() => expect(barText()).toContain('12'))
+    expect(reloads).toEqual([])
+    expect(document.querySelector('[data-action="reload"]')).not.toBeNull()
+  })
+})

@@ -41,6 +41,7 @@ function setup(
     name?: string
     drafts?: TextWebApiOptions['drafts']
     downloadMaxBytes?: number
+    revision?: string
   } = {},
 ) {
   const mock = createMockPort()
@@ -65,6 +66,9 @@ function setup(
   mock.init({
     documentId: file.fileId,
     capabilities: opts.caps ?? FULL,
+    ...(opts.revision !== undefined
+      ? { open: { ...mock.openPayload(file.fileId), file: { ...file, revision: opts.revision } } }
+      : {}),
     ...(opts.downloadMaxBytes !== undefined ? { downloadMaxBytes: opts.downloadMaxBytes } : {}),
   })
   return { mock, file, api, print, reload }
@@ -153,21 +157,22 @@ describe('markdownApi: open and save', () => {
     // any other failure shows the shared sentence of its code, not the host's English message
     mock.override('api.save', () => ({
       ok: false,
-      error: { code: 'forbidden', message: 'You can only view this document.' },
-    }))
-    const denied = await api.save({ text, imageSources: [], mode: 'save' })
-    expect(denied).toEqual({
-      ok: false,
-      error: 'You do not have permission to save this document.',
-    })
-    mock.override('api.save', () => ({
-      ok: false,
       error: { code: 'internal', message: 'Internal Server Error', status: 500 },
     }))
     const server = await api.save({ text, imageSources: [], mode: 'save' })
     expect(server).toEqual({
       ok: false,
       error: 'UniWork had a problem saving. Try again in a moment.',
+    })
+    // a 403 is the revoke lock now, so it comes last: the shared sentence of its code, not the host's English message
+    mock.override('api.save', () => ({
+      ok: false,
+      error: { code: 'forbidden', message: 'You can only view this document.' },
+    }))
+    const denied = await api.save({ text, imageSources: [], mode: 'save' })
+    expect(denied).toEqual({
+      ok: false,
+      error: 'You do not have permission to save this document.',
     })
   })
 
@@ -764,5 +769,51 @@ describe('markdownApi: draft recovery (C18)', () => {
     f.api.setDirty(true)
     await f.flush()
     expect(p.records().size).toBe(0)
+  })
+})
+
+// G5-03w: a newer version saved elsewhere (doc.remoteVersion)
+describe('markdownApi: new version on UniWork', () => {
+  const event = (fileId: string, revision: string) => ({
+    document_id: fileId,
+    revision,
+    version_id: `v${revision}`,
+    saved_at: new Date(Date.UTC(2026, 9, 12, 8)).toISOString(),
+    author_name: 'Trần An',
+  })
+  const barText = () => document.querySelector('.uw-remote-bar-text')?.textContent ?? null
+
+  it('clean: the frame reloads on the event version, and no bar is left behind', async () => {
+    const { api, mock, file, reload } = setup({ revision: '10' })
+    await open(api)
+    api.setDirty(false)
+    mock.sendRemoteVersion(event(file.fileId, '12'))
+    await vi.waitFor(() => expect(reload).toHaveBeenCalledOnce())
+    const opens = mock.calls.filter((c) => c.type === 'api.open')
+    expect(opens.at(-1)!.payload).toEqual({ fileId: file.fileId, versionId: 'v12' })
+  })
+
+  it('dirty: nothing is reloaded and the warn bar offers Reload', async () => {
+    const { api, mock, file, reload } = setup({ revision: '10' })
+    await open(api)
+    api.setDirty(true)
+    mock.sendRemoteVersion(event(file.fileId, '12'))
+    await vi.waitFor(() => expect(barText()).toContain('12'))
+    expect(reload).not.toHaveBeenCalled()
+    expect(document.querySelector('[data-action="reload"]')).not.toBeNull()
+  })
+
+  it('a revoked document locks saving with the status bar', async () => {
+    const { api, mock, file } = setup({ revision: '10' })
+    await open(api)
+    api.setDirty(false)
+    mock.override('api.open', () => {
+      throw Object.assign(new Error('revoked'), { code: 'forbidden', status: 403 })
+    })
+    mock.sendRemoteVersion(event(file.fileId, '12'))
+    await vi.waitFor(() => expect(document.querySelector('.uw-remote-bar--error')).not.toBeNull())
+    const res = await api.save({ text: 'x', imageSources: [], mode: 'save' })
+    expect(res.ok).toBe(false)
+    expect(mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(0)
   })
 })
