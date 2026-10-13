@@ -17,7 +17,8 @@ import {
   type DraftRecord,
   type DraftRecovery,
 } from '../../docs/bridge/draft-recovery'
-import { setWebLanguage } from '../../docs/bridge/browser'
+import { setWebLanguage, webLanguage } from '../../docs/bridge/browser'
+import { webText } from '../shared/i18n/strings-web'
 import { createFakeIdb } from '../../docs/bridge/testing/fake-idb'
 import type { PdfCore } from './core'
 import { createSignatureStore } from './signatures'
@@ -704,5 +705,98 @@ describe('openInApp (A7: the "use the app" action)', () => {
     const t = await setup({ caps: { desktopOpen: false } })
     t.caps.desktopOpen = true
     expect(await t.api.openInApp()).toEqual({ outcome: 'launched' })
+  })
+})
+
+// G5-03w: a newer version saved elsewhere (doc.remoteVersion)
+describe('new version on UniWork (doc.remoteVersion)', () => {
+  const event = (fileId: string, revision: string) => ({
+    document_id: fileId,
+    revision,
+    version_id: `v${revision}`,
+    saved_at: new Date(Date.UTC(2026, 9, 12, 8)).toISOString(),
+    author_name: 'Trần An',
+  })
+  const barText = () => document.querySelector('.uw-remote-bar-text')?.textContent ?? null
+  /** a viewer that opened the document at revision 10, so a revision 12 event is newer */
+  async function bootAt10() {
+    const mock = createMockPort()
+    const meta = mock.seed('Report.pdf', PDF('v1'))
+    const { api } = createPdfWebApi(mock.port, {
+      capabilities: { edit: true },
+      core: async () => fakeCore(),
+      ensureFonts: async () => {},
+      signatures: createSignatureStore({ idb: () => null, legacy: () => null }),
+      download: () => {},
+      saveTimeoutMs: 2000,
+    })
+    mock.init({
+      documentId: meta.fileId,
+      open: { ...mock.openPayload(meta.fileId), file: { ...meta, revision: '10' } },
+    })
+    await api.consumePending()
+    return { mock, meta, api }
+  }
+
+  it('clean: the head is read through api.open and the viewer reloads it in place', async () => {
+    const { mock, meta, api } = await bootAt10()
+    const reloads: string[] = []
+    api.onReloadRequest((p) => reloads.push(p))
+    api.setDirty(false)
+    mock.commit(meta.fileId, PDF('head'))
+    mock.override('api.open', (payload) => {
+      const open = mock.openPayload((payload as { fileId: string }).fileId)
+      return { ...open, file: { ...open.file, revision: '12', versionId: 'v12' } }
+    })
+    mock.sendRemoteVersion(event(meta.fileId, '12'))
+    await vi.waitFor(() => expect(reloads).toHaveLength(1))
+    expect(str(await api.readFile(reloads[0]!))).toBe('%PDF-1.7 head')
+    expect(mock.calls.filter((c) => c.type === 'api.open').at(-1)!.payload).toEqual({
+      fileId: meta.fileId,
+      versionId: 'v12',
+    })
+    expect(barText()).toContain('12')
+  })
+
+  it('dirty: the viewer keeps its copy and the warn bar shows', async () => {
+    const { mock, meta, api } = await bootAt10()
+    const reloads: string[] = []
+    api.onReloadRequest((p) => reloads.push(p))
+    api.setDirty(true)
+    mock.sendRemoteVersion(event(meta.fileId, '12'))
+    await vi.waitFor(() => expect(barText()).toContain('12'))
+    expect(reloads).toEqual([])
+    expect(document.querySelector('[data-action="reload"]')).not.toBeNull()
+  })
+
+  it('doc.blocked locks at once on a dirty viewer: the bar, the host save refused, no reload', async () => {
+    const { mock, meta, api } = await bootAt10()
+    const reloads: string[] = []
+    api.onReloadRequest((p) => reloads.push(p))
+    api.setDirty(true)
+    mock.sendBlocked({ document_id: meta.fileId, reason: 'permission_revoked' })
+    expect(document.querySelector('.uw-remote-bar--error')).not.toBeNull()
+    expect(await mock.host.save({ reason: 'user' })).toMatchObject({
+      ok: false,
+      error: { code: 'forbidden' },
+    })
+    expect(mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(0)
+    expect(reloads).toEqual([])
+  })
+
+  it('doc.blocked with an organisation reason: the bar only, the viewer usable, Save still reaches the host', async () => {
+    const { mock, meta, api } = await bootAt10()
+    api.setDirty(true)
+    mock.sendBlocked({ document_id: meta.fileId, reason: 'organization_suspended' })
+    expect(document.querySelector('.uw-remote-bar--error')).not.toBeNull()
+    expect(barText()).toBe(
+      webText(webLanguage(), 'uwRemoteOrgBlockedWeb', {
+        reason: webText(webLanguage(), 'uwReasonSuspended'),
+      }),
+    )
+    expect(await api.save(req(pathFor(meta), { markups: [{} as never] }))).toEqual({
+      ok: true,
+    })
+    expect(mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(1)
   })
 })

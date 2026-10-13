@@ -28,6 +28,7 @@ import { rememberRemoteVersion } from '../../modules/shared/conflict-dialog'
 import { bindHostAppearance, createFrameClient, frameVersionFromDocument } from './frame-boot'
 import type { FramePort } from './frame-port'
 import { hostGrants } from './hide'
+import { frameAiRun } from '../../modules/shared/ai-run'
 import { projectApi } from './project-memory'
 import { mergeModules, safeApi, type BridgeObject } from './safe-api'
 import {
@@ -62,7 +63,9 @@ export type ModuleBridgePort = Pick<
   | 'setTitle'
   | 'setModal'
   | 'onRemoteVersion'
+  | 'onBlocked'
   | 'reportSaved'
+  | 'reportAiRun'
   | 'reportError'
   | 'getToken'
   | 'refreshToken'
@@ -174,7 +177,9 @@ export function installModuleBridge(spec: ModuleBridgeSpec): InstalledModuleBrid
   // holds its save watchdog; the conflict table learns who saved a revision from doc.remoteVersion
   onFrameModal((open) => client.setModal?.(open))
   client.onRemoteVersion?.(rememberRemoteVersion)
-  const ai = createWebAi({ port: client, capabilities })
+  // the AI turns of this frame: the host hears `aiRun`, the new-version bar waits for idle
+  frameAiRun.bind((payload) => client.reportAiRun?.(payload))
+  const ai = createWebAi({ port: client, capabilities, aiRun: frameAiRun })
 
   const ctx: ModuleBridgeContext = { module: spec.module, client, capabilities }
   const target = spec.target ?? (window as unknown as Record<string, unknown>)

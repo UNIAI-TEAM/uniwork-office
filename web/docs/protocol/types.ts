@@ -668,6 +668,27 @@ export interface RemoteVersionPayload {
   author_name?: string
 }
 
+/** Why the host blocks the open document; a frame treats a value it does not know as `permission_revoked`. */
+export type DocBlockedReason =
+  | 'permission_revoked'
+  | 'document_deleted'
+  | 'organization_suspended'
+  | 'member_deactivated'
+  | 'document_archived'
+
+/**
+ * additive (G5-03w): the host learned that the open document can no longer be saved by this viewer
+ * (access revoked, deleted, organisation suspended, member deactivated, archived). The frame ignores
+ * it for another `document_id`; for its own it shows the reason's error bar, keeps the content
+ * (dirty edits included) read-only and refuses every Save / Save As. The host keeps refusing
+ * `api.save` / `api.saveAs` by itself, so a frame without a listener loses nothing but the early bar.
+ */
+export interface DocBlockedPayload {
+  document_id: string
+  /** validated as a non-empty string so a reason a newer host adds still reaches the frame */
+  reason: DocBlockedReason
+}
+
 export type AiRunState = 'running' | 'idle'
 
 /**
@@ -1158,6 +1179,8 @@ export interface HostEvents {
   'doc.remoteVersion': RemoteVersionPayload
   /** additive (G8-08): reload the comment list (frames without `comments` have no listener) */
   'comments.changed': CommentsChangedPayload
+  /** additive (G5-03w): the open document is blocked (revoked, deleted, …); frames before it have no listener */
+  'doc.blocked': DocBlockedPayload
 }
 
 /** Requests the frame sends to the host. `api.*` are proxied to UniWork APIs. */
@@ -1252,6 +1275,7 @@ const HOST_EVENTS: Record<HostEventType, true> = {
   'file.renamed': true,
   'doc.remoteVersion': true,
   'comments.changed': true,
+  'doc.blocked': true,
 }
 const FRAME_REQUESTS: Record<FrameRequestType, true> = {
   'token.refresh': true,
@@ -1578,6 +1602,7 @@ const PAYLOAD_VALIDATORS: Record<string, (x: unknown) => boolean> = {
     isNonEmptyStr(x.saved_at) &&
     isOpt(x.author_name, isStr),
   'event:comments.changed': (x) => isObj(x) && isNonEmptyStr(x.document_id),
+  'event:doc.blocked': (x) => isObj(x) && isNonEmptyStr(x.document_id) && isNonEmptyStr(x.reason),
   // frame -> host requests
   'request:token.refresh': (x) =>
     isObj(x) && (x.reason === 'expiring' || x.reason === 'unauthorized'),

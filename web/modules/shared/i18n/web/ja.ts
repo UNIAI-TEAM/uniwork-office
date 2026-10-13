@@ -114,6 +114,8 @@ export const ja = {
   uwRemoteReloadFailed: 'バージョン {n} を読み込めませんでした。前のバージョンを表示したままです。',
   uwRemoteDeleted: 'このドキュメントは UniWork で削除されました。保存待ちは停止しました。',
   uwAuthorFallback: 'メンバー',
+  uwLockRegion: 'ドキュメントの状態',
+  uwActRetry: '再試行',
 
   // S6 new-version bar (web only)
   uwRemoteRevokedWeb:

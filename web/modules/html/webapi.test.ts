@@ -35,6 +35,8 @@ function setup(
   caps: Capabilities = FULL,
   drafts?: TextWebApiOptions['drafts'],
   assets: Record<string, string> = { 'assets/p.png': '/files/p' },
+  reload?: () => void,
+  revision?: string,
 ) {
   const mock = createMockPort()
   const file = mock.seed('Page.html', enc(PAGE))
@@ -47,7 +49,9 @@ function setup(
       defaults: { ...TEXT_MODULE_WEB_CAPABILITIES, ...HTML_WEB_CAPABILITIES },
       grants: htmlModuleGrants,
     },
-    globals: { htmlApi: (ctx) => createHtmlWebApi(ctx, { print, drafts }) },
+    globals: {
+      htmlApi: (ctx) => createHtmlWebApi(ctx, { print, drafts, ...(reload ? { reload } : {}) }),
+    },
     client: mock.port,
     target,
   })
@@ -55,7 +59,11 @@ function setup(
   mock.init({
     documentId: file.fileId,
     capabilities: caps,
-    open: { ...mock.openPayload(file.fileId), assets },
+    open: {
+      ...mock.openPayload(file.fileId),
+      assets,
+      ...(revision ? { file: { ...file, revision } } : {}),
+    },
   })
   return { mock, file, api, print }
 }
@@ -359,5 +367,37 @@ describe('htmlApi: draft recovery (C18)', () => {
     expect(second.api.consumeRecovered()).toBe(PAGE)
     expect(path).toBe(restored)
     for (const stop of stops) stop()
+  })
+})
+
+// G5-03w: the same shared reload as Markdown (the renderer reads its page once at boot)
+describe('htmlApi: new version on UniWork', () => {
+  it('a clean newer version restarts the frame and the next boot shows the information bar', async () => {
+    sessionStorage.clear()
+    const reload = vi.fn()
+    const first = setup(FULL, undefined, undefined, reload, '10')
+    await first.api.consumePending()
+    first.api.setDirty(false)
+    first.mock.override('api.open', () => ({
+      ...first.mock.openPayload(first.file.fileId),
+      file: { ...first.file, revision: '12', etag: '12', versionId: 'v12', modifiedAt: 5_000 },
+    }))
+    first.mock.sendRemoteVersion({
+      document_id: first.file.fileId,
+      revision: '12',
+      version_id: 'v12',
+      saved_at: new Date(5_000).toISOString(),
+      author_name: 'Trần An',
+    })
+    await vi.waitFor(() => expect(reload).toHaveBeenCalledOnce())
+    expect(sessionStorage.getItem(`uw-reload-notice:${first.file.fileId}`)).not.toBeNull()
+
+    document.body.innerHTML = ''
+    const next = setup(FULL, undefined, undefined, undefined, '12')
+    await next.api.consumePending()
+    expect(document.querySelector('.uw-remote-bar--info')).not.toBeNull()
+    expect(document.querySelector('.uw-remote-bar-text')!.textContent).toContain('12')
+    expect(document.querySelector('.uw-remote-bar-text')!.textContent).toContain('Trần An')
+    document.body.innerHTML = ''
   })
 })

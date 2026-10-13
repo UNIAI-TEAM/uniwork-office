@@ -17,6 +17,7 @@ import {
 } from './errors'
 import { aiNoticeBody, aiNoticeKind } from '../../../../packages/ai-provider/src/ai-notice'
 import { createProxyFetch, toProxyRequest } from './transport'
+import { createAiRunTracker, type AiRunTracker } from '../ai-run'
 import { createWebAiStreams } from './stream'
 import {
   CREDENTIALS_TTL_MS,
@@ -399,7 +400,7 @@ describe('streams', () => {
       providers: { [provider]: { apiKey: 'never-sent', model: 'm-1' } },
     }) as never
 
-  function streams(answer: (c: Call) => Response) {
+  function streams(answer: (c: Call) => Response, aiRun?: AiRunTracker) {
     const { calls, fetch } = recorder((c) => answer(c))
     const client = { base: BASE, fetch: (u: string, i?: RequestInit) => fetch(u, i) }
     const onChatFailure = vi.fn()
@@ -415,6 +416,7 @@ describe('streams', () => {
               : null,
       describe: (err) => `typed:${err.code}`,
       onChatFailure,
+      ...(aiRun ? { aiRun } : {}),
     })
     const chunks: Array<{ type: string; text?: string; error?: string }> = []
     s.onAiStream((c) => chunks.push(c))
@@ -448,6 +450,63 @@ describe('streams', () => {
     expect(body.model).toBe('m-1')
     expect(body.stream).toBe(true)
     expect(JSON.stringify(calls[0]!.init)).not.toContain('never-sent')
+  })
+
+  it('a chat stream is a running turn until it ends: aiRun running, then one idle (X-02, S6)', async () => {
+    const sent: string[] = []
+    const aiRun = createAiRunTracker({ report: (p) => sent.push(p.state), graceMs: 0 })
+    const { s } = streams(
+      () =>
+        sseResponse([
+          `data: ${JSON.stringify({ choices: [{ delta: { content: 'x' } }] })}\n\n`,
+          'data: [DONE]\n\n',
+        ]),
+      aiRun,
+    )
+    const turn = s.aiStream({
+      requestId: 'run1',
+      settings: settings('openai'),
+      system: 's',
+      messages: [{ role: 'user', content: 'hi' }],
+    } as never)
+    expect(aiRun.running()).toBe(true)
+    await turn
+    expect(aiRun.running()).toBe(false)
+    expect(sent).toEqual(['running', 'idle'])
+  })
+
+  it('a stream that cannot start (no model) is not a running turn; a stopped one ends the run', async () => {
+    const sent: string[] = []
+    const aiRun = createAiRunTracker({ report: (p) => sent.push(p.state), graceMs: 0 })
+    const { s } = streams(() => jsonResponse(400, {}), aiRun)
+    const noModel = { provider: 'openai', providers: { openai: { apiKey: 'k', model: ' ' } } }
+    await s.aiStream({ requestId: 'r0', settings: noModel, system: 's', messages: [] } as never)
+    expect(sent).toEqual([])
+    // a stream that hangs until it is cancelled (the "stop to reload" path)
+    const hang = streams(
+      (c) =>
+        new Response(
+          new ReadableStream({
+            start(controller) {
+              c.init.signal?.addEventListener('abort', () => controller.error(new Error('aborted')))
+            },
+          }),
+          { status: 200, headers: { 'content-type': 'text/event-stream' } },
+        ),
+      aiRun,
+    )
+    const turn = hang.s.aiStream({
+      requestId: 'r1',
+      settings: settings('openai'),
+      system: 's',
+      messages: [{ role: 'user', content: 'hi' }],
+    } as never)
+    await new Promise((r) => setTimeout(r, 0))
+    expect(aiRun.running()).toBe(true)
+    await aiRun.stop()
+    await turn
+    expect(aiRun.running()).toBe(false)
+    expect(sent).toEqual(['running', 'idle'])
   })
 
   it('a provider with no model sends nothing and says to choose one (never the generic refusal)', async () => {

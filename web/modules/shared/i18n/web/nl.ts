@@ -116,6 +116,8 @@ export const nl = {
   uwRemoteReloadFailed: 'Kan versie {n} niet laden. Je bekijkt nog de vorige versie.',
   uwRemoteDeleted: 'Dit document is verwijderd op UniWork. Opslagen in de wachtrij zijn gestopt.',
   uwAuthorFallback: 'een lid',
+  uwLockRegion: 'Documentstatus',
+  uwActRetry: 'Opnieuw proberen',
 
   // S6 new-version bar (web only)
   uwRemoteRevokedWeb:

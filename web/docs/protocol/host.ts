@@ -35,6 +35,7 @@ import {
   PROTOCOL_VERSION,
   toProtocolError,
   type CommentsRevealResult,
+  type DocBlockedPayload,
   type FileMeta,
   type FrameEvents,
   type FrameRequests,
@@ -138,6 +139,11 @@ export interface DocsFrameHost {
     commentId: string,
     options?: RequestOptions & { retry?: boolean },
   ): Promise<CommentsRevealResult>
+  /**
+   * the open document is blocked for this viewer (additive, G5-03w). A frame before it has no
+   * listener and drops it silently; the host keeps refusing its saves either way.
+   */
+  notifyBlocked(payload: DocBlockedPayload): void
   /** live theme / language switches (no-ops before the handshake; getInit supplies the initial values) */
   setTheme(theme: Theme): void
   setLanguage(locale: string): void
@@ -382,6 +388,7 @@ export function createDocsFrameHost(options: DocsFrameHostOptions): DocsFrameHos
       for (const wake of [...commentsWakers]) wake()
     },
     revealComment,
+    notifyBlocked: (p) => emitIfReady('doc.blocked', { ...p }),
     setTheme: (theme) => emitIfReady('theme', { theme }),
     setLanguage: (locale) => emitIfReady('language', { locale }),
     pushToken: (t) =>

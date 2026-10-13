@@ -121,6 +121,8 @@ export const de = {
   uwRemoteDeleted:
     'Dieses Dokument wurde in UniWork gelöscht. Eingereihte Speicherstände wurden gestoppt.',
   uwAuthorFallback: 'ein Mitglied',
+  uwLockRegion: 'Dokumentstatus',
+  uwActRetry: 'Erneut versuchen',
 
   // S6 new-version bar (web only)
   uwRemoteRevokedWeb:

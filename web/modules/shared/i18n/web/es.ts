@@ -116,6 +116,8 @@ export const es = {
   uwRemoteReloadFailed: 'No se pudo cargar la versión {n}. Sigues viendo la versión anterior.',
   uwRemoteDeleted: 'Este documento se eliminó en UniWork. Los guardados en cola se detuvieron.',
   uwAuthorFallback: 'un miembro',
+  uwLockRegion: 'Estado del documento',
+  uwActRetry: 'Reintentar',
 
   // S6 new-version bar (web only)
   uwRemoteRevokedWeb:

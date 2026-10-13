@@ -117,6 +117,8 @@ export const pt = {
     'Não foi possível carregar a versão {n}. Você ainda está vendo a versão anterior.',
   uwRemoteDeleted: 'Este documento foi excluído no UniWork. Os salvamentos na fila pararam.',
   uwAuthorFallback: 'um membro',
+  uwLockRegion: 'Estado do documento',
+  uwActRetry: 'Tentar novamente',
 
   // S6 new-version bar (web only)
   uwRemoteRevokedWeb:
