@@ -45,5 +45,7 @@ export interface ServerCommentsApi extends UniworkCommentsLike {
 declare global {
   interface Window {
     uniworkComments?: ServerCommentsApi
+    /** web frame: settles once the frame comments API is installed (or found not granted) */
+    uniworkCommentsReady?: Promise<unknown>
   }
 }

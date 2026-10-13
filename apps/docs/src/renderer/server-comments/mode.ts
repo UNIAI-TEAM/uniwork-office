@@ -50,24 +50,41 @@ export async function resolveServerMode(
 }
 
 /**
+ * `window.uniworkComments`, read lazily: the web frame installs it only after init (it publishes
+ * `window.uniworkCommentsReady` while that runs); desktop preloads set it before the renderer starts.
+ */
+export async function currentCommentsApi(): Promise<ServerCommentsApi | undefined> {
+  if (typeof window === 'undefined') return undefined
+  if (!window.uniworkComments && window.uniworkCommentsReady) {
+    try {
+      await window.uniworkCommentsReady
+    } catch {
+      // no comments API: local mode
+    }
+  }
+  return window.uniworkComments
+}
+
+/**
  * The server mode of the document identified by `docKey` (any value that changes when another
  * document opens) at `path`; null while unknown and for a local document.
  */
 export function useServerMode(
   docKey: unknown,
   path: string | null | undefined,
-  api: ServerCommentsApi | undefined = typeof window !== 'undefined'
-    ? window.uniworkComments
-    : undefined,
+  /** tests inject the API; the app reads `window.uniworkComments` lazily */
+  api?: ServerCommentsApi,
 ): ServerMode | null {
   const [mode, setMode] = useState<{ key: unknown; mode: ServerMode } | null>(null)
   useEffect(() => {
     setMode(null)
     if (!docKey) return
     let live = true
-    void resolveServerMode(api, path).then((m) => {
-      if (live && m) setMode({ key: docKey, mode: m })
-    })
+    void (api ? Promise.resolve(api) : currentCommentsApi())
+      .then((a) => resolveServerMode(a, path))
+      .then((m) => {
+        if (live && m) setMode({ key: docKey, mode: m })
+      })
     return () => {
       live = false
     }
