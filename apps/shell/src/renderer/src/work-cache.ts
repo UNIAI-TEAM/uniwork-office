@@ -13,7 +13,11 @@ import type {
   WorkTask,
   WorkTaskStatus,
 } from '../../shared/uniwork-work-api'
-import { pickActiveWorkspace, readActiveWorkspaceId } from './active-workspace'
+import {
+  pickActiveWorkspace,
+  readActiveWorkspaceId,
+  type WorkspaceListState,
+} from './active-workspace'
 import { agendaRange, groupAgenda } from './work-calendar'
 import { closedStatusKeys, localIsoDate } from './work-tasks'
 import { currentWorkbenchBucket, isWorkbenchBucketCleared } from './workbench-bucket'
@@ -151,6 +155,20 @@ export function useWorkLoad<T>(
     stale,
     reload,
     update,
+  }
+}
+
+/**
+ * The Workbench's starting list: PracticeHome remounts on every return to the
+ * Workbench, so it starts from the cached list (null = loading when none) and an
+ * offline re-entry keeps showing the cached tabs instead of the error state.
+ */
+export function cachedWorkspaceListState(): WorkspaceListState {
+  const listed = cachedWork<UniworkWorkspaceRef[]>('workspaces')
+  return {
+    workspaces: listed?.value ?? null,
+    workspaceId: listed ? pickActiveWorkspace(listed.value, readActiveWorkspaceId()) : null,
+    workspaceError: null,
   }
 }
 

@@ -32,7 +32,7 @@ import { WorkbenchTabs } from './WorkbenchTabs'
 import { WorkbenchTopBar, type WorkbenchNewItem } from './WorkbenchTopBar'
 import { pinPillar } from './workbench-pins'
 import { WbDeleteBtn, WbOpenBtn, WbRowActions } from './WbRowActions'
-import { WB_REFRESH_EVENT, cacheWork, workCacheSlot } from './work-cache'
+import { WB_REFRESH_EVENT, cacheWork, cachedWorkspaceListState, workCacheSlot } from './work-cache'
 import { WorkOverview } from './WorkOverview'
 
 interface PracticeHomeProps {
@@ -81,13 +81,9 @@ export function PracticeHome({
   const showMsg = (m: Msg): string => (typeof m === 'string' ? m : t(m.key, m.params))
   const vi = lang === 'vi'
 
-  // null while the list loads; Home remounts on an account or org change
-  // (WorkbenchAccountGate keys it by bucket), so one load per mount plus Refresh is enough
-  const [wsState, setWsState] = useState<WorkspaceListState>({
-    workspaces: null,
-    workspaceId: null,
-    workspaceError: null,
-  })
+  // starts from this bucket's cached list (this pane remounts whenever the user returns
+  // to the Workbench), then one load per mount plus Refresh
+  const [wsState, setWsState] = useState<WorkspaceListState>(cachedWorkspaceListState)
   const { workspaces, workspaceId, workspaceError } = wsState
   const workspace = workspaces?.find((w) => w.id === workspaceId) ?? null
   const [refreshTick, setRefreshTick] = useState(0)

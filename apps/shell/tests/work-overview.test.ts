@@ -12,7 +12,9 @@ import type {
   UniworkWorkspaceRef,
 } from '../src/shared/home-api'
 import type { UniworkWorkApi, WorkHomeSummary, WorkTask } from '../src/shared/uniwork-work-api'
+import { afterWorkspaceList } from '../src/renderer/src/active-workspace'
 import { LocaleProvider } from '../src/renderer/src/locale'
+import { cacheWork, cachedWorkspaceListState, workCacheSlot } from '../src/renderer/src/work-cache'
 import { WorkOverview } from '../src/renderer/src/WorkOverview'
 
 const actEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -280,6 +282,23 @@ describe('WorkOverview', () => {
     expect(work.homeSummary).toHaveBeenCalledTimes(2)
     expect(text()).toContain('Send the contract')
     expect(text()).toContain('Updated at')
+  })
+
+  it('offline re-entry: a remount starts from the cached list and shows the cached summary', async () => {
+    const props = await mount()
+    expect(text()).toContain('Send the contract')
+    // PracticeHome caches the list on every load and remounts when the user comes back
+    cacheWork(workCacheSlot('workspaces'), props.workspaces)
+    act(() => root.unmount())
+    root = createRoot(host)
+    work.homeSummary.mockResolvedValueOnce({ ok: false, error: 'offline' })
+    const seeded = cachedWorkspaceListState()
+    expect(seeded.workspaceId).toBe(props.workspaceId)
+    const offline = afterWorkspaceList(seeded, { ok: false, error: 'network' }, null)
+    await render({ ...props, ...offline })
+    expect(text()).toContain('Send the contract')
+    expect(text()).toContain('Updated at')
+    expect(text()).not.toContain('Couldn’t reach UniWork')
   })
 
   it('offline with nothing cached: an empty state with Retry', async () => {
