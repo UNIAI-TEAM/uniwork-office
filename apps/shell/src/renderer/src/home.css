@@ -3530,10 +3530,9 @@ body.vib .home {
   visibility: visible;
 }
 
-/* Windows high contrast: keep the ticked fill and the active-tab underline as system colours */
+/* Windows high contrast: keep the ticked fill as a system colour */
 @media (forced-colors: active) {
-  .wb-check input:checked + .wb-check-box,
-  .wb-tab.active::after {
+  .wb-check input:checked + .wb-check-box {
     forced-color-adjust: none;
     background: Highlight;
     color: HighlightText;
@@ -3931,23 +3930,35 @@ body.vib .home {
 
 .wb-tabs {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: 2px;
   border-bottom: 1px solid var(--border);
 }
 
+/* one row: many pinned tabs scroll sideways (wheel, trackpad, focus) instead of wrapping */
+.wb-tabs-scroll {
+  display: flex;
+  gap: 2px;
+  min-width: 0;
+  margin-bottom: -1px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+/* the grip and the unpin × sit in the side padding, so a tab is as wide as its label */
 .wb-tab {
   position: relative;
   display: inline-flex;
+  flex: none;
   align-items: center;
   gap: 6px;
-  margin-bottom: -1px;
   border: none;
   border-radius: var(--radius-6) var(--radius-6) 0 0;
   background: transparent;
   color: var(--text-secondary);
-  padding: 8px 10px 10px;
+  padding: 8px 16px 10px;
+  white-space: nowrap;
   font: inherit;
   font-size: 13px;
   font-weight: 500;
@@ -3975,6 +3986,14 @@ body.vib .home {
   height: 2px;
   border-radius: 2px;
   background: var(--accent);
+}
+
+/* Windows high contrast: after the rule above, so the system colour wins the cascade */
+@media (forced-colors: active) {
+  .wb-tab.active::after {
+    forced-color-adjust: none;
+    background: Highlight;
+  }
 }
 
 .wb-tab-count {
@@ -4031,6 +4050,10 @@ body.vib .home {
 }
 
 .wb-tab-grip {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -4051,11 +4074,16 @@ body.vib .home {
 }
 
 .wb-tab-unpin {
+  position: absolute;
+  top: 0;
+  right: 1px;
+  bottom: 0;
+  margin: auto 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   border-radius: var(--radius-6);
   color: var(--text-secondary);
   font-size: 13px;
@@ -4097,12 +4125,13 @@ body.vib .home {
 
 .wb-tab-add-wrap {
   position: relative;
+  flex: none;
 }
 
 .wb-tab-menu {
   position: absolute;
   top: calc(100% + 4px);
-  left: 0;
+  right: 0;
   z-index: 40;
   width: min(320px, 92vw);
   padding: 8px;

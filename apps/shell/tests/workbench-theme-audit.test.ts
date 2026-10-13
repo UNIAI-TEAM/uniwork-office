@@ -78,10 +78,18 @@ describe('Workbench CSS sweep', () => {
     const body = (selector: string) => rules.find((r) => r.selector === selector)?.body ?? ''
     expect(body('.wb-check-box svg')).toMatch(/visibility:\s*hidden/)
     expect(body('.wb-check input:checked + .wb-check-box svg')).toMatch(/visibility:\s*visible/)
-    const forced = /@media \(forced-colors: active\) \{([\s\S]*?)\n\}/.exec(region)?.[1] ?? ''
-    expect(forced).toMatch(
-      /\.wb-check input:checked \+ \.wb-check-box,\s*\.wb-tab\.active::after\s*\{[^}]*forced-color-adjust: none;[^}]*background: Highlight;/,
-    )
+    const forced = [...region.matchAll(/@media \(forced-colors: active\) \{([\s\S]*?)\n\}/g)]
+    const override = (selector: RegExp) =>
+      forced.find((m) =>
+        new RegExp(
+          `${selector.source}\\s*\\{[^}]*forced-color-adjust: none;[^}]*background: Highlight;`,
+        ).test(m[1]!),
+      )
+    expect(override(/\.wb-check input:checked \+ \.wb-check-box/)).toBeDefined()
+    // same specificity: the override only wins when it comes after the base underline rule
+    const tab = override(/\n {2}\.wb-tab\.active::after/)
+    expect(tab).toBeDefined()
+    expect(tab!.index).toBeGreaterThan(region.indexOf('\n.wb-tab.active::after {'))
   })
 
   it('defines no class the renderer never uses', () => {
