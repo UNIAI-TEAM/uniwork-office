@@ -79,7 +79,7 @@ import {
 } from '@genoffice/electron-utils'
 import { configureMetricsCache, familyVerticalMetrics } from '@genoffice/font-metrics'
 import { createI18n, getUiLang, normalizeLang, setUiLang } from '@genoffice/i18n'
-import { ProjectStore } from '@genoffice/project-store'
+import { ProjectStore, type PracticeId } from '@genoffice/project-store'
 import type {
   IpcMainInvokeEvent,
   MenuItemConstructorOptions,
@@ -4314,13 +4314,13 @@ export function registerProjectIpc(): void {
     return store.listProjectsSummary().find((s) => s.id === data.id) ?? data
   })
 
-  /** Create a non-teacher practice pack */
+  /** Create a practice pack */
   ipcMain.handle(
     'project:createPractice',
     (
       _event,
       args: {
-        practiceId: 'legal' | 'construction' | 'procurement' | 'principal'
+        practiceId: PracticeId
         title: string
         facets?: Record<string, string>
         tags?: string[]
@@ -4331,7 +4331,7 @@ export function registerProjectIpc(): void {
       const now = new Date().toISOString()
       const title = (args.title ?? '').trim()
       const practiceId = args.practiceId
-      if (!title || !practiceId || practiceId === ('teacher' as string)) {
+      if (!title || !practiceId) {
         throw new Error('practiceId and title are required')
       }
       const facets: Record<string, string> = {}
