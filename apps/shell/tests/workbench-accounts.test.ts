@@ -26,8 +26,8 @@ const describeSqlite = sqliteAvailable() ? describe : describe.skip
 
 const OWNER: WorkbenchOwner = { deploymentId: 'default', accountId: 'acc-owner' }
 const MEMBER: WorkbenchOwner = { deploymentId: 'default', accountId: 'acc-member' }
-const CHAT = 'uniwork.my-ai.chat.v1:teacher'
-const TASKS = 'uniwork.wb.tasks.teacher'
+const CHAT = 'uniwork.my-ai.chat.v1:entrepreneur'
+const TASKS = 'uniwork.wb.tasks.entrepreneur'
 
 describeSqlite('workbench data per UniWork account', () => {
   const dirs: string[] = []

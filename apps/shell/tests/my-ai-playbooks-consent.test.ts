@@ -39,8 +39,8 @@ describe('Phase C / P1 practice playbooks', () => {
     }
   })
 
-  it('does not apply sales playbook on teacher practice', () => {
-    const r = routeMyAiText('Soạn báo giá cho gói Pro', { practiceId: 'teacher' })
+  it('does not apply sales playbook on legal practice', () => {
+    const r = routeMyAiText('Soạn báo giá cho gói Pro', { practiceId: 'legal' })
     // May still be create_file or clause plan, but not sales-quote playbook
     if (r.kind === 'plan') expect(r.playbookId).not.toBe('sales-quote')
   })

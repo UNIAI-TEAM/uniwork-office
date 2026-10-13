@@ -453,35 +453,6 @@ const PLAYBOOKS: readonly MyAiPlaybook[] = [
     },
   },
   {
-    id: 'teacher-lesson',
-    practiceIds: ['teacher', 'principal'],
-    labelVi: 'Giáo án + slide',
-    labelEn: 'Lesson + slides',
-    chip: {
-      id: 'teacher-lesson',
-      labelVi: 'Giáo án + Slide + việc',
-      labelEn: 'Lesson + slides + task',
-      promptVi: 'Soạn giáo án Word và tạo slide bài giảng, thêm việc chuẩn bị tiết dạy',
-      promptEn: 'Draft a lesson plan in Word and create slides, add a prep task',
-    },
-    match: (lower, norm) =>
-      /(?:giáo án|giao an|bài giảng|bai giang|lesson plan|tiết dạy|tiet day)/i.test(lower) ||
-      /(?:giao an|bai giang|lesson)/i.test(norm),
-    buildSteps: (raw) => {
-      const topic =
-        residualBrief(raw, [
-          AND_TAIL,
-          /(?:soạn|soan|tạo|tao|viết|viet|draft)/gi,
-          /(?:giáo án|giao an|bài giảng|bai giang|lesson plan|word|slide)/gi,
-        ]) || 'Chủ đề tiết học'
-      return [
-        fillTemplate('teacher-lesson', raw),
-        createSlides(`Bài giảng / slide: ${topic}`),
-        wb('add_item', 'tasks', `Chuẩn bị tiết dạy: ${topic.slice(0, 80)}`, 'Thêm việc chuẩn bị'),
-      ]
-    },
-  },
-  {
     id: 'hr-offer',
     practiceIds: ['hr'],
     labelVi: 'Thư mời / offer',

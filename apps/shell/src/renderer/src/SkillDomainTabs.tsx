@@ -95,7 +95,7 @@ export function SkillDomainTabs({ vi, active, onSelect, onPinsChange }: Props): 
     const next = unpinSkillDomain(id)
     setPins(next)
     onPinsChange?.(next)
-    if (active === id) select(next[0] ?? 'education')
+    if (active === id) select(readActiveSkillDomain(next))
   }
 
   const onDragStart = (id: SkillDomainId, e: ReactDragEvent) => {

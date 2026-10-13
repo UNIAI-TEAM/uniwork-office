@@ -805,11 +805,9 @@ export interface FolderEntry {
 }
 
 export type PracticeIdEntry =
-  | 'teacher'
   | 'legal'
   | 'construction'
   | 'procurement'
-  | 'principal'
   | 'sales'
   | 'customer-care'
   | 'entrepreneur'
@@ -822,11 +820,9 @@ export type PracticeIdEntry =
   | 'real-estate'
 
 export type ProjectKindEntry =
-  | 'education'
   | 'legal'
   | 'construction'
   | 'procurement'
-  | 'principal'
   | 'sales'
   | 'customer-care'
   | 'entrepreneur'
@@ -864,7 +860,7 @@ export interface ProjectSummaryEntry {
 }
 
 export interface CreatePracticeProjectArgs {
-  practiceId: Exclude<PracticeIdEntry, 'teacher'>
+  practiceId: PracticeIdEntry
   title: string
   facets?: Record<string, string>
   tags?: string[]
@@ -953,7 +949,7 @@ export interface ProjectHomeApi {
   listFiles(projectId: string): Promise<string[]>
   /** create a project */
   createProject(name: string): Promise<ProjectSummaryEntry>
-  /** create a non-teacher practice pack with practice/meta.json */
+  /** create a practice pack with practice/meta.json */
   createPracticeProject(args: CreatePracticeProjectArgs): Promise<ProjectSummaryEntry>
   /** read practice metadata for a project */
   getPracticeMeta(projectId: string): Promise<PracticeProjectMetaEntry | null>

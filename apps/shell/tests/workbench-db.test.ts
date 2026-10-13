@@ -46,7 +46,7 @@ describeSqlite('workbench-db', () => {
     const dir = mkdtempSync(join(tmpdir(), 'uw-wb-db-'))
     dirs.push(dir)
     const a = new WorkbenchDb(dir)
-    a.set('uniwork.wb.tasks.teacher', JSON.stringify([{ id: '1' }]))
+    a.set('uniwork.wb.tasks.entrepreneur', JSON.stringify([{ id: '1' }]))
     a.set('uniwork.wb.calendar.view', 'month')
     expect(a.keyCount()).toBe(2)
     a.close()
@@ -54,7 +54,7 @@ describeSqlite('workbench-db', () => {
 
     const b = new WorkbenchDb(dir)
     expect(b.get('uniwork.wb.calendar.view')).toBe('month')
-    expect(JSON.parse(b.get('uniwork.wb.tasks.teacher')!)).toEqual([{ id: '1' }])
+    expect(JSON.parse(b.get('uniwork.wb.tasks.entrepreneur')!)).toEqual([{ id: '1' }])
     b.close()
   })
 
@@ -88,8 +88,8 @@ describeSqlite('workbench-db', () => {
 
 describe('workbench-db allowlist', () => {
   it('allows workbench / my-ai key prefixes', () => {
-    expect(isAllowedWbKey('uniwork.wb.calendar.teacher')).toBe(true)
-    expect(isAllowedWbKey('uniwork.my-ai.history.teacher')).toBe(true)
+    expect(isAllowedWbKey('uniwork.wb.calendar.entrepreneur')).toBe(true)
+    expect(isAllowedWbKey('uniwork.my-ai.history.entrepreneur')).toBe(true)
     expect(isAllowedWbKey('uniwork.ai.usage.v1')).toBe(true)
     expect(isAllowedWbKey('uniwork.activePracticeId')).toBe(true)
     expect(isAllowedWbKey('evil.other')).toBe(false)

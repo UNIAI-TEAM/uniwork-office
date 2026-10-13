@@ -1,10 +1,7 @@
 import { DEFAULT_PILLARS } from '../pillars.js'
 import type { PracticeDefinition, PracticeId, PracticeSkillDef } from '../types.js'
 
-type BusinessPracticeId = Exclude<
-  PracticeId,
-  'teacher' | 'legal' | 'construction' | 'procurement' | 'principal'
->
+type BusinessPracticeId = Exclude<PracticeId, 'legal' | 'construction' | 'procurement'>
 
 interface BusinessPracticeInput {
   id: BusinessPracticeId

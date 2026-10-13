@@ -14,7 +14,6 @@ export type TemplateSlotId =
   | 'deadline'
   | 'investor'
   | 'project'
-  | 'subject'
 
 export interface TemplateSlotDef {
   id: TemplateSlotId
@@ -148,30 +147,6 @@ const TEMPLATES: readonly PracticeDocTemplate[] = [
     ],
   },
   {
-    id: 'teacher-lesson',
-    playbookId: 'teacher-lesson',
-    labelVi: 'Giáo án',
-    labelEn: 'Lesson plan',
-    app: 'docs',
-    slots: [
-      { id: 'subject', required: true, labelVi: 'Môn / chủ đề', labelEn: 'Subject / topic' },
-      { id: 'scope', required: false, labelVi: 'Lớp / thời lượng', labelEn: 'Grade / duration' },
-      { id: 'deadline', required: false, labelVi: 'Tiết / ngày dạy', labelEn: 'Period / date' },
-    ],
-    outlineVi: [
-      'Mục tiêu bài học',
-      'Chuẩn bị đồ dùng',
-      'Các hoạt động (mở đầu / luyện tập / củng cố)',
-      'Đánh giá & bài tập về nhà',
-    ],
-    outlineEn: [
-      'Learning objectives',
-      'Materials',
-      'Activities (warm-up / practice / wrap-up)',
-      'Assessment & homework',
-    ],
-  },
-  {
     id: 'cs-reply',
     playbookId: 'cs-reply',
     labelVi: 'Trả lời CSKH',
@@ -254,9 +229,6 @@ export function extractSlotsFromUserText(text: string): ResolvedSlots {
     if (cleaned.length >= 3) out.topic = cleaned
   }
 
-  const subject = /(?:môn|mon|bài|bai|lesson)\s*[:\-–]?\s*([^,.;\n]+)/i.exec(raw)
-  if (subject?.[1]?.trim()) out.subject = subject[1].trim().slice(0, 120)
-
   const amount =
     /(?:giá|gia|price|amount|giá trị|gia tri)\s*[:\-–]?\s*([0-9][0-9.\s]*\s*(?:đ|vnd|usd|\$)?)/i.exec(
       raw,
@@ -297,17 +269,16 @@ export function resolveTemplateSlots(
   if (!slots.investor && slots.client) slots.investor = slots.client
 
   // topic from residual: strip playbook noise if still empty
-  if (!slots.topic && !slots.subject && !slots.project) {
+  if (!slots.topic && !slots.project) {
     const residual = userText
       .replace(
-        /(?:soạn|soan|tạo|tao|viết|viet|draft|create|báo giá|bao gia|quote|hợp đồng|hop dong|chiến dịch|chien dich|giáo án|giao an|nhật ký|nhat ky|word|excel|và.+$)/gi,
+        /(?:soạn|soan|tạo|tao|viết|viet|draft|create|báo giá|bao gia|quote|hợp đồng|hop dong|chiến dịch|chien dich|nhật ký|nhat ky|word|excel|và.+$)/gi,
         ' ',
       )
       .replace(/\s+/g, ' ')
       .trim()
     if (residual.length >= 4) {
-      if (template.slots.some((s) => s.id === 'subject')) slots.subject = residual.slice(0, 160)
-      else if (template.slots.some((s) => s.id === 'project')) slots.project = residual.slice(0, 160)
+      if (template.slots.some((s) => s.id === 'project')) slots.project = residual.slice(0, 160)
       else slots.topic = residual.slice(0, 160)
     }
   }
@@ -355,7 +326,7 @@ export function slotPromptPrefix(slot: TemplateSlotDef, template: PracticeDocTem
   if (slot.id === 'client' || slot.id === 'party' || slot.id === 'investor') {
     return vi ? `Soạn ${tpl} cho khách ` : `Draft ${tpl} for client `
   }
-  if (slot.id === 'topic' || slot.id === 'subject' || slot.id === 'project') {
+  if (slot.id === 'topic' || slot.id === 'project') {
     return vi ? `Soạn ${tpl} về ` : `Draft ${tpl} about `
   }
   return vi ? `Soạn ${tpl} — ${lab}: ` : `Draft ${tpl} — ${lab}: `

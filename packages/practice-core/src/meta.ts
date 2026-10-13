@@ -6,15 +6,11 @@ function nowIso(): string {
 }
 
 export function practiceProjectKind(practiceId: PracticeId): PracticeProjectKind {
-  if (practiceId === 'teacher') return 'education'
   return practiceId
 }
 
 export function practiceIdFromProjectKind(kind: string | undefined): PracticeId | null {
-  if (!kind) return null
-  if (kind === 'education') return 'teacher'
-  if (isPracticeId(kind) && kind !== 'teacher') return kind
-  return null
+  return isPracticeId(kind) ? kind : null
 }
 
 export function packDisplayName(practiceLabel: string, title: string, facets: Record<string, string>): string {

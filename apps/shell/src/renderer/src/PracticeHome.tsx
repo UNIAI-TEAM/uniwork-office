@@ -324,11 +324,8 @@ export function PracticeHome({
         .split(/[,;]/)
         .map((t) => t.trim())
         .filter(Boolean)
-      if (practice.id === 'teacher') {
-        throw new Error('Teacher packs use TeacherHome')
-      }
       const created = await window.aiOfficeProject!.createPracticeProject({
-        practiceId: practice.id as Exclude<PracticeId, 'teacher'>,
+        practiceId: practice.id,
         title,
         facets: facetDraft,
         tags,

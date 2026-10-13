@@ -33,9 +33,9 @@ describe('agent-intent catalog', () => {
   it('parses tab targets and skill domains', () => {
     expect(parseAgentIntentTarget('calendar')).toEqual({ kind: 'module', id: 'calendar' })
     expect(parseAgentIntentTarget('knowledge')).toEqual({ kind: 'pillar', id: 'knowledge' })
-    expect(parseAgentIntentTarget(null, 'education')).toEqual({
+    expect(parseAgentIntentTarget(null, 'legal')).toEqual({
       kind: 'skill-domain',
-      id: 'education',
+      id: 'legal',
     })
     expect(tabIdForTarget({ kind: 'skill-domain', id: 'legal' })).toBe('skills')
     expect(moduleSupportsAddItem('notes')).toBe(true)

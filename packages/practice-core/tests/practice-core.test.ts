@@ -7,7 +7,6 @@ import {
   ensureCorePinnedModules,
   isCorePinnedModule,
   defaultPinnedSkillDomains,
-  getPractice,
   isPracticeMeta,
   isSkillDomainId,
   listPractices,
@@ -20,15 +19,13 @@ import {
 } from '../src/index.js'
 
 describe('practice-core', () => {
-  it('registers profession practices including teacher and business roles', () => {
+  it('registers the 13 business practices and no education role', () => {
     const ids = listPractices().map((p) => p.id)
     expect(ids).toEqual(
       expect.arrayContaining([
-        'teacher',
         'legal',
         'construction',
         'procurement',
-        'principal',
         'sales',
         'customer-care',
         'entrepreneur',
@@ -41,11 +38,12 @@ describe('practice-core', () => {
         'real-estate',
       ]),
     )
-    expect(ids).toHaveLength(15)
-    expect(getPractice('teacher')?.projectKind).toBe('education')
+    expect(ids).toHaveLength(13)
+    expect(ids).not.toContain('teacher')
+    expect(ids).not.toContain('principal')
     expect(practiceProjectKind('legal')).toBe('legal')
     expect(practiceProjectKind('sales')).toBe('sales')
-    expect(practiceIdFromProjectKind('education')).toBe('teacher')
+    expect(practiceIdFromProjectKind('education')).toBeNull()
     expect(practiceIdFromProjectKind('content-creator')).toBe('content-creator')
   })
 
@@ -106,10 +104,10 @@ describe('practice-core', () => {
     ])
   })
 
-  it('exposes skill domains with starter skills', () => {
-    expect(SKILL_DOMAINS.map((d) => d.id)).toEqual(
+  it('exposes skill domains with starter skills and role-based defaults', () => {
+    const ids = SKILL_DOMAINS.map((d) => d.id)
+    expect(ids).toEqual(
       expect.arrayContaining([
-        'education',
         'health',
         'legal',
         'design',
@@ -121,7 +119,11 @@ describe('practice-core', () => {
         'personal',
       ]),
     )
-    expect(defaultPinnedSkillDomains()).toEqual(['education', 'personal', 'admin'])
+    expect(ids).not.toContain('education')
+    expect(isSkillDomainId('education')).toBe(false)
+    expect(defaultPinnedSkillDomains('entrepreneur')).toEqual(['sales', 'admin'])
+    expect(defaultPinnedSkillDomains('legal')).toEqual(['legal', 'admin'])
+    expect(defaultPinnedSkillDomains('accounting')).toEqual(['admin'])
     expect(isSkillDomainId('sales')).toBe(true)
     expect(skillsForDomain('legal').length).toBeGreaterThan(0)
     expect(skillsForDomain('personal').every((s) => s.domainId === 'personal')).toBe(true)
