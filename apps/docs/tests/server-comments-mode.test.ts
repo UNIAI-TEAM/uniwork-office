@@ -40,6 +40,31 @@ describe('resolveServerMode', () => {
     expect(await resolveServerMode(throwing, '/a.docx')).toBeNull()
   })
 
+  it('tells the frame there is no editor owner to wait for when the document is not in server mode', async () => {
+    const withHook = (context: unknown) => {
+      const noEditor = vi.fn()
+      return {
+        api: {
+          context: vi.fn(() => Promise.resolve(context)),
+          noEditor,
+        } as unknown as ServerCommentsApi,
+        noEditor,
+      }
+    }
+    const miss = withHook({ ok: false, error: { code: 'not_found' } })
+    expect(await resolveServerMode(miss.api, '')).toBeNull()
+    expect(miss.noEditor).toHaveBeenCalledTimes(1)
+    const hit = withHook({ ok: true, value: { documentId: 'd1', versionId: 'v1' } })
+    expect(await resolveServerMode(hit.api, '')).not.toBeNull()
+    expect(hit.noEditor).not.toHaveBeenCalled()
+    const throwing = {
+      context: () => Promise.reject(new Error('x')),
+      noEditor: vi.fn(),
+    } as unknown as ServerCommentsApi
+    expect(await resolveServerMode(throwing, '')).toBeNull()
+    expect(throwing.noEditor).toHaveBeenCalledTimes(1)
+  })
+
   it('a bound document answers its context; an unknown level is dropped, a null version kept', async () => {
     const api = apiWith({
       ok: true,

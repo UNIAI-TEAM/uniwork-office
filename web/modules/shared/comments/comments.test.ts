@@ -7,6 +7,8 @@
  * Discussion mount (discussion id -> Discussion, editor-owned id -> editor, unknown -> one
  * `revealed:false`, held until the first list).
  */
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { act } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createMockPort } from '../../../docs/bridge/testing/mock-port'
@@ -372,6 +374,28 @@ describe('the frame reveal router (one handler, exactly one panel reacts)', () =
       expect(discussionPanel()).toBeNull()
     })
 
+    it('an editor that reports no server mode releases the wait: a non-discussion id answers revealed:false at once', async () => {
+      const p = framePort()
+      await mountDiscussion(p)
+      const target: Record<string, unknown> = {}
+      const api = (await installFrameComments(
+        p.port,
+        { version: createFrameDocVersion() },
+        target,
+      )) as { noEditor?: () => void } | null
+      expect(typeof api?.noEditor).toBe('function')
+      api!.noEditor!()
+      // idempotent: a second report never over-releases
+      api!.noEditor!()
+      let result: unknown
+      await act(async () => {
+        result = await p.reveal('nope')
+      })
+      await flush()
+      expect(result).toEqual({ revealed: false })
+      expect(discussionPanel()!.textContent).toContain('This discussion post was deleted')
+    })
+
     it('a discussion id is still answered by Discussion at once, without waiting for the editor', async () => {
       const p = await expecting()
       let result: unknown
@@ -465,6 +489,18 @@ describe('the frame reveal router (one handler, exactly one panel reacts)', () =
       announceFrameSidePanel('editor', true)
       window.removeEventListener(FRAME_SIDE_PANEL_EVENT, on)
       expect(seen).toEqual([{ owner: 'editor', open: true }])
+    })
+
+    it('the Docs renderer literal (it cannot import web/**) names the same event', () => {
+      const source = readFileSync(
+        join(
+          __dirname,
+          '../../../../apps/docs/src/renderer/server-comments/ServerCommentsHost.tsx',
+        ),
+        'utf8',
+      )
+      const literal = /const FRAME_SIDE_PANEL_EVENT = '([^']+)'/.exec(source)?.[1]
+      expect(literal).toBe(FRAME_SIDE_PANEL_EVENT)
     })
 
     it('onFrameSidePanel closes only for an open event of another owner', () => {
