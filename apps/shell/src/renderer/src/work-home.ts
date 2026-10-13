@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { RecentEntry, UniworkDocSummary } from '../../shared/home-api'
 import type {
   UniworkWorkError,
@@ -249,30 +249,46 @@ export function overviewView(i: {
 
 export const HOME_REFRESH_MS = 60_000
 
-/** "Tài liệu gần đây": the workspace's cloud recents (signed in) plus this device's recents */
+/**
+ * "Tài liệu gần đây": the workspace's cloud recents (signed in) plus this device's
+ * recents, reloaded like the summary (Refresh, window focus, every HOME_REFRESH_MS
+ * while visible). `cloudFailed`: the cloud list did not load, so only local files show.
+ */
 export function useRecentDocuments(
   workspaceId: string | null,
   refreshTick: number,
-): WorkRecentDocument[] {
-  const [docs, setDocs] = useState<WorkRecentDocument[]>([])
+): { docs: WorkRecentDocument[]; cloudFailed: boolean; reload: () => void } {
+  const [state, setState] = useState({ docs: [] as WorkRecentDocument[], cloudFailed: false })
+  const [tick, setTick] = useState(0)
+  const reload = useCallback(() => setTick((n) => n + 1), [])
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') reload()
+    }, HOME_REFRESH_MS)
+    window.addEventListener('focus', reload)
+    return () => {
+      window.clearInterval(timer)
+      window.removeEventListener('focus', reload)
+    }
+  }, [reload])
   useEffect(() => {
     let live = true
     const local = window.aiOffice.recents({ limit: 12 }).then(
       (page) => page.entries,
       () => [] as RecentEntry[],
     )
-    const cloud = workspaceId
+    const cloud: Promise<UniworkDocSummary[] | null> = workspaceId
       ? window.aiOffice.uniworkListDocuments({ workspaceId, limit: 20 }).then(
-          (r) => (r.ok ? r.value.documents : []),
-          () => [] as UniworkDocSummary[],
+          (r) => (r.ok ? r.value.documents : null),
+          () => null,
         )
-      : Promise.resolve([] as UniworkDocSummary[])
+      : Promise.resolve([])
     void Promise.all([cloud, local]).then(([c, l]) => {
-      if (live) setDocs(mergeRecentDocuments(c, l))
+      if (live) setState({ docs: mergeRecentDocuments(c ?? [], l), cloudFailed: c === null })
     })
     return () => {
       live = false
     }
-  }, [workspaceId, refreshTick])
-  return docs
+  }, [workspaceId, refreshTick, tick])
+  return { ...state, reload }
 }

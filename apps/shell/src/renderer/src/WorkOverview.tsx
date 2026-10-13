@@ -123,10 +123,10 @@ export function WorkOverview({
     setFailedWrite({ task, status })
   }
 
-  const retryLine = (
+  const retryLine = (onRetry: () => void = home.reload) => (
     <p className="wb-ov-partial">
       {t('wbOvLoadFailed')} ·{' '}
-      <button type="button" className="wb-link" onClick={home.reload}>
+      <button type="button" className="wb-link" onClick={onRetry}>
         {t('acctRetry')}
       </button>
     </p>
@@ -196,7 +196,7 @@ export function WorkOverview({
     <section id="wb-ov-mywork" className="wb-ov-card">
       <h3 className="wb-ov-card-title">{t('wbOvMyWork')}</h3>
       {s.partial.includes('tasks') ? (
-        retryLine
+        retryLine()
       ) : s.my_work.length === 0 ? (
         <p className="wb-ov-note">{t('wbOvMyWorkEmpty')}</p>
       ) : (
@@ -243,7 +243,7 @@ export function WorkOverview({
     <section id="wb-ov-meetings" className="wb-ov-card">
       <h3 className="wb-ov-card-title">{t('wbOvMeetings')}</h3>
       {s.partial.includes('meetings') ? (
-        retryLine
+        retryLine()
       ) : s.upcoming_meetings.length === 0 ? (
         <p className="wb-ov-note">{t('wbOvMeetingsEmpty')}</p>
       ) : (
@@ -288,7 +288,7 @@ export function WorkOverview({
     <section id="wb-ov-inbox" className="wb-ov-card">
       <h3 className="wb-ov-card-title">{t('wbOvInbox')}</h3>
       {s.partial.includes('notifications') ? (
-        retryLine
+        retryLine()
       ) : s.inbox.length === 0 ? (
         <p className="wb-ov-note">{t('wbOvInboxEmpty')}</p>
       ) : (
@@ -314,7 +314,7 @@ export function WorkOverview({
     <section className="wb-ov-recents">
       <h3 className="wb-ov-card-title">{t('wbOvRecentDocs')}</h3>
       <ul className="wb-ov-recent-grid">
-        {recents.map((r) =>
+        {recents.docs.map((r) =>
           r.source === 'uniwork' ? (
             <li key={`u:${r.doc.id}`}>
               <button
@@ -350,6 +350,7 @@ export function WorkOverview({
           ),
         )}
       </ul>
+      {recents.cloudFailed ? retryLine(recents.reload) : null}
     </section>
   )
 
@@ -368,7 +369,7 @@ export function WorkOverview({
       ) : null}
       {view === 'no-workspace' ? <WorkNoWorkspace error={null} onRetry={onReload} /> : null}
       {shown && !isQuiet(shown) ? stats(shown) : null}
-      {recents.length > 0 ? recentStrip : null}
+      {recents.docs.length > 0 || recents.cloudFailed ? recentStrip : null}
       {shown ? (
         isQuiet(shown) ? (
           <div className="wb-ov-quiet" role="status">

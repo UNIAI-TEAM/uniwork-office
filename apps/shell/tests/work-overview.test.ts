@@ -245,6 +245,32 @@ describe('WorkOverview', () => {
     expect(work.homeSummary).toHaveBeenCalledTimes(2)
   })
 
+  it('recents: a failed cloud list keeps local files and offers Retry under the strip', async () => {
+    api.uniworkListDocuments.mockResolvedValueOnce({ ok: false, error: 'network' })
+    await mount()
+    const strip = () => host.querySelector('.wb-ov-recents')!
+    expect(strip().textContent).toContain('notes.docx')
+    expect(strip().textContent).not.toContain('Plan.docx')
+    expect(strip().textContent).toContain('Couldn’t load')
+    await click(
+      Array.from(strip().querySelectorAll('button')).find((b) => b.textContent === 'Retry'),
+    )
+    expect(api.uniworkListDocuments).toHaveBeenCalledTimes(2)
+    expect(strip().textContent).toContain('Plan.docx')
+    expect(strip().textContent).not.toContain('Couldn’t load')
+  })
+
+  it('recents reload on window focus, like the summary', async () => {
+    await mount()
+    expect(api.recents).toHaveBeenCalledTimes(1)
+    await act(async () => {
+      window.dispatchEvent(new Event('focus'))
+    })
+    await flush()
+    expect(api.recents).toHaveBeenCalledTimes(2)
+    expect(api.uniworkListDocuments).toHaveBeenCalledTimes(2)
+  })
+
   it('quiet: one line and a shortcut to Compose instead of empty lists', async () => {
     work.homeSummary.mockResolvedValue({
       ok: true,
