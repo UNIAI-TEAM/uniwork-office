@@ -10,9 +10,15 @@ import type {
   IntentBindFacts,
   IntentRecordV2,
   IntentStore,
-  PendingIntentRecord,
 } from '../uniwork-sync/intent-store'
-import type { QueueCapabilityRead, QueueDispatcher, QueueDoc, QueueDrafts, QueuePause } from '../uniwork-sync/queue/dispatcher'
+import { isTerminalQueueState } from '../uniwork-sync/queue/record'
+import type {
+  QueueCapabilityRead,
+  QueueDispatcher,
+  QueueDoc,
+  QueueDrafts,
+  QueuePause,
+} from '../uniwork-sync/queue/dispatcher'
 import { QUEUE_LIMITS } from '../uniwork-sync/queue/limits'
 
 /**
@@ -265,8 +271,11 @@ export class SaveCoordinator {
     const facts = factsOf(doc, bytes.byteLength)
 
     const stored = await intents.read(doc.key, facts)
-    let intent: IntentRecordV2 | null = stored?.intent ?? null
-    let payload: Uint8Array | null = stored?.payload ?? null
+    // a terminal record (cancelled / committed) is spent: the next Save mints a
+    // fresh intent (the machine's own `save` rule)
+    const pending = stored && !isTerminalQueueState(stored.intent.state) ? stored : null
+    let intent: IntentRecordV2 | null = pending?.intent ?? null
+    let payload: Uint8Array | null = pending?.payload ?? null
     let binding = doc.binding
     if (!intent) {
       if (checksum === binding.baseChecksum) {
@@ -308,8 +317,9 @@ export class SaveCoordinator {
         return this.commitState(doc, { ...doc.binding, state, error: errorForState(state) })
       }
     } else {
-      // an intent is already pending: no second one. The status says so, and
-      // the working copy reads dirty while it has moved past the snapshot
+      // an intent is already pending: never a second one. The status says so
+      // (pendingNext = an unsent N+1) and the SAME record and key are replayed
+      // below; a save that lands settles this very intent
       this.pendingNext.add(doc.path)
     }
     binding = withoutError({ ...binding, state: 'saving' })
@@ -353,11 +363,7 @@ export class SaveCoordinator {
   }
 
   /** the v2 record of one Ctrl/Cmd+S, before its lane verdict sets the state */
-  private mintIntent(
-    doc: BoundDocument,
-    facts: IntentBindFacts,
-    checksum: string,
-  ): IntentRecordV2 {
+  private mintIntent(doc: BoundDocument, facts: IntentBindFacts, checksum: string): IntentRecordV2 {
     const id = this.uuid()
     const at = this.now().toISOString()
     return {
@@ -519,7 +525,11 @@ export class SaveCoordinator {
         return this.commitState(doc, { ...base, state: 'blocked', error: error.code })
       case 'intent_unknown':
         // "unknown" is never queued and never deleted: it cannot be proven either way
-        return this.commitState(doc, { ...base, state: 'reconciling-stuck', error: 'intent_unknown' })
+        return this.commitState(doc, {
+          ...base,
+          state: 'reconciling-stuck',
+          error: 'intent_unknown',
+        })
       case 'ticket_expired':
         // the upload claim expired: look the intent up before touching bytes again
         return this.commitState(doc, { ...base, state: 'reconciling' })

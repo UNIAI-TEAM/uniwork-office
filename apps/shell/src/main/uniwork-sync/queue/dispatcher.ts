@@ -43,7 +43,13 @@ export interface QueueClient {
     uploadId: string
     baseRevision: string
     idempotencyKey: string
-  }): Promise<{ versionId: string; version: number; revision: string }>
+  }): Promise<{
+    documentId: string
+    versionId: string
+    version: number
+    revision: string
+    checksumSha256: string | null
+  }>
   lookupCommit(input: { documentId: string; idempotencyKey: string }): Promise<CommitLookup>
 }
 
@@ -179,13 +185,29 @@ export class QueueDispatcher {
     return result.record
   }
 
-  /** persist a freshly minted record and publish it (the Ctrl/Cmd+S hand-off) */
+  /**
+   * Persist a freshly minted record and publish it (the Ctrl/Cmd+S hand-off).
+   * The org's lane verdict decides the record's first state: offline parks it
+   * `paused_offline`, a known-off `sync_write` parks it `paused_admin`, the
+   * user's durable pause parks it `paused_user`, otherwise it is `queued`.
+   */
   async enqueue(doc: QueueDoc): Promise<QueueState> {
     const access = await this.deps.intents()
     if (access.kind !== 'ok') {
       this.deps.publish(doc.record)
       return doc.record.state
     }
+    const verdict = await this.readCapability(doc.orgId)
+    const context: QueueContext = {
+      now: this.deps.clock(),
+      limits: this.limits,
+      random: this.random,
+      pausedUser: await this.userPaused(),
+    }
+    if (verdict === 'sync_write_off') context.syncWrite = false
+    if (verdict === 'offline') context.online = false
+    const created = transition(null, { type: 'save', intent: toNewIntent(doc.record) }, context)
+    if (created.record) doc.record = created.record
     const written = await access.intents.put(doc.key, doc.record, doc.payload)
     this.deps.publish(doc.record)
     if (written.kind !== 'ok') return doc.record.state
@@ -200,6 +222,15 @@ export class QueueDispatcher {
     const outcomes = new Map<string, QueueState>()
     let dispatched = 0
     let parked = 0
+    // a store that cannot open right now (a locked keychain) freezes the whole
+    // queue: no state may move without being persisted
+    if ((await this.deps.intents()).kind !== 'ok') {
+      for (const doc of docs) {
+        this.deps.publish(doc.record)
+        outcomes.set(doc.key, doc.record.state)
+      }
+      return { dispatched: 0, parked: docs.length, outcomes }
+    }
     const lanes = new Map<string, QueueDoc[]>()
     for (const doc of docs) {
       const lane = lanes.get(doc.orgId) ?? []
@@ -270,6 +301,8 @@ export class QueueDispatcher {
    * per call, never a new attempt, never a re-uploaded byte.
    */
   async reconcile(doc: QueueDoc, now = this.deps.clock()): Promise<QueueState> {
+    // the store cannot record an outcome right now: the record stays where it is
+    if ((await this.deps.intents()).kind !== 'ok') return doc.record.state
     let lookup: CommitLookup
     try {
       lookup = await this.deps.client.lookupCommit({
@@ -289,6 +322,24 @@ export class QueueDispatcher {
     const result = await this.apply(doc, event, now)
     if (result.record?.state === 'committed') await this.finishCleanup(doc)
     return doc.record.state
+  }
+
+  /**
+   * A connectivity change: coming online moves a `paused_offline` intent back to
+   * `queued` (or `paused_user` when the user is still paused); going offline
+   * parks a waiting one. A settled intent never moves.
+   */
+  async setOnline(
+    docs: QueueDoc[],
+    online: boolean,
+    now = this.deps.clock(),
+  ): Promise<QueueState[]> {
+    const states: QueueState[] = []
+    for (const doc of docs) {
+      await this.apply(doc, { type: 'online', online }, now)
+      states.push(doc.record.state)
+    }
+    return states
   }
 
   /** the user's "Kiem tra lai" (check again): a lookup only, never a new attempt */
@@ -342,7 +393,10 @@ export class QueueDispatcher {
   }
 
   /** "Bo lan luu..." on a stuck intent: the snapshot becomes a kept draft */
-  async discard(doc: QueueDoc, options: { title?: string; now?: number } = {}): Promise<QueueState> {
+  async discard(
+    doc: QueueDoc,
+    options: { title?: string; now?: number } = {},
+  ): Promise<QueueState> {
     const now = options.now ?? this.deps.clock()
     const result = await this.apply(doc, { type: 'discard' }, now)
     if (result.record?.state !== 'cancelled') return doc.record.state
@@ -430,20 +484,27 @@ export class QueueDispatcher {
         )
         return doc.record.state
       }
-      // the bytes are staged: the second `uploaded` advances uploading -> committing
-      await this.apply(doc, { type: 'uploaded' }, now)
-      // the capability can flip off mid-upload: stop before commit, same intent
+      // the capability can flip off mid-upload: while the record is still
+      // `uploading` it parks `paused_admin` and never reaches the commit
       if ((await this.readCapability(doc.orgId)) === 'sync_write_off') {
         await this.apply(doc, { type: 'capability', syncWrite: false }, now)
         return doc.record.state
       }
+      // the bytes are staged: the second `uploaded` advances uploading -> committing
+      await this.apply(doc, { type: 'uploaded' }, now)
       // a lost generation (another window took the lock) stops before commit
       if (!(await this.deps.lock.check(doc.key, generation))) {
         this.otherWindow.add(doc.key)
         await this.apply(doc, { type: 'commitFailed', error: 'other_window' }, now)
         return doc.record.state
       }
-      let receipt: { versionId: string; version: number; revision: string }
+      let receipt: {
+        documentId: string
+        versionId: string
+        version: number
+        revision: string
+        checksumSha256: string | null
+      }
       try {
         receipt = await this.deps.client.commit({
           documentId: doc.record.documentId,
@@ -490,12 +551,15 @@ export class QueueDispatcher {
       return { record: doc.record, effects: result.effects }
     }
     const access = await this.deps.intents()
-    if (access.kind === 'ok') {
-      const written = await access.intents.put(doc.key, result.record, doc.payload)
-      if (written.kind !== 'ok') {
-        this.deps.publish(doc.record)
-        return { record: doc.record, effects: [] }
-      }
+    if (access.kind !== 'ok') {
+      // the store cannot record the change: the record does not move
+      this.deps.publish(doc.record)
+      return { record: doc.record, effects: [] }
+    }
+    const written = await access.intents.put(doc.key, result.record, doc.payload)
+    if (written.kind !== 'ok') {
+      this.deps.publish(doc.record)
+      return { record: doc.record, effects: [] }
     }
     doc.record = result.record
     this.deps.publish(doc.record)
