@@ -655,7 +655,7 @@ describe('S18 archived row and archive confirm (FX4)', () => {
   it('V17b-04: the active row has a ring only while focus is inside the list, not in the search', () => {
     const css = readFileSync(join(__dirname, '../src/renderer/src/home.css'), 'utf8')
     const block = (selector: string) =>
-      css.match(new RegExp(`${selector.replace(/[.>:\-]/g, '\\$&')}\\s*\\{([^}]*)\\}`))?.[1] ?? ''
+      css.match(new RegExp(`${selector.replace(/[.>:-]/g, '\\$&')}\\s*\\{([^}]*)\\}`))?.[1] ?? ''
     expect(block('.uw-pick-row.active')).not.toMatch(/outline/)
     expect(block('.uw-pick-item:focus-within > .uw-pick-row.active')).toMatch(/outline:/)
   })

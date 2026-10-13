@@ -338,7 +338,7 @@ export function UniworkOpenDialog({
         path: input.path,
         uploadId: id,
       }),
-    ).then((result) => {
+    ).then((result): ActionOutcome => {
       if (run !== uploadRun.current) return { ok: true }
       uploadId.current = null
       if (mounted.current) setUpload(null)
