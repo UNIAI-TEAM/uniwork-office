@@ -239,9 +239,7 @@ describe('Retry-After (G5-06 be-9)', () => {
     expect(inFlight.retryAfterMs).toBe(120_000)
     // a malformed header, or one on a status that does not carry it, is ignored
     expect((await failureOf(async () => dated(429, 'busy', 'later'))).retryAfterMs).toBeUndefined()
-    const denied = await failureOf(async () =>
-      dated(403, { error: { code: 'forbidden' } }, '900'),
-    )
+    const denied = await failureOf(async () => dated(403, { error: { code: 'forbidden' } }, '900'))
     expect(denied.code).toBe('permission_revoked')
     expect(denied.retryAfterMs).toBeUndefined()
   })

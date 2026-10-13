@@ -776,7 +776,11 @@ describe('G5-06 W4a save queue (fakes)', () => {
     const pass = dispatcher.dispatchAll([doc2])
     await atUpload
     // another window takes the lease while the upload is in flight
-    lost.lockTable.leases.set(doc2.key, { owner: 'win2', generation: 2, heartbeatAt: lost.clock.now })
+    lost.lockTable.leases.set(doc2.key, {
+      owner: 'win2',
+      generation: 2,
+      heartbeatAt: lost.clock.now,
+    })
     release()
     await pass
     expect(dispatcher.isOtherWindow(doc2.key)).toBe(true)
@@ -1123,7 +1127,9 @@ describe('G5-06 W4a save queue (fakes)', () => {
     // intent: the snapshot was never dropped for a draft that was refused
     const reopened = await h.layer.open(SCOPE)
     if (reopened.kind !== 'ok') throw new Error('store did not reopen')
-    const reopenedIntents = createIntentStore(reopened.store.records(INTENT_STORE_REGISTRATION.name))
+    const reopenedIntents = createIntentStore(
+      reopened.store.records(INTENT_STORE_REGISTRATION.name),
+    )
     const reopenedDrafts = createDraftStore(reopened.store.records(DRAFTS_STORE_REGISTRATION.name))
     expect((await reopenedIntents.read(doc.key, factsOf(doc)))?.intent.state).toBe('queued')
     expect(await reopenedDrafts.list(doc.key)).toHaveLength(3)

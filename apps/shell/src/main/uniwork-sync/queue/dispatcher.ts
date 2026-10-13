@@ -585,7 +585,11 @@ export class QueueDispatcher {
     const retryAfterMs = error instanceof UniworkDocError ? error.retryAfterMs : undefined
     await this.apply(
       doc,
-      { type: 'commitFailed', error: code, ...(retryAfterMs === undefined ? {} : { retryAfterMs }) },
+      {
+        type: 'commitFailed',
+        error: code,
+        ...(retryAfterMs === undefined ? {} : { retryAfterMs }),
+      },
       now,
     )
   }
@@ -657,7 +661,12 @@ export class QueueDispatcher {
   }
 
   /** the binding facts a stored record is read (and a v1 record upgraded) with */
-  private facts(doc: QueueDoc): { orgId: string; workspaceId: string; baseVersion: number; length: number } {
+  private facts(doc: QueueDoc): {
+    orgId: string
+    workspaceId: string
+    baseVersion: number
+    length: number
+  } {
     return {
       orgId: doc.orgId,
       workspaceId: doc.workspaceId,

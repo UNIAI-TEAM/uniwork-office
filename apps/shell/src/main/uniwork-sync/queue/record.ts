@@ -234,9 +234,7 @@ export function isIntentRecordV2(
  * generation. A v1 record's upgrade never saw a newer snapshot (it stays 1),
  * and neither has an empty store.
  */
-export function nextIntentGeneration(
-  stored: IntentRecordV2 | PendingIntentRecord | null,
-): number {
+export function nextIntentGeneration(stored: IntentRecordV2 | PendingIntentRecord | null): number {
   if (!stored || !isIntentRecordV2(stored)) return 1
   return stored.generation + 1
 }
