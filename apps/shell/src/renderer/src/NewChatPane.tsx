@@ -32,10 +32,9 @@ import {
   getFormById,
   listFormsWithFiles,
   readFormFileExcerpt,
-  resolveFormFillContext,
 } from './my-ai-forms'
 import { buildTemplateBrief, resolveTemplateSlots, slotPromptPrefix } from './my-ai-templates'
-import { readClients, readForms } from './workbench-pins'
+import { readForms } from './workbench-pins'
 import {
   isAmbiguousRecentMatch,
   isSubstantiveCreateBrief,
@@ -897,9 +896,8 @@ export function NewChatPane({ practiceId, ensureWorkbench }: Props): ReactElemen
           pausePlan: true,
         }
       }
-      const { clientRow } = resolveFormFillContext(practiceId, form, hint)
       const excerpt = form.filePath ? await readFormFileExcerpt(form.filePath) : ''
-      const brief = buildFormFillBrief({ form, vi, userHint: hint, excerpt, clientRow })
+      const brief = buildFormFillBrief({ form, vi, userHint: hint, excerpt })
       const mode = await createOfficeFile('docs', brief)
       return {
         text: describeCreate('docs', mode, brief, true),
@@ -919,24 +917,7 @@ export function NewChatPane({ practiceId, ensureWorkbench }: Props): ReactElemen
         const miss = resolved.missing
           .map((s) => (vi ? s.labelVi : s.labelEn))
           .join(vi ? ', ' : ', ')
-        const clients = readClients(practiceId).slice(0, 5)
         const choices: ChatChoice[] = []
-        const needsClient = resolved.missing.some(
-          (s) => s.id === 'client' || s.id === 'party' || s.id === 'investor',
-        )
-        if (needsClient) {
-          for (const c of clients) {
-            choices.push({
-              id: `tpl-client-${c.id}`,
-              label: c.name,
-              kind: 'prompt',
-              value: label(
-                `Soạn ${resolved.template.labelVi} cho khách ${c.name}`,
-                `Draft ${resolved.template.labelEn} for client ${c.name}`,
-              ),
-            })
-          }
-        }
         for (const slot of resolved.missing.slice(0, 2)) {
           choices.push({
             id: `tpl-slot-${slot.id}`,
@@ -1647,14 +1628,6 @@ export function NewChatPane({ practiceId, ensureWorkbench }: Props): ReactElemen
           label: label('Mở ghi chú', 'Open notes'),
           kind: 'prompt',
           value: label('Mở tab ghi chú', 'Open notes tab'),
-        })
-      }
-      if (local.topic === 'email') {
-        topicChoices.push({
-          id: 'email',
-          label: label('Mở email', 'Open email'),
-          kind: 'prompt',
-          value: label('Mở tab email', 'Open email tab'),
         })
       }
 

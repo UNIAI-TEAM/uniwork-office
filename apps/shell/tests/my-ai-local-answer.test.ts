@@ -5,7 +5,6 @@ const empty: LocalAnswerSnapshot = {
   tasks: [],
   calendar: [],
   notes: '',
-  emails: [],
   recents: [],
 }
 

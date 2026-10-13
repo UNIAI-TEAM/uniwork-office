@@ -620,8 +620,6 @@ export interface HomeApi {
 export interface WorkbenchIdbMediaDump {
   version: 1
   tasks: Record<string, string>
-  pets: Record<string, string>
-  health: Record<string, string>
 }
 
 /** Workbench data of one bucket: a UniWork account, or signed-out use */

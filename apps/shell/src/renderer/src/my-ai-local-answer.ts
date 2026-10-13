@@ -4,14 +4,13 @@
  */
 import type { PracticeId } from '@uniwork/practice-core'
 import type { MyAiRecentHint } from './context-manager'
-import { readCalendar, readEmails, readNotes, readTasks } from './workbench-pins'
+import { readCalendar, readNotes, readTasks } from './workbench-pins'
 
 export type LocalAnswerTopic =
   | 'calendar'
   | 'tasks'
   | 'recents'
   | 'notes'
-  | 'email'
   | 'pulse'
   | 'off_topic'
   | 'fallback'
@@ -28,7 +27,6 @@ export interface LocalAnswerSnapshot {
   tasks: { title: string; done: boolean }[]
   calendar: { date: string; title: string }[]
   notes: string
-  emails: { subject: string; folder: string; to?: string; from?: string }[]
   recents: { name: string; ext: string }[]
 }
 
@@ -82,10 +80,6 @@ function wantsRecents(lower: string): boolean {
 
 function wantsNotes(lower: string): boolean {
   return /(?:ghi chú|ghi chu|\bnotes?\b|sticky)/i.test(lower)
-}
-
-function wantsEmail(lower: string): boolean {
-  return /(?:\bemail\b|hộp thư|hop thu|thư đến|thu den|mailbox)/i.test(lower)
 }
 
 function wantsPulse(lower: string): boolean {
@@ -145,11 +139,6 @@ export function answerMyAiLocally(
   const calAll = snap.calendar.slice(0, 8).map((c) => `${c.date} — ${c.title}`)
   const recentLines = snap.recents.slice(0, 6).map((e) => `${e.name} (.${e.ext})`)
   const notePreview = snap.notes.trim()
-  const mailLines = snap.emails.slice(0, 5).map((m) => {
-    const sub = m.subject?.trim() || (vi ? '(không tiêu đề)' : '(no subject)')
-    return `[${m.folder}] ${sub}`
-  })
-
   const calendarFocused = /(?:calendar|lịch|lich|cuộc họp|cuoc hop|meeting|sự kiện|su kien)/i.test(
     lower,
   )
@@ -260,17 +249,6 @@ export function answerMyAiLocally(
     }
   }
 
-  if (wantsEmail(lower)) {
-    return {
-      text: [
-        vi ? 'Email gần đây:' : 'Recent email:',
-        bullets(mailLines, '• Hộp thư trống.', '• Mailbox empty.', vi),
-      ].join('\n'),
-      topic: 'email',
-      offerAi: false,
-      contextUsed: true,
-    }
-  }
 
   // Soft fallback: short redirect + tiny pulse (not a system hint dump)
   const pulseBits: string[] = []
@@ -313,12 +291,6 @@ export function buildLocalAnswerSnapshot(
     tasks: readTasks(practiceId).map((t) => ({ title: t.title, done: t.done })),
     calendar: readCalendar(practiceId).map((c) => ({ date: c.date, title: c.title })),
     notes: readNotes(practiceId) || '',
-    emails: readEmails(practiceId).map((m) => ({
-      subject: m.subject || '',
-      folder: m.folder,
-      to: m.to,
-      from: m.from,
-    })),
     recents: (recents ?? []).map((e) => ({ name: e.name, ext: e.ext })),
   }
 }

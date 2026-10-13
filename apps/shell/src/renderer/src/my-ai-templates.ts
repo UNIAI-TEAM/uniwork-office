@@ -4,7 +4,6 @@
  */
 import type { PracticeId } from '@uniwork/practice-core'
 import type { OfficeApp } from './my-ai-router'
-import { readClients, readContracts, readMatters, type WbClientItem } from './workbench-pins'
 
 export type TemplateSlotId =
   | 'client'
@@ -213,10 +212,6 @@ export function listTemplates(): readonly PracticeDocTemplate[] {
 
 export type ResolvedSlots = Partial<Record<TemplateSlotId, string>>
 
-function stripDiacritics(s: string): string {
-  return s.normalize('NFD').replace(/\p{M}/gu, '')
-}
-
 /** Pull slot cues from free text (vi/en). */
 export function extractSlotsFromUserText(text: string): ResolvedSlots {
   const raw = text.trim()
@@ -281,22 +276,10 @@ export function extractSlotsFromUserText(text: string): ResolvedSlots {
   return out
 }
 
-function matchClient(nameHint: string, clients: WbClientItem[]): WbClientItem | undefined {
-  const n = stripDiacritics(nameHint.toLowerCase())
-  if (!n) return undefined
-  return (
-    clients.find((c) => stripDiacritics(c.name.toLowerCase()) === n) ||
-    clients.find((c) => stripDiacritics(c.name.toLowerCase()).includes(n)) ||
-    clients.find((c) => n.includes(stripDiacritics(c.name.toLowerCase())))
-  )
-}
-
 export interface TemplateResolveResult {
   template: PracticeDocTemplate
   slots: ResolvedSlots
   missing: TemplateSlotDef[]
-  /** Client row when matched */
-  clientRow?: WbClientItem
 }
 
 export function resolveTemplateSlots(
@@ -308,39 +291,10 @@ export function resolveTemplateSlots(
   if (!template) return null
 
   const slots: ResolvedSlots = { ...extractSlotsFromUserText(userText) }
-  const clients = readClients(practiceId)
-  const contracts = readContracts(practiceId)
-  let clientRow: WbClientItem | undefined
 
-  if (slots.client) {
-    clientRow = matchClient(slots.client, clients)
-    if (clientRow) {
-      slots.client = clientRow.name
-      if (clientRow.contact && !slots.scope) {
-        /* keep contact for brief via clientRow */
-      }
-    }
-  } else if (clients.length === 1) {
-    clientRow = clients[0]
-    slots.client = clientRow!.name
-  }
-
-  // party / investor can reuse client list
+  // party / investor reuse the client named in the request
   if (!slots.party && slots.client) slots.party = slots.client
   if (!slots.investor && slots.client) slots.investor = slots.client
-  if (!slots.party && clients.length === 1) slots.party = clients[0]!.name
-  if (!slots.investor && clients.length === 1) slots.investor = clients[0]!.name
-
-  if (!slots.party && contracts[0]?.party) slots.party = contracts[0].party
-  if (!slots.topic && contracts[0]?.title) slots.topic = contracts[0].title
-
-  try {
-    const matters = readMatters(practiceId)
-    if (!slots.project && matters[0]?.title) slots.project = matters[0].title
-    if (!slots.client && matters[0]?.client) slots.client = matters[0].client
-  } catch {
-    /* matters may be absent in some builds */
-  }
 
   // topic from residual: strip playbook noise if still empty
   if (!slots.topic && !slots.subject && !slots.project) {
@@ -359,14 +313,14 @@ export function resolveTemplateSlots(
   }
 
   const missing = template.slots.filter((s) => s.required && !slots[s.id]?.trim())
-  return { template, slots, missing, clientRow }
+  return { template, slots, missing }
 }
 
 export function buildTemplateBrief(
   result: TemplateResolveResult,
   vi: boolean,
 ): string {
-  const { template, slots, clientRow } = result
+  const { template, slots } = result
   const lines: string[] = []
   const title = vi ? template.labelVi : template.labelEn
   lines.push(
@@ -381,12 +335,6 @@ export function buildTemplateBrief(
     if (!v) continue
     const lab = vi ? slot.labelVi : slot.labelEn
     lines.push(`- ${lab}: ${v}`)
-  }
-  if (clientRow) {
-    if (clientRow.contact) lines.push(`- ${vi ? 'Liên hệ' : 'Contact'}: ${clientRow.contact}`)
-    if (clientRow.phone) lines.push(`- ${vi ? 'Điện thoại' : 'Phone'}: ${clientRow.phone}`)
-    if (clientRow.email) lines.push(`- Email: ${clientRow.email}`)
-    if (clientRow.note) lines.push(`- ${vi ? 'Ghi chú KH' : 'Client note'}: ${clientRow.note}`)
   }
   lines.push('')
   lines.push(vi ? 'Khung mục lục bắt buộc:' : 'Required outline:')
