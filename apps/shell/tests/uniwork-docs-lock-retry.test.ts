@@ -259,10 +259,10 @@ describe('unlock + Retry ends in a live session with one migration (l.480-481)',
     expect(status.loggedIn).toBe(true)
     expect(status.error).toBeUndefined()
 
-    // the listener opened the store; the sweep moved the intent exactly once
-    expect((await ctx.service.openSyncStore()).kind).toBe('ok')
+    // no explicit open here: the account listener opened the store on the
+    // status push, so the sweep count below depends on the listener alone
+    await vi.waitFor(() => expect(intentRecords()).toHaveLength(1))
     expect(sweeps.calls).toBe(1)
-    expect(intentRecords()).toHaveLength(1)
     const migrated = JSON.parse(bindingText()) as Record<string, unknown>
     expect(migrated).toMatchObject({ schema: 2, min_store_level: 2 })
     expect(migrated).not.toHaveProperty('pendingIntent')
