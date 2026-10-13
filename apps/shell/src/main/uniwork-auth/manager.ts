@@ -400,8 +400,17 @@ export class AccountManager extends SessionCore {
       }
     } catch (error) {
       if (generation !== this.generation) return this.status()
-      // an unreachable membership read must not silently hand out an org the
-      // account may no longer be in: keep the picker and report the failure
+      if (handled.has(error as object)) throw error
+      const outcome = this.failureOutcome(error)
+      // RBE1-02: a transient failure of the membership read (network / 5xx /
+      // gateway) while the org list has just loaded is not a verdict on the
+      // session, so it must not drop the signed-in UI to `server-unreachable`.
+      // Keep the previous selection and state untouched and reject the call:
+      // the renderer keeps the picker (its checked row intact) and shows its
+      // existing retryable error (`acctSwitchOrgFailed`). A failure that does
+      // end or change the session (a dead device, a moved deployment, a locked
+      // keystore) keeps its own handling below.
+      if (outcome.state === 'server-unreachable') throw this.markHandled(error)
       this.applyFailure(error, 'session')
       return this.status()
     }

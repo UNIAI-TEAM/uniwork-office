@@ -1069,6 +1069,29 @@ describe('G8-16 organization choice (S16)', () => {
     expect(after.org?.id).toBe('org_a')
   })
 
+  it('a transient membership read inside selectOrg keeps the picker and the session (RBE1-02)', async () => {
+    const ctx = setup()
+    await signIn(ctx)
+    // two active orgs and no choice -> the picker
+    expect(ctx.manager.status()).toMatchObject({ state: 'signed-in', needsOrgChoice: true })
+    ctx.transport.orgMembership.mockImplementation(fail('network'))
+    // the membership read blips: the choice is rejected, but the session is
+    // untouched (no server-unreachable pane, the picker stays)
+    await expect(ctx.manager.selectOrg('org_a')).rejects.toBeInstanceOf(TransportError)
+    const status = ctx.manager.status()
+    expect(status.state).toBe('signed-in')
+    expect(status.error).toBeUndefined()
+    expect(status.needsOrgChoice).toBe(true)
+    expect(status.org).toBeUndefined()
+    expect(ctx.transport.billing).not.toHaveBeenCalled()
+    expect(ctx.persistSelectedOrgId).not.toHaveBeenCalled()
+    // the next attempt with a working read succeeds (retryable)
+    ctx.transport.orgMembership.mockImplementation(async () => ({ role: 'owner' }))
+    const after = await ctx.manager.selectOrg('org_a')
+    expect(after).toMatchObject({ state: 'signed-in', org: { id: 'org_a' }, needsOrgChoice: false })
+    expect(ctx.persistSelectedOrgId).toHaveBeenCalledWith('acc_1', 'org_a')
+  })
+
   it('every organization blocked leaves no picker (the lock panel handles it)', async () => {
     const ctx = setup()
     ctx.transport.orgs.mockImplementation(async () => [
