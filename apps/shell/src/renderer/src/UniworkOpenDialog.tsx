@@ -553,7 +553,14 @@ export function UniworkOpenDialog({
                 const row = doc as LibraryDocRow
                 const editing = renaming?.id === doc.id ? renaming : null
                 const active = doc.id === state.activeId
-                const meta = openable ? pickerRowMeta(doc, t, dateLocale) : t('uwPickUnsupported')
+                const archived = row.archived === true
+                // an archived row is a supported document that is parked, not an unsupported one
+                const updated = pickerRowMeta(doc, t, dateLocale)
+                const meta = archived
+                  ? [t('uwDocArchived'), updated].filter(Boolean).join(' · ')
+                  : openable
+                    ? updated
+                    : t('uwPickUnsupported')
                 // shared rows come from several workspaces: name the one each lives in
                 const where =
                   state.source === 'shared' ? (doc as SharedDocSummary).workspaceName?.trim() : ''
@@ -563,8 +570,8 @@ export function UniworkOpenDialog({
                       id={optionId(index)}
                       role="option"
                       aria-selected={active}
-                      aria-disabled={!openable}
-                      className={`uw-pick-row${active ? ' active' : ''}${openable ? '' : ' disabled'}${row.archived ? ' archived' : ''}${state.opening?.id === doc.id ? ' opening' : ''}`}
+                      aria-disabled={archived ? undefined : !openable}
+                      className={`uw-pick-row${active ? ' active' : ''}${openable ? '' : ' disabled'}${archived ? ' archived' : ''}${state.opening?.id === doc.id ? ' opening' : ''}`}
                       onMouseMove={() => {
                         if (openable && !active) dispatch({ type: 'set-active', id: doc.id })
                       }}
@@ -587,12 +594,7 @@ export function UniworkOpenDialog({
                             }}
                           />
                         ) : (
-                          <span className="uw-pick-row-title">
-                            {doc.title}
-                            {row.archived && (
-                              <span className="uw-pick-row-archived">{t('uwDocArchived')}</span>
-                            )}
-                          </span>
+                          <span className="uw-pick-row-title">{doc.title}</span>
                         )}
                         {(meta || where) && (
                           <span className="uw-pick-row-meta">
@@ -640,7 +642,7 @@ export function UniworkOpenDialog({
                         docId={doc.id}
                         title={doc.title}
                         actions={rowActionsOf(row)}
-                        tabbable={active}
+                        tabbable={active || archived}
                         onAction={(action) => onRowAction(row, action)}
                       />
                     )}
@@ -789,7 +791,11 @@ export function UniworkOpenDialog({
         {archiving && (
           <ArchiveConfirm
             name={archiving.title}
-            onCancel={() => setArchiving(null)}
+            onCancel={() => {
+              const id = archiving.id
+              setArchiving(null)
+              focusRowMenu(id)
+            }}
             onConfirm={() => {
               setArchiving(null)
               setArchived(archiving.id, true)

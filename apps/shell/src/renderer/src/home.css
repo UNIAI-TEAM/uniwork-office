@@ -8303,6 +8303,12 @@ html[dir='rtl'] .quick-title-row {
 
 .uw-pick-row.disabled {
   cursor: default;
+}
+
+/* dim the icon and the text only: the row's controls (the "…" menu with Restore) stay legible */
+.uw-pick-row.disabled > img,
+.uw-pick-row.disabled > svg,
+.uw-pick-row.disabled > .uw-pick-row-text {
   opacity: 0.6;
 }
 
@@ -8836,34 +8842,72 @@ html[dir='rtl'] .quick-title-row {
   height: 28px;
 }
 
-.uw-pick-row-archived {
-  margin-inline-start: 6px;
-  padding: 1px 6px;
-  border-radius: 4px;
-  background: var(--surface-subtle);
-  color: var(--text-muted);
-  font-size: 11px;
-}
-
 .uw-pick-row.archived .uw-pick-row-title {
   color: var(--text-muted);
 }
 
-/* above the library and its modals, so a failure inside a modal is seen too */
+/* Restore is the only action of an archived row: always visible, not on hover only */
+.uw-pick-row.archived .uw-row-menu-btn {
+  opacity: 1;
+}
+
+/* above the library and its modals, so a failure inside a modal is seen too; near the foot, close to the actions */
 .uw-act-toast {
   position: fixed;
-  bottom: 24px;
+  bottom: 12vh;
   left: 50%;
   z-index: 120;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
   max-width: min(420px, 90vw);
   transform: translateX(-50%);
-  padding: 8px 12px;
+  padding: 8px 8px 8px 12px;
   box-shadow: var(--shadow-menu);
   border: 1px solid var(--danger-border);
   border-radius: 8px;
   background: var(--danger-bg);
   color: var(--danger-text);
   font-size: 13px;
+  line-height: 1.4;
+}
+
+.uw-act-toast-icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.uw-act-toast-text {
+  min-width: 0;
+  flex: 1;
+  padding-top: 1px;
+  overflow-wrap: anywhere;
+}
+
+.uw-act-toast-close {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.uw-act-toast-close:hover {
+  background: var(--bg-hover-strong);
+}
+
+.uw-act-toast-close:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.uw-act-heading {
+  overflow-wrap: anywhere;
 }
 
 @media (pointer: coarse) {
@@ -8871,8 +8915,14 @@ html[dir='rtl'] .quick-title-row {
   .uw-act-select,
   .uw-act-type,
   .uw-row-menu-item,
-  .uw-pick-actions .btn {
+  .uw-pick-actions .btn,
+  .modal.uw-act .btn,
+  .uw-act-toast-close {
     min-height: 44px;
+  }
+
+  .uw-act-toast-close {
+    min-width: 44px;
   }
 
   .uw-row-menu-btn {

@@ -440,7 +440,10 @@ export function UploadDocDialog({
   )
 }
 
-/** one-step confirmation before a document is archived (it can be restored later) */
+/**
+ * One-step confirmation before a document is archived (it can be restored
+ * later). Focus starts on Cancel: the safe answer, not the destructive one.
+ */
 export function ArchiveConfirm({
   name,
   onConfirm,
@@ -453,8 +456,10 @@ export function ArchiveConfirm({
   const { t } = useI18n()
   const id = useId()
   return (
-    <ActionModal labelledBy={`${id}-title`} onCancel={onCancel} initialFocus=".btn-primary">
-      <h3 id={`${id}-title`}>{t('uwDocArchive')}</h3>
+    <ActionModal labelledBy={`${id}-title`} onCancel={onCancel} initialFocus=".btn-secondary">
+      <h3 id={`${id}-title`} className="uw-act-heading">
+        {t('uwDocArchive')} · {name}
+      </h3>
       <p>{t('uwDocArchiveConfirm', { name })}</p>
       <div className="modal-buttons">
         <button type="button" className="btn btn-secondary" onClick={onCancel}>
@@ -588,6 +593,9 @@ export function RowMenu({
               className="uw-row-menu-item"
               onClick={() => {
                 setOpen(false)
+                // the menu is about to unmount: park focus on its button so a modal
+                // opened by the action remembers it and gives it back on close
+                buttonRef.current?.focus()
                 onAction(item.action)
               }}
             >
@@ -664,15 +672,45 @@ export function RenameField({
   )
 }
 
-/** short-lived failure note at the bottom of the library (an action did not apply) */
+/**
+ * Failure note near the foot of the library (an action did not apply): icon,
+ * the message, and a dismiss button; it also clears itself after a while.
+ */
 export function ActionToast({ message, onDone }: { message: string; onDone: () => void }) {
+  const { t } = useI18n()
   useEffect(() => {
     const timer = window.setTimeout(onDone, 6000)
     return () => window.clearTimeout(timer)
   }, [message, onDone])
   return (
     <div className="uw-act-toast" role="alert">
-      {message}
+      <svg
+        className="uw-act-toast-icon"
+        width="16"
+        height="16"
+        viewBox="0 0 16 16"
+        aria-hidden="true"
+      >
+        <circle cx="8" cy="8" r="6.25" stroke="currentColor" strokeWidth="1.5" fill="none" />
+        <path d="M8 4.75v3.9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        <circle cx="8" cy="11.1" r="0.9" fill="currentColor" />
+      </svg>
+      <span className="uw-act-toast-text">{message}</span>
+      <button
+        type="button"
+        className="uw-act-toast-close"
+        aria-label={t('uwPickClose')}
+        onClick={onDone}
+      >
+        <svg width="12" height="12" viewBox="0 0 14 14" aria-hidden="true">
+          <path
+            d="M3 3l8 8M11 3l-8 8"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+          />
+        </svg>
+      </button>
     </div>
   )
 }
