@@ -55,6 +55,8 @@ interface SlideEntry {
   sldId: string
   rId: string
   deckIndex: number
+  /** the slide part the relationship targets (undefined: dangling rId) */
+  path: string | undefined
 }
 
 function readSlideEntries(opened: OpenedPptx): SlideEntry[] {
@@ -71,9 +73,17 @@ function readSlideEntries(opened: OpenedPptx): SlideEntry[] {
     const rel = rels.get(rId)
     const path = rel ? resolveTarget(PRES_PATH, rel.target) : undefined
     const deckIndex = path ? deck.slides.findIndex((s) => s.path === path) : -1
-    out.push({ sldId, rId, deckIndex })
+    out.push({ sldId, rId, deckIndex, path })
   }
   return out
+}
+
+/**
+ * The p:sldId/@id of the slide part `slidePath` (e.g. "257"): the slide's stable identity across
+ * insert / delete / reorder and Save. Undefined when presentation.xml does not list the part.
+ */
+export function slideIdOfPath(opened: OpenedPptx, slidePath: string): string | undefined {
+  return readSlideEntries(opened).find((e) => e.path === slidePath)?.sldId
 }
 
 /**

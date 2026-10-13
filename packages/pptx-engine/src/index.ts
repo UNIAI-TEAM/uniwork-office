@@ -312,6 +312,7 @@ export {
   moveSection,
   moveSlide,
   normalizeSections,
+  slideIdOfPath,
   type SectionInfo,
 } from './sections'
 export {
