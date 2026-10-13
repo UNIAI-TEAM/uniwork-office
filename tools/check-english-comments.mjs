@@ -6,29 +6,31 @@
 // Functional CJK string literals are fine (i18n resources, test fixture
 // text, zh-UI matchers), as are the AI prompt guides (runtime resources that
 // legitimately show CJK examples), translated READMEs under an i18n directory,
-// and the language-switcher line that names those translations.
+// and the language-switcher line that names those translations. Fenced code
+// blocks in Markdown are code, not prose, and are exempt.
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
 
 const HAN = /[\u3400-\u9fff]/
 
-const git = spawnSync('git', ['ls-files'], { encoding: 'utf8' })
-if (git.status !== 0) {
-  console.error(git.stderr)
-  process.exit(git.status ?? 1)
-}
-const root = spawnSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).stdout.trim()
-
-const violations = []
-for (const file of git.stdout.trim().split('\n')) {
+/** Returns the violation lines (`  file:line: text`) for one tracked file. */
+export function findViolations(file, content) {
   const isCode = /\.(ts|tsx|mjs|cjs|js|rs)$/.test(file)
   const isHashCode = /\.(py|sh)$/.test(file)
   const isDoc =
     /\.(md|html?)$/.test(file) && !file.includes('/ai/prompts/') && !file.includes('/i18n/')
-  if (!isCode && !isHashCode && !isDoc) continue
-  const lines = readFileSync(join(root, file), 'utf8').split('\n')
-  lines.forEach((line, index) => {
+  if (!isCode && !isHashCode && !isDoc) return []
+  const isMd = file.endsWith('.md')
+  const violations = []
+  let inFence = false
+  content.split('\n').forEach((line, index) => {
+    if (isMd && /^\s*(```|~~~)/.test(line)) {
+      inFence = !inFence
+      return
+    }
+    if (inFence) return
     const text = isDoc
       ? line
       : isHashCode
@@ -40,14 +42,35 @@ for (const file of git.stdout.trim().split('\n')) {
       violations.push(`  ${file}:${index + 1}: ${line.trim()}`)
     }
   })
+  return violations
 }
 
-if (violations.length > 0) {
-  console.error(
-    `Chinese text found in code comments or docs:\n${violations.join('\n')}\n` +
-      'Comments and documentation must be English-only. Move CJK text into ' +
-      'string literals or rewrite the comment in English.',
-  )
-  process.exit(1)
+function main() {
+  const git = spawnSync('git', ['ls-files'], { encoding: 'utf8' })
+  if (git.status !== 0) {
+    console.error(git.stderr)
+    process.exit(git.status ?? 1)
+  }
+  const root = spawnSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).stdout.trim()
+  const violations = git.stdout
+    .trim()
+    .split('\n')
+    .flatMap((file) => {
+      try {
+        return findViolations(file, readFileSync(join(root, file), 'utf8'))
+      } catch {
+        return []
+      }
+    })
+  if (violations.length > 0) {
+    console.error(
+      `Chinese text found in code comments or docs:\n${violations.join('\n')}\n` +
+        'Comments and documentation must be English-only. Move CJK text into ' +
+        'string literals or rewrite the comment in English.',
+    )
+    process.exit(1)
+  }
+  console.log('check-english-comments: OK')
 }
-console.log('check-english-comments: OK')
+
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) main()

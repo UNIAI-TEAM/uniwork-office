@@ -29,7 +29,7 @@
     "legal": "node tools/legal/sync-legal.mjs",
     "legal:check": "node tools/legal/sync-legal.mjs --check",
     "test:legal": "node --test tools/legal/sync-legal.test.mjs",
-    "check:english-comments": "node tools/check-english-comments.mjs",
+    "check:english-comments": "node tools/check-english-comments.mjs && node --test tools/check-english-comments.test.mjs",
     "check:skill-version": "node tools/check-skill-version.mjs",
     "lint": "eslint .",
     "fixtures": "npm run fixtures -w @genoffice/docx-engine",
