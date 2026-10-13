@@ -81,6 +81,8 @@ export interface BuildOptions {
    * If omitted, the cached text in <a:fld> is used (which may be stale from before slides were moved).
    */
   slideNo?: number
+  /** The slide's p:sldId/@id (the caller reads presentation.xml); copied to RenderSlide.sldId. */
+  sldId?: string
 }
 
 /** Refresh slidenum field display to the current slide number (returns a replaced copy; returns the input as-is on no match, never mutates the model). */
@@ -195,6 +197,7 @@ export function buildRenderSlide(
     nodes,
     ...(hidden ? { hidden: true } : {}),
     partPath: slide.path,
+    ...(opts.sldId ? { sldId: opts.sldId } : {}),
   }
 }
 
