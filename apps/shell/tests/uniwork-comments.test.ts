@@ -12,7 +12,10 @@ import {
   createUniworkComments,
   resolveCommentBinding,
 } from '../src/main/uniwork-docs/comments-wiring'
-import { createUniworkCommentsClient } from '../src/main/uniwork-docs/comments'
+import {
+  createUniworkCommentsClient,
+  parseCommentsRevisions,
+} from '../src/main/uniwork-docs/comments'
 import { COMMENTS_CHANNELS } from '@genoffice/electron-utils/comments-ipc'
 import { createFakeCommentServer } from './fixtures/comments-fake-server'
 
@@ -231,72 +234,72 @@ function serviceFor(bound: boolean) {
   } as unknown as Parameters<typeof createUniworkComments>[1]['service']
 }
 
+/** mount the wiring over a fake server; returns the handler map and the reveal spy */
+function mount(
+  options: {
+    server?: ReturnType<typeof createFakeCommentServer>
+    bound?: boolean
+    /** the path the invoking editor window shows (R1-2 pull scope) */
+    shownPath?: (sender: { id: number }) => string | null
+  } = {},
+) {
+  const { ipcMain, handlers } = fakeIpc()
+  const server = options.server ?? createFakeCommentServer()
+  const reveals: Array<{ path: string; commentId: string }> = []
+  const handle = createUniworkComments(ipcMain, {
+    service: serviceFor(options.bound ?? true),
+    profile: () => ({ apiOrigin: ORIGIN }),
+    authorized: <T>(call: (t: string) => Promise<T>) => call('tok'),
+    isSignedIn: () => true,
+    fetch: server.fetch,
+    sendReveal: (payload) => reveals.push(payload),
+    ...(options.shownPath ? { shownPath: options.shownPath } : {}),
+  })
+  return { handle, handlers, server, reveals }
+}
+
+type Handler = (event: unknown, payload: unknown) => Promise<unknown>
+
 describe('the comments IPC wiring (unbound -> zero requests)', () => {
-  it('an unbound document makes no request and rejects with not_found', async () => {
-    const server = createFakeCommentServer()
-    const { ipcMain, handlers } = fakeIpc()
-    const reveals: unknown[] = []
-    createUniworkComments(ipcMain, {
-      service: serviceFor(false),
-      profile: () => ({ apiOrigin: ORIGIN }),
-      authorized: <T>(call: (t: string) => Promise<T>) => call('tok'),
-      isSignedIn: () => true,
-      fetch: server.fetch,
-      sendReveal: (p) => reveals.push(p),
-    })
-    const list = handlers.get(COMMENTS_CHANNELS.list)!
-    expect(await shapeOf(list({}, { path: '/home/u/Desktop/copy.docx' }))).toMatchObject({
-      code: 'not_found',
+  it('an unbound document makes no request and answers the not_found reply', async () => {
+    const { handlers, server } = mount({ bound: false })
+    expect(
+      await handlers.get(COMMENTS_CHANNELS.list)!({}, { path: '/home/u/Desktop/copy.docx' }),
+    ).toEqual({
+      ok: false,
+      error: {
+        code: 'not_found',
+        message: 'comments: document is not bound to UniWork',
+        retryable: false,
+      },
     })
     expect(server.calls).toHaveLength(0)
   })
 
-  it('a bound document lists through the fake server', async () => {
+  it('a bound document answers { ok: true, value }', async () => {
     const server = createFakeCommentServer()
     server.seed(DOC, [{ id: CMT, body: 'hi', kind: 'comment' }])
-    const { ipcMain, handlers } = fakeIpc()
-    createUniworkComments(ipcMain, {
-      service: serviceFor(true),
-      profile: () => ({ apiOrigin: ORIGIN }),
-      authorized: <T>(call: (t: string) => Promise<T>) => call('tok'),
-      isSignedIn: () => true,
-      fetch: server.fetch,
-      sendReveal: () => undefined,
-    })
-    const out = (await handlers.get(COMMENTS_CHANNELS.list)!({}, { path: PATH })) as {
-      comments: unknown[]
+    const { handlers } = mount({ server })
+    const reply = (await handlers.get(COMMENTS_CHANNELS.list)!({}, { path: PATH })) as {
+      ok: boolean
+      value: { comments: unknown[] }
     }
-    expect(out.comments).toHaveLength(1)
+    expect(reply.ok).toBe(true)
+    expect(reply.value.comments).toHaveLength(1)
     expect(server.calls).toHaveLength(1)
   })
 
   it('a malformed payload is refused before any request', async () => {
-    const server = createFakeCommentServer()
-    const { ipcMain, handlers } = fakeIpc()
-    createUniworkComments(ipcMain, {
-      service: serviceFor(true),
-      profile: () => ({ apiOrigin: ORIGIN }),
-      authorized: <T>(call: (t: string) => Promise<T>) => call('tok'),
-      isSignedIn: () => true,
-      fetch: server.fetch,
-      sendReveal: () => undefined,
+    const { handlers, server } = mount()
+    expect(await handlers.get(COMMENTS_CHANNELS.create)!({}, { path: PATH, body: 'x' })).toEqual({
+      ok: false,
+      error: { code: 'malformed', message: 'comments: invalid request', retryable: false },
     })
-    expect(
-      await shapeOf(handlers.get(COMMENTS_CHANNELS.create)!({}, { path: PATH, body: 'x' })),
-    ).toMatchObject({ code: 'malformed' })
     expect(server.calls).toHaveLength(0)
   })
 
-  it('registers one handler per frame request kind', () => {
-    const { ipcMain, handlers } = fakeIpc()
-    createUniworkComments(ipcMain, {
-      service: serviceFor(true),
-      profile: () => ({ apiOrigin: ORIGIN }),
-      authorized: <T>(call: (t: string) => Promise<T>) => call('tok'),
-      isSignedIn: () => true,
-      fetch: createFakeCommentServer().fetch,
-      sendReveal: () => undefined,
-    })
+  it('registers one handler per frame request kind plus the pending-reveal pull', () => {
+    const { handlers } = mount()
     expect([...handlers.keys()].sort()).toEqual(
       [
         COMMENTS_CHANNELS.list,
@@ -308,21 +311,13 @@ describe('the comments IPC wiring (unbound -> zero requests)', () => {
         COMMENTS_CHANNELS.revisions,
         COMMENTS_CHANNELS.anchors,
         COMMENTS_CHANNELS.searchMentions,
+        COMMENTS_CHANNELS.revealPending,
       ].sort(),
     )
   })
 
   it('reveal pushes only for a bound path', () => {
-    const { ipcMain } = fakeIpc()
-    const reveals: unknown[] = []
-    const handle = createUniworkComments(ipcMain, {
-      service: serviceFor(true),
-      profile: () => ({ apiOrigin: ORIGIN }),
-      authorized: <T>(call: (t: string) => Promise<T>) => call('tok'),
-      isSignedIn: () => true,
-      fetch: createFakeCommentServer().fetch,
-      sendReveal: (p) => reveals.push(p),
-    })
+    const { handle, reveals } = mount()
     handle.reveal(PATH, CMT)
     handle.reveal('/home/u/Desktop/copy.docx', CMT)
     expect(reveals).toEqual([{ path: PATH, commentId: CMT }])
@@ -331,6 +326,112 @@ describe('the comments IPC wiring (unbound -> zero requests)', () => {
   it('resolveCommentBinding returns null for an unbound path', () => {
     expect(resolveCommentBinding(serviceFor(true), PATH)).toMatchObject({ documentId: DOC })
     expect(resolveCommentBinding(serviceFor(true), '/other')).toBeNull()
+  })
+})
+
+describe('protocol errors cross the IPC boundary as data (R1-1)', () => {
+  it('a create 409 comment_deleted survives structuredClone as conflict + details.code', async () => {
+    const server = createFakeCommentServer()
+    server.seed(DOC, [
+      { id: 'thread', body: '', kind: 'comment', deleted_at: '2026-10-13T10:00:00Z' },
+    ])
+    const { handlers } = mount({ server })
+    const reply = await handlers.get(COMMENTS_CHANNELS.create)!(
+      {},
+      {
+        path: PATH,
+        kind: 'comment',
+        parentId: 'thread',
+        body: 'draft',
+      },
+    )
+    expect(reply).toEqual({
+      ok: false,
+      error: {
+        code: 'conflict',
+        message: 'comments: HTTP 409 comment_deleted',
+        status: 409,
+        retryable: false,
+        details: { code: 'comment_deleted' },
+      },
+    })
+    // Electron's ipcMain.handle serialises the reply; nothing richer than plain data may travel
+    expect(structuredClone(reply)).toEqual(reply)
+  })
+
+  it.each([
+    [401, 'unauthorized', false],
+    [404, 'not_found', false],
+    [500, 'internal', true],
+    [503, 'internal', true],
+  ] as const)(
+    'a list %i survives structuredClone as %s (retryable %s)',
+    async (status, code, retryable) => {
+      const server = createFakeCommentServer()
+      server.fail(status)
+      const { handlers } = mount({ server })
+      const reply = await handlers.get(COMMENTS_CHANNELS.list)!({}, { path: PATH })
+      expect(reply).toEqual({
+        ok: false,
+        error: { code, message: `comments: HTTP ${status}`, status, retryable },
+      })
+      expect(structuredClone(reply)).toEqual(reply)
+    },
+  )
+
+  it('a successful reply travels as { ok: true, value } through structuredClone', async () => {
+    const server = createFakeCommentServer()
+    server.seed(DOC, [{ id: CMT, body: 'hi', kind: 'comment' }])
+    const { handlers } = mount({ server })
+    const reply = await handlers.get(COMMENTS_CHANNELS.list)!({}, { path: PATH })
+    expect(structuredClone(reply)).toEqual(reply)
+    expect((reply as { ok: boolean }).ok).toBe(true)
+  })
+})
+
+describe('the launch reveal is held until the editor subscribes (R1-2)', () => {
+  const pull = (handlers: Map<string, Handler>, senderId: number) =>
+    handlers.get(COMMENTS_CHANNELS.revealPending)!({ sender: { id: senderId } }, undefined)
+
+  it('a reveal decided before the editor subscribes is pulled once, then cleared', async () => {
+    const { handle, handlers } = mount({ shownPath: (sender) => (sender.id === 7 ? PATH : null) })
+    handle.reveal(PATH, CMT)
+    expect(await pull(handlers, 7)).toEqual({ path: PATH, commentId: CMT })
+    expect(await pull(handlers, 7)).toBeNull()
+  })
+
+  it('a pull reaches only the sender’s own path', async () => {
+    const { handle, handlers } = mount({ shownPath: (sender) => (sender.id === 7 ? PATH : null) })
+    handle.reveal(PATH, CMT)
+    expect(await pull(handlers, 8)).toBeNull()
+    expect(await pull(handlers, 7)).toEqual({ path: PATH, commentId: CMT })
+  })
+
+  it('a later reveal still pushes to the subscribed editor', async () => {
+    const { handle, handlers, reveals } = mount({
+      shownPath: (sender) => (sender.id === 7 ? PATH : null),
+    })
+    await pull(handlers, 7)
+    handle.reveal(PATH, 'c2')
+    expect(reveals).toEqual([{ path: PATH, commentId: 'c2' }])
+  })
+})
+
+describe('the desktop DTO parsers match the frame types (R1-4)', () => {
+  it('a revision with created_by_id: null keeps null (a system author)', () => {
+    const out = parseCommentsRevisions({
+      revisions: [
+        {
+          id: '01J8X4REV0000000000000001',
+          revision: 2,
+          body: 'trimmed by the system',
+          created_by_id: null,
+          created_by_kind: 'system',
+          created_at: '2026-10-13T10:00:00Z',
+        },
+      ],
+    })
+    expect(out.revisions[0]?.created_by_id).toBeNull()
   })
 })
 

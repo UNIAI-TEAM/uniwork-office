@@ -20,7 +20,7 @@ import {
 import { COMMENTS_POLL_INTERVAL_MS, createCommentsPoll } from '../src/comments-poll'
 
 describe('the comments IPC channel contract', () => {
-  it('names one channel per frame request kind plus the reveal push', () => {
+  it('names one channel per frame request kind plus the reveal push and its pending pull', () => {
     expect(COMMENTS_CHANNELS).toEqual({
       list: 'uniwork:comments:list',
       create: 'uniwork:comments:create',
@@ -32,6 +32,7 @@ describe('the comments IPC channel contract', () => {
       anchors: 'uniwork:comments:anchors',
       searchMentions: 'uniwork:comments:search-mentions',
       reveal: 'uniwork:comments:reveal',
+      revealPending: 'uniwork:comments:reveal:pending',
     })
     expect(COMMENTS_BRIDGE_KEY).toBe('uniworkComments')
   })
@@ -98,14 +99,21 @@ describe('the comments IPC channel contract', () => {
     expect(parseMentionsSearchInput({ path: 'p' })).toBeNull()
   })
 
-  it('comments.anchors: 1..500 items, state exact|lost only', () => {
+  it('comments.anchors: 0..500 items, state exact|lost only', () => {
     const item = { commentId: 'c1', anchor: { format: 'docx', v: 1 }, state: 'exact' as const }
     expect(parseCommentsAnchorsInput({ path: 'p', versionId: 'v1', anchors: [item] })).toEqual({
       path: 'p',
       versionId: 'v1',
       anchors: [item],
     })
-    expect(parseCommentsAnchorsInput({ path: 'p', versionId: 'v1', anchors: [] })).toBeNull()
+    // an empty round is a server no-op (contract §2.6: the field must be present, not non-empty)
+    expect(parseCommentsAnchorsInput({ path: 'p', versionId: 'v1', anchors: [] })).toEqual({
+      path: 'p',
+      versionId: 'v1',
+      anchors: [],
+    })
+    const many = Array.from({ length: 501 }, () => item)
+    expect(parseCommentsAnchorsInput({ path: 'p', versionId: 'v1', anchors: many })).toBeNull()
     expect(
       parseCommentsAnchorsInput({
         path: 'p',
