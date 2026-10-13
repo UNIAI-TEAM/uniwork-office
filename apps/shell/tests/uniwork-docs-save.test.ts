@@ -1976,6 +1976,22 @@ describe('the comments context of a bound copy (G8-12 §3.1)', () => {
     expect(ctx.service.commentContext(opened.path)).toMatchObject({ level: 'view' })
   })
 
+  it('a view launch without a version caps the comments level at view', async () => {
+    const server = fakeServer({ bytes: enc('v3'), myLevel: 'manage' })
+    const ctx = setup(server)
+    const opened = await ctx.service.openFromServer(DOC, {
+      organizationId: 'org_launch',
+      workspaceId: 'ws_launch',
+      title: 'Q4 plan',
+      operation: 'view' as const,
+      version: 0,
+      revision: '41',
+      downloadPath: `/api/v1/documents/${DOC}/download`,
+    } as never)
+    expect(binding(opened.path)).toMatchObject({ access: 'view', level: 'view' })
+    expect(ctx.service.commentContext(opened.path)).toMatchObject({ level: 'view' })
+  })
+
   it('a conflicted or failed Save pushes nothing and keeps the open version', async () => {
     const server = fakeServer({ bytes: enc('v3') })
     const ctx = setup(server)

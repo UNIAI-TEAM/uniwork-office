@@ -49,6 +49,11 @@ export interface ServerCommentsApi extends UniworkCommentsLike {
   context(input: { path: string }): Promise<Reply<ServerCommentsContext>>
   /** a Save of `path` settled with a commit receipt */
   onSaved(handler: (payload: { path: string; versionId: string }) => void): () => void
+  /**
+   * web frame only: this editor has no server mode, so no owner will register (the reveal router
+   * stops waiting for one); idempotent
+   */
+  noEditor?(): void
 }
 
 declare global {

@@ -36,6 +36,12 @@ export interface FrameCommentsHooks {
   version?: FrameDocVersion
 }
 
+/**
+ * what `installFrameComments` publishes: the comments API plus `noEditor`, which the editor calls
+ * when it ends without a server mode (the reveal router then stops waiting for its owner)
+ */
+export type FrameCommentsApi = UniworkCommentsApi & { noEditor(): void }
+
 /** the `init` fields the API reads (the real client's FrameSession has them all) */
 type CommentsSession = PortSession & { commentsLevel?: CommentsLevel }
 
@@ -127,7 +133,7 @@ export async function installFrameComments(
   client: FrameCommentsClient,
   hooks: FrameCommentsHooks = {},
   target: Record<string, unknown> = globalThis as unknown as Record<string, unknown>,
-): Promise<UniworkCommentsApi | null> {
+): Promise<FrameCommentsApi | null> {
   let session: PortSession
   try {
     session = await client.whenInitialized()
@@ -135,10 +141,11 @@ export async function installFrameComments(
     return null
   }
   if (!commentsAccess({ capabilities: session.capabilities ?? {} }).enabled) return null
-  const api = createFrameCommentsApi(client, hooks)
   // the editor serving the anchored comments registers its onReveal owner later: the reveal router
-  // waits for it instead of answering revealed:false for an id the editor owns
-  frameRevealRouter(client).expectEditor()
+  // waits for it instead of answering revealed:false for an id the editor owns; an editor that ends
+  // without a server mode says so through `noEditor` and the wait is released (idempotent)
+  const noEditor = frameRevealRouter(client).expectEditor()
+  const api: FrameCommentsApi = { ...createFrameCommentsApi(client, hooks), noEditor }
   target[COMMENTS_BRIDGE_KEY] = api
   return api
 }
