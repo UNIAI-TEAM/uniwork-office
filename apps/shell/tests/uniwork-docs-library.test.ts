@@ -3,10 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DeploymentProfile } from '../src/main/uniwork-auth/deployment'
-import {
-  UniworkDocsService,
-  type ConflictUi,
-} from '../src/main/uniwork-docs/service'
+import { UniworkDocsService, type ConflictUi } from '../src/main/uniwork-docs/service'
 import type { FetchLike } from '../src/main/uniwork-docs/client'
 
 /**
@@ -295,7 +292,12 @@ describe('shared with me (S17)', () => {
 
   it('pages locally with an opaque cursor', async () => {
     const docs = Array.from({ length: 60 }, (_, i) =>
-      docRow(`d${i}`, 'ws_1', `F${i}.docx`, `2026-01-${String((i % 28) + 1).padStart(2, '0')}T00:00:00Z`),
+      docRow(
+        `d${i}`,
+        'ws_1',
+        `F${i}.docx`,
+        `2026-01-${String((i % 28) + 1).padStart(2, '0')}T00:00:00Z`,
+      ),
     )
     const server = fakeServer({ shared: { ws_1: { documents: docs } } })
     const { service } = serviceWith(server)

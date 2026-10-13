@@ -271,9 +271,7 @@ export function parseProperties(raw: unknown): DocumentProperties {
     updatedAt: optTimestamp(doc.updated_at),
     myLevel: optId(doc.my_level, 16),
     currentVersion:
-      typeof version === 'number' && Number.isSafeInteger(version) && version >= 0
-        ? version
-        : null,
+      typeof version === 'number' && Number.isSafeInteger(version) && version >= 0 ? version : null,
   }
 }
 

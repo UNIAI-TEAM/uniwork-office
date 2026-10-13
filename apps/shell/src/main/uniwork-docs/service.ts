@@ -920,7 +920,10 @@ export class UniworkDocsService {
               await api.listSharedWithMe({ workspaceId: ws.id, cursor, limit: SHARED_PAGE_SIZE })
             for (const doc of page.documents) {
               if (!merged.has(doc.id)) {
-                merged.set(doc.id, { ...doc, workspaceName: nameOf.get(doc.workspaceId) ?? ws.name })
+                merged.set(doc.id, {
+                  ...doc,
+                  workspaceName: nameOf.get(doc.workspaceId) ?? ws.name,
+                })
               }
             }
             cursor = page.nextCursor ?? undefined
@@ -928,8 +931,13 @@ export class UniworkDocsService {
           } while (cursor && pages < SHARED_MAX_PAGES && merged.size < SHARED_MAX_ROWS)
         }),
       )
-      const all = [...merged.values()].sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0))
-      const limit = Math.min(SHARED_PAGE_SIZE, Math.max(1, Math.floor(Number(query.limit) || SHARED_PAGE_SIZE)))
+      const all = [...merged.values()].sort((a, b) =>
+        a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0,
+      )
+      const limit = Math.min(
+        SHARED_PAGE_SIZE,
+        Math.max(1, Math.floor(Number(query.limit) || SHARED_PAGE_SIZE)),
+      )
       const offset = parseOffsetCursor(query.cursor)
       const slice = all.slice(offset, offset + limit)
       const next = offset + limit < all.length ? `shared:${offset + limit}` : null
