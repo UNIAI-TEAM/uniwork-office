@@ -3,6 +3,7 @@ import type {
   RecentEntry,
   UniworkDocErrorCode,
   UniworkDocListPage,
+  UniworkDocProperties,
   UniworkDocStatus,
   UniworkDocSummary,
   UniworkLaunchEvent,
@@ -795,18 +796,18 @@ export function accessKeyOf(level: string | null | undefined): StringKey | null 
 /** a field the server did not send */
 export const MISSING_VALUE = '—'
 
-/** the details panel input: GET /documents/{id} as main hands it over (null = not sent) */
-export interface DocInfoFields {
-  ownerName: string | null
-  createdByName: string | null
-  createdAt: string | null
-  updatedByName: string | null
-  updatedAt: string | null
-  myLevel: string | null
-  /** current version ordinal; null or 0 = no version yet */
-  version: number | null
-  versionByName: string | null
-}
+/** the details panel input: the fields of the properties read it shows (null = not sent) */
+export type DocInfoFields = Pick<
+  UniworkDocProperties,
+  | 'ownerName'
+  | 'createdByName'
+  | 'createdAt'
+  | 'updatedByName'
+  | 'updatedAt'
+  | 'myLevel'
+  | 'version'
+  | 'versionByName'
+>
 
 export interface DocInfoRow {
   labelKey: StringKey

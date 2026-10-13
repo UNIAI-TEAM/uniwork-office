@@ -263,6 +263,45 @@ describe('organization step after sign-in', () => {
     expect(account.selectOrg).toHaveBeenCalledWith('org-1')
   })
 
+  it('drops a checked row that a status push locks: Continue goes back to disabled', async () => {
+    const account = controller(choosing([ACME, BETA]))
+    await render(account)
+    await key(radio('Acme School'), ' ')
+    expect(continueBtn().getAttribute('aria-disabled')).toBe('false')
+    const locked = { ...BETA, membership: 'organization_suspended' as const }
+    await render({ ...account, status: choosing([ACME, locked]) })
+    await key(radio('Acme School'), ' ')
+    await render({
+      ...account,
+      status: choosing([{ ...ACME, membership: 'member_deactivated' }, BETA]),
+    })
+    // Acme is checked then locked: no row stays checked and Continue cannot choose it
+    expect(radios().filter((r) => r.getAttribute('aria-checked') === 'true')).toEqual([])
+    expect(continueBtn().getAttribute('aria-disabled')).toBe('true')
+    await click(continueBtn())
+    expect(account.selectOrg).not.toHaveBeenCalled()
+  })
+
+  it('focuses the first choosable row once the rows arrive after the step mounted', async () => {
+    const account = controller(choosing([]))
+    await render(account)
+    expect(radios()).toHaveLength(0)
+    await render({ ...account, status: choosing([SUSPENDED, ACME, BETA]) })
+    expect(document.activeElement).toBe(radio('Acme School'))
+    // a later push does not pull focus back
+    radio('Beta Clinic').focus()
+    await render({ ...account, status: choosing([SUSPENDED, ACME, BETA]) })
+    expect(document.activeElement).toBe(radio('Beta Clinic'))
+  })
+
+  it('ids of the step are unique per mount', async () => {
+    await render(controller(choosing([ACME, BETA])))
+    const group_ = group()!
+    const title = document.getElementById(group_.getAttribute('aria-labelledby')!)
+    expect(title?.textContent).toBe(en.uwOrgPickTitle)
+    expect(group_.getAttribute('aria-labelledby')).not.toBe('uw-org-title')
+  })
+
   it('says why it asks again when the remembered organization is gone', async () => {
     await render(controller(choosing([ACME, BETA], { rememberedGone: true })))
     expect(host.textContent).toContain(en.uwOrgPickRememberedGone)

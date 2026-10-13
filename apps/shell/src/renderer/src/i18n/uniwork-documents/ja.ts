@@ -113,9 +113,12 @@ export const ja = {
   uwOrgSettingsLabel: '作業中の組織',
   uwLibShared: '共有アイテム',
   uwLibSharedEmpty: 'あなたに直接共有されたドキュメントはまだありません。',
+  uwLibSharedPartial:
+    '読み込み済みのドキュメントのみを検索しました。さらに読み込んで検索を続けてください。',
   uwLibWsRole: '{workspace} · {role}',
   uwDocInfo: '詳細',
   uwDocInfoFor: '「{name}」の詳細',
+  uwDocInfoClose: '詳細を閉じる',
   uwDocInfoOwner: 'オーナー',
   uwDocInfoCreated: '作成',
   uwDocInfoUpdated: '更新',

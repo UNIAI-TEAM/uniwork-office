@@ -114,9 +114,12 @@ export const nl = {
   uwOrgSettingsLabel: 'Werkorganisatie',
   uwLibShared: 'Gedeeld met mij',
   uwLibSharedEmpty: 'Er is nog niets rechtstreeks met je gedeeld.',
+  uwLibSharedPartial:
+    'Er is alleen gezocht in de tot nu toe geladen documenten. Laad meer om verder te zoeken.',
   uwLibWsRole: '{workspace} · {role}',
   uwDocInfo: 'Details',
   uwDocInfoFor: 'Details van ‘{name}’',
+  uwDocInfoClose: 'Details sluiten',
   uwDocInfoOwner: 'Eigenaar',
   uwDocInfoCreated: 'Gemaakt',
   uwDocInfoUpdated: 'Bijgewerkt',

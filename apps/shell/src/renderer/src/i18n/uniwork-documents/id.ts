@@ -111,9 +111,12 @@ export const id = {
   uwOrgSettingsLabel: 'Organisasi kerja',
   uwLibShared: 'Dibagikan dengan saya',
   uwLibSharedEmpty: 'Belum ada yang dibagikan langsung dengan Anda.',
+  uwLibSharedPartial:
+    'Hanya dokumen yang sudah dimuat yang dicari. Muat lebih banyak untuk terus mencari.',
   uwLibWsRole: '{workspace} · {role}',
   uwDocInfo: 'Detail',
   uwDocInfoFor: 'Detail “{name}”',
+  uwDocInfoClose: 'Tutup detail',
   uwDocInfoOwner: 'Pemilik',
   uwDocInfoCreated: 'Dibuat',
   uwDocInfoUpdated: 'Diperbarui',

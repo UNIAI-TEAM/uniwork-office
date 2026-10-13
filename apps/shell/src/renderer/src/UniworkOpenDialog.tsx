@@ -291,6 +291,25 @@ export function UniworkOpenDialog({
     </div>
   )
 
+  const renderLoadMore = () => (
+    <>
+      {state.list.moreError && (
+        <p className="uw-pick-more-error" role="alert">
+          {t(UNIWORK_ERROR_KEYS[state.list.moreError])}
+        </p>
+      )}
+      {state.list.nextCursor && (
+        <button
+          className="btn btn-secondary uw-pick-more"
+          onClick={loadMore}
+          disabled={state.list.loadingMore}
+        >
+          {state.list.loadingMore ? t('uwPickLoadingMore') : t('uwPickLoadMore')}
+        </button>
+      )}
+    </>
+  )
+
   const renderBody = () => {
     switch (body.kind) {
       case 'loading':
@@ -334,6 +353,11 @@ export function UniworkOpenDialog({
         return (
           <div className="uw-pick-state">
             <p className="uw-pick-state-title">{t('uwPickNoResults', { query: body.query })}</p>
+            {/* the shared list is filtered here, so a match may sit on a page not loaded yet */}
+            {state.list.nextCursor && (
+              <p className="uw-pick-state-hint">{t('uwLibSharedPartial')}</p>
+            )}
+            {renderLoadMore()}
           </div>
         )
       case 'list':
@@ -359,29 +383,30 @@ export function UniworkOpenDialog({
                 const where =
                   state.source === 'shared' ? (doc as SharedDocSummary).workspaceName?.trim() : ''
                 return (
-                  <li
-                    key={doc.id}
-                    id={optionId(index)}
-                    role="option"
-                    aria-selected={active}
-                    aria-disabled={!openable}
-                    className={`uw-pick-row${active ? ' active' : ''}${openable ? '' : ' disabled'}${state.opening?.id === doc.id ? ' opening' : ''}`}
-                    onMouseMove={() => {
-                      if (openable && !active) dispatch({ type: 'set-active', id: doc.id })
-                    }}
-                    onClick={() => openDoc(doc.id)}
-                  >
-                    <FileBadge ext={docExtension(doc)} size={24} />
-                    <span className="uw-pick-row-text">
-                      <span className="uw-pick-row-title">{doc.title}</span>
-                      {(meta || where) && (
-                        <span className="uw-pick-row-meta">
-                          {where && <span className="uw-pick-row-where">{where}</span>}
-                          {where && meta ? ' · ' : ''}
-                          {meta}
-                        </span>
-                      )}
-                    </span>
+                  <li key={doc.id} role="presentation" className="uw-pick-item">
+                    <div
+                      id={optionId(index)}
+                      role="option"
+                      aria-selected={active}
+                      aria-disabled={!openable}
+                      className={`uw-pick-row${active ? ' active' : ''}${openable ? '' : ' disabled'}${state.opening?.id === doc.id ? ' opening' : ''}`}
+                      onMouseMove={() => {
+                        if (openable && !active) dispatch({ type: 'set-active', id: doc.id })
+                      }}
+                      onClick={() => openDoc(doc.id)}
+                    >
+                      <FileBadge ext={docExtension(doc)} size={24} />
+                      <span className="uw-pick-row-text">
+                        <span className="uw-pick-row-title">{doc.title}</span>
+                        {(meta || where) && (
+                          <span className="uw-pick-row-meta">
+                            {where && <span className="uw-pick-row-where">{where}</span>}
+                            {where && meta ? ' · ' : ''}
+                            {meta}
+                          </span>
+                        )}
+                      </span>
+                    </div>
                     <button
                       type="button"
                       className={`uw-pick-info-btn${info?.id === doc.id ? ' on' : ''}`}
@@ -418,20 +443,7 @@ export function UniworkOpenDialog({
                 )
               })}
             </ul>
-            {state.list.moreError && (
-              <p className="uw-pick-more-error" role="alert">
-                {t(UNIWORK_ERROR_KEYS[state.list.moreError])}
-              </p>
-            )}
-            {state.list.nextCursor && (
-              <button
-                className="btn btn-secondary uw-pick-more"
-                onClick={loadMore}
-                disabled={state.list.loadingMore}
-              >
-                {state.list.loadingMore ? t('uwPickLoadingMore') : t('uwPickLoadMore')}
-              </button>
-            )}
+            {renderLoadMore()}
           </>
         )
     }
@@ -470,6 +482,8 @@ export function UniworkOpenDialog({
               aria-label={t('uwPickWorkspace')}
               value={state.source === 'shared' ? SHARED_SOURCE_VALUE : (state.workspaceId ?? '')}
               onChange={(e) => {
+                // a details read still in flight belongs to the old source: drop its answer
+                infoRequest.current++
                 setInfo(null)
                 if (e.target.value === SHARED_SOURCE_VALUE) dispatch({ type: 'select-shared' })
                 else dispatch({ type: 'select-workspace', id: e.target.value })

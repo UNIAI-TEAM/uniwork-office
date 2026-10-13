@@ -114,9 +114,12 @@ export const ru = {
   uwOrgSettingsLabel: 'Рабочая организация',
   uwLibShared: 'Доступные мне',
   uwLibSharedEmpty: 'С вами пока ничего не поделились напрямую.',
+  uwLibSharedPartial:
+    'Поиск выполнен только среди уже загруженных документов. Загрузите ещё, чтобы продолжить.',
   uwLibWsRole: '{workspace} · {role}',
   uwDocInfo: 'Сведения',
   uwDocInfoFor: 'Сведения о «{name}»',
+  uwDocInfoClose: 'Закрыть сведения',
   uwDocInfoOwner: 'Владелец',
   uwDocInfoCreated: 'Создан',
   uwDocInfoUpdated: 'Изменён',

@@ -113,9 +113,12 @@ export const pt = {
   uwOrgSettingsLabel: 'Organização de trabalho',
   uwLibShared: 'Compartilhados comigo',
   uwLibSharedEmpty: 'Nada foi compartilhado diretamente com você ainda.',
+  uwLibSharedPartial:
+    'Só foram pesquisados os documentos carregados até agora. Carregue mais para continuar procurando.',
   uwLibWsRole: '{workspace} · {role}',
   uwDocInfo: 'Detalhes',
   uwDocInfoFor: 'Detalhes de “{name}”',
+  uwDocInfoClose: 'Fechar detalhes',
   uwDocInfoOwner: 'Proprietário',
   uwDocInfoCreated: 'Criado',
   uwDocInfoUpdated: 'Atualizado',

@@ -111,9 +111,12 @@ export const ms = {
   uwOrgSettingsLabel: 'Organisasi kerja',
   uwLibShared: 'Dikongsi dengan saya',
   uwLibSharedEmpty: 'Belum ada apa-apa yang dikongsi terus dengan anda.',
+  uwLibSharedPartial:
+    'Hanya dokumen yang telah dimuatkan setakat ini dicari. Muatkan lebih banyak untuk terus mencari.',
   uwLibWsRole: '{workspace} · {role}',
   uwDocInfo: 'Butiran',
   uwDocInfoFor: 'Butiran “{name}”',
+  uwDocInfoClose: 'Tutup butiran',
   uwDocInfoOwner: 'Pemilik',
   uwDocInfoCreated: 'Dicipta',
   uwDocInfoUpdated: 'Dikemas kini',

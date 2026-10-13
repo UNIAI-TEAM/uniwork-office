@@ -118,9 +118,12 @@ export const de = {
   uwOrgSettingsLabel: 'Aktive Organisation',
   uwLibShared: 'Für mich freigegeben',
   uwLibSharedEmpty: 'Bisher wurde nichts direkt für Sie freigegeben.',
+  uwLibSharedPartial:
+    'Es wurden nur die bisher geladenen Dokumente durchsucht. Laden Sie mehr, um weiterzusuchen.',
   uwLibWsRole: '{workspace} · {role}',
   uwDocInfo: 'Details',
   uwDocInfoFor: 'Details zu „{name}“',
+  uwDocInfoClose: 'Details schließen',
   uwDocInfoOwner: 'Eigentümer',
   uwDocInfoCreated: 'Erstellt',
   uwDocInfoUpdated: 'Aktualisiert',
