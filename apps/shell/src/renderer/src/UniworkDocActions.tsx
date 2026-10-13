@@ -1,4 +1,5 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react'
 import type { UniworkWorkspaceRef } from '../../shared/home-api'
 import { useI18n } from './locale'
@@ -475,6 +476,28 @@ export function ArchiveConfirm({
 
 export type RowAction = keyof RowActions
 
+/** gap between the "…" button and its popup, and the least distance the popup keeps from the window edge */
+const MENU_GAP = 4
+const MENU_EDGE = 8
+
+/**
+ * The popup is portalled to the body and placed with fixed coordinates, so no
+ * scrollable list or clipped dialog can cut it off. It drops below the button
+ * and flips upward when the room below is smaller than it is (and larger above).
+ */
+function placeMenu(button: HTMLElement, menu: HTMLElement) {
+  const anchor = button.getBoundingClientRect()
+  const { width, height } = menu.getBoundingClientRect()
+  const below = window.innerHeight - anchor.bottom - MENU_GAP - MENU_EDGE
+  const above = anchor.top - MENU_GAP - MENU_EDGE
+  const up = height > below && above > below
+  const top = up ? anchor.top - MENU_GAP - height : anchor.bottom + MENU_GAP
+  const left = Math.max(MENU_EDGE, anchor.right - width)
+  menu.style.top = `${Math.max(MENU_EDGE, top)}px`
+  menu.style.left = `${left}px`
+  menu.dataset.placement = up ? 'up' : 'down'
+}
+
 /**
  * The row's "…" menu (menu button pattern): Enter/Space/ArrowDown opens it on
  * the first item, arrows move, Escape closes it and returns to the button.
@@ -502,6 +525,22 @@ export function RowMenu({
   if (actions.rename) items.push({ action: 'rename', label: t('uwDocRename') })
   if (actions.archive) items.push({ action: 'archive', label: t('uwDocArchive') })
   if (actions.restore) items.push({ action: 'restore', label: t('uwDocRestore') })
+
+  // measured before paint: the popup never shows at a wrong place first
+  useLayoutEffect(() => {
+    if (!open) return
+    const place = () => {
+      if (buttonRef.current && menuRef.current) placeMenu(buttonRef.current, menuRef.current)
+    }
+    place()
+    window.addEventListener('resize', place)
+    // the list scrolls under an open popup: keep it beside its button
+    document.addEventListener('scroll', place, true)
+    return () => {
+      window.removeEventListener('resize', place)
+      document.removeEventListener('scroll', place, true)
+    }
+  }, [open])
 
   useEffect(() => {
     if (open) menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus()
@@ -540,7 +579,8 @@ export function RowMenu({
       event.preventDefault()
       nodes[event.key === 'Home' ? 0 : nodes.length - 1]?.focus()
     } else if (event.key === 'Tab') {
-      close(false)
+      // the popup lives at the end of the body: leave from the button so Tab continues in the row
+      close(true)
     }
   }
 
@@ -574,36 +614,38 @@ export function RowMenu({
           <circle cx="12.5" cy="8" r="1.3" fill="currentColor" />
         </svg>
       </button>
-      {open && (
-        <div
-          className="uw-row-menu-list"
-          role="menu"
-          id={menuId}
-          aria-label={t('uwDocActionsFor', { name: title })}
-          ref={menuRef}
-          onKeyDown={onMenuKey}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {items.map((item) => (
-            <button
-              key={item.action}
-              type="button"
-              role="menuitem"
-              tabIndex={-1}
-              className="uw-row-menu-item"
-              onClick={() => {
-                setOpen(false)
-                // the menu is about to unmount: park focus on its button so a modal
-                // opened by the action remembers it and gives it back on close
-                buttonRef.current?.focus()
-                onAction(item.action)
-              }}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
-      )}
+      {open &&
+        createPortal(
+          <div
+            className="uw-row-menu-list"
+            role="menu"
+            id={menuId}
+            aria-label={t('uwDocActionsFor', { name: title })}
+            ref={menuRef}
+            onKeyDown={onMenuKey}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {items.map((item) => (
+              <button
+                key={item.action}
+                type="button"
+                role="menuitem"
+                tabIndex={-1}
+                className="uw-row-menu-item"
+                onClick={() => {
+                  setOpen(false)
+                  // the menu is about to unmount: park focus on its button so a modal
+                  // opened by the action remembers it and gives it back on close
+                  buttonRef.current?.focus()
+                  onAction(item.action)
+                }}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>,
+          document.body,
+        )}
     </span>
   )
 }

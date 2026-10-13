@@ -175,7 +175,8 @@ async function type(input: HTMLInputElement, value: string) {
 
 async function openMenuItem(title: string, item: string) {
   await click(menuButton(rowOf(title))!)
-  await click(buttonByText(host, item))
+  // the popup is portalled to the body, outside the dialog
+  await click(buttonByText(document.body, item))
 }
 
 beforeEach(() => {
@@ -407,7 +408,9 @@ describe('S18 row menu', () => {
     expect(editor.closest('[role="option"]')).toBeNull()
     expect(editor.getAttribute('aria-label')).toBe('More actions for “Editor.docx”')
     await click(editor)
-    const items = Array.from(host.querySelectorAll('[role="menuitem"]')).map((i) => i.textContent)
+    const items = Array.from(document.body.querySelectorAll('[role="menuitem"]')).map(
+      (i) => i.textContent,
+    )
     expect(items).toEqual([en.uwDocRename, en.uwDocArchive])
     // no permanent delete anywhere in the dialog
     expect(host.textContent).not.toMatch(/delete/i)
@@ -501,9 +504,11 @@ describe('S18 row menu', () => {
     expect(archived.textContent).toContain(en.uwDocArchived)
     expect(archived.getAttribute('aria-disabled')).toBeNull()
     await click(menuButton(archived)!)
-    const items = Array.from(host.querySelectorAll('[role="menuitem"]')).map((i) => i.textContent)
+    const items = Array.from(document.body.querySelectorAll('[role="menuitem"]')).map(
+      (i) => i.textContent,
+    )
     expect(items).toEqual([en.uwDocRestore])
-    await click(buttonByText(host, en.uwDocRestore))
+    await click(buttonByText(document.body, en.uwDocRestore))
     expect(api.uniworkRestoreDocument).toHaveBeenCalledWith('m')
     expect(rowOf('Old.docx').textContent).not.toContain(en.uwDocArchived)
   })
@@ -521,14 +526,82 @@ describe('S18 row menu', () => {
     await render([row('e', 'Plan.docx', { canEdit: true, canManage: true })])
     const button = menuButton(rowOf('Plan.docx'))!
     await click(button)
-    const first = host.querySelector<HTMLElement>('[role="menuitem"]')!
+    const first = document.body.querySelector<HTMLElement>('[role="menuitem"]')!
     expect(document.activeElement).toBe(first)
     await key(first, 'ArrowDown')
     expect(document.activeElement?.textContent).toBe(en.uwDocArchive)
     await key(document.activeElement!, 'Escape')
-    expect(host.querySelector('[role="menu"]')).toBeNull()
+    expect(document.body.querySelector('[role="menu"]')).toBeNull()
     expect(document.activeElement).toBe(button)
     expect(onClose).not.toHaveBeenCalled()
+  })
+
+  describe('V17b-01: the popup is never clipped by the list', () => {
+    const innerHeight = window.innerHeight
+    afterEach(() => {
+      vi.restoreAllMocks()
+      window.innerHeight = innerHeight
+    })
+
+    // jsdom has no layout: pretend the "…" button sits at `top` in a 640px window and the popup is 80x160
+    const layout = (top: number) => {
+      window.innerHeight = 640
+      vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+        this: HTMLElement,
+      ) {
+        const menu = this.classList.contains('uw-row-menu-list')
+        const button = this.classList.contains('uw-row-menu-btn')
+        const box = menu
+          ? { top: 0, left: 0, width: 160, height: 80 }
+          : button
+            ? { top, left: 560, width: 28, height: 28 }
+            : { top: 0, left: 0, width: 0, height: 0 }
+        return {
+          ...box,
+          x: box.left,
+          y: box.top,
+          right: box.left + box.width,
+          bottom: box.top + box.height,
+          toJSON: () => ({}),
+        } as DOMRect
+      })
+    }
+
+    it('renders outside the scrolling list and the dialog, in the body', async () => {
+      layout(100)
+      await render([row('e', 'Plan.docx', { canEdit: true, canManage: true })])
+      await click(menuButton(rowOf('Plan.docx'))!)
+      const menu = document.body.querySelector<HTMLElement>('[role="menu"]')!
+      expect(menu.parentElement).toBe(document.body)
+      expect(menu.closest('.uw-pick-body, .uw-pick-list, .modal')).toBeNull()
+      expect(readFileSync(join(__dirname, '../src/renderer/src/home.css'), 'utf8')).toMatch(
+        /\.uw-row-menu-list\s*\{[^}]*position:\s*fixed/,
+      )
+    })
+
+    it('opens downward when there is room below the button', async () => {
+      layout(100)
+      await render([row('e', 'Plan.docx', { canEdit: true, canManage: true })])
+      await click(menuButton(rowOf('Plan.docx'))!)
+      const menu = document.body.querySelector<HTMLElement>('[role="menu"]')!
+      expect(menu.dataset.placement).toBe('down')
+      expect(menu.style.top).toBe('132px') // button bottom 128 + 4 gap
+      expect(menu.style.left).toBe('428px') // right edge of the button (588) minus the popup width
+    })
+
+    it('flips upward on a last row with no room below, keeping its focus behaviour', async () => {
+      layout(590)
+      await render([row('e', 'Plan.docx', { canEdit: true, canManage: true })])
+      const button = menuButton(rowOf('Plan.docx'))!
+      await click(button)
+      const menu = document.body.querySelector<HTMLElement>('[role="menu"]')!
+      expect(menu.dataset.placement).toBe('up')
+      expect(menu.style.top).toBe('506px') // button top 590 - 4 gap - 80 popup height
+      expect(document.activeElement).toBe(menu.querySelector('[role="menuitem"]'))
+      await key(document.activeElement!, 'Escape')
+      expect(document.body.querySelector('[role="menu"]')).toBeNull()
+      expect(document.activeElement).toBe(button)
+    })
   })
 })
 
@@ -543,6 +616,28 @@ describe('S18 archived row and archive confirm (FX4)', () => {
     expect(block('.uw-pick-row.disabled')).not.toMatch(/opacity/)
     // only the icon and the text are
     expect(block('.uw-pick-row.disabled > .uw-pick-row-text')).toMatch(/opacity:\s*0\.6/)
+  })
+
+  it('V17b-02: an archived row keeps its text at full opacity on the muted token', () => {
+    const css = readFileSync(join(__dirname, '../src/renderer/src/home.css'), 'utf8')
+    const block = (selector: string) =>
+      css.match(new RegExp(`${selector.replace(/[.>]/g, '\\$&')}\\s*\\{([^}]*)\\}`))?.[1] ?? ''
+    // declared after the .disabled dimming, same specificity, so it wins
+    expect(css.indexOf('.uw-pick-row.archived > .uw-pick-row-text')).toBeGreaterThan(
+      css.indexOf('.uw-pick-row.disabled > .uw-pick-row-text'),
+    )
+    expect(block('.uw-pick-row.archived > .uw-pick-row-text')).toMatch(/opacity:\s*1\s*;/)
+    expect(block('.uw-pick-row.archived .uw-pick-row-title')).toMatch(
+      /color:\s*var\(--text-muted\)/,
+    )
+  })
+
+  it('V17b-04: the active row has a ring only while focus is inside the list, not in the search', () => {
+    const css = readFileSync(join(__dirname, '../src/renderer/src/home.css'), 'utf8')
+    const block = (selector: string) =>
+      css.match(new RegExp(`${selector.replace(/[.>:\-]/g, '\\$&')}\\s*\\{([^}]*)\\}`))?.[1] ?? ''
+    expect(block('.uw-pick-row.active')).not.toMatch(/outline/)
+    expect(block('.uw-pick-item:focus-within > .uw-pick-row.active')).toMatch(/outline:/)
   })
 
   it('V17-02: an archived row says it is archived, never "not supported"', async () => {
@@ -564,7 +659,7 @@ describe('S18 archived row and archive confirm (FX4)', () => {
     // in the tab order although the row is never the highlighted one
     expect(button.tabIndex).toBe(0)
     await key(button, 'Enter')
-    const item = host.querySelector<HTMLElement>('[role="menuitem"]')!
+    const item = document.body.querySelector<HTMLElement>('[role="menuitem"]')!
     expect(item.textContent).toBe(en.uwDocRestore)
     expect(document.activeElement).toBe(item)
     await click(item)
