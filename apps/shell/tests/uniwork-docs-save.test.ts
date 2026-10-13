@@ -1456,8 +1456,13 @@ describe('a deferred sweep never erases the pre-store intent (R1-be-5)', () => {
     expect(binding(copyPath())).toMatchObject({ schema: 1, state: 'saving' })
     expect(binding(copyPath()).pendingIntent).toEqual(LEGACY)
 
-    // a save in that window must not mint a new intent or rewrite the binding
-    expect(await ctx.service.save(copyPath())).toMatchObject({ state: 'dirty' })
+    // a save in that window is refused with the store's reason and must not
+    // mint a new intent or rewrite the binding
+    expect(await ctx.service.save(copyPath())).toMatchObject({
+      state: 'error',
+      error: 'store_full',
+    })
+    expect(ctx.statuses.at(-1)).toMatchObject({ state: 'error', error: 'store_full' })
     expect(readFileSync(join(folder(), BINDING_FILE), 'utf8')).toBe(before.binding)
     expect(readFileSync(payloadPath(), 'utf8')).toBe(before.payload)
     expect(uploads(server)).toHaveLength(0)

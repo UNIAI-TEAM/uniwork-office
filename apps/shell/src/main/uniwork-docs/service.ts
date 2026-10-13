@@ -485,6 +485,25 @@ export class UniworkDocsService {
   }
 
   /**
+   * The refusal of a save the sweep still owns: the chip says why, but nothing
+   * is written - a binding write would stamp schema 2 and drop the plaintext
+   * intent. keystore_locked while the store is locked, store_full while it
+   * refused the intent write; the next store open retries the sweep either way.
+   */
+  private refuseMigration(doc: BoundDocument): UniworkDocStatus {
+    const status = toStatus({
+      ...doc,
+      binding: {
+        ...doc.binding,
+        state: 'error',
+        error: this.storeLocked() ? 'keystore_locked' : 'store_full',
+      },
+    })
+    this.publish(status)
+    return status
+  }
+
+  /**
    * The outcome of the last open decides the S11 picture: while the store is
    * locked, a working copy that still holds a pre-store intent is locked too
    * (it cannot be opened until the intent can move into the store); once it
@@ -756,6 +775,7 @@ export class UniworkDocsService {
     // a binding write here would drop the intent (the open retries the sweep)
     if (this.awaitingMigration(doc)) {
       void this.openSyncStore().catch(() => undefined)
+      this.refuseMigration(doc)
       return
     }
     void this.coordinator.save(path)
@@ -854,7 +874,7 @@ export class UniworkDocsService {
     if (!this.canSave(doc)) return this.statusOf(doc)
     // a copy whose pre-store intent the sweep has not moved yet is left alone:
     // a save would rewrite its binding and drop that intent (R1-be-5)
-    if (await this.holdForMigration(doc)) return this.statusOf(doc)
+    if (await this.holdForMigration(doc)) return this.refuseMigration(doc)
     const intent = await this.hasIntent(doc)
     if (intent === 'locked') {
       const refused = await this.coordinator.commitState(doc, {
@@ -959,7 +979,10 @@ export class UniworkDocsService {
     const latest = this.store.lookup(path)
     if (!latest || !this.canSave(latest)) return this.keepOpen(path)
     // the sweep still owns the copy's pre-store intent: nothing may be written
-    if (await this.holdForMigration(latest)) return this.keepOpen(path)
+    if (await this.holdForMigration(latest)) {
+      this.refuseMigration(latest)
+      return false
+    }
     const wait = this.waitForSettle(latest.path, CLOSE_SAVE_WAIT_MS)
     const notWritten = () => {
       if (!this.coordinator.isSaving(latest.path)) wait.cancel()
