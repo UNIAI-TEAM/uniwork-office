@@ -41,6 +41,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it, type TestContext } from 'vitest'
 import { createUniworkDocsClient, type UniworkDocsClient } from '../../src/main/uniwork-docs/client'
+import { errorFromResponse } from '../../src/main/uniwork-docs/errors'
 import { sha256Hex } from '../../src/main/uniwork-docs/formats'
 import type { UniworkDocFormat } from '../../src/shared/home-api'
 import { CapabilityCache } from '../../src/main/uniwork-sync/capability/cache'
@@ -102,6 +103,7 @@ interface LiveState {
     commit: SeededFileDocument
     dispatch: SeededFileDocument
     settle: SeededFileDocument
+    uploading: SeededFileDocument
     flagOff: SeededFileDocument
   }
   capabilities: LiveCapabilities
@@ -219,7 +221,7 @@ describe.skipIf(!LIVE)('G5-06 AC-4 live: real D server against the fork durable 
     const origin = LIVE_ORIGIN
     const api = createLiveApi(origin)
     const seed = await seedLiveRun(api, 0)
-    const [lookup, commit, dispatch, settle, flagOff] = await Promise.all([
+    const [lookup, commit, dispatch, settle, uploading, flagOff] = await Promise.all([
       seedFileDocument(origin, seed.token, seed.workspaceId, 'ac4-lookup.pdf', pdfBody('lookup')),
       seedFileDocument(origin, seed.token, seed.workspaceId, 'ac4-commit.pdf', pdfBody('commit')),
       seedFileDocument(
@@ -230,6 +232,13 @@ describe.skipIf(!LIVE)('G5-06 AC-4 live: real D server against the fork durable 
         pdfBody('dispatch'),
       ),
       seedFileDocument(origin, seed.token, seed.workspaceId, 'ac4-settle.pdf', pdfBody('settle')),
+      seedFileDocument(
+        origin,
+        seed.token,
+        seed.workspaceId,
+        'ac4-uploading.pdf',
+        pdfBody('uploading'),
+      ),
       seedFileDocument(origin, seed.token, seed.workspaceId, 'ac4-flagoff.pdf', pdfBody('flagoff')),
     ])
 
@@ -297,7 +306,7 @@ describe.skipIf(!LIVE)('G5-06 AC-4 live: real D server against the fork durable 
       origin,
       api,
       seed,
-      docs: { lookup, commit, dispatch, settle, flagOff },
+      docs: { lookup, commit, dispatch, settle, uploading, flagOff },
       capabilities,
       http,
       counters,
@@ -342,6 +351,15 @@ describe.skipIf(!LIVE)('G5-06 AC-4 live: real D server against the fork durable 
       '1: the server must never fake not_committed for a key it holds nothing for',
     ).not.toBe('not_committed')
     expect(lookup.outcome, '1: an unknown key can never read as committed').not.toBe('committed')
+
+    // the raw 410 the server actually sent maps to the client's `intent_unknown`
+    // (never the tombstone `deleted`): the D behaviour the lane's reconciling
+    // path depends on (packet residual Q1)
+    const mapped = errorFromResponse(raw.status, raw.body)
+    expect(mapped.code, '1: the live 410 commit_intent_unknown must map to intent_unknown').toBe(
+      'intent_unknown',
+    )
+    expect(mapped.code, '1: a commit-intent 410 is never the tombstone deleted').not.toBe('deleted')
   }, 60_000)
 
   it('2. commit with a key: a receipt, and the lookup reports the same version and revision', async () => {
@@ -471,7 +489,6 @@ describe.skipIf(!LIVE)('G5-06 AC-4 live: real D server against the fork durable 
 
     // the commit already landed server-side (a crash after the POST): do it
     // through the client, then leave a record at rest in `committing`
-    const start = snapshotCounters(s)
     const upload = await s.client.upload({
       documentId,
       bytes: pdfBody('ac4-settle-v2'),
@@ -487,6 +504,10 @@ describe.skipIf(!LIVE)('G5-06 AC-4 live: real D server against the fork durable 
     })
     expect(receipt.versionId, '5: the direct commit produced a version').toBeTruthy()
     const before = await listDocumentVersions(s.api, s.seed.token, documentId)
+    // the counters wrap only the dispatcher's client, and the direct upload and
+    // commit above went through the real `s.client` (uncounted): snapshot AFTER
+    // them so each delta below measures the settle pass alone (G5-06 stage FG)
+    const settleStart = snapshotCounters(s)
 
     const doc = makeQueueDoc({
       key: 'ac4-settle',
@@ -510,17 +531,17 @@ describe.skipIf(!LIVE)('G5-06 AC-4 live: real D server against the fork durable 
       '5: the pass must settle the at-rest record to committed by lookup',
     ).toBe('committed')
     expect(
-      delta(s.counters.lookup, start.lookup),
+      delta(s.counters.lookup, settleStart.lookup),
       '5: settling by lookup issues exactly one lookup',
     ).toBe(1)
     expect(
-      delta(s.counters.upload, start.upload),
-      '5: settling must never re-upload a byte (only the direct commit uploaded)',
-    ).toBe(1)
+      delta(s.counters.upload, settleStart.upload),
+      '5: settling must never re-upload a byte',
+    ).toBe(0)
     expect(
-      delta(s.counters.commit, start.commit),
+      delta(s.counters.commit, settleStart.commit),
       '5: settling must never issue a second commit',
-    ).toBe(1)
+    ).toBe(0)
 
     const after = await listDocumentVersions(s.api, s.seed.token, documentId)
     expect(after.count, '5: settling must not append a second version').toBe(before.count)
@@ -536,6 +557,77 @@ describe.skipIf(!LIVE)('G5-06 AC-4 live: real D server against the fork durable 
       }),
       '5: a committed intent is cleaned up from the store',
     ).toBeNull()
+  }, 120_000)
+
+  it('5b. an uploading record at rest for a never-received key re-sends the SAME key', async (context) => {
+    const s = live()
+    if (!s.capabilities.sync_write) {
+      skipStep(context, syncWriteOffNote('5b'))
+      return
+    }
+    const seeded = s.docs.uploading
+    const documentId = seeded.documentId
+    const key = `ac4-uploading-${randomUUID()}`
+
+    // the record is at rest in `uploading` but the server never received the
+    // key (no commit POST was made): a lookup would answer 410
+    // commit_intent_unknown, so the pass must requeue it with the SAME key and
+    // re-send it - 0 lookups, one upload, one commit, exactly one new version
+    const doc = makeQueueDoc({
+      key: 'ac4-uploading',
+      filename: 'ac4-uploading.pdf',
+      documentId,
+      orgId: s.seed.orgId,
+      workspaceId: s.seed.workspaceId,
+      baseRevision: seeded.revision,
+      baseVersion: seeded.currentVersion,
+      payload: pdfBody('ac4-uploading-v2'),
+      idempotencyKey: key,
+      state: 'uploading',
+    })
+    const written = await s.intents.put(doc.key, doc.record, doc.payload)
+    expect(written.kind, '5b: the at-rest record must be persisted').toBe('ok')
+    const before = await listDocumentVersions(s.api, s.seed.token, documentId)
+    const start = snapshotCounters(s)
+
+    const result = await s.dispatcher.dispatchAll([doc])
+    expect(
+      result.outcomes.get(doc.key),
+      '5b: the pass must re-send the uploading-at-rest record to committed',
+    ).toBe('committed')
+    expect(
+      delta(s.counters.lookup, start.lookup),
+      '5b: an uploading-at-rest record must never be settled by lookup (the server never received the key)',
+    ).toBe(0)
+    expect(
+      delta(s.counters.upload, start.upload),
+      '5b: the pass re-uploads the payload exactly once',
+    ).toBe(1)
+    expect(
+      delta(s.counters.commit, start.commit),
+      '5b: the pass commits exactly once with the same key',
+    ).toBe(1)
+
+    const after = await listDocumentVersions(s.api, s.seed.token, documentId)
+    expect(after.count, '5b: exactly one new version was appended').toBe(before.count + 1)
+    expect(
+      await s.intents.read(doc.key, {
+        orgId: doc.orgId,
+        workspaceId: doc.workspaceId,
+        baseVersion: doc.baseVersion,
+        length: doc.record.length,
+      }),
+      '5b: a committed intent is cleaned up from the store',
+    ).toBeNull()
+
+    const second = await s.dispatcher.dispatchAll([doc])
+    expect(second.dispatched, '5b: a second pass on a settled intent dispatches nothing').toBe(0)
+    const again = await listDocumentVersions(s.api, s.seed.token, documentId)
+    expect(again.count, '5b: a second pass must not append a version').toBe(after.count)
+    expect(
+      [...again.ids].sort(),
+      '5b: a second pass must leave the version list unchanged',
+    ).toEqual([...after.ids].sort())
   }, 120_000)
 
   it('6. lookup in_flight: needs a way to hold a claim open', async (context) => {
