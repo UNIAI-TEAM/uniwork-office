@@ -3,7 +3,7 @@ import QRCode from 'qrcode'
 import type { Lang } from '@genoffice/i18n'
 
 /** Production/staging host for the standalone UniAI PWA. */
-export const UNIAI_PWA_URL = 'https://uniwork.app/app'
+export const UNIAI_PWA_URL = 'https://uniworkos.com/app'
 
 function L(lang: Lang, vi: string, en: string): string {
   return lang === 'vi' ? vi : en

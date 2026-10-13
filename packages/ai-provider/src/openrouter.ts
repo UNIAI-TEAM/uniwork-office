@@ -38,7 +38,7 @@ export interface OpenRouterKeyStatus {
 export function openRouterAttributionHeaders(baseUrl?: string): Record<string, string> {
   if (!baseUrl?.includes('openrouter.ai')) return {}
   return {
-    'HTTP-Referer': 'https://uniwork.app',
+    'HTTP-Referer': 'https://uniworkos.com',
     'X-Title': 'UniWork Office',
   }
 }

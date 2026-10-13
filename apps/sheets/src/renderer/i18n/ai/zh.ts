@@ -52,7 +52,7 @@ export const zh = {
   aiTimeoutError: 'AI 请求超时：网络长时间无响应，已停止。请检查网络后重试',
   aiOverloadedError: 'AI 服务当前繁忙，请稍后重试',
   aiNetworkError: '网络有问题，无法连接 AI 服务。请检查网络后重试',
-  aiCreditsExhausted: 'UniWork 积分已用完，请前往 uniwork.app/pricing 充值后重试',
+  aiCreditsExhausted: 'UniWork 积分已用完，请前往 uniworkos.com/pricing 充值后重试',
   aiToolWorkbookContext: '读取工作表信息',
   aiToolReadRange: '读取范围',
   aiToolReadRangeOf: '读取范围 {range}',

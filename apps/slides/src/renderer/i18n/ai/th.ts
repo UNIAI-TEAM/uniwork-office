@@ -116,7 +116,7 @@ export const th = {
   aiErrNetwork:
     'เครือข่ายมีปัญหา ไม่สามารถเชื่อมต่อบริการ AI ได้ โปรดตรวจสอบการเชื่อมต่อแล้วลองใหม่',
   aiCreditsExhausted:
-    'เครดิต UniWork ของคุณหมดแล้ว โปรดเติมเครดิตที่ uniwork.app/pricing แล้วลองใหม่',
+    'เครดิต UniWork ของคุณหมดแล้ว โปรดเติมเครดิตที่ uniworkos.com/pricing แล้วลองใหม่',
   aiErrRequestFailed: 'ส่งคำขอไม่สำเร็จ: {msg}',
   aiErrGenerateFailed: 'สร้างไม่สำเร็จ',
   aiErrRegenFailed: 'ทำหน้าใหม่ไม่สำเร็จ',

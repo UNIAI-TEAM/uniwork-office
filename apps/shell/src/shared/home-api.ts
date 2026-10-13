@@ -750,7 +750,7 @@ export interface AccountStatus {
   org?: AccountOrg
   orgs?: AccountOrg[]
   entitlements?: AccountEntitlements | null
-  /** API origin of the active deployment profile (display only, e.g. "uniwork.app") */
+  /** API origin of the active deployment profile (display only, e.g. "uniworkos.com") */
   serverOrigin?: string
   /** full API origin of the active profile (prefills the server address field) */
   serverUrl?: string

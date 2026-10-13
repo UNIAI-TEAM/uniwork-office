@@ -118,7 +118,7 @@ export const pt = {
   aiNetworkError:
     'Problema de rede: não foi possível conectar ao serviço de IA. Verifique sua conexão e tente novamente',
   aiCreditsExhausted:
-    'Seus créditos UniWork acabaram. Recarregue em uniwork.app/pricing e tente novamente',
+    'Seus créditos UniWork acabaram. Recarregue em uniworkos.com/pricing e tente novamente',
   aiSumReadAttachment: 'Ler anexo',
   aiSumImageAttachment: 'Imagem anexada {name}',
   aiSumRead: 'Ler {name}',

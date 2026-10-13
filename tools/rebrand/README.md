@@ -168,7 +168,7 @@ scopes is in `office-g3g4/reports/go-a1/rebrand-table.md`; in short:
   linux `executableName`, deb / rpm `packageName`, maintainer / vendor, `desktopName`, `/opt/UniWork Office/...` in the post-install scripts,
   User-Agent token (`UniWorkOffice`).
 - **Vendor wording**: `Genspark` to `UniWork` in every locale (including `vi`), `Genspark AI` to `AI`, AI panel title `UniAI`,
-  credits top-up links to `uniwork.app`, generic AI badge instead of the Genspark sparkle (`GensparkMark` name kept for call sites).
+  credits top-up links to `uniworkos.com`, generic AI badge instead of the Genspark sparkle (`GensparkMark` name kept for call sites).
 - **Links**: only functional URLs remain (package homepage / repository, the updater download page, the PWA download links), all on
   `github.com/UNIAI-TEAM/uniwork-office`; the product UI shows no GitHub wording, repo link or star prompt. `drop-github-and-usage-strings`
   removes those string keys again after a sync, and the scan fails if they come back.

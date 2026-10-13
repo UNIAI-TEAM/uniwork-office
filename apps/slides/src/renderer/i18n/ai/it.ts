@@ -120,7 +120,7 @@ export const it = {
   aiErrNetwork:
     'Problema di rete: impossibile raggiungere il servizio IA. Controlla la connessione e riprova',
   aiCreditsExhausted:
-    'I tuoi crediti UniWork sono esauriti. Ricarica su uniwork.app/pricing e riprova',
+    'I tuoi crediti UniWork sono esauriti. Ricarica su uniworkos.com/pricing e riprova',
   aiErrRequestFailed: 'Invio della richiesta non riuscito: {msg}',
   aiErrGenerateFailed: 'Generazione non riuscita',
   aiErrRegenFailed: 'Rigenerazione della diapositiva non riuscita',

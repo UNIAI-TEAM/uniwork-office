@@ -117,7 +117,7 @@ export const ja = {
   aiErrNetwork:
     'ネットワークに問題があり、AI サービスに接続できません。接続を確認して再試行してください',
   aiCreditsExhausted:
-    'UniWorkクレジットを使い切りました。uniwork.app/pricing でチャージしてから再試行してください',
+    'UniWorkクレジットを使い切りました。uniworkos.com/pricing でチャージしてから再試行してください',
   aiErrRequestFailed: 'リクエストの送信に失敗しました: {msg}',
   aiErrGenerateFailed: '生成に失敗しました',
   aiErrRegenFailed: 'ページの再生成に失敗しました',
