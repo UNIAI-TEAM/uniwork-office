@@ -77,8 +77,10 @@ export function WorkbenchTabs({
     if (!el) return
     const onWheel = (e: WheelEvent) => {
       if (Math.abs(e.deltaY) <= Math.abs(e.deltaX) || el.scrollWidth <= el.clientWidth) return
+      const before = el.scrollLeft
       el.scrollLeft += e.deltaY
-      e.preventDefault()
+      // at either end the row cannot move: let the page scroll instead
+      if (el.scrollLeft !== before) e.preventDefault()
     }
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)

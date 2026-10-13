@@ -185,6 +185,35 @@ describe('Workbench tab row (one row, scrolls sideways)', () => {
     expect(wheel(30, 5)).toBe(false)
   })
 
+  it('a vertical wheel at either end of the row is left to the page', async () => {
+    await mount()
+    const scroller = host.querySelector<HTMLDivElement>('.wb-tabs-scroll')!
+    Object.defineProperty(scroller, 'scrollWidth', { value: 900, configurable: true })
+    Object.defineProperty(scroller, 'clientWidth', { value: 400, configurable: true })
+    // clamp like a browser: scrollLeft stays within 0..scrollWidth-clientWidth
+    let left = 0
+    Object.defineProperty(scroller, 'scrollLeft', {
+      configurable: true,
+      get: () => left,
+      set: (v: number) => {
+        left = Math.max(0, Math.min(500, v))
+      },
+    })
+    const wheel = (deltaY: number) => {
+      const e = new WheelEvent('wheel', { deltaY, cancelable: true })
+      scroller.dispatchEvent(e)
+      return e.defaultPrevented
+    }
+    expect(wheel(-40)).toBe(false) // already at the start
+    expect(wheel(40)).toBe(true)
+    expect(left).toBe(40)
+    left = 500
+    expect(wheel(40)).toBe(false) // already at the end
+    expect(left).toBe(500)
+    expect(wheel(-40)).toBe(true)
+    expect(left).toBe(460)
+  })
+
   it('CSS: the bar never wraps; the scroller hides its bar and keeps the underline on the border', () => {
     expect(rule('.wb-tabs')).not.toMatch(/flex-wrap/)
     const scroller = rule('.wb-tabs-scroll')
