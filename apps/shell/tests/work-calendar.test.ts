@@ -89,6 +89,16 @@ describe('groupAgenda', () => {
     ])
   })
 
+  it('orders a timed task by its due time, the time it shows', () => {
+    const at = (h: number) => new Date(2026, 9, 14, h, 0).toISOString()
+    const days = groupAgenda(
+      [ev('task', at(9), false, 'task', 'task', at(17)), ev('m10', at(10), false, 'meeting')],
+      from,
+      to,
+    )
+    expect(days.map((d) => d.events.map((e) => e.id))).toEqual([['m10', 'task']])
+  })
+
   it('keeps a row still running on the first day, drops what only the wider request brought in', () => {
     const days = groupAgenda(
       [

@@ -47,6 +47,11 @@ export function eventDay(e: WorkCalendarEvent): string | null {
   return localDayOf(e.start, e.all_day)
 }
 
+/** the time a row shows and sorts by: a timed task's due time, otherwise its start */
+export function rowTime(e: WorkCalendarEvent): string {
+  return e.kind === 'task' && e.end ? e.end : e.start
+}
+
 /** a non-task row that began before `from` and is still running on it (multi-day, or across midnight) */
 function runsInto(e: WorkCalendarEvent, from: string): boolean {
   if (e.kind === 'task' || !e.end) return false
@@ -55,8 +60,8 @@ function runsInto(e: WorkCalendarEvent, from: string): boolean {
 }
 
 /**
- * Days of [from, to] that have rows, in order; all-day rows first, then by start
- * time, then title. A row still running on `from` lands on `from`; anything else
+ * Days of [from, to] that have rows, in order; all-day rows first, then by rowTime,
+ * then title. A row still running on `from` lands on `from`; anything else
  * outside [from, to] (the extra request days, an overdue task) is dropped.
  */
 export function groupAgenda(
@@ -79,7 +84,7 @@ export function groupAgenda(
       .sort(
         (a, b) =>
           Number(b.all_day) - Number(a.all_day) ||
-          Date.parse(a.start) - Date.parse(b.start) ||
+          Date.parse(rowTime(a)) - Date.parse(rowTime(b)) ||
           a.title.localeCompare(b.title),
       ),
   }))

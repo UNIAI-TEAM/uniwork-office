@@ -4,7 +4,7 @@ import type { WorkCalendarEvent, WorkWebTarget } from '../../shared/uniwork-work
 import { useI18n, type StringKey } from './locale'
 import { MEETING_TINT, MODULE_TONES, tintStyle, type Tint } from './module-tones'
 import { useWorkLoad } from './work-cache'
-import { agendaRange, agendaRequest, groupAgenda } from './work-calendar'
+import { agendaRange, agendaRequest, groupAgenda, rowTime } from './work-calendar'
 import { clock, formatDay } from './work-home'
 import { localIsoDate } from './work-tasks'
 import { WorkNoWorkspace, WorkStaleNote, workLoadState, type WorkPaneProps } from './WorkErrorState'
@@ -115,8 +115,6 @@ export function WorkCalendarPane({
             <ul>
               {rows.map((e) => {
                 const kind = kindOf(e)
-                // a timed task shows its due time, anything else its start
-                const at = e.kind === 'task' && e.end ? e.end : e.start
                 return (
                   <li key={e.id}>
                     <button
@@ -136,7 +134,7 @@ export function WorkCalendarPane({
                         <KindIcon kind={kind} />
                       </span>
                       <span className="wb-agenda-time">
-                        {e.all_day ? t('wbCalAllDay') : clock(at, dateLocale)}
+                        {e.all_day ? t('wbCalAllDay') : clock(rowTime(e), dateLocale)}
                       </span>
                       <span className="wb-agenda-title">{e.title}</span>
                     </button>
