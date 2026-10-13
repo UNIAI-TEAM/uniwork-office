@@ -780,7 +780,11 @@ describe('G506-be-3: only a failed feed round trip reports the queue offline', (
   }
 
   it('a pass with no org to feed (nothing attempted) reports no verdict', async () => {
-    const { runtime, polls } = pollRuntime([], async () => ({ ...PAGE, changes: [], nextCursor: 'c1' }))
+    const { runtime, polls } = pollRuntime([], async () => ({
+      ...PAGE,
+      changes: [],
+      nextCursor: 'c1',
+    }))
     await runtime.tick()
     // neither online nor offline: nothing was attempted
     expect(polls).toHaveLength(1)

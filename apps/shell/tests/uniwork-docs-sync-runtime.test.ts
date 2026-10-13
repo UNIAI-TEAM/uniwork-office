@@ -249,5 +249,4 @@ describe('G506-be-3: the queue online verdict is a real transport result, not a 
     expect(state.parked).toBe(false)
     expect(state.dispatched).toBe(1)
   })
-
 })
