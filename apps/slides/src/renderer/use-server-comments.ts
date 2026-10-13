@@ -90,7 +90,7 @@ export function useServerComments(o: ServerCommentsOptions): ServerComments {
         slides: () => slidesRef.current,
         goTo: (index, sourceId) => optsRef.current.goTo(index, sourceId),
       }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // the deck is read through the ref; only its order decides a new adapter
     [slideOrder],
   )
   const controller = useCollabThreads(source, host, { adapter, strings })

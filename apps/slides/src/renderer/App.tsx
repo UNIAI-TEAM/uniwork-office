@@ -110,6 +110,7 @@ import {
   commentsBridge,
   loadCommentsContext,
   selectedObjectId,
+  wantsServerComments,
   type SlidesCommentsContext,
   type SlidesCommentsContextApi,
 } from './server-comments'
@@ -524,7 +525,7 @@ export function App() {
   const [commentsContext, setCommentsContext] = useState<SlidesCommentsContext | null>(null)
   const commentsBridgeApi = useMemo(() => commentsBridge(), [])
   useEffect(() => {
-    if (!path || !uniwork.bound || !commentsBridgeApi) {
+    if (!path || !wantsServerComments(path, uniwork.bound, commentsBridgeApi)) {
       setCommentsContext(null)
       return
     }

@@ -174,6 +174,18 @@ export function commentsBridge(): UniworkCommentsApi | null {
 }
 
 /**
+ * Server mode needs a bound working copy AND the shell's bridge; anything else (a local file, a
+ * signed-out / standalone build) keeps the local pane and its p:cm behaviour unchanged.
+ */
+export function wantsServerComments(
+  path: string | null | undefined,
+  bound: boolean,
+  bridge: UniworkCommentsApi | null,
+): boolean {
+  return !!path && bound && bridge !== null
+}
+
+/**
  * What the editor needs to know about a bound document. The fields beyond `documentId` come from the
  * shell: `versionId` is the version the editor has open (or just saved) and is required to start a
  * new anchored thread (`base_version_id`); `userId` lets the panel recognise "mine"; `level` is the
@@ -209,12 +221,10 @@ export async function loadCommentsContext(
     documentId: path,
     level: readOnly ? 'view' : 'edit',
   }
-  let ctx: SlidesCommentsContext | null = null
-  try {
-    ctx = (await api?.uniworkCommentsContext?.()) ?? null
-  } catch {
-    ctx = null
-  }
+  const ctx = await Promise.resolve(api?.uniworkCommentsContext?.()).then(
+    (c) => c ?? null,
+    () => null,
+  )
   if (!ctx || typeof ctx.documentId !== 'string' || ctx.documentId === '') return fallback
   return {
     documentId: ctx.documentId,
