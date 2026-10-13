@@ -273,9 +273,7 @@ function requireName(raw: string): string {
  * themselves (`name_empty` / `name_taken`) so the renderer can show them at the
  * field, and a server 409 `conflict` (a duplicate name) becomes `name_taken`.
  */
-async function actionResult<T>(
-  run: () => Promise<T>,
-): Promise<UniworkDocActionResult<T>> {
+async function actionResult<T>(run: () => Promise<T>): Promise<UniworkDocActionResult<T>> {
   try {
     return { ok: true, value: await run() }
   } catch (error) {
@@ -1139,7 +1137,10 @@ export class UniworkDocsService {
    * server is the real gate, but the person has no such action, so main does not
    * even try). The current revision is read first because PATCH requires it.
    */
-  renameDocument(documentId: string, name: string): Promise<UniworkDocActionResult<UniworkDocSummary>> {
+  renameDocument(
+    documentId: string,
+    name: string,
+  ): Promise<UniworkDocActionResult<UniworkDocSummary>> {
     return actionResult(async () => {
       if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
       if (typeof documentId !== 'string' || !documentId) throw new UniworkDocError('not_found')
@@ -1176,14 +1177,13 @@ export class UniworkDocsService {
   }
 
   /** the workspace/folder a create or upload targets, validated before any call */
-  private docTarget(input: {
-    workspaceId?: unknown
-    folderId?: unknown
-  }): { workspaceId: string; folderId: string | null } {
+  private docTarget(input: { workspaceId?: unknown; folderId?: unknown }): {
+    workspaceId: string
+    folderId: string | null
+  } {
     const workspaceId = typeof input.workspaceId === 'string' ? input.workspaceId : ''
     if (!workspaceId) throw new UniworkDocError('not_found')
-    const folderId =
-      typeof input.folderId === 'string' && input.folderId ? input.folderId : null
+    const folderId = typeof input.folderId === 'string' && input.folderId ? input.folderId : null
     return { workspaceId, folderId }
   }
 
@@ -1208,7 +1208,9 @@ export class UniworkDocsService {
   }
 
   private newIdempotencyKey(): string {
-    return this.deps.now ? `uniwork-doc-${this.deps.now()}-${randomUUID()}` : `uniwork-doc-${randomUUID()}`
+    return this.deps.now
+      ? `uniwork-doc-${this.deps.now()}-${randomUUID()}`
+      : `uniwork-doc-${randomUUID()}`
   }
 
   /**

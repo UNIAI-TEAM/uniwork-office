@@ -144,7 +144,10 @@ async function pickUploadFile(
     title: tUniworkDocs(wiring.lang(), 'uploadPickTitle'),
     properties: ['openFile'],
     filters: [
-      { name: tUniworkDocs(wiring.lang(), 'uploadPickDocuments'), extensions: ['docx', 'xlsx', 'pptx', 'pdf', 'md', 'html'] },
+      {
+        name: tUniworkDocs(wiring.lang(), 'uploadPickDocuments'),
+        extensions: ['docx', 'xlsx', 'pptx', 'pdf', 'md', 'html'],
+      },
       { name: tUniworkDocs(wiring.lang(), 'uploadPickAll'), extensions: ['*'] },
     ],
   }

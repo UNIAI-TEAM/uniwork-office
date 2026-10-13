@@ -238,8 +238,7 @@ export type UniworkDocNameError = 'name_empty' | 'name_taken'
  */
 export type UniworkDocActionError = UniworkDocErrorCode | UniworkDocNameError
 export type UniworkDocActionResult<T> =
-  | { ok: true; value: T }
-  | { ok: false; error: UniworkDocActionError }
+  { ok: true; value: T } | { ok: false; error: UniworkDocActionError }
 
 /** the formats the New document dialog offers (D accepts more; these three are the Office ones) */
 export type UniworkDocNewFormat = 'docx' | 'xlsx' | 'pptx'
@@ -730,13 +729,9 @@ export interface HomeApi {
     name: string,
   ): Promise<UniworkDocActionResult<UniworkDocSummary>>
   /** S18: archive a document (never a hard delete) */
-  uniworkArchiveDocument(
-    documentId: string,
-  ): Promise<UniworkDocActionResult<UniworkDocSummary>>
+  uniworkArchiveDocument(documentId: string): Promise<UniworkDocActionResult<UniworkDocSummary>>
   /** S18: restore an archived document */
-  uniworkRestoreDocument(
-    documentId: string,
-  ): Promise<UniworkDocActionResult<UniworkDocSummary>>
+  uniworkRestoreDocument(documentId: string): Promise<UniworkDocActionResult<UniworkDocSummary>>
   /** the folders of one workspace, for the create/upload "Location" field */
   uniworkListFolders(workspaceId: string): Promise<UniworkResult<UniworkDocFolderRef[]>>
   /** a document was renamed (here or elsewhere); returns an unsubscribe */

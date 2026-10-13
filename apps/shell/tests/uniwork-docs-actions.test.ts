@@ -118,7 +118,12 @@ function fakeServer(
       const form = init.body as FormData
       const file = form.get('file') as File
       const bytes = new Uint8Array(await file.arrayBuffer())
-      call.body = { title: form.get('title'), parent_id: form.get('parent_id'), name: file.name, bytes }
+      call.body = {
+        title: form.get('title'),
+        parent_id: form.get('parent_id'),
+        name: file.name,
+        bytes,
+      }
       const id = `up_${++seq}`
       state.documents.set(id, { title: file.name, bytes })
       return json(201, { document: { ...docJson(id), title: file.name } })
@@ -166,7 +171,11 @@ function fakeServer(
       if (options.nameTaken) return envelope(409, 'conflict')
       if (body.revision !== String(state.revision)) {
         return json(422, {
-          error: { code: 'revision_conflict', message: 'x', fields: { current_revision: String(state.revision) } },
+          error: {
+            code: 'revision_conflict',
+            message: 'x',
+            fields: { current_revision: String(state.revision) },
+          },
         })
       }
       state.title = body.title

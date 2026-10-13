@@ -102,11 +102,7 @@ export interface UniworkDocsClient {
     idempotencyKey: string
   }): Promise<UniworkDocSummary>
   /** rename a document (S18); the server compares `revision` and may answer a conflict */
-  rename(input: {
-    documentId: string
-    revision: string
-    title: string
-  }): Promise<UniworkDocSummary>
+  rename(input: { documentId: string; revision: string; title: string }): Promise<UniworkDocSummary>
   /** archive a document (S18); there is no hard-delete route */
   archive(documentId: string, idempotencyKey: string): Promise<UniworkDocSummary>
   /** restore an archived document (S18) */

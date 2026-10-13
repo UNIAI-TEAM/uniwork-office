@@ -158,16 +158,18 @@ export function createStoreDocCache(options: StoreDocCacheOptions): DocCache {
     async applyPage(changes: readonly FeedChange[]) {
       const state = await load()
       if (!state) return UNAVAILABLE
+      const applied: string[] = []
       for (const change of changes) {
         const known = state.docs[change.documentId]
         // an older revision never overwrites a newer one, so a replay is inert
         if (known && compareRevision(change.revision, known.revision) <= 0) continue
         state.docs[change.documentId] = change
+        applied.push(change.documentId)
       }
       const listed = new Set(state.index)
       for (const change of changes) listed.add(change.documentId)
       state.index = [...listed]
-      return commit(state)
+      return { ...(await commit(state)), applied }
     },
 
     async reconcile(ids: ReadonlySet<string>, { keepDrafts }) {
@@ -376,7 +378,15 @@ export class SyncRuntime {
     return {
       async applyPage(changes) {
         const commit = await cache.applyPage(changes)
-        if (commit.kind === 'ok') for (const change of changes) notify(change)
+        // only a document whose row this commit changed is announced: a replayed
+        // page (a snapshot that lists documents the cache already holds) is inert
+        if (commit.kind === 'ok' && commit.applied) {
+          const byId = new Map(changes.map((change) => [change.documentId, change]))
+          for (const documentId of commit.applied) {
+            const change = byId.get(documentId)
+            if (change) notify(change)
+          }
+        }
         return commit
       },
       reconcile: (ids, options) => cache.reconcile(ids, options),

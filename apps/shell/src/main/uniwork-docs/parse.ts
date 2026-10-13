@@ -108,10 +108,7 @@ function summaryFlags(row: Record<string, unknown>): {
 }
 
 /** one list row as the renderer's summary (title is the only name the server sends) */
-function summaryRow(
-  row: Record<string, unknown>,
-  workspaceId: string,
-): UniworkDocSummary {
+function summaryRow(row: Record<string, unknown>, workspaceId: string): UniworkDocSummary {
   const title = str(row.title)
   return {
     id: str(row.id, 128),
@@ -387,8 +384,7 @@ export function parseDocumentSummary(raw: unknown): UniworkDocSummary {
     updatedAt: typeof doc.updated_at === 'string' ? doc.updated_at.slice(0, 64) : '',
     canEdit: level === 'edit' || level === 'manage',
     canManage: level === 'manage',
-    archived:
-      typeof doc.archived_at === 'string' && doc.archived_at.length > 0,
+    archived: typeof doc.archived_at === 'string' && doc.archived_at.length > 0,
   }
 }
 
