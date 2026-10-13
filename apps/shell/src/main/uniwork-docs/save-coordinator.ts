@@ -6,11 +6,7 @@ import type { UniworkDocsClient } from './client'
 import { UniworkDocError, isTerminalRefusal } from './errors'
 import { sha256Hex } from './formats'
 import type { CommitReceipt, DocumentDetail } from './parse'
-import type {
-  IntentBindFacts,
-  IntentRecordV2,
-  IntentStore,
-} from '../uniwork-sync/intent-store'
+import type { IntentBindFacts, IntentRecordV2, IntentStore } from '../uniwork-sync/intent-store'
 import { isTerminalQueueState } from '../uniwork-sync/queue/record'
 import type {
   QueueCapabilityRead,
@@ -596,12 +592,14 @@ export class SaveCoordinator {
 
   /**
    * Overwrite / Reload / "Luu lai": the old intent is superseded BEFORE a new
-   * one is minted (EXPERIENCE - Superseded, :239-242).
+   * one is minted (EXPERIENCE - Superseded, :239-242). A superseded record is
+   * terminal, so it never moves the chip itself (see publishQueueState).
    */
   async supersede(doc: QueueDoc): Promise<void> {
-    if (!this.deps.dispatcher) return
-    const state = await this.deps.dispatcher.supersede(doc)
-    this.publishQueueState(doc, state)
+    // a superseded record is always terminal: the machine never moves it to a
+    // chip state, and the caller's Overwrite / Reload is what the binding shows
+    // next. So this never publishes (publishQueueState would drop it anyway).
+    await this.deps.dispatcher?.supersede(doc)
   }
 
   /** "Kiem tra lai" (check again): a lookup of the intent only, never a new attempt */
@@ -632,9 +630,11 @@ export class SaveCoordinator {
   private publishQueueState(doc: QueueDoc, state: IntentRecordV2['state']): void {
     const bound = this.deps.store.lookup(doc.path)
     if (!bound) return
-    this.deps.publish(
-      toStatus({ ...bound, binding: { ...bound.binding, state: state as Binding['state'] } }),
-    )
+    // a terminal record is spent: its state is not a chip state, and the front's
+    // own settle/supersede already moved the binding (never write `cancelled`)
+    const chip = queueChipState(state)
+    if (!chip) return
+    this.deps.publish(toStatus({ ...bound, binding: { ...bound.binding, state: chip } }))
   }
 
   /**
@@ -671,6 +671,17 @@ function errorForState(state: IntentRecordV2['state']): Binding['error'] | undef
   if (state === 'paused_admin') return 'capability_off'
   if (state === 'paused_offline') return 'network'
   return undefined
+}
+
+/**
+ * The chip state a queue record maps onto, or null for a record that must not
+ * move the binding: a committed/cancelled record is spent. The three in-flight
+ * states read as the umbrella `saving`.
+ */
+export function queueChipState(state: IntentRecordV2['state']): Binding['state'] | null {
+  if (state === 'committed' || state === 'cancelled') return null
+  if (state === 'validating' || state === 'uploading' || state === 'committing') return 'saving'
+  return state as Binding['state']
 }
 
 export { QUEUE_LIMITS }

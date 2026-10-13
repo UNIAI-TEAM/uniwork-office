@@ -214,6 +214,14 @@ export interface SyncRuntimeOptions {
   clock: { now(): number }
   /** a capability or feed 401: hand the session its chance to re-evaluate */
   onSessionExpired?(): void
+  /**
+   * Runs after every pass (sign-in and each interval tick), for the durable
+   * save queue the same poll drives: `online` is the pass's connectivity
+   * (false when a capability or feed round trip failed, true when the pass
+   * reached the server). It dispatches the pending intents and advances their
+   * reconciling clocks. Awaited, so a slow dispatch cannot overlap the next pass.
+   */
+  onPoll?(online: boolean): Promise<void>
   intervalMs?: number
   /** test seam: schedule `run` on the interval, return the cancel */
   schedule?(run: () => void): () => void
@@ -278,6 +286,15 @@ export class SyncRuntime {
     return run
   }
 
+  /**
+   * The org capability read of this runtime (the per-account cache the save
+   * queue's lane verdicts share, so a `sync_write` flag is read once per
+   * account and cleared on a switch for both callers).
+   */
+  capabilityRead(orgId: string): Promise<CapabilityRead> {
+    return this.options.capability(orgId)
+  }
+
   private async run(): Promise<void> {
     const generation = this.generation
     const current = () => this.generation === generation
@@ -285,6 +302,8 @@ export class SyncRuntime {
     const client = this.options.client()
     if (!scope || !client) {
       if (current()) this.running.clear()
+      // no session to reach the server: the queue's intents wait where they are
+      await this.options.onPoll?.(false)
       return
     }
     const open = await this.options.store.open()
@@ -292,8 +311,11 @@ export class SyncRuntime {
     if (open.kind !== 'ok') {
       // no feed without the store: a cursor cannot move without its record
       this.running.clear()
+      await this.options.onPoll?.(false)
       return
     }
+    /** whether this pass reached the server at least once (capability or feed) */
+    let reachedServer = false
 
     const wanted = new Set<string>()
     let sessionExpired = false
@@ -301,6 +323,7 @@ export class SyncRuntime {
       if (!current()) return
       const capability = await this.options.capability(orgId)
       if (!current()) return
+      reachedServer = true
       if (capability.kind === 'session_expired') sessionExpired = true
       this.capabilities.set(orgId, capability.capabilities)
       if (!capability.capabilities.sync_feed) continue
@@ -327,6 +350,7 @@ export class SyncRuntime {
       if (!wanted.has(key)) this.running.delete(key)
     }
     if (sessionExpired) this.options.onSessionExpired?.()
+    await this.options.onPoll?.(reachedServer)
   }
 
   private consumerFor(
