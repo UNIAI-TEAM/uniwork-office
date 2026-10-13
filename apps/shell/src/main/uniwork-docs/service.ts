@@ -38,6 +38,7 @@ import {
   type Binding,
   BindingStore,
   type BoundDocument,
+  docLevelOf,
   documentNameIn,
   hasLegacyIntentFiles,
   type LastOwner,
@@ -56,6 +57,7 @@ import {
 } from './formats'
 import { pathKey } from '../../shared/path-key'
 import { LaunchController } from './launch'
+import type { CommentsContextResult } from '@genoffice/electron-utils/comments-ipc'
 import { actionFlags, type DocumentDetail, type LaunchDescriptor } from './parse'
 import { SaveCoordinator, toStatus, type IntentAccess } from './save-coordinator'
 import type { SyncStoreAccess, SyncStoreOpen } from '../uniwork-sync/session-store'
@@ -202,6 +204,12 @@ export interface UniworkDocsServiceDeps {
    * test installs none and the reveal is dropped.
    */
   revealComment?(path: string, commentId: string): void
+  /**
+   * G8-12: a Save of `path` settled with a commit; `versionId` is the server
+   * version the editor's comment anchors now refer to. Optional (read at push
+   * time): a standalone app or a test installs none.
+   */
+  notifySaved?(path: string, versionId: string): void
   /** test seam: replaces the HTTP client */
   client?: UniworkDocsClient
   sleep?(ms: number): Promise<void>
@@ -360,6 +368,22 @@ function accessFor(level: string | null): UniworkDocAccess {
 }
 
 /**
+ * G8-12: what a document read tells a binding for the comments seam: the
+ * caller's level, and the server version id of the base bytes when the base is
+ * the version that read describes (a binding on another version keeps its own).
+ */
+function withServerContext(binding: Binding, detail: DocumentDetail): Binding {
+  const next = { ...binding }
+  const level = docLevelOf(detail.myLevel)
+  if (level) next.level = level
+  else delete next.level
+  if (detail.file.versionId && next.baseVersion === detail.file.version) {
+    next.baseVersionId = detail.file.versionId
+  }
+  return next
+}
+
+/**
  * The core semver of a version string: `0.11.0-dev.3` -> `0.11.0` (build
  * metadata after `+` goes too). OQ-P4: `min_app_version` is display metadata,
  * so a prerelease build must not stamp its tail - the store gate reads
@@ -449,6 +473,7 @@ export class UniworkDocsService {
       ownsBinding: (doc) => this.owns(doc),
       intents: () => this.intentAccess(),
       publish: (status) => this.publish(status),
+      onSaved: (doc, versionId) => this.deps.notifySaved?.(doc.path, versionId),
       ...(deps.sleep ? { sleep: deps.sleep } : {}),
     })
     this.launch = new LaunchController({
@@ -1943,6 +1968,23 @@ export class UniworkDocsService {
     }
   }
 
+  /**
+   * G8-12: the comments context of the bound copy at `path` - everything comes
+   * from the binding and the session, nothing from the renderer. null when the
+   * path is not a copy of the signed-in account (no request is made for it).
+   */
+  commentContext(path: string): CommentsContextResult | null {
+    const doc = this.store.lookup(path)
+    if (!doc || !this.owns(doc)) return null
+    const b = doc.binding
+    return {
+      documentId: b.documentId,
+      versionId: b.baseVersionId ?? null,
+      ...(b.level ? { level: b.level } : {}),
+      myUserId: doc.userId,
+    }
+  }
+
   // ---- flows -----------------------------------------------------------------
 
   /** "Save my version as the newest version": a new intent on the server's revision */
@@ -1983,7 +2025,7 @@ export class UniworkDocsService {
     await this.store.writeWorkingCopy(doc.dir, doc.binding.filename, bytes)
     // the local work (and its intent) is discarded: nothing is left to replay
     await this.dropIntent(doc)
-    const next: Binding = {
+    const fresh: Binding = {
       ...doc.binding,
       title: detail.title,
       access: accessFor(detail.myLevel),
@@ -1992,6 +2034,9 @@ export class UniworkDocsService {
       baseChecksum: sha256Hex(bytes),
       state: 'saved',
     }
+    // the base moved: the old version id must not survive an unknown new one
+    delete fresh.baseVersionId
+    const next = withServerContext(fresh, detail)
     delete next.error
     delete next.serverRevision
     const done = await this.coordinator.commitState(doc, next)
@@ -2078,7 +2123,10 @@ export class UniworkDocsService {
           // permissions come from the server: a save refused with 403 left the
           // copy view-only; once the server grants edit again, its local work
           // can be saved (dirty), otherwise it stays view-only
-          const binding: Binding = { ...existing, title: detail.title, access }
+          const binding: Binding = withServerContext(
+            { ...existing, title: detail.title, access },
+            detail,
+          )
           if (existing.state === 'blocked' && existing.error === 'forbidden' && access === 'edit') {
             binding.state = 'dirty'
             delete binding.error
@@ -2142,23 +2190,26 @@ export class UniworkDocsService {
       (stale ? null : existing?.filename) ?? workingCopyName(base.title, base.file.filename, format)
     const path = await this.store.writeWorkingCopy(dir, filename, bytes)
     if (stale && stale !== filename) await this.store.removeWorkingCopy(dir, stale)
-    const binding: Binding = {
-      schema: 2,
-      documentId,
-      workspaceId,
-      orgId,
-      title: base.title,
-      filename,
-      format,
-      access,
-      baseRevision: viewTicket ? launch.revision : base.revision,
-      baseVersion: viewTicket ? launch.version : base.file.version,
-      baseChecksum: sha256Hex(bytes),
-      state: 'ready',
-      minStoreLevel: APP_STORE_LEVEL,
-      minAppVersion: this.buildVersion(),
-      ...(existing?.lastSavedAt ? { lastSavedAt: existing.lastSavedAt } : {}),
-    }
+    const binding: Binding = withServerContext(
+      {
+        schema: 2,
+        documentId,
+        workspaceId,
+        orgId,
+        title: base.title,
+        filename,
+        format,
+        access,
+        baseRevision: viewTicket ? launch.revision : base.revision,
+        baseVersion: viewTicket ? launch.version : base.file.version,
+        baseChecksum: sha256Hex(bytes),
+        state: 'ready',
+        minStoreLevel: APP_STORE_LEVEL,
+        minAppVersion: this.buildVersion(),
+        ...(existing?.lastSavedAt ? { lastSavedAt: existing.lastSavedAt } : {}),
+      },
+      base,
+    )
     // a refused write is never ignored, exactly as in the branch above: the
     // copy then reads as the binding that persisted, not the refused one
     const written = await this.store.write(dir, binding)

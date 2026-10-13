@@ -74,6 +74,12 @@ export interface SaveCoordinatorDeps {
   intents(): Promise<IntentAccess>
   /** status push for every state change */
   publish(status: UniworkDocStatus): void
+  /**
+   * G8-12: a Save of `doc` settled with a commit and the binding now names the
+   * server version `versionId` (the comments anchor base). Never called for a
+   * failed, conflicted or no-op Save.
+   */
+  onSaved?(doc: BoundDocument, versionId: string): void
   now?(): Date
   uuid?(): string
   sleep?(ms: number): Promise<void>
@@ -251,7 +257,7 @@ export class SaveCoordinator {
   private async settle(
     doc: BoundDocument,
     intent: PendingIntentRecord,
-    landed: { revision: string; version: number },
+    landed: { revision: string; version: number; versionId?: string },
     intents: IntentStore,
   ): Promise<BoundDocument> {
     let current: string | null
@@ -270,8 +276,15 @@ export class SaveCoordinator {
       lastSavedAt: this.now().toISOString(),
     })
     delete settled.serverRevision
+    // the comments anchor base moves with the base version; an unknown id is
+    // dropped rather than left naming the previous version
+    if (landed.versionId) settled.baseVersionId = landed.versionId
+    else delete settled.baseVersionId
     const done = await this.commitState(doc, settled)
     await intents.delete(doc.key)
+    if (landed.versionId && done.binding.baseVersionId === landed.versionId) {
+      this.deps.onSaved?.(done, landed.versionId)
+    }
     return done
   }
 
@@ -298,7 +311,11 @@ export class SaveCoordinator {
       return this.settle(
         doc,
         intent,
-        { revision: detail.revision, version: detail.file.version },
+        {
+          revision: detail.revision,
+          version: detail.file.version,
+          ...(detail.file.versionId ? { versionId: detail.file.versionId } : {}),
+        },
         intents,
       )
     }
@@ -372,6 +389,7 @@ export class SaveCoordinator {
           state: 'blocked',
           error: 'forbidden',
           access: 'view',
+          ...(base.level ? { level: 'view' as const } : {}),
         })
       case 'quota_exceeded':
       case 'not_found':
