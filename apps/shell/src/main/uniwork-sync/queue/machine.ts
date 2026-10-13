@@ -9,8 +9,8 @@ import {
 
 /**
  * The pure state machine of one save intent. Everything the queue does to a
- * record is a `transition` over an event, so the whole EXPERIENCE › State
- * Patterns behaviour (Ctrl/⌘+S table, Queue rows, blocked reasons, capability
+ * record is a `transition` over an event, so the whole EXPERIENCE â€º State
+ * Patterns behaviour (Ctrl/âŒ˜+S table, Queue rows, blocked reasons, capability
  * off) is one table with no I/O: the dispatcher (W4) performs the effects and
  * persists the returned record.
  *
@@ -163,7 +163,7 @@ const CANCELLABLE = new Set<QueueState>([
   'conflict',
 ])
 
-/** Overwrite/Reload/"Lưu lại" replace the intent; in-flight or stuck ones are never superseded */
+/** Overwrite/Reload/"LÆ°u láº¡i" replace the intent; in-flight or stuck ones are never superseded */
 const SUPERSEDABLE = new Set<QueueState>([
   'queued',
   'paused_offline',
@@ -224,7 +224,7 @@ function createFromSave(
   ctx: QueueContext,
 ): IntentRecordV2 | null {
   if (!input) return null
-  // offline wins over a known-off capability (Ctrl/⌘+S while the capability is
+  // offline wins over a known-off capability (Ctrl/âŒ˜+S while the capability is
   // past its TTL and there is no network is `paused_offline`, not `paused_admin`)
   const state: QueueState =
     ctx.online === false
@@ -340,6 +340,10 @@ function onCommitFailed(
     // "unknown" is never queued: the outcome cannot be proven either way
     return { record: enterStuck(record, ctx), effects: [] }
   }
+  if (error === 'other_window') {
+    // another window owns the document lock: read-only, the intent stays
+    return { record: withState(record, ctx, 'paused_offline', { retryAt: undefined }), effects: [] }
+  }
   if (error === 'ticket_expired') {
     // the upload claim expired: look the intent up before touching bytes again
     return { record: enterReconciling(record, ctx), effects: [] }
@@ -355,7 +359,7 @@ function onCommitFailed(
   }
   if (record.state === 'reconciling-stuck') return { record: record, effects: [] }
   if (ctx.online === false || error === 'network') {
-    // unreachable with an intent is `paused_offline` (EXPERIENCE › Save pill)
+    // unreachable with an intent is `paused_offline` (EXPERIENCE â€º Save pill)
     return {
       record: withState(record, ctx, 'paused_offline', { retryAt: undefined }),
       effects: [],

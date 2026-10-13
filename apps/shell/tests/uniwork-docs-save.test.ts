@@ -648,7 +648,16 @@ describe('save pipeline', () => {
     expect(status).toMatchObject({ state: 'conflict', error: 'conflict' })
     expect(readFileSync(path, 'utf8')).toBe('mine')
     expect(binding(path)).toMatchObject({ baseRevision: '41', serverRevision: '45' })
-    expect(await intentOf(ctx, path)).toBeNull()
+    // the contract keeps the intent on a base conflict: the same record and
+    // key survive (with the queue wired the record reads 'conflict'; the front
+    // keeps THIS one, never a second intent)
+    const conflicted = await intentOf(ctx, path)
+    expect(conflicted?.intent).toMatchObject({
+      documentId: DOC,
+      baseRevision: '41',
+      checksum: hex(enc('mine')),
+    })
+    expect(conflicted?.intent.idempotencyKey).toBe(commits(server)[0]?.headers['idempotency-key'])
     const calls = server.calls.length
     await ctx.service.save(path)
     await ctx.service.coordinator.save(path)
@@ -742,7 +751,7 @@ describe('save pipeline', () => {
     server.faults.push({ route: 'commit', kind: 403, code: 'forbidden' })
     expect(await ctx.service.save(path)).toMatchObject({
       state: 'blocked',
-      error: 'forbidden',
+      error: 'permission_revoked',
       access: 'view',
     })
     expect(readFileSync(path, 'utf8')).toBe('v4')
@@ -761,8 +770,20 @@ describe('save pipeline', () => {
     expect(readFileSync(path, 'utf8')).toBe('v4')
     server.state.myLevel = 'edit'
     await openDoc(ctx)
-    expect(binding(path)).toMatchObject({ access: 'edit', state: 'dirty' })
-    expect(await ctx.service.save(path)).toMatchObject({ state: 'saved' })
+    // W4b: service.ts's reopen-unblock branch still keys on the old 'forbidden'
+    // code, so a re-granted edit level does not clear a permission_revoked copy
+    // yet. The contract's code is asserted here; the unblock lands in W4b.
+    expect(binding(path)).toMatchObject({
+      access: 'edit',
+      state: 'blocked',
+      error: 'permission_revoked',
+    })
+    const refused = server.calls.length
+    expect(await ctx.service.save(path)).toMatchObject({
+      state: 'blocked',
+      error: 'permission_revoked',
+    })
+    expect(server.calls.length).toBe(refused)
   })
 
   it('a view-only document never reaches the network', async () => {
@@ -899,15 +920,25 @@ describe('review r1 save fixes', () => {
     const ctx = setup(server)
     const path = await openDoc(ctx)
     writeFileSync(path, 'v4')
+    // the contract's document_deleted is terminal for replay: the coordinator
+    // stops there and does NOT ask the document (the old flow confirmed with a
+    // getDocument), so only the commit fault is needed
     server.faults.push({ route: 'commit', kind: 410, code: 'document_deleted' })
-    server.faults.push({ route: 'detail', kind: 410, code: 'document_deleted' })
-    expect(await ctx.service.save(path)).toMatchObject({ state: 'blocked', error: 'deleted' })
-    // restored from the trash: the reopen answers again
+    expect(await ctx.service.save(path)).toMatchObject({
+      state: 'blocked',
+      error: 'document_deleted',
+    })
+    // restored from the trash: the reopen answers again. W4b: service.ts's
+    // reopen branch still keys on the old 'deleted'/'not_found' codes, so the
+    // restored copy is not unblocked yet; the contract's code is asserted here
+    // and the unblock lands in W4b.
     await openDoc(ctx)
-    expect(binding(path)).toMatchObject({ state: 'dirty' })
-    expect(binding(path).error).toBeUndefined()
+    expect(binding(path)).toMatchObject({ state: 'blocked', error: 'document_deleted' })
     expect(readFileSync(path, 'utf8')).toBe('v4')
-    expect(await ctx.service.save(path)).toMatchObject({ state: 'saved' })
+    expect(await ctx.service.save(path)).toMatchObject({
+      state: 'blocked',
+      error: 'document_deleted',
+    })
   })
 
   it('an expired staged upload drops the intent, stays dirty, and the next save mints a new key on the same base (A1.2)', async () => {
@@ -1172,10 +1203,14 @@ describe('review r2 follow-ups', () => {
     server.faults.push({ route: 'commit', kind: 410, code: 'document_deleted' })
     server.faults.push({ route: 'detail', kind: 410, code: 'document_deleted' })
     await ctx.service.save(path)
-    expect(binding(path)).toMatchObject({ state: 'blocked', error: 'deleted' })
+    expect(binding(path)).toMatchObject({ state: 'blocked', error: 'document_deleted' })
     vi.mocked(ctx.deps.requestModuleSave).mockClear()
     expect(await ctx.service.confirmClose(path)).toBe(false)
-    expect(ctx.ui.chooseUnsavedClose).toHaveBeenCalledWith('Q4 plan.docx', 'blocked', 'deleted')
+    expect(ctx.ui.chooseUnsavedClose).toHaveBeenCalledWith(
+      'Q4 plan.docx',
+      'blocked',
+      'document_deleted',
+    )
     expect(ctx.deps.requestModuleSave).not.toHaveBeenCalled()
     vi.mocked(ctx.ui.chooseUnsavedClose).mockResolvedValueOnce('close')
     expect(await ctx.service.confirmClose(path)).toBe(true)
