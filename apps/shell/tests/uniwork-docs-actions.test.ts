@@ -272,12 +272,31 @@ function hex(bytes: Uint8Array): string {
 let dir: string
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'uw-docs-actions-'))
+  // The service remembers the live session's account with a fire-and-forget
+  // atomic write of last-account.json (`liveIdentity`). Seeding it as the
+  // session already having been remembered removes that background write
+  // entirely, so nothing can recreate the fixture directory while it is being
+  // removed (R1-13) - the write raced the recursive walk and its rmdir.
+  mkdirSync(join(dir, 'uniwork-documents'), { recursive: true })
+  writeFileSync(
+    join(dir, 'uniwork-documents', LAST_OWNER_FILE),
+    JSON.stringify({ accountId: 'acc_1', deploymentId: 'default' }),
+  )
 })
-afterEach(() => {
-  // a fire-and-forget atomic write from a test can still be landing when the
-  // temp dir is removed (the write's temp file appears between the recursive
-  // walk and the rmdir): retry instead of racing it (F4)
-  rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 })
+afterEach(async () => {
+  // No fixture write is outstanding by design (see above); the retry still
+  // absorbs a late atomic write from a service call the test did not await
+  // (a feed notice, a focus refresh), whose temp file could otherwise appear
+  // between the recursive walk and the rmdir (F4's race, R1-13)
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      rmSync(dir, { recursive: true, force: true })
+      return
+    } catch (error) {
+      if (attempt >= 20) throw error
+      await new Promise((resolve) => setTimeout(resolve, 25))
+    }
+  }
 })
 
 function setup(server: ReturnType<typeof fakeServer>, options: { pathOpen?: boolean } = {}) {
