@@ -379,9 +379,10 @@ export class SessionCore {
         return false
       }
       if (error instanceof CredentialStoreError && error.code === 'keystore_locked') {
-        // a locked keystore is transient: keep the session in memory for this
-        // run and show keystore-locked (no network session); Retry re-reads the
-        // store. The stored credential is left untouched.
+        // a locked keystore cannot be written: drop the in-memory session and
+        // show keystore-locked (no network session) - a failed persist is never
+        // continued as if saved. The stored credential is left untouched;
+        // Retry re-reads the store once it opens.
         this.resetSession()
         this.setState('keystore-locked', 'keystore_locked')
         return false

@@ -106,6 +106,12 @@ type ReadResult =
  * file that decrypts to garbage is dropped. There is no plaintext fallback: a
  * Linux host on the `basic_text` backend or with encryption unavailable is
  * refused.
+ *
+ * A save is classified the same way: the keyring call (encryptString) is kept
+ * apart from the file steps, so a keyring that refuses is keystore_locked
+ * whichever half it hits, and only the file steps (mkdir, write, fsync,
+ * rename) can be io. A save refused by the keyring throws before anything is
+ * written, so the stored credential survives untouched for the next attempt.
  */
 export function createCredentialStore(options: {
   userDataDir: string
@@ -188,13 +194,20 @@ export function createCredentialStore(options: {
     save(credential) {
       ensureAvailable()
       if (!isStoredCredential(credential)) throw new CredentialStoreError('io')
+      // the one keyring call, kept apart from the file steps: the probe above
+      // found a usable keyring, so a refusal here is the keystore failing to
+      // open right now (locked keychain, DPAPI hiccup) - transient, and thrown
+      // before any byte is written
+      let encrypted: Buffer
+      try {
+        encrypted = safeStorage.encryptString(JSON.stringify({ version: VERSION, credential }))
+      } catch {
+        throw new CredentialStoreError('keystore_locked')
+      }
       const temp = `${target}.${process.pid}.${Date.now()}.tmp`
       let fd: number | undefined
       try {
         mkdirSync(dir, { recursive: true, mode: 0o700 })
-        const encrypted = safeStorage.encryptString(
-          JSON.stringify({ version: VERSION, credential }),
-        )
         writeFileSync(temp, encrypted, { mode: 0o600, flag: 'wx' })
         fd = openSync(temp, 'r+')
         fsyncSync(fd)
@@ -202,7 +215,7 @@ export function createCredentialStore(options: {
         fd = undefined
         // atomic replace (MoveFileEx REPLACE_EXISTING on Windows, rename(2) elsewhere)
         renameSync(temp, target)
-      } catch (error) {
+      } catch {
         if (fd !== undefined) {
           try {
             closeSync(fd)
@@ -211,7 +224,7 @@ export function createCredentialStore(options: {
           }
         }
         removeQuietly(temp)
-        if (error instanceof CredentialStoreError) throw error
+        // only file steps run here: a failure is a real io error
         throw new CredentialStoreError('io')
       }
       removeQuietly(legacyBackup)

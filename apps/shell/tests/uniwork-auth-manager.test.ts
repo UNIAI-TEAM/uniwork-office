@@ -1,8 +1,13 @@
+import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AccountLoginEvent, AccountStatus } from '../src/shared/home-api'
 import {
   CredentialStoreError,
+  createCredentialStore,
   type CredentialStore,
+  type SafeStorageLike,
   type StoredCredential,
 } from '../src/main/uniwork-auth/credentials'
 import type { DeploymentProfile } from '../src/main/uniwork-auth/deployment'
@@ -93,6 +98,36 @@ const stored = (overrides: Partial<StoredCredential> = {}): StoredCredential => 
   profile: { accountId: 'acc_1', email: 'cached@example.com', displayName: 'Cached' },
   ...overrides,
 })
+
+/**
+ * A real-store keychain stand-in whose lock() makes the wrap refuse (as a
+ * locked OS keychain does at save time) while reads keep working, so a test
+ * can lock it between the credential load and the rotated save.
+ */
+function lockableKeychain() {
+  let locked = false
+  const safeStorage: SafeStorageLike = {
+    isEncryptionAvailable: () => true,
+    encryptString: (text) => {
+      if (locked) throw new Error('keychain access denied')
+      return Buffer.from(`enc:${text}`)
+    },
+    decryptString: (buf) => {
+      const raw = buf.toString()
+      if (!raw.startsWith('enc:')) throw new Error('bad ciphertext')
+      return raw.slice(4)
+    },
+  }
+  return {
+    safeStorage,
+    lock: () => {
+      locked = true
+    },
+    unlock: () => {
+      locked = false
+    },
+  }
+}
 
 function setup(
   options: {
@@ -425,6 +460,58 @@ describe('keystore locked', () => {
     expect((await ctx.manager.restore()).state).toBe('keystore-locked')
     locked.unlock()
     expect((await ctx.manager.retry()).state).toBe('signed-in')
+  })
+
+  it('a keychain that locks between load and save is keystore_locked, never io (real store)', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'uw-auth-lock-'))
+    const keychain = lockableKeychain()
+    const store = createCredentialStore({ userDataDir: dir, safeStorage: keychain.safeStorage })
+    try {
+      store.save(stored({ refreshToken: 'rt_keep' }))
+      const before = readFileSync(join(dir, 'uniwork-auth', 'session.bin'))
+      // the credential loads; the keychain then locks before the rotated one is wrapped
+      keychain.lock()
+      const ctx = setup({ credentials: store })
+      const status = await ctx.manager.restore()
+      expect(status).toMatchObject({
+        state: 'keystore-locked',
+        error: 'keystore_locked',
+        loggedIn: false,
+      })
+      // a failed persist must not continue as if saved
+      expect(ctx.statuses.map((s) => s.state)).not.toContain('signed-in')
+      expect(ctx.transport.me).not.toHaveBeenCalled()
+      // refused before any write: the stored credential still holds the old token
+      keychain.unlock()
+      expect(store.load()?.refreshToken).toBe('rt_keep')
+      expect(readFileSync(join(dir, 'uniwork-auth', 'session.bin'))).toEqual(before)
+      expect(readdirSync(join(dir, 'uniwork-auth'))).toEqual(['session.bin'])
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('a sign-in whose credential cannot be wrapped never overwrites the stored one (real store)', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'uw-auth-lock-'))
+    const keychain = lockableKeychain()
+    const store = createCredentialStore({ userDataDir: dir, safeStorage: keychain.safeStorage })
+    try {
+      store.save(stored({ refreshToken: 'rt_keep' }))
+      keychain.lock()
+      const ctx = setup({ credentials: store })
+      await signIn(ctx)
+      expect(ctx.manager.status()).toMatchObject({
+        state: 'keystore-locked',
+        error: 'keystore_locked',
+        loggedIn: false,
+      })
+      expect(ctx.events.at(-1)).toEqual({ phase: 'error', error: 'keystore_locked' })
+      // the redeemed credential was refused before writing: the stored one survives
+      keychain.unlock()
+      expect(store.load()?.refreshToken).toBe('rt_keep')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })
 
