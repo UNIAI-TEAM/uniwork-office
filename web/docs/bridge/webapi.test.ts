@@ -345,9 +345,10 @@ describe('saveDocx', () => {
       ok: false,
       error: { code: 'forbidden', message: 'read-only' },
     }))
+    // the bar says it: no error text, so the editor raises no toast of its own
     expect(await api.saveDocx(doc.path, buf([5]))).toEqual({
       ok: false,
-      error: 'You do not have permission to save this document.',
+      reason: 'external-modified',
     })
   })
 
@@ -1385,6 +1386,53 @@ describe('new version on UniWork (doc.remoteVersion)', () => {
     })
     expect(mock.calls.filter((c) => c.type === 'api.save')).toHaveLength(calls)
     expect(document.getElementById('root')?.hasAttribute('inert') ?? true).toBe(true)
+  })
+
+  describe.each([
+    ['401', 'unauthorized', 'webSaveUnauthorized'],
+    ['403', 'forbidden', 'uwRemoteRevokedWeb'],
+    ['410', 'not_found', 'uwRemoteDeleted'],
+  ] as const)('a save answered %s', (status, code, key) => {
+    const fail = () => Promise.reject(protocolError(code, `HTTP ${status}`))
+
+    it('Save: the bar is the only surface, the reason that means "stay dirty, nothing more to say"', async () => {
+      const doc = await bootRevision('10')
+      mock.override('api.save', fail)
+      expect(await api.saveDocx(doc.path, buf([4]), false)).toEqual({
+        ok: false,
+        reason: 'external-modified',
+      })
+      expect(barText()).toBe(wt(key))
+    })
+
+    it('Save As and the first save: a result without an error shows no editor toast either', async () => {
+      const doc = await bootRevision('10')
+      mock.override('api.saveAs', fail)
+      expect(await api.saveDocxAs('Copy', buf([4]), doc.path)).toEqual({ ok: false })
+      expect(barText()).toBe(wt(key))
+    })
+
+    it('the first save of a new document', async () => {
+      await bootRevision('10')
+      mock.override('api.saveAs', fail)
+      expect(await api.saveDocxNew('Untitled', buf([4]))).toEqual({ ok: false })
+      expect(barText()).toBe(wt(key))
+    })
+  })
+
+  it('an error the bar does not own (a 500, the network) keeps the editor toast text', async () => {
+    const doc = await bootRevision('10')
+    mock.override('api.save', () => Promise.reject(protocolError('internal', 'HTTP 500')))
+    expect(await api.saveDocx(doc.path, buf([4]), false)).toEqual({
+      ok: false,
+      error: wt('webSaveFailedGeneric'),
+    })
+    expect(bar()).toBeNull()
+    mock.override('api.saveAs', () => Promise.reject(protocolError('internal', 'HTTP 500')))
+    expect(await api.saveDocxAs('Copy', buf([4]), doc.path)).toMatchObject({
+      ok: false,
+      error: wt('webSaveFailedGeneric'),
+    })
   })
 
   it('doc.blocked on a dirty frame: the bar and the lock at once, Save and Save As refused, edits kept', async () => {

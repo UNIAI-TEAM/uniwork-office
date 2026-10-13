@@ -611,7 +611,7 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
     if (outcome.kind === 'overwritten') return { file: outcome.file ?? file! }
     if (outcome.kind === 'reloaded') return { canceled: true }
     if (outcome.kind === 'failed') {
-      throw saveFailure({
+      return failSave({
         code: outcome.code,
         message: '',
         ...(outcome.apiCode ? { details: { apiCode: outcome.apiCode } } : {}),
@@ -635,7 +635,7 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
       const head = await ownHeadAfterUnknown(port, fileId, files.get(fileId)?.etag, data)
       if (head) remember(head)
     }
-    throw saveFailure(res.error)
+    return failSave(res.error)
   }
 
   /**
@@ -644,10 +644,18 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
    * English status line ("Internal Server Error")
    */
   function saveFailure(error: SaveFailure & { message: string }): Error {
-    // a 401 / 403 / 410 gets the new-version bar's error variant (G5-03w)
-    remote?.saveFailed(error)
     const detail = saveFailureDetail(error)
     return new Error(detail ? `${text('appWebSaveFailed')} ${detail}` : text('appWebSaveFailed'))
+  }
+
+  /**
+   * A failed save. A 401 / 403 / 410 gets the new-version bar (G5-03w), which is then the only
+   * surface: the save ends as cancelled, so the editor shows no error toast on top of the bar.
+   * Any other failure throws and the editor reports it.
+   */
+  function failSave(error: SaveFailure & { message: string }): Landed {
+    if (remote?.saveFailed(error)) return { canceled: true }
+    throw saveFailure(error)
   }
 
   async function saveAsNew(
@@ -668,7 +676,7 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
     pending?.settle(res)
     if (res.ok) return { file: res.file }
     if (res.error.code === 'cancelled') return { canceled: true }
-    throw saveFailure(res.error)
+    return failSave(res.error)
   }
 
   // ------------------------------------------------------------ chunked edit transfers

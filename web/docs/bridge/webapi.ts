@@ -481,11 +481,13 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
     // the document is being replaced by the latest version: no error banner
     if (outcome.kind === 'reloaded') return { ok: false, reason: 'external-modified' }
     if (outcome.kind === 'failed') {
-      // a 401 / 403 / 410 the Overwrite got: the bar of the document's new state stays behind
-      remote?.saveFailed({
+      // a 401 / 403 / 410 the Overwrite got: the bar of the document's new state stays behind, and
+      // it is the only surface: no failure toast of the editor on top of it
+      const shown = remote?.saveFailed({
         code: outcome.code,
         ...(outcome.apiCode ? { details: { apiCode: outcome.apiCode } } : {}),
       })
+      if (shown) return { ok: false, reason: 'external-modified' }
       return {
         ok: false,
         error: saveFailureText({ code: outcome.code, message: '' }, () =>
@@ -718,7 +720,7 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
       }
       if (hostSave) hostSave.error = res.error
       const code = res.error.code
-      remote?.saveFailed(res.error)
+      const shown = remote?.saveFailed(res.error) === true
       if (code === 'conflict') {
         // the host's own `save` waits for the dialog's answer instead of an error event
         if (!hostSave) port.reportError(res.error, false)
@@ -729,6 +731,9 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
       if (code === 'timeout' || code === 'network') {
         await reconcileAfterUnknown(fileId, data)
       }
+      // the new-version bar says it (401 / 403 / 410): the editor shows neither a toast nor a status
+      // line of its own; the reason is the one that means "stay dirty, nothing more to say here"
+      if (shown) return { ok: false, reason: 'external-modified' }
       return {
         ok: false,
         // a raw browser error ("Failed to fetch") or status line is English whatever the UI language
@@ -773,7 +778,8 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
       pending?.settle(res)
       // cancelled dialog: {ok:false} without error, like the desktop
       if (res.error.code === 'cancelled') return { ok: false }
-      remote?.saveFailed(res.error)
+      // the bar says it: a result without an error shows no toast (like a cancelled dialog)
+      if (remote?.saveFailed(res.error)) return { ok: false }
       return { ok: false, error: saveFailureText(res.error, () => text('appWebSaveOffline')) }
     },
 
@@ -798,7 +804,7 @@ export function createWebApi(port: FramePort, opts: WebApiOptions = {}) {
       )
       if (!res.ok) {
         if (hostSave) hostSave.error = res.error
-        remote?.saveFailed(res.error)
+        if (remote?.saveFailed(res.error)) return { ok: false }
         return { ok: false, error: saveFailureText(res.error, () => text('appWebSaveOffline')) }
       }
       return { ok: true, path: pathFor(landed(res)) }

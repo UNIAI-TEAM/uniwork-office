@@ -503,6 +503,59 @@ describe('save failures', () => {
     )
     expect(t.mock.dirty.at(-1)).toBe(true)
   })
+
+  it.each([
+    ['401', 'unauthorized', undefined],
+    ['403', 'forbidden', undefined],
+    ['403 (organisation)', 'forbidden', 'organization_suspended'],
+    ['410', 'not_found', undefined],
+  ] as const)(
+    'a %s is the new-version bar alone: the save ends cancelled, so the editor raises no error toast',
+    async (_label, code, apiCode) => {
+      const t = setup()
+      const wb = await t.boot()
+      t.desktop.notifyPendingEdits(1)
+      t.mock.override('api.save', () => ({
+        ok: false,
+        error: { code, message: 'nope', ...(apiCode ? { details: { apiCode } } : {}) },
+      }))
+      // resolves (no throw: a throw is what the editor turns into its toast)
+      await expect(
+        t.desktop.saveWorkbookEdits(saveRequest(wb.sessionId, [[0, 0, 5]])),
+      ).resolves.toEqual({ canceled: true })
+      expect(document.querySelector('.uw-remote-bar--error')).not.toBeNull()
+      // the edits are still pending
+      expect(t.mock.dirty.at(-1)).toBe(true)
+    },
+  )
+
+  it('Save As answered 403 is the bar alone too', async () => {
+    const t = setup()
+    const wb = await t.boot()
+    t.desktop.notifyPendingEdits(1)
+    t.mock.override('api.saveAs', () => ({
+      ok: false,
+      error: { code: 'forbidden', message: 'nope' },
+    }))
+    await expect(
+      t.desktop.saveWorkbookEdits({ ...saveRequest(wb.sessionId, [[0, 0, 5]]), mode: 'save-as' }),
+    ).resolves.toEqual({ canceled: true })
+    expect(document.querySelector('.uw-remote-bar--error')).not.toBeNull()
+  })
+
+  it('an error the bar does not own still throws for the editor to report', async () => {
+    const t = setup()
+    const wb = await t.boot()
+    t.desktop.notifyPendingEdits(1)
+    t.mock.override('api.save', () => ({
+      ok: false,
+      error: { code: 'internal', message: 'boom', status: 500 },
+    }))
+    await expect(
+      t.desktop.saveWorkbookEdits(saveRequest(wb.sessionId, [[0, 0, 5]])),
+    ).rejects.toThrow(/Saving to UniWork failed/)
+    expect(document.querySelector('.uw-remote-bar')).toBeNull()
+  })
 })
 
 describe('save conflicts', () => {
@@ -603,6 +656,17 @@ describe('save conflicts', () => {
       ok: false,
       error: { code: 'forbidden' },
     })
+  })
+
+  it('an Overwrite refused with 403 leaves the bar alone, the save ends cancelled', async () => {
+    const t = setup({ conflict: async () => ({ kind: 'failed', code: 'forbidden' }) })
+    const wb = await t.boot()
+    t.desktop.notifyPendingEdits(1)
+    t.mock.bumpRemote(t.file.fileId)
+    await expect(
+      t.desktop.saveWorkbookEdits(saveRequest(wb.sessionId, [[0, 0, 1]])),
+    ).resolves.toEqual({ canceled: true })
+    expect(document.querySelector('.uw-remote-bar--error')).not.toBeNull()
   })
 
   it('the dialog stays open past the host-save timer without a timeout answer', async () => {
