@@ -81,7 +81,6 @@ import { controlHandler } from './control-handlers'
 import { cliLinkStatus, healCliLinks, installCliLinkOnRequest, recordCliLauncher } from './cli-link'
 import { createDefaultAppService, execFileRunner } from './default-app'
 import { registerIntegrationsIpc } from './integrations-ipc'
-import { exportLessonPackZip, probeAiHub } from './edu-commercial'
 import { handleDroppedFiles } from './dropped-files'
 import {
   handleOfficeLaunchUrl,
@@ -4461,25 +4460,6 @@ function registerHomeIpc(): void {
       properties: ['openFile', 'multiSelections'],
     })
     if (!result.canceled) for (const path of result.filePaths) openDocumentPath(path)
-  })
-
-  ipcMain.handle(HOME_CHANNELS.probeAiHub, (_event, opts?: { baseUrl?: string; apiKey?: string }) =>
-    probeAiHub(
-      typeof opts?.baseUrl === 'string' ? opts.baseUrl : '',
-      typeof opts?.apiKey === 'string' ? opts.apiKey : '',
-    ),
-  )
-
-  ipcMain.handle(HOME_CHANNELS.exportLessonPack, async (event, projectId: unknown) => {
-    if (typeof projectId !== 'string' || !projectId) {
-      return { ok: false, error: 'Invalid project id.' }
-    }
-    const win = BrowserWindow.fromWebContents(event.sender) ?? shellWindow
-    return exportLessonPackZip({
-      userDataPath: app.getPath('userData'),
-      projectId,
-      parent: win,
-    })
   })
 
   ipcMain.handle(HOME_CHANNELS.newDoc, (_event, opts?: HomeNewOpts) => {

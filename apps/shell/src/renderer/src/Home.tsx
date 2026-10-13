@@ -25,11 +25,10 @@ import { CreditWallet } from './CreditWallet'
 import type { SettingsSectionId, SettingsTarget } from './SettingsModal'
 import { AccountEntry } from './AccountEntry'
 import { skillUpdateDue } from './IntegrationsPane'
-import { getPractice, isPracticeId, listPractices, type PracticeId } from '@uniwork/practice-core'
+import { getPractice, isPracticeId, requirePractice, type PracticeId } from '@uniwork/practice-core'
 import { AgentIntentBanner } from './AgentIntentBanner'
 import { NewChatPane } from './NewChatPane'
 import { PracticeHome } from './PracticeHome'
-import { TeacherHome } from './TeacherHome'
 import { wbStoreGetRaw, wbStoreSetRaw } from './workbench-store-client'
 import { onFilesChanged } from './file-events'
 import { FileBadge } from './FileBadge'
@@ -3445,44 +3444,22 @@ export function Home() {
       {selectedProjectId ? (
         renderProjectContent()
       ) : eduMode ? (
-        activePracticeId === 'teacher' ? (
-          <TeacherHome
-            projects={projects}
-            selectedId={eduSelectedId}
-            onSelectPack={setEduSelectedId}
-            onOpenPackFiles={(id) => {
-              setEduMode(false)
-              setChatMode(false)
-              setSelectedProjectId(id)
-              setSelectedFolder(null)
-              setSelected(new Set())
-              setRowMenu(null)
-            }}
-            onRefresh={refresh}
-            onSwitchPractice={switchPractice}
-          />
-        ) : (
-          <PracticeHome
-            practice={
-              getPractice(activePracticeId) ??
-              listPractices().find((p) => p.id !== 'teacher') ??
-              listPractices()[0]!
-            }
-            projects={projects}
-            selectedId={eduSelectedId}
-            onSelectPack={setEduSelectedId}
-            onOpenPackFiles={(id) => {
-              setEduMode(false)
-              setChatMode(false)
-              setSelectedProjectId(id)
-              setSelectedFolder(null)
-              setSelected(new Set())
-              setRowMenu(null)
-            }}
-            onRefresh={refresh}
-            onSwitchPractice={switchPractice}
-          />
-        )
+        <PracticeHome
+          practice={getPractice(activePracticeId) ?? requirePractice('entrepreneur')}
+          projects={projects}
+          selectedId={eduSelectedId}
+          onSelectPack={setEduSelectedId}
+          onOpenPackFiles={(id) => {
+            setEduMode(false)
+            setChatMode(false)
+            setSelectedProjectId(id)
+            setSelectedFolder(null)
+            setSelected(new Set())
+            setRowMenu(null)
+          }}
+          onRefresh={refresh}
+          onSwitchPractice={switchPractice}
+        />
       ) : selectedFolder && rootOf(selectedFolder, roots)?.readable ? (
         renderFolderContent()
       ) : chatMode ? (

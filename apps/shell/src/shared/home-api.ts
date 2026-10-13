@@ -394,13 +394,6 @@ export interface HomeApi {
     displayText?: string
     tabId?: string
   }): Promise<{ ok: boolean; tabId?: string; kind?: string; title?: string; path?: string }>
-  /** Probe OpenAI-compatible Hub (models + optional balance hints) */
-  probeAiHub(opts: { baseUrl: string; apiKey: string }): Promise<{
-    ok: boolean
-    message: string
-    balanceText?: string
-    modelCount?: number
-  }>
   /** PWA / Hub → desktop Agent Intent (navigate Workbench tabs, optional mutate) */
   onAgentIntent(handler: (intent: AgentIntentDto) => void): () => void
   /** Ack intent lifecycle for future Hub result channel */
@@ -409,13 +402,6 @@ export interface HomeApi {
   resolveAgentIntent(text: string): Promise<AgentIntentDto | null>
   /** DEV / tests: inject an intent without deep link */
   submitAgentIntent(intent: AgentIntentDto): Promise<boolean>
-  /** Zip an education lesson pack (files + README + meta.json) */
-  exportLessonPack(projectId: string): Promise<{
-    ok: boolean
-    path?: string
-    error?: string
-    canceled?: boolean
-  }>
   /** open a blank markdown editor tab */
   newMarkdown(opts?: NewFileOpts & { projectId?: string }): Promise<void>
   /** open a blank html editor tab */
@@ -818,33 +804,6 @@ export interface FolderEntry {
   hasSubfolders: boolean
 }
 
-export type EduMaterialRoleEntry =
-  | 'giao-an'
-  | 'khdh'
-  | 'slide'
-  | 'phieu-hoc-tap'
-  | 'ppct'
-  | 'de-kiem-tra'
-  | 'tai-lieu-tham-khao'
-  | 'khac'
-
-/** Teacher lesson-pack metadata mirrored from project-store edu/meta.json */
-export interface EduProjectMetaEntry {
-  version: 1 | 2
-  kind: 'education'
-  subject: string
-  grade: string
-  week?: string
-  lessonTitle: string
-  durationMinutes?: number
-  objectives: string[]
-  tags?: string[]
-  notes?: string
-  materials?: Partial<Record<string, EduMaterialRoleEntry>>
-  createdAt: string
-  updatedAt: string
-}
-
 export type PracticeIdEntry =
   | 'teacher'
   | 'legal'
@@ -901,7 +860,6 @@ export interface ProjectSummaryEntry {
   lastActiveAt: string
   isDefault: boolean
   kind?: ProjectKindEntry
-  edu?: EduProjectMetaEntry
   practice?: PracticeProjectMetaEntry
 }
 
@@ -917,35 +875,6 @@ export interface PatchPracticeMetaArgs {
   projectId: string
   patch: Partial<
     Pick<PracticeProjectMetaEntry, 'title' | 'facets' | 'tags' | 'notes' | 'materials'>
-  >
-}
-
-export interface CreateEducationProjectArgs {
-  subject: string
-  grade: string
-  week?: string
-  lessonTitle: string
-  durationMinutes?: number
-  objectives?: string[]
-  tags?: string[]
-  notes?: string
-}
-
-export interface PatchEducationMetaArgs {
-  projectId: string
-  patch: Partial<
-    Pick<
-      EduProjectMetaEntry,
-      | 'subject'
-      | 'grade'
-      | 'week'
-      | 'lessonTitle'
-      | 'durationMinutes'
-      | 'objectives'
-      | 'tags'
-      | 'notes'
-      | 'materials'
-    >
   >
 }
 
@@ -1024,12 +953,6 @@ export interface ProjectHomeApi {
   listFiles(projectId: string): Promise<string[]>
   /** create a project */
   createProject(name: string): Promise<ProjectSummaryEntry>
-  /** create a teacher lesson pack with edu/meta.json */
-  createEducationProject(args: CreateEducationProjectArgs): Promise<ProjectSummaryEntry>
-  /** read education metadata for a project */
-  getEduMeta(projectId: string): Promise<EduProjectMetaEntry | null>
-  /** patch education metadata (tags, materials, notes, …) */
-  patchEduMeta(args: PatchEducationMetaArgs): Promise<EduProjectMetaEntry>
   /** create a non-teacher practice pack with practice/meta.json */
   createPracticeProject(args: CreatePracticeProjectArgs): Promise<ProjectSummaryEntry>
   /** read practice metadata for a project */
@@ -1137,8 +1060,6 @@ export const HOME_CHANNELS = {
   installCliLink: 'home:install-cli-link',
   pickDefaultSaveDir: 'home:pick-default-save-dir',
   openCreditUsage: 'home:open-credit-usage',
-  probeAiHub: 'home:probe-ai-hub',
-  exportLessonPack: 'home:export-lesson-pack',
   agentIntentEvent: 'home:agent-intent-event',
   agentIntentAck: 'home:agent-intent-ack',
   resolveAgentIntent: 'home:resolve-agent-intent',
@@ -1181,9 +1102,6 @@ export const PROJECT_CHANNELS = {
   list: 'project:list',
   files: 'project:files',
   create: 'project:create',
-  createEducation: 'project:createEducation',
-  getEduMeta: 'project:getEduMeta',
-  patchEduMeta: 'project:patchEduMeta',
   createPractice: 'project:createPractice',
   getPracticeMeta: 'project:getPracticeMeta',
   patchPracticeMeta: 'project:patchPracticeMeta',
