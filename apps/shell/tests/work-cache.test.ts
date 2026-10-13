@@ -1,3 +1,8 @@
+/**
+ * @vitest-environment jsdom
+ */
+import { act, createElement } from 'react'
+import { createRoot } from 'react-dom/client'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const env = vi.hoisted(() => ({ bucket: 'a-one', cleared: false, active: 'w1' as string | null }))
@@ -19,9 +24,14 @@ import {
   cachedOpenTasks,
   cachedWork,
   settleWork,
+  useWorkLoad,
   workCacheSlot,
+  type WorkLoad,
 } from '../src/renderer/src/work-cache'
 import { localIsoDate } from '../src/renderer/src/work-tasks'
+
+const actEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+actEnvironment.IS_REACT_ACT_ENVIRONMENT = true
 
 beforeEach(() => {
   env.bucket = 'a-one'
@@ -112,6 +122,28 @@ describe('cachedOpenTasks (My AI grounding)', () => {
     expect(cachedOpenTasks()?.map((x) => x.id)).toEqual(['first'])
     env.active = 'gone'
     expect(cachedOpenTasks()?.map((x) => x.id)).toEqual(['first'])
+  })
+})
+
+describe('useWorkLoad.update', () => {
+  it('mirrors an optimistic edit into the cache My AI reads, under the old time', async () => {
+    env.bucket = 'a-update'
+    let load: WorkLoad<WorkTask[]> | null = null
+    const fetch = async () => ({ ok: true as const, value: [task('a', 'todo'), task('b', 'todo')] })
+    function Probe() {
+      load = useWorkLoad<WorkTask[]>('tasks:w1', fetch)
+      return null
+    }
+    const root = createRoot(document.createElement('div'))
+    await act(async () => root.render(createElement(Probe)))
+    expect(cachedOpenTasks()?.map((x) => x.id)).toEqual(['a', 'b'])
+    const at = cachedWork('tasks:w1')?.at
+    act(() =>
+      load!.update((rows) => rows.map((x) => (x.id === 'a' ? { ...x, status: 'done' } : x))),
+    )
+    expect(cachedOpenTasks()?.map((x) => x.id)).toEqual(['b'])
+    expect(cachedWork('tasks:w1')?.at).toBe(at)
+    act(() => root.unmount())
   })
 })
 

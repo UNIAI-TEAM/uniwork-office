@@ -69,7 +69,7 @@ export interface WorkLoad<T> {
   /** a kept value after an offline or server failure: show "Updated at HH:mm" */
   stale: boolean
   reload: () => void
-  /** optimistic edit of the value on screen; the cache keeps server truth */
+  /** optimistic edit of the value on screen, mirrored into the cache under its old time */
   update: (edit: (value: T) => T) => void
 }
 
@@ -144,7 +144,15 @@ export function useWorkLoad<T>(
   }, [reload, intervalMs, tickDriven])
 
   const update = useCallback((edit: (value: T) => T) => {
-    setState((s) => (s.value === null ? s : { ...s, value: edit(s.value) }))
+    setState((s) => {
+      if (s.value === null) return s
+      const value = edit(s.value)
+      // My AI reads the cache: it sees the edit, under the old time so "Updated at" stays honest
+      const slot = s.key ? workCacheSlot(s.key) : null
+      const hit = slot ? entries.get(slot) : undefined
+      if (slot && hit) entries.set(slot, { value, at: hit.at })
+      return { ...s, value }
+    })
   }, [])
 
   const stale = state.value !== null && (state.error === 'offline' || state.error === 'server')
