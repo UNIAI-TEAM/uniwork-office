@@ -9,8 +9,9 @@
  * account never lands in the next one's data (and the next account can never
  * read the previous one's).
  *
- * The bucket name is a hash of deployment + account id: no account id or
- * email appears in a path.
+ * The bucket name is a hash of deployment + account id + org id: no id or
+ * email appears in a path. An org switch is a bucket switch (notes, forms
+ * and the active workspace are per org).
  *
  * Pre-upgrade data (the shared `<userData>/workbench/workbench.sqlite`, plus
  * the renderer's localStorage / IndexedDB copies) goes to the first account
@@ -26,19 +27,21 @@ import { join } from 'node:path'
 import type { WorkbenchSnapshot } from '../shared/home-api'
 import { tryOpenWorkbenchDb, type WorkbenchDb } from './workbench-db'
 
-/** the account a bucket belongs to (deployment-scoped, like working copies) */
+/** the account and org a bucket belongs to (deployment-scoped, like working copies) */
 export interface WorkbenchOwner {
   deploymentId: string
   accountId: string
+  /** the selected org; '' while signed in before an org is selected */
+  orgId: string
 }
 
 export const LOCAL_BUCKET = 'local'
 
-/** `local` for signed-out use, `a-<hash>` for an account */
+/** `local` for signed-out use, `a-<hash>` for an account in an org */
 export function workbenchBucketOf(owner: WorkbenchOwner | null): string {
   if (!owner) return LOCAL_BUCKET
   const digest = createHash('sha256')
-    .update(`${owner.deploymentId}\n${owner.accountId}`)
+    .update(`${owner.deploymentId}\n${owner.accountId}\n${owner.orgId}`)
     .digest('hex')
   return `a-${digest.slice(0, 32)}`
 }

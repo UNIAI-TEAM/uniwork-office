@@ -2923,14 +2923,18 @@ function workbenchAccounts(): WorkbenchAccounts {
 }
 
 /**
- * Points the workbench store at the live session's account (none = the
- * signed-out bucket). On a change the Home renderer drops everything it shows
- * and reloads from the new bucket.
+ * Points the workbench store at the live session's account and selected org
+ * (none = the signed-out bucket). On a change (sign-in, sign-out, org switch)
+ * the Home renderer drops everything it shows and reloads from the new bucket.
  */
 function syncWorkbenchOwner(): void {
   const identity = uniworkSessionIdentity()
   const owner = identity
-    ? { deploymentId: identity.deploymentId, accountId: identity.accountId }
+    ? {
+        deploymentId: identity.deploymentId,
+        accountId: identity.accountId,
+        orgId: uniworkAccount().status().org?.id ?? '',
+      }
     : null
   if (!workbenchAccounts().setOwner(owner)) return
   const wc = shellWindow && !shellWindow.isDestroyed() ? shellWindow.webContents : null
