@@ -30,12 +30,14 @@
  * found through a second, deliberately narrow `name` anchor: the object must be
  * an element of a tools-list array literal. A tools list is written in one of
  * three forms: an annotated binding (`AgentToolDef[]`, `readonly AgentToolDef[]`,
- * `Array<AgentToolDef> = [`), a `tools: [ ... ]` field, or a `return [ ... ]`
- * inside a `get tools()` accessor. `AgentToolDef` (or the bare `AgentTool`) is
- * matched exactly, so an `AgentToolCall[]` / `AgentToolResult[]` array — whose
- * records carry `name` too — is not a tools list. An unannotated array, one
- * typed as anything else (an option list, a typed command list), a nested
- * `options:` bag, a `get options()` returned literal or a plain helper's
+ * `Array<AgentToolDef> = [`), a `tools: [ ... ]` field outside a schema bag, or
+ * a `return [ ... ]` at a `get tools()` accessor body's own brace level (the
+ * head may carry a return-type annotation, `get tools(): AgentToolDef[]`).
+ * `AgentToolDef` (or the bare `AgentTool`) is matched exactly, so an
+ * `AgentToolCall[]` / `AgentToolResult[]` array — whose records carry `name`
+ * too — is not a tools list. An unannotated array, one typed as anything else
+ * (an option list, a typed command list), a nested `options:` bag, a `tools`
+ * bag in a schema, a `get options()` returned literal or a plain helper's
  * `return [ ... ]` contributes no row, so a non-tool `{ name, description }`
  * array cannot manufacture phantom rows.
  *
@@ -73,7 +75,25 @@
  *      read for `===` (the branch the named tool takes); for `!==` the
  *      enclosing body minus that consequent is read (the tool's own
  *      fall-through path), so a `mutated: false` declared after an early-return
- *      guard still counts. A `call.name === 'x'` anywhere else (a ternary, a
+ *      guard still counts. A braceless consequent is one statement, and its
+ *      extent is that statement's own: it runs through an open call, object or
+ *      array, takes a nested control statement with it (the `else` that binds
+ *      to it and a `label:` that names it included), and crosses a line break
+ *      only when the break sits inside such an open group or one of the two
+ *      tokens beside it is an operator that still needs its operand (`return
+ *      read(call) &&` / break / `write(call)`). A *completed* primary
+ *      expression at the end of the line — a template literal with its
+ *      interpolations and nested templates, a string, number or regex literal,
+ *      an identifier (a keyword used as a property name, `read(call).in`), or a
+ *      closing `)`/`]`/`}` — ends the statement there: the next line continues
+ *      it only when it opens with an operator, a tagged template included, so
+ *      the sibling `switch` below is never credited. The tokenizer reads that
+ *      following operator as the operator it is: a `/` after a member name
+ *      (`.in`, `.instanceof`) or a postfix `++`/`--` is division, never a regex
+ *      start (G706-BE-R6), so `read(call).in` / break / `/ 2 / write(call)`
+ *      runs on to the `write` call. `return` is a restricted production: a line
+ *      break after it ends the statement, so a `(`/`[` on the next line is not
+ *      part of the branch. A `call.name === 'x'` anywhere else (a ternary, a
  *      `const`, an argument) controls no path and contributes nothing.
  * A local helper is resolved by declaration position and lexical scope, not by
  * bare name, so same-named closures in different cases stay distinct. The
@@ -323,7 +343,14 @@ function tokenize(src) {
   }
   const regexAllowed = () => {
     if (!last) return true
-    if (last.type === 'ident') return REGEX_OK_AFTER_KEYWORD.has(last.value)
+    if (last.type === 'ident') {
+      if (!REGEX_OK_AFTER_KEYWORD.has(last.value)) return false
+      // a keyword that is a member name (`read(call).in`) is a completed
+      // property access, not an operator: the `/` after it is division, never
+      // the start of a regex (G706-BE-R6)
+      const before = tokens[tokens.length - 2]
+      return !(before && (before.value === '.' || before.value === '?.'))
+    }
     if (
       last.type === 'string' ||
       last.type === 'number' ||
@@ -331,7 +358,9 @@ function tokenize(src) {
       last.type === 'regex'
     )
       return false
-    return ![')', ']', '}'].includes(last.value)
+    // `)`/`]`/`}` close a completed expression and a postfix `++`/`--` ends
+    // one; a `/` after either is division, not a regex start
+    return ![')', ']', '}', '++', '--'].includes(last.value)
   }
   while (i < src.length) {
     const c = src[i]
@@ -1318,15 +1347,236 @@ function enclosingIfCondition(tokens, at) {
   return -1
 }
 
-/** [start, end) of the branch the `if (...)` at `openIdx` controls */
-function branchRange(tokens, openIdx) {
+/**
+ * Tokens that can continue an expression across a line break. A line break in
+ * front of anything else ends the statement (ASI), which is how the fork's
+ * semicolon-free braceless consequents end.
+ */
+const CONTINUES_EXPRESSION = new Set([
+  '.',
+  '?.',
+  '(',
+  '[',
+  ',',
+  '?',
+  ':',
+  '=',
+  '=>',
+  '==',
+  '===',
+  '!=',
+  '!==',
+  '<',
+  '>',
+  '<=',
+  '>=',
+  '+',
+  '-',
+  '*',
+  '/',
+  '%',
+  '**',
+  '&&',
+  '||',
+  '??',
+  '|',
+  '&',
+  '^',
+  '<<',
+  '>>',
+  '>>>',
+  'instanceof',
+  'in',
+  'as',
+  'satisfies',
+])
+
+const LINE_BREAK_RE = /[\n\r\u2028\u2029]/
+
+/** is there a line terminator between two tokens in the source? */
+function lineBreakBetween(src, before, after) {
+  return LINE_BREAK_RE.test(src.slice(before.end, after.start))
+}
+
+/**
+ * Does the statement that reached token `k` continue at `k`? Without a line
+ * break it does. After one it does when the token after the break can continue
+ * the expression — an operator, `.`, `(`, `[`, a tagged template,
+ * `instanceof`/`in`/`as` — or when the token before the break still needs its
+ * operand, as a trailing `&&` does. `return` is a restricted production: a line
+ * break after it ends the statement whatever follows, so a `(`/`[` below it
+ * starts a new statement and is not a continuation. Anything else starts a new
+ * statement (ASI).
+ */
+function statementContinues(tokens, src, k) {
+  const tk = tokens[k]
+  const prev = tokens[k - 1]
+  if (!lineBreakBetween(src, prev, tk)) return true
+  if (prev.type === 'ident' && prev.value === 'return') {
+    const before = tokens[k - 2]
+    if (!(before && (before.value === '.' || before.value === '?.'))) return false
+  }
+  return continuesExpression(tk) || needsOperand(tokens, k - 1)
+}
+
+/**
+ * Can the token after a line break continue an expression? An operator, `.`,
+ * `(`, `[`, `in`/`as`/`instanceof`/`satisfies`, or a template literal — a
+ * tagged template whose tag ended the line above (`wrap` / break / `` `a` ``).
+ */
+function continuesExpression(tk) {
+  if (tk.type === 'template') return true
+  if (tk.type !== 'punct' && tk.type !== 'ident') return false
+  return CONTINUES_EXPRESSION.has(tk.value)
+}
+
+/**
+ * Does the token *before* a line break still need its operand, so the statement
+ * runs on? Only a genuine operator does. A completed primary expression — a
+ * template literal, a string/number/regex literal, a closing `)`/`]`/`}` — ends
+ * the expression there, and a keyword token (`in`, `as`, `instanceof`,
+ * `satisfies`) that is a property name (`read(call).in`) is a completed member
+ * access, not an operator waiting for a right-hand side. Without this, a
+ * consequent ending in a template or a property access ran into the statement
+ * below it (G706-BE-R3). The tokenizer agrees with the member-name case: the
+ * `/` that opens the next line there is a division (see `regexAllowed`), so
+ * this suppression only ends a statement that really ended and never cuts a
+ * division continuation short (G706-BE-R6).
+ */
+function needsOperand(tokens, k) {
+  const tk = tokens[k]
+  if (tk.type !== 'punct' && tk.type !== 'ident') return false
+  if (!CONTINUES_EXPRESSION.has(tk.value)) return false
+  if (tk.type === 'ident') {
+    const dot = tokens[k - 1]
+    if (dot && (dot.value === '.' || dot.value === '?.')) return false
+  }
+  return true
+}
+
+/** index just past the `( ... )` header at `at`, when `at` is its `(` */
+function headerEnd(tokens, at) {
+  return tokens[at] && tokens[at].value === '(' ? skipBalanced(tokens, at) : at
+}
+
+/**
+ * Index just past the statement that starts at `at`. A statement that is itself
+ * a control statement consumes its own consequent — and, for `if`, the `else`
+ * that binds to it — so a nested braceless consequent belongs to the outer
+ * branch and a line break inside it never ends the outer statement. Anything
+ * else is an expression statement.
+ */
+function statementEnd(tokens, src, at) {
+  const tk = tokens[at]
+  if (!tk || (tk.type !== 'punct' && tk.type !== 'ident')) {
+    return expressionStatementEnd(tokens, src, at)
+  }
+  // `label: stmt` — the label is part of the statement it names, so the branch
+  // runs to the labelled statement's own end (G706-BE-R4), stacked labels too
+  if (tk.type === 'ident' && tokens[at + 1] && tokens[at + 1].value === ':') {
+    return statementEnd(tokens, src, at + 2)
+  }
+  switch (tk.value) {
+    case ';':
+      return at
+    case '{':
+      return skipBraces(tokens, at)
+    case 'if':
+      return ifStatementEnd(tokens, src, at)
+    case 'for': {
+      // `for await (...)` is a `for` statement too
+      const open = tokens[at + 1] && tokens[at + 1].value === 'await' ? at + 2 : at + 1
+      return statementEnd(tokens, src, headerEnd(tokens, open))
+    }
+    case 'while':
+      return statementEnd(tokens, src, headerEnd(tokens, at + 1))
+    case 'do':
+      return doStatementEnd(tokens, src, at)
+    case 'switch':
+      return switchStatementEnd(tokens, at)
+    case 'try':
+      return tryStatementEnd(tokens, src, at)
+    default:
+      return expressionStatementEnd(tokens, src, at)
+  }
+}
+
+/**
+ * `if (cond) stmt [else stmt]`. The `else` binds to the nearest `if` that is
+ * still looking for one, so it belongs to this branch even when the consequent
+ * is a nested `if` or the `else` sits on the line below.
+ */
+function ifStatementEnd(tokens, src, at) {
+  let end = statementEnd(tokens, src, headerEnd(tokens, at + 1))
+  if (tokens[end] && tokens[end].value === ';') end += 1
+  if (tokens[end] && tokens[end].value === 'else') end = statementEnd(tokens, src, end + 1)
+  return end
+}
+
+/** `do stmt while (cond)` — the `while` closes the `do` it belongs to */
+function doStatementEnd(tokens, src, at) {
+  const end = statementEnd(tokens, src, at + 1)
+  return tokens[end] && tokens[end].value === 'while' ? headerEnd(tokens, end + 1) : end
+}
+
+/** `switch (cond) { ... }` */
+function switchStatementEnd(tokens, at) {
+  const header = headerEnd(tokens, at + 1)
+  return tokens[header] && tokens[header].value === '{' ? skipBraces(tokens, header) : header
+}
+
+/** `try Block [catch [(param)] Block] [finally Block]` */
+function tryStatementEnd(tokens, src, at) {
+  let end = statementEnd(tokens, src, at + 1)
+  while (tokens[end] && (tokens[end].value === 'catch' || tokens[end].value === 'finally')) {
+    const header = tokens[end].value === 'catch' ? headerEnd(tokens, end + 1) : end + 1
+    end = tokens[header] && tokens[header].value === '{' ? skipBraces(tokens, header) : header
+  }
+  return end
+}
+
+/**
+ * Index just past an expression statement: through the `;` or `}` that closes
+ * it at the outer level, else up to the line break where ASI ends it. A line
+ * break inside an open delimiter never ends it, so a multiline call, object or
+ * array stays one statement.
+ */
+function expressionStatementEnd(tokens, src, at) {
+  let end = at
+  let depth = 0
+  while (end < tokens.length) {
+    const tk = tokens[end]
+    const punct = tk.type === 'punct'
+    if (depth === 0 && end > at) {
+      if (punct && (tk.value === ';' || tk.value === '}')) break
+      if (!statementContinues(tokens, src, end)) break
+    }
+    if (punct && (tk.value === '(' || tk.value === '[' || tk.value === '{')) depth += 1
+    else if (punct && (tk.value === ')' || tk.value === ']' || tk.value === '}')) {
+      if (depth === 0) break
+      depth -= 1
+    }
+    end += 1
+  }
+  return end
+}
+
+/**
+ * [start, end) of the branch the `if (...)` at `openIdx` controls. A block
+ * branch ends at its matching `}`; a braceless branch is one statement, and the
+ * walk above finds that statement's real end — so a semicolon-free consequent
+ * stops where ASI ends it and never runs on into the code beneath it. Reading to
+ * the next `;`/`}` alone ran the markdown guard `=== 'ask_clarification'`
+ * through the whole `switch` below and over-reported `editor_write`.
+ */
+function branchRange(analysis, openIdx) {
+  const tokens = analysis.tokens
   const start = skipBalanced(tokens, openIdx)
-  if (tokens[start] && tokens[start].value === '{') {
+  if (tokens[start] && tokens[start].type === 'punct' && tokens[start].value === '{') {
     const end = skipBraces(tokens, start)
     return { start: start + 1, end: end - 1, branchStart: start, branchEnd: end }
   }
-  let end = start
-  while (end < tokens.length && tokens[end].value !== ';' && tokens[end].value !== '}') end += 1
+  const end = statementEnd(tokens, analysis.src, start)
   return { start, end, branchStart: start, branchEnd: end }
 }
 
@@ -1341,7 +1591,7 @@ function guardRegions(analysis, at, op, functions, _owners) {
   const tokens = analysis.tokens
   const open = enclosingIfCondition(tokens, at)
   if (open < 0) return null
-  const branch = branchRange(tokens, open)
+  const branch = branchRange(analysis, open)
   if (op === '===' || op === '==') return [{ from: branch.start, to: branch.end }]
   const fn = enclosingFunction(functions, at)
   if (!fn) return null
@@ -1507,9 +1757,41 @@ function collectReadOnlyNames(files) {
 const TOOL_DEF_TYPE_RE = /^(?:AgentToolDef|AgentTool)$/
 
 /**
- * Is token index `at` inside the body of a `get tools()` accessor? Walks the
- * enclosing brace stack, so a `return [ ... ]` nested in an `if` block of the
- * accessor still counts. Any other accessor (`get options()`) returns false.
+ * Index of the `)` that closes the parameter list of the accessor whose body
+ * brace is at `bodyOpen`, or -1. In `get tools() {` the `)` sits right before
+ * the body; the annotated spelling `get tools(): AgentToolDef[] {` puts a
+ * return-type annotation between them, so the walk back skips that annotation
+ * (balanced `()` / `[]` / `<>` groups) and stops at the `:` that separates it
+ * from the parameter list (R1-2). Any other brace head returns -1.
+ */
+function accessorParamClose(tokens, bodyOpen) {
+  const prev = tokens[bodyOpen - 1]
+  if (prev && prev.value === ')') return bodyOpen - 1
+  let depth = 0
+  for (let k = bodyOpen - 1; k >= 0; k -= 1) {
+    const tk = tokens[k]
+    if (tk.type !== 'punct') continue
+    const v = tk.value
+    if (v === ')' || v === ']' || v === '>') depth += 1
+    else if (v === '(' || v === '[' || v === '<') {
+      if (depth === 0) return -1
+      depth -= 1
+    } else if (depth === 0) {
+      if (v === ':') return tokens[k - 1] && tokens[k - 1].value === ')' ? k - 1 : -1
+      if (v === '{' || v === '}' || v === ';' || v === '=' || v === ',') return -1
+    }
+  }
+  return -1
+}
+
+/**
+ * Is token index `at` the operand of a `return` at a `get tools()` accessor
+ * body's own brace level? Only the innermost enclosing brace is consulted: the
+ * body brace of `get tools() { ... }` — whose head may carry a return-type
+ * annotation — opens a tools list, while a `return [ ... ]` nested deeper
+ * inside the accessor (a local helper, a control block) is that statement's own
+ * value and must not manufacture a phantom row (R1-3). Any other accessor
+ * (`get options()`) returns false.
  */
 function insideToolsAccessor(tokens, at) {
   const stack = []
@@ -1519,25 +1801,54 @@ function insideToolsAccessor(tokens, at) {
     if (tk.value === '{') stack.push(k)
     else if (tk.value === '}') stack.pop()
   }
-  for (let i = stack.length - 1; i >= 0; i -= 1) {
-    const bodyOpen = stack[i]
-    const close = tokens[bodyOpen - 1]
-    const open = tokens[bodyOpen - 2]
-    const name = tokens[bodyOpen - 3]
-    const get = tokens[bodyOpen - 4]
-    if (
-      close &&
-      close.value === ')' &&
-      open &&
-      open.value === '(' &&
-      name &&
-      name.type === 'ident' &&
-      name.value === 'tools' &&
-      get &&
-      get.type === 'ident' &&
-      get.value === 'get'
-    )
-      return true
+  const bodyOpen = stack[stack.length - 1]
+  if (bodyOpen === undefined) return false
+  const close = accessorParamClose(tokens, bodyOpen)
+  if (close < 0) return false
+  const open = tokens[close - 1]
+  const name = tokens[close - 2]
+  const get = tokens[close - 3]
+  return (
+    !!open &&
+    open.value === '(' &&
+    !!name &&
+    name.type === 'ident' &&
+    name.value === 'tools' &&
+    !!get &&
+    get.type === 'ident' &&
+    get.value === 'get'
+  )
+}
+
+/** the `{` of the object literal that encloses token index `at`, or -1 */
+function enclosingBrace(tokens, at) {
+  let depth = 0
+  for (let k = at - 1; k >= 0; k -= 1) {
+    const tk = tokens[k]
+    if (tk.type !== 'punct') continue
+    if (tk.value === '}') depth += 1
+    else if (tk.value === '{') {
+      if (depth === 0) return k
+      depth -= 1
+    }
+  }
+  return -1
+}
+
+/**
+ * Is the array literal at `at` — the value of a `tools:` field — inside a
+ * schema bag, i.e. inside an object that is the value of a `properties` /
+ * `inputSchema` key at any nesting level? A `tools` property of a schema
+ * describes a schema property; its items are not tools, however tool-shaped
+ * they look (R1-1).
+ */
+function insideSchemaBag(tokens, at) {
+  for (let open = enclosingBrace(tokens, at); open >= 0; open = enclosingBrace(tokens, open)) {
+    const colon = tokens[open - 1]
+    const key = tokens[open - 2]
+    if (!(colon && colon.type === 'punct' && colon.value === ':')) continue
+    if (!(key && (key.type === 'ident' || key.type === 'string'))) continue
+    if (key.value === 'properties' || key.value === 'inputSchema') return true
   }
   return false
 }
@@ -1547,14 +1858,14 @@ function insideToolsAccessor(tokens, at) {
  * forms are a tools list:
  *   1. an annotated binding — `AgentToolDef[] = [`, `readonly AgentToolDef[] = [`,
  *      `Array<AgentToolDef> = [`;
- *   2. the value of a `tools:` field — `tools: [ ... ]`;
+ *   2. the value of a `tools:` field outside a schema bag — `tools: [ ... ]`;
  *   3. the operand of `return` inside a `get tools()` accessor —
  *      `get tools() { return [ ... ] }`.
  * Any other array — an unannotated array, one typed as something else (an
- * option list, a typed command list), a nested `options:` bag, a `get options()`
- * returned literal, a plain helper's `return [ ... ]` — is not a tools list for
- * the `name` anchor below, so a non-tool `{ name, description }` element cannot
- * manufacture a phantom row.
+ * option list, a typed command list), a nested `options:` bag, a `tools` bag
+ * inside a schema, a `get options()` returned literal, a plain helper's
+ * `return [ ... ]` — is not a tools list for the `name` anchor below, so a
+ * non-tool `{ name, description }` element cannot manufacture a phantom row.
  */
 function toolListArrayIndices(tokens) {
   const out = new Set()
@@ -1562,7 +1873,10 @@ function toolListArrayIndices(tokens) {
     const tk = tokens[b]
     if (!(tk.type === 'punct' && tk.value === '[')) continue
 
-    // `tools: [ ... ]` — the value of a `tools` field is a tools list
+    // `tools: [ ... ]` — the value of a `tools` field is a tools list, unless
+    // the field sits inside a schema: `properties: { tools: [ … ] }` describes
+    // a schema property, so its items are not tools however tool-shaped they
+    // look
     const colon = tokens[b - 1]
     const fieldName = tokens[b - 2]
     if (
@@ -1571,7 +1885,8 @@ function toolListArrayIndices(tokens) {
       colon.value === ':' &&
       fieldName &&
       fieldName.type === 'ident' &&
-      fieldName.value === 'tools'
+      fieldName.value === 'tools' &&
+      !insideSchemaBag(tokens, b)
     ) {
       out.add(b)
       continue

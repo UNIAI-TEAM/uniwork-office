@@ -877,6 +877,952 @@ describe('name anchor hardening (N1/N2)', () => {
   })
 })
 
+describe('extractor residuals (G7-06)', () => {
+  // R1-1 (g6-12/review-be-extractor-1.md): the `tools: [...]` branch is
+  // file-global, so a property bag that happens to be named `tools` inside a
+  // schema is read as a tools list and its `{ name, description }` items become
+  // phantom rows. A schema property bag is a schema description, not a list of
+  // tools, while a real `tools:` field next to it still names its tools.
+  const SCHEMA_TOOLS_BAG_FIXTURE = {
+    'apps/docs/src/renderer/ai/tools.ts': [
+      "import type { AgentSkill, AgentToolDef } from '@genoffice/agent-core'",
+      '',
+      'export const realTool: AgentToolDef = {',
+      "  name: 'real_tool',",
+      "  description: 'a tool whose schema has a property bag named tools',",
+      '  inputSchema: {',
+      "    type: 'object',",
+      '    properties: {',
+      '      tools: [',
+      "        { name: 'phantom_in_schema', description: 'a schema property bag item, not a tool' },",
+      '      ],',
+      '    },',
+      '  },',
+      '}',
+      '',
+      'export const docsSkill: AgentSkill = {',
+      "  id: 'docs',",
+      '  tools: [',
+      '    {',
+      "      name: 'field_tool',",
+      "      description: 'schema-less tool in a real tools: field',",
+      '    },',
+      '  ],',
+      '}',
+      '',
+    ].join('\n'),
+  }
+
+  it('ignores a `tools` property bag nested in a schema (R1-1)', () => {
+    const { dir } = fixture(SCHEMA_TOOLS_BAG_FIXTURE)
+    const { rows } = extract({ repo: dir, rev: 'HEAD' })
+    const tools = rows.map((r) => r.tool).sort()
+    assert.deepEqual(tools, ['field_tool', 'real_tool'])
+    assert.equal(rows.find((r) => r.tool === 'field_tool').hash, 'unresolved:missing')
+  })
+
+  // R1-2 (same review): `insideToolsAccessor` requires the token right before
+  // the body brace to be `)`, so a return-type annotation on the accessor
+  // (`get tools(): AgentToolDef[]`) hides the accessor and its schema-less
+  // tools are dropped silently. The `get options()` negative must stay a
+  // non-tools accessor.
+  const ANNOTATED_ACCESSOR_FIXTURE = {
+    'apps/docs/src/renderer/ai/tools.ts': [
+      "import type { AgentSkill, AgentToolDef } from '@genoffice/agent-core'",
+      '',
+      'export const s: AgentSkill = {',
+      "  id: 'docs',",
+      '  get tools(): AgentToolDef[] {',
+      '    return [',
+      '      {',
+      "        name: 'annotated_tool',",
+      "        description: 'schema-less tool in a return-type-annotated accessor',",
+      '      },',
+      '    ]',
+      '  },',
+      '}',
+      '',
+      'export const menu = {',
+      '  get options(): Option[] {',
+      '    return [',
+      "      { name: 'opt_a', description: 'A' },",
+      '    ]',
+      '  },',
+      '}',
+      '',
+    ].join('\n'),
+  }
+
+  it('finds a returned tool in a return-type-annotated `get tools()` (R1-2)', () => {
+    const { dir } = fixture(ANNOTATED_ACCESSOR_FIXTURE)
+    const { rows } = extract({ repo: dir, rev: 'HEAD' })
+    const tool = rows.find((r) => r.tool === 'annotated_tool')
+    assert.ok(tool, 'the annotated accessor tools list must be recognised')
+    assert.equal(tool.hash, 'unresolved:missing')
+    assert.ok(
+      !rows.some((r) => r.tool === 'opt_a'),
+      'a `get options()` accessor is not a tools list',
+    )
+  })
+
+  // R1-3 (same review): `insideToolsAccessor` answered true when *any* enclosing
+  // brace was a `get tools()` body, so a local helper declared inside the
+  // accessor and returning a tool-shaped array was read as the accessor's own
+  // tools list. Only the accessor body's own brace level is that list; the
+  // direct `return [ ... ]` in the same fixture must keep its row.
+  const NESTED_HELPER_RETURN_FIXTURE = {
+    'apps/docs/src/renderer/ai/tools.ts': [
+      "import type { AgentSkill } from '@genoffice/agent-core'",
+      '',
+      'export const s: AgentSkill = {',
+      "  id: 'docs',",
+      '  get tools() {',
+      '    const helper = () => {',
+      '      return [',
+      "        { name: 'inner_tool', description: 'the helper return value, not the accessor list' },",
+      '      ]',
+      '    }',
+      '    void helper',
+      '    return [',
+      "      { name: 'direct_tool', description: 'schema-less tool in the accessor return' },",
+      '    ]',
+      '  },',
+      '}',
+      '',
+    ].join('\n'),
+  }
+
+  it('ignores a nested helper return inside `get tools()` (R1-3)', () => {
+    const { dir } = fixture(NESTED_HELPER_RETURN_FIXTURE)
+    const { rows } = extract({ repo: dir, rev: 'HEAD' })
+    const tools = rows.map((r) => r.tool).sort()
+    assert.deepEqual(tools, ['direct_tool'])
+    assert.equal(rows.find((r) => r.tool === 'direct_tool').hash, 'unresolved:missing')
+  })
+
+  // ASI (doc §3.1 group C, packet-G6-12): the markdown module routes with a
+  // semicolon-free braceless guard — `if (call.name === 'ask_clarification')
+  // return …` on one line with the `switch` below it. `branchRange()` used to
+  // end such a branch only at the next `;` or `}`, so the guard swallowed the
+  // `switch` and the guarded read-only tool was credited with a sibling case's
+  // `mutated: true`. The consequent is a single statement: it ends at the line
+  // break (ASI), while an unguarded sibling keeps its own switch flag.
+  const BRACELESS_GUARD_FIXTURE = {
+    'apps/docs/src/renderer/ai/tools.ts': [
+      "import type { AgentToolCall, AgentToolDef, ToolExecution } from '@genoffice/agent-core'",
+      '',
+      'export const AGENT_TOOLS: AgentToolDef[] = [',
+      '  {',
+      "    name: 'read_only_tool',",
+      "    description: 'guarded read-only tool',",
+      "    inputSchema: { type: 'object', properties: {} },",
+      '  },',
+      '  {',
+      "    name: 'mutating_sibling',",
+      "    description: 'mutating sibling routed by the switch below',",
+      "    inputSchema: { type: 'object', properties: {} },",
+      '  },',
+      ']',
+      '',
+      'export function executeTool(call: AgentToolCall): ToolExecution {',
+      "  if (call.name === 'read_only_tool') return executeRead(call)",
+      '  const doc = state.doc',
+      '  void doc',
+      '  switch (call.name) {',
+      "    case 'mutating_sibling':",
+      '      return writeDoc(call)',
+      '    default:',
+      "      return { output: 'unknown', isError: true, mutated: false, summary: call.name }",
+      '  }',
+      '}',
+      '',
+      'function executeRead(call: AgentToolCall): ToolExecution {',
+      "  return { output: 'read', mutated: false, summary: 'read' }",
+      '}',
+      '',
+      'function writeDoc(call: AgentToolCall): ToolExecution {',
+      "  return { output: 'wrote', mutated: true, summary: 'write' }",
+      '}',
+      '',
+    ].join('\n'),
+  }
+
+  it('ends a semicolon-free braceless `if` branch at its own statement (G7-06 ASI)', () => {
+    const { dir } = fixture(BRACELESS_GUARD_FIXTURE)
+    const { rows } = extract({ repo: dir, rev: 'HEAD' })
+    const write = (tool) => rows.find((r) => r.tool === tool).write
+    assert.equal(write('read_only_tool'), 'no')
+    assert.equal(write('mutating_sibling'), 'yes')
+  })
+})
+
+// G706-BE-R1 (reviewer-be-ext-r1.md): `statementContinues` looked only at the
+// token after a line break, so a braceless consequent that was still open there
+// — an unclosed call, a returned object or array, a trailing operator that
+// still needs its operand, a nested control statement — was cut at that line
+// break. The named tool then lost its own `mutated: true` and the table said
+// `no` / `undeclared` for code that mutates. Each shape below must keep its
+// declaration inside the branch; the negatives keep the statement after a bare
+// `return` (a restricted production) out of it, and the sibling keeps the
+// switch route itself intact.
+describe('braceless consequent extent (G7-06 r2)', () => {
+  const MULTILINE_CONSEQUENT_FIXTURE = {
+    'apps/docs/src/renderer/ai/tools.ts': [
+      "import type { AgentToolCall, AgentToolDef, ToolExecution } from '@genoffice/agent-core'",
+      '',
+      'export const AGENT_TOOLS: AgentToolDef[] = [',
+      "  { name: 'open_call', description: 'an unclosed call continues', inputSchema: { type: 'object' } },",
+      "  { name: 'object_return', description: 'a returned object continues', inputSchema: { type: 'object' } },",
+      "  { name: 'array_return', description: 'a returned array continues', inputSchema: { type: 'object' } },",
+      "  { name: 'trailing_operator', description: 'a trailing && continues', inputSchema: { type: 'object' } },",
+      "  { name: 'comma_argument', description: 'a comma before the break continues', inputSchema: { type: 'object' } },",
+      "  { name: 'comment_inside_call', description: 'a block comment spans the break', inputSchema: { type: 'object' } },",
+      "  { name: 'string_punctuation', description: 'a string holding a brace is not punctuation', inputSchema: { type: 'object' } },",
+      "  { name: 'nested_if', description: 'a nested braceless if is the consequent', inputSchema: { type: 'object' } },",
+      "  { name: 'nested_if_block', description: 'a nested if with a block consequent', inputSchema: { type: 'object' } },",
+      "  { name: 'nested_if_else', description: 'the else binds to the nested if', inputSchema: { type: 'object' } },",
+      "  { name: 'nested_for', description: 'a nested for is the consequent', inputSchema: { type: 'object' } },",
+      "  { name: 'nested_for_await', description: 'a nested for await is the consequent', inputSchema: { type: 'object' } },",
+      "  { name: 'nested_while', description: 'a nested while is the consequent', inputSchema: { type: 'object' } },",
+      "  { name: 'nested_do', description: 'a nested do/while is the consequent', inputSchema: { type: 'object' } },",
+      "  { name: 'nested_switch', description: 'a nested switch is the consequent', inputSchema: { type: 'object' } },",
+      "  { name: 'nested_try', description: 'a nested try is the consequent', inputSchema: { type: 'object' } },",
+      "  { name: 'outer_else', description: 'the guard branch stops before its own else', inputSchema: { type: 'object' } },",
+      "  { name: 'bare_return_block', description: 'a block after a bare return', inputSchema: { type: 'object' } },",
+      "  { name: 'bare_return_call', description: 'a call after a bare return', inputSchema: { type: 'object' } },",
+      "  { name: 'mutating_sibling', description: 'mutating sibling routed by the switch', inputSchema: { type: 'object' } },",
+      ']',
+      '',
+      'const ready = true',
+      'const pending = false',
+      'const mode = 1',
+      'const items = [1]',
+      '',
+      'function read(call: AgentToolCall): ToolExecution {',
+      "  return { output: 'read', mutated: false, summary: 'read' }",
+      '}',
+      '',
+      'function write(call: AgentToolCall): ToolExecution {',
+      "  return { output: 'wrote', mutated: true, summary: 'write' }",
+      '}',
+      '',
+      'function wrap(value: ToolExecution): ToolExecution {',
+      '  return value',
+      '}',
+      '',
+      'export async function executeTool(call: AgentToolCall): Promise<ToolExecution> {',
+      "  if (call.name === 'open_call')",
+      '    return wrap(',
+      '      write(call)',
+      '    )',
+      "  if (call.name === 'object_return')",
+      '    return {',
+      "      output: 'wrote',",
+      '      mutated: true,',
+      "      summary: 'write',",
+      '    }',
+      "  if (call.name === 'array_return')",
+      '    return [',
+      '      write(call),',
+      '    ]',
+      "  if (call.name === 'trailing_operator')",
+      '    return read(call) &&',
+      '      write(call)',
+      "  if (call.name === 'comma_argument')",
+      '    return wrap(read(call),',
+      '      write(call))',
+      "  if (call.name === 'comment_inside_call')",
+      '    return wrap(read(call), /* the comment',
+      '      spans a line */',
+      '      write(call))',
+      "  if (call.name === 'string_punctuation')",
+      "    return read(call).output === '}' ? write(call) : read(call)",
+      "  if (call.name === 'nested_if')",
+      '    if (ready)',
+      '      return write(call)',
+      "  if (call.name === 'nested_if_block')",
+      '    if (ready) {',
+      '      return write(call)',
+      '    }',
+      "  if (call.name === 'nested_if_else')",
+      '    if (ready) return read(call)',
+      '    else return write(call)',
+      "  if (call.name === 'nested_for')",
+      '    for (const item of items)',
+      '      write(call)',
+      "  if (call.name === 'nested_for_await')",
+      '    for await (const item of items)',
+      '      write(call)',
+      "  if (call.name === 'nested_while')",
+      '    while (pending)',
+      '      write(call)',
+      "  if (call.name === 'nested_do')",
+      '    do {',
+      '      write(call)',
+      '    } while (pending)',
+      "  if (call.name === 'nested_switch')",
+      '    switch (mode) {',
+      '      case 1:',
+      '        return write(call)',
+      '      default:',
+      '        return read(call)',
+      '    }',
+      "  if (call.name === 'nested_try')",
+      '    try {',
+      '      write(call)',
+      '    } catch {',
+      '      return read(call)',
+      '    }',
+      "  if (call.name === 'outer_else')",
+      '    return read(call)',
+      '  else',
+      '    write(call)',
+      "  if (call.name === 'bare_return_block')",
+      '    return',
+      '  {',
+      '    mutated: true',
+      '  }',
+      "  if (call.name === 'bare_return_call')",
+      '    return',
+      '  (write(call))',
+      '  switch (call.name) {',
+      "    case 'mutating_sibling':",
+      '      return write(call)',
+      '    default:',
+      "      return { output: 'unknown', isError: true, mutated: false, summary: call.name }",
+      '  }',
+      '}',
+      '',
+    ].join('\n'),
+  }
+
+  it('keeps a multiline consequent inside the braceless guard that owns it (G706-BE-R1)', () => {
+    const { dir } = fixture(MULTILINE_CONSEQUENT_FIXTURE)
+    const { rows } = extract({ repo: dir, rev: 'HEAD' })
+    const write = (tool) => {
+      const row = rows.find((r) => r.tool === tool)
+      assert.ok(row, `expected a row for ${tool}`)
+      return row.write
+    }
+    // every consequent below runs `mutated: true`
+    for (const tool of [
+      'open_call', // return wrap( / write(call) / )
+      'object_return', // return { / mutated: true / }
+      'array_return', // return [ / write(call) / ]
+      'trailing_operator', // return read(call) && / write(call)
+      'comma_argument', // return wrap(read(call), / write(call))
+      'comment_inside_call', // the line break sits inside a block comment
+      'string_punctuation', // a string whose decoded value is `}` is not punctuation
+      'nested_if', // if (ready) / return write(call)
+      'nested_if_block', // if (ready) { / return write(call) / }
+      'nested_if_else', // if (ready) return read(call) / else return write(call)
+      'nested_for', // for (const item of items) / write(call)
+      'nested_for_await', // for await (const item of items) / write(call)
+      'nested_while', // while (pending) / write(call)
+      'nested_do', // do { write(call) } while (pending)
+      'nested_switch', // switch (mode) { case 1: return write(call) … }
+      'nested_try', // try { write(call) } catch { … }
+    ]) {
+      assert.equal(write(tool), 'yes', `${tool} must keep its own mutating branch`)
+    }
+    // the guard's own `else` is not the `===` path, and the switch below still routes
+    assert.equal(write('outer_else'), 'no')
+    assert.equal(write('mutating_sibling'), 'yes')
+  })
+
+  it('does not credit a statement after a bare `return` (G706-BE-R1)', () => {
+    const { dir } = fixture(MULTILINE_CONSEQUENT_FIXTURE)
+    const { rows } = extract({ repo: dir, rev: 'HEAD' })
+    const write = (tool) => rows.find((r) => r.tool === tool).write
+    // `return` NL is a restricted production: the line break ends the statement,
+    // so the block / call below it runs for every tool, not as this guard's branch
+    assert.equal(write('bare_return_block'), 'undeclared')
+    assert.equal(write('bare_return_call'), 'undeclared')
+  })
+})
+
+// G706-BE-R3/-R4 (reviewer-be-ext-r2-report.md §5): the statement walk treated
+// a template literal as an operator that still needs its operand, so a
+// consequent that *ended* in a template never ended there — the walk ran on and
+// credited the following statement's `mutated: true` to a read-only tool, and
+// the symmetric `!==` fall-through lost a real flag. A template literal is one
+// complete primary expression: the next line continues the statement only when
+// it opens with an operator, a tagged template included. The same rule covers
+// the other completed tails (string, number, regex, an identifier — e.g. a
+// keyword used as a property name like `read(call).in` — and a closing `)`),
+// and a labelled control statement keeps its label inside the branch.
+describe('completed primary expression (G7-06 r3)', () => {
+  const COMPLETED_PRIMARY_FIXTURE = {
+    'apps/docs/src/renderer/ai/tools.ts': [
+      "import type { AgentToolCall, AgentToolDef, ToolExecution } from '@genoffice/agent-core'",
+      '',
+      'export const AGENT_TOOLS: AgentToolDef[] = [',
+      "  { name: 't_plain', description: 'a template ends the statement', inputSchema: { type: 'object' } },",
+      "  { name: 't_switch', description: 'a template then a sibling switch', inputSchema: { type: 'object' } },",
+      "  { name: 't_interp', description: 'an interpolated template ends the statement', inputSchema: { type: 'object' } },",
+      "  { name: 't_nested', description: 'a nested template ends the statement', inputSchema: { type: 'object' } },",
+      "  { name: 't_void', description: 'a void template ends the statement', inputSchema: { type: 'object' } },",
+      "  { name: 't_assign', description: 'an assigned template ends the statement', inputSchema: { type: 'object' } },",
+      "  { name: 'read_and', description: 'a read && template branch falls through', inputSchema: { type: 'object' } },",
+      "  { name: 't_prop_in', description: 'a property named in completes the statement', inputSchema: { type: 'object' } },",
+      "  { name: 't_prop_as', description: 'a property named as completes the statement', inputSchema: { type: 'object' } },",
+      "  { name: 't_string', description: 'a string ends the statement', inputSchema: { type: 'object' } },",
+      "  { name: 't_number', description: 'a number ends the statement', inputSchema: { type: 'object' } },",
+      "  { name: 't_regex', description: 'a regex ends the statement', inputSchema: { type: 'object' } },",
+      "  { name: 't_close', description: 'a member access on a call ends the statement', inputSchema: { type: 'object' } },",
+      "  { name: 'tag_next', description: 'a tagged template continues the statement', inputSchema: { type: 'object' } },",
+      "  { name: 'call_template', description: 'a template inside an open call continues', inputSchema: { type: 'object' } },",
+      "  { name: 'closed_call', description: 'a closed call with a template ends the statement', inputSchema: { type: 'object' } },",
+      "  { name: 'lbl_if', description: 'a labelled if is the consequent', inputSchema: { type: 'object' } },",
+      "  { name: 'lbl_for', description: 'a labelled for is the consequent', inputSchema: { type: 'object' } },",
+      "  { name: 'lbl_while', description: 'a labelled while is the consequent', inputSchema: { type: 'object' } },",
+      "  { name: 'lbl_block', description: 'a labelled block is the consequent', inputSchema: { type: 'object' } },",
+      "  { name: 'lbl_switch', description: 'a labelled switch is the consequent', inputSchema: { type: 'object' } },",
+      "  { name: 'sib_plain', description: 'mutating sibling of the plain template', inputSchema: { type: 'object' } },",
+      "  { name: 'sib_switch', description: 'mutating sibling in the switch route', inputSchema: { type: 'object' } },",
+      "  { name: 'sib_interp', description: 'mutating sibling of the interpolated template', inputSchema: { type: 'object' } },",
+      "  { name: 'sib_nested', description: 'mutating sibling of the nested template', inputSchema: { type: 'object' } },",
+      "  { name: 'sib_void', description: 'mutating sibling of the void template', inputSchema: { type: 'object' } },",
+      "  { name: 'sib_assign', description: 'mutating sibling of the assigned template', inputSchema: { type: 'object' } },",
+      "  { name: 'sib_read_and', description: 'mutating sibling after read && template', inputSchema: { type: 'object' } },",
+      "  { name: 'sib_prop_in', description: 'mutating sibling of the in property', inputSchema: { type: 'object' } },",
+      "  { name: 'sib_prop_as', description: 'mutating sibling of the as property', inputSchema: { type: 'object' } },",
+      "  { name: 'sib_string', description: 'mutating sibling of the string tail', inputSchema: { type: 'object' } },",
+      "  { name: 'sib_number', description: 'mutating sibling of the number tail', inputSchema: { type: 'object' } },",
+      "  { name: 'sib_regex', description: 'mutating sibling of the regex tail', inputSchema: { type: 'object' } },",
+      "  { name: 'sib_close', description: 'mutating sibling of the member access tail', inputSchema: { type: 'object' } },",
+      "  { name: 'sib_closed', description: 'mutating sibling in the closed-call switch', inputSchema: { type: 'object' } },",
+      "  { name: 'mutating_sibling', description: 'mutating sibling routed by the switch', inputSchema: { type: 'object' } },",
+      ']',
+      '',
+      'const ready = true',
+      'const pending = false',
+      'const mode = 1',
+      'const items = [1]',
+      'let out: unknown',
+      '',
+      'function read(call: AgentToolCall): ToolExecution {',
+      "  return { output: 'read', mutated: false, summary: 'read' }",
+      '}',
+      '',
+      'function write(call: AgentToolCall): ToolExecution {',
+      "  return { output: 'wrote', mutated: true, summary: 'write' }",
+      '}',
+      '',
+      'function wrap(value: ToolExecution): ToolExecution {',
+      "  return { output: 'wrapped', mutated: false, summary: 'wrap' }",
+      '}',
+      '',
+      'export async function executeTool(call: AgentToolCall): Promise<ToolExecution> {',
+      "  if (call.name === 't_plain')",
+      '    return `a`',
+      "  if (call.name === 'sib_plain') return write(call)",
+      "  if (call.name === 't_switch')",
+      '    return `a`',
+      '  switch (call.name) {',
+      "    case 'sib_switch':",
+      '      return write(call)',
+      '    default:',
+      '      return read(call)',
+      '  }',
+      "  if (call.name === 't_interp')",
+      '    return `${call.name}`',
+      "  if (call.name === 'sib_interp') return write(call)",
+      "  if (call.name === 't_nested')",
+      '    return `${`inner ${1}`}`',
+      "  if (call.name === 'sib_nested') return write(call)",
+      "  if (call.name === 't_void')",
+      '    void `a`',
+      "  if (call.name === 'sib_void') return write(call)",
+      "  if (call.name === 't_assign')",
+      '    out = `a`',
+      "  if (call.name === 'sib_assign') return write(call)",
+      "  if (call.name === 'read_and')",
+      '    read(call) &&',
+      '      `a`',
+      "  if (call.name === 'sib_read_and') return write(call)",
+      "  if (call.name === 't_prop_in')",
+      '    return read(call).in',
+      "  if (call.name === 'sib_prop_in') return write(call)",
+      "  if (call.name === 't_prop_as')",
+      '    return read(call).as',
+      "  if (call.name === 'sib_prop_as') return write(call)",
+      "  if (call.name === 't_string')",
+      "    return read(call) && 'a'",
+      "  if (call.name === 'sib_string') return write(call)",
+      "  if (call.name === 't_number')",
+      '    return read(call) && 5',
+      "  if (call.name === 'sib_number') return write(call)",
+      "  if (call.name === 't_regex')",
+      '    return read(call) && /a/',
+      "  if (call.name === 'sib_regex') return write(call)",
+      "  if (call.name === 't_close')",
+      '    return read(call).output',
+      "  if (call.name === 'sib_close') return write(call)",
+      "  if (call.name === 'tag_next')",
+      '    return wrap',
+      '      `a${1}',
+      'b` && write(call)',
+      "  if (call.name === 'call_template')",
+      '    return wrap(',
+      '      `a',
+      'b`,',
+      '      write(call))',
+      "  if (call.name === 'closed_call')",
+      '    return wrap(',
+      '      `a`',
+      '    )',
+      '  switch (call.name) {',
+      "    case 'sib_closed':",
+      '      return write(call)',
+      '  }',
+      "  if (call.name === 'lbl_if')",
+      '    label_if: if (ready)',
+      '      return write(call)',
+      "  if (call.name === 'lbl_for')",
+      '    label_for: for (const item of items)',
+      '      write(call)',
+      "  if (call.name === 'lbl_while')",
+      '    label_while: while (pending)',
+      '      write(call)',
+      "  if (call.name === 'lbl_block')",
+      '    label_block: {',
+      '      return write(call)',
+      '    }',
+      "  if (call.name === 'lbl_switch')",
+      '    label_switch: switch (mode) {',
+      '      case 1:',
+      '        write(call)',
+      '    }',
+      '  switch (call.name) {',
+      "    case 'mutating_sibling':",
+      '      return write(call)',
+      '    default:',
+      "      return { output: 'unknown', isError: true, mutated: false, summary: call.name }",
+      '  }',
+      '}',
+      '',
+    ].join('\n'),
+    'apps/docs/src/renderer/ai/neq.ts': [
+      "import type { AgentToolCall, AgentToolDef, ToolExecution } from '@genoffice/agent-core'",
+      '',
+      'export const AGENT_TOOLS: AgentToolDef[] = [',
+      "  { name: 't_neq', description: 'the fall-through keeps its own mutation', inputSchema: { type: 'object' } },",
+      "  { name: 't_neq_prop', description: 'the fall-through after a property tail', inputSchema: { type: 'object' } },",
+      ']',
+      '',
+      'function read(call: AgentToolCall): ToolExecution {',
+      "  return { output: 'read', mutated: false, summary: 'read' }",
+      '}',
+      '',
+      'function write(call: AgentToolCall): ToolExecution {',
+      "  return { output: 'wrote', mutated: true, summary: 'write' }",
+      '}',
+      '',
+      'export async function executeNeq(call: AgentToolCall): Promise<ToolExecution> {',
+      "  if (call.name !== 't_neq')",
+      '    return read(call) && `a`',
+      '  write(call)',
+      '}',
+      '',
+      'export async function executeNeqProp(call: AgentToolCall): Promise<ToolExecution> {',
+      "  if (call.name !== 't_neq_prop')",
+      '    return read(call).in',
+      '  write(call)',
+      '}',
+      '',
+    ].join('\n'),
+  }
+
+  it('ends a consequent at the primary expression that completes it (G706-BE-R3)', () => {
+    const { dir } = fixture(COMPLETED_PRIMARY_FIXTURE)
+    const { rows } = extract({ repo: dir, rev: 'HEAD' })
+    const write = (tool) => {
+      const row = rows.find((r) => r.tool === tool)
+      assert.ok(row, `expected a row for ${tool}`)
+      return row.write
+    }
+    // the template (plain, interpolated, nested) ends the consequent at ASI, so
+    // the sibling below it is a statement of its own, not part of this branch
+    for (const tool of ['t_plain', 't_switch', 't_interp', 't_nested', 't_void', 't_assign']) {
+      assert.equal(write(tool), 'undeclared', `${tool} must not borrow a sibling's mutation`)
+    }
+    // `read(call) &&` + template: the branch declares only read's `mutated: false`
+    assert.equal(write('read_and'), 'no')
+    // a keyword used as a property name is a complete expression too
+    assert.equal(write('t_prop_in'), 'no')
+    assert.equal(write('t_prop_as'), 'no')
+    // the already-correct completed tails (string, number, regex, member access)
+    for (const tool of ['t_string', 't_number', 't_regex', 't_close']) {
+      assert.equal(write(tool), 'no', `${tool} must end at its own statement`)
+    }
+    // and every sibling guard keeps its own mutating branch
+    for (const tool of [
+      'sib_plain',
+      'sib_switch',
+      'sib_interp',
+      'sib_nested',
+      'sib_void',
+      'sib_assign',
+      'sib_read_and',
+      'sib_prop_in',
+      'sib_prop_as',
+      'sib_string',
+      'sib_number',
+      'sib_regex',
+      'sib_close',
+      'sib_closed',
+    ]) {
+      assert.equal(write(tool), 'yes', `${tool} must keep its own mutating branch`)
+    }
+  })
+
+  it('keeps a template that does not complete the statement inside the branch (G706-BE-R3)', () => {
+    const { dir } = fixture(COMPLETED_PRIMARY_FIXTURE)
+    const { rows } = extract({ repo: dir, rev: 'HEAD' })
+    const write = (tool) => rows.find((r) => r.tool === tool).write
+    // a tagged template on the next line continues the statement
+    assert.equal(write('tag_next'), 'yes')
+    // and a template spanning lines inside an open call keeps the call's argument
+    assert.equal(write('call_template'), 'yes')
+    // a closed call (wrap declares `mutated: false`) ends the statement at `)`
+    assert.equal(write('closed_call'), 'no')
+  })
+
+  it('keeps the `!==` fall-through after a completed primary expression (G706-BE-R3)', () => {
+    const { dir } = fixture(COMPLETED_PRIMARY_FIXTURE)
+    const { rows } = extract({ repo: dir, rev: 'HEAD' })
+    const write = (tool) => rows.find((r) => r.tool === tool).write
+    // the early-return consequent ends at the template / the property access, so
+    // the `write(call)` under it is the tool's own fall-through path
+    assert.equal(write('t_neq'), 'yes')
+    assert.equal(write('t_neq_prop'), 'yes')
+  })
+
+  it('takes a labelled control statement with the braceless branch (G706-BE-R4)', () => {
+    const { dir } = fixture(COMPLETED_PRIMARY_FIXTURE)
+    const { rows } = extract({ repo: dir, rev: 'HEAD' })
+    const write = (tool) => rows.find((r) => r.tool === tool).write
+    // the three shapes the review found broken, plus the labelled block and
+    // labelled switch that were already correct before this fix
+    for (const tool of ['lbl_if', 'lbl_for', 'lbl_while', 'lbl_block', 'lbl_switch']) {
+      assert.equal(write(tool), 'yes', `${tool} must keep the labelled consequent`)
+    }
+  })
+})
+
+// G706-BE-R6/-R7 (reviewer-be-ext-r3-report.md §5): a keyword used as a property
+// name (`read(call).in`, `read(call).instanceof`) completes the expression, but
+// the tokenizer still read the `/` that opens the next line as a regex literal.
+// One `regex` token swallowed the division (`/ 2 /`), the walk stopped at the
+// property, and the consequent was cut short: the `===` branch lost its real
+// `write` call and the `!==` fall-through started early and credited one. The
+// tokenizer must keep a `/` after a member name a division — and after a
+// postfix `++`/`--`, the same completed-expression class — so the division that
+// really continues the statement does continue it.
+describe('division after a property name (G7-06 r4)', () => {
+  const KEYWORD_PROPERTIES = ['in', 'instanceof', 'typeof', 'delete', 'void', 'new', 'return']
+  const EQ_TOOLS = [
+    ...KEYWORD_PROPERTIES.flatMap((kw) => [`eq_${kw}`, `sib_eq_${kw}`]),
+    'eq_opt_in',
+    'sib_eq_opt_in',
+    'eq_as',
+    'sib_eq_as',
+    'eq_output',
+    'sib_eq_output',
+    'div_paren',
+    'sib_div_paren',
+    'div_bracket',
+    'sib_div_bracket',
+    'div_brace',
+    'sib_div_brace',
+    'div_literal',
+    'sib_div_literal',
+    'div_ident',
+    'sib_div_ident',
+    'div_string',
+    'sib_div_string',
+    'div_template',
+    'sib_div_template',
+    'div_regex',
+    'sib_div_regex',
+    'div_postfix_inc',
+    'sib_div_postfix_inc',
+    'div_postfix_dec',
+    'sib_div_postfix_dec',
+    'ctrl_regex_return',
+    'sib_ctrl_regex_return',
+    'ctrl_regex_and',
+    'sib_ctrl_regex_and',
+    'ctrl_regex_stmt',
+    'sib_ctrl_regex_stmt',
+  ]
+  // one guard per tool; the consequent on one line, its division on the next
+  const NEQ_ROWS = [
+    ...KEYWORD_PROPERTIES.map((kw) => [`neq_${kw}`, `read(call).${kw}`]),
+    ['neq_as', 'read(call).as'],
+    ['neq_output', 'read(call).output'],
+  ]
+
+  const DIVISION_PROPERTY_FIXTURE = {
+    'apps/docs/src/renderer/ai/div_eq.ts': [
+      "import type { AgentToolCall, AgentToolDef, ToolExecution } from '@genoffice/agent-core'",
+      '',
+      'export const AGENT_TOOLS: AgentToolDef[] = [',
+      ...EQ_TOOLS.map(
+        (name) =>
+          `  { name: '${name}', description: 'division continues a property tail', inputSchema: { type: 'object' } },`,
+      ),
+      ']',
+      '',
+      'const mode = 1',
+      'let counter = 0',
+      '',
+      'function read(call: AgentToolCall): ToolExecution {',
+      "  return { output: 'read', mutated: false, summary: 'read' }",
+      '}',
+      '',
+      'function write(call: AgentToolCall): ToolExecution {',
+      "  return { output: 'wrote', mutated: true, summary: 'write' }",
+      '}',
+      '',
+      'function wrap(value: ToolExecution): ToolExecution {',
+      "  return { output: 'wrapped', mutated: false, summary: 'wrap' }",
+      '}',
+      '',
+      'export async function executeTool(call: AgentToolCall): Promise<ToolExecution> {',
+      ...KEYWORD_PROPERTIES.flatMap((kw) => [
+        `  if (call.name === 'eq_${kw}')`,
+        `    return read(call).${kw}`,
+        '      / 2 / write(call)',
+        `  if (call.name === 'sib_eq_${kw}') return write(call)`,
+      ]),
+      "  if (call.name === 'eq_opt_in')",
+      '    return read(call)?.in',
+      '      / 2 / write(call)',
+      "  if (call.name === 'sib_eq_opt_in') return write(call)",
+      "  if (call.name === 'eq_as')",
+      '    return read(call).as',
+      '      / 2 / write(call)',
+      "  if (call.name === 'sib_eq_as') return write(call)",
+      "  if (call.name === 'eq_output')",
+      '    return read(call).output',
+      '      / 2 / write(call)',
+      "  if (call.name === 'sib_eq_output') return write(call)",
+      "  if (call.name === 'div_paren')",
+      '    return wrap(read(call))',
+      '      / 2 / write(call)',
+      "  if (call.name === 'sib_div_paren') return write(call)",
+      "  if (call.name === 'div_bracket')",
+      '    return [read(call)][0]',
+      '      / 2 / write(call)',
+      "  if (call.name === 'sib_div_bracket') return write(call)",
+      "  if (call.name === 'div_brace')",
+      '    return { output: read(call).output }',
+      '      / 2 / write(call)',
+      "  if (call.name === 'sib_div_brace') return write(call)",
+      "  if (call.name === 'div_literal')",
+      '    return read(call) && 5',
+      '      / 2 / write(call)',
+      "  if (call.name === 'sib_div_literal') return write(call)",
+      "  if (call.name === 'div_ident')",
+      '    return read(call) && mode',
+      '      / 2 / write(call)',
+      "  if (call.name === 'sib_div_ident') return write(call)",
+      "  if (call.name === 'div_string')",
+      "    return read(call) && 'a'",
+      '      / 2 / write(call)',
+      "  if (call.name === 'sib_div_string') return write(call)",
+      "  if (call.name === 'div_template')",
+      '    return read(call) && `a`',
+      '      / 2 / write(call)',
+      "  if (call.name === 'sib_div_template') return write(call)",
+      "  if (call.name === 'div_regex')",
+      '    return read(call) && /a/',
+      '      / 2 / write(call)',
+      "  if (call.name === 'sib_div_regex') return write(call)",
+      "  if (call.name === 'div_postfix_inc')",
+      '    counter++',
+      '      / 2 / write(call)',
+      "  if (call.name === 'sib_div_postfix_inc') return write(call)",
+      "  if (call.name === 'div_postfix_dec')",
+      '    counter--',
+      '      / 2 / write(call)',
+      "  if (call.name === 'sib_div_postfix_dec') return write(call)",
+      "  if (call.name === 'ctrl_regex_return')",
+      "    return / 2 /.test(String(read(call).output)) && write(call)",
+      "  if (call.name === 'sib_ctrl_regex_return') return write(call)",
+      "  if (call.name === 'ctrl_regex_and')",
+      '    return read(call) &&',
+      '      / 2 /.test(String(read(call).output)) && write(call)',
+      "  if (call.name === 'sib_ctrl_regex_and') return write(call)",
+      "  if (call.name === 'ctrl_regex_stmt')",
+      '    / 2 /.test(String(read(call).output)) && write(call)',
+      "  if (call.name === 'sib_ctrl_regex_stmt') return write(call)",
+      '}',
+      '',
+    ].join('\n'),
+    'apps/docs/src/renderer/ai/div_neq.ts': [
+      "import type { AgentToolCall, AgentToolDef, ToolExecution } from '@genoffice/agent-core'",
+      '',
+      'export const AGENT_TOOLS: AgentToolDef[] = [',
+      ...NEQ_ROWS.map(
+        ([name]) =>
+          `  { name: '${name}', description: 'division after a property tail', inputSchema: { type: 'object' } },`,
+      ),
+      ']',
+      '',
+      'function read(call: AgentToolCall): ToolExecution {',
+      "  return { output: 'read', mutated: false, summary: 'read' }",
+      '}',
+      '',
+      'function write(call: AgentToolCall): ToolExecution {',
+      "  return { output: 'wrote', mutated: true, summary: 'write' }",
+      '}',
+      '',
+      // the consequent (the branch the tool does not take) ends after the whole
+      // division statement, so the fall-through `return read(call)` is the
+      // tool's own path, and `write` must never reach it
+      ...NEQ_ROWS.flatMap(([name, tail]) => [
+        `export async function execute_${name}(call: AgentToolCall): Promise<ToolExecution> {`,
+        `  if (call.name !== '${name}')`,
+        `    return ${tail}`,
+        '      / 2 / write(call)',
+        '  return read(call)',
+        '}',
+        '',
+      ]),
+    ].join('\n'),
+  }
+
+  it('keeps the division that continues a keyword property tail in the `===` branch (G706-BE-R6)', () => {
+    const { dir } = fixture(DIVISION_PROPERTY_FIXTURE)
+    const { rows } = extract({ repo: dir, rev: 'HEAD' })
+    const write = (tool) => {
+      const row = rows.find((r) => r.tool === tool)
+      assert.ok(row, `expected a row for ${tool}`)
+      return row.write
+    }
+    // each consequent really is `return read(call).<kw> / 2 / write(call)`: the
+    // division-initial line continues the statement, so `write` is reached
+    for (const kw of KEYWORD_PROPERTIES) {
+      assert.equal(write(`eq_${kw}`), 'yes', `eq_${kw} must keep its division continuation`)
+      assert.equal(write(`sib_eq_${kw}`), 'yes', `sib_eq_${kw} must keep its own branch`)
+    }
+    assert.equal(write('eq_opt_in'), 'yes')
+    assert.equal(write('sib_eq_opt_in'), 'yes')
+  })
+
+  it('credits the `!==` fall-through only after the whole division statement (G706-BE-R6)', () => {
+    const { dir } = fixture(DIVISION_PROPERTY_FIXTURE)
+    const { rows } = extract({ repo: dir, rev: 'HEAD' })
+    const write = (tool) => {
+      const row = rows.find((r) => r.tool === tool)
+      assert.ok(row, `expected a row for ${tool}`)
+      return row.write
+    }
+    // the truncated consequent used to hand the rest of the statement to the
+    // fall-through, so `write` was credited to a read-only tool
+    for (const [name] of NEQ_ROWS) {
+      assert.equal(write(name), 'no', `${name} must not credit the early-return branch`)
+    }
+  })
+
+  it('keeps the division continuation after every other completed tail (G706-BE-R6 sweep)', () => {
+    const { dir } = fixture(DIVISION_PROPERTY_FIXTURE)
+    const { rows } = extract({ repo: dir, rev: 'HEAD' })
+    const write = (tool) => rows.find((r) => r.tool === tool).write
+    for (const tool of [
+      'div_paren',
+      'div_bracket',
+      'div_brace',
+      'div_literal',
+      'div_ident',
+      'div_string',
+      'div_template',
+      'div_regex',
+      'div_postfix_inc',
+      'div_postfix_dec',
+    ]) {
+      assert.equal(write(tool), 'yes', `${tool} must keep its division continuation`)
+      assert.equal(write(`sib_${tool}`), 'yes', `sib_${tool} must keep its own branch`)
+    }
+  })
+
+  it('keeps a non-keyword property and a real regex green (G706-BE-R6 controls)', () => {
+    const { dir } = fixture(DIVISION_PROPERTY_FIXTURE)
+    const { rows } = extract({ repo: dir, rev: 'HEAD' })
+    const write = (tool) => rows.find((r) => r.tool === tool).write
+    // `as` / `output` never allowed a regex after them, so they were already
+    // right; a real regex literal keeps being a regex
+    for (const tool of [
+      'eq_as',
+      'sib_eq_as',
+      'eq_output',
+      'sib_eq_output',
+      'ctrl_regex_return',
+      'sib_ctrl_regex_return',
+      'ctrl_regex_and',
+      'sib_ctrl_regex_and',
+      'ctrl_regex_stmt',
+      'sib_ctrl_regex_stmt',
+    ]) {
+      assert.equal(write(tool), 'yes', `${tool} must keep its own branch`)
+    }
+  })
+})
+
+// G706-BE-R8/-R9/-R10 and the fail-closed question (reviewer-be-ext-r4-report.md).
+// The residuals are LATENT under the advisor rule: no reachable trigger at
+// 66169a9a, 0d03b185 or cb76dde5, and their three-rev stdout is byte-identical.
+// They stay todos, with the exact source shape in each comment, so the fixture
+// can be written from them without re-deriving the trigger.
+describe('latent residuals (G7-06 r5)', () => {
+  // LATENT: zero prefix update followed by a regex token at all three revs.
+  // Equality shape, expected `yes` (f0fead82 gives `undeclared`):
+  //   if (call.name === 'target') ++/;/.lastIndex && write(call)
+  //   if (call.name === 'target') --/;/.lastIndex && write(call)
+  // Inequality shape, expected `no` (f0fead82 gives `yes`), the consequent is the
+  // early return and `return read(call)` is the fall-through:
+  //   if (call.name !== 'target') ++/;/.lastIndex && write(call)
+  //   return read(call)
+  // Postfix controls keep their division, expected `yes` under `===`:
+  //   counter++ NL / 2 / write(call)
+  //   counter-- NL / 2 / write(call)
+  it.todo('LATENT G706-BE-R8: prefix ++/-- before a regex member keeps the guard boundary')
+
+  // LATENT: zero decoded `.` or `?.` string followed by a regex-allowing keyword
+  // at all three revs (six `.` strings, each followed by `)` or `:`).
+  // Equality shape inside the guard block, expected `yes` (f0fead82 gives `undeclared`):
+  //   if (call.name === 'target') {
+  //     const x = '.'
+  //     return /}/.test('x') && write(call)
+  //   }
+  // The same with const x = '?.'. Real-member controls, expected `yes`:
+  //   return read(call).output NL / 2 / write(call)
+  //   return read(call).in NL / 2 / write(call)
+  it.todo('LATENT G706-BE-R9: string dot before return does not turn a regex into division')
+
+  // LATENT: verification gap linked to R8/R9. All 40 tests pass while the R8 and
+  // R9 shapes regress, because no fixture covers a prefix update before a regex
+  // member or a decoded dot string before a regex-allowing keyword. The two todos
+  // above are those complementary fixtures; zero occurrences at all three revs.
+  it.todo(
+    'LATENT G706-BE-R10: new tokenizer branches have complementary fixtures for prefix update and string dot',
+  )
+
+  // Fail-closed, not latent: the extractor does not fail closed today. Each probe
+  // below exits 0 with an ordinary cell (report: FAIL CLOSED NO). Expected: a
+  // nonzero exit or an explicit unresolved cell, and no yes/no for that analysis.
+  //   missing final `}` after `if (call.name === 't') return read(call)` + `return write(call)` (today: no)
+  //   `return { mutated:false` never closed, then `return write(call)` (today: yes)
+  //   unknown token `call.name §=== 't'` in the guard condition (today: no)
+  //   unterminated `'oops` after `return read(call) +` (today: no)
+  //   `return wrap(` NL `read(call)` NL `return write(call)`, no matching `)` (today: yes)
+  //   unbounded consequent `return typeof` NL `write(call)` (today: undeclared)
+  it.todo('extractor fails closed on malformed tokens and unbounded guard consequents')
+})
+
 describe('real repo', () => {
   it('produces rows for each of the six apps at HEAD', () => {
     const { rows } = extract({ repo: REPO_ROOT, rev: 'HEAD' })
