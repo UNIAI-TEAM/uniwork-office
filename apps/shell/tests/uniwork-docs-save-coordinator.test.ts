@@ -992,6 +992,60 @@ describe('G5-06 W4a save queue (fakes)', () => {
     expect((await stored(unknown.intents, u))?.intent.state).toBe('reconciling-stuck')
   })
 
+  it('G506-be-d1-1: an in-flight record at rest runs under the lock and canCommit (no write, no lookup)', async () => {
+    const seedInFlight = async (
+      h: Harness,
+      state: 'uploading' | 'committing',
+    ): Promise<QueueDoc> => {
+      const doc = h.makeDoc()
+      doc.record = { ...doc.record, state, attempt: 1 }
+      await h.intents.put(doc.key, doc.record, doc.payload)
+      return doc
+    }
+
+    // (a) another window holds a FRESH lease: this window does nothing at all -
+    // no lookup, no record write (the be-6 read-only invariant, d1-1)
+    const other = await harness()
+    const held = await seedInFlight(other, 'uploading')
+    other.lockTable.leases.set(held.key, {
+      owner: 'win1',
+      generation: 1,
+      heartbeatAt: other.clock.now,
+    })
+    const before = await stored(other.intents, held)
+    const loser = other.newDispatcher('win2')
+    const result = await loser.dispatchAll([held])
+    expect(loser.isOtherWindow(held.key)).toBe(true)
+    expect(other.server.state.counts.lookup).toBe(0)
+    expect(other.server.state.counts.upload).toBe(0)
+    expect(other.server.state.counts.commit).toBe(0)
+    // the shared record is untouched (same bytes and updatedAt)
+    expect(await stored(other.intents, held)).toEqual(before)
+    expect(result.dispatched).toBe(1)
+    // the loser's own status says why
+    expect(other.published.at(-1)).toMatchObject({ state: 'blocked', lastError: 'other_window' })
+
+    // (b) canCommit false (a torn-down / switched session): no lookup, no write
+    const off = await harness()
+    const torn = await seedInFlight(off, 'committing')
+    const beforeTorn = await stored(off.intents, torn)
+    const dead = off.newDispatcherWith({ canCommit: () => false })
+    await dead.dispatchAll([torn])
+    expect(off.server.state.counts.lookup).toBe(0)
+    expect(off.server.state.counts.upload).toBe(0)
+    expect(off.server.state.counts.commit).toBe(0)
+    expect(await stored(off.intents, torn)).toEqual(beforeTorn)
+    expect(torn.record.state).toBe('committing')
+
+    // (c) the holder runs the same record: one lookup settles it, the record moves
+    const holder = await harness()
+    const mine = await seedInFlight(holder, 'uploading')
+    holder.server.state.lookupOutcome = 'not_committed'
+    await holder.dispatcher.dispatchAll([mine])
+    expect(holder.server.state.counts.lookup).toBe(1)
+    expect(mine.record.state).toBe('queued')
+  })
+
   it('lock holder crash -> the other window acquires after goneMs', async () => {
     const h = await harness()
     const doc = h.makeDoc()

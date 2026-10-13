@@ -294,8 +294,10 @@ export class QueueDispatcher {
         if (this.isInFlightState(doc.record.state)) {
           // a stop left this record mid-flight and THIS dispatcher is not
           // running it: resolve it through the lookup, never a new key or a
-          // blind re-upload (G5-06 fix-C item 4)
-          outcomes.set(doc.key, await this.settleInFlight(doc, now))
+          // blind re-upload. It runs under the SAME guards as a full dispatch -
+          // the document lock and `canCommit` - so a window without the lock
+          // does nothing at all (G5-06 fix-C item 4, d1-1)
+          outcomes.set(doc.key, await this.runOne(doc, now))
           dispatched += 1
           continue
         }
@@ -544,7 +546,13 @@ export class QueueDispatcher {
     )
   }
 
-  /** one document through validate -> upload -> lock check -> commit */
+  /**
+   * One document through the queue. A record that is dispatchable runs
+   * validate -> upload -> lock check -> commit; a record left mid-flight at rest
+   * (validating/uploading/committing) is settled by ONE lookup instead. Both
+   * paths hold the document lock and honour `canCommit`, so a window that does
+   * not own the document never writes the shared record or sends a request.
+   */
   private async runOne(doc: QueueDoc, now: number): Promise<QueueState> {
     const lock = await this.deps.lock.acquire(doc.key)
     if (lock.kind === 'other_window') {
@@ -556,18 +564,26 @@ export class QueueDispatcher {
       return doc.record.state
     }
     this.otherWindow.delete(doc.key)
+    // a record left mid-flight at rest: settle it through the lookup below. It
+    // skips the dispatchable/driving gates (its state is not dispatchable) but
+    // still holds the lock and passes `canCommit` first (G506-be-d1-1).
+    const inFlight = this.isInFlightState(doc.record.state)
     // the record may have been settled while this pass waited for the lock: a
     // cancel, supersede or tombstone that won must leave exactly one outcome,
     // and a record the store no longer holds (or holds for another intent) is
     // not this pass's to send
-    if (!this.isDispatchable(doc.record.state)) return doc.record.state
-    if (!(await this.driving(doc))) return doc.record.state
+    if (!inFlight && !this.isDispatchable(doc.record.state)) return doc.record.state
+    if (!inFlight && !(await this.driving(doc))) return doc.record.state
     const generation = lock.generation
     const stopBeat = this.startHeartbeat(doc.key, generation)
     this.committing.add(doc.key)
     try {
-      // the session must still own this document before a byte moves
+      // the session must still own this document before a byte moves (or before
+      // a settle lookup): false stops the pass with no request and no write
       if (!this.sessionAllows(doc)) return doc.record.state
+      // a stop left this record mid-flight: exactly one lookup with the SAME
+      // key, never a new key and never a blind re-upload (G5-06 fix-C item 4)
+      if (inFlight) return await this.settleInFlight(doc, now)
       // validation passed: the first `uploaded` advances validating -> uploading
       await this.apply(doc, { type: 'dispatch' }, now)
       await this.apply(doc, { type: 'uploaded' }, now)

@@ -768,4 +768,84 @@ describe('G5-06 W4b save queue wiring', () => {
     expect(uploads(server)).toHaveLength(1)
     expect(commits(server)).toHaveLength(1)
   })
+
+  it('G506-be-d1-1: a settle left in flight is not sent after teardown resolves', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    const key = basename(dirname(path))
+    // an in-flight record at rest (a lost lock / crash): the poll settles it
+    // through the G5-07 lookup with the SAME key
+    const opened = await ctx.layer.open({ deploymentId: 'default', accountId: 'acc_1' })
+    if (opened.kind !== 'ok') throw new Error('store did not open')
+    await createIntentStore(opened.store.records(INTENT_STORE_REGISTRATION.name)).put(
+      key,
+      {
+        v: 2,
+        intentId: `intent_${key}`,
+        idempotencyKey: 'key_stuck',
+        documentId: DOC,
+        orgId: 'org_a',
+        workspaceId: 'ws_1',
+        baseRevision: '41',
+        baseVersion: 3,
+        checksum: hex(enc('v4')),
+        length: enc('v4').byteLength,
+        generation: 1,
+        state: 'uploading',
+        attempt: 1,
+        createdAt: '2026-10-13T00:00:00.000Z',
+        updatedAt: '2026-10-13T00:00:00.000Z',
+      },
+      enc('v4'),
+    )
+    // gate the settle lookup so the poll is mid-settle when teardown lands
+    const realFetch = server.fetch.getMockImplementation()!
+    let releaseLookup!: () => void
+    const lookupGate = new Promise<void>((resolve) => {
+      releaseLookup = resolve
+    })
+    let enteredLookup!: () => void
+    const inLookup = new Promise<void>((resolve) => {
+      enteredLookup = resolve
+    })
+    server.fetch.mockImplementation(async (url: string, init: RequestInit) => {
+      if (url.endsWith('/versions/commit') && (init.method ?? 'GET') === 'GET') {
+        enteredLookup()
+        await lookupGate
+      }
+      return realFetch(url, init)
+    })
+    const polling = ctx.service.pollSaveQueue()
+    await inLookup
+    // the account switches mid-settle: teardown must await the in-flight pass
+    ctx.signInAs('acc_2')
+    let resolved = false
+    const teardown = ctx.service.teardownSaveQueue().then(() => {
+      resolved = true
+    })
+    await new Promise((resolve) => setTimeout(resolve, 30))
+    expect(resolved).toBe(false)
+    releaseLookup()
+    await teardown
+    const after = server.calls.length
+    await polling
+    // no lookup/record write landed after teardown resolved
+    expect(server.calls.length).toBe(after)
+  })
+
+  it('G506-be-d1-1: the account-boundary wipe awaits teardownSaveQueue before the wipe', () => {
+    // the wiring source pins the order: the in-flight poll/dispatch must unwind
+    // before the scope is wiped, so no settle lookup runs into a wiped scope
+    const source = readFileSync(join(__dirname, '..', 'src/main/uniwork-docs/wiring.ts'), 'utf8')
+    const wipe = source.slice(source.indexOf('wipeStore: async (owner) =>'))
+    const awaited = wipe.indexOf('await service.teardownSaveQueue?.()')
+    const lockAndWipe = wipe.indexOf('lockAndWipe(')
+    expect(awaited).toBeGreaterThan(-1)
+    expect(lockAndWipe).toBeGreaterThan(-1)
+    expect(awaited).toBeLessThan(lockAndWipe)
+    // and it is awaited, not a fire-and-forget call
+    expect(wipe).toMatch(/await service\.teardownSaveQueue\?\.\(\)/)
+    expect(wipe).not.toMatch(/\n\s+service\.teardownSaveQueue\?\.\(\)\n/)
+  })
 })
