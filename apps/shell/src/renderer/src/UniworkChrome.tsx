@@ -281,7 +281,7 @@ export function DiscussionToggle({ status }: { status: UniworkDocStatus }) {
       id={DISCUSSION_TOGGLE_ID}
       className="uw-discussion-toggle"
       aria-expanded={open}
-      aria-controls={DISCUSSION_PANEL_ID}
+      aria-controls={open ? DISCUSSION_PANEL_ID : undefined}
       data-open={open ? 'true' : undefined}
       onClick={() => setDiscussionOpen(!open)}
     >
