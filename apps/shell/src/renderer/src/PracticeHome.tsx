@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useState } from 'react'
 import type { ReactElement } from 'react'
 import {
   domainSkillPrompt,
@@ -29,6 +29,9 @@ import { SkillDomainTabs } from './SkillDomainTabs'
 import { readActiveSkillDomain, readPinnedSkillDomains } from './skill-domain-pins'
 import { WorkbenchModulePane } from './WorkbenchModulePanes'
 import { LocalTag } from './LocalTag'
+import { MODULE_TONES } from './module-tones'
+import { WorkbenchIcon } from './WorkbenchIcons'
+import { WorkPaneHeader } from './WorkPaneHeader'
 import { WorkbenchTabs } from './WorkbenchTabs'
 import { WorkbenchTopBar, type WorkbenchNewItem } from './WorkbenchTopBar'
 import { pinPillar } from './workbench-pins'
@@ -41,7 +44,7 @@ import {
   workCacheSlot,
 } from './work-cache'
 import { tabCounts } from './work-home'
-import { WorkSkeleton } from './WorkErrorState'
+import { WorkSkeleton, WorkStatePanel } from './WorkErrorState'
 import { WorkOverview } from './WorkOverview'
 
 interface PracticeHomeProps {
@@ -249,6 +252,8 @@ export function PracticeHome({
       )
       .sort((a, b) => (b.entry.lastActiveAt > a.entry.lastActiveAt ? 1 : -1))
   }, [projects, practice.id, practice.projectKind, qQuery])
+  const pillar = practice.pillars.find((p) => p.id === tab)
+  const pillarTitleId = useId()
 
   useEffect(() => {
     if (!meta) {
@@ -624,14 +629,33 @@ export function PracticeHome({
         />
       ) : null}
 
+      {pillar ? (
+        <WorkPaneHeader
+          module={pillar.id}
+          title={vi ? pillar.labelVi : pillar.labelEn}
+          meta={`${vi ? pillar.hintVi : pillar.hintEn}${meta?.title ? ` · ${meta.title}` : ''}`}
+          aside={<LocalTag />}
+          titleId={pillarTitleId}
+        />
+      ) : null}
+
       {tab === 'knowledge' && (
-        <section className="wb-panel">
-          <LocalTag />
-          <label className="wb-form-wide">
-            <span>{t('wbKnSearch')}</span>
+        <section className="wb-pane" aria-labelledby={pillarTitleId}>
+          <label className="wb-kn-search">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
+              <path
+                d="M20 20l-3.5-3.5"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+            </svg>
             <input
+              type="search"
               value={qQuery}
               onChange={(e) => setQQuery(e.target.value)}
+              aria-label={t('wbKnSearch')}
               placeholder={t('wbKnSearchPlaceholder')}
             />
           </label>
@@ -639,10 +663,14 @@ export function PracticeHome({
             <section className="wb-packs">
               <h2>
                 {t('wbKnLibrary')}
-                <span className="wb-count">{packs.length}</span>
+                <span className="wb-count wb-num">{packs.length}</span>
               </h2>
               {packs.length === 0 ? (
-                <p className="wb-empty">{t('wbKnEmpty')}</p>
+                <WorkStatePanel
+                  tone={MODULE_TONES.knowledge}
+                  icon={<WorkbenchIcon id="knowledge" size={20} />}
+                  title={t('wbKnEmpty')}
+                />
               ) : (
                 <ul className="wb-pack-list">
                   {packs.map(({ entry, meta: m }) => (
@@ -671,7 +699,7 @@ export function PracticeHome({
                   <div className="wb-chip-row">
                     <button
                       type="button"
-                      className="btn btn-secondary"
+                      className="wb-btn wb-btn-secondary"
                       onClick={() => {
                         pinPillar(practice.id, 'materials')
                         window.dispatchEvent(new Event('uniwork:wb-pins-changed'))
@@ -682,14 +710,14 @@ export function PracticeHome({
                     </button>
                     <button
                       type="button"
-                      className="btn btn-secondary"
+                      className="wb-btn wb-btn-secondary"
                       onClick={() => onOpenPackFiles(selected.id)}
                     >
                       {t('wbKnViewFiles')}
                     </button>
                     <button
                       type="button"
-                      className="btn btn-secondary"
+                      className="wb-btn wb-btn-secondary"
                       disabled={busy === 'delete-pack'}
                       onClick={() => void deletePack()}
                     >
@@ -712,7 +740,7 @@ export function PracticeHome({
                   </div>
                   <button
                     type="button"
-                    className="btn btn-primary"
+                    className="wb-btn wb-btn-primary"
                     disabled={!!busy}
                     onClick={() => void saveMeta()}
                   >
@@ -728,15 +756,11 @@ export function PracticeHome({
       )}
 
       {tab === 'materials' && (
-        <section className="wb-panel wb-detail">
-          <LocalTag />
+        <section className="wb-pane" aria-labelledby={pillarTitleId}>
           {!selected || !meta ? (
             <p className="wb-empty">{t('wbMatSelectPackFirst')}</p>
           ) : (
             <>
-              <h2>
-                {t('wbCommonMaterials')} · {meta.title}
-              </h2>
               <ul className="wb-material-list">
                 {packFiles.length === 0 ? (
                   <li className="wb-empty">{t('wbMatEmpty')}</li>
@@ -780,7 +804,7 @@ export function PracticeHome({
                 </label>
                 <button
                   type="button"
-                  className="btn btn-primary"
+                  className="wb-btn wb-btn-primary"
                   disabled={!!busy}
                   onClick={() => void addMaterial()}
                 >
@@ -791,7 +815,7 @@ export function PracticeHome({
               <div className="wb-chip-row">
                 <button
                   type="button"
-                  className="wb-chip"
+                  className="wb-btn wb-btn-secondary wb-btn-sm"
                   disabled={!!busy}
                   onClick={() => void window.aiOffice.newDoc({ projectId: selected.id })}
                 >
@@ -799,7 +823,7 @@ export function PracticeHome({
                 </button>
                 <button
                   type="button"
-                  className="wb-chip"
+                  className="wb-btn wb-btn-secondary wb-btn-sm"
                   disabled={!!busy}
                   onClick={() => void window.aiOffice.newSheet({ projectId: selected.id })}
                 >
@@ -807,7 +831,7 @@ export function PracticeHome({
                 </button>
                 <button
                   type="button"
-                  className="wb-chip"
+                  className="wb-btn wb-btn-secondary wb-btn-sm"
                   disabled={!!busy}
                   onClick={() => void window.aiOffice.newSlide({ projectId: selected.id })}
                 >
@@ -815,7 +839,7 @@ export function PracticeHome({
                 </button>
                 <button
                   type="button"
-                  className="wb-chip"
+                  className="wb-btn wb-btn-secondary wb-btn-sm"
                   disabled={!!busy}
                   onClick={() => void window.aiOffice.newPdf({ projectId: selected.id })}
                 >
@@ -828,7 +852,7 @@ export function PracticeHome({
                   <button
                     key={t.id}
                     type="button"
-                    className="wb-chip"
+                    className="wb-btn wb-btn-secondary wb-btn-sm"
                     disabled={!!busy}
                     onClick={() => void openTemplate(t.id)}
                   >
@@ -840,7 +864,7 @@ export function PracticeHome({
                 <div className="wb-chip-row">
                   <button
                     type="button"
-                    className="btn btn-secondary"
+                    className="wb-btn wb-btn-secondary"
                     disabled={!!busy}
                     onClick={() => void openFreeChain()}
                   >
@@ -854,9 +878,7 @@ export function PracticeHome({
       )}
 
       {tab === 'skills' && (
-        <section className="wb-panel wb-detail">
-          <LocalTag />
-          <h2>{t('wbCommonSkills')}</h2>
+        <section className="wb-pane" aria-labelledby={pillarTitleId}>
           {!selected || !meta ? (
             <p className="wb-empty">{t('wbSkNeedPack')}</p>
           ) : (
@@ -881,7 +903,7 @@ export function PracticeHome({
                     </div>
                     <button
                       type="button"
-                      className="btn btn-primary"
+                      className="wb-btn wb-btn-primary wb-btn-sm"
                       disabled={!!busy || !selected}
                       onClick={() => setConfirmSkill({ kind: 'practice', id: s.id })}
                     >
@@ -919,7 +941,7 @@ export function PracticeHome({
                   </div>
                   <button
                     type="button"
-                    className="btn btn-primary"
+                    className="wb-btn wb-btn-primary wb-btn-sm"
                     disabled={!!busy || !selected}
                     onClick={() => setConfirmSkill({ kind: 'domain', id: s.id })}
                   >
@@ -933,9 +955,7 @@ export function PracticeHome({
       )}
 
       {tab === 'compose' && (
-        <section className="wb-panel wb-create">
-          <LocalTag />
-          <h2>{t('wbCmpTitle')}</h2>
+        <section className="wb-block wb-cmp" aria-labelledby={pillarTitleId}>
           <div className="wb-form">
             {practice.facets.map((f) => {
               if (f.id === practice.titleFacetId) {
@@ -981,7 +1001,7 @@ export function PracticeHome({
           </div>
           <button
             type="button"
-            className="btn btn-primary"
+            className="wb-btn wb-btn-primary"
             disabled={busy === 'create'}
             onClick={() => void submitCreate()}
           >

@@ -10,15 +10,25 @@ export interface WorkPaneHeaderProps {
   meta?: ReactNode
   /** the right-hand slot: a summary count or the pane's own actions */
   aside?: ReactNode
+  /** id of the title, for a pane section's aria-labelledby */
+  titleId?: string
 }
 
 /** The title every Workbench tab shares (redesign spec 4.2): tile, title, meta, no card around it. */
-export function WorkPaneHeader({ module, title, meta, aside }: WorkPaneHeaderProps): ReactElement {
+export function WorkPaneHeader({
+  module,
+  title,
+  meta,
+  aside,
+  titleId,
+}: WorkPaneHeaderProps): ReactElement {
   return (
     <header className="wb-pane-head">
       <WorkbenchIcon id={module} size={20} />
       <div className="wb-pane-text">
-        <h2 className="wb-pane-title">{title}</h2>
+        <h2 className="wb-pane-title" id={titleId}>
+          {title}
+        </h2>
         {meta ? <p className="wb-pane-meta">{meta}</p> : null}
       </div>
       {aside ? <div className="wb-pane-aside">{aside}</div> : null}

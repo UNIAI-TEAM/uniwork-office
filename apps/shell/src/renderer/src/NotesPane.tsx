@@ -3,8 +3,9 @@ import type { FormEvent, ReactElement } from 'react'
 import type { PracticeId } from '@uniwork/practice-core'
 import { useI18n } from './locale'
 import { MODULE_TONES } from './module-tones'
-import { WorkStatePanel } from './WorkErrorState'
+import { WbDeleteBtn, WbRowActions } from './WbRowActions'
 import { WorkbenchIcon } from './WorkbenchIcons'
+import { WorkStatePanel } from './WorkErrorState'
 import {
   createStickyNote,
   normalizeStickyNote,
@@ -14,8 +15,8 @@ import {
 } from './workbench-pins'
 
 /**
- * Notes: a flat list of cards, stored on this device. The stored paper color
- * and board position (from the old pinboard) are kept in the data, unused.
+ * Notes: one row per note in a list block, stored on this device. The stored paper
+ * color and board position (from the old pinboard) are kept in the data, unused.
  */
 export function NotesPane({ practiceId }: { practiceId: PracticeId }): ReactElement {
   const { t, dateLocale } = useI18n()
@@ -57,7 +58,7 @@ export function NotesPane({ practiceId }: { practiceId: PracticeId }): ReactElem
           placeholder={t('wbNotesPlaceholder')}
           aria-label={t('wbNotesPlaceholder')}
         />
-        <button type="submit" className="btn btn-primary" disabled={!draft.trim()}>
+        <button type="submit" className="wb-btn wb-btn-primary" disabled={!draft.trim()}>
           {t('wbNotesAdd')}
         </button>
       </form>
@@ -68,17 +69,17 @@ export function NotesPane({ practiceId }: { practiceId: PracticeId }): ReactElem
           title={t('wbNotesEmpty')}
         />
       ) : (
-        <ul className="wb-notes-list">
+        <ul className="wb-block wb-notes-list">
           {items.map((note) => (
-            <li key={note.id} className="wb-notes-card">
-              <textarea
-                value={note.body}
-                rows={3}
-                aria-label={t('wbNotesBodyLabel')}
-                onChange={(e) => edit(note.id, e.target.value)}
-              />
-              <footer>
-                <span>
+            <li key={note.id} className="wb-row wb-notes-card">
+              <div className="wb-notes-text">
+                <textarea
+                  value={note.body}
+                  rows={2}
+                  aria-label={t('wbNotesBodyLabel')}
+                  onChange={(e) => edit(note.id, e.target.value)}
+                />
+                <span className="wb-notes-edited">
                   {t('wbNotesEdited', {
                     time: new Date(note.updatedAt).toLocaleString(dateLocale, {
                       dateStyle: 'short',
@@ -86,14 +87,13 @@ export function NotesPane({ practiceId }: { practiceId: PracticeId }): ReactElem
                     }),
                   })}
                 </span>
-                <button
-                  type="button"
-                  className="wb-notes-delete"
+              </div>
+              <WbRowActions>
+                <WbDeleteBtn
+                  label={t('wbNotesDelete')}
                   onClick={() => persist(items.filter((n) => n.id !== note.id))}
-                >
-                  {t('wbNotesDelete')}
-                </button>
-              </footer>
+                />
+              </WbRowActions>
             </li>
           ))}
         </ul>

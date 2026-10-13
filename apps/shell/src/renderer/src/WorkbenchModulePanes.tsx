@@ -5,6 +5,8 @@ import type { UniworkWorkspaceRef } from '../../shared/home-api'
 import type { UniworkWorkError } from '../../shared/uniwork-work-api'
 import { NotesPane } from './NotesPane'
 import { LocalTag } from './LocalTag'
+import { MODULE_TONES } from './module-tones'
+import { WorkbenchIcon } from './WorkbenchIcons'
 import { useI18n, type StringKey } from './locale'
 import { WorkProfilePane } from './WorkProfilePane'
 import { escapeHtml, profileForDraft, profileMergeHtml } from './form-merge'
@@ -13,7 +15,7 @@ import { WorkTasksPane } from './WorkTasksPane'
 import { WorkPaneHeader } from './WorkPaneHeader'
 import { WbDeleteBtn, WbDraftBtn, WbEditBtn, WbFileBtn, WbRowActions } from './WbRowActions'
 import { readForms, writeForms, type WbFormItem } from './workbench-pins'
-import type { WorkPaneProps } from './WorkErrorState'
+import { WorkStatePanel, type WorkPaneProps } from './WorkErrorState'
 
 interface Props {
   moduleId: WorkbenchModuleId
@@ -235,79 +237,83 @@ function FormsPane({
 
   return (
     <>
-      <p className="wb-hint">{t('wbFormsHint')}</p>
-      {!packId ? <p className="wb-hint">{t('wbFormsDraftNeedsPackHint')}</p> : null}
-      <div className="wb-module-form">
-        <label className="wb-form-wide">
-          <span>{t('wbFormsTitle')}</span>
-          <input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder={t('wbFormsTitlePlaceholder')}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') save()
-            }}
-          />
-        </label>
-        <label className="wb-form-wide">
-          <span>{t('wbFormsNote')}</span>
-          <input value={note} onChange={(e) => setNote(e.target.value)} />
-        </label>
-        <div className="wb-chip-row">
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={() => void pickTemplateFile()}
-          >
-            {draftFile ? t('wbFormsReplaceFile') : t('wbFormsUploadFile')}
-          </button>
-          {draftFile ? (
-            <button type="button" className="btn btn-secondary" onClick={() => setDraftFile(null)}>
-              {t('wbFormsClearFile')}
-            </button>
-          ) : null}
-        </div>
+      <p className="wb-forms-hint" title={t('wbFormsHint')}>
+        {t('wbFormsHint')}
+      </p>
+      <div className="wb-forms-add">
+        <input
+          className="wb-forms-title"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          aria-label={t('wbFormsTitle')}
+          placeholder={t('wbFormsTitle')}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') save()
+          }}
+        />
+        <input
+          className="wb-forms-note"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          aria-label={t('wbFormsNote')}
+          placeholder={t('wbFormsNote')}
+        />
+        <button
+          type="button"
+          className="wb-btn wb-btn-secondary"
+          onClick={() => void pickTemplateFile()}
+        >
+          {draftFile ? t('wbFormsReplaceFile') : t('wbFormsUploadFile')}
+        </button>
         {draftFile ? (
-          <p className="wb-hint">
-            {t('wbFormsTemplateFile')} {draftFile.fileName}
-          </p>
-        ) : null}
-        {uploadNotice ? (
-          <p className="wb-hint">
-            {'key' in uploadNotice ? t(uploadNotice.key) : uploadNotice.text}
-          </p>
-        ) : null}
-        <div className="wb-chip-row">
-          <button type="button" className="btn btn-primary" onClick={save}>
-            {editingId ? t('wbFormsSave') : t('wbFormsAdd')}
+          <button type="button" className="wb-btn wb-btn-ghost" onClick={() => setDraftFile(null)}>
+            {t('wbFormsClearFile')}
           </button>
-          {editingId ? (
-            <button type="button" className="btn btn-secondary" onClick={clearForm}>
-              {t('wbFormsCancelEdit')}
-            </button>
-          ) : null}
-        </div>
+        ) : null}
+        <button type="button" className="wb-btn wb-btn-primary" onClick={save}>
+          {editingId ? t('wbFormsSave') : t('wbFormsAdd')}
+        </button>
+        {editingId ? (
+          <button type="button" className="wb-btn wb-btn-ghost" onClick={clearForm}>
+            {t('wbFormsCancelEdit')}
+          </button>
+        ) : null}
       </div>
-      <ul className="wb-module-list">
-        {items.length === 0 ? (
-          <li className="wb-empty">{t('wbFormsEmpty')}</li>
-        ) : (
-          items.map((it) => {
+      {draftFile ? (
+        <p className="wb-hint">
+          {t('wbFormsTemplateFile')} {draftFile.fileName}
+        </p>
+      ) : null}
+      {uploadNotice ? (
+        <p className="wb-hint">{'key' in uploadNotice ? t(uploadNotice.key) : uploadNotice.text}</p>
+      ) : null}
+      {items.length === 0 ? (
+        <WorkStatePanel
+          tone={MODULE_TONES.forms}
+          icon={<WorkbenchIcon id="forms" size={20} />}
+          title={t('wbFormsEmpty')}
+        />
+      ) : (
+        <ul className="wb-block wb-forms-list">
+          {items.map((it) => {
             const canOpen = Boolean(packId ?? it.linkedProjectId)
+            const caption = [
+              it.note ?? '',
+              it.fileName ? `${t('wbFormsFile')} ${it.fileName}` : '',
+              it.linkedProjectId ? t('wbFormsLinked') : '',
+            ]
+              .filter(Boolean)
+              .join(' · ')
             return (
-              <li key={it.id} className="wb-module-row">
-                <div className="wb-module-meta">
+              <li key={it.id} className="wb-row">
+                <div className="wb-forms-text">
                   <strong>{it.title}</strong>
-                  {it.note ? <span>{it.note}</span> : null}
-                  {it.fileName ? (
-                    <span className="wb-hint">
-                      {t('wbFormsFile')} {it.fileName}
-                    </span>
-                  ) : null}
-                  {it.linkedProjectId ? (
-                    <span className="wb-hint">{t('wbFormsLinked')}</span>
-                  ) : null}
+                  {caption ? <span>{caption}</span> : null}
                 </div>
+                {/* outside the hover-only actions: it explains why Draft is locked */}
+                {canOpen ? null : (
+                  <span className="wb-forms-locked">{t('wbFormsDraftNeedsPackHint')}</span>
+                )}
                 <WbRowActions>
                   <WbEditBtn label={t('wbFormsEdit')} onClick={() => startEdit(it)} />
                   {it.filePath ? (
@@ -332,9 +338,9 @@ function FormsPane({
                 </WbRowActions>
               </li>
             )
-          })
-        )}
-      </ul>
+          })}
+        </ul>
+      )}
     </>
   )
 }
