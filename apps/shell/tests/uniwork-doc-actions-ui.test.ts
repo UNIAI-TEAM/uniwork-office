@@ -86,6 +86,7 @@ function makeApi(docs: LibraryDocRow[]) {
       async (_input: UploadDocInput): Promise<DocActionResult<UniworkDocSummary>> =>
         ok(row('up1', 'Q3.xlsx', { format: 'xlsx' })),
     ),
+    uniworkCancelUploadDocument: vi.fn(async (_uploadId: string) => undefined),
     onUniworkUploadProgress: vi.fn((cb: (e: UploadProgressEvent) => void) => {
       progress = cb
       return () => {
@@ -259,7 +260,7 @@ describe('S18 new document', () => {
     expect(api.uniworkCreateDocument).toHaveBeenCalledWith({
       workspaceId: 'w1',
       folderId: 'f1',
-      name: 'Q4 plan',
+      name: 'Q4 plan.pptx',
       format: 'pptx',
     })
     // opened by the server id, through the normal open path; no second local copy is made here
@@ -290,7 +291,7 @@ describe('S18 new document', () => {
     await click(buttonByText(dialog, en.uwDocCreate))
     expect(api.uniworkCreateDocument).toHaveBeenCalledTimes(1)
     expect(api.uniworkCreateDocument).toHaveBeenCalledWith(
-      expect.objectContaining({ name: 'Plan' }),
+      expect.objectContaining({ name: 'Plan.docx' }),
     )
     expect(name.getAttribute('aria-invalid')).not.toBe('true')
   })
@@ -307,8 +308,13 @@ describe('S18 new document', () => {
     expect(document.getElementById(name.getAttribute('aria-describedby')!)!.textContent).toBe(
       en.uwDocNameTooLong,
     )
-    // 500 runes pass, even when they are astral characters of two UTF-16 units each
-    await type(name, '😀'.repeat(500))
+    // the extension counts: 496 runes + ".docx" is over the limit
+    await type(name, 'a'.repeat(496))
+    await click(buttonByText(dialog, en.uwDocCreate))
+    expect(api.uniworkCreateDocument).not.toHaveBeenCalled()
+    expect(name.getAttribute('aria-invalid')).toBe('true')
+    // 500 runes in all pass, even when they are astral characters of two UTF-16 units each
+    await type(name, '😀'.repeat(495))
     expect(name.getAttribute('aria-invalid')).toBe('false')
     await click(buttonByText(dialog, en.uwDocCreate))
     expect(api.uniworkCreateDocument).toHaveBeenCalledTimes(1)
@@ -378,12 +384,26 @@ describe('S18 upload', () => {
     })
     await flush()
     await click(dialog.querySelector('.btn-primary')!)
-    expect(api.uniworkUploadDocument).toHaveBeenCalledWith({
+    const sent = api.uniworkUploadDocument.mock.calls[0]![0]
+    expect(sent).toEqual({
       workspaceId: 'w2',
       folderId: null,
       path: '/home/me/Q3.xlsx',
+      uploadId: expect.any(String),
     })
-    await act(async () => api.pushProgress({ path: '/home/me/Q3.xlsx', loaded: 50, total: 200 }))
+    // another upload's progress is not ours
+    await act(async () =>
+      api.pushProgress({ uploadId: 'other', path: '/x', loaded: 150, total: 200 }),
+    )
+    expect(dialog.querySelector('progress')!.hasAttribute('value')).toBe(false)
+    await act(async () =>
+      api.pushProgress({
+        uploadId: sent.uploadId,
+        path: '/home/me/Q3.xlsx',
+        loaded: 50,
+        total: 200,
+      }),
+    )
     const status = dialog.querySelector('.uw-act-progress')!
     expect(status.getAttribute('role')).toBe('status')
     expect(status.textContent).toContain('Uploading “Q3.xlsx”')
@@ -788,6 +808,92 @@ async function renderWithChrome(docs: LibraryDocRow[]) {
   })
   await flush()
 }
+
+describe('G8-17 review r3 fixes', () => {
+  it('Cancel aborts the upload in main by its id; a late result is still ignored', async () => {
+    await render([])
+    let finish: (v: DocActionResult<UniworkDocSummary>) => void = () => undefined
+    api.uniworkUploadDocument.mockImplementationOnce(
+      () => new Promise((resolve) => (finish = resolve)),
+    )
+    await click(buttonByText(host, en.uwDocUpload))
+    const dialog = modal()!
+    await click(buttonByText(dialog, en.uwDocUploadPick))
+    await click(dialog.querySelector('.btn-primary')!)
+    const { uploadId } = api.uniworkUploadDocument.mock.calls[0]![0]
+    expect(uploadId).toBeTruthy()
+    expect(api.uniworkCancelUploadDocument).not.toHaveBeenCalled()
+    await click(dialog.querySelector('.modal-buttons .btn-secondary')!)
+    expect(api.uniworkCancelUploadDocument).toHaveBeenCalledTimes(1)
+    expect(api.uniworkCancelUploadDocument).toHaveBeenCalledWith(uploadId)
+    // the server had answered before the abort took effect
+    await act(async () => finish(ok(row('up1', 'Q3.xlsx', { format: 'xlsx' }))))
+    await flush()
+    expect(api.uniworkOpenDocument).not.toHaveBeenCalled()
+    expect(host.querySelector('.uw-act-toast')).toBeNull()
+  })
+
+  it('Escape cancels by id, and the upload_cancelled answer never toasts', async () => {
+    await render([])
+    let finish: (v: DocActionResult<UniworkDocSummary>) => void = () => undefined
+    api.uniworkUploadDocument.mockImplementationOnce(
+      () => new Promise((resolve) => (finish = resolve)),
+    )
+    await click(buttonByText(host, en.uwDocUpload))
+    const dialog = modal()!
+    await click(buttonByText(dialog, en.uwDocUploadPick))
+    await click(dialog.querySelector('.btn-primary')!)
+    const { uploadId } = api.uniworkUploadDocument.mock.calls[0]![0]
+    await key(dialog, 'Escape')
+    expect(api.uniworkCancelUploadDocument).toHaveBeenCalledWith(uploadId)
+    await act(async () => finish(fail('upload_cancelled')))
+    await flush()
+    expect(host.querySelector('.uw-act-toast')).toBeNull()
+    expect(api.uniworkOpenDocument).not.toHaveBeenCalled()
+  })
+
+  it('each upload start mints a fresh id', async () => {
+    await render([])
+    for (let i = 0; i < 2; i++) {
+      api.uniworkUploadDocument.mockImplementationOnce(() => new Promise(() => undefined))
+      await click(buttonByText(host, en.uwDocUpload))
+      const dialog = modal()!
+      await click(buttonByText(dialog, en.uwDocUploadPick))
+      await click(dialog.querySelector('.btn-primary')!)
+      await click(dialog.querySelector('.modal-buttons .btn-secondary')!)
+    }
+    const [a, b] = api.uniworkUploadDocument.mock.calls.map((c) => c[0].uploadId)
+    expect(a).not.toBe(b)
+  })
+
+  it('a typed name that already ends in an Office extension is sent as typed', async () => {
+    await render([])
+    await click(buttonByText(host, en.uwDocNew))
+    const dialog = modal()!
+    const name = dialog.querySelector<HTMLInputElement>('input[type="text"]')!
+    await type(name, 'a.DOCX')
+    await click(buttonByText(dialog, en.uwDocCreate))
+    // the field still shows what was typed
+    expect(name.value).toBe('a.DOCX')
+    expect(api.uniworkCreateDocument).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'a.DOCX', format: 'docx' }),
+    )
+  })
+
+  it('the format extension is appended for a name without one, whatever the format', async () => {
+    await render([])
+    await click(buttonByText(host, en.uwDocNew))
+    const dialog = modal()!
+    const name = dialog.querySelector<HTMLInputElement>('input[type="text"]')!
+    await type(name, 'Q4 plan')
+    await click(dialog.querySelector('input[value="xlsx"]')!)
+    await click(buttonByText(dialog, en.uwDocCreate))
+    expect(name.value).toBe('Q4 plan')
+    expect(api.uniworkCreateDocument).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Q4 plan.xlsx', format: 'xlsx' }),
+    )
+  })
+})
 
 describe('G8-17 review r1 fixes', () => {
   it('RFE17-01: a cancelled upload never opens the document or toasts when it finishes', async () => {

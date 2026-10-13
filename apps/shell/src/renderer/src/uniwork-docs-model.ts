@@ -767,6 +767,19 @@ export function renameParts(
   return { base: title, ext: '' }
 }
 
+const OFFICE_EXTENSIONS = ['.docx', '.xlsx', '.pptx']
+
+/**
+ * The name a blank document is created with: the chosen format's extension is
+ * put on unless the typed name already ends in .docx / .xlsx / .pptx (any case,
+ * and something before the dot), the same way rename keeps a title's extension.
+ */
+export function nameWithExtension(name: string, format: NewDocFormat): string {
+  const lower = name.toLowerCase()
+  const has = OFFICE_EXTENSIONS.some((ext) => lower.endsWith(ext) && name.length > ext.length)
+  return has ? name : `${name}.${format}`
+}
+
 // ── Time ────────────────────────────────────────────────
 
 /** "10:42" for today, a medium date otherwise; '' when the server sent no usable time */

@@ -7,6 +7,8 @@ import {
   DOC_NAME_ERROR_KEYS,
   NEW_DOC_FORMATS,
   checkDocName,
+  isDocTitleTooLong,
+  nameWithExtension,
   workspaceLabel,
   type DocNameError,
   type NewDocFormat,
@@ -249,8 +251,15 @@ export function NewDocDialog({
       nameRef.current?.focus()
       return
     }
+    // the server keeps the extension in the title: the name as sent is what the limit counts
+    const sent = nameWithExtension(checked.name, format)
+    if (isDocTitleTooLong(sent)) {
+      setError('name_too_long')
+      nameRef.current?.focus()
+      return
+    }
     setBusy(true)
-    void onCreate({ ...target, name: checked.name, format }).then((outcome) => {
+    void onCreate({ ...target, name: sent, format }).then((outcome) => {
       setBusy(false)
       if (outcome.ok || outcome.error === 'failed') return
       setError(outcome.error)

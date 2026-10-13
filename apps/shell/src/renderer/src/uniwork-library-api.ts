@@ -38,8 +38,11 @@ export function loadDocProperties(
 // Contract G8-17 §1-§3: the shapes below mirror home-api's UniworkDocAction*
 // types structurally until the main side merges; then they can be imported.
 
-/** an action's failure: a contract error code, or a name the server refused */
-export type DocActionError = UniworkDocErrorCode | DocNameError
+/**
+ * an action's failure: a contract error code, or a name the server refused.
+ * 'upload_cancelled' answers an upload the renderer aborted; it is never shown.
+ */
+export type DocActionError = UniworkDocErrorCode | DocNameError | 'upload_cancelled'
 
 export type DocActionResult<T> = { ok: true; value: T } | { ok: false; error: DocActionError }
 
@@ -55,9 +58,13 @@ export interface UploadDocInput {
   folderId: string | null
   /** the file main's dialog returned */
   path: string
+  /** minted per upload start: names the upload for progress events and cancel */
+  uploadId: string
 }
 
 export interface UploadProgressEvent {
+  /** the upload this progress belongs to */
+  uploadId: string
   path: string
   loaded: number
   total: number
@@ -72,6 +79,7 @@ interface ActionsBridge {
   uniworkCreateDocument?(input: CreateDocInput): Promise<DocActionResult<UniworkDocSummary>>
   uniworkPickUploadFile?(): Promise<{ path: string; name: string } | null>
   uniworkUploadDocument?(input: UploadDocInput): Promise<DocActionResult<UniworkDocSummary>>
+  uniworkCancelUploadDocument?(uploadId: string): Promise<void>
   onUniworkUploadProgress?(cb: (event: UploadProgressEvent) => void): () => void
   uniworkRenameDocument?(
     documentId: string,
@@ -99,6 +107,11 @@ export function pickUploadFile(): Promise<{ path: string; name: string } | null>
 
 export function uploadDocument(input: UploadDocInput): Promise<DocActionResult<UniworkDocSummary>> {
   return actions().uniworkUploadDocument?.(input) ?? Promise.resolve(unavailable)
+}
+
+/** abort an upload in flight; an unknown or finished id is a no-op in main */
+export function cancelUploadDocument(uploadId: string): Promise<void> {
+  return actions().uniworkCancelUploadDocument?.(uploadId) ?? Promise.resolve()
 }
 
 export function onUploadProgress(cb: (event: UploadProgressEvent) => void): () => void {

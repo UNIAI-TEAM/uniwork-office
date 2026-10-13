@@ -46,6 +46,7 @@ import {
 } from './uniwork-docs-model'
 import {
   archiveDocument,
+  cancelUploadDocument,
   createDocument,
   listFolders,
   listSharedDocuments,
@@ -143,6 +144,8 @@ export function UniworkOpenDialog({
   const [upload, setUpload] = useState<UploadProgress | null>(null)
   /** bumped by every upload start and cancel: a result of an older upload is ignored */
   const uploadRun = useRef(0)
+  /** the id of the upload under way: progress of any other upload is not ours */
+  const uploadId = useRef<string | null>(null)
   /** rows with an archive/restore call in flight (one call per row at a time) */
   const rowBusy = useRef(new Set<string>())
   const [renaming, setRenaming] = useState<{
@@ -185,9 +188,10 @@ export function UniworkOpenDialog({
 
   useEffect(
     () =>
-      onUploadProgress(({ loaded, total }) =>
-        setUpload((prev) => (prev ? { ...prev, loaded, total } : prev)),
-      ),
+      onUploadProgress((event) => {
+        if (event.uploadId !== uploadId.current) return
+        setUpload((prev) => (prev ? { ...prev, loaded: event.loaded, total: event.total } : prev))
+      }),
     [],
   )
 
@@ -310,28 +314,36 @@ export function UniworkOpenDialog({
     settleAction(createDocument(input)).then(created)
 
   /**
-   * Cancel / Esc / overlay on the Upload dialog. Main has no abort for an
-   * upload in flight, so the bytes may still land on the server; the renderer
-   * just stops listening: the late result neither opens the document nor toasts.
+   * Cancel / Esc / overlay on the Upload dialog. Main aborts the upload by its
+   * id; if the server had already answered, the document exists anyway, so the
+   * renderer also stops listening: a late result neither opens it nor toasts.
    */
   const cancelUpload = () => {
     uploadRun.current++
+    if (uploadId.current) void cancelUploadDocument(uploadId.current).catch(() => undefined)
+    uploadId.current = null
     setUpload(null)
     setForm(null)
   }
 
   const uploadDoc = (input: DocTarget & { path: string; name: string }) => {
     const run = ++uploadRun.current
+    const id = crypto.randomUUID()
+    uploadId.current = id
     setUpload({ name: input.name, loaded: 0, total: 0 })
     return settleAction(
       uploadDocument({
         workspaceId: input.workspaceId,
         folderId: input.folderId,
         path: input.path,
+        uploadId: id,
       }),
     ).then((result) => {
       if (run !== uploadRun.current) return { ok: true }
+      uploadId.current = null
       if (mounted.current) setUpload(null)
+      // a cancelled upload is never an error to show
+      if (!result.ok && result.error === 'upload_cancelled') return { ok: true }
       return created(result)
     })
   }
