@@ -192,12 +192,15 @@ export class TabManager {
     return this.untitledTitleFor?.(kind) ?? fallback
   }
 
-  private contentBounds(): Rectangle {
+  /** bounds for the view of tab `forId` (default: the active tab). activateTab
+   *  asks for the tab it is about to show, so the full-bleed / panel rule is
+   *  judged on the tab being shown, not on the one being left (W11A-3). */
+  private contentBounds(forId: string | null = this.activeId): Rectangle {
     const { width, height } = this.shellWindow.getContentBounds()
-    if (this.htmlFullScreenId !== null && this.htmlFullScreenId === this.activeId) {
+    if (this.htmlFullScreenId !== null && this.htmlFullScreenId === forId) {
       return { x: 0, y: 0, width, height }
     }
-    const active = this.tabs.find((t) => t.id === this.activeId)
+    const active = this.tabs.find((t) => t.id === forId)
     if (active?.view && this.bleedWcIds.has(active.view.webContents.id)) {
       return { x: 0, y: 0, width, height }
     }
@@ -656,7 +659,7 @@ export class TabManager {
     const target = this.tabs.find((t) => t.id === id)
     if (!target) return
     for (const t of this.tabs) t.view?.setVisible(t.id === id)
-    if (target.view) target.view.setBounds(this.contentBounds())
+    if (target.view) target.view.setBounds(this.contentBounds(id))
     this.activeId = id
     if (this.isOfficeTab(target)) this.lastOfficeId = id
     if (target.kind === 'sheets') this.scheduleSpareSheetsView(3000)

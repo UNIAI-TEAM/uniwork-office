@@ -83,7 +83,7 @@ export interface CommentsWiringDeps {
 }
 
 /** the slice of a shell webContents the discussion reveal push needs */
-export interface DiscussionPushTarget {
+export interface DiscussionPushTarget extends Partial<Pick<WebContents, 'on'>> {
   id: number
   isDestroyed(): boolean
   send(channel: string, payload: unknown): void
@@ -290,8 +290,9 @@ export function createUniworkComments(
 
   // D2-2 for the shell: the armed discussion listeners belong to one realm of
   // the shell page. A reload, a navigation or a crash replaces it, so its
-  // armed paths are dropped (a reveal is held again until the new realm pulls)
-  // and the editor view gets its full width back (the panel is gone with it).
+  // armed paths and the reveals held for that shell's tabs are dropped (the
+  // new realm starts clean, like the editor side) and the editor view gets
+  // its full width back (the panel is gone with it).
   const armed = new Map<number, Set<string>>()
   // D3: the latest launch reveal per path, held for the shell panel until the
   // shell pulls it for that path (delivered once)
@@ -303,6 +304,8 @@ export function createUniworkComments(
     watchedShells.add(sender.id)
     const id = sender.id
     const reset = (): void => {
+      for (const path of armed.get(id) ?? []) shellHeld.delete(path)
+      for (const path of deps.shellTabPaths?.({ id }) ?? []) shellHeld.delete(path)
       armed.delete(id)
       deps.setDiscussionPanel?.({ id }, { open: false, width: 0 })
     }
@@ -315,6 +318,15 @@ export function createUniworkComments(
       armed.delete(id)
       watchedShells.delete(id)
     })
+  }
+
+  // W11A-2: a hold lives only while a shell shows its path. A closed tab's hold
+  // is swept on the next shell message or reveal, so the map is bounded by the
+  // open tabs (plus the reveal being held right now).
+  const sweepShellHeld = (keep?: string): void => {
+    for (const path of [...shellHeld.keys()]) {
+      if (path !== keep && !deps.shellTarget?.(path)) shellHeld.delete(path)
+    }
   }
 
   const handleDiscussion = <I extends { path: string }, R>(
@@ -391,6 +403,7 @@ export function createUniworkComments(
       const paths = deps.shellTabPaths?.(event.sender) ?? null
       if (!paths || !paths.includes(path) || !resolveCommentBinding(deps.service, path)) return null
       watchShell(event.sender)
+      sweepShellHeld()
       const set = armed.get(event.sender.id) ?? new Set<string>()
       set.add(path)
       armed.set(event.sender.id, set)
@@ -402,13 +415,17 @@ export function createUniworkComments(
 
     ipcMain.on(DISCUSSION_CHANNELS.revealRelease, (event, payload: unknown) => {
       const request = parseDiscussionRevealRequest(payload)
-      if (request) armed.get(event.sender.id)?.delete(request.path)
+      if (!request) return
+      armed.get(event.sender.id)?.delete(request.path)
+      // W11A-2: the panel let go of this path; its hold goes with it
+      shellHeld.delete(request.path)
     })
 
     ipcMain.on(DISCUSSION_CHANNELS.panel, (event, payload: unknown) => {
       const panel = parseDiscussionPanelInput(payload)
       if (!panel || !deps.shellTabPaths?.(event.sender)) return
       watchShell(event.sender)
+      sweepShellHeld()
       deps.setDiscussionPanel?.(event.sender, panel)
     })
   }
@@ -416,6 +433,12 @@ export function createUniworkComments(
   /** push to an armed shell listener for `path`, else hold until it pulls */
   const revealToShell = (path: string, commentId: string): void => {
     const target = deps.shellTarget?.(path) ?? null
+    // a shell that never talked to us is watched from its first reveal, so a
+    // reload before its first pull still starts a clean realm (W11A-1)
+    if (target && !target.isDestroyed() && typeof target.on === 'function') {
+      watchShell(target as RealmSender)
+    }
+    sweepShellHeld(path)
     if (target && !target.isDestroyed() && armed.get(target.id)?.has(path)) {
       target.send(DISCUSSION_CHANNELS.reveal, { path, commentId })
       shellHeld.delete(path)
