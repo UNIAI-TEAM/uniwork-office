@@ -134,11 +134,14 @@ function LocationFields({
   workspaces,
   target,
   folders,
+  locked,
   onChange,
 }: {
   workspaces: UniworkWorkspaceRef[]
   target: DocTarget
   folders: FolderChoice[]
+  /** an upload is under way: the place it goes to cannot change any more */
+  locked?: boolean
   onChange: (target: DocTarget) => void
 }) {
   const { t } = useI18n()
@@ -152,6 +155,7 @@ function LocationFields({
           id={`${id}-ws`}
           aria-label={t('uwPickWorkspace')}
           value={target.workspaceId}
+          disabled={locked}
           onChange={(e) => onChange({ workspaceId: e.target.value, folderId: null })}
         >
           {workspaces.map((w) => (
@@ -164,7 +168,7 @@ function LocationFields({
           className="uw-act-select"
           aria-label={t('uwDocLocation')}
           value={target.folderId ?? ''}
-          disabled={folders.length === 0}
+          disabled={locked || folders.length === 0}
           onChange={(e) => onChange({ ...target, folderId: e.target.value || null })}
         >
           <option value="">{t('uwDocLocationTop')}</option>
@@ -410,6 +414,7 @@ export function UploadDocDialog({
         workspaces={workspaces}
         target={target}
         folders={folders}
+        locked={busy}
         onChange={setTarget}
       />
       {busy && (

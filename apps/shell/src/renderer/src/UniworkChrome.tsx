@@ -3,7 +3,7 @@ import type { TabSummary } from '../../shared/tabs-api'
 import type { UniworkDocStatus } from '../../shared/home-api'
 import { useI18n } from './locale'
 import { useAccount } from './account-model'
-import { onUniworkNotice } from './uniwork-notice-bus'
+import { onLocalRename, onUniworkNotice } from './uniwork-notice-bus'
 import { onDocRenamed } from './uniwork-library-api'
 import {
   chipCopy,
@@ -227,7 +227,7 @@ function NoticePill({ notice, onDismiss }: { notice: LaunchNotice; onDismiss: ()
 }
 
 /** "Opening from UniWork…", the sign-in prompt and failures of an open (web launch or recent) */
-export function UniworkNotice() {
+export function UniworkNotice({ openDocumentIds }: { openDocumentIds: ReadonlySet<string> }) {
   const [notice, setNotice] = useState<LaunchNotice | null>(null)
 
   useEffect(() => {
@@ -249,23 +249,34 @@ export function UniworkNotice() {
   return (
     <>
       {notice && <NoticePill notice={notice} onDismiss={() => setNotice(null)} />}
-      <RenamedAnnouncer />
+      <RenamedAnnouncer openDocumentIds={openDocumentIds} />
     </>
   )
 }
 
 /**
- * Polite announcement when an open UniWork document gets a new name from
- * elsewhere (main refreshed its metadata; the tab title follows from main).
- * The live region is always in the DOM so screen readers pick changes up.
+ * Polite announcement of a document's new name: a rename the person just made
+ * in the library, or one from elsewhere for a document open in a tab (main
+ * refreshed its metadata; the tab title follows from main). A feed push for a
+ * document that is not open stays silent. The live region is always in the DOM
+ * so screen readers pick changes up.
  */
-function RenamedAnnouncer() {
+function RenamedAnnouncer({ openDocumentIds }: { openDocumentIds: ReadonlySet<string> }) {
   const { t } = useI18n()
   const [name, setName] = useState<{ title: string; n: number } | null>(null)
-  useEffect(
-    () => onDocRenamed(({ title }) => setName((prev) => ({ title, n: (prev?.n ?? 0) + 1 }))),
-    [],
-  )
+  const openRef = useRef(openDocumentIds)
+  openRef.current = openDocumentIds
+  useEffect(() => {
+    const say = (title: string) => setName((prev) => ({ title, n: (prev?.n ?? 0) + 1 }))
+    const offFeed = onDocRenamed(({ documentId, title }) => {
+      if (openRef.current.has(documentId)) say(title)
+    })
+    const offLocal = onLocalRename(say)
+    return () => {
+      offFeed()
+      offLocal()
+    }
+  }, [])
   return (
     <span className="uw-sr-only" role="status" aria-live="polite">
       {name ? <span key={name.n}>{t('uwDocRenamedAnnounce', { name: name.title })}</span> : null}

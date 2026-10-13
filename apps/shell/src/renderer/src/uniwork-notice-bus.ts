@@ -19,3 +19,20 @@ export function onUniworkNotice(handler: (event: UniworkLaunchEvent) => void): (
   target.addEventListener(NOTICE, listener)
   return () => target.removeEventListener(NOTICE, listener)
 }
+
+const RENAMED = 'uniwork-doc-renamed-here'
+
+/**
+ * A rename the person made in this window: main does not push it back (it
+ * only pushes renames that came from elsewhere), so the dialog hands the new
+ * name to the always-present live region itself.
+ */
+export function publishLocalRename(title: string): void {
+  target.dispatchEvent(new CustomEvent<string>(RENAMED, { detail: title }))
+}
+
+export function onLocalRename(handler: (title: string) => void): () => void {
+  const listener = (ev: Event): void => handler((ev as CustomEvent<string>).detail)
+  target.addEventListener(RENAMED, listener)
+  return () => target.removeEventListener(RENAMED, listener)
+}

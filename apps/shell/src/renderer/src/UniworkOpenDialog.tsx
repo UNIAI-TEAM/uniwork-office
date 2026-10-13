@@ -17,7 +17,7 @@ import {
 } from './UniworkDocActions'
 import { useI18n } from './locale'
 import { needsSignIn, type AccountView } from './account-model'
-import { publishUniworkNotice } from './uniwork-notice-bus'
+import { publishLocalRename, publishUniworkNotice } from './uniwork-notice-bus'
 import {
   PICKER_PAGE_SIZE,
   PICKER_SEARCH_DEBOUNCE_MS,
@@ -30,6 +30,7 @@ import {
   isDocNameError,
   isDocTitleTooLong,
   initialPickerState,
+  isNavigable,
   isOpenable,
   pickerBodyOf,
   pickerReducer,
@@ -140,6 +141,10 @@ export function UniworkOpenDialog({
   /** S18: the New document / Upload dialog, the row being renamed, the archive prompt */
   const [form, setForm] = useState<'new' | 'upload' | null>(null)
   const [upload, setUpload] = useState<UploadProgress | null>(null)
+  /** bumped by every upload start and cancel: a result of an older upload is ignored */
+  const uploadRun = useRef(0)
+  /** rows with an archive/restore call in flight (one call per row at a time) */
+  const rowBusy = useRef(new Set<string>())
   const [renaming, setRenaming] = useState<{
     id: string
     error: DocNameError | null
@@ -304,7 +309,19 @@ export function UniworkOpenDialog({
   const createDoc = (input: Parameters<typeof createDocument>[0]) =>
     settleAction(createDocument(input)).then(created)
 
+  /**
+   * Cancel / Esc / overlay on the Upload dialog. Main has no abort for an
+   * upload in flight, so the bytes may still land on the server; the renderer
+   * just stops listening: the late result neither opens the document nor toasts.
+   */
+  const cancelUpload = () => {
+    uploadRun.current++
+    setUpload(null)
+    setForm(null)
+  }
+
   const uploadDoc = (input: DocTarget & { path: string; name: string }) => {
+    const run = ++uploadRun.current
     setUpload({ name: input.name, loaded: 0, total: 0 })
     return settleAction(
       uploadDocument({
@@ -313,6 +330,7 @@ export function UniworkOpenDialog({
         path: input.path,
       }),
     ).then((result) => {
+      if (run !== uploadRun.current) return { ok: true }
       if (mounted.current) setUpload(null)
       return created(result)
     })
@@ -355,7 +373,10 @@ export function UniworkOpenDialog({
     void settleAction(renameDocument(doc.id, next)).then((result) => {
       if (!mounted.current) return
       if (result.ok) {
-        dispatch({ type: 'doc-renamed', id: doc.id, title: result.value.title || next })
+        const title = result.value.title || next
+        dispatch({ type: 'doc-renamed', id: doc.id, title })
+        // main does not push a rename made here back: say it once in the live region
+        publishLocalRename(title)
         endRename(doc.id)
         return
       }
@@ -371,8 +392,11 @@ export function UniworkOpenDialog({
   }
 
   const setArchived = (id: string, archived: boolean) => {
+    if (rowBusy.current.has(id)) return
+    rowBusy.current.add(id)
     const call = archived ? archiveDocument(id) : restoreDocument(id)
     void settleAction(call).then((result) => {
+      rowBusy.current.delete(id)
       if (!mounted.current) return
       if (result.ok) dispatch({ type: 'doc-archived', id, archived })
       else outcomeOf(result.error)
@@ -560,6 +584,7 @@ export function UniworkOpenDialog({
                 const editing = renaming?.id === doc.id ? renaming : null
                 const active = doc.id === state.activeId
                 const archived = row.archived === true
+                const navigable = isNavigable(doc)
                 // an archived row is a supported document that is parked, not an unsupported one
                 const updated = pickerRowMeta(doc, t, dateLocale)
                 const meta = archived
@@ -579,7 +604,7 @@ export function UniworkOpenDialog({
                       aria-disabled={archived ? undefined : !openable}
                       className={`uw-pick-row${active ? ' active' : ''}${openable ? '' : ' disabled'}${archived ? ' archived' : ''}${state.opening?.id === doc.id ? ' opening' : ''}`}
                       onMouseMove={() => {
-                        if (openable && !active) dispatch({ type: 'set-active', id: doc.id })
+                        if (navigable && !active) dispatch({ type: 'set-active', id: doc.id })
                       }}
                       onClick={() => {
                         if (!editing) openDoc(doc.id)
@@ -648,7 +673,7 @@ export function UniworkOpenDialog({
                         docId={doc.id}
                         title={doc.title}
                         actions={rowActionsOf(row)}
-                        tabbable={active || archived}
+                        tabbable={active}
                         onAction={(action) => onRowAction(row, action)}
                       />
                     )}
@@ -791,7 +816,7 @@ export function UniworkOpenDialog({
             pickFile={pickUploadFile}
             onUpload={uploadDoc}
             progress={upload}
-            onCancel={() => setForm(null)}
+            onCancel={cancelUpload}
           />
         )}
         {archiving && (

@@ -456,17 +456,26 @@ export function docExtension(doc: UniworkDocSummary): string {
   return dot > 0 ? doc.title.slice(dot + 1).toLowerCase() : ''
 }
 
-function firstOpenable(docs: UniworkDocSummary[]): string | null {
-  return docs.find(isOpenable)?.id ?? null
+/**
+ * Rows the arrow keys can land on: the openable ones plus the archived ones,
+ * so the single "…" tab stop (the active row's) reaches Restore by keyboard.
+ */
+export function isNavigable(doc: UniworkDocSummary): boolean {
+  return isOpenable(doc) || (doc as LibraryDocRow).archived === true
 }
 
-/** arrow keys step over documents that cannot be opened */
+function firstOpenable(docs: UniworkDocSummary[]): string | null {
+  // a list of archived rows only still gets a row to start from (its "…" is the tab stop)
+  return (docs.find(isOpenable) ?? docs.find(isNavigable))?.id ?? null
+}
+
+/** arrow keys step over documents that are neither openable nor archived (a row that can only be listed) */
 export function moveActive(
   docs: UniworkDocSummary[],
   activeId: string | null,
   to: 'next' | 'prev' | 'first' | 'last',
 ): string | null {
-  const ids = docs.filter(isOpenable).map((d) => d.id)
+  const ids = docs.filter(isNavigable).map((d) => d.id)
   if (ids.length === 0) return null
   if (to === 'first') return ids[0]!
   if (to === 'last') return ids[ids.length - 1]!
@@ -586,7 +595,7 @@ export function pickerReducer(state: PickerState, action: PickerAction): PickerS
           moreError: undefined,
         },
         activeId:
-          state.activeId && shown.some((d) => d.id === state.activeId && isOpenable(d))
+          state.activeId && shown.some((d) => d.id === state.activeId && isNavigable(d))
             ? state.activeId
             : firstOpenable(shown),
       }

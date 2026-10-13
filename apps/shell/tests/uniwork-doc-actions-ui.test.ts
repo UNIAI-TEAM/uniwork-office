@@ -735,11 +735,171 @@ describe('S18 renamed elsewhere', () => {
   it('announces the new name politely from the tab strip', async () => {
     api = makeApi([])
     await act(async () => {
-      root.render(createElement(LocaleProvider, { initial: 'en' }, createElement(UniworkNotice)))
+      root.render(
+        createElement(
+          LocaleProvider,
+          { initial: 'en' },
+          createElement(UniworkNotice, { openDocumentIds: new Set(['e']) }),
+        ),
+      )
     })
     const live = host.querySelector('[aria-live="polite"]')!
     expect(live.textContent).toBe('')
     await act(async () => api.pushRenamed({ documentId: 'e', title: 'Roadmap.docx' }))
     expect(live.textContent).toBe('The document was renamed to Roadmap.docx.')
+  })
+
+  it('RFE17-06: stays silent for a document that is not open in a tab', async () => {
+    api = makeApi([])
+    await act(async () => {
+      root.render(
+        createElement(
+          LocaleProvider,
+          { initial: 'en' },
+          createElement(UniworkNotice, { openDocumentIds: new Set(['other']) }),
+        ),
+      )
+    })
+    const live = host.querySelector('[aria-live="polite"]')!
+    await act(async () => api.pushRenamed({ documentId: 'e', title: 'Roadmap.docx' }))
+    expect(live.textContent).toBe('')
+    await act(async () => api.pushRenamed({ documentId: 'other', title: 'Other.docx' }))
+    expect(live.textContent).toBe('The document was renamed to Other.docx.')
+  })
+})
+
+/** the library dialog together with the tab strip's live region, as in the window */
+async function renderWithChrome(docs: LibraryDocRow[]) {
+  api = makeApi(docs)
+  onClose = vi.fn()
+  await act(async () => {
+    root.render(
+      createElement(
+        LocaleProvider,
+        { initial: 'en' },
+        createElement(UniworkOpenDialog, {
+          onClose,
+          accountView: 'signed-in',
+          onSignIn: () => undefined,
+        }),
+        createElement(UniworkNotice, { openDocumentIds: new Set<string>() }),
+      ),
+    )
+  })
+  await flush()
+}
+
+describe('G8-17 review r1 fixes', () => {
+  it('RFE17-01: a cancelled upload never opens the document or toasts when it finishes', async () => {
+    await render([])
+    let finish: (v: DocActionResult<UniworkDocSummary>) => void = () => undefined
+    api.uniworkUploadDocument.mockImplementationOnce(
+      () => new Promise((resolve) => (finish = resolve)),
+    )
+    await click(buttonByText(host, en.uwDocUpload))
+    const dialog = modal()!
+    await click(buttonByText(dialog, en.uwDocUploadPick))
+    await click(dialog.querySelector('.btn-primary')!)
+    expect(api.uniworkUploadDocument).toHaveBeenCalledTimes(1)
+    // Cancel while the bytes are going up
+    await click(dialog.querySelector('.modal-buttons .btn-secondary')!)
+    expect(modal()).toBeNull()
+    await act(async () => finish(ok(row('up1', 'Q3.xlsx', { format: 'xlsx' }))))
+    await flush()
+    expect(api.uniworkOpenDocument).not.toHaveBeenCalled()
+    expect(host.querySelector('.uw-act-toast')).toBeNull()
+  })
+
+  it('RFE17-01: Escape cancels a failing upload without a toast either', async () => {
+    await render([])
+    let finish: (v: DocActionResult<UniworkDocSummary>) => void = () => undefined
+    api.uniworkUploadDocument.mockImplementationOnce(
+      () => new Promise((resolve) => (finish = resolve)),
+    )
+    await click(buttonByText(host, en.uwDocUpload))
+    const dialog = modal()!
+    await click(buttonByText(dialog, en.uwDocUploadPick))
+    await click(dialog.querySelector('.btn-primary')!)
+    await key(dialog, 'Escape')
+    expect(modal()).toBeNull()
+    await act(async () => finish(fail('server_error')))
+    await flush()
+    expect(host.querySelector('.uw-act-toast')).toBeNull()
+  })
+
+  it('RFE17-05: the location selects are locked while an upload is busy', async () => {
+    await render([])
+    api.uniworkUploadDocument.mockImplementationOnce(() => new Promise(() => undefined))
+    await click(buttonByText(host, en.uwDocUpload))
+    const dialog = modal()!
+    await click(buttonByText(dialog, en.uwDocUploadPick))
+    const selects = () => Array.from(dialog.querySelectorAll<HTMLSelectElement>('select'))
+    expect(selects()[0]!.disabled).toBe(false)
+    await click(dialog.querySelector('.btn-primary')!)
+    expect(selects().every((sel) => sel.disabled)).toBe(true)
+  })
+
+  it('RFE17-02: a successful rename is announced once in the polite live region', async () => {
+    await renderWithChrome([row('e', 'Plan.docx', { canEdit: true })])
+    const live = host.querySelector('[aria-live="polite"]')!
+    expect(live.textContent).toBe('')
+    await openMenuItem('Plan.docx', en.uwDocRename)
+    const input = host.querySelector<HTMLInputElement>('.uw-rename-input')!
+    await type(input, 'Roadmap')
+    await key(input, 'Enter')
+    expect(live.textContent).toBe('The document was renamed to Roadmap.docx.')
+    expect(host.querySelectorAll('[aria-live="polite"] > span')).toHaveLength(1)
+  })
+
+  it('RFE17-02: a failed rename announces nothing', async () => {
+    await renderWithChrome([row('e', 'Plan.docx', { canEdit: true })])
+    api.uniworkRenameDocument.mockResolvedValueOnce(fail('server_error'))
+    await openMenuItem('Plan.docx', en.uwDocRename)
+    const input = host.querySelector<HTMLInputElement>('.uw-rename-input')!
+    await type(input, 'Roadmap')
+    await key(input, 'Enter')
+    expect(host.querySelector('[aria-live="polite"]')!.textContent).toBe('')
+  })
+
+  it('RFE17-03: a second Restore while the first is in flight makes no second call', async () => {
+    const archived = row('m', 'Old.docx', { canEdit: true, canManage: true, archived: true })
+    await render([archived])
+    let finish: (v: DocActionResult<unknown>) => void = () => undefined
+    api.uniworkRestoreDocument.mockImplementationOnce(
+      () => new Promise((resolve) => (finish = resolve)),
+    )
+    await openMenuItem('Old.docx', en.uwDocRestore)
+    await openMenuItem('Old.docx', en.uwDocRestore)
+    expect(api.uniworkRestoreDocument).toHaveBeenCalledTimes(1)
+    await act(async () => finish(ok({})))
+    await flush()
+    expect(rowOf('Old.docx').textContent).not.toContain(en.uwDocArchived)
+    // settled: the row can be acted on again
+    await openMenuItem('Old.docx', en.uwDocArchive)
+    await click(modal()!.querySelector('.btn-primary')!)
+    expect(api.uniworkArchiveDocument).toHaveBeenCalledTimes(1)
+  })
+
+  it('RFE17-04: only the active row has its "…" in the tab order, archived rows are reached by arrows', async () => {
+    const flags = { canEdit: true, canManage: true, archived: true }
+    await render([
+      row('a', 'Open.docx', { canEdit: true, canManage: true }),
+      row('m1', 'Old1.docx', flags),
+      row('m2', 'Old2.docx', flags),
+    ])
+    const stops = () =>
+      Array.from(host.querySelectorAll<HTMLButtonElement>('.uw-row-menu-btn'))
+        .filter((b) => b.tabIndex === 0)
+        .map((b) => b.dataset.menuFor)
+    expect(stops()).toEqual(['a'])
+    const search = host.querySelector<HTMLInputElement>('.uw-pick-search')!
+    await key(search, 'ArrowDown')
+    expect(stops()).toEqual(['m1'])
+    await key(search, 'ArrowDown')
+    expect(stops()).toEqual(['m2'])
+    // Restore of that row is one Enter away
+    const button = menuButton(rowOf('Old2.docx'))!
+    await key(button, 'Enter')
+    expect(document.body.querySelector('[role="menuitem"]')!.textContent).toBe(en.uwDocRestore)
   })
 })
