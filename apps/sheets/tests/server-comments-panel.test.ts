@@ -13,7 +13,7 @@ import { resolve } from 'node:path'
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { COLLAB_LIVE_REGION_ID, collabStrings } from '@genoffice/ui/collab'
+import { COLLAB_LIVE_REGION_ID, COMMENTS_REVEAL_WAIT_MS, collabStrings } from '@genoffice/ui/collab'
 
 import { LocaleProvider } from '../src/renderer/i18n/locale'
 import type { SheetsEditorView } from '../src/renderer/server-comments/adapter'
@@ -48,12 +48,15 @@ interface Row {
 }
 
 /** an in-memory UniWork server behind the editor API shape (camelCase in, reply envelopes out) */
-function fakeServer(opts: { versionId?: string | null; context?: 'ok' | 'not_found' } = {}) {
+function fakeServer(
+  opts: { versionId?: string | null; context?: 'ok' | 'not_found'; frame?: boolean } = {},
+) {
   const rows: Row[] = []
   let seq = 0
   let token = 0
   const savedHandlers: Array<(p: { path: string; versionId: string }) => void> = []
-  const revealHandlers: Array<(p: { path: string; commentId: string }) => unknown> = []
+  const revealHandlers: Array<(p: { path: string; commentId: string; last?: boolean }) => unknown> =
+    []
   const ok = <T>(value: T) => Promise.resolve({ ok: true as const, value })
   const stamp = () => `2026-10-13T10:00:${String(++seq).padStart(2, '0')}Z`
   const find = (id: string) => rows.find((r) => r.id === id)!
@@ -132,13 +135,14 @@ function fakeServer(opts: { versionId?: string | null; context?: 'ok' | 'not_fou
             versionId: opts.versionId === undefined ? 'v1' : opts.versionId,
             level: 'edit',
             myUserId: 'me',
+            ...(opts.frame ? { frame: true } : {}),
           }),
     ),
     onSaved: vi.fn((h: (p: { path: string; versionId: string }) => void) => {
       savedHandlers.push(h)
       return () => void savedHandlers.splice(savedHandlers.indexOf(h), 1)
     }),
-    onReveal: vi.fn((h: (p: { path: string; commentId: string }) => unknown) => {
+    onReveal: vi.fn((h: (p: { path: string; commentId: string; last?: boolean }) => unknown) => {
       revealHandlers.push(h)
       return () => void revealHandlers.splice(revealHandlers.indexOf(h), 1)
     }),
@@ -155,10 +159,15 @@ function fakeServer(opts: { versionId?: string | null; context?: 'ok' | 'not_fou
       await act(async () => savedHandlers.forEach((h) => h({ path: PATH, versionId })))
       await flush()
     },
-    reveal: async (commentId: string) => {
+    /** `last`: the web frame router's flag (set on the frame, never on desktop) */
+    reveal: async (commentId: string, last?: boolean) => {
       let out: unknown[] = []
       await act(async () => {
-        out = await Promise.all(revealHandlers.map((h) => h({ path: PATH, commentId })))
+        out = await Promise.all(
+          revealHandlers.map((h) =>
+            h({ path: PATH, commentId, ...(last !== undefined ? { last } : {}) }),
+          ),
+        )
       })
       await flush()
       return out
@@ -174,11 +183,15 @@ const SHEETS = [
 function fakeView() {
   const state = {
     active: 'sheet-1',
-    selection: { sheetId: 'sheet-1', range: cell(0, 0) },
+    selection: { sheetId: 'sheet-1', range: cell(0, 0) } as {
+      sheetId: string
+      range: CellRange
+    } | null,
     selected: [] as Array<[string, CellRange]>,
+    sheets: SHEETS.map((s) => ({ ...s })) as Array<{ id: string; name: string; stableId?: string }>,
   }
   const view: SheetsEditorView = {
-    sheets: () => SHEETS,
+    sheets: () => state.sheets,
     activeSheetId: () => state.active,
     selection: () => state.selection,
     select: (sheetId, range) => {
@@ -508,5 +521,259 @@ describe('21-locale parity of the new key', () => {
       expect(text, lang).toBeTruthy()
       if (lang !== 'en') expect(text, lang).not.toBe(strings.en.appCommentSaveFirst)
     }
+  })
+})
+
+describe('reveal in the frame and on desktop (lane contract §3.5, V13-5)', () => {
+  it('web frame: a miss shows the S15 line and opens the panel only when last is true', async () => {
+    const server = fakeServer({ frame: true })
+    await mount(server)
+    // another owner is still asked after this one: stay silent and closed
+    expect(await server.reveal('gone', false)).toEqual([false])
+    expect(threadPane.getState().open).toBe(false)
+    expect(el.textContent).not.toContain(EN.collabCommentDeleted!)
+    expect(await server.reveal('gone', true)).toEqual([false])
+    expect(threadPane.getState().open).toBe(true)
+    expect(el.querySelector('.collab-panel')).not.toBeNull()
+    expect(el.textContent).toContain(EN.collabCommentDeleted!)
+  })
+
+  it('desktop (no last): a miss is silent; a failed first list answers false, no throw', async () => {
+    const server = fakeServer()
+    await mount(server)
+    expect(await server.reveal('gone')).toEqual([false])
+    expect(threadPane.getState().open).toBe(false)
+
+    act(() => root.unmount())
+    root = createRoot(el)
+    const failing = fakeServer()
+    failing.calls.list.mockImplementation(
+      () => Promise.resolve({ ok: false, error: { code: 'internal' } }) as never,
+    )
+    await mount(failing)
+    expect(await failing.reveal('x')).toEqual([false])
+  })
+
+  it('frame (last set): a late first list is the typed not_ready the router maps', async () => {
+    const server = fakeServer({ frame: true })
+    server.calls.list.mockImplementation(() => new Promise(() => undefined) as never)
+    const handlers: Array<(p: { path: string; commentId: string; last?: boolean }) => unknown> = []
+    server.calls.onReveal.mockImplementation((h) => {
+      handlers.push(h)
+      return () => undefined
+    })
+    vi.useFakeTimers()
+    try {
+      await mount(server)
+      const caught = Promise.resolve(handlers[0]!({ path: PATH, commentId: 'x', last: true })).then(
+        () => null,
+        (e: unknown) => e,
+      )
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(COMMENTS_REVEAL_WAIT_MS + 50)
+      })
+      expect(await caught).toMatchObject({ code: 'not_ready', retryable: true })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
+describe('one side panel at a time in the frame (lane contract §3.5)', () => {
+  const EVENT = 'uniwork:frame-side-panel'
+  const seen: Array<{ owner: string; open: boolean }> = []
+  const listener = (e: Event) => seen.push((e as CustomEvent).detail)
+  beforeEach(() => {
+    seen.length = 0
+    window.addEventListener(EVENT, listener)
+  })
+  afterEach(() => window.removeEventListener(EVENT, listener))
+
+  it('announces its own open and close as the editor owner, nothing for the closed mount', async () => {
+    await mount(fakeServer({ frame: true }))
+    expect(seen).toEqual([])
+    act(() => threadPane.show())
+    await flush()
+    expect(seen).toEqual([{ owner: 'editor', open: true }])
+    act(() => threadPane.close())
+    await flush()
+    expect(seen).toEqual([
+      { owner: 'editor', open: true },
+      { owner: 'editor', open: false },
+    ])
+  })
+
+  it('closes itself when another owner opens, and ignores its own and close events', async () => {
+    await mount(fakeServer({ frame: true }))
+    act(() => threadPane.show())
+    await flush()
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent(EVENT, { detail: { owner: 'editor', open: true } }))
+      window.dispatchEvent(new CustomEvent(EVENT, { detail: { owner: 'discussion', open: false } }))
+    })
+    expect(threadPane.getState().open).toBe(true)
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent(EVENT, { detail: { owner: 'discussion', open: true } }))
+    })
+    await flush()
+    expect(threadPane.getState().open).toBe(false)
+    expect(el.querySelector('.collab-panel')).toBeNull()
+    // no ping-pong: closing on another owner's open announces only its own close
+    expect(seen.filter((d) => d.owner === 'editor').at(-1)).toEqual({
+      owner: 'editor',
+      open: false,
+    })
+  })
+
+  it('the old side-by-side rule beside the Discussion panel is gone (one panel at a time)', () => {
+    const css = readFileSync(resolve(process.cwd(), 'src/renderer/styles.css'), 'utf8')
+    expect(css).not.toMatch(/html\.uw-disc-open \.collab-panel\.sheets-server-comments/)
+  })
+})
+
+describe("the desktop poll is not the frame's (lane contract §3.5)", () => {
+  it('a window focus reloads the list on desktop and does not in the frame', async () => {
+    const desktop = fakeServer()
+    await mount(desktop)
+    act(() => threadPane.show())
+    await flush()
+    const before = desktop.calls.list.mock.calls.length
+    await act(async () => {
+      window.dispatchEvent(new Event('focus'))
+    })
+    await flush()
+    expect(desktop.calls.list.mock.calls.length).toBeGreaterThan(before)
+
+    act(() => root.unmount())
+    root = createRoot(el)
+    const frame = fakeServer({ frame: true })
+    await mount(frame)
+    act(() => threadPane.show())
+    await flush()
+    const framed = frame.calls.list.mock.calls.length
+    await act(async () => {
+      window.dispatchEvent(new Event('focus'))
+    })
+    await flush()
+    expect(frame.calls.list.mock.calls.length).toBe(framed)
+  })
+})
+
+describe('save the workbook first, inside the panel (V13-1)', () => {
+  it('shows a warn line near the composer while the version is unknown and announces it politely', async () => {
+    vi.useFakeTimers()
+    try {
+      const server = fakeServer({ versionId: null })
+      await mount(server)
+      await act(async () => serverComments.handle!.startThread())
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(100)
+      })
+      const line = el.querySelector('.sheets-server-comments .sheets-server-save-first')
+      expect(line?.textContent).toBe('Save the workbook first to add a comment')
+      expect(line?.classList.contains('collab-pnote--warn')).toBe(true)
+      expect(document.getElementById(COLLAB_LIVE_REGION_ID)?.textContent).toBe(
+        'Save the workbook first to add a comment',
+      )
+      await server.saved('v2')
+      expect(el.querySelector('.sheets-server-save-first')).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('no line for a known version', async () => {
+    await mount(fakeServer())
+    act(() => threadPane.show())
+    await flush()
+    expect(el.querySelector('.collab-panel')).not.toBeNull()
+    expect(el.querySelector('.sheets-server-save-first')).toBeNull()
+  })
+})
+
+describe('New Comment without a selection (FE13-6)', () => {
+  it('gives visible feedback instead of doing nothing', async () => {
+    vi.useFakeTimers()
+    try {
+      const server = fakeServer()
+      const { view, state } = fakeView()
+      state.selection = null
+      const { status } = await mount(server, view)
+      await act(async () => serverComments.handle!.startThread())
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(100)
+      })
+      expect(status).toHaveBeenCalledWith('Select a cell first.')
+      expect(document.getElementById(COLLAB_LIVE_REGION_ID)?.textContent).toBe(
+        'Select a cell first.',
+      )
+      expect(threadPane.getState().open).toBe(true)
+      expect(el.querySelector('.collab-thread--new')).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
+describe('labels follow the workbook (FE13-5, V13-3)', () => {
+  it('a sheet rename refreshes the in-file labels', async () => {
+    const { view, state } = fakeView()
+    await mount(fakeServer(), view)
+    act(() => threadPane.show())
+    await flush()
+    const toggle = [...el.querySelectorAll<HTMLButtonElement>('button')].find((b) =>
+      b.textContent?.includes(EN.collabInFileSection!),
+    )
+    await act(async () => toggle!.click())
+    await flush()
+    expect(el.querySelector('.collab-infile')!.textContent).toContain("'Data'!D3")
+    state.sheets = state.sheets.map((s) => (s.id === 'sheet-2' ? { ...s, name: 'Costs' } : s))
+    act(() => serverAnchorStore.sheetRenamed('sheet-2'))
+    await flush()
+    expect(el.querySelector('.collab-infile')!.textContent).toContain("'Costs'!D3")
+  })
+
+  it('a sheet the workbook does not know: the last known name, else the cell only, never the raw id', async () => {
+    const server = fakeServer()
+    server.add({
+      body: 'Unknown sheet',
+      anchor: { format: 'xlsx', v: 1, sheet: 'sheet-9', range: 'A9' },
+      anchor_state: 'stale',
+    })
+    server.add({
+      body: 'Removed sheet',
+      anchor: { format: 'xlsx', v: 1, sheet: 'sheet-2', range: 'B2' },
+      anchor_state: 'exact',
+    })
+    const { view, state } = fakeView()
+    await mount(server, view)
+    // the sheet goes away after the list was seen (deleted by someone, kept by the server)
+    state.sheets = state.sheets.filter((s) => s.id !== 'sheet-2')
+    act(() => serverAnchorStore.sheetRenamed('sheet-2'))
+    act(() => threadPane.show())
+    await flush()
+    const text = el.querySelector('.collab-panel')!.textContent ?? ''
+    expect(text).not.toContain('sheet-9')
+    expect(text).not.toContain('sheet-2')
+    expect(text).toContain('A9')
+    expect(text).toContain("'Data'!B2")
+  })
+})
+
+describe('the anchor store follows a reopen that is not a Save (FE13-4)', () => {
+  it('reset re-locates the listed roots without waiting for the next list', async () => {
+    const server = fakeServer()
+    server.add({
+      body: 'Marked',
+      anchor: { format: 'xlsx', v: 1, sheet: 'sheet-2', range: 'B7' },
+      anchor_state: 'exact',
+    })
+    await mount(server)
+    expect(serverAnchorStore.hasMarker('sheet-2', 6, 1)).toBe(true)
+    const lists = server.calls.list.mock.calls.length
+    act(() => serverAnchorStore.reset())
+    await flush()
+    expect(server.calls.list.mock.calls.length).toBe(lists)
+    expect(serverAnchorStore.hasMarker('sheet-2', 6, 1)).toBe(true)
   })
 })

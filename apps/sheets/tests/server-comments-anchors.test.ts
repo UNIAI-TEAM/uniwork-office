@@ -252,3 +252,48 @@ describe('the kit anchor adapter', () => {
     expect(adapter.sheetName?.('sheet-9')).toBeUndefined()
   })
 })
+
+describe('not located yet is not lost (FE13-3)', () => {
+  it('a list that lands before the workbook has sheets stays untracked, then locates', () => {
+    const store = new ServerAnchorStore()
+    const roots = [rootAt('c1', 'sheet-2', 'B7')]
+    store.track(roots, [])
+    expect(store.locationOf('c1')).toBeUndefined()
+    // the next Save still encodes it from the live sheets, not as lost
+    expect(buildAnchorUpdates(store, roots, SHEETS)).toEqual([
+      {
+        comment_id: 'c1',
+        anchor: { format: 'xlsx', v: 1, sheet: 'sheet-2', range: 'B7' },
+        state: 'exact',
+      },
+    ])
+    store.track(roots, SHEETS)
+    expect(store.locationOf('c1')).toEqual({ sheetId: 'sheet-2', range: cell(6, 1) })
+  })
+
+  it('a sheet the loaded workbook does not have is lost; a server-lost one stays lost', () => {
+    const store = new ServerAnchorStore()
+    store.track([rootAt('c1', 'sheet-9', 'A1'), rootAt('c2', 'sheet-2', 'B7', 'lost')], SHEETS)
+    expect(store.locationOf('c1')).toBeNull()
+    expect(store.locationOf('c2')).toBeNull()
+  })
+
+  it('the adapter names a sheet that went away by its last known name', () => {
+    const store = new ServerAnchorStore()
+    store.track([rootAt('c1', 'sheet-2', 'B7')], SHEETS)
+    const live = SHEETS.filter((s) => s.id !== 'sheet-2')
+    const adapter = createSheetsAnchorAdapter(store, {
+      sheets: () => live,
+      activeSheetId: () => 'sheet-1',
+      selection: () => null,
+      select: () => undefined,
+    })
+    expect(adapter.sheetName!('sheet-2')).toBe('Data')
+    // never seen: the active sheet's name, so the label is the bare cell
+    expect(adapter.sheetName!('sheet-9')).toBe('Summary')
+    // a session sheet keyed by its name keeps that name
+    expect(adapter.sheetName!('Added')).toBe('Added')
+    store.reset()
+    expect(adapter.sheetName!('sheet-2')).toBe('Summary')
+  })
+})
