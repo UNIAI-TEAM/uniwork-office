@@ -1,8 +1,8 @@
 import type { ReactElement } from 'react'
 import type { PracticePillarId, WorkbenchModuleId } from '@uniwork/practice-core'
-import { MODULE_TONES, tintStyle } from './module-tones'
+import { MODULE_TONES, tintStyle, type Tint } from './module-tones'
 
-type IconId = PracticePillarId | WorkbenchModuleId | 'add'
+type IconId = PracticePillarId | WorkbenchModuleId | 'add' | 'inbox'
 
 /**
  * Line glyphs on a 24-unit box, drawn in currentColor: the tile's tint
@@ -106,14 +106,35 @@ const GLYPH: Record<IconId, ReactElement> = {
       />
     </>
   ),
+  inbox: (
+    <>
+      <path
+        d="M8 16.5V11a4 4 0 0 1 8 0v5.5l1.5 1.5h-11z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+      <path d="M10.5 19.5h3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </>
+  ),
   add: <path d="M12 7v10M7 12h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />,
 }
 
-export function WorkbenchIcon({ id, size = 18 }: { id: IconId; size?: number }): ReactElement {
+/** `tint` overrides the module tone (the Overview strip paints Meetings violet, Unread blue) */
+export function WorkbenchIcon({
+  id,
+  size = 18,
+  tint,
+}: {
+  id: IconId
+  size?: number
+  tint?: Tint
+}): ReactElement {
+  const tone = tint ?? (id === 'add' || id === 'inbox' ? 'gray' : MODULE_TONES[id])
   return (
     <span
       className="wb-icon-tile"
-      style={{ ...tintStyle(id === 'add' ? 'gray' : MODULE_TONES[id]), width: size, height: size }}
+      style={{ ...tintStyle(tone), width: size, height: size }}
       aria-hidden="true"
     >
       <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
@@ -122,3 +143,16 @@ export function WorkbenchIcon({ id, size = 18 }: { id: IconId; size?: number }):
     </span>
   )
 }
+
+/** the tick inside a `.wb-check` box, shared by the Overview and Tasks lists */
+export const CHECK_GLYPH = (
+  <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+    <path
+      d="M2 5.2 4.1 7.2 8 3"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+)

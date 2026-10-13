@@ -188,6 +188,23 @@ export function dueState(task: WorkTask, today: string): DueState {
   return task.due_date === today ? 'today' : 'later'
 }
 
+export type MyWorkGroup = 'overdue' | 'today' | 'upcoming'
+
+/** Overview "My work" groups in display order; a ticked task keeps its due group (not 'none'). */
+export function myWorkGroups(
+  tasks: readonly WorkTask[],
+  today: string,
+): { key: MyWorkGroup; tasks: WorkTask[] }[] {
+  const groups: Record<MyWorkGroup, WorkTask[]> = { overdue: [], today: [], upcoming: [] }
+  for (const task of tasks) {
+    const due = dueState({ ...task, status: 'todo' }, today)
+    groups[due === 'overdue' || due === 'today' ? due : 'upcoming'].push(task)
+  }
+  return (['overdue', 'today', 'upcoming'] as const)
+    .filter((key) => groups[key].length > 0)
+    .map((key) => ({ key, tasks: groups[key] }))
+}
+
 /** nothing assigned, scheduled or unread, and every source and count answered */
 export function isQuiet(summary: WorkHomeSummary): boolean {
   return (

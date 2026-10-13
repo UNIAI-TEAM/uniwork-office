@@ -56,6 +56,8 @@ export const en = {
   wbOvDueOverdue: 'Days overdue: {count}',
   wbOvDueToday: 'Due today',
   wbOvDueOn: 'Due {date}',
+  wbOvGroupUpcoming: 'Upcoming',
+  wbOvMinutes: '{count} min',
   wbOvMeetings: 'Upcoming meetings',
   wbOvMeetingsEmpty: 'You have no meetings today or tomorrow.',
   wbOvInbox: 'Notifications',

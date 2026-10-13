@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import type { ReactElement, ReactNode } from 'react'
 import type { UniworkWorkspaceRef } from '../../shared/home-api'
 import type {
@@ -11,27 +11,39 @@ import type {
 } from '../../shared/uniwork-work-api'
 import { FileBadge } from './FileBadge'
 import { useI18n, type StringKey } from './locale'
+import { MEETING_TINT, type Tint } from './module-tones'
 import { docExtension, formatWhen } from './uniwork-docs-model'
 import { openRecentEntry, openUniworkDocument } from './uniwork-open'
+import { WbRowActions } from './WbRowActions'
+import { CHECK_GLYPH, WorkbenchIcon } from './WorkbenchIcons'
 import {
   buildHeadline,
   clock,
   dueState,
   formatDay,
   greetingKey,
+  greetingName,
   HOME_REFRESH_MS,
   hourIn,
   inboxTarget,
   isQuiet,
   localDay,
+  myWorkGroups,
   notificationKey,
   overdueDays,
   overviewView,
   useRecentDocuments,
   withTaskStatus,
+  type MyWorkGroup,
 } from './work-home'
 import { settleWork, useWorkLoad } from './work-cache'
-import { WorkErrorState, WorkNoWorkspace, WorkStaleNote, WorkToast } from './WorkErrorState'
+import {
+  WorkErrorState,
+  WorkNoWorkspace,
+  WorkStaleNote,
+  WorkStatePanel,
+  WorkToast,
+} from './WorkErrorState'
 
 interface Props {
   /** null while the list loads */
@@ -52,14 +64,17 @@ const STATS: readonly {
   label: StringKey
   tone?: 'danger' | 'warning'
   section: string
+  icon: 'tasks' | 'calendar' | 'inbox'
+  tint?: Tint
 }[] = [
-  { key: 'open', source: 'tasks', label: 'wbOvStatOpen', section: 'wb-ov-mywork' },
+  { key: 'open', source: 'tasks', label: 'wbOvStatOpen', section: 'wb-ov-mywork', icon: 'tasks' },
   {
     key: 'overdue',
     source: 'tasks',
     label: 'wbOvStatOverdue',
     tone: 'danger',
     section: 'wb-ov-mywork',
+    icon: 'tasks',
   },
   {
     key: 'due_today',
@@ -67,15 +82,31 @@ const STATS: readonly {
     label: 'wbOvStatDueToday',
     tone: 'warning',
     section: 'wb-ov-mywork',
+    icon: 'tasks',
   },
   {
     key: 'meetings_today',
     source: 'meetings',
     label: 'wbOvStatMeetingsToday',
     section: 'wb-ov-meetings',
+    icon: 'calendar',
+    tint: MEETING_TINT,
   },
-  { key: 'unread', source: 'notifications', label: 'wbOvStatUnread', section: 'wb-ov-inbox' },
+  {
+    key: 'unread',
+    source: 'notifications',
+    label: 'wbOvStatUnread',
+    section: 'wb-ov-inbox',
+    icon: 'inbox',
+    tint: 'blue',
+  },
 ]
+
+const GROUP_LABEL: Record<MyWorkGroup, StringKey> = {
+  overdue: 'wbTasksGroupOverdue',
+  today: 'wbTasksGroupToday',
+  upcoming: 'wbOvGroupUpcoming',
+}
 
 /** Tổng quan: the desktop window onto UniWork Home (spec §6.3, states §7). */
 export function WorkOverview({
@@ -151,13 +182,15 @@ export function WorkOverview({
     return (
       <header className="wb-ov-head">
         <p className="wb-ov-date">{formatDay(s.today, dateLocale, true)}</p>
-        <h2 className="wb-ov-greeting">{t(greetingKey(hourIn(s.timezone)), { name })}</h2>
+        <h2 className="wb-ov-greeting">
+          {t(greetingKey(hourIn(s.timezone)), { name: greetingName(name) })}
+        </h2>
         <div className="wb-ov-headline">
           <p>{t(headline.key, { ...headline.params, ...time })}</p>
           {liveId && base ? (
             <button
               type="button"
-              className="btn btn-primary"
+              className="wb-btn wb-btn-primary wb-btn-sm"
               onClick={() => openWeb({ kind: 'room', ...base, id: liveId })}
             >
               {t('wbOvJoin')}
@@ -172,28 +205,34 @@ export function WorkOverview({
   }
 
   const stats = (s: WorkHomeSummary) => (
-    <ul className="wb-ov-stats" aria-label={t('wbOvStatsLabel')}>
+    <ul className="wb-ov-strip wb-block" aria-label={t('wbOvStatsLabel')}>
       {STATS.map((item) => {
         const value = s.counts[item.key]
+        const top = (
+          <span className="wb-ov-stat-top">
+            <WorkbenchIcon id={item.icon} size={20} tint={item.tint} />
+            <span className="wb-ov-stat-label">{t(item.label)}</span>
+          </span>
+        )
         return (
           <li key={item.key} className="wb-ov-stat">
             {value === null || s.partial.includes(item.source) ? (
               <div className="wb-ov-stat-body">
-                <span className="wb-ov-stat-value is-muted">—</span>
-                <span className="wb-ov-stat-label">{t(item.label)}</span>
+                {top}
+                <span className="wb-ov-stat-value wb-num is-muted">—</span>
                 <button type="button" className="wb-link" onClick={home.reload}>
                   {t('acctRetry')}
                 </button>
               </div>
             ) : (
               <button type="button" className="wb-ov-stat-body" onClick={() => jump(item.section)}>
+                {top}
                 <span
-                  className={`wb-ov-stat-value${value > 0 && item.tone ? ` is-${item.tone}` : ''}`}
+                  className={`wb-ov-stat-value wb-num${value > 0 && item.tone ? ` is-${item.tone}` : ''}`}
                   data-testid={`wb-stat-${item.key}`}
                 >
                   {value}
                 </span>
-                <span className="wb-ov-stat-label">{t(item.label)}</span>
               </button>
             )}
           </li>
@@ -210,41 +249,65 @@ export function WorkOverview({
       ) : s.my_work.length === 0 ? (
         <p className="wb-ov-note">{t('wbOvMyWorkEmpty')}</p>
       ) : (
-        <ul className="wb-ov-list">
-          {s.my_work.map((task) => {
-            const done = task.status === 'done'
-            const due = dueState(task, s.today)
-            return (
-              <li key={task.id} className={`wb-ov-row${done ? ' is-done' : ''}`}>
-                <input
-                  type="checkbox"
-                  checked={done}
-                  aria-label={t('wbOvMarkDone', { title: task.title })}
-                  onChange={() => void setStatus(task, done ? 'todo' : 'done')}
-                />
-                <button
-                  type="button"
-                  className="wb-ov-row-title"
-                  onClick={() => base && openWeb({ kind: 'task', ...base, id: task.id })}
-                >
-                  {task.title}
-                </button>
-                {task.identifier ? <span className="wb-ov-row-meta">{task.identifier}</span> : null}
-                {due === 'overdue' ? (
-                  <span className="wb-pill is-danger">
-                    {t('wbOvDueOverdue', { count: overdueDays(s.today, task.due_date) })}
-                  </span>
-                ) : due === 'today' ? (
-                  <span className="wb-pill is-warning">{t('wbOvDueToday')}</span>
-                ) : due === 'later' && task.due_date ? (
-                  <span className="wb-pill">
-                    {t('wbOvDueOn', { date: formatDay(task.due_date, dateLocale, false) })}
-                  </span>
-                ) : null}
-              </li>
-            )
-          })}
-        </ul>
+        <div className="wb-block">
+          {myWorkGroups(s.my_work, s.today).map((group) => (
+            <Fragment key={group.key}>
+              <h4 className={`wb-group-head${group.key === 'overdue' ? ' is-overdue' : ''}`}>
+                {t(GROUP_LABEL[group.key])} <span className="wb-num">{group.tasks.length}</span>
+              </h4>
+              <ul className="wb-ov-list">
+                {group.tasks.map((task) => {
+                  const done = task.status === 'done'
+                  const due = dueState(task, s.today)
+                  const open = () => base && openWeb({ kind: 'task', ...base, id: task.id })
+                  return (
+                    <li key={task.id} className={`wb-row${done ? ' is-done' : ''}`}>
+                      <label className="wb-check">
+                        <input
+                          type="checkbox"
+                          className="uw-sr-only"
+                          checked={done}
+                          aria-label={t('wbOvMarkDone', { title: task.title })}
+                          onChange={() => void setStatus(task, done ? 'todo' : 'done')}
+                        />
+                        <span className="wb-check-box" aria-hidden="true">
+                          {CHECK_GLYPH}
+                        </span>
+                      </label>
+                      <button type="button" className="wb-ov-row-title" onClick={open}>
+                        {task.title}
+                      </button>
+                      {task.identifier ? <span className="wb-mono">{task.identifier}</span> : null}
+                      {due === 'overdue' ? (
+                        <span className="wb-pill is-danger">
+                          {t('wbOvDueOverdue', { count: overdueDays(s.today, task.due_date) })}
+                        </span>
+                      ) : due === 'today' ? (
+                        <span className="wb-pill is-warning">{t('wbOvDueToday')}</span>
+                      ) : due === 'later' && task.due_date ? (
+                        <span className="wb-pill">
+                          {t('wbOvDueOn', { date: formatDay(task.due_date, dateLocale, false) })}
+                        </span>
+                      ) : null}
+                      <WbRowActions>
+                        {/* pointer shortcut only: the title button is the keyboard and reader path */}
+                        <button
+                          type="button"
+                          className="wb-btn wb-btn-ghost wb-btn-sm"
+                          tabIndex={-1}
+                          aria-hidden="true"
+                          onClick={open}
+                        >
+                          {t('wbCommonOpen')} ↗
+                        </button>
+                      </WbRowActions>
+                    </li>
+                  )
+                })}
+              </ul>
+            </Fragment>
+          ))}
+        </div>
       )}
     </section>
   )
@@ -257,34 +320,41 @@ export function WorkOverview({
       ) : s.upcoming_meetings.length === 0 ? (
         <p className="wb-ov-note">{t('wbOvMeetingsEmpty')}</p>
       ) : (
-        <ul className="wb-ov-list">
+        <ul className="wb-ov-list wb-block">
           {s.upcoming_meetings.map((m) => {
             const live = m.status === 'IN_PROGRESS'
             const tomorrow = localDay(m.starts_at, s.timezone || 'UTC') !== s.today
+            const minutes = Math.round((Date.parse(m.ends_at) - Date.parse(m.starts_at)) / 60_000)
+            const sub = [
+              live ? t('wbOvLive') : null,
+              tomorrow ? t('wbOvTomorrow') : null,
+              minutes > 0 ? t('wbOvMinutes', { count: minutes }) : null,
+            ]
+              .filter(Boolean)
+              .join(' · ')
             return (
-              <li key={m.id} className="wb-ov-row">
-                <span className="wb-ov-row-meta">
-                  {tomorrow ? `${t('wbOvTomorrow')} ` : ''}
+              <li key={m.id} className="wb-row">
+                <span className="wb-mono wb-num wb-ov-time">
                   {clock(m.starts_at, dateLocale, s.timezone)}
                 </span>
-                <button
-                  type="button"
-                  className="wb-ov-row-title"
-                  onClick={() => base && openWeb({ kind: 'meeting', ...base, id: m.id })}
-                >
-                  {m.title}
-                </button>
+                <div className="wb-ov-meet">
+                  <button
+                    type="button"
+                    className="wb-ov-row-title"
+                    onClick={() => base && openWeb({ kind: 'meeting', ...base, id: m.id })}
+                  >
+                    {m.title}
+                  </button>
+                  {sub ? <span className="wb-ov-meet-sub">{sub}</span> : null}
+                </div>
                 {live ? (
-                  <>
-                    <span className="wb-pill is-success">{t('wbOvLive')}</span>
-                    <button
-                      type="button"
-                      className="btn btn-primary"
-                      onClick={() => base && openWeb({ kind: 'room', ...base, id: m.id })}
-                    >
-                      {t('wbOvJoin')}
-                    </button>
-                  </>
+                  <button
+                    type="button"
+                    className="wb-btn wb-btn-primary wb-btn-sm"
+                    onClick={() => base && openWeb({ kind: 'room', ...base, id: m.id })}
+                  >
+                    {t('wbOvJoin')}
+                  </button>
                 ) : null}
               </li>
             )
@@ -302,9 +372,12 @@ export function WorkOverview({
       ) : s.inbox.length === 0 ? (
         <p className="wb-ov-note">{t('wbOvInboxEmpty')}</p>
       ) : (
-        <ul className="wb-ov-list">
+        <ul className="wb-ov-list wb-block">
           {s.inbox.map((n) => (
-            <li key={n.id} className="wb-ov-row">
+            <li key={n.id} className="wb-row">
+              <span className="wb-ov-avatar" aria-hidden="true">
+                {(n.params.actor ?? '').trim().charAt(0).toUpperCase()}
+              </span>
               <button
                 type="button"
                 className="wb-ov-row-title"
@@ -312,7 +385,7 @@ export function WorkOverview({
               >
                 {t(notificationKey(n.kind), n.params)}
               </button>
-              <span className="wb-ov-row-meta">{formatWhen(n.created_at, dateLocale)}</span>
+              <span className="wb-mono wb-num">{formatWhen(n.created_at, dateLocale)}</span>
             </li>
           ))}
         </ul>
@@ -369,9 +442,10 @@ export function WorkOverview({
       {shown ? header(shown) : null}
       {view === 'loading' ? (
         <div className="wb-ov-skel" aria-hidden="true">
-          <span className="uw-skel uw-skel-line short" />
-          <span className="uw-skel uw-skel-line" />
-          <span className="uw-skel uw-skel-line" />
+          <span className="wb-skel wb-skel-strip" />
+          <span className="wb-skel wb-skel-row" />
+          <span className="wb-skel wb-skel-row" />
+          <span className="wb-skel wb-skel-row" />
         </div>
       ) : null}
       {view === 'signed-out' || view === 'forbidden' || view === 'unreachable' ? (
@@ -382,12 +456,13 @@ export function WorkOverview({
       {recents.docs.length > 0 || recents.cloudFailed ? recentStrip : null}
       {shown ? (
         isQuiet(shown) ? (
-          <div className="wb-ov-quiet" role="status">
-            <span>{t('wbOvQuiet')}</span>
-            <button type="button" className="btn btn-secondary" onClick={onCompose}>
-              {t('wbOvQuietAction')}
-            </button>
-          </div>
+          <WorkStatePanel
+            tone="gray"
+            icon={<WorkbenchIcon id="desk" size={20} />}
+            title={t('wbOvQuiet')}
+            action={{ label: t('wbOvQuietAction'), onClick: onCompose, variant: 'secondary' }}
+            role="status"
+          />
         ) : (
           <div className="wb-ov-body">
             {myWork(shown)}

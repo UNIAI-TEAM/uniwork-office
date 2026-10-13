@@ -199,6 +199,19 @@ describe('WorkOverview', () => {
       '1',
       '3',
     ])
+    expect(host.querySelectorAll('.wb-ov-strip.wb-block > .wb-ov-stat')).toHaveLength(5)
+    // Open, Overdue, Due today in the Tasks tint; Meetings violet; Unread blue
+    expect(
+      Array.from(host.querySelectorAll<HTMLElement>('.wb-ov-stat .wb-icon-tile')).map(
+        (tile) => tile.style.background,
+      ),
+    ).toEqual([
+      'var(--tint-green)',
+      'var(--tint-green)',
+      'var(--tint-green)',
+      'var(--tint-violet)',
+      'var(--tint-blue)',
+    ])
     expect(text()).toContain('Send the contract')
     expect(text()).toContain('OPS-7')
     expect(text()).toContain('Days overdue: 3')
@@ -292,7 +305,10 @@ describe('WorkOverview', () => {
     })
     const props = await mount()
     expect(text()).toContain('Nothing is waiting for you')
-    expect(host.querySelector('.wb-ov-stats')).toBeNull()
+    expect(host.querySelector('.wb-ov-strip')).toBeNull()
+    expect(host.querySelector('.wb-state[role="status"]')?.textContent).toContain(
+      'Nothing is waiting for you',
+    )
     await click(buttons('Compose')[0])
     expect(props.onCompose).toHaveBeenCalledTimes(1)
   })
@@ -365,6 +381,9 @@ describe('WorkOverview', () => {
     expect(work.homeSummary).toHaveBeenCalledTimes(2)
     expect(host.querySelector<HTMLInputElement>('input[type="checkbox"]')!.checked).toBe(true)
     expect(stat('open')).toBe('3')
+    // the ticked row keeps its due group; it does not jump to Upcoming
+    expect(host.querySelector('.wb-group-head.is-overdue')?.textContent).toBe('Overdue 1')
+    expect(host.querySelector('.wb-row.is-done')?.textContent).toContain('Send the contract')
     expect(host.querySelector('[role="alert"]')).toBeNull()
   })
 
@@ -413,5 +432,85 @@ describe('WorkOverview', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  it('greets a person by the name they are called by', async () => {
+    api.accountStatus.mockResolvedValue({
+      loggedIn: true,
+      state: 'signed-in',
+      profile: { accountId: 'u1', email: 'quang@acme.vn', displayName: 'Phan Đức Quang' },
+    })
+    await mount()
+    const greeting = host.querySelector('.wb-ov-greeting')?.textContent ?? ''
+    expect(greeting).toContain('Quang')
+    expect(greeting).not.toContain('Phan')
+  })
+
+  it('my work under Overdue / Today / Upcoming with counts; meeting length; inbox initial', async () => {
+    work.homeSummary.mockResolvedValue({
+      ok: true,
+      value: summary({
+        my_work: [
+          task(),
+          task({ id: 't2', identifier: 'OPS-8', title: 'Call the bank', due_date: TODAY }),
+          task({ id: 't3', identifier: 'OPS-9', title: 'Plan Q4', due_date: '2026-10-20' }),
+          task({ id: 't4', identifier: 'OPS-10', title: 'Read the memo', due_date: undefined }),
+        ],
+        upcoming_meetings: [
+          {
+            id: 'm2',
+            workspace_id: 'w',
+            title: 'Budget review',
+            starts_at: '2026-10-14T03:00:00Z',
+            ends_at: '2026-10-14T03:30:00Z',
+            status: 'SCHEDULED',
+          },
+        ],
+      }),
+    })
+    await mount()
+    const heads = Array.from(host.querySelectorAll('#wb-ov-mywork .wb-group-head')).map(
+      (h) => h.textContent,
+    )
+    expect(heads).toEqual(['Overdue 1', 'Today 1', 'Upcoming 2'])
+    expect(
+      host.querySelector('#wb-ov-mywork .wb-row .wb-check input.uw-sr-only[type="checkbox"]'),
+    ).not.toBeNull()
+    expect(host.querySelector('#wb-ov-mywork .wb-mono')?.textContent).toBe('OPS-7')
+    // keyboard: the title is the way in; the hover-only "Open ↗" shortcut stays out of the tab order
+    const row = host.querySelector('#wb-ov-mywork .wb-row')!
+    expect(row.querySelector('button.wb-ov-row-title')).not.toBeNull()
+    const shortcut = row.querySelector<HTMLButtonElement>('.wb-row-actions button')!
+    expect(shortcut.tabIndex).toBe(-1)
+    expect(shortcut.getAttribute('aria-hidden')).toBe('true')
+    const meeting = host.querySelector('#wb-ov-meetings .wb-row')!
+    expect(meeting.querySelector('.wb-ov-time.wb-mono')?.textContent).toBe('10:00')
+    expect(meeting.textContent).toContain('Tomorrow · 30 min')
+    expect(host.querySelector('#wb-ov-inbox .wb-ov-avatar')?.textContent).toBe('L')
+  })
+
+  it('loading: a skeleton shaped like the strip and three rows', async () => {
+    work.homeSummary.mockReturnValue(new Promise<never>(() => undefined))
+    await mount()
+    const skel = host.querySelector('.wb-ov-skel[aria-hidden="true"]')!
+    expect(skel.querySelectorAll('.wb-skel.wb-skel-strip')).toHaveLength(1)
+    expect(skel.querySelectorAll('.wb-skel.wb-skel-row')).toHaveLength(3)
+  })
+
+  it('no tasks but a meeting: not the quiet panel; My work says so and the meeting still lists', async () => {
+    work.homeSummary.mockResolvedValue({
+      ok: true,
+      value: summary({
+        my_work: [],
+        inbox: [],
+        counts: { open: 0, overdue: 0, due_today: 0, meetings_today: 1, unread: 0 },
+      }),
+    })
+    await mount()
+    expect(host.querySelector('.wb-state')).toBeNull()
+    expect(host.querySelectorAll('.wb-ov-strip > .wb-ov-stat')).toHaveLength(5)
+    expect(host.querySelector('#wb-ov-mywork .wb-group-head')).toBeNull()
+    expect(host.querySelector('#wb-ov-mywork .wb-ov-note')).not.toBeNull()
+    expect(host.querySelectorAll('#wb-ov-meetings .wb-row')).toHaveLength(1)
   })
 })

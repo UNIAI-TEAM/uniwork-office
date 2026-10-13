@@ -56,6 +56,8 @@ export const vi = {
   wbOvDueOverdue: 'Quá hạn {count} ngày',
   wbOvDueToday: 'Hạn hôm nay',
   wbOvDueOn: 'Hạn {date}',
+  wbOvGroupUpcoming: 'Sắp tới',
+  wbOvMinutes: '{count} phút',
   wbOvMeetings: 'Họp sắp tới',
   wbOvMeetingsEmpty: 'Bạn không có cuộc họp nào hôm nay và ngày mai.',
   wbOvInbox: 'Thông báo',

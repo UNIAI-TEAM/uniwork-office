@@ -16,6 +16,7 @@ import {
   isQuiet,
   localDay,
   mergeRecentDocuments,
+  myWorkGroups,
   notificationKey,
   overdueDays,
   overviewView,
@@ -366,5 +367,33 @@ describe('tabCounts (Tasks and Calendar tab counts from the cached summary)', ()
       tasks: { n: 2, key: 'wbTabCountOverdue', tone: 'danger' },
     })
     expect(tabCounts(summary({ counts: { ...ZERO, overdue: null, due_today: 3 } }))).toEqual({})
+  })
+})
+
+describe('myWorkGroups', () => {
+  it('Overdue, Today, then Upcoming (later and no due date), each in list order', () => {
+    const groups = myWorkGroups(
+      [
+        task({ id: 'a', due_date: '2026-10-20' }),
+        task({ id: 'b' }),
+        task({ id: 'c', due_date: TODAY }),
+        task({ id: 'd', due_date: undefined }),
+      ],
+      TODAY,
+    )
+    expect(groups.map((g) => [g.key, g.tasks.map((x) => x.id)])).toEqual([
+      ['overdue', ['b']],
+      ['today', ['c']],
+      ['upcoming', ['a', 'd']],
+    ])
+  })
+
+  it('a ticked task keeps its due group instead of jumping to Upcoming', () => {
+    const done = task({ status: 'done' })
+    expect(myWorkGroups([done], TODAY)).toEqual([{ key: 'overdue', tasks: [done] }])
+  })
+
+  it('no tasks, no groups', () => {
+    expect(myWorkGroups([], TODAY)).toEqual([])
   })
 })

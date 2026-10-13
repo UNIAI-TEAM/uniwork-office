@@ -61,6 +61,8 @@ export const zh = {
   wbOvDueOverdue: '逾期 {count} 天',
   wbOvDueToday: '今天到期',
   wbOvDueOn: '{date} 到期',
+  wbOvGroupUpcoming: '即将到期',
+  wbOvMinutes: '{count} 分钟',
   wbOvMeetings: '即将开始的会议',
   wbOvMeetingsEmpty: '今天和明天没有会议。',
   wbOvInbox: '通知',
