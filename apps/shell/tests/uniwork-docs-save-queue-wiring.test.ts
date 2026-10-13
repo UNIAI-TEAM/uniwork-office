@@ -834,6 +834,64 @@ describe('G5-06 W4b save queue wiring', () => {
     expect(server.calls.length).toBe(after)
   })
 
+  it("G506-be-d1-2: a read-only window status does not rewrite the holder's binding.json", async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const first = setup(server)
+    const second = setup(server)
+    const path = await openDoc(first)
+    await openDoc(second)
+    const key = basename(dirname(path))
+    // a stored pending intent for window 2 (no save: no binding write yet)
+    const opened = await second.layer.open({ deploymentId: 'default', accountId: 'acc_1' })
+    if (opened.kind !== 'ok') throw new Error('store did not open')
+    await createIntentStore(opened.store.records(INTENT_STORE_REGISTRATION.name)).put(
+      key,
+      {
+        v: 2,
+        intentId: `intent_${key}`,
+        idempotencyKey: 'key_pending',
+        documentId: DOC,
+        orgId: 'org_a',
+        workspaceId: 'ws_1',
+        baseRevision: '41',
+        baseVersion: 3,
+        checksum: hex(enc('v4')),
+        length: enc('v4').byteLength,
+        generation: 1,
+        state: 'queued',
+        attempt: 0,
+        createdAt: '2026-10-13T00:00:00.000Z',
+        updatedAt: '2026-10-13T00:00:00.000Z',
+      },
+      enc('v4'),
+    )
+    // window 1 takes a fresh lease (a live holder)
+    const opener = createDocLock({
+      root: join(dir, 'uniwork-documents'),
+      scope: { deploymentId: 'default', accountId: 'acc_1' },
+      clock: () => Date.now(),
+      owner: 'win1',
+    })
+    expect((await opener.acquire(key)).kind).toBe('held')
+    const before = readFileSync(join(path, '..', BINDING_FILE))
+    // window 2's poll sees window 1's fresh lease and goes read-only, pushing
+    // blocked/other_window to ITSELF only (never the shared binding.json)
+    await second.service.pollSaveQueue()
+    expect(second.service.isOtherWindow(path)).toBe(true)
+    // window 2's own status reads blocked/other_window
+    await vi.waitFor(async () =>
+      expect(await second.service.docStatus(path)).toMatchObject({
+        state: 'blocked',
+        error: 'other_window',
+      }),
+    )
+    // window 1's binding.json is byte-for-byte unchanged, and its own status is
+    // still the holder's (never the loser's other_window)
+    expect(readFileSync(join(path, '..', BINDING_FILE))).toEqual(before)
+    expect(await first.service.docStatus(path)).not.toMatchObject({ error: 'other_window' })
+    await opener.release(key, 1)
+  })
+
   it('G506-be-d1-1: the account-boundary wipe awaits teardownSaveQueue before the wipe', () => {
     // the wiring source pins the order: the in-flight poll/dispatch must unwind
     // before the scope is wiped, so no settle lookup runs into a wiped scope
