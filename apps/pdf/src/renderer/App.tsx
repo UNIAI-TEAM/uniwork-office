@@ -139,6 +139,16 @@ import { useI18n } from './i18n/locale'
 import { useAutosave } from './useAutosave'
 import { drainedOrigin, forcesBoundSave, type SaveOrigin } from './uniwork-save'
 import { queryPdfUniworkState } from './uniwork-state'
+import { collabStrings } from '@genoffice/ui/collab'
+import { PdfServerCommentsHost, type PdfServerComments } from './server-comments/PdfServerComments'
+import { createPdfAnchorAdapter } from './server-comments/pdf-adapter'
+import { withoutFileNoteWrites } from './server-comments/bound-save'
+import {
+  pdfCommentsBridge,
+  type PdfCommentsContextApi,
+} from './server-comments/pdf-comments-source'
+import { FileNotesList, type FileNoteThread } from './server-comments/FileNotesList'
+import type { PdfRect } from './server-comments/pdf-anchor'
 import { isUniworkRefusal } from '../shared/uniwork-refusal'
 import type {
   AnnotDeleteInput,
@@ -294,6 +304,10 @@ import {
 } from './icons'
 
 GlobalWorkerOptions.workerSrc = workerUrl
+
+/** G8-15: the server comments toggle and panel (aria-controls / focus return on close) */
+const SERVER_COMMENTS_TOGGLE_ID = 'pdf-server-comments-toggle'
+const SERVER_COMMENTS_PANEL_ID = 'pdf-server-comments-panel'
 
 const DRAW_TOOLS = [
   { tool: 'ink' as const, icon: IconInk, key: 'drawInk' as const },
@@ -1417,6 +1431,10 @@ export default function App() {
     }
   }, [filePath])
 
+  /** G8-15: a bound document with the comments bridge keeps its comments on UniWork (server mode) */
+  const commentsBridge = useMemo(() => pdfCommentsBridge(), [])
+  const serverComments = uniwork.bound && commentsBridge !== null && !!filePath
+
   /** pdf-lib cannot write encrypted files, including owner-protected files that open without a password. */
   const encryptedReadOnly =
     status === 'ready' && (passwordRef.current !== undefined || documentEncrypted)
@@ -1514,14 +1532,15 @@ export default function App() {
   /** Reserve the WPS-style comments margin while the doc has notes or one is being added */
   const noteMarginOn = useMemo(
     () =>
-      drawTool === 'note' ||
+      // a bound document never drafts a file note: the margin only shows the file's own notes
+      (drawTool === 'note' && !serverComments) ||
       noteDraft !== null ||
       drawings.some((d) => d.input.kind === 'note') ||
       (() => {
         const deletedObjs = new Set(annotDeletes.map((d) => d.annot.objNum))
         return [...savedNotes.values()].some((l) => l.some((a) => !deletedObjs.has(a.objNum)))
       })(),
-    [drawTool, noteDraft, drawings, annotDeletes, savedNotes],
+    [drawTool, noteDraft, drawings, annotDeletes, savedNotes, serverComments],
   )
 
   const recomputeFit = useCallback(() => {
@@ -1646,6 +1665,79 @@ export default function App() {
     if (!el) return
     const target = Math.min(Math.max(1, n), pageCount)
     el.scrollTop = rowTop(rowOfVis(target - 1)) - PAGE_GAP / 2
+  }
+
+  // ── G8-15 server comments: a bound document keeps its comments on UniWork ──
+  // (the file's own notes stay read-only; new threads, replies and resolves go to the server)
+  const serverRef = useRef<PdfServerComments | null>(null)
+  const [serverPanelOpen, setServerPanelOpen] = useState(false)
+  useEffect(() => {
+    if (!serverComments) setServerPanelOpen(false)
+  }, [serverComments])
+  /** The rect a reveal / "go to" framed, or the one a new thread is being written for */
+  const [commentFrame, setCommentFrame] = useState<{ origIdx: number; rect: PdfRect } | null>(null)
+  const [pendingCommentFrame, setPendingCommentFrame] = useState<{
+    origIdx: number
+    rect: PdfRect
+  } | null>(null)
+  useEffect(() => setCommentFrame(null), [filePath])
+  const goToCommentRef = useRef<(origIdx: number, rect: PdfRect) => void>(() => undefined)
+  goToCommentRef.current = (origIdx, rect) => {
+    const visIdx = visList.indexOf(origIdx)
+    if (visIdx < 0) return
+    scrollToPage(visIdx + 1)
+    const el = scrollRef.current
+    if (el) {
+      // bring the rect itself into view, not only the page top
+      const top = pdfRectToCss(pageGeom(origIdx), rect, scale).top
+      el.scrollTop += Math.max(0, top - el.clientHeight * 0.3)
+    }
+    setCurrentPage(visIdx + 1)
+    setPageInput(String(visIdx + 1))
+    setCommentFrame({ origIdx, rect })
+  }
+  const commentAdapter = useMemo(
+    () =>
+      createPdfAnchorAdapter({
+        pageCount: sizes.length,
+        isShown: (origIdx) => !deleted.has(origIdx),
+        viewTop: (origIdx, rect) => pdfRectToCss(pageGeom(origIdx), rect, 1).top,
+        goTo: (origIdx, rect) => goToCommentRef.current(origIdx, rect),
+      }),
+    [sizes.length, deleted, pageGeom],
+  )
+  const commentsContextApi = window.pdfApi as unknown as PdfCommentsContextApi
+  const commentStrings = useMemo(() => collabStrings(lang), [lang])
+  /** The file's own note threads for the panel's read-only "Comments in the file" section;
+      read from every page once the panel opens (the margin cache only holds visible pages) */
+  const [fileNoteThreads, setFileNoteThreads] = useState<FileNoteThread[]>([])
+  useEffect(() => {
+    if (!serverComments || !serverPanelOpen || !doc) return
+    let live = true
+    void (async () => {
+      const out: FileNoteThread[] = []
+      for (let origIdx = 0; origIdx < doc.numPages; origIdx++) {
+        const { notes } = await loadSavedAnnots(doc, origIdx)
+        for (const root of visibleNoteThreads(notes, [], new Set(), new Map()))
+          out.push({ origIdx, root })
+        if (!live) return
+      }
+      setFileNoteThreads(out)
+    })()
+    return () => {
+      live = false
+    }
+  }, [serverComments, serverPanelOpen, doc])
+
+  /** The note tool on a bound document opens the panel's composer at the click (no file note) */
+  const startServerComment = (origIdx: number, at: [number, number], aiText?: string): boolean => {
+    setServerPanelOpen(true)
+    const server = serverRef.current
+    if (!server?.startAt(origIdx + 1, at, aiText)) {
+      showNotice(t('serverCommentStartUnavailable'))
+      return false
+    }
+    return true
   }
 
   // genoffice CLI (`open --page`, `selection`): the shell evaluates this hook
@@ -3551,10 +3643,16 @@ export default function App() {
   /** Pending edits in SavePdfRequest form; shared by in-place Save and Save As.
       `noteFlush` carries the drawings/noteEdits returned by commitNoteEdit — the
       state values in this closure predate that flush. */
+  // G8-15: a bound document never writes a note into the file (the last gate; see bound-save.ts)
   const editsPayload = (
     edits: LocalTextEdit[] = textEdits,
     noteFlush?: { drawings: LocalDrawing[]; noteEdits: LocalNoteEdit[] },
     extraDrawings: LocalDrawing[] = [],
+  ) => withoutFileNoteWrites(rawEditsPayload(edits, noteFlush, extraDrawings), serverComments)
+  const rawEditsPayload = (
+    edits: LocalTextEdit[],
+    noteFlush: { drawings: LocalDrawing[]; noteEdits: LocalNoteEdit[] } | undefined,
+    extraDrawings: LocalDrawing[],
   ) => ({
     markups: markups.map(({ id: _id, ...rest }) => rest),
     annotDeletes: annotDeletes.map((d): AnnotDeleteInput => ({
@@ -3683,6 +3781,8 @@ export default function App() {
       }
       // the restored draft is the file's new version now
       setRecovered(false)
+      // G8-15: the server anchors follow this save's page layout once UniWork reports the version
+      if (serverComments) serverRef.current?.saved(snapshot.pageMap)
       if (!anythingToSave) {
         // Forced save of a clean bound document: the file is unchanged, nothing to reload
         setSaveState('saved')
@@ -5618,6 +5718,8 @@ export default function App() {
     pageCount: () => sizes.length,
     currentPage: () => (visList[currentPage - 1] ?? 0) + 1,
     readOnly: () => readOnly,
+    serverComments: () => serverComments,
+    draftServerComment: (origIdx, at, text) => startServerComment(origIdx, at, text),
     uniworkBound: () => uniwork.bound,
     ocrText: (origIdx) => ocrPages.get(origIdx)?.entry.text ?? null,
     selection: () => aiSelection,
@@ -6770,6 +6872,23 @@ export default function App() {
                       {t(key)}
                     </button>
                   ))}
+                  {/* G8-15: the server comments panel of a bound document (spine S12: the
+                      button carries the panel title, expanded = open) */}
+                  {serverComments && (
+                    <button
+                      id={SERVER_COMMENTS_TOGGLE_ID}
+                      className={`rb-big${serverPanelOpen ? ' active' : ''}`}
+                      aria-expanded={serverPanelOpen}
+                      aria-controls={SERVER_COMMENTS_PANEL_ID}
+                      data-tip={commentStrings.collabComments}
+                      onClick={() => setServerPanelOpen((v) => !v)}
+                    >
+                      <span className="rb-big-icon">
+                        <IconNote />
+                      </span>
+                      {commentStrings.collabComments}
+                    </button>
+                  )}
                   {/* redaction writes a working copy next to the file: desktop only (cap 'redaction');
                       the web keeps the entry and says to use the app */}
                   {!cap('redaction') && (
@@ -8524,7 +8643,8 @@ export default function App() {
                                 onCommit={(input) => commitDrawing(origIdx, input)}
                                 onNoteAt={(at) => {
                                   setActiveNote(null)
-                                  setNoteDraft({ origIdx, at })
+                                  if (serverComments) startServerComment(origIdx, at)
+                                  else setNoteDraft({ origIdx, at })
                                 }}
                                 onNoteOpen={(key) => {
                                   setNoteDraft(null)
@@ -8588,6 +8708,20 @@ export default function App() {
                                     </div>
                                   )
                                 })()}
+                              {/* G8-15: the server comment a reveal / "go to" framed, and the
+                                  rect of the new thread being written */}
+                              {serverComments &&
+                                [commentFrame, pendingCommentFrame].map((frame, i) =>
+                                  frame && frame.origIdx === origIdx ? (
+                                    <div
+                                      key={i}
+                                      className={`pdf-comment-frame${i === 1 ? ' pdf-comment-frame-new' : ''}`}
+                                      data-comment-frame={i === 1 ? 'new' : 'revealed'}
+                                      aria-hidden="true"
+                                      style={pdfRectToCss(geom, frame.rect, scale)}
+                                    />
+                                  ) : null,
+                                )}
                               <LinkLayer
                                 doc={doc}
                                 pageNo={origIdx + 1}
@@ -8631,7 +8765,7 @@ export default function App() {
                         }
                         author={noteAuthor}
                         lang={lang}
-                        readOnly={readOnly}
+                        readOnly={readOnly || serverComments}
                         t={t}
                         onActivate={(th) => {
                           setNoteDraft(null)
@@ -9427,6 +9561,49 @@ export default function App() {
                 }
                 onApply={(_png, crop) => confirmPageCrop(crop)}
                 onCancel={() => setPageCropDlg(null)}
+              />
+            )}
+            {serverComments && commentsBridge && (
+              <PdfServerCommentsHost
+                key={filePath}
+                bridge={commentsBridge}
+                path={filePath}
+                lang={lang}
+                readOnly={readOnly}
+                contextApi={commentsContextApi}
+                adapter={commentAdapter}
+                open={serverPanelOpen}
+                panelId={SERVER_COMMENTS_PANEL_ID}
+                apiRef={serverRef}
+                onRevealRequest={() => setServerPanelOpen(true)}
+                onClose={() => {
+                  setServerPanelOpen(false)
+                  setCommentFrame(null)
+                  document.getElementById(SERVER_COMMENTS_TOGGLE_ID)?.focus()
+                }}
+                onPendingAnchor={(anchor) =>
+                  setPendingCommentFrame(
+                    anchor ? { origIdx: anchor.page - 1, rect: anchor.rect } : null,
+                  )
+                }
+                inFile={{
+                  count: fileNoteThreads.length,
+                  content: (
+                    <FileNotesList
+                      threads={fileNoteThreads}
+                      lang={lang}
+                      pageLabel={commentStrings.collabAnchorPage ?? ''}
+                      neutralAuthor={t('noteNeutralAuthor')}
+                      onShow={(th) => {
+                        const visIdx = visList.indexOf(th.origIdx)
+                        if (visIdx < 0) return
+                        scrollToPage(visIdx + 1)
+                        setActiveNote({ origIdx: th.origIdx, rootKey: th.root.key })
+                      }}
+                    />
+                  ),
+                }}
+                startUnavailableText={t('serverCommentStartUnavailable')}
               />
             )}
           </div>
