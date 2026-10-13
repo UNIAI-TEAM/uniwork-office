@@ -126,4 +126,29 @@ describe('Calendar tab', () => {
     await act(async () => row.click())
     expect(api.openWeb).toHaveBeenCalledWith({ kind: 'calendar', orgSlug: 'acme', wsSlug: 'ops' })
   })
+
+  it('day heads are sticky heads; today has the dot; clock times are mono and lead the row', async () => {
+    await mount()
+    const head = host.querySelector('.wb-agenda-day > h3')!
+    expect(head.classList.contains('wb-agenda-head')).toBe(true)
+    expect(head.classList.contains('is-today')).toBe(true)
+    expect(head.querySelector('.wb-agenda-dot')).not.toBeNull()
+    expect(head.textContent).toContain('Today · ')
+    expect(host.querySelector('.wb-agenda-day > ul')?.classList.contains('wb-block')).toBe(true)
+    const rows = Array.from(host.querySelectorAll('.wb-agenda-row'))
+    for (const row of rows) {
+      expect(row.firstElementChild?.classList.contains('wb-agenda-time')).toBe(true)
+    }
+    expect(host.querySelectorAll('.wb-agenda-time.wb-mono')).toHaveLength(1)
+    expect(host.querySelector('.wb-agenda-time:not(.wb-mono)')?.textContent).toBe('All day')
+  })
+
+  it('nothing in the next 14 days: the empty state panel', async () => {
+    api.calendarEvents.mockResolvedValueOnce({ ok: true as const, value: [] })
+    await mount()
+    expect(host.querySelector('.wb-state')?.textContent).toContain(
+      'No tasks or meetings in the next 14 days.',
+    )
+    expect(host.querySelector('.wb-work-state')).toBeNull()
+  })
 })

@@ -118,12 +118,16 @@ export function WorkCalendarPane({
       ) : (
         days.map(({ day, events: rows }) => (
           <section key={day} className="wb-agenda-day">
-            <h3>
-              {day === today
-                ? `${t('wbTasksGroupToday')} · ${formatDay(day, dateLocale, true)}`
-                : formatDay(day, dateLocale, true)}
+            <h3 className={`wb-agenda-head${day === today ? ' is-today' : ''}`}>
+              {day === today ? (
+                <>
+                  <span className="wb-agenda-dot" aria-hidden="true" />
+                  {`${t('wbTasksGroupToday')} · `}
+                </>
+              ) : null}
+              <span className="wb-num">{formatDay(day, dateLocale, true)}</span>
             </h3>
-            <ul>
+            <ul className="wb-block">
               {rows.map((e) => {
                 const kind = kindOf(e)
                 return (
@@ -136,6 +140,13 @@ export function WorkCalendarPane({
                         void window.uniworkWork.openWeb(webTarget(e, workspace)).catch(() => false)
                       }
                     >
+                      {e.all_day ? (
+                        <span className="wb-agenda-time">{t('wbCalAllDay')}</span>
+                      ) : (
+                        <span className="wb-agenda-time wb-mono">
+                          {clock(rowTime(e), dateLocale)}
+                        </span>
+                      )}
                       <span
                         className="wb-agenda-icon"
                         style={tintStyle(KIND[kind].tint)}
@@ -143,9 +154,6 @@ export function WorkCalendarPane({
                         aria-label={t(KIND[kind].label)}
                       >
                         <KindIcon kind={kind} />
-                      </span>
-                      <span className="wb-agenda-time">
-                        {e.all_day ? t('wbCalAllDay') : clock(rowTime(e), dateLocale)}
                       </span>
                       <span className="wb-agenda-title">{e.title}</span>
                     </button>

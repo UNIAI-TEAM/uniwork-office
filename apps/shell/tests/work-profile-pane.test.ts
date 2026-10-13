@@ -102,4 +102,23 @@ describe('Profile tab', () => {
     await flush()
     expect(host.textContent).toContain('Lan Nguyen')
   })
+
+  it('a card: initial tile, name, job title as caption, fields in a grid, a secondary web button', async () => {
+    await mount()
+    expect(host.querySelector('section.wb-block.wb-profile-card')).not.toBeNull()
+    expect(host.querySelector('.wb-profile-avatar')?.textContent).toBe('L')
+    expect(host.querySelector('.wb-profile-name')?.textContent).toBe('Lan Nguyen')
+    expect(host.querySelector('.wb-profile-title')?.textContent).toBe('Sales lead')
+    expect(host.querySelector('dl.wb-profile')?.textContent).not.toContain('Job title')
+    expect(buttonByText('Edit on the web')!.className).toBe('wb-btn wb-btn-secondary')
+  })
+
+  it('a Vietnamese name shows the given-name initial', async () => {
+    api.myProfile.mockResolvedValueOnce({
+      ok: true,
+      value: { ...PERSON, display_name: 'Nguyễn Văn An' },
+    })
+    await mount({ ...WS, orgId: 'o-vi' })
+    expect(host.querySelector('.wb-profile-avatar')?.textContent).toBe('A')
+  })
 })
