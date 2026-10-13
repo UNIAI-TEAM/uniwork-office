@@ -104,7 +104,7 @@ describe('scroll position', () => {
   it('captures every scrolled element by its place in the page', () => {
     const b = document.querySelector('.b')!
     scrollable(b, 2000, 500, 320)
-    expect(captureScroll()).toEqual([{ path: [0, 1], top: 320 }])
+    expect(captureScroll()).toEqual([{ path: [1], top: 320 }])
     scrollable(b, 2000, 500, 0)
     expect(captureScroll()).toEqual([])
   })
@@ -112,7 +112,7 @@ describe('scroll position', () => {
   it('puts it back once the renderer has drawn enough content, retrying while the page is short', () => {
     const b = document.querySelector('.b')!
     scrollable(b, 100, 100)
-    restoreScroll([{ path: [0, 1], top: 320 }])
+    restoreScroll([{ path: [1], top: 320 }])
     vi.advanceTimersByTime(300)
     expect(b.scrollTop).toBe(0)
     scrollable(b, 2000, 500)
@@ -123,7 +123,7 @@ describe('scroll position', () => {
   it('gives up after the tries, and never after the user has taken over', () => {
     const b = document.querySelector('.b')!
     scrollable(b, 100, 100)
-    restoreScroll([{ path: [0, 1], top: 320 }], document, 3, 100)
+    restoreScroll([{ path: [1], top: 320 }], document, 3, 100)
     vi.advanceTimersByTime(1_000)
     scrollable(b, 2000, 500)
     vi.advanceTimersByTime(1_000)
@@ -131,7 +131,7 @@ describe('scroll position', () => {
 
     const a = document.querySelector('.a')!
     scrollable(a, 100, 100)
-    restoreScroll([{ path: [0, 0], top: 50 }])
+    restoreScroll([{ path: [0], top: 50 }])
     window.dispatchEvent(new Event('wheel'))
     scrollable(a, 2000, 500)
     vi.advanceTimersByTime(1_000)
@@ -140,5 +140,24 @@ describe('scroll position', () => {
 
   it('does nothing when there is nothing to restore', () => {
     expect(() => restoreScroll([])()).not.toThrow()
+  })
+})
+
+describe('scroll position survives the bar the next boot adds to <body>', () => {
+  afterEach(() => {
+    document.body.innerHTML = ''
+  })
+
+  it('paths are relative to #root, so a bar prepended to <body> does not move them', () => {
+    document.body.innerHTML = '<div id="root"><div class="a"></div><div class="b"></div></div>'
+    scrollable(document.querySelector('.b')!, 2000, 500, 320)
+    const taken = captureScroll()
+    // the next page: the bar and a live node are in <body> before the position goes back
+    document.body.innerHTML =
+      '<section class="uw-remote-bar"></section><div id="root"><div class="a"></div><div class="b"></div></div><div class="uw-live"></div>'
+    const b = document.querySelector('.b')!
+    scrollable(b, 2000, 500)
+    restoreScroll(taken)
+    expect(b.scrollTop).toBe(320)
   })
 })

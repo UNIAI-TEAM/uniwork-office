@@ -14,7 +14,7 @@ const MAX_AGE_MS = 60_000
 const KEY_PREFIX = 'uw-reload-notice:'
 
 export interface ScrollPosition {
-  /** child indexes from <body> down to the scrolled element; empty = the page itself */
+  /** child indexes from the app root (#root) down to the scrolled element; empty = the page itself */
   path: number[]
   top: number
 }
@@ -41,6 +41,14 @@ function sessionStore(): Store | null {
   }
 }
 
+/**
+ * Paths start at the app root, not <body>: the new-version bar and the live nodes are children of
+ * <body> too, and the bar is there after the next boot but was not when the position was taken.
+ */
+function baseOf(doc: Document): Element {
+  return doc.getElementById('root') ?? doc.body
+}
+
 function pathOf(el: Element, body: Element): number[] {
   const path: number[] = []
   for (let node: Element | null = el; node && node !== body; node = node.parentElement) {
@@ -63,7 +71,7 @@ export function captureScroll(doc: Document = document): ScrollPosition[] {
   const view = doc.defaultView
   const page = view?.scrollY ?? 0
   if (page > 0) out.push({ path: [], top: page })
-  const body = doc.body
+  const body = baseOf(doc)
   for (const el of body.querySelectorAll('*')) {
     if (el.scrollTop > 0) out.push({ path: pathOf(el, body), top: el.scrollTop })
     if (out.length >= 8) break
@@ -102,7 +110,7 @@ export function restoreScroll(
         }
         continue
       }
-      const el = nodeAt(p.path, doc.body)
+      const el = nodeAt(p.path, baseOf(doc))
       if (el && el.scrollHeight - el.clientHeight >= p.top) {
         el.scrollTop = p.top
         left.delete(i)

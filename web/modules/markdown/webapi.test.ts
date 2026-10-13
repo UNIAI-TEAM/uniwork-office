@@ -831,7 +831,7 @@ describe('markdownApi: new version on UniWork', () => {
       // the page is about to go: no bar of this page, the notice waits in the session
       const stash = JSON.parse(sessionStorage.getItem(stashKey(first.file.fileId))!)
       expect(stash.notice).toEqual({ revision: '12', author: 'Trần An', savedAt: SAVED_AT })
-      expect(stash.scroll).toEqual([{ path: [0, 0], top: 240 }])
+      expect(stash.scroll).toEqual([{ path: [0], top: 240 }])
 
       // the next page: same document, boots on the head
       document.body.innerHTML = '<div id="root"></div>'
