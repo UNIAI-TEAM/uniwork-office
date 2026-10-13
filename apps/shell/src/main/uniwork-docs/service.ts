@@ -372,11 +372,7 @@ function accessFor(level: string | null): UniworkDocAccess {
  * caller's level, and the server version id of the base bytes when the base is
  * the version that read describes (a binding on another version keeps its own).
  */
-function withServerContext(
-  binding: Binding,
-  detail: DocumentDetail,
-  viewTicket = false,
-): Binding {
+function withServerContext(binding: Binding, detail: DocumentDetail, viewTicket = false): Binding {
   const next = { ...binding }
   const level = docLevelOf(detail.myLevel)
   // a view-ticket copy is read-only: its level never exceeds the ticket's access
