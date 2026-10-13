@@ -81,6 +81,18 @@ describe('the comments IPC channel contract', () => {
     expect(
       parseCommentsCreateInput({
         path: 'p',
+        kind: 'comment',
+        parentId: 'c1',
+        body: 'hi',
+        baseVersionId: 'v1',
+      }),
+    ).toBeNull()
+    expect(
+      parseCommentsCreateInput({ path: 'p', kind: 'comment', body: 'hi', baseVersionId: 'v1' }),
+    ).toBeNull()
+    expect(
+      parseCommentsCreateInput({
+        path: 'p',
         kind: 'discussion',
         body: 'hi',
         anchor,
