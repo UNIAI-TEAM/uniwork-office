@@ -251,11 +251,18 @@ export function createRemoteVersion(host: RemoteVersionHost): RemoteVersion {
         }
         // a version that is gone (purged): the head is what the user wants to see
         if (toProtocolError(err).code !== 'not_found') throw err
-        reply = await host.port.request(
-          'api.open',
-          { fileId: event.document_id },
-          { timeoutMs: TIMEOUTS.transfer },
-        )
+        try {
+          reply = await host.port.request(
+            'api.open',
+            { fileId: event.document_id },
+            { timeoutMs: TIMEOUTS.transfer },
+          )
+        } catch (headErr) {
+          // the head itself is not found: the document is gone, not just the version
+          if (toProtocolError(headErr).code !== 'not_found') throw headErr
+          lockFrame('deleted')
+          return { kind: 'locked' }
+        }
       }
       if (my !== token || lock) return { kind: 'dropped' }
       const cur = host.current()
