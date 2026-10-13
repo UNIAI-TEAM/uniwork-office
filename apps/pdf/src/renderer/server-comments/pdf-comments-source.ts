@@ -129,7 +129,7 @@ export async function loadPdfCommentsContext(
   readOnly: boolean,
 ): Promise<PdfCommentsContext> {
   const fallback = fallbackPdfCommentsContext(path, readOnly)
-  let raw: PdfCommentsContext | null = null
+  let raw: PdfCommentsContext | null
   try {
     raw = (await api?.uniworkCommentsContext?.()) ?? null
   } catch {
