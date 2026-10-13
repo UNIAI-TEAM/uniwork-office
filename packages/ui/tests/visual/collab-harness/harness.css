@@ -1,0 +1,112 @@
+/* the harness page chrome; tokens only, so the page itself follows the theme toggle */
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: var(--canvas);
+  color: var(--text);
+  font-family: var(--gs-font-sans);
+  font-size: 13px;
+}
+.h-bar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: var(--chrome-bg);
+  border-bottom: 1px solid var(--border);
+}
+.h-bar h1 {
+  margin: 0;
+  font-size: 15px;
+}
+.h-seg {
+  display: inline-flex;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.h-seg button {
+  padding: 4px 10px;
+  border: 0;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.h-seg button[aria-pressed='true'] {
+  background: var(--accent);
+  color: var(--surface);
+}
+.h-note {
+  color: var(--text-muted);
+}
+.h-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  padding: 8px 16px;
+  background: var(--surface-subtle);
+  border-bottom: 1px solid var(--border);
+}
+.h-nav a {
+  color: var(--accent);
+}
+.h-main {
+  padding: 16px;
+}
+.h-group {
+  margin: 24px 0 8px;
+  font-size: 14px;
+}
+.h-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  gap: 20px 16px;
+  align-items: start;
+}
+.h-sec {
+  scroll-margin-top: 56px;
+}
+.h-sec-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.h-sec-head h3 {
+  margin: 0;
+  font-size: 13px;
+}
+.h-sec-head code {
+  color: var(--text-muted);
+}
+.h-sec-head button {
+  margin-left: auto;
+  padding: 2px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.h-sec-note {
+  margin: 0 0 6px;
+  color: var(--text-muted);
+}
+/* the side panel the apps give the collab panel: a fixed-width column with the app's border */
+.h-frame {
+  width: var(--h-width, 360px);
+  max-width: 100%;
+  height: 560px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-btn-hover);
+  overflow: hidden;
+}
