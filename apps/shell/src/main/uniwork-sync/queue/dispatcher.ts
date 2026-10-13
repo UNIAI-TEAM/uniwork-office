@@ -344,7 +344,12 @@ export class QueueDispatcher {
     } catch (error) {
       const code = error instanceof UniworkDocError ? error.code : 'server_error'
       if (code === 'keystore_locked' || code === 'store_full') return doc.record.state
-      await this.apply(doc, { type: 'lookup', error: code }, now)
+      const retryAfterMs = error instanceof UniworkDocError ? error.retryAfterMs : undefined
+      await this.apply(
+        doc,
+        { type: 'lookup', error: code, ...(retryAfterMs === undefined ? {} : { retryAfterMs }) },
+        now,
+      )
       return doc.record.state
     }
     const event: QueueEvent =
@@ -557,7 +562,12 @@ export class QueueDispatcher {
   /** a failed upload/commit: the machine decides the state (never "failed" on a lost answer) */
   private async failCommit(doc: QueueDoc, error: unknown, now: number): Promise<void> {
     const code = error instanceof UniworkDocError ? error.code : 'server_error'
-    await this.apply(doc, { type: 'commitFailed', error: code }, now)
+    const retryAfterMs = error instanceof UniworkDocError ? error.retryAfterMs : undefined
+    await this.apply(
+      doc,
+      { type: 'commitFailed', error: code, ...(retryAfterMs === undefined ? {} : { retryAfterMs }) },
+      now,
+    )
   }
 
   /**

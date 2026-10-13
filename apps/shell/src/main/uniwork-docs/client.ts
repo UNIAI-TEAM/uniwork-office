@@ -1,6 +1,6 @@
 import type { UniworkDocFormat, UniworkWorkspaceRef } from '../../shared/home-api'
 import { TransportError } from '../uniwork-auth/transport'
-import { UniworkDocError, errorFromResponse } from './errors'
+import { UniworkDocError, errorFromResponse, parseRetryAfter } from './errors'
 import { formatForName, isDecimalString, mimeForFormat } from './formats'
 import {
   parseCommit,
@@ -213,7 +213,13 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
             const body: unknown = await response.json().catch(() => undefined)
             throw timedOut
               ? new UniworkDocError('timeout')
-              : errorFromResponse(response.status, body)
+              : errorFromResponse(
+                  response.status,
+                  body,
+                  // a Retry-After on a throttle / the in-flight idempotency
+                  // verdict rides on the error (see errorFromResponse)
+                  parseRetryAfter(response.headers.get('Retry-After')),
+                )
           }
           try {
             return await call.read(response)

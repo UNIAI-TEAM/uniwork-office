@@ -902,6 +902,24 @@ describe('G5-06 W4a save queue (fakes)', () => {
     expect((await stored(gone.intents, doc2))?.intent.state).toBe('queued')
   })
 
+  it('a 429 with Retry-After schedules the retry at now + the 300 s clamp', async () => {
+    const h = await harness()
+    const doc = h.makeDoc()
+    await h.dispatcher.enqueue(doc)
+    // the server throttled the upload: the error carries the Retry-After the
+    // client parsed (900 s), which the dispatcher must pass into the machine
+    h.server.state.uploadError = new UniworkDocError('server_error', {
+      status: 429,
+      retryAfterMs: 900_000,
+    })
+    await h.dispatcher.dispatchAll([doc])
+    expect(doc.record.state).toBe('queued')
+    expect(doc.record.lastError).toBe('server_error')
+    expect(doc.record.retryAt).toBe(
+      new Date(h.clock.now + QUEUE_LIMITS.retryAfterClampMs).toISOString(),
+    )
+  })
+
   it('two orgs with different sync_write -> each intent follows its org', async () => {
     const h = await harness()
     h.capability.set('org_a', true)
