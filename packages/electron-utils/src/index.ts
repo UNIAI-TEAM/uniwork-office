@@ -111,6 +111,7 @@ export {
 } from './print-window'
 export { abortOnDestroyed, type DestroyableSender } from './abort-on-destroyed'
 export { createUniworkCommentsApi, installUniworkCommentsBridge } from './comments-bridge'
+export { unwrapCommentsReply } from './comments-reply'
 export {
   COMMENTS_BRIDGE_KEY,
   COMMENTS_CHANNELS,
