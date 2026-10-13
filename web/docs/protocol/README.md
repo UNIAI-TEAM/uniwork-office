@@ -39,20 +39,20 @@ gets no `init` within its retry budget (40 × 500 ms), or is opened top-level (`
 
 ### Host → frame
 
-| type                | kind    | payload → result                                                                                                                                                                                                                        |
-| ------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `init`              | request | `InitPayload` {protocolVersion, token, tokenExpiresAt, documentId, workspaceId, apiBase, apiMode, locale, theme, capabilities, open?, module?, user?, recovery?} → `InitAck` {protocolVersion, frameVersion?, capabilities (effective)} |
-| `open`              | request | `OpenPayload` {file: FileMeta, source: {kind:'url', url} \| {kind:'bytes', data}, assets?} → {opened, title?}                                                                                                                           |
-| `save`              | request | {reason: 'user' \| 'navigate' \| 'autosave'} → `SaveResult`                                                                                                                                                                             |
-| `saveAs`            | request | {name?} → `SaveResult`                                                                                                                                                                                                                  |
-| `print`             | request | {mode?: 'dialog' \| 'pdf'} → {printed}                                                                                                                                                                                                  |
-| `doc.closeCheck`    | request | {} → {dirty, autoSave}                                                                                                                                                                                                                  |
-| `token.update`      | event   | {token, tokenExpiresAt} — proactive rotation                                                                                                                                                                                            |
-| `theme`             | event   | {theme: 'light' \| 'dark'} (host resolves "system")                                                                                                                                                                                     |
-| `language`          | event   | {locale}                                                                                                                                                                                                                                |
-| `file.renamed`      | event   | {file: FileMeta}                                                                                                                                                                                                                        |
-| `doc.remoteVersion` | event   | {document_id, revision (decimal), version_id, saved_at, author_name?} (additive, X-02)                                                                                                                                                  |
-| `cancel`            | event   | {id} — abort a host→frame request                                                                                                                                                                                                       |
+| type                | kind    | payload → result                                                                                                                                                                                                                                           |
+| ------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `init`              | request | `InitPayload` {protocolVersion, token, tokenExpiresAt, documentId, workspaceId, apiBase, apiMode, locale, theme, capabilities, open?, module?, user?, recovery?, downloadMaxBytes?} → `InitAck` {protocolVersion, frameVersion?, capabilities (effective)} |
+| `open`              | request | `OpenPayload` {file: FileMeta, source: {kind:'url', url} \| {kind:'bytes', data}, assets?} → {opened, title?}                                                                                                                                              |
+| `save`              | request | {reason: 'user' \| 'navigate' \| 'autosave'} → `SaveResult`                                                                                                                                                                                                |
+| `saveAs`            | request | {name?} → `SaveResult`                                                                                                                                                                                                                                     |
+| `print`             | request | {mode?: 'dialog' \| 'pdf'} → {printed}                                                                                                                                                                                                                     |
+| `doc.closeCheck`    | request | {} → {dirty, autoSave}                                                                                                                                                                                                                                     |
+| `token.update`      | event   | {token, tokenExpiresAt} — proactive rotation                                                                                                                                                                                                               |
+| `theme`             | event   | {theme: 'light' \| 'dark'} (host resolves "system")                                                                                                                                                                                                        |
+| `language`          | event   | {locale}                                                                                                                                                                                                                                                   |
+| `file.renamed`      | event   | {file: FileMeta}                                                                                                                                                                                                                                           |
+| `doc.remoteVersion` | event   | {document_id, revision (decimal), version_id, saved_at, author_name?} (additive, X-02)                                                                                                                                                                     |
+| `cancel`            | event   | {id} — abort a host→frame request                                                                                                                                                                                                                          |
 
 ### Frame → host
 
@@ -111,6 +111,13 @@ URL must widen `connect-src` in the CSP it serves (`csp.json`) for that origin.
   own origin (the frame has no `allow-downloads`). Refusals use existing codes (`malformed`, `too_large`,
   `forbidden`). The host advertises `download` only once it handles `api.download`; every frame declares it, so the
   effective key is the host's grant. A host before X-02 answers `unknown_type`.
+- `init.downloadMaxBytes?` (additive, X-02 r2b): the largest file, in bytes, the host's `api.download` accepts for this
+  document (a positive safe integer; the host sends it only together with the `download` capability). When the
+  save-conflict dialog opens and the frame's version (the bytes of the Save that got the 409) is larger, the "download
+  my version, then reload" choice is disabled up front with the too-large reason; a version of exactly the cap is
+  allowed. Absent, or no `download` capability = the choice is disabled only after a `too_large` answer. A present
+  value that is not a positive safe integer makes the whole `init` malformed, like a bad `user` or `recovery`.
+  `PROTOCOL_VERSION` is not bumped.
 - `aiRun {state, run_id?}` (frame → host): `running` when an AI turn starts, exactly one `idle` on every end path
   (rules: UX spine EXPERIENCE.md › Foundation). A host treats the turn as idle when the frame unloads. A host before
   X-02 drops it silently.

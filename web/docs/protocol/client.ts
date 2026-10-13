@@ -95,6 +95,8 @@ export interface FrameSession {
   user?: InitUser
   /** draft-recovery grant (CONTRACT C18), if the host sent one; absent = recovery off */
   recovery?: InitRecovery
+  /** largest file `api.download` accepts (X-02 r2b), if the host sent it */
+  downloadMaxBytes?: number
 }
 
 type HostRequestHandler<K extends keyof HostRequests> = (
@@ -244,11 +246,13 @@ export function createDocsFrameClient(options: DocsFrameClientOptions): DocsFram
     if (p.open) next.open = p.open
     if (p.user) next.user = { displayName: p.user.displayName }
     if (p.recovery) next.recovery = { key: p.recovery.key, scope: p.recovery.scope }
+    if (p.downloadMaxBytes !== undefined) next.downloadMaxBytes = p.downloadMaxBytes
     // a repeated init (host re-handshake) updates the object callers already hold
     if (session) {
       delete session.open
       delete session.user
       delete session.recovery
+      delete session.downloadMaxBytes
       Object.assign(session, next)
     } else session = next
     resolveInit(session)
