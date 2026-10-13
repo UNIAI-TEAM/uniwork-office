@@ -193,7 +193,7 @@ export function parseCommentsListInput(
   }
 }
 
-/** `comments.create`: kind + non-empty body, optional parent/anchor/base version */
+/** `comments.create`: kind + non-empty body, optional parent/anchor/base version (OQ-C2 shape rules) */
 export function parseCommentsCreateInput(payload: unknown): CommentsCreateInput | null {
   if (!isRecord(payload)) return null
   const path = readCommentsPath(payload)
@@ -204,6 +204,15 @@ export function parseCommentsCreateInput(payload: unknown): CommentsCreateInput 
   if (parentId !== undefined && !isId(parentId)) return null
   if (baseVersionId !== undefined && !isId(baseVersionId)) return null
   if (anchor !== undefined && !isRecord(anchor)) return null
+  // OQ-C2: root comment = anchor + base version; reply = neither; discussion = no anchor
+  if (anchor !== undefined && baseVersionId === undefined) return null
+  if (parentId !== undefined) {
+    if (anchor !== undefined || baseVersionId !== undefined) return null
+  } else if (kind === 'discussion') {
+    if (anchor !== undefined) return null
+  } else if (anchor === undefined) {
+    return null
+  }
   return {
     path,
     kind,

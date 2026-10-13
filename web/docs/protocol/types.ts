@@ -1445,6 +1445,25 @@ function isCommentRevision(x: unknown): x is CommentRevision {
   )
 }
 
+/**
+ * OQ-C2 (the server enforces the same on create): a root `comment` carries an anchor and the version
+ * it was taken from; a reply (`parent_id` set) carries neither; a `discussion` carries no anchor.
+ * An anchor without `base_version_id` is invalid everywhere.
+ */
+function isCommentCreateAnchorShape(x: {
+  kind?: unknown
+  parent_id?: unknown
+  anchor?: unknown
+  base_version_id?: unknown
+}): boolean {
+  const hasAnchor = x.anchor !== undefined
+  const hasBase = x.base_version_id !== undefined
+  if (hasAnchor && !hasBase) return false
+  if (x.parent_id !== undefined) return !hasAnchor && !hasBase
+  if (x.kind === 'discussion') return !hasAnchor
+  return hasAnchor && hasBase
+}
+
 function isCommentAnchorUpdate(x: unknown): x is CommentAnchorUpdate {
   return (
     isObj(x) &&
@@ -1611,8 +1630,7 @@ const PAYLOAD_VALIDATORS: Record<string, (x: unknown) => boolean> = {
     isOpt(x.parent_id, isNonEmptyStr) &&
     isOpt(x.anchor, isCommentAnchor) &&
     isOpt(x.base_version_id, isNonEmptyStr) &&
-    // an anchor is only meaningful on the version it was taken from
-    (x.anchor === undefined || x.base_version_id !== undefined),
+    isCommentCreateAnchorShape(x),
   'request:comments.update': (x) =>
     isObj(x) && isNonEmptyStr(x.comment_id) && isNonEmptyStr(x.body),
   'request:comments.delete': isCommentIdPayload,

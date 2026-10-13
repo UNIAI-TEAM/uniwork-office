@@ -150,7 +150,7 @@ Source of truth: dev-uniwork `docs/office/g5g6g7/contract-collab.md` §2 (routes
   | type                 | payload                                                                    | result                                      |
   | -------------------- | -------------------------------------------------------------------------- | ------------------------------------------- |
   | `comments.list`      | {kind?, since_token?}                                                      | {comments, mentions, list_token, unchanged} |
-  | `comments.create`    | {kind, parent_id?, body, anchor?, base_version_id?}                        | {comment}                                   |
+  | `comments.create`    | {kind, parent_id?, body, anchor?, base_version_id?} (OQ-C2 rules below)    | {comment}                                   |
   | `comments.update`    | {comment_id, body}                                                         | {comment}                                   |
   | `comments.delete`    | {comment_id}                                                               | {outcome: 'tombstoned' \| 'removed'}        |
   | `comments.resolve`   | {comment_id}                                                               | {comment}                                   |
@@ -159,7 +159,9 @@ Source of truth: dev-uniwork `docs/office/g5g6g7/contract-collab.md` §2 (routes
   | `comments.anchors`   | {version_id, anchors: [{comment_id, anchor, state: exact\|lost}]} (1..500) | {updated, skipped, list_token}              |
   | `mentions.search`    | {q, limit?}                                                                | {candidates}                                |
 
-  `anchor` needs `base_version_id`; `unchanged: true` (since_token = current token) means keep the held comments and
+  OQ-C2 on `comments.create`: a root `kind=comment` requires `anchor` + `base_version_id`; a reply (`parent_id` set) carries
+  neither; `anchor` is forbidden on `discussion`; `anchor` without `base_version_id` is always invalid (a malformed create
+  is refused before it is sent). `unchanged: true` (since_token = current token) means keep the held comments and
   mentions, otherwise replace the whole list. Never use the `comments.anchors` `list_token` as a `since_token`.
 
 - Errors: every host maps the UniWork API answer with `commentsErrorFromHttp(status, body)` (status 0 = no response):
