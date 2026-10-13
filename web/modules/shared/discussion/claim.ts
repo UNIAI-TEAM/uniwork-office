@@ -14,7 +14,7 @@ export const FRAME_COMMENTS: Readonly<Record<OfficeModule, boolean>> = Object.fr
   markdown: true,
   html: true,
   docs: false,
-  sheets: false,
+  sheets: true,
   slides: false,
   pdf: false,
 })
