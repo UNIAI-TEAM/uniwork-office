@@ -15,6 +15,7 @@ import {
 } from '@uniwork/practice-core'
 import { WorkbenchIcon } from './WorkbenchIcons'
 import { useI18n } from './locale'
+import type { tabCounts } from './work-home'
 import {
   pinModule,
   pinPillar,
@@ -35,6 +36,8 @@ interface WorkbenchTabsProps {
   vi: boolean
   /** Called when pinned modules or pillars change (parent may clear active if unpinned). */
   onPinsChange?: (pins: WorkbenchModuleId[], pillarPins: PracticePillarId[]) => void
+  /** Tasks and Calendar counts from the cached Overview summary (tabCounts) */
+  counts?: ReturnType<typeof tabCounts>
 }
 
 function notifyPinsChanged(): void {
@@ -48,6 +51,7 @@ export function WorkbenchTabs({
   onSelect,
   vi,
   onPinsChange,
+  counts,
 }: WorkbenchTabsProps): ReactElement {
   const [pins, setPins] = useState<WorkbenchModuleId[]>(() => readPinnedModules(practiceId))
   const [pillarPins, setPillarPins] = useState<PracticePillarId[]>(() =>
@@ -172,6 +176,7 @@ export function WorkbenchTabs({
         if (!mod) return null
         const dragging = dragId === id
         const over = overId === id && dragId !== id
+        const count = id === 'tasks' || id === 'calendar' ? counts?.[id] : undefined
         return (
           <button
             key={id}
@@ -200,6 +205,14 @@ export function WorkbenchTabs({
               <WorkbenchIcon id={id} size={18} />
             </span>
             <span>{vi ? mod.labelVi : mod.labelEn}</span>
+            {count ? (
+              <>
+                <span className={`wb-tab-count wb-num is-${count.tone}`} aria-hidden="true">
+                  {count.n}
+                </span>
+                <span className="uw-sr-only">{t(count.key, { count: count.n })}</span>
+              </>
+            ) : null}
             {isCorePinnedModule(id) ? null : (
               <span
                 className="wb-tab-unpin"

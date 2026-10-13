@@ -16,6 +16,7 @@ import {
   type SkillDomainId,
 } from '@uniwork/practice-core'
 import type { ProjectSummaryEntry, UniworkResult, UniworkWorkspaceRef } from '../../shared/home-api'
+import type { WorkHomeSummary } from '../../shared/uniwork-work-api'
 import {
   afterWorkspaceList,
   readActiveWorkspaceId,
@@ -32,7 +33,14 @@ import { WorkbenchTabs } from './WorkbenchTabs'
 import { WorkbenchTopBar, type WorkbenchNewItem } from './WorkbenchTopBar'
 import { pinPillar } from './workbench-pins'
 import { WbDeleteBtn, WbOpenBtn, WbRowActions } from './WbRowActions'
-import { WB_REFRESH_EVENT, cacheWork, cachedWorkspaceListState, workCacheSlot } from './work-cache'
+import {
+  WB_REFRESH_EVENT,
+  cacheWork,
+  cachedWork,
+  cachedWorkspaceListState,
+  workCacheSlot,
+} from './work-cache'
+import { tabCounts } from './work-home'
 import { WorkSkeleton } from './WorkErrorState'
 import { WorkOverview } from './WorkOverview'
 
@@ -88,6 +96,8 @@ export function PracticeHome({
   const { workspaces, workspaceId, workspaceError } = wsState
   const workspace = workspaces?.find((w) => w.id === workspaceId) ?? null
   const [refreshTick, setRefreshTick] = useState(0)
+  // set by the Overview when its summary changes, only to redraw the tab counts (they read the cache)
+  const [, setHomeSummary] = useState<WorkHomeSummary | null>(null)
 
   useEffect(() => {
     let live = true
@@ -575,6 +585,9 @@ export function PracticeHome({
         active={tab}
         onSelect={setTab}
         vi={vi}
+        counts={tabCounts(
+          workspace ? (cachedWork<WorkHomeSummary>(`home:${workspace.id}`)?.value ?? null) : null,
+        )}
         onPinsChange={(pins, pillarPins) => {
           if (isWorkbenchModuleId(tab) && !pins.includes(tab)) setTab('desk')
           if (isPracticePillarId(tab) && !pillarPins.includes(tab)) setTab('desk')
@@ -592,6 +605,7 @@ export function PracticeHome({
           refreshTick={refreshTick}
           onReload={refresh}
           onCompose={openCompose}
+          onSummary={setHomeSummary}
         />
       ) : isWorkbenchModuleId(tab) && workspaces === null && tab !== 'forms' && tab !== 'notes' ? (
         // server tabs wait for the workspace list: null would read as "no workspace"

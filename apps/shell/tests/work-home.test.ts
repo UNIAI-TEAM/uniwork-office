@@ -19,6 +19,7 @@ import {
   notificationKey,
   overdueDays,
   overviewView,
+  tabCounts,
   withTaskStatus,
 } from '../src/renderer/src/work-home'
 
@@ -329,5 +330,41 @@ describe('the summary zone decides today near midnight', () => {
       }),
     )
     expect(h).toEqual({ key: 'wbOvHeadlineUnread', params: { count: 2 } })
+  })
+})
+describe('tabCounts (Tasks and Calendar tab counts from the cached summary)', () => {
+  it('shows nothing without a summary or when every count is zero', () => {
+    expect(tabCounts(null)).toEqual({})
+    expect(tabCounts(summary())).toEqual({})
+  })
+
+  it('Tasks shows overdue in danger first, else what is due today, muted', () => {
+    expect(tabCounts(summary({ counts: { ...ZERO, overdue: 2, due_today: 5 } })).tasks).toEqual({
+      n: 2,
+      key: 'wbTabCountOverdue',
+      tone: 'danger',
+    })
+    expect(tabCounts(summary({ counts: { ...ZERO, due_today: 5 } })).tasks).toEqual({
+      n: 5,
+      key: 'wbTabCountDueToday',
+      tone: 'muted',
+    })
+  })
+
+  it('Calendar shows the meetings today', () => {
+    expect(tabCounts(summary({ counts: { ...ZERO, meetings_today: 1 } }))).toEqual({
+      calendar: { n: 1, key: 'wbTabCountMeetings', tone: 'muted' },
+    })
+  })
+
+  it('a failed source or a malformed count shows no count, never a guess', () => {
+    const counts = { ...ZERO, overdue: 2, meetings_today: 1 }
+    expect(tabCounts(summary({ counts, partial: ['tasks'] }))).toEqual({
+      calendar: { n: 1, key: 'wbTabCountMeetings', tone: 'muted' },
+    })
+    expect(tabCounts(summary({ counts, partial: ['meetings'] }))).toEqual({
+      tasks: { n: 2, key: 'wbTabCountOverdue', tone: 'danger' },
+    })
+    expect(tabCounts(summary({ counts: { ...ZERO, overdue: null, due_today: 3 } }))).toEqual({})
   })
 })

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ReactElement, ReactNode } from 'react'
 import type { UniworkWorkspaceRef } from '../../shared/home-api'
 import type {
@@ -42,6 +42,8 @@ interface Props {
   /** reload the workspace list and every server section (the top bar's Refresh) */
   onReload: () => void
   onCompose: () => void
+  /** each summary on screen (null before one exists): the page redraws the tab counts on it */
+  onSummary?: (summary: WorkHomeSummary | null) => void
 }
 
 const STATS: readonly {
@@ -83,6 +85,7 @@ export function WorkOverview({
   refreshTick,
   onReload,
   onCompose,
+  onSummary,
 }: Props): ReactElement {
   const { t, dateLocale } = useI18n()
   const workspace = workspaces?.find((w) => w.id === workspaceId) ?? null
@@ -105,6 +108,13 @@ export function WorkOverview({
       () => undefined,
     )
   }, [])
+
+  // a ref, so an inline callback never re-fires the effect
+  const onSummaryRef = useRef(onSummary)
+  onSummaryRef.current = onSummary
+  useEffect(() => {
+    onSummaryRef.current?.(home.value)
+  }, [home.value])
 
   const openWeb = (target: WorkWebTarget) => {
     void window.uniworkWork.openWeb(target).catch(() => false)

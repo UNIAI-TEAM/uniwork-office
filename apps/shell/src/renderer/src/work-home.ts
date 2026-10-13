@@ -199,6 +199,28 @@ export function isQuiet(summary: WorkHomeSummary): boolean {
   )
 }
 
+export type TabCount = { n: number; key: StringKey; tone: 'danger' | 'muted' }
+
+/**
+ * The Tasks and Calendar tab counts from the Overview summary. A failed source
+ * or a malformed (null) count shows nothing: its zeros are not true.
+ */
+export function tabCounts(
+  s: WorkHomeSummary | null,
+): Partial<Record<'tasks' | 'calendar', TabCount>> {
+  const out: Partial<Record<'tasks' | 'calendar', TabCount>> = {}
+  if (!s) return out
+  const { overdue, due_today, meetings_today } = s.counts
+  if (!s.partial.includes('tasks') && overdue !== null) {
+    if (overdue > 0) out.tasks = { n: overdue, key: 'wbTabCountOverdue', tone: 'danger' }
+    else if ((due_today ?? 0) > 0)
+      out.tasks = { n: due_today!, key: 'wbTabCountDueToday', tone: 'muted' }
+  }
+  if (!s.partial.includes('meetings') && (meetings_today ?? 0) > 0)
+    out.calendar = { n: meetings_today!, key: 'wbTabCountMeetings', tone: 'muted' }
+  return out
+}
+
 export function withTaskStatus(
   summary: WorkHomeSummary,
   taskId: string,

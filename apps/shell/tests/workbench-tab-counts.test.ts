@@ -1,0 +1,131 @@
+/**
+ * @vitest-environment jsdom
+ */
+import { act, createElement } from 'react'
+import { createRoot } from 'react-dom/client'
+import type { Root } from 'react-dom/client'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { requirePractice } from '@uniwork/practice-core'
+import type { HomeApi, UniworkWorkspaceRef } from '../src/shared/home-api'
+import type { UniworkWorkApi, WorkHomeSummary } from '../src/shared/uniwork-work-api'
+
+const store = vi.hoisted(() => new Map<string, string>())
+vi.mock('../src/renderer/src/workbench-store-client', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../src/renderer/src/workbench-store-client')>()),
+  wbStoreGetRaw: (key: string) => store.get(key) ?? null,
+  wbStoreSetRaw: (key: string, value: string) => {
+    store.set(key, value)
+  },
+  wbStoreRemove: (key: string) => {
+    store.delete(key)
+  },
+  wbStoreRead: <T>(key: string, fallback: T): T => {
+    const raw = store.get(key)
+    return raw === undefined ? fallback : (JSON.parse(raw) as T)
+  },
+  wbStoreWrite: (key: string, value: unknown) => {
+    store.set(key, JSON.stringify(value))
+  },
+}))
+
+import { LocaleProvider } from '../src/renderer/src/locale'
+import { PracticeHome } from '../src/renderer/src/PracticeHome'
+
+const actEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+actEnvironment.IS_REACT_ACT_ENVIRONMENT = true
+
+const WS: UniworkWorkspaceRef = {
+  id: 'w-counts',
+  name: 'Ops',
+  orgId: 'o1',
+  slug: 'ops',
+  orgSlug: 'acme',
+}
+const SUMMARY: WorkHomeSummary = {
+  today: '2026-10-13',
+  timezone: 'Asia/Ho_Chi_Minh',
+  counts: { open: 4, overdue: 2, due_today: 1, meetings_today: 1, unread: 0 },
+  my_work: [],
+  upcoming_meetings: [],
+  inbox: [],
+  partial: [],
+  generated_at: '2026-10-13T03:00:00Z',
+}
+
+let host: HTMLDivElement
+let root: Root
+let land: (value: unknown) => void
+
+async function flush(): Promise<void> {
+  await act(async () => {
+    for (let i = 0; i < 10; i++) await Promise.resolve()
+  })
+}
+
+beforeEach(() => {
+  store.clear()
+  host = document.createElement('div')
+  document.body.append(host)
+  root = createRoot(host)
+  window.aiOffice = {
+    uniworkListWorkspaces: vi.fn(async () => ({ ok: true, value: [WS] })),
+    accountStatus: vi.fn(async () => ({
+      loggedIn: true,
+      state: 'signed-in',
+      profile: { accountId: 'u1', email: 'linh@acme.vn', displayName: 'Linh' },
+    })),
+    accountLogin: vi.fn(async () => true),
+    recents: vi.fn(async () => ({ entries: [], total: 0, totalAll: 0 })),
+    uniworkListDocuments: vi.fn(async () => ({
+      ok: true,
+      value: { documents: [], nextCursor: null },
+    })),
+    setLanguage: vi.fn(async () => undefined),
+  } as unknown as HomeApi
+  window.uniworkWork = {
+    homeSummary: vi.fn(() => new Promise((resolve) => (land = resolve))),
+    setTaskStatus: vi.fn(),
+    openWeb: vi.fn(async () => true),
+  } as unknown as UniworkWorkApi
+})
+
+afterEach(() => {
+  act(() => root.unmount())
+  host.remove()
+})
+
+describe('Workbench tab counts follow the Overview summary', () => {
+  it('no count before the summary lands; the counts appear when it does, without a tab switch', async () => {
+    await act(async () => {
+      root.render(
+        createElement(
+          LocaleProvider,
+          { initial: 'en' },
+          createElement(PracticeHome, {
+            practice: requirePractice('entrepreneur'),
+            projects: [],
+            selectedId: null,
+            onSelectPack: vi.fn(),
+            onOpenPackFiles: vi.fn(),
+            onRefresh: vi.fn(),
+            onSwitchPractice: vi.fn(),
+            newItems: [],
+          }),
+        ),
+      )
+    })
+    await flush()
+    expect(window.uniworkWork.homeSummary).toHaveBeenCalled()
+    expect(host.querySelector('.wb-tab-count')).toBeNull()
+    await act(async () => land({ ok: true, value: SUMMARY }))
+    await flush()
+    const counts = Array.from(host.querySelectorAll('.wb-tab-count')).map((c) => [
+      c.textContent,
+      c.classList.contains('is-danger'),
+    ])
+    expect(counts).toEqual([
+      ['2', true],
+      ['1', false],
+    ])
+  })
+})

@@ -226,6 +226,15 @@ describe('WorkOverview', () => {
     expect(api.uniworkOpenDocument).toHaveBeenCalledWith('d1')
   })
 
+  it('reports each summary it shows to the page, which redraws the tab counts', async () => {
+    const onSummary = vi.fn()
+    await mount({ onSummary })
+    expect(onSummary).toHaveBeenNthCalledWith(1, null)
+    expect(onSummary).toHaveBeenLastCalledWith(
+      expect.objectContaining({ counts: summary().counts }),
+    )
+  })
+
   it('partial: the failed source shows a dash and Retry, never a zero', async () => {
     work.homeSummary.mockResolvedValue({
       ok: true,
