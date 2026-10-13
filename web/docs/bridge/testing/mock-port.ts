@@ -35,6 +35,12 @@ export function timeoutAfter(_payload: unknown, opts?: PortRequestOptions): Prom
   return Promise.reject(protocolError('timeout', `timed out after ${opts?.timeoutMs} ms`))
 }
 
+function unsupportedComments(type: string): () => never {
+  return () => {
+    throw protocolError('unsupported', type)
+  }
+}
+
 export function createMockPort(session: Partial<PortSession> = {}) {
   const store = new Map<string, StoredFile>()
   let seq = 0
@@ -117,6 +123,18 @@ export function createMockPort(session: Partial<PortSession> = {}) {
       throw protocolError('unsupported', 'api.assets.resolve')
     },
     'api.download': () => ({ delivered: true }),
+    // G8-08 server comments: the default mock host does not advertise the `comments` capability, so
+    // the frame never sends these; a request that still arrives is answered like an old host would.
+    // A test of the comments flow replaces the type with `override()`.
+    'comments.list': unsupportedComments('comments.list'),
+    'comments.create': unsupportedComments('comments.create'),
+    'comments.update': unsupportedComments('comments.update'),
+    'comments.delete': unsupportedComments('comments.delete'),
+    'comments.resolve': unsupportedComments('comments.resolve'),
+    'comments.reopen': unsupportedComments('comments.reopen'),
+    'comments.revisions': unsupportedComments('comments.revisions'),
+    'comments.anchors': unsupportedComments('comments.anchors'),
+    'mentions.search': unsupportedComments('mentions.search'),
   }
 
   const initSession: PortSession = { documentId: session.documentId ?? 'missing', ...session }
