@@ -1,9 +1,9 @@
 /* Shared chrome/AI-panel tokens come from @genoffice/ui/tokens.css (imported
  * before this file in main.tsx); only shell-specific tokens live here. */
 :root {
-  /* Genspark DS v4.1: guide/onboarding accent is the brand blue */
-  --accent: #0f7fff;
-  --accent-hover: #0e72e5;
+  /* UniWork brand blue (uniwork tokens.css); dark themes put a dark ink on it (--on-accent) */
+  --accent: #0a52e6;
+  --accent-hover: #0843bd;
   /* selected-option tint for the shared dropdown (gs-dd) */
   --accent-soft: #eaf0fd;
   --modal-width-sm: 480px;
@@ -19,7 +19,7 @@
   /* soft elevated controls (Workbench / Home buttons) */
   --shadow-btn: 0 1px 2px rgb(0 0 0 / 6%), 0 4px 12px rgb(0 0 0 / 6%);
   --shadow-btn-lift: 0 4px 16px rgb(0 0 0 / 12%);
-  --shadow-btn-primary: 0 2px 6px rgb(15 127 255 / 28%), 0 6px 18px rgb(15 127 255 / 18%);
+  --shadow-btn-primary: 0 2px 6px rgb(10 82 230 / 28%), 0 6px 18px rgb(10 82 230 / 18%);
   --on-accent: #ffffff;
 
   /* Sticky notes board (paper colors stay vivid in both themes) */
@@ -59,8 +59,8 @@
 
 /* Explicit dark: [data-theme="dark"] on <html> */
 [data-theme='dark'] {
-  --accent: #3f99ff;
-  --accent-hover: #5ba5ff;
+  --accent: #5a96ff;
+  --accent-hover: #7aabff;
   --accent-soft: #24354d;
   --avatar-bg: #333;
   --account-avatar-bg: #3f99ff;
@@ -71,15 +71,15 @@
   --shadow-pill: 0 1px 2px rgb(0 0 0 / 40%);
   --shadow-btn: 0 1px 2px rgb(0 0 0 / 35%), 0 4px 14px rgb(0 0 0 / 28%);
   --shadow-btn-lift: 0 6px 20px rgb(0 0 0 / 40%);
-  --shadow-btn-primary: 0 2px 8px rgb(63 153 255 / 35%), 0 8px 22px rgb(63 153 255 / 22%);
-  --on-accent: #ffffff;
+  --shadow-btn-primary: 0 2px 8px rgb(90 150 255 / 35%), 0 8px 22px rgb(90 150 255 / 22%);
+  --on-accent: #0d1220;
 }
 
 /* System dark: no data-theme or data-theme="system" — follow OS preference */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']):not([data-theme='dark']) {
-    --accent: #3f99ff;
-    --accent-hover: #5ba5ff;
+    --accent: #5a96ff;
+    --accent-hover: #7aabff;
     --accent-soft: #24354d;
     --avatar-bg: #333;
     --account-avatar-bg: #3f99ff;
@@ -90,8 +90,8 @@
     --shadow-pill: 0 1px 2px rgb(0 0 0 / 40%);
     --shadow-btn: 0 1px 2px rgb(0 0 0 / 35%), 0 4px 14px rgb(0 0 0 / 28%);
     --shadow-btn-lift: 0 6px 20px rgb(0 0 0 / 40%);
-    --shadow-btn-primary: 0 2px 8px rgb(63 153 255 / 35%), 0 8px 22px rgb(63 153 255 / 22%);
-    --on-accent: #ffffff;
+    --shadow-btn-primary: 0 2px 8px rgb(90 150 255 / 35%), 0 8px 22px rgb(90 150 255 / 22%);
+    --on-accent: #0d1220;
   }
 }
 
@@ -2353,7 +2353,7 @@ body.vib .home {
 .btn-danger {
   background: var(--color-error);
   border: none;
-  color: var(--on-accent);
+  color: var(--on-danger);
   box-shadow: var(--shadow-btn);
 }
 
