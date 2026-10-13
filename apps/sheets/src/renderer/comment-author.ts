@@ -5,7 +5,9 @@ import { FALLBACK_AUTHOR as NEUTRAL_COMMENT_AUTHOR } from './threaded-comments'
  * again on every account-change ping (sign-in, sign-out, session expiry); only
  * the latest request's answer is applied, and nothing is applied after the
  * returned dispose (the document changed). A failed or blank answer applies
- * the neutral constant — never the OS account name.
+ * the neutral constant — never the OS account name. While an ask is in flight
+ * the author is the neutral constant, so a comment written in that window never
+ * carries the previous document's or account's name (BE-8).
  */
 export function followCommentAuthor(
   ask: () => Promise<string>,
@@ -17,6 +19,7 @@ export function followCommentAuthor(
   const refresh = (): void => {
     if (!live) return
     const request = ++latest
+    apply(NEUTRAL_COMMENT_AUTHOR)
     void ask().then(
       (name) => {
         if (!live || request !== latest) return

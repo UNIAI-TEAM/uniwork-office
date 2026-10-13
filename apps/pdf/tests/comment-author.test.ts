@@ -157,26 +157,66 @@ describe('followCommentAuthor (renderer; FE-2 / FE-4)', () => {
       ping = handler
       return () => undefined
     }
-    const apply = vi.fn()
-    const dispose = followCommentAuthor(ask, onChanged, apply)
+    const answers: string[] = []
+    const dispose = followCommentAuthor(ask, onChanged, (name) => answers.push(name))
     ping()
-    second.resolve('User')
+    second.resolve(NAME)
     await flush()
-    first.resolve(NAME) // the stale answer arrives last
+    first.resolve('stale') // the stale answer arrives last
     await flush()
-    expect(apply.mock.calls).toEqual([['User']])
+    expect(answers.at(-1)).toBe(NAME)
+    expect(answers).not.toContain('stale')
 
+    const applied = answers.length
     dispose()
     ping()
     await flush()
-    expect(apply.mock.calls).toEqual([['User']])
+    expect(answers).toHaveLength(applied)
   })
 
   it('a blank or failed answer applies the neutral constant', async () => {
-    const apply = vi.fn()
-    followCommentAuthor(async () => '  ', undefined, apply)
-    followCommentAuthor(() => Promise.reject(new Error('no host')), undefined, apply)
+    const blank = vi.fn()
+    const failed = vi.fn()
+    followCommentAuthor(async () => '  ', undefined, blank)
+    followCommentAuthor(() => Promise.reject(new Error('no host')), undefined, failed)
     await flush()
-    expect(apply.mock.calls).toEqual([[NEUTRAL_COMMENT_AUTHOR], [NEUTRAL_COMMENT_AUTHOR]])
+    expect(blank).toHaveBeenLastCalledWith(NEUTRAL_COMMENT_AUTHOR)
+    expect(failed).toHaveBeenLastCalledWith(NEUTRAL_COMMENT_AUTHOR)
+  })
+
+  it('a note written while the ask is in flight is "User", not the previous name (BE-8)', async () => {
+    const bound = pdfFile('bound.pdf')
+    const local = pdfFile('local.pdf')
+    setUniworkDocumentPolicy({
+      isBound: (p) => p === bound,
+      isReadOnly: () => false,
+      commentAuthor: (p) => (p === bound ? NAME : 'User'),
+    })
+    let noteAuthor = NEUTRAL_COMMENT_AUTHOR
+    const setNoteAuthor = (name: string) => void (noteAuthor = name)
+    const disposeBound = followCommentAuthor(viewOf(bound), undefined, setNoteAuthor)
+    await flush()
+    expect(noteAuthor).toBe(NAME)
+
+    // the user switches to a local file; its answer has not arrived yet
+    const pending = deferred()
+    disposeBound()
+    followCommentAuthor(() => pending.promise, undefined, setNoteAuthor)
+    expect(await savedAuthors(noteAuthor)).toEqual(['User', 'User'])
+
+    // the account ping while the same file stays open behaves the same way
+    let ping: () => void = () => undefined
+    const signedOut = deferred()
+    followCommentAuthor(
+      vi.fn().mockResolvedValueOnce(NAME).mockReturnValueOnce(signedOut.promise),
+      (handler) => ((ping = handler), () => undefined),
+      setNoteAuthor,
+    )
+    await flush()
+    expect(noteAuthor).toBe(NAME)
+    ping()
+    expect(await savedAuthors(noteAuthor)).toEqual(['User', 'User'])
+    pending.resolve('User')
+    signedOut.resolve('User')
   })
 })

@@ -160,6 +160,26 @@ describe('comment author source', () => {
     expect(commentAuthorName()).toBe(NEUTRAL_COMMENT_AUTHOR)
   })
 
+  it('a comment written while the next ask is in flight is "User", not the previous name (BE-8)', async () => {
+    const { parsed, editor } = await makeDocument()
+    const { ctx, state } = makeCtx(editor)
+    getCommentAuthor.mockResolvedValueOnce('Nguyễn An')
+    await refreshCommentAuthor('/u/uniwork-documents/dep/acc/doc1/Plan.docx')
+    expect(commentAuthorName()).toBe('Nguyễn An')
+
+    // the user switches to a local document (or the account signs out); the
+    // answer has not arrived when the comment is written
+    let answer: (name: string) => void = () => undefined
+    getCommentAuthor.mockImplementationOnce(() => new Promise<string>((r) => (answer = r)))
+    const pending = refreshCommentAuthor('C:/Users/me/notes.docx')
+    submitNewComment(ctx, 'during the ask')
+    answer(NEUTRAL_COMMENT_AUTHOR)
+    await pending
+
+    expect(await savedAuthors(editor, parsed, state.comments)).toEqual(['User'])
+    editor.destroy()
+  })
+
   it('the saved word/comments.xml carries the host author for roots and replies, never the OS account (BE-7)', async () => {
     const { parsed, editor } = await makeDocument()
     const { ctx, state } = makeCtx(editor)

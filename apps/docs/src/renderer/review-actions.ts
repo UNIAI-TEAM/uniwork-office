@@ -70,10 +70,13 @@ let authorRequest = 0
  * display name for a bound document, the neutral constant otherwise. Never the
  * OS account name. Called when a document opens and when the signed-in account
  * changes; only the answer to the latest request is kept, so a slow answer for
- * the previous document never overwrites the current one.
+ * the previous document never overwrites the current one. While the ask is in
+ * flight the author is the neutral constant, so a comment written in that
+ * window never carries the previous document's or account's name (BE-8).
  */
 export async function refreshCommentAuthor(path: string | null): Promise<void> {
   const request = ++authorRequest
+  setCommentAuthor(null)
   let name: unknown
   try {
     name = await window.desktop.getCommentAuthor(path)
