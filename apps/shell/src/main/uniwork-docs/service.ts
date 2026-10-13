@@ -56,7 +56,7 @@ import {
 } from './formats'
 import { pathKey } from '../../shared/path-key'
 import { LaunchController } from './launch'
-import type { DocumentDetail, LaunchDescriptor } from './parse'
+import { actionFlags, type DocumentDetail, type LaunchDescriptor } from './parse'
 import { SaveCoordinator, toStatus, type IntentAccess } from './save-coordinator'
 import type { SyncStoreAccess, SyncStoreOpen } from '../uniwork-sync/session-store'
 import { createIntentStore, INTENT_STORE_REGISTRATION } from '../uniwork-sync/intent-store'
@@ -1230,17 +1230,23 @@ export class UniworkDocsService {
     if (detail.myLevel !== 'manage') throw new UniworkDocError('forbidden')
   }
 
-  /** the summary a rename/create answer already carries, without a second read */
+  /**
+   * The summary a rename/create answer already carries, without a second read.
+   * The flags come from the detail the call was gated on (a no-op rename of an
+   * archived manage-level document must not report `canManage:false,
+   * archived:false`), and the format from the file block first (R1-2).
+   */
   private summaryOf(detail: DocumentDetail): UniworkDocSummary {
     return {
       id: detail.id,
       workspaceId: detail.workspaceId,
       title: detail.title,
-      format: formatForMime(detail.file.mimeType) ?? formatForName(detail.file.filename),
+      format:
+        formatForMime(detail.file.mimeType) ??
+        formatForName(detail.file.filename) ??
+        formatForName(detail.title),
       updatedAt: '',
-      canEdit: true,
-      canManage: false,
-      archived: false,
+      ...actionFlags(detail.myLevel, detail.archivedAt),
     }
   }
 

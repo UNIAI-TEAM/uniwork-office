@@ -55,6 +55,8 @@ function fakeServer(
     lifecycleConflict?: boolean
     /** D's `my_level` is omitempty: absent on a row the caller may not edit (default view) */
     omitMyLevel?: boolean
+    /** an older row without the `file` block (omitempty): the title extension decides */
+    omitListFile?: boolean
   } = {},
 ) {
   const state = {
@@ -116,7 +118,15 @@ function fakeServer(
       const id = `new_${++seq}`
       const title = (call.body as { title: string }).title
       state.documents.set(id, { title, bytes: enc('blank') })
-      return json(201, { document: { ...docJson(id), title } })
+      // D stores the title verbatim while the first version's file is
+      // untitled.<format>, so a name without an extension must not decide the row
+      return json(201, {
+        document: {
+          ...docJson(id),
+          title,
+          file: { ...docJson(id).file, filename: 'untitled.docx' },
+        },
+      })
     }
     // upload (multipart)
     if (u.pathname === `/api/v1/workspaces/${WS}/documents/files`) {
@@ -144,6 +154,8 @@ function fakeServer(
             workspace_id: WS,
             updated_at: '2026-10-13T09:00:00Z',
             my_level: state.myLevel,
+            // D's DocumentDTO carries the file block on every kind=file row
+            ...(options.omitListFile ? {} : { file: docJson(DOC).file }),
           },
         ],
         next_cursor: null,
@@ -313,6 +325,33 @@ describe('create a blank document', () => {
     expect(copies).toHaveLength(1)
     expect(opened.value.path).toBe(join(docDir(id), copies[0]!))
     expect(binding(opened.value.path)).toMatchObject({ documentId: id, state: 'ready' })
+  })
+
+  // R1-2: D keeps the typed title verbatim and its list rows carry only that
+  // title, so an extensionless name must not decide the format: the row renders
+  // as unsupported and the created document cannot be opened. The file block of
+  // the create answer is the name that always carries the extension.
+  it('derives the created format from the file block, not an extensionless title', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    const created = await ctx.service.createDocument({
+      workspaceId: WS,
+      folderId: null,
+      name: 'Q4 plan',
+      format: 'docx',
+    })
+    expect(created.ok).toBe(true)
+    if (!created.ok) return
+    expect(created.value.title).toBe('Q4 plan')
+    expect(created.value.format).toBe('docx')
+    expect(created.value.canEdit).toBe(true)
+    expect(created.value.canManage).toBe(true)
+
+    // the library row for the same document is openable (format !== null)
+    const page = await ctx.service.listDocuments({ workspaceId: WS })
+    expect(page.ok).toBe(true)
+    if (!page.ok) return
+    expect(page.value.documents[0]!.format).toBe('docx')
   })
 
   it('refuses an empty (trimmed) name before any request', async () => {
@@ -486,6 +525,26 @@ describe('rename, archive and restore', () => {
     expect(result).toEqual({ ok: false, error: 'server_error' })
   })
 
+  // R1-12: a rename to the title the document already has answers the detail's
+  // own row (no second read, no write) - so its flags must come from that
+  // detail, not from a fixed "canEdit, no manage, not archived".
+  it('answers a no-op rename with the flags of the detail it read', async () => {
+    const server = fakeServer({ myLevel: 'manage' })
+    const ctx = setup(server)
+    server.state.archived = true
+    const result = await ctx.service.renameDocument(DOC, 'Q4 plan.docx')
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value).toMatchObject({
+      title: 'Q4 plan.docx',
+      canEdit: true,
+      canManage: true,
+      archived: true,
+    })
+    // nothing was written: the title did not change
+    expect(server.calls.every((c) => c.method === 'GET')).toBe(true)
+  })
+
   it('archives and restores through the lifecycle routes, never a delete', async () => {
     const server = fakeServer()
     const ctx = setup(server)
@@ -578,6 +637,23 @@ describe('my_level gating', () => {
     const ctx = setup(server)
     expect((await ctx.service.renameDocument(DOC, 'Q4 v2.docx')).ok).toBe(true)
     expect(await ctx.service.archiveDocument(DOC)).toEqual({ ok: false, error: 'forbidden' })
+  })
+
+  // R1-2 on the read path: the file block decides the format of a library row,
+  // and a row that omits it (an older server, `omitempty`) falls back to the
+  // title's extension - never the other way around.
+  it('derives a list row format from the file block, title extension only without one', async () => {
+    const withFile = setup(fakeServer({ title: 'Q4 plan' }))
+    const row = await withFile.service.listDocuments({ workspaceId: WS })
+    expect(row.ok).toBe(true)
+    if (!row.ok) return
+    expect(row.value.documents[0]!.format).toBe('docx')
+
+    const withoutFile = setup(fakeServer({ title: 'Q4 plan', omitListFile: true }))
+    const bare = await withoutFile.service.listDocuments({ workspaceId: WS })
+    expect(bare.ok).toBe(true)
+    if (!bare.ok) return
+    expect(bare.value.documents[0]!.format).toBeNull()
   })
 
   it('carries the row action flags on every list row', async () => {

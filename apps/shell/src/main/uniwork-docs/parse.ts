@@ -1,6 +1,10 @@
-import type { UniworkDocFolderRef, UniworkDocSummary } from '../../shared/home-api'
+import type {
+  UniworkDocFolderRef,
+  UniworkDocFormat,
+  UniworkDocSummary,
+} from '../../shared/home-api'
 import { UniworkDocError } from './errors'
-import { formatForName, isDecimalString } from './formats'
+import { formatForMime, formatForName, isDecimalString } from './formats'
 
 /**
  * Strict readers for the server's snake_case DTOs (documents, uploads,
@@ -17,6 +21,8 @@ export interface DocumentDetail {
   revision: string
   currentVersion: number
   myLevel: string | null
+  /** `archived_at`: present while the document sits in the trash */
+  archivedAt: string | null
   file: {
     filename: string
     mimeType: string
@@ -89,22 +95,52 @@ export interface LaunchDescriptor {
 const HEX64 = /^[0-9a-f]{64}$/
 
 /**
- * S18 action flags off one list/detail row: `my_level` (view|edit|manage) and
+ * S18 action flags off one effective level (view|edit|manage) and an
  * `archived_at`. Absent/unknown fields leave the flag false, so the renderer
  * offers no action it cannot prove the person has.
  */
+export function actionFlags(
+  myLevel: string | null,
+  archivedAt: string | null,
+): { canEdit: boolean; canManage: boolean; archived: boolean } {
+  return {
+    canEdit: myLevel === 'edit' || myLevel === 'manage',
+    canManage: myLevel === 'manage',
+    archived: typeof archivedAt === 'string' && archivedAt.length > 0,
+  }
+}
+
 function summaryFlags(row: Record<string, unknown>): {
   canEdit: boolean
   canManage: boolean
   archived: boolean
 } {
-  const level = typeof row.my_level === 'string' ? row.my_level : ''
-  const archivedAt = row.archived_at
-  return {
-    canEdit: level === 'edit' || level === 'manage',
-    canManage: level === 'manage',
-    archived: typeof archivedAt === 'string' && archivedAt.length > 0,
+  return actionFlags(
+    typeof row.my_level === 'string' ? row.my_level : null,
+    typeof row.archived_at === 'string' ? row.archived_at : null,
+  )
+}
+
+/**
+ * The format of a document row: D's `file.mime_type` / `file.filename` first -
+ * every kind=file document carries the block, and the title is the one name
+ * that may not carry an extension (a blank document keeps the name the person
+ * typed, while its first version's file is `untitled.docx`). The title's
+ * extension is only the fallback for a row that omits `file` (`omitempty`).
+ */
+function formatOf(doc: Record<string, unknown>, title: string): UniworkDocFormat | null {
+  const file = isRecord(doc.file) ? doc.file : null
+  if (file) {
+    if (typeof file.mime_type === 'string') {
+      const byMime = formatForMime(file.mime_type)
+      if (byMime) return byMime
+    }
+    if (typeof file.filename === 'string') {
+      const byName = formatForName(file.filename)
+      if (byName) return byName
+    }
   }
+  return formatForName(title)
 }
 
 /** one list row as the renderer's summary (title is the only name the server sends) */
@@ -115,7 +151,7 @@ function summaryRow(row: Record<string, unknown>, workspaceId: string): UniworkD
     workspaceId:
       typeof row.workspace_id === 'string' && row.workspace_id ? row.workspace_id : workspaceId,
     title,
-    format: formatForName(title),
+    format: formatOf(row, title),
     updatedAt: str(row.updated_at, 64),
     ...summaryFlags(row),
   }
@@ -166,6 +202,7 @@ export function parseDetail(raw: unknown): DocumentDetail {
     revision: revision(doc.revision),
     currentVersion: nonNegInt(doc.current_version),
     myLevel: typeof myLevel === 'string' ? myLevel : null,
+    archivedAt: typeof doc.archived_at === 'string' && doc.archived_at ? doc.archived_at : null,
     file: {
       filename: str(file.filename),
       mimeType: typeof file.mime_type === 'string' ? file.mime_type : '',
@@ -375,16 +412,16 @@ export function parseDocumentSummary(raw: unknown): UniworkDocSummary {
   const doc = record(record(raw).document)
   const title = str(doc.title)
   const workspaceId = str(doc.workspace_id, 128)
-  const level = typeof doc.my_level === 'string' ? doc.my_level : ''
   return {
     id: str(doc.id, 128),
     workspaceId,
     title,
-    format: formatForName(title),
+    format: formatOf(doc, title),
     updatedAt: typeof doc.updated_at === 'string' ? doc.updated_at.slice(0, 64) : '',
-    canEdit: level === 'edit' || level === 'manage',
-    canManage: level === 'manage',
-    archived: typeof doc.archived_at === 'string' && doc.archived_at.length > 0,
+    ...actionFlags(
+      typeof doc.my_level === 'string' ? doc.my_level : null,
+      typeof doc.archived_at === 'string' ? doc.archived_at : null,
+    ),
   }
 }
 
