@@ -18,6 +18,7 @@ import { PAUSE_STORE_REGISTRATION } from '../src/main/uniwork-sync/queue/pause'
 import { createSafeStorageKeyProvider } from '../src/main/uniwork-sync/keys'
 import { createSyncStoreAccess } from '../src/main/uniwork-sync/session-store'
 import { createDocLock } from '../src/main/uniwork-sync/doc-lock'
+import { SaveCoordinator } from '../src/main/uniwork-docs/save-coordinator'
 import { createStoreLayer, type StoreLayer } from '../src/main/uniwork-sync/store'
 import {
   createLockableSafeStorage,
@@ -578,6 +579,85 @@ describe('G5-06 W4b save queue wiring', () => {
     expect(uploads(server)).toHaveLength(before.upload)
     expect(commits(server)).toHaveLength(before.commit)
     expect((await storedIntent(ctx, path))?.intent.state).toBe('conflict')
+  })
+
+  it('G506-be-4: teardownSaveQueue awaits the in-flight poll and nothing lands after it resolves', async () => {
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    writeFileSync(path, 'v4')
+    // park a queued intent, then let the poll dispatch it
+    ctx.setCapabilityOffline(true)
+    await ctx.service.save(path)
+    ctx.setCapabilityOffline(false)
+    // gate the upload so the poll is mid-dispatch when teardown lands
+    const realFetch = server.fetch.getMockImplementation()!
+    let releaseUpload!: () => void
+    const uploadGate = new Promise<void>((resolve) => {
+      releaseUpload = resolve
+    })
+    let enteredUpload!: () => void
+    const inUpload = new Promise<void>((resolve) => {
+      enteredUpload = resolve
+    })
+    server.fetch.mockImplementation(async (url: string, init: RequestInit) => {
+      if (url.endsWith('/uploads')) {
+        enteredUpload()
+        await uploadGate
+      }
+      return realFetch(url, init)
+    })
+    const polling = ctx.service.pollSaveQueue()
+    await inUpload
+    // the account switches mid-upload: teardown must stop the pass before it commits
+    ctx.signInAs('acc_2')
+    let resolved = false
+    const teardown = ctx.service.teardownSaveQueue().then(() => {
+      resolved = true
+    })
+    await new Promise((resolve) => setTimeout(resolve, 30))
+    // teardown waits for the in-flight pass, it does not return early
+    expect(resolved).toBe(false)
+    releaseUpload()
+    await teardown
+    const after = server.calls.length
+    await polling
+    // no request landed after teardown resolved
+    expect(server.calls.length).toBe(after)
+  })
+
+  it('G506-be-7: binding writes for one document serialize, so the later state wins', async () => {
+    // a store whose FIRST write is slow: without serialization the second write
+    // lands first and the slow one then overwrites it (the wrong state wins)
+    const order: string[] = []
+    const delays: Record<string, number> = { first: 30, second: 0 }
+    const store = {
+      write: async (_dir: string, binding: { state: string }) => {
+        await new Promise((resolve) => setTimeout(resolve, delays[binding.state] ?? 0))
+        order.push(binding.state)
+        return true
+      },
+    }
+    const coordinator = new SaveCoordinator({
+      store: store as never,
+      client: {} as never,
+      isSignedIn: () => true,
+      ownsBinding: () => true,
+      intents: async () => ({ kind: 'unavailable' }),
+      publish: () => undefined,
+    })
+    const doc = {
+      path: '/doc',
+      dir: '/doc',
+      deploymentId: 'd',
+      userId: 'u',
+      key: 'k',
+      binding: { state: 'saving' },
+    } as never
+    const first = coordinator.commitState(doc, { state: 'first' } as never)
+    const second = coordinator.commitState(doc, { state: 'second' } as never)
+    await Promise.all([first, second])
+    expect(order).toEqual(['first', 'second'])
   })
 
   it('G506-be-1: a poll during an in-flight inline save does not upload the same key twice', async () => {
