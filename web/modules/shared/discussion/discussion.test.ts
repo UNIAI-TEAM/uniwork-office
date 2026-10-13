@@ -121,7 +121,7 @@ describe('frame claim per module (D4)', () => {
       markdown: true,
       html: true,
       docs: false,
-      sheets: false,
+      sheets: true,
       slides: false,
       pdf: false,
     })
@@ -151,7 +151,7 @@ describe('frame claim per module (D4)', () => {
     const expected: Record<string, boolean> = {
       'modules/markdown/install.ts': true,
       'modules/html/install.ts': true,
-      'modules/sheets/install.ts': false,
+      'modules/sheets/install.ts': true,
       'modules/slides/install.ts': false,
       'modules/pdf/install.ts': false,
       'docs/bridge/install.ts': false,
