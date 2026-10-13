@@ -155,13 +155,15 @@ export function useServerComments(o: ServerCommentsOptions): ServerComments {
     (round: string) => {
       const ctl = ctlRef.current
       const roots = [...ctl.threads, ...ctl.resolved].filter((t) => !t.deleted).map((t) => t.root)
+      // what this round covers: a slide replaced while it is in flight is for the next round
+      const marks = tracker.snapshot()
       void sendAnchorsAfterSave(bridge, path, round, roots, slidesRef.current, (id) =>
         tracker.replacedAt(id),
       ).then(
         (res) => {
           if (res.outcome !== 'synced') return
           // the server holds the lost threads now: a reused id can no longer pull them onto its slide
-          tracker.settle()
+          tracker.settle(marks)
           // contract §2.6: a round that changed rows is followed by a full reload
           if (res.updated.length > 0) void ctlRef.current.reload()
         },

@@ -6464,13 +6464,15 @@ body.vib .slide-list {
   height: auto;
 }
 
+/* the save-first line: a note card like the panel's status lines, clear of the pane edge */
 .comments-server-hint {
   flex: none;
-  margin: 0;
-  padding: 8px 12px 10px;
-  border-top: 1px solid var(--border);
-  border-left: 1px solid var(--border);
-  font-size: 12px;
+  margin: 8px 12px 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-6);
+  background: var(--surface-subtle);
+  font-size: var(--text-caption);
   line-height: 1.4;
   color: var(--text-secondary);
 }

@@ -222,6 +222,8 @@ export const ja = {
   ribbonGroupComments: 'コメント',
   ribbonComment: 'コメント',
   ribbonNewCommentTip: '現在のスライドに新しいコメントを追加（pptx に保存、PowerPoint で表示可能）',
+  ribbonNewCommentServerTip:
+    '現在のスライドに新しいコメントを追加（このプレゼンテーションを開く全員と共有され、ファイルには保存されません）',
   ribbonInsertTextBoxTip: 'テキストボックスの挿入',
   ribbonWordArt: 'ワードアート',
   ribbonWordArtTip: 'ワードアートの挿入（大きな塗りつぶし/輪郭スタイルのテキスト）',

@@ -214,6 +214,7 @@ export const zh = {
   ribbonGroupComments: '批注',
   ribbonComment: '批注',
   ribbonNewCommentTip: '在当前页新建批注（写入 pptx，PowerPoint 中可见）',
+  ribbonNewCommentServerTip: '在当前页新建批注（与打开此演示文稿的所有人共享，不写入文件）',
   ribbonInsertTextBoxTip: '插入文本框',
   ribbonWordArt: '艺术字',
   ribbonWordArtTip: '插入艺术字（大号填充/描边样式文本）',

@@ -10,7 +10,7 @@
  * server comments, anchored per slide; the file's own comments only show read-only in the
  * "Comments in the file" section and are never rewritten.
  */
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { format } from '@genoffice/i18n'
 import type { UniworkCommentsSeamApi } from '../comments-seam'
@@ -19,6 +19,7 @@ import {
   CollabComposer,
   CollabPanel,
   collabStrings,
+  type CollabActions,
   type CollabAnchorSlot,
 } from '@genoffice/ui/collab'
 import type { SlideComment } from '../../shared/ipc'
@@ -169,7 +170,64 @@ interface ServerProps {
 export function ServerCommentsPane({ server, slides, inFile, onCollapse }: ServerProps) {
   const { lang, t, dateLocale } = useI18n()
   const strings = useMemo(() => collabStrings(lang), [lang])
-  const ctl = server.controller
+  const baseCtl = server.controller
+  const baseRef = useRef(baseCtl)
+  baseRef.current = baseCtl
+  const paneRef = useRef<HTMLDivElement>(null)
+
+  // After Send of a NEW thread the composer unmounts with the focus in it. Focus goes to the pane
+  // heading at once (the list reloads later), then to the new thread's heading once it is listed.
+  const [sent, setSent] = useState<ReadonlySet<string> | null>(null)
+  const create: CollabActions['create'] = async (body, p) => {
+    const b = baseRef.current
+    const before = new Set([...b.threads, ...b.resolved].map((th) => th.id))
+    await b.actions.create(body, p)
+    if (!p?.anchor) return
+    const active = document.activeElement
+    if (!active || active === document.body || paneRef.current?.contains(active)) {
+      paneRef.current?.querySelector<HTMLElement>('.collab-title')?.focus()
+      setSent(before)
+    }
+  }
+  const ctl = { ...baseCtl, actions: { ...baseCtl.actions, create } }
+
+  useEffect(() => {
+    if (!sent) return
+    const mine = [...baseCtl.threads, ...baseCtl.resolved].find(
+      (th) => !sent.has(th.id) && th.root.author_id === baseCtl.host.myUserId,
+    )
+    const active = document.activeElement
+    const free =
+      !active ||
+      active === document.body ||
+      active === paneRef.current?.querySelector('.collab-title')
+    if (!mine || !free) return
+    const heading = paneRef.current?.querySelector<HTMLElement>(
+      `[data-thread-id="${mine.id.replace(/["\\]/g, '\\$&')}"] [data-thread-heading]`,
+    )
+    if (!heading) return
+    heading.focus()
+    heading.scrollIntoView?.({ block: 'center' })
+    setSent(null)
+  }, [sent, baseCtl])
+  // a thread that never shows up (someone else's Save raced, a failed reload) stops waiting
+  useEffect(() => {
+    if (!sent) return
+    const timer = window.setTimeout(() => setSent(null), 5000)
+    return () => window.clearTimeout(timer)
+  }, [sent])
+
+  // Esc: the kit consumes it in a dirty composer, an edit box, a menu and a dialog; what reaches
+  // here is an empty new-thread composer (kit rule: it falls through) or focus elsewhere in the
+  // pane. The empty composer is dropped and the pane closes (focus returns to the opener).
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key !== 'Escape' || e.defaultPrevented || e.nativeEvent.isComposing) return
+    e.stopPropagation()
+    if (baseCtl.newThread && (e.target as HTMLElement).closest('.collab-thread--new')) {
+      baseCtl.cancelThread()
+    }
+    onCollapse()
+  }
 
   // the label names the slide where it is now (a reorder before Save keeps the server's old index)
   const renderAnchor = (slot: CollabAnchorSlot) => {
@@ -219,7 +277,7 @@ export function ServerCommentsPane({ server, slides, inFile, onCollapse }: Serve
   )
 
   return (
-    <div className="comments-pane comments-pane--server">
+    <div className="comments-pane comments-pane--server" ref={paneRef} onKeyDown={onKeyDown}>
       <CollabPanel
         controller={ctl}
         strings={strings}
@@ -281,15 +339,54 @@ export function ServerCommentsHost(p: HostProps) {
     onOpen: p.onOpen,
   })
   const onStatus = p.onStatus
+  // New Comment while a composer is already open: the open composer takes the focus (draft kept)
+  const [composerNonce, setComposerNonce] = useState(0)
+  const slotRef = useRef(p.slot)
+  slotRef.current = p.slot
+  useEffect(() => {
+    if (composerNonce === 0) return
+    slotRef.current?.querySelector<HTMLElement>('.collab-thread--new textarea')?.focus()
+  }, [composerNonce])
+  const ctlState = server.controller
+  // the pane's own save-first line shows (and is announced) for exactly this case
+  const hintShown = !server.versionId && ctlState.can.canWrite && ctlState.state === 'ready'
   p.handleRef.current = {
     startThread: (index, objectId) => {
+      const composerOpen = ctlState.newThread !== null
       const started = server.startThread(index, objectId)
+      if (started) {
+        if (composerOpen) setComposerNonce((n) => n + 1)
+        return started
+      }
       // a root thread needs base_version_id: unknown until the first Save receipt (same rule as Docs)
-      if (!started)
-        onStatus(t(server.versionId ? 'paneCommentsNewNoSlide' : 'paneCommentsSaveFirst'))
+      if (!server.versionId) {
+        if (!hintShown) onStatus(t('paneCommentsSaveFirst'))
+      } else onStatus(t('paneCommentsNewNoSlide'))
       return started
     },
   }
+
+  // Closing the pane hands the focus back to the control that opened it (ribbon Comments / New Comment)
+  const slotEl = p.slot
+  const opener = useRef<HTMLElement | null>(null)
+  const wasShown = useRef(false)
+  useLayoutEffect(() => {
+    if (slotEl) {
+      if (!wasShown.current) {
+        const a = document.activeElement
+        opener.current = a instanceof HTMLElement && a !== document.body ? a : null
+      }
+      wasShown.current = true
+      return
+    }
+    if (!wasShown.current) return
+    wasShown.current = false
+    const back = opener.current
+    opener.current = null
+    const a = document.activeElement
+    // the pane took its focused control with it; a click elsewhere already moved the focus on its own
+    if ((!a || a === document.body) && back?.isConnected) back.focus()
+  }, [slotEl])
 
   const openCount = server.controller.threads.length
   const onOpenCount = p.onOpenCount

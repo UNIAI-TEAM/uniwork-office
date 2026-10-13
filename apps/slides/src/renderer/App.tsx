@@ -1508,6 +1508,8 @@ export function App() {
         bottom: Math.min(r.top + maxY * scale, view?.bottom ?? Infinity),
         viewTop: view?.top ?? 0,
         viewBottom: view?.bottom ?? window.innerHeight,
+        viewLeft: view?.left ?? 0,
+        viewRight: view?.right ?? window.innerWidth,
       }
       return rect.right <= rect.left || rect.bottom <= rect.top ? null : rect
     },
@@ -3541,6 +3543,7 @@ export function App() {
         onToggleComments={() => (showComments ? setShowComments(false) : openComments(false))}
         onNewComment={newComment}
         commentCount={serverComments ? serverOpenCount : comments.length}
+        serverComments={serverComments}
         onInsertIcon={(def, color) => void insertIcon(def, color)}
         onInsertChart={(kind) => void insertChart(kind)}
         onInsertSmartArt={(def) => void insertSmartArt(def)}

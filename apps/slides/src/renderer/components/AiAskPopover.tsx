@@ -25,6 +25,9 @@ export interface AnchorRect {
   /** Band the popover must stay inside — the canvas viewport, so it never covers the ribbon */
   viewTop: number
   viewBottom: number
+  /** Horizontal band of the canvas viewport: the chip must not cover a pane beside it (comments) */
+  viewLeft?: number
+  viewRight?: number
 }
 
 export interface AskTarget {
@@ -81,8 +84,10 @@ export function AiAskTrigger({ getAnchorRect, onOpen }: TriggerProps): React.JSX
       const w = btnRef.current?.offsetWidth ?? 96
       const h = btnRef.current?.offsetHeight ?? 32
       const bottom = Math.min(rect.viewBottom, window.innerHeight)
+      const right = Math.min(rect.viewRight ?? Infinity, window.innerWidth)
+      const leftMin = rect.viewLeft ?? 0
       setPos({
-        left: Math.min(rect.right + 6, window.innerWidth - w - EDGE),
+        left: Math.max(leftMin, Math.min(rect.right + 6, right - w - EDGE)),
         top: Math.min(rect.bottom + 4, bottom - h - EDGE),
       })
     }

@@ -218,6 +218,8 @@ export const ms = {
   ribbonComment: 'Komen',
   ribbonNewCommentTip:
     'Komen baharu pada slaid semasa (disimpan dalam pptx, kelihatan dalam PowerPoint)',
+  ribbonNewCommentServerTip:
+    'Komen baharu pada slaid semasa (dikongsi dengan semua orang yang membuka pembentangan ini, tidak disimpan dalam fail)',
   ribbonInsertTextBoxTip: 'Sisipkan kotak teks',
   ribbonWordArt: 'WordArt',
   ribbonWordArtTip: 'Sisipkan WordArt (teks besar bergaya isian/garis luar)',

@@ -213,6 +213,8 @@ export const ar = {
   ribbonGroupComments: 'تعليقات',
   ribbonComment: 'تعليق',
   ribbonNewCommentTip: 'تعليق جديد على الشريحة الحالية (يُحفظ في pptx ويظهر في PowerPoint)',
+  ribbonNewCommentServerTip:
+    'تعليق جديد على الشريحة الحالية (يُشارك مع كل من يفتح هذا العرض التقديمي ولا يُحفظ في الملف)',
   ribbonInsertTextBoxTip: 'إدراج مربع نص',
   ribbonWordArt: 'WordArt',
   ribbonWordArtTip: 'إدراج WordArt (نص كبير بنمط تعبئة/حدود)',

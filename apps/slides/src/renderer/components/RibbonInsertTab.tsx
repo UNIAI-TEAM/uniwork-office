@@ -74,6 +74,7 @@ export function RibbonInsertTab({ rb }: { rb: RibbonTabCtx }) {
     onOpenZoom,
     hasSections,
     onNewComment,
+    serverComments,
     onOpenEquation,
     onOpenHeaderFooter,
     onOpenLink,
@@ -399,7 +400,7 @@ export function RibbonInsertTab({ rb }: { rb: RibbonTabCtx }) {
           className="rb-big"
           disabled={!hasDoc}
           onClick={onNewComment}
-          data-tip={t('ribbonNewCommentTip')}
+          data-tip={t(serverComments ? 'ribbonNewCommentServerTip' : 'ribbonNewCommentTip')}
         >
           <span className="rb-big-icon">
             <IconComment size={BIG} />

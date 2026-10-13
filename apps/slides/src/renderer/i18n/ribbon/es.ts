@@ -224,6 +224,8 @@ export const es = {
   ribbonComment: 'Comentario',
   ribbonNewCommentTip:
     'Nuevo comentario en la diapositiva actual (guardado en pptx, visible en PowerPoint)',
+  ribbonNewCommentServerTip:
+    'Nuevo comentario en la diapositiva actual (compartido con todos los que abran esta presentación, no se guarda en el archivo)',
   ribbonInsertTextBoxTip: 'Insertar un cuadro de texto',
   ribbonWordArt: 'WordArt',
   ribbonWordArtTip: 'Insertar WordArt (texto grande con relleno/contorno)',

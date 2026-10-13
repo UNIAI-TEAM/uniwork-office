@@ -116,8 +116,15 @@ export interface SlideTracker {
   observe(slides: readonly SlideIdentity[]): void
   /** when (ms) the id was first given to another slide since the last settle; undefined: not reused */
   replacedAt(slideId: string): number | undefined
-  /** a round reached the server: the old threads are lost there now, forget the reuse marks */
-  settle(): void
+  /** the marks as they stand now: a round settles exactly these, not what lands while it is in flight */
+  snapshot(): SlideTrackerMarks
+  /** a round reached the server: the old threads are lost there now, forget the reuse marks it covered */
+  settle(marks?: SlideTrackerMarks): void
+}
+
+export interface SlideTrackerMarks {
+  replaced: readonly string[]
+  gone: readonly string[]
 }
 
 export function createSlideTracker(now: () => number = Date.now): SlideTracker {
@@ -141,9 +148,15 @@ export function createSlideTracker(now: () => number = Date.now): SlideTracker {
       last = cur
     },
     replacedAt: (slideId) => replaced.get(slideId),
-    settle() {
-      gone.clear()
-      replaced.clear()
+    snapshot: () => ({ replaced: [...replaced.keys()], gone: [...gone.keys()] }),
+    settle(marks) {
+      if (!marks) {
+        gone.clear()
+        replaced.clear()
+        return
+      }
+      for (const id of marks.gone) gone.delete(id)
+      for (const id of marks.replaced) replaced.delete(id)
     },
   }
 }

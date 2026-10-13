@@ -211,6 +211,8 @@ export const he = {
   ribbonGroupComments: 'תגובות',
   ribbonComment: 'תגובה',
   ribbonNewCommentTip: 'תגובה חדשה בשקופית הנוכחית (נשמרת ב-pptx, גלויה ב-PowerPoint)',
+  ribbonNewCommentServerTip:
+    'תגובה חדשה בשקופית הנוכחית (משותפת לכל מי שפותח מצגת זו, לא נשמרת בקובץ)',
   ribbonInsertTextBoxTip: 'הוספת תיבת טקסט',
   ribbonWordArt: 'WordArt',
   ribbonWordArtTip: 'הוספת WordArt (טקסט גדול עם מילוי/קו מתאר)',
