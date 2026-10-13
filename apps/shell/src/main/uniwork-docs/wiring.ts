@@ -417,6 +417,9 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
       () => wiring.shellContents(),
       UNIWORK_DOC_CHANNELS.lock,
     ),
+    // the whole list when locks clear (a Retry that unlocked the keychain): the
+    // shell replaces its list, so the S11 panel does not outlive the lock
+    pushLocks: () => push(UNIWORK_DOC_CHANNELS.locksChanged, service.currentLocks()),
     reveal: () => wiring.reveal(),
   })
 

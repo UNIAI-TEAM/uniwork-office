@@ -153,6 +153,12 @@ export interface UniworkDocsServiceDeps {
   pushLaunch(event: UniworkLaunchEvent): void
   /** a working copy refused by the newer-store guard (S11 lock panel) */
   pushLock?(lock: UniworkDocLock): void
+  /**
+   * The lock list changed in a way the single-lock push does not carry (a
+   * keystore lock cleared when the store opened): the shell replaces its list,
+   * so a panel on screen goes away without waiting for an unrelated push.
+   */
+  pushLocks?(): void
   reveal(): void
   /** test seam: replaces the HTTP client */
   client?: UniworkDocsClient
@@ -630,9 +636,16 @@ export class UniworkDocsService {
 
   /** the store opened (again): the keystore_locked panels are stale */
   private clearKeystoreLocks(): void {
+    let cleared = false
     for (const [key, lock] of [...this.locks]) {
-      if (lock.reason === 'keystore_locked') this.locks.delete(key)
+      if (lock.reason === 'keystore_locked') {
+        this.locks.delete(key)
+        cleared = true
+      }
     }
+    // the renderer's list is its own: it must be told the list changed, or a
+    // Retry that worked leaves the S11 panel up until some other push
+    if (cleared) this.deps.pushLocks?.()
   }
 
   /**

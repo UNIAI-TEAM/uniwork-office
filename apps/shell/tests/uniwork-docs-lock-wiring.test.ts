@@ -19,14 +19,24 @@ let statusListener: ((status: { state: string }) => void) | null = null
 /** the account state the mocked auth module reports (keystore-locked after a lock) */
 let accountState = 'signed-out'
 
+const safe = vi.hoisted(() => ({ locked: false }))
+
 vi.mock('electron', () => ({
   app: { getPath: () => dir },
   BrowserWindow: { getFocusedWindow: () => null },
   dialog: {},
   safeStorage: {
     isEncryptionAvailable: () => true,
-    encryptString: (text: string) => Buffer.from(`ENC1${text}`),
-    decryptString: (buf: Buffer) => buf.toString().slice(4),
+    // a locked keychain: the store key cannot be produced (or opened), which is
+    // what the S11 keystore lock reports
+    encryptString: (text: string) => {
+      if (safe.locked) throw new Error('keychain locked')
+      return Buffer.from(`ENC1${text}`)
+    },
+    decryptString: (buf: Buffer) => {
+      if (safe.locked) throw new Error('keychain locked')
+      return buf.toString().slice(4)
+    },
   },
 }))
 
@@ -52,6 +62,7 @@ beforeEach(() => {
   identity = { accountId: 'acc_1', deviceSessionId: 'dev_1', deploymentId: 'default' }
   statusListener = null
   accountState = 'signed-out'
+  safe.locked = false
 })
 afterEach(() => rmSync(dir, { recursive: true, force: true }))
 
@@ -72,6 +83,38 @@ function seedOther(binding: unknown): void {
   mkdirSync(otherDir(), { recursive: true })
   writeFileSync(otherPath(), 'other bytes')
   writeFileSync(join(otherDir(), BINDING_FILE), JSON.stringify(binding))
+}
+
+/** a pre-store working copy of acc_1: schema 1 + pendingIntent + its payload */
+function seedLegacyIntent(): void {
+  mkdirSync(docDir(), { recursive: true })
+  writeFileSync(docPath(), 'working copy bytes')
+  writeFileSync(
+    join(docDir(), BINDING_FILE),
+    JSON.stringify({
+      schema: 1,
+      documentId: 'doc_1',
+      workspaceId: 'ws_1',
+      orgId: 'org_a',
+      title: 'Plan.docx',
+      filename: 'Plan.docx',
+      format: 'docx',
+      access: 'edit',
+      baseRevision: '41',
+      baseVersion: 3,
+      baseChecksum: 'abc',
+      state: 'saving',
+      pendingIntent: {
+        intentId: 'office-intent-legacy',
+        idempotencyKey: 'office-key-legacy',
+        documentId: 'doc_1',
+        baseRevision: '41',
+        checksum: 'abc',
+        createdAt: '2026-10-11T00:00:00.000Z',
+      },
+    }),
+  )
+  writeFileSync(join(docDir(), INTENT_PAYLOAD_FILE), 'working copy bytes')
 }
 
 async function setup(openPath = vi.fn(() => true)) {
@@ -223,34 +266,7 @@ describe('the durable store at the account boundary (W3b)', () => {
 
 describe('a cold locked restore at the wiring (R1-be-4)', () => {
   it('the account keystore-locked state locks the saved account copy with no session', async () => {
-    mkdirSync(docDir(), { recursive: true })
-    writeFileSync(docPath(), 'working copy bytes')
-    writeFileSync(
-      join(docDir(), BINDING_FILE),
-      JSON.stringify({
-        schema: 1,
-        documentId: 'doc_1',
-        workspaceId: 'ws_1',
-        orgId: 'org_a',
-        title: 'Plan.docx',
-        filename: 'Plan.docx',
-        format: 'docx',
-        access: 'edit',
-        baseRevision: '41',
-        baseVersion: 3,
-        baseChecksum: 'abc',
-        state: 'saving',
-        pendingIntent: {
-          intentId: 'office-intent-legacy',
-          idempotencyKey: 'office-key-legacy',
-          documentId: 'doc_1',
-          baseRevision: '41',
-          checksum: 'abc',
-          createdAt: '2026-10-11T00:00:00.000Z',
-        },
-      }),
-    )
-    writeFileSync(join(docDir(), INTENT_PAYLOAD_FILE), 'working copy bytes')
+    seedLegacyIntent()
     mkdirSync(join(dir, 'uniwork-documents'), { recursive: true })
     writeFileSync(
       join(dir, 'uniwork-documents', 'last-account.json'),
@@ -267,5 +283,39 @@ describe('a cold locked restore at the wiring (R1-be-4)', () => {
     })
     // the plaintext pair is untouched
     expect(existsSync(join(docDir(), INTENT_PAYLOAD_FILE))).toBe(true)
+  })
+})
+
+describe('the lock list push when a keystore lock clears (R1-fe-1 BE)', () => {
+  it('main pushes the cleared list after the store opens, so the S11 panel can go away', async () => {
+    seedLegacyIntent()
+    const { handle, sent } = await setup()
+    safe.locked = true
+
+    // the locked open records + pushes the S11 keystore lock
+    expect((await handle.service.openSyncStore()).kind).toBe('keystore_locked')
+    expect(sent.filter((m) => m.channel === UNIWORK_DOC_CHANNELS.lock)).toEqual([
+      {
+        channel: UNIWORK_DOC_CHANNELS.lock,
+        payload: { path: docPath(), reason: 'keystore_locked', name: 'Plan.docx' },
+      },
+    ])
+    // and the list itself is not pushed while the lock is on screen
+    expect(sent.filter((m) => m.channel === UNIWORK_DOC_CHANNELS.locksChanged)).toEqual([])
+
+    // the keychain unlocks and Retry opens the store: the intent migrates and
+    // main tells the shell the list changed (it is empty now)
+    safe.locked = false
+    expect((await handle.service.openSyncStore()).kind).toBe('ok')
+    expect(handle.service.currentLocks()).toEqual([])
+    expect(sent.filter((m) => m.channel === UNIWORK_DOC_CHANNELS.locksChanged)).toEqual([
+      { channel: UNIWORK_DOC_CHANNELS.locksChanged, payload: [] },
+    ])
+    // the same open ran the sweep: the plaintext pair is gone for good
+    expect(existsSync(join(docDir(), INTENT_PAYLOAD_FILE))).toBe(false)
+
+    // a later open that clears nothing does not push the list again
+    expect((await handle.service.openSyncStore()).kind).toBe('ok')
+    expect(sent.filter((m) => m.channel === UNIWORK_DOC_CHANNELS.locksChanged)).toHaveLength(1)
   })
 })
