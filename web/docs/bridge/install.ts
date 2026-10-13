@@ -49,7 +49,15 @@ import { createHeadless, isTopLevel, parseHeadlessEntry } from './headless'
 import { installFocusReturn } from './focus-return'
 import { aiHostGrants, createWebAi, withWebAi } from '../../modules/shared/ai/web-ai'
 import { FRAME_BASE_CAPABILITIES } from './module-bridge'
+import { frameCommentsClaim } from '../../modules/shared/discussion/claim'
+import { mountFrameDiscussion } from '../../modules/shared/discussion/mount'
 import type { DesktopCapabilities } from '../../../apps/docs/src/shared/ipc'
+
+/**
+ * The frame Discussion panel (S13) + the `comments` claim (lane G8-11 D4, invariant 8): off until
+ * the Docs frame also serves its anchored comments (S12); the page panel serves both until then.
+ */
+const frameComments = false
 
 const headlessEntry = parseHeadlessEntry(location.href, isTopLevel(window))
 const headless = headlessEntry ? createHeadless(headlessEntry) : null
@@ -68,6 +76,7 @@ const client =
       exportPdf: true,
       exportHtml: true,
       filePick: true,
+      ...frameCommentsClaim(frameComments),
     },
   })
 /** read by the renderer's cap(); boot waits (bounded) for init, so the grants land before the first render */
@@ -117,6 +126,7 @@ export function installBridge(): void {
   win.__docsWebBridge = true
   // the host leave dialog hands the focus back to the frame window: put it in the editor again
   if (!headless) installFocusReturn()
+  if (!headless && frameComments) void mountFrameDiscussion(client)
 }
 
 installBridge()

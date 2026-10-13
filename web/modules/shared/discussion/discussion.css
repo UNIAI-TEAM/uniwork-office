@@ -1,0 +1,99 @@
+/* The web frame's Discussion (S13): a slim document bar above the editor with the Discussion
+ * toggle, and the shared collab panel docked at the inline end. Chrome only, theme tokens only
+ * (CLAUDE.md theming rules); the panel itself is styled by @genoffice/ui/collab.css.
+ * While the bar is on, the page is a column (bar, new-version bar, app root) like remote-bar.css. */
+
+html.uw-disc-on {
+  --uw-disc-bar-h: 37px;
+  --uw-disc-w: 360px;
+}
+
+html.uw-disc-on body {
+  display: flex;
+  flex-direction: column;
+}
+
+html.uw-disc-on #root {
+  flex: 1 1 0;
+  min-height: 0;
+  height: auto;
+}
+
+/* the document bar stays first, above a new-version bar that prepends itself later */
+.uw-disc-root {
+  order: -1;
+  flex: none;
+}
+
+.uw-disc-bar {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  height: var(--uw-disc-bar-h);
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--chrome-bg, var(--surface));
+  color: var(--text);
+  font-family: var(--gs-font-sans, inherit);
+  font-size: var(--text-small);
+}
+
+.uw-disc-toggle {
+  box-sizing: border-box;
+  min-width: 24px;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-6, 6px);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.uw-disc-toggle:hover {
+  background: var(--hover);
+}
+
+.uw-disc-toggle[aria-expanded='true'] {
+  border-color: var(--border);
+  background: var(--accent-soft, var(--active-bg));
+  color: var(--accent, var(--text));
+}
+
+.uw-disc-toggle:focus-visible {
+  outline: 2px solid var(--accent, var(--color-brand-secondary));
+  outline-offset: 2px;
+}
+
+@media (pointer: coarse) {
+  .uw-disc-toggle {
+    min-height: 44px;
+  }
+  html.uw-disc-on {
+    --uw-disc-bar-h: 52px;
+  }
+}
+
+.uw-disc {
+  position: fixed;
+  z-index: 40;
+  top: var(--uw-disc-bar-h);
+  bottom: 0;
+  inset-inline-end: 0;
+  width: min(var(--uw-disc-w), 100vw);
+  box-sizing: border-box;
+}
+
+.uw-disc[hidden] {
+  display: none;
+}
+
+/* the editor narrows by the panel width; on a narrow viewport the panel covers it instead */
+@media (min-width: 640px) {
+  html.uw-disc-open #root {
+    margin-inline-end: var(--uw-disc-w);
+  }
+}

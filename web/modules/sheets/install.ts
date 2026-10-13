@@ -37,6 +37,8 @@ let sheetsApi: ReturnType<typeof createSheetsWebApi> | null = null
 
 export const bridge = installModuleBridge({
   module: 'sheets',
+  // no frame comments yet: the page panel serves Comments + Discussion until the in-frame comments land
+  frameComments: false,
   // what this frame build supports (effective = frame ∩ host grant)
   frameCapabilities: { save: true, saveAs: true, filePick: true, print: true, exportPdf: true },
   capabilities: { defaults: sheetsWebCapabilities(transport), grants: sheetsHostGrants },
