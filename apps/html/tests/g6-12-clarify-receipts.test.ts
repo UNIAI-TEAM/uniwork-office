@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { buildParseMap } from '../src/renderer/document/parse-map'
+import { usableAiSettings } from './helpers/ai-settings'
 
 // the loop is replaced by a fake whose run() asks one clarification and then finishes
 vi.mock('@genoffice/agent-core', async (orig) => {
@@ -53,7 +54,9 @@ describe('answered clarify receipts (html)', () => {
           if (!(prop in target)) {
             target[prop] = /^on[A-Z]/.test(prop)
               ? vi.fn(() => () => {})
-              : vi.fn(async () => undefined)
+              : prop === 'getAiSettings'
+                ? vi.fn(async () => usableAiSettings())
+                : vi.fn(async () => undefined)
           }
           return target[prop]
         },
