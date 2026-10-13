@@ -712,6 +712,7 @@ export interface OrgChoiceModel {
 }
 
 type OrgChoiceWire = {
+  org?: { id: string }
   needsOrgChoice?: boolean
   rememberedGone?: boolean
   orgsError?: unknown
@@ -732,8 +733,11 @@ export function orgChoiceOf(status: AccountStatus | null): OrgChoiceModel {
     role: o.myRole ?? o.role ?? '',
     membership: o.membership,
   }))
+  // contract §2: "every organization locked" is not sent; main reports no
+  // choice and no org, and every row is locked, so the step shows the lock notice
+  const blocked = !wire.org && allOrgsBlocked(rows)
   return {
-    needed: wire.needsOrgChoice === true,
+    needed: wire.needsOrgChoice === true || blocked,
     rememberedGone: wire.rememberedGone === true,
     loadError: Boolean(wire.orgsError),
     rows,
@@ -860,8 +864,10 @@ export function roleLabel(role: string | null | undefined, t: TFunc): string {
   return key ? t(key) : (role ?? '')
 }
 
-/** "Sales · Admin" for the workspace select; just the name when the role is unknown */
+/** "Sales · Admin" for the workspace select; "Sales · —" when the role read failed */
 export function workspaceLabel(ws: UniworkWorkspaceRef, t: TFunc): string {
-  const role = roleLabel((ws as UniworkWorkspaceRef & { myRole?: string }).myRole, t)
-  return role ? t('uwLibWsRole', { workspace: ws.name, role }) : ws.name
+  const myRole = (ws as UniworkWorkspaceRef & { myRole?: string | null }).myRole
+  // an older main build sends no role at all: just the name
+  if (myRole === undefined) return ws.name
+  return t('uwLibWsRole', { workspace: ws.name, role: roleLabel(myRole, t) || MISSING_VALUE })
 }

@@ -59,7 +59,7 @@ const FOCUSABLE =
 function fetchPage(s: PickerState, cursor?: string): Promise<UniworkResult<UniworkDocListPage>> {
   const workspaceId = s.workspaceId!
   if (s.source === 'shared') {
-    return settle(listSharedDocuments({ workspaceId, cursor, limit: PICKER_PAGE_SIZE }))
+    return settle(listSharedDocuments({ cursor, limit: PICKER_PAGE_SIZE }))
   }
   return settle(
     window.aiOffice.uniworkListDocuments({

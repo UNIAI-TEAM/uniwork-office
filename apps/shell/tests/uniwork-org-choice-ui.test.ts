@@ -254,7 +254,10 @@ describe('organization step after sign-in', () => {
   })
 
   it('all organizations locked: the lock notice with Sign out, no radio group', async () => {
-    const account = controller(choosing([SUSPENDED, DEACTIVATED]))
+    // contract §2: derived, not sent (needsOrgChoice false, no org, every row locked)
+    const account = controller(
+      signedIn({ org: undefined, orgs: [SUSPENDED, DEACTIVATED], needsOrgChoice: false }),
+    )
     await render(account)
     expect(group()).toBeNull()
     const notice = host.querySelector<HTMLElement>('[role="alert"]')!

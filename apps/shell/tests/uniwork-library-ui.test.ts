@@ -33,7 +33,7 @@ import { accountStrings } from '../src/renderer/src/i18n/strings-account'
 /**
  * S17: "Shared with me" in the Open from UniWork dialog, the workspace list
  * with my role, and the document details panel. The bridge is a typed fake of
- * the library IPC (uniworkListShared, uniworkDocProperties); no main runs.
+ * the library IPC (uniworkListSharedWithMe, uniworkDocumentProperties); no main runs.
  */
 
 const actEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -96,10 +96,10 @@ function makeApi(opts: { shared?: UniworkDocListPage; info?: DocInfoFields } = {
         nextCursor: null,
       }),
     ),
-    uniworkListShared: vi.fn(async (_q: SharedListQuery) =>
+    uniworkListSharedWithMe: vi.fn(async (_q?: SharedListQuery) =>
       ok<UniworkDocListPage>(opts.shared ?? { documents: [], nextCursor: null }),
     ),
-    uniworkDocProperties: vi.fn(async (_id: string) => ok(opts.info ?? FULL_INFO)),
+    uniworkDocumentProperties: vi.fn(async (_id: string) => ok(opts.info ?? FULL_INFO)),
     uniworkOpenDocument: vi.fn(async () => ok({ path: 'C:\\x\\Plan.docx' })),
   }
   window.aiOffice = fns as unknown as HomeApi
@@ -165,6 +165,10 @@ describe('library model', () => {
   it('labels a workspace with my role, and falls back to the name', () => {
     expect(workspaceLabel(WORKSPACES[0]!, t)).toBe('Sales · Admin')
     expect(workspaceLabel({ id: 'w', name: 'Plain', orgId: 'o' }, t)).toBe('Plain')
+    // contract: myRole null = the role read failed
+    expect(workspaceLabel({ id: 'w', name: 'Ops', orgId: 'o', myRole: null } as never, t)).toBe(
+      'Ops · —',
+    )
     expect(roleLabel('owner', t)).toBe('Owner')
     expect(roleLabel('auditor', t)).toBe('auditor')
   })
@@ -248,8 +252,8 @@ describe('Open from UniWork: workspaces and Shared with me', () => {
       },
     })
     await choose(Array.from(select().options).at(-1)!.value)
-    expect(api.uniworkListShared).toHaveBeenCalledTimes(1)
-    expect(api.uniworkListShared.mock.calls[0]![0]).toMatchObject({ workspaceId: 'w1' })
+    expect(api.uniworkListSharedWithMe).toHaveBeenCalledTimes(1)
+    expect(api.uniworkListSharedWithMe.mock.calls[0]![0]).toEqual({ cursor: undefined, limit: 50 })
     expect(host.querySelector('.uw-pick-heading')?.textContent).toBe(en.uwLibShared)
     expect(rows().map((r) => r.querySelector('.uw-pick-row-title')?.textContent)).toEqual([
       'Contract.docx',
@@ -270,7 +274,7 @@ describe('Open from UniWork: details panel', () => {
     const btn = rows()[0]!.querySelector<HTMLButtonElement>('.uw-pick-info-btn')!
     expect(btn.getAttribute('aria-label')).toBe('Details for “Plan.docx”')
     await click(btn)
-    expect(api.uniworkDocProperties).toHaveBeenCalledWith('d1')
+    expect(api.uniworkDocumentProperties).toHaveBeenCalledWith('d1')
     // the row did not open the document
     expect(api.uniworkOpenDocument).not.toHaveBeenCalled()
     const panel = infoPanel()!
@@ -312,7 +316,7 @@ describe('Open from UniWork: details panel', () => {
 
   it('a failed details read says why and retries', async () => {
     await render()
-    api.uniworkDocProperties.mockResolvedValueOnce({ ok: false, error: 'network' } as never)
+    api.uniworkDocumentProperties.mockResolvedValueOnce({ ok: false, error: 'network' } as never)
     await click(rows()[0]!.querySelector('.uw-pick-info-btn')!)
     expect(infoPanel()!.querySelector('[role="alert"]')?.textContent).toContain(en.uwErrNetwork)
     await click(
