@@ -10,8 +10,8 @@ import {
   type PracticeId,
   type WorkbenchModuleId,
 } from '@uniwork/practice-core'
-import { readCalendar, readNotes } from './workbench-pins'
-import { cachedOpenTasks } from './work-cache'
+import { readNotes } from './workbench-pins'
+import { cachedAgendaItems, cachedOpenTasks } from './work-cache'
 
 const MAX_PACK_CHARS = 6_000
 const MAX_LIST = 8
@@ -68,13 +68,16 @@ function moduleContext(practiceId: PracticeId, moduleId: WorkbenchModuleId): Con
             : 'No open tasks.',
     })
   } else if (moduleId === 'calendar') {
-    const items = readCalendar(practiceId).slice(0, MAX_LIST)
+    const items = cachedAgendaItems()?.slice(0, MAX_LIST) ?? null
     chunks.push({
       id: 'calendar',
-      source: 'local:calendar',
-      text: items.length
-        ? `Calendar: ${items.map((i) => `${i.date} ${i.title}`).join('; ')}`
-        : 'Calendar empty.',
+      source: 'uniwork:calendar',
+      text:
+        items === null
+          ? 'Calendar: not loaded from UniWork yet.'
+          : items.length
+            ? `Calendar: ${items.map((i) => `${i.date} ${i.title}`).join('; ')}`
+            : 'Calendar empty.',
     })
   } else if (moduleId === 'notes') {
     const text = readNotes(practiceId)
@@ -163,17 +166,22 @@ export function buildMyAiContextPack(
     ),
   })
 
-  const cal = readCalendar(practiceId).slice(0, MAX_LIST)
+  const cal = cachedAgendaItems()?.slice(0, MAX_LIST) ?? null
   chunks.push({
     id: 'calendar',
-    source: 'local:calendar',
-    text: cal.length
-      ? vi
-        ? `Lịch: ${cal.map((i) => `${i.date} ${i.title}`).join('; ')}`
-        : `Calendar: ${cal.map((i) => `${i.date} ${i.title}`).join('; ')}`
-      : vi
-        ? 'Lịch trống.'
-        : 'Calendar empty.',
+    source: 'uniwork:calendar',
+    text:
+      cal === null
+        ? vi
+          ? 'Lịch chưa được tải từ UniWork.'
+          : 'The calendar is not loaded from UniWork yet.'
+        : cal.length
+          ? vi
+            ? `Lịch: ${cal.map((i) => `${i.date} ${i.title}`).join('; ')}`
+            : `Calendar: ${cal.map((i) => `${i.date} ${i.title}`).join('; ')}`
+          : vi
+            ? 'Lịch trống.'
+            : 'Calendar empty.',
   })
 
   const recents = opts?.recents?.slice(0, MAX_LIST) ?? []

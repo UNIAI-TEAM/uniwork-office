@@ -116,47 +116,12 @@ export function reorderPinnedModules(
 
 // ── Lightweight local module data (per practice) ───────────
 
-export interface WbCalendarItem {
-  id: string
-  date: string
-  title: string
-  done?: boolean
-}
-
-export type CalendarViewMode = 'list' | 'calendar'
-
-export function readCalendarView(): CalendarViewMode {
-  try {
-    const raw = wbStoreGetRaw('uniwork.wb.calendar.view')
-    if (raw === 'list' || raw === 'calendar') return raw
-  } catch {
-    /* ignore */
-  }
-  return 'calendar'
-}
-
-export function writeCalendarView(mode: CalendarViewMode): void {
-  try {
-    wbStoreSetRaw('uniwork.wb.calendar.view', mode)
-  } catch {
-    /* ignore */
-  }
-}
-
 function readJson<T>(key: string, fallback: T): T {
   return wbStoreRead(key, fallback)
 }
 
 function writeJson(key: string, value: unknown): void {
   wbStoreWrite(key, value)
-}
-
-export function readCalendar(practiceId: PracticeId): WbCalendarItem[] {
-  return readJson(`uniwork.wb.calendar.${practiceId}`, [])
-}
-
-export function writeCalendar(practiceId: PracticeId, items: WbCalendarItem[]): void {
-  writeJson(`uniwork.wb.calendar.${practiceId}`, items)
 }
 
 export type WbStickyColor = 'yellow' | 'peach' | 'mint' | 'sky' | 'lilac' | 'rose'

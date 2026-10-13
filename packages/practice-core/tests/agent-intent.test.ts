@@ -61,4 +61,12 @@ describe('agent-intent catalog', () => {
       id: 'desk',
     })
   })
+
+  it('opens Calendar for an add request: meetings are created on the web', () => {
+    const intent = resolveAgentIntentFromText('Thêm cuộc họp vào lịch tuần sau')
+    expect(intent?.target).toEqual({ kind: 'module', id: 'calendar' })
+    expect(intent?.action).toBe('open')
+    expect(moduleSupportsAddItem('calendar')).toBe(false)
+    expect(moduleSupportsAddItem('tasks')).toBe(true)
+  })
 })

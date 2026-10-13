@@ -83,4 +83,19 @@ describe('My AI add_item → Tasks', () => {
     listWorkspaces.mockRejectedValueOnce(new Error('ipc closed'))
     expect((await applyAgentIntent(addTask('Y'), 'entrepreneur')).ok).toBe(false)
   })
+
+  it('an add request for Calendar opens the tab and writes nothing', async () => {
+    const r = await applyAgentIntent(
+      createAgentIntent({
+        target: { kind: 'module', id: 'calendar' },
+        action: 'add_item',
+        source: 'desktop',
+        summary: 'x',
+        text: 'Họp khách',
+      }),
+      'entrepreneur',
+    )
+    expect(r).toMatchObject({ ok: true, tabId: 'calendar', messageEn: 'Opened calendar.' })
+    expect(createTask).not.toHaveBeenCalled()
+  })
 })

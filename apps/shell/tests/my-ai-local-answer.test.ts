@@ -90,4 +90,10 @@ describe('answerMyAiLocally', () => {
     expect(r.text).toMatch(/Chưa tải danh sách việc/)
     expect(r.text).not.toMatch(/Không có việc đang mở/)
   })
+  it('says the calendar is not loaded yet, not empty, when UniWork was never read', () => {
+    const r = answerMyAiLocally('Lịch hôm nay có gì?', { ...empty, calendar: null }, true, now)
+    expect(r.topic).toBe('calendar')
+    expect(r.text).toMatch(/Chưa tải lịch/)
+    expect(r.text).not.toMatch(/Chưa có sự kiện/)
+  })
 })

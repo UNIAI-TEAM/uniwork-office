@@ -215,6 +215,10 @@ export function resolveAgentIntentFromText(
       return null
     }
   }
+  // a tab without add_item (Calendar: meetings are created on the web) opens instead
+  if (action === 'add_item' && target.kind === 'module' && !moduleSupportsAddItem(target.id)) {
+    action = 'open'
+  }
 
   const modLabel =
     target.kind === 'module'
@@ -244,9 +248,9 @@ export function parseAgentIntentTarget(
   return null
 }
 
-/** Modules that support add_item on-device today (must write a real row). */
+/** Modules that support add_item (must write a real row): Tasks on UniWork, Notes on this device. */
 export function moduleSupportsAddItem(id: WorkbenchModuleId): boolean {
-  return id === 'tasks' || id === 'notes' || id === 'calendar'
+  return id === 'tasks' || id === 'notes'
 }
 
 /** Catalog export for PWA / Hub documentation. */

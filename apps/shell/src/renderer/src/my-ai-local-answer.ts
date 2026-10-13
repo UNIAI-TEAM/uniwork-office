@@ -4,8 +4,8 @@
  */
 import type { PracticeId } from '@uniwork/practice-core'
 import type { MyAiRecentHint } from './context-manager'
-import { readCalendar, readNotes } from './workbench-pins'
-import { cachedOpenTasks } from './work-cache'
+import { readNotes } from './workbench-pins'
+import { cachedAgendaItems, cachedOpenTasks } from './work-cache'
 
 export type LocalAnswerTopic =
   'calendar' | 'tasks' | 'recents' | 'notes' | 'pulse' | 'off_topic' | 'fallback'
@@ -21,7 +21,8 @@ export interface LocalAnswer {
 export interface LocalAnswerSnapshot {
   /** null = not loaded from UniWork yet (never read as "no open tasks") */
   tasks: { title: string; done: boolean }[] | null
-  calendar: { date: string; title: string }[]
+  /** null = not loaded from UniWork yet (never read as "calendar empty") */
+  calendar: { date: string; title: string }[] | null
   notes: string
   recents: { name: string; ext: string }[]
 }
@@ -46,6 +47,8 @@ function bullets(items: string[], emptyVi: string, emptyEn: string, vi: boolean)
 
 const TASKS_NOT_LOADED_VI = '• Chưa tải danh sách việc từ UniWork: mở tab Việc để tải.'
 const TASKS_NOT_LOADED_EN = '• Tasks are not loaded from UniWork yet: open the Tasks tab.'
+const CAL_NOT_LOADED_VI = '• Chưa tải lịch từ UniWork: mở tab Lịch để tải.'
+const CAL_NOT_LOADED_EN = '• The calendar is not loaded from UniWork yet: open the Calendar tab.'
 
 function looksOffTopic(lower: string): boolean {
   return /(?:ý nghĩa cuộc sống|meaning of life|triết học|philosophy|kể chuyện cười|tell (?:me )?a joke|thời tiết|weather|bóng đá|crypto tip|chứng khoán hôm nay)/i.test(
@@ -136,9 +139,15 @@ export function answerMyAiLocally(
   const openTasks = (snap.tasks ?? []).filter((t) => !t.done).map((t) => t.title)
   const today = todayIsoLocal(now)
   const tomorrow = tomorrowIsoLocal(now)
-  const calToday = snap.calendar.filter((c) => c.date === today).map((c) => c.title)
-  const calTomorrow = snap.calendar.filter((c) => c.date === tomorrow).map((c) => c.title)
-  const calAll = snap.calendar.slice(0, 8).map((c) => `${c.date} — ${c.title}`)
+  const cal = snap.calendar ?? []
+  const calToday = cal.filter((c) => c.date === today).map((c) => c.title)
+  const calTomorrow = cal.filter((c) => c.date === tomorrow).map((c) => c.title)
+  const calAll = cal.slice(0, 8).map((c) => `${c.date} — ${c.title}`)
+  // a calendar never loaded from UniWork is "not loaded yet", never "empty"
+  const calList = (items: string[], emptyVi: string, emptyEn: string) =>
+    snap.calendar === null
+      ? bullets(items, CAL_NOT_LOADED_VI, CAL_NOT_LOADED_EN, vi)
+      : bullets(items, emptyVi, emptyEn, vi)
   const recentLines = snap.recents.slice(0, 6).map((e) => `${e.name} (.${e.ext})`)
   const notePreview = snap.notes.trim()
   const calendarFocused = /(?:calendar|lịch|lich|cuộc họp|cuoc hop|meeting|sự kiện|su kien)/i.test(
@@ -156,7 +165,7 @@ export function answerMyAiLocally(
       return {
         text: [
           vi ? `Ngày mai (${tomorrow}):` : `Tomorrow (${tomorrow}):`,
-          bullets(calTomorrow, '• Chưa có sự kiện.', '• No events.', vi),
+          calList(calTomorrow, '• Chưa có sự kiện.', '• No events.'),
         ].join('\n'),
         topic: 'calendar',
         offerAi: false,
@@ -167,7 +176,7 @@ export function answerMyAiLocally(
       return {
         text: [
           vi ? `Lịch hôm nay (${today}):` : `Today’s calendar (${today}):`,
-          bullets(calToday, '• Chưa có sự kiện.', '• No events.', vi),
+          calList(calToday, '• Chưa có sự kiện.', '• No events.'),
         ].join('\n'),
         topic: 'calendar',
         offerAi: false,
@@ -177,7 +186,7 @@ export function answerMyAiLocally(
     return {
       text: [
         vi ? 'Lịch gần đây:' : 'Upcoming calendar:',
-        bullets(calAll, '• Lịch trống.', '• Calendar empty.', vi),
+        calList(calAll, '• Lịch trống.', '• Calendar empty.'),
       ].join('\n'),
       topic: 'calendar',
       offerAi: false,
@@ -189,7 +198,7 @@ export function answerMyAiLocally(
     const parts: string[] = []
     parts.push(
       vi ? `Hôm nay (${today}):` : `Today (${today}):`,
-      bullets(calToday, '• Chưa có sự kiện trên lịch.', '• No calendar events.', vi),
+      calList(calToday, '• Chưa có sự kiện trên lịch.', '• No calendar events.'),
     )
     parts.push(
       '',
@@ -294,7 +303,7 @@ export function buildLocalAnswerSnapshot(
 ): LocalAnswerSnapshot {
   return {
     tasks: cachedOpenTasks()?.map((t) => ({ title: t.title, done: false })) ?? null,
-    calendar: readCalendar(practiceId).map((c) => ({ date: c.date, title: c.title })),
+    calendar: cachedAgendaItems(),
     notes: readNotes(practiceId) || '',
     recents: (recents ?? []).map((e) => ({ name: e.name, ext: e.ext })),
   }

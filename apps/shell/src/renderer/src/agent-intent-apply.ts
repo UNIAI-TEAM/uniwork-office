@@ -9,11 +9,9 @@ import {
 import {
   pinModule,
   pinPillar,
-  readCalendar,
   readStickyNotes,
   createStickyNote,
   readPinnedModules,
-  writeCalendar,
   writeStickyNotes,
 } from './workbench-pins'
 import { pinSkillDomain, writeActiveSkillDomain } from './skill-domain-pins'
@@ -33,14 +31,6 @@ export interface AgentIntentApplyResult {
   messageEn: string
   /** Present when add_item created a row — soft mutate can offer Undo. */
   undo?: AgentAddUndo
-}
-
-function newId(): string {
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
-}
-
-function todayIso(): string {
-  return new Date().toISOString().slice(0, 10)
 }
 
 function ensurePinned(practiceId: PracticeId, moduleId: WorkbenchModuleId): void {
@@ -100,15 +90,6 @@ async function addItem(
       undo: { moduleId, itemId: note.id },
     }
   }
-  if (moduleId === 'calendar') {
-    const id = newId()
-    writeCalendar(practiceId, [{ id, date: todayIso(), title }, ...readCalendar(practiceId)])
-    return {
-      vi: `Đã thêm vào ${place}: ${title}`,
-      en: `Added to ${placeEn}: ${title}`,
-      undo: { moduleId, itemId: id },
-    }
-  }
   return null
 }
 
@@ -124,11 +105,6 @@ export function undoAgentAddItem(
     writeStickyNotes(
       practiceId,
       readStickyNotes(practiceId).filter((n) => n.id !== itemId),
-    )
-  } else if (moduleId === 'calendar') {
-    writeCalendar(
-      practiceId,
-      readCalendar(practiceId).filter((c) => c.id !== itemId),
     )
   } else {
     return {
