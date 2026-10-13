@@ -143,7 +143,7 @@ export function WorkCalendarPane({
                       {e.all_day ? (
                         <span className="wb-agenda-time">{t('wbCalAllDay')}</span>
                       ) : (
-                        <span className="wb-agenda-time wb-mono">
+                        <span className="wb-agenda-time wb-mono wb-num">
                           {clock(rowTime(e), dateLocale)}
                         </span>
                       )}

@@ -698,7 +698,7 @@ export function PracticeHome({
                       >
                         <strong>{m.title}</strong>
                         <span>{Object.values(m.facets).filter(Boolean).join(' · ')}</span>
-                        <em>
+                        <em className="wb-num">
                           {entry.fileCount} {t('wbKnFiles')}
                         </em>
                       </button>

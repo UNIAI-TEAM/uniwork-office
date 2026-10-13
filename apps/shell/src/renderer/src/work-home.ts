@@ -80,12 +80,14 @@ export function clock(iso: string, locale: string, timeZone?: string): string {
 export function formatDay(day: string, locale: string, long: boolean): string {
   const date = new Date(`${day}T12:00:00Z`)
   if (Number.isNaN(date.getTime())) return day
-  return new Intl.DateTimeFormat(
+  const text = new Intl.DateTimeFormat(
     locale,
     long
       ? { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' }
       : { day: 'numeric', month: 'short', timeZone: 'UTC' },
   ).format(date)
+  // the long form opens a heading: sentence case ("mercredi 14 octobre" -> "Mercredi 14 octobre")
+  return long ? text.charAt(0).toLocaleUpperCase(locale) + text.slice(1) : text
 }
 
 /** same bands as the web home */

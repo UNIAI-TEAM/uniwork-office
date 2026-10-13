@@ -16,6 +16,20 @@ function workbenchRules(): { selector: string; body: string }[] {
 }
 
 describe('Workbench surfaces (redesign spec 2.2, 2.4, 5)', () => {
+  it('no Workbench text is re-cased by CSS: dates keep sentence case (formatDay)', () => {
+    const recased = workbenchRules()
+      .filter((r) => /text-transform:\s*capitalize/.test(r.body))
+      .map((r) => r.selector)
+    expect(recased).toEqual([])
+  })
+
+  it('recent-document meta is caption size (12px, spec 2.3)', () => {
+    const sizes = workbenchRules()
+      .filter((r) => r.selector === '.wb-ov-recent-meta')
+      .flatMap((r) => [...r.body.matchAll(/font-size:\s*([^;]+);/g)].map((m) => m[1]))
+    expect(sizes).toEqual(['12px'])
+  })
+
   it('the quick-add plus box is the only dashed border left', () => {
     const dashed = workbenchRules()
       .filter((r) => /dashed/.test(r.body))

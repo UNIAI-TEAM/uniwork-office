@@ -181,7 +181,7 @@ export function WorkOverview({
       : {}
     return (
       <header className="wb-ov-head">
-        <p className="wb-ov-date">{formatDay(s.today, dateLocale, true)}</p>
+        <p className="wb-ov-date wb-num">{formatDay(s.today, dateLocale, true)}</p>
         <h2 className="wb-ov-greeting">
           {t(greetingKey(hourIn(s.timezone)), { name: greetingName(name) })}
         </h2>
@@ -279,13 +279,13 @@ export function WorkOverview({
                       </button>
                       {task.identifier ? <span className="wb-mono">{task.identifier}</span> : null}
                       {due === 'overdue' ? (
-                        <span className="wb-pill is-danger">
+                        <span className="wb-pill wb-num is-danger">
                           {t('wbOvDueOverdue', { count: overdueDays(s.today, task.due_date) })}
                         </span>
                       ) : due === 'today' ? (
                         <span className="wb-pill is-warning">{t('wbOvDueToday')}</span>
                       ) : due === 'later' && task.due_date ? (
-                        <span className="wb-pill">
+                        <span className="wb-pill wb-num">
                           {t('wbOvDueOn', { date: formatDay(task.due_date, dateLocale, false) })}
                         </span>
                       ) : null}
@@ -345,7 +345,7 @@ export function WorkOverview({
                   >
                     {m.title}
                   </button>
-                  {sub ? <span className="wb-ov-meet-sub">{sub}</span> : null}
+                  {sub ? <span className="wb-ov-meet-sub wb-num">{sub}</span> : null}
                 </div>
                 {live ? (
                   <button
@@ -419,7 +419,9 @@ export function WorkOverview({
               >
                 <FileBadge ext={docExtension(r.doc)} size={24} />
                 <span className="wb-ov-recent-name">{r.doc.title}</span>
-                <span className="wb-ov-recent-meta">{formatWhen(r.doc.updatedAt, dateLocale)}</span>
+                <span className="wb-ov-recent-meta wb-num">
+                  {formatWhen(r.doc.updatedAt, dateLocale)}
+                </span>
               </button>
             </li>
           ) : (
@@ -431,7 +433,7 @@ export function WorkOverview({
               >
                 <FileBadge ext={r.entry.ext} size={24} />
                 <span className="wb-ov-recent-name">{r.entry.name}</span>
-                <span className="wb-ov-recent-meta">
+                <span className="wb-ov-recent-meta wb-num">
                   {formatWhen(new Date(r.entry.mtimeMs).toISOString(), dateLocale)} ·{' '}
                   {t('wbOnThisDevice')}
                 </span>

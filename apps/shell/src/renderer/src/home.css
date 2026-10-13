@@ -4607,7 +4607,7 @@ button.wb-ov-stat-body:focus-visible {
 }
 
 .wb-ov-recent-meta {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-secondary);
 }
 
@@ -5633,7 +5633,6 @@ html[dir='rtl'] .quick-title-row {
   color: var(--text-secondary);
   font-size: 13px;
   font-weight: 600;
-  text-transform: capitalize;
 }
 
 .wb-agenda-head.is-today {

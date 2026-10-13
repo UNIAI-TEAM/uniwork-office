@@ -197,7 +197,7 @@ export function WorkSkeleton(): ReactElement {
 export function WorkStaleNote({ at, onRetry }: { at: number; onRetry: () => void }): ReactElement {
   const { t, dateLocale } = useI18n()
   return (
-    <p className="wb-work-stale" role="status">
+    <p className="wb-work-stale wb-num" role="status">
       {t('wbOvUpdatedAt', { time: clock(new Date(at).toISOString(), dateLocale) })} ·{' '}
       <button type="button" className="wb-link" onClick={onRetry}>
         {t('acctRetry')}

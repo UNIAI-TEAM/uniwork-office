@@ -219,6 +219,17 @@ describe('WorkOverview', () => {
     expect(text()).toContain('Plan.docx')
     expect(text()).toContain('notes.docx')
     expect(text()).toContain('On this device')
+    // every date, time and count sits in tabular figures (spec 2.3)
+    for (const sel of [
+      '.wb-ov-date',
+      '.wb-ov-stat-value',
+      '.wb-ov-time',
+      '.wb-ov-meet-sub',
+      '.wb-pill.is-danger',
+      '.wb-ov-recent-meta',
+    ]) {
+      expect(host.querySelector(sel)?.classList.contains('wb-num'), sel).toBe(true)
+    }
     expect(api.uniworkListDocuments).toHaveBeenCalledWith({
       workspaceId: props.workspaceId,
       limit: 20,

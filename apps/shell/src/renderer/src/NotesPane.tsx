@@ -79,7 +79,7 @@ export function NotesPane({ practiceId }: { practiceId: PracticeId }): ReactElem
                   aria-label={t('wbNotesBodyLabel')}
                   onChange={(e) => edit(note.id, e.target.value)}
                 />
-                <span className="wb-notes-edited">
+                <span className="wb-notes-edited wb-num">
                   {t('wbNotesEdited', {
                     time: new Date(note.updatedAt).toLocaleString(dateLocale, {
                       dateStyle: 'short',

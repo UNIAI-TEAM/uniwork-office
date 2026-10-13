@@ -9,6 +9,7 @@ import type {
 import {
   buildHeadline,
   dueState,
+  formatDay,
   greetingKey,
   greetingName,
   hourIn,
@@ -395,5 +396,16 @@ describe('myWorkGroups', () => {
 
   it('no tasks, no groups', () => {
     expect(myWorkGroups([], TODAY)).toEqual([])
+  })
+})
+
+describe('formatDay', () => {
+  it('writes a long day in sentence case: only the first letter capitalised', () => {
+    expect(formatDay('2026-10-14', 'vi', true)).toBe('Thứ Tư, 14 tháng 10')
+    expect(formatDay('2026-10-14', 'fr', true)).toBe('Mercredi 14 octobre')
+    expect(formatDay('2026-10-14', 'en', true)).toBe('Wednesday, October 14')
+  })
+  it('leaves the short form as the locale writes it', () => {
+    expect(formatDay('2026-10-14', 'fr', false)).toBe('14 oct.')
   })
 })

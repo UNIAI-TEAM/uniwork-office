@@ -139,7 +139,7 @@ describe('Calendar tab', () => {
     for (const row of rows) {
       expect(row.firstElementChild?.classList.contains('wb-agenda-time')).toBe(true)
     }
-    expect(host.querySelectorAll('.wb-agenda-time.wb-mono')).toHaveLength(1)
+    expect(host.querySelectorAll('.wb-agenda-time.wb-mono.wb-num')).toHaveLength(1)
     expect(host.querySelector('.wb-agenda-time:not(.wb-mono)')?.textContent).toBe('All day')
   })
 
