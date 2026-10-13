@@ -784,6 +784,9 @@ export class UniworkDocsService {
       clock: () => Date.now(),
       owner: this.windowOwner,
     })
+    // the session this dispatcher belongs to: the canCommit guard below reads
+    // this exact id, so a torn-down or switched session reads false
+    const id = randomUUID()
     const dispatcher = new QueueDispatcher({
       intents: async () => ({ kind: 'ok', intents }),
       client: {
@@ -806,9 +809,21 @@ export class UniworkDocsService {
       pause,
       drafts,
       clock: () => Date.now(),
+      // an account switch (or a sign-out) between the upload and the commit
+      // must not commit this copy under the other account: the dispatcher
+      // re-asks this right before the upload and right before the commit
+      canCommit: (doc) => {
+        const bound = this.store.lookup(doc.path)
+        return (
+          this.isQueueSessionCurrent({ id }) &&
+          this.deps.identity() !== null &&
+          bound !== null &&
+          this.owns(bound)
+        )
+      },
       publish: (record) => this.publishRecord(record),
     })
-    this.queueSession = { id: randomUUID(), token, dispatcher, lock, intents, drafts, pause }
+    this.queueSession = { id, token, dispatcher, lock, intents, drafts, pause }
     return { kind: 'ok', ...this.queueSession }
   }
 

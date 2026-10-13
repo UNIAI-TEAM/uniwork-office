@@ -18,7 +18,9 @@ import {
   QueueDispatcher,
   type QueueCapabilityRead,
   type QueueClient,
+  type QueueDispatcherDeps,
   type QueueDoc,
+  type MintedIntent,
 } from '../src/main/uniwork-sync/queue/dispatcher'
 import { QUEUE_LIMITS } from '../src/main/uniwork-sync/queue/limits'
 import { createDraftStore, DRAFTS_STORE_REGISTRATION } from '../src/main/uniwork-sync/queue/drafts'
@@ -203,8 +205,11 @@ interface Harness {
   layer: StoreLayer
   lockTable: FakeLockTable
   statuses: UniworkDocStatus[]
+  /** every record the dispatchers published (one entry per `publish` call) */
+  published: IntentRecordV2[]
   makeDoc: (opts?: { key?: string; orgId?: string; payload?: string }) => QueueDoc
   newDispatcher: (owner: string) => QueueDispatcher
+  newDispatcherWith: (deps: Partial<QueueDispatcherDeps>) => QueueDispatcher
   setLocked: (value: boolean) => void
 }
 
@@ -239,24 +244,28 @@ async function harness(): Promise<Harness> {
   const store = new FakeBindingStore()
   const lockTable = new FakeLockTable()
   const statuses: UniworkDocStatus[] = []
+  const published: IntentRecordV2[] = []
   let locked = false
   const intentsAccess = async () =>
     locked ? { kind: 'keystore_locked' as const } : { kind: 'ok' as const, intents }
 
-  const makeDispatcher = (owner: string): QueueDispatcher =>
+  const makeDispatcherWith = (deps: Partial<QueueDispatcherDeps>): QueueDispatcher =>
     new QueueDispatcher({
       intents: intentsAccess,
       client: server.client,
       capability,
-      lock: fakeLock(lockTable, owner, () => clock.now),
+      lock: fakeLock(lockTable, 'win1', () => clock.now),
       pause,
       drafts,
       clock: () => clock.now,
       random: () => 0.5,
       limits: QUEUE_LIMITS,
-      publish: () => undefined,
+      publish: (record) => published.push(record),
       uuid: () => 'u1',
+      ...deps,
     })
+  const makeDispatcher = (owner: string): QueueDispatcher =>
+    makeDispatcherWith({ lock: fakeLock(lockTable, owner, () => clock.now) })
   const dispatcher = makeDispatcher('win1')
 
   const coordinator = new SaveCoordinator({
@@ -352,8 +361,10 @@ async function harness(): Promise<Harness> {
     layer,
     lockTable,
     statuses,
+    published,
     makeDoc,
     newDispatcher: makeDispatcher,
+    newDispatcherWith: makeDispatcherWith,
     setLocked: (value: boolean) => {
       locked = value
     },
@@ -367,6 +378,20 @@ const factsOf = (doc: QueueDoc) => ({
   length: doc.record.length,
 })
 const stored = (intents: IntentStore, doc: QueueDoc) => intents.read(doc.key, factsOf(doc))
+
+const mintedFor = (doc: QueueDoc, overrides: Partial<MintedIntent> = {}): MintedIntent => ({
+  key: doc.key,
+  intentId: `intent_next_${doc.key}`,
+  idempotencyKey: `key_next_${doc.key}`,
+  documentId: doc.record.documentId,
+  orgId: doc.orgId,
+  workspaceId: doc.workspaceId,
+  baseRevision: doc.record.baseRevision,
+  baseVersion: doc.baseVersion,
+  checksum: doc.record.checksum,
+  length: doc.record.length,
+  ...overrides,
+})
 
 /** the coordinator over a store that refuses the intent write / a locked keychain */
 function refusingCoordinator(
@@ -435,6 +460,93 @@ describe('G5-06 W4a save queue (fakes)', () => {
     await restarted.reconcile(doc2)
     expect(doc2.record.state).toBe('committed')
     expect(new Set(h2.server.state.keys.commit)).toEqual(new Set([doc2.record.idempotencyKey]))
+  })
+
+  it('cancel race: uploading / committing refuse it, a won cancel stops the pass', async () => {
+    // (a) the cancel arrives while the intent is uploading: refused (only an
+    // intent that provably did not commit can be cancelled), commit still lands
+    const h = await harness()
+    const doc = h.makeDoc()
+    await h.dispatcher.enqueue(doc)
+    let atUpload!: () => void
+    const uploading = new Promise<void>((resolve) => (atUpload = resolve))
+    let releaseUpload!: () => void
+    const uploadGate = new Promise<void>((resolve) => (releaseUpload = resolve))
+    const gatedUpload: QueueClient = {
+      upload: async (input) => {
+        atUpload()
+        await uploadGate
+        return h.server.client.upload(input)
+      },
+      commit: h.server.client.commit,
+      lookupCommit: h.server.client.lookupCommit,
+    }
+    const dispatcher = h.newDispatcherWith({ client: gatedUpload })
+    const pass = dispatcher.dispatchAll([doc])
+    await uploading
+    expect(await dispatcher.cancel(doc, { documentClosed: true })).toBe('uploading')
+    releaseUpload()
+    await pass
+    expect(doc.record.state).toBe('committed')
+    expect(h.server.state.counts.upload).toBe(1)
+    expect(h.server.state.counts.commit).toBe(1)
+    const opened = await h.layer.open(SCOPE)
+    if (opened.kind !== 'ok') throw new Error('store did not open')
+    const drafts = createDraftStore(opened.store.records(DRAFTS_STORE_REGISTRATION.name))
+    expect(await drafts.list(doc.key)).toHaveLength(0)
+
+    // (b) the same while the commit is in flight: refused, the receipt is kept
+    const c = await harness()
+    const doc2 = c.makeDoc({ key: 'doc_commit_race' })
+    await c.dispatcher.enqueue(doc2)
+    let atCommit!: () => void
+    const committing = new Promise<void>((resolve) => (atCommit = resolve))
+    let releaseCommit!: () => void
+    const commitGate = new Promise<void>((resolve) => (releaseCommit = resolve))
+    const gatedCommit: QueueClient = {
+      upload: c.server.client.upload,
+      commit: async (input) => {
+        atCommit()
+        await commitGate
+        return c.server.client.commit(input)
+      },
+      lookupCommit: c.server.client.lookupCommit,
+    }
+    const dispatcher2 = c.newDispatcherWith({ client: gatedCommit })
+    const pass2 = dispatcher2.dispatchAll([doc2])
+    await committing
+    expect(await dispatcher2.cancel(doc2, { documentClosed: true })).toBe('committing')
+    releaseCommit()
+    await pass2
+    expect(doc2.record.state).toBe('committed')
+    expect(c.server.state.counts.commit).toBe(1)
+
+    // (c) the cancel wins before the pass moves a byte: no version is created
+    const won = await harness()
+    const doc3 = won.makeDoc({ key: 'doc_won_cancel' })
+    await won.dispatcher.enqueue(doc3)
+    let atLock!: () => void
+    const acquiring = new Promise<void>((resolve) => (atLock = resolve))
+    let openLock!: () => void
+    const lockGate = new Promise<void>((resolve) => (openLock = resolve))
+    const realLock = fakeLock(won.lockTable, 'win1', () => won.clock.now)
+    const slowLock: DocLock = {
+      ...realLock,
+      acquire: async (key) => {
+        atLock()
+        await lockGate
+        return realLock.acquire(key)
+      },
+    }
+    const dispatcher3 = won.newDispatcherWith({ lock: slowLock })
+    const pass3 = dispatcher3.dispatchAll([doc3])
+    await acquiring
+    expect(await dispatcher3.cancel(doc3, { documentClosed: true })).toBe('cancelled')
+    openLock()
+    await pass3
+    expect(doc3.record.state).toBe('cancelled')
+    expect(won.server.state.counts.upload).toBe(0)
+    expect(won.server.state.counts.commit).toBe(0)
   })
 
   it('one receipt/version: a replayed intent commits exactly one version', async () => {
@@ -621,6 +733,120 @@ describe('G5-06 W4a save queue (fakes)', () => {
     expect(doc2.record.idempotencyKey).toBe(keyBefore)
   })
 
+  it('a window without the lock never writes the record: it publishes other_window, the holder commits', async () => {
+    // (a) the acquire is refused: the loser writes NOTHING and publishes blocked/other_window
+    const h = await harness()
+    const doc = h.makeDoc()
+    await h.dispatcher.enqueue(doc)
+    h.lockTable.leases.set(doc.key, { owner: 'win1', generation: 1, heartbeatAt: h.clock.now })
+    const before = await stored(h.intents, doc)
+    const loser = h.newDispatcher('win2')
+    await loser.dispatchAll([doc])
+    expect(loser.isOtherWindow(doc.key)).toBe(true)
+    // the record is left exactly as it was for the holder: same bytes/updatedAt
+    expect(await stored(h.intents, doc)).toEqual(before)
+    // and the loser's own status says why (a read-only window lock)
+    expect(h.published.at(-1)).toMatchObject({ state: 'blocked', lastError: 'other_window' })
+    // the holder dispatches the same record and commits exactly once
+    const holder = h.newDispatcher('win1')
+    await holder.dispatchAll([doc])
+    expect(doc.record.state).toBe('committed')
+    expect(h.server.state.counts.upload).toBe(1)
+    expect(h.server.state.counts.commit).toBe(1)
+
+    // (b) the lock is lost while the bytes move: the window stops before the
+    // commit, still without writing a paused_offline park
+    const lost = await harness()
+    const doc2 = lost.makeDoc()
+    await lost.dispatcher.enqueue(doc2)
+    let entered!: () => void
+    const atUpload = new Promise<void>((resolve) => (entered = resolve))
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const gated: QueueClient = {
+      upload: async (input) => {
+        entered()
+        await gate
+        return lost.server.client.upload(input)
+      },
+      commit: lost.server.client.commit,
+      lookupCommit: lost.server.client.lookupCommit,
+    }
+    const dispatcher = lost.newDispatcherWith({ client: gated })
+    const pass = dispatcher.dispatchAll([doc2])
+    await atUpload
+    // another window takes the lease while the upload is in flight
+    lost.lockTable.leases.set(doc2.key, {
+      owner: 'win2',
+      generation: 2,
+      heartbeatAt: lost.clock.now,
+    })
+    release()
+    await pass
+    expect(dispatcher.isOtherWindow(doc2.key)).toBe(true)
+    expect(lost.server.state.counts.commit).toBe(0)
+    expect(lost.published.at(-1)).toMatchObject({ state: 'blocked', lastError: 'other_window' })
+    const after = await stored(lost.intents, doc2)
+    expect(after?.intent.lastError).toBeUndefined()
+    expect(after?.intent.state).not.toBe('paused_offline')
+  })
+
+  it('mint ages the generation over a stored record; cleanup is compare-then-delete', async () => {
+    const h = await harness()
+    const doc = h.makeDoc()
+    await h.dispatcher.enqueue(doc)
+    // a superseded record is still in the store: the next intent is generation + 1
+    await h.intents.put(
+      doc.key,
+      { ...doc.record, generation: 3, state: 'cancelled', cancelReason: 'superseded' },
+      doc.payload,
+    )
+    const minted = await h.dispatcher.mint(mintedFor(doc))
+    expect(minted.generation).toBe(4)
+    // the hand-off keeps the minted generation through `enqueue`
+    doc.record = minted
+    await h.dispatcher.enqueue(doc)
+    expect((await stored(h.intents, doc))?.intent.generation).toBe(4)
+    // a plain commit cleans up exactly this generation
+    await h.dispatcher.dispatchAll([doc])
+    expect(doc.record.state).toBe('committed')
+    expect(await stored(h.intents, doc)).toBeNull()
+
+    // a newer intent (N+1) minted while N commits is left untouched
+    const race = await harness()
+    const old = race.makeDoc({ key: 'doc_race' })
+    await race.dispatcher.enqueue(old)
+    let entered!: () => void
+    const atCommit = new Promise<void>((resolve) => (entered = resolve))
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const gated: QueueClient = {
+      upload: race.server.client.upload,
+      commit: async (input) => {
+        entered()
+        await gate
+        return race.server.client.commit(input)
+      },
+      lookupCommit: race.server.client.lookupCommit,
+    }
+    const dispatcher = race.newDispatcherWith({ client: gated })
+    const pass = dispatcher.dispatchAll([old])
+    await atCommit
+    const next = await dispatcher.mint(mintedFor(old))
+    expect(next.generation).toBe(2)
+    const newer = { ...old, record: next }
+    await dispatcher.enqueue(newer)
+    expect((await stored(race.intents, old))?.intent.intentId).toBe(next.intentId)
+    release()
+    await pass
+    // N committed with exactly one request, but N+1 survived: it was never this
+    // generation's to clean up
+    expect(race.server.state.counts.commit).toBe(1)
+    const after = await stored(race.intents, old)
+    expect(after?.intent.intentId).toBe(next.intentId)
+    expect(after?.intent.generation).toBe(2)
+  })
+
   it('lock holder crash -> the other window acquires after goneMs', async () => {
     const h = await harness()
     const doc = h.makeDoc()
@@ -729,6 +955,62 @@ describe('G5-06 W4a save queue (fakes)', () => {
     expect((await stored(h.intents, doc))?.intent.intentId).toBe(doc.record.intentId)
   })
 
+  it('canCommit false between upload and commit -> no commit, the record is not damaged', async () => {
+    const h = await harness()
+    const doc = h.makeDoc()
+    await h.dispatcher.enqueue(doc)
+    const keyBefore = doc.record.idempotencyKey
+    let allowed = true
+    const switching: QueueClient = {
+      upload: async (input) => {
+        const receipt = await h.server.client.upload(input)
+        // the account switches while the bytes are in flight
+        allowed = false
+        return receipt
+      },
+      commit: h.server.client.commit,
+      lookupCommit: h.server.client.lookupCommit,
+    }
+    const dispatcher = h.newDispatcherWith({ client: switching, canCommit: () => allowed })
+    await dispatcher.dispatchAll([doc])
+    // the guard stopped the pass before the commit request
+    expect(h.server.state.counts.commit).toBe(0)
+    // and wrote nothing of its own: same intent, no terminal/failed state
+    const after = await stored(h.intents, doc)
+    expect(after?.intent.intentId).toBe(doc.record.intentId)
+    expect(after?.intent.idempotencyKey).toBe(keyBefore)
+    expect(after?.intent.state).toBe('uploading')
+    expect(after?.intent.lastError).toBeUndefined()
+
+    // the same guard before the upload: a session that is already gone sends nothing
+    const gone = await harness()
+    const doc2 = gone.makeDoc()
+    await gone.dispatcher.enqueue(doc2)
+    const blocked = gone.newDispatcherWith({ canCommit: () => false })
+    await blocked.dispatchAll([doc2])
+    expect(gone.server.state.counts.upload).toBe(0)
+    expect(gone.server.state.counts.commit).toBe(0)
+    expect((await stored(gone.intents, doc2))?.intent.state).toBe('queued')
+  })
+
+  it('a 429 with Retry-After schedules the retry at now + the 300 s clamp', async () => {
+    const h = await harness()
+    const doc = h.makeDoc()
+    await h.dispatcher.enqueue(doc)
+    // the server throttled the upload: the error carries the Retry-After the
+    // client parsed (900 s), which the dispatcher must pass into the machine
+    h.server.state.uploadError = new UniworkDocError('server_error', {
+      status: 429,
+      retryAfterMs: 900_000,
+    })
+    await h.dispatcher.dispatchAll([doc])
+    expect(doc.record.state).toBe('queued')
+    expect(doc.record.lastError).toBe('server_error')
+    expect(doc.record.retryAt).toBe(
+      new Date(h.clock.now + QUEUE_LIMITS.retryAfterClampMs).toISOString(),
+    )
+  })
+
   it('two orgs with different sync_write -> each intent follows its org', async () => {
     const h = await harness()
     h.capability.set('org_a', true)
@@ -743,6 +1025,35 @@ describe('G5-06 W4a save queue (fakes)', () => {
     expect(a.record.state).toBe('committed')
     expect(b.record.state).toBe('paused_admin')
     expect(h.server.state.keys.commit).toEqual([a.record.idempotencyKey])
+  })
+
+  it('concurrency caps documents across ALL org lanes of one pass', async () => {
+    const h = await harness()
+    h.capability.set('org_a', true)
+    h.capability.set('org_b', true)
+    const docs: QueueDoc[] = []
+    for (const org of ['org_a', 'org_b']) {
+      for (const n of [1, 2, 3]) {
+        const doc = h.makeDoc({ key: `doc_${org}_${n}`, orgId: org })
+        await h.dispatcher.enqueue(doc)
+        docs.push(doc)
+      }
+    }
+    const before = await Promise.all(docs.map((doc) => stored(h.intents, doc)))
+    const result = await h.dispatcher.dispatchAll(docs)
+    // one global cap: 2 documents this pass, never 2 per lane (4 across orgs)
+    expect(result.dispatched).toBe(QUEUE_LIMITS.concurrency)
+    expect(result.parked).toBe(docs.length - QUEUE_LIMITS.concurrency)
+    expect(h.server.state.counts.upload).toBe(QUEUE_LIMITS.concurrency)
+    expect(h.server.state.counts.commit).toBe(QUEUE_LIMITS.concurrency)
+    // every later document is parked exactly as it was (still queued)
+    const after = await Promise.all(docs.map((doc) => stored(h.intents, doc)))
+    for (const [i, row] of after.entries()) {
+      if (row === null) continue
+      expect(row.intent.state).toBe('queued')
+      expect(row).toEqual(before[i])
+    }
+    expect(after.filter((row) => row !== null)).toHaveLength(4)
   })
 
   it('offline 2 h (past capability TTL) -> Ctrl/Cmd+S -> paused_offline, not paused_admin', async () => {
@@ -803,10 +1114,45 @@ describe('G5-06 W4a save queue (fakes)', () => {
     for (const id of ['d1', 'd2', 'd3']) {
       expect(await drafts.keep(doc.key, enc(id), { id, createdAt: ISO })).toBe('ok')
     }
+    const before = await stored(h.intents, doc)
     const state = await h.dispatcher.cancel(doc, { documentClosed: true })
     expect(state).toBe('failed')
-    expect(await stored(h.intents, doc)).not.toBeNull()
+    // the refusal is durable: the STORED record is exactly the pre-cancel one
+    // (still pending, byte for byte), never `cancelled`
+    expect(await stored(h.intents, doc)).toEqual(before)
+    expect((await stored(h.intents, doc))?.intent.state).toBe('queued')
+    expect(doc.record.lastError).toBe('drafts_full')
     expect(await drafts.list(doc.key)).toHaveLength(3)
+    // a restart (the store reopened, a fresh dispatcher over it) still sees the
+    // intent: the snapshot was never dropped for a draft that was refused
+    const reopened = await h.layer.open(SCOPE)
+    if (reopened.kind !== 'ok') throw new Error('store did not reopen')
+    const reopenedIntents = createIntentStore(
+      reopened.store.records(INTENT_STORE_REGISTRATION.name),
+    )
+    const reopenedDrafts = createDraftStore(reopened.store.records(DRAFTS_STORE_REGISTRATION.name))
+    expect((await reopenedIntents.read(doc.key, factsOf(doc)))?.intent.state).toBe('queued')
+    expect(await reopenedDrafts.list(doc.key)).toHaveLength(3)
+
+    // discard on a stuck intent: the same refusal, the same durability
+    const stuck = h.makeDoc({ key: 'doc_stuck' })
+    await h.dispatcher.enqueue(stuck)
+    h.server.state.commitError = new UniworkDocError('timeout')
+    await h.dispatcher.dispatchAll([stuck])
+    h.server.state.commitError = null
+    h.server.state.lookupOutcome = 'unknown'
+    await h.dispatcher.reconcile(stuck)
+    expect(stuck.record.state).toBe('reconciling-stuck')
+    for (const id of ['s1', 's2', 's3']) {
+      expect(await drafts.keep(stuck.key, enc(id), { id, createdAt: ISO })).toBe('ok')
+    }
+    const stuckBefore = await stored(h.intents, stuck)
+    const discarded = await h.dispatcher.discard(stuck, {})
+    expect(discarded).toBe('failed')
+    expect(stuck.record.lastError).toBe('drafts_full')
+    expect(await stored(h.intents, stuck)).toEqual(stuckBefore)
+    expect((await stored(h.intents, stuck))?.intent.state).toBe('reconciling-stuck')
+    expect(await drafts.list(stuck.key)).toHaveLength(3)
   })
 
   it('user pause + offline -> online -> paused_user, no dispatch', async () => {

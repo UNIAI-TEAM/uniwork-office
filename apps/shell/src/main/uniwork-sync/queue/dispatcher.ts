@@ -10,7 +10,13 @@ import {
   type QueueEvent,
   type TransitionResult,
 } from './machine'
-import type { IntentRecordV2, QueueState } from './record'
+import {
+  nextIntentGeneration,
+  parseStoredIntent,
+  type IntentRecordV2,
+  type PendingIntentRecord,
+  type QueueState,
+} from './record'
 
 /**
  * The G5-06 durable save queue engine: it turns a stored `IntentRecordV2` into
@@ -53,6 +59,12 @@ export interface QueueClient {
   lookupCommit(input: { documentId: string; idempotencyKey: string }): Promise<CommitLookup>
 }
 
+/** the record exactly as a store holds it: a v1 record stays v1 */
+export interface StoredIntentValue {
+  intent: IntentRecordV2 | PendingIntentRecord
+  payload: Uint8Array
+}
+
 /** what the queue needs to persist one record (the G5-04 intent store, v2 path) */
 export interface QueueIntents {
   read(
@@ -61,6 +73,12 @@ export interface QueueIntents {
   ): Promise<{ intent: IntentRecordV2; payload: Uint8Array } | null>
   put(documentKey: string, intent: IntentRecordV2, payload: Uint8Array): Promise<{ kind: string }>
   delete(documentKey: string): Promise<void>
+  /**
+   * The record exactly as stored (a v1 record stays v1), when the store can
+   * serve it. `mint` reads it to age the snapshot generation over an older
+   * record; a store that cannot answer mints generation 1.
+   */
+  get?(documentKey: string): Promise<StoredIntentValue | null>
 }
 
 /** one queue document: its record, the exact bytes it uploads and its file */
@@ -114,6 +132,13 @@ export interface QueueDispatcherDeps {
   clock(): number
   random?(): number
   limits?: QueueLimits
+  /**
+   * Whether this session may still send for this document (signed in, still
+   * the account that owns the binding). Checked right before the upload and
+   * right before the commit: false stops the pass with no request and no state
+   * of its own, so an account switch mid-upload never commits the copy.
+   */
+  canCommit?(doc: QueueDoc): boolean
   /** status push for every record change; the front maps a record to a chip */
   publish(record: IntentRecordV2): void
   uuid?(): string
@@ -131,6 +156,9 @@ export interface DispatchResult {
 
 /** the identity of a freshly minted intent; the front fills the binding facts */
 export interface MintedIntent {
+  /** the intent-store key of the document, when known: `mint` ages the
+   *  snapshot generation over the record the store already holds under it */
+  key?: string
   intentId: string
   idempotencyKey: string
   documentId: string
@@ -171,18 +199,16 @@ export class QueueDispatcher {
    */
   async mint(intent: MintedIntent): Promise<IntentRecordV2> {
     const now = this.deps.clock()
-    const context: QueueContext = {
-      now,
-      limits: this.limits,
-      random: this.random,
-      pausedUser: await this.userPaused(),
-    }
+    const context = await this.context(now)
     const verdict = await this.readCapability(intent.orgId)
     if (verdict === 'sync_write_off') context.syncWrite = false
     if (verdict === 'offline') context.online = false
     const result = transition(null, { type: 'save', intent: toNewIntent(intent) }, context)
     if (!result.record) throw new Error('the queue machine refused the save')
-    return result.record
+    // a document whose store still holds a record (superseded/committed/older)
+    // mints one past that record's generation, so its own cleanup can tell a
+    // newer snapshot (N+1 minted meanwhile) apart
+    return { ...result.record, generation: await this.mintedGeneration(intent) }
   }
 
   /**
@@ -207,7 +233,11 @@ export class QueueDispatcher {
     if (verdict === 'sync_write_off') context.syncWrite = false
     if (verdict === 'offline') context.online = false
     const created = transition(null, { type: 'save', intent: toNewIntent(doc.record) }, context)
-    if (created.record) doc.record = created.record
+    if (created.record) {
+      // the caller's record carries the minted generation (a fresh transition
+      // always starts at 1; `mint` ages it over an older stored record)
+      doc.record = { ...created.record, generation: doc.record.generation }
+    }
     const written = await access.intents.put(doc.key, doc.record, doc.payload)
     this.deps.publish(doc.record)
     if (written.kind !== 'ok') return doc.record.state
@@ -237,6 +267,9 @@ export class QueueDispatcher {
       lane.push(doc)
       lanes.set(doc.orgId, lane)
     }
+    // one global counter across every org lane of this pass: `concurrency`
+    // caps documents in flight for the WHOLE dispatch, never per lane
+    let inFlight = 0
     for (const [orgId, lane] of lanes) {
       const verdict = await this.readCapability(orgId)
       if (verdict !== 'ok') {
@@ -253,7 +286,6 @@ export class QueueDispatcher {
         }
         continue
       }
-      let inFlight = 0
       for (const doc of lane) {
         if (!this.isDispatchable(doc.record.state) || this.committing.has(doc.key)) {
           outcomes.set(doc.key, doc.record.state)
@@ -312,7 +344,12 @@ export class QueueDispatcher {
     } catch (error) {
       const code = error instanceof UniworkDocError ? error.code : 'server_error'
       if (code === 'keystore_locked' || code === 'store_full') return doc.record.state
-      await this.apply(doc, { type: 'lookup', error: code }, now)
+      const retryAfterMs = error instanceof UniworkDocError ? error.retryAfterMs : undefined
+      await this.apply(
+        doc,
+        { type: 'lookup', error: code, ...(retryAfterMs === undefined ? {} : { retryAfterMs }) },
+        now,
+      )
       return doc.record.state
     }
     const event: QueueEvent =
@@ -366,28 +403,23 @@ export class QueueDispatcher {
   /**
    * "Huy lan luu": only an intent that provably did not commit. When the
    * document is closed its snapshot becomes a kept draft; a draft the store
-   * refused (the cap or the budget) leaves the intent exactly as it was.
+   * refused (the cap, the budget, a locked keychain) leaves the STORED intent
+   * exactly as it was - nothing is cancelled until the draft is kept.
    */
   async cancel(
     doc: QueueDoc,
     options: { documentClosed: boolean; title?: string; now?: number } = { documentClosed: false },
   ): Promise<QueueState> {
     const now = options.now ?? this.deps.clock()
+    // the machine decides before anything is persisted: a cancel that cannot
+    // apply never touches the stored record
+    if (!(await this.wouldCancel(doc, 'cancel', now))) return doc.record.state
+    if (options.documentClosed && this.deps.drafts) {
+      const kept = await this.keepDraft(doc, options.title, now)
+      if (kept !== 'ok') return this.refuseCancel(doc, kept, now)
+    }
     const result = await this.apply(doc, { type: 'cancel' }, now)
     if (result.record?.state !== 'cancelled') return doc.record.state
-    if (options.documentClosed && this.deps.drafts) {
-      const kept = await this.deps.drafts.keep(doc.key, doc.payload, {
-        id: this.uuid(),
-        createdAt: new Date(now).toISOString(),
-        ...(options.title ? { title: options.title } : {}),
-      })
-      if (kept !== 'ok') {
-        // the cap or the budget refused the draft: the intent is kept, not lost
-        doc.record = { ...doc.record, state: 'failed' }
-        this.deps.publish(doc.record)
-        return doc.record.state
-      }
-    }
     await this.forget(doc)
     return 'cancelled'
   }
@@ -398,20 +430,13 @@ export class QueueDispatcher {
     options: { title?: string; now?: number } = {},
   ): Promise<QueueState> {
     const now = options.now ?? this.deps.clock()
+    if (!(await this.wouldCancel(doc, 'discard', now))) return doc.record.state
+    if (this.deps.drafts) {
+      const kept = await this.keepDraft(doc, options.title, now)
+      if (kept !== 'ok') return this.refuseCancel(doc, kept, now)
+    }
     const result = await this.apply(doc, { type: 'discard' }, now)
     if (result.record?.state !== 'cancelled') return doc.record.state
-    if (this.deps.drafts) {
-      const kept = await this.deps.drafts.keep(doc.key, doc.payload, {
-        id: this.uuid(),
-        createdAt: new Date(now).toISOString(),
-        ...(options.title ? { title: options.title } : {}),
-      })
-      if (kept !== 'ok') {
-        doc.record = { ...doc.record, state: 'reconciling-stuck' }
-        this.deps.publish(doc.record)
-        return doc.record.state
-      }
-    }
     await this.forget(doc)
     return 'cancelled'
   }
@@ -430,15 +455,8 @@ export class QueueDispatcher {
 
   /** the record as it is stored now, upgraded to v2 with the binding facts */
   async readState(doc: QueueDoc): Promise<QueueState> {
-    const access = await this.deps.intents()
-    if (access.kind !== 'ok') return doc.record.state
-    const stored = await access.intents.read(doc.key, {
-      orgId: doc.orgId,
-      workspaceId: doc.workspaceId,
-      baseVersion: doc.baseVersion,
-      length: doc.record.length,
-    })
-    return stored?.intent.state ?? doc.record.state
+    const stored = await this.storedRecord(doc)
+    return stored?.state ?? doc.record.state
   }
 
   // ---- internals -----------------------------------------------------------
@@ -447,19 +465,49 @@ export class QueueDispatcher {
     return state === 'queued' || state === 'paused_offline'
   }
 
+  /** the session/ownership verdict of the front: false stops the pass silently */
+  private sessionAllows(doc: QueueDoc): boolean {
+    return this.deps.canCommit?.(doc) !== false
+  }
+
+  /**
+   * Whether the store still holds THIS intent: the same intentId and
+   * generation, whatever its state. A cancel, supersede or tombstone another
+   * window committed leaves nothing behind for this pass to send.
+   */
+  private async driving(doc: QueueDoc): Promise<boolean> {
+    const stored = await this.storedRecord(doc)
+    return (
+      stored !== null &&
+      stored.intentId === doc.record.intentId &&
+      stored.generation === doc.record.generation
+    )
+  }
+
   /** one document through validate -> upload -> lock check -> commit */
   private async runOne(doc: QueueDoc, now: number): Promise<QueueState> {
     const lock = await this.deps.lock.acquire(doc.key)
     if (lock.kind === 'other_window') {
-      // another window edits this document: this one is read-only, never writes
+      // another window edits this document: this one is read-only. It writes
+      // NOTHING to the shared record (no transition, no park) - the record is
+      // left for the holder; the window only pushes its own status.
       this.otherWindow.add(doc.key)
+      this.publishOtherWindow(doc)
       return doc.record.state
     }
     this.otherWindow.delete(doc.key)
+    // the record may have been settled while this pass waited for the lock: a
+    // cancel, supersede or tombstone that won must leave exactly one outcome,
+    // and a record the store no longer holds (or holds for another intent) is
+    // not this pass's to send
+    if (!this.isDispatchable(doc.record.state)) return doc.record.state
+    if (!(await this.driving(doc))) return doc.record.state
     const generation = lock.generation
     const stopBeat = this.startHeartbeat(doc.key, generation)
     this.committing.add(doc.key)
     try {
+      // the session must still own this document before a byte moves
+      if (!this.sessionAllows(doc)) return doc.record.state
       // validation passed: the first `uploaded` advances validating -> uploading
       await this.apply(doc, { type: 'dispatch' }, now)
       await this.apply(doc, { type: 'uploaded' }, now)
@@ -490,14 +538,19 @@ export class QueueDispatcher {
         await this.apply(doc, { type: 'capability', syncWrite: false }, now)
         return doc.record.state
       }
-      // the bytes are staged: the second `uploaded` advances uploading -> committing
-      await this.apply(doc, { type: 'uploaded' }, now)
-      // a lost generation (another window took the lock) stops before commit
+      // a lost generation (another window took the lock while the bytes moved)
+      // stops before the commit, still writing nothing: the record is left for
+      // the holder, never parked on a network reason (`paused_offline`)
       if (!(await this.deps.lock.check(doc.key, generation))) {
         this.otherWindow.add(doc.key)
-        await this.apply(doc, { type: 'commitFailed', error: 'other_window' }, now)
+        this.publishOtherWindow(doc)
         return doc.record.state
       }
+      // and the session must still own the document right before the commit:
+      // an account switch during the upload must not commit this copy
+      if (!this.sessionAllows(doc)) return doc.record.state
+      // the bytes are staged: the second `uploaded` advances uploading -> committing
+      await this.apply(doc, { type: 'uploaded' }, now)
       let receipt: {
         documentId: string
         versionId: string
@@ -529,21 +582,128 @@ export class QueueDispatcher {
   /** a failed upload/commit: the machine decides the state (never "failed" on a lost answer) */
   private async failCommit(doc: QueueDoc, error: unknown, now: number): Promise<void> {
     const code = error instanceof UniworkDocError ? error.code : 'server_error'
-    await this.apply(doc, { type: 'commitFailed', error: code }, now)
+    const retryAfterMs = error instanceof UniworkDocError ? error.retryAfterMs : undefined
+    await this.apply(
+      doc,
+      {
+        type: 'commitFailed',
+        error: code,
+        ...(retryAfterMs === undefined ? {} : { retryAfterMs }),
+      },
+      now,
+    )
   }
 
   /**
-   * Apply one event: run the machine, persist the record, publish it and
-   * perform the machine's effects. A store that refuses the write leaves the
-   * record where it was, so nothing downstream acts on a lost state.
+   * A read-only window's own status: `blocked` with `other_window`, so the
+   * chip reads the window lock (never `paused_offline`, which means the
+   * network). A status push only - the shared record is never written here.
    */
-  private async apply(doc: QueueDoc, event: QueueEvent, now: number): Promise<TransitionResult> {
-    const context: QueueContext = {
+  private publishOtherWindow(doc: QueueDoc): void {
+    this.deps.publish({ ...doc.record, state: 'blocked', lastError: 'other_window' })
+  }
+
+  /** the machine context of one transition (the account's pause flag included) */
+  private async context(now: number): Promise<QueueContext> {
+    return {
       now,
       limits: this.limits,
       random: this.random,
       pausedUser: await this.userPaused(),
     }
+  }
+
+  /**
+   * Whether a cancel/discard event would move this record, decided by the pure
+   * machine BEFORE anything is persisted: a refused kept draft must leave the
+   * stored record exactly as it was.
+   */
+  private async wouldCancel(
+    doc: QueueDoc,
+    event: 'cancel' | 'discard',
+    now: number,
+  ): Promise<boolean> {
+    const result = transition(doc.record, { type: event }, await this.context(now))
+    return result.record?.state === 'cancelled'
+  }
+
+  /** the snapshot of a cancelled intent, kept as a draft the user can restore */
+  private async keepDraft(
+    doc: QueueDoc,
+    title: string | undefined,
+    now: number,
+  ): Promise<'ok' | 'drafts_full' | 'store_full' | 'keystore_locked'> {
+    return this.deps.drafts!.keep(doc.key, doc.payload, {
+      id: this.uuid(),
+      createdAt: new Date(now).toISOString(),
+      ...(title ? { title } : {}),
+    })
+  }
+
+  /**
+   * A refused cancel/discard: the stored record does not move (the intent
+   * stays exactly as it was, so a restart still has it); this window shows the
+   * refusal and its reason.
+   */
+  private refuseCancel(
+    doc: QueueDoc,
+    reason: 'drafts_full' | 'store_full' | 'keystore_locked',
+    now: number,
+  ): QueueState {
+    doc.record = {
+      ...doc.record,
+      state: 'failed',
+      lastError: reason,
+      updatedAt: new Date(now).toISOString(),
+    }
+    this.deps.publish(doc.record)
+    return doc.record.state
+  }
+
+  /** the binding facts a stored record is read (and a v1 record upgraded) with */
+  private facts(doc: QueueDoc): {
+    orgId: string
+    workspaceId: string
+    baseVersion: number
+    length: number
+  } {
+    return {
+      orgId: doc.orgId,
+      workspaceId: doc.workspaceId,
+      baseVersion: doc.baseVersion,
+      length: doc.record.length,
+    }
+  }
+
+  /** the record as stored under this document key, or null when there is none */
+  private async storedRecord(doc: QueueDoc): Promise<IntentRecordV2 | null> {
+    const access = await this.deps.intents()
+    if (access.kind !== 'ok') return null
+    const stored = await access.intents.read(doc.key, this.facts(doc))
+    return stored?.intent ?? null
+  }
+
+  /**
+   * The generation a freshly minted intent carries: one past the record the
+   * store still holds under the document key (v2 only - a v1 record's upgrade
+   * stays 1), or 1 over an empty store.
+   */
+  private async mintedGeneration(intent: MintedIntent): Promise<number> {
+    if (!intent.key) return 1
+    const access = await this.deps.intents()
+    if (access.kind !== 'ok' || !access.intents.get) return 1
+    const raw = await access.intents.get(intent.key)
+    return nextIntentGeneration(raw ? parseStoredIntent(raw.intent) : null)
+  }
+
+  /**
+   * Apply one event: run the machine, persist the record, publish it and
+   * perform the machine's effects. A store that refuses the write leaves the
+   * record where it was, so nothing downstream acts on a lost state; a stored
+   * record that is a NEWER intent (N+1 minted meanwhile) is never clobbered.
+   */
+  private async apply(doc: QueueDoc, event: QueueEvent, now: number): Promise<TransitionResult> {
+    const context = await this.context(now)
     const result = transition(doc.record, event, context)
     if (!result.record) {
       doc.record = { ...doc.record, updatedAt: new Date(now).toISOString() }
@@ -553,6 +713,16 @@ export class QueueDispatcher {
     const access = await this.deps.intents()
     if (access.kind !== 'ok') {
       // the store cannot record the change: the record does not move
+      this.deps.publish(doc.record)
+      return { record: doc.record, effects: [] }
+    }
+    const stored = await access.intents.read(doc.key, this.facts(doc))
+    if (
+      stored &&
+      (stored.intent.intentId !== doc.record.intentId ||
+        stored.intent.generation !== doc.record.generation)
+    ) {
+      // a newer intent owns this document now: this generation writes nothing
       this.deps.publish(doc.record)
       return { record: doc.record, effects: [] }
     }
@@ -566,10 +736,26 @@ export class QueueDispatcher {
     return result
   }
 
-  /** the committed snapshot generation: delete exactly it, leave an N+1 dirty */
+  /**
+   * The committed snapshot generation: delete exactly it. The stored record is
+   * compared with the committed one by intentId AND generation first - a newer
+   * record minted while this one committed (N+1) is left untouched for its own
+   * dispatch.
+   */
   private async finishCleanup(doc: QueueDoc): Promise<void> {
     const access = await this.deps.intents()
-    if (access.kind === 'ok') await access.intents.delete(doc.key)
+    if (access.kind !== 'ok') {
+      this.otherWindow.delete(doc.key)
+      return
+    }
+    const stored = await access.intents.read(doc.key, this.facts(doc))
+    if (
+      stored &&
+      stored.intent.intentId === doc.record.intentId &&
+      stored.intent.generation === doc.record.generation
+    ) {
+      await access.intents.delete(doc.key)
+    }
     this.otherWindow.delete(doc.key)
   }
 

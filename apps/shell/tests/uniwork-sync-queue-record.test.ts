@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   isTerminalQueueState,
+  nextIntentGeneration,
   parsePendingIntentRecord,
   readIntentRecord,
   type IntentBindFacts,
@@ -95,6 +96,14 @@ describe('uniwork queue record', () => {
     expect(upgraded?.orgId).toBe('')
     expect(upgraded?.workspaceId).toBe('')
     expect(readIntentRecord(upgraded, FACTS)).toEqual(upgraded)
+  })
+
+  it('the next intent generation: one past a v2 record, 1 over a v1 record or nothing', () => {
+    expect(nextIntentGeneration(v2())).toBe(2)
+    expect(nextIntentGeneration(v2({ generation: 4, state: 'cancelled' }))).toBe(5)
+    // a v1 record's upgrade never saw a newer snapshot: the next generation is 1
+    expect(nextIntentGeneration(legacy())).toBe(1)
+    expect(nextIntentGeneration(null)).toBe(1)
   })
 
   it('the v1 parser keeps the G5-04 shape check', () => {

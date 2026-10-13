@@ -228,6 +228,18 @@ export function isIntentRecordV2(
 }
 
 /**
+ * The generation a NEW intent for a document carries. `stored` is the record
+ * exactly as the store holds it: a v2 record (superseded, committed, or just
+ * older) means a newer snapshot exists, so the next intent is one past its
+ * generation. A v1 record's upgrade never saw a newer snapshot (it stays 1),
+ * and neither has an empty store.
+ */
+export function nextIntentGeneration(stored: IntentRecordV2 | PendingIntentRecord | null): number {
+  if (!stored || !isIntentRecordV2(stored)) return 1
+  return stored.generation + 1
+}
+
+/**
  * The record as a v2 one, or null when it is malformed. A v2 record is read as
  * it is; a v1 record is upgraded with `facts`.
  */
