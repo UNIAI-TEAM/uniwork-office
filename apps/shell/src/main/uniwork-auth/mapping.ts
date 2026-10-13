@@ -107,6 +107,21 @@ export interface OrgChoice {
 }
 
 /**
+ * The organization this account remembered on this machine. The stored value
+ * is `{ accountId, orgId }`: a choice made by another account is not this
+ * account's memory, so it is ignored (and never reported as `rememberedGone`).
+ * A legacy bare string has no account and is ignored too - the account that
+ * wrote it signs in again and picks once.
+ */
+export function rememberedOrgFor(persisted: unknown, accountId: string | undefined): string | null {
+  if (!persisted || typeof persisted !== 'object' || Array.isArray(persisted)) return null
+  const record = persisted as { accountId?: unknown; orgId?: unknown }
+  if (typeof record.orgId !== 'string' || record.orgId.length === 0) return null
+  if (typeof record.accountId !== 'string' || !accountId) return null
+  return record.accountId === accountId ? record.orgId : null
+}
+
+/**
  * G8-16 S16: no auto-pick when the account belongs to more than one usable
  * organization and none was remembered. The stored choice (per account +
  * machine) is used when it is still a membership and usable; when it is gone
@@ -115,12 +130,11 @@ export interface OrgChoice {
  */
 export function resolveOrgChoice(
   orgs: readonly OrgResponse[],
-  persistedId: unknown,
+  persisted: unknown,
+  accountId?: string,
 ): OrgChoice {
-  const remembered =
-    typeof persistedId === 'string' && persistedId
-      ? orgs.find((org) => org.id === persistedId)
-      : undefined
+  const rememberedId = rememberedOrgFor(persisted, accountId)
+  const remembered = rememberedId ? orgs.find((org) => org.id === rememberedId) : undefined
   if (remembered) {
     if (remembered.status === 'active') {
       return { org: remembered, needsOrgChoice: false, rememberedGone: false }
@@ -128,7 +142,7 @@ export function resolveOrgChoice(
     // still a membership, but the organization (or the membership) is blocked
     return { org: undefined, needsOrgChoice: true, rememberedGone: false }
   }
-  const hadRemembered = typeof persistedId === 'string' && persistedId.length > 0
+  const hadRemembered = rememberedId !== null
   const active = orgs.filter((org) => org.status === 'active')
   if (active.length === 1) {
     return { org: active[0], needsOrgChoice: false, rememberedGone: false }

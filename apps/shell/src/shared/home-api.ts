@@ -825,6 +825,13 @@ export interface AccountStatus {
   needsOrgChoice?: boolean
   /** G8-16 S16: a remembered organization is no longer a membership of this account */
   rememberedGone?: boolean
+  /**
+   * G8-16 S16: the organization list could not be loaded, so the picker cannot
+   * show it (the renderer shows `uwOrgPickError` + Retry). Set only when the
+   * session itself is still usable (offline); a failure that ended the session
+   * keeps its own state and error.
+   */
+  orgsError?: AccountErrorCode
   error?: AccountErrorCode
 }
 

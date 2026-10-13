@@ -2,7 +2,15 @@ import type { AccountEntitlements, AccountErrorCode, AccountStatus } from '../..
 import { isAuthCallbackUrl, validateCallback } from './callback'
 import { CredentialStoreError, type StoredCredential } from './credentials'
 import { redirectUriForProfile, type DeploymentProfile } from './deployment'
-import { resolveOrgChoice, toAccountOrg, toEntitlements, toProfile } from './mapping'
+import {
+  classifyTransportFailure,
+  rememberedOrgFor,
+  resolveOrgChoice,
+  toAccountOrg,
+  toEntitlements,
+  toProfile,
+  type FailureOutcome,
+} from './mapping'
 import { LoginAttemptStore, type PendingLoginAttempt } from './pkce'
 import {
   ACCESS_TOKEN_SKEW_MS,
@@ -11,7 +19,13 @@ import {
   type AccountManagerDeps,
   type LiveSession,
 } from './session-core'
-import { TransportError, type DesktopSession, type UniworkTransport } from './transport'
+import {
+  TransportError,
+  type DesktopSession,
+  type OrgMembershipResponse,
+  type OrgResponse,
+  type UniworkTransport,
+} from './transport'
 
 export type { AccountManagerDeps } from './session-core'
 
@@ -392,14 +406,11 @@ export class AccountManager extends SessionCore {
       return this.status()
     }
     this.deactivatedOrgIds.delete(org.id)
-    try {
-      this.deps.persistSelectedOrgId(org.id)
-    } catch {
-      // the choice still applies to this run
-    }
+    this.rememberOrg(org.id)
     this.org = org
     this.needsOrgChoice = false
     this.rememberedGone = false
+    this.orgsError = undefined
     try {
       await this.loadEntitlements(generation)
     } catch (error) {
@@ -463,17 +474,42 @@ export class AccountManager extends SessionCore {
 
   private async loadAccount(generation: number): Promise<void> {
     const me = await this.authorized((token) => (this.transport as UniworkTransport).me(token))
-    const orgs = await this.authorized((token) => (this.transport as UniworkTransport).orgs(token))
     if (generation !== this.generation) return
     // the tokens belong to the account the credential was issued for
     if (this.session && me.id !== this.session.credential.accountId) {
       throw new TransportError('unauthorized', undefined, true)
     }
     this.accountProfile = toProfile(me)
+    let orgs: OrgResponse[]
+    try {
+      orgs = await this.authorized((token) => (this.transport as UniworkTransport).orgs(token))
+    } catch (error) {
+      if (generation !== this.generation) return
+      // G8-16 S16 / F-5: the org list is the one read that can fail on its own
+      // while the session stays usable (an outage, a gateway). Show the picker's
+      // own error + Retry instead of the generic unreachable pane: the account
+      // is still signed in and a retry re-reads the list. Anything that ends or
+      // changes the session (a dead device, a moved deployment, a locked
+      // keystore) keeps its own state and error, exactly as before.
+      if (handled.has(error as object)) throw error
+      const outcome = this.failureOutcome(error)
+      if (outcome.state !== 'server-unreachable') throw error
+      this.orgs = []
+      this.org = undefined
+      // the S16 step is where the error belongs, so the shell opens it and
+      // shows uwOrgPickError + Retry; nothing org-scoped runs either way
+      this.needsOrgChoice = true
+      this.rememberedGone = false
+      this.orgsError = outcome.error
+      this.setState('signed-in')
+      return
+    }
+    if (generation !== this.generation) return
     this.orgs = orgs
+    this.orgsError = undefined
     // G8-16 S16: a >1-org account with no remembered choice stops here, before
     // any org-scoped read (billing included); one org is picked automatically.
-    const choice = resolveOrgChoice(orgs, this.deps.readSelectedOrgId())
+    const choice = resolveOrgChoice(orgs, this.deps.readSelectedOrgId(), me.id)
     this.needsOrgChoice = choice.needsOrgChoice
     this.rememberedGone = choice.rememberedGone
     this.org = choice.org
@@ -483,19 +519,86 @@ export class AccountManager extends SessionCore {
       this.setState('signed-in')
       return
     }
-    // the auto-picked single org is remembered like a manual choice, so the
-    // next sign-in on this machine skips the question
-    if (this.org && this.org.id !== this.deps.readSelectedOrgId()) {
-      try {
-        this.deps.persistSelectedOrgId(this.org.id)
-      } catch {
-        // the choice still applies to this run
-      }
-    }
+    // G8-16 S16 / F-2: the org list cannot carry a deactivated membership (D
+    // sends only the tenant status), so the chosen org's own membership is read
+    // here - it is the chosen org, so the read is allowed. A deactivated
+    // membership locks the row (and, when other orgs stay active, brings the
+    // picker back with that row locked) instead of failing on the first docs call.
+    if (this.org && !(await this.markDeactivated(this.org, generation))) return
+    if (generation !== this.generation) return
+    // the usable chosen org is remembered like a manual choice, so the next
+    // sign-in on this machine skips the question (a deactivated one is not)
+    if (this.org) this.rememberOrg(this.org.id)
     await this.loadEntitlements(generation)
     if (generation !== this.generation || !this.session) return
     this.cacheAccount()
     this.setState('signed-in')
+  }
+
+  /**
+   * G8-16 S16 / F-2: read the caller's membership of `org` (the chosen one) and
+   * mark it deactivated when the server says so. True when the org stays usable;
+   * false when it is deactivated (the state is already pushed) or the read moved
+   * on. A failure to read the membership is not a verdict: the org stays usable
+   * (its row is not a lie, it is unknown) and the caller's own failure handling
+   * applies.
+   */
+  private async markDeactivated(org: OrgResponse, generation: number): Promise<boolean> {
+    let membership: OrgMembershipResponse
+    try {
+      membership = await this.authorized((token) =>
+        (this.transport as UniworkTransport).orgMembership(org.slug, token),
+      )
+    } catch (error) {
+      if (generation !== this.generation) return false
+      if (handled.has(error as object)) throw error
+      return true
+    }
+    if (generation !== this.generation) return false
+    if (!membership.deactivatedAt) {
+      this.deactivatedOrgIds.delete(org.id)
+      return true
+    }
+    this.deactivatedOrgIds.add(org.id)
+    // the org cannot be worked in: with other active orgs the picker comes back
+    // (this row locked), with none the renderer shows the all-blocked panel
+    this.org = undefined
+    this.rememberedGone = false
+    const others = this.orgs.some(
+      (candidate) => candidate.id !== org.id && candidate.status === 'active',
+    )
+    this.needsOrgChoice = others
+    this.setEntitlements(null)
+    this.setState('signed-in')
+    return false
+  }
+
+  /**
+   * The state and code a failure would produce, without applying either: the
+   * same table `applyFailure` uses, so a caller can decide whether the failure
+   * belongs to it (a transient org-list outage) or must keep its own state.
+   */
+  private failureOutcome(error: unknown): FailureOutcome {
+    if (error instanceof CredentialStoreError) {
+      return error.code === 'keystore_locked'
+        ? { state: 'keystore-locked', error: 'keystore_locked', clearCredentials: false }
+        : { state: 'keyring-unavailable', error: 'keyring_unavailable', clearCredentials: false }
+    }
+    if (!(error instanceof TransportError))
+      return classifyTransportFailure('server_error', 'session')
+    return classifyTransportFailure(error.code, 'session', error.fromServer)
+  }
+
+  /** remember `orgId` for this account on this machine (best effort) */
+  private rememberOrg(orgId: string): void {
+    const accountId = this.session?.credential.accountId
+    if (!accountId) return
+    if (rememberedOrgFor(this.deps.readSelectedOrgId(), accountId) === orgId) return
+    try {
+      this.deps.persistSelectedOrgId(accountId, orgId)
+    } catch {
+      // the choice still applies to this run
+    }
   }
 
   private async loadEntitlements(generation: number): Promise<void> {

@@ -28,8 +28,10 @@ export interface AccountManagerDeps {
   credentials: CredentialStore
   /** opens the validated authorization URL in the system browser */
   openBrowser(url: string, profile: DeploymentProfile): Promise<void>
+  /** the remembered organization of this machine: `{ accountId, orgId }` or a legacy value */
   readSelectedOrgId(): unknown
-  persistSelectedOrgId(orgId: string): void
+  /** remembers the account's choice on this machine (per account + machine) */
+  persistSelectedOrgId(accountId: string, orgId: string): void
   device?: { label?: string; platform?: string; build?: string }
   attempts?: LoginAttemptStore
   now?: () => number
@@ -78,6 +80,8 @@ export class SessionCore {
   protected needsOrgChoice = false
   /** G8-16 S16: the stored choice is no longer a membership of this account */
   protected rememberedGone = false
+  /** G8-16 S16: the org list could not be loaded (the picker shows uwOrgPickError) */
+  protected orgsError: AccountErrorCode | undefined
   protected entitlements: AccountEntitlements | null = null
   /** last known plan from the stored credential: shown, never published, until fresh data arrives */
   protected cachedEntitlements: AccountEntitlements | null = null
@@ -120,7 +124,11 @@ export class SessionCore {
           }
         : {}),
       ...(showsAccount
-        ? { needsOrgChoice: this.needsOrgChoice, rememberedGone: this.rememberedGone }
+        ? {
+            needsOrgChoice: this.needsOrgChoice,
+            rememberedGone: this.rememberedGone,
+            ...(this.orgsError ? { orgsError: this.orgsError } : {}),
+          }
         : {}),
       ...(showsAccount ? { entitlements: this.entitlements ?? this.cachedEntitlements } : {}),
       ...(this.profile
@@ -466,6 +474,7 @@ export class SessionCore {
     this.deactivatedOrgIds.clear()
     this.needsOrgChoice = false
     this.rememberedGone = false
+    this.orgsError = undefined
     this.setEntitlements(null)
   }
 
