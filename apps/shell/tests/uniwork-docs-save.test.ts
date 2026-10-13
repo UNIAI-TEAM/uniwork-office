@@ -1,5 +1,7 @@
 import { createHash } from 'node:crypto'
 import {
+  existsSync,
+  mkdirSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
@@ -24,7 +26,7 @@ import {
   type ConflictUi,
   type UnsavedCloseChoice,
 } from '../src/main/uniwork-docs/service'
-import { BINDING_FILE } from '../src/main/uniwork-docs/binding-store'
+import { BINDING_FILE, INTENT_PAYLOAD_FILE } from '../src/main/uniwork-docs/binding-store'
 import { pageRecentPaths } from '../src/main/recent-files'
 import {
   INTENT_STORE_REGISTRATION,
@@ -1364,6 +1366,111 @@ describe('the durable store guards the save (W3b)', () => {
     expect(uploads(server)).toHaveLength(0)
     expect(commits(server)).toHaveLength(0)
     expect(storeFiles(ctx)).toEqual([])
+  })
+})
+
+/**
+ * R1-be-5: a sweep that could not move a pre-store intent (the store was at
+ * its budget) is not complete. The copy keeps its plaintext intent, no save
+ * may rewrite its binding into schema 2 (which would drop `pendingIntent`),
+ * and the next open - here after the budget frees - migrates it exactly once,
+ * with its own idempotency key.
+ */
+describe('a deferred sweep never erases the pre-store intent (R1-be-5)', () => {
+  const LEGACY = {
+    intentId: 'office-intent-legacy',
+    idempotencyKey: 'office-key-legacy',
+    documentId: DOC,
+    baseRevision: '41',
+    checksum: hex(enc('working copy bytes')),
+    createdAt: '2026-10-11T00:00:00.000Z',
+  }
+  const folder = () => join(dir, 'uniwork-documents', 'default', 'acc_1', DOC)
+  const copyPath = () => join(folder(), 'Plan.docx')
+  const payloadPath = () => join(folder(), INTENT_PAYLOAD_FILE)
+
+  /** the pre-store working copy: a schema-1 binding with the intent + its payload */
+  function seedLegacy(): void {
+    mkdirSync(folder(), { recursive: true })
+    writeFileSync(copyPath(), 'working copy bytes')
+    writeFileSync(
+      join(folder(), BINDING_FILE),
+      JSON.stringify(
+        {
+          schema: 1,
+          documentId: DOC,
+          workspaceId: 'ws_1',
+          orgId: 'org_a',
+          title: 'Plan.docx',
+          filename: 'Plan.docx',
+          format: 'docx',
+          access: 'edit',
+          baseRevision: '41',
+          baseVersion: 3,
+          baseChecksum: 'stale',
+          state: 'saving',
+          pendingIntent: LEGACY,
+        },
+        null,
+        2,
+      ),
+    )
+    writeFileSync(payloadPath(), 'working copy bytes')
+  }
+
+  /** the intent store of the account's scope, as the layer hands it back */
+  async function intentStoreOf(ctx: ReturnType<typeof setup>) {
+    const opened = await ctx.layer.open({ deploymentId: 'default', accountId: 'acc_1' })
+    if (opened.kind !== 'ok') throw new Error(opened.kind)
+    return createIntentStore(opened.store.records(INTENT_STORE_REGISTRATION.name))
+  }
+
+  /** write records until the account's budget refuses the next one */
+  async function fillBudget(ctx: ReturnType<typeof setup>): Promise<string[]> {
+    const intents = await intentStoreOf(ctx)
+    const keys: string[] = []
+    for (let i = 0; i < 200; i += 1) {
+      const key = `fill-${i}`
+      if ((await intents.put(key, LEGACY, new Uint8Array(1))).kind === 'store_full') break
+      keys.push(key)
+    }
+    return keys
+  }
+
+  it('keeps the plaintext, refuses every binding rewrite, then migrates once when the budget frees', async () => {
+    seedLegacy()
+    const server = fakeServer({ bytes: enc('v3') })
+    const ctx = setup(server, { budgetBytes: 4096 })
+    const fillers = await fillBudget(ctx)
+    const before = {
+      binding: readFileSync(join(folder(), BINDING_FILE), 'utf8'),
+      payload: readFileSync(payloadPath(), 'utf8'),
+    }
+
+    // the sweep runs on the open and cannot move the intent: nothing is complete
+    expect((await ctx.service.openSyncStore()).kind).toBe('ok')
+    expect(binding(copyPath())).toMatchObject({ schema: 1, state: 'saving' })
+    expect(binding(copyPath()).pendingIntent).toEqual(LEGACY)
+
+    // a save in that window must not mint a new intent or rewrite the binding
+    expect(await ctx.service.save(copyPath())).toMatchObject({ state: 'dirty' })
+    expect(readFileSync(join(folder(), BINDING_FILE), 'utf8')).toBe(before.binding)
+    expect(readFileSync(payloadPath(), 'utf8')).toBe(before.payload)
+    expect(uploads(server)).toHaveLength(0)
+    expect(commits(server)).toHaveLength(0)
+
+    // the budget frees: the next open completes the sweep, exactly once
+    const intents = await intentStoreOf(ctx)
+    for (const key of fillers) await intents.delete(key)
+    expect((await ctx.service.openSyncStore()).kind).toBe('ok')
+    const migrated = await intentOf(ctx, copyPath())
+    expect(migrated?.intent.idempotencyKey).toBe(LEGACY.idempotencyKey)
+    expect(Buffer.from(migrated?.payload ?? []).toString()).toBe('working copy bytes')
+    expect(binding(copyPath())).toMatchObject({ schema: 2, min_store_level: 2, state: 'dirty' })
+    expect(binding(copyPath())).not.toHaveProperty('pendingIntent')
+    expect(existsSync(payloadPath())).toBe(false)
+    // one record only: the fillers are gone and no second intent was minted
+    expect(storeFiles(ctx)).toHaveLength(1)
   })
 })
 

@@ -42,6 +42,12 @@ export interface LegacyIntentMigrationReport {
   migrated: number
   /** plaintext payloads dropped (a migrated or unusable pair) */
   cleaned: number
+  /**
+   * copies whose intent the store could not take (budget full, a wipe): the
+   * plaintext is kept and the run is NOT complete - the caller must retry it
+   * on the next open instead of treating the scope as done.
+   */
+  deferred: number
 }
 
 export interface LegacyIntentMigrationDeps {
@@ -81,7 +87,7 @@ async function dropPayload(path: string): Promise<void> {
 export async function migrateLegacyIntents(
   deps: LegacyIntentMigrationDeps,
 ): Promise<LegacyIntentMigrationReport> {
-  const report: LegacyIntentMigrationReport = { found: 0, migrated: 0, cleaned: 0 }
+  const report: LegacyIntentMigrationReport = { found: 0, migrated: 0, cleaned: 0, deferred: 0 }
   const intents: IntentStore = createIntentStore(deps.records('intents'))
   for (const dir of scopeWorkingCopyDirs(deps.root, deps.scope)) {
     const raw = readRawBinding(dir)
@@ -114,6 +120,7 @@ export async function migrateLegacyIntents(
       if (written.kind !== 'ok') {
         // the store cannot take it right now: leave the plaintext exactly as it
         // is and let the next open retry the whole copy
+        report.deferred += 1
         deps.log?.('uniwork sync: legacy intent migration deferred (store refused the write)')
         continue
       }

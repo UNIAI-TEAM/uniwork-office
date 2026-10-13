@@ -145,7 +145,7 @@ describe('migrateLegacyIntents', () => {
       records: await openRecords(layer),
       appVersion: APP_VERSION,
     })
-    expect(report).toEqual({ found: 1, migrated: 1, cleaned: 1 })
+    expect(report).toEqual({ found: 1, migrated: 1, cleaned: 1, deferred: 0 })
 
     // the intent is in the store, field for field, with the exact payload bytes
     const intent = await createIntentStore((await openRecords(layer))('intents')).get(DOC_KEY)
@@ -186,7 +186,7 @@ describe('migrateLegacyIntents', () => {
       records,
       appVersion: APP_VERSION,
     })
-    expect(report).toEqual({ found: 1, migrated: 1, cleaned: 1 })
+    expect(report).toEqual({ found: 1, migrated: 1, cleaned: 1, deferred: 0 })
     // one record only: the resumed run overwrote the same key
     const files = recordFiles().filter((path) => path.includes(INTENT_STORE_REGISTRATION.name))
     expect(files).toHaveLength(1)
@@ -201,7 +201,7 @@ describe('migrateLegacyIntents', () => {
       records,
       appVersion: APP_VERSION,
     })
-    expect(third).toEqual({ found: 0, migrated: 0, cleaned: 0 })
+    expect(third).toEqual({ found: 0, migrated: 0, cleaned: 0, deferred: 0 })
     expect(
       recordFiles().filter((path) => path.includes(INTENT_STORE_REGISTRATION.name)),
     ).toHaveLength(1)
@@ -217,7 +217,7 @@ describe('migrateLegacyIntents', () => {
       records: await openRecords(layer),
       appVersion: APP_VERSION,
     })
-    expect(report).toEqual({ found: 1, migrated: 0, cleaned: 1 })
+    expect(report).toEqual({ found: 1, migrated: 0, cleaned: 1, deferred: 0 })
     expect(await createIntentStore((await openRecords(layer))('intents')).get(DOC_KEY)).toBeNull()
     expect(bindingAt(dir).schema).toBe(2)
     expect(bindingAt(dir)).not.toHaveProperty('pendingIntent')
@@ -246,7 +246,7 @@ describe('migrateLegacyIntents', () => {
       records: await openRecords(layer),
       appVersion: APP_VERSION,
     })
-    expect(report).toEqual({ found: 1, migrated: 1, cleaned: 1 })
+    expect(report).toEqual({ found: 1, migrated: 1, cleaned: 1, deferred: 0 })
     expect(bindingAt(mine).schema).toBe(2)
     // the other account keeps its pre-store state untouched
     expect(bindingAt(otherDir).schema).toBe(1)
@@ -286,12 +286,12 @@ describe('migrateLegacyIntents', () => {
       records: await openRecords(layer),
       appVersion: APP_VERSION,
     })
-    expect(report).toEqual({ found: 0, migrated: 0, cleaned: 1 })
+    expect(report).toEqual({ found: 0, migrated: 0, cleaned: 1, deferred: 0 })
     expect(readFileSync(join(dir, BINDING_FILE), 'utf8')).toBe(before)
     expect(existsSync(join(dir, INTENT_PAYLOAD_FILE))).toBe(false)
   })
 
-  it('a store that refuses the write leaves the plaintext exactly as it is', async () => {
+  it('a store that refuses the write leaves the plaintext exactly as it is and reports the deferral', async () => {
     const dir = seedLegacy()
     const layer = makeLayer({ budgetBytes: 1 })
     const before = {
@@ -304,7 +304,9 @@ describe('migrateLegacyIntents', () => {
       records: await openRecords(layer),
       appVersion: APP_VERSION,
     })
-    expect(report).toEqual({ found: 1, migrated: 0, cleaned: 0 })
+    // deferred, not "migrated nothing": the caller must retry, never treat the
+    // scope as done (R1-be-5)
+    expect(report).toEqual({ found: 1, migrated: 0, cleaned: 0, deferred: 1 })
     expect(readFileSync(join(dir, BINDING_FILE), 'utf8')).toBe(before.binding)
     expect(readFileSync(join(dir, INTENT_PAYLOAD_FILE), 'utf8')).toBe(before.payload)
     expect(recordFiles()).toEqual([])

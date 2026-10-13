@@ -401,8 +401,8 @@ export class UniworkDocsService {
    * The schema 1 -> 2 sweep (the pre-store plaintext intent moves into the
    * durable store), once per scope and process: the first open after sign-in
    * (or after the keychain unlocks) runs it, every later open skips it. A
-   * failed sweep is not remembered, so the next open retries; a locked store
-   * never reaches here.
+   * failed or deferred sweep is not remembered, so the next open retries; a
+   * locked store never reaches here.
    */
   private async migrateLegacyState(
     sync: SyncStoreAccess,
@@ -419,6 +419,15 @@ export class UniworkDocsService {
         records: (name) => open.records(name),
         appVersion: this.buildVersion(),
       })
+      // a sweep that could not move every pre-store intent (a store at its
+      // budget) is not complete: the next open runs it again, and until then
+      // those copies are never rewritten (see awaitingMigration)
+      if (report.deferred > 0) {
+        console.warn(
+          `uniwork sync: legacy save intent migration deferred for ${report.deferred} working copy/copies`,
+        )
+        return
+      }
       this.migratedScopes.add(token)
       if (report.migrated > 0) {
         console.warn(`uniwork sync: moved ${report.migrated} legacy save intent(s) into the store`)
@@ -427,6 +436,34 @@ export class UniworkDocsService {
       // the store opened but the sweep could not finish: the next open retries
       console.warn('uniwork sync: legacy save intent migration failed:', error)
     }
+  }
+
+  /**
+   * True while the copy still holds the pre-store intent pair and this
+   * process's sweep has not moved it. Any binding rewrite would stamp schema 2
+   * and drop `pendingIntent` - the only replayable record of the save - so
+   * such a copy is left exactly as it is until the sweep completes (every
+   * store open retries it; the caller sees the failure when one happened).
+   */
+  private awaitingMigration(doc: BoundDocument): boolean {
+    return this.awaitingMigrationIn(doc.dir, doc.deploymentId, doc.userId)
+  }
+
+  /** the same for a folder, before the binding is read (the open flow) */
+  private awaitingMigrationIn(dir: string, deploymentId: string, accountId: string): boolean {
+    if (this.migratedScopes.has(`${deploymentId}/${accountId}`)) return false
+    return hasLegacyIntentFiles(dir)
+  }
+
+  /**
+   * The save of a copy the sweep still owns: the store open runs the sweep
+   * again, and while it cannot complete the save stops here - no intent, no
+   * request and no binding write. True = the copy must not be written.
+   */
+  private async holdForMigration(doc: BoundDocument): Promise<boolean> {
+    if (!this.awaitingMigration(doc)) return false
+    await this.openSyncStore().catch(() => null)
+    return this.awaitingMigration(doc)
   }
 
   /**
@@ -690,6 +727,12 @@ export class UniworkDocsService {
     this.lastUserSave.set(doc.path, ++this.saveCounter)
     // the module just wrote what its editor held
     this.editorDirty.delete(doc.path)
+    // the sweep still owns this copy's pre-store intent: nothing is sent, and
+    // a binding write here would drop the intent (the open retries the sweep)
+    if (this.awaitingMigration(doc)) {
+      void this.openSyncStore().catch(() => undefined)
+      return
+    }
     void this.coordinator.save(path)
   }
 
@@ -784,6 +827,9 @@ export class UniworkDocsService {
     const doc = typeof path === 'string' ? this.store.lookup(path) : null
     if (!doc || !this.ownsLocally(doc)) return null
     if (!this.canSave(doc)) return this.statusOf(doc)
+    // a copy whose pre-store intent the sweep has not moved yet is left alone:
+    // a save would rewrite its binding and drop that intent (R1-be-5)
+    if (await this.holdForMigration(doc)) return this.statusOf(doc)
     const intent = await this.hasIntent(doc)
     if (intent === 'locked') {
       const refused = await this.coordinator.commitState(doc, {
@@ -887,6 +933,8 @@ export class UniworkDocsService {
   private async saveForClose(path: string): Promise<boolean> {
     const latest = this.store.lookup(path)
     if (!latest || !this.canSave(latest)) return this.keepOpen(path)
+    // the sweep still owns the copy's pre-store intent: nothing may be written
+    if (await this.holdForMigration(latest)) return this.keepOpen(path)
     const wait = this.waitForSettle(latest.path, CLOSE_SAVE_WAIT_MS)
     const notWritten = () => {
       if (!this.coordinator.isSaving(latest.path)) wait.cancel()
@@ -1247,6 +1295,11 @@ export class UniworkDocsService {
           ) {
             binding.state = localChecksum === existing.baseChecksum ? 'ready' : 'dirty'
             delete binding.error
+          }
+          // the sweep still owns this copy's pre-store intent: opening the
+          // copy is fine, rewriting its binding is not (schema 2 would drop it)
+          if (this.awaitingMigrationIn(dir, identity.deploymentId, identity.accountId)) {
+            return this.show(local, existing)
           }
           await this.store.write(dir, binding)
           return this.show(local, binding)
