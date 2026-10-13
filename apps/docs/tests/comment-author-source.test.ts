@@ -13,6 +13,7 @@ import { buildDocx } from '../../../packages/docx-engine/tests/helpers/build-doc
 import { blocksToPmDoc, pmDocToSavePlan, type PmNode } from '../src/renderer/editor/convert'
 import { editorExtensions } from '../src/renderer/editor/extensions'
 import { CommentsPanel } from '../src/renderer/components/CommentsPanel'
+import { syncMarginAnnotations } from '../src/renderer/editor/margin-annotations'
 import { LocaleProvider, setModuleLang } from '../src/renderer/i18n/locale'
 import {
   NEUTRAL_COMMENT_AUTHOR,
@@ -245,5 +246,56 @@ describe('the neutral author shows in the UI language (BE-6 / FE-1)', () => {
     act(() => root.unmount())
     container.remove()
     editor.destroy()
+  })
+})
+
+describe('the page-margin comment surfaces use the same label (visual F1)', () => {
+  /** a page wrap with one anchored comment span; jsdom has no layout, so the span gets one line box */
+  function marginOf(simpleMarkup: boolean, comments: CommentInfo[]) {
+    const host = document.createElement('div')
+    if (simpleMarkup) host.className = 'rev-display-simple'
+    const wrap = document.createElement('div')
+    const pm = document.createElement('div')
+    const span = document.createElement('span')
+    span.className = 'doc-comment'
+    span.dataset.commentIds = '1'
+    span.textContent = 'Hello'
+    span.getClientRects = () =>
+      [{ top: 10, bottom: 26, left: 0, right: 40, height: 16, width: 40 }] as unknown as DOMRectList
+    pm.appendChild(span)
+    wrap.appendChild(pm)
+    host.appendChild(wrap)
+    document.body.appendChild(host)
+    syncMarginAnnotations(wrap, pm, comments, 1)
+    return { wrap, dispose: () => host.remove() }
+  }
+
+  const comments: CommentInfo[] = [
+    { id: '1', author: NEUTRAL_COMMENT_AUTHOR, date: '2026-01-01T00:00:00Z', text: 'root' },
+    { id: '2', author: 'Nguyễn An', date: '2026-01-02T00:00:00Z', text: 're', parentId: '1' },
+    { id: '3', author: NEUTRAL_COMMENT_AUTHOR, date: '2026-01-03T00:00:00Z', text: 'r2', parentId: '1' },
+  ]
+
+  afterEach(() => setModuleLang('en'))
+
+  it('a vi All Markup bubble shows "Người dùng" for the stored "User"; names stay verbatim', () => {
+    setModuleLang('vi')
+    const { wrap, dispose } = marginOf(false, comments)
+    const names = [...wrap.querySelectorAll('.comment-bubble-author')].map((el) => el.textContent)
+    expect(names).toEqual(['Người dùng', 'Nguyễn An', 'Người dùng'])
+    expect(comments[0]!.author).toBe('User')
+    dispose()
+  })
+
+  it('a vi Simple Markup balloon names the neutral author in its tooltip', () => {
+    setModuleLang('vi')
+    const { wrap, dispose } = marginOf(true, comments)
+    const balloon = wrap.querySelector<HTMLElement>('.comment-balloon')
+    expect(balloon?.title).toBe('Người dùng\nroot')
+    dispose()
+    setModuleLang('en')
+    const en = marginOf(true, comments)
+    expect(en.wrap.querySelector<HTMLElement>('.comment-balloon')?.title).toBe('User\nroot')
+    en.dispose()
   })
 })

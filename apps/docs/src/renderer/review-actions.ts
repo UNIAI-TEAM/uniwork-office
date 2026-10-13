@@ -8,6 +8,7 @@ import type { Editor } from '@tiptap/core'
 import { TextSelection } from '@tiptap/pm/state'
 import { nextNoteId, parseDocx, type CommentInfo, type NoteInfo } from '@genoffice/docx-engine'
 import type { Dispatch, SetStateAction } from 'react'
+import { NEUTRAL_COMMENT_AUTHOR } from './comment-author'
 import { fetchDocBytes } from './doc-bytes'
 import type { DocState } from './doc-state'
 import {
@@ -45,8 +46,7 @@ export interface NotePrompt {
   id?: string
 }
 
-/** G8-02: the author written into comments when no UniWork account resolves. */
-export const NEUTRAL_COMMENT_AUTHOR = 'User'
+export { NEUTRAL_COMMENT_AUTHOR }
 
 /** G8-02: author written into new comments — refreshed from the host per open document. */
 let commentAuthor = NEUTRAL_COMMENT_AUTHOR

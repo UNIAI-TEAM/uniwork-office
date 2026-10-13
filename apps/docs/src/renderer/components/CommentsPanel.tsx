@@ -3,7 +3,7 @@ import type { Node as PmNode } from '@tiptap/pm/model'
 import type { CommentInfo } from '@genoffice/docx-engine'
 import { isWebFrame } from '../capabilities'
 import { useI18n } from '../i18n/locale'
-import { NEUTRAL_COMMENT_AUTHOR } from '../review-actions'
+import { displayCommentAuthor } from '../comment-author'
 import { IconComment, IconPencil, IconTrash } from './icons'
 
 function formatDate(iso?: string): string {
@@ -83,7 +83,7 @@ export const CommentsPanel = memo(function CommentsPanel({
   // G8-02: the neutral author is written into the file as the fixed "User";
   // the pane shows it in the UI language. Any other author shows verbatim.
   const authorLabel = (author: string) =>
-    author === NEUTRAL_COMMENT_AUTHOR ? t('editorDefaultAuthor') : author
+    displayCommentAuthor(author, t('editorNeutralCommentAuthor'))
   const [activeId, setActiveId] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
   const draftRef = useRef<HTMLTextAreaElement>(null)
