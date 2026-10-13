@@ -11,7 +11,7 @@ import {
   sendAnchorMap,
   type AnchorSyncOutcome,
   type CollabAnchorUpdate,
-  type CollabSourceWithAnchors,
+  type CollabSource,
 } from './seam'
 
 export function buildAnchorUpdates(
@@ -36,7 +36,7 @@ export function buildAnchorUpdates(
 
 /** send the map for `versionId`; `reload` runs when the server changed at least one row */
 export async function syncAnchorsAfterSave(
-  source: CollabSourceWithAnchors,
+  source: CollabSource,
   versionId: string,
   updates: CollabAnchorUpdate[],
   reload: () => void,
