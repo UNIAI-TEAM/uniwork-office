@@ -1,0 +1,105 @@
+/* Comment body + anchor label (collab W20B). Tokens only; the lead folds this into collab.css at merge.
+ * --accent / --accent-soft come from each app's styles.css, with the shared brand token as a fallback. */
+
+.collab-body {
+  min-width: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+  /* a long word or URL wraps instead of widening the panel */
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.collab-body-p {
+  margin: 0 0 6px;
+}
+
+.collab-body-p:last-child {
+  margin-bottom: 0;
+}
+
+.collab-body-code {
+  padding: 1px 4px;
+  border-radius: var(--radius-6);
+  background: var(--surface-subtle);
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 0.92em;
+  /* inline code keeps its own spacing but still wraps */
+  white-space: pre-wrap;
+}
+
+.collab-body-link {
+  color: var(--accent, var(--color-brand-secondary));
+  text-decoration: underline;
+}
+
+.collab-body-link:hover {
+  text-decoration-thickness: 2px;
+}
+
+.collab-body-link:focus-visible {
+  outline: 2px solid var(--accent, var(--color-brand-secondary));
+  outline-offset: 1px;
+  border-radius: 2px;
+}
+
+.collab-mention {
+  display: inline;
+  padding: 0 4px;
+  border-radius: var(--radius-6);
+  background: var(--accent-soft, var(--bg-hover-subtle));
+  color: var(--accent, var(--color-brand-secondary));
+  font-weight: 500;
+  /* the chip may break across lines for a long name */
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+/* unavailable / unknown member: the token label as plain, muted text, no chip, nothing to follow */
+.collab-mention-unavailable {
+  color: var(--text-secondary);
+}
+
+.collab-anchor {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+  min-width: 0;
+  font-size: var(--text-caption);
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
+.collab-anchor-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.collab-anchor-label:focus-visible {
+  outline: 2px solid var(--accent, var(--color-brand-secondary));
+  outline-offset: 1px;
+  border-radius: 2px;
+}
+
+/* stale / lost are words first; the tint only backs them up */
+.collab-anchor-state {
+  padding: 0 6px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-6);
+  background: var(--surface-subtle);
+  color: var(--text);
+}
+
+.collab-anchor-state-stale {
+  border-color: var(--warning-border);
+  background: var(--warning-bg);
+  color: var(--warning-text);
+}
+
+.collab-anchor-state-lost {
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}

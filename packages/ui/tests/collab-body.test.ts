@@ -58,11 +58,22 @@ describe('parseBody / serialize', () => {
     for (const s of samples) expect(serialize(parseBody(s))).toBe(s)
   })
 
+  it('stays linear on a maximum-size body of unclosed markup', () => {
+    for (const unit of ['*a ', '**a ', '[a ', '`a ', '[@a](mention://member/', ' ', '\\']) {
+      const big = unit.repeat(Math.ceil(1_048_576 / unit.length))
+      const t0 = performance.now()
+      expect(serialize(parseBody(big))).toBe(big)
+      expect(performance.now() - t0).toBeLessThan(2000)
+    }
+  })
+
   it('recognises every subset part', () => {
     const types = parseBody(BODY_FIXTURE)
       .map((t) => t.type)
       .filter((t, i, all) => all.indexOf(t) === i)
-    expect(types).toEqual(expect.arrayContaining(['text', 'mention', 'bold', 'italic', 'code', 'link', 'break']))
+    expect(types).toEqual(
+      expect.arrayContaining(['text', 'mention', 'bold', 'italic', 'code', 'link', 'break']),
+    )
   })
 
   it('unescapes the mention label and normalises the id', () => {
@@ -82,7 +93,9 @@ describe('parseBody / serialize', () => {
   })
 
   it('only accepts http(s) links', () => {
-    const ok = parseBody('[a](http://x.test/p) [b](https://x.test/p)').filter((t) => t.type === 'link')
+    const ok = parseBody('[a](http://x.test/p) [b](https://x.test/p)').filter(
+      (t) => t.type === 'link',
+    )
     expect(ok).toHaveLength(2)
     for (const bad of [
       '[a](javascript:alert(1))',
@@ -111,7 +124,11 @@ describe('buildMentionToken', () => {
     for (const label of ['A [b] (c)', 'x\\', ']](', 'two\nlines']) {
       const tokens = parseBody(buildMentionToken(AN, label))
       expect(tokens).toHaveLength(1)
-      expect(tokens[0]).toMatchObject({ type: 'mention', userId: AN, label: label.replace(/[\r\n]+/g, ' ') })
+      expect(tokens[0]).toMatchObject({
+        type: 'mention',
+        userId: AN,
+        label: label.replace(/[\r\n]+/g, ' '),
+      })
     }
   })
 })
@@ -122,7 +139,9 @@ describe('CollabBody', () => {
     expect(el.querySelectorAll('br').length).toBeGreaterThanOrEqual(3)
     expect(el.querySelector('strong')?.textContent).toBe('đậm')
     expect(el.querySelector('em')?.textContent).toBe('nghiêng')
-    expect(el.querySelector('code')?.textContent).toBe('code [@x](mention://member/01J8X4USR0BBBBBBBBBBBBBBBB)')
+    expect(el.querySelector('code')?.textContent).toBe(
+      'code [@x](mention://member/01J8X4USR0BBBBBBBBBBBBBBBB)',
+    )
     const a = el.querySelector('a') as HTMLAnchorElement
     expect(a.getAttribute('href')).toBe('https://example.com/a?b=1&c=2')
     expect(a.textContent).toBe('liên kết')
@@ -179,7 +198,9 @@ describe('CollabBody', () => {
   })
 
   it('falls back to the token label, without a link, for an unavailable mention', () => {
-    const el = render(BODY_FIXTURE, [{ user_id: AN, display_name: 'Nguyễn An', state: 'unavailable' }])
+    const el = render(BODY_FIXTURE, [
+      { user_id: AN, display_name: 'Nguyễn An', state: 'unavailable' },
+    ])
     const chip = el.querySelector('.collab-mention-unavailable') as HTMLElement
     expect(chip.textContent).toBe('@Nguyễn [An]')
     expect(el.querySelector('a[href^="mention:"], .collab-mention[data-user-id]')).toBeNull()

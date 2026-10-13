@@ -32,8 +32,20 @@ afterEach(() => {
 
 describe('anchorLabel', () => {
   it('docx: quote under the cut is used whole, no title', () => {
-    const a = { format: 'docx', v: 1, path: [0], start: 0, end: 5, quote: 'doanh thu quý 3', prefix: '', suffix: '' }
-    expect(anchorLabel(a, { lang: 'vi' })).toEqual({ key: 'collabAnchorDocx', params: { quote: 'doanh thu quý 3' } })
+    const a = {
+      format: 'docx',
+      v: 1,
+      path: [0],
+      start: 0,
+      end: 5,
+      quote: 'doanh thu quý 3',
+      prefix: '',
+      suffix: '',
+    }
+    expect(anchorLabel(a, { lang: 'vi' })).toEqual({
+      key: 'collabAnchorDocx',
+      params: { quote: 'doanh thu quý 3' },
+    })
   })
 
   it('docx: a long quote is cut at 60 characters with an ellipsis; the full quote (<= 500) goes in the title', () => {
@@ -54,8 +66,12 @@ describe('anchorLabel', () => {
 
   it('docx: counts code points, never splits a surrogate pair, and collapses whitespace', () => {
     const quote = '😀'.repeat(70)
-    expect(anchorLabel({ format: 'docx', v: 1, quote }, { lang: 'en' })?.params.quote).toBe('😀'.repeat(60) + '…')
-    expect(anchorLabel({ format: 'docx', v: 1, quote: 'a\n  b\tc' }, { lang: 'en' })?.params.quote).toBe('a b c')
+    expect(anchorLabel({ format: 'docx', v: 1, quote }, { lang: 'en' })?.params.quote).toBe(
+      '😀'.repeat(60) + '…',
+    )
+    expect(
+      anchorLabel({ format: 'docx', v: 1, quote: 'a\n  b\tc' }, { lang: 'en' })?.params.quote,
+    ).toBe('a b c')
   })
 
   it('docx: a title never exceeds 500 characters even when the server sent more', () => {
@@ -77,23 +93,35 @@ describe('anchorLabel', () => {
   })
 
   it("xlsx: another sheet gets Excel syntax 'Sheet'!B7, quotes doubled", () => {
-    expect(anchorLabel({ format: 'xlsx', v: 1, sheet: 'Other sheet', range: 'B7' }, { lang: 'en', activeSheet: 'S1' })?.params.cell).toBe(
-      "'Other sheet'!B7",
-    )
-    expect(anchorLabel({ format: 'xlsx', v: 1, sheet: "Bob's", range: 'A1' }, { lang: 'en', activeSheet: 'S1' })?.params.cell).toBe(
-      "'Bob''s'!A1",
-    )
+    expect(
+      anchorLabel(
+        { format: 'xlsx', v: 1, sheet: 'Other sheet', range: 'B7' },
+        { lang: 'en', activeSheet: 'S1' },
+      )?.params.cell,
+    ).toBe("'Other sheet'!B7")
+    expect(
+      anchorLabel(
+        { format: 'xlsx', v: 1, sheet: "Bob's", range: 'A1' },
+        { lang: 'en', activeSheet: 'S1' },
+      )?.params.cell,
+    ).toBe("'Bob''s'!A1")
   })
 
   it('xlsx: without an active sheet (no editor) the sheet is always named', () => {
-    expect(anchorLabel({ format: 'xlsx', v: 1, sheet: 'S1', range: 'B7' }, { lang: 'en' })?.params.cell).toBe("'S1'!B7")
+    expect(
+      anchorLabel({ format: 'xlsx', v: 1, sheet: 'S1', range: 'B7' }, { lang: 'en' })?.params.cell,
+    ).toBe("'S1'!B7")
   })
 
   it('xlsx: a stable sheet id is shown through the name resolver', () => {
     const a = { format: 'xlsx', v: 1, sheet: 'sh-9', range: 'C3' }
     const resolveSheetName = (id: string) => (id === 'sh-9' ? 'Plan' : undefined)
-    expect(anchorLabel(a, { lang: 'en', activeSheet: 'Plan', resolveSheetName })?.params.cell).toBe('C3')
-    expect(anchorLabel(a, { lang: 'en', activeSheet: 'Other', resolveSheetName })?.params.cell).toBe("'Plan'!C3")
+    expect(anchorLabel(a, { lang: 'en', activeSheet: 'Plan', resolveSheetName })?.params.cell).toBe(
+      'C3',
+    )
+    expect(
+      anchorLabel(a, { lang: 'en', activeSheet: 'Other', resolveSheetName })?.params.cell,
+    ).toBe("'Plan'!C3")
   })
 
   it('xlsx: no range -> no label', () => {
@@ -101,19 +129,30 @@ describe('anchorLabel', () => {
   })
 
   it('pptx: slide_index + 1, number through the locale', () => {
-    expect(anchorLabel({ format: 'pptx', v: 1, slide_id: '257', slide_index: 4 }, { lang: 'en' })).toEqual({
+    expect(
+      anchorLabel({ format: 'pptx', v: 1, slide_id: '257', slide_index: 4 }, { lang: 'en' }),
+    ).toEqual({
       key: 'collabAnchorSlide',
       params: { slide: '5' },
     })
-    expect(anchorLabel({ format: 'pptx', v: 1, slide_id: '1', slide_index: 1233 }, { lang: 'en' })?.params.slide).toBe('1,234')
-    expect(anchorLabel({ format: 'pptx', v: 1, slide_id: '1', slide_index: 1233 }, { lang: 'de' })?.params.slide).toBe('1.234')
-    expect(anchorLabel({ format: 'pptx', v: 1, slide_id: '1', slide_index: 1233 }, { lang: 'ar' })?.params.slide).toBe(
-      new Intl.NumberFormat('ar').format(1234),
-    )
+    expect(
+      anchorLabel({ format: 'pptx', v: 1, slide_id: '1', slide_index: 1233 }, { lang: 'en' })
+        ?.params.slide,
+    ).toBe('1,234')
+    expect(
+      anchorLabel({ format: 'pptx', v: 1, slide_id: '1', slide_index: 1233 }, { lang: 'de' })
+        ?.params.slide,
+    ).toBe('1.234')
+    expect(
+      anchorLabel({ format: 'pptx', v: 1, slide_id: '1', slide_index: 1233 }, { lang: 'ar' })
+        ?.params.slide,
+    ).toBe(new Intl.NumberFormat('ar').format(1234))
   })
 
   it('pdf: the page through the locale', () => {
-    expect(anchorLabel({ format: 'pdf', v: 1, page: 2, rect: [0, 0, 1, 1] }, { lang: 'vi' })).toEqual({
+    expect(
+      anchorLabel({ format: 'pdf', v: 1, page: 2, rect: [0, 0, 1, 1] }, { lang: 'vi' }),
+    ).toEqual({
       key: 'collabAnchorPage',
       params: { page: '2' },
     })
@@ -135,7 +174,9 @@ describe('anchorLabel', () => {
 })
 
 function render(props: Record<string, unknown>): HTMLElement {
-  act(() => root.render(createElement(AnchorLabel, { lang: 'vi', strings: STRINGS, ...props } as never)))
+  act(() =>
+    root.render(createElement(AnchorLabel, { lang: 'vi', strings: STRINGS, ...props } as never)),
+  )
   return host
 }
 
@@ -149,14 +190,19 @@ describe('AnchorLabel', () => {
   })
 
   it('renders one label per format', () => {
-    expect(render({ anchor: { format: 'xlsx', v: 1, sheet: 'S1', range: 'B7' }, activeSheet: 'S1' }).textContent).toBe('Ô B7')
+    expect(
+      render({ anchor: { format: 'xlsx', v: 1, sheet: 'S1', range: 'B7' }, activeSheet: 'S1' })
+        .textContent,
+    ).toBe('Ô B7')
     expect(render({ anchor: { format: 'pptx', v: 1, slide_index: 2 } }).textContent).toBe('Slide 3')
     expect(render({ anchor: { format: 'pdf', v: 1, page: 9 } }).textContent).toBe('Trang 9')
   })
 
   it('a cut quote keeps the full text in title and is keyboard-reachable', () => {
     const quote = 'w'.repeat(200)
-    const label = render({ anchor: { format: 'docx', v: 1, quote } }).querySelector('.collab-anchor-label') as HTMLElement
+    const label = render({ anchor: { format: 'docx', v: 1, quote } }).querySelector(
+      '.collab-anchor-label',
+    ) as HTMLElement
     expect(label.getAttribute('title')).toBe(quote)
     expect(label.getAttribute('tabindex')).toBe('0')
     expect(label.textContent).toBe('Đoạn “' + 'w'.repeat(60) + '…”')
@@ -177,7 +223,9 @@ describe('AnchorLabel', () => {
   })
 
   it('lost: label + its own state text', () => {
-    const state = render({ anchor: docx, state: 'lost' }).querySelector('.collab-anchor-state') as HTMLElement
+    const state = render({ anchor: docx, state: 'lost' }).querySelector(
+      '.collab-anchor-state',
+    ) as HTMLElement
     expect(state.textContent).toBe('Không còn tìm thấy vị trí được bình luận')
     expect(state.classList.contains('collab-anchor-state-lost')).toBe(true)
   })
@@ -200,6 +248,8 @@ describe('AnchorLabel', () => {
   })
 
   it('an unknown anchor_state string shows no state text', () => {
-    expect(render({ anchor: docx, state: 'weird' }).querySelector('.collab-anchor-state')).toBeNull()
+    expect(
+      render({ anchor: docx, state: 'weird' }).querySelector('.collab-anchor-state'),
+    ).toBeNull()
   })
 })
