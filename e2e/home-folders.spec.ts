@@ -200,15 +200,22 @@ test.describe('home folders panel', () => {
       await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => done(null))))
       await expect(menu).toBeVisible()
 
-      // the row really moving keeps the menu on it as long as the row is visible
-      const before = await menu.boundingBox()
+      // the row really moving keeps the menu on it as long as the row is visible. The menu
+      // fades in with a short translateY, so measure both boxes once that has settled and
+      // compare the menu's move with the row's own move instead of a hard-coded distance
+      await menu.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)))
+      const menuBefore = await menu.boundingBox()
+      const rowBefore = await rootRow.boundingBox()
       await tree.evaluate((el) => {
         ;(el as HTMLElement).style.paddingTop = '16px'
         el.dispatchEvent(new Event('scroll'))
       })
       await expect
+        .poll(async () => (await rootRow.boundingBox())?.y)
+        .toBeCloseTo((rowBefore?.y ?? 0) + 16, 0)
+      await expect
         .poll(async () => (await menu.boundingBox())?.y)
-        .toBeCloseTo((before?.y ?? 0) + 16, 0)
+        .toBeCloseTo((menuBefore?.y ?? 0) + 16, 0)
       await expect(menu).toBeVisible()
     } finally {
       await closeAndSaveVideo(launched, 'home-folders-menu-scroll')
