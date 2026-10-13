@@ -20,7 +20,7 @@ export interface WorkbenchNewItem {
 interface Props {
   practice: PracticeDefinition
   onSwitchPractice: (id: PracticeId) => void
-  /** empty while signed out or still loading: the workspace select is hidden */
+  /** empty while signed out or still loading: the workspace chip is hidden */
   workspaces: readonly UniworkWorkspaceRef[]
   workspaceId: string | null
   onSelectWorkspace: (id: string) => void
@@ -29,7 +29,11 @@ interface Props {
   onRefresh: () => void
 }
 
-/** Workbench title, the "workspace · role" picker, + New and Refresh. */
+/**
+ * Workbench breadcrumb (workspace / title, role), Refresh and + New. Each chip
+ * lays a transparent native select over itself, so keyboard and screen readers
+ * keep the platform picker.
+ */
 export function WorkbenchTopBar({
   practice,
   onSwitchPractice,
@@ -44,6 +48,8 @@ export function WorkbenchTopBar({
   const vi = lang === 'vi'
   const [menuOpen, setMenuOpen] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
+  // a select whose value is not listed shows its first option, so the chip does too
+  const ws = workspaces.find((w) => w.id === workspaceId) ?? workspaces[0]
 
   useEffect(() => {
     if (!menuOpen) return
@@ -68,10 +74,21 @@ export function WorkbenchTopBar({
 
   return (
     <header className="wb-topbar">
-      <h1 className="wb-topbar-title">{t('wbTopTitle')}</h1>
-      <div className="wb-topbar-picker">
-        {workspaces.length > 0 ? (
-          <>
+      {ws ? (
+        <>
+          <span className="wb-crumb wb-crumb-ws">
+            <span className="wb-crumb-mark" aria-hidden="true">
+              {Array.from(ws.name.trim())[0]?.toUpperCase()}
+            </span>
+            <span className="wb-crumb-name" aria-hidden="true">
+              {ws.name}
+            </span>
+            <span
+              className={`wb-crumb-caret${workspaces.length === 1 ? ' is-muted' : ''}`}
+              aria-hidden="true"
+            >
+              ▾
+            </span>
             <select
               aria-label={t('wbTopWorkspace')}
               value={workspaceId ?? ''}
@@ -83,11 +100,20 @@ export function WorkbenchTopBar({
                 </option>
               ))}
             </select>
-            <span className="wb-topbar-sep" aria-hidden="true">
-              ·
-            </span>
-          </>
-        ) : null}
+          </span>
+          <span className="wb-crumb-sep" aria-hidden="true">
+            /
+          </span>
+        </>
+      ) : null}
+      <h1 className="wb-topbar-title">{t('wbTopTitle')}</h1>
+      <span className="wb-crumb wb-crumb-role">
+        <span className="wb-crumb-name" aria-hidden="true">
+          {vi ? practice.labelVi : practice.labelEn}
+        </span>
+        <span className="wb-crumb-caret" aria-hidden="true">
+          ▾
+        </span>
         <select
           aria-label={t('wbTopRole')}
           value={practice.id}
@@ -103,15 +129,29 @@ export function WorkbenchTopBar({
             </optgroup>
           ))}
         </select>
-      </div>
+      </span>
       <div className="wb-topbar-actions">
-        <button type="button" className="btn btn-secondary" onClick={onRefresh}>
-          {t('wbTopRefresh')}
+        <button
+          type="button"
+          className="wb-btn wb-btn-ghost wb-btn-icon"
+          aria-label={t('wbTopRefresh')}
+          title={t('wbTopRefresh')}
+          onClick={onRefresh}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path
+              d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 4.5v4h-4"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
         </button>
         <div className="wb-new-wrap" ref={wrapRef}>
           <button
             type="button"
-            className="btn btn-primary"
+            className="wb-btn wb-btn-primary"
             aria-haspopup="menu"
             aria-expanded={menuOpen}
             onClick={() => setMenuOpen((o) => !o)}

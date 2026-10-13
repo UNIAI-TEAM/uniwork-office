@@ -41,7 +41,7 @@ describe('Workbench tab bar', () => {
   })
 
   // WCAG 2.4.7: the hover background alone is near-invisible on the light surface
-  it.each(['.wb-topbar-picker select', '.wb-new-item', '.wb-tab-menu-item'])(
+  it.each(['.wb-new-item', '.wb-tab-menu-item'])(
     '%s shows an accent outline on keyboard focus',
     (sel) => {
       const css = readFileSync(join(__dirname, '../src/renderer/src/home.css'), 'utf8')
@@ -52,4 +52,14 @@ describe('Workbench tab bar', () => {
       expect(css).not.toMatch(new RegExp(`${escaped}:focus-visible \\{[^}]*outline: none`))
     },
   )
+
+  // the select inside a breadcrumb chip is transparent, so the chip draws its focus ring
+  it('a breadcrumb chip shows an accent outline while its select has keyboard focus', () => {
+    const css = readFileSync(join(__dirname, '../src/renderer/src/home.css'), 'utf8')
+    expect(css).toContain(
+      '\n.wb-crumb:has(select:focus-visible) {\n  outline: 2px solid var(--accent);',
+    )
+    expect(css).toContain('\n.wb-crumb > select {\n  position: absolute;\n  inset: 0;')
+    expect(css).not.toContain('.wb-topbar-picker')
+  })
 })
