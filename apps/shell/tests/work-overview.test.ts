@@ -489,6 +489,27 @@ describe('WorkOverview', () => {
     expect(host.querySelector('#wb-ov-inbox .wb-ov-avatar')?.textContent).toBe('L')
   })
 
+  it('an inbox item with no actor shows the inbox icon, never an empty avatar', async () => {
+    const [n] = summary().inbox
+    work.homeSummary.mockResolvedValue({
+      ok: true,
+      value: summary({
+        inbox: [
+          {
+            ...n!,
+            id: 'n2',
+            kind: 'meeting_starting',
+            params: { meeting: 'Weekly sync', minutes: '5' },
+          },
+        ],
+      }),
+    })
+    await mount()
+    const row = host.querySelector('#wb-ov-inbox .wb-row')!
+    expect(row.querySelector('.wb-ov-avatar')).toBeNull()
+    expect(row.querySelector('.wb-icon-tile')).not.toBeNull()
+  })
+
   it('loading: a skeleton shaped like the strip and three rows', async () => {
     work.homeSummary.mockReturnValue(new Promise<never>(() => undefined))
     await mount()

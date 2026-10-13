@@ -373,21 +373,28 @@ export function WorkOverview({
         <p className="wb-ov-note">{t('wbOvInboxEmpty')}</p>
       ) : (
         <ul className="wb-ov-list wb-block">
-          {s.inbox.map((n) => (
-            <li key={n.id} className="wb-row">
-              <span className="wb-ov-avatar" aria-hidden="true">
-                {(n.params.actor ?? '').trim().charAt(0).toUpperCase()}
-              </span>
-              <button
-                type="button"
-                className="wb-ov-row-title"
-                onClick={() => base && openWeb(inboxTarget(n, base))}
-              >
-                {t(notificationKey(n.kind), n.params)}
-              </button>
-              <span className="wb-mono wb-num">{formatWhen(n.created_at, dateLocale)}</span>
-            </li>
-          ))}
+          {s.inbox.map((n) => {
+            const initial = (n.params.actor ?? '').trim().charAt(0).toUpperCase()
+            return (
+              <li key={n.id} className="wb-row">
+                {initial ? (
+                  <span className="wb-ov-avatar" aria-hidden="true">
+                    {initial}
+                  </span>
+                ) : (
+                  <WorkbenchIcon id="inbox" size={20} tint="blue" />
+                )}
+                <button
+                  type="button"
+                  className="wb-ov-row-title"
+                  onClick={() => base && openWeb(inboxTarget(n, base))}
+                >
+                  {t(notificationKey(n.kind), n.params)}
+                </button>
+                <span className="wb-mono wb-num">{formatWhen(n.created_at, dateLocale)}</span>
+              </li>
+            )
+          })}
         </ul>
       )}
     </section>
