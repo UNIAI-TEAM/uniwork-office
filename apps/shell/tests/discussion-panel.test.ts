@@ -1,6 +1,8 @@
 /**
  * @vitest-environment jsdom
  */
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
@@ -234,13 +236,57 @@ describe('toggle', () => {
     expect(frame()).toBeNull()
   })
 
-  it('a bound document shows a closed toggle that names the panel it controls', async () => {
+  it('a bound document shows a closed toggle; it points at no panel while none exists (F1)', async () => {
     await mount()
     const button = toggle()!
     expect(button.textContent).toContain('Discussion')
     expect(button.getAttribute('aria-expanded')).toBe('false')
-    expect(button.getAttribute('aria-controls')).toBeTruthy()
     expect(frame()).toBeNull()
+    // aria-controls must never name an element that is not in the DOM
+    const controls = button.getAttribute('aria-controls')
+    expect(controls === null || document.getElementById(controls) !== null).toBe(true)
+  })
+
+  it('the open toggle controls the panel frame', async () => {
+    await mount()
+    await click(toggle())
+    const controls = toggle()!.getAttribute('aria-controls')
+    expect(controls).toBeTruthy()
+    expect(document.getElementById(controls!)).toBe(frame())
+  })
+
+  it('the resize separator has its own name, not the toggle label (F2)', async () => {
+    await mount()
+    await click(toggle())
+    const handle = frame()!.querySelector('[role=separator]')!
+    const name = handle.getAttribute('aria-label')
+    expect(name).toBe('Resize panel')
+    expect(name).not.toBe(toggle()!.textContent?.trim())
+  })
+
+  it('the toggle stays inside the 40 px tab strip with a 44 px hit area (V-F1)', () => {
+    const css = readFileSync(resolve(__dirname, '../src/renderer/src/discussion.css'), 'utf8')
+    const rule = (sel: string, from = 0) => {
+      const at = css.indexOf(`${sel} {`, from)
+      expect(at, `rule ${sel}`).toBeGreaterThanOrEqual(0)
+      return css.slice(at, css.indexOf('}', at))
+    }
+    const px = (block: string, prop: string) =>
+      Number(new RegExp(`(?:^|[\\s;])${prop}:\\s*(-?\\d+)px`).exec(block)?.[1] ?? NaN)
+    const base = rule('.uw-discussion-toggle')
+    expect(px(base, 'height')).toBeLessThanOrEqual(36)
+    expect(base).toMatch(/position:\s*relative/)
+    const coarseAt = css.indexOf('@media (pointer: coarse)')
+    const coarse = rule('.uw-discussion-toggle', coarseAt)
+    expect(coarse).not.toMatch(/min-height:\s*44px/)
+    const pill = px(coarse, 'height')
+    expect(pill).toBeLessThanOrEqual(36)
+    // the 44 px target is a pseudo-element, so the visible pill stays small
+    const hit = rule('.uw-discussion-toggle::after')
+    expect(hit).toMatch(/position:\s*absolute/)
+    const coarseHit = rule('.uw-discussion-toggle::after', coarseAt)
+    const reach = (block: string) => pill - px(block, 'top') - px(block, 'bottom')
+    expect(reach(coarseHit)).toBeGreaterThanOrEqual(44)
   })
 
   it('opens the panel, tells main the width and renders the list from the bridge', async () => {
@@ -351,6 +397,41 @@ describe('keyboard', () => {
     expect(frame()).toBeNull()
     expect(document.activeElement).toBe(toggle())
     expect(bridge.setPanel.mock.calls.at(-1)![0].open).toBe(false)
+  })
+
+  it('Esc in an empty composer closes the panel and returns focus to the toggle (V-F3)', async () => {
+    await mount()
+    await click(toggle())
+    const area = panel()!.querySelector<HTMLTextAreaElement>('textarea')!
+    expect(area).toBeTruthy()
+    await act(async () => area.focus())
+    await act(async () => {
+      area.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+      )
+    })
+    await flush()
+    expect(frame()).toBeNull()
+    expect(document.activeElement).toBe(toggle())
+  })
+
+  it('Esc with text in the composer keeps the panel open (the kit asks first)', async () => {
+    await mount()
+    await click(toggle())
+    const area = panel()!.querySelector<HTMLTextAreaElement>('textarea')!
+    const setValue = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!
+    await act(async () => {
+      area.focus()
+      setValue.call(area, 'half a thought')
+      area.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await act(async () => {
+      area.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+      )
+    })
+    await flush()
+    expect(frame()).not.toBeNull()
   })
 
   it('the toggle closes the panel again', async () => {
