@@ -30,6 +30,7 @@
     "module-bridge.test.ts",
     "draft-recovery.ts",
     "draft-recovery.test.ts",
+    "mock-port.test.ts",
     "testing/*.ts"
   ]
 }
