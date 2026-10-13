@@ -767,6 +767,23 @@ describe('the S18 change notice (G8-17)', () => {
     expect(seen).toEqual([])
   })
 
+  // R1-7: a page can carry two changes for one document (a fast double edit);
+  // both pass the revision comparison in the same pass, so the applied ids are
+  // deduped per document - one metadata re-read, not two.
+  it('announces a document with two changes in one page exactly once', async () => {
+    const seen: string[] = []
+    const h = harness({
+      pages: () => ({
+        ...PAGE,
+        changes: [change('doc_1'), { ...change('doc_1'), revision: '42' }, change('doc_2')],
+        nextCursor: 'c1',
+      }),
+      onFeedChange: (c) => seen.push(c.documentId),
+    })
+    await h.runtime.tick()
+    expect(seen).toEqual(['doc_1', 'doc_2'])
+  })
+
   it('announces nothing when the cache refuses the page', async () => {
     const seen: string[] = []
     const h = harness({

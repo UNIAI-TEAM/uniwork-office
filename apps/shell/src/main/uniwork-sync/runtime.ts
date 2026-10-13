@@ -158,18 +158,21 @@ export function createStoreDocCache(options: StoreDocCacheOptions): DocCache {
     async applyPage(changes: readonly FeedChange[]) {
       const state = await load()
       if (!state) return UNAVAILABLE
-      const applied: string[] = []
+      // one id per document, however many of its changes this page carries: a
+      // fast double edit passes the revision comparison twice in one pass, and
+      // the notice must still be one per document (R1-7)
+      const applied = new Set<string>()
       for (const change of changes) {
         const known = state.docs[change.documentId]
         // an older revision never overwrites a newer one, so a replay is inert
         if (known && compareRevision(change.revision, known.revision) <= 0) continue
         state.docs[change.documentId] = change
-        applied.push(change.documentId)
+        applied.add(change.documentId)
       }
       const listed = new Set(state.index)
       for (const change of changes) listed.add(change.documentId)
       state.index = [...listed]
-      return { ...(await commit(state)), applied }
+      return { ...(await commit(state)), applied: [...applied] }
     },
 
     async reconcile(ids: ReadonlySet<string>, { keepDrafts }) {
