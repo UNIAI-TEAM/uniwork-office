@@ -132,6 +132,13 @@ export interface QueueDispatcherDeps {
   clock(): number
   random?(): number
   limits?: QueueLimits
+  /**
+   * Whether this session may still send for this document (signed in, still
+   * the account that owns the binding). Checked right before the upload and
+   * right before the commit: false stops the pass with no request and no state
+   * of its own, so an account switch mid-upload never commits the copy.
+   */
+  canCommit?(doc: QueueDoc): boolean
   /** status push for every record change; the front maps a record to a chip */
   publish(record: IntentRecordV2): void
   uuid?(): string
@@ -451,6 +458,11 @@ export class QueueDispatcher {
     return state === 'queued' || state === 'paused_offline'
   }
 
+  /** the session/ownership verdict of the front: false stops the pass silently */
+  private sessionAllows(doc: QueueDoc): boolean {
+    return this.deps.canCommit?.(doc) !== false
+  }
+
   /** one document through validate -> upload -> lock check -> commit */
   private async runOne(doc: QueueDoc, now: number): Promise<QueueState> {
     const lock = await this.deps.lock.acquire(doc.key)
@@ -467,6 +479,8 @@ export class QueueDispatcher {
     const stopBeat = this.startHeartbeat(doc.key, generation)
     this.committing.add(doc.key)
     try {
+      // the session must still own this document before a byte moves
+      if (!this.sessionAllows(doc)) return doc.record.state
       // validation passed: the first `uploaded` advances validating -> uploading
       await this.apply(doc, { type: 'dispatch' }, now)
       await this.apply(doc, { type: 'uploaded' }, now)
@@ -505,6 +519,9 @@ export class QueueDispatcher {
         this.publishOtherWindow(doc)
         return doc.record.state
       }
+      // and the session must still own the document right before the commit:
+      // an account switch during the upload must not commit this copy
+      if (!this.sessionAllows(doc)) return doc.record.state
       // the bytes are staged: the second `uploaded` advances uploading -> committing
       await this.apply(doc, { type: 'uploaded' }, now)
       let receipt: {

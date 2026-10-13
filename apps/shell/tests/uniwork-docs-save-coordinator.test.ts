@@ -864,6 +864,44 @@ describe('G5-06 W4a save queue (fakes)', () => {
     expect((await stored(h.intents, doc))?.intent.intentId).toBe(doc.record.intentId)
   })
 
+  it('canCommit false between upload and commit -> no commit, the record is not damaged', async () => {
+    const h = await harness()
+    const doc = h.makeDoc()
+    await h.dispatcher.enqueue(doc)
+    const keyBefore = doc.record.idempotencyKey
+    let allowed = true
+    const switching: QueueClient = {
+      upload: async (input) => {
+        const receipt = await h.server.client.upload(input)
+        // the account switches while the bytes are in flight
+        allowed = false
+        return receipt
+      },
+      commit: h.server.client.commit,
+      lookupCommit: h.server.client.lookupCommit,
+    }
+    const dispatcher = h.newDispatcherWith({ client: switching, canCommit: () => allowed })
+    await dispatcher.dispatchAll([doc])
+    // the guard stopped the pass before the commit request
+    expect(h.server.state.counts.commit).toBe(0)
+    // and wrote nothing of its own: same intent, no terminal/failed state
+    const after = await stored(h.intents, doc)
+    expect(after?.intent.intentId).toBe(doc.record.intentId)
+    expect(after?.intent.idempotencyKey).toBe(keyBefore)
+    expect(after?.intent.state).toBe('uploading')
+    expect(after?.intent.lastError).toBeUndefined()
+
+    // the same guard before the upload: a session that is already gone sends nothing
+    const gone = await harness()
+    const doc2 = gone.makeDoc()
+    await gone.dispatcher.enqueue(doc2)
+    const blocked = gone.newDispatcherWith({ canCommit: () => false })
+    await blocked.dispatchAll([doc2])
+    expect(gone.server.state.counts.upload).toBe(0)
+    expect(gone.server.state.counts.commit).toBe(0)
+    expect((await stored(gone.intents, doc2))?.intent.state).toBe('queued')
+  })
+
   it('two orgs with different sync_write -> each intent follows its org', async () => {
     const h = await harness()
     h.capability.set('org_a', true)

@@ -795,6 +795,18 @@ export class UniworkDocsService {
       pause,
       drafts,
       clock: () => Date.now(),
+      // an account switch (or a sign-out) between the upload and the commit
+      // must not commit this copy under the other account: the dispatcher
+      // re-asks this right before the upload and right before the commit
+      canCommit: (doc) => {
+        const bound = this.store.lookup(doc.path)
+        return (
+          this.isQueueSessionCurrent({ token }) &&
+          this.deps.identity() !== null &&
+          bound !== null &&
+          this.owns(bound)
+        )
+      },
       publish: (record) => this.publishRecord(record),
     })
     this.queueSession = { token, dispatcher, lock, intents, drafts, pause }
@@ -1062,6 +1074,18 @@ export class UniworkDocsService {
    */
   private stopQueue(): void {
     this.queueSession = null
+  }
+
+  /**
+   * Whether the account session a dispatcher belongs to is still the live one:
+   * a sign-out (no scope) or an account switch (another token) must stop its
+   * commits. Minimal stub while the parallel fix-B edit adds the full helper;
+   * the lead resolves the merge.
+   */
+  private isQueueSessionCurrent(session: { token: string }): boolean {
+    const scope = this.deps.syncStore?.scope()
+    if (!scope) return false
+    return `${scope.deploymentId}/${scope.accountId}` === session.token
   }
 
   /**
