@@ -63,6 +63,7 @@ export type ModuleBridgePort = Pick<
   | 'setTitle'
   | 'setModal'
   | 'onRemoteVersion'
+  | 'onBlocked'
   | 'reportSaved'
   | 'reportAiRun'
   | 'reportError'

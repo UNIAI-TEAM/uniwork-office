@@ -14,6 +14,7 @@ import {
   type InitUser,
   type ProtocolErrorCode,
   type AiRunPayload,
+  type DocBlockedPayload,
   type ProtocolErrorShape,
   type RemoteVersionPayload,
   type SavedPayload,
@@ -65,6 +66,8 @@ export interface FramePort {
   onFileRenamed(listener: (file: FileMeta) => void): () => void
   /** host event `doc.remoteVersion` for this document (X-02; optional for older clients and mocks) */
   onRemoteVersion?(listener: (payload: RemoteVersionPayload) => void): () => void
+  /** host event `doc.blocked` for this document (G5-03w; optional for older clients and mocks) */
+  onBlocked?(listener: (payload: DocBlockedPayload) => void): () => void
   /** host `theme` / `language` events (the host is authoritative for both) */
   onTheme(listener: (theme: Theme) => void): () => void
   onLanguage(listener: (locale: string) => void): () => void

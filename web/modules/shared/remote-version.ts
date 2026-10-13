@@ -14,7 +14,11 @@
  *     content and shows the error bar with Retry;
  *   - revoke / delete (a 403 or 410 from a reload or a save): the frame is locked (inert editor,
  *     every save refused) behind the error bar; the organisation reasons of a 403 and a 401 only
- *     show their bar, because the server keeps refusing the saves by itself.
+ *     show their bar, because the server keeps refusing the saves by itself;
+ *   - the host's `doc.blocked` (G5-03w: it saw the revoke / delete itself) locks at once, before
+ *     any save: the reason's bar (revoke, delete, or the organisation sentence; a reason this frame
+ *     does not know reads as revoked), the editor inert with its content (dirty edits included)
+ *     kept, every save refused. Once per reason; another document lifts it (`reset`).
  * A module supplies the bits that are its own (what is open, dirty, how a head replaces the
  * document); the rest is shared by Docs, PDF, Markdown, HTML, Slides and Sheets.
  */
@@ -23,6 +27,7 @@ import {
   isDecimalRevision,
   openReplyRevision,
   toProtocolError,
+  type DocBlockedPayload,
   type OpenPayload,
   type ProtocolErrorShape,
   type RemoteVersionPayload,
@@ -38,7 +43,7 @@ import { createRemoteBar, type BarAction, type RemoteBar } from './remote-bar'
 export type LockKind = 'revoked' | 'deleted'
 
 export interface RemoteVersionHost {
-  port: Pick<FramePort, 'onRemoteVersion' | 'request'>
+  port: Pick<FramePort, 'onRemoteVersion' | 'onBlocked' | 'request'>
   /** the open document; `revision` is the open copy's (decimal), null when the host sent none */
   current(): { fileId: string; revision: string | null } | null
   /** the editor holds edits that are not saved */
@@ -190,11 +195,14 @@ export function createRemoteVersion(host: RemoteVersionHost): RemoteVersion {
 
   // ------------------------------------------------------------ lock (revoke / delete)
 
-  function lockFrame(kind: LockKind): void {
-    if (lock === kind) return
+  function lockFrame(kind: LockKind, sentence?: string): void {
+    const text = sentence ?? t(kind === 'revoked' ? 'uwRemoteRevokedWeb' : 'uwRemoteDeleted')
+    if (lock === kind && lockSentence === text) return
+    // a deleted document stays deleted: a later revoke of it changes nothing
+    if (lock === 'deleted' && kind === 'revoked') return
     lock = kind
     latest = null
-    lockSentence = t(kind === 'revoked' ? 'uwRemoteRevokedWeb' : 'uwRemoteDeleted')
+    lockSentence = text
     shown = null
     bar.show({ tone: 'error', region: 'lock', text: lockSentence })
     // the editor stays on screen but nothing can be typed, saved, exported or printed
@@ -398,6 +406,19 @@ export function createRemoteVersion(host: RemoteVersionHost): RemoteVersion {
     evaluate()
   })
 
+  /** `doc.blocked`: the host saw the revoke / delete itself; the reason picks the bar */
+  function blocked(p: DocBlockedPayload): void {
+    const cur = host.current()
+    if (cur && cur.fileId !== p.document_id) return
+    if (p.reason === 'document_deleted') return lockFrame('deleted')
+    const org = ORG_BLOCKED[p.reason]
+    // the organisation reasons lock too: the host already knows the saves will be refused
+    if (org) return lockFrame('revoked', t('uwRemoteOrgBlockedWeb', { reason: t(org) }))
+    lockFrame('revoked')
+  }
+
+  const offBlocked = host.port.onBlocked?.(blocked)
+
   const offAi = ai.onChange((running) => {
     // the AI bar waits for the turn: idle on a still clean document loads the version
     if (!running && latest && shown === 'ai') evaluate()
@@ -449,6 +470,7 @@ export function createRemoteVersion(host: RemoteVersionHost): RemoteVersion {
     },
     dispose() {
       offRemote?.()
+      offBlocked?.()
       offAi()
       token++
       unlockFrame()
