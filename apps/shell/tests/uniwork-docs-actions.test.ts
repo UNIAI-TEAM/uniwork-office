@@ -70,6 +70,8 @@ function fakeServer(
      * request already in flight (the abort rejects it, as real fetch does)
      */
     uploadGate?: () => Promise<void>
+    /** the "Location" field's folder pages, served in cursor order (R1-8) */
+    folderPages?: Array<Array<{ id: string; title: string }>>
   } = {},
 ) {
   const state = {
@@ -190,6 +192,16 @@ function fakeServer(
     }
     // folders
     if (u.pathname === `/api/v1/workspaces/${WS}/documents`) {
+      if (options.folderPages) {
+        // cursor `n` names page n; the page before the last one carries the next
+        const page = Number(u.searchParams.get('cursor') ?? '0')
+        const rows = options.folderPages[page] ?? []
+        const next = page + 1 < options.folderPages.length ? String(page + 1) : null
+        return json(200, {
+          documents: rows.map((row) => ({ ...row, kind: 'folder', workspace_id: WS })),
+          next_cursor: next,
+        })
+      }
       return json(200, {
         documents: [
           { id: 'fold_1', kind: 'folder', title: 'Contracts' },
@@ -552,6 +564,46 @@ describe('folders', () => {
     expect(folders).toEqual({ ok: true, value: [{ id: 'fold_1', title: 'Contracts' }] })
     const call = server.calls.find((c) => c.path === `/api/v1/workspaces/${WS}/documents`)!
     expect(call.query).toContain('kind=folder')
+  })
+
+  // R1-8: a workspace with more than one page of folders ignored `next_cursor`,
+  // so a destination past the first page could not be chosen at all.
+  it('follows the folder next_cursor across pages', async () => {
+    const server = fakeServer({
+      folderPages: [
+        [{ id: 'fold_1', title: 'Contracts' }],
+        [{ id: 'fold_2', title: 'Archive' }],
+      ],
+    })
+    const ctx = setup(server)
+    const folders = await ctx.service.listFolders(WS)
+    expect(folders).toEqual({
+      ok: true,
+      value: [
+        { id: 'fold_1', title: 'Contracts' },
+        { id: 'fold_2', title: 'Archive' },
+      ],
+    })
+    const calls = server.calls.filter((c) => c.path === `/api/v1/workspaces/${WS}/documents`)
+    expect(calls).toHaveLength(2)
+    expect(calls[0]!.query).toContain('kind=folder')
+    expect(calls[1]!.query).toContain('cursor=1')
+  })
+
+  // the walk is bounded: 10 pages x D's 100-row cap. Past that the remaining
+  // folders are simply not offered (documented residual), never an endless read.
+  it('stops the folder walk at its page bound', async () => {
+    const server = fakeServer({
+      folderPages: Array.from({ length: 12 }, (_, i) => [{ id: `f_${i}`, title: `F${i}` }]),
+    })
+    const ctx = setup(server)
+    const folders = await ctx.service.listFolders(WS)
+    expect(folders.ok).toBe(true)
+    if (!folders.ok) return
+    expect(folders.value).toHaveLength(10)
+    expect(
+      server.calls.filter((c) => c.path === `/api/v1/workspaces/${WS}/documents`),
+    ).toHaveLength(10)
   })
 })
 

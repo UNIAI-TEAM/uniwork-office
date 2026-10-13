@@ -426,23 +426,28 @@ export function parseDocumentSummary(raw: unknown): UniworkDocSummary {
 }
 
 /**
- * `GET /workspaces/{ws}/documents?kind=folder` -> the folder choices for the
- * "Location" field. A row without a usable id or title is skipped rather than
- * failing the dialog.
+ * `GET /workspaces/{ws}/documents?kind=folder` -> one page of folder choices
+ * for the "Location" field, plus D's opaque `next_cursor` (null at the end). A
+ * row without a usable id or title is skipped rather than failing the dialog.
  */
-export function parseFolders(raw: unknown): UniworkDocFolderRef[] {
+export function parseFolders(raw: unknown): {
+  folders: UniworkDocFolderRef[]
+  nextCursor: string | null
+} {
   const body = record(raw)
   if (!Array.isArray(body.documents)) bad()
-  const out: UniworkDocFolderRef[] = []
+  const next = body.next_cursor
+  if (next !== null && next !== undefined && typeof next !== 'string') bad()
+  const folders: UniworkDocFolderRef[] = []
   for (const value of body.documents) {
     if (!isRecord(value)) continue
     if (value.kind !== 'folder') continue
     const id = value.id
     const title = value.title
     if (typeof id !== 'string' || !id || typeof title !== 'string' || !title) continue
-    out.push({ id, title })
+    folders.push({ id, title })
   }
-  return out
+  return { folders, nextCursor: typeof next === 'string' && next ? next : null }
 }
 
 /**
