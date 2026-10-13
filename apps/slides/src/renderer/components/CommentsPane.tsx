@@ -13,7 +13,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { format } from '@genoffice/i18n'
-import type { UniworkCommentsApi } from '@genoffice/electron-utils/comments-ipc'
+import type { UniworkCommentsSeamApi } from '../comments-seam'
 import {
   AnchorLabel,
   CollabComposer,
@@ -30,7 +30,6 @@ import {
   slidePositionOf,
   type SlideIdentity,
   type SlidesCommentsContext,
-  type SlidesCommentsContextApi,
 } from '../server-comments'
 import { useServerComments, type ServerComments } from '../use-server-comments'
 import { IconComment, IconSidebarCollapse } from './icons'
@@ -227,7 +226,7 @@ export function ServerCommentsPane({ server, slides, inFile, onCollapse }: Serve
         inFile={{ count: inFile.length, content: inFileContent }}
       />
       {!server.versionId && ctl.can.canWrite && ctl.state === 'ready' && (
-        <p className="comments-server-hint">{t('paneCommentsNewUnavailable')}</p>
+        <p className="comments-server-hint">{t('paneCommentsSaveFirst')}</p>
       )}
     </div>
   )
@@ -235,15 +234,14 @@ export function ServerCommentsPane({ server, slides, inFile, onCollapse }: Serve
 
 /** what App calls on the mounted server comments (the ribbon's "New Comment") */
 export interface ServerCommentsHandle {
-  /** false: no thread could start (no slide identity, or no document version yet) */
+  /** false: no thread could start (no slide identity, or the open version is unknown: save first) */
   startThread(slideIndex: number, objectId?: string): boolean
 }
 
 interface HostProps {
-  bridge: UniworkCommentsApi
+  bridge: UniworkCommentsSeamApi
   path: string
   context: SlidesCommentsContext
-  contextApi?: SlidesCommentsContextApi
   slides: readonly SlideIdentity[]
   /** the pane slot App draws while the comments pane is shown; null: closed */
   slot: HTMLElement | null
@@ -257,6 +255,8 @@ interface HostProps {
   handleRef: React.MutableRefObject<ServerCommentsHandle | null>
   /** open threads, for the ribbon badge */
   onOpenCount(n: number): void
+  /** the status line: "save first" when a new thread is asked for while the open version is unknown */
+  onStatus(text: string): void
 }
 
 /**
@@ -264,19 +264,26 @@ interface HostProps {
  * launch-ticket reveal work while the pane is closed; the pane renders into App's slot.
  */
 export function ServerCommentsHost(p: HostProps) {
-  const { lang } = useI18n()
+  const { lang, t } = useI18n()
   const server = useServerComments({
     bridge: p.bridge,
     path: p.path,
     context: p.context,
-    contextApi: p.contextApi,
     lang,
     slides: p.slides,
     open: p.slot !== null,
     goTo: p.goTo,
     onOpen: p.onOpen,
   })
-  p.handleRef.current = { startThread: server.startThread }
+  const onStatus = p.onStatus
+  p.handleRef.current = {
+    startThread: (index, objectId) => {
+      const started = server.startThread(index, objectId)
+      // a root thread needs base_version_id: unknown until the first Save receipt (same rule as Docs)
+      if (!started && !server.versionId) onStatus(t('paneCommentsSaveFirst'))
+      return started
+    },
+  }
 
   const openCount = server.controller.threads.length
   const onOpenCount = p.onOpenCount

@@ -6,8 +6,9 @@
  * - poll: focus + 30 s, only while the window is visible and the pane is open (comments-poll.ts);
  * - reveal: the shell's `comments.reveal` push for this path opens the pane, goes to the slide
  *   (+ selects the object) and focuses the thread (the kit holds it until the first list);
- * - save: after the save receipt (`onUniworkSaved`, carrying the new version) every live anchored
- *   thread is re-sent with its slide's new position, or `lost` when the slide is gone.
+ * - save: after the save receipt (`window.uniworkComments.onSaved`, for this path, carrying the new
+ *   version) every live anchored thread is re-sent with its slide's new position, or `lost` when the
+ *   slide is gone; a version the server rejects keeps the shown anchors and retries at the next Save.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Lang } from '@genoffice/i18n'
@@ -18,7 +19,7 @@ import {
   type CollabHostState,
 } from '@genoffice/ui/collab'
 import { createCommentsPoll } from '@genoffice/electron-utils/comments-poll'
-import type { UniworkCommentsApi } from '@genoffice/electron-utils/comments-ipc'
+import type { UniworkCommentsSeamApi } from './comments-seam'
 import {
   createSlidesAnchorAdapter,
   createSlidesCommentSource,
@@ -27,15 +28,13 @@ import {
   slideIdOf,
   type SlideIdentity,
   type SlidesCommentsContext,
-  type SlidesCommentsContextApi,
 } from './server-comments'
 
 export interface ServerCommentsOptions {
-  bridge: UniworkCommentsApi
+  bridge: UniworkCommentsSeamApi
   /** the working-copy path every bridge call names */
   path: string
   context: SlidesCommentsContext
-  contextApi?: SlidesCommentsContextApi
   lang: Lang
   slides: readonly SlideIdentity[]
   /** the pane is shown */
@@ -48,14 +47,14 @@ export interface ServerCommentsOptions {
 
 export interface ServerComments {
   controller: CollabController
-  /** the version a new thread is based on; undefined: new threads are unavailable */
-  versionId: string | undefined
+  /** the version a new thread is based on; null: unknown, new threads are unavailable */
+  versionId: string | null
   /** opens a new thread on slide `index` (+ object); false when the anchor or the version is missing */
   startThread(index: number, objectId?: string): boolean
 }
 
 export function useServerComments(o: ServerCommentsOptions): ServerComments {
-  const { bridge, path, context, contextApi, lang, slides, open } = o
+  const { bridge, path, context, lang, slides, open } = o
   const optsRef = useRef(o)
   optsRef.current = o
   const slidesRef = useRef(slides)
@@ -75,11 +74,11 @@ export function useServerComments(o: ServerCommentsOptions): ServerComments {
       documentId: context.documentId,
       kind: 'comment',
       level: context.level,
-      myUserId: context.userId,
+      myUserId: context.myUserId,
       lang,
       platform,
     }),
-    [context.documentId, context.level, context.userId, lang, platform],
+    [context.documentId, context.level, context.myUserId, lang, platform],
   )
   const strings = useMemo(() => collabStrings(lang), [lang])
   // rebuilt when the slide order changes, so a reorder re-sorts the list (the kit memoises on it)
@@ -137,25 +136,26 @@ export function useServerComments(o: ServerCommentsOptions): ServerComments {
   )
 
   // after the save receipt: the new version is the base of new threads, and every anchor follows its slide
-  useEffect(() => {
-    const subscribe = contextApi?.onUniworkSaved
-    if (!subscribe) return
-    return subscribe.call(contextApi, (receipt) => {
-      if (typeof receipt?.versionId !== 'string' || receipt.versionId === '') return
-      setVersionId(receipt.versionId)
-      const ctl = ctlRef.current
-      if (ctl.state !== 'ready') return
-      const roots = [...ctl.threads, ...ctl.resolved].filter((t) => !t.deleted).map((t) => t.root)
-      void sendAnchorsAfterSave(bridge, path, receipt.versionId, roots, slidesRef.current).then(
-        (changed) => {
-          // contract §2.6: a round that changed rows is followed by a full reload
-          if (changed) void ctlRef.current.reload()
-        },
-        // anchor_version_invalid / offline: the shown anchors stay; the next save retries
-        () => undefined,
-      )
-    })
-  }, [contextApi, bridge, path])
+  useEffect(
+    () =>
+      bridge.onSaved((receipt) => {
+        if (receipt?.path !== path) return
+        if (typeof receipt.versionId !== 'string' || receipt.versionId === '') return
+        setVersionId(receipt.versionId)
+        const ctl = ctlRef.current
+        if (ctl.state !== 'ready') return
+        const roots = [...ctl.threads, ...ctl.resolved].filter((t) => !t.deleted).map((t) => t.root)
+        void sendAnchorsAfterSave(bridge, path, receipt.versionId, roots, slidesRef.current).then(
+          (res) => {
+            // contract §2.6: a round that changed rows is followed by a full reload
+            if (res.outcome === 'synced' && res.updated.length > 0) void ctlRef.current.reload()
+          },
+          // offline / server error: the shown anchors stay; the next save sends the map again
+          () => undefined,
+        )
+      }),
+    [bridge, path],
+  )
 
   const startThread = useCallback((index: number, objectId?: string): boolean => {
     const base = versionRef.current

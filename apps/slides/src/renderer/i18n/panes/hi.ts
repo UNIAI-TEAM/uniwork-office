@@ -63,8 +63,8 @@ export const hi = {
   paneCommentsPlaceholder: 'नई टिप्पणी… (पोस्ट करने के लिए ⌘/Ctrl+Enter)',
   paneCommentsPost: 'पोस्ट करें',
   paneCommentsNeutralAuthor: 'उपयोगकर्ता',
-  paneCommentsNewUnavailable:
-    'इस प्रस्तुति में अभी नई टिप्पणी नहीं जोड़ी जा सकती। आप नीचे की टिप्पणियाँ पढ़, उनका जवाब दे और उन्हें हल कर सकते हैं।',
+  paneCommentsSaveFirst:
+    'टिप्पणी जोड़ने के लिए पहले प्रेज़ेंटेशन सहेजें। नीचे की टिप्पणियाँ आप अब भी पढ़ सकते हैं, उनका उत्तर दे सकते हैं और उन्हें हल कर सकते हैं।',
 
   paneCsdTitle: 'कस्टम शो',
   paneCsdDefaultName: 'कस्टम शो {n}',

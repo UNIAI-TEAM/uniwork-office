@@ -63,8 +63,8 @@ export const es = {
   paneCommentsPlaceholder: 'Nuevo comentario… (⌘/Ctrl+Entrar para publicar)',
   paneCommentsPost: 'Publicar',
   paneCommentsNeutralAuthor: 'Usuario',
-  paneCommentsNewUnavailable:
-    'Todavía no se pueden añadir comentarios nuevos a esta presentación. Puedes seguir leyendo, respondiendo y resolviendo los comentarios de abajo.',
+  paneCommentsSaveFirst:
+    'Guarda primero la presentación para añadir un comentario. Aún puedes leer, responder y resolver los comentarios de abajo.',
 
   paneCsdTitle: 'Presentaciones personalizadas',
   paneCsdDefaultName: 'Presentación personalizada {n}',

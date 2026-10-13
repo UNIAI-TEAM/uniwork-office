@@ -63,8 +63,8 @@ export const fr = {
   paneCommentsPlaceholder: 'Nouveau commentaire… (⌘/Ctrl+Entrée pour publier)',
   paneCommentsPost: 'Publier',
   paneCommentsNeutralAuthor: 'Utilisateur',
-  paneCommentsNewUnavailable:
-    'L’ajout d’un nouveau commentaire n’est pas encore disponible pour cette présentation. Vous pouvez toujours lire, répondre et résoudre les commentaires ci-dessous.',
+  paneCommentsSaveFirst:
+    'Enregistrez d’abord la présentation pour ajouter un commentaire. Vous pouvez toujours lire, répondre et résoudre les commentaires ci-dessous.',
 
   paneCsdTitle: 'Diaporamas personnalisés',
   paneCsdDefaultName: 'Diaporama personnalisé {n}',

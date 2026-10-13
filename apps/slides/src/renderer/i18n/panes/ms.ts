@@ -63,8 +63,8 @@ export const ms = {
   paneCommentsPlaceholder: 'Komen baharu… (⌘/Ctrl+Enter untuk menyiarkan)',
   paneCommentsPost: 'Siarkan',
   paneCommentsNeutralAuthor: 'Pengguna',
-  paneCommentsNewUnavailable:
-    'Komen baharu belum boleh ditambah pada persembahan ini. Anda masih boleh membaca, membalas dan menyelesaikan komen di bawah.',
+  paneCommentsSaveFirst:
+    'Simpan pembentangan dahulu untuk menambah komen. Anda masih boleh membaca, membalas dan menyelesaikan komen di bawah.',
 
   paneCsdTitle: 'Persembahan Tersuai',
   paneCsdDefaultName: 'Persembahan Tersuai {n}',

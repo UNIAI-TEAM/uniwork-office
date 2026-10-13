@@ -112,7 +112,6 @@ import {
   selectedObjectId,
   wantsServerComments,
   type SlidesCommentsContext,
-  type SlidesCommentsContextApi,
 } from './server-comments'
 import { AnimationPane } from './components/AnimationPane'
 import { AnimPreviewOverlay } from './components/AnimatedSlide'
@@ -525,16 +524,17 @@ export function App() {
   const [commentsContext, setCommentsContext] = useState<SlidesCommentsContext | null>(null)
   const commentsBridgeApi = useMemo(() => commentsBridge(), [])
   useEffect(() => {
-    if (!path || !wantsServerComments(path, uniwork.bound, commentsBridgeApi)) {
-      setCommentsContext(null)
+    // a context never applies to another document: drop it first, then ask the shell again
+    setCommentsContext(null)
+    if (
+      !path ||
+      !commentsBridgeApi ||
+      !wantsServerComments(path, uniwork.bound, commentsBridgeApi)
+    ) {
       return
     }
     let live = true
-    void loadCommentsContext(
-      window.slidesApi as unknown as SlidesCommentsContextApi,
-      path,
-      uniwork.readOnly,
-    ).then((ctx) => {
+    void loadCommentsContext(commentsBridgeApi, path, uniwork.readOnly).then((ctx) => {
       if (live) setCommentsContext(ctx)
     })
     return () => {
@@ -3378,7 +3378,6 @@ export function App() {
           bridge={commentsBridgeApi}
           path={path}
           context={commentsContext}
-          contextApi={window.slidesApi as unknown as SlidesCommentsContextApi}
           slides={slides}
           slot={showComments ? serverCommentsSlot : null}
           goTo={goToCommentAnchor}
@@ -3388,6 +3387,7 @@ export function App() {
           fileCommentsNonce={annotationsNonce}
           handleRef={serverCommentsHandle}
           onOpenCount={setServerOpenCount}
+          onStatus={setStatus}
         />
       )}
       <Ribbon

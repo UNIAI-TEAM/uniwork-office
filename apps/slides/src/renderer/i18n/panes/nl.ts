@@ -63,8 +63,8 @@ export const nl = {
   paneCommentsPlaceholder: 'Nieuwe opmerking… (⌘/Ctrl+Enter om te plaatsen)',
   paneCommentsPost: 'Plaatsen',
   paneCommentsNeutralAuthor: 'Gebruiker',
-  paneCommentsNewUnavailable:
-    'Een nieuwe opmerking toevoegen is nog niet beschikbaar voor deze presentatie. Je kunt de opmerkingen hieronder nog steeds lezen, beantwoorden en oplossen.',
+  paneCommentsSaveFirst:
+    'Sla de presentatie eerst op om een opmerking toe te voegen. Je kunt de opmerkingen hieronder nog steeds lezen, beantwoorden en afhandelen.',
 
   paneCsdTitle: 'Aangepaste voorstellingen',
   paneCsdDefaultName: 'Aangepaste voorstelling {n}',

@@ -63,8 +63,8 @@ export const pl = {
   paneCommentsPlaceholder: 'Nowy komentarz… (⌘/Ctrl+Enter, aby opublikować)',
   paneCommentsPost: 'Opublikuj',
   paneCommentsNeutralAuthor: 'Użytkownik',
-  paneCommentsNewUnavailable:
-    'Dodawanie nowego komentarza nie jest jeszcze dostępne dla tej prezentacji. Nadal możesz czytać komentarze poniżej, odpowiadać na nie i je rozwiązywać.',
+  paneCommentsSaveFirst:
+    'Najpierw zapisz prezentację, aby dodać komentarz. Komentarze poniżej nadal możesz czytać, odpowiadać na nie i rozwiązywać je.',
 
   paneCsdTitle: 'Pokazy niestandardowe',
   paneCsdDefaultName: 'Pokaz niestandardowy {n}',

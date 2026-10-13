@@ -6,8 +6,9 @@
  *   slide's stable identity, so a reorder moves the thread with its slide and a deleted slide makes it
  *   `lost` (the discussion stays);
  * - the `CollabAnchorAdapter` (order by the slide's current position, locate, go to);
- * - the anchor map sent with `comments.anchors` after a save receipt;
- * - the `CollabSource` over `window.uniworkComments` (the preload bridge, envelope unwrapped here).
+ * - the anchor map sent with `comments.anchors` after a save receipt (chunks of 500, merged);
+ * - the `CollabSource` over `window.uniworkComments` (the preload bridge, envelope unwrapped here);
+ * - the document context: `window.uniworkComments.context({path})` (G8-12 seam, see ./comments-seam).
  *
  * The file's own comments (p:cm) are never touched by this path: server comments are not written into
  * the pptx, so Save leaves the original comment parts byte-identical.
@@ -25,6 +26,7 @@ import {
   type CommentsReply,
   type UniworkCommentsApi,
 } from '@genoffice/electron-utils/comments-ipc'
+import type { UniworkCommentsSeamApi } from './comments-seam'
 
 /** the slide fields the adapter reads (a `RenderSlide` carries them) */
 export interface SlideIdentity {
@@ -167,10 +169,15 @@ export function anchorUpdatesAfterSave(
 
 /* ---- the host side: bridge, document context ---- */
 
-/** the typed accessor: null when this build's preload has no bridge (local file behaviour then) */
-export function commentsBridge(): UniworkCommentsApi | null {
-  const w = window as unknown as Record<string, UniworkCommentsApi | undefined>
-  return w[COMMENTS_BRIDGE_KEY] ?? null
+/**
+ * The typed accessor: null when this build's preload has no bridge, or a shell that does not serve
+ * the G8-12 context / saved calls (local file behaviour then).
+ */
+export function commentsBridge(): UniworkCommentsSeamApi | null {
+  const w = window as unknown as Record<string, Partial<UniworkCommentsSeamApi> | undefined>
+  const api = w[COMMENTS_BRIDGE_KEY]
+  if (!api || typeof api.context !== 'function' || typeof api.onSaved !== 'function') return null
+  return api as UniworkCommentsSeamApi
 }
 
 /**
@@ -186,54 +193,49 @@ export function wantsServerComments(
 }
 
 /**
- * What the editor needs to know about a bound document. The fields beyond `documentId` come from the
- * shell: `versionId` is the version the editor has open (or just saved) and is required to start a
- * new anchored thread (`base_version_id`); `userId` lets the panel recognise "mine"; `level` is the
- * caller's document level.
+ * What the editor knows about a bound document (field names as the seam's `CommentsContextResult`).
+ * `versionId` is the version the editor has open (or just saved); null = unknown, so no new
+ * anchored thread can start (`base_version_id`). `myUserId` lets the panel recognise "mine";
+ * `level` undefined = the own-comments-only rule.
  */
 export interface SlidesCommentsContext {
   documentId: string
-  versionId?: string
-  userId?: string
+  versionId: string | null
   level?: CollabLevel
+  myUserId?: string
+}
+
+function isId(v: unknown): v is string {
+  return typeof v === 'string' && v.length > 0 && v.length <= 128
 }
 
 /**
- * The optional preload surface the shell provides for this (contract; absent in builds whose main
- * process does not serve it yet). `onUniworkSaved` fires after the commit receipt of a Save.
- */
-export interface SlidesCommentsContextApi {
-  uniworkCommentsContext?(): Promise<SlidesCommentsContext | null>
-  onUniworkSaved?(handler: (receipt: { versionId: string }) => void): () => void
-}
-
-/**
- * The context for a bound `path`. Without the shell's context call the editor falls back to what
- * it does know: the path as the key, `view` for a read-only copy, `edit` otherwise, no version and
- * no user id (new threads and own-comment edits stay unavailable, everything else works).
+ * The context of the bound `path`, or null when the shell gives none (an error envelope such as an
+ * unbound copy's `not_found`, a failed call, a malformed answer): no server context, local pane.
+ * A read-only copy never writes, whatever the context says.
  */
 export async function loadCommentsContext(
-  api: SlidesCommentsContextApi | undefined,
+  bridge: Pick<UniworkCommentsSeamApi, 'context'>,
   path: string,
   readOnly: boolean,
-): Promise<SlidesCommentsContext> {
-  const fallback: SlidesCommentsContext = {
-    documentId: path,
-    level: readOnly ? 'view' : 'edit',
+): Promise<SlidesCommentsContext | null> {
+  let value: unknown
+  try {
+    value = unwrapCommentsReply(await bridge.context({ path }))
+  } catch {
+    return null
   }
-  const ctx = await Promise.resolve(api?.uniworkCommentsContext?.()).then(
-    (c) => c ?? null,
-    () => null,
-  )
-  if (!ctx || typeof ctx.documentId !== 'string' || ctx.documentId === '') return fallback
+  if (!value || typeof value !== 'object') return null
+  const v = value as Record<string, unknown>
+  if (!isId(v.documentId)) return null
+  if (v.versionId !== null && !isId(v.versionId)) return null
+  const level =
+    v.level === 'view' || v.level === 'edit' || v.level === 'manage' ? v.level : undefined
   return {
-    documentId: ctx.documentId,
-    ...(typeof ctx.versionId === 'string' && ctx.versionId !== ''
-      ? { versionId: ctx.versionId }
-      : {}),
-    ...(typeof ctx.userId === 'string' && ctx.userId !== '' ? { userId: ctx.userId } : {}),
-    // a read-only copy never writes, whatever the context says
-    level: readOnly ? 'view' : (ctx.level ?? 'edit'),
+    documentId: v.documentId,
+    versionId: v.versionId,
+    ...(readOnly ? { level: 'view' as const } : level ? { level } : {}),
+    ...(isId(v.myUserId) ? { myUserId: v.myUserId } : {}),
   }
 }
 
@@ -281,10 +283,32 @@ export function createSlidesCommentSource(bridge: UniworkCommentsApi, path: stri
   }
 }
 
+/** protocol `COMMENTS_MAX_ANCHORS`: the most anchors one `comments.anchors` call may carry */
+const MAX_ANCHORS = 500
+
+/** what one post-Save anchor round did (the kit's `AnchorSyncOutcome` shape) */
+export type AnchorSyncOutcome =
+  | {
+      outcome: 'synced'
+      updated: string[]
+      skipped: Array<{ comment_id: string; reason: 'older_version' | 'not_applicable' }>
+      list_token: string
+    }
+  /** the server does not know the version (400 `anchor_version_invalid`): the anchors stay shown as stale; send again after the next Save */
+  | { outcome: 'retry_next_save' }
+
+function isVersionInvalid(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false
+  const e = error as { code?: unknown; details?: { code?: unknown } | null }
+  return e.code === 'anchor_version_invalid' || e.details?.code === 'anchor_version_invalid'
+}
+
 /**
- * Sends the post-save anchor round (contract §2.6): only after the save receipt, with the receipt's
- * version. Returns true when the server changed rows (the caller then reloads the full list).
- * An empty round sends nothing.
+ * Sends the post-save anchor round (contract §2.6, same behaviour as the kit's `sendAnchorMap`):
+ * only after the save receipt, with the receipt's version, in chunks of 500 sent one after the
+ * other, answers merged (`list_token` = the last one). `anchor_version_invalid` resolves to
+ * `retry_next_save` and never throws; any other failure rejects. The caller reloads the full list
+ * when the round `synced` with `updated.length > 0`. An empty round sends nothing.
  */
 export async function sendAnchorsAfterSave(
   bridge: UniworkCommentsApi,
@@ -292,20 +316,28 @@ export async function sendAnchorsAfterSave(
   versionId: string,
   comments: readonly CollabComment[],
   slides: readonly SlideIdentity[],
-): Promise<boolean> {
+): Promise<AnchorSyncOutcome> {
+  const synced: AnchorSyncOutcome = { outcome: 'synced', updated: [], skipped: [], list_token: '' }
   const anchors = anchorUpdatesAfterSave(comments, slides)
-  if (anchors.length === 0) return false
-  // the IPC caps one round at 500 anchors; send in slices so a large deck keeps every thread
-  let changed = false
-  for (let i = 0; i < anchors.length; i += 500) {
-    const res = unwrapCommentsReply(
-      await bridge.anchors({
-        path,
-        versionId,
-        anchors: anchors.slice(i, i + 500).map((a) => ({ ...a, anchor: { ...a.anchor } })),
-      }),
-    )
-    if (res.updated.length > 0) changed = true
+  for (let i = 0; i < anchors.length; i += MAX_ANCHORS) {
+    let res
+    try {
+      res = unwrapCommentsReply(
+        await bridge.anchors({
+          path,
+          versionId,
+          anchors: anchors
+            .slice(i, i + MAX_ANCHORS)
+            .map((a) => ({ ...a, anchor: { ...a.anchor } })),
+        }),
+      )
+    } catch (error) {
+      if (isVersionInvalid(error)) return { outcome: 'retry_next_save' }
+      throw error
+    }
+    synced.updated.push(...res.updated)
+    synced.skipped.push(...res.skipped)
+    synced.list_token = res.list_token
   }
-  return changed
+  return synced
 }

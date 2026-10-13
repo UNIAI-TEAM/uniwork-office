@@ -61,8 +61,7 @@ export const zh = {
   paneCommentsPlaceholder: '新建批注…（⌘/Ctrl+Enter 发布）',
   paneCommentsPost: '发布',
   paneCommentsNeutralAuthor: '用户',
-  paneCommentsNewUnavailable:
-    '暂时无法为此演示文稿添加新批注。你仍可以阅读、回复和解决下面的批注。',
+  paneCommentsSaveFirst: '请先保存演示文稿，再添加批注。你仍可以阅读、回复和解决下面的批注。',
 
   paneCsdTitle: '自定义放映',
   paneCsdDefaultName: '自定义放映 {n}',

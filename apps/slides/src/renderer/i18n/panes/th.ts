@@ -63,8 +63,8 @@ export const th = {
   paneCommentsPlaceholder: 'ข้อคิดเห็นใหม่… (⌘/Ctrl+Enter เพื่อโพสต์)',
   paneCommentsPost: 'โพสต์',
   paneCommentsNeutralAuthor: 'ผู้ใช้',
-  paneCommentsNewUnavailable:
-    'ยังเพิ่มความคิดเห็นใหม่ในงานนำเสนอนี้ไม่ได้ คุณยังอ่าน ตอบกลับ และแก้ไขความคิดเห็นด้านล่างได้',
+  paneCommentsSaveFirst:
+    'บันทึกงานนำเสนอก่อนจึงจะเพิ่มความคิดเห็นได้ คุณยังอ่าน ตอบกลับ และแก้ไขความคิดเห็นด้านล่างได้',
 
   paneCsdTitle: 'การนำเสนอแบบกำหนดเอง',
   paneCsdDefaultName: 'การนำเสนอแบบกำหนดเอง {n}',

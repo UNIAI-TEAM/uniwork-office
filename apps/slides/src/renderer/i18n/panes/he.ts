@@ -62,8 +62,8 @@ export const he = {
   paneCommentsPlaceholder: 'הערה חדשה… (⌘/Ctrl+Enter לפרסום)',
   paneCommentsPost: 'פרסם',
   paneCommentsNeutralAuthor: 'משתמש',
-  paneCommentsNewUnavailable:
-    'עדיין אי אפשר להוסיף הערה חדשה למצגת הזו. עדיין אפשר לקרוא את ההערות שלמטה, להשיב להן ולסמן אותן כפתורות.',
+  paneCommentsSaveFirst:
+    'שמרו קודם את המצגת כדי להוסיף הערה. עדיין אפשר לקרוא את ההערות שלמטה, להגיב להן ולסגור אותן.',
 
   paneCsdTitle: 'הצגות מותאמות אישית',
   paneCsdDefaultName: 'הצגה מותאמת אישית {n}',

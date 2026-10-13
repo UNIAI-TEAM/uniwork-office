@@ -63,8 +63,8 @@ export const en = {
   paneCommentsPlaceholder: 'New comment… (⌘/Ctrl+Enter to post)',
   paneCommentsPost: 'Post',
   paneCommentsNeutralAuthor: 'User',
-  paneCommentsNewUnavailable:
-    'Adding a new comment isn’t available for this presentation yet. You can still read, reply to and resolve the comments below.',
+  paneCommentsSaveFirst:
+    'Save the presentation first to add a comment. You can still read, reply to and resolve the comments below.',
 
   paneCsdTitle: 'Custom Shows',
   paneCsdDefaultName: 'Custom Show {n}',
