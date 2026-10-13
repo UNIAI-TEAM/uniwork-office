@@ -24,6 +24,7 @@ import { ORIGIN, flush as flushWindows, wirePair } from '../../../docs/protocol/
 import { FRAME_COMMENTS, frameCommentsClaim } from './claim'
 import { createFrameDiscussionSource } from './source'
 import { mountFrameDiscussion, type DiscussionPort } from './mount'
+import { announceFrameSidePanel } from '../comments/side-panel'
 
 // React's act() needs this flag in a plain jsdom test
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -605,5 +606,68 @@ describe('toggle look matches the shell pill (visual F5)', () => {
     // --accent on --accent-soft is 4.18:1 in markdown dark; --text on it is >= 8.4 in every app and theme
     expect(open).toMatch(/color:\s*var\(--text\)/)
     expect(css).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgba?\(/)
+  })
+})
+
+// ---------------------------------------------------------------- W12G focusfix (V12-2-1)
+
+describe("the editor's panel opening closes Discussion without moving focus", () => {
+  it('Discussion closed: editor open:true leaves the focus alone and announces nothing', async () => {
+    const p = discussionPort()
+    await mount(p)
+    const field = document.createElement('textarea')
+    document.body.append(field)
+    field.focus()
+    const seen: Array<{ owner: string; open: boolean }> = []
+    const listener = (e: Event) => seen.push((e as CustomEvent).detail)
+    window.addEventListener('uniwork:frame-side-panel', listener)
+    await act(async () => announceFrameSidePanel('editor', true))
+    await flush()
+    window.removeEventListener('uniwork:frame-side-panel', listener)
+    expect(document.activeElement).toBe(field)
+    expect(toggle()!.getAttribute('aria-expanded')).toBe('false')
+    // only the editor's own announcement went by: Discussion said nothing
+    expect(seen).toEqual([{ owner: 'editor', open: true }])
+  })
+
+  it('Discussion open: editor open:true closes it and does not take the focus', async () => {
+    const p = discussionPort()
+    await mount(p)
+    await act(async () => toggle()!.click())
+    await flush()
+    expect(panel()).not.toBeNull()
+    const field = document.createElement('textarea')
+    document.body.append(field)
+    field.focus()
+    await act(async () => announceFrameSidePanel('editor', true))
+    await flush()
+    expect(panel()).toBeNull()
+    expect(toggle()!.getAttribute('aria-expanded')).toBe('false')
+    expect(document.activeElement).toBe(field)
+    expect(document.activeElement).not.toBe(toggle())
+  })
+
+  it('the close button still returns focus to the toggle', async () => {
+    const p = discussionPort()
+    await mount(p)
+    await act(async () => toggle()!.click())
+    await flush()
+    const close = panel()!.querySelector<HTMLButtonElement>('.collab-close')
+    expect(close).not.toBeNull()
+    await act(async () => close!.click())
+    await flush()
+    expect(panel()).toBeNull()
+    expect(document.activeElement).toBe(toggle())
+  })
+
+  it('the toggle itself closes the open panel and keeps the focus on the toggle', async () => {
+    const p = discussionPort()
+    await mount(p)
+    await act(async () => toggle()!.click())
+    await flush()
+    await act(async () => toggle()!.click())
+    await flush()
+    expect(panel()).toBeNull()
+    expect(document.activeElement).toBe(toggle())
   })
 })
