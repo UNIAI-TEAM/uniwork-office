@@ -33,7 +33,7 @@ import { createStoreLayer, type StoreLayer } from '../uniwork-sync/store'
 import { createFeedClient, type FeedClient } from '../uniwork-sync/feed/client'
 import { createCapabilityFetch } from '../uniwork-sync/capability/client'
 import { CapabilityCache, NEVER_READ_CAPABILITIES } from '../uniwork-sync/capability/cache'
-import { createUniworkDocsClient, type UniworkDocsClient } from './client'
+import { createUniworkDocsClient, type FetchLike, type UniworkDocsClient } from './client'
 import {
   UniworkDocsService,
   type ConflictUi,
@@ -272,20 +272,37 @@ function syncStoreFor(): { layer: StoreLayer; access: SyncStoreAccess } {
 }
 
 /**
+ * Test seams of the feed runtime: the HTTP round trip of the capability and
+ * feed clients, and the clock their caches read. Production leaves both out.
+ */
+export interface SyncRuntimeSeam {
+  fetch?: FetchLike
+  now?(): number
+}
+
+/**
  * The change-feed runtime of the shell: one FeedConsumer per (org, workspace)
  * of the signed-in account, over the shared durable store, started on sign-in
  * and re-run on a 60 s poll. There is no desktop realtime channel today, so
  * this poll (plus a pass per sign-in) is the whole mechanism. Clients are
- * rebuilt when the deployment origin changes; capabilities are cached per org.
+ * rebuilt when the deployment origin changes; capabilities are cached per org
+ * FOR ONE ACCOUNT - a same-origin account switch clears the cache, so the
+ * outgoing account's org flags are never served to the incoming one.
  * A capability or feed 401 asks the account to re-evaluate its session.
  */
-function createSyncRuntime(service: UniworkDocsService): SyncRuntime {
+export function createSyncRuntime(
+  service: UniworkDocsService,
+  seam: SyncRuntimeSeam = {},
+): SyncRuntime {
   let origin: string | null = null
+  /** the account the capability cache belongs to: '', or `deployment/account` */
+  let account = ''
   let docs: UniworkDocsClient | null = null
   let feed: FeedClient | null = null
+  const clock = { now: () => seam.now?.() ?? Date.now() }
   let capability: CapabilityCache = new CapabilityCache({
     fetch: () => Promise.resolve({ status: 0, body: undefined }),
-    clock: { now: () => Date.now() },
+    clock,
   })
   const clients = (): {
     docs: UniworkDocsClient
@@ -294,19 +311,28 @@ function createSyncRuntime(service: UniworkDocsService): SyncRuntime {
   } | null => {
     const profile = uniworkDeploymentProfile()
     if (!profile) return null
+    const identity = uniworkSessionIdentity()
+    const token = identity ? `${identity.deploymentId}/${identity.accountId}` : ''
     if (origin !== profile.apiOrigin) {
       origin = profile.apiOrigin
+      account = token
       const options = {
         apiOrigin: profile.apiOrigin,
         authorized: <T>(call: (token: string) => Promise<T>) => authorizedRequest(call),
         isSignedIn: () => uniworkSessionIdentity() !== null,
+        ...(seam.fetch ? { fetch: seam.fetch } : {}),
       }
       docs = createUniworkDocsClient(options)
       feed = createFeedClient(options)
       capability = new CapabilityCache({
         fetch: createCapabilityFetch(options),
-        clock: { now: () => Date.now() },
+        clock,
       })
+    } else if (account !== token) {
+      // the boundary is the identity, not the origin: cached per-org flags of
+      // the outgoing account must never answer for the incoming one (R1-be-8)
+      account = token
+      capability.clear()
     }
     return docs && feed ? { docs, feed, capability } : null
   }
