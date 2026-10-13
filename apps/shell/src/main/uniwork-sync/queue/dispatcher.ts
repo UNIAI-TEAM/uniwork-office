@@ -10,7 +10,13 @@ import {
   type QueueEvent,
   type TransitionResult,
 } from './machine'
-import type { IntentRecordV2, QueueState } from './record'
+import {
+  nextIntentGeneration,
+  parseStoredIntent,
+  type IntentRecordV2,
+  type PendingIntentRecord,
+  type QueueState,
+} from './record'
 
 /**
  * The G5-06 durable save queue engine: it turns a stored `IntentRecordV2` into
@@ -53,6 +59,12 @@ export interface QueueClient {
   lookupCommit(input: { documentId: string; idempotencyKey: string }): Promise<CommitLookup>
 }
 
+/** the record exactly as a store holds it: a v1 record stays v1 */
+export interface StoredIntentValue {
+  intent: IntentRecordV2 | PendingIntentRecord
+  payload: Uint8Array
+}
+
 /** what the queue needs to persist one record (the G5-04 intent store, v2 path) */
 export interface QueueIntents {
   read(
@@ -61,6 +73,12 @@ export interface QueueIntents {
   ): Promise<{ intent: IntentRecordV2; payload: Uint8Array } | null>
   put(documentKey: string, intent: IntentRecordV2, payload: Uint8Array): Promise<{ kind: string }>
   delete(documentKey: string): Promise<void>
+  /**
+   * The record exactly as stored (a v1 record stays v1), when the store can
+   * serve it. `mint` reads it to age the snapshot generation over an older
+   * record; a store that cannot answer mints generation 1.
+   */
+  get?(documentKey: string): Promise<StoredIntentValue | null>
 }
 
 /** one queue document: its record, the exact bytes it uploads and its file */
@@ -131,6 +149,9 @@ export interface DispatchResult {
 
 /** the identity of a freshly minted intent; the front fills the binding facts */
 export interface MintedIntent {
+  /** the intent-store key of the document, when known: `mint` ages the
+   *  snapshot generation over the record the store already holds under it */
+  key?: string
   intentId: string
   idempotencyKey: string
   documentId: string
@@ -171,18 +192,16 @@ export class QueueDispatcher {
    */
   async mint(intent: MintedIntent): Promise<IntentRecordV2> {
     const now = this.deps.clock()
-    const context: QueueContext = {
-      now,
-      limits: this.limits,
-      random: this.random,
-      pausedUser: await this.userPaused(),
-    }
+    const context = await this.context(now)
     const verdict = await this.readCapability(intent.orgId)
     if (verdict === 'sync_write_off') context.syncWrite = false
     if (verdict === 'offline') context.online = false
     const result = transition(null, { type: 'save', intent: toNewIntent(intent) }, context)
     if (!result.record) throw new Error('the queue machine refused the save')
-    return result.record
+    // a document whose store still holds a record (superseded/committed/older)
+    // mints one past that record's generation, so its own cleanup can tell a
+    // newer snapshot (N+1 minted meanwhile) apart
+    return { ...result.record, generation: await this.mintedGeneration(intent) }
   }
 
   /**
@@ -207,7 +226,11 @@ export class QueueDispatcher {
     if (verdict === 'sync_write_off') context.syncWrite = false
     if (verdict === 'offline') context.online = false
     const created = transition(null, { type: 'save', intent: toNewIntent(doc.record) }, context)
-    if (created.record) doc.record = created.record
+    if (created.record) {
+      // the caller's record carries the minted generation (a fresh transition
+      // always starts at 1; `mint` ages it over an older stored record)
+      doc.record = { ...created.record, generation: doc.record.generation }
+    }
     const written = await access.intents.put(doc.key, doc.record, doc.payload)
     this.deps.publish(doc.record)
     if (written.kind !== 'ok') return doc.record.state
@@ -418,15 +441,8 @@ export class QueueDispatcher {
 
   /** the record as it is stored now, upgraded to v2 with the binding facts */
   async readState(doc: QueueDoc): Promise<QueueState> {
-    const access = await this.deps.intents()
-    if (access.kind !== 'ok') return doc.record.state
-    const stored = await access.intents.read(doc.key, {
-      orgId: doc.orgId,
-      workspaceId: doc.workspaceId,
-      baseVersion: doc.baseVersion,
-      length: doc.record.length,
-    })
-    return stored?.intent.state ?? doc.record.state
+    const stored = await this.storedRecord(doc)
+    return stored?.state ?? doc.record.state
   }
 
   // ---- internals -----------------------------------------------------------
@@ -591,10 +607,42 @@ export class QueueDispatcher {
     return doc.record.state
   }
 
+  /** the binding facts a stored record is read (and a v1 record upgraded) with */
+  private facts(doc: QueueDoc): { orgId: string; workspaceId: string; baseVersion: number; length: number } {
+    return {
+      orgId: doc.orgId,
+      workspaceId: doc.workspaceId,
+      baseVersion: doc.baseVersion,
+      length: doc.record.length,
+    }
+  }
+
+  /** the record as stored under this document key, or null when there is none */
+  private async storedRecord(doc: QueueDoc): Promise<IntentRecordV2 | null> {
+    const access = await this.deps.intents()
+    if (access.kind !== 'ok') return null
+    const stored = await access.intents.read(doc.key, this.facts(doc))
+    return stored?.intent ?? null
+  }
+
+  /**
+   * The generation a freshly minted intent carries: one past the record the
+   * store still holds under the document key (v2 only - a v1 record's upgrade
+   * stays 1), or 1 over an empty store.
+   */
+  private async mintedGeneration(intent: MintedIntent): Promise<number> {
+    if (!intent.key) return 1
+    const access = await this.deps.intents()
+    if (access.kind !== 'ok' || !access.intents.get) return 1
+    const raw = await access.intents.get(intent.key)
+    return nextIntentGeneration(raw ? parseStoredIntent(raw.intent) : null)
+  }
+
   /**
    * Apply one event: run the machine, persist the record, publish it and
    * perform the machine's effects. A store that refuses the write leaves the
-   * record where it was, so nothing downstream acts on a lost state.
+   * record where it was, so nothing downstream acts on a lost state; a stored
+   * record that is a NEWER intent (N+1 minted meanwhile) is never clobbered.
    */
   private async apply(doc: QueueDoc, event: QueueEvent, now: number): Promise<TransitionResult> {
     const context = await this.context(now)
@@ -610,6 +658,16 @@ export class QueueDispatcher {
       this.deps.publish(doc.record)
       return { record: doc.record, effects: [] }
     }
+    const stored = await access.intents.read(doc.key, this.facts(doc))
+    if (
+      stored &&
+      (stored.intent.intentId !== doc.record.intentId ||
+        stored.intent.generation !== doc.record.generation)
+    ) {
+      // a newer intent owns this document now: this generation writes nothing
+      this.deps.publish(doc.record)
+      return { record: doc.record, effects: [] }
+    }
     const written = await access.intents.put(doc.key, result.record, doc.payload)
     if (written.kind !== 'ok') {
       this.deps.publish(doc.record)
@@ -620,10 +678,26 @@ export class QueueDispatcher {
     return result
   }
 
-  /** the committed snapshot generation: delete exactly it, leave an N+1 dirty */
+  /**
+   * The committed snapshot generation: delete exactly it. The stored record is
+   * compared with the committed one by intentId AND generation first - a newer
+   * record minted while this one committed (N+1) is left untouched for its own
+   * dispatch.
+   */
   private async finishCleanup(doc: QueueDoc): Promise<void> {
     const access = await this.deps.intents()
-    if (access.kind === 'ok') await access.intents.delete(doc.key)
+    if (access.kind !== 'ok') {
+      this.otherWindow.delete(doc.key)
+      return
+    }
+    const stored = await access.intents.read(doc.key, this.facts(doc))
+    if (
+      stored &&
+      stored.intent.intentId === doc.record.intentId &&
+      stored.intent.generation === doc.record.generation
+    ) {
+      await access.intents.delete(doc.key)
+    }
     this.otherWindow.delete(doc.key)
   }
 

@@ -20,6 +20,7 @@ import {
   type QueueClient,
   type QueueDispatcherDeps,
   type QueueDoc,
+  type MintedIntent,
 } from '../src/main/uniwork-sync/queue/dispatcher'
 import { QUEUE_LIMITS } from '../src/main/uniwork-sync/queue/limits'
 import { createDraftStore, DRAFTS_STORE_REGISTRATION } from '../src/main/uniwork-sync/queue/drafts'
@@ -378,6 +379,20 @@ const factsOf = (doc: QueueDoc) => ({
 })
 const stored = (intents: IntentStore, doc: QueueDoc) => intents.read(doc.key, factsOf(doc))
 
+const mintedFor = (doc: QueueDoc, overrides: Partial<MintedIntent> = {}): MintedIntent => ({
+  key: doc.key,
+  intentId: `intent_next_${doc.key}`,
+  idempotencyKey: `key_next_${doc.key}`,
+  documentId: doc.record.documentId,
+  orgId: doc.orgId,
+  workspaceId: doc.workspaceId,
+  baseRevision: doc.record.baseRevision,
+  baseVersion: doc.baseVersion,
+  checksum: doc.record.checksum,
+  length: doc.record.length,
+  ...overrides,
+})
+
 /** the coordinator over a store that refuses the intent write / a locked keychain */
 function refusingCoordinator(
   h: Harness,
@@ -683,6 +698,62 @@ describe('G5-06 W4a save queue (fakes)', () => {
     const after = await stored(lost.intents, doc2)
     expect(after?.intent.lastError).toBeUndefined()
     expect(after?.intent.state).not.toBe('paused_offline')
+  })
+
+  it('mint ages the generation over a stored record; cleanup is compare-then-delete', async () => {
+    const h = await harness()
+    const doc = h.makeDoc()
+    await h.dispatcher.enqueue(doc)
+    // a superseded record is still in the store: the next intent is generation + 1
+    await h.intents.put(
+      doc.key,
+      { ...doc.record, generation: 3, state: 'cancelled', cancelReason: 'superseded' },
+      doc.payload,
+    )
+    const minted = await h.dispatcher.mint(mintedFor(doc))
+    expect(minted.generation).toBe(4)
+    // the hand-off keeps the minted generation through `enqueue`
+    doc.record = minted
+    await h.dispatcher.enqueue(doc)
+    expect((await stored(h.intents, doc))?.intent.generation).toBe(4)
+    // a plain commit cleans up exactly this generation
+    await h.dispatcher.dispatchAll([doc])
+    expect(doc.record.state).toBe('committed')
+    expect(await stored(h.intents, doc)).toBeNull()
+
+    // a newer intent (N+1) minted while N commits is left untouched
+    const race = await harness()
+    const old = race.makeDoc({ key: 'doc_race' })
+    await race.dispatcher.enqueue(old)
+    let entered!: () => void
+    const atCommit = new Promise<void>((resolve) => (entered = resolve))
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const gated: QueueClient = {
+      upload: race.server.client.upload,
+      commit: async (input) => {
+        entered()
+        await gate
+        return race.server.client.commit(input)
+      },
+      lookupCommit: race.server.client.lookupCommit,
+    }
+    const dispatcher = race.newDispatcherWith({ client: gated })
+    const pass = dispatcher.dispatchAll([old])
+    await atCommit
+    const next = await dispatcher.mint(mintedFor(old))
+    expect(next.generation).toBe(2)
+    const newer = { ...old, record: next }
+    await dispatcher.enqueue(newer)
+    expect((await stored(race.intents, old))?.intent.intentId).toBe(next.intentId)
+    release()
+    await pass
+    // N committed with exactly one request, but N+1 survived: it was never this
+    // generation's to clean up
+    expect(race.server.state.counts.commit).toBe(1)
+    const after = await stored(race.intents, old)
+    expect(after?.intent.intentId).toBe(next.intentId)
+    expect(after?.intent.generation).toBe(2)
   })
 
   it('lock holder crash -> the other window acquires after goneMs', async () => {
