@@ -285,18 +285,18 @@ describe('kind is forced to discussion (D2)', () => {
     expect(
       await call(DISCUSSION_CHANNELS.update, { path: PATH, commentId: CMT, body: 'new' }),
     ).toMatchObject({ ok: true })
-    expect(await call(DISCUSSION_CHANNELS.resolve, { path: PATH, commentId: CMT })).toMatchObject(
-      { ok: true },
-    )
+    expect(await call(DISCUSSION_CHANNELS.resolve, { path: PATH, commentId: CMT })).toMatchObject({
+      ok: true,
+    })
     expect(await call(DISCUSSION_CHANNELS.reopen, { path: PATH, commentId: CMT })).toMatchObject({
       ok: true,
     })
-    expect(
-      await call(DISCUSSION_CHANNELS.revisions, { path: PATH, commentId: CMT }),
-    ).toMatchObject({ ok: true })
-    expect(
-      await call(DISCUSSION_CHANNELS.searchMentions, { path: PATH, q: 'an' }),
-    ).toMatchObject({ ok: true })
+    expect(await call(DISCUSSION_CHANNELS.revisions, { path: PATH, commentId: CMT })).toMatchObject(
+      { ok: true },
+    )
+    expect(await call(DISCUSSION_CHANNELS.searchMentions, { path: PATH, q: 'an' })).toMatchObject({
+      ok: true,
+    })
     expect(await call(DISCUSSION_CHANNELS.remove, { path: PATH, commentId: CMT })).toMatchObject({
       ok: true,
     })

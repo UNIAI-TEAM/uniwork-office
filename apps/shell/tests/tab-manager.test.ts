@@ -1304,7 +1304,12 @@ describe('detach / attach (Open in New Window, tear-off, dock)', () => {
 })
 
 describe('the Discussion panel narrows the active editor view (G8-11 D1)', () => {
-  const full = { x: 0, y: TAB_STRIP_HEIGHT, width: WINDOW_WIDTH, height: WINDOW_HEIGHT - TAB_STRIP_HEIGHT }
+  const full = {
+    x: 0,
+    y: TAB_STRIP_HEIGHT,
+    width: WINDOW_WIDTH,
+    height: WINDOW_HEIGHT - TAB_STRIP_HEIGHT,
+  }
 
   it('takes the clamped panel width off the right edge and restores it on close', () => {
     manager.openDocsTab()
@@ -1334,10 +1339,10 @@ describe('the Discussion panel narrows the active editor view (G8-11 D1)', () =>
     shellWindow.getContentBounds = () => ({ x: 0, y: 0, width: 1200, height: WINDOW_HEIGHT })
     manager.layout()
     expect(docsView.setBounds).toHaveBeenLastCalledWith({ ...full, width: 1200 - 300 })
-    // a window too narrow for both leaves the editor alone
+    // a narrow window: the editor keeps its 360 minimum, the panel shrinks
     shellWindow.getContentBounds = () => ({ x: 0, y: 0, width: 500, height: WINDOW_HEIGHT })
     manager.layout()
-    expect(docsView.setBounds).toHaveBeenLastCalledWith({ ...full, width: 500 })
+    expect(docsView.setBounds).toHaveBeenLastCalledWith({ ...full, width: 360 })
   })
 
   it('a full-bleed view (slideshow, HTML fullscreen) ignores the panel', () => {

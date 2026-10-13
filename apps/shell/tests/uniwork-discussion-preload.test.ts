@@ -53,9 +53,7 @@ function push(payload: unknown): void {
 const flush = () => new Promise<void>((resolve) => setTimeout(resolve, 0))
 
 async function api(): Promise<UniworkDiscussionApi> {
-  const { createUniworkDiscussionApi } = await import(
-    '@genoffice/electron-utils/discussion-bridge'
-  )
+  const { createUniworkDiscussionApi } = await import('@genoffice/electron-utils/discussion-bridge')
   return createUniworkDiscussionApi()
 }
 
@@ -69,9 +67,8 @@ beforeEach(() => {
 
 describe('the discussion bridge surface', () => {
   it('installs under window.uniworkDiscussion with the contract §3.1 methods', async () => {
-    const { installUniworkDiscussionBridge } = await import(
-      '@genoffice/electron-utils/discussion-bridge'
-    )
+    const { installUniworkDiscussionBridge } =
+      await import('@genoffice/electron-utils/discussion-bridge')
     installUniworkDiscussionBridge()
     const exposed = bridge.exposed.get('uniworkDiscussion') as Record<string, unknown>
     expect(Object.keys(exposed).sort()).toEqual(
@@ -180,7 +177,9 @@ describe('only the shell preload installs it', () => {
     const read = (rel: string) => readFileSync(resolve(__dirname, rel), 'utf8')
     expect(read('../src/preload/index.ts')).toMatch(/installUniworkDiscussionBridge\(\)/)
     for (const app of ['docs', 'sheets', 'slides', 'pdf', 'markdown', 'html']) {
-      expect(read(`../../${app}/src/preload/index.ts`), app).not.toMatch(/uniworkDiscussion|discussion-bridge/i)
+      expect(read(`../../${app}/src/preload/index.ts`), app).not.toMatch(
+        /uniworkDiscussion|discussion-bridge/i,
+      )
     }
   })
 })

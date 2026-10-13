@@ -374,7 +374,10 @@ describe('the discussion bridge contract (G8-11)', () => {
   })
 
   it('panel input needs a boolean open and a finite width', () => {
-    expect(parseDiscussionPanelInput({ open: true, width: 320 })).toEqual({ open: true, width: 320 })
+    expect(parseDiscussionPanelInput({ open: true, width: 320 })).toEqual({
+      open: true,
+      width: 320,
+    })
     expect(parseDiscussionPanelInput({ open: 1, width: 320 })).toBeNull()
     expect(parseDiscussionPanelInput({ open: true, width: Infinity })).toBeNull()
     expect(parseDiscussionRevealRequest({ path: 'p' })).toEqual({ path: 'p' })
