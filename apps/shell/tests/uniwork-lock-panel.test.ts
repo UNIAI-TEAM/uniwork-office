@@ -73,10 +73,12 @@ describe('lock model', () => {
 let host: HTMLDivElement
 let root: Root
 let pushLock: ((l: UniworkDocLock) => void) | null
+let pushLocksChanged: ((locks: UniworkDocLock[]) => void) | null
 let changeAccount: (() => void) | null
 let initial: UniworkDocLock[]
 let api: {
   onUniworkLock: ReturnType<typeof vi.fn>
+  onUniworkLocksChanged: ReturnType<typeof vi.fn>
   uniworkLocks: ReturnType<typeof vi.fn>
   dismissUniworkLock: ReturnType<typeof vi.fn>
 }
@@ -148,6 +150,7 @@ beforeEach(() => {
   document.body.append(host)
   root = createRoot(host)
   pushLock = null
+  pushLocksChanged = null
   changeAccount = null
   initial = []
   api = {
@@ -155,6 +158,12 @@ beforeEach(() => {
       pushLock = cb
       return () => {
         pushLock = null
+      }
+    }),
+    onUniworkLocksChanged: vi.fn((cb: (locks: UniworkDocLock[]) => void) => {
+      pushLocksChanged = cb
+      return () => {
+        pushLocksChanged = null
       }
     }),
     uniworkLocks: vi.fn(async () => initial),
@@ -712,6 +721,110 @@ describe('S11 lock panel (keystore locked)', () => {
     expect(api.dismissUniworkLock).not.toHaveBeenCalled()
     expect(api.uniworkLocks).toHaveBeenCalledTimes(1)
     expect(region()).toBeNull()
+  })
+
+  it('Retry: the first re-read still returns the lock; the pushed empty list removes the panel and focus lands on Home', async () => {
+    const still = keystoreLock()
+    initial = [still]
+    await mount()
+    expect(api.onUniworkLocksChanged).toHaveBeenCalledTimes(1)
+    await act(async () => actionButton().click())
+    await flush()
+    // main had not finished opening the store when the re-read ran
+    expect(accountRetry).toHaveBeenCalledTimes(1)
+    expect(title()!.textContent).toBe(syncStrings.en.uwLockKeystoreTitle)
+    // the store opened: main pushes the whole (now empty) list
+    await act(async () => pushLocksChanged!([]))
+    await flush()
+    expect(region()).toBeNull()
+    expect(alertText()).toBe('')
+    expect(isInert(homeRegion())).toBe(false)
+    expect(document.activeElement).toBe(host.querySelector('[data-testid="home"]'))
+    expect(api.dismissUniworkLock).not.toHaveBeenCalled()
+  })
+
+  it('a pushed list replaces the list and an in-flight read does not bring the lock back', async () => {
+    initial = [keystoreLock()]
+    await mount()
+    let release!: (locks: UniworkDocLock[]) => void
+    api.uniworkLocks.mockImplementationOnce(() => new Promise((res) => (release = res)))
+    await act(async () => actionButton().click())
+    await flush()
+    // the read began before main cleared the lock, so it answers with the old list
+    await act(async () => pushLocksChanged!([]))
+    release([keystoreLock()])
+    await flush()
+    expect(region()).toBeNull()
+    // and the list is exactly what main pushed
+    await act(async () => pushLocksChanged!([lock('Other.docx')]))
+    expect(title()!.textContent).toBe(uniworkDocumentStrings.en.uwLockNewerStoreTitle)
+  })
+
+  it('a lock the user closed while a read is in flight stays closed in a pushed list', async () => {
+    await mount()
+    await act(async () => pushLock!(lock('A.docx')))
+    await flush()
+    let release!: (locks: UniworkDocLock[]) => void
+    api.uniworkLocks.mockImplementationOnce(() => new Promise((res) => (release = res)))
+    await act(async () => changeAccount!())
+    await clickClose()
+    await act(async () => pushLocksChanged!([lock('A.docx')]))
+    release([lock('A.docx')])
+    await flush()
+    expect(region()).toBeNull()
+  })
+
+  it('Retry is disabled and aria-busy while pending; a double click makes one accountRetry call', async () => {
+    initial = [keystoreLock()]
+    let finish!: (s: unknown) => void
+    accountRetry.mockImplementationOnce(() => new Promise((res) => (finish = res)))
+    await mount()
+    const button = actionButton()
+    expect(button.disabled).toBe(false)
+    expect(button.hasAttribute('aria-busy')).toBe(false)
+    await act(async () => {
+      button.click()
+      button.click()
+    })
+    await flush()
+    expect(accountRetry).toHaveBeenCalledTimes(1)
+    expect(button.disabled).toBe(true)
+    expect(button.getAttribute('aria-busy')).toBe('true')
+    await act(async () => {
+      button.click()
+    })
+    expect(accountRetry).toHaveBeenCalledTimes(1)
+    await act(async () => finish({ loggedIn: true, state: 'keystore-locked' }))
+    await flush()
+    expect(actionButton().disabled).toBe(false)
+    expect(actionButton().hasAttribute('aria-busy')).toBe(false)
+    // idle again: the next click retries again
+    await act(async () => actionButton().click())
+    await flush()
+    expect(accountRetry).toHaveBeenCalledTimes(2)
+  })
+
+  it('Retry is a native button on the tab order: Enter and Space are not swallowed and activate it', async () => {
+    initial = [keystoreLock()]
+    await mount()
+    const button = actionButton()
+    expect(button.tagName).toBe('BUTTON')
+    expect(button.type).toBe('button')
+    expect(button.tabIndex).toBeGreaterThanOrEqual(0)
+    expect(title()!.tabIndex).toBe(-1)
+    button.focus()
+    expect(document.activeElement).toBe(button)
+    for (const key of ['Enter', ' ']) {
+      accountRetry.mockClear()
+      const down = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true })
+      button.dispatchEvent(down)
+      button.dispatchEvent(new KeyboardEvent('keyup', { key, bubbles: true, cancelable: true }))
+      // nothing prevents the browser's own key activation (jsdom has none: it is the click it fires)
+      expect(down.defaultPrevented).toBe(false)
+      await act(async () => button.click())
+      await flush()
+      expect(accountRetry).toHaveBeenCalledTimes(1)
+    }
   })
 
   it('keeps the panel when the keychain is still locked after Retry', async () => {

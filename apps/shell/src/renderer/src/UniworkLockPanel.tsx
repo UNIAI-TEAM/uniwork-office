@@ -12,7 +12,10 @@ import { useI18n } from './locale'
 import { pathKey } from './uniwork-docs-model'
 import { lockCopyOf, mergeLocks, shownLock, withoutLock } from './uniwork-lock-model'
 
-type LockApi = Pick<Window['aiOffice'], 'onUniworkLock' | 'uniworkLocks' | 'dismissUniworkLock'>
+type LockApi = Pick<
+  Window['aiOffice'],
+  'onUniworkLock' | 'onUniworkLocksChanged' | 'uniworkLocks' | 'dismissUniworkLock'
+>
 
 /**
  * Locks main currently shows: the pushed ones, plus the ones read from main. The
@@ -22,6 +25,9 @@ type LockApi = Pick<Window['aiOffice'], 'onUniworkLock' | 'uniworkLocks' | 'dism
  * previous account's locks without sending an event. A lock pushed or dismissed
  * while a read is in flight is not overwritten by it. `onPush` hears every pushed
  * lock: a push counts as the lock newly shown, even when it is already listed.
+ * Main also pushes the whole list when a lock clears on its own (the keychain
+ * unlocked and the store opened): that list REPLACES this one and outranks a read
+ * still in flight, which may have been answered before the lock cleared.
  */
 export function useUniworkLocks(
   api: LockApi,
@@ -29,7 +35,7 @@ export function useUniworkLocks(
 ): {
   locks: UniworkDocLock[]
   dismiss: (path: string) => void
-  /** read the list again (a keystore lock goes away in main when the store opens, without an event) */
+  /** read the list again (a retry that races the store open can still see the lock; main pushes the cleared list) */
   refresh: () => void
 } {
   const [locks, setLocks] = useState<UniworkDocLock[]>([])
@@ -65,6 +71,14 @@ export function useUniworkLocks(
       onPushRef.current?.(lock)
       setLocks((prev) => mergeLocks(prev, [lock]))
     })
+    const offChanged = api.onUniworkLocksChanged?.((next) => {
+      const during = reading.current
+      // a read answered before this list was built is stale now; what the user closed meanwhile stays closed
+      const keep = during ? next.filter((lock) => !during.dismissed.has(pathKey(lock.path))) : next
+      readSeq.current++
+      reading.current = null
+      setLocks(mergeLocks([], keep))
+    })
     const offAccount = window.aiOffice?.wb?.onBucketChanged?.(readLocks)
     readRef.current = readLocks
     readLocks()
@@ -72,6 +86,7 @@ export function useUniworkLocks(
       live = false
       reading.current = null
       offPush()
+      offChanged?.()
       offAccount?.()
     }
   }, [api])
@@ -160,11 +175,14 @@ export function UniworkLockPanel({
   titleRef,
   onDismiss,
   onRetry,
+  retrying = false,
 }: {
   lock: UniworkDocLock
   titleRef: RefObject<HTMLHeadingElement | null>
   onDismiss: (path: string) => void
   onRetry?: () => void
+  /** the retry is in flight: its button waits (a second click would restore the account again) */
+  retrying?: boolean
 }) {
   const { t } = useI18n()
   const copy = lockCopyOf(lock)
@@ -192,6 +210,8 @@ export function UniworkLockPanel({
         <button
           type="button"
           className="btn btn-primary uw-lock-action"
+          disabled={copy.action === 'retry' && retrying}
+          aria-busy={copy.action === 'retry' && retrying ? true : undefined}
           onClick={() => (copy.action === 'retry' ? onRetry?.() : onDismiss(lock.path))}
         >
           {t(copy.actionKey)}
@@ -224,11 +244,22 @@ export function UniworkLockHost({
     activated.current.delete(pathKey(pushed.path)),
   )
   const lock = shownLock(locks)
-  // Retry (keystore locked): the account re-reads the keychain; main drops the panel once the store opens
+  // Retry (keystore locked): the account re-reads the keychain; main pushes the cleared list once the
+  // store opens, which can come after this re-read. One retry at a time: the ref also covers a second click
+  // that lands before the busy state has rendered.
+  const [retrying, setRetrying] = useState(false)
+  const retryRunning = useRef(false)
   const retry = useCallback(() => {
+    if (retryRunning.current) return
+    retryRunning.current = true
+    setRetrying(true)
     void (window.aiOffice.accountRetry?.() ?? Promise.resolve())
       .catch(() => undefined)
-      .finally(refresh)
+      .finally(() => {
+        retryRunning.current = false
+        setRetrying(false)
+        refresh()
+      })
   }, [refresh])
   const shownKey = lock ? pathKey(lock.path) : null
   const titleRef = useRef<HTMLHeadingElement>(null)
@@ -313,6 +344,7 @@ export function UniworkLockHost({
           titleRef={titleRef}
           onDismiss={dismiss}
           onRetry={retry}
+          retrying={retrying}
         />
       )}
     </>
