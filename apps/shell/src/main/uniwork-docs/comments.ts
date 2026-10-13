@@ -296,6 +296,17 @@ export function createUniworkCommentsClient(
             ) {
               throw error
             }
+            // a deadline abort that lands while the body is read is a network
+            // interruption (§9), not a malformed payload: the headers arrived,
+            // the body never did
+            if (
+              controller.signal.aborted ||
+              (typeof error === 'object' &&
+                error !== null &&
+                (error as { name?: string }).name === 'AbortError')
+            ) {
+              throw commentsErrorFromHttp(0)
+            }
             throw new DocsProtocolError({
               code: 'malformed',
               message: 'comments: malformed response',
